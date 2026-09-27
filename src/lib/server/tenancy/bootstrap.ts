@@ -102,7 +102,8 @@ export function createFirstOrg(input: { userId: string; name: string }): Promise
 
 export type AcceptOutcome =
   | { outcome: 'accepted'; orgId: string; role: OrgRole }
-  | { outcome: 'invalid' };
+  | { outcome: 'invalid' }
+  | { outcome: 'wrong_email' };
 
 /**
  * Accettare due volte non crea due membri.
@@ -114,13 +115,13 @@ export type AcceptOutcome =
  */
 export async function acceptInviteWith(
   db: Db,
-  input: { token: string; userId: string; now?: Date }
+  input: { token: string; userId: string; email: string; now?: Date }
 ): Promise<AcceptOutcome> {
   const now = input.now ?? new Date();
 
   const { data: invite, error } = await db
     .from('orgs_invites')
-    .select('id, org_id, role, expires_at, accepted_at')
+    .select('id, org_id, email, role, expires_at, accepted_at')
     .eq('token', hashInviteToken(input.token))
     .maybeSingle();
 
@@ -134,6 +135,9 @@ export async function acceptInviteWith(
   const status = inviteStatus(invite, now);
   if (status === 'expired') {
     return { outcome: 'invalid' };
+  }
+  if (invite.email.toLowerCase() !== input.email.toLowerCase()) {
+    return { outcome: 'wrong_email' };
   }
 
   const { data: existing, error: memberError } = await db
@@ -183,7 +187,7 @@ export async function acceptInviteWith(
   return { outcome: 'accepted', orgId: invite.org_id, role: invite.role as OrgRole };
 }
 
-export function acceptInvite(input: { token: string; userId: string }): Promise<AcceptOutcome> {
+export function acceptInvite(input: { token: string; userId: string; email: string }): Promise<AcceptOutcome> {
   return acceptInviteWith(
     createServiceRoleDb(use('src/lib/server/tenancy/bootstrap.ts — acceptInvite')),
     input

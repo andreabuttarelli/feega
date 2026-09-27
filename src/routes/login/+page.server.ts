@@ -6,8 +6,7 @@ import { emailLocale } from '$lib/server/email-i18n';
 import { sanitizeWebsiteParam } from '$lib/website-param';
 import { appOrigin } from '$lib/server/app-url';
 import { takeOAuthReturn } from '$lib/server/oauth';
-import { ENTRY_DEPS, homePathFor } from '$lib/server/tenancy/entry';
-import { ORG_COOKIE, LAST_PROJECT_COOKIE } from '$lib/server/tenancy/context';
+import { INVITE_ERROR_PARAM, INVITE_PARAM, inviteTokenIn, landingPath } from '$lib/server/tenancy/landing';
 import type { Cookies, RequestEvent } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -22,28 +21,36 @@ function preferSignup(url: URL): boolean {
   return false;
 }
 
-// Già dentro? Diritto alla propria tela, che ora fa da sé il poco che serve prima di aprirla.
+const INVITE_ERRORS = ['invalid', 'wrong_email'] as const;
+type InviteError = (typeof INVITE_ERRORS)[number];
+
+function inviteErrorIn(url: URL): InviteError | null {
+  const code = url.searchParams.get(INVITE_ERROR_PARAM);
+  return INVITE_ERRORS.find((known) => known === code) ?? null;
+}
+
 export const load: PageServerLoad = async ({ url, cookies, locals: { safeGetSession, db } }) => {
   const cliPort = url.searchParams.get('cli_port') ?? '';
   const cliState = url.searchParams.get('cli_state') ?? '';
-  const { session, user } = await safeGetSession();
-  if (session && user) {
-    const oauthReturn = takeOAuthReturn(cookies);
-    if (oauthReturn) throw redirect(303, oauthReturn);
-    if (cliPort) throw redirect(303, `/cli/callback?cli_port=${cliPort}&cli_state=${cliState}`);
-    throw redirect(303, await homeRedirectTarget(cookies, user, await db()));
-  }
-  return { cliPort, cliState, preferSignup: preferSignup(url) };
-};
+  const inviteToken = inviteTokenIn(url.searchParams);
+  const inviteError = inviteErrorIn(url);
+  const page = { cliPort, cliState, inviteToken, inviteError, homeHref: null as string | null, preferSignup: preferSignup(url) };
 
-async function homeRedirectTarget(
-  cookies: Cookies,
-  user: NonNullable<Awaited<ReturnType<RequestEvent['locals']['safeGetSession']>>['user']>,
-  db: Awaited<ReturnType<RequestEvent['locals']['db']>>
-): Promise<string> {
-  if (!db) return '/app';
-  return homePathFor(db, ENTRY_DEPS, user, cookies.get(ORG_COOKIE) ?? null, cookies.get(LAST_PROJECT_COOKIE) ?? null);
-}
+  const { session, user } = await safeGetSession();
+  const client = session && user ? await db() : null;
+  if (!user || !client) {
+    return page;
+  }
+
+  if (inviteError) {
+    return { ...page, homeHref: await landingPath(client, user, cookies, null) };
+  }
+
+  const oauthReturn = takeOAuthReturn(cookies);
+  if (oauthReturn) throw redirect(303, oauthReturn);
+  if (cliPort) throw redirect(303, `/cli/callback?cli_port=${cliPort}&cli_state=${cliState}`);
+  throw redirect(303, await landingPath(client, user, cookies, inviteToken));
+};
 
 // Public origin for absolute email / OAuth links. Prefer the live request host (www vs apex)
 // so Supabase redirect allow-lists match; see appOrigin().
@@ -70,12 +77,10 @@ async function routeAfterAuth(
 
   const { user } = await locals.safeGetSession();
   const db = user ? await locals.db() : null;
-  throw redirect(
-    303,
-    db && user
-      ? await homePathFor(db, ENTRY_DEPS, user, cookies.get(ORG_COOKIE) ?? null, cookies.get(LAST_PROJECT_COOKIE) ?? null)
-      : '/app'
-  );
+  if (!user || !db) {
+    throw redirect(303, '/login');
+  }
+  throw redirect(303, await landingPath(db, user, cookies, inviteTokenIn(data)));
 }
 
 export const actions: Actions = {
@@ -148,7 +153,7 @@ export const actions: Actions = {
       const hashed = link?.properties?.hashed_token;
       if (!error && hashed) {
         const base = appBase(url);
-        const confirmUrl = `${base}/auth/confirm?token_hash=${encodeURIComponent(hashed)}&type=recovery&next=${encodeURIComponent('/auth/reset-password')}`;
+        const confirmUrl = `${base}/auth/confirm?token_hash=${encodeURIComponent(hashed)}&type=recovery&next=${encodeURIComponent(resetPasswordPath(inviteTokenIn(data)))}`;
         await sendEmail({
           to: email,
           subject: passwordResetEmailSubject(locale),
@@ -167,13 +172,18 @@ export const actions: Actions = {
   google: (event) => oauthSignIn(event, 'google')
 };
 
-// L'unica intenzione che deve sopravvivere al giro OAuth: quella del CLI, che aspetta su una
-// porta locale. Tutto il resto atterra su /app, che decide da sé cosa aprire.
-function buildRedirectTo(url: URL, cliPort: string, cliState: string): string {
+function resetPasswordPath(inviteToken: string | null): string {
+  return inviteToken ? `/auth/reset-password?${INVITE_PARAM}=${encodeURIComponent(inviteToken)}` : '/auth/reset-password';
+}
+
+function buildRedirectTo(url: URL, cliPort: string, cliState: string, inviteToken: string | null): string {
   const cb = new URLSearchParams();
   if (cliPort) {
     cb.set('cli_port', cliPort);
     cb.set('cli_state', cliState);
+  }
+  if (inviteToken) {
+    cb.set(INVITE_PARAM, inviteToken);
   }
   return `${appBase(url)}/auth/callback${cb.toString() ? `?${cb}` : ''}`;
 }
@@ -183,7 +193,7 @@ async function oauthSignIn({ request, locals: { supabase }, url }: RequestEvent,
   const data = await request.formData();
   const cliPort = String(data.get('cli_port') ?? '');
   const cliState = String(data.get('cli_state') ?? '');
-  const redirectTo = buildRedirectTo(url, cliPort, cliState);
+  const redirectTo = buildRedirectTo(url, cliPort, cliState, inviteTokenIn(data));
   const { data: oauth, error } = await supabase.auth.signInWithOAuth({ provider, options: { redirectTo } });
 
   if (error || !oauth?.url) return fail(400, { error: error?.message ?? `Could not start ${provider} sign-in` });

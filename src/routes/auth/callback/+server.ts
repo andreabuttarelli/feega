@@ -1,7 +1,6 @@
 import { redirect } from '@sveltejs/kit';
 import { takeOAuthReturn } from '$lib/server/oauth';
-import { ENTRY_DEPS, homePathFor } from '$lib/server/tenancy/entry';
-import { ORG_COOKIE, LAST_PROJECT_COOKIE } from '$lib/server/tenancy/context';
+import { inviteTokenIn, landingPath } from '$lib/server/tenancy/landing';
 import type { RequestHandler } from './$types';
 
 // Scambia il codice del magic link / OAuth per una sessione, poi instrada. Le destinazioni sono
@@ -34,10 +33,8 @@ export const GET: RequestHandler = async ({ url, cookies, locals: { supabase, db
   }
 
   const dbClient = user ? await db() : null;
-  throw redirect(
-    303,
-    dbClient && user
-      ? await homePathFor(dbClient, ENTRY_DEPS, user, cookies.get(ORG_COOKIE) ?? null, cookies.get(LAST_PROJECT_COOKIE) ?? null)
-      : '/app'
-  );
+  if (!user || !dbClient) {
+    throw redirect(303, '/login');
+  }
+  throw redirect(303, await landingPath(dbClient, user, cookies, inviteTokenIn(url.searchParams)));
 };

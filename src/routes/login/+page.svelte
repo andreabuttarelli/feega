@@ -87,6 +87,13 @@
   // CLI login: opened by the feega CLI. Show a consent notice and carry the port/state through.
   const cliPort = $derived(data.cliPort ?? '');
   const cliState = $derived(data.cliState ?? '');
+
+  const INVITE_ERROR_TEXT: Record<string, string> = {
+    invalid: 'This invite link is invalid, expired or already used. Ask for a new one.',
+    wrong_email: 'This invite was sent to a different email. Sign in with the invited address.'
+  };
+  const inviteToken = $derived(data.inviteToken ?? '');
+  const inviteError = $derived(data.inviteError ? INVITE_ERROR_TEXT[data.inviteError] : '');
 </script>
 
 <svelte:head>
@@ -105,6 +112,13 @@
           <span class="cli-icon" aria-hidden="true">⌘</span>
           <span>feega CLI sta richiedendo accesso al tuo account</span>
         </div>
+      {/if}
+
+      {#if inviteError}
+        <p class="err invite-err" role="alert">{inviteError}</p>
+        {#if data.homeHref}<p class="toggle"><a class="textlink" href={data.homeHref}>Continue to your workspace</a></p>{/if}
+      {:else if inviteToken}
+        <p class="sub invite-notice">You've been invited to a workspace. Sign in or create an account with the invited email to join.</p>
       {/if}
 
       {#if form?.reset}
@@ -133,6 +147,7 @@
         <form method="POST" action="?/github" class="form oauth-form" onsubmit={handleOAuthInApp}>
           {#if cliPort}<input type="hidden" name="cli_port" value={cliPort} />{/if}
           {#if cliState}<input type="hidden" name="cli_state" value={cliState} />{/if}
+          {#if inviteToken}<input type="hidden" name="invite_token" value={inviteToken} />{/if}
           {#if startFlow}<input type="hidden" name="next" value="onboarding" />{/if}
           {#if planParam}<input type="hidden" name="plan" value={planParam} />{/if}
           {#if cycleParam}<input type="hidden" name="cycle" value={cycleParam} />{/if}
@@ -165,6 +180,7 @@
         >
           {#if cliPort}<input type="hidden" name="cli_port" value={cliPort} />{/if}
           {#if cliState}<input type="hidden" name="cli_state" value={cliState} />{/if}
+          {#if inviteToken}<input type="hidden" name="invite_token" value={inviteToken} />{/if}
           {#if startFlow}<input type="hidden" name="next" value="onboarding" />{/if}
           {#if planParam}<input type="hidden" name="plan" value={planParam} />{/if}
           {#if cycleParam}<input type="hidden" name="cycle" value={cycleParam} />{/if}

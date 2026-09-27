@@ -10,6 +10,7 @@ const ORG = '11111111-1111-1111-1111-111111111111';
 const USER = '22222222-2222-2222-2222-222222222222';
 const INVITE = '33333333-3333-3333-3333-333333333333';
 const NOW = new Date('2026-09-21T12:00:00Z');
+const INVITED = 'chi@esempio.it';
 
 const orgRow = { id: ORG, name: 'Acme', slug: 'acme' };
 const memberRow = { id: 'm1', org_id: ORG, user_id: USER, role: 'owner', created_at: NOW.toISOString() };
@@ -133,7 +134,7 @@ describe('accettare un invito è idempotente', () => {
   it('un token che non esiste non dice che non esiste: risponde no', async () => {
     const { db } = fakeDb({ orgs_invites: [] });
 
-    expect(await acceptInviteWith(db, { token: 'niente', userId: USER, now: NOW })).toEqual({
+    expect(await acceptInviteWith(db, { token: 'niente', userId: USER, email: INVITED, now: NOW })).toEqual({
       outcome: 'invalid'
     });
   });
@@ -143,13 +144,13 @@ describe('accettare un invito è idempotente', () => {
       orgs_invites: [{ ...inviteRow, expires_at: '2026-09-20T12:00:00Z' }]
     });
 
-    expect(await acceptInviteWith(db, { token: 'x', userId: USER, now: NOW })).toEqual({ outcome: 'invalid' });
+    expect(await acceptInviteWith(db, { token: 'x', userId: USER, email: INVITED, now: NOW })).toEqual({ outcome: 'invalid' });
   });
 
   it('cerca per impronta, mai per token in chiaro', async () => {
     const { db, calls } = fakeDb({ orgs_invites: [inviteRow], orgs_members: [] });
 
-    await acceptInviteWith(db, { token: 'segreto', userId: USER, now: NOW });
+    await acceptInviteWith(db, { token: 'segreto', userId: USER, email: INVITED, now: NOW });
 
     expect(filtersOf(calls, 'select')).toMatchObject({ token: hashInviteToken('segreto') });
   });
@@ -212,7 +213,7 @@ describe('accettare un invito è idempotente', () => {
     const db = inviteDb({ existingFreeOrgIds: ['free-1', 'free-2'], joiningOrgIsPaid: false });
 
     await expect(
-      acceptInviteWith(db as never, { token: 'segreto', userId: USER, now: NOW })
+      acceptInviteWith(db as never, { token: 'segreto', userId: USER, email: INVITED, now: NOW })
     ).rejects.toBeInstanceOf(FreeOrgLimitReachedError);
 
     expect(db.inserted).toEqual([]);
@@ -221,7 +222,7 @@ describe('accettare un invito è idempotente', () => {
   it("un invito verso un'org che ha già pagato non è mai bloccato dal limite", async () => {
     const db = inviteDb({ existingFreeOrgIds: ['free-1', 'free-2'], joiningOrgIsPaid: true });
 
-    const result = await acceptInviteWith(db as never, { token: 'segreto', userId: USER, now: NOW });
+    const result = await acceptInviteWith(db as never, { token: 'segreto', userId: USER, email: INVITED, now: NOW });
 
     expect(result).toEqual({ outcome: 'accepted', orgId: ORG, role: 'member' });
     expect(db.inserted).toHaveLength(1);
@@ -233,7 +234,7 @@ describe('accettare un invito è idempotente', () => {
       orgs_members: [{ ...memberRow, role: 'member' }]
     });
 
-    const result = await acceptInviteWith(db, { token: 'segreto', userId: USER, now: NOW });
+    const result = await acceptInviteWith(db, { token: 'segreto', userId: USER, email: INVITED, now: NOW });
 
     expect(result).toEqual({ outcome: 'accepted', orgId: ORG, role: 'member' });
     expect(opsOn(calls, 'orgs_members')).not.toContain('insert');
@@ -245,7 +246,7 @@ describe('accettare un invito è idempotente', () => {
       orgs_members: []
     });
 
-    expect(await acceptInviteWith(db, { token: 'segreto', userId: USER, now: NOW })).toEqual({
+    expect(await acceptInviteWith(db, { token: 'segreto', userId: USER, email: INVITED, now: NOW })).toEqual({
       outcome: 'invalid'
     });
   });
@@ -253,16 +254,34 @@ describe('accettare un invito è idempotente', () => {
   it('un membro nasce col ruolo scritto sull invito', async () => {
     const { db, calls } = fakeDb({ orgs_invites: [inviteRow], orgs_members: [] });
 
-    await acceptInviteWith(db, { token: 'segreto', userId: USER, now: NOW });
+    await acceptInviteWith(db, { token: 'segreto', userId: USER, email: INVITED, now: NOW });
 
     const insert = calls.find((c) => c.table === 'orgs_members' && c.op === 'insert')!;
     expect(insert.payload).toMatchObject({ org_id: ORG, user_id: USER, role: 'member' });
   });
 
+  it("chi entra con un'altra email non consuma l'invito", async () => {
+    const { db, calls } = fakeDb({ orgs_invites: [inviteRow], orgs_members: [] });
+
+    const result = await acceptInviteWith(db, { token: 'segreto', userId: USER, email: 'altro@esempio.it', now: NOW });
+
+    expect(result).toEqual({ outcome: 'wrong_email' });
+    expect(opsOn(calls, 'orgs_members')).not.toContain('insert');
+    expect(opsOn(calls, 'orgs_invites')).not.toContain('update');
+  });
+
+  it("l'email invitata si confronta senza badare alle maiuscole", async () => {
+    const { db } = fakeDb({ orgs_invites: [inviteRow], orgs_members: [] });
+
+    const result = await acceptInviteWith(db, { token: 'segreto', userId: USER, email: 'Chi@Esempio.IT', now: NOW });
+
+    expect(result).toMatchObject({ outcome: 'accepted', orgId: ORG });
+  });
+
   it('l invito consumato si marca accettato', async () => {
     const { db, calls } = fakeDb({ orgs_invites: [inviteRow], orgs_members: [] });
 
-    await acceptInviteWith(db, { token: 'segreto', userId: USER, now: NOW });
+    await acceptInviteWith(db, { token: 'segreto', userId: USER, email: INVITED, now: NOW });
 
     const update = calls.find((c) => c.table === 'orgs_invites' && c.op === 'update')!;
     expect(update.payload).toMatchObject({ accepted_at: NOW.toISOString() });

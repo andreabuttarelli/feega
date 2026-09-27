@@ -1,6 +1,5 @@
 import { fail, redirect } from '@sveltejs/kit';
-import { ENTRY_DEPS, homePathFor } from '$lib/server/tenancy/entry';
-import { ORG_COOKIE, LAST_PROJECT_COOKIE } from '$lib/server/tenancy/context';
+import { inviteTokenIn, landingPath } from '$lib/server/tenancy/landing';
 import type { Actions, PageServerLoad } from './$types';
 
 const MIN_PASSWORD = 6;
@@ -13,7 +12,7 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession } }) => {
 };
 
 export const actions: Actions = {
-  default: async ({ request, cookies, locals: { supabase, safeGetSession, db } }) => {
+  default: async ({ request, url, cookies, locals: { supabase, safeGetSession, db } }) => {
     const { session, user } = await safeGetSession();
     if (!session || !user) throw redirect(303, '/login?error=link');
 
@@ -28,11 +27,7 @@ export const actions: Actions = {
     if (error) return fail(400, { error: error.message });
 
     const dbClient = await db();
-    throw redirect(
-      303,
-      dbClient
-        ? await homePathFor(dbClient, ENTRY_DEPS, user, cookies.get(ORG_COOKIE) ?? null, cookies.get(LAST_PROJECT_COOKIE) ?? null)
-        : '/app'
-    );
+    if (!dbClient) throw redirect(303, '/login');
+    throw redirect(303, await landingPath(dbClient, user, cookies, inviteTokenIn(url.searchParams)));
   }
 };
