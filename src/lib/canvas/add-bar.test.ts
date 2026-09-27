@@ -78,3 +78,11 @@ describe('la tela che riceve il trascinamento', () => {
     expect(flow).toMatch(/<CanvasAddBar/);
   });
 });
+
+describe('le scorciatoie stanno accanto al nome della tela', () => {
+  it('la barra non le mostra, la barra in alto sì', () => {
+    const top = readFileSync(join(dir, '..', 'components', 'canvas', 'CanvasTopBar.svelte'), 'utf8');
+    expect(bar).not.toMatch(/CANVAS_SHORTCUTS/);
+    expect(top).toMatch(/<ShortcutsMenu/);
+  });
+});

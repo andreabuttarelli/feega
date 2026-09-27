@@ -21,17 +21,14 @@
    * dall'evento sopravvive a un trascinamento annullato — il nodo successivo nascerebbe del tipo
    * sbagliato.
    */
-  import Keyboard from '@lucide/svelte/icons/keyboard';
   import Upload from '@lucide/svelte/icons/upload';
   import LayoutGrid from '@lucide/svelte/icons/layout-grid';
   import { CANVAS_ADD_BAR, CANVAS_BAR_MAIN, CANVAS_BAR_MORE, ADDABLE_LABEL, type Addable } from '$lib/canvas/addable';
   import { ADDABLE_ICON } from '$lib/canvas/addable-icons';
   import { CANVAS_DRAG_MEDIUM } from '$lib/canvas/new-node';
-  import { CANVAS_SHORTCUTS } from '$lib/canvas/shortcuts';
 
   let { onpick, onupload }: { onpick?: (what: Addable) => void; onupload?: (file: File) => void } = $props();
 
-  let showKeys = $state(false);
   let showMore = $state(false);
 
   const slot = (what: Addable) => CANVAS_ADD_BAR.indexOf(what) + 1;
@@ -52,13 +49,6 @@
     if (file) { onupload?.(file); }
     input.value = '';
   }
-
-  const isMac =
-    typeof navigator !== 'undefined' &&
-    /mac|iphone|ipad/i.test(navigator.platform || navigator.userAgent);
-
-  /** 'mod' → ⌘ o Ctrl, secondo la macchina. Le altre etichette passano com'erano. */
-  const keyLabel = (k: string) => (k === 'mod' ? (isMac ? '⌘' : 'Ctrl') : k);
 </script>
 
 <div class="add-bar">
@@ -100,7 +90,7 @@
       title="Altri nodi"
       aria-label="Altri nodi"
       aria-expanded={showMore}
-      onclick={() => { showMore = !showMore; showKeys = false; }}
+      onclick={() => (showMore = !showMore)}
     >
       <LayoutGrid size={17} strokeWidth={1.7} />
     </button>
@@ -125,36 +115,6 @@
         </button>
       {/each}
     </div>
-  {/if}
-
-  <span class="tool">
-    <button
-      type="button"
-      class="keys-toggle"
-      title="Scorciatoie da tastiera"
-      aria-label="Scorciatoie da tastiera"
-      aria-expanded={showKeys}
-      onclick={() => { showKeys = !showKeys; showMore = false; }}
-    >
-      <Keyboard size={17} strokeWidth={1.7} />
-    </button>
-    <span class="add-tip" role="tooltip">Scorciatoie da tastiera</span>
-  </span>
-
-  {#if showKeys}
-    <!-- Generata da `CANVAS_SHORTCUTS`, che è la stessa lista che i tasti usano: una scheda
-         scritta a mano accanto al riconoscimento diverge al primo tasto cambiato, e a divergere
-         è sempre quella che l'utente legge. -->
-    <ul class="keys">
-      {#each CANVAS_SHORTCUTS as row, i (row.id + i)}
-        <li>
-          <span>{row.label}</span>
-          <span class="combo">
-            {#each row.keys as k (k)}<kbd>{keyLabel(k)}</kbd>{/each}
-          </span>
-        </li>
-      {/each}
-    </ul>
   {/if}
 </div>
 
@@ -266,51 +226,5 @@
     padding: 12px 6px;
     font-size: 11.5px;
     text-align: center;
-  }
-
-  .keys {
-    position: absolute;
-    z-index: 13;
-    bottom: calc(100% + 8px);
-    right: 0;
-    width: max-content;
-    min-width: 230px;
-    max-height: 46vh;
-    overflow-y: auto;
-    margin: 0;
-    padding: 6px;
-    list-style: none;
-    border-radius: 0;
-    background: var(--paper, #fff);
-    border: 1px solid var(--line-2, #d2d2d7);
-    box-shadow: 0 6px 20px rgb(0 0 0 / 0.12);
-  }
-  .keys li {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 14px;
-    padding: 5px 8px;
-    font-size: 12.5px;
-    color: var(--ink, #1d1d1f);
-  }
-  .combo {
-    display: inline-flex;
-    gap: 3px;
-    flex-shrink: 0;
-  }
-  kbd {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 18px;
-    height: 18px;
-    padding: 0 4px;
-    border: 1px solid var(--line, #e5e5e5);
-    border-radius: 0;
-    background: var(--paper-2, #f9f9f9);
-    font-family: inherit;
-    font-size: 11px;
-    color: var(--ink-soft, #6e6e73);
   }
 </style>
