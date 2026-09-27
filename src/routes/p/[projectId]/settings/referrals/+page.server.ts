@@ -6,11 +6,9 @@ import {
   REFERRAL_CREDITS_EACH
 } from '$lib/server/referrals';
 import { createAdminClient } from '$lib/server/supabase-admin';
-import { requireBrand } from '$lib/server/projects/brand-shell';
 
 export const load: PageServerLoad = async ({ parent, locals: { safeGetSession } }) => {
-  const { brand: brandOrNull, isOwner } = await parent();
-  const brand = requireBrand(brandOrNull);
+  const { brand, isOwner } = await parent();
   const { user } = await safeGetSession();
   if (!user) {
     return {
@@ -30,7 +28,7 @@ export const load: PageServerLoad = async ({ parent, locals: { safeGetSession } 
     };
   }
 
-  const { code } = await ensureReferralCode(user.id, brand.id);
+  const { code } = await ensureReferralCode(user.id, brand?.id ?? null);
   const shareUrl = referralShareUrl(code);
   const badgeHtml = referralBadgeHtml(code);
 

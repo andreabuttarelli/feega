@@ -4,6 +4,7 @@
   import { goto } from '$app/navigation';
   import { SETTINGS_SECTIONS } from '$lib/components/settings/platforms';
   import PageHead from '$lib/components/PageHead.svelte';
+  import BrandGate from '$lib/components/settings/BrandGate.svelte';
   import { _ } from 'svelte-i18n';
   // Stili condivisi con /app/billing, che monta le stesse primitive fuori da questo layout.
   import '$lib/styles/settings-shell.css';
@@ -28,6 +29,9 @@
     const p = path.replace(/\/$/, '');
     const base = `/p/${data.project.id}/settings`;
     const map: Record<string, SettingsHead> = {
+      [`${base}/project`]: {
+        title: $_('app.settings.project.title')
+      },
       [`${base}/brand`]: {
         title: $_('app.studio.tabs.brand')
       },
@@ -82,7 +86,11 @@
   <div class="content settings-shell" class:brand-kit={isBrandKit}>
     <PageHead title={head.title} subtitle={head.subtitle ?? null} />
     <div class="settings">
-      {@render children()}
+      {#if data.brandGate}
+        <BrandGate projectId={data.project.id} returnTo={path} orgBrands={data.orgBrands} />
+      {:else}
+        {@render children()}
+      {/if}
     </div>
   </div>
 {/if}

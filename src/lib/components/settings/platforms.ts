@@ -39,7 +39,8 @@ export type SettingsSection = {
 };
 
 export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
-  { path: 'brand', labelKey: 'app.studio.tabs.brand', scope: 'brand', requiresBrand: true },
+  { path: 'project', labelKey: 'app.settings.project.title', scope: 'project', requiresBrand: false },
+  { path: 'brand', labelKey: 'app.studio.tabs.brand', scope: 'brand', requiresBrand: false },
   {
     path: 'products',
     labelKey: 'app.hub.overview.brand.products',

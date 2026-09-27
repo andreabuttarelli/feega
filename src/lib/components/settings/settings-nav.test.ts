@@ -4,11 +4,16 @@ import { SETTINGS_GROUPS, SETTINGS_SECTIONS, sectionRequiresBrand } from './plat
 describe('la tabella di nav delle impostazioni', () => {
   it('raggruppa per scope nell\'ordine Progetto, Workspace, Brand, Account', () => {
     const labels = SETTINGS_GROUPS.map((g) => g.labelKey);
-    expect(labels).toEqual(['app.nav.workspace', 'app.nav.sectionBrand', 'app.nav.sectionAccount']);
+    expect(labels).toEqual([
+      'app.nav.sectionProject',
+      'app.nav.workspace',
+      'app.nav.sectionBrand',
+      'app.nav.sectionAccount'
+    ]);
   });
 
-  it('omette Progetto: nessuna sezione ha ancora quello scope', () => {
-    expect(SETTINGS_GROUPS.some((g) => g.labelKey === 'app.nav.sectionProject')).toBe(false);
+  it('il gruppo Progetto contiene la pagina del progetto', () => {
+    expect(SETTINGS_GROUPS[0].items.map((i) => i.section)).toEqual(['project']);
   });
 
   it('mostra gli stessi gruppi con o senza un brand: la nav non dipende dal brand', () => {
@@ -26,13 +31,17 @@ describe('la tabella di nav delle impostazioni', () => {
 });
 
 describe('sectionRequiresBrand', () => {
-  it('richiede un brand per le sezioni brand-scoped', () => {
-    for (const s of SETTINGS_SECTIONS.filter((s) => s.scope === 'brand')) {
+  it('richiede un brand per le sezioni brand-scoped, tranne la pagina brand che lo collega', () => {
+    for (const s of SETTINGS_SECTIONS.filter((s) => s.scope === 'brand' && s.path !== 'brand')) {
       expect(sectionRequiresBrand(`/p/proj-1/settings/${s.path}`), s.path).toBe(true);
     }
   });
 
-  it('non richiede un brand per workspace o account', () => {
+  it('la pagina brand non chiude il cancello: è lei a collegare o creare il brand', () => {
+    expect(sectionRequiresBrand('/p/proj-1/settings/brand')).toBe(false);
+  });
+
+  it('non richiede un brand per progetto, workspace o account', () => {
     for (const s of SETTINGS_SECTIONS.filter((s) => s.scope !== 'brand')) {
       expect(sectionRequiresBrand(`/p/proj-1/settings/${s.path}`), s.path).toBe(false);
     }

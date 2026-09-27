@@ -519,6 +519,9 @@
         "connectBody": "Separate from posting: Meta Ads runs on a Facebook token with the ads scopes, Google Ads needs its own dedicated connection.",
         "connectMeta": "Connect Meta Ads",
         "connectGoogle": "Connect Google Ads"
+      },
+      "project": {
+        "title": "Project"
       }
     },
     "studio": {

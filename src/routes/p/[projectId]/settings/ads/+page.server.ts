@@ -1,14 +1,15 @@
 import type { Actions, PageServerLoad } from './$types';
 import { error, fail } from '@sveltejs/kit';
 import { adsAvailable, adsFeatureEnabled, parseAdsSettings } from '$lib/server/ads';
-import { requireBrand } from '$lib/server/projects/brand-shell';
 import { brandSlugOf } from '$lib/server/tenancy/brand-slug';
 
 export const load: PageServerLoad = async ({ parent, locals: { safeGetSession } }) => {
-  const { brand: brandOrNull } = await parent();
-  const brand = requireBrand(brandOrNull);
+  const { brand } = await parent();
   const { user } = await safeGetSession();
   if (!adsFeatureEnabled(user?.email)) throw error(404, 'Not found');
+  if (!brand) {
+    return { adsEnabled: false, settings: parseAdsSettings(null) };
+  }
   return {
     adsEnabled: adsAvailable(brand.plan, user?.email),
     settings: parseAdsSettings(brand.ads_settings)

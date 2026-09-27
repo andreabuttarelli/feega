@@ -23,6 +23,6 @@
   {/if}
 </section>
 
-{#if data.isOwner}
+{#if data.isOwner && brand}
   <DeleteBrandDialog bind:open={deleteOpen} brand={{ name: brand.name, slug: brand.slug }} action="?/deleteBrand" />
 {/if}
