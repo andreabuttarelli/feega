@@ -10,6 +10,7 @@
    */
   import { enhance } from '$app/forms';
   import { goto } from '$app/navigation';
+  import { page } from '$app/state';
   import { onMount } from 'svelte';
   import PageHead from '$lib/components/PageHead.svelte';
   import PlatformGlyph from '$lib/components/PlatformGlyph.svelte';
@@ -400,6 +401,7 @@
           };
         }}
       >
+        <input type="hidden" name="returnTo" value={page.url.searchParams.get('returnTo') ?? ''} />
         <input type="hidden" name="name" value={draft.name} />
         <input type="hidden" name="website" value={draft.website} />
         <input type="hidden" name="shortDescription" value={draft.shortDescription} />
