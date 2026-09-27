@@ -401,25 +401,6 @@
       "usage": {
         "creditsUsed": "Credits used"
       },
-      "referrals": {
-        "title": "Referrals",
-        "headline": "Gift {credits} credits — get {credits} back",
-        "subtitle": "Share your link. When a founder signs up and creates their first brand, you both get {credits} AI credits.",
-        "yourLink": "Your invite link",
-        "copyLink": "Copy link",
-        "copied": "Copied",
-        "badgeTitle": "Public badge",
-        "badgeDesc": "Paste this on your site. It links to your invite and credits both of you when someone starts with feega.",
-        "copyBadge": "Copy badge HTML",
-        "blogNoteTitle": "On your feega blog",
-        "blogNote": "The Powered by feega badge is already in your public blog footer — with your referral link baked in.",
-        "statCredited": "Successful invites",
-        "statCredits": "Credits earned",
-        "history": "Recent referrals",
-        "statusCredited": "Credited",
-        "statusRejected": "Rejected",
-        "empty": "No referrals yet — share your link to start earning credits."
-      },
       "cancel": {
         "back": "Back"
       },
@@ -544,7 +525,6 @@
         "breakdownTitle": "Usage by brand",
         "brandCol": "Brand",
         "creditsCol": "Credits used",
-        "noBrands": "Create a brand to start.",
         "ladderTitle": "Buy credits",
         "ladderDesc": "Subscription credits renew monthly and expire at period end. One-time credits never expire.",
         "priceCol": "Price",

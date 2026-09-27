@@ -7,12 +7,6 @@ vi.mock('$lib/server/ads', () => ({
   parseAdsSettings: () => ({}),
   syncAdAccounts: async () => 0
 }));
-vi.mock('$lib/server/referrals', () => ({
-  ensureReferralCode: async () => ({ code: 'CODE', brandId: null }),
-  referralShareUrl: () => 'https://feega.test/r/CODE',
-  referralBadgeHtml: () => '<a></a>',
-  REFERRAL_CREDITS_EACH: 10
-}));
 vi.mock('$lib/server/supabase-admin', () => {
   const q = { select: () => q, eq: () => q, order: () => q, limit: async () => ({ data: [] }) };
   return { createAdminClient: () => ({ from: () => q }) };
@@ -22,8 +16,7 @@ const PAGES = {
   'connected-accounts': () => import('./connected-accounts/+page.server'),
   danger: () => import('./danger/+page.server'),
   ads: () => import('./ads/+page.server'),
-  'ads/accounts': () => import('./ads/accounts/+page.server'),
-  referrals: () => import('./referrals/+page.server')
+  'ads/accounts': () => import('./ads/accounts/+page.server')
 };
 
 const event = {

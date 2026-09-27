@@ -88,12 +88,6 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
   },
   { path: 'team', labelKey: 'app.settings.team.title', scope: 'workspace', requiresBrand: false },
   {
-    path: 'referrals',
-    labelKey: 'app.settings.referrals.title',
-    scope: 'workspace',
-    requiresBrand: false
-  },
-  {
     path: 'billing',
     labelKey: 'app.settings.billing.title',
     scope: 'workspace',

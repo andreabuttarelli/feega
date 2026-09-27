@@ -22,6 +22,10 @@ describe('la tabella di nav delle impostazioni', () => {
     expect(withBrand).toEqual(withoutBrand);
   });
 
+  it('non offre i referral: referrals e referral_codes non esistono nello schema', () => {
+    expect(SETTINGS_SECTIONS.map((s) => s.path)).not.toContain('referrals');
+  });
+
   it('non elenca le sotto-rotte come voci separate', () => {
     const sections = SETTINGS_GROUPS.flatMap((g) => g.items.map((i) => i.section));
     expect(sections).not.toContain('facebook');

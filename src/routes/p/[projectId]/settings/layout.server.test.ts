@@ -112,7 +112,7 @@ describe('settings +layout.server load', () => {
 		}
 	);
 
-	it.each(['api-keys', 'team', 'referrals', 'profile', 'appearance', 'project', 'brand'])(
+	it.each(['api-keys', 'team', 'profile', 'appearance', 'project', 'brand'])(
 		'senza brand, la sezione %s resta aperta',
 		async (section) => {
 			const { data } = await loadWithoutBrand(section);

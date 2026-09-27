@@ -9,7 +9,6 @@ import type { Handle } from '@sveltejs/kit';
 import { withBrandContext, withToolContext } from '$lib/server/ai-log';
 import { TOOL_HEADER, TOOL_HEADER_LEGACY, toolFromHeader } from '@feega/api-contracts';
 import { createAdminClient } from '$lib/server/supabase-admin';
-import { captureReferralCookie } from '$lib/server/referrals';
 import { isCsrfForbidden } from '$lib/server/csrf';
 import { catalogModelIds } from '$lib/server/chat-model-catalog';
 import { ENTRY_DEPS, homePathFor } from '$lib/server/tenancy/entry';
@@ -186,12 +185,6 @@ export const handle: Handle = sequence(csrf, Sentry.sentryHandle(), async ({ eve
     if (!event.cookies.get('_fbp')) {
       event.cookies.set('_fbp', `fb.1.${Date.now()}.${Math.floor(Math.random() * 1e10)}`, opts);
     }
-  }
-
-  // Growth referral: `?ref=CODE` → first-party cookie (30d). Captured on marketing/app only —
-  // brand blogs stay clean; their Powered-by badge already links to feega.app/?ref=….
-  if (!isBlogRoute) {
-    captureReferralCookie(event.cookies, event.url.searchParams.get('ref'));
   }
 
   // La radice è l'app, non più un sito di marketing. Il safety net dell'OAuth viene prima:

@@ -281,13 +281,6 @@ async function brandCreditsUsage(
   };
 }
 
-// `credit_grants` does not exist on the new schema (verified against database.types.ts) — the
-// grant-summing that used to run here (sumActiveCreditGrants/sumGrantRows) has no table to read,
-// so `bonus` above is hardcoded to 0 instead of a function that would always throw or always
-// silently return 0. `grantCredits` below is left as dead code, not rewired: its only caller,
-// referrals.ts, is itself built on tables that don't exist on the new schema (referral_codes,
-// referrals) and is a deletion candidate per TYPES_AUDIT.md, not a repoint target.
-
 // ── Enforcement ──────────────────────────────────────────────────────────────────
 
 export class CreditsExhaustedError extends Error {
@@ -320,38 +313,6 @@ import { createAdminClient } from './supabase-admin';
 
 const gateCache = new Map<string, { usage: CreditsUsage; at: number }>();
 const GATE_TTL_MS = 60_000;
-
-/**
- * Insert a credit_grants row (quota boost). Service-role client required —
- * there is no authenticated insert policy on credit_grants.
- */
-export async function grantCredits(
-  supabase: SupabaseClient,
-  opts: {
-    brandId: string;
-    amount: number;
-    note?: string | null;
-    createdBy?: string | null;
-    expiresAt?: string | null;
-  }
-): Promise<void> {
-  const amount = Math.floor(Number(opts.amount));
-  if (!Number.isFinite(amount) || amount <= 0) {
-    throw new Error('grantCredits: amount must be a positive integer');
-  }
-  const { error } = await supabase.from('credit_grants').insert({
-    brand_id: opts.brandId,
-    amount,
-    note: opts.note ?? null,
-    created_by: opts.createdBy ?? null,
-    expires_at: opts.expiresAt ?? null
-  });
-  if (error) throw new Error(`grantCredits failed: ${error.message}`);
-  // Invalidate the hard-gate cache so the gift is visible immediately. The gate keys on the org
-  // now, so the entry to drop is the org's — the gift lands in the pool all its brands share.
-  const org = await resolveOrgBilling(supabase, opts.brandId);
-  gateCache.delete(org?.orgId ?? opts.brandId);
-}
 
 /**
  * The 29 call sites (17 direct + 12 via cli-auth.ts's gateAiAction) all call THIS function,
