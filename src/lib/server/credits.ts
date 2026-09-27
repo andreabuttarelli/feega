@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { FREE_CREDITS, PLANS } from '$lib/plans';
 import { swallow } from '$lib/server/swallow';
-import { billedCreditsFor } from '$lib/server/credit-ladder';
+import { billedCreditsFor } from '$lib/credit-ladder';
 
 // ── AI Credits: consumption tracking per billing period ─────────────────────────
 // Every AI call logs cost_usd in ai_calls (tagged by brand_id via the AsyncLocalStorage

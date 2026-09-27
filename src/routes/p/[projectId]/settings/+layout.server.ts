@@ -1,6 +1,6 @@
 import type { LayoutServerLoad } from './$types';
 import { affordableSeats } from '$lib/server/social-connections';
-import { ACCOUNT_SEAT_USD } from '$lib/server/credit-ladder';
+import { ACCOUNT_SEAT_USD } from '$lib/credit-ladder';
 import { orgCreditBalance } from '$lib/server/credits';
 import { isBrandOwner } from '$lib/server/settings-actions';
 import { orgBillingForBrand } from '$lib/server/org-billing';

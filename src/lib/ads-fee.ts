@@ -1,4 +1,4 @@
-import { billedCreditsFor } from '$lib/server/credit-ladder';
+import { billedCreditsFor } from '$lib/credit-ladder';
 import { formatCredits } from '$lib/components/credit-amount-format';
 
 /** feega management fee on top of platform ad spend (model A: pass-through + markup). */

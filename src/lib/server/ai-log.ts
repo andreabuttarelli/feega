@@ -3,7 +3,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { gatewayRate } from '$lib/server/openrouter-models';
 import { createAdminClient } from '$lib/server/supabase-admin';
 import { GEMINI_FLASH, geminiFlash, isGeminiFlashId, isKieFlashId, kieFlashId, NANO_BANANA_PRO, isNanoBananaProId, geminiVisualCreditShare } from '$lib/server/google-models';
-import { billedCreditsFor } from '$lib/server/credit-ladder';
+import { billedCreditsFor } from '$lib/credit-ladder';
 import type { Database } from '$lib/database.types';
 
 type AiCallInsert = Database['public']['Tables']['ai_calls']['Insert'];

@@ -1,5 +1,5 @@
 import type { Db } from '$lib/server/db/client';
-import { ACCOUNT_SEAT_CREDITS } from '$lib/server/credit-ladder';
+import { ACCOUNT_SEAT_CREDITS } from '$lib/credit-ladder';
 
 /**
  * `credit_ledger.social_account_id` e `source = 'social_seat'` non sono nei tipi generati —

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { billedCreditsFor } from './credit-ladder';
+import { billedCreditsFor } from '../credit-ladder';
 import { sandboxCredits, sandboxUsdPerSecond, withSandboxBilling } from './sandbox-credits';
 
 describe('sandboxCredits', () => {

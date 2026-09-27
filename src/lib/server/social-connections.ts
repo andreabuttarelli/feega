@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { orgCreditBalance } from '$lib/server/credits';
-import { ACCOUNT_SEAT_CREDITS } from '$lib/server/credit-ladder';
+import { ACCOUNT_SEAT_CREDITS } from '$lib/credit-ladder';
 
 /**
  * Lo stato del collegamento social di un brand, letto una volta sola.

@@ -9,8 +9,8 @@ import {
   MARGIN_FLOOR,
   marginForRung
 } from './credit-ladder';
-import { estimateLoopCredits } from './canvas/loop-cost';
-import { IMAGE_CREDITS, videoCredits } from './content-cost';
+import { estimateLoopCredits } from './server/canvas/loop-cost';
+import { IMAGE_CREDITS, videoCredits } from './server/content-cost';
 
 describe('credit ladder never falls below the margin floor', () => {
   for (const rung of CREDIT_LADDER) {
@@ -83,8 +83,8 @@ describe('nessun secondo cambio credito/dollaro fuori da credit-ladder.ts', () =
   const SRC_DIR = fileURLToPath(new URL('../../', import.meta.url));
   const FORBIDDEN = /\bCREDITS_PER_USD\b\s*=/;
   const ALLOWED_FILES = new Set([
-    'server/credit-ladder.ts',
-    'server/credit-ladder.test.ts',
+    'credit-ladder.ts',
+    'credit-ladder.test.ts',
     // Tasso di ACQUISTO (100 crediti = $1 di listino, PLANS[].credits) — un concetto diverso
     // dal cambio di FATTURAZIONE (billedCreditsFor, 200 crediti = $1 di costo provider). Le due
     // costanti coesistono per costruzione (vedi il commento in testa a credit-ladder.ts); qui
