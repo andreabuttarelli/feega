@@ -128,8 +128,7 @@
       "create": "Create account",
       "sendReset": "Send reset link",
       "or": "or",
-      "github": "Continue with GitHub",
-      "google": "Continue with Google"
+      "github": "Continue with GitHub"
     },
     "inapp": {
       "title": "Open in your browser",
