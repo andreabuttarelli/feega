@@ -26,11 +26,11 @@ describe('@font-face di app.css', () => {
     }
   });
 
-  it('tiene Inter come ripiego dei titoli, non un serif di sistema', () => {
+  it('tiene DM Sans come ripiego dei titoli, non un serif di sistema', () => {
     const serif = APP_CSS.match(/^\s*--serif:\s*([^;]+);/m)?.[1].replace(/\s+/g, ' ');
 
     expect(serif).toBeDefined();
-    expect(serif).toContain('"Inter"');
-    expect(serif!.indexOf('"Inter"')).toBeLessThan(serif!.indexOf('sans-serif'));
+    expect(serif).toContain('"DM Sans"');
+    expect(serif!.indexOf('"DM Sans"')).toBeLessThan(serif!.indexOf('sans-serif'));
   });
 });
