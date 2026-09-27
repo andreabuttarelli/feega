@@ -2002,3 +2002,21 @@ calcola SOLO alla lettura (`signAssetPaths`/la rotta `/assets/<id>`, mai in scri
 confine si valida al bordo di scrittura, una volta sola: `validateNodeData` rifiuta oggi
 qualunque `/storage/v1/object/sign/` trovato ovunque nel payload, ricorsivamente — non un
 controllo per campo che la prossima scrittura aggirerebbe.
+
+### Un indice unico PARZIALE non può mai essere il bersaglio di un upsert PostgREST — `42P10` anche quando l'indice esiste
+`upsertNodeProducts`/`insertBrandProducts` chiamavano `.upsert(rows, { onConflict:
+'node_id,platform,external_id' })`, e ogni sync di un nodo `products` tornava 500 con `42P10:
+there is no unique or exclusion constraint matching the ON CONFLICT specification`. L'indice
+ESISTEVA — verificato via SQL diretto (`pg_indexes`), e un `INSERT ... ON CONFLICT (node_id,
+platform, external_id) WHERE node_id IS NOT NULL` via connessione Postgres diretta risolveva
+senza errore. La stessa identica lista di colonne via `supabase-js` (cioè via PostgREST)
+falliva comunque. La causa: PostgREST genera SEMPRE `ON CONFLICT (colonne) DO UPDATE` senza
+`WHERE`, e Postgres fa combaciare un `ON CONFLICT` solo con un indice la cui definizione è
+IDENTICA — un indice parziale non matcha mai quella forma, qualunque sia il nome o le colonne.
+Segnale: `42P10` da `supabase-js`/PostgREST anche dopo aver confermato che l'indice esiste ed è
+scritto giusto via SQL diretto — la discrepanza tra "SQL diretto passa" e "REST fallisce" è la
+prova che il problema è la clausola `WHERE`, non l'indice in sé. Mossa: un indice unico dietro
+un `onConflict` chiamato da `supabase-js`/PostgREST non può MAI essere parziale — se la
+protezione serve solo quando una colonna non è nulla, un indice pieno basta comunque, perché
+Postgres non considera mai due NULL uguali in un indice unico normale: la partialità qui non
+aggiungeva niente che l'indice pieno non desse già.

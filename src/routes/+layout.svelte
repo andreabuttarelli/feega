@@ -4,6 +4,7 @@
   import { navigating } from '$app/state';
   import CookieBanner from '$lib/components/CookieBanner.svelte';
   import AppEntryShimmer from '$lib/components/AppEntryShimmer.svelte';
+  import CanvasEntryShimmer from '$lib/components/CanvasEntryShimmer.svelte';
   import {
     identifyUser,
     loadMetaPixel,
@@ -49,8 +50,7 @@
   }
 
   // Optimistic entry into the app: show the destination shell immediately while loads /
-  // redirect chains (/app → /p/<projectId>) finish. Same-project navigations keep using the
-  // project layout's WorkbenchPageShimmer instead.
+  // redirect chains (/app → /p/<projectId>) finish. Same-project navigations skip it.
   const showAppEntry = $derived.by(() => {
     const to = navigating.to?.url.pathname;
     if (!to) return false;
@@ -65,6 +65,8 @@
     if ((to === '/login' || to.startsWith('/login/')) && data?.session) return true;
     return false;
   });
+
+  const showCanvasEntry = $derived(showAppEntry && (navigating.to?.url.pathname ?? '').startsWith('/p/'));
 
   // Global navigation feedback: without it, any server-load wait reads as "the click did
   // nothing". Shown only when a navigation outlives 150ms so instant navs never flash a bar.
@@ -161,7 +163,9 @@
   <div class="nav-progress" aria-hidden="true"></div>
 {/if}
 
-{#if showAppEntry}
+{#if showCanvasEntry}
+  <CanvasEntryShimmer />
+{:else if showAppEntry}
   <AppEntryShimmer />
 {/if}
 
