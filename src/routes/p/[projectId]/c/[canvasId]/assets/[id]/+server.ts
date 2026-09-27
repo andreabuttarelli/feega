@@ -45,6 +45,10 @@ export const GET: RequestHandler = async ({ params, locals }) => {
     throw error(404, 'asset senza file');
   }
 
+  if (asset.source === 'imported' && /^https?:\/\//.test(path)) {
+    return new Response(null, { status: 302, headers: { Location: path, 'Cache-Control': 'no-store' } });
+  }
+
   // `source` dice il bucket: un upload sta su canvas-assets, un disegno di modello su brand-knowledge.
   // La riga è già provata dell'org tramite `findAsset` con il client dell'utente; la firma passa
   // alla service role perché brand-knowledge è per-utente e l'asset può essere di un collega.

@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * IL WIZARD, UN PASSO ALLA VOLTA — sito → analisi → prodotti → target → concorrenti →
+   * IL WIZARD, UN PASSO ALLA VOLTA — sito → analisi → prodotti → target →
    * handle del brand → overview → approva. `STEPS` è la tabella: l'ordine e le etichette stanno
    * qui, non sparsi in `if`/`else` per ogni bottone avanti/indietro.
    *
@@ -17,19 +17,16 @@
   import { renderBrandContentHtml, tokenizeChips, type ChipToken } from '$lib/canvas/brand-content-chips';
   import { SOCIAL_PLATFORMS } from '$lib/canvas/social-platforms';
   import { ANALYSIS_STEPS, ANALYSIS_STEP_INTERVAL_MS, analysisStepIndexAt } from '$lib/brand-wizard-analysis-steps';
+  import { WIZARD_STEPS as STEPS, restoreWizardState, type WizardStep as Step } from '$lib/brand-wizard-steps';
   import '$lib/styles/doc-prose.css';
 
   let { data, form } = $props();
-
-  const STEPS = ['website', 'analysis', 'products', 'target', 'competitors', 'handles', 'overview'] as const;
-  type Step = (typeof STEPS)[number];
 
   const STEP_LABEL: Record<Step, string> = {
     website: 'Website',
     analysis: 'Analysis',
     products: 'Products',
     target: 'Target',
-    competitors: 'Competitors',
     handles: 'Social handles',
     overview: 'Overview'
   };
@@ -57,7 +54,6 @@
     productsPlatform: string;
     target: string;
     colours: string[];
-    competitorHandles: Handle[];
     brandHandles: Handle[];
     content: string;
     images: string[];
@@ -73,7 +69,6 @@
       productsPlatform: '',
       target: '',
       colours: [],
-      competitorHandles: [],
       brandHandles: [],
       content: '',
       images: []
@@ -111,9 +106,9 @@
     try {
       const saved = sessionStorage.getItem(STORAGE_KEY);
       if (saved) {
-        const parsed = JSON.parse(saved) as { step: Step; draft: Draft };
-        if (STEPS.includes(parsed.step)) step = parsed.step;
-        if (parsed.draft) draft = { ...emptyDraft(), ...parsed.draft };
+        const restored = restoreWizardState(JSON.parse(saved), emptyDraft());
+        step = restored.step;
+        draft = restored.draft;
       }
     } catch {
       // una sessionStorage rotta non deve impedire di aprire il wizard da zero
@@ -224,8 +219,6 @@
     if (draft.colours.length) parts.push(`## Colours\n\n${draft.colours.map((c) => `- ${c}`).join('\n')}`);
     const brandLines = draft.brandHandles.filter((h) => h.handle.trim()).map((h) => `- ${h.platform}:@${h.handle.trim().replace(/^@/, '')}`);
     if (brandLines.length) parts.push(`## Social handles\n\n${brandLines.join('\n')}`);
-    const competitorLines = draft.competitorHandles.filter((h) => h.handle.trim()).map((h) => `- ${h.platform}:@${h.handle.trim().replace(/^@/, '')}`);
-    if (competitorLines.length) parts.push(`## Competitors\n\n${competitorLines.join('\n')}`);
     draft.content = parts.join('\n\n');
   }
 
@@ -403,30 +396,6 @@
         <button class="btn ghost" type="button" onclick={() => (draft.colours = [...draft.colours, '#000000'])}>+ Add colour</button>
       </div>
 
-      <div class="row">
-        <button class="btn ghost" type="button" onclick={back}>Back</button>
-        <button class="btn primary" type="button" onclick={forward}>Continue</button>
-      </div>
-    </section>
-  {/if}
-
-  {#if step === 'competitors'}
-    <section class="wizard-panel">
-      <h2>Competitors' social handles</h2>
-      <p class="hint">Recorded only — connecting accounts to publish happens later, from Settings.</p>
-      {#each draft.competitorHandles as h, i (i)}
-        <div class="handle-row">
-          <select bind:value={h.platform}>
-            {#each SOCIAL_PLATFORMS as p (p)}
-              <option value={p}>{p}</option>
-            {/each}
-          </select>
-          <PlatformGlyph platform={h.platform} />
-          <input type="text" placeholder="handle" bind:value={h.handle} />
-          <button class="btn ghost small" type="button" onclick={() => (draft.competitorHandles = removeHandle(draft.competitorHandles, i))}>Remove</button>
-        </div>
-      {/each}
-      <button class="btn ghost" type="button" onclick={() => (draft.competitorHandles = addHandle(draft.competitorHandles))}>+ Add competitor handle</button>
       <div class="row">
         <button class="btn ghost" type="button" onclick={back}>Back</button>
         <button class="btn primary" type="button" onclick={forward}>Continue</button>

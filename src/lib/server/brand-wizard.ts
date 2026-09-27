@@ -1,8 +1,8 @@
 /**
- * IL WIZARD DI CREAZIONE BRAND — sito → analisi → prodotti → target → concorrenti →
+ * IL WIZARD DI CREAZIONE BRAND — sito → analisi → prodotti → target →
  * handle del brand → overview → approva.
  *
- * `brands.content` (markdown) È DOVE VIVONO TARGET, PALETTE, CONCORRENTI E HANDLE — non colonne
+ * `brands.content` (markdown) È DOVE VIVONO TARGET, PALETTE E HANDLE — non colonne
  * nuove, non tabelle nuove. `composeWizardContent` scrive quel markdown; `brand-content-chips.ts`
  * lo legge indietro (colori e `platform:@handle` diventano chip trascinabili). Le due direzioni
  * usano la STESSA sintassi — `platform:@handle`, `#rrggbb`/`#rgb`/`rgb(...)` — o scriverebbero e
@@ -23,7 +23,6 @@ export type WizardDraft = {
   target: string;
   colours: string[];
   brandHandles: WizardHandle[];
-  competitorHandles: WizardHandle[];
 };
 
 export type WizardProduct = {
@@ -66,11 +65,6 @@ export function composeWizardContent(draft: WizardDraft): string {
     parts.push(`## Social handles\n\n${brandLines.join('\n')}`);
   }
 
-  const competitorLines = handleLines(draft.competitorHandles);
-  if (competitorLines.length) {
-    parts.push(`## Competitors\n\n${competitorLines.join('\n')}`);
-  }
-
   return parts.join('\n\n');
 }
 
@@ -96,8 +90,7 @@ export async function analyzeWizardSite(orgId: string, url: string): Promise<Wiz
   const draft: WizardDraft = {
     target: profile.target_audience ?? '',
     colours: profile.brand_colors ?? [],
-    brandHandles: (profile.social_handles ?? []).map((h) => ({ platform: h.platform, handle: h.handle })),
-    competitorHandles: []
+    brandHandles: (profile.social_handles ?? []).map((h) => ({ platform: h.platform, handle: h.handle }))
   };
 
   const products: WizardProduct[] = (profile.products ?? []).map((p, i) => ({

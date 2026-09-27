@@ -2020,3 +2020,10 @@ un `onConflict` chiamato da `supabase-js`/PostgREST non può MAI essere parziale
 protezione serve solo quando una colonna non è nulla, un indice pieno basta comunque, perché
 Postgres non considera mai due NULL uguali in un indice unico normale: la partialità qui non
 aggiungeva niente che l'indice pieno non desse già.
+
+## Un `upload` con `upsert: true` chiede SELECT e UPDATE, non solo INSERT
+Segnale: `new row violates row-level security policy` su un upload a un percorso per cui la
+policy INSERT c'è ed è giusta. Lo Storage fa `insert ... on conflict do update`, e Postgres
+valuta anche le policy SELECT e UPDATE — anche al primo caricamento, senza conflitto. Mossa: per
+ogni cartella scritta con `upsert: true`, una policy SELECT e una UPDATE (using + with check)
+accanto alla INSERT. La suite non lo vede: il fake dello storage risponde sempre ok.

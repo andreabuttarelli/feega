@@ -100,7 +100,7 @@ export function influencerNodeSize(): { w: number; h: number } {
 export const CANVAS_DRAG_FILLED_NODE = 'application/x-feega-filled-node';
 
 export type FilledNodeDrag = {
-  type: 'image' | 'video' | 'text' | 'doc' | 'influencer' | 'social_account_feed';
+  type: 'image' | 'video' | 'text' | 'doc' | 'influencer' | 'social_account_feed' | 'products' | 'iframe';
   data: Record<string, unknown>;
   w: number;
   h: number;
@@ -222,7 +222,9 @@ const FILLED_NODE_DRAG_TYPES = new Set<FilledNodeDrag['type']>([
   'text',
   'doc',
   'influencer',
-  'social_account_feed'
+  'social_account_feed',
+  'products',
+  'iframe'
 ]);
 
 export function parseFilledNodeDrag(raw: string): FilledNodeDrag | null {

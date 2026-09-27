@@ -22,8 +22,7 @@ import { gateOrgCredits } from '$lib/server/credits';
 const DRAFT: WizardDraft = {
   target: 'Small coffee shops in Northern Italy',
   colours: ['#1a2b3c', '#ffffff'],
-  brandHandles: [{ platform: 'instagram', handle: 'acme' }],
-  competitorHandles: [{ platform: 'instagram', handle: 'rival' }]
+  brandHandles: [{ platform: 'instagram', handle: 'acme' }]
 };
 
 describe('composeWizardContent: il markdown che il wizard scrive in brands.content', () => {
@@ -43,24 +42,22 @@ describe('composeWizardContent: il markdown che il wizard scrive in brands.conte
     expect(md).toContain('instagram:@acme');
   });
 
-  it('porta gli handle dei concorrenti, in una sezione separata da quelli del brand', () => {
-    const md = composeWizardContent(DRAFT);
-    expect(md).toContain('instagram:@rival');
-    const brandSection = md.indexOf('instagram:@acme');
-    const competitorSection = md.indexOf('instagram:@rival');
-    expect(brandSection).toBeGreaterThan(-1);
-    expect(competitorSection).toBeGreaterThan(brandSection);
+  it('non scrive più una sezione Competitors, nemmeno da una bozza vecchia che li porta', () => {
+    const legacy = { ...DRAFT, competitorHandles: [{ platform: 'instagram', handle: 'rival' }] } as WizardDraft;
+    const md = composeWizardContent(legacy);
+    expect(md).not.toContain('## Competitors');
+    expect(md).not.toContain('rival');
   });
 
   it('senza colori o handle non scrive quelle sezioni', () => {
-    const md = composeWizardContent({ target: 'Chiunque', colours: [], brandHandles: [], competitorHandles: [] });
+    const md = composeWizardContent({ target: 'Chiunque', colours: [], brandHandles: [] });
     expect(md).not.toContain('## Colours');
     expect(md).not.toContain('## Social handles');
     expect(md).not.toContain('## Competitors');
   });
 
   it('senza niente affatto torna una stringa vuota', () => {
-    expect(composeWizardContent({ target: '', colours: [], brandHandles: [], competitorHandles: [] })).toBe('');
+    expect(composeWizardContent({ target: '', colours: [], brandHandles: [] })).toBe('');
   });
 });
 
