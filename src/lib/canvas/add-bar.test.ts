@@ -79,10 +79,10 @@ describe('la tela che riceve il trascinamento', () => {
   });
 });
 
-describe('le scorciatoie stanno accanto al nome della tela', () => {
-  it('la barra non le mostra, la barra in alto sì', () => {
-    const top = readFileSync(join(dir, '..', 'components', 'canvas', 'CanvasTopBar.svelte'), 'utf8');
+describe('le scorciatoie stanno nel menu burger della top bar', () => {
+  it('la barra non le mostra, il menu della top bar sì', () => {
+    const menu = readFileSync(join(dir, '..', 'components', 'canvas', 'CanvasMenu.svelte'), 'utf8');
     expect(bar).not.toMatch(/CANVAS_SHORTCUTS/);
-    expect(top).toMatch(/<ShortcutsMenu/);
+    expect(menu).toMatch(/CANVAS_SHORTCUTS/);
   });
 });

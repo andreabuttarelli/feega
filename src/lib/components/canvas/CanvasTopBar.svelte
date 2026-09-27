@@ -7,7 +7,7 @@
   import MessageSquare from '@lucide/svelte/icons/message-square';
   import Plus from '@lucide/svelte/icons/plus';
   import CreditAmount from '$lib/components/CreditAmount.svelte';
-  import ShortcutsMenu from './ShortcutsMenu.svelte';
+  import CanvasMenu from './CanvasMenu.svelte';
 
   type ProjectRow = { id: string; name: string; href: string; updatedAt: string };
   type CanvasRow = { id: string; name: string; href: string };
@@ -18,6 +18,7 @@
    * non deve costringere a scegliere anche una tela nella stessa tendina.
    */
   let {
+    projectId,
     projectName,
     projects,
     canvasName,
@@ -26,6 +27,7 @@
     chatOpen,
     onToggleChat
   }: {
+    projectId: string;
     projectName: string;
     projects: ProjectRow[];
     canvasName: string;
@@ -49,6 +51,8 @@
 <header class="canvas-topbar">
   <div class="topbar-row">
     <div class="switchers">
+      <CanvasMenu {projectId} />
+
       <DropdownMenu.Root>
         <DropdownMenu.Trigger class="switcher-btn">
           <span class="truncate">{projectName}</span>
@@ -102,8 +106,6 @@
           {/each}
         </DropdownMenu.Content>
       </DropdownMenu.Root>
-
-      <ShortcutsMenu />
     </div>
 
     <button

@@ -90,6 +90,7 @@
       <div class="canvas-stage">
         {@render children()}
         <CanvasTopBar
+          {projectId}
           projectName={data.project.name}
           projects={data.projects.map((p: { id: string; name: string; href: string; updatedAt: string }) => ({
             id: p.id,

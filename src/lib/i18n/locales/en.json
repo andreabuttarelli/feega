@@ -280,6 +280,14 @@
         "canvas": "Canvas",
         "chat": "Chat",
         "more": "More"
+      },
+      "menu": {
+        "open": "Menu",
+        "home": "Home",
+        "shortcuts": "Keyboard shortcuts",
+        "settings": "Settings",
+        "billing": "Billing",
+        "logout": "Sign out"
       }
     },
     "brands": {
