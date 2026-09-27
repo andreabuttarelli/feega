@@ -33,8 +33,9 @@ describe('la tabella delle voci del menu', () => {
     expect(menu).toMatch(/logout/);
   });
 
-  it('home porta al vero punto d\'ingresso, non a /app scritto a mano come link morto', () => {
-    expect(menu).toMatch(/\/app/);
+  it('home porta alla home del progetto, mai a /app che è deprecata', () => {
+    expect(menu).toMatch(/\/p\/\$\{projectId\}/);
+    expect(menu).not.toMatch(/['"`]\/app['"`]/);
   });
 
   it('esci invia il POST a /auth/signout, lo stesso della pagina profilo', () => {

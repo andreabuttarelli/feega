@@ -32,7 +32,7 @@
     href?: string;
     sheet?: string;
   }> = [
-    { id: 'home', labelKey: 'app.shell.menu.home', icon: House, href: '/app' },
+    { id: 'home', labelKey: 'app.shell.menu.home', icon: House, href: `/p/${projectId}` },
     { id: 'settings', labelKey: 'app.shell.menu.settings', icon: Settings, sheet: '/settings/connected-accounts' },
     { id: 'billing', labelKey: 'app.shell.menu.billing', icon: CreditCard, sheet: '/settings/billing' }
   ];
@@ -53,7 +53,7 @@
   <DropdownMenu.Content align="start" class="w-64">
     <DropdownMenu.Item>
       {#snippet child({ props })}
-        <a {...props} href="/app" class="menu-row">
+        <a {...props} href={`/p/${projectId}`} class="menu-row">
           <House size={15} />
           <span>{$_('app.shell.menu.home')}</span>
         </a>
