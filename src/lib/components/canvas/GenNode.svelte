@@ -16,14 +16,19 @@
   import { blockedReason, canStartRun, shownIndex } from '$lib/canvas/gen-history';
   import { effectiveModel } from '$lib/canvas/default-models';
   import { scrollGuard } from '$lib/canvas/scroll-guard';
-  import { creditsForRun, creditsForLoop } from '$lib/canvas/gen-cost';
+  import { creditsForRun, creditsForLoop, textOutputTokens, tokenCount } from '$lib/canvas/gen-cost';
   import CreditAmount from '$lib/components/CreditAmount.svelte';
+  import { untrack } from 'svelte';
 
   let {
     node,
     choices = [],
     catalogueSynced = true,
     enhanceUnitCredits,
+    estimatedTextInputTokens,
+    estimatedTextOutputTokens,
+    estimateRevision = '',
+    variableTextInput = false,
     hasUpstreamText = false,
     loopQueued = 0,
     loopVisible = false,
@@ -35,6 +40,7 @@
     onshow,
     onunlock,
     onmeasure,
+    onestimate,
     result
   }: {
     node: GenNode;
@@ -51,6 +57,10 @@
      *  dallo stesso listino di `TEXT_NODE_CREDITS` — assente = costo ignoto, il preventivo non
      *  aggiunge un extra. */
     enhanceUnitCredits?: number;
+    estimatedTextInputTokens?: number;
+    estimatedTextOutputTokens?: number;
+    estimateRevision?: string;
+    variableTextInput?: boolean;
     /** Un testo a monte collegato conta come prompt quando il nodo non ne ha uno suo
      *  (`hasPrompt`, `gen-node.ts`) — chi usa il nodo lo calcola da `edges`/`nodes`, che il nodo
      *  stesso non conosce. */
@@ -81,6 +91,7 @@
     /** Solo per `medium === 'text'`: l'altezza reale del contenuto (prompt + risultato), a ogni
      *  cambio — mai scritta, chi la usa la clampa (`text-node-grow.ts`) e la mostra soltanto. */
     onmeasure?: (contentHeight: number) => void;
+    onestimate?: (prompt: string, model: string | null, revision: string) => void;
     /** Come si disegna quel che è uscito. Il nodo non sa da dove venga l'URL firmato. */
     result?: import('svelte').Snippet<[{ refId: string; text: string | null }]>;
   } = $props();
@@ -93,9 +104,39 @@
    */
   const resolvedModel = $derived(effectiveModel(node.medium, node.model, choices));
   const choice = $derived(choices.find((c) => c.id === resolvedModel) ?? choices[0]);
+  const pricedChoice = $derived.by(() => {
+    if (node.medium !== 'text' || !choice?.textPricing) {
+      return choice;
+    }
+
+    return {
+      ...choice,
+      variableCredits: choice.variableCredits || variableTextInput,
+      textPricing: {
+        ...choice.textPricing,
+        estimatedOutputTokens:
+          estimatedTextOutputTokens ??
+          textOutputTokens(choice.textPricing.systemPromptTokens + tokenCount(node.prompt))
+      }
+    };
+  });
   const upstream = $derived({ hasUpstreamText });
   const state = $derived(runStateOf(node, upstream));
   const tooLong = $derived(!!choice && promptTooLong(node.prompt, choice));
+  const TEXT_ESTIMATE_DELAY_MS = 400;
+
+  $effect(() => {
+    const estimate = untrack(() => onestimate);
+    if (node.medium !== 'text' || !estimate) {
+      return;
+    }
+
+    const prompt = node.prompt;
+    const model = resolvedModel;
+    const revision = estimateRevision;
+    const timer = setTimeout(() => estimate(prompt, model, revision), TEXT_ESTIMATE_DELAY_MS);
+    return () => clearTimeout(timer);
+  });
 
   /**
    * PERCHÉ IL BOTTONE È SPENTO, da `gen-history` e non da una condizione scritta qui.
@@ -117,11 +158,15 @@
   /** Quanto costerebbe UN giro, con lo stesso modello/parametri che "Genera" spedirebbe adesso —
    *  `null` quando il catalogo non porta un prezzo per questo modello, mai un numero inventato. */
   const runCredits = $derived(
-    creditsForRun({ medium: node.medium, model: choice ?? null, params: node.params, enhanceUnitCredits })
+    variableTextInput
+      ? null
+      : creditsForRun({ medium: node.medium, model: pricedChoice ?? null, params: node.params, prompt: node.prompt, textInputTokens: estimatedTextInputTokens, enhanceUnitCredits })
   );
   const loopCredits = $derived(
-    creditsForLoop(
-      { medium: node.medium, model: choice ?? null, params: node.params, enhanceUnitCredits },
+    variableTextInput
+      ? null
+      : creditsForLoop(
+      { medium: node.medium, model: pricedChoice ?? null, params: node.params, prompt: node.prompt, textInputTokens: estimatedTextInputTokens, enhanceUnitCredits },
       loopCombinationCount
     )
   );
@@ -268,11 +313,11 @@
         </button>
       {:else if onrunloop && loopVisible}
         <button type="button" class="gen-loop" onclick={() => onrunloop?.()} disabled={!canRun}>
-          Loop ×{loopCombinationCount}{#if loopCredits !== null} · <CreditAmount amount={loopCredits} approx />{/if}
+          Loop ×{loopCombinationCount}{#if loopCredits !== null} · <CreditAmount amount={loopCredits} approx />{:else if pricedChoice?.variableCredits} · costo variabile{/if}
         </button>
       {/if}
       <button type="button" onclick={() => onrun?.()} disabled={!canRun}>
-        {state === 'done' ? 'Rifai' : 'Genera'}{#if runCredits !== null} · <CreditAmount amount={runCredits} approx />{/if}
+        {state === 'done' ? 'Rifai' : 'Genera'}{#if runCredits !== null} · <CreditAmount amount={runCredits} approx />{:else if pricedChoice?.variableCredits} · costo variabile{/if}
       </button>
     </div>
   </footer>

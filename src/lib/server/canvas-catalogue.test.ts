@@ -5,9 +5,9 @@ vi.mock('./openrouter-models', () => ({
     { id: 'anthropic/claude', label: 'Claude', contextLength: 200_000, usable: true }
   ],
   gatewayModels: () => [
-    { id: 'anthropic/claude', label: 'Claude', contextLength: 200_000, usable: true },
-    { id: 'deepseek/r1', label: 'R1', contextLength: 64_000, usable: false },
-    { id: 'openai/gpt', label: 'GPT', contextLength: 400_000, usable: false }
+    { id: 'anthropic/claude', label: 'Claude', contextLength: 200_000, usable: true, rate: { input: 2, output: 8 } },
+    { id: 'deepseek/r1', label: 'R1', contextLength: 64_000, usable: false, rate: { input: 1, output: 4 } },
+    { id: 'openai/gpt', label: 'GPT', contextLength: 400_000, usable: false, rate: { input: 3, output: 12 } }
   ],
   ensureGatewayModels: async () => {}
 }));
@@ -61,6 +61,17 @@ describe('i modelli che un nodo può scegliere', () => {
 
     const gpt = out.text.choices.find((c) => c.id === 'openai/gpt');
     expect(gpt?.inputModalities).toEqual([]);
+  });
+
+  it('ogni modello testo porta le proprie tariffe input e output', async () => {
+    const out = await canvasModelCatalogue();
+
+    const claude = out.text.choices.find((c) => c.id === 'anthropic/claude');
+    expect(claude?.textPricing).toEqual({
+      inputCreditsPerMillion: 400,
+      outputCreditsPerMillion: 1600,
+      systemPromptTokens: 0
+    });
   });
 
   it('per immagine e video vengono da offerableModels, che porta i loro limiti', async () => {

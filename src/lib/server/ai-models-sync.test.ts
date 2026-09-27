@@ -40,6 +40,7 @@ const IMAGE_MODELS = {
     {
       id: 'bytedance-seed/seedream-5-0-lite',
       name: 'ByteDance Seed: Seedream 5.0 Lite',
+      endpoints: '/api/v1/images/models/bytedance-seed/seedream-5-0-lite/endpoints',
       architecture: { input_modalities: ['text', 'image'], output_modalities: ['image'] },
       supported_parameters: { resolution: { type: 'enum', values: ['2K', '4K'] } }
     }
@@ -96,10 +97,24 @@ const okAllThree = () =>
   fetchImplFor({
     '/models': { body: CHAT_MODELS },
     '/images/models': { body: IMAGE_MODELS },
+    '/images/models/bytedance-seed/seedream-5-0-lite/endpoints': {
+      body: {
+        id: 'bytedance-seed/seedream-5-0-lite',
+        endpoints: [
+          {
+            provider_slug: 'seed',
+            pricing: [
+              { billable: 'output_image', unit: 'image', cost_usd: 0.035 },
+              { billable: 'input_image', unit: 'image', cost_usd: 0 }
+            ]
+          }
+        ]
+      }
+    },
     '/videos/models': { body: VIDEO_MODELS }
   });
 
-function fakeAdmin(existing: Record<string, unknown>[] = []) {
+function fakeAdmin(existing: Record<string, unknown>[] = [], selectError: { message: string } | null = null) {
   const upserts: unknown[] = [];
   const admin = {
     from: (table: string) => ({
@@ -118,8 +133,8 @@ function fakeAdmin(existing: Record<string, unknown>[] = []) {
               })
             }),
             maybeSingle: async () => ({ data: filtered[0] ?? null, error: null }),
-            then: (resolve: (v: { data: Record<string, unknown>[]; error: null }) => unknown) =>
-              resolve({ data: filtered, error: null })
+            then: (resolve: (v: { data: Record<string, unknown>[]; error: { message: string } | null }) => unknown) =>
+              resolve({ data: filtered, error: selectError })
           };
         }
       })
@@ -206,6 +221,59 @@ describe('syncAiModels — dai tre listini del gateway alla tabella', () => {
     expect(seedreamLite.supported_resolutions).not.toContain('1K');
   });
 
+  it('un modello immagine porta il listino definitivo del proprio endpoint', async () => {
+    const { admin, upserts } = fakeAdmin();
+
+    await syncAiModels(admin, { fetchImpl: okAllThree(), baseUrl: 'https://openrouter.ai/api/v1' });
+
+    const seedreamLite = upserts.find(
+      (r) => (r as Record<string, unknown>).id === 'bytedance-seed/seedream-5-0-lite' && (r as Record<string, unknown>).catalogue === 'image'
+    ) as Record<string, unknown>;
+    expect(seedreamLite.pricing).toEqual({
+      endpoints: [{
+        provider: 'seed',
+        parameters: {},
+        lines: [
+          { billable: 'output_image', unit: 'image', cost_usd: 0.035 },
+          { billable: 'input_image', unit: 'image', cost_usd: 0 }
+        ]
+      }]
+    });
+  });
+
+  it('un endpoint prezzo irraggiungibile non sovrascrive il prezzo precedente', async () => {
+    const previousPricing = { endpoints: [{ provider: 'seed', lines: [{ billable: 'output_image', unit: 'image', cost_usd: 0.035 }] }] };
+    const { admin, upserts } = fakeAdmin([
+      { id: 'bytedance-seed/seedream-5-0-lite', catalogue: 'image', pricing: previousPricing }
+    ]);
+    const fetchImpl = fetchImplFor({
+      '/models': { body: CHAT_MODELS },
+      '/images/models': { body: IMAGE_MODELS },
+      '/videos/models': { body: VIDEO_MODELS }
+    });
+
+    await syncAiModels(admin, { fetchImpl, baseUrl: 'https://openrouter.ai/api/v1' });
+
+    const seedreamLite = upserts.find(
+      (row) => (row as Record<string, unknown>).id === 'bytedance-seed/seedream-5-0-lite' && (row as Record<string, unknown>).catalogue === 'image'
+    ) as Record<string, unknown>;
+    expect(seedreamLite.pricing).toEqual(previousPricing);
+  });
+
+  it('se non può leggere il prezzo precedente non riscrive le righe immagine senza prezzo', async () => {
+    const { admin, upserts } = fakeAdmin([], { message: 'database unavailable' });
+    const fetchImpl = fetchImplFor({
+      '/models': { body: CHAT_MODELS },
+      '/images/models': { body: IMAGE_MODELS },
+      '/videos/models': { body: VIDEO_MODELS }
+    });
+
+    await syncAiModels(admin, { fetchImpl, baseUrl: 'https://openrouter.ai/api/v1' });
+
+    expect(upserts.some((row) => (row as Record<string, unknown>).catalogue === 'image')).toBe(false);
+    expect(upserts.some((row) => (row as Record<string, unknown>).catalogue === 'chat')).toBe(true);
+  });
+
   it('un modello immagine senza "resolution" (i GPT Image, che usano "quality") non porta nessuna risoluzione', async () => {
     const { admin, upserts } = fakeAdmin();
 
@@ -263,6 +331,11 @@ describe('syncAiModels — dai tre listini del gateway alla tabella', () => {
     let firstAttempt = true;
     const admin = {
       from: () => ({
+        select: () => ({
+          eq: () => ({
+            then: (resolve: (v: { data: unknown[]; error: null }) => unknown) => resolve({ data: [], error: null })
+          })
+        }),
         upsert: (rows: unknown[]) => {
           if (firstAttempt) {
             firstAttempt = false;

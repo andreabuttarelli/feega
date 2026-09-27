@@ -14,6 +14,7 @@ function fakeAdmin(
     supported_parameters?: string[];
     supported_resolutions?: string[];
     param_schema?: Record<string, unknown>;
+    pricing?: unknown;
   }[]
 ) {
   const admin = {
@@ -43,13 +44,219 @@ describe('offerableModels — cosa un nodo può davvero scegliere', () => {
 
   it('ogni immagine offerta porta un unitCredits — il prezzo che il bottone "Genera" mostra', async () => {
     const admin = fakeAdmin([
-      { id: 'openai/gpt-image-2', catalogue: 'image', input_modalities: ['text', 'image'], output_modalities: ['image'] }
+      {
+        id: 'openai/gpt-image-2',
+        catalogue: 'image',
+        input_modalities: ['text', 'image'],
+        output_modalities: ['image'],
+        pricing: { endpoints: [{ provider: 'openai', lines: [{ billable: 'output_image', unit: 'image', cost_usd: 0.03 }] }] }
+      }
     ]);
 
     const out = await offerableModels(admin, 'image');
 
     const choice = out.choices.find((c) => c.id === GPT_IMAGE_2_MODEL);
-    expect(choice?.unitCredits).toBeGreaterThan(0);
+    expect(choice?.unitCredits).toBe(6);
+  });
+
+  it('un modello nuovo a prezzo fisso mostra la preview senza uno spec locale', async () => {
+    const admin = fakeAdmin([
+      {
+        id: 'meta/muse-image',
+        catalogue: 'image',
+        input_modalities: ['text'],
+        output_modalities: ['image'],
+        pricing: { endpoints: [{ provider: 'meta', lines: [{ billable: 'output_image', unit: 'image', cost_usd: 0.035 }] }] }
+      }
+    ]);
+
+    const out = await offerableModels(admin, 'image');
+
+    expect(out.choices.find((choice) => choice.id === 'meta/muse-image')?.unitCredits).toBe(7);
+  });
+
+  it('più provider usano il prezzo minimo senza fissare il provider', async () => {
+    const admin = fakeAdmin([
+      {
+        id: 'meta/muse-image',
+        catalogue: 'image',
+        input_modalities: ['text'],
+        output_modalities: ['image'],
+        pricing: {
+          endpoints: [
+            { provider: 'a', lines: [{ billable: 'output_image', unit: 'image', cost_usd: 0.03 }] },
+            { provider: 'b', lines: [{ billable: 'output_image', unit: 'image', cost_usd: 0.05 }] }
+          ]
+        }
+      }
+    ]);
+
+    const out = await offerableModels(admin, 'image');
+
+    expect(out.choices.find((choice) => choice.id === 'meta/muse-image')?.unitCredits).toBe(6);
+  });
+
+  it('un prezzo a consumo è dichiarato variabile invece di sparire', async () => {
+    const admin = fakeAdmin([
+      {
+        id: 'openai/gpt-image-2',
+        catalogue: 'image',
+        input_modalities: ['text'],
+        output_modalities: ['image'],
+        pricing: {
+          endpoints: [{ provider: 'openai', lines: [{ billable: 'output_image', unit: 'token', cost_usd: 0.00003 }] }]
+        }
+      }
+    ]);
+
+    const out = await offerableModels(admin, 'image');
+    const choice = out.choices.find((candidate) => candidate.id === 'gpt-image-2');
+
+    expect(choice?.unitCredits).toBeUndefined();
+    expect(choice?.variableCredits).toBe(true);
+  });
+
+  it('un provider variabile rende variabile anche un modello con un altro provider a prezzo fisso', async () => {
+    const admin = fakeAdmin([
+      {
+        id: 'meta/muse-image',
+        catalogue: 'image',
+        input_modalities: ['text'],
+        output_modalities: ['image'],
+        pricing: {
+          endpoints: [
+            { provider: 'a', lines: [{ billable: 'output_image', unit: 'image', cost_usd: 0.03 }] },
+            { provider: 'b', lines: [{ billable: 'output_image', unit: 'token', cost_usd: 0.00003 }] }
+          ]
+        }
+      }
+    ]);
+
+    const choice = (await offerableModels(admin, 'image')).choices.find((candidate) => candidate.id === 'meta/muse-image');
+
+    expect(choice?.unitCredits).toBeUndefined();
+    expect(choice?.variableCredits).toBe(true);
+  });
+
+  it('un riferimento a pagamento rende il costo variabile', async () => {
+    const admin = fakeAdmin([
+      {
+        id: 'meta/muse-image',
+        catalogue: 'image',
+        input_modalities: ['text', 'image'],
+        output_modalities: ['image'],
+        pricing: {
+          endpoints: [{
+            provider: 'a',
+            lines: [
+              { billable: 'output_image', unit: 'image', cost_usd: 0.03 },
+              { billable: 'input_reference', unit: 'image', cost_usd: 0.01 }
+            ]
+          }]
+        }
+      }
+    ]);
+
+    const choice = (await offerableModels(admin, 'image')).choices.find((candidate) => candidate.id === 'meta/muse-image');
+
+    expect(choice?.unitCredits).toBeUndefined();
+    expect(choice?.variableCredits).toBe(true);
+  });
+
+  it('una variante 2k segue la risoluzione omonima anche se il catalogo non è ordinato', async () => {
+    const admin = fakeAdmin([
+      {
+        id: 'bytedance-seed/seedream-5-0-pro',
+        catalogue: 'image',
+        input_modalities: ['text', 'image'],
+        output_modalities: ['image'],
+        supported_resolutions: ['2K', '1K'],
+        pricing: {
+          endpoints: [{
+            provider: 'seed',
+            lines: [
+              { billable: 'output_image', unit: 'image', cost_usd: 0.045 },
+              { billable: 'output_image', unit: 'image', cost_usd: 0.09, variant: '2k' }
+            ]
+          }]
+        }
+      }
+    ]);
+
+    const out = await offerableModels(admin, 'image');
+    const choice = out.choices.find((candidate) => candidate.id === 'seedream-5-pro');
+
+    expect(choice?.unitCredits).toBe(9);
+    expect(choice?.creditOverrides).toEqual({ resolution: { '2K': 18 } });
+  });
+
+  it('una variante usa il provider meno caro senza fissarlo', async () => {
+    const admin = fakeAdmin([
+      {
+        id: 'bytedance-seed/seedream-5-0-pro',
+        catalogue: 'image',
+        input_modalities: ['text', 'image'],
+        output_modalities: ['image'],
+        supported_resolutions: ['1K', '2K'],
+        pricing: {
+          endpoints: [
+            {
+              provider: 'a',
+              lines: [
+                { billable: 'output_image', unit: 'image', cost_usd: 0.04 },
+                { billable: 'output_image', unit: 'image', cost_usd: 0.1, variant: '2k' }
+              ]
+            },
+            {
+              provider: 'b',
+              lines: [
+                { billable: 'output_image', unit: 'image', cost_usd: 0.03 },
+                { billable: 'output_image', unit: 'image', cost_usd: 0.08, variant: '2k' }
+              ]
+            }
+          ]
+        }
+      }
+    ]);
+
+    const choice = (await offerableModels(admin, 'image')).choices.find(
+      (candidate) => candidate.id === 'seedream-5-pro'
+    );
+
+    expect(choice?.unitCredits).toBe(6);
+    expect(choice?.creditOverrides).toEqual({ resolution: { '2K': 16 } });
+  });
+
+  it('il minimo per risoluzione considera solo provider che la supportano', async () => {
+    const admin = fakeAdmin([
+      {
+        id: 'bytedance-seed/seedream-5-0-pro',
+        catalogue: 'image',
+        input_modalities: ['text'],
+        output_modalities: ['image'],
+        supported_resolutions: ['1K', '2K'],
+        pricing: {
+          endpoints: [
+            {
+              provider: 'cheap-1k',
+              parameters: { resolution: { values: ['1K'] } },
+              lines: [{ billable: 'output_image', unit: 'image', cost_usd: 0.03 }]
+            },
+            {
+              provider: 'costly-2k',
+              parameters: { resolution: { values: ['2K'] } },
+              lines: [{ billable: 'output_image', unit: 'image', cost_usd: 0.08 }]
+            }
+          ]
+        }
+      }
+    ]);
+
+    const choice = (await offerableModels(admin, 'image')).choices.find(
+      (candidate) => candidate.id === 'seedream-5-pro'
+    );
+
+    expect(choice?.creditOverrides).toEqual({ resolution: { '1K': 6, '2K': 16 } });
   });
 
   it('un modello sincronizzato SENZA una riga di integrazione nostra è offerto comunque, con la resa prudente', async () => {

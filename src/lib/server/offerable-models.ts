@@ -1,44 +1,12 @@
-/**
- * QUALI MODELLI QUESTO NODO PUÒ OFFRIRE, ADESSO — un modello alla volta, dai due fatti che
- * servono ENTRAMBI, mai uno solo:
- *
- *   COSA IL MODELLO ACCETTA — sincronizzato da OpenRouter (`ai_models`, `ai-models-sync.ts`). Tre
- *   listini diversi per medium: `chat` per il testo, `image` per `/images/models`, `video` per
- *   `/videos/models` — lo stesso id può comparire su più di uno con fatti diversi, ed è per questo
- *   che la riga si cerca sul CATALOGO giusto, non per id da solo.
- *
- *   COME LO SI CHIAMA — i nostri fatti di integrazione (`image-models.ts`, `video-models.ts`):
- *   quale campo del corpo vuole i riferimenti, quanti ne inoltra, quanto può durare una clip,
- *   il prezzo che fatturiamo. OpenRouter non pubblica NESSUNO di questi — verificato leggendo le
- *   risposte vere di `/images/models` e `/videos/models`: `input_references` è un tetto numerico,
- *   non il nome del campo; nessun payload nomina `image_urls` o `input_urls`. Restano nostri.
- *
- * LA REGOLA DEL PRODOTTO: OGNI riga sincronizzata è offerta — "l'app comanda" (CLAUDE.md) vuol
- * dire seguire OpenRouter, non un elenco scritto a mano che lo filtra silenziosamente a una
- * manciata di famiglie. Uno spec nostro (`image-models.ts`, `video-models.ts`) ARRICCHISCE la
- * riga quando esiste — il campo dei riferimenti, i rapporti misurati, il prezzo — non la gate: un
- * modello sincronizzato SENZA spec passa con la resa più prudente (`GENERIC_IMAGE_ASPECTS`, nessun
- * `unitCredits` finché non lo misuriamo) invece di sparire dal menu. Un nostro spec senza una riga
- * sincronizzata — l'avevamo integrato, il sync di oggi non lo conferma più — resta fuori, con la
- * stessa disciplina di `upstream.ts::modalitiesFor`: un `null` dal sync non è "non lo so", è "non
- * offribile", perché altrimenti un provider lo rifiuterebbe dopo aver speso il giro invece che
- * prima.
- *
- * `synced: false` DICE PERCHÉ IL MENU È VUOTO. Una tabella `ai_models` vuota — primo avvio, DB di
- * branch, sync mai girato — produce zero scelte per ogni medium: è la conseguenza accettata della
- * regola sopra, ma un dropdown vuoto senza spiegazione sembra un difetto. Chi chiama (il catalogo
- * della tela, le settings) mostra "catalogo modelli non ancora sincronizzato" quando `synced` è
- * `false`, "nessun modello disponibile" quando è `true` ma `choices` è comunque vuoto — due stati
- * diversi, con due messaggi diversi, perché la causa è diversa.
- */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { IMAGE_MODEL_CHOICES, imageModelSpec, IMAGE_REFS_BUDGET, type ImageModelSpec } from '$lib/image-models';
 import { videoModelSpec, type VideoModelSpec } from '$lib/video-models';
 import type { GenMedium, ModelChoice } from '$lib/canvas/gen-node';
 import type { MediaModelSlot } from '$lib/media-model-slots';
-import { wireModelId } from '$lib/server/ai-models-sync';
+import { wireModelId, type ImagePricingLine } from '$lib/server/ai-models-sync';
 import { providerOf } from '$lib/canvas/model-provider';
-import { IMAGE_CREDITS, videoCredits } from '$lib/server/content-cost';
+import { videoCredits } from '$lib/server/content-cost';
+import { billedCreditsFor } from '$lib/credit-ladder';
 import { videoDurationOptions, VIDEO_RESOLUTIONS, MIN_DURATION } from '$lib/server/video';
 import { modelParamsOf } from '$lib/canvas/model-params';
 
@@ -62,6 +30,7 @@ type SyncedRow = {
   supported_parameters: string[] | null;
   supported_resolutions: string[] | null;
   param_schema: Record<string, unknown> | null;
+  pricing: unknown;
 };
 
 async function syncedRows(
@@ -70,7 +39,7 @@ async function syncedRows(
 ): Promise<{ rows: Map<string, SyncedRow>; synced: boolean }> {
   const { data } = await admin
     .from('ai_models')
-    .select('id, label, input_modalities, supported_parameters, supported_resolutions, param_schema')
+    .select('id, label, input_modalities, supported_parameters, supported_resolutions, param_schema, pricing')
     .eq('catalogue', catalogue);
 
   const rows = (data ?? []) as SyncedRow[];
@@ -109,7 +78,9 @@ function genericImageChoice(row: SyncedRow): ModelChoice {
     ...providerOf(row.id),
     inputModalities: row.input_modalities ?? [],
     resolutions: imageResolutionsFor(row.supported_resolutions),
-    unitCredits: undefined,
+    unitCredits: imageUnitCredits(row.pricing),
+    creditOverrides: imageCreditOverrides(row),
+    variableCredits: hasVariableCredits(row.pricing),
     params: modelParamsOf(row.param_schema ?? {})
   };
 }
@@ -150,9 +121,7 @@ function genericVideoChoice(row: SyncedRow): ModelChoice {
 function imageChoice(
   spec: ImageModelSpec,
   wireId: string,
-  inputModalities: string[],
-  supportedResolutions: string[] | null,
-  paramSchema: Record<string, unknown> | null
+  row: SyncedRow
 ): ModelChoice {
   return {
     id: spec.id,
@@ -160,12 +129,156 @@ function imageChoice(
     aspectRatios: spec.aspectRatios,
     maxRefs: spec.maxRefs,
     ...providerOf(wireId),
-    inputModalities,
-    resolutions: imageResolutionsFor(supportedResolutions),
-    unitCredits: IMAGE_CREDITS,
-    params: modelParamsOf(paramSchema ?? {})
+    inputModalities: row.input_modalities ?? [],
+    resolutions: imageResolutionsFor(row.supported_resolutions),
+    unitCredits: imageUnitCredits(row.pricing),
+    creditOverrides: imageCreditOverrides(row),
+    variableCredits: hasVariableCredits(row.pricing),
+    params: modelParamsOf(row.param_schema ?? {})
   };
 }
+
+function imageUnitCredits(pricing: unknown): number | undefined {
+  if (hasVariableCredits(pricing)) {
+    return undefined;
+  }
+  const costs = pricingLines(pricing)
+    .filter((line) => line.billable === 'output_image' && line.unit === 'image' && !line.variant)
+    .map((line) => line.cost_usd);
+  return costs.length ? billedCreditsFor(Math.min(...costs)) : undefined;
+}
+
+function imageCreditOverrides(row: SyncedRow): Record<string, Record<string, number>> | undefined {
+  const overrides: Record<string, Record<string, number>> = {};
+  for (const resolution of row.supported_resolutions ?? []) {
+    const cost = cheapestEndpointCost(row.pricing, 'resolution', resolution, row.supported_resolutions ?? []);
+    if (cost !== undefined) {
+      overrides.resolution = { ...(overrides.resolution ?? {}), [resolution]: billedCreditsFor(cost) };
+    }
+  }
+
+  const quality = row.param_schema?.quality as { values?: unknown } | undefined;
+  if (Array.isArray(quality?.values)) {
+    for (const value of quality.values.map(String)) {
+      const cost = cheapestEndpointCost(row.pricing, 'quality', value, []);
+      if (cost !== undefined) {
+        overrides.quality = { ...(overrides.quality ?? {}), [value]: billedCreditsFor(cost) };
+      }
+    }
+  }
+
+  return Object.keys(overrides).length ? overrides : undefined;
+}
+
+type PricingEndpoint = {
+  lines: ImagePricingLine[];
+  parameters: Record<string, unknown>;
+};
+
+function cheapestEndpointCost(
+  pricing: unknown,
+  parameter: 'resolution' | 'quality',
+  value: string,
+  resolutions: string[]
+): number | undefined {
+  const costs = pricingEndpoints(pricing).flatMap((endpoint) => {
+    const variants = endpoint.lines.filter(
+      (line) =>
+        line.billable === 'output_image' &&
+        line.unit === 'image' &&
+        line.variant &&
+        (parameter === 'resolution'
+          ? resolutionForVariant(line.variant, resolutions) === value
+          : line.variant === value)
+    );
+    if (variants.length) {
+      return variants.map((line) => line.cost_usd);
+    }
+    if (!endpointSupports(endpoint, parameter, value)) {
+      return [];
+    }
+    return endpoint.lines
+      .filter((line) => line.billable === 'output_image' && line.unit === 'image' && !line.variant)
+      .map((line) => line.cost_usd);
+  });
+  return costs.length ? Math.min(...costs) : undefined;
+}
+
+function endpointSupports(endpoint: PricingEndpoint, parameter: string, value: string): boolean {
+  const declaration = endpoint.parameters[parameter];
+  if (!declaration || typeof declaration !== 'object') {
+    return false;
+  }
+  const values = (declaration as { values?: unknown }).values;
+  return Array.isArray(values) && values.some((candidate) => String(candidate).toLowerCase() === value.toLowerCase());
+}
+
+function pricingLines(pricing: unknown): ImagePricingLine[] {
+  return pricingEndpoints(pricing).flatMap((endpoint) => endpoint.lines);
+}
+
+function pricingEndpoints(pricing: unknown): PricingEndpoint[] {
+  if (!pricing || typeof pricing !== 'object') {
+    return [];
+  }
+  const endpoints = (pricing as Record<string, unknown>).endpoints;
+  if (!Array.isArray(endpoints)) {
+    return [];
+  }
+  return endpoints.flatMap((endpoint) => {
+    if (!endpoint || typeof endpoint !== 'object') {
+      return [];
+    }
+    const lines = (endpoint as Record<string, unknown>).lines;
+    const parameters = (endpoint as Record<string, unknown>).parameters;
+    return [{
+      lines: Array.isArray(lines) ? lines.filter(isImagePricingLine) : [],
+      parameters: parameters && typeof parameters === 'object' && !Array.isArray(parameters)
+        ? parameters as Record<string, unknown>
+        : {}
+    }];
+  });
+}
+
+function isImagePricingLine(value: unknown): value is ImagePricingLine {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+  const line = value as Record<string, unknown>;
+  return (
+    typeof line.billable === 'string' &&
+    typeof line.unit === 'string' &&
+    typeof line.cost_usd === 'number' &&
+    Number.isFinite(line.cost_usd) &&
+    (line.variant === undefined || typeof line.variant === 'string')
+  );
+}
+
+function hasVariableCredits(pricing: unknown): boolean {
+  return pricingLines(pricing).some(
+    (line) =>
+      (line.billable === 'output_image' && (line.unit === 'token' || line.unit === 'megapixel')) ||
+      ((line.billable === 'input_image' || line.billable === 'input_reference') && line.cost_usd > 0)
+  );
+}
+
+function resolutionForVariant(variant: string, resolutions: string[]): string | undefined {
+  const exact = resolutions.find((resolution) => resolution.toLowerCase() === variant.toLowerCase());
+  if (exact) {
+    return exact;
+  }
+  return RESOLUTION_VARIANTS[variant]?.(resolutions);
+}
+
+function resolutionPixels(resolution: string): number {
+  const value = Number.parseFloat(resolution);
+  return resolution.toLowerCase().endsWith('k') ? value * 1000 : value;
+}
+
+const RESOLUTION_VARIANTS: Record<string, (resolutions: string[]) => string | undefined> = {
+  high_resolution: (resolutions) =>
+    [...resolutions].sort((left, right) => resolutionPixels(left) - resolutionPixels(right)).at(-1)
+};
 
 function videoChoice(spec: VideoModelSpec, row: SyncedRow, inputModalities: string[]): ModelChoice {
   return {
@@ -198,17 +311,12 @@ async function offerableImages(admin: SupabaseClient): Promise<OfferableModels> 
   const choices: ModelChoice[] = [];
   specs.forEach((spec, i) => {
     const wireId = wireIds[i];
-    if (!wireId || !rows.has(wireId)) return;
+    const row = wireId ? rows.get(wireId) : undefined;
+    if (!wireId || !row) {
+      return;
+    }
     specced.add(wireId);
-    choices.push(
-      imageChoice(
-        spec,
-        wireId,
-        rows.get(wireId)?.input_modalities ?? [],
-        rows.get(wireId)?.supported_resolutions ?? null,
-        rows.get(wireId)?.param_schema ?? null
-      )
-    );
+    choices.push(imageChoice(spec, wireId, row));
   });
 
   // OGNI riga sincronizzata che nessuno spec ha già arricchito: offerta con la resa prudente,

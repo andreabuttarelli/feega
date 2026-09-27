@@ -7,6 +7,27 @@ vi.mock('$lib/server/canvas/generate', () => ({ runGenNode: (...args: unknown[])
 const { modalitiesOf } = vi.hoisted(() => ({ modalitiesOf: vi.fn() }));
 vi.mock('$lib/server/ai-models-sync', () => ({ modalitiesOf }));
 vi.mock('$lib/server/supabase-admin', () => ({ createAdminClient: () => ({}) }));
+vi.mock('$lib/server/canvas-catalogue', () => ({
+  canvasModelCatalogue: async () => ({
+    text: {
+      choices: [{
+        id: 'text-model',
+        label: 'Text',
+        aspectRatios: [],
+        provider: 'openrouter',
+        providerLabel: 'OpenRouter',
+        textPricing: {
+          inputCreditsPerMillion: 400,
+          outputCreditsPerMillion: 1600,
+          systemPromptTokens: 0
+        }
+      }],
+      synced: true
+    },
+    image: { choices: [], synced: true },
+    video: { choices: [], synced: true }
+  })
+}));
 
 const { orgCreditBalance } = vi.hoisted(() => ({ orgCreditBalance: vi.fn() }));
 vi.mock('$lib/server/credits', () => ({ orgCreditBalance }));
@@ -102,6 +123,51 @@ describe('planLoop — il preventivo, senza girare niente', () => {
 
     expect(out.combinations).toHaveLength(1);
     expect(out.safety.verdict).toBe('run');
+  });
+
+  it('un loop testo usa input e output stimati del modello per ogni giro', async () => {
+    const { db } = fakeDb({
+      nodes: [nodeRow(GEN_NODE, 'text', { prompt: 'a'.repeat(4000), model: null, params: { repeat: 3 } })],
+      nodes_connections: []
+    });
+
+    const out = await planLoop(db, { orgId: ORG, canvasId: CANVAS, nodeId: GEN_NODE });
+
+    expect(out.cost.perRun).toBe(2);
+    expect(out.cost.total).toBe(6);
+  });
+
+  it('un loop testo con media collegati dichiara il costo variabile', async () => {
+    const IMAGE_NODE = '77777777-7777-7777-7777-777777777777';
+    const { db } = fakeDb({
+      nodes: [
+        nodeRow(GEN_NODE, 'text', { prompt: 'descrivi', model: 'text-model', params: { repeat: 2 } }),
+        nodeRow(IMAGE_NODE, 'image', { refId: 'asset-image' })
+      ],
+      nodes_connections: [{
+        id: 'edge-image',
+        org_id: ORG,
+        canvas_id: CANVAS,
+        source_node_id: IMAGE_NODE,
+        target_node_id: GEN_NODE,
+        source_handle: null,
+        target_handle: null,
+        mode: 'fixed',
+        deleted_at: null
+      }],
+      assets: [{
+        id: 'asset-image',
+        org_id: ORG,
+        project_id: PROJECT,
+        type: 'image',
+        url: 'image.png',
+        content: null
+      }]
+    }, { filter: true });
+
+    const out = await planLoop(db, { orgId: ORG, canvasId: CANVAS, nodeId: GEN_NODE });
+
+    expect(out.cost).toEqual({ perRun: null, total: null });
   });
 
   it('un asse iterate da una list con 4 item: 4 combinazioni', async () => {

@@ -29,6 +29,7 @@ import type { GenMedium, ModelChoice } from '$lib/canvas/gen-node';
 import { providerOf } from '$lib/canvas/model-provider';
 import { createAdminClient } from './supabase-admin';
 import { TEXT_NODE_CREDITS } from '$lib/server/content-cost';
+import { CREDITS_PER_USD_SUBSCRIPTION_LIST } from '$lib/credit-ladder';
 
 export type MediumCatalogue = {
   choices: ModelChoice[];
@@ -64,7 +65,11 @@ export async function canvasModelCatalogue(): Promise<Record<GenMedium, MediumCa
         aspectRatios: [],
         ...providerOf(m.id),
         inputModalities: textModalities.get(m.id) ?? [],
-        unitCredits: TEXT_NODE_CREDITS
+        textPricing: {
+          inputCreditsPerMillion: m.rate.input * CREDITS_PER_USD_SUBSCRIPTION_LIST,
+          outputCreditsPerMillion: m.rate.output * CREDITS_PER_USD_SUBSCRIPTION_LIST,
+          systemPromptTokens: 0
+        }
       })),
       synced: true
     },

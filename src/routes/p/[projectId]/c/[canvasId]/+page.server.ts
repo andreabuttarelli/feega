@@ -53,6 +53,8 @@ import { listNodesByIds } from '$lib/server/repos/canvas';
 import { suggestNextSteps } from '$lib/canvas/suggest-next-steps';
 import { actionFrequencyFor } from '$lib/server/next-step-stats';
 import { decideWithJev } from '$lib/server/jev';
+import { upstreamInputsFor } from '$lib/server/canvas/upstream';
+import { estimateCanvasTextCost } from '$lib/server/canvas/text-cost-estimate';
 import { applyEffectsNode } from '$lib/server/canvas/apply-effects';
 import { nodeAcceptsConnection } from '$lib/canvas/connector-ports';
 
@@ -307,6 +309,37 @@ async function syncSocialFeed(db: Db, orgId: string, projectId: string | null, n
 }
 
 export const actions: Actions = {
+  estimate_text_cost: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const nodeId = String(fd.get('node_id') ?? '');
+    const userPrompt = String(fd.get('prompt') ?? '');
+    const model = String(fd.get('model') ?? '') || null;
+    if (!nodeId) {
+      return fail(400, { error: 'nodo non trovato' });
+    }
+
+    const upstream = await upstreamInputsFor(scope.db, {
+      orgId: scope.orgId,
+      canvasId: scope.canvasId,
+      nodeId,
+      model,
+      medium: 'text'
+    });
+    const decide = process.env.TYPESAFE_API_KEY ? decideWithJev : null;
+    return estimateCanvasTextCost({
+      material: upstream.text,
+      ownPrompt: userPrompt,
+      inputCost:
+        upstream.referenceImageUrls.length > 0 ||
+        upstream.referenceVideoUrls.length > 0 ||
+        upstream.referenceAudioUrls.length > 0
+          ? 'variable_media'
+          : 'fixed',
+      decide
+    });
+  },
+
   upload: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();
