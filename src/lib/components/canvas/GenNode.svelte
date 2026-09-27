@@ -41,7 +41,8 @@
     onunlock,
     onmeasure,
     onestimate,
-    result
+    result,
+    references
   }: {
     node: GenNode;
     /** I modelli che questo medium può usare, dal catalogo del brand. */
@@ -94,6 +95,7 @@
     onestimate?: (prompt: string, model: string | null, revision: string) => void;
     /** Come si disegna quel che è uscito. Il nodo non sa da dove venga l'URL firmato. */
     result?: import('svelte').Snippet<[{ refId: string; text: string | null }]>;
+    references?: import('svelte').Snippet;
   } = $props();
 
   /**
@@ -285,6 +287,10 @@
         </button>
       {/each}
     </div>
+  {/if}
+
+  {#if references && node.medium !== 'text'}
+    {@render references()}
   {/if}
 
   <footer class="gen-foot" class:is-full={!hasBody}>

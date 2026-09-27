@@ -23,6 +23,7 @@ import { z } from 'zod';
 import { SOCIAL_PLATFORMS } from './social-platforms';
 import { FEED_MEDIA, FEED_SORTS, PRODUCT_SORTS } from './source-filters';
 import { EFFECTS } from './effects';
+import { nodeReferenceSchema } from './node-references';
 import type { EffectId, EffectParam } from './effects';
 import { LAYOUTS } from './composition/index';
 import { CAMERA_PRESETS } from './composition/camera';
@@ -76,6 +77,7 @@ const imageSchema = z.object({
   model: z.string().nullable().optional(),
   aspect_ratio: z.string().optional(),
   resolution: z.string().optional(),
+  references: z.array(nodeReferenceSchema).optional(),
   ...genState,
   ...libraryMedia
 });
@@ -86,6 +88,7 @@ const videoSchema = z.object({
   audio: z.boolean().optional(),
   aspect_ratio: z.string().optional(),
   resolution: z.string().optional(),
+  references: z.array(nodeReferenceSchema).optional(),
   ...genState,
   ...libraryMedia
 });

@@ -383,6 +383,7 @@ export type ImageJob = {
   model?: string;
   /** L'immagine della libreria da cui partire. Presente → è una modifica. */
   baseMediaId?: string;
+  referenceImageUrls?: string[];
   brandStyle?: BrandStyleUse;
   /** I campi extra che il modello scelto dichiara (`ai_models.param_schema`), già filtrati e
    *  col loro nome esatto — `model-params.ts` decide cosa entra, questo file lo porta soltanto. */
@@ -468,6 +469,12 @@ async function storedImageSource(
   return outcome.ok ? outcome : { ...outcome, bytes: null };
 }
 
+async function referenceImageParts(urls: string[]): Promise<ImagePart[]> {
+  const { imagePartFor } = await import('$lib/server/brand-context');
+  const outcomes = await Promise.all(urls.map((url) => imagePartFor(url)));
+  return outcomes.flatMap((outcome) => (outcome.ok ? [outcome.part] : []));
+}
+
 async function runImageJob(
   supabase: SupabaseClient,
   job: ImageJob
@@ -521,6 +528,8 @@ async function runImageJob(
     baseImage = found.part;
   }
 
+  const userRefImages = await referenceImageParts(job.referenceImageUrls ?? []);
+
   const brandVisuals =
     job.brandId && job.brandStyle !== 'ignore'
       ? await loadBrandVisualContext(supabase, job.brandId)
@@ -531,6 +540,7 @@ async function runImageJob(
     model: refining ? imageModelFor(prefs) : (job.model ?? imageModelFor(prefs)),
     refineModel: refining ? (job.model ?? imageRefineModelFor(prefs)) : imageRefineModelFor(prefs),
     baseImage,
+    userRefImages,
     aspectRatio: job.aspectRatio,
     resolution: job.resolution,
     params: job.params

@@ -365,6 +365,7 @@ export async function runGenNode(db: Db, input: StartRun): Promise<RunOutcome> {
         // modello ne accetterebbe di più (`upstream.referenceImageUrls`, dal catalogo in
         // `graph.ts`). Il tetto vero sta lì; qui si spedisce solo quel che il trasporto sa portare.
         baseMediaId: upstream.referenceImageUrl ?? undefined,
+        referenceImageUrls: await signMediaPaths(db, upstream.pickedImageUrls),
         params: extraParamsOf(input.params as unknown as Record<string, unknown>, declared)
       });
       if (!out.ok) {

@@ -104,6 +104,7 @@ export type UpstreamNode = {
    *  `mediaUrl` come sorgente per ogni connettore che questo nodo alimenta — un influencer non ha
    *  anche un `mediaUrl` singolo da cui scegliere. */
   mediaUrls?: string[];
+  referenceUrls?: string[];
 };
 
 export type UpstreamEdge = {
@@ -152,12 +153,14 @@ export type UpstreamInputs = {
    */
   blocked: string | null;
   rejected: UpstreamRejection[];
+  pickedImageUrls: string[];
 };
 
 const EMPTY: UpstreamInputs = {
   text: [],
   referenceImageUrl: null,
   referenceImageUrls: [],
+  pickedImageUrls: [],
   referenceVideoUrls: [],
   referenceAudioUrls: [],
   startFrameUrl: null,
@@ -265,6 +268,28 @@ function listCapacity(connector: ConnectorType, kind: GenerativeNodeKind, model:
     if (connector === 'audios') return caps.audios;
   }
   return 1;
+}
+
+function pickedWithin(
+  target: UpstreamNode,
+  kind: GenerativeNodeKind,
+  connectors: Set<ConnectorType>,
+  taken: number
+): { accepted: string[]; rejected: UpstreamRejection[] } {
+  const picked = target.referenceUrls ?? [];
+  if (!picked.length) {
+    return { accepted: [], rejected: [] };
+  }
+  if (!connectors.has('images')) {
+    return { accepted: [], rejected: [{ nodeId: target.id, why: `questo modello non ha un connettore ${CONNECTOR_LABEL.images}` }] };
+  }
+
+  const room = Math.max(listCapacity('images', kind, target.model ?? null) - taken, 0);
+  const accepted = picked.slice(0, room);
+  if (accepted.length === picked.length) {
+    return { accepted, rejected: [] };
+  }
+  return { accepted, rejected: [{ nodeId: target.id, why: `al massimo ${room + taken} ${CONNECTOR_LABEL.images} in ingresso` }] };
 }
 
 /**
@@ -390,16 +415,19 @@ export function resolveUpstreamInputs(
     }
   }
 
+  const picked = pickedWithin(target, targetKind, connectors, referenceImageUrls.length);
+
   return {
     text,
     referenceImageUrl: referenceImageUrls[0] ?? null,
-    referenceImageUrls,
+    referenceImageUrls: [...referenceImageUrls, ...picked.accepted],
+    pickedImageUrls: picked.accepted,
     referenceVideoUrls,
     referenceAudioUrls,
     startFrameUrl,
     endFrameUrl,
     blocked: null,
-    rejected
+    rejected: [...rejected, ...picked.rejected]
   };
 }
 

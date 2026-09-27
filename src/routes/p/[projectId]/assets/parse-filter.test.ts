@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseAssetSourceFilter } from './asset-filter';
+import { isGlobalTab, parseAssetSourceFilter } from './asset-filter';
 
 describe('il filtro della libreria è un terzo stato, non un booleano', () => {
   it('nessun parametro è "tutti", non un filtro mancante', () => {
@@ -17,5 +17,16 @@ describe('il filtro della libreria è un terzo stato, non un booleano', () => {
   it('un valore che non è dei tre non filtra nulla', () => {
     expect(parseAssetSourceFilter('imported')).toBeUndefined();
     expect(parseAssetSourceFilter('qualsiasi')).toBeUndefined();
+  });
+});
+
+describe('la scheda Global è il catalogo condiviso, non un filtro sugli asset', () => {
+  it('"global" apre il catalogo', () => {
+    expect(isGlobalTab('global')).toBe(true);
+  });
+
+  it('ogni altro valore resta sugli asset del progetto', () => {
+    expect(isGlobalTab(null)).toBe(false);
+    expect(isGlobalTab('upload')).toBe(false);
   });
 });

@@ -11,3 +11,9 @@ import type { AssetSource } from '$lib/server/repos/assets';
 export function parseAssetSourceFilter(raw: string | null): AssetSource | undefined {
   return raw === 'generated' || raw === 'upload' ? raw : undefined;
 }
+
+export const GLOBAL_TAB = 'global';
+
+export function isGlobalTab(raw: string | null): boolean {
+  return raw === GLOBAL_TAB;
+}

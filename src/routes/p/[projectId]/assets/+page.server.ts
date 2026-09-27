@@ -6,7 +6,8 @@ import { listProjectAssets, type Asset } from '$lib/server/repos/assets';
 import { listNodesByIds } from '$lib/server/repos/canvas';
 import { createAssetSigningDb, signAssetPaths } from '$lib/server/canvas/sign-media';
 import { registerUploadedAsset, UploadError } from '$lib/server/canvas/upload';
-import { parseAssetSourceFilter } from './asset-filter';
+import { GLOBAL_TAB, isGlobalTab, parseAssetSourceFilter } from './asset-filter';
+import { listCatalogueImages } from '$lib/server/repos/reference-images';
 
 /**
  * LA LIBRERIA MEDIA DI UN PROGETTO, SULLO SCHEMA NUOVO.
@@ -64,6 +65,12 @@ export const load: PageServerLoad = async ({ params, url, locals }) => {
   }
 
   const { orgId, project } = found;
+  const projectSummary = { id: project.id, name: project.name, slug: project.slug };
+
+  if (isGlobalTab(url.searchParams.get('source'))) {
+    return { orgId, project: projectSummary, items: [] as MediaAsset[], catalogue: await listCatalogueImages(db), filter: GLOBAL_TAB };
+  }
+
   const source = parseAssetSourceFilter(url.searchParams.get('source'));
 
   const assets = await listProjectAssets(db, { orgId, projectId: project.id, source });
@@ -88,8 +95,9 @@ export const load: PageServerLoad = async ({ params, url, locals }) => {
 
   return {
     orgId,
-    project: { id: project.id, name: project.name, slug: project.slug },
+    project: projectSummary,
     items,
+    catalogue: [],
     filter: source ?? 'all'
   };
 };

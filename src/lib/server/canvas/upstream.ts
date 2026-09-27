@@ -2,6 +2,8 @@ import type { Db } from '$lib/server/db/client';
 import { listConnections, listNodes, type CanvasNodeRecord, type Connection } from '$lib/server/repos/canvas';
 import { findAsset, findAssets } from '$lib/server/repos/assets';
 import { listInfluencerViews, signInfluencerViewFiles } from '$lib/server/repos/influencers';
+import { findReferenceImages, signReferenceImages } from '$lib/server/repos/reference-images';
+import { referencesOf } from '$lib/canvas/node-references';
 import { syncedSourceItems } from './synced-items';
 import {
   resolveUpstreamInputs,
@@ -315,6 +317,29 @@ async function toUpstreamNode(
   };
 }
 
+async function pickedReferenceUrls(db: Db, orgId: string, node: CanvasNodeRecord): Promise<string[]> {
+  const refs = referencesOf(node.data);
+  if (!refs.length) {
+    return [];
+  }
+
+  const idsOf = (source: string) => refs.filter((r) => r.source === source).map((r) => r.id);
+  const [assets, catalogue] = await Promise.all([
+    findAssets(db, { orgId, assetIds: idsOf('asset') }),
+    findReferenceImages(db, idsOf('catalogue'))
+  ]);
+  const signed = await signReferenceImages(db, [...catalogue.values()].map((image) => image.storagePath));
+
+  const urlOf = {
+    asset: (id: string) => assets.get(id)?.url ?? null,
+    catalogue: (id: string) => {
+      const image = catalogue.get(id);
+      return image ? (signed.get(image.storagePath) ?? null) : null;
+    }
+  };
+  return refs.map((ref) => urlOf[ref.source](ref.id)).filter((url): url is string => Boolean(url));
+}
+
 function toUpstreamEdge(connection: Connection): UpstreamEdge {
   return {
     id: connection.id,
@@ -329,6 +354,7 @@ const BLOCKED_EMPTY: Omit<UpstreamInputs, 'blocked'> = {
   text: [],
   referenceImageUrl: null,
   referenceImageUrls: [],
+  pickedImageUrls: [],
   referenceVideoUrls: [],
   referenceAudioUrls: [],
   startFrameUrl: null,
@@ -380,5 +406,9 @@ export async function upstreamInputsFor(
   );
   const edges = connectionRows.map(toUpstreamEdge);
 
-  return resolveUpstreamInputs(nodes, edges, scope.nodeId, resolvedModalities ?? { input: [] });
+  const target = nodesById.get(scope.nodeId);
+  const referenceUrls = target ? await pickedReferenceUrls(db, scope.orgId, target) : [];
+  const withPicked = nodes.map((n) => (n.id === scope.nodeId ? { ...n, referenceUrls } : n));
+
+  return resolveUpstreamInputs(withPicked, edges, scope.nodeId, resolvedModalities ?? { input: [] });
 }

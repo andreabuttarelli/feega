@@ -881,3 +881,52 @@ describe('upstreamInputsFor — il select vede il feed filtrato, non le righe gr
     expect(out.referenceImageUrls).toEqual(['canvas-assets/clip.png']);
   });
 });
+
+describe('upstreamInputsFor — riferimenti scelti sul nodo', () => {
+  const CATALOGUE_ID = '12121212-1212-1212-1212-121212121212';
+
+  it('un asset della libreria e una foto del catalogo globale arrivano come riferimenti, nell\'ordine scelto', async () => {
+    modalitiesOf.mockResolvedValue({ input: ['text', 'image'], output: ['image'], synced_at: 'now' });
+    const { db } = fakeDb(
+      {
+        nodes: [
+          nodeRow(IMAGE_NODE, 'image', {
+            prompt: 'x',
+            model: 'qwen3-pro',
+            references: [
+              { source: 'catalogue', id: CATALOGUE_ID },
+              { source: 'asset', id: IMAGE_ASSET_1 }
+            ]
+          })
+        ],
+        nodes_connections: [],
+        assets: [{ id: IMAGE_ASSET_1, project_id: 'p1', type: 'image', url: `${ORG}/p1/own.png`, content: null, mime_type: 'image/png', bytes: 1, width: null, height: null, duration_s: null, source: 'upload', source_node_id: null, created_at: 'now' }],
+        reference_images: [{ id: CATALOGUE_ID, org_id: null, name: 'Chrome sphere', storage_path: 'catalogue/model-01-chrome-sphere.png', mime_type: 'image/png', width: null, height: null, sort_order: 0 }]
+      }
+    );
+
+    const out = await upstreamInputsFor(db, { orgId: ORG, canvasId: CANVAS, nodeId: IMAGE_NODE, model: 'qwen3-pro', medium: 'image' });
+
+    expect(out.pickedImageUrls).toEqual([
+      'https://signed.example/reference-images/catalogue/model-01-chrome-sphere.png',
+      `${ORG}/p1/own.png`
+    ]);
+    expect(out.referenceImageUrl).toBeNull();
+  });
+
+  it('un riferimento sparito si salta, non ferma il giro', async () => {
+    const { db } = fakeDb(
+      {
+        nodes: [nodeRow(IMAGE_NODE, 'image', { prompt: 'x', model: MODEL, references: [{ source: 'catalogue', id: CATALOGUE_ID }] })],
+        nodes_connections: [],
+        assets: [],
+        reference_images: []
+      }
+    );
+
+    const out = await upstreamInputsFor(db, { orgId: ORG, canvasId: CANVAS, nodeId: IMAGE_NODE, model: MODEL, medium: 'image' });
+
+    expect(out.pickedImageUrls).toEqual([]);
+    expect(out.blocked).toBeNull();
+  });
+});

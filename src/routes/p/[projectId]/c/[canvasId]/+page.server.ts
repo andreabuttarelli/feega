@@ -60,6 +60,7 @@ import { estimateCanvasTextCost } from '$lib/server/canvas/text-cost-estimate';
 import { applyEffectsNode } from '$lib/server/canvas/apply-effects';
 import { nodeAcceptsConnection } from '$lib/canvas/connector-ports';
 import { ShareState, readCanvasShare, setCanvasShare } from '$lib/server/canvas/canvas-share';
+import { referenceLibrary } from '$lib/server/canvas/reference-library';
 
 // L'azione `run` aspetta la generazione DENTRO la richiesta — un'immagine ci mette fino a un
 // minuto, e il default della piattaforma è sotto quella soglia. Senza, la richiesta muore a metà
@@ -192,11 +193,12 @@ async function loadInfluencerViews(
 export const load: PageServerLoad = async ({ params, locals }) => {
   const { db, orgId, canvasId, canvas } = await scopeFor(locals, params.canvasId);
 
-  const [nodes, connections, catalogue, shareToken] = await Promise.all([
+  const [nodes, connections, catalogue, shareToken, references] = await Promise.all([
     listNodes(db, { orgId, canvasId }),
     listConnections(db, { orgId, canvasId }),
     canvasModelCatalogue(),
-    readCanvasShare(db, { orgId, canvasId })
+    readCanvasShare(db, { orgId, canvasId }),
+    referenceLibrary(db, { orgId, projectId: canvas.projectId })
   ]);
 
   const [runs, { products, socialPosts, influencers }, sources] = await Promise.all([
@@ -219,7 +221,8 @@ export const load: PageServerLoad = async ({ params, locals }) => {
     projectId: params.projectId,
     orgId,
     nodeIdsInPost,
-    shareToken
+    shareToken,
+    references
   };
 };
 

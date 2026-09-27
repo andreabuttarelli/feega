@@ -33,6 +33,8 @@
   import ListNode from '$lib/components/canvas/ListNode.svelte';
   import SelectNode from '$lib/components/canvas/SelectNode.svelte';
   import NodeDownload from '$lib/components/canvas/NodeDownload.svelte';
+  import NodeReferences from '$lib/components/canvas/NodeReferences.svelte';
+  import { referencesOf } from '$lib/canvas/node-references';
   import EffectsNode from '$lib/components/canvas/EffectsNode.svelte';
   import EffectsEditor from '$lib/components/canvas/EffectsEditor.svelte';
   import CompositionNode from '$lib/components/canvas/CompositionNode.svelte';
@@ -1878,6 +1880,15 @@
                   <NodeDownload kind="image" sourceUrl={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} nodeId={id} nodeType={gen.medium} />
                 </div>
               {/if}
+            {/snippet}
+            {#snippet references()}
+              <NodeReferences
+                references={referencesOf(row.data)}
+                catalogue={data.references.catalogue}
+                media={data.references.media}
+                assetUrl={(assetId) => `/p/${data.projectId}/c/${data.canvas.id}/assets/${assetId}`}
+                onchange={(next) => void write(id, { references: next })}
+              />
             {/snippet}
           </GenNode>
         {:else if frame}
