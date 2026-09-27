@@ -4,7 +4,7 @@ import { hashInviteToken } from '$lib/server/repos/invites';
 import { fakeDb, filtersOf, type Call } from '$lib/server/db/fake-db';
 import { SERVICE_ROLE_USES } from '$lib/server/db/service-role-uses';
 import { FreeOrgLimitReachedError } from '$lib/server/tenancy/free-org-limit';
-import { WELCOME_CREDITS } from '$lib/server/credit-ladder';
+import { WELCOME_CREDITS } from '$lib/credit-ladder';
 
 const ORG = '11111111-1111-1111-1111-111111111111';
 const USER = '22222222-2222-2222-2222-222222222222';

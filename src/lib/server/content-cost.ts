@@ -27,7 +27,7 @@
  */
 import type { ContentFormat } from '$lib/content-formats';
 import { videoModel } from '$lib/server/model-routing';
-import { billedCreditsFor } from '$lib/server/credit-ladder';
+import { billedCreditsFor } from '$lib/credit-ladder';
 
 const credits = billedCreditsFor;
 

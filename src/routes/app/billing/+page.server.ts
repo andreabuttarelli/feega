@@ -2,7 +2,7 @@ import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad, RequestEvent } from './$types';
 import { orgCreditBalance } from '$lib/server/credits';
 import { ensureOrgForUser } from '$lib/server/org';
-import { billedCreditsFor, CREDIT_LADDER } from '$lib/server/credit-ladder';
+import { billedCreditsFor, CREDIT_LADDER } from '$lib/credit-ladder';
 import { isOrgOwner } from '$lib/server/org-billing';
 import { billingGrantsReady } from '$lib/server/billing-readiness';
 import {

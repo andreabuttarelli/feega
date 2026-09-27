@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { socialConnections } from './social-connections';
-import { ACCOUNT_SEAT_CREDITS } from './credit-ladder';
+import { ACCOUNT_SEAT_CREDITS } from '../credit-ladder';
 
 /**
  * Non ci sono più piani: collegare un account è gated dal saldo crediti dell'org, non da

@@ -1955,3 +1955,16 @@ Segnale: `git add src/routes/p/[projectId]/c/[canvasId]/+page.svelte` non da' er
 resta fuori dallo staging — git tratta `[...]` come una character class glob, e `projectId` non
 la soddisfa mai. Mossa: `git add ':(literal)src/routes/p/[projectId]/c/[canvasId]/+page.svelte'`
 — il prefisso `:(literal)` disattiva il glob e fa matchare il percorso byte per byte.
+
+### Un modulo client-safe dentro `$lib/server/` rompe la build, non un test
+`import { billedCreditsFor } from '$lib/server/credit-ladder'` in `ads-fee.ts` (universale,
+importato da un `+page.svelte`) — nessun test lo copre perché ogni test lo importa lato server,
+dove la guardia di SvelteKit non gira. In produzione la build fallisce ("Cannot import
+$lib/server/credit-ladder.ts into code that runs in the browser") e il deployment non nasce mai:
+il 500 `FUNCTION_INVOCATION_FAILED` che l'utente vede è l'alias che punta a un deployment
+inesistente, non una funzione che crasha a runtime. Segnale: `vercel inspect <url> --logs` mostra
+l'errore `vite-plugin-sveltekit-guard` durante `npm run build`, non uno stack a runtime; l'unico
+deployment "Production" è in stato Error. Mossa: `credit-ladder.ts` non ha segreti — è prezzo
+puro (costanti + funzioni) — quindi va spostato fuori da `$lib/server/` (`$lib/credit-ladder.ts`)
+invece di duplicare la logica lato client. Prima di mettere qualcosa sotto `$lib/server/`,
+chiedersi se un componente lo importerà mai: se sì e il contenuto è client-safe, non ci va sotto.

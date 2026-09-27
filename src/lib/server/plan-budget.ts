@@ -15,7 +15,7 @@
  * `cost_usd`): usare l'euro darebbe un budget più stretto a parità di margine dichiarato.
  */
 import { PLANS } from '$lib/plans';
-import { CREDITS_PER_USD_GRANT } from '$lib/server/credit-ladder';
+import { CREDITS_PER_USD_GRANT } from '$lib/credit-ladder';
 
 /** Quanto del prezzo NON va in produzione. Go tiene meno margine: è il piano d'ingresso. */
 export const PRODUCTION_MARGIN = { standard: 0.5, go: 0.4 } as const;

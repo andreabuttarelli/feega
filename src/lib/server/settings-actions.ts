@@ -4,7 +4,7 @@ import { fail, redirect } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 import { syncBrandAccounts, disconnectAccount } from '$lib/server/zernio';
 import { canAffordSeat } from '$lib/server/social-connections';
-import { CREDIT_LADDER } from '$lib/server/credit-ladder';
+import { CREDIT_LADDER } from '$lib/credit-ladder';
 import { generateApiKey } from '$lib/server/cli-auth';
 import { sendEmail, brandInviteEmailSubject, brandInviteEmailHtml, brandInviteEmailText } from '$lib/server/email';
 import { emailLocale } from '$lib/server/email-i18n';

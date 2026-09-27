@@ -1,5 +1,5 @@
 import type { Db } from '$lib/server/db/client';
-import { FREE_ORGS_PER_USER, WELCOME_CREDITS, WELCOME_CREDITS_EXPIRY_DAYS } from '$lib/server/credit-ladder';
+import { FREE_ORGS_PER_USER, WELCOME_CREDITS, WELCOME_CREDITS_EXPIRY_DAYS } from '$lib/credit-ladder';
 
 /**
  * `credit_ledger` (20260922_org_billing.sql) non è nei tipi generati — `database.types.ts` non è

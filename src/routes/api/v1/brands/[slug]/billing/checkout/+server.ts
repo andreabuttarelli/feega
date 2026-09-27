@@ -4,7 +4,7 @@ import { authenticate, checkApiKeyWriteAccess, loadBrandForUser } from '$lib/ser
 import { billingLink } from '$lib/server/billing-links';
 import { isOrgOwner, orgBillingForBrand } from '$lib/server/org-billing';
 import { billingGrantsReady } from '$lib/server/billing-readiness';
-import { CREDIT_LADDER } from '$lib/server/credit-ladder';
+import { CREDIT_LADDER } from '$lib/credit-ladder';
 import { appOrigin } from '$lib/server/app-url';
 import { CHECKOUT_LINK, statusForFailure } from '@feega/api-contracts';
 

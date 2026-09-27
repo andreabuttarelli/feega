@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ACCOUNT_SEAT_CREDITS } from '$lib/server/credit-ladder';
+import { ACCOUNT_SEAT_CREDITS } from '$lib/credit-ladder';
 
 vi.mock('$lib/server/cli-auth', () => ({
   authenticate: vi.fn(),

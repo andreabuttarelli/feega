@@ -26,7 +26,7 @@
  * all'infinito gratis, e sarebbe la prima cosa che fa un agente in loop. Il fallimento però si
  * vede: la riga porta `ok: false`, quindi in bolletta si distingue.
  */
-import { billedCreditsFor } from '$lib/server/credit-ladder';
+import { billedCreditsFor } from '$lib/credit-ladder';
 import { logAiCall } from '$lib/server/ai-log';
 import { env } from '$env/dynamic/private';
 

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { chargeAccountSeat, renewAccountSeats } from './account-billing';
-import { ACCOUNT_SEAT_CREDITS } from './credit-ladder';
+import { ACCOUNT_SEAT_CREDITS } from '../credit-ladder';
 
 /**
  * Il canone mensile per un account collegato: un debito `credit_ledger` (source 'social_seat'),
