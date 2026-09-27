@@ -34,6 +34,10 @@ export const CANVAS_ADDABLE = [
 
 export type Addable = (typeof CANVAS_ADDABLE)[number];
 
+const NOT_READY: readonly Addable[] = ['iframe'];
+
+export const CANVAS_ADD_BAR = CANVAS_ADDABLE.filter((w) => !NOT_READY.includes(w));
+
 export function isAddable(x: string): x is Addable {
   return (CANVAS_ADDABLE as readonly string[]).includes(x);
 }

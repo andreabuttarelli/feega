@@ -120,7 +120,7 @@ const iframeSchema = z
 
 const socialAccountFeedSchema = z.object({
   platform: z.enum(SOCIAL_PLATFORMS),
-  handle: z.string().min(1),
+  handle: z.string(),
   limit: z.number().int().positive().optional(),
   after: z.string().nullable().optional(),
   ...syncState
@@ -148,7 +148,7 @@ const PRODUCT_PLATFORMS = ['shopify', 'woocommerce'] as const;
 
 const productsSchema = z.object({
   type: z.enum(PRODUCT_PLATFORMS),
-  url: z.string().url(),
+  url: z.union([z.literal(''), z.string().url()]),
   limit: z.number().int().positive().optional(),
   after: z.string().nullable().optional(),
   only_first_photo: z.boolean().optional(),

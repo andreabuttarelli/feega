@@ -49,3 +49,12 @@ describe('cosa si può mettere sulla tela', () => {
     expect(isGenAddable('doc')).toBe(false);
   });
 });
+
+describe('la barra mostra solo i nodi pronti', () => {
+  it('la pagina web resta aggiungibile ma non compare nella barra', async () => {
+    const { CANVAS_ADD_BAR } = await import('./addable');
+    expect(CANVAS_ADD_BAR).not.toContain('iframe');
+    expect(CANVAS_ADDABLE).toContain('iframe');
+    expect(CANVAS_ADD_BAR.every((w) => CANVAS_ADDABLE.includes(w))).toBe(true);
+  });
+});

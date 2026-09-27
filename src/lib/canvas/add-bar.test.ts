@@ -20,9 +20,7 @@ const flow = readFileSync(join(dir, '..', 'components', 'canvas', 'CanvasFlow.sv
 
 describe('la barra per aggiungere un nodo', () => {
   it('offre tutto ciò che si può aggiungere, preso dal modello e non riscritto', () => {
-    // `CANVAS_ADDABLE` e non `GEN_MEDIUMS`: la barra mostra anche la pagina incorporata, che non
-    // produce niente. Un elenco riscritto qui perderebbe la quarta voce senza che nulla lo dica.
-    expect(bar).toMatch(/CANVAS_ADDABLE/);
+    expect(bar).toMatch(/CANVAS_ADD_BAR/);
   });
 
   it('ogni voce si può cliccare', () => {

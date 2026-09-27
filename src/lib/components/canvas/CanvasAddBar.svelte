@@ -23,7 +23,7 @@
    */
   import Keyboard from '@lucide/svelte/icons/keyboard';
   import Upload from '@lucide/svelte/icons/upload';
-  import { CANVAS_ADDABLE, ADDABLE_LABEL, type Addable } from '$lib/canvas/addable';
+  import { CANVAS_ADD_BAR, ADDABLE_LABEL, type Addable } from '$lib/canvas/addable';
   import { ADDABLE_ICON } from '$lib/canvas/addable-icons';
   import { CANVAS_DRAG_MEDIUM } from '$lib/canvas/new-node';
   import { CANVAS_SHORTCUTS } from '$lib/canvas/shortcuts';
@@ -53,7 +53,7 @@
 </script>
 
 <div class="add-bar">
-  {#each CANVAS_ADDABLE as what, i (what)}
+  {#each CANVAS_ADD_BAR as what, i (what)}
     {@const Icon = ADDABLE_ICON[what]}
     <!-- Il numero nel `title` è il posto in cui la scorciatoia si incontra SENZA cercarla: la
          scheda accanto la elenca, ma la si apre solo sospettando che esista. -->

@@ -9,7 +9,7 @@ import {
   nudgeOf,
   type CanvasCommand
 } from './shortcuts';
-import { CANVAS_ADDABLE } from './addable';
+import { CANVAS_ADD_BAR } from './addable';
 
 /** Un evento tastiera finto: bastano i campi che il registro guarda. */
 function ev(
@@ -116,7 +116,7 @@ describe('quello che i tasti fanno sulla tela', () => {
   });
 
   it('i numeri aggiungono, nello stesso ordine della barra', () => {
-    CANVAS_ADDABLE.forEach((what, i) => {
+    CANVAS_ADD_BAR.forEach((what, i) => {
       const m = matchCanvasShortcut(ev(String(i + 1)));
       expect(m?.id).toBe('add');
       expect(addableOf(m as CanvasCommand)).toBe(what);
@@ -124,7 +124,7 @@ describe('quello che i tasti fanno sulla tela', () => {
   });
 
   it('un numero oltre l’elenco non aggiunge niente', () => {
-    expect(matchCanvasShortcut(ev(String(CANVAS_ADDABLE.length + 1)))).toBeNull();
+    expect(matchCanvasShortcut(ev(String(CANVAS_ADD_BAR.length + 1)))).toBeNull();
   });
 
   it('la vista: 0 inquadra tutto, + e - la scala', () => {

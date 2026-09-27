@@ -40,7 +40,7 @@
  * caso in cui la cancellazione arriva senza essere stata chiesta, ed è il primo test del file.
  */
 import { isTypingTarget } from '$lib/shortcuts';
-import { CANVAS_ADDABLE, ADDABLE_LABEL, type Addable } from './addable';
+import { CANVAS_ADD_BAR, ADDABLE_LABEL, type Addable } from './addable';
 
 /** Di quante unità di tela sposta una freccia, e quanto con Shift. */
 export const NUDGE_STEP = 8;
@@ -133,8 +133,8 @@ export function matchCanvasShortcut(e: KeyboardEvent): CanvasCommand | null {
   if (key === '-') return { id: 'zoom-out' };
 
   const slot = Number(key);
-  if (Number.isInteger(slot) && slot >= 1 && slot <= CANVAS_ADDABLE.length) {
-    return { id: 'add', what: CANVAS_ADDABLE[slot - 1] };
+  if (Number.isInteger(slot) && slot >= 1 && slot <= CANVAS_ADD_BAR.length) {
+    return { id: 'add', what: CANVAS_ADD_BAR[slot - 1] };
   }
 
   return null;
@@ -157,7 +157,7 @@ export type CanvasShortcutRow = { id: CanvasCommandId; keys: string[]; label: st
  * sempre quella che l'utente legge.
  */
 export const CANVAS_SHORTCUTS: readonly CanvasShortcutRow[] = [
-  ...CANVAS_ADDABLE.map((what, i) => ({
+  ...CANVAS_ADD_BAR.map((what, i) => ({
     id: 'add' as const,
     keys: [String(i + 1)],
     label: `Aggiungi: ${ADDABLE_LABEL[what]}`
