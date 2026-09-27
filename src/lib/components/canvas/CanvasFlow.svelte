@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { focusEdges } from '$lib/canvas/edge-focus';
   /**
    * LA TELA, SU SVELTEFLOW.
    *
@@ -506,6 +507,13 @@
    */
   const selectedSummaries = $derived(nodeSummaries.filter((n) => selection.ids.includes(n.id)));
   const selectionEdges = $derived(edges.map((e) => ({ sourceNodeId: e.source, targetNodeId: e.target })));
+
+  $effect(() => {
+    const next = focusEdges(edges, selection.ids);
+    if (next) {
+      edges = next;
+    }
+  });
   const selectionMedium = $derived(
     selectedSummaries.length && selectedSummaries.every((n) => n.type === selectedSummaries[0].type)
       ? (selectedSummaries[0].type as 'text' | 'image' | 'video')
@@ -768,8 +776,12 @@
        invece di essere l'unico riquadro bianco su una tela scura. */
     --xy-attribution-background-color: color-mix(in srgb, var(--paper, #fff) 70%, transparent);
 
-    --xy-edge-stroke: var(--ink-soft, #6e6e73);
+    --xy-edge-stroke: color-mix(in srgb, var(--ink-soft, #6e6e73) 45%, var(--paper, #fff));
     --xy-edge-stroke-selected: var(--accent, #7c5cff);
+  }
+
+  .wrap :global(.svelte-flow__edge.is-linked .svelte-flow__edge-path) {
+    stroke: var(--ink-soft, #6e6e73);
   }
 
   /* Il colore del link è scritto fisso nella libreria (`#999`), quindi non basta una variabile. */
