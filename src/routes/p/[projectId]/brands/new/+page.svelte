@@ -219,18 +219,22 @@
 
 <PageHead title="New brand" subtitle={`Step ${stepIndex + 1} of ${STEPS.length} — ${STEP_LABEL[step]}`} />
 
-<div class="wizard">
-  <ol class="steps">
-    {#each STEPS as s, i (s)}
-      <li class:active={s === step} class:done={i < stepIndex}>{STEP_LABEL[s]}</li>
-    {/each}
-  </ol>
+<div class="wizard-shell">
+  <div class="wizard">
+    <ol class="steps">
+      {#each STEPS as s, i (s)}
+        <li class:active={s === step} class:done={i < stepIndex}>
+          <span class="dot"></span>
+          <span class="label">{STEP_LABEL[s]}</span>
+        </li>
+      {/each}
+    </ol>
 
-  {#if error}
-    <p class="msg warn">{error}</p>
-  {/if}
+    {#if error}
+      <p class="msg warn">{error}</p>
+    {/if}
 
-  {#if step === 'website'}
+    {#if step === 'website'}
     <section class="panel">
       <h2>Where can we find this brand?</h2>
       <p class="hint">We'll read the site for a logo, colours, description and detected products. You can skip this and fill everything by hand.</p>
@@ -417,49 +421,161 @@
       </form>
     </section>
   {/if}
+  </div>
 </div>
 
 <style>
-  .wizard { max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+  .wizard-shell {
+    min-height: 100dvh;
+    display: flex;
+    justify-content: center;
+    padding: 56px 24px 80px;
+    background: var(--paper-2);
+  }
 
-  .steps { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0; padding: 0; }
-  .steps li { font-size: 11px; padding: 4px 8px; border: 1px solid var(--line); color: var(--ink-faint); }
-  .steps li.active { color: var(--ink); border-color: var(--ink); }
-  .steps li.done { color: var(--ink-soft); }
+  .wizard {
+    width: 100%;
+    max-width: 560px;
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+  }
 
-  .panel { display: flex; flex-direction: column; gap: 14px; }
-  .panel h2 { margin: 0; font-size: 16px; }
-  .hint { margin: 0; font-size: 12px; color: var(--ink-soft); }
+  .steps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .steps li {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 0 10px;
+    border-bottom: 2px solid var(--line);
+    color: var(--ink-faint);
+  }
+  .steps li .dot {
+    width: 6px;
+    height: 6px;
+    background: currentColor;
+    flex: 0 0 auto;
+  }
+  .steps li .label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .steps li.done { color: var(--ink-soft); border-color: var(--ink-soft); }
+  .steps li.active { color: var(--accent); border-color: var(--accent); }
 
-  .field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
-  .field span { color: var(--ink-soft); }
-  input[type='text'], input[type='url'], textarea, select {
-    border: 1px solid var(--line); background: var(--paper); padding: 8px; font: inherit; color: var(--ink);
+  .panel {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    padding: 40px;
+  }
+  .panel h2 {
+    margin: 0;
+    font-size: clamp(1.3rem, 2.4vw, 1.6rem);
+    font-weight: var(--heading-weight);
+    letter-spacing: var(--heading-tracking);
+  }
+  .hint { margin: 0; font-size: 13.5px; color: var(--ink-soft); line-height: 1.5; }
+
+  .field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+  .field span { color: var(--ink-soft); font-weight: 500; }
+
+  input[type='text'],
+  input[type='url'],
+  textarea,
+  select {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid var(--line-2);
+    background: var(--paper);
+    padding: 12px 14px;
+    font: inherit;
+    font-size: 15px;
+    color: var(--ink);
+    outline: none;
+  }
+  input[type='text']:focus,
+  input[type='url']:focus,
+  textarea:focus,
+  select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 4px rgba(var(--accent-rgb), 0.12);
   }
   textarea { resize: vertical; }
 
-  .row { display: flex; justify-content: space-between; gap: 8px; }
-  .btn { border: 1px solid var(--line); background: var(--paper); padding: 8px 14px; font-size: 13px; cursor: pointer; }
+  .row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding-top: 4px;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--line-2);
+    background: var(--paper);
+    color: var(--ink);
+    padding: 12px 22px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
   .btn.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
   .btn.ghost { background: transparent; }
-  .btn.small { padding: 4px 8px; font-size: 11px; }
+  .btn.small { padding: 6px 10px; font-size: 12px; }
   .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-  .msg.warn { font-size: 12px; color: var(--warn, #b00); border: 1px solid var(--warn, #b00); padding: 8px; margin: 0; }
+  .msg.warn {
+    font-size: 13px;
+    color: #c0392b;
+    background: rgba(192, 57, 43, 0.06);
+    border: 1px solid rgba(192, 57, 43, 0.35);
+    padding: 12px 16px;
+    margin: 0;
+  }
 
-  .found { display: flex; flex-direction: column; gap: 10px; }
-  .logo { width: 56px; height: 56px; object-fit: cover; border: 1px solid var(--line); }
-  .swatches { display: flex; gap: 6px; }
-  .swatch { width: 24px; height: 24px; border: 1px solid var(--line); }
+  .found { display: flex; flex-direction: column; gap: 14px; }
+  .logo { width: 64px; height: 64px; object-fit: cover; border: 1px solid var(--line); }
+  .swatches { display: flex; gap: 8px; }
+  .swatch { width: 28px; height: 28px; border: 1px solid var(--line); }
 
-  .products { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
-  .products li { border-bottom: 1px solid var(--line); padding-bottom: 8px; }
-  .products label { display: flex; align-items: center; gap: 8px; font-size: 13px; }
-  .products .desc { margin: 4px 0 0 24px; font-size: 12px; color: var(--ink-soft); }
+  .products { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+  .products li { border-bottom: 1px solid var(--line); padding-bottom: 12px; }
+  .products label { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+  .products .desc { margin: 6px 0 0 26px; font-size: 12.5px; color: var(--ink-soft); }
 
   .handle-row { display: flex; align-items: center; gap: 8px; }
-  .handle-row select { flex: 0 0 auto; }
+  .handle-row select { flex: 0 0 auto; width: auto; }
   .handle-row input { flex: 1; }
 
-  .preview { border: 1px solid var(--line); padding: 12px; }
+  .preview { border: 1px solid var(--line); padding: 16px; background: var(--paper-2); }
+
+  @media (max-width: 480px) {
+    .wizard-shell { padding: 32px 16px 56px; }
+    .panel { padding: 24px 20px; }
+    .steps li .label { font-size: 10px; }
+    .row { flex-direction: column-reverse; }
+    .row .btn { width: 100%; }
+  }
+
+  @media (max-width: 360px) {
+    .wizard-shell { padding: 24px 12px 48px; }
+    .panel { padding: 20px 16px; }
+  }
 </style>
