@@ -2,8 +2,7 @@ import { json } from '@sveltejs/kit';
 import { listMemberships } from '$lib/server/repos/orgs';
 import { listProjectAssets, type Asset } from '$lib/server/repos/assets';
 import { findProjectForUser } from '$lib/server/projects/lookup';
-import { signAssetFiles } from '$lib/server/repos/asset-storage';
-import { signKnowledgePaths } from '$lib/server/media-archive';
+import { createAssetSigningDb, signAssetPaths } from '$lib/server/canvas/sign-media';
 import type { Db } from '$lib/server/db/client';
 import type { RequestHandler } from './$types';
 
@@ -27,12 +26,10 @@ async function withSignedUrls(db: Db, assets: Asset[]): Promise<Map<string, stri
   const uploadPaths = assets.filter((a) => a.source === 'upload' && a.url).map((a) => a.url!);
   const generatedPaths = assets.filter((a) => a.source === 'generated' && a.url).map((a) => a.url!);
 
-  const [uploaded, generated] = await Promise.all([
-    signAssetFiles(db, uploadPaths),
-    signKnowledgePaths(db as never, generatedPaths)
-  ]);
-
-  return new Map([...uploaded, ...generated]);
+  return signAssetPaths(db, createAssetSigningDb(), {
+    generated: generatedPaths,
+    uploaded: uploadPaths
+  });
 }
 
 export const GET: RequestHandler = async ({ params, locals }) => {

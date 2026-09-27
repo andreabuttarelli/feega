@@ -4,8 +4,7 @@ import { listMemberships } from '$lib/server/repos/orgs';
 import { findProjectForUser } from '$lib/server/projects/lookup';
 import { listProjectAssets, type Asset } from '$lib/server/repos/assets';
 import { listNodesByIds } from '$lib/server/repos/canvas';
-import { signAssetFiles } from '$lib/server/repos/asset-storage';
-import { signKnowledgePaths } from '$lib/server/media-archive';
+import { createAssetSigningDb, signAssetPaths } from '$lib/server/canvas/sign-media';
 import { registerUploadedAsset, UploadError } from '$lib/server/canvas/upload';
 import { parseAssetSourceFilter } from './asset-filter';
 
@@ -41,12 +40,10 @@ async function withSignedUrls(
   const uploadPaths = assets.filter((a) => a.source === 'upload' && a.url).map((a) => a.url!);
   const generatedPaths = assets.filter((a) => a.source === 'generated' && a.url).map((a) => a.url!);
 
-  const [uploaded, generated] = await Promise.all([
-    signAssetFiles(db, uploadPaths),
-    signKnowledgePaths(db as never, generatedPaths)
-  ]);
-
-  return new Map([...uploaded, ...generated]);
+  return signAssetPaths(db, createAssetSigningDb(), {
+    generated: generatedPaths,
+    uploaded: uploadPaths
+  });
 }
 
 export const load: PageServerLoad = async ({ params, url, locals }) => {

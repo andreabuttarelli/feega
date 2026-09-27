@@ -3,8 +3,7 @@ import { error, redirect } from '@sveltejs/kit';
 import { findCanvasForUser } from '$lib/server/canvas/lookup';
 import { listMemberships } from '$lib/server/repos/orgs';
 import { findAsset } from '$lib/server/repos/assets';
-import { signKnowledgePaths } from '$lib/server/media-archive';
-import { signAssetFile } from '$lib/server/repos/asset-storage';
+import { createAssetSigningDb, signAssetPaths } from '$lib/server/canvas/sign-media';
 
 /**
  * UN ASSET DI UNA TELA, CON LA FIRMA DEL MOMENTO.
@@ -47,10 +46,14 @@ export const GET: RequestHandler = async ({ params, locals }) => {
   }
 
   // `source` dice il bucket: un upload sta su canvas-assets, un disegno di modello su brand-knowledge.
-  const signed =
-    asset.source === 'generated'
-      ? ((await signKnowledgePaths(db as never, [path])).get(path) ?? null)
-      : await signAssetFile(db, path).catch(() => null);
+  // La riga è già provata dell'org tramite `findAsset` con il client dell'utente; la firma passa
+  // alla service role perché brand-knowledge è per-utente e l'asset può essere di un collega.
+  const serviceDb = createAssetSigningDb();
+  const signedUrls = await signAssetPaths(db, serviceDb, {
+    generated: asset.source === 'generated' ? [path] : [],
+    uploaded: asset.source !== 'generated' ? [path] : []
+  });
+  const signed = signedUrls.get(path) ?? null;
 
   if (!signed) {
     throw error(404, 'file non trovato');

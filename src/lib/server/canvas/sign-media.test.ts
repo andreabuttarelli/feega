@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Db } from '$lib/server/db/client';
-import { signMediaPaths } from './sign-media';
+import { markRlsScoped } from '$lib/server/rls-client';
+import { signAssetPaths, signMediaPaths } from './sign-media';
 
 function storageWith(buckets: Record<string, string[]>): Db {
   return {
@@ -32,5 +33,36 @@ describe('un file in Storage arriva al modello come URL firmato, non come percor
     const urls = await signMediaPaths(db, ['https://cdn.example/x.png', 'missing/path.png']);
 
     expect(urls).toEqual(['https://cdn.example/x.png']);
+  });
+});
+
+describe('un asset è visibile a chiunque legga la sua riga, non solo a chi lo ha generato', () => {
+  it('firma un render con il client di servizio, non con quello dell\'utente', async () => {
+    const userDb = markRlsScoped(
+      storageWith({ 'canvas-assets': ['o/p/upload.png'] })
+    );
+    const serviceDb = storageWith({
+      'brand-knowledge': ['other-user/media/generated.png'],
+      'canvas-assets': ['o/p/upload.png']
+    });
+
+    const urls = await signAssetPaths(userDb, serviceDb, {
+      generated: ['other-user/media/generated.png'],
+      uploaded: ['o/p/upload.png']
+    });
+
+    expect(urls.get('other-user/media/generated.png')).toBe(
+      'https://signed/brand-knowledge/other-user/media/generated.png'
+    );
+    expect(urls.get('o/p/upload.png')).toBe('https://signed/canvas-assets/o/p/upload.png');
+  });
+
+  it('rifiuta un client utente non marchiato RLS, per non far passare un service client al posto suo', async () => {
+    const notRlsScoped = storageWith({});
+    const serviceDb = storageWith({ 'brand-knowledge': ['x/media/y.png'] });
+
+    await expect(
+      signAssetPaths(notRlsScoped, serviceDb, { generated: ['x/media/y.png'], uploaded: [] })
+    ).rejects.toThrow();
   });
 });

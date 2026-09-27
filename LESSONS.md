@@ -1976,3 +1976,15 @@ di ricaricare la pagina) un `ReferenceError` di un'API del browser dentro `node_
 modulo server la carica all'avvio della funzione, e in Node `DOMMatrix` non esiste. Mossa:
 `await import('libreria')` dentro la funzione che la usa, e un test che importa il modulo e
 verifica che la libreria non si carichi.
+
+### Un bucket per-utente + una riga condivisa dall'org: la RLS della riga non basta, va firmata con un client diverso
+Segnale: l'asset e il file in Storage esistono entrambi (verificabile con SQL a chiave anon), la
+RLS su `assets` lo mostra a ogni membro dell'org, eppure per chiunque non sia chi l'ha generato
+l'immagine sparisce dal canvas e dal pannello Media. `brand-knowledge` tiene cartelle per UTENTE
+(`<userId>/media/...`), e la sua unica policy di lettura confronta il primo segmento del path con
+`auth.uid()` — non con `auth_org_ids()` come ogni altra policy dell'app. Firmare con il client
+dell'utente eredita quel confine per-utente anche dove il dato che conta è condiviso per-org.
+Mossa: leggere la riga con il client dell'utente (prova l'appartenenza all'org via RLS), poi
+firmare il path con un client service-role dichiarato in `service-role-uses.ts` — mai il
+contrario, e mai un service client passato al posto del client utente per la lettura: la firma è
+un passo deliberatamente più permissivo della lettura, non un modo per saltarla.
