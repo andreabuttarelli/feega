@@ -11,11 +11,12 @@
   import { enhance } from '$app/forms';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import PageHead from '$lib/components/PageHead.svelte';
   import PlatformGlyph from '$lib/components/PlatformGlyph.svelte';
-  import { renderBrandContentHtml } from '$lib/canvas/brand-content-chips';
+  import { renderBrandContentHtml, tokenizeChips, type ChipToken } from '$lib/canvas/brand-content-chips';
   import { SOCIAL_PLATFORMS } from '$lib/canvas/social-platforms';
+  import { ANALYSIS_STEPS, ANALYSIS_STEP_INTERVAL_MS, analysisStepIndexAt } from '$lib/brand-wizard-analysis-steps';
   import '$lib/styles/doc-prose.css';
 
   let { data, form } = $props();
@@ -59,6 +60,7 @@
     competitorHandles: Handle[];
     brandHandles: Handle[];
     content: string;
+    images: string[];
   };
 
   function emptyDraft(): Draft {
@@ -73,7 +75,8 @@
       colours: [],
       competitorHandles: [],
       brandHandles: [],
-      content: ''
+      content: '',
+      images: []
     };
   }
 
@@ -83,6 +86,26 @@
   let draft = $state<Draft>(emptyDraft());
   let busy = $state(false);
   let error = $state<string | null>(null);
+
+  let analysisStepIndex = $state(0);
+  let analysisTimer: ReturnType<typeof setInterval> | null = null;
+
+  function startAnalysisCycle() {
+    analysisStepIndex = 0;
+    const startedAt = Date.now();
+    analysisTimer = setInterval(() => {
+      analysisStepIndex = analysisStepIndexAt(Date.now() - startedAt, ANALYSIS_STEPS.length);
+    }, 250);
+  }
+
+  function stopAnalysisCycle() {
+    if (analysisTimer) clearInterval(analysisTimer);
+    analysisTimer = null;
+  }
+
+  onDestroy(stopAnalysisCycle);
+
+  let editingField = $state<'name' | 'shortDescription' | 'target' | null>(null);
 
   onMount(() => {
     try {
@@ -124,8 +147,10 @@
     return () => {
       busy = true;
       error = null;
+      startAnalysisCycle();
       return async ({ result, update }: { result: { type: string; data?: unknown }; update: () => Promise<void> }) => {
         busy = false;
+        stopAnalysisCycle();
         if (result.type === 'failure') {
           const data = result.data as { error?: string } | undefined;
           error = data?.error === 'credits_exhausted' ? 'Out of AI credits for this billing period.' : (data?.error ?? 'Something went wrong.');
@@ -144,6 +169,7 @@
       logoUrl?: string | null;
       suggestedContent?: string;
       products?: Product[];
+      images?: string[];
       website?: string;
     };
 
@@ -152,6 +178,7 @@
     draft.logoUrl = r.logoUrl ?? draft.logoUrl;
     draft.content = r.suggestedContent ?? draft.content;
     draft.products = r.products ?? [];
+    draft.images = r.images ?? [];
     draft.website = r.website ?? draft.website;
 
     const targetMatch = /## Target\n\n([\s\S]*?)(\n\n##|$)/.exec(draft.content);
@@ -161,8 +188,8 @@
     if (coloursMatch) {
       draft.colours = coloursMatch[1]
         .split('\n')
-        .map((l) => l.replace(/^- /, '').trim())
-        .filter(Boolean);
+        .flatMap((l) => tokenizeChips(l).filter((t): t is Extract<ChipToken, { kind: 'colour' }> => t.kind === 'colour'))
+        .map((t) => t.hex);
     }
 
     const handlesMatch = /## Social handles\n\n([\s\S]*?)(\n\n##|$)/.exec(draft.content);
@@ -235,18 +262,34 @@
     {/if}
 
     {#if step === 'website'}
-    <section class="panel">
-      <h2>Where can we find this brand?</h2>
-      <p class="hint">We'll read the site for a logo, colours, description and detected products. You can skip this and fill everything by hand.</p>
+    <section class="wizard-panel">
+      {#if busy}
+        <h2>Reading {draft.website}</h2>
+        <p class="hint">This takes a moment — we're actually visiting the site.</p>
+        <div class="progress-track" role="progressbar" aria-label="Analyzing site"><div class="progress-fill"></div></div>
+        <ol class="analysis-steps">
+          {#each ANALYSIS_STEPS as s, i (s.label)}
+            <li class:done={i < analysisStepIndex} class:active={i === analysisStepIndex}>
+              <span class="analysis-step-mark">{i < analysisStepIndex ? '✓' : ''}</span>
+              <span>{s.label}</span>
+            </li>
+          {/each}
+        </ol>
+      {:else}
+        <h2>Where can we find this brand?</h2>
+        <p class="hint">We'll read the site for a logo, colours, description and detected products. You can skip this and fill everything by hand.</p>
+      {/if}
 
       <form
         method="POST"
         action="?/analyze"
         use:enhance={withBusy((result) => applyAnalysis(result))}
       >
-        <input name="url" type="text" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="example.com" bind:value={draft.website} />
+        {#if !busy}
+          <input name="url" type="text" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="example.com" bind:value={draft.website} />
+        {/if}
         <div class="row">
-          <button class="btn ghost" type="button" onclick={forward}>Skip, no website</button>
+          <button class="btn ghost" type="button" onclick={forward} disabled={busy}>Skip, no website</button>
           <button class="btn primary" type="submit" disabled={busy || !draft.website}>{busy ? 'Reading…' : 'Analyze'}</button>
         </div>
       </form>
@@ -254,18 +297,35 @@
   {/if}
 
   {#if step === 'analysis'}
-    <section class="panel">
+    <section class="wizard-panel">
       <h2>What we found</h2>
       <div class="found">
         {#if draft.logoUrl}<img class="logo" src={draft.logoUrl} alt="" />{/if}
-        <label class="field">
-          <span>Name</span>
-          <input type="text" bind:value={draft.name} />
-        </label>
-        <label class="field">
-          <span>Short description</span>
-          <input type="text" bind:value={draft.shortDescription} />
-        </label>
+
+        {#if editingField === 'name'}
+          <label class="wizard-field">
+            <span>Name</span>
+            <input type="text" bind:value={draft.name} onblur={() => (editingField = null)} />
+          </label>
+        {:else}
+          <div class="found-item">
+            <h3 class="found-name">{draft.name || 'Untitled brand'}</h3>
+            <button class="btn ghost small" type="button" onclick={() => (editingField = 'name')}>Edit</button>
+          </div>
+        {/if}
+
+        {#if editingField === 'shortDescription'}
+          <label class="wizard-field">
+            <span>Short description</span>
+            <input type="text" bind:value={draft.shortDescription} onblur={() => (editingField = null)} />
+          </label>
+        {:else}
+          <div class="found-item">
+            <p class="found-description">{draft.shortDescription || 'No description found.'}</p>
+            <button class="btn ghost small" type="button" onclick={() => (editingField = 'shortDescription')}>Edit</button>
+          </div>
+        {/if}
+
         {#if draft.colours.length}
           <div class="swatches">
             {#each draft.colours as c (c)}
@@ -273,6 +333,15 @@
             {/each}
           </div>
         {/if}
+
+        {#if draft.images.length}
+          <div class="image-grid">
+            {#each draft.images as img (img)}
+              <img class="image-grid-item" src={img} alt="" loading="lazy" />
+            {/each}
+          </div>
+        {/if}
+
         <p class="hint">{draft.products.length} product{draft.products.length === 1 ? '' : 's'} detected.</p>
       </div>
       <div class="row">
@@ -283,7 +352,7 @@
   {/if}
 
   {#if step === 'products'}
-    <section class="panel">
+    <section class="wizard-panel">
       <h2>Products</h2>
       {#if !draft.products.length}
         <p class="hint">No products detected. This step is optional.</p>
@@ -308,10 +377,32 @@
   {/if}
 
   {#if step === 'target'}
-    <section class="panel">
+    <section class="wizard-panel">
       <h2>Who is this brand for?</h2>
       <p class="hint">A free-text description of the audience. We drafted one from the site — edit it freely.</p>
       <textarea rows="5" bind:value={draft.target} placeholder="e.g. Small coffee shops in Northern Italy, owner-operators, 25-45"></textarea>
+
+      <div class="wizard-field">
+        <span>Colours</span>
+        <div class="colour-list">
+          {#each draft.colours as c, i (i)}
+            <div class="colour-row">
+              <label class="colour-swatch-label" style={`background:${c}`}>
+                <input
+                  type="color"
+                  class="colour-swatch-input"
+                  value={/^#[0-9a-fA-F]{6}$/.test(c) ? c : '#000000'}
+                  oninput={(e) => (draft.colours[i] = (e.currentTarget as HTMLInputElement).value)}
+                />
+              </label>
+              <input type="text" bind:value={draft.colours[i]} placeholder="#rrggbb" />
+              <button class="btn ghost small" type="button" onclick={() => (draft.colours = draft.colours.filter((_, idx) => idx !== i))}>Remove</button>
+            </div>
+          {/each}
+        </div>
+        <button class="btn ghost" type="button" onclick={() => (draft.colours = [...draft.colours, '#000000'])}>+ Add colour</button>
+      </div>
+
       <div class="row">
         <button class="btn ghost" type="button" onclick={back}>Back</button>
         <button class="btn primary" type="button" onclick={forward}>Continue</button>
@@ -320,7 +411,7 @@
   {/if}
 
   {#if step === 'competitors'}
-    <section class="panel">
+    <section class="wizard-panel">
       <h2>Competitors' social handles</h2>
       <p class="hint">Recorded only — connecting accounts to publish happens later, from Settings.</p>
       {#each draft.competitorHandles as h, i (i)}
@@ -344,7 +435,7 @@
   {/if}
 
   {#if step === 'handles'}
-    <section class="panel">
+    <section class="wizard-panel">
       <h2>This brand's social handles</h2>
       <p class="hint">Recorded only — connecting accounts to publish happens later, from Settings → Connected accounts.</p>
       {#each draft.brandHandles as h, i (i)}
@@ -368,15 +459,15 @@
   {/if}
 
   {#if step === 'overview'}
-    <section class="panel">
+    <section class="wizard-panel">
       <h2>Review before creating</h2>
 
-      <label class="field">
+      <label class="wizard-field">
         <span>Name</span>
         <input type="text" bind:value={draft.name} required />
       </label>
 
-      <label class="field">
+      <label class="wizard-field">
         <span>Content</span>
         <textarea rows="10" bind:value={draft.content} oninput={() => {}}></textarea>
       </label>
@@ -466,7 +557,7 @@
   .steps li.done { background: var(--ink-soft); }
   .steps li.active { background: var(--accent); }
 
-  .panel {
+  .wizard-panel {
     display: flex;
     flex-direction: column;
     gap: 20px;
@@ -474,7 +565,7 @@
     border: 1px solid var(--line);
     padding: 40px;
   }
-  .panel h2 {
+  .wizard-panel h2 {
     margin: 0;
     font-size: clamp(1.3rem, 2.4vw, 1.6rem);
     font-weight: var(--heading-weight);
@@ -482,8 +573,8 @@
   }
   .hint { margin: 0; font-size: 13.5px; color: var(--ink-soft); line-height: 1.5; }
 
-  .field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
-  .field span { color: var(--ink-soft); font-weight: 500; }
+  .wizard-field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+  .wizard-field span { color: var(--ink-soft); font-weight: 500; }
 
   input[type='text'],
   input[type='url'],
@@ -540,6 +631,100 @@
     margin: 0;
   }
 
+  .progress-track {
+    width: 100%;
+    height: 3px;
+    background: var(--line);
+    overflow: hidden;
+    position: relative;
+  }
+  .progress-fill {
+    position: absolute;
+    inset: 0;
+    width: 40%;
+    background: var(--accent);
+    animation: progress-sweep 1.4s ease-in-out infinite;
+  }
+  @keyframes progress-sweep {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(250%); }
+  }
+
+  .analysis-steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .analysis-steps li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    color: var(--ink-soft);
+  }
+  .analysis-steps li.done { color: var(--ink); }
+  .analysis-steps li.active {
+    color: var(--ink);
+    font-weight: 600;
+    animation: analysis-step-pulse 1.6s ease-in-out infinite;
+  }
+  .analysis-step-mark {
+    width: 18px;
+    height: 18px;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--line-2);
+    font-size: 11px;
+  }
+  .analysis-steps li.done .analysis-step-mark { border-color: var(--ink); background: var(--ink); color: var(--paper); }
+  .analysis-steps li.active .analysis-step-mark { border-color: var(--accent); }
+
+  @keyframes analysis-step-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.55; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .progress-fill { animation: none; }
+    .analysis-steps li.active { animation: none; }
+  }
+
+  .found-item {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .found-name {
+    margin: 0;
+    font-size: clamp(1.2rem, 2.2vw, 1.5rem);
+    font-weight: var(--heading-weight);
+    letter-spacing: var(--heading-tracking);
+  }
+  .found-description {
+    margin: 0;
+    font-size: 14.5px;
+    line-height: 1.6;
+    color: var(--ink);
+  }
+
+  .image-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+    gap: 6px;
+  }
+  .image-grid-item {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    border: 1px solid var(--line);
+  }
+
   .found { display: flex; flex-direction: column; gap: 14px; }
   .logo { width: 64px; height: 64px; object-fit: cover; border: 1px solid var(--line); }
   .swatches { display: flex; gap: 8px; }
@@ -555,11 +740,36 @@
   .handle-row input { flex: 1 1 160px; min-width: 0; }
   .handle-row .btn.small { flex: 0 0 auto; margin-left: auto; }
 
+  .colour-list { display: flex; flex-direction: column; gap: 8px; }
+  .colour-row { display: flex; align-items: center; gap: 8px; }
+  .colour-row input[type='text'] { flex: 1 1 auto; min-width: 0; }
+  .colour-row .btn.small { flex: 0 0 auto; }
+
+  .colour-swatch-label {
+    position: relative;
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--line);
+    cursor: pointer;
+    overflow: hidden;
+  }
+  .colour-swatch-input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+
   .preview { border: 1px solid var(--line); padding: 16px; background: var(--paper-2); }
 
   @media (max-width: 480px) {
     .wizard-shell { padding: 32px 16px 56px; }
-    .panel { padding: 24px 20px; }
+    .wizard-panel { padding: 24px 20px; }
     .row { flex-direction: column-reverse; }
     .row .btn { width: 100%; }
 
@@ -570,6 +780,6 @@
 
   @media (max-width: 360px) {
     .wizard-shell { padding: 24px 12px 48px; }
-    .panel { padding: 20px 16px; }
+    .wizard-panel { padding: 20px 16px; }
   }
 </style>

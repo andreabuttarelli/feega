@@ -128,16 +128,4 @@
   }
 
   .content { border: 1px solid var(--line); padding: 16px; }
-
-  :global(.chip) {
-    display: inline-flex; align-items: center; gap: 4px;
-    border: 1px solid var(--line); padding: 1px 6px; margin: 0 2px;
-    font-size: 0.85em; cursor: grab; background: var(--paper-2);
-  }
-  :global(.chip-swatch) { width: 10px; height: 10px; display: inline-block; border: 1px solid var(--line); }
-  :global(.chip-platform) {
-    width: 12px; height: 12px; display: inline-flex; align-items: center; justify-content: center;
-    color: #fff; font-size: 7px; font-weight: 700;
-  }
-  :global(.chip-platform svg) { width: 8px; height: 8px; }
 </style>

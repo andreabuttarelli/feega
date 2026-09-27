@@ -78,6 +78,7 @@ export type WizardAnalysis = {
   profile: BrandProfile;
   suggestedContent: string;
   products: WizardProduct[];
+  images: string[];
 };
 
 /**
@@ -112,7 +113,7 @@ export async function analyzeWizardSite(orgId: string, url: string): Promise<Wiz
     included: true
   }));
 
-  return { profile, suggestedContent: composeWizardContent(draft), products };
+  return { profile, suggestedContent: composeWizardContent(draft), products, images: profile.images ?? [] };
 }
 
 export { CreditsExhaustedError };

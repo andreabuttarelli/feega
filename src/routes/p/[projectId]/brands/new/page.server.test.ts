@@ -81,18 +81,20 @@ describe('actions.analyze: dal form al motore di analisi vero', () => {
       target_audience: 'Coffee lovers in Milan',
       brand_colors: ['#1a2b3c'],
       products: [{ name: 'Espresso', description: '250g' }],
-      social_handles: [{ platform: 'instagram', handle: 'acme', url: 'https://instagram.com/acme' }]
+      social_handles: [{ platform: 'instagram', handle: 'acme', url: 'https://instagram.com/acme' }],
+      images: ['https://acme.example/hero.jpg', 'https://acme.example/team.jpg']
     } as never);
 
     const { client: db } = seed();
     const result = (await (actions.analyze as (e: unknown) => Promise<unknown>)(
       event({ url: 'https://acme.example' }, db)
-    )) as { analyzed: boolean; suggestedContent: string; products: Array<{ title: string }> };
+    )) as { analyzed: boolean; suggestedContent: string; products: Array<{ title: string }>; images: string[] };
 
     expect(runBrandAnalysis).toHaveBeenCalled();
     expect(result.analyzed).toBe(true);
     expect(result.suggestedContent).toContain('instagram:@acme');
     expect(result.products).toHaveLength(1);
+    expect(result.images).toEqual(['https://acme.example/hero.jpg', 'https://acme.example/team.jpg']);
   });
 
   it('accetta un dominio senza https:// e lo completa', async () => {

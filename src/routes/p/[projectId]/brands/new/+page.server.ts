@@ -75,6 +75,7 @@ export const actions: Actions = {
         logoUrl: analysis.profile.logos?.[0]?.url ?? null,
         suggestedContent: analysis.suggestedContent,
         products: analysis.products,
+        images: analysis.images,
         website: url
       };
     } catch (e) {
