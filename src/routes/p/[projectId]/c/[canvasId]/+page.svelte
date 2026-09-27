@@ -673,6 +673,33 @@
     return true;
   }
 
+  /**
+   * L'esportazione della composizione (video o immagine) segue lo stesso schema di `upload()`:
+   * il file va dritto in `canvas-assets` dal browser, e solo il percorso arriva al server perché
+   * un MP4 supera facilmente il corpo che un'azione SvelteKit regge su Vercel. `into: 'library'`
+   * registra l'asset senza creare un nodo — la riga che riceve il `refId` è già quella del nodo
+   * `composition` che sta esportando.
+   */
+  async function uploadCompositionExport(file: Blob, extension: 'mp4' | 'webm' | 'png'): Promise<string | null> {
+    const mimeType = extension === 'png' ? 'image/png' : extension === 'webm' ? 'video/webm' : 'video/mp4';
+    const path = `${canvasUploadPrefix(data.orgId, data.projectId)}${crypto.randomUUID()}-export.${extension}`;
+    const up = await supabase.storage.from('canvas-assets').upload(path, file, { contentType: mimeType, upsert: false });
+    if (up.error) {
+      failed = up.error.message;
+      return null;
+    }
+
+    const result = await post('upload', {
+      path, file_name: `export.${extension}`, mime_type: mimeType, bytes: file.size, into: 'library'
+    });
+    const asset = result?.asset as { id?: string } | undefined;
+    return asset?.id ?? null;
+  }
+
+  async function saveCompositionExportRefId(id: string, refId: string): Promise<boolean> {
+    return write(id, { refId });
+  }
+
   async function applyEffects(id: string, steps: EffectStep[], _output: Blob | null = null): Promise<boolean> {
     const source = upstreamEffectsMediaOf(id);
     if (!source) {
@@ -1812,6 +1839,8 @@
         initial={compositionEditing}
         mediaUrls={upstreamCompositionRefsOf(editingId).map((refId) => assetUrl(refId)).filter((url) => url !== null)}
         onsave={(next) => saveComposition(editingId, next)}
+        onupload={uploadCompositionExport}
+        onwriterefid={(refId) => saveCompositionExportRefId(editingId, refId)}
         onclose={() => (compositionEditorId = null)}
       />
     {/key}

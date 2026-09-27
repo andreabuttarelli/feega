@@ -4,10 +4,12 @@
   import Pause from '@lucide/svelte/icons/pause';
   import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
   import LoaderCircle from '@lucide/svelte/icons/loader-circle';
+  import Download from '@lucide/svelte/icons/download';
   import { LAYOUTS } from '$lib/canvas/composition/index';
   import { CAMERA_PRESETS, type CameraPresetId } from '$lib/canvas/composition/camera';
   import type { LayoutId, LayoutParams } from '$lib/canvas/composition/types';
   import type { CompositionMedia, CompositionScene } from '$lib/canvas/composition/scene';
+  import type { ExportResolution } from '$lib/canvas/composition/export';
   import { clampDuration, createSceneWhenMounted, defaultParamsFor, setLayoutParam } from '$lib/canvas/composition-editor';
   import type { CompositionAspect, CompositionNode } from '$lib/canvas/composition-node';
   import CompositionParamControl from './CompositionParamControl.svelte';
@@ -17,16 +19,22 @@
   const DEFAULT_BACKGROUND = '#000000';
   const DEFAULT_DURATION = 6;
   const DEFAULT_ASPECT: CompositionAspect = '9:16';
+  const EXPORT_FPS = 30;
+  const EXPORT_RESOLUTION: ExportResolution = '1080p';
 
   let {
     initial,
     mediaUrls,
     onsave,
+    onupload,
+    onwriterefid,
     onclose
   }: {
     initial: CompositionNode;
     mediaUrls: string[];
     onsave: (node: CompositionNode) => Promise<boolean>;
+    onupload: (file: Blob, extension: 'mp4' | 'webm' | 'png') => Promise<string | null>;
+    onwriterefid: (refId: string) => Promise<boolean>;
     onclose: () => void;
   } = $props();
 
@@ -219,6 +227,100 @@
     }
   }
 
+  let exporting = $state(false);
+  let exportProgress = $state(0);
+  let exportError = $state<string | null>(null);
+  let exportCancelled = false;
+
+  function mediaFromMediaUrls(): CompositionMedia[] {
+    return mediaFromUrls(mediaUrls);
+  }
+
+  function cancelExport() {
+    exportCancelled = true;
+  }
+
+  async function exportVideo() {
+    if (exporting) {
+      return;
+    }
+    exporting = true;
+    exportProgress = 0;
+    exportError = null;
+    exportCancelled = false;
+    try {
+      const { encodeCompositionVideo } = await import('$lib/canvas/composition/encode');
+
+      const sceneOptions = {
+        media: mediaFromMediaUrls(),
+        layout,
+        layoutParams,
+        camera: cameraPreset,
+        cameraParams,
+        background: backgroundColor,
+        duration
+      };
+
+      const outcome = await encodeCompositionVideo({
+        sceneOptions,
+        aspect,
+        resolution: EXPORT_RESOLUTION,
+        durationS: duration,
+        fps: EXPORT_FPS,
+        onProgress: (fraction) => { exportProgress = fraction; },
+        isCancelled: () => exportCancelled
+      });
+
+      if (outcome.outcome === 'cancelled') {
+        return;
+      }
+      if (outcome.outcome === 'unsupported') {
+        exportError = 'Il browser non supporta la registrazione video: provare con Chrome o Edge';
+        return;
+      }
+
+      const refId = await onupload(outcome.blob, outcome.format);
+      if (!refId || !(await onwriterefid(refId))) {
+        exportError = 'Esportazione non salvata: riprovare';
+      }
+    } catch (cause) {
+      exportError = cause instanceof Error ? cause.message : 'esportazione video non riuscita';
+    } finally {
+      exporting = false;
+    }
+  }
+
+  async function exportImage() {
+    if (exporting) {
+      return;
+    }
+    exporting = true;
+    exportError = null;
+    try {
+      const { captureCompositionFrame } = await import('$lib/canvas/composition/encode');
+
+      const sceneOptions = {
+        media: mediaFromMediaUrls(),
+        layout,
+        layoutParams,
+        camera: cameraPreset,
+        cameraParams,
+        background: backgroundColor,
+        duration
+      };
+
+      const blob = await captureCompositionFrame(sceneOptions, aspect, EXPORT_RESOLUTION, time);
+      const refId = await onupload(blob, 'png');
+      if (!refId || !(await onwriterefid(refId))) {
+        exportError = 'Esportazione non salvata: riprovare';
+      }
+    } catch (cause) {
+      exportError = cause instanceof Error ? cause.message : 'esportazione immagine non riuscita';
+    } finally {
+      exporting = false;
+    }
+  }
+
   const ASPECT_RATIO_VALUE: Record<CompositionAspect, number> = {
     '9:16': 9 / 16,
     '1:1': 1,
@@ -329,6 +431,25 @@
           {/each}
         </select>
       </label>
+
+      {#if exportError}
+        <p class="cx-note cx-error">{exportError}</p>
+      {/if}
+
+      {#if exporting}
+        <div class="cx-export-progress">
+          <div class="cx-export-bar" style={`width: ${Math.round(exportProgress * 100)}%`}></div>
+        </div>
+        <button type="button" class="cx-button" onclick={cancelExport}>Annulla esportazione</button>
+      {:else}
+        <div class="cx-export-actions">
+          <button type="button" class="cx-button" onclick={exportImage} disabled={busy}>Esporta immagine</button>
+          <button type="button" class="cx-button" onclick={exportVideo} disabled={busy}>
+            <Download size={14} />
+            Esporta video
+          </button>
+        </div>
+      {/if}
 
       <footer class="cx-foot">
         <button type="button" class="cx-button" onclick={close} disabled={busy}>Annulla</button>
@@ -525,6 +646,33 @@
   .cx-icon:hover {
     background: var(--paper-2, #f9f9f9);
     color: var(--ink, #1d1d1f);
+  }
+
+  .cx-note {
+    margin: 0;
+    font-size: 12px;
+    color: var(--ink-soft, #6e6e73);
+  }
+  .cx-note.cx-error {
+    color: #b3261e;
+  }
+
+  .cx-export-actions {
+    display: flex;
+    gap: 8px;
+  }
+  .cx-export-actions .cx-button {
+    flex: 1;
+  }
+
+  .cx-export-progress {
+    height: 4px;
+    background: var(--paper-2, #f9f9f9);
+    border: 1px solid var(--line, #ededef);
+  }
+  .cx-export-bar {
+    height: 100%;
+    background: var(--ink, #1d1d1f);
   }
 
   .cx-foot {

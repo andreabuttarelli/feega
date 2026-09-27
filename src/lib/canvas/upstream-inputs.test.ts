@@ -364,6 +364,19 @@ describe('resolveUpstreamInputs — video verso video: riferimento, mai un fotog
     expect(out.rejected).toEqual([{ nodeId: 'src', why: expect.stringContaining('non ancora girato') }]);
   });
 
+  it('una composizione esportata entra come riferimento video, come un nodo video', () => {
+    const nodes = [
+      node({ id: 'v1', type: 'video', model: 'bytedance/seedance-2-5' }),
+      node({ id: 'src', type: 'composition', mediaUrl: 'https://cdn/composition.mp4' })
+    ];
+    const edges = [edge({ id: 'e1', sourceNodeId: 'src', targetNodeId: 'v1' })];
+
+    const out = resolveUpstreamInputs(nodes, edges, 'v1', TEXT_IMAGE_VIDEO_AUDIO);
+
+    expect(out.referenceVideoUrls).toEqual(['https://cdn/composition.mp4']);
+    expect(out.startFrameUrl).toBeNull();
+  });
+
   it('un modello senza il connettore video rifiuta il riferimento video collegato', () => {
     const nodes = [
       node({ id: 'v1', type: 'video', model: 'grok-imagine-video-1-5-preview' }),
