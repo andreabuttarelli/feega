@@ -145,7 +145,8 @@ export function productsOf(row: NodeRow): ProductsNode | null {
     syncStatus: syncStatusOf(row.data.sync_status),
     syncError: nullableStr(row.data.sync_error),
     syncedCount: num(row.data.synced_count, 0),
-    syncedAt: nullableStr(row.data.synced_at)
+    syncedAt: nullableStr(row.data.synced_at),
+    syncSummary: nullableStr(row.data.sync_summary)
   };
 }
 
@@ -166,7 +167,8 @@ export function socialFeedOf(row: NodeRow): SocialFeedNode | null {
     syncStatus: syncStatusOf(row.data.sync_status),
     syncError: nullableStr(row.data.sync_error),
     syncedCount: num(row.data.synced_count, 0),
-    syncedAt: nullableStr(row.data.synced_at)
+    syncedAt: nullableStr(row.data.synced_at),
+    syncSummary: nullableStr(row.data.sync_summary)
   };
 }
 
@@ -384,7 +386,8 @@ export function productsData(node: ProductsNode): Record<string, unknown> {
     sync_status: node.syncStatus,
     sync_error: node.syncError,
     synced_count: node.syncedCount,
-    synced_at: node.syncedAt
+    synced_at: node.syncedAt,
+    sync_summary: node.syncSummary
   };
 }
 
@@ -397,7 +400,8 @@ export function socialFeedData(node: SocialFeedNode): Record<string, unknown> {
     sync_status: node.syncStatus,
     sync_error: node.syncError,
     synced_count: node.syncedCount,
-    synced_at: node.syncedAt
+    synced_at: node.syncedAt,
+    sync_summary: node.syncSummary
   };
 }
 

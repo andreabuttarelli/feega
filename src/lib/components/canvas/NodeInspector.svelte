@@ -1,7 +1,7 @@
 <script lang="ts">
   import RefreshCw from '@lucide/svelte/icons/refresh-cw';
   import X from '@lucide/svelte/icons/x';
-  import { AppliesAt, FieldKind, inputValueOf, parseFieldInput, type FieldSpec, type InspectorView } from '$lib/canvas/node-inspector';
+  import { AppliesAt, FieldKind, inputValueOf, parseFieldInput, commitHandleField, type FieldSpec, type InspectorView } from '$lib/canvas/node-inspector';
   import { syncBlockedReason } from '$lib/canvas/sync-state';
 
   let {
@@ -27,6 +27,10 @@
   const blocked = $derived(syncBlockedReason(view.sync));
 
   function commit(field: FieldSpec, raw: string | boolean) {
+    if (field.path === 'handle') {
+      onfield(commitHandleField(view, String(raw)));
+      return;
+    }
     const value = parseFieldInput(field, raw);
     if (value === undefined) {
       return;
@@ -94,7 +98,7 @@
       {:else if view.sync.syncStatus === 'failed' && view.sync.syncError}
         <span class="inspector-error" role="alert">{view.sync.syncError}</span>
       {:else if view.sync.syncedAt}
-        {shown} di {view.sync.syncedCount} mostrati · ultima sincronizzazione {new Date(view.sync.syncedAt).toLocaleString()}
+        {view.syncSummary ? `${view.syncSummary} · ` : ''}{shown} di {view.sync.syncedCount} mostrati · ultima sincronizzazione {new Date(view.sync.syncedAt).toLocaleString()}
       {:else}
         Mai sincronizzato
       {/if}

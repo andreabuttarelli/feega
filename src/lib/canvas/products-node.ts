@@ -31,6 +31,7 @@ export type ProductsNode = {
   syncError: string | null;
   syncedCount: number;
   syncedAt: string | null;
+  syncSummary: string | null;
 };
 
 const PRODUCTS_NODE_SIZE = { w: 420, h: 360 };

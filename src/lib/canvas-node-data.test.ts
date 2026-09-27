@@ -227,7 +227,8 @@ describe('un nodo products, letto dalla riga', () => {
       syncStatus: 'idle',
       syncError: null,
       syncedCount: 0,
-      syncedAt: null
+      syncedAt: null,
+      syncSummary: null
     });
   });
 
@@ -288,7 +289,8 @@ describe('un nodo social_account_feed, letto dalla riga', () => {
       syncStatus: 'idle',
       syncError: null,
       syncedCount: 0,
-      syncedAt: null
+      syncedAt: null,
+      syncSummary: null
     });
   });
 

@@ -1,5 +1,11 @@
 import type { Db } from '$lib/server/db/client';
-import { fetchStoreProductsPage, type StorePlatform } from '$lib/server/store-fetch';
+import {
+  fetchStoreProductsPage,
+  fetchStoreProduct,
+  classifyStoreUrl,
+  type FetchedProduct,
+  type StorePlatform
+} from '$lib/server/store-fetch';
 import { upsertNodeProducts } from '$lib/server/repos/products';
 
 /**
@@ -18,28 +24,63 @@ import { upsertNodeProducts } from '$lib/server/repos/products';
  * `fetch_failed`) — qui non lo si riscrive, lo si porta fino al nodo.
  */
 export type ProductsSyncOutcome =
-  | { ok: true; synced: number; after: string | null }
+  | { ok: true; synced: number; after: string | null; summary: string }
   | { ok: false; error: string };
 
-export async function syncProductsNode(
+type SyncInput = {
+  orgId: string;
+  projectId: string | null;
+  nodeId: string;
+  platform: StorePlatform;
+  storeUrl: string;
+  limit: number;
+  after: string | null;
+  onlyFirstPhoto: boolean;
+  category?: string;
+};
+
+const summaryOf = (count: number): string => (count === 1 ? '1 product' : `${count} products`);
+
+/**
+ * UNA VOCE INCOLLATA, UN GIRO CHE SCARICA SOLO QUELLI: `classifyStoreUrl` legge la forma dell'URL
+ * (o degli URL, uno per riga) e dice cosa scaricare — un singolo prodotto, una collezione o l'intero
+ * catalogo — invece di chiedere alla persona di scegliere una modalità. La piattaforma letta
+ * dall'URL vince su quella dichiarata sul nodo solo quando l'URL la dice (Shopify); altrimenti
+ * resta quella del nodo.
+ */
+async function syncSingleProducts(
   db: Db,
-  input: {
-    orgId: string;
-    projectId: string | null;
-    nodeId: string;
-    platform: StorePlatform;
-    storeUrl: string;
-    limit: number;
-    after: string | null;
-    onlyFirstPhoto: boolean;
-    category?: string;
-  }
+  input: SyncInput,
+  platform: StorePlatform,
+  handles: string[]
 ): Promise<ProductsSyncOutcome> {
-  const page = await fetchStoreProductsPage(input.platform, input.storeUrl, {
+  const products: FetchedProduct[] = [];
+
+  for (const handle of handles) {
+    const fetched = await fetchStoreProduct(platform, input.storeUrl, handle, input.onlyFirstPhoto);
+    if (!fetched.ok) {
+      return { ok: false, error: fetched.error };
+    }
+    products.push(fetched.product);
+  }
+
+  const synced = await upsertNodeProducts(db, {
+    orgId: input.orgId,
+    projectId: input.projectId,
+    nodeId: input.nodeId,
+    platform,
+    products
+  });
+
+  return { ok: true, synced, after: null, summary: summaryOf(synced) };
+}
+
+async function syncPage(db: Db, input: SyncInput, platform: StorePlatform, category?: string): Promise<ProductsSyncOutcome> {
+  const page = await fetchStoreProductsPage(platform, input.storeUrl, {
     limit: input.limit,
     after: input.after,
     onlyFirstPhoto: input.onlyFirstPhoto,
-    category: input.category
+    category
   });
 
   if (!page.ok) {
@@ -50,9 +91,21 @@ export async function syncProductsNode(
     orgId: input.orgId,
     projectId: input.projectId,
     nodeId: input.nodeId,
-    platform: input.platform,
+    platform,
     products: page.products
   });
 
-  return { ok: true, synced, after: page.after };
+  return { ok: true, synced, after: page.after, summary: category ? `collection: ${category}` : 'whole store' };
+}
+
+export async function syncProductsNode(db: Db, input: SyncInput): Promise<ProductsSyncOutcome> {
+  const classified = classifyStoreUrl(input.storeUrl);
+  const platform = classified.platform ?? input.platform;
+
+  if (classified.scope === 'products') {
+    return syncSingleProducts(db, input, platform, classified.handles);
+  }
+
+  const category = classified.scope === 'collection' ? classified.category : input.category;
+  return syncPage(db, input, platform, category);
 }

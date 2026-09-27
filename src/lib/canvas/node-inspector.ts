@@ -1,9 +1,10 @@
 import { normalizeUrl } from '$lib/ads-fee';
 import { productsData, productsOf, socialFeedData, socialFeedOf, type NodeRow } from '$lib/canvas-node-data';
 import { PRODUCT_PLATFORMS } from './products-node';
-import { SOCIAL_FEED_PLATFORMS } from './social-feed-node';
+import { isSocialFeedPlatform, SOCIAL_FEED_PLATFORMS, type SocialFeedPlatform } from './social-feed-node';
 import { canStartSync, type SyncNode } from './sync-state';
 import { FEED_MEDIA, FEED_SORTS, PRODUCT_SORTS, normalizeHandle } from './source-filters';
+import { classifySocialLines } from './social-url-classifier';
 
 export enum FieldKind {
   Select = 'select',
@@ -128,6 +129,7 @@ export type InspectorView = {
   sync: SyncNode;
   canSync: boolean;
   syncCredits: number;
+  syncSummary: string | null;
   dataWith: (path: string, value: unknown) => Record<string, unknown>;
 };
 
@@ -136,7 +138,8 @@ function view<N extends SyncNode>(
   fields: readonly FieldSpec[],
   node: N,
   ready: boolean,
-  toData: (node: N) => Record<string, unknown>
+  toData: (node: N) => Record<string, unknown>,
+  syncSummary: string | null = null
 ): InspectorView {
   return {
     title,
@@ -145,6 +148,7 @@ function view<N extends SyncNode>(
     sync: node,
     canSync: ready && canStartSync(node),
     syncCredits: 0,
+    syncSummary,
     dataWith: (path, value) => toData(withValue(node, path, value))
   };
 }
@@ -152,14 +156,83 @@ function view<N extends SyncNode>(
 const INSPECTORS: Record<string, (row: NodeRow) => InspectorView | null> = {
   products: (row) => {
     const node = productsOf(row);
-    return node && view('Prodotti', PRODUCT_FIELDS, node, node.url.trim().length > 0, productsData);
+    return node && view('Prodotti', PRODUCT_FIELDS, node, node.url.trim().length > 0, productsData, node.syncSummary);
   },
   social_account_feed: (row) => {
     const node = socialFeedOf(row);
-    return node && view('Feed social', FEED_FIELDS, node, node.handle.trim().length > 0, socialFeedData);
+    return node && view('Feed social', FEED_FIELDS, node, node.handle.trim().length > 0, socialFeedData, node.syncSummary);
   }
 };
 
 export function inspectorOf(row: NodeRow): InspectorView | null {
   return INSPECTORS[row.type]?.(row) ?? null;
+}
+
+const PLATFORM_LABEL_OF: Record<SocialFeedPlatform, string> = {
+  instagram: 'Instagram',
+  tiktok: 'TikTok',
+  x: 'X',
+  threads: 'Threads',
+  facebook: 'Facebook',
+  youtube: 'YouTube',
+  linkedin: 'LinkedIn',
+  reddit: 'Reddit',
+  pinterest: 'Pinterest'
+};
+
+function summaryOf(platform: string, kind: 'profile' | 'post' | 'hashtag', handleOrId: string | null): string {
+  const label = isSocialFeedPlatform(platform) ? PLATFORM_LABEL_OF[platform] : platform;
+  if (kind === 'post') {
+    return `${label} · 1 post`;
+  }
+  if (kind === 'hashtag') {
+    return `${label} · hashtag #${handleOrId}`;
+  }
+  return `${label} · profile @${handleOrId}`;
+}
+
+/**
+ * IL CAMPO `handle` DEL FEED CAPISCE DA SOLO COSA GLI È STATO INCOLLATO — un handle nudo, l'URL di
+ * un profilo, l'URL di un singolo post/video, un hashtag, o più righe insieme. Un URL di PROFILO
+ * riconosciuto normalizza il campo al solo handle e imposta anche `platform` — l'unico caso il cui
+ * commit tocca due colonne insieme, quindi vive qui e non in `parseFieldInput`, che ne scrive una
+ * sola. Un handle nudo senza dominio non tocca `platform`: la scelta manuale resta l'unico modo di
+ * dire quale piattaforma, perché il testo da solo non lo dice. Un post, un hashtag o più righe
+ * insieme restano SCRITTI COSÌ COME SONO — `syncSocialFeedEntries` (lato server) li riclassifica
+ * uno per uno alla sincronizzazione, ognuno con la sua vera piattaforma — e il riassunto qui è solo
+ * un'anteprima di quel che capirà. Solo un input che non classifica NULLA (dominio sconosciuto,
+ * reddit/pinterest) lascia l'handle precedente intatto e dice perché in `sync_error`.
+ */
+export function commitHandleField(view: InspectorView, raw: string): Record<string, unknown> {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return { ...view.dataWith('handle', ''), sync_summary: null, sync_error: null };
+  }
+
+  const { entries, errors } = classifySocialLines(trimmed);
+  if (!entries.length) {
+    return { ...view.values, sync_error: errors[0]?.message ?? `could not recognize "${trimmed}"` };
+  }
+
+  if (entries.length > 1) {
+    const summary = entries.map((e) => summaryOf(e.platform, e.kind, e.handle ?? e.id)).join(' · ');
+    return { ...view.dataWith('handle', raw), sync_summary: summary, sync_error: null };
+  }
+
+  const entry = entries[0];
+  const isSingleUrl = /^https?:\/\//i.test(trimmed) || (trimmed.includes('.') && trimmed.includes('/'));
+  const summary = summaryOf(entry.platform, entry.kind, entry.handle ?? entry.id);
+
+  if (entry.kind === 'profile' && isSingleUrl) {
+    const data = view.dataWith('handle', entry.handle ?? '');
+    return { ...data, platform: entry.platform, sync_summary: summary, sync_error: null };
+  }
+
+  if (entry.kind === 'profile') {
+    // A bare handle carries no domain to detect a platform from — the classifier defaults it to
+    // instagram, but the user's already-chosen `platform` field is the real override here.
+    return { ...view.dataWith('handle', entry.handle ?? ''), sync_summary: null, sync_error: null };
+  }
+
+  return { ...view.dataWith('handle', raw), sync_summary: summary, sync_error: null };
 }
