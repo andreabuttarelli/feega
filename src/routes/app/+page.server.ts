@@ -1,7 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { ENTRY_DEPS, homePathFor } from '$lib/server/tenancy/entry';
-import { ORG_COOKIE } from '$lib/server/tenancy/context';
+import { ORG_COOKIE, LAST_PROJECT_COOKIE } from '$lib/server/tenancy/context';
 
 /**
  * `/app` È DEPRECATO: bookmark ed email vecchie ci atterrano ancora, quindi resta un 308
@@ -18,6 +18,6 @@ export const load: PageServerLoad = async ({ cookies, locals }) => {
     throw redirect(308, '/login');
   }
 
-  const path = await homePathFor(db, ENTRY_DEPS, user, cookies.get(ORG_COOKIE) ?? null);
+  const path = await homePathFor(db, ENTRY_DEPS, user, cookies.get(ORG_COOKIE) ?? null, cookies.get(LAST_PROJECT_COOKIE) ?? null);
   throw redirect(308, path);
 };

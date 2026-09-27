@@ -7,7 +7,7 @@ import { sanitizeWebsiteParam } from '$lib/website-param';
 import { appOrigin } from '$lib/server/app-url';
 import { takeOAuthReturn } from '$lib/server/oauth';
 import { ENTRY_DEPS, homePathFor } from '$lib/server/tenancy/entry';
-import { ORG_COOKIE } from '$lib/server/tenancy/context';
+import { ORG_COOKIE, LAST_PROJECT_COOKIE } from '$lib/server/tenancy/context';
 import type { Cookies, RequestEvent } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -42,7 +42,7 @@ async function homeRedirectTarget(
   db: Awaited<ReturnType<RequestEvent['locals']['db']>>
 ): Promise<string> {
   if (!db) return '/app';
-  return homePathFor(db, ENTRY_DEPS, user, cookies.get(ORG_COOKIE) ?? null);
+  return homePathFor(db, ENTRY_DEPS, user, cookies.get(ORG_COOKIE) ?? null, cookies.get(LAST_PROJECT_COOKIE) ?? null);
 }
 
 // Public origin for absolute email / OAuth links. Prefer the live request host (www vs apex)
@@ -70,7 +70,12 @@ async function routeAfterAuth(
 
   const { user } = await locals.safeGetSession();
   const db = user ? await locals.db() : null;
-  throw redirect(303, db && user ? await homePathFor(db, ENTRY_DEPS, user, cookies.get(ORG_COOKIE) ?? null) : '/app');
+  throw redirect(
+    303,
+    db && user
+      ? await homePathFor(db, ENTRY_DEPS, user, cookies.get(ORG_COOKIE) ?? null, cookies.get(LAST_PROJECT_COOKIE) ?? null)
+      : '/app'
+  );
 }
 
 export const actions: Actions = {

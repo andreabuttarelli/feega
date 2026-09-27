@@ -12,7 +12,7 @@ const CANVAS = '44444444-4444-4444-4444-444444444444';
 const user = { id: USER, email: 'chi@esempio.it', user_metadata: {} } as unknown as User;
 
 const membership: Membership = { org: { id: ORG, name: 'chi', slug: 'chi-abcd' }, role: 'owner' };
-const project = { id: PROJECT, name: DEFAULT_PROJECT_NAME, slug: 'untitled', brandId: null, archivedAt: null };
+const project = { id: PROJECT, name: DEFAULT_PROJECT_NAME, slug: 'untitled', brandId: null, archivedAt: null, lastActiveAt: '2026-09-21T00:00:00Z' };
 const canvas = { id: CANVAS, projectId: PROJECT, name: DEFAULT_CANVAS_NAME, viewport: null };
 
 /** I collaboratori del bootstrap, sostituiti uno per uno: il test guarda QUANTE volte si crea. */
@@ -71,6 +71,14 @@ describe('entrare la prima volta crea tutto, una volta sola', () => {
 
     expect(d.createProject).toHaveBeenCalledWith(db, expect.objectContaining({ orgId: ORG, brandId: null }));
   });
+
+  it('due schede sulla stessa org vuota non creano due progetti "Untitled"', async () => {
+    const d = deps({ listProjects: vi.fn(async () => []) });
+
+    await Promise.all([enterApp(db, d, user), enterApp(db, d, user)]);
+
+    expect(d.createProject).toHaveBeenCalledOnce();
+  });
 });
 
 describe('entrare la seconda volta non duplica niente', () => {
@@ -119,6 +127,34 @@ describe('entrare la seconda volta non duplica niente', () => {
 
     expect(d.createProject).not.toHaveBeenCalled();
     expect(d.createCanvas).toHaveBeenCalledOnce();
+  });
+});
+
+describe('con più progetti, atterra su quello usato per ultimo', () => {
+  const usedProject = { ...project, id: PROJECT };
+  const emptyDuplicate = {
+    id: '66666666-6666-6666-6666-666666666666',
+    name: DEFAULT_PROJECT_NAME,
+    slug: 'untitled',
+    brandId: null,
+    archivedAt: null,
+    lastActiveAt: '2026-09-24T10:00:00Z'
+  };
+
+  it('con un cookie di ultimo progetto, lo riapre anche se non è il più recente', async () => {
+    const d = deps({ listProjects: vi.fn(async () => [emptyDuplicate, usedProject]) });
+
+    const entry = await enterApp(db, d, user, null, PROJECT);
+
+    expect(entry.projectId).toBe(PROJECT);
+  });
+
+  it('senza cookie, atterra sul progetto aggiornato più di recente', async () => {
+    const d = deps({ listProjects: vi.fn(async () => [emptyDuplicate, usedProject]) });
+
+    const entry = await enterApp(db, d, user);
+
+    expect(entry.projectId).toBe(emptyDuplicate.id);
   });
 });
 

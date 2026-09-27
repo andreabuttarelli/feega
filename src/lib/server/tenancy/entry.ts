@@ -80,6 +80,30 @@ function firstOrgOnce(
   return flight;
 }
 
+/**
+ * STESSA CORSA, STESSO RIMEDIO: DUE SCHEDE SULLA STESSA ORG VUOTA NON CREANO DUE "UNTITLED".
+ *
+ * `listProjects` seguito da un `insert` non è atomico: due richieste quasi simultanee (due tab,
+ * o login + callback) possono vedersi entrambe zero progetti e inserire entrambe. Come per l'org,
+ * la promessa in corso si riusa invece di aprirne una seconda.
+ */
+const firstProjectFlights = new Map<string, Promise<Awaited<ReturnType<EntryDeps['createProject']>>>>();
+
+function firstProjectOnce(
+  create: EntryDeps['createProject'],
+  db: Db,
+  input: { orgId: string; name: string; slug: string; brandId: string | null }
+): Promise<Awaited<ReturnType<EntryDeps['createProject']>>> {
+  const pending = firstProjectFlights.get(input.orgId);
+  if (pending) {
+    return pending;
+  }
+
+  const flight = create(db, input).finally(() => firstProjectFlights.delete(input.orgId));
+  firstProjectFlights.set(input.orgId, flight);
+  return flight;
+}
+
 async function orgIdFor(db: Db, deps: EntryDeps, user: User, chosenOrgId: string | null): Promise<string> {
   const memberships = await deps.listMemberships(db, user.id);
   const membership = chooseOrg(memberships, chosenOrgId);
@@ -94,13 +118,20 @@ async function orgIdFor(db: Db, deps: EntryDeps, user: User, chosenOrgId: string
   return orgId;
 }
 
-async function projectIdFor(db: Db, deps: EntryDeps, orgId: string): Promise<string> {
+/**
+ * QUALE PROGETTO, TRA PIÙ, IN ASSENZA DI UNA SCELTA ESPLICITA: quello visitato per ultimo (il
+ * cookie messo da `+layout.server.ts` a ogni apertura), altrimenti il più aggiornato di recente
+ * (`listProjects` ordina già così) — mai il più nuovo per nascita, che è il caso di un
+ * "Untitled" appena creato e mai più toccato.
+ */
+async function projectIdFor(db: Db, deps: EntryDeps, orgId: string, lastProjectId: string | null): Promise<string> {
   const projects = await deps.listProjects(db, orgId);
   if (projects.length > 0) {
-    return projects[0].id;
+    const last = lastProjectId ? projects.find((p) => p.id === lastProjectId) : undefined;
+    return (last ?? projects[0]).id;
   }
 
-  const project = await deps.createProject(db, {
+  const project = await firstProjectOnce(deps.createProject, db, {
     orgId,
     name: DEFAULT_PROJECT_NAME,
     slug: DEFAULT_PROJECT_SLUG,
@@ -119,11 +150,17 @@ async function canvasIdFor(db: Db, deps: EntryDeps, scope: { orgId: string; proj
   return canvas.id;
 }
 
-export async function enterApp(db: Db, deps: EntryDeps, user: User, chosenOrgId: string | null = null): Promise<Entry> {
+export async function enterApp(
+  db: Db,
+  deps: EntryDeps,
+  user: User,
+  chosenOrgId: string | null = null,
+  lastProjectId: string | null = null
+): Promise<Entry> {
   await deps.ensureProfile(db, user);
 
   const orgId = await orgIdFor(db, deps, user, chosenOrgId);
-  const projectId = await projectIdFor(db, deps, orgId);
+  const projectId = await projectIdFor(db, deps, orgId, lastProjectId);
   const canvasId = await canvasIdFor(db, deps, { orgId, projectId });
 
   return { orgId, projectId, canvasId };
@@ -140,8 +177,9 @@ export async function homePathFor(
   db: Db,
   deps: EntryDeps,
   user: User,
-  chosenOrgId: string | null = null
+  chosenOrgId: string | null = null,
+  lastProjectId: string | null = null
 ): Promise<string> {
-  const { projectId, canvasId } = await enterApp(db, deps, user, chosenOrgId);
+  const { projectId, canvasId } = await enterApp(db, deps, user, chosenOrgId, lastProjectId);
   return canvasPath(projectId, canvasId);
 }

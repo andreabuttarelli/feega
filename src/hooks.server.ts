@@ -13,7 +13,7 @@ import { captureReferralCookie } from '$lib/server/referrals';
 import { isCsrfForbidden } from '$lib/server/csrf';
 import { catalogModelIds } from '$lib/server/chat-model-catalog';
 import { ENTRY_DEPS, homePathFor } from '$lib/server/tenancy/entry';
-import { ORG_COOKIE } from '$lib/server/tenancy/context';
+import { ORG_COOKIE, LAST_PROJECT_COOKIE } from '$lib/server/tenancy/context';
 import type { RequestEvent } from '@sveltejs/kit';
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
@@ -45,7 +45,13 @@ async function rootRedirectTarget(event: RequestEvent): Promise<string> {
     return '/login';
   }
 
-  return homePathFor(db, ENTRY_DEPS, user, event.cookies.get(ORG_COOKIE) ?? null);
+  return homePathFor(
+    db,
+    ENTRY_DEPS,
+    user,
+    event.cookies.get(ORG_COOKIE) ?? null,
+    event.cookies.get(LAST_PROJECT_COOKIE) ?? null
+  );
 }
 
 function isValidSessionCookie(cookie: { name: string; value: string }): boolean {

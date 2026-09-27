@@ -4,7 +4,7 @@ import { listMemberships } from '$lib/server/repos/orgs';
 import { listProjects } from '$lib/server/repos/projects';
 import { listCanvases } from '$lib/server/repos/canvas';
 import { findProjectForUser } from '$lib/server/projects/lookup';
-import { chooseOrg } from '$lib/server/tenancy/context';
+import { LAST_PROJECT_COOKIE } from '$lib/server/tenancy/context';
 import { ensureProfile } from '$lib/server/repos/profiles';
 import { PROJECT_BRAND_SHELL_SELECT, projectBrandShellOf, type ProjectBrandShell } from '$lib/server/projects/brand-shell';
 import { orgCreditBalance } from '$lib/server/credits';
@@ -22,7 +22,7 @@ const FLAGS = {
  * progetto (`projects.brand_id`, nullable): si apre una tela per esplorare, e solo quando il
  * materiale diventa qualcosa da pubblicare si decide per chi.
  */
-export const load: LayoutServerLoad = async ({ params, locals, depends }) => {
+export const load: LayoutServerLoad = async ({ params, locals, depends, cookies }) => {
   depends('app:credits');
 
   const { session, user } = await locals.safeGetSession();
@@ -50,6 +50,10 @@ export const load: LayoutServerLoad = async ({ params, locals, depends }) => {
     orgCreditBalance(db, orgId)
   ]);
 
+  // Dove atterra chi rientra: l'ultimo progetto aperto, letto da `homePathFor` — non il più
+  // nuovo per nascita (vedi `src/lib/server/tenancy/entry.ts`).
+  cookies.set(LAST_PROJECT_COOKIE, project.id, { path: '/', maxAge: 60 * 60 * 24 * 365 });
+
   return {
     profile: { name: profile.name, email: profile.email, avatarUrl: profile.avatarUrl },
     org: { id: orgId, name: membership.org.name, slug: membership.org.slug, role: membership.role },
@@ -58,7 +62,16 @@ export const load: LayoutServerLoad = async ({ params, locals, depends }) => {
     creditBalance,
     projects: projects.map((p) => {
       const first = p.id === project.id ? canvases[0] : undefined;
-      return { id: p.id, name: p.name, slug: p.slug, href: `/p/${p.id}`, brandId: p.brandId, active: p.id === project.id, firstCanvasId: first?.id ?? null };
+      return {
+        id: p.id,
+        name: p.name,
+        slug: p.slug,
+        href: `/p/${p.id}`,
+        brandId: p.brandId,
+        active: p.id === project.id,
+        firstCanvasId: first?.id ?? null,
+        updatedAt: p.lastActiveAt
+      };
     }),
     canvases: canvases.map((c) => ({ id: c.id, name: c.name, href: `/p/${project.id}/c/${c.id}` })),
     workspaces: memberships.map((m) => ({ id: m.org.id, name: m.org.name, slug: m.org.slug, href: '/app' })),

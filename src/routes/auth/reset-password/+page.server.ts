@@ -1,6 +1,6 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { ENTRY_DEPS, homePathFor } from '$lib/server/tenancy/entry';
-import { ORG_COOKIE } from '$lib/server/tenancy/context';
+import { ORG_COOKIE, LAST_PROJECT_COOKIE } from '$lib/server/tenancy/context';
 import type { Actions, PageServerLoad } from './$types';
 
 const MIN_PASSWORD = 6;
@@ -28,6 +28,11 @@ export const actions: Actions = {
     if (error) return fail(400, { error: error.message });
 
     const dbClient = await db();
-    throw redirect(303, dbClient ? await homePathFor(dbClient, ENTRY_DEPS, user, cookies.get(ORG_COOKIE) ?? null) : '/app');
+    throw redirect(
+      303,
+      dbClient
+        ? await homePathFor(dbClient, ENTRY_DEPS, user, cookies.get(ORG_COOKIE) ?? null, cookies.get(LAST_PROJECT_COOKIE) ?? null)
+        : '/app'
+    );
   }
 };
