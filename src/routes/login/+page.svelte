@@ -239,6 +239,7 @@
       {/if}
     </div>
   </section>
+  <aside class="pane visual-pane" aria-hidden="true"></aside>
 </div>
 
 {#if showOpenInBrowser && inApp}
@@ -283,6 +284,11 @@
   .form-pane {
     flex: 1;
     background: var(--paper, #fff);
+  }
+  .visual-pane {
+    flex: 0 0 50%;
+    padding: 0;
+    background: #1a2bb0 url('/login-visual.webp') center / cover no-repeat;
   }
   .form-inner {
     width: 100%;
@@ -471,6 +477,9 @@
   }
 
   @media (max-width: 880px) {
+    .visual-pane {
+      display: none;
+    }
     .form-inner {
       text-align: center;
       margin: 0 auto;
