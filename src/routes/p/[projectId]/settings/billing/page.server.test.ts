@@ -211,6 +211,20 @@ describe('project settings billing', () => {
 		expect(data.credits.atRisk).toEqual([{ expiresAt: '2026-10-07T00:00:00Z', amount: 100 }]);
 	});
 
+	it('drops an at-risk row with no expiry instead of showing epoch 1970', async () => {
+		const data = await run(
+			fakeSupabase(
+				{ id: 'org-1', name: 'Ana', stripe_customer_id: 'cus_1' },
+				{ role: 'owner' },
+				[{ id: 'b1', name: 'One', slug: 'one' }],
+				{},
+				[{ next_expiry: null, expiring_credits: null } as unknown as { next_expiry: string; expiring_credits: number }]
+			)
+		);
+
+		expect(data.credits.atRisk).toEqual([]);
+	});
+
 	it('carries purchasesReady from the readiness gate, so the page can hide the buy buttons', async () => {
 		billingGrantsReady.mockResolvedValue(false);
 

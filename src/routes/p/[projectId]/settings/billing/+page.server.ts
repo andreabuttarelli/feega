@@ -44,10 +44,12 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
   if (!org) throw error(404, 'Organization not found');
 
   const brands = (brandRows ?? []) as BrandRow[];
-  const atRisk = ((atRiskRows ?? []) as { next_expiry: string; expiring_credits: number }[]).map((row) => ({
-    expiresAt: row.next_expiry,
-    amount: row.expiring_credits
-  }));
+  const atRisk = ((atRiskRows ?? []) as { next_expiry: string | null; expiring_credits: number | null }[])
+    .filter((row): row is { next_expiry: string; expiring_credits: number } => row.next_expiry != null)
+    .map((row) => ({
+      expiresAt: row.next_expiry,
+      amount: row.expiring_credits
+    }));
 
   const balance = await orgCreditBalance(supabase, orgId);
 
