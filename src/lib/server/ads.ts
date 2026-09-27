@@ -1444,7 +1444,7 @@ export async function adsReadiness(
       key: 'credits',
       ok: afford.ok,
       blocking: true,
-      fix: '/app/billing',
+      fix: `${base}/settings/billing`,
       detail: String(minLaunch)
     },
     {

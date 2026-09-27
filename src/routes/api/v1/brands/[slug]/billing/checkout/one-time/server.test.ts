@@ -6,6 +6,9 @@ const ensureOrgCustomer = vi.fn();
 const createOneTimeCreditCheckout = vi.fn();
 const billingGrantsReady = vi.fn();
 
+vi.mock('$lib/server/tenancy/brand-slug', () => ({
+	appPathForBrand: async (_db: unknown, _brandId: string, path: string) => `/p/p1${path}`
+}));
 vi.mock('$lib/server/cli-auth', () => ({
 	authenticate: vi.fn(),
 	loadBrandForUser: vi.fn(),
@@ -87,8 +90,8 @@ describe('POST /api/v1/brands/:slug/billing/checkout/one-time', () => {
 			orgId: 'org-1',
 			price: 30,
 			credits: 2100,
-			successUrl: 'https://feega.test/app/billing',
-			cancelUrl: 'https://feega.test/app/billing'
+			successUrl: 'https://feega.test/p/p1/settings/billing',
+			cancelUrl: 'https://feega.test/p/p1/settings/billing'
 		});
 	});
 

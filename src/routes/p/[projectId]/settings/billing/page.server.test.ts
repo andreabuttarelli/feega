@@ -9,7 +9,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  */
 
 const orgCreditBalance = vi.fn();
-const ensureOrgForUser = vi.fn();
+const settingsScope = vi.fn();
 const billingPortal = vi.fn();
 const isOrgOwner = vi.fn();
 const ensureOrgCustomer = vi.fn();
@@ -19,14 +19,13 @@ const billingGrantsReady = vi.fn();
 vi.mock('$lib/server/credits', () => ({
 	orgCreditBalance: (...a: unknown[]) => orgCreditBalance(...a)
 }));
-vi.mock('$lib/server/org', () => ({
-	ensureOrgForUser: (...a: unknown[]) => ensureOrgForUser(...a)
-}));
 vi.mock('$lib/server/settings-actions', () => ({
 	billingPortal: (...a: unknown[]) => billingPortal(...a),
 	upgrade: vi.fn(),
 	applyRetention: vi.fn(),
-	cancelPlan: vi.fn()
+	cancelPlan: vi.fn(),
+	settingsScope: (...a: unknown[]) => settingsScope(...a),
+	billingPath: (id: string) => `/p/${id}/settings/billing`
 }));
 vi.mock('$lib/server/org-billing', () => ({
 	isOrgOwner: (...a: unknown[]) => isOrgOwner(...a)
@@ -111,21 +110,23 @@ function fakeSupabase(
 function run(supabase: unknown) {
 	return (load as (e: unknown) => Promise<Record<string, any>>)({
 		locals: { supabase },
-		url: new URL('https://example.test/app/billing')
+		parent: async () => ({ org: { id: 'org-1' } }),
+		params: { projectId: 'p1' },
+		url: new URL('https://example.test/p/p1/settings/billing')
 	});
 }
 
 beforeEach(() => {
 	vi.clearAllMocks();
 	orgCreditBalance.mockResolvedValue(3600);
-	ensureOrgForUser.mockResolvedValue('org-1');
+	settingsScope.mockResolvedValue({ projectId: 'p1', orgId: 'org-1', brand: null });
 	isOrgOwner.mockResolvedValue(true);
 	ensureOrgCustomer.mockResolvedValue('cus_1');
 	createOneTimeCreditCheckout.mockResolvedValue('https://checkout.stripe.com/c/pay/cs_test_one_time');
 	billingGrantsReady.mockResolvedValue(true);
 });
 
-describe('/app/billing', () => {
+describe('project settings billing', () => {
 	it('shows the org credit balance once, not a per-brand quota', async () => {
 		const data = await run(
 			fakeSupabase(
@@ -170,31 +171,20 @@ describe('/app/billing', () => {
 		);
 
 		expect(data.hasBilling).toBe(true);
-		expect(data.billingBrandSlug).toBe('one');
 	});
 
-	it('runs a billing action against the first org brand', async () => {
-		const supabase = fakeSupabase({ id: 'org-1', name: 'Ana', stripe_customer_id: 'cus_1' }, { role: 'owner' }, [
-			{ id: 'b1', name: 'One', slug: 'one' },
-			{ id: 'b2', name: 'Two', slug: 'two' }
-		]);
-
-		await (actions.billingPortal as (e: unknown) => Promise<unknown>)({
-			locals: { supabase },
-			params: {}
-		});
-
-		expect(billingPortal).toHaveBeenCalledTimes(1);
-		expect(billingPortal.mock.calls[0][0].params).toEqual({ brand: 'one' });
+	it('runs the billing actions of the project settings unchanged', () => {
+		expect(actions.billingPortal).toBeDefined();
+		expect(actions.upgrade).toBeDefined();
 	});
 
-	it('has no billing brand to act through when the org has no brands', async () => {
+	it('offers billing to an org without brands', async () => {
 		const data = await run(
 			fakeSupabase({ id: 'org-1', name: 'Ana', stripe_customer_id: null }, { role: 'owner' }, [])
 		);
 
 		expect(data.brands).toEqual([]);
-		expect(data.billingBrandSlug).toBeNull();
+		expect(data.org.id).toBe('org-1');
 	});
 
 	it('reads the org owner status from orgs_members, not organizations.owner_id', async () => {
@@ -239,7 +229,8 @@ describe('/app/billing', () => {
 			data.set('usd', usd);
 			return (actions.buyOneTime as (e: unknown) => Promise<unknown>)({
 				request: { formData: async () => data },
-				url: new URL('https://example.test/app/billing'),
+				url: new URL('https://example.test/p/p1/settings/billing'),
+				params: { projectId: 'p1' },
 				locals: { supabase }
 			});
 		}
@@ -252,7 +243,12 @@ describe('/app/billing', () => {
 				location: 'https://checkout.stripe.com/c/pay/cs_test_one_time'
 			});
 			expect(createOneTimeCreditCheckout).toHaveBeenCalledWith(
-				expect.objectContaining({ orgId: 'org-1', price: 30, credits: 2100 })
+				expect.objectContaining({
+					orgId: 'org-1',
+					price: 30,
+					credits: 2100,
+					successUrl: 'https://example.test/p/p1/settings/billing'
+				})
 			);
 		});
 

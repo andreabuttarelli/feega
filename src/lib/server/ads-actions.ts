@@ -76,7 +76,7 @@ export function adsChannelLoad(channel: AdsChannel) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return async ({ parent, params, locals: { supabase, safeGetSession }, url }: ServerLoadEvent<any, any>) => {
     const { brand } = (await parent()) as { brand: AdsBrand };
-    const base = params.brand ? `/app/${params.brand}` : `/p/${params.projectId}`;
+    const base = `/p/${params.projectId}`;
     const { user } = await safeGetSession();
     const email = user?.email ?? null;
 
@@ -379,7 +379,7 @@ export const adsNewLoad = async ({
   const { brand } = (await parent()) as { brand: AdsBrand };
   const { user } = await safeGetSession();
   const email = user?.email ?? null;
-  const base = params.brand ? `/app/${params.brand}` : `/p/${params.projectId}`;
+  const base = `/p/${params.projectId}`;
   if (!adsFeatureEnabled(email)) throw error(404, 'Not found');
   // No new-campaign form until self-serve — send them back to the book-a-call placeholder.
   if (!adsSelfServeEnabled(isAdsPreviewUser(email))) throw redirect(303, `${base}/ads/${channel}`);

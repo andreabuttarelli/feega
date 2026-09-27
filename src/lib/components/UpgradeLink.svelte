@@ -1,12 +1,10 @@
 <script lang="ts">
   import { _ } from 'svelte-i18n';
-
-  // Un messaggio "crediti finiti" senza uscita è peggio del silenzio: l'utente resta fermo e
-  // non sa cosa fare. /app/billing è l'unica pagina che mostra i piani — billing è dell'org, non
-  // del brand, quindi nessuno slug serve a raggiungerla.
+  import { page } from '$app/state';
+  import { billingPath } from '$lib/billing-path';
 </script>
 
-<a class="upgrade-link" href="/app/billing">{$_('app.nav.upgrade')} →</a>
+<a class="upgrade-link" href={billingPath(page.params.projectId ?? '')}>{$_('app.nav.upgrade')} →</a>
 
 <style>
   .upgrade-link {

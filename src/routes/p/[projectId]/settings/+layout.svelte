@@ -6,7 +6,6 @@
   import PageHead from '$lib/components/PageHead.svelte';
   import BrandGate from '$lib/components/settings/BrandGate.svelte';
   import { _ } from 'svelte-i18n';
-  // Stili condivisi con /app/billing, che monta le stesse primitive fuori da questo layout.
   import '$lib/styles/settings-shell.css';
 
   let { data, children } = $props();

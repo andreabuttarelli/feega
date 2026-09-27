@@ -114,6 +114,7 @@
   import type { Product } from '$lib/server/repos/products';
   import type { SocialPost } from '$lib/server/repos/social-posts';
   import { openSheet } from '$lib/canvas/sheet-nav';
+  import { billingPath } from '$lib/billing-path';
 
   let { data } = $props();
   type TextCostEstimate = { inputTokens: number; outputTokens: number; variableInput: boolean; revision: string };
@@ -1757,7 +1758,7 @@
     <p class="warning" role="alert">
       {failed}
       {#if failedIsCreditsExhausted}
-        <a href="/app/billing">Buy credits</a>
+        <a href={billingPath(data.projectId)}>Buy credits</a>
       {/if}
     </p>
   {/if}

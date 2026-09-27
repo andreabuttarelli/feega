@@ -18,8 +18,6 @@
 
   {#if !data.isOwner}
     <div class="field"><div class="bill-notice">{$_('app.settings.billing.membersNotice')}</div></div>
-  {:else if !data.billingBrandSlug}
-    <div class="field"><div class="fs">{$_('app.account.billing.noBrands')}</div></div>
   {:else}
     {#if form?.retentionApplied}
       <div class="field"><div class="fs" style="color:var(--accent);">{$_('app.settings.billing.retentionApplied')}</div></div>
