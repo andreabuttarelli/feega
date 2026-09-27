@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_FEED_FILTERS, DEFAULT_PRODUCT_FILTERS } from '$lib/canvas/source-filters';
 import {
   NODE_TYPES,
   docData,
@@ -177,7 +178,9 @@ describe('con che `data` nasce una riga', () => {
       url: '',
       limit: 20,
       after: null,
-      only_first_photo: false
+      only_first_photo: false,
+      category: '',
+      filters: DEFAULT_PRODUCT_FILTERS
     });
   });
 
@@ -190,7 +193,7 @@ describe('con che `data` nasce una riga', () => {
   });
 
   it('un nodo social_account_feed nasce su instagram e senza handle', () => {
-    expect(newNodeRow('social_account_feed')).toEqual({ platform: 'instagram', handle: '', limit: 20 });
+    expect(newNodeRow('social_account_feed')).toEqual({ platform: 'instagram', handle: '', limit: 20, filters: DEFAULT_FEED_FILTERS });
   });
 });
 
@@ -219,6 +222,8 @@ describe('un nodo products, letto dalla riga', () => {
       limit: 20,
       after: null,
       onlyFirstPhoto: false,
+      category: '',
+      filters: DEFAULT_PRODUCT_FILTERS,
       syncStatus: 'idle',
       syncError: null,
       syncedCount: 0,
@@ -279,6 +284,7 @@ describe('un nodo social_account_feed, letto dalla riga', () => {
       platform: 'instagram',
       handle: '',
       limit: 20,
+      filters: DEFAULT_FEED_FILTERS,
       syncStatus: 'idle',
       syncError: null,
       syncedCount: 0,

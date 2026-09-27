@@ -2,8 +2,7 @@ import type { Db } from '$lib/server/db/client';
 import { listConnections, listNodes, type CanvasNodeRecord, type Connection } from '$lib/server/repos/canvas';
 import { findAsset, findAssets } from '$lib/server/repos/assets';
 import { listInfluencerViews, signInfluencerViewFiles } from '$lib/server/repos/influencers';
-import { listNodeProducts } from '$lib/server/repos/products';
-import { listNodeSocialPosts } from '$lib/server/repos/social-posts';
+import { syncedSourceItems } from './synced-items';
 import {
   resolveUpstreamInputs,
   type UpstreamEdge,
@@ -12,7 +11,7 @@ import {
 } from '$lib/canvas/upstream-inputs';
 import type { Modalities } from '$lib/canvas/connectors';
 import { isSelectableSourceType } from '$lib/canvas/select-node';
-import { productItem, socialPostItem, type SelectableItem } from '$lib/canvas/select-sources';
+import type { SelectableItem } from '$lib/canvas/select-sources';
 import {
   isListItemKind,
   listValues,
@@ -195,24 +194,6 @@ function listFeeding(node: CanvasNodeRecord, connections: Connection[], nodesByI
     if (source && isSelectableSourceType(source.type)) return source;
   }
   return null;
-}
-
-/**
- * GLI ITEM DI UN `products`/`social_account_feed` COME `ListValues` — la stessa forma che
- * `resolvedListValues` produce per una `list`, così `itemAt` (sotto) legge l'indice scelto allo
- * stesso modo qualunque sia la sorgente. `wiredFrom` resta sempre `null`: un catalogo o un feed
- * sincronizzato non ha "fili" che lo alimentano, ogni item è già un valore, non un nodo collegato.
- * `itemKind` è sempre `'image'`: `itemAt` legge SOLO `text`/`mediaUrl` da `ListItem`, mai un
- * `mediaUrls` multiplo — quello lo porta `toUpstreamNode` a parte, quando il `select` stesso
- * risolve il valore, non questa lettura intermedia.
- */
-async function syncedSourceItems(db: Db, orgId: string, source: CanvasNodeRecord): Promise<SelectableItem[]> {
-  if (source.type === 'products') {
-    const products = await listNodeProducts(db, { orgId, nodeId: source.id });
-    return products.map(productItem);
-  }
-  const posts = await listNodeSocialPosts(db, { orgId, nodeId: source.id });
-  return posts.map(socialPostItem);
 }
 
 /** L'item scelto (1-based) di un `products`/`social_account_feed`, come lo legge sia un `select`

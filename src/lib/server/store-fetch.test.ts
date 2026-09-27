@@ -232,3 +232,31 @@ describe('fetchWooCommercePage', () => {
     expect(out.error).toMatch(/store_invalid/);
   });
 });
+
+describe('categoria/collezione, applicata allo scaricamento', () => {
+  it('Shopify legge la collezione indicata', async () => {
+    resolvesTo({ 'shop.example.com': PUBLIC_ADDRESS });
+    const requested = serves({
+      'https://shop.example.com/collections/summer-sale/products.json?limit=2&page=1': {
+        status: 200,
+        body: JSON.stringify({ products: [] })
+      }
+    });
+
+    await fetchShopifyPage('https://shop.example.com', { limit: 2, after: null, onlyFirstPhoto: false, category: ' summer-sale ' });
+    expect(requested).toContain('https://shop.example.com/collections/summer-sale/products.json?limit=2&page=1');
+  });
+
+  it('WooCommerce passa la categoria come parametro', async () => {
+    resolvesTo({ 'shop.example.com': PUBLIC_ADDRESS });
+    const requested = serves({
+      'https://shop.example.com/wp-json/wc/store/v1/products?per_page=2&page=1&category=shoes': {
+        status: 200,
+        body: JSON.stringify([])
+      }
+    });
+
+    await fetchWooCommercePage('https://shop.example.com', { limit: 2, after: null, onlyFirstPhoto: false, category: 'shoes' });
+    expect(requested).toContain('https://shop.example.com/wp-json/wc/store/v1/products?per_page=2&page=1&category=shoes');
+  });
+});

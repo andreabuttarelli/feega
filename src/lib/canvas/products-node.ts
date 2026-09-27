@@ -8,6 +8,7 @@
  * viaggerebbe intero a ogni evento realtime, cioè a ogni trascinamento di quel nodo.
  */
 import type { SyncStatus } from './sync-state';
+import type { ProductFilters } from './source-filters';
 
 export const PRODUCT_PLATFORMS = ['shopify', 'woocommerce'] as const;
 
@@ -24,6 +25,8 @@ export type ProductsNode = {
   limit: number;
   after: string | null;
   onlyFirstPhoto: boolean;
+  category: string;
+  filters: ProductFilters;
   syncStatus: SyncStatus;
   syncError: string | null;
   syncedCount: number;

@@ -36,6 +36,8 @@ import { undoGesture } from '$lib/server/canvas/undo';
 import type { Gesture, UndoItem } from '$lib/canvas/undo-plan';
 import { gateOrgAiActionForForm } from '$lib/server/cli-auth';
 import { listNodeProducts } from '$lib/server/repos/products';
+import { normalizeUrl } from '$lib/ads-fee';
+import { normalizeHandle } from '$lib/canvas/source-filters';
 import { listNodeSocialPosts } from '$lib/server/repos/social-posts';
 import { getInfluencer, listInfluencerViewsByIds, signInfluencerViewFiles } from '$lib/server/repos/influencers';
 import { syncProductsNode } from '$lib/server/canvas/products-sync';
@@ -276,7 +278,8 @@ type SyncNodeOutcome = { ok: true; synced: number; extra?: Record<string, unknow
 /** `products`: `type`/`url`/`limit`/`after`/`only_first_photo` sono la query — `productsOf` li legge già validati. */
 async function syncProducts(db: Db, orgId: string, projectId: string | null, node: { id: string; data: Record<string, unknown> }): Promise<SyncNodeOutcome> {
   const parsed = productsOf({ id: node.id, type: 'products', data: node.data });
-  if (!parsed || !isProductPlatform(parsed.platform) || !parsed.url.trim()) {
+  const storeUrl = normalizeUrl(parsed?.url);
+  if (!parsed || !isProductPlatform(parsed.platform) || !storeUrl) {
     return { ok: false, error: 'invalid_url: this node has no store URL to sync' };
   }
 
@@ -285,10 +288,11 @@ async function syncProducts(db: Db, orgId: string, projectId: string | null, nod
     projectId,
     nodeId: node.id,
     platform: parsed.platform,
-    storeUrl: parsed.url,
+    storeUrl,
     limit: parsed.limit,
     after: parsed.after,
-    onlyFirstPhoto: parsed.onlyFirstPhoto
+    onlyFirstPhoto: parsed.onlyFirstPhoto,
+    category: parsed.category
   });
 
   return outcome.ok ? { ok: true, synced: outcome.synced, extra: { after: outcome.after } } : outcome;
@@ -297,7 +301,8 @@ async function syncProducts(db: Db, orgId: string, projectId: string | null, nod
 /** `social_account_feed`: `platform`/`handle`/`limit` sono la query. */
 async function syncSocialFeed(db: Db, orgId: string, projectId: string | null, node: { id: string; data: Record<string, unknown> }): Promise<SyncNodeOutcome> {
   const parsed = socialFeedOf({ id: node.id, type: 'social_account_feed', data: node.data });
-  if (!parsed || !isSocialFeedPlatform(parsed.platform) || !parsed.handle.trim()) {
+  const handle = normalizeHandle(parsed?.handle ?? '');
+  if (!parsed || !isSocialFeedPlatform(parsed.platform) || !handle) {
     return { ok: false, error: 'missing_handle: this node has no handle to sync' };
   }
 
@@ -306,7 +311,7 @@ async function syncSocialFeed(db: Db, orgId: string, projectId: string | null, n
     projectId,
     nodeId: node.id,
     platform: parsed.platform,
-    handle: parsed.handle,
+    handle,
     limit: parsed.limit
   });
 }

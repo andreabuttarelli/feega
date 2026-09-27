@@ -844,3 +844,40 @@ describe('upstreamInputsFor — effects: alimenta a valle col suo refId, come og
     expect(out.referenceImageUrls).toEqual([]);
   });
 });
+
+describe('upstreamInputsFor — il select vede il feed filtrato, non le righe grezze', () => {
+  it('index 1 su un feed filtrato a soli video dà il primo video, non il primo post', async () => {
+    const post = (id: string, type: string, url: string) => ({
+      id,
+      org_id: ORG,
+      node_id: FEED_NODE,
+      project_id: 'p1',
+      platform: 'instagram',
+      external_id: id,
+      handle: 'acme',
+      caption: id,
+      media: { type, items: [{ type, url }] },
+      metrics: {},
+      permalink: null,
+      posted_at: id === 'foto' ? '2026-09-02T00:00:00Z' : '2026-09-01T00:00:00Z',
+      fetched_at: 'now'
+    });
+    const { db } = fakeDb({
+      nodes: [
+        nodeRow(FEED_NODE, 'social_account_feed', { platform: 'instagram', handle: 'acme', filters: { media: 'video' } }),
+        nodeRow(SELECT_NODE, 'select', { index: 1 }),
+        nodeRow(IMAGE_NODE, 'image', { prompt: '', model: 'qwen3-pro' })
+      ],
+      nodes_connections: [
+        { id: 'e-feed-select', canvas_id: CANVAS, source_node_id: FEED_NODE, target_node_id: SELECT_NODE, source_handle: null, target_handle: null },
+        { id: 'e-select-image', canvas_id: CANVAS, source_node_id: SELECT_NODE, target_node_id: IMAGE_NODE, source_handle: null, target_handle: null }
+      ],
+      social_posts: [post('foto', 'image', 'canvas-assets/foto.png'), post('clip', 'video', 'canvas-assets/clip.png')],
+      assets: []
+    });
+
+    const out = await upstreamInputsFor(db, { orgId: ORG, canvasId: CANVAS, nodeId: IMAGE_NODE, model: 'qwen3-pro', medium: 'image' });
+
+    expect(out.referenceImageUrls).toEqual(['canvas-assets/clip.png']);
+  });
+});

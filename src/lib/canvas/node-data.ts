@@ -21,6 +21,7 @@
  */
 import { z } from 'zod';
 import { SOCIAL_PLATFORMS } from './social-platforms';
+import { FEED_MEDIA, FEED_SORTS, PRODUCT_SORTS } from './source-filters';
 import { EFFECTS } from './effects';
 import type { EffectId, EffectParam } from './effects';
 import { LAYOUTS } from './composition/index';
@@ -118,11 +119,33 @@ const iframeSchema = z
     message: 'serve url o content — una pagina incorporata senza nessuno dei due non mostra niente'
   });
 
+const isoDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional();
+
+const feedFiltersSchema = z.object({
+  from: isoDay,
+  to: isoDay,
+  media: z.enum(FEED_MEDIA).optional(),
+  min_likes: z.number().nonnegative().nullable().optional(),
+  min_views: z.number().nonnegative().nullable().optional(),
+  include: z.string().optional(),
+  exclude: z.string().optional(),
+  sort: z.enum(FEED_SORTS).optional()
+});
+
+const productFiltersSchema = z.object({
+  query: z.string().optional(),
+  price_min: z.number().nonnegative().nullable().optional(),
+  price_max: z.number().nonnegative().nullable().optional(),
+  in_stock_only: z.boolean().optional(),
+  sort: z.enum(PRODUCT_SORTS).optional()
+});
+
 const socialAccountFeedSchema = z.object({
   platform: z.enum(SOCIAL_PLATFORMS),
   handle: z.string(),
   limit: z.number().int().positive().optional(),
   after: z.string().nullable().optional(),
+  filters: feedFiltersSchema.optional(),
   ...syncState
 });
 
@@ -152,6 +175,8 @@ const productsSchema = z.object({
   limit: z.number().int().positive().optional(),
   after: z.string().nullable().optional(),
   only_first_photo: z.boolean().optional(),
+  category: z.string().optional(),
+  filters: productFiltersSchema.optional(),
   ...syncState
 });
 

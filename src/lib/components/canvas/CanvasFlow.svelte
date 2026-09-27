@@ -122,6 +122,7 @@
     modelChoicesFor,
     catalogueSyncedFor,
     onPropertyChange,
+    onSelectionChange,
     mode = CanvasMode.Edit,
     tile
   }: {
@@ -198,6 +199,7 @@
     /** Il catalogo di un medium è già sincronizzato? Come `GenNode`, per il campo modello della
      *  barra quando la selezione è di un solo tipo. */
     catalogueSyncedFor?: (type: 'text' | 'image' | 'video') => boolean;
+    onSelectionChange?: (ids: string[]) => void;
     /** La barra ha scritto: un campo, applicato a ogni nodo selezionato — uno o molti, stessa
      *  concorrenza ottimistica di `write`, N scritture indipendenti per una barra sola. */
     onPropertyChange?: (
@@ -663,7 +665,12 @@
       onredo={onRedo}
     />
     {/if}
-    <CanvasSelectionBridge onchange={(next) => (selection = next)} />
+    <CanvasSelectionBridge
+      onchange={(next) => {
+        selection = next;
+        onSelectionChange?.(next.ids);
+      }}
+    />
     <Background gap={24} />
   </SvelteFlow>
 

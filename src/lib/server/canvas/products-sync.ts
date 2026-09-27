@@ -32,12 +32,14 @@ export async function syncProductsNode(
     limit: number;
     after: string | null;
     onlyFirstPhoto: boolean;
+    category?: string;
   }
 ): Promise<ProductsSyncOutcome> {
   const page = await fetchStoreProductsPage(input.platform, input.storeUrl, {
     limit: input.limit,
     after: input.after,
-    onlyFirstPhoto: input.onlyFirstPhoto
+    onlyFirstPhoto: input.onlyFirstPhoto,
+    category: input.category
   });
 
   if (!page.ok) {

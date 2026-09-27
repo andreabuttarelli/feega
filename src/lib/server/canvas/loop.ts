@@ -61,8 +61,7 @@ import { creditsForRun } from '$lib/canvas/gen-cost';
 import { decideWithJev } from '$lib/server/jev';
 import { effectiveModel } from '$lib/canvas/default-models';
 import { resolvedListValues, upstreamInputsFor } from './upstream';
-import { listNodeProducts } from '$lib/server/repos/products';
-import { listNodeSocialPosts } from '$lib/server/repos/social-posts';
+import { syncedSourceItems } from './synced-items';
 import type { Connection } from '$lib/server/repos/canvas';
 import { orgCreditBalance } from '$lib/server/credits';
 import { createAdminClient } from '$lib/server/supabase-admin';
@@ -104,11 +103,8 @@ async function itemCountOf(
   if (source.type === 'list') {
     return (await resolvedListValues(db, orgId, source, connections, canvasNodes)).values.length;
   }
-  if (source.type === 'products') {
-    return (await listNodeProducts(db, { orgId, nodeId: source.id })).length;
-  }
-  if (source.type === 'social_account_feed') {
-    return (await listNodeSocialPosts(db, { orgId, nodeId: source.id })).length;
+  if (source.type === 'products' || source.type === 'social_account_feed') {
+    return (await syncedSourceItems(db, orgId, source)).length;
   }
   return 0;
 }

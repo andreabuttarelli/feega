@@ -31,6 +31,10 @@ export type FetchedProduct = {
 
 export type StorePlatform = 'shopify' | 'woocommerce';
 
+export type StorePageOptions = { limit: number; after: string | null; onlyFirstPhoto: boolean; category?: string };
+
+const categoryOf = (opts: StorePageOptions): string => encodeURIComponent(opts.category?.trim() ?? '');
+
 export type FetchProductsPage = {
   products: FetchedProduct[];
   /** Il cursore per la pagina successiva, o null quando questa era l'ultima. */
@@ -103,14 +107,16 @@ function shopifyProductOf(raw: any, origin: string, onlyFirstPhoto: boolean): Fe
  */
 export async function fetchShopifyPage(
   storeUrl: string,
-  opts: { limit: number; after: string | null; onlyFirstPhoto: boolean }
+  opts: StorePageOptions
 ): Promise<FetchProductsResult> {
   const origin = originOf(storeUrl);
   if (!origin) return { ok: false, error: 'invalid_url: not a valid store URL' };
 
   const page = opts.after ? Math.max(1, Number(opts.after) || 1) : 1;
   const limit = Math.min(Math.max(1, opts.limit), SHOPIFY_MAX_LIMIT);
-  const target = `${origin.origin}/products.json?limit=${limit}&page=${page}`;
+  const category = categoryOf(opts);
+  const collection = category ? `/collections/${category}` : '';
+  const target = `${origin.origin}${collection}/products.json?limit=${limit}&page=${page}`;
 
   try {
     const res = await safeFetchUrl(target, { maxBytes: MAX_BYTES });
@@ -185,14 +191,15 @@ function decodeHtmlEntities(s: string): string {
  */
 export async function fetchWooCommercePage(
   storeUrl: string,
-  opts: { limit: number; after: string | null; onlyFirstPhoto: boolean }
+  opts: StorePageOptions
 ): Promise<FetchProductsResult> {
   const origin = originOf(storeUrl);
   if (!origin) return { ok: false, error: 'invalid_url: not a valid store URL' };
 
   const page = opts.after ? Math.max(1, Number(opts.after) || 1) : 1;
   const limit = Math.min(Math.max(1, opts.limit), WOOCOMMERCE_MAX_LIMIT);
-  const target = `${origin.origin}/wp-json/wc/store/v1/products?per_page=${limit}&page=${page}`;
+  const category = categoryOf(opts);
+  const target = `${origin.origin}/wp-json/wc/store/v1/products?per_page=${limit}&page=${page}${category ? `&category=${category}` : ''}`;
 
   try {
     const res = await safeFetchUrl(target, { maxBytes: MAX_BYTES });
@@ -228,7 +235,7 @@ export async function fetchWooCommercePage(
 export async function fetchStoreProductsPage(
   platform: StorePlatform,
   storeUrl: string,
-  opts: { limit: number; after: string | null; onlyFirstPhoto: boolean }
+  opts: StorePageOptions
 ): Promise<FetchProductsResult> {
   return platform === 'shopify' ? fetchShopifyPage(storeUrl, opts) : fetchWooCommercePage(storeUrl, opts);
 }

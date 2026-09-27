@@ -56,4 +56,23 @@ describe('syncProductsNode', () => {
       expect.objectContaining({ orgId: ORG, projectId: PROJECT, nodeId: NODE, platform: 'shopify' })
     );
   });
+
+  it('la categoria arriva al fetcher come parametro della pagina', async () => {
+    fetchStoreProductsPage.mockResolvedValue({ ok: true, products: [], after: null });
+    upsertNodeProducts.mockResolvedValue(0);
+
+    await syncProductsNode({} as never, {
+      orgId: ORG,
+      projectId: PROJECT,
+      nodeId: NODE,
+      platform: 'shopify',
+      storeUrl: 'https://shop.example.com',
+      limit: 2,
+      after: null,
+      onlyFirstPhoto: false,
+      category: 'sale'
+    });
+
+    expect(fetchStoreProductsPage).toHaveBeenCalledWith('shopify', 'https://shop.example.com', expect.objectContaining({ category: 'sale' }));
+  });
 });
