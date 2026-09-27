@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { newNodeRow } from '$lib/canvas-node-data';
-import { FieldKind, inputValueOf, inspectorOf, parseFieldInput, FEED_FIELDS, PRODUCT_FIELDS } from './node-inspector';
+import { FieldKind, inputValueOf, inspectorOf, parseFieldInput, commitHandleField, FEED_FIELDS, PRODUCT_FIELDS } from './node-inspector';
 
 const row = (type: string, data: Record<string, unknown>) => ({ id: 'n', type, data });
 
@@ -90,5 +90,59 @@ describe('parseFieldInput', () => {
 
   it('un interruttore resta un booleano', () => {
     expect(parseFieldInput(field('filters.in_stock_only'), true)).toBe(true);
+  });
+});
+
+describe('commitHandleField: incollare un URL del feed capisce piattaforma e tipo', () => {
+  const view = (data: Record<string, unknown>) => inspectorOf(row('social_account_feed', data))!;
+
+  it('un URL di profilo riconosciuto imposta piattaforma, handle e un riassunto', () => {
+    const data = commitHandleField(view({ platform: 'instagram', handle: '' }), 'https://www.tiktok.com/@nike');
+    expect(data.platform).toBe('tiktok');
+    expect(data.handle).toBe('nike');
+    expect(data.sync_summary).toBe('TikTok · profile @nike');
+    expect(data.sync_error).toBeNull();
+  });
+
+  it('un handle nudo senza dominio usa la piattaforma già scelta nel nodo, non l’ipotesi del classificatore', () => {
+    const data = commitHandleField(view({ platform: 'youtube', handle: '' }), 'nike');
+    expect(data.platform).toBe('youtube');
+    expect(data.handle).toBe('nike');
+  });
+
+  it('un post singolo resta scritto così com’è: syncSocialFeedEntries lo riclassifica alla sincronizzazione', () => {
+    const data = commitHandleField(view({ platform: 'instagram', handle: 'old' }), 'https://www.instagram.com/p/ABC123/');
+    expect(data.handle).toBe('https://www.instagram.com/p/ABC123/');
+    expect(data.sync_summary).toBe('Instagram · 1 post');
+    expect(data.sync_error).toBeNull();
+  });
+
+  it('un hashtag resta scritto così com’è, con un riassunto', () => {
+    const data = commitHandleField(view({ platform: 'instagram', handle: 'old' }), '#running');
+    expect(data.handle).toBe('#running');
+    expect(data.sync_summary).toBe('Instagram · hashtag #running');
+  });
+
+  it('più righe restano scritte così come sono, il riassunto le elenca tutte', () => {
+    const data = commitHandleField(
+      view({ platform: 'instagram', handle: 'old' }),
+      '@nike\nhttps://www.tiktok.com/@nike/video/7441152690236771640'
+    );
+    expect(data.handle).toBe('@nike\nhttps://www.tiktok.com/@nike/video/7441152690236771640');
+    expect(data.sync_summary).toContain('Instagram · profile @nike');
+    expect(data.sync_summary).toContain('TikTok · 1 post');
+  });
+
+  it('un dominio sconosciuto non aggiorna handle: sync_error spiega perché', () => {
+    const data = commitHandleField(view({ platform: 'instagram', handle: 'old' }), 'https://www.pinterest.com/nike/');
+    expect(data.handle).toBe('old');
+    expect(data.sync_error).toContain('pinterest');
+  });
+
+  it('svuotare il campo pulisce riassunto ed errore', () => {
+    const data = commitHandleField(view({ platform: 'instagram', handle: 'nike', sync_summary: 'x', sync_error: 'y' }), '');
+    expect(data.handle).toBe('');
+    expect(data.sync_summary).toBeNull();
+    expect(data.sync_error).toBeNull();
   });
 });

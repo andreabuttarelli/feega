@@ -502,6 +502,13 @@ describe('describeNodeType / describeNodeTypes — la forma verso l\'esterno, de
     const all = describeNodeTypes();
     expect(Object.keys(all).sort()).toEqual([...NODE_TYPES].sort());
   });
+
+  it('sync_summary — condiviso da products e social_account_feed — è nello schema, non solo nel codice', () => {
+    const products = describeNodeType('products') as { properties: Record<string, unknown> };
+    const feed = describeNodeType('social_account_feed') as { properties: Record<string, unknown> };
+    expect(products.properties).toHaveProperty('sync_summary');
+    expect(feed.properties).toHaveProperty('sync_summary');
+  });
 });
 
 describe('looseNodeJsonSchema — solo required + enum del discriminante, per il CHECK del database', () => {

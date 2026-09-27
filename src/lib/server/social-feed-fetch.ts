@@ -1,5 +1,6 @@
 import { env } from '$env/dynamic/private';
-import { fetchProfileHistory, type NormalizedPost } from '$lib/server/scrapecreators';
+import { fetchProfileHistory, fetchSinglePost, isSinglePostPlatform, type NormalizedPost } from '$lib/server/scrapecreators';
+import { classifySocialInput, type SocialEntry } from '$lib/canvas/social-url-classifier';
 
 /**
  * IL FEED PUBBLICO DI UN ACCOUNT, PER IL NODO `social_account_feed`.
@@ -55,3 +56,40 @@ export async function fetchSocialFeed(
     return { ok: false, error: `fetch_failed: ${e instanceof Error ? e.message : String(e)}` };
   }
 }
+
+/**
+ * UN'ENTRY GIÀ CLASSIFICATA (`social-url-classifier.ts`) → I SUOI POST.
+ *
+ * `fetchSocialFeed` sopra prende una piattaforma+handle già decisi a mano; questa prende quel che
+ * `classifySocialInput` ha capito da solo — un profilo scarica lo storico come prima, un post
+ * singolo scarica quell'unico post via `fetchSinglePost`, un hashtag non è ancora cablato e lo
+ * dice, non finge un array vuoto.
+ */
+export async function fetchClassifiedEntry(entry: SocialEntry, limit: number): Promise<FetchFeedResult> {
+  if (!env.SCRAPECREATORS_API_KEY) {
+    return { ok: false, error: 'not_configured: ScrapeCreators has no API key on this environment' };
+  }
+
+  if (entry.kind === 'hashtag') {
+    return { ok: false, error: `not_supported: hashtag sync for ${entry.platform} is not wired yet` };
+  }
+
+  if (entry.kind === 'post') {
+    if (!isSinglePostPlatform(entry.platform)) {
+      return { ok: false, error: `unsupported_platform: single-post fetch is not wired for ${entry.platform}` };
+    }
+    try {
+      const post = await fetchSinglePost(entry.platform, entry.source);
+      return { ok: true, posts: [post] };
+    } catch (e) {
+      return { ok: false, error: `fetch_failed: ${e instanceof Error ? e.message : String(e)}` };
+    }
+  }
+
+  if (!entry.handle) {
+    return { ok: false, error: 'missing_handle: this feed has no handle to download' };
+  }
+  return fetchSocialFeed(entry.platform, entry.handle, limit);
+}
+
+export { classifySocialInput };

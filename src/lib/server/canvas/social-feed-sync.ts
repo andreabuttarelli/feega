@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto';
 import type { Db } from '$lib/server/db/client';
-import { fetchSocialFeed } from '$lib/server/social-feed-fetch';
+import { fetchSocialFeed, fetchClassifiedEntry } from '$lib/server/social-feed-fetch';
 import { upsertNodeSocialPosts } from '$lib/server/repos/social-posts';
 import { archiveImageToBucket } from '$lib/server/media-archive';
 import type { MediaItem, NormalizedPost } from '$lib/server/scrapecreators';
+import { classifySocialLines, type SocialEntry, type ClassifyFailureReason } from '$lib/canvas/social-url-classifier';
 
 /**
  * UN GIRO DI SINCRONIZZAZIONE PER UN NODO `social_account_feed`.
@@ -78,4 +79,76 @@ export async function syncSocialFeedNode(
   });
 
   return { ok: true, synced };
+}
+
+export type SyncedEntry = { platform: string; kind: SocialEntry['kind']; source: string; synced: number };
+export type UnsupportedEntry = { source: string; reason: ClassifyFailureReason; message: string };
+
+export type SocialFeedEntriesOutcome =
+  | { ok: true; synced: number; entries: SyncedEntry[]; unsupported: UnsupportedEntry[] }
+  | { ok: false; error: string };
+
+/**
+ * QUEL CHE L'UTENTE HA INCOLLATO — una riga, più righe, handle nudi o URL — classificato una volta
+ * (`social-url-classifier.ts`) e sincronizzato entry per entry. Ogni entry finisce sotto il proprio
+ * `handle` (il post singolo usa l'id del post come handle, per restare nella stessa colonna che
+ * `social_posts_node_id_external_id_key` già indicizza), così un profilo e un post dello stesso
+ * account non si sovrascrivono a vicenda.
+ *
+ * Un'entry non riconosciuta o non ancora coperta (hashtag, reddit/pinterest) non blocca le altre:
+ * finisce in `unsupported`, non in un `throw` che azzera un giro riuscito per metà.
+ */
+export async function syncSocialFeedEntries(
+  db: Db,
+  input: { orgId: string; projectId: string | null; nodeId: string; raw: string; limit: number }
+): Promise<SocialFeedEntriesOutcome> {
+  const { entries, errors } = classifySocialLines(input.raw);
+  const unsupported: UnsupportedEntry[] = errors;
+
+  if (!entries.length) {
+    return {
+      ok: false,
+      error: unsupported.length
+        ? `not_supported: ${unsupported.map((u) => u.message).join('; ')}`
+        : 'unrecognized: nothing here looks like a social handle, profile or post URL'
+    };
+  }
+
+  const results = await Promise.all(
+    entries.map(async (entry) => {
+      const fetched = await fetchClassifiedEntry(entry, input.limit);
+      if (!fetched.ok) {
+        return { entry, error: fetched.error, synced: 0 };
+      }
+
+      const posts = await archivePosts(db, input.orgId, input.nodeId, fetched.posts);
+      const handle = entry.handle ?? entry.id ?? entry.source;
+      const synced = await upsertNodeSocialPosts(db, {
+        orgId: input.orgId,
+        projectId: input.projectId,
+        nodeId: input.nodeId,
+        platform: entry.platform,
+        handle,
+        posts
+      });
+      return { entry, error: null, synced };
+    })
+  );
+
+  for (const r of results) {
+    if (r.error) {
+      unsupported.push({ source: r.entry.source, reason: 'unrecognized', message: r.error });
+    }
+  }
+
+  const succeeded: SyncedEntry[] = results
+    .filter((r) => !r.error)
+    .map((r) => ({ platform: r.entry.platform, kind: r.entry.kind, source: r.entry.source, synced: r.synced }));
+
+  return {
+    ok: true,
+    synced: succeeded.reduce((a, e) => a + e.synced, 0),
+    entries: succeeded,
+    unsupported
+  };
 }

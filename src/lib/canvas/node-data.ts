@@ -54,7 +54,8 @@ const syncState = {
   sync_status: z.enum(GEN_STATUS).optional(),
   sync_error: z.string().nullable().optional(),
   synced_count: z.number().optional(),
-  synced_at: z.string().nullable().optional()
+  synced_at: z.string().nullable().optional(),
+  sync_summary: z.string().nullable().optional()
 };
 
 const textSchema = z.object({

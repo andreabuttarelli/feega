@@ -532,6 +532,211 @@ export async function fetchProfileHistory(
   return fn(account, limits.maxPages ?? DEFAULT_MAX_PAGES, limits.maxPosts ?? DEFAULT_MAX_POSTS);
 }
 
+// ---- single post/video by URL -----------------------------------------------------------------
+//
+// `fetchProfileHistory` above takes a HANDLE and returns everything it posted; this takes a POST
+// URL and returns that one post — for a link pasted into a node, not an account. One endpoint per
+// platform, 1 credit each, verified live against api.scrapecreators.com on 2026-09-27:
+//   instagram GET /v1/instagram/post?url=       tiktok    GET /v2/tiktok/video?url=
+//   x         GET /v1/twitter/tweet?url=         threads   GET /v1/threads/post?url=
+//   facebook  GET /v1/facebook/post?url=         youtube   GET /v1/youtube/video?url=
+// linkedin has no single-post endpoint (only company-posts, same as fetchProfileHistory above).
+
+/** `pickString` reads nested paths too — Instagram's fields can sit one or two levels deep. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function pickPath(obj: any, path: string): unknown {
+  return path.split('.').reduce((at, key) => (at && typeof at === 'object' ? at[key] : undefined), obj);
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function pickStringPath(obj: any, paths: string[]): string | null {
+  for (const path of paths) {
+    const v = pickPath(obj, path);
+    if (typeof v === 'string' && v.trim()) return v.trim();
+  }
+  return null;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function pickNumberPath(obj: any, paths: string[]): number | null {
+  for (const path of paths) {
+    const v = pickPath(obj, path);
+    if (typeof v === 'number' && Number.isFinite(v)) return v;
+  }
+  return null;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function instagramSingle(raw: any, url: string): NormalizedPost {
+  // The real response wraps the post under `data.xdt_shortcode_media` — verified live against
+  // api.scrapecreators.com/v1/instagram/post on 2026-09-27, not the flatter shape the docs summary
+  // implied. `created_at`/`taken_at_timestamp` are both unix SECONDS, `created_at` as a string.
+  const data = raw.data?.xdt_shortcode_media ?? raw.xdt_shortcode_media ?? raw;
+  const isVideo = data.is_video === true || data.product_type === 'clips';
+  const thumbnailUrl = pickStringPath(data, ['display_url', 'thumbnail_src']);
+  const videoUrl = isVideo ? pickStringPath(data, ['video_url']) : null;
+  return {
+    externalId: String(data.id ?? data.shortcode ?? url),
+    url,
+    content: pickStringPath(data, ['edge_media_to_caption.edges.0.node.text', 'caption']),
+    mediaType: isVideo ? 'video' : 'image',
+    thumbnailUrl,
+    videoUrl,
+    items: thumbnailUrl ? [{ type: isVideo ? 'video' : 'image', url: videoUrl ?? thumbnailUrl, thumbnailUrl }] : [],
+    publishedAt: isoFromUnix(Number(data.created_at) || data.taken_at_timestamp),
+    metrics: {
+      likes: pickNumberPath(data, ['edge_media_preview_like.count', 'like_count']),
+      comments: pickNumberPath(data, ['comment_count', 'edge_media_to_parent_comment.count']),
+      views: pickNumberPath(data, ['video_play_count'])
+    }
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function tiktokSingle(data: any, url: string): NormalizedPost {
+  const v = data.aweme_detail ?? data;
+  const items = tiktokItems(v);
+  return {
+    externalId: String(v.aweme_id ?? url),
+    url: v.share_url ?? url,
+    content: v.desc ?? null,
+    mediaType: (v.image_post_info?.images?.length ? 'image' : 'video') as 'image' | 'video',
+    thumbnailUrl: items[0]?.thumbnailUrl ?? v.video?.dynamic_cover?.url_list?.[0] ?? null,
+    videoUrl: v.video?.play_addr?.url_list?.[0] ?? v.video?.download_addr?.url_list?.[0] ?? null,
+    items,
+    publishedAt: isoFromUnix(v.create_time),
+    metrics: {
+      views: num(v.statistics?.play_count),
+      likes: num(v.statistics?.digg_count),
+      comments: num(v.statistics?.comment_count),
+      shares: num(v.statistics?.share_count),
+      saves: num(v.statistics?.collect_count)
+    }
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function twitterSingle(data: any, url: string): NormalizedPost {
+  const lg = data.legacy ?? data;
+  const mediaList = lg.extended_entities?.media ?? [];
+  const items = twitterItems(mediaList);
+  const media = mediaList[0];
+  const isClip = media?.type === 'video' || media?.type === 'animated_gif';
+  return {
+    externalId: String(data.rest_id ?? lg.id_str ?? url),
+    url,
+    content: lg.full_text ?? data.text ?? null,
+    mediaType: isClip ? 'video' : media ? 'image' : 'text',
+    thumbnailUrl: items[0]?.thumbnailUrl ?? media?.media_url_https ?? null,
+    videoUrl: isClip ? bestTwitterVariant(media?.video_info?.variants) : null,
+    items,
+    publishedAt: isoFromString(lg.created_at ?? data.created_at),
+    metrics: {
+      likes: num(lg.favorite_count ?? data.favorite_count),
+      shares: num(lg.retweet_count ?? data.retweet_count),
+      comments: num(lg.reply_count ?? data.reply_count)
+    }
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function threadsSingle(data: any, url: string): NormalizedPost {
+  const p = data.thread_items?.[0]?.post ?? data;
+  const mediaType = p.image_versions2?.candidates?.length ? 'image' : 'text';
+  const thumbnailUrl = p.image_versions2?.candidates?.[0]?.url ?? null;
+  return {
+    externalId: String(p.pk ?? p.id ?? url),
+    url,
+    content: p.caption?.text ?? null,
+    mediaType,
+    thumbnailUrl,
+    items: singleItem(mediaType, thumbnailUrl),
+    publishedAt: isoFromUnix(p.taken_at),
+    metrics: {
+      likes: num(p.like_count),
+      comments: num(p.text_post_app_info?.direct_reply_count)
+    }
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function facebookSingle(data: any, url: string): NormalizedPost {
+  // Flat response, no envelope — verified live on 2026-09-27. Video lives under `video.sd_url`/
+  // `hd_url` (no `videoDetails`), the still image under `image_url` or the first of `images`.
+  const isVideo = !!data.video?.hd_url || !!data.video?.sd_url;
+  const mediaType = (isVideo ? 'video' : data.image_url || data.images?.length ? 'image' : 'text') as 'image' | 'video' | 'text';
+  const thumbnailUrl = data.video?.thumbnail ?? data.thumbnail ?? data.image_url ?? data.images?.[0] ?? null;
+  const videoUrl = isVideo ? (data.video?.hd_url ?? data.video?.sd_url ?? null) : null;
+  return {
+    externalId: String(data.post_id ?? data.id ?? url),
+    url: data.url ?? url,
+    content: data.description ?? data.text ?? null,
+    mediaType,
+    thumbnailUrl,
+    videoUrl,
+    items: thumbnailUrl ? [{ type: isVideo ? 'video' : 'image', url: videoUrl ?? thumbnailUrl, thumbnailUrl }] : [],
+    publishedAt: isoFromString(data.creation_time),
+    metrics: {
+      likes: num(data.like_count),
+      comments: num(data.comment_count),
+      views: num(data.view_count)
+    }
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function youtubeSingle(data: any, url: string): NormalizedPost {
+  return {
+    externalId: String(data.id ?? url),
+    url: data.url ?? url,
+    content: data.title ?? null,
+    mediaType: 'video',
+    thumbnailUrl: data.thumbnail ?? null,
+    items: singleItem('video', data.thumbnail ?? null),
+    durationMs: num(data.durationMs),
+    publishedAt: isoFromString(data.publishDate),
+    metrics: {
+      views: num(data.viewCountInt),
+      likes: num(data.likeCountInt),
+      comments: num(data.commentCountInt)
+    }
+  };
+}
+
+const SINGLE_POST_ENDPOINTS: Record<string, string> = {
+  instagram: '/v1/instagram/post',
+  tiktok: '/v2/tiktok/video',
+  x: '/v1/twitter/tweet',
+  threads: '/v1/threads/post',
+  facebook: '/v1/facebook/post',
+  youtube: '/v1/youtube/video'
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const SINGLE_POST_MAPPERS: Record<string, (data: any, url: string) => NormalizedPost> = {
+  instagram: instagramSingle,
+  tiktok: tiktokSingle,
+  x: twitterSingle,
+  threads: threadsSingle,
+  facebook: facebookSingle,
+  youtube: youtubeSingle
+};
+
+export function isSinglePostPlatform(platform: string): boolean {
+  return platform in SINGLE_POST_ENDPOINTS;
+}
+
+// Fetch exactly one post/video by its public URL. Throws on HTTP error (a 404 is a real "post not
+// found", not zero results to swallow) so callers can tell it apart from every other failure.
+export async function fetchSinglePost(platform: string, url: string): Promise<NormalizedPost> {
+  const path = SINGLE_POST_ENDPOINTS[platform];
+  if (!path) {
+    throw new Error(`single post fetch not supported for platform: ${platform}`);
+  }
+  const data = await scfetch('GET', `${path}?url=${encodeURIComponent(url)}`);
+  return SINGLE_POST_MAPPERS[platform](data, url);
+}
+
 // ---- profile identity (for People detection from socials) -----------------------------------
 //
 // A personal social handle (e.g. a founder's Instagram) is full of the person's own photos. We use

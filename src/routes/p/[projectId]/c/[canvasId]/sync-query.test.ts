@@ -6,6 +6,7 @@ const findCanvasForUser = vi.fn();
 const runGenNode = vi.fn();
 const syncProductsNode = vi.fn();
 const syncSocialFeedNode = vi.fn();
+const syncSocialFeedEntries = vi.fn();
 const findNode = vi.fn();
 const writeNodeData = vi.fn();
 
@@ -27,7 +28,10 @@ vi.mock('$lib/server/canvas/loop', () => ({ planLoop: vi.fn(), runLoop: vi.fn() 
 vi.mock('$lib/server/canvas/duplicate', () => ({ duplicateNodes: vi.fn() }));
 vi.mock('$lib/server/canvas/undo', () => ({ undoGesture: vi.fn() }));
 vi.mock('$lib/server/canvas/products-sync', () => ({ syncProductsNode: (...a: unknown[]) => syncProductsNode(...a) }));
-vi.mock('$lib/server/canvas/social-feed-sync', () => ({ syncSocialFeedNode: (...a: unknown[]) => syncSocialFeedNode(...a) }));
+vi.mock('$lib/server/canvas/social-feed-sync', () => ({
+	syncSocialFeedNode: (...a: unknown[]) => syncSocialFeedNode(...a),
+	syncSocialFeedEntries: (...a: unknown[]) => syncSocialFeedEntries(...a)
+}));
 vi.mock('$lib/server/repos/canvas', async (importOriginal) => ({
 	...(await importOriginal<object>()),
 	findNode: (...a: unknown[]) => findNode(...a),
@@ -74,11 +78,23 @@ beforeEach(() => {
 	findCanvasForUser.mockResolvedValue({ orgId: 'org-1', canvas: { projectId: 'project-1' } });
 	syncProductsNode.mockResolvedValue({ ok: true, synced: 0, after: null });
 	syncSocialFeedNode.mockResolvedValue({ ok: true, synced: 0 });
+	syncSocialFeedEntries.mockResolvedValue({ ok: true, synced: 0, entries: [], unsupported: [] });
 });
 
 describe('actions.sync legge la query come la scrive una persona', () => {
 	it('un handle incollato come URL del profilo scarica l’account giusto', async () => {
 		nodeWith('social_account_feed', { platform: 'instagram', handle: 'https://www.instagram.com/@nike/' });
+
+		await actions.sync(fakeEvent({ node_id: 'node-1', version: '1' }));
+
+		expect(syncSocialFeedEntries).toHaveBeenCalledWith(
+			expect.anything(),
+			expect.objectContaining({ raw: 'https://www.instagram.com/@nike/' })
+		);
+	});
+
+	it('un handle nudo, senza URL, scarica ancora per la via diretta', async () => {
+		nodeWith('social_account_feed', { platform: 'instagram', handle: 'nike' });
 
 		await actions.sync(fakeEvent({ node_id: 'node-1', version: '1' }));
 

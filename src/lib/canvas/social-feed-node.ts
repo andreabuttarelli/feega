@@ -36,6 +36,7 @@ export type SocialFeedNode = {
   syncError: string | null;
   syncedCount: number;
   syncedAt: string | null;
+  syncSummary: string | null;
 };
 
 const SOCIAL_FEED_NODE_SIZE = { w: 420, h: 360 };

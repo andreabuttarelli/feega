@@ -1,16 +1,17 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-const { fetchSocialFeed, upsertNodeSocialPosts, archiveImageToBucket } = vi.hoisted(() => ({
+const { fetchSocialFeed, fetchClassifiedEntry, upsertNodeSocialPosts, archiveImageToBucket } = vi.hoisted(() => ({
   fetchSocialFeed: vi.fn(),
+  fetchClassifiedEntry: vi.fn(),
   upsertNodeSocialPosts: vi.fn(),
   archiveImageToBucket: vi.fn()
 }));
 
-vi.mock('$lib/server/social-feed-fetch', () => ({ fetchSocialFeed }));
+vi.mock('$lib/server/social-feed-fetch', () => ({ fetchSocialFeed, fetchClassifiedEntry }));
 vi.mock('$lib/server/repos/social-posts', () => ({ upsertNodeSocialPosts }));
 vi.mock('$lib/server/media-archive', () => ({ archiveImageToBucket }));
 
-import { syncSocialFeedNode } from './social-feed-sync';
+import { syncSocialFeedNode, syncSocialFeedEntries } from './social-feed-sync';
 
 const ORG = '11111111-1111-1111-1111-111111111111';
 const PROJECT = '22222222-2222-2222-2222-222222222222';
@@ -112,5 +113,64 @@ describe('syncSocialFeedNode', () => {
     expect(out.ok).toBe(true);
     const [, input] = upsertNodeSocialPosts.mock.calls[0];
     expect(input.posts[0].items[0].thumbnailPath).toBeUndefined();
+  });
+});
+
+describe('syncSocialFeedEntries', () => {
+  it('classifica il testo incollato e scarica ogni entry riconosciuta, ognuna con la sua piattaforma', async () => {
+    fetchClassifiedEntry.mockImplementation(async (entry: { platform: string }) =>
+      entry.platform === 'instagram'
+        ? { ok: true, posts: [{ externalId: 'ig-1' }] }
+        : { ok: true, posts: [{ externalId: 'tt-1' }] }
+    );
+    upsertNodeSocialPosts.mockResolvedValue(1);
+
+    const out = await syncSocialFeedEntries({} as never, {
+      orgId: ORG,
+      projectId: PROJECT,
+      nodeId: NODE,
+      raw: '@nike\nhttps://www.tiktok.com/@nike/video/7441152690236771640',
+      limit: 20
+    });
+
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.synced).toBe(2);
+    expect(out.entries).toHaveLength(2);
+    expect(out.entries[0]).toMatchObject({ platform: 'instagram', kind: 'profile', synced: 1 });
+    expect(out.entries[1]).toMatchObject({ platform: 'tiktok', kind: 'post', synced: 1 });
+    expect(fetchClassifiedEntry).toHaveBeenCalledTimes(2);
+  });
+
+  it('un input non riconosciuto o non supportato non blocca gli altri — appare come errore per entry', async () => {
+    fetchClassifiedEntry.mockResolvedValue({ ok: true, posts: [{ externalId: 'ig-1' }] });
+    upsertNodeSocialPosts.mockResolvedValue(1);
+
+    const out = await syncSocialFeedEntries({} as never, {
+      orgId: ORG,
+      projectId: PROJECT,
+      nodeId: NODE,
+      raw: '@nike, https://www.reddit.com/r/nike/',
+      limit: 20
+    });
+
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.synced).toBe(1);
+    expect(out.entries).toHaveLength(1);
+    expect(out.unsupported).toEqual([{ source: 'https://www.reddit.com/r/nike/', reason: 'not_supported', message: expect.stringContaining('reddit') }]);
+  });
+
+  it('un testo che non classifica niente torna ok:false con un messaggio leggibile', async () => {
+    const out = await syncSocialFeedEntries({} as never, {
+      orgId: ORG,
+      projectId: PROJECT,
+      nodeId: NODE,
+      raw: 'https://www.reddit.com/r/nike/',
+      limit: 20
+    });
+
+    expect(out).toMatchObject({ ok: false });
+    expect(fetchClassifiedEntry).not.toHaveBeenCalled();
   });
 });
