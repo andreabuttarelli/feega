@@ -24,6 +24,11 @@ export type ServiceRoleUse = {
 
 export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
   {
+    path: 'src/lib/server/canvas/canvas-share.ts — readSharedCanvas + signSharedMedia (rotta pubblica /s/[token])',
+    why: "Chi apre un link condiviso non ha sessione: il token È l'autorizzazione. La riga si trova solo per canvases.share_token; l'org_id si LEGGE da quella riga e limita ogni lettura successiva (nodi non cancellati, connessioni, asset di quei nodi). Sola lettura, e fuori esce solo il contenuto dei nodi con i file firmati — mai org, progetto, prompt o utenti.",
+    tables: ['canvases', 'nodes', 'nodes_connections', 'assets']
+  },
+  {
     path: 'src/lib/server/cli-auth.ts — authenticateApiKey',
     why: "La chiave API va risolta in un utente PRIMA di sapere chi è: non esiste ancora un JWT su cui far girare la RLS. La lettura è su key_hash e non accetta nulla da chi chiama oltre la chiave stessa; dopo la risoluzione il lavoro continua con il client dell'utente.",
     tables: ['api_keys']

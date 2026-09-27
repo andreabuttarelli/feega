@@ -26,7 +26,7 @@
    * che si colora e il menù dei versi, e tre copie diverrebbero diverse al primo caso nuovo.
    */
   import { untrack } from 'svelte';
-  import { SvelteFlow, Background, SelectionMode, type Node } from '@xyflow/svelte';
+  import { SvelteFlow, Background, type Node } from '@xyflow/svelte';
   import '@xyflow/svelte/dist/style.css';
   import CanvasTile from './CanvasTile.svelte';
   import CanvasPointer from './CanvasPointer.svelte';
@@ -49,6 +49,7 @@
   import { setTileRender } from '$lib/canvas/tile-render-context';
   import { setTileResize } from '$lib/canvas/tile-resize-context';
   import type { CanvasNode } from '$lib/canvas/graph';
+  import { CANVAS_MODES, CanvasMode } from '$lib/canvas/canvas-mode';
 
   /**
    * Dove sta una tile e quanto è grande, in unità di tela — le stesse di `brand_canvas_items`.
@@ -121,6 +122,7 @@
     modelChoicesFor,
     catalogueSyncedFor,
     onPropertyChange,
+    mode = CanvasMode.Edit,
     tile
   }: {
     tiles?: Tile[];
@@ -216,7 +218,10 @@
     onResize?: (id: string, w: number, h: number) => void;
     /** Cosa disegnare dentro una tile. La tela non sa cosa mostra: lo decide chi la usa. */
     tile: import('svelte').Snippet<[{ id: string; selected: boolean }]>;
+    mode?: CanvasMode;
   } = $props();
+
+  const spec = $derived(CANVAS_MODES[mode]);
 
   // Un tipo di nodo solo: la tela non ha tipi di NODO, ha tipi di CONTENUTO, e quelli li decide
   // lo snippet di chi la usa.
@@ -641,18 +646,12 @@
     onnodeclick={onNodeClick}
     {isValidConnection}
     onconnectend={() => (refusal = null)}
-    panOnScroll
-    zoomOnPinch
-    zoomOnScroll={false}
-    zoomOnDoubleClick={false}
-    deleteKey={null}
-    selectionOnDrag
-    selectionMode={SelectionMode.Partial}
-    panOnDrag={[1, 2]}
+    {...spec.flow}
     fitView
     multiSelectionKey={['Meta', 'Control', 'Shift']}
   >
     <CanvasPointer onready={(fn) => (toFlow = fn)} />
+    {#if spec.chrome}
     <CanvasKeys
       onadd={addAtCentre}
       onmove={onMove}
@@ -663,6 +662,7 @@
       onundo={onUndo}
       onredo={onRedo}
     />
+    {/if}
     <CanvasSelectionBridge onchange={(next) => (selection = next)} />
     <Background gap={24} />
   </SvelteFlow>
@@ -677,10 +677,11 @@
     <p class="edge-refusal" role="status">Scegli il nodo a cui collegare — Esc per annullare</p>
   {/if}
 
-  {#if onCreate}
+  {#if spec.chrome && onCreate}
     <CanvasAddBar onpick={addAtCentre} onupload={onUpload} />
   {/if}
 
+  {#if spec.chrome}
   <SelectionToolbar
     box={selection.box}
     zoom={selection.zoom}
@@ -694,6 +695,7 @@
   />
 
   <NextStepChips box={selection.box} zoom={selection.zoom} nodeId={nextStepNodeId} onpick={pickNextStep} />
+  {/if}
 
   {#if connectPickerAt}
     <ConnectPicker at={connectPickerAt} onpick={pickConnectMedium} onclose={() => (connectPickerAt = null)} />

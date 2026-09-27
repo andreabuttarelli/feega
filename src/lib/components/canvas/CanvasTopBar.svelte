@@ -5,9 +5,10 @@
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import Check from '@lucide/svelte/icons/check';
   import MessageSquare from '@lucide/svelte/icons/message-square';
-  import Send from '@lucide/svelte/icons/send';
   import CreditAmount from '$lib/components/CreditAmount.svelte';
   import CanvasMenu from './CanvasMenu.svelte';
+  import CanvasShare from './CanvasShare.svelte';
+  import type { ShareState } from '$lib/canvas/shared-view';
   import { openSheet } from '$lib/canvas/sheet-nav';
 
   type ProjectRow = { id: string; name: string; href: string; updatedAt: string };
@@ -31,7 +32,8 @@
     creditBalance,
     chatOpen,
     onToggleChat,
-    onPublish
+    shareToken,
+    onShare
   }: {
     projectId: string;
     projectName: string;
@@ -41,7 +43,8 @@
     creditBalance: number;
     chatOpen: boolean;
     onToggleChat: () => void;
-    onPublish: () => void;
+    shareToken: string | null;
+    onShare: (state: ShareState) => Promise<void>;
   } = $props();
 
   /** "3 Sep" o "14:20" per oggi: distingue progetti con lo stesso nome nel menu. */
@@ -116,10 +119,7 @@
       <CreditAmount amount={creditBalance} />
     </a>
 
-    <button type="button" class="publish-btn" onclick={onPublish}>
-      <Send size={14} />
-      <span class="publish-label">{$_('app.shell.publish')}</span>
-    </button>
+    <CanvasShare {shareToken} {onShare} />
 
     <button
       type="button"
@@ -226,25 +226,6 @@
     color: var(--accent-ink, var(--accent, #7c5cff));
   }
 
-  .publish-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    height: 30px;
-    flex-shrink: 0;
-    appearance: none;
-    border: 1px solid var(--line, #ededef);
-    background: var(--ink, #1d1d1f);
-    color: var(--paper, #fff);
-    padding: 0 10px;
-    font: inherit;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-  }
-  .publish-btn:hover {
-    background: var(--ink-soft, #333);
-  }
 
   .credits {
     display: inline-flex;
@@ -265,14 +246,6 @@
   @media (max-width: 480px) {
     .canvas-name {
       max-width: 80px;
-    }
-    .publish-label {
-      display: none;
-    }
-    .publish-btn {
-      width: 30px;
-      padding: 0;
-      justify-content: center;
     }
   }
 </style>
