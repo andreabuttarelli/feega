@@ -2,10 +2,7 @@
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
-  import {
-    SETTINGS_BRAND_SECTIONS,
-    SETTINGS_SECTIONS
-  } from '$lib/components/settings/platforms';
+  import { SETTINGS_SECTIONS } from '$lib/components/settings/platforms';
   import PageHead from '$lib/components/PageHead.svelte';
   import { _ } from 'svelte-i18n';
   // Stili condivisi con /app/billing, che monta le stesse primitive fuori da questo layout.
@@ -22,9 +19,7 @@
   );
 
   const isBrandKit = $derived(
-    (SETTINGS_BRAND_SECTIONS as readonly string[]).some((s) =>
-      path.replace(/\/$/, '').endsWith(`/settings/${s}`)
-    )
+    ['brand', 'products'].some((s) => path.replace(/\/$/, '').endsWith(`/settings/${s}`))
   );
 
   type SettingsHead = { title: string; subtitle?: string };
@@ -74,7 +69,7 @@
   onMount(() => {
     if (isOauthFlow) return;
     const hash = $page.url.hash.replace(/^#/, '');
-    if (!hash || !(SETTINGS_SECTIONS as readonly string[]).includes(hash)) return;
+    if (!hash || !SETTINGS_SECTIONS.some((s) => s.path === hash)) return;
     const p = path.replace(/\/$/, '');
     if (p.endsWith(`/${hash}`)) return;
     goto(`${settingsBase}/${hash}${$page.url.search}`, { replaceState: true });

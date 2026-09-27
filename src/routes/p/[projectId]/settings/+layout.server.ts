@@ -6,15 +6,14 @@ import { isBrandOwner } from '$lib/server/settings-actions';
 import { orgBillingForBrand } from '$lib/server/org-billing';
 import { requireBrand } from '$lib/server/projects/brand-shell';
 
-// La pagina Brand è l'unica sezione che sa cosa fare senza un brand: propone di sceglierne uno
-// per il progetto (`projects.brand_id` è nullable, ed è il caso normale). Ogni altra sezione —
-// ads, billing, i social connessi — non ha senso senza un brand reale, quindi continua a rifiutare.
-const BRAND_ROUTE = 'settings/brand';
-
-export const load: LayoutServerLoad = async ({ parent, url, locals: { supabase } }) => {
+export const load: LayoutServerLoad = async ({ parent, locals: { supabase } }) => {
   const { brand: brandOrNull } = await parent();
 
-  if (!brandOrNull && url.pathname.replace(/\/$/, '').endsWith(`/${BRAND_ROUTE}`)) {
+  // Le sezioni con `requiresBrand: true` (la tabella in platforms.ts) mostrano uno stato "Collega
+  // o crea un brand" invece di caricare dati che non esistono senza un brand; il gate che decide
+  // quale sezione lo richiede vive nella pagina che la disegna, non qui — questo load si limita a
+  // non fallire quando il brand manca.
+  if (!brandOrNull) {
     return {
       brand: null,
       accounts: [],

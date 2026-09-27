@@ -86,4 +86,17 @@ describe('settings +layout.server load', () => {
 		);
 		expect(data.invites).toEqual([{ id: 'inv-1', email: 'a@b.com', accepted_at: null, created_at: '2026-01-01' }]);
 	});
+
+	it('non lancia quando il progetto non ha un brand', async () => {
+		const supabase = fakeSupabase({});
+
+		const data = await (load as (e: unknown) => Promise<Record<string, unknown>>)({
+			parent: async () => ({ brand: null }),
+			url: new URL('https://feega.test/p/x/settings/video'),
+			locals: { supabase }
+		});
+
+		expect(data.brand).toBeNull();
+		expect(requireBrand).not.toHaveBeenCalled();
+	});
 });

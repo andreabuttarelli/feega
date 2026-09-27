@@ -250,7 +250,8 @@
       "workspace": "Workspace",
       "sectionPublishing": "Publishing",
       "sectionAccount": "Account",
-      "sectionBrand": "Brand"
+      "sectionBrand": "Brand",
+      "sectionProject": "Project"
     },
     "hub": {
       "publish": {
@@ -563,6 +564,23 @@
       "empty": "No campaigns yet. Propose boosts from your winners, or create a standalone ad.",
       "approve": "Approve & spend",
       "reject": "Reject",
+      "noBrand": {
+        "title": "Link or create a brand to use Ads",
+        "body": "Ads run against a brand's posts and ad account. Link this project to one, or create a new one.",
+        "cta": "Create or link a brand"
+      },
+      "noAdAccount": {
+        "title": "Connect a Meta Ads account",
+        "body": "Link {brand}'s Meta Ads account to propose boosts and launch campaigns.",
+        "cta": "Connect Meta Ads",
+        "unavailable": "Meta Ads connect isn't wired up yet for this brand."
+      },
+      "steps": {
+        "title": "How Social ads work",
+        "one": "Connect a Meta Ads account",
+        "two": "Propose a boost from a winning post, or create a campaign",
+        "three": "Approve — nothing spends until then"
+      },
       "overview": {
         "charts": "Ads performance",
         "spendTrend": "Spend (ours)",
