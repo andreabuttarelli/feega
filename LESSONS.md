@@ -1988,3 +1988,17 @@ Mossa: leggere la riga con il client dell'utente (prova l'appartenenza all'org v
 firmare il path con un client service-role dichiarato in `service-role-uses.ts` — mai il
 contrario, e mai un service client passato al posto del client utente per la lettura: la firma è
 un passo deliberatamente più permissivo della lettura, non un modo per saltarla.
+
+### Un URL firmato scritto in `nodes.data` scade, e l'immagine sparisce senza che il file si muova
+Segnale: la riga e il file in Storage sono entrambi sani (verificabile con SQL), `data` porta
+`assetId` ma non `refId`, e `data.url` è un URL `/storage/v1/object/sign/...` — non la rotta
+stabile `/p/<project>/c/<canvas>/assets/<id>`. Un URL firmato dura ~2 ore su Supabase Storage;
+persisterlo in una colonna che sopravvive a una ricarica è la stessa classe di errore di un
+token di sessione salvato in una colonna "permanente". Tre scritture da drag-and-drop
+(`assetDrag`, `brandFieldDrag`, `colourDrag` in `drag-payload.ts`) lo facevano, mentre l'upload
+diretto (`registerCanvasUpload`) già scriveva la rotta stabile. Mossa: mai un URL effimero in
+stato durevole — si persiste solo il riferimento stabile (`refId`/`assetId`), e l'URL firmato si
+calcola SOLO alla lettura (`signAssetPaths`/la rotta `/assets/<id>`, mai in scrittura). Il
+confine si valida al bordo di scrittura, una volta sola: `validateNodeData` rifiuta oggi
+qualunque `/storage/v1/object/sign/` trovato ovunque nel payload, ricorsivamente — non un
+controllo per campo che la prossima scrittura aggirerebbe.

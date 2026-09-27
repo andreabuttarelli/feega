@@ -59,10 +59,11 @@ describe('cosa diventa un nodo trascinato da fuori la tela', () => {
   });
 
   describe('assetDrag: lo stesso pacchetto per la libreria del progetto e la barra laterale', () => {
-    it('un\'immagine diventa un nodo image, con l\'url firmato dentro', () => {
+    it('un\'immagine diventa un nodo image, con solo l\'assetId dentro — mai un url firmato', () => {
       const drag = assetDrag({ type: 'image', id: 'a1', signedUrl: '/signed', url: 'store/x.png', mimeType: 'image/png', content: null });
       expect(drag?.type).toBe('image');
-      expect(drag?.data).toMatchObject({ assetId: 'a1', url: '/signed', mimeType: 'image/png' });
+      expect(drag?.data).toMatchObject({ assetId: 'a1', mimeType: 'image/png' });
+      expect(drag?.data.url).toBeUndefined();
       expect(validateNodeData('image', drag!.data).ok).toBe(true);
     });
 
@@ -135,10 +136,11 @@ describe('cosa diventa un nodo trascinato da fuori la tela', () => {
   });
 
   describe('colourDrag: un chip colore diventa un nodo image già riempito', () => {
-    it('diventa un nodo image con l\'assetId dello swatch già creato', () => {
+    it('diventa un nodo image con l\'assetId dello swatch già creato, mai l\'url firmato', () => {
       const drag = colourDrag({ hex: '#1a2b3c', assetId: 'asset-1', url: '/swatch.png' });
       expect(drag?.type).toBe('image');
-      expect(drag?.data).toMatchObject({ assetId: 'asset-1', url: '/swatch.png', name: '#1a2b3c' });
+      expect(drag?.data).toMatchObject({ assetId: 'asset-1', name: '#1a2b3c' });
+      expect(drag?.data.url).toBeUndefined();
       expect(validateNodeData('image', drag!.data).ok).toBe(true);
     });
 

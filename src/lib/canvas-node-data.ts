@@ -87,7 +87,7 @@ export function genOf(row: NodeRow): GenNode | null {
     model: nullableStr(row.data.model),
     prompt: str(row.data.prompt),
     params: record(row.data.params) as GenParams,
-    refId: nullableStr(row.data.refId),
+    refId: nullableStr(row.data.refId) ?? nullableStr(row.data.assetId),
     runs: [],
     running: row.data.running === true,
     error: typeof row.data.error === 'string' && row.data.error ? row.data.error : null

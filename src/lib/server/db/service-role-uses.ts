@@ -62,5 +62,10 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
     path: 'scripts/import-anomalia-talents.ts',
     why: "Uno script una tantum, senza sessione utente: scrive il catalogo globale (`influencers.org_id = null`), che la RLS vieta a qualunque JWT per costruzione — le policy di scrittura richiedono `org_id is not null`. Legge anche dal progetto Supabase VECCHIO (`OLD_FEEGA_*`), un database diverso su cui questa distinzione non si applica.",
     tables: ['influencers', 'influencer_views']
+  },
+  {
+    path: 'scripts/backfill-signed-url-nodes.ts',
+    why: 'Uno script una tantum, senza sessione utente: attraversa `nodes` di ogni org per trovare le righe con un url firmato scritto per errore in `data` (bug risolto in codice), cosa che nessun JWT di una singola org potrebbe fare.',
+    tables: ['nodes']
   }
 ] as const;

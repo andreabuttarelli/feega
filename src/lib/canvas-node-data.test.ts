@@ -86,6 +86,18 @@ describe('un nodo che produce, letto dalla riga', () => {
     expect(genOf({ id: 'n1', type: 'iframe', data: {} })).toBeNull();
   });
 
+  it('senza refId ma con assetId, il nodo si legge comunque: assetId è il refId', () => {
+    const node = genOf({ id: 'n1', type: 'image', data: { assetId: 'asset-123' } });
+
+    expect(node?.refId).toBe('asset-123');
+  });
+
+  it('refId, quando c`è, vince su assetId', () => {
+    const node = genOf({ id: 'n1', type: 'image', data: { refId: 'ref-1', assetId: 'asset-123' } });
+
+    expect(node?.refId).toBe('ref-1');
+  });
+
   it('un `data` che mente sul tipo dei campi non rompe la pagina', () => {
     const node = genOf({ id: 'n1', type: 'image', data: { prompt: 7, model: [], params: 'no' } });
 

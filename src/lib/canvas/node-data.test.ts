@@ -64,6 +64,16 @@ describe('validateNodeData — image', () => {
     const out = validateNodeData('image', { prompt: 'x', ...GEN_STATE });
     expect(out.ok).toBe(true);
   });
+
+  it('rifiuta un url firmato: scade, e `data` è ciò che sopravvive a una ricarica', () => {
+    const out = validateNodeData('image', {
+      prompt: 'x',
+      assetId: 'a1',
+      url: 'https://klnswzhhgrqvbfjzioul.supabase.co/storage/v1/object/sign/brand-knowledge/u1/media/x.jpg?token=abc'
+    });
+    expect(out.ok).toBe(false);
+    if (!out.ok) expect(out.error).toMatch(/url/);
+  });
 });
 
 describe('validateNodeData — video', () => {

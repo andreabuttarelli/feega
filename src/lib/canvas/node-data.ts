@@ -418,9 +418,42 @@ export function looseNodeJsonSchema(type: NodeType): Record<string, unknown> {
   return { type: 'object', required, properties };
 }
 
+/**
+ * UN URL FIRMATO NON ENTRA MAI IN `nodes.data` — scade (due ore su Supabase Storage), e `data` è
+ * ciò che sopravvive a una ricarica. La forma giusta è un riferimento stabile (`refId`/`assetId`)
+ * rifirmato a ogni lettura (`signAssetPaths`); un URL firmato scritto qui è un riquadro rotto in
+ * attesa di succedere. Il pattern è quello di Supabase Storage: `/storage/v1/object/sign/...`.
+ */
+const SIGNED_STORAGE_URL = /\/storage\/v1\/object\/sign\//;
+
+function findSignedUrl(data: unknown): string | null {
+  if (typeof data === 'string') {
+    return SIGNED_STORAGE_URL.test(data) ? data : null;
+  }
+  if (Array.isArray(data)) {
+    for (const item of data) {
+      const found = findSignedUrl(item);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (data && typeof data === 'object') {
+    for (const value of Object.values(data)) {
+      const found = findSignedUrl(value);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
 export function validateNodeData(type: string, data: unknown): NodeDataVerdict {
   if (!isNodeType(type)) {
     return { ok: false, error: `type sconosciuto: "${type}". Sono ${NODE_TYPES.join(', ')}.` };
+  }
+
+  const signedUrl = findSignedUrl(data);
+  if (signedUrl) {
+    return { ok: false, error: `data contiene un url firmato, che scade: "${signedUrl}"` };
   }
 
   const schema = NODE_DATA_SCHEMAS[type];
