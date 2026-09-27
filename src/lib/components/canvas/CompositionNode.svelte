@@ -2,6 +2,7 @@
   import Orbit from '@lucide/svelte/icons/orbit';
   import type { CompositionNode } from '$lib/canvas/composition-node';
   import CompositionPreview from './CompositionPreview.svelte';
+  import NodeDownload from './NodeDownload.svelte';
 
   let {
     node,
@@ -46,6 +47,9 @@
   {/if}
 
   <div class="composition-actions">
+    {#if node.refId && posterUrl}
+      <NodeDownload kind="video" sourceUrl={posterUrl} nodeId={node.id} nodeType="composizione" />
+    {/if}
     <button type="button" class="composition-action nodrag" onclick={onopeneditor}>Apri editor</button>
   </div>
 </div>
