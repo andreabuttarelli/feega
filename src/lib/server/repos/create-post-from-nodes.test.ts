@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createPostFromNodes } from './create-post-from-nodes';
+import { promoteNodesToPost } from './post-from-nodes';
+import { findBrand } from './brands';
+import { listBrandAccounts } from './social-accounts';
+import { listNodesByIds } from './canvas';
+import { promoteToPost } from './posts';
+import { createTestSupabase } from '$lib/testkit/supabase';
 import type { SocialPublisher } from '$lib/server/publishing/port';
 
 const ORG = 'org-1';
@@ -143,6 +149,103 @@ describe('createPostFromNodes: schedule', () => {
 
     expect(result).toEqual({ ok: false, error: 'delivery_failed', postId: 'post-1' });
     expect(d.setPostStatus).not.toHaveBeenCalled();
+  });
+});
+
+describe('createPostFromNodes: ordine dei media scelto dal composer, contro il vero promoteNodesToPost', () => {
+  function seedTwoImageNodes() {
+    return createTestSupabase({
+      brands: [{ id: BRAND, org_id: ORG, name: 'Brand', slug: 'brand', website: null, short_description: null, logo_url: null }],
+      nodes: [
+        {
+          id: 'img-top',
+          org_id: ORG,
+          canvas_id: 'canvas-1',
+          project_id: 'proj-1',
+          type: 'image',
+          display_name: null,
+          x: 0,
+          y: 0,
+          z: 0,
+          width: null,
+          height: null,
+          data: { assetId: 'asset-top' },
+          version: 1,
+          deleted_at: null
+        },
+        {
+          id: 'img-bottom',
+          org_id: ORG,
+          canvas_id: 'canvas-1',
+          project_id: 'proj-1',
+          type: 'image',
+          display_name: null,
+          x: 0,
+          y: 100,
+          z: 0,
+          width: null,
+          height: null,
+          data: { assetId: 'asset-bottom' },
+          version: 1,
+          deleted_at: null
+        }
+      ]
+    });
+  }
+
+  function realDeps() {
+    return {
+      brands: { findBrand },
+      accounts: { listBrandAccounts },
+      promoteNodesToPost: (
+        db: Parameters<typeof promoteNodesToPost>[0],
+        _repos: unknown,
+        input: Parameters<typeof promoteNodesToPost>[2]
+      ) => promoteNodesToPost(db, { canvas: { listNodesByIds }, posts: { promoteToPost } }, input),
+      setPostStatus: fakeSetStatus(),
+      scheduleDelivery: fakeScheduleDelivery()
+    };
+  }
+
+  it('canvas position alone would put img-top first, but the composer sent img-bottom first', async () => {
+    const kit = seedTwoImageNodes();
+
+    const result = await createPostFromNodes(
+      kit.client,
+      realDeps(),
+      {
+        ...BASE_INPUT,
+        nodeIds: ['img-bottom', 'img-top'],
+        mediaOrder: ['img-bottom', 'img-top'],
+        caption: 'ordine scelto dall utente'
+      },
+      FAKE_PUBLISHER
+    );
+
+    expect(result.ok).toBe(true);
+    const saved = kit.tables.get('posts')?.[0];
+    expect(saved?.media).toEqual([
+      { assetId: 'asset-bottom', order: 0, role: 'media' },
+      { assetId: 'asset-top', order: 1, role: 'media' }
+    ]);
+  });
+
+  it('without mediaOrder it falls back to canvas reading position', async () => {
+    const kit = seedTwoImageNodes();
+
+    const result = await createPostFromNodes(
+      kit.client,
+      realDeps(),
+      { ...BASE_INPUT, nodeIds: ['img-bottom', 'img-top'], caption: 'nessun ordine scelto' },
+      FAKE_PUBLISHER
+    );
+
+    expect(result.ok).toBe(true);
+    const saved = kit.tables.get('posts')?.[0];
+    expect(saved?.media).toEqual([
+      { assetId: 'asset-top', order: 0, role: 'media' },
+      { assetId: 'asset-bottom', order: 1, role: 'media' }
+    ]);
   });
 });
 

@@ -1,3 +1,5 @@
+import { errorCopyFor } from '$lib/canvas/create-post-errors';
+
 function swap(order: string[], from: number, to: number): string[] {
   const next = [...order];
   [next[from], next[to]] = [next[to], next[from]];
@@ -64,4 +66,18 @@ export function scheduleReasonFor(readiness: ComposerReadiness): string | null {
 
 export function submittedNodeIds(mediaOrder: string[], captionNodeIds: string[]): string[] {
   return [...mediaOrder, ...captionNodeIds];
+}
+
+export type SubmitOutcome = 'network' | 'server' | Record<string, unknown> | null | undefined;
+
+const NETWORK_ERROR_COPY = 'Connessione assente. Riprova.';
+
+export function submitErrorFor(outcome: SubmitOutcome): string | null {
+  if (outcome === 'network') return NETWORK_ERROR_COPY;
+  if (outcome === 'server') return errorCopyFor('');
+  if (!outcome || typeof outcome !== 'object') return null;
+  if ('post' in outcome && outcome.post) return null;
+  if (!('error' in outcome) || !outcome.error) return null;
+
+  return errorCopyFor(String(outcome.error));
 }

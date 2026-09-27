@@ -1343,10 +1343,11 @@ export const actions: Actions = {
   },
 
   /**
-   * DALLA SELEZIONE DEL CANVAS A UN POST — la promozione, opzionalmente programmata. `node_ids`
-   * arriva in ordine dalla UI (l'ordine con cui il composer li ha raccolti); questa action non
-   * sceglie una caption, la riceve già scelta. `mode`: senza `scheduled_for` resta `draft`, con
-   * un `scheduled_for` (e almeno un account) prova a consegnare via Zernio.
+   * DALLA SELEZIONE DEL CANVAS A UN POST — la promozione, opzionalmente programmata.
+   * `media_order_node_id` porta l'ordine scelto nel composer (il drag/i pulsanti su e giù),
+   * separato da `node_id` perché quest'ultimo include anche i nodi caption/riferimento; questa
+   * action non sceglie una caption, la riceve già scelta. `mode`: senza `scheduled_for` resta
+   * `draft`, con un `scheduled_for` (e almeno un account) prova a consegnare via Zernio.
    */
   create_post: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
@@ -1355,6 +1356,7 @@ export const actions: Actions = {
     const brandId = String(fd.get('brand_id') ?? '');
     const caption = String(fd.get('caption') ?? '');
     const nodeIds = fd.getAll('node_id').map(String);
+    const mediaOrder = fd.getAll('media_order_node_id').map(String);
     const accountIds = fd.getAll('account_id').map(String);
     const scheduledFor = String(fd.get('scheduled_for') ?? '').trim();
 
@@ -1374,7 +1376,16 @@ export const actions: Actions = {
         setPostStatus,
         scheduleDelivery
       },
-      { orgId: scope.orgId, userId: scope.userId, brandId, nodeIds, caption, accountIds, mode },
+      {
+        orgId: scope.orgId,
+        userId: scope.userId,
+        brandId,
+        nodeIds,
+        caption,
+        mediaOrder: mediaOrder.length ? mediaOrder : undefined,
+        accountIds,
+        mode
+      },
       publisher
     );
 

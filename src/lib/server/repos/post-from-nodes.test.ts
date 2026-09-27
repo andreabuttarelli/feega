@@ -56,6 +56,91 @@ describe('promoteNodesToPost: ordine di lettura', () => {
   });
 });
 
+describe('promoteNodesToPost: ordine scelto dal composer', () => {
+  it('segue node_ids quando arriva un ordine esplicito, non la posizione in tela', async () => {
+    const nodes = [
+      node({ id: 'top-left', type: 'image', y: 0, x: 0, data: { assetId: 'asset-top-left' } }),
+      node({ id: 'top-right', type: 'image', y: 0, x: 100, data: { assetId: 'asset-top-right' } }),
+      node({ id: 'bottom', type: 'image', y: 100, x: 0, data: { assetId: 'asset-bottom' } })
+    ];
+    const canvasRepo = fakeCanvasRepo(nodes);
+    const postsRepo = fakePostsRepo();
+
+    await promoteNodesToPost(
+      FAKE_DB,
+      { canvas: canvasRepo, posts: postsRepo },
+      { orgId: ORG, brandId: BRAND, nodeIds: ['bottom', 'top-right', 'top-left'], mediaOrder: ['bottom', 'top-right', 'top-left'] }
+    );
+
+    expect(postsRepo.promoteToPost).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        media: [
+          { assetId: 'asset-bottom', order: 0, role: 'media' },
+          { assetId: 'asset-top-right', order: 1, role: 'media' },
+          { assetId: 'asset-top-left', order: 2, role: 'media' }
+        ]
+      })
+    );
+  });
+
+  it('ignora nel mediaOrder un id senza asset media (es. la caption)', async () => {
+    const nodes = [
+      node({ id: 'text-1', type: 'text', data: { prompt: 'ciao', status: 'done', output_asset_id: 'text-asset' } }),
+      node({ id: 'img-a', type: 'image', y: 0, data: { assetId: 'asset-a' } }),
+      node({ id: 'img-b', type: 'image', y: 10, data: { assetId: 'asset-b' } })
+    ];
+    const canvasRepo = fakeCanvasRepo(nodes);
+    const postsRepo = fakePostsRepo();
+
+    await promoteNodesToPost(
+      FAKE_DB,
+      { canvas: canvasRepo, posts: postsRepo },
+      {
+        orgId: ORG,
+        brandId: BRAND,
+        nodeIds: ['text-1', 'img-a', 'img-b'],
+        mediaOrder: ['img-b', 'text-1', 'img-a']
+      }
+    );
+
+    expect(postsRepo.promoteToPost).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        media: [
+          { assetId: 'asset-b', order: 0, role: 'media' },
+          { assetId: 'asset-a', order: 1, role: 'media' }
+        ]
+      })
+    );
+  });
+
+  it('senza mediaOrder ricade sulla posizione in tela', async () => {
+    const nodes = [
+      node({ id: 'bottom', type: 'image', y: 100, x: 0, data: { assetId: 'asset-bottom' } }),
+      node({ id: 'top', type: 'image', y: 0, x: 0, data: { assetId: 'asset-top' } })
+    ];
+    const canvasRepo = fakeCanvasRepo(nodes);
+    const postsRepo = fakePostsRepo();
+
+    await promoteNodesToPost(
+      FAKE_DB,
+      { canvas: canvasRepo, posts: postsRepo },
+      { orgId: ORG, brandId: BRAND, nodeIds: ['bottom', 'top'] }
+    );
+
+    expect(postsRepo.promoteToPost).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        media: [
+          { assetId: 'asset-top', order: 0, role: 'media' },
+          { assetId: 'asset-bottom', order: 1, role: 'media' }
+        ]
+      })
+    );
+  });
+});
+
 describe('promoteNodesToPost: risoluzione asset per tipo di nodo', () => {
   it('un nodo caricato prende data.assetId', async () => {
     const nodes = [node({ type: 'image', data: { assetId: 'uploaded-1' } })];

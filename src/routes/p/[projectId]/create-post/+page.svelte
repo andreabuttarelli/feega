@@ -13,9 +13,10 @@
     defaultScheduleTime,
     saveReasonFor,
     scheduleReasonFor,
-    submittedNodeIds
+    submittedNodeIds,
+    submitErrorFor,
+    type SubmitOutcome
   } from '$lib/canvas/create-post-composer';
-  import { errorCopyFor } from '$lib/canvas/create-post-errors';
   import { closeSheet } from '$lib/canvas/sheet-nav';
 
   let { data, form } = $props();
@@ -66,29 +67,15 @@
 
   const formAction = $derived(data.canvasId ? `/p/${projectId}/c/${data.canvasId}?/create_post` : '');
 
-  const errors = $derived(
-    form && typeof form === 'object' && 'error' in form && form.error ? [form.error as string] : []
-  );
-
-  function onSubmitComplete({ result }: { result: { type: string; data?: Record<string, unknown> } }) {
-    if (result.type === 'success' && result.data?.post) {
-      closeSheet();
-    }
-  }
+  let submitting = $state(false);
+  let submitOutcome = $state<SubmitOutcome>((form as SubmitOutcome) ?? null);
+  const submitError = $derived(submitErrorFor(submitOutcome));
 </script>
 
 <div class="composer">
   <header class="composer-header">
     <h1>Create post</h1>
   </header>
-
-  {#if errors.length}
-    <div class="banner err">
-      {#each errors as code (code)}
-        <p>{errorCopyFor(code)}</p>
-      {/each}
-    </div>
-  {/if}
 
   {#if form && typeof form === 'object' && 'post' in form && form.post}
     <div class="banner ok">
@@ -100,9 +87,25 @@
     method="POST"
     action={formAction}
     use:enhance={() => {
+      submitting = true;
+      submitOutcome = null;
       return async ({ result, update }) => {
+        submitting = false;
+        if (result.type === 'error') {
+          submitOutcome = 'server';
+          return;
+        }
+        if (result.type === 'redirect') {
+          await update();
+          return;
+        }
+        submitOutcome = (result.data as SubmitOutcome) ?? null;
+        if (result.type === 'success' && result.data?.post) {
+          await update();
+          closeSheet();
+          return;
+        }
         await update();
-        onSubmitComplete({ result: result as never });
       };
     }}
   >
@@ -110,6 +113,9 @@
     <input type="hidden" name="caption" value={caption} />
     {#each submittedNodeIds(mediaOrder, composition.captions.map((c) => c.nodeId)) as nodeId (nodeId)}
       <input type="hidden" name="node_id" value={nodeId} />
+    {/each}
+    {#each mediaOrder as nodeId (nodeId)}
+      <input type="hidden" name="media_order_node_id" value={nodeId} />
     {/each}
     {#each selectedAccountIds as accountId (accountId)}
       <input type="hidden" name="account_id" value={accountId} />
@@ -242,9 +248,15 @@
       </section>
     {/if}
 
+    {#if submitError}
+      <div class="banner err" role="alert">{submitError}</div>
+    {/if}
+
     <footer class="composer-footer">
       <div class="footer-action">
-        <button class="btn ghost" type="submit" disabled={!!saveDisabledReason}>Save as draft</button>
+        <button class="btn ghost" type="submit" disabled={!!saveDisabledReason || submitting}>
+          {submitting ? 'Saving…' : 'Save as draft'}
+        </button>
         {#if saveDisabledReason}<p class="reason">{saveDisabledReason}</p>{/if}
       </div>
       <div class="footer-action">
@@ -252,14 +264,14 @@
           <button
             class="btn primary"
             type="button"
-            disabled={!!scheduleDisabledReason}
+            disabled={!!scheduleDisabledReason || submitting}
             onclick={() => (scheduling = true)}
           >
             Approve and schedule
           </button>
         {:else}
-          <button class="btn primary" type="submit" disabled={!!scheduleDisabledReason}>
-            Approve and schedule
+          <button class="btn primary" type="submit" disabled={!!scheduleDisabledReason || submitting}>
+            {submitting ? 'Scheduling…' : 'Approve and schedule'}
           </button>
         {/if}
         {#if scheduleDisabledReason}<p class="reason">{scheduleDisabledReason}</p>{/if}
