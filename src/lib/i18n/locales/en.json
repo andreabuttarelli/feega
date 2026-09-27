@@ -535,11 +535,9 @@
       }
     },
     "ads": {
-      "proposeBoosts": "Propose boosts",
       "refresh": "Refresh",
       "cancelCreate": "Cancel",
       "approvedOk": "Campaign approved and sent to the platform.",
-      "proposedOk": "Created {n} boost proposal(s).",
       "spend": "Spend",
       "impressions": "Impressions",
       "clicks": "Clicks",
@@ -557,9 +555,6 @@
       "landingUrl": "Landing page URL",
       "createHint": "Saves a proposal only — nothing spends until you Approve.",
       "saveProposal": "Save proposal",
-      "candidates": "Boost candidates",
-      "candidatesSub": "Top organic posts ready to amplify",
-      "candidatesHint": "Click Propose boosts to turn these into approve-ready proposals.",
       "campaigns": "Campaigns",
       "empty": "No campaigns yet. Propose boosts from your winners, or create a standalone ad.",
       "approve": "Approve & spend",
@@ -751,9 +746,7 @@
         "variantPlaceholder": "Variant {n}",
         "noAccountYet": "You can save the proposal without a connected ad account — it just cannot launch until you connect one."
       },
-      "proposing": "Finding winners…",
       "syncing": "Syncing…",
-      "noCandidates": "No organic post ready to amplify yet — publish something and come back.",
       "pendingTitle": "Waiting for approval",
       "pendingSub": "No spend starts without your go-ahead",
       "typeBoost": "Post boost",
