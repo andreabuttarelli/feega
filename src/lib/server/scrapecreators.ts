@@ -95,6 +95,9 @@ async function scfetch(
   }
 }
 
+/** One slide of a carousel — same media shape whether it stands alone or sits inside a post. */
+export type MediaItem = { type: 'image' | 'video'; url: string; thumbnailUrl: string | null };
+
 // Normalised post = the subset of fields social_post_history actually stores.
 export type NormalizedPost = {
   externalId: string;
@@ -104,6 +107,15 @@ export type NormalizedPost = {
   thumbnailUrl: string | null;
   publishedAt: string | null; // ISO
   metrics: Record<string, number | null>;
+
+  /**
+   * EVERY SLIDE, IN ORDER. A single-media post still carries one entry here — `thumbnailUrl`
+   * stays the first slide's thumbnail for back-compat with readers that never learned about
+   * carousels. Only Instagram (`carousel_media`), TikTok (`image_post_info.images`) and X
+   * (`extended_entities.media`) can return more than one; every other platform's mapper fills
+   * exactly one item from the fields it already had.
+   */
+  items?: MediaItem[];
 
   /**
    * OPTIONAL, and only some platforms fill it. It exists because the market corpus needs more than
@@ -171,6 +183,26 @@ async function collect(
 // ---- per-platform fetchers ------------------------------------------------------------------
 // Each returns the brand's posts for that platform, or [] if it can't run (missing handle, etc).
 
+/** Una slide di Instagram: `media_type` 1 = foto, 2 = video (stesso codice usato sul post intero). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function instagramSlide(raw: any): MediaItem | null {
+  const thumbnailUrl = raw.display_uri ?? raw.image_versions2?.candidates?.[0]?.url ?? null;
+  const isVideo = raw.media_type === 2;
+  const url = isVideo ? (raw.video_versions?.[0]?.url ?? null) : thumbnailUrl;
+  if (!url) return null;
+  return { type: isVideo ? 'video' : 'image', url, thumbnailUrl };
+}
+
+/** Un post normale ha una sola slide; `carousel_media` ne porta quante ce ne sono, nell'ordine ricevuto. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function instagramItems(p: any): MediaItem[] {
+  if (Array.isArray(p.carousel_media) && p.carousel_media.length) {
+    return p.carousel_media.map(instagramSlide).filter((x: MediaItem | null): x is MediaItem => x !== null);
+  }
+  const single = instagramSlide(p);
+  return single ? [single] : [];
+}
+
 async function instagram(a: Account, maxPages: number, maxPosts: number): Promise<NormalizedPost[]> {
   if (!a.username) return [];
   return collect(
@@ -179,28 +211,50 @@ async function instagram(a: Account, maxPages: number, maxPosts: number): Promis
       if (cursor) qs.set('next_max_id', cursor);
       const data = await scfetch('GET', `/v2/instagram/user/posts?${qs}`);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const posts = (data.items ?? []).map((p: any) => ({
-        externalId: String(p.pk ?? p.id),
-        url: p.url ?? null,
-        content: p.caption?.text ?? null,
-        mediaType: p.media_type === 2 ? 'video' : 'image',
-        thumbnailUrl: p.display_uri ?? p.image_versions2?.candidates?.[0]?.url ?? null,
-        // The clip itself, which this mapper dropped for as long as it existed. Measured on
-        // `lovable.dev`: 9 of 12 posts are media_type 2 and every one of them carries three
-        // `video_versions`. Without this every Instagram video reached the archive as its cover —
-        // still frame, no motion, and nothing downstream could tell that from a post that never had
-        // a clip. Same class of bug as region and captions in migration 0192: the field was in the
-        // response we already paid for.
-        videoUrl: p.video_versions?.[0]?.url ?? null,
-        durationMs: p.video_duration ? Math.round(Number(p.video_duration) * 1000) : null,
-        publishedAt: isoFromUnix(p.taken_at),
-        metrics: { likes: num(p.like_count), comments: num(p.comment_count) }
-      })) as NormalizedPost[];
+      const posts = (data.items ?? []).map((p: any) => {
+        const items = instagramItems(p);
+        return {
+          externalId: String(p.pk ?? p.id),
+          url: p.url ?? null,
+          content: p.caption?.text ?? null,
+          mediaType: p.media_type === 2 ? 'video' : 'image',
+          thumbnailUrl: items[0]?.thumbnailUrl ?? p.display_uri ?? p.image_versions2?.candidates?.[0]?.url ?? null,
+          items,
+          // The clip itself, which this mapper dropped for as long as it existed. Measured on
+          // `lovable.dev`: 9 of 12 posts are media_type 2 and every one of them carries three
+          // `video_versions`. Without this every Instagram video reached the archive as its cover —
+          // still frame, no motion, and nothing downstream could tell that from a post that never had
+          // a clip. Same class of bug as region and captions in migration 0192: the field was in the
+          // response we already paid for.
+          videoUrl: p.video_versions?.[0]?.url ?? null,
+          durationMs: p.video_duration ? Math.round(Number(p.video_duration) * 1000) : null,
+          publishedAt: isoFromUnix(p.taken_at),
+          metrics: { likes: num(p.like_count), comments: num(p.comment_count) }
+        };
+      }) as NormalizedPost[];
       return { posts, next: data.more_available ? (data.next_max_id ?? null) : null };
     },
     maxPages,
     maxPosts
   );
+}
+
+/** Un post-foto TikTok (`image_post_info.images`) è già un carosello — ogni slide è un'immagine. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function tiktokItems(v: any): MediaItem[] {
+  const images = v.image_post_info?.images;
+  if (Array.isArray(images) && images.length) {
+    return images
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .map((img: any) => {
+        const url = img.display_image?.url_list?.[0] ?? null;
+        return url ? ({ type: 'image', url, thumbnailUrl: url } as MediaItem) : null;
+      })
+      .filter((x: MediaItem | null): x is MediaItem => x !== null);
+  }
+  const thumbnailUrl = v.video?.dynamic_cover?.url_list?.[0] ?? v.video?.cover?.url_list?.[0] ?? null;
+  const url = v.video?.play_addr?.url_list?.[0] ?? v.video?.download_addr?.url_list?.[0] ?? null;
+  return url ? [{ type: 'video', url, thumbnailUrl }] : [];
 }
 
 async function tiktok(a: Account, maxPages: number, maxPosts: number): Promise<NormalizedPost[]> {
@@ -211,13 +265,15 @@ async function tiktok(a: Account, maxPages: number, maxPosts: number): Promise<N
       if (cursor) qs.set('max_cursor', cursor);
       const data = await scfetch('GET', `/v3/tiktok/profile/videos?${qs}`);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const posts = (data.aweme_list ?? []).map((v: any) => ({
+      const posts = (data.aweme_list ?? []).map((v: any) => {
+      const items = tiktokItems(v);
+      return {
         externalId: String(v.aweme_id),
         url: v.share_url ?? null,
         content: v.desc ?? null,
-        mediaType: 'video' as const,
-        thumbnailUrl:
-          v.video?.dynamic_cover?.url_list?.[0] ?? v.video?.cover?.url_list?.[0] ?? null,
+        mediaType: (v.image_post_info?.images?.length ? 'image' : 'video') as 'image' | 'video',
+        thumbnailUrl: items[0]?.thumbnailUrl ?? v.video?.dynamic_cover?.url_list?.[0] ?? v.video?.cover?.url_list?.[0] ?? null,
+        items,
         publishedAt: isoFromUnix(v.create_time),
         metrics: {
           views: num(v.statistics?.play_count),
@@ -250,7 +306,8 @@ async function tiktok(a: Account, maxPages: number, maxPosts: number): Promise<N
         videoHeight: num(v.video?.height),
         shootMode: v.shoot_tab_name ? String(v.shoot_tab_name) : null,
         videoUrlClean: v.video?.download_no_watermark_addr?.url_list?.[0] ?? null
-      })) as NormalizedPost[];
+      };
+      }) as NormalizedPost[];
       return { posts, next: data.has_more && data.max_cursor ? String(data.max_cursor) : null };
     },
     maxPages,
@@ -288,13 +345,30 @@ export function bestTwitterVariant(variants: unknown, maxBitrate = 3_000_000): s
   return (capped.length ? capped[capped.length - 1] : mp4[0]).url;
 }
 
+/** Ogni entry di `extended_entities.media` è una slide — una sola per un tweet normale, più di una per una galleria. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function twitterItems(media: any[]): MediaItem[] {
+  return media
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .map((m: any) => {
+      const isClip = m?.type === 'video' || m?.type === 'animated_gif';
+      const thumbnailUrl = m?.media_url_https ?? null;
+      const url = isClip ? bestTwitterVariant(m?.video_info?.variants) : thumbnailUrl;
+      if (!url) return null;
+      return { type: isClip ? 'video' : 'image', url, thumbnailUrl } as MediaItem;
+    })
+    .filter((x): x is MediaItem => x !== null);
+}
+
 async function twitter(a: Account): Promise<NormalizedPost[]> {
   if (!a.username) return [];
   const data = await scfetch('GET', `/v1/twitter/user-tweets?handle=${encodeURIComponent(a.username)}`);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (data.tweets ?? []).map((t: any) => {
     const lg = t.legacy ?? {};
-    const media = lg.extended_entities?.media?.[0];
+    const mediaList = lg.extended_entities?.media ?? [];
+    const media = mediaList[0];
+    const items = twitterItems(mediaList);
     // `type` is 'photo' | 'video' | 'animated_gif'. It was ignored, so every video tweet arrived
     // labelled 'image' — measured on @uber: 7 of 17 tweets are video, 6 photo, 4 text.
     const isClip = media?.type === 'video' || media?.type === 'animated_gif';
@@ -303,7 +377,8 @@ async function twitter(a: Account): Promise<NormalizedPost[]> {
       url: t.url ?? (lg.id_str ? `https://x.com/${a.username}/status/${lg.id_str}` : null),
       content: lg.full_text ?? null,
       mediaType: isClip ? 'video' : media ? 'image' : 'text',
-      thumbnailUrl: media?.media_url_https ?? null,
+      thumbnailUrl: items[0]?.thumbnailUrl ?? media?.media_url_https ?? null,
+      items,
       videoUrl: isClip ? bestTwitterVariant(media?.video_info?.variants) : null,
       durationMs: media?.video_info?.duration_millis ? num(media.video_info.duration_millis) : null,
       publishedAt: isoFromString(lg.created_at),
@@ -317,22 +392,32 @@ async function twitter(a: Account): Promise<NormalizedPost[]> {
 }
 
 // Threads exposes only the last ~20-30 posts, single page.
+/** Un post con una sola foto o clip: `items` è lo stesso singolo elemento che `thumbnailUrl` già descrive. */
+function singleItem(mediaType: 'image' | 'video' | 'text' | null, thumbnailUrl: string | null): MediaItem[] {
+  return mediaType && mediaType !== 'text' && thumbnailUrl ? [{ type: mediaType, url: thumbnailUrl, thumbnailUrl }] : [];
+}
+
 async function threads(a: Account): Promise<NormalizedPost[]> {
   if (!a.username) return [];
   const data = await scfetch('GET', `/v1/threads/user/posts?handle=${encodeURIComponent(a.username)}`);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (data.posts ?? []).map((p: any) => ({
-    externalId: String(p.pk ?? p.id),
-    url: p.url ?? null,
-    content: p.caption?.text ?? null,
-    mediaType: p.image_versions2?.candidates?.length ? 'image' : 'text',
-    thumbnailUrl: p.image_versions2?.candidates?.[0]?.url ?? null,
-    publishedAt: isoFromUnix(p.taken_at),
-    metrics: {
-      likes: num(p.like_count),
-      comments: num(p.text_post_app_info?.direct_reply_count)
-    }
-  })) as NormalizedPost[];
+  return (data.posts ?? []).map((p: any) => {
+    const mediaType = p.image_versions2?.candidates?.length ? 'image' : 'text';
+    const thumbnailUrl = p.image_versions2?.candidates?.[0]?.url ?? null;
+    return {
+      externalId: String(p.pk ?? p.id),
+      url: p.url ?? null,
+      content: p.caption?.text ?? null,
+      mediaType,
+      thumbnailUrl,
+      items: singleItem(mediaType, thumbnailUrl),
+      publishedAt: isoFromUnix(p.taken_at),
+      metrics: {
+        likes: num(p.like_count),
+        comments: num(p.text_post_app_info?.direct_reply_count)
+      }
+    };
+  }) as NormalizedPost[];
 }
 
 // Facebook needs the profile URL (or pageId). We use profile_url, else build it from username.
@@ -345,19 +430,24 @@ async function facebook(a: Account, maxPages: number, maxPosts: number): Promise
       if (cursor) qs.set('cursor', cursor);
       const data = await scfetch('GET', `/v1/facebook/profile/posts?${qs}`);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const posts = (data.posts ?? []).map((p: any) => ({
-        externalId: String(p.id),
-        url: p.url ?? p.permalink ?? null,
-        content: p.text ?? null,
-        mediaType: p.videoDetails ? 'video' : p.text ? 'text' : 'image',
-        thumbnailUrl: p.videoDetails?.thumbnailUrl ?? null,
-        publishedAt: isoFromUnix(p.publishTime),
-        metrics: {
-          likes: num(p.reactionCount),
-          comments: num(p.commentCount),
-          views: num(p.videoViewCount)
-        }
-      })) as NormalizedPost[];
+      const posts = (data.posts ?? []).map((p: any) => {
+        const mediaType = (p.videoDetails ? 'video' : p.text ? 'text' : 'image') as 'image' | 'video' | 'text';
+        const thumbnailUrl = p.videoDetails?.thumbnailUrl ?? null;
+        return {
+          externalId: String(p.id),
+          url: p.url ?? p.permalink ?? null,
+          content: p.text ?? null,
+          mediaType,
+          thumbnailUrl,
+          items: singleItem(mediaType, thumbnailUrl),
+          publishedAt: isoFromUnix(p.publishTime),
+          metrics: {
+            likes: num(p.reactionCount),
+            comments: num(p.commentCount),
+            views: num(p.videoViewCount)
+          }
+        };
+      }) as NormalizedPost[];
       return { posts, next: data.cursor ?? null };
     },
     maxPages,
@@ -380,6 +470,7 @@ async function youtube(a: Account, maxPages: number, maxPosts: number): Promise<
         content: v.title ?? null,
         mediaType: 'video' as const,
         thumbnailUrl: v.thumbnail ?? null,
+        items: singleItem('video', v.thumbnail ?? null),
         publishedAt: isoFromString(v.publishedTime),
         metrics: { views: num(v.viewCountInt) }
       })) as NormalizedPost[];
@@ -399,15 +490,19 @@ async function linkedin(a: Account, _maxPages: number, maxPosts: number): Promis
   for (let page = 1; page <= 7 && out.length < maxPosts; page++) {
     const data = await scfetch('GET', `/v1/linkedin/company/posts?url=${encodeURIComponent(url)}&page=${page}`);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const posts = (data.posts ?? []).map((p: any) => ({
-      externalId: String(p.id),
-      url: p.url ?? null,
-      content: p.text ?? null,
-      mediaType: 'text' as const,
-      thumbnailUrl: p.thumbnail ?? p.image ?? null,
-      publishedAt: isoFromString(p.datePublished),
-      metrics: { likes: num(p.reactionCount ?? p.likeCount), comments: num(p.commentCount) }
-    })) as NormalizedPost[];
+    const posts = (data.posts ?? []).map((p: any) => {
+      const thumbnailUrl = p.thumbnail ?? p.image ?? null;
+      return {
+        externalId: String(p.id),
+        url: p.url ?? null,
+        content: p.text ?? null,
+        mediaType: 'text' as const,
+        thumbnailUrl,
+        items: singleItem(thumbnailUrl ? 'image' : 'text', thumbnailUrl),
+        publishedAt: isoFromString(p.datePublished),
+        metrics: { likes: num(p.reactionCount ?? p.likeCount), comments: num(p.commentCount) }
+      };
+    }) as NormalizedPost[];
     if (!posts.length) break;
     out.push(...posts);
   }

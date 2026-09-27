@@ -7,11 +7,13 @@ import type { FetchedProduct, StorePlatform } from '$lib/server/store-fetch';
  *
  * `node_id` possiede la riga: un `products` node non appartiene a un brand — prende un URL di
  * store e basta — quindi `brand_id` resta nullable e non è la chiave. La chiave è
- * `products_node_external_idx`, un indice unico parziale su `(node_id, platform, external_id)
- * where node_id is not null`: due NULL non collidono in Postgres, quindi un unique su `brand_id`
- * con quella colonna nullable non avrebbe protetto niente — ogni ri-sync avrebbe duplicato ogni
- * riga. `products_brand_external_idx` resta per un catalogo futuro a livello di brand, ma questo
- * repository scrive solo per nodo.
+ * `products_node_external_idx`, un indice unico su `(node_id, platform, external_id)` — NON
+ * parziale (`20260927130000_products_node_external_idx.sql` spiega perché: PostgREST genera
+ * l'upsert come `ON CONFLICT (colonne) DO UPDATE` senza `WHERE`, e Postgres può far combaciare
+ * quell'`ON CONFLICT` solo con un indice la cui definizione è IDENTICA — un indice parziale non
+ * matcha mai, `42P10` ogni volta). Due NULL non collidono comunque in un indice non parziale, quindi
+ * un `node_id` nullo (ogni riga di `products_brand_external_idx`, sotto) non collide con nessun'altra
+ * riga tramite QUESTO indice — la protezione resta la stessa, solo espressa senza predicato.
  *
  * L'UPSERT usa `onConflict` su quello stesso indice: la stessa riga letta due volte aggiorna,
  * mai duplica.

@@ -59,6 +59,27 @@ describe('upsertNodeSocialPosts', () => {
     });
   });
 
+  it('porta il thumbnailPath archiviato di ogni slide dentro media.items, non solo l\'url che scade', async () => {
+    const { db, calls } = fakeDb({});
+    await upsertNodeSocialPosts(db, {
+      orgId: ORG,
+      projectId: PROJECT,
+      nodeId: NODE,
+      platform: 'instagram',
+      handle: 'brand',
+      posts: [
+        {
+          ...post,
+          items: [{ type: 'image', url: post.thumbnailUrl!, thumbnailUrl: post.thumbnailUrl!, thumbnailPath: `${ORG}/${NODE}/abc.jpg` }]
+        }
+      ]
+    });
+
+    const call = calls.find((c) => c.table === 'social_posts' && c.op === 'upsert')!;
+    const rows = call.payload as Array<{ media: { items: Array<Record<string, unknown>> } }>;
+    expect(rows[0].media.items[0].thumbnailPath).toBe(`${ORG}/${NODE}/abc.jpg`);
+  });
+
   it('lo stesso post ri-sincronizzato resta una riga sola nel payload di questo giro', async () => {
     const { db, calls } = fakeDb({});
     await upsertNodeSocialPosts(db, {
@@ -105,6 +126,72 @@ describe('listNodeSocialPosts', () => {
     const filters = Object.fromEntries(call.filters);
     expect(filters.org_id).toBe(ORG);
     expect(filters.node_id).toBe(NODE);
+  });
+
+  it('quando una slide porta thumbnailPath, la sua thumbnailUrl diventa il link firmato del nostro archivio', async () => {
+    const path = `${ORG}/${NODE}/abc.jpg`;
+    const { db } = fakeDb({
+      social_posts: [
+        {
+          id: 's1',
+          node_id: NODE,
+          project_id: PROJECT,
+          platform: 'instagram',
+          external_id: 'abc123',
+          handle: 'brand',
+          caption: 'hello',
+          media: {
+            thumbnailUrl: 'https://cdn.example.com/expired.jpg',
+            items: [
+              {
+                type: 'image',
+                url: 'https://cdn.example.com/expired.jpg',
+                thumbnailUrl: 'https://cdn.example.com/expired.jpg',
+                thumbnailPath: path
+              }
+            ]
+          },
+          metrics: {},
+          permalink: null,
+          posted_at: null,
+          fetched_at: '2026-09-22T00:00:00Z'
+        }
+      ]
+    });
+
+    const out = await listNodeSocialPosts(db, { orgId: ORG, nodeId: NODE });
+    const items = out[0].media?.items as Array<Record<string, unknown>>;
+    expect(items[0].thumbnailUrl).toBe(`https://signed.example/canvas-assets/${path}`);
+    expect(items[0].url).toBe(`https://signed.example/canvas-assets/${path}`);
+    expect(out[0].media?.thumbnailUrl).toBe(`https://signed.example/canvas-assets/${path}`);
+  });
+
+  it('un post senza thumbnailPath archiviato resta con l\'url originale, senza chiamare la firma', async () => {
+    const { db, calls } = fakeDb({
+      social_posts: [
+        {
+          id: 's1',
+          node_id: NODE,
+          project_id: PROJECT,
+          platform: 'instagram',
+          external_id: 'abc123',
+          handle: 'brand',
+          caption: 'hello',
+          media: {
+            thumbnailUrl: 'https://cdn.example.com/still-alive.jpg',
+            items: [{ type: 'image', url: 'https://cdn.example.com/still-alive.jpg', thumbnailUrl: 'https://cdn.example.com/still-alive.jpg' }]
+          },
+          metrics: {},
+          permalink: null,
+          posted_at: null,
+          fetched_at: '2026-09-22T00:00:00Z'
+        }
+      ]
+    });
+
+    const out = await listNodeSocialPosts(db, { orgId: ORG, nodeId: NODE });
+    expect(out[0].media?.thumbnailUrl).toBe('https://cdn.example.com/still-alive.jpg');
+    expect(calls.some((c) => c.table.startsWith('storage:'))).toBe(false);
   });
 });
 

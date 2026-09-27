@@ -24,19 +24,37 @@
     onsync?: () => void;
   } = $props();
 
+  type MediaSlide = { type: 'image' | 'video'; url: string; thumbnailUrl: string | null };
+
   let index = $state(0);
+  let slideIndex = $state(0);
   const current = $derived(posts[Math.min(index, Math.max(posts.length - 1, 0))] ?? null);
   const blocked = $derived(syncBlockedReason(node));
   const canSync = $derived(canStartSync(node) && node.handle.trim().length > 0);
+
+  /** Ogni post porta `media.items`, una slide per elemento del carosello — un post normale ne ha
+   *  comunque una, quindi qui non serve un ramo separato per "senza carosello". */
+  const slides = $derived(
+    Array.isArray(current?.media?.items) ? (current!.media!.items as MediaSlide[]) : []
+  );
+  const slide = $derived(slides[Math.min(slideIndex, Math.max(slides.length - 1, 0))] ?? null);
   const thumbnail = $derived(
-    current && typeof current.media?.thumbnailUrl === 'string' ? (current.media.thumbnailUrl as string) : null
+    slide?.thumbnailUrl ?? (current && typeof current.media?.thumbnailUrl === 'string' ? (current.media.thumbnailUrl as string) : null)
   );
 
   function prev() {
     index = index <= 0 ? posts.length - 1 : index - 1;
+    slideIndex = 0;
   }
   function next() {
     index = index >= posts.length - 1 ? 0 : index + 1;
+    slideIndex = 0;
+  }
+  function prevSlide() {
+    slideIndex = slideIndex <= 0 ? slides.length - 1 : slideIndex - 1;
+  }
+  function nextSlide() {
+    slideIndex = slideIndex >= slides.length - 1 ? 0 : slideIndex + 1;
   }
 </script>
 
@@ -86,11 +104,27 @@
         {/if}
 
         <div class="feed-card">
-          {#if thumbnail}
-            <img class="feed-photo" src={thumbnail} alt={current.caption ?? ''} loading="lazy" />
-          {:else}
-            <div class="feed-photo feed-photo-empty"><Rss size={22} strokeWidth={1.5} /></div>
-          {/if}
+          <div class="feed-photo-wrap">
+            {#if thumbnail}
+              <img class="feed-photo" src={thumbnail} alt={current.caption ?? ''} loading="lazy" />
+            {:else}
+              <div class="feed-photo feed-photo-empty"><Rss size={22} strokeWidth={1.5} /></div>
+            {/if}
+
+            {#if slides.length > 1}
+              <button type="button" class="feed-slide-nav feed-slide-nav-prev" onclick={prevSlide} aria-label="Slide precedente">
+                <ChevronLeft size={13} strokeWidth={2} />
+              </button>
+              <button type="button" class="feed-slide-nav feed-slide-nav-next" onclick={nextSlide} aria-label="Slide successiva">
+                <ChevronRight size={13} strokeWidth={2} />
+              </button>
+              <div class="feed-slide-dots" aria-live="polite">
+                {#each slides as _, i (i)}
+                  <span class="feed-slide-dot" class:is-active={i === slideIndex}></span>
+                {/each}
+              </div>
+            {/if}
+          </div>
           <div class="feed-info">
             {#if current.caption}
               <p class="feed-caption">{current.caption}</p>
@@ -271,6 +305,13 @@
     gap: 8px;
   }
 
+  .feed-photo-wrap {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+  }
+
   .feed-photo {
     flex: 1;
     min-height: 0;
@@ -282,6 +323,44 @@
     display: grid;
     place-content: center;
     color: var(--ink-soft, #6e6e73);
+  }
+
+  .feed-slide-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    color: var(--ink, #1d1d1f);
+    background: rgb(255 255 255 / 0.85);
+    border: 1px solid var(--line-2, #d2d2d7);
+    cursor: pointer;
+  }
+  .feed-slide-nav-prev {
+    left: 4px;
+  }
+  .feed-slide-nav-next {
+    right: 4px;
+  }
+
+  .feed-slide-dots {
+    position: absolute;
+    bottom: 4px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 3px;
+  }
+  .feed-slide-dot {
+    width: 4px;
+    height: 4px;
+    background: rgb(255 255 255 / 0.6);
+  }
+  .feed-slide-dot.is-active {
+    background: #fff;
   }
 
   .feed-info {

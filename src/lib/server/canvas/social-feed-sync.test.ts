@@ -1,12 +1,14 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-const { fetchSocialFeed, upsertNodeSocialPosts } = vi.hoisted(() => ({
+const { fetchSocialFeed, upsertNodeSocialPosts, archiveImageToBucket } = vi.hoisted(() => ({
   fetchSocialFeed: vi.fn(),
-  upsertNodeSocialPosts: vi.fn()
+  upsertNodeSocialPosts: vi.fn(),
+  archiveImageToBucket: vi.fn()
 }));
 
 vi.mock('$lib/server/social-feed-fetch', () => ({ fetchSocialFeed }));
 vi.mock('$lib/server/repos/social-posts', () => ({ upsertNodeSocialPosts }));
+vi.mock('$lib/server/media-archive', () => ({ archiveImageToBucket }));
 
 import { syncSocialFeedNode } from './social-feed-sync';
 
@@ -49,5 +51,66 @@ describe('syncSocialFeedNode', () => {
     });
 
     expect(out).toEqual({ ok: true, synced: 2 });
+  });
+
+  it('archivia ogni thumbnail di ogni slide nel bucket canvas-assets prima di scrivere', async () => {
+    fetchSocialFeed.mockResolvedValue({
+      ok: true,
+      posts: [
+        {
+          externalId: '1',
+          items: [
+            { type: 'image', url: 'https://cdn.example.com/slide1.jpg', thumbnailUrl: 'https://cdn.example.com/slide1.jpg' },
+            { type: 'video', url: 'https://cdn.example.com/slide2.mp4', thumbnailUrl: 'https://cdn.example.com/slide2-cover.jpg' }
+          ]
+        }
+      ]
+    });
+    archiveImageToBucket.mockResolvedValue(`${ORG}/${NODE}/archived.jpg`);
+    upsertNodeSocialPosts.mockResolvedValue(1);
+
+    await syncSocialFeedNode({} as never, {
+      orgId: ORG,
+      projectId: PROJECT,
+      nodeId: NODE,
+      platform: 'instagram',
+      handle: 'brand',
+      limit: 20
+    });
+
+    expect(archiveImageToBucket).toHaveBeenCalledTimes(2);
+    expect(archiveImageToBucket).toHaveBeenCalledWith(
+      {},
+      expect.stringContaining(`${ORG}/${NODE}/`),
+      'https://cdn.example.com/slide1.jpg',
+      'canvas-assets'
+    );
+
+    const [, input] = upsertNodeSocialPosts.mock.calls[0];
+    const postedItems = input.posts[0].items;
+    expect(postedItems[0].thumbnailPath).toBe(`${ORG}/${NODE}/archived.jpg`);
+    expect(postedItems[1].thumbnailPath).toBe(`${ORG}/${NODE}/archived.jpg`);
+  });
+
+  it('una thumbnail che non si archivia (link morto) non blocca il giro — resta senza path', async () => {
+    fetchSocialFeed.mockResolvedValue({
+      ok: true,
+      posts: [{ externalId: '1', items: [{ type: 'image', url: 'https://cdn.example.com/dead.jpg', thumbnailUrl: 'https://cdn.example.com/dead.jpg' }] }]
+    });
+    archiveImageToBucket.mockResolvedValue(null);
+    upsertNodeSocialPosts.mockResolvedValue(1);
+
+    const out = await syncSocialFeedNode({} as never, {
+      orgId: ORG,
+      projectId: PROJECT,
+      nodeId: NODE,
+      platform: 'instagram',
+      handle: 'brand',
+      limit: 20
+    });
+
+    expect(out.ok).toBe(true);
+    const [, input] = upsertNodeSocialPosts.mock.calls[0];
+    expect(input.posts[0].items[0].thumbnailPath).toBeUndefined();
   });
 });
