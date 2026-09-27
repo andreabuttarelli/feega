@@ -94,7 +94,7 @@
   .rail {
     position: absolute;
     z-index: 20;
-    left: 12px;
+    left: 8px;
     top: 50%;
     transform: translateY(-50%);
     display: flex;

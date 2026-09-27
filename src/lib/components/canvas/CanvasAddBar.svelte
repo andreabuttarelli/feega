@@ -23,7 +23,8 @@
    */
   import Keyboard from '@lucide/svelte/icons/keyboard';
   import Upload from '@lucide/svelte/icons/upload';
-  import { CANVAS_ADD_BAR, ADDABLE_LABEL, type Addable } from '$lib/canvas/addable';
+  import LayoutGrid from '@lucide/svelte/icons/layout-grid';
+  import { CANVAS_ADD_BAR, CANVAS_BAR_MAIN, CANVAS_BAR_MORE, ADDABLE_LABEL, type Addable } from '$lib/canvas/addable';
   import { ADDABLE_ICON } from '$lib/canvas/addable-icons';
   import { CANVAS_DRAG_MEDIUM } from '$lib/canvas/new-node';
   import { CANVAS_SHORTCUTS } from '$lib/canvas/shortcuts';
@@ -31,6 +32,14 @@
   let { onpick, onupload }: { onpick?: (what: Addable) => void; onupload?: (file: File) => void } = $props();
 
   let showKeys = $state(false);
+  let showMore = $state(false);
+
+  const slot = (what: Addable) => CANVAS_ADD_BAR.indexOf(what) + 1;
+
+  function pickMore(what: Addable) {
+    showMore = false;
+    onpick?.(what);
+  }
   let fileInput = $state<HTMLInputElement | null>(null);
 
   function pickFile() {
@@ -53,25 +62,6 @@
 </script>
 
 <div class="add-bar">
-  {#each CANVAS_ADD_BAR as what, i (what)}
-    {@const Icon = ADDABLE_ICON[what]}
-    <!-- Il numero nel `title` è il posto in cui la scorciatoia si incontra SENZA cercarla: la
-         scheda accanto la elenca, ma la si apre solo sospettando che esista. -->
-    <span class="tool">
-      <button
-        type="button"
-        title={`${ADDABLE_LABEL[what]} (${i + 1})`}
-        aria-label={ADDABLE_LABEL[what]}
-        draggable="true"
-        onclick={() => onpick?.(what)}
-        ondragstart={(e) => e.dataTransfer?.setData(CANVAS_DRAG_MEDIUM, what)}
-      >
-        <Icon size={17} strokeWidth={1.7} />
-      </button>
-      <span class="add-tip" role="tooltip">{ADDABLE_LABEL[what]}</span>
-    </span>
-  {/each}
-
   <span class="tool">
     <button type="button" title="Carica file" aria-label="Carica file" onclick={pickFile}>
       <Upload size={17} strokeWidth={1.7} />
@@ -86,6 +76,57 @@
     onchange={fileChosen}
   />
 
+  {#each CANVAS_BAR_MAIN as what (what)}
+    {@const Icon = ADDABLE_ICON[what]}
+    <span class="tool">
+      <button
+        type="button"
+        title={`${ADDABLE_LABEL[what]} (${slot(what)})`}
+        aria-label={ADDABLE_LABEL[what]}
+        draggable="true"
+        onclick={() => onpick?.(what)}
+        ondragstart={(e) => e.dataTransfer?.setData(CANVAS_DRAG_MEDIUM, what)}
+      >
+        <Icon size={17} strokeWidth={1.7} />
+      </button>
+      <span class="add-tip" role="tooltip">{ADDABLE_LABEL[what]}</span>
+    </span>
+  {/each}
+
+  <span class="tool">
+    <button
+      type="button"
+      class="keys-toggle"
+      title="Altri nodi"
+      aria-label="Altri nodi"
+      aria-expanded={showMore}
+      onclick={() => { showMore = !showMore; showKeys = false; }}
+    >
+      <LayoutGrid size={17} strokeWidth={1.7} />
+    </button>
+    <span class="add-tip" role="tooltip">Altri nodi</span>
+  </span>
+
+  {#if showMore}
+    <div class="more">
+      {#each CANVAS_BAR_MORE as what (what)}
+        {@const Icon = ADDABLE_ICON[what]}
+        <button
+          type="button"
+          class="more-item"
+          title={`${ADDABLE_LABEL[what]} (${slot(what)})`}
+          draggable="true"
+          onclick={() => pickMore(what)}
+          ondragstart={(e) => e.dataTransfer?.setData(CANVAS_DRAG_MEDIUM, what)}
+          ondragend={() => (showMore = false)}
+        >
+          <Icon size={20} strokeWidth={1.6} />
+          <span>{ADDABLE_LABEL[what]}</span>
+        </button>
+      {/each}
+    </div>
+  {/if}
+
   <span class="tool">
     <button
       type="button"
@@ -93,7 +134,7 @@
       title="Scorciatoie da tastiera"
       aria-label="Scorciatoie da tastiera"
       aria-expanded={showKeys}
-      onclick={() => (showKeys = !showKeys)}
+      onclick={() => { showKeys = !showKeys; showMore = false; }}
     >
       <Keyboard size={17} strokeWidth={1.7} />
     </button>
@@ -121,7 +162,7 @@
   .add-bar {
     position: absolute;
     z-index: 12;
-    bottom: 18px;
+    bottom: 8px;
     left: 50%;
     transform: translateX(-50%);
     display: flex;
@@ -204,7 +245,29 @@
     border: 0;
   }
 
-  /* Sopra la barra e non sotto: sotto uscirebbe dal riquadro della tela e verrebbe tagliata. */
+  .more {
+    position: absolute;
+    z-index: 13;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    display: grid;
+    grid-template-columns: repeat(3, 96px);
+    gap: 4px;
+    padding: 6px;
+    background: var(--paper, #fff);
+    border: 1px solid var(--line-2, #d2d2d7);
+    box-shadow: 0 6px 20px rgb(0 0 0 / 0.12);
+  }
+  .more-item {
+    display: grid;
+    justify-items: center;
+    gap: 6px;
+    padding: 12px 6px;
+    font-size: 11.5px;
+    text-align: center;
+  }
+
   .keys {
     position: absolute;
     z-index: 13;

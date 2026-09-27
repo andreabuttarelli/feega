@@ -53,6 +53,6 @@ describe('le scorciatoie della tela', () => {
     // La scheda `?` le elenca, ma la si apre solo sospettando che esistano: il numero accanto
     // all'etichetta è l'unico posto in cui la scorciatoia si incontra senza cercarla.
     const bar = read('CanvasAddBar.svelte');
-    expect(bar).toMatch(/title=\{`\$\{ADDABLE_LABEL\[what\]\} \(\$\{i \+ 1\}\)`\}/);
+    expect(bar).toMatch(/title=\{`\$\{ADDABLE_LABEL\[what\]\} \(\$\{slot\(what\)\}\)`\}/);
   });
 });
