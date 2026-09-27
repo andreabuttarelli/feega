@@ -1762,7 +1762,10 @@
         {@const textCost = textCostEstimates[id]?.revision === estimateRevision ? textCostEstimates[id] : undefined}
         {@const uploaded = isUploadedNodeRow(row) ? uploadedNodeOf(row) : null}
         {#if uploaded}
-          <UploadedNode node={uploaded} medium={row.type === 'video' ? 'video' : 'image'} />
+          <UploadedNode
+            node={{ ...uploaded, url: assetUrl(uploaded.assetId) ?? uploaded.url }}
+            medium={row.type === 'video' ? 'video' : 'image'}
+          />
         {:else if gen}
           <GenNode
             node={{ ...gen, runs: runsByNode[row.id] ?? [] }}

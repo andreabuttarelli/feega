@@ -51,4 +51,22 @@ describe('la lista che alimenta un select', () => {
   it('nessun arco affatto: null', () => {
     expect(listFeedingSelect('n-select', [], nodesById)).toBeNull();
   });
+
+  it('un nodo products conta come sorgente selezionabile', () => {
+    const withProducts = new Map([
+      ...nodesById,
+      ['n-products', { id: 'n-products', type: 'products' }]
+    ]);
+    const edges = [{ sourceNodeId: 'n-products', targetNodeId: 'n-select' }];
+    expect(listFeedingSelect('n-select', edges, withProducts)).toEqual({ id: 'n-products', type: 'products' });
+  });
+
+  it('un nodo social_account_feed conta come sorgente selezionabile', () => {
+    const withFeed = new Map([
+      ...nodesById,
+      ['n-feed', { id: 'n-feed', type: 'social_account_feed' }]
+    ]);
+    const edges = [{ sourceNodeId: 'n-feed', targetNodeId: 'n-select' }];
+    expect(listFeedingSelect('n-select', edges, withFeed)).toEqual({ id: 'n-feed', type: 'social_account_feed' });
+  });
 });

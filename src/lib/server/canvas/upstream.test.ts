@@ -20,6 +20,8 @@ const SELECT_NODE = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
 const IMAGE_ASSET_1 = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
 const IMAGE_ASSET_2 = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee';
 const INFLUENCER_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+const PRODUCTS_NODE = 'ffffffff-ffff-ffff-ffff-ffffffffffff';
+const FEED_NODE = '10101010-1010-1010-1010-101010101010';
 
 const MODEL = 'bytedance/seedance-2-5';
 
@@ -632,6 +634,105 @@ describe('upstreamInputsFor — select: risolve ESATTAMENTE l\'item scelto dalla
 
     expect(out.referenceImageUrls).toEqual([]);
     expect(out.rejected).toEqual([{ nodeId: SELECT_NODE, why: expect.stringContaining('non ancora') }]);
+  });
+});
+
+describe('upstreamInputsFor — select su products/social_account_feed: intrinsecamente liste anche loro', () => {
+  it('un select su un catalogo prodotti porta titolo+descrizione come testo e le foto come immagini', async () => {
+    const { db } = fakeDb({
+      nodes: [
+        nodeRow(PRODUCTS_NODE, 'products', { type: 'shopify', url: 'https://x.myshopify.com' }),
+        nodeRow(SELECT_NODE, 'select', { index: 2 }),
+        nodeRow(IMAGE_NODE, 'image', { prompt: '', model: 'qwen3-pro' })
+      ],
+      nodes_connections: [
+        { id: 'e-products-select', canvas_id: CANVAS, source_node_id: PRODUCTS_NODE, target_node_id: SELECT_NODE, source_handle: null, target_handle: null },
+        { id: 'e-select-image', canvas_id: CANVAS, source_node_id: SELECT_NODE, target_node_id: IMAGE_NODE, source_handle: null, target_handle: null }
+      ],
+      products: [
+        { id: 'pr1', org_id: ORG, node_id: PRODUCTS_NODE, project_id: 'p1', platform: 'shopify', external_id: '1', handle: 'a', title: 'Sedia', description: 'Rossa', price: 10, currency: 'EUR', url: null, images: [{ url: 'canvas-assets/sedia.png' }], available: true, synced_at: 'now', created_at: 'now' },
+        { id: 'pr2', org_id: ORG, node_id: PRODUCTS_NODE, project_id: 'p1', platform: 'shopify', external_id: '2', handle: 'b', title: 'Tavolo', description: 'Blu', price: 20, currency: 'EUR', url: null, images: [{ url: 'canvas-assets/tavolo.png' }], available: true, synced_at: 'now', created_at: 'now' }
+      ],
+      assets: []
+    });
+
+    const out = await upstreamInputsFor(db, { orgId: ORG, canvasId: CANVAS, nodeId: IMAGE_NODE, model: 'qwen3-pro', medium: 'image' });
+
+    expect(out.blocked).toBeNull();
+    expect(out.referenceImageUrls).toEqual(['canvas-assets/tavolo.png']);
+  });
+
+  it('un select su un feed social porta le slide di un carosello, tutte', async () => {
+    const { db } = fakeDb({
+      nodes: [
+        nodeRow(FEED_NODE, 'social_account_feed', { platform: 'instagram', handle: 'acme' }),
+        nodeRow(SELECT_NODE, 'select', { index: 1 }),
+        nodeRow(IMAGE_NODE, 'image', { prompt: '', model: 'qwen3-pro' })
+      ],
+      nodes_connections: [
+        { id: 'e-feed-select', canvas_id: CANVAS, source_node_id: FEED_NODE, target_node_id: SELECT_NODE, source_handle: null, target_handle: null },
+        { id: 'e-select-image', canvas_id: CANVAS, source_node_id: SELECT_NODE, target_node_id: IMAGE_NODE, source_handle: null, target_handle: null }
+      ],
+      social_posts: [
+        {
+          id: 'sp1',
+          org_id: ORG,
+          node_id: FEED_NODE,
+          project_id: 'p1',
+          platform: 'instagram',
+          external_id: 'ext1',
+          handle: 'acme',
+          caption: 'Nuova collezione',
+          media: { items: [{ type: 'image', url: 'canvas-assets/s1.png' }, { type: 'image', url: 'canvas-assets/s2.png' }] },
+          metrics: {},
+          permalink: null,
+          posted_at: 'now',
+          fetched_at: 'now'
+        }
+      ],
+      assets: []
+    });
+
+    const out = await upstreamInputsFor(db, { orgId: ORG, canvasId: CANVAS, nodeId: IMAGE_NODE, model: 'qwen3-pro', medium: 'image' });
+
+    expect(out.blocked).toBeNull();
+    expect(out.referenceImageUrls).toEqual(['canvas-assets/s1.png', 'canvas-assets/s2.png']);
+  });
+
+  it('un select su un feed social senza slide (post singolo) alimenta con la sua copertina', async () => {
+    const { db } = fakeDb({
+      nodes: [
+        nodeRow(FEED_NODE, 'social_account_feed', { platform: 'instagram', handle: 'acme' }),
+        nodeRow(SELECT_NODE, 'select', { index: 1 }),
+        nodeRow(IMAGE_NODE, 'image', { prompt: '', model: 'qwen3-pro' })
+      ],
+      nodes_connections: [
+        { id: 'e-feed-select', canvas_id: CANVAS, source_node_id: FEED_NODE, target_node_id: SELECT_NODE, source_handle: null, target_handle: null },
+        { id: 'e-select-image', canvas_id: CANVAS, source_node_id: SELECT_NODE, target_node_id: IMAGE_NODE, source_handle: null, target_handle: null }
+      ],
+      social_posts: [
+        {
+          id: 'sp1',
+          org_id: ORG,
+          node_id: FEED_NODE,
+          project_id: 'p1',
+          platform: 'instagram',
+          external_id: 'ext1',
+          handle: 'acme',
+          caption: null,
+          media: { thumbnailUrl: 'canvas-assets/cover.png' },
+          metrics: {},
+          permalink: null,
+          posted_at: 'now',
+          fetched_at: 'now'
+        }
+      ],
+      assets: []
+    });
+
+    const out = await upstreamInputsFor(db, { orgId: ORG, canvasId: CANVAS, nodeId: IMAGE_NODE, model: 'qwen3-pro', medium: 'image' });
+
+    expect(out.referenceImageUrls).toEqual(['canvas-assets/cover.png']);
   });
 });
 
