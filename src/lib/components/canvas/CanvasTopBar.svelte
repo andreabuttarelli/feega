@@ -8,7 +8,7 @@
   import Plus from '@lucide/svelte/icons/plus';
   import CreditAmount from '$lib/components/CreditAmount.svelte';
 
-  type ProjectRow = { id: string; name: string; href: string };
+  type ProjectRow = { id: string; name: string; href: string; updatedAt: string };
   type CanvasRow = { id: string; name: string; href: string };
 
   /**
@@ -33,6 +33,16 @@
     chatOpen: boolean;
     onToggleChat: () => void;
   } = $props();
+
+  /** "3 Sep" o "14:20" per oggi: distingue progetti con lo stesso nome nel menu. */
+  function formatLastEdited(iso: string): string {
+    const date = new Date(iso);
+    const today = new Date();
+    const isToday = date.toDateString() === today.toDateString();
+    return isToday
+      ? date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+      : date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  }
 </script>
 
 <header class="canvas-topbar">
@@ -49,6 +59,7 @@
               {#snippet child({ props })}
                 <a {...props} href={project.href} class="switcher-row">
                   <span class="truncate">{project.name}</span>
+                  <span class="switcher-meta">{formatLastEdited(project.updatedAt)}</span>
                   {#if project.name === projectName}
                     <Check size={14} />
                   {/if}
@@ -169,6 +180,13 @@
     width: 100%;
     text-decoration: none;
     color: inherit;
+  }
+
+  .switcher-meta {
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--ink-faint, #9a9a9e);
+    white-space: nowrap;
   }
 
   .chat-toggle {

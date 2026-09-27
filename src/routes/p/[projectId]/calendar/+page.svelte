@@ -41,16 +41,14 @@
   </header>
 
   {#if !brand}
+    <p class="brand-hint">
+      Posts appear here once a brand is set. <a href={`/p/${page.params.projectId}/settings/brand`}>Go to Brand settings</a>.
+    </p>
+  {/if}
+
+  {#if !posts.length}
     <div class="empty-state">
-      <p>This project has no brand yet.</p>
-      {#if data.brands.length}
-        <p>Pick or create one in Settings → Brand.</p>
-      {/if}
-      <a class="cta" href={`/p/${page.params.projectId}/settings/brand`}>Go to Brand settings</a>
-    </div>
-  {:else if !posts.length}
-    <div class="empty-state">
-      <p>No posts yet for this brand.</p>
+      <p>No posts yet{#if brand} for this brand{/if}.</p>
     </div>
   {:else}
     <div class="calendar-list">
@@ -209,6 +207,16 @@
 
   .empty-state {
     padding: 24px 0;
+  }
+
+  .brand-hint {
+    margin: 0 0 16px;
+    font-size: 12px;
+    color: var(--ink-faint, #9a9a9e);
+  }
+
+  .brand-hint a {
+    color: inherit;
   }
 
   .cta {
