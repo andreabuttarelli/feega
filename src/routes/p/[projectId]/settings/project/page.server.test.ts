@@ -7,6 +7,9 @@ const ORG = 'org-1';
 const PROJECT = 'proj-1';
 const BRAND = 'brand-1';
 const NAME = 'Spring launch';
+const OTHER = 'proj-2';
+const CANVAS = 'canvas-2';
+const USER = { id: 'user-1', email: 'u@example.com', user_metadata: {} };
 
 function seed() {
   return {
@@ -20,7 +23,12 @@ function formEvent(fields: Record<string, string>, db: unknown) {
   for (const [key, value] of Object.entries(fields)) {
     fd.append(key, value);
   }
-  return { request: { formData: async () => fd }, params: { projectId: PROJECT }, locals: { db: async () => db } };
+  return {
+    request: { formData: async () => fd },
+    params: { projectId: PROJECT },
+    cookies: { get: () => undefined },
+    locals: { db: async () => db, safeGetSession: async () => ({ user: USER }) }
+  };
 }
 
 type Action = (e: unknown) => Promise<unknown>;
@@ -102,14 +110,45 @@ describe('settings/project actions', () => {
     expect(projectUpdate(calls)).toBeUndefined();
   });
 
-  it('delete col nome esatto archivia il progetto e porta fuori', async () => {
-    const { db, calls } = fakeDb(seed(), { filter: true });
+  it('delete col nome esatto archivia il progetto e atterra sul progetto rimasto', async () => {
+    const { db, calls } = entryDb([{ id: OTHER, org_id: ORG, name: 'Other', updated_at: '2026-01-01', canvases: [] }]);
 
     const result = await run('delete', { confirmName: NAME }, db);
 
     expect(isRedirect(result)).toBe(true);
-    expect((result as { location: string }).location).toBe('/app');
+    expect((result as { location: string }).location).toBe(`/p/${OTHER}/c/${CANVAS}`);
     expect(projectUpdate(calls)?.payload).toHaveProperty('archived_at');
     expect(calls.find((c) => c.op === 'delete')).toBeUndefined();
   });
+
+  it('cancellato l unico progetto, ne nasce esattamente uno nuovo e non si passa da /app', async () => {
+    const { db, calls } = entryDb([]);
+
+    const result = await run('delete', { confirmName: NAME }, db);
+
+    expect(isRedirect(result)).toBe(true);
+    expect((result as { location: string }).location).not.toBe('/app');
+    expect(calls.filter((c) => c.table === 'projects' && c.op === 'insert')).toHaveLength(1);
+  });
 });
+
+function entryDb(others: Record<string, unknown>[]) {
+  const rows: Record<string, Record<string, unknown>[]> = {
+    projects: [{ id: PROJECT, org_id: ORG, name: NAME, updated_at: '2026-01-01', archived_at: null, canvases: [] }, ...others],
+    profiles: [{ id: USER.id, email: USER.email, name: null, avatar_url: null }],
+    orgs_members: [{ user_id: USER.id, role: 'owner', orgs: { id: ORG, name: 'Org', slug: 'org' } }],
+    canvases: [{ id: CANVAS, org_id: ORG, project_id: OTHER, name: 'C', viewport: null }]
+  };
+  const fake = fakeDb(rows, { filter: true });
+  const applied = new Set<unknown>();
+  const from = fake.db.from.bind(fake.db);
+  (fake.db as unknown as { from: unknown }).from = (table: string) => {
+    for (const call of fake.calls.filter((c) => c.op === 'update' && !applied.has(c))) {
+      applied.add(call);
+      const matching = (rows[call.table] ?? []).filter((row) => call.filters.every(([k, v]) => row[k] === v));
+      matching.forEach((row) => Object.assign(row, call.payload));
+    }
+    return from(table as never);
+  };
+  return fake;
+}

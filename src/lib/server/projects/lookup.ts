@@ -23,6 +23,7 @@ export async function findProjectForUser(
       .select(PROJECT_COLUMNS)
       .eq('id', input.projectId)
       .eq('org_id', org.id)
+      .is('archived_at', null)
       .maybeSingle();
 
     if (error) {

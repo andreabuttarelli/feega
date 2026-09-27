@@ -4,8 +4,7 @@ import type { Actions, PageServerLoad } from './$types';
 import { archiveProject, renameProject, setProjectBrand } from '$lib/server/repos/projects';
 import { findBrand, listOrgBrands } from '$lib/server/repos/brands';
 import type { Db } from '$lib/server/db/client';
-
-const EXIT_AFTER_DELETE = '/app';
+import { ENTRY_DEPS, homePathFor } from '$lib/server/tenancy/entry';
 
 type OwnedProject = { db: Db; orgId: string; projectId: string; name: string };
 
@@ -16,7 +15,7 @@ async function ownedProject(event: RequestEvent): Promise<OwnedProject> {
   }
 
   const projectId = event.params.projectId ?? '';
-  const { data } = await db.from('projects').select('org_id, name').eq('id', projectId).maybeSingle();
+  const { data } = await db.from('projects').select('org_id, name').eq('id', projectId).is('archived_at', null).maybeSingle();
   const row = data as { org_id: string; name: string } | null;
   if (!row) {
     throw error(404, 'progetto non trovato');
@@ -92,6 +91,10 @@ export const actions: Actions = {
     }
 
     await archiveProject(db, { orgId, projectId });
-    throw redirect(303, EXIT_AFTER_DELETE);
+    const { user } = await event.locals.safeGetSession();
+    if (!user) {
+      throw redirect(303, '/login');
+    }
+    throw redirect(303, await homePathFor(db, ENTRY_DEPS, user, orgId));
   }
 };
