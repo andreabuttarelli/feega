@@ -61,3 +61,7 @@ export function saveReasonFor(readiness: ComposerReadiness): string | null {
 export function scheduleReasonFor(readiness: ComposerReadiness): string | null {
   return reasonFrom(SCHEDULE_BLOCKERS, readiness);
 }
+
+export function submittedNodeIds(mediaOrder: string[], captionNodeIds: string[]): string[] {
+  return [...mediaOrder, ...captionNodeIds];
+}

@@ -3,7 +3,7 @@
   import { goto } from '$app/navigation';
   import PlatformGlyph from '$lib/components/PlatformGlyph.svelte';
   import { monthGrid, placePosts, type GridDay } from '$lib/calendar/month-grid';
-  import type { CalendarPost } from './calendar-load';
+  import { ALL_BRANDS, type CalendarPost } from './calendar-load';
 
   const CALENDAR_TIME_ZONE = 'Europe/Rome';
 
@@ -16,7 +16,10 @@
 
   let { data } = $props();
 
-  const brand = $derived(data.brand);
+  const BRAND_TONES = ['#1d1d1f', '#7c5cff', '#0a7d5a', '#c2410c', '#0369a1', '#a21caf'];
+
+  const brandsById = $derived(new Map(data.brands.map((b, i) => [b.id, { ...b, tone: BRAND_TONES[i % BRAND_TONES.length] }])));
+  const showsAll = $derived(data.selection === ALL_BRANDS);
   const posts = $derived(data.posts as CalendarPost[]);
   const year = $derived(data.month.year);
   const month = $derived(data.month.month);
@@ -66,23 +69,61 @@
     let m = month + delta;
     if (m < 1) { m = 12; y -= 1; }
     if (m > 12) { m = 1; y += 1; }
-    void goto(`?month=${monthParam(y, m)}`, { keepFocus: true, noScroll: true });
+    withParam('month', monthParam(y, m));
   }
 
   function goToday() {
-    void goto(`?month=${monthParam(today.getUTCFullYear(), today.getUTCMonth() + 1)}`, { keepFocus: true, noScroll: true });
+    withParam('month', monthParam(today.getUTCFullYear(), today.getUTCMonth() + 1));
+  }
+
+  function withParam(key: string, value: string) {
+    const params = new URLSearchParams(page.url.searchParams);
+    params.set(key, value);
+    void goto(`?${params}`, { keepFocus: true, noScroll: true });
+  }
+
+  function initialsOf(name: string): string {
+    return name.split(/\s+/).map((w) => w[0] ?? '').join('').slice(0, 2).toUpperCase();
+  }
+
+  function localInputOf(iso: string | null): string {
+    const at = iso ? new Date(iso) : new Date(Date.now() + 60 * 60 * 1000);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}T${pad(at.getHours())}:${pad(at.getMinutes())}`;
+  }
+
+  function isoOf(local: string): string {
+    return local ? new Date(local).toISOString() : '';
+  }
+
+  let scheduleLocal = $state('');
+
+  function undeliveredOf(post: CalendarPost) {
+    return (data.accountsByBrand[post.brandId] ?? []).filter((a) => !post.deliveries.some((d) => d.accountId === a.id));
   }
 
   let selectedPost = $state<CalendarPost | null>(null);
 
   function openPost(post: CalendarPost) {
     selectedPost = post;
+    scheduleLocal = localInputOf(scheduledForOf(post));
   }
 
   function closePost() {
     selectedPost = null;
   }
 </script>
+
+{#snippet brandChip(brandId: string)}
+  {@const b = brandsById.get(brandId)}
+  {#if b}
+    {#if b.logoUrl}
+      <img class="brand-chip" src={b.logoUrl} alt={b.name} title={b.name} />
+    {:else}
+      <span class="brand-chip" style:background={b.tone} title={b.name}>{initialsOf(b.name)}</span>
+    {/if}
+  {/if}
+{/snippet}
 
 <div class="calendar-page">
   <header class="page-header">
@@ -93,28 +134,28 @@
         <button type="button" onclick={goToday}>Oggi</button>
         <button type="button" onclick={() => navigateMonth(1)} aria-label="Mese successivo">›</button>
       </div>
+      {#if data.brands.length}
+        <select
+          class="brand-select"
+          aria-label="Brand"
+          value={data.selection}
+          onchange={(e) => withParam('brand', e.currentTarget.value)}
+        >
+          <option value={ALL_BRANDS}>All brands</option>
+          {#each data.brands as b (b.id)}
+            <option value={b.slug}>{b.name}</option>
+          {/each}
+        </select>
+      {/if}
     </div>
-    {#if brand}<p class="subtitle">{brand.name}</p>{/if}
   </header>
 
-  <div class="calendar-body" class:has-overlay={!brand}>
-    {#if !brand}
+  <div class="calendar-body" class:has-overlay={!data.brands.length}>
+    {#if !data.brands.length}
       <div class="brand-overlay">
         <div class="brand-overlay-box">
-          <p class="brand-overlay-title">This project has no brand yet</p>
-          <p class="brand-overlay-hint">Link an existing brand or create one to see the calendar.</p>
-
-          {#if data.brands.length}
-            <form method="POST" action="?/linkBrand" class="brand-link-form">
-              <select name="brandId" required>
-                <option value="" disabled selected>Choose a brand</option>
-                {#each data.brands as b (b.id)}
-                  <option value={b.id}>{b.name}</option>
-                {/each}
-              </select>
-              <button type="submit">Link brand</button>
-            </form>
-          {/if}
+          <p class="brand-overlay-title">No brand yet</p>
+          <p class="brand-overlay-hint">Create a brand to schedule posts.</p>
 
           <a class="brand-create-link" href={`/p/${page.params.projectId}/brands/new?returnTo=/p/${page.params.projectId}/calendar`}>
             Create brand
@@ -138,6 +179,7 @@
               <div class="day-chips">
                 {#each dayPosts as post (post.id)}
                   <button type="button" class="post-chip" onclick={() => openPost(post)}>
+                    {#if showsAll}{@render brandChip(post.brandId)}{/if}
                     {#each platformsOf(post) as platform (platform)}
                       <PlatformGlyph {platform} />
                     {/each}
@@ -159,6 +201,7 @@
       {:else}
         {#each unscheduledPosts as post (post.id)}
           <button type="button" class="unscheduled-item" onclick={() => openPost(post)}>
+            {#if showsAll}{@render brandChip(post.brandId)}{/if}
             {#each platformsOf(post) as platform (platform)}
               <PlatformGlyph {platform} />
             {/each}
@@ -174,6 +217,10 @@
   <div class="popover-backdrop" onclick={closePost} role="presentation">
     <div class="popover" onclick={(e) => e.stopPropagation()} role="dialog" aria-label="Dettaglio post">
       <header class="popover-header">
+        <span class="popover-brand">
+          {@render brandChip(selectedPost.brandId)}
+          {brandsById.get(selectedPost.brandId)?.name}
+        </span>
         <span class="status-badge">{selectedPost.status}</span>
         <button type="button" class="close-btn" onclick={closePost} aria-label="Chiudi">×</button>
       </header>
@@ -187,6 +234,12 @@
             <PlatformGlyph platform={delivery.platform} />
             <span>{delivery.status}</span>
             {#if delivery.url}<a href={delivery.url} target="_blank" rel="noreferrer">Vedi</a>{/if}
+            <form method="POST" action="?/reschedule" class="popover-action">
+              <input type="hidden" name="postId" value={selectedPost.id} />
+              <input type="hidden" name="accountId" value={delivery.accountId} />
+              <input type="hidden" name="scheduledFor" value={isoOf(scheduleLocal)} />
+              <button type="submit">Sposta</button>
+            </form>
             <form method="POST" action="?/publishNow" class="popover-action">
               <input type="hidden" name="postId" value={selectedPost.id} />
               <input type="hidden" name="accountId" value={delivery.accountId} />
@@ -200,6 +253,29 @@
           </li>
         {/each}
       </ul>
+      <label class="popover-when">
+        Quando
+        <input type="datetime-local" bind:value={scheduleLocal} />
+      </label>
+      {#if undeliveredOf(selectedPost).length}
+        <form method="POST" action="?/schedule" class="popover-schedule">
+          <input type="hidden" name="postId" value={selectedPost.id} />
+          <input type="hidden" name="scheduledFor" value={isoOf(scheduleLocal)} />
+          {#each undeliveredOf(selectedPost) as account (account.id)}
+            <label class="account-row">
+              <input type="checkbox" name="accountId" value={account.id} checked />
+              <PlatformGlyph platform={account.platform} />
+              {account.handle ?? account.displayName ?? account.platform}
+            </label>
+          {/each}
+          <button type="submit">Programma</button>
+        </form>
+      {:else if !selectedPost.deliveries.length}
+        <p class="popover-media">
+          Nessun account collegato per questo brand.
+          <a href={`/p/${page.params.projectId}/settings/connected-accounts`}>Collega</a>
+        </p>
+      {/if}
     </div>
   </div>
 {/if}
@@ -238,9 +314,57 @@
     color: var(--ink, #1d1d1f);
   }
 
-  .subtitle {
-    margin: 4px 0 0;
-    color: var(--ink-faint, #9a9a9e);
+  .brand-select {
+    margin-left: auto;
+    border: 1px solid var(--line, #ededef);
+    background: transparent;
+    padding: 4px 8px;
+    font: inherit;
+    color: var(--ink, #1d1d1f);
+  }
+
+  .brand-chip {
+    flex: 0 0 auto;
+    width: 14px;
+    height: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 7px;
+    font-weight: 700;
+    color: #fff;
+    object-fit: cover;
+  }
+
+  .popover-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .popover-when,
+  .popover-schedule {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+  }
+
+  .popover-when input,
+  .popover-schedule button {
+    border: 1px solid var(--line, #ededef);
+    background: transparent;
+    padding: 4px 8px;
+    font: inherit;
+    color: var(--ink, #1d1d1f);
+  }
+
+  .account-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
   }
 
   .calendar-body {
@@ -288,14 +412,6 @@
     color: var(--ink-faint, #9a9a9e);
   }
 
-  .brand-link-form {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .brand-link-form select,
-  .brand-link-form button,
   .brand-create-link {
     border: 1px solid var(--line, #ededef);
     background: transparent;

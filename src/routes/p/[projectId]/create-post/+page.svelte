@@ -12,7 +12,8 @@
     removeMedia,
     defaultScheduleTime,
     saveReasonFor,
-    scheduleReasonFor
+    scheduleReasonFor,
+    submittedNodeIds
   } from '$lib/canvas/create-post-composer';
   import { errorCopyFor } from '$lib/canvas/create-post-errors';
   import { closeSheet } from '$lib/canvas/sheet-nav';
@@ -107,7 +108,7 @@
   >
     <input type="hidden" name="brand_id" value={selectedBrandId} />
     <input type="hidden" name="caption" value={caption} />
-    {#each mediaOrder as nodeId (nodeId)}
+    {#each submittedNodeIds(mediaOrder, composition.captions.map((c) => c.nodeId)) as nodeId (nodeId)}
       <input type="hidden" name="node_id" value={nodeId} />
     {/each}
     {#each selectedAccountIds as accountId (accountId)}

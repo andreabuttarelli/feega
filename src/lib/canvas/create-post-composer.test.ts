@@ -6,6 +6,7 @@ import {
   defaultScheduleTime,
   saveReasonFor,
   scheduleReasonFor,
+  submittedNodeIds,
   type ComposerReadiness
 } from './create-post-composer';
 
@@ -101,5 +102,15 @@ describe('scheduleReasonFor', () => {
     expect(scheduleReasonFor({ ...READY, hasConnectedAccounts: false })).toBe(
       'Connect an account for this brand first.'
     );
+  });
+});
+
+describe('submittedNodeIds', () => {
+  it('sends the caption node too, so a text-only selection becomes a post', () => {
+    expect(submittedNodeIds([], ['text-1'])).toEqual(['text-1']);
+  });
+
+  it('keeps the media order, then the caption nodes', () => {
+    expect(submittedNodeIds(['img-2', 'img-1'], ['text-1'])).toEqual(['img-2', 'img-1', 'text-1']);
   });
 });

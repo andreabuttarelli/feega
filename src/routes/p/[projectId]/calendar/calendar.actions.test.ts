@@ -145,32 +145,6 @@ describe('actions.cancel: dal form a deletePost() su Zernio', () => {
   });
 });
 
-describe('actions.linkBrand: dal form a projects.brand_id', () => {
-  it('scrive brand_id sul progetto scoperto per org_id', async () => {
-    const { db, calls } = fakeDb(seedRows());
-
-    const result = (await (actions.linkBrand as (e: unknown) => Promise<unknown>)(
-      formEvent({ brandId: BRAND }, db)
-    )) as { linked: boolean };
-
-    expect(result.linked).toBe(true);
-    const update = calls.find((c) => c.table === 'projects' && c.op === 'update');
-    expect(update?.payload).toMatchObject({ brand_id: BRAND });
-    expect(update?.filters).toEqual(expect.arrayContaining([['id', PROJECT], ['org_id', ORG]]));
-  });
-
-  it('senza brandId risponde 400 senza scrivere niente', async () => {
-    const { db, calls } = fakeDb(seedRows());
-
-    const result = (await (actions.linkBrand as (e: unknown) => Promise<unknown>)(
-      formEvent({ brandId: '' }, db)
-    )) as { status: number };
-
-    expect(result.status).toBe(400);
-    expect(calls.find((c) => c.table === 'projects' && c.op === 'update')).toBeUndefined();
-  });
-});
-
 describe('actions.reschedule: cancella su Zernio e riconsegna con il nuovo orario', () => {
   it('chiama deletePost() e poi publish() con lo scheduledFor nuovo', async () => {
     publish.mockResolvedValue({ ok: true, postId: 'zernio-post-4' });
@@ -184,5 +158,45 @@ describe('actions.reschedule: cancella su Zernio e riconsegna con il nuovo orari
     expect(deletePost).toHaveBeenCalledWith('zernio-post-old');
     expect(publish).toHaveBeenCalledWith(expect.objectContaining({ scheduledFor: '2030-02-01T09:00:00.000Z' }));
     expect(result.rescheduled).toBe(true);
+  });
+});
+
+describe('le action agiscono sul brand del post, dentro l org del progetto', () => {
+  it('un account di un altro brand non riceve il post, anche se la pagina mostra quel brand', async () => {
+    const rows = seedRows();
+    rows.social_accounts.push({ id: 'account-other', brand_id: 'brand-2', platform: 'instagram', zernio_account_id: 'zern-2', status: 'connected' });
+    const withOrg = {
+      ...rows,
+      posts: rows.posts.map((p) => ({ ...p, org_id: ORG })),
+      social_accounts: rows.social_accounts.map((a) => ({ ...a, org_id: ORG }))
+    };
+    const { db } = fakeDb(withOrg, { filter: true });
+
+    const result = (await (actions.schedule as (e: unknown) => Promise<unknown>)(
+      formEvent({ postId: POST_ID, accountId: 'account-other', scheduledFor: '2030-01-01T10:00:00.000Z' }, db)
+    )) as { result: { deliveries: unknown[] } };
+
+    expect(publish).not.toHaveBeenCalled();
+    expect(result.result.deliveries).toEqual([{ accountId: 'account-other', ok: false, error: 'account_not_found' }]);
+  });
+
+  it('un post di un altra org risponde 404 senza chiamare Zernio', async () => {
+    const rows = seedRows();
+    const foreign = {
+      ...rows,
+      posts: rows.posts.map((p) => ({ ...p, org_id: 'org-2' })),
+      social_accounts: rows.social_accounts.map((a) => ({ ...a, org_id: 'org-2' }))
+    };
+    const { db } = fakeDb(foreign, { filter: true });
+
+    for (const name of ['schedule', 'publishNow', 'cancel', 'reschedule'] as const) {
+      const result = (await (actions[name] as (e: unknown) => Promise<unknown>)(
+        formEvent({ postId: POST_ID, accountId: ACCOUNT_ID, scheduledFor: '2030-01-01T10:00:00.000Z' }, db)
+      )) as { status: number };
+
+      expect(result.status, name).toBe(404);
+    }
+    expect(publish).not.toHaveBeenCalled();
+    expect(deletePost).not.toHaveBeenCalled();
   });
 });
