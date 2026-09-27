@@ -32,6 +32,7 @@
   import UploadedNode from '$lib/components/canvas/UploadedNode.svelte';
   import ListNode from '$lib/components/canvas/ListNode.svelte';
   import SelectNode from '$lib/components/canvas/SelectNode.svelte';
+  import NodeDownload from '$lib/components/canvas/NodeDownload.svelte';
   import EffectsNode from '$lib/components/canvas/EffectsNode.svelte';
   import EffectsEditor from '$lib/components/canvas/EffectsEditor.svelte';
   import CompositionNode from '$lib/components/canvas/CompositionNode.svelte';
@@ -1751,8 +1752,14 @@
               {:else if gen.medium === 'video'}
                 <!-- svelte-ignore a11y_media_has_caption -->
                 <video src={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} controls playsinline></video>
+                <div class="gen-download">
+                  <NodeDownload kind="video" sourceUrl={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} nodeId={id} nodeType={gen.medium} />
+                </div>
               {:else}
                 <img src={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} alt={gen.prompt} loading="lazy" />
+                <div class="gen-download">
+                  <NodeDownload kind="image" sourceUrl={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} nodeId={id} nodeType={gen.medium} />
+                </div>
               {/if}
             {/snippet}
           </GenNode>
@@ -1854,6 +1861,13 @@
     min-height: 0;
     height: 100%;
     overflow: hidden;
+  }
+
+  .gen-download {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    z-index: 5;
   }
 
   .gen-text-wrap {
