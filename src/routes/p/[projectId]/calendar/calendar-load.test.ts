@@ -45,14 +45,14 @@ describe('buildCalendarData: nessun brand sul progetto', () => {
 
 describe('buildCalendarData: progetto con brand', () => {
   it('carica gli account e i post di QUEL brand, con lo stato di consegna per post', async () => {
-    const r = repos({ deliveryStatus: vi.fn().mockResolvedValue([{ accountId: 'acc-ig', platform: 'instagram', status: 'scheduled', url: null, error: null }]) });
+    const r = repos({ deliveryStatus: vi.fn().mockResolvedValue([{ accountId: 'acc-ig', platform: 'instagram', status: 'scheduled', url: null, error: null, scheduledFor: '2026-09-15T09:00:00Z' }]) });
 
     const data = await buildCalendarData(r, { orgId: ORG, brandId: BRAND, db: {} as never, publisher: {} as never });
 
     expect(data.brand).toEqual(brand);
     expect(data.accounts).toEqual(accounts);
     expect(data.posts).toEqual([
-      { ...posts[0], deliveries: [{ accountId: 'acc-ig', platform: 'instagram', status: 'scheduled', url: null, error: null }] }
+      { ...posts[0], deliveries: [{ accountId: 'acc-ig', platform: 'instagram', status: 'scheduled', url: null, error: null, scheduledFor: '2026-09-15T09:00:00Z' }] }
     ]);
   });
 

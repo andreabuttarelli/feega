@@ -178,8 +178,8 @@ describe('deliveryStatus', () => {
 
     expect(publisher.postStatus).toHaveBeenCalledTimes(2);
     expect(result).toEqual([
-      { accountId: ACCOUNT_IG, platform: 'instagram', status: 'scheduled', url: null, error: null },
-      { accountId: ACCOUNT_X, platform: 'x', status: 'published', url: 'https://x.com/p/1', error: null }
+      { accountId: ACCOUNT_IG, platform: 'instagram', status: 'scheduled', url: null, error: null, scheduledFor: null },
+      { accountId: ACCOUNT_X, platform: 'x', status: 'published', url: 'https://x.com/p/1', error: null, scheduledFor: null }
     ]);
   });
 
@@ -201,7 +201,7 @@ describe('deliveryStatus', () => {
     const result = await deliveryStatus(db, publisher, { orgId: ORG, postId: POST_ID });
 
     expect(result).toEqual([
-      { accountId: ACCOUNT_IG, platform: 'instagram', status: 'unreachable', url: null, error: 'Zernio 503: down' }
+      { accountId: ACCOUNT_IG, platform: 'instagram', status: 'unreachable', url: null, error: 'Zernio 503: down', scheduledFor: null }
     ]);
   });
 });
