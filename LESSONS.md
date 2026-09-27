@@ -1968,3 +1968,11 @@ deployment "Production" è in stato Error. Mossa: `credit-ladder.ts` non ha segr
 puro (costanti + funzioni) — quindi va spostato fuori da `$lib/server/` (`$lib/credit-ladder.ts`)
 invece di duplicare la logica lato client. Prima di mettere qualcosa sotto `$lib/server/`,
 chiedersi se un componente lo importerà mai: se sì e il contenuto è client-safe, non ci va sotto.
+
+### Una pagina dà 500 su Vercel e in locale no: `ReferenceError: DOMMatrix is not defined`
+Segnale: nei log di produzione (`vercel logs <deployment> --json`, in streaming: vanno aperti PRIMA
+di ricaricare la pagina) un `ReferenceError` di un'API del browser dentro `node_modules/pdfjs-dist`
+(o simili), mentre si carica il modulo della rotta. Una libreria per PDF importata in cima a un
+modulo server la carica all'avvio della funzione, e in Node `DOMMatrix` non esiste. Mossa:
+`await import('libreria')` dentro la funzione che la usa, e un test che importa il modulo e
+verifica che la libreria non si carichi.

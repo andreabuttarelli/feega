@@ -2,7 +2,6 @@
  * Convert uploaded files to markdown via markitdown-ts, with the existing
  * knowledge converters as fallback when markitdown fails (empty PDF, Vercel quirks).
  */
-import { MarkItDown } from 'markitdown-ts';
 import {
   dottedExtension,
   fileExt,
@@ -33,6 +32,7 @@ export async function convertWithMarkitdown(
   if (!file_extension) {
     throw new Error(`Unsupported document type: ${mime || name}`);
   }
+  const { MarkItDown } = await import('markitdown-ts');
   const markitdown = new MarkItDown();
   const result = await markitdown.convertBuffer(asBuffer(buf), { file_extension });
   const markdown = (result?.markdown ?? result?.text_content ?? '').trim();
