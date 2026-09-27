@@ -3,6 +3,9 @@
   import { CanvasMode } from '$lib/canvas/canvas-mode';
   import { renderDocHtml } from '$lib/canvas/doc-render';
   import type { SharedNode } from '$lib/canvas/shared-view';
+  import { NODE_KIND_ICON } from '$lib/canvas/node-label';
+  import type { NodeType } from '$lib/canvas/node-data';
+  import SourcePreview from '$lib/components/canvas/SourcePreview.svelte';
   import { DEFAULT_EDGE_KIND } from '$lib/canvas/connect-rules';
   import '$lib/styles/doc-prose.css';
 
@@ -43,6 +46,46 @@
             <iframe src={node.view.url} title={node.displayName ?? 'embed'} sandbox="allow-scripts allow-same-origin"></iframe>
           {:else if node.view.kind === 'frame'}
             <iframe srcdoc={node.view.html} title={node.displayName ?? 'embed'} sandbox="allow-scripts"></iframe>
+          {:else if node.view.kind === 'grid'}
+            <SourcePreview
+              icon={NODE_KIND_ICON[node.type as NodeType]}
+              title={node.displayName ?? ''}
+              tiles={node.view.tiles}
+              total={node.view.total}
+              syncStatus="done"
+              syncError={null}
+              empty=""
+            />
+          {:else if node.view.kind === 'list'}
+            <ol class="items nowheel">
+              {#each node.view.items as item, i (i)}
+                <li>
+                  <span class="index">{i + 1}</span>
+                  {#if item.url}
+                    <img class="thumb" src={item.url} alt={item.label} loading="lazy" />
+                  {/if}
+                  <span>{item.label || item.text}</span>
+                </li>
+              {/each}
+            </ol>
+          {:else if node.view.kind === 'select'}
+            <p class="big">#{node.view.index}</p>
+          {:else if node.view.kind === 'influencer'}
+            <figure class="face">
+              {#if node.view.photo}
+                <img src={node.view.photo} alt={node.view.name} />
+              {/if}
+              <figcaption><strong>{node.view.name}</strong>{#if node.view.summary}<span>{node.view.summary}</span>{/if}</figcaption>
+            </figure>
+          {:else if node.view.kind === 'post'}
+            <article class="post nowheel">
+              {#each node.view.media as url (url)}
+                <img src={url} alt="" loading="lazy" />
+              {/each}
+              <p>{node.view.caption}</p>
+            </article>
+          {:else if node.view.kind === 'ads'}
+            <p class="big">{node.view.query}<span>{node.view.country}</span></p>
           {/if}
         </div>
       {/if}
@@ -93,6 +136,79 @@
     overflow: auto;
     padding: 14px 16px;
     font-size: 13px;
+  }
+
+  .items,
+  .post {
+    height: 100%;
+    overflow: auto;
+    margin: 0;
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+
+  .items {
+    list-style: none;
+  }
+
+  .items li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--line, #ededef);
+  }
+
+  .index {
+    color: var(--ink-faint, #9a9a9e);
+  }
+
+  .view .thumb {
+    width: 32px;
+    height: 32px;
+    object-fit: cover;
+  }
+
+  .view .post img {
+    height: auto;
+    margin-bottom: 8px;
+  }
+
+  .big {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+  }
+
+  .big span {
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--ink-faint, #9a9a9e);
+  }
+
+  .face {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    margin: 0;
+  }
+
+  .view .face img {
+    flex: 1;
+    min-height: 0;
+    object-fit: cover;
+  }
+
+  .face figcaption {
+    display: flex;
+    flex-direction: column;
+    padding: 8px 10px;
+    font-size: 12px;
   }
 
   .mark {

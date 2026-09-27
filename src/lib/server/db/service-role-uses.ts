@@ -25,8 +25,8 @@ export type ServiceRoleUse = {
 export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
   {
     path: 'src/lib/server/canvas/canvas-share.ts — readSharedCanvas + signSharedMedia (rotta pubblica /s/[token])',
-    why: "Chi apre un link condiviso non ha sessione: il token È l'autorizzazione. La riga si trova solo per canvases.share_token; l'org_id si LEGGE da quella riga e limita ogni lettura successiva (nodi non cancellati, connessioni, asset di quei nodi). Sola lettura, e fuori esce solo il contenuto dei nodi con i file firmati — mai org, progetto, prompt o utenti.",
-    tables: ['canvases', 'nodes', 'nodes_connections', 'assets']
+    why: "Chi apre un link condiviso non ha sessione: il token È l'autorizzazione. La riga si trova solo per canvases.share_token; l'org_id si LEGGE da quella riga e limita ogni lettura successiva (nodi non cancellati, connessioni, asset di quei nodi, prodotti e post scaricati da quei nodi). Gli influencer non hanno sempre un org_id: si legge quello referenziato dal nodo e passa solo se è del catalogo (org_id null) o della stessa org — mai il volto di un'altra. Sola lettura, e fuori esce solo il contenuto dei nodi con i file firmati — mai org, progetto, prompt, parametri o utenti.",
+    tables: ['canvases', 'nodes', 'nodes_connections', 'assets', 'products', 'social_posts', 'influencers', 'influencer_views']
   },
   {
     path: 'src/lib/server/cli-auth.ts — authenticateApiKey',
@@ -67,6 +67,11 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
     path: 'scripts/import-anomalia-talents.ts',
     why: "Uno script una tantum, senza sessione utente: scrive il catalogo globale (`influencers.org_id = null`), che la RLS vieta a qualunque JWT per costruzione — le policy di scrittura richiedono `org_id is not null`. Legge anche dal progetto Supabase VECCHIO (`OLD_FEEGA_*`), un database diverso su cui questa distinzione non si applica.",
     tables: ['influencers', 'influencer_views']
+  },
+  {
+    path: 'scripts/seed-reference-images.ts',
+    why: "Uno script una tantum, senza sessione utente: semina il catalogo globale delle foto di riferimento (`reference_images.org_id = null`, bucket `reference-images` sotto `catalogue/`), che nessuna policy lascia scrivere a un JWT — il catalogo si legge da ogni org e non lo scrive nessuna.",
+    tables: ['reference_images']
   },
   {
     path: 'scripts/backfill-signed-url-nodes.ts',
