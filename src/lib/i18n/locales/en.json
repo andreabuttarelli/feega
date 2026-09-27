@@ -247,7 +247,6 @@
       "settings": "Settings",
       "upgrade": "Upgrade",
       "workspace": "Workspace",
-      "sectionPublishing": "Publishing",
       "sectionAccount": "Account",
       "sectionBrand": "Brand",
       "sectionProject": "Project"
@@ -297,9 +296,6 @@
         "help": "Help",
         "account": "Account"
       }
-    },
-    "brands": {
-      "newBrand": "New brand"
     },
     "settings": {
       "team": {
@@ -469,7 +465,6 @@
         }
       },
       "ads": {
-        "nav": "Ads",
         "accountsNav": "Ads accounts",
         "budgetNav": "Budget & defaults",
         "accountsTitle": "Ads accounts",
