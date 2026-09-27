@@ -221,14 +221,14 @@
 
 <div class="wizard-shell">
   <div class="wizard">
-    <ol class="steps">
-      {#each STEPS as s, i (s)}
-        <li class:active={s === step} class:done={i < stepIndex}>
-          <span class="dot"></span>
-          <span class="label">{STEP_LABEL[s]}</span>
-        </li>
-      {/each}
-    </ol>
+    <div class="step-bar">
+      <p class="step-caption">Step {stepIndex + 1} of {STEPS.length} · {STEP_LABEL[step]}</p>
+      <ol class="steps">
+        {#each STEPS as s, i (s)}
+          <li class:active={s === step} class:done={i < stepIndex}></li>
+        {/each}
+      </ol>
+    </div>
 
     {#if error}
       <p class="msg warn">{error}</p>
@@ -441,40 +441,30 @@
     gap: 32px;
   }
 
+  .step-bar { display: flex; flex-direction: column; gap: 10px; }
+  .step-caption {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ink-soft);
+  }
+
   .steps {
     display: flex;
-    flex-wrap: wrap;
     gap: 4px;
     list-style: none;
     margin: 0;
     padding: 0;
   }
   .steps li {
-    flex: 1 1 auto;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 0 0 10px;
-    border-bottom: 2px solid var(--line);
-    color: var(--ink-faint);
+    flex: 1 1 0;
+    height: 3px;
+    background: var(--line);
   }
-  .steps li .dot {
-    width: 6px;
-    height: 6px;
-    background: currentColor;
-    flex: 0 0 auto;
-  }
-  .steps li .label {
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .steps li.done { color: var(--ink-soft); border-color: var(--ink-soft); }
-  .steps li.active { color: var(--accent); border-color: var(--accent); }
+  .steps li.done { background: var(--ink-soft); }
+  .steps li.active { background: var(--accent); }
 
   .panel {
     display: flex;
@@ -560,18 +550,22 @@
   .products label { display: flex; align-items: center; gap: 10px; font-size: 14px; }
   .products .desc { margin: 6px 0 0 26px; font-size: 12.5px; color: var(--ink-soft); }
 
-  .handle-row { display: flex; align-items: center; gap: 8px; }
+  .handle-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
   .handle-row select { flex: 0 0 auto; width: auto; }
-  .handle-row input { flex: 1; }
+  .handle-row input { flex: 1 1 160px; min-width: 0; }
+  .handle-row .btn.small { flex: 0 0 auto; margin-left: auto; }
 
   .preview { border: 1px solid var(--line); padding: 16px; background: var(--paper-2); }
 
   @media (max-width: 480px) {
     .wizard-shell { padding: 32px 16px 56px; }
     .panel { padding: 24px 20px; }
-    .steps li .label { font-size: 10px; }
     .row { flex-direction: column-reverse; }
     .row .btn { width: 100%; }
+
+    .handle-row select { flex: 1 1 auto; }
+    .handle-row input { flex: 1 1 100%; order: 1; }
+    .handle-row .btn.small { flex: 1 1 auto; margin-left: 0; order: 2; }
   }
 
   @media (max-width: 360px) {
