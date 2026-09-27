@@ -18,3 +18,7 @@ which renders the message instead of redirecting a signed-in user.
 
 No magic-link sign-in exists today; `/auth/callback` covers it if it returns.
 Invite copy on /login is English-only: `src/lib/i18n` was owned by a parallel task.
+
+Found in the browser run: a brand-new signup hit a 500 because `orgs_members.user_id`
+references `profiles`, and the profile was only created later by `enterApp`.
+`landingPath` now calls `ensureProfile` before `acceptInvite`.

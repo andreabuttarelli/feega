@@ -12,8 +12,16 @@ function cookies(values: Record<string, string> = {}): Cookies {
 }
 
 function deps(outcome: Awaited<ReturnType<LandingDeps['acceptInvite']>>) {
+  const order: string[] = [];
   return {
-    acceptInvite: vi.fn(async () => outcome),
+    order,
+    ensureProfile: vi.fn(async () => {
+      order.push('profile');
+    }),
+    acceptInvite: vi.fn(async () => {
+      order.push('accept');
+      return outcome;
+    }),
     homePathFor: vi.fn(async () => '/p/proj/c/canvas')
   } satisfies LandingDeps;
 }
@@ -37,6 +45,14 @@ describe('dove atterra chi è appena entrato', () => {
     expect(path).toBe('/p/proj/c/canvas');
     expect(d.acceptInvite).toHaveBeenCalledWith({ token: 'tok', userId: 'u1', email: 'b@esempio.it' });
     expect(d.homePathFor.mock.calls[0].slice(3)).toEqual(['org-a', null]);
+  });
+
+  it("chi si è appena registrato ha un profilo prima che l'invito lo renda membro", async () => {
+    const d = deps({ outcome: 'accepted', orgId: 'org-a', role: 'member' });
+
+    await landingPath(DB, USER, cookies(), 'tok', d);
+
+    expect(d.order).toEqual(['profile', 'accept']);
   });
 
   it('un invito non valido torna al login col motivo', async () => {
