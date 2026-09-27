@@ -7,6 +7,7 @@ import { listBrandAccounts } from '$lib/server/repos/social-accounts';
 import { listPosts } from '$lib/server/repos/posts';
 import { deliveryStatus, scheduleDelivery, cancelDelivery } from '$lib/server/repos/post-delivery';
 import { buildCalendarData } from './calendar-load';
+import { monthOf } from './calendar-month';
 import type { Db } from '$lib/server/db/client';
 
 /**
@@ -15,7 +16,7 @@ import type { Db } from '$lib/server/db/client';
  * mette in `parent()`) legge colonne che sul database nuovo non esistono e torna sempre `null`
  * silenziosamente: questa rotta risolve il brand da sola, con `brands.ts` (colonne vere).
  */
-export const load: PageServerLoad = async ({ parent, locals }) => {
+export const load: PageServerLoad = async ({ parent, locals, url }) => {
   const { project, org } = await parent();
   const db = await locals.db();
   if (!db) throw error(500, 'sessione senza client');
@@ -28,7 +29,7 @@ export const load: PageServerLoad = async ({ parent, locals }) => {
   // Zernio irraggiungibile non è un errore di caricamento: deliveryStatus lo racconta PER POST
   // (`deliveries[].status === 'unreachable'`, con l'errore accanto) — mai una settimana vuota o
   // vecchia che finge di non avere niente programmato.
-  return data;
+  return { ...data, month: monthOf(url.searchParams.get('month')) };
 };
 
 /** L'org non arriva mai dal form: si risolve dal progetto nell'URL, come le altre azioni di
