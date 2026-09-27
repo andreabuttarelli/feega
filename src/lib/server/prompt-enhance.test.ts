@@ -225,6 +225,10 @@ describe('enhancePrompt paga da dove tutto il resto paga', () => {
     llmText: M.llmText
   }));
 
+  vi.mock('$lib/server/craft-model', () => ({
+    craftAgentModel: () => ({ model: {}, modelId: 'test/enhancer', provider: 'llm' })
+  }));
+
   beforeEach(() => {
     M.llmText.mockReset();
   });

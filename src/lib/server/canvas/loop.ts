@@ -236,9 +236,8 @@ async function wholeLoopCreditsAvailable(orgId: string, cost: LoopCostPreview): 
   if (cost.total === null) {
     return true;
   }
-  const admin = createAdminClient();
   try {
-    const balance = await orgCreditBalance(admin, orgId);
+    const balance = await orgCreditBalance(createAdminClient(), orgId);
     return balance >= cost.total;
   } catch {
     // Fail-open, come `gateOrgCreditsCore`: un saldo illeggibile non deve bloccare un loop che

@@ -2027,3 +2027,8 @@ policy INSERT c'è ed è giusta. Lo Storage fa `insert ... on conflict do update
 valuta anche le policy SELECT e UPDATE — anche al primo caricamento, senza conflitto. Mossa: per
 ogni cartella scritta con `upsert: true`, una policy SELECT e una UPDATE (using + with check)
 accanto alla INSERT. La suite non lo vede: il fake dello storage risponde sempre ok.
+
+## Green locally, red in CI: the test was reading `.env`
+
+**Signal:** a test passes on your machine and fails in CI with "not configured", or a spy "called 0 times" where the code quietly took a fallback. SvelteKit loads `.env` into `$env/*` for Vitest too, so local runs see real keys that CI never has.
+**Move:** reproduce with `.env` set aside (`mv .env .env.x`, run, move it back), then mock the boundary that reads env (`craft-model`, `createAdminClient`) or move the env read inside the fail-open `try`.
