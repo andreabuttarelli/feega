@@ -733,6 +733,8 @@ export type Database = {
           name: string
           org_id: string
           project_id: string
+          share_token: string | null
+          shared_at: string | null
           updated_at: string
           viewport: Json | null
         }
@@ -742,6 +744,8 @@ export type Database = {
           name: string
           org_id: string
           project_id: string
+          share_token?: string | null
+          shared_at?: string | null
           updated_at?: string
           viewport?: Json | null
         }
@@ -751,6 +755,8 @@ export type Database = {
           name?: string
           org_id?: string
           project_id?: string
+          share_token?: string | null
+          shared_at?: string | null
           updated_at?: string
           viewport?: Json | null
         }

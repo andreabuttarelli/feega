@@ -24,7 +24,7 @@ describe('la pagina brand mostra solo le colonne vere', () => {
 
   it('non le lascia nemmeno negli elenchi che disegnano la navigazione', () => {
     const listed = [
-      ...SETTINGS_SECTIONS,
+      ...SETTINGS_SECTIONS.map((s) => s.path),
       ...SETTINGS_GROUPS.flatMap((g) => g.items.map((i) => i.section))
     ];
     for (const section of REMOVED) {

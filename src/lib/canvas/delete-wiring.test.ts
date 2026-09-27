@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { CANVAS_MODES, CanvasMode } from './canvas-mode';
 
 /**
  * CANCELLARE ERA SCOLLEGATO, E IL NODO TORNAVA IN SCENA.
@@ -44,7 +45,10 @@ describe('il gesto di cancellare arriva fino alla riga', () => {
     // `deleteKey` vale 'Backspace' di default e `KeyHandler` chiama `deleteElements`: il nodo
     // sparisce dal solo stato di SvelteFlow, la riga resta, e `syncNodes` lo riporta dentro.
     // È il meccanismo esatto del «torna in scena», e si spegne da qui.
-    expect(flow).toMatch(/deleteKey=\{null\}/);
+    expect(flow).toMatch(/\{\.\.\.spec\.flow\}/);
+    for (const mode of Object.values(CanvasMode)) {
+      expect(CANVAS_MODES[mode].flow.deleteKey).toBeNull();
+    }
   });
 
   it('la pagina toglie le tile dal PROPRIO stato, o la riconciliazione le riporta', () => {

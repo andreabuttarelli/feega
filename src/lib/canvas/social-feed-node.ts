@@ -5,6 +5,7 @@
  * un handle e scarica da lì. I post scaricati vivono in `social_posts`, mai dentro `nodes.data`.
  */
 import type { SyncStatus } from './sync-state';
+import type { FeedFilters } from './source-filters';
 
 /** Gli stessi valori di `social_accounts_platform_check` — la stessa piattaforma, la stessa riga. */
 export const SOCIAL_FEED_PLATFORMS = [
@@ -30,10 +31,12 @@ export type SocialFeedNode = {
   platform: SocialFeedPlatform;
   handle: string;
   limit: number;
+  filters: FeedFilters;
   syncStatus: SyncStatus;
   syncError: string | null;
   syncedCount: number;
   syncedAt: string | null;
+  syncSummary: string | null;
 };
 
 const SOCIAL_FEED_NODE_SIZE = { w: 420, h: 360 };

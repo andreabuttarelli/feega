@@ -16,34 +16,60 @@ export type Project = {
   slug: string;
   brandId: string | null;
   archivedAt: string | null;
+  lastActiveAt: string;
 };
 
-const PROJECT_COLUMNS = 'id, name, slug, brand_id, archived_at';
+const PROJECT_COLUMNS = 'id, name, slug, brand_id, archived_at, updated_at';
 
-type ProjectColumns = Pick<ProjectRow, 'id' | 'name' | 'slug' | 'brand_id' | 'archived_at'>;
+type ProjectColumns = Pick<ProjectRow, 'id' | 'name' | 'slug' | 'brand_id' | 'archived_at' | 'updated_at'>;
 
-function toProject(row: ProjectColumns): Project {
+function toProject(row: ProjectColumns, lastActiveAt: string = row.updated_at): Project {
   return {
     id: row.id,
     name: row.name,
     slug: row.slug,
     brandId: row.brand_id,
-    archivedAt: row.archived_at
+    archivedAt: row.archived_at,
+    lastActiveAt
   };
 }
 
+/**
+ * ORDINATI PER ULTIMO USO, NON PER NASCITA: chi entra senza un progetto scelto atterra su quello
+ * che ha toccato più di recente, mai su un "Untitled" vuoto appena nato da una corsa risolta.
+ *
+ * `projects.updated_at` da solo non basta: si aggiorna solo su rename o cambio brand, non quando
+ * si lavora sulla tela. L'uso reale sta in `nodes.updated_at` (l'ultima generazione o modifica),
+ * col fallback a `projects.updated_at` per un progetto ancora senza nodi.
+ */
 export async function listProjects(db: Db, orgId: string): Promise<Project[]> {
   const { data, error } = await db
     .from('projects')
-    .select(PROJECT_COLUMNS)
+    .select(`${PROJECT_COLUMNS}, canvases(nodes(updated_at, deleted_at))`)
     .eq('org_id', orgId)
-    .is('archived_at', null)
-    .order('created_at', { ascending: false });
+    .is('archived_at', null);
 
   if (error) {
     throw error;
   }
-  return (data ?? []).map(toProject);
+
+  type Row = ProjectColumns & { canvases: { nodes: { updated_at: string; deleted_at: string | null }[] }[] };
+  const rows = (data ?? []) as unknown as Row[];
+
+  return rows
+    .map((row) => toProject(row, lastActiveAtFor(row)))
+    .sort((a, b) => b.lastActiveAt.localeCompare(a.lastActiveAt));
+}
+
+function lastActiveAtFor(row: {
+  updated_at: string;
+  canvases: { nodes: { updated_at: string; deleted_at: string | null }[] }[];
+}): string {
+  const nodeUpdates = row.canvases
+    .flatMap((canvas) => canvas.nodes)
+    .filter((node) => node.deleted_at === null)
+    .map((node) => node.updated_at);
+  return nodeUpdates.reduce((latest, current) => (current > latest ? current : latest), row.updated_at);
 }
 
 export async function findProjectBySlug(

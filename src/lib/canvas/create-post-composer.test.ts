@@ -6,6 +6,8 @@ import {
   defaultScheduleTime,
   saveReasonFor,
   scheduleReasonFor,
+  submittedNodeIds,
+  submitErrorFor,
   type ComposerReadiness
 } from './create-post-composer';
 
@@ -101,5 +103,45 @@ describe('scheduleReasonFor', () => {
     expect(scheduleReasonFor({ ...READY, hasConnectedAccounts: false })).toBe(
       'Connect an account for this brand first.'
     );
+  });
+});
+
+describe('submittedNodeIds', () => {
+  it('sends the caption node too, so a text-only selection becomes a post', () => {
+    expect(submittedNodeIds([], ['text-1'])).toEqual(['text-1']);
+  });
+
+  it('keeps the media order, then the caption nodes', () => {
+    expect(submittedNodeIds(['img-2', 'img-1'], ['text-1'])).toEqual(['img-2', 'img-1', 'text-1']);
+  });
+});
+
+describe('submitErrorFor', () => {
+  it('is null before any submit', () => {
+    expect(submitErrorFor(null)).toBeNull();
+  });
+
+  it('is null when the submit succeeded', () => {
+    expect(submitErrorFor({ post: { id: 'post-1' } })).toBeNull();
+  });
+
+  it('turns a failure result into a message for a known error code', () => {
+    expect(submitErrorFor({ error: 'brand_and_nodes_required' })).toBe(
+      'Seleziona un brand e almeno un contenuto.'
+    );
+  });
+
+  it('turns an unmapped error code into a generic message', () => {
+    expect(submitErrorFor({ error: 'delivery_failed', postId: 'post-1' })).toBe(
+      'Il post è stato creato ma la programmazione è fallita. Riprova dal calendario.'
+    );
+  });
+
+  it('reports a network failure that never reached the server', () => {
+    expect(submitErrorFor('network')).toBe('Connessione assente. Riprova.');
+  });
+
+  it('reports an unexpected server error', () => {
+    expect(submitErrorFor('server')).toBe('Qualcosa è andato storto. Riprova.');
   });
 });

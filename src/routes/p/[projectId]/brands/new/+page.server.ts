@@ -1,3 +1,4 @@
+import { normalizeUrl } from '$lib/ads-fee';
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { listMemberships } from '$lib/server/repos/orgs';
@@ -55,9 +56,14 @@ export const actions: Actions = {
     }
 
     const fd = await request.formData();
-    const url = String(fd.get('url') ?? '').trim();
-    if (!url) {
+    const typed = String(fd.get('url') ?? '').trim();
+    if (!typed) {
       return fail(400, { error: 'Website URL is required' });
+    }
+
+    const url = normalizeUrl(typed);
+    if (!url) {
+      return fail(400, { error: 'That doesn\'t look like a website address' });
     }
 
     try {
@@ -69,6 +75,7 @@ export const actions: Actions = {
         logoUrl: analysis.profile.logos?.[0]?.url ?? null,
         suggestedContent: analysis.suggestedContent,
         products: analysis.products,
+        images: analysis.images,
         website: url
       };
     } catch (e) {
@@ -164,11 +171,13 @@ export const actions: Actions = {
       return fail(400, { error: 'Name is required' });
     }
 
-    const website = String(fd.get('website') ?? '').trim() || null;
+    const website = normalizeUrl(String(fd.get('website') ?? '')) || null;
     const shortDescription = String(fd.get('shortDescription') ?? '').trim() || null;
     const content = String(fd.get('content') ?? '');
     const logoUrl = String(fd.get('logoUrl') ?? '').trim() || null;
     const productsPlatform = (String(fd.get('productsPlatform') ?? '').trim() || null) as StorePlatform | null;
+    const returnTo = String(fd.get('returnTo') ?? '').trim();
+    const safeReturnTo = returnTo.startsWith('/p/') ? returnTo : null;
 
     let products: Parameters<typeof createBrandFromWizard>[1]['products'] = [];
     const productsRaw = String(fd.get('products') ?? '');
@@ -194,7 +203,7 @@ export const actions: Actions = {
         productsPlatform
       });
 
-      throw redirect(303, `/p/${found.project.id}/brands/${created.slug}`);
+      throw redirect(303, safeReturnTo ?? `/p/${found.project.id}/brands/${created.slug}`);
     } catch (e) {
       if (e && typeof e === 'object' && 'status' in e && 'location' in e) {
         throw e;

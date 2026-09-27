@@ -36,10 +36,12 @@ import { undoGesture } from '$lib/server/canvas/undo';
 import type { Gesture, UndoItem } from '$lib/canvas/undo-plan';
 import { gateOrgAiActionForForm } from '$lib/server/cli-auth';
 import { listNodeProducts } from '$lib/server/repos/products';
+import { normalizeUrl } from '$lib/ads-fee';
+import { normalizeHandle } from '$lib/canvas/source-filters';
 import { listNodeSocialPosts } from '$lib/server/repos/social-posts';
 import { getInfluencer, listInfluencerViewsByIds, signInfluencerViewFiles } from '$lib/server/repos/influencers';
 import { syncProductsNode } from '$lib/server/canvas/products-sync';
-import { syncSocialFeedNode } from '$lib/server/canvas/social-feed-sync';
+import { syncSocialFeedNode, syncSocialFeedEntries } from '$lib/server/canvas/social-feed-sync';
 import { isProductPlatform } from '$lib/canvas/products-node';
 import { isSocialFeedPlatform } from '$lib/canvas/social-feed-node';
 import { createPostFromNodes } from '$lib/server/repos/create-post-from-nodes';
@@ -57,6 +59,8 @@ import { upstreamInputsFor } from '$lib/server/canvas/upstream';
 import { estimateCanvasTextCost } from '$lib/server/canvas/text-cost-estimate';
 import { applyEffectsNode } from '$lib/server/canvas/apply-effects';
 import { nodeAcceptsConnection } from '$lib/canvas/connector-ports';
+import { ShareState, readCanvasShare, setCanvasShare } from '$lib/server/canvas/canvas-share';
+import { referenceLibrary } from '$lib/server/canvas/reference-library';
 
 // L'azione `run` aspetta la generazione DENTRO la richiesta — un'immagine ci mette fino a un
 // minuto, e il default della piattaforma è sotto quella soglia. Senza, la richiesta muore a metà
@@ -189,10 +193,12 @@ async function loadInfluencerViews(
 export const load: PageServerLoad = async ({ params, locals }) => {
   const { db, orgId, canvasId, canvas } = await scopeFor(locals, params.canvasId);
 
-  const [nodes, connections, catalogue] = await Promise.all([
+  const [nodes, connections, catalogue, shareToken, references] = await Promise.all([
     listNodes(db, { orgId, canvasId }),
     listConnections(db, { orgId, canvasId }),
-    canvasModelCatalogue()
+    canvasModelCatalogue(),
+    readCanvasShare(db, { orgId, canvasId }),
+    referenceLibrary(db, { orgId, projectId: canvas.projectId })
   ]);
 
   const [runs, { products, socialPosts, influencers }, sources] = await Promise.all([
@@ -214,7 +220,9 @@ export const load: PageServerLoad = async ({ params, locals }) => {
     influencers,
     projectId: params.projectId,
     orgId,
-    nodeIdsInPost
+    nodeIdsInPost,
+    shareToken,
+    references
   };
 };
 
@@ -273,7 +281,8 @@ type SyncNodeOutcome = { ok: true; synced: number; extra?: Record<string, unknow
 /** `products`: `type`/`url`/`limit`/`after`/`only_first_photo` sono la query — `productsOf` li legge già validati. */
 async function syncProducts(db: Db, orgId: string, projectId: string | null, node: { id: string; data: Record<string, unknown> }): Promise<SyncNodeOutcome> {
   const parsed = productsOf({ id: node.id, type: 'products', data: node.data });
-  if (!parsed || !isProductPlatform(parsed.platform) || !parsed.url.trim()) {
+  const storeUrl = normalizeUrl(parsed?.url);
+  if (!parsed || !isProductPlatform(parsed.platform) || !storeUrl) {
     return { ok: false, error: 'invalid_url: this node has no store URL to sync' };
   }
 
@@ -282,30 +291,66 @@ async function syncProducts(db: Db, orgId: string, projectId: string | null, nod
     projectId,
     nodeId: node.id,
     platform: parsed.platform,
-    storeUrl: parsed.url,
+    storeUrl,
     limit: parsed.limit,
     after: parsed.after,
-    onlyFirstPhoto: parsed.onlyFirstPhoto
+    onlyFirstPhoto: parsed.onlyFirstPhoto,
+    category: parsed.category
   });
 
-  return outcome.ok ? { ok: true, synced: outcome.synced, extra: { after: outcome.after } } : outcome;
+  return outcome.ok
+    ? { ok: true, synced: outcome.synced, extra: { after: outcome.after, sync_summary: outcome.summary } }
+    : outcome;
 }
 
-/** `social_account_feed`: `platform`/`handle`/`limit` sono la query. */
+/**
+ * `social_account_feed`: `handle` porta quel che l'utente ha incollato — un handle nudo, un URL
+ * di profilo, un URL di un post, più righe — e viene CLASSIFICATO prima di sincronizzare
+ * (`social-url-classifier.ts`), non letto alla lettera come prima. La piattaforma scelta a mano
+ * nel campo `platform` resta l'override per un handle nudo senza dominio nell'URL — un handle
+ * come "nike" da solo non dice se è Instagram o TikTok, e lì la scelta manuale vince.
+ */
 async function syncSocialFeed(db: Db, orgId: string, projectId: string | null, node: { id: string; data: Record<string, unknown> }): Promise<SyncNodeOutcome> {
   const parsed = socialFeedOf({ id: node.id, type: 'social_account_feed', data: node.data });
-  if (!parsed || !isSocialFeedPlatform(parsed.platform) || !parsed.handle.trim()) {
+  const raw = (parsed?.handle ?? '').trim();
+  if (!parsed || !raw) {
     return { ok: false, error: 'missing_handle: this node has no handle to sync' };
   }
 
-  return syncSocialFeedNode(db, {
-    orgId,
-    projectId,
-    nodeId: node.id,
-    platform: parsed.platform,
-    handle: parsed.handle,
-    limit: parsed.limit
-  });
+  const looksLikeUrlOrMultiline = raw.includes('/') || raw.includes('\n') || raw.includes(',') || raw.startsWith('#');
+  if (!looksLikeUrlOrMultiline) {
+    const handle = normalizeHandle(raw);
+    if (!isSocialFeedPlatform(parsed.platform) || !handle) {
+      return { ok: false, error: 'missing_handle: this node has no handle to sync' };
+    }
+    return syncSocialFeedNode(db, { orgId, projectId, nodeId: node.id, platform: parsed.platform, handle, limit: parsed.limit });
+  }
+
+  const outcome = await syncSocialFeedEntries(db, { orgId, projectId, nodeId: node.id, raw, limit: parsed.limit });
+  if (!outcome.ok) {
+    return outcome;
+  }
+
+  const summary = outcome.entries
+    .map((e) => `${PLATFORM_LABELS[e.platform] ?? e.platform} · ${e.kind} · ${e.synced}`)
+    .concat(outcome.unsupported.map((u) => `${u.source}: ${u.message}`))
+    .join(' — ');
+
+  return { ok: true, synced: outcome.synced, extra: { sync_summary: summary } };
+}
+
+const PLATFORM_LABELS: Record<string, string> = {
+  instagram: 'Instagram',
+  tiktok: 'TikTok',
+  x: 'X',
+  threads: 'Threads',
+  facebook: 'Facebook',
+  youtube: 'YouTube',
+  linkedin: 'LinkedIn'
+};
+
+function isShareState(value: string): value is ShareState {
+  return (Object.values(ShareState) as string[]).includes(value);
 }
 
 export const actions: Actions = {
@@ -995,6 +1040,19 @@ export const actions: Actions = {
     return { public: true, path: `/d/${token}` };
   },
 
+  share_canvas: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+
+    const state = String(fd.get('state') ?? '');
+    if (!isShareState(state)) {
+      return fail(400, { error: 'stato di condivisione non valido' });
+    }
+
+    const shareToken = await setCanvasShare(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, state });
+    return { shareToken };
+  },
+
   connect: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();
@@ -1285,10 +1343,11 @@ export const actions: Actions = {
   },
 
   /**
-   * DALLA SELEZIONE DEL CANVAS A UN POST — la promozione, opzionalmente programmata. `node_ids`
-   * arriva in ordine dalla UI (l'ordine con cui il composer li ha raccolti); questa action non
-   * sceglie una caption, la riceve già scelta. `mode`: senza `scheduled_for` resta `draft`, con
-   * un `scheduled_for` (e almeno un account) prova a consegnare via Zernio.
+   * DALLA SELEZIONE DEL CANVAS A UN POST — la promozione, opzionalmente programmata.
+   * `media_order_node_id` porta l'ordine scelto nel composer (il drag/i pulsanti su e giù),
+   * separato da `node_id` perché quest'ultimo include anche i nodi caption/riferimento; questa
+   * action non sceglie una caption, la riceve già scelta. `mode`: senza `scheduled_for` resta
+   * `draft`, con un `scheduled_for` (e almeno un account) prova a consegnare via Zernio.
    */
   create_post: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
@@ -1297,6 +1356,7 @@ export const actions: Actions = {
     const brandId = String(fd.get('brand_id') ?? '');
     const caption = String(fd.get('caption') ?? '');
     const nodeIds = fd.getAll('node_id').map(String);
+    const mediaOrder = fd.getAll('media_order_node_id').map(String);
     const accountIds = fd.getAll('account_id').map(String);
     const scheduledFor = String(fd.get('scheduled_for') ?? '').trim();
 
@@ -1316,7 +1376,16 @@ export const actions: Actions = {
         setPostStatus,
         scheduleDelivery
       },
-      { orgId: scope.orgId, userId: scope.userId, brandId, nodeIds, caption, accountIds, mode },
+      {
+        orgId: scope.orgId,
+        userId: scope.userId,
+        brandId,
+        nodeIds,
+        caption,
+        mediaOrder: mediaOrder.length ? mediaOrder : undefined,
+        accountIds,
+        mode
+      },
       publisher
     );
 

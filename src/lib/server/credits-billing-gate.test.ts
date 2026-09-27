@@ -18,7 +18,6 @@ function fakeProvider(kind: 'open' | 'feega', gate: BillingProvider['gate']): Bi
     kind,
     gate,
     quota: async () => Infinity,
-    upgradeUrl: () => undefined,
     plansAbove: () => [],
     isTopPlan: () => true
   };

@@ -2,6 +2,7 @@ import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { getFacebookPages, selectFacebookPage, syncBrandAccounts, type FacebookPage } from '$lib/server/zernio';
 import { canAffordSeat } from '$lib/server/social-connections';
+import { billingPath } from '$lib/billing-path';
 import { brandSlugOf } from '$lib/server/tenancy/brand-slug';
 
 // Facebook headless connect — the page Zernio redirects back to after OAuth. Meta only allows
@@ -120,7 +121,7 @@ export const actions: Actions = {
     const brand = await resolveBrand(supabase, params.projectId);
     if (!brand?.zernio_profile_id) return fail(404, { error: 'brand' });
     if (!(await canAffordSeat(supabase, brand.org_id))) {
-      throw redirect(303, '/app/billing');
+      throw redirect(303, billingPath(params.projectId));
     }
 
     let userProfile: unknown = null;

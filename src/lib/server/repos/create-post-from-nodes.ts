@@ -32,6 +32,7 @@ export type CreatePostFromNodesRepos = {
       brandId: string;
       nodeIds: string[];
       caption?: string;
+      mediaOrder?: string[];
       actorKind?: 'user' | 'agent' | 'system';
       actorId?: string | null;
     }
@@ -53,6 +54,7 @@ export async function createPostFromNodes(
     brandId: string;
     nodeIds: string[];
     caption: string;
+    mediaOrder?: string[];
     accountIds: string[];
     mode: CreatePostMode;
   },
@@ -85,6 +87,7 @@ export async function createPostFromNodes(
         brandId: input.brandId,
         nodeIds: input.nodeIds,
         caption: input.caption,
+        mediaOrder: input.mediaOrder,
         actorKind: 'user',
         actorId: input.userId
       }

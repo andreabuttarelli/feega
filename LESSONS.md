@@ -1976,3 +1976,59 @@ di ricaricare la pagina) un `ReferenceError` di un'API del browser dentro `node_
 modulo server la carica all'avvio della funzione, e in Node `DOMMatrix` non esiste. Mossa:
 `await import('libreria')` dentro la funzione che la usa, e un test che importa il modulo e
 verifica che la libreria non si carichi.
+
+### Un bucket per-utente + una riga condivisa dall'org: la RLS della riga non basta, va firmata con un client diverso
+Segnale: l'asset e il file in Storage esistono entrambi (verificabile con SQL a chiave anon), la
+RLS su `assets` lo mostra a ogni membro dell'org, eppure per chiunque non sia chi l'ha generato
+l'immagine sparisce dal canvas e dal pannello Media. `brand-knowledge` tiene cartelle per UTENTE
+(`<userId>/media/...`), e la sua unica policy di lettura confronta il primo segmento del path con
+`auth.uid()` — non con `auth_org_ids()` come ogni altra policy dell'app. Firmare con il client
+dell'utente eredita quel confine per-utente anche dove il dato che conta è condiviso per-org.
+Mossa: leggere la riga con il client dell'utente (prova l'appartenenza all'org via RLS), poi
+firmare il path con un client service-role dichiarato in `service-role-uses.ts` — mai il
+contrario, e mai un service client passato al posto del client utente per la lettura: la firma è
+un passo deliberatamente più permissivo della lettura, non un modo per saltarla.
+
+### Un URL firmato scritto in `nodes.data` scade, e l'immagine sparisce senza che il file si muova
+Segnale: la riga e il file in Storage sono entrambi sani (verificabile con SQL), `data` porta
+`assetId` ma non `refId`, e `data.url` è un URL `/storage/v1/object/sign/...` — non la rotta
+stabile `/p/<project>/c/<canvas>/assets/<id>`. Un URL firmato dura ~2 ore su Supabase Storage;
+persisterlo in una colonna che sopravvive a una ricarica è la stessa classe di errore di un
+token di sessione salvato in una colonna "permanente". Tre scritture da drag-and-drop
+(`assetDrag`, `brandFieldDrag`, `colourDrag` in `drag-payload.ts`) lo facevano, mentre l'upload
+diretto (`registerCanvasUpload`) già scriveva la rotta stabile. Mossa: mai un URL effimero in
+stato durevole — si persiste solo il riferimento stabile (`refId`/`assetId`), e l'URL firmato si
+calcola SOLO alla lettura (`signAssetPaths`/la rotta `/assets/<id>`, mai in scrittura). Il
+confine si valida al bordo di scrittura, una volta sola: `validateNodeData` rifiuta oggi
+qualunque `/storage/v1/object/sign/` trovato ovunque nel payload, ricorsivamente — non un
+controllo per campo che la prossima scrittura aggirerebbe.
+
+### Un indice unico PARZIALE non può mai essere il bersaglio di un upsert PostgREST — `42P10` anche quando l'indice esiste
+`upsertNodeProducts`/`insertBrandProducts` chiamavano `.upsert(rows, { onConflict:
+'node_id,platform,external_id' })`, e ogni sync di un nodo `products` tornava 500 con `42P10:
+there is no unique or exclusion constraint matching the ON CONFLICT specification`. L'indice
+ESISTEVA — verificato via SQL diretto (`pg_indexes`), e un `INSERT ... ON CONFLICT (node_id,
+platform, external_id) WHERE node_id IS NOT NULL` via connessione Postgres diretta risolveva
+senza errore. La stessa identica lista di colonne via `supabase-js` (cioè via PostgREST)
+falliva comunque. La causa: PostgREST genera SEMPRE `ON CONFLICT (colonne) DO UPDATE` senza
+`WHERE`, e Postgres fa combaciare un `ON CONFLICT` solo con un indice la cui definizione è
+IDENTICA — un indice parziale non matcha mai quella forma, qualunque sia il nome o le colonne.
+Segnale: `42P10` da `supabase-js`/PostgREST anche dopo aver confermato che l'indice esiste ed è
+scritto giusto via SQL diretto — la discrepanza tra "SQL diretto passa" e "REST fallisce" è la
+prova che il problema è la clausola `WHERE`, non l'indice in sé. Mossa: un indice unico dietro
+un `onConflict` chiamato da `supabase-js`/PostgREST non può MAI essere parziale — se la
+protezione serve solo quando una colonna non è nulla, un indice pieno basta comunque, perché
+Postgres non considera mai due NULL uguali in un indice unico normale: la partialità qui non
+aggiungeva niente che l'indice pieno non desse già.
+
+## Un `upload` con `upsert: true` chiede SELECT e UPDATE, non solo INSERT
+Segnale: `new row violates row-level security policy` su un upload a un percorso per cui la
+policy INSERT c'è ed è giusta. Lo Storage fa `insert ... on conflict do update`, e Postgres
+valuta anche le policy SELECT e UPDATE — anche al primo caricamento, senza conflitto. Mossa: per
+ogni cartella scritta con `upsert: true`, una policy SELECT e una UPDATE (using + with check)
+accanto alla INSERT. La suite non lo vede: il fake dello storage risponde sempre ok.
+
+## Green locally, red in CI: the test was reading `.env`
+
+**Signal:** a test passes on your machine and fails in CI with "not configured", or a spy "called 0 times" where the code quietly took a fallback. SvelteKit loads `.env` into `$env/*` for Vitest too, so local runs see real keys that CI never has.
+**Move:** reproduce with `.env` set aside (`mv .env .env.x`, run, move it back), then mock the boundary that reads env (`craft-model`, `createAdminClient`) or move the env read inside the fail-open `try`.

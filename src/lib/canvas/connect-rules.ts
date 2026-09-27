@@ -19,7 +19,7 @@
  * rifiutato da `canConnect` non è un arco impossibile: è un arco che non può essere quel verso lì.
  */
 import { CANVAS_EDGE_KINDS, type CanvasEdgeKind } from '$lib/canvas-edges';
-import { canConnect, type CanvasNode, type Medium, type Verdict } from './graph';
+import { canConnect, type CanvasNode, type Medium, type NodeKind, type Verdict } from './graph';
 
 /** Cosa c'è dietro una tile, quando il chiamante lo sa. Null vale «non lo so», mai «non si può». */
 export type NodeLookup = (itemId: string) => CanvasNode | null;
@@ -33,7 +33,7 @@ export type NodeLookup = (itemId: string) => CanvasNode | null;
  */
 export function tileNode(n: {
   id: string;
-  medium?: Medium | null;
+  medium?: Medium | Exclude<NodeKind, Medium | 'iframe'> | null;
   model?: string | null;
 }): CanvasNode {
   return { id: n.id, kind: n.medium ?? 'iframe', model: n.model ?? null };

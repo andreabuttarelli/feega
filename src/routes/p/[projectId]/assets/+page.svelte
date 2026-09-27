@@ -9,12 +9,13 @@
 
   let { data } = $props();
 
-  type Filter = 'all' | 'generated' | 'upload';
+  type Filter = 'all' | 'generated' | 'upload' | 'global';
 
   const FILTERS: { value: Filter; label: string }[] = [
     { value: 'all', label: 'All' },
     { value: 'generated', label: 'Generated' },
-    { value: 'upload', label: 'Uploaded' }
+    { value: 'upload', label: 'Uploaded' },
+    { value: 'global', label: 'Global' }
   ];
 
   function filterHref(value: Filter): string {
@@ -108,7 +109,7 @@
         {f.label}
       </a>
     {/each}
-    <span class="count">{data.items.length}</span>
+    <span class="count">{data.filter === 'global' ? data.catalogue.length : data.items.length}</span>
 
     <input
       bind:this={fileInput}
@@ -126,7 +127,28 @@
     <p class="upload-error">{uploadError}</p>
   {/if}
 
-  {#if !data.items.length}
+  {#if data.filter === 'global'}
+    {#if !data.catalogue.length}
+      <div class="empty">
+        <h3>Nothing here yet</h3>
+        <p>The shared reference catalogue is empty.</p>
+      </div>
+    {:else}
+      <div class="grid">
+        {#each data.catalogue as image (image.id)}
+          <div class="tile">
+            <span class="badge">global</span>
+            {#if image.url}
+              <img src={image.url} alt={image.name} loading="lazy" decoding="async" />
+            {:else}
+              <span class="ph">image</span>
+            {/if}
+            <div class="meta"><span class="dim">{image.name}</span></div>
+          </div>
+        {/each}
+      </div>
+    {/if}
+  {:else if !data.items.length}
     <div class="empty">
       <h3>Nothing here yet</h3>
       <p>

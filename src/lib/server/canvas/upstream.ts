@@ -2,6 +2,9 @@ import type { Db } from '$lib/server/db/client';
 import { listConnections, listNodes, type CanvasNodeRecord, type Connection } from '$lib/server/repos/canvas';
 import { findAsset, findAssets } from '$lib/server/repos/assets';
 import { listInfluencerViews, signInfluencerViewFiles } from '$lib/server/repos/influencers';
+import { findReferenceImages, signReferenceImages } from '$lib/server/repos/reference-images';
+import { referencesOf } from '$lib/canvas/node-references';
+import { syncedSourceItems } from './synced-items';
 import {
   resolveUpstreamInputs,
   type UpstreamEdge,
@@ -9,6 +12,8 @@ import {
   type UpstreamNode
 } from '$lib/canvas/upstream-inputs';
 import type { Modalities } from '$lib/canvas/connectors';
+import { isSelectableSourceType } from '$lib/canvas/select-node';
+import type { SelectableItem } from '$lib/canvas/select-sources';
 import {
   isListItemKind,
   listValues,
@@ -174,11 +179,12 @@ function listTexts(values: ListValues): string[] {
 }
 
 /**
- * IL NODO `list` CHE ALIMENTA QUESTO `select`, O NULL QUANDO LA REFERENZA È ROTTA — cancellato,
- * mai stato collegato, o collegato a qualcosa che non è una lista. `select` prende SOLO dal primo
- * arco entrante che porta a un `list`: la stessa disciplina deterministica di
+ * IL NODO CHE ALIMENTA QUESTO `select`, O NULL QUANDO LA REFERENZA È ROTTA — cancellato, mai stato
+ * collegato, o collegato a qualcosa che non è una sorgente selezionabile. `select` prende SOLO dal
+ * primo arco entrante la cui sorgente è in `SELECTABLE_SOURCE_TYPES` (`select-node.ts`, la stessa
+ * tabella che il client legge): la stessa disciplina deterministica di
  * `upstream-inputs.ts::incomingEdges`, applicata qui perché un `select` ha senso con un solo
- * upstream — sceglierne uno fra due liste diverse non è un caso che il prodotto definisce.
+ * upstream — sceglierne uno fra due sorgenti diverse non è un caso che il prodotto definisce.
  */
 function listFeeding(node: CanvasNodeRecord, connections: Connection[], nodesById: Map<string, CanvasNodeRecord>): CanvasNodeRecord | null {
   const incoming = connections
@@ -187,9 +193,16 @@ function listFeeding(node: CanvasNodeRecord, connections: Connection[], nodesByI
 
   for (const edge of incoming) {
     const source = nodesById.get(edge.sourceNodeId);
-    if (source?.type === 'list') return source;
+    if (source && isSelectableSourceType(source.type)) return source;
   }
   return null;
+}
+
+/** L'item scelto (1-based) di un `products`/`social_account_feed`, come lo legge sia un `select`
+ *  che un'iterazione di loop su quello stesso nodo — la stessa domanda di `itemAt` per una `list`,
+ *  sulla stessa `SelectableItem[]` che `syncedSourceItems` costruisce. */
+function syncedItemAt(items: SelectableItem[], index: number): SelectableItem | null {
+  return index >= 1 && index <= items.length ? items[index - 1] : null;
 }
 
 /**
@@ -245,12 +258,49 @@ async function toUpstreamNode(
     return { id: node.id, type: node.type, medium, model: null, text: null, mediaUrl: null, mediaUrls: await listMediaUrls(db, orgId, values) };
   }
 
-  if (node.type === 'select') {
-    const list = listFeeding(node, connections, nodesById);
-    if (!list) return { id: node.id, type: node.type, medium: 'image', model: null, text: null, mediaUrl: null };
+  if (node.type === 'products' || node.type === 'social_account_feed') {
+    const items = await syncedSourceItems(db, orgId, node);
 
-    const values = await resolvedListValues(db, orgId, list, connections, nodesById);
+    // UN'ITERAZIONE DI LOOP VEDE UN VALORE SOLO — la stessa dottrina di `list` sopra, sulla stessa
+    // `SelectableItem[]` che un `select` su questo nodo leggerebbe.
+    if (node.id in iterateSelection) {
+      const item = syncedItemAt(items, iterateSelection[node.id]);
+      return {
+        id: node.id,
+        type: node.type,
+        medium: item?.mediaUrls.length ? 'image' : 'text',
+        model: null,
+        text: item?.text ?? null,
+        mediaUrl: item?.mediaUrls[0] ?? null,
+        mediaUrls: item?.mediaUrls ?? []
+      };
+    }
+
+    return { id: node.id, type: node.type, medium: 'text', model: null, text: null, mediaUrl: null };
+  }
+
+  if (node.type === 'select') {
+    const source = listFeeding(node, connections, nodesById);
+    if (!source) return { id: node.id, type: node.type, medium: 'image', model: null, text: null, mediaUrl: null };
+
     const index = typeof node.data.index === 'number' ? node.data.index : 0;
+
+    if (source.type === 'products' || source.type === 'social_account_feed') {
+      const items = await syncedSourceItems(db, orgId, source);
+      const item = syncedItemAt(items, index);
+      const medium = item?.mediaUrls.length ? 'image' : 'text';
+      return {
+        id: node.id,
+        type: node.type,
+        medium,
+        model: null,
+        text: item?.text ?? null,
+        mediaUrl: item?.mediaUrls[0] ?? null,
+        mediaUrls: item?.mediaUrls ?? []
+      };
+    }
+
+    const values = await resolvedListValues(db, orgId, source, connections, nodesById);
     const value = await itemAt(db, orgId, values, index);
     return { id: node.id, type: node.type, medium: values.itemKind === 'text' ? 'text' : 'image', model: null, text: value.text, mediaUrl: value.mediaUrl };
   }
@@ -267,6 +317,29 @@ async function toUpstreamNode(
   };
 }
 
+async function pickedReferenceUrls(db: Db, orgId: string, node: CanvasNodeRecord): Promise<string[]> {
+  const refs = referencesOf(node.data);
+  if (!refs.length) {
+    return [];
+  }
+
+  const idsOf = (source: string) => refs.filter((r) => r.source === source).map((r) => r.id);
+  const [assets, catalogue] = await Promise.all([
+    findAssets(db, { orgId, assetIds: idsOf('asset') }),
+    findReferenceImages(db, idsOf('catalogue'))
+  ]);
+  const signed = await signReferenceImages(db, [...catalogue.values()].map((image) => image.storagePath));
+
+  const urlOf = {
+    asset: (id: string) => assets.get(id)?.url ?? null,
+    catalogue: (id: string) => {
+      const image = catalogue.get(id);
+      return image ? (signed.get(image.storagePath) ?? null) : null;
+    }
+  };
+  return refs.map((ref) => urlOf[ref.source](ref.id)).filter((url): url is string => Boolean(url));
+}
+
 function toUpstreamEdge(connection: Connection): UpstreamEdge {
   return {
     id: connection.id,
@@ -281,6 +354,7 @@ const BLOCKED_EMPTY: Omit<UpstreamInputs, 'blocked'> = {
   text: [],
   referenceImageUrl: null,
   referenceImageUrls: [],
+  pickedImageUrls: [],
   referenceVideoUrls: [],
   referenceAudioUrls: [],
   startFrameUrl: null,
@@ -332,5 +406,9 @@ export async function upstreamInputsFor(
   );
   const edges = connectionRows.map(toUpstreamEdge);
 
-  return resolveUpstreamInputs(nodes, edges, scope.nodeId, resolvedModalities ?? { input: [] });
+  const target = nodesById.get(scope.nodeId);
+  const referenceUrls = target ? await pickedReferenceUrls(db, scope.orgId, target) : [];
+  const withPicked = nodes.map((n) => (n.id === scope.nodeId ? { ...n, referenceUrls } : n));
+
+  return resolveUpstreamInputs(withPicked, edges, scope.nodeId, resolvedModalities ?? { input: [] });
 }

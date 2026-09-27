@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_FEED_FILTERS, DEFAULT_PRODUCT_FILTERS } from '$lib/canvas/source-filters';
 import {
   NODE_TYPES,
   docData,
@@ -86,6 +87,18 @@ describe('un nodo che produce, letto dalla riga', () => {
     expect(genOf({ id: 'n1', type: 'iframe', data: {} })).toBeNull();
   });
 
+  it('senza refId ma con assetId, il nodo si legge comunque: assetId è il refId', () => {
+    const node = genOf({ id: 'n1', type: 'image', data: { assetId: 'asset-123' } });
+
+    expect(node?.refId).toBe('asset-123');
+  });
+
+  it('refId, quando c`è, vince su assetId', () => {
+    const node = genOf({ id: 'n1', type: 'image', data: { refId: 'ref-1', assetId: 'asset-123' } });
+
+    expect(node?.refId).toBe('ref-1');
+  });
+
   it('un `data` che mente sul tipo dei campi non rompe la pagina', () => {
     const node = genOf({ id: 'n1', type: 'image', data: { prompt: 7, model: [], params: 'no' } });
 
@@ -165,7 +178,9 @@ describe('con che `data` nasce una riga', () => {
       url: '',
       limit: 20,
       after: null,
-      only_first_photo: false
+      only_first_photo: false,
+      category: '',
+      filters: DEFAULT_PRODUCT_FILTERS
     });
   });
 
@@ -178,7 +193,7 @@ describe('con che `data` nasce una riga', () => {
   });
 
   it('un nodo social_account_feed nasce su instagram e senza handle', () => {
-    expect(newNodeRow('social_account_feed')).toEqual({ platform: 'instagram', handle: '', limit: 20 });
+    expect(newNodeRow('social_account_feed')).toEqual({ platform: 'instagram', handle: '', limit: 20, filters: DEFAULT_FEED_FILTERS });
   });
 });
 
@@ -207,10 +222,13 @@ describe('un nodo products, letto dalla riga', () => {
       limit: 20,
       after: null,
       onlyFirstPhoto: false,
+      category: '',
+      filters: DEFAULT_PRODUCT_FILTERS,
       syncStatus: 'idle',
       syncError: null,
       syncedCount: 0,
-      syncedAt: null
+      syncedAt: null,
+      syncSummary: null
     });
   });
 
@@ -267,10 +285,12 @@ describe('un nodo social_account_feed, letto dalla riga', () => {
       platform: 'instagram',
       handle: '',
       limit: 20,
+      filters: DEFAULT_FEED_FILTERS,
       syncStatus: 'idle',
       syncError: null,
       syncedCount: 0,
-      syncedAt: null
+      syncedAt: null,
+      syncSummary: null
     });
   });
 

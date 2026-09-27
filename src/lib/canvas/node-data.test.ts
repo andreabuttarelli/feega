@@ -64,6 +64,16 @@ describe('validateNodeData — image', () => {
     const out = validateNodeData('image', { prompt: 'x', ...GEN_STATE });
     expect(out.ok).toBe(true);
   });
+
+  it('rifiuta un url firmato: scade, e `data` è ciò che sopravvive a una ricarica', () => {
+    const out = validateNodeData('image', {
+      prompt: 'x',
+      assetId: 'a1',
+      url: 'https://klnswzhhgrqvbfjzioul.supabase.co/storage/v1/object/sign/brand-knowledge/u1/media/x.jpg?token=abc'
+    });
+    expect(out.ok).toBe(false);
+    if (!out.ok) expect(out.error).toMatch(/url/);
+  });
 });
 
 describe('validateNodeData — video', () => {
@@ -491,6 +501,13 @@ describe('describeNodeType / describeNodeTypes — la forma verso l\'esterno, de
   it('copre tutti e dieci i tipi, la stessa lista di NODE_TYPES', () => {
     const all = describeNodeTypes();
     expect(Object.keys(all).sort()).toEqual([...NODE_TYPES].sort());
+  });
+
+  it('sync_summary — condiviso da products e social_account_feed — è nello schema, non solo nel codice', () => {
+    const products = describeNodeType('products') as { properties: Record<string, unknown> };
+    const feed = describeNodeType('social_account_feed') as { properties: Record<string, unknown> };
+    expect(products.properties).toHaveProperty('sync_summary');
+    expect(feed.properties).toHaveProperty('sync_summary');
   });
 });
 

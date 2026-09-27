@@ -5,6 +5,9 @@ import { isOrgOwner, orgBillingForBrand } from '$lib/server/org-billing';
 import { billingGrantsReady } from '$lib/server/billing-readiness';
 import { CREDIT_LADDER } from '$lib/credit-ladder';
 import { appOrigin } from '$lib/server/app-url';
+import { appPathForBrand } from '$lib/server/tenancy/brand-slug';
+
+const BILLING_SUBPATH = '/settings/billing';
 import { ONE_TIME_CHECKOUT_LINK, statusForFailure } from '@feega/api-contracts';
 
 /**
@@ -58,7 +61,7 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
     );
   }
 
-  const appBillingUrl = `${appOrigin(url)}/app/billing`;
+  const appBillingUrl = `${appOrigin(url)}${await appPathForBrand(supabase, brand.id, BILLING_SUBPATH)}`;
 
   try {
     const { ensureOrgCustomer, createOneTimeCreditCheckout } = await import('$lib/server/stripe');

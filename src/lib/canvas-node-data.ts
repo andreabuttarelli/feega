@@ -4,6 +4,12 @@ import type { DocNode } from '$lib/canvas/doc-node';
 import type { Addable } from '$lib/canvas/addable';
 import { isProductPlatform, type ProductsNode } from '$lib/canvas/products-node';
 import { isSocialFeedPlatform, type SocialFeedNode } from '$lib/canvas/social-feed-node';
+import {
+  DEFAULT_FEED_FILTERS,
+  DEFAULT_PRODUCT_FILTERS,
+  feedFiltersOf,
+  productFiltersOf
+} from '$lib/canvas/source-filters';
 import { SYNC_STATUSES, type SyncStatus } from '$lib/canvas/sync-state';
 import { isListItemKind, type ListItem, type ListNode } from '$lib/canvas/list-node';
 import type { SelectNode } from '$lib/canvas/select-node';
@@ -87,7 +93,7 @@ export function genOf(row: NodeRow): GenNode | null {
     model: nullableStr(row.data.model),
     prompt: str(row.data.prompt),
     params: record(row.data.params) as GenParams,
-    refId: nullableStr(row.data.refId),
+    refId: nullableStr(row.data.refId) ?? nullableStr(row.data.assetId),
     runs: [],
     running: row.data.running === true,
     error: typeof row.data.error === 'string' && row.data.error ? row.data.error : null
@@ -134,10 +140,13 @@ export function productsOf(row: NodeRow): ProductsNode | null {
     limit: num(row.data.limit, 20),
     after: nullableStr(row.data.after),
     onlyFirstPhoto: row.data.only_first_photo === true,
+    category: str(row.data.category),
+    filters: productFiltersOf(row.data.filters),
     syncStatus: syncStatusOf(row.data.sync_status),
     syncError: nullableStr(row.data.sync_error),
     syncedCount: num(row.data.synced_count, 0),
-    syncedAt: nullableStr(row.data.synced_at)
+    syncedAt: nullableStr(row.data.synced_at),
+    syncSummary: nullableStr(row.data.sync_summary)
   };
 }
 
@@ -154,10 +163,12 @@ export function socialFeedOf(row: NodeRow): SocialFeedNode | null {
     platform: typeof platform === 'string' && isSocialFeedPlatform(platform) ? platform : 'instagram',
     handle: str(row.data.handle),
     limit: num(row.data.limit, 20),
+    filters: feedFiltersOf(row.data.filters),
     syncStatus: syncStatusOf(row.data.sync_status),
     syncError: nullableStr(row.data.sync_error),
     syncedCount: num(row.data.synced_count, 0),
-    syncedAt: nullableStr(row.data.synced_at)
+    syncedAt: nullableStr(row.data.synced_at),
+    syncSummary: nullableStr(row.data.sync_summary)
   };
 }
 
@@ -295,11 +306,19 @@ export function newNodeRow(what: Addable): Record<string, unknown> {
   }
 
   if (what === 'products') {
-    return { type: 'shopify', url: '', limit: 20, after: null, only_first_photo: false };
+    return {
+      type: 'shopify',
+      url: '',
+      limit: 20,
+      after: null,
+      only_first_photo: false,
+      category: '',
+      filters: DEFAULT_PRODUCT_FILTERS
+    };
   }
 
   if (what === 'social_account_feed') {
-    return { platform: 'instagram', handle: '', limit: 20 };
+    return { platform: 'instagram', handle: '', limit: 20, filters: DEFAULT_FEED_FILTERS };
   }
 
   if (what === 'list') {
@@ -362,10 +381,13 @@ export function productsData(node: ProductsNode): Record<string, unknown> {
     limit: node.limit,
     after: node.after,
     only_first_photo: node.onlyFirstPhoto,
+    category: node.category,
+    filters: node.filters,
     sync_status: node.syncStatus,
     sync_error: node.syncError,
     synced_count: node.syncedCount,
-    synced_at: node.syncedAt
+    synced_at: node.syncedAt,
+    sync_summary: node.syncSummary
   };
 }
 
@@ -374,10 +396,12 @@ export function socialFeedData(node: SocialFeedNode): Record<string, unknown> {
     platform: node.platform,
     handle: node.handle,
     limit: node.limit,
+    filters: node.filters,
     sync_status: node.syncStatus,
     sync_error: node.syncError,
     synced_count: node.syncedCount,
-    synced_at: node.syncedAt
+    synced_at: node.syncedAt,
+    sync_summary: node.syncSummary
   };
 }
 

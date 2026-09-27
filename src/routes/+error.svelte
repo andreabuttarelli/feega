@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { HOME_PATH } from '$lib/home-path';
   // L'UNICA pagina d'errore del progetto — e una basta.
   //
   // Perché una sola: per una URL che non matcha nessuna rotta, SvelteKit monta SOLO il layout
@@ -18,7 +19,7 @@
 
   const status = $derived(page.status);
   const loggedIn = $derived(Boolean(page.data?.session));
-  const href = $derived(loggedIn ? '/app' : '/');
+  const href = HOME_PATH;
 
   // 404 → non c'è; 401/403 → non è tua; tutto il resto → si è rotto da noi.
   // `$page.error.message` non si mostra MAI: è testo interno.

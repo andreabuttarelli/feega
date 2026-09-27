@@ -1,5 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { orgBillingForBrand } from '$lib/server/org-billing';
+import { orgBillingForBrand, type OrgBilling } from '$lib/server/org-billing';
+
+type PortalFlow = 'payment_method' | 'upgrade';
 
 const stripeApi = () => import('$lib/server/stripe');
 
@@ -23,9 +25,15 @@ const refuse = (refusal: BillingLinkRefusal, message = ''): BillingLink => ({ re
 
 export async function billingLink(
 	supabase: SupabaseClient,
-	opts: { slug: string; returnUrl: string; flow?: 'payment_method' | 'upgrade' }
+	opts: { slug: string; returnUrl: string; flow?: PortalFlow }
 ): Promise<BillingLink> {
-	const billing = await orgBillingForBrand(supabase, { slug: opts.slug });
+	return portalLink(await orgBillingForBrand(supabase, { slug: opts.slug }), opts);
+}
+
+export async function portalLink(
+	billing: OrgBilling | null,
+	opts: { returnUrl: string; flow?: PortalFlow }
+): Promise<BillingLink> {
 	if (!billing) return refuse('no_org_billing');
 	if (!billing.customerId) return refuse('no_customer');
 	if (opts.flow === 'upgrade' && !billing.subscriptionId) return refuse('no_subscription');

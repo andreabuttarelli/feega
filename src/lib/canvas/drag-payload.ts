@@ -44,18 +44,22 @@ export const DRAG_NODE_KIND: {
 export type StaticImageOrVideoData = {
   prompt: '';
   assetId: string;
-  url: string;
   name: string;
   mimeType: string;
 };
 
+/**
+ * `url` NON ENTRA IN `data`: un URL firmato scade (due ore), e `nodes.data` è ciò che sopravvive
+ * a una ricarica. `assetId` è il riferimento stabile — la tela lo rifirma da capo a ogni lettura
+ * (`assetUrl`/`signAssetPaths`), la stessa dottrina di `refId` sui nodi che generano.
+ */
 export function staticMediaData(input: {
   assetId: string;
   url: string;
   name: string;
   mimeType: string;
 }): StaticImageOrVideoData {
-  return { prompt: '', assetId: input.assetId, url: input.url, name: input.name, mimeType: input.mimeType };
+  return { prompt: '', assetId: input.assetId, name: input.name, mimeType: input.mimeType };
 }
 
 export type StaticTextData = { prompt: string };
@@ -96,7 +100,7 @@ export function influencerNodeSize(): { w: number; h: number } {
 export const CANVAS_DRAG_FILLED_NODE = 'application/x-feega-filled-node';
 
 export type FilledNodeDrag = {
-  type: 'image' | 'video' | 'text' | 'doc' | 'influencer' | 'social_account_feed';
+  type: 'image' | 'video' | 'text' | 'doc' | 'influencer' | 'social_account_feed' | 'products' | 'iframe';
   data: Record<string, unknown>;
   w: number;
   h: number;
@@ -218,7 +222,9 @@ const FILLED_NODE_DRAG_TYPES = new Set<FilledNodeDrag['type']>([
   'text',
   'doc',
   'influencer',
-  'social_account_feed'
+  'social_account_feed',
+  'products',
+  'iframe'
 ]);
 
 export function parseFilledNodeDrag(raw: string): FilledNodeDrag | null {

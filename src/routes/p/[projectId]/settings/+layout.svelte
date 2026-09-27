@@ -2,13 +2,10 @@
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
-  import {
-    SETTINGS_BRAND_SECTIONS,
-    SETTINGS_SECTIONS
-  } from '$lib/components/settings/platforms';
+  import { SETTINGS_SECTIONS } from '$lib/components/settings/platforms';
   import PageHead from '$lib/components/PageHead.svelte';
+  import BrandGate from '$lib/components/settings/BrandGate.svelte';
   import { _ } from 'svelte-i18n';
-  // Stili condivisi con /app/billing, che monta le stesse primitive fuori da questo layout.
   import '$lib/styles/settings-shell.css';
 
   let { data, children } = $props();
@@ -22,9 +19,7 @@
   );
 
   const isBrandKit = $derived(
-    (SETTINGS_BRAND_SECTIONS as readonly string[]).some((s) =>
-      path.replace(/\/$/, '').endsWith(`/settings/${s}`)
-    )
+    ['brand', 'products'].some((s) => path.replace(/\/$/, '').endsWith(`/settings/${s}`))
   );
 
   type SettingsHead = { title: string; subtitle?: string };
@@ -33,6 +28,9 @@
     const p = path.replace(/\/$/, '');
     const base = `/p/${data.project.id}/settings`;
     const map: Record<string, SettingsHead> = {
+      [`${base}/project`]: {
+        title: $_('app.settings.project.title')
+      },
       [`${base}/brand`]: {
         title: $_('app.studio.tabs.brand')
       },
@@ -74,7 +72,7 @@
   onMount(() => {
     if (isOauthFlow) return;
     const hash = $page.url.hash.replace(/^#/, '');
-    if (!hash || !(SETTINGS_SECTIONS as readonly string[]).includes(hash)) return;
+    if (!hash || !SETTINGS_SECTIONS.some((s) => s.path === hash)) return;
     const p = path.replace(/\/$/, '');
     if (p.endsWith(`/${hash}`)) return;
     goto(`${settingsBase}/${hash}${$page.url.search}`, { replaceState: true });
@@ -87,7 +85,11 @@
   <div class="content settings-shell" class:brand-kit={isBrandKit}>
     <PageHead title={head.title} subtitle={head.subtitle ?? null} />
     <div class="settings">
-      {@render children()}
+      {#if data.brandGate}
+        <BrandGate projectId={data.project.id} returnTo={path} orgBrands={data.orgBrands} />
+      {:else}
+        {@render children()}
+      {/if}
     </div>
   </div>
 {/if}

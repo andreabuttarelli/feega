@@ -20,6 +20,8 @@ const SELECT_NODE = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
 const IMAGE_ASSET_1 = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
 const IMAGE_ASSET_2 = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee';
 const INFLUENCER_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+const PRODUCTS_NODE = 'ffffffff-ffff-ffff-ffff-ffffffffffff';
+const FEED_NODE = '10101010-1010-1010-1010-101010101010';
 
 const MODEL = 'bytedance/seedance-2-5';
 
@@ -635,6 +637,105 @@ describe('upstreamInputsFor — select: risolve ESATTAMENTE l\'item scelto dalla
   });
 });
 
+describe('upstreamInputsFor — select su products/social_account_feed: intrinsecamente liste anche loro', () => {
+  it('un select su un catalogo prodotti porta titolo+descrizione come testo e le foto come immagini', async () => {
+    const { db } = fakeDb({
+      nodes: [
+        nodeRow(PRODUCTS_NODE, 'products', { type: 'shopify', url: 'https://x.myshopify.com' }),
+        nodeRow(SELECT_NODE, 'select', { index: 2 }),
+        nodeRow(IMAGE_NODE, 'image', { prompt: '', model: 'qwen3-pro' })
+      ],
+      nodes_connections: [
+        { id: 'e-products-select', canvas_id: CANVAS, source_node_id: PRODUCTS_NODE, target_node_id: SELECT_NODE, source_handle: null, target_handle: null },
+        { id: 'e-select-image', canvas_id: CANVAS, source_node_id: SELECT_NODE, target_node_id: IMAGE_NODE, source_handle: null, target_handle: null }
+      ],
+      products: [
+        { id: 'pr1', org_id: ORG, node_id: PRODUCTS_NODE, project_id: 'p1', platform: 'shopify', external_id: '1', handle: 'a', title: 'Sedia', description: 'Rossa', price: 10, currency: 'EUR', url: null, images: [{ url: 'canvas-assets/sedia.png' }], available: true, synced_at: 'now', created_at: 'now' },
+        { id: 'pr2', org_id: ORG, node_id: PRODUCTS_NODE, project_id: 'p1', platform: 'shopify', external_id: '2', handle: 'b', title: 'Tavolo', description: 'Blu', price: 20, currency: 'EUR', url: null, images: [{ url: 'canvas-assets/tavolo.png' }], available: true, synced_at: 'now', created_at: 'now' }
+      ],
+      assets: []
+    });
+
+    const out = await upstreamInputsFor(db, { orgId: ORG, canvasId: CANVAS, nodeId: IMAGE_NODE, model: 'qwen3-pro', medium: 'image' });
+
+    expect(out.blocked).toBeNull();
+    expect(out.referenceImageUrls).toEqual(['canvas-assets/tavolo.png']);
+  });
+
+  it('un select su un feed social porta le slide di un carosello, tutte', async () => {
+    const { db } = fakeDb({
+      nodes: [
+        nodeRow(FEED_NODE, 'social_account_feed', { platform: 'instagram', handle: 'acme' }),
+        nodeRow(SELECT_NODE, 'select', { index: 1 }),
+        nodeRow(IMAGE_NODE, 'image', { prompt: '', model: 'qwen3-pro' })
+      ],
+      nodes_connections: [
+        { id: 'e-feed-select', canvas_id: CANVAS, source_node_id: FEED_NODE, target_node_id: SELECT_NODE, source_handle: null, target_handle: null },
+        { id: 'e-select-image', canvas_id: CANVAS, source_node_id: SELECT_NODE, target_node_id: IMAGE_NODE, source_handle: null, target_handle: null }
+      ],
+      social_posts: [
+        {
+          id: 'sp1',
+          org_id: ORG,
+          node_id: FEED_NODE,
+          project_id: 'p1',
+          platform: 'instagram',
+          external_id: 'ext1',
+          handle: 'acme',
+          caption: 'Nuova collezione',
+          media: { items: [{ type: 'image', url: 'canvas-assets/s1.png' }, { type: 'image', url: 'canvas-assets/s2.png' }] },
+          metrics: {},
+          permalink: null,
+          posted_at: 'now',
+          fetched_at: 'now'
+        }
+      ],
+      assets: []
+    });
+
+    const out = await upstreamInputsFor(db, { orgId: ORG, canvasId: CANVAS, nodeId: IMAGE_NODE, model: 'qwen3-pro', medium: 'image' });
+
+    expect(out.blocked).toBeNull();
+    expect(out.referenceImageUrls).toEqual(['canvas-assets/s1.png', 'canvas-assets/s2.png']);
+  });
+
+  it('un select su un feed social senza slide (post singolo) alimenta con la sua copertina', async () => {
+    const { db } = fakeDb({
+      nodes: [
+        nodeRow(FEED_NODE, 'social_account_feed', { platform: 'instagram', handle: 'acme' }),
+        nodeRow(SELECT_NODE, 'select', { index: 1 }),
+        nodeRow(IMAGE_NODE, 'image', { prompt: '', model: 'qwen3-pro' })
+      ],
+      nodes_connections: [
+        { id: 'e-feed-select', canvas_id: CANVAS, source_node_id: FEED_NODE, target_node_id: SELECT_NODE, source_handle: null, target_handle: null },
+        { id: 'e-select-image', canvas_id: CANVAS, source_node_id: SELECT_NODE, target_node_id: IMAGE_NODE, source_handle: null, target_handle: null }
+      ],
+      social_posts: [
+        {
+          id: 'sp1',
+          org_id: ORG,
+          node_id: FEED_NODE,
+          project_id: 'p1',
+          platform: 'instagram',
+          external_id: 'ext1',
+          handle: 'acme',
+          caption: null,
+          media: { thumbnailUrl: 'canvas-assets/cover.png' },
+          metrics: {},
+          permalink: null,
+          posted_at: 'now',
+          fetched_at: 'now'
+        }
+      ],
+      assets: []
+    });
+
+    const out = await upstreamInputsFor(db, { orgId: ORG, canvasId: CANVAS, nodeId: IMAGE_NODE, model: 'qwen3-pro', medium: 'image' });
+
+    expect(out.referenceImageUrls).toEqual(['canvas-assets/cover.png']);
+  });
+});
+
 describe('upstreamInputsFor — iterateSelection: UNA iterazione di un loop vede UN item, non la lista intera', () => {
   it('un nodeId in iterateSelection fa risolvere quella list come un select a quell\'indice, per questa sola chiamata', async () => {
     const { db } = fakeDb({
@@ -741,5 +842,91 @@ describe('upstreamInputsFor — effects: alimenta a valle col suo refId, come og
     const out = await upstreamInputsFor(db, { orgId: ORG, canvasId: CANVAS, nodeId: IMAGE_NODE, model: MODEL, medium: 'image' });
 
     expect(out.referenceImageUrls).toEqual([]);
+  });
+});
+
+describe('upstreamInputsFor — il select vede il feed filtrato, non le righe grezze', () => {
+  it('index 1 su un feed filtrato a soli video dà il primo video, non il primo post', async () => {
+    const post = (id: string, type: string, url: string) => ({
+      id,
+      org_id: ORG,
+      node_id: FEED_NODE,
+      project_id: 'p1',
+      platform: 'instagram',
+      external_id: id,
+      handle: 'acme',
+      caption: id,
+      media: { type, items: [{ type, url }] },
+      metrics: {},
+      permalink: null,
+      posted_at: id === 'foto' ? '2026-09-02T00:00:00Z' : '2026-09-01T00:00:00Z',
+      fetched_at: 'now'
+    });
+    const { db } = fakeDb({
+      nodes: [
+        nodeRow(FEED_NODE, 'social_account_feed', { platform: 'instagram', handle: 'acme', filters: { media: 'video' } }),
+        nodeRow(SELECT_NODE, 'select', { index: 1 }),
+        nodeRow(IMAGE_NODE, 'image', { prompt: '', model: 'qwen3-pro' })
+      ],
+      nodes_connections: [
+        { id: 'e-feed-select', canvas_id: CANVAS, source_node_id: FEED_NODE, target_node_id: SELECT_NODE, source_handle: null, target_handle: null },
+        { id: 'e-select-image', canvas_id: CANVAS, source_node_id: SELECT_NODE, target_node_id: IMAGE_NODE, source_handle: null, target_handle: null }
+      ],
+      social_posts: [post('foto', 'image', 'canvas-assets/foto.png'), post('clip', 'video', 'canvas-assets/clip.png')],
+      assets: []
+    });
+
+    const out = await upstreamInputsFor(db, { orgId: ORG, canvasId: CANVAS, nodeId: IMAGE_NODE, model: 'qwen3-pro', medium: 'image' });
+
+    expect(out.referenceImageUrls).toEqual(['canvas-assets/clip.png']);
+  });
+});
+
+describe('upstreamInputsFor — riferimenti scelti sul nodo', () => {
+  const CATALOGUE_ID = '12121212-1212-1212-1212-121212121212';
+
+  it('un asset della libreria e una foto del catalogo globale arrivano come riferimenti, nell\'ordine scelto', async () => {
+    modalitiesOf.mockResolvedValue({ input: ['text', 'image'], output: ['image'], synced_at: 'now' });
+    const { db } = fakeDb(
+      {
+        nodes: [
+          nodeRow(IMAGE_NODE, 'image', {
+            prompt: 'x',
+            model: 'qwen3-pro',
+            references: [
+              { source: 'catalogue', id: CATALOGUE_ID },
+              { source: 'asset', id: IMAGE_ASSET_1 }
+            ]
+          })
+        ],
+        nodes_connections: [],
+        assets: [{ id: IMAGE_ASSET_1, project_id: 'p1', type: 'image', url: `${ORG}/p1/own.png`, content: null, mime_type: 'image/png', bytes: 1, width: null, height: null, duration_s: null, source: 'upload', source_node_id: null, created_at: 'now' }],
+        reference_images: [{ id: CATALOGUE_ID, org_id: null, name: 'Chrome sphere', storage_path: 'catalogue/model-01-chrome-sphere.png', mime_type: 'image/png', width: null, height: null, sort_order: 0 }]
+      }
+    );
+
+    const out = await upstreamInputsFor(db, { orgId: ORG, canvasId: CANVAS, nodeId: IMAGE_NODE, model: 'qwen3-pro', medium: 'image' });
+
+    expect(out.pickedImageUrls).toEqual([
+      'https://signed.example/reference-images/catalogue/model-01-chrome-sphere.png',
+      `${ORG}/p1/own.png`
+    ]);
+    expect(out.referenceImageUrl).toBeNull();
+  });
+
+  it('un riferimento sparito si salta, non ferma il giro', async () => {
+    const { db } = fakeDb(
+      {
+        nodes: [nodeRow(IMAGE_NODE, 'image', { prompt: 'x', model: MODEL, references: [{ source: 'catalogue', id: CATALOGUE_ID }] })],
+        nodes_connections: [],
+        assets: [],
+        reference_images: []
+      }
+    );
+
+    const out = await upstreamInputsFor(db, { orgId: ORG, canvasId: CANVAS, nodeId: IMAGE_NODE, model: MODEL, medium: 'image' });
+
+    expect(out.pickedImageUrls).toEqual([]);
+    expect(out.blocked).toBeNull();
   });
 });

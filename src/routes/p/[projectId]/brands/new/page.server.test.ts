@@ -81,18 +81,39 @@ describe('actions.analyze: dal form al motore di analisi vero', () => {
       target_audience: 'Coffee lovers in Milan',
       brand_colors: ['#1a2b3c'],
       products: [{ name: 'Espresso', description: '250g' }],
-      social_handles: [{ platform: 'instagram', handle: 'acme', url: 'https://instagram.com/acme' }]
+      social_handles: [{ platform: 'instagram', handle: 'acme', url: 'https://instagram.com/acme' }],
+      images: ['https://acme.example/hero.jpg', 'https://acme.example/team.jpg']
     } as never);
 
     const { client: db } = seed();
     const result = (await (actions.analyze as (e: unknown) => Promise<unknown>)(
       event({ url: 'https://acme.example' }, db)
-    )) as { analyzed: boolean; suggestedContent: string; products: Array<{ title: string }> };
+    )) as { analyzed: boolean; suggestedContent: string; products: Array<{ title: string }>; images: string[] };
 
     expect(runBrandAnalysis).toHaveBeenCalled();
     expect(result.analyzed).toBe(true);
     expect(result.suggestedContent).toContain('instagram:@acme');
     expect(result.products).toHaveLength(1);
+    expect(result.images).toEqual(['https://acme.example/hero.jpg', 'https://acme.example/team.jpg']);
+  });
+
+  it('accetta un dominio senza https:// e lo completa', async () => {
+    vi.mocked(runBrandAnalysis).mockResolvedValue({ name: 'feega', url: 'https://feega.app/' } as never);
+
+    const { client: db } = seed();
+    const result = (await (actions.analyze as (e: unknown) => Promise<unknown>)(event({ url: 'feega.app' }, db))) as {
+      website: string;
+    };
+
+    expect(result.website).toBe('https://feega.app/');
+  });
+
+  it('un indirizzo che non è un sito torna 400', async () => {
+    const { client: db } = seed();
+    const outcome = (await (actions.analyze as (e: unknown) => Promise<unknown>)(event({ url: 'not a site' }, db))) as {
+      status: number;
+    };
+    expect(outcome.status).toBe(400);
   });
 
   it('senza url torna un errore 400, senza chiamare l\'analisi', async () => {
@@ -131,6 +152,53 @@ describe('actions.create: dal form al brand vero, i prodotti veri, il progetto a
 
     const project = tables.get('projects')?.find((p) => p.id === PROJECT);
     expect(project?.brand_id).toBe(brand?.id);
+    expect((outcome as { location: string }).location).toBe(`/p/${PROJECT}/brands/${brand?.slug}`);
+  });
+
+  it('con returnTo sicuro (/p/...) reindirizza lì invece che alla pagina del brand', async () => {
+    const { client: db } = seed();
+
+    const outcome = await (actions.create as (e: unknown) => Promise<unknown>)(
+      event(
+        {
+          name: 'Acme Coffee',
+          website: '',
+          shortDescription: '',
+          content: '',
+          logoUrl: '',
+          productsPlatform: '',
+          products: '[]',
+          returnTo: `/p/${PROJECT}/calendar`
+        },
+        db
+      )
+    ).catch((e) => e);
+
+    expect(isRedirect(outcome)).toBe(true);
+    expect((outcome as { location: string }).location).toBe(`/p/${PROJECT}/calendar`);
+  });
+
+  it('con returnTo non sicuro (non /p/...) ignora il parametro e usa la pagina del brand', async () => {
+    const { client: db, tables } = seed();
+
+    const outcome = await (actions.create as (e: unknown) => Promise<unknown>)(
+      event(
+        {
+          name: 'Acme Coffee',
+          website: '',
+          shortDescription: '',
+          content: '',
+          logoUrl: '',
+          productsPlatform: '',
+          products: '[]',
+          returnTo: 'https://evil.example/steal'
+        },
+        db
+      )
+    ).catch((e) => e);
+
+    expect(isRedirect(outcome)).toBe(true);
+    const brand = tables.get('brands')?.[0];
     expect((outcome as { location: string }).location).toBe(`/p/${PROJECT}/brands/${brand?.slug}`);
   });
 

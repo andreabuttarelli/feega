@@ -2,74 +2,59 @@ import type { LayoutServerLoad } from './$types';
 import { affordableSeats } from '$lib/server/social-connections';
 import { ACCOUNT_SEAT_USD } from '$lib/credit-ladder';
 import { orgCreditBalance } from '$lib/server/credits';
-import { isBrandOwner } from '$lib/server/settings-actions';
 import { orgBillingForBrand } from '$lib/server/org-billing';
-import { requireBrand } from '$lib/server/projects/brand-shell';
+import { listOrgBrands } from '$lib/server/repos/brands';
+import { sectionRequiresBrand } from '$lib/components/settings/platforms';
+import type { ProjectBrandShell } from '$lib/server/projects/brand-shell';
+import type { Db } from '$lib/server/db/client';
 
-// La pagina Brand è l'unica sezione che sa cosa fare senza un brand: propone di sceglierne uno
-// per il progetto (`projects.brand_id` è nullable, ed è il caso normale). Ogni altra sezione —
-// ads, billing, i social connessi — non ha senso senza un brand reale, quindi continua a rifiutare.
-const BRAND_ROUTE = 'settings/brand';
+const ORG_OWNER_ROLE = 'owner';
 
-export const load: LayoutServerLoad = async ({ parent, url, locals: { supabase } }) => {
-  const { brand: brandOrNull } = await parent();
-
-  if (!brandOrNull && url.pathname.replace(/\/$/, '').endsWith(`/${BRAND_ROUTE}`)) {
-    return {
-      brand: null,
-      accounts: [],
-      limit: 0,
-      used: 0,
-      seatCostUsd: ACCOUNT_SEAT_USD,
-      hasBilling: false,
-      apiKeys: [],
-      isOwner: false,
-      invites: []
-    };
-  }
-
-  const brand = requireBrand(brandOrNull);
-  const [{ data: accounts }, { data: apiKeys }, isOwner, { data: invites }, billing, balance] =
-    await Promise.all([
-      supabase
-        .from('social_accounts')
-        .select('id, platform, handle, display_name, status')
-        .eq('brand_id', brand.id)
-        .order('connected_at', { ascending: true }),
-      // api_keys.org_id, non brand_id: una chiave vale per ogni brand dell'org (vedi ApiKeyInfo
-      // in cli-auth.ts), quindi qui basta l'org del brand — niente più filtro per-brand su un
-      // campo `permissions.brand_ids` che la colonna non porta.
-      supabase
-        .from('api_keys')
-        .select('id, name, key_prefix, scopes, created_at, last_used_at')
-        .eq('org_id', brand.org_id)
-        .order('created_at', { ascending: false }),
-      isBrandOwner(supabase, brand.slug),
-      // orgs_invites è a livello di org, non di brand: non ha brand_id.
-      supabase
-        .from('orgs_invites')
-        .select('id, email, accepted_at, created_at')
-        .eq('org_id', brand.org_id)
-        .order('created_at', { ascending: true }),
-      orgBillingForBrand(supabase, { id: brand.id }),
-      orgCreditBalance(supabase, brand.org_id)
-    ]);
+async function brandSeats(supabase: Db, brand: ProjectBrandShell) {
+  const [{ data: accounts }, billing, balance] = await Promise.all([
+    supabase
+      .from('social_accounts')
+      .select('id, platform, handle, display_name, status')
+      .eq('brand_id', brand.id)
+      .order('connected_at', { ascending: true }),
+    orgBillingForBrand(supabase, { id: brand.id }),
+    orgCreditBalance(supabase, brand.org_id)
+  ]);
 
   const list = accounts ?? [];
   const used = list.filter((a) => a.status === 'active').length;
+  return { accounts: list, limit: used + affordableSeats(balance), used, hasBilling: !!billing?.customerId };
+}
+
+const NO_SEATS = { accounts: [], limit: 0, used: 0, hasBilling: false };
+
+export const load: LayoutServerLoad = async ({ parent, url, locals: { supabase } }) => {
+  const { brand, org } = await parent();
+  const brandGate = !brand && sectionRequiresBrand(url.pathname);
+
+  const [seats, { data: apiKeys }, { data: invites }, orgBrands] = await Promise.all([
+    brand ? brandSeats(supabase, brand) : NO_SEATS,
+    supabase
+      .from('api_keys')
+      .select('id, name, key_prefix, scopes, created_at, last_used_at')
+      .eq('org_id', org.id)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('orgs_invites')
+      .select('id, email, accepted_at, created_at')
+      .eq('org_id', org.id)
+      .order('created_at', { ascending: true }),
+    brandGate ? listOrgBrands(supabase, org.id) : []
+  ]);
 
   return {
     brand,
-    accounts: list,
-    // Non un tetto di piano: quanti account l'org può sostenere ORA col saldo che ha
-    // (account-billing.ts, ACCOUNT_SEAT_CREDITS) — account già pagati compresi.
-    limit: used + affordableSeats(balance),
-    used,
+    brandGate,
+    orgBrands: orgBrands.map((b) => ({ id: b.id, name: b.name })),
+    ...seats,
     seatCostUsd: ACCOUNT_SEAT_USD,
-    // The org pays, so a free brand sitting next to a paying sibling still has billing to show.
-    hasBilling: !!billing?.customerId,
     apiKeys: apiKeys ?? [],
-    isOwner,
+    isOwner: org.role === ORG_OWNER_ROLE,
     invites: invites ?? []
   };
 };

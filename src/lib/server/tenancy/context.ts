@@ -11,6 +11,10 @@ import type { Membership } from '$lib/server/repos/orgs';
  */
 export const ORG_COOKIE = 'dz-org';
 
+/** L'ultimo progetto aperto, messo da `/p/[projectId]/+layout.server.ts` a ogni visita: dove
+ *  atterra chi rientra, invece che sul progetto nato per ultimo. */
+export const LAST_PROJECT_COOKIE = 'dz-last-project';
+
 export function chooseOrg(memberships: Membership[], chosenId: string | null): Membership | null {
   if (memberships.length === 0) {
     return null;

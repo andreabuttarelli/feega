@@ -4,10 +4,10 @@ import { listMemberships } from '$lib/server/repos/orgs';
 import { findProjectForUser } from '$lib/server/projects/lookup';
 import { listProjectAssets, type Asset } from '$lib/server/repos/assets';
 import { listNodesByIds } from '$lib/server/repos/canvas';
-import { signAssetFiles } from '$lib/server/repos/asset-storage';
-import { signKnowledgePaths } from '$lib/server/media-archive';
+import { createAssetSigningDb, signAssetPaths } from '$lib/server/canvas/sign-media';
 import { registerUploadedAsset, UploadError } from '$lib/server/canvas/upload';
-import { parseAssetSourceFilter } from './asset-filter';
+import { GLOBAL_TAB, isGlobalTab, parseAssetSourceFilter } from './asset-filter';
+import { listCatalogueImages } from '$lib/server/repos/reference-images';
 
 /**
  * LA LIBRERIA MEDIA DI UN PROGETTO, SULLO SCHEMA NUOVO.
@@ -41,12 +41,10 @@ async function withSignedUrls(
   const uploadPaths = assets.filter((a) => a.source === 'upload' && a.url).map((a) => a.url!);
   const generatedPaths = assets.filter((a) => a.source === 'generated' && a.url).map((a) => a.url!);
 
-  const [uploaded, generated] = await Promise.all([
-    signAssetFiles(db, uploadPaths),
-    signKnowledgePaths(db as never, generatedPaths)
-  ]);
-
-  return new Map([...uploaded, ...generated]);
+  return signAssetPaths(db, createAssetSigningDb(), {
+    generated: generatedPaths,
+    uploaded: uploadPaths
+  });
 }
 
 export const load: PageServerLoad = async ({ params, url, locals }) => {
@@ -67,6 +65,12 @@ export const load: PageServerLoad = async ({ params, url, locals }) => {
   }
 
   const { orgId, project } = found;
+  const projectSummary = { id: project.id, name: project.name, slug: project.slug };
+
+  if (isGlobalTab(url.searchParams.get('source'))) {
+    return { orgId, project: projectSummary, items: [] as MediaAsset[], catalogue: await listCatalogueImages(db), filter: GLOBAL_TAB };
+  }
+
   const source = parseAssetSourceFilter(url.searchParams.get('source'));
 
   const assets = await listProjectAssets(db, { orgId, projectId: project.id, source });
@@ -91,8 +95,9 @@ export const load: PageServerLoad = async ({ params, url, locals }) => {
 
   return {
     orgId,
-    project: { id: project.id, name: project.name, slug: project.slug },
+    project: projectSummary,
     items,
+    catalogue: [],
     filter: source ?? 'all'
   };
 };

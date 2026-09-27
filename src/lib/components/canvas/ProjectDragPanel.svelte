@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { page } from '$app/state';
   /**
    * ASSET E BRAND DEL PROGETTO, DRAGGABILI SULLA TELA CHE È GIÀ APERTA.
    *
@@ -11,7 +12,8 @@
    * `assetDrag`/`brandFieldDrag` (`drag-payload.ts`) costruiscono lo stesso pacchetto delle
    * pagine dedicate: una card di qui e una di là finiscono sulla tela nello stesso modo.
    */
-  import { assetDrag, brandFieldDrag, CANVAS_DRAG_FILLED_NODE, serializeFilledNodeDrag } from '$lib/canvas/drag-payload';
+  import { assetDrag, CANVAS_DRAG_FILLED_NODE, serializeFilledNodeDrag } from '$lib/canvas/drag-payload';
+  import { brandPieces, pieceDrag, type BrandDetails, type BrandPiece } from '$lib/canvas/brand-pieces';
   import { CANVAS_DRAG_MEDIUM } from '$lib/canvas/new-node';
 
   type PanelAsset = {
@@ -101,19 +103,93 @@
     e.dataTransfer.setData(CANVAS_DRAG_MEDIUM, drag.type);
   }
 
-  function onBrandDragStart(e: DragEvent, brand: PanelBrand, field: 'logo' | 'text' | 'content') {
-    const drag = brandFieldDrag(brand, field);
-    if (!drag || !e.dataTransfer) return;
+  function onPieceDragStart(e: DragEvent, piece: BrandPiece) {
+    const drag = pieceDrag(piece);
+    if (!drag || !e.dataTransfer) {
+      return;
+    }
 
     e.dataTransfer.effectAllowed = 'copy';
     e.dataTransfer.setData(CANVAS_DRAG_FILLED_NODE, serializeFilledNodeDrag(drag));
     e.dataTransfer.setData(CANVAS_DRAG_MEDIUM, drag.type);
   }
 
+  const openKey = $derived(`feega:brands-panel-open:${projectId}`);
+  let openBrands = $state<string[]>([]);
+  let details = $state<Record<string, BrandDetails | 'loading' | 'failed'>>({});
+
+  $effect(() => {
+    try {
+      openBrands = JSON.parse(localStorage.getItem(openKey) ?? '[]');
+    } catch {
+      openBrands = [];
+    }
+  });
+
+  function saveOpen() {
+    try {
+      localStorage.setItem(openKey, JSON.stringify(openBrands));
+    } catch {
+      return;
+    }
+  }
+
+  async function loadDetails(brandId: string) {
+    details[brandId] = 'loading';
+    const res = await fetch(`/api/v1/projects/${projectId}/agent/brands/${brandId}`).catch(() => null);
+    details[brandId] = res?.ok ? ((await res.json()) as { details: BrandDetails }).details : 'failed';
+  }
+
+  $effect(() => {
+    for (const brand of brands) {
+      if (openBrands.includes(brand.id) && !details[brand.id]) {
+        void loadDetails(brand.id);
+      }
+    }
+  });
+
+  function toggleBrand(brandId: string) {
+    openBrands = openBrands.includes(brandId) ? openBrands.filter((id) => id !== brandId) : [...openBrands, brandId];
+    saveOpen();
+  }
+
+  const PIECE_LABEL: Record<BrandPiece['kind'], (piece: BrandPiece) => string> = {
+    logo: () => 'Logo',
+    name: (p) => (p.kind === 'name' ? p.text : ''),
+    description: (p) => (p.kind === 'description' ? p.text : ''),
+    content: () => 'Brand document',
+    colour: (p) => (p.kind === 'colour' ? p.hex : ''),
+    handle: (p) => (p.kind === 'handle' ? `${p.platform} @${p.handle}` : ''),
+    store: (p) => (p.kind === 'store' ? `Products · ${p.url}` : ''),
+    website: (p) => (p.kind === 'website' ? p.url : '')
+  };
+
+  const PIECE_GROUP: Record<BrandPiece['kind'], string> = {
+    logo: 'Logo',
+    name: 'Name',
+    description: 'Description',
+    content: 'Content',
+    colour: 'Colours',
+    handle: 'Social',
+    store: 'Products',
+    website: 'Website'
+  };
+
+  const EMPTY_HINT = {
+    assets: 'Nothing to drag yet. Generate or upload something first.',
+    brands: 'No brands yet.',
+    both: 'Nothing to drag yet. Generate or upload something first.'
+  } as const;
+
+  const newBrandHref = $derived(`/p/${projectId}/brands/new?returnTo=${encodeURIComponent(page.url.pathname)}`);
+
   const hasAnything = $derived((showAssets && assets.length > 0) || (showBrands && brands.length > 0));
 </script>
 
 <div class="panel">
+  {#if showBrands}
+    <a class="new-brand" href={newBrandHref}>+ New brand</a>
+  {/if}
   {#if loading}
     <div class="grid" aria-hidden="true">
       {#each Array(6) as _}
@@ -126,7 +202,7 @@
       <button type="button" class="retry" onclick={retry}>Retry</button>
     </div>
   {:else if !hasAnything}
-    <p class="hint">Nothing to drag yet. Generate or upload something first.</p>
+    <p class="hint">{EMPTY_HINT[kind]}</p>
   {:else}
     {#if showAssets && assets.length}
       <h4 class="section">Assets</h4>
@@ -156,23 +232,43 @@
       <h4 class="section">Brands</h4>
       <div class="brand-list">
         {#each brands as brand (brand.id)}
-          <div class="brand-card">
-            <!-- svelte-ignore a11y_no_static_element_interactions -->
-            <div
-              class="brand-logo"
-              draggable={Boolean(brand.logoAssetId)}
-              ondragstart={(e) => onBrandDragStart(e, brand, 'logo')}
-            >
-              {#if brand.logoUrl}
-                <img src={brand.logoUrl} alt="" loading="lazy" />
-              {:else}
-                <span class="logo-ph">{brand.name.slice(0, 2).toUpperCase()}</span>
-              {/if}
-            </div>
-            <!-- svelte-ignore a11y_no_static_element_interactions -->
-            <div class="brand-name" draggable="true" ondragstart={(e) => onBrandDragStart(e, brand, 'text')}>
-              {brand.name}
-            </div>
+          {@const open = openBrands.includes(brand.id)}
+          {@const loaded = details[brand.id]}
+          <div class="brand-card" data-brand-id={brand.id}>
+            <button type="button" class="brand-head" aria-expanded={open} onclick={() => toggleBrand(brand.id)}>
+              <span class="brand-logo">
+                {#if brand.logoUrl}
+                  <img src={brand.logoUrl} alt="" loading="lazy" />
+                {:else}
+                  <span class="logo-ph">{brand.name.slice(0, 2).toUpperCase()}</span>
+                {/if}
+              </span>
+              <span class="brand-name">{brand.name}</span>
+              <span class="chevron" class:open aria-hidden="true">›</span>
+            </button>
+
+            {#if open}
+              <div class="pieces">
+                {#if loaded === 'loading' || !loaded}
+                  <p class="hint small">Loading…</p>
+                {:else if loaded === 'failed'}
+                  <button type="button" class="retry" onclick={() => loadDetails(brand.id)}>Retry</button>
+                {:else}
+                  {#each brandPieces(brand, loaded) as piece, i (i)}
+                    <!-- svelte-ignore a11y_no_static_element_interactions -->
+                    <div class="piece" data-piece={piece.kind} draggable="true" ondragstart={(e) => onPieceDragStart(e, piece)}>
+                      <span class="piece-kind">{PIECE_GROUP[piece.kind]}</span>
+                      {#if piece.kind === 'logo' && brand.logoUrl}
+                        <img class="piece-thumb" src={brand.logoUrl} alt="" loading="lazy" />
+                      {:else if piece.kind === 'colour'}
+                        <span class="swatch" style="background:{piece.hex}"></span>
+                      {/if}
+                      <span class="piece-label">{PIECE_LABEL[piece.kind](piece)}</span>
+                    </div>
+                  {/each}
+                {/if}
+              </div>
+            {/if}
           </div>
         {/each}
       </div>
@@ -289,6 +385,21 @@
     }
   }
 
+  .new-brand {
+    display: block;
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--paper, #fff);
+    background: var(--ink, #1d1d1f);
+    text-decoration: none;
+  }
+  .new-brand:hover {
+    opacity: 0.9;
+  }
+
   .brand-list {
     display: flex;
     flex-direction: column;
@@ -296,13 +407,23 @@
     padding: 2px 1px 10px;
   }
   .brand-card {
+    border: 1px solid var(--line, #ededef);
+    border-radius: 0;
+    background: var(--paper-2, #f9f9f9);
+  }
+  .brand-head {
+    appearance: none;
+    width: 100%;
     display: flex;
     align-items: center;
     gap: 8px;
     padding: 6px;
-    border: 1px solid var(--line, #ededef);
+    border: 0;
     border-radius: 0;
-    background: var(--paper-2, #f9f9f9);
+    background: transparent;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
   }
   .brand-logo {
     width: 28px;
@@ -314,7 +435,6 @@
     background: var(--paper, #fff);
     display: grid;
     place-items: center;
-    cursor: grab;
   }
   .brand-logo img {
     width: 100%;
@@ -336,6 +456,65 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+  .chevron {
+    flex: 0 0 auto;
+    color: var(--ink-faint, #9a9a9e);
+    transition: transform 0.12s ease;
+  }
+  .chevron.open {
+    transform: rotate(90deg);
+  }
+  .pieces {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 0 6px 6px;
+  }
+  .hint.small {
+    margin: 0;
+    padding: 4px 0;
+    font-size: 11.5px;
+    text-align: left;
+  }
+  .piece {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    padding: 5px 6px;
+    border: 1px solid var(--line, #ededef);
+    border-radius: 0;
+    background: var(--paper, #fff);
     cursor: grab;
+  }
+  .piece-kind {
+    flex: 0 0 auto;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ink-faint, #9a9a9e);
+  }
+  .piece-thumb {
+    width: 18px;
+    height: 18px;
+    object-fit: cover;
+    display: block;
+  }
+  .swatch {
+    width: 14px;
+    height: 14px;
+    flex: 0 0 auto;
+    border: 1px solid var(--line, #ededef);
+  }
+  .piece-label {
+    min-width: 0;
+    flex: 1;
+    font-size: 12px;
+    color: var(--ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 </style>

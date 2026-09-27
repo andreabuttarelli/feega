@@ -160,3 +160,43 @@ describe('actions.reschedule: cancella su Zernio e riconsegna con il nuovo orari
     expect(result.rescheduled).toBe(true);
   });
 });
+
+describe('le action agiscono sul brand del post, dentro l org del progetto', () => {
+  it('un account di un altro brand non riceve il post, anche se la pagina mostra quel brand', async () => {
+    const rows = seedRows();
+    rows.social_accounts.push({ id: 'account-other', brand_id: 'brand-2', platform: 'instagram', zernio_account_id: 'zern-2', status: 'connected' });
+    const withOrg = {
+      ...rows,
+      posts: rows.posts.map((p) => ({ ...p, org_id: ORG })),
+      social_accounts: rows.social_accounts.map((a) => ({ ...a, org_id: ORG }))
+    };
+    const { db } = fakeDb(withOrg, { filter: true });
+
+    const result = (await (actions.schedule as (e: unknown) => Promise<unknown>)(
+      formEvent({ postId: POST_ID, accountId: 'account-other', scheduledFor: '2030-01-01T10:00:00.000Z' }, db)
+    )) as { result: { deliveries: unknown[] } };
+
+    expect(publish).not.toHaveBeenCalled();
+    expect(result.result.deliveries).toEqual([{ accountId: 'account-other', ok: false, error: 'account_not_found' }]);
+  });
+
+  it('un post di un altra org risponde 404 senza chiamare Zernio', async () => {
+    const rows = seedRows();
+    const foreign = {
+      ...rows,
+      posts: rows.posts.map((p) => ({ ...p, org_id: 'org-2' })),
+      social_accounts: rows.social_accounts.map((a) => ({ ...a, org_id: 'org-2' }))
+    };
+    const { db } = fakeDb(foreign, { filter: true });
+
+    for (const name of ['schedule', 'publishNow', 'cancel', 'reschedule'] as const) {
+      const result = (await (actions[name] as (e: unknown) => Promise<unknown>)(
+        formEvent({ postId: POST_ID, accountId: ACCOUNT_ID, scheduledFor: '2030-01-01T10:00:00.000Z' }, db)
+      )) as { status: number };
+
+      expect(result.status, name).toBe(404);
+    }
+    expect(publish).not.toHaveBeenCalled();
+    expect(deletePost).not.toHaveBeenCalled();
+  });
+});

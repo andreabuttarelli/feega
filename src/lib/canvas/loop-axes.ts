@@ -5,12 +5,15 @@
  * `upstreamInputsFor`'s `iterateSelection` per l'iterazione N — la domanda che l'esecutore
  * (`loop.ts`, con un `db`) fa una volta per combinazione.
  *
- * SOLO UNA `list` PUÒ ESSERE UN ASSE, oggi: è l'unico nodo che porta più valori con un ordine
- * dichiarato (`data.items`). Un filo `iterate` la cui sorgente non è una `list` non è un asse —
- * lo dice `axesFrom` con lo stesso `rejected` che il resolver usa per un input che non alimenta
- * niente, non un errore che ferma l'intero piano.
+ * UN ASSE È UN NODO CHE PORTA PIÙ VALORI CON UN ORDINE DICHIARATO — `list` (`data.items`), e allo
+ * stesso modo `products`/`social_account_feed`: un catalogo e un feed sincronizzati sono N righe
+ * in un ordine fisso, la stessa idea che `select-node.ts::SELECTABLE_SOURCE_TYPES` già dichiara
+ * per `select`. Un filo `iterate` la cui sorgente non è in quella tabella non è un asse — lo dice
+ * `axesFrom` con lo stesso `rejected` che il resolver usa per un input che non alimenta niente,
+ * non un errore che ferma l'intero piano.
  */
 import type { LoopAxis } from './loop-plan';
+import { isSelectableSourceType } from './select-node';
 
 export type LoopSourceNode = { id: string; type: string; itemCount: number };
 export type LoopEdge = { sourceNodeId: string; targetNodeId: string; mode: 'fixed' | 'iterate' };
@@ -32,8 +35,8 @@ export function axesFrom(targetId: string, edges: LoopEdge[], nodesById: Map<str
     const source = nodesById.get(edge.sourceNodeId);
     if (!source) continue;
 
-    if (source.type !== 'list') {
-      rejected.push({ nodeId: source.id, why: 'solo un nodo list può essere un asse di loop' });
+    if (!isSelectableSourceType(source.type)) {
+      rejected.push({ nodeId: source.id, why: 'solo list, products o social_account_feed possono essere un asse di loop' });
       continue;
     }
     if (source.itemCount === 0) {

@@ -4,6 +4,9 @@ import { authenticate, checkApiKeyWriteAccess, loadBrandForUser } from '$lib/ser
 import { billingLink } from '$lib/server/billing-links';
 import { isOrgOwner } from '$lib/server/org-billing';
 import { appOrigin } from '$lib/server/app-url';
+import { appPathForBrand } from '$lib/server/tenancy/brand-slug';
+
+const BILLING_SUBPATH = '/settings/billing';
 import { BILLING_PORTAL_LINK, statusForFailure } from '@feega/api-contracts';
 
 /**
@@ -25,7 +28,7 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
     return json({ error: 'invalid_input', details: parsed.error.issues }, { status: 400 });
   }
 
-  const appBillingUrl = `${appOrigin(url)}/app/billing`;
+  const appBillingUrl = `${appOrigin(url)}${await appPathForBrand(supabase, brand.id, BILLING_SUBPATH)}`;
 
   if (!(await isOrgOwner(supabase, brand.org_id, user.id))) {
     return json(

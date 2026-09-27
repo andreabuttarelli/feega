@@ -20,9 +20,7 @@ const flow = readFileSync(join(dir, '..', 'components', 'canvas', 'CanvasFlow.sv
 
 describe('la barra per aggiungere un nodo', () => {
   it('offre tutto ciò che si può aggiungere, preso dal modello e non riscritto', () => {
-    // `CANVAS_ADDABLE` e non `GEN_MEDIUMS`: la barra mostra anche la pagina incorporata, che non
-    // produce niente. Un elenco riscritto qui perderebbe la quarta voce senza che nulla lo dica.
-    expect(bar).toMatch(/CANVAS_ADDABLE/);
+    expect(bar).toMatch(/CANVAS_ADD_BAR/);
   });
 
   it('ogni voce si può cliccare', () => {
@@ -78,5 +76,13 @@ describe('la tela che riceve il trascinamento', () => {
 
   it('monta la barra sopra la tela', () => {
     expect(flow).toMatch(/<CanvasAddBar/);
+  });
+});
+
+describe('le scorciatoie stanno nel menu burger della top bar', () => {
+  it('la barra non le mostra, il menu della top bar sì', () => {
+    const menu = readFileSync(join(dir, '..', 'components', 'canvas', 'CanvasMenu.svelte'), 'utf8');
+    expect(bar).not.toMatch(/CANVAS_SHORTCUTS/);
+    expect(menu).toMatch(/CANVAS_SHORTCUTS/);
   });
 });

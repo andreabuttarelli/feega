@@ -3,6 +3,8 @@
   import { _, locale } from 'svelte-i18n';
   import { fly } from 'svelte/transition';
   import CountryPicker from '$lib/components/CountryPicker.svelte';
+  import { page } from '$app/state';
+  import { billingPath } from '$lib/billing-path';
 
   // Intl knows every ISO-4217 code and how to name it — no currency table to maintain.
   const currencies = $derived.by(() => {
@@ -56,7 +58,7 @@
   {#if !data.adsEnabled}
     <div class="field">
       <div class="fs">{$_('app.settings.ads.proOnly')}</div>
-      <a class="mini connect" href="/app/billing">{$_('app.settings.ads.upgrade')}</a>
+      <a class="mini connect" href={billingPath(page.params.projectId ?? '')}>{$_('app.settings.ads.upgrade')}</a>
     </div>
   {:else}
     <div class="field" style="flex-direction:column;align-items:stretch;gap:10px;">

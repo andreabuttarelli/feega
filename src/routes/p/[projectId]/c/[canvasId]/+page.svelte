@@ -33,6 +33,8 @@
   import ListNode from '$lib/components/canvas/ListNode.svelte';
   import SelectNode from '$lib/components/canvas/SelectNode.svelte';
   import NodeDownload from '$lib/components/canvas/NodeDownload.svelte';
+  import NodeReferences from '$lib/components/canvas/NodeReferences.svelte';
+  import { referencesOf } from '$lib/canvas/node-references';
   import EffectsNode from '$lib/components/canvas/EffectsNode.svelte';
   import EffectsEditor from '$lib/components/canvas/EffectsEditor.svelte';
   import CompositionNode from '$lib/components/canvas/CompositionNode.svelte';
@@ -42,6 +44,10 @@
   import { upstreamImageRefs } from '$lib/canvas/composition-node';
   import type { CompositionNode as CompositionNodeState } from '$lib/canvas/composition-node';
   import { listFeedingSelect } from '$lib/canvas/select-node';
+  import { productItem, socialPostItem } from '$lib/canvas/select-sources';
+  import { feedFiltersOf, filterPosts, filterProducts, productFiltersOf } from '$lib/canvas/source-filters';
+  import { inspectorOf } from '$lib/canvas/node-inspector';
+  import NodeInspector from '$lib/components/canvas/NodeInspector.svelte';
   import {
     listConnectors,
     listKindOf,
@@ -88,7 +94,6 @@
     listData,
     listOf,
     newNodeRow,
-    productsData,
     productsOf,
     selectData,
     selectOf,
@@ -96,7 +101,6 @@
     effectsData,
     compositionOf,
     compositionData,
-    socialFeedData,
     socialFeedOf
   } from '$lib/canvas-node-data';
   import {
@@ -110,6 +114,7 @@
   import type { Product } from '$lib/server/repos/products';
   import type { SocialPost } from '$lib/server/repos/social-posts';
   import { openSheet } from '$lib/canvas/sheet-nav';
+  import { billingPath } from '$lib/billing-path';
 
   let { data } = $props();
   type TextCostEstimate = { inputTokens: number; outputTokens: number; variableInput: boolean; revision: string };
@@ -335,12 +340,20 @@
   /** Ogni nodo, per id — la stessa lettura che `listFeedingSelect` chiede, minima apposta. */
   const nodesById = $derived(new Map(nodes.map((n) => [n.id, { id: n.id, type: n.type }])));
 
-  /** Ogni nodo, per id, con quanti item porta una `list` — la lettura che `loopAffordance`
-   *  chiede per contare gli assi di un loop. */
+  /** Quanti item porta un nodo, qualunque sia la sua sorgente — una `list` conta i suoi valori
+   *  risolti, `products`/`social_account_feed` contano le righe sincronizzate che la pagina ha già
+   *  in mano (`data.products`/`data.socialPosts`, lette da `load`): la stessa tabella di
+   *  `select-node.ts::SELECTABLE_SOURCE_TYPES`, qui applicata al conteggio invece che al filtro. */
+  function itemCountOf(n: Tile): number {
+    if (n.type === 'products') return shownProducts[n.id]?.length ?? 0;
+    if (n.type === 'social_account_feed') return shownPosts[n.id]?.length ?? 0;
+    return listValuesByNode[n.id]?.values.length ?? 0;
+  }
+
+  /** Ogni nodo, per id, con quanti item porta — la lettura che `loopAffordance` chiede per
+   *  contare gli assi di un loop. */
   const loopSourceNodesById = $derived(
-    new Map<string, LoopSourceNode>(
-      nodes.map((n) => [n.id, { id: n.id, type: n.type, itemCount: listValuesByNode[n.id]?.values.length ?? 0 }])
-    )
+    new Map<string, LoopSourceNode>(nodes.map((n) => [n.id, { id: n.id, type: n.type, itemCount: itemCountOf(n) }]))
   );
 
   /** Se il bottone Loop si vede su un nodo, e con quante combinazioni — un filo `iterate` la
@@ -358,12 +371,28 @@
     )
   );
 
-  /** La `list` che alimenta un `select`, o null — `listFeedingSelect` sceglie il primo arco
-   *  entrante la cui sorgente è una `list`, la stessa disciplina di `upstream.ts::listFeeding`. */
+  /** Un `products`/`social_account_feed` come `ListNodeState` — la stessa forma che `SelectNode`
+   *  già disegna per una `list`, con `productItem`/`socialPostItem` (`select-sources.ts`) a
+   *  tradurre ogni riga sincronizzata in un item: la stessa tabella per tipo che `upstream.ts`
+   *  usa lato server, qui applicata all'anteprima invece che alla generazione. */
+  function syncedSourceListOf(source: { id: string; type: string }): ListNodeState {
+    const rows = source.type === 'products' ? (shownProducts[source.id] ?? []).map(productItem) : (shownPosts[source.id] ?? []).map(socialPostItem);
+
+    return {
+      id: source.id,
+      itemKind: rows.some((r) => r.mediaUrls.length) ? 'image' : 'text',
+      items: rows.map((r) => ({ text: r.text ?? undefined, url: r.mediaUrls[0] }))
+    };
+  }
+
+  /** La sorgente che alimenta un `select`, o null — `listFeedingSelect` sceglie il primo arco
+   *  entrante la cui sorgente è in `SELECTABLE_SOURCE_TYPES`, la stessa disciplina di
+   *  `upstream.ts::listFeeding`. */
   function upstreamListOf(selectId: string): ListNodeState | null {
     const upstreamEdges = edges.map((e) => ({ sourceNodeId: e.source, targetNodeId: e.target }));
     const source = listFeedingSelect(selectId, upstreamEdges, nodesById);
     if (!source) return null;
+    if (source.type === 'products' || source.type === 'social_account_feed') return syncedSourceListOf(source);
     const values = listValuesByNode[source.id];
     return values ? { id: source.id, itemKind: values.itemKind, items: values.values.map((v) => v.item) } : null;
   }
@@ -479,7 +508,7 @@
         ? { id: n.id, kind: 'effects' as const, mediaKind: n.data.mediaKind === 'video' ? 'video' as const : 'image' as const }
         : tileNode({
         id: n.id,
-        medium: n.type === 'iframe' || n.type === 'document' || n.type === 'doc' ? null : (n.type as 'text' | 'image' | 'video'),
+        medium: n.type === 'iframe' || n.type === 'document' || n.type === 'doc' ? null : (n.type as 'text' | 'image' | 'video' | 'list' | 'select' | 'products' | 'social_account_feed'),
         model: typeof n.data.model === 'string' ? n.data.model : null
       })
     }))
@@ -527,6 +556,28 @@
   let socialPostsOverride = $state<Record<string, SocialPost[]> | null>(null);
   const products = $derived(productsOverride ?? productsByNode);
   const socialPosts = $derived(socialPostsOverride ?? socialPostsByNode);
+  const shownProducts = $derived(
+    Object.fromEntries(
+      nodes.filter((n) => n.type === 'products').map((n) => [n.id, filterProducts(products[n.id] ?? [], productFiltersOf(n.data.filters))])
+    ) as Record<string, Product[]>
+  );
+  const shownPosts = $derived(
+    Object.fromEntries(
+      nodes
+        .filter((n) => n.type === 'social_account_feed')
+        .map((n) => [n.id, filterPosts(socialPosts[n.id] ?? [], feedFiltersOf(n.data.filters))])
+    ) as Record<string, SocialPost[]>
+  );
+
+  let selectedIds = $state<string[]>([]);
+  let dismissedInspector = $state<string | null>(null);
+  const inspectedRow = $derived(selectedIds.length === 1 ? nodes.find((n) => n.id === selectedIds[0]) : undefined);
+  const inspector = $derived(inspectedRow && inspectedRow.id !== dismissedInspector ? inspectorOf(inspectedRow) : null);
+
+  function selectionChanged(ids: string[]) {
+    selectedIds = ids;
+    dismissedInspector = null;
+  }
 
   async function refresh() {
     const version = ++snapshotVersion;
@@ -1707,7 +1758,7 @@
     <p class="warning" role="alert">
       {failed}
       {#if failedIsCreditsExhausted}
-        <a href="/app/billing">Buy credits</a>
+        <a href={billingPath(data.projectId)}>Buy credits</a>
       {/if}
     </p>
   {/if}
@@ -1744,6 +1795,7 @@
     {modelChoicesFor}
     catalogueSyncedFor={(type) => mediumCatalogue[type].synced}
     onPropertyChange={commonChange}
+    onSelectionChange={selectionChanged}
   >
     {#snippet tile({ id, selected })}
       {@const row = nodes.find((n) => n.id === id)}
@@ -1762,7 +1814,10 @@
         {@const textCost = textCostEstimates[id]?.revision === estimateRevision ? textCostEstimates[id] : undefined}
         {@const uploaded = isUploadedNodeRow(row) ? uploadedNodeOf(row) : null}
         {#if uploaded}
-          <UploadedNode node={uploaded} medium={row.type === 'video' ? 'video' : 'image'} />
+          <UploadedNode
+            node={{ ...uploaded, url: assetUrl(uploaded.assetId) ?? uploaded.url }}
+            medium={row.type === 'video' ? 'video' : 'image'}
+          />
         {:else if gen}
           <GenNode
             node={{ ...gen, runs: runsByNode[row.id] ?? [] }}
@@ -1827,6 +1882,15 @@
                 </div>
               {/if}
             {/snippet}
+            {#snippet references()}
+              <NodeReferences
+                references={referencesOf(row.data)}
+                catalogue={data.references.catalogue}
+                media={data.references.media}
+                assetUrl={(assetId) => `/p/${data.projectId}/c/${data.canvas.id}/assets/${assetId}`}
+                onchange={(next) => void write(id, { references: next })}
+              />
+            {/snippet}
           </GenNode>
         {:else if frame}
           <IframeNode node={frame} onchange={(patch) => write(id, frameData({ ...frame, ...patch }))} />
@@ -1837,19 +1901,9 @@
             onshare={(on) => share(id, on)}
           />
         {:else if catalog}
-          <ProductsNode
-            node={catalog}
-            products={products[id] ?? []}
-            onchange={(patch) => write(id, productsData({ ...catalog, ...patch }))}
-            onsync={() => sync(id)}
-          />
+          <ProductsNode node={catalog} products={shownProducts[id] ?? []} total={products[id]?.length ?? 0} />
         {:else if feed}
-          <SocialFeedNode
-            node={feed}
-            posts={socialPosts[id] ?? []}
-            onchange={(patch) => write(id, socialFeedData({ ...feed, ...patch }))}
-            onsync={() => sync(id)}
-          />
+          <SocialFeedNode node={feed} posts={shownPosts[id] ?? []} total={socialPosts[id]?.length ?? 0} />
         {:else if influencer}
           <InfluencerNode
             name={influencersByNode[id]?.name ?? 'Influencer'}
@@ -1890,6 +1944,17 @@
       {/if}
     {/snippet}
   </CanvasFlow>
+
+  {#if inspector && inspectedRow}
+    {@const id = inspectedRow.id}
+    <NodeInspector
+      view={inspector}
+      shown={(inspectedRow.type === 'products' ? shownProducts[id] : shownPosts[id])?.length ?? 0}
+      onfield={(data) => write(id, data)}
+      onsync={() => sync(id)}
+      onclose={() => (dismissedInspector = id)}
+    />
+  {/if}
 
   {#if effectsEditing}
     {@const editingId = effectsEditing.id}

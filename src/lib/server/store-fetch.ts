@@ -31,6 +31,10 @@ export type FetchedProduct = {
 
 export type StorePlatform = 'shopify' | 'woocommerce';
 
+export type StorePageOptions = { limit: number; after: string | null; onlyFirstPhoto: boolean; category?: string };
+
+const categoryOf = (opts: StorePageOptions): string => encodeURIComponent(opts.category?.trim() ?? '');
+
 export type FetchProductsPage = {
   products: FetchedProduct[];
   /** Il cursore per la pagina successiva, o null quando questa era l'ultima. */
@@ -103,14 +107,16 @@ function shopifyProductOf(raw: any, origin: string, onlyFirstPhoto: boolean): Fe
  */
 export async function fetchShopifyPage(
   storeUrl: string,
-  opts: { limit: number; after: string | null; onlyFirstPhoto: boolean }
+  opts: StorePageOptions
 ): Promise<FetchProductsResult> {
   const origin = originOf(storeUrl);
   if (!origin) return { ok: false, error: 'invalid_url: not a valid store URL' };
 
   const page = opts.after ? Math.max(1, Number(opts.after) || 1) : 1;
   const limit = Math.min(Math.max(1, opts.limit), SHOPIFY_MAX_LIMIT);
-  const target = `${origin.origin}/products.json?limit=${limit}&page=${page}`;
+  const category = categoryOf(opts);
+  const collection = category ? `/collections/${category}` : '';
+  const target = `${origin.origin}${collection}/products.json?limit=${limit}&page=${page}`;
 
   try {
     const res = await safeFetchUrl(target, { maxBytes: MAX_BYTES });
@@ -185,14 +191,15 @@ function decodeHtmlEntities(s: string): string {
  */
 export async function fetchWooCommercePage(
   storeUrl: string,
-  opts: { limit: number; after: string | null; onlyFirstPhoto: boolean }
+  opts: StorePageOptions
 ): Promise<FetchProductsResult> {
   const origin = originOf(storeUrl);
   if (!origin) return { ok: false, error: 'invalid_url: not a valid store URL' };
 
   const page = opts.after ? Math.max(1, Number(opts.after) || 1) : 1;
   const limit = Math.min(Math.max(1, opts.limit), WOOCOMMERCE_MAX_LIMIT);
-  const target = `${origin.origin}/wp-json/wc/store/v1/products?per_page=${limit}&page=${page}`;
+  const category = categoryOf(opts);
+  const target = `${origin.origin}/wp-json/wc/store/v1/products?per_page=${limit}&page=${page}${category ? `&category=${category}` : ''}`;
 
   try {
     const res = await safeFetchUrl(target, { maxBytes: MAX_BYTES });
@@ -228,7 +235,162 @@ export async function fetchWooCommercePage(
 export async function fetchStoreProductsPage(
   platform: StorePlatform,
   storeUrl: string,
-  opts: { limit: number; after: string | null; onlyFirstPhoto: boolean }
+  opts: StorePageOptions
 ): Promise<FetchProductsResult> {
   return platform === 'shopify' ? fetchShopifyPage(storeUrl, opts) : fetchWooCommercePage(storeUrl, opts);
+}
+
+export type FetchProductResult =
+  | { ok: true; product: FetchedProduct }
+  | { ok: false; error: string };
+
+export async function fetchShopifyProduct(storeUrl: string, handle: string, onlyFirstPhoto: boolean): Promise<FetchProductResult> {
+  const origin = originOf(storeUrl);
+  if (!origin) return { ok: false, error: 'invalid_url: not a valid store URL' };
+
+  const target = `${origin.origin}/products/${encodeURIComponent(handle)}.json`;
+
+  try {
+    const res = await safeFetchUrl(target, { maxBytes: MAX_BYTES });
+    if (!res.ok) return { ok: false, error: `store_unreachable: /products/${handle}.json returned ${res.status}` };
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(res.body);
+    } catch {
+      return { ok: false, error: 'store_invalid: /products/<handle>.json did not return JSON' };
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const raw = (parsed as any)?.product;
+    if (!raw || typeof raw !== 'object') {
+      return { ok: false, error: 'store_invalid: /products/<handle>.json has no "product" object' };
+    }
+
+    return { ok: true, product: shopifyProductOf(raw, origin.origin, onlyFirstPhoto) };
+  } catch (e) {
+    if (e instanceof SafeFetchError) return { ok: false, error: `${e.reason}: ${e.message}` };
+    return { ok: false, error: `fetch_failed: ${e instanceof Error ? e.message : String(e)}` };
+  }
+}
+
+export async function fetchWooCommerceProductBySlug(storeUrl: string, slug: string, onlyFirstPhoto: boolean): Promise<FetchProductResult> {
+  const origin = originOf(storeUrl);
+  if (!origin) return { ok: false, error: 'invalid_url: not a valid store URL' };
+
+  const target = `${origin.origin}/wp-json/wc/store/v1/products?slug=${encodeURIComponent(slug)}`;
+
+  try {
+    const res = await safeFetchUrl(target, { maxBytes: MAX_BYTES });
+    if (!res.ok) return { ok: false, error: `store_unreachable: Store API returned ${res.status}` };
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(res.body);
+    } catch {
+      return { ok: false, error: 'store_invalid: Store API did not return JSON' };
+    }
+
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      return { ok: false, error: `store_invalid: no product found for slug "${slug}"` };
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const raw = parsed[0] as any;
+    const minorUnit = Number(raw?.prices?.currency_minor_unit ?? 2);
+    const divisor = Math.pow(10, Number.isFinite(minorUnit) ? minorUnit : 2);
+
+    return { ok: true, product: wooProductOf(raw, divisor, onlyFirstPhoto) };
+  } catch (e) {
+    if (e instanceof SafeFetchError) return { ok: false, error: `${e.reason}: ${e.message}` };
+    return { ok: false, error: `fetch_failed: ${e instanceof Error ? e.message : String(e)}` };
+  }
+}
+
+export async function fetchStoreProduct(
+  platform: StorePlatform,
+  storeUrl: string,
+  handleOrSlug: string,
+  onlyFirstPhoto: boolean
+): Promise<FetchProductResult> {
+  return platform === 'shopify'
+    ? fetchShopifyProduct(storeUrl, handleOrSlug, onlyFirstPhoto)
+    : fetchWooCommerceProductBySlug(storeUrl, handleOrSlug, onlyFirstPhoto);
+}
+
+export type UrlScope = 'store' | 'collection' | 'products';
+
+export type StoreUrlClassification =
+  | { scope: 'store'; platform: StorePlatform | null; category: null; handles: [] }
+  | { scope: 'collection'; platform: StorePlatform | null; category: string; handles: [] }
+  | { scope: 'products'; platform: StorePlatform | null; category: null; handles: string[] };
+
+/**
+ * UNA TABELLA, NON UN IF PER PIATTAFORMA: cosa capire da un URL incollato dipende solo dalla sua
+ * forma — Shopify ha convenzioni di percorso fisse (`/products/<handle>`, `/collections/<c>`),
+ * WooCommerce no (il permalink è configurabile dal negoziante), quindi il riconoscimento di
+ * piattaforma dall'URL vale solo per Shopify: un URL Woo torna `platform: null` e la piattaforma
+ * resta quella dichiarata sul nodo — non è una perdita, è l'unica cosa che l'URL può dire.
+ */
+const SHOPIFY_PRODUCT_PATH = /^\/products\/([^/?#]+)\/?$/;
+const SHOPIFY_COLLECTION_PATH = /^\/collections\/([^/?#]+)\/?$/;
+const SHOPIFY_COLLECTION_PRODUCT_PATH = /^\/collections\/([^/?#]+)\/products\/([^/?#]+)\/?$/;
+
+function classifyOneUrl(raw: string): StoreUrlClassification | null {
+  const origin = originOf(raw);
+  if (!origin) return null;
+
+  const collectionProduct = origin.pathname.match(SHOPIFY_COLLECTION_PRODUCT_PATH);
+  if (collectionProduct) {
+    return { scope: 'products', platform: 'shopify', category: null, handles: [decodeURIComponent(collectionProduct[2])] };
+  }
+
+  const product = origin.pathname.match(SHOPIFY_PRODUCT_PATH);
+  if (product) {
+    return { scope: 'products', platform: 'shopify', category: null, handles: [decodeURIComponent(product[1])] };
+  }
+
+  const collection = origin.pathname.match(SHOPIFY_COLLECTION_PATH);
+  if (collection) {
+    return { scope: 'collection', platform: 'shopify', category: decodeURIComponent(collection[1]), handles: [] };
+  }
+
+  return { scope: 'store', platform: null, category: null, handles: [] };
+}
+
+/**
+ * PIÙ URL, UNA RIGA PER VOCE: incollare più prodotti (uno per riga o separati da virgola) resta
+ * "products" solo se OGNI voce è un singolo prodotto — un mix di un prodotto e una collezione non
+ * ha una lettura sola, e vince la lettura più larga (la collezione), la stessa regola con cui una
+ * ricerca con più filtri restringe invece di allargare.
+ */
+export function classifyStoreUrl(raw: string): StoreUrlClassification {
+  const entries = raw
+    .split(/[\n,]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  if (entries.length === 0) {
+    return { scope: 'store', platform: null, category: null, handles: [] };
+  }
+
+  const classified = entries.map(classifyOneUrl);
+  if (classified.some((c) => c === null)) {
+    return { scope: 'store', platform: null, category: null, handles: [] };
+  }
+
+  const valid = classified as StoreUrlClassification[];
+  if (valid.every((c) => c.scope === 'products')) {
+    return {
+      scope: 'products',
+      platform: valid[0].platform,
+      category: null,
+      handles: valid.flatMap((c) => c.handles)
+    };
+  }
+
+  const firstNonStore = valid.find((c) => c.scope === 'collection') ?? valid[0];
+  return firstNonStore.scope === 'collection'
+    ? { scope: 'collection', platform: firstNonStore.platform, category: firstNonStore.category, handles: [] }
+    : { scope: 'store', platform: valid[0].platform, category: null, handles: [] };
 }

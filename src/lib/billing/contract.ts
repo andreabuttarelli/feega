@@ -68,9 +68,6 @@ export interface BillingProvider {
   /** Ceiling for a quota kind. Infinity under the open provider — drives server/usage.ts remaining(). */
   quota(kind: QuotaKind, ctx: BillingContext): Promise<number>;
 
-  /** Where to send the user to pay for more. undefined when there's nothing to sell. */
-  upgradeUrl(ctx: BillingContext): string | undefined;
-
   /** Plans strictly above the current one, for upsell UI. [] when there's nothing to sell. */
   plansAbove(plan: string | null | undefined): UpgradeOption[];
 

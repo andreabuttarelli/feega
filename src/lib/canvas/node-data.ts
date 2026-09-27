@@ -21,7 +21,9 @@
  */
 import { z } from 'zod';
 import { SOCIAL_PLATFORMS } from './social-platforms';
+import { FEED_MEDIA, FEED_SORTS, PRODUCT_SORTS } from './source-filters';
 import { EFFECTS } from './effects';
+import { nodeReferenceSchema } from './node-references';
 import type { EffectId, EffectParam } from './effects';
 import { LAYOUTS } from './composition/index';
 import { CAMERA_PRESETS } from './composition/camera';
@@ -52,7 +54,8 @@ const syncState = {
   sync_status: z.enum(GEN_STATUS).optional(),
   sync_error: z.string().nullable().optional(),
   synced_count: z.number().optional(),
-  synced_at: z.string().nullable().optional()
+  synced_at: z.string().nullable().optional(),
+  sync_summary: z.string().nullable().optional()
 };
 
 const textSchema = z.object({
@@ -75,6 +78,7 @@ const imageSchema = z.object({
   model: z.string().nullable().optional(),
   aspect_ratio: z.string().optional(),
   resolution: z.string().optional(),
+  references: z.array(nodeReferenceSchema).optional(),
   ...genState,
   ...libraryMedia
 });
@@ -85,6 +89,7 @@ const videoSchema = z.object({
   audio: z.boolean().optional(),
   aspect_ratio: z.string().optional(),
   resolution: z.string().optional(),
+  references: z.array(nodeReferenceSchema).optional(),
   ...genState,
   ...libraryMedia
 });
@@ -118,11 +123,33 @@ const iframeSchema = z
     message: 'serve url o content — una pagina incorporata senza nessuno dei due non mostra niente'
   });
 
+const isoDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional();
+
+const feedFiltersSchema = z.object({
+  from: isoDay,
+  to: isoDay,
+  media: z.enum(FEED_MEDIA).optional(),
+  min_likes: z.number().nonnegative().nullable().optional(),
+  min_views: z.number().nonnegative().nullable().optional(),
+  include: z.string().optional(),
+  exclude: z.string().optional(),
+  sort: z.enum(FEED_SORTS).optional()
+});
+
+const productFiltersSchema = z.object({
+  query: z.string().optional(),
+  price_min: z.number().nonnegative().nullable().optional(),
+  price_max: z.number().nonnegative().nullable().optional(),
+  in_stock_only: z.boolean().optional(),
+  sort: z.enum(PRODUCT_SORTS).optional()
+});
+
 const socialAccountFeedSchema = z.object({
   platform: z.enum(SOCIAL_PLATFORMS),
-  handle: z.string().min(1),
+  handle: z.string(),
   limit: z.number().int().positive().optional(),
   after: z.string().nullable().optional(),
+  filters: feedFiltersSchema.optional(),
   ...syncState
 });
 
@@ -148,10 +175,12 @@ const PRODUCT_PLATFORMS = ['shopify', 'woocommerce'] as const;
 
 const productsSchema = z.object({
   type: z.enum(PRODUCT_PLATFORMS),
-  url: z.string().url(),
+  url: z.union([z.literal(''), z.string().url()]),
   limit: z.number().int().positive().optional(),
   after: z.string().nullable().optional(),
   only_first_photo: z.boolean().optional(),
+  category: z.string().optional(),
+  filters: productFiltersSchema.optional(),
   ...syncState
 });
 
@@ -418,9 +447,42 @@ export function looseNodeJsonSchema(type: NodeType): Record<string, unknown> {
   return { type: 'object', required, properties };
 }
 
+/**
+ * UN URL FIRMATO NON ENTRA MAI IN `nodes.data` — scade (due ore su Supabase Storage), e `data` è
+ * ciò che sopravvive a una ricarica. La forma giusta è un riferimento stabile (`refId`/`assetId`)
+ * rifirmato a ogni lettura (`signAssetPaths`); un URL firmato scritto qui è un riquadro rotto in
+ * attesa di succedere. Il pattern è quello di Supabase Storage: `/storage/v1/object/sign/...`.
+ */
+const SIGNED_STORAGE_URL = /\/storage\/v1\/object\/sign\//;
+
+function findSignedUrl(data: unknown): string | null {
+  if (typeof data === 'string') {
+    return SIGNED_STORAGE_URL.test(data) ? data : null;
+  }
+  if (Array.isArray(data)) {
+    for (const item of data) {
+      const found = findSignedUrl(item);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (data && typeof data === 'object') {
+    for (const value of Object.values(data)) {
+      const found = findSignedUrl(value);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
 export function validateNodeData(type: string, data: unknown): NodeDataVerdict {
   if (!isNodeType(type)) {
     return { ok: false, error: `type sconosciuto: "${type}". Sono ${NODE_TYPES.join(', ')}.` };
+  }
+
+  const signedUrl = findSignedUrl(data);
+  if (signedUrl) {
+    return { ok: false, error: `data contiene un url firmato, che scade: "${signedUrl}"` };
   }
 
   const schema = NODE_DATA_SCHEMAS[type];

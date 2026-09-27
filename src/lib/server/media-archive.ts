@@ -8,13 +8,14 @@ import { ARCHIVE_USER_AGENT, safeFetchBytes } from '$lib/server/tool-guard';
 // Anything that must survive (history thumbs, competitor reference posts) gets downloaded into the
 // private brand-knowledge bucket WHILE the link is alive; consumers then sign our copy.
 
-const BUCKET = 'brand-knowledge';
+const DEFAULT_BUCKET = 'brand-knowledge';
 const MAX_BYTES = 5 * 1024 * 1024;
 const TIMEOUT_MS = 10_000;
 
-// Download an external image and store it at `path` in the brand-knowledge bucket. Returns the
-// path on success, null on any failure (dead URL, non-image, oversized, a target we refuse to
-// reach) — callers keep the URL fallback. Upsert so re-archiving the same key is idempotent.
+// Download an external image and store it at `path` in the given bucket (brand-knowledge unless
+// told otherwise). Returns the path on success, null on any failure (dead URL, non-image,
+// oversized, a target we refuse to reach) — callers keep the URL fallback. Upsert so re-archiving
+// the same key is idempotent.
 //
 // The fetch goes through safeFetchBytes rather than bare fetch: at least one caller (the chat's
 // style-reference tool) hands it a URL a model chose, and a plain fetch of a model-chosen URL is
@@ -22,7 +23,8 @@ const TIMEOUT_MS = 10_000;
 export async function archiveImageToBucket(
   supabase: SupabaseClient,
   path: string,
-  url: string
+  url: string,
+  bucket: string = DEFAULT_BUCKET
 ): Promise<string | null> {
   try {
     const res = await safeFetchBytes(url, {
@@ -33,7 +35,7 @@ export async function archiveImageToBucket(
     if (!res.ok || !res.mime.startsWith('image/') || !res.bytes.length) return null;
 
     const { error } = await supabase.storage
-      .from(BUCKET)
+      .from(bucket)
       .upload(path, res.bytes, { contentType: res.mime, upsert: true });
     return error ? null : path;
   } catch {
@@ -50,7 +52,7 @@ export async function signKnowledgePaths(
   const out = new Map<string, string>();
   const clean = [...new Set(paths.filter(Boolean))];
   if (!clean.length) return out;
-  const { data } = await supabase.storage.from(BUCKET).createSignedUrls(clean, ttlSeconds);
+  const { data } = await supabase.storage.from(DEFAULT_BUCKET).createSignedUrls(clean, ttlSeconds);
   for (const row of data ?? []) if (row.signedUrl && row.path) out.set(row.path, row.signedUrl);
   return out;
 }

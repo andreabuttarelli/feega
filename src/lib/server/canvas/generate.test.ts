@@ -1359,3 +1359,51 @@ describe('reconcileVideoNodeRuns chiude un video in coda quando il fornitore ha 
     expect(currentRun().status).toBe('running');
   });
 });
+
+describe('i riferimenti scelti sul nodo arrivano al render immagine', () => {
+  const CATALOGUE_ID = '77777777-7777-7777-7777-777777777777';
+
+  beforeEach(() => {
+    generateImagesWithoutBrand.mockReset();
+    generateImagesWithoutBrand.mockResolvedValue({
+      ok: true,
+      media: [{ storage_path: 'u/media/generated.png', mime: 'image/png', width: 1024, height: 1024 }],
+      costUsd: 0.02
+    });
+  });
+
+  it('una foto del catalogo scelta, senza fili, parte come riferimento e non come base', async () => {
+    const pickedNode = { ...freshNodeRow, data: { prompt: 'a vase', references: [{ source: 'catalogue', id: CATALOGUE_ID }] } };
+    const { db } = fakeDb(
+      {
+        nodes: [pickedNode],
+        nodes_connections: [],
+        assets: [],
+        reference_images: [{ id: CATALOGUE_ID, org_id: null, name: 'Vase', storage_path: 'catalogue/vase.png', mime_type: 'image/png', width: null, height: null, sort_order: 0 }]
+      },
+      { updateRows: { nodes: [{ ...pickedNode, version: 2 }] } }
+    );
+
+    const result = await runGenNode(db, {
+      orgId: ORG,
+      projectId: PROJECT,
+      canvasId: CANVAS,
+      nodeId: NODE,
+      userId: USER,
+      medium: 'image',
+      prompt: 'a vase',
+      model: 'qwen3-pro',
+      params: {},
+      expectedVersion: 1
+    });
+
+    expect(result.kind).toBe('done');
+    expect(generateImagesWithoutBrand).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        baseMediaId: undefined,
+        referenceImageUrls: ['https://signed.example/reference-images/catalogue/vase.png']
+      })
+    );
+  });
+});

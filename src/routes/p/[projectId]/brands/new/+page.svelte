@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * IL WIZARD, UN PASSO ALLA VOLTA — sito → analisi → prodotti → target → concorrenti →
+   * IL WIZARD, UN PASSO ALLA VOLTA — sito → analisi → prodotti → target →
    * handle del brand → overview → approva. `STEPS` è la tabella: l'ordine e le etichette stanno
    * qui, non sparsi in `if`/`else` per ogni bottone avanti/indietro.
    *
@@ -10,24 +10,23 @@
    */
   import { enhance } from '$app/forms';
   import { goto } from '$app/navigation';
-  import { onMount } from 'svelte';
+  import { page } from '$app/state';
+  import { onMount, onDestroy } from 'svelte';
   import PageHead from '$lib/components/PageHead.svelte';
   import PlatformGlyph from '$lib/components/PlatformGlyph.svelte';
-  import { renderBrandContentHtml } from '$lib/canvas/brand-content-chips';
+  import { renderBrandContentHtml, tokenizeChips, type ChipToken } from '$lib/canvas/brand-content-chips';
   import { SOCIAL_PLATFORMS } from '$lib/canvas/social-platforms';
+  import { ANALYSIS_STEPS, ANALYSIS_STEP_INTERVAL_MS, analysisStepIndexAt } from '$lib/brand-wizard-analysis-steps';
+  import { WIZARD_STEPS as STEPS, restoreWizardState, type WizardStep as Step } from '$lib/brand-wizard-steps';
   import '$lib/styles/doc-prose.css';
 
   let { data, form } = $props();
-
-  const STEPS = ['website', 'analysis', 'products', 'target', 'competitors', 'handles', 'overview'] as const;
-  type Step = (typeof STEPS)[number];
 
   const STEP_LABEL: Record<Step, string> = {
     website: 'Website',
     analysis: 'Analysis',
     products: 'Products',
     target: 'Target',
-    competitors: 'Competitors',
     handles: 'Social handles',
     overview: 'Overview'
   };
@@ -55,9 +54,9 @@
     productsPlatform: string;
     target: string;
     colours: string[];
-    competitorHandles: Handle[];
     brandHandles: Handle[];
     content: string;
+    images: string[];
   };
 
   function emptyDraft(): Draft {
@@ -70,9 +69,9 @@
       productsPlatform: '',
       target: '',
       colours: [],
-      competitorHandles: [],
       brandHandles: [],
-      content: ''
+      content: '',
+      images: []
     };
   }
 
@@ -83,13 +82,33 @@
   let busy = $state(false);
   let error = $state<string | null>(null);
 
+  let analysisStepIndex = $state(0);
+  let analysisTimer: ReturnType<typeof setInterval> | null = null;
+
+  function startAnalysisCycle() {
+    analysisStepIndex = 0;
+    const startedAt = Date.now();
+    analysisTimer = setInterval(() => {
+      analysisStepIndex = analysisStepIndexAt(Date.now() - startedAt, ANALYSIS_STEPS.length);
+    }, 250);
+  }
+
+  function stopAnalysisCycle() {
+    if (analysisTimer) clearInterval(analysisTimer);
+    analysisTimer = null;
+  }
+
+  onDestroy(stopAnalysisCycle);
+
+  let editingField = $state<'name' | 'shortDescription' | 'target' | null>(null);
+
   onMount(() => {
     try {
       const saved = sessionStorage.getItem(STORAGE_KEY);
       if (saved) {
-        const parsed = JSON.parse(saved) as { step: Step; draft: Draft };
-        if (STEPS.includes(parsed.step)) step = parsed.step;
-        if (parsed.draft) draft = { ...emptyDraft(), ...parsed.draft };
+        const restored = restoreWizardState(JSON.parse(saved), emptyDraft());
+        step = restored.step;
+        draft = restored.draft;
       }
     } catch {
       // una sessionStorage rotta non deve impedire di aprire il wizard da zero
@@ -123,8 +142,10 @@
     return () => {
       busy = true;
       error = null;
+      startAnalysisCycle();
       return async ({ result, update }: { result: { type: string; data?: unknown }; update: () => Promise<void> }) => {
         busy = false;
+        stopAnalysisCycle();
         if (result.type === 'failure') {
           const data = result.data as { error?: string } | undefined;
           error = data?.error === 'credits_exhausted' ? 'Out of AI credits for this billing period.' : (data?.error ?? 'Something went wrong.');
@@ -143,6 +164,7 @@
       logoUrl?: string | null;
       suggestedContent?: string;
       products?: Product[];
+      images?: string[];
       website?: string;
     };
 
@@ -151,6 +173,7 @@
     draft.logoUrl = r.logoUrl ?? draft.logoUrl;
     draft.content = r.suggestedContent ?? draft.content;
     draft.products = r.products ?? [];
+    draft.images = r.images ?? [];
     draft.website = r.website ?? draft.website;
 
     const targetMatch = /## Target\n\n([\s\S]*?)(\n\n##|$)/.exec(draft.content);
@@ -160,8 +183,8 @@
     if (coloursMatch) {
       draft.colours = coloursMatch[1]
         .split('\n')
-        .map((l) => l.replace(/^- /, '').trim())
-        .filter(Boolean);
+        .flatMap((l) => tokenizeChips(l).filter((t): t is Extract<ChipToken, { kind: 'colour' }> => t.kind === 'colour'))
+        .map((t) => t.hex);
     }
 
     const handlesMatch = /## Social handles\n\n([\s\S]*?)(\n\n##|$)/.exec(draft.content);
@@ -196,8 +219,6 @@
     if (draft.colours.length) parts.push(`## Colours\n\n${draft.colours.map((c) => `- ${c}`).join('\n')}`);
     const brandLines = draft.brandHandles.filter((h) => h.handle.trim()).map((h) => `- ${h.platform}:@${h.handle.trim().replace(/^@/, '')}`);
     if (brandLines.length) parts.push(`## Social handles\n\n${brandLines.join('\n')}`);
-    const competitorLines = draft.competitorHandles.filter((h) => h.handle.trim()).map((h) => `- ${h.platform}:@${h.handle.trim().replace(/^@/, '')}`);
-    if (competitorLines.length) parts.push(`## Competitors\n\n${competitorLines.join('\n')}`);
     draft.content = parts.join('\n\n');
   }
 
@@ -218,30 +239,50 @@
 
 <PageHead title="New brand" subtitle={`Step ${stepIndex + 1} of ${STEPS.length} — ${STEP_LABEL[step]}`} />
 
-<div class="wizard">
-  <ol class="steps">
-    {#each STEPS as s, i (s)}
-      <li class:active={s === step} class:done={i < stepIndex}>{STEP_LABEL[s]}</li>
-    {/each}
-  </ol>
+<div class="wizard-shell">
+  <div class="wizard">
+    <div class="step-bar">
+      <p class="step-caption">Step {stepIndex + 1} of {STEPS.length} · {STEP_LABEL[step]}</p>
+      <ol class="steps">
+        {#each STEPS as s, i (s)}
+          <li class:active={s === step} class:done={i < stepIndex}></li>
+        {/each}
+      </ol>
+    </div>
 
-  {#if error}
-    <p class="msg warn">{error}</p>
-  {/if}
+    {#if error}
+      <p class="msg warn">{error}</p>
+    {/if}
 
-  {#if step === 'website'}
-    <section class="panel">
-      <h2>Where can we find this brand?</h2>
-      <p class="hint">We'll read the site for a logo, colours, description and detected products. You can skip this and fill everything by hand.</p>
+    {#if step === 'website'}
+    <section class="wizard-panel">
+      {#if busy}
+        <h2>Reading {draft.website}</h2>
+        <p class="hint">This takes a moment — we're actually visiting the site.</p>
+        <div class="progress-track" role="progressbar" aria-label="Analyzing site"><div class="progress-fill"></div></div>
+        <ol class="analysis-steps">
+          {#each ANALYSIS_STEPS as s, i (s.label)}
+            <li class:done={i < analysisStepIndex} class:active={i === analysisStepIndex}>
+              <span class="analysis-step-mark">{i < analysisStepIndex ? '✓' : ''}</span>
+              <span>{s.label}</span>
+            </li>
+          {/each}
+        </ol>
+      {:else}
+        <h2>Where can we find this brand?</h2>
+        <p class="hint">We'll read the site for a logo, colours, description and detected products. You can skip this and fill everything by hand.</p>
+      {/if}
 
       <form
         method="POST"
         action="?/analyze"
         use:enhance={withBusy((result) => applyAnalysis(result))}
       >
-        <input name="url" type="url" placeholder="https://example.com" bind:value={draft.website} />
+        {#if !busy}
+          <input name="url" type="text" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="example.com" bind:value={draft.website} />
+        {/if}
         <div class="row">
-          <button class="btn ghost" type="button" onclick={forward}>Skip, no website</button>
+          <button class="btn ghost" type="button" onclick={forward} disabled={busy}>Skip, no website</button>
           <button class="btn primary" type="submit" disabled={busy || !draft.website}>{busy ? 'Reading…' : 'Analyze'}</button>
         </div>
       </form>
@@ -249,18 +290,35 @@
   {/if}
 
   {#if step === 'analysis'}
-    <section class="panel">
+    <section class="wizard-panel">
       <h2>What we found</h2>
       <div class="found">
         {#if draft.logoUrl}<img class="logo" src={draft.logoUrl} alt="" />{/if}
-        <label class="field">
-          <span>Name</span>
-          <input type="text" bind:value={draft.name} />
-        </label>
-        <label class="field">
-          <span>Short description</span>
-          <input type="text" bind:value={draft.shortDescription} />
-        </label>
+
+        {#if editingField === 'name'}
+          <label class="wizard-field">
+            <span>Name</span>
+            <input type="text" bind:value={draft.name} onblur={() => (editingField = null)} />
+          </label>
+        {:else}
+          <div class="found-item">
+            <h3 class="found-name">{draft.name || 'Untitled brand'}</h3>
+            <button class="btn ghost small" type="button" onclick={() => (editingField = 'name')}>Edit</button>
+          </div>
+        {/if}
+
+        {#if editingField === 'shortDescription'}
+          <label class="wizard-field">
+            <span>Short description</span>
+            <input type="text" bind:value={draft.shortDescription} onblur={() => (editingField = null)} />
+          </label>
+        {:else}
+          <div class="found-item">
+            <p class="found-description">{draft.shortDescription || 'No description found.'}</p>
+            <button class="btn ghost small" type="button" onclick={() => (editingField = 'shortDescription')}>Edit</button>
+          </div>
+        {/if}
+
         {#if draft.colours.length}
           <div class="swatches">
             {#each draft.colours as c (c)}
@@ -268,6 +326,15 @@
             {/each}
           </div>
         {/if}
+
+        {#if draft.images.length}
+          <div class="image-grid">
+            {#each draft.images as img (img)}
+              <img class="image-grid-item" src={img} alt="" loading="lazy" />
+            {/each}
+          </div>
+        {/if}
+
         <p class="hint">{draft.products.length} product{draft.products.length === 1 ? '' : 's'} detected.</p>
       </div>
       <div class="row">
@@ -278,7 +345,7 @@
   {/if}
 
   {#if step === 'products'}
-    <section class="panel">
+    <section class="wizard-panel">
       <h2>Products</h2>
       {#if !draft.products.length}
         <p class="hint">No products detected. This step is optional.</p>
@@ -303,34 +370,32 @@
   {/if}
 
   {#if step === 'target'}
-    <section class="panel">
+    <section class="wizard-panel">
       <h2>Who is this brand for?</h2>
       <p class="hint">A free-text description of the audience. We drafted one from the site — edit it freely.</p>
       <textarea rows="5" bind:value={draft.target} placeholder="e.g. Small coffee shops in Northern Italy, owner-operators, 25-45"></textarea>
-      <div class="row">
-        <button class="btn ghost" type="button" onclick={back}>Back</button>
-        <button class="btn primary" type="button" onclick={forward}>Continue</button>
-      </div>
-    </section>
-  {/if}
 
-  {#if step === 'competitors'}
-    <section class="panel">
-      <h2>Competitors' social handles</h2>
-      <p class="hint">Recorded only — connecting accounts to publish happens later, from Settings.</p>
-      {#each draft.competitorHandles as h, i (i)}
-        <div class="handle-row">
-          <select bind:value={h.platform}>
-            {#each SOCIAL_PLATFORMS as p (p)}
-              <option value={p}>{p}</option>
-            {/each}
-          </select>
-          <PlatformGlyph platform={h.platform} />
-          <input type="text" placeholder="handle" bind:value={h.handle} />
-          <button class="btn ghost small" type="button" onclick={() => (draft.competitorHandles = removeHandle(draft.competitorHandles, i))}>Remove</button>
+      <div class="wizard-field">
+        <span>Colours</span>
+        <div class="colour-list">
+          {#each draft.colours as c, i (i)}
+            <div class="colour-row">
+              <label class="colour-swatch-label" style={`background:${c}`}>
+                <input
+                  type="color"
+                  class="colour-swatch-input"
+                  value={/^#[0-9a-fA-F]{6}$/.test(c) ? c : '#000000'}
+                  oninput={(e) => (draft.colours[i] = (e.currentTarget as HTMLInputElement).value)}
+                />
+              </label>
+              <input type="text" bind:value={draft.colours[i]} placeholder="#rrggbb" />
+              <button class="btn ghost small" type="button" onclick={() => (draft.colours = draft.colours.filter((_, idx) => idx !== i))}>Remove</button>
+            </div>
+          {/each}
         </div>
-      {/each}
-      <button class="btn ghost" type="button" onclick={() => (draft.competitorHandles = addHandle(draft.competitorHandles))}>+ Add competitor handle</button>
+        <button class="btn ghost" type="button" onclick={() => (draft.colours = [...draft.colours, '#000000'])}>+ Add colour</button>
+      </div>
+
       <div class="row">
         <button class="btn ghost" type="button" onclick={back}>Back</button>
         <button class="btn primary" type="button" onclick={forward}>Continue</button>
@@ -339,7 +404,7 @@
   {/if}
 
   {#if step === 'handles'}
-    <section class="panel">
+    <section class="wizard-panel">
       <h2>This brand's social handles</h2>
       <p class="hint">Recorded only — connecting accounts to publish happens later, from Settings → Connected accounts.</p>
       {#each draft.brandHandles as h, i (i)}
@@ -363,15 +428,15 @@
   {/if}
 
   {#if step === 'overview'}
-    <section class="panel">
+    <section class="wizard-panel">
       <h2>Review before creating</h2>
 
-      <label class="field">
+      <label class="wizard-field">
         <span>Name</span>
         <input type="text" bind:value={draft.name} required />
       </label>
 
-      <label class="field">
+      <label class="wizard-field">
         <span>Content</span>
         <textarea rows="10" bind:value={draft.content} oninput={() => {}}></textarea>
       </label>
@@ -400,6 +465,7 @@
           };
         }}
       >
+        <input type="hidden" name="returnTo" value={page.url.searchParams.get('returnTo') ?? ''} />
         <input type="hidden" name="name" value={draft.name} />
         <input type="hidden" name="website" value={draft.website} />
         <input type="hidden" name="shortDescription" value={draft.shortDescription} />
@@ -415,49 +481,274 @@
       </form>
     </section>
   {/if}
+  </div>
 </div>
 
 <style>
-  .wizard { max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+  .wizard-shell {
+    min-height: 100dvh;
+    display: flex;
+    justify-content: center;
+    padding: 56px 24px 80px;
+    background: var(--paper-2);
+  }
 
-  .steps { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0; padding: 0; }
-  .steps li { font-size: 11px; padding: 4px 8px; border: 1px solid var(--line); color: var(--ink-faint); }
-  .steps li.active { color: var(--ink); border-color: var(--ink); }
-  .steps li.done { color: var(--ink-soft); }
+  .wizard {
+    width: 100%;
+    max-width: 560px;
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+  }
 
-  .panel { display: flex; flex-direction: column; gap: 14px; }
-  .panel h2 { margin: 0; font-size: 16px; }
-  .hint { margin: 0; font-size: 12px; color: var(--ink-soft); }
+  .step-bar { display: flex; flex-direction: column; gap: 10px; }
+  .step-caption {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ink-soft);
+  }
 
-  .field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
-  .field span { color: var(--ink-soft); }
-  input[type='text'], input[type='url'], textarea, select {
-    border: 1px solid var(--line); background: var(--paper); padding: 8px; font: inherit; color: var(--ink);
+  .steps {
+    display: flex;
+    gap: 4px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .steps li {
+    flex: 1 1 0;
+    height: 3px;
+    background: var(--line);
+  }
+  .steps li.done { background: var(--ink-soft); }
+  .steps li.active { background: var(--accent); }
+
+  .wizard-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    padding: 40px;
+  }
+  .wizard-panel h2 {
+    margin: 0;
+    font-size: clamp(1.3rem, 2.4vw, 1.6rem);
+    font-weight: var(--heading-weight);
+    letter-spacing: var(--heading-tracking);
+  }
+  .hint { margin: 0; font-size: 13.5px; color: var(--ink-soft); line-height: 1.5; }
+
+  .wizard-field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+  .wizard-field span { color: var(--ink-soft); font-weight: 500; }
+
+  input[type='text'],
+  input[type='url'],
+  textarea,
+  select {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid var(--line-2);
+    background: var(--paper);
+    padding: 12px 14px;
+    font: inherit;
+    font-size: 15px;
+    color: var(--ink);
+    outline: none;
+  }
+  input[type='text']:focus,
+  input[type='url']:focus,
+  textarea:focus,
+  select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 4px rgba(var(--accent-rgb), 0.12);
   }
   textarea { resize: vertical; }
 
-  .row { display: flex; justify-content: space-between; gap: 8px; }
-  .btn { border: 1px solid var(--line); background: var(--paper); padding: 8px 14px; font-size: 13px; cursor: pointer; }
+  .row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding-top: 4px;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--line-2);
+    background: var(--paper);
+    color: var(--ink);
+    padding: 12px 22px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
   .btn.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
   .btn.ghost { background: transparent; }
-  .btn.small { padding: 4px 8px; font-size: 11px; }
+  .btn.small { padding: 6px 10px; font-size: 12px; }
   .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-  .msg.warn { font-size: 12px; color: var(--warn, #b00); border: 1px solid var(--warn, #b00); padding: 8px; margin: 0; }
+  .msg.warn {
+    font-size: 13px;
+    color: #c0392b;
+    background: rgba(192, 57, 43, 0.06);
+    border: 1px solid rgba(192, 57, 43, 0.35);
+    padding: 12px 16px;
+    margin: 0;
+  }
 
-  .found { display: flex; flex-direction: column; gap: 10px; }
-  .logo { width: 56px; height: 56px; object-fit: cover; border: 1px solid var(--line); }
-  .swatches { display: flex; gap: 6px; }
-  .swatch { width: 24px; height: 24px; border: 1px solid var(--line); }
+  .progress-track {
+    width: 100%;
+    height: 3px;
+    background: var(--line);
+    overflow: hidden;
+    position: relative;
+  }
+  .progress-fill {
+    position: absolute;
+    inset: 0;
+    width: 40%;
+    background: var(--accent);
+    animation: progress-sweep 1.4s ease-in-out infinite;
+  }
+  @keyframes progress-sweep {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(250%); }
+  }
 
-  .products { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
-  .products li { border-bottom: 1px solid var(--line); padding-bottom: 8px; }
-  .products label { display: flex; align-items: center; gap: 8px; font-size: 13px; }
-  .products .desc { margin: 4px 0 0 24px; font-size: 12px; color: var(--ink-soft); }
+  .analysis-steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .analysis-steps li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    color: var(--ink-soft);
+  }
+  .analysis-steps li.done { color: var(--ink); }
+  .analysis-steps li.active {
+    color: var(--ink);
+    font-weight: 600;
+    animation: analysis-step-pulse 1.6s ease-in-out infinite;
+  }
+  .analysis-step-mark {
+    width: 18px;
+    height: 18px;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--line-2);
+    font-size: 11px;
+  }
+  .analysis-steps li.done .analysis-step-mark { border-color: var(--ink); background: var(--ink); color: var(--paper); }
+  .analysis-steps li.active .analysis-step-mark { border-color: var(--accent); }
 
-  .handle-row { display: flex; align-items: center; gap: 8px; }
-  .handle-row select { flex: 0 0 auto; }
-  .handle-row input { flex: 1; }
+  @keyframes analysis-step-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.55; }
+  }
 
-  .preview { border: 1px solid var(--line); padding: 12px; }
+  @media (prefers-reduced-motion: reduce) {
+    .progress-fill { animation: none; }
+    .analysis-steps li.active { animation: none; }
+  }
+
+  .found-item {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .found-name {
+    margin: 0;
+    font-size: clamp(1.2rem, 2.2vw, 1.5rem);
+    font-weight: var(--heading-weight);
+    letter-spacing: var(--heading-tracking);
+  }
+  .found-description {
+    margin: 0;
+    font-size: 14.5px;
+    line-height: 1.6;
+    color: var(--ink);
+  }
+
+  .image-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+    gap: 6px;
+  }
+  .image-grid-item {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    border: 1px solid var(--line);
+  }
+
+  .found { display: flex; flex-direction: column; gap: 14px; }
+  .logo { width: 64px; height: 64px; object-fit: cover; border: 1px solid var(--line); }
+  .swatches { display: flex; gap: 8px; }
+  .swatch { width: 28px; height: 28px; border: 1px solid var(--line); }
+
+  .products { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+  .products li { border-bottom: 1px solid var(--line); padding-bottom: 12px; }
+  .products label { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+  .products .desc { margin: 6px 0 0 26px; font-size: 12.5px; color: var(--ink-soft); }
+
+  .handle-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .handle-row select { flex: 0 0 auto; width: auto; }
+  .handle-row input { flex: 1 1 160px; min-width: 0; }
+  .handle-row .btn.small { flex: 0 0 auto; margin-left: auto; }
+
+  .colour-list { display: flex; flex-direction: column; gap: 8px; }
+  .colour-row { display: flex; align-items: center; gap: 8px; }
+  .colour-row input[type='text'] { flex: 1 1 auto; min-width: 0; }
+  .colour-row .btn.small { flex: 0 0 auto; }
+
+  .colour-swatch-label {
+    position: relative;
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--line);
+    cursor: pointer;
+    overflow: hidden;
+  }
+  .colour-swatch-input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .preview { border: 1px solid var(--line); padding: 16px; background: var(--paper-2); }
+
+  @media (max-width: 480px) {
+    .wizard-shell { padding: 32px 16px 56px; }
+    .wizard-panel { padding: 24px 20px; }
+    .row { flex-direction: column-reverse; }
+    .row .btn { width: 100%; }
+
+    .handle-row select { flex: 1 1 auto; }
+    .handle-row input { flex: 1 1 100%; order: 1; }
+    .handle-row .btn.small { flex: 1 1 auto; margin-left: 0; order: 2; }
+  }
+
+  @media (max-width: 360px) {
+    .wizard-shell { padding: 24px 12px 48px; }
+    .wizard-panel { padding: 20px 16px; }
+  }
 </style>

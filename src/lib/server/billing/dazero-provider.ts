@@ -33,10 +33,6 @@ export const dazeroBillingProvider: BillingProvider = {
     return kind === 'credits' ? creditQuota(plan) : postQuota(plan);
   },
 
-  upgradeUrl(ctx) {
-    return ctx.brandSlug ? `/app/${ctx.brandSlug}/settings/billing` : undefined;
-  },
-
   plansAbove(plan) {
     return plansAbove(plan);
   },

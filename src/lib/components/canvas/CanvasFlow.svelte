@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { focusEdges } from '$lib/canvas/edge-focus';
   /**
    * LA TELA, SU SVELTEFLOW.
    *
@@ -25,7 +26,7 @@
    * che si colora e il menù dei versi, e tre copie diverrebbero diverse al primo caso nuovo.
    */
   import { untrack } from 'svelte';
-  import { SvelteFlow, Background, SelectionMode, type Node } from '@xyflow/svelte';
+  import { SvelteFlow, Background, type Node } from '@xyflow/svelte';
   import '@xyflow/svelte/dist/style.css';
   import CanvasTile from './CanvasTile.svelte';
   import CanvasPointer from './CanvasPointer.svelte';
@@ -48,6 +49,7 @@
   import { setTileRender } from '$lib/canvas/tile-render-context';
   import { setTileResize } from '$lib/canvas/tile-resize-context';
   import type { CanvasNode } from '$lib/canvas/graph';
+  import { CANVAS_MODES, CanvasMode } from '$lib/canvas/canvas-mode';
 
   /**
    * Dove sta una tile e quanto è grande, in unità di tela — le stesse di `brand_canvas_items`.
@@ -120,6 +122,8 @@
     modelChoicesFor,
     catalogueSyncedFor,
     onPropertyChange,
+    onSelectionChange,
+    mode = CanvasMode.Edit,
     tile
   }: {
     tiles?: Tile[];
@@ -195,6 +199,7 @@
     /** Il catalogo di un medium è già sincronizzato? Come `GenNode`, per il campo modello della
      *  barra quando la selezione è di un solo tipo. */
     catalogueSyncedFor?: (type: 'text' | 'image' | 'video') => boolean;
+    onSelectionChange?: (ids: string[]) => void;
     /** La barra ha scritto: un campo, applicato a ogni nodo selezionato — uno o molti, stessa
      *  concorrenza ottimistica di `write`, N scritture indipendenti per una barra sola. */
     onPropertyChange?: (
@@ -215,7 +220,10 @@
     onResize?: (id: string, w: number, h: number) => void;
     /** Cosa disegnare dentro una tile. La tela non sa cosa mostra: lo decide chi la usa. */
     tile: import('svelte').Snippet<[{ id: string; selected: boolean }]>;
+    mode?: CanvasMode;
   } = $props();
+
+  const spec = $derived(CANVAS_MODES[mode]);
 
   // Un tipo di nodo solo: la tela non ha tipi di NODO, ha tipi di CONTENUTO, e quelli li decide
   // lo snippet di chi la usa.
@@ -506,6 +514,13 @@
    */
   const selectedSummaries = $derived(nodeSummaries.filter((n) => selection.ids.includes(n.id)));
   const selectionEdges = $derived(edges.map((e) => ({ sourceNodeId: e.source, targetNodeId: e.target })));
+
+  $effect(() => {
+    const next = focusEdges(edges, selection.ids);
+    if (next) {
+      edges = next;
+    }
+  });
   const selectionMedium = $derived(
     selectedSummaries.length && selectedSummaries.every((n) => n.type === selectedSummaries[0].type)
       ? (selectedSummaries[0].type as 'text' | 'image' | 'video')
@@ -633,18 +648,12 @@
     onnodeclick={onNodeClick}
     {isValidConnection}
     onconnectend={() => (refusal = null)}
-    panOnScroll
-    zoomOnPinch
-    zoomOnScroll={false}
-    zoomOnDoubleClick={false}
-    deleteKey={null}
-    selectionOnDrag
-    selectionMode={SelectionMode.Partial}
-    panOnDrag={[1, 2]}
+    {...spec.flow}
     fitView
     multiSelectionKey={['Meta', 'Control', 'Shift']}
   >
     <CanvasPointer onready={(fn) => (toFlow = fn)} />
+    {#if spec.chrome}
     <CanvasKeys
       onadd={addAtCentre}
       onmove={onMove}
@@ -655,7 +664,13 @@
       onundo={onUndo}
       onredo={onRedo}
     />
-    <CanvasSelectionBridge onchange={(next) => (selection = next)} />
+    {/if}
+    <CanvasSelectionBridge
+      onchange={(next) => {
+        selection = next;
+        onSelectionChange?.(next.ids);
+      }}
+    />
     <Background gap={24} />
   </SvelteFlow>
 
@@ -669,10 +684,11 @@
     <p class="edge-refusal" role="status">Scegli il nodo a cui collegare — Esc per annullare</p>
   {/if}
 
-  {#if onCreate}
+  {#if spec.chrome && onCreate}
     <CanvasAddBar onpick={addAtCentre} onupload={onUpload} />
   {/if}
 
+  {#if spec.chrome}
   <SelectionToolbar
     box={selection.box}
     zoom={selection.zoom}
@@ -686,6 +702,7 @@
   />
 
   <NextStepChips box={selection.box} zoom={selection.zoom} nodeId={nextStepNodeId} onpick={pickNextStep} />
+  {/if}
 
   {#if connectPickerAt}
     <ConnectPicker at={connectPickerAt} onpick={pickConnectMedium} onclose={() => (connectPickerAt = null)} />
@@ -768,8 +785,12 @@
        invece di essere l'unico riquadro bianco su una tela scura. */
     --xy-attribution-background-color: color-mix(in srgb, var(--paper, #fff) 70%, transparent);
 
-    --xy-edge-stroke: var(--ink-soft, #6e6e73);
+    --xy-edge-stroke: color-mix(in srgb, var(--ink-soft, #6e6e73) 45%, var(--paper, #fff));
     --xy-edge-stroke-selected: var(--accent, #7c5cff);
+  }
+
+  .wrap :global(.svelte-flow__edge.is-linked .svelte-flow__edge-path) {
+    stroke: var(--ink-soft, #6e6e73);
   }
 
   /* Il colore del link è scritto fisso nella libreria (`#999`), quindi non basta una variabile. */

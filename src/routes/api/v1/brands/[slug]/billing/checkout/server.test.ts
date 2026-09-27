@@ -13,6 +13,9 @@ const gateCredits = vi.fn();
 const structured = vi.fn();
 const billingGrantsReady = vi.fn();
 
+vi.mock('$lib/server/tenancy/brand-slug', () => ({
+	appPathForBrand: async (_db: unknown, _brandId: string, path: string) => `/p/p1${path}`
+}));
 vi.mock('$lib/server/cli-auth', () => ({
 	authenticate: vi.fn(),
 	loadBrandForUser: vi.fn(),
@@ -111,7 +114,7 @@ describe('POST /api/v1/brands/:slug/billing/checkout', () => {
 
 		expect(createBillingPortalSession).toHaveBeenCalledWith({
 			customerId: 'cus_org',
-			returnUrl: 'https://feega.test/app/billing',
+			returnUrl: 'https://feega.test/p/p1/settings/billing',
 			flow: 'upgrade',
 			subscriptionId: 'sub_org'
 		});
@@ -165,7 +168,7 @@ describe('POST /api/v1/brands/:slug/billing/checkout', () => {
 
 		expect(res.status).toBe(409);
 		expect(body.error).toBe('no_subscription');
-		expect(body.app_billing_url).toBe('https://feega.test/app/billing');
+		expect(body.app_billing_url).toBe('https://feega.test/p/p1/settings/billing');
 		expect(createBillingPortalSession).not.toHaveBeenCalled();
 	});
 
@@ -193,8 +196,8 @@ describe('POST /api/v1/brands/:slug/billing/checkout', () => {
 				orgId: 'org-1',
 				priceId: 'price_sub_30',
 				credits: 3000,
-				successUrl: 'https://feega.test/app/billing',
-				cancelUrl: 'https://feega.test/app/billing'
+				successUrl: 'https://feega.test/p/p1/settings/billing',
+				cancelUrl: 'https://feega.test/p/p1/settings/billing'
 			});
 		});
 
@@ -205,7 +208,7 @@ describe('POST /api/v1/brands/:slug/billing/checkout', () => {
 
 			expect(res.status).toBe(409);
 			expect(body.error).toBe('subscriptions_not_configured');
-			expect(body.app_billing_url).toBe('https://feega.test/app/billing');
+			expect(body.app_billing_url).toBe('https://feega.test/p/p1/settings/billing');
 			expect(createSubscriptionCheckout).not.toHaveBeenCalled();
 			expect(createBillingPortalSession).not.toHaveBeenCalled();
 		});
@@ -227,7 +230,7 @@ describe('POST /api/v1/brands/:slug/billing/checkout', () => {
 
 		expect(res.status).toBe(409);
 		expect(body.error).toBe('no_customer');
-		expect(body.app_billing_url).toBe('https://feega.test/app/billing');
+		expect(body.app_billing_url).toBe('https://feega.test/p/p1/settings/billing');
 	});
 
 	it('a Stripe outage is ours: 502, not a 4xx that accuses the caller', async () => {

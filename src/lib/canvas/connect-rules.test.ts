@@ -56,6 +56,25 @@ describe('verdictBetween — il verdetto che si dà mentre il puntatore è in ar
   });
 });
 
+describe('un select accetta prodotti e feed come sorgente, non solo una lista', () => {
+  const list: CanvasNode = { id: 'l', kind: 'list' };
+  const select: CanvasNode = { id: 's', kind: 'select' };
+  const products: CanvasNode = { id: 'p', kind: 'products' };
+  const feed: CanvasNode = { id: 'sf', kind: 'social_account_feed' };
+
+  it('list -> select passa', () => {
+    expect(verdictBetween(lookup({ l: list, s: select }), 'l', 's')).toEqual({ ok: true });
+  });
+
+  it('products -> select passa', () => {
+    expect(verdictBetween(lookup({ p: products, s: select }), 'p', 's')).toEqual({ ok: true });
+  });
+
+  it('social_account_feed -> select passa', () => {
+    expect(verdictBetween(lookup({ sf: feed, s: select }), 'sf', 's')).toEqual({ ok: true });
+  });
+});
+
 describe('edgeKindsFor — quali versi ha senso proporre', () => {
   it('i tre versi restano tutti disponibili su un arco lecito', () => {
     const at = lookup({ t: text, i: image });

@@ -11,7 +11,7 @@ vi.mock('$env/dynamic/private', () => ({ env: {} }));
 vi.mock('node:dns/promises', () => ({ lookup: vi.fn() }));
 
 import { lookup } from 'node:dns/promises';
-import { fetchShopifyPage, fetchWooCommercePage } from './store-fetch';
+import { fetchShopifyPage, fetchWooCommercePage, fetchShopifyProduct, fetchWooCommerceProductBySlug, classifyStoreUrl } from './store-fetch';
 
 const PUBLIC_ADDRESS = '93.184.216.34';
 const LOOPBACK = '127.0.0.1';
@@ -230,5 +230,135 @@ describe('fetchWooCommercePage', () => {
     expect(out.ok).toBe(false);
     if (out.ok) return;
     expect(out.error).toMatch(/store_invalid/);
+  });
+});
+
+describe('categoria/collezione, applicata allo scaricamento', () => {
+  it('Shopify legge la collezione indicata', async () => {
+    resolvesTo({ 'shop.example.com': PUBLIC_ADDRESS });
+    const requested = serves({
+      'https://shop.example.com/collections/summer-sale/products.json?limit=2&page=1': {
+        status: 200,
+        body: JSON.stringify({ products: [] })
+      }
+    });
+
+    await fetchShopifyPage('https://shop.example.com', { limit: 2, after: null, onlyFirstPhoto: false, category: ' summer-sale ' });
+    expect(requested).toContain('https://shop.example.com/collections/summer-sale/products.json?limit=2&page=1');
+  });
+
+  it('WooCommerce passa la categoria come parametro', async () => {
+    resolvesTo({ 'shop.example.com': PUBLIC_ADDRESS });
+    const requested = serves({
+      'https://shop.example.com/wp-json/wc/store/v1/products?per_page=2&page=1&category=shoes': {
+        status: 200,
+        body: JSON.stringify([])
+      }
+    });
+
+    await fetchWooCommercePage('https://shop.example.com', { limit: 2, after: null, onlyFirstPhoto: false, category: 'shoes' });
+    expect(requested).toContain('https://shop.example.com/wp-json/wc/store/v1/products?per_page=2&page=1&category=shoes');
+  });
+});
+
+describe('fetchShopifyProduct — un singolo prodotto', () => {
+  it('scarica /products/<handle>.json e torna quel prodotto solo', async () => {
+    resolvesTo({ 'shop.example.com': PUBLIC_ADDRESS });
+    serves({
+      'https://shop.example.com/products/blue-shirt.json': {
+        status: 200,
+        body: JSON.stringify({ product: shopifyProduct(42, 'Blue Shirt') })
+      }
+    });
+
+    const out = await fetchShopifyProduct('https://shop.example.com', 'blue-shirt', false);
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.product.title).toBe('Blue Shirt');
+    expect(out.product.handle).toBe('blue-shirt');
+  });
+
+  it('un handle inesistente torna un errore leggibile', async () => {
+    resolvesTo({ 'shop.example.com': PUBLIC_ADDRESS });
+    serves({ 'https://shop.example.com/products/missing.json': { status: 404 } });
+
+    const out = await fetchShopifyProduct('https://shop.example.com', 'missing', false);
+    expect(out.ok).toBe(false);
+    if (out.ok) return;
+    expect(out.error).toMatch(/404/);
+  });
+});
+
+describe('fetchWooCommerceProductBySlug — un singolo prodotto', () => {
+  it('interroga la Store API con ?slug= e torna quel prodotto solo', async () => {
+    resolvesTo({ 'shop.example.com': PUBLIC_ADDRESS });
+    serves({
+      'https://shop.example.com/wp-json/wc/store/v1/products?slug=widget': {
+        status: 200,
+        body: JSON.stringify([wooProduct(7, 'Widget')])
+      }
+    });
+
+    const out = await fetchWooCommerceProductBySlug('https://shop.example.com', 'widget', false);
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.product.title).toBe('Widget');
+  });
+
+  it('nessun risultato torna un errore leggibile', async () => {
+    resolvesTo({ 'shop.example.com': PUBLIC_ADDRESS });
+    serves({ 'https://shop.example.com/wp-json/wc/store/v1/products?slug=ghost': { status: 200, body: '[]' } });
+
+    const out = await fetchWooCommerceProductBySlug('https://shop.example.com', 'ghost', false);
+    expect(out.ok).toBe(false);
+    if (out.ok) return;
+    expect(out.error).toMatch(/store_invalid/);
+  });
+});
+
+describe('classifyStoreUrl — cosa capire da un URL incollato', () => {
+  it('la root dello store resta "store", senza piattaforma riconoscibile dall\'URL', () => {
+    const out = classifyStoreUrl('https://shop.example.com');
+    expect(out).toEqual({ scope: 'store', platform: null, category: null, handles: [] });
+  });
+
+  it('/products/<handle> di Shopify è "products" con quell\'handle', () => {
+    const out = classifyStoreUrl('https://allbirds.com/products/mens-wool-runners');
+    expect(out.scope).toBe('products');
+    expect(out.platform).toBe('shopify');
+    expect(out.handles).toEqual(['mens-wool-runners']);
+  });
+
+  it('/collections/<c> di Shopify è "collection" con quella categoria', () => {
+    const out = classifyStoreUrl('https://allbirds.com/collections/mens-shoes');
+    expect(out).toEqual({ scope: 'collection', platform: 'shopify', category: 'mens-shoes', handles: [] });
+  });
+
+  it('/collections/<c>/products/<handle> è comunque un singolo prodotto', () => {
+    const out = classifyStoreUrl('https://allbirds.com/collections/mens-shoes/products/mens-wool-runners');
+    expect(out.scope).toBe('products');
+    expect(out.handles).toEqual(['mens-wool-runners']);
+  });
+
+  it('più URL prodotto, uno per riga, restano "products" con tutti gli handle', () => {
+    const out = classifyStoreUrl('https://shop.example.com/products/a\nhttps://shop.example.com/products/b');
+    expect(out.scope).toBe('products');
+    expect(out.handles).toEqual(['a', 'b']);
+  });
+
+  it('più URL prodotto separati da virgola restano "products"', () => {
+    const out = classifyStoreUrl('https://shop.example.com/products/a, https://shop.example.com/products/b');
+    expect(out.scope).toBe('products');
+    expect(out.handles).toEqual(['a', 'b']);
+  });
+
+  it('un mix di prodotto e collezione allarga alla collezione', () => {
+    const out = classifyStoreUrl('https://shop.example.com/products/a\nhttps://shop.example.com/collections/sale');
+    expect(out.scope).toBe('collection');
+    expect(out.category).toBe('sale');
+  });
+
+  it('un URL vuoto resta "store"', () => {
+    expect(classifyStoreUrl('')).toEqual({ scope: 'store', platform: null, category: null, handles: [] });
   });
 });

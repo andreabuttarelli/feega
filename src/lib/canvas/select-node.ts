@@ -56,11 +56,27 @@ export function clampIndex(index: number, length: number): number {
 }
 
 /**
- * LA LISTA CHE ALIMENTA QUESTO `select`, LATO CLIENT — la stessa disciplina deterministica di
- * `upstream.ts::listFeeding`: il PRIMO arco entrante la cui sorgente è una `list`, mai una scelta
- * fra più liste diverse. Serve solo per l'ANTEPRIMA sulla tela (il thumbnail cliccato, il conteggio
- * per il clamp): la scrittura vera dell'indice resta un valore libero finché il server non la
- * rifiuta, la stessa disciplina di ogni altro campo su questo nodo.
+ * I TIPI DI NODO DA CUI UN `select` PUÒ SCEGLIERE — una lista è il caso storico, `products` e
+ * `social_account_feed` sono intrinsecamente liste anche loro: un catalogo sincronizzato e un feed
+ * scaricato sono N righe nello stesso ordine per tutta la vita del nodo, la stessa idea di
+ * `list.data.items` con la sorgente altrove (`products`/`social_posts`, non `data`). Una riga sola
+ * qui è ciò che tiene `listFeedingSelect` (client) e `listFeeding` (`upstream.ts`, server) d'accordo
+ * su COSA conta come sorgente, senza due elenchi che divergono al primo tipo aggiunto.
+ */
+export const SELECTABLE_SOURCE_TYPES = ['list', 'products', 'social_account_feed'] as const;
+
+export type SelectableSourceType = (typeof SELECTABLE_SOURCE_TYPES)[number];
+
+export function isSelectableSourceType(type: string): type is SelectableSourceType {
+  return (SELECTABLE_SOURCE_TYPES as readonly string[]).includes(type);
+}
+
+/**
+ * LA SORGENTE CHE ALIMENTA QUESTO `select`, LATO CLIENT — la stessa disciplina deterministica di
+ * `upstream.ts::listFeeding`: il PRIMO arco entrante la cui sorgente è in `SELECTABLE_SOURCE_TYPES`,
+ * mai una scelta fra più sorgenti diverse. Serve solo per l'ANTEPRIMA sulla tela (il thumbnail
+ * cliccato, il conteggio per il clamp): la scrittura vera dell'indice resta un valore libero finché
+ * il server non la rifiuta, la stessa disciplina di ogni altro campo su questo nodo.
  */
 export function listFeedingSelect<TNode extends { id: string; type: string }>(
   targetId: string,
@@ -70,7 +86,7 @@ export function listFeedingSelect<TNode extends { id: string; type: string }>(
   for (const edge of edges) {
     if (edge.targetNodeId !== targetId) continue;
     const source = nodesById.get(edge.sourceNodeId);
-    if (source?.type === 'list') return source;
+    if (source && isSelectableSourceType(source.type)) return source;
   }
   return null;
 }

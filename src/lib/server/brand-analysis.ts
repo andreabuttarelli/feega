@@ -95,6 +95,7 @@ const browserRenderer: BrowserRenderer = {
 };
 
 const MAX_ANALYSIS_IMAGES = 3; // Immagini passate al LLM multimodale per leggere palette/stile reali
+const MAX_SITE_IMAGES = 60; // Immagini mostrate nel recap del wizard (raccolte da tutte le pagine visitate)
 const BRAND_ANALYSIS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 // In-memory cache for brand analysis results
@@ -592,15 +593,14 @@ export async function runBrandAnalysis(
     const siteImages: string[] = [];
     if (metadata.ogImage) siteImages.push(metadata.ogImage);
     for (const img of harvestedImages) {
-        if (siteImages.length >= 20) break;
+        if (siteImages.length >= MAX_SITE_IMAGES) break;
         if (!siteImages.includes(img)) siteImages.push(img);
     }
     for (const p of ecommerceProducts) {
         if (p.images?.[0] && !siteImages.includes(p.images[0])) {
             siteImages.push(p.images[0]);
         }
-        // Max 20 immagini generali per non sovraccaricare il profilo
-        if (siteImages.length >= 20) break;
+        if (siteImages.length >= MAX_SITE_IMAGES) break;
     }
     if (siteImages.length > 0) profile.images = siteImages;
 

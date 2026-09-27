@@ -1,6 +1,7 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
   import { page } from '$app/stores';
+  import { billingPath } from '$lib/billing-path';
   import { onMount } from 'svelte';
   import { _ } from 'svelte-i18n';
   import { PLATFORMS, ICONS } from '$lib/components/settings/platforms';
@@ -118,7 +119,7 @@
       </div>
       <div class="nm"><div class="h">{p.label}</div><div class="s">{count ? $_('app.settings.connectedAddAnother', { values: { count } }) : $_('app.settings.connectViaOauth')}</div></div>
       {#if atLimit}
-        <a class="mini connect" href="/app/billing">{$_('app.settings.connect')}</a>
+        <a class="mini connect" href={billingPath($page.params.projectId ?? '')}>{$_('app.settings.connect')}</a>
       {:else}
         <a class="mini connect" href={`${base}/settings/connect/${p.key}`} target="_blank" rel="noopener" onclick={() => (pendingConnect = true)}>{$_('app.settings.connect')}</a>
       {/if}

@@ -24,6 +24,8 @@
   import { readChatOpen, writeChatOpen } from '$lib/shell-prefs';
   import { guideOpenRequest } from '$lib/canvas/guide-open';
   import { browser } from '$app/environment';
+  import { deserialize } from '$app/forms';
+  import type { ShareState } from '$lib/canvas/shared-view';
 
   let { data, children } = $props();
 
@@ -52,6 +54,23 @@
   function toggleChat() {
     chatOpen = !chatOpen;
     writeChatOpen(chatOpen);
+  }
+
+  let shareWritten = $state<{ canvasId: string; token: string | null } | null>(null);
+  const shareToken = $derived(
+    shareWritten?.canvasId === canvasId ? shareWritten.token : ((page.data.shareToken as string | null | undefined) ?? null)
+  );
+
+  async function onShare(state: ShareState) {
+    const body = new FormData();
+    body.set('state', state);
+    const res = await fetch(`/p/${projectId}/c/${canvasId}?/share_canvas`, { method: 'POST', body });
+    const result = deserialize(await res.text());
+    if (result.type !== 'success') {
+      console.error('condivisione della tela fallita', result);
+      return;
+    }
+    shareWritten = { canvasId, token: (result.data?.shareToken as string | null) ?? null };
   }
 
   $effect(() => {
@@ -90,13 +109,23 @@
       <div class="canvas-stage">
         {@render children()}
         <CanvasTopBar
+          {projectId}
           projectName={data.project.name}
-          projects={data.projects.map((p: { id: string; name: string; href: string }) => ({ id: p.id, name: p.name, href: p.href }))}
+          projects={data.projects.map((p: { id: string; name: string; href: string; updatedAt: string }) => ({
+            id: p.id,
+            name: p.name,
+            href: p.href,
+            updatedAt: p.updatedAt
+          }))}
           canvasName={currentCanvas?.name ?? ''}
           canvases={data.canvases}
           creditBalance={data.creditBalance}
           {chatOpen}
           onToggleChat={toggleChat}
+          {shareToken}
+          {onShare}
+          profile={data.profile}
+          org={data.org}
         />
         <FloatingRail
           activePanel={leftPanel}

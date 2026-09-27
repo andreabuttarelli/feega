@@ -1,6 +1,7 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
   import { page } from '$app/stores';
+  import { billingPath } from '$lib/billing-path';
   import { onMount } from 'svelte';
   import { _ } from 'svelte-i18n';
 
@@ -59,7 +60,7 @@
     <div class="panel-head"><div class="t">{$_('app.settings.ads.accountsTitle')}</div></div>
     <div class="field">
       <div class="fs">{$_('app.settings.ads.proOnly')}</div>
-      <a class="mini connect" href="/app/billing">{$_('app.settings.ads.upgrade')}</a>
+      <a class="mini connect" href={billingPath($page.params.projectId ?? '')}>{$_('app.settings.ads.upgrade')}</a>
     </div>
   </section>
 {:else}

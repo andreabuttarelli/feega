@@ -70,12 +70,4 @@ describe('dazeroBillingProvider', () => {
 		expect(dazeroBillingProvider.isTopPlan('pro')).toBe(true);
 		expect(dazeroBillingProvider.isTopPlan(null)).toBe(false);
 	});
-
-	it('upgradeUrl points at the brand billing settings when a slug is known', async () => {
-		const { dazeroBillingProvider } = await import('./dazero-provider');
-		expect(dazeroBillingProvider.upgradeUrl({ brandId: 'b', brandSlug: 'demo' })).toBe(
-			'/app/demo/settings/billing'
-		);
-		expect(dazeroBillingProvider.upgradeUrl({ brandId: 'b' })).toBeUndefined();
-	});
 });

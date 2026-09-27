@@ -679,3 +679,48 @@ describe('hasUpstreamText — se un nodo ha un testo a monte da usare come promp
     expect(hasUpstreamText(nodes, edges, 'v1')).toBe(true);
   });
 });
+
+describe('resolveUpstreamInputs — riferimenti scelti sul nodo', () => {
+  it('senza fili, i riferimenti scelti entrano da soli e non diventano la base da modificare', () => {
+    const nodes = [node({ id: 'i1', type: 'image', model: 'qwen3-pro', referenceUrls: ['https://cat/a.png', 'https://cat/b.png'] })];
+
+    const out = resolveUpstreamInputs(nodes, [], 'i1', TEXT_IMAGE);
+
+    expect(out.referenceImageUrls).toEqual(['https://cat/a.png', 'https://cat/b.png']);
+    expect(out.pickedImageUrls).toEqual(['https://cat/a.png', 'https://cat/b.png']);
+    expect(out.referenceImageUrl).toBeNull();
+  });
+
+  it('prima i fili, poi i scelti, fino al tetto del modello', () => {
+    const nodes = [
+      node({ id: 'i1', type: 'image', model: 'qwen3-pro', referenceUrls: ['https://cat/a.png', 'https://cat/b.png', 'https://cat/c.png'] }),
+      node({ id: 'r1', type: 'image', mediaUrl: 'https://cdn/1.png' })
+    ];
+    const edges = [edge({ id: 'e1', sourceNodeId: 'r1', targetNodeId: 'i1' })];
+
+    const out = resolveUpstreamInputs(nodes, edges, 'i1', TEXT_IMAGE);
+
+    expect(out.referenceImageUrls).toEqual(['https://cdn/1.png', 'https://cat/a.png', 'https://cat/b.png']);
+    expect(out.pickedImageUrls).toEqual(['https://cat/a.png', 'https://cat/b.png']);
+    expect(out.referenceImageUrl).toBe('https://cdn/1.png');
+    expect(out.rejected).toEqual([{ nodeId: 'i1', why: expect.stringContaining('al massimo 3') }]);
+  });
+
+  it('un modello senza ingresso immagine rifiuta i riferimenti scelti', () => {
+    const nodes = [node({ id: 'i1', type: 'image', referenceUrls: ['https://cat/a.png'] })];
+
+    const out = resolveUpstreamInputs(nodes, [], 'i1', TEXT_ONLY);
+
+    expect(out.referenceImageUrls).toEqual([]);
+    expect(out.rejected).toEqual([{ nodeId: 'i1', why: expect.stringContaining('connettore') }]);
+  });
+
+  it('su un video i scelti vanno fra i riferimenti immagine', () => {
+    const nodes = [node({ id: 'v1', type: 'video', model: 'bytedance/seedance-2-5', referenceUrls: ['https://cat/a.png'] })];
+
+    const out = resolveUpstreamInputs(nodes, [], 'v1', TEXT_IMAGE_VIDEO_AUDIO);
+
+    expect(out.referenceImageUrls).toEqual(['https://cat/a.png']);
+    expect(out.startFrameUrl).toBeNull();
+  });
+});

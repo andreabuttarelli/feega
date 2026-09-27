@@ -128,8 +128,7 @@
       "create": "Create account",
       "sendReset": "Send reset link",
       "or": "or",
-      "github": "Continue with GitHub",
-      "google": "Continue with Google"
+      "github": "Continue with GitHub"
     },
     "inapp": {
       "title": "Open in your browser",
@@ -248,9 +247,9 @@
       "settings": "Settings",
       "upgrade": "Upgrade",
       "workspace": "Workspace",
-      "sectionPublishing": "Publishing",
       "sectionAccount": "Account",
-      "sectionBrand": "Brand"
+      "sectionBrand": "Brand",
+      "sectionProject": "Project"
     },
     "hub": {
       "publish": {
@@ -272,6 +271,11 @@
       "resizeChat": "Resize chat",
       "collapseChat": "Collapse chat",
       "expandChat": "Show chat",
+      "share": "Share",
+      "shareAnyone": "Anyone with the link can view",
+      "shareCopy": "Copy",
+      "shareCopied": "Copied",
+      "shareNewLink": "New link (old one stops working)",
       "chatTab": "Chat",
       "guideTab": "Guide",
       "guideBack": "Back to guides",
@@ -279,10 +283,19 @@
         "canvas": "Canvas",
         "chat": "Chat",
         "more": "More"
+      },
+      "menu": {
+        "open": "Menu",
+        "home": "Home",
+        "shortcuts": "Keyboard shortcuts",
+        "settings": "Settings",
+        "billing": "Billing & credits",
+        "changelog": "Changelog",
+        "logout": "Sign out",
+        "navigate": "Navigate",
+        "help": "Help",
+        "account": "Account"
       }
-    },
-    "brands": {
-      "newBrand": "New brand"
     },
     "settings": {
       "team": {
@@ -383,25 +396,6 @@
       "usage": {
         "creditsUsed": "Credits used"
       },
-      "referrals": {
-        "title": "Referrals",
-        "headline": "Gift {credits} credits — get {credits} back",
-        "subtitle": "Share your link. When a founder signs up and creates their first brand, you both get {credits} AI credits.",
-        "yourLink": "Your invite link",
-        "copyLink": "Copy link",
-        "copied": "Copied",
-        "badgeTitle": "Public badge",
-        "badgeDesc": "Paste this on your site. It links to your invite and credits both of you when someone starts with feega.",
-        "copyBadge": "Copy badge HTML",
-        "blogNoteTitle": "On your feega blog",
-        "blogNote": "The Powered by feega badge is already in your public blog footer — with your referral link baked in.",
-        "statCredited": "Successful invites",
-        "statCredits": "Credits earned",
-        "history": "Recent referrals",
-        "statusCredited": "Credited",
-        "statusRejected": "Rejected",
-        "empty": "No referrals yet — share your link to start earning credits."
-      },
       "cancel": {
         "back": "Back"
       },
@@ -471,7 +465,6 @@
         }
       },
       "ads": {
-        "nav": "Ads",
         "accountsNav": "Ads accounts",
         "budgetNav": "Budget & defaults",
         "accountsTitle": "Ads accounts",
@@ -505,6 +498,9 @@
         "connectBody": "Separate from posting: Meta Ads runs on a Facebook token with the ads scopes, Google Ads needs its own dedicated connection.",
         "connectMeta": "Connect Meta Ads",
         "connectGoogle": "Connect Google Ads"
+      },
+      "project": {
+        "title": "Project"
       }
     },
     "studio": {
@@ -523,7 +519,6 @@
         "breakdownTitle": "Usage by brand",
         "brandCol": "Brand",
         "creditsCol": "Credits used",
-        "noBrands": "Create a brand to start.",
         "ladderTitle": "Buy credits",
         "ladderDesc": "Subscription credits renew monthly and expire at period end. One-time credits never expire.",
         "priceCol": "Price",
@@ -534,11 +529,9 @@
       }
     },
     "ads": {
-      "proposeBoosts": "Propose boosts",
       "refresh": "Refresh",
       "cancelCreate": "Cancel",
       "approvedOk": "Campaign approved and sent to the platform.",
-      "proposedOk": "Created {n} boost proposal(s).",
       "spend": "Spend",
       "impressions": "Impressions",
       "clicks": "Clicks",
@@ -556,13 +549,27 @@
       "landingUrl": "Landing page URL",
       "createHint": "Saves a proposal only — nothing spends until you Approve.",
       "saveProposal": "Save proposal",
-      "candidates": "Boost candidates",
-      "candidatesSub": "Top organic posts ready to amplify",
-      "candidatesHint": "Click Propose boosts to turn these into approve-ready proposals.",
       "campaigns": "Campaigns",
       "empty": "No campaigns yet. Propose boosts from your winners, or create a standalone ad.",
       "approve": "Approve & spend",
       "reject": "Reject",
+      "noBrand": {
+        "title": "Link or create a brand to use Ads",
+        "body": "Ads run against a brand's posts and ad account. Link this project to one, or create a new one.",
+        "cta": "Create or link a brand"
+      },
+      "noAdAccount": {
+        "title": "Connect a Meta Ads account",
+        "body": "Link {brand}'s Meta Ads account to propose boosts and launch campaigns.",
+        "cta": "Connect Meta Ads",
+        "unavailable": "Meta Ads connect isn't wired up yet for this brand."
+      },
+      "steps": {
+        "title": "How Social ads work",
+        "one": "Connect a Meta Ads account",
+        "two": "Propose a boost from a winning post, or create a campaign",
+        "three": "Approve — nothing spends until then"
+      },
       "overview": {
         "charts": "Ads performance",
         "spendTrend": "Spend (ours)",
@@ -733,9 +740,7 @@
         "variantPlaceholder": "Variant {n}",
         "noAccountYet": "You can save the proposal without a connected ad account — it just cannot launch until you connect one."
       },
-      "proposing": "Finding winners…",
       "syncing": "Syncing…",
-      "noCandidates": "No organic post ready to amplify yet — publish something and come back.",
       "pendingTitle": "Waiting for approval",
       "pendingSub": "No spend starts without your go-ahead",
       "typeBoost": "Post boost",

@@ -2,6 +2,7 @@ import { redirect, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { ensureBrandProfile, getConnectUrl } from '$lib/server/zernio';
 import { canAffordSeat } from '$lib/server/social-connections';
+import { billingPath } from '$lib/billing-path';
 import { brandSlugOf } from '$lib/server/tenancy/brand-slug';
 
 // Ensures the brand's own Zernio profile exists, then redirects to the platform OAuth.
@@ -22,7 +23,7 @@ export const GET: RequestHandler = async ({ params, url, locals: { supabase, saf
 
   // No credits for the first month's fee — send them to buy some before connecting.
   if (!(await canAffordSeat(supabase, brand.org_id))) {
-    throw redirect(303, '/app/billing');
+    throw redirect(303, billingPath(params.projectId));
   }
 
   const profileId = await ensureBrandProfile(brand);

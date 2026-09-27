@@ -49,3 +49,20 @@ describe('cosa si può mettere sulla tela', () => {
     expect(isGenAddable('doc')).toBe(false);
   });
 });
+
+describe('la barra mostra solo i nodi pronti', () => {
+  it('la pagina web resta aggiungibile ma non compare nella barra', async () => {
+    const { CANVAS_ADD_BAR } = await import('./addable');
+    expect(CANVAS_ADD_BAR).not.toContain('iframe');
+    expect(CANVAS_ADDABLE).toContain('iframe');
+    expect(CANVAS_ADD_BAR.every((w) => CANVAS_ADDABLE.includes(w))).toBe(true);
+  });
+});
+
+describe('la barra corta: tre voci in vista, il resto in «Altro»', () => {
+  it('testo, immagine e video in vista; nessuna voce persa né doppia', async () => {
+    const { CANVAS_BAR_MAIN, CANVAS_BAR_MORE, CANVAS_ADD_BAR } = await import('./addable');
+    expect(CANVAS_BAR_MAIN).toEqual(['text', 'image', 'video']);
+    expect([...CANVAS_BAR_MAIN, ...CANVAS_BAR_MORE].sort()).toEqual([...CANVAS_ADD_BAR].sort());
+  });
+});

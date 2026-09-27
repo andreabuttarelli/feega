@@ -2,13 +2,14 @@ import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
+import { fakeDb } from '$lib/server/db/fake-db';
 
 /**
  * La home del progetto rimanda alla prima tela. Due cose che il redirect deve rispettare:
  *
  *   1. la destinazione è DENTRO il progetto — da /p/abc si va a /p/abc/c/xyz,
  *      non a /c/xyz, che non è la rotta di nessuno;
- *   2. senza tele si torna a /app, che è un livello sopra e ci sta.
+ *   2. senza tele ne nasce una nel progetto: /app è deprecato.
  */
 const redirect = vi.fn((status: number, location: string) => {
 	const e = new Error(`redirect ${status} ${location}`) as Error & { status: number; location: string };
@@ -23,7 +24,8 @@ async function loadHome(canvases: Array<{ id: string }>, projectId = 'proj1') {
 	const mod = await import('./+page.server');
 	try {
 		await (mod.load as (e: unknown) => Promise<unknown>)({
-			parent: async () => ({ project: { id: projectId }, canvases })
+			parent: async () => ({ project: { id: projectId }, org: { id: 'org1' }, canvases }),
+			locals: { db: async () => fakeDb({ canvases: [] }).db }
 		});
 		return { redirected: null as null | { status: number; location: string } };
 	} catch (e) {
@@ -39,9 +41,9 @@ describe('la home del progetto rimanda alla prima tela del progetto', () => {
 		expect(redirected?.location).toBe('/p/proj1/c/c1');
 	});
 
-	it('senza tele si torna a /app', async () => {
+	it('senza tele ne crea una nel progetto invece di passare da /app', async () => {
 		const { redirected } = await loadHome([]);
-		expect(redirected?.location).toBe('/app');
+		expect(redirected?.location).toBe('/p/proj1/c/generated-id');
 	});
 
 	it('usa la prima tela, non una qualsiasi', async () => {

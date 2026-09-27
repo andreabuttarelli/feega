@@ -200,6 +200,7 @@ export type AccountDeliveryStatus = {
   status: string;
   url: string | null;
   error: string | null;
+  scheduledFor: string | null;
 };
 
 /**
@@ -226,14 +227,22 @@ export async function deliveryStatus(
     const platform = platformOf.get(accountId) ?? ('' as Platform);
     try {
       const remote = await publisher.postStatus(zernioPostId);
-      results.push({ accountId, platform, status: remote.status, url: remote.url, error: remote.error });
+      results.push({
+        accountId,
+        platform,
+        status: remote.status,
+        url: remote.url,
+        error: remote.error,
+        scheduledFor: remote.scheduledFor
+      });
     } catch (e) {
       results.push({
         accountId,
         platform,
         status: 'unreachable',
         url: null,
-        error: e instanceof Error ? e.message : 'zernio_unreachable'
+        error: e instanceof Error ? e.message : 'zernio_unreachable',
+        scheduledFor: null
       });
     }
   }

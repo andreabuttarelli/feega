@@ -5,18 +5,14 @@ import type { SocialAccount } from '$lib/server/repos/social-accounts';
 import type { Post } from '$lib/server/repos/posts';
 import type { AccountDeliveryStatus } from '$lib/server/repos/post-delivery';
 
-/**
- * IL CALENDARIO LEGGE ZERNIO DAL VIVO — non una copia. Ogni post porta le sue `deliveries`,
- * chieste a Zernio una per una tramite `posts.zernio_post_ids` (decisione utente, 2026-09-22): se
- * Zernio non risponde, la pagina lo dice invece di mostrare una settimana vuota o vecchia (vedi
- * `+page.server.ts`, che intercetta l'errore).
- */
+export const ALL_BRANDS = 'all';
+
 export type CalendarPost = Post & { deliveries: AccountDeliveryStatus[] };
 
 export type CalendarData = {
-  brand: Brand | null;
   brands: Brand[];
-  accounts: SocialAccount[];
+  selection: string;
+  accountsByBrand: Record<string, SocialAccount[]>;
   posts: CalendarPost[];
 };
 
@@ -31,50 +27,28 @@ type CalendarRepos = {
   ) => Promise<AccountDeliveryStatus[]>;
 };
 
-/**
- * Senza brand, il progetto non ha un calendario — solo la scelta fra i brand dell'org (o crearne
- * uno, in Settings → Brand). `brandId` arriva già risolto da `+page.server.ts`, che sa come farlo
- * senza incappare nelle colonne del vecchio schema (`brand-shell.ts`).
- */
-export async function buildCalendarData(
-  repos: CalendarRepos,
-  input: { orgId: string; brandId: string | null; db: Db; publisher: SocialPublisher }
-): Promise<CalendarData> {
-  if (!input.brandId) {
-    const brands = await repos.listOrgBrands(input.db, input.orgId);
-    return { brand: null, brands, accounts: [], posts: [] };
-  }
+type CalendarInput = { orgId: string; brandParam: string | null; db: Db; publisher: SocialPublisher };
 
-  const [brands, accounts, posts] = await Promise.all([
-    repos.listOrgBrands(input.db, input.orgId),
-    repos.listBrandAccounts(input.db, { orgId: input.orgId, brandId: input.brandId }),
-    repos.listPosts(input.db, { orgId: input.orgId, brandId: input.brandId })
+export async function buildCalendarData(repos: CalendarRepos, input: CalendarInput): Promise<CalendarData> {
+  const brands = await repos.listOrgBrands(input.db, input.orgId);
+  const picked = brands.find((b) => b.slug === input.brandParam);
+  const shown = picked ? [picked] : brands;
+
+  const [accountLists, postLists] = await Promise.all([
+    Promise.all(brands.map((b) => repos.listBrandAccounts(input.db, { orgId: input.orgId, brandId: b.id }))),
+    Promise.all(shown.map((b) => repos.listPosts(input.db, { orgId: input.orgId, brandId: b.id })))
   ]);
 
-  const brand = brands.find((b) => b.id === input.brandId) ?? null;
+  const accountsByBrand = Object.fromEntries(brands.map((b, i) => [b.id, accountLists[i]]));
 
-  const withDeliveries = await Promise.all(
-    posts.map(async (post) => ({
-      ...post,
-      deliveries: await deliveriesOrEmpty(repos, input, post.id)
-    }))
+  const posts = await Promise.all(
+    postLists.flat().map(async (post) => ({ ...post, deliveries: await deliveriesOrEmpty(repos, input, post.id) }))
   );
 
-  return { brand, brands, accounts, posts: withDeliveries };
+  return { brands, selection: picked?.slug ?? ALL_BRANDS, accountsByBrand, posts };
 }
 
-/**
- * `posts.zernio_post_ids` esiste solo dopo che la migration
- * (`supabase/canvas-migrations/20260922_drop_scheduled_posts.sql`) è applicata — scritta, non
- * ancora eseguita. Finché non lo è, ogni post appare senza consegne invece di far cadere l'intera
- * pagina con un 500: non è una bugia (non dice "pubblicato" quando non lo è), è la stessa verità
- * che avrebbe un post appena creato, mai consegnato.
- */
-async function deliveriesOrEmpty(
-  repos: CalendarRepos,
-  input: { orgId: string; db: Db; publisher: SocialPublisher },
-  postId: string
-): Promise<AccountDeliveryStatus[]> {
+async function deliveriesOrEmpty(repos: CalendarRepos, input: CalendarInput, postId: string): Promise<AccountDeliveryStatus[]> {
   try {
     return await repos.deliveryStatus(input.db, input.publisher, { orgId: input.orgId, postId });
   } catch {

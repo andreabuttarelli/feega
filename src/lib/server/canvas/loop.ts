@@ -61,6 +61,8 @@ import { creditsForRun } from '$lib/canvas/gen-cost';
 import { decideWithJev } from '$lib/server/jev';
 import { effectiveModel } from '$lib/canvas/default-models';
 import { resolvedListValues, upstreamInputsFor } from './upstream';
+import { syncedSourceItems } from './synced-items';
+import type { Connection } from '$lib/server/repos/canvas';
 import { orgCreditBalance } from '$lib/server/credits';
 import { createAdminClient } from '$lib/server/supabase-admin';
 import type { Actor } from '$lib/server/repos/actor';
@@ -88,6 +90,25 @@ function combineOf(node: CanvasNodeRecord): LoopCombine {
   return paramsOf(node).combine === 'zip' ? 'zip' : 'product';
 }
 
+/** Quanti item un possibile asse porta — `list` conta i suoi valori risolti, `products`/
+ *  `social_account_feed` le righe sincronizzate, ogni altro tipo zero (non è un asse, `axesFrom`
+ *  lo rifiuterà comunque): la stessa tabella di `select-node.ts::SELECTABLE_SOURCE_TYPES`. */
+async function itemCountOf(
+  db: Db,
+  orgId: string,
+  source: CanvasNodeRecord,
+  connections: Connection[],
+  canvasNodes: Map<string, CanvasNodeRecord>
+): Promise<number> {
+  if (source.type === 'list') {
+    return (await resolvedListValues(db, orgId, source, connections, canvasNodes)).values.length;
+  }
+  if (source.type === 'products' || source.type === 'social_account_feed') {
+    return (await syncedSourceItems(db, orgId, source)).length;
+  }
+  return 0;
+}
+
 async function axesForNode(db: Db, scope: { orgId: string; canvasId: string; nodeId: string }) {
   const [nodes, connections] = await Promise.all([
     listNodes(db, { orgId: scope.orgId, canvasId: scope.canvasId }),
@@ -100,9 +121,7 @@ async function axesForNode(db: Db, scope: { orgId: string; canvasId: string; nod
   for (const edge of incoming) {
     const source = canvasNodes.get(edge.sourceNodeId);
     if (!source) continue;
-    const itemCount = source.type === 'list'
-      ? (await resolvedListValues(db, scope.orgId, source, connections, canvasNodes)).values.length
-      : 0;
+    const itemCount = await itemCountOf(db, scope.orgId, source, connections, canvasNodes);
     nodesById.set(source.id, { id: source.id, type: source.type, itemCount });
   }
 
@@ -217,9 +236,8 @@ async function wholeLoopCreditsAvailable(orgId: string, cost: LoopCostPreview): 
   if (cost.total === null) {
     return true;
   }
-  const admin = createAdminClient();
   try {
-    const balance = await orgCreditBalance(admin, orgId);
+    const balance = await orgCreditBalance(createAdminClient(), orgId);
     return balance >= cost.total;
   } catch {
     // Fail-open, come `gateOrgCreditsCore`: un saldo illeggibile non deve bloccare un loop che

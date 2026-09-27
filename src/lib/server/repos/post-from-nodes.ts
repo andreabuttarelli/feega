@@ -7,8 +7,9 @@ import { uploadedNodeOf } from '$lib/canvas/uploaded-node';
 /**
  * DAI NODI DELLA TELA A UN POST — la promozione (NEW_DATABASE_STRUCTURE.md: "canvas → post").
  * Ogni nodo passato diventa una sorgente (`post_sources`), e i nodi che portano un asset (image,
- * video, doc/text caricati o generati) entrano in `posts.media` nell'ordine di lettura della tela:
- * alto→basso, poi sinistra→destra — lo stesso ordine in cui un occhio la percorre.
+ * video, doc/text caricati o generati) entrano in `posts.media` nell'ordine di `mediaOrder`, se
+ * chi chiama lo passa (il composer, dopo che l'utente ha riordinato); senza `mediaOrder` si torna
+ * all'ordine di lettura della tela: alto→basso, poi sinistra→destra.
  *
  * UN ASSET SI RISOLVE IN DUE MODI, MAI UN TERZO: `data.assetId` per un nodo caricato
  * (`uploaded-node.ts`), `data.output_asset_id` per un nodo generato — e solo quando
@@ -58,6 +59,10 @@ function captionOf(node: CanvasNodeRecord): string | null {
   return null;
 }
 
+function byMediaOrder(mediaOrder: string[]): (a: { nodeId: string }, b: { nodeId: string }) => number {
+  return (a, b) => mediaOrder.indexOf(a.nodeId) - mediaOrder.indexOf(b.nodeId);
+}
+
 export async function promoteNodesToPost(
   db: Db,
   repos: { canvas: CanvasRepo; posts: PostsRepo },
@@ -66,6 +71,7 @@ export async function promoteNodesToPost(
     brandId: string;
     nodeIds: string[];
     caption?: string;
+    mediaOrder?: string[];
     actorKind?: ActorKind;
     actorId?: string | null;
   }
@@ -78,18 +84,15 @@ export async function promoteNodesToPost(
     throw new Error(`node_not_found: ${missing.join(', ')}`);
   }
 
-  const ordered = [...nodes].sort(readingOrder);
+  const readOrder = [...nodes].sort(readingOrder);
 
-  const media: PostMedia[] = [];
+  const mediaAssets: { nodeId: string; assetId: string }[] = [];
   const sources: { nodeId: string; role: string }[] = [];
   const captionParts: string[] = [];
 
-  for (const node of ordered) {
+  for (const node of readOrder) {
     const caption = captionOf(node);
     if (caption !== null) {
-      // Un `caption` esplicito arriva già scelto da chi chiama (il composer): i nodi restano
-      // sorgenti — `post_sources` non deve dimenticare da dove il post nasce — ma non concatenano
-      // più il proprio testo, che sarebbe una seconda caption che nessuno ha scelto.
       if (input.caption === undefined) {
         captionParts.push(caption);
       }
@@ -99,13 +102,23 @@ export async function promoteNodesToPost(
 
     const assetId = assetIdOf(node);
     if (assetId) {
-      media.push({ assetId, order: media.length, role: 'media' });
+      mediaAssets.push({ nodeId: node.id, assetId });
       sources.push({ nodeId: node.id, role: 'media' });
       continue;
     }
 
     sources.push({ nodeId: node.id, role: 'reference' });
   }
+
+  const orderedMediaAssets = input.mediaOrder
+    ? mediaAssets.filter((m) => input.mediaOrder!.includes(m.nodeId)).sort(byMediaOrder(input.mediaOrder))
+    : mediaAssets;
+
+  const media: PostMedia[] = orderedMediaAssets.map((m, index) => ({
+    assetId: m.assetId,
+    order: index,
+    role: 'media'
+  }));
 
   return repos.posts.promoteToPost(db, {
     orgId: input.orgId,
