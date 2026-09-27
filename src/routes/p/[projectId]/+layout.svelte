@@ -124,6 +124,8 @@
           onToggleChat={toggleChat}
           {shareToken}
           {onShare}
+          profile={data.profile}
+          org={data.org}
         />
         <FloatingRail
           activePanel={leftPanel}

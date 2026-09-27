@@ -53,4 +53,37 @@ describe('la tabella delle voci del menu', () => {
   it('ha un nome accessibile: un\'icona sola non si legge', () => {
     expect(menu).toMatch(/aria-label/);
   });
+
+  it('ogni voce porta un gruppo esplicito (navigate, help, account)', () => {
+    expect(menu).toMatch(/group:\s*['"`]navigate['"`]/);
+    expect(menu).toMatch(/group:\s*['"`]help['"`]/);
+    expect(menu).toMatch(/group:\s*['"`]account['"`]/);
+  });
+
+  it('la fatturazione mostra il saldo crediti nel menu', () => {
+    expect(menu).toMatch(/creditBalance/);
+    expect(menu).toMatch(/CreditAmount/);
+  });
+
+  it('esci è in tono muto/danger, non uguale alle altre voci', () => {
+    expect(menu).toMatch(/variant="destructive"|is-danger/);
+  });
+
+  it('riceve profilo e org dai dati di pagina per l\'header', () => {
+    expect(menu).toMatch(/profile/);
+    expect(menu).toMatch(/org/);
+  });
+
+  it('mostra nome e email nell\'header del menu', () => {
+    expect(menu).toMatch(/profile\.name/);
+    expect(menu).toMatch(/profile\.email/);
+  });
+});
+
+describe('CanvasTopBar passa profilo, org e saldo al menu', () => {
+  it('inoltra profile, org e creditBalance a CanvasMenu', () => {
+    expect(top).toMatch(/<CanvasMenu[\s\S]*?profile[\s\S]*?\/>/);
+    expect(top).toMatch(/<CanvasMenu[\s\S]*?org[\s\S]*?\/>/);
+    expect(top).toMatch(/<CanvasMenu[\s\S]*?creditBalance[\s\S]*?\/>/);
+  });
 });

@@ -291,8 +291,12 @@
         "home": "Home",
         "shortcuts": "Keyboard shortcuts",
         "settings": "Settings",
-        "billing": "Billing",
-        "logout": "Sign out"
+        "billing": "Billing & credits",
+        "changelog": "Changelog",
+        "logout": "Sign out",
+        "navigate": "Navigate",
+        "help": "Help",
+        "account": "Account"
       }
     },
     "brands": {

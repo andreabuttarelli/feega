@@ -33,7 +33,9 @@
     chatOpen,
     onToggleChat,
     shareToken,
-    onShare
+    onShare,
+    profile,
+    org
   }: {
     projectId: string;
     projectName: string;
@@ -45,6 +47,8 @@
     onToggleChat: () => void;
     shareToken: string | null;
     onShare: (state: ShareState) => Promise<void>;
+    profile: { name: string | null; email: string; avatarUrl: string | null };
+    org: { name: string } | null;
   } = $props();
 
   /** "3 Sep" o "14:20" per oggi: distingue progetti con lo stesso nome nel menu. */
@@ -66,7 +70,7 @@
 
 <header class="canvas-topbar">
   <div class="top-box left">
-    <CanvasMenu {projectId} />
+    <CanvasMenu {projectId} {profile} {org} {creditBalance} />
 
     <DropdownMenu.Root>
       <DropdownMenu.Trigger class="switcher-btn">
