@@ -54,7 +54,12 @@ import {
 } from '$lib/server/repos/node-runs';
 import { planCombinations, loopSafety, type LoopCombine, type PlannedCombination, type LoopSafety } from '$lib/canvas/loop-plan';
 import { axesFrom, iterateSelectionFor, type LoopEdge, type LoopSourceNode } from '$lib/canvas/loop-axes';
-import { estimateLoopCredits, type LoopCostEstimate } from './loop-cost';
+import { estimateLoopCredits, type LoopCostPreview } from './loop-cost';
+import { canvasModelCatalogue } from '$lib/server/canvas-catalogue';
+import { estimateCanvasTextCost } from './text-cost-estimate';
+import { creditsForRun } from '$lib/canvas/gen-cost';
+import { decideWithJev } from '$lib/server/jev';
+import { effectiveModel } from '$lib/canvas/default-models';
 import { resolvedListValues, upstreamInputsFor } from './upstream';
 import { orgCreditBalance } from '$lib/server/credits';
 import { createAdminClient } from '$lib/server/supabase-admin';
@@ -114,8 +119,74 @@ export type LoopPlanResult = {
   shortestWins: { nodeId: string; length: number } | null;
   rejectedAxes: { nodeId: string; why: string }[];
   safety: LoopSafety;
-  cost: LoopCostEstimate;
+  cost: LoopCostPreview;
 };
+
+async function loopCreditsFor(
+  db: Db,
+  scope: LoopPlanInput,
+  node: CanvasNodeRecord,
+  combinations: PlannedCombination[]
+): Promise<LoopCostPreview> {
+  const medium = (node.type === 'text' || node.type === 'video' ? node.type : 'image') as GenMedium;
+  const savedModel = typeof node.data.model === 'string' ? node.data.model : null;
+  if (medium !== 'text') {
+    return estimateLoopCredits({ medium, model: savedModel, count: combinations.length });
+  }
+
+  const choices = (await canvasModelCatalogue()).text.choices;
+  const model = effectiveModel('text', savedModel, choices);
+  const choice = choices.find((candidate) => candidate.id === model);
+  if (!choice?.textPricing) {
+    return { perRun: null, total: null };
+  }
+
+  let total = 0;
+  const decide = process.env.TYPESAFE_API_KEY ? decideWithJev : null;
+  const estimates = new Map<string, ReturnType<typeof estimateCanvasTextCost>>();
+  for (const combination of combinations) {
+    const upstream = await upstreamInputsFor(db, {
+      ...scope,
+      model,
+      medium: 'text',
+      iterateSelection: iterateSelectionFor(combination.values)
+    });
+    const inputCost =
+      upstream.referenceImageUrls.length || upstream.referenceVideoUrls.length || upstream.referenceAudioUrls.length
+        ? 'variable_media'
+        : 'fixed';
+    const estimateKey = JSON.stringify([upstream.text, node.data.prompt, inputCost]);
+    const pendingEstimate = estimates.get(estimateKey) ?? estimateCanvasTextCost({
+      material: upstream.text,
+      ownPrompt: typeof node.data.prompt === 'string' ? node.data.prompt : '',
+      inputCost,
+      decide
+    });
+    estimates.set(estimateKey, pendingEstimate);
+    const estimate = await pendingEstimate;
+    if (estimate.variableInput) {
+      return { perRun: null, total: null };
+    }
+    const credits = creditsForRun({
+      medium: 'text',
+      model: {
+        ...choice,
+        textPricing: { ...choice.textPricing, estimatedOutputTokens: estimate.estimatedOutputTokens }
+      },
+      params: {},
+      textInputTokens: estimate.systemPromptTokens + estimate.userPromptTokens
+    });
+    if (credits === null) {
+      return { perRun: null, total: null };
+    }
+    total += credits;
+  }
+
+  return {
+    perRun: combinations.length ? Math.round(total / combinations.length) : 0,
+    total
+  };
+}
 
 /** Il preventivo: stessa pianificazione di `enqueueLoop`, senza scrivere niente — CLAUDE.md lo
  *  chiede esplicito prima del clic. */
@@ -127,9 +198,7 @@ export async function planLoop(db: Db, input: LoopPlanInput): Promise<LoopPlanRe
 
   const { axes, rejected } = await axesForNode(db, input);
   const plan = planCombinations(axes, combineOf(node), repeatOf(node));
-  const medium = (node.type === 'text' || node.type === 'video' ? node.type : 'image') as GenMedium;
-  const model = typeof node.data.model === 'string' ? node.data.model : null;
-  const cost = estimateLoopCredits({ medium, model, count: plan.combinations.length });
+  const cost = await loopCreditsFor(db, input, node, plan.combinations);
   const safety = loopSafety(plan.combinations.length);
 
   return { node, combinations: plan.combinations, shortestWins: plan.shortestWins, rejectedAxes: rejected, safety, cost };
@@ -144,7 +213,10 @@ export async function planLoop(db: Db, input: LoopPlanInput): Promise<LoopPlanRe
  * per il cancello di un giro solo, da quando quel cancello è passato dalla vecchia quota mensile
  * al saldo del ledger. Leggerne una diversa qui darebbe un preventivo che il gate vero smentisce.
  */
-async function wholeLoopCreditsAvailable(orgId: string, cost: LoopCostEstimate): Promise<boolean> {
+async function wholeLoopCreditsAvailable(orgId: string, cost: LoopCostPreview): Promise<boolean> {
+  if (cost.total === null) {
+    return true;
+  }
   const admin = createAdminClient();
   try {
     const balance = await orgCreditBalance(admin, orgId);
@@ -182,7 +254,7 @@ type LoopTicket = {
 
 export type LoopEnqueueOutcome =
   | { kind: 'refused'; error: string }
-  | { kind: 'needs_confirmation'; count: number; cost: LoopCostEstimate }
+  | { kind: 'needs_confirmation'; count: number; cost: LoopCostPreview }
   | { kind: 'enqueued'; total: number; outputListNodeId: string; runIds: string[] };
 
 /**
@@ -250,9 +322,8 @@ export async function enqueueLoop(db: Db, input: LoopEnqueueInput): Promise<Loop
     return { kind: 'refused', error: `troppe combinazioni (${safety.count}): dividi il loop` };
   }
 
-  const medium = (node.type === 'text' || node.type === 'video' ? node.type : 'image') as GenMedium;
+  const cost = await loopCreditsFor(db, { orgId: input.orgId, canvasId: input.canvasId, nodeId: input.nodeId }, node, plan.combinations);
   const model = typeof node.data.model === 'string' ? node.data.model : null;
-  const cost = estimateLoopCredits({ medium, model, count: plan.combinations.length });
 
   if (safety.verdict === 'confirm' && !input.confirmed) {
     return { kind: 'needs_confirmation', count: safety.count, cost };

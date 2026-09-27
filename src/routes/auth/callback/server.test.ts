@@ -11,8 +11,8 @@ const { GET } = await import('./+server');
 async function redirectFor(code: string) {
   const event = {
     url: new URL(`https://feega.app/auth/callback?code=${code}`),
-    cookies: {},
-    locals: { supabase: { auth: { exchangeCodeForSession } } }
+    cookies: { get: () => undefined },
+    locals: { supabase: { auth: { exchangeCodeForSession } }, db: async () => null }
   };
 
   try {

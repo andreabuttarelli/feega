@@ -43,31 +43,25 @@
     loadSeline();
   });
 
-  /** Non-brand /app shells that already own their own UI (don't cover with entry shimmer). */
-  const APP_RESERVED = new Set(['onboarding', 'api-keys']);
-
   function appNavScope(pathname: string): string | null {
-    if (pathname === '/app') return 'app-root';
-    const m = pathname.match(/^\/app\/([^/]+)/);
-    if (!m) return null;
-    if (APP_RESERVED.has(m[1])) return m[1];
-    return `brand:${m[1]}`;
+    const m = pathname.match(/^\/p\/([^/]+)/);
+    return m ? `project:${m[1]}` : null;
   }
 
   // Optimistic entry into the app: show the destination shell immediately while loads /
-  // redirect chains (/app → /app/[brand]) finish. Same-brand navigations keep using the
-  // brand layout's WorkbenchPageShimmer instead.
+  // redirect chains (/app → /p/<projectId>) finish. Same-project navigations keep using the
+  // project layout's WorkbenchPageShimmer instead.
   const showAppEntry = $derived.by(() => {
     const to = navigating.to?.url.pathname;
     if (!to) return false;
     const from = navigating.from?.url.pathname ?? $page.url.pathname;
-    if (to.startsWith('/app')) {
+    if (to.startsWith('/p/') || to === '/app' || to.startsWith('/app/')) {
       const fromScope = appNavScope(from);
       const toScope = appNavScope(to);
       if (fromScope && toScope && fromScope === toScope) return false;
       return true;
     }
-    // Logged-in Start → /login always bounces to /app; cover that hop too.
+    // Logged-in Start → /login always bounces to the home project; cover that hop too.
     if ((to === '/login' || to.startsWith('/login/')) && data?.session) return true;
     return false;
   });
@@ -157,7 +151,7 @@
   $effect(() => {
     if (typeof document === 'undefined') return;
     const path = $page.url.pathname;
-    const isApp = showAppEntry || path.startsWith('/app');
+    const isApp = showAppEntry || path.startsWith('/app') || path.startsWith('/p/');
     if (isApp) document.documentElement.setAttribute('data-shell', 'app');
     else document.documentElement.removeAttribute('data-shell');
   });

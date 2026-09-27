@@ -1,6 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { isRedirect } from '@sveltejs/kit';
-import { load } from './+page.server';
+
+vi.mock('$lib/server/tenancy/entry', async (orig) => ({
+	...(await orig<object>()),
+	homePathFor: vi.fn(async () => '/p/proj1/c/canvas1')
+}));
+
+const { load } = await import('./+page.server');
 
 const ORIGIN = 'https://feega.app';
 const SIGNED_IN = { session: { access_token: 'jwt' }, user: { id: 'u1' } };
@@ -13,7 +19,7 @@ function run(path: string) {
       get: () => undefined,
       delete: () => undefined
     },
-    locals: { safeGetSession: async () => SIGNED_IN }
+    locals: { safeGetSession: async () => SIGNED_IN, db: async () => ({ mocked: true }) }
   };
 
   return Promise.resolve((load as any)(event)).then(
@@ -26,19 +32,19 @@ function run(path: string) {
 }
 
 describe('login page load', () => {
-  // L'onboarding non esiste più: entrare è un bootstrap silenzioso, e /app è l'unica porta.
-  // I parametri che servivano a preparare il modulo non hanno più un modulo da preparare.
-  it('manda chi è già dentro all app, qualunque parametro porti', async () => {
+  // L'onboarding non esiste più: entrare è un bootstrap silenzioso, e la propria tela è
+  // l'unica porta — mai /app, che oggi è solo un redirect permanente.
+  it('manda chi è già dentro alla propria tela, qualunque parametro porti', async () => {
     await expect(run('/login?website=acme.example')).resolves.toEqual({
       status: 303,
-      location: '/app'
+      location: '/p/proj1/c/canvas1'
     });
   });
 
   it('non fa eccezione per next=onboarding, che non porta più da nessuna parte', async () => {
     await expect(run('/login?next=onboarding')).resolves.toEqual({
       status: 303,
-      location: '/app'
+      location: '/p/proj1/c/canvas1'
     });
   });
 });

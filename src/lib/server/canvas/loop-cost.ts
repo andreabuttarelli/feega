@@ -16,6 +16,7 @@ import type { GenMedium } from '$lib/canvas/gen-node';
 export type LoopCostInput = { medium: GenMedium; model: string | null; count: number };
 
 export type LoopCostEstimate = { perRun: number; total: number };
+export type LoopCostPreview = LoopCostEstimate | { perRun: null; total: null };
 
 function perRunCredits(medium: GenMedium, model: string | null): number {
   if (medium === 'image') return IMAGE_CREDITS;

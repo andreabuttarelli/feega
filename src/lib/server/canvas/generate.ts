@@ -20,6 +20,7 @@ import { findNode, writeNodeData } from '$lib/server/repos/canvas';
 import type { Actor } from '$lib/server/repos/actor';
 import { signMediaPaths } from './sign-media';
 import { composePrompt } from '$lib/canvas/compose-prompt';
+import { textRequest } from '$lib/canvas/text-request';
 
 /**
  * FAR GIRARE UN NODO DELLA TELA, SULLO SCHEMA NUOVO.
@@ -305,7 +306,8 @@ export async function runGenNode(db: Db, input: StartRun): Promise<RunOutcome> {
     return { kind: 'refused', error: upstream.blocked };
   }
 
-  const prompt = composePrompt(input.medium, upstream.text, input.prompt);
+  const textInput = input.medium === 'text' ? textRequest(upstream.text, input.prompt) : null;
+  const prompt = textInput?.user ?? composePrompt(input.medium, upstream.text, input.prompt);
 
   // NÉ IL PROPRIO PROMPT NÉ UN TESTO A MONTE: solo ORA si sa che non c'è niente da mandare al
   // modello — prima di questa riga `upstream.text` non era ancora stato letto. Il messaggio è
@@ -333,6 +335,7 @@ export async function runGenNode(db: Db, input: StartRun): Promise<RunOutcome> {
       const { text, costUsd } = await withOrgContext(input.orgId, async () => {
         const result = await llmText({
           prompt,
+          system: textInput?.system || undefined,
           model: input.model ?? undefined,
           label: 'canvas.text',
           upstream: { imageUrls, videoUrls, audioUrls }

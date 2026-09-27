@@ -128,3 +128,20 @@ export async function enterApp(db: Db, deps: EntryDeps, user: User, chosenOrgId:
 
   return { orgId, projectId, canvasId };
 }
+
+/**
+ * DOVE ATTERRA CHI È GIÀ DENTRO: LA PROPRIA TELA, MAI `/app`.
+ *
+ * `/app` era la dashboard vecchia; oggi è solo un bootstrap che questa funzione assorbe. Stesso
+ * gradino di `enterApp` — profilo, org, progetto, tela, ognuno creato solo se manca — ma la
+ * risposta è già il percorso su cui mandare la persona, non i tre id sciolti.
+ */
+export async function homePathFor(
+  db: Db,
+  deps: EntryDeps,
+  user: User,
+  chosenOrgId: string | null = null
+): Promise<string> {
+  const { projectId, canvasId } = await enterApp(db, deps, user, chosenOrgId);
+  return canvasPath(projectId, canvasId);
+}

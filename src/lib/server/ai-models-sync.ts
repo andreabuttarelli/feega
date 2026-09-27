@@ -29,6 +29,7 @@ export type AiModelCatalogue = 'chat' | 'image' | 'video';
 type RawChatOrImageModel = {
   id?: string;
   name?: string;
+  endpoints?: string;
   supported_parameters?: unknown;
   architecture?: { input_modalities?: string[]; output_modalities?: string[] };
   pricing?: Record<string, unknown>;
@@ -65,8 +66,29 @@ export type AiModelRow = {
    *  presa intera (non solo le chiavi, come fa `supported_parameters` sopra). Su video,
    *  `generate_audio`/`seed` quando il modello li dichiara true/false. Vuoto per chat. */
   param_schema: Record<string, unknown>;
-  pricing: Record<string, unknown>;
+  pricing?: Record<string, unknown> | ImagePricing;
   synced_at: string;
+};
+
+export type ImagePricingLine = {
+  billable: string;
+  unit: string;
+  cost_usd: number;
+  variant?: string;
+};
+
+type ImageEndpoint = {
+  provider_slug?: string | null;
+  pricing?: ImagePricingLine[];
+  supported_parameters?: Record<string, unknown>;
+};
+
+export type ImagePricing = {
+  endpoints: Array<{
+    provider: string | null;
+    lines: ImagePricingLine[];
+    parameters: Record<string, unknown>;
+  }>;
 };
 
 function toArray(raw: unknown): string[] {
@@ -167,11 +189,78 @@ type CatalogueFetch<Raw> = {
   toRow: (raw: Raw, syncedAt: string) => AiModelRow | null;
 };
 
-const CATALOGUES: [CatalogueFetch<RawChatOrImageModel>, CatalogueFetch<RawChatOrImageModel>, CatalogueFetch<RawVideoModel>] = [
-  { path: '/models', toRow: (m, at) => chatOrImageRow(m, 'chat', at) },
-  { path: '/images/models', toRow: (m, at) => chatOrImageRow(m, 'image', at) },
-  { path: '/videos/models', toRow: videoRow }
-];
+const CHAT_CATALOGUE: CatalogueFetch<RawChatOrImageModel> = {
+  path: '/models',
+  toRow: (model, syncedAt) => chatOrImageRow(model, 'chat', syncedAt)
+};
+const VIDEO_CATALOGUE: CatalogueFetch<RawVideoModel> = { path: '/videos/models', toRow: videoRow };
+
+function endpointUrl(baseUrl: string, path: string): string {
+  return new URL(path, `${new URL(baseUrl).origin}/`).toString();
+}
+
+async function imagePricing(
+  doFetch: typeof fetch,
+  baseUrl: string,
+  path?: string
+): Promise<{ ok: boolean; value?: ImagePricing }> {
+  if (!path) {
+    return { ok: false };
+  }
+
+  try {
+    const key = env.OPENROUTER_API_KEY?.trim() || env.LLM_API_KEY?.trim();
+    const res = await doFetch(endpointUrl(baseUrl, path), key ? { headers: { authorization: `Bearer ${key}` } } : undefined);
+    if (!res.ok) {
+      return { ok: false };
+    }
+    const body = (await res.json()) as { endpoints?: ImageEndpoint[] };
+    return {
+      ok: true,
+      value: {
+        endpoints: (body.endpoints ?? []).map((endpoint) => ({
+          provider: endpoint.provider_slug ?? null,
+          lines: endpoint.pricing ?? [],
+          parameters: endpoint.supported_parameters ?? {}
+        }))
+      }
+    };
+  } catch {
+    return { ok: false };
+  }
+}
+
+async function fetchImageCatalogue(
+  doFetch: typeof fetch,
+  baseUrl: string,
+  syncedAt: string
+): Promise<{ rows: AiModelRow[]; ok: boolean; reason?: string }> {
+  try {
+    const res = await doFetch(`${baseUrl}/images/models`);
+    if (!res.ok) {
+      return { rows: [], ok: false, reason: `/images/models responded ${res.status}` };
+    }
+    const body = (await res.json()) as { data?: RawChatOrImageModel[] };
+    const models = body.data ?? [];
+    const prices = await Promise.all(models.map((model) => imagePricing(doFetch, baseUrl, model.endpoints)));
+    const rows = models
+      .map((model, index) => {
+        const row = chatOrImageRow(model, 'image', syncedAt);
+        if (!row) {
+          return null;
+        }
+        if (prices[index].ok) {
+          return { ...row, pricing: prices[index].value };
+        }
+        const { pricing: _pricing, ...withoutPricing } = row;
+        return withoutPricing;
+      })
+      .filter((row): row is AiModelRow => row !== null);
+    return { rows, ok: true };
+  } catch (error) {
+    return { rows: [], ok: false, reason: error instanceof Error ? error.message : 'images catalogue fetch_failed' };
+  }
+}
 
 async function fetchCatalogue<Raw>(
   doFetch: typeof fetch,
@@ -190,13 +279,26 @@ async function fetchCatalogue<Raw>(
   }
 }
 
-/**
- * UN GIRO SOLO, TRE RICHIESTE: chiede i tre listini, scrive le righe di quelli che hanno risposto.
- * Un listino giù non blocca gli altri due — la stessa disciplina di `openrouter-video-models.ts`,
- * dove una rete che cade lascia le cose come stavano invece di fermare tutto. Fallisce solo se
- * NESSUNO dei tre ha risposto: a quel punto non c'è niente da scrivere, e la ragione è quella
- * dell'ultimo fallimento incontrato.
- */
+async function keepImagePricing(admin: SupabaseClient, rows: AiModelRow[]): Promise<AiModelRow[]> {
+  const missing = rows.filter((row) => row.catalogue === 'image' && row.pricing === undefined);
+  if (!missing.length) {
+    return rows;
+  }
+
+  const { data, error } = await admin.from('ai_models').select('id, pricing').eq('catalogue', 'image');
+  if (error) {
+    return rows.filter((row) => row.catalogue !== 'image' || row.pricing !== undefined);
+  }
+  const existing = new Map(
+    ((data ?? []) as Array<{ id: string; pricing: Record<string, unknown> | ImagePricing }>).map((row) => [row.id, row.pricing])
+  );
+  return rows.map((row) =>
+    row.catalogue === 'image' && row.pricing === undefined
+      ? { ...row, pricing: existing.get(row.id) ?? {} }
+      : row
+  );
+}
+
 export async function syncAiModels(
   admin: SupabaseClient,
   opts: { fetchImpl?: typeof fetch; baseUrl?: string } = {}
@@ -206,9 +308,13 @@ export async function syncAiModels(
   if (!baseUrl) return { ok: false, reason: 'LLM_BASE_URL not configured' };
 
   const syncedAt = new Date().toISOString();
-  const results = await Promise.all(CATALOGUES.map((c) => fetchCatalogue(doFetch, baseUrl, c, syncedAt)));
+  const results = await Promise.all([
+    fetchCatalogue(doFetch, baseUrl, CHAT_CATALOGUE, syncedAt),
+    fetchImageCatalogue(doFetch, baseUrl, syncedAt),
+    fetchCatalogue(doFetch, baseUrl, VIDEO_CATALOGUE, syncedAt)
+  ]);
 
-  const rows = results.flatMap((r) => r.rows);
+  const rows = await keepImagePricing(admin, results.flatMap((result) => result.rows));
   if (!rows.length) {
     const reason = results.find((r) => !r.ok)?.reason ?? 'gateway returned no models';
     return { ok: false, reason };

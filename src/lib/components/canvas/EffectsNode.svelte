@@ -2,6 +2,7 @@
   import ImageIcon from '@lucide/svelte/icons/image';
   import type { EffectsNode } from '$lib/canvas/effects-node';
   import EffectsPreview from './EffectsPreview.svelte';
+  import NodeDownload from './NodeDownload.svelte';
 
   let {
     node,
@@ -39,6 +40,9 @@
   <div class="effects-actions">
     {#if inputChanged}
       <button type="button" class="effects-action is-warn nodrag" onclick={onopeneditor}>Input cambiato · Riapplica</button>
+    {/if}
+    {#if node.refId && imageUrl}
+      <NodeDownload kind={node.mediaKind} sourceUrl={imageUrl} nodeId={node.id} nodeType="effetti" />
     {/if}
     <button type="button" class="effects-action nodrag" onclick={onopeneditor}>Apri editor</button>
   </div>

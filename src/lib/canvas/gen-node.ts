@@ -47,11 +47,15 @@ export type ModelChoice = {
    *  (`canvas/connectors.ts`) traduce nelle porte del nodo. Assente per il testo, che non passa
    *  da `offerable-models.ts` e non ha porte oltre a quella fissa. */
   inputModalities?: string[];
-  /** I crediti per UN giro di questo modello, alla durata `minDuration` per un video — dallo
-   *  stesso listino di `content-cost.ts` (`billedCreditsFor`), calcolato una volta sul server e
-   *  spedito qui perché il client non ha (e non deve avere) le tariffe. Assente = prezzo ignoto:
-   *  `gen-cost.ts::creditsForRun` torna `null`, mai un numero inventato. */
   unitCredits?: number;
+  textPricing?: {
+    inputCreditsPerMillion: number;
+    outputCreditsPerMillion: number;
+    systemPromptTokens: number;
+    estimatedOutputTokens?: number;
+  };
+  creditOverrides?: Record<string, Record<string, number>>;
+  variableCredits?: boolean;
   /** I campi extra dichiarati da `ai_models.param_schema` per questo modello, oltre a quelli con
    *  un controllo già dedicato (`aspectRatio`, `resolution`…) — v. `model-params.ts`. Assente per
    *  un modello che non passa da `offerable-models.ts` (il testo) o dichiara zero campi extra. */

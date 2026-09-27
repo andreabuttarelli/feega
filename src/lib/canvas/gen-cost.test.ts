@@ -31,9 +31,75 @@ const unpricedChoice: ModelChoice = {
 };
 
 describe('creditsForRun — un giro solo', () => {
+  it('un testo somma input e output alle tariffe del modello', () => {
+    const model: ModelChoice = {
+      ...imageChoice,
+      unitCredits: undefined,
+      textPricing: {
+        inputCreditsPerMillion: 400,
+        outputCreditsPerMillion: 1600,
+        systemPromptTokens: 100,
+        estimatedOutputTokens: 500
+      }
+    };
+
+    const out = creditsForRun({
+      medium: 'text',
+      model,
+      params: {},
+      prompt: 'a'.repeat(3600)
+    });
+
+    expect(out).toBe(1);
+  });
+
+  it('un testo usa il conteggio completo già composto con i dati collegati', () => {
+    const model: ModelChoice = {
+      ...imageChoice,
+      unitCredits: undefined,
+      textPricing: {
+        inputCreditsPerMillion: 400,
+        outputCreditsPerMillion: 1600,
+        systemPromptTokens: 0,
+        estimatedOutputTokens: 500
+      }
+    };
+
+    const out = creditsForRun({
+      medium: 'text',
+      model,
+      params: {},
+      prompt: '',
+      textInputTokens: 2000
+    });
+
+    expect(out).toBe(2);
+  });
+
   it("un'immagine costa il prezzo unitario del modello, params a parte", () => {
     const out = creditsForRun({ medium: 'image', model: imageChoice, params: {} });
     expect(out).toBe(14);
+  });
+
+  it('un parametro con prezzo proprio sostituisce il prezzo base', () => {
+    const model: ModelChoice = {
+      ...imageChoice,
+      unitCredits: 9,
+      creditOverrides: { resolution: { '2K': 18 } }
+    };
+
+    expect(creditsForRun({ medium: 'image', model, params: { resolution: '1K' } })).toBe(9);
+    expect(creditsForRun({ medium: 'image', model, params: { resolution: '2K' } })).toBe(18);
+  });
+
+  it('una tariffa composta solo da varianti usa la variante selezionata', () => {
+    const model: ModelChoice = {
+      ...imageChoice,
+      unitCredits: undefined,
+      creditOverrides: { resolution: { '2K': 18 } }
+    };
+
+    expect(creditsForRun({ medium: 'image', model, params: { resolution: '2K' } })).toBe(18);
   });
 
   it('un video alla durata minima costa il prezzo misurato, invariato', () => {
@@ -91,6 +157,26 @@ describe('creditsForLoop — N giri identici', () => {
 
   it('prezzo ignoto: il totale del loop resta ignoto, mai una somma sbagliata', () => {
     expect(creditsForLoop({ medium: 'image', model: unpricedChoice, params: {} }, 5)).toBeNull();
+  });
+
+  it('un loop testo aggiorna il totale dalla stima completa del singolo giro', () => {
+    const model: ModelChoice = {
+      ...imageChoice,
+      unitCredits: undefined,
+      textPricing: {
+        inputCreditsPerMillion: 400,
+        outputCreditsPerMillion: 1600,
+        systemPromptTokens: 0,
+        estimatedOutputTokens: 500
+      }
+    };
+
+    const total = creditsForLoop(
+      { medium: 'text', model, params: {}, prompt: '', textInputTokens: 2000 },
+      3
+    );
+
+    expect(total).toBe(6);
   });
 });
 

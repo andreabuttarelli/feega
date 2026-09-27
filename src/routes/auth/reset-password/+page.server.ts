@@ -1,4 +1,6 @@
 import { fail, redirect } from '@sveltejs/kit';
+import { ENTRY_DEPS, homePathFor } from '$lib/server/tenancy/entry';
+import { ORG_COOKIE } from '$lib/server/tenancy/context';
 import type { Actions, PageServerLoad } from './$types';
 
 const MIN_PASSWORD = 6;
@@ -11,9 +13,9 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession } }) => {
 };
 
 export const actions: Actions = {
-  default: async ({ request, locals: { supabase, safeGetSession } }) => {
-    const { session } = await safeGetSession();
-    if (!session) throw redirect(303, '/login?error=link');
+  default: async ({ request, cookies, locals: { supabase, safeGetSession, db } }) => {
+    const { session, user } = await safeGetSession();
+    if (!session || !user) throw redirect(303, '/login?error=link');
 
     const data = await request.formData();
     const password = String(data.get('password') ?? '');
@@ -25,6 +27,7 @@ export const actions: Actions = {
     const { error } = await supabase.auth.updateUser({ password });
     if (error) return fail(400, { error: error.message });
 
-    throw redirect(303, '/app');
+    const dbClient = await db();
+    throw redirect(303, dbClient ? await homePathFor(dbClient, ENTRY_DEPS, user, cookies.get(ORG_COOKIE) ?? null) : '/app');
   }
 };

@@ -32,6 +32,7 @@
   import UploadedNode from '$lib/components/canvas/UploadedNode.svelte';
   import ListNode from '$lib/components/canvas/ListNode.svelte';
   import SelectNode from '$lib/components/canvas/SelectNode.svelte';
+  import NodeDownload from '$lib/components/canvas/NodeDownload.svelte';
   import EffectsNode from '$lib/components/canvas/EffectsNode.svelte';
   import EffectsEditor from '$lib/components/canvas/EffectsEditor.svelte';
   import CompositionNode from '$lib/components/canvas/CompositionNode.svelte';
@@ -111,6 +112,8 @@
   import { openSheet } from '$lib/canvas/sheet-nav';
 
   let { data } = $props();
+  type TextCostEstimate = { inputTokens: number; outputTokens: number; variableInput: boolean; revision: string };
+  let textCostEstimates = $state<Record<string, TextCostEstimate>>({});
 
   function handleCreatePost(ids: string[]) {
     void openSheet(data.projectId, `/create-post?nodeIds=${ids.join(',')}`);
@@ -265,6 +268,18 @@
     return Object.fromEntries(nodes.map((n) => [n.id, hasUpstreamText(upstreamNodes, upstreamEdges, n.id)]));
   });
 
+  function textEstimateRevision(nodeId: string): string {
+    return JSON.stringify(
+      edges
+        .filter((edge) => edge.target === nodeId)
+        .sort((left, right) => left.id.localeCompare(right.id))
+        .map((edge) => {
+          const source = nodes.find((node) => node.id === edge.source);
+          return [edge, source?.version, source?.data, source ? sourceTextOf(source) : null];
+        })
+    );
+  }
+
   /** Quanti biglietti di loop sono ancora `queued` per nodo — non ancora reclamati da un tick.
    *  `data.runs` porta OGNI riga `node_runs`, biglietti compresi (`runsOf` non li filtra, sono
    *  righe come le altre): la stessa lista che alimenta `runsByNode`, letta prima che
@@ -383,7 +398,7 @@
       text: { choices: [], synced: true },
       image: { choices: [], synced: false },
       video: { choices: [], synced: false }
-    }) as Record<GenMedium, { choices: ModelChoice[]; synced: boolean }>
+    }) as Record<GenMedium, { choices: ModelChoice[]; synced: boolean; enhanceUnitCredits?: number }>
   );
   const catalogue = $derived(
     Object.fromEntries(
@@ -544,6 +559,8 @@
     });
   });
 
+  const READ_ACTIONS = new Set(['snapshot', 'estimate_text_cost']);
+
   /**
    * `x-sveltekit-action` distingue questa chiamata dall'invio di un form: senza, SvelteKit
    * risponde 303 verso la pagina, `fetch` segue il redirect da solo e torna l'HTML con `res.ok`
@@ -563,7 +580,7 @@
       body.set(key, value instanceof File ? value : String(value));
     }
 
-    const mutating = action !== 'snapshot';
+    const mutating = !READ_ACTIONS.has(action);
     if (mutating) { pending += 1; snapshotVersion += 1; }
     try {
       const res = await fetch(`?/${action}`, {
@@ -671,6 +688,33 @@
     }
     nodes = nodes.map((node) => (node.id === id ? { ...node, data: written.data, version: written.version } : node));
     return true;
+  }
+
+  /**
+   * L'esportazione della composizione (video o immagine) segue lo stesso schema di `upload()`:
+   * il file va dritto in `canvas-assets` dal browser, e solo il percorso arriva al server perché
+   * un MP4 supera facilmente il corpo che un'azione SvelteKit regge su Vercel. `into: 'library'`
+   * registra l'asset senza creare un nodo — la riga che riceve il `refId` è già quella del nodo
+   * `composition` che sta esportando.
+   */
+  async function uploadCompositionExport(file: Blob, extension: 'mp4' | 'webm' | 'png'): Promise<string | null> {
+    const mimeType = extension === 'png' ? 'image/png' : extension === 'webm' ? 'video/webm' : 'video/mp4';
+    const path = `${canvasUploadPrefix(data.orgId, data.projectId)}${crypto.randomUUID()}-export.${extension}`;
+    const up = await supabase.storage.from('canvas-assets').upload(path, file, { contentType: mimeType, upsert: false });
+    if (up.error) {
+      failed = up.error.message;
+      return null;
+    }
+
+    const result = await post('upload', {
+      path, file_name: `export.${extension}`, mime_type: mimeType, bytes: file.size, into: 'library'
+    });
+    const asset = result?.asset as { id?: string } | undefined;
+    return asset?.id ?? null;
+  }
+
+  async function saveCompositionExportRefId(id: string, refId: string): Promise<boolean> {
+    return write(id, { refId });
   }
 
   async function applyEffects(id: string, steps: EffectStep[], _output: Blob | null = null): Promise<boolean> {
@@ -833,9 +877,10 @@
     }
 
     if (safety.verdict === 'confirm') {
-      const cost = plan.cost as { total: number } | undefined;
+      const cost = plan.cost as { total: number | null } | undefined;
+      const costLabel = typeof cost?.total === 'number' ? `${formatCredits(cost.total)} crediti` : 'costo variabile';
       const ok = confirm(
-        `Genera ${safety.count} combinazioni (${cost ? formatCredits(cost.total) : '?'} crediti)? Verranno prodotte nei prossimi minuti, non subito.`
+        `Genera ${safety.count} combinazioni (${costLabel})? Verranno prodotte nei prossimi minuti, non subito.`
       );
       if (!ok) return;
     }
@@ -1072,6 +1117,47 @@
       if (!pending) { void refresh(); }
     });
     return saved;
+  }
+
+  function changeGen(id: string, gen: GenNodeState, patch: Partial<GenNodeState>) {
+    if (typeof patch.prompt === 'string') {
+      const next = { ...textCostEstimates };
+      delete next[id];
+      textCostEstimates = next;
+    }
+    void write(id, genData({ ...gen, ...patch }));
+  }
+
+  async function estimateTextCost(id: string, prompt: string, model: string, revision: string) {
+    const result = await post('estimate_text_cost', { node_id: id, prompt, model });
+    const outputTokens = result?.estimatedOutputTokens;
+    const systemTokens = result?.systemPromptTokens;
+    const userTokens = result?.userPromptTokens;
+    const current = nodes.find((node) => node.id === id);
+    const currentGen = current ? genOf(current) : null;
+    const currentModel = currentGen
+      ? effectiveModel(currentGen.medium, currentGen.model, catalogue[currentGen.medium] ?? []) ?? ''
+      : '';
+    if (
+      typeof outputTokens !== 'number' ||
+      typeof systemTokens !== 'number' ||
+      typeof userTokens !== 'number' ||
+      currentGen?.prompt !== prompt ||
+      currentModel !== model ||
+      textEstimateRevision(id) !== revision
+    ) {
+      return;
+    }
+
+    textCostEstimates = {
+      ...textCostEstimates,
+      [id]: {
+        inputTokens: systemTokens + userTokens,
+        outputTokens,
+        variableInput: result?.variableInput === true,
+        revision
+      }
+    };
   }
 
   /**
@@ -1672,6 +1758,8 @@
         {@const select = selectOf(row)}
         {@const effects = effectsOf(row)}
         {@const composition = compositionOf(row)}
+        {@const estimateRevision = textEstimateRevision(id)}
+        {@const textCost = textCostEstimates[id]?.revision === estimateRevision ? textCostEstimates[id] : undefined}
         {@const uploaded = isUploadedNodeRow(row) ? uploadedNodeOf(row) : null}
         {#if uploaded}
           <UploadedNode node={uploaded} medium={row.type === 'video' ? 'video' : 'image'} />
@@ -1681,11 +1769,16 @@
             choices={mediumCatalogue[gen.medium].choices}
             catalogueSynced={mediumCatalogue[gen.medium].synced}
             enhanceUnitCredits={mediumCatalogue[gen.medium].enhanceUnitCredits}
+            estimatedTextInputTokens={textCost?.inputTokens}
+            estimatedTextOutputTokens={textCost?.outputTokens}
+            variableTextInput={textCost?.variableInput ?? (gen.medium === 'text' && estimateRevision !== '[]')}
+            {estimateRevision}
             hasUpstreamText={hasUpstreamTextByNode[row.id] ?? false}
             loopQueued={loopQueuedByNode[row.id] ?? 0}
             loopVisible={loopAffordanceByNode[row.id]?.visible ?? false}
             loopCombinationCount={loopAffordanceByNode[row.id]?.combinationCount ?? 0}
-            onchange={(patch) => write(id, genData({ ...gen, ...patch }))}
+            onchange={(patch) => changeGen(id, gen, patch)}
+            onestimate={(prompt, model, revision) => void estimateTextCost(id, prompt, model ?? '', revision)}
             onrun={() => run(id, gen)}
             onrunloop={() => runLoop(id)}
             oncancelloop={() => cancelLoopFor(id)}
@@ -1724,8 +1817,14 @@
               {:else if gen.medium === 'video'}
                 <!-- svelte-ignore a11y_media_has_caption -->
                 <video src={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} controls playsinline></video>
+                <div class="gen-download">
+                  <NodeDownload kind="video" sourceUrl={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} nodeId={id} nodeType={gen.medium} />
+                </div>
               {:else}
                 <img src={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} alt={gen.prompt} loading="lazy" />
+                <div class="gen-download">
+                  <NodeDownload kind="image" sourceUrl={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} nodeId={id} nodeType={gen.medium} />
+                </div>
               {/if}
             {/snippet}
           </GenNode>
@@ -1812,6 +1911,8 @@
         initial={compositionEditing}
         mediaUrls={upstreamCompositionRefsOf(editingId).map((refId) => assetUrl(refId)).filter((url) => url !== null)}
         onsave={(next) => saveComposition(editingId, next)}
+        onupload={uploadCompositionExport}
+        onwriterefid={(refId) => saveCompositionExportRefId(editingId, refId)}
         onclose={() => (compositionEditorId = null)}
       />
     {/key}
@@ -1825,6 +1926,13 @@
     min-height: 0;
     height: 100%;
     overflow: hidden;
+  }
+
+  .gen-download {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    z-index: 5;
   }
 
   .gen-text-wrap {

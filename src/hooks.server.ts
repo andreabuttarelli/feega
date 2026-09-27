@@ -12,6 +12,9 @@ import { createAdminClient } from '$lib/server/supabase-admin';
 import { captureReferralCookie } from '$lib/server/referrals';
 import { isCsrfForbidden } from '$lib/server/csrf';
 import { catalogModelIds } from '$lib/server/chat-model-catalog';
+import { ENTRY_DEPS, homePathFor } from '$lib/server/tenancy/entry';
+import { ORG_COOKIE } from '$lib/server/tenancy/context';
+import type { RequestEvent } from '@sveltejs/kit';
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
@@ -27,6 +30,22 @@ export function isRootPath(pathname: string): boolean {
 
 function isSessionCookie(name: string): boolean {
   return name === SESSION_COOKIE_NAME || name.startsWith(SESSION_COOKIE_PREFIX);
+}
+
+// Chi visita la radice: al login se non è dentro, alla propria tela se lo è — mai a /app, che
+// è solo un bootstrap deprecato dietro un redirect permanente.
+async function rootRedirectTarget(event: RequestEvent): Promise<string> {
+  const { session, user } = await event.locals.safeGetSession();
+  if (!session || !user) {
+    return '/login';
+  }
+
+  const db = await event.locals.db();
+  if (!db) {
+    return '/login';
+  }
+
+  return homePathFor(db, ENTRY_DEPS, user, event.cookies.get(ORG_COOKIE) ?? null);
 }
 
 function isValidSessionCookie(cookie: { name: string; value: string }): boolean {
@@ -170,13 +189,14 @@ export const handle: Handle = sequence(csrf, Sentry.sentryHandle(), async ({ eve
   }
 
   // La radice è l'app, non più un sito di marketing. Il safety net dell'OAuth viene prima:
-  // un bounce magic-link sul Site URL con ?code= deve arrivare a /auth/callback, non a /app,
-  // o il code si perde e il login fallisce in silenzio.
+  // un bounce magic-link sul Site URL con ?code= deve arrivare a /auth/callback, non alla home,
+  // o il code si perde e il login fallisce in silenzio. `/app` è deprecato: chi è dentro va
+  // diritto alla propria tela, chi non lo è va al login — mai a una dashboard che non esiste più.
   if (isRootPath(event.url.pathname)) {
     if (event.url.searchParams.has('code') || event.url.searchParams.has('error_description')) {
       throw redirect(303, `/auth/callback${event.url.search}`);
     }
-    throw redirect(302, '/app');
+    throw redirect(302, await rootRedirectTarget(event));
   }
 
   const doResolve = () =>
@@ -184,7 +204,7 @@ export const handle: Handle = sequence(csrf, Sentry.sentryHandle(), async ({ eve
       transformPageChunk: ({ html }) => {
         let out = html;
         // Keep in sync with +layout.svelte — scopes landing.css away from /app on SSR too.
-        if (event.url.pathname.startsWith('/app') || event.url.pathname.startsWith('/c')) {
+        if (event.url.pathname.startsWith('/app') || event.url.pathname.startsWith('/c') || event.url.pathname.startsWith('/p/')) {
           out = out.replace('<html', '<html data-shell="app"');
         }
         return out;
