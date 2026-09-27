@@ -95,6 +95,25 @@ describe('actions.analyze: dal form al motore di analisi vero', () => {
     expect(result.products).toHaveLength(1);
   });
 
+  it('accetta un dominio senza https:// e lo completa', async () => {
+    vi.mocked(runBrandAnalysis).mockResolvedValue({ name: 'feega', url: 'https://feega.app/' } as never);
+
+    const { client: db } = seed();
+    const result = (await (actions.analyze as (e: unknown) => Promise<unknown>)(event({ url: 'feega.app' }, db))) as {
+      website: string;
+    };
+
+    expect(result.website).toBe('https://feega.app/');
+  });
+
+  it('un indirizzo che non è un sito torna 400', async () => {
+    const { client: db } = seed();
+    const outcome = (await (actions.analyze as (e: unknown) => Promise<unknown>)(event({ url: 'not a site' }, db))) as {
+      status: number;
+    };
+    expect(outcome.status).toBe(400);
+  });
+
   it('senza url torna un errore 400, senza chiamare l\'analisi', async () => {
     const { client: db } = seed();
     const outcome = (await (actions.analyze as (e: unknown) => Promise<unknown>)(event({ url: '' }, db))) as {

@@ -244,7 +244,7 @@
         action="?/analyze"
         use:enhance={withBusy((result) => applyAnalysis(result))}
       >
-        <input name="url" type="url" placeholder="https://example.com" bind:value={draft.website} />
+        <input name="url" type="text" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="example.com" bind:value={draft.website} />
         <div class="row">
           <button class="btn ghost" type="button" onclick={forward}>Skip, no website</button>
           <button class="btn primary" type="submit" disabled={busy || !draft.website}>{busy ? 'Reading…' : 'Analyze'}</button>

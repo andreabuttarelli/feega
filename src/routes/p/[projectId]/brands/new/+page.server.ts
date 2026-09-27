@@ -1,3 +1,4 @@
+import { normalizeUrl } from '$lib/ads-fee';
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { listMemberships } from '$lib/server/repos/orgs';
@@ -55,9 +56,14 @@ export const actions: Actions = {
     }
 
     const fd = await request.formData();
-    const url = String(fd.get('url') ?? '').trim();
-    if (!url) {
+    const typed = String(fd.get('url') ?? '').trim();
+    if (!typed) {
       return fail(400, { error: 'Website URL is required' });
+    }
+
+    const url = normalizeUrl(typed);
+    if (!url) {
+      return fail(400, { error: 'That doesn\'t look like a website address' });
     }
 
     try {
@@ -164,7 +170,7 @@ export const actions: Actions = {
       return fail(400, { error: 'Name is required' });
     }
 
-    const website = String(fd.get('website') ?? '').trim() || null;
+    const website = normalizeUrl(String(fd.get('website') ?? '')) || null;
     const shortDescription = String(fd.get('shortDescription') ?? '').trim() || null;
     const content = String(fd.get('content') ?? '');
     const logoUrl = String(fd.get('logoUrl') ?? '').trim() || null;
