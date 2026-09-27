@@ -54,6 +54,12 @@
     writeChatOpen(chatOpen);
   }
 
+  function onPublish() {
+    openSheet(projectId, '/create-post').catch((err) => {
+      console.error('apertura del foglio "create-post" fallita', err);
+    });
+  }
+
   $effect(() => {
     if ($guideOpenRequest) {
       chatOpen = true;
@@ -103,6 +109,7 @@
           creditBalance={data.creditBalance}
           {chatOpen}
           onToggleChat={toggleChat}
+          {onPublish}
         />
         <FloatingRail
           activePanel={leftPanel}
