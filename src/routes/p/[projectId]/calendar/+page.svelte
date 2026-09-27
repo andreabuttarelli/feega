@@ -97,13 +97,31 @@
     {#if brand}<p class="subtitle">{brand.name}</p>{/if}
   </header>
 
-  {#if !brand}
-    <p class="brand-hint">
-      Posts appear here once a brand is set. <a href={`/p/${page.params.projectId}/settings/brand`}>Go to Brand settings</a>.
-    </p>
-  {/if}
+  <div class="calendar-body" class:has-overlay={!brand}>
+    {#if !brand}
+      <div class="brand-overlay">
+        <div class="brand-overlay-box">
+          <p class="brand-overlay-title">This project has no brand yet</p>
+          <p class="brand-overlay-hint">Link an existing brand or create one to see the calendar.</p>
 
-  <div class="calendar-body">
+          {#if data.brands.length}
+            <form method="POST" action="?/linkBrand" class="brand-link-form">
+              <select name="brandId" required>
+                <option value="" disabled selected>Choose a brand</option>
+                {#each data.brands as b (b.id)}
+                  <option value={b.id}>{b.name}</option>
+                {/each}
+              </select>
+              <button type="submit">Link brand</button>
+            </form>
+          {/if}
+
+          <a class="brand-create-link" href={`/p/${page.params.projectId}/brands/new?returnTo=/p/${page.params.projectId}/calendar`}>
+            Create brand
+          </a>
+        </div>
+      </div>
+    {/if}
     <div class="grid-wrap">
       <div class="weekday-row">
         {#each WEEKDAY_NAMES as name (name)}
@@ -169,6 +187,16 @@
             <PlatformGlyph platform={delivery.platform} />
             <span>{delivery.status}</span>
             {#if delivery.url}<a href={delivery.url} target="_blank" rel="noreferrer">Vedi</a>{/if}
+            <form method="POST" action="?/publishNow" class="popover-action">
+              <input type="hidden" name="postId" value={selectedPost.id} />
+              <input type="hidden" name="accountId" value={delivery.accountId} />
+              <button type="submit">Pubblica ora</button>
+            </form>
+            <form method="POST" action="?/cancel" class="popover-action">
+              <input type="hidden" name="postId" value={selectedPost.id} />
+              <input type="hidden" name="accountId" value={delivery.accountId} />
+              <button type="submit">Annulla</button>
+            </form>
           </li>
         {/each}
       </ul>
@@ -215,20 +243,72 @@
     color: var(--ink-faint, #9a9a9e);
   }
 
-  .brand-hint {
-    margin: 0 0 16px;
-    font-size: 12px;
-    color: var(--ink-faint, #9a9a9e);
-  }
-
-  .brand-hint a {
-    color: inherit;
-  }
-
   .calendar-body {
     display: flex;
     gap: 24px;
     align-items: flex-start;
+    position: relative;
+  }
+
+  .calendar-body.has-overlay .grid-wrap,
+  .calendar-body.has-overlay .unscheduled-list {
+    filter: blur(2px);
+    pointer-events: none;
+  }
+
+  .brand-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--paper-2, rgba(249, 249, 249, 0.9));
+    z-index: 1;
+  }
+
+  .brand-overlay-box {
+    border: 1px solid var(--line, #ededef);
+    background: var(--paper, #fff);
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-width: 320px;
+    text-align: center;
+  }
+
+  .brand-overlay-title {
+    margin: 0;
+    font-weight: 600;
+  }
+
+  .brand-overlay-hint {
+    margin: 0;
+    font-size: 12px;
+    color: var(--ink-faint, #9a9a9e);
+  }
+
+  .brand-link-form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .brand-link-form select,
+  .brand-link-form button,
+  .brand-create-link {
+    border: 1px solid var(--line, #ededef);
+    background: transparent;
+    padding: 6px 10px;
+    font: inherit;
+    cursor: pointer;
+    color: var(--ink, #1d1d1f);
+  }
+
+  .brand-create-link {
+    display: block;
+    text-decoration: none;
+    text-align: center;
   }
 
   .grid-wrap {
@@ -404,5 +484,18 @@
     display: flex;
     align-items: center;
     gap: 6px;
+  }
+
+  .popover-action {
+    margin: 0 0 0 auto;
+  }
+
+  .popover-action button {
+    border: 1px solid var(--line, #ededef);
+    background: transparent;
+    padding: 2px 8px;
+    font-size: 11px;
+    cursor: pointer;
+    color: var(--ink, #1d1d1f);
   }
 </style>

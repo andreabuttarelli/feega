@@ -145,6 +145,32 @@ describe('actions.cancel: dal form a deletePost() su Zernio', () => {
   });
 });
 
+describe('actions.linkBrand: dal form a projects.brand_id', () => {
+  it('scrive brand_id sul progetto scoperto per org_id', async () => {
+    const { db, calls } = fakeDb(seedRows());
+
+    const result = (await (actions.linkBrand as (e: unknown) => Promise<unknown>)(
+      formEvent({ brandId: BRAND }, db)
+    )) as { linked: boolean };
+
+    expect(result.linked).toBe(true);
+    const update = calls.find((c) => c.table === 'projects' && c.op === 'update');
+    expect(update?.payload).toMatchObject({ brand_id: BRAND });
+    expect(update?.filters).toEqual(expect.arrayContaining([['id', PROJECT], ['org_id', ORG]]));
+  });
+
+  it('senza brandId risponde 400 senza scrivere niente', async () => {
+    const { db, calls } = fakeDb(seedRows());
+
+    const result = (await (actions.linkBrand as (e: unknown) => Promise<unknown>)(
+      formEvent({ brandId: '' }, db)
+    )) as { status: number };
+
+    expect(result.status).toBe(400);
+    expect(calls.find((c) => c.table === 'projects' && c.op === 'update')).toBeUndefined();
+  });
+});
+
 describe('actions.reschedule: cancella su Zernio e riconsegna con il nuovo orario', () => {
   it('chiama deletePost() e poi publish() con lo scheduledFor nuovo', async () => {
     publish.mockResolvedValue({ ok: true, postId: 'zernio-post-4' });

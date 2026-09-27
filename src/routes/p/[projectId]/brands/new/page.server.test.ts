@@ -134,6 +134,53 @@ describe('actions.create: dal form al brand vero, i prodotti veri, il progetto a
     expect((outcome as { location: string }).location).toBe(`/p/${PROJECT}/brands/${brand?.slug}`);
   });
 
+  it('con returnTo sicuro (/p/...) reindirizza lì invece che alla pagina del brand', async () => {
+    const { client: db } = seed();
+
+    const outcome = await (actions.create as (e: unknown) => Promise<unknown>)(
+      event(
+        {
+          name: 'Acme Coffee',
+          website: '',
+          shortDescription: '',
+          content: '',
+          logoUrl: '',
+          productsPlatform: '',
+          products: '[]',
+          returnTo: `/p/${PROJECT}/calendar`
+        },
+        db
+      )
+    ).catch((e) => e);
+
+    expect(isRedirect(outcome)).toBe(true);
+    expect((outcome as { location: string }).location).toBe(`/p/${PROJECT}/calendar`);
+  });
+
+  it('con returnTo non sicuro (non /p/...) ignora il parametro e usa la pagina del brand', async () => {
+    const { client: db, tables } = seed();
+
+    const outcome = await (actions.create as (e: unknown) => Promise<unknown>)(
+      event(
+        {
+          name: 'Acme Coffee',
+          website: '',
+          shortDescription: '',
+          content: '',
+          logoUrl: '',
+          productsPlatform: '',
+          products: '[]',
+          returnTo: 'https://evil.example/steal'
+        },
+        db
+      )
+    ).catch((e) => e);
+
+    expect(isRedirect(outcome)).toBe(true);
+    const brand = tables.get('brands')?.[0];
+    expect((outcome as { location: string }).location).toBe(`/p/${PROJECT}/brands/${brand?.slug}`);
+  });
+
   it('scrive solo i prodotti passati, per quel brand, senza node_id', async () => {
     const { client: db, tables } = seed();
     const products = [

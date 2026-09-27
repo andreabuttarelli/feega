@@ -169,6 +169,8 @@ export const actions: Actions = {
     const content = String(fd.get('content') ?? '');
     const logoUrl = String(fd.get('logoUrl') ?? '').trim() || null;
     const productsPlatform = (String(fd.get('productsPlatform') ?? '').trim() || null) as StorePlatform | null;
+    const returnTo = String(fd.get('returnTo') ?? '').trim();
+    const safeReturnTo = returnTo.startsWith('/p/') ? returnTo : null;
 
     let products: Parameters<typeof createBrandFromWizard>[1]['products'] = [];
     const productsRaw = String(fd.get('products') ?? '');
@@ -194,7 +196,7 @@ export const actions: Actions = {
         productsPlatform
       });
 
-      throw redirect(303, `/p/${found.project.id}/brands/${created.slug}`);
+      throw redirect(303, safeReturnTo ?? `/p/${found.project.id}/brands/${created.slug}`);
     } catch (e) {
       if (e && typeof e === 'object' && 'status' in e && 'location' in e) {
         throw e;

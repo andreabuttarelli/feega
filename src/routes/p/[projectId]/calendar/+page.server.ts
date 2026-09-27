@@ -6,6 +6,7 @@ import { listOrgBrands } from '$lib/server/repos/brands';
 import { listBrandAccounts } from '$lib/server/repos/social-accounts';
 import { listPosts } from '$lib/server/repos/posts';
 import { deliveryStatus, scheduleDelivery, cancelDelivery } from '$lib/server/repos/post-delivery';
+import { setProjectBrand } from '$lib/server/repos/projects';
 import { buildCalendarData } from './calendar-load';
 import { monthOf } from './calendar-month';
 import type { Db } from '$lib/server/db/client';
@@ -47,6 +48,16 @@ async function requireDbAndOrg(event: RequestEvent): Promise<{ db: Db; orgId: st
 }
 
 export const actions: Actions = {
+  linkBrand: async (event) => {
+    const { db, orgId } = await requireDbAndOrg(event);
+    const fd = await event.request.formData();
+    const brandId = String(fd.get('brandId') ?? '').trim();
+    if (!brandId) return fail(400, { error: 'brand_required' });
+
+    await setProjectBrand(db, { orgId, projectId: event.params.projectId ?? '', brandId });
+    return { linked: true };
+  },
+
   schedule: async (event) => {
     const { db, orgId } = await requireDbAndOrg(event);
     const fd = await event.request.formData();
