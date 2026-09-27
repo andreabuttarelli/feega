@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { page } from '$app/state';
   /**
    * ASSET E BRAND DEL PROGETTO, DRAGGABILI SULLA TELA CHE È GIÀ APERTA.
    *
@@ -110,10 +111,21 @@
     e.dataTransfer.setData(CANVAS_DRAG_MEDIUM, drag.type);
   }
 
+  const EMPTY_HINT = {
+    assets: 'Nothing to drag yet. Generate or upload something first.',
+    brands: 'No brands yet.',
+    both: 'Nothing to drag yet. Generate or upload something first.'
+  } as const;
+
+  const newBrandHref = $derived(`/p/${projectId}/brands/new?returnTo=${encodeURIComponent(page.url.pathname)}`);
+
   const hasAnything = $derived((showAssets && assets.length > 0) || (showBrands && brands.length > 0));
 </script>
 
 <div class="panel">
+  {#if showBrands}
+    <a class="new-brand" href={newBrandHref}>+ New brand</a>
+  {/if}
   {#if loading}
     <div class="grid" aria-hidden="true">
       {#each Array(6) as _}
@@ -126,7 +138,7 @@
       <button type="button" class="retry" onclick={retry}>Retry</button>
     </div>
   {:else if !hasAnything}
-    <p class="hint">Nothing to drag yet. Generate or upload something first.</p>
+    <p class="hint">{EMPTY_HINT[kind]}</p>
   {:else}
     {#if showAssets && assets.length}
       <h4 class="section">Assets</h4>
@@ -287,6 +299,21 @@
     .skel {
       animation: none;
     }
+  }
+
+  .new-brand {
+    display: block;
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--paper, #fff);
+    background: var(--ink, #1d1d1f);
+    text-decoration: none;
+  }
+  .new-brand:hover {
+    opacity: 0.9;
   }
 
   .brand-list {
