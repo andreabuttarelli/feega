@@ -107,6 +107,8 @@ if (!dev && typeof window !== 'undefined') {
   // l'interazione, così l'envelope verso l'ingest resta fuori dall'albero di rete dell'LCP.
   const path = window.location.pathname;
   const isApp =
+    path === '/p' ||
+    path.startsWith('/p/') ||
     path === '/app' ||
     path.startsWith('/app/') ||
     path === '/login' ||

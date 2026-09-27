@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { DEFAULT_CANVAS_NAME, DEFAULT_PROJECT_NAME, canvasPath, enterApp, workspaceNameFor } from '$lib/server/tenancy/entry';
+import { DEFAULT_CANVAS_NAME, DEFAULT_PROJECT_NAME, canvasPath, enterApp, homePathFor, workspaceNameFor } from '$lib/server/tenancy/entry';
 import type { Db } from '$lib/server/db/client';
 import type { Membership } from '$lib/server/repos/orgs';
 import type { User } from '@supabase/supabase-js';
@@ -125,5 +125,35 @@ describe('entrare la seconda volta non duplica niente', () => {
 describe('la tela ha un indirizzo, e non è quello del brand', () => {
   it('il percorso è scopato sulla tela, non sul brand', () => {
     expect(canvasPath(PROJECT, CANVAS)).toBe(`/p/${PROJECT}/c/${CANVAS}`);
+  });
+});
+
+describe('la home di chi è già dentro è la sua tela, mai /app', () => {
+  it('chi ha già tutto atterra sulla tela esistente', async () => {
+    const d = deps({});
+
+    const path = await homePathFor(db, d, user);
+
+    expect(path).toBe(`/p/${PROJECT}/c/${CANVAS}`);
+  });
+
+  it('chi arriva per la prima volta ottiene il bootstrap, non un 404', async () => {
+    const d = deps({ listMemberships: vi.fn(async () => []) });
+
+    const path = await homePathFor(db, d, user);
+
+    expect(path).toBe(`/p/${PROJECT}/c/${CANVAS}`);
+    expect(d.createFirstOrg).toHaveBeenCalledOnce();
+  });
+
+  it('rispetta l org scelta quando ce ne sono più di una', async () => {
+    const chosenOrg = '55555555-5555-5555-5555-555555555555';
+    const d = deps({
+      listMemberships: vi.fn(async () => [membership, { ...membership, org: { ...membership.org, id: chosenOrg } }])
+    });
+
+    await homePathFor(db, d, user, chosenOrg);
+
+    expect(d.listProjects).toHaveBeenCalledWith(db, chosenOrg);
   });
 });

@@ -28,6 +28,32 @@ vi.mock('@sveltejs/kit/hooks', () => ({
 		}
 }));
 
+let mockSession: { session: unknown; user: unknown } = { session: null, user: null };
+
+vi.mock('@supabase/ssr', async (orig) => ({
+	...(await orig<object>()),
+	createServerClient: () => ({
+		auth: {
+			getSession: async () => ({ data: { session: mockSession.session } }),
+			getUser: async () => ({ data: { user: mockSession.user }, error: null })
+		}
+	})
+}));
+
+vi.mock('$lib/server/nav-cache', () => ({
+	verifiedUser: async () => mockSession.user
+}));
+
+vi.mock('$lib/server/db/client', async (orig) => ({
+	...(await orig<object>()),
+	createUserDb: () => ({ mocked: true })
+}));
+
+vi.mock('$lib/server/tenancy/entry', async (orig) => ({
+	...(await orig<object>()),
+	homePathFor: vi.fn(async () => '/p/proj1/c/canvas1')
+}));
+
 const aiCalls: Record<string, unknown>[] = [];
 
 vi.mock('$lib/server/supabase-admin', () => ({
@@ -115,5 +141,42 @@ describe('il tool che ha chiesto il lavoro', () => {
 
 	it('senza intestazione la riga resta com’era', async () => {
 		expect((await spendUnder({})).operation).toBe('planStrategy');
+	});
+});
+
+/**
+ * `/app` non esiste più come destinazione: la radice manda al login chi non è dentro,
+ * alla propria tela chi lo è. Nessun 404 in mezzo.
+ */
+describe('la radice non porta mai a /app', () => {
+	const rootRequestTo = async () => {
+		try {
+			await handle({
+				event: {
+					request: new Request('http://localhost/'),
+					url: new URL('http://localhost/'),
+					route: { id: '/' },
+					params: {},
+					cookies: { getAll: () => [], get: () => undefined, set: vi.fn() },
+					locals: {}
+				},
+				resolve: async () => new Response('never')
+			} as any);
+			return null;
+		} catch (e) {
+			return e as Error & { status?: number; location?: string };
+		}
+	};
+
+	it('senza sessione va al login', async () => {
+		mockSession = { session: null, user: null };
+		const redirected = await rootRequestTo();
+		expect(redirected?.location).toBe('/login');
+	});
+
+	it('con sessione va dritto alla propria tela, non a /app', async () => {
+		mockSession = { session: { access_token: 'tok' }, user: { id: 'user-1', email: 'chi@esempio.it' } };
+		const redirected = await rootRequestTo();
+		expect(redirected?.location).toBe('/p/proj1/c/canvas1');
 	});
 });

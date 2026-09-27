@@ -6,6 +6,8 @@ import { emailLocale } from '$lib/server/email-i18n';
 import { sanitizeWebsiteParam } from '$lib/website-param';
 import { appOrigin } from '$lib/server/app-url';
 import { takeOAuthReturn } from '$lib/server/oauth';
+import { ENTRY_DEPS, homePathFor } from '$lib/server/tenancy/entry';
+import { ORG_COOKIE } from '$lib/server/tenancy/context';
 import type { Cookies, RequestEvent } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -20,8 +22,8 @@ function preferSignup(url: URL): boolean {
   return false;
 }
 
-// Già dentro? Si va all'app, che ora fa da sé il poco che serve prima di aprire una tela.
-export const load: PageServerLoad = async ({ url, cookies, locals: { safeGetSession } }) => {
+// Già dentro? Diritto alla propria tela, che ora fa da sé il poco che serve prima di aprirla.
+export const load: PageServerLoad = async ({ url, cookies, locals: { safeGetSession, db } }) => {
   const cliPort = url.searchParams.get('cli_port') ?? '';
   const cliState = url.searchParams.get('cli_state') ?? '';
   const { session, user } = await safeGetSession();
@@ -29,10 +31,19 @@ export const load: PageServerLoad = async ({ url, cookies, locals: { safeGetSess
     const oauthReturn = takeOAuthReturn(cookies);
     if (oauthReturn) throw redirect(303, oauthReturn);
     if (cliPort) throw redirect(303, `/cli/callback?cli_port=${cliPort}&cli_state=${cliState}`);
-    throw redirect(303, '/app');
+    throw redirect(303, await homeRedirectTarget(cookies, user, await db()));
   }
   return { cliPort, cliState, preferSignup: preferSignup(url) };
 };
+
+async function homeRedirectTarget(
+  cookies: Cookies,
+  user: NonNullable<Awaited<ReturnType<RequestEvent['locals']['safeGetSession']>>['user']>,
+  db: Awaited<ReturnType<RequestEvent['locals']['db']>>
+): Promise<string> {
+  if (!db) return '/app';
+  return homePathFor(db, ENTRY_DEPS, user, cookies.get(ORG_COOKIE) ?? null);
+}
 
 // Public origin for absolute email / OAuth links. Prefer the live request host (www vs apex)
 // so Supabase redirect allow-lists match; see appOrigin().
@@ -46,7 +57,8 @@ async function routeAfterAuth(
   data: FormData,
   cliPort: string,
   cliState: string,
-  cookies: Cookies
+  cookies: Cookies,
+  locals: RequestEvent['locals']
 ): Promise<never> {
   // An interrupted /oauth/authorize resumes here (MCP client connect → login → consent).
   const oauthReturn = takeOAuthReturn(cookies);
@@ -56,12 +68,14 @@ async function routeAfterAuth(
     throw redirect(303, `/cli/callback?cli_port=${encodeURIComponent(cliPort)}&cli_state=${encodeURIComponent(cliState)}`);
   }
 
-  throw redirect(303, '/app');
+  const { user } = await locals.safeGetSession();
+  const db = user ? await locals.db() : null;
+  throw redirect(303, db && user ? await homePathFor(db, ENTRY_DEPS, user, cookies.get(ORG_COOKIE) ?? null) : '/app');
 }
 
 export const actions: Actions = {
   // Email + password sign-in. Wrong creds come back as a generic code (no account enumeration).
-  login: async ({ request, cookies, locals: { supabase } }) => {
+  login: async ({ request, cookies, locals }) => {
     const data = await request.formData();
     const email = String(data.get('email') ?? '').trim().toLowerCase();
     const password = String(data.get('password') ?? '');
@@ -71,20 +85,20 @@ export const actions: Actions = {
     if (!EMAIL_RE.test(email)) return fail(400, { errorCode: 'invalidEmail', email });
     if (!password) return fail(400, { errorCode: 'invalidCredentials', email });
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await locals.supabase.auth.signInWithPassword({ email, password });
     if (error) {
       // "Invalid login credentials" / "Email not confirmed" → one generic message.
       const code = /invalid login|not confirmed/i.test(error.message) ? 'invalidCredentials' : null;
       return code ? fail(400, { errorCode: code, email }) : fail(400, { error: error.message, email });
     }
 
-    return routeAfterAuth(data, cliPort, cliState, cookies);
+    return routeAfterAuth(data, cliPort, cliState, cookies, locals);
   },
 
   // Sign-up. We create an already-confirmed user via the admin API (no confirmation email — the
   // product decision is instant login) and then sign in on the SSR client to set the session
   // cookies. This is robust to the dashboard "Confirm email" toggle either way.
-  signup: async ({ request, cookies, locals: { supabase } }) => {
+  signup: async ({ request, cookies, locals }) => {
     const data = await request.formData();
     const email = String(data.get('email') ?? '').trim().toLowerCase();
     const password = String(data.get('password') ?? '');
@@ -107,10 +121,10 @@ export const actions: Actions = {
       return fail(400, { error: createErr.message, email });
     }
 
-    const { error: signErr } = await supabase.auth.signInWithPassword({ email, password });
+    const { error: signErr } = await locals.supabase.auth.signInWithPassword({ email, password });
     if (signErr) return fail(400, { error: signErr.message, email });
 
-    return routeAfterAuth(data, cliPort, cliState, cookies);
+    return routeAfterAuth(data, cliPort, cliState, cookies, locals);
   },
 
   // Forgot-password. Generate a recovery link server-side (service role) and email it ourselves via
