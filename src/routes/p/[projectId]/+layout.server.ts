@@ -74,7 +74,7 @@ export const load: LayoutServerLoad = async ({ params, locals, depends, cookies 
       };
     }),
     canvases: canvases.map((c) => ({ id: c.id, name: c.name, href: `/p/${project.id}/c/${c.id}` })),
-    workspaces: memberships.map((m) => ({ id: m.org.id, name: m.org.name, slug: m.org.slug, href: '/app' })),
+    workspaces: memberships.map((m) => ({ id: m.org.id, name: m.org.name, slug: m.org.slug })),
     flags: FLAGS
   };
 };

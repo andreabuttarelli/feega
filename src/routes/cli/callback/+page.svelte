@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { HOME_PATH } from '$lib/home-path';
   let { data } = $props();
   const { accessToken, refreshToken, expiresAt, cliPort, cliState, userEmail } = data;
 
@@ -21,7 +22,7 @@
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       status = 'done';
-      setTimeout(() => { window.location.href = '/app'; }, 2500);
+      setTimeout(() => { window.location.href = HOME_PATH; }, 2500);
     } catch {
       status = 'error';
       errorMsg = 'Impossibile raggiungere la CLI. Assicurati che feega sia in esecuzione e riprova.';
@@ -55,7 +56,7 @@
       <button class="btn-primary" onclick={authorize} disabled={status === 'sending'}>
         {status === 'sending' ? 'Autorizzazione…' : 'Autorizza'}
       </button>
-      <a class="btn-cancel" href="/app">Annulla</a>
+      <a class="btn-cancel" href={HOME_PATH}>Annulla</a>
     {/if}
   </div>
 </div>

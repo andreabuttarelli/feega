@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { HOME_PATH } from '$lib/home-path';
   import { enhance } from '$app/forms';
   import { _ } from 'svelte-i18n';
   import { Button } from '$lib/components/ui/button';
@@ -28,7 +29,7 @@
 
 <main class="bg-background text-foreground min-h-screen">
   <div class="mx-auto max-w-3xl px-6 py-12">
-    <a href="/app" class="text-muted-foreground hover:text-foreground mb-4 inline-flex items-center gap-1.5 text-sm transition">
+    <a href={HOME_PATH} class="text-muted-foreground hover:text-foreground mb-4 inline-flex items-center gap-1.5 text-sm transition">
       {$_('app.settings.back')}
     </a>
     <h1 class="text-2xl font-semibold tracking-tight">{$_('app.settings.apiKeys.title')}</h1>

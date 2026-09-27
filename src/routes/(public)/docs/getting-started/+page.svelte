@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { HOME_PATH } from '$lib/home-path';
   import { _, locale } from 'svelte-i18n';
   import { toc } from '$lib/stores/toc';
 
@@ -19,7 +20,7 @@
 
 <h2>{$_('docs.getting_started.s6')}</h2>
 <p>
-  {$_('docs.getting_started.s7')} <a href="/app">{$_('docs.getting_started.s8')}</a> {$_('docs.getting_started.s9')}
+  {$_('docs.getting_started.s7')} <a href={HOME_PATH}>{$_('docs.getting_started.s8')}</a> {$_('docs.getting_started.s9')}
 </p>
 
 <h2>{$_('docs.getting_started.s10')}</h2>

@@ -16,7 +16,7 @@ function fallBackToOpen(reason: string, err?: unknown): BillingProvider {
   return openBillingProvider;
 }
 
-// The one place that decides which billing provider answers gate()/quota()/upgradeUrl().
+// The one place that decides which billing provider answers gate()/quota().
 // Default: dazero (today's product, unchanged). BILLING_PROVIDER=open forces the permissive
 // default — and so does dazero-provider.ts not being there, which is what a self-hosted fork
 // looks like once it's extracted into its own (absent, private) npm package. "Not there" has two

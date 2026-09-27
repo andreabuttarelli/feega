@@ -14,10 +14,6 @@ export const openBillingProvider: BillingProvider = {
     return Infinity;
   },
 
-  upgradeUrl() {
-    return undefined;
-  },
-
   plansAbove() {
     return [];
   },

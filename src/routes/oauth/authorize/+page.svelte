@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { HOME_PATH } from '$lib/home-path';
   let { data } = $props();
 </script>
 
@@ -11,7 +12,7 @@
     {#if data.fatal}
       <h2>Richiesta non valida</h2>
       <p class="desc">{data.fatal}</p>
-      <a class="btn-cancel" href="/app">Torna ad feega</a>
+      <a class="btn-cancel" href={HOME_PATH}>Torna ad feega</a>
     {:else}
       <h2>{data.clientName} vuole accedere al tuo account</h2>
       <p class="email">{data.userEmail}</p>

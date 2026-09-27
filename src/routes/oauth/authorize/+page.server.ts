@@ -6,6 +6,7 @@ import {
   stashOAuthReturn
 } from '$lib/server/oauth';
 import type { Actions, PageServerLoad } from './$types';
+import { HOME_PATH } from '$lib/home-path';
 
 type Parsed =
   /** Bad client_id / redirect_uri — must be rendered in place, never redirected. */
@@ -78,7 +79,7 @@ export const actions: Actions = {
   approve: async ({ url, locals: { safeGetSession } }) => {
     const parsed = parse(url);
     if (parsed.kind === 'error') throw redirect(303, parsed.back.toString());
-    if (parsed.kind === 'fatal') throw redirect(303, '/app');
+    if (parsed.kind === 'fatal') throw redirect(303, HOME_PATH);
 
     const { session, user } = await safeGetSession();
     if (!session || !user?.email) throw redirect(303, '/login');
@@ -99,7 +100,7 @@ export const actions: Actions = {
   deny: async ({ url }) => {
     const parsed = parse(url);
     if (parsed.kind === 'error') throw redirect(303, parsed.back.toString());
-    if (parsed.kind === 'fatal') throw redirect(303, '/app');
+    if (parsed.kind === 'fatal') throw redirect(303, HOME_PATH);
 
     const back = new URL(parsed.redirectUri);
     back.searchParams.set('error', 'access_denied');

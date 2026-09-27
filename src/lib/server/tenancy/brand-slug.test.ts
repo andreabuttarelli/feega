@@ -59,9 +59,9 @@ describe('appPathForBrand', () => {
     expect(await appPathForBrand(client, 'brand-1')).toBe('/p/proj-1');
   });
 
-  it('falls back to the bootstrap /app when the brand has no project', async () => {
+  it('falls back to the home path when the brand has no project', async () => {
     const client = projectsClient([]);
-    expect(await appPathForBrand(client, 'brand-1', '/calendar')).toBe('/app');
+    expect(await appPathForBrand(client, 'brand-1', '/calendar')).toBe('/');
   });
 });
 
@@ -70,7 +70,7 @@ describe('joinAppPath', () => {
     expect(joinAppPath('/p/proj-1', '/calendar')).toBe('/p/proj-1/calendar');
   });
 
-  it('drops the sub-path on the bootstrap — /app takes no further segment', () => {
-    expect(joinAppPath('/app', '/calendar')).toBe('/app');
+  it('drops the sub-path on the home path', () => {
+    expect(joinAppPath('/', '/calendar')).toBe('/');
   });
 });

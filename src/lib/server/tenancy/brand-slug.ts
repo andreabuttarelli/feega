@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { HOME_PATH } from '$lib/home-path';
 
 /**
  * DA UN PROGETTO AL SUO BRAND, QUANDO LE PAGINE ANCORA CHIEDONO LO SLUG DEL BRAND.
@@ -64,10 +65,6 @@ export async function projectIdOfBrand(
   return projects?.[0]?.id ?? null;
 }
 
-/** Bootstrap route: picks a project for whoever lands here with none chosen yet. The one link
- *  that is never a 404, for a brand whose project could not be resolved. */
-export const APP_BOOTSTRAP_PATH = '/app';
-
 /**
  * Un link `/p/<projectId>/…` per un brand conosciuto solo per slug o id — quello che un'email
  * transazionale costruisce. Risolve il progetto UNA volta e lo antepone a `path`; senza un
@@ -81,16 +78,11 @@ export async function appPathForBrand(
 ): Promise<string> {
   const projectId = await projectIdOfBrand(supabase, brandId);
   if (!projectId) {
-    return APP_BOOTSTRAP_PATH;
+    return HOME_PATH;
   }
   return `/p/${projectId}${path}`;
 }
 
-/**
- * Un `appBasePath` già risolto (una volta, per più link della stessa email) più un sotto-path —
- * MAI una concatenazione diretta: il bootstrap `/app` non accetta segmenti dopo di sé, quindi
- * quando la base è il bootstrap il sotto-path si perde piuttosto che produrre un altro 404.
- */
 export function joinAppPath(appBasePath: string, path: string): string {
-  return appBasePath === APP_BOOTSTRAP_PATH ? APP_BOOTSTRAP_PATH : `${appBasePath}${path}`;
+  return appBasePath === HOME_PATH ? HOME_PATH : `${appBasePath}${path}`;
 }
