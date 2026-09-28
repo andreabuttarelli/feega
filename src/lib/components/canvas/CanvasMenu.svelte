@@ -16,12 +16,14 @@
     projectId,
     profile,
     org,
-    creditBalance
+    creditBalance,
+    navigation = 'sheet'
   }: {
     projectId: string;
     profile: { name: string | null; email: string; avatarUrl: string | null };
     org: { name: string } | null;
     creditBalance: number;
+    navigation?: 'sheet' | 'page';
   } = $props();
 
   const isMac =
@@ -71,6 +73,13 @@
   const navigateItems = CANVAS_MENU_ITEMS.filter((item) => item.group === 'navigate');
   const helpItems = CANVAS_MENU_ITEMS.filter((item) => item.group === 'help');
 
+  function hrefOf(item: (typeof CANVAS_MENU_ITEMS)[number]): string | undefined {
+    if (item.sheet && navigation === 'page') {
+      return `/p/${projectId}${item.sheet}`;
+    }
+    return item.href;
+  }
+
   function onItemClick(item: (typeof CANVAS_MENU_ITEMS)[number]) {
     if (item.sheet) {
       openSheet(projectId, item.sheet).catch((err) => {
@@ -109,8 +118,8 @@
       {#each navigateItems as item (item.id)}
         <DropdownMenu.Item class="menu-row">
           {#snippet child({ props })}
-            {#if item.href}
-              <a {...props} href={item.href}>
+            {#if hrefOf(item)}
+              <a {...props} href={hrefOf(item)}>
                 <item.icon size={16} />
                 <span>{$_(item.labelKey)}</span>
               </a>

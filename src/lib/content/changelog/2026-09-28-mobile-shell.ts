@@ -1,0 +1,11 @@
+import type { ChangelogEntry } from './index';
+
+export default {
+  date: '2026-09-28',
+  title: 'A proper mobile layout',
+  items: [
+    'On phones every project page has the same top bar and bottom tab bar.',
+    'The page title, menu, credits and sharing are always one tap away.',
+    'Chat opens from any page, not only the canvas.'
+  ]
+} satisfies ChangelogEntry;

@@ -70,19 +70,37 @@ export function sheetEntryForPath(path: string): NavEntry | null {
   );
 }
 
-export type MobileTab = { id: string; labelKey: string; icon: 'layout-grid' | 'message-circle' | 'calendar-days' | 'more-horizontal'; path: string | null };
+export type MobileTab = {
+  id: 'canvas' | 'chat' | 'calendar' | 'more';
+  labelKey: string;
+  icon: 'layout-grid' | 'message-circle' | 'calendar-days' | 'more-horizontal';
+  path: string | null;
+  root: string | null;
+};
 
-/**
- * LA BARRA MOBILE: quattro voci fisse, non l'inventario della rail. "More" non ha un `path` —
- * apre un foglio locale con le voci restanti (Assets, Brands, Ads, Settings), che su schermo
- * piccolo sono rotte intere e non pannelli/sheet.
- */
+export type MobileView = 'page' | 'chat';
+
+export type TabOutcome = 'handled' | 'follow-link';
+
 export const MOBILE_TABS: MobileTab[] = [
-  { id: 'canvas', labelKey: 'app.shell.mobile.canvas', icon: 'layout-grid', path: null },
-  { id: 'chat', labelKey: 'app.shell.mobile.chat', icon: 'message-circle', path: null },
-  { id: 'calendar', labelKey: 'app.hub.publish.calendar', icon: 'calendar-days', path: '/calendar' },
-  { id: 'more', labelKey: 'app.shell.mobile.more', icon: 'more-horizontal', path: null }
+  { id: 'canvas', labelKey: 'app.shell.mobile.canvas', icon: 'layout-grid', path: '', root: '/c' },
+  { id: 'chat', labelKey: 'app.shell.mobile.chat', icon: 'message-circle', path: null, root: null },
+  { id: 'calendar', labelKey: 'app.hub.publish.calendar', icon: 'calendar-days', path: '/calendar', root: '/calendar' },
+  { id: 'more', labelKey: 'app.shell.mobile.more', icon: 'more-horizontal', path: null, root: null }
 ];
+
+export function mobileTabHref(projectId: string, tab: MobileTab): string | null {
+  return tab.path === null ? null : `/p/${projectId}${tab.path}`;
+}
+
+export function activeMobileTab(projectId: string, pathname: string, view: MobileView): MobileTab['id'] {
+  if (view === 'chat') {
+    return 'chat';
+  }
+  const inner = pathname.slice(`/p/${projectId}`.length);
+  const hit = MOBILE_TABS.find((tab) => tab.root !== null && (inner === tab.root || inner.startsWith(`${tab.root}/`)));
+  return hit?.id ?? 'more';
+}
 
 export const MOBILE_MORE_ENTRIES: NavEntry[] = NAV_ENTRIES.filter(
   (entry) => entry.group !== 'hidden' && entry.id !== 'calendar'

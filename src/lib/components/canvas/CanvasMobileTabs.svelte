@@ -1,6 +1,6 @@
 <script lang="ts">
   import { _ } from 'svelte-i18n';
-  import { MOBILE_TABS, type MobileTab } from '$lib/shell-nav';
+  import { MOBILE_TABS, mobileTabHref, type MobileTab, type TabOutcome } from '$lib/shell-nav';
   import LayoutGrid from '@lucide/svelte/icons/layout-grid';
   import MessageCircle from '@lucide/svelte/icons/message-circle';
   import CalendarDays from '@lucide/svelte/icons/calendar-days';
@@ -14,34 +14,29 @@
     'more-horizontal': MoreHorizontal
   };
 
-  /**
-   * LA BARRA MOBILE: Canvas · Chat · Calendar · More, ognuna la sua rotta intera (CLAUDE.md).
-   * `active` confronta l'id, non l'URL: "canvas" e "chat" non hanno un `path` proprio (sono la
-   * stessa pagina canvas, con la chat aperta o chiusa — vedi `+layout.svelte`), quindi lo decide
-   * chi monta questo componente, non un confronto con `page.url` che qui non avrebbe niente da
-   * confrontare per quei due casi.
-   */
   let {
     projectId,
     active,
     onselect
   }: {
     projectId: string;
-    active: string;
-    onselect: (tab: MobileTab) => void;
+    active: MobileTab['id'];
+    onselect: (tab: MobileTab) => TabOutcome;
   } = $props();
 
-  function hrefFor(tab: MobileTab): string | null {
-    return tab.path ? `/p/${projectId}${tab.path}` : null;
+  function onLinkClick(event: MouseEvent, tab: MobileTab) {
+    if (onselect(tab) === 'handled') {
+      event.preventDefault();
+    }
   }
 </script>
 
 <nav class="tabs" aria-label={$_('app.shell.rail')}>
   {#each MOBILE_TABS as tab (tab.id)}
     {@const Icon = ICONS[tab.icon]}
-    {@const href = hrefFor(tab)}
+    {@const href = mobileTabHref(projectId, tab)}
     {#if href}
-      <a {href} class="tab" class:is-active={active === tab.id}>
+      <a {href} class="tab" class:is-active={active === tab.id} aria-current={active === tab.id ? 'page' : undefined} onclick={(e) => onLinkClick(e, tab)}>
         <Icon size={19} />
         <span>{$_(tab.labelKey)}</span>
       </a>
@@ -56,11 +51,13 @@
 
 <style>
   .tabs {
+    flex: 0 0 auto;
     display: flex;
     align-items: stretch;
+    height: calc(var(--mobile-tabbar-h) + env(safe-area-inset-bottom, 0px));
     border-top: 1px solid var(--line, #ededef);
     background: var(--paper, #fff);
-    padding-bottom: env(safe-area-inset-bottom, 0);
+    padding: 0 env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
   }
 
   .tab {
@@ -73,14 +70,15 @@
     appearance: none;
     border: 0;
     background: transparent;
-    padding: 8px 4px 6px;
+    min-height: var(--touch-target);
+    padding: 6px 4px;
     font: inherit;
     text-decoration: none;
     color: var(--ink-soft, #6e6e73);
     cursor: pointer;
   }
   .tab span {
-    font-size: 10.5px;
+    font-size: 11px;
     font-weight: 600;
   }
   .tab.is-active {
