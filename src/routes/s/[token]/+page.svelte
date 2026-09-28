@@ -28,6 +28,7 @@
 </svelte:head>
 
 <main class="shared-canvas">
+  <h1 class="share-title">{data.shared.name}</h1>
   <CanvasFlow {tiles} {edges} mode={CanvasMode.View}>
     {#snippet tile({ id })}
       {@const node = byId.get(id)}
@@ -211,10 +212,27 @@
     font-size: 12px;
   }
 
+  .share-title {
+    position: fixed;
+    z-index: 10;
+    top: calc(8px + env(safe-area-inset-top, 0px));
+    left: calc(8px + env(safe-area-inset-left, 0px));
+    max-width: calc(100vw - 16px);
+    margin: 0;
+    padding: 10px 14px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: 14px;
+    font-weight: 600;
+    background: var(--paper, #fff);
+    border: 1px solid var(--line-2, #d2d2d7);
+  }
+
   .mark {
     position: fixed;
-    left: 12px;
-    bottom: 10px;
+    left: calc(12px + env(safe-area-inset-left, 0px));
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
     z-index: 10;
     font-size: 11px;
     font-weight: 600;

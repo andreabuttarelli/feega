@@ -107,6 +107,8 @@
 
 <style>
   .brand-item { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+  :global([data-viewport='mobile']) .brand-item { padding: 16px var(--page-gutter) 24px; }
+  :global([data-viewport='mobile']) .content { padding: 12px; overflow-wrap: anywhere; }
 
   .head { display: flex; align-items: flex-start; gap: 16px; }
   .logo {

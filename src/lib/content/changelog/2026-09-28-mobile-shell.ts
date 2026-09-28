@@ -8,6 +8,7 @@ export default {
     'The page title, menu, credits and sharing are always one tap away.',
     'Chat opens from any page, not only the canvas.',
     'Settings on phones opens as a list of sections, each with a way back.',
-    'The calendar on phones is an agenda with day chips; post details open as a bottom sheet.'
+    'The calendar on phones is an agenda with day chips; post details open as a bottom sheet.',
+    'Assets, Brands, Influencers, Create post and shared canvases fit small screens.'
   ]
 } satisfies ChangelogEntry;

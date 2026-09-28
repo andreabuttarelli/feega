@@ -84,6 +84,10 @@
   .empty p { margin: 0; color: var(--ink-soft); }
 
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+
+  :global([data-viewport='mobile']) .brands-page { padding: 12px var(--page-gutter) 24px; }
+  :global([data-viewport='mobile']) .btn.primary { display: inline-flex; align-items: center; min-height: var(--touch-target); }
+  :global([data-viewport='mobile']) .grid { grid-template-columns: minmax(0, 1fr); }
   .card {
     background: var(--paper-2); border: 1px solid var(--line); padding: 14px;
     display: flex; flex-direction: column; gap: 10px;

@@ -736,19 +736,11 @@
 
   .preview { border: 1px solid var(--line); padding: 16px; background: var(--paper-2); }
 
-  @media (max-width: 480px) {
-    .wizard-shell { padding: 32px 16px 56px; }
-    .wizard-panel { padding: 24px 20px; }
-    .row { flex-direction: column-reverse; }
-    .row .btn { width: 100%; }
-
-    .handle-row select { flex: 1 1 auto; }
-    .handle-row input { flex: 1 1 100%; order: 1; }
-    .handle-row .btn.small { flex: 1 1 auto; margin-left: 0; order: 2; }
-  }
-
-  @media (max-width: 360px) {
-    .wizard-shell { padding: 24px 12px 48px; }
-    .wizard-panel { padding: 20px 16px; }
-  }
+  :global([data-viewport='mobile']) .wizard-shell { min-height: 100%; padding: 20px var(--page-gutter) 32px; }
+  :global([data-viewport='mobile']) .wizard-panel { padding: 20px 16px; }
+  :global([data-viewport='mobile']) .row { flex-direction: column-reverse; }
+  :global([data-viewport='mobile']) .row .btn { width: 100%; min-height: var(--touch-target); }
+  :global([data-viewport='mobile']) .handle-row select { flex: 1 1 auto; }
+  :global([data-viewport='mobile']) .handle-row input { flex: 1 1 100%; order: 1; }
+  :global([data-viewport='mobile']) .handle-row .btn.small { flex: 1 1 auto; margin-left: 0; order: 2; }
 </style>

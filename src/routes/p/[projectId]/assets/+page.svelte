@@ -233,6 +233,12 @@
   .empty p { margin: 0; color: var(--ink-soft); max-width: 420px; line-height: 1.5; }
 
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+
+  :global([data-viewport='mobile']) .media-page { padding: 8px var(--page-gutter) 24px; }
+  :global([data-viewport='mobile']) .filters { flex-wrap: wrap; gap: 4px; }
+  :global([data-viewport='mobile']) .filter { min-height: var(--touch-target); display: inline-flex; align-items: center; padding: 0 12px; }
+  :global([data-viewport='mobile']) .upload-btn { min-height: var(--touch-target); margin-left: 0; }
+  :global([data-viewport='mobile']) .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .tile {
     position: relative; overflow: hidden; background: var(--paper-2);
     border: 1px solid var(--line); display: flex; flex-direction: column; min-height: 160px;

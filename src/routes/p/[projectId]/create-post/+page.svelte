@@ -430,6 +430,18 @@
     gap: 4px;
   }
 
+  :global([data-viewport='mobile']) .composer {
+    padding: 20px var(--page-gutter) 32px;
+  }
+  :global([data-viewport='mobile']) .composer-footer {
+    flex-direction: column;
+    gap: 12px;
+  }
+  :global([data-viewport='mobile']) .footer-action :global(button) {
+    width: 100%;
+    min-height: var(--touch-target);
+  }
+
   .reason {
     margin: 0;
     font-size: 12px;

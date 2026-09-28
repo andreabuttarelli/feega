@@ -28,6 +28,12 @@ not mounted on mobile, so they did nothing.
 - Calendar on mobile: the 7-column month grid hides; an agenda (strip of day chips, then only
   the days with posts) takes its place, the unscheduled tray stacks below, and the post
   popover becomes a bottom sheet. Same data (`placePosts`), no second model.
+- Assets, Brands, brand detail, brand wizard, Influencers, Create post: pages built for the
+  desktop side panel had `padding: 0`; on mobile they take `--page-gutter`, grids go to one or
+  two columns, button rows wrap or stack at `--touch-target`. The wizard's two ad-hoc
+  `@media (max-width: 480/360px)` blocks became the shared `data-viewport` rule. Influencers'
+  "Create with AI" button was white on white (`.toolbar button` beat `.primary`).
+- Share viewer: canvas name in a header, safe-area offsets.
 
 Discarded: a fixed-position tab bar with padded pages — a flex column where `main` is the only
 scroller keeps content out from under the bars without every page knowing their heights.
