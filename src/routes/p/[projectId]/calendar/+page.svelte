@@ -1,7 +1,9 @@
 <script lang="ts">
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
+  import { _ } from 'svelte-i18n';
   import PlatformGlyph from '$lib/components/PlatformGlyph.svelte';
+  import PageHead from '$lib/components/PageHead.svelte';
   import { monthGrid, placePosts, type GridDay } from '$lib/calendar/month-grid';
   import { ALL_BRANDS, type CalendarPost } from './calendar-load';
 
@@ -112,6 +114,21 @@
   function closePost() {
     selectedPost = null;
   }
+
+  function dayKey(day: GridDay): string {
+    return `day-${day.year}-${day.month}-${day.day}`;
+  }
+
+  const monthDays = $derived(weeks.flat().filter((day) => !day.outside));
+
+  function weekdayOf(day: GridDay): string {
+    const sundayFirst = new Date(Date.UTC(day.year, day.month - 1, day.day)).getUTCDay();
+    return WEEKDAY_NAMES[(sundayFirst + 6) % 7];
+  }
+
+  function jumpTo(day: GridDay) {
+    document.getElementById(dayKey(day))?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 </script>
 
 {#snippet brandChip(brandId: string)}
@@ -124,6 +141,8 @@
     {/if}
   {/if}
 {/snippet}
+
+<PageHead title={$_('app.hub.publish.calendar')} />
 
 <div class="calendar-page">
   <header class="page-header">
@@ -193,6 +212,42 @@
         </div>
       {/each}
     </div>
+
+    <section class="agenda" aria-label="Agenda">
+      <div class="day-strip">
+        {#each monthDays as day (dayKey(day))}
+          {@const count = postsOnDay(day).length}
+          <button
+            type="button"
+            class="day-pill"
+            class:is-today={day.isToday}
+            class:has-posts={count > 0}
+            disabled={count === 0}
+            onclick={() => jumpTo(day)}
+          >
+            <span class="pill-weekday">{weekdayOf(day)}</span>
+            <span class="pill-day">{day.day}</span>
+          </button>
+        {/each}
+      </div>
+      {#each monthDays.filter((day) => postsOnDay(day).length > 0) as day (dayKey(day))}
+        <div class="agenda-day" id={dayKey(day)}>
+          <h3 class:is-today={day.isToday}>{day.day} {MONTH_NAMES[day.month - 1]}</h3>
+          {#each postsOnDay(day) as post (post.id)}
+            <button type="button" class="agenda-post" onclick={() => openPost(post)}>
+              {#if showsAll}{@render brandChip(post.brandId)}{/if}
+              {#each platformsOf(post) as platform (platform)}
+                <PlatformGlyph {platform} />
+              {/each}
+              <span class="chip-time">{timeOf(post)}</span>
+              <span class="chip-caption">{post.caption}</span>
+            </button>
+          {/each}
+        </div>
+      {:else}
+        <p class="empty-hint">Nessun post programmato questo mese.</p>
+      {/each}
+    </section>
 
     <aside class="unscheduled-list">
       <h2>Da programmare</h2>
@@ -613,5 +668,135 @@
     font-size: 11px;
     cursor: pointer;
     color: var(--ink, #1d1d1f);
+  }
+
+  .agenda {
+    display: none;
+  }
+
+  :global([data-viewport='mobile']) .calendar-page {
+    padding: 12px 16px 24px;
+  }
+  :global([data-viewport='mobile']) .title-row {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  :global([data-viewport='mobile']) .title-row h1 {
+    flex: 1 0 100%;
+  }
+  :global([data-viewport='mobile']) .nav-buttons button,
+  :global([data-viewport='mobile']) .brand-select {
+    min-height: var(--touch-target);
+    min-width: var(--touch-target);
+  }
+  :global([data-viewport='mobile']) .brand-select {
+    flex: 1 1 auto;
+  }
+  :global([data-viewport='mobile']) .calendar-body {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+  :global([data-viewport='mobile']) .grid-wrap {
+    display: none;
+  }
+  :global([data-viewport='mobile']) .agenda {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+  }
+  :global([data-viewport='mobile']) .unscheduled-list {
+    flex: 0 0 auto;
+  }
+  :global([data-viewport='mobile']) .post-chip,
+  :global([data-viewport='mobile']) .unscheduled-item {
+    min-height: var(--touch-target);
+    font-size: 13px;
+  }
+
+  .day-strip {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+  .day-pill {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: var(--touch-target);
+    height: 52px;
+    border: 1px solid var(--line, #ededef);
+    background: var(--paper, #fff);
+    font: inherit;
+    color: var(--ink-faint, #9a9a9e);
+  }
+  .day-pill.has-posts {
+    color: var(--ink, #1d1d1f);
+    border-color: var(--ink, #1d1d1f);
+    cursor: pointer;
+  }
+  .day-pill.is-today {
+    color: var(--accent, #7c5cff);
+  }
+  .pill-weekday {
+    font-size: 10px;
+    text-transform: uppercase;
+  }
+  .pill-day {
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .agenda-day {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    scroll-margin-top: 8px;
+  }
+  .agenda-day h3 {
+    margin: 4px 0;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .agenda-day h3.is-today {
+    color: var(--accent, #7c5cff);
+  }
+  .agenda-post {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: var(--touch-target);
+    padding: 0 10px;
+    border: 1px solid var(--line, #ededef);
+    background: var(--paper, #fff);
+    font: inherit;
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  :global([data-viewport='mobile']) .popover-backdrop {
+    align-items: flex-end;
+  }
+  :global([data-viewport='mobile']) .popover {
+    width: 100%;
+    max-height: 85dvh;
+    overflow-y: auto;
+    padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+    border-width: 1px 0 0;
+  }
+  :global([data-viewport='mobile']) .popover-deliveries li {
+    flex-wrap: wrap;
+  }
+  :global([data-viewport='mobile']) .popover-action button,
+  :global([data-viewport='mobile']) .popover-when input,
+  :global([data-viewport='mobile']) .popover-schedule button,
+  :global([data-viewport='mobile']) .close-btn {
+    min-height: var(--touch-target);
+    min-width: var(--touch-target);
   }
 </style>

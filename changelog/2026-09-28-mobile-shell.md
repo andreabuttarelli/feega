@@ -25,6 +25,9 @@ not mounted on mobile, so they did nothing.
   `?error`) still redirect to connected accounts. The More sheet reaches it through
   `NavEntry.mobilePath`; each section shows a back link on mobile. Desktop keeps opening
   `/settings/connected-accounts` as before.
+- Calendar on mobile: the 7-column month grid hides; an agenda (strip of day chips, then only
+  the days with posts) takes its place, the unscheduled tray stacks below, and the post
+  popover becomes a bottom sheet. Same data (`placePosts`), no second model.
 
 Discarded: a fixed-position tab bar with padded pages — a flex column where `main` is the only
 scroller keeps content out from under the bars without every page knowing their heights.
