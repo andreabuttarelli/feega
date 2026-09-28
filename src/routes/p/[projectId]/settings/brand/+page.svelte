@@ -112,6 +112,8 @@
     border: 1px solid var(--line); padding: 9px 10px; font-family: inherit;
   }
   .create-form { display: flex; gap: 8px; align-items: flex-end; }
+  :global([data-viewport='mobile']) .create-form, :global([data-viewport='mobile']) .pick-form { flex-direction: column; align-items: stretch; }
+  :global([data-viewport='mobile']) .btn { min-height: var(--touch-target); }
   .wizard-link { font-size: 13px; font-weight: 600; color: var(--accent); text-decoration: none; }
   .wizard-link:hover { text-decoration: underline; }
 

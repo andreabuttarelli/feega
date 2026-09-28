@@ -119,7 +119,7 @@
   .btn.primary { background: var(--accent, #7c5cff); color: #fff; }
   .btn.primary:disabled { opacity: .6; cursor: default; }
   .btn.ghost { background: transparent; color: var(--ink-faint, #8a8a99); border: 1px solid var(--line, #ececf1); }
-  .actions { display: flex; gap: 10px; margin-top: 18px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
   .empty { color: var(--ink-faint, #8a8a99); font-size: 14px; padding: 8px 2px 4px; }
   .err {
     background: #fdecec; color: #c0392b; padding: 12px 14px; margin-bottom: 8px; font-size: 14px;

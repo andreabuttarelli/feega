@@ -1,8 +1,7 @@
 <script lang="ts">
   import { _ } from 'svelte-i18n';
   import * as Sheet from '$lib/components/ui/sheet/index.js';
-  import { MOBILE_MORE_ENTRIES } from '$lib/shell-nav';
-  import { navHref } from '$lib/shell-nav';
+  import { MOBILE_MORE_ENTRIES, mobileNavHref } from '$lib/shell-nav';
   import Images from '@lucide/svelte/icons/images';
   import Building from '@lucide/svelte/icons/building';
   import UserRound from '@lucide/svelte/icons/user-round';
@@ -36,7 +35,7 @@
     <div class="list">
       {#each MOBILE_MORE_ENTRIES as entry (entry.id)}
         {@const Icon = ICONS[entry.icon]}
-        <a href={navHref(projectId, entry)} class="row">
+        <a href={mobileNavHref(projectId, entry)} class="row">
           <Icon size={17} />
           <span>{$_(entry.labelKey)}</span>
         </a>
@@ -49,13 +48,14 @@
   .list {
     display: flex;
     flex-direction: column;
-    padding: 4px 4px 16px;
+    padding: 4px 4px calc(16px + env(safe-area-inset-bottom, 0px));
   }
   .row {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 12px 12px;
+    min-height: var(--touch-target);
+    padding: 0 12px;
     text-decoration: none;
     color: var(--ink, #1d1d1f);
     font-size: 14px;

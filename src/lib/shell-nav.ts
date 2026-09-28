@@ -6,6 +6,7 @@ export type NavEntry = {
   icon: 'images' | 'building' | 'user-round' | 'calendar-days' | 'megaphone' | 'settings';
   family: NavFamily;
   path: string;
+  mobilePath?: string;
   group: 'panel' | 'workbench' | 'hidden';
 };
 
@@ -21,7 +22,7 @@ export const NAV_ENTRIES: NavEntry[] = [
   { id: 'influencers', labelKey: 'app.nav2.influencers', icon: 'user-round', family: 'panel', path: '/influencers', group: 'panel' },
   { id: 'calendar', labelKey: 'app.hub.publish.calendar', icon: 'calendar-days', family: 'sheet', path: '/calendar', group: 'workbench' },
   { id: 'ads', labelKey: 'app.hub.ads.social', icon: 'megaphone', family: 'sheet', path: '/ads/social', group: 'workbench' },
-  { id: 'settings', labelKey: 'app.nav.settings', icon: 'settings', family: 'sheet', path: '/settings/connected-accounts', group: 'workbench' },
+  { id: 'settings', labelKey: 'app.nav.settings', icon: 'settings', family: 'sheet', path: '/settings/connected-accounts', mobilePath: '/settings', group: 'workbench' },
   { id: 'create-post', labelKey: 'app.hub.publish.createPost', icon: 'megaphone', family: 'sheet', path: '/create-post', group: 'hidden' }
 ];
 
@@ -47,6 +48,10 @@ export function navEntriesByGroup(group: NavEntry['group']): NavEntry[] {
 
 export function navHref(projectId: string, entry: NavEntry): string {
   return `/p/${projectId}${entry.path}`;
+}
+
+export function mobileNavHref(projectId: string, entry: NavEntry): string {
+  return `/p/${projectId}${entry.mobilePath ?? entry.path}`;
 }
 
 /**

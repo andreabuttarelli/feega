@@ -20,5 +20,11 @@ not mounted on mobile, so they did nothing.
   their mobile layout from the same breakpoint instead of their own numbers.
 - Safe-area insets on both bars; `viewport-fit=cover` in `app.html`.
 
+- Settings on mobile is list → detail: `/settings` without a query string now renders the
+  section index (`SETTINGS_GROUPS`) instead of redirecting; OAuth returns (`?connected`,
+  `?error`) still redirect to connected accounts. The More sheet reaches it through
+  `NavEntry.mobilePath`; each section shows a back link on mobile. Desktop keeps opening
+  `/settings/connected-accounts` as before.
+
 Discarded: a fixed-position tab bar with padded pages — a flex column where `main` is the only
 scroller keeps content out from under the bars without every page knowing their heights.

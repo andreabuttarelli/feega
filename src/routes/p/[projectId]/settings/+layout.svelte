@@ -6,6 +6,7 @@
   import PageHead from '$lib/components/PageHead.svelte';
   import BrandGate from '$lib/components/settings/BrandGate.svelte';
   import { _ } from 'svelte-i18n';
+  import ChevronLeft from '@lucide/svelte/icons/chevron-left';
   import '$lib/styles/settings-shell.css';
 
   let { data, children } = $props();
@@ -17,6 +18,8 @@
       path.includes('/settings/linkedin') ||
       path.includes('/settings/connect/')
   );
+
+  const isIndex = $derived(path.replace(/\/$/, '') === settingsBase);
 
   const isBrandKit = $derived(
     ['brand', 'products'].some((s) => path.replace(/\/$/, '').endsWith(`/settings/${s}`))
@@ -84,6 +87,12 @@
 {:else}
   <div class="content settings-shell" class:brand-kit={isBrandKit}>
     <PageHead title={head.title} subtitle={head.subtitle ?? null} />
+    {#if !isIndex}
+      <a class="back-to-sections" href={settingsBase}>
+        <ChevronLeft size={16} />
+        <span>{$_('app.nav.settings')}</span>
+      </a>
+    {/if}
     <div class="settings">
       {#if data.brandGate}
         <BrandGate projectId={data.project.id} returnTo={path} orgBrands={data.orgBrands} />
@@ -109,4 +118,18 @@
   }
 
   form { margin: 0; }
+
+  .back-to-sections {
+    display: none;
+    align-items: center;
+    gap: 4px;
+    min-height: var(--touch-target);
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    color: var(--ink-soft, #6e6e73);
+  }
+  :global([data-viewport='mobile']) .back-to-sections {
+    display: inline-flex;
+  }
 </style>
