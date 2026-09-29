@@ -68,6 +68,7 @@ const ASSET_REFS_OF: Partial<Record<NodeType, (node: CanvasNodeRecord) => string
   text: refOf,
   effects: refOf,
   composition: refOf,
+  audio: refOf,
   list: listAssetIds
 };
 
@@ -104,6 +105,12 @@ function resultView(input: ViewInput): SharedView {
   const asset = assetOf(input);
   const url = signedUrl(input, asset);
   return url ? { kind: asset?.type === 'video' ? 'video' : 'image', url } : EMPTY;
+}
+
+function audioView(input: ViewInput): SharedView {
+  const asset = assetOf(input);
+  const url = signedUrl(input, asset);
+  return url ? { kind: asset?.type === 'video' ? 'video' : 'audio', url } : EMPTY;
 }
 
 const BADGE_OF = { carousel: 'carousel', video: 'video', image: null } as const;
@@ -210,7 +217,8 @@ export const SHARED_VIEW_OF: Record<NodeType, (input: ViewInput) => SharedView |
   select: ({ node }) => ({ kind: 'select', index: Number(node.data.index) || 1 }),
   effects: resultView,
   composition: resultView,
-  calendar: calendarView
+  calendar: calendarView,
+  audio: audioView
 };
 
 async function viewOf(input: ViewInput): Promise<SharedView> {

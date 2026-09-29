@@ -439,6 +439,17 @@ export const actions: Actions = {
     return { renamed: true };
   },
 
+  audio_voices: async ({ params, locals }) => {
+    await scopeFor(locals, params.canvasId);
+    const { configuredAudioProvider } = await import('$lib/server/elevenlabs-config');
+    const { cachedVoices } = await import('$lib/server/canvas/audio-voices');
+    const provider = configuredAudioProvider();
+    if (!provider) {
+      return fail(503, { error: 'elevenlabs_not_configured' });
+    }
+    return { voices: await cachedVoices(provider) };
+  },
+
   estimate_text_cost: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();

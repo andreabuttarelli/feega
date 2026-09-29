@@ -52,7 +52,8 @@ export const NODE_TYPES = [
   'select',
   'effects',
   'composition',
-  'calendar'
+  'calendar',
+  'audio'
 ] as const;
 
 function syncStatusOf(v: unknown): SyncStatus {

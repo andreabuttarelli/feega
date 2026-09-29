@@ -45,6 +45,8 @@
   import SelectNode from '$lib/components/canvas/SelectNode.svelte';
   import NodeDownload from '$lib/components/canvas/NodeDownload.svelte';
   import NodeReferences from '$lib/components/canvas/NodeReferences.svelte';
+  import AudioControls, { type VoiceChoice } from '$lib/components/canvas/AudioControls.svelte';
+  import AudioPlayer from '$lib/components/canvas/AudioPlayer.svelte';
   import { referencesOf } from '$lib/canvas/node-references';
   import EffectsNode from '$lib/components/canvas/EffectsNode.svelte';
   import EffectsEditor from '$lib/components/canvas/EffectsEditor.svelte';
@@ -138,6 +140,20 @@
   let { data } = $props();
   type TextCostEstimate = { inputTokens: number; outputTokens: number; variableInput: boolean; revision: string };
   let textCostEstimates = $state<Record<string, TextCostEstimate>>({});
+  let voices = $state<VoiceChoice[]>([]);
+  let voicesError = $state<string | null>(null);
+  let voicesLoading = false;
+
+  async function loadVoices() {
+    if (voicesLoading) {
+      return;
+    }
+    voicesLoading = true;
+    const result = await post('audio_voices', {});
+    const found = (result?.voices as VoiceChoice[] | undefined) ?? [];
+    voices = found;
+    voicesError = found.length ? null : 'No voices available';
+  }
 
   function handlePromote(ids: string[]) {
     void openSheet(data.projectId, promotePath(ids));
@@ -554,7 +570,8 @@
     (data.catalogue ?? {
       text: { choices: [], synced: true },
       image: { choices: [], synced: false },
-      video: { choices: [], synced: false }
+      video: { choices: [], synced: false },
+      audio: { choices: [], synced: false }
     }) as Record<GenMedium, { choices: ModelChoice[]; synced: boolean; enhanceUnitCredits?: number }>
   );
   const catalogue = $derived(
@@ -732,7 +749,7 @@
 
   $effect(() => onCanvasReveal(() => { void refresh(); }));
 
-  const READ_ACTIONS = new Set(['snapshot', 'estimate_text_cost', 'calendar_posts']);
+  const READ_ACTIONS = new Set(['snapshot', 'estimate_text_cost', 'calendar_posts', 'audio_voices']);
 
   function formOf(fields: Record<string, string | number | File | string[]>): FormData {
     const body = new FormData();
@@ -2078,6 +2095,8 @@
                     <pre class="gen-text nodrag" use:scrollGuard>{text ?? ''}</pre>
                   {/if}
                 </div>
+              {:else if gen.medium === 'audio'}
+                <AudioPlayer src={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} cacheKey={refId} />
               {:else if gen.medium === 'video'}
                 <!-- svelte-ignore a11y_media_has_caption -->
                 <video src={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} controls playsinline></video>
@@ -2092,6 +2111,16 @@
               {/if}
             {/snippet}
             {#snippet references()}
+              {#if gen.medium === 'audio'}
+                <AudioControls
+                  node={gen}
+                  {voices}
+                  {voicesError}
+                  onparams={(params) => changeGen(id, gen, { params })}
+                  onmodel={(model) => changeGen(id, gen, { model })}
+                  onloadvoices={() => void loadVoices()}
+                />
+              {:else}
               <NodeReferences
                 references={referencesOf(row.data)}
                 catalogue={data.references.catalogue}
@@ -2099,6 +2128,7 @@
                 assetUrl={(assetId) => sized(`/p/${data.projectId}/c/${data.canvas.id}/assets/${assetId}`, AssetSize.Thumb)}
                 onchange={(next) => void write(id, { references: next })}
               />
+              {/if}
             {/snippet}
           </GenNode>
         {:else if frame}

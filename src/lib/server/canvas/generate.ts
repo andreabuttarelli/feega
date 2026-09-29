@@ -9,6 +9,7 @@ import {
   expireRun,
   failRun,
   listNodeRuns,
+  queuedAudioRuns,
   queuedVideoRuns,
   releaseClaim,
   retryClaim,
@@ -22,6 +23,9 @@ import { signMediaPaths } from './sign-media';
 import { composePrompt } from '$lib/canvas/compose-prompt';
 import { textRequest } from '$lib/canvas/text-request';
 import { resolveNodeModel } from './node-model';
+import { finishAudioJob, runAudio, type AudioScope } from './audio-run';
+import { audioOperationOf, defaultAudioModel } from '$lib/canvas/audio-operations';
+import type { UpstreamInputs } from '$lib/canvas/upstream-inputs';
 
 /**
  * FAR GIRARE UN NODO DELLA TELA, SULLO SCHEMA NUOVO.
@@ -176,8 +180,53 @@ async function giveUp(db: Db, input: StartRun, run: NodeRun, message: string): P
   await showRunState(db, input, { running: false, runId: run.id, error: message });
 }
 
+const AUDIO_NOT_CONFIGURED = 'elevenlabs_not_configured';
+
+function audioScopeOf(input: StartRun): AudioScope {
+  return { orgId: input.orgId, projectId: input.projectId, nodeId: input.nodeId, userId: input.userId, actor: input.actor };
+}
+
+async function runAudioNode(db: Db, input: StartRun, run: NodeRun, upstream: UpstreamInputs, text: string): Promise<RunOutcome> {
+  const { configuredAudioProvider } = await import('$lib/server/elevenlabs-config');
+  const provider = configuredAudioProvider();
+  if (!provider) {
+    await giveUp(db, input, run, AUDIO_NOT_CONFIGURED);
+    return { kind: 'refused', error: AUDIO_NOT_CONFIGURED };
+  }
+
+  try {
+    const [audioUrls, videoUrls] = await Promise.all([
+      signMediaPaths(db, upstream.referenceAudioUrls),
+      signMediaPaths(db, upstream.referenceVideoUrls)
+    ]);
+    const out = await runAudio(db, provider, {
+      scope: audioScopeOf(input),
+      operation: audioOperationOf(input.params),
+      model: input.model ?? defaultAudioModel(audioOperationOf(input.params)),
+      params: input.params,
+      text,
+      audioUrls,
+      videoUrls
+    });
+
+    if (out.kind === 'refused') {
+      await giveUp(db, input, run, out.error);
+      return out;
+    }
+    if (out.kind === 'job') {
+      await setExternalJob(db, { orgId: input.orgId, runId: run.id, externalJobId: out.jobId });
+      return { kind: 'queued', run: { ...run, externalJobId: out.jobId } };
+    }
+    return land(db, input, run, out.asset, out.costUsd);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'audio_failed';
+    await giveUp(db, input, run, message);
+    return { kind: 'refused', error: message };
+  }
+}
+
 export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcome> {
-  const pick = await resolveNodeModel(requested.medium, requested.model);
+  const pick = await resolveNodeModel(requested.medium, requested.model, requested.params);
   if (!pick.ok) {
     return { kind: 'refused', error: pick.error };
   }
@@ -242,6 +291,10 @@ export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcom
 
   const textInput = input.medium === 'text' ? textRequest(upstream.text, input.prompt) : null;
   const prompt = textInput?.user ?? composePrompt(input.medium, upstream.text, input.prompt);
+
+  if (input.medium === 'audio') {
+    return runAudioNode(db, input, run, upstream, prompt);
+  }
 
   // NÉ IL PROPRIO PROMPT NÉ UN TESTO A MONTE: solo ORA si sa che non c'è niente da mandare al
   // modello — prima di questa riga `upstream.text` non era ancora stato letto. Il messaggio è
@@ -595,6 +648,69 @@ export async function reconcileVideoNodeRuns(db: Db): Promise<VideoReconcileOutc
   }
 
   return { checked, done, failed, pending };
+}
+
+const AUDIO_RECONCILE_LIMIT = 20;
+const AUDIO_RUN_MAX_ATTEMPTS = 8;
+
+export async function reconcileAudioNodeRuns(db: Db): Promise<VideoReconcileOutcome> {
+  const outcome: VideoReconcileOutcome = { checked: 0, done: 0, failed: 0, pending: 0 };
+  const { configuredAudioProvider } = await import('$lib/server/elevenlabs-config');
+  const provider = configuredAudioProvider();
+  if (!provider) {
+    return outcome;
+  }
+
+  for (const run of await queuedAudioRuns(db, { limit: AUDIO_RECONCILE_LIMIT })) {
+    const claimed = await claimRun(db, { orgId: run.orgId, runId: run.id });
+    if (!claimed || !run.externalJobId) {
+      continue;
+    }
+    outcome.checked += 1;
+
+    const node = await findNode(db, { orgId: run.orgId, nodeId: run.nodeId }).catch(() => null);
+    if (!node) {
+      await failRun(db, { orgId: run.orgId, runId: run.id, error: 'node_deleted' }).catch(() => {});
+      outcome.failed += 1;
+      continue;
+    }
+
+    const shape: StartRun = { ...toStartRunShape(run), medium: 'audio', projectId: node.projectId, canvasId: node.canvasId };
+    const finishing: NodeRun = { ...run, status: 'finishing' };
+    try {
+      const progress = await finishAudioJob(db, provider, {
+        externalJobId: run.externalJobId,
+        model: run.model ?? defaultAudioModel('dubbing'),
+        scope: audioScopeOf(shape)
+      });
+
+      if (progress.state === 'pending') {
+        await releaseClaim(db, { orgId: run.orgId, runId: run.id });
+        outcome.pending += 1;
+        continue;
+      }
+      if (progress.state === 'failed') {
+        await giveUp(db, shape, finishing, progress.error);
+        outcome.failed += 1;
+        continue;
+      }
+
+      await completeRun(db, { orgId: run.orgId, runId: run.id, assetId: progress.asset.id, costUsd: progress.costUsd });
+      await showRunState(db, shape, { running: false, runId: run.id, refId: progress.asset.id, error: null });
+      outcome.done += 1;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'audio_reconcile_failed';
+      if (run.attempts + 1 < AUDIO_RUN_MAX_ATTEMPTS) {
+        await retryClaim(db, { orgId: run.orgId, runId: run.id, attempts: run.attempts + 1, error: message }).catch(() => {});
+        outcome.pending += 1;
+        continue;
+      }
+      await giveUp(db, shape, finishing, message);
+      outcome.failed += 1;
+    }
+  }
+
+  return outcome;
 }
 
 export type RunWithText = NodeRun & { text: string | null };

@@ -26,7 +26,8 @@ const EXPECTED: Record<(typeof NODE_TYPES)[number], { inputs: boolean; output: b
   select: { inputs: true, output: true },
   effects: { inputs: true, output: true },
   composition: { inputs: true, output: true },
-  calendar: { inputs: false, output: false }
+  calendar: { inputs: false, output: false },
+  audio: { inputs: true, output: true }
 };
 
 describe('ogni tipo di nodo disegna le porte che la sua riga dichiara', () => {
@@ -48,6 +49,11 @@ describe('ogni tipo di nodo disegna le porte che la sua riga dichiara', () => {
       if (!spec) continue;
       expect(portsOf(type, ctx).inputs.length > 0).toBe(spec.generated && spec.accepts.length > 0);
     }
+  });
+
+  it('un nodo audio prende testo, video e audio, ed esce audio', () => {
+    expect(portsOf('audio', ctx)).toEqual({ inputs: ['text', 'videos', 'audios'], output: 'audios' });
+    expect(anyPortAccepts(portsOf('audio', ctx).inputs, 'videos')).toBe(true);
   });
 
   it('prodotti e feed escono come una lista di immagini', () => {

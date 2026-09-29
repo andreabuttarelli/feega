@@ -33,11 +33,11 @@ const node = (over: Partial<GenNode> = {}): GenNode => ({
 
 describe('il medium di un nodo che produce', () => {
   it('sono i tre della tela, e nient altro', () => {
-    expect(GEN_MEDIUMS).toEqual(['text', 'image', 'video']);
+    expect(GEN_MEDIUMS).toEqual(['text', 'image', 'video', 'audio']);
   });
 
   it('rifiuta un medium inventato prima che arrivi al check', () => {
-    expect(isGenMedium('audio')).toBe(false);
+    expect(isGenMedium('podcast')).toBe(false);
     expect(isGenMedium('video')).toBe(true);
   });
 });

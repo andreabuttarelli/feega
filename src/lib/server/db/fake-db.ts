@@ -66,6 +66,12 @@ export function fakeDb(rows: Record<string, unknown[]>, options: FakeOptions = {
         call.filters.push([column, values]);
         return chain;
       },
+      like() {
+        return chain;
+      },
+      not() {
+        return chain;
+      },
       gt(column: string, value: unknown) {
         call.filters.push([column, value]);
         return chain;

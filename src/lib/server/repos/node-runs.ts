@@ -204,6 +204,23 @@ export async function retryClaim(
  * immagine) non ha mai un external_job_id — lo abbandona subito a `done` o `failed` — quindi il
  * filtro basta a distinguere i due mondi senza un `medium` sulla riga.
  */
+export const AUDIO_JOB_PREFIX = 'elevenlabs:';
+
+export async function queuedAudioRuns(db: Db, input: { limit: number }): Promise<NodeRun[]> {
+  const { data, error } = await db
+    .from('node_runs')
+    .select(RUN_COLUMNS)
+    .eq('status', 'running')
+    .like('external_job_id', `${AUDIO_JOB_PREFIX}%`)
+    .order('started_at', { ascending: true })
+    .limit(input.limit);
+
+  if (error) {
+    throw error;
+  }
+  return (data ?? []).map(toRun);
+}
+
 export async function queuedVideoRuns(db: Db, input: { limit: number }): Promise<NodeRun[]> {
   const { data, error } = await db
     .from('node_runs')
@@ -216,7 +233,7 @@ export async function queuedVideoRuns(db: Db, input: { limit: number }): Promise
   if (error) {
     throw error;
   }
-  return (data ?? []).map(toRun);
+  return (data ?? []).map(toRun).filter((run) => !run.externalJobId?.startsWith(AUDIO_JOB_PREFIX));
 }
 
 export async function completeRun(

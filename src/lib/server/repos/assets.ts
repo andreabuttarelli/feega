@@ -10,7 +10,7 @@ import type { Database } from '$lib/database.types';
  */
 type AssetRow = Database['public']['Tables']['assets']['Row'];
 
-export const ASSET_TYPES = ['text', 'image', 'video', 'iframe', 'document'] as const;
+export const ASSET_TYPES = ['text', 'image', 'video', 'iframe', 'document', 'audio'] as const;
 export type AssetType = (typeof ASSET_TYPES)[number];
 
 export const ASSET_SOURCES = ['upload', 'generated', 'imported'] as const;

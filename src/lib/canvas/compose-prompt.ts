@@ -19,7 +19,8 @@ const frameAsMaterial: Composer = (material, own) => {
 const COMPOSER: Record<GenMedium, Composer> = {
   text: frameAsMaterial,
   image: joinPlain,
-  video: joinPlain
+  video: joinPlain,
+  audio: joinPlain
 };
 
 export function composePrompt(medium: GenMedium, material: string[], own: string): string {

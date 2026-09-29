@@ -177,7 +177,8 @@ const KIND_MAP: Record<string, CanvasNode['kind']> = {
   doc: 'document',
   iframe: 'iframe',
   effects: 'image',
-  composition: 'video'
+  composition: 'video',
+  audio: 'audio'
 };
 
 function toCanvasKind(type: string): CanvasNode['kind'] {
@@ -233,7 +234,7 @@ export function hasUpstreamCycle(
 /** `nodes.type` → il kind che `connectors.ts` conosce. `null` per tutto ciò che non genera —
  *  quei nodi non hanno connettori propri, sono sorgenti guardate dall'altro capo dell'arco. */
 function generativeKindOf(type: string): GenerativeNodeKind | null {
-  if (type === 'text' || type === 'image' || type === 'video') return type;
+  if (type === 'text' || type === 'image' || type === 'video' || type === 'audio') return type;
   return null;
 }
 
@@ -241,7 +242,8 @@ function generativeKindOf(type: string): GenerativeNodeKind | null {
 const CONNECTOR_FOR_MEDIUM: Record<Medium, ConnectorType> = {
   text: 'text',
   image: 'images',
-  video: 'videos'
+  video: 'videos',
+  audio: 'audios'
 };
 
 /**

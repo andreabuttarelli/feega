@@ -147,7 +147,7 @@ describe('perché un nodo non parte', () => {
   });
 
   it('girano tutti e tre i medium che producono: il testo atterra su un asset', () => {
-    expect(RUNNABLE_MEDIUMS).toEqual(['text', 'image', 'video']);
+    expect(RUNNABLE_MEDIUMS).toEqual(['text', 'image', 'video', 'audio']);
   });
 });
 

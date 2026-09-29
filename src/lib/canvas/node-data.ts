@@ -32,6 +32,7 @@ import type { LayoutId } from './composition/types';
 import type { CameraPresetId } from './composition/camera';
 import { CALENDAR_VIEWS } from '$lib/calendar/period-grid';
 import { CALENDAR_SCOPES } from './calendar-node';
+import { AUDIO_OPERATION_IDS, type AudioOperationId } from './audio-operations';
 
 /** Lo stato di una generazione lunga: gli stessi campi per i tre tipi che generano davvero. */
 const GEN_STATUS = ['idle', 'running', 'done', 'failed'] as const;
@@ -93,6 +94,25 @@ const videoSchema = z.object({
   aspect_ratio: z.string().optional(),
   resolution: z.string().optional(),
   references: z.array(nodeReferenceSchema).optional(),
+  ...genState,
+  ...libraryMedia
+});
+
+const audioSchema = z.object({
+  prompt: z.string(),
+  model: z.string().nullable().optional(),
+  params: z
+    .object({
+      operation: z.enum(AUDIO_OPERATION_IDS as [AudioOperationId, ...AudioOperationId[]]).optional(),
+      voiceId: z.string().optional(),
+      voiceName: z.string().optional(),
+      targetLanguage: z.string().optional(),
+      duration: z.number().optional(),
+      stability: z.number().min(0).max(1).optional(),
+      similarity: z.number().min(0).max(1).optional(),
+      style: z.number().min(0).max(1).optional()
+    })
+    .optional(),
   ...genState,
   ...libraryMedia
 });
@@ -390,7 +410,8 @@ export const NODE_DATA_SCHEMAS = {
   select: selectSchema,
   effects: effectsSchema,
   composition: compositionSchema,
-  calendar: calendarSchema
+  calendar: calendarSchema,
+  audio: audioSchema
 } as const;
 
 export type NodeType = keyof typeof NODE_DATA_SCHEMAS;

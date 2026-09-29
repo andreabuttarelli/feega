@@ -31,7 +31,7 @@ import { videoRefCapacity } from '$lib/video-models';
 import { imageModelSpec } from '$lib/image-models';
 import { SELECTABLE_SOURCE_TYPES } from './select-node';
 
-export const MEDIUMS = ['text', 'image', 'video'] as const;
+export const MEDIUMS = ['text', 'image', 'video', 'audio'] as const;
 export type Medium = (typeof MEDIUMS)[number];
 
 /**
@@ -53,7 +53,8 @@ export const NODE_KINDS = [
   'products',
   'social_account_feed',
   'effects',
-  'composition'
+  'composition',
+  'audio'
 ] as const;
 export type NodeKind = (typeof NODE_KINDS)[number];
 
@@ -61,7 +62,7 @@ export type CanvasNode = {
   id: string;
   kind: NodeKind;
   /** Per un nodo `media`: il `kind` della sua riga, che ne è il medium. */
-  mediaKind?: 'image' | 'video';
+  mediaKind?: 'image' | 'video' | 'audio';
   /** Per un nodo `post`: il suo `content_type`, da cui si ricava il medium. */
   contentType?: string | null;
   /** Per un nodo che si genera: con quale modello. Decide quanti riferimenti entrano. */
@@ -88,7 +89,7 @@ export const CANVAS_NODE_SPECS: Record<NodeKind, NodeSpec> = {
   // sono riferimenti facoltativi, come per un nodo immagine: se il modello scelto non li legge, è
   // `connectorsForNode`/`portAccepts` (`connectors.ts`) a non disegnare la porta — l'arco QUI non
   // sa ancora quale modello il nodo userà.
-  text: { medium: 'text', generated: true, accepts: ['text', 'image', 'video'], requires: [] },
+  text: { medium: 'text', generated: true, accepts: ['text', 'image', 'video', 'audio'], requires: [] },
   // Un'immagine nasce da un prompt, e un'altra immagine collegata è il riferimento da riprodurre
   // fedelmente (`ImageJob.baseMediaId`) — non un prompt in più, quindi resta facoltativa.
   image: { medium: 'image', generated: true, accepts: ['text', 'image'], requires: ['text'] },
@@ -96,7 +97,7 @@ export const CANVAS_NODE_SPECS: Record<NodeKind, NodeSpec> = {
   // prodotto sa girare una clip dal solo testo, e chiederli bloccherebbe quel percorso. Un video
   // collegato è un riferimento multimodale (`referenceVideoUrls`), non un fotogramma: quello è
   // ciò che una MANIGLIA esplicita dice, non ciò che ogni immagine porta di default.
-  video: { medium: 'video', generated: true, accepts: ['text', 'image', 'video'], requires: ['text'] },
+  video: { medium: 'video', generated: true, accepts: ['text', 'image', 'video', 'audio'], requires: ['text'] },
   // Un post è un contenitore: prende ciò che gli si dà, e il suo medium lo porta il contenuto.
   post: { medium: null, generated: true, accepts: ['text', 'image', 'video'], requires: ['text'] },
   // Le tre righe che esistono già nel database. Niente le genera: sono sorgenti.
@@ -127,7 +128,8 @@ export const CANVAS_NODE_SPECS: Record<NodeKind, NodeSpec> = {
   effects: { medium: null, generated: true, accepts: ['image', 'video'], requires: [], requiresOneOf: ['image', 'video'] },
   // Un nodo `composition` compone più immagini in una scena 3D animata: produce un video (fase 3),
   // richiede almeno un'immagine collegata — senza materiale la scena non ha cosa mostrare.
-  composition: { medium: 'video', generated: true, accepts: ['image'], requires: ['image'] }
+  composition: { medium: 'video', generated: true, accepts: ['image'], requires: ['image'] },
+  audio: { medium: 'audio', generated: true, accepts: ['text', 'audio', 'video'], requires: [] }
 };
 
 /** Da `posts.content_type` al medium: è il ruolo che porta dentro il medium, e qui si separano. */
@@ -143,7 +145,7 @@ export function mediumOf(node: CanvasNode): Medium {
   const spec = CANVAS_NODE_SPECS[node.kind];
   if (node.kind === 'effects') return node.mediaKind === 'video' ? 'video' : 'image';
   if (spec?.medium) return spec.medium;
-  if (node.kind === 'media') return node.mediaKind === 'video' ? 'video' : 'image';
+  if (node.kind === 'media') return node.mediaKind ?? 'image';
   if (node.kind === 'post') return mediumFromContentType(node.contentType);
   return 'text';
 }
@@ -175,7 +177,7 @@ export function canConnect(from: CanvasNode, to: CanvasNode): Verdict {
   return { ok: true };
 }
 
-const MEDIUM_NAME: Record<Medium, string> = { text: 'text', image: 'image', video: 'video' };
+const MEDIUM_NAME: Record<Medium, string> = { text: 'text', image: 'image', video: 'video', audio: 'audio' };
 
 /** I medium che mancano perché il nodo possa produrre. Vuoto = pronto. */
 export function missingInputs(node: CanvasNode, incoming: CanvasNode[]): Medium[] {
@@ -218,7 +220,7 @@ export function acceptedInputs(node: CanvasNode, incoming: CanvasNode[]): InputV
   const caps = capacityOf(node);
   const accepted: CanvasNode[] = [];
   const rejected: CanvasNode[] = [];
-  const used: Record<Medium, number> = { text: 0, image: 0, video: 0 };
+  const used: Record<Medium, number> = { text: 0, image: 0, video: 0, audio: 0 };
   let why: string | null = null;
 
   for (const source of incoming) {
@@ -250,7 +252,8 @@ export function acceptedInputs(node: CanvasNode, incoming: CanvasNode[]): InputV
 
 /** Quanti ingressi per medium: dal modello quando c'è, altrimenti uno per tipo. */
 function capacityOf(node: CanvasNode): Record<Medium, number> {
-  if (node.kind === 'effects') return { text: 0, image: 1, video: 1 };
+  if (node.kind === 'effects') return { text: 0, image: 1, video: 1, audio: 0 };
+  if (node.kind === 'audio') return { text: 1, image: 0, video: 1, audio: 1 };
   if (node.kind === 'video') {
     const caps = videoRefCapacity(node.model);
     // Il prompt è sempre uno: due prompt sono due video, non un video con due prompt.
@@ -260,13 +263,13 @@ function capacityOf(node: CanvasNode): Record<Medium, number> {
     // tetto del provider è sullo STESSO campo (`frame_images` + `input_references` condividono il
     // conto in `video.ts`). Un modello senza riferimenti multimodali tiene comunque un'immagine:
     // il fotogramma iniziale resta possibile ovunque, è il caso `Math.max(caps.images, 1)`.
-    return { text: 1, image: Math.max(caps.images, 1), video: caps.videos };
+    return { text: 1, image: Math.max(caps.images, 1), video: caps.videos, audio: caps.audios };
   }
   // Un post raccoglie ciò che gli si dà: è un contenitore, non un modello con i suoi limiti.
-  if (node.kind === 'post') return { text: 1, image: 20, video: 5 };
+  if (node.kind === 'post') return { text: 1, image: 20, video: 5, audio: 0 };
   // Un'immagine di riferimento è quante il MODELLO scelto ne accetta davvero (`maxRefs`, da 3 a
   // 16): un tetto uguale per tutti mentirebbe agli stessi due versi di `video`. Senza un modello
   // noto resta 1 — il caso oggi eseguito (`baseMediaId`), mai un numero inventato.
-  if (node.kind === 'image') return { text: 1, image: imageModelSpec(node.model)?.maxRefs ?? 1, video: 0 };
-  return { text: 1, image: 1, video: 0 };
+  if (node.kind === 'image') return { text: 1, image: imageModelSpec(node.model)?.maxRefs ?? 1, video: 0, audio: 0 };
+  return { text: 1, image: 1, video: 0, audio: 1 };
 }

@@ -15,6 +15,7 @@
 import { MEDIUMS, type Medium } from './graph';
 import type { ModelParam } from './model-params';
 import type { RecommendationTier } from './recommended-models';
+import type { AudioParams } from './audio-operations';
 
 /** I tre medium che un nodo può produrre: gli stessi della tela, non un secondo elenco. */
 export const GEN_MEDIUMS = MEDIUMS;
@@ -67,7 +68,7 @@ export type ModelChoice = {
 };
 
 /** Quel che l'utente ha scelto nell'overlay. Non è il catalogo: è la scelta dentro al catalogo. */
-export type GenParams = {
+export type GenParams = Omit<AudioParams, 'duration'> & {
   aspectRatio?: string;
   duration?: number;
   /** Assente = la resa di default del modello. Solo per i modelli con più di una risoluzione. */
@@ -212,7 +213,8 @@ export function promptTooLong(prompt: string, choice: ModelChoice): boolean {
 const GEN_NODE_SIZES: Record<GenMedium, { w: number; h: number }> = {
   text: { w: 360, h: 220 },
   image: { w: 360, h: 460 },
-  video: { w: 360, h: 460 }
+  video: { w: 360, h: 460 },
+  audio: { w: 360, h: 320 }
 };
 
 export function genNodeSize(medium: GenMedium): { w: number; h: number } {

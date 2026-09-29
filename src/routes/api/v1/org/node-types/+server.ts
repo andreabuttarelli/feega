@@ -4,6 +4,7 @@ import { resolveOrgCaller } from '$lib/server/org-data/auth';
 import { describeNodeType, describeNodeTypes, isNodeType } from '$lib/canvas/node-data';
 import { canvasModelCatalogue } from '$lib/server/canvas-catalogue';
 import { GEN_MEDIUMS } from '$lib/canvas/gen-node';
+import { audioTables, audioVoices } from '$lib/server/canvas/audio-description';
 
 async function recommendedModels() {
   const catalogue = await canvasModelCatalogue();
@@ -33,8 +34,9 @@ export const GET: RequestHandler = async ({ request, url }) => {
     if (!isNodeType(type)) {
       return json({ error: 'unknown_type', message: `"${type}" is not a nodes.type value.` }, { status: 400 });
     }
-    return json({ types: { [type]: describeNodeType(type) }, recommended_models: await recommendedModels() });
+    const voices = type === 'audio' ? { voices: await audioVoices() } : {};
+    return json({ types: { [type]: describeNodeType(type) }, recommended_models: await recommendedModels(), ...audioTables(), ...voices });
   }
 
-  return json({ types: describeNodeTypes(), recommended_models: await recommendedModels() });
+  return json({ types: describeNodeTypes(), recommended_models: await recommendedModels(), ...audioTables() });
 };

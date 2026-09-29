@@ -6,6 +6,9 @@ const canvasModelCatalogue = vi.fn();
 vi.mock('$lib/server/org-data/auth', () => ({
   resolveOrgCaller: (...args: unknown[]) => resolveOrgCaller(...args)
 }));
+vi.mock('$lib/server/elevenlabs-config', () => ({
+  configuredAudioProvider: () => ({ voices: async () => [{ id: 'v1', name: 'Rachel', previewUrl: null, category: null, labels: {} }] })
+}));
 vi.mock('$lib/server/canvas-catalogue', () => ({
   canvasModelCatalogue: (...args: unknown[]) => canvasModelCatalogue(...args)
 }));
@@ -29,7 +32,8 @@ beforeEach(() => {
   canvasModelCatalogue.mockResolvedValue({
     text: { recommended: [REC('t')], candidates: [] },
     image: { recommended: [REC('i')], candidates: [] },
-    video: { recommended: [], candidates: [] }
+    video: { recommended: [], candidates: [] },
+    audio: { recommended: [], candidates: [] }
   });
 });
 
@@ -41,9 +45,24 @@ describe('GET /api/v1/org/node-types', () => {
     expect(body.recommended_models).toEqual({
       text: [{ tier: 'balanced', id: 't', label: 't', why: WHY }],
       image: [{ tier: 'balanced', id: 'i', label: 'i', why: WHY }],
-      video: []
+      video: [],
+      audio: []
     });
     expect(body.types).toBeTruthy();
+  });
+
+  it('describes every audio operation: inputs, default model, price unit', async () => {
+    const { body } = await call('?type=audio');
+
+    expect(Object.keys(body.types)).toEqual(['audio']);
+    expect(body.audio_operations.text_to_speech).toMatchObject({
+      source: 'text',
+      needs_voice: true,
+      default_model: 'eleven_multilingual_v2',
+      billed_per: 'character'
+    });
+    expect(body.voices).toEqual([{ id: 'v1', name: 'Rachel', previewUrl: null, category: null, labels: {} }]);
+    expect(body.audio_operations.dubbing).toMatchObject({ source: 'media', delivery: 'job', needs_language: true });
   });
 
   it('keeps the recommendations when asking for one type', async () => {
