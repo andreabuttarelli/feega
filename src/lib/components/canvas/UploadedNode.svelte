@@ -10,6 +10,7 @@
    * `connectable: true`, non questo componente.
    */
   import type { UploadedNode } from '$lib/canvas/uploaded-node';
+  import TieredImage from './TieredImage.svelte';
 
   let { node, medium }: { node: UploadedNode; medium: 'image' | 'video' } = $props();
 </script>
@@ -17,7 +18,7 @@
 <div class="uploaded">
   <div class="uploaded-body">
     {#if medium === 'image'}
-      <img src={node.url} alt={node.name} loading="lazy" />
+      <TieredImage src={node.url} nodeId={node.id} alt={node.name} />
     {:else}
       <!-- svelte-ignore a11y_media_has_caption -->
       <video src={node.url} controls playsinline></video>
@@ -49,7 +50,6 @@
     background: var(--paper-2, #f9f9f9);
   }
 
-  .uploaded-body img,
   .uploaded-body video {
     width: 100%;
     height: 100%;

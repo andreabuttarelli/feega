@@ -14,6 +14,8 @@
    */
   import { onCanvasReveal } from '$lib/canvas/canvas-reveal';
   import { keepSame } from '$lib/canvas/snapshot-keep';
+  import { AssetSize, sized } from '$lib/canvas/asset-url';
+  import TieredImage from '$lib/components/canvas/TieredImage.svelte';
   import { createWriteQueue } from '$lib/canvas/write-queue';
   import { canvasActionUrl } from '$lib/canvas/canvas-action-url';
   import { baseOf, diffNodeData } from '$lib/canvas/node-patch';
@@ -1953,7 +1955,7 @@
                   <NodeDownload kind="video" sourceUrl={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} nodeId={id} nodeType={gen.medium} />
                 </div>
               {:else}
-                <img src={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} alt={gen.prompt} loading="lazy" />
+                <TieredImage src={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} nodeId={id} alt={gen.prompt} />
                 <div class="gen-download">
                   <NodeDownload kind="image" sourceUrl={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} nodeId={id} nodeType={gen.medium} />
                 </div>
@@ -1964,7 +1966,7 @@
                 references={referencesOf(row.data)}
                 catalogue={data.references.catalogue}
                 media={data.references.media}
-                assetUrl={(assetId) => `/p/${data.projectId}/c/${data.canvas.id}/assets/${assetId}`}
+                assetUrl={(assetId) => sized(`/p/${data.projectId}/c/${data.canvas.id}/assets/${assetId}`, AssetSize.Thumb)}
                 onchange={(next) => void write(id, { references: next })}
               />
             {/snippet}
@@ -2012,7 +2014,7 @@
           <CompositionNode
             node={composition}
             posterUrl={assetUrl(composition.refId)}
-            mediaUrls={upstreamCompositionRefsOf(id).map((refId) => assetUrl(refId)).filter((url): url is string => url !== null)}
+            mediaUrls={upstreamCompositionRefsOf(id).map((refId) => assetUrl(refId)).filter((url): url is string => url !== null).map((url) => sized(url, AssetSize.Px1024))}
             previewActive={compositionEditorId !== id}
             imageCount={upstreamCompositionRefsOf(id).length}
             onopeneditor={() => openCompositionEditor(id)}

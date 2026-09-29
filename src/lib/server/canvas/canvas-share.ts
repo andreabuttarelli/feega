@@ -5,6 +5,7 @@ import { listConnections, listNodes, type CanvasNodeRecord } from '$lib/server/r
 import { findAssets, type Asset } from '$lib/server/repos/assets';
 import { signKnowledgePaths } from '$lib/server/media-archive';
 import { signAssetFiles } from '$lib/server/repos/asset-storage';
+import type { ThumbnailPreset } from '$lib/server/media-thumbnails';
 import { listNodeProducts } from '$lib/server/repos/products';
 import { listNodeSocialPosts, type SocialPost } from '$lib/server/repos/social-posts';
 import { getInfluencer, listInfluencerViews, signInfluencerViewFiles } from '$lib/server/repos/influencers';
@@ -17,7 +18,12 @@ export { ShareState };
 
 const TOKEN_BYTES = 24;
 
-export type SignPaths = (paths: { generated: string[]; uploaded: string[]; influencer: string[] }) => Promise<Map<string, string>>;
+type SharedPaths = { generated: string[]; uploaded: string[]; influencer: string[] };
+
+export type SignPaths = (paths: SharedPaths, preset?: ThumbnailPreset) => Promise<Map<string, string>>;
+
+const SHARED_IMAGE_PRESET: ThumbnailPreset = 'canvas1024';
+const SHARED_FACE_PRESET: ThumbnailPreset = 'canvas512';
 
 function mintToken(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(TOKEN_BYTES));
@@ -151,7 +157,7 @@ async function influencerView({ db, orgId, node, sign }: ViewInput): Promise<Sha
   }
 
   const [cover] = await listInfluencerViews(db, influencer.id);
-  const signed = cover ? await sign({ generated: [], uploaded: [], influencer: [cover.storagePath] }) : new Map<string, string>();
+  const signed = cover ? await sign({ generated: [], uploaded: [], influencer: [cover.storagePath] }, SHARED_FACE_PRESET) : new Map<string, string>();
   return { kind: 'influencer', name: influencer.name, summary: influencer.summary, photo: cover ? signed.get(cover.storagePath) ?? null : null };
 }
 
@@ -230,11 +236,16 @@ export async function readSharedCanvas(db: Db, token: string, sign: SignPaths): 
   const assets = await findAssets(db, { orgId, assetIds: nodes.flatMap(assetRefsOf) });
 
   const files = [...assets.values()].filter((a) => a.url && a.type !== 'text');
-  const signed = await sign({
-    generated: files.filter((a) => a.source === 'generated').map((a) => a.url!),
-    uploaded: files.filter((a) => a.source !== 'generated').map((a) => a.url!),
+  const pathsOf = (list: Asset[]): SharedPaths => ({
+    generated: list.filter((a) => a.source === 'generated').map((a) => a.url!),
+    uploaded: list.filter((a) => a.source !== 'generated').map((a) => a.url!),
     influencer: []
   });
+  const [images, others] = await Promise.all([
+    sign(pathsOf(files.filter((a) => a.type === 'image')), SHARED_IMAGE_PRESET),
+    sign(pathsOf(files.filter((a) => a.type !== 'image')))
+  ]);
+  const signed = new Map([...others, ...images]);
 
   const nodeIds = new Set(nodes.map((n) => n.id));
 
@@ -272,11 +283,11 @@ export function createShareReadDb(): Db {
 }
 
 export function signSharedMedia(db: Db): SignPaths {
-  return async (paths) => {
+  return async (paths, preset) => {
     const [rendered, uploaded, faces] = await Promise.all([
-      signKnowledgePaths(db as never, paths.generated),
-      signAssetFiles(db, paths.uploaded),
-      signInfluencerViewFiles(db, paths.influencer)
+      signKnowledgePaths(db as never, paths.generated, undefined, preset),
+      signAssetFiles(db, paths.uploaded, undefined, preset),
+      signInfluencerViewFiles(db, paths.influencer, preset)
     ]);
     return new Map([...rendered, ...uploaded, ...faces]);
   };

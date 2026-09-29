@@ -4,6 +4,17 @@ import { findCanvasForUser } from '$lib/server/canvas/lookup';
 import { listMemberships } from '$lib/server/repos/orgs';
 import { findAsset } from '$lib/server/repos/assets';
 import { createAssetSigningDb, signAssetPaths } from '$lib/server/canvas/sign-media';
+import type { ThumbnailPreset } from '$lib/server/media-thumbnails';
+import { AssetSize, sizeOf } from '$lib/canvas/asset-url';
+
+const IMAGE_PRESET_OF: Record<AssetSize, ThumbnailPreset | undefined> = {
+  [AssetSize.Thumb]: 'nodeThumbnail',
+  [AssetSize.Px256]: 'canvas256',
+  [AssetSize.Px512]: 'canvas512',
+  [AssetSize.Px1024]: 'canvas1024',
+  [AssetSize.Px2048]: 'canvas2048',
+  [AssetSize.Full]: undefined
+};
 
 /**
  * UN ASSET DI UNA TELA, CON LA FIRMA DEL MOMENTO.
@@ -12,7 +23,7 @@ import { createAssetSigningDb, signAssetPaths } from '$lib/server/canvas/sign-me
  * tua — e un asset senza la sua tela sarebbe un file di chiunque. La firma non si conserva: dura
  * due ore, e una tela lasciata aperta tutto il giorno mostrerebbe riquadri rotti.
  */
-export const GET: RequestHandler = async ({ params, locals }) => {
+export const GET: RequestHandler = async ({ params, locals, url }) => {
   const { session, user } = await locals.safeGetSession();
   if (!session || !user) {
     throw redirect(303, '/login');
@@ -56,7 +67,7 @@ export const GET: RequestHandler = async ({ params, locals }) => {
   const signedUrls = await signAssetPaths(db, serviceDb, {
     generated: asset.source === 'generated' ? [path] : [],
     uploaded: asset.source !== 'generated' ? [path] : []
-  });
+  }, undefined, asset.type === 'image' ? IMAGE_PRESET_OF[sizeOf(url)] : undefined);
   const signed = signedUrls.get(path) ?? null;
 
   if (!signed) {

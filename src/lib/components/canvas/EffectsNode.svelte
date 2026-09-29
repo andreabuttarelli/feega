@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { AssetSize, sized } from '$lib/canvas/asset-url';
   import ImageIcon from '@lucide/svelte/icons/image';
   import type { EffectsNode } from '$lib/canvas/effects-node';
   import EffectsPreview from './EffectsPreview.svelte';
@@ -23,7 +24,7 @@
 <div class="effects" ondblclick={onopeneditor}>
   {#if sourceImageUrl || imageUrl}
     <EffectsPreview
-      url={sourceImageUrl ?? imageUrl ?? ''}
+      url={sized(sourceImageUrl ?? imageUrl ?? '', AssetSize.Px1024)}
       kind={node.mediaKind}
       effects={sourceImageUrl ? node.effects : []}
     />

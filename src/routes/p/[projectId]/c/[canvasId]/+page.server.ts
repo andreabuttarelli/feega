@@ -180,7 +180,7 @@ async function loadInfluencerViews(
   ]);
 
   const allPaths = [...viewsByInfluencer.values()].flatMap((views) => views.map((v) => v.storagePath));
-  const signed = await signInfluencerViewFiles(db, allPaths);
+  const signed = await signInfluencerViewFiles(db, allPaths, 'canvas512');
 
   const nameById = new Map(influencerRows.filter((r) => r !== null).map((r) => [r.id, r.name]));
 

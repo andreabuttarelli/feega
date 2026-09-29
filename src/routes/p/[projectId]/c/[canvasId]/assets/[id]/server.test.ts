@@ -9,6 +9,7 @@ vi.mock('$lib/server/canvas/sign-media', () => ({
 }));
 
 const { GET } = await import('./+server');
+const { signAssetPaths } = await import('$lib/server/canvas/sign-media');
 
 const PUBLIC_SWATCH = 'https://x.supabase.co/storage/v1/object/public/media/colours/org-1/c0392b.png';
 
@@ -20,10 +21,11 @@ function asset(overrides: Record<string, unknown>) {
   };
 }
 
-function call(row: Record<string, unknown>) {
+function call(row: Record<string, unknown>, search = '') {
   const { db } = fakeDb({ assets: [row] }, { filter: true });
   const locals = { safeGetSession: async () => ({ session: {}, user: { id: 'u1' } }), db: async () => db };
-  return GET({ params: { projectId: 'p1', canvasId: 'c1', id: 'a1' }, locals } as never);
+  const url = new URL(`http://localhost/p/p1/c/c1/assets/a1${search}`);
+  return GET({ params: { projectId: 'p1', canvasId: 'c1', id: 'a1' }, locals, url } as never);
 }
 
 describe('GET canvas asset', () => {
@@ -35,5 +37,23 @@ describe('GET canvas asset', () => {
 
   it('un asset caricato senza firma resta 404', async () => {
     await expect(call(asset({ source: 'upload', url: 'org-1/p1/x.png' }))).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('un\'immagine chiesta a 1024 si firma con il preset canvas1024', async () => {
+    vi.mocked(signAssetPaths).mockClear();
+    await Promise.resolve(call(asset({ source: 'upload', url: 'org-1/p1/x.png' }), '?size=1024')).catch(() => null);
+    expect(vi.mocked(signAssetPaths).mock.calls[0][4]).toBe('canvas1024');
+  });
+
+  it('un video chiesto a 1024 resta il file intero: la trasformazione vale solo per le immagini', async () => {
+    vi.mocked(signAssetPaths).mockClear();
+    await Promise.resolve(call(asset({ type: 'video', source: 'upload', url: 'org-1/p1/x.mp4' }), '?size=1024')).catch(() => null);
+    expect(vi.mocked(signAssetPaths).mock.calls[0][4]).toBeUndefined();
+  });
+
+  it('senza size l\'immagine resta intera, per il download e l\'editor', async () => {
+    vi.mocked(signAssetPaths).mockClear();
+    await Promise.resolve(call(asset({ source: 'upload', url: 'org-1/p1/x.png' }))).catch(() => null);
+    expect(vi.mocked(signAssetPaths).mock.calls[0][4]).toBeUndefined();
   });
 });

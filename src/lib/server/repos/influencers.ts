@@ -1,5 +1,6 @@
 import type { Db } from '$lib/server/db/client';
 import type { Database, Json } from '$lib/database.types';
+import { signThumbnailUrls, type ThumbnailPreset } from '$lib/server/media-thumbnails';
 
 /**
  * UN VOLTO RIUSABILE, E LE SUE VISTE.
@@ -243,27 +244,8 @@ export type CreateInfluencerViewInput = {
 const INFLUENCER_BUCKET = 'influencers';
 const SIGNED_URL_SECONDS = 300;
 
-/**
- * FIRMA IN BLOCCO, come `signAssetFiles` per `canvas-assets`: un influencer porta 5-7 viste, e un
- * pannello che ne elenca dieci firmerebbe settanta URL uno alla volta senza questo. Il bucket è
- * privato (`public: false`) anche per `catalogue/...` — la lettura resta dietro la RLS di
- * `storage.objects`, un URL firmato è comunque necessario, solo la policy dietro cambia da
- * "propria org" a "chiunque abbia una sessione".
- */
-export async function signInfluencerViewFiles(db: Db, paths: string[]): Promise<Map<string, string>> {
-  const out = new Map<string, string>();
-  const clean = [...new Set(paths.filter(Boolean))];
-  if (!clean.length) {
-    return out;
-  }
-
-  const { data } = await db.storage.from(INFLUENCER_BUCKET).createSignedUrls(clean, SIGNED_URL_SECONDS);
-  for (const row of data ?? []) {
-    if (row.signedUrl && row.path) {
-      out.set(row.path, row.signedUrl);
-    }
-  }
-  return out;
+export async function signInfluencerViewFiles(db: Db, paths: string[], preset?: ThumbnailPreset): Promise<Map<string, string>> {
+  return signThumbnailUrls(() => db.storage.from(INFLUENCER_BUCKET) as never, paths, SIGNED_URL_SECONDS, preset);
 }
 
 export async function insertInfluencerViews(db: Db, views: CreateInfluencerViewInput[]): Promise<InfluencerView[]> {
