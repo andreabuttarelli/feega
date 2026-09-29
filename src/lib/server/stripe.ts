@@ -143,9 +143,12 @@ export async function createBillingPortalSession(opts: {
           }
         : undefined;
 
+  const configuration = env.STRIPE_PORTAL_CONFIGURATION;
+
   const session = await stripe().billingPortal.sessions.create({
     customer: opts.customerId,
     return_url: opts.returnUrl,
+    ...(configuration ? { configuration } : {}),
     ...(flow_data ? { flow_data } : {})
   });
   return session.url;

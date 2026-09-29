@@ -55,6 +55,27 @@ afterEach(() => {
 });
 
 describe('createBillingPortalSession', () => {
+	it('opens the feega portal configuration when one is set', async () => {
+		const { env } = await import('$env/dynamic/private');
+		(env as Record<string, string>).STRIPE_PORTAL_CONFIGURATION = 'bpc_feega';
+		billingPortalSessionsCreate.mockResolvedValue({ url: 'https://portal/feega' });
+		const { createBillingPortalSession } = await import('./stripe');
+
+		await createBillingPortalSession({
+			customerId: 'cus_1',
+			returnUrl: 'https://app/return',
+			flow: undefined,
+			subscriptionId: 'sub_1'
+		});
+
+		expect(billingPortalSessionsCreate).toHaveBeenCalledWith({
+			customer: 'cus_1',
+			return_url: 'https://app/return',
+			configuration: 'bpc_feega'
+		});
+		delete (env as Record<string, string>).STRIPE_PORTAL_CONFIGURATION;
+	});
+
 	it('opens the portal home when no flow is requested', async () => {
 		billingPortalSessionsCreate.mockResolvedValue({ url: 'https://portal/home' });
 		const { createBillingPortalSession } = await import('./stripe');
