@@ -27,7 +27,7 @@ describe('la rail: due gruppi, un comportamento a testa', () => {
 describe('sheetEntryForPath: quale voce apre il foglio', () => {
   it('un path esatto apre il suo foglio', () => {
     expect(sheetEntryForPath('/calendar')?.id).toBe('calendar');
-    expect(sheetEntryForPath('/ads/social')?.id).toBe('ads');
+    expect(sheetEntryForPath('/ads')?.id).toBe('ads');
     expect(sheetEntryForPath('/settings/connected-accounts')?.id).toBe('settings');
   });
 

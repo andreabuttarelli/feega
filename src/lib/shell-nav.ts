@@ -21,7 +21,7 @@ export const NAV_ENTRIES: NavEntry[] = [
   { id: 'brands', labelKey: 'app.nav2.brands', icon: 'building', family: 'panel', path: '/brands', group: 'panel' },
   { id: 'influencers', labelKey: 'app.nav2.influencers', icon: 'user-round', family: 'panel', path: '/influencers', group: 'panel' },
   { id: 'calendar', labelKey: 'app.hub.publish.calendar', icon: 'calendar-days', family: 'sheet', path: '/calendar', group: 'workbench' },
-  { id: 'ads', labelKey: 'app.hub.ads.social', icon: 'megaphone', family: 'sheet', path: '/ads/social', group: 'workbench' },
+  { id: 'ads', labelKey: 'app.hub.ads.social', icon: 'megaphone', family: 'sheet', path: '/ads', group: 'workbench' },
   { id: 'settings', labelKey: 'app.nav.settings', icon: 'settings', family: 'sheet', path: '/settings/connected-accounts', mobilePath: '/settings', group: 'workbench' },
   { id: 'create-post', labelKey: 'app.hub.publish.createPost', icon: 'megaphone', family: 'sheet', path: '/create-post', group: 'hidden' }
 ];

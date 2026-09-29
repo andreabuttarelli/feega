@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { buildAdsSocialState } from './ads-social-load';
+import { buildAdsSocialState } from './ads-page-load';
 import type { Brand } from '$lib/server/repos/brands';
 import type { AdAccount } from '$lib/server/repos/ads';
 import type { Db } from '$lib/server/db/client';
