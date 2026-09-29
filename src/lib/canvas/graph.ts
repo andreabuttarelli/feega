@@ -29,6 +29,7 @@
 /** Cosa una cosa È. I tre primitivi, e nient'altro. */
 import { videoRefCapacity } from '$lib/video-models';
 import { imageModelSpec } from '$lib/image-models';
+import { SELECTABLE_SOURCE_TYPES } from './select-node';
 
 export const MEDIUMS = ['text', 'image', 'video'] as const;
 export type Medium = (typeof MEDIUMS)[number];
@@ -77,6 +78,7 @@ type NodeSpec = {
   /** Quelli senza cui non si può eseguire. Il resto è facoltativo. */
   requires: readonly Medium[];
   requiresOneOf?: readonly Medium[];
+  sources?: readonly string[];
 };
 
 export const CANVAS_NODE_SPECS: Record<NodeKind, NodeSpec> = {
@@ -113,7 +115,7 @@ export const CANVAS_NODE_SPECS: Record<NodeKind, NodeSpec> = {
   // `social_account_feed` (`select-node.ts::SELECTABLE_SOURCE_TYPES`, la tabella unica) — quindi
   // accetta le stesse due porte di `list`. Non richiede niente: senza sorgente collegata mostra
   // solo il numero scritto a mano, la stessa dottrina di un `text` mai collegato.
-  select: { medium: null, generated: true, accepts: ['text', 'image'], requires: [] },
+  select: { medium: null, generated: true, accepts: ['text', 'image'], requires: [], sources: SELECTABLE_SOURCE_TYPES },
   // Un catalogo prodotti sincronizzato: esiste già (`products` table), niente lo genera da un
   // arco — è una sorgente come `media`/`document`, ma porta immagine E testo insieme (titolo,
   // descrizione), quindi il suo medium non è fisso: lo decide chi lo consuma a valle
@@ -162,6 +164,9 @@ export function canConnect(from: CanvasNode, to: CanvasNode): Verdict {
   }
   if (!target.generated) {
     return { ok: false, why: `${to.kind} already exists: it is not generated from other nodes` };
+  }
+  if (target.sources && !target.sources.includes(from.kind)) {
+    return { ok: false, why: `A ${to.kind} node takes a list, products or a social feed` };
   }
   const medium = mediumOf(from);
   if (!target.accepts.includes(medium)) {

@@ -42,6 +42,8 @@
   import { CANVAS_DRAG_MEDIUM } from '$lib/canvas/new-node';
   import { CANVAS_DRAG_FILLED_NODE, parseFilledNodeDrag, type FilledNodeDrag } from '$lib/canvas/drag-payload';
   import { syncNodes } from '$lib/canvas/tile-sync';
+  import { ColumnAxis, withSettingsColumn } from '$lib/canvas/settings-column';
+  import { MOBILE_QUERY } from '$lib/breakpoints';
   import { CANVAS_EDGE_KINDS, EDGE_KIND_LABEL, WIRE_MODES, WIRE_MODE_LABEL, type CanvasEdgeKind, type FlowEdge, type WireMode } from '$lib/canvas-edges';
   import { isAddable, type Addable } from '$lib/canvas/addable';
   import { DEFAULT_EDGE_KIND, edgeKindsFor, verdictBetween } from '$lib/canvas/connect-rules';
@@ -95,6 +97,7 @@
      *  duplicato/incolla, "Collega a nuovo…". `syncNodes` la consuma una volta sola e la
      *  seleziona; un inserimento realtime da un altro utente non la porta mai. */
     select?: boolean;
+    settings?: boolean;
   };
 
   let {
@@ -264,6 +267,7 @@
       minH: t.minH
     },
     type: 'tile',
+    class: t.settings ? 'has-settings' : undefined,
     style: `width:${t.w}px;height:${t.h}px`
   });
 
@@ -283,7 +287,16 @@
     // senza, aggiungerne uno lo rimetterebbe subito in coda a se stesso.
     const next = syncNodes(untrack(() => nodes), incoming, toNode);
     if (next) nodes = next;
+    untrack(settleSettingsColumns);
   });
+
+  function settleSettingsColumns() {
+    const axis = window.matchMedia(MOBILE_QUERY).matches ? ColumnAxis.Below : ColumnAxis.Beside;
+    const next = withSettingsColumn(nodes, new Map(tiles.map((t) => [t.id, t])), axis);
+    if (next) {
+      nodes = next;
+    }
+  }
 
   // Gli archi seguono la stessa riconciliazione dei nodi: entrano i nuovi, escono quelli tolti.
   $effect(() => {
@@ -702,6 +715,7 @@
     <CanvasSelectionBridge
       onchange={(next) => {
         selection = next;
+        settleSettingsColumns();
         onSelectionChange?.(next.ids);
       }}
     />
@@ -823,6 +837,17 @@
 
     --xy-edge-stroke: color-mix(in srgb, var(--ink-soft, #6e6e73) 45%, var(--paper, #fff));
     --xy-edge-stroke-selected: var(--accent, #7c5cff);
+  }
+
+  .wrap :global(.svelte-flow__node.has-settings) {
+    transition:
+      width 160ms ease,
+      height 160ms ease;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .wrap :global(.svelte-flow__node.has-settings) {
+      transition: none;
+    }
   }
 
   .wrap :global(.svelte-flow__edge.is-linked .svelte-flow__edge-path) {

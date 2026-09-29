@@ -102,7 +102,7 @@
 
 <style>
   @layer utilities {
-    :global([data-slot='sheet-content'].canvas-sheet) {
+    :global([data-slot='sheet-content'][data-side].canvas-sheet) {
       position: absolute !important;
       top: 60px !important;
       left: 60px !important;
@@ -119,7 +119,7 @@
     }
 
     @media (max-width: 480px) {
-      :global([data-slot='sheet-content'].canvas-sheet) {
+      :global([data-slot='sheet-content'][data-side].canvas-sheet) {
         top: 0 !important;
         left: 0 !important;
       }

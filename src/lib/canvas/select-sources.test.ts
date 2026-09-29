@@ -45,6 +45,19 @@ describe('socialPostItem — un post come item di select', () => {
     expect(item).toEqual({ text: null, mediaUrls: ['https://cdn/thumb.jpg'] });
   });
 
+  it('una slide video dà la sua copertina, non il file video', () => {
+    const item = socialPostItem({
+      caption: null,
+      media: { items: [{ type: 'video', url: 'https://cdn/clip.mp4', thumbnailUrl: 'https://cdn/cover.jpg' }] }
+    });
+    expect(item.mediaUrls).toEqual(['https://cdn/cover.jpg']);
+  });
+
+  it('un post video senza slide dà la copertina, non il video', () => {
+    const item = socialPostItem({ caption: null, media: { thumbnailUrl: 'https://cdn/cover.jpg', videoUrl: 'https://cdn/clip.mp4' } });
+    expect(item.mediaUrls).toEqual(['https://cdn/cover.jpg']);
+  });
+
   it('nessun media: array vuoto, non un errore', () => {
     expect(socialPostItem({ caption: 'solo testo', media: null })).toEqual({ text: 'solo testo', mediaUrls: [] });
   });

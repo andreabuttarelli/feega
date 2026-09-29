@@ -25,6 +25,7 @@
   import { isNodeType } from '$lib/canvas/node-data';
   import { getTileRender } from '$lib/canvas/tile-render-context';
   import { getTileResize } from '$lib/canvas/tile-resize-context';
+  import { growthOf } from '$lib/canvas/settings-column';
 
   type TileData = {
     id: string;
@@ -54,6 +55,7 @@
   const tile = $derived(data as unknown as TileData);
   const render = getTileRender();
   const resize = getTileResize();
+  const growth = $derived(growthOf(data));
 
   const connection = useConnection();
   const origin = $derived.by((): DragOrigin => {
@@ -81,7 +83,7 @@
 </script>
 
 {#if tile.connectable}
-  {#if tile.connectors?.length}
+  {#if tile.connectors}
     {#each tile.connectors as connector, i (connector)}
       <Handle
         type="target"
@@ -117,12 +119,12 @@
 {#if selected && resize() && tile.minW != null && tile.minH != null}
   <NodeResizer
     nodeId={tile.id}
-    minWidth={tile.minW}
-    minHeight={tile.minH}
+    minWidth={tile.minW + growth.w}
+    minHeight={tile.minH + growth.h}
     color={selectionColor}
     handleStyle="border-radius:0;width:8px;height:8px;"
     lineStyle="border-radius:0;"
-    onResizeEnd={(_event, params) => resize()?.(tile.id, params.width, params.height)}
+    onResizeEnd={(_event, params) => resize()?.(tile.id, params.width - growth.w, params.height - growth.h)}
   />
 {/if}
 
@@ -140,7 +142,7 @@
     >
       <span class="port-name">{CONNECTOR_STYLE[tile.output].label}</span>
     </Handle>
-  {:else}
+  {:else if !kind}
     <Handle type="source" position={Position.Right} />
   {/if}
 {/if}

@@ -282,7 +282,9 @@
   .mobile-main:not(.is-canvas) {
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
-  .mobile-view.is-hidden,
+  .mobile-view.is-hidden {
+    visibility: hidden;
+  }
   .mobile-chat.is-hidden {
     display: none;
   }
