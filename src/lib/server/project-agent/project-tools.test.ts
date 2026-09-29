@@ -147,3 +147,76 @@ describe('run_node rifiuta prima di spendere', () => {
     expect(calls.some((c) => c.table === 'node_runs')).toBe(false);
   });
 });
+
+describe('create_node scrive solo una forma che la tela sa disegnare', () => {
+  const setup = () => {
+    const rows = { nodes: [] as Array<{ data: unknown }>, canvas_events: [] as unknown[] };
+    const { db } = fakeDb(rows, { filter: true, mutate: true });
+    return { rows, tools: createProjectTools({ db, orgId: ORG, projectId: PROJECT, userId: USER }) };
+  };
+
+  it('un text con content al posto di prompt è rifiutato, e indica doc', async () => {
+    const { rows, tools } = setup();
+
+    const out = (await run(tools.create_node, {
+      canvasId: CANVAS,
+      type: 'text',
+      x: 0,
+      y: 0,
+      displayName: 'Launch Hooks',
+      data: { content: '1. hook\n2. hook\n3. hook' }
+    })) as { outcome: string; message: string };
+
+    expect(out.outcome).toBe('invalid');
+    expect(out.message).toContain('content');
+    expect(out.message).toContain('doc');
+    expect(rows.nodes).toHaveLength(0);
+  });
+
+  it('un campo che il tipo non ha è rifiutato, non tolto in silenzio', async () => {
+    const { rows, tools } = setup();
+
+    const out = (await run(tools.create_node, {
+      canvasId: CANVAS,
+      type: 'doc',
+      x: 0,
+      y: 0,
+      data: { content: 'ciao', public: false, body: 'x' }
+    })) as { outcome: string; message: string };
+
+    expect(out.outcome).toBe('invalid');
+    expect(out.message).toContain('body');
+    expect(rows.nodes).toHaveLength(0);
+  });
+
+  it('un doc con content torna la riga salvata', async () => {
+    const { db, calls } = fakeDb({ nodes: [], canvas_events: [] });
+    const tools = createProjectTools({ db, orgId: ORG, projectId: PROJECT, userId: USER });
+
+    const out = (await run(tools.create_node, {
+      canvasId: CANVAS,
+      type: 'doc',
+      x: 0,
+      y: 0,
+      data: { content: '1. hook', public: false }
+    })) as { outcome: string; node: { data: unknown } };
+
+    const insert = calls.find((c) => c.op === 'insert' && c.table === 'nodes')!;
+    expect(out.outcome).toBe('written');
+    expect(out.node.data).toEqual((insert.payload as { data: unknown }).data);
+    expect(out.node.data).toEqual({ content: '1. hook', public: false });
+  });
+});
+
+describe('update_node rifiuta un campo che il tipo non ha', () => {
+  it('content su un text non viene scritto', async () => {
+    const rows = { nodes: [{ ...nodeRow, data: { ...nodeRow.data } }], canvas_events: [{}] };
+    const { db } = fakeDb(rows, { filter: true, mutate: true });
+    const tools = createProjectTools({ db, orgId: ORG, projectId: PROJECT, userId: USER });
+
+    const out = await run(tools.update_node, { nodeId: NODE, data: { content: 'x' } });
+
+    expect(out).toMatchObject({ outcome: 'invalid' });
+    expect(rows.nodes[0].version).toBe(3);
+  });
+});

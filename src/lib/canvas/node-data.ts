@@ -507,3 +507,39 @@ export function validateNodeData(type: string, data: unknown): NodeDataVerdict {
 export function validateNodeDataPatch(type: string, current: unknown, patch: unknown): NodeDataVerdict {
   return validateNodeData(type, mergeNodeData((current ?? {}) as NodeData, (patch ?? {}) as NodeData));
 }
+
+const MISPLACED_FIELD_HINTS: Partial<Record<string, string>> = {
+  content: 'Written text for the user to read goes in a doc node: type "doc", data { content: "<markdown>", public: false }.'
+};
+
+function fieldsOf(type: NodeType): string[] {
+  return Object.keys((describeNodeType(type).properties ?? {}) as Record<string, unknown>);
+}
+
+export function unknownFieldsError(type: string, data: unknown): string | null {
+  if (!isNodeType(type) || !data || typeof data !== 'object') {
+    return null;
+  }
+
+  const allowed = fieldsOf(type);
+  const unknown = Object.entries(data)
+    .filter(([key, value]) => value !== null && !allowed.includes(key))
+    .map(([key]) => key);
+  if (!unknown.length) {
+    return null;
+  }
+
+  const hints = unknown.flatMap((key) => MISPLACED_FIELD_HINTS[key] ?? []);
+  return [
+    `${type}.data has no field ${unknown.map((key) => `"${key}"`).join(', ')}. Allowed: ${allowed.join(', ')}.`,
+    ...hints
+  ].join(' ');
+}
+
+export function validateNewNodeData(type: string, data: unknown): NodeDataVerdict {
+  const unknown = unknownFieldsError(type, data);
+  if (unknown) {
+    return { ok: false, error: unknown };
+  }
+  return validateNodeData(type, data);
+}

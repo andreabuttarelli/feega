@@ -2067,3 +2067,10 @@ optimistic `next` against the last server-confirmed data: a caller that passes t
 state carries a stale `refId`, and that diff sees it as a change.
 **Move:** diff `next` against what the tile showed when the user acted (the user's intent);
 use the server-confirmed data only as `base` for the same-key conflict check.
+
+## An agent tool reports success for a node the canvas shows empty
+
+**Signal:** the chat says it added content, the tool result echoes it, the node is blank. The
+tool wrote `nodes.data` without `validateNodeData`, or zod stripped an unknown key.
+**Move:** every agent write to `nodes.data` goes through `validateNewNodeData` (unknown keys
+refused) and returns the stored row; written copy belongs in `doc.content`, not `text`.
