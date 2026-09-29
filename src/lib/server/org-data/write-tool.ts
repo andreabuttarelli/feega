@@ -19,8 +19,9 @@ import { logAiCall } from '$lib/server/ai-log';
 import type { OrgQueryAuthority } from './query-tool';
 import { announcePresence } from './presence';
 import type { Actor } from '$lib/server/repos/actor';
-import { validateNewNodeData, validateNodeDataPatch } from '$lib/canvas/node-data';
+import { validateNewNodeData, validateNodeDataUpdate } from '$lib/canvas/node-data';
 import { mergeNodeData, type NodeData } from '$lib/canvas/node-patch';
+import { nodeModelError } from '$lib/server/canvas/node-model';
 
 type NodeMerge = { id: string; version: number; data: NodeData };
 import { jsonbColumnsOf, validateJsonbColumn } from './jsonb-schemas';
@@ -267,6 +268,8 @@ export function createOrgWriteTools({ authority, orgId, userId, threadId, actor 
     if (table === NODES_TABLE) {
       const verdict = validateNewNodeData(String(values.type ?? ''), values.data);
       if (!verdict.ok) return finish(invalidNodeData(verdict.error), 'org_db_write:refused:invalid_node_data', t0);
+      const badModel = await nodeModelError(String(values.type ?? ''), values.data);
+      if (badModel) return finish(invalidNodeData(badModel), 'org_db_write:refused:invalid_node_data', t0);
     } else {
       const refusedJsonb = firstInvalidJsonbColumn(table, values);
       if (refusedJsonb) return finish(refusedJsonb, 'org_db_write:refused:invalid_jsonb_column', t0);
@@ -429,9 +432,13 @@ export function createOrgWriteTools({ authority, orgId, userId, threadId, actor 
       const merged: NodeMerge[] = [];
       for (const row of (current.data ?? []) as Array<{ id: string; type: string; data: unknown; version: number }>) {
         const type = String(values.type ?? row.type);
-        const verdict = validateNodeDataPatch(type, row.data, values.data);
+        const verdict = validateNodeDataUpdate(type, row.data, values.data);
         if (!verdict.ok) {
           return finish(invalidNodeData(`node ${row.id}: ${verdict.error}`), 'org_db_write:refused:invalid_node_data', t0);
+        }
+        const badModel = await nodeModelError(type, values.data);
+        if (badModel) {
+          return finish(invalidNodeData(`node ${row.id}: ${badModel}`), 'org_db_write:refused:invalid_node_data', t0);
         }
         merged.push({ id: row.id, version: row.version, data: mergeNodeData((row.data ?? {}) as NodeData, values.data as NodeData) });
       }

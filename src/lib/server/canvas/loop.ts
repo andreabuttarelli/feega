@@ -59,7 +59,7 @@ import { canvasModelCatalogue } from '$lib/server/canvas-catalogue';
 import { estimateCanvasTextCost } from './text-cost-estimate';
 import { creditsForRun } from '$lib/canvas/gen-cost';
 import { decideWithJev } from '$lib/server/jev';
-import { effectiveModel } from '$lib/canvas/default-models';
+import { resolveNodeModel } from './node-model';
 import { resolvedListValues, upstreamInputsFor } from './upstream';
 import { syncedSourceItems } from './synced-items';
 import type { Connection } from '$lib/server/repos/canvas';
@@ -148,13 +148,13 @@ async function loopCreditsFor(
   combinations: PlannedCombination[]
 ): Promise<LoopCostPreview> {
   const medium = (node.type === 'text' || node.type === 'video' ? node.type : 'image') as GenMedium;
-  const savedModel = typeof node.data.model === 'string' ? node.data.model : null;
+  const pick = await resolveNodeModel(medium, typeof node.data.model === 'string' ? node.data.model : null);
+  const model = pick.ok ? pick.model : null;
   if (medium !== 'text') {
-    return estimateLoopCredits({ medium, model: savedModel, count: combinations.length });
+    return estimateLoopCredits({ medium, model, count: combinations.length });
   }
 
   const choices = (await canvasModelCatalogue()).text.choices;
-  const model = effectiveModel('text', savedModel, choices);
   const choice = choices.find((candidate) => candidate.id === model);
   if (!choice?.textPricing) {
     return { perRun: null, total: null };
@@ -409,7 +409,11 @@ async function runOneCombination(
   | { outcome: 'failed'; error: string }
 > {
   const medium = (node.type === 'text' || node.type === 'video' ? node.type : 'image') as GenMedium;
-  const model = typeof node.data.model === 'string' ? node.data.model : null;
+  const pick = await resolveNodeModel(medium, typeof node.data.model === 'string' ? node.data.model : null);
+  if (!pick.ok) {
+    return { outcome: 'failed', error: pick.error };
+  }
+  const model = pick.model;
   const basePrompt = typeof node.data.prompt === 'string' ? node.data.prompt : '';
 
   const iterateSelection = iterateSelectionFor(combination.values);

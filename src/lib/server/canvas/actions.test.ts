@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 
+vi.mock('$lib/server/canvas-catalogue', () => {
+  const nothing = { choices: [], recommended: [], synced: true };
+  return { canvasModelCatalogue: async () => ({ text: nothing, image: nothing, video: nothing }) };
+});
 vi.mock('$lib/server/cli-auth', () => ({ gateOrgAiActionForForm: async () => null }));
 vi.mock('$lib/server/credits', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$lib/server/credits')>()),

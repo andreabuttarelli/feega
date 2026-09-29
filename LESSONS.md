@@ -2115,3 +2115,11 @@ fetch kept streaming into a destroyed component.
 (`chat-session.svelte.ts`), never in the component. Server side, `streamText` only finishes if
 someone reads it: `void result.consumeStream()` so `onFinish` persists the turn even when the
 client disconnects.
+
+## An eval image run fails `render_failed` with no ai_calls row
+
+**Signal:** text passes, image comes back a bare `render_failed`, nothing billed. The disposable
+org had zero credits: the gate inside `renderPostImage` threw `CreditsExhaustedError` and
+`runImageJob` swallowed it.
+**Move:** evals grant the org credits (`grantWelcomeCredits`) like a real signup; a render that
+throws now returns its message as `reason`, so read `node_runs.error` before suspecting the model.

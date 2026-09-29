@@ -1,5 +1,4 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { DEFAULT_MODEL } from '$lib/canvas/default-models';
 import { fakeDb } from '$lib/server/db/fake-db';
 
 const runGenNode = vi.fn();
@@ -158,7 +157,7 @@ describe('drainWorkflowQueue — il cron drena, rispettando le dipendenze', () =
     expect(runGenNode).toHaveBeenCalledTimes(1);
   });
 
-  it('un nodo senza modello scelto gira col modello predefinito del suo medium', async () => {
+  it('a node without a model hands the choice to the shared resolution, not a fixed default', async () => {
     const ticketB = { workflow: { phase: 'queued', workflowId: 'wf1', dependsOn: [], projectId: PROJECT, canvasId: CANVAS, userId: USER } };
     const { db } = fakeDb(
       { node_runs: [runRow({ id: 'run-b', node_id: NODE_B, params: ticketB })], nodes: [nodeRow(NODE_B, 'text', { prompt: 'b' }, 5)] },
@@ -172,7 +171,7 @@ describe('drainWorkflowQueue — il cron drena, rispettando le dipendenze', () =
 
     await drainWorkflowQueue(db, { limit: 10 });
 
-    expect(runGenNode).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ model: DEFAULT_MODEL.text }));
+    expect(runGenNode).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ model: null }));
   });
 
   it('A ancora running: B resta waiting, non reclamato, non girato', async () => {

@@ -21,6 +21,7 @@ import type { Actor } from '$lib/server/repos/actor';
 import { signMediaPaths } from './sign-media';
 import { composePrompt } from '$lib/canvas/compose-prompt';
 import { textRequest } from '$lib/canvas/text-request';
+import { resolveNodeModel } from './node-model';
 
 /**
  * FAR GIRARE UN NODO DELLA TELA, SULLO SCHEMA NUOVO.
@@ -61,21 +62,6 @@ export type RunOutcome =
   | { kind: 'queued'; run: NodeRun }
   | { kind: 'refused'; error: string }
   | { kind: 'conflict' };
-
-/**
- * IL MODELLO SI SCEGLIE PRIMA DI SPENDERE UNA LETTURA — l'unica cosa che questo giro sa senza
- * aver ancora chiesto alla tela. IL PROMPT NO: un nodo senza prompt proprio ma wired a un testo
- * a monte con qualcosa scritto è comunque pronto a girare (CLAUDE.md — "un testo a monte conta
- * come prompt"), e questo si scopre solo dopo aver letto l'upstream (`upstream.ts`), non prima.
- * Rifiutare qui su `input.prompt` da solo era il difetto: un'immagine wired a un testo restava
- * spenta perché questa funzione non sapeva ancora che a monte c'era qualcosa da dire.
- */
-function refuse(input: StartRun): string | null {
-  if (!input.model) {
-    return 'model_required';
-  }
-  return null;
-}
 
 async function depositText(db: Db, input: StartRun, text: string): Promise<Asset> {
   return insertAsset(db, {
@@ -190,11 +176,12 @@ async function giveUp(db: Db, input: StartRun, run: NodeRun, message: string): P
   await showRunState(db, input, { running: false, runId: run.id, error: message });
 }
 
-export async function runGenNode(db: Db, input: StartRun): Promise<RunOutcome> {
-  const refused = refuse(input);
-  if (refused) {
-    return { kind: 'refused', error: refused };
+export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcome> {
+  const pick = await resolveNodeModel(requested.medium, requested.model);
+  if (!pick.ok) {
+    return { kind: 'refused', error: pick.error };
   }
+  const input: StartRun = { ...requested, model: pick.model };
 
   const run = await createRun(db, {
     orgId: input.orgId,

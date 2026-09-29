@@ -2,7 +2,13 @@ import type { Db } from '$lib/server/db/client';
 import { signThumbnailUrls, type ThumbnailPreset } from '$lib/server/media-thumbnails';
 
 export const CANVAS_ASSET_BUCKET = 'canvas-assets';
-const SIGNED_URL_SECONDS = 300;
+export const SIGNED_URL_TTL_S = {
+  canvas: 300,
+  agentPreview: 300,
+  userLink: 3600
+} as const;
+
+const SIGNED_URL_SECONDS = SIGNED_URL_TTL_S.canvas;
 
 export async function storeAssetFile(db: Db, path: string, file: File): Promise<void> {
   const { error } = await db.storage.from(CANVAS_ASSET_BUCKET).upload(path, file, {
@@ -42,13 +48,13 @@ export async function signAssetFiles(
 export const PREVIEW_EDGE_PX = 1024;
 const PREVIEW_QUALITY = 80;
 
-export async function signStoredFile(db: Db, bucket: string, path: string): Promise<string | null> {
-  const { data } = await db.storage.from(bucket).createSignedUrl(path, SIGNED_URL_SECONDS);
+export async function signStoredFile(db: Db, bucket: string, path: string, ttlSeconds: number): Promise<string | null> {
+  const { data } = await db.storage.from(bucket).createSignedUrl(path, ttlSeconds);
   return data?.signedUrl ?? null;
 }
 
-export async function signStoredPreview(db: Db, bucket: string, path: string): Promise<string | null> {
-  const { data } = await db.storage.from(bucket).createSignedUrl(path, SIGNED_URL_SECONDS, {
+export async function signStoredPreview(db: Db, bucket: string, path: string, ttlSeconds: number): Promise<string | null> {
+  const { data } = await db.storage.from(bucket).createSignedUrl(path, ttlSeconds, {
     transform: { width: PREVIEW_EDGE_PX, height: PREVIEW_EDGE_PX, resize: 'contain', quality: PREVIEW_QUALITY }
   });
   return data?.signedUrl ?? null;

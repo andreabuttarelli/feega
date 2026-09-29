@@ -18,6 +18,7 @@ import { runGenNode, runsOf, type RunOutcome } from '$lib/server/canvas/generate
 import { agentActor, type Actor } from '$lib/server/repos/actor';
 import { withBrandContext, withOrgContext } from '$lib/server/ai-log';
 import { isGenMedium, type GenParams } from '$lib/canvas/gen-node';
+import { nodeModelError } from '$lib/server/canvas/node-model';
 import { describeNodeType, describeNodeTypes, isNodeType, unknownFieldsError, validateNewNodeData } from '$lib/canvas/node-data';
 
 /**
@@ -122,6 +123,10 @@ export function createProjectTools(deps: ProjectToolDeps): Record<string, Tool> 
         if (!verdict.ok) {
           return { outcome: 'invalid', message: verdict.error };
         }
+        const badModel = await nodeModelError(input.type, input.data);
+        if (badModel) {
+          return { outcome: 'invalid', message: badModel };
+        }
 
         const node = await createNode(deps.db, {
           orgId: deps.orgId,
@@ -155,6 +160,10 @@ export function createProjectTools(deps: ProjectToolDeps): Record<string, Tool> 
         const unknown = unknownFieldsError(current.type, input.data);
         if (unknown) {
           return { outcome: 'invalid', message: unknown };
+        }
+        const badModel = await nodeModelError(current.type, input.data);
+        if (badModel) {
+          return { outcome: 'invalid', message: badModel };
         }
 
         const written = await patchNodeData(deps.db, {
