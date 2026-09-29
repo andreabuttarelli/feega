@@ -34,6 +34,8 @@
   import CanvasAddBar from './CanvasAddBar.svelte';
   import CanvasKeys from './CanvasKeys.svelte';
   import CanvasSelectionBridge from './CanvasSelectionBridge.svelte';
+  import CanvasImageTiers from './CanvasImageTiers.svelte';
+  import { provideTierBoard } from '$lib/canvas/tier-board.svelte';
   import SelectionToolbar from './SelectionToolbar.svelte';
   import NextStepChips from './NextStepChips.svelte';
   import ConnectPicker from './ConnectPicker.svelte';
@@ -652,6 +654,8 @@
   }
 
   let wrap = $state<HTMLDivElement | null>(null);
+
+  const tierBoard = provideTierBoard();
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -- il trascinamento è una scorciatoia sulla
@@ -719,6 +723,7 @@
         onSelectionChange?.(next.ids);
       }}
     />
+    <CanvasImageTiers board={tierBoard} />
     <Background gap={24} />
   </SvelteFlow>
 

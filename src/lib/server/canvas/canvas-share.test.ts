@@ -120,6 +120,19 @@ describe('readSharedCanvas', () => {
     expect(shared?.edges).toEqual([{ id: 'e1', source: 'n-txt', target: 'n-img' }]);
   });
 
+  it('a shared image is signed as a preview, never as the original file', async () => {
+    const { db } = sharedDb();
+    const presets = new Map<string, string | undefined>();
+    const recording = async (paths: { generated: string[]; uploaded: string[]; influencer: string[] }, preset?: string) => {
+      [...paths.generated, ...paths.uploaded, ...paths.influencer].forEach((p) => presets.set(p, preset));
+      return sign(paths);
+    };
+
+    await readSharedCanvas(db, 'tok-live', recording);
+
+    expect(presets.get('u1/media/pic.png')).toBe('canvas1024');
+  });
+
   it('never exposes the org, the project or the prompts', async () => {
     const { db } = sharedDb();
 

@@ -17,6 +17,15 @@ describe('thumbnailTransform', () => {
   it('sizes the panel tile at 2x the rendered 96px tile', () => {
     expect(thumbnailTransform('panelTile')).toEqual({ width: 192, height: 192, resize: 'cover', quality: 70 });
   });
+
+  it.each([
+    ['canvas256', 256],
+    ['canvas512', 512],
+    ['canvas1024', 1024],
+    ['canvas2048', 2048]
+  ] as const)('fits the %s canvas tier inside %ipx without cropping', (preset, px) => {
+    expect(thumbnailTransform(preset)).toEqual({ width: px, height: px, resize: 'contain', quality: 75 });
+  });
 });
 
 function fakeBucket() {
