@@ -282,7 +282,8 @@
       "mobile": {
         "canvas": "Canvas",
         "chat": "Chat",
-        "more": "More",
+        "backToCanvas": "Back to canvas",
+        "switchView": "Canvas or chat",
         "switchTitle": "Switch project or canvas",
         "projects": "Projects",
         "canvases": "Canvases"
@@ -300,6 +301,7 @@
       },
       "menu": {
         "open": "Menu",
+        "pages": "Pages",
         "home": "Home",
         "shortcuts": "Keyboard shortcuts",
         "settings": "Settings",

@@ -1,20 +1,20 @@
 <script lang="ts">
   import '$lib/styles/tailwind.css';
   import { page } from '$app/state';
-  import { onDestroy } from 'svelte';
+  import { onDestroy, untrack } from 'svelte';
   import CanvasTopBar from '$lib/components/canvas/CanvasTopBar.svelte';
   import FloatingRail from '$lib/components/canvas/FloatingRail.svelte';
   import CanvasChatPanel from '$lib/components/canvas/CanvasChatPanel.svelte';
   import CanvasSheet from '$lib/components/canvas/CanvasSheet.svelte';
-  import CanvasMobileTabs from '$lib/components/canvas/CanvasMobileTabs.svelte';
-  import CanvasMobileMore from '$lib/components/canvas/CanvasMobileMore.svelte';
   import ChatLeaveGuard from '$lib/components/canvas/ChatLeaveGuard.svelte';
   import { openSheet, restoreSheet } from '$lib/canvas/sheet-nav';
   import { revealCanvas } from '$lib/canvas/canvas-reveal';
   import { CHROME_LOADERS } from '$lib/canvas/chrome-loaders';
   import MobileTopBar from '$lib/components/canvas/MobileTopBar.svelte';
   import DesktopPageBar from '$lib/components/canvas/DesktopPageBar.svelte';
-  import { sheetEntryForPath, directLoadMode, activeMobileTab, type NavEntry, type MobileTab, type MobileView, type TabOutcome } from '$lib/shell-nav';
+  import { sheetEntryForPath, directLoadMode, type NavEntry } from '$lib/shell-nav';
+  import { INITIAL_MOBILE_VIEW, chatBadge, showView, turnEnded, type MobileView, type ChatTurn } from '$lib/canvas/mobile-view';
+  import { anyChatRunning } from '$lib/components/brand-agent/chat-session.svelte';
   import { MOBILE_QUERY, type Viewport } from '$lib/breakpoints';
   import { readChatOpen, writeChatOpen } from '$lib/shell-prefs';
   import { guideOpenRequest } from '$lib/canvas/guide-open';
@@ -34,8 +34,7 @@
 
   let leftPanel = $state<'assets' | 'brands' | 'influencers' | null>(null);
   let chatOpen = $state(browser ? readChatOpen() : true);
-  let mobileMoreOpen = $state(false);
-  let mobileView = $state<MobileView>('page');
+  let mobileView = $state(INITIAL_MOBILE_VIEW);
 
   let isMobile = $state(browser ? matchMedia(MOBILE_QUERY).matches : false);
   if (browser) {
@@ -104,37 +103,31 @@
     }).catch((err) => console.error('apertura del foglio da link diretto fallita', err));
   });
 
-  const activeTab = $derived(activeMobileTab(projectId, page.url.pathname, mobileView));
+  const chatTurn = $derived<ChatTurn>(anyChatRunning() ? 'running' : 'idle');
+  let lastTurn: ChatTurn = 'idle';
+
+  $effect(() => {
+    if (lastTurn === 'running' && chatTurn === 'idle') {
+      mobileView = untrack(() => turnEnded(mobileView));
+    }
+    lastTurn = chatTurn;
+  });
 
   $effect(() => {
     void page.url.pathname;
-    mobileView = 'page';
-    mobileMoreOpen = false;
+    mobileView = untrack(() => showView(mobileView, 'canvas'));
   });
 
-  const MOBILE_TAB_ACTIONS: Record<MobileTab['id'], () => TabOutcome> = {
-    canvas: () => {
-      mobileView = 'page';
-      if (!onCanvasRoute) {
-        return 'follow-link';
-      }
+  function onMobileView(view: MobileView) {
+    mobileView = showView(mobileView, view);
+    if (view === 'canvas') {
       revealCanvas();
-      return 'handled';
-    },
-    chat: () => {
-      mobileView = 'chat';
-      return 'handled';
-    },
-    calendar: () => 'follow-link',
-    more: () => {
-      mobileMoreOpen = true;
-      return 'handled';
     }
-  };
-
-  function onMobileTab(tab: MobileTab): TabOutcome {
-    return MOBILE_TAB_ACTIONS[tab.id]();
   }
+
+  const viewSwitch = $derived(
+    onCanvasRoute ? { view: mobileView.view, badge: chatBadge(mobileView, chatTurn), onselect: onMobileView } : null
+  );
 </script>
 
 <ChatLeaveGuard {projectId} />
@@ -158,19 +151,17 @@
       canvasName={currentCanvas?.name ?? ''}
       canvasHref={currentCanvas?.href ?? null}
       canvases={data.canvases}
+      {viewSwitch}
+      backHref={onCanvasRoute ? null : (data.canvases[0]?.href ?? `/p/${projectId}`)}
     />
     <main class="mobile-main" class:is-canvas={onCanvasRoute}>
-      <div class="mobile-view" class:is-hidden={mobileView !== 'page'}>
+      <div class="mobile-view" class:is-hidden={mobileView.view === 'chat'}>
         {@render children()}
       </div>
-      {#if mobileView === 'chat'}
-        <div class="mobile-chat">
-          <CanvasChatPanel {projectId} brandSlug={data.brand?.slug ?? ''} open={true} />
-        </div>
-      {/if}
+      <div class="mobile-chat" class:is-hidden={mobileView.view !== 'chat'} data-testid="mobile-chat">
+        <CanvasChatPanel {projectId} brandSlug={data.brand?.slug ?? ''} open={true} />
+      </div>
     </main>
-    <CanvasMobileTabs {projectId} active={activeTab} onselect={onMobileTab} />
-    <CanvasMobileMore {projectId} open={mobileMoreOpen} onOpenChange={(open) => (mobileMoreOpen = open)} />
   {:else if onCanvasRoute}
     <div class="canvas-row">
       <div class="canvas-stage">
@@ -280,11 +271,17 @@
   .mobile-main.is-canvas .mobile-view {
     height: 100%;
   }
-  .mobile-view.is-hidden {
+  .mobile-main:not(.is-canvas) {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .mobile-view.is-hidden,
+  .mobile-chat.is-hidden {
     display: none;
   }
   .mobile-chat {
     position: absolute;
     inset: 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: var(--paper, #fff);
   }
 </style>

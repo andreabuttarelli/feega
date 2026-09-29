@@ -4,22 +4,7 @@
   import { cn } from '$lib/utils';
   import { navEntriesByGroup, type NavEntry } from '$lib/shell-nav';
   import { prefetchEntry } from '$lib/canvas/chrome-loaders';
-  import Images from '@lucide/svelte/icons/images';
-  import Building from '@lucide/svelte/icons/building';
-  import UserRound from '@lucide/svelte/icons/user-round';
-  import CalendarDays from '@lucide/svelte/icons/calendar-days';
-  import Megaphone from '@lucide/svelte/icons/megaphone';
-  import Settings from '@lucide/svelte/icons/settings';
-  import type { Component } from 'svelte';
-
-  const ICONS: Record<NavEntry['icon'], Component<{ size?: number }>> = {
-    images: Images,
-    building: Building,
-    'user-round': UserRound,
-    'calendar-days': CalendarDays,
-    megaphone: Megaphone,
-    settings: Settings
-  };
+  import { NAV_ICONS } from './nav-icons';
 
   /**
    * LA RAIL FLOTTANTE: due gruppi separati da un divisore, e il divisore stesso dice il
@@ -53,7 +38,7 @@
   <Tooltip.Root>
     <Tooltip.Trigger>
       {#snippet child({ props })}
-        {@const Icon = ICONS[entry.icon]}
+        {@const Icon = NAV_ICONS[entry.icon]}
         <button
           {...props}
           type="button"

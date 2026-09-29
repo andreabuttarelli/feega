@@ -160,6 +160,16 @@
     cursor: grabbing;
   }
 
+  @media (max-width: 767px) {
+    .add-bar {
+      bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    }
+    button {
+      min-width: var(--touch-target);
+      min-height: var(--touch-target);
+    }
+  }
+
   .keys-toggle {
     cursor: pointer;
     color: var(--ink-soft, #6e6e73);
