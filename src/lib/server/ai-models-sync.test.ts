@@ -357,6 +357,69 @@ describe('syncAiModels — dai tre listini del gateway alla tabella', () => {
     expect((upserts[0] as Record<string, unknown>).param_schema).toBeUndefined();
   });
 
+  it('porta data di uscita, scadenza, contesto e benchmark dal listino, per raccomandare i modelli attuali', async () => {
+    const { admin, upserts } = fakeAdmin();
+    const fetchImpl = fetchImplFor({
+      '/models': {
+        body: {
+          data: [
+            {
+              id: 'maker/chat',
+              created: 1788000000,
+              expiration_date: '2026-12-31',
+              context_length: 200000,
+              benchmarks: { artificial_analysis: { intelligence_index: 56 } }
+            }
+          ]
+        }
+      },
+      '/images/models': { body: { data: [{ id: 'maker/image', created: 1789000000 }] } },
+      '/videos/models': { body: { data: [{ id: 'maker/video', created: 1790000000 }] } }
+    });
+
+    await syncAiModels(admin, { fetchImpl, baseUrl: 'https://openrouter.ai/api/v1' });
+
+    const byId = new Map((upserts as Record<string, unknown>[]).map((r) => [r.id, r]));
+    expect(byId.get('maker/chat')).toMatchObject({
+      released_at: new Date(1788000000 * 1000).toISOString(),
+      expires_at: '2026-12-31',
+      context_length: 200000,
+      intelligence_index: 56
+    });
+    expect(byId.get('maker/image')).toMatchObject({ released_at: new Date(1789000000 * 1000).toISOString(), expires_at: null });
+    expect(byId.get('maker/video')).toMatchObject({ released_at: new Date(1790000000 * 1000).toISOString() });
+  });
+
+  it('quando la colonna released_at non esiste ancora, riprova senza le colonne nuove e scrive comunque', async () => {
+    const upserts: unknown[] = [];
+    let firstAttempt = true;
+    const admin = {
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            then: (resolve: (v: { data: unknown[]; error: null }) => unknown) => resolve({ data: [], error: null })
+          })
+        }),
+        upsert: (rows: unknown[]) => {
+          if (firstAttempt) {
+            firstAttempt = false;
+            return {
+              then: (resolve: (v: { error: { message: string } }) => unknown) =>
+                resolve({ error: { message: 'column "released_at" of relation "ai_models" does not exist' } })
+            };
+          }
+          upserts.push(...rows);
+          return { then: (resolve: (v: { error: null }) => unknown) => resolve({ error: null }) };
+        }
+      })
+    } as unknown as SupabaseClient;
+
+    const out = await syncAiModels(admin, { fetchImpl: okAllThree(), baseUrl: 'https://openrouter.ai/api/v1' });
+
+    expect(out).toEqual({ ok: true, synced: 9 });
+    expect((upserts[0] as Record<string, unknown>).released_at).toBeUndefined();
+  });
+
   it('lo stesso id su due listini resta due righe distinte, non una che sovrascrive l’altra', async () => {
     const { admin, upserts } = fakeAdmin();
 

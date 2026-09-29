@@ -1320,7 +1320,7 @@
       .map((n) => ({ id: n.id, type: n.type }));
     if (!sources.length) { return; }
 
-    const model = catalogue[medium]?.[0]?.id ?? null;
+    const model = effectiveModel(medium, null, catalogue[medium] ?? []);
     const modalities = model ? { input: catalogue[medium].find((c) => c.id === model)?.inputModalities ?? [] } : { input: [] };
 
     const { w, h } = genNodeSize(medium);

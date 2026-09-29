@@ -34,10 +34,31 @@ const { chatInputModalities } = vi.hoisted(() => ({
 }));
 vi.mock('./ai-models-sync', () => ({ chatInputModalities }));
 
+const { syncedCandidates } = vi.hoisted(() => ({
+  syncedCandidates: vi.fn(async (_admin: unknown, medium: string) =>
+    medium === 'text'
+      ? [
+          { id: 'anthropic/claude', label: 'Claude', releasedAt: '2026-09-01T00:00:00Z', expiresAt: null, unitCostUsd: 8, benchmark: 55, capability: 200_000 },
+          { id: 'openai/gpt', label: 'GPT', releasedAt: '2024-01-01T00:00:00Z', expiresAt: null, unitCostUsd: 12, benchmark: 20, capability: 400_000 }
+        ]
+      : []
+  )
+}));
+vi.mock('./recommended-models', () => ({ syncedCandidates }));
+
 import { canvasModelCatalogue } from './canvas-catalogue';
 
 describe('i modelli che un nodo può scegliere', () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it('marca il modello raccomandato del catalogo, e lo espone con il perché', async () => {
+    const out = await canvasModelCatalogue();
+
+    expect(out.text.choices.find((c) => c.id === 'anthropic/claude')?.tiers).toContain('balanced');
+    expect(out.text.choices.find((c) => c.id === 'openai/gpt')?.tiers).toBeUndefined();
+    expect(out.text.recommended.find((r) => r.tier === 'balanced')).toMatchObject({ id: 'anthropic/claude' });
+    expect(out.image.recommended).toEqual([]);
+  });
 
   it('per il testo è la lista completa del centralino, non solo i modelli da agente', async () => {
     const out = await canvasModelCatalogue();

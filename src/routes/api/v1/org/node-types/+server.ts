@@ -2,6 +2,18 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { resolveOrgCaller } from '$lib/server/org-data/auth';
 import { describeNodeType, describeNodeTypes, isNodeType } from '$lib/canvas/node-data';
+import { canvasModelCatalogue } from '$lib/server/canvas-catalogue';
+import { GEN_MEDIUMS } from '$lib/canvas/gen-node';
+
+async function recommendedModels() {
+  const catalogue = await canvasModelCatalogue();
+  return Object.fromEntries(
+    GEN_MEDIUMS.map((medium) => [
+      medium,
+      catalogue[medium].recommended.map(({ tier, id, label, why }) => ({ tier, id, label, why }))
+    ])
+  );
+}
 
 /**
  * LA FORMA DI `nodes.data`, PER CHI SCRIVE `insert_row`/`update_row` SENZA VEDERE IL CODICE.
@@ -21,8 +33,8 @@ export const GET: RequestHandler = async ({ request, url }) => {
     if (!isNodeType(type)) {
       return json({ error: 'unknown_type', message: `"${type}" is not a nodes.type value.` }, { status: 400 });
     }
-    return json({ types: { [type]: describeNodeType(type) } });
+    return json({ types: { [type]: describeNodeType(type) }, recommended_models: await recommendedModels() });
   }
 
-  return json({ types: describeNodeTypes() });
+  return json({ types: describeNodeTypes(), recommended_models: await recommendedModels() });
 };

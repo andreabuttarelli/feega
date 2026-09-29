@@ -8,6 +8,11 @@ describe('il modello di un nodo', () => {
     expect(effectiveModel('image', null, choices)).toBe(DEFAULT_MODEL.image);
   });
 
+  it('un nodo senza modello usa il balanced raccomandato dal catalogo', () => {
+    const tagged = [...choices, { id: 'current', tiers: ['balanced' as const] }];
+    expect(effectiveModel('image', null, tagged)).toBe('current');
+  });
+
   it('un modello scelto vince sempre sul default', () => {
     expect(effectiveModel('image', 'other', choices)).toBe('other');
   });

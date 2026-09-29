@@ -30,6 +30,8 @@ import { providerOf } from '$lib/canvas/model-provider';
 import { createAdminClient } from './supabase-admin';
 import { TEXT_NODE_CREDITS } from '$lib/server/content-cost';
 import { CREDITS_PER_USD_SUBSCRIPTION_LIST } from '$lib/credit-ladder';
+import { withRecommendations, type CandidateModel, type Recommendation } from '$lib/canvas/recommended-models';
+import { syncedCandidates } from './recommended-models';
 
 export type MediumCatalogue = {
   choices: ModelChoice[];
@@ -38,6 +40,8 @@ export type MediumCatalogue = {
    *  di `TEXT_NODE_CREDITS` — la riscrittura è un giro del modello di craft, lo stesso mestiere
    *  di un nodo testo. Assente su `text`: il testo non ha craft di prompting da riscrivere. */
   enhanceUnitCredits?: number;
+  recommended: Recommendation[];
+  candidates: CandidateModel[];
 };
 
 /**
@@ -51,29 +55,33 @@ export async function canvasModelCatalogue(): Promise<Record<GenMedium, MediumCa
   await ensureGatewayModels().catch(() => {});
   const admin = createAdminClient();
 
-  const [image, video, textModalities] = await Promise.all([
+  const [image, video, textModalities, textSynced, imageSynced, videoSynced] = await Promise.all([
     offerableModels(admin, 'image'),
     offerableModels(admin, 'video'),
-    chatInputModalities(admin)
+    chatInputModalities(admin),
+    syncedCandidates(admin, 'text'),
+    syncedCandidates(admin, 'image'),
+    syncedCandidates(admin, 'video')
   ]);
+  const now = new Date();
+
+  const textChoices: ModelChoice[] = gatewayModels().map((m) => ({
+    id: m.id,
+    label: m.label,
+    aspectRatios: [],
+    ...providerOf(m.id),
+    wireId: m.id,
+    inputModalities: textModalities.get(m.id) ?? [],
+    textPricing: {
+      inputCreditsPerMillion: m.rate.input * CREDITS_PER_USD_SUBSCRIPTION_LIST,
+      outputCreditsPerMillion: m.rate.output * CREDITS_PER_USD_SUBSCRIPTION_LIST,
+      systemPromptTokens: 0
+    }
+  }));
 
   return {
-    text: {
-      choices: gatewayModels().map((m) => ({
-        id: m.id,
-        label: m.label,
-        aspectRatios: [],
-        ...providerOf(m.id),
-        inputModalities: textModalities.get(m.id) ?? [],
-        textPricing: {
-          inputCreditsPerMillion: m.rate.input * CREDITS_PER_USD_SUBSCRIPTION_LIST,
-          outputCreditsPerMillion: m.rate.output * CREDITS_PER_USD_SUBSCRIPTION_LIST,
-          systemPromptTokens: 0
-        }
-      })),
-      synced: true
-    },
-    image: { ...image, enhanceUnitCredits: TEXT_NODE_CREDITS },
-    video: { ...video, enhanceUnitCredits: TEXT_NODE_CREDITS }
+    text: { ...withRecommendations('text', textChoices, textSynced, now), synced: true },
+    image: { ...image, ...withRecommendations('image', image.choices, imageSynced, now), enhanceUnitCredits: TEXT_NODE_CREDITS },
+    video: { ...video, ...withRecommendations('video', video.choices, videoSynced, now), enhanceUnitCredits: TEXT_NODE_CREDITS }
   };
 }

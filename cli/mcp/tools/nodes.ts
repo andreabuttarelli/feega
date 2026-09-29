@@ -38,13 +38,16 @@ export function registerNodeTools(server: McpServer) {
         'A `video` NEVER returns finished here: it comes back `queued` with an `external_job_id` on ' +
         'the run, and the render lands later, asynchronously — the node stays `running` until a ' +
         'later tick deposits the asset. Poll the node (`query`) rather than expecting a file now. ' +
+        'Omit `model` to use the recommended balanced model for the medium (`describe_node_types` ' +
+        'lists the recommended ones); an old or weak model still runs but the result carries a ' +
+        '`warning` naming the recommended one. ' +
         'Spends credits; a `credits_exhausted` failure means the org is out.',
       inputSchema: z.object({
         org,
         node_id: z.string(),
         medium: z.enum(['text', 'image', 'video']),
         prompt: z.string(),
-        model: z.string(),
+        model: z.string().optional(),
         version: z.number().int(),
         params: z.record(z.string(), z.unknown()).optional()
       }),

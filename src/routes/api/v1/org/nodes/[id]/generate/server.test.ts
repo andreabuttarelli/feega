@@ -26,7 +26,23 @@ vi.mock('$lib/server/repos/canvas', () => ({
   findNode: (...args: unknown[]) => findNode(...args)
 }));
 
+const canvasModelCatalogue = vi.fn();
+vi.mock('$lib/server/canvas-catalogue', () => ({
+  canvasModelCatalogue: (...args: unknown[]) => canvasModelCatalogue(...args)
+}));
+
 import { POST } from './+server';
+
+const CANDIDATES = [
+  { id: 'current', label: 'Current', releasedAt: '2026-09-01T00:00:00Z', expiresAt: null, unitCostUsd: 0.04, benchmark: null, capability: 1 },
+  { id: 'ancient', label: 'Ancient', releasedAt: '2024-01-01T00:00:00Z', expiresAt: null, unitCostUsd: 0.04, benchmark: null, capability: 1 }
+];
+const IMAGE_CATALOGUE = {
+  choices: [],
+  synced: true,
+  candidates: CANDIDATES,
+  recommended: [{ tier: 'balanced', id: 'current', label: 'Current', unitCostUsd: 0.04, releasedAt: '2026-09-01T00:00:00Z', why: '' }]
+};
 
 const ORG = 'org-1';
 const NODE = 'node-1';
@@ -62,6 +78,7 @@ beforeEach(() => {
   });
   gateOrgAiAction.mockResolvedValue(undefined);
   findNode.mockResolvedValue(NODE_ROW);
+  canvasModelCatalogue.mockResolvedValue({ image: IMAGE_CATALOGUE });
 });
 
 describe('POST /api/v1/org/nodes/:id/generate', () => {
@@ -155,5 +172,32 @@ describe('POST /api/v1/org/nodes/:id/generate', () => {
 
     expect(res.status).toBe(400);
     expect(body.error).toBe('prompt_required');
+  });
+
+  it('without a model, generates with the recommended balanced one', async () => {
+    runGenNode.mockResolvedValue({ kind: 'done', run: { id: 'r' }, asset: { id: 'a' } });
+
+    const { res } = await call(NODE, { medium: 'image', prompt: 'x', version: 3 });
+
+    expect(res.status).toBe(200);
+    expect(runGenNode).toHaveBeenCalledWith({}, expect.objectContaining({ model: 'current' }));
+  });
+
+  it('an old model still runs, with a warning naming the recommended one', async () => {
+    runGenNode.mockResolvedValue({ kind: 'done', run: { id: 'r' }, asset: { id: 'a' } });
+
+    const { res, body } = await call(NODE, { medium: 'image', prompt: 'x', model: 'ancient', version: 3 });
+
+    expect(res.status).toBe(200);
+    expect(runGenNode).toHaveBeenCalledWith({}, expect.objectContaining({ model: 'ancient' }));
+    expect(body.warning).toContain('current');
+  });
+
+  it('a recommended model carries no warning', async () => {
+    runGenNode.mockResolvedValue({ kind: 'done', run: { id: 'r' }, asset: { id: 'a' } });
+
+    const { body } = await call(NODE, { medium: 'image', prompt: 'x', model: 'current', version: 3 });
+
+    expect(body.warning).toBeUndefined();
   });
 });

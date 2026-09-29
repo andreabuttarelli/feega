@@ -14,6 +14,7 @@
  */
 import { MEDIUMS, type Medium } from './graph';
 import type { ModelParam } from './model-params';
+import type { RecommendationTier } from './recommended-models';
 
 /** I tre medium che un nodo può produrre: gli stessi della tela, non un secondo elenco. */
 export const GEN_MEDIUMS = MEDIUMS;
@@ -60,6 +61,9 @@ export type ModelChoice = {
    *  un controllo già dedicato (`aspectRatio`, `resolution`…) — v. `model-params.ts`. Assente per
    *  un modello che non passa da `offerable-models.ts` (il testo) o dichiara zero campi extra. */
   params?: ModelParam[];
+  wireId?: string;
+  tiers?: RecommendationTier[];
+  recommendedWhy?: string;
 };
 
 /** Quel che l'utente ha scelto nell'overlay. Non è il catalogo: è la scelta dentro al catalogo. */
