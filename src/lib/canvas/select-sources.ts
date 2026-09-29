@@ -22,16 +22,18 @@ export type SelectableItem = {
 
 type MediaSlide = { type?: string; url?: string; thumbnailUrl?: string };
 
+const stillOf = (slide: MediaSlide): string | undefined =>
+  slide.type === 'video' ? slide.thumbnailUrl : (slide.url ?? slide.thumbnailUrl);
+
 function slidesOf(media: Record<string, unknown> | null): string[] {
   if (!media) return [];
 
   const items = Array.isArray(media.items) ? (media.items as MediaSlide[]) : [];
   if (items.length) {
-    return items.map((slide) => slide.url ?? slide.thumbnailUrl).filter((url): url is string => Boolean(url));
+    return items.map(stillOf).filter((url): url is string => Boolean(url));
   }
 
-  const single = [media.thumbnailUrl, media.videoUrl].filter((url): url is string => typeof url === 'string' && Boolean(url));
-  return single;
+  return typeof media.thumbnailUrl === 'string' && media.thumbnailUrl ? [media.thumbnailUrl] : [];
 }
 
 export function productItem(product: {

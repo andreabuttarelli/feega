@@ -856,7 +856,7 @@ describe('upstreamInputsFor — il select vede il feed filtrato, non le righe gr
       external_id: id,
       handle: 'acme',
       caption: id,
-      media: { type, items: [{ type, url }] },
+      media: { type, items: [{ type, url, thumbnailUrl: url }] },
       metrics: {},
       permalink: null,
       posted_at: id === 'foto' ? '2026-09-02T00:00:00Z' : '2026-09-01T00:00:00Z',

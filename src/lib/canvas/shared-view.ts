@@ -1,3 +1,5 @@
+import type { CalendarView } from '$lib/calendar/period-grid';
+
 export type SharedView =
   | { kind: 'image'; url: string }
   | { kind: 'video'; url: string }
@@ -10,6 +12,7 @@ export type SharedView =
   | { kind: 'influencer'; name: string; summary: string | null; photo: string | null }
   | { kind: 'post'; caption: string; media: string[] }
   | { kind: 'ads'; query: string; country: string }
+  | { kind: 'calendar'; view: CalendarView; anchor: string }
   | { kind: 'empty' };
 
 export type SharedTile = {

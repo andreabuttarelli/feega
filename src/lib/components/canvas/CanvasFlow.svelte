@@ -44,6 +44,8 @@
   import { CANVAS_DRAG_MEDIUM } from '$lib/canvas/new-node';
   import { CANVAS_DRAG_FILLED_NODE, parseFilledNodeDrag, type FilledNodeDrag } from '$lib/canvas/drag-payload';
   import { syncNodes } from '$lib/canvas/tile-sync';
+  import { ColumnAxis, withSettingsColumn } from '$lib/canvas/settings-column';
+  import { MOBILE_QUERY } from '$lib/breakpoints';
   import { CANVAS_EDGE_KINDS, EDGE_KIND_LABEL, WIRE_MODES, WIRE_MODE_LABEL, type CanvasEdgeKind, type FlowEdge, type WireMode } from '$lib/canvas-edges';
   import { isAddable, type Addable } from '$lib/canvas/addable';
   import { DEFAULT_EDGE_KIND, edgeKindsFor, verdictBetween } from '$lib/canvas/connect-rules';
@@ -53,6 +55,7 @@
   import { setTileResize } from '$lib/canvas/tile-resize-context';
   import type { CanvasNode } from '$lib/canvas/graph';
   import { CANVAS_MODES, CanvasMode } from '$lib/canvas/canvas-mode';
+  import { DropVerdict, pointOf, type PointerPoint } from '$lib/canvas/canvas-drop';
 
   /**
    * Dove sta una tile e quanto è grande, in unità di tela — le stesse di `brand_canvas_items`.
@@ -96,6 +99,7 @@
      *  duplicato/incolla, "Collega a nuovo…". `syncNodes` la consuma una volta sola e la
      *  seleziona; un inserimento realtime da un altro utente non la porta mai. */
     select?: boolean;
+    settings?: boolean;
   };
 
   let {
@@ -104,6 +108,8 @@
     edges: incomingEdges = [],
     onMove,
     onMoveEnd,
+    onTileDragOver,
+    onTileDrop,
     onResize,
     onConnect,
     onDelete,
@@ -144,6 +150,8 @@
      * prop nessuno lo leggeva.
      */
     onMoveEnd?: (moves: { id: string; x: number; y: number }[]) => void;
+    onTileDragOver?: (ids: string[], at: PointerPoint) => void;
+    onTileDrop?: (ids: string[], at: PointerPoint) => DropVerdict;
     /**
      * Una linea appena tirata fra due tile, col verso già scelto: il primo che `edgeKindsFor`
      * propone su quella coppia. Un `kind` fisso qui sarebbe una derivazione salvata anche fra due
@@ -261,6 +269,7 @@
       minH: t.minH
     },
     type: 'tile',
+    class: t.settings ? 'has-settings' : undefined,
     style: `width:${t.w}px;height:${t.h}px`
   });
 
@@ -280,7 +289,16 @@
     // senza, aggiungerne uno lo rimetterebbe subito in coda a se stesso.
     const next = syncNodes(untrack(() => nodes), incoming, toNode);
     if (next) nodes = next;
+    untrack(settleSettingsColumns);
   });
+
+  function settleSettingsColumns() {
+    const axis = window.matchMedia(MOBILE_QUERY).matches ? ColumnAxis.Below : ColumnAxis.Beside;
+    const next = withSettingsColumn(nodes, new Map(tiles.map((t) => [t.id, t])), axis);
+    if (next) {
+      nodes = next;
+    }
+  }
 
   // Gli archi seguono la stessa riconciliazione dei nodi: entrano i nuovi, escono quelli tolti.
   $effect(() => {
@@ -296,8 +314,29 @@
    * che il server non ha mai salvato riporterebbe un nodo a un `before` che coincide col suo
    * `after`, cioè a niente.
    */
-  function onNodeDragStop({ targetNode, nodes: dragged }: { targetNode: Node | null; nodes: Node[] }) {
+  let dragOrigin = new Map<string, { x: number; y: number }>();
+
+  function onNodeDragStart({ nodes: dragged }: { nodes: Node[] }) {
+    dragOrigin = new Map(dragged.map((n) => [n.id, { ...n.position }]));
+  }
+
+  function onNodeDrag({ nodes: dragged, event }: { nodes: Node[]; event: MouseEvent | TouchEvent }) {
+    onTileDragOver?.(dragged.map((n) => n.id), pointOf(event));
+  }
+
+  function returnToOrigin() {
+    nodes = nodes.map((n) => {
+      const origin = dragOrigin.get(n.id);
+      return origin ? { ...n, position: origin } : n;
+    });
+  }
+
+  function onNodeDragStop({ targetNode, nodes: dragged, event }: { targetNode: Node | null; nodes: Node[]; event: MouseEvent | TouchEvent }) {
     if (!targetNode) return;
+    if (onTileDrop?.(dragged.map((n) => n.id), pointOf(event)) === DropVerdict.Taken) {
+      returnToOrigin();
+      return;
+    }
     for (const n of dragged) {
       onMove?.(n.id, n.position.x, n.position.y);
     }
@@ -651,6 +690,8 @@
     bind:nodes
     bind:edges
     {nodeTypes}
+    onnodedragstart={onNodeDragStart}
+    onnodedrag={onNodeDrag}
     onnodedragstop={onNodeDragStop}
     onconnect={onConnected}
     onedgeclick={onEdgeClick}
@@ -678,6 +719,7 @@
     <CanvasSelectionBridge
       onchange={(next) => {
         selection = next;
+        settleSettingsColumns();
         onSelectionChange?.(next.ids);
       }}
     />
@@ -800,6 +842,17 @@
 
     --xy-edge-stroke: color-mix(in srgb, var(--ink-soft, #6e6e73) 45%, var(--paper, #fff));
     --xy-edge-stroke-selected: var(--accent, #7c5cff);
+  }
+
+  .wrap :global(.svelte-flow__node.has-settings) {
+    transition:
+      width 160ms ease,
+      height 160ms ease;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .wrap :global(.svelte-flow__node.has-settings) {
+      transition: none;
+    }
   }
 
   .wrap :global(.svelte-flow__edge.is-linked .svelte-flow__edge-path) {

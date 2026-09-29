@@ -11,7 +11,7 @@ import type { DeliveryOutcome } from '$lib/server/repos/post-delivery';
  * `mode` distingue un post che resta `draft` da uno che va programmato — mai un booleano, perché
  * "programmato" porta con sé un orario che un `true`/`false` non può portare.
  */
-export type CreatePostMode = { kind: 'draft' } | { kind: 'schedule'; at: string };
+export type CreatePostMode = { kind: 'draft'; plannedFor?: string } | { kind: 'schedule'; at: string };
 
 export type CreatePostResult =
   | { ok: true; post: Post }
@@ -35,6 +35,7 @@ export type CreatePostFromNodesRepos = {
       mediaOrder?: string[];
       actorKind?: 'user' | 'agent' | 'system';
       actorId?: string | null;
+      plannedFor?: string | null;
     }
   ) => Promise<Post>;
   setPostStatus: (db: Db, input: { orgId: string; postId: string; status: PostStatus }) => Promise<void>;
@@ -53,7 +54,7 @@ export async function createPostFromNodes(
     userId: string;
     brandId: string;
     nodeIds: string[];
-    caption: string;
+    caption?: string;
     mediaOrder?: string[];
     accountIds: string[];
     mode: CreatePostMode;
@@ -89,7 +90,8 @@ export async function createPostFromNodes(
         caption: input.caption,
         mediaOrder: input.mediaOrder,
         actorKind: 'user',
-        actorId: input.userId
+        actorId: input.userId,
+        plannedFor: input.mode.kind === 'draft' ? input.mode.plannedFor : input.mode.at
       }
     );
   } catch (e) {

@@ -101,23 +101,6 @@ export function modalityBadges(inputModalities: string[]): ModalityBadge[] {
   return MODALITY_ORDER.filter((m) => has.has(m)).map((m) => ({ modality: m, ...MODALITY_BADGE[m]! }));
 }
 
-const NODE_OUTPUT: Partial<Record<string, ConnectorType>> = {
-  text: 'text',
-  doc: 'text',
-  image: 'images',
-  influencer: 'images',
-  video: 'videos',
-  effects: 'images',
-  composition: 'videos'
-};
-
-export function outputConnectorOf(nodeType: string, mediaKind?: 'image' | 'video'): ConnectorType | null {
-  if (nodeType === 'effects' && mediaKind === 'video') {
-    return 'videos';
-  }
-  return NODE_OUTPUT[nodeType] ?? null;
-}
-
 /** Il minimo che `ai-models-sync.ts::ModelModalities` porta — nessun import di codice server qui. */
 export type Modalities = { input: string[] };
 
