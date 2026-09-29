@@ -17,10 +17,10 @@
   import { keepSame } from '$lib/canvas/snapshot-keep';
   import { AssetSize, sized } from '$lib/canvas/asset-url';
   import TieredImage from '$lib/components/canvas/TieredImage.svelte';
-  import { createWriteQueue } from '$lib/canvas/write-queue';
+  import { SaveStatus, SaveTiming, SendResult, createSaveScheduler } from '$lib/canvas/save-scheduler';
   import { canvasActionUrl } from '$lib/canvas/canvas-action-url';
   import { baseOf, diffNodeData } from '$lib/canvas/node-patch';
-  import { SaveFailure, adoptIdleRows, failureOf, saveMessage, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
+  import { SaveFailure, adoptIdleRows, failureOf, isOwnEcho, keepDirty, keepLocal, saveMessage, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
   import { createUndoStack } from '$lib/canvas/undo-stack';
   import type { Gesture, UndoItem } from '$lib/canvas/undo-plan';
   import { buildMoveGesture, checkMoveGesture, inverseMoveGesture, type MoveGesture } from '$lib/canvas/move-gesture';
@@ -28,7 +28,7 @@
   import type { PresencePeer } from '$lib/realtime/presence-peers';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import { deserialize } from '$app/forms';
-  import { invalidate } from '$app/navigation';
+  import { beforeNavigate, invalidate } from '$app/navigation';
   import { CANVAS_LIST_DEPENDENCY } from '$lib/canvas/canvas-list';
   import { formatCredits } from '$lib/components/credit-amount-format';
   import { untrack } from 'svelte';
@@ -141,7 +141,7 @@
   import { billingPath } from '$lib/billing-path';
 
   let { data } = $props();
-  type TextCostEstimate = { inputTokens: number; outputTokens: number; variableInput: boolean; revision: string };
+  type TextCostEstimate = { inputTokens: number; outputTokens: number; variableInput: boolean; revision: string; asked: string };
   let textCostEstimates = $state<Record<string, TextCostEstimate>>({});
   let voices = $state<VoiceChoice[]>([]);
   let voicesError = $state<string | null>(null);
@@ -669,7 +669,23 @@
   let peers = $state<PresencePeer[]>([]);
   let pending = 0;
   let snapshotVersion = 0;
-  const enqueue = createWriteQueue();
+  const SAVE_DEBOUNCE_MS = 400;
+  const SAVE_MAX_WAIT_MS = 2000;
+  const SAVE_BACKOFF_CAP_MS = 30000;
+  const REMOTE_REFRESH_MS = 250;
+  let saveStatus = $state(SaveStatus.Saved);
+  const SAVE_LABEL: Record<SaveStatus, string> = {
+    [SaveStatus.Saved]: 'Saved',
+    [SaveStatus.Saving]: 'Saving…',
+    [SaveStatus.Retrying]: 'Offline — retrying'
+  };
+  const saves = createSaveScheduler({
+    send: sendSave,
+    debounceMs: SAVE_DEBOUNCE_MS,
+    maxWaitMs: SAVE_MAX_WAIT_MS,
+    backoffMs: (failures) => Math.min(SAVE_BACKOFF_CAP_MS, 1000 * 2 ** (failures - 1)),
+    onStatus: (status) => { saveStatus = status; }
+  });
 
   /**
    * LO STACK DI QUESTA SCHEDA — non dell'utente, non del database: `undo-stack.ts` lo dice in
@@ -713,6 +729,7 @@
   let selectedIds = $state<string[]>([]);
 
   function selectionChanged(ids: string[]) {
+    if (ids.join() !== untrack(() => selectedIds.join())) { void saves.flush(); }
     selectedIds = ids;
   }
 
@@ -728,11 +745,11 @@
       return;
     }
     if (pending || version !== snapshotVersion) {
-      nodes = adoptIdleRows(nodes, snapshot.nodes as CanvasNodeRecord[], enqueue.busy);
+      nodes = adoptIdleRows(nodes, snapshot.nodes as CanvasNodeRecord[], saves.dirtyKeys);
       return;
     }
     const now = Date.now();
-    nodes = keepSame(nodes, (snapshot.nodes as CanvasNodeRecord[]).map((n) => toTile(n)), now);
+    nodes = keepSame(nodes, keepDirty((snapshot.nodes as CanvasNodeRecord[]).map((n) => toTile(n)), nodes, saves.dirtyKeys), now);
     edges = keepSame(edges, (snapshot.connections as Connection[]).map(toEdge), now);
     productsOverride = keepSame(products, (snapshot.products ?? {}) as Record<string, Product[]>, now);
     socialPostsOverride = keepSame(socialPosts, (snapshot.socialPosts ?? {}) as Record<string, SocialPost[]>, now);
@@ -751,7 +768,9 @@
       projectId: data.projectId,
       peer: { userId: user.id, name: user.email ?? 'Utente', avatar: null,
         path: `/p/${data.projectId}/c/${data.canvas.id}`, threadId: null },
-      onChange: () => { void refresh(); },
+      onChange: (change) => {
+        if (!isOwnEcho(change, nodes, saves.sending)) { refreshSoon(); }
+      },
       onReconnect: () => { void refresh(); },
       onCanvasList: () => { void invalidate(CANVAS_LIST_DEPENDENCY); },
       onPeers: (value) => { peers = value; },
@@ -760,6 +779,35 @@
   });
 
   $effect(() => onCanvasReveal(() => { void refresh(); }));
+
+  let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function refreshSoon() {
+    if (refreshTimer) { clearTimeout(refreshTimer); }
+    refreshTimer = setTimeout(() => { refreshTimer = null; void refresh(); }, REMOTE_REFRESH_MS);
+  }
+
+  $effect(() => {
+    const flushAll = () => { void saves.flush(); };
+    const flushHidden = () => { if (document.visibilityState === 'hidden') { flushAll(); } };
+    const warnUnsent = (event: BeforeUnloadEvent) => {
+      if (!saves.unsent()) { return; }
+      flushAll();
+      event.preventDefault();
+    };
+    document.addEventListener('focusout', flushAll);
+    document.addEventListener('visibilitychange', flushHidden);
+    window.addEventListener('pagehide', flushAll);
+    window.addEventListener('beforeunload', warnUnsent);
+    return () => {
+      document.removeEventListener('focusout', flushAll);
+      document.removeEventListener('visibilitychange', flushHidden);
+      window.removeEventListener('pagehide', flushAll);
+      window.removeEventListener('beforeunload', warnUnsent);
+    };
+  });
+
+  beforeNavigate(() => { void saves.flush(); });
 
   const READ_ACTIONS = new Set(['snapshot', 'estimate_text_cost', 'calendar_posts', 'audio_voices']);
 
@@ -936,7 +984,7 @@
   }
 
   async function saveCompositionExportRefId(id: string, refId: string): Promise<boolean> {
-    return write(id, { refId });
+    return write(id, { refId }, SaveTiming.Now);
   }
 
   async function applyEffects(id: string, steps: EffectStep[], _output: Blob | null = null): Promise<boolean> {
@@ -949,7 +997,7 @@
     if (!current) {
       return false;
     }
-    const saved = await write(id, effectsData({ ...current, effects: steps, sourceRefId: source.refId, mediaKind: source.kind }));
+    const saved = await write(id, effectsData({ ...current, effects: steps, sourceRefId: source.refId, mediaKind: source.kind }), SaveTiming.Now);
     if (!saved) {
       return false;
     }
@@ -1072,7 +1120,7 @@
 
     nodes = nodes.map((node) => (node.id === id ? { ...node, data: { ...node.data, ...genData(startRun(gen)) } } : node));
 
-    await enqueue(id, async () => {});
+    await saves.flush(id);
 
     const before = nodes.find((node) => node.id === id);
     if (!before) {
@@ -1276,7 +1324,7 @@
 
     const data = { ...before.data, running: false, error: null };
     nodes = nodes.map((node) => (node.id === id ? { ...node, data } : node));
-    await write(id, data);
+    await write(id, data, SaveTiming.Now);
   }
 
   async function move(id: string, x: number, y: number) {
@@ -1362,44 +1410,48 @@
     }
   }
 
-  async function write(id: string, patch: Record<string, unknown>): Promise<boolean> {
+  const SEND_RESULT: Record<SaveFailure, SendResult> = {
+    [SaveFailure.Network]: SendResult.Retry,
+    [SaveFailure.Server]: SendResult.Retry,
+    [SaveFailure.Conflict]: SendResult.Dropped,
+    [SaveFailure.Invalid]: SendResult.Dropped,
+    [SaveFailure.Gone]: SendResult.Dropped,
+    [SaveFailure.Credits]: SendResult.Dropped,
+    [SaveFailure.Auth]: SendResult.Dropped
+  };
+
+  async function sendSave(id: string, touched: Record<string, unknown>): Promise<SendResult> {
     const current = nodes.find((node) => node.id === id);
-    if (!current) { return false; }
-    const next = { ...current.data, ...patch };
-    const change = diffNodeData(current.data, next, Object.keys(patch));
-    nodes = nodes.map((node) => node.id === id ? { ...node, data: next } : node);
-    pending += 1;
-    let saved = false;
-    await enqueue(id, async () => {
-      const before = nodes.find((node) => node.id === id);
-      if (!before) { pending -= 1; return; }
-      if (!Object.keys(change).length) {
-        pending -= 1;
-        saved = true;
-        return;
-      }
-      const out = await saveNode(id, change, baseOf(before.saved, change));
-      pending -= 1;
-      if (!out.ok) {
-        return;
-      }
-      saved = true;
-      const written = out.node;
-      nodes = nodes.map((node) => node.id === id ? { ...node, data: written.data, saved: written.data, version: written.version } : node);
-      pushGesture({
-        items: [
-          {
-            kind: 'node.update',
-            nodeId: id,
-            before: { data: current.data },
-            after: { data: next },
-            expectedVersion: current.version
-          }
-        ]
-      });
-      if (!pending) { void refresh(); }
+    if (!current) { return SendResult.Dropped; }
+    const change = diffNodeData(current.saved, current.data, Object.keys(touched));
+    if (!Object.keys(change).length) { return SendResult.Saved; }
+
+    const out = await saveNode(id, change, baseOf(current.saved, change));
+    if (!out.ok) { return SEND_RESULT[out.reason]; }
+
+    const written = out.node;
+    nodes = nodes.map((node) => node.id === id
+      ? { ...node, data: keepLocal(written.data, node.data, saves.dirtyKeys(id)), saved: written.data, version: Math.max(written.version, node.version) }
+      : node);
+    pushGesture({
+      items: [
+        {
+          kind: 'node.update',
+          nodeId: id,
+          before: { data: current.saved },
+          after: { data: written.data },
+          expectedVersion: current.version
+        }
+      ]
     });
-    return saved;
+    return SendResult.Saved;
+  }
+
+  function write(id: string, patch: Record<string, unknown>, timing = SaveTiming.Debounced): Promise<boolean> {
+    const current = nodes.find((node) => node.id === id);
+    if (!current) { return Promise.resolve(false); }
+    nodes = nodes.map((node) => node.id === id ? { ...node, data: { ...node.data, ...patch } } : node);
+    return saves.schedule(id, patch, timing);
   }
 
   function changeGen(id: string, gen: GenNodeState, patch: Partial<GenNodeState>) {
@@ -1412,6 +1464,10 @@
   }
 
   async function estimateTextCost(id: string, prompt: string, model: string, revision: string) {
+    const asked = JSON.stringify([prompt, model, revision]);
+    if (textCostEstimates[id]?.asked === asked) {
+      return;
+    }
     const result = await post('estimate_text_cost', { node_id: id, prompt, model });
     const outputTokens = result?.estimatedOutputTokens;
     const systemTokens = result?.systemPromptTokens;
@@ -1438,7 +1494,8 @@
         inputTokens: systemTokens + userTokens,
         outputTokens,
         variableInput: result?.variableInput === true,
-        revision
+        revision,
+        asked
       }
     };
   }
@@ -1648,7 +1705,7 @@
         if (item) { droppedEdges.push(item); }
       }
       for (const nodeId of clearedReferenceIds) {
-        await write(nodeId, { references: [] });
+        await write(nodeId, { references: [] }, SaveTiming.Now);
       }
     }
 
@@ -2026,6 +2083,7 @@
   {#if peers.length}
     <div class="peers" aria-label="Persone sulla tela">{peers.map((peer) => peer.name).join(', ')}</div>
   {/if}
+  <p class="save-status" role="status" data-status={saveStatus}>{SAVE_LABEL[saveStatus]}</p>
   {#if failed}
     <!-- Un salvataggio perso in silenzio si scopre alla prossima apertura, quando quel che si era
          scritto non c'è più e nessuno sa perché. -->
@@ -2385,6 +2443,19 @@
   }
 
   .peers { position: absolute; z-index: 10; right: 16px; top: 16px; }
+
+  .save-status {
+    position: absolute;
+    z-index: 10;
+    left: 16px;
+    bottom: 16px;
+    margin: 0;
+    font-size: 11px;
+    color: var(--muted-foreground, #888);
+    pointer-events: none;
+  }
+
+  .save-status[data-status='retrying'] { color: #c0392b; }
 
   .warning {
     position: absolute;
