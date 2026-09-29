@@ -143,6 +143,15 @@
       profile={data.profile}
       org={data.org}
       share={onCanvasRoute ? { shareToken, onShare } : null}
+      projectName={data.project.name}
+      projects={data.projects.map((p: { id: string; name: string; href: string; updatedAt: string }) => ({
+        id: p.id,
+        name: p.name,
+        href: p.href,
+        updatedAt: p.updatedAt
+      }))}
+      canvasName={currentCanvas?.name ?? ''}
+      canvases={data.canvases}
     />
     <main class="mobile-main" class:is-canvas={onCanvasRoute}>
       <div class="mobile-view" class:is-hidden={mobileView !== 'page'}>
