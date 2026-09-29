@@ -1,7 +1,16 @@
-import { judgeDecision, mentionsMinor, MINORS, MODERATION_CATEGORIES, type JevDecision, type JudgeVerdict } from './policy';
+import {
+  identifiabilityDecision,
+  IDENTIFIABILITY_CATEGORIES,
+  judgeDecision,
+  mentionsMinor,
+  MINORS,
+  MODERATION_CATEGORIES,
+  type JevDecision,
+  type JudgeVerdict
+} from './policy';
 
 export type ModerationRecord = {
-  stage: 'rules' | 'jev' | 'llm';
+  stage: 'rules' | 'jev' | 'llm' | 'identifiability';
   verdict: 'clear' | 'escalate' | 'refuse';
   category: string | null;
   probabilities: Record<string, number>;
@@ -11,6 +20,8 @@ export type ModerationRecord = {
 export type ScreenPorts = {
   decide(state: string): Promise<JevDecision>;
   judge(state: string): Promise<JudgeVerdict>;
+  decideIdentifiability(state: string): Promise<JevDecision>;
+  judgeIdentifiability(state: string): Promise<JudgeVerdict>;
   record(entry: ModerationRecord): void;
 };
 
@@ -19,6 +30,15 @@ export type ScreenRequest = { text: string; references: string[]; uncensored: bo
 export type ScreenOutcome = { ok: true } | { ok: false; error: string };
 
 const UNAVAILABLE = 'moderation_unavailable';
+
+const SCREEN_STAGES: Readonly<Record<'yes' | 'no', readonly ('content' | 'identifiability')[]>> = {
+  yes: ['content', 'identifiability'],
+  no: ['content']
+};
+
+function stagesFor(request: ScreenRequest): readonly ('content' | 'identifiability')[] {
+  return SCREEN_STAGES[request.uncensored ? 'yes' : 'no'];
+}
 
 function stateOf(request: ScreenRequest): string {
   const references = request.references.length ? `\nReferences attached: ${request.references.join('; ')}` : '';
@@ -30,7 +50,7 @@ function errorOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-async function escalate(ports: ScreenPorts, state: string): Promise<ScreenOutcome> {
+async function escalateContent(ports: ScreenPorts, state: string): Promise<ScreenOutcome> {
   let verdict: JudgeVerdict;
   try {
     verdict = await ports.judge(state);
@@ -47,14 +67,7 @@ async function escalate(ports: ScreenPorts, state: string): Promise<ScreenOutcom
   return { ok: false, error: verdict.reason ? `${message} (${verdict.reason})` : message };
 }
 
-export async function screenGeneration(ports: ScreenPorts, request: ScreenRequest): Promise<ScreenOutcome> {
-  const state = stateOf(request);
-
-  if (request.uncensored && mentionsMinor(`${request.text} ${request.references.join(' ')}`)) {
-    ports.record({ stage: 'rules', verdict: 'refuse', category: MINORS, probabilities: {}, reason: 'minor keyword' });
-    return { ok: false, error: MODERATION_CATEGORIES[MINORS].refusal };
-  }
-
+async function screenContent(ports: ScreenPorts, state: string): Promise<ScreenOutcome> {
   let decision: JevDecision;
   try {
     decision = await ports.decide(state);
@@ -76,7 +89,68 @@ export async function screenGeneration(ports: ScreenPorts, request: ScreenReques
     return { ok: false, error: verdict.message };
   }
   if (verdict.kind === 'escalate') {
-    return escalate(ports, state);
+    return escalateContent(ports, state);
   }
   return { ok: true };
+}
+
+async function escalateIdentifiability(ports: ScreenPorts, state: string): Promise<ScreenOutcome> {
+  let verdict: JudgeVerdict;
+  try {
+    verdict = await ports.judgeIdentifiability(state);
+  } catch (error) {
+    ports.record({ stage: 'identifiability', verdict: 'refuse', category: null, probabilities: {}, reason: errorOf(error) });
+    return { ok: false, error: `${UNAVAILABLE}: the identifiability review could not run` };
+  }
+
+  ports.record({ stage: 'identifiability', verdict: verdict.allowed ? 'clear' : 'refuse', category: verdict.category, probabilities: {}, reason: verdict.reason });
+  if (verdict.allowed) {
+    return { ok: true };
+  }
+  const message = IDENTIFIABILITY_CATEGORIES[verdict.category]?.refusal || 'Refused: too specific — could depict a real person.';
+  return { ok: false, error: verdict.reason ? `${message} (${verdict.reason})` : message };
+}
+
+async function screenIdentifiability(ports: ScreenPorts, state: string): Promise<ScreenOutcome> {
+  let decision: JevDecision;
+  try {
+    decision = await ports.decideIdentifiability(state);
+  } catch (error) {
+    ports.record({ stage: 'identifiability', verdict: 'refuse', category: null, probabilities: {}, reason: errorOf(error) });
+    return { ok: false, error: `${UNAVAILABLE}: ${errorOf(error)}` };
+  }
+
+  const verdict = identifiabilityDecision(decision);
+  ports.record({
+    stage: 'identifiability',
+    verdict: verdict.kind,
+    category: verdict.kind === 'refuse' ? verdict.category : decision.choice,
+    probabilities: decision.probabilities,
+    reason: verdict.kind === 'escalate' ? verdict.reason : null
+  });
+
+  if (verdict.kind === 'refuse') {
+    return { ok: false, error: verdict.message };
+  }
+  if (verdict.kind === 'escalate') {
+    return escalateIdentifiability(ports, state);
+  }
+  return { ok: true };
+}
+
+const SCREEN_OF: Readonly<Record<'content' | 'identifiability', (ports: ScreenPorts, state: string) => Promise<ScreenOutcome>>> = {
+  content: screenContent,
+  identifiability: screenIdentifiability
+};
+
+export async function screenGeneration(ports: ScreenPorts, request: ScreenRequest): Promise<ScreenOutcome> {
+  const state = stateOf(request);
+
+  if (request.uncensored && mentionsMinor(`${request.text} ${request.references.join(' ')}`)) {
+    ports.record({ stage: 'rules', verdict: 'refuse', category: MINORS, probabilities: {}, reason: 'minor keyword' });
+    return { ok: false, error: MODERATION_CATEGORIES[MINORS].refusal };
+  }
+
+  const outcomes = await Promise.all(stagesFor(request).map((stage) => SCREEN_OF[stage](ports, state)));
+  return outcomes.find((outcome) => !outcome.ok) ?? { ok: true };
 }

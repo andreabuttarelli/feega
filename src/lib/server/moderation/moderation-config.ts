@@ -3,11 +3,13 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Db } from '$lib/server/db/client';
 import type { Actor } from '$lib/server/repos/actor';
 import { jev, jevUsd } from './jev';
-import { JUDGE_SYSTEM, parseJudgeVerdict } from './policy';
+import { IDENTIFIABILITY_CATEGORIES, IDENTIFIABILITY_JUDGE_SYSTEM, JUDGE_SYSTEM, parseJudgeVerdict } from './policy';
 import type { ModerationRecord, ScreenPorts } from './screen';
 
 const JEV_LABEL = 'moderation.jev';
+const IDENTIFIABILITY_JEV_LABEL = 'moderation.jev.identifiability';
 const JUDGE_LABEL = 'moderation.judge';
+const IDENTIFIABILITY_JUDGE_LABEL = 'moderation.judge.identifiability';
 const JEV_NOT_CONFIGURED = 'jev_not_configured';
 const BEST_TIER = 'best';
 
@@ -62,33 +64,37 @@ async function judgeModel(): Promise<string | undefined> {
   return catalogue?.text.recommended.find((r) => r.tier === BEST_TIER)?.id;
 }
 
+async function decideWith(scope: ModerationScope, label: string, categories: typeof IDENTIFIABILITY_CATEGORIES | undefined, state: string) {
+  const apiKey = env.JEV_API_KEY?.trim();
+  if (!apiKey) {
+    throw new Error(JEV_NOT_CONFIGURED);
+  }
+  const { logAiCall } = await import('$lib/server/ai-log');
+  const startedAt = Date.now();
+  try {
+    const decision = await jev({ apiKey, baseUrl: env.JEV_BASE_URL?.trim() || undefined, categories }).decide(state);
+    logAiCall({ label, provider: 'jev', model: 'jev-latest', ms: Date.now() - startedAt, ok: true, flatCostUsd: jevUsd(decision.tokens), ...callerOf(scope) });
+    return decision;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'jev_failed';
+    logAiCall({ label, provider: 'jev', model: 'jev-latest', ms: Date.now() - startedAt, ok: false, error: message, ...callerOf(scope) });
+    throw error;
+  }
+}
+
+async function judgeWith(scope: ModerationScope, label: string, system: string, state: string) {
+  const [{ llmText }, { withOrgContext }] = await Promise.all([import('$lib/server/llm'), import('$lib/server/ai-log')]);
+  const model = await judgeModel();
+  const { text } = await withOrgContext(scope.orgId, () => llmText({ prompt: state, system, model, label }));
+  return parseJudgeVerdict(text);
+}
+
 export function moderationPorts(db: Db, scope: ModerationScope): ScreenPorts {
   return {
-    async decide(state) {
-      const apiKey = env.JEV_API_KEY?.trim();
-      if (!apiKey) {
-        throw new Error(JEV_NOT_CONFIGURED);
-      }
-      const { logAiCall } = await import('$lib/server/ai-log');
-      const startedAt = Date.now();
-      try {
-        const decision = await jev({ apiKey, baseUrl: env.JEV_BASE_URL?.trim() || undefined }).decide(state);
-        logAiCall({ label: JEV_LABEL, provider: 'jev', model: 'jev-latest', ms: Date.now() - startedAt, ok: true, flatCostUsd: jevUsd(decision.tokens), ...callerOf(scope) });
-        return decision;
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'jev_failed';
-        logAiCall({ label: JEV_LABEL, provider: 'jev', model: 'jev-latest', ms: Date.now() - startedAt, ok: false, error: message, ...callerOf(scope) });
-        throw error;
-      }
-    },
-
-    async judge(state) {
-      const [{ llmText }, { withOrgContext }] = await Promise.all([import('$lib/server/llm'), import('$lib/server/ai-log')]);
-      const model = await judgeModel();
-      const { text } = await withOrgContext(scope.orgId, () => llmText({ prompt: state, system: JUDGE_SYSTEM, model, label: JUDGE_LABEL }));
-      return parseJudgeVerdict(text);
-    },
-
+    decide: (state) => decideWith(scope, JEV_LABEL, undefined, state),
+    decideIdentifiability: (state) => decideWith(scope, IDENTIFIABILITY_JEV_LABEL, IDENTIFIABILITY_CATEGORIES, state),
+    judge: (state) => judgeWith(scope, JUDGE_LABEL, JUDGE_SYSTEM, state),
+    judgeIdentifiability: (state) => judgeWith(scope, IDENTIFIABILITY_JUDGE_LABEL, IDENTIFIABILITY_JUDGE_SYSTEM, state),
     record: (entry) => recordModeration(db, scope, entry)
   };
 }

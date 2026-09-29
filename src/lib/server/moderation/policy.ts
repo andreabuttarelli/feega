@@ -65,30 +65,34 @@ export type Verdict =
   | { kind: 'escalate'; reason: string }
   | { kind: 'refuse'; category: string; message: string };
 
-function refuse(category: string): Verdict {
-  return { kind: 'refuse', category, message: MODERATION_CATEGORIES[category]?.refusal || `Refused: ${category}` };
+function refuseFrom(categories: Readonly<Record<string, ModerationCategory>>, category: string): Verdict {
+  return { kind: 'refuse', category, message: categories[category]?.refusal || `Refused: ${category}` };
 }
 
-export function judgeDecision(decision: JevDecision): Verdict {
+function decisionAgainst(categories: Readonly<Record<string, ModerationCategory>>, clearChoice: string, decision: JevDecision): Verdict {
   const p = (category: string) => decision.probabilities[category] ?? 0;
 
-  for (const [name, category] of Object.entries(MODERATION_CATEGORIES)) {
+  for (const [name, category] of Object.entries(categories)) {
     if (category.refuseAbove !== undefined && p(name) > category.refuseAbove) {
-      return refuse(name);
+      return refuseFrom(categories, name);
     }
   }
 
-  if (decision.choice !== SAFE) {
-    return refuse(decision.choice);
+  if (decision.choice !== clearChoice) {
+    return refuseFrom(categories, decision.choice);
   }
 
-  const safe = MODERATION_CATEGORIES[SAFE];
-  if (p(SAFE) < (safe.clearAtLeast ?? 1)) {
-    return { kind: 'escalate', reason: `safe at ${p(SAFE)}` };
+  const clear = categories[clearChoice];
+  if (p(clearChoice) < (clear.clearAtLeast ?? 1)) {
+    return { kind: 'escalate', reason: `${clearChoice} at ${p(clearChoice)}` };
   }
 
-  const doubted = Object.entries(MODERATION_CATEGORIES).find(([name, category]) => name !== SAFE && p(name) > category.escalateAbove);
+  const doubted = Object.entries(categories).find(([name, category]) => name !== clearChoice && p(name) > category.escalateAbove);
   return doubted ? { kind: 'escalate', reason: `${doubted[0]} at ${p(doubted[0])}` } : { kind: 'clear' };
+}
+
+export function judgeDecision(decision: JevDecision): Verdict {
+  return decisionAgainst(MODERATION_CATEGORIES, SAFE, decision);
 }
 
 const MINOR_PATTERNS: readonly RegExp[] = [
@@ -119,6 +123,53 @@ export function parseJudgeVerdict(raw: string): JudgeVerdict {
     return UNREADABLE_VERDICT;
   }
 }
+
+export const GENERIC = 'generic';
+const IDENTIFIABILITY_DOUBT = 0.05;
+const IDENTIFIABILITY_CONFIDENT_GENERIC = 0.95;
+
+export const IDENTIFIABILITY_CATEGORIES: Readonly<Record<string, ModerationCategory>> = {
+  [GENERIC]: {
+    instructions: 'The request describes a fictional or unidentifiable person: no distinctive marks, no real name, no specific enough face or context to point back at a real individual.',
+    refusal: '',
+    escalateAbove: IDENTIFIABILITY_DOUBT,
+    clearAtLeast: IDENTIFIABILITY_CONFIDENT_GENERIC
+  },
+  distinctive_marks: {
+    instructions: 'A distinctive tattoo (placement, design or text), scar, birthmark or other unique physical marking specific enough to identify a real person.',
+    refusal: 'Refused: too specific — could depict a real person. Remove identifying details like distinctive tattoos, scars or birthmarks.',
+    escalateAbove: IDENTIFIABILITY_DOUBT
+  },
+  specific_face: {
+    instructions: 'A facial description detailed enough (exact features, "looks like X", a described likeness of a known or specific person) to point at a real face rather than a generic one.',
+    refusal: 'Refused: too specific — could depict a real person. Remove identifying details like an exact facial description or a likeness to a named person.',
+    escalateAbove: IDENTIFIABILITY_DOUBT
+  },
+  named_or_referenced_person: {
+    instructions: 'A named real person, a social handle (@name), or an unambiguous reference to a specific real individual.',
+    refusal: 'Refused: too specific — could depict a real person. Remove the name or handle that identifies who this is.',
+    escalateAbove: IDENTIFIABILITY_DOUBT
+  },
+  personal_context: {
+    instructions: 'A specific real place combined with personal details, a workplace or uniform with a name, a license plate, or other contextual detail specific enough to identify a real person.',
+    refusal: 'Refused: too specific — could depict a real person. Remove identifying details like a named workplace, a license plate or a specific real place tied to a person.',
+    escalateAbove: IDENTIFIABILITY_DOUBT
+  }
+};
+
+export function identifiabilityDecision(decision: JevDecision): Verdict {
+  return decisionAgainst(IDENTIFIABILITY_CATEGORIES, GENERIC, decision);
+}
+
+export const IDENTIFIABILITY_JUDGE_SYSTEM = [
+  'You are a strict content-safety moderator checking whether a generation request is specific enough to identify a real person.',
+  'Decide whether the request below is generic (a fictional or unidentifiable person) or identifies someone real. Refuse when in doubt.',
+  'Categories that must be refused:',
+  ...Object.entries(IDENTIFIABILITY_CATEGORIES)
+    .filter(([name]) => name !== GENERIC)
+    .map(([name, category]) => `- ${name}: ${category.instructions}`),
+  'Answer with JSON only: {"allowed": boolean, "category": string, "reason": string}.'
+].join('\n');
 
 export const JUDGE_SYSTEM = [
   'You are a strict content-safety moderator for an image and video generator.',
