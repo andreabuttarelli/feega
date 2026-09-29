@@ -6,7 +6,8 @@ import type { GenParams } from '$lib/canvas/gen-node';
 import type { WiroFields, WiroWireSpec } from '$lib/server/wiro-catalogue';
 import { screenGeneration, type ScreenPorts } from '$lib/server/moderation/screen';
 import type { WiroGateway, WiroOutput } from './wiro-gateway';
-import { moderationProfileOf, ModerationProfile, STORAGE_FOLDER, type ProjectMode } from '$lib/project-mode';
+import { STORAGE_FOLDER, type ProjectMode } from '$lib/project-mode';
+import { ModerationProfile, profileOf } from '$lib/server/moderation/profiles';
 import { likenessRefusal, type ProvenanceEntry } from './likeness-guard';
 
 const GENERATED_MEDIA_BUCKET = 'brand-knowledge';
@@ -126,7 +127,7 @@ export async function startWiroRun(deps: WiroRunDeps, req: WiroRequest): Promise
   const screened = await screenGeneration(deps.screen(req.scope, model), {
     text: req.prompt,
     references: req.provenance.map((p) => p.label),
-    uncensored: moderationProfileOf(req.mode, model.uncensored) === ModerationProfile.Adult
+    uncensored: profileOf({ uncensored: model.uncensored, mode: req.mode }) === ModerationProfile.Uncensored
   });
   if (!screened.ok) {
     return { kind: 'refused', error: screened.error };

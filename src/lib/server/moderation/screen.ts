@@ -8,7 +8,7 @@ import {
   type JevDecision,
   type JudgeVerdict
 } from './policy';
-import { JevOutage, MODERATION_PROFILES, profileOf, type ProfilePolicy } from './profiles';
+import { JevOutage, MODERATION_PROFILES, carriedProfile, type ProfilePolicy } from './profiles';
 
 export type ModerationRecord = {
   stage: 'rules' | 'jev' | 'llm' | 'identifiability';
@@ -156,7 +156,7 @@ const SCREEN_OF: Readonly<Record<'content' | 'identifiability', (ports: ScreenPo
 
 export async function screenGeneration(ports: ScreenPorts, request: ScreenRequest): Promise<ScreenOutcome> {
   const state = stateOf(request);
-  const policy = MODERATION_PROFILES[profileOf(request)];
+  const policy = MODERATION_PROFILES[carriedProfile(request)];
 
   if (request.uncensored && mentionsMinor(`${request.text} ${request.references.join(' ')}`)) {
     ports.record({ stage: 'rules', verdict: 'refuse', category: MINORS, probabilities: {}, reason: 'minor keyword' });

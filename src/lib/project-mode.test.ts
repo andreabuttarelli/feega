@@ -2,12 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   Capability,
   catalogueIn,
-  ModerationProfile,
   ProjectMode,
   modeAllows,
   modeOf,
   modelAllowedIn,
-  moderationProfileOf,
   offerableIn
 } from './project-mode';
 
@@ -40,12 +38,6 @@ describe('project mode', () => {
     expect(offerableIn(ProjectMode.Nsfw, choices).map((c) => c.id)).toEqual(['wiro/a', 'openai/b']);
   });
 
-  it('the adult moderation profile applies only to uncensored models in nsfw projects', () => {
-    expect(moderationProfileOf(ProjectMode.Nsfw, true)).toBe(ModerationProfile.Adult);
-    expect(moderationProfileOf(ProjectMode.Nsfw, false)).toBe(ModerationProfile.General);
-    expect(moderationProfileOf(ProjectMode.Standard, true)).toBe(ModerationProfile.General);
-    expect(moderationProfileOf(ProjectMode.Standard, false)).toBe(ModerationProfile.General);
-  });
 });
 
 describe('catalogueIn', () => {

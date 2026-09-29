@@ -13,11 +13,6 @@ export enum Capability {
   StandardModels = 'standard_models'
 }
 
-export enum ModerationProfile {
-  General = 'general',
-  Adult = 'adult'
-}
-
 const EVERYTHING_BUT_WIRO = new Set(Object.values(Capability).filter((c) => c !== Capability.WiroModels));
 
 export const MODE_ALLOWS: Readonly<Record<ProjectMode, ReadonlySet<Capability>>> = {
@@ -33,11 +28,6 @@ export const MODE_REFUSAL: Readonly<Record<Capability, string>> = {
   [Capability.CatalogueWrite]: 'nsfw_not_in_catalogue',
   [Capability.WiroModels]: 'wiro_requires_nsfw_project',
   [Capability.StandardModels]: 'model_not_in_this_project'
-};
-
-const MODERATION_PROFILE: Readonly<Record<ProjectMode, Readonly<Record<'uncensored' | 'standard', ModerationProfile>>>> = {
-  [ProjectMode.Standard]: { uncensored: ModerationProfile.General, standard: ModerationProfile.General },
-  [ProjectMode.Nsfw]: { uncensored: ModerationProfile.Adult, standard: ModerationProfile.General }
 };
 
 const WIRO_PREFIX = 'wiro/';
@@ -72,10 +62,6 @@ export function modelRefusal(mode: ProjectMode, model: string | null | undefined
 
 export function offerableIn<C extends { id: string }>(mode: ProjectMode, choices: readonly C[]): C[] {
   return choices.filter((choice) => modelAllowedIn(mode, choice.id));
-}
-
-export function moderationProfileOf(mode: ProjectMode, uncensored: boolean): ModerationProfile {
-  return MODERATION_PROFILE[mode][uncensored ? 'uncensored' : 'standard'];
 }
 
 const CATALOGUE_LISTS = ['choices', 'recommended', 'candidates'] as const;
