@@ -11,6 +11,8 @@
   import { revealCanvas } from '$lib/canvas/canvas-reveal';
   import { CHROME_LOADERS } from '$lib/canvas/chrome-loaders';
   import MobileTopBar from '$lib/components/canvas/MobileTopBar.svelte';
+  import MobileViewSwitch from '$lib/components/canvas/MobileViewSwitch.svelte';
+  import { watchKeyboard } from '$lib/canvas/keyboard-inset';
   import DesktopPageBar from '$lib/components/canvas/DesktopPageBar.svelte';
   import { sheetEntryForPath, directLoadMode, type NavEntry } from '$lib/shell-nav';
   import { INITIAL_MOBILE_VIEW, chatBadge, showView, turnEnded, type MobileView, type ChatTurn } from '$lib/canvas/mobile-view';
@@ -37,6 +39,10 @@
   let mobileView = $state(INITIAL_MOBILE_VIEW);
 
   let isMobile = $state(browser ? matchMedia(MOBILE_QUERY).matches : false);
+  let typing = $state(false);
+  if (browser) {
+    onDestroy(watchKeyboard((open) => (typing = open)));
+  }
   if (browser) {
     const mql = matchMedia(MOBILE_QUERY);
     const onChange = () => (isMobile = mql.matches);
@@ -151,16 +157,18 @@
       canvasName={currentCanvas?.name ?? ''}
       canvasHref={currentCanvas?.href ?? null}
       canvases={data.canvases}
-      {viewSwitch}
       backHref={onCanvasRoute ? null : (data.canvases[0]?.href ?? `/p/${projectId}`)}
     />
-    <main class="mobile-main" class:is-canvas={onCanvasRoute}>
+    <main class="mobile-main" class:is-canvas={onCanvasRoute} class:is-typing={typing}>
       <div class="mobile-view" class:is-hidden={mobileView.view === 'chat'}>
         {@render children()}
       </div>
       <div class="mobile-chat" class:is-hidden={mobileView.view !== 'chat'} data-testid="mobile-chat">
         <CanvasChatPanel {projectId} brandSlug={data.brand?.slug ?? ''} open={true} />
       </div>
+      {#if viewSwitch && !typing}
+        <MobileViewSwitch {...viewSwitch} />
+      {/if}
     </main>
   {:else if onCanvasRoute}
     <div class="canvas-row">
@@ -281,7 +289,10 @@
   .mobile-chat {
     position: absolute;
     inset: 0;
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-bottom: var(--mobile-bar-clearance);
     background: var(--paper, #fff);
+  }
+  .mobile-main.is-typing .mobile-chat {
+    padding-bottom: 0;
   }
 </style>
