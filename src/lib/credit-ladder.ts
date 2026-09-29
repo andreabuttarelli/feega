@@ -22,15 +22,8 @@ export const AI_MARKUP = 1.0;
 export const MARGIN_FLOOR = 0.35;
 
 // Il cambio "costo provider → credito addebitato" per il debito di una chiamata AI. Vale SEMPRE
-// questo, a prescindere da come l'org ha comprato i suoi crediti: il cambio 70:1 sotto vale solo
-// all'ACQUISTO di un pacchetto una tantum, mai alla SPESA — un credito nel saldo vale uguale a
-// prescindere da dove viene.
+// questo, a prescindere da come l'org ha comprato i suoi crediti.
 export const CREDITS_PER_USD_SUBSCRIPTION_LIST = 100 * (1 + AI_MARKUP); // 200
-
-// Il cambio per un acquisto una tantum: comprare senza impegno costa di più al cliente (70
-// crediti per $1 invece di 100), quindi rende di più a noi — per questo la colonna una tantum ha
-// sempre un margine più alto di quella abbonamento sullo stesso gradino, per costruzione.
-export const CREDITS_PER_USD_ONE_TIME_LIST = 70;
 
 // Quanti crediti concede UN dollaro di prezzo abbonamento (`PLANS[].mUsd` → `PLANS[].credits`,
 // plans.ts) — un QUARTO concetto ancora, diverso dagli altri tre sopra: quello è il cambio a cui
@@ -41,24 +34,27 @@ export const CREDITS_PER_USD_ONE_TIME_LIST = 70;
 // strategia, chat) oltre alla produzione dei post.
 export const CREDITS_PER_USD_GRANT = 100;
 
+export const PLAN_CURRENCY = 'eur';
+
 export type CreditRung = {
   price: number;
-  creditsSubscription: number;
-  creditsOneTime: number;
+  credits: number;
+  lookupKey: string;
 };
 
-// Piatta (100:1 sub, 70:1 one-time — nessuno sconto) fino a $50: nessuna aritmetica da spiegare,
-// un cliente fa il conto a mente. Lo sconto comincia solo da $100, dove vale la pena — ogni punto
-// di margine speso da lì in su è deliberato, verificato dal test, mai deriva.
-export const CREDIT_LADDER: readonly CreditRung[] = [
-  { price: 5, creditsSubscription: 500, creditsOneTime: 350 },
-  { price: 15, creditsSubscription: 1_500, creditsOneTime: 1_050 },
-  { price: 30, creditsSubscription: 3_000, creditsOneTime: 2_100 },
-  { price: 50, creditsSubscription: 5_000, creditsOneTime: 3_500 },
-  { price: 100, creditsSubscription: 11_200, creditsOneTime: 7_840 },
-  { price: 200, creditsSubscription: 24_000, creditsOneTime: 16_800 },
-  { price: 400, creditsSubscription: 52_000, creditsOneTime: 36_400 }
-] as const;
+const PLAN_PRICES_EUR = [8, 16, 32, 64, 128, 256] as const;
+
+export const CREDIT_LADDER: readonly CreditRung[] = PLAN_PRICES_EUR.map((price) => ({
+  price,
+  credits: price * CREDITS_PER_USD_GRANT,
+  lookupKey: `feega_monthly_${price}`
+}));
+
+export const rungFor = (price: number): CreditRung | undefined =>
+  CREDIT_LADDER.find((rung) => rung.price === price);
+
+export const rungForLookupKey = (lookupKey: string | null | undefined): CreditRung | undefined =>
+  CREDIT_LADDER.find((rung) => rung.lookupKey === lookupKey);
 
 /**
  * Il debito di una chiamata AI in crediti, dal suo costo provider reale. Scritto UNA VOLTA in

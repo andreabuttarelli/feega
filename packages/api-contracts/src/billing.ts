@@ -20,7 +20,7 @@ const CheckoutInputSchema = z
       .number()
       .positive()
       .optional()
-      .describe('Monthly subscription rung the human wants, e.g. 30. Must be one of CREDIT_LADDER\'s prices')
+      .describe('Monthly plan in EUR the human wants: 8, 16, 32, 64, 128 or 256 (field name kept for compatibility)')
   })
   .strict();
 
@@ -95,7 +95,7 @@ const OneTimeCheckoutInputSchema = z
     usd: z
       .number()
       .positive()
-      .describe('A one-time ladder rung, e.g. 30. Must be one of CREDIT_LADDER\'s prices')
+      .describe('One-time top-up in EUR, 1 credit per euro: 8, 16, 32, 64, 128 or 256')
   })
   .strict();
 
@@ -111,7 +111,7 @@ export type OneTimeCheckoutLinkResult = z.infer<typeof OneTimeCheckoutResultSche
 /**
  * A separate tool from CHECKOUT_LINK on purpose: a one-time purchase never touches a subscription
  * and never needs one to exist first (unlike the subscription rungs, which need a Stripe Price
- * configured per rung — see `subscriptionPriceIdFor` in `$lib/server/stripe`). It works for an
+ * found by lookup key). It works for an
  * organization that has never subscribed and never will.
  */
 export const ONE_TIME_CHECKOUT_LINK = {

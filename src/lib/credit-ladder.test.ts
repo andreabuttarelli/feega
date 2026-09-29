@@ -7,42 +7,52 @@ import {
   billedCreditsFor,
   CREDIT_LADDER,
   MARGIN_FLOOR,
-  marginForRung
+  marginForRung,
+  rungFor
 } from './credit-ladder';
+import { DISPLAY_UNITS_PER_CREDIT } from './components/credit-amount-format';
 import { estimateLoopCredits } from './server/canvas/loop-cost';
 import { IMAGE_CREDITS, videoCredits } from './server/content-cost';
 
 describe('credit ladder never falls below the margin floor', () => {
   for (const rung of CREDIT_LADDER) {
-    it(`$${rung.price} subscription clears the floor in the worst case`, () => {
-      // Worst case: the customer spends every credit they bought. No breakage assumption.
-      expect(marginForRung(rung.price, rung.creditsSubscription)).toBeGreaterThanOrEqual(
-        MARGIN_FLOOR
-      );
-    });
-
-    it(`$${rung.price} one-time clears the floor in the worst case`, () => {
-      expect(marginForRung(rung.price, rung.creditsOneTime)).toBeGreaterThanOrEqual(MARGIN_FLOOR);
-    });
-
-    it(`$${rung.price} one-time margin is never below its subscription margin`, () => {
-      // One-time sells fewer credits per dollar (70:1 vs 100:1), so it must always cost less to
-      // honour at the same price — never the other way round.
-      expect(marginForRung(rung.price, rung.creditsOneTime)).toBeGreaterThanOrEqual(
-        marginForRung(rung.price, rung.creditsSubscription)
-      );
+    it(`€${rung.price} clears the floor when every credit is spent`, () => {
+      expect(marginForRung(rung.price, rung.credits)).toBeGreaterThanOrEqual(MARGIN_FLOOR);
     });
   }
 
-  it('the top rung sits exactly on the floor, not below it', () => {
-    const top = CREDIT_LADDER[CREDIT_LADDER.length - 1];
-    expect(marginForRung(top.price, top.creditsSubscription)).toBeCloseTo(MARGIN_FLOOR, 5);
+  it('every rung is a flat 50% margin', () => {
+    for (const rung of CREDIT_LADDER) {
+      expect(marginForRung(rung.price, rung.credits)).toBeCloseTo(0.5, 5);
+    }
+  });
+});
+
+describe('the plans feega.app sells', () => {
+  it('are the six monthly tiers of the site, in order', () => {
+    expect(CREDIT_LADDER.map((r) => r.price)).toEqual([8, 16, 32, 64, 128, 256]);
   });
 
-  it('the first four rungs are a flat 50% margin (no partial discount)', () => {
-    for (const rung of CREDIT_LADDER.slice(0, 4)) {
-      expect(marginForRung(rung.price, rung.creditsSubscription)).toBeCloseTo(0.5, 5);
+  it('grant one displayed credit per euro', () => {
+    for (const rung of CREDIT_LADDER) {
+      expect(rung.credits / DISPLAY_UNITS_PER_CREDIT).toBe(rung.price);
     }
+  });
+
+  it('name the Stripe price by lookup key, never by id', () => {
+    expect(CREDIT_LADDER.map((r) => r.lookupKey)).toEqual([
+      'feega_monthly_8',
+      'feega_monthly_16',
+      'feega_monthly_32',
+      'feega_monthly_64',
+      'feega_monthly_128',
+      'feega_monthly_256'
+    ]);
+  });
+
+  it('find a rung by its price and refuse any other', () => {
+    expect(rungFor(32)?.credits).toBe(3_200);
+    expect(rungFor(30)).toBeUndefined();
   });
 });
 
@@ -52,10 +62,8 @@ describe('billedCreditsFor', () => {
     expect(billedCreditsFor(1)).toBe(200);
   });
 
-  it('$5 of credits cost us $2.50 of provider spend — the user-given anchor', () => {
-    const fiveDollarRung = CREDIT_LADDER.find((r) => r.price === 5)!;
-    const costUsd = fiveDollarRung.creditsSubscription / 200;
-    expect(costUsd).toBeCloseTo(2.5, 5);
+  it('$8 of credits cost us $4 of provider spend', () => {
+    expect(rungFor(8)!.credits / 200).toBeCloseTo(4, 5);
   });
 });
 

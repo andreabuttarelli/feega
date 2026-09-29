@@ -22,6 +22,10 @@ integration Supabase recommends; the npm package still installs under that name)
    - `customer.subscription.created`
    - `customer.subscription.updated`
    - `customer.subscription.deleted`
+   - `invoice.paid`
+   - `invoice.payment_succeeded`
+   - `price.created`
+   - `price.updated`
    - `customer.created`
    - `customer.updated`
 
@@ -29,50 +33,45 @@ integration Supabase recommends; the npm package still installs under that name)
    need the webhook live yet — but the webhook is what keeps `stripe.subscriptions` and
    `stripe.checkout_sessions` current going forward.)
 
-Once `stripe.checkout_sessions` and `stripe.subscriptions` exist and are being written to, come
-back and ask Claude to apply:
+Once the `stripe` schema exists and is being written to, apply, in this order:
 
-- `supabase/canvas-migrations/20260924_billing_grants_ready.sql` — the readiness function.
-- `supabase/canvas-migrations/20260924_stripe_sync_grants.sql` — the triggers that turn a
-  completed checkout / an active subscription into a `credit_ledger` grant. It refuses to apply
-  (raises an exception) if `stripe.checkout_sessions` or `stripe.subscriptions` don't exist yet,
-  so it's safe to ask for any time — it just won't do anything until step 1 is real.
+- `supabase/canvas-migrations/20260924_billing_grants_ready.sql` (already live).
+- `supabase/canvas-migrations/20260924_stripe_sync_grants.sql` — superseded; apply only because
+  migrations run by filename, immediately followed by the next one.
+- `supabase/canvas-migrations/20260929_feega_plan_grants.sql` — the live triggers:
+  - `stripe.invoices`: a paid invoice with `billing_reason` `subscription_create` or
+    `subscription_cycle` grants the month's credits, once per invoice id, expiring at the
+    period end. Credits come from the price's `metadata.credits` in `stripe.prices`, falling
+    back to the subscription's `metadata.credits`.
+  - `stripe.checkout_sessions`: a paid one-time checkout grants `metadata.credits`, never
+    expiring.
+  - `stripe.subscriptions`: links/unlinks `orgs.stripe_subscription_id`.
+  - Every trigger ignores rows without `metadata.app = 'feega'` and a `metadata.org_id` of an
+    existing org: the Stripe account is shared with other products.
 
-Both migrations are already written and sitting in `supabase/canvas-migrations/`, unapplied.
-Neither creates a Stripe object or touches live data by itself.
+Verify with a local Postgres: `DATABASE_URL=postgres://postgres@127.0.0.1:5432/postgres npm run
+test:stripe-grants`.
 
-## 2. Create the 7 subscription Prices
+## 2. Create the 6 subscription Prices
 
-The credit ladder (`src/lib/server/credit-ladder.ts`) has 7 rungs: $5 / $15 / $30 / $50 / $100 /
-$200 / $400 per month. Each rung needs a **recurring** Stripe Price (test mode first) — the
-one-time purchase path needs no Price object (it inlines the amount), only subscriptions do.
+Plans (`src/lib/credit-ladder.ts`): €8 / €16 / €32 / €64 / €128 / €256 per month, 1 credit = €1.
+The app finds each Price by `lookup_key` — no env var, no price id in code. One-time top-ups need
+no Price (the amount is inlined).
 
-For each rung, in the Stripe dashboard:
+For each tier N, a recurring monthly EUR Price (a Price in any other currency is ignored):
 
-1. Create a Product (or reuse one product with 7 Prices — either works, the code only reads the
-   Price id).
-2. Add a recurring Price, monthly, in USD, at the rung's amount.
-3. Copy the Price id (`price_...`) into the matching env var:
+| field | value |
+|---|---|
+| product name | `feega N` |
+| `lookup_key` | `feega_monthly_N` |
+| `unit_amount` | `N * 100` (euro cents) |
+| `metadata` | `app=feega`, `credits=N*100` (ledger units: 100 = 1 displayed credit) |
 
-   ```
-   STRIPE_PRICE_ID_SUBSCRIPTION_5=price_...
-   STRIPE_PRICE_ID_SUBSCRIPTION_15=price_...
-   STRIPE_PRICE_ID_SUBSCRIPTION_30=price_...
-   STRIPE_PRICE_ID_SUBSCRIPTION_50=price_...
-   STRIPE_PRICE_ID_SUBSCRIPTION_100=price_...
-   STRIPE_PRICE_ID_SUBSCRIPTION_200=price_...
-   STRIPE_PRICE_ID_SUBSCRIPTION_400=price_...
-   ```
+A Price whose `unit_amount` disagrees with its tier is ignored. A tier with no Price answers
+`subscriptions_not_configured`; top-ups work regardless.
 
-A rung with no Price id configured isn't broken — the checkout endpoint answers
-`subscriptions_not_configured` instead of minting a session that would fail, and the one-time
-purchase path for that same rung works regardless.
-
-4. Ask Claude to update `credits_from_price_id()` in
-   `supabase/canvas-migrations/20260924_stripe_sync_grants.sql` with the real price id → credits
-   mapping (currently a placeholder, `else null` for every price) and re-apply it. This is the SQL
-   side of the same table `subscriptionPriceIdFor` reads in `src/lib/server/stripe.ts` — the two
-   have to move together or a subscription renews without ever granting credits.
+Configure the customer portal to allow switching between these six Prices: the app sends existing
+subscribers there to upgrade or downgrade.
 
 ## Going live
 

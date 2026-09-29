@@ -1,8 +1,9 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad, RequestEvent } from './$types';
 import { orgCreditBalance } from '$lib/server/credits';
-import { billedCreditsFor, CREDIT_LADDER } from '$lib/credit-ladder';
-import { isOrgOwner } from '$lib/server/org-billing';
+import { billedCreditsFor, CREDIT_LADDER, rungFor } from '$lib/credit-ladder';
+import { isOrgOwner, orgBillingById } from '$lib/server/org-billing';
+import { appOrigin } from '$lib/server/app-url';
 import { billingGrantsReady } from '$lib/server/billing-readiness';
 import {
   billingPortal,
@@ -11,7 +12,7 @@ import {
   cancelPlan,
   settingsScope
 } from '$lib/server/settings-actions';
-import { billingPath } from '$lib/billing-path';
+import { billingPath, checkoutReturnUrls, checkoutOutcomeOf } from '$lib/billing-path';
 
 const PURCHASES_NOT_READY = 'Purchases open soon.';
 
@@ -20,7 +21,7 @@ const stripeApi = () => import('$lib/server/stripe');
 type OrgRow = { id: string; name: string; stripe_customer_id: string | null };
 type BrandRow = { id: string; name: string; slug: string };
 
-export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => {
+export const load: PageServerLoad = async ({ parent, url, locals: { supabase } }) => {
   const {
     data: { user }
   } = await supabase.auth.getUser();
@@ -51,7 +52,10 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
       amount: row.expiring_credits
     }));
 
-  const balance = await orgCreditBalance(supabase, orgId);
+  const [balance, currentPlanUsd] = await Promise.all([
+    orgCreditBalance(supabase, orgId),
+    currentPlanOf(supabase, orgId)
+  ]);
 
   const spends = await Promise.all(
     brands.map(async (b) => ({
@@ -67,10 +71,26 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
     credits: { balance, ladder: CREDIT_LADDER, atRisk },
     brands: spends,
     hasBilling: !!org.stripe_customer_id,
+    currentPlanUsd,
+    checkoutOutcome: checkoutOutcomeOf(url),
     isOwner: (membership as { role?: string } | null)?.role === 'owner',
     purchasesReady
   };
 };
+
+async function currentPlanOf(supabase: App.Locals['supabase'], orgId: string): Promise<number | null> {
+  const billing = await orgBillingById(supabase, orgId);
+  if (!billing?.subscriptionId) {
+    return null;
+  }
+
+  try {
+    const { subscribedRungPrice } = await stripeApi();
+    return await subscribedRungPrice(billing.subscriptionId);
+  } catch {
+    return null;
+  }
+}
 
 async function sumBrandCostUsd(supabase: App.Locals['supabase'], brandId: string): Promise<number> {
   const now = new Date();
@@ -107,7 +127,7 @@ async function buyOneTime({ request, url, params, locals: { supabase } }: Reques
 
   const data = await request.formData();
   const usd = Number(data.get('usd') ?? '');
-  const rung = CREDIT_LADDER.find((r) => r.price === usd);
+  const rung = rungFor(usd);
   if (!rung) return fail(400, { billingError: 'Unknown one-time pack' });
 
   const { data: orgRow } = await supabase
@@ -118,7 +138,7 @@ async function buyOneTime({ request, url, params, locals: { supabase } }: Reques
   const org = orgRow as { id: string; name: string; stripe_customer_id: string | null } | null;
   if (!org) return fail(404, { billingError: 'Organization not found' });
 
-  const returnUrl = `${url.origin}${billingPath(scope.projectId)}`;
+  const returnUrl = `${appOrigin(url)}${billingPath(scope.projectId)}`;
 
   let checkoutUrl: string;
   try {
@@ -128,9 +148,8 @@ async function buyOneTime({ request, url, params, locals: { supabase } }: Reques
       customerId,
       orgId: org.id,
       price: rung.price,
-      credits: rung.creditsOneTime,
-      successUrl: returnUrl,
-      cancelUrl: returnUrl
+      credits: rung.credits,
+      ...checkoutReturnUrls(returnUrl)
     });
   } catch (e) {
     return fail(500, { billingError: e instanceof Error ? e.message : 'Could not start the purchase' });

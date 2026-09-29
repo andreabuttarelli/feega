@@ -94,7 +94,7 @@ beforeEach(() => {
 	createBillingPortalSession.mockResolvedValue(CHECKOUT_URL);
 	ensureOrgCustomer.mockResolvedValue('cus_org');
 	createSubscriptionCheckout.mockResolvedValue(CHECKOUT_URL);
-	subscriptionPriceIdFor.mockReturnValue(undefined);
+	subscriptionPriceIdFor.mockResolvedValue(undefined);
 	billingGrantsReady.mockResolvedValue(true);
 });
 
@@ -106,11 +106,11 @@ describe('POST /api/v1/brands/:slug/billing/checkout', () => {
 		expect(res.headers.get('location')).toBeNull();
 		expect(body.ok).toBe(true);
 		expect(body.url).toBe(CHECKOUT_URL);
-		expect(body.plans).toContainEqual({ usd: 30, label: '$30/mo' });
+		expect(body.plans).toContainEqual({ usd: 32, label: '€32/mo' });
 	});
 
 	it('sends the ORG subscription to the hosted plan picker, naming no price', async () => {
-		await call({ usd: 30 });
+		await call({ usd: 32 });
 
 		expect(createBillingPortalSession).toHaveBeenCalledWith({
 			customerId: 'cus_org',
@@ -127,7 +127,7 @@ describe('POST /api/v1/brands/:slug/billing/checkout', () => {
 	});
 
 	it('never charges, never changes a plan, never cancels', async () => {
-		await call({ usd: 30 });
+		await call({ usd: 32 });
 
 		expect(cancelSubscriptionAtPeriodEnd).not.toHaveBeenCalled();
 		expect(applyRetentionCoupon).not.toHaveBeenCalled();
@@ -147,7 +147,7 @@ describe('POST /api/v1/brands/:slug/billing/checkout', () => {
 
 		expect(res.status).toBe(400);
 		expect(body.error).toBe('unknown_plan');
-		expect(body.plans).toContainEqual({ usd: 30, label: '$30/mo' });
+		expect(body.plans).toContainEqual({ usd: 32, label: '€32/mo' });
 		expect(createBillingPortalSession).not.toHaveBeenCalled();
 	});
 
@@ -175,11 +175,11 @@ describe('POST /api/v1/brands/:slug/billing/checkout', () => {
 	describe('a specific rung with no subscription yet — starts a real first subscription', () => {
 		beforeEach(() => {
 			orgBillingForBrand.mockResolvedValue(ORG_BILLING_NO_SUBSCRIPTION);
-			subscriptionPriceIdFor.mockReturnValue('price_sub_30');
+			subscriptionPriceIdFor.mockResolvedValue('price_sub_32');
 		});
 
 		it('creates a Checkout Session on the configured price, not a portal link', async () => {
-			const { res, body } = await call({ usd: 30 });
+			const { res, body } = await call({ usd: 32 });
 
 			expect(res.status).toBe(200);
 			expect(body.ok).toBe(true);
@@ -190,21 +190,21 @@ describe('POST /api/v1/brands/:slug/billing/checkout', () => {
 				name: 'Acme',
 				stripe_customer_id: 'cus_org'
 			});
-			expect(subscriptionPriceIdFor).toHaveBeenCalledWith(30);
+			expect(subscriptionPriceIdFor).toHaveBeenCalledWith(32);
 			expect(createSubscriptionCheckout).toHaveBeenCalledWith({
 				customerId: 'cus_org',
 				orgId: 'org-1',
-				priceId: 'price_sub_30',
-				credits: 3000,
-				successUrl: 'https://feega.test/p/p1/settings/billing',
-				cancelUrl: 'https://feega.test/p/p1/settings/billing'
+				priceId: 'price_sub_32',
+				credits: 3200,
+				successUrl: 'https://feega.test/p/p1/settings/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}',
+				cancelUrl: 'https://feega.test/p/p1/settings/billing?checkout=canceled'
 			});
 		});
 
 		it('says subscriptions_not_configured when no price id exists for the rung, and never mints a broken session', async () => {
-			subscriptionPriceIdFor.mockReturnValue(undefined);
+			subscriptionPriceIdFor.mockResolvedValue(undefined);
 
-			const { res, body } = await call({ usd: 30 });
+			const { res, body } = await call({ usd: 32 });
 
 			expect(res.status).toBe(409);
 			expect(body.error).toBe('subscriptions_not_configured');
@@ -216,7 +216,7 @@ describe('POST /api/v1/brands/:slug/billing/checkout', () => {
 		it('a Stripe outage while creating the subscription session is ours: 502', async () => {
 			createSubscriptionCheckout.mockRejectedValue(new Error('connection error'));
 
-			const { res, body } = await call({ usd: 30 });
+			const { res, body } = await call({ usd: 32 });
 
 			expect(res.status).toBe(502);
 			expect(body.error).toBe('stripe_unavailable');
@@ -286,7 +286,7 @@ describe('POST /api/v1/brands/:slug/billing/checkout', () => {
 	it('refuses to sell when a grant could not land — the sync engine trigger is not there yet', async () => {
 		billingGrantsReady.mockResolvedValue(false);
 
-		const { res, body } = await call({ usd: 30 });
+		const { res, body } = await call({ usd: 32 });
 
 		expect(res.status).toBe(409);
 		expect(body.error).toBe('purchases_not_ready');

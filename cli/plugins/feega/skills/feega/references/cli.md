@@ -37,7 +37,8 @@ feega post <slug> <id> reschedule --scheduledFor "2026-06-20T10:00"
 feega products <slug> [sync]                    # List, or re-import from the connected store
 feega ads <slug>                                  # Meta ad campaigns of the brand
 feega ads <slug> --approve <id> | --pause <id> | --resume <id>
-feega upgrade <slug>                            # Open billing checkout
+feega upgrade <slug> --eur 16                   # Checkout a monthly plan (8/16/32/64/128/256)
+feega upgrade <slug> --top-up 8                 # One-time top-up, credits never expire
 feega update                                    # Update the CLI itself
 ```
 

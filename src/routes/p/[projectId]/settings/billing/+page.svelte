@@ -6,9 +6,45 @@
   import { Field, FieldLayout } from '$lib/components/ui/field';
   import { Button } from '$lib/components/ui/button';
   import { Notice } from '$lib/components/ui/notice';
+  import { invalidateAll } from '$app/navigation';
+  import { CheckoutOutcome } from '$lib/billing-path';
+  import { DISPLAY_UNITS_PER_CREDIT } from '$lib/components/credit-amount-format';
 
   let { data, form } = $props();
+
+  const BALANCE_POLL_MS = 3000;
+  const BALANCE_POLL_LIMIT = 20;
+
+  $effect(() => {
+    if (data.checkoutOutcome !== CheckoutOutcome.Paid) {
+      return;
+    }
+
+    const startingBalance = data.credits.balance;
+    let polls = 0;
+    const timer = setInterval(async () => {
+      polls += 1;
+      await invalidateAll();
+      if (data.credits.balance !== startingBalance || polls >= BALANCE_POLL_LIMIT) {
+        clearInterval(timer);
+      }
+    }, BALANCE_POLL_MS);
+    return () => clearInterval(timer);
+  });
+
+  const planAction = (price: number) => {
+    if (data.currentPlanUsd === price) {
+      return null;
+    }
+    return data.currentPlanUsd == null ? 'subscribe' : 'switchPlan';
+  };
 </script>
+
+{#if data.checkoutOutcome === CheckoutOutcome.Paid}
+  <Notice tone="success">{$_('app.account.billing.paymentReceived')}</Notice>
+{:else if data.checkoutOutcome === CheckoutOutcome.Canceled}
+  <Notice>{$_('app.account.billing.checkoutCanceled')}</Notice>
+{/if}
 
 {#if data.isOwner}
   {#if form?.retentionApplied}
@@ -44,27 +80,26 @@
         <span class="text-[0.8125rem] text-muted-foreground">{$_('app.account.billing.purchasesNotReady')}</span>
       {:else}
         <table class="ladder">
-          <thead>
-            <tr>
-              <th>{$_('app.account.billing.priceCol')}</th>
-              <th>{$_('app.account.billing.subscriptionCol')}</th>
-              <th>{$_('app.account.billing.oneTimeCol')}</th>
-            </tr>
-          </thead>
           <tbody>
             {#each data.credits.ladder as rung (rung.price)}
+              {@const action = planAction(rung.price)}
               <tr>
-                <td>${rung.price}</td>
+                <td>€{rung.price}/mo</td>
+                <td>{$_('app.account.billing.creditsIncluded', { values: { credits: rung.credits / DISPLAY_UNITS_PER_CREDIT } })}</td>
                 <td>
-                  <form method="POST" action={`?/upgrade`}>
-                    <input type="hidden" name="usd" value={rung.price} />
-                    <Button size="sm" type="submit"><CreditAmount amount={rung.creditsSubscription} /> — /mo</Button>
-                  </form>
+                  {#if action}
+                    <form method="POST" action={`?/upgrade`}>
+                      <input type="hidden" name="usd" value={rung.price} />
+                      <Button size="sm" type="submit">{$_(`app.account.billing.${action}`)}</Button>
+                    </form>
+                  {:else}
+                    <span class="text-[0.8125rem] font-semibold">{$_('app.account.billing.currentPlan')}</span>
+                  {/if}
                 </td>
                 <td>
                   <form method="POST" action={`?/buyOneTime`}>
                     <input type="hidden" name="usd" value={rung.price} />
-                    <Button variant="secondary" size="sm" type="submit"><CreditAmount amount={rung.creditsOneTime} /> — {$_('app.account.billing.neverExpires')}</Button>
+                    <Button variant="secondary" size="sm" type="submit">{$_('app.account.billing.topUp', { values: { credits: rung.credits / DISPLAY_UNITS_PER_CREDIT } })}</Button>
                   </form>
                 </td>
               </tr>

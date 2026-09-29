@@ -69,11 +69,11 @@ beforeEach(() => {
 describe('upgrade — starting a first subscription for a ladder rung', () => {
 	it('redirects straight to a real Checkout Session when no subscription exists yet', async () => {
 		orgBillingById.mockResolvedValue(ORG_BILLING_NO_SUBSCRIPTION);
-		subscriptionPriceIdFor.mockReturnValue('price_sub_30');
+		subscriptionPriceIdFor.mockResolvedValue('price_sub_32');
 		ensureOrgCustomer.mockResolvedValue('cus_org');
 		createSubscriptionCheckout.mockResolvedValue('https://checkout.stripe.com/c/pay/cs_test_sub');
 
-		await expect(upgrade(formEvent('30'))).rejects.toMatchObject({
+		await expect(upgrade(formEvent('32'))).rejects.toMatchObject({
 			status: 303,
 			location: 'https://checkout.stripe.com/c/pay/cs_test_sub'
 		});
@@ -82,9 +82,10 @@ describe('upgrade — starting a first subscription for a ladder rung', () => {
 			expect.objectContaining({
 				customerId: 'cus_org',
 				orgId: 'org-1',
-				priceId: 'price_sub_30',
-				credits: 3000,
-				successUrl: 'https://feega.test/p/p1/settings/billing'
+				priceId: 'price_sub_32',
+				credits: 3200,
+				successUrl: 'https://feega.test/p/p1/settings/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}',
+				cancelUrl: 'https://feega.test/p/p1/settings/billing?checkout=canceled'
 			})
 		);
 	});
@@ -93,15 +94,15 @@ describe('upgrade — starting a first subscription for a ladder rung', () => {
 		orgBillingById.mockResolvedValue(ORG_BILLING_WITH_SUBSCRIPTION);
 		portalLink.mockResolvedValue({ url: 'https://portal/upgrade' });
 
-		await expect(upgrade(formEvent('30'))).rejects.toMatchObject({ status: 303, location: 'https://portal/upgrade' });
+		await expect(upgrade(formEvent('32'))).rejects.toMatchObject({ status: 303, location: 'https://portal/upgrade' });
 		expect(createSubscriptionCheckout).not.toHaveBeenCalled();
 	});
 
 	it('fails plainly when the rung has no Stripe price configured, instead of minting a broken session', async () => {
 		orgBillingById.mockResolvedValue(ORG_BILLING_NO_SUBSCRIPTION);
-		subscriptionPriceIdFor.mockReturnValue(undefined);
+		subscriptionPriceIdFor.mockResolvedValue(undefined);
 
-		const result = await upgrade(formEvent('30'));
+		const result = await upgrade(formEvent('32'));
 		expect(result).toMatchObject({ status: 400, data: { billingError: expect.stringMatching(/not configured/i) } });
 		expect(createSubscriptionCheckout).not.toHaveBeenCalled();
 	});
@@ -118,7 +119,7 @@ describe('upgrade — starting a first subscription for a ladder rung', () => {
 		billingGrantsReady.mockResolvedValue(false);
 		orgBillingById.mockResolvedValue(ORG_BILLING_NO_SUBSCRIPTION);
 
-		const result = await upgrade(formEvent('30'));
+		const result = await upgrade(formEvent('32'));
 		expect(result).toMatchObject({ status: 409, data: { billingError: expect.stringMatching(/open soon/i) } });
 		expect(orgBillingById).not.toHaveBeenCalled();
 		expect(createSubscriptionCheckout).not.toHaveBeenCalled();

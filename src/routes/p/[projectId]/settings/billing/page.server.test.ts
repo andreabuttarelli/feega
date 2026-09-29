@@ -15,6 +15,8 @@ const isOrgOwner = vi.fn();
 const ensureOrgCustomer = vi.fn();
 const createOneTimeCreditCheckout = vi.fn();
 const billingGrantsReady = vi.fn();
+const orgBillingById = vi.fn();
+const subscribedRungPrice = vi.fn();
 
 vi.mock('$lib/server/credits', () => ({
 	orgCreditBalance: (...a: unknown[]) => orgCreditBalance(...a)
@@ -28,11 +30,13 @@ vi.mock('$lib/server/settings-actions', () => ({
 	billingPath: (id: string) => `/p/${id}/settings/billing`
 }));
 vi.mock('$lib/server/org-billing', () => ({
-	isOrgOwner: (...a: unknown[]) => isOrgOwner(...a)
+	isOrgOwner: (...a: unknown[]) => isOrgOwner(...a),
+	orgBillingById: (...a: unknown[]) => orgBillingById(...a)
 }));
 vi.mock('$lib/server/stripe', () => ({
 	ensureOrgCustomer: (...a: unknown[]) => ensureOrgCustomer(...a),
-	createOneTimeCreditCheckout: (...a: unknown[]) => createOneTimeCreditCheckout(...a)
+	createOneTimeCreditCheckout: (...a: unknown[]) => createOneTimeCreditCheckout(...a),
+	subscribedRungPrice: (...a: unknown[]) => subscribedRungPrice(...a)
 }));
 vi.mock('$lib/server/billing-readiness', () => ({
 	billingGrantsReady: (...a: unknown[]) => billingGrantsReady(...a)
@@ -107,12 +111,12 @@ function fakeSupabase(
 	};
 }
 
-function run(supabase: unknown) {
+function run(supabase: unknown, query = '') {
 	return (load as (e: unknown) => Promise<Record<string, any>>)({
 		locals: { supabase },
 		parent: async () => ({ org: { id: 'org-1' } }),
 		params: { projectId: 'p1' },
-		url: new URL('https://example.test/p/p1/settings/billing')
+		url: new URL(`https://example.test/p/p1/settings/billing${query}`)
 	});
 }
 
@@ -124,9 +128,45 @@ beforeEach(() => {
 	ensureOrgCustomer.mockResolvedValue('cus_1');
 	createOneTimeCreditCheckout.mockResolvedValue('https://checkout.stripe.com/c/pay/cs_test_one_time');
 	billingGrantsReady.mockResolvedValue(true);
+	orgBillingById.mockResolvedValue({ subscriptionId: null });
 });
 
 describe('project settings billing', () => {
+	const ownerOrg = () =>
+		fakeSupabase({ id: 'org-1', name: 'Ana', stripe_customer_id: 'cus_1' }, { role: 'owner' }, []);
+
+	it('offers the six plans of feega.app', async () => {
+		const data = await run(ownerOrg());
+		expect(data.credits.ladder.map((r: { price: number }) => r.price)).toEqual([8, 16, 32, 64, 128, 256]);
+	});
+
+	it('names the tier the org is subscribed to', async () => {
+		orgBillingById.mockResolvedValue({ subscriptionId: 'sub_1' });
+		subscribedRungPrice.mockResolvedValue(64);
+
+		const data = await run(ownerOrg());
+
+		expect(subscribedRungPrice).toHaveBeenCalledWith('sub_1');
+		expect(data.currentPlanUsd).toBe(64);
+	});
+
+	it('has no current plan without a subscription, and never asks Stripe', async () => {
+		const data = await run(ownerOrg());
+		expect(data.currentPlanUsd).toBeNull();
+		expect(subscribedRungPrice).not.toHaveBeenCalled();
+	});
+
+	it('still renders when Stripe cannot say which tier is current', async () => {
+		orgBillingById.mockResolvedValue({ subscriptionId: 'sub_1' });
+		subscribedRungPrice.mockRejectedValue(new Error('down'));
+		expect((await run(ownerOrg())).currentPlanUsd).toBeNull();
+	});
+
+	it('knows a checkout just came back paid', async () => {
+		const data = await run(ownerOrg(), '?checkout=success&session_id=cs_1');
+		expect(data.checkoutOutcome).toBe('paid');
+	});
+
 	it('shows the org credit balance once, not a per-brand quota', async () => {
 		const data = await run(
 			fakeSupabase(
@@ -252,16 +292,17 @@ describe('project settings billing', () => {
 		it('redirects to a real one-time Checkout Session for the picked rung', async () => {
 			const supabase = fakeSupabase({ id: 'org-1', name: 'Ana', stripe_customer_id: 'cus_1' }, { role: 'owner' }, []);
 
-			await expect(call(supabase, '30')).rejects.toMatchObject({
+			await expect(call(supabase, '32')).rejects.toMatchObject({
 				status: 303,
 				location: 'https://checkout.stripe.com/c/pay/cs_test_one_time'
 			});
 			expect(createOneTimeCreditCheckout).toHaveBeenCalledWith(
 				expect.objectContaining({
 					orgId: 'org-1',
-					price: 30,
-					credits: 2100,
-					successUrl: 'https://example.test/p/p1/settings/billing'
+					price: 32,
+					credits: 3200,
+					successUrl: 'https://example.test/p/p1/settings/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}',
+					cancelUrl: 'https://example.test/p/p1/settings/billing?checkout=canceled'
 				})
 			);
 		});
@@ -278,7 +319,7 @@ describe('project settings billing', () => {
 			isOrgOwner.mockResolvedValue(false);
 			const supabase = fakeSupabase({ id: 'org-1', name: 'Ana', stripe_customer_id: 'cus_1' }, { role: 'member' }, []);
 
-			const result = await call(supabase, '30');
+			const result = await call(supabase, '32');
 			expect(result).toMatchObject({ status: 403 });
 			expect(createOneTimeCreditCheckout).not.toHaveBeenCalled();
 		});
@@ -287,7 +328,7 @@ describe('project settings billing', () => {
 			billingGrantsReady.mockResolvedValue(false);
 			const supabase = fakeSupabase({ id: 'org-1', name: 'Ana', stripe_customer_id: 'cus_1' }, { role: 'owner' }, []);
 
-			const result = await call(supabase, '30');
+			const result = await call(supabase, '32');
 			expect(result).toMatchObject({ status: 409, data: { billingError: expect.stringMatching(/open soon/i) } });
 			expect(createOneTimeCreditCheckout).not.toHaveBeenCalled();
 		});

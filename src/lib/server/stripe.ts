@@ -1,7 +1,8 @@
 import { env } from '$env/dynamic/private';
 import Stripe from 'stripe';
 import { createAdminClient } from './supabase-admin';
-import type { Currency } from '$lib/plans';
+import { CREDIT_LADDER, PLAN_CURRENCY, rungForLookupKey } from '$lib/credit-ladder';
+import { DISPLAY_UNITS_PER_CREDIT } from '$lib/components/credit-amount-format';
 
 let client: Stripe | null = null;
 
@@ -13,111 +14,46 @@ function stripe(): Stripe {
   return client;
 }
 
-/**
- * The FIRST subscription is the one thing the hosted portal cannot sell: it changes a
- * subscription, and there is none yet. Checkout has to be handed a price, so these ids live here
- * — and nowhere else. Every later plan change stays in the portal, on the prices configured
- * there. Not secret (they travel in the checkout URL); the eurozone pays in EUR, everyone else on
- * the parallel USD ladder.
- */
-export const PRICES = {
-  go: {
-    eur: { month: 'price_1U1Li6RxN8PTIw40wpOkPdVy', year: 'price_1U1Li7RxN8PTIw40r1ESOfKs' },
-    usd: { month: 'price_1U1Li7RxN8PTIw40cSQTHgoa', year: 'price_1U1Li7RxN8PTIw40DS8GpdHG' }
-  },
-  starter: {
-    eur: { month: 'price_1Tfx7NRxN8PTIw40e2md3XM3', year: 'price_1Tfx7ORxN8PTIw40zbThuICT' },
-    usd: { month: 'price_1TwIisRxN8PTIw40DO1gzGRn', year: 'price_1TwIkiRxN8PTIw4069cfBSqj' }
-  },
-  pro: {
-    eur: { month: 'price_1TsqcSRxN8PTIw40NwIFR94X', year: 'price_1TsqcSRxN8PTIw40uJn3KM8f' },
-    usd: { month: 'price_1TwIkiRxN8PTIw40pHJIw9YA', year: 'price_1TwIkjRxN8PTIw40mkrp09Hn' }
-  }
-} as const;
+const APP_TAG = 'feega';
+const CENTS_PER_UNIT = 100;
 
-export function priceFor(plan: string, cycle: string, currency: Currency): string | undefined {
-  const tier = PRICES[plan as keyof typeof PRICES];
-  return tier ? tier[currency][cycle === 'year' ? 'year' : 'month'] : undefined;
-}
+let rungPriceIds: Promise<Map<number, string>> | null = null;
 
-/**
- * The subscription side of CREDIT_LADDER needs a real Stripe Price per rung — a Checkout Session
- * cannot be handed a raw amount for `mode: 'subscription'` the way it can for `mode: 'payment'`.
- * One env var per rung, read here and nowhere else: `credits_from_price_id` in
- * `20260922_org_billing.sql` has to be kept in step by hand (SQL cannot read `.env`), and this is
- * the map whoever updates it copies from.
- */
-const SUBSCRIPTION_PRICE_ID_ENV: Record<number, string> = {
-  5: 'STRIPE_PRICE_ID_SUBSCRIPTION_5',
-  15: 'STRIPE_PRICE_ID_SUBSCRIPTION_15',
-  30: 'STRIPE_PRICE_ID_SUBSCRIPTION_30',
-  50: 'STRIPE_PRICE_ID_SUBSCRIPTION_50',
-  100: 'STRIPE_PRICE_ID_SUBSCRIPTION_100',
-  200: 'STRIPE_PRICE_ID_SUBSCRIPTION_200',
-  400: 'STRIPE_PRICE_ID_SUBSCRIPTION_400'
-};
-
-export function subscriptionPriceIdFor(rungPrice: number): string | undefined {
-  const varName = SUBSCRIPTION_PRICE_ID_ENV[rungPrice];
-  return varName ? env[varName] || undefined : undefined;
-}
-
-/**
- * Purchasing-power discounts, auto-applied at checkout from the visitor's country
- * (`x-vercel-ip-country`). Good-faith, not fraud-proof: a VPN defeats it. First match wins, and
- * the coupons live in the same Stripe account as the prices above.
- */
-const GEO_COUPONS: Array<{ coupon: string; countries: ReadonlySet<string> }> = [
-  {
-    coupon: 'latam40',
-    countries: new Set([
-      'MX',
-      'GT', 'BZ', 'SV', 'HN', 'NI', 'CR', 'PA',
-      'CO', 'VE', 'EC', 'PE', 'BO', 'CL', 'AR', 'UY', 'PY', 'BR', 'GY', 'SR',
-      'DO', 'CU'
-    ])
-  },
-  {
-    // Singapore and Brunei stay out: high income, no purchasing-power case.
-    coupon: 'sea50',
-    countries: new Set(['ID', 'TH', 'VN', 'PH', 'MY', 'MM', 'KH', 'LA', 'TL'])
-  }
-];
-
-export function geoCouponFor(country: string | null | undefined): string | undefined {
-  if (!country) return undefined;
-  return GEO_COUPONS.find((g) => g.countries.has(country))?.coupon;
-}
-
-/**
- * A brand's Stripe customer, created on first need. The id on the row is what migration 0007's
- * trigger joins on to mirror the subscription back into `brands.plan` / `brands.status`, so it
- * has to be written before checkout, not after it.
- *
- * Written with the service role and not with the caller's session: that join key is a right, not a
- * preference — another customer's id on this row would mirror their subscription onto this brand.
- * `20260905210000_self_write_columns.sql` keeps `authenticated` out of the column.
- */
-export async function ensureBrandCustomer(brand: {
-  id: string;
-  name: string;
-  stripe_customer_id: string | null;
-}): Promise<string> {
-  if (brand.stripe_customer_id) return brand.stripe_customer_id;
-
-  const customer = await stripe().customers.create({
-    name: brand.name,
-    metadata: { brand_id: brand.id }
+async function fetchRungPriceIds(): Promise<Map<number, string>> {
+  const { data } = await stripe().prices.list({
+    lookup_keys: CREDIT_LADDER.map((rung) => rung.lookupKey),
+    active: true,
+    limit: 100
   });
-  await createAdminClient().from('brands').update({ stripe_customer_id: customer.id }).eq('id', brand.id);
 
-  return customer.id;
+  const ids = new Map<number, string>();
+  for (const price of data) {
+    const rung = rungForLookupKey(price.lookup_key);
+    if (!rung || price.currency !== PLAN_CURRENCY || price.unit_amount !== rung.price * CENTS_PER_UNIT) {
+      continue;
+    }
+    ids.set(rung.price, price.id);
+  }
+  return ids;
+}
+
+export async function subscriptionPriceIdFor(rungPrice: number): Promise<string | undefined> {
+  rungPriceIds ??= fetchRungPriceIds().catch((e) => {
+    rungPriceIds = null;
+    throw e;
+  });
+  return (await rungPriceIds).get(rungPrice);
+}
+
+export async function subscribedRungPrice(subscriptionId: string): Promise<number | null> {
+  const sub = await stripe().subscriptions.retrieve(subscriptionId);
+  return rungForLookupKey(sub.items.data[0]?.price.lookup_key)?.price ?? null;
 }
 
 /**
  * Billing is org-level (CLAUDE.md: `orgs.stripe_customer_id`, not a brand column) — every brand
- * under the org checks out against the same customer. Written with the service role for the same
- * reason as `ensureBrandCustomer`: this id is a join key another org's session must never set.
+ * under the org checks out against the same customer. Written with the service role: this id is a join
+ * key another org's session must never set.
  */
 export async function ensureOrgCustomer(org: {
   id: string;
@@ -135,14 +71,6 @@ export async function ensureOrgCustomer(org: {
   return customer.id;
 }
 
-/**
- * A ladder rung bought once, never a subscription. `mode: 'payment'` needs no Stripe Price object
- * — the amount is inlined as `price_data` — so a new rung ships without touching the Stripe
- * dashboard. `metadata.org_id` / `metadata.credits` are what
- * `grant_credits_from_checkout_session` (20260922_org_billing.sql) reads to write the permanent
- * grant; the credits are `CREDIT_LADDER[...].creditsOneTime`, computed by the caller — this
- * function never recomputes a price.
- */
 export async function createOneTimeCreditCheckout(opts: {
   customerId: string;
   orgId: string;
@@ -157,29 +85,22 @@ export async function createOneTimeCreditCheckout(opts: {
     line_items: [
       {
         price_data: {
-          currency: 'usd',
-          unit_amount: Math.round(opts.price * 100),
-          product_data: { name: `${opts.credits} feega credits` }
+          currency: PLAN_CURRENCY,
+          unit_amount: Math.round(opts.price * CENTS_PER_UNIT),
+          product_data: { name: `${opts.credits / DISPLAY_UNITS_PER_CREDIT} feega credits` }
         },
         quantity: 1
       }
     ],
     success_url: opts.successUrl,
     cancel_url: opts.cancelUrl,
-    metadata: { org_id: opts.orgId, credits: String(opts.credits) }
+    metadata: { app: APP_TAG, org_id: opts.orgId, credits: String(opts.credits) }
   });
   if (!session.url) throw new Error('Stripe: no checkout URL');
 
   return session.url;
 }
 
-/**
- * A ladder rung as a recurring subscription. Unlike the one-time path this NEEDS a real Stripe
- * Price (`subscriptionPriceIdFor` above) — the caller must have checked one exists before calling
- * this, there is no inline fallback. `subscription_data.metadata` carries org id and the rung's
- * `creditsSubscription` so `grant_credits_from_stripe_subscription` can grant even when
- * `credits_from_price_id` has not been updated for this price yet.
- */
 export async function createSubscriptionCheckout(opts: {
   customerId: string;
   orgId: string;
@@ -194,44 +115,8 @@ export async function createSubscriptionCheckout(opts: {
     line_items: [{ price: opts.priceId, quantity: 1 }],
     success_url: opts.successUrl,
     cancel_url: opts.cancelUrl,
-    subscription_data: { metadata: { org_id: opts.orgId, credits: String(opts.credits) } },
-    metadata: { org_id: opts.orgId }
-  });
-  if (!session.url) throw new Error('Stripe: no checkout URL');
-
-  return session.url;
-}
-
-/**
- * Stripe-hosted checkout for the first subscription. `subscription_data.metadata.plan` is not
- * decoration: the 0007 trigger reads it to set `brands.plan` when the subscription lands.
- *
- * Regime forfettario — no VAT is charged, so `automatic_tax` stays OFF; the VAT id and legal name
- * are still collected for the invoice.
- */
-export async function createCheckoutSession(opts: {
-  customerId: string;
-  brandId: string;
-  plan: string;
-  priceId: string;
-  successUrl: string;
-  cancelUrl: string;
-  couponId?: string;
-}): Promise<string> {
-  const session = await stripe().checkout.sessions.create({
-    mode: 'subscription',
-    customer: opts.customerId,
-    line_items: [{ price: opts.priceId, quantity: 1 }],
-    // Stripe forbids pairing `discounts` with `allow_promotion_codes`: an auto-applied geo coupon
-    // replaces the promo-code field rather than sitting next to it.
-    ...(opts.couponId ? { discounts: [{ coupon: opts.couponId }] } : { allow_promotion_codes: true }),
-    success_url: opts.successUrl,
-    cancel_url: opts.cancelUrl,
-    tax_id_collection: { enabled: true },
-    customer_update: { name: 'auto', address: 'auto' },
-    billing_address_collection: 'required',
-    subscription_data: { metadata: { brand_id: opts.brandId, plan: opts.plan } },
-    metadata: { brand_id: opts.brandId }
+    subscription_data: { metadata: { app: APP_TAG, org_id: opts.orgId, credits: String(opts.credits) } },
+    metadata: { app: APP_TAG, org_id: opts.orgId }
   });
   if (!session.url) throw new Error('Stripe: no checkout URL');
 
@@ -240,7 +125,7 @@ export async function createCheckoutSession(opts: {
 
 /**
  * Every plan CHANGE happens inside Stripe's hosted portal, on the prices configured there — the
- * app names a price only to open the first subscription (see PRICES above).
+ * app names a price only to open the first subscription.
  */
 export async function createBillingPortalSession(opts: {
   customerId: string;

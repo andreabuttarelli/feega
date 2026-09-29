@@ -1,7 +1,6 @@
 // Per-brand pricing tiers — the single source of truth for plan display + selection.
-// Shared by the public /pricing page, onboarding and the activate paywall. The Stripe
-// price ids that back these live server-side in $lib/server/stripe (PRICES); this module
-// is display data only, so it's safe to import in the browser.
+// Shared by the public /pricing page, onboarding and the activate paywall. Display data
+// only, safe to import in the browser.
 
 /**
  * Quante settimane dura un ciclo di piano editoriale.

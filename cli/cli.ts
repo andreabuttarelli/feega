@@ -105,10 +105,12 @@ program
 
 program
   .command('upgrade <slug>')
-  .description('Upgrade piano — apre la pagina di checkout nel browser')
-  .action(async (slug: string) => {
+  .description('Open Stripe checkout: a monthly plan (--eur 8|16|32|64|128|256) or a one-time top-up (--top-up)')
+  .option('--eur <euros>', 'Monthly plan in EUR')
+  .option('--top-up <euros>', 'One-time top-up in EUR, 1 credit per euro')
+  .action(async (slug: string, opts) => {
     const { cmdUpgrade } = await import('./commands/upgrade.ts');
-    await cmdUpgrade(slug);
+    await cmdUpgrade(slug, opts);
   });
 
 program

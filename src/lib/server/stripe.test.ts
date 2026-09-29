@@ -6,12 +6,11 @@ const subscriptionsUpdate = vi.fn();
 const subscriptionsCancel = vi.fn();
 const checkoutSessionsCreate = vi.fn();
 const customersCreate = vi.fn();
+const pricesList = vi.fn();
 
 vi.mock('$env/dynamic/private', () => ({
 	env: {
-		STRIPE_SECRET_KEY: 'sk_test_123',
-		STRIPE_PRICE_ID_SUBSCRIPTION_5: 'price_sub_5',
-		STRIPE_PRICE_ID_SUBSCRIPTION_15: 'price_sub_15'
+		STRIPE_SECRET_KEY: 'sk_test_123'
 	}
 }));
 
@@ -25,6 +24,7 @@ vi.mock('stripe', () => ({
 		};
 		checkout = { sessions: { create: checkoutSessionsCreate } };
 		customers = { create: customersCreate };
+		prices = { list: pricesList };
 	}
 }));
 
@@ -44,6 +44,7 @@ beforeEach(() => {
 	subscriptionsCancel.mockReset();
 	checkoutSessionsCreate.mockReset();
 	customersCreate.mockReset();
+	pricesList.mockReset();
 	adminUpdateEq.mockReset().mockResolvedValue({ error: null });
 	adminUpdate.mockClear();
 	adminFrom.mockClear();
@@ -220,16 +221,82 @@ describe('ensureOrgCustomer', () => {
 	});
 });
 
+const feegaPrice = (usd: number, id = `price_${usd}`) => ({
+	id,
+	lookup_key: `feega_monthly_${usd}`,
+	unit_amount: usd * 100,
+	currency: 'eur'
+});
+
 describe('subscriptionPriceIdFor', () => {
-	it('returns the configured price id for a rung with one set', async () => {
+	it('resolves a rung by its lookup key', async () => {
+		pricesList.mockResolvedValue({ data: [feegaPrice(8), feegaPrice(16)] });
 		const { subscriptionPriceIdFor } = await import('./stripe');
-		expect(subscriptionPriceIdFor(5)).toBe('price_sub_5');
-		expect(subscriptionPriceIdFor(15)).toBe('price_sub_15');
+
+		expect(await subscriptionPriceIdFor(8)).toBe('price_8');
+		expect(await subscriptionPriceIdFor(16)).toBe('price_16');
+		expect(pricesList).toHaveBeenCalledWith({
+			lookup_keys: [
+				'feega_monthly_8',
+				'feega_monthly_16',
+				'feega_monthly_32',
+				'feega_monthly_64',
+				'feega_monthly_128',
+				'feega_monthly_256'
+			],
+			active: true,
+			limit: 100
+		});
 	});
 
-	it('returns undefined for a rung with no price id configured', async () => {
+	it('asks Stripe once, then answers from memory', async () => {
+		pricesList.mockResolvedValue({ data: [feegaPrice(8)] });
 		const { subscriptionPriceIdFor } = await import('./stripe');
-		expect(subscriptionPriceIdFor(30)).toBeUndefined();
+
+		await subscriptionPriceIdFor(8);
+		await subscriptionPriceIdFor(8);
+
+		expect(pricesList).toHaveBeenCalledTimes(1);
+	});
+
+	it('returns undefined for a rung whose price is not in Stripe', async () => {
+		pricesList.mockResolvedValue({ data: [feegaPrice(8)] });
+		const { subscriptionPriceIdFor } = await import('./stripe');
+		expect(await subscriptionPriceIdFor(32)).toBeUndefined();
+	});
+
+	it('refuses a price whose amount disagrees with the rung', async () => {
+		pricesList.mockResolvedValue({ data: [{ ...feegaPrice(8), unit_amount: 900 }] });
+		const { subscriptionPriceIdFor } = await import('./stripe');
+		expect(await subscriptionPriceIdFor(8)).toBeUndefined();
+	});
+
+	it('refuses a price in any currency but euro', async () => {
+		pricesList.mockResolvedValue({ data: [{ ...feegaPrice(8), currency: 'usd' }] });
+		const { subscriptionPriceIdFor } = await import('./stripe');
+		expect(await subscriptionPriceIdFor(8)).toBeUndefined();
+	});
+
+	it('asks again after a failed lookup instead of caching the failure', async () => {
+		pricesList.mockRejectedValueOnce(new Error('down')).mockResolvedValue({ data: [feegaPrice(8)] });
+		const { subscriptionPriceIdFor } = await import('./stripe');
+
+		await expect(subscriptionPriceIdFor(8)).rejects.toThrow('down');
+		expect(await subscriptionPriceIdFor(8)).toBe('price_8');
+	});
+});
+
+describe('subscribedRungPrice', () => {
+	it('reads the tier from the subscription price lookup key', async () => {
+		subscriptionsRetrieve.mockResolvedValue({ items: { data: [{ price: { lookup_key: 'feega_monthly_64' } }] } });
+		const { subscribedRungPrice } = await import('./stripe');
+		expect(await subscribedRungPrice('sub_1')).toBe(64);
+	});
+
+	it('is null for a price that is not a feega tier', async () => {
+		subscriptionsRetrieve.mockResolvedValue({ items: { data: [{ price: { lookup_key: 'other_app_pro' } }] } });
+		const { subscribedRungPrice } = await import('./stripe');
+		expect(await subscribedRungPrice('sub_1')).toBeNull();
 	});
 });
 
@@ -241,8 +308,8 @@ describe('createOneTimeCreditCheckout', () => {
 		const url = await createOneTimeCreditCheckout({
 			customerId: 'cus_1',
 			orgId: 'org_1',
-			price: 100,
-			credits: 7840,
+			price: 16,
+			credits: 1600,
 			successUrl: 'https://app/return?ok=1',
 			cancelUrl: 'https://app/return?cancel=1'
 		});
@@ -254,16 +321,16 @@ describe('createOneTimeCreditCheckout', () => {
 			line_items: [
 				{
 					price_data: {
-						currency: 'usd',
-						unit_amount: 10000,
-						product_data: { name: '7840 feega credits' }
+						currency: 'eur',
+						unit_amount: 1600,
+						product_data: { name: '16 feega credits' }
 					},
 					quantity: 1
 				}
 			],
 			success_url: 'https://app/return?ok=1',
 			cancel_url: 'https://app/return?cancel=1',
-			metadata: { org_id: 'org_1', credits: '7840' }
+			metadata: { app: 'feega', org_id: 'org_1', credits: '1600' }
 		});
 	});
 
@@ -305,8 +372,8 @@ describe('createSubscriptionCheckout', () => {
 			line_items: [{ price: 'price_sub_5', quantity: 1 }],
 			success_url: 'https://app/return?ok=1',
 			cancel_url: 'https://app/return?cancel=1',
-			subscription_data: { metadata: { org_id: 'org_1', credits: '500' } },
-			metadata: { org_id: 'org_1' }
+			subscription_data: { metadata: { app: 'feega', org_id: 'org_1', credits: '500' } },
+			metadata: { app: 'feega', org_id: 'org_1' }
 		});
 	});
 
