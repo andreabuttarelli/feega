@@ -29,11 +29,12 @@ export type Asset = {
   durationS: number | null;
   source: AssetSource | null;
   sourceNodeId: string | null;
+  uncensored: boolean;
   createdAt: string;
 };
 
 const ASSET_COLUMNS =
-  'id, project_id, type, url, content, mime_type, bytes, width, height, duration_s, source, source_node_id, created_at';
+  'id, project_id, type, url, content, mime_type, bytes, width, height, duration_s, source, source_node_id, uncensored, created_at';
 
 type AssetColumns = Omit<AssetRow, 'org_id' | 'embedding' | 'updated_at'>;
 
@@ -51,6 +52,7 @@ function toAsset(row: AssetColumns): Asset {
     durationS: row.duration_s === null ? null : Number(row.duration_s),
     source: row.source as AssetSource | null,
     sourceNodeId: row.source_node_id,
+    uncensored: row.uncensored === true,
     createdAt: row.created_at
   };
 }
@@ -150,6 +152,7 @@ export async function insertAsset(
     height?: number | null;
     durationS?: number | null;
     sourceNodeId?: string | null;
+    uncensored?: boolean;
   }
 ): Promise<Asset> {
   const { data, error } = await db
@@ -166,7 +169,8 @@ export async function insertAsset(
       width: input.width ?? null,
       height: input.height ?? null,
       duration_s: input.durationS ?? null,
-      source_node_id: input.sourceNodeId ?? null
+      source_node_id: input.sourceNodeId ?? null,
+      uncensored: input.uncensored ?? false
     })
     .select(ASSET_COLUMNS)
     .single();
