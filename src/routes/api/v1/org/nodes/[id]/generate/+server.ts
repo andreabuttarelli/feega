@@ -4,6 +4,18 @@ import { resolveOrgCaller } from '$lib/server/org-data/auth';
 import { gateOrgAiAction } from '$lib/server/cli-auth';
 import { findNode } from '$lib/server/repos/canvas';
 import { runGenNode } from '$lib/server/canvas/generate';
+import { canvasModelCatalogue } from '$lib/server/canvas-catalogue';
+import { modelAdvice } from '$lib/canvas/recommended-models';
+import type { GenMedium } from '$lib/canvas/gen-node';
+
+async function agentModel(medium: GenMedium, requested: string | undefined): Promise<{ model: string | null; warning?: string }> {
+  const catalogue = (await canvasModelCatalogue())[medium];
+  if (!requested) {
+    return { model: catalogue?.recommended.find((r) => r.tier === 'balanced')?.id ?? null };
+  }
+  const warning = catalogue ? modelAdvice(medium, requested, catalogue.candidates, new Date()) : null;
+  return warning ? { model: requested, warning } : { model: requested };
+}
 
 /**
  * LA STESSA PORTA DEL BOTTONE «GENERA» SULLA TELA, per un agente MCP. Il motore è `runGenNode`,
@@ -38,6 +50,7 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
   const gate = await gateOrgAiAction(orgId, apiKeyId ? { id: apiKeyId, name: '', user_id: userId, org_id: orgId, scopes: ['write'] } : undefined);
   if (gate) return gate;
 
+  const { model, warning } = await agentModel(body.medium as GenMedium, body.model);
   const outcome = await runGenNode(db, {
     orgId,
     projectId: node.projectId,
@@ -46,12 +59,12 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
     userId,
     medium: body.medium as never,
     prompt: body.prompt ?? '',
-    model: body.model ?? null,
+    model,
     params: (body.params ?? {}) as never,
     expectedVersion: body.version ?? node.version
   });
 
   if (outcome.kind === 'refused') return json({ error: outcome.error }, { status: 400 });
   if (outcome.kind === 'conflict') return json({ conflict: true }, { status: 409 });
-  return json(outcome);
+  return json(warning ? { ...outcome, warning } : outcome);
 };

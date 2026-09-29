@@ -29,7 +29,7 @@
   import { nearestVideoDuration } from '$lib/video-models';
   import { effectiveModel } from '$lib/canvas/default-models';
   import { TOOLBAR_HIDE_BELOW_ZOOM, toolbarScale } from '$lib/canvas/toolbar-scale';
-  import { filterChoices, groupByProvider } from '$lib/canvas/model-picker';
+  import { filterChoices, groupByProvider, recommendedFirst } from '$lib/canvas/model-picker';
   import type { ModelChoice } from '$lib/canvas/gen-node';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
   import * as Tooltip from '$lib/components/ui/tooltip/index.js';
@@ -115,6 +115,7 @@
 
   let modelQuery = $state('');
   const filteredGroups = $derived(groupByProvider(filterChoices(choices, modelQuery)));
+  const recommendedChoices = $derived(recommendedFirst(filterChoices(choices, modelQuery)));
 
   function valueOr<T>(v: CommonValue<T>, fallback: T | null): T | null {
     return v.kind === 'same' ? v.value : fallback;
@@ -168,6 +169,15 @@
                 value={modelValue ?? ''}
                 onValueChange={(v) => onpropertychange?.({ model: v || null })}
               >
+                {#if recommendedChoices.length}
+                  <DropdownMenu.Label class="provider-label">Recommended</DropdownMenu.Label>
+                  {#each recommendedChoices as c (c.id)}
+                    <DropdownMenu.RadioItem value={c.id} title={c.recommendedWhy}>
+                      <span class="model-name">{c.label}</span>
+                      <span class="tier-badge">{c.tiers?.[0]}</span>
+                    </DropdownMenu.RadioItem>
+                  {/each}
+                {/if}
                 {#each filteredGroups as group (group.provider)}
                   <DropdownMenu.Label class="provider-label">
                     <ProviderIcon provider={group.provider} />
@@ -395,6 +405,13 @@
 
   .model-name {
     flex: 1 1 auto;
+  }
+
+  .tier-badge {
+    padding: 0 4px;
+    font-size: 10px;
+    color: var(--ink-soft, #6e6e73);
+    border: 1px solid var(--line-2, #d2d2d7);
   }
 
   :global(.model-menu) {

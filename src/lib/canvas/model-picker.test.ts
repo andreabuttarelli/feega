@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { filterChoices, groupByProvider } from './model-picker';
+import { filterChoices, groupByProvider, recommendedFirst } from './model-picker';
 import type { ModelChoice } from './gen-node';
 
 const choice = (over: Partial<ModelChoice> = {}): ModelChoice => ({
@@ -44,5 +44,19 @@ describe('groupByProvider: un gruppo per provider, nell\'ordine in cui compaiono
 
   it('un catalogo vuoto non produce gruppi', () => {
     expect(groupByProvider([])).toEqual([]);
+  });
+});
+
+describe('recommendedFirst: la sezione "Recommended" in cima al menù', () => {
+  it('mette i raccomandati in ordine best, balanced, cheapest-good, uno per modello', () => {
+    const cheap = choice({ id: 'cheap', tiers: ['cheapest-good'] });
+    const top = choice({ id: 'top', tiers: ['best', 'balanced'] });
+    const plain = choice({ id: 'plain' });
+
+    expect(recommendedFirst([cheap, plain, top]).map((c) => c.id)).toEqual(['top', 'cheap']);
+  });
+
+  it('senza raccomandati la sezione è vuota', () => {
+    expect(recommendedFirst([choice()])).toEqual([]);
   });
 });

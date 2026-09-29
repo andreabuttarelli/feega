@@ -26,7 +26,14 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 export type AiModelCatalogue = 'chat' | 'image' | 'video';
 
-type RawChatOrImageModel = {
+type RawReleaseFacts = {
+  created?: number;
+  expiration_date?: string | null;
+  context_length?: number | null;
+  benchmarks?: { artificial_analysis?: { intelligence_index?: number | null } };
+};
+
+type RawChatOrImageModel = RawReleaseFacts & {
   id?: string;
   name?: string;
   endpoints?: string;
@@ -35,7 +42,7 @@ type RawChatOrImageModel = {
   pricing?: Record<string, unknown>;
 };
 
-type RawVideoModel = {
+type RawVideoModel = RawReleaseFacts & {
   id?: string;
   name?: string;
   supported_frame_images?: unknown;
@@ -68,7 +75,23 @@ export type AiModelRow = {
   param_schema: Record<string, unknown>;
   pricing?: Record<string, unknown> | ImagePricing;
   synced_at: string;
+} & ReleaseFacts;
+
+type ReleaseFacts = {
+  released_at: string | null;
+  expires_at: string | null;
+  context_length: number | null;
+  intelligence_index: number | null;
 };
+
+function releaseFactsOf(m: RawReleaseFacts): ReleaseFacts {
+  return {
+    released_at: typeof m.created === 'number' ? new Date(m.created * 1000).toISOString() : null,
+    expires_at: m.expiration_date ?? null,
+    context_length: m.context_length ?? null,
+    intelligence_index: m.benchmarks?.artificial_analysis?.intelligence_index ?? null
+  };
+}
 
 export type ImagePricingLine = {
   billable: string;
@@ -128,7 +151,8 @@ function chatOrImageRow(m: RawChatOrImageModel, catalogue: 'chat' | 'image', syn
     supported_resolutions: catalogue === 'image' ? imageResolutionValues(m.supported_parameters) : [],
     param_schema: catalogue === 'image' ? imageParamSchema(m.supported_parameters) : {},
     pricing: m.pricing ?? {},
-    synced_at: syncedAt
+    synced_at: syncedAt,
+    ...releaseFactsOf(m)
   };
 }
 
@@ -167,21 +191,36 @@ function videoRow(m: RawVideoModel, syncedAt: string): AiModelRow | null {
     supported_resolutions: toArray(m.supported_resolutions),
     param_schema: videoParamSchema(m),
     pricing: m.pricing_skus ?? {},
-    synced_at: syncedAt
+    synced_at: syncedAt,
+    ...releaseFactsOf(m)
   };
 }
 
 export type SyncOutcome = { ok: true; synced: number } | { ok: false; reason: string };
 
-/**
- * La migration di `param_schema` (20260925130000) può non essere ancora applicata quando questo
- * sync gira — la regola del progetto è che il codice vivo tollera l'assenza della colonna finché
- * non è applicata. Postgres risponde con `42703` (`column "param_schema" of relation "ai_models"
- * does not exist`, messaggio esatto di PostgREST): un solo retry, senza quella chiave, invece di
- * far fallire l'intero sync per una colonna che non è ancora lì.
- */
-function isMissingParamSchemaColumn(message: string): boolean {
-  return message.includes('param_schema') && message.includes('does not exist');
+const COLUMNS_NEWER_THAN_TABLE = ['param_schema', 'released_at', 'expires_at', 'context_length', 'intelligence_index'] as const;
+
+function missingColumnIn(message: string): string | undefined {
+  if (!message.includes('does not exist')) {
+    return undefined;
+  }
+  return COLUMNS_NEWER_THAN_TABLE.find((column) => message.includes(`"${column}"`));
+}
+
+async function upsertTolerant(admin: SupabaseClient, rows: AiModelRow[]): Promise<string | null> {
+  let pending: Record<string, unknown>[] = rows;
+  for (let attempt = 0; attempt <= COLUMNS_NEWER_THAN_TABLE.length; attempt++) {
+    const { error } = await admin.from('ai_models').upsert(pending, { onConflict: 'id,catalogue' });
+    if (!error) {
+      return null;
+    }
+    const missing = missingColumnIn(error.message);
+    if (!missing) {
+      return error.message;
+    }
+    pending = pending.map(({ [missing]: _dropped, ...rest }) => rest);
+  }
+  return 'ai_models upsert kept failing on missing columns';
 }
 
 type CatalogueFetch<Raw> = {
@@ -320,14 +359,10 @@ export async function syncAiModels(
     return { ok: false, reason };
   }
 
-  const { error } = await admin.from('ai_models').upsert(rows, { onConflict: 'id,catalogue' });
-  if (error && isMissingParamSchemaColumn(error.message)) {
-    const rowsWithoutParamSchema = rows.map(({ param_schema: _param_schema, ...rest }) => rest);
-    const retry = await admin.from('ai_models').upsert(rowsWithoutParamSchema, { onConflict: 'id,catalogue' });
-    if (retry.error) return { ok: false, reason: retry.error.message };
-    return { ok: true, synced: rows.length };
+  const failure = await upsertTolerant(admin, rows);
+  if (failure) {
+    return { ok: false, reason: failure };
   }
-  if (error) return { ok: false, reason: error.message };
 
   return { ok: true, synced: rows.length };
 }

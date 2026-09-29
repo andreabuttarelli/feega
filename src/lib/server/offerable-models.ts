@@ -76,6 +76,7 @@ function genericImageChoice(row: SyncedRow): ModelChoice {
     aspectRatios: GENERIC_IMAGE_ASPECTS,
     maxRefs: IMAGE_REFS_BUDGET,
     ...providerOf(row.id),
+    wireId: row.id,
     inputModalities: row.input_modalities ?? [],
     resolutions: imageResolutionsFor(row.supported_resolutions),
     unitCredits: imageUnitCredits(row.pricing),
@@ -112,6 +113,7 @@ function genericVideoChoice(row: SyncedRow): ModelChoice {
     durationOptions: [MIN_DURATION],
     resolutions: videoResolutionsFor(row),
     ...providerOf(row.id),
+    wireId: row.id,
     inputModalities: row.input_modalities ?? [],
     unitCredits: undefined,
     params: modelParamsOf(row.param_schema ?? {})
@@ -129,6 +131,7 @@ function imageChoice(
     aspectRatios: spec.aspectRatios,
     maxRefs: spec.maxRefs,
     ...providerOf(wireId),
+    wireId,
     inputModalities: row.input_modalities ?? [],
     resolutions: imageResolutionsFor(row.supported_resolutions),
     unitCredits: imageUnitCredits(row.pricing),
@@ -294,6 +297,7 @@ function videoChoice(spec: VideoModelSpec, row: SyncedRow, inputModalities: stri
     // un tetto uguale per tutti — v. `videoResolutionsFor`.
     resolutions: videoResolutionsFor(row),
     ...providerOf(row.id),
+    wireId: row.id,
     inputModalities,
     unitCredits: videoCredits(spec.id),
     params: modelParamsOf(row.param_schema ?? {})

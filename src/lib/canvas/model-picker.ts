@@ -1,4 +1,5 @@
 import type { ModelChoice } from './gen-node';
+import { TIER_ORDER } from './recommended-models';
 
 export function filterChoices(choices: ModelChoice[], query: string): ModelChoice[] {
   const q = query.trim().toLowerCase();
@@ -23,4 +24,12 @@ export function groupByProvider(choices: ModelChoice[]): ProviderGroup[] {
   }
 
   return order.map((key) => groups.get(key)!);
+}
+
+function firstTierIndex(choice: ModelChoice): number {
+  return Math.min(...(choice.tiers ?? []).map((tier) => TIER_ORDER.indexOf(tier)));
+}
+
+export function recommendedFirst(choices: ModelChoice[]): ModelChoice[] {
+  return choices.filter((c) => c.tiers?.length).sort((a, b) => firstTierIndex(a) - firstTierIndex(b));
 }
