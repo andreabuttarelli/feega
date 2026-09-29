@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { DEFAULT_MODEL, effectiveModel } from './default-models';
+import { DEFAULT_MODEL, effectiveModel, pickModel, type GenerativeMedium } from './default-models';
 
 const choices = [{ id: 'first' }, { id: DEFAULT_MODEL.image }, { id: 'other' }];
 
@@ -27,5 +27,40 @@ describe('il modello di un nodo', () => {
 
   it('ogni medium generativo ha un default', () => {
     expect(Object.keys(DEFAULT_MODEL).sort()).toEqual(['image', 'text', 'video']);
+  });
+});
+
+const offered = (medium: GenerativeMedium) => ({
+  choices: [{ id: `${medium}-a` }, { id: `${medium}-b` }, { id: `${medium}-c` }],
+  recommended: [
+    { tier: 'best' as const, id: `${medium}-a` },
+    { tier: 'balanced' as const, id: `${medium}-b` },
+    { tier: 'cheapest-good' as const, id: `${medium}-c` }
+  ]
+});
+
+describe('pickModel: one resolution for every generation entry', () => {
+  it('an explicit model on the node wins over the recommendation', () => {
+    expect(pickModel('image', 'image-c', offered('image'))).toEqual({ ok: true, model: 'image-c' });
+  });
+
+  it.each(['text', 'image', 'video'] as const)('a %s node without a model gets the balanced one', (medium) => {
+    expect(pickModel(medium, null, offered(medium))).toEqual({ ok: true, model: `${medium}-b` });
+  });
+
+  it('an unknown model is refused, naming the recommended alternatives', () => {
+    const out = pickModel('video', 'made-up', offered('video'));
+
+    expect(out.ok).toBe(false);
+    expect(!out.ok && out.error).toMatch(/made-up/);
+    expect(!out.ok && out.error).toMatch(/video-b \(balanced\).*video-a \(best\).*video-c \(cheapest-good\)/);
+  });
+
+  it('an empty catalogue cannot judge, so an explicit model passes', () => {
+    expect(pickModel('text', 'x', { choices: [], recommended: [] })).toEqual({ ok: true, model: 'x' });
+  });
+
+  it('no model and nothing offered is refused as model_required', () => {
+    expect(pickModel('text', null, { choices: [], recommended: [] })).toEqual({ ok: false, error: 'model_required' });
   });
 });

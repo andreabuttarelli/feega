@@ -15,6 +15,10 @@ import { fakeDb } from '$lib/server/db/fake-db';
  */
 
 const { modalitiesOf } = vi.hoisted(() => ({ modalitiesOf: vi.fn() }));
+vi.mock('$lib/server/canvas-catalogue', () => {
+  const nothing = { choices: [], recommended: [], synced: true };
+  return { canvasModelCatalogue: async () => ({ text: nothing, image: nothing, video: nothing }) };
+});
 vi.mock('$lib/server/ai-models-sync', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$lib/server/ai-models-sync')>()),
   modalitiesOf

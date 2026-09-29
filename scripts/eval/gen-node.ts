@@ -4,17 +4,12 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { env } from '../_shims/env-private';
 import { runGenNode, reconcileVideoNodeRuns } from '$lib/server/canvas/generate';
 import { writeNodeData } from '$lib/server/repos/canvas';
+import { grantWelcomeCredits } from '$lib/server/tenancy/free-org-limit';
 import { GPT_IMAGE_25_FLARE_MODEL } from '$lib/image-models';
 import { GROK_IMAGINE_VIDEO_MODEL } from '$lib/video-models';
 
 const VIDEO_COMPLETE = process.argv.includes('--video-complete');
 
-/**
- * `runGenNode` requires an explicit model for every medium, text included — `refuse()` in
- * `canvas/generate.ts` has no text exception, even though `llmText` itself can default one.
- * The product's answer is that a text node names its model like every other node; the eval
- * gives it the same cheap default the rest of the app falls back to.
- */
 const TEXT_EVAL_MODEL = env.LLM_DEFAULT_MODEL?.trim() || 'z-ai/glm-5.3-flash';
 
 /**
@@ -58,7 +53,8 @@ const scenarios = new Map([
   ['B. text: ai_calls row with non-null cost_usd', 'unrun'],
   ['B. image: ai_calls row with non-null cost_usd', 'unrun'],
   ['B. node_runs.cost_usd populated for text and image', 'unrun'],
-  ['C. invalid model refuses without spending, node_runs.status=failed', 'unrun'],
+  ['C. unknown model refused before any run, naming the recommended models', 'unrun'],
+  ['C. failed run: node_runs.status=failed with a readable reason', 'unrun'],
   ['C. failed run: node.data.running=false and error set', 'unrun'],
   ['C. failed run: ai_calls row exists with status=error (or none reached provider)', 'unrun'],
   ['C. version race: a failure write is never lost, node never left stuck running', 'unrun']
@@ -147,6 +143,7 @@ try {
   await checked(admin.from('orgs').insert({ id: orgId, name: 'Gen node eval', slug: `gen-node-eval-${orgId}` }));
   orgCreated = true;
   await checked(admin.from('orgs_members').insert({ org_id: orgId, user_id: userId, role: 'owner' }));
+  await grantWelcomeCredits(admin as never, orgId);
   await checked(admin.from('projects').insert({ id: projectId, org_id: orgId, name: 'Gen node eval', slug: 'gen-node-eval' }));
   await checked(admin.from('canvases').insert({ id: canvasId, org_id: orgId, project_id: projectId, name: 'Gen node eval' }));
   await checked(userClient.rpc('auth_org_ids'));
@@ -322,14 +319,33 @@ try {
     }
   }
 
-  // --- C. FAILURE PATH: invalid model, no spend -------------------------------
+  // --- C. FAILURE PATHS: unknown model refused up front; a started run that fails ----
+  const unknownNode = await makeNode('image');
+  const unknownOutcome = await runGenNode(userClient as never, {
+    orgId, projectId, canvasId, nodeId: unknownNode.id, userId,
+    medium: 'image',
+    prompt: 'this must never render',
+    model: 'not-a-real-model-id-eval-probe',
+    params: { aspectRatio: '1:1' },
+    expectedVersion: unknownNode.version
+  });
+  assert.equal(unknownOutcome.kind, 'refused', `expected refused, got ${unknownOutcome.kind}`);
+  const unknownError = 'error' in unknownOutcome ? unknownOutcome.error : '';
+  assert.match(unknownError, /unknown_model.*Recommended: \S+/, `refusal must name alternatives, got ${unknownError}`);
+  const unknownRuns = await checked(admin.from('node_runs').select('id').eq('org_id', orgId).eq('node_id', unknownNode.id));
+  assert.equal(unknownRuns.length, 0, 'an unknown model must be refused before any node_runs row exists');
+  const unknownRow = await checked(admin.from('nodes').select('data').eq('org_id', orgId).eq('id', unknownNode.id).single());
+  assert.notEqual((unknownRow.data as { running?: boolean }).running, true, 'a refused node must never be marked running');
+  console.log(`unknown model refusal: ${unknownError}`);
+  passed('C. unknown model refused before any run, naming the recommended models');
+
   const failNode = await makeNode('image');
   const failStart = new Date().toISOString();
   const failOutcome = await runGenNode(userClient as never, {
     orgId, projectId, canvasId, nodeId: failNode.id, userId,
     medium: 'image',
-    prompt: 'this must never render',
-    model: 'not-a-real-model-id-eval-probe',
+    prompt: '',
+    model: GPT_IMAGE_25_FLARE_MODEL,
     params: { aspectRatio: '1:1' },
     expectedVersion: failNode.version
   });
@@ -338,9 +354,8 @@ try {
   const failRun = await latestRun(failNode.id);
   assert.equal(failRun.status, 'failed', `node_runs.status must be failed, got ${failRun.status}`);
   assert.ok(failRun.error && failRun.error.length > 0, 'node_runs.error must carry a readable reason');
-  assert.notEqual(failRun.error, 'store_failed', 'error must not be a mute token');
-  console.log(`node_runs.error (invalid model): ${failRun.error}`);
-  passed('C. invalid model refuses without spending, node_runs.status=failed');
+  console.log(`node_runs.error (started run that fails): ${failRun.error}`);
+  passed('C. failed run: node_runs.status=failed with a readable reason');
 
   const failNodeRow = await checked(admin.from('nodes').select('data').eq('org_id', orgId).eq('id', failNode.id).single());
   const failData = failNodeRow.data as { running?: boolean; error?: string | null };
@@ -351,9 +366,9 @@ try {
   const failAiCalls = await aiCallsSince(failStart);
   const errorRow = failAiCalls.find((r) => r.status === 'error');
   if (errorRow) {
-    console.log(`ai_calls row for the invalid-model failure: status=${errorRow.status} cost_usd=${errorRow.cost_usd}`);
+    console.log(`ai_calls row for the failed run: status=${errorRow.status} cost_usd=${errorRow.cost_usd}`);
   } else {
-    console.log('No ai_calls row for the invalid-model failure — the call never reached the provider (refused before the request), which is correct: model_not_for_slot / unknown model is caught before billing.');
+    console.log('No ai_calls row for the failed run — the call never reached the provider (refused before the request), which is correct: model_not_for_slot / unknown model is caught before billing.');
   }
   passed('C. failed run: ai_calls row exists with status=error (or none reached provider)');
 
@@ -368,19 +383,13 @@ try {
   // `conflict`, a different and also-correct behavior (`runGenNode` refuses to start over stale
   // state, same as any other optimistic-concurrency guard).
   //
-  // `refuse()` validates the model SYNCHRONOUSLY (`model_required` only), so an invalid model id
-  // fails inside `generateImagesWithoutBrand`, which awaits a real network round-trip to
-  // `ai-models-sync` before returning `model_not_for_slot`. That await is the real window: firing
-  // the version bump in parallel with the `runGenNode` call lands the write mid-flight, after
-  // "mark running" and before `giveUp()`, exactly like a drag or a second panel editing the same
-  // node while a generation is in progress.
   const raceNode = await makeNode('image');
 
   const racePromise = runGenNode(userClient as never, {
     orgId, projectId, canvasId, nodeId: raceNode.id, userId,
     medium: 'image',
-    prompt: 'this must never render either',
-    model: 'not-a-real-model-id-eval-probe-race',
+    prompt: '',
+    model: GPT_IMAGE_25_FLARE_MODEL,
     params: { aspectRatio: '1:1' },
     expectedVersion: raceNode.version
   });

@@ -174,13 +174,23 @@ describe('POST /api/v1/org/nodes/:id/generate', () => {
     expect(body.error).toBe('prompt_required');
   });
 
-  it('without a model, generates with the recommended balanced one', async () => {
+  it('without a model, keeps the one already set on the node', async () => {
+    findNode.mockResolvedValue({ ...NODE_ROW, data: { model: 'chosen-by-user' } });
     runGenNode.mockResolvedValue({ kind: 'done', run: { id: 'r' }, asset: { id: 'a' } });
 
     const { res } = await call(NODE, { medium: 'image', prompt: 'x', version: 3 });
 
     expect(res.status).toBe(200);
-    expect(runGenNode).toHaveBeenCalledWith({}, expect.objectContaining({ model: 'current' }));
+    expect(runGenNode).toHaveBeenCalledWith({}, expect.objectContaining({ model: 'chosen-by-user' }));
+  });
+
+  it('without a model anywhere, leaves the balanced pick to the shared resolution', async () => {
+    findNode.mockResolvedValue({ ...NODE_ROW, data: {} });
+    runGenNode.mockResolvedValue({ kind: 'done', run: { id: 'r' }, asset: { id: 'a' } });
+
+    await call(NODE, { medium: 'image', prompt: 'x', version: 3 });
+
+    expect(runGenNode).toHaveBeenCalledWith({}, expect.objectContaining({ model: null }));
   });
 
   it('an old model still runs, with a warning naming the recommended one', async () => {

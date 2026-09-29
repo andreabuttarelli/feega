@@ -91,6 +91,10 @@ vi.mock('$lib/server/ai-models-sync', async (importOriginal) => ({
 }));
 vi.mock('$lib/server/supabase-admin', () => ({ createAdminClient: () => ({}) }));
 
+const EMPTY_OFFER = { choices: [], recommended: [] };
+const { canvasModelCatalogue } = vi.hoisted(() => ({ canvasModelCatalogue: vi.fn() }));
+vi.mock('$lib/server/canvas-catalogue', () => ({ canvasModelCatalogue }));
+
 const SYNCED_MODALITIES = { input: ['text', 'image'], output: ['image'], synced_at: 'now' };
 
 // Il default per OGNI test: un modello sincronizzato. Un solo describe (quello sul modello
@@ -100,6 +104,62 @@ const SYNCED_MODALITIES = { input: ['text', 'image'], output: ['image'], synced_
 beforeEach(() => {
   modalitiesOf.mockReset();
   modalitiesOf.mockResolvedValue(SYNCED_MODALITIES);
+  canvasModelCatalogue.mockResolvedValue({ text: EMPTY_OFFER, image: EMPTY_OFFER, video: EMPTY_OFFER });
+});
+
+describe('runGenNode resolves the model the same way for every entry point', () => {
+  const imageOffer = {
+    choices: [{ id: 'img-best' }, { id: 'img-balanced' }],
+    recommended: [
+      { tier: 'best', id: 'img-best' },
+      { tier: 'balanced', id: 'img-balanced' }
+    ]
+  };
+  const start = (model: string | null) => ({
+    orgId: ORG,
+    projectId: PROJECT,
+    canvasId: CANVAS,
+    nodeId: NODE,
+    userId: USER,
+    medium: 'image' as const,
+    prompt: 'a cat',
+    model,
+    params: {},
+    expectedVersion: 1
+  });
+
+  beforeEach(() => {
+    canvasModelCatalogue.mockResolvedValue({ text: EMPTY_OFFER, image: imageOffer, video: EMPTY_OFFER });
+    generateImagesWithoutBrand.mockReset();
+    generateImagesWithoutBrand.mockResolvedValue({ ok: false, error: 'provider_down' });
+  });
+
+  it('a node without a model runs on the balanced recommendation', async () => {
+    const { db, calls } = fakeDb({ nodes: [freshNodeRow] }, { updateRows: { nodes: [{ ...freshNodeRow, version: 2 }] } });
+
+    await runGenNode(db, start(null));
+
+    const run = calls.find((c) => c.table === 'node_runs' && c.op === 'insert');
+    expect((run?.payload as { model?: string }).model).toBe('img-balanced');
+  });
+
+  it('an explicit model wins over the recommendation', async () => {
+    const { db, calls } = fakeDb({ nodes: [freshNodeRow] }, { updateRows: { nodes: [{ ...freshNodeRow, version: 2 }] } });
+
+    await runGenNode(db, start('img-best'));
+
+    const run = calls.find((c) => c.table === 'node_runs' && c.op === 'insert');
+    expect((run?.payload as { model?: string }).model).toBe('img-best');
+  });
+
+  it('an unknown model is refused with the recommended alternatives, before any run exists', async () => {
+    const { db, calls } = fakeDb({ nodes: [freshNodeRow] });
+
+    const out = await runGenNode(db, start('made-up'));
+
+    expect(out).toMatchObject({ kind: 'refused', error: expect.stringMatching(/made-up.*img-balanced \(balanced\)/) });
+    expect(calls.some((c) => c.table === 'node_runs')).toBe(false);
+  });
 });
 
 /**

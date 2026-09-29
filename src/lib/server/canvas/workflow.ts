@@ -1,5 +1,4 @@
 import type { Db } from '$lib/server/db/client';
-import { DEFAULT_MODEL } from '$lib/canvas/default-models';
 import { runGenNode, type StartRun } from '$lib/server/canvas/generate';
 import { DataCheck, findNode, patchNodeData, listConnections, type CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { createRun, claimRun, completeRun, failRun, runningRuns, runsByIds, type NodeRun } from '$lib/server/repos/node-runs';
@@ -148,7 +147,7 @@ async function runStep(
   }
 
   const medium = (node.type === 'text' || node.type === 'video' ? node.type : 'image') as GenMedium;
-  const model = typeof node.data.model === 'string' && node.data.model ? node.data.model : DEFAULT_MODEL[medium];
+  const model = typeof node.data.model === 'string' && node.data.model ? node.data.model : null;
   const prompt = typeof node.data.prompt === 'string' ? node.data.prompt : '';
 
   const startRun: StartRun = {

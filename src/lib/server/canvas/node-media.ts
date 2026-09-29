@@ -2,7 +2,7 @@ import type { Db } from '$lib/server/db/client';
 import { findAssets, type Asset, type AssetSource, type AssetType } from '$lib/server/repos/assets';
 import { findNode } from '$lib/server/repos/canvas';
 import { findRunOutputs } from '$lib/server/repos/node-runs';
-import { CANVAS_ASSET_BUCKET, signStoredFile, signStoredPreview } from '$lib/server/repos/asset-storage';
+import { CANVAS_ASSET_BUCKET, SIGNED_URL_TTL_S, signStoredFile, signStoredPreview } from '$lib/server/repos/asset-storage';
 
 const BUCKET_BY_SOURCE: Record<AssetSource, string> = {
   generated: 'brand-knowledge',
@@ -68,8 +68,8 @@ async function signed(serviceDb: Db, asset: Asset): Promise<Pick<MediaItem, 'ful
 
   const bucket = BUCKET_BY_SOURCE[asset.source ?? 'upload'];
   const [fullUrl, previewUrl] = await Promise.all([
-    signStoredFile(serviceDb, bucket, asset.url),
-    PREVIEWABLE[asset.type] ? signStoredPreview(serviceDb, bucket, asset.url) : null
+    signStoredFile(serviceDb, bucket, asset.url, SIGNED_URL_TTL_S.userLink),
+    PREVIEWABLE[asset.type] ? signStoredPreview(serviceDb, bucket, asset.url, SIGNED_URL_TTL_S.agentPreview) : null
   ]);
   return { fullUrl, previewUrl };
 }

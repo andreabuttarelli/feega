@@ -40,9 +40,10 @@ export function registerNodeTools(server: McpServer) {
         'the run, and the render lands later, asynchronously — the node stays `running` until a ' +
         'later tick deposits the asset. Poll the node (`query`) rather than expecting a file now. ' +
         'A finished result returns `asset_ids` and `media` with `preview_url`/`full_url` (see `get_media`). ' +
-        'Omit `model` to use the recommended balanced model for the medium (`describe_node_types` ' +
-        'lists the recommended ones); an old or weak model still runs but the result carries a ' +
-        '`warning` naming the recommended one. ' +
+        'Omit `model` to keep the node\'s own model, or the recommended balanced one for the medium ' +
+        'when it has none (`describe_node_types` lists the recommended ones). A model the canvas does ' +
+        'not offer is refused with the recommended alternatives; an old or weak one still runs but ' +
+        'the result carries a `warning` naming the recommended one. ' +
         'Spends credits; a `credits_exhausted` failure means the org is out.',
       inputSchema: z.object({
         org,
@@ -73,8 +74,8 @@ export function registerNodeTools(server: McpServer) {
       description:
         'View the image, video or text a node holds, a generation run produced, or an asset — ' +
         'by `node_ids`, `run_ids` and/or `asset_ids`. Per item: type, mime, width/height, duration, ' +
-        'and two short-lived signed links: `preview_url` (images: 1024px long edge — FETCH THIS to ' +
-        'look at the image and judge it against the prompt) and `full_url` (the original file — ' +
+        'and two signed links: `preview_url` (images: 1024px long edge, valid 5 minutes — FETCH THIS to ' +
+        'look at the image and judge it against the prompt) and `full_url` (the original file, valid 1 hour — ' +
         'give this to the user). Videos have `full_url` only. Ids your org cannot see come back in ' +
         '`missing`. Reads only, spends nothing.',
       inputSchema: z.object({
