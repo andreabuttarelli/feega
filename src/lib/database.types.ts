@@ -319,6 +319,7 @@ export type Database = {
           status: string
           thread_id: string | null
           total_tokens: number | null
+          uncensored: boolean
         }
         Insert: {
           actor_id?: string | null
@@ -348,6 +349,7 @@ export type Database = {
           status: string
           thread_id?: string | null
           total_tokens?: number | null
+          uncensored?: boolean
         }
         Update: {
           actor_id?: string | null
@@ -377,6 +379,7 @@ export type Database = {
           status?: string
           thread_id?: string | null
           total_tokens?: number | null
+          uncensored?: boolean
         }
         Relationships: [
           {
@@ -440,39 +443,63 @@ export type Database = {
       ai_models: {
         Row: {
           catalogue: string
+          context_length: number | null
           created_at: string
+          expires_at: string | null
           id: string
           input_modalities: string[]
+          intelligence_index: number | null
           label: string | null
           output_modalities: string[]
+          param_schema: Json
           pricing: Json
           provider: string
+          released_at: string | null
           supported_parameters: string[]
+          supported_resolutions: string[]
           synced_at: string
+          uncensored: boolean
+          wire_spec: Json
         }
         Insert: {
           catalogue?: string
+          context_length?: number | null
           created_at?: string
+          expires_at?: string | null
           id: string
           input_modalities?: string[]
+          intelligence_index?: number | null
           label?: string | null
           output_modalities?: string[]
+          param_schema?: Json
           pricing?: Json
           provider?: string
+          released_at?: string | null
           supported_parameters?: string[]
+          supported_resolutions?: string[]
           synced_at?: string
+          uncensored?: boolean
+          wire_spec?: Json
         }
         Update: {
           catalogue?: string
+          context_length?: number | null
           created_at?: string
+          expires_at?: string | null
           id?: string
           input_modalities?: string[]
+          intelligence_index?: number | null
           label?: string | null
           output_modalities?: string[]
+          param_schema?: Json
           pricing?: Json
           provider?: string
+          released_at?: string | null
           supported_parameters?: string[]
+          supported_resolutions?: string[]
           synced_at?: string
+          uncensored?: boolean
+          wire_spec?: Json
         }
         Relationships: []
       }
@@ -548,6 +575,7 @@ export type Database = {
           source: string | null
           source_node_id: string | null
           type: string
+          uncensored: boolean
           updated_at: string
           url: string | null
           width: number | null
@@ -566,6 +594,7 @@ export type Database = {
           source?: string | null
           source_node_id?: string | null
           type: string
+          uncensored?: boolean
           updated_at?: string
           url?: string | null
           width?: number | null
@@ -584,6 +613,7 @@ export type Database = {
           source?: string | null
           source_node_id?: string | null
           type?: string
+          uncensored?: boolean
           updated_at?: string
           url?: string | null
           width?: number | null
@@ -624,6 +654,7 @@ export type Database = {
           slug: string
           updated_at: string
           website: string | null
+          zernio_profile_id: string | null
         }
         Insert: {
           content?: string | null
@@ -636,6 +667,7 @@ export type Database = {
           slug: string
           updated_at?: string
           website?: string | null
+          zernio_profile_id?: string | null
         }
         Update: {
           content?: string | null
@@ -648,6 +680,7 @@ export type Database = {
           slug?: string
           updated_at?: string
           website?: string | null
+          zernio_profile_id?: string | null
         }
         Relationships: [
           {
@@ -1176,6 +1209,7 @@ export type Database = {
         Row: {
           actor_id: string | null
           actor_kind: string
+          adult_persona_at: string | null
           age: number | null
           body_type: string | null
           builder: Json | null
@@ -1198,6 +1232,7 @@ export type Database = {
         Insert: {
           actor_id?: string | null
           actor_kind?: string
+          adult_persona_at?: string | null
           age?: number | null
           body_type?: string | null
           builder?: Json | null
@@ -1220,6 +1255,7 @@ export type Database = {
         Update: {
           actor_id?: string | null
           actor_kind?: string
+          adult_persona_at?: string | null
           age?: number | null
           body_type?: string | null
           builder?: Json | null
@@ -1259,6 +1295,62 @@ export type Database = {
             columns: ["template_of"]
             isOneToOne: false
             referencedRelation: "influencers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      moderation_checks: {
+        Row: {
+          actor_id: string | null
+          actor_kind: string
+          category: string | null
+          created_at: string
+          id: string
+          model: string | null
+          node_id: string | null
+          org_id: string
+          probabilities: Json
+          reason: string | null
+          stage: string
+          uncensored: boolean
+          verdict: string
+        }
+        Insert: {
+          actor_id?: string | null
+          actor_kind?: string
+          category?: string | null
+          created_at?: string
+          id?: string
+          model?: string | null
+          node_id?: string | null
+          org_id: string
+          probabilities?: Json
+          reason?: string | null
+          stage: string
+          uncensored?: boolean
+          verdict: string
+        }
+        Update: {
+          actor_id?: string | null
+          actor_kind?: string
+          category?: string | null
+          created_at?: string
+          id?: string
+          model?: string | null
+          node_id?: string | null
+          org_id?: string
+          probabilities?: Json
+          reason?: string | null
+          stage?: string
+          uncensored?: boolean
+          verdict?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "moderation_checks_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
             referencedColumns: ["id"]
           },
         ]
@@ -1552,6 +1644,58 @@ export type Database = {
             columns: ["target_node_id"]
             isOneToOne: false
             referencedRelation: "nodes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      org_uncensored_optins: {
+        Row: {
+          attested_adult: boolean
+          disabled_at: string | null
+          disabled_by: string | null
+          enabled_at: string
+          enabled_by: string
+          org_id: string
+          policy_version: string
+        }
+        Insert: {
+          attested_adult: boolean
+          disabled_at?: string | null
+          disabled_by?: string | null
+          enabled_at?: string
+          enabled_by: string
+          org_id: string
+          policy_version: string
+        }
+        Update: {
+          attested_adult?: boolean
+          disabled_at?: string | null
+          disabled_by?: string | null
+          enabled_at?: string
+          enabled_by?: string
+          org_id?: string
+          policy_version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_uncensored_optins_disabled_by_fkey"
+            columns: ["disabled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_uncensored_optins_enabled_by_fkey"
+            columns: ["enabled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_uncensored_optins_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
+            referencedRelation: "orgs"
             referencedColumns: ["id"]
           },
         ]
@@ -1961,6 +2105,50 @@ export type Database = {
           },
         ]
       }
+      reference_images: {
+        Row: {
+          created_at: string
+          height: number | null
+          id: string
+          mime_type: string | null
+          name: string
+          org_id: string | null
+          sort_order: number
+          storage_path: string
+          width: number | null
+        }
+        Insert: {
+          created_at?: string
+          height?: number | null
+          id?: string
+          mime_type?: string | null
+          name: string
+          org_id?: string | null
+          sort_order?: number
+          storage_path: string
+          width?: number | null
+        }
+        Update: {
+          created_at?: string
+          height?: number | null
+          id?: string
+          mime_type?: string | null
+          name?: string
+          org_id?: string | null
+          sort_order?: number
+          storage_path?: string
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reference_images_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       social_accounts: {
         Row: {
           avatar_url: string | null
@@ -2219,6 +2407,10 @@ export type Database = {
     }
     Functions: {
       auth_org_ids: { Args: never; Returns: string[] }
+      billing_grants_ready: { Args: never; Returns: boolean }
+      credits_from_price_id: { Args: { price_id: string }; Returns: number }
+      feega_credits: { Args: { _value: string }; Returns: number }
+      feega_org_from_metadata: { Args: { _metadata: Json }; Returns: string }
       org_credit_balance: { Args: { _org_id: string }; Returns: number }
     }
     Enums: {
