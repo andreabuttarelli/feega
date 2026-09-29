@@ -8,11 +8,11 @@
   import CanvasSheet from '$lib/components/canvas/CanvasSheet.svelte';
   import CanvasMobileTabs from '$lib/components/canvas/CanvasMobileTabs.svelte';
   import CanvasMobileMore from '$lib/components/canvas/CanvasMobileMore.svelte';
-  import { openSheet } from '$lib/canvas/sheet-nav';
+  import { openSheet, restoreSheet } from '$lib/canvas/sheet-nav';
   import { CHROME_LOADERS } from '$lib/canvas/chrome-loaders';
   import MobileTopBar from '$lib/components/canvas/MobileTopBar.svelte';
   import DesktopPageBar from '$lib/components/canvas/DesktopPageBar.svelte';
-  import { sheetEntryForPath, activeMobileTab, type NavEntry, type MobileTab, type MobileView, type TabOutcome } from '$lib/shell-nav';
+  import { sheetEntryForPath, directLoadMode, activeMobileTab, type NavEntry, type MobileTab, type MobileView, type TabOutcome } from '$lib/shell-nav';
   import { MOBILE_QUERY, type Viewport } from '$lib/breakpoints';
   import { readChatOpen, writeChatOpen } from '$lib/shell-prefs';
   import { guideOpenRequest } from '$lib/canvas/guide-open';
@@ -85,6 +85,23 @@
   }
 
   const viewport = $derived<Viewport>(isMobile ? 'mobile' : 'desktop');
+  const innerPath = $derived(page.url.pathname.slice(`/p/${projectId}`.length));
+  const sheetPending = $derived(
+    !onCanvasRoute && !page.state.sheet && directLoadMode(innerPath, page.url.search, viewport) === 'sheet'
+  );
+
+  $effect(() => {
+    if (!browser || !sheetPending) {
+      return;
+    }
+    restoreSheet({
+      canvasHref: data.canvases[0]?.href ?? `/p/${projectId}`,
+      sheetHref: `${page.url.pathname}${page.url.search}`,
+      path: innerPath,
+      data: page.data
+    }).catch((err) => console.error('apertura del foglio da link diretto fallita', err));
+  });
+
   const activeTab = $derived(activeMobileTab(projectId, page.url.pathname, mobileView));
 
   $effect(() => {
@@ -117,7 +134,7 @@
   }
 </script>
 
-<div class="project-shell" data-viewport={viewport}>
+<div class="project-shell" class:is-sheet-pending={sheetPending} data-viewport={viewport}>
   {#if isMobile}
     <MobileTopBar
       {projectId}
@@ -218,6 +235,12 @@
     min-width: 0;
     min-height: 0;
     overflow: hidden;
+  }
+
+  @media (min-width: 768px) {
+    .project-shell.is-sheet-pending {
+      visibility: hidden;
+    }
   }
 
   .desktop-page {

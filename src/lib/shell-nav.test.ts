@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { NAV_ENTRIES, navEntriesByGroup, navHref, sheetEntryForPath, MOBILE_TABS, MOBILE_MORE_ENTRIES, activeMobileTab, mobileTabHref, mobileNavHref } from './shell-nav';
+import { NAV_ENTRIES, navEntriesByGroup, navHref, sheetEntryForPath, MOBILE_TABS, MOBILE_MORE_ENTRIES, activeMobileTab, mobileTabHref, mobileNavHref, directLoadMode } from './shell-nav';
 
 describe('la rail: due gruppi, un comportamento a testa', () => {
   it('il gruppo "panel" è Assets, Brands e Influencers, in quest\'ordine', () => {
@@ -93,5 +93,29 @@ describe('More su mobile', () => {
   it('le altre voci vanno dove va la rail', () => {
     const assets = MOBILE_MORE_ENTRIES.find((e) => e.id === 'assets')!;
     expect(mobileNavHref('x', assets)).toBe('/p/x/assets');
+  });
+});
+
+describe('un link diretto a un foglio su desktop apre la tela con il foglio', () => {
+  const cases: Array<[string, string, 'mobile' | 'desktop', 'sheet' | 'page']> = [
+    ['/calendar', '', 'desktop', 'sheet'],
+    ['/calendar', '?month=2026-10', 'desktop', 'sheet'],
+    ['/ads', '', 'desktop', 'sheet'],
+    ['/promote', '', 'desktop', 'sheet'],
+    ['/settings/billing', '', 'desktop', 'sheet'],
+    ['/settings/connected-accounts', '', 'desktop', 'sheet'],
+    ['/settings/connected-accounts', '?connected=instagram', 'desktop', 'page'],
+    ['/settings/facebook', '?tempToken=x', 'desktop', 'page'],
+    ['/settings/linkedin', '', 'desktop', 'page'],
+    ['/settings/connect/instagram', '', 'desktop', 'page'],
+    ['/calendar', '', 'mobile', 'page'],
+    ['/settings/billing', '', 'mobile', 'page'],
+    ['/assets', '', 'desktop', 'page'],
+    ['/brands/new', '', 'desktop', 'page'],
+    ['/c/abc', '', 'desktop', 'page']
+  ];
+
+  it.each(cases)('%s%s su %s → %s', (path, search, viewport, expected) => {
+    expect(directLoadMode(path, search, viewport)).toBe(expected);
   });
 });

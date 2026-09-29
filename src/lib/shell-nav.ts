@@ -1,3 +1,5 @@
+import type { Viewport } from '$lib/breakpoints';
+
 export type NavFamily = 'panel' | 'sheet';
 
 export type NavEntry = {
@@ -100,3 +102,23 @@ export function activeMobileTab(projectId: string, pathname: string, view: Mobil
 export const MOBILE_MORE_ENTRIES: NavEntry[] = NAV_ENTRIES.filter(
   (entry) => entry.group !== 'hidden' && entry.id !== 'calendar'
 );
+
+export type DirectLoadMode = 'sheet' | 'page';
+
+const PAGE_ONLY_PREFIXES = ['/settings/facebook', '/settings/linkedin', '/settings/connect/'];
+const PAGE_ONLY_QUERY_KEYS = ['connected'];
+
+const VIEWPORT_ALLOWS_SHEET: Record<Viewport, boolean> = {
+  mobile: false,
+  desktop: true
+};
+
+export function directLoadMode(path: string, search: string, viewport: Viewport): DirectLoadMode {
+  const params = new URLSearchParams(search);
+  const pageOnly =
+    !VIEWPORT_ALLOWS_SHEET[viewport] ||
+    !sheetEntryForPath(path) ||
+    PAGE_ONLY_PREFIXES.some((prefix) => path.startsWith(prefix)) ||
+    PAGE_ONLY_QUERY_KEYS.some((key) => params.has(key));
+  return pageOnly ? 'page' : 'sheet';
+}
