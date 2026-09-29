@@ -102,6 +102,10 @@ export const AUDIO_OPERATION_IDS = Object.keys(AUDIO_OPERATIONS) as AudioOperati
 
 export const DEFAULT_AUDIO_OPERATION: AudioOperationId = 'text_to_speech';
 
+export const AUDIO_PROVIDER = { provider: 'elevenlabs', providerLabel: 'ElevenLabs' } as const;
+
+export const AUDIO_INPUT_MODALITIES = ['text', 'audio', 'video'];
+
 export const DUBBING_LANGUAGES: Record<string, string> = {
   en: 'English',
   it: 'Italian',

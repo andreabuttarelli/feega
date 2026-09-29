@@ -1,6 +1,7 @@
 export type SharedView =
   | { kind: 'image'; url: string }
   | { kind: 'video'; url: string }
+  | { kind: 'audio'; url: string }
   | { kind: 'text'; text: string }
   | { kind: 'doc'; content: string }
   | { kind: 'frame'; url: string; html: string }

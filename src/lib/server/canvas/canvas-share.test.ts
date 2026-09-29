@@ -132,6 +132,30 @@ describe('readSharedCanvas', () => {
   });
 });
 
+describe('readSharedCanvas — audio', () => {
+  it('an audio node shares a player, a dubbed video shares a video', async () => {
+    const { db } = fakeDb(
+      {
+        canvases: [CANVAS],
+        nodes: [node('n-voice', 'audio', { prompt: 'p', refId: 'a-mp3' }), node('n-dub', 'audio', { prompt: '', refId: 'a-dub' })],
+        nodes_connections: [],
+        assets: [
+          { id: 'a-mp3', org_id: 'org-1', type: 'audio', source: 'generated', url: 'u1/media/audio/v.mp3', content: null },
+          { id: 'a-dub', org_id: 'org-1', type: 'video', source: 'generated', url: 'u1/media/audio/d.mp4', content: null }
+        ]
+      },
+      { filter: true }
+    );
+
+    const shared = await readSharedCanvas(db, 'tok-live', sign);
+
+    expect(shared?.nodes.map((n) => n.view)).toEqual([
+      { kind: 'audio', url: 'https://signed/u1/media/audio/v.mp3' },
+      { kind: 'video', url: 'https://signed/u1/media/audio/d.mp4' }
+    ]);
+  });
+});
+
 describe('SHARED_VIEW_OF', () => {
   it('ha una vista per ogni tipo che nodes_type_check ammette, e nessuna di troppo', () => {
     expect(Object.keys(SHARED_VIEW_OF).sort()).toEqual([...NODE_TYPES].sort());

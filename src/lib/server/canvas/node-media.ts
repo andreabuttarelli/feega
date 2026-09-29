@@ -15,7 +15,8 @@ const PREVIEWABLE: Record<AssetType, boolean> = {
   video: false,
   text: false,
   iframe: false,
-  document: false
+  document: false,
+  audio: false
 };
 
 const NODE_ASSET_FIELDS = ['refId', 'assetId'] as const;

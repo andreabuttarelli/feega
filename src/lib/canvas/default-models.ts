@@ -1,19 +1,22 @@
-export type GenerativeMedium = 'text' | 'image' | 'video';
+export type GenerativeMedium = 'text' | 'image' | 'video' | 'audio';
 
 import { TIER_ORDER, type RecommendationTier } from './recommended-models';
+import { DEFAULT_AUDIO_OPERATION, defaultAudioModel } from './audio-operations';
 
 export type ModelChoiceLike = { id: string; tiers?: readonly RecommendationTier[] };
 
 const MEDIUM_PHRASE: Record<GenerativeMedium, string> = {
   text: 'a text',
   image: 'an image',
-  video: 'a video'
+  video: 'a video',
+  audio: 'an audio'
 };
 
 export const DEFAULT_MODEL: Record<GenerativeMedium, string> = {
   text: 'anthropic/claude-haiku-4.5',
   image: 'nano-banana-2',
-  video: 'bytedance/seedance-2-fast'
+  video: 'bytedance/seedance-2-fast',
+  audio: defaultAudioModel(DEFAULT_AUDIO_OPERATION)
 };
 
 export function effectiveModel(

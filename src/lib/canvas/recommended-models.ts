@@ -39,13 +39,15 @@ type Weights = { recency: number; benchmark: number; capability: number; priceTi
 const QUALITY_WEIGHTS: Record<GenerativeMedium, Weights> = {
   text: { recency: 0.3, benchmark: 0.5, capability: 0.1, priceTier: 0.1 },
   image: { recency: 0.6, benchmark: 0, capability: 0.2, priceTier: 0.2 },
-  video: { recency: 0.6, benchmark: 0, capability: 0.2, priceTier: 0.2 }
+  video: { recency: 0.6, benchmark: 0, capability: 0.2, priceTier: 0.2 },
+  audio: { recency: 0.6, benchmark: 0, capability: 0.2, priceTier: 0.2 }
 };
 
 const COST_UNIT: Record<GenerativeMedium, string> = {
   text: 'M output tokens',
   image: 'image',
-  video: 'second'
+  video: 'second',
+  audio: 'second'
 };
 
 const RECENCY_HORIZON_MONTHS = 24;

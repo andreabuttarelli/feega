@@ -50,7 +50,8 @@ export const NODE_TYPES = [
   'list',
   'select',
   'effects',
-  'composition'
+  'composition',
+  'audio'
 ] as const;
 
 function syncStatusOf(v: unknown): SyncStatus {

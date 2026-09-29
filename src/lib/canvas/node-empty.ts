@@ -14,5 +14,6 @@ export const NODE_EMPTY_HINT: Record<NodeType, string> = {
   list: 'Add items to the list.',
   select: 'Connect a list to pick one item.',
   effects: 'Connect an image or a video to apply effects.',
-  composition: 'Connect images to compose them.'
+  composition: 'Connect images to compose them.',
+  audio: 'Pick an operation, then write or connect what to voice.'
 };

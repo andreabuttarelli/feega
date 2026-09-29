@@ -22,7 +22,7 @@ describe('audio operations table', () => {
     for (const id of AUDIO_OPERATION_IDS) {
       const op = AUDIO_OPERATIONS[id];
       expect(op.label.length).toBeGreaterThan(0);
-      expect(op.usdPerUnit[op.defaultModel]).toBeGreaterThan(0);
+      expect((op.usdPerUnit as Record<string, number>)[op.defaultModel]).toBeGreaterThan(0);
       expect(['character', 'second']).toContain(op.billedPer);
     }
   });

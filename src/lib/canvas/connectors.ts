@@ -108,7 +108,8 @@ const NODE_OUTPUT: Partial<Record<string, ConnectorType>> = {
   influencer: 'images',
   video: 'videos',
   effects: 'images',
-  composition: 'videos'
+  composition: 'videos',
+  audio: 'audios'
 };
 
 export function outputConnectorOf(nodeType: string, mediaKind?: 'image' | 'video'): ConnectorType | null {
@@ -128,7 +129,7 @@ const CONNECTOR_MODALITY: Record<Exclude<ConnectorType, 'first_frame' | 'last_fr
   audios: 'audio'
 };
 
-export type GenerativeNodeKind = 'text' | 'image' | 'video';
+export type GenerativeNodeKind = 'text' | 'image' | 'video' | 'audio';
 
 /**
  * I CONNETTORI DI QUESTO NODO, ORA — in un ORDINE STABILE (`CONNECTOR_TYPES`), perché la UI li

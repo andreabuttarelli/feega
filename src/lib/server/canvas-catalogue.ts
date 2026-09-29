@@ -32,6 +32,20 @@ import { TEXT_NODE_CREDITS } from '$lib/server/content-cost';
 import { CREDITS_PER_USD_SUBSCRIPTION_LIST } from '$lib/credit-ladder';
 import { withRecommendations, type CandidateModel, type Recommendation } from '$lib/canvas/recommended-models';
 import { syncedCandidates } from './recommended-models';
+import { AUDIO_INPUT_MODALITIES, AUDIO_OPERATION_IDS, AUDIO_PROVIDER, audioModelsOf, operationSpec } from '$lib/canvas/audio-operations';
+
+function audioChoices(): ModelChoice[] {
+  return AUDIO_OPERATION_IDS.flatMap((operation) =>
+    audioModelsOf(operation).map((id) => ({
+      id,
+      label: `${operationSpec(operation).label} · ${id}`,
+      aspectRatios: [],
+      ...AUDIO_PROVIDER,
+      wireId: id,
+      inputModalities: AUDIO_INPUT_MODALITIES
+    }))
+  );
+}
 
 export type MediumCatalogue = {
   choices: ModelChoice[];
@@ -82,6 +96,7 @@ export async function canvasModelCatalogue(): Promise<Record<GenMedium, MediumCa
   return {
     text: { ...withRecommendations('text', textChoices, textSynced, now), synced: true },
     image: { ...image, ...withRecommendations('image', image.choices, imageSynced, now), enhanceUnitCredits: TEXT_NODE_CREDITS },
-    video: { ...video, ...withRecommendations('video', video.choices, videoSynced, now), enhanceUnitCredits: TEXT_NODE_CREDITS }
+    video: { ...video, ...withRecommendations('video', video.choices, videoSynced, now), enhanceUnitCredits: TEXT_NODE_CREDITS },
+    audio: { choices: audioChoices(), synced: true, recommended: [], candidates: [] }
   };
 }

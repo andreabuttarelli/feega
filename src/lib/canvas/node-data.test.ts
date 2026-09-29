@@ -29,7 +29,8 @@ describe('NODE_DATA_SCHEMAS — una riga per tipo, tutti i 10 valori di nodes_ty
         'social_account_feed',
         'social_post_mockup',
         'text',
-        'video'
+        'video',
+        'audio'
       ].sort()
     );
   });

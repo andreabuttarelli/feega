@@ -28,7 +28,8 @@ const NODE_SIZE: Record<NodeType, () => Size> = {
   list: listNodeSize,
   select: selectNodeSize,
   effects: effectsNodeSize,
-  composition: compositionNodeSize
+  composition: compositionNodeSize,
+  audio: () => genNodeSize('audio')
 };
 
 export function nodeSize(type: string): Size {

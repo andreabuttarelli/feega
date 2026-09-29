@@ -38,7 +38,7 @@ const NOT_READY: readonly Addable[] = ['iframe'];
 
 export const CANVAS_ADD_BAR = CANVAS_ADDABLE.filter((w) => !NOT_READY.includes(w));
 
-export const CANVAS_BAR_MAIN: readonly Addable[] = GEN_MEDIUMS;
+export const CANVAS_BAR_MAIN: readonly Addable[] = ['text', 'image', 'video'];
 
 export const CANVAS_BAR_MORE = CANVAS_ADD_BAR.filter((w) => !CANVAS_BAR_MAIN.includes(w));
 
@@ -71,5 +71,6 @@ export const ADDABLE_LABEL: Record<Addable, string> = {
   list: 'List',
   select: 'Select',
   effects: 'Effects',
-  composition: 'Composition'
+  composition: 'Composition',
+  audio: 'Audio'
 };

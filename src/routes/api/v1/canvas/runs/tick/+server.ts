@@ -3,7 +3,7 @@ import { json } from '@sveltejs/kit';
 import { createServiceRoleDb } from '$lib/server/db/client';
 import { SERVICE_ROLE_USES } from '$lib/server/db/service-role-uses';
 import { cronAuthorized } from '$lib/server/cron-auth';
-import { expireStuckRuns, reconcileVideoNodeRuns } from '$lib/server/canvas/generate';
+import { expireStuckRuns, reconcileAudioNodeRuns, reconcileVideoNodeRuns } from '$lib/server/canvas/generate';
 import { drainLoopQueue } from '$lib/server/canvas/loop';
 import { drainWorkflowQueue } from '$lib/server/canvas/workflow';
 import { pruneOldCanvasEvents } from '$lib/server/canvas/retention';
@@ -48,6 +48,11 @@ export const GET: RequestHandler = async ({ request }) => {
     return { checked: 0, done: 0, failed: 0, pending: 0 };
   });
 
+  const audios = await reconcileAudioNodeRuns(db).catch((e) => {
+    console.error('[canvas runs] audio reconcile failed', e);
+    return { checked: 0, done: 0, failed: 0, pending: 0 };
+  });
+
   const loops = await drainLoopQueue(db, { limit: LOOP_DRAIN_BATCH }).catch((e) => {
     console.error('[canvas runs] loop drain failed', e);
     return { claimed: 0, done: 0, failed: 0 };
@@ -79,7 +84,7 @@ export const GET: RequestHandler = async ({ request }) => {
         })
       : { charged: 0, paused: 0, alreadyCharged: 0, skipped: true };
 
-  return json({ ...runs, videos, loops, workflows, events, seats });
+  return json({ ...runs, videos, audios, loops, workflows, events, seats });
 };
 
 export const POST = GET;

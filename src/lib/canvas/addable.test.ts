@@ -39,7 +39,8 @@ describe('cosa si può mettere sulla tela', () => {
     expect(isAddable('doc')).toBe(true);
     expect(isAddable('iframe')).toBe(true);
     expect(isAddable('image')).toBe(true);
-    expect(isAddable('audio')).toBe(false);
+    expect(isAddable('audio')).toBe(true);
+    expect(isAddable('podcast')).toBe(false);
   });
 
   it('sa dire quali fra questi sono nodi che producono, e quali no', () => {

@@ -12,6 +12,7 @@ import {
   type UpstreamNode
 } from '$lib/canvas/upstream-inputs';
 import type { Modalities } from '$lib/canvas/connectors';
+import { AUDIO_INPUT_MODALITIES } from '$lib/canvas/audio-operations';
 import { isSelectableSourceType } from '$lib/canvas/select-node';
 import type { SelectableItem } from '$lib/canvas/select-sources';
 import {
@@ -375,7 +376,7 @@ export async function upstreamInputsFor(
     canvasId: string;
     nodeId: string;
     model?: string | null;
-    medium?: 'text' | 'image' | 'video';
+    medium?: 'text' | 'image' | 'video' | 'audio';
     /** Un'iterazione di loop (`loop.ts`): quale item (1-based) di ogni `list` nominata qui vede
      *  QUESTA chiamata, invece della lista intera. Assente = comportamento `fixed`, invariato. */
     iterateSelection?: Record<string, number>;
@@ -392,7 +393,9 @@ export async function upstreamInputsFor(
   }
 
   const resolvedModalities =
-    modalities ?? (scope.medium === 'text' && scope.model ? await textModalitiesFor(scope.model) : null);
+    modalities ??
+    (scope.medium === 'audio' ? { input: AUDIO_INPUT_MODALITIES } : null) ??
+    (scope.medium === 'text' && scope.model ? await textModalitiesFor(scope.model) : null);
 
   const [nodeRows, connectionRows] = await Promise.all([
     listNodes(db, { orgId: scope.orgId, canvasId: scope.canvasId }),

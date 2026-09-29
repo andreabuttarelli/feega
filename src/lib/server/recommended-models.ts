@@ -1,5 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { GenerativeMedium } from '$lib/canvas/default-models';
+
+type CatalogueMedium = Exclude<GenerativeMedium, 'audio'>;
 import type { CandidateModel } from '$lib/canvas/recommended-models';
 import type { AiModelCatalogue } from './ai-models-sync';
 
@@ -21,7 +23,7 @@ const MEGAPIXELS_PER_1K_IMAGE = 1;
 const VIDEO_TOKENS_PER_SECOND_720P = (1280 * 720 * 24) / 1024;
 const CENTS_PER_USD = 100;
 
-const CATALOGUE_OF: Record<GenerativeMedium, AiModelCatalogue> = { text: 'chat', image: 'image', video: 'video' };
+const CATALOGUE_OF: Record<CatalogueMedium, AiModelCatalogue> = { text: 'chat', image: 'image', video: 'video' };
 
 const IMAGE_LINE_USD: Record<string, (cost: number) => number> = {
   image: (cost) => cost,
@@ -72,7 +74,7 @@ function videoCost(pricing: unknown): number | null {
   return cheapest(costs);
 }
 
-const UNIT_COST: Record<GenerativeMedium, (pricing: unknown) => number | null> = {
+const UNIT_COST: Record<CatalogueMedium, (pricing: unknown) => number | null> = {
   text: textCost,
   image: imageCost,
   video: videoCost
@@ -82,13 +84,13 @@ function declaredOptions(row: ReleaseRow): number {
   return (row.supported_resolutions?.length ?? 0) + Object.keys(row.param_schema ?? {}).length;
 }
 
-const CAPABILITY: Record<GenerativeMedium, (row: ReleaseRow) => number> = {
+const CAPABILITY: Record<CatalogueMedium, (row: ReleaseRow) => number> = {
   text: (row) => row.context_length ?? 0,
   image: declaredOptions,
   video: declaredOptions
 };
 
-export function candidateOf(medium: GenerativeMedium, row: ReleaseRow): CandidateModel {
+export function candidateOf(medium: CatalogueMedium, row: ReleaseRow): CandidateModel {
   return {
     id: row.id,
     label: row.label ?? row.id,
@@ -100,7 +102,7 @@ export function candidateOf(medium: GenerativeMedium, row: ReleaseRow): Candidat
   };
 }
 
-export async function syncedCandidates(admin: SupabaseClient, medium: GenerativeMedium): Promise<CandidateModel[]> {
+export async function syncedCandidates(admin: SupabaseClient, medium: CatalogueMedium): Promise<CandidateModel[]> {
   const { data, error } = await admin
     .from('ai_models')
     .select('id, label, released_at, expires_at, context_length, intelligence_index, supported_resolutions, param_schema, pricing')
