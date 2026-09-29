@@ -13,7 +13,7 @@ const BILLING_SUBPATH = '/settings/billing';
 import { CHECKOUT_LINK, statusForFailure } from '@feega/api-contracts';
 
 const SUBSCRIPTION_RUNGS = CREDIT_LADDER.map((rung) => ({
-  usd: rung.price,
+  credits: rung.price,
   label: `€${rung.price}/mo`
 }));
 
@@ -56,7 +56,7 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
     );
   }
 
-  const wanted = parsed.data.usd;
+  const wanted = parsed.data.credits;
   const rung = wanted != null ? rungFor(wanted) : undefined;
   if (wanted != null && !rung) {
     return json(

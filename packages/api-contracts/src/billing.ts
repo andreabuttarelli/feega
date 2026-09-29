@@ -5,7 +5,7 @@ const LinkSchema = z
   .string()
   .describe('One-time Stripe URL. Give it to the account owner and keep no copy');
 
-const PlanSchema = z.object({ usd: z.number(), label: z.string() });
+const PlanSchema = z.object({ credits: z.number(), label: z.string() });
 
 const PortalInputSchema = z.object({}).strict();
 
@@ -16,11 +16,11 @@ const PortalResultSchema = z.object({
 
 const CheckoutInputSchema = z
   .object({
-    usd: z
+    credits: z
       .number()
       .positive()
       .optional()
-      .describe('Monthly plan in EUR the human wants: 8, 16, 32, 64, 128 or 256 (field name kept for compatibility)')
+      .describe('Monthly credits the human wants: 8, 16, 32, 64, 128 or 256 (1 credit = €1)')
   })
   .strict();
 
@@ -92,10 +92,10 @@ export const CHECKOUT_LINK = {
 
 const OneTimeCheckoutInputSchema = z
   .object({
-    usd: z
+    credits: z
       .number()
       .positive()
-      .describe('One-time top-up in EUR, 1 credit per euro: 8, 16, 32, 64, 128 or 256')
+      .describe('One-time top-up in credits (1 credit = €1): 8, 16, 32, 64, 128 or 256')
   })
   .strict();
 
