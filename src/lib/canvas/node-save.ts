@@ -1,3 +1,5 @@
+import { baseOf, type NodeData } from './node-patch';
+
 export enum SaveFailure {
   Conflict = 'conflict',
   Invalid = 'invalid',
@@ -72,7 +74,7 @@ export function saveMessage(reason: SaveFailure, data: { message?: string } = {}
   return SAVE_MESSAGES[reason];
 }
 
-type Row = { id: string; version: number; data: Record<string, unknown> };
+type Row = { id: string; version: number; data: Record<string, unknown>; saved?: Record<string, unknown> };
 
 export function adoptIdleRows<T extends Row>(local: T[], server: Row[], busy: (id: string) => boolean): T[] {
   const fresh = new Map(server.map((row) => [row.id, row]));
@@ -82,7 +84,7 @@ export function adoptIdleRows<T extends Row>(local: T[], server: Row[], busy: (i
     if (!row || busy(tile.id) || row.version <= tile.version) {
       return tile;
     }
-    return { ...tile, version: row.version, data: row.data };
+    return { ...tile, version: row.version, data: row.data, saved: row.data };
   });
 }
 
@@ -90,14 +92,13 @@ type Written = { id: string; version: number; data: Record<string, unknown> };
 
 export type WriteOutcome =
   | { ok: true; node: Written }
-  | { ok: false; reason: SaveFailure; data: Record<string, unknown>; detail?: FailureData };
+  | { ok: false; reason: SaveFailure; patch: NodeData; detail?: FailureData };
 
 export type WriteAttempt = {
-  send: (version: number, data: Record<string, unknown>) => Promise<ActionAnswer>;
-  reread: () => Promise<{ version: number; data: Record<string, unknown> } | null>;
-  version: number;
-  patch: Record<string, unknown>;
-  data: Record<string, unknown>;
+  send: (patch: NodeData, base: NodeData) => Promise<ActionAnswer>;
+  reread: () => Promise<NodeData | null>;
+  patch: NodeData;
+  base: NodeData;
 };
 
 function written(result: ActionAnswer): Written | null {
@@ -108,7 +109,7 @@ function written(result: ActionAnswer): Written | null {
 }
 
 export async function writeWithRetry(attempt: WriteAttempt): Promise<WriteOutcome> {
-  const first = await attempt.send(attempt.version, attempt.data);
+  const first = await attempt.send(attempt.patch, attempt.base);
   const node = written(first);
   if (node) {
     return { ok: true, node };
@@ -116,18 +117,18 @@ export async function writeWithRetry(attempt: WriteAttempt): Promise<WriteOutcom
 
   const reason = failureOf(first);
   if (reason !== SaveFailure.Conflict) {
-    return { ok: false, reason, data: attempt.data, detail: dataOf(first) };
+    return { ok: false, reason, patch: attempt.patch, detail: dataOf(first) };
   }
 
   const fresh = await attempt.reread();
   if (!fresh) {
-    return { ok: false, reason: SaveFailure.Gone, data: attempt.data };
+    return { ok: false, reason: SaveFailure.Gone, patch: attempt.patch };
   }
 
-  const second = await attempt.send(fresh.version, { ...fresh.data, ...attempt.patch });
+  const second = await attempt.send(attempt.patch, baseOf(fresh, attempt.patch));
   const retried = written(second);
   if (retried) {
     return { ok: true, node: retried };
   }
-  return { ok: false, reason: failureOf(second), data: attempt.data, detail: dataOf(second) };
+  return { ok: false, reason: failureOf(second), patch: attempt.patch, detail: dataOf(second) };
 }

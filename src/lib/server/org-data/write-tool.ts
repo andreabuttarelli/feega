@@ -20,6 +20,9 @@ import type { OrgQueryAuthority } from './query-tool';
 import { announcePresence } from './presence';
 import type { Actor } from '$lib/server/repos/actor';
 import { validateNodeData, validateNodeDataPatch } from '$lib/canvas/node-data';
+import { mergeNodeData, type NodeData } from '$lib/canvas/node-patch';
+
+type NodeMerge = { id: string; version: number; data: NodeData };
 import { jsonbColumnsOf, validateJsonbColumn } from './jsonb-schemas';
 
 const NODES_TABLE = 'nodes';
@@ -299,6 +302,50 @@ export function createOrgWriteTools({ authority, orgId, userId, threadId, actor 
     return out.filter('org_id', 'eq', orgId);
   };
 
+  const writeMergedNodes = async (
+    table: OrgTable,
+    values: Record<string, unknown>,
+    merged: NodeMerge[],
+    matched: number,
+    t0: number
+  ) => {
+    const rows: Array<Record<string, unknown>> = [];
+    const conflicts: string[] = [];
+
+    for (const node of merged) {
+      const written = await supabase
+        .from(table)
+        .update({ ...values, data: node.data, version: node.version + 1 })
+        .filter('id', 'eq', node.id)
+        .filter('version', 'eq', String(node.version))
+        .filter('org_id', 'eq', orgId)
+        .select()
+        .abortSignal(AbortSignal.timeout(WRITE_ABORT_MS));
+
+      if (written.error) return failed(table, written.error, `org_db_write:${table}:update:err:${written.error.code ?? '?'}`, t0);
+
+      const landed = (written.data ?? []) as Array<Record<string, unknown>>;
+      if (!landed.length) {
+        conflicts.push(node.id);
+      }
+      rows.push(...landed);
+    }
+
+    await canvasAnnounce(table, rows);
+    return finish(
+      {
+        table,
+        rows,
+        updated: rows.length,
+        matched,
+        conflicts,
+        note: `data was merged into each row: keys you did not send are kept, a key set to null is removed.${conflicts.length ? ' Rows in conflicts changed while writing: read them again and retry.' : ''}`
+      },
+      `org_db_write:${table}:update:merged:rows=${rows.length}/${matched}`,
+      t0
+    );
+  };
+
   const updateRow = async (input: UpdateInput) => {
     const t0 = Date.now();
     const values = input.values ?? {};
@@ -373,20 +420,25 @@ export function createOrgWriteTools({ authority, orgId, userId, threadId, actor 
     }
 
     if (table === NODES_TABLE && 'data' in values) {
-      const current = await filtered(supabase.from(table).select('id, type, data'), where)
+      const current = await filtered(supabase.from(table).select('id, type, data, version'), where)
         .limit(UPDATE_MAX_ROWS)
         .abortSignal(AbortSignal.timeout(WRITE_ABORT_MS));
 
       if (current.error) return failed(table, current.error, `org_db_write:${table}:precheck:err:${current.error.code ?? '?'}`, t0);
 
-      for (const row of (current.data ?? []) as Array<{ id: string; type: string; data: unknown }>) {
+      const merged: NodeMerge[] = [];
+      for (const row of (current.data ?? []) as Array<{ id: string; type: string; data: unknown; version: number }>) {
         const type = String(values.type ?? row.type);
         const verdict = validateNodeDataPatch(type, row.data, values.data);
         if (!verdict.ok) {
           return finish(invalidNodeData(`node ${row.id}: ${verdict.error}`), 'org_db_write:refused:invalid_node_data', t0);
         }
+        merged.push({ id: row.id, version: row.version, data: mergeNodeData((row.data ?? {}) as NodeData, values.data as NodeData) });
       }
-    } else if (table !== NODES_TABLE) {
+
+      return writeMergedNodes(table, values, merged, matched, t0);
+    }
+    if (table !== NODES_TABLE) {
       const refusedJsonb = firstInvalidJsonbColumn(table, values);
       if (refusedJsonb) return finish(refusedJsonb, 'org_db_write:refused:invalid_jsonb_column', t0);
     }

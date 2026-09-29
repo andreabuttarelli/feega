@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeDb } from '$lib/server/db/fake-db';
-import { listNodes } from '$lib/server/repos/canvas';
-import { SaveFailure, writeWithRetry } from '$lib/canvas/node-save';
+import { DataCheck, listNodes, patchNodeData } from '$lib/server/repos/canvas';
+import { writeWithRetry } from '$lib/canvas/node-save';
 
 const gateOrgAiActionForForm = vi.fn();
 const listMemberships = vi.fn();
@@ -74,11 +74,11 @@ const serverRow = {
 	updated_at: '2026-09-29T00:00:00Z'
 };
 
-function writeEvent(db: unknown, version: number, data: Record<string, unknown>) {
+function writeEvent(db: unknown, patch: Record<string, unknown>, base: Record<string, unknown>) {
 	const fd = new FormData();
 	fd.set('node_id', NODE);
-	fd.set('version', String(version));
-	fd.set('data', JSON.stringify(data));
+	fd.set('patch', JSON.stringify(patch));
+	fd.set('base', JSON.stringify(base));
 	return {
 		request: { formData: () => Promise.resolve(fd) },
 		params: { canvasId: CANVAS },
@@ -103,33 +103,63 @@ beforeEach(() => {
 	findCanvasForUser.mockResolvedValue({ orgId: ORG, canvas: { projectId: 'project-1' } });
 });
 
-describe('actions.write with a version left behind by a dropped refresh', () => {
-	it('the stale write is a 409, and the retry lands the edit on the fresh row', async () => {
-		const { db, calls } = fakeDb({ nodes: [serverRow], canvas_events: [{}] }, { filter: true });
-		const send = async (version: number, data: Record<string, unknown>) =>
-			answerOf(await actions.write(writeEvent(db, version, data)));
-		const reread = async () => {
-			const row = (await listNodes(db, { orgId: ORG, canvasId: CANVAS })).find((node) => node.id === NODE);
-			return row ? { version: row.version, data: row.data } : null;
-		};
+function stored(rows: { nodes: Record<string, unknown>[] }) {
+	return rows.nodes[0] as { version: number; data: Record<string, unknown> };
+}
 
-		expect((await send(3, { prompt: 'mine' })).status).toBe(409);
+function kit(data: Record<string, unknown>, version = 7) {
+	const rows = { nodes: [{ ...serverRow, data, version }], canvas_events: [{}] };
+	const { db, calls } = fakeDb(rows, { filter: true, mutate: true });
+	const send = async (patch: Record<string, unknown>, base: Record<string, unknown>) =>
+		answerOf(await actions.write(writeEvent(db, patch, base)));
+	const reread = async () => {
+		const row = (await listNodes(db, { orgId: ORG, canvasId: CANVAS })).find((node) => node.id === NODE);
+		return row ? row.data : null;
+	};
+	return { db, calls, rows, send, reread };
+}
 
-		const out = await writeWithRetry({ send, reread, version: 3, patch: { prompt: 'mine' }, data: { prompt: 'mine' } });
+describe('actions.write merges a patch into the current row', () => {
+	it('a concurrent write on other keys survives the edit', async () => {
+		const { send, rows } = kit({ prompt: 'a white cat', status: 'done', refId: 'theirs' }, 8);
 
-		expect(out.ok).toBe(true);
-		const lastUpdate = calls.filter((c) => c.op === 'update' && c.table === 'nodes').at(-1)!;
-		expect(lastUpdate.filters).toContainEqual(['version', 7]);
-		expect(lastUpdate.payload).toMatchObject({ data: { prompt: 'mine', status: 'done', refId: 'asset-1' }, version: 8 });
+		const answer = await send({ prompt: 'a black cat' }, { prompt: 'a white cat' });
+
+		expect(answer.status).toBe(200);
+		expect(stored(rows)).toMatchObject({
+			version: 9,
+			data: { prompt: 'a black cat', status: 'done', refId: 'theirs' }
+		});
 	});
 
-	it('a write that still conflicts reports Conflict, not a generic failure', async () => {
-		const { db } = fakeDb({ nodes: [serverRow] }, { filter: true, updateRows: { nodes: [] } });
-		const send = async (version: number, data: Record<string, unknown>) =>
-			answerOf(await actions.write(writeEvent(db, version, data)));
+	it('the same key moved underneath is a 409, and the reapply lands on the fresh row', async () => {
+		const { send, reread, rows } = kit({ prompt: 'theirs', status: 'done', refId: 'asset-2' });
 
-		const out = await writeWithRetry({ send, reread: async () => ({ version: 7, data: {} }), version: 3, patch: {}, data: {} });
+		expect((await send({ prompt: 'mine' }, { prompt: 'a white cat' })).status).toBe(409);
+		expect(stored(rows).data.prompt).toBe('theirs');
 
-		expect(out).toMatchObject({ ok: false, reason: SaveFailure.Conflict });
+		const out = await writeWithRetry({ send, reread, patch: { prompt: 'mine' }, base: { prompt: 'a white cat' } });
+
+		expect(out.ok).toBe(true);
+		expect(stored(rows).data).toEqual({ prompt: 'mine', status: 'done', refId: 'asset-2' });
+	});
+
+	it('a merged row the schema refuses is a 400 and nothing is written', async () => {
+		const { send, rows } = kit({ prompt: 'a white cat' });
+
+		const answer = await send({ prompt: 42 }, { prompt: 'a white cat' });
+
+		expect(answer.status).toBe(400);
+		expect(stored(rows)).toMatchObject({ version: 7, data: { prompt: 'a white cat' } });
+	});
+
+	it('a worker closing a run and a user edit are both kept', async () => {
+		const { db, send, rows } = kit({ prompt: 'a white cat', running: true, runId: 'run-1' });
+
+		await send({ prompt: 'a black cat' }, { prompt: 'a white cat' });
+		await patchNodeData(db, { orgId: ORG, nodeId: NODE, patch: { running: false, refId: 'asset-9' }, check: DataCheck.None });
+
+		expect(stored(rows).data).toEqual({ prompt: 'a black cat', running: false, runId: 'run-1', refId: 'asset-9' });
+		expect(stored(rows).version).toBe(9);
 	});
 });

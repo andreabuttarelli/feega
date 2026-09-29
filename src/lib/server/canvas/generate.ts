@@ -16,7 +16,7 @@ import {
   setRunPrompt,
   type NodeRun
 } from '$lib/server/repos/node-runs';
-import { findNode, writeNodeData } from '$lib/server/repos/canvas';
+import { DataCheck, findNode, patchNodeData, writeNodeData } from '$lib/server/repos/canvas';
 import type { Actor } from '$lib/server/repos/actor';
 import { signMediaPaths } from './sign-media';
 import { composePrompt } from '$lib/canvas/compose-prompt';
@@ -132,16 +132,10 @@ async function depositVideo(
  * il nodo non mostra — recuperabile. Il contrario perderebbe il legame fra il nodo e quel che ha
  * fatto, che è la cosa che nessuna ricerca a mano in una libreria ricostruisce.
  */
-async function land(db: Db, input: StartRun, version: number, run: NodeRun, asset: Asset, costUsd?: number | null): Promise<RunOutcome> {
+async function land(db: Db, input: StartRun, run: NodeRun, asset: Asset, costUsd?: number | null): Promise<RunOutcome> {
   await completeRun(db, { orgId: input.orgId, runId: run.id, assetId: asset.id, costUsd });
 
-  const shown = await writeNodeDataRetrying(db, input, version, (prior) => ({
-    ...prior,
-    running: false,
-    runId: run.id,
-    refId: asset.id,
-    error: null
-  }));
+  const shown = await showRunState(db, input, { running: false, runId: run.id, refId: asset.id, error: null });
 
   if (!shown) {
     return { kind: 'conflict' };
@@ -149,57 +143,19 @@ async function land(db: Db, input: StartRun, version: number, run: NodeRun, asse
   return { kind: 'done', run: { ...run, status: 'done', outputAssetId: asset.id }, asset };
 }
 
-/**
- * Un giro che non atterra deve COMUNQUE abbassare `running`. Senza, il nodo resta in corso per
- * sempre e il bottone resta spento: il difetto che non si può più riprovare. `refId` di prima si
- * conserva — il risultato vecchio non sparisce perché il nuovo è fallito.
- *
- * QUESTA SCRITTURA NON PUÒ ESSERE PERSA A UN CONFLITTO DI VERSIONE. `writeNodeData` con
- * `expectedVersion` è la guardia giusta per il CONTENUTO — un secondo autore non deve sovrascrivere
- * il primo senza saperlo — ma una chiusura di errore non è contenuto: è il solo fatto che rimette
- * il nodo in condizione di essere riprovato. Un'altra scrittura arrivata nel mezzo (il trascinamento,
- * un altro campo) alza la versione, la guardia rifiuta scrivendo zero righe, e senza un ritentativo
- * quello zero passava per un successo silenzioso — il nodo restava `running:true` per sempre, il
- * difetto che questo commento sostituisce. Il ritentativo rilegge la versione VERA e ci scrive
- * sopra: un tetto di tentativi, non un ciclo infinito, perché un nodo cancellato nel mezzo non deve
- * far girare questa funzione all'infinito.
- */
-const GIVE_UP_MAX_ATTEMPTS = 5;
-
-/**
- * Riscrive `nodes.data` rileggendo la versione VERA a ogni conflitto, fino a un tetto di
- * tentativi. Condivisa da `giveUp` (chiusura d'errore) e dal riconciliatore video (chiusura di
- * successo arrivata da un cron, dove non c'è più una richiesta HTTP viva che possa riprovare da
- * sola): in entrambi i casi un conflitto perso lascerebbe il nodo `running:true` per sempre.
- */
-async function writeNodeDataRetrying(
+async function showRunState(
   db: Db,
   input: { orgId: string; nodeId: string; actor?: Actor },
-  version: number,
-  patch: (prior: Record<string, unknown>) => Record<string, unknown>
+  patch: Record<string, unknown>
 ): Promise<boolean> {
-  let attemptVersion = version;
-  for (let attempt = 0; attempt < GIVE_UP_MAX_ATTEMPTS; attempt++) {
-    const prior = await findNode(db, { orgId: input.orgId, nodeId: input.nodeId }).catch(() => null);
-    if (!prior) {
-      return false;
-    }
-
-    const written = await writeNodeData(db, {
-      orgId: input.orgId,
-      nodeId: input.nodeId,
-      expectedVersion: attemptVersion,
-      actor: input.actor,
-      data: patch(prior.data as Record<string, unknown>)
-    }).catch(() => null);
-
-    if (written?.outcome === 'written') {
-      return true;
-    }
-
-    attemptVersion = prior.version;
-  }
-  return false;
+  const written = await patchNodeData(db, {
+    orgId: input.orgId,
+    nodeId: input.nodeId,
+    patch,
+    check: DataCheck.None,
+    actor: input.actor
+  }).catch(() => null);
+  return written?.outcome === 'written';
 }
 
 /**
@@ -228,18 +184,10 @@ async function enhancedPromptFor(input: StartRun, prompt: string): Promise<strin
   }
 }
 
-async function giveUp(db: Db, input: StartRun, version: number, run: NodeRun, message: string): Promise<void> {
+async function giveUp(db: Db, input: StartRun, run: NodeRun, message: string): Promise<void> {
   await failRun(db, { orgId: input.orgId, runId: run.id, error: message }).catch(() => {});
 
-  await writeNodeDataRetrying(db, input, version, (prior) => ({
-    ...prior,
-    prompt: input.prompt,
-    model: input.model,
-    params: input.params,
-    running: false,
-    runId: run.id,
-    error: message
-  }));
+  await showRunState(db, input, { running: false, runId: run.id, error: message });
 }
 
 export async function runGenNode(db: Db, input: StartRun): Promise<RunOutcome> {
@@ -282,7 +230,6 @@ export async function runGenNode(db: Db, input: StartRun): Promise<RunOutcome> {
     await failRun(db, { orgId: input.orgId, runId: run.id, error: 'conflict' }).catch(() => {});
     return { kind: 'conflict' };
   }
-  const version = marked.node.version;
 
   // QUEL CHE LA TELA COLLEGA, DENTRO QUEL CHE SI MANDA AL MODELLO. Una lettura sola, prima dei tre
   // rami: `upstream-inputs.ts` è pura logica testata da sé (`upstream-inputs.test.ts`), e questa è
@@ -302,7 +249,7 @@ export async function runGenNode(db: Db, input: StartRun): Promise<RunOutcome> {
   // `refId` del giro precedente resta, solo `running`/`error` cambiano — il nodo mostra l'alert,
   // non perde il suo ultimo risultato.
   if (upstream.blocked) {
-    await giveUp(db, input, version, run, upstream.blocked);
+    await giveUp(db, input, run, upstream.blocked);
     return { kind: 'refused', error: upstream.blocked };
   }
 
@@ -314,7 +261,7 @@ export async function runGenNode(db: Db, input: StartRun): Promise<RunOutcome> {
   // lo stesso che il client mostra (`gen-history.ts::BLOCKED`, "Scrivi cosa vuoi"), la stessa
   // regola in un posto solo, non due verità che possono divergere.
   if (!prompt.trim()) {
-    await giveUp(db, input, version, run, 'prompt_required');
+    await giveUp(db, input, run, 'prompt_required');
     return { kind: 'refused', error: 'prompt_required' };
   }
 
@@ -343,7 +290,7 @@ export async function runGenNode(db: Db, input: StartRun): Promise<RunOutcome> {
         return { text: result.text, costUsd: billedUsdInScope() ?? null };
       });
       const asset = await depositText(db, input, text);
-      return land(db, input, version, run, asset, costUsd);
+      return land(db, input, run, asset, costUsd);
     }
 
     if (input.medium === 'image') {
@@ -370,7 +317,7 @@ export async function runGenNode(db: Db, input: StartRun): Promise<RunOutcome> {
       });
       if (!out.ok) {
         const message = 'reason' in out && out.reason ? `${out.error}: ${out.reason}` : out.error;
-        await giveUp(db, input, version, run, message);
+        await giveUp(db, input, run, message);
         return { kind: 'refused', error: message };
       }
 
@@ -380,10 +327,10 @@ export async function runGenNode(db: Db, input: StartRun): Promise<RunOutcome> {
         const message = generated?.storage_path === undefined
           ? 'store_failed: the render carried no storage path to deposit'
           : 'store_failed';
-        await giveUp(db, input, version, run, message);
+        await giveUp(db, input, run, message);
         return { kind: 'refused', error: message };
       }
-      return land(db, input, version, run, asset, out.costUsd);
+      return land(db, input, run, asset, out.costUsd);
     }
 
     const { generateVideoWithoutBrand } = await import('$lib/server/media-generate');
@@ -420,7 +367,7 @@ export async function runGenNode(db: Db, input: StartRun): Promise<RunOutcome> {
       referenceAudioUrls
     });
     if (!out.ok) {
-      await giveUp(db, input, version, run, out.error);
+      await giveUp(db, input, run, out.error);
       return { kind: 'refused', error: out.error };
     }
 
@@ -428,7 +375,7 @@ export async function runGenNode(db: Db, input: StartRun): Promise<RunOutcome> {
     return { kind: 'queued', run: { ...run, externalJobId: out.jobId } };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'render_failed';
-    await giveUp(db, input, version, run, message);
+    await giveUp(db, input, run, message);
     return { kind: 'refused', error: message };
   }
 }
@@ -448,7 +395,7 @@ export async function runGenNode(db: Db, input: StartRun): Promise<RunOutcome> {
  *                                          ├─→ video_renders(task_id) ──→ finishVideoRender
  *   depositVideo → assets ←────────────────┘                                    │
  *          │                                                          pending/done/failed
- *          └───────────────── writeNodeDataRetrying / giveUp ←────────────────┘
+ *          └───────────────── showRunState / giveUp ←────────────────┘
  *
  * IL CLAIM (`claimRun` → `finishing`) VIENE PRIMA DI TUTTO — stesso motivo di `video-render-queue.ts`:
  * due tick sovrapposti non devono scaricare e fatturare la stessa clip due volte. Un «non è ancora
@@ -574,7 +521,7 @@ export async function reconcileVideoNodeRuns(db: Db): Promise<VideoReconcileOutc
     try {
       const row = await findVideoRenderRow(db, run.externalJobId);
       if (!row) {
-        await giveUp(db, startRunShape, node.version, { ...run, status: 'finishing' }, 'video_render_row_missing');
+        await giveUp(db, startRunShape, { ...run, status: 'finishing' }, 'video_render_row_missing');
         failed += 1;
         continue;
       }
@@ -630,7 +577,7 @@ export async function reconcileVideoNodeRuns(db: Db): Promise<VideoReconcileOutc
           pending += 1;
           continue;
         }
-        await giveUp(db, startRunShape, node.version, { ...run, status: 'finishing' }, outcome.error);
+        await giveUp(db, startRunShape, { ...run, status: 'finishing' }, outcome.error);
         failed += 1;
         continue;
       }
@@ -642,16 +589,7 @@ export async function reconcileVideoNodeRuns(db: Db): Promise<VideoReconcileOutc
         { url: outcome.url, durationSeconds: outcome.durationSeconds }
       );
       await completeRun(db, { orgId: run.orgId, runId: run.id, assetId: asset.id, costUsd });
-      await writeNodeDataRetrying(db, startRunShape, node.version, (prior) => ({
-        ...prior,
-        prompt: startRunShape.prompt,
-        model: startRunShape.model,
-        params: startRunShape.params,
-        running: false,
-        runId: run.id,
-        refId: asset.id,
-        error: null
-      }));
+      await showRunState(db, startRunShape, { running: false, runId: run.id, refId: asset.id, error: null });
       done += 1;
     } catch (error) {
       if (claimedRenderId) {
@@ -664,7 +602,7 @@ export async function reconcileVideoNodeRuns(db: Db): Promise<VideoReconcileOutc
         pending += 1;
         continue;
       }
-      await giveUp(db, startRunShape, node.version, { ...run, status: 'finishing' }, message);
+      await giveUp(db, startRunShape, { ...run, status: 'finishing' }, message);
       failed += 1;
     }
   }
@@ -748,15 +686,7 @@ export async function expireStuckRuns(db: Db): Promise<ExpireOutcome> {
 
     await expireRun(db, { orgId: run.orgId, runId: run.id, error: RUN_TIMED_OUT });
 
-    const node = await findNode(db, { orgId: run.orgId, nodeId: run.nodeId }).catch(() => null);
-    if (node) {
-      await writeNodeData(db, {
-        orgId: run.orgId,
-        nodeId: run.nodeId,
-        expectedVersion: node.version,
-        data: { ...node.data, running: false, runId: run.id, error: RUN_TIMED_OUT }
-      }).catch(() => {});
-    }
+    await showRunState(db, run, { running: false, runId: run.id, error: RUN_TIMED_OUT });
 
     expired += 1;
   }
