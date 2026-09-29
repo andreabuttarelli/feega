@@ -78,13 +78,15 @@ export function moderationProfileOf(mode: ProjectMode, uncensored: boolean): Mod
   return MODERATION_PROFILE[mode][uncensored ? 'uncensored' : 'standard'];
 }
 
-type Offered = { choices: readonly { id: string }[]; recommended?: readonly { id: string }[] };
+const CATALOGUE_LISTS = ['choices', 'recommended', 'candidates'] as const;
+
+type Offered = { [L in (typeof CATALOGUE_LISTS)[number]]?: readonly { id: string }[] };
+
+function entryIn<M extends Offered>(mode: ProjectMode, entry: M): M {
+  const filtered = CATALOGUE_LISTS.filter((list) => entry[list]).map((list) => [list, offerableIn(mode, entry[list] ?? [])]);
+  return { ...entry, ...Object.fromEntries(filtered) };
+}
 
 export function catalogueIn<K extends string, M extends Offered>(mode: ProjectMode, catalogue: Record<K, M>): Record<K, M> {
-  return Object.fromEntries(
-    Object.entries<M>(catalogue).map(([medium, entry]) => [
-      medium,
-      { ...entry, choices: offerableIn(mode, entry.choices), ...(entry.recommended ? { recommended: offerableIn(mode, entry.recommended) } : {}) }
-    ])
-  ) as Record<K, M>;
+  return Object.fromEntries(Object.entries<M>(catalogue).map(([medium, entry]) => [medium, entryIn(mode, entry)])) as Record<K, M>;
 }

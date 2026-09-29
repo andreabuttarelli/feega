@@ -51,12 +51,13 @@ describe('project mode', () => {
 describe('catalogueIn', () => {
   it('drops wiro choices and recommendations from every medium of a standard project', () => {
     const catalogue = {
-      image: { choices: [{ id: 'wiro/a' }, { id: 'openai/b' }], recommended: [{ id: 'wiro/a' }, { id: 'openai/b' }] },
+      image: { choices: [{ id: 'wiro/a' }, { id: 'openai/b' }], recommended: [{ id: 'wiro/a' }, { id: 'openai/b' }], candidates: [{ id: 'wiro/a' }] },
       video: { choices: [{ id: 'wiro/v' }], recommended: [] }
     };
     const standard = catalogueIn(ProjectMode.Standard, catalogue);
     expect(standard.image.choices.map((c) => c.id)).toEqual(['openai/b']);
     expect(standard.image.recommended.map((c) => c.id)).toEqual(['openai/b']);
+    expect(standard.image.candidates).toEqual([]);
     expect(standard.video.choices).toEqual([]);
     expect(catalogueIn(ProjectMode.Nsfw, catalogue)).toEqual(catalogue);
   });
