@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { SaveFailure, adoptIdleRows, failureOf, saveMessage, writeWithRetry } from './node-save';
+import { SaveFailure, adoptIdleRows, failureOf, isOwnEcho, keepDirty, saveMessage, writeWithRetry } from './node-save';
 
 describe('failureOf: every server answer has one reason', () => {
   it.each([
@@ -40,15 +40,63 @@ describe('adoptIdleRows: a dropped snapshot still advances idle nodes', () => {
       { id: 'b', version: 6, data: { prompt: 'other' } }
     ];
 
-    const next = adoptIdleRows(local, server, (id) => id === 'b');
+    const next = adoptIdleRows(local, server, (id) => (id === 'b' ? ['prompt'] : []));
 
     expect(next[0]).toEqual({ id: 'a', version: 4, data: { prompt: 'old', status: 'done' }, saved: { prompt: 'old', status: 'done' } });
-    expect(next[1]).toEqual(local[1]);
+    expect(next[1]).toEqual({ id: 'b', version: 6, data: { prompt: 'typing' }, saved: { prompt: 'other' } });
+  });
+
+  it('a remote update merges other fields and never overwrites the one being typed', () => {
+    const local: Tile[] = [{ id: 'a', version: 3, data: { prompt: 'hello wor', model: 'm1' } }];
+    const server = [{ id: 'a', version: 4, data: { prompt: 'hello', model: 'm2' } }];
+
+    const next = adoptIdleRows(local, server, () => ['prompt']);
+
+    expect(next[0].data).toEqual({ prompt: 'hello wor', model: 'm2' });
+    expect(next[0].version).toBe(4);
   });
 
   it('never moves a version backwards', () => {
     const local: Tile[] = [{ id: 'a', version: 9, data: {} }];
-    expect(adoptIdleRows(local, [{ id: 'a', version: 7, data: { x: 1 } }], () => false)).toEqual(local);
+    expect(adoptIdleRows(local, [{ id: 'a', version: 7, data: { x: 1 } }], () => [])).toEqual(local);
+  });
+});
+
+describe('keepDirty: a full snapshot keeps unsent edits', () => {
+  it('overlays the local value of every dirty field on the fresh tile', () => {
+    const local: Tile[] = [{ id: 'a', version: 3, data: { prompt: 'typed', index: 2 } }];
+    const fresh: Tile[] = [
+      { id: 'a', version: 4, data: { prompt: 'stale', index: 5 } },
+      { id: 'b', version: 1, data: { prompt: 'new' } }
+    ];
+
+    const next = keepDirty(fresh, local, (id) => (id === 'a' ? ['prompt'] : []));
+
+    expect(next[0].data).toEqual({ prompt: 'typed', index: 5 });
+    expect(next[1]).toBe(fresh[1]);
+  });
+});
+
+describe('isOwnEcho: realtime does not refetch what this tab just wrote', () => {
+  const tiles: Tile[] = [{ id: 'a', version: 5, data: {} }];
+  const update = (version: number, table = 'nodes') =>
+    ({ table, eventType: 'UPDATE', new: { id: 'a', version } }) as const;
+
+  it('ignores an update the tab already holds', () => {
+    expect(isOwnEcho(update(5), tiles, () => false)).toBe(true);
+  });
+
+  it('ignores an update on a node whose save is in flight', () => {
+    expect(isOwnEcho(update(6), tiles, (id) => id === 'a')).toBe(true);
+  });
+
+  it('refetches a newer update from someone else', () => {
+    expect(isOwnEcho(update(6), tiles, () => false)).toBe(false);
+  });
+
+  it('refetches inserts, deletes and connections', () => {
+    expect(isOwnEcho({ table: 'nodes', eventType: 'INSERT', new: { id: 'z', version: 1 } }, tiles, () => false)).toBe(false);
+    expect(isOwnEcho(update(1, 'nodes_connections'), tiles, () => false)).toBe(false);
   });
 });
 

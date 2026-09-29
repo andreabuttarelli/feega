@@ -76,16 +76,50 @@ export function saveMessage(reason: SaveFailure, data: { message?: string } = {}
 
 type Row = { id: string; version: number; data: Record<string, unknown>; saved?: Record<string, unknown> };
 
-export function adoptIdleRows<T extends Row>(local: T[], server: Row[], busy: (id: string) => boolean): T[] {
+export function keepLocal(data: Record<string, unknown>, local: Record<string, unknown>, keys: string[]): Record<string, unknown> {
+  if (!keys.length) {
+    return data;
+  }
+  return { ...data, ...Object.fromEntries(keys.map((key) => [key, local[key]])) };
+}
+
+export function adoptIdleRows<T extends Row>(local: T[], server: Row[], dirtyKeys: (id: string) => string[]): T[] {
   const fresh = new Map(server.map((row) => [row.id, row]));
 
   return local.map((tile) => {
     const row = fresh.get(tile.id);
-    if (!row || busy(tile.id) || row.version <= tile.version) {
+    if (!row || row.version <= tile.version) {
       return tile;
     }
-    return { ...tile, version: row.version, data: row.data, saved: row.data };
+    return { ...tile, version: row.version, data: keepLocal(row.data, tile.data, dirtyKeys(tile.id)), saved: row.data };
   });
+}
+
+export function keepDirty<T extends Row>(fresh: T[], local: T[], dirtyKeys: (id: string) => string[]): T[] {
+  const mine = new Map(local.map((tile) => [tile.id, tile]));
+
+  return fresh.map((tile) => {
+    const held = mine.get(tile.id);
+    const keys = dirtyKeys(tile.id);
+    if (!held || !keys.length) {
+      return tile;
+    }
+    return { ...tile, data: keepLocal(tile.data, held.data, keys) };
+  });
+}
+
+type RealtimeChange = { table: string; eventType: string; new: unknown };
+
+export function isOwnEcho(change: RealtimeChange, tiles: Row[], saving: (id: string) => boolean): boolean {
+  if (change.table !== 'nodes' || change.eventType !== 'UPDATE') {
+    return false;
+  }
+  const row = (change.new ?? {}) as Partial<Row>;
+  const tile = tiles.find((known) => known.id === row.id);
+  if (!tile || typeof row.version !== 'number') {
+    return false;
+  }
+  return saving(tile.id) || row.version <= tile.version;
 }
 
 type Written = { id: string; version: number; data: Record<string, unknown> };
