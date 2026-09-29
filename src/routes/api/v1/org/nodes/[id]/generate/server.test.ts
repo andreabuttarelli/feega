@@ -174,6 +174,16 @@ describe('POST /api/v1/org/nodes/:id/generate', () => {
     expect(body.error).toBe('prompt_required');
   });
 
+  it('hands an MCP agent the moderation refusal verbatim, so it can say why', async () => {
+    const blocked = "This prompt was blocked: sexual content isn't allowed in feega's standard mode.";
+    runGenNode.mockResolvedValue({ kind: 'refused', error: blocked });
+
+    const { res, body } = await call(NODE, { medium: 'image', prompt: 'explicit', model: 'm', version: 3, params: {} });
+
+    expect(res.status).toBe(400);
+    expect(body.error).toBe(blocked);
+  });
+
   it('without a model, keeps the one already set on the node', async () => {
     findNode.mockResolvedValue({ ...NODE_ROW, data: { model: 'chosen-by-user' } });
     runGenNode.mockResolvedValue({ kind: 'done', run: { id: 'r' }, asset: { id: 'a' } });

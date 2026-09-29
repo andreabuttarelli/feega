@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MockLanguageModelV4 } from 'ai/test';
 
+const streamed = vi.fn();
+const { screenModelInput } = vi.hoisted(() => ({ screenModelInput: vi.fn() }));
+vi.mock('$lib/server/moderation/model-input', () => ({ screenModelInput }));
+
 const saveTurn = vi.fn(async (_db: unknown, _turn: { role: string; content?: string }) => undefined);
 
 let releaseTail: () => void = () => {};
@@ -8,7 +12,9 @@ let releaseTail: () => void = () => {};
 function slowModel() {
   const tail = new Promise<void>((resolve) => (releaseTail = resolve));
   return new MockLanguageModelV4({
-    doStream: async () => ({
+    doStream: async () => {
+      streamed();
+      return {
       stream: new ReadableStream({
         async start(controller) {
           controller.enqueue({ type: 'stream-start', warnings: [] });
@@ -28,7 +34,8 @@ function slowModel() {
           controller.close();
         }
       })
-    })
+      };
+    }
   });
 }
 
@@ -89,7 +96,25 @@ async function assistantSaved() {
 }
 
 describe('POST /api/v1/projects/[projectId]/agent', () => {
-  beforeEach(() => saveTurn.mockClear());
+  beforeEach(() => {
+    saveTurn.mockClear();
+    streamed.mockClear();
+    screenModelInput.mockReset();
+    screenModelInput.mockResolvedValue({ ok: true });
+  });
+
+  it('refuses a sexual message before the model sees it, and saves no turn', async () => {
+    const blocked = "This prompt was blocked: sexual content isn't allowed in feega's standard mode.";
+    screenModelInput.mockResolvedValue({ ok: false, error: blocked });
+
+    const res = await POST(postEvent());
+
+    expect(res.status).toBe(422);
+    expect(await res.json()).toEqual({ error: blocked, code: 'prompt_blocked' });
+    expect(streamed).not.toHaveBeenCalled();
+    expect(saveTurn).not.toHaveBeenCalled();
+    expect(screenModelInput.mock.calls[0][1]).toMatchObject({ profile: 'standard', texts: ['make a doc'], scope: { orgId: 'org-1', userId: 'u-1', projectId: 'p-1' } });
+  });
 
   it('salva la risposta anche se il client chiude la connessione a metà turno', async () => {
     const res = await POST(postEvent());

@@ -220,8 +220,17 @@ describe('an image node on a Wiro model', () => {
     expect(gateway.run).not.toHaveBeenCalled();
   });
 
-  it('fails closed when the classifier is unavailable', async () => {
+  it('asks the LLM judge on a standard Wiro model when the classifier is unavailable', async () => {
     decide.mockRejectedValue(new Error('jev_not_configured'));
+    judge.mockResolvedValue({ allowed: true, category: 'safe', reason: 'landscape' });
+    const { db } = canvas();
+    expect((await runGenNode(db, start(SAFE, 'a mountain lake'))).kind).toBe('queued');
+    expect(judge).toHaveBeenCalledOnce();
+  });
+
+  it('fails closed when both the classifier and the judge are unavailable', async () => {
+    decide.mockRejectedValue(new Error('jev_not_configured'));
+    judge.mockRejectedValue(new Error('judge down'));
     const { db } = canvas();
     expect(await runGenNode(db, start(SAFE, 'a mountain lake'))).toMatchObject({ kind: 'refused', error: expect.stringMatching(/moderation_unavailable/) });
     expect(gateway.run).not.toHaveBeenCalled();

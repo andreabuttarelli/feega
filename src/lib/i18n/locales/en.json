@@ -568,7 +568,8 @@
         "load": "Couldn't load the conversation.",
         "send": "The agent didn't answer.",
         "empty": "The agent returned an empty reply.",
-        "credits": "You're out of AI credits for this period."
+        "credits": "You're out of AI credits for this period.",
+        "blocked": "This message was blocked by feega's content rules."
       }
     },
     "toolJob": {

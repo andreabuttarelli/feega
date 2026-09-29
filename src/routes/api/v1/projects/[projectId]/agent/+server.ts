@@ -14,6 +14,9 @@ import { createProjectTools } from '$lib/server/project-agent/project-tools';
 import { openAgentTools } from '$lib/server/project-agent/tool-surface';
 import { projectAgentPrompt } from '$lib/server/project-agent/system-prompt';
 import { AGENT_MAX_DURATION_S, agentStopWhen } from '$lib/server/project-agent/limits';
+import { screenModelInput } from '$lib/server/moderation/model-input';
+import { ModerationProfile } from '$lib/server/moderation/profiles';
+import { blockedPrompt } from '$lib/server/moderation/blocked-response';
 import type { RequestHandler } from './$types';
 
 /**
@@ -71,6 +74,12 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
   const text = message?.trim();
   if (!text) return json({ error: 'empty_message' }, { status: 400 });
 
+  const screening = screenModelInput(db, {
+    profile: ModerationProfile.Standard,
+    texts: [text],
+    scope: { orgId, userId: user.id, projectId: project.id, actor: { kind: 'user', id: user.id } }
+  });
+
   const canvases = await listCanvases(db, { orgId, projectId: project.id });
   const threadId = await openThread(db, {
     orgId,
@@ -79,6 +88,11 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
     brandId: brand?.id ?? null
   });
   const history = promptHistory(await loadTurns(db, { orgId, threadId }));
+
+  const screened = await screening;
+  if (!screened.ok) {
+    return blockedPrompt(screened.error);
+  }
 
   const actor = agentActor(user.id, SIDEBAR_AGENT_KEY);
   const userActor = { kind: 'user' as const, id: user.id };

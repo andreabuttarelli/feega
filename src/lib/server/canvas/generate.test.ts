@@ -78,6 +78,9 @@ vi.mock('$lib/server/llm', () => ({ llmText }));
 const { enhancePrompt } = vi.hoisted(() => ({ enhancePrompt: vi.fn() }));
 vi.mock('$lib/server/prompt-enhance', () => ({ enhancePrompt }));
 
+const { screenModelInput } = vi.hoisted(() => ({ screenModelInput: vi.fn() }));
+vi.mock('$lib/server/moderation/model-input', () => ({ screenModelInput }));
+
 const { finishVideoRender } = vi.hoisted(() => ({ finishVideoRender: vi.fn() }));
 vi.mock('$lib/server/video', () => ({ finishVideoRender }));
 
@@ -102,6 +105,8 @@ const SYNCED_MODALITIES = { input: ['text', 'image'], output: ['image'], synced_
 // esegue i `beforeEach` dal più esterno al più interno, quindi quello locale vince sempre per
 // ultimo.
 beforeEach(() => {
+  screenModelInput.mockReset();
+  screenModelInput.mockResolvedValue({ ok: true });
   modalitiesOf.mockReset();
   modalitiesOf.mockResolvedValue(SYNCED_MODALITIES);
   canvasModelCatalogue.mockResolvedValue({ text: EMPTY_OFFER, image: EMPTY_OFFER, video: EMPTY_OFFER });
@@ -1551,5 +1556,71 @@ describe('i riferimenti scelti sul nodo arrivano al render immagine', () => {
         referenceImageUrls: ['https://signed.example/reference-images/catalogue/vase.png']
       })
     );
+  });
+});
+
+describe('a standard generation is screened before anything reaches the provider', () => {
+  const GORE = "This prompt was blocked: violence and gore aren't allowed in feega's standard mode.";
+  const DOC = 'ffffffff-ffff-ffff-ffff-ffffffffffff';
+
+  beforeEach(() => {
+    llmText.mockReset();
+    llmText.mockResolvedValue({ text: 'ok', citations: [] });
+    generateImagesWithoutBrand.mockReset();
+    enhancePrompt.mockReset();
+    screenModelInput.mockResolvedValue({ ok: false, error: GORE });
+  });
+
+  const start = (medium: 'text' | 'image', prompt: string, params: Record<string, unknown> = {}) => ({
+    orgId: ORG,
+    projectId: PROJECT,
+    canvasId: CANVAS,
+    nodeId: NODE,
+    userId: USER,
+    medium,
+    prompt,
+    model: medium === 'text' ? 'anthropic/claude-haiku-4.5' : 'img-model',
+    params,
+    expectedVersion: 1
+  });
+
+  it('refuses an image run with the category message, calls no provider and releases the node', async () => {
+    const { db, calls } = fakeDb({ nodes: [freshNodeRow] }, { updateRows: { nodes: [{ ...freshNodeRow, version: 2 }] } });
+
+    const out = await runGenNode(db, start('image', 'a man dismembered', { enhancePrompt: true }));
+
+    expect(out).toEqual({ kind: 'refused', error: GORE });
+    expect(generateImagesWithoutBrand).not.toHaveBeenCalled();
+    expect(enhancePrompt).not.toHaveBeenCalled();
+    const updated = (table: string) => calls.filter((c) => c.table === table && c.op === 'update').at(-1)?.payload as Record<string, unknown>;
+    expect(updated('nodes').data).toMatchObject({ running: false, error: GORE });
+    expect(updated('node_runs')).toMatchObject({ status: 'failed', error: GORE });
+  });
+
+  it('screens a text run on its connected upstream text and system prompt, not only its own prompt', async () => {
+    const textNode = { ...freshNodeRow, type: 'text' };
+    const { db } = fakeDb(
+      {
+        nodes: [textNode, { ...freshNodeRow, id: DOC, type: 'doc', data: { content: 'explicit erotic story', public: false } }],
+        nodes_connections: [{ id: 'e1', canvas_id: CANVAS, source_node_id: DOC, target_node_id: NODE, source_handle: null, target_handle: 'text', mode: 'fixed' }],
+        assets: []
+      },
+      { updateRows: { nodes: [{ ...textNode, version: 2 }] } }
+    );
+
+    expect((await runGenNode(db, start('text', 'continue it'))).kind).toBe('refused');
+    expect(llmText).not.toHaveBeenCalled();
+    const [, screened] = screenModelInput.mock.calls[0];
+    expect(screened).toMatchObject({ profile: 'standard', scope: expect.objectContaining({ orgId: ORG, nodeId: NODE }) });
+    expect(screened.texts.join(' ')).toContain('explicit erotic story');
+  });
+
+  it('lets a clean prompt through to the provider', async () => {
+    screenModelInput.mockResolvedValue({ ok: true });
+    const textNode = { ...freshNodeRow, type: 'text' };
+    const { db } = fakeDb({ nodes: [textNode] }, { updateRows: { nodes: [{ ...textNode, version: 2 }] } });
+
+    expect((await runGenNode(db, start('text', 'a haiku about the sea'))).kind).toBe('done');
+    expect(llmText).toHaveBeenCalledOnce();
   });
 });

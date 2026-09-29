@@ -61,19 +61,25 @@ export function canvasLinkOf(call: ToolCall, projectId: string): CanvasLink | nu
   return { href: `/p/${projectId}/c/${target.canvasId}`, label: target.label };
 }
 
-export type Failure = 'load' | 'send' | 'empty' | 'credits';
+export type Failure = 'load' | 'send' | 'empty' | 'credits' | 'blocked';
 
 const HTTP_PAYMENT_REQUIRED = 402;
 
-export const FAILURES: Record<Failure, { messageKey: string; action: 'retry' | 'credits' }> = {
+export const FAILURES: Record<Failure, { messageKey: string; action: 'retry' | 'credits' | 'rephrase' }> = {
   load: { messageKey: 'chat.panel.failure.load', action: 'retry' },
   send: { messageKey: 'chat.panel.failure.send', action: 'retry' },
   empty: { messageKey: 'chat.panel.failure.empty', action: 'retry' },
-  credits: { messageKey: 'chat.panel.failure.credits', action: 'credits' }
+  credits: { messageKey: 'chat.panel.failure.credits', action: 'credits' },
+  blocked: { messageKey: 'chat.panel.failure.blocked', action: 'rephrase' }
 };
 
-export function failureOfStatus(status: number): Failure {
-  return status === HTTP_PAYMENT_REQUIRED ? 'credits' : 'send';
+const FAILURE_OF_CODE: Readonly<Record<string, Failure>> = {
+  prompt_blocked: 'blocked'
+};
+
+export function failureOfStatus(status: number, code?: string): Failure {
+  const coded = code ? FAILURE_OF_CODE[code] : undefined;
+  return coded ?? (status === HTTP_PAYMENT_REQUIRED ? 'credits' : 'send');
 }
 
 export function speakerStarts(messages: Array<{ role: string }>): boolean[] {

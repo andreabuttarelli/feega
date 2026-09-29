@@ -277,6 +277,16 @@ function providerRunOf(medium: GenMedium, model: string | null): ProviderRun | n
   return GENERATION_PROVIDERS.find((p) => model.startsWith(p.prefix))?.run ?? null;
 }
 
+async function screenStandardRun(db: Db, input: StartRun, texts: Array<string | null | undefined>) {
+  const { screenModelInput } = await import('$lib/server/moderation/model-input');
+  const { ModerationProfile } = await import('$lib/server/moderation/profiles');
+  return screenModelInput(db, {
+    profile: ModerationProfile.Standard,
+    texts,
+    scope: { orgId: input.orgId, userId: input.userId, projectId: input.projectId, nodeId: input.nodeId, model: input.model, actor: input.actor }
+  });
+}
+
 export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcome> {
   const pick = await resolveNodeModel(requested.medium, requested.model, requested.params);
   if (!pick.ok) {
@@ -349,6 +359,15 @@ export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcom
 
   const textInput = input.medium === 'text' ? textRequest(upstream.text, input.prompt) : null;
   const prompt = textInput?.user ?? composePrompt(input.medium, upstream.text, input.prompt);
+  const providerRun = providerRunOf(input.medium, input.model);
+
+  if (!providerRun) {
+    const screened = await screenStandardRun(db, input, [prompt, textInput?.system]);
+    if (!screened.ok) {
+      await giveUp(db, input, run, screened.error);
+      return { kind: 'refused', error: screened.error };
+    }
+  }
 
   if (input.medium === 'audio') {
     return runAudioNode(db, input, run, upstream, prompt);
@@ -368,7 +387,6 @@ export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcom
     await setRunPrompt(db, { orgId: input.orgId, runId: run.id, prompt: sentPrompt });
   }
 
-  const providerRun = providerRunOf(input.medium, input.model);
   if (providerRun) {
     return providerRun(db, input, run, upstream, sentPrompt);
   }
