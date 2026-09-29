@@ -380,6 +380,7 @@ export type ModelModalities = {
   input: string[];
   output: string[];
   synced_at: string;
+  uncensored: boolean;
 } | null;
 
 /**
@@ -452,13 +453,18 @@ export async function modalitiesOf(
 
     const { data } = await admin
       .from('ai_models')
-      .select('input_modalities, output_modalities, synced_at')
+      .select('input_modalities, output_modalities, synced_at, uncensored')
       .eq('id', wireId)
       .eq('catalogue', c)
       .maybeSingle();
 
     if (data) {
-      return { input: data.input_modalities ?? [], output: data.output_modalities ?? [], synced_at: data.synced_at };
+      return {
+        input: data.input_modalities ?? [],
+        output: data.output_modalities ?? [],
+        synced_at: data.synced_at,
+        uncensored: data.uncensored === true
+      };
     }
   }
 

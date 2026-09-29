@@ -3,6 +3,7 @@ import { fakeDb } from '$lib/server/db/fake-db';
 import {
   disableUncensored,
   enableUncensored,
+  isUncensoredModel,
   uncensoredAccess,
   UNCENSORED_ENTITLEMENT,
   UNCENSORED_POLICY_VERSION,
@@ -51,6 +52,29 @@ describe('who may use uncensored models', () => {
 
   it('entitles paid plans only, from one table', () => {
     expect(UNCENSORED_ENTITLEMENT).toEqual({ free: false, paid: true });
+  });
+});
+
+describe('isUncensoredModel — the single ai_models.uncensored lookup, reused everywhere', () => {
+  it('true for a model row marked uncensored', async () => {
+    const { db } = fakeDb({ ai_models: [{ id: 'wiro/nsfw-image', uncensored: true }] }, { filter: true });
+    expect(await isUncensoredModel(db, 'wiro/nsfw-image')).toBe(true);
+  });
+
+  it('false for a model row not marked uncensored', async () => {
+    const { db } = fakeDb({ ai_models: [{ id: 'openai/gpt-image', uncensored: false }] }, { filter: true });
+    expect(await isUncensoredModel(db, 'openai/gpt-image')).toBe(false);
+  });
+
+  it('false for a model id that does not resolve to a row', async () => {
+    const { db } = fakeDb({ ai_models: [] }, { filter: true });
+    expect(await isUncensoredModel(db, 'gone')).toBe(false);
+  });
+
+  it('false for a null or empty model id: nothing was chosen yet', async () => {
+    const { db } = fakeDb({ ai_models: [] }, { filter: true });
+    expect(await isUncensoredModel(db, null)).toBe(false);
+    expect(await isUncensoredModel(db, '')).toBe(false);
   });
 });
 

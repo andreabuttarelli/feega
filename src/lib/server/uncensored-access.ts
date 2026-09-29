@@ -99,6 +99,14 @@ export async function disableUncensored(db: Db, input: { orgId: string; userId: 
   return error ? { ok: false, error: error.message } : { ok: true };
 }
 
+export async function isUncensoredModel(db: Db, modelId: string | null | undefined): Promise<boolean> {
+  if (!modelId) {
+    return false;
+  }
+  const { data } = await untyped(db).from('ai_models').select('uncensored').eq('id', modelId).maybeSingle();
+  return (data as { uncensored?: boolean } | null)?.uncensored === true;
+}
+
 export function visibleChoices<C extends { uncensored?: boolean }>(choices: readonly C[], access: { allowed: boolean }): C[] {
   return access.allowed ? [...choices] : choices.filter((choice) => !choice.uncensored);
 }

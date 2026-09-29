@@ -102,7 +102,7 @@ export function modalityBadges(inputModalities: string[]): ModalityBadge[] {
 }
 
 /** Il minimo che `ai-models-sync.ts::ModelModalities` porta — nessun import di codice server qui. */
-export type Modalities = { input: string[] };
+export type Modalities = { input: string[]; uncensored?: boolean };
 
 const CONNECTOR_MODALITY: Record<Exclude<ConnectorType, 'first_frame' | 'last_frame'>, string> = {
   text: 'text',
@@ -119,6 +119,10 @@ export type GenerativeNodeKind = 'text' | 'image' | 'video' | 'audio';
  * conta deterministica.
  */
 export function connectorsFor(kind: GenerativeNodeKind, modalities: Modalities): ConnectorType[] {
+  if (modalities.uncensored) {
+    return [];
+  }
+
   const has = new Set(modalities.input);
   const out: ConnectorType[] = [];
 
@@ -157,7 +161,7 @@ export function orphanedByModelChange(wired: WiredConnector[], nextConnectors: C
   return wired.filter((w) => !next.has(w.connector));
 }
 
-export type ModelWithModalities = { id: string; inputModalities?: string[] };
+export type ModelWithModalities = { id: string; inputModalities?: string[]; uncensored?: boolean };
 
 export function connectorsForNode(
   kind: GenerativeNodeKind,
@@ -169,7 +173,7 @@ export function connectorsForNode(
   if (kind !== 'text' && !choice) {
     return [];
   }
-  return connectorsFor(kind, { input: choice?.inputModalities ?? [] });
+  return connectorsFor(kind, { input: choice?.inputModalities ?? [], uncensored: choice?.uncensored });
 }
 
 const PORTS_ACCEPTING: Record<ConnectorType, readonly ConnectorType[]> = {

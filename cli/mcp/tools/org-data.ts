@@ -89,7 +89,9 @@ export function registerOrgDataTools(server: McpServer) {
         'back as a collision, and changing it is `update_row`. Several jsonb columns are checked ' +
         'against a real shape before writing (`nodes.data` by `type` — call `describe_node_types` ' +
         'first; `posts.media`, `ad_campaigns.targeting`/`placements`, `canvases.viewport` too); a ' +
-        'rejection names the exact field. Others are deliberately free-form. Free.',
+        'rejection names the exact field. On `nodes_connections`, an edge into a node whose model is ' +
+        'uncensored is refused — those nodes take no input of any kind. Others are deliberately ' +
+        'free-form. Free.',
       inputSchema: z.object({ org, table: z.string(), values: z.record(z.string(), z.unknown()) }),
       annotations: { readOnlyHint: false, destructiveHint: false }
     },

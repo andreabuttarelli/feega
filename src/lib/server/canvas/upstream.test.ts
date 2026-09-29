@@ -42,7 +42,7 @@ const nodeRow = (id: string, type: string, data: Record<string, unknown>) => ({
 
 beforeEach(() => {
   modalitiesOf.mockReset();
-  modalitiesOf.mockResolvedValue({ input: ['text', 'image', 'video', 'audio'], output: ['video'], synced_at: 'now' });
+  modalitiesOf.mockResolvedValue({ input: ['text', 'image', 'video', 'audio'], output: ['video'], synced_at: 'now', uncensored: false });
 });
 
 describe('upstreamInputsFor — dal database alla forma pura', () => {
@@ -912,6 +912,27 @@ describe('upstreamInputsFor — riferimenti scelti sul nodo', () => {
       `${ORG}/p1/own.png`
     ]);
     expect(out.referenceImageUrl).toBeNull();
+  });
+
+  it('un modello uncensored rifiuta i riferimenti scelti sul nodo, dal database vero fino al resolver', async () => {
+    modalitiesOf.mockResolvedValue({ input: ['text', 'image'], output: ['image'], synced_at: 'now', uncensored: true });
+    const { db } = fakeDb({
+      nodes: [
+        nodeRow(IMAGE_NODE, 'image', {
+          prompt: 'x',
+          model: 'wiro/nsfw-image',
+          references: [{ source: 'asset', id: IMAGE_ASSET_1 }]
+        })
+      ],
+      nodes_connections: [],
+      assets: [{ id: IMAGE_ASSET_1, project_id: 'p1', type: 'image', url: `${ORG}/p1/own.png`, content: null, mime_type: 'image/png', bytes: 1, width: null, height: null, duration_s: null, source: 'upload', source_node_id: null, created_at: 'now' }],
+      reference_images: []
+    });
+
+    const out = await upstreamInputsFor(db, { orgId: ORG, canvasId: CANVAS, nodeId: IMAGE_NODE, model: 'wiro/nsfw-image', medium: 'image' });
+
+    expect(out.pickedImageUrls).toEqual([]);
+    expect(out.rejected).toEqual([{ nodeId: IMAGE_NODE, why: expect.stringContaining('has no') }]);
   });
 
   it('un riferimento sparito si salta, non ferma il giro', async () => {

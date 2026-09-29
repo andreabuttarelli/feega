@@ -139,6 +139,21 @@ describe('le scritture firmano agent per conto della persona', () => {
       expect(payloadHasOrg || filterHasOrg, `${call.table} ${call.op} senza org_id`).toBe(true);
     }
   });
+
+  it('connect_nodes rifiuta un arco verso un nodo con un modello uncensored', async () => {
+    const sourceRow = { ...nodeRow, id: '77777777-7777-7777-7777-777777777777', data: { prompt: 'ciao' } };
+    const targetRow = { ...nodeRow, type: 'image', data: { model: 'wiro/nsfw-image' } };
+    const { db, calls } = fakeDb(
+      { nodes: [sourceRow, targetRow], ai_models: [{ id: 'wiro/nsfw-image', uncensored: true }] },
+      { filter: true }
+    );
+    const tools = createProjectTools({ db, orgId: ORG, projectId: PROJECT, userId: USER });
+
+    const out = await run(tools.connect_nodes, { canvasId: CANVAS, sourceNodeId: sourceRow.id, targetNodeId: NODE });
+
+    expect(out).toMatchObject({ error: 'uncensored_no_inputs' });
+    expect(calls.some((c) => c.table === 'nodes_connections' && c.op === 'insert')).toBe(false);
+  });
 });
 
 describe('run_node rifiuta prima di spendere', () => {

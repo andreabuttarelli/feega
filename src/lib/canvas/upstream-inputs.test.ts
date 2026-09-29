@@ -64,6 +64,27 @@ describe('resolveUpstreamInputs — testo verso un nodo che genera', () => {
   });
 });
 
+describe('resolveUpstreamInputs — un modello uncensored non riceve nessun ingresso', () => {
+  it('testo, immagine e riferimenti scelti vengono tutti rifiutati, mai passati in silenzio', () => {
+    const nodes = [
+      node({ id: 't1', type: 'text', text: 'un gatto rosso' }),
+      node({ id: 'im1', type: 'image', mediaUrl: 'https://example.com/ref.png' }),
+      node({ id: 'i1', type: 'image', referenceUrls: ['https://example.com/picked.png'] })
+    ];
+    const edges = [
+      edge({ id: 'e1', sourceNodeId: 't1', targetNodeId: 'i1' }),
+      edge({ id: 'e2', sourceNodeId: 'im1', targetNodeId: 'i1' })
+    ];
+
+    const out = resolveUpstreamInputs(nodes, edges, 'i1', { input: ['text', 'image'], uncensored: true });
+
+    expect(out.text).toEqual([]);
+    expect(out.referenceImageUrls).toEqual([]);
+    expect(out.pickedImageUrls).toEqual([]);
+    expect(out.rejected.map((r) => r.nodeId).sort()).toEqual(['im1', 'i1', 't1'].sort());
+  });
+});
+
 describe('resolveUpstreamInputs — immagine verso immagine', () => {
   it("un'immagine girata alimenta come riferimento, non come testo", () => {
     const nodes = [

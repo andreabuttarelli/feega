@@ -21,12 +21,21 @@ import { announcePresence } from './presence';
 import type { Actor } from '$lib/server/repos/actor';
 import { validateNewNodeData, validateNodeDataUpdate } from '$lib/canvas/node-data';
 import { mergeNodeData, type NodeData } from '$lib/canvas/node-patch';
-import { nodeModelError } from '$lib/server/canvas/node-model';
+import { nodeModelError, targetTakesNoInputs, UNCENSORED_NO_INPUTS_ERROR } from '$lib/server/canvas/node-model';
+import type { Db } from '$lib/server/db/client';
 
 type NodeMerge = { id: string; version: number; data: NodeData };
 import { jsonbColumnsOf, validateJsonbColumn } from './jsonb-schemas';
 
 const NODES_TABLE = 'nodes';
+const NODES_CONNECTIONS_TABLE = 'nodes_connections';
+
+function uncensoredTargetRefused(): Refusal {
+  return {
+    error: UNCENSORED_NO_INPUTS_ERROR,
+    message: 'The target node uses an uncensored model, which takes no inputs of any kind. Switch its model first.'
+  };
+}
 
 function invalidJsonbColumn(message: string): Refusal {
   return {
@@ -273,6 +282,13 @@ export function createOrgWriteTools({ authority, orgId, userId, threadId, actor 
     } else {
       const refusedJsonb = firstInvalidJsonbColumn(table, values);
       if (refusedJsonb) return finish(refusedJsonb, 'org_db_write:refused:invalid_jsonb_column', t0);
+    }
+
+    if (table === NODES_CONNECTIONS_TABLE) {
+      const targetNodeId = String(values.target_node_id ?? '');
+      if (targetNodeId && (await targetTakesNoInputs(supabase as unknown as Db, { orgId, targetNodeId }))) {
+        return finish(uncensoredTargetRefused(), 'org_db_write:refused:uncensored_no_inputs', t0);
+      }
     }
 
     const { data, error } = await supabase

@@ -105,7 +105,8 @@ describe('tileNode — da quel che la pagina ha in mano al vocabolario del model
     expect(tileNode({ id: 'g1', medium: 'video', model: 'seedance' })).toEqual({
       id: 'g1',
       kind: 'video',
-      model: 'seedance'
+      model: 'seedance',
+      uncensored: false
     });
   });
 
@@ -115,6 +116,15 @@ describe('tileNode — da quel che la pagina ha in mano al vocabolario del model
    * volta che aggiunge una superficie, e la seconda copia direbbe un'altra cosa.
    */
   it("una pagina incorporata è del tipo `iframe`, e non porta modello", () => {
-    expect(tileNode({ id: 'f1' })).toEqual({ id: 'f1', kind: 'iframe', model: null });
+    expect(tileNode({ id: 'f1' })).toEqual({ id: 'f1', kind: 'iframe', model: null, uncensored: false });
+  });
+
+  it('un nodo col modello uncensored porta il segno con sé', () => {
+    expect(tileNode({ id: 'g1', medium: 'image', model: 'wiro/nsfw', uncensored: true })).toEqual({
+      id: 'g1',
+      kind: 'image',
+      model: 'wiro/nsfw',
+      uncensored: true
+    });
   });
 });

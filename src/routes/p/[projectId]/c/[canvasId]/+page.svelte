@@ -102,6 +102,8 @@
   import { planDelete } from '$lib/canvas/delete-plan';
   import { connectorsFor, orphanedByModelChange, type ConnectorType, type GenerativeNodeKind, connectorsForNode } from '$lib/canvas/connectors';
   import { portsOf } from '$lib/canvas/node-ports';
+  import { needsUncensoredConfirm } from '$lib/canvas/uncensored-switch';
+  import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import { planConnectSelection, type ConnectSource } from '$lib/canvas/connect-selection-plan';
   import {
     docData,
@@ -593,6 +595,14 @@
 
   const itemPortOf = (kind: string | undefined): ConnectorType => (kind === 'text' ? 'text' : 'images');
 
+  function uncensoredModelOf(n: Tile): boolean {
+    if (n.type !== 'text' && n.type !== 'image' && n.type !== 'video') {
+      return false;
+    }
+    const model = typeof n.data.model === 'string' ? n.data.model : null;
+    return catalogue[n.type]?.find((c) => c.id === model)?.uncensored === true;
+  }
+
   function portsOfTile(n: Tile): { inputs: ConnectorType[] | undefined; output: ConnectorType | null } {
     if (!isNodeType(n.type)) {
       return { inputs: undefined, output: null };
@@ -638,7 +648,8 @@
         : tileNode({
         id: n.id,
         medium: n.type === 'iframe' || n.type === 'document' || n.type === 'doc' ? null : (n.type as 'text' | 'image' | 'video' | 'list' | 'select' | 'products' | 'social_account_feed'),
-        model: typeof n.data.model === 'string' ? n.data.model : null
+        model: typeof n.data.model === 'string' ? n.data.model : null,
+        uncensored: uncensoredModelOf(n)
       })
     }))
   );
@@ -1546,6 +1557,31 @@
     if (items.length) { pushGesture({ items }); }
   }
 
+  let confirmingUncensoredSwitch = $state(false);
+  let resolveUncensoredSwitch: ((ok: boolean) => void) | null = null;
+
+  function confirmUncensoredSwitch(): Promise<boolean> {
+    confirmingUncensoredSwitch = true;
+    return new Promise((resolve) => {
+      resolveUncensoredSwitch = resolve;
+    });
+  }
+
+  function settleUncensoredSwitch(ok: boolean) {
+    resolveUncensoredSwitch?.(ok);
+    resolveUncensoredSwitch = null;
+  }
+
+  function onUncensoredSwitchConfirmed() {
+    settleUncensoredSwitch(true);
+  }
+
+  $effect(() => {
+    if (!confirmingUncensoredSwitch) {
+      untrack(() => settleUncensoredSwitch(false));
+    }
+  });
+
   /**
    * LA BARRA DELLA SELEZIONE HA SCRITTO — un campo, applicato a ogni nodo selezionato, UNO o
    * MOLTI: con un nodo solo è la stessa funzione, non un percorso a parte, perché la domanda «un
@@ -1577,24 +1613,41 @@
     if (!chosen.length) { return; }
 
     const droppedEdges: UndoItem[] = [];
+    const clearedReferenceIds: string[] = [];
 
     if (patch.model !== undefined) {
+      const uncensoredTargets = chosen.filter((n) => {
+        if (n.type !== 'text' && n.type !== 'image' && n.type !== 'video') { return false; }
+        const model = catalogue[n.type]?.find((c) => c.id === patch.model);
+        const hasIncomingEdges = edges.some((e) => e.target === n.id);
+        const hasReferences = referencesOf(n.data).length > 0;
+        return needsUncensoredConfirm({ nextUncensored: model?.uncensored === true, hasIncomingEdges, hasReferences });
+      });
+
+      if (uncensoredTargets.length && !(await confirmUncensoredSwitch())) {
+        return;
+      }
+      clearedReferenceIds.push(...uncensoredTargets.map((n) => n.id));
+
       const orphaned = chosen.flatMap((n) => {
         if (n.type !== 'text' && n.type !== 'image' && n.type !== 'video') { return []; }
         const model = catalogue[n.type]?.find((c) => c.id === patch.model);
-        const nextConnectors = connectorsFor(n.type, { input: model?.inputModalities ?? [] });
+        const nextConnectors = connectorsFor(n.type, { input: model?.inputModalities ?? [], uncensored: model?.uncensored });
         const wired: { edgeId: string; sourceNodeId: string; connector: ConnectorType }[] = edges
           .filter((e) => e.target === n.id && e.targetHandle)
           .map((e) => ({ edgeId: e.id, sourceNodeId: e.source, connector: e.targetHandle as ConnectorType }));
         return orphanedByModelChange(wired, nextConnectors);
       });
 
-      if (orphaned.length && !confirm(`${orphaned.length} collegamento/i cadranno con questo modello. Continuare?`)) {
+      if (orphaned.length && !uncensoredTargets.length && !confirm(`${orphaned.length} collegamento/i cadranno con questo modello. Continuare?`)) {
         return;
       }
       for (const drop of orphaned) {
         const item = await disconnect(drop.edgeId, false);
         if (item) { droppedEdges.push(item); }
+      }
+      for (const nodeId of clearedReferenceIds) {
+        await write(nodeId, { references: [] });
       }
     }
 
@@ -1988,6 +2041,15 @@
       <button type="button" onclick={stopWorkflow}>Ferma</button>
     </div>
   {/if}
+
+  <ConfirmDialog
+    bind:open={confirmingUncensoredSwitch}
+    title="Uncensored model"
+    body="Uncensored models don't accept references. Switching removes the incoming connections and picked references on this node."
+    confirmLabel="Switch model"
+    cancelLabel="Cancel"
+    onConfirm={onUncensoredSwitchConfirmed}
+  />
 
   <CanvasFlow
     actionUrl={(action: string) => canvasActionUrl({ projectId: data.projectId, canvasId: data.canvas.id }, action)}

@@ -19,7 +19,7 @@ import { agentActor, type Actor } from '$lib/server/repos/actor';
 import { withBrandContext, withOrgContext } from '$lib/server/ai-log';
 import { GEN_MEDIUMS, isGenMedium, type GenParams } from '$lib/canvas/gen-node';
 import { audioDescription } from '$lib/server/canvas/audio-description';
-import { nodeModelError } from '$lib/server/canvas/node-model';
+import { nodeModelError, targetTakesNoInputs, UNCENSORED_NO_INPUTS_ERROR } from '$lib/server/canvas/node-model';
 import { describeNodeType, describeNodeTypes, isNodeType, unknownFieldsError, validateNewNodeData } from '$lib/canvas/node-data';
 
 /**
@@ -39,6 +39,10 @@ export type ProjectToolDeps = {
 };
 
 const NODE_NOT_FOUND = { error: 'node_not_found', message: 'No live node with that id in this project.' };
+const UNCENSORED_TARGET_REFUSED = {
+  error: UNCENSORED_NO_INPUTS_ERROR,
+  message: 'The target node uses an uncensored model, which takes no inputs of any kind. Switch its model first.'
+};
 const AGENT_PATCH_ANSWERS: Record<PatchWrite['outcome'], (written: PatchWrite) => unknown> = {
   written: (written) => ({ outcome: 'written', node: (written as Extract<PatchWrite, { outcome: 'written' }>).node }),
   conflict: () => ({ outcome: 'conflict', message: 'Node kept changing while writing. Retry.' }),
@@ -199,7 +203,8 @@ export function createProjectTools(deps: ProjectToolDeps): Record<string, Tool> 
     }),
 
     connect_nodes: tool({
-      description: 'Connect two nodes on one canvas of THIS project. The edge is directed: source feeds target.',
+      description:
+        'Connect two nodes on one canvas of THIS project. The edge is directed: source feeds target. Refused when the target node uses an uncensored model — those take no inputs of any kind, ever: switch the model first.',
       inputSchema: z
         .object({
           canvasId: z.string(),
@@ -210,6 +215,10 @@ export function createProjectTools(deps: ProjectToolDeps): Record<string, Tool> 
         })
         .strict(),
       execute: async (input: { canvasId: string; sourceNodeId: string; targetNodeId: string; sourceHandle?: string; targetHandle?: string }) => {
+        if (await targetTakesNoInputs(deps.db, { orgId: deps.orgId, targetNodeId: input.targetNodeId })) {
+          return UNCENSORED_TARGET_REFUSED;
+        }
+
         const connection = await createConnection(deps.db, {
           orgId: deps.orgId,
           canvasId: input.canvasId,
