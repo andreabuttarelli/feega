@@ -29,5 +29,5 @@
   {total}
   syncStatus={node.syncStatus}
   syncError={node.syncError}
-  empty={node.url.trim() ? 'No products yet. Sync from the panel on the right.' : 'Enter the store address in the panel on the right.'}
+  empty={node.url.trim() ? 'No products yet. Select the node to sync.' : 'Select the node to enter the store address.'}
 />

@@ -1725,6 +1725,7 @@ export type Database = {
           media: Json
           org_id: string
           per_platform: Json | null
+          planned_for: string | null
           status: string
           title: string | null
           updated_at: string
@@ -1742,6 +1743,7 @@ export type Database = {
           media?: Json
           org_id: string
           per_platform?: Json | null
+          planned_for?: string | null
           status?: string
           title?: string | null
           updated_at?: string
@@ -1759,6 +1761,7 @@ export type Database = {
           media?: Json
           org_id?: string
           per_platform?: Json | null
+          planned_for?: string | null
           status?: string
           title?: string | null
           updated_at?: string

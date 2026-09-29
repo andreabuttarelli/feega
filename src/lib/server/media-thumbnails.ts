@@ -1,20 +1,36 @@
-export type ThumbnailPreset = 'pickerTile' | 'mediaGrid' | 'nodeThumbnail' | 'panelTile';
+import { AssetSize, TIER_PX } from '$lib/canvas/asset-url';
+
+export type ThumbnailPreset = 'pickerTile' | 'mediaGrid' | 'nodeThumbnail' | 'panelTile' | 'canvas256' | 'canvas512' | 'canvas1024' | 'canvas2048';
+
+type Resize = 'cover' | 'contain';
 
 const DEVICE_PIXEL_RATIO = 2;
 const THUMBNAIL_QUALITY = 70;
+const CANVAS_TIER_QUALITY = 75;
 
-const THUMBNAIL_TILE_PX: Record<ThumbnailPreset, number> = {
-  pickerTile: 96,
-  mediaGrid: 180,
-  nodeThumbnail: 140,
-  panelTile: 96
+const canvasTier = (tier: AssetSize.Px256 | AssetSize.Px512 | AssetSize.Px1024 | AssetSize.Px2048) => ({
+  tilePx: TIER_PX[tier] / DEVICE_PIXEL_RATIO,
+  resize: 'contain' as const,
+  quality: CANVAS_TIER_QUALITY
+});
+
+const PRESETS: Record<ThumbnailPreset, { tilePx: number; resize: Resize; quality: number }> = {
+  pickerTile: { tilePx: 96, resize: 'cover', quality: THUMBNAIL_QUALITY },
+  mediaGrid: { tilePx: 180, resize: 'cover', quality: THUMBNAIL_QUALITY },
+  nodeThumbnail: { tilePx: 140, resize: 'cover', quality: THUMBNAIL_QUALITY },
+  panelTile: { tilePx: 96, resize: 'cover', quality: THUMBNAIL_QUALITY },
+  canvas256: canvasTier(AssetSize.Px256),
+  canvas512: canvasTier(AssetSize.Px512),
+  canvas1024: canvasTier(AssetSize.Px1024),
+  canvas2048: canvasTier(AssetSize.Px2048)
 };
 
-export type ImageTransform = { width: number; height: number; resize: 'cover'; quality: number };
+export type ImageTransform = { width: number; height: number; resize: Resize; quality: number };
 
 export function thumbnailTransform(preset: ThumbnailPreset): ImageTransform {
-  const size = THUMBNAIL_TILE_PX[preset] * DEVICE_PIXEL_RATIO;
-  return { width: size, height: size, resize: 'cover', quality: THUMBNAIL_QUALITY };
+  const { tilePx, resize, quality } = PRESETS[preset];
+  const size = tilePx * DEVICE_PIXEL_RATIO;
+  return { width: size, height: size, resize, quality };
 }
 
 type SignedUrlBucket = {

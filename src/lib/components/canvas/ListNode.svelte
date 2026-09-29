@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { AssetSize, sized } from '$lib/canvas/asset-url';
   /**
    * IL NODO `list`: N valori, immagini O testo. Nasce vuoto — si riempie trascinando asset sopra
    * (lo stesso `CANVAS_DRAG_FILLED_NODE` che l'aggiunge alla tela, letto qui invece che sulla
@@ -159,7 +160,7 @@
             <span class="list-item-index">{index + 1}</span>
 
             {#if node.itemKind === 'image' && item.url}
-              <img class="list-item-thumb" src={item.url} alt={listLabel(item, index)} loading="lazy" />
+              <img class="list-item-thumb" src={sized(item.url, AssetSize.Thumb)} alt={listLabel(item, index)} loading="lazy" decoding="async" />
             {:else}
               <span class="list-item-text">{item.text ?? listLabel(item, index)}</span>
             {/if}
@@ -187,7 +188,7 @@
           <li class="list-item list-item-wired">
             <span class="list-item-index">{index + 1}</span>
             {#if itemKind === 'image' && value.item.url}
-              <img class="list-item-thumb" src={value.item.url} alt={listLabel(value.item, index)} loading="lazy" />
+              <img class="list-item-thumb" src={sized(value.item.url, AssetSize.Thumb)} alt={listLabel(value.item, index)} loading="lazy" decoding="async" />
             {:else}
               <span class="list-item-text">{value.item.text ?? listLabel(value.item, index)}</span>
             {/if}

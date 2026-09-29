@@ -33,7 +33,7 @@ export function registerPostTools(server: McpServer) {
       title: 'List posts',
       description:
         'Posts of one brand — the promoted artifacts, not canvas nodes. Filter by status ' +
-        '(draft, ready, archived). Free.',
+        '(draft, ready, archived). Each carries plannedFor, the day a draft is planned for. Free.',
       inputSchema: z.object({ org, brand_id: z.string(), status: z.enum(['draft', 'ready', 'archived']).optional() }),
       annotations: { readOnlyHint: true }
     },
@@ -61,7 +61,12 @@ export function registerPostTools(server: McpServer) {
         title: z.string().optional(),
         link_url: z.string().optional(),
         sources: z.array(z.object({ node_id: z.string(), role: z.enum(['caption', 'media', 'reference']).optional() })).optional(),
-        node_ids: z.array(z.string()).optional().describe('Resolve these canvas nodes into the post instead of passing caption/media directly.')
+        node_ids: z.array(z.string()).optional().describe('Resolve these canvas nodes into the post instead of passing caption/media directly.'),
+        planned_for: z
+          .string()
+          .datetime({ offset: true })
+          .optional()
+          .describe('ISO date-time the draft is planned for. It shows on calendars; nothing is scheduled.')
       }),
       annotations: { readOnlyHint: false, destructiveHint: false }
     },

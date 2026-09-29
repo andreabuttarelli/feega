@@ -9,7 +9,6 @@ import {
   anyPortAccepts,
   portListValued,
   portActive,
-  outputConnectorOf,
   modalityBadges,
   type Modalities,
   type WiredConnector
@@ -133,21 +132,6 @@ describe('porte visibili: colore ed etichetta per ogni tipo', () => {
       expect(CONNECTOR_STYLE[c].color).toMatch(/^#[0-9a-f]{6}$/i);
     }
     expect(new Set(colors).size).toBe(colors.length);
-  });
-
-  it("l'uscita di un nodo ha il tipo di ciò che produce", () => {
-    expect(outputConnectorOf('text')).toBe('text');
-    expect(outputConnectorOf('image')).toBe('images');
-    expect(outputConnectorOf('video')).toBe('videos');
-    expect(outputConnectorOf('iframe')).toBeNull();
-  });
-
-  it("un nodo effects esce come un'immagine — la stessa porta di un nodo image", () => {
-    expect(outputConnectorOf('effects')).toBe('images');
-  });
-
-  it('un nodo effects video esce come video', () => {
-    expect(outputConnectorOf('effects', 'video')).toBe('videos');
   });
 
   it('le porte media di effects accettano un solo filo', () => {

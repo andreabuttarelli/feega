@@ -28,17 +28,18 @@ export type Post = {
   media: PostMedia[];
   linkUrl: string | null;
   status: PostStatus;
+  plannedFor: string | null;
   createdAt: string;
 };
 
 export type PostSource = { postId: string; nodeId: string; role: string | null };
 
 const POST_COLUMNS =
-  'id, brand_id, title, caption, per_platform, media, link_url, status, created_at';
+  'id, brand_id, title, caption, per_platform, media, link_url, status, planned_for, created_at';
 
 type PostColumns = Pick<
   PostRow,
-  'id' | 'brand_id' | 'title' | 'caption' | 'per_platform' | 'media' | 'link_url' | 'status' | 'created_at'
+  'id' | 'brand_id' | 'title' | 'caption' | 'per_platform' | 'media' | 'link_url' | 'status' | 'planned_for' | 'created_at'
 >;
 
 function toPost(row: PostColumns): Post {
@@ -51,6 +52,7 @@ function toPost(row: PostColumns): Post {
     media: ((row.media ?? []) as unknown as PostMedia[]),
     linkUrl: row.link_url,
     status: row.status as PostStatus,
+    plannedFor: row.planned_for ?? null,
     createdAt: row.created_at
   };
 }
@@ -111,6 +113,7 @@ export async function promoteToPost(
     actorKind?: ActorKind;
     actorId?: string | null;
     sources?: { nodeId: string; role?: string }[];
+    plannedFor?: string | null;
   }
 ): Promise<Post> {
   const { data, error } = await db
@@ -124,7 +127,8 @@ export async function promoteToPost(
       link_url: input.linkUrl ?? null,
       per_platform: (input.perPlatform ?? null) as Database['public']['Tables']['posts']['Insert']['per_platform'],
       actor_kind: input.actorKind ?? 'user',
-      actor_id: input.actorId ?? null
+      actor_id: input.actorId ?? null,
+      planned_for: input.plannedFor ?? null
     })
     .select(POST_COLUMNS)
     .single();

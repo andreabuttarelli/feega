@@ -1,4 +1,5 @@
 <script lang="ts">
+  import TieredImage from './TieredImage.svelte';
   /**
    * IL NODO `select`: sceglie UN item da una `list` a monte, per indice 1-based — la stessa cifra
    * sul nodo e sul thumbnail cliccato (CLAUDE.md, il disegno concordato). `list` arriva da fuori,
@@ -75,7 +76,7 @@
       <p class="select-empty">Empty list</p>
     {:else if current}
       {#if list.itemKind === 'image' && current.url}
-        <img class="select-photo" src={current.url} alt={listLabel(current, node.index - 1)} loading="lazy" />
+        <TieredImage src={current.url} nodeId={node.id} alt={listLabel(current, node.index - 1)} fit="cover" />
       {:else if list.itemKind === 'image'}
         <div class="select-photo select-photo-empty"><ImageIcon size={22} strokeWidth={1.5} /></div>
       {:else}

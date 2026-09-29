@@ -1,4 +1,5 @@
 <script lang="ts">
+  import TieredImage from './TieredImage.svelte';
   import Orbit from '@lucide/svelte/icons/orbit';
   import type { CompositionNode } from '$lib/canvas/composition-node';
   import CompositionPreview from './CompositionPreview.svelte';
@@ -33,7 +34,7 @@
       <CompositionPreview {node} {mediaUrls} />
     </div>
   {:else if node.refId && posterUrl}
-    <img class="composition-photo" src={posterUrl} alt="Composition" loading="lazy" />
+    <TieredImage src={posterUrl} nodeId={node.id} alt="Composition" />
   {:else if imageCount > 0}
     <div class="composition-ready">
       <Orbit size={22} strokeWidth={1.5} />
@@ -80,13 +81,6 @@
   .composition {
       transition: none;
     }
-  }
-
-  .composition-photo {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    background: var(--paper-2, #f9f9f9);
   }
 
   .composition-preview {

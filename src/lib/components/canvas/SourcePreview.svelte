@@ -54,7 +54,7 @@
       {#each tiles as tile (tile.key)}
         <li class="preview-tile" title={tile.caption ?? tile.label}>
           {#if tile.thumb}
-            <img class="preview-img" src={tile.thumb} alt={tile.label} loading="lazy" />
+            <img class="preview-img" src={tile.thumb} alt={tile.label} loading="lazy" decoding="async" />
           {:else}
             <div class="preview-img preview-img-empty"><Icon size={16} strokeWidth={1.5} /></div>
           {/if}

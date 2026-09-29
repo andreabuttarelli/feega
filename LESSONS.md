@@ -2133,3 +2133,12 @@ even when nothing changed, so each switch downloads and decodes the images again
 sample RSS of the `WebContent`/`GPU` processes (`ps`) and count image requests per toggle. A
 refetch keeps what is shown when only signatures differ (`snapshot-keep.ts`); a hidden view
 uses `visibility: hidden`, not `display: none`.
+
+## A canvas sheet shrinks back to a 384px column on the left
+
+**Signal:** production build, sheet `left: 0`, `max-width: 384px`; the `.canvas-sheet` rule is in
+the loaded CSS with `!important`, but CDP shows it losing to `data-[side=left]:*` utilities.
+Tailwind is `important`, so both are `!important` in `utilities` at equal specificity, and the
+winner is whichever chunk loads last — any unrelated merge can flip it.
+**Move:** override a primitive's utilities with strictly higher specificity (add `[data-side]`),
+never a tie. A `@real` e2e is skipped in CI: it guards nothing until someone runs it.

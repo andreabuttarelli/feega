@@ -25,7 +25,7 @@
 <div class="influencer">
   <div class="influencer-body">
     {#if cover?.url}
-      <img class="influencer-photo" src={cover.url} alt={name} loading="lazy" />
+      <img class="influencer-photo" src={cover.url} alt={name} loading="lazy" decoding="async" />
     {:else}
       <div class="influencer-photo influencer-photo-empty"><UserRound size={28} strokeWidth={1.5} /></div>
     {/if}

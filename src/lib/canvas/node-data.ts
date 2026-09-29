@@ -30,6 +30,8 @@ import { LAYOUTS } from './composition/index';
 import { CAMERA_PRESETS } from './composition/camera';
 import type { LayoutId } from './composition/types';
 import type { CameraPresetId } from './composition/camera';
+import { CALENDAR_VIEWS } from '$lib/calendar/period-grid';
+import { CALENDAR_SCOPES } from './calendar-node';
 import { AUDIO_OPERATION_IDS, type AudioOperationId } from './audio-operations';
 
 /** Lo stato di una generazione lunga: gli stessi campi per i tre tipi che generano davvero. */
@@ -350,6 +352,13 @@ const effectsSchema = z.object({
   sourceRefId: z.string().nullish()
 });
 
+const calendarSchema = z.object({
+  view: z.enum(CALENDAR_VIEWS),
+  scope: z.enum(CALENDAR_SCOPES),
+  brand_id: z.string().nullable().optional(),
+  anchor: z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
+});
+
 const LAYOUT_IDS = Object.keys(LAYOUTS) as [LayoutId, ...LayoutId[]];
 const CAMERA_PRESET_IDS = Object.keys(CAMERA_PRESETS) as [CameraPresetId, ...CameraPresetId[]];
 const COMPOSITION_ASPECTS = ['9:16', '1:1', '16:9'] as const;
@@ -401,6 +410,7 @@ export const NODE_DATA_SCHEMAS = {
   select: selectSchema,
   effects: effectsSchema,
   composition: compositionSchema,
+  calendar: calendarSchema,
   audio: audioSchema
 } as const;
 

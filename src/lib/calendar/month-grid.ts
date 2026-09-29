@@ -14,17 +14,17 @@ function daysInMonth(year: number, month: number): number {
   return new Date(Date.UTC(year, month, 0)).getUTCDate();
 }
 
-function isoWeekday(year: number, month: number, day: number): number {
+export function isoWeekday(year: number, month: number, day: number): number {
   const jsDay = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
   return jsDay === 0 ? 7 : jsDay;
 }
 
-function shiftedDay(year: number, month: number, day: number, offset: number) {
+export function shiftedDay(year: number, month: number, day: number, offset: number) {
   const shifted = new Date(Date.UTC(year, month - 1, day + offset));
   return { year: shifted.getUTCFullYear(), month: shifted.getUTCMonth() + 1, day: shifted.getUTCDate() };
 }
 
-function toGridDay(
+export function toGridDay(
   year: number,
   month: number,
   day: number,
@@ -36,7 +36,7 @@ function toGridDay(
   return { year, month, day, weekday, outside, isToday: key === todayKey };
 }
 
-function dayKey(year: number, month: number, day: number): string {
+export function dayKey(year: number, month: number, day: number): string {
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
@@ -77,7 +77,7 @@ export type PlacedPosts = {
   unscheduled: string[];
 };
 
-function localDayKey(scheduledFor: string, timeZone: string): string {
+export function localDayKey(scheduledFor: string, timeZone: string): string {
   const fmt = new Intl.DateTimeFormat('en-US', {
     timeZone,
     year: 'numeric',

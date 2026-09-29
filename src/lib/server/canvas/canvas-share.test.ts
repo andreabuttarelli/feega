@@ -120,6 +120,19 @@ describe('readSharedCanvas', () => {
     expect(shared?.edges).toEqual([{ id: 'e1', source: 'n-txt', target: 'n-img' }]);
   });
 
+  it('a shared image is signed as a preview, never as the original file', async () => {
+    const { db } = sharedDb();
+    const presets = new Map<string, string | undefined>();
+    const recording = async (paths: { generated: string[]; uploaded: string[]; influencer: string[] }, preset?: string) => {
+      [...paths.generated, ...paths.uploaded, ...paths.influencer].forEach((p) => presets.set(p, preset));
+      return sign(paths);
+    };
+
+    await readSharedCanvas(db, 'tok-live', recording);
+
+    expect(presets.get('u1/media/pic.png')).toBe('canvas1024');
+  });
+
   it('never exposes the org, the project or the prompts', async () => {
     const { db } = sharedDb();
 
@@ -299,6 +312,16 @@ describe('readSharedCanvas — i nodi sorgente', () => {
 
     expect(shared?.nodes[0].view).toEqual({ kind: 'empty' });
     expect(calls.some((c) => c.table === 'influencers')).toBe(false);
+  });
+
+  it('calendar mostra il periodo, mai le bozze né il brand', async () => {
+    const { db, calls } = sourceDb([node('n-cal', 'calendar', { view: 'month', scope: 'brand', brand_id: 'brand-secret', anchor: '2026-10-01' })]);
+
+    const shared = await readSharedCanvas(db, 'tok-live', sign);
+
+    expect(shared?.nodes[0].view).toEqual({ kind: 'calendar', view: 'month', anchor: '2026-10-01' });
+    expect(JSON.stringify(shared)).not.toContain('brand-secret');
+    expect(calls.some((c) => c.table === 'posts')).toBe(false);
   });
 
   it('social_post_mockup e ads mostrano il contenuto, non gli id', async () => {

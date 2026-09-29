@@ -14,6 +14,8 @@
    */
   import { onCanvasReveal } from '$lib/canvas/canvas-reveal';
   import { keepSame } from '$lib/canvas/snapshot-keep';
+  import { AssetSize, sized } from '$lib/canvas/asset-url';
+  import TieredImage from '$lib/components/canvas/TieredImage.svelte';
   import { createWriteQueue } from '$lib/canvas/write-queue';
   import { canvasActionUrl } from '$lib/canvas/canvas-action-url';
   import { baseOf, diffNodeData } from '$lib/canvas/node-patch';
@@ -28,6 +30,7 @@
   import { invalidate } from '$app/navigation';
   import { CANVAS_LIST_DEPENDENCY } from '$lib/canvas/canvas-list';
   import { formatCredits } from '$lib/components/credit-amount-format';
+  import { untrack } from 'svelte';
   import CanvasFlow from '$lib/components/canvas/CanvasFlow.svelte';
   import GenNode from '$lib/components/canvas/GenNode.svelte';
   import IframeNode from '$lib/components/canvas/IframeNode.svelte';
@@ -48,6 +51,11 @@
   import EffectsNode from '$lib/components/canvas/EffectsNode.svelte';
   import EffectsEditor from '$lib/components/canvas/EffectsEditor.svelte';
   import CompositionNode from '$lib/components/canvas/CompositionNode.svelte';
+  import CalendarNode from '$lib/components/canvas/CalendarNode.svelte';
+  import { calendarData, calendarOf, CalendarScope, type CalendarNode as CalendarNodeState } from '$lib/canvas/calendar-node';
+  import { calendarError, type CalendarBrand, type CalendarPost } from '$lib/canvas/calendar-posts';
+  import { plannedInstant } from '$lib/calendar/period-grid';
+  import { DropVerdict, dayUnderPointer, type PointerPoint } from '$lib/canvas/canvas-drop';
   import { inputChanged } from '$lib/canvas/effects/editor';
   import { upstreamMedia } from '$lib/canvas/effects-node';
   import type { EffectStep } from '$lib/canvas/effects';
@@ -56,8 +64,8 @@
   import { listFeedingSelect } from '$lib/canvas/select-node';
   import { productItem, socialPostItem } from '$lib/canvas/select-sources';
   import { feedFiltersOf, filterPosts, filterProducts, productFiltersOf } from '$lib/canvas/source-filters';
-  import { inspectorOf } from '$lib/canvas/node-inspector';
-  import NodeInspector from '$lib/components/canvas/NodeInspector.svelte';
+  import { hasInspector, inspectorOf } from '$lib/canvas/node-inspector';
+  import SourceSettingsFrame from '$lib/components/canvas/SourceSettingsFrame.svelte';
   import {
     listConnectors,
     listKindOf,
@@ -76,7 +84,7 @@
   import { hasUpstreamText } from '$lib/canvas/upstream-inputs';
   import { effectiveModel } from '$lib/canvas/default-models';
   import { nearestVideoDuration } from '$lib/video-models';
-  import { isGenMedium, snapResolution } from '$lib/canvas/gen-node';
+  import { snapResolution } from '$lib/canvas/gen-node';
   import { snapDynamicParams } from '$lib/canvas/model-params';
   import { type IframeNode as IframeNodeState } from '$lib/canvas/iframe-node';
   import { shareUrlOf } from '$lib/canvas/doc-node';
@@ -91,7 +99,8 @@
   import type { FilledNodeDrag } from '$lib/canvas/drag-payload';
   import { tileNode } from '$lib/canvas/connect-rules';
   import { planDelete } from '$lib/canvas/delete-plan';
-  import { connectorsFor, orphanedByModelChange, type ConnectorType, connectorsForNode, outputConnectorOf } from '$lib/canvas/connectors';
+  import { connectorsFor, orphanedByModelChange, type ConnectorType, type GenerativeNodeKind, connectorsForNode } from '$lib/canvas/connectors';
+  import { portsOf } from '$lib/canvas/node-ports';
   import { planConnectSelection, type ConnectSource } from '$lib/canvas/connect-selection-plan';
   import {
     docData,
@@ -147,6 +156,113 @@
 
   function handlePromote(ids: string[]) {
     void openSheet(data.projectId, promotePath(ids));
+  }
+
+  type CalendarState = { posts: CalendarPost[] | null; brands: CalendarBrand[]; error: string | null; busy: boolean };
+  const CALENDAR_REFRESH_MS = 60_000;
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  let calendars = $state<Record<string, CalendarState>>({});
+
+  function calendarStateOf(id: string): CalendarState {
+    return calendars[id] ?? { posts: null, brands: [], error: null, busy: false };
+  }
+
+  function patchCalendar(id: string, patch: Partial<CalendarState>) {
+    calendars = { ...calendars, [id]: { ...calendarStateOf(id), ...patch } };
+  }
+
+  function answerError(answer: ActionAnswer): string {
+    const detail = (answer.data ?? {}) as { error?: unknown; message?: string; deliveries?: { error?: string }[] };
+    const reasons = (detail.deliveries ?? []).map((d) => d.error).filter(Boolean).join(', ');
+    return calendarError(detail.error, reasons || undefined);
+  }
+
+  async function loadCalendar(calendar: CalendarNodeState) {
+    const answer = await send('calendar_posts', { scope: calendar.scope, brand_id: calendar.brandId ?? '' });
+    if (answer.type !== 'success') {
+      patchCalendar(calendar.id, { posts: [], error: answerError(answer) });
+      return;
+    }
+    const result = answer.data as { posts: CalendarPost[]; brands: CalendarBrand[] };
+    patchCalendar(calendar.id, { posts: result.posts, brands: result.brands, error: null });
+  }
+
+  function calendarNodes(): CalendarNodeState[] {
+    return nodes.map((n) => calendarOf(n)).filter((c): c is CalendarNodeState => c !== null);
+  }
+
+  function refreshCalendars() {
+    for (const calendar of calendarNodes()) {
+      void loadCalendar(calendar);
+    }
+  }
+
+  const calendarQueries = $derived(calendarNodes().map((c) => `${c.id}:${c.scope}:${c.brandId ?? ''}`).join('|'));
+
+  $effect(() => {
+    void calendarQueries;
+    untrack(refreshCalendars);
+  });
+
+  $effect(() => {
+    const timer = setInterval(refreshCalendars, CALENDAR_REFRESH_MS);
+    window.addEventListener('focus', refreshCalendars);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('focus', refreshCalendars);
+    };
+  });
+
+  async function moveDraft(calendar: CalendarNodeState, post: CalendarPost, dayKey: string) {
+    patchCalendar(calendar.id, { busy: true });
+    const answer = await send('plan_post', {
+      post_id: post.id,
+      planned_for: plannedInstant(dayKey, timeZone, post.plannedFor),
+      expected_updated_at: post.updatedAt
+    });
+    patchCalendar(calendar.id, { busy: false, error: answer.type === 'success' ? null : answerError(answer) });
+    await loadCalendar(calendar);
+  }
+
+  async function scheduleDraft(calendar: CalendarNodeState, post: CalendarPost) {
+    patchCalendar(calendar.id, { busy: true });
+    const answer = await send('schedule_post', { post_id: post.id });
+    patchCalendar(calendar.id, { busy: false, error: answer.type === 'success' ? null : answerError(answer) });
+    await loadCalendar(calendar);
+  }
+
+  function highlightDay(ids: string[], at: PointerPoint) {
+    const target = dayUnderPointer(at, ids);
+    for (const el of document.querySelectorAll('.is-node-drop')) {
+      if (el !== target?.element) { el.classList.remove('is-node-drop'); }
+    }
+    target?.element.classList.add('is-node-drop');
+  }
+
+  function dropOnDay(ids: string[], at: PointerPoint): DropVerdict {
+    const target = dayUnderPointer(at, ids);
+    for (const el of document.querySelectorAll('.is-node-drop')) { el.classList.remove('is-node-drop'); }
+    const calendar = target ? calendarNodes().find((c) => c.id === target.calendarId) : null;
+    if (!target || !calendar) {
+      return DropVerdict.Ignored;
+    }
+    void draftOnDay(calendar, ids, target.dayKey);
+    return DropVerdict.Taken;
+  }
+
+  async function draftOnDay(calendar: CalendarNodeState, ids: string[], dayKey: string) {
+    if (!calendar.brandId) {
+      patchCalendar(calendar.id, { error: calendarError('brand_missing') });
+      return;
+    }
+    patchCalendar(calendar.id, { busy: true });
+    const answer = await send('create_post', {
+      brand_id: calendar.brandId,
+      node_id: ids,
+      planned_for: plannedInstant(dayKey, timeZone, null)
+    });
+    patchCalendar(calendar.id, { busy: false, error: answer.type === 'success' ? null : answerError(answer) });
+    await loadCalendar(calendar);
   }
 
   /** Una riga come la pagina la tiene: quel che il database ha, più dove sta sullo schermo. */
@@ -474,36 +590,19 @@
   let influencersOverride = $state<Record<string, InfluencerTile> | null>(null);
   const influencersByNode = $derived(influencersOverride ?? ((data.influencers ?? {}) as Record<string, InfluencerTile>));
 
-  /**
-   * LE PORTE DI UN NODO CHE PRODUCE, dal modello scelto — mai un elenco scritto a mano. Un
-   * modello assente dal catalogo (non sincronizzato: `offerableModels` non lo offre) disegna
-   * ZERO porte piuttosto che indovinare: `choice` è `undefined` e la funzione torna `[]`.
-   */
-  function connectorsOfNode(n: Tile): ConnectorType[] | undefined {
-    if (n.type === 'list') { return listPortsByNode[n.id]; }
-    if (n.type === 'effects') { return ['images', 'videos']; }
-    if (n.type === 'composition') { return ['images']; }
-    if (!isGenMedium(n.type)) { return undefined; }
-    const model = typeof n.data.model === 'string' ? n.data.model : null;
-    return connectorsForNode(n.type, model, catalogue[n.type] ?? []);
-  }
+  const itemPortOf = (kind: string | undefined): ConnectorType => (kind === 'text' ? 'text' : 'images');
 
-  /**
-   * L'USCITA DI `list`/`select` SEGUE IL MEDIUM DEI SUOI ITEM, non un tipo fisso come
-   * `outputConnectorOf` conosce per gli altri nodi: una lista di testo esce come `text`, una di
-   * immagini come `images` — e `select`, che porta il medium della lista a monte incapsulato nel
-   * proprio `data.item_kind` (`upstream.ts::resolveUpstreamInputs`, lo stesso campo), esce a
-   * valore SINGOLO sullo stesso connettore, mai `images` list-valued.
-   */
-  function outputConnectorOfTile(n: Tile): ConnectorType | null {
-    if (n.type === 'list') {
-      return listValuesByNode[n.id]?.itemKind === 'text' ? 'text' : 'images';
+  function portsOfTile(n: Tile): { inputs: ConnectorType[] | undefined; output: ConnectorType | null } {
+    if (!isNodeType(n.type)) {
+      return { inputs: undefined, output: null };
     }
-    if (n.type === 'select') {
-      return n.data.item_kind === 'text' ? 'text' : 'images';
-    }
-    const effectsKind = n.type === 'effects' ? upstreamEffectsMediaOf(n.id)?.kind : null;
-    return outputConnectorOf(n.type, effectsKind ?? (n.data.mediaKind === 'video' ? 'video' : 'image'));
+    const model = typeof n.data.model === 'string' ? n.data.model : null;
+    return portsOf(n.type, {
+      modelPorts: () => connectorsForNode(n.type as GenerativeNodeKind, model, catalogue[n.type as GenerativeNodeKind] ?? []),
+      listPorts: () => listPortsByNode[n.id] ?? [],
+      itemPort: () => itemPortOf(n.type === 'list' ? listValuesByNode[n.id]?.itemKind : upstreamListOf(n.id)?.itemKind),
+      mediaKind: () => upstreamEffectsMediaOf(n.id)?.kind ?? (n.data.mediaKind === 'video' ? 'video' : 'image')
+    });
   }
 
   /**
@@ -517,19 +616,20 @@
   }
 
   const tiles = $derived(
-    nodes.map((n) => ({
+    nodes.map((n) => ({ n, ports: portsOfTile(n) })).map(({ n, ports }) => ({
       id: n.id,
       x: n.x,
       y: n.y,
       w: n.w,
       h: tileHeight(n),
       connectable: true,
-      connectors: connectorsOfNode(n),
-      output: outputConnectorOfTile(n),
+      connectors: ports.inputs,
+      output: ports.output,
       kind: n.type,
       displayName: n.displayName,
       inPost: data.nodeIdsInPost.includes(n.id),
       select: n.select,
+      settings: hasInspector(n.type),
       minW: nodeSize(n.type).w,
       minH: nodeSize(n.type).h,
       node: n.type === 'effects'
@@ -598,13 +698,9 @@
   );
 
   let selectedIds = $state<string[]>([]);
-  let dismissedInspector = $state<string | null>(null);
-  const inspectedRow = $derived(selectedIds.length === 1 ? nodes.find((n) => n.id === selectedIds[0]) : undefined);
-  const inspector = $derived(inspectedRow && inspectedRow.id !== dismissedInspector ? inspectorOf(inspectedRow) : null);
 
   function selectionChanged(ids: string[]) {
     selectedIds = ids;
-    dismissedInspector = null;
   }
 
   $effect(() => {
@@ -652,7 +748,7 @@
 
   $effect(() => onCanvasReveal(() => { void refresh(); }));
 
-  const READ_ACTIONS = new Set(['snapshot', 'estimate_text_cost', 'audio_voices']);
+  const READ_ACTIONS = new Set(['snapshot', 'estimate_text_cost', 'calendar_posts', 'audio_voices']);
 
   function formOf(fields: Record<string, string | number | File | string[]>): FormData {
     const body = new FormData();
@@ -1331,7 +1427,7 @@
   /**
    * "COLLEGA A NUOVO…": un nodo del tipo scelto nasce a destra della selezione, GIÀ CON UN
    * MODELLO — il primo del catalogo per quel medium — perché senza modello un nodo `image`/`video`
-   * non ha porte (`connectorsOfNode`, sopra: `!choice` → `[]`), e il piano di collegamento
+   * non ha porte (`portsOfTile`, sopra: `!choice` → `[]`), e il piano di collegamento
    * troverebbe zero connettori su un nodo appena nato. Il piano stesso (`planConnectSelection`) è
    * lo stesso che decide un collegamento a un nodo ESISTENTE (`connectExisting`, sotto): la
    * domanda "quale porta per quale sorgente" non cambia perché il bersaglio è appena nato.
@@ -1868,6 +1964,8 @@
     {edges}
     onMove={move}
     onMoveEnd={moveEnd}
+    onTileDragOver={highlightDay}
+    onTileDrop={dropOnDay}
     onResize={resize}
     onConnect={connect}
     onDelete={remove}
@@ -1904,6 +2002,7 @@
         {@const select = selectOf(row)}
         {@const effects = effectsOf(row)}
         {@const composition = compositionOf(row)}
+        {@const calendar = calendarOf(row)}
         {@const estimateRevision = textEstimateRevision(id)}
         {@const textCost = textCostEstimates[id]?.revision === estimateRevision ? textCostEstimates[id] : undefined}
         {@const uploaded = isUploadedNodeRow(row) ? uploadedNodeOf(row) : null}
@@ -1972,7 +2071,7 @@
                   <NodeDownload kind="video" sourceUrl={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} nodeId={id} nodeType={gen.medium} />
                 </div>
               {:else}
-                <img src={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} alt={gen.prompt} loading="lazy" />
+                <TieredImage src={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} nodeId={id} alt={gen.prompt} />
                 <div class="gen-download">
                   <NodeDownload kind="image" sourceUrl={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} nodeId={id} nodeType={gen.medium} />
                 </div>
@@ -1993,7 +2092,7 @@
                 references={referencesOf(row.data)}
                 catalogue={data.references.catalogue}
                 media={data.references.media}
-                assetUrl={(assetId) => `/p/${data.projectId}/c/${data.canvas.id}/assets/${assetId}`}
+                assetUrl={(assetId) => sized(`/p/${data.projectId}/c/${data.canvas.id}/assets/${assetId}`, AssetSize.Thumb)}
                 onchange={(next) => void write(id, { references: next })}
               />
               {/if}
@@ -2008,9 +2107,25 @@
             onshare={(on) => share(id, on)}
           />
         {:else if catalog}
-          <ProductsNode node={catalog} products={shownProducts[id] ?? []} total={products[id]?.length ?? 0} />
+          <SourceSettingsFrame
+            {selected}
+            view={selected ? inspectorOf(row) : null}
+            shown={shownProducts[id]?.length ?? 0}
+            onfield={(patch) => write(id, patch)}
+            onsync={() => sync(id)}
+          >
+            <ProductsNode node={catalog} products={shownProducts[id] ?? []} total={products[id]?.length ?? 0} />
+          </SourceSettingsFrame>
         {:else if feed}
-          <SocialFeedNode node={feed} posts={shownPosts[id] ?? []} total={socialPosts[id]?.length ?? 0} />
+          <SourceSettingsFrame
+            {selected}
+            view={selected ? inspectorOf(row) : null}
+            shown={shownPosts[id]?.length ?? 0}
+            onfield={(patch) => write(id, patch)}
+            onsync={() => sync(id)}
+          >
+            <SocialFeedNode node={feed} posts={shownPosts[id] ?? []} total={socialPosts[id]?.length ?? 0} />
+          </SourceSettingsFrame>
         {:else if influencer}
           <InfluencerNode
             name={influencersByNode[id]?.name ?? 'Influencer'}
@@ -2042,10 +2157,26 @@
           <CompositionNode
             node={composition}
             posterUrl={assetUrl(composition.refId)}
-            mediaUrls={upstreamCompositionRefsOf(id).map((refId) => assetUrl(refId)).filter((url): url is string => url !== null)}
+            mediaUrls={upstreamCompositionRefsOf(id).map((refId) => assetUrl(refId)).filter((url): url is string => url !== null).map((url) => sized(url, AssetSize.Px1024))}
             previewActive={compositionEditorId !== id}
             imageCount={upstreamCompositionRefsOf(id).length}
             onopeneditor={() => openCompositionEditor(id)}
+          />
+        {:else if calendar}
+          {@const calState = calendarStateOf(id)}
+          <CalendarNode
+            node={calendar}
+            posts={calState.posts}
+            brands={calState.brands}
+            error={calState.error}
+            busy={calState.busy}
+            {timeZone}
+            mediaUrl={(assetId) => assetUrl(assetId)}
+            onchange={(patch) => write(id, calendarData({ ...calendar, ...patch }))}
+            onmove={(post, dayKey) => moveDraft(calendar, post, dayKey)}
+            onschedule={(post) => scheduleDraft(calendar, post)}
+            onedit={(post) => handlePromote(post.sourceNodeIds)}
+            onrefresh={() => loadCalendar(calendar)}
           />
         {:else if isNodeType(row.type)}
           <EmptyNode type={row.type} />
@@ -2053,17 +2184,6 @@
       {/if}
     {/snippet}
   </CanvasFlow>
-
-  {#if inspector && inspectedRow}
-    {@const id = inspectedRow.id}
-    <NodeInspector
-      view={inspector}
-      shown={(inspectedRow.type === 'products' ? shownProducts[id] : shownPosts[id])?.length ?? 0}
-      onfield={(data) => write(id, data)}
-      onsync={() => sync(id)}
-      onclose={() => (dismissedInspector = id)}
-    />
-  {/if}
 
   {#if effectsEditing}
     {@const editingId = effectsEditing.id}
