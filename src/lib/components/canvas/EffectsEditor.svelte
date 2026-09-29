@@ -45,7 +45,7 @@
   async function loadBitmap(url: string): Promise<ImageBitmap> {
     const res = await fetch(url);
     if (!res.ok) {
-      throw new Error(`immagine non disponibile (${res.status})`);
+      throw new Error(`image unavailable (${res.status})`);
     }
     return createImageBitmap(await res.blob());
   }

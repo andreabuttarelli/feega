@@ -26,12 +26,12 @@ export const GET: RequestHandler = async ({ params, locals }) => {
   const memberships = await listMemberships(db, user.id);
   const found = await findCanvasForUser(db, { canvasId: params.canvasId ?? '', memberships });
   if (!found) {
-    throw error(404, 'questa tela non esiste, o non è tua');
+    throw error(404, 'This canvas does not exist, or is not yours');
   }
 
   const asset = await findAsset(db, { orgId: found.orgId, assetId: params.id ?? '' });
   if (!asset) {
-    throw error(404, 'asset non trovato');
+    throw error(404, 'Asset not found');
   }
 
   if (asset.type === 'text' && asset.content !== null) {
@@ -60,7 +60,7 @@ export const GET: RequestHandler = async ({ params, locals }) => {
   const signed = signedUrls.get(path) ?? null;
 
   if (!signed) {
-    throw error(404, 'file non trovato');
+    throw error(404, 'File not found');
   }
 
   return new Response(null, {

@@ -12,9 +12,9 @@ describe('modelParamsOf', () => {
     });
 
     expect(params).toEqual([
-      { name: 'quality', label: 'Qualità', kind: 'enum', values: ['auto', 'low', 'medium', 'high', 'xhigh', 'max'] },
-      { name: 'background', label: 'Sfondo', kind: 'enum', values: ['auto', 'opaque', 'transparent'] },
-      { name: 'output_compression', label: 'Compressione', kind: 'number', min: 0, max: 100 }
+      { name: 'quality', label: 'Quality', kind: 'enum', values: ['auto', 'low', 'medium', 'high', 'xhigh', 'max'] },
+      { name: 'background', label: 'Background', kind: 'enum', values: ['auto', 'opaque', 'transparent'] },
+      { name: 'output_compression', label: 'Compression', kind: 'number', min: 0, max: 100 }
     ]);
   });
 
@@ -49,7 +49,7 @@ describe('modelParamsOf', () => {
 
 describe('extraParamsOf — cosa spedire al provider oltre ai campi con controllo dedicato', () => {
   it('un modello che dichiara "quality" lo manda, invariati aspectRatio/duration/resolution/audio/repeat', () => {
-    const declared = [{ name: 'quality', label: 'Qualità', kind: 'enum' as const, values: ['low', 'high'] }];
+    const declared = [{ name: 'quality', label: 'Quality', kind: 'enum' as const, values: ['low', 'high'] }];
 
     const extra = extraParamsOf(
       { aspectRatio: '1:1', duration: 5, resolution: '2K', audio: true, repeat: 2, quality: 'low' },
@@ -71,7 +71,7 @@ describe('extraParamsOf — cosa spedire al provider oltre ai campi con controll
 });
 
 describe('snapDynamicParams — un cambio modello non deve mai lasciare un token che il nuovo rifiuta', () => {
-  const QUALITY = { name: 'quality', label: 'Qualità', kind: 'enum' as const, values: ['low', 'high'] };
+  const QUALITY = { name: 'quality', label: 'Quality', kind: 'enum' as const, values: ['low', 'high'] };
   const SEED = { name: 'seed', label: 'Seed', kind: 'number' as const, min: 0, max: 100 };
   const AUDIO = { name: 'transparent', label: 'Transparent', kind: 'boolean' as const };
 

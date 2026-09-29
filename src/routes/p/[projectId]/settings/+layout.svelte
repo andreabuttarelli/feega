@@ -133,6 +133,13 @@
 
   form { margin: 0; }
 
+  .content {
+    width: 100%;
+    max-width: var(--content-max);
+    margin-inline: auto;
+    padding: var(--content-pad-top) var(--content-pad-x) var(--content-pad-bottom);
+  }
+
   .settings-frame.has-nav {
     display: grid;
     grid-template-columns: 200px minmax(0, 1fr);

@@ -79,7 +79,7 @@ export function verdictForUpload(mimeType: string, fileName: string, bytes: numb
 
   const ceiling = UPLOAD_MAX_BYTES[kind];
   if (bytes > ceiling) {
-    return { ok: false, why: `${labelFor(kind)}: al massimo ${ceiling / MB}MB` };
+    return { ok: false, why: `${labelFor(kind)}: at most ${ceiling / MB}MB` };
   }
 
   return { ok: true, kind };

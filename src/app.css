@@ -120,6 +120,7 @@
   --page-title-bar-sub-size: 0.8rem;
   /* Shared shell chrome: top bar + sidebar header */
   --shell-top-h: 56px;
+  --canvas-label-size: 12px;
   /* Single content column — shell, shimmer, and every hub page */
   --content-max: 960px;
   --content-pad-x: 20px;
@@ -161,7 +162,9 @@
   --sidebar-line: var(--line);
 }
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
+@layer base {
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+}
 /* Shared shell chrome: top bar + sidebar header divider alignment */
 .shell-top-header {
   height: var(--shell-top-h, 56px);
@@ -261,14 +264,6 @@ h1, h2 { font-family: var(--serif); font-weight: var(--heading-weight); letter-s
 
 .side-foot { margin-top: auto; }
 .account { position: relative; }
-.user {
-  width: 100%; text-align: left; cursor: pointer; font: inherit;
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px; border: 1px solid var(--line);
-  background: var(--paper);
-}
-.user:hover { background: var(--paper-2); }
-.user .chev { margin-left: auto; color: var(--ink-faint); font-size: 11px; flex: 0 0 auto; }
 /* click-away layer behind the menu */
 .account .scrim { position: fixed; inset: 0; z-index: 40; background: transparent; border: 0; cursor: default; }
 .account .menu {
@@ -296,9 +291,6 @@ h1, h2 { font-family: var(--serif); font-weight: var(--heading-weight); letter-s
   color: #fff; font-weight: 600; font-size: 13px;
   display: flex; align-items: center; justify-content: center; flex: 0 0 auto;
 }
-.user .who { min-width: 0; }
-.user .name { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.user .plan { font-size: 11.5px; color: var(--ink-faint); }
 
 /* ---------------- Main + topbar ---------------- */
 .main { display: flex; flex-direction: column; min-width: 0; background: var(--paper-2); position: relative; }
@@ -392,13 +384,6 @@ h1, h2 { font-family: var(--serif); font-weight: var(--heading-weight); letter-s
                   background: var(--accent); border: 2px solid var(--paper); }
 
 /* Centred horizontally: every page column uses --content-max + --content-pad-*. */
-.content {
-  padding: var(--content-pad-top, 32px) var(--content-pad-x, 20px) var(--content-pad-bottom, 64px);
-  max-width: var(--content-max, 960px);
-  width: 100%;
-  margin-inline: auto;
-  box-sizing: border-box;
-}
 
 /* Page header + title — global only. Do not re-declare size/weight in pages.
    !important beats Svelte scoped styles that still set local font-size. */
@@ -406,8 +391,6 @@ h1, h2 { font-family: var(--serif); font-weight: var(--heading-weight); letter-s
 .page-title,
 .page-head h1,
 .page-head h2,
-.head h1,
-.head h2,
 .glow-title,
 .leads-title,
 .chat-col-greet,
@@ -423,8 +406,7 @@ h1, h2 { font-family: var(--serif); font-weight: var(--heading-weight); letter-s
   color: var(--ink);
 }
 .page-head p,
-.page-sub,
-.head .sub {
+.page-sub {
   color: var(--ink-soft);
   font-size: var(--page-sub-size) !important;
   margin-top: 6px;
@@ -438,18 +420,6 @@ h1, h2 { font-family: var(--serif); font-weight: var(--heading-weight); letter-s
 .greet p b { color: var(--accent); font-weight: 600; }
 
 /* ---------------- Buttons ---------------- */
-.btn {
-  border: none; font-size: 13px; font-weight: 600;
-  letter-spacing: 0.01em;
-  padding: 11px 22px; transition: transform .25s var(--ease), opacity .25s var(--ease), background .25s var(--ease);
-}
-.btn-primary { background: var(--ink); color: #fff; }
-.btn-primary:hover { transform: scale(1.03); background: #000; }
-.btn-accent { background: linear-gradient(120deg, var(--accent), var(--accent-2)); color: #fff;
-              box-shadow: 0 8px 18px -8px rgba(var(--accent-rgb),0.55); }
-.btn-accent:hover { transform: scale(1.03); }
-.btn-ghost { background: var(--paper); color: var(--ink); border: 1px solid var(--line-2); }
-.btn-ghost:hover { background: var(--paper-2); }
 
 /* ---------------- Stat tiles ---------------- */
 .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 26px; }
@@ -461,17 +431,6 @@ h1, h2 { font-family: var(--serif); font-weight: var(--heading-weight); letter-s
 .tile .delta.up { color: var(--accent); }
 
 /* ---------------- Panels ---------------- */
-.grid { display: grid; grid-template-columns: 1.7fr 1fr; gap: 16px; align-items: start; }
-.panel { background: var(--paper); border: 1px solid var(--line); overflow: hidden; }
-.panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 18px 22px; border-bottom: 1px solid var(--line); }
-.panel-head .t { font-size: 14.5px; font-weight: 700; letter-spacing: -0.03em; }
-.panel-head .t span { color: var(--ink-faint); font-weight: 500; }
-.approve-all { background: rgba(var(--accent-rgb),0.09); color: var(--accent);
-  border: none; font-size: 13px; font-weight: 600; padding: 7px 14px;
-  transition: background .2s var(--ease); }
-.approve-all:hover { background: rgba(var(--accent-rgb),0.16); }
-.approve-all:disabled { opacity: .4; cursor: default; }
 
 /* Approval post rows */
 .post-row { display: flex; align-items: center; gap: 14px;
@@ -490,12 +449,6 @@ h1, h2 { font-family: var(--serif); font-weight: var(--heading-weight); letter-s
                  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .post-row .time { font-size: 12.5px; color: var(--ink-faint); margin-top: 3px; }
 .post-row .actions { display: flex; gap: 8px; flex: 0 0 auto; }
-.mini { font-size: 13px; font-weight: 600; padding: 8px 16px; border: none;
-  transition: transform .2s var(--ease), background .2s var(--ease), opacity .2s var(--ease); }
-.mini.edit { background: var(--paper); color: var(--ink-soft); border: 1px solid var(--line-2); }
-.mini.edit:hover { background: var(--paper-2); color: var(--ink); }
-.mini.ok { background: linear-gradient(120deg, var(--accent), var(--accent-2)); color: #fff; }
-.mini.ok:hover { transform: scale(1.04); }
 .post-row.approved { opacity: .62; }
 .post-row.approved .actions { display: none; }
 .approved-tag { display: none; align-items: center; gap: 5px; flex: 0 0 auto;
@@ -506,20 +459,6 @@ h1, h2 { font-family: var(--serif); font-weight: var(--heading-weight); letter-s
 .empty-note.show { display: block; }
 
 /* Accounts + assistant (overview right column) */
-.acct { display: flex; align-items: center; gap: 12px; padding: 14px 22px; border-bottom: 1px solid var(--line); }
-.acct:last-child { border-bottom: none; }
-.acct .glyph { width: 34px; height: 34px; display: flex; align-items: center;
-               justify-content: center; color: #fff; font-weight: 700; font-size: 13px; flex: 0 0 auto; }
-.g-ig { background: linear-gradient(135deg, #f58529, #dd2a7b, #8134af); }
-.g-tk { background: #111; }
-.g-fb { background: #1877f2; }
-.acct .nm { flex: 1; min-width: 0; }
-.acct .nm .h { font-size: 14px; font-weight: 600; }
-.acct .nm .s { font-size: 12px; color: var(--ink-faint); }
-.status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--accent); }
-.status .d { width: 7px; height: 7px; background: var(--accent); }
-.status.off { color: var(--ink-faint); }
-.status.off .d { background: var(--ink-faint); }
 
 .assistant { padding: 18px 22px; }
 .assistant .bubble { background: var(--paper-2); border: 1px solid var(--line);
@@ -582,30 +521,6 @@ h1, h2 { font-family: var(--serif); font-weight: var(--heading-weight); letter-s
 .ev.hide { display: none; }
 
 /* ============================================================
-   CONTENT LIBRARY PAGE
-   ============================================================ */
-.tabs { display: inline-flex; gap: 4px; background: var(--paper); border: 1px solid var(--line); padding: 4px; margin-bottom: 22px; }
-.tab { border: none; background: transparent; padding: 8px 18px;
-  font-size: 13.5px; font-weight: 600; color: var(--ink-soft); transition: background .2s var(--ease), color .2s var(--ease); }
-.tab.active { background: var(--ink); color: #fff; }
-.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(238px, 1fr)); gap: 16px; }
-.card { background: var(--paper); border: 1px solid var(--line); overflow: hidden;
-  transition: transform .3s var(--ease), box-shadow .3s var(--ease); }
-.card:hover { transform: translateY(-4px); box-shadow: 0 20px 40px -24px rgba(0,0,0,.22); }
-.card .media { height: 152px; position: relative; }
-.card .media .badge2 { position: absolute; top: 10px; left: 10px; background: rgba(255,255,255,.92);
-  backdrop-filter: blur(6px); padding: 4px 10px; font-size: 11px; font-weight: 700; }
-.card .status2 { position: absolute; top: 10px; right: 10px; font-size: 11px; font-weight: 700;
-  padding: 4px 10px; }
-.st-draft { background: #fff3d6; color: #a3700a; }
-.st-sched { background: #d9f0e8; color: var(--accent); }
-.st-pub { background: #e8e8ed; color: var(--ink-soft); }
-.card .info { padding: 14px 16px; }
-.card .info .cap2 { font-size: 14px; font-weight: 600; line-height: 1.35; }
-.card .info .meta2 { font-size: 12px; color: var(--ink-faint); margin-top: 10px; display: flex; justify-content: space-between; }
-.card.hide { display: none; }
-
-/* ============================================================
    ANALYTICS PAGE
    ============================================================ */
 .charts { display: grid; grid-template-columns: 1.5fr 1fr; gap: 16px; align-items: start; }
@@ -638,15 +553,6 @@ h1, h2 { font-family: var(--serif); font-weight: var(--heading-weight); letter-s
 /* Full width, Pinterest-style: CSS columns pack the panels by height (no empty gaps under a
    short box) and flow TOP-TO-BOTTOM — so "Connect a platform" sits right under "Connected
    accounts", which precedes it in the DOM. break-inside keeps a panel from splitting. */
-.settings { columns: 1; }
-.settings .panel { margin-bottom: 16px; }
-.field { padding: 18px 22px; border-bottom: 1px solid var(--line); display: flex; align-items: center;
-  justify-content: space-between; gap: 18px; }
-.field:last-child { border-bottom: none; }
-[data-viewport='mobile'] .field { flex-direction: column; align-items: stretch; gap: 10px; padding: 16px; }
-.field.col { flex-direction: column; align-items: stretch; gap: 14px; }
-.field .ftxt .fh { font-size: 14.5px; font-weight: 600; }
-.field .ftxt .fs { font-size: 13px; color: var(--ink-faint); margin-top: 3px; max-width: 52ch; line-height: 1.45; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .chip2 { background: var(--paper-2); border: 1px solid var(--line);
   padding: 7px 14px; font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 8px; }
@@ -725,8 +631,6 @@ h1, h2 { font-family: var(--serif); font-weight: var(--heading-weight); letter-s
 .switch input:checked + .sl::before { transform: translateX(18px); }
 
 /* connect button for disconnected accounts */
-.mini.connect { background: var(--ink); color: #fff; }
-.mini.connect:hover { transform: scale(1.04); }
 
 /* Legacy topbar (unused) — hide when workbench is wide. */
 @container workbench (min-width: 901px) {
@@ -736,11 +640,11 @@ h1, h2 { font-family: var(--serif); font-weight: var(--heading-weight); letter-s
 /* ---------------- Responsive ---------------- */
 @media (max-width: 1080px) {
   .stats { grid-template-columns: repeat(2, 1fr); }
-  .grid, .charts { grid-template-columns: 1fr; }
+  .charts { grid-template-columns: 1fr; }
 }
 @container workbench (max-width: 1080px) {
   .stats { grid-template-columns: repeat(2, 1fr); }
-  .grid, .charts { grid-template-columns: 1fr; }
+  .charts { grid-template-columns: 1fr; }
 }
 @media (max-width: 900px) {
   .app { grid-template-columns: 1fr; }
@@ -758,18 +662,12 @@ h1, h2 { font-family: var(--serif); font-weight: var(--heading-weight); letter-s
   .sidebar.open { transform: translateX(0); }
 }
 @media (max-width: 600px) {
-  .content {
-    padding: var(--content-pad-top, 24px) var(--content-pad-x, 14px) var(--content-pad-bottom, 48px);
-  }
   .stats { grid-template-columns: 1fr; }
   .topbar { padding: 0 16px; }
   .search { display: none; }
   .post-row .cap { white-space: normal; }
 }
 @container workbench (max-width: 600px) {
-  .content {
-    padding: var(--content-pad-top, 24px) var(--content-pad-x, 14px) var(--content-pad-bottom, 48px);
-  }
   .stats { grid-template-columns: 1fr; }
   .topbar { padding: 0 16px; }
   .search { display: none; }

@@ -98,6 +98,15 @@ describe('readSharedCanvas', () => {
     expect(await readSharedCanvas(db, '', sign)).toBeNull();
   });
 
+  it('a soft-deleted canvas reads as not found', async () => {
+    const { db } = fakeDb(
+      { canvases: [{ ...CANVAS, deleted_at: '2026-09-29T00:00:00.000Z' }] },
+      { filter: true }
+    );
+
+    expect(await readSharedCanvas(db, 'tok-live', sign)).toBeNull();
+  });
+
   it('a live token returns the nodes, signed media and text, without deleted nodes', async () => {
     const { db } = sharedDb();
 
@@ -259,6 +268,15 @@ describe('readSharedCanvas — i nodi sorgente', () => {
     expect(shared?.nodes[1].view).toEqual({ kind: 'empty' });
   });
 
+  it('an influencer node with nobody picked yet is empty and never queries the catalogue', async () => {
+    const { db, calls } = sourceDb([node('n-inf', 'influencer', {})]);
+
+    const shared = await readSharedCanvas(db, 'tok-live', sign);
+
+    expect(shared?.nodes[0].view).toEqual({ kind: 'empty' });
+    expect(calls.some((c) => c.table === 'influencers')).toBe(false);
+  });
+
   it('social_post_mockup e ads mostrano il contenuto, non gli id', async () => {
     const { db } = sourceDb([
       node('n-mock', 'social_post_mockup', { general: { caption: 'Hello', media: ['https://cdn.example/m.jpg', { url: 'https://cdn.example/n.jpg' }] } }),
@@ -270,5 +288,18 @@ describe('readSharedCanvas — i nodi sorgente', () => {
     expect(shared?.nodes[0].view).toEqual({ kind: 'post', caption: 'Hello', media: ['https://cdn.example/m.jpg', 'https://cdn.example/n.jpg'] });
     expect(shared?.nodes[1].view).toEqual({ kind: 'ads', query: 'Nike', country: 'IT' });
     expect(JSON.stringify(shared)).not.toContain('123');
+  });
+
+  it('a post, ads, embed or document with nothing in it reads as empty, not as a blank frame', async () => {
+    const { db } = sourceDb([
+      node('n-mock', 'social_post_mockup', {}),
+      node('n-ads', 'ads', {}),
+      node('n-frame', 'iframe', {}),
+      node('n-doc', 'doc', {})
+    ]);
+
+    const shared = await readSharedCanvas(db, 'tok-live', sign);
+
+    expect(shared?.nodes.map((n) => n.view)).toEqual([{ kind: 'empty' }, { kind: 'empty' }, { kind: 'empty' }, { kind: 'empty' }]);
   });
 });

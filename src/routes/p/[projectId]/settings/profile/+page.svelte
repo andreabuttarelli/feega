@@ -4,6 +4,11 @@
   import { SvelteSet } from 'svelte/reactivity';
   import { jpegIfHeicFormFiles } from '$lib/raster-image-client';
   import { RASTER_IMAGE_ACCEPT } from '$lib/raster-image';
+  import { Panel } from '$lib/components/ui/panel';
+  import { Field, FieldLayout } from '$lib/components/ui/field';
+  import { Input } from '$lib/components/ui/input';
+  import { Button, buttonVariants } from '$lib/components/ui/button';
+  import { Notice } from '$lib/components/ui/notice';
 
   let { data, form } = $props();
 
@@ -28,21 +33,19 @@
 </script>
 
 {#if form?.profileSaved}
-  <p class="banner ok">{$_('app.settings.profile.saved')}</p>
+  <Notice tone="success">{$_('app.settings.profile.saved')}</Notice>
 {:else if form?.avatarUploaded}
-  <p class="banner ok">{$_('app.settings.profile.avatarSaved')}</p>
+  <Notice tone="success">{$_('app.settings.profile.avatarSaved')}</Notice>
 {:else if form?.avatarRemoved}
-  <p class="banner ok">{$_('app.settings.profile.avatarRemoved')}</p>
+  <Notice tone="success">{$_('app.settings.profile.avatarRemoved')}</Notice>
 {:else if form?.error === 'too_large'}
-  <p class="banner err">{$_('app.settings.profile.tooLarge')}</p>
+  <Notice tone="error">{$_('app.settings.profile.tooLarge')}</Notice>
 {:else if form?.error === 'not_image'}
-  <p class="banner err">{$_('app.settings.profile.notImage')}</p>
+  <Notice tone="error">{$_('app.settings.profile.notImage')}</Notice>
 {/if}
 
-<section class="panel">
-  <div class="panel-head"><div class="t">{$_('app.settings.profile.title')}</div></div>
-
-  <div class="field avatar-field">
+<Panel title={$_('app.settings.profile.title')}>
+  <div class="flex items-start gap-4">
     <div class="avatar-preview">
       {#if data.avatarUrl}
         <img src={data.avatarUrl} alt="" />
@@ -50,10 +53,8 @@
         <span>{initials}</span>
       {/if}
     </div>
-    <div class="ftxt">
-      <div class="fh">{$_('app.settings.profile.photo')}</div>
-      <div class="fs">{$_('app.settings.profile.photoDesc')}</div>
-      <div class="avatar-actions">
+    <Field label={$_('app.settings.profile.photo')} hint={$_('app.settings.profile.photoDesc')} class="flex-1">
+      <div class="flex flex-wrap gap-2">
         <form
           method="POST"
           action="?/uploadProfileAvatar"
@@ -63,7 +64,7 @@
             return withBusy('avatar')();
           }}
         >
-          <label class="bbtn" class:busy={isBusy('avatar')}>
+          <label class={buttonVariants({ variant: 'secondary', size: 'sm' })} class:busy={isBusy('avatar')}>
             {$_('app.settings.profile.uploadPhoto')}
             <input
               type="file"
@@ -76,86 +77,58 @@
         </form>
         {#if data.hasCustomAvatar}
           <form method="POST" action="?/removeProfileAvatar" use:enhance={withBusy('avatar')}>
-            <button class="bbtn" type="submit" disabled={isBusy('avatar')}
-              >{$_('app.settings.profile.removePhoto')}</button
-            >
+            <Button variant="ghost" size="sm" type="submit" disabled={isBusy('avatar')}>{$_('app.settings.profile.removePhoto')}</Button>
           </form>
         {/if}
       </div>
-    </div>
+    </Field>
   </div>
 
-  <form method="POST" action="?/updateProfile" use:enhance={withBusy('profile')} class="name-form">
-    <div class="field col">
-      <div class="ftxt">
-        <div class="fh">{$_('app.settings.profile.name')}</div>
-        <div class="fs">{$_('app.settings.profile.nameDesc')}</div>
-      </div>
+  <form method="POST" action="?/updateProfile" use:enhance={withBusy('profile')} class="m-0 flex flex-col gap-3">
+    <Field label={$_('app.settings.profile.name')} hint={$_('app.settings.profile.nameDesc')}>
       <div class="name-row">
-        <label>
+        <label class="flex flex-col gap-1.5 text-[0.8125rem] text-muted-foreground" for="profile-first-name">
           {$_('app.settings.profile.firstName')}
-          <input
-            type="text"
+          <Input
+            id="profile-first-name"
             name="firstName"
             value={data.firstName}
-            maxlength="80"
+            maxlength={80}
             autocomplete="given-name"
             disabled={isBusy('profile')}
+            class="h-9"
           />
         </label>
-        <label>
+        <label class="flex flex-col gap-1.5 text-[0.8125rem] text-muted-foreground" for="profile-last-name">
           {$_('app.settings.profile.lastName')}
-          <input
-            type="text"
+          <Input
+            id="profile-last-name"
             name="lastName"
             value={data.lastName}
-            maxlength="80"
+            maxlength={80}
             autocomplete="family-name"
             disabled={isBusy('profile')}
+            class="h-9"
           />
         </label>
       </div>
-      {#if data.email}
-        <p class="email-line">{data.email}</p>
-      {/if}
-      <button class="bbtn primary" type="submit" disabled={isBusy('profile')}
-        >{$_('app.settings.save')}</button
-      >
+    </Field>
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <p class="m-0 text-[0.8125rem] text-muted-foreground">{data.email ?? ''}</p>
+      <Button type="submit" disabled={isBusy('profile')}>{$_('app.settings.save')}</Button>
     </div>
   </form>
-</section>
+</Panel>
 
-<section class="panel">
-  <div class="panel-head"><div class="t">{$_('app.settings.profile.session')}</div></div>
-  <div class="field">
-    <div class="ftxt">
-      <div class="fh">{$_('app.account.signOut')}</div>
-      <div class="fs">{$_('app.settings.profile.signOutDesc')}</div>
-    </div>
+<Panel title={$_('app.settings.profile.session')}>
+  <Field label={$_('app.account.signOut')} hint={$_('app.settings.profile.signOutDesc')} layout={FieldLayout.Row}>
     <form method="POST" action="/auth/signout">
-      <button class="bbtn" type="submit">{$_('app.account.signOut')}</button>
+      <Button variant="secondary" type="submit">{$_('app.account.signOut')}</Button>
     </form>
-  </div>
-</section>
+  </Field>
+</Panel>
 
 <style>
-  .banner {
-    font-size: 13px;
-    padding: 10px 14px;
-    margin: 0 0 16px;
-  }
-  .banner.ok {
-    background: #dcfce7;
-    color: #166534;
-  }
-  .banner.err {
-    background: #fef2f2;
-    color: #b91c1c;
-  }
-  .avatar-field {
-    align-items: flex-start;
-    gap: 16px;
-  }
   .avatar-preview {
     width: 64px;
     height: 64px;
@@ -175,47 +148,12 @@
     height: 100%;
     object-fit: cover;
   }
-  .avatar-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 10px;
-  }
-  .name-form {
-    margin: 0;
-  }
   .name-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 12px;
   }
-  .name-row label {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    font-size: 12.5px;
-    font-weight: 600;
-    color: var(--ink-soft);
-  }
-  .name-row input {
-    font: inherit;
-    font-size: 14px;
-    font-weight: 400;
-    padding: 9px 12px;
-    border: 1px solid var(--line-2, var(--line));
-    background: var(--paper);
-    color: var(--ink);
-    outline: none;
-  }
-  .name-row input:focus {
-    border-color: var(--accent);
-  }
-  .email-line {
-    margin: 0;
-    font-size: 13px;
-    color: var(--ink-faint);
-  }
-  .bbtn.busy {
+  .busy {
     opacity: 0.55;
     pointer-events: none;
   }

@@ -151,6 +151,7 @@
         updatedAt: p.updatedAt
       }))}
       canvasName={currentCanvas?.name ?? ''}
+      canvasHref={currentCanvas?.href ?? null}
       canvases={data.canvases}
     />
     <main class="mobile-main" class:is-canvas={onCanvasRoute}>
@@ -179,6 +180,7 @@
             updatedAt: p.updatedAt
           }))}
           canvasName={currentCanvas?.name ?? ''}
+          canvasHref={currentCanvas?.href ?? ''}
           canvases={data.canvases}
           creditBalance={data.creditBalance}
           {chatOpen}

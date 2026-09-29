@@ -13,6 +13,11 @@
   import Megaphone from '@lucide/svelte/icons/megaphone';
   import { canvasSelection, promotePath } from '$lib/canvas/promote-sheet';
   import { formatLastEdited } from '$lib/canvas/format-last-edited';
+  import { CanvasAction, submitCanvasAction, renameProjectAction } from '$lib/canvas/canvas-list';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Pencil from '@lucide/svelte/icons/pencil';
+  import Trash from '@lucide/svelte/icons/trash-2';
+  import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 
   type ProjectRow = { id: string; name: string; href: string; updatedAt: string };
   type CanvasRow = { id: string; name: string; href: string };
@@ -31,6 +36,7 @@
     projectName,
     projects,
     canvasName,
+    canvasHref,
     canvases,
     creditBalance,
     chatOpen,
@@ -44,6 +50,7 @@
     projectName: string;
     projects: ProjectRow[];
     canvasName: string;
+    canvasHref: string;
     canvases: CanvasRow[];
     creditBalance: number;
     chatOpen: boolean;
@@ -53,6 +60,47 @@
     profile: { name: string | null; email: string; avatarUrl: string | null };
     org: { name: string } | null;
   } = $props();
+
+  let renaming = $state(false);
+  let draftName = $state('');
+  let confirmingDelete = $state(false);
+  const lastCanvas = $derived(canvases.length <= 1);
+
+  let renamingProject = $state(false);
+  let draftProjectName = $state('');
+
+  function startRename() {
+    draftName = canvasName;
+    renaming = true;
+  }
+
+  async function saveRename(event: SubmitEvent) {
+    event.preventDefault();
+    renaming = false;
+    await submitCanvasAction(canvasHref, CanvasAction.Rename, { name: draftName });
+  }
+
+  function startRenameProject() {
+    draftProjectName = projectName;
+    renamingProject = true;
+  }
+
+  async function saveRenameProject(event: SubmitEvent) {
+    event.preventDefault();
+    renamingProject = false;
+    await renameProjectAction(canvasHref, draftProjectName);
+  }
+
+  function askDeleteCurrent() {
+    if (lastCanvas) {
+      return;
+    }
+    confirmingDelete = true;
+  }
+
+  async function deleteCurrent() {
+    await submitCanvasAction(canvasHref, CanvasAction.Delete);
+  }
 
   function openBilling() {
     openSheet(projectId, '/settings/billing').catch((err) => {
@@ -65,8 +113,20 @@
   <div class="top-box left">
     <CanvasMenu {projectId} {profile} {org} {creditBalance} />
 
+    {#if renamingProject}
+      <form class="rename-form" onsubmit={saveRenameProject}>
+        <input
+          class="rename-input"
+          data-testid="project-rename-input"
+          bind:value={draftProjectName}
+          {@attach (el) => el.focus()}
+          onkeydown={(e) => e.key === 'Escape' && (renamingProject = false)}
+        />
+        <button type="submit" class="rename-save">{$_('app.shell.canvasActions.save')}</button>
+      </form>
+    {:else}
     <DropdownMenu.Root>
-      <DropdownMenu.Trigger class="switcher-btn">
+      <DropdownMenu.Trigger class="switcher-btn" data-testid="project-switcher">
         <span class="truncate">{projectName}</span>
         <ChevronDown size={13} />
       </DropdownMenu.Trigger>
@@ -84,13 +144,31 @@
             {/snippet}
           </DropdownMenu.Item>
         {/each}
+        <DropdownMenu.Separator />
+        <DropdownMenu.Item data-testid="project-rename" onSelect={startRenameProject}>
+          <Pencil size={14} />
+          {$_('app.shell.canvasActions.rename')}
+        </DropdownMenu.Item>
       </DropdownMenu.Content>
     </DropdownMenu.Root>
+    {/if}
 
     <span class="sep">/</span>
 
+    {#if renaming}
+      <form class="rename-form" onsubmit={saveRename}>
+        <input
+          class="rename-input"
+          data-testid="canvas-rename-input"
+          bind:value={draftName}
+          {@attach (el) => el.focus()}
+          onkeydown={(e) => e.key === 'Escape' && (renaming = false)}
+        />
+        <button type="submit" class="rename-save">{$_('app.shell.canvasActions.save')}</button>
+      </form>
+    {:else}
     <DropdownMenu.Root>
-      <DropdownMenu.Trigger class="switcher-btn">
+      <DropdownMenu.Trigger class="switcher-btn" data-testid="canvas-switcher">
         <span class="truncate canvas-name">{canvasName}</span>
         <ChevronDown size={13} />
       </DropdownMenu.Trigger>
@@ -107,9 +185,37 @@
             {/snippet}
           </DropdownMenu.Item>
         {/each}
+        <DropdownMenu.Separator />
+        <DropdownMenu.Item data-testid="canvas-new" onSelect={() => submitCanvasAction(canvasHref, CanvasAction.New)}>
+          <Plus size={14} />
+          {$_('app.shell.canvasActions.new')}
+        </DropdownMenu.Item>
+        <DropdownMenu.Item data-testid="canvas-rename" onSelect={startRename}>
+          <Pencil size={14} />
+          {$_('app.shell.canvasActions.rename')}
+        </DropdownMenu.Item>
+        <DropdownMenu.Item
+          data-testid="canvas-delete"
+          disabled={lastCanvas}
+          title={lastCanvas ? $_('app.shell.canvasActions.lastCanvas') : undefined}
+          onSelect={askDeleteCurrent}
+        >
+          <Trash size={14} />
+          {$_('app.shell.canvasActions.delete')}
+        </DropdownMenu.Item>
       </DropdownMenu.Content>
     </DropdownMenu.Root>
+    {/if}
   </div>
+
+  <ConfirmDialog
+    bind:open={confirmingDelete}
+    title={$_('app.shell.canvasActions.confirmDeleteTitle')}
+    body={$_('app.shell.canvasActions.confirmDeleteBody')}
+    confirmLabel={$_('app.shell.canvasActions.confirmDeleteCta')}
+    cancelLabel={$_('app.shell.canvasActions.confirmDeleteCancel')}
+    onConfirm={deleteCurrent}
+  />
 
   <div class="top-box right">
     <a href="#billing" class="credits" onclick={(e) => { e.preventDefault(); openBilling(); }}>
@@ -194,6 +300,33 @@
   }
   :global(.switcher-btn:hover) {
     background: var(--paper-2, #f9f9f9);
+  }
+
+  .rename-form {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .rename-input {
+    width: 180px;
+    border: 1px solid var(--line, #e5e5e7);
+    padding: 4px 6px;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink, #1d1d1f);
+    background: var(--paper, #fff);
+  }
+
+  .rename-save {
+    border: 1px solid var(--ink, #1d1d1f);
+    background: var(--ink, #1d1d1f);
+    color: var(--paper, #fff);
+    padding: 4px 8px;
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
   }
 
   .switcher-row {

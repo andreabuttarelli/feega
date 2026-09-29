@@ -10,6 +10,7 @@ import { PROJECT_BRAND_SHELL_SELECT, projectBrandShellOf, type ProjectBrandShell
 import { orgCreditBalance } from '$lib/server/credits';
 import { env } from '$env/dynamic/private';
 import type { Db } from '$lib/server/db/client';
+import { CANVAS_LIST_DEPENDENCY } from '$lib/canvas/canvas-list';
 
 const FLAGS = {
   navTeam: env.FEATURE_NAV_TEAM === 'true'
@@ -23,7 +24,7 @@ const FLAGS = {
  * materiale diventa qualcosa da pubblicare si decide per chi.
  */
 export const load: LayoutServerLoad = async ({ params, locals, depends, cookies }) => {
-  depends('app:credits');
+  depends('app:credits', CANVAS_LIST_DEPENDENCY);
 
   const { session, user } = await locals.safeGetSession();
   if (!session || !user) {
@@ -38,7 +39,7 @@ export const load: LayoutServerLoad = async ({ params, locals, depends, cookies 
   const [profile, memberships] = await Promise.all([ensureProfile(db, user), listMemberships(db, user.id)]);
   const found = await findProjectForUser(db, { projectId: params.projectId ?? '', memberships });
   if (!found) {
-    throw error(404, 'questo progetto non esiste, o non è tuo');
+    throw error(404, 'This project does not exist, or is not yours');
   }
 
   const { orgId, project } = found;

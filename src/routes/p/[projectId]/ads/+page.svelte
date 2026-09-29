@@ -118,7 +118,7 @@
 </div>
 
 <style>
-  .content { display: flex; flex-direction: column; gap: 16px; padding: 16px 22px 32px; max-width: 880px; }
+  .content { display: flex; flex-direction: column; gap: 16px; width: 100%; padding: 16px 22px 32px; max-width: 880px; margin-inline: auto; }
   .gate { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 28px 24px; border: 1px solid var(--line); max-width: 520px; }
   .gate h2 { margin: 0; font-size: 1.05rem; font-weight: 650; }
   .gate p, .muted { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--muted, #6e6e73); }

@@ -60,4 +60,15 @@ describe('aprire una tela dal suo id', () => {
 
     expect(calls).toHaveLength(1);
   });
+
+  it('una tela soft-deleted non si apre', async () => {
+    const { db } = fakeDb(
+      { canvases: [{ ...row, org_id: ORG, deleted_at: '2026-09-29T00:00:00.000Z' }] },
+      { filter: true }
+    );
+
+    expect(
+      await findCanvasForUser(db, { canvasId: CANVAS, memberships: [membership(ORG)] })
+    ).toBeNull();
+  });
 });

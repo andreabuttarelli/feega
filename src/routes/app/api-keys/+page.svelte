@@ -40,7 +40,7 @@
         <div class="mb-2.5 text-sm font-semibold text-amber-600">⚠️ {$_('app.settings.apiKeys.warning')}</div>
         <div class="flex items-center gap-2">
           <code class="bg-muted ring-border flex-1 select-all break-all px-2.5 py-2 text-xs ring-1">{form.apiKeyRaw}</code>
-          <Button variant="outline" size="sm" onclick={copyKey}>
+          <Button variant="secondary" size="sm" onclick={copyKey}>
             {#if copied}<Check class="size-3.5" /> {$_('app.settings.apiKeys.copied')}
             {:else}<Copy class="size-3.5" /> {$_('app.settings.apiKeys.copyKey')}{/if}
           </Button>
@@ -85,7 +85,7 @@
               <div class="flex shrink-0 items-center gap-2">
                 <form method="POST" action="?/revokeApiKey" use:enhance>
                   <input type="hidden" name="key_id" value={k.id} />
-                  <Button variant="destructive" size="sm" type="submit">{$_('app.settings.apiKeys.revoke')}</Button>
+                  <Button variant="danger" size="sm" type="submit">{$_('app.settings.apiKeys.revoke')}</Button>
                 </form>
                 <Button variant="ghost" size="sm" onclick={() => (confirmingRevoke = null)}>{$_('app.settings.keep')}</Button>
               </div>
@@ -151,7 +151,7 @@
       {/if}
 
       <Dialog.Footer>
-        <Button variant="outline" type="button" onclick={() => (modalOpen = false)}>{$_('app.settings.close')}</Button>
+        <Button variant="secondary" type="button" onclick={() => (modalOpen = false)}>{$_('app.settings.close')}</Button>
         <Button type="submit">{$_('app.settings.apiKeys.createKey')}</Button>
       </Dialog.Footer>
     </form>

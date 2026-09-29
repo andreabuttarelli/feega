@@ -2069,6 +2069,14 @@ byte sizes, catches it; a green test against a mock never would.
 reserve the batch call for full-size, no-transform signing. `signThumbnailUrls`
 (`src/lib/server/media-thumbnails.ts`) is the one place that decides which.
 
+## `npm run db:types` truncates `database.types.ts` on auth failure
+
+**Signal:** the file is 0 lines after a failed `db:types` run in a sandbox with no Supabase
+access token. `> file` opens and truncates the file before the command runs, and
+`supabase gen types` fails after that — the shell redirect wins the race, not the command.
+**Move:** `git checkout -- src/lib/database.types.ts` before editing by hand when `db:types`
+fails; never trust the file's presence after a failed run without checking `git status` first.
+
 ## A partial save still reverts someone else's field
 
 **Signal:** after a burst of edits a key another writer changed (`refId`, `runId`) is back to

@@ -24,6 +24,7 @@
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import { deserialize } from '$app/forms';
   import { invalidate } from '$app/navigation';
+  import { CANVAS_LIST_DEPENDENCY } from '$lib/canvas/canvas-list';
   import { formatCredits } from '$lib/components/credit-amount-format';
   import CanvasFlow from '$lib/components/canvas/CanvasFlow.svelte';
   import GenNode from '$lib/components/canvas/GenNode.svelte';
@@ -32,6 +33,8 @@
   import ProductsNode from '$lib/components/canvas/ProductsNode.svelte';
   import SocialFeedNode from '$lib/components/canvas/SocialFeedNode.svelte';
   import InfluencerNode from '$lib/components/canvas/InfluencerNode.svelte';
+  import EmptyNode from '$lib/components/canvas/EmptyNode.svelte';
+  import { isNodeType } from '$lib/canvas/node-data';
   import UploadedNode from '$lib/components/canvas/UploadedNode.svelte';
   import ListNode from '$lib/components/canvas/ListNode.svelte';
   import SelectNode from '$lib/components/canvas/SelectNode.svelte';
@@ -616,10 +619,12 @@
     return connectCanvas({
       client: createSupabaseBrowserClient(),
       canvasId: data.canvas.id,
+      projectId: data.projectId,
       peer: { userId: user.id, name: user.email ?? 'Utente', avatar: null,
         path: `/p/${data.projectId}/c/${data.canvas.id}`, threadId: null },
       onChange: () => { void refresh(); },
       onReconnect: () => { void refresh(); },
+      onCanvasList: () => { void invalidate(CANVAS_LIST_DEPENDENCY); },
       onPeers: (value) => { peers = value; },
       onError: () => { failed = 'Connessione in tempo reale interrotta'; }
     });
@@ -2007,6 +2012,8 @@
             imageCount={upstreamCompositionRefsOf(id).length}
             onopeneditor={() => openCompositionEditor(id)}
           />
+        {:else if isNodeType(row.type)}
+          <EmptyNode type={row.type} />
         {/if}
       {/if}
     {/snippet}

@@ -5,6 +5,11 @@
   import ArrowDown from '@lucide/svelte/icons/arrow-down';
   import Trash2 from '@lucide/svelte/icons/trash-2';
   import PlatformGlyph from '$lib/components/PlatformGlyph.svelte';
+  import { Button } from '$lib/components/ui/button';
+  import { Select } from '$lib/components/ui/select';
+  import { Textarea } from '$lib/components/ui/textarea';
+  import { Input } from '$lib/components/ui/input';
+  import { Notice } from '$lib/components/ui/notice';
   import { postCompositionFor } from '$lib/canvas/post-composition';
   import {
     moveMediaUp,
@@ -72,6 +77,7 @@
 
   const saveDisabledReason = $derived(saveReasonFor(readiness));
   const scheduleDisabledReason = $derived(scheduleReasonFor(readiness));
+  const disabledReasons = $derived([...new Set([saveDisabledReason, scheduleDisabledReason].filter((r): r is string => !!r))]);
 
   const formAction = $derived(data.canvasId ? `/p/${projectId}/c/${data.canvasId}?/create_post` : '');
 
@@ -82,9 +88,9 @@
 
 <div class="composer">
   {#if form && typeof form === 'object' && 'post' in form && form.post}
-    <div class="banner ok">
-      Post saved. <a href={`/p/${projectId}/calendar`}>Open calendar</a>
-    </div>
+    <Notice tone="success">
+      Post saved. <Button variant="link" href={`/p/${projectId}/calendar`}>Open calendar</Button>
+    </Notice>
   {/if}
 
   <form
@@ -196,23 +202,23 @@
           {/each}
         </div>
       {/if}
-      <textarea bind:value={caption} rows="4" placeholder="Write a caption…"></textarea>
+      <Textarea bind:value={caption} rows={4} placeholder="Write a caption…" />
     </section>
 
     <section class="brand-section">
       <h2>Brand</h2>
       {#if data.brands.length > 1}
-        <select bind:value={selectedBrandId}>
+        <Select bind:value={selectedBrandId} class="max-w-xs" aria-label="Brand">
           {#each data.brands as brand (brand.id)}
             <option value={brand.id}>{brand.name}</option>
           {/each}
-        </select>
+        </Select>
       {:else if data.brands.length === 1}
         <p>{data.brands[0].name}</p>
       {:else}
         <p class="empty">
           No brand yet.
-          <a class="btn ghost" href={`/p/${projectId}/brands/new`}>Create a brand</a>
+          <Button variant="link" href={`/p/${projectId}/brands/new`}>Create a brand</Button>
         </p>
       {/if}
     </section>
@@ -238,7 +244,7 @@
       {:else}
         <p class="empty">
           No connected accounts.
-          <a href={`/p/${projectId}/settings/connected-accounts`}>Connect one</a>
+          <Button variant="link" href={`/p/${projectId}/settings/connected-accounts`}>Connect one</Button>
         </p>
       {/if}
     </section>
@@ -247,39 +253,33 @@
       <section class="schedule-section">
         <label>
           Schedule for
-          <input type="datetime-local" bind:value={scheduledForLocal} />
+          <Input type="datetime-local" bind:value={scheduledForLocal} class="h-9 max-w-xs" />
         </label>
       </section>
     {/if}
 
     {#if submitError}
-      <div class="banner err" role="alert">{submitError}</div>
+      <Notice tone="error">{submitError}</Notice>
     {/if}
 
     <footer class="composer-footer">
-      <div class="footer-action">
-        <button class="btn ghost" type="submit" disabled={!!saveDisabledReason || submitting}>
+      <div class="footer-actions">
+        <Button variant="secondary" type="submit" disabled={!!saveDisabledReason || submitting}>
           {submitting ? 'Saving…' : 'Save as draft'}
-        </button>
-        {#if saveDisabledReason}<p class="reason">{saveDisabledReason}</p>{/if}
-      </div>
-      <div class="footer-action">
+        </Button>
         {#if !scheduling}
-          <button
-            class="btn primary"
-            type="button"
-            disabled={!!scheduleDisabledReason || submitting}
-            onclick={() => (scheduling = true)}
-          >
+          <Button disabled={!!scheduleDisabledReason || submitting} onclick={() => (scheduling = true)}>
             Approve and schedule
-          </button>
+          </Button>
         {:else}
-          <button class="btn primary" type="submit" disabled={!!scheduleDisabledReason || submitting}>
+          <Button type="submit" disabled={!!scheduleDisabledReason || submitting}>
             {submitting ? 'Scheduling…' : 'Approve and schedule'}
-          </button>
+          </Button>
         {/if}
-        {#if scheduleDisabledReason}<p class="reason">{scheduleDisabledReason}</p>{/if}
       </div>
+      {#each disabledReasons as reason (reason)}
+        <p class="reason">{reason}</p>
+      {/each}
     </footer>
   </form>
 </div>
@@ -374,19 +374,6 @@
     font-size: 13px;
   }
 
-  textarea {
-    width: 100%;
-    border: 1px solid var(--line, #e5e5e5);
-    padding: 8px;
-    font: inherit;
-  }
-
-  select {
-    border: 1px solid var(--line, #e5e5e5);
-    padding: 6px 8px;
-    font: inherit;
-  }
-
   .accounts-list {
     list-style: none;
     margin: 0;
@@ -410,28 +397,21 @@
     font-size: 13px;
   }
 
-  .schedule-section input {
-    border: 1px solid var(--line, #e5e5e5);
-    padding: 6px 8px;
-    font: inherit;
-  }
-
   .composer-footer {
     display: flex;
-    gap: 16px;
+    flex-direction: column;
+    gap: 6px;
   }
 
-  .footer-action {
+  .footer-actions {
     display: flex;
-    flex-direction: column;
-    gap: 4px;
+    gap: 8px;
   }
 
-  :global([data-viewport='mobile']) .composer-footer {
+  :global([data-viewport='mobile']) .footer-actions {
     flex-direction: column;
-    gap: 12px;
   }
-  :global([data-viewport='mobile']) .footer-action :global(button) {
+  :global([data-viewport='mobile']) .footer-actions :global(button) {
     width: 100%;
     min-height: var(--touch-target);
   }
@@ -442,47 +422,4 @@
     color: var(--ink-faint, #9a9a9e);
   }
 
-  .btn {
-    font-size: 13px;
-    font-weight: 600;
-    padding: 9px 16px;
-    cursor: pointer;
-    border: 1px solid transparent;
-    line-height: 1;
-    text-decoration: none;
-    display: inline-block;
-  }
-
-  .btn:disabled {
-    opacity: 0.55;
-    cursor: default;
-  }
-
-  .btn.primary {
-    background: var(--ink);
-    color: var(--paper);
-    border-color: var(--ink);
-  }
-
-  .btn.ghost {
-    background: transparent;
-    color: var(--ink-soft, #6e6e73);
-    border-color: var(--line, #e5e5e5);
-  }
-
-  .banner {
-    padding: 10px 12px;
-    margin-bottom: 16px;
-    font-size: 13px;
-  }
-
-  .banner.err {
-    background: var(--danger-bg, #fdeceb);
-    color: var(--danger, #b3261e);
-  }
-
-  .banner.ok {
-    background: var(--success-bg, #e8f5e9);
-    color: var(--success, #1b6b30);
-  }
 </style>

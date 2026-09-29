@@ -28,6 +28,7 @@ export async function findCanvasForUser(
       .select(CANVAS_COLUMNS)
       .eq('id', input.canvasId)
       .eq('org_id', org.id)
+      .is('deleted_at', null)
       .maybeSingle();
 
     if (error) {

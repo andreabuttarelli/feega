@@ -96,11 +96,28 @@
     gap: 10px;
     justify-content: center;
   }
-  .err-acts :global(.btn) {
+  .err-acts .btn {
     text-decoration: none;
     display: inline-flex;
     align-items: center;
     cursor: pointer;
+    border: 1px solid transparent;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 11px 22px;
+  }
+  .err-acts .btn-primary {
+    background: var(--ink);
+    color: var(--paper);
+  }
+  .err-acts .btn-ghost {
+    background: var(--paper);
+    color: var(--ink);
+    border-color: var(--line-2);
+  }
+  .err-acts .btn-ghost:hover {
+    background: var(--paper-2);
   }
   @media (max-width: 420px) {
     .err-card {
