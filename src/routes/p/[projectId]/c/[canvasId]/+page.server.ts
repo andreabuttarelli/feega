@@ -17,6 +17,9 @@ import {
   resizeNode,
   setConnectionMode,
   writeNodeData,
+  patchNodeData,
+  DataCheck,
+  type PatchWrite,
   type CanvasNodeRecord
 } from '$lib/server/repos/canvas';
 import { nodeSize } from '$lib/canvas/node-size';
@@ -224,6 +227,26 @@ export const load: PageServerLoad = async ({ params, locals }) => {
     shareToken,
     references
   };
+};
+
+function jsonObject(value: FormDataEntryValue | null): Record<string, unknown> | null {
+  try {
+    const parsed: unknown = JSON.parse(String(value ?? ''));
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+const HTTP_BAD_REQUEST = 400;
+const HTTP_NOT_FOUND = 404;
+const HTTP_CONFLICT = 409;
+
+const PATCH_ANSWERS: { [K in PatchWrite['outcome']]: (written: Extract<PatchWrite, { outcome: K }>) => unknown } = {
+  written: (written) => ({ node: written.node }),
+  conflict: (written) => fail(HTTP_CONFLICT, { conflict: true, keys: written.keys }),
+  invalid: (written) => fail(HTTP_BAD_REQUEST, { error: written.error }),
+  gone: () => fail(HTTP_NOT_FOUND, { error: 'nodo non trovato' })
 };
 
 /** Un numero che arriva da un form: finito, o la riga nasce con `NaN` dentro una colonna numerica. */
@@ -718,18 +741,15 @@ export const actions: Actions = {
       ? { sync_status: 'done', sync_error: null, synced_count: outcome.synced, synced_at: new Date().toISOString(), ...outcome.extra }
       : { sync_status: 'failed', sync_error: outcome.error };
 
-    const written = await writeNodeData(scope.db, {
+    const written = await patchNodeData(scope.db, {
       orgId: scope.orgId,
       nodeId,
-      expectedVersion: running.node.version,
-      data: { ...running.node.data, ...patch },
+      patch,
+      check: DataCheck.None,
       actor: userActor(scope)
     });
-    if (written.outcome === 'conflict') {
-      return fail(409, { conflict: true });
-    }
 
-    return { node: written.node };
+    return (PATCH_ANSWERS[written.outcome] as (w: PatchWrite) => unknown)(written);
   },
 
   /**
@@ -890,38 +910,26 @@ export const actions: Actions = {
     const fd = await request.formData();
 
     const nodeId = String(fd.get('node_id') ?? '');
-    const version = coord(fd.get('version'));
-    if (!nodeId || version === null || !Number.isInteger(version) || version < 1) {
-      return fail(400, { error: 'scrittura non valida' });
-    }
-
-    let data: Record<string, unknown>;
-    try {
-      data = JSON.parse(String(fd.get('data') ?? '{}')) as Record<string, unknown>;
-      if (!data || typeof data !== 'object' || Array.isArray(data)) {
-        return fail(400, { error: 'contenuto non valido' });
-      }
-    } catch {
-      return fail(400, { error: 'contenuto non leggibile' });
+    const patch = jsonObject(fd.get('patch'));
+    const base = jsonObject(fd.get('base'));
+    if (!nodeId || !patch || !base) {
+      return fail(HTTP_BAD_REQUEST, { error: 'scrittura non valida' });
     }
 
     if (!(await listNodes(scope.db, scope)).some((node) => node.id === nodeId)) {
-      return fail(404, { error: 'nodo non trovato' });
+      return PATCH_ANSWERS.gone({ outcome: 'gone' });
     }
 
-    const written = await writeNodeData(scope.db, {
+    const written = await patchNodeData(scope.db, {
       orgId: scope.orgId,
       nodeId,
-      data,
-      expectedVersion: version,
+      patch,
+      base,
+      check: DataCheck.Schema,
       actor: userActor(scope)
     });
 
-    if (written.outcome === 'conflict') {
-      return fail(409, { conflict: true });
-    }
-
-    return { node: written.node };
+    return (PATCH_ANSWERS[written.outcome] as (w: PatchWrite) => unknown)(written);
   },
 
   apply_effects: async ({ request, params, locals }) => {

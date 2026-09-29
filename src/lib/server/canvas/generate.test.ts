@@ -1258,7 +1258,7 @@ describe('reconcileVideoNodeRuns chiude un video in coda quando il fornitore ha 
 
     const data = currentNode().data as { running?: boolean; error?: string | null; refId?: string };
     expect(data.running).toBe(false);
-    expect(data.error).toBeNull();
+    expect(data.error ?? null).toBeNull();
     expect(data.refId).toBe('asset-video-1');
   });
 
