@@ -13,6 +13,7 @@ const { generateImagesWithoutBrandMock, safeFetchBytesMock } = vi.hoisted(() => 
 vi.mock('$lib/server/media-generate', () => ({
   generateImagesWithoutBrand: generateImagesWithoutBrandMock
 }));
+vi.mock('$lib/server/cli-auth', () => ({ gateOrgAiActionForForm: async () => null }));
 vi.mock('$lib/server/tool-guard', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$lib/server/tool-guard')>()),
   safeFetchBytes: safeFetchBytesMock

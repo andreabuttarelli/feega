@@ -2050,3 +2050,11 @@ and continues, never before the work the user asked for.
 (`pushState`) changed `location`, and a relative `fetch('?/action')` resolves against it.
 **Move:** post canvas actions to `canvasActionUrl(...)`, never a relative `?/`; the source
 guard in `canvas-action-url.test.ts` keeps it that way.
+
+## Production logs show fixture ids (`org-1`) failing a uuid cast
+
+**Signal:** Postgres logs `invalid input syntax for type uuid: "org-1"` in bursts that match
+someone's test run, not user traffic. Vitest loads `.env`, and a fail-open path (credit gate,
+brand lookup) sent the fixture to the live project without failing the test.
+**Move:** `src/test/no-live-supabase.ts` fails any test that reaches `*.supabase.co`; mock the
+boundary it names (`gateOrgAiActionForForm`, `createAdminClient`, `orgCreditBalance`).
