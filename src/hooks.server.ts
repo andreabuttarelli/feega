@@ -10,7 +10,6 @@ import { withBrandContext, withToolContext } from '$lib/server/ai-log';
 import { TOOL_HEADER, TOOL_HEADER_LEGACY, toolFromHeader } from '@feega/api-contracts';
 import { createAdminClient } from '$lib/server/supabase-admin';
 import { isCsrfForbidden } from '$lib/server/csrf';
-import { catalogModelIds } from '$lib/server/chat-model-catalog';
 import { ENTRY_DEPS, homePathFor } from '$lib/server/tenancy/entry';
 import { ORG_COOKIE, LAST_PROJECT_COOKIE } from '$lib/server/tenancy/context';
 import type { RequestEvent } from '@sveltejs/kit';
@@ -95,19 +94,6 @@ const csrf: Handle = async ({ event, resolve }) => {
 };
 
 export const handle: Handle = sequence(csrf, Sentry.sentryHandle(), async ({ event, resolve }) => {
-  // Il catalogo dei modelli, caldo PRIMA di ogni handler.
-  //
-  // `resolveChatModel` è sincrono e lo chiamano una dozzina di superfici: renderlo asincrono
-  // vorrebbe dire propagare un await fino a ogni `streamText`. Quindi legge una cache — e una
-  // cache fredda gli fa scegliere il default dell'env invece di quello che l'operatore ha marcato
-  // in Supabase. È già successo: turno partito su `google/gemini-3.8-flash` con la riga marcata su
-  // `z-ai/glm-5.3-flash`, senza un errore da nessuna parte. Il difetto più silenzioso possibile,
-  // perché il turno riesce — solo sul modello sbagliato.
-  //
-  // Qui la richiesta non è ancora entrata in nessun handler, e la cache dura 60s: una query al
-  // minuto per istanza, e nessun percorso può leggere un catalogo mai caricato.
-  await catalogModelIds().catch(() => []);
-
   // Per-request Supabase client bound to the request cookies (SSR auth).
   // Marchiato come RLS-scoped: chiave anon, quindi Postgres valuta le policy dell'utente. È la
   // dichiarazione su cui `query` decide di leggere — vedi $lib/server/rls-client.

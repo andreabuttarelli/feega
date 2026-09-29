@@ -96,6 +96,7 @@
   };
 
   let {
+    actionUrl,
     tiles = [],
     edges: incomingEdges = [],
     onMove,
@@ -126,6 +127,7 @@
     mode = CanvasMode.Edit,
     tile
   }: {
+    actionUrl?: (action: string) => string;
     tiles?: Tile[];
     /** Le linee già in `brand_canvas_edges`, pronte per il disegno. */
     edges?: FlowEdge[];
@@ -701,7 +703,9 @@
     onpropertychange={(patch) => onPropertyChange?.(selection.ids, patch)}
   />
 
-  <NextStepChips box={selection.box} zoom={selection.zoom} nodeId={nextStepNodeId} onpick={pickNextStep} />
+  {#if actionUrl}
+    <NextStepChips {actionUrl} box={selection.box} zoom={selection.zoom} nodeId={nextStepNodeId} onpick={pickNextStep} />
+  {/if}
   {/if}
 
   {#if connectPickerAt}

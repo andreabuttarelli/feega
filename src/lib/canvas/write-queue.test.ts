@@ -15,3 +15,16 @@ it('waits for the previous save before reading the next version', async () => {
   await Promise.all([first, second]);
   expect(seen).toEqual([1, 2]);
 });
+
+it('knows which nodes still have a save in flight', async () => {
+  const enqueue = createWriteQueue();
+  let release!: () => void;
+  const barrier = new Promise<void>((resolve) => { release = resolve; });
+  const saving = enqueue('node', () => barrier);
+  expect(enqueue.busy('node')).toBe(true);
+  expect(enqueue.busy('other')).toBe(false);
+  release();
+  await saving;
+  await Promise.resolve();
+  expect(enqueue.busy('node')).toBe(false);
+});

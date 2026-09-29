@@ -282,7 +282,10 @@
       "mobile": {
         "canvas": "Canvas",
         "chat": "Chat",
-        "more": "More"
+        "more": "More",
+        "switchTitle": "Switch project or canvas",
+        "projects": "Projects",
+        "canvases": "Canvases"
       },
       "menu": {
         "open": "Menu",

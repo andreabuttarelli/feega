@@ -1,4 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('$lib/server/cli-auth', () => ({ gateOrgAiActionForForm: async () => null }));
+vi.mock('$lib/server/credits', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('$lib/server/credits')>()),
+  orgCreditBalance: async () => Number.MAX_SAFE_INTEGER
+}));
 import { actions } from '../../../routes/p/[projectId]/c/[canvasId]/+page.server';
 import { fakeDb } from '$lib/server/db/fake-db';
 

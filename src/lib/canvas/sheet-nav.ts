@@ -63,3 +63,10 @@ export async function openSheet(
 export function closeSheet(): void {
   history.back();
 }
+
+export type SheetRestore = { canvasHref: string; sheetHref: string; path: string; data: Record<string, unknown> };
+
+export async function restoreSheet({ canvasHref, sheetHref, path, data }: SheetRestore): Promise<void> {
+  await goto(canvasHref, { replaceState: true });
+  pushState(sheetHref, { sheet: { path, data } });
+}

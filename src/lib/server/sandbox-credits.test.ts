@@ -1,4 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { fakeDb } from '$lib/server/db/fake-db';
+
+vi.mock('$lib/server/supabase-admin', () => ({ createAdminClient: () => fakeDb({}).db }));
 import { billedCreditsFor } from '../credit-ladder';
 import { sandboxCredits, sandboxUsdPerSecond, withSandboxBilling } from './sandbox-credits';
 

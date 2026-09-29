@@ -2,13 +2,17 @@
   import CreditAmount from '$lib/components/CreditAmount.svelte';
   import CanvasMenu from './CanvasMenu.svelte';
   import CanvasShare from './CanvasShare.svelte';
+  import CanvasMobileSwitcher from './CanvasMobileSwitcher.svelte';
   import { pageMeta, pageTopActions } from '$lib/stores/page-meta';
   import type { ShareState } from '$lib/canvas/shared-view';
   import Megaphone from '@lucide/svelte/icons/megaphone';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import { canvasSelection, promotePath } from '$lib/canvas/promote-sheet';
   import { openSheet } from '$lib/canvas/sheet-nav';
 
   type CanvasShareProps = { shareToken: string | null; onShare: (state: ShareState) => Promise<void> };
+  type ProjectRow = { id: string; name: string; href: string; updatedAt: string };
+  type CanvasRow = { id: string; name: string; href: string };
 
   let {
     projectId,
@@ -16,7 +20,11 @@
     creditBalance,
     profile,
     org,
-    share = null
+    share = null,
+    projectName,
+    projects,
+    canvasName,
+    canvases
   }: {
     projectId: string;
     fallbackTitle: string;
@@ -24,14 +32,31 @@
     profile: { name: string | null; email: string; avatarUrl: string | null };
     org: { name: string } | null;
     share?: CanvasShareProps | null;
+    projectName: string;
+    projects: ProjectRow[];
+    canvasName: string;
+    canvases: CanvasRow[];
   } = $props();
 
   const title = $derived($pageMeta.title ?? fallbackTitle);
+
+  let switcherOpen = $state(false);
 </script>
 
 <header class="mobile-topbar">
   <CanvasMenu {projectId} {profile} {org} {creditBalance} navigation="page" />
-  <h1 class="title">{title}</h1>
+  <button type="button" class="title" data-testid="mobile-switch-trigger" onclick={() => (switcherOpen = true)}>
+    <span class="truncate">{title}</span>
+    <ChevronDown size={14} />
+  </button>
+  <CanvasMobileSwitcher
+    open={switcherOpen}
+    onOpenChange={(open) => (switcherOpen = open)}
+    {projectName}
+    {projects}
+    {canvasName}
+    {canvases}
+  />
   {#if $pageTopActions}
     <div class="actions">{@render $pageTopActions()}</div>
   {/if}
@@ -84,15 +109,28 @@
   }
 
   .title {
+    display: flex;
+    align-items: center;
+    gap: 4px;
     flex: 1 1 auto;
     min-width: 0;
+    height: var(--touch-target);
     margin: 0;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
+    padding: 0 4px;
+    appearance: none;
+    border: none;
+    background: transparent;
+    font: inherit;
     font-size: 15px;
     font-weight: 600;
     color: var(--ink, #1d1d1f);
+  }
+
+  .title .truncate {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    min-width: 0;
   }
 
   .actions {

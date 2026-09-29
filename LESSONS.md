@@ -2042,3 +2042,19 @@ external dependency (a remote MCP host that doesn't resolve) throws before the t
 **Move:** `grep` every `.from('<table>')` for columns missing from information_schema and delete
 or reroute what the rewrite left behind; open optional external tools inside a `try` that logs
 and continues, never before the work the user asked for.
+
+## Every canvas action fails with "Not saved" after a sheet opened
+
+**Signal:** Vercel logs `No action with name 'create' found` on a route that isn't the canvas
+(`/p/<id>/settings/...`); local runs that never open a sheet stay green. Shallow routing
+(`pushState`) changed `location`, and a relative `fetch('?/action')` resolves against it.
+**Move:** post canvas actions to `canvasActionUrl(...)`, never a relative `?/`; the source
+guard in `canvas-action-url.test.ts` keeps it that way.
+
+## Production logs show fixture ids (`org-1`) failing a uuid cast
+
+**Signal:** Postgres logs `invalid input syntax for type uuid: "org-1"` in bursts that match
+someone's test run, not user traffic. Vitest loads `.env`, and a fail-open path (credit gate,
+brand lookup) sent the fixture to the live project without failing the test.
+**Move:** `src/test/no-live-supabase.ts` fails any test that reaches `*.supabase.co`; mock the
+boundary it names (`gateOrgAiActionForForm`, `createAdminClient`, `orgCreditBalance`).

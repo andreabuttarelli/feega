@@ -133,7 +133,6 @@ const REST_ONLY = [
   // La chat nella sidebar: il browser arriva con un cookie di sessione, non con un Bearer, quindi
   // queste due non passano da `authenticate` e non possono diventare un tool MCP. Restano rotte e
   // basta, ed è la superficie che `src/lib/server/brand-agent/` serve.
-  'agent',
   'agent/assets',
   'api-keys',
   'api-keys/[id]',

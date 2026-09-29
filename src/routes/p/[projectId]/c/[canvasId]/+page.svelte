@@ -13,6 +13,8 @@
    * Qui si fa l'altra metà — quale riga sta dietro una tile, e cosa si scrive quando cambia.
    */
   import { createWriteQueue } from '$lib/canvas/write-queue';
+  import { canvasActionUrl } from '$lib/canvas/canvas-action-url';
+  import { SaveFailure, adoptIdleRows, failureOf, saveMessage, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
   import { createUndoStack } from '$lib/canvas/undo-stack';
   import type { Gesture, UndoItem } from '$lib/canvas/undo-plan';
   import { buildMoveGesture, checkMoveGesture, inverseMoveGesture, type MoveGesture } from '$lib/canvas/move-gesture';
@@ -588,7 +590,11 @@
   async function refresh() {
     const version = ++snapshotVersion;
     const snapshot = await post('snapshot', {});
-    if (!snapshot || pending || version !== snapshotVersion) {
+    if (!snapshot) {
+      return;
+    }
+    if (pending || version !== snapshotVersion) {
+      nodes = adoptIdleRows(nodes, snapshot.nodes as CanvasNodeRecord[], enqueue.busy);
       return;
     }
     nodes = (snapshot.nodes as CanvasNodeRecord[]).map((n) => toTile(n));
@@ -618,16 +624,7 @@
 
   const READ_ACTIONS = new Set(['snapshot', 'estimate_text_cost']);
 
-  /**
-   * `x-sveltekit-action` distingue questa chiamata dall'invio di un form: senza, SvelteKit
-   * risponde 303 verso la pagina, `fetch` segue il redirect da solo e torna l'HTML con `res.ok`
-   * vero — si legge «salvato» mentre la tabella resta vuota. Lezione già pagata sulla tela di
-   * prima, e vale identica qui.
-   */
-  async function post(
-    action: string,
-    fields: Record<string, string | number | File | string[]>
-  ): Promise<Record<string, unknown> | null> {
+  function formOf(fields: Record<string, string | number | File | string[]>): FormData {
     const body = new FormData();
     for (const [key, value] of Object.entries(fields)) {
       if (Array.isArray(value)) {
@@ -636,29 +633,59 @@
       }
       body.set(key, value instanceof File ? value : String(value));
     }
+    return body;
+  }
 
+  async function send(
+    action: string,
+    fields: Record<string, string | number | File | string[]>
+  ): Promise<ActionAnswer> {
+    let res: Response;
+    try {
+      res = await fetch(canvasActionUrl({ projectId: data.projectId, canvasId: data.canvas.id }, action), {
+        method: 'POST',
+        headers: { 'x-sveltekit-action': 'true' },
+        body: formOf(fields)
+      });
+    } catch (cause) {
+      console.warn(`canvas action ${action}: network`, cause);
+      return { type: 'network' };
+    }
+
+    const text = await res.text();
+    try {
+      return deserialize(text) as ActionAnswer;
+    } catch {
+      console.warn(`canvas action ${action}: unreadable ${res.status}`, text.slice(0, 500));
+      return { type: 'error', status: res.status };
+    }
+  }
+
+  function announce(action: string, reason: SaveFailure, detail: unknown) {
+    console.warn(`canvas action ${action} failed: ${reason}`, detail);
+    failedIsCreditsExhausted = reason === SaveFailure.Credits;
+    failed = saveMessage(reason, (detail ?? {}) as { message?: string });
+  }
+
+  function report(action: string, result: ActionAnswer) {
+    announce(action, failureOf(result), result.data ?? result);
+  }
+
+  async function post(
+    action: string,
+    fields: Record<string, string | number | File | string[]>
+  ): Promise<Record<string, unknown> | null> {
     const mutating = !READ_ACTIONS.has(action);
     if (mutating) { pending += 1; snapshotVersion += 1; }
     try {
-      const res = await fetch(`?/${action}`, {
-        method: 'POST',
-        headers: { 'x-sveltekit-action': 'true' },
-        body
-      });
-      const result = deserialize(await res.text());
-
+      const result = await send(action, fields);
       if (result.type !== 'success') {
-        const data = (result as { data?: { error?: string; message?: string } }).data;
-        failedIsCreditsExhausted = data?.error === 'credits_exhausted';
-        failed = failedIsCreditsExhausted ? (data?.message ?? 'Not enough credits') : 'non salvato';
+        report(action, result);
         return null;
       }
 
       if (mutating) { failed = null; failedIsCreditsExhausted = false; }
       return (result.data ?? null) as Record<string, unknown> | null;
-    } catch {
-      failed = 'non salvato';
-      return null;
     } finally {
       if (mutating) { pending -= 1; snapshotVersion += 1; }
     }
@@ -735,14 +762,12 @@
   async function saveComposition(id: string, next: CompositionNodeState): Promise<boolean> {
     const current = nodes.find((node) => node.id === id);
     if (!current) { return false; }
-    const result = await post('write', {
-      node_id: id, version: current.version, data: JSON.stringify(compositionData(next))
-    });
-    const written = result?.node as CanvasNodeRecord | undefined;
-    if (!written) {
-      failed = 'Contenuto non salvato: ricarica prima di continuare';
+    const patch = compositionData(next) as Record<string, unknown>;
+    const out = await saveNode(id, current.version, patch, patch);
+    if (!out.ok) {
       return false;
     }
+    const written = out.node;
     nodes = nodes.map((node) => (node.id === id ? { ...node, data: written.data, version: written.version } : node));
     return true;
   }
@@ -1139,6 +1164,40 @@
     return url ? { url } : null;
   }
 
+  async function saveNode(
+    id: string,
+    version: number,
+    patch: Record<string, unknown>,
+    data: Record<string, unknown>
+  ): Promise<WriteOutcome> {
+    pending += 1;
+    snapshotVersion += 1;
+    try {
+      const out = await writeWithRetry({
+        send: (at, body) => send('write', { node_id: id, version: at, data: JSON.stringify(body) }),
+        reread: async () => {
+          const snapshot = await send('snapshot', {});
+          const rows = ((snapshot.data ?? {}) as { nodes?: CanvasNodeRecord[] }).nodes ?? [];
+          const row = rows.find((node) => node.id === id);
+          return row ? { version: row.version, data: row.data } : null;
+        },
+        version,
+        patch,
+        data
+      });
+      if (out.ok) {
+        failed = null;
+        failedIsCreditsExhausted = false;
+        return out;
+      }
+      announce('write', out.reason, out.detail);
+      return out;
+    } finally {
+      pending -= 1;
+      snapshotVersion += 1;
+    }
+  }
+
   async function write(id: string, patch: Record<string, unknown>): Promise<boolean> {
     const current = nodes.find((node) => node.id === id);
     if (!current) { return false; }
@@ -1149,17 +1208,14 @@
     await enqueue(id, async () => {
       const before = nodes.find((node) => node.id === id);
       if (!before) { pending -= 1; return; }
-      const result = await post('write', {
-        node_id: id, version: before.version, data: JSON.stringify(next)
-      });
-      const written = result?.node as CanvasNodeRecord | undefined;
+      const out = await saveNode(id, before.version, patch, next);
       pending -= 1;
-      if (!written) {
-        failed = 'Contenuto non salvato: ricarica prima di continuare';
+      if (!out.ok) {
         return;
       }
       saved = true;
-      nodes = nodes.map((node) => node.id === id ? { ...node, version: written.version } : node);
+      const written = out.node;
+      nodes = nodes.map((node) => node.id === id ? { ...node, data: written.data, version: written.version } : node);
       pushGesture({
         items: [
           {
@@ -1776,6 +1832,7 @@
   {/if}
 
   <CanvasFlow
+    actionUrl={(action: string) => canvasActionUrl({ projectId: data.projectId, canvasId: data.canvas.id }, action)}
     {tiles}
     {edges}
     onMove={move}

@@ -5,7 +5,7 @@
   import * as Sheet from '$lib/components/ui/sheet/index.js';
   import { openSheet, closeSheet } from '$lib/canvas/sheet-nav';
   import { SHEET_PAGE_LOADERS, settingsPageLoader } from '$lib/canvas/sheet-pages';
-  import { sheetEntryForPath, SHEET_WIDTHS } from '$lib/shell-nav';
+  import { sheetEntryForPath } from '$lib/shell-nav';
   import { SETTINGS_GROUPS } from '$lib/components/settings/platforms';
   import { cn } from '$lib/utils';
 
@@ -25,7 +25,6 @@
    */
   const sheet = $derived(page.state.sheet ?? null);
   const entry = $derived(sheet ? sheetEntryForPath(sheet.path) : null);
-  const sheetWidth = $derived(entry ? SHEET_WIDTHS[entry.id] ?? SHEET_WIDTHS.settings : SHEET_WIDTHS.settings);
   const settingsSubpath = $derived(sheet ? sheet.path.replace(/^\/settings\/?/, '') || 'connected-accounts' : '');
   const settingsLoader = $derived(sheet && entry?.id === 'settings' ? settingsPageLoader(sheet.path) : null);
 
@@ -44,7 +43,7 @@
       side="left"
       class="canvas-sheet"
       showOverlay={false}
-      style={`--sheet-width: min(${sheetWidth}px, calc(100vw - 84px));`}
+      portalProps={{ disabled: true }}
     >
       <div class="sheet-scroll">
         {#if entry.id === 'settings'}
@@ -98,15 +97,16 @@
 <style>
   @layer utilities {
     :global([data-slot='sheet-content'].canvas-sheet) {
-      top: 44px !important;
+      position: absolute !important;
+      top: 60px !important;
       left: 60px !important;
-      right: auto !important;
-      bottom: 0 !important;
+      right: 0 !important;
+      bottom: 8px !important;
       height: auto !important;
-      width: var(--sheet-width) !important;
+      width: auto !important;
       max-width: none !important;
       border-radius: 0 !important;
-      border-left: 1px solid var(--line, #ededef) !important;
+      border: 1px solid var(--line-2, #d2d2d7) !important;
       box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
       padding: 0 !important;
       gap: 0 !important;
@@ -116,7 +116,6 @@
       :global([data-slot='sheet-content'].canvas-sheet) {
         top: 0 !important;
         left: 0 !important;
-        width: 100vw !important;
       }
     }
   }

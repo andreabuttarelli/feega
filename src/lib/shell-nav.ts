@@ -1,3 +1,5 @@
+import type { Viewport } from '$lib/breakpoints';
+
 export type NavFamily = 'panel' | 'sheet';
 
 export type NavEntry = {
@@ -26,17 +28,7 @@ export const NAV_ENTRIES: NavEntry[] = [
   { id: 'promote', labelKey: 'app.hub.publish.promote', icon: 'megaphone', family: 'sheet', path: '/promote', group: 'hidden' }
 ];
 
-/**
- * LARGHEZZA DI OGNI FOGLIO/PANNELLO, IN UNA TABELLA SOLA — non CSS per componente. Calendar è
- * una griglia mensile e vuole più spazio; gli altri fogli (Ads, Settings, Create post) sono
- * moduli di testo e stanno bene più stretti. I pannelli sinistri (Assets/Brands/Influencers)
- * restano alla larghezza fissa che avevano.
- */
-export const SHEET_WIDTHS: Record<string, number> = {
-  calendar: 960,
-  ads: 720,
-  settings: 720,
-  promote: 880,
+export const PANEL_WIDTHS: Record<string, number> = {
   assets: 320,
   brands: 320,
   influencers: 320
@@ -110,3 +102,23 @@ export function activeMobileTab(projectId: string, pathname: string, view: Mobil
 export const MOBILE_MORE_ENTRIES: NavEntry[] = NAV_ENTRIES.filter(
   (entry) => entry.group !== 'hidden' && entry.id !== 'calendar'
 );
+
+export type DirectLoadMode = 'sheet' | 'page';
+
+const PAGE_ONLY_PREFIXES = ['/settings/facebook', '/settings/linkedin', '/settings/connect/'];
+const PAGE_ONLY_QUERY_KEYS = ['connected'];
+
+const VIEWPORT_ALLOWS_SHEET: Record<Viewport, boolean> = {
+  mobile: false,
+  desktop: true
+};
+
+export function directLoadMode(path: string, search: string, viewport: Viewport): DirectLoadMode {
+  const params = new URLSearchParams(search);
+  const pageOnly =
+    !VIEWPORT_ALLOWS_SHEET[viewport] ||
+    !sheetEntryForPath(path) ||
+    PAGE_ONLY_PREFIXES.some((prefix) => path.startsWith(prefix)) ||
+    PAGE_ONLY_QUERY_KEYS.some((key) => params.has(key));
+  return pageOnly ? 'page' : 'sheet';
+}

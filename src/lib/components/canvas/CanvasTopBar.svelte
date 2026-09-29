@@ -12,6 +12,7 @@
   import { openSheet } from '$lib/canvas/sheet-nav';
   import Megaphone from '@lucide/svelte/icons/megaphone';
   import { canvasSelection, promotePath } from '$lib/canvas/promote-sheet';
+  import { formatLastEdited } from '$lib/canvas/format-last-edited';
 
   type ProjectRow = { id: string; name: string; href: string; updatedAt: string };
   type CanvasRow = { id: string; name: string; href: string };
@@ -52,16 +53,6 @@
     profile: { name: string | null; email: string; avatarUrl: string | null };
     org: { name: string } | null;
   } = $props();
-
-  /** "3 Sep" o "14:20" per oggi: distingue progetti con lo stesso nome nel menu. */
-  function formatLastEdited(iso: string): string {
-    const date = new Date(iso);
-    const today = new Date();
-    const isToday = date.toDateString() === today.toDateString();
-    return isToday
-      ? date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
-      : date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
-  }
 
   function openBilling() {
     openSheet(projectId, '/settings/billing').catch((err) => {

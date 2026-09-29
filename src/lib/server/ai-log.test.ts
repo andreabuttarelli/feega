@@ -1,4 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import { fakeDb } from '$lib/server/db/fake-db';
+
+vi.mock('$lib/server/supabase-admin', () => ({ createAdminClient: () => fakeDb({}).db }));
 import {
   billedUsdInScope,
   computeCostUsd,

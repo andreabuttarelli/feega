@@ -6,7 +6,6 @@ const M = vi.hoisted(() => ({
 }));
 
 vi.mock('$env/dynamic/private', () => ({ env: M.env }));
-vi.mock('$lib/server/chat-model-catalog', () => ({ defaultChatModelId: () => null }));
 vi.mock('$lib/server/ai-log', () => ({
 	logAiCall: vi.fn(),
 	extractSdkUsage: () => ({}),
