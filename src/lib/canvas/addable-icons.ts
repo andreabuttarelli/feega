@@ -22,6 +22,7 @@ import List from '@lucide/svelte/icons/list';
 import MousePointerClick from '@lucide/svelte/icons/mouse-pointer-click';
 import WandSparkles from '@lucide/svelte/icons/wand-sparkles';
 import Orbit from '@lucide/svelte/icons/orbit';
+import CalendarDays from '@lucide/svelte/icons/calendar-days';
 import type { Component } from 'svelte';
 import type { Addable } from './addable';
 
@@ -36,5 +37,6 @@ export const ADDABLE_ICON: Record<Addable, Component> = {
   list: List,
   select: MousePointerClick,
   effects: WandSparkles,
-  composition: Orbit
+  composition: Orbit,
+  calendar: CalendarDays
 };

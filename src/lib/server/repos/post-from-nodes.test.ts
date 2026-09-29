@@ -248,6 +248,21 @@ describe('promoteNodesToPost: post_sources', () => {
   });
 });
 
+describe('promoteNodesToPost: data pianificata', () => {
+  it('passa planned_for alla promozione', async () => {
+    const canvasRepo = fakeCanvasRepo([node({ id: 'img-1', data: { assetId: 'asset-1' } })]);
+    const postsRepo = fakePostsRepo();
+
+    await promoteNodesToPost(
+      FAKE_DB,
+      { canvas: canvasRepo, posts: postsRepo },
+      { orgId: ORG, brandId: BRAND, nodeIds: ['img-1'], plannedFor: '2026-10-02T08:00:00.000Z' }
+    );
+
+    expect(postsRepo.promoteToPost.mock.calls[0][1].plannedFor).toBe('2026-10-02T08:00:00.000Z');
+  });
+});
+
 describe('promoteNodesToPost: tenancy', () => {
   it('un id che non appartiene a questa org non entra nel post', async () => {
     const nodes = [node({ id: 'mine', type: 'image', data: { assetId: 'asset-1' } })];

@@ -8,6 +8,7 @@
   import SourcePreview from '$lib/components/canvas/SourcePreview.svelte';
   import { DEFAULT_EDGE_KIND } from '$lib/canvas/connect-rules';
   import '$lib/styles/doc-prose.css';
+  import { periodTitle } from '$lib/calendar/period-grid';
 
   let { data } = $props();
 
@@ -87,6 +88,8 @@
             </article>
           {:else if node.view.kind === 'ads'}
             <p class="big">{node.view.query}<span>{node.view.country}</span></p>
+          {:else if node.view.kind === 'calendar'}
+            <p class="big">{periodTitle(node.view.view, node.view.anchor)}<span>Calendar</span></p>
           {:else}
             {@const Icon = NODE_KIND_ICON[node.type as NodeType]}
             <p class="empty"><Icon size={20} strokeWidth={1.6} />Nothing here yet</p>

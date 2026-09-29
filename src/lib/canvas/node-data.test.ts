@@ -23,6 +23,7 @@ describe('NODE_DATA_SCHEMAS — una riga per tipo, tutti i 10 valori di nodes_ty
         'influencer',
         'effects',
         'composition',
+        'calendar',
         'list',
         'products',
         'select',
@@ -423,6 +424,21 @@ describe('validateNodeData — effects', () => {
       ]
     });
     expect(out.ok).toBe(true);
+  });
+});
+
+describe('validateNodeData — calendar', () => {
+  it('accetta vista, scope, brand facoltativo e giorno di ancoraggio', () => {
+    expect(validateNodeData('calendar', { view: 'week', scope: 'canvas', anchor: '2026-09-29' }).ok).toBe(true);
+    expect(validateNodeData('calendar', { view: 'month', scope: 'brand', brand_id: 'b-1', anchor: '2026-09-29' }).ok).toBe(true);
+  });
+
+  it('rifiuta una vista che non esiste', () => {
+    expect(validateNodeData('calendar', { view: 'year', scope: 'canvas', anchor: '2026-09-29' }).ok).toBe(false);
+  });
+
+  it('rifiuta un’ancora che non è un giorno', () => {
+    expect(validateNodeData('calendar', { view: 'week', scope: 'canvas', anchor: 'domani' }).ok).toBe(false);
   });
 });
 

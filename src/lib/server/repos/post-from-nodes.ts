@@ -33,6 +33,7 @@ type PostsRepo = {
       actorKind?: ActorKind;
       actorId?: string | null;
       sources?: { nodeId: string; role?: string }[];
+      plannedFor?: string | null;
     }
   ) => Promise<Post>;
 };
@@ -74,6 +75,7 @@ export async function promoteNodesToPost(
     mediaOrder?: string[];
     actorKind?: ActorKind;
     actorId?: string | null;
+    plannedFor?: string | null;
   }
 ): Promise<Post> {
   const nodes = await repos.canvas.listNodesByIds(db, { orgId: input.orgId, nodeIds: input.nodeIds });
@@ -127,6 +129,7 @@ export async function promoteNodesToPost(
     media,
     actorKind: input.actorKind,
     actorId: input.actorId,
-    sources
+    sources,
+    plannedFor: input.plannedFor
   });
 }

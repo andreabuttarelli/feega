@@ -30,3 +30,25 @@ describe('il foglio non copre la top bar e respira sul fondo', () => {
     expect(sheet).toMatch(/bottom:\s*8px\s*!important/);
   });
 });
+
+describe('il foglio vince sulle utility del primitivo, in qualunque ordine arrivino i CSS', () => {
+  const primitive = readFileSync(join(dir, '../ui/sheet/sheet-content.svelte'), 'utf8');
+  const SIDE_UTILITY_SPECIFICITY = 2;
+
+  function specificity(selector: string): number {
+    return (selector.match(/\[|\.|:(?!:)/g) ?? []).length;
+  }
+
+  it('il primitivo ancora il lato sinistro con utility data-[side], una classe più un attributo', () => {
+    expect(primitive).toMatch(/data-\[side=left\]:left-0/);
+    expect(primitive).toMatch(/data-\[side=left\]:sm:max-w-sm/);
+  });
+
+  it('ogni selettore di .canvas-sheet supera quella specificità, invece di pareggiarla', () => {
+    const selectors = [...sheet.matchAll(/:global\(([^)]*canvas-sheet[^)]*)\)/g)].map((m) => m[1]);
+    expect(selectors.length).toBeGreaterThan(0);
+    for (const selector of selectors) {
+      expect(specificity(selector), selector).toBeGreaterThan(SIDE_UTILITY_SPECIFICITY);
+    }
+  });
+});

@@ -12,6 +12,7 @@ import { nodeSize } from '$lib/canvas/node-size';
 import type { NodeType } from '$lib/canvas/node-data';
 import { feedFiltersOf, filterPosts, filterProducts, mediaKindOf, productFiltersOf } from '$lib/canvas/source-filters';
 import { ShareState, type SharedCanvas, type SharedListItem, type SharedTile, type SharedView } from '$lib/canvas/shared-view';
+import { calendarOf } from '$lib/canvas/calendar-node';
 
 export { ShareState };
 
@@ -180,6 +181,11 @@ function frameView({ node }: ViewInput): SharedView {
   return url || html ? { kind: 'frame', url, html } : EMPTY;
 }
 
+function calendarView({ node }: ViewInput): SharedView {
+  const calendar = calendarOf(node);
+  return calendar ? { kind: 'calendar', view: calendar.view, anchor: calendar.anchor } : EMPTY;
+}
+
 export const SHARED_VIEW_OF: Record<NodeType, (input: ViewInput) => SharedView | Promise<SharedView>> = {
   image: signedView('image'),
   video: signedView('video'),
@@ -197,7 +203,8 @@ export const SHARED_VIEW_OF: Record<NodeType, (input: ViewInput) => SharedView |
   list: listView,
   select: ({ node }) => ({ kind: 'select', index: Number(node.data.index) || 1 }),
   effects: resultView,
-  composition: resultView
+  composition: resultView,
+  calendar: calendarView
 };
 
 async function viewOf(input: ViewInput): Promise<SharedView> {

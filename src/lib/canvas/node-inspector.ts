@@ -164,6 +164,10 @@ const INSPECTORS: Record<string, (row: NodeRow) => InspectorView | null> = {
   }
 };
 
+export function hasInspector(type: string): boolean {
+  return type in INSPECTORS;
+}
+
 export function inspectorOf(row: NodeRow): InspectorView | null {
   return INSPECTORS[row.type]?.(row) ?? null;
 }

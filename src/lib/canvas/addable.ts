@@ -29,7 +29,8 @@ export const CANVAS_ADDABLE = [
   'list',
   'select',
   'effects',
-  'composition'
+  'composition',
+  'calendar'
 ] as const;
 
 export type Addable = (typeof CANVAS_ADDABLE)[number];
@@ -71,5 +72,6 @@ export const ADDABLE_LABEL: Record<Addable, string> = {
   list: 'List',
   select: 'Select',
   effects: 'Effects',
-  composition: 'Composition'
+  composition: 'Composition',
+  calendar: 'Calendar'
 };

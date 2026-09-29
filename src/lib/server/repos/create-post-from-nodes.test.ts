@@ -84,6 +84,26 @@ describe('createPostFromNodes: draft', () => {
   });
 });
 
+describe('createPostFromNodes: bozza su un giorno', () => {
+  it('una bozza con plannedFor la porta alla promozione e resta draft', async () => {
+    const d = deps();
+
+    await createPostFromNodes(
+      FAKE_DB,
+      d,
+      { ...BASE_INPUT, mode: { kind: 'draft', plannedFor: '2026-10-02T08:00:00.000Z' } },
+      FAKE_PUBLISHER
+    );
+
+    expect(d.promoteNodesToPost).toHaveBeenCalledWith(
+      FAKE_DB,
+      expect.anything(),
+      expect.objectContaining({ plannedFor: '2026-10-02T08:00:00.000Z' })
+    );
+    expect(d.scheduleDelivery).not.toHaveBeenCalled();
+  });
+});
+
 describe('createPostFromNodes: schedule', () => {
   it('promuove, approva e consegna via Zernio con la data richiesta', async () => {
     const d = deps();

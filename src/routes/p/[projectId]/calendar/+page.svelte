@@ -8,6 +8,7 @@
   import PlatformGlyph from '$lib/components/PlatformGlyph.svelte';
   import PageHead from '$lib/components/PageHead.svelte';
   import { monthGrid, placePosts, type GridDay } from '$lib/calendar/month-grid';
+  import { placedInstant } from '$lib/calendar/period-grid';
   import { ALL_BRANDS, type CalendarPost } from './calendar-load';
 
   const CALENDAR_TIME_ZONE = 'Europe/Rome';
@@ -38,7 +39,7 @@
   const weeks = $derived(monthGrid(year, month, today));
 
   function scheduledForOf(post: CalendarPost): string | null {
-    return post.deliveries.find((d) => d.scheduledFor)?.scheduledFor ?? null;
+    return placedInstant(post);
   }
 
   const placed = $derived(
@@ -206,7 +207,7 @@
               <span class="day-number">{day.day}</span>
               <div class="day-chips">
                 {#each dayPosts as post (post.id)}
-                  <button type="button" class="post-chip" onclick={() => openPost(post)}>
+                  <button type="button" class="post-chip" class:is-draft={!post.deliveries.length} onclick={() => openPost(post)}>
                     {#if showsAll}{@render brandChip(post.brandId)}{/if}
                     {#each platformsOf(post) as platform (platform)}
                       <PlatformGlyph {platform} />
@@ -687,6 +688,11 @@
   :global([data-viewport='mobile']) .unscheduled-list {
     flex: 0 0 auto;
   }
+  .post-chip.is-draft {
+    border-style: dashed;
+    color: var(--ink-soft, #6e6e73);
+  }
+
   :global([data-viewport='mobile']) .post-chip,
   :global([data-viewport='mobile']) .unscheduled-item {
     min-height: var(--touch-target);
