@@ -287,6 +287,17 @@
         "projects": "Projects",
         "canvases": "Canvases"
       },
+      "canvasActions": {
+        "new": "New canvas",
+        "rename": "Rename",
+        "delete": "Delete",
+        "save": "Save",
+        "confirmDeleteTitle": "Delete this canvas?",
+        "confirmDeleteBody": "It leaves the project. Nothing on it is lost — nodes, generations and posts made from it stay put.",
+        "confirmDeleteCta": "Delete",
+        "confirmDeleteCancel": "Cancel",
+        "lastCanvas": "A project keeps at least one canvas"
+      },
       "menu": {
         "open": "Menu",
         "home": "Home",

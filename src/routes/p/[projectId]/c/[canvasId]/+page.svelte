@@ -24,6 +24,7 @@
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import { deserialize } from '$app/forms';
   import { invalidate } from '$app/navigation';
+  import { CANVAS_LIST_DEPENDENCY } from '$lib/canvas/canvas-list';
   import { formatCredits } from '$lib/components/credit-amount-format';
   import CanvasFlow from '$lib/components/canvas/CanvasFlow.svelte';
   import GenNode from '$lib/components/canvas/GenNode.svelte';
@@ -618,10 +619,12 @@
     return connectCanvas({
       client: createSupabaseBrowserClient(),
       canvasId: data.canvas.id,
+      projectId: data.projectId,
       peer: { userId: user.id, name: user.email ?? 'Utente', avatar: null,
         path: `/p/${data.projectId}/c/${data.canvas.id}`, threadId: null },
       onChange: () => { void refresh(); },
       onReconnect: () => { void refresh(); },
+      onCanvasList: () => { void invalidate(CANVAS_LIST_DEPENDENCY); },
       onPeers: (value) => { peers = value; },
       onError: () => { failed = 'Connessione in tempo reale interrotta'; }
     });

@@ -24,6 +24,7 @@
     projectName,
     projects,
     canvasName,
+    canvasHref,
     canvases
   }: {
     projectId: string;
@@ -35,6 +36,7 @@
     projectName: string;
     projects: ProjectRow[];
     canvasName: string;
+    canvasHref: string | null;
     canvases: CanvasRow[];
   } = $props();
 
@@ -55,6 +57,7 @@
     {projectName}
     {projects}
     {canvasName}
+    {canvasHref}
     {canvases}
   />
   {#if $pageTopActions}

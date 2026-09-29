@@ -3,6 +3,9 @@
   import * as Sheet from '$lib/components/ui/sheet/index.js';
   import Check from '@lucide/svelte/icons/check';
   import { formatLastEdited } from '$lib/canvas/format-last-edited';
+  import { CanvasAction, submitCanvasAction, renameProjectAction } from '$lib/canvas/canvas-list';
+  import Pencil from '@lucide/svelte/icons/pencil';
+  import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 
   type ProjectRow = { id: string; name: string; href: string; updatedAt: string };
   type CanvasRow = { id: string; name: string; href: string };
@@ -13,6 +16,7 @@
     projectName,
     projects,
     canvasName,
+    canvasHref,
     canvases
   }: {
     open: boolean;
@@ -20,8 +24,61 @@
     projectName: string;
     projects: ProjectRow[];
     canvasName: string;
+    canvasHref: string | null;
     canvases: CanvasRow[];
   } = $props();
+
+  let renaming = $state(false);
+  let draftName = $state('');
+  let confirmingDelete = $state(false);
+  const lastCanvas = $derived(canvases.length <= 1);
+
+  let renamingProject = $state(false);
+  let draftProjectName = $state('');
+
+  async function run(action: CanvasAction, fields: Record<string, string> = {}) {
+    if (!canvasHref) {
+      return;
+    }
+    onOpenChange(false);
+    await submitCanvasAction(canvasHref, action, fields);
+  }
+
+  function startRenameProject() {
+    draftProjectName = projectName;
+    renamingProject = true;
+  }
+
+  async function saveRenameProject(event: SubmitEvent) {
+    event.preventDefault();
+    renamingProject = false;
+    if (!canvasHref) {
+      return;
+    }
+    await renameProjectAction(canvasHref, draftProjectName);
+  }
+
+  function startRename() {
+    draftName = canvasName;
+    renaming = true;
+  }
+
+  async function saveRename(event: SubmitEvent) {
+    event.preventDefault();
+    renaming = false;
+    await run(CanvasAction.Rename, { name: draftName });
+  }
+
+  function askDeleteCurrent() {
+    if (lastCanvas) {
+      return;
+    }
+    confirmingDelete = true;
+  }
+
+  async function deleteCurrent() {
+    await run(CanvasAction.Delete);
+  }
 </script>
 
 <Sheet.Root {open} {onOpenChange}>
@@ -42,8 +99,45 @@
       {/each}
     </div>
 
+    {#if canvasHref}
+      {#if renaming}
+        <form class="rename-form" onsubmit={saveRename}>
+          <input class="rename-input" data-testid="canvas-rename-input" bind:value={draftName} {@attach (el) => el.focus()} />
+          <button type="submit" class="action">{$_('app.shell.canvasActions.save')}</button>
+        </form>
+      {:else}
+        <div class="actions">
+          <button type="button" class="action" data-testid="canvas-new" onclick={() => run(CanvasAction.New)}>
+            {$_('app.shell.canvasActions.new')}
+          </button>
+          <button type="button" class="action" data-testid="canvas-rename" onclick={startRename}>
+            {$_('app.shell.canvasActions.rename')}
+          </button>
+          <button
+            type="button"
+            class="action"
+            data-testid="canvas-delete"
+            disabled={lastCanvas}
+            title={lastCanvas ? $_('app.shell.canvasActions.lastCanvas') : undefined}
+            onclick={askDeleteCurrent}
+          >
+            {$_('app.shell.canvasActions.delete')}
+          </button>
+        </div>
+      {/if}
+    {/if}
+
+    <ConfirmDialog
+      bind:open={confirmingDelete}
+      title={$_('app.shell.canvasActions.confirmDeleteTitle')}
+      body={$_('app.shell.canvasActions.confirmDeleteBody')}
+      confirmLabel={$_('app.shell.canvasActions.confirmDeleteCta')}
+      cancelLabel={$_('app.shell.canvasActions.confirmDeleteCancel')}
+      onConfirm={deleteCurrent}
+    />
+
     <div class="section-label">{$_('app.shell.mobile.projects')}</div>
-    <div class="list list-last">
+    <div class="list">
       {#each projects as project (project.id)}
         <a href={project.href} class="row" onclick={() => onOpenChange(false)}>
           <span class="truncate">{project.name}</span>
@@ -54,6 +148,27 @@
         </a>
       {/each}
     </div>
+
+    {#if canvasHref}
+      {#if renamingProject}
+        <form class="rename-form list-last" onsubmit={saveRenameProject}>
+          <input
+            class="rename-input"
+            data-testid="project-rename-input"
+            bind:value={draftProjectName}
+            {@attach (el) => el.focus()}
+          />
+          <button type="submit" class="action">{$_('app.shell.canvasActions.save')}</button>
+        </form>
+      {:else}
+        <div class="actions list-last">
+          <button type="button" class="action" data-testid="project-rename" onclick={startRenameProject}>
+            <Pencil size={14} />
+            {$_('app.shell.canvasActions.rename')}
+          </button>
+        </div>
+      {/if}
+    {/if}
   </Sheet.Content>
 </Sheet.Root>
 
@@ -102,6 +217,36 @@
     color: var(--ink-faint, #9a9a9e);
     white-space: nowrap;
     flex-shrink: 0;
+  }
+
+  .actions,
+  .rename-form {
+    display: flex;
+    gap: 4px;
+    padding: 8px 16px 0;
+  }
+
+  .action {
+    flex: 1 1 0;
+    min-height: var(--touch-target);
+    border: 1px solid var(--line, #e5e5e7);
+    background: var(--paper, #fff);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink, #1d1d1f);
+  }
+  .action:disabled {
+    color: var(--ink-faint, #9a9a9e);
+  }
+
+  .rename-input {
+    flex: 3 1 0;
+    min-height: var(--touch-target);
+    border: 1px solid var(--line, #e5e5e7);
+    padding: 0 12px;
+    font: inherit;
+    font-size: 16px;
   }
 
   .list-last {
