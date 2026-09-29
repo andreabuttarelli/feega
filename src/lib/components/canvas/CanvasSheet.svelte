@@ -98,15 +98,15 @@
   @layer utilities {
     :global([data-slot='sheet-content'].canvas-sheet) {
       position: absolute !important;
-      top: 44px !important;
+      top: 60px !important;
       left: 60px !important;
       right: 0 !important;
-      bottom: 0 !important;
+      bottom: 8px !important;
       height: auto !important;
       width: auto !important;
       max-width: none !important;
       border-radius: 0 !important;
-      border-left: 1px solid var(--line, #ededef) !important;
+      border: 1px solid var(--line-2, #d2d2d7) !important;
       box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
       padding: 0 !important;
       gap: 0 !important;

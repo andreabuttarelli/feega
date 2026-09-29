@@ -23,3 +23,10 @@ describe('il foglio occupa la tela intera, non una colonna a sinistra', () => {
     expect(sheet).not.toMatch(/--sheet-width/);
   });
 });
+
+describe('il foglio non copre la top bar e respira sul fondo', () => {
+  it('parte sotto le scatole della top bar e lascia 8px dal fondo', () => {
+    expect(sheet).toMatch(/top:\s*60px\s*!important/);
+    expect(sheet).toMatch(/bottom:\s*8px\s*!important/);
+  });
+});
