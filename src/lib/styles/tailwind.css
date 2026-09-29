@@ -46,7 +46,6 @@
   --sh-ring: var(--accent);
   --radius: 0rem;
   --mobile-topbar-h: 48px;
-  --mobile-tabbar-h: 56px;
   --touch-target: 44px;
   --page-gutter: 16px;
   /* App shell sidebar — light tint toward brand accent-2 (see --sidebar-bg in app.css). */

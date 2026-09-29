@@ -11,19 +11,25 @@
   import CreditAmount from '$lib/components/CreditAmount.svelte';
   import { CANVAS_SHORTCUTS } from '$lib/canvas/shortcuts';
   import { openSheet } from '$lib/canvas/sheet-nav';
+  import { BURGER_ENTRIES, mobileNavHref } from '$lib/shell-nav';
+  import { NAV_ICONS } from './nav-icons';
+
+  type RailPages = 'include' | 'omit';
 
   let {
     projectId,
     profile,
     org,
     creditBalance,
-    navigation = 'sheet'
+    navigation = 'sheet',
+    railPages = 'omit'
   }: {
     projectId: string;
     profile: { name: string | null; email: string; avatarUrl: string | null };
     org: { name: string } | null;
     creditBalance: number;
     navigation?: 'sheet' | 'page';
+    railPages?: RailPages;
   } = $props();
 
   const isMac =
@@ -71,7 +77,11 @@
     { id: 'logout', group: 'account', labelKey: 'app.shell.menu.logout', icon: LogOut, danger: true }
   ];
 
-  const navigateItems = CANVAS_MENU_ITEMS.filter((item) => item.group === 'navigate');
+  const ITEMS_THE_RAIL_ALREADY_HAS: ReadonlySet<MenuAction> = new Set(['settings']);
+
+  const navigateItems = CANVAS_MENU_ITEMS.filter(
+    (item) => item.group === 'navigate' && !(railPages === 'include' && ITEMS_THE_RAIL_ALREADY_HAS.has(item.id))
+  );
   const helpItems = CANVAS_MENU_ITEMS.filter(
     (item) => item.group === 'help' && !(navigation === 'page' && item.desktopOnly)
   );
@@ -139,6 +149,25 @@
         </DropdownMenu.Item>
       {/each}
     </DropdownMenu.Group>
+
+    {#if railPages === 'include'}
+      <DropdownMenu.Separator />
+
+      <DropdownMenu.Group>
+        <DropdownMenu.GroupHeading class="menu-heading">{$_('app.shell.menu.pages')}</DropdownMenu.GroupHeading>
+        {#each BURGER_ENTRIES as entry (entry.id)}
+          {@const Icon = NAV_ICONS[entry.icon]}
+          <DropdownMenu.Item class="menu-row">
+            {#snippet child({ props })}
+              <a {...props} href={mobileNavHref(projectId, entry)}>
+                <Icon size={16} />
+                <span>{$_(entry.labelKey)}</span>
+              </a>
+            {/snippet}
+          </DropdownMenu.Item>
+        {/each}
+      </DropdownMenu.Group>
+    {/if}
 
     <DropdownMenu.Separator />
 

@@ -15,6 +15,8 @@ export type UserEcho = 'append-user' | 'reuse-user';
 const HTTP_NOT_FOUND = 404;
 const SILENT_TOOLS = new Set(['reply']);
 
+const turns = $state({ running: 0 });
+
 class HttpFailure extends Error {
   status: number;
   constructor(status: number) {
@@ -75,6 +77,7 @@ export class ChatSession {
 
     this.failed = '';
     this.sending = true;
+    turns.running++;
     this.#abort = new AbortController();
 
     if (echo === 'append-user') {
@@ -100,6 +103,7 @@ export class ChatSession {
       this.#settleAfter(e);
     } finally {
       this.sending = false;
+      turns.running--;
       this.#abort = null;
       this.revision++;
     }
@@ -205,9 +209,10 @@ export function chatSession(endpoint: string, fetcher: typeof fetch = fetch): Ch
 }
 
 export function anyChatRunning(): boolean {
-  return [...sessions.values()].some((s) => s.sending);
+  return turns.running > 0;
 }
 
 export function forgetChatSessions() {
   sessions.clear();
+  turns.running = 0;
 }
