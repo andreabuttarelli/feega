@@ -116,7 +116,15 @@ the node's own `type`, or the call is refused before anything is spent. Pass the
 `nodes.version`; a stale value comes back `conflict`, never a silent overwrite. A `video` never
 returns finished here — it comes back `queued` with an `external_job_id`, and the render lands
 later on a tick you do not control: poll the node with `query` rather than waiting on this call.
-Spends credits; `credits_exhausted` means the org is out.
+Spends credits; `credits_exhausted` means the org is out. A finished result carries `asset_ids` and
+`media` with the same two links `get_media` returns.
+
+## See what a node holds
+
+`get_media({ node_ids?, run_ids?, asset_ids? })` returns, per item, type, mime, size, duration and
+two short-lived signed links: `preview_url` (images, 1024px long edge) — fetch it to look at the
+result and judge it against the prompt — and `full_url`, the original file, to give the user.
+Videos have `full_url` only. Ids your org cannot see come back in `missing`. Free.
 
 `enhance_prompt` rewrites a brief into the shape the model you are about to render with wants —
 pass `model`, use the `prompt` it returns. It rewrites, never invents: a rewrite that changes the

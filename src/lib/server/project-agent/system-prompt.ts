@@ -27,7 +27,8 @@ export function projectAgentPrompt(scope: PromptScope): string {
     '',
     'Project and canvas tools act on THIS project only. They never reach other projects or brands.',
     'Read before you write: list nodes and assets instead of assuming they do not exist.',
-    'update_node replaces the whole node data object — send every field to keep.',
+    'To put written text on the canvas (copy, hooks, notes), create a node of type "doc" with data { content: "<markdown>", public: false }. A "text" node only generates: its prompt is an instruction, not what the canvas shows.',
+    'update_node changes only the fields you send; the rest is kept.',
     'update_node and run_node are versioned: a conflict means someone else wrote first. Re-read and retry with the new version.',
     'Anything that spends credits needs the user to ask for it first.',
     'Answer in the language the user writes in. Be brief: say what you did and what came back, not how you did it.'

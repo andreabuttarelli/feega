@@ -65,7 +65,8 @@ Run `feega login` once to authenticate via browser, or non-interactively with `f
 MCP server in `mcp/` — stdio + Streamable HTTP. Same OAuth identity as the CLI (no static API tokens).
 Twelve tools, org-scoped: `query`, `insert_row`, `update_row`, `delete_row`, `describe_node_types`,
 `list_posts`, `create_post`, `set_post_status`, `list_ad_campaigns`, `create_ad_campaign`,
-`approve_ad_campaign`, `set_ad_campaign_status`, `run_node_generation`.
+`approve_ad_campaign`, `set_ad_campaign_status`, `run_node_generation`, `get_media` (signed
+`preview_url` to look at an image, `full_url` for the user).
 
 ```bash
 bun run mcp          # stdio

@@ -93,7 +93,7 @@ the CLI).
 | Area | Tools |
 |------|-------|
 | Database (org-scoped) | `query`, `insert_row`, `update_row`, `delete_row`, `describe_node_types` |
-| Canvas generation | `run_node_generation` |
+| Canvas generation | `run_node_generation`, `get_media` |
 | Posts | `list_posts`, `create_post`, `set_post_status` |
 | Ads (Meta) | `list_ad_campaigns`, `create_ad_campaign`, `approve_ad_campaign`, `set_ad_campaign_status` |
 

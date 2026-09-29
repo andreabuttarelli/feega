@@ -3,16 +3,16 @@
 > Generato da `node scripts/mcp-inventory.mjs --write`, leggendo `tools/list` dal server vero.
 > Non si modifica a mano: il prossimo che rigenera cancella le correzioni.
 
-**18 tool** — 5 in lettura, 10 in scrittura, 3 che distruggono.
-Il payload di `tools/list` pesa **18.107 caratteri**, circa **4527 token**, ed e' il costo che ogni sessione paga prima di dire una parola.
+**19 tool** — 6 in lettura, 10 in scrittura, 3 che distruggono.
+Il payload di `tools/list` pesa **19.139 caratteri**, circa **4785 token**, ed e' il costo che ogni sessione paga prima di dire una parola.
 
 | gruppo | tool |
 |---|---:|
 | Accesso diretto al database | 5 |
 | Ads | 4 |
 | Nodi e generazione | 4 |
+| Altro | 3 |
 | Post | 3 |
-| Altro | 2 |
 
 Legenda: **R** legge e non cambia niente · **W** scrive · **D** distrugge, e il client puo' chiedere conferma.
 
@@ -176,7 +176,7 @@ How many combinations `run_node_loop` would queue on this node right now, and wh
 
 *Generate a node's content*
 
-Generate into an existing canvas node — text, image or video. This is the same engine the canvas Generate button calls; it never creates a node (`insert_row` does that). `medium` MUST match the node's own type, or the call is refused before anything is spent. Pass `version` as the node's current `nodes.version`: a stale value comes back `conflict` (never a silent overwrite) — re-read the node and retry with the fresh version. A `video` NEVER returns finished here: it comes back `queued` with an `external_job_id` on the run, and the render lands later, asynchronously — the node stays `running` until a later tick deposits the asset. Poll the node (`query`) rather than expecting a file now. Spends credits; a `credits_exhausted` failure means the org is out.
+Generate into an existing canvas node — text, image or video. This is the same engine the canvas Generate button calls; it never creates a node (`insert_row` does that). `medium` MUST match the node's own type, or the call is refused before anything is spent. Pass `version` as the node's current `nodes.version`: a stale value comes back `conflict` (never a silent overwrite) — re-read the node and retry with the fresh version. A `video` NEVER returns finished here: it comes back `queued` with an `external_job_id` on the run, and the render lands later, asynchronously — the node stays `running` until a later tick deposits the asset. Poll the node (`query`) rather than expecting a file now. A finished result returns `asset_ids` and `media` with `preview_url`/`full_url` (see `get_media`). Spends credits; a `credits_exhausted` failure means the org is out.
 
 | campo | tipo | |
 |---|---|---|
@@ -199,6 +199,45 @@ QUEUES many combinations from a node's `iterate` wires (or plain "repeat N" vari
 | `org`? | string | Which org, if you belong to more than one. |
 | `node_id` | string |  |
 | `confirm`? | boolean | Required (true) to queue above 50 combinations. |
+
+## Altro
+
+### `apply_effects` · W
+
+*Render an effects node*
+
+Renders an `effects` node's stack onto its upstream image and lands the result as the node's `refId` — the same render `EffectsEditor` does in the browser, run server-side so an agent without a browser can do it. Set the stack first with `update_row` on `nodes.data.effects` (see `describe_node_types` for the effect list and their params), then call this. Refused before anything runs if `data.sourceRefId` is empty (nothing upstream to render) — wire an image into the node first. Spends no credits: no AI provider is called.
+
+| campo | tipo | |
+|---|---|---|
+| `org`? | string | Which org, if you belong to more than one. |
+| `node_id` | string |  |
+
+### `enhance_prompt` · W
+
+*Rewrite a prompt for the model that will render it*
+
+Rewrites a brief into the SHAPE the model you are about to render with wants — one reads labelled sections, another one flowing paragraph, another a command when it edits. Pass the `model` (`get_media_models` lists them) and use the `prompt` that comes back to render. It rewrites, it never invents: a rewrite that adds a subject, asks for readable text or states an aspect ratio is thrown away and the original returns with `changed: false` and the reason in `notes`, as does a model we have no guide for. Draws nothing, files nothing. Spends credits.
+
+| campo | tipo | |
+|---|---|---|
+| `org`? | string | Which org, if you belong to more than one. |
+| `prompt` | string |  |
+| `model` | string |  |
+| `shot_mode`? | `hero` \| `flat-lay` \| `on-model` \| `close-up` \| `lifestyle` \| `studio` |  |
+
+### `get_media` · R
+
+*See a node's media*
+
+View the image, video or text a node holds, a generation run produced, or an asset — by `node_ids`, `run_ids` and/or `asset_ids`. Per item: type, mime, width/height, duration, and two short-lived signed links: `preview_url` (images: 1024px long edge — FETCH THIS to look at the image and judge it against the prompt) and `full_url` (the original file — give this to the user). Videos have `full_url` only. Ids your org cannot see come back in `missing`. Reads only, spends nothing.
+
+| campo | tipo | |
+|---|---|---|
+| `org`? | string | Which org, if you belong to more than one. |
+| `node_ids`? | string[] |  |
+| `run_ids`? | string[] |  |
+| `asset_ids`? | string[] |  |
 
 ## Post
 
@@ -242,30 +281,4 @@ Move a post between draft, ready and archived. Does not schedule or publish it. 
 | `org`? | string | Which org, if you belong to more than one. |
 | `id` | string |  |
 | `status` | `draft` \| `ready` \| `archived` |  |
-
-## Altro
-
-### `apply_effects` · W
-
-*Render an effects node*
-
-Renders an `effects` node's stack onto its upstream image and lands the result as the node's `refId` — the same render `EffectsEditor` does in the browser, run server-side so an agent without a browser can do it. Set the stack first with `update_row` on `nodes.data.effects` (see `describe_node_types` for the effect list and their params), then call this. Refused before anything runs if `data.sourceRefId` is empty (nothing upstream to render) — wire an image into the node first. Spends no credits: no AI provider is called.
-
-| campo | tipo | |
-|---|---|---|
-| `org`? | string | Which org, if you belong to more than one. |
-| `node_id` | string |  |
-
-### `enhance_prompt` · W
-
-*Rewrite a prompt for the model that will render it*
-
-Rewrites a brief into the SHAPE the model you are about to render with wants — one reads labelled sections, another one flowing paragraph, another a command when it edits. Pass the `model` (`get_media_models` lists them) and use the `prompt` that comes back to render. It rewrites, it never invents: a rewrite that adds a subject, asks for readable text or states an aspect ratio is thrown away and the original returns with `changed: false` and the reason in `notes`, as does a model we have no guide for. Draws nothing, files nothing. Spends credits.
-
-| campo | tipo | |
-|---|---|---|
-| `org`? | string | Which org, if you belong to more than one. |
-| `prompt` | string |  |
-| `model` | string |  |
-| `shot_mode`? | `hero` \| `flat-lay` \| `on-model` \| `close-up` \| `lifestyle` \| `studio` |  |
 

@@ -92,6 +92,18 @@ program
   });
 
 program
+  .command('media')
+  .description('Signed links to the media of canvas nodes, generation runs or assets')
+  .option('--node <ids>', 'Comma-separated node ids')
+  .option('--run <ids>', 'Comma-separated run ids')
+  .option('--asset <ids>', 'Comma-separated asset ids')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (opts) => {
+    const { cmdMedia } = await import('./commands/media.ts');
+    await cmdMedia(opts);
+  });
+
+program
   .command('upgrade <slug>')
   .description('Upgrade piano — apre la pagina di checkout nel browser')
   .action(async (slug: string) => {

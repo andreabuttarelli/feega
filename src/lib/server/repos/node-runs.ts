@@ -114,6 +114,25 @@ export async function createRun(
   return toRun(data);
 }
 
+export type RunOutput = { id: string; nodeId: string; outputAssetId: string | null };
+
+export async function findRunOutputs(db: Db, input: { orgId: string; runIds: string[] }): Promise<RunOutput[]> {
+  if (!input.runIds.length) {
+    return [];
+  }
+
+  const { data, error } = await db
+    .from('node_runs')
+    .select('id, node_id, output_asset_id')
+    .eq('org_id', input.orgId)
+    .in('id', input.runIds);
+
+  if (error) {
+    throw error;
+  }
+  return (data ?? []).map((row) => ({ id: row.id, nodeId: row.node_id, outputAssetId: row.output_asset_id }));
+}
+
 /**
  * Prende un giro da finalizzare, o null se qualcun altro l'ha già preso.
  *
