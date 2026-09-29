@@ -31,7 +31,7 @@ export function registerNodeTools(server: McpServer) {
     {
       title: 'Generate a node\'s content',
       description:
-        'Generate into an existing canvas node — text, image or video. This is the same engine ' +
+        'Generate into an existing canvas node — text, image, video or audio. This is the same engine ' +
         'the canvas Generate button calls; it never creates a node (`insert_row` does that). ' +
         '`medium` MUST match the node\'s own type, or the call is refused before anything is spent. ' +
         'Pass `version` as the node\'s current `nodes.version`: a stale value comes back `conflict` ' +
@@ -39,6 +39,8 @@ export function registerNodeTools(server: McpServer) {
         'A `video` NEVER returns finished here: it comes back `queued` with an `external_job_id` on ' +
         'the run, and the render lands later, asynchronously — the node stays `running` until a ' +
         'later tick deposits the asset. Poll the node (`query`) rather than expecting a file now. ' +
+        'An `audio` node runs one ElevenLabs operation set in `params.operation` (see `audio_operations` ' +
+        'in `describe_node_types`); `describe_node_types` with `type: audio` also lists the voices. Audio `dubbing` is queued like a video. ' +
         'A finished result returns `asset_ids` and `media` with `preview_url`/`full_url` (see `get_media`). ' +
         'Omit `model` to keep the node\'s own model, or the recommended balanced one for the medium ' +
         'when it has none (`describe_node_types` lists the recommended ones). A model the canvas does ' +
@@ -48,7 +50,7 @@ export function registerNodeTools(server: McpServer) {
       inputSchema: z.object({
         org,
         node_id: z.string(),
-        medium: z.enum(['text', 'image', 'video']),
+        medium: z.enum(['text', 'image', 'video', 'audio']),
         prompt: z.string(),
         model: z.string().optional(),
         version: z.number().int(),
@@ -72,11 +74,11 @@ export function registerNodeTools(server: McpServer) {
     {
       title: 'See a node\'s media',
       description:
-        'View the image, video or text a node holds, a generation run produced, or an asset — ' +
+        'View the image, video, audio or text a node holds, a generation run produced, or an asset — ' +
         'by `node_ids`, `run_ids` and/or `asset_ids`. Per item: type, mime, width/height, duration, ' +
         'and two signed links: `preview_url` (images: 1024px long edge, valid 5 minutes — FETCH THIS to ' +
         'look at the image and judge it against the prompt) and `full_url` (the original file, valid 1 hour — ' +
-        'give this to the user). Videos have `full_url` only. Ids your org cannot see come back in ' +
+        'give this to the user). Videos and audio have `full_url` only. Ids your org cannot see come back in ' +
         '`missing`. Reads only, spends nothing.',
       inputSchema: z.object({
         org,

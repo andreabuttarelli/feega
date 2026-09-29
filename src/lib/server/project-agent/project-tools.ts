@@ -17,7 +17,8 @@ import { listProjectAssets } from '$lib/server/repos/assets';
 import { runGenNode, runsOf, type RunOutcome } from '$lib/server/canvas/generate';
 import { agentActor, type Actor } from '$lib/server/repos/actor';
 import { withBrandContext, withOrgContext } from '$lib/server/ai-log';
-import { isGenMedium, type GenParams } from '$lib/canvas/gen-node';
+import { GEN_MEDIUMS, isGenMedium, type GenParams } from '$lib/canvas/gen-node';
+import { audioDescription } from '$lib/server/canvas/audio-description';
 import { nodeModelError } from '$lib/server/canvas/node-model';
 import { describeNodeType, describeNodeTypes, isNodeType, unknownFieldsError, validateNewNodeData } from '$lib/canvas/node-data';
 
@@ -45,7 +46,7 @@ const AGENT_PATCH_ANSWERS: Record<PatchWrite['outcome'], (written: PatchWrite) =
   gone: () => NODE_NOT_FOUND
 };
 
-const BAD_MEDIUM = { error: 'bad_medium', message: 'medium must be one of: text, image, video.' };
+const BAD_MEDIUM = { error: 'bad_medium', message: `medium must be one of: ${GEN_MEDIUMS.join(', ')}.` };
 
 function outcomeOf(out: RunOutcome): Record<string, unknown> {
   if (out.kind === 'done') {
@@ -98,7 +99,8 @@ export function createProjectTools(deps: ProjectToolDeps): Record<string, Tool> 
         if (!isNodeType(input.type)) {
           return { error: 'unknown_type', message: `Unknown type "${input.type}".` };
         }
-        return { types: { [input.type]: describeNodeType(input.type) } };
+        const audio = input.type === 'audio' ? await audioDescription() : {};
+        return { types: { [input.type]: describeNodeType(input.type) }, ...audio };
       }
     }),
 
@@ -242,11 +244,11 @@ export function createProjectTools(deps: ProjectToolDeps): Record<string, Tool> 
 
     run_node: tool({
       description:
-        'Generate on a producing node of THIS project (text, image or video). Costs credits: only when the user asked. Versioned like update_node — conflict means re-read and retry. A video may come back queued; poll with list_runs.',
+        'Generate on a producing node of THIS project (text, image, video or audio). Costs credits: only when the user asked. Versioned like update_node — conflict means re-read and retry. A video or an audio dubbing may come back queued; poll with list_runs. An audio node runs params.operation (describe_node_types type "audio" lists operations and voices).',
       inputSchema: z
         .object({
           nodeId: z.string(),
-          medium: z.enum(['text', 'image', 'video']),
+          medium: z.enum(GEN_MEDIUMS),
           prompt: z.string().optional().describe('Omit to keep the prompt already on the node.'),
           model: z.string().optional().describe('Omit to keep the model already on the node.'),
           params: z.record(z.string(), z.unknown()).optional().describe('e.g. { aspectRatio: "1:1", duration: 8 }.'),

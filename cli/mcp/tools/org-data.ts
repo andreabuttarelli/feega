@@ -110,7 +110,8 @@ export function registerOrgDataTools(server: McpServer) {
         'catalogue or feed is an ordered list too, so `select` can pull one product or one post out ' +
         'of either the same way; `effects` holds a stack of image filters over an upstream ' +
         'image, each with its own params — set it with `update_row`, then render it with ' +
-        '`apply_effects`. Also returns `recommended_models` per medium (best, balanced, ' +
+        '`apply_effects`; `audio` runs one ElevenLabs operation — `audio_operations` lists each one\'s ' +
+        'inputs, default model and price. Also returns `recommended_models` per medium (best, balanced, ' +
         'cheapest-good, each with price and release month) — prefer these over older models. ' +
         'Limits (aspect ratios, durations, prompt length) are NOT here — those come ' +
         'from `get_media_models`, because they are a fact of the model, not the node. Free.',

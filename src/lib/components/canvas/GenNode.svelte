@@ -181,6 +181,13 @@
    */
   const hasBody = $derived(node.medium !== 'text' || state === 'running' || state === 'failed' || !!node.refId);
 
+  const PROMPT_PLACEHOLDER: Record<GenNode['medium'], string> = {
+    text: 'What should it be about…',
+    image: 'Describe what you want to see…',
+    video: 'Describe what you want to see…',
+    audio: 'Text to speak, or the music or sound to make…'
+  };
+
   const LABEL: Record<string, string> = {
     empty: 'Write what you want',
     ready: 'Ready',
@@ -298,7 +305,7 @@
       class="gen-prompt nodrag"
       class:is-full={!hasBody}
       rows="2"
-      placeholder={node.medium === 'text' ? 'What should it be about…' : 'Describe what you want to see…'}
+      placeholder={PROMPT_PLACEHOLDER[node.medium]}
       value={node.prompt}
       oninput={(e) => onchange?.({ prompt: e.currentTarget.value })}
       use:scrollGuard

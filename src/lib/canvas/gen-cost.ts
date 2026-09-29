@@ -1,4 +1,5 @@
 import type { GenMedium, GenParams, ModelChoice } from './gen-node';
+import { audioCreditsFor, audioDurationOf, audioModelFor, audioOperationOf } from './audio-operations';
 
 export type RunCostInput = {
   medium: GenMedium;
@@ -46,9 +47,19 @@ const RESOLUTION_MULTIPLIERS: Record<string, number> = {
   '720p': 2
 };
 
+function audioCredits(input: RunCostInput): number | null {
+  const operation = audioOperationOf(input.params);
+  const model = audioModelFor(operation, input.model?.id);
+  const seconds = audioDurationOf(operation, input.params);
+  return audioCreditsFor(operation, model, { characters: input.prompt?.length ?? 0, seconds: seconds ?? undefined });
+}
+
 export function creditsForRun(input: RunCostInput): number | null {
   if (input.medium === 'text') {
     return textCredits(input);
+  }
+  if (input.medium === 'audio') {
+    return audioCredits(input);
   }
 
   let unit = input.model?.unitCredits;

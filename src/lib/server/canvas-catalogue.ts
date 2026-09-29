@@ -42,7 +42,8 @@ function audioChoices(): ModelChoice[] {
       aspectRatios: [],
       ...AUDIO_PROVIDER,
       wireId: id,
-      inputModalities: AUDIO_INPUT_MODALITIES
+      inputModalities: AUDIO_INPUT_MODALITIES,
+      variableCredits: true
     }))
   );
 }

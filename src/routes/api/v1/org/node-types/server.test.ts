@@ -6,6 +6,9 @@ const canvasModelCatalogue = vi.fn();
 vi.mock('$lib/server/org-data/auth', () => ({
   resolveOrgCaller: (...args: unknown[]) => resolveOrgCaller(...args)
 }));
+vi.mock('$lib/server/elevenlabs-config', () => ({
+  configuredAudioProvider: () => ({ voices: async () => [{ id: 'v1', name: 'Rachel', previewUrl: null, category: null, labels: {} }] })
+}));
 vi.mock('$lib/server/canvas-catalogue', () => ({
   canvasModelCatalogue: (...args: unknown[]) => canvasModelCatalogue(...args)
 }));
@@ -58,6 +61,7 @@ describe('GET /api/v1/org/node-types', () => {
       default_model: 'eleven_multilingual_v2',
       billed_per: 'character'
     });
+    expect(body.voices).toEqual([{ id: 'v1', name: 'Rachel', previewUrl: null, category: null, labels: {} }]);
     expect(body.audio_operations.dubbing).toMatchObject({ source: 'media', delivery: 'job', needs_language: true });
   });
 
