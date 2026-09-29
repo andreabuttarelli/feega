@@ -1,6 +1,7 @@
 import type { Db } from '$lib/server/db/client';
 import type { Canvas } from '$lib/server/repos/canvas';
 import type { Membership } from '$lib/server/repos/orgs';
+import { modeOf, type ProjectMode } from '$lib/project-mode';
 
 /**
  * DA UN ID NELL'URL A UNA TELA CHE È DAVVERO SUA.
@@ -14,9 +15,9 @@ import type { Membership } from '$lib/server/repos/orgs';
  * Una per una e non in un `in`: le org di una persona sono una o due, la prima risponde quasi
  * sempre, e un giro in più costa meno di una query che il doppio del client non sa riprodurre.
  */
-export type OpenCanvas = { orgId: string; canvas: Canvas };
+export type OpenCanvas = { orgId: string; canvas: Canvas; mode: ProjectMode };
 
-const CANVAS_COLUMNS = 'id, project_id, name, viewport';
+const CANVAS_COLUMNS = 'id, project_id, name, viewport, projects(mode)';
 
 export async function findCanvasForUser(
   db: Db,
@@ -45,7 +46,8 @@ export async function findCanvasForUser(
         projectId: data.project_id,
         name: data.name,
         viewport: (data.viewport as Canvas['viewport']) ?? null
-      }
+      },
+      mode: modeOf((data.projects as { mode?: string } | null)?.mode)
     };
   }
 

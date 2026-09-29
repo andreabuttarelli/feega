@@ -4,7 +4,7 @@ import type { Db } from '$lib/server/db/client';
 import type { Actor } from '$lib/server/repos/actor';
 import { jev, jevUsd } from './jev';
 import { IDENTIFIABILITY_CATEGORIES, IDENTIFIABILITY_JUDGE_SYSTEM, judgeSystem, parseJudgeVerdict, type ModerationCategories } from './policy';
-import { JudgeTier, MODERATION_PROFILES, profileOf } from './profiles';
+import { JudgeTier, MODERATION_PROFILES, carriedProfile } from './profiles';
 import type { RecommendationTier } from '$lib/canvas/recommended-models';
 import type { ModerationRecord, ScreenPorts } from './screen';
 
@@ -90,13 +90,13 @@ async function decideWith(scope: ModerationScope, label: string, categories: Mod
 
 async function judgeWith(scope: ModerationScope, label: string, system: string, state: string) {
   const [{ llmText }, { withOrgContext }] = await Promise.all([import('$lib/server/llm'), import('$lib/server/ai-log')]);
-  const model = await judgeModel(MODERATION_PROFILES[profileOf(scope)].judgeTier);
+  const model = await judgeModel(MODERATION_PROFILES[carriedProfile(scope)].judgeTier);
   const { text } = await withOrgContext(scope.orgId, () => llmText({ prompt: state, system, model, label }));
   return parseJudgeVerdict(text);
 }
 
 export function moderationPorts(db: Db, scope: ModerationScope): ScreenPorts {
-  const { categories } = MODERATION_PROFILES[profileOf(scope)];
+  const { categories } = MODERATION_PROFILES[carriedProfile(scope)];
   return {
     decide: (state) => decideWith(scope, JEV_LABEL, categories, state),
     decideIdentifiability: (state) => decideWith(scope, IDENTIFIABILITY_JEV_LABEL, IDENTIFIABILITY_CATEGORIES, state),

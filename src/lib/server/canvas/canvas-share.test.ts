@@ -5,7 +5,7 @@ import { SHARED_VIEW_OF, ShareState, readSharedCanvas, setCanvasShare } from './
 
 const SCOPE = { orgId: 'org-1', canvasId: 'canvas-1' };
 
-const CANVAS = { id: 'canvas-1', org_id: 'org-1', name: 'Moodboard', share_token: 'tok-live' };
+const CANVAS = { id: 'canvas-1', org_id: 'org-1', project_id: 'project-1', name: 'Moodboard', share_token: 'tok-live' };
 
 function node(id: string, type: string, data: Record<string, unknown>, deleted_at: string | null = null) {
   return {
@@ -96,6 +96,15 @@ describe('readSharedCanvas', () => {
     const { db } = sharedDb();
 
     expect(await readSharedCanvas(db, '', sign)).toBeNull();
+  });
+
+  it('a canvas of an nsfw project reads as not found, even with a live token', async () => {
+    const { db } = fakeDb(
+      { canvases: [CANVAS], projects: [{ id: 'project-1', org_id: 'org-1', mode: 'nsfw' }], nodes: [], nodes_connections: [], assets: [] },
+      { filter: true }
+    );
+
+    expect(await readSharedCanvas(db, 'tok-live', sign)).toBeNull();
   });
 
   it('a soft-deleted canvas reads as not found', async () => {

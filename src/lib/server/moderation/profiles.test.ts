@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { judgeDecision, SAFE } from './policy';
+import { ProjectMode } from '$lib/project-mode';
 import { ADULT_SEXUAL, JevOutage, MODERATION_PROFILES, ModerationProfile, profileOf } from './profiles';
 
 const decided = (profile: ModerationProfile, choice: string, overrides: Record<string, number> = {}) => {
@@ -40,8 +41,12 @@ describe('the moderation profile table', () => {
     expect(MODERATION_PROFILES[ModerationProfile.Uncensored].onJevOutage).toBe(JevOutage.Refuse);
   });
 
-  it('picks the profile from the model, never from a caller flag', () => {
-    expect(profileOf({ uncensored: false })).toBe(ModerationProfile.Standard);
-    expect(profileOf({ uncensored: true })).toBe(ModerationProfile.Uncensored);
+  it.each([
+    [ProjectMode.Nsfw, true, ModerationProfile.Uncensored],
+    [ProjectMode.Nsfw, false, ModerationProfile.Standard],
+    [ProjectMode.Standard, true, ModerationProfile.Standard],
+    [ProjectMode.Standard, false, ModerationProfile.Standard]
+  ])('picks the profile from project mode %s and model uncensored=%s: %s', (mode, uncensored, profile) => {
+    expect(profileOf({ uncensored, mode })).toBe(profile);
   });
 });

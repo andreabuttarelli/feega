@@ -6,7 +6,7 @@ import { extractSdkUsage, logAiCall, withBrandContext, withOrgContext } from '$l
 import { gateAiAction, gateOrgAiAction } from '$lib/server/cli-auth';
 import { listMemberships } from '$lib/server/repos/orgs';
 import { listCanvases } from '$lib/server/repos/canvas';
-import { findProjectForUser } from '$lib/server/projects/lookup';
+import { findReachableProject } from '$lib/server/projects/lookup';
 import { openThread, loadTurns, promptHistory, saveTurn } from '$lib/server/repos/chat';
 import { finishedTurn } from '$lib/server/project-agent/finished-turn';
 import { agentActor, SIDEBAR_AGENT_KEY } from '$lib/server/repos/actor';
@@ -59,7 +59,7 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
   }
 
   const memberships = await listMemberships(db, user.id);
-  const found = await findProjectForUser(db, { projectId: params.projectId ?? '', memberships });
+  const found = await findReachableProject(db, { projectId: params.projectId ?? '', memberships, userId: user.id });
   if (!found) {
     return json({ error: 'project_not_found' }, { status: 404 });
   }
@@ -174,7 +174,7 @@ export const GET: RequestHandler = async ({ params, locals }) => {
   }
 
   const memberships = await listMemberships(db, user.id);
-  const found = await findProjectForUser(db, { projectId: params.projectId ?? '', memberships });
+  const found = await findReachableProject(db, { projectId: params.projectId ?? '', memberships, userId: user.id });
   if (!found) {
     return json({ error: 'project_not_found' }, { status: 404 });
   }

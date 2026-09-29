@@ -2,6 +2,7 @@ import type { Db } from '$lib/server/db/client';
 import type { SocialPublisher } from '$lib/server/publishing/port';
 import { formatFor, type Platform } from '$lib/platform-capabilities';
 import { providerMediaSigner } from '$lib/server/ads/provider-media';
+import { Capability, MODE_REFUSAL } from '$lib/project-mode';
 import { uncensoredDeliveryError, UncensoredConfirmation } from '$lib/platform-adult-policy';
 
 const ZERNIO_FETCH_WINDOW_SECONDS = 60 * 60 * 24 * 30;
@@ -106,7 +107,7 @@ async function findAccounts(
   }));
 }
 
-type AssetForMedia = { id: string; type: string; url: string | null; source: string | null; uncensored?: boolean | null };
+type AssetForMedia = { id: string; type: string; url: string | null; source: string | null; uncensored?: boolean | null; nsfw?: boolean | null };
 
 async function resolveMediaAssets(
   db: Db,
@@ -115,7 +116,7 @@ async function resolveMediaAssets(
   if (!input.media.length) return [];
 
   const ids = input.media.map((m) => m.assetId);
-  const { data, error } = await db.from('assets').select('id, type, url, source, uncensored').eq('org_id', input.orgId).in('id', ids);
+  const { data, error } = await db.from('assets').select('id, type, url, source, uncensored, nsfw').eq('org_id', input.orgId).in('id', ids);
   if (error) throw error;
 
   const byId = new Map(((data ?? []) as unknown as AssetForMedia[]).map((a) => [a.id, a]));
@@ -167,8 +168,14 @@ export async function scheduleDelivery(
   const deliveries: DeliveryOutcome[] = [];
   const zernioPostIds: ZernioPostIds = { ...post.zernioPostIds };
 
+  const fromNsfwProject = assets.some((a) => a.nsfw === true);
+
   for (const account of accounts) {
-    const blocked = uncensored ? uncensoredDeliveryError(account.platform, confirmation) : null;
+    const blocked = fromNsfwProject
+      ? MODE_REFUSAL[Capability.Publish]
+      : uncensored
+        ? uncensoredDeliveryError(account.platform, confirmation)
+        : null;
     if (blocked) {
       deliveries.push({ accountId: account.id, ok: false, error: blocked });
       continue;

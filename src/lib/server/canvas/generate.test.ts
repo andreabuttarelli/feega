@@ -992,6 +992,10 @@ function statefulNodesDb(initial: { id: string; orgId: string; data: Record<stri
         return { select: () => ({ eq: () => Promise.resolve({ data: [], error: null }) }) };
       }
 
+      if (table === 'projects') {
+        return { select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { mode: 'standard' }, error: null }) }) }) }) };
+      }
+
       // `writeNodeData` scrive `canvas_events` a ogni scrittura riuscita: questo scenario non
       // guarda l'audit trail, solo che la scrittura del contenuto non si perda a un conflitto.
       if (table === 'canvas_events') {

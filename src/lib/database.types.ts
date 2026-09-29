@@ -296,6 +296,7 @@ export type Database = {
           actor_kind: string
           agent_key: string | null
           billed_credits: number | null
+          billing_scope: string
           brand_id: string | null
           cached_tokens: number | null
           completion_tokens: number | null
@@ -326,6 +327,7 @@ export type Database = {
           actor_kind?: string
           agent_key?: string | null
           billed_credits?: number | null
+          billing_scope?: string
           brand_id?: string | null
           cached_tokens?: number | null
           completion_tokens?: number | null
@@ -356,6 +358,7 @@ export type Database = {
           actor_kind?: string
           agent_key?: string | null
           billed_credits?: number | null
+          billing_scope?: string
           brand_id?: string | null
           cached_tokens?: number | null
           completion_tokens?: number | null
@@ -388,6 +391,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_calls_billing_scope_fkey"
+            columns: ["billing_scope"]
+            isOneToOne: false
+            referencedRelation: "billing_scopes"
+            referencedColumns: ["key"]
           },
           {
             foreignKeyName: "ai_calls_brand_id_fkey"
@@ -570,6 +580,7 @@ export type Database = {
           height: number | null
           id: string
           mime_type: string | null
+          nsfw: boolean
           org_id: string
           project_id: string | null
           source: string | null
@@ -589,6 +600,7 @@ export type Database = {
           height?: number | null
           id?: string
           mime_type?: string | null
+          nsfw?: boolean
           org_id: string
           project_id?: string | null
           source?: string | null
@@ -608,6 +620,7 @@ export type Database = {
           height?: number | null
           id?: string
           mime_type?: string | null
+          nsfw?: boolean
           org_id?: string
           project_id?: string | null
           source?: string | null
@@ -641,6 +654,18 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      billing_scopes: {
+        Row: {
+          key: string
+        }
+        Insert: {
+          key: string
+        }
+        Update: {
+          key?: string
+        }
+        Relationships: []
       }
       brands: {
         Row: {
@@ -1072,6 +1097,7 @@ export type Database = {
         Row: {
           ai_call_id: string | null
           amount: number
+          billing_scope: string
           created_at: string
           created_by: string | null
           expires_at: string | null
@@ -1088,6 +1114,7 @@ export type Database = {
         Insert: {
           ai_call_id?: string | null
           amount: number
+          billing_scope?: string
           created_at?: string
           created_by?: string | null
           expires_at?: string | null
@@ -1104,6 +1131,7 @@ export type Database = {
         Update: {
           ai_call_id?: string | null
           amount?: number
+          billing_scope?: string
           created_at?: string
           created_by?: string | null
           expires_at?: string | null
@@ -1124,6 +1152,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "ai_calls"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_ledger_billing_scope_fkey"
+            columns: ["billing_scope"]
+            isOneToOne: false
+            referencedRelation: "billing_scopes"
+            referencedColumns: ["key"]
           },
           {
             foreignKeyName: "credit_ledger_created_by_fkey"
@@ -1147,6 +1182,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      feature_flags: {
+        Row: {
+          enabled: boolean
+          key: string
+          updated_at: string
+        }
+        Insert: {
+          enabled?: boolean
+          key: string
+          updated_at?: string
+        }
+        Update: {
+          enabled?: boolean
+          key?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       influencer_views: {
         Row: {
@@ -2063,6 +2116,7 @@ export type Database = {
           brand_id: string | null
           created_at: string
           id: string
+          mode: Database["public"]["Enums"]["project_mode"]
           name: string
           org_id: string
           slug: string
@@ -2073,6 +2127,7 @@ export type Database = {
           brand_id?: string | null
           created_at?: string
           id?: string
+          mode?: Database["public"]["Enums"]["project_mode"]
           name: string
           org_id: string
           slug: string
@@ -2083,6 +2138,7 @@ export type Database = {
           brand_id?: string | null
           created_at?: string
           id?: string
+          mode?: Database["public"]["Enums"]["project_mode"]
           name?: string
           org_id?: string
           slug?: string
@@ -2288,6 +2344,41 @@ export type Database = {
           },
         ]
       }
+      user_age_verifications: {
+        Row: {
+          id: string
+          method: string
+          provider: string
+          result: string
+          user_id: string
+          verified_at: string
+        }
+        Insert: {
+          id?: string
+          method: string
+          provider: string
+          result: string
+          user_id: string
+          verified_at?: string
+        }
+        Update: {
+          id?: string
+          method?: string
+          provider?: string
+          result?: string
+          user_id?: string
+          verified_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_age_verifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       video_renders: {
         Row: {
           attempts: number
@@ -2412,9 +2503,10 @@ export type Database = {
       feega_credits: { Args: { _value: string }; Returns: number }
       feega_org_from_metadata: { Args: { _metadata: Json }; Returns: string }
       org_credit_balance: { Args: { _org_id: string }; Returns: number }
+      project_is_nsfw: { Args: { p_project_id: string }; Returns: boolean }
     }
     Enums: {
-      [_ in never]: never
+      project_mode: "standard" | "nsfw"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2541,6 +2633,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      project_mode: ["standard", "nsfw"],
+    },
   },
 } as const

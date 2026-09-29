@@ -3,6 +3,7 @@ import type { Db } from '$lib/server/db/client';
 import { ensureProfile } from '$lib/server/repos/profiles';
 import { listMemberships } from '$lib/server/repos/orgs';
 import { createProject, listProjects } from '$lib/server/repos/projects';
+import { ProjectMode } from '$lib/project-mode';
 import { createCanvas, listCanvases } from '$lib/server/repos/canvas';
 import { createFirstOrg } from '$lib/server/tenancy/bootstrap';
 import { chooseOrg } from '$lib/server/tenancy/context';
@@ -125,7 +126,7 @@ async function orgIdFor(db: Db, deps: EntryDeps, user: User, chosenOrgId: string
  * "Untitled" appena creato e mai più toccato.
  */
 async function projectIdFor(db: Db, deps: EntryDeps, orgId: string, lastProjectId: string | null): Promise<string> {
-  const projects = await deps.listProjects(db, orgId);
+  const projects = (await deps.listProjects(db, orgId)).filter((p) => p.mode !== ProjectMode.Nsfw);
   if (projects.length > 0) {
     const last = lastProjectId ? projects.find((p) => p.id === lastProjectId) : undefined;
     return (last ?? projects[0]).id;

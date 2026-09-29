@@ -5,6 +5,7 @@
   import { navEntriesByGroup, type NavEntry } from '$lib/shell-nav';
   import { prefetchEntry } from '$lib/canvas/chrome-loaders';
   import { NAV_ICONS } from './nav-icons';
+  import { ProjectMode, sectionAllowed } from '$lib/project-mode';
 
   /**
    * LA RAIL FLOTTANTE: due gruppi separati da un divisore, e il divisore stesso dice il
@@ -16,13 +17,17 @@
     activePanel = null,
     activeSheet = null,
     onPanel,
-    onSheet
+    onSheet,
+    mode = ProjectMode.Standard
   }: {
     activePanel?: string | null;
     activeSheet?: string | null;
     onPanel: (entry: NavEntry) => void;
     onSheet: (entry: NavEntry) => void;
+    mode?: ProjectMode;
   } = $props();
+
+  const sheets = $derived(navEntriesByGroup('workbench').filter((entry) => sectionAllowed(mode, entry.id)));
 
   function onClick(entry: NavEntry) {
     if (entry.family === 'panel') onPanel(entry);
@@ -68,7 +73,7 @@
     <div class="rail-divider" role="separator"></div>
 
     <div class="rail-group">
-      {#each navEntriesByGroup('workbench') as entry (entry.id)}
+      {#each sheets as entry (entry.id)}
         {@render railButton(entry)}
       {/each}
     </div>

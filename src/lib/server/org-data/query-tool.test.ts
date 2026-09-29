@@ -23,6 +23,10 @@ function fakeAuthority(opts: { rows?: Array<Record<string, unknown>>; count?: nu
             rec.filters.push([c, v]);
             return builder;
           },
+          not: (c: string, op: string, v: string) => {
+            rec.filters.push([`not.${c}.${op}`, v]);
+            return builder;
+          },
           order: () => builder,
           range: (from: number, to: number) => {
             rec.range = [from, to];
@@ -90,5 +94,22 @@ describe('il confine è org_id, imposto dal codice — non un affinamento facolt
 
   it('la lista delle tabelle è esattamente ORG_TABLES, niente di più niente di meno', () => {
     expect([...ORG_QUERY_TABLE_LIST].sort()).toEqual([...ORG_TABLES].sort());
+  });
+});
+
+describe('an nsfw project stays out of reach of a caller whose nsfw access is locked', () => {
+  it('every read of a project-scoped table excludes the nsfw projects', async () => {
+    const { calls, supabase } = fakeAuthority({ rows: [] });
+
+    await (
+      createOrgQueryTool({
+        authority: { kind: 'service', supabase },
+        orgId: 'org-mine',
+        hidden: { projectIds: ['p-nsfw'], canvasIds: [], nodeIds: [] }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      }).query as any
+    ).execute({ table: 'nodes' }, {});
+
+    expect(calls[0].filters).toContainEqual(['not.project_id.in', '(p-nsfw)']);
   });
 });

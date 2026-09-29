@@ -1,5 +1,5 @@
 import {sequence} from '@sveltejs/kit/hooks';
-import { json, redirect, text } from '@sveltejs/kit';
+import { error, json, redirect, text } from '@sveltejs/kit';
 import * as Sentry from '@sentry/sveltekit';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { markRlsScoped } from '$lib/server/rls-client';
@@ -93,6 +93,24 @@ const csrf: Handle = async ({ event, resolve }) => {
   return resolve(event);
 };
 
+async function refuseNsfwSection(event: RequestEvent): Promise<void> {
+  const { guardedSection, sectionRefusal } = await import('$lib/server/nsfw/section-guard');
+  const projectId = event.params.projectId;
+  if (!projectId || !guardedSection(event.route.id)) {
+    return;
+  }
+  const db = await event.locals.db();
+  if (!db) {
+    return;
+  }
+  const { data } = await db.from('projects').select('mode').eq('id', projectId).maybeSingle();
+  const { modeOf } = await import('$lib/project-mode');
+  const refusal = sectionRefusal(modeOf(data?.mode), event.route.id ?? '');
+  if (refusal) {
+    throw error(403, refusal);
+  }
+}
+
 export const handle: Handle = sequence(csrf, Sentry.sentryHandle(), async ({ event, resolve }) => {
   // Per-request Supabase client bound to the request cookies (SSR auth).
   // Marchiato come RLS-scoped: chiave anon, quindi Postgres valuta le policy dell'utente. È la
@@ -183,6 +201,8 @@ export const handle: Handle = sequence(csrf, Sentry.sentryHandle(), async ({ eve
     }
     throw redirect(302, await rootRedirectTarget(event));
   }
+
+  await refuseNsfwSection(event);
 
   const doResolve = () =>
     resolve(event, {

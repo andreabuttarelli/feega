@@ -12,6 +12,7 @@
  * invece che in ogni chiamante — un tool nuovo che scrive `nodes` lo eredita per il fatto di passare
  * da questo file.
  */
+import { exclusionsFor, inList, NOTHING_HIDDEN, touchesHidden, type HiddenScope } from '$lib/server/nsfw/hidden-scope';
 import { ORG_TABLES, CANVAS_WRITE_TABLES, type OrgTable } from './tables';
 import { ORG_TABLE_CHECKS } from './checks';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -179,9 +180,10 @@ export type WriteToolDeps = {
   threadId?: string;
   /** Chi sta scrivendo — serve solo per l'annuncio di presenza su `nodes`/`nodes_connections`. */
   actor?: Actor;
+  hidden?: HiddenScope;
 };
 
-export function createOrgWriteTools({ authority, orgId, userId, threadId, actor }: WriteToolDeps) {
+export function createOrgWriteTools({ authority, orgId, userId, threadId, actor, hidden = NOTHING_HIDDEN }: WriteToolDeps) {
   const { supabase } = authority;
 
   const finish = <T extends Record<string, unknown>>(out: T, note: string, t0: number): T => {
@@ -274,6 +276,14 @@ export function createOrgWriteTools({ authority, orgId, userId, threadId, actor 
       );
     }
 
+    if (touchesHidden(table, values, hidden)) {
+      return finish(
+        { error: 'not_found', message: 'That project, canvas or node is not reachable from this key.', fix: 'Target a project this key can see.' },
+        'org_db_write:refused:nsfw_hidden',
+        t0
+      );
+    }
+
     if (table === NODES_TABLE) {
       const verdict = validateNewNodeData(String(values.type ?? ''), values.data);
       if (!verdict.ok) return finish(invalidNodeData(verdict.error), 'org_db_write:refused:invalid_node_data', t0);
@@ -310,8 +320,11 @@ export function createOrgWriteTools({ authority, orgId, userId, threadId, actor 
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   type Filterable = { filter: (c: string, o: string, v: string) => any; not: (c: string, o: string, v: string) => any };
-  const filtered = <T extends Filterable>(q: T, where: Filter[]) => {
+  const filtered = <T extends Filterable>(q: T, where: Filter[], table: string) => {
     let out = q;
+    for (const [column, ids] of exclusionsFor(table, hidden)) {
+      out = out.not(column, 'in', inList(ids));
+    }
     for (const f of where) {
       const column = String(f.column).trim();
       if (column === 'org_id') continue; // si impone sotto, mai due volte e mai un valore diverso
@@ -406,7 +419,7 @@ export function createOrgWriteTools({ authority, orgId, userId, threadId, actor 
     }
 
     const table = input.table.trim() as OrgTable;
-    const count = await filtered(supabase.from(table).select('*', { count: 'exact' }), where)
+    const count = await filtered(supabase.from(table).select('*', { count: 'exact' }), where, table)
       .limit(1)
       .abortSignal(AbortSignal.timeout(WRITE_ABORT_MS));
 
@@ -439,7 +452,7 @@ export function createOrgWriteTools({ authority, orgId, userId, threadId, actor 
     }
 
     if (table === NODES_TABLE && 'data' in values) {
-      const current = await filtered(supabase.from(table).select('id, type, data, version'), where)
+      const current = await filtered(supabase.from(table).select('id, type, data, version'), where, table)
         .limit(UPDATE_MAX_ROWS)
         .abortSignal(AbortSignal.timeout(WRITE_ABORT_MS));
 
@@ -466,7 +479,7 @@ export function createOrgWriteTools({ authority, orgId, userId, threadId, actor 
       if (refusedJsonb) return finish(refusedJsonb, 'org_db_write:refused:invalid_jsonb_column', t0);
     }
 
-    const written = await filtered(supabase.from(table).update(values), where)
+    const written = await filtered(supabase.from(table).update(values), where, table)
       .select()
       .abortSignal(AbortSignal.timeout(WRITE_ABORT_MS));
 
@@ -507,7 +520,7 @@ export function createOrgWriteTools({ authority, orgId, userId, threadId, actor 
     }
 
     const table = input.table.trim() as OrgTable;
-    const count = await filtered(supabase.from(table).select('*', { count: 'exact' }), where)
+    const count = await filtered(supabase.from(table).select('*', { count: 'exact' }), where, table)
       .limit(1)
       .abortSignal(AbortSignal.timeout(WRITE_ABORT_MS));
 
@@ -539,7 +552,7 @@ export function createOrgWriteTools({ authority, orgId, userId, threadId, actor 
       );
     }
 
-    const removed = await filtered(supabase.from(table).delete(), where)
+    const removed = await filtered(supabase.from(table).delete(), where, table)
       .select()
       .abortSignal(AbortSignal.timeout(WRITE_ABORT_MS));
 

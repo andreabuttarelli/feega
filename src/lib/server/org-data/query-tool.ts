@@ -17,6 +17,7 @@
  * Le 26 tabelle sono `ORG_TABLES` (org-data/tables.ts), non `QUERY_TABLES`: quel file resta dello
  * schema vecchio, letto da `brand-data/query-tool.ts`, e i due non si toccano.
  */
+import { exclusionsFor, inList, NOTHING_HIDDEN, type HiddenScope } from '$lib/server/nsfw/hidden-scope';
 import { tool } from 'ai';
 import { z } from 'zod';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -123,9 +124,10 @@ export type QueryToolDeps = {
   orgId: string;
   userId?: string;
   threadId?: string;
+  hidden?: HiddenScope;
 };
 
-export function createOrgQueryTool({ authority, orgId, userId, threadId }: QueryToolDeps) {
+export function createOrgQueryTool({ authority, orgId, userId, threadId, hidden = NOTHING_HIDDEN }: QueryToolDeps) {
   return {
     query: tool({
       description: [
@@ -299,6 +301,7 @@ export function createOrgQueryTool({ authority, orgId, userId, threadId }: Query
           let q = supabase.from(table).select(selectCols, { count: countMode });
           for (const f of filtriModello) q = q.filter(f.column.trim(), wireOp(f), wireValue(f.op, f.value));
           q = q.filter('org_id', 'eq', orgId);
+          for (const [column, ids] of exclusionsFor(table, hidden)) q = q.not(column, 'in', inList(ids));
           for (const o of orders) {
             q = q.order(o.column.trim(), { ascending: o.ascending ?? false, nullsFirst: o.nullsFirst });
           }

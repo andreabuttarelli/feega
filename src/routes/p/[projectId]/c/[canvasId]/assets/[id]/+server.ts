@@ -6,6 +6,7 @@ import { findAsset } from '$lib/server/repos/assets';
 import { createAssetSigningDb, signAssetPaths } from '$lib/server/canvas/sign-media';
 import type { ThumbnailPreset } from '$lib/server/media-thumbnails';
 import { AssetSize, sizeOf } from '$lib/canvas/asset-url';
+import { canvasReachable } from '$lib/server/nsfw/nsfw-server';
 
 const IMAGE_PRESET_OF: Record<AssetSize, ThumbnailPreset | undefined> = {
   [AssetSize.Thumb]: 'nodeThumbnail',
@@ -36,7 +37,7 @@ export const GET: RequestHandler = async ({ params, locals, url }) => {
 
   const memberships = await listMemberships(db, user.id);
   const found = await findCanvasForUser(db, { canvasId: params.canvasId ?? '', memberships });
-  if (!found) {
+  if (!found || !(await canvasReachable(db, found, user.id))) {
     throw error(404, 'This canvas does not exist, or is not yours');
   }
 

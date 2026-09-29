@@ -1,3 +1,4 @@
+import { ProjectMode } from '$lib/project-mode';
 import { DOUBT, MODERATION_CATEGORIES, SAFE, type ModerationCategories } from './policy';
 
 export enum ModerationProfile {
@@ -67,6 +68,15 @@ export const MODERATION_PROFILES: Readonly<Record<ModerationProfile, ProfilePoli
   }
 };
 
-export function profileOf(model: { uncensored: boolean }): ModerationProfile {
-  return model.uncensored ? ModerationProfile.Uncensored : ModerationProfile.Standard;
+const PROFILE_BY_MODE: Readonly<Record<ProjectMode, Readonly<Record<'uncensored' | 'standard', ModerationProfile>>>> = {
+  [ProjectMode.Standard]: { uncensored: ModerationProfile.Standard, standard: ModerationProfile.Standard },
+  [ProjectMode.Nsfw]: { uncensored: ModerationProfile.Uncensored, standard: ModerationProfile.Standard }
+};
+
+export function profileOf(input: { uncensored: boolean; mode: ProjectMode }): ModerationProfile {
+  return PROFILE_BY_MODE[input.mode][input.uncensored ? 'uncensored' : 'standard'];
+}
+
+export function carriedProfile(carrier: { uncensored: boolean }): ModerationProfile {
+  return carrier.uncensored ? ModerationProfile.Uncensored : ModerationProfile.Standard;
 }

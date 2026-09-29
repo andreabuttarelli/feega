@@ -1,3 +1,4 @@
+import { ProjectMode } from '$lib/project-mode';
 import { describe, expect, it, vi } from 'vitest';
 import { startWiroRun, WIRO_REFUSALS, type WiroModel, type WiroRunDeps, type WiroRequest } from './wiro-run';
 
@@ -31,6 +32,7 @@ function depsFor(model: WiroModel | null): { deps: WiroRunDeps; gatewayRun: Retu
 }
 
 const baseRequest: Omit<WiroRequest, 'scope' | 'modelId'> = {
+  mode: ProjectMode.Nsfw,
   prompt: 'a picture',
   params: {},
   imageUrls: [],

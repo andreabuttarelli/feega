@@ -1,5 +1,6 @@
 import type { Db } from '$lib/server/db/client';
 import type { Database } from '$lib/database.types';
+import { modeOf, ProjectMode } from '$lib/project-mode';
 
 /**
  * I PROGETTI DI UN'ORG.
@@ -17,11 +18,12 @@ export type Project = {
   brandId: string | null;
   archivedAt: string | null;
   lastActiveAt: string;
+  mode: ProjectMode;
 };
 
-const PROJECT_COLUMNS = 'id, name, slug, brand_id, archived_at, updated_at';
+const PROJECT_COLUMNS = 'id, name, slug, brand_id, archived_at, updated_at, mode';
 
-type ProjectColumns = Pick<ProjectRow, 'id' | 'name' | 'slug' | 'brand_id' | 'archived_at' | 'updated_at'>;
+type ProjectColumns = Pick<ProjectRow, 'id' | 'name' | 'slug' | 'brand_id' | 'archived_at' | 'updated_at' | 'mode'>;
 
 function toProject(row: ProjectColumns, lastActiveAt: string = row.updated_at): Project {
   return {
@@ -30,7 +32,8 @@ function toProject(row: ProjectColumns, lastActiveAt: string = row.updated_at): 
     slug: row.slug,
     brandId: row.brand_id,
     archivedAt: row.archived_at,
-    lastActiveAt
+    lastActiveAt,
+    mode: modeOf(row.mode)
   };
 }
 
@@ -91,7 +94,7 @@ export async function findProjectBySlug(
 
 export async function createProject(
   db: Db,
-  input: { orgId: string; name: string; slug: string; brandId?: string | null }
+  input: { orgId: string; name: string; slug: string; brandId?: string | null; mode?: ProjectMode }
 ): Promise<Project> {
   const { data, error } = await db
     .from('projects')
@@ -99,7 +102,8 @@ export async function createProject(
       org_id: input.orgId,
       name: input.name,
       slug: input.slug,
-      brand_id: input.brandId ?? null
+      brand_id: input.brandId ?? null,
+      mode: input.mode ?? ProjectMode.Standard
     })
     .select(PROJECT_COLUMNS)
     .single();

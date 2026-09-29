@@ -18,8 +18,9 @@
   import Pencil from '@lucide/svelte/icons/pencil';
   import Trash from '@lucide/svelte/icons/trash-2';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+  import { Capability, modeAllows, modeOf, ProjectMode } from '$lib/project-mode';
 
-  type ProjectRow = { id: string; name: string; href: string; updatedAt: string };
+  type ProjectRow = { id: string; name: string; href: string; updatedAt: string; mode?: string };
   type CanvasRow = { id: string; name: string; href: string };
 
   /**
@@ -44,7 +45,9 @@
     shareToken,
     onShare,
     profile,
-    org
+    org,
+    projectMode = ProjectMode.Standard,
+    nsfw = null
   }: {
     projectId: string;
     projectName: string;
@@ -59,7 +62,14 @@
     onShare: (state: ShareState) => Promise<void>;
     profile: { name: string | null; email: string; avatarUrl: string | null };
     org: { name: string } | null;
+    projectMode?: string;
+    nsfw?: { visible: boolean; text: string } | null;
   } = $props();
+
+  const standardProjects = $derived(projects.filter((p) => p.mode !== ProjectMode.Nsfw));
+  const nsfwProjects = $derived(projects.filter((p) => p.mode === ProjectMode.Nsfw));
+  const inNsfw = $derived(projectMode === ProjectMode.Nsfw);
+  const mode = $derived(modeOf(projectMode));
 
   let renaming = $state(false);
   let draftName = $state('');
@@ -127,11 +137,14 @@
     {:else}
     <DropdownMenu.Root>
       <DropdownMenu.Trigger class="switcher-btn" data-testid="project-switcher">
+        {#if inNsfw}
+          <span class="nsfw-badge" data-testid="nsfw-project-badge">NSFW</span>
+        {/if}
         <span class="truncate">{projectName}</span>
         <ChevronDown size={13} />
       </DropdownMenu.Trigger>
       <DropdownMenu.Content align="start" class="w-64">
-        {#each projects as project (project.id)}
+        {#each standardProjects as project (project.id)}
           <DropdownMenu.Item>
             {#snippet child({ props })}
               <a {...props} href={project.href} class="switcher-row">
@@ -144,6 +157,29 @@
             {/snippet}
           </DropdownMenu.Item>
         {/each}
+        {#if nsfw?.visible}
+          <DropdownMenu.Separator />
+          <div class="nsfw-section-label" data-testid="nsfw-section">NSFW · 18+</div>
+          {#each nsfwProjects as project (project.id)}
+            <DropdownMenu.Item>
+              {#snippet child({ props })}
+                <a {...props} href={project.href} class="switcher-row">
+                  <span class="truncate">{project.name}</span>
+                  {#if project.name === projectName}
+                    <Check size={14} />
+                  {/if}
+                </a>
+              {/snippet}
+            </DropdownMenu.Item>
+          {/each}
+          <DropdownMenu.Item>
+            {#snippet child({ props })}
+              <a {...props} href={`/p/${projectId}/nsfw`} class="switcher-row" data-testid="nsfw-workspace-link">
+                <span class="truncate">{nsfw.text}</span>
+              </a>
+            {/snippet}
+          </DropdownMenu.Item>
+        {/if}
         <DropdownMenu.Separator />
         <DropdownMenu.Item data-testid="project-rename" onSelect={startRenameProject}>
           <Pencil size={14} />
@@ -222,17 +258,21 @@
       <CreditAmount amount={creditBalance} />
     </a>
 
-    <button
-      type="button"
-      class="promote-btn"
-      data-testid="topbar-promote"
-      onclick={() => openSheet(projectId, promotePath($canvasSelection))}
-    >
-      <Megaphone size={14} />
-      Promote
-    </button>
+    {#if modeAllows(mode, Capability.Promote)}
+      <button
+        type="button"
+        class="promote-btn"
+        data-testid="topbar-promote"
+        onclick={() => openSheet(projectId, promotePath($canvasSelection))}
+      >
+        <Megaphone size={14} />
+        Promote
+      </button>
+    {/if}
 
-    <CanvasShare {shareToken} {onShare} />
+    {#if modeAllows(mode, Capability.Share)}
+      <CanvasShare {shareToken} {onShare} />
+    {/if}
 
     <button
       type="button"
@@ -403,5 +443,17 @@
     .canvas-name {
       max-width: 80px;
     }
+  }
+  .nsfw-badge {
+    border: 1px solid var(--color-destructive);
+    color: var(--color-destructive);
+    padding: 0 0.25rem;
+    font-size: 0.625rem;
+    line-height: 1rem;
+  }
+  .nsfw-section-label {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.625rem;
+    color: var(--color-destructive);
   }
 </style>

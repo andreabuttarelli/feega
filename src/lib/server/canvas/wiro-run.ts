@@ -6,6 +6,8 @@ import type { GenParams } from '$lib/canvas/gen-node';
 import type { WiroFields, WiroWireSpec } from '$lib/server/wiro-catalogue';
 import { screenGeneration, type ScreenPorts } from '$lib/server/moderation/screen';
 import type { WiroGateway, WiroOutput } from './wiro-gateway';
+import { STORAGE_FOLDER, type ProjectMode } from '$lib/project-mode';
+import { ModerationProfile, profileOf } from '$lib/server/moderation/profiles';
 import { likenessRefusal, type ProvenanceEntry } from './likeness-guard';
 
 const GENERATED_MEDIA_BUCKET = 'brand-knowledge';
@@ -54,6 +56,7 @@ export type WiroRunDeps = {
 
 export type WiroRequest = {
   scope: WiroScope;
+  mode: ProjectMode;
   modelId: string;
   prompt: string;
   params: GenParams;
@@ -77,7 +80,7 @@ function extraInputs(params: GenParams, schema: Record<string, unknown>): Record
   );
 }
 
-export function wiroInputs(fields: WiroFields, input: Omit<WiroRequest, 'scope' | 'modelId' | 'provenance'>, schema: Record<string, unknown>): Record<string, unknown> {
+export function wiroInputs(fields: WiroFields, input: Omit<WiroRequest, 'scope' | 'mode' | 'modelId' | 'provenance'>, schema: Record<string, unknown>): Record<string, unknown> {
   const inputs: Record<string, unknown> = { ...extraInputs(input.params, schema), [fields.prompt]: input.prompt };
   const controls: Array<[string | undefined, unknown]> = [
     [fields.aspectRatio, input.params.aspectRatio],
@@ -124,7 +127,7 @@ export async function startWiroRun(deps: WiroRunDeps, req: WiroRequest): Promise
   const screened = await screenGeneration(deps.screen(req.scope, model), {
     text: req.prompt,
     references: req.provenance.map((p) => p.label),
-    uncensored: model.uncensored
+    uncensored: profileOf({ uncensored: model.uncensored, mode: req.mode }) === ModerationProfile.Uncensored
   });
   if (!screened.ok) {
     return { kind: 'refused', error: screened.error };
@@ -157,8 +160,9 @@ async function download(output: WiroOutput): Promise<{ bytes: Uint8Array; mime: 
   return { bytes: new Uint8Array(await res.arrayBuffer()), mime: res.headers.get('content-type') ?? output.contentType };
 }
 
-async function deposit(db: Db, scope: WiroScope, model: WiroModel, file: { bytes: Uint8Array; mime: string }): Promise<Asset> {
-  const path = `${scope.userId}/media/wiro/${crypto.randomUUID()}.${EXTENSION_OF_MIME[file.mime] ?? 'bin'}`;
+async function deposit(db: Db, job: { scope: WiroScope; mode: ProjectMode }, model: WiroModel, file: { bytes: Uint8Array; mime: string }): Promise<Asset> {
+  const { scope } = job;
+  const path = `${scope.userId}/${STORAGE_FOLDER[job.mode]}/wiro/${crypto.randomUUID()}.${EXTENSION_OF_MIME[file.mime] ?? 'bin'}`;
   const { error } = await db.storage
     .from(GENERATED_MEDIA_BUCKET)
     .upload(path, new Blob([file.bytes as BlobPart], { type: file.mime }), { contentType: file.mime, upsert: false });
@@ -182,7 +186,7 @@ async function deposit(db: Db, scope: WiroScope, model: WiroModel, file: { bytes
 export async function finishWiroJob(
   db: Db,
   deps: Pick<WiroRunDeps, 'gateway' | 'model' | 'bill'>,
-  job: { externalJobId: string; modelId: string; scope: WiroScope }
+  job: { externalJobId: string; modelId: string; scope: WiroScope; mode: ProjectMode }
 ): Promise<WiroProgress> {
   const model = await deps.model(job.modelId);
   if (!deps.gateway || !model) {
@@ -205,7 +209,7 @@ export async function finishWiroJob(
   }
   deps.bill({ model: model.id, ms: Date.now() - startedAt, costUsd: task.costUsd, uncensored: model.uncensored, scope: job.scope });
 
-  const asset = await deposit(db, job.scope, model, await download(output));
+  const asset = await deposit(db, job, model, await download(output));
   return { state: 'landed', asset, costUsd: task.costUsd, uncensored: model.uncensored };
 }
 
