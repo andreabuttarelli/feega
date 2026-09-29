@@ -54,7 +54,20 @@ function audioCredits(input: RunCostInput): number | null {
   return audioCreditsFor(operation, model, { characters: input.prompt?.length ?? 0, seconds: seconds ?? undefined });
 }
 
+function pricedCredits(input: RunCostInput): number | null {
+  const params = input.params as Record<string, unknown>;
+  const line = input.model?.pricedInputs?.find((l) => Object.entries(l.inputs).every(([k, v]) => String(params[k] ?? '') === v));
+  if (!line) {
+    return null;
+  }
+  const enhanceExtra = input.params.enhancePrompt && typeof input.enhanceUnitCredits === 'number' ? input.enhanceUnitCredits : 0;
+  return line.credits + enhanceExtra;
+}
+
 export function creditsForRun(input: RunCostInput): number | null {
+  if (input.model?.pricedInputs) {
+    return pricedCredits(input);
+  }
   if (input.medium === 'text') {
     return textCredits(input);
   }

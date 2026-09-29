@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { candidateOf, type ReleaseRow } from './recommended-models';
+import { candidateOf, syncedCandidates, type ReleaseRow } from './recommended-models';
 
 function row(over: Partial<ReleaseRow>): ReleaseRow {
   return {
@@ -15,6 +15,22 @@ function row(over: Partial<ReleaseRow>): ReleaseRow {
     ...over
   };
 }
+
+describe('syncedCandidates — never recommends an uncensored model', () => {
+  it('drops uncensored rows before scoring', async () => {
+    const rows = [row({ id: 'a/safe' }), { ...row({ id: 'wiro/x/uncensored' }), uncensored: true }];
+    const admin = { from: () => ({ select: () => ({ eq: async () => ({ data: rows, error: null }) }) }) };
+
+    const out = await syncedCandidates(admin as never, 'image');
+
+    expect(out.map((c) => c.id)).toEqual(['a/safe']);
+  });
+
+  it('prices a Wiro image by its cheapest per-run line', () => {
+    const c = candidateOf('image', row({ pricing: { lines: [{ inputs: {}, usd: 0.02, method: 'cpr' }, { inputs: {}, usd: 0.05, method: 'cpr' }] } }));
+    expect(c.unitCostUsd).toBeCloseTo(0.02);
+  });
+});
 
 describe('candidateOf — what one catalogue row is worth recommending', () => {
   it('text costs per million output tokens and brings its benchmark and context', () => {

@@ -247,3 +247,22 @@ describe('creditsForRun — audio', () => {
     expect(creditsForRun({ medium: 'audio', model: null, params: { operation: 'voice_isolation' }, prompt: '' })).toBeNull();
   });
 });
+
+describe('creditsForRun — a model priced per setting combination', () => {
+  const priced: ModelChoice = {
+    ...videoChoice,
+    unitCredits: undefined,
+    pricedInputs: [
+      { inputs: { resolution: '480p', duration: '5' }, credits: 25 },
+      { inputs: { resolution: '720p', duration: '5' }, credits: 50 }
+    ]
+  };
+
+  it('charges the line matching the chosen settings, not a per-second multiplier', () => {
+    expect(creditsForRun({ medium: 'video', model: priced, params: { resolution: '720p', duration: 5 } })).toBe(50);
+  });
+
+  it('is unknown when no line matches the settings', () => {
+    expect(creditsForRun({ medium: 'video', model: priced, params: { resolution: '1080p', duration: 5 } })).toBeNull();
+  });
+});

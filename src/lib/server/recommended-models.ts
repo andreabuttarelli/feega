@@ -4,6 +4,7 @@ import type { GenerativeMedium } from '$lib/canvas/default-models';
 type CatalogueMedium = Exclude<GenerativeMedium, 'audio'>;
 import type { CandidateModel } from '$lib/canvas/recommended-models';
 import type { AiModelCatalogue } from './ai-models-sync';
+import { isWiroPricing } from './wiro-catalogue';
 
 export type ReleaseRow = {
   id: string;
@@ -15,6 +16,7 @@ export type ReleaseRow = {
   supported_resolutions: string[] | null;
   param_schema: Record<string, unknown> | null;
   pricing: unknown;
+  uncensored?: boolean | null;
 };
 
 const TOKENS_PER_MILLION = 1_000_000;
@@ -22,6 +24,8 @@ const TOKENS_PER_1K_IMAGE = 1290;
 const MEGAPIXELS_PER_1K_IMAGE = 1;
 const VIDEO_TOKENS_PER_SECOND_720P = (1280 * 720 * 24) / 1024;
 const CENTS_PER_USD = 100;
+
+const PER_RUN_METHODS = new Set(['cpr', 'cpo']);
 
 const CATALOGUE_OF: Record<CatalogueMedium, AiModelCatalogue> = { text: 'chat', image: 'image', video: 'video' };
 
@@ -60,6 +64,9 @@ function imageLines(pricing: unknown): ImageLine[] {
 }
 
 function imageCost(pricing: unknown): number | null {
+  if (isWiroPricing(pricing)) {
+    return cheapest(pricing.lines.filter((line) => PER_RUN_METHODS.has(line.method)).map((line) => line.usd));
+  }
   const costs = imageLines(pricing)
     .filter((line) => line.billable === 'output_image' && !line.variant)
     .map((line) => IMAGE_LINE_USD[String(line.unit)]?.(Number(line.cost_usd)) ?? NaN);
@@ -105,10 +112,10 @@ export function candidateOf(medium: CatalogueMedium, row: ReleaseRow): Candidate
 export async function syncedCandidates(admin: SupabaseClient, medium: CatalogueMedium): Promise<CandidateModel[]> {
   const { data, error } = await admin
     .from('ai_models')
-    .select('id, label, released_at, expires_at, context_length, intelligence_index, supported_resolutions, param_schema, pricing')
+    .select('id, label, released_at, expires_at, context_length, intelligence_index, supported_resolutions, param_schema, pricing, uncensored')
     .eq('catalogue', CATALOGUE_OF[medium]);
   if (error) {
     return [];
   }
-  return ((data ?? []) as ReleaseRow[]).map((row) => candidateOf(medium, row));
+  return ((data ?? []) as ReleaseRow[]).filter((row) => row.uncensored !== true).map((row) => candidateOf(medium, row));
 }
