@@ -237,10 +237,11 @@ const WIRO_IMAGE_PATHS: Readonly<Record<string, (upstream: UpstreamInputs) => st
 };
 
 async function runWiroNode(db: Db, input: StartRun, run: NodeRun, upstream: UpstreamInputs, prompt: string): Promise<RunOutcome> {
-  const [{ wiroRunDeps }, { startWiroRun }, { upstreamProvenance }] = await Promise.all([
+  const [{ wiroRunDeps }, { startWiroRun }, { upstreamProvenance }, { projectModeOf }] = await Promise.all([
     import('$lib/server/wiro-config'),
     import('./wiro-run'),
-    import('./likeness-guard')
+    import('./likeness-guard'),
+    import('$lib/server/nsfw/nsfw-server')
   ]);
   const node = await findNode(db, { orgId: input.orgId, nodeId: input.nodeId }).catch(() => null);
   const [imageUrls, lastFrame, provenance] = await Promise.all([
@@ -251,6 +252,7 @@ async function runWiroNode(db: Db, input: StartRun, run: NodeRun, upstream: Upst
 
   const out = await startWiroRun(wiroRunDeps(db), {
     scope: audioScopeOf(input),
+    mode: await projectModeOf(db, input),
     modelId: input.model ?? '',
     prompt,
     params: input.params,
@@ -281,6 +283,12 @@ export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcom
     return { kind: 'refused', error: pick.error };
   }
   const input: StartRun = { ...requested, model: pick.model };
+
+  const { generationRefusal } = await import('$lib/server/nsfw/nsfw-server');
+  const refusal = await generationRefusal(db, { orgId: input.orgId, projectId: input.projectId, userId: input.userId, model: input.model });
+  if (refusal) {
+    return { kind: 'refused', error: refusal };
+  }
 
   const run = await createRun(db, {
     orgId: input.orgId,

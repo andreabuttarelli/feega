@@ -44,6 +44,8 @@ const screen: ScreenPorts = { decide, judge, decideIdentifiability, judgeIdentif
 
 const { deps } = vi.hoisted(() => ({ deps: { current: null as null | ((db: Db) => WiroRunDeps) } }));
 vi.mock('$lib/server/wiro-config', () => ({ wiroRunDeps: (db: Db) => deps.current!(db) }));
+vi.mock('$app/environment', () => ({ dev: true, browser: false, building: false }));
+vi.mock('$env/dynamic/private', () => ({ env: { NSFW_DEV_MANUAL_VERIFICATION: 'true' } }));
 vi.mock('./node-model', () => ({ resolveNodeModel: async (_m: string, model: string | null) => ({ ok: true, model }) }));
 vi.mock('$lib/server/canvas/upstream', () => ({
   upstreamInputsFor: async () => ({
@@ -111,10 +113,21 @@ const start = (model: string, prompt: string, params: Record<string, unknown> = 
 
 const paidOrg = { id: ORG, stripe_subscription_id: 'sub_1' };
 const optIn = { org_id: ORG, enabled_by: USER, enabled_at: '2026-09-29T10:00:00Z', disabled_at: null };
+const nsfwProject = { id: PROJECT, org_id: ORG, mode: 'nsfw' };
+const verified = { id: 'v1', user_id: USER, provider: 'manual_admin', method: 'manual_admin', result: 'adult' };
 
 function canvas(extra: Record<string, unknown[]> = {}) {
   return fakeDb(
-    { nodes: [imageNode()], nodes_connections: [], assets: [], orgs: [paidOrg], org_uncensored_optins: [optIn], ...extra },
+    {
+      nodes: [imageNode()],
+      nodes_connections: [],
+      assets: [],
+      orgs: [paidOrg],
+      org_uncensored_optins: [optIn],
+      projects: [nsfwProject],
+      user_age_verifications: [verified],
+      ...extra
+    },
     { updateRows: { nodes: [{ ...imageNode(), version: 2 }] } }
   );
 }
@@ -125,12 +138,30 @@ const externalJobOf = (calls: ReturnType<typeof fakeDb>['calls']) =>
     | undefined)?.external_job_id;
 
 describe('an image node on a Wiro model', () => {
+  it('is refused in a standard project, by project mode, before any provider call', async () => {
+    const { db } = canvas({ projects: [{ ...nsfwProject, mode: 'standard' }] });
+
+    const out = await runGenNode(db, start(SAFE, 'a lighthouse'));
+
+    expect(out).toEqual({ kind: 'refused', error: 'wiro_requires_nsfw_project' });
+    expect(gateway.run).not.toHaveBeenCalled();
+  });
+
+  it('is refused in an nsfw project for a user without age verification', async () => {
+    const { db } = canvas({ user_age_verifications: [] });
+
+    const out = await runGenNode(db, start(SAFE, 'a lighthouse'));
+
+    expect(out).toEqual({ kind: 'refused', error: 'nsfw_workspace_locked' });
+    expect(gateway.run).not.toHaveBeenCalled();
+  });
+
   it('keeps uncensored models off until the owner opted in', async () => {
     const { db } = canvas({ org_uncensored_optins: [] });
 
     const out = await runGenNode(db, start(UNCENSORED, 'a woman on a balcony'));
 
-    expect(out).toMatchObject({ kind: 'refused', error: expect.stringMatching(/owner can turn them on/) });
+    expect(out).toEqual({ kind: 'refused', error: 'nsfw_workspace_locked' });
     expect(gateway.run).not.toHaveBeenCalled();
   });
 
@@ -171,7 +202,9 @@ describe('an image node on a Wiro model', () => {
         influencers: [{ id: 'talent', org_id: null, source: 'catalogue', age: 26, adult_persona_at: null, name: 'Luna' }],
         assets: [],
         orgs: [paidOrg],
-        org_uncensored_optins: [optIn]
+        org_uncensored_optins: [optIn],
+        projects: [nsfwProject],
+        user_age_verifications: [verified]
       },
       { updateRows: { nodes: [{ ...imageNode(), version: 2 }] } }
     );
@@ -194,10 +227,15 @@ describe('an image node on a Wiro model', () => {
     expect(gateway.run).not.toHaveBeenCalled();
   });
 
-  it('runs a safe Wiro model without any opt-in, still screened', async () => {
-    const { db } = canvas({ org_uncensored_optins: [], orgs: [{ id: ORG, stripe_subscription_id: null }] });
+  it('runs a safe Wiro model in an open nsfw project, still screened', async () => {
+    const { db } = canvas();
     expect((await runGenNode(db, start(SAFE, 'a mountain lake'))).kind).toBe('queued');
     expect(decide).toHaveBeenCalledOnce();
+  });
+
+  it('refuses even a safe Wiro model once the owner turned nsfw mode off', async () => {
+    const { db } = canvas({ org_uncensored_optins: [] });
+    expect(await runGenNode(db, start(SAFE, 'a mountain lake'))).toEqual({ kind: 'refused', error: 'nsfw_workspace_locked' });
   });
 });
 

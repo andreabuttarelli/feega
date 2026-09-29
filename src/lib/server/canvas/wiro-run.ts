@@ -6,6 +6,7 @@ import type { GenParams } from '$lib/canvas/gen-node';
 import type { WiroFields, WiroWireSpec } from '$lib/server/wiro-catalogue';
 import { screenGeneration, type ScreenPorts } from '$lib/server/moderation/screen';
 import type { WiroGateway, WiroOutput } from './wiro-gateway';
+import { moderationProfileOf, ModerationProfile, type ProjectMode } from '$lib/project-mode';
 import { likenessRefusal, type ProvenanceEntry } from './likeness-guard';
 
 const GENERATED_MEDIA_BUCKET = 'brand-knowledge';
@@ -54,6 +55,7 @@ export type WiroRunDeps = {
 
 export type WiroRequest = {
   scope: WiroScope;
+  mode: ProjectMode;
   modelId: string;
   prompt: string;
   params: GenParams;
@@ -77,7 +79,7 @@ function extraInputs(params: GenParams, schema: Record<string, unknown>): Record
   );
 }
 
-export function wiroInputs(fields: WiroFields, input: Omit<WiroRequest, 'scope' | 'modelId' | 'provenance'>, schema: Record<string, unknown>): Record<string, unknown> {
+export function wiroInputs(fields: WiroFields, input: Omit<WiroRequest, 'scope' | 'mode' | 'modelId' | 'provenance'>, schema: Record<string, unknown>): Record<string, unknown> {
   const inputs: Record<string, unknown> = { ...extraInputs(input.params, schema), [fields.prompt]: input.prompt };
   const controls: Array<[string | undefined, unknown]> = [
     [fields.aspectRatio, input.params.aspectRatio],
@@ -124,7 +126,7 @@ export async function startWiroRun(deps: WiroRunDeps, req: WiroRequest): Promise
   const screened = await screenGeneration(deps.screen(req.scope, model), {
     text: req.prompt,
     references: req.provenance.map((p) => p.label),
-    uncensored: model.uncensored
+    uncensored: moderationProfileOf(req.mode, model.uncensored) === ModerationProfile.Adult
   });
   if (!screened.ok) {
     return { kind: 'refused', error: screened.error };

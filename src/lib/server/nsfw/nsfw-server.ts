@@ -5,7 +5,7 @@ import type { Db } from '$lib/server/db/client';
 import { createServiceRoleDb } from '$lib/server/db/client';
 import { SERVICE_ROLE_USES } from '$lib/server/db/service-role-uses';
 import { uncensoredAccess } from '$lib/server/uncensored-access';
-import { modeOf, ProjectMode } from '$lib/project-mode';
+import { modelRefusal, modeOf, ProjectMode } from '$lib/project-mode';
 import { nsfwLock, NsfwLock, type NsfwFacts } from '$lib/nsfw-access';
 import { VerifierSetting, verifierFor, type AgeVerificationStore, type AgeVerifier } from './age-verification';
 
@@ -89,4 +89,21 @@ export async function canvasModeOf(db: Db, input: { orgId: string; canvasId: str
 export async function nsfwProjectIds(db: Db, orgId: string): Promise<Set<string>> {
   const { data } = await untyped(db).from('projects').select('id').eq('org_id', orgId).eq('mode', ProjectMode.Nsfw);
   return new Set(((data ?? []) as { id: string }[]).map((r) => r.id));
+}
+
+export const NSFW_LOCKED = 'nsfw_workspace_locked';
+
+export async function generationRefusal(
+  db: Db,
+  input: { orgId: string; projectId: string; userId: string; model: string | null }
+): Promise<string | null> {
+  const mode = await projectModeOf(db, input);
+  const refused = modelRefusal(mode, input.model);
+  if (refused) {
+    return refused;
+  }
+  if (mode !== ProjectMode.Nsfw) {
+    return null;
+  }
+  return (await nsfwLockFor(db, input)) === NsfwLock.Open ? null : NSFW_LOCKED;
 }
