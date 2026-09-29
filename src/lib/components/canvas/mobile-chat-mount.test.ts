@@ -17,4 +17,10 @@ describe('su mobile la chat resta montata anche quando si guarda la tela', () =>
   it('niente barra in fondo: la vecchia tab bar non esiste più', () => {
     expect(layout).not.toMatch(/CanvasMobileTabs|CanvasMobileMore/);
   });
+
+  it('la tela dietro la chat resta nel layout: display none su WebKit la ridisegna e ridecodifica a ogni ritorno', () => {
+    const hiddenView = layout.match(/\.mobile-view\.is-hidden\s*\{([^}]*)\}/);
+    expect(hiddenView?.[1]).toMatch(/visibility:\s*hidden/);
+    expect(hiddenView?.[1]).not.toMatch(/display:\s*none/);
+  });
 });
