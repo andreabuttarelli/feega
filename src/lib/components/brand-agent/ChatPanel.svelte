@@ -10,10 +10,7 @@
   import ChatComposer from './ChatComposer.svelte';
   import ChatMessage from './ChatMessage.svelte';
 
-  let {
-    brandSlug = '',
-    projectId = ''
-  }: { brandSlug?: string; projectId?: string } = $props();
+  let { projectId = '' }: { projectId?: string } = $props();
 
   type Message = {
     role: 'user' | 'assistant';
@@ -47,7 +44,7 @@
 
   const routeProjectId = $derived($page.params.projectId ?? '');
   const scopeProjectId = $derived(projectId || routeProjectId);
-  const endpoint = $derived(chatEndpoint({ projectId: scopeProjectId, brandSlug }));
+  const endpoint = $derived(chatEndpoint({ projectId: scopeProjectId }));
   const starts = $derived(speakerStarts(messages));
   const failure = $derived(failed ? FAILURES[failed] : null);
   const suggestions = $derived(($json('chat.panel.suggestions') as string[] | undefined) ?? []);

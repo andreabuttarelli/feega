@@ -2032,3 +2032,13 @@ accanto alla INSERT. La suite non lo vede: il fake dello storage risponde sempre
 
 **Signal:** a test passes on your machine and fails in CI with "not configured", or a spy "called 0 times" where the code quietly took a fallback. SvelteKit loads `.env` into `$env/*` for Vitest too, so local runs see real keys that CI never has.
 **Move:** reproduce with `.env` set aside (`mv .env .env.x`, run, move it back), then mock the boundary that reads env (`craft-model`, `createAdminClient`) or move the env read inside the fail-open `try`.
+
+## A route on the old schema is still reachable after a schema rewrite
+
+**Signal:** rows in a parent table keep appearing (`chat_threads`) while the child table stops
+(`chat_messages`); a 500 only when some optional context is attached (a brand). One branch of a
+client-side switch still points at a route written against columns that no longer exist, and an
+external dependency (a remote MCP host that doesn't resolve) throws before the turn streams.
+**Move:** `grep` every `.from('<table>')` for columns missing from information_schema and delete
+or reroute what the rewrite left behind; open optional external tools inside a `try` that logs
+and continues, never before the work the user asked for.

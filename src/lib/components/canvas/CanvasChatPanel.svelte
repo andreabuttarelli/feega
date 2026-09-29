@@ -76,7 +76,7 @@
           <CanvasGuideTab initialSlug={$guideOpenRequest} onopened={() => guideOpenRequest.set(null)} />
         {:else if browser}
           {#await CHROME_LOADERS.chat() then { default: ChatPanel }}
-            <ChatPanel {projectId} {brandSlug} />
+            <ChatPanel {projectId} />
           {/await}
         {/if}
       </div>

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Tool } from 'ai';
 import { fakeDb } from '$lib/server/db/fake-db';
 import { createProjectTools } from './project-tools';
-import { projectToolSurface } from './tool-surface';
+import { openAgentTools, projectToolSurface } from './tool-surface';
 
 const ORG = '11111111-1111-1111-1111-111111111111';
 const PROJECT = '22222222-2222-2222-2222-222222222222';
@@ -73,5 +73,23 @@ describe('la superficie del modello mostra solo ciò che può usare', () => {
     for (const name of without) {
       expect(withBrand).toContain(name);
     }
+  });
+});
+
+describe('openAgentTools — un MCP di brand irraggiungibile non uccide il turno', () => {
+  it('il turno parte coi soli tool di progetto', async () => {
+    const unreachable = async () => {
+      throw new Error('getaddrinfo ENOTFOUND mcp.feega.app');
+    };
+
+    const agent = await openAgentTools({
+      projectTools: projectTools(),
+      brand: { id: 'b1' },
+      accessToken: 't',
+      openBrand: unreachable
+    });
+
+    expect(Object.keys(agent.tools).sort()).toEqual(Object.keys(projectTools()).sort());
+    await expect(agent.close()).resolves.toBeUndefined();
   });
 });

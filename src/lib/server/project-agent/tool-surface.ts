@@ -1,5 +1,5 @@
 import type { Tool } from 'ai';
-import { openBrandMcp } from '$lib/server/brand-agent/mcp-client';
+import { openBrandMcp, type BrandMcpSession } from '$lib/server/brand-agent/mcp-client';
 
 /**
  * LA SUPERFICIE VISTA DAL MODELLO: progetto sempre, brand solo se il progetto ne ha uno.
@@ -34,11 +34,19 @@ export async function openAgentTools(input: {
   projectTools: Record<string, Tool>;
   brand: { id: string } | null;
   accessToken: string;
+  openBrand?: (accessToken: string) => Promise<BrandMcpSession>;
 }): Promise<AgentTools> {
+  const projectOnly = { tools: projectToolSurface(input.projectTools, null), close: NOOP_CLOSE };
   if (!input.brand) {
-    return { tools: projectToolSurface(input.projectTools, null), close: NOOP_CLOSE };
+    return projectOnly;
   }
 
-  const mcp = await openBrandMcp(input.accessToken);
-  return { tools: projectToolSurface(input.projectTools, mcp.tools), close: mcp.close };
+  const openBrand = input.openBrand ?? openBrandMcp;
+  try {
+    const mcp = await openBrand(input.accessToken);
+    return { tools: projectToolSurface(input.projectTools, mcp.tools), close: mcp.close };
+  } catch (e) {
+    console.error('[project-agent] brand tools unreachable, turn runs on project tools only', { brandId: input.brand.id }, e);
+    return projectOnly;
+  }
 }
