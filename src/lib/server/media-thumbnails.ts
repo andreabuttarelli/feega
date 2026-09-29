@@ -29,9 +29,13 @@ type SignedUrlBucket = {
  * miniatura richiesta a lotti torna piena, e il risparmio di banda che questo file esiste per dare
  * sparisce senza un errore che lo segnali. `createSignedUrl` (singolare) lo applica, quindi con un
  * preset si firma un path alla volta, in parallelo — nessun lotto quando la miniatura conta.
+ *
+ * `bucket` È UNA FABBRICA, NON L'OGGETTO GIÀ COSTRUITO: `db.storage.from(...)` deve restare non
+ * chiamato quando `paths` è vuoto — un client di test senza `.storage` (`generate.test.ts`) non lo
+ * implementa, e valutarlo comunque lo fa esplodere per un giro che non aveva niente da firmare.
  */
 export async function signThumbnailUrls(
-  bucket: SignedUrlBucket,
+  bucket: () => SignedUrlBucket,
   paths: string[],
   ttlSeconds: number,
   preset?: ThumbnailPreset
@@ -41,8 +45,10 @@ export async function signThumbnailUrls(
     return new Map();
   }
 
+  const storage = bucket();
+
   if (!preset) {
-    const { data } = await bucket.createSignedUrls(clean, ttlSeconds);
+    const { data } = await storage.createSignedUrls(clean, ttlSeconds);
     const signed = new Map<string, string>();
     for (const row of data ?? []) {
       if (row.signedUrl && row.path) {
@@ -55,7 +61,7 @@ export async function signThumbnailUrls(
   const transform = thumbnailTransform(preset);
   const results = await Promise.all(
     clean.map(async (path) => {
-      const { data } = await bucket.createSignedUrl(path, ttlSeconds, { transform });
+      const { data } = await storage.createSignedUrl(path, ttlSeconds, { transform });
       return [path, data?.signedUrl ?? null] as const;
     })
   );

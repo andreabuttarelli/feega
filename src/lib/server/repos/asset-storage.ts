@@ -36,5 +36,5 @@ export async function signAssetFiles(
   ttlSeconds = SIGNED_URL_SECONDS,
   preset?: ThumbnailPreset
 ): Promise<Map<string, string>> {
-  return signThumbnailUrls(db.storage.from(CANVAS_ASSET_BUCKET), paths, ttlSeconds, preset);
+  return signThumbnailUrls(() => db.storage.from(CANVAS_ASSET_BUCKET), paths, ttlSeconds, preset);
 }

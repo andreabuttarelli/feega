@@ -40,7 +40,7 @@ describe('signThumbnailUrls', () => {
   it('batches when no preset is given, without a transform', async () => {
     const { bucket, calls } = fakeBucket();
 
-    const signed = await signThumbnailUrls(bucket, ['a.png', 'b.png'], 60);
+    const signed = await signThumbnailUrls(() => bucket, ['a.png', 'b.png'], 60);
 
     expect(signed.get('a.png')).toBe('https://signed.example/a.png');
     expect(calls).toEqual([{ method: 'createSignedUrls', args: [['a.png', 'b.png'], 60] }]);
@@ -49,7 +49,7 @@ describe('signThumbnailUrls', () => {
   it('signs one path at a time with the preset transform, because the batch endpoint ignores it', async () => {
     const { bucket, calls } = fakeBucket();
 
-    const signed = await signThumbnailUrls(bucket, ['a.png', 'b.png'], 60, 'pickerTile');
+    const signed = await signThumbnailUrls(() => bucket, ['a.png', 'b.png'], 60, 'pickerTile');
 
     expect(signed.get('a.png')).toBe('https://signed.example/a.png');
     expect(signed.get('b.png')).toBe('https://signed.example/b.png');
@@ -58,12 +58,13 @@ describe('signThumbnailUrls', () => {
     expect(calls[0].args[2]).toEqual({ transform: { width: 192, height: 192, resize: 'cover', quality: 70 } });
   });
 
-  it('returns an empty map for no paths, without calling storage', async () => {
-    const { bucket, calls } = fakeBucket();
+  it('returns an empty map for no paths, without ever building the bucket', async () => {
+    const bucket = () => {
+      throw new Error('bucket factory called with nothing to sign');
+    };
 
     const signed = await signThumbnailUrls(bucket, [], 60, 'pickerTile');
 
     expect(signed.size).toBe(0);
-    expect(calls).toEqual([]);
   });
 });

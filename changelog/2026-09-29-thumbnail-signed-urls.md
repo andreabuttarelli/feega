@@ -51,3 +51,21 @@ layout shift and defer offscreen decoding.
 that `signThumbnailUrls` batches without a preset but signs one path at a
 time with `transform` when a preset is given — the exact split the batch
 endpoint's silent no-op forced.
+
+## CI break: `db.storage.from(...)` called on an empty path list
+
+`signAssetFiles`/`signKnowledgePaths`/`signReferenceImages` used to check
+`if (!clean.length) return out` BEFORE ever touching `db.storage` — the
+refactor into `signThumbnailUrls` moved that check inside the shared
+function, but every call site still built the bucket eagerly
+(`db.storage.from(BUCKET)`) before calling it. `generate.test.ts`'s fake db
+has no `.storage` at all — a run with nothing to sign (the common case:
+`upstream.pickedImageUrls` empty) threw, caught by `runGenNode`'s
+try/catch, and turned a `done` outcome into `refused`.
+
+`asset-storage.test.ts` reproduces it first: a `db` whose `.storage` getter
+throws, called with `paths: []`, must never touch it. Fixed by making
+`signThumbnailUrls`'s first argument a bucket FACTORY (`() => SignedUrlBucket`)
+instead of the already-built bucket — the empty check now runs before the
+factory is ever invoked, in the one place that owns it, instead of
+duplicated at each of the three call sites.

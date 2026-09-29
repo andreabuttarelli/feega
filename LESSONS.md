@@ -2077,3 +2077,15 @@ optimistic `next` against the last server-confirmed data: a caller that passes t
 state carries a stale `refId`, and that diff sees it as a change.
 **Move:** diff `next` against what the tile showed when the user acted (the user's intent);
 use the server-confirmed data only as `base` for the same-key conflict check.
+
+## A "no paths, nothing to do" check moved past the eager call it was guarding
+
+**Signal:** a real signup path that never needed storage (no reference images this turn) throws
+inside a helper that touches `db.storage`, caught by an outer try/catch far away — a `done`
+outcome quietly becomes `refused`, and the failing assertion is nowhere near the actual cause.
+Only a test whose fake db has no `.storage` at all catches it; one with an empty-but-present
+`.storage` stub would pass and hide the bug.
+**Move:** when refactoring `if (!input.length) return empty` out of several call sites into one
+shared function, check whether any call site still builds the expensive/unavailable-in-tests
+argument (a bucket, a client) BEFORE calling the shared function — pass a factory (`() => X`)
+instead of `X`, so the empty check can run before that argument is ever constructed.

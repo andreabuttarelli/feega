@@ -51,5 +51,5 @@ export async function signKnowledgePaths(
   ttlSeconds = 60 * 60 * 2,
   preset?: ThumbnailPreset
 ): Promise<Map<string, string>> {
-  return signThumbnailUrls(supabase.storage.from(DEFAULT_BUCKET), paths, ttlSeconds, preset);
+  return signThumbnailUrls(() => supabase.storage.from(DEFAULT_BUCKET), paths, ttlSeconds, preset);
 }
