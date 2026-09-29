@@ -37,8 +37,10 @@ const gateway = { run: vi.fn(), task: vi.fn() };
 const bill = vi.fn();
 const decide = vi.fn();
 const judge = vi.fn();
+const decideIdentifiability = vi.fn();
+const judgeIdentifiability = vi.fn();
 const record = vi.fn();
-const screen: ScreenPorts = { decide, judge, record };
+const screen: ScreenPorts = { decide, judge, decideIdentifiability, judgeIdentifiability, record };
 
 const { deps } = vi.hoisted(() => ({ deps: { current: null as null | ((db: Db) => WiroRunDeps) } }));
 vi.mock('$lib/server/wiro-config', () => ({ wiroRunDeps: (db: Db) => deps.current!(db) }));
@@ -59,10 +61,12 @@ vi.mock('$lib/server/canvas/upstream', () => ({
 }));
 
 beforeEach(async () => {
-  for (const fn of [gateway.run, gateway.task, bill, decide, judge, record]) {
+  for (const fn of [gateway.run, gateway.task, bill, decide, judge, decideIdentifiability, judgeIdentifiability, record]) {
     fn.mockReset();
   }
   decide.mockResolvedValue({ choice: 'safe', probabilities: { safe: 0.999 } });
+  decideIdentifiability.mockResolvedValue({ choice: 'generic', probabilities: { generic: 0.999 } });
+  judgeIdentifiability.mockResolvedValue({ allowed: true, category: 'generic', reason: '' });
   gateway.run.mockResolvedValue({ taskId: '2221' });
   const { uncensoredAccess } = await import('$lib/server/uncensored-access');
   deps.current = (db) => ({
