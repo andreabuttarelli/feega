@@ -3,11 +3,9 @@
  *
  * OpenRouter ne serve 423, di cui 229 sanno usare i tool e leggere immagini — il minimo perche' un
  * turno con gli agenti arrivi in fondo. Duecento voci non sono una scelta, sono un menu che
- * nessuno legge, quindi la vetrina resta corta e la decide `chat-model-catalog.ts`: la tabella,
- * poi `LLM_MODELS`, poi il fallback nel codice.
+ * nessuno legge, quindi la vetrina resta corta: `LLM_MODELS`, poi il fallback nel codice.
  *
- * A quella vetrina si aggiunge da se' il modello piu` recente di ogni vendor che gia` ci sta: il
- * cron scrive le righe una volta al giorno, ma il menu non aspetta il cron per mostrarle.
+ * A quella vetrina si aggiunge da se' il modello piu` recente di ogni vendor che gia` ci sta.
  *
  * La vetrina dichiara solo gli ID. Nome, prezzo, finestra di contesto e capacita` arrivano vivi da
  * `openrouter-models.ts`: un modello ritirato sparisce dal menu da solo invece di fallire al primo
@@ -15,7 +13,7 @@
  */
 import { llmModels } from '$lib/server/llm';
 import { ensureGatewayModels, gatewayModel } from '$lib/server/openrouter-models';
-import { catalogModelIds, newModelsForCatalog, FALLBACK_CHAT_MODEL_IDS } from '$lib/server/chat-model-catalog';
+import { newModelsForCatalog, FALLBACK_CHAT_MODEL_IDS } from '$lib/server/chat-model-catalog';
 
 export type ChatModelChoice = {
   id: string;
@@ -26,10 +24,7 @@ export type ChatModelChoice = {
   reasoning: boolean;
 };
 
-async function showcaseIds(configured?: string[]): Promise<string[]> {
-  const fromDb = await catalogModelIds().catch(() => []);
-  if (fromDb.length) return fromDb;
-
+function showcaseIds(configured?: string[]): string[] {
   const fromEnv = configured ?? llmModels();
   if (fromEnv.length) return fromEnv;
 
@@ -45,7 +40,7 @@ export async function chatModelChoices(
 ): Promise<ChatModelChoice[]> {
   await ensureGatewayModels({ fetchImpl: opts.fetchImpl, baseUrl: opts.baseUrl });
 
-  const showcase = await showcaseIds(opts.configured);
+  const showcase = showcaseIds(opts.configured);
   const ids = [...showcase, ...newModelsForCatalog(showcase)];
 
   const out: ChatModelChoice[] = [];

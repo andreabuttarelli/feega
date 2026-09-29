@@ -5,11 +5,9 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const M = vi.hoisted(() => ({
-	env: {} as Record<string, string | undefined>,
-	catalogDefault: null as string | null
+	env: {} as Record<string, string | undefined>
 }));
 vi.mock('$env/dynamic/private', () => ({ env: M.env }));
-vi.mock('$lib/server/chat-model-catalog', () => ({ defaultChatModelId: () => M.catalogDefault }));
 
 function setEnv(vars: Record<string, string | undefined>) {
 	for (const k of Object.keys(M.env)) delete M.env[k];
@@ -20,21 +18,6 @@ describe('llm — catalogo e fallback', () => {
 	beforeEach(() => {
 		vi.resetModules();
 		setEnv({});
-		M.catalogDefault = null;
-	});
-
-	/**
-	 * IL DIFETTO PAGATO, 2026-09-02. La riga marcata in Supabase diceva `z-ai/glm-5.3-flash`,
-	 * l'env diceva `google/gemini-3.8-flash`, e il turno e` girato sull'env — senza un errore da
-	 * nessuna parte. Il piu` silenzioso che ci sia: il turno riesce, solo sul modello sbagliato.
-	 * Se questo test cade, l'operatore cambia la riga in Studio e non succede niente.
-	 */
-	it('il default del catalogo batte LLM_DEFAULT_MODEL', async () => {
-		setEnv({ LLM_API_KEY: 'k', LLM_DEFAULT_MODEL: 'google/gemini-3.8-flash' });
-		M.catalogDefault = 'z-ai/glm-5.3-flash';
-		const { llmModelForPicker } = await import('./llm');
-		expect(llmModelForPicker(null)).toBe('z-ai/glm-5.3-flash');
-		expect(llmModelForPicker(undefined)).toBe('z-ai/glm-5.3-flash');
 	});
 
 	/** A catalogo vuoto o irraggiungibile resta l'env: un'istanza appena installata parte lo stesso. */
@@ -232,7 +215,6 @@ describe('llmApiKey — un segnaposto non è una chiave', () => {
   beforeEach(() => {
     vi.resetModules();
     setEnv({});
-    M.catalogDefault = null;
   });
 
   for (const placeholder of ['<la STRINGA della chiave>', '<your-key>', '<LLM_API_KEY>']) {
