@@ -201,6 +201,20 @@ describe('insert_row su nodes: data si giudica contro il suo type, prima di scri
     expect(calls.filter((c) => c.op === 'insert')).toHaveLength(1);
   });
 
+  it('un campo che il type non ha è rifiutato, non tolto in silenzio', async () => {
+    const { calls, supabase } = fakeAuthority({ writeRows: [{ id: 'n1' }] });
+
+    const out = await tools(supabase, 'org-mine').insertRow({
+      table: 'nodes',
+      values: { canvas_id: 'c1', project_id: 'p1', type: 'text', x: 0, y: 0, data: { prompt: 'x', content: 'tre hook' } }
+    });
+
+    expect(out.error).toBe('invalid_node_data');
+    expect(out.message).toMatch(/content/);
+    expect(out.message).toMatch(/doc/);
+    expect(calls.filter((c) => c.op === 'insert')).toHaveLength(0);
+  });
+
   it('un type fuori da nodes_type_check è rifiutato prima del database', async () => {
     const { calls, supabase } = fakeAuthority({});
 

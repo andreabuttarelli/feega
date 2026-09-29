@@ -19,7 +19,7 @@ import { logAiCall } from '$lib/server/ai-log';
 import type { OrgQueryAuthority } from './query-tool';
 import { announcePresence } from './presence';
 import type { Actor } from '$lib/server/repos/actor';
-import { validateNodeData, validateNodeDataPatch } from '$lib/canvas/node-data';
+import { validateNewNodeData, validateNodeDataPatch } from '$lib/canvas/node-data';
 import { mergeNodeData, type NodeData } from '$lib/canvas/node-patch';
 
 type NodeMerge = { id: string; version: number; data: NodeData };
@@ -265,7 +265,7 @@ export function createOrgWriteTools({ authority, orgId, userId, threadId, actor 
     }
 
     if (table === NODES_TABLE) {
-      const verdict = validateNodeData(String(values.type ?? ''), values.data);
+      const verdict = validateNewNodeData(String(values.type ?? ''), values.data);
       if (!verdict.ok) return finish(invalidNodeData(verdict.error), 'org_db_write:refused:invalid_node_data', t0);
     } else {
       const refusedJsonb = firstInvalidJsonbColumn(table, values);
