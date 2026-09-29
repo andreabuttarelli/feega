@@ -2066,3 +2066,12 @@ access token. `> file` opens and truncates the file before the command runs, and
 `supabase gen types` fails after that — the shell redirect wins the race, not the command.
 **Move:** `git checkout -- src/lib/database.types.ts` before editing by hand when `db:types`
 fails; never trust the file's presence after a failed run without checking `git status` first.
+
+## A partial save still reverts someone else's field
+
+**Signal:** after a burst of edits a key another writer changed (`refId`, `runId`) is back to
+an older value, while other keys from the same writer survived. The client diffed the
+optimistic `next` against the last server-confirmed data: a caller that passes the whole gen
+state carries a stale `refId`, and that diff sees it as a change.
+**Move:** diff `next` against what the tile showed when the user acted (the user's intent);
+use the server-confirmed data only as `base` for the same-key conflict check.

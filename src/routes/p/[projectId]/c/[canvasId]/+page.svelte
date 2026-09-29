@@ -14,6 +14,7 @@
    */
   import { createWriteQueue } from '$lib/canvas/write-queue';
   import { canvasActionUrl } from '$lib/canvas/canvas-action-url';
+  import { baseOf, diffNodeData } from '$lib/canvas/node-patch';
   import { SaveFailure, adoptIdleRows, failureOf, saveMessage, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
   import { createUndoStack } from '$lib/canvas/undo-stack';
   import type { Gesture, UndoItem } from '$lib/canvas/undo-plan';
@@ -134,6 +135,7 @@
     type: string;
     displayName: string | null;
     data: Record<string, unknown>;
+    saved: Record<string, unknown>;
     version: number;
     x: number;
     y: number;
@@ -160,6 +162,7 @@
       type: node.type,
       displayName: node.displayName,
       data: node.data,
+      saved: node.data,
       version: node.version,
       x: node.position.x,
       y: node.position.y,
@@ -765,13 +768,14 @@
   async function saveComposition(id: string, next: CompositionNodeState): Promise<boolean> {
     const current = nodes.find((node) => node.id === id);
     if (!current) { return false; }
-    const patch = compositionData(next) as Record<string, unknown>;
-    const out = await saveNode(id, current.version, patch, patch);
+    const wanted = compositionData(next) as Record<string, unknown>;
+    const patch = diffNodeData(current.data, wanted, Object.keys(wanted));
+    const out = await saveNode(id, patch, baseOf(current.saved, patch));
     if (!out.ok) {
       return false;
     }
     const written = out.node;
-    nodes = nodes.map((node) => (node.id === id ? { ...node, data: written.data, version: written.version } : node));
+    nodes = nodes.map((node) => (node.id === id ? { ...node, data: written.data, saved: written.data, version: written.version } : node));
     return true;
   }
 
@@ -1167,26 +1171,20 @@
     return url ? { url } : null;
   }
 
-  async function saveNode(
-    id: string,
-    version: number,
-    patch: Record<string, unknown>,
-    data: Record<string, unknown>
-  ): Promise<WriteOutcome> {
+  async function saveNode(id: string, patch: Record<string, unknown>, base: Record<string, unknown>): Promise<WriteOutcome> {
     pending += 1;
     snapshotVersion += 1;
     try {
       const out = await writeWithRetry({
-        send: (at, body) => send('write', { node_id: id, version: at, data: JSON.stringify(body) }),
+        send: (changed, believed) =>
+          send('write', { node_id: id, patch: JSON.stringify(changed), base: JSON.stringify(believed) }),
         reread: async () => {
           const snapshot = await send('snapshot', {});
           const rows = ((snapshot.data ?? {}) as { nodes?: CanvasNodeRecord[] }).nodes ?? [];
-          const row = rows.find((node) => node.id === id);
-          return row ? { version: row.version, data: row.data } : null;
+          return rows.find((node) => node.id === id)?.data ?? null;
         },
-        version,
         patch,
-        data
+        base
       });
       if (out.ok) {
         failed = null;
@@ -1205,20 +1203,26 @@
     const current = nodes.find((node) => node.id === id);
     if (!current) { return false; }
     const next = { ...current.data, ...patch };
+    const change = diffNodeData(current.data, next, Object.keys(patch));
     nodes = nodes.map((node) => node.id === id ? { ...node, data: next } : node);
     pending += 1;
     let saved = false;
     await enqueue(id, async () => {
       const before = nodes.find((node) => node.id === id);
       if (!before) { pending -= 1; return; }
-      const out = await saveNode(id, before.version, patch, next);
+      if (!Object.keys(change).length) {
+        pending -= 1;
+        saved = true;
+        return;
+      }
+      const out = await saveNode(id, change, baseOf(before.saved, change));
       pending -= 1;
       if (!out.ok) {
         return;
       }
       saved = true;
       const written = out.node;
-      nodes = nodes.map((node) => node.id === id ? { ...node, data: written.data, version: written.version } : node);
+      nodes = nodes.map((node) => node.id === id ? { ...node, data: written.data, saved: written.data, version: written.version } : node);
       pushGesture({
         items: [
           {

@@ -9,7 +9,9 @@ import {
   listCanvases,
   listNodes,
   moveNode,
-  writeNodeData
+  patchNodeData,
+  DataCheck,
+  type PatchWrite
 } from '$lib/server/repos/canvas';
 import { listProjectAssets } from '$lib/server/repos/assets';
 import { runGenNode, runsOf, type RunOutcome } from '$lib/server/canvas/generate';
@@ -34,6 +36,13 @@ export type ProjectToolDeps = {
 };
 
 const NODE_NOT_FOUND = { error: 'node_not_found', message: 'No live node with that id in this project.' };
+const AGENT_PATCH_ANSWERS: Record<PatchWrite['outcome'], (written: PatchWrite) => unknown> = {
+  written: (written) => ({ outcome: 'written', node: (written as Extract<PatchWrite, { outcome: 'written' }>).node }),
+  conflict: () => ({ outcome: 'conflict', message: 'Node kept changing while writing. Retry.' }),
+  invalid: (written) => ({ outcome: 'invalid', message: (written as Extract<PatchWrite, { outcome: 'invalid' }>).error }),
+  gone: () => NODE_NOT_FOUND
+};
+
 const BAD_MEDIUM = { error: 'bad_medium', message: 'medium must be one of: text, image, video.' };
 
 function outcomeOf(out: RunOutcome): Record<string, unknown> {
@@ -108,26 +117,22 @@ export function createProjectTools(deps: ProjectToolDeps): Record<string, Tool> 
 
     update_node: tool({
       description:
-        'Replace a node\'s whole data object on THIS project, versioned. Send every field to keep — this is not a merge. Zero rows written returns { outcome: "conflict" }: re-read the node and retry with its current version. Never reports success on a lost race.',
+        'Change some fields of a node\'s data on THIS project. Send only the fields to change: the rest is kept, and a field set to null is removed. `params` and `filters` merge one level down; arrays replace whole. Returns { outcome: "invalid" } when the merged data breaks the node schema.',
       inputSchema: z
         .object({
           nodeId: z.string(),
-          data: z.record(z.string(), z.unknown()).describe('The full new data object, not a patch.'),
-          expectedVersion: z.number().int().describe('The version you read from list_nodes.')
+          data: z.record(z.string(), z.unknown()).describe('Only the fields to change.')
         })
         .strict(),
-      execute: async (input: { nodeId: string; data: Record<string, unknown>; expectedVersion: number }) => {
-        const written = await writeNodeData(deps.db, {
+      execute: async (input: { nodeId: string; data: Record<string, unknown> }) => {
+        const written = await patchNodeData(deps.db, {
           orgId: deps.orgId,
           nodeId: input.nodeId,
-          data: input.data,
-          expectedVersion: input.expectedVersion,
+          patch: input.data,
+          check: DataCheck.Schema,
           actor
         });
-        if (written.outcome === 'conflict') {
-          return { outcome: 'conflict', message: 'Node was written by someone else. Re-read it and retry with the new version.' };
-        }
-        return { outcome: 'written', node: written.node };
+        return AGENT_PATCH_ANSWERS[written.outcome](written);
       }
     }),
 
