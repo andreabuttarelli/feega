@@ -2059,6 +2059,16 @@ brand lookup) sent the fixture to the live project without failing the test.
 **Move:** `src/test/no-live-supabase.ts` fails any test that reaches `*.supabase.co`; mock the
 boundary it names (`gateOrgAiActionForForm`, `createAdminClient`, `orgCreditBalance`).
 
+## Supabase Storage `createSignedUrls` (batch) silently ignores `transform`
+
+**Signal:** a thumbnail request via the batch signer returns full-size bytes, no error, no type
+error either (the installed `storage-js` types don't even declare `transform` on the batch
+overload — only on `createSignedUrl` singular). Only a real curl of the returned URL, comparing
+byte sizes, catches it; a green test against a mock never would.
+**Move:** sign per-path in parallel with `createSignedUrl` when a thumbnail transform is needed;
+reserve the batch call for full-size, no-transform signing. `signThumbnailUrls`
+(`src/lib/server/media-thumbnails.ts`) is the one place that decides which.
+
 ## `npm run db:types` truncates `database.types.ts` on auth failure
 
 **Signal:** the file is 0 lines after a failed `db:types` run in a sandbox with no Supabase
@@ -2075,6 +2085,18 @@ optimistic `next` against the last server-confirmed data: a caller that passes t
 state carries a stale `refId`, and that diff sees it as a change.
 **Move:** diff `next` against what the tile showed when the user acted (the user's intent);
 use the server-confirmed data only as `base` for the same-key conflict check.
+
+## A "no paths, nothing to do" check moved past the eager call it was guarding
+
+**Signal:** a real signup path that never needed storage (no reference images this turn) throws
+inside a helper that touches `db.storage`, caught by an outer try/catch far away — a `done`
+outcome quietly becomes `refused`, and the failing assertion is nowhere near the actual cause.
+Only a test whose fake db has no `.storage` at all catches it; one with an empty-but-present
+`.storage` stub would pass and hide the bug.
+**Move:** when refactoring `if (!input.length) return empty` out of several call sites into one
+shared function, check whether any call site still builds the expensive/unavailable-in-tests
+argument (a bucket, a client) BEFORE calling the shared function — pass a factory (`() => X`)
+instead of `X`, so the empty check can run before that argument is ever constructed.
 
 ## An agent tool reports success for a node the canvas shows empty
 

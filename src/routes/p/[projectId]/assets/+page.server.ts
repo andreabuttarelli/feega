@@ -41,10 +41,13 @@ async function withSignedUrls(
   const uploadPaths = assets.filter((a) => a.source === 'upload' && a.url).map((a) => a.url!);
   const generatedPaths = assets.filter((a) => a.source === 'generated' && a.url).map((a) => a.url!);
 
-  return signAssetPaths(db, createAssetSigningDb(), {
-    generated: generatedPaths,
-    uploaded: uploadPaths
-  });
+  return signAssetPaths(
+    db,
+    createAssetSigningDb(),
+    { generated: generatedPaths, uploaded: uploadPaths },
+    undefined,
+    'mediaGrid'
+  );
 }
 
 export const load: PageServerLoad = async ({ params, url, locals }) => {
@@ -68,7 +71,7 @@ export const load: PageServerLoad = async ({ params, url, locals }) => {
   const projectSummary = { id: project.id, name: project.name, slug: project.slug };
 
   if (isGlobalTab(url.searchParams.get('source'))) {
-    return { orgId, project: projectSummary, items: [] as MediaAsset[], catalogue: await listCatalogueImages(db), filter: GLOBAL_TAB };
+    return { orgId, project: projectSummary, items: [] as MediaAsset[], catalogue: await listCatalogueImages(db, 'mediaGrid'), filter: GLOBAL_TAB };
   }
 
   const source = parseAssetSourceFilter(url.searchParams.get('source'));

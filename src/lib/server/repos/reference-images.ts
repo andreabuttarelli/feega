@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Db } from '$lib/server/db/client';
+import { signThumbnailUrls, type ThumbnailPreset } from '$lib/server/media-thumbnails';
 
 export const REFERENCE_IMAGES_BUCKET = 'reference-images';
 
@@ -71,26 +72,14 @@ export async function findReferenceImages(db: Db, ids: string[]): Promise<Map<st
   return new Map(rowsOrEmpty(result).map((row) => [row.id, toReferenceImage(row)]));
 }
 
-export async function signReferenceImages(db: Db, paths: string[]): Promise<Map<string, string>> {
-  const clean = [...new Set(paths.filter(Boolean))];
-  if (!clean.length) {
-    return new Map();
-  }
-
-  const { data } = await db.storage.from(REFERENCE_IMAGES_BUCKET).createSignedUrls(clean, SIGNED_URL_SECONDS);
-  const signed = new Map<string, string>();
-  for (const row of data ?? []) {
-    if (row.signedUrl && row.path) {
-      signed.set(row.path, row.signedUrl);
-    }
-  }
-  return signed;
+export async function signReferenceImages(db: Db, paths: string[], preset?: ThumbnailPreset): Promise<Map<string, string>> {
+  return signThumbnailUrls(() => untyped(db).storage.from(REFERENCE_IMAGES_BUCKET), paths, SIGNED_URL_SECONDS, preset);
 }
 
 export type CatalogueImage = { id: string; name: string; url: string | null };
 
-export async function listCatalogueImages(db: Db): Promise<CatalogueImage[]> {
+export async function listCatalogueImages(db: Db, preset: ThumbnailPreset = 'pickerTile'): Promise<CatalogueImage[]> {
   const images = await listReferenceImages(db);
-  const signed = await signReferenceImages(db, images.map((image) => image.storagePath));
+  const signed = await signReferenceImages(db, images.map((image) => image.storagePath), preset);
   return images.map((image) => ({ id: image.id, name: image.name, url: signed.get(image.storagePath) ?? null }));
 }

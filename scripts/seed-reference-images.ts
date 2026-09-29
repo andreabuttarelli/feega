@@ -15,6 +15,12 @@ const MIME_BY_EXTENSION: Record<string, string> = {
   '.webp': 'image/webp'
 };
 
+const HOME_FILE_PREFIX = 'home-';
+
+export function isHomeFile(file: string): boolean {
+  return file.startsWith(HOME_FILE_PREFIX);
+}
+
 export function displayName(file: string): string {
   const stem = file.slice(0, file.length - extname(file).length);
   const words = stem.replace(/^(model-)?\d+-/, '').split('-').filter(Boolean);
@@ -30,7 +36,10 @@ function seedUse() {
 }
 
 async function main() {
-  const files = (await readdir(SOURCE_DIR)).filter((f) => MIME_BY_EXTENSION[extname(f).toLowerCase()]).sort();
+  const files = (await readdir(SOURCE_DIR))
+    .filter((f) => MIME_BY_EXTENSION[extname(f).toLowerCase()])
+    .filter((f) => !isHomeFile(f))
+    .sort();
   console.log(`${files.length} images in ${SOURCE_DIR}`);
   if (DRY_RUN) {
     files.forEach((f, i) => console.log(`${i}\t${CATALOGUE_PREFIX}/${f}\t${displayName(f)}`));
@@ -58,7 +67,9 @@ async function main() {
   }
 }
 
-main().catch((cause) => {
-  console.error(cause);
-  process.exit(1);
-});
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((cause) => {
+    console.error(cause);
+    process.exit(1);
+  });
+}

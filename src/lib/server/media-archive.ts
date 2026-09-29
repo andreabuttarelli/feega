@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { ARCHIVE_USER_AGENT, safeFetchBytes } from '$lib/server/tool-guard';
+import { signThumbnailUrls, type ThumbnailPreset } from '$lib/server/media-thumbnails';
 
 // Tiny, dependency-free media archival helpers (deliberately imports nothing from the AI modules,
 // so scrapecreators/content-preview/brand-context can all use it without import cycles).
@@ -47,12 +48,8 @@ export async function archiveImageToBucket(
 export async function signKnowledgePaths(
   supabase: SupabaseClient,
   paths: string[],
-  ttlSeconds = 60 * 60 * 2
+  ttlSeconds = 60 * 60 * 2,
+  preset?: ThumbnailPreset
 ): Promise<Map<string, string>> {
-  const out = new Map<string, string>();
-  const clean = [...new Set(paths.filter(Boolean))];
-  if (!clean.length) return out;
-  const { data } = await supabase.storage.from(DEFAULT_BUCKET).createSignedUrls(clean, ttlSeconds);
-  for (const row of data ?? []) if (row.signedUrl && row.path) out.set(row.path, row.signedUrl);
-  return out;
+  return signThumbnailUrls(() => supabase.storage.from(DEFAULT_BUCKET), paths, ttlSeconds, preset);
 }

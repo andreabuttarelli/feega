@@ -48,7 +48,7 @@
   {#each references as ref (`${ref.source}:${ref.id}`)}
     {@const url = thumbOf(ref)}
     <span class="ref">
-      {#if url}<img src={url} alt="" loading="lazy" />{/if}
+      {#if url}<img src={url} alt="" loading="lazy" decoding="async" width="28" height="28" />{/if}
       <button type="button" class="ref-remove" aria-label="Remove reference" onclick={() => onchange(removeReference(references, ref))}>×</button>
     </span>
   {/each}
@@ -82,7 +82,7 @@
               title={choice.name}
               onclick={() => onchange(toggleReference(references, choice.ref))}
             >
-              {#if choice.url}<img src={choice.url} alt={choice.name} loading="lazy" />{/if}
+              {#if choice.url}<img src={choice.url} alt={choice.name} loading="lazy" decoding="async" width="96" height="96" />{/if}
             </button>
           {/each}
         </div>

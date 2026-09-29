@@ -7,7 +7,7 @@
 </script>
 
 {#if showsImage}
-  <img class="brand-logo-img" src={url} alt="" loading="lazy" onerror={() => (failedUrl = url ?? null)} />
+  <img class="brand-logo-img" src={url} alt="" loading="lazy" decoding="async" onerror={() => (failedUrl = url ?? null)} />
 {:else}
   <span class="brand-logo-ph" aria-hidden="true">{initials}</span>
 {/if}
