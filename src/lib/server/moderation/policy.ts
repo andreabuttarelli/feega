@@ -6,7 +6,7 @@ export type ModerationCategory = {
   clearAtLeast?: number;
 };
 
-const DOUBT = 0.02;
+export const DOUBT = 0.02;
 const ZERO_TOLERANCE = 0.005;
 const CONFIDENT_SAFE = 0.98;
 
@@ -65,6 +65,8 @@ export const MODERATION_CATEGORIES: Readonly<Record<string, ModerationCategory>>
   }
 };
 
+export type ModerationCategories = Readonly<Record<string, ModerationCategory>>;
+
 export type JevDecision = { choice: string; probabilities: Record<string, number> };
 
 export type Verdict =
@@ -98,8 +100,8 @@ function decisionAgainst(categories: Readonly<Record<string, ModerationCategory>
   return doubted ? { kind: 'escalate', reason: `${doubted[0]} at ${p(doubted[0])}` } : { kind: 'clear' };
 }
 
-export function judgeDecision(decision: JevDecision): Verdict {
-  return decisionAgainst(MODERATION_CATEGORIES, SAFE, decision);
+export function judgeDecision(decision: JevDecision, categories: ModerationCategories = MODERATION_CATEGORIES): Verdict {
+  return decisionAgainst(categories, SAFE, decision);
 }
 
 const MINOR_PATTERNS: readonly RegExp[] = [
@@ -178,12 +180,14 @@ export const IDENTIFIABILITY_JUDGE_SYSTEM = [
   'Answer with JSON only: {"allowed": boolean, "category": string, "reason": string}.'
 ].join('\n');
 
-export const JUDGE_SYSTEM = [
-  'You are a strict content-safety moderator for an image and video generator.',
-  'Decide whether the request below may be generated. Refuse when in doubt.',
-  'Categories that must be refused:',
-  ...Object.entries(MODERATION_CATEGORIES)
-    .filter(([name]) => name !== SAFE)
-    .map(([name, category]) => `- ${name}: ${category.instructions}`),
-  'Answer with JSON only: {"allowed": boolean, "category": string, "reason": string}.'
-].join('\n');
+export function judgeSystem(categories: ModerationCategories): string {
+  return [
+    'You are a strict content-safety moderator for an image, video, audio and text generator.',
+    'Decide whether the request below may be generated. Refuse when in doubt.',
+    'Categories that must be refused:',
+    ...Object.entries(categories)
+      .filter(([name]) => name !== SAFE)
+      .map(([name, category]) => `- ${name}: ${category.instructions}`),
+    'Answer with JSON only: {"allowed": boolean, "category": string, "reason": string}.'
+  ].join('\n');
+}

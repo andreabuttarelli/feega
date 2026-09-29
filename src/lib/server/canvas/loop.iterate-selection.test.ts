@@ -28,6 +28,9 @@ vi.mock('$lib/server/supabase-admin', () => ({ createAdminClient: () => ({}) }))
 const { generateImagesWithoutBrand } = vi.hoisted(() => ({ generateImagesWithoutBrand: vi.fn() }));
 vi.mock('$lib/server/media-generate', () => ({ generateImagesWithoutBrand }));
 
+const { screenModelInput } = vi.hoisted(() => ({ screenModelInput: vi.fn() }));
+vi.mock('$lib/server/moderation/model-input', () => ({ screenModelInput }));
+
 import { retryLoopCombination } from './loop';
 
 const ORG = '11111111-1111-1111-1111-111111111111';
@@ -69,6 +72,8 @@ const edge = (id: string, source: string, target: string, mode: 'fixed' | 'itera
 });
 
 beforeEach(() => {
+  screenModelInput.mockReset();
+  screenModelInput.mockResolvedValue({ ok: true });
   modalitiesOf.mockReset();
   modalitiesOf.mockResolvedValue({ input: ['text', 'image'], output: ['image'], synced_at: 'now' });
   generateImagesWithoutBrand.mockReset();
@@ -137,5 +142,31 @@ describe('un asse iterate su una list: ogni iterazione riceve il PROPRIO item, n
     expect(firstBaseMediaId).toBeTruthy();
     expect(secondBaseMediaId).toBeTruthy();
     expect(secondBaseMediaId).not.toBe(firstBaseMediaId);
+  });
+});
+
+describe('a loop iteration is screened on the prompt it would send', () => {
+  it('blocks the iteration before the provider, and the next iteration is screened again', async () => {
+    const blocked = "This prompt was blocked: violence and gore aren't allowed in feega's standard mode.";
+    screenModelInput.mockResolvedValue({ ok: false, error: blocked });
+    const { db } = fakeDb(
+      {
+        nodes: [
+          nodeRow(GEN_NODE, 'image', { prompt: 'a beheading, blood everywhere', model: 'qwen3-pro' }, 5),
+          nodeRow(OUTPUT_LIST, 'list', { item_kind: 'image', items: [{ label: '1', status: 'queued' }, { label: '2', status: 'queued' }] })
+        ],
+        nodes_connections: [],
+        assets: []
+      },
+      { filter: true, updateRows: { nodes: [nodeRow(GEN_NODE, 'image', { prompt: 'a beheading, blood everywhere', model: 'qwen3-pro' }, 5)], node_runs: [] } }
+    );
+
+    for (const label of ['1', '2']) {
+      await retryLoopCombination(db, { orgId: ORG, projectId: PROJECT, canvasId: CANVAS, nodeId: GEN_NODE, userId: USER, outputListNodeId: OUTPUT_LIST, combination: { label, values: {} } });
+    }
+
+    expect(generateImagesWithoutBrand).not.toHaveBeenCalled();
+    expect(screenModelInput).toHaveBeenCalledTimes(2);
+    expect(screenModelInput.mock.calls[0][1].texts.join(' ')).toContain('a beheading');
   });
 });
