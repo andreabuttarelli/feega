@@ -76,7 +76,7 @@
   import { hasUpstreamText } from '$lib/canvas/upstream-inputs';
   import { effectiveModel } from '$lib/canvas/default-models';
   import { nearestVideoDuration } from '$lib/video-models';
-  import { snapResolution } from '$lib/canvas/gen-node';
+  import { isGenMedium, snapResolution } from '$lib/canvas/gen-node';
   import { snapDynamicParams } from '$lib/canvas/model-params';
   import { type IframeNode as IframeNodeState } from '$lib/canvas/iframe-node';
   import { shareUrlOf } from '$lib/canvas/doc-node';
@@ -453,7 +453,8 @@
     (data.catalogue ?? {
       text: { choices: [], synced: true },
       image: { choices: [], synced: false },
-      video: { choices: [], synced: false }
+      video: { choices: [], synced: false },
+      audio: { choices: [], synced: false }
     }) as Record<GenMedium, { choices: ModelChoice[]; synced: boolean; enhanceUnitCredits?: number }>
   );
   const catalogue = $derived(
@@ -482,7 +483,7 @@
     if (n.type === 'list') { return listPortsByNode[n.id]; }
     if (n.type === 'effects') { return ['images', 'videos']; }
     if (n.type === 'composition') { return ['images']; }
-    if (n.type !== 'text' && n.type !== 'image' && n.type !== 'video') { return undefined; }
+    if (!isGenMedium(n.type)) { return undefined; }
     const model = typeof n.data.model === 'string' ? n.data.model : null;
     return connectorsForNode(n.type, model, catalogue[n.type] ?? []);
   }
