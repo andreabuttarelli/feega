@@ -162,10 +162,37 @@
 
   @media (max-width: 767px) {
     .add-bar {
-      bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+      left: var(--mobile-bar-inset);
+      bottom: calc(var(--mobile-bar-inset) + env(safe-area-inset-bottom, 0px));
+      transform: none;
+      gap: 0;
+      padding: var(--mobile-bar-pad);
+      box-shadow: var(--mobile-bar-shadow);
     }
     button {
       min-width: var(--touch-target);
+      min-height: var(--touch-target);
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    button:hover {
+      background: none;
+    }
+    button:active,
+    .keys-toggle[aria-expanded='true'] {
+      background: var(--paper-3, #f4f4f4);
+    }
+    .add-tip {
+      display: none;
+    }
+    .add-bar .more {
+      left: calc(-1 * var(--mobile-bar-pad) - 1px);
+      transform: none;
+      grid-template-columns: repeat(3, minmax(88px, 1fr));
+      max-width: calc(100vw - 2 * var(--mobile-bar-inset));
+    }
+    .add-bar .more-item {
+      font-size: 13px;
       min-height: var(--touch-target);
     }
   }

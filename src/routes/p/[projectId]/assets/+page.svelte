@@ -231,7 +231,7 @@
   :global([data-viewport='mobile']) .media-page { padding: 8px var(--page-gutter) 24px; }
   :global([data-viewport='mobile']) .filters { flex-wrap: wrap; gap: 4px; }
   :global([data-viewport='mobile']) .filter { min-height: var(--touch-target); display: inline-flex; align-items: center; padding: 0 12px; }
-  :global([data-viewport='mobile']) .filters :global(.upload-btn) { min-height: var(--touch-target); }
+  :global([data-viewport='mobile']) .filters :global(.upload-btn) { min-height: var(--touch-target); order: 1; width: 100%; margin: 4px 0 0; }
   :global([data-viewport='mobile']) .asset-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .tile {
     position: relative; overflow: hidden; background: var(--paper-2);

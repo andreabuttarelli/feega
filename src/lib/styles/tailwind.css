@@ -47,6 +47,11 @@
   --radius: 0rem;
   --mobile-topbar-h: 48px;
   --touch-target: 44px;
+  --mobile-bar-inset: 8px;
+  --mobile-bar-pad: 2px;
+  --mobile-bar-h: calc(var(--touch-target) + 2 * var(--mobile-bar-pad) + 2px);
+  --mobile-bar-clearance: calc(var(--mobile-bar-h) + 2 * var(--mobile-bar-inset) + env(safe-area-inset-bottom, 0px));
+  --mobile-bar-shadow: 0 4px 18px rgb(0 0 0 / 0.1);
   --page-gutter: 16px;
   /* App shell sidebar — light tint toward brand accent-2 (see --sidebar-bg in app.css). */
   --sh-sidebar: var(--sidebar-bg);

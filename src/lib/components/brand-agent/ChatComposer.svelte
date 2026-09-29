@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { composerHeight } from './composer-height';
   import { _ } from 'svelte-i18n';
 
   let {
@@ -15,8 +16,6 @@
     onstop: () => void;
   } = $props();
 
-  const MAX_HEIGHT_PX = 200;
-
   let textarea = $state<HTMLTextAreaElement | null>(null);
 
   const canSend = $derived(!busy && enabled && !!value.trim());
@@ -26,7 +25,7 @@
       return;
     }
     textarea.style.height = 'auto';
-    textarea.style.height = `${Math.min(textarea.scrollHeight, MAX_HEIGHT_PX)}px`;
+    textarea.style.height = composerHeight(textarea.scrollHeight);
   }
 
   $effect(() => {

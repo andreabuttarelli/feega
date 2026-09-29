@@ -395,6 +395,33 @@
     text-overflow: ellipsis;
   }
 
+  @media (max-width: 767px) {
+    :global([data-slot='dropdown-menu-content'].canvas-menu) {
+      max-height: calc(var(--bits-dropdown-menu-content-available-height) - var(--mobile-bar-inset));
+      overflow-y: auto;
+    }
+    :global(a.menu-row),
+    :global(button.menu-row),
+    .menu-logout {
+      min-height: var(--touch-target);
+      font-size: 15px;
+    }
+    .menu-logout {
+      padding: 0;
+    }
+    :global(.menu-heading) {
+      padding: 12px 8px 4px;
+      font-size: 12px;
+    }
+    .menu-name {
+      font-size: 15px;
+    }
+    .menu-email,
+    .menu-org {
+      font-size: 13px;
+    }
+  }
+
   :global(.shortcuts-content) {
     width: 240px;
     max-height: 60vh;
