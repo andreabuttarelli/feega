@@ -61,17 +61,20 @@
     sheet?: string;
     sub?: true;
     danger?: true;
+    desktopOnly?: true;
   }> = [
     { id: 'home', group: 'navigate', labelKey: 'app.shell.menu.home', icon: House, href: `/p/${projectId}` },
     { id: 'settings', group: 'navigate', labelKey: 'app.shell.menu.settings', icon: Settings, sheet: '/settings/connected-accounts' },
     { id: 'billing', group: 'navigate', labelKey: 'app.shell.menu.billing', icon: CreditCard, sheet: '/settings/billing' },
-    { id: 'shortcuts', group: 'help', labelKey: 'app.shell.menu.shortcuts', icon: Keyboard, sub: true },
+    { id: 'shortcuts', group: 'help', labelKey: 'app.shell.menu.shortcuts', icon: Keyboard, sub: true, desktopOnly: true },
     { id: 'changelog', group: 'help', labelKey: 'app.shell.menu.changelog', icon: Sparkles, href: '/changelog' },
     { id: 'logout', group: 'account', labelKey: 'app.shell.menu.logout', icon: LogOut, danger: true }
   ];
 
   const navigateItems = CANVAS_MENU_ITEMS.filter((item) => item.group === 'navigate');
-  const helpItems = CANVAS_MENU_ITEMS.filter((item) => item.group === 'help');
+  const helpItems = CANVAS_MENU_ITEMS.filter(
+    (item) => item.group === 'help' && !(navigation === 'page' && item.desktopOnly)
+  );
 
   function hrefOf(item: (typeof CANVAS_MENU_ITEMS)[number]): string | undefined {
     if (item.sheet && navigation === 'page') {

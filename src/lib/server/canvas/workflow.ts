@@ -1,7 +1,7 @@
 import type { Db } from '$lib/server/db/client';
 import { DEFAULT_MODEL } from '$lib/canvas/default-models';
 import { runGenNode, type StartRun } from '$lib/server/canvas/generate';
-import { findNode, writeNodeData, listConnections, type CanvasNodeRecord } from '$lib/server/repos/canvas';
+import { DataCheck, findNode, patchNodeData, listConnections, type CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { createRun, claimRun, completeRun, failRun, runningRuns, runsByIds, type NodeRun } from '$lib/server/repos/node-runs';
 import { planWorkflow, stepReadiness, type WorkflowStep, type StepStatus, type WorkflowPlanResult } from '$lib/canvas/workflow-plan';
 import type { Actor } from '$lib/server/repos/actor';
@@ -43,15 +43,12 @@ export function isWorkflowTicket(run: NodeRun): boolean {
 }
 
 async function setRunning(db: Db, input: { orgId: string; nodeId: string; running: boolean; actor?: Actor }): Promise<void> {
-  const node = await findNode(db, { orgId: input.orgId, nodeId: input.nodeId });
-  if (!node) return;
-
-  await writeNodeData(db, {
+  await patchNodeData(db, {
     orgId: input.orgId,
     nodeId: input.nodeId,
-    expectedVersion: node.version,
-    actor: input.actor,
-    data: { ...node.data, running: input.running }
+    patch: { running: input.running },
+    check: DataCheck.None,
+    actor: input.actor
   }).catch(() => {});
 }
 

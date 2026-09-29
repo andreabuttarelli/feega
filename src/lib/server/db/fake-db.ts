@@ -21,7 +21,7 @@ export type Call = {
 
 export type FakeDb = { db: Db; calls: Call[] };
 
-export type FakeOptions = { updateRows?: Record<string, unknown[]>; filter?: boolean };
+export type FakeOptions = { updateRows?: Record<string, unknown[]>; filter?: boolean; mutate?: boolean };
 
 export function fakeDb(rows: Record<string, unknown[]>, options: FakeOptions = {}): FakeDb {
   const calls: Call[] = [];
@@ -39,6 +39,14 @@ export function fakeDb(rows: Record<string, unknown[]>, options: FakeOptions = {
       return all;
     }
     return all.filter((row) => filters.every((f) => matches(row as Record<string, unknown>, f)));
+  };
+
+  const resolved = (call: Call): unknown[] => {
+    const found = rowsFor(call.op, call.table, call.filters);
+    if (!options.mutate || call.op !== 'update' || !call.payload) {
+      return found;
+    }
+    return found.map((row) => Object.assign(row as object, call.payload));
   };
 
   const builder = (table: string, op: string, payload?: unknown) => {
@@ -78,7 +86,7 @@ export function fakeDb(rows: Record<string, unknown[]>, options: FakeOptions = {
         return chain;
       },
       single: async () => {
-        const first = rowsFor(op, table, call.filters)[0];
+        const first = resolved(call)[0];
         if (first !== undefined) {
           return { data: first, error: null };
         }
@@ -87,9 +95,8 @@ export function fakeDb(rows: Record<string, unknown[]>, options: FakeOptions = {
         }
         return { data: null, error: null };
       },
-      maybeSingle: async () => ({ data: rowsFor(op, table, call.filters)[0] ?? null, error: null }),
-      then: (resolve: (v: { data: unknown[]; error: null }) => unknown) =>
-        resolve({ data: rowsFor(op, table, call.filters), error: null })
+      maybeSingle: async () => ({ data: resolved(call)[0] ?? null, error: null }),
+      then: (resolve: (v: { data: unknown[]; error: null }) => unknown) => resolve({ data: resolved(call), error: null })
     };
     return chain;
   };
