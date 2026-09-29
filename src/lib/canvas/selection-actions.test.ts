@@ -2,14 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { enabledFor } from './selection-actions';
 
 describe('enabledFor', () => {
-  it('create-post è abilitata con un\'immagine nella selezione', () => {
-    const result = enabledFor('create-post', [{ id: '1', type: 'image', data: { refId: 'a1' } }]);
+  it('promote è abilitata con un\'immagine nella selezione', () => {
+    const result = enabledFor('promote', [{ id: '1', type: 'image', data: { refId: 'a1' } }]);
     expect(result.enabled).toBe(true);
     expect(result.reason).toBeUndefined();
   });
 
-  it('create-post è disabilitata senza media né testo, e dà una ragione', () => {
-    const result = enabledFor('create-post', [{ id: '1', type: 'iframe', data: { url: 'x' } }]);
+  it('promote è disabilitata senza media né testo, e dà una ragione', () => {
+    const result = enabledFor('promote', [{ id: '1', type: 'iframe', data: { url: 'x' } }]);
     expect(result.enabled).toBe(false);
     expect(result.reason).toBe('Select at least one media or text node');
   });

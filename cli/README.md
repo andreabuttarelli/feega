@@ -93,7 +93,7 @@ prefixes error instead of guessing.
 | Posts | `content`, `approve`, `post <id> [show\|edit\|render\|approve\|publish\|reschedule\|reject]` |
 | Planning | `calendar` |
 | Brand | `products [sync]` |
-| Ads | `ads` — Meta campaigns of a brand, `--approve` to launch one |
+| Ads | `ads` — Meta campaigns of a brand; `--approve` launches one, `--pause`/`--resume` |
 | Insight | `dashboard`, `status`, `health` |
 | Account | `upgrade`, `update`, `login`, `logout` |
 

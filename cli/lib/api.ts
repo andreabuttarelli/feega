@@ -164,4 +164,11 @@ export const api = {
       t
     ),
 
+  setAdCampaignStatus: (t: string, id: string, next: 'active' | 'paused') =>
+    post<{ ok: boolean; error?: string; detail?: string }>(
+      `/api/v1/org/ads/campaigns/${encodeURIComponent(id)}/status`,
+      t,
+      { next }
+    ),
+
 };

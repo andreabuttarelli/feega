@@ -221,27 +221,26 @@ is the incident this asymmetry exists to prevent.
 | MCP | CLI |
 |-----|-----|
 | `list_ad_campaigns` | `feega ads <slug>` |
-| `create_ad_campaign` | `feega ads <slug> --create --name … --headline …` |
+| `create_ad_campaign` | Promote → Paid ad, in the app |
 | `approve_ad_campaign` | `feega ads <slug> --approve <id>` |
+| `set_ad_campaign_status` | `feega ads <slug> --pause <id>` / `--resume <id>` |
 
-An ad campaign spends real money, so `create_ad_campaign` never produces something already
-publishable: it always drafts `draft`, `approved_by: null`. `approve_ad_campaign` is the only door
-that lets it spend, and it is refused over an API key on purpose — an agent cannot approve its own
-spend. This only works from a signed-in person's own session (the app, `feega login`, or the MCP
-host doing OAuth). If you are an agent and this fails, tell the person to approve it themselves.
+Ads are Meta only (Facebook + Instagram). An ad campaign spends real money, so
+`create_ad_campaign` never produces something already running: it always drafts `draft`,
+`approved_by: null`. `approve_ad_campaign` is the only door that launches it, and it is refused
+over an API key on purpose — an agent cannot approve its own spend. This only works from a
+signed-in person's own session (the app, `feega login`, or the MCP host doing OAuth). If you are
+an agent and this fails, tell the person to approve it themselves.
 
 `list_ad_campaigns({ org, brand_id, status? })` reads a brand's campaigns with their status and
 whether a human has approved them yet. Free.
 
-`create_ad_campaign({ org, brand_id, ad_account_id, name, objective, budget_type, budget_amount,
-starts_at?, ends_at? })` drafts a new campaign against a brand's ad account. `objective` is one of
-`awareness`, `traffic`, `engagement`, `video_views`, `lead_generation`, `conversions`,
-`app_promotion`, `catalog_sales`. `budget_type` is `daily` or `lifetime`. Nothing is scheduled or
-billed by calling this. Free.
+`create_ad_campaign({ org, brand_id, ad_account_id, objective, budget_type, budget_amount, days,
+countries, placements, primary_text, headline, age_min?, age_max?, gender?, call_to_action?,
+link_url?, node_ids?, post_id? })` drafts a campaign and its creative. `objective` is `traffic`
+(needs `link_url`), `engagement` or `awareness`. `node_ids` are canvas image/video nodes;
+`post_id` boosts a published post instead. Free.
 
-`approve_ad_campaign({ org, id })` lets a drafted campaign spend.
+`approve_ad_campaign({ org, id })` launches a drafted campaign on Meta and charges the fee.
 
-The CLI's `feega ads <slug>` surface also covers what MCP does not expose yet — sync, propose,
-remix, pause/resume, duplicate, delete — through a single brand-scoped REST endpoint
-(`/api/v1/brands/:slug/ads`), separate from the org-scoped `ad_campaigns` table MCP reads and
-writes.
+`set_ad_campaign_status({ org, id, next })` pauses (`paused`) or resumes (`active`) it.

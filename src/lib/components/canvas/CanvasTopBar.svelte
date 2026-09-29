@@ -10,6 +10,8 @@
   import CanvasShare from './CanvasShare.svelte';
   import type { ShareState } from '$lib/canvas/shared-view';
   import { openSheet } from '$lib/canvas/sheet-nav';
+  import Megaphone from '@lucide/svelte/icons/megaphone';
+  import { canvasSelection, promotePath } from '$lib/canvas/promote-sheet';
 
   type ProjectRow = { id: string; name: string; href: string; updatedAt: string };
   type CanvasRow = { id: string; name: string; href: string };
@@ -123,6 +125,16 @@
       <CreditAmount amount={creditBalance} />
     </a>
 
+    <button
+      type="button"
+      class="promote-btn"
+      data-testid="topbar-promote"
+      onclick={() => openSheet(projectId, promotePath($canvasSelection))}
+    >
+      <Megaphone size={14} />
+      Promote
+    </button>
+
     <CanvasShare {shareToken} {onShare} />
 
     <button
@@ -230,6 +242,22 @@
     color: var(--accent-ink, var(--accent, #7c5cff));
   }
 
+
+  .promote-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 30px;
+    padding: 0 10px;
+    flex-shrink: 0;
+    border: 1px solid var(--ink, #1d1d1f);
+    background: var(--ink, #1d1d1f);
+    color: var(--paper, #fff);
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+  }
 
   .credits {
     display: inline-flex;

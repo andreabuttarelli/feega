@@ -1,4 +1,5 @@
 import { env } from '$env/dynamic/private';
+import type { ZernioPlacements } from '$lib/ads/paid-ad';
 
 // Zernio Ads API client — wraps /v1/ads/* (boost, create, accounts, analytics).
 // Organic publish/analytics stay in zernio.ts; this module is paid-only.
@@ -263,7 +264,7 @@ export type CreateStandaloneAdInput = {
   };
   /** Meta only. When set, `creative` is ignored and one ad is created per entry. */
   creatives?: AdCreativeVariant[];
-  placements?: string[];
+  placements?: ZernioPlacements;
   dsaBeneficiary?: string;
   dsaPayor?: string;
   /** Validate the whole campaign tree against the platform and create nothing. */
@@ -293,7 +294,7 @@ export function buildCreatePayload(input: CreateStandaloneAdInput): Record<strin
     body: c.body,
     linkUrl: c.linkUrl ?? c.landingPageUrl,
     callToAction: c.callToAction,
-    videoUrl: c.videoUrl,
+    video: c.videoUrl ? { url: c.videoUrl } : undefined,
     additionalHeadlines: c.headlines?.filter((h) => h && h !== c.headline),
     additionalDescriptions: c.descriptions?.filter((d) => d && d !== c.body),
     countries: t.countries,
@@ -334,7 +335,7 @@ export function buildCreatePayload(input: CreateStandaloneAdInput): Record<strin
   // Zernio IGNORES the top-level copy/media in this mode, so we drop it rather than send a payload
   // that reads as if it mattered. validateOnly is not supported on this shape either.
   if (input.creatives?.length) {
-    for (const k of ['headline', 'body', 'linkUrl', 'callToAction', 'videoUrl', 'imageUrl', 'validateOnly']) {
+    for (const k of ['headline', 'body', 'linkUrl', 'callToAction', 'video', 'imageUrl', 'validateOnly']) {
       delete body[k];
     }
     body.creatives = input.creatives.map((v) => ({

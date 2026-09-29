@@ -33,6 +33,8 @@ feega products <slug> sync                # Re-importa dallo store collegato
 # Ads
 feega ads <slug>                          # Campagne Meta del brand
 feega ads <slug> --approve <id>           # Approva e lancia (spende budget)
+feega ads <slug> --pause <id>             # Pausa
+feega ads <slug> --resume <id>            # Riattiva
 
 # Account e billing
 feega upgrade <slug>                      # Apri checkout piano

@@ -6,7 +6,7 @@
 import Copy from '@lucide/svelte/icons/copy';
 import Workflow from '@lucide/svelte/icons/workflow';
 import Link2 from '@lucide/svelte/icons/link-2';
-import Send from '@lucide/svelte/icons/send';
+import Megaphone from '@lucide/svelte/icons/megaphone';
 import Play from '@lucide/svelte/icons/play';
 import Trash2 from '@lucide/svelte/icons/trash-2';
 import Hash from '@lucide/svelte/icons/hash';
@@ -17,7 +17,7 @@ export const SELECTION_ACTION_ICON: Record<SelectionActionId, Component> = {
   duplicate: Copy,
   'connect-new': Workflow,
   'connect-existing': Link2,
-  'create-post': Send,
+  promote: Megaphone,
   'run-workflow': Play,
   'copy-id': Hash,
   delete: Trash2

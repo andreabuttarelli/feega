@@ -103,7 +103,7 @@
     onResize,
     onConnect,
     onDelete,
-    onCreatePost,
+    onPromote,
     onEdgeDelete,
     onEdgeRetype,
     onEdgeModeChange,
@@ -152,7 +152,7 @@
      */
     onDelete?: (ids: string[]) => void;
     /** "Crea post" dalla barra della selezione: gli id scelti, così com'è per `onDelete`. */
-    onCreatePost?: (ids: string[]) => void;
+    onPromote?: (ids: string[]) => void;
     /** Una linea da togliere. Senza, il primo errore resta sulla tela per sempre. */
     onEdgeDelete?: (edgeId: string) => void;
     /** Il verso di una linea che c'è già: si corregge, non si rifà. */
@@ -190,7 +190,7 @@
     onConnectNew?: (ids: string[], medium: GenMedium, at: { x: number; y: number }, prompt?: string) => void;
     /** "Collega a…": gli id scelti e il nodo su cui si è cliccato per chiudere la modalità bersaglio. */
     onConnectExisting?: (ids: string[], targetId: string) => void;
-    /** "Esegui flusso": gli id scelti, così com'è per `onDelete`/`onCreatePost`. */
+    /** "Esegui flusso": gli id scelti, così com'è per `onDelete`/`onPromote`. */
     onRunWorkflow?: (ids: string[]) => void;
     /** `type`/`data` di ogni tile — la forma grezza che `commonPropertiesOf` legge, non `Tile`. */
     nodeSummaries?: { id: string; type: string; data: Record<string, unknown> }[];
@@ -494,7 +494,7 @@
     'connect-existing': (ids) => {
       targeting = ids;
     },
-    'create-post': (ids) => onCreatePost?.(ids),
+    promote: (ids) => onPromote?.(ids),
     'run-workflow': (ids) => onRunWorkflow?.(ids),
     'copy-id': (ids) => {
       void navigator.clipboard?.writeText(ids.join('\n'));
@@ -546,7 +546,7 @@
     if (!selection.box || !toFlow) return;
 
     if (suggestion.wiring === 'create-post') {
-      onCreatePost?.(selection.ids);
+      onPromote?.(selection.ids);
       return;
     }
     if (!suggestion.createsNodeType) return;

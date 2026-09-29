@@ -57,8 +57,8 @@ describe('la barra mobile', () => {
 });
 
 describe('un foglio si riconosce anche con parametri nell\'indirizzo', () => {
-  it('/create-post?nodeIds=… apre il foglio di creazione post', () => {
-    expect(sheetEntryForPath('/create-post?nodeIds=a,b')?.id).toBe('create-post');
+  it('/promote?nodeIds=… apre il foglio Promote', () => {
+    expect(sheetEntryForPath('/promote?nodeIds=a,b&tab=paid')?.id).toBe('promote');
   });
 
   it('un frammento non cambia il foglio', () => {

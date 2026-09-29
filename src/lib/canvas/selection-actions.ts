@@ -21,7 +21,7 @@ export type SelectionActionId =
   | 'duplicate'
   | 'connect-new'
   | 'connect-existing'
-  | 'create-post'
+  | 'promote'
   | 'run-workflow'
   | 'copy-id'
   | 'delete';
@@ -37,7 +37,7 @@ export const SELECTION_ACTIONS: readonly SelectionAction[] = [
   { id: 'duplicate', label: 'Duplicate', keys: ['mod', 'D'] },
   { id: 'connect-new', label: 'Connect to new…' },
   { id: 'connect-existing', label: 'Connect to…' },
-  { id: 'create-post', label: 'Crea post' },
+  { id: 'promote', label: 'Promote' },
   { id: 'run-workflow', label: 'Esegui flusso' },
   { id: 'copy-id', label: 'Copy id' },
   { id: 'delete', label: 'Delete', keys: ['⌫'] }
@@ -48,7 +48,7 @@ export function enabledFor(
   nodeSummaries: PostCompositionNode[],
   edges: WorkflowEdge[] = []
 ): { enabled: boolean; reason?: string } {
-  if (id === 'create-post') {
+  if (id === 'promote') {
     const composition = postCompositionFor(nodeSummaries);
     return {
       enabled: composition.enabled,

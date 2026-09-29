@@ -23,7 +23,7 @@ export const NAV_ENTRIES: NavEntry[] = [
   { id: 'calendar', labelKey: 'app.hub.publish.calendar', icon: 'calendar-days', family: 'sheet', path: '/calendar', group: 'workbench' },
   { id: 'ads', labelKey: 'app.hub.ads.social', icon: 'megaphone', family: 'sheet', path: '/ads', group: 'workbench' },
   { id: 'settings', labelKey: 'app.nav.settings', icon: 'settings', family: 'sheet', path: '/settings/connected-accounts', mobilePath: '/settings', group: 'workbench' },
-  { id: 'create-post', labelKey: 'app.hub.publish.createPost', icon: 'megaphone', family: 'sheet', path: '/create-post', group: 'hidden' }
+  { id: 'promote', labelKey: 'app.hub.publish.promote', icon: 'megaphone', family: 'sheet', path: '/promote', group: 'hidden' }
 ];
 
 /**
@@ -36,7 +36,7 @@ export const SHEET_WIDTHS: Record<string, number> = {
   calendar: 960,
   ads: 720,
   settings: 720,
-  'create-post': 720,
+  promote: 880,
   assets: 320,
   brands: 320,
   influencers: 320

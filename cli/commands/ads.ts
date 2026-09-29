@@ -2,7 +2,12 @@ import { loadSession } from '../lib/auth.ts';
 import { api } from '../lib/api.ts';
 import { ok, warn, table, section, info } from '../lib/display.ts';
 
-export async function cmdAds(slug: string, opts: { approve?: string }) {
+const RUNNING_FLAGS = [
+  { flag: 'pause', next: 'paused' },
+  { flag: 'resume', next: 'active' }
+] as const;
+
+export async function cmdAds(slug: string, opts: { approve?: string; pause?: string; resume?: string }) {
   const session = await loadSession();
   if (!session) {
     console.error('Session expired or missing. Run: feega login');
@@ -17,6 +22,17 @@ export async function cmdAds(slug: string, opts: { approve?: string }) {
       process.exit(1);
     }
     ok(`Approved ${r.campaign.name} → ${r.campaign.status}`);
+    return;
+  }
+
+  const running = RUNNING_FLAGS.find((r) => opts[r.flag]);
+  if (running) {
+    const r = await api.setAdCampaignStatus(token, opts[running.flag]!, running.next);
+    if (!r.ok) {
+      warn(r.detail ?? r.error ?? 'status_failed');
+      process.exit(1);
+    }
+    ok(`Campaign ${running.next}`);
     return;
   }
 

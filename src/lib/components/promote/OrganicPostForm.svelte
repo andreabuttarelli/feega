@@ -19,7 +19,15 @@
   } from '$lib/canvas/create-post-composer';
   import { closeSheet } from '$lib/canvas/sheet-nav';
 
-  let { data, form } = $props();
+  type OrganicData = {
+    nodes: { id: string; type: string; data: Record<string, unknown>; text: string | null; mediaUrl: string | null }[];
+    brands: { id: string; name: string }[];
+    accountsByBrand: Record<string, { id: string; platform: string; handle: string | null; displayName: string | null }[]>;
+    projectBrandId: string | null;
+    canvasId: string | null;
+  };
+
+  let { data, form = null }: { data: OrganicData; form?: unknown } = $props();
 
   const projectId = $derived(page.params.projectId);
   const composition = $derived(postCompositionFor(data.nodes));
@@ -73,10 +81,6 @@
 </script>
 
 <div class="composer">
-  <header class="composer-header">
-    <h1>Create post</h1>
-  </header>
-
   {#if form && typeof form === 'object' && 'post' in form && form.post}
     <div class="banner ok">
       Post saved. <a href={`/p/${projectId}/calendar`}>Open calendar</a>
@@ -282,14 +286,7 @@
 
 <style>
   .composer {
-    padding: 40px 32px;
     max-width: 640px;
-    margin: 0 auto;
-  }
-
-  .composer-header h1 {
-    font-size: 20px;
-    margin: 0 0 24px;
   }
 
   section {
@@ -430,9 +427,6 @@
     gap: 4px;
   }
 
-  :global([data-viewport='mobile']) .composer {
-    padding: 20px var(--page-gutter) 32px;
-  }
   :global([data-viewport='mobile']) .composer-footer {
     flex-direction: column;
     gap: 12px;
@@ -465,8 +459,9 @@
   }
 
   .btn.primary {
-    background: var(--accent, #7c5cff);
-    color: #fff;
+    background: var(--ink);
+    color: var(--paper);
+    border-color: var(--ink);
   }
 
   .btn.ghost {

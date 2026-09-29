@@ -4,6 +4,9 @@
   import CanvasShare from './CanvasShare.svelte';
   import { pageMeta, pageTopActions } from '$lib/stores/page-meta';
   import type { ShareState } from '$lib/canvas/shared-view';
+  import Megaphone from '@lucide/svelte/icons/megaphone';
+  import { canvasSelection, promotePath } from '$lib/canvas/promote-sheet';
+  import { openSheet } from '$lib/canvas/sheet-nav';
 
   type CanvasShareProps = { shareToken: string | null; onShare: (state: ShareState) => Promise<void> };
 
@@ -32,6 +35,17 @@
   {#if $pageTopActions}
     <div class="actions">{@render $pageTopActions()}</div>
   {/if}
+  {#if $canvasSelection.length}
+    <button
+      type="button"
+      class="promote"
+      aria-label="Promote"
+      data-testid="mobile-promote"
+      onclick={() => openSheet(projectId, promotePath($canvasSelection))}
+    >
+      <Megaphone size={18} />
+    </button>
+  {/if}
   {#if share}
     <CanvasShare shareToken={share.shareToken} onShare={share.onShare} />
   {/if}
@@ -51,6 +65,17 @@
       max(4px, env(safe-area-inset-left, 0px));
     border-bottom: 1px solid var(--line, #ededef);
     background: var(--paper, #fff);
+  }
+
+  .promote {
+    display: grid;
+    place-items: center;
+    width: var(--touch-target);
+    height: var(--touch-target);
+    flex-shrink: 0;
+    border: none;
+    background: transparent;
+    color: var(--ink, #1d1d1f);
   }
 
   .mobile-topbar :global(.burger-btn) {

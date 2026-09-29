@@ -84,6 +84,8 @@ program
   .command('ads <slug>')
   .description('Meta ad campaigns of a brand: list, approve spend')
   .option('--approve <id>', 'Approve and launch a proposed campaign (spends budget)')
+  .option('--pause <id>', 'Pause a running campaign')
+  .option('--resume <id>', 'Resume a paused campaign')
   .action(async (slug: string, opts) => {
     const { cmdAds } = await import('./commands/ads.ts');
     await cmdAds(slug, opts);

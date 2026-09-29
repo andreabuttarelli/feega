@@ -114,14 +114,15 @@
   import type { Product } from '$lib/server/repos/products';
   import type { SocialPost } from '$lib/server/repos/social-posts';
   import { openSheet } from '$lib/canvas/sheet-nav';
+  import { promotePath, canvasSelection } from '$lib/canvas/promote-sheet';
   import { billingPath } from '$lib/billing-path';
 
   let { data } = $props();
   type TextCostEstimate = { inputTokens: number; outputTokens: number; variableInput: boolean; revision: string };
   let textCostEstimates = $state<Record<string, TextCostEstimate>>({});
 
-  function handleCreatePost(ids: string[]) {
-    void openSheet(data.projectId, `/create-post?nodeIds=${ids.join(',')}`);
+  function handlePromote(ids: string[]) {
+    void openSheet(data.projectId, promotePath(ids));
   }
 
   /** Una riga come la pagina la tiene: quel che il database ha, più dove sta sullo schermo. */
@@ -578,6 +579,11 @@
     selectedIds = ids;
     dismissedInspector = null;
   }
+
+  $effect(() => {
+    canvasSelection.set(selectedIds);
+    return () => canvasSelection.set([]);
+  });
 
   async function refresh() {
     const version = ++snapshotVersion;
@@ -1783,7 +1789,7 @@
     onCreateFilled={createFilled}
     onUpload={upload}
     onDuplicate={duplicate}
-    onCreatePost={handleCreatePost}
+    onPromote={handlePromote}
     onCopy={copy}
     onPaste={paste}
     onUndo={undo}
