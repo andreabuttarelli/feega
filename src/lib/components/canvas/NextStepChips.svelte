@@ -22,12 +22,14 @@
     box,
     zoom = 1,
     nodeId,
+    actionUrl,
     onpick
   }: {
     box: { x: number; y: number; width: number; height: number } | null;
     zoom?: number;
     /** Il nodo unico selezionato — niente suggerimenti su una selezione multipla. */
     nodeId: string | null;
+    actionUrl: (action: string) => string;
     onpick?: (suggestion: Suggestion) => void;
   } = $props();
 
@@ -49,7 +51,7 @@
       body.set('node_id', id);
 
       try {
-        const res = await fetch('?/suggestNextStep', {
+        const res = await fetch(actionUrl('suggestNextStep'), {
           method: 'POST',
           headers: { 'x-sveltekit-action': 'true' },
           body

@@ -13,6 +13,7 @@
    * Qui si fa l'altra metà — quale riga sta dietro una tile, e cosa si scrive quando cambia.
    */
   import { createWriteQueue } from '$lib/canvas/write-queue';
+  import { canvasActionUrl } from '$lib/canvas/canvas-action-url';
   import { createUndoStack } from '$lib/canvas/undo-stack';
   import type { Gesture, UndoItem } from '$lib/canvas/undo-plan';
   import { buildMoveGesture, checkMoveGesture, inverseMoveGesture, type MoveGesture } from '$lib/canvas/move-gesture';
@@ -640,7 +641,7 @@
     const mutating = !READ_ACTIONS.has(action);
     if (mutating) { pending += 1; snapshotVersion += 1; }
     try {
-      const res = await fetch(`?/${action}`, {
+      const res = await fetch(canvasActionUrl({ projectId: data.projectId, canvasId: data.canvas.id }, action), {
         method: 'POST',
         headers: { 'x-sveltekit-action': 'true' },
         body
@@ -1776,6 +1777,7 @@
   {/if}
 
   <CanvasFlow
+    actionUrl={(action: string) => canvasActionUrl({ projectId: data.projectId, canvasId: data.canvas.id }, action)}
     {tiles}
     {edges}
     onMove={move}

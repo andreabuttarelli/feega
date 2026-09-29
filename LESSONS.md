@@ -2042,3 +2042,11 @@ external dependency (a remote MCP host that doesn't resolve) throws before the t
 **Move:** `grep` every `.from('<table>')` for columns missing from information_schema and delete
 or reroute what the rewrite left behind; open optional external tools inside a `try` that logs
 and continues, never before the work the user asked for.
+
+## Every canvas action fails with "Not saved" after a sheet opened
+
+**Signal:** Vercel logs `No action with name 'create' found` on a route that isn't the canvas
+(`/p/<id>/settings/...`); local runs that never open a sheet stay green. Shallow routing
+(`pushState`) changed `location`, and a relative `fetch('?/action')` resolves against it.
+**Move:** post canvas actions to `canvasActionUrl(...)`, never a relative `?/`; the source
+guard in `canvas-action-url.test.ts` keeps it that way.
