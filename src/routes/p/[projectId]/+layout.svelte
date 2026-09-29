@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ProjectMode } from '$lib/project-mode';
+  import { modeOf, ProjectMode } from '$lib/project-mode';
   import '$lib/styles/tailwind.css';
   import { page } from '$app/state';
   import { onDestroy, untrack } from 'svelte';
@@ -203,6 +203,7 @@
           activeSheet={activeSheetId}
           onPanel={onRailPanel}
           onSheet={onRailSheet}
+          mode={modeOf(data.project.mode)}
         />
         {#if browser && leftPanel}
           {#await CHROME_LOADERS.leftPanel() then { default: CanvasLeftPanel }}
@@ -236,7 +237,7 @@
 
 <style>
   .project-shell.is-nsfw {
-    box-shadow: inset 0 3px 0 var(--destructive);
+    box-shadow: inset 0 3px 0 var(--color-destructive);
   }
   .project-shell {
     height: 100dvh;

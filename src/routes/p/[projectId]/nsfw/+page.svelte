@@ -47,8 +47,8 @@
   }
   .nsfw-mark {
     display: inline-block;
-    border: 1px solid var(--destructive);
-    color: var(--destructive);
+    border: 1px solid var(--color-destructive);
+    color: var(--color-destructive);
     padding: 0 0.375rem;
     font-size: 0.75rem;
   }

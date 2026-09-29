@@ -18,7 +18,7 @@
   import Pencil from '@lucide/svelte/icons/pencil';
   import Trash from '@lucide/svelte/icons/trash-2';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
-  import { ProjectMode } from '$lib/project-mode';
+  import { Capability, modeAllows, modeOf, ProjectMode } from '$lib/project-mode';
 
   type ProjectRow = { id: string; name: string; href: string; updatedAt: string; mode?: string };
   type CanvasRow = { id: string; name: string; href: string };
@@ -69,6 +69,7 @@
   const standardProjects = $derived(projects.filter((p) => p.mode !== ProjectMode.Nsfw));
   const nsfwProjects = $derived(projects.filter((p) => p.mode === ProjectMode.Nsfw));
   const inNsfw = $derived(projectMode === ProjectMode.Nsfw);
+  const mode = $derived(modeOf(projectMode));
 
   let renaming = $state(false);
   let draftName = $state('');
@@ -257,17 +258,21 @@
       <CreditAmount amount={creditBalance} />
     </a>
 
-    <button
-      type="button"
-      class="promote-btn"
-      data-testid="topbar-promote"
-      onclick={() => openSheet(projectId, promotePath($canvasSelection))}
-    >
-      <Megaphone size={14} />
-      Promote
-    </button>
+    {#if modeAllows(mode, Capability.Promote)}
+      <button
+        type="button"
+        class="promote-btn"
+        data-testid="topbar-promote"
+        onclick={() => openSheet(projectId, promotePath($canvasSelection))}
+      >
+        <Megaphone size={14} />
+        Promote
+      </button>
+    {/if}
 
-    <CanvasShare {shareToken} {onShare} />
+    {#if modeAllows(mode, Capability.Share)}
+      <CanvasShare {shareToken} {onShare} />
+    {/if}
 
     <button
       type="button"
@@ -440,8 +445,8 @@
     }
   }
   .nsfw-badge {
-    border: 1px solid var(--destructive);
-    color: var(--destructive);
+    border: 1px solid var(--color-destructive);
+    color: var(--color-destructive);
     padding: 0 0.25rem;
     font-size: 0.625rem;
     line-height: 1rem;
@@ -449,6 +454,6 @@
   .nsfw-section-label {
     padding: 0.25rem 0.5rem;
     font-size: 0.625rem;
-    color: var(--destructive);
+    color: var(--color-destructive);
   }
 </style>

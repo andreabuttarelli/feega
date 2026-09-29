@@ -32,6 +32,13 @@ export const MODE_REFUSAL: Readonly<Record<Capability, string>> = {
 
 const WIRO_PREFIX = 'wiro/';
 
+export const SECTION_CAPABILITY: Readonly<Record<string, Capability>> = {
+  calendar: Capability.Schedule,
+  promote: Capability.Promote,
+  ads: Capability.Promote,
+  influencers: Capability.CatalogueWrite
+};
+
 export const STORAGE_FOLDER: Readonly<Record<ProjectMode, string>> = {
   [ProjectMode.Standard]: 'media',
   [ProjectMode.Nsfw]: 'nsfw'
@@ -47,6 +54,11 @@ export function modeAllows(mode: ProjectMode, capability: Capability): boolean {
 
 function capabilityOfModel(model: string): Capability {
   return model.startsWith(WIRO_PREFIX) ? Capability.WiroModels : Capability.StandardModels;
+}
+
+export function sectionAllowed(mode: ProjectMode, section: string): boolean {
+  const capability = SECTION_CAPABILITY[section];
+  return !capability || modeAllows(mode, capability);
 }
 
 export function modelAllowedIn(mode: ProjectMode, model: string | null | undefined): boolean {

@@ -49,7 +49,7 @@ describe('catalogueIn', () => {
     const standard = catalogueIn(ProjectMode.Standard, catalogue);
     expect(standard.image.choices.map((c) => c.id)).toEqual(['openai/b']);
     expect(standard.image.recommended.map((c) => c.id)).toEqual(['openai/b']);
-    expect(standard.image.candidates).toEqual([]);
+    expect((standard.image as { candidates?: unknown[] }).candidates).toEqual([]);
     expect(standard.video.choices).toEqual([]);
     expect(catalogueIn(ProjectMode.Nsfw, catalogue)).toEqual(catalogue);
   });
