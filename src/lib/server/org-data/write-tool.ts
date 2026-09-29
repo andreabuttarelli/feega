@@ -19,7 +19,7 @@ import { logAiCall } from '$lib/server/ai-log';
 import type { OrgQueryAuthority } from './query-tool';
 import { announcePresence } from './presence';
 import type { Actor } from '$lib/server/repos/actor';
-import { validateNewNodeData, validateNodeDataPatch } from '$lib/canvas/node-data';
+import { validateNewNodeData, validateNodeDataUpdate } from '$lib/canvas/node-data';
 import { mergeNodeData, type NodeData } from '$lib/canvas/node-patch';
 
 type NodeMerge = { id: string; version: number; data: NodeData };
@@ -429,7 +429,7 @@ export function createOrgWriteTools({ authority, orgId, userId, threadId, actor 
       const merged: NodeMerge[] = [];
       for (const row of (current.data ?? []) as Array<{ id: string; type: string; data: unknown; version: number }>) {
         const type = String(values.type ?? row.type);
-        const verdict = validateNodeDataPatch(type, row.data, values.data);
+        const verdict = validateNodeDataUpdate(type, row.data, values.data);
         if (!verdict.ok) {
           return finish(invalidNodeData(`node ${row.id}: ${verdict.error}`), 'org_db_write:refused:invalid_node_data', t0);
         }

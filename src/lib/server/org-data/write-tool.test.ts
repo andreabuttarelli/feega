@@ -333,6 +333,43 @@ describe('update_row su nodes: data si valida DOPO la fusione con la riga esiste
   });
 });
 
+describe('update_row on nodes: data keys are as strict as insert_row', () => {
+  it('refuses a key the node type does not have, listing the allowed fields', async () => {
+    const { calls, supabase } = fakeAuthority({
+      count: 1,
+      currentRows: [{ id: 'n1', type: 'image', version: 1, data: { prompt: 'un gatto' } }]
+    });
+
+    const out = await tools(supabase, 'org-mine').updateRow({
+      table: 'nodes',
+      where: [{ column: 'id', op: 'eq', value: 'n1' }],
+      values: { data: { colour: 'red' } }
+    });
+
+    expect(out.error).toBe('invalid_node_data');
+    expect(out.message).toMatch(/"colour"/);
+    expect(out.message).toMatch(/Allowed: .*prompt.*refId/);
+    expect(calls.filter((c) => c.op === 'update')).toHaveLength(0);
+  });
+
+  it('keeps accepting the system-owned keys the canvas and engine write', async () => {
+    const { calls, supabase } = fakeAuthority({
+      count: 1,
+      currentRows: [{ id: 'n1', type: 'image', version: 1, data: { prompt: 'un gatto' } }],
+      writeRows: [{ id: 'n1' }]
+    });
+
+    const out = await tools(supabase, 'org-mine').updateRow({
+      table: 'nodes',
+      where: [{ column: 'id', op: 'eq', value: 'n1' }],
+      values: { data: { refId: 'a1', runId: 'r1', running: false, error: null, params: { aspectRatio: '1:1' } } }
+    });
+
+    expect(out.error).toBeUndefined();
+    expect(calls.filter((c) => c.op === 'update')).toHaveLength(1);
+  });
+});
+
 describe('insert_row/update_row: le colonne jsonb registrate si giudicano, non solo nodes.data', () => {
   it('insert: rifiuta posts.media che non è un array di { assetId, order }', async () => {
     const { calls, supabase } = fakeAuthority({});

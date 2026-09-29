@@ -516,12 +516,34 @@ function fieldsOf(type: NodeType): string[] {
   return Object.keys((describeNodeType(type).properties ?? {}) as Record<string, unknown>);
 }
 
-export function unknownFieldsError(type: string, data: unknown): string | null {
+export const SYSTEM_OWNED_FIELDS = [
+  'refId',
+  'sourceRefId',
+  'mediaKind',
+  'assetId',
+  'runId',
+  'running',
+  'error',
+  'params',
+  'html'
+] as const;
+
+export enum FieldScope {
+  Schema = 'schema',
+  WithSystem = 'with-system'
+}
+
+const FIELDS_BY_SCOPE: Record<FieldScope, (type: NodeType) => string[]> = {
+  [FieldScope.Schema]: fieldsOf,
+  [FieldScope.WithSystem]: (type) => [...new Set([...fieldsOf(type), ...SYSTEM_OWNED_FIELDS])]
+};
+
+export function unknownFieldsError(type: string, data: unknown, scope = FieldScope.Schema): string | null {
   if (!isNodeType(type) || !data || typeof data !== 'object') {
     return null;
   }
 
-  const allowed = fieldsOf(type);
+  const allowed = FIELDS_BY_SCOPE[scope](type);
   const unknown = Object.entries(data)
     .filter(([key, value]) => value !== null && !allowed.includes(key))
     .map(([key]) => key);
@@ -542,4 +564,12 @@ export function validateNewNodeData(type: string, data: unknown): NodeDataVerdic
     return { ok: false, error: unknown };
   }
   return validateNodeData(type, data);
+}
+
+export function validateNodeDataUpdate(type: string, current: unknown, patch: unknown): NodeDataVerdict {
+  const unknown = unknownFieldsError(type, patch, FieldScope.WithSystem);
+  if (unknown) {
+    return { ok: false, error: unknown };
+  }
+  return validateNodeDataPatch(type, current, patch);
 }
