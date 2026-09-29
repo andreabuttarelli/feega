@@ -48,7 +48,7 @@ const ORG_BILLING_NO_CUSTOMER = {
 	brandCount: 1
 };
 
-function call(body: unknown = { usd: 30 }, slug = 'demo') {
+function call(body: unknown = { usd: 32 }, slug = 'demo') {
 	const url = new URL(`https://feega.test/api/v1/brands/${slug}/billing/checkout/one-time`);
 	return (POST as (event: unknown) => Promise<Response>)({
 		request: new Request(url, { method: 'POST', body: JSON.stringify(body) }),
@@ -79,26 +79,26 @@ beforeEach(() => {
 
 describe('POST /api/v1/brands/:slug/billing/checkout/one-time', () => {
 	it('creates a payment-mode session for the ladder rung and returns its credits', async () => {
-		const { res, body } = await call({ usd: 30 });
+		const { res, body } = await call({ usd: 32 });
 
 		expect(res.status).toBe(200);
 		expect(body.ok).toBe(true);
 		expect(body.url).toBe(CHECKOUT_URL);
-		expect(body.credits).toBe(2100);
+		expect(body.credits).toBe(3200);
 		expect(createOneTimeCreditCheckout).toHaveBeenCalledWith({
 			customerId: 'cus_org',
 			orgId: 'org-1',
-			price: 30,
-			credits: 2100,
-			successUrl: 'https://feega.test/p/p1/settings/billing',
-			cancelUrl: 'https://feega.test/p/p1/settings/billing'
+			price: 32,
+			credits: 3200,
+			successUrl: 'https://feega.test/p/p1/settings/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}',
+			cancelUrl: 'https://feega.test/p/p1/settings/billing?checkout=canceled'
 		});
 	});
 
 	it('creates the org Stripe customer on the spot when none exists yet — no subscription required first', async () => {
 		orgBillingForBrand.mockResolvedValue(ORG_BILLING_NO_CUSTOMER);
 
-		const { res } = await call({ usd: 30 });
+		const { res } = await call({ usd: 32 });
 
 		expect(res.status).toBe(200);
 		expect(ensureOrgCustomer).toHaveBeenCalledWith({
@@ -125,14 +125,14 @@ describe('POST /api/v1/brands/:slug/billing/checkout/one-time', () => {
 	});
 
 	it('checks the owner against the org the brand belongs to', async () => {
-		await call({ usd: 30 });
+		await call({ usd: 32 });
 		expect(isOrgOwner).toHaveBeenCalledWith(expect.anything(), 'org-1', 'user-1');
 	});
 
 	it('refuses a caller who reaches the brand but does not own the org billing', async () => {
 		isOrgOwner.mockResolvedValue(false);
 
-		const { res, body } = await call({ usd: 30 });
+		const { res, body } = await call({ usd: 32 });
 
 		expect(res.status).toBe(403);
 		expect(body.error).toBe('not_org_owner');
@@ -142,7 +142,7 @@ describe('POST /api/v1/brands/:slug/billing/checkout/one-time', () => {
 	it('a Stripe outage is ours: 502, not a 4xx that accuses the caller', async () => {
 		createOneTimeCreditCheckout.mockRejectedValue(new Error('connection error'));
 
-		const { res, body } = await call({ usd: 30 });
+		const { res, body } = await call({ usd: 32 });
 
 		expect(res.status).toBe(502);
 		expect(body.error).toBe('stripe_unavailable');
@@ -164,7 +164,7 @@ describe('POST /api/v1/brands/:slug/billing/checkout/one-time', () => {
 			error: new Response(JSON.stringify({ error: 'Brand not found' }), { status: 404 })
 		} as never);
 
-		const { res } = await call({ usd: 30 }, 'altrui');
+		const { res } = await call({ usd: 32 }, 'altrui');
 
 		expect(res.status).toBe(404);
 		expect(createOneTimeCreditCheckout).not.toHaveBeenCalled();
@@ -175,14 +175,14 @@ describe('POST /api/v1/brands/:slug/billing/checkout/one-time', () => {
 			new Response(JSON.stringify({ error: 'API key is read-only' }), { status: 403 }) as never
 		);
 
-		const { res } = await call({ usd: 30 });
+		const { res } = await call({ usd: 32 });
 
 		expect(res.status).toBe(403);
 		expect(createOneTimeCreditCheckout).not.toHaveBeenCalled();
 	});
 
 	it('rejects a field the contract never declared instead of ignoring it', async () => {
-		const { res, body } = await call({ usd: 30, coupon: 'FREE' });
+		const { res, body } = await call({ usd: 32, coupon: 'FREE' });
 
 		expect(res.status).toBe(400);
 		expect(body.error).toBe('invalid_input');
@@ -192,7 +192,7 @@ describe('POST /api/v1/brands/:slug/billing/checkout/one-time', () => {
 	it('refuses to sell when a grant could not land — the sync engine trigger is not there yet', async () => {
 		billingGrantsReady.mockResolvedValue(false);
 
-		const { res, body } = await call({ usd: 30 });
+		const { res, body } = await call({ usd: 32 });
 
 		expect(res.status).toBe(409);
 		expect(body.error).toBe('purchases_not_ready');

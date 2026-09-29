@@ -37,7 +37,7 @@ feega ads <slug> --pause <id>             # Pausa
 feega ads <slug> --resume <id>            # Riattiva
 
 # Account e billing
-feega upgrade <slug>                      # Apri checkout piano
+feega upgrade <slug> --usd 16             # Checkout piano mensile (--top-up N: ricarica)
 feega update                              # Aggiorna la CLI
 ```
 

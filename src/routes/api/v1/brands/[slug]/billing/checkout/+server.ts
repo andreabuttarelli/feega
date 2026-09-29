@@ -4,7 +4,8 @@ import { authenticate, checkApiKeyWriteAccess, loadBrandForUser } from '$lib/ser
 import { billingLink } from '$lib/server/billing-links';
 import { isOrgOwner, orgBillingForBrand } from '$lib/server/org-billing';
 import { billingGrantsReady } from '$lib/server/billing-readiness';
-import { CREDIT_LADDER } from '$lib/credit-ladder';
+import { CREDIT_LADDER, rungFor } from '$lib/credit-ladder';
+import { checkoutReturnUrls } from '$lib/billing-path';
 import { appOrigin } from '$lib/server/app-url';
 import { appPathForBrand } from '$lib/server/tenancy/brand-slug';
 
@@ -22,7 +23,7 @@ const SUBSCRIPTION_RUNGS = CREDIT_LADDER.map((rung) => ({
  * this still proxies to the hosted portal, which can only CHANGE an existing subscription — so
  * that path still refuses `no_subscription` when there is none. With a rung picked, a missing
  * subscription is no longer a refusal: this mints a real Checkout Session on that rung's Stripe
- * Price (see `subscriptionPriceIdFor`), which is how a first subscription gets created at all.
+ * Price, resolved by lookup key, which is how a first subscription gets created at all.
  */
 export const POST: RequestHandler = async ({ request, params, url }) => {
   const { supabase, user, apiKey, error } = await authenticate(request);
@@ -56,7 +57,7 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
   }
 
   const wanted = parsed.data.usd;
-  const rung = wanted != null ? CREDIT_LADDER.find((r) => r.price === wanted) : undefined;
+  const rung = wanted != null ? rungFor(wanted) : undefined;
   if (wanted != null && !rung) {
     return json(
       { error: 'unknown_plan', plans: SUBSCRIPTION_RUNGS },
@@ -70,17 +71,15 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
   }
 
   if (rung && !billing.subscriptionId) {
-    const { subscriptionPriceIdFor } = await import('$lib/server/stripe');
-    const priceId = subscriptionPriceIdFor(rung.price);
-    if (!priceId) {
-      return json(
-        { error: 'subscriptions_not_configured', app_billing_url: appBillingUrl },
-        { status: statusForFailure(CHECKOUT_LINK, 'subscriptions_not_configured') }
-      );
-    }
-
     try {
-      const { ensureOrgCustomer, createSubscriptionCheckout } = await import('$lib/server/stripe');
+      const { subscriptionPriceIdFor, ensureOrgCustomer, createSubscriptionCheckout } = await import('$lib/server/stripe');
+      const priceId = await subscriptionPriceIdFor(rung.price);
+      if (!priceId) {
+        return json(
+          { error: 'subscriptions_not_configured', app_billing_url: appBillingUrl },
+          { status: statusForFailure(CHECKOUT_LINK, 'subscriptions_not_configured') }
+        );
+      }
       const customerId = await ensureOrgCustomer({
         id: billing.orgId,
         name: billing.orgName,
@@ -90,9 +89,8 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
         customerId,
         orgId: billing.orgId,
         priceId,
-        credits: rung.creditsSubscription,
-        successUrl: appBillingUrl,
-        cancelUrl: appBillingUrl
+        credits: rung.credits,
+        ...checkoutReturnUrls(appBillingUrl)
       });
       return json({ ok: true, url: checkoutUrl, plans: SUBSCRIPTION_RUNGS });
     } catch (e) {

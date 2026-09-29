@@ -4,7 +4,7 @@ import { fail, redirect } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 import { syncBrandAccounts, disconnectAccount } from '$lib/server/zernio';
 import { canAffordSeat } from '$lib/server/social-connections';
-import { CREDIT_LADDER } from '$lib/credit-ladder';
+import { rungFor } from '$lib/credit-ladder';
 import { generateApiKey } from '$lib/server/cli-auth';
 import { sendEmail, brandInviteEmailSubject, brandInviteEmailHtml, brandInviteEmailText } from '$lib/server/email';
 import { emailLocale } from '$lib/server/email-i18n';
@@ -15,7 +15,8 @@ import { readUploadImage } from '$lib/server/raster-image';
 import { isOrgOwner, orgBillingById } from '$lib/server/org-billing';
 import { portalLink } from '$lib/server/billing-links';
 import { billingGrantsReady } from '$lib/server/billing-readiness';
-import { billingPath } from '$lib/billing-path';
+import { billingPath, checkoutReturnUrls } from '$lib/billing-path';
+import { appOrigin } from '$lib/server/app-url';
 
 const stripeApi = () => import('$lib/server/stripe');
 
@@ -78,7 +79,7 @@ export async function billingPortal(event: Ev) {
   const flow = flowRaw === 'payment_method' || flowRaw === 'upgrade' ? flowRaw : undefined;
 
   const link = await portalLink(await orgBillingById(event.locals.supabase, scope.orgId), {
-    returnUrl: `${event.url.origin}${billingPath(scope.projectId)}`,
+    returnUrl: `${appOrigin(event.url)}${billingPath(scope.projectId)}`,
     flow
   });
   if (link.refusal === 'no_org_billing') return fail(404, { billingError: 'Organization not found' });
@@ -100,23 +101,22 @@ export async function upgrade(event: Ev) {
   const data = await event.request.formData();
   const usd = Number(data.get('usd') ?? '');
 
-  const rung = CREDIT_LADDER.find((r) => r.price === usd);
+  const rung = rungFor(usd);
   if (!rung) return fail(400, { billingError: 'Unknown subscription tier' });
 
   const billing = await orgBillingById(supabase, scope.orgId);
   if (!billing) return fail(404, { billingError: 'Organization not found' });
 
-  const returnUrl = `${event.url.origin}${billingPath(scope.projectId)}`;
+  const returnUrl = `${appOrigin(event.url)}${billingPath(scope.projectId)}`;
 
   if (!billing.subscriptionId) {
     const { subscriptionPriceIdFor, ensureOrgCustomer, createSubscriptionCheckout } = await stripeApi();
-    const priceId = subscriptionPriceIdFor(rung.price);
-    if (!priceId) {
-      return fail(400, { billingError: 'Subscriptions are not configured yet for this rung.' });
-    }
-
     let checkoutUrl: string;
     try {
+      const priceId = await subscriptionPriceIdFor(rung.price);
+      if (!priceId) {
+        return fail(400, { billingError: 'Subscriptions are not configured yet for this tier.' });
+      }
       const customerId = await ensureOrgCustomer({
         id: billing.orgId,
         name: billing.orgName,
@@ -126,9 +126,8 @@ export async function upgrade(event: Ev) {
         customerId,
         orgId: billing.orgId,
         priceId,
-        credits: rung.creditsSubscription,
-        successUrl: returnUrl,
-        cancelUrl: returnUrl
+        credits: rung.credits,
+        ...checkoutReturnUrls(returnUrl)
       });
     } catch (e) {
       return fail(500, { billingError: e instanceof Error ? e.message : 'Could not start the upgrade' });

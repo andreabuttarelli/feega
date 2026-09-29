@@ -3,7 +3,8 @@ import type { RequestHandler } from './$types';
 import { authenticate, checkApiKeyWriteAccess, loadBrandForUser } from '$lib/server/cli-auth';
 import { isOrgOwner, orgBillingForBrand } from '$lib/server/org-billing';
 import { billingGrantsReady } from '$lib/server/billing-readiness';
-import { CREDIT_LADDER } from '$lib/credit-ladder';
+import { rungFor } from '$lib/credit-ladder';
+import { checkoutReturnUrls } from '$lib/billing-path';
 import { appOrigin } from '$lib/server/app-url';
 import { appPathForBrand } from '$lib/server/tenancy/brand-slug';
 
@@ -11,8 +12,8 @@ const BILLING_SUBPATH = '/settings/billing';
 import { ONE_TIME_CHECKOUT_LINK, statusForFailure } from '@feega/api-contracts';
 
 /**
- * The one-time side of CREDIT_LADDER: a fixed batch of credits bought once, at the 70:1 rate
- * (`creditsOneTime`), that never expires. Unlike the subscription checkout, this needs no Stripe
+ * The one-time side of CREDIT_LADDER: a fixed batch of credits bought once, at the same $1 per
+ * credit as the plans, that never expires. Unlike the subscription checkout, this needs no Stripe
  * Price configured per rung — `createOneTimeCreditCheckout` inlines the amount — so it works the
  * moment an org exists, subscribed or not.
  */
@@ -45,7 +46,7 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
     );
   }
 
-  const rung = CREDIT_LADDER.find((r) => r.price === parsed.data.usd);
+  const rung = rungFor(parsed.data.usd);
   if (!rung) {
     return json(
       { error: 'unknown_plan' },
@@ -74,11 +75,10 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
       customerId,
       orgId: billing.orgId,
       price: rung.price,
-      credits: rung.creditsOneTime,
-      successUrl: appBillingUrl,
-      cancelUrl: appBillingUrl
+      credits: rung.credits,
+      ...checkoutReturnUrls(appBillingUrl)
     });
-    return json({ ok: true, url: checkoutUrl, credits: rung.creditsOneTime });
+    return json({ ok: true, url: checkoutUrl, credits: rung.credits });
   } catch (e) {
     return json(
       { error: 'stripe_unavailable', message: e instanceof Error ? e.message : undefined },
