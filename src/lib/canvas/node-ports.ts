@@ -39,7 +39,8 @@ export const NODE_PORTS: Record<NodeType, Ports> = {
   list: { inputs: InputRule.List, output: OutputRule.Item },
   select: { inputs: ['text', 'images'], output: OutputRule.Item },
   effects: { inputs: ['images', 'videos'], output: OutputRule.Media },
-  composition: { inputs: ['images'], output: 'videos' }
+  composition: { inputs: ['images'], output: 'videos' },
+  calendar: { inputs: NONE, output: null }
 };
 
 const INPUTS: Record<InputRule, (ctx: PortContext) => ConnectorType[]> = {
