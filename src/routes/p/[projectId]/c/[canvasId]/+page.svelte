@@ -13,6 +13,7 @@
    * Qui si fa l'altra metà — quale riga sta dietro una tile, e cosa si scrive quando cambia.
    */
   import { onCanvasReveal } from '$lib/canvas/canvas-reveal';
+  import { keepSame } from '$lib/canvas/snapshot-keep';
   import { createWriteQueue } from '$lib/canvas/write-queue';
   import { canvasActionUrl } from '$lib/canvas/canvas-action-url';
   import { baseOf, diffNodeData } from '$lib/canvas/node-patch';
@@ -604,11 +605,12 @@
       nodes = adoptIdleRows(nodes, snapshot.nodes as CanvasNodeRecord[], enqueue.busy);
       return;
     }
-    nodes = (snapshot.nodes as CanvasNodeRecord[]).map((n) => toTile(n));
-    edges = (snapshot.connections as Connection[]).map(toEdge);
-    productsOverride = (snapshot.products ?? {}) as Record<string, Product[]>;
-    socialPostsOverride = (snapshot.socialPosts ?? {}) as Record<string, SocialPost[]>;
-    influencersOverride = (snapshot.influencers ?? {}) as Record<string, InfluencerTile>;
+    const now = Date.now();
+    nodes = keepSame(nodes, (snapshot.nodes as CanvasNodeRecord[]).map((n) => toTile(n)), now);
+    edges = keepSame(edges, (snapshot.connections as Connection[]).map(toEdge), now);
+    productsOverride = keepSame(products, (snapshot.products ?? {}) as Record<string, Product[]>, now);
+    socialPostsOverride = keepSame(socialPosts, (snapshot.socialPosts ?? {}) as Record<string, SocialPost[]>, now);
+    influencersOverride = keepSame(influencersByNode, (snapshot.influencers ?? {}) as Record<string, InfluencerTile>, now);
   }
 
   $effect(() => {
