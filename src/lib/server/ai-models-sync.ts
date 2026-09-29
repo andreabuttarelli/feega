@@ -23,6 +23,8 @@
  */
 import { env } from '$env/dynamic/private';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { fetchWiroCatalogue } from './wiro-catalogue';
+import { DEFAULT_WIRO_BASE_URL } from './wiro';
 
 export type AiModelCatalogue = 'chat' | 'image' | 'video';
 
@@ -75,6 +77,8 @@ export type AiModelRow = {
   param_schema: Record<string, unknown>;
   pricing?: Record<string, unknown> | ImagePricing;
   synced_at: string;
+  uncensored: boolean;
+  wire_spec: Record<string, unknown>;
 } & ReleaseFacts;
 
 type ReleaseFacts = {
@@ -138,6 +142,8 @@ function imageParamSchema(raw: unknown): Record<string, unknown> {
   return raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
 }
 
+const OPENROUTER_WIRING = { uncensored: false, wire_spec: {} };
+
 function chatOrImageRow(m: RawChatOrImageModel, catalogue: 'chat' | 'image', syncedAt: string): AiModelRow | null {
   if (!m.id) return null;
   return {
@@ -152,6 +158,7 @@ function chatOrImageRow(m: RawChatOrImageModel, catalogue: 'chat' | 'image', syn
     param_schema: catalogue === 'image' ? imageParamSchema(m.supported_parameters) : {},
     pricing: m.pricing ?? {},
     synced_at: syncedAt,
+    ...OPENROUTER_WIRING,
     ...releaseFactsOf(m)
   };
 }
@@ -192,13 +199,14 @@ function videoRow(m: RawVideoModel, syncedAt: string): AiModelRow | null {
     param_schema: videoParamSchema(m),
     pricing: m.pricing_skus ?? {},
     synced_at: syncedAt,
+    ...OPENROUTER_WIRING,
     ...releaseFactsOf(m)
   };
 }
 
 export type SyncOutcome = { ok: true; synced: number } | { ok: false; reason: string };
 
-const COLUMNS_NEWER_THAN_TABLE = ['param_schema', 'released_at', 'expires_at', 'context_length', 'intelligence_index'] as const;
+const COLUMNS_NEWER_THAN_TABLE = ['param_schema', 'released_at', 'expires_at', 'context_length', 'intelligence_index', 'uncensored', 'wire_spec'] as const;
 
 function missingColumnIn(message: string): string | undefined {
   if (!message.includes('does not exist')) {
@@ -340,7 +348,7 @@ async function keepImagePricing(admin: SupabaseClient, rows: AiModelRow[]): Prom
 
 export async function syncAiModels(
   admin: SupabaseClient,
-  opts: { fetchImpl?: typeof fetch; baseUrl?: string } = {}
+  opts: { fetchImpl?: typeof fetch; baseUrl?: string; wiroBaseUrl?: string } = {}
 ): Promise<SyncOutcome> {
   const doFetch = opts.fetchImpl ?? fetch;
   const baseUrl = (opts.baseUrl ?? env.LLM_BASE_URL?.trim() ?? '').replace(/\/$/, '');
@@ -350,7 +358,8 @@ export async function syncAiModels(
   const results = await Promise.all([
     fetchCatalogue(doFetch, baseUrl, CHAT_CATALOGUE, syncedAt),
     fetchImageCatalogue(doFetch, baseUrl, syncedAt),
-    fetchCatalogue(doFetch, baseUrl, VIDEO_CATALOGUE, syncedAt)
+    fetchCatalogue(doFetch, baseUrl, VIDEO_CATALOGUE, syncedAt),
+    fetchWiroCatalogue(doFetch, opts.wiroBaseUrl ?? env.WIRO_BASE_URL?.trim() ?? DEFAULT_WIRO_BASE_URL, syncedAt)
   ]);
 
   const rows = await keepImagePricing(admin, results.flatMap((result) => result.rows));
