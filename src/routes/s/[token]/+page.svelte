@@ -55,7 +55,7 @@
               total={node.view.total}
               syncStatus="done"
               syncError={null}
-              empty=""
+              empty="Nothing here yet"
             />
           {:else if node.view.kind === 'list'}
             <ol class="items nowheel">
@@ -87,6 +87,9 @@
             </article>
           {:else if node.view.kind === 'ads'}
             <p class="big">{node.view.query}<span>{node.view.country}</span></p>
+          {:else}
+            {@const Icon = NODE_KIND_ICON[node.type as NodeType]}
+            <p class="empty"><Icon size={20} strokeWidth={1.6} />Nothing here yet</p>
           {/if}
         </div>
       {/if}
@@ -97,6 +100,17 @@
 </main>
 
 <style>
+  .empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 100%;
+    margin: 0;
+    font-size: 13px;
+    color: var(--ink-faint);
+  }
   .shared-canvas {
     position: fixed;
     inset: 0;

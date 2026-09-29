@@ -33,7 +33,7 @@ async function requirePost(event: RequestEvent): Promise<PostScope | null> {
 
   const { data } = await db.from('projects').select('org_id').eq('id', event.params.projectId ?? '').maybeSingle();
   const orgId = (data as { org_id: string } | null)?.org_id;
-  if (!orgId) throw error(NOT_FOUND, 'progetto non trovato');
+  if (!orgId) throw error(NOT_FOUND, 'Project not found');
 
   const fd = await event.request.formData();
   const postId = String(fd.get('postId') ?? '');

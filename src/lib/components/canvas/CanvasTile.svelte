@@ -246,7 +246,7 @@
     gap: 5px;
     max-width: 100%;
     padding: 2px 0;
-    font-size: 11px;
+    font-size: var(--canvas-label-size);
     line-height: 1.3;
     color: var(--ink-soft, #6e6e73);
     white-space: nowrap;

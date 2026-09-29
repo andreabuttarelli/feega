@@ -109,7 +109,7 @@
       video.preload = 'metadata';
       video.onloadedmetadata = () =>
         resolve({ width: video.videoWidth, height: video.videoHeight, durationS: video.duration, fps: PROBE_FPS });
-      video.onerror = () => reject(new Error('video non leggibile'));
+      video.onerror = () => reject(new Error('video could not be read'));
       video.src = url;
     });
   }

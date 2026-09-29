@@ -120,6 +120,7 @@
   --page-title-bar-sub-size: 0.8rem;
   /* Shared shell chrome: top bar + sidebar header */
   --shell-top-h: 56px;
+  --canvas-label-size: 12px;
   /* Single content column — shell, shimmer, and every hub page */
   --content-max: 960px;
   --content-pad-x: 20px;

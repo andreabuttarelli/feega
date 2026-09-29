@@ -244,7 +244,7 @@
               indeterminate={properties.audio.kind === 'mixed'}
               onchange={(e) => onpropertychange?.({ audio: e.currentTarget.checked })}
             />
-            audio
+            Audio
           </label>
         {/if}
 
@@ -256,7 +256,7 @@
               indeterminate={properties.enhancePrompt.kind === 'mixed'}
               onchange={(e) => onpropertychange?.({ enhancePrompt: e.currentTarget.checked })}
             />
-            Migliora prompt
+            Enhance prompt
           </label>
         {/if}
 

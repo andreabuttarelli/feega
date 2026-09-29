@@ -14,13 +14,13 @@ export async function convertImageTo(
 
 	const ctx = canvas.getContext('2d');
 	if (!ctx) {
-		throw new Error('canvas 2d non disponibile');
+		throw new Error('canvas 2d unavailable');
 	}
 	ctx.drawImage(image, 0, 0);
 
 	return new Promise((resolve, reject) => {
 		canvas.toBlob(
-			(blob) => (blob ? resolve(blob) : reject(new Error('conversione immagine fallita'))),
+			(blob) => (blob ? resolve(blob) : reject(new Error('image conversion failed'))),
 			mime,
 			quality
 		);
@@ -32,7 +32,7 @@ function loadImage(url: string): Promise<HTMLImageElement> {
 		const image = new Image();
 		image.crossOrigin = 'anonymous';
 		image.onload = () => resolve(image);
-		image.onerror = () => reject(new Error('immagine non caricabile'));
+		image.onerror = () => reject(new Error('image could not load'));
 		image.src = url;
 	});
 }
@@ -53,7 +53,7 @@ export async function convertVideoToGif(
 	canvas.height = plan.height;
 	const ctx = canvas.getContext('2d', { willReadFrequently: true });
 	if (!ctx) {
-		throw new Error('canvas 2d non disponibile');
+		throw new Error('canvas 2d unavailable');
 	}
 
 	const encoder = GIFEncoder();
@@ -88,7 +88,7 @@ function loadVideo(url: string): Promise<HTMLVideoElement> {
 		video.playsInline = true;
 		video.preload = 'auto';
 		video.onloadedmetadata = () => resolve(video);
-		video.onerror = () => reject(new Error('video non caricabile'));
+		video.onerror = () => reject(new Error('video could not load'));
 		video.src = url;
 	});
 }

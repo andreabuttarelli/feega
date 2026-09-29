@@ -26,7 +26,7 @@ async function scopeFor(event: RequestEvent) {
   const memberships = await listMemberships(db, user.id);
   const found = await findProjectForUser(db, { projectId: event.params.projectId ?? '', memberships });
   if (!found) {
-    throw error(404, 'questo progetto non esiste, o non è tuo');
+    throw error(404, 'This project does not exist, or is not yours');
   }
 
   return { db, orgId: found.orgId, project: found.project, userId: user.id };
