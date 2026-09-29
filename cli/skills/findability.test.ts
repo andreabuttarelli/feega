@@ -32,6 +32,7 @@ const ASKED_FOR: ReadonlyArray<{ tool: string; question: string; words: readonly
   { tool: 'approve_ad_campaign', question: 'approve this ad campaign so it can spend', words: ['approve', 'campaign', 'spend'] },
   { tool: 'insert_row', question: 'add a row to a table', words: ['add', 'row', 'table'] },
   { tool: 'delete_row', question: 'delete rows from a table', words: ['remove', 'org'] },
+  { tool: 'get_media', question: 'show me the image this node generated', words: ['view', 'image', 'node'] },
   { tool: 'describe_node_types', question: 'what shape does a node need', words: ['data', 'type', 'node'] }
 ];
 

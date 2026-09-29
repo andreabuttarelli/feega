@@ -63,11 +63,12 @@ const RESTANO = [
   'enhance_prompt',
   'run_node_loop',
   'preview_node_loop',
-  'cancel_node_loop'
+  'cancel_node_loop',
+  'get_media'
 ];
 
-describe('la superficie MCP è le diciotto dichiarate', () => {
-  test('tools/list è esattamente questi diciotto nomi', async () => {
+describe('la superficie MCP è le diciannove dichiarate', () => {
+  test('tools/list è esattamente questi diciannove nomi', async () => {
     const names = (await tools()).map((t) => t.name).sort();
 
     expect(names).toEqual([...RESTANO].sort());
@@ -79,9 +80,9 @@ describe('la superficie MCP è le diciotto dichiarate', () => {
     expect(names).toEqual([...new Set(names)]);
   });
 
-  test('le cinque letture sono annotate readOnlyHint', async () => {
+  test('le sei letture sono annotate readOnlyHint', async () => {
     const all = await tools();
-    const reads = ['query', 'describe_node_types', 'list_posts', 'list_ad_campaigns', 'preview_node_loop'];
+    const reads = ['query', 'describe_node_types', 'list_posts', 'list_ad_campaigns', 'preview_node_loop', 'get_media'];
 
     for (const name of reads) {
       const tool = all.find((t) => t.name === name) as { annotations?: { readOnlyHint?: boolean } } | undefined;

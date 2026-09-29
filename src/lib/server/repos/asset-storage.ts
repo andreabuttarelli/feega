@@ -46,3 +46,18 @@ export async function signAssetFiles(db: Db, paths: string[], ttlSeconds = SIGNE
   }
   return out;
 }
+
+export const PREVIEW_EDGE_PX = 1024;
+const PREVIEW_QUALITY = 80;
+
+export async function signStoredFile(db: Db, bucket: string, path: string): Promise<string | null> {
+  const { data } = await db.storage.from(bucket).createSignedUrl(path, SIGNED_URL_SECONDS);
+  return data?.signedUrl ?? null;
+}
+
+export async function signStoredPreview(db: Db, bucket: string, path: string): Promise<string | null> {
+  const { data } = await db.storage.from(bucket).createSignedUrl(path, SIGNED_URL_SECONDS, {
+    transform: { width: PREVIEW_EDGE_PX, height: PREVIEW_EDGE_PX, resize: 'contain', quality: PREVIEW_QUALITY }
+  });
+  return data?.signedUrl ?? null;
+}

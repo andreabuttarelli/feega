@@ -129,6 +129,7 @@ returned for it lists every effect's params with their ranges/options/defaults. 
 |-----|-----|
 | `run_node_generation` | (MCP only — the canvas UI's Generate button is the equivalent, not a CLI command) |
 | `enhance_prompt` | (MCP only) |
+| `get_media` | `feega media --node <id> --run <id> --asset <id>` |
 
 `enhance_prompt({ org, prompt, model, shot_mode? })` rewrites a brief into the shape the given
 model wants — labelled sections, one paragraph, a command when editing, whatever that model's
@@ -146,7 +147,14 @@ version.
 A `video` never returns finished here: it comes back `queued` with an `external_job_id` on the
 run, and the render lands later, asynchronously — the node stays `running` until a later tick
 deposits the asset. Poll the node (`query`) rather than expecting a file now. Spends credits; a
-`credits_exhausted` failure means the org is out.
+`credits_exhausted` failure means the org is out. A finished image or text comes back with
+`asset_ids` and `media` (the `get_media` links for it).
+
+`get_media({ org, node_ids?, run_ids?, asset_ids? })` resolves nodes (their current output), runs
+(what that run produced) and assets to: type, mime, width/height, duration, and two signed links
+valid a few minutes — `preview_url` (images only, 1024px long edge: fetch it to see the image)
+and `full_url` (the original, for the user). Ids outside your org come back in `missing`; nothing
+visible at all is a 404. Reads only.
 
 `apply_effects({ org, node_id })` renders an `effects` node's stack onto its upstream image and
 writes the result as the node's `refId` — the same render `EffectsEditor` does in the browser, for

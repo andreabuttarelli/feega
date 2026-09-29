@@ -134,6 +134,38 @@ export type BrandDetail = {
   logoUrl: string | null;
 };
 
+export type MediaItem = {
+  assetId: string;
+  nodeId: string | null;
+  runId: string | null;
+  type: string;
+  mimeType: string | null;
+  width: number | null;
+  height: number | null;
+  durationS: number | null;
+  bytes: number | null;
+  fullUrl: string | null;
+  previewUrl: string | null;
+  text: string | null;
+};
+
+export type Media = { items: MediaItem[]; missing: string[] };
+
+export type MediaQuery = { node?: string[]; run?: string[]; asset?: string[]; org?: string };
+
+function mediaPath(q: MediaQuery): string {
+  const qs = new URLSearchParams();
+  for (const key of ['node', 'run', 'asset'] as const) {
+    if (q[key]?.length) {
+      qs.set(key, q[key]!.join(','));
+    }
+  }
+  if (q.org) {
+    qs.set('org', q.org);
+  }
+  return `/api/v1/org/media?${qs}`;
+}
+
 // ── API methods ─────────────────────────────────────────────────────────
 
 export const api = {
@@ -170,5 +202,7 @@ export const api = {
       t,
       { next }
     ),
+
+  getMedia: (t: string, q: MediaQuery) => get<Media>(mediaPath(q), t),
 
 };
