@@ -56,6 +56,16 @@ describe('pickModel: one resolution for every generation entry', () => {
     expect(!out.ok && out.error).toMatch(/video-b \(balanced\).*video-a \(best\).*video-c \(cheapest-good\)/);
   });
 
+  it.each([
+    ['image', 'an image'],
+    ['video', 'a video'],
+    ['text', 'a text']
+  ] as const)('the refusal names the %s medium with the right article', (medium, phrase) => {
+    const out = pickModel(medium, 'made-up', offered(medium));
+
+    expect(!out.ok && out.error).toContain(`is not ${phrase} model`);
+  });
+
   it('an empty catalogue cannot judge, so an explicit model passes', () => {
     expect(pickModel('text', 'x', { choices: [], recommended: [] })).toEqual({ ok: true, model: 'x' });
   });

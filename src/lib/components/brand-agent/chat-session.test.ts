@@ -1,0 +1,97 @@
+import { describe, it, expect } from 'vitest';
+import { chatSession, anyChatRunning, forgetChatSessions } from './chat-session.svelte';
+
+type Pipe = { push: (text: string) => void; end: () => void };
+
+function sse(evt: object): string {
+  return `data: ${JSON.stringify(evt)}\n\n`;
+}
+
+function fakeServer(saved: object[] = []) {
+  const encoder = new TextEncoder();
+  let pipe: Pipe | null = null;
+
+  const fetcher = (async (_url: string, init?: RequestInit) => {
+    if (init?.method !== 'POST') {
+      return new Response(JSON.stringify({ messages: saved }), { status: 200 });
+    }
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        pipe = {
+          push: (text) => controller.enqueue(encoder.encode(sse({ type: 'text-delta', id: 't', delta: text }))),
+          end: () => controller.close()
+        };
+      }
+    });
+    return new Response(body, { status: 200 });
+  }) as typeof fetch;
+
+  return { fetcher, pipe: () => pipe! };
+}
+
+async function settle() {
+  for (let i = 0; i < 5; i++) {
+    await new Promise((r) => setTimeout(r, 0));
+  }
+}
+
+describe('chatSession', () => {
+  it('il turno in corso sopravvive allo smontaggio del pannello: chi si riattacca lo ritrova vivo', async () => {
+    forgetChatSessions();
+    const server = fakeServer();
+    const first = chatSession('/api/v1/projects/p/agent', server.fetcher);
+    await first.load();
+
+    const sent = first.send('make a doc', 'append-user');
+    await settle();
+    server.pipe().push('Created ');
+    await settle();
+
+    const reattached = chatSession('/api/v1/projects/p/agent', server.fetcher);
+    expect(reattached).toBe(first);
+    expect(reattached.sending).toBe(true);
+    expect(reattached.messages.at(-1)?.content).toBe('Created ');
+
+    server.pipe().push('the doc.');
+    server.pipe().end();
+    await sent;
+
+    expect(reattached.sending).toBe(false);
+    expect(reattached.messages.map((m) => m.content)).toEqual(['make a doc', 'Created the doc.']);
+  });
+
+  it('ricaricare la cronologia a metà turno non cancella la risposta che sta arrivando', async () => {
+    forgetChatSessions();
+    const server = fakeServer([{ role: 'user', content: 'old' }]);
+    const session = chatSession('/api/v1/projects/p/agent', server.fetcher);
+    await session.load();
+
+    const sent = session.send('make a doc', 'append-user');
+    await settle();
+    server.pipe().push('Working');
+    await settle();
+
+    await session.load();
+    expect(session.messages.at(-1)?.content).toBe('Working');
+
+    server.pipe().end();
+    await sent;
+  });
+
+  it('anyChatRunning dice se una chat sta ancora lavorando', async () => {
+    forgetChatSessions();
+    const server = fakeServer();
+    const session = chatSession('/api/v1/projects/p/agent', server.fetcher);
+    await session.load();
+    expect(anyChatRunning()).toBe(false);
+
+    const sent = session.send('hi', 'append-user');
+    await settle();
+    expect(anyChatRunning()).toBe(true);
+
+    server.pipe().push('ok');
+    server.pipe().end();
+    await sent;
+    expect(anyChatRunning()).toBe(false);
+  });
+});

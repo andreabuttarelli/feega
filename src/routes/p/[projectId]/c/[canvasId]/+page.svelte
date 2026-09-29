@@ -12,6 +12,7 @@
    * riquadro, il menù del doppio clic e il rifiuto di una linea mentre il puntatore è in aria.
    * Qui si fa l'altra metà — quale riga sta dietro una tile, e cosa si scrive quando cambia.
    */
+  import { onCanvasReveal } from '$lib/canvas/canvas-reveal';
   import { createWriteQueue } from '$lib/canvas/write-queue';
   import { canvasActionUrl } from '$lib/canvas/canvas-action-url';
   import { baseOf, diffNodeData } from '$lib/canvas/node-patch';
@@ -629,6 +630,8 @@
       onError: () => { failed = 'Connessione in tempo reale interrotta'; }
     });
   });
+
+  $effect(() => onCanvasReveal(() => { void refresh(); }));
 
   const READ_ACTIONS = new Set(['snapshot', 'estimate_text_cost']);
 

@@ -8,7 +8,9 @@
   import CanvasSheet from '$lib/components/canvas/CanvasSheet.svelte';
   import CanvasMobileTabs from '$lib/components/canvas/CanvasMobileTabs.svelte';
   import CanvasMobileMore from '$lib/components/canvas/CanvasMobileMore.svelte';
+  import ChatLeaveGuard from '$lib/components/canvas/ChatLeaveGuard.svelte';
   import { openSheet, restoreSheet } from '$lib/canvas/sheet-nav';
+  import { revealCanvas } from '$lib/canvas/canvas-reveal';
   import { CHROME_LOADERS } from '$lib/canvas/chrome-loaders';
   import MobileTopBar from '$lib/components/canvas/MobileTopBar.svelte';
   import DesktopPageBar from '$lib/components/canvas/DesktopPageBar.svelte';
@@ -113,16 +115,17 @@
   const MOBILE_TAB_ACTIONS: Record<MobileTab['id'], () => TabOutcome> = {
     canvas: () => {
       mobileView = 'page';
-      return onCanvasRoute ? 'handled' : 'follow-link';
+      if (!onCanvasRoute) {
+        return 'follow-link';
+      }
+      revealCanvas();
+      return 'handled';
     },
     chat: () => {
       mobileView = 'chat';
       return 'handled';
     },
-    calendar: () => {
-      mobileView = 'page';
-      return 'follow-link';
-    },
+    calendar: () => 'follow-link',
     more: () => {
       mobileMoreOpen = true;
       return 'handled';
@@ -133,6 +136,8 @@
     return MOBILE_TAB_ACTIONS[tab.id]();
   }
 </script>
+
+<ChatLeaveGuard {projectId} />
 
 <div class="project-shell" class:is-sheet-pending={sheetPending} data-viewport={viewport}>
   {#if isMobile}

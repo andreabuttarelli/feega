@@ -1,50 +1,31 @@
 <script lang="ts">
-  import { tick } from 'svelte';
+  import { tick, untrack } from 'svelte';
   import { _, json } from 'svelte-i18n';
   import { page } from '$app/stores';
-  import { applyChatStreamEvent, closeDanglingToolCalls, emptyStreamState, readSseEvents, type ChatStreamState } from '$lib/chat-stream-events';
   import { nearBottom } from '$lib/chat-scroll';
   import { chatEndpoint } from './chat-endpoint';
+  import { chatSession, type ChatSession } from './chat-session.svelte';
   import { nextFollow, type Follow, type FollowEvent } from './chat-follow';
-  import { FAILURES, failureOfStatus, keyboardInset, speakerStarts, type Failure, type ToolCall } from './chat-view';
+  import { FAILURES, keyboardInset, speakerStarts } from './chat-view';
   import ChatComposer from './ChatComposer.svelte';
   import ChatMessage from './ChatMessage.svelte';
 
   let { projectId = '' }: { projectId?: string } = $props();
 
-  type Message = {
-    role: 'user' | 'assistant';
-    content: string;
-    pending?: boolean;
-    at?: number | null;
-    tools?: ToolCall[];
-    live?: boolean;
-  };
-
-  class HttpFailure extends Error {
-    status: number;
-    constructor(status: number) {
-      super(String(status));
-      this.status = status;
-    }
-  }
-
-  const SILENT_TOOLS = new Set(['reply']);
-
-  let messages = $state<Message[]>([]);
   let draft = $state('');
-  let sending = $state(false);
-  let loading = $state(true);
-  let failed = $state<Failure | ''>('');
   let follow = $state<Follow>('following');
   let scroller = $state<HTMLDivElement | null>(null);
   let root = $state<HTMLDivElement | null>(null);
   let kbInset = $state(0);
-  let abort: AbortController | null = null;
 
   const routeProjectId = $derived($page.params.projectId ?? '');
   const scopeProjectId = $derived(projectId || routeProjectId);
   const endpoint = $derived(chatEndpoint({ projectId: scopeProjectId }));
+  const session = $derived<ChatSession | null>(endpoint ? chatSession(endpoint) : null);
+  const messages = $derived(session?.messages ?? []);
+  const sending = $derived(session?.sending ?? false);
+  const loading = $derived(session?.loading ?? false);
+  const failed = $derived(session?.failed ?? '');
   const starts = $derived(speakerStarts(messages));
   const failure = $derived(failed ? FAILURES[failed] : null);
   const suggestions = $derived(($json('chat.panel.suggestions') as string[] | undefined) ?? []);
@@ -67,40 +48,20 @@
     void toEnd('smooth');
   }
 
-  async function load() {
-    if (!endpoint) {
-      loading = false;
-      messages = [];
-      failed = '';
+  $effect(() => {
+    if (!session) {
       return;
     }
-
-    loading = true;
-    failed = '';
-
-    try {
-      const res = await fetch(endpoint);
-      if (res.status === 404) {
-        messages = [];
-        return;
-      }
-      if (!res.ok) {
-        throw new HttpFailure(res.status);
-      }
-      const data = (await res.json()) as { messages?: Message[] };
-      messages = data.messages ?? [];
+    const current = session;
+    untrack(() => {
       on({ kind: 'jumped' });
-    } catch {
-      failed = 'load';
-    } finally {
-      loading = false;
-      void toEnd();
-    }
-  }
+      void current.load();
+    });
+  });
 
   $effect(() => {
-    void endpoint;
-    void load();
+    void session?.revision;
+    void toEnd();
   });
 
   $effect(() => {
@@ -122,131 +83,25 @@
     };
   });
 
-  function lastAssistant(): Message | null {
-    const last = messages[messages.length - 1];
-    return last?.role === 'assistant' ? last : null;
-  }
-
-  function foldLive(state: ChatStreamState) {
-    const last = lastAssistant();
-    if (!last) {
+  function send(text: string) {
+    if (!text || !session || session.sending) {
       return;
     }
-    last.content = state.text;
-    last.pending = !state.text;
-    last.tools = state.tools
-      .filter((t) => !SILENT_TOOLS.has(t.toolName))
-      .map((t) => ({ toolCallId: t.toolCallId, toolName: t.toolName, status: t.status, input: t.input, output: t.output, errorText: t.errorText }));
-  }
-
-  async function stream(res: Response) {
-    const reader = res.body!.getReader();
-    const decoder = new TextDecoder();
-    const state = emptyStreamState();
-    let buffered = '';
-
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) {
-        break;
-      }
-      buffered += decoder.decode(value, { stream: true });
-      const { events, rest } = readSseEvents(buffered);
-      buffered = rest;
-      for (const evt of events) {
-        if (applyChatStreamEvent(state, evt)) {
-          foldLive(state);
-        }
-      }
-      on({ kind: 'grew' });
-      void toEnd();
-    }
-
-    closeDanglingToolCalls(state);
-    foldLive(state);
-    return state;
-  }
-
-  async function send(text: string, appendUser: boolean) {
-    if (!text || sending || !endpoint) {
-      return;
-    }
-
-    failed = '';
-    sending = true;
-    abort = new AbortController();
-
-    if (appendUser) {
-      draft = '';
-      messages = [...messages, { role: 'user', content: text, at: Date.now() }];
-    }
-    messages = [...messages, { role: 'assistant', content: '', pending: true, at: Date.now(), tools: [], live: true }];
+    draft = '';
     on({ kind: 'sent' });
-    void toEnd();
-
-    try {
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ message: text }),
-        signal: abort.signal
-      });
-      if (!res.ok || !res.body) {
-        throw new HttpFailure(res.status);
-      }
-
-      await stream(res);
-      const done = lastAssistant();
-      if (done) {
-        done.live = false;
-        done.pending = false;
-      }
-      if (!done?.content && !done?.tools?.length) {
-        messages = messages.slice(0, -1);
-        failed = 'empty';
-      }
-    } catch (e) {
-      settleAfter(e);
-    } finally {
-      sending = false;
-      abort = null;
-      void toEnd();
-    }
-  }
-
-  function settleAfter(e: unknown) {
-    const partial = lastAssistant();
-    const aborted = (e as Error | undefined)?.name === 'AbortError';
-
-    if (aborted && partial && (partial.content || partial.tools?.length)) {
-      partial.live = false;
-      partial.pending = false;
-      return;
-    }
-
-    messages = messages.slice(0, -1);
-    if (!aborted) {
-      failed = e instanceof HttpFailure ? failureOfStatus(e.status) : 'send';
-    }
+    void session.send(text, 'append-user');
   }
 
   function retry() {
-    if (failed === 'load') {
-      void load();
-      return;
-    }
-    const lastUser = [...messages].reverse().find((m) => m.role === 'user');
-    if (lastUser) {
-      void send(lastUser.content, false);
-    }
+    session?.retry();
   }
 
   function suggest(text: string) {
-    void send(text, true);
+    send(text);
   }
 
   function stop() {
-    abort?.abort();
+    session?.stop();
   }
 </script>
 
@@ -330,7 +185,7 @@
         bind:value={draft}
         busy={sending}
         enabled={!loading}
-        onsend={() => void send(draft.trim(), true)}
+        onsend={() => send(draft.trim())}
         onstop={stop}
       />
       <span class="sr-only" aria-live="polite">{sending ? $_('chat.panel.responding') : ''}</span>

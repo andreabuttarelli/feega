@@ -145,6 +145,8 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
     }
   });
 
+  void result.consumeStream({ onError: (e) => console.error('[project-agent] turn failed after client left', e) });
+
   return result.toUIMessageStreamResponse({ sendReasoning: false });
 };
 
