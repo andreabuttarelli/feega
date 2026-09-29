@@ -49,6 +49,8 @@ export function registerNodeTools(server: McpServer) {
         'Models whose id starts with `wiro/` run on Wiro and are always queued like a video, after a ' +
         'safety screen that refuses with a readable reason. Uncensored `wiro/` models run only when the ' +
         'org owner turned them on in Settings; minors and real, identifiable people are refused regardless. ' +
+        'An uncensored model takes NO input of any kind — no upstream connections, no picked references, ' +
+        'no image/mask/init params — and the call is refused before anything is spent if any are present. ' +
         'Spends credits; a `credits_exhausted` failure means the org is out.',
       inputSchema: z.object({
         org,
