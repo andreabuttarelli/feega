@@ -9,12 +9,17 @@
 
   const CALENDAR_TIME_ZONE = 'Europe/Rome';
 
-  const MONTH_NAMES = [
-    'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
-    'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'
-  ];
+  const CALENDAR_LOCALE = 'en-GB';
+  const MONDAY_2024_01_01 = Date.UTC(2024, 0, 1);
+  const DAY_MS = 24 * 60 * 60 * 1000;
 
-  const WEEKDAY_NAMES = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
+  const MONTH_NAMES = Array.from({ length: 12 }, (_unused, i) =>
+    new Intl.DateTimeFormat(CALENDAR_LOCALE, { month: 'long', timeZone: 'UTC' }).format(Date.UTC(2024, i, 1))
+  );
+
+  const WEEKDAY_NAMES = Array.from({ length: 7 }, (_unused, i) =>
+    new Intl.DateTimeFormat(CALENDAR_LOCALE, { weekday: 'short', timeZone: 'UTC' }).format(MONDAY_2024_01_01 + i * DAY_MS)
+  );
 
   let { data } = $props();
 
@@ -55,7 +60,7 @@
   function timeOf(post: CalendarPost): string {
     const at = scheduledForOf(post);
     if (!at) return '';
-    return new Intl.DateTimeFormat('it-IT', { timeZone: CALENDAR_TIME_ZONE, hour: '2-digit', minute: '2-digit' }).format(new Date(at));
+    return new Intl.DateTimeFormat(CALENDAR_LOCALE, { timeZone: CALENDAR_TIME_ZONE, hour: '2-digit', minute: '2-digit' }).format(new Date(at));
   }
 
   function platformsOf(post: CalendarPost): string[] {
@@ -105,6 +110,7 @@
   }
 
   let selectedPost = $state<CalendarPost | null>(null);
+  let brokenLogos = $state(new Set<string>());
 
   function openPost(post: CalendarPost) {
     selectedPost = post;
@@ -134,8 +140,8 @@
 {#snippet brandChip(brandId: string)}
   {@const b = brandsById.get(brandId)}
   {#if b}
-    {#if b.logoUrl}
-      <img class="brand-chip" src={b.logoUrl} alt={b.name} title={b.name} />
+    {#if b.logoUrl && !brokenLogos.has(b.id)}
+      <img class="brand-chip" src={b.logoUrl} alt={b.name} title={b.name} onerror={() => (brokenLogos = new Set(brokenLogos).add(b.id))} />
     {:else}
       <span class="brand-chip" style:background={b.tone} title={b.name}>{initialsOf(b.name)}</span>
     {/if}
@@ -149,9 +155,9 @@
     <div class="title-row">
       <h1>{MONTH_NAMES[month - 1]} {year}</h1>
       <div class="nav-buttons">
-        <button type="button" onclick={() => navigateMonth(-1)} aria-label="Mese precedente">‹</button>
-        <button type="button" onclick={goToday}>Oggi</button>
-        <button type="button" onclick={() => navigateMonth(1)} aria-label="Mese successivo">›</button>
+        <button type="button" onclick={() => navigateMonth(-1)} aria-label="Previous month">‹</button>
+        <button type="button" onclick={goToday}>Today</button>
+        <button type="button" onclick={() => navigateMonth(1)} aria-label="Next month">›</button>
       </div>
       {#if data.brands.length}
         <select
@@ -245,14 +251,14 @@
           {/each}
         </div>
       {:else}
-        <p class="empty-hint">Nessun post programmato questo mese.</p>
+        <p class="empty-hint">Nothing scheduled this month.</p>
       {/each}
     </section>
 
     <aside class="unscheduled-list">
-      <h2>Da programmare</h2>
+      <h2>Unscheduled</h2>
       {#if !unscheduledPosts.length}
-        <p class="empty-hint">Niente in bozza.</p>
+        <p class="empty-hint">No drafts.</p>
       {:else}
         {#each unscheduledPosts as post (post.id)}
           <button type="button" class="unscheduled-item" onclick={() => openPost(post)}>
@@ -270,46 +276,46 @@
 
 {#if selectedPost}
   <div class="popover-backdrop" onclick={closePost} role="presentation">
-    <div class="popover" onclick={(e) => e.stopPropagation()} role="dialog" aria-label="Dettaglio post">
+    <div class="popover" onclick={(e) => e.stopPropagation()} role="dialog" aria-label="Post details">
       <header class="popover-header">
         <span class="popover-brand">
           {@render brandChip(selectedPost.brandId)}
           {brandsById.get(selectedPost.brandId)?.name}
         </span>
         <span class="status-badge">{selectedPost.status}</span>
-        <button type="button" class="close-btn" onclick={closePost} aria-label="Chiudi">×</button>
+        <button type="button" class="close-btn" onclick={closePost} aria-label="Close">×</button>
       </header>
       <p class="popover-caption">{selectedPost.caption}</p>
       {#if selectedPost.media.length}
-        <p class="popover-media">{selectedPost.media.length} elemento{selectedPost.media.length === 1 ? '' : 'i'} media</p>
+        <p class="popover-media">{selectedPost.media.length} media item{selectedPost.media.length === 1 ? '' : 's'}</p>
       {/if}
       <ul class="popover-deliveries">
         {#each selectedPost.deliveries as delivery (delivery.accountId)}
           <li>
             <PlatformGlyph platform={delivery.platform} />
             <span>{delivery.status}</span>
-            {#if delivery.url}<a href={delivery.url} target="_blank" rel="noreferrer">Vedi</a>{/if}
+            {#if delivery.url}<a href={delivery.url} target="_blank" rel="noreferrer">View</a>{/if}
             <form method="POST" action="?/reschedule" class="popover-action">
               <input type="hidden" name="postId" value={selectedPost.id} />
               <input type="hidden" name="accountId" value={delivery.accountId} />
               <input type="hidden" name="scheduledFor" value={isoOf(scheduleLocal)} />
-              <button type="submit">Sposta</button>
+              <button type="submit">Move</button>
             </form>
             <form method="POST" action="?/publishNow" class="popover-action">
               <input type="hidden" name="postId" value={selectedPost.id} />
               <input type="hidden" name="accountId" value={delivery.accountId} />
-              <button type="submit">Pubblica ora</button>
+              <button type="submit">Publish now</button>
             </form>
             <form method="POST" action="?/cancel" class="popover-action">
               <input type="hidden" name="postId" value={selectedPost.id} />
               <input type="hidden" name="accountId" value={delivery.accountId} />
-              <button type="submit">Annulla</button>
+              <button type="submit">Cancel</button>
             </form>
           </li>
         {/each}
       </ul>
       <label class="popover-when">
-        Quando
+        When
         <input type="datetime-local" bind:value={scheduleLocal} />
       </label>
       {#if undeliveredOf(selectedPost).length}
@@ -323,12 +329,12 @@
               {account.handle ?? account.displayName ?? account.platform}
             </label>
           {/each}
-          <button type="submit">Programma</button>
+          <button type="submit">Schedule</button>
         </form>
       {:else if !selectedPost.deliveries.length}
         <p class="popover-media">
-          Nessun account collegato per questo brand.
-          <a href={`/p/${page.params.projectId}/settings/connected-accounts`}>Collega</a>
+          No account connected for this brand.
+          <a href={`/p/${page.params.projectId}/settings/connected-accounts`}>Connect</a>
         </p>
       {/if}
     </div>
@@ -361,20 +367,25 @@
   }
 
   .nav-buttons button {
+    height: 32px;
+    min-width: 32px;
     border: 1px solid var(--line, #ededef);
-    background: transparent;
-    padding: 4px 10px;
+    background: var(--paper, #fff);
+    padding: 0 10px;
     font: inherit;
+    font-size: 13px;
     cursor: pointer;
     color: var(--ink, #1d1d1f);
   }
 
   .brand-select {
     margin-left: auto;
+    height: 32px;
     border: 1px solid var(--line, #ededef);
-    background: transparent;
-    padding: 4px 8px;
+    background: var(--paper, #fff);
+    padding: 0 8px;
     font: inherit;
+    font-size: 13px;
     color: var(--ink, #1d1d1f);
   }
 

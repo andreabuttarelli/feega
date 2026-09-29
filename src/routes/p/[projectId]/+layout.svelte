@@ -11,6 +11,7 @@
   import { openSheet } from '$lib/canvas/sheet-nav';
   import { CHROME_LOADERS } from '$lib/canvas/chrome-loaders';
   import MobileTopBar from '$lib/components/canvas/MobileTopBar.svelte';
+  import DesktopPageBar from '$lib/components/canvas/DesktopPageBar.svelte';
   import { sheetEntryForPath, activeMobileTab, type NavEntry, type MobileTab, type MobileView, type TabOutcome } from '$lib/shell-nav';
   import { MOBILE_QUERY, type Viewport } from '$lib/breakpoints';
   import { readChatOpen, writeChatOpen } from '$lib/shell-prefs';
@@ -183,7 +184,17 @@
       <CanvasChatPanel {projectId} brandSlug={data.brand?.slug ?? ''} open={chatOpen} />
     </div>
   {:else}
-    {@render children()}
+    <DesktopPageBar
+      {projectId}
+      canvasHref={data.canvases[0]?.href ?? `/p/${projectId}`}
+      fallbackTitle={data.project.name}
+      creditBalance={data.creditBalance}
+      profile={data.profile}
+      org={data.org}
+    />
+    <main class="desktop-page">
+      {@render children()}
+    </main>
   {/if}
 </div>
 
@@ -207,6 +218,13 @@
     min-width: 0;
     min-height: 0;
     overflow: hidden;
+  }
+
+  .desktop-page {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: var(--content-pad-top) var(--content-pad-x) var(--content-pad-bottom);
   }
 
   .mobile-main {

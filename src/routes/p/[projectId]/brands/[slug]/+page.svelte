@@ -9,6 +9,7 @@
    * in basso perché qui il markup non è nostro riga per riga.
    */
   import PageHead from '$lib/components/PageHead.svelte';
+  import BrandLogo from '$lib/components/BrandLogo.svelte';
   import {
     brandFieldDrag,
     colourDrag,
@@ -73,11 +74,7 @@
   <div class="head">
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="logo" draggable={Boolean(data.brand.logoAssetId)} ondragstart={(e) => onFieldDragStart(e, 'logo')}>
-      {#if data.brand.logoUrl}
-        <img src={data.brand.logoUrl} alt="" loading="lazy" />
-      {:else}
-        <span class="logo-ph">{data.brand.name.slice(0, 2).toUpperCase()}</span>
-      {/if}
+      <BrandLogo name={data.brand.name} url={data.brand.logoUrl} />
     </div>
 
     <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -116,8 +113,7 @@
     background: var(--paper-2); border: 1px solid var(--line);
     display: grid; place-items: center; cursor: grab;
   }
-  .logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .logo-ph { font-size: 20px; font-weight: 700; color: var(--ink-faint); }
+  .logo { font-size: 20px; }
 
   .names { flex: 1; min-width: 0; cursor: grab; }
   .names h1 { margin: 0; font-size: 20px; }

@@ -164,14 +164,14 @@
         class:is-on={node.source === 'url'}
         onclick={() => pickSource('url')}
       >
-        Indirizzo
+        URL
       </button>
       <button
         type="button"
         class:is-on={node.source === 'html'}
         onclick={() => pickSource('html')}
       >
-        Codice
+        Code
       </button>
     </div>
 

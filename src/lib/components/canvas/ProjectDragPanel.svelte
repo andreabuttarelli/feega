@@ -1,5 +1,6 @@
 <script lang="ts">
   import { page } from '$app/state';
+  import BrandLogo from '$lib/components/BrandLogo.svelte';
   /**
    * ASSET E BRAND DEL PROGETTO, DRAGGABILI SULLA TELA CHE È GIÀ APERTA.
    *
@@ -237,11 +238,7 @@
           <div class="brand-card" data-brand-id={brand.id}>
             <button type="button" class="brand-head" aria-expanded={open} onclick={() => toggleBrand(brand.id)}>
               <span class="brand-logo">
-                {#if brand.logoUrl}
-                  <img src={brand.logoUrl} alt="" loading="lazy" />
-                {:else}
-                  <span class="logo-ph">{brand.name.slice(0, 2).toUpperCase()}</span>
-                {/if}
+                <BrandLogo name={brand.name} url={brand.logoUrl} />
               </span>
               <span class="brand-name">{brand.name}</span>
               <span class="chevron" class:open aria-hidden="true">›</span>
@@ -386,18 +383,24 @@
   }
 
   .new-brand {
-    display: block;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 32px;
     margin-bottom: 12px;
-    padding: 8px 12px;
-    text-align: center;
     font-size: 13px;
-    font-weight: 600;
-    color: var(--paper, #fff);
-    background: var(--ink, #1d1d1f);
+    font-weight: 500;
+    color: var(--ink, #1d1d1f);
+    background: var(--paper, #fff);
+    border: 1px solid var(--line, #ededef);
     text-decoration: none;
   }
   .new-brand:hover {
-    opacity: 0.9;
+    background: var(--paper-2, #f9f9f9);
+  }
+  .new-brand:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
 
   .brand-list {
@@ -435,17 +438,7 @@
     background: var(--paper, #fff);
     display: grid;
     place-items: center;
-  }
-  .brand-logo img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-  }
-  .logo-ph {
     font-size: 10px;
-    font-weight: 700;
-    color: var(--ink-faint, #9a9a9e);
   }
   .brand-name {
     min-width: 0;

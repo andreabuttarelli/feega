@@ -1,10 +1,15 @@
 <script lang="ts">
   import PageHead from '$lib/components/PageHead.svelte';
+  import BrandLogo from '$lib/components/BrandLogo.svelte';
+  import { Button } from '$lib/components/ui/button/index.js';
+  import { brandExcerpt } from '$lib/brand-excerpt';
   import { brandFieldDrag, CANVAS_DRAG_FILLED_NODE, serializeFilledNodeDrag, type DragBrandField } from '$lib/canvas/drag-payload';
   import { CANVAS_DRAG_MEDIUM } from '$lib/canvas/new-node';
   import type { BrandCard } from './+page.server';
 
   let { data } = $props();
+
+  const BRAND_EXCERPT_CHARS = 300;
 
   /** TRASCINARE UN CAMPO BRAND — `brandFieldDrag` (`drag-payload.ts`) porta la tabella "cosa
    *  diventa", la stessa che la sidebar del progetto usa per le sue card. */
@@ -19,11 +24,11 @@
 </script>
 
 <div class="brands-page">
-  <PageHead title="Brands" subtitle="Every brand your org has. Drag a logo, a text or the content onto a canvas." />
-
-  <div class="toolbar">
-    <a class="btn primary" href={`/p/${data.project.id}/brands/new`}>+ New brand</a>
-  </div>
+  <PageHead title="Brands" subtitle="Every brand your org has. Drag a logo, a text or the content onto a canvas.">
+    {#snippet actions()}
+      <Button href={`/p/${data.project.id}/brands/new`}>New brand</Button>
+    {/snippet}
+  </PageHead>
 
   {#if !data.brands.length}
     <div class="empty">
@@ -31,9 +36,9 @@
       <p>Create one to get started.</p>
     </div>
   {:else}
-    <div class="grid">
+    <div class="brand-grid">
       {#each data.brands as brand (brand.id)}
-        <div class="card">
+        <div class="brand-card">
           <div class="card-head">
             <!-- svelte-ignore a11y_no_static_element_interactions -- trascinare il logo è una
                  scorciatoia: chi non può trascinare arriva comunque al brand da /settings/brand. -->
@@ -42,11 +47,7 @@
               draggable={Boolean(brand.logoAssetId)}
               ondragstart={(e) => onFieldDragStart(e, brand, 'logo')}
             >
-              {#if brand.logoUrl}
-                <img src={brand.logoUrl} alt="" loading="lazy" />
-              {:else}
-                <span class="logo-ph">{brand.name.slice(0, 2).toUpperCase()}</span>
-              {/if}
+              <BrandLogo name={brand.name} url={brand.logoUrl} />
             </div>
 
             <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -60,8 +61,8 @@
 
           {#if brand.content}
             <!-- svelte-ignore a11y_no_static_element_interactions -->
-            <div class="content" draggable="true" ondragstart={(e) => onFieldDragStart(e, brand, 'content')}>
-              {brand.content.slice(0, 300)}
+            <div class="brand-excerpt" draggable="true" ondragstart={(e) => onFieldDragStart(e, brand, 'content')}>
+              {brandExcerpt(brand.content, BRAND_EXCERPT_CHARS)}
             </div>
           {/if}
         </div>
@@ -73,24 +74,18 @@
 <style>
   .brands-page { max-width: var(--content-max, 1100px); margin: 0 auto; padding: 0; }
 
-  .toolbar { display: flex; justify-content: flex-end; margin-bottom: 12px; }
-  .btn.primary {
-    background: var(--ink); color: var(--paper); border: 1px solid var(--ink);
-    padding: 8px 14px; font-size: 13px; text-decoration: none;
-  }
 
   .empty { text-align: center; padding: 48px 20px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
   .empty h3 { margin: 0; font-size: 18px; }
   .empty p { margin: 0; color: var(--ink-soft); }
 
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+  .brand-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
 
   :global([data-viewport='mobile']) .brands-page { padding: 12px var(--page-gutter) 24px; }
-  :global([data-viewport='mobile']) .btn.primary { display: inline-flex; align-items: center; min-height: var(--touch-target); }
-  :global([data-viewport='mobile']) .grid { grid-template-columns: minmax(0, 1fr); }
-  .card {
-    background: var(--paper-2); border: 1px solid var(--line); padding: 14px;
-    display: flex; flex-direction: column; gap: 10px;
+  :global([data-viewport='mobile']) .brand-grid { grid-template-columns: minmax(0, 1fr); }
+  .brand-card {
+    background: var(--paper); border: 1px solid var(--line); padding: 16px;
+    display: flex; flex-direction: column; gap: 12px;
   }
 
   .card-head { display: flex; align-items: center; gap: 12px; }
@@ -99,8 +94,7 @@
     background: var(--paper); border: 1px solid var(--line);
     display: grid; place-items: center; cursor: grab;
   }
-  .logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .logo-ph { font-size: 13px; font-weight: 700; color: var(--ink-faint); }
+  .logo { font-size: 13px; }
 
   .names { flex: 1; min-width: 0; cursor: grab; }
   .names h3 { margin: 0; font-size: 14px; }
@@ -108,9 +102,9 @@
   .names h3 a:hover { text-decoration: underline; }
   .short { margin: 2px 0 0; font-size: 12px; color: var(--ink-soft); line-height: 1.4; }
 
-  .content {
-    font-size: 12px; line-height: 1.5; color: var(--ink); cursor: grab;
-    max-height: 100px; overflow: hidden; white-space: pre-wrap;
+  .brand-excerpt {
+    font-size: 12px; line-height: 1.5; cursor: grab;
+    max-height: 100px; overflow: hidden; white-space: pre-line; color: var(--ink-soft);
     border-top: 1px solid var(--line); padding-top: 10px;
   }
 </style>

@@ -31,7 +31,7 @@
   }
 </script>
 
-<nav class="tabs" aria-label={$_('app.shell.rail')}>
+<nav class="mobile-tabbar" aria-label={$_('app.shell.rail')}>
   {#each MOBILE_TABS as tab (tab.id)}
     {@const Icon = ICONS[tab.icon]}
     {@const href = mobileTabHref(projectId, tab)}
@@ -50,7 +50,7 @@
 </nav>
 
 <style>
-  .tabs {
+  .mobile-tabbar {
     flex: 0 0 auto;
     display: flex;
     align-items: stretch;

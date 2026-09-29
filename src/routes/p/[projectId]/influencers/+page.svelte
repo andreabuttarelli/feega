@@ -183,9 +183,9 @@
   }
   .toolbar button.primary,
   .primary {
-    background: var(--accent, #7c5cff);
-    color: #fff;
-    border-color: var(--accent, #7c5cff);
+    background: var(--ink);
+    color: var(--paper);
+    border-color: var(--ink);
   }
   .primary:disabled {
     opacity: 0.5;

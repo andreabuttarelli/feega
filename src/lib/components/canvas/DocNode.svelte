@@ -83,29 +83,29 @@
   <header class="doc-head">
     <div class="doc-modes" role="group" aria-label="How the document looks">
       <button type="button" class:is-on={mode === 'view'} onclick={() => (mode = 'view')}>
-        Leggi
+        Read
       </button>
       <button type="button" class:is-on={mode === 'edit'} onclick={() => (mode = 'edit')}>
-        Scrivi
+        Write
       </button>
     </div>
 
     {#if node.public}
       <button type="button" class="doc-share is-on" onclick={toggleShare} title="Revoke link">
         <LinkOff size={14} strokeWidth={1.7} />
-        <span>Revoca</span>
+        <span>Revoke</span>
       </button>
     {:else}
       <button type="button" class="doc-share" onclick={toggleShare} title="Create a public link">
         <Link size={14} strokeWidth={1.7} />
-        <span>Link pubblico</span>
+        <span>Public link</span>
       </button>
     {/if}
   </header>
 
   {#if shareUrl}
     <div class="doc-link">
-      <input class="doc-link-url" readonly value={shareUrl} aria-label="Link pubblico" />
+      <input class="doc-link-url" readonly value={shareUrl} aria-label="Public link" />
       <button type="button" class="doc-link-copy" onclick={copyShare}>Copy</button>
       <a class="doc-link-open" href={shareUrl} target="_blank" rel="noopener noreferrer" aria-label="Open link">
         <ExternalLink size={14} strokeWidth={1.7} />
