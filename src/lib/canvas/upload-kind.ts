@@ -69,12 +69,12 @@ export type UploadVerdict = { ok: true; kind: UploadKind } | { ok: false; why: s
 
 export function verdictForUpload(mimeType: string, fileName: string, bytes: number): UploadVerdict {
   if (!bytes) {
-    return { ok: false, why: 'File vuoto' };
+    return { ok: false, why: 'Empty file' };
   }
 
   const kind = uploadKindOf(mimeType, fileName);
   if (!kind) {
-    return { ok: false, why: 'Formato non supportato: scegli un\'immagine, un video o un documento' };
+    return { ok: false, why: 'Unsupported format: choose an image, a video or a document' };
   }
 
   const ceiling = UPLOAD_MAX_BYTES[kind];
@@ -86,7 +86,7 @@ export function verdictForUpload(mimeType: string, fileName: string, bytes: numb
 }
 
 function labelFor(kind: UploadKind): string {
-  if (kind === 'image') return 'Immagine';
+  if (kind === 'image') return 'Image';
   if (kind === 'video') return 'Video';
-  return 'Documento';
+  return 'Document';
 }

@@ -1,4 +1,6 @@
 import type { Db } from '$lib/server/db/client';
+import type { Json } from '$lib/database.types';
+import { toolsForMirror } from '$lib/chat-stream-events';
 import { actorCols, type Actor } from './actor';
 
 /**
@@ -15,7 +17,18 @@ export const SIDEBAR_SURFACE = 'sidebar';
 /** La cronologia viaggia nel prompt a ogni messaggio: senza tetto il conto cresce da solo. */
 export const HISTORY_LIMIT = 40;
 
-export type Turn = { role: 'user' | 'assistant'; content: string };
+export type SavedTool = {
+  toolCallId: string;
+  toolName: string;
+  status: 'done' | 'error';
+  input?: unknown;
+  output?: unknown;
+  errorText?: string;
+};
+
+export type Turn = { role: 'user' | 'assistant'; content: string; tools?: SavedTool[] };
+
+export type PromptTurn = { role: Turn['role']; content: string };
 
 export async function openThread(
   db: Db,
@@ -62,18 +75,27 @@ export async function loadTurns(
 ): Promise<Turn[]> {
   const { data } = await db
     .from('chat_messages')
-    .select('role, content')
+    .select('role, content, tool_calls')
     .eq('org_id', input.orgId)
     .eq('thread_id', input.threadId)
     .order('seq', { ascending: false })
     .limit(HISTORY_LIMIT);
 
-  const rows = (data ?? []) as Array<{ role?: string; content?: string | null }>;
+  const rows = (data ?? []) as Array<{ role?: string; content?: string | null; tool_calls?: SavedTool[] | null }>;
 
   return rows
-    .filter((row) => row.content?.trim() && (row.role === 'user' || row.role === 'assistant'))
-    .map((row) => ({ role: row.role as Turn['role'], content: row.content as string }))
+    .filter((row) => row.role === 'user' || row.role === 'assistant')
+    .filter((row) => row.content?.trim() || row.tool_calls?.length)
+    .map((row) => ({
+      role: row.role as Turn['role'],
+      content: row.content ?? '',
+      ...(row.tool_calls?.length ? { tools: row.tool_calls } : {})
+    }))
     .reverse();
+}
+
+export function promptHistory(turns: Turn[]): PromptTurn[] {
+  return turns.filter((t) => t.content.trim()).map(({ role, content }) => ({ role, content }));
 }
 
 /**
@@ -87,6 +109,7 @@ export async function saveTurn(
     threadId: string;
     role: Turn['role'];
     content: string;
+    tools?: SavedTool[];
     actor: Actor;
   }
 ): Promise<void> {
@@ -106,6 +129,7 @@ export async function saveTurn(
     thread_id: input.threadId,
     role: input.role,
     content: input.content,
+    tool_calls: input.tools?.length ? (toolsForMirror(input.tools) as Json) : null,
     seq,
     ...actorCols(input.actor)
   });

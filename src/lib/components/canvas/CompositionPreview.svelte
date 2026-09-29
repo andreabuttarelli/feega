@@ -67,7 +67,7 @@
   });
 </script>
 
-<canvas bind:this={canvas} aria-label="Anteprima composizione"></canvas>
+<canvas bind:this={canvas} aria-label="Composition preview"></canvas>
 
 <style>
   canvas {

@@ -5,7 +5,7 @@ type PageModule = { default: Component<{ data: unknown; form: unknown }> };
 /**
  * OGNI `+page.svelte` SOTTO `settings/`, CARICATA PIGRA E PER CARTELLA — non un elenco scritto a
  * mano che Agent F dovrebbe ricordarsi di aggiornare a ogni sezione nuova. `**` cattura anche le
- * sezioni a due livelli (`settings/ads/accounts`); la radice (`settings/+page.svelte`, che oggi è
+ * sezioni a due livelli; la radice (`settings/+page.svelte`, che oggi è
  * solo un redirect) non ha materiale da mostrare in un foglio, quindi resta fuori dal glob.
  */
 const SETTINGS_PAGE_MODULES = import.meta.glob<PageModule>(
@@ -14,8 +14,8 @@ const SETTINGS_PAGE_MODULES = import.meta.glob<PageModule>(
 
 export const SHEET_PAGE_LOADERS = {
   calendar: () => import('../../routes/p/[projectId]/calendar/+page.svelte') as Promise<PageModule>,
-  ads: () => import('../../routes/p/[projectId]/ads/social/+page.svelte') as Promise<PageModule>,
-  createPost: () => import('../../routes/p/[projectId]/create-post/+page.svelte') as Promise<PageModule>,
+  ads: () => import('../../routes/p/[projectId]/ads/+page.svelte') as Promise<PageModule>,
+  promote: () => import('../../routes/p/[projectId]/promote/+page.svelte') as Promise<PageModule>,
   settingsLayout: () => import('../../routes/p/[projectId]/settings/+layout.svelte') as Promise<PageModule>
 };
 

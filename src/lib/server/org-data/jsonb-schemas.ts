@@ -64,9 +64,7 @@ export const adTargetingSchema = z.object({
   genders: z.array(z.string()).optional(),
   countries: z.array(z.string()).optional(),
   languages: z.array(z.string()).optional(),
-  interests: z.array(z.object({ id: z.string(), name: z.string().optional() })).optional(),
-  keywords: z.array(z.object({ text: z.string(), matchType: z.enum(['BROAD', 'PHRASE', 'EXACT']).optional() })).optional(),
-  geoTargets: z.array(z.string()).optional()
+  interests: z.array(z.object({ id: z.string(), name: z.string().optional() })).optional()
 });
 
 /** `ad_campaigns.placements`: `string[]` nello stesso client (`CreateStandaloneAdInput.placements`). */

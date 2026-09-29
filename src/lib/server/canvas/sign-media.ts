@@ -43,15 +43,16 @@ export async function signMediaPaths(db: Db, paths: string[]): Promise<string[]>
 export async function signAssetPaths(
   userDb: Db,
   serviceDb: Db,
-  paths: { generated: string[]; uploaded: string[] }
+  paths: { generated: string[]; uploaded: string[] },
+  ttlSeconds?: number
 ): Promise<Map<string, string>> {
   if (!isRlsScoped(userDb)) {
     throw new Error('signAssetPaths richiede un client utente scoped RLS come prova di appartenenza');
   }
 
   const [rendered, uploaded] = await Promise.all([
-    signKnowledgePaths(serviceDb as never, paths.generated),
-    signAssetFiles(serviceDb, paths.uploaded)
+    ttlSeconds ? signKnowledgePaths(serviceDb as never, paths.generated, ttlSeconds) : signKnowledgePaths(serviceDb as never, paths.generated),
+    ttlSeconds ? signAssetFiles(serviceDb, paths.uploaded, ttlSeconds) : signAssetFiles(serviceDb, paths.uploaded)
   ]);
 
   return new Map([...rendered, ...uploaded]);

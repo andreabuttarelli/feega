@@ -3,13 +3,6 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { request } from '../../lib/api.ts';
 import { withAuth } from '../util.ts';
 
-/**
- * CAMPAGNE PUBBLICITARIE. Una campagna spende soldi veri, quindi `create_ad_campaign` non produce
- * mai qualcosa di già pubblicabile: nasce `draft`, `approved_by: null`, ed è `repos/ads.ts` a
- * garantirlo — non un controllo qui che si potrebbe dimenticare. `approve_ad_campaign` è l'unica
- * strada che la fa avanzare, e SOLO una sessione di una persona può chiamarla: una chiave API
- * (cioè questo stesso agente, su un turno diverso) viene rifiutata dal server.
- */
 const org = z.string().optional().describe('Which org, if you belong to more than one.');
 
 function call<T>(
@@ -48,30 +41,32 @@ export function registerAdsTools(server: McpServer) {
   server.registerTool(
     'create_ad_campaign',
     {
-      title: 'Draft an ad campaign',
+      title: 'Propose a Meta ad',
       description:
-        'Draft a new ad campaign for a brand\'s ad account. It ALWAYS lands unapproved (`draft`, no ' +
-        '`approved_by`) — a campaign spends real money, and nothing here can make it spend without a ' +
-        'human approving it separately. Nothing is scheduled or billed by calling this. Free.',
+        'Draft a paid Meta ad campaign (Facebook + Instagram) for a brand, from canvas image/video nodes or ' +
+        'by boosting a published post. It ALWAYS lands as an unapproved draft: nothing is launched or ' +
+        'billed until a person approves it in the app (or `feega ads --approve`). Free.',
       inputSchema: z.object({
         org,
         brand_id: z.string(),
-        ad_account_id: z.string(),
-        name: z.string().min(1),
-        objective: z.enum([
-          'awareness',
-          'traffic',
-          'engagement',
-          'video_views',
-          'lead_generation',
-          'conversions',
-          'app_promotion',
-          'catalog_sales'
-        ]),
+        ad_account_id: z.string().describe('A Meta ad account of the brand (ad_accounts.id).'),
+        objective: z.enum(['traffic', 'engagement', 'awareness']),
         budget_type: z.enum(['daily', 'lifetime']),
-        budget_amount: z.number().positive(),
-        starts_at: z.string().optional(),
-        ends_at: z.string().optional()
+        budget_amount: z.number().positive().describe('Whole currency units of the ad account.'),
+        days: z.number().int().positive(),
+        countries: z.array(z.string().length(2)).min(1),
+        age_min: z.number().int().min(18).max(65).optional(),
+        age_max: z.number().int().min(18).max(65).optional(),
+        gender: z.enum(['all', 'female', 'male']).optional(),
+        placements: z
+          .array(z.enum(['facebook_feed', 'instagram_feed', 'facebook_stories', 'instagram_stories', 'facebook_reels', 'instagram_reels']))
+          .min(1),
+        primary_text: z.string().min(1),
+        headline: z.string().min(1),
+        call_to_action: z.enum(['LEARN_MORE', 'SHOP_NOW', 'SIGN_UP', 'BOOK_NOW', 'CONTACT_US', 'ORDER_NOW']).optional(),
+        link_url: z.string().optional().describe('Required for traffic.'),
+        node_ids: z.array(z.string()).optional().describe('Canvas image/video nodes, in order.'),
+        post_id: z.string().optional().describe('A published post to boost instead of node_ids.')
       }),
       annotations: { readOnlyHint: false, destructiveHint: false }
     },
@@ -83,12 +78,24 @@ export function registerAdsTools(server: McpServer) {
     {
       title: 'Approve an ad campaign',
       description:
-        'Let a drafted campaign spend. REFUSED over an API key on purpose: an agent cannot approve ' +
+        'Approve a proposed campaign and launch it on Meta — this spends money. REFUSED over an API key on purpose: an agent cannot approve ' +
         'its own spend — this only works from a signed-in person\'s own session (the app, or `feega ' +
         'login`). If you are an agent and this fails, tell the person to approve it themselves.',
       inputSchema: z.object({ org, id: z.string() }),
       annotations: { readOnlyHint: false, destructiveHint: true }
     },
     async ({ org, id }) => withAuth((token) => call(token, 'POST', `/api/v1/org/ads/campaigns/${encodeURIComponent(id)}/approve`, org))
+  );
+
+  server.registerTool(
+    'set_ad_campaign_status',
+    {
+      title: 'Pause or resume an ad campaign',
+      description: 'Pause a running Meta campaign, or resume a paused one. Pausing stops spend.',
+      inputSchema: z.object({ org, id: z.string(), next: z.enum(['active', 'paused']) }),
+      annotations: { readOnlyHint: false, destructiveHint: false }
+    },
+    async ({ org, id, next }) =>
+      withAuth((token) => call(token, 'POST', `/api/v1/org/ads/campaigns/${encodeURIComponent(id)}/status`, org, { next }))
   );
 }

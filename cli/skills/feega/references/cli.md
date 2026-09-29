@@ -35,10 +35,8 @@ feega post <slug> <id> render                   # Draw the missing image from it
 feega post <slug> <id> approve|publish|reject   # Move it forward
 feega post <slug> <id> reschedule --scheduledFor "2026-06-20T10:00"
 feega products <slug> [sync]                    # List, or re-import from the connected store
-feega ads <slug> [--propose|--remix|--sync]     # Ad campaigns, spend, boost candidates
-feega ads <slug> --create --name "..." --headline "..." [--platform metaads] [--budget N]
-feega ads <slug> --approve <id> | --reject <id> | --pause <id> | --resume <id>
-feega ads <slug> --duplicate <id> | --delete <id>
+feega ads <slug>                                  # Meta ad campaigns of the brand
+feega ads <slug> --approve <id> | --pause <id> | --resume <id>
 feega upgrade <slug>                            # Open billing checkout
 feega update                                    # Update the CLI itself
 ```

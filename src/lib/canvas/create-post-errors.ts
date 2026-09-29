@@ -1,12 +1,12 @@
 export const ERROR_COPY: Record<string, string> = {
-  brand_not_found: 'Brand non trovato.',
-  no_connected_accounts: 'Nessun account collegato per questo brand.',
-  accounts_not_found: 'Uno o più account selezionati non sono validi.',
-  delivery_failed: 'Il post è stato creato ma la programmazione è fallita. Riprova dal calendario.',
-  node_not_found: 'Uno dei contenuti selezionati non esiste più.',
-  brand_and_nodes_required: 'Seleziona un brand e almeno un contenuto.'
+  brand_not_found: 'Brand not found.',
+  no_connected_accounts: 'No account connected for this brand.',
+  accounts_not_found: 'One or more selected accounts are not valid.',
+  delivery_failed: 'The post was created but scheduling failed. Try again from the calendar.',
+  node_not_found: 'One of the selected items no longer exists.',
+  brand_and_nodes_required: 'Choose a brand and at least one item.'
 };
 
 export function errorCopyFor(code: string): string {
-  return ERROR_COPY[code] ?? 'Qualcosa è andato storto. Riprova.';
+  return ERROR_COPY[code] ?? 'Something went wrong. Try again.';
 }

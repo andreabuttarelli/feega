@@ -29,7 +29,7 @@ describe('NodeInspector disegna i campi dalla tabella, non a mano', () => {
   it('mostra lo stato e il costo della sincronizzazione', () => {
     const body = html('social_account_feed', { platform: 'instagram', handle: 'nike', sync_status: 'failed', sync_error: 'no_posts: nope' });
     expect(body).toContain('no_posts: nope');
-    expect(body).toContain('Sincronizzare non costa crediti');
-    expect(body).toContain('Sincronizza ora');
+    expect(body).toContain('Syncing costs no credits');
+    expect(body).toContain('Sync now');
   });
 });

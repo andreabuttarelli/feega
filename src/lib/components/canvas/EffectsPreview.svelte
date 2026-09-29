@@ -101,7 +101,7 @@
   }
 </script>
 
-<canvas bind:this={canvas} aria-label="Anteprima effetti"></canvas>
+<canvas bind:this={canvas} aria-label="Effects preview"></canvas>
 
 <style>
   canvas {

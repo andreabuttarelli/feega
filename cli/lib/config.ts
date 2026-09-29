@@ -10,19 +10,7 @@
 
 const LOCAL_URL = 'http://localhost:5173';
 
-/**
- * Canonical production origin — **www, not the apex**.
- *
- * `https://feega.app` 308-redirects to `https://www.feega.app`, which is a *cross-origin*
- * redirect, and fetch drops the `Authorization` header across origins. Every API call made
- * against the apex therefore arrives unauthenticated and the server answers
- * `401 {"error":"Missing or invalid Authorization header"}` — which reads like a broken login
- * but is really a redirect eating the token. Point at the host that answers directly.
- *
- * Single source of truth on purpose: this literal used to be copy-pasted into api.ts, auth.ts,
- * health.ts and the MCP HTTP layer, so the bug had to be fixed in six places or none.
- */
-export const PRODUCTION_URL = 'https://www.feega.app';
+export const PRODUCTION_URL = 'https://oh.feega.app';
 
 /** Resolved API/base origin: explicit override, else auto-detected dev server, else production. */
 export function appUrl(): string {
@@ -37,8 +25,11 @@ export function authServerUrl(): string {
 }
 
 // Public Supabase keys (safe to embed — anon key, no secrets)
-process.env.PUBLIC_SUPABASE_URL ??= 'https://kszazivzwievqixcnanp.supabase.co';
-process.env.PUBLIC_SUPABASE_ANON_KEY ??= 'sb_publishable_gXzHd-4PxJ8UJ-US7mO15Q_bgiGGHvB';
+export const SUPABASE_URL = 'https://klnswzhhgrqvbfjzioul.supabase.co';
+export const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_4TwkYt0gDk2VeF57n_npzw_cFO5FMyR';
+
+process.env.PUBLIC_SUPABASE_URL ??= SUPABASE_URL;
+process.env.PUBLIC_SUPABASE_ANON_KEY ??= SUPABASE_PUBLISHABLE_KEY;
 
 let resolved = false;
 

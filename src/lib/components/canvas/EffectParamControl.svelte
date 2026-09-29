@@ -50,7 +50,7 @@
   {:else}
     <span class="param-seed">
       <input type="number" value={control.value} onchange={(e) => onchange(Number(e.currentTarget.value))} />
-      <button type="button" class="param-reroll" aria-label="Nuovo seed" onclick={reroll}>
+      <button type="button" class="param-reroll" aria-label="New seed" onclick={reroll}>
         <Dices size={14} strokeWidth={1.75} />
       </button>
     </span>

@@ -7,7 +7,8 @@ import { gateAiAction, gateOrgAiAction } from '$lib/server/cli-auth';
 import { listMemberships } from '$lib/server/repos/orgs';
 import { listCanvases } from '$lib/server/repos/canvas';
 import { findProjectForUser } from '$lib/server/projects/lookup';
-import { openThread, loadTurns, saveTurn } from '$lib/server/repos/chat';
+import { openThread, loadTurns, promptHistory, saveTurn } from '$lib/server/repos/chat';
+import { finishedTurn } from '$lib/server/project-agent/finished-turn';
 import { agentActor, SIDEBAR_AGENT_KEY } from '$lib/server/repos/actor';
 import { createProjectTools } from '$lib/server/project-agent/project-tools';
 import { openAgentTools } from '$lib/server/project-agent/tool-surface';
@@ -77,7 +78,7 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
     userId: user.id,
     brandId: brand?.id ?? null
   });
-  const history = await loadTurns(db, { orgId, threadId });
+  const history = promptHistory(await loadTurns(db, { orgId, threadId }));
 
   const actor = agentActor(user.id, SIDEBAR_AGENT_KEY);
   const userActor = { kind: 'user' as const, id: user.id };
@@ -110,12 +111,12 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
     messages: [...history, { role: 'user', content: text }] as ModelMessage[],
     tools: agent.tools,
     stopWhen: [agentStopWhen(t0)],
-    onFinish: async ({ text: answer, totalUsage }) => {
-      // Chiusura e salvataggio QUI: `streamText` torna subito e dopo il return i tool sarebbero a metà.
-      await agent.close().catch(() => {});
+    onFinish: async ({ steps, totalUsage }) => {
+      await agent.close().catch((e) => console.error('[project-agent] tools not closed:', e));
 
-      await saveTurn(db, { orgId, threadId, role: 'assistant', content: answer, actor }).catch((e) =>
-        console.warn('[project-agent] turn not saved:', e)
+      const turn = finishedTurn(steps);
+      await saveTurn(db, { orgId, threadId, role: 'assistant', ...turn, actor }).catch((e) =>
+        console.error('[project-agent] assistant turn not saved', { threadId, orgId }, e)
       );
 
       const log = () =>

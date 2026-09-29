@@ -70,7 +70,7 @@ export function submittedNodeIds(mediaOrder: string[], captionNodeIds: string[])
 
 export type SubmitOutcome = 'network' | 'server' | Record<string, unknown> | null | undefined;
 
-const NETWORK_ERROR_COPY = 'Connessione assente. Riprova.';
+const NETWORK_ERROR_COPY = 'No connection. Try again.';
 
 export function submitErrorFor(outcome: SubmitOutcome): string | null {
   if (outcome === 'network') return NETWORK_ERROR_COPY;

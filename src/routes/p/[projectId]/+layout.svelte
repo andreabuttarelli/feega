@@ -1,14 +1,4 @@
 <script lang="ts">
-  /**
-   * IL GUSCIO DEL PROGETTO: tela infinita al centro, rail flottante a sinistra, chat a destra —
-   * la stessa gerarchia per ogni rotta sotto `/p/[projectId]`, di cui il canvas è la HOME
-   * (`+page.server.ts` reindirizza già alla prima tela).
-   *
-   * La cromatura del canvas (rail, top bar, chat, fogli) monta SOLO sopra la rotta della tela
-   * (`/c/[canvasId]`): le altre rotte (Assets, Brands, Ads, Settings) restano pagine intere — è
-   * così che rispondono a un link diretto, un refresh o uno schermo mobile, e su desktop il rail
-   * apre le stesse pagine come pannello o foglio invece di navigarci sopra.
-   */
   import '$lib/styles/tailwind.css';
   import { page } from '$app/state';
   import { onDestroy } from 'svelte';
@@ -20,7 +10,10 @@
   import CanvasMobileMore from '$lib/components/canvas/CanvasMobileMore.svelte';
   import { openSheet } from '$lib/canvas/sheet-nav';
   import { CHROME_LOADERS } from '$lib/canvas/chrome-loaders';
-  import { sheetEntryForPath, type NavEntry } from '$lib/shell-nav';
+  import MobileTopBar from '$lib/components/canvas/MobileTopBar.svelte';
+  import DesktopPageBar from '$lib/components/canvas/DesktopPageBar.svelte';
+  import { sheetEntryForPath, activeMobileTab, type NavEntry, type MobileTab, type MobileView, type TabOutcome } from '$lib/shell-nav';
+  import { MOBILE_QUERY, type Viewport } from '$lib/breakpoints';
   import { readChatOpen, writeChatOpen } from '$lib/shell-prefs';
   import { guideOpenRequest } from '$lib/canvas/guide-open';
   import { browser } from '$app/environment';
@@ -40,9 +33,8 @@
   let leftPanel = $state<'assets' | 'brands' | 'influencers' | null>(null);
   let chatOpen = $state(browser ? readChatOpen() : true);
   let mobileMoreOpen = $state(false);
-  let mobileView = $state<'canvas' | 'chat'>('canvas');
+  let mobileView = $state<MobileView>('page');
 
-  const MOBILE_QUERY = '(max-width: 767px)';
   let isMobile = $state(browser ? matchMedia(MOBILE_QUERY).matches : false);
   if (browser) {
     const mql = matchMedia(MOBILE_QUERY);
@@ -92,19 +84,62 @@
     });
   }
 
-  function onMobileTab(tab: { id: string }) {
-    if (tab.id === 'canvas' || tab.id === 'chat') {
-      mobileView = tab.id;
-      return;
-    }
-    if (tab.id === 'more') {
+  const viewport = $derived<Viewport>(isMobile ? 'mobile' : 'desktop');
+  const activeTab = $derived(activeMobileTab(projectId, page.url.pathname, mobileView));
+
+  $effect(() => {
+    void page.url.pathname;
+    mobileView = 'page';
+    mobileMoreOpen = false;
+  });
+
+  const MOBILE_TAB_ACTIONS: Record<MobileTab['id'], () => TabOutcome> = {
+    canvas: () => {
+      mobileView = 'page';
+      return onCanvasRoute ? 'handled' : 'follow-link';
+    },
+    chat: () => {
+      mobileView = 'chat';
+      return 'handled';
+    },
+    calendar: () => {
+      mobileView = 'page';
+      return 'follow-link';
+    },
+    more: () => {
       mobileMoreOpen = true;
+      return 'handled';
     }
+  };
+
+  function onMobileTab(tab: MobileTab): TabOutcome {
+    return MOBILE_TAB_ACTIONS[tab.id]();
   }
 </script>
 
-<div class="project-shell">
-  {#if onCanvasRoute && !isMobile}
+<div class="project-shell" data-viewport={viewport}>
+  {#if isMobile}
+    <MobileTopBar
+      {projectId}
+      fallbackTitle={onCanvasRoute ? (currentCanvas?.name ?? data.project.name) : data.project.name}
+      creditBalance={data.creditBalance}
+      profile={data.profile}
+      org={data.org}
+      share={onCanvasRoute ? { shareToken, onShare } : null}
+    />
+    <main class="mobile-main" class:is-canvas={onCanvasRoute}>
+      <div class="mobile-view" class:is-hidden={mobileView !== 'page'}>
+        {@render children()}
+      </div>
+      {#if mobileView === 'chat'}
+        <div class="mobile-chat">
+          <CanvasChatPanel {projectId} brandSlug={data.brand?.slug ?? ''} open={true} />
+        </div>
+      {/if}
+    </main>
+    <CanvasMobileTabs {projectId} active={activeTab} onselect={onMobileTab} />
+    <CanvasMobileMore {projectId} open={mobileMoreOpen} onOpenChange={(open) => (mobileMoreOpen = open)} />
+  {:else if onCanvasRoute}
     <div class="canvas-row">
       <div class="canvas-stage">
         {@render children()}
@@ -148,21 +183,18 @@
 
       <CanvasChatPanel {projectId} brandSlug={data.brand?.slug ?? ''} open={chatOpen} />
     </div>
-  {:else if onCanvasRoute && isMobile}
-    <div class="mobile-canvas">
-      <div class="mobile-view" class:is-hidden={mobileView !== 'canvas'}>
-        {@render children()}
-      </div>
-      {#if mobileView === 'chat'}
-        <div class="mobile-chat">
-          <CanvasChatPanel {projectId} brandSlug={data.brand?.slug ?? ''} open={true} />
-        </div>
-      {/if}
-    </div>
-    <CanvasMobileTabs {projectId} active={mobileView} onselect={onMobileTab} />
-    <CanvasMobileMore {projectId} open={mobileMoreOpen} onOpenChange={(open) => (mobileMoreOpen = open)} />
   {:else}
-    {@render children()}
+    <DesktopPageBar
+      {projectId}
+      canvasHref={data.canvases[0]?.href ?? `/p/${projectId}`}
+      fallbackTitle={data.project.name}
+      creditBalance={data.creditBalance}
+      profile={data.profile}
+      org={data.org}
+    />
+    <main class="desktop-page">
+      {@render children()}
+    </main>
   {/if}
 </div>
 
@@ -188,12 +220,25 @@
     overflow: hidden;
   }
 
-  .mobile-canvas {
+  .desktop-page {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: var(--content-pad-top) var(--content-pad-x) var(--content-pad-bottom);
+  }
+
+  .mobile-main {
     flex: 1 1 auto;
     min-height: 0;
     position: relative;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
-  .mobile-view {
+  .mobile-main.is-canvas {
+    overflow: hidden;
+  }
+  .mobile-main.is-canvas .mobile-view {
     height: 100%;
   }
   .mobile-view.is-hidden {

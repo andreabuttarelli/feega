@@ -19,8 +19,8 @@
   } = $props();
 
   const GROUPS = [
-    { at: AppliesAt.Fetch, title: 'Sorgente', hint: 'Vale dalla prossima sincronizzazione' },
-    { at: AppliesAt.Read, title: 'Filtri', hint: 'Valgono subito, anche per select e loop' }
+    { at: AppliesAt.Fetch, title: 'Source', hint: 'Applies from the next sync' },
+    { at: AppliesAt.Read, title: 'Filters', hint: 'Apply now, also to select and loop' }
   ] as const;
 
   const running = $derived(view.sync.syncStatus === 'running');
@@ -44,10 +44,10 @@
   }
 </script>
 
-<aside class="inspector" aria-label={`Impostazioni: ${view.title}`} data-testid="node-inspector">
+<aside class="inspector" aria-label={`Settings: ${view.title}`} data-testid="node-inspector">
   <header class="inspector-head">
     <h2 class="inspector-title">{view.title}</h2>
-    <button type="button" class="inspector-close" onclick={onclose} aria-label="Chiudi impostazioni">
+    <button type="button" class="inspector-close" onclick={onclose} aria-label="Close settings">
       <X size={14} strokeWidth={1.8} />
     </button>
   </header>
@@ -103,10 +103,10 @@
         Mai sincronizzato
       {/if}
     </p>
-    <p class="inspector-cost">{view.syncCredits ? `Costa ${view.syncCredits} crediti` : 'Sincronizzare non costa crediti'}</p>
-    <button type="button" class="inspector-sync-btn" onclick={onsync} disabled={!view.canSync} title={blocked ?? 'Sincronizza ora'}>
+    <p class="inspector-cost">{view.syncCredits ? `Costs ${view.syncCredits} credits` : 'Syncing costs no credits'}</p>
+    <button type="button" class="inspector-sync-btn" onclick={onsync} disabled={!view.canSync} title={blocked ?? 'Sync now'}>
       <RefreshCw size={13} strokeWidth={1.8} class={running ? 'is-spinning' : ''} />
-      Sincronizza ora
+      Sync now
     </button>
   </footer>
 </aside>

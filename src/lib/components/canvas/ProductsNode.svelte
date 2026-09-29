@@ -24,10 +24,10 @@
 
 <SourcePreview
   icon={ShoppingBag}
-  title={node.url.trim() ? hostOf(node.url) : 'Prodotti'}
+  title={node.url.trim() ? hostOf(node.url) : 'Products'}
   {tiles}
   {total}
   syncStatus={node.syncStatus}
   syncError={node.syncError}
-  empty={node.url.trim() ? 'Nessun prodotto scaricato. Sincronizza dal pannello a destra.' : "Scrivi l'indirizzo dello store nel pannello a destra."}
+  empty={node.url.trim() ? 'No products yet. Sync from the panel on the right.' : 'Enter the store address in the panel on the right.'}
 />

@@ -65,7 +65,7 @@
       },
       "starter": {
         "tagline": "For one brand getting consistent.",
-        "highlights": "Autopublish to 2 social accounts|Editorial plan on autopilot|Blog articles built to rank|Backlink network across feega brands|Meta & Google Ads — you approve spend"
+        "highlights": "Autopublish to 2 social accounts|Editorial plan on autopilot|Blog articles built to rank|Backlink network across feega brands|Meta Ads — you approve spend"
       },
       "pro": {
         "tagline": "The full autonomous manager.",
@@ -254,7 +254,7 @@
     "hub": {
       "publish": {
         "calendar": "Calendar",
-        "createPost": "Create post"
+        "promote": "Promote"
       },
       "overview": {
         "brand": {
@@ -262,7 +262,7 @@
         }
       },
       "ads": {
-        "social": "Social ads"
+        "social": "Ads"
       }
     },
     "shell": {
@@ -465,39 +465,7 @@
         }
       },
       "ads": {
-        "accountsNav": "Ads accounts",
-        "budgetNav": "Budget & defaults",
-        "accountsTitle": "Ads accounts",
-        "connectPlatform": "Connect an ads account",
-        "connectViaOauth": "Secure OAuth",
-        "proOnly": "Ads (boosts + Meta and Google campaigns) are included from the Starter plan.",
-        "upgrade": "Get Starter",
-        "needFacebook": "Connect a Facebook Page with ads permissions to run Meta ads.",
-        "connectFacebook": "Connect Facebook",
-        "accountsDesc": "Detected automatically after you connect Meta Ads or Google Ads.",
-        "sync": "Sync",
-        "noAccounts": "No ad accounts yet — connect Meta Ads or Google Ads below, then sync.",
-        "capsTitle": "Defaults & spend limits",
-        "capsDesc": "Budget is set per campaign. These are defaults reused on every campaign plus an optional ceiling: leave it blank for no limit, set it and campaigns above it cannot be approved. Countries are ISO-2 (IT, US…). DSA fields are required for EU targeting.",
-        "dailyCap": "Daily ceiling (optional)",
-        "monthlyCap": "Monthly ceiling (optional)",
-        "blocked": "Blocked",
-        "accountBlocked": "blocked by the platform ({reason})",
-        "noCap": "No limit",
-        "saving": "Saving…",
-        "countriesPh": "Search a country…",
-        "noCountryMatch": "No country found",
-        "countries": "Default countries",
-        "currency": "Currency",
-        "dsaBeneficiary": "DSA beneficiary (EU)",
-        "dsaPayor": "DSA payor (EU)",
-        "saved": "Settings saved",
-        "synced": "Synced {n} ad account(s)",
-        "openAds": "Open Ads",
-        "connectTitle": "Ads connections",
-        "connectBody": "Separate from posting: Meta Ads runs on a Facebook token with the ads scopes, Google Ads needs its own dedicated connection.",
-        "connectMeta": "Connect Meta Ads",
-        "connectGoogle": "Connect Google Ads"
+        "noCountryMatch": "No country found"
       },
       "project": {
         "title": "Project"
@@ -529,295 +497,7 @@
       }
     },
     "ads": {
-      "refresh": "Refresh",
-      "cancelCreate": "Cancel",
-      "approvedOk": "Campaign approved and sent to the platform.",
-      "spend": "Spend",
-      "impressions": "Impressions",
-      "clicks": "Clicks",
-      "active": "Active",
-      "proposed": "Proposed",
-      "campaignType": "Campaign type",
-      "adAccount": "Ad account",
-      "adAccountAuto": "Auto (match platform)",
-      "name": "Campaign name",
-      "goal": "Goal",
-      "dailyBudget": "Daily budget",
-      "headline": "Headline",
-      "body": "Body",
-      "imageUrl": "Image URL",
-      "landingUrl": "Landing page URL",
-      "createHint": "Saves a proposal only — nothing spends until you Approve.",
-      "saveProposal": "Save proposal",
-      "campaigns": "Campaigns",
-      "empty": "No campaigns yet. Propose boosts from your winners, or create a standalone ad.",
-      "approve": "Approve & spend",
-      "reject": "Reject",
-      "noBrand": {
-        "title": "Link or create a brand to use Ads",
-        "body": "Ads run against a brand's posts and ad account. Link this project to one, or create a new one.",
-        "cta": "Create or link a brand"
-      },
-      "noAdAccount": {
-        "title": "Connect a Meta Ads account",
-        "body": "Link {brand}'s Meta Ads account to propose boosts and launch campaigns.",
-        "cta": "Connect Meta Ads",
-        "unavailable": "Meta Ads connect isn't wired up yet for this brand."
-      },
-      "steps": {
-        "title": "How Social ads work",
-        "one": "Connect a Meta Ads account",
-        "two": "Propose a boost from a winning post, or create a campaign",
-        "three": "Approve — nothing spends until then"
-      },
-      "overview": {
-        "charts": "Ads performance",
-        "spendTrend": "Spend (ours)",
-        "spendTrendSub": "Synced metrics over recent periods",
-        "clicksTrend": "Clicks",
-        "clicksTrendSub": "Engagement from synced windows",
-        "spendSplit": "Spend split",
-        "spendSplitSub": "feega vs other ads on the account",
-        "topCampaigns": "Top campaigns by spend",
-        "topCampaignsSub": "Created or boosted from feega",
-        "filters": "Filters",
-        "source": "Source",
-        "sourceAll": "All",
-        "ours": "Ours",
-        "external": "On account",
-        "status": "Status",
-        "statusAll": "All statuses",
-        "search": "Search",
-        "searchPh": "Name, goal, platform…",
-        "oursTitle": "Our campaigns — performance",
-        "oursSub": "{n} matching",
-        "accountTitle": "Ads on connected accounts",
-        "accountSub": "{n} on your connected accounts (includes existing Meta/Google ads)",
-        "noSeries": "No synced spend yet — approve a campaign or hit Refresh.",
-        "noOurs": "No feega campaigns match these filters.",
-        "noAccount": "No ads found on connected ad accounts yet. Connect Meta/Google Ads and Refresh."
-      },
-      "channel": {
-        "social": "Social",
-        "google": "Google",
-        "library": "Ads library"
-      },
-      "social": {
-        "title": "Social ads",
-        "subtitle": "Amplify {brand}’s best posts and launch Meta Ads campaigns (Facebook & Instagram)."
-      },
-      "google": {
-        "title": "Google ads",
-        "subtitle": "Search and Display campaigns for {brand}, created and managed from here.",
-        "headline": "Headline (max 30)",
-        "moreHeadlines": "Additional headlines",
-        "description": "Description (max 90)",
-        "moreDescriptions": "Additional descriptions",
-        "keywords": "Keywords",
-        "keywordsHint": "One per line — broad match by default",
-        "businessName": "Business name (max 25)",
-        "landscape": "Landscape image (1.91:1)",
-        "square": "Square image (1:1)",
-        "displayHint": "Google rejects Responsive Display ads unless both formats are supplied."
-      },
-      "bookCall": {
-        "title": "Talk to us to activate automatic ads",
-        "body": "Automatic ads are set up with our team. Book a call and we’ll turn them on for your brand.",
-        "cta": "Book a call"
-      },
-      "connectedOk": "Account connected. Ad accounts synced.",
-      "launchCost": "Costs {credits} credits to launch (12% of the first day's budget)",
-      "readiness": {
-        "title": "Prerequisites",
-        "ok": "Ready to launch",
-        "blocked": "{n} to fix",
-        "warn": "{n} warnings",
-        "fix": "Fix",
-        "checks": {
-          "plan": {
-            "label": "Starter plan",
-            "ok": "Ads are included in your plan.",
-            "todo": "Ads are included from the Starter plan."
-          },
-          "profile": {
-            "label": "Publishing profile",
-            "ok": "Profile ready.",
-            "todo": "Connect an account to create the profile."
-          },
-          "connection": {
-            "label": "{channel} connection",
-            "ok": "Authorisation active.",
-            "todo": "Authorise ads access: Meta needs a Facebook connection carrying the ads scopes (Instagram alone cannot grant them), Google Ads needs its own dedicated connection."
-          },
-          "adAccount": {
-            "label": "Ad account",
-            "ok": "Found.",
-            "todo": "No ad account found — sync after authorising."
-          },
-          "adAccountBlocked": {
-            "label": "Ad account blocked",
-            "ok": "Ad account is usable.",
-            "todo": "The platform has blocked this ad account: {detail}. Nothing can launch until you clear it in Meta or Google Ads — usually an outstanding payment or a review."
-          },
-          "caps": {
-            "label": "Budget caps",
-            "ok": "Daily and monthly caps set.",
-            "todo": "Optional: a daily/monthly ceiling that blocks campaigns above it. You still set the budget per campaign."
-          },
-          "credits": {
-            "label": "Credits",
-            "ok": "Enough credits.",
-            "todo": "You need at least {detail} credits to launch: 12% of the first day's budget up front, then 12% of actual spend. Billed in credits."
-          },
-          "landing": {
-            "label": "Destination URL",
-            "ok": "Website set.",
-            "todo": "Set the brand website — traffic ads need a destination."
-          },
-          "dsa": {
-            "label": "DSA details (EU)",
-            "ok": "Beneficiary and payor set.",
-            "todo": "EU targeting requires DSA beneficiary and payor."
-          }
-        }
-      },
-      "err": {
-        "paused_credits_exhausted": "Campaign paused: the brand ran out of AI credits for this period — spend on Meta has stopped. It can be switched back on once credits reset.",
-        "paused_not_on_plan": "Campaign paused: your plan no longer includes Ads. Spend on Meta has stopped.",
-        "already_launching": "This campaign is already launching. Wait a moment and reload.",
-        "launch_interrupted": "The launch was interrupted. Try again: if the campaign had already started it will not be duplicated.",
-        "goal_not_supported": "That goal is not supported yet. Use traffic, engagement, awareness or video_views.",
-        "variants_or_story_image": "On Meta an ad can have per-placement creatives OR several separate creatives, not both. Drop either the Stories image or the extra creatives.",
-        "ads_not_on_plan": "Ads require the Starter plan or above.",
-        "ads_book_call": "Automatic ads are activated with our team — book a call to get started.",
-        "ad_account_missing": "No ad account connected for this platform.",
-        "social_account_missing": "No social account connected for this platform.",
-        "zernio_profile_missing": "Publishing profile missing.",
-        "display_needs_both_images": "Display campaigns need both a landscape and a square image.",
-        "name_and_headline_required": "Name and headline are required.",
-        "boost_social_only": "Boosting only exists on social.",
-        "credits_exhausted": "Not enough credits: launching needs {needed}, you have {left} left. The 12% management fee is billed in credits."
-      },
-      "newCampaign": "New campaign",
-      "new": {
-        "title": {
-          "social": "New social campaign",
-          "google": "New Google campaign"
-        },
-        "subtitle": "Say what to push, the AI writes it. Nothing goes live until you approve.",
-        "back": "Back to campaigns",
-        "briefTitle": "What to push",
-        "briefLabel": "Instruction (optional)",
-        "briefPlaceholder": "e.g. push the new autumn menu, target restaurant owners in Milan",
-        "briefHint": "Leave it empty and the AI picks the angle from brand context: what you do, for whom, tone of voice and recent organic posts.",
-        "landingLabel": "Destination URL",
-        "generate": "Generate with AI",
-        "generating": "Writing the campaign…",
-        "reviewTitle": "Review and edit",
-        "notReady": "Some prerequisites are missing: you can draft the campaign, but you will not be able to launch it until they are fixed.",
-        "countries": "Countries",
-        "ageMin": "Min age",
-        "ageMax": "Max age",
-        "optional": "optional",
-        "editable": "everything editable",
-        "waiting": "Generate the campaign above: it lands here with every field editable before you save it.",
-        "secBasics": "Setup",
-        "secCreative": "Creative",
-        "secVariants": "Extra creatives",
-        "variantsHint": "each creative becomes its own ad inside the same ad set, sharing budget and targeting",
-        "addVariant": "Add creative",
-        "storyImage": "Stories and Reels image",
-        "storyImageBlocked": "unavailable with extra creatives",
-        "endDate": "Campaign end",
-        "endDateOpt": "optional",
-        "budgetUntil": "{amount} a day until {date}, then the campaign stops on its own.",
-        "budgetForever": "{amount} every single day until you pause it. No end date.",
-        "secTargeting": "Targeting",
-        "ageRange": "Age range",
-        "addHeadline": "Add headline",
-        "addDescription": "Add description",
-        "removeVariant": "Remove",
-        "variantPlaceholder": "Variant {n}",
-        "noAccountYet": "You can save the proposal without a connected ad account — it just cannot launch until you connect one."
-      },
-      "syncing": "Syncing…",
-      "pendingTitle": "Waiting for approval",
-      "pendingSub": "No spend starts without your go-ahead",
-      "typeBoost": "Post boost",
-      "campaignLive": "Campaign live",
-      "typeStandalone": "Standalone campaign",
-      "awaitingYou": "waiting for you",
-      "accountsTitle": "Google Ads accounts",
-      "accountsSub": "Where the spend lands",
-      "accountActive": "active",
-      "noGoogleAccount": "No Google Ads account connected. Google needs its own connection, separate from any other Google account.",
-      "status": {
-        "launching": "Launching…",
-        "proposed": "proposed",
-        "approved": "approved",
-        "active": "active",
-        "pending_review": "in review",
-        "paused": "paused",
-        "completed": "completed",
-        "failed": "failed",
-        "rejected": "rejected"
-      },
-      "library": {
-        "title": "Ads library",
-        "subtitle": "Browse active Meta ads (Facebook & Instagram) from the public Ad Library — research competitors before you write creatives.",
-        "searchTitle": "Search Meta Ad Library",
-        "searchSub": "By company page or keyword. Long-running ACTIVE ads ≈ validated angles — steal structure, not copy.",
-        "modeCompany": "Company",
-        "modeQuery": "Keyword",
-        "queryPhCompany": "Competitor or brand name…",
-        "queryPhQuery": "Niche pain, product category…",
-        "status": "Status",
-        "statusActive": "Active",
-        "statusAll": "All",
-        "media": "Media",
-        "mediaAll": "All",
-        "mediaVideo": "Video",
-        "mediaImage": "Image",
-        "search": "Search",
-        "searching": "Searching…",
-        "competitors": "Your competitors",
-        "results": "{n} ads",
-        "emptyTitle": "Search Meta ads",
-        "emptyBody": "Pick a competitor above or search by company / keyword. Results come from Meta’s public Ad Library via ScrapeCreators.",
-        "noResults": "No ads found — try another company name, keyword, or status.",
-        "error": "Could not fetch ads: {msg}",
-        "active": "Active",
-        "inactive": "Inactive",
-        "since": "Since {date}",
-        "openLibrary": "Open in Meta",
-        "cta": "CTA",
-        "sourceNote": "Public Ad Library research only — not your own Meta Ads account. Managing spend lives under Social ads.",
-        "select": "Select",
-        "selectAll": "Select up to 12",
-        "clearSelection": "Clear",
-        "remixSelected": "Remix {n}",
-        "remixing": "Remixing…",
-        "remixHint": "Select competitor ads, then remix them into briefs in your brand’s voice (structure, not copy).",
-        "remixOk": "Created {n} remix brief(s).",
-        "briefsTitle": "Remix briefs",
-        "briefsSub": "Latest agent output — ranked for your brand",
-        "briefsEmpty": "No remix briefs yet. Search Meta ads, select a few, and hit Remix.",
-        "produce": "Produce",
-        "producing": "Producing…",
-        "produced": "Produced",
-        "produceNote": "Uses your own products, people and videos — never the competitor’s footage.",
-        "producedOk": "Queued. The clip lands in your media, ready to review.",
-        "sourceAd": "Source",
-        "keep": "Keep",
-        "change": "Change",
-        "errors": {
-          "no_ads_selected": "Select at least one ad to remix.",
-          "no_competitor_ads": "No ads to remix.",
-          "no_remix_briefs": "The agent didn’t produce usable briefs — try different ads.",
-          "ads_not_on_plan": "Ads remix needs a plan with Ads enabled.",
-          "credits_exhausted": "Out of AI credits."
-        }
-      }
+      "syncing": "Syncing…"
     }
   },
   "cookie": {
@@ -826,6 +506,44 @@
     "accept": "Accept"
   },
   "chat": {
+    "panel": {
+      "log": "Conversation",
+      "agent": "Agent",
+      "you": "You",
+      "noScope": "Open a project to start chatting.",
+      "emptyTitle": "What are we making?",
+      "emptyBody": "The agent reads and edits this project's canvases: it adds nodes, connects them and runs generations.",
+      "suggestions": [
+        "What's on my canvases right now?",
+        "Add a text node with three hook ideas for a product launch",
+        "Create an image node for a minimal hero shot and connect it to my text",
+        "Summarise the assets this project has produced"
+      ],
+      "placeholder": "Ask the agent…",
+      "hint": "Enter to send · Shift+Enter for a new line",
+      "send": "Send",
+      "stop": "Stop generating",
+      "jump": "Jump to latest",
+      "thinking": "Working…",
+      "responding": "Agent is responding",
+      "retry": "Retry",
+      "buyCredits": "Get credits",
+      "openOnCanvas": "Open on canvas",
+      "input": "Input",
+      "output": "Result",
+      "tools": "{count, plural, one {# action} other {# actions}}",
+      "tool": {
+        "running": "Running",
+        "done": "Done",
+        "error": "Failed"
+      },
+      "failure": {
+        "load": "Couldn't load the conversation.",
+        "send": "The agent didn't answer.",
+        "empty": "The agent returned an empty reply.",
+        "credits": "You're out of AI credits for this period."
+      }
+    },
     "toolJob": {
       "analytics_review": "Performance review",
       "create_campaign": "Campaign",

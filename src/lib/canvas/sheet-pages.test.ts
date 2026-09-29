@@ -20,18 +20,13 @@ describe('settingsSectionOf: quale cartella sotto settings/ risponde a questo pa
 
 describe('settingsPageLoader: la sezione trova la sua pagina reale', () => {
   it('ogni sezione esistente sotto settings/ ha un loader', () => {
-    for (const section of ['brand', 'connected-accounts', 'api-keys', 'team', 'profile', 'appearance', 'billing', 'danger', 'products', 'ads']) {
+    for (const section of ['brand', 'connected-accounts', 'api-keys', 'team', 'profile', 'appearance', 'billing', 'danger', 'products']) {
       expect(settingsPageLoader(`/settings/${section}`), `manca la pagina per ${section}`).not.toBeNull();
     }
   });
 
   it('una sezione inesistente non trova niente', () => {
     expect(settingsPageLoader('/settings/does-not-exist')).toBeNull();
-  });
-
-  it('una sezione a due livelli (ads/accounts) trova la sua pagina, non quella del genitore', () => {
-    expect(settingsPageLoader('/settings/ads/accounts')).not.toBeNull();
-    expect(settingsPageLoader('/settings/ads/accounts')).not.toBe(settingsPageLoader('/settings/ads'));
   });
 
   it('la radice di settings trova la stessa pagina di connected-accounts', () => {

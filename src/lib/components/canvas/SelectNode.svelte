@@ -69,10 +69,10 @@
   <div class="select-body">
     {#if !list}
       <p class="select-empty">
-        Sceglie un elemento da una lista collegata, per numero.<br />Collega una lista
+        Picks one item from a connected list, by number.<br />Connect a list
       </p>
     {:else if !length}
-      <p class="select-empty">Lista vuota</p>
+      <p class="select-empty">Empty list</p>
     {:else if current}
       {#if list.itemKind === 'image' && current.url}
         <img class="select-photo" src={current.url} alt={listLabel(current, node.index - 1)} loading="lazy" />

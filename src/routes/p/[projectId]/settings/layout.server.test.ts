@@ -102,7 +102,7 @@ describe('settings +layout.server load', () => {
 		return { data, ops: (supabase as unknown as { __ops: any[] }).__ops };
 	}
 
-	it.each(['video', 'connected-accounts', 'danger', 'products', 'ads', 'ads/accounts'])(
+	it.each(['video', 'connected-accounts', 'danger', 'products'])(
 		'senza brand, la sezione di brand %s chiude il cancello',
 		async (section) => {
 			const { data } = await loadWithoutBrand(section, { brands: [{ id: 'b-1', name: 'Acme', slug: 'acme' }] });

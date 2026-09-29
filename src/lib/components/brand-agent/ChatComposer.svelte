@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { _ } from 'svelte-i18n';
+
   let {
     value = $bindable(),
     busy = false,
@@ -13,14 +15,18 @@
     onstop: () => void;
   } = $props();
 
-  let el = $state<HTMLTextAreaElement | null>(null);
+  const MAX_HEIGHT_PX = 200;
+
+  let textarea = $state<HTMLTextAreaElement | null>(null);
+
+  const canSend = $derived(!busy && enabled && !!value.trim());
 
   function grow() {
-    if (!el) {
+    if (!textarea) {
       return;
     }
-    el.style.height = 'auto';
-    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+    textarea.style.height = 'auto';
+    textarea.style.height = `${Math.min(textarea.scrollHeight, MAX_HEIGHT_PX)}px`;
   }
 
   $effect(() => {
@@ -29,83 +35,98 @@
   });
 
   function onKeydown(e: KeyboardEvent) {
-    // isComposing: Invio durante un IME conferma la composizione, non manda.
     if (e.key !== 'Enter' || e.shiftKey || e.isComposing) {
       return;
     }
     e.preventDefault();
-    if (!busy && enabled && value.trim()) {
-      onsend();
-    }
+    submit();
   }
 
   function submit() {
-    if (!busy && enabled && value.trim()) {
+    if (canSend) {
       onsend();
     }
   }
 </script>
 
-<div class="composer" class:focusable={enabled && !busy}>
+<form
+  class="composer"
+  class:is-disabled={!enabled}
+  onsubmit={(e) => {
+    e.preventDefault();
+    submit();
+  }}
+>
+  <label class="sr-only" for="chat-composer-input">{$_('chat.panel.placeholder')}</label>
   <textarea
-    bind:this={el}
+    id="chat-composer-input"
+    bind:this={textarea}
     bind:value
     onkeydown={onKeydown}
     rows="1"
-    placeholder="Scrivi un messaggio…"
-    disabled={busy || !enabled}
+    placeholder={$_('chat.panel.placeholder')}
+    disabled={!enabled}
+    enterkeyhint="send"
   ></textarea>
 
-  {#if busy}
-    <button type="button" class="act stop" onclick={onstop} aria-label="Interrompi">
-      <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
-        <rect x="3.5" y="3.5" width="9" height="9" fill="currentColor" />
-      </svg>
-    </button>
-  {:else}
-    <button type="button" class="act send" onclick={submit} disabled={!value.trim() || !enabled} aria-label="Invia">
-      <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-        <path
-          fill="currentColor"
-          d="M1.7 7.3 13.2 2a.6.6 0 0 1 .8.8L8.7 14.3a.6.6 0 0 1-1.1-.1L6.4 9.6 1.8 8.4a.6.6 0 0 1-.1-1.1Z"
-        />
-      </svg>
-    </button>
-  {/if}
-</div>
+  <div class="row">
+    <span class="hint">{$_('chat.panel.hint')}</span>
+    {#if busy}
+      <button type="button" class="act stop" onclick={onstop} aria-label={$_('chat.panel.stop')} title={$_('chat.panel.stop')}>
+        <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><rect x="3" y="3" width="10" height="10" fill="currentColor" /></svg>
+      </button>
+    {:else}
+      <button type="submit" class="act send" disabled={!canSend} aria-label={$_('chat.panel.send')} title={$_('chat.panel.send')}>
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square" /></svg>
+      </button>
+    {/if}
+  </div>
+</form>
 
 <style>
   .composer {
     display: flex;
-    align-items: flex-end;
-    gap: 5px;
-    padding: 6px 6px 6px 9px;
-    background: color-mix(in srgb, var(--ink, #1d1d1f) 5%, transparent);
-    transition: background 0.14s var(--ease, cubic-bezier(0.22, 1, 0.36, 1));
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 10px 8px 12px;
+    background: var(--paper, #fff);
+    border: 1px solid var(--line-2, #d2d2d7);
+    transition: border-color 0.14s ease, box-shadow 0.14s ease;
   }
-  .composer.focusable:focus-within {
-    background: color-mix(in srgb, var(--ink, #1d1d1f) 8%, transparent);
+  .composer:focus-within {
+    border-color: var(--ink-soft, #6e6e73);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #c485fe) 22%, transparent);
+  }
+  .composer.is-disabled {
+    opacity: 0.6;
   }
 
   textarea {
-    flex: 1;
-    min-width: 0;
+    width: 100%;
     border: none;
     outline: none;
     resize: none;
     background: transparent;
     color: var(--ink, #1d1d1f);
     font: inherit;
-    font-size: 12.5px;
-    line-height: 1.4;
-    max-height: 120px;
-    padding: 4px 0;
+    font-size: var(--chat-font, 14px);
+    line-height: 1.5;
+    max-height: 200px;
+    padding: 0;
   }
   textarea::placeholder {
     color: var(--ink-faint, #86868b);
   }
-  textarea:disabled {
-    opacity: 0.55;
+
+  .row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .hint {
+    font-size: 11.5px;
+    color: var(--ink-faint, #86868b);
   }
 
   .act {
@@ -113,47 +134,46 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 24px;
-    height: 24px;
+    width: var(--chat-action, 32px);
+    height: var(--chat-action, 32px);
     border: none;
     cursor: pointer;
-    transition: opacity 0.14s ease, transform 0.14s var(--ease, cubic-bezier(0.22, 1, 0.36, 1));
-  }
-  .send {
-    background: transparent;
-    color: var(--ink, #1d1d1f);
-  }
-  .stop {
-    background: transparent;
-    color: var(--ink, #1d1d1f);
+    background: var(--ink, #1d1d1f);
+    color: var(--paper, #fff);
+    transition: opacity 0.14s ease, background 0.14s ease;
   }
   .act:disabled {
-    opacity: 0.3;
+    background: var(--paper-3, #f4f4f4);
+    color: var(--ink-faint, #86868b);
     cursor: default;
-  }
-  .act:not(:disabled):hover {
-    transform: translateY(-1px);
   }
   .act:focus-visible {
     outline: 2px solid var(--accent, #c485fe);
-    outline-offset: 1px;
+    outline-offset: 2px;
   }
 
-  :global(:root[data-theme='dark']) .composer {
-    background: color-mix(in srgb, #fff 8%, transparent);
-  }
-  :global(:root[data-theme='dark']) .composer.focusable:focus-within {
-    background: color-mix(in srgb, #fff 12%, transparent);
-  }
-  :global(:root[data-theme='dark']) .send,
-  :global(:root[data-theme='dark']) .stop {
-    background: transparent;
-    color: #fff;
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .act:not(:disabled):hover {
-      transform: none;
+  @media (hover: none) {
+    .composer {
+      flex-direction: row;
+      align-items: flex-end;
+      gap: 8px;
+      padding: 6px 6px 6px 12px;
+    }
+    textarea {
+      align-self: center;
+      padding: 6px 0;
+    }
+    .hint {
+      display: none;
     }
   }
 </style>

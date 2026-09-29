@@ -181,10 +181,11 @@
     border-radius: 0;
     cursor: pointer;
   }
+  .toolbar button.primary,
   .primary {
-    background: var(--accent, #7c5cff);
-    color: #fff;
-    border-color: var(--accent, #7c5cff);
+    background: var(--ink);
+    color: var(--paper);
+    border-color: var(--ink);
   }
   .primary:disabled {
     opacity: 0.5;
@@ -212,6 +213,24 @@
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     gap: 12px;
+  }
+
+  :global([data-viewport='mobile']) .influencers-page {
+    padding: 12px var(--page-gutter) 24px;
+  }
+  :global([data-viewport='mobile']) .toolbar {
+    flex-wrap: wrap;
+  }
+  :global([data-viewport='mobile']) .toolbar button {
+    flex: 1 1 0;
+    min-height: var(--touch-target);
+  }
+  :global([data-viewport='mobile']) .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  :global([data-viewport='mobile']) .template-btn {
+    min-height: var(--touch-target);
   }
   .card {
     background: var(--paper-2);

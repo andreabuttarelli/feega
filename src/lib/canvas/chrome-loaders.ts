@@ -12,7 +12,7 @@ export const ENTRY_PREFETCH: Record<string, () => Promise<{ default: unknown }>>
   calendar: SHEET_PAGE_LOADERS.calendar,
   ads: SHEET_PAGE_LOADERS.ads,
   settings: SHEET_PAGE_LOADERS.settingsLayout,
-  'create-post': SHEET_PAGE_LOADERS.createPost
+  promote: SHEET_PAGE_LOADERS.promote
 };
 
 export function prefetchEntry(entryId: string): void {

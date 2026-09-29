@@ -36,10 +36,10 @@ export const NODE_KIND_ICON: Record<NodeType, Component> = {
 
 export const NODE_KIND_LABEL: Record<NodeType, string> = {
   ...ADDABLE_LABEL,
-  social_post_mockup: 'Anteprima post',
+  social_post_mockup: 'Post preview',
   ads: 'Ads',
   influencer: 'Influencer',
-  list: 'Lista',
-  select: 'Selezione',
-  composition: 'Composizione'
+  list: 'List',
+  select: 'Select',
+  composition: 'Composition'
 };

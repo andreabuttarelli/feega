@@ -29,26 +29,14 @@ const GONE = [
   'REFINE_MEDIA',
   'GENERATE_MEDIA',
   'CHECK_MEDIA_JOB_READ',
-  'MAX_MEDIA_ALTERNATIVES'
+  'MAX_MEDIA_ALTERNATIVES',
+  'GET_ADS',
+  'ADS_ACTION',
+  'ADS_REMIX'
 ] as const;
 
-/**
- * `GET_ADS` invece resta: `/ads` è vivo (`cli/commands/ads.ts` lo chiama), il contratto continua a
- * descrivere la sua forma anche se non è più un tool MCP a sé.
- */
 describe('i contratti delle rotte cancellate', () => {
   it.each(GONE)('%s non è più esportato: nessuna rotta lo usa', (name) => {
     expect(contracts).not.toHaveProperty(name);
-  });
-});
-
-describe('il contratto ancora esportato per la rotta che resta', () => {
-  it('GET_ADS resta esportato: la rotta REST lo usa', () => {
-    expect(contracts).toHaveProperty('GET_ADS');
-  });
-
-  it('ma non è più un tool', () => {
-    const tools = new Set(contracts.BRAND_ENDPOINTS.map((e) => e.tool));
-    expect(tools.has(contracts.GET_ADS.tool)).toBe(false);
   });
 });

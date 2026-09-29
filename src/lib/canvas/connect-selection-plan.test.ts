@@ -31,7 +31,7 @@ describe('collegare una selezione a un nodo che genera', () => {
     });
 
     expect(plan.wires).toEqual([{ sourceId: 'a', connector: 'text' }]);
-    expect(plan.rejected).toEqual([{ sourceId: 'b', why: expect.stringContaining('occupata') }]);
+    expect(plan.rejected).toEqual([{ sourceId: 'b', why: expect.stringContaining('already taken') }]);
   });
 
   it('rifiuta un medium che il modello del bersaglio non accetta', () => {

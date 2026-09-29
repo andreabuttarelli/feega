@@ -38,17 +38,17 @@
     <Icon size={13} strokeWidth={1.8} />
     <span class="preview-title">{title}</span>
     <span class="preview-count" class:is-running={syncStatus === 'running'}>
-      {syncStatus === 'running' ? 'scarica…' : total ? `${tiles.length}/${total}` : ''}
+      {syncStatus === 'running' ? 'syncing…' : total ? `${tiles.length}/${total}` : ''}
     </span>
   </header>
 
   {#if syncStatus === 'failed' && syncError}
     <div class="preview-fail" role="alert">
-      <p class="preview-fail-title">Sincronizzazione non riuscita</p>
+      <p class="preview-fail-title">Sync failed</p>
       <p class="preview-fail-why">{syncError}</p>
     </div>
   {:else if !tiles.length}
-    <p class="preview-empty">{total ? 'Nessun risultato con questi filtri.' : empty}</p>
+    <p class="preview-empty">{total ? 'No results with these filters.' : empty}</p>
   {:else}
     <ul class="preview-grid">
       {#each tiles as tile (tile.key)}

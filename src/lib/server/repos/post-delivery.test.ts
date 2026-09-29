@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fakeDb, filtersOf } from '$lib/server/db/fake-db';
 import type { SocialPublisher, PublishReceipt, RemotePostStatus } from '$lib/server/publishing/port';
+
+vi.mock('$lib/server/ads/provider-media', () => ({
+  providerMediaSigner: () => async (media: { path: string }[]) =>
+    new Map(media.map((m) => [m.path, m.path.startsWith('http') ? m.path : `https://signed.test/${m.path}`]))
+}));
+
 import {
   cancelDelivery,
   deliveryStatus,
@@ -137,6 +143,25 @@ describe('scheduleDelivery', () => {
 
     expect(publisher.publish).not.toHaveBeenCalled();
     expect(result.deliveries[0]).toMatchObject({ accountId: threadsAccount.id, ok: false });
+  });
+
+  it('firma un asset che è un percorso di storage prima di mandarlo a Zernio, mai il percorso nudo', async () => {
+    const storedAsset = { id: 'asset-stored', org_id: ORG, type: 'image', url: 'org-1/project-1/asset-stored.jpg' };
+    const postWithStoredAsset = { ...postRow, media: [{ assetId: 'asset-stored', order: 0, role: 'primary' }] };
+    const { db } = fakeDb({ posts: [postWithStoredAsset], social_accounts: [accountRows[0]], assets: [storedAsset] });
+    const publisher = fakePublisher();
+
+    await scheduleDelivery(db, publisher, {
+      orgId: ORG,
+      postId: POST_ID,
+      accountIds: [ACCOUNT_IG]
+    });
+
+    const [call] = (publisher.publish as ReturnType<typeof vi.fn>).mock.calls;
+    const mediaUrls = call[0].mediaUrls as string[];
+    expect(mediaUrls).toHaveLength(1);
+    expect(mediaUrls[0]).toMatch(/^https:\/\//);
+    expect(mediaUrls[0]).not.toBe(storedAsset.url);
   });
 
   it('un fallimento Zernio su un account non impedisce la consegna sugli altri', async () => {

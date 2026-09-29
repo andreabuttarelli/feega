@@ -1,189 +1,238 @@
 <script lang="ts">
-  import { toolLabel } from '$lib/chat-parts';
-
-  export type ToolLine = {
-    toolCallId?: string;
-    toolName: string;
-    status?: 'running' | 'done' | 'error';
-  };
+  import { _ } from 'svelte-i18n';
+  import { renderDocHtml } from '$lib/canvas/doc-render';
+  import ChatToolRow from './ChatToolRow.svelte';
+  import type { ToolCall } from './chat-view';
 
   let {
     role,
     content,
+    projectId,
     pending = false,
     at = null,
     tools = [],
-    live = false
+    live = false,
+    first = true
   }: {
     role: 'user' | 'assistant';
     content: string;
+    projectId: string;
     pending?: boolean;
     at?: number | null;
-    tools?: ToolLine[];
+    tools?: ToolCall[];
     live?: boolean;
+    first?: boolean;
   } = $props();
 
-  const STATUS_WORD: Record<string, string> = {
-    running: 'in corso',
-    done: 'fatto',
-    error: 'errore'
-  };
-
-  const time = $derived(at ? new Date(at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) : '');
-  const showCaret = $derived(live && !!content);
-  const showDots = $derived(pending && !content && !tools.length);
-  const showWait = $derived(pending && !content && tools.length > 0);
+  const time = $derived(at ? new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '');
+  const html = $derived(role === 'assistant' && content ? renderDocHtml(content) : '');
+  const thinking = $derived(pending && !content);
 </script>
 
-{#snippet toolRow(tool: ToolLine)}
-  {@const status = tool.status ?? 'running'}
-  <div class="tool {status}">
-    <span class="pip" aria-hidden="true"></span>
-    <span class="tool-name">{toolLabel(tool.toolName)}</span>
-    <span class="tool-status">{STATUS_WORD[status] ?? status}</span>
-  </div>
-{/snippet}
+<div class="msg is-{role}" class:first class:live role="group" aria-label={role === 'user' ? $_('chat.panel.you') : $_('chat.panel.agent')}>
+  {#if role === 'user'}
+    <div class="user-body">{content}</div>
+  {:else}
+    {#if first}
+      <div class="who">
+        <span class="mark" aria-hidden="true"></span>
+        <span>{$_('chat.panel.agent')}</span>
+        {#if time && !live}<time>{time}</time>{/if}
+      </div>
+    {/if}
 
-<div class="msg {role}" class:live>
-  {#if tools.length}
-    <div class="tools" aria-label="azioni del turno">
-      {#each tools as tool, i (tool.toolCallId ?? `${tool.toolName}-${i}`)}
-        {@render toolRow(tool)}
-      {/each}
-    </div>
-  {/if}
+    {#if tools.length}
+      <ul class="tools" aria-label={$_('chat.panel.tools', { values: { count: tools.length } })}>
+        {#each tools as call, i (call.toolCallId ?? `${call.toolName}-${i}`)}
+          <ChatToolRow {call} {projectId} />
+        {/each}
+      </ul>
+    {/if}
 
-  {#if showDots}
-    <div class="bubble assistant-bubble dots" aria-label="sta scrivendo">
-      <i></i><i></i><i></i>
-    </div>
-  {:else if content || showWait}
-    <div class="bubble {role}-bubble">
-      {content}{#if showCaret}<span class="caret" aria-hidden="true"></span>{/if}
-      {#if showWait}<span class="wait">sta scrivendo…</span>{/if}
-    </div>
-  {/if}
-
-  {#if time && content}
-    <time class="meta">{time}</time>
+    {#if thinking}
+      <p class="thinking">
+        <span class="bar" aria-hidden="true"></span>{$_('chat.panel.thinking')}
+      </p>
+    {:else if html}
+      <div class="prose" class:streaming={live}>{@html html}</div>
+    {/if}
   {/if}
 </div>
 
 <style>
   .msg {
-    border: 0;
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 8px;
     animation: enter 0.18s var(--ease, cubic-bezier(0.22, 1, 0.36, 1));
   }
-  .msg.user {
-    align-items: flex-end;
-  }
-  .msg.assistant {
-    align-items: flex-start;
+  .msg.first {
+    margin-top: 12px;
   }
 
-  .bubble {
-    border: 0;
-    max-width: 92%;
-    padding: 6px 9px;
-    font-size: 12.5px;
-    line-height: 1.45;
+  .msg.is-user {
+    align-items: flex-end;
+  }
+  .user-body {
+    max-width: 85%;
+    padding: 9px 12px;
+    background: var(--paper-3, #f4f4f4);
+    border: 1px solid var(--line, #ededef);
+    color: var(--ink, #1d1d1f);
+    font-size: var(--chat-font, 14px);
+    line-height: 1.55;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
-  .user-bubble {
-    background: color-mix(in srgb, var(--ink, #1d1d1f) 6%, transparent);
-    color: var(--ink, #1d1d1f);
-  }
-  .assistant-bubble {
-    padding: 6px 2px;
-    color: var(--ink, #1d1d1f);
-  }
 
-  .meta {
-    font-size: 10px;
-    line-height: 1;
+  .who {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ink, #1d1d1f);
+  }
+  .mark {
+    width: 10px;
+    height: 10px;
+    background: var(--accent, #c485fe);
+  }
+  .who time {
+    font-weight: 400;
     color: var(--ink-faint, #86868b);
-    padding: 0 2px;
   }
 
   .tools {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    padding: 1px 2px 2px;
+    margin: 0;
+    padding: 0;
+    border: 1px solid var(--line, #ededef);
+    background: var(--paper, #fff);
   }
-  .tool {
-    display: grid;
-    grid-template-columns: 6px minmax(0, 1fr) auto;
-    gap: 5px;
-    align-items: baseline;
-    font-size: 10.5px;
-    line-height: 1.3;
+
+  .thinking {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    font-size: 13px;
     color: var(--ink-soft, #6e6e73);
   }
-  .tool-name {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  .bar {
+    width: 18px;
+    height: 3px;
+    background: linear-gradient(90deg, var(--ink-faint, #86868b) 0 33%, transparent 33%);
+    background-size: 300% 100%;
+    animation: slide 1s linear infinite;
   }
-  .tool-status {
+
+  .prose {
+    color: var(--ink, #1d1d1f);
+    font-size: var(--chat-font, 14px);
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+  }
+  .prose :global(> :first-child) {
+    margin-top: 0;
+  }
+  .prose :global(> :last-child) {
+    margin-bottom: 0;
+  }
+  .prose :global(p),
+  .prose :global(ul),
+  .prose :global(ol),
+  .prose :global(pre),
+  .prose :global(table),
+  .prose :global(blockquote) {
+    margin: 0 0 0.75em;
+  }
+  .prose :global(h1),
+  .prose :global(h2),
+  .prose :global(h3),
+  .prose :global(h4) {
+    margin: 1.1em 0 0.4em;
+    font-size: 1em;
+    font-weight: 700;
+    line-height: 1.35;
+  }
+  .prose :global(h1) {
+    font-size: 1.15em;
+  }
+  .prose :global(ul),
+  .prose :global(ol) {
+    padding-left: 1.4em;
+  }
+  .prose :global(ul) {
+    list-style: disc;
+  }
+  .prose :global(ol) {
+    list-style: decimal;
+  }
+  .prose :global(li) {
+    margin: 0.2em 0;
+  }
+  .prose :global(li::marker) {
     color: var(--ink-faint, #86868b);
   }
-  .tool.error,
-  .tool.error .tool-status {
-    color: #c0392b;
+  .prose :global(a) {
+    color: var(--accent-ink, #6b4aa0);
+    text-decoration: underline;
+    text-underline-offset: 2px;
   }
-  .pip {
-    width: 5px;
-    height: 5px;
-    background: var(--ink-faint, #86868b);
-    align-self: center;
+  .prose :global(code) {
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+    font-size: 0.88em;
+    padding: 1px 4px;
+    background: var(--paper-3, #f4f4f4);
   }
-  .tool.running .pip {
-    background: var(--accent, #c485fe);
-    animation: pulse 1.1s ease-in-out infinite;
+  .prose :global(pre) {
+    padding: 10px 12px;
+    overflow-x: auto;
+    background: var(--paper-3, #f4f4f4);
+    border: 1px solid var(--line, #ededef);
   }
-  .tool.error .pip {
-    background: #c0392b;
+  .prose :global(pre code) {
+    padding: 0;
+    background: none;
+    font-size: 12.5px;
+    line-height: 1.55;
   }
-
-  .dots {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    padding: 8px 10px;
+  .prose :global(blockquote) {
+    padding-left: 10px;
+    border-left: 2px solid var(--line-2, #d2d2d7);
+    color: var(--ink-soft, #6e6e73);
   }
-  .dots i {
-    width: 4px;
-    height: 4px;
-    background: var(--ink-soft, #6e6e73);
-    animation: blink 1.2s infinite;
-  }
-  .dots i:nth-child(2) {
-    animation-delay: 0.2s;
-  }
-  .dots i:nth-child(3) {
-    animation-delay: 0.4s;
-  }
-
-  .caret {
-    display: inline-block;
-    width: 5px;
-    height: 11px;
-    margin-left: 2px;
-    vertical-align: -1px;
-    background: var(--ink-soft, #6e6e73);
-    animation: blink 1s step-end infinite;
-  }
-
-  .wait {
+  .prose :global(table) {
     display: block;
-    margin-top: 2px;
-    font-size: 11px;
-    color: var(--ink-faint, #86868b);
+    overflow-x: auto;
+    border-collapse: collapse;
+    font-size: 0.93em;
+  }
+  .prose :global(th),
+  .prose :global(td) {
+    padding: 6px 10px;
+    border: 1px solid var(--line, #ededef);
+    text-align: left;
+    vertical-align: top;
+  }
+  .prose :global(th) {
+    background: var(--paper-3, #f4f4f4);
+    font-weight: 600;
+  }
+  .prose :global(hr) {
+    border: 0;
+    border-top: 1px solid var(--line, #ededef);
+    margin: 1em 0;
+  }
+  .prose.streaming :global(> :last-child::after) {
+    content: '';
+    display: inline-block;
+    width: 7px;
+    height: 1em;
+    margin-left: 3px;
+    vertical-align: -0.15em;
+    background: var(--ink, #1d1d1f);
+    animation: blink 1s step-end infinite;
   }
 
   @keyframes enter {
@@ -197,34 +246,24 @@
     }
   }
   @keyframes blink {
-    0%,
-    60%,
-    100% {
-      opacity: 0.25;
-    }
-    30% {
-      opacity: 1;
+    50% {
+      opacity: 0;
     }
   }
-  @keyframes pulse {
-    0%,
-    100% {
-      opacity: 0.35;
+  @keyframes slide {
+    from {
+      background-position: 100% 0;
     }
-    50% {
-      opacity: 1;
+    to {
+      background-position: -50% 0;
     }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .msg {
+    .msg,
+    .bar,
+    .prose.streaming :global(> :last-child::after) {
       animation: none;
-    }
-    .dots i,
-    .caret,
-    .tool.running .pip {
-      animation: none;
-      opacity: 0.55;
     }
   }
 </style>

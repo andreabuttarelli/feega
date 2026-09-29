@@ -1,15 +1,16 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { resolveOrgCaller } from '$lib/server/org-data/auth';
-import { approveCampaign } from '$lib/server/repos/ads';
+import { launchCampaign } from '$lib/server/ads/paid-ads';
+import { orgCreditBalance } from '$lib/server/credits';
+import { providerMediaSigner } from '$lib/server/ads/provider-media';
 
-/**
- * IL CANCELLO UMANO. `ad_campaigns.approved_by` esiste per una ragione sola: una campagna creata da
- * un agente non deve poter spendere senza che una persona l'abbia guardata. Una chiave API — cioè
- * un agente esterno via MCP — non passa mai di qui: `apiKeyId` presente è un agente che agisce per
- * conto di qualcuno, e "per conto di" non è "è" quel qualcuno. Solo una sessione utente (Bearer
- * JWT di una persona loggata) può approvare.
- */
+const FAILURE_STATUS: Record<string, number> = {
+  campaign_not_approvable: 404,
+  credits_exhausted: 402
+};
+const UNPROCESSABLE = 422;
+
 export const POST: RequestHandler = async ({ request, params, url }) => {
   const bearer = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
   const resolved = await resolveOrgCaller(bearer, url.searchParams.get('org') ?? undefined);
@@ -23,10 +24,12 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
     );
   }
 
-  const campaign = await approveCampaign(db, { orgId, campaignId: params.id ?? '', approvedBy: userId });
-  if (!campaign) {
-    return json({ error: 'campaign_not_approvable', message: 'Not found, or already past draft/pending_review.' }, { status: 404 });
-  }
+  const result = await launchCampaign(
+    db,
+    { creditBalance: (id) => orgCreditBalance(db, id), publicUrls: providerMediaSigner(db) },
+    { orgId, campaignId: params.id ?? '', userId }
+  );
+  if (!result.ok) return json(result, { status: FAILURE_STATUS[result.error] ?? UNPROCESSABLE });
 
-  return json({ campaign });
+  return json({ campaign: result.campaign });
 };

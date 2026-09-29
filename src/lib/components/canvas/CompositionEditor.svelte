@@ -14,7 +14,7 @@
   import type { CompositionAspect, CompositionNode } from '$lib/canvas/composition-node';
   import CompositionParamControl from './CompositionParamControl.svelte';
 
-  const UNSAVED_PROMPT = 'Chiudere senza salvare? Le modifiche andranno perse.';
+  const UNSAVED_PROMPT = 'Close without saving? Your changes will be lost.';
   const ASPECT_RATIOS: CompositionAspect[] = ['9:16', '1:1', '16:9'];
   const DEFAULT_BACKGROUND = '#000000';
   const DEFAULT_DURATION = 6;
@@ -275,16 +275,16 @@
         return;
       }
       if (outcome.outcome === 'unsupported') {
-        exportError = 'Il browser non supporta la registrazione video: provare con Chrome o Edge';
+        exportError = 'This browser cannot record video: try Chrome or Edge';
         return;
       }
 
       const refId = await onupload(outcome.blob, outcome.format);
       if (!refId || !(await onwriterefid(refId))) {
-        exportError = 'Esportazione non salvata: riprovare';
+        exportError = 'Export not saved: try again';
       }
     } catch (cause) {
-      exportError = cause instanceof Error ? cause.message : 'esportazione video non riuscita';
+      exportError = cause instanceof Error ? cause.message : 'Video export failed';
     } finally {
       exporting = false;
     }
@@ -312,10 +312,10 @@
       const blob = await captureCompositionFrame(sceneOptions, aspect, EXPORT_RESOLUTION, time);
       const refId = await onupload(blob, 'png');
       if (!refId || !(await onwriterefid(refId))) {
-        exportError = 'Esportazione non salvata: riprovare';
+        exportError = 'Export not saved: try again';
       }
     } catch (cause) {
-      exportError = cause instanceof Error ? cause.message : 'esportazione immagine non riuscita';
+      exportError = cause instanceof Error ? cause.message : 'Image export failed';
     } finally {
       exporting = false;
     }
@@ -330,15 +330,15 @@
 
 <div class="cx-backdrop" role="presentation" onclick={close}></div>
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-<section class="cx-editor" role="dialog" aria-label="Editor composizione" tabindex="-1" {onkeydown}>
+<section class="cx-editor" role="dialog" aria-label="Composition editor" tabindex="-1" {onkeydown}>
   <header class="cx-head">
-    <h2>Composizione</h2>
+    <h2>Composition</h2>
     <div class="cx-head-actions">
       <button type="button" class="cx-reset" onclick={reset} disabled={busy}>
         <RotateCcw size={14} />
         Ripristina
       </button>
-      <button type="button" class="cx-icon" aria-label="Chiudi" onclick={close}><X size={16} /></button>
+      <button type="button" class="cx-icon" aria-label="Close" onclick={close}><X size={16} /></button>
     </div>
   </header>
 
@@ -440,10 +440,10 @@
         <div class="cx-export-progress">
           <div class="cx-export-bar" style={`width: ${Math.round(exportProgress * 100)}%`}></div>
         </div>
-        <button type="button" class="cx-button" onclick={cancelExport}>Annulla esportazione</button>
+        <button type="button" class="cx-button" onclick={cancelExport}>Cancel export</button>
       {:else}
         <div class="cx-export-actions">
-          <button type="button" class="cx-button" onclick={exportImage} disabled={busy}>Esporta immagine</button>
+          <button type="button" class="cx-button" onclick={exportImage} disabled={busy}>Export image</button>
           <button type="button" class="cx-button" onclick={exportVideo} disabled={busy}>
             <Download size={14} />
             Esporta video
@@ -452,7 +452,7 @@
       {/if}
 
       <footer class="cx-foot">
-        <button type="button" class="cx-button" onclick={close} disabled={busy}>Annulla</button>
+        <button type="button" class="cx-button" onclick={close} disabled={busy}>Cancel</button>
         <button type="button" class="cx-button is-primary" onclick={save} disabled={busy}>
           {#if busy}<LoaderCircle size={14} class="cx-spin" />{/if}
           Salva

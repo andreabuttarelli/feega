@@ -47,46 +47,46 @@ const PLATFORM_LABELS: Record<string, string> = {
 };
 
 const OPTION_LABELS: Record<string, string> = {
-  newest: 'Più recenti',
-  price_asc: 'Prezzo crescente',
-  price_desc: 'Prezzo decrescente',
-  title: 'Titolo A–Z',
-  most_liked: 'Più like',
-  most_viewed: 'Più visualizzati',
-  all: 'Tutti',
-  image: 'Immagini',
+  newest: 'Newest',
+  price_asc: 'Price: low to high',
+  price_desc: 'Price: high to low',
+  title: 'Title A–Z',
+  most_liked: 'Most liked',
+  most_viewed: 'Most viewed',
+  all: 'All',
+  image: 'Images',
   video: 'Video',
-  carousel: 'Caroselli'
+  carousel: 'Carousels'
 };
 
 const options = (values: readonly string[], labels: Record<string, string>): Option[] =>
   values.map((value) => ({ value, label: labels[value] ?? value }));
 
 export const PRODUCT_FIELDS: readonly FieldSpec[] = [
-  { path: 'platform', label: 'Piattaforma', kind: FieldKind.Select, appliesAt: AppliesAt.Fetch, options: options(PRODUCT_PLATFORMS, PLATFORM_LABELS) },
-  { path: 'url', label: 'Indirizzo dello store', kind: FieldKind.Text, appliesAt: AppliesAt.Fetch, placeholder: 'store.example.com', normalize: normalizeUrl },
-  { path: 'limit', label: 'Quanti prodotti', kind: FieldKind.Number, appliesAt: AppliesAt.Fetch, required: true },
-  { path: 'onlyFirstPhoto', label: 'Solo la prima foto', kind: FieldKind.Toggle, appliesAt: AppliesAt.Fetch },
-  { path: 'category', label: 'Categoria / collezione', kind: FieldKind.Text, appliesAt: AppliesAt.Fetch, placeholder: 'es. summer-sale' },
-  { path: 'filters.query', label: 'Titolo o descrizione contiene', kind: FieldKind.Text, appliesAt: AppliesAt.Read },
-  { path: 'filters.price_min', label: 'Prezzo minimo', kind: FieldKind.Number, appliesAt: AppliesAt.Read },
-  { path: 'filters.price_max', label: 'Prezzo massimo', kind: FieldKind.Number, appliesAt: AppliesAt.Read },
-  { path: 'filters.in_stock_only', label: 'Solo disponibili', kind: FieldKind.Toggle, appliesAt: AppliesAt.Read },
-  { path: 'filters.sort', label: 'Ordina per', kind: FieldKind.Select, appliesAt: AppliesAt.Read, options: options(PRODUCT_SORTS, OPTION_LABELS) }
+  { path: 'platform', label: 'Platform', kind: FieldKind.Select, appliesAt: AppliesAt.Fetch, options: options(PRODUCT_PLATFORMS, PLATFORM_LABELS) },
+  { path: 'url', label: 'Store address', kind: FieldKind.Text, appliesAt: AppliesAt.Fetch, placeholder: 'store.example.com', normalize: normalizeUrl },
+  { path: 'limit', label: 'Number of products', kind: FieldKind.Number, appliesAt: AppliesAt.Fetch, required: true },
+  { path: 'onlyFirstPhoto', label: 'First photo only', kind: FieldKind.Toggle, appliesAt: AppliesAt.Fetch },
+  { path: 'category', label: 'Category / collection', kind: FieldKind.Text, appliesAt: AppliesAt.Fetch, placeholder: 'e.g. summer-sale' },
+  { path: 'filters.query', label: 'Title or description contains', kind: FieldKind.Text, appliesAt: AppliesAt.Read },
+  { path: 'filters.price_min', label: 'Minimum price', kind: FieldKind.Number, appliesAt: AppliesAt.Read },
+  { path: 'filters.price_max', label: 'Maximum price', kind: FieldKind.Number, appliesAt: AppliesAt.Read },
+  { path: 'filters.in_stock_only', label: 'In stock only', kind: FieldKind.Toggle, appliesAt: AppliesAt.Read },
+  { path: 'filters.sort', label: 'Sort by', kind: FieldKind.Select, appliesAt: AppliesAt.Read, options: options(PRODUCT_SORTS, OPTION_LABELS) }
 ];
 
 export const FEED_FIELDS: readonly FieldSpec[] = [
-  { path: 'platform', label: 'Piattaforma', kind: FieldKind.Select, appliesAt: AppliesAt.Fetch, options: options(SOCIAL_FEED_PLATFORMS, PLATFORM_LABELS) },
-  { path: 'handle', label: 'Account', kind: FieldKind.Text, appliesAt: AppliesAt.Fetch, placeholder: '@nike o URL del profilo', normalize: normalizeHandle },
-  { path: 'limit', label: 'Quanti post', kind: FieldKind.Number, appliesAt: AppliesAt.Fetch, required: true },
-  { path: 'filters.from', label: 'Dal', kind: FieldKind.Date, appliesAt: AppliesAt.Read },
-  { path: 'filters.to', label: 'Al', kind: FieldKind.Date, appliesAt: AppliesAt.Read },
-  { path: 'filters.media', label: 'Tipo di media', kind: FieldKind.Select, appliesAt: AppliesAt.Read, options: options(FEED_MEDIA, OPTION_LABELS) },
-  { path: 'filters.min_likes', label: 'Like minimi', kind: FieldKind.Number, appliesAt: AppliesAt.Read },
-  { path: 'filters.min_views', label: 'Visualizzazioni minime', kind: FieldKind.Number, appliesAt: AppliesAt.Read },
-  { path: 'filters.include', label: 'La didascalia contiene', kind: FieldKind.Text, appliesAt: AppliesAt.Read, placeholder: 'parole, separate da virgola' },
-  { path: 'filters.exclude', label: 'La didascalia non contiene', kind: FieldKind.Text, appliesAt: AppliesAt.Read, placeholder: 'parole, separate da virgola' },
-  { path: 'filters.sort', label: 'Ordina per', kind: FieldKind.Select, appliesAt: AppliesAt.Read, options: options(FEED_SORTS, OPTION_LABELS) }
+  { path: 'platform', label: 'Platform', kind: FieldKind.Select, appliesAt: AppliesAt.Fetch, options: options(SOCIAL_FEED_PLATFORMS, PLATFORM_LABELS) },
+  { path: 'handle', label: 'Account', kind: FieldKind.Text, appliesAt: AppliesAt.Fetch, placeholder: '@nike or profile URL', normalize: normalizeHandle },
+  { path: 'limit', label: 'Number of posts', kind: FieldKind.Number, appliesAt: AppliesAt.Fetch, required: true },
+  { path: 'filters.from', label: 'From', kind: FieldKind.Date, appliesAt: AppliesAt.Read },
+  { path: 'filters.to', label: 'To', kind: FieldKind.Date, appliesAt: AppliesAt.Read },
+  { path: 'filters.media', label: 'Media type', kind: FieldKind.Select, appliesAt: AppliesAt.Read, options: options(FEED_MEDIA, OPTION_LABELS) },
+  { path: 'filters.min_likes', label: 'Minimum likes', kind: FieldKind.Number, appliesAt: AppliesAt.Read },
+  { path: 'filters.min_views', label: 'Minimum views', kind: FieldKind.Number, appliesAt: AppliesAt.Read },
+  { path: 'filters.include', label: 'Caption contains', kind: FieldKind.Text, appliesAt: AppliesAt.Read, placeholder: 'words, comma separated' },
+  { path: 'filters.exclude', label: 'Caption does not contain', kind: FieldKind.Text, appliesAt: AppliesAt.Read, placeholder: 'words, comma separated' },
+  { path: 'filters.sort', label: 'Sort by', kind: FieldKind.Select, appliesAt: AppliesAt.Read, options: options(FEED_SORTS, OPTION_LABELS) }
 ];
 
 export function inputValueOf(values: Record<string, unknown>, path: string): unknown {
@@ -156,11 +156,11 @@ function view<N extends SyncNode>(
 const INSPECTORS: Record<string, (row: NodeRow) => InspectorView | null> = {
   products: (row) => {
     const node = productsOf(row);
-    return node && view('Prodotti', PRODUCT_FIELDS, node, node.url.trim().length > 0, productsData, node.syncSummary);
+    return node && view('Products', PRODUCT_FIELDS, node, node.url.trim().length > 0, productsData, node.syncSummary);
   },
   social_account_feed: (row) => {
     const node = socialFeedOf(row);
-    return node && view('Feed social', FEED_FIELDS, node, node.handle.trim().length > 0, socialFeedData, node.syncSummary);
+    return node && view('Social feed', FEED_FIELDS, node, node.handle.trim().length > 0, socialFeedData, node.syncSummary);
   }
 };
 

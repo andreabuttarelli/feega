@@ -36,11 +36,11 @@ export function axesFrom(targetId: string, edges: LoopEdge[], nodesById: Map<str
     if (!source) continue;
 
     if (!isSelectableSourceType(source.type)) {
-      rejected.push({ nodeId: source.id, why: 'solo list, products o social_account_feed possono essere un asse di loop' });
+      rejected.push({ nodeId: source.id, why: 'Only list, products or social_account_feed can be a loop axis' });
       continue;
     }
     if (source.itemCount === 0) {
-      rejected.push({ nodeId: source.id, why: 'lista vuota: niente da iterare' });
+      rejected.push({ nodeId: source.id, why: 'Empty list: nothing to loop over' });
       continue;
     }
 

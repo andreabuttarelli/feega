@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { NAV_ENTRIES, navEntriesByGroup, navHref, sheetEntryForPath, MOBILE_TABS, MOBILE_MORE_ENTRIES } from './shell-nav';
+import { NAV_ENTRIES, navEntriesByGroup, navHref, sheetEntryForPath, MOBILE_TABS, MOBILE_MORE_ENTRIES, activeMobileTab, mobileTabHref, mobileNavHref } from './shell-nav';
 
 describe('la rail: due gruppi, un comportamento a testa', () => {
   it('il gruppo "panel" è Assets, Brands e Influencers, in quest\'ordine', () => {
@@ -27,7 +27,7 @@ describe('la rail: due gruppi, un comportamento a testa', () => {
 describe('sheetEntryForPath: quale voce apre il foglio', () => {
   it('un path esatto apre il suo foglio', () => {
     expect(sheetEntryForPath('/calendar')?.id).toBe('calendar');
-    expect(sheetEntryForPath('/ads/social')?.id).toBe('ads');
+    expect(sheetEntryForPath('/ads')?.id).toBe('ads');
     expect(sheetEntryForPath('/settings/connected-accounts')?.id).toBe('settings');
   });
 
@@ -57,11 +57,41 @@ describe('la barra mobile', () => {
 });
 
 describe('un foglio si riconosce anche con parametri nell\'indirizzo', () => {
-  it('/create-post?nodeIds=… apre il foglio di creazione post', () => {
-    expect(sheetEntryForPath('/create-post?nodeIds=a,b')?.id).toBe('create-post');
+  it('/promote?nodeIds=… apre il foglio Promote', () => {
+    expect(sheetEntryForPath('/promote?nodeIds=a,b&tab=paid')?.id).toBe('promote');
   });
 
   it('un frammento non cambia il foglio', () => {
     expect(sheetEntryForPath('/calendar#oggi')?.id).toBe('calendar');
+  });
+});
+
+describe('la barra mobile sa quale voce è accesa su ogni pagina', () => {
+  it.each([
+    ['/p/x/c/y', 'page', 'canvas'],
+    ['/p/x/c/y', 'chat', 'chat'],
+    ['/p/x/calendar', 'page', 'calendar'],
+    ['/p/x/calendar', 'chat', 'chat'],
+    ['/p/x/assets', 'page', 'more'],
+    ['/p/x/settings/team', 'page', 'more'],
+    ['/p/x/brands/acme', 'page', 'more']
+  ] as const)('%s con vista %s → %s', (path, view, tab) => {
+    expect(activeMobileTab('x', path, view)).toBe(tab);
+  });
+
+  it('Canvas porta alla home del progetto, Calendar alla sua pagina, Chat e More restano sul posto', () => {
+    expect(MOBILE_TABS.map((t) => mobileTabHref('x', t))).toEqual(['/p/x', null, '/p/x/calendar', null]);
+  });
+});
+
+describe('More su mobile', () => {
+  it('Settings apre l\'elenco delle sezioni, non una sezione a caso', () => {
+    const settings = MOBILE_MORE_ENTRIES.find((e) => e.id === 'settings')!;
+    expect(mobileNavHref('x', settings)).toBe('/p/x/settings');
+  });
+
+  it('le altre voci vanno dove va la rail', () => {
+    const assets = MOBILE_MORE_ENTRIES.find((e) => e.id === 'assets')!;
+    expect(mobileNavHref('x', assets)).toBe('/p/x/assets');
   });
 });

@@ -1,7 +1,5 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
 import { creditsForSpend, feeBreakdown } from '$lib/ads-fee';
 import { logAiCall } from '$lib/server/ai-log';
-import { getCreditsUsage, type CreditsUsage } from '$lib/server/credits';
 
 // ── Ads metering ────────────────────────────────────────────────────────────────
 // Running ads costs credits: the 12% management fee is charged against the same balance as AI
@@ -65,32 +63,5 @@ export function chargeAdsCredits(opts: {
   });
 }
 
-/**
- * Can this brand afford `credits`? Ads are the one flow where we check the exact amount instead of
- * the "any credits left" gate: approving a campaign commits real money on the platform, so we would
- * rather refuse up front than start something we cannot bill for.
- *
- * Fails OPEN on a broken query (same policy as gateCredits): a billing outage must not strand a
- * campaign the user already paid the platform for.
- */
-export async function canAffordAdsCredits(
-  supabase: SupabaseClient,
-  brand: { id: string; plan: string | null; activated_at?: string | null; status?: string },
-  credits: number
-): Promise<{ ok: true; usage: CreditsUsage | null } | { ok: false; usage: CreditsUsage }> {
-  let usage: CreditsUsage;
-  try {
-    usage = await getCreditsUsage(supabase, {
-      id: brand.id,
-      plan: brand.plan,
-      activated_at: brand.activated_at ?? null,
-      status: brand.status ?? 'active'
-    });
-  } catch {
-    return { ok: true, usage: null };
-  }
-  if (usage.remaining < credits) return { ok: false, usage };
-  return { ok: true, usage };
-}
 
 export { creditsForSpend };

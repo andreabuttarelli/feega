@@ -21,7 +21,7 @@ export type SelectionActionId =
   | 'duplicate'
   | 'connect-new'
   | 'connect-existing'
-  | 'create-post'
+  | 'promote'
   | 'run-workflow'
   | 'copy-id'
   | 'delete';
@@ -34,13 +34,13 @@ export type SelectionAction = {
 };
 
 export const SELECTION_ACTIONS: readonly SelectionAction[] = [
-  { id: 'duplicate', label: 'Duplica', keys: ['mod', 'D'] },
-  { id: 'connect-new', label: 'Collega a nuovo…' },
-  { id: 'connect-existing', label: 'Collega a…' },
-  { id: 'create-post', label: 'Crea post' },
+  { id: 'duplicate', label: 'Duplicate', keys: ['mod', 'D'] },
+  { id: 'connect-new', label: 'Connect to new…' },
+  { id: 'connect-existing', label: 'Connect to…' },
+  { id: 'promote', label: 'Promote' },
   { id: 'run-workflow', label: 'Esegui flusso' },
-  { id: 'copy-id', label: 'Copia id' },
-  { id: 'delete', label: 'Elimina', keys: ['⌫'] }
+  { id: 'copy-id', label: 'Copy id' },
+  { id: 'delete', label: 'Delete', keys: ['⌫'] }
 ];
 
 export function enabledFor(
@@ -48,11 +48,11 @@ export function enabledFor(
   nodeSummaries: PostCompositionNode[],
   edges: WorkflowEdge[] = []
 ): { enabled: boolean; reason?: string } {
-  if (id === 'create-post') {
+  if (id === 'promote') {
     const composition = postCompositionFor(nodeSummaries);
     return {
       enabled: composition.enabled,
-      reason: composition.enabled ? undefined : 'Serve almeno un media o un testo nella selezione'
+      reason: composition.enabled ? undefined : 'Select at least one media or text node'
     };
   }
 

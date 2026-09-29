@@ -127,21 +127,21 @@ describe('submitErrorFor', () => {
 
   it('turns a failure result into a message for a known error code', () => {
     expect(submitErrorFor({ error: 'brand_and_nodes_required' })).toBe(
-      'Seleziona un brand e almeno un contenuto.'
+      'Choose a brand and at least one item.'
     );
   });
 
   it('turns an unmapped error code into a generic message', () => {
     expect(submitErrorFor({ error: 'delivery_failed', postId: 'post-1' })).toBe(
-      'Il post è stato creato ma la programmazione è fallita. Riprova dal calendario.'
+      'The post was created but scheduling failed. Try again from the calendar.'
     );
   });
 
   it('reports a network failure that never reached the server', () => {
-    expect(submitErrorFor('network')).toBe('Connessione assente. Riprova.');
+    expect(submitErrorFor('network')).toBe('No connection. Try again.');
   });
 
   it('reports an unexpected server error', () => {
-    expect(submitErrorFor('server')).toBe('Qualcosa è andato storto. Riprova.');
+    expect(submitErrorFor('server')).toBe('Something went wrong. Try again.');
   });
 });

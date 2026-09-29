@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { fakeDb, filtersOf } from '$lib/server/db/fake-db';
 import { agentActor, SIDEBAR_AGENT_KEY } from '$lib/server/repos/actor';
-import { HISTORY_LIMIT, loadTurns, openThread, saveTurn } from './chat';
+import { HISTORY_LIMIT, loadTurns, openThread, promptHistory, saveTurn } from './chat';
 
 const ORG = '11111111-1111-1111-1111-111111111111';
 const PROJECT = '22222222-2222-2222-2222-222222222222';
@@ -71,5 +71,26 @@ describe('saveTurn — seq progressivo e actor agente', () => {
 
     expect(filtersOf(calls, 'select')).toMatchObject({ org_id: ORG, thread_id: THREAD });
     expect(calls.find((c) => c.op === 'select')!.limit).toBe(HISTORY_LIMIT);
+  });
+});
+
+describe('i tool del turno sopravvivono al reload', () => {
+  const TOOL = { toolCallId: 'c1', toolName: 'list_nodes', status: 'done' as const, input: { a: 1 }, output: { n: 3 } };
+
+  it('saveTurn scrive i tool in tool_calls', async () => {
+    const { db, calls } = fakeDb({ chat_messages: [] });
+
+    await saveTurn(db, { orgId: ORG, threadId: THREAD, role: 'assistant', content: '', tools: [TOOL], actor: agentActor(USER) });
+
+    expect(calls.find((c) => c.op === 'insert')!.payload).toMatchObject({ tool_calls: [TOOL] });
+  });
+
+  it('un turno fatto solo di tool torna nella cronologia, ma non nel prompt', async () => {
+    const { db } = fakeDb({ chat_messages: [{ role: 'assistant', content: '', tool_calls: [TOOL] }] });
+
+    const turns = await loadTurns(db, { orgId: ORG, threadId: THREAD });
+
+    expect(turns).toEqual([{ role: 'assistant', content: '', tools: [TOOL] }]);
+    expect(promptHistory(turns)).toEqual([]);
   });
 });

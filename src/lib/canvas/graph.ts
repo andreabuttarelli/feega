@@ -154,23 +154,23 @@ export type Verdict = { ok: true } | { ok: false; why: string };
  */
 export function canConnect(from: CanvasNode, to: CanvasNode): Verdict {
   if (from.id === to.id) {
-    return { ok: false, why: 'un nodo non si collega a se stesso' };
+    return { ok: false, why: 'A node cannot connect to itself' };
   }
   const target = CANVAS_NODE_SPECS[to.kind];
   if (!target) {
-    return { ok: false, why: `tipo sconosciuto: ${to.kind}` };
+    return { ok: false, why: `Unknown type: ${to.kind}` };
   }
   if (!target.generated) {
-    return { ok: false, why: `${to.kind} esiste già: non si genera da altri nodi` };
+    return { ok: false, why: `${to.kind} already exists: it is not generated from other nodes` };
   }
   const medium = mediumOf(from);
   if (!target.accepts.includes(medium)) {
-    return { ok: false, why: `un ${ITALIAN[medium]} non alimenta un nodo ${ITALIAN[mediumOf(to)] ?? to.kind}` };
+    return { ok: false, why: `${MEDIUM_NAME[medium]} cannot feed a ${MEDIUM_NAME[mediumOf(to)] ?? to.kind} node` };
   }
   return { ok: true };
 }
 
-const ITALIAN: Record<Medium, string> = { text: 'testo', image: 'immagine', video: 'video' };
+const MEDIUM_NAME: Record<Medium, string> = { text: 'text', image: 'image', video: 'video' };
 
 /** I medium che mancano perché il nodo possa produrre. Vuoto = pronto. */
 export function missingInputs(node: CanvasNode, incoming: CanvasNode[]): Medium[] {
@@ -207,7 +207,7 @@ export type InputVerdict = {
 export function acceptedInputs(node: CanvasNode, incoming: CanvasNode[]): InputVerdict {
   const spec = CANVAS_NODE_SPECS[node.kind];
   if (!spec?.generated) {
-    return { accepted: [], rejected: incoming, why: `${node.kind} non si genera da altri nodi` };
+    return { accepted: [], rejected: incoming, why: `${node.kind} is not generated from other nodes` };
   }
 
   const caps = capacityOf(node);
@@ -221,20 +221,20 @@ export function acceptedInputs(node: CanvasNode, incoming: CanvasNode[]): InputV
     const room = caps[medium] ?? 0;
     if (!spec.accepts.includes(medium)) {
       rejected.push(source);
-      why ??= `un ${ITALIAN[medium]} non alimenta questo nodo`;
+      why ??= `${MEDIUM_NAME[medium]} cannot feed this node`;
       continue;
     }
     if (node.kind === 'effects' && accepted.length > 0) {
       rejected.push(source);
-      why ??= 'un nodo effetti prende un solo media';
+      why ??= 'An effects node takes one media input';
       continue;
     }
     if (used[medium] >= room) {
       rejected.push(source);
       why ??=
         room === 0
-          ? `questo modello non prende ${ITALIAN[medium]} di riferimento`
-          : `al massimo ${room} ${ITALIAN[medium]} in ingresso`;
+          ? `This model takes no ${MEDIUM_NAME[medium]} reference`
+          : `At most ${room} ${MEDIUM_NAME[medium]} input${room === 1 ? '' : 's'}`;
       continue;
     }
     used[medium] += 1;

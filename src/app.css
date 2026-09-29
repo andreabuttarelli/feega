@@ -109,7 +109,7 @@
   --heading-weight: 500;   /* single knob for all h1/h2 serif weight */
   /* Stretto: un bastone a corpo grande ha bisogno di meno aria fra le lettere di un grazie, o
      il titolo si sfilaccia invece di leggersi come un blocco. */
-  --heading-tracking: -0.08em;  /* single knob for all h1/h2 heading tracking */
+  --heading-tracking: -0.03em;  /* single knob for all h1/h2 heading tracking */
   /* Unified page / subpage title — compact in the global sticky top bar */
   --page-title-size: 0.95rem;
   --page-title-weight: 700;
@@ -643,6 +643,7 @@ h1, h2 { font-family: var(--serif); font-weight: var(--heading-weight); letter-s
 .field { padding: 18px 22px; border-bottom: 1px solid var(--line); display: flex; align-items: center;
   justify-content: space-between; gap: 18px; }
 .field:last-child { border-bottom: none; }
+[data-viewport='mobile'] .field { flex-direction: column; align-items: stretch; gap: 10px; padding: 16px; }
 .field.col { flex-direction: column; align-items: stretch; gap: 14px; }
 .field .ftxt .fh { font-size: 14.5px; font-weight: 600; }
 .field .ftxt .fs { font-size: 13px; color: var(--ink-faint); margin-top: 3px; max-width: 52ch; line-height: 1.45; }

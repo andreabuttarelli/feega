@@ -71,13 +71,6 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     scope: 'brand',
     requiresBrand: true
   },
-  {
-    path: 'ads/accounts',
-    labelKey: 'app.settings.ads.accountsNav',
-    scope: 'brand',
-    requiresBrand: true
-  },
-  { path: 'ads', labelKey: 'app.settings.ads.budgetNav', scope: 'brand', requiresBrand: true },
   { path: 'video', labelKey: 'app.settings.video.title', scope: 'brand', requiresBrand: true },
   { path: 'danger', labelKey: 'app.settings.del.title', scope: 'brand', requiresBrand: true },
   {

@@ -30,8 +30,8 @@
   --sh-card-foreground: var(--ink);
   --sh-popover: var(--paper-2);
   --sh-popover-foreground: var(--ink);
-  --sh-primary: var(--accent);
-  --sh-primary-foreground: #fff;
+  --sh-primary: var(--ink);
+  --sh-primary-foreground: var(--paper);
   --sh-secondary: var(--paper-3);
   --sh-secondary-foreground: var(--ink);
   --sh-muted: var(--paper-2);
@@ -44,6 +44,10 @@
   --sh-input: var(--line);
   --sh-ring: var(--accent);
   --radius: 0rem;
+  --mobile-topbar-h: 48px;
+  --mobile-tabbar-h: 56px;
+  --touch-target: 44px;
+  --page-gutter: 16px;
   /* App shell sidebar — light tint toward brand accent-2 (see --sidebar-bg in app.css). */
   --sh-sidebar: var(--sidebar-bg);
   --sh-sidebar-foreground: var(--ink);

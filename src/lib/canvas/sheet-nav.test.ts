@@ -20,11 +20,11 @@ describe('sheetOutcomeOf: cosa fare del load della rotta vera', () => {
   });
 
   it('un load con status diverso da 200 naviga invece di aprire un foglio a metà', () => {
-    const outcome = sheetOutcomeOf('/p/x/ads/social', {
+    const outcome = sheetOutcomeOf('/p/x/ads', {
       type: 'loaded',
       status: 500,
       data: {}
     });
-    expect(outcome).toEqual({ kind: 'navigate', href: '/p/x/ads/social' });
+    expect(outcome).toEqual({ kind: 'navigate', href: '/p/x/ads' });
   });
 });

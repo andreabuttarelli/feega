@@ -53,9 +53,9 @@ function runnable(medium: GenMedium): boolean {
  * girare — il testo a monte È il prompt, quando il nodo non ne ha uno suo.
  */
 const BLOCKED: readonly { when: (node: GenNode, choices: readonly ModelChoiceLike[], upstream: UpstreamTextAvailability) => boolean; say: string }[] = [
-  { when: (n) => !runnable(n.medium), say: 'Questo nodo non produce nulla' },
-  { when: (n, _choices, upstream) => !hasPrompt(n, upstream), say: 'Scrivi cosa vuoi' },
-  { when: (n, choices) => !effectiveModel(n.medium, n.model, choices), say: 'Scegli un modello' }
+  { when: (n) => !runnable(n.medium), say: 'This node produces nothing' },
+  { when: (n, _choices, upstream) => !hasPrompt(n, upstream), say: 'Write what you want' },
+  { when: (n, choices) => !effectiveModel(n.medium, n.model, choices), say: 'Choose a model' }
 ];
 
 export function blockedReason(

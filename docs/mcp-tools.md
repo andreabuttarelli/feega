@@ -3,15 +3,16 @@
 > Generato da `node scripts/mcp-inventory.mjs --write`, leggendo `tools/list` dal server vero.
 > Non si modifica a mano: il prossimo che rigenera cancella le correzioni.
 
-**12 tool** — 4 in lettura, 5 in scrittura, 3 che distruggono.
-Il payload di `tools/list` pesa **11.441 caratteri**, circa **2860 token**, ed e' il costo che ogni sessione paga prima di dire una parola.
+**18 tool** — 5 in lettura, 10 in scrittura, 3 che distruggono.
+Il payload di `tools/list` pesa **18.107 caratteri**, circa **4527 token**, ed e' il costo che ogni sessione paga prima di dire una parola.
 
 | gruppo | tool |
 |---|---:|
 | Accesso diretto al database | 5 |
-| Ads | 3 |
+| Ads | 4 |
+| Nodi e generazione | 4 |
 | Post | 3 |
-| Nodi e generazione | 1 |
+| Altro | 2 |
 
 Legenda: **R** legge e non cambia niente · **W** scrive · **D** distrugge, e il client puo' chiedere conferma.
 
@@ -33,12 +34,12 @@ Remove rows that exist, in your org. `where` is required — a delete with no fi
 
 *Node data shapes*
 
-What `data` must look like on a `nodes` row, per `type` — the JSON Schema `insert_row`/`update_row` actually enforce on `nodes`, not a guess. Omit `type` for all 9 at once; name one to save tokens once you know which you need. Limits (aspect ratios, durations, prompt length) are NOT here — those come from `get_media_models`, because they are a fact of the model, not the node. Free.
+What `data` must look like on a `nodes` row, per `type` — the JSON Schema `insert_row`/`update_row` actually enforce on `nodes`, not a guess. Omit `type` for every type at once; name one to save tokens once you know which you need — an unknown `type` comes back as an error naming the ones that exist, so this list is never hand-maintained here. `list` holds N iteration values (images or text, never mixed); `select` picks exactly one item back out of a connected `list`, `products` or `social_account_feed` by a 1-based `index` — a synced catalogue or feed is an ordered list too, so `select` can pull one product or one post out of either the same way; `effects` holds a stack of image filters over an upstream image, each with its own params — set it with `update_row`, then render it with `apply_effects`. Limits (aspect ratios, durations, prompt length) are NOT here — those come from `get_media_models`, because they are a fact of the model, not the node. Free.
 
 | campo | tipo | |
 |---|---|---|
 | `org`? | string | Which org, if you belong to more than one. Omit to use the default. |
-| `type`? | `text` \| `image` \| `video` \| `doc` \| `iframe` \| `social_account_feed` \| `social_post_mockup` \| `products` \| `ads` |  |
+| `type`? | string |  |
 
 ### `insert_row` · W
 
@@ -89,7 +90,7 @@ Change columns on rows that already exist in your org. Only the columns you send
 
 *Approve an ad campaign*
 
-Let a drafted campaign spend. REFUSED over an API key on purpose: an agent cannot approve its own spend — this only works from a signed-in person's own session (the app, or `feega login`). If you are an agent and this fails, tell the person to approve it themselves.
+Approve a proposed campaign and launch it on Meta — this spends money. REFUSED over an API key on purpose: an agent cannot approve its own spend — this only works from a signed-in person's own session (the app, or `feega login`). If you are an agent and this fails, tell the person to approve it themselves.
 
 | campo | tipo | |
 |---|---|---|
@@ -98,21 +99,30 @@ Let a drafted campaign spend. REFUSED over an API key on purpose: an agent canno
 
 ### `create_ad_campaign` · W
 
-*Draft an ad campaign*
+*Propose a Meta ad*
 
-Draft a new ad campaign for a brand's ad account. It ALWAYS lands unapproved (`draft`, no `approved_by`) — a campaign spends real money, and nothing here can make it spend without a human approving it separately. Nothing is scheduled or billed by calling this. Free.
+Draft a paid Meta ad campaign (Facebook + Instagram) for a brand, from canvas image/video nodes or by boosting a published post. It ALWAYS lands as an unapproved draft: nothing is launched or billed until a person approves it in the app (or `feega ads --approve`). Free.
 
 | campo | tipo | |
 |---|---|---|
 | `org`? | string | Which org, if you belong to more than one. |
 | `brand_id` | string |  |
-| `ad_account_id` | string |  |
-| `name` | string |  |
-| `objective` | `awareness` \| `traffic` \| `engagement` \| `video_views` \| `lead_generation` \| `conversions` \| `app_promotion` \| `catalog_sales` |  |
+| `ad_account_id` | string | A Meta ad account of the brand (ad_accounts.id). |
+| `objective` | `traffic` \| `engagement` \| `awareness` |  |
 | `budget_type` | `daily` \| `lifetime` |  |
-| `budget_amount` | number |  |
-| `starts_at`? | string |  |
-| `ends_at`? | string |  |
+| `budget_amount` | number | Whole currency units of the ad account. |
+| `days` | integer |  |
+| `countries` | string[] |  |
+| `age_min`? | integer |  |
+| `age_max`? | integer |  |
+| `gender`? | `all` \| `female` \| `male` |  |
+| `placements` | string[] |  |
+| `primary_text` | string |  |
+| `headline` | string |  |
+| `call_to_action`? | `LEARN_MORE` \| `SHOP_NOW` \| `SIGN_UP` \| `BOOK_NOW` \| `CONTACT_US` \| `ORDER_NOW` |  |
+| `link_url`? | string | Required for traffic. |
+| `node_ids`? | string[] | Canvas image/video nodes, in order. |
+| `post_id`? | string | A published post to boost instead of node_ids. |
 
 ### `list_ad_campaigns` · R
 
@@ -126,23 +136,88 @@ Ad campaigns of one brand, with their status and whether a human has approved th
 | `brand_id` | string |  |
 | `status`? | `draft` \| `pending_review` \| `scheduled` \| `active` \| `paused` \| `completed` \| `failed` \| `rejected` |  |
 
+### `set_ad_campaign_status` · W
+
+*Pause or resume an ad campaign*
+
+Pause a running Meta campaign, or resume a paused one. Pausing stops spend.
+
+| campo | tipo | |
+|---|---|---|
+| `org`? | string | Which org, if you belong to more than one. |
+| `id` | string |  |
+| `next` | `active` \| `paused` |  |
+
+## Nodi e generazione
+
+### `cancel_node_loop` · W
+
+*Cancel a queued loop*
+
+Stops the combinations still queued for this node — the ones a tick has already claimed finish regardless, and anything already produced stays in the output list. Returns how many combinations it actually stopped.
+
+| campo | tipo | |
+|---|---|---|
+| `org`? | string | Which org, if you belong to more than one. |
+| `node_id` | string |  |
+
+### `preview_node_loop` · R
+
+*Preview a node's loop*
+
+How many combinations `run_node_loop` would queue on this node right now, and what they would cost — reads only, spends nothing. Call this before `run_node_loop` when the count is not already known, rather than guessing at whether confirm will be needed.
+
+| campo | tipo | |
+|---|---|---|
+| `org`? | string | Which org, if you belong to more than one. |
+| `node_id` | string |  |
+
+### `run_node_generation` · W
+
+*Generate a node's content*
+
+Generate into an existing canvas node — text, image or video. This is the same engine the canvas Generate button calls; it never creates a node (`insert_row` does that). `medium` MUST match the node's own type, or the call is refused before anything is spent. Pass `version` as the node's current `nodes.version`: a stale value comes back `conflict` (never a silent overwrite) — re-read the node and retry with the fresh version. A `video` NEVER returns finished here: it comes back `queued` with an `external_job_id` on the run, and the render lands later, asynchronously — the node stays `running` until a later tick deposits the asset. Poll the node (`query`) rather than expecting a file now. Spends credits; a `credits_exhausted` failure means the org is out.
+
+| campo | tipo | |
+|---|---|---|
+| `org`? | string | Which org, if you belong to more than one. |
+| `node_id` | string |  |
+| `medium` | `text` \| `image` \| `video` |  |
+| `prompt` | string |  |
+| `model` | string |  |
+| `version` | integer |  |
+| `params`? | object |  |
+
+### `run_node_loop` · W
+
+*Queue a generation node loop*
+
+QUEUES many combinations from a node's `iterate` wires (or plain "repeat N" variants when it has none) to run through the SAME engine `run_node_generation` calls — one real run per combination, never a copy of it. This call returns as soon as the queue is written, NOT when the images exist: combinations run a few at a time as a background tick drains the queue over the following minutes, so 1000 combinations take longer than 50 to finish. Up to 50 queues on the call; above 50 it comes back `needs_confirmation` with the count and the credit cost — call again with `confirm: true`; above 1000 it is refused outright and the loop must be split. Credits for the WHOLE loop are checked up front, not discovered empty halfway. A failed combination never stops the others; results land in an output `list` node next to this one as they finish, each item labelled with which values produced it — poll that node (`query`) to see progress, do not expect it done here.
+
+| campo | tipo | |
+|---|---|---|
+| `org`? | string | Which org, if you belong to more than one. |
+| `node_id` | string |  |
+| `confirm`? | boolean | Required (true) to queue above 50 combinations. |
+
 ## Post
 
 ### `create_post` · W
 
 *Promote to a post*
 
-Turn material into a post: this is what makes something publishable, distinct from writing to a node. Give it a brand, a caption and its media (asset ids already in this org). `sources` optionally links back to the nodes it came from. Lands as `draft`; nothing is scheduled or published from here. Free.
+Turn material into a post: this is what makes something publishable, distinct from writing to a node. Two ways in: give it a brand, a caption and its media (asset ids already in this org) directly — or give it `node_ids` and let it resolve each node to its asset itself (uploaded or generated), ordered by canvas reading order (top-to-bottom, left-to-right), with text/doc nodes becoming the caption. `sources` optionally links back to the nodes it came from when using the direct form. Lands as `draft`; nothing is scheduled or published from here. Free.
 
 | campo | tipo | |
 |---|---|---|
 | `org`? | string | Which org, if you belong to more than one. |
 | `brand_id` | string |  |
-| `caption` | string |  |
+| `caption`? | string |  |
 | `media`? | object[] |  |
 | `title`? | string |  |
 | `link_url`? | string |  |
 | `sources`? | object[] |  |
+| `node_ids`? | string[] | Resolve these canvas nodes into the post instead of passing caption/media directly. |
 
 ### `list_posts` · R
 
@@ -168,21 +243,29 @@ Move a post between draft, ready and archived. Does not schedule or publish it. 
 | `id` | string |  |
 | `status` | `draft` \| `ready` \| `archived` |  |
 
-## Nodi e generazione
+## Altro
 
-### `run_node_generation` · W
+### `apply_effects` · W
 
-*Generate a node's content*
+*Render an effects node*
 
-Generate into an existing canvas node — text, image or video. This is the same engine the canvas Generate button calls; it never creates a node (`insert_row` does that). `medium` MUST match the node's own type, or the call is refused before anything is spent. Pass `version` as the node's current `nodes.version`: a stale value comes back `conflict` (never a silent overwrite) — re-read the node and retry with the fresh version. A `video` NEVER returns finished here: it comes back `queued` with an `external_job_id` on the run, and the render lands later, asynchronously — the node stays `running` until a later tick deposits the asset. Poll the node (`query`) rather than expecting a file now. Spends credits; a `credits_exhausted` failure means the org is out.
+Renders an `effects` node's stack onto its upstream image and lands the result as the node's `refId` — the same render `EffectsEditor` does in the browser, run server-side so an agent without a browser can do it. Set the stack first with `update_row` on `nodes.data.effects` (see `describe_node_types` for the effect list and their params), then call this. Refused before anything runs if `data.sourceRefId` is empty (nothing upstream to render) — wire an image into the node first. Spends no credits: no AI provider is called.
 
 | campo | tipo | |
 |---|---|---|
 | `org`? | string | Which org, if you belong to more than one. |
 | `node_id` | string |  |
-| `medium` | `text` \| `image` \| `video` |  |
+
+### `enhance_prompt` · W
+
+*Rewrite a prompt for the model that will render it*
+
+Rewrites a brief into the SHAPE the model you are about to render with wants — one reads labelled sections, another one flowing paragraph, another a command when it edits. Pass the `model` (`get_media_models` lists them) and use the `prompt` that comes back to render. It rewrites, it never invents: a rewrite that adds a subject, asks for readable text or states an aspect ratio is thrown away and the original returns with `changed: false` and the reason in `notes`, as does a model we have no guide for. Draws nothing, files nothing. Spends credits.
+
+| campo | tipo | |
+|---|---|---|
+| `org`? | string | Which org, if you belong to more than one. |
 | `prompt` | string |  |
 | `model` | string |  |
-| `version` | integer |  |
-| `params`? | object |  |
+| `shot_mode`? | `hero` \| `flat-lay` \| `on-model` \| `close-up` \| `lifestyle` \| `studio` |  |
 

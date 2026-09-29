@@ -42,7 +42,7 @@ describe('axesFrom — solo i fili iterate contano, e solo verso una list', () =
     const edges: LoopEdge[] = [{ sourceNodeId: 'l1', targetNodeId: 'gen', mode: 'iterate' }];
     const out = axesFrom('gen', edges, nodesById([{ id: 'l1', type: 'list', itemCount: 0 }]));
     expect(out.axes).toEqual([]);
-    expect(out.rejected).toEqual([{ nodeId: 'l1', why: expect.stringContaining('vuota') }]);
+    expect(out.rejected).toEqual([{ nodeId: 'l1', why: expect.stringContaining('Empty list') }]);
   });
 
   it('un filo iterate verso un ALTRO nodo non conta per questo target', () => {

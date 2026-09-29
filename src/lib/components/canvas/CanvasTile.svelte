@@ -105,7 +105,7 @@
     <LabelIcon size={12} strokeWidth={1.8} />
     <span>{label}</span>
     {#if tile.inPost}
-      <span class="in-post-marker" title="Usato in un post">●</span>
+      <span class="in-post-marker" title="Used in a post">●</span>
     {/if}
   </div>
 {/if}

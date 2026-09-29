@@ -153,10 +153,12 @@ it. `list_posts` filters by brand and status.
 
 ## Ad campaigns
 
-`list_ad_campaigns` reads a brand's campaigns and their status. `create_ad_campaign` drafts one
-against a brand's ad account — objective, budget type and amount, optional start/end — and it
+Meta only (Facebook + Instagram). `list_ad_campaigns` reads a brand's campaigns and their status.
+`create_ad_campaign` drafts one against a brand's Meta ad account — objective, budget, days,
+audience, placements, copy, and canvas image/video nodes (or a published post to boost) — and it
 always lands `draft` with no `approved_by`: nothing here can make it spend. `approve_ad_campaign`
-is the only door that lets it spend, and it only opens for a signed-in person's own session.
+is the only door that launches it, and it only opens for a signed-in person's own session.
+`set_ad_campaign_status` pauses or resumes a launched campaign.
 
 ## References (load on demand)
 

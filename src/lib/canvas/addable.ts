@@ -61,15 +61,15 @@ export function isGenAddable(x: Addable): x is GenMedium {
  * nome cambiato, in silenzio e solo su una delle due.
  */
 export const ADDABLE_LABEL: Record<Addable, string> = {
-  text: 'Testo',
-  image: 'Immagine',
+  text: 'Text',
+  image: 'Image',
   video: 'Video',
-  iframe: 'Pagina web',
-  doc: 'Documento',
-  products: 'Prodotti',
-  social_account_feed: 'Feed social',
-  list: 'Lista',
-  select: 'Selezione',
-  effects: 'Effetti',
-  composition: 'Composizione'
+  iframe: 'Web page',
+  doc: 'Document',
+  products: 'Products',
+  social_account_feed: 'Social feed',
+  list: 'List',
+  select: 'Select',
+  effects: 'Effects',
+  composition: 'Composition'
 };

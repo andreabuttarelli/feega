@@ -12,7 +12,7 @@
 
   const PREVIEW_MAX_SIDE = 900;
   const PREVIEW_DEBOUNCE_MS = 80;
-  const UNSAVED_PROMPT = 'Chiudere senza applicare? Le modifiche alla pila andranno perse.';
+  const UNSAVED_PROMPT = 'Close without applying? Your changes to the stack will be lost.';
 
   type View = 'after' | 'before';
 
@@ -72,7 +72,7 @@
 
   $effect(() => {
     if (!inputUrl) {
-      loadError = 'Collega un’immagine al nodo per vedere l’anteprima';
+      loadError = 'Connect an image to the node to see a preview';
       return;
     }
 
@@ -92,7 +92,7 @@
         preview = pixelsOf(loaded, fitWithin(loaded.videoWidth, loaded.videoHeight, PREVIEW_MAX_SIDE));
         void loaded.play();
       };
-      loaded.onerror = () => { loadError = 'video non leggibile'; };
+      loaded.onerror = () => { loadError = 'Video cannot be read'; };
       return () => {
         cancelled = true;
         loaded.pause();
@@ -112,7 +112,7 @@
         redraw();
       })
       .catch((cause: unknown) => {
-        loadError = cause instanceof Error ? cause.message : 'immagine non leggibile';
+        loadError = cause instanceof Error ? cause.message : 'Image cannot be read';
       });
 
     return () => {
@@ -185,7 +185,7 @@
       const current = $state.snapshot(steps) as EffectStep[];
       const output = bitmap ? await outputBlob(applyStack(pixelsOf(bitmap, bitmap), current)) : null;
       if (bitmap && !output) {
-        loadError = 'impossibile esportare l’immagine';
+        loadError = 'Could not export the image';
         return;
       }
       if (await onapply(current, output)) {
@@ -214,10 +214,10 @@
 
 <div class="fx-backdrop" role="presentation" onclick={close}></div>
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-<section class="fx-editor" role="dialog" aria-label="Editor effetti" tabindex="-1" {onkeydown}>
+<section class="fx-editor" role="dialog" aria-label="Effects editor" tabindex="-1" {onkeydown}>
   <header class="fx-head">
-    <h2>Effetti</h2>
-    <button type="button" class="fx-icon" aria-label="Chiudi" onclick={close}><X size={16} /></button>
+    <h2>Effects</h2>
+    <button type="button" class="fx-icon" aria-label="Close" onclick={close}><X size={16} /></button>
   </header>
 
   <div class="fx-body">
@@ -227,14 +227,14 @@
       {/if}
       <canvas bind:this={canvas} class="fx-canvas" data-testid="effects-preview"></canvas>
       <div class="fx-toggle" role="group" aria-label="Confronto">
-        <button type="button" class:is-on={view === 'before'} onclick={() => (view = 'before')}>Prima</button>
-        <button type="button" class:is-on={view === 'after'} onclick={() => (view = 'after')}>Dopo</button>
+        <button type="button" class:is-on={view === 'before'} onclick={() => (view = 'before')}>Before</button>
+        <button type="button" class:is-on={view === 'after'} onclick={() => (view = 'after')}>After</button>
       </div>
     </div>
 
     <aside class="fx-side">
-      <select class="fx-add" aria-label="Aggiungi effetto" onchange={add}>
-        <option value="">+ Aggiungi effetto</option>
+      <select class="fx-add" aria-label="Add effect" onchange={add}>
+        <option value="">+ Add effect</option>
         {#each effectIds as id (id)}
           <option value={id}>{EFFECTS[id].label}</option>
         {/each}
@@ -245,8 +245,8 @@
           <li class="fx-step" class:is-off={!step.enabled} data-effect={step.id}>
             <div class="fx-step-head">
               <span class="fx-step-name">{EFFECTS[step.id].label}</span>
-              <button type="button" class="fx-icon" aria-label="Sposta su" disabled={index === 0} onclick={() => (steps = moveStep(steps, index, 'up'))}><ArrowUp size={14} /></button>
-              <button type="button" class="fx-icon" aria-label="Sposta giù" disabled={index === steps.length - 1} onclick={() => (steps = moveStep(steps, index, 'down'))}><ArrowDown size={14} /></button>
+              <button type="button" class="fx-icon" aria-label="Move up" disabled={index === 0} onclick={() => (steps = moveStep(steps, index, 'up'))}><ArrowUp size={14} /></button>
+              <button type="button" class="fx-icon" aria-label="Move down" disabled={index === steps.length - 1} onclick={() => (steps = moveStep(steps, index, 'down'))}><ArrowDown size={14} /></button>
               <button type="button" class="fx-icon" aria-label={step.enabled ? 'Disattiva' : 'Attiva'} onclick={() => (steps = toggleStep(steps, index))}>
                 {#if step.enabled}<Eye size={14} />{:else}<EyeOff size={14} />{/if}
               </button>
@@ -261,12 +261,12 @@
             {/each}
           </li>
         {:else}
-          <li class="fx-note">Nessun effetto: aggiungine uno dal menu.</li>
+          <li class="fx-note">No effects yet: add one from the menu.</li>
         {/each}
       </ol>
 
       <footer class="fx-foot">
-        <button type="button" class="fx-button" onclick={close} disabled={busy}>Annulla</button>
+        <button type="button" class="fx-button" onclick={close} disabled={busy}>Cancel</button>
         <button type="button" class="fx-button is-primary" onclick={apply} disabled={busy || (!bitmap && !video)}>
           {#if busy}<LoaderCircle size={14} class="fx-spin" />{/if}
           Applica

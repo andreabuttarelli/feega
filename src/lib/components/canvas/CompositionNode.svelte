@@ -33,7 +33,7 @@
       <CompositionPreview {node} {mediaUrls} />
     </div>
   {:else if node.refId && posterUrl}
-    <img class="composition-photo" src={posterUrl} alt="Composizione" loading="lazy" />
+    <img class="composition-photo" src={posterUrl} alt="Composition" loading="lazy" />
   {:else if imageCount > 0}
     <div class="composition-ready">
       <Orbit size={22} strokeWidth={1.5} />
@@ -42,7 +42,7 @@
   {:else}
     <div class="composition-empty">
       <Orbit size={22} strokeWidth={1.5} />
-      <p>Collega immagini</p>
+      <p>Connect images</p>
     </div>
   {/if}
 
@@ -50,7 +50,7 @@
     {#if node.refId && posterUrl}
       <NodeDownload kind="video" sourceUrl={posterUrl} nodeId={node.id} nodeType="composizione" />
     {/if}
-    <button type="button" class="composition-action nodrag" onclick={onopeneditor}>Apri editor</button>
+    <button type="button" class="composition-action nodrag" onclick={onopeneditor}>Open editor</button>
   </div>
 </div>
 
