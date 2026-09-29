@@ -12,11 +12,11 @@
    * risultato, storia — e legge ancora il catalogo (`choices`) perché `tooLong` e il motivo per
    * cui "Genera" è spento dipendono dal modello scelto, che il nodo continua a sapere.
    */
-  import { runStateOf, promptTooLong, type GenNode, type ModelChoice } from '$lib/canvas/gen-node';
-  import { blockedReason, canStartRun, shownIndex } from '$lib/canvas/gen-history';
+  import { runStateOf, type GenNode, type ModelChoice } from '$lib/canvas/gen-node';
+  import { shownIndex } from '$lib/canvas/gen-history';
+  import { loopCreditsOf, runQuoteOf } from '$lib/canvas/run-quote';
   import { effectiveModel } from '$lib/canvas/default-models';
   import { scrollGuard } from '$lib/canvas/scroll-guard';
-  import { creditsForRun, creditsForLoop, textOutputTokens, tokenCount } from '$lib/canvas/gen-cost';
   import CreditAmount from '$lib/components/CreditAmount.svelte';
   import { untrack } from 'svelte';
 
@@ -105,26 +105,13 @@
    * che non c'è più.
    */
   const resolvedModel = $derived(effectiveModel(node.medium, node.model, choices));
-  const choice = $derived(choices.find((c) => c.id === resolvedModel) ?? choices[0]);
-  const pricedChoice = $derived.by(() => {
-    if (node.medium !== 'text' || !choice?.textPricing) {
-      return choice;
-    }
-
-    return {
-      ...choice,
-      variableCredits: choice.variableCredits || variableTextInput,
-      textPricing: {
-        ...choice.textPricing,
-        estimatedOutputTokens:
-          estimatedTextOutputTokens ??
-          textOutputTokens(choice.textPricing.systemPromptTokens + tokenCount(node.prompt))
-      }
-    };
-  });
+  const quote = $derived(
+    runQuoteOf({ node, choices, hasUpstreamText, variableTextInput, enhanceUnitCredits, estimatedTextInputTokens, estimatedTextOutputTokens })
+  );
+  const choice = $derived(quote.choice);
   const upstream = $derived({ hasUpstreamText });
   const state = $derived(runStateOf(node, upstream));
-  const tooLong = $derived(!!choice && promptTooLong(node.prompt, choice));
+  const tooLong = $derived(quote.tooLong);
   const TEXT_ESTIMATE_DELAY_MS = 400;
 
   $effect(() => {
@@ -140,38 +127,14 @@
     return () => clearTimeout(timer);
   });
 
-  /**
-   * PERCHÉ IL BOTTONE È SPENTO, da `gen-history` e non da una condizione scritta qui.
-   *
-   * Il difetto segnalato era «Genera non fa niente»: il bottone era collegato allo stato e a
-   * nessun generatore, quindi si accendeva e taceva. Adesso lancia — e quando non può, lo dice.
-   * Un bottone spento senza spiegazione è indistinguibile da uno rotto.
-   *
-   * `tooLong` resta qui e non nel registro: dipende dal CATALOGO, che il nodo ha e le funzioni
-   * pure no — spostarlo là significherebbe passargli il modello scelto a ogni chiamata, per un
-   * caso solo.
-   */
-  const blocked = $derived(
-    tooLong && choice?.maxPromptChars ? `Prompt troppo lungo` : blockedReason(node, choices, upstream)
-  );
-  const canRun = $derived(canStartRun(node, choices, upstream) && !tooLong);
+  const blocked = $derived(quote.reason);
+  const canRun = $derived(quote.enabled);
   const shown = $derived(shownIndex(node));
 
   /** Quanto costerebbe UN giro, con lo stesso modello/parametri che "Genera" spedirebbe adesso —
    *  `null` quando il catalogo non porta un prezzo per questo modello, mai un numero inventato. */
-  const runCredits = $derived(
-    variableTextInput
-      ? null
-      : creditsForRun({ medium: node.medium, model: pricedChoice ?? null, params: node.params, prompt: node.prompt, textInputTokens: estimatedTextInputTokens, enhanceUnitCredits })
-  );
-  const loopCredits = $derived(
-    variableTextInput
-      ? null
-      : creditsForLoop(
-      { medium: node.medium, model: pricedChoice ?? null, params: node.params, prompt: node.prompt, textInputTokens: estimatedTextInputTokens, enhanceUnitCredits },
-      loopCombinationCount
-    )
-  );
+  const runCredits = $derived(quote.credits);
+  const loopCredits = $derived(loopCreditsOf(quote, loopCombinationCount, variableTextInput));
 
   /**
    * SE QUESTO NODO HA UNA FASCIA `.gen-body` DA MOSTRARE — la stessa regola che decide se
@@ -319,11 +282,11 @@
         </button>
       {:else if onrunloop && loopVisible}
         <button type="button" class="gen-loop" onclick={() => onrunloop?.()} disabled={!canRun}>
-          Loop ×{loopCombinationCount}{#if loopCredits !== null} · <CreditAmount amount={loopCredits} approx />{:else if pricedChoice?.variableCredits} · variable cost{/if}
+          Loop ×{loopCombinationCount}{#if loopCredits !== null} · <CreditAmount amount={loopCredits} approx />{:else if quote.variable} · variable cost{/if}
         </button>
       {/if}
       <button type="button" onclick={() => onrun?.()} disabled={!canRun}>
-        {state === 'done' ? 'Redo' : 'Generate'}{#if runCredits !== null} · <CreditAmount amount={runCredits} approx />{:else if pricedChoice?.variableCredits} · variable cost{/if}
+        {state === 'done' ? 'Redo' : 'Generate'}{#if runCredits !== null} · <CreditAmount amount={runCredits} approx />{:else if quote.variable} · variable cost{/if}
       </button>
     </div>
   </footer>

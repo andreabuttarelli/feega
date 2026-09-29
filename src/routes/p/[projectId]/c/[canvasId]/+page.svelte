@@ -93,6 +93,7 @@
   import { renderDocHtml } from '$lib/canvas/doc-render';
   import '$lib/styles/doc-prose.css';
   import { producedRuns } from '$lib/canvas/gen-history';
+  import { runQuoteOf, type RunQuote } from '$lib/canvas/run-quote';
   import { type Addable } from '$lib/canvas/addable';
   import type { FilledNodeDrag } from '$lib/canvas/drag-payload';
   import { tileNode } from '$lib/canvas/connect-rules';
@@ -1005,6 +1006,36 @@
    * prompt mai partito. Passare per la stessa coda del nodo mette la POST in fila dietro quella
    * scrittura invece di correrci contro — ma questo riguarda solo la POST, non lo spinner.
    */
+  function runQuoteFor(ids: string[]): RunQuote | null {
+    const row = ids.length === 1 ? nodes.find((n) => n.id === ids[0]) : undefined;
+    const gen = row ? genOf(row) : null;
+    if (!row || !gen) {
+      return null;
+    }
+
+    const revision = textEstimateRevision(row.id);
+    const estimate = textCostEstimates[row.id]?.revision === revision ? textCostEstimates[row.id] : undefined;
+    const catalogueEntry = mediumCatalogue[gen.medium];
+
+    return runQuoteOf({
+      node: { ...gen, runs: runsByNode[row.id] ?? [] },
+      choices: catalogueEntry.choices,
+      hasUpstreamText: hasUpstreamTextByNode[row.id] ?? false,
+      variableTextInput: estimate?.variableInput ?? (gen.medium === 'text' && revision !== '[]'),
+      enhanceUnitCredits: catalogueEntry.enhanceUnitCredits,
+      estimatedTextInputTokens: estimate?.inputTokens,
+      estimatedTextOutputTokens: estimate?.outputTokens
+    });
+  }
+
+  function runNode(id: string) {
+    const row = nodes.find((n) => n.id === id);
+    const gen = row ? genOf(row) : null;
+    if (gen) {
+      void run(id, gen);
+    }
+  }
+
   async function run(id: string, gen: GenNodeState) {
     if (gen.running) {
       return;
@@ -1966,6 +1997,8 @@
     onConnectNew={connectNew}
     onConnectExisting={connectExisting}
     onRunWorkflow={runWorkflow}
+    {runQuoteFor}
+    onRunNode={runNode}
     {nodeSummaries}
     {modelChoicesFor}
     catalogueSyncedFor={(type) => mediumCatalogue[type].synced}

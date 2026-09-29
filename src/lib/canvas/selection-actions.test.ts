@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { enabledFor } from './selection-actions';
+import { actionsIn, enabledFor } from './selection-actions';
+
+describe('la barra ha lo stesso ordine per ogni tipo di nodo', () => {
+  it('secondarie, overflow e distruttive in gruppi fissi', () => {
+    expect(actionsIn('secondary', 1).map((a) => a.id)).toEqual(['connect-new', 'connect-existing', 'duplicate', 'promote']);
+    expect(actionsIn('overflow', 1).map((a) => a.id)).toEqual(['copy-id']);
+    expect(actionsIn('danger', 1).map((a) => a.id)).toEqual(['delete']);
+  });
+
+  it("eseguire il flusso è l'azione primaria solo con più nodi", () => {
+    expect(actionsIn('primary', 1)).toEqual([]);
+    expect(actionsIn('primary', 2).map((a) => a.id)).toEqual(['run-workflow']);
+  });
+});
 
 describe('enabledFor', () => {
   it('promote è abilitata con un\'immagine nella selezione', () => {

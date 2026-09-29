@@ -4,8 +4,8 @@
   import { LAYOUTS } from '$lib/canvas/composition/index';
   import type { LayoutId, LayoutParams } from '$lib/canvas/composition/types';
   import type { CompositionMedia, CompositionScene } from '$lib/canvas/composition/scene';
-  import CompositionParamControl from '$lib/components/canvas/CompositionParamControl.svelte';
-  import { createSceneWhenMounted } from '$lib/canvas/composition-editor';
+  import StudioParamControl from '$lib/components/canvas/StudioParamControl.svelte';
+  import { controlFor, createSceneWhenMounted } from '$lib/canvas/composition-editor';
 
   const PLACEHOLDER_COLORS = ['#e4572e', '#29335c', '#f3a712', '#669900', '#a288e3', '#2ec4b6'];
   const PLACEHOLDER_SIZE = 512;
@@ -160,9 +160,9 @@
 
     <div class="param-grid">
       {#each LAYOUTS[layoutId].params as param (param.name)}
-        <CompositionParamControl
-          {param}
-          value={layoutParams[param.name]}
+        <StudioParamControl
+          label={param.label}
+          control={controlFor(param, layoutParams[param.name])}
           onchange={(value) => onLayoutParamChange(param.name, value)}
         />
       {/each}
@@ -183,9 +183,9 @@
 
     <div class="param-grid">
       {#each CAMERA_PRESETS[cameraId].params as param (param.name)}
-        <CompositionParamControl
-          {param}
-          value={cameraParams[param.name]}
+        <StudioParamControl
+          label={param.label}
+          control={controlFor(param, cameraParams[param.name])}
           onchange={(value) => onCameraParamChange(param.name, value)}
         />
       {/each}

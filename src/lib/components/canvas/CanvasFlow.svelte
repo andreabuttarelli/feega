@@ -55,6 +55,7 @@
   import { setTileResize } from '$lib/canvas/tile-resize-context';
   import type { CanvasNode } from '$lib/canvas/graph';
   import { CANVAS_MODES, CanvasMode } from '$lib/canvas/canvas-mode';
+  import type { RunQuote } from '$lib/canvas/run-quote';
   import { DropVerdict, pointOf, type PointerPoint } from '$lib/canvas/canvas-drop';
 
   /**
@@ -128,6 +129,8 @@
     onConnectNew,
     onConnectExisting,
     onRunWorkflow,
+    runQuoteFor,
+    onRunNode,
     nodeSummaries = [],
     modelChoicesFor,
     catalogueSyncedFor,
@@ -205,6 +208,8 @@
     onConnectExisting?: (ids: string[], targetId: string) => void;
     /** "Esegui flusso": gli id scelti, così com'è per `onDelete`/`onPromote`. */
     onRunWorkflow?: (ids: string[]) => void;
+    runQuoteFor?: (ids: string[]) => RunQuote | null;
+    onRunNode?: (id: string) => void;
     /** `type`/`data` di ogni tile — la forma grezza che `commonPropertiesOf` legge, non `Tile`. */
     nodeSummaries?: { id: string; type: string; data: Record<string, unknown> }[];
     /** I modelli offribili per un medium che genera, dal catalogo di chi monta la tela. */
@@ -750,6 +755,8 @@
     edges={selectionEdges}
     choicesFor={modelChoicesFor}
     catalogueSynced={selectionMedium && catalogueSyncedFor ? catalogueSyncedFor(selectionMedium) : true}
+    runQuote={runQuoteFor?.(selection.ids) ?? null}
+    onrun={() => onRunNode?.(selection.ids[0])}
     onaction={runSelectionAction}
     onpropertychange={(patch) => onPropertyChange?.(selection.ids, patch)}
   />
