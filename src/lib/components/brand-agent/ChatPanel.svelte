@@ -26,6 +26,7 @@
   const sending = $derived(session?.sending ?? false);
   const loading = $derived(session?.loading ?? false);
   const failed = $derived(session?.failed ?? '');
+  const failedDetail = $derived(session?.failedDetail ?? '');
   const starts = $derived(speakerStarts(messages));
   const failure = $derived(failed ? FAILURES[failed] : null);
   const suggestions = $derived(($json('chat.panel.suggestions') as string[] | undefined) ?? []);
@@ -172,10 +173,10 @@
       {#if failure}
         <div class="banner" role="alert">
           <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 4.5v4.5M8 11v1" stroke="currentColor" stroke-width="1.8" /><rect x="1.5" y="1.5" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.3" /></svg>
-          <span class="banner-text">{$_(failure.messageKey)}</span>
+          <span class="banner-text">{failure.action === 'rephrase' && failedDetail ? failedDetail : $_(failure.messageKey)}</span>
           {#if failure.action === 'credits'}
             <a class="banner-act" href={`/p/${scopeProjectId}/credits`}>{$_('chat.panel.buyCredits')}</a>
-          {:else}
+          {:else if failure.action === 'retry'}
             <button type="button" class="banner-act" onclick={retry}>{$_('chat.panel.retry')}</button>
           {/if}
         </div>

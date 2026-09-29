@@ -11,6 +11,8 @@ function ports(overrides: Partial<ScreenPorts> = {}): ScreenPorts {
   return {
     decide: vi.fn(async () => ({ choice: 'safe', probabilities: { safe: 0.999 } })),
     judge: vi.fn(async () => ({ allowed: true, category: 'safe', reason: 'ok' })),
+    decideIdentifiability: vi.fn(async () => ({ choice: 'generic', probabilities: { generic: 0.999 } })),
+    judgeIdentifiability: vi.fn(async () => ({ allowed: true, category: 'generic', reason: 'ok' })),
     record: vi.fn(),
     ...overrides
   };

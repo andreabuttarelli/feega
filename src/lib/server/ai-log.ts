@@ -426,6 +426,12 @@ export function promptHash(prompt: string | undefined): string | null {
  * leggeva `context like 'tool:%'` diventa `operation like '%:tool:%'`, senza una colonna che il
  * deploy non aggiungerebbe comunque.
  */
+const HOUSE_PAID_LABEL_PREFIXES: readonly string[] = ['moderation.'];
+
+function billedToUser(entry: AiCallLog): boolean {
+  return !HOUSE_PAID_LABEL_PREFIXES.some((prefix) => entry.label.startsWith(prefix));
+}
+
 function operationTag(entry: AiCallLog): string {
   const context = entry.context ?? toolTag();
   return context ? `${entry.label}:${context}` : entry.label;
@@ -499,7 +505,7 @@ export function logAiCall(entry: AiCallLog): void {
         await ensureGatewayModels();
       }
       const costUsd = computeCostUsd(entry, plan);
-      const billedCredits = costUsd != null && costUsd > 0 ? billedCreditsFor(costUsd) : null;
+      const billedCredits = billedToUser(entry) && costUsd != null && costUsd > 0 ? billedCreditsFor(costUsd) : null;
       const row: AiCallInsert = {
         org_id: orgId,
         brand_id: brandId,

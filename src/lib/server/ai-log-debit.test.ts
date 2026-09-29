@@ -95,4 +95,15 @@ describe('logAiCall debita credit_ledger per una chiamata prezzata', () => {
 		await vi.waitFor(() => expect(aiCallsRows.length).toBeGreaterThan(0));
 		expect(ledgerRows).toHaveLength(0);
 	});
+
+	it.each(['moderation.judge', 'moderation.jev', 'moderation.judge.identifiability'])('%s: logs the cost but bills the user nothing', async (label) => {
+		logAiCall({ label, provider: 'jev', ms: 90, ok: true, flatCostUsd: 0.002, orgId: 'org-1' });
+
+		await vi.waitFor(() => expect(aiCallsRows.length).toBeGreaterThan(0));
+		await new Promise((r) => setTimeout(r, 10));
+		expect(aiCallsRows[0].cost_usd).toBe(0.002);
+		expect(aiCallsRows[0].billed_credits).toBeNull();
+		expect(ledgerRows).toHaveLength(0);
+	});
 });
+

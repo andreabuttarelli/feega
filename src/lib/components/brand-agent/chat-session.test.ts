@@ -94,4 +94,21 @@ describe('chatSession', () => {
     await sent;
     expect(anyChatRunning()).toBe(false);
   });
+
+  it('a blocked prompt keeps the server reason, not the generic "the agent didn\'t answer"', async () => {
+    forgetChatSessions();
+    const reason = "This prompt was blocked: sexual content isn't allowed in feega's standard mode.";
+    const fetcher = (async (_url: string, init?: RequestInit) =>
+      init?.method === 'POST'
+        ? new Response(JSON.stringify({ error: reason, code: 'prompt_blocked' }), { status: 422 })
+        : new Response(JSON.stringify({ messages: [] }), { status: 200 })) as typeof fetch;
+    const session = chatSession('/api/v1/projects/blocked/agent', fetcher);
+    await session.load();
+
+    await session.send('something explicit', 'append-user');
+
+    expect(session.failed).toBe('blocked');
+    expect(session.failedDetail).toBe(reason);
+    expect(session.messages.map((m) => m.role)).toEqual(['user']);
+  });
 });
