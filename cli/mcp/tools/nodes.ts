@@ -40,9 +40,10 @@ export function registerNodeTools(server: McpServer) {
         'the run, and the render lands later, asynchronously — the node stays `running` until a ' +
         'later tick deposits the asset. Poll the node (`query`) rather than expecting a file now. ' +
         'A finished result returns `asset_ids` and `media` with `preview_url`/`full_url` (see `get_media`). ' +
-        'Omit `model` to use the recommended balanced model for the medium (`describe_node_types` ' +
-        'lists the recommended ones); an old or weak model still runs but the result carries a ' +
-        '`warning` naming the recommended one. ' +
+        'Omit `model` to keep the node\'s own model, or the recommended balanced one for the medium ' +
+        'when it has none (`describe_node_types` lists the recommended ones). A model the canvas does ' +
+        'not offer is refused with the recommended alternatives; an old or weak one still runs but ' +
+        'the result carries a `warning` naming the recommended one. ' +
         'Spends credits; a `credits_exhausted` failure means the org is out.',
       inputSchema: z.object({
         org,

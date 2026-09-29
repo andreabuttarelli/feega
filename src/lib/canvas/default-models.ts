@@ -1,6 +1,6 @@
 export type GenerativeMedium = 'text' | 'image' | 'video';
 
-import type { RecommendationTier } from './recommended-models';
+import { TIER_ORDER, type RecommendationTier } from './recommended-models';
 
 export type ModelChoiceLike = { id: string; tiers?: readonly RecommendationTier[] };
 
@@ -26,4 +26,48 @@ export function effectiveModel(
     return DEFAULT_MODEL[medium];
   }
   return choices[0]?.id ?? null;
+}
+
+export type OfferedModels = {
+  choices: readonly ModelChoiceLike[];
+  recommended: readonly { tier: RecommendationTier; id: string }[];
+};
+
+export type ModelPick = { ok: true; model: string } | { ok: false; error: string };
+
+const SUGGESTION_ORDER: readonly RecommendationTier[] = ['balanced', ...TIER_ORDER.filter((tier) => tier !== 'balanced')];
+const MAX_PLAIN_SUGGESTIONS = 5;
+
+function suggestions(offered: OfferedModels): string {
+  const tiered = SUGGESTION_ORDER.flatMap((tier) =>
+    offered.recommended.filter((r) => r.tier === tier).map((r) => `${r.id} (${tier})`)
+  );
+  if (tiered.length) {
+    return tiered.join(', ');
+  }
+  return offered.choices.slice(0, MAX_PLAIN_SUGGESTIONS).map((c) => c.id).join(', ');
+}
+
+function isOffered(model: string, offered: OfferedModels): boolean {
+  return offered.choices.some((c) => c.id === model) || offered.recommended.some((r) => r.id === model);
+}
+
+function cannotJudge(offered: OfferedModels): boolean {
+  return !offered.choices.length && !offered.recommended.length;
+}
+
+export function pickModel(medium: GenerativeMedium, explicit: string | null | undefined, offered: OfferedModels): ModelPick {
+  if (!explicit) {
+    const model = offered.recommended.find((r) => r.tier === 'balanced')?.id ?? effectiveModel(medium, null, offered.choices);
+    return model ? { ok: true, model } : { ok: false, error: 'model_required' };
+  }
+
+  if (cannotJudge(offered) || isOffered(explicit, offered)) {
+    return { ok: true, model: explicit };
+  }
+
+  return {
+    ok: false,
+    error: `unknown_model: "${explicit}" is not a ${medium} model the canvas offers. Recommended: ${suggestions(offered)}.`
+  };
 }

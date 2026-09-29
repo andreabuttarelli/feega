@@ -8,13 +8,13 @@ import { canvasModelCatalogue } from '$lib/server/canvas-catalogue';
 import { modelAdvice } from '$lib/canvas/recommended-models';
 import type { GenMedium } from '$lib/canvas/gen-node';
 
-async function agentModel(medium: GenMedium, requested: string | undefined): Promise<{ model: string | null; warning?: string }> {
-  const catalogue = (await canvasModelCatalogue())[medium];
-  if (!requested) {
-    return { model: catalogue?.recommended.find((r) => r.tier === 'balanced')?.id ?? null };
-  }
-  const warning = catalogue ? modelAdvice(medium, requested, catalogue.candidates, new Date()) : null;
-  return warning ? { model: requested, warning } : { model: requested };
+async function modelWarning(medium: GenMedium, requested: string | null): Promise<string | null> {
+  const catalogue = requested ? (await canvasModelCatalogue())[medium] : null;
+  return catalogue && requested ? modelAdvice(medium, requested, catalogue.candidates, new Date()) : null;
+}
+
+function savedModel(data: Record<string, unknown> | undefined): string | null {
+  return typeof data?.model === 'string' && data.model ? data.model : null;
 }
 
 /**
@@ -50,7 +50,8 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
   const gate = await gateOrgAiAction(orgId, apiKeyId ? { id: apiKeyId, name: '', user_id: userId, org_id: orgId, scopes: ['write'] } : undefined);
   if (gate) return gate;
 
-  const { model, warning } = await agentModel(body.medium as GenMedium, body.model);
+  const model = body.model || savedModel(node.data);
+  const warning = await modelWarning(body.medium as GenMedium, model);
   const outcome = await runGenNode(db, {
     orgId,
     projectId: node.projectId,

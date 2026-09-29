@@ -1,4 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('$lib/server/canvas-catalogue', () => {
+  const offer = (ids: string[]) => ({ choices: ids.map((id) => ({ id })), recommended: ids.slice(0, 1).map((id) => ({ tier: 'balanced', id })), synced: true });
+  return { canvasModelCatalogue: async () => ({ text: offer(['m1']), image: offer(['img-a', 'img-b']), video: offer([]) }) };
+});
 import type { Tool } from 'ai';
 import { fakeDb } from '$lib/server/db/fake-db';
 import { createProjectTools } from './project-tools';
@@ -218,5 +223,36 @@ describe('update_node rifiuta un campo che il tipo non ha', () => {
 
     expect(out).toMatchObject({ outcome: 'invalid' });
     expect(rows.nodes[0].version).toBe(3);
+  });
+});
+
+describe('the chat agent sets a node model only from the canvas catalogue', () => {
+  it('create_node accepts an offered model on an image node', async () => {
+    const { db } = fakeDb({ nodes: [] });
+    const tools = createProjectTools({ db, orgId: ORG, projectId: PROJECT, userId: USER }) as Record<string, Tool>;
+
+    const out = (await run(tools.create_node, { canvasId: CANVAS, type: 'image', x: 0, y: 0, data: { prompt: 'p', model: 'img-b' } })) as { outcome: string };
+
+    expect(out.outcome).toBe('written');
+  });
+
+  it('create_node refuses an unknown model, suggesting the recommended ones', async () => {
+    const { db } = fakeDb({ nodes: [] });
+    const tools = createProjectTools({ db, orgId: ORG, projectId: PROJECT, userId: USER }) as Record<string, Tool>;
+
+    const out = (await run(tools.create_node, { canvasId: CANVAS, type: 'image', x: 0, y: 0, data: { prompt: 'p', model: 'nope' } })) as { outcome: string; message: string };
+
+    expect(out.outcome).toBe('invalid');
+    expect(out.message).toMatch(/nope.*img-a \(balanced\)/);
+  });
+
+  it('update_node refuses an unknown model on a text node', async () => {
+    const { db } = fakeDb({ nodes: [{ ...nodeRow }] });
+    const tools = createProjectTools({ db, orgId: ORG, projectId: PROJECT, userId: USER }) as Record<string, Tool>;
+
+    const out = (await run(tools.update_node, { nodeId: NODE, data: { model: 'nope' } })) as { outcome: string; message: string };
+
+    expect(out.outcome).toBe('invalid');
+    expect(out.message).toMatch(/m1 \(balanced\)/);
   });
 });

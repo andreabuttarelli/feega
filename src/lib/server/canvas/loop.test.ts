@@ -22,10 +22,11 @@ vi.mock('$lib/server/canvas-catalogue', () => ({
           systemPromptTokens: 0
         }
       }],
+      recommended: [],
       synced: true
     },
-    image: { choices: [], synced: true },
-    video: { choices: [], synced: true }
+    image: { choices: [{ id: 'qwen3-pro' }, { id: 'img-balanced' }], recommended: [{ tier: 'balanced', id: 'img-balanced' }], synced: true },
+    video: { choices: [], recommended: [], synced: true }
   })
 }));
 
@@ -311,6 +312,22 @@ describe('drainLoopQueue — il cron drena un lotto, con lo stesso motore', () =
     expect(runGenNode).toHaveBeenCalledTimes(1);
     const claimUpdate = calls.find((c) => c.table === 'node_runs' && c.op === 'update' && (c.payload as { status?: string })?.status === 'finishing');
     expect(claimUpdate).toBeTruthy();
+  });
+
+  it('a node without a model runs every combination on the balanced recommendation', async () => {
+    const ticket = { loop: { phase: 'queued', outputListNodeId: 'list-1', label: 'variante 1', values: {}, projectId: PROJECT, canvasId: CANVAS, userId: USER } };
+    const { db } = fakeDb(
+      {
+        node_runs: [runRow({ id: 'r1', node_id: GEN_NODE, params: ticket })],
+        nodes: [nodeRow(GEN_NODE, 'image', { prompt: 'un gatto' }, 5), nodeRow('list-1', 'list', { item_kind: 'image', items: [{ label: 'variante 1', status: 'queued' }] })]
+      },
+      { updateRows: { node_runs: [runRow({ id: 'r1', node_id: GEN_NODE, params: ticket, status: 'finishing' })] } }
+    );
+    runGenNode.mockResolvedValue({ kind: 'refused', error: 'x' });
+
+    await drainLoopQueue(db, { limit: 10 });
+
+    expect(runGenNode).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ model: 'img-balanced' }));
   });
 
   it('un biglietto già reclamato (status finishing) non viene ripreso da un secondo drain nello stesso lotto', async () => {

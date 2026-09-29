@@ -2,6 +2,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { createOrgWriteTools } from './write-tool';
 
 vi.mock('$lib/server/ai-log', () => ({ logAiCall: vi.fn() }));
+vi.mock('$lib/server/canvas-catalogue', () => {
+  const offer = (ids: string[]) => ({ choices: ids.map((id) => ({ id })), recommended: ids.slice(0, 1).map((id) => ({ tier: 'balanced', id })), synced: true });
+  return { canvasModelCatalogue: async () => ({ text: offer(['txt-a']), image: offer(['img-a']), video: offer(['vid-a']) }) };
+});
 vi.mock('./presence', () => ({ announcePresence: vi.fn().mockResolvedValue(undefined) }));
 
 type Call = { op: string; table: string; filters: string[][]; values?: Record<string, unknown> };
@@ -363,6 +367,55 @@ describe('update_row on nodes: data keys are as strict as insert_row', () => {
       table: 'nodes',
       where: [{ column: 'id', op: 'eq', value: 'n1' }],
       values: { data: { refId: 'a1', runId: 'r1', running: false, error: null, params: { aspectRatio: '1:1' } } }
+    });
+
+    expect(out.error).toBeUndefined();
+    expect(calls.filter((c) => c.op === 'update')).toHaveLength(1);
+  });
+});
+
+describe('insert_row/update_row on nodes: model must be one the canvas offers', () => {
+  it('insert_row refuses an unknown video model, suggesting the recommended one', async () => {
+    const { calls, supabase } = fakeAuthority({});
+
+    const out = await tools(supabase, 'org-mine').insertRow({
+      table: 'nodes',
+      values: { type: 'video', canvas_id: 'c1', project_id: 'p1', data: { prompt: 'p', model: 'nope' } }
+    });
+
+    expect(out.error).toBe('invalid_node_data');
+    expect(out.message).toMatch(/nope.*vid-a \(balanced\)/);
+    expect(calls.filter((c) => c.op === 'insert')).toHaveLength(0);
+  });
+
+  it('update_row refuses an unknown text model', async () => {
+    const { calls, supabase } = fakeAuthority({
+      count: 1,
+      currentRows: [{ id: 'n1', type: 'text', version: 1, data: { prompt: 'x' } }]
+    });
+
+    const out = await tools(supabase, 'org-mine').updateRow({
+      table: 'nodes',
+      where: [{ column: 'id', op: 'eq', value: 'n1' }],
+      values: { data: { model: 'nope' } }
+    });
+
+    expect(out.error).toBe('invalid_node_data');
+    expect(out.message).toMatch(/txt-a \(balanced\)/);
+    expect(calls.filter((c) => c.op === 'update')).toHaveLength(0);
+  });
+
+  it('update_row accepts an offered image model', async () => {
+    const { calls, supabase } = fakeAuthority({
+      count: 1,
+      currentRows: [{ id: 'n1', type: 'image', version: 1, data: { prompt: 'x' } }],
+      writeRows: [{ id: 'n1' }]
+    });
+
+    const out = await tools(supabase, 'org-mine').updateRow({
+      table: 'nodes',
+      where: [{ column: 'id', op: 'eq', value: 'n1' }],
+      values: { data: { model: 'img-a' } }
     });
 
     expect(out.error).toBeUndefined();
