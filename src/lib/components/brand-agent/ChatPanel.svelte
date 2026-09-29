@@ -1,52 +1,73 @@
 <script lang="ts">
   import { tick } from 'svelte';
+  import { _, json } from 'svelte-i18n';
   import { page } from '$app/stores';
-  import { applyChatStreamEvent, closeDanglingToolCalls, emptyStreamState, readSseEvents } from '$lib/chat-stream-events';
+  import { applyChatStreamEvent, closeDanglingToolCalls, emptyStreamState, readSseEvents, type ChatStreamState } from '$lib/chat-stream-events';
   import { nearBottom } from '$lib/chat-scroll';
   import { chatEndpoint } from './chat-endpoint';
+  import { nextFollow, type Follow, type FollowEvent } from './chat-follow';
+  import { FAILURES, failureOfStatus, keyboardInset, speakerStarts, type Failure, type ToolCall } from './chat-view';
   import ChatComposer from './ChatComposer.svelte';
-  import ChatMessage, { type ToolLine } from './ChatMessage.svelte';
+  import ChatMessage from './ChatMessage.svelte';
 
   let {
     brandSlug = '',
     projectId = ''
   }: { brandSlug?: string; projectId?: string } = $props();
 
-  type Failure = 'load' | 'send' | 'empty';
   type Message = {
     role: 'user' | 'assistant';
     content: string;
     pending?: boolean;
     at?: number | null;
-    tools?: ToolLine[];
+    tools?: ToolCall[];
     live?: boolean;
   };
+
+  class HttpFailure extends Error {
+    status: number;
+    constructor(status: number) {
+      super(String(status));
+      this.status = status;
+    }
+  }
+
+  const SILENT_TOOLS = new Set(['reply']);
 
   let messages = $state<Message[]>([]);
   let draft = $state('');
   let sending = $state(false);
   let loading = $state(true);
   let failed = $state<Failure | ''>('');
+  let follow = $state<Follow>('following');
   let scroller = $state<HTMLDivElement | null>(null);
+  let root = $state<HTMLDivElement | null>(null);
+  let kbInset = $state(0);
   let abort: AbortController | null = null;
-  let stick = true;
 
   const routeProjectId = $derived($page.params.projectId ?? '');
-  const endpoint = $derived(
-    chatEndpoint({ projectId: projectId || routeProjectId, brandSlug })
-  );
-  const hasScope = $derived(!!endpoint);
+  const scopeProjectId = $derived(projectId || routeProjectId);
+  const endpoint = $derived(chatEndpoint({ projectId: scopeProjectId, brandSlug }));
+  const starts = $derived(speakerStarts(messages));
+  const failure = $derived(failed ? FAILURES[failed] : null);
+  const suggestions = $derived(($json('chat.panel.suggestions') as string[] | undefined) ?? []);
+  const showEmpty = $derived(!loading && failed !== 'load' && !messages.length);
 
-  function onScroll() {
-    stick = nearBottom(scroller);
+  function on(event: FollowEvent) {
+    follow = nextFollow(follow, event);
   }
 
-  async function scrollToEnd(force = false) {
+  async function toEnd(behavior: ScrollBehavior = 'auto') {
     await tick();
-    if (!scroller || (!force && !stick)) {
+    if (!scroller || follow !== 'following') {
       return;
     }
-    scroller.scrollTo({ top: scroller.scrollHeight, behavior: force ? 'smooth' : 'auto' });
+    scroller.scrollTo({ top: scroller.scrollHeight, behavior });
+  }
+
+  function jump() {
+    on({ kind: 'jumped' });
+    void toEnd('smooth');
   }
 
   async function load() {
@@ -62,55 +83,91 @@
 
     try {
       const res = await fetch(endpoint);
-      // Nessun thread ancora: la conversazione è vuota, non rotta.
       if (res.status === 404) {
         messages = [];
         return;
       }
       if (!res.ok) {
-        throw new Error(String(res.status));
+        throw new HttpFailure(res.status);
       }
       const data = (await res.json()) as { messages?: Message[] };
       messages = data.messages ?? [];
-      stick = true;
-      await scrollToEnd(true);
+      on({ kind: 'jumped' });
     } catch {
       failed = 'load';
     } finally {
       loading = false;
+      void toEnd();
     }
   }
 
-  // Un thread per ambito: al mount si riapre quello che c'è già, quindi ricaricare la pagina
-  // riporta nella stessa conversazione invece di aprirne una nuova.
   $effect(() => {
     void endpoint;
     void load();
   });
 
-  function visibleTools(tools: ToolLine[]): ToolLine[] {
-    return tools.filter((t) => t.toolName !== 'reply');
+  $effect(() => {
+    const vv = window.visualViewport;
+    if (!vv || !root) {
+      return;
+    }
+    const el = root;
+    const measure = () => {
+      const reservedBelow = window.innerHeight - el.getBoundingClientRect().bottom;
+      kbInset = keyboardInset({ innerHeight: window.innerHeight, viewportHeight: vv.height, offsetTop: vv.offsetTop, reservedBelow });
+      void toEnd();
+    };
+    vv.addEventListener('resize', measure);
+    vv.addEventListener('scroll', measure);
+    return () => {
+      vv.removeEventListener('resize', measure);
+      vv.removeEventListener('scroll', measure);
+    };
+  });
+
+  function lastAssistant(): Message | null {
+    const last = messages[messages.length - 1];
+    return last?.role === 'assistant' ? last : null;
   }
 
-  function liveIndex() {
-    return messages.length - 1;
-  }
-
-  function foldLive(state: ReturnType<typeof emptyStreamState>) {
-    const last = messages[liveIndex()];
-    if (!last || last.role !== 'assistant') {
+  function foldLive(state: ChatStreamState) {
+    const last = lastAssistant();
+    if (!last) {
       return;
     }
     last.content = state.text;
-    last.pending = false;
-    last.live = true;
-    last.tools = visibleTools(
-      state.tools.map((t) => ({ toolCallId: t.toolCallId, toolName: t.toolName, status: t.status }))
-    );
+    last.pending = !state.text;
+    last.tools = state.tools
+      .filter((t) => !SILENT_TOOLS.has(t.toolName))
+      .map((t) => ({ toolCallId: t.toolCallId, toolName: t.toolName, status: t.status, input: t.input, output: t.output, errorText: t.errorText }));
   }
 
-  function dropLive() {
-    messages = messages.slice(0, -1);
+  async function stream(res: Response) {
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+    const state = emptyStreamState();
+    let buffered = '';
+
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      buffered += decoder.decode(value, { stream: true });
+      const { events, rest } = readSseEvents(buffered);
+      buffered = rest;
+      for (const evt of events) {
+        if (applyChatStreamEvent(state, evt)) {
+          foldLive(state);
+        }
+      }
+      on({ kind: 'grew' });
+      void toEnd();
+    }
+
+    closeDanglingToolCalls(state);
+    foldLive(state);
+    return state;
   }
 
   async function send(text: string, appendUser: boolean) {
@@ -126,13 +183,9 @@
       draft = '';
       messages = [...messages, { role: 'user', content: text, at: Date.now() }];
     }
-
-    messages = [
-      ...messages,
-      { role: 'assistant', content: '', pending: true, at: Date.now(), tools: [], live: true }
-    ];
-    stick = true;
-    await scrollToEnd(true);
+    messages = [...messages, { role: 'assistant', content: '', pending: true, at: Date.now(), tools: [], live: true }];
+    on({ kind: 'sent' });
+    void toEnd();
 
     try {
       const res = await fetch(endpoint, {
@@ -141,65 +194,42 @@
         body: JSON.stringify({ message: text }),
         signal: abort.signal
       });
-
       if (!res.ok || !res.body) {
-        throw new Error(String(res.status));
+        throw new HttpFailure(res.status);
       }
 
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      const state = emptyStreamState();
-      let buffered = '';
-
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) {
-          break;
-        }
-
-        buffered += decoder.decode(value, { stream: true });
-        const { events, rest } = readSseEvents(buffered);
-        buffered = rest;
-
-        for (const evt of events) {
-          if (!applyChatStreamEvent(state, evt)) {
-            continue;
-          }
-          foldLive(state);
-        }
-
-        void scrollToEnd();
-      }
-
-      closeDanglingToolCalls(state);
-      foldLive(state);
-      const done = messages[liveIndex()];
-      if (done?.role === 'assistant') {
+      await stream(res);
+      const done = lastAssistant();
+      if (done) {
         done.live = false;
+        done.pending = false;
       }
-
-      if (!done?.content) {
-        dropLive();
+      if (!done?.content && !done?.tools?.length) {
+        messages = messages.slice(0, -1);
         failed = 'empty';
       }
     } catch (e) {
-      const aborted = (e as Error | undefined)?.name === 'AbortError';
-      const partial = messages[liveIndex()];
-      const textKept = partial?.role === 'assistant' ? partial.content : '';
-
-      dropLive();
-
-      if (aborted) {
-        if (textKept) {
-          messages = [...messages, { role: 'assistant', content: textKept, at: Date.now(), tools: [] }];
-        }
-      } else {
-        failed = 'send';
-      }
+      settleAfter(e);
     } finally {
       sending = false;
       abort = null;
-      await scrollToEnd(true);
+      void toEnd();
+    }
+  }
+
+  function settleAfter(e: unknown) {
+    const partial = lastAssistant();
+    const aborted = (e as Error | undefined)?.name === 'AbortError';
+
+    if (aborted && partial && (partial.content || partial.tools?.length)) {
+      partial.live = false;
+      partial.pending = false;
+      return;
+    }
+
+    messages = messages.slice(0, -1);
+    if (!aborted) {
+      failed = e instanceof HttpFailure ? failureOfStatus(e.status) : 'send';
     }
   }
 
@@ -208,11 +238,14 @@
       void load();
       return;
     }
-
     const lastUser = [...messages].reverse().find((m) => m.role === 'user');
     if (lastUser) {
       void send(lastUser.content, false);
     }
+  }
+
+  function suggest(text: string) {
+    void send(text, true);
   }
 
   function stop() {
@@ -220,154 +253,316 @@
   }
 </script>
 
-<div class="panel">
-  {#if !hasScope}
-    <p class="empty">Seleziona un progetto per iniziare.</p>
+<div class="panel" bind:this={root} style={`--kb-inset: ${kbInset}px;`}>
+  {#if !endpoint}
+    <p class="center muted">{$_('chat.panel.noScope')}</p>
   {:else}
-    <div class="scroll" bind:this={scroller} onscroll={onScroll}>
-      {#if loading}
-        <div class="shimmer" aria-hidden="true">
-          <span class="s1"></span>
-          <span class="s2"></span>
-          <span class="s3"></span>
-        </div>
-      {:else if failed === 'load'}
-        <div class="state">
-          <p class="hint">Non riesco a leggere la conversazione.</p>
-          <button type="button" class="retry" onclick={retry}>Riprova</button>
-        </div>
-      {:else if !messages.length}
-        <p class="empty">Chiedi qualcosa su questo progetto.</p>
-      {/if}
+    <div
+      class="scroll"
+      bind:this={scroller}
+      onscroll={() => on({ kind: 'scrolled', atBottom: nearBottom(scroller) })}
+      role="log"
+      aria-label={$_('chat.panel.log')}
+      aria-live="polite"
+      aria-busy={sending}
+    >
+      <div class="column">
+        {#if loading}
+          <div class="skeleton" aria-hidden="true">
+            <span class="s-user"></span>
+            <span class="s-line w90"></span>
+            <span class="s-line w70"></span>
+            <span class="s-line w80"></span>
+            <span class="s-user short"></span>
+            <span class="s-line w60"></span>
+          </div>
+        {:else if showEmpty}
+          <section class="empty">
+            <span class="empty-mark" aria-hidden="true"></span>
+            <h2>{$_('chat.panel.emptyTitle')}</h2>
+            <p>{$_('chat.panel.emptyBody')}</p>
+            <ul class="suggestions">
+              {#each suggestions as text (text)}
+                <li>
+                  <button type="button" onclick={() => suggest(text)}>
+                    <span>{text}</span>
+                    <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M5 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.6" /></svg>
+                  </button>
+                </li>
+              {/each}
+            </ul>
+          </section>
+        {/if}
 
-      {#each messages as message, i (i)}
-        <ChatMessage
-          role={message.role}
-          content={message.content}
-          pending={message.pending}
-          at={message.at}
-          tools={message.tools}
-          live={message.live}
-        />
-      {/each}
-
-      {#if failed === 'send' || failed === 'empty'}
-        <div class="state inline">
-          <p class="hint err">
-            {failed === 'empty' ? 'Risposta vuota.' : 'Non è arrivata risposta.'}
-          </p>
-          <button type="button" class="retry" onclick={retry}>Riprova</button>
-        </div>
-      {/if}
+        {#each messages as message, i (i)}
+          <ChatMessage
+            role={message.role}
+            content={message.content}
+            projectId={scopeProjectId}
+            pending={message.pending}
+            at={message.at}
+            tools={message.tools}
+            live={message.live}
+            first={starts[i]}
+          />
+        {/each}
+      </div>
     </div>
 
-    <ChatComposer bind:value={draft} busy={sending} enabled={hasScope && !loading} onsend={() => void send(draft.trim(), true)} onstop={stop} />
+    <div class="dock">
+      {#if follow === 'reading' && messages.length}
+        <button type="button" class="jump" onclick={jump}>
+          <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M8 3v10M3.5 8.5 8 13l4.5-4.5" fill="none" stroke="currentColor" stroke-width="1.6" /></svg>
+          {$_('chat.panel.jump')}
+        </button>
+      {/if}
+
+      {#if failure}
+        <div class="banner" role="alert">
+          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 4.5v4.5M8 11v1" stroke="currentColor" stroke-width="1.8" /><rect x="1.5" y="1.5" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.3" /></svg>
+          <span class="banner-text">{$_(failure.messageKey)}</span>
+          {#if failure.action === 'credits'}
+            <a class="banner-act" href={`/p/${scopeProjectId}/credits`}>{$_('chat.panel.buyCredits')}</a>
+          {:else}
+            <button type="button" class="banner-act" onclick={retry}>{$_('chat.panel.retry')}</button>
+          {/if}
+        </div>
+      {/if}
+
+      <ChatComposer
+        bind:value={draft}
+        busy={sending}
+        enabled={!loading}
+        onsend={() => void send(draft.trim(), true)}
+        onstop={stop}
+      />
+      <span class="sr-only" aria-live="polite">{sending ? $_('chat.panel.responding') : ''}</span>
+    </div>
   {/if}
 </div>
 
 <style>
   .panel {
+    position: relative;
     display: flex;
     flex-direction: column;
     height: 100%;
     min-height: 0;
-    gap: 8px;
-    border: 0;
-    background: transparent;
+    padding-bottom: var(--kb-inset, 0px);
+    font-family: 'DM Sans', var(--font-sans, system-ui), sans-serif;
+    --chat-font: 14px;
+    --chat-action: 32px;
   }
 
   .scroll {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+  .column {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    padding: 2px 0 4px;
-    scrollbar-width: thin;
+    gap: 10px;
+    max-width: 720px;
+    min-height: 100%;
+    margin: 0 auto;
+    padding: 4px 16px 20px;
+  }
+
+  .center {
+    margin: auto;
+    padding: 24px;
+    text-align: center;
+  }
+  .muted {
+    color: var(--ink-soft, #6e6e73);
+    font-size: 13px;
   }
 
   .empty {
     margin: auto 0;
-    text-align: center;
-    font-size: 12.5px;
-    line-height: 1.4;
+    padding: 24px 0;
+  }
+  .empty-mark {
+    display: block;
+    width: 14px;
+    height: 14px;
+    margin-bottom: 14px;
+    background: var(--accent, #c485fe);
+  }
+  .empty h2 {
+    margin: 0 0 6px;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--ink, #1d1d1f);
+  }
+  .empty p {
+    margin: 0 0 18px;
+    font-size: 13.5px;
+    line-height: 1.55;
     color: var(--ink-soft, #6e6e73);
-    padding: 12px 6px;
+  }
+  .suggestions {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border: 1px solid var(--line, #ededef);
+    background: var(--paper, #fff);
+  }
+  .suggestions li + li {
+    border-top: 1px solid var(--line, #ededef);
+  }
+  .suggestions button {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 12px;
+    border: 0;
+    background: transparent;
+    font: inherit;
+    font-size: 13.5px;
+    line-height: 1.4;
+    text-align: left;
+    color: var(--ink, #1d1d1f);
+    cursor: pointer;
+    transition: background 0.12s ease;
+  }
+  .suggestions button svg {
+    flex: 0 0 auto;
+    color: var(--ink-faint, #86868b);
+  }
+  .suggestions button:hover {
+    background: var(--paper-3, #f4f4f4);
+  }
+  .suggestions button:focus-visible {
+    outline: 2px solid var(--accent, #c485fe);
+    outline-offset: -2px;
   }
 
-  .state {
-    margin: auto 0;
+  .dock {
+    position: relative;
+    flex: 0 0 auto;
     display: flex;
     flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    max-width: 752px;
+    margin: 0 auto;
+    padding: 0 16px 16px;
+  }
+
+  .jump {
+    position: absolute;
+    top: -44px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 32px;
+    padding: 0 12px;
+    border: 1px solid var(--line-2, #d2d2d7);
+    background: var(--paper, #fff);
+    color: var(--ink, #1d1d1f);
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 500;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+    cursor: pointer;
+  }
+  .jump:focus-visible {
+    outline: 2px solid var(--accent, #c485fe);
+    outline-offset: 2px;
+  }
+
+  .banner {
+    display: flex;
     align-items: center;
     gap: 8px;
-    padding: 8px 4px;
+    min-height: 40px;
+    padding: 6px 6px 6px 10px;
+    border: 1px solid color-mix(in srgb, var(--danger, #c0392b) 35%, transparent);
+    background: color-mix(in srgb, var(--danger, #c0392b) 7%, var(--paper, #fff));
+    color: var(--danger, #c0392b);
+    font-size: 13px;
   }
-  .state.inline {
-    margin: 4px 0 0;
-    flex-direction: row;
-    justify-content: center;
-    gap: 6px;
-  }
-
-  .hint {
-    margin: 0;
-    text-align: center;
-    font-size: 12px;
-    line-height: 1.4;
-    color: var(--ink-soft, #6e6e73);
-  }
-  .hint.err {
+  .banner-text {
+    flex: 1;
     color: var(--ink, #1d1d1f);
   }
-
-  .retry {
-    appearance: none;
-    border: 0;
-    background: color-mix(in srgb, var(--ink, #1d1d1f) 6%, transparent);
+  .banner-act {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    height: 30px;
+    padding: 0 12px;
+    border: 1px solid var(--line-2, #d2d2d7);
+    background: var(--paper, #fff);
     color: var(--ink, #1d1d1f);
-    padding: 3px 9px;
-    font-size: 11px;
+    font: inherit;
+    font-size: 12.5px;
     font-weight: 600;
+    text-decoration: none;
     cursor: pointer;
-    transition: background 0.14s ease;
   }
-  .retry:hover {
-    background: color-mix(in srgb, var(--ink, #1d1d1f) 10%, transparent);
-  }
-  .retry:focus-visible {
+  .banner-act:focus-visible {
     outline: 2px solid var(--accent, #c485fe);
-    outline-offset: 1px;
+    outline-offset: 2px;
   }
 
-  .shimmer {
+  .skeleton {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    padding: 6px 2px;
+    gap: 10px;
+    padding-top: 16px;
   }
-  .shimmer span {
+  .skeleton span {
     display: block;
-    height: 28px;
+    height: 12px;
     background: linear-gradient(
       90deg,
-      color-mix(in srgb, var(--ink) 4%, var(--paper)) 0%,
-      color-mix(in srgb, var(--ink) 9%, var(--paper)) 45%,
-      color-mix(in srgb, var(--ink) 4%, var(--paper)) 100%
+      color-mix(in srgb, var(--ink) 5%, var(--paper)) 0%,
+      color-mix(in srgb, var(--ink) 10%, var(--paper)) 45%,
+      color-mix(in srgb, var(--ink) 5%, var(--paper)) 100%
     );
     background-size: 200% 100%;
     animation: shimmer 1.35s ease-in-out infinite;
   }
-  .shimmer .s1 {
-    width: 72%;
+  .skeleton .s-user {
     align-self: flex-end;
+    width: 55%;
+    height: 36px;
+    margin: 8px 0 4px;
   }
-  .shimmer .s2 {
-    width: 88%;
+  .skeleton .s-user.short {
+    width: 38%;
   }
-  .shimmer .s3 {
-    width: 54%;
+  .w90 {
+    width: 90%;
+  }
+  .w80 {
+    width: 80%;
+  }
+  .w70 {
+    width: 70%;
+  }
+  .w60 {
+    width: 60%;
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
 
   @keyframes shimmer {
@@ -379,8 +574,21 @@
     }
   }
 
+  @media (max-width: 767px) {
+    .panel {
+      --chat-font: 15px;
+      --chat-action: 44px;
+    }
+    .dock {
+      padding: 0 12px 12px;
+    }
+    .column {
+      padding: 4px 12px 16px;
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
-    .shimmer span {
+    .skeleton span {
       animation: none;
     }
   }

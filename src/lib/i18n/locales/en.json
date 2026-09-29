@@ -529,6 +529,46 @@
     "accept": "Accept"
   },
   "chat": {
+    "panel": {
+      "log": "Conversation",
+      "agent": "Agent",
+      "you": "You",
+      "noScope": "Open a project to start chatting.",
+      "emptyTitle": "What are we making?",
+      "emptyBody": "The agent reads and edits this project's canvases: it adds nodes, connects them and runs generations.",
+      "suggestions": [
+        "What's on my canvases right now?",
+        "Add a text node with three hook ideas for a product launch",
+        "Create an image node for a minimal hero shot and connect it to my text",
+        "Summarise the assets this project has produced"
+      ],
+      "placeholder": "Ask the agent…",
+      "hint": "Enter to send · Shift+Enter for a new line",
+      "send": "Send",
+      "stop": "Stop generating",
+      "jump": "Jump to latest",
+      "thinking": "Working…",
+      "responding": "Agent is responding",
+      "stopped": "Stopped",
+      "retry": "Retry",
+      "buyCredits": "Get credits",
+      "openOnCanvas": "Open on canvas",
+      "details": "Details",
+      "input": "Input",
+      "output": "Result",
+      "tools": "{count, plural, one {# action} other {# actions}}",
+      "tool": {
+        "running": "Running",
+        "done": "Done",
+        "error": "Failed"
+      },
+      "failure": {
+        "load": "Couldn't load the conversation.",
+        "send": "The agent didn't answer.",
+        "empty": "The agent returned an empty reply.",
+        "credits": "You're out of AI credits for this period."
+      }
+    },
     "toolJob": {
       "analytics_review": "Performance review",
       "create_campaign": "Campaign",
