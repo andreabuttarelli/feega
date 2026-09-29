@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { fakeDb } from '$lib/server/db/fake-db';
-import { listSourcesForNodes } from './posts';
+import { listSourcesForNodes, promoteToPost } from './posts';
+
+describe('promoteToPost: planned_for', () => {
+  it('scrive la data pianificata sulla riga', async () => {
+    const { db, calls } = fakeDb({ posts: [] });
+
+    await promoteToPost(db, { orgId: 'org-1', brandId: 'brand-1', caption: '', media: [], plannedFor: '2026-10-02T08:00:00.000Z' });
+
+    expect(calls.find((c) => c.op === 'insert')?.payload).toMatchObject({ planned_for: '2026-10-02T08:00:00.000Z' });
+  });
+});
 
 describe('listSourcesForNodes', () => {
   it('trova i post_sources dei nodi passati, ignorando gli altri', async () => {

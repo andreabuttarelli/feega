@@ -111,6 +111,7 @@ export async function promoteToPost(
     actorKind?: ActorKind;
     actorId?: string | null;
     sources?: { nodeId: string; role?: string }[];
+    plannedFor?: string | null;
   }
 ): Promise<Post> {
   const { data, error } = await db
@@ -124,7 +125,8 @@ export async function promoteToPost(
       link_url: input.linkUrl ?? null,
       per_platform: (input.perPlatform ?? null) as Database['public']['Tables']['posts']['Insert']['per_platform'],
       actor_kind: input.actorKind ?? 'user',
-      actor_id: input.actorId ?? null
+      actor_id: input.actorId ?? null,
+      planned_for: input.plannedFor ?? null
     })
     .select(POST_COLUMNS)
     .single();
