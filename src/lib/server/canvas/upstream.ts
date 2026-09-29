@@ -59,7 +59,7 @@ async function modalitiesFor(model: string, medium: 'image' | 'video'): Promise<
   const { modalitiesOf } = await import('$lib/server/ai-models-sync');
   const { createAdminClient } = await import('$lib/server/supabase-admin');
   const modalities = await modalitiesOf(createAdminClient(), model, medium);
-  return modalities ? { input: modalities.input } : null;
+  return modalities ? { input: modalities.input, uncensored: modalities.uncensored } : null;
 }
 
 /**

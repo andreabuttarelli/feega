@@ -174,7 +174,12 @@ describe('an image node on a Wiro model', () => {
 
     const out = await runGenNode(db, start(UNCENSORED, 'lingerie editorial'));
 
-    expect(out).toMatchObject({ kind: 'refused', error: expect.stringMatching(/real people/) });
+    // Uncensored models take no input of any kind (CLAUDE.md, "No inputs for uncensored
+    // models"): a wired node — real talent or not — is refused by that broader rule before the
+    // likeness guard ever runs. The likeness guard (`likeness-guard.ts`) stays as defense in
+    // depth for a crafted request that reaches `startWiroRun` without going through
+    // `upstreamInputsFor` — see `wiro-run.test.ts`.
+    expect(out).toMatchObject({ kind: 'refused', error: expect.stringMatching(/accept references/) });
     expect(gateway.run).not.toHaveBeenCalled();
   });
 

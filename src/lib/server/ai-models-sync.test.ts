@@ -483,7 +483,8 @@ describe('modalitiesOf — cosa sa un modello, dalla tabella, per il listino giu
     expect(await modalitiesOf(admin, 'bytedance/seedance-2-5', 'chat')).toEqual({
       input: ['text', 'image'],
       output: ['video'],
-      synced_at: '2026-09-22T00:00:00Z'
+      synced_at: '2026-09-22T00:00:00Z',
+      uncensored: false
     });
   });
 
@@ -509,7 +510,8 @@ describe('modalitiesOf — cosa sa un modello, dalla tabella, per il listino giu
     expect(await modalitiesOf(admin, 'bytedance/seedance-2-5')).toEqual({
       input: ['text', 'image'],
       output: ['video'],
-      synced_at: '2026-09-22T00:00:00Z'
+      synced_at: '2026-09-22T00:00:00Z',
+      uncensored: false
     });
   });
 
@@ -530,7 +532,8 @@ describe('modalitiesOf — cosa sa un modello, dalla tabella, per il listino giu
     expect(await modalitiesOf(admin, GPT_IMAGE_25_FLARE_MODEL, 'image')).toEqual({
       input: ['text', 'image'],
       output: ['image'],
-      synced_at: '2026-09-22T00:00:00Z'
+      synced_at: '2026-09-22T00:00:00Z',
+      uncensored: false
     });
   });
 
@@ -540,6 +543,22 @@ describe('modalitiesOf — cosa sa un modello, dalla tabella, per il listino giu
     ]);
 
     expect(await modalitiesOf(admin, 'not-a-real-model', 'image')).toBeNull();
+  });
+
+  it('porta uncensored: true quando la riga lo dichiara — la stessa colonna, non un secondo giro', async () => {
+    const { admin } = fakeAdmin([
+      { id: 'wiro/nsfw-image', catalogue: 'image', input_modalities: ['text', 'image'], output_modalities: ['image'], synced_at: 'now', uncensored: true }
+    ]);
+
+    expect(await modalitiesOf(admin, 'wiro/nsfw-image', 'image')).toMatchObject({ uncensored: true });
+  });
+
+  it('uncensored false o assente resta false, mai true per omissione', async () => {
+    const { admin } = fakeAdmin([
+      { id: 'openai/gpt-image-2.5-flare', catalogue: 'image', input_modalities: ['text'], output_modalities: ['image'], synced_at: 'now' }
+    ]);
+
+    expect(await modalitiesOf(admin, 'openai/gpt-image-2.5-flare', 'image')).toMatchObject({ uncensored: false });
   });
 });
 

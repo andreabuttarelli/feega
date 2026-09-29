@@ -26,6 +26,7 @@ export const WIRO_REFUSALS = {
   notConfigured: 'wiro_not_configured',
   unknownModel: 'wiro_model_not_synced',
   notEnabled: 'Uncensored models are off for this workspace. The owner can turn them on in Settings.',
+  noInputsAllowed: "Uncensored models don't accept references: remove every incoming connection and reference first.",
   noOutput: 'wiro_task_failed: no output'
 } as const;
 
@@ -62,6 +63,10 @@ export type WiroRequest = {
 };
 
 export type WiroStart = { kind: 'job'; jobId: string } | { kind: 'refused'; error: string };
+
+function carriesInputs(req: Pick<WiroRequest, 'imageUrls' | 'lastFrameUrl' | 'provenance'>): boolean {
+  return req.imageUrls.length > 0 || req.lastFrameUrl !== null || req.provenance.length > 0;
+}
 
 function extraInputs(params: GenParams, schema: Record<string, unknown>): Record<string, unknown> {
   const raw = params as Record<string, unknown>;
@@ -102,6 +107,9 @@ export async function startWiroRun(deps: WiroRunDeps, req: WiroRequest): Promise
   }
   if (model.uncensored && !(await deps.access(req.scope.orgId)).allowed) {
     return { kind: 'refused', error: WIRO_REFUSALS.notEnabled };
+  }
+  if (model.uncensored && carriesInputs(req)) {
+    return { kind: 'refused', error: WIRO_REFUSALS.noInputsAllowed };
   }
   if (!deps.gateway) {
     return { kind: 'refused', error: WIRO_REFUSALS.notConfigured };
