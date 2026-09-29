@@ -4,6 +4,8 @@
   import { SETTINGS_GROUPS } from '$lib/components/settings/platforms';
 
   let { data } = $props();
+
+  const settingsBase = $derived(`/p/${data.project.id}/settings`);
 </script>
 
 <nav class="sections" aria-label={$_('app.nav.settings')}>
@@ -12,7 +14,7 @@
     <ul>
       {#each group.items as item (item.section)}
         <li>
-          <a href="/p/{data.project.id}/settings/{item.section}">
+          <a href="{settingsBase}/{item.section}">
             <span>{$_(item.labelKey)}</span>
             <ChevronRight size={16} />
           </a>

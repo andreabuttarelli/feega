@@ -25,8 +25,11 @@ export function authServerUrl(): string {
 }
 
 // Public Supabase keys (safe to embed — anon key, no secrets)
-process.env.PUBLIC_SUPABASE_URL ??= 'https://klnswzhhgrqvbfjzioul.supabase.co';
-process.env.PUBLIC_SUPABASE_ANON_KEY ??= 'sb_publishable_4TwkYt0gDk2VeF57n_npzw_cFO5FMyR';
+export const SUPABASE_URL = 'https://klnswzhhgrqvbfjzioul.supabase.co';
+export const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_4TwkYt0gDk2VeF57n_npzw_cFO5FMyR';
+
+process.env.PUBLIC_SUPABASE_URL ??= SUPABASE_URL;
+process.env.PUBLIC_SUPABASE_ANON_KEY ??= SUPABASE_PUBLISHABLE_KEY;
 
 let resolved = false;
 

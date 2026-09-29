@@ -55,8 +55,7 @@ describe('oauth discovery, walked the way a client walks it', () => {
   });
 
   it.each([
-    ['apex', 'https://feega.app'],
-    ['www', 'https://www.feega.app']
+    ['production', 'https://oh.feega.app']
   ])(
     'advertises an identifier that serves its own metadata, PUBLIC_APP_URL=%s',
     async (_, configured) => {
@@ -70,8 +69,7 @@ describe('oauth discovery, walked the way a client walks it', () => {
   );
 
   it.each([
-    ['apex', 'https://feega.app'],
-    ['www', 'https://www.feega.app']
+    ['production', 'https://oh.feega.app']
   ])('issues the identifier it advertised, PUBLIC_APP_URL=%s', async (_, configured) => {
     configureMcp(undefined);
     configureApp(configured);
@@ -83,7 +81,7 @@ describe('oauth discovery, walked the way a client walks it', () => {
 
   it('advertises endpoints on the origin it named as issuer', async () => {
     configureMcp(undefined);
-    configureApp('https://feega.app');
+    configureApp('https://oh.feega.app');
 
     const { identifier, server } = await walkDiscovery();
 

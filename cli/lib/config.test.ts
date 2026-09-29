@@ -37,7 +37,7 @@ describe('authServerUrl', () => {
 
 describe('supabase pubblico', () => {
   test('punta al progetto vivo, non a quello di dazero', async () => {
-    await import('./config.ts');
-    expect(process.env.PUBLIC_SUPABASE_URL).toBe('https://klnswzhhgrqvbfjzioul.supabase.co');
+    const { SUPABASE_URL } = await import('./config.ts');
+    expect(SUPABASE_URL).toBe('https://klnswzhhgrqvbfjzioul.supabase.co');
   });
 });
