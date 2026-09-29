@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { request } from '../../lib/api.ts';
+import { api, request } from '../../lib/api.ts';
 import { withAuth } from '../util.ts';
+import { generationView, mediaView } from '../media.ts';
 
 /**
  * IL CLICK «GENERA» SULLA TELA, PER UN AGENTE. Non crea un nodo — quello è `insert_row` — genera
@@ -38,6 +39,7 @@ export function registerNodeTools(server: McpServer) {
         'A `video` NEVER returns finished here: it comes back `queued` with an `external_job_id` on ' +
         'the run, and the render lands later, asynchronously — the node stays `running` until a ' +
         'later tick deposits the asset. Poll the node (`query`) rather than expecting a file now. ' +
+        'A finished result returns `asset_ids` and `media` with `preview_url`/`full_url` (see `get_media`). ' +
         'Spends credits; a `credits_exhausted` failure means the org is out.',
       inputSchema: z.object({
         org,
@@ -51,11 +53,38 @@ export function registerNodeTools(server: McpServer) {
       annotations: { readOnlyHint: false, destructiveHint: false }
     },
     async ({ org, node_id, ...input }) =>
-      withAuth((token) =>
-        call(token, 'POST', `/api/v1/org/nodes/${encodeURIComponent(node_id)}/generate`, org, {
-          ...input,
-          params: input.params ?? {}
-        })
+      withAuth(async (token) => {
+        const outcome = await call<Record<string, unknown>>(
+          token, 'POST', `/api/v1/org/nodes/${encodeURIComponent(node_id)}/generate`, org,
+          { ...input, params: input.params ?? {} }
+        );
+        return generationView(outcome, (asset) =>
+          api.getMedia(token, { asset, org }).catch(() => ({ items: [], missing: asset })));
+      })
+  );
+
+  server.registerTool(
+    'get_media',
+    {
+      title: 'See a node\'s media',
+      description:
+        'View the image, video or text a node holds, a generation run produced, or an asset — ' +
+        'by `node_ids`, `run_ids` and/or `asset_ids`. Per item: type, mime, width/height, duration, ' +
+        'and two short-lived signed links: `preview_url` (images: 1024px long edge — FETCH THIS to ' +
+        'look at the image and judge it against the prompt) and `full_url` (the original file — ' +
+        'give this to the user). Videos have `full_url` only. Ids your org cannot see come back in ' +
+        '`missing`. Reads only, spends nothing.',
+      inputSchema: z.object({
+        org,
+        node_ids: z.array(z.string()).optional(),
+        run_ids: z.array(z.string()).optional(),
+        asset_ids: z.array(z.string()).optional()
+      }),
+      annotations: { readOnlyHint: true }
+    },
+    async ({ org, node_ids, run_ids, asset_ids }) =>
+      withAuth(async (token) =>
+        mediaView(await api.getMedia(token, { node: node_ids, run: run_ids, asset: asset_ids, org }))
       )
   );
 

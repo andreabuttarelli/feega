@@ -25,7 +25,8 @@ export const MCP_INSTRUCTIONS = [
   '`run_node_generation` is the canvas Generate button: fills an existing node with text/image/video, never creates one; `medium` must match the node\'s type; a video comes back `queued`. `apply_effects` renders an effects node, free. `enhance_prompt` improves a prompt. `run_node_loop` queues every combination of a node\'s inputs and returns at once (`preview_node_loop` free, `cancel_node_loop` stops what\'s queued); confirm above 50, refused above 1000.',
   'A canvas node is raw material; a post (`list_posts`/`create_post`/`set_post_status`) is the promoted artifact ready to schedule. An ad campaign (`list_ad_campaigns`/`create_ad_campaign`/`approve_ad_campaign`/`set_ad_campaign_status`) always drafts unapproved; only a signed-in person approves it.',
   'A project has no brand until one is attached (`projects.brand_id` is nullable, and that is the normal case): open a canvas to explore, choose a brand only once something is ready to publish.',
-  'Signing in is not a tool: over HTTP the host does the OAuth round and sends the Bearer; locally run `feega login` once — the CLI and this server share one session file. No API keys required, though one works the same way.'
+  '`get_media` shows what a node, run or asset holds: fetch `preview_url` to look, give `full_url` to the user.',
+  'Signing in is not a tool: over HTTP the host sends the Bearer; locally run `feega login` once (shared session file).'
 ].join(' ');
 
 type ListedTool = { inputSchema?: Record<string, unknown> };

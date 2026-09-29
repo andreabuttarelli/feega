@@ -59,7 +59,7 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
     tables: ['api_keys']
   },
   {
-    path: 'src/lib/server/canvas/sign-media.ts — signAssetPaths, e ogni rotta che la chiama (assets/[id], p/[projectId]/assets, agent/assets)',
+    path: 'src/lib/server/canvas/sign-media.ts — signAssetPaths, e ogni rotta che la chiama (assets/[id], p/[projectId]/assets, agent/assets, api/v1/org/media)',
     why: "brand-knowledge tiene una cartella per utente (`<userId>/media/...`), e la sua unica policy di lettura confronta il primo segmento del path con auth.uid(): il client dell'utente firma solo i file che ha generato lui, non quelli generati da un altro membro della stessa org. La visibilità che conta è quella della riga `assets`, già provata da un SELECT con il client dell'utente (RLS su org_id) prima di chiamare questa funzione — la firma è un passo separato, e qui usa la service role solo dopo quella prova, mai su un path scelto da chi chiama.",
     tables: ['assets']
   },
