@@ -555,9 +555,13 @@ async function runImageJob(
   // qualcosa a valle scarta si paga lo stesso, e finche' il conto dichiarato racconta le immagini
   // invece dei render, mente — in silenzio, perche' `ai_calls` si riempie di `ok: true`.
   let renders = 0;
+  let renderError: string | undefined;
   for (let i = 0; i < (job.count ?? 1); i++) {
     renders += 1;
-    const dataUrl = await renderPostImage(job.prompt, opts).catch(() => undefined);
+    const dataUrl = await renderPostImage(job.prompt, opts).catch((error: unknown) => {
+      renderError = error instanceof Error ? error.message : undefined;
+      return undefined;
+    });
     if (!dataUrl) break;
 
     const filed = job.brandId
@@ -570,7 +574,7 @@ async function runImageJob(
 
   // Nessuna alternativa prodotta è un fallimento, non un successo vuoto: chi legge `ok` deve poter
   // credere che qualcosa esista.
-  if (!media.length) return { ok: false, error: 'render_failed' };
+  if (!media.length) return { ok: false, error: 'render_failed', ...(renderError ? { reason: renderError } : {}) };
 
   // Si legge QUI, dentro lo scope: la fattura vive lì e fuori non esiste più.
   const { billedUsdInScope } = await import('$lib/server/ai-log');

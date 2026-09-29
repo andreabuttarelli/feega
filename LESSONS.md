@@ -2104,3 +2104,11 @@ instead of `X`, so the empty check can run before that argument is ever construc
 tool wrote `nodes.data` without `validateNodeData`, or zod stripped an unknown key.
 **Move:** every agent write to `nodes.data` goes through `validateNewNodeData` (unknown keys
 refused) and returns the stored row; written copy belongs in `doc.content`, not `text`.
+
+## An eval image run fails `render_failed` with no ai_calls row
+
+**Signal:** text passes, image comes back a bare `render_failed`, nothing billed. The disposable
+org had zero credits: the gate inside `renderPostImage` threw `CreditsExhaustedError` and
+`runImageJob` swallowed it.
+**Move:** evals grant the org credits (`grantWelcomeCredits`) like a real signup; a render that
+throws now returns its message as `reason`, so read `node_runs.error` before suspecting the model.
