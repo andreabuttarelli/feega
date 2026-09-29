@@ -4,6 +4,12 @@ import { TIER_ORDER, type RecommendationTier } from './recommended-models';
 
 export type ModelChoiceLike = { id: string; tiers?: readonly RecommendationTier[] };
 
+const MEDIUM_PHRASE: Record<GenerativeMedium, string> = {
+  text: 'a text',
+  image: 'an image',
+  video: 'a video'
+};
+
 export const DEFAULT_MODEL: Record<GenerativeMedium, string> = {
   text: 'anthropic/claude-haiku-4.5',
   image: 'nano-banana-2',
@@ -68,6 +74,6 @@ export function pickModel(medium: GenerativeMedium, explicit: string | null | un
 
   return {
     ok: false,
-    error: `unknown_model: "${explicit}" is not a ${medium} model the canvas offers. Recommended: ${suggestions(offered)}.`
+    error: `unknown_model: "${explicit}" is not ${MEDIUM_PHRASE[medium]} model the canvas offers. Recommended: ${suggestions(offered)}.`
   };
 }
