@@ -2097,3 +2097,10 @@ Only a test whose fake db has no `.storage` at all catches it; one with an empty
 shared function, check whether any call site still builds the expensive/unavailable-in-tests
 argument (a bucket, a client) BEFORE calling the shared function — pass a factory (`() => X`)
 instead of `X`, so the empty check can run before that argument is ever constructed.
+
+## An agent tool reports success for a node the canvas shows empty
+
+**Signal:** the chat says it added content, the tool result echoes it, the node is blank. The
+tool wrote `nodes.data` without `validateNodeData`, or zod stripped an unknown key.
+**Move:** every agent write to `nodes.data` goes through `validateNewNodeData` (unknown keys
+refused) and returns the stored row; written copy belongs in `doc.content`, not `text`.

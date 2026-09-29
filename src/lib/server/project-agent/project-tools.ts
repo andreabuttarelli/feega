@@ -18,6 +18,7 @@ import { runGenNode, runsOf, type RunOutcome } from '$lib/server/canvas/generate
 import { agentActor, type Actor } from '$lib/server/repos/actor';
 import { withBrandContext, withOrgContext } from '$lib/server/ai-log';
 import { isGenMedium, type GenParams } from '$lib/canvas/gen-node';
+import { describeNodeType, describeNodeTypes, isNodeType, unknownFieldsError, validateNewNodeData } from '$lib/canvas/node-data';
 
 /**
  * I TOOL DI PROGETTO E TELA. Sempre presenti, anche senza brand.
@@ -86,9 +87,26 @@ export function createProjectTools(deps: ProjectToolDeps): Record<string, Tool> 
       }
     }),
 
+    describe_node_types: tool({
+      description: 'The JSON schema of `data` for one node type, or for every type when type is omitted. Read it before create_node or update_node on a type you have not written yet.',
+      inputSchema: z.object({ type: z.string().optional() }).strict(),
+      execute: async (input: { type?: string }) => {
+        if (!input.type) {
+          return { types: describeNodeTypes() };
+        }
+        if (!isNodeType(input.type)) {
+          return { error: 'unknown_type', message: `Unknown type "${input.type}".` };
+        }
+        return { types: { [input.type]: describeNodeType(input.type) } };
+      }
+    }),
+
     create_node: tool({
-      description:
-        'Create a node on a canvas of THIS project. type is the node kind (text, image, video, …). data is free-form node content, e.g. { prompt, model, params }.',
+      description: [
+        'Create a node on a canvas of THIS project. data must match the type exactly (describe_node_types): unknown fields and missing required fields are refused.',
+        'To put written text on the canvas (copy, hooks, notes, a script) use type "doc" with data { content: "<markdown>", public: false } — the canvas shows content as it is.',
+        'A "text" node is a generator: data { prompt } is the instruction, and its visible body appears only after run_node.'
+      ].join(' '),
       inputSchema: z
         .object({
           canvasId: z.string(),
@@ -100,6 +118,11 @@ export function createProjectTools(deps: ProjectToolDeps): Record<string, Tool> 
         })
         .strict(),
       execute: async (input: { canvasId: string; type: string; x: number; y: number; displayName?: string; data?: Record<string, unknown> }) => {
+        const verdict = validateNewNodeData(input.type, input.data ?? {});
+        if (!verdict.ok) {
+          return { outcome: 'invalid', message: verdict.error };
+        }
+
         const node = await createNode(deps.db, {
           orgId: deps.orgId,
           projectId: deps.projectId,
@@ -108,10 +131,10 @@ export function createProjectTools(deps: ProjectToolDeps): Record<string, Tool> 
           x: input.x,
           y: input.y,
           displayName: input.displayName ?? null,
-          data: input.data ?? {},
+          data: verdict.data,
           actor
         });
-        return { node };
+        return { outcome: 'written', node };
       }
     }),
 
@@ -125,6 +148,15 @@ export function createProjectTools(deps: ProjectToolDeps): Record<string, Tool> 
         })
         .strict(),
       execute: async (input: { nodeId: string; data: Record<string, unknown> }) => {
+        const current = await findNode(deps.db, { orgId: deps.orgId, nodeId: input.nodeId });
+        if (!current) {
+          return NODE_NOT_FOUND;
+        }
+        const unknown = unknownFieldsError(current.type, input.data);
+        if (unknown) {
+          return { outcome: 'invalid', message: unknown };
+        }
+
         const written = await patchNodeData(deps.db, {
           orgId: deps.orgId,
           nodeId: input.nodeId,

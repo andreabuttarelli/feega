@@ -26,6 +26,13 @@ describe('il prompt dichiara lo scope, non un brand obbligatorio', () => {
     expect(prompt).toContain('publishing tools are available');
   });
 
+  it('il testo scritto va in un doc, non in un text che genera', () => {
+    const prompt = projectAgentPrompt({ project, canvases, brand: null });
+
+    expect(prompt).toContain('type "doc"');
+    expect(prompt).not.toContain('replaces the whole node data');
+  });
+
   it('non inventa un bisogno di brand per lavorare sul progetto', () => {
     const prompt = projectAgentPrompt({ project, canvases, brand: null });
 
