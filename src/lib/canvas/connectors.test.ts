@@ -81,6 +81,19 @@ describe('connectorsFor — video: gli stessi connettori di immagine, PIÙ i due
   });
 });
 
+describe('connectorsFor — un modello uncensored non ha porte, di nessun tipo', () => {
+  it('immagine, video e testo perdono ogni connettore quando il modello è uncensored', () => {
+    expect(connectorsFor('image', { input: ['text', 'image'], uncensored: true })).toEqual([]);
+    expect(connectorsFor('video', { input: ['text', 'image', 'audio'], uncensored: true })).toEqual([]);
+    expect(connectorsFor('text', { input: ['text', 'image'], uncensored: true })).toEqual([]);
+  });
+
+  it('uncensored assente o false si comporta come oggi', () => {
+    expect(connectorsFor('image', { input: ['text', 'image'] })).toEqual(['text', 'images']);
+    expect(connectorsFor('image', { input: ['text', 'image'], uncensored: false })).toEqual(['text', 'images']);
+  });
+});
+
 describe('CONNECTOR_TYPES — il vocabolario chiuso', () => {
   it('sono esattamente i sei dichiarati, in un ordine stabile', () => {
     expect(CONNECTOR_TYPES).toEqual(['text', 'images', 'first_frame', 'last_frame', 'videos', 'audios']);
@@ -211,6 +224,11 @@ describe('connectorsForNode: le porte seguono il modello che il nodo MOSTRA', ()
 
   it('un nodo testo con un modello solo testo NON mostra il connettore immagini', () => {
     expect(connectorsForNode('text', 'meta/llama-text-only', textChoices)).toEqual(['text']);
+  });
+
+  it('un modello uncensored scelto sul nodo non apre nessuna porta, nemmeno il testo', () => {
+    const uncensoredChoices = [{ id: 'wiro/nsfw-image', inputModalities: ['text', 'image'], uncensored: true }];
+    expect(connectorsForNode('image', 'wiro/nsfw-image', uncensoredChoices)).toEqual([]);
   });
 });
 

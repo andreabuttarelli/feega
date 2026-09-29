@@ -79,6 +79,19 @@ describe('canConnect — un arco che non produrrebbe niente si rifiuta', () => {
   });
 });
 
+describe('canConnect — un modello uncensored non riceve nessun ingresso', () => {
+  it('un testo verso un nodo immagine uncensored si rifiuta', () => {
+    const verdict = canConnect(node('t', 'text'), node('i', 'image', { uncensored: true }));
+    expect(verdict.ok).toBe(false);
+    expect(verdict.ok === false && verdict.why).toContain('Uncensored');
+  });
+
+  it('lo stesso nodo, non uncensored, resta lecito', () => {
+    expect(canConnect(node('t', 'text'), node('i', 'image', { uncensored: false })).ok).toBe(true);
+    expect(canConnect(node('t', 'text'), node('i', 'image')).ok).toBe(true);
+  });
+});
+
 describe('missingInputs — un nodo dice cosa gli manca invece di fallire dopo', () => {
   it('un nodo immagine senza prompt non è pronto', () => {
     expect(missingInputs(node('i', 'image'), [])).toContain('text');

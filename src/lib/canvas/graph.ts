@@ -67,6 +67,9 @@ export type CanvasNode = {
   contentType?: string | null;
   /** Per un nodo che si genera: con quale modello. Decide quanti riferimenti entrano. */
   model?: string | null;
+  /** Il modello scelto è un Wiro uncensored (`ai_models.uncensored`): non riceve ingressi, di
+   *  nessun medium — la regola vive qui, l'unico posto che decide se un arco entra. */
+  uncensored?: boolean;
 };
 
 type NodeSpec = {
@@ -166,6 +169,9 @@ export function canConnect(from: CanvasNode, to: CanvasNode): Verdict {
   }
   if (!target.generated) {
     return { ok: false, why: `${to.kind} already exists: it is not generated from other nodes` };
+  }
+  if (to.uncensored) {
+    return { ok: false, why: 'Uncensored models take no reference: switch model to connect inputs' };
   }
   if (target.sources && !target.sources.includes(from.kind)) {
     return { ok: false, why: `A ${to.kind} node takes a list, products or a social feed` };
