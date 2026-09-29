@@ -138,7 +138,7 @@
 
 <ChatLeaveGuard {projectId} />
 
-<div class="project-shell" class:is-sheet-pending={sheetPending} data-viewport={viewport}>
+<div class="project-shell" class:is-sheet-pending={sheetPending} class:is-nsfw={data.project.mode === 'nsfw'} data-viewport={viewport} data-mode={data.project.mode}>
   {#if isMobile}
     <MobileTopBar
       {projectId}
@@ -148,7 +148,7 @@
       org={data.org}
       share={onCanvasRoute ? { shareToken, onShare } : null}
       projectName={data.project.name}
-      projects={data.projects.map((p: { id: string; name: string; href: string; updatedAt: string }) => ({
+      projects={data.projects.filter((p: { mode: string }) => p.mode === data.project.mode).map((p: { id: string; name: string; href: string; updatedAt: string }) => ({
         id: p.id,
         name: p.name,
         href: p.href,
@@ -177,12 +177,15 @@
         <CanvasTopBar
           {projectId}
           projectName={data.project.name}
-          projects={data.projects.map((p: { id: string; name: string; href: string; updatedAt: string }) => ({
+          projects={data.projects.map((p: { id: string; name: string; href: string; updatedAt: string; mode: string }) => ({
             id: p.id,
             name: p.name,
             href: p.href,
-            updatedAt: p.updatedAt
+            updatedAt: p.updatedAt,
+            mode: p.mode
           }))}
+          projectMode={data.project.mode}
+          nsfw={data.nsfw}
           canvasName={currentCanvas?.name ?? ''}
           canvasHref={currentCanvas?.href ?? ''}
           canvases={data.canvases}
@@ -231,6 +234,9 @@
 </div>
 
 <style>
+  .project-shell.is-nsfw {
+    box-shadow: inset 0 3px 0 var(--destructive);
+  }
   .project-shell {
     height: 100dvh;
     display: flex;

@@ -9,6 +9,9 @@ import { ensureProfile } from '$lib/server/repos/profiles';
 import { PROJECT_BRAND_SHELL_SELECT, projectBrandShellOf, type ProjectBrandShell } from '$lib/server/projects/brand-shell';
 import { orgCreditBalance } from '$lib/server/credits';
 import { env } from '$env/dynamic/private';
+import { ProjectMode } from '$lib/project-mode';
+import { NSFW_LOCK_TEXT, NsfwLock, nsfwSectionVisible } from '$lib/nsfw-access';
+import { nsfwLockFor } from '$lib/server/nsfw/nsfw-server';
 import type { Db } from '$lib/server/db/client';
 import { CANVAS_LIST_DEPENDENCY } from '$lib/canvas/canvas-list';
 
@@ -43,13 +46,19 @@ export const load: LayoutServerLoad = async ({ params, locals, depends, cookies 
   }
 
   const { orgId, project } = found;
+  const nsfwLock = await nsfwLockFor(db, { orgId, userId: user.id });
+  if (project.mode === ProjectMode.Nsfw && nsfwLock !== NsfwLock.Open) {
+    throw error(404, 'This project does not exist, or is not yours');
+  }
+
   const membership = memberships.find((m) => m.org.id === orgId)!;
-  const [projects, canvases, brand, creditBalance] = await Promise.all([
+  const [allProjects, canvases, brand, creditBalance] = await Promise.all([
     listProjects(db, orgId),
     listCanvases(db, { orgId, projectId: project.id }),
     loadBrandShell(db, orgId, project.brandId),
     orgCreditBalance(db, orgId)
   ]);
+  const listed = allProjects.filter((p) => p.mode === ProjectMode.Standard || nsfwLock === NsfwLock.Open);
 
   // Dove atterra chi rientra: l'ultimo progetto aperto, letto da `homePathFor` — non il più
   // nuovo per nascita (vedi `src/lib/server/tenancy/entry.ts`).
@@ -61,7 +70,8 @@ export const load: LayoutServerLoad = async ({ params, locals, depends, cookies 
     project,
     brand,
     creditBalance,
-    projects: projects.map((p) => {
+    nsfw: { lock: nsfwLock, visible: nsfwSectionVisible(nsfwLock), text: NSFW_LOCK_TEXT[nsfwLock] },
+    projects: listed.map((p) => {
       const first = p.id === project.id ? canvases[0] : undefined;
       return {
         id: p.id,
@@ -69,6 +79,7 @@ export const load: LayoutServerLoad = async ({ params, locals, depends, cookies 
         slug: p.slug,
         href: `/p/${p.id}`,
         brandId: p.brandId,
+        mode: p.mode,
         active: p.id === project.id,
         firstCanvasId: first?.id ?? null,
         updatedAt: p.lastActiveAt

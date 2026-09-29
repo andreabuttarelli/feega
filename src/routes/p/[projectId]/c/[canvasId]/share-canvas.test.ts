@@ -46,6 +46,9 @@ vi.mock('$lib/server/canvas/canvas-share', () => ({
 	setCanvasShare: (...a: unknown[]) => setCanvasShare(...a)
 }));
 
+const nsfwLockFor = vi.fn();
+vi.mock('$lib/server/nsfw/nsfw-server', () => ({ nsfwLockFor: (...a: unknown[]) => nsfwLockFor(...a) }));
+
 import { actions } from './+page.server';
 
 function fakeEvent(formEntries: Record<string, string>) {
@@ -92,6 +95,21 @@ describe('actions.share_canvas', () => {
 
 		await expect(actions.share_canvas(fakeEvent({ state: 'on' }))).rejects.toMatchObject({ status: 404 });
 		expect(setCanvasShare).not.toHaveBeenCalled();
+	});
+
+	it('a canvas of an nsfw project is never shared, even by a verified member', async () => {
+		findCanvasForUser.mockResolvedValue({ orgId: 'org-1', canvas: { projectId: 'project-1' }, mode: 'nsfw' });
+		nsfwLockFor.mockResolvedValue('open');
+
+		await expect(actions.share_canvas(fakeEvent({ state: 'on' }))).rejects.toMatchObject({ status: 403 });
+		expect(setCanvasShare).not.toHaveBeenCalled();
+	});
+
+	it('a canvas of an nsfw project is not found for a member whose nsfw access is locked', async () => {
+		findCanvasForUser.mockResolvedValue({ orgId: 'org-1', canvas: { projectId: 'project-1' }, mode: 'nsfw' });
+		nsfwLockFor.mockResolvedValue('age_unverified');
+
+		await expect(actions.share_canvas(fakeEvent({ state: 'off' }))).rejects.toMatchObject({ status: 404 });
 	});
 
 	it('an unknown state is refused', async () => {

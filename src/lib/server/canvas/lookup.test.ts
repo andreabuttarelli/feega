@@ -46,8 +46,17 @@ describe('aprire una tela dal suo id', () => {
       await findCanvasForUser(db, { canvasId: CANVAS, memberships: [membership(ORG)] })
     ).toEqual({
       orgId: ORG,
-      canvas: { id: CANVAS, projectId: PROJECT, name: 'Untitled', viewport: null }
+      canvas: { id: CANVAS, projectId: PROJECT, name: 'Untitled', viewport: null },
+      mode: 'standard'
     });
+  });
+
+  it('carries the mode of the project the canvas belongs to', async () => {
+    const { db } = fakeDb({ canvases: [{ ...row, projects: { mode: 'nsfw' } }] });
+
+    const found = await findCanvasForUser(db, { canvasId: CANVAS, memberships: [membership(ORG)] });
+
+    expect(found?.mode).toBe('nsfw');
   });
 
   it('trovata nella prima org, la seconda non si chiede nemmeno', async () => {
