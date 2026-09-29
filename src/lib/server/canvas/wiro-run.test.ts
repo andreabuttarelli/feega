@@ -20,6 +20,8 @@ function depsFor(model: WiroModel | null): { deps: WiroRunDeps; gatewayRun: Retu
     screen: () => ({
       decide: async () => ({ choice: 'safe', probabilities: { safe: 1 } }),
       judge: async () => ({ allowed: true, category: 'none', reason: '' }),
+      decideIdentifiability: async () => ({ choice: 'generic', probabilities: { generic: 1 } }),
+      judgeIdentifiability: async () => ({ allowed: true, category: 'generic', reason: '' }),
       record: () => {}
     }),
     refuseLikeness: vi.fn(),

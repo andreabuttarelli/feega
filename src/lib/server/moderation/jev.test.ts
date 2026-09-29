@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { jev, jevUsd } from './jev';
-import { MODERATION_CATEGORIES } from './policy';
+import { IDENTIFIABILITY_CATEGORIES, MODERATION_CATEGORIES } from './policy';
 
 function recorder(reply: () => Response) {
   const calls: { url: string; init: RequestInit }[] = [];
@@ -38,5 +38,19 @@ describe('Jev adapter', () => {
 
   it('prices tokens at the published rate', () => {
     expect(jevUsd(1_000_000)).toBeCloseTo(0.042);
+  });
+});
+
+describe('Jev adapter against a custom category table', () => {
+  it('sends the identifiability criteria keys when configured with that table', async () => {
+    const calls: { url: string; init: RequestInit }[] = [];
+    const fetchFn = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      calls.push({ url: String(url), init: init ?? {} });
+      return Response.json(answer);
+    });
+    const model = jev({ apiKey: 'k', baseUrl: 'https://jev.test/v1', fetchFn: fetchFn as typeof fetch, categories: IDENTIFIABILITY_CATEGORIES });
+    await model.decide('x');
+    const body = JSON.parse(String(calls[0].init.body));
+    expect(Object.keys(body.questions.category.criteria)).toEqual(Object.keys(IDENTIFIABILITY_CATEGORIES));
   });
 });

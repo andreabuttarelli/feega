@@ -1,4 +1,4 @@
-import { MODERATION_CATEGORIES, type JevDecision } from './policy';
+import { MODERATION_CATEGORIES, type JevDecision, type ModerationCategory } from './policy';
 
 const JEV_MODEL = 'jev-latest';
 const QUESTION = 'category';
@@ -18,10 +18,15 @@ export function jevUsd(tokens: number): number {
   return (tokens / TOKENS_PER_MILLION) * USD_PER_MILLION_TOKENS;
 }
 
-export function jev(config: { apiKey: string; baseUrl?: string; fetchFn?: typeof fetch }): JevModel {
+export function jev(config: {
+  apiKey: string;
+  baseUrl?: string;
+  fetchFn?: typeof fetch;
+  categories?: Readonly<Record<string, ModerationCategory>>;
+}): JevModel {
   const baseUrl = (config.baseUrl ?? DEFAULT_JEV_BASE_URL).replace(/\/$/, '');
   const doFetch = config.fetchFn ?? fetch;
-  const criteria = Object.fromEntries(Object.entries(MODERATION_CATEGORIES).map(([name, c]) => [name, c.instructions]));
+  const criteria = Object.fromEntries(Object.entries(config.categories ?? MODERATION_CATEGORIES).map(([name, c]) => [name, c.instructions]));
 
   return {
     async decide(state) {

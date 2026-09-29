@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { judgeDecision, MODERATION_CATEGORIES, mentionsMinor, parseJudgeVerdict } from './policy';
+import {
+  GENERIC,
+  IDENTIFIABILITY_CATEGORIES,
+  identifiabilityDecision,
+  judgeDecision,
+  MODERATION_CATEGORIES,
+  mentionsMinor,
+  parseJudgeVerdict
+} from './policy';
 
 const only = (choice: string, overrides: Record<string, number> = {}) => {
   const probabilities: Record<string, number> = Object.fromEntries(Object.keys(MODERATION_CATEGORIES).map((c) => [c, 0]));
@@ -53,6 +61,39 @@ describe('the minors keyword rule', () => {
 
   it.each(['a 25 year old woman', 'adult couple at the beach', 'a kidney-shaped pool'])('does not flag %s', (text) => {
     expect(mentionsMinor(text)).toBe(false);
+  });
+});
+
+describe('the identifiability threshold table', () => {
+  const identOnly = (choice: string, overrides: Record<string, number> = {}) => {
+    const probabilities: Record<string, number> = Object.fromEntries(Object.keys(IDENTIFIABILITY_CATEGORIES).map((c) => [c, 0]));
+    return { choice, probabilities: { ...probabilities, ...overrides } };
+  };
+
+  it('clears a confident generic decision', () => {
+    expect(identifiabilityDecision(identOnly(GENERIC, { generic: 0.99 })).kind).toBe('clear');
+  });
+
+  it('refuses when the top choice is a non-generic category', () => {
+    const verdict = identifiabilityDecision(identOnly('distinctive_marks', { distinctive_marks: 0.8, generic: 0.2 }));
+    expect(verdict).toMatchObject({ kind: 'refuse', category: 'distinctive_marks' });
+  });
+
+  it('escalates a generic decision with any doubt above threshold', () => {
+    expect(identifiabilityDecision(identOnly(GENERIC, { generic: 0.9, specific_face: 0.05 })).kind).toBe('escalate');
+  });
+
+  it('every identifiability category carries a readable refusal and a threshold', () => {
+    for (const [name, category] of Object.entries(IDENTIFIABILITY_CATEGORIES)) {
+      expect(category.instructions.length, name).toBeGreaterThan(10);
+      expect(category.escalateAbove, name).toBeGreaterThan(0);
+    }
+  });
+
+  it('names the four non-generic identifiability categories', () => {
+    expect(Object.keys(IDENTIFIABILITY_CATEGORIES).filter((c) => c !== GENERIC).sort()).toEqual(
+      ['distinctive_marks', 'named_or_referenced_person', 'personal_context', 'specific_face'].sort()
+    );
   });
 });
 
