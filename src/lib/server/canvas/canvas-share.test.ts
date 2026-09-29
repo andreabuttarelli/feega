@@ -259,6 +259,15 @@ describe('readSharedCanvas — i nodi sorgente', () => {
     expect(shared?.nodes[1].view).toEqual({ kind: 'empty' });
   });
 
+  it('an influencer node with nobody picked yet is empty and never queries the catalogue', async () => {
+    const { db, calls } = sourceDb([node('n-inf', 'influencer', {})]);
+
+    const shared = await readSharedCanvas(db, 'tok-live', sign);
+
+    expect(shared?.nodes[0].view).toEqual({ kind: 'empty' });
+    expect(calls.some((c) => c.table === 'influencers')).toBe(false);
+  });
+
   it('social_post_mockup e ads mostrano il contenuto, non gli id', async () => {
     const { db } = sourceDb([
       node('n-mock', 'social_post_mockup', { general: { caption: 'Hello', media: ['https://cdn.example/m.jpg', { url: 'https://cdn.example/n.jpg' }] } }),

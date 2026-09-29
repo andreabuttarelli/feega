@@ -140,7 +140,12 @@ function listView(input: ViewInput): SharedView {
 }
 
 async function influencerView({ db, orgId, node, sign }: ViewInput): Promise<SharedView> {
-  const influencer = await getInfluencer(db, str(node.data.influencer_id));
+  const influencerId = str(node.data.influencer_id);
+  if (!influencerId) {
+    return EMPTY;
+  }
+
+  const influencer = await getInfluencer(db, influencerId);
   if (!influencer || (influencer.orgId !== null && influencer.orgId !== orgId)) {
     return EMPTY;
   }
