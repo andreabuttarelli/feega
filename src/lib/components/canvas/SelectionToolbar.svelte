@@ -355,6 +355,18 @@
     box-shadow: 0 4px 18px rgb(0 0 0 / 0.1);
   }
 
+  @media (max-width: 767px) {
+    .toolbar {
+      left: var(--mobile-bar-inset) !important;
+      right: var(--mobile-bar-inset);
+      top: calc(var(--mobile-topbar-h) + env(safe-area-inset-top, 0px) + var(--mobile-bar-inset)) !important;
+      transform: none;
+      overflow-x: auto;
+      scrollbar-width: none;
+      box-shadow: var(--mobile-bar-shadow);
+    }
+  }
+
   .props {
     display: flex;
     align-items: center;
