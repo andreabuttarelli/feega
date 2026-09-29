@@ -54,15 +54,26 @@ function slugify(text: string): string {
 		.replace(/^-|-$/g, '');
 }
 
+export enum MediaOrigin {
+	Generated = 'generated',
+	Other = 'other'
+}
+
+const ORIGIN_SUFFIX: Readonly<Record<MediaOrigin, string>> = {
+	[MediaOrigin.Generated]: '-ai-generated',
+	[MediaOrigin.Other]: ''
+};
+
 export function buildDownloadFilename(input: {
 	displayName: string | null;
 	nodeId: string;
 	nodeType?: string;
 	extension: string;
+	origin?: MediaOrigin;
 }): string {
 	const base = slugify(input.displayName || input.nodeType || 'file');
 	const shortId = input.nodeId.slice(0, SHORT_ID_LENGTH);
-	return `${base}-${shortId}.${input.extension}`;
+	return `${base}-${shortId}${ORIGIN_SUFFIX[input.origin ?? MediaOrigin.Other]}.${input.extension}`;
 }
 
 const GIF_MAX_WIDTH = 640;

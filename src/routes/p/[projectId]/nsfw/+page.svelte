@@ -19,7 +19,7 @@
     {/if}
 
     {#if data.lock === NsfwLock.ComingSoon}
-      <Notice class="mb-0" data-testid="nsfw-coming-soon">{data.text}</Notice>
+      <div data-testid="nsfw-coming-soon"><Notice class="mb-0">{data.text}</Notice></div>
     {:else if data.lock === NsfwLock.AgeUnverified}
       <form method="POST" action="?/verify" use:enhance>
         <p>{data.text}</p>

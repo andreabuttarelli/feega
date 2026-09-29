@@ -4,6 +4,7 @@ import {
 	VIDEO_FORMATS,
 	formatsFor,
 	buildDownloadFilename,
+	MediaOrigin,
 	clampGifPlan,
 	type MediaKind
 } from './download';
@@ -37,6 +38,11 @@ describe('buildDownloadFilename', () => {
 	it('falls back to the node type when there is no display name', () => {
 		const name = buildDownloadFilename({ displayName: null, nodeId: 'a1b2c3d4e5f6', nodeType: 'image', extension: 'png' });
 		expect(name).toBe('image-a1b2c3.png');
+	});
+
+	it('marks a generated result as AI-generated in its name', () => {
+		const name = buildDownloadFilename({ displayName: null, nodeId: 'a1b2c3d4e5f6', nodeType: 'image', extension: 'png', origin: MediaOrigin.Generated });
+		expect(name).toBe('image-a1b2c3-ai-generated.png');
 	});
 
 	it('strips characters unsafe in a filename', () => {

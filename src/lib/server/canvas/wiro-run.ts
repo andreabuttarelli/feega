@@ -6,7 +6,7 @@ import type { GenParams } from '$lib/canvas/gen-node';
 import type { WiroFields, WiroWireSpec } from '$lib/server/wiro-catalogue';
 import { screenGeneration, type ScreenPorts } from '$lib/server/moderation/screen';
 import type { WiroGateway, WiroOutput } from './wiro-gateway';
-import { moderationProfileOf, ModerationProfile, type ProjectMode } from '$lib/project-mode';
+import { moderationProfileOf, ModerationProfile, STORAGE_FOLDER, type ProjectMode } from '$lib/project-mode';
 import { likenessRefusal, type ProvenanceEntry } from './likeness-guard';
 
 const GENERATED_MEDIA_BUCKET = 'brand-knowledge';
@@ -159,8 +159,9 @@ async function download(output: WiroOutput): Promise<{ bytes: Uint8Array; mime: 
   return { bytes: new Uint8Array(await res.arrayBuffer()), mime: res.headers.get('content-type') ?? output.contentType };
 }
 
-async function deposit(db: Db, scope: WiroScope, model: WiroModel, file: { bytes: Uint8Array; mime: string }): Promise<Asset> {
-  const path = `${scope.userId}/media/wiro/${crypto.randomUUID()}.${EXTENSION_OF_MIME[file.mime] ?? 'bin'}`;
+async function deposit(db: Db, job: { scope: WiroScope; mode: ProjectMode }, model: WiroModel, file: { bytes: Uint8Array; mime: string }): Promise<Asset> {
+  const { scope } = job;
+  const path = `${scope.userId}/${STORAGE_FOLDER[job.mode]}/wiro/${crypto.randomUUID()}.${EXTENSION_OF_MIME[file.mime] ?? 'bin'}`;
   const { error } = await db.storage
     .from(GENERATED_MEDIA_BUCKET)
     .upload(path, new Blob([file.bytes as BlobPart], { type: file.mime }), { contentType: file.mime, upsert: false });
@@ -184,7 +185,7 @@ async function deposit(db: Db, scope: WiroScope, model: WiroModel, file: { bytes
 export async function finishWiroJob(
   db: Db,
   deps: Pick<WiroRunDeps, 'gateway' | 'model' | 'bill'>,
-  job: { externalJobId: string; modelId: string; scope: WiroScope }
+  job: { externalJobId: string; modelId: string; scope: WiroScope; mode: ProjectMode }
 ): Promise<WiroProgress> {
   const model = await deps.model(job.modelId);
   if (!deps.gateway || !model) {
@@ -207,7 +208,7 @@ export async function finishWiroJob(
   }
   deps.bill({ model: model.id, ms: Date.now() - startedAt, costUsd: task.costUsd, uncensored: model.uncensored, scope: job.scope });
 
-  const asset = await deposit(db, job.scope, model, await download(output));
+  const asset = await deposit(db, job, model, await download(output));
   return { state: 'landed', asset, costUsd: task.costUsd, uncensored: model.uncensored };
 }
 

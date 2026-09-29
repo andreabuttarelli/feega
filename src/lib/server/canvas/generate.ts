@@ -781,7 +781,11 @@ const WIRO_RUN_MAX_ATTEMPTS = 8;
 
 export async function reconcileWiroNodeRuns(db: Db): Promise<VideoReconcileOutcome> {
   const outcome: VideoReconcileOutcome = { checked: 0, done: 0, failed: 0, pending: 0 };
-  const [{ wiroRunDeps }, { finishWiroJob }] = await Promise.all([import('$lib/server/wiro-config'), import('./wiro-run')]);
+  const [{ wiroRunDeps }, { finishWiroJob }, { projectModeOf }] = await Promise.all([
+    import('$lib/server/wiro-config'),
+    import('./wiro-run'),
+    import('$lib/server/nsfw/nsfw-server')
+  ]);
   const deps = wiroRunDeps(db);
 
   for (const run of await queuedWiroRuns(db, { limit: WIRO_RECONCILE_LIMIT })) {
@@ -801,7 +805,8 @@ export async function reconcileWiroNodeRuns(db: Db): Promise<VideoReconcileOutco
     const shape: StartRun = { ...toStartRunShape(run), medium: node.type as GenMedium, projectId: node.projectId, canvasId: node.canvasId };
     const finishing: NodeRun = { ...run, status: 'finishing' };
     try {
-      const progress = await finishWiroJob(db, deps, { externalJobId: run.externalJobId, modelId: run.model ?? '', scope: audioScopeOf(shape) });
+      const mode = await projectModeOf(db, shape);
+      const progress = await finishWiroJob(db, deps, { externalJobId: run.externalJobId, modelId: run.model ?? '', scope: audioScopeOf(shape), mode });
 
       if (progress.state === 'pending') {
         await releaseClaim(db, { orgId: run.orgId, runId: run.id });

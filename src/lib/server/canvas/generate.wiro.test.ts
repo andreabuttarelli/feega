@@ -269,14 +269,14 @@ describe('the run tick finishes a Wiro task', () => {
 
   it('stores the output as a flagged asset, bills the real cost and marks the node', async () => {
     gateway.task.mockResolvedValue({ state: 'done', costUsd: 0.013, outputs: [{ url: 'https://cdn.wiro.test/0.png', contentType: 'image/png' }] });
-    const { db, calls } = fakeDb({ node_runs: [queued], nodes: [imageNode({ running: true, runId: RUN })] });
+    const { db, calls } = fakeDb({ node_runs: [queued], nodes: [imageNode({ running: true, runId: RUN })], projects: [nsfwProject] });
 
     expect(await reconcileWiroNodeRuns(db)).toMatchObject({ done: 1 });
 
     expect(gateway.task).toHaveBeenCalledWith('2221');
     const asset = calls.find((c) => c.table === 'assets' && c.op === 'insert')?.payload as Record<string, unknown>;
     expect(asset).toMatchObject({ type: 'image', uncensored: true, source: 'generated' });
-    expect(String(asset.url)).toMatch(new RegExp(`^${USER}/media/wiro/.+\\.png$`));
+    expect(String(asset.url)).toMatch(new RegExp(`^${USER}/nsfw/wiro/.+\\.png$`));
     expect(bill).toHaveBeenCalledWith(expect.objectContaining({ costUsd: 0.013, uncensored: true }));
     const shown = calls.find((c) => c.table === 'nodes' && c.op === 'update' && JSON.stringify(c.payload).includes('outputUncensored'));
     expect(shown).toBeTruthy();

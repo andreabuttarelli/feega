@@ -47,7 +47,9 @@ vi.mock('$lib/server/canvas/canvas-share', () => ({
 }));
 
 const nsfwLockFor = vi.fn();
-vi.mock('$lib/server/nsfw/nsfw-server', () => ({ nsfwLockFor: (...a: unknown[]) => nsfwLockFor(...a) }));
+vi.mock('$lib/server/nsfw/nsfw-server', () => ({
+	canvasReachable: async (_db: unknown, found: { mode: string }) => found.mode !== 'nsfw' || (await nsfwLockFor()) === 'open'
+}));
 
 import { actions } from './+page.server';
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { ProjectMode } from '$lib/project-mode';
   import '$lib/styles/tailwind.css';
   import { page } from '$app/state';
   import { onDestroy, untrack } from 'svelte';
@@ -138,7 +139,7 @@
 
 <ChatLeaveGuard {projectId} />
 
-<div class="project-shell" class:is-sheet-pending={sheetPending} class:is-nsfw={data.project.mode === 'nsfw'} data-viewport={viewport} data-mode={data.project.mode}>
+<div class="project-shell" class:is-sheet-pending={sheetPending} class:is-nsfw={data.project.mode === ProjectMode.Nsfw} data-viewport={viewport} data-mode={data.project.mode}>
   {#if isMobile}
     <MobileTopBar
       {projectId}

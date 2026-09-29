@@ -42,6 +42,11 @@ const MODERATION_PROFILE: Readonly<Record<ProjectMode, Readonly<Record<'uncensor
 
 const WIRO_PREFIX = 'wiro/';
 
+export const STORAGE_FOLDER: Readonly<Record<ProjectMode, string>> = {
+  [ProjectMode.Standard]: 'media',
+  [ProjectMode.Nsfw]: 'nsfw'
+};
+
 export function modeOf(value: unknown): ProjectMode {
   return value === ProjectMode.Nsfw ? ProjectMode.Nsfw : ProjectMode.Standard;
 }

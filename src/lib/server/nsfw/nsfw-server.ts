@@ -107,3 +107,10 @@ export async function generationRefusal(
   }
   return (await nsfwLockFor(db, input)) === NsfwLock.Open ? null : NSFW_LOCKED;
 }
+
+export async function canvasReachable(db: Db, found: { orgId: string; mode: ProjectMode }, userId: string): Promise<boolean> {
+  if (found.mode !== ProjectMode.Nsfw) {
+    return true;
+  }
+  return (await nsfwLockFor(db, { orgId: found.orgId, userId })) === NsfwLock.Open;
+}

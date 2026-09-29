@@ -30,9 +30,8 @@ import { mintShareToken } from '$lib/canvas/doc-node';
 import { clearDocShare, setDocShare } from '$lib/server/repos/doc-share';
 import { isCanvasEdgeKind, isWireMode } from '$lib/canvas-edges';
 import { canvasModelCatalogue } from '$lib/server/canvas-catalogue';
-import { Capability, catalogueIn, MODE_REFUSAL, modeAllows, modeOf, ProjectMode } from '$lib/project-mode';
-import { NsfwLock } from '$lib/nsfw-access';
-import { nsfwLockFor } from '$lib/server/nsfw/nsfw-server';
+import { Capability, catalogueIn, MODE_REFUSAL, modeAllows, modeOf, type ProjectMode } from '$lib/project-mode';
+import { canvasReachable } from '$lib/server/nsfw/nsfw-server';
 import { NO_UNCENSORED_ACCESS, uncensoredAccess, visibleCatalogue } from '$lib/server/uncensored-access';
 import { runGenNode, runsOf } from '$lib/server/canvas/generate';
 import { planLoop, enqueueLoop, cancelLoop, retryLoopCombination } from '$lib/server/canvas/loop';
@@ -117,7 +116,7 @@ async function scopeFor(locals: App.Locals, canvasId: string): Promise<Scope> {
   }
 
   const mode = modeOf(found.mode);
-  if (mode === ProjectMode.Nsfw && (await nsfwLockFor(db, { orgId: found.orgId, userId: user.id })) !== NsfwLock.Open) {
+  if (!(await canvasReachable(db, { orgId: found.orgId, mode }, user.id))) {
     throw error(404, 'questa tela non esiste, o non è tua');
   }
 

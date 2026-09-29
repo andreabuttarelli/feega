@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { MediaOrigin } from '$lib/canvas/download';
   /**
    * LA TELA.
    *
@@ -2136,6 +2137,7 @@
               {#if row.data.outputUncensored === true}
                 <span class="uncensored-output" data-testid="uncensored-output">Uncensored</span>
               {/if}
+              <span class="ai-generated-mark" data-testid="ai-generated-mark">AI-generated</span>
               {#if gen.medium === 'text'}
                 <div class="gen-text-wrap">
                   <div class="gen-text-toggle" role="group" aria-label="Vista del testo">
@@ -2166,12 +2168,12 @@
                 <!-- svelte-ignore a11y_media_has_caption -->
                 <video src={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} controls playsinline></video>
                 <div class="gen-download">
-                  <NodeDownload kind="video" sourceUrl={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} nodeId={id} nodeType={gen.medium} />
+                  <NodeDownload kind="video" sourceUrl={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} nodeId={id} nodeType={gen.medium} origin={MediaOrigin.Generated} />
                 </div>
               {:else}
                 <TieredImage src={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} nodeId={id} alt={gen.prompt} />
                 <div class="gen-download">
-                  <NodeDownload kind="image" sourceUrl={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} nodeId={id} nodeType={gen.medium} />
+                  <NodeDownload kind="image" sourceUrl={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} nodeId={id} nodeType={gen.medium} origin={MediaOrigin.Generated} />
                 </div>
               {/if}
             {/snippet}
@@ -2422,6 +2424,18 @@
     border: none;
     text-decoration: underline;
     cursor: pointer;
+  }
+  .ai-generated-mark {
+    position: absolute;
+    bottom: 6px;
+    left: 6px;
+    z-index: 2;
+    padding: 0 4px;
+    font-size: 0.625rem;
+    line-height: 1rem;
+    color: var(--paper, #fff);
+    background: rgb(0 0 0 / 0.6);
+    pointer-events: none;
   }
   .uncensored-output {
     position: absolute;

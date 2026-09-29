@@ -10,7 +10,7 @@
   import DownloadIcon from '@lucide/svelte/icons/download';
   import LoaderIcon from '@lucide/svelte/icons/loader-circle';
   import XIcon from '@lucide/svelte/icons/x';
-  import { formatsFor, buildDownloadFilename, clampGifPlan, type DownloadFormat, type MediaKind } from '$lib/canvas/download';
+  import { formatsFor, buildDownloadFilename, clampGifPlan, MediaOrigin, type DownloadFormat, type MediaKind } from '$lib/canvas/download';
   import { avifEncodable } from '$lib/canvas/avif-support';
 
   let {
@@ -18,13 +18,15 @@
     sourceUrl,
     nodeId,
     nodeType,
-    displayName = null
+    displayName = null,
+    origin = MediaOrigin.Other
   }: {
     kind: MediaKind;
     sourceUrl: string;
     nodeId: string;
     nodeType: string;
     displayName?: string | null;
+    origin?: MediaOrigin;
   } = $props();
 
   let open = $state(false);
@@ -45,7 +47,7 @@
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = buildDownloadFilename({ displayName, nodeId, nodeType, extension });
+    a.download = buildDownloadFilename({ displayName, nodeId, nodeType, extension, origin });
     a.click();
     URL.revokeObjectURL(url);
   }
