@@ -135,9 +135,6 @@ const REST_ONLY = [
   // basta, ed è la superficie che `src/lib/server/brand-agent/` serve.
   'agent',
   'agent/assets',
-  // `ads_action` chiama funzioni sue (approva, rifiuta, duplica, propone) senza passare da un
-  // contratto: il CLI la raggiunge con `api.adsAction`, non con `ADS_ACTION`.
-  'ads',
   'api-keys',
   'api-keys/[id]',
   'products',

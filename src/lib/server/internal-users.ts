@@ -28,7 +28,7 @@ function internalDomains(): string[] {
 
 /**
  * Account personali del team (founder + Marco). Sono gli stessi che compaiono in
- * `brand-limits.ts` (slot illimitati) e in `ads-fee.ts` (preview Ads): liste separate di proposito,
+ * `brand-limits.ts` (slot illimitati): liste separate di proposito,
  * perché "è dei nostri" e "ha diritto a X" sono domande diverse e non devono muoversi insieme.
  */
 // Da env, non dal sorgente: il repo va open source e un'email personale hardcoded è
@@ -49,18 +49,4 @@ export function isInternalEmail(email: string | null | undefined): boolean {
   if (internalEmails().includes(e)) return true;
   const domain = e.slice(e.lastIndexOf('@') + 1);
   return internalDomains().some((d) => domain === d || domain.endsWith(`.${d}`));
-}
-
-/**
- * Dogfood Ads: questi account vedono la UI self-serve anche con la flag globale spenta.
- * Da env (`ADS_PREVIEW_EMAILS`, lista separata da virgole) — prima era una costante in
- * `$lib/ads-fee.ts`, cioè NEL BUNDLE DEL BROWSER: due email personali servite a ogni visitatore.
- */
-export function isAdsPreviewUser(email?: string | null): boolean {
-  const e = (email ?? '').trim().toLowerCase();
-  const list = (env.ADS_PREVIEW_EMAILS ?? '')
-    .split(',')
-    .map((x) => x.trim().toLowerCase())
-    .filter(Boolean);
-  return list.includes(e);
 }

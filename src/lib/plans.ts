@@ -123,7 +123,7 @@ export const PLANS: Plan[] = [
       'Editorial plan on autopilot',
       'Blog articles built to rank',
       'Backlink network across feega brands',
-      'Meta & Google Ads — you approve spend'
+      'Meta Ads — you approve spend'
     ],
     platforms: ['instagram', 'tiktok', 'linkedin', 'x', 'facebook', 'threads', 'youtube', 'bluesky', 'reddit'],
     socialsIncluded: 2,

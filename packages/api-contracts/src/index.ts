@@ -1,5 +1,4 @@
 import type { z } from 'zod';
-import { ADS_ACTION, ADS_REMIX } from './ads';
 import { BILLING_PORTAL_LINK, CHECKOUT_LINK, ONE_TIME_CHECKOUT_LINK } from './billing';
 import { QUERY_DATABASE } from './query';
 import { INSERT_ROW, UPDATE_ROW, DELETE_ROW } from './write';
@@ -69,7 +68,6 @@ export type ResourceEndpoint = EndpointShape & {
 export type BrandEndpoint = ResourcelessEndpoint | ResourceEndpoint;
 
 export const BRAND_ENDPOINTS: readonly BrandEndpoint[] = [
-  ADS_REMIX,
   BILLING_PORTAL_LINK,
   CHECKOUT_LINK,
   ONE_TIME_CHECKOUT_LINK,
@@ -116,8 +114,6 @@ export function statusForFailure(
 }
 
 export {
-  ADS_ACTION,
-  ADS_REMIX,
   IMPORT_MEDIA_URL,
 };
 /**
@@ -169,4 +165,3 @@ export { TABLE_CHECKS, WRITABLE_COLUMNS } from './write-rules';
  * di qui fa smettere di compilare una rotta, con un errore di TIPO che il codice in esecuzione non
  * mostra e che si perde fra i preesistenti.
  */
-export { GET_ADS } from './reads';

@@ -1,24 +1,7 @@
 import { billedCreditsFor } from '$lib/credit-ladder';
-import { formatCredits } from '$lib/components/credit-amount-format';
 
 /** feega management fee on top of platform ad spend (model A: pass-through + markup). */
 export const AD_MANAGEMENT_FEE_RATE = 0.12;
-
-/**
- * When false, Social ads / Google ads show a "book a call" placeholder instead of the self-serve
- * UI. The real page markup stays in place behind this gate — flip to `true` when automatic ads
- * go fully self-serve (no sales call required). Client-safe; mirrored by server loaders/actions.
- */
-export const ADS_SELF_SERVE = false;
-
-
-/**
- * True when this user may use the self-serve Ads UI. La allowlist di preview vive lato server
- * (internal-users.ts, da env): chi chiama da lì passa `preview`; il client riceve il booleano.
- */
-export function adsSelfServeEnabled(preview = false): boolean {
-  return ADS_SELF_SERVE || preview;
-}
 
 /**
  * The management fee, billed in AI credits instead of an invoice: launching a campaign and every
@@ -48,25 +31,6 @@ export function normalizeUrl(raw: string | null | undefined): string {
   } catch {
     return '';
   }
-}
-
-/**
- * Server error code → i18n key + values. Only `credits_exhausted` carries data (it is encoded as
- * `credits_exhausted:<needed>:<left>` by approveCampaign); everything else is a plain code, and an
- * unknown one falls back to itself so a Zernio message still reaches the user.
- */
-export function adsErrorMessage(error: string): { key: string; values: Record<string, string> } {
-  const [code, needed, left] = error.split(':');
-  if (code === 'credits_exhausted') {
-    return {
-      key: 'app.ads.err.credits_exhausted',
-      values: { needed: needed ? formatCredits(Number(needed)) : '', left: formatCredits(Number(left ?? '0')) }
-    };
-  }
-  // Codes may carry a payload after a colon (`goal_not_supported:conversions`,
-  // `invalid_status:active`). Key off the code alone, or the whole string became the key, no
-  // translation ever matched, and the user read the raw identifier.
-  return { key: `app.ads.err.${code}`, values: { detail: needed ?? '' } };
 }
 
 export function feeBreakdown(platformBudget: number): {

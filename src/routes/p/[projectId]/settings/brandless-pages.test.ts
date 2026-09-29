@@ -1,12 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('$lib/server/tenancy', () => ({ hasManyTenants: () => true }));
-vi.mock('$lib/server/ads', () => ({
-  adsFeatureEnabled: () => true,
-  adsAvailable: () => true,
-  parseAdsSettings: () => ({}),
-  syncAdAccounts: async () => 0
-}));
 vi.mock('$lib/server/supabase-admin', () => {
   const q = { select: () => q, eq: () => q, order: () => q, limit: async () => ({ data: [] }) };
   return { createAdminClient: () => ({ from: () => q }) };
@@ -14,9 +8,7 @@ vi.mock('$lib/server/supabase-admin', () => {
 
 const PAGES = {
   'connected-accounts': () => import('./connected-accounts/+page.server'),
-  danger: () => import('./danger/+page.server'),
-  ads: () => import('./ads/+page.server'),
-  'ads/accounts': () => import('./ads/accounts/+page.server')
+  danger: () => import('./danger/+page.server')
 };
 
 const event = {

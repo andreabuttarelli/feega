@@ -61,8 +61,6 @@ export type AdTargeting = {
   countries?: string[];
   languages?: string[];
   interests?: { id: string; name?: string }[];
-  keywords?: { text: string; matchType?: 'BROAD' | 'PHRASE' | 'EXACT' }[];
-  geoTargets?: string[];
 };
 
 export type ZernioAdAccount = {
@@ -208,7 +206,7 @@ export type BoostPostInput = {
   dsaPayor?: string;
 };
 
-/** Promote an existing organic post. Meta / TikTok / LinkedIn / Pinterest / X — not Google. */
+/** Promote an existing organic post as a Meta ad. */
 export async function boostPost(input: BoostPostInput, idempotencyKey?: string): Promise<ZernioAd> {
   const headers: Record<string, string> = {};
   if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
@@ -244,8 +242,6 @@ export type CreateStandaloneAdInput = {
   name: string;
   goal: AdGoal;
   budget: AdBudget;
-  platform?: string;
-  campaignType?: 'SEARCH' | 'DISPLAY';
   schedule?: { startDate?: string; endDate?: string };
   targeting?: AdTargeting;
   creative?: {
@@ -254,8 +250,6 @@ export type CreateStandaloneAdInput = {
     body?: string;
     descriptions?: string[];
     imageUrl?: string;
-    /** Google Responsive Display needs BOTH a 1.91:1 and a 1:1 image; one alone is rejected. */
-    squareImageUrl?: string;
     /**
      * Meta only. Vertical asset pinned to Stories/Reels while `imageUrl` serves Feed — Meta's
      * "different creative per placement". A 1:1 feed image letterboxed into a 9:16 slot is the
@@ -266,8 +260,6 @@ export type CreateStandaloneAdInput = {
     callToAction?: string;
     landingPageUrl?: string;
     linkUrl?: string;
-    /** Google Display only: advertiser name shown on the ad (max 25 chars). */
-    businessName?: string;
   };
   /** Meta only. When set, `creative` is ignored and one ad is created per entry. */
   creatives?: AdCreativeVariant[];
@@ -288,7 +280,6 @@ export type CreateStandaloneAdInput = {
 export function buildCreatePayload(input: CreateStandaloneAdInput): Record<string, unknown> {
   const c = input.creative ?? {};
   const t = input.targeting ?? {};
-  const isGoogle = (input.platform ?? '').toLowerCase() === 'googleads';
 
   const body: Record<string, unknown> = {
     accountId: input.accountId,
@@ -310,15 +301,8 @@ export function buildCreatePayload(input: CreateStandaloneAdInput): Record<strin
     ageMin: t.age_min,
     ageMax: t.age_max,
     genders: t.genders,
-    // Google takes plain keyword strings (match types default to broad); Meta takes interests.
-    interests: isGoogle ? undefined : t.interests,
-    keywords: isGoogle ? t.keywords?.map((k) => k.text).filter(Boolean) : undefined,
-    // Lowercase per the Google docs ('search' | 'display'); we store the enum uppercase.
-    campaignType: input.campaignType ? input.campaignType.toLowerCase() : undefined,
-    businessName: c.businessName,
-    // Display wants the pair under `images`; every other platform wants a single imageUrl.
-    imageUrl: isGoogle && c.squareImageUrl ? undefined : c.imageUrl,
-    images: isGoogle && c.squareImageUrl ? { landscape: c.imageUrl, square: c.squareImageUrl } : undefined,
+    interests: t.interests,
+    imageUrl: c.imageUrl,
     startDate: input.schedule?.startDate,
     endDate: input.schedule?.endDate,
     placements: input.placements,
@@ -330,7 +314,7 @@ export function buildCreatePayload(input: CreateStandaloneAdInput): Record<strin
   // Placement asset customisation (Meta only): the same ad, a vertical asset on Stories/Reels and
   // the feed asset everywhere else. Mutually exclusive with the multi-creative shape below, which
   // is why it is applied first and skipped when `creatives` is present.
-  if (!isGoogle && !input.creatives?.length && c.storyImageUrl && c.imageUrl) {
+  if (!input.creatives?.length && c.storyImageUrl && c.imageUrl) {
     body.placementAssets = {
       defaultImageUrl: c.imageUrl,
       rules: [
@@ -349,8 +333,8 @@ export function buildCreatePayload(input: CreateStandaloneAdInput): Record<strin
   // Multi-creative shape (Meta only): 1 campaign + 1 ad set + N ads sharing budget and targeting.
   // Zernio IGNORES the top-level copy/media in this mode, so we drop it rather than send a payload
   // that reads as if it mattered. validateOnly is not supported on this shape either.
-  if (!isGoogle && input.creatives?.length) {
-    for (const k of ['headline', 'body', 'linkUrl', 'callToAction', 'videoUrl', 'imageUrl', 'images', 'validateOnly']) {
+  if (input.creatives?.length) {
+    for (const k of ['headline', 'body', 'linkUrl', 'callToAction', 'videoUrl', 'imageUrl', 'validateOnly']) {
       delete body[k];
     }
     body.creatives = input.creatives.map((v) => ({
@@ -373,7 +357,7 @@ export function buildCreatePayload(input: CreateStandaloneAdInput): Record<strin
 }
 
 /**
- * Create a standalone (dark) ad — Meta, Google Search/Display, TikTok, LinkedIn, etc.
+ * Create a standalone (dark) Meta ad.
  *
  * The 201 comes back in TWO shapes: `{ ad }` for a single creative, `{ ads[], platformCampaignId,
  * platformAdSetId }` for the multi-creative one. Always returns the full list: reading only the

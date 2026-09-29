@@ -81,7 +81,7 @@ feega dashboard my-brand
 feega content my-brand --status pending_user
 feega approve my-brand --all
 feega calendar my-brand
-feega ads my-brand --remix
+feega ads my-brand
 ```
 
 Every command takes the brand slug as its first argument. `feega --help` lists them all;
@@ -93,7 +93,7 @@ prefixes error instead of guessing.
 | Posts | `content`, `approve`, `post <id> [show\|edit\|render\|approve\|publish\|reschedule\|reject]` |
 | Planning | `calendar` |
 | Brand | `products [sync]` |
-| Ads | `ads` — campaigns, spend, boost proposals, remix, duplicate/delete (`--sync`, `--propose`, `--remix`, `--create`, `--approve`, `--pause`, `--resume`, `--duplicate`, `--delete`, `--reject`, `--ad` per singola creatività) |
+| Ads | `ads` — Meta campaigns of a brand, `--approve` to launch one |
 | Insight | `dashboard`, `status`, `health` |
 | Account | `upgrade`, `update`, `login`, `logout` |
 

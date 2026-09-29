@@ -29,7 +29,6 @@ export type ProfileInput = { name: string; description: string };
 
 export type AdsConnectPlatform =
   | 'facebook'
-  | 'googleads'
   | 'instagram'
   | 'linkedin'
   | 'tiktok'

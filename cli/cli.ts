@@ -82,26 +82,8 @@ program
 
 program
   .command('ads <slug>')
-  .description('Ads via Zernio: list, propose boosts, remix competitor ads, approve spend')
-  .option('--propose', 'Crea proposte di boost dai post organici migliori')
-  .option('--remix', 'Remix competitor/trending ads → brief creativi in brand voice')
-  .option('--approve <id>', 'Approva e lancia una campagna proposta (spende budget)')
-  .option('--reject <id>', 'Rifiuta una proposta')
-  .option('--duplicate <id>', 'Duplica una campagna live (copia in pausa, poi approva)')
-  .option('--delete <id>', 'Elimina una campagna sulla piattaforma (storico conservato)')
-  .option('--pause <id>', 'Metti in pausa una campagna attiva')
-  .option('--resume <id>', 'Riattiva una campagna in pausa')
-  .option('--ad <adId>', 'Singola creatività: con --pause/--resume agisce solo su quella ad')
-  .option('--sync', 'Sincronizza ad account + metrics da Zernio')
-  .option('--budget <amount>', 'Budget daily (con --approve o --create)')
-  .option('--create', 'Crea proposta standalone (serve --name --headline)')
-  .option('--platform <platform>', 'metaads|googleads|tiktokads|linkedinads|xads|pinterestads', 'metaads')
-  .option('--name <name>', 'Nome campagna (--create)')
-  .option('--headline <text>', 'Headline creative (--create)')
-  .option('--body <text>', 'Body creative (--create)')
-  .option('--url <url>', 'Landing page (--create)')
-  .option('--image <url>', 'Image URL (--create)')
-  .option('--goal <goal>', 'engagement|traffic|awareness|…')
+  .description('Meta ad campaigns of a brand: list, approve spend')
+  .option('--approve <id>', 'Approve and launch a proposed campaign (spends budget)')
   .action(async (slug: string, opts) => {
     const { cmdAds } = await import('./commands/ads.ts');
     await cmdAds(slug, opts);

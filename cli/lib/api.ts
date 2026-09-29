@@ -116,6 +116,16 @@ export type BrandSummary = {
   pendingCount: number;
 };
 
+export type AdCampaignSummary = {
+  id: string;
+  name: string;
+  objective: string;
+  budgetType: string;
+  budgetAmount: number;
+  status: string;
+  approvedAt: string | null;
+};
+
 export type BrandDetail = {
   brand: BrandSummary;
   pendingCount: number;
@@ -145,41 +155,13 @@ export const api = {
 
   // ── Ads ───────────────────────────────────────────────────────────────
 
-  getAds: (t: string, slug: string) =>
-    get<{
-      summary: {
-        campaigns: {
-          id: string;
-          name: string;
-          platform: string;
-          ad_type: string;
-          status: string;
-          goal: string;
-          budget_amount: number;
-          budget_type: string;
-        }[];
-        totals: { spend: number; impressions: number; clicks: number; active: number; proposed: number };
-      };
-      candidates: { platform: string; score: number; reason: string; caption: string | null }[];
-      adAccounts: { id: string; platform: string; name: string | null; status: string; zernio_ad_account_id: string }[];
-    }>(`/api/v1/brands/${slug}/ads`, t),
+  listAdCampaigns: (t: string, brandId: string) =>
+    get<{ campaigns: AdCampaignSummary[] }>(`/api/v1/org/ads/campaigns?brand_id=${encodeURIComponent(brandId)}`, t),
 
-  adsAction: (
-    t: string,
-    slug: string,
-    body: Record<string, unknown>
-  ) =>
-    post<{
-      ok?: boolean;
-      error?: string;
-      created?: number;
-      candidates?: number;
-      zernioAdId?: string;
-      accounts?: number;
-      metrics?: number;
-      id?: string;
-      next?: 'active' | 'paused';
-      copiedCampaignId?: string;
-    }>(`/api/v1/brands/${slug}/ads`, t, body),
+  approveAdCampaign: (t: string, id: string) =>
+    post<{ campaign?: AdCampaignSummary; error?: string; message?: string }>(
+      `/api/v1/org/ads/campaigns/${encodeURIComponent(id)}/approve`,
+      t
+    ),
 
 };

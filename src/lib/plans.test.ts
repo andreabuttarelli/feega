@@ -27,14 +27,14 @@ describe('Go plan helpers', () => {
     expect(canConnectSocials('go', 'active')).toBe(false);
   });
 
-  it('unlocks Meta & Google Ads from Starter up (not Go/Free)', () => {
+  it('unlocks Meta Ads from Starter up (not Go/Free)', () => {
     expect(hasAds(null)).toBe(false);
     expect(hasAds('go')).toBe(false);
     expect(hasAds('starter')).toBe(true);
     expect(hasAds('pro')).toBe(true);
     expect(hasAds('scale')).toBe(true);
-    expect(planByKey('starter').highlights.some((h) => /Meta|& Google Ads/i.test(h))).toBe(true);
-    expect(planByKey('go').highlights.some((h) => /Meta|& Google Ads/i.test(h))).toBe(false);
+    expect(planByKey('starter').highlights.some((h) => /Meta Ads/i.test(h))).toBe(true);
+    expect(planByKey('go').highlights.some((h) => /Meta Ads/i.test(h))).toBe(false);
   });
 
   it('gives the full chat context window to Starter and up, caps Free/Go', () => {

@@ -31,19 +31,8 @@ feega products <slug>                     # Lista
 feega products <slug> sync                # Re-importa dallo store collegato
 
 # Ads
-feega ads <slug>                          # Campagne + metriche paid
-feega ads <slug> --sync                   # Sincronizza account + metriche
-feega ads <slug> --propose                # Proposte boost dai top post organici
-feega ads <slug> --remix                  # Remix competitor ads → brief creativi
-feega ads <slug> --approve <id> [--budget N]
-feega ads <slug> --reject <id>
-feega ads <slug> --pause <id>             # Pausa campagna (tutte le creatività)
-feega ads <slug> --resume <id>            # Riattiva campagna
-feega ads <slug> --pause <id> --ad <adId> # Pausa UNA creatività (A/B)
-feega ads <slug> --resume <id> --ad <adId>
-feega ads <slug> --duplicate <id>          # Copia in pausa → nuova proposta
-feega ads <slug> --delete <id>             # Elimina sulla piattaforma (storico ok)
-feega ads <slug> --create --name "..." --headline "..." [--platform metaads|googleads] [--budget N]
+feega ads <slug>                          # Campagne Meta del brand
+feega ads <slug> --approve <id>           # Approva e lancia (spende budget)
 
 # Account e billing
 feega upgrade <slug>                      # Apri checkout piano

@@ -120,7 +120,7 @@ function childCandidates(dir: string, segment: string): string[] {
   }
   // A literal segment matches its own folder first — `facebook` under `settings/connect/`
   // really does mean the `[platform]` folder, a hand-typed value for a dynamic slot, and that
-  // is common enough (`settings/connect/facebook`, `ads/connect/googleads`) that refusing to
+  // is common enough (`settings/connect/facebook`, `settings/connect/instagram`) that refusing to
   // fall through would flag real links as dead. The cost, accepted rather than hidden: a typo'd
   // literal segment (`/p/does-not-exist`) can also "resolve" this way, through `[projectId]`.
   // Static text can't tell a real value from a typo without knowing what the param means — this
