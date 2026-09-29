@@ -48,11 +48,33 @@ describe('screening a generation before it reaches the provider', () => {
     expect(await screenGeneration(p, request('x'))).toMatchObject({ ok: false });
   });
 
-  it('fails closed when Jev is unavailable', async () => {
-    const p = ports({ decide: vi.fn(async () => Promise.reject(new Error('jev_not_configured'))) });
-    const out = await screenGeneration(p, request('a mountain lake'));
-    expect(out).toMatchObject({ ok: false });
-    expect(!out.ok && out.error).toMatch(/^moderation_unavailable/);
+  const jevDown = (reason: string) => vi.fn(async () => Promise.reject(new Error(reason)));
+  const judgeDown = () => vi.fn(async () => Promise.reject(new Error('judge down')));
+  const judgeClears = () => vi.fn(async () => ({ allowed: true, category: 'safe', reason: 'landscape' }));
+  const judgeRefuses = () => vi.fn(async () => ({ allowed: false, category: 'adult_sexual', reason: 'nudity' }));
+
+  it.each([
+    { jev: 'jev_not_configured', judge: judgeClears, uncensored: false, ok: true, judged: true },
+    { jev: 'jev_failed: HTTP 503', judge: judgeClears, uncensored: false, ok: true, judged: true },
+    { jev: 'jev_not_configured', judge: judgeRefuses, uncensored: false, ok: false, judged: true },
+    { jev: 'jev_not_configured', judge: judgeDown, uncensored: false, ok: false, judged: true },
+    { jev: 'jev_failed: HTTP 503', judge: judgeDown, uncensored: false, ok: false, judged: true },
+    { jev: 'jev_not_configured', judge: judgeClears, uncensored: true, ok: false, judged: false }
+  ])('Jev $jev, uncensored $uncensored: judged $judged, allowed $ok', async ({ jev, judge, uncensored, ok, judged }) => {
+    const p = ports({ decide: jevDown(jev), judge: judge() });
+    const out = await screenGeneration(p, request('a mountain lake', uncensored));
+    expect(out.ok).toBe(ok);
+    expect(p.judge).toHaveBeenCalledTimes(judged ? 1 : 0);
+  });
+
+  it('marks a refusal caused by both moderators failing as unavailable, never as a verdict', async () => {
+    const out = await screenGeneration(ports({ decide: jevDown('jev_not_configured'), judge: judgeDown() }), request('x'));
+    expect(out).toMatchObject({ ok: false, unavailable: true });
+  });
+
+  it('names the category in a standard-mode refusal from the judge', async () => {
+    const out = await screenGeneration(ports({ decide: jevDown('jev_not_configured'), judge: judgeRefuses() }), request('x'));
+    expect(!out.ok && out.error).toMatch(/^This prompt was blocked: sexual content isn't allowed/);
   });
 
   it('refuses minors on an uncensored model from the keyword rule without calling Jev', async () => {

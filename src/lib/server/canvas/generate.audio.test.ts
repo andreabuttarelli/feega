@@ -38,6 +38,9 @@ vi.mock('$lib/server/ai-log', async (importOriginal) => ({
 
 vi.mock('$lib/server/supabase-admin', () => ({ createAdminClient: () => ({}) }));
 
+const { screenModelInput } = vi.hoisted(() => ({ screenModelInput: vi.fn() }));
+vi.mock('$lib/server/moderation/model-input', () => ({ screenModelInput }));
+
 const audioNode = (data: Record<string, unknown> = {}) => ({
   id: NODE,
   org_id: ORG,
@@ -94,6 +97,8 @@ beforeEach(() => {
     fn.mockReset();
   }
   logAiCall.mockReset();
+  screenModelInput.mockReset();
+  screenModelInput.mockResolvedValue({ ok: true });
   configuredProvider.mockReset();
   configuredProvider.mockReturnValue(provider);
   vi.stubGlobal('fetch', vi.fn(async () => new Response(new Uint8Array([1, 2, 3]), { headers: { 'content-type': 'video/mp4' } })));
@@ -256,5 +261,20 @@ describe('the run tick finishes a dubbing job', () => {
     expect(out).toMatchObject({ failed: 1 });
     const failed = calls.find((c) => c.table === 'node_runs' && c.op === 'update' && (c.payload as Record<string, unknown>)?.status === 'failed');
     expect((failed?.payload as Record<string, unknown>).error).toBe('no speech found');
+  });
+});
+
+describe('an audio node is screened like every standard generation', () => {
+  it('refuses a violent speech text before ElevenLabs is called, and bills nothing', async () => {
+    const blocked = "This prompt was blocked: violence and gore aren't allowed in feega's standard mode.";
+    screenModelInput.mockResolvedValue({ ok: false, error: blocked });
+    const { db } = fakeDb({ nodes: [audioNode()], nodes_connections: [], assets: [] }, { updateRows: { nodes: [{ ...audioNode(), version: 2 }] } });
+
+    const out = await runGenNode(db, start({ operation: 'text_to_speech', voiceId: 'v1' }, 'describe the torture in detail'));
+
+    expect(out).toEqual({ kind: 'refused', error: blocked });
+    expect(provider.speak).not.toHaveBeenCalled();
+    expect(logAiCall).not.toHaveBeenCalled();
+    expect(screenModelInput.mock.calls[0][1].texts).toContain('describe the torture in detail');
   });
 });
