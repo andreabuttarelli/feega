@@ -3,7 +3,7 @@
   import ProjectDragPanel from './ProjectDragPanel.svelte';
   import InfluencersPanel from './InfluencersPanel.svelte';
   import X from '@lucide/svelte/icons/x';
-  import { SHEET_WIDTHS } from '$lib/shell-nav';
+  import { PANEL_WIDTHS } from '$lib/shell-nav';
 
   /**
    * IL PANNELLO ACCANTO ALLA TELA — Assets, Brands o Influencers, uno alla volta (CLAUDE.md: "One
@@ -26,7 +26,7 @@
     onclose: () => void;
   } = $props();
 
-  const panelWidth = $derived(SHEET_WIDTHS[kind] ?? SHEET_WIDTHS.assets);
+  const panelWidth = $derived(PANEL_WIDTHS[kind] ?? PANEL_WIDTHS.assets);
 </script>
 
 {#if kind === 'influencers'}

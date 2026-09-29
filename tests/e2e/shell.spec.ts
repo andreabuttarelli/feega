@@ -37,3 +37,24 @@ test('apri il progetto, la rail c\'è, Calendar si apre come foglio ed Esc torna
   await expect(page).toHaveURL(canvasUrl);
   await expect(sheet).not.toBeVisible();
 });
+
+const DESKTOP = { width: 1440, height: 900 };
+const MIN_CALENDAR_WIDTH = 1000;
+
+test.describe('a 1440px', () => {
+  test.use({ viewport: DESKTOP });
+
+  test('il foglio Calendar occupa la tela, non una colonna schiacciata a sinistra', async ({ page, session }) => {
+    await page.goto(`/p/${session.projectId}`);
+    await page.waitForURL(new RegExp(`/p/${session.projectId}/c/`));
+    await page.waitForLoadState('networkidle');
+
+    await page.getByRole('button', { name: 'Calendar' }).click();
+
+    const content = page.locator('[role="dialog"].canvas-sheet .calendar-page');
+    await expect(content).toBeVisible();
+
+    const box = await content.boundingBox();
+    expect(box?.width ?? 0).toBeGreaterThan(MIN_CALENDAR_WIDTH);
+  });
+});

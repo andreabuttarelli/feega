@@ -26,17 +26,7 @@ export const NAV_ENTRIES: NavEntry[] = [
   { id: 'promote', labelKey: 'app.hub.publish.promote', icon: 'megaphone', family: 'sheet', path: '/promote', group: 'hidden' }
 ];
 
-/**
- * LARGHEZZA DI OGNI FOGLIO/PANNELLO, IN UNA TABELLA SOLA — non CSS per componente. Calendar è
- * una griglia mensile e vuole più spazio; gli altri fogli (Ads, Settings, Create post) sono
- * moduli di testo e stanno bene più stretti. I pannelli sinistri (Assets/Brands/Influencers)
- * restano alla larghezza fissa che avevano.
- */
-export const SHEET_WIDTHS: Record<string, number> = {
-  calendar: 960,
-  ads: 720,
-  settings: 720,
-  promote: 880,
+export const PANEL_WIDTHS: Record<string, number> = {
   assets: 320,
   brands: 320,
   influencers: 320
