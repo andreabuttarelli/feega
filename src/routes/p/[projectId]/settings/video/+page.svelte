@@ -1,6 +1,12 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
   import { _ } from 'svelte-i18n';
+  import { Panel } from '$lib/components/ui/panel';
+  import { Field, FieldLayout } from '$lib/components/ui/field';
+  import { Select } from '$lib/components/ui/select';
+  import { Textarea } from '$lib/components/ui/textarea';
+  import { Button } from '$lib/components/ui/button';
+  import { Notice } from '$lib/components/ui/notice';
 
   let { data, form } = $props();
 
@@ -32,98 +38,71 @@
   });
 </script>
 
-<section class="panel">
-  <div class="panel-head"><div class="t">{$_('app.settings.video.title')}</div></div>
+{#if form?.saved}<Notice tone="success">{$_('app.settings.video.saved')}</Notice>{/if}
+{#if form?.error}<Notice tone="error">{form.error}</Notice>{/if}
+
+<Panel title={$_('app.settings.video.title')}>
   {#each SLOTS as slot (slot.id)}
-    <div class="field">
-      <div class="ftxt">
-        <div class="fh">{$_(`app.settings.video.slots.${slot.i18n}`)}</div>
-        <div class="fs">{$_(`app.settings.video.slots.${slot.i18n}Desc`)}</div>
-      </div>
+    <Field label={$_(`app.settings.video.slots.${slot.i18n}`)} hint={$_(`app.settings.video.slots.${slot.i18n}Desc`)} layout={FieldLayout.Row}>
       {#if !slot.choices.length && !slot.synced}
         <span class="vd-warn">{$_('app.settings.video.catalogueNotSynced')}</span>
       {:else}
         <form method="POST" action="?/updateMediaModel" use:enhance class="vd-form">
           <input type="hidden" name="slot" value={slot.id} />
-          <select name="model" class="vd-select">
+          <Select name="model" class="w-56">
             <option value="" selected={!slot.current}>{$_('app.settings.video.modelDefault')}</option>
             {#each slot.choices as m (m.id)}
               <option value={m.id} selected={m.id === slot.current}>{m.label}</option>
             {/each}
-          </select>
-          <button class="mini connect" type="submit">{$_('app.settings.save')}</button>
+          </Select>
+          <Button variant="secondary" type="submit">{$_('app.settings.save')}</Button>
         </form>
       {/if}
-    </div>
+    </Field>
   {/each}
-  <div class="field">
-    <div class="ftxt">
-      <div class="fh">{$_('app.settings.video.clipLength')}</div>
-      <div class="fs">{$_('app.settings.video.clipLengthDesc')}</div>
-    </div>
+  <Field label={$_('app.settings.video.clipLength')} hint={$_('app.settings.video.clipLengthDesc')} layout={FieldLayout.Row}>
     <form method="POST" action="?/updateVideoDuration" use:enhance class="vd-form">
-      <select name="videoDuration" class="vd-select">
+      <Select name="videoDuration" class="w-40">
         <option value="" selected={current == null}>{$_('app.settings.video.clipLengthAuto')}</option>
         {#each LENGTHS as s (s)}
           <option value={s} selected={current === s}>{s}s</option>
         {/each}
-      </select>
-      <button class="mini connect" type="submit">{$_('app.settings.save')}</button>
+      </Select>
+      <Button variant="secondary" type="submit">{$_('app.settings.save')}</Button>
     </form>
-  </div>
-  <div class="field">
-    <div class="ftxt">
-      <div class="fh">{$_('app.settings.video.resolution')}</div>
-      <div class="fs">{$_('app.settings.video.resolutionDesc')}</div>
-    </div>
+  </Field>
+  <Field label={$_('app.settings.video.resolution')} hint={$_('app.settings.video.resolutionDesc')} layout={FieldLayout.Row}>
     <form method="POST" action="?/updateVideoResolution" use:enhance class="vd-form">
-      <select name="videoResolution" class="vd-select">
+      <Select name="videoResolution" class="w-40">
         {#each RESOLUTIONS as r (r)}
           <option value={r} selected={r === currentRes}>
             {r}{r === DEFAULT_RESOLUTION ? ` · ${$_('app.settings.video.recommended')}` : ''}
           </option>
         {/each}
-      </select>
-      <button class="mini connect" type="submit">{$_('app.settings.save')}</button>
+      </Select>
+      <Button variant="secondary" type="submit">{$_('app.settings.save')}</Button>
     </form>
-  </div>
-  <div class="field vi-field">
-    <div class="ftxt">
-      <div class="fh">{$_('app.settings.video.instructions')}</div>
-      <div class="fs">{$_('app.settings.video.instructionsDesc')}</div>
-    </div>
+  </Field>
+  <Field label={$_('app.settings.video.instructions')} hint={$_('app.settings.video.instructionsDesc')}>
     <form method="POST" action="?/updateVideoInstructions" use:enhance class="vi-form">
-      <textarea
+      <Textarea
         name="videoInstructions"
-        class="vi-text"
-        rows="4"
+        rows={4}
         maxlength={MAX}
         bind:value={instructions}
         placeholder={$_('app.settings.video.instructionsPlaceholder')}
-      ></textarea>
+      />
       <div class="vi-foot">
-        <span class="fs">{instructions.length}/{MAX}</span>
-        <button class="mini connect" type="submit">{$_('app.settings.save')}</button>
+        <span class="text-[0.8125rem] text-muted-foreground">{instructions.length}/{MAX}</span>
+        <Button variant="secondary" type="submit">{$_('app.settings.save')}</Button>
       </div>
     </form>
-  </div>
-  {#if form?.saved}<div class="field"><div class="fs" style="color:var(--accent);">{$_('app.settings.video.saved')}</div></div>{/if}
-  {#if form?.error}<div class="field"><div class="fs" style="color:#c0392b;">{form.error}</div></div>{/if}
-</section>
+  </Field>
+</Panel>
 
 <style>
   .vd-form { display: flex; align-items: center; gap: 8px; }
-  .vi-field { flex-direction: column; align-items: stretch; gap: 10px; }
   .vi-form { display: flex; flex-direction: column; gap: 8px; width: 100%; }
-  .vi-text {
-    width: 100%; padding: 9px 11px; border: 1px solid var(--line);
-    background: var(--paper); color: var(--ink); font: inherit; font-size: 13px;
-    line-height: 1.5; resize: vertical; min-height: 88px;
-  }
   .vi-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-  .vd-select {
-    padding: 7px 10px; border: 1px solid var(--line);
-    background: var(--paper); color: var(--ink); font: inherit; font-size: 13px;
-  }
-  .vd-warn { color: #c0392b; font-size: 13px; }
+  .vd-warn { color: var(--sh-destructive); font-size: 13px; }
 </style>

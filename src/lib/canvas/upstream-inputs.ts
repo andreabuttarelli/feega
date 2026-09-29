@@ -281,7 +281,7 @@ function pickedWithin(
     return { accepted: [], rejected: [] };
   }
   if (!connectors.has('images')) {
-    return { accepted: [], rejected: [{ nodeId: target.id, why: `questo modello non ha un connettore ${CONNECTOR_LABEL.images}` }] };
+    return { accepted: [], rejected: [{ nodeId: target.id, why: `this model has no ${CONNECTOR_LABEL.images} input` }] };
   }
 
   const room = Math.max(listCapacity('images', kind, target.model ?? null) - taken, 0);
@@ -289,7 +289,7 @@ function pickedWithin(
   if (accepted.length === picked.length) {
     return { accepted, rejected: [] };
   }
-  return { accepted, rejected: [{ nodeId: target.id, why: `al massimo ${room + taken} ${CONNECTOR_LABEL.images} in ingresso` }] };
+  return { accepted, rejected: [{ nodeId: target.id, why: `at most ${room + taken} ${CONNECTOR_LABEL.images} inputs` }] };
 }
 
 /**
@@ -309,12 +309,12 @@ export function resolveUpstreamInputs(
   if (!target) return EMPTY;
 
   if (hasUpstreamCycle(edges, targetId)) {
-    return { ...EMPTY, rejected: [{ nodeId: targetId, why: 'ciclo: questo nodo dipende da se stesso' }] };
+    return { ...EMPTY, rejected: [{ nodeId: targetId, why: 'cycle: this node depends on itself' }] };
   }
 
   const targetKind = generativeKindOf(target.type);
   if (!targetKind) {
-    return { ...EMPTY, rejected: [{ nodeId: targetId, why: `${target.type} non si genera da altri nodi` }] };
+    return { ...EMPTY, rejected: [{ nodeId: targetId, why: `${target.type} is not generated from other nodes` }] };
   }
 
   const ordered = incomingEdges(edges, targetId);
@@ -339,13 +339,13 @@ export function resolveUpstreamInputs(
     const connector = connectorOf(edge, medium);
 
     if (!connectors.has(connector)) {
-      rejected.push({ nodeId: source.id, why: `questo modello non ha un connettore ${CONNECTOR_LABEL[connector]}` });
+      rejected.push({ nodeId: source.id, why: `this model has no ${CONNECTOR_LABEL[connector]} input` });
       continue;
     }
 
     if (connector === 'text') {
       if (!source.text?.trim()) {
-        rejected.push({ nodeId: source.id, why: 'nodo di testo non ancora girato: niente da dare' });
+        rejected.push({ nodeId: source.id, why: 'text node has not run yet: nothing to pass on' });
         continue;
       }
       text.push(source.text);
@@ -359,7 +359,7 @@ export function resolveUpstreamInputs(
 
     if (connector === 'first_frame' || connector === 'last_frame') {
       if (!sourceUrls.length) {
-        rejected.push({ nodeId: source.id, why: 'nodo immagine non ancora girato: niente da dare' });
+        rejected.push({ nodeId: source.id, why: 'image node has not run yet: nothing to pass on' });
         continue;
       }
 
@@ -372,14 +372,14 @@ export function resolveUpstreamInputs(
       // sbagliato, non nel canvas che l'ha causato.
       if (connector === 'first_frame') {
         if (startFrameUrl && startFrameSourceId !== source.id) {
-          rejected.push({ nodeId: source.id, why: `due immagini collegate a ${FIRST_FRAME_HANDLE}: solo una può esserlo` });
+          rejected.push({ nodeId: source.id, why: `two images wired to ${FIRST_FRAME_HANDLE}: only one can be` });
           continue;
         }
         startFrameUrl = frameUrl;
         startFrameSourceId = source.id;
       } else {
         if (endFrameUrl && endFrameSourceId !== source.id) {
-          rejected.push({ nodeId: source.id, why: `due immagini collegate a ${LAST_FRAME_HANDLE}: solo una può esserlo` });
+          rejected.push({ nodeId: source.id, why: `two images wired to ${LAST_FRAME_HANDLE}: only one can be` });
           continue;
         }
         endFrameUrl = frameUrl;
@@ -390,7 +390,7 @@ export function resolveUpstreamInputs(
 
     // I tre connettori a valore multiplo: images, videos, audios.
     if (!sourceUrls.length) {
-      rejected.push({ nodeId: source.id, why: `nodo ${CONNECTOR_LABEL[connector]} non ancora girato: niente da dare` });
+      rejected.push({ nodeId: source.id, why: `${CONNECTOR_LABEL[connector]} node has not run yet: nothing to pass on` });
       continue;
     }
 
@@ -406,7 +406,7 @@ export function resolveUpstreamInputs(
       if (count >= room) {
         rejected.push({
           nodeId: source.id,
-          why: room === 0 ? `questo modello non prende ${CONNECTOR_LABEL[connector]} di riferimento` : `al massimo ${room} ${CONNECTOR_LABEL[connector]} in ingresso`
+          why: room === 0 ? `this model takes no reference ${CONNECTOR_LABEL[connector]}` : `at most ${room} ${CONNECTOR_LABEL[connector]} inputs`
         });
         continue;
       }

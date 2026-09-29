@@ -140,7 +140,12 @@ function listView(input: ViewInput): SharedView {
 }
 
 async function influencerView({ db, orgId, node, sign }: ViewInput): Promise<SharedView> {
-  const influencer = await getInfluencer(db, str(node.data.influencer_id));
+  const influencerId = str(node.data.influencer_id);
+  if (!influencerId) {
+    return EMPTY;
+  }
+
+  const influencer = await getInfluencer(db, influencerId);
   if (!influencer || (influencer.orgId !== null && influencer.orgId !== orgId)) {
     return EMPTY;
   }
@@ -154,11 +159,25 @@ const mediaUrl = (m: unknown): string => (typeof m === 'string' ? m : str(record
 
 function postView({ node }: ViewInput): SharedView {
   const general = record(node.data.general);
-  return { kind: 'post', caption: str(general.caption), media: list(general.media).map(mediaUrl).filter(Boolean) };
+  const caption = str(general.caption);
+  const media = list(general.media).map(mediaUrl).filter(Boolean);
+  return caption || media.length ? { kind: 'post', caption, media } : EMPTY;
 }
 
 function adsView({ node }: ViewInput): SharedView {
-  return { kind: 'ads', query: str(node.data.page_name) || str(node.data.search_terms), country: str(node.data.country) };
+  const query = str(node.data.page_name) || str(node.data.search_terms);
+  return query ? { kind: 'ads', query, country: str(node.data.country) } : EMPTY;
+}
+
+function docView({ node }: ViewInput): SharedView {
+  const content = str(node.data.content);
+  return content ? { kind: 'doc', content } : EMPTY;
+}
+
+function frameView({ node }: ViewInput): SharedView {
+  const url = str(node.data.url);
+  const html = str(node.data.html);
+  return url || html ? { kind: 'frame', url, html } : EMPTY;
 }
 
 export const SHARED_VIEW_OF: Record<NodeType, (input: ViewInput) => SharedView | Promise<SharedView>> = {
@@ -168,8 +187,8 @@ export const SHARED_VIEW_OF: Record<NodeType, (input: ViewInput) => SharedView |
     const content = assetOf(input)?.content;
     return content ? { kind: 'text', text: content } : EMPTY;
   },
-  doc: ({ node }) => ({ kind: 'doc', content: str(node.data.content) }),
-  iframe: ({ node }) => ({ kind: 'frame', url: str(node.data.url), html: str(node.data.html) }),
+  doc: docView,
+  iframe: frameView,
   social_account_feed: feedView,
   social_post_mockup: postView,
   products: productsView,

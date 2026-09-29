@@ -227,6 +227,7 @@
   } = $props();
 
   const spec = $derived(CANVAS_MODES[mode]);
+  const ATTRIBUTION_IN_CREDITS_PAGE = { hideAttribution: true };
 
   // Un tipo di nodo solo: la tela non ha tipi di NODO, ha tipi di CONTENUTO, e quelli li decide
   // lo snippet di chi la usa.
@@ -654,6 +655,7 @@
     onconnectend={() => (refusal = null)}
     {...spec.flow}
     fitView
+    proOptions={ATTRIBUTION_IN_CREDITS_PAGE}
     multiSelectionKey={['Meta', 'Control', 'Shift']}
   >
     <CanvasPointer onready={(fn) => (toFlow = fn)} />

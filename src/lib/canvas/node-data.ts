@@ -121,7 +121,7 @@ const iframeSchema = z
     content: z.string().optional()
   })
   .refine((v) => Boolean(v.url) || Boolean(v.content), {
-    message: 'serve url o content — una pagina incorporata senza nessuno dei due non mostra niente'
+    message: 'needs a url or content: an embed with neither shows nothing'
   });
 
 const isoDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional();
@@ -206,13 +206,13 @@ const adsSchema = adsBase.superRefine((v, ctx) => {
     ctx.addIssue({ code: 'custom', path: ['page_id'], message: 'mode "page" richiede page_id' });
   }
   if (v.mode === 'page' && v.search_terms) {
-    ctx.addIssue({ code: 'custom', path: ['search_terms'], message: 'mode "page" non ammette search_terms' });
+    ctx.addIssue({ code: 'custom', path: ['search_terms'], message: 'mode "page" does not take search_terms' });
   }
   if (v.mode === 'search' && !v.search_terms) {
     ctx.addIssue({ code: 'custom', path: ['search_terms'], message: 'mode "search" richiede search_terms' });
   }
   if (v.mode === 'search' && v.page_id) {
-    ctx.addIssue({ code: 'custom', path: ['page_id'], message: 'mode "search" non ammette page_id' });
+    ctx.addIssue({ code: 'custom', path: ['page_id'], message: 'mode "search" does not take page_id' });
   }
 });
 
@@ -243,7 +243,7 @@ const listItemSchema = z
     url: z.string().optional()
   })
   .refine((v) => Boolean(v.asset_id) || Boolean(v.text) || Boolean(v.url), {
-    message: 'ogni item serve un asset_id, un text o un url'
+    message: 'every item needs an asset_id, a text or a url'
   });
 
 const listSchema = z.object({
@@ -280,7 +280,7 @@ function paramFieldSchema(param: EffectParam) {
     return z.enum(values).default(param.default);
   }
   if (param.kind === 'color') {
-    return z.string().regex(HEX_COLOR, 'colore non valido, atteso #rrggbb').default(param.default);
+    return z.string().regex(HEX_COLOR, 'invalid colour, expected #rrggbb').default(param.default);
   }
   return z.int().default(param.default);
 }
@@ -356,7 +356,7 @@ const compositionSchema = z.object({
   layout: z.enum(LAYOUT_IDS),
   layoutParams: z.record(z.string(), z.union([z.number(), z.string()])).default({}),
   camera: compositionCameraSchema,
-  background: z.object({ color: z.string().regex(HEX_COLOR, 'colore non valido, atteso #rrggbb') }),
+  background: z.object({ color: z.string().regex(HEX_COLOR, 'invalid colour, expected #rrggbb') }),
   duration: z.number().positive(),
   aspect: z.enum(COMPOSITION_ASPECTS),
   refId: z.string().nullish()

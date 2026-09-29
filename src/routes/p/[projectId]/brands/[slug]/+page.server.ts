@@ -41,7 +41,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
   const memberships = await listMemberships(db, user.id);
   const found = await findProjectForUser(db, { projectId: params.projectId ?? '', memberships });
   if (!found) {
-    throw error(404, 'questo progetto non esiste, o non è tuo');
+    throw error(404, 'This project does not exist, or is not yours');
   }
 
   const { orgId, project } = found;
@@ -57,7 +57,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
     throw error(500, dbError.message);
   }
   if (!data) {
-    throw error(404, 'questo brand non esiste, o non è tuo');
+    throw error(404, 'This brand does not exist, or is not yours');
   }
 
   const logoAsset = data.logo_url

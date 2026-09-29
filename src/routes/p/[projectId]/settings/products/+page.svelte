@@ -1,11 +1,14 @@
 <script lang="ts">
+  import { ShoppingBag } from '@lucide/svelte';
+  import { Panel } from '$lib/components/ui/panel';
+  import { EmptyState } from '$lib/components/ui/empty-state';
+
   let { data } = $props();
 </script>
 
-<section class="panel">
-  <h2 class="panel-title">Products ({data.products.length})</h2>
+<Panel title={`Products (${data.products.length})`}>
   {#if data.products.length}
-    <div class="grid">
+    <div class="catalog">
       {#each data.products as p (p.id)}
         {@const image = Array.isArray(p.images) ? (p.images as { url?: string }[])[0]?.url : null}
         <div class="product">
@@ -21,15 +24,14 @@
       {/each}
     </div>
   {:else}
-    <div class="empty">No products yet. Run <code>feega products &lt;slug&gt; sync</code> to import the catalog from the connected store.</div>
+    <EmptyState title="No products yet" description="Add a products node on the canvas, or run feega products <slug> sync to import the catalog from the connected store.">
+      {#snippet icon()}<ShoppingBag />{/snippet}
+    </EmptyState>
   {/if}
-</section>
+</Panel>
 
 <style>
-  .panel { display: flex; flex-direction: column; gap: 20px; }
-  .panel-title { font-size: 20px; font-weight: 600; margin: 0; color: var(--ink); }
-
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+  .catalog { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
   .product { display: flex; flex-direction: column; gap: 8px; }
   .pimg {
     aspect-ratio: 1; background: var(--paper-2); border: 1px solid var(--line);
@@ -40,8 +42,5 @@
   .pinfo { display: flex; flex-direction: column; gap: 2px; }
   .ptitle { font-size: 13px; font-weight: 600; color: var(--ink); }
   .pprice { font-size: 12px; color: var(--ink-soft); }
-  .punavailable { font-size: 11px; color: #b25000; }
-
-  .empty { font-size: 14px; color: var(--ink-soft); line-height: 1.6; }
-  .empty code { font-family: monospace; background: var(--paper-2); padding: 1px 4px; }
+  .punavailable { font-size: 11px; color: var(--amber); }
 </style>

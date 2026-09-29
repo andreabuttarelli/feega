@@ -1,42 +1,40 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
   import { _ } from 'svelte-i18n';
+  import { Panel } from '$lib/components/ui/panel';
+  import { Input } from '$lib/components/ui/input';
+  import { Button } from '$lib/components/ui/button';
+  import { Notice } from '$lib/components/ui/notice';
 
   let { data, form } = $props();
 </script>
 
-<section class="panel">
-  <div class="panel-head"><div class="t">{$_('app.settings.team.title')}</div></div>
+{#if form?.teamError}<Notice tone="error">{form.teamError}</Notice>{/if}
+{#if form?.teamInvited}<Notice tone="success">{form.emailSent ? $_('app.settings.team.invited') : $_('app.settings.team.invitedNoEmail')}</Notice>{/if}
+{#if form?.teamRevoked}<Notice tone="success">{$_('app.settings.team.revoked')}</Notice>{/if}
 
+<Panel title={$_('app.settings.team.title')} description={data.isOwner ? $_('app.settings.team.subtitle') : undefined}>
   {#if !data.isOwner}
-    <div class="field"><div class="bill-notice">{$_('app.settings.billing.membersNotice')}</div></div>
+    <div><Notice class="mb-0">{$_('app.settings.billing.membersNotice')}</Notice></div>
   {:else}
-    <div class="field"><div class="ftxt"><div class="fs">{$_('app.settings.team.subtitle')}</div></div></div>
-    <div class="field">
-      <form method="POST" action="?/invite" use:enhance class="team-form">
-        <input class="team-input" type="email" name="email" required placeholder={$_('app.settings.team.emailPlaceholder')} />
-        <button class="mini connect" type="submit">{$_('app.settings.team.invite')}</button>
-      </form>
-    </div>
-    {#if form?.teamError}<div class="field"><div class="fs" style="color:#c0392b;">{form.teamError}</div></div>{/if}
-    {#if form?.teamInvited}<div class="field"><div class="fs" style="color:var(--accent);">{form.emailSent ? $_('app.settings.team.invited') : $_('app.settings.team.invitedNoEmail')}</div></div>{/if}
-    {#if form?.teamRevoked}<div class="field"><div class="fs" style="color:var(--accent);">{$_('app.settings.team.revoked')}</div></div>{/if}
+    <form method="POST" action="?/invite" use:enhance class="flex gap-2">
+      <Input type="email" name="email" required placeholder={$_('app.settings.team.emailPlaceholder')} class="h-9" />
+      <Button type="submit">{$_('app.settings.team.invite')}</Button>
+    </form>
 
-    {#if data.invites.length}
-      {#each data.invites as inv (inv.id)}
-        <div class="acct">
-          <div class="nm">
-            <div class="h">{inv.email}</div>
-            <div class="s">{inv.accepted_at ? $_('app.settings.team.member') : $_('app.settings.team.pending')}</div>
-          </div>
-          <form method="POST" action="?/revokeInvite" use:enhance>
-            <input type="hidden" name="invite_id" value={inv.id} />
-            <button class="disc-btn" type="submit">{$_('app.settings.team.revoke')}</button>
-          </form>
+    {#each data.invites as inv (inv.id)}
+      <div class="flex items-center justify-between gap-3">
+        <div class="min-w-0">
+          <p class="m-0 truncate text-sm font-semibold">{inv.email}</p>
+          <p class="m-0 text-[0.8125rem] text-muted-foreground">{inv.accepted_at ? $_('app.settings.team.member') : $_('app.settings.team.pending')}</p>
         </div>
-      {/each}
+        <form method="POST" action="?/revokeInvite" use:enhance>
+          <input type="hidden" name="invite_id" value={inv.id} />
+          <Button variant="ghost" size="sm" type="submit">{$_('app.settings.team.revoke')}</Button>
+        </form>
+      </div>
     {:else}
-      <div class="field"><div class="fs">{$_('app.settings.team.empty')}</div></div>
-    {/if}
+      <p class="m-0 text-[0.8125rem] text-muted-foreground">{$_('app.settings.team.empty')}</p>
+    {/each}
   {/if}
-</section>
+</Panel>

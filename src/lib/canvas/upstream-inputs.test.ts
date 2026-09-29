@@ -50,7 +50,7 @@ describe('resolveUpstreamInputs — testo verso un nodo che genera', () => {
     const out = resolveUpstreamInputs(nodes, edges, 'i1', TEXT_IMAGE);
 
     expect(out.text).toEqual([]);
-    expect(out.rejected).toEqual([{ nodeId: 't1', why: expect.stringContaining('non ancora girato') }]);
+    expect(out.rejected).toEqual([{ nodeId: 't1', why: expect.stringContaining('has not run yet') }]);
   });
 
   it('un modello che non ha il connettore testo (caso limite: nessuna modalità testo) rifiuta il testo collegato', () => {
@@ -60,7 +60,7 @@ describe('resolveUpstreamInputs — testo verso un nodo che genera', () => {
     const out = resolveUpstreamInputs(nodes, edges, 'i1', { input: ['image'] });
 
     expect(out.text).toEqual([]);
-    expect(out.rejected).toEqual([{ nodeId: 't1', why: expect.stringContaining('connettore') }]);
+    expect(out.rejected).toEqual([{ nodeId: 't1', why: expect.stringContaining('has no') }]);
   });
 });
 
@@ -86,7 +86,7 @@ describe('resolveUpstreamInputs — immagine verso immagine', () => {
     const out = resolveUpstreamInputs(nodes, edges, 'i1', TEXT_IMAGE);
 
     expect(out.referenceImageUrl).toBeNull();
-    expect(out.rejected).toEqual([{ nodeId: 'src', why: expect.stringContaining('non ancora girato') }]);
+    expect(out.rejected).toEqual([{ nodeId: 'src', why: expect.stringContaining('has not run yet') }]);
   });
 
   it('un modello che non ha il connettore immagini (solo testo) rifiuta l\'immagine collegata', () => {
@@ -99,7 +99,7 @@ describe('resolveUpstreamInputs — immagine verso immagine', () => {
     const out = resolveUpstreamInputs(nodes, edges, 'i1', TEXT_ONLY);
 
     expect(out.referenceImageUrls).toEqual([]);
-    expect(out.rejected).toEqual([{ nodeId: 'r1', why: expect.stringContaining('connettore') }]);
+    expect(out.rejected).toEqual([{ nodeId: 'r1', why: expect.stringContaining('has no') }]);
   });
 
   it('senza un modello noto nel catalogo integrazione (`maxRefs`), un nodo immagine accetta un solo riferimento', () => {
@@ -320,7 +320,7 @@ describe('resolveUpstreamInputs — video: fotogrammi e riferimenti', () => {
     const out = resolveUpstreamInputs(nodes, edges, 'v1', TEXT_ONLY);
 
     expect(out.startFrameUrl).toBeNull();
-    expect(out.rejected).toEqual([{ nodeId: 'img', why: expect.stringContaining('connettore') }]);
+    expect(out.rejected).toEqual([{ nodeId: 'img', why: expect.stringContaining('has no') }]);
   });
 });
 
@@ -361,7 +361,7 @@ describe('resolveUpstreamInputs — video verso video: riferimento, mai un fotog
     const out = resolveUpstreamInputs(nodes, edges, 'v1', TEXT_IMAGE_VIDEO_AUDIO);
 
     expect(out.referenceVideoUrls).toEqual([]);
-    expect(out.rejected).toEqual([{ nodeId: 'src', why: expect.stringContaining('non ancora girato') }]);
+    expect(out.rejected).toEqual([{ nodeId: 'src', why: expect.stringContaining('has not run yet') }]);
   });
 
   it('una composizione esportata entra come riferimento video, come un nodo video', () => {
@@ -387,7 +387,7 @@ describe('resolveUpstreamInputs — video verso video: riferimento, mai un fotog
     const out = resolveUpstreamInputs(nodes, edges, 'v1', TEXT_IMAGE);
 
     expect(out.referenceVideoUrls).toEqual([]);
-    expect(out.rejected).toEqual([{ nodeId: 'src', why: expect.stringContaining('connettore') }]);
+    expect(out.rejected).toEqual([{ nodeId: 'src', why: expect.stringContaining('has no') }]);
   });
 });
 
@@ -422,7 +422,7 @@ describe('resolveUpstreamInputs — cicli: mai un giro infinito', () => {
 
     const out = resolveUpstreamInputs(nodes, edges, 'a', TEXT_IMAGE);
 
-    expect(out.rejected).toEqual([{ nodeId: 'a', why: expect.stringContaining('ciclo') }]);
+    expect(out.rejected).toEqual([{ nodeId: 'a', why: expect.stringContaining('cycle') }]);
     expect(out.text).toEqual([]);
     expect(out.referenceImageUrls).toEqual([]);
   });
@@ -438,7 +438,7 @@ describe('resolveUpstreamInputs — nodo assente o non generativo', () => {
 
     const out = resolveUpstreamInputs(nodes, [], 'd1', TEXT_IMAGE);
 
-    expect(out.rejected).toEqual([{ nodeId: 'd1', why: expect.stringContaining('non si genera') }]);
+    expect(out.rejected).toEqual([{ nodeId: 'd1', why: expect.stringContaining('is not generated') }]);
   });
 });
 
@@ -516,7 +516,7 @@ describe('resolveUpstreamInputs — un influencer porta tutte le sue viste, non 
     const out = resolveUpstreamInputs(nodes, edges, 'i1', TEXT_ONLY);
 
     expect(out.referenceImageUrls).toEqual([]);
-    expect(out.rejected).toEqual([{ nodeId: 'inf1', why: expect.stringContaining('connettore') }]);
+    expect(out.rejected).toEqual([{ nodeId: 'inf1', why: expect.stringContaining('has no') }]);
   });
 
   it('un influencer senza viste ancora caricate non alimenta niente', () => {
@@ -526,7 +526,7 @@ describe('resolveUpstreamInputs — un influencer porta tutte le sue viste, non 
     const out = resolveUpstreamInputs(nodes, edges, 'i1', TEXT_IMAGE);
 
     expect(out.referenceImageUrls).toEqual([]);
-    expect(out.rejected).toEqual([{ nodeId: 'inf1', why: expect.stringContaining('non ancora') }]);
+    expect(out.rejected).toEqual([{ nodeId: 'inf1', why: expect.stringContaining('not run yet') }]);
   });
 
   it('un influencer collegato al fotogramma iniziale porta solo la prima vista', () => {
@@ -575,7 +575,7 @@ describe('resolveUpstreamInputs — list: fisso, porta TUTTI i suoi item, come u
     const out = resolveUpstreamInputs(nodes, edges, 'i1', TEXT_IMAGE);
 
     expect(out.referenceImageUrls).toEqual([]);
-    expect(out.rejected).toEqual([{ nodeId: 'l1', why: expect.stringContaining('non ancora') }]);
+    expect(out.rejected).toEqual([{ nodeId: 'l1', why: expect.stringContaining('not run yet') }]);
   });
 });
 
@@ -612,7 +612,7 @@ describe('resolveUpstreamInputs — select: sceglie ESATTAMENTE un item, mai la 
     const out = resolveUpstreamInputs(nodes, edges, 'i1', TEXT_IMAGE);
 
     expect(out.referenceImageUrls).toEqual([]);
-    expect(out.rejected).toEqual([{ nodeId: 's1', why: expect.stringContaining('non ancora') }]);
+    expect(out.rejected).toEqual([{ nodeId: 's1', why: expect.stringContaining('not run yet') }]);
   });
 
   it('un select può alimentare un fotogramma, come un\'immagine qualunque', () => {
@@ -703,7 +703,7 @@ describe('resolveUpstreamInputs — riferimenti scelti sul nodo', () => {
     expect(out.referenceImageUrls).toEqual(['https://cdn/1.png', 'https://cat/a.png', 'https://cat/b.png']);
     expect(out.pickedImageUrls).toEqual(['https://cat/a.png', 'https://cat/b.png']);
     expect(out.referenceImageUrl).toBe('https://cdn/1.png');
-    expect(out.rejected).toEqual([{ nodeId: 'i1', why: expect.stringContaining('al massimo 3') }]);
+    expect(out.rejected).toEqual([{ nodeId: 'i1', why: expect.stringContaining('at most 3') }]);
   });
 
   it('un modello senza ingresso immagine rifiuta i riferimenti scelti', () => {
@@ -712,7 +712,7 @@ describe('resolveUpstreamInputs — riferimenti scelti sul nodo', () => {
     const out = resolveUpstreamInputs(nodes, [], 'i1', TEXT_ONLY);
 
     expect(out.referenceImageUrls).toEqual([]);
-    expect(out.rejected).toEqual([{ nodeId: 'i1', why: expect.stringContaining('connettore') }]);
+    expect(out.rejected).toEqual([{ nodeId: 'i1', why: expect.stringContaining('has no') }]);
   });
 
   it('su un video i scelti vanno fra i riferimenti immagine', () => {

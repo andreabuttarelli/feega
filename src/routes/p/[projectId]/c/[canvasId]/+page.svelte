@@ -33,6 +33,8 @@
   import ProductsNode from '$lib/components/canvas/ProductsNode.svelte';
   import SocialFeedNode from '$lib/components/canvas/SocialFeedNode.svelte';
   import InfluencerNode from '$lib/components/canvas/InfluencerNode.svelte';
+  import EmptyNode from '$lib/components/canvas/EmptyNode.svelte';
+  import { isNodeType } from '$lib/canvas/node-data';
   import UploadedNode from '$lib/components/canvas/UploadedNode.svelte';
   import ListNode from '$lib/components/canvas/ListNode.svelte';
   import SelectNode from '$lib/components/canvas/SelectNode.svelte';
@@ -2010,6 +2012,8 @@
             imageCount={upstreamCompositionRefsOf(id).length}
             onopeneditor={() => openCompositionEditor(id)}
           />
+        {:else if isNodeType(row.type)}
+          <EmptyNode type={row.type} />
         {/if}
       {/if}
     {/snippet}

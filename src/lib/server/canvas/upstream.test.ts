@@ -266,7 +266,7 @@ describe('upstreamInputsFor — un nodo influencer, dal database vero fino al re
     });
 
     expect(out.referenceImageUrls).toEqual([]);
-    expect(out.rejected).toEqual([{ nodeId: INFLUENCER_NODE, why: expect.stringContaining('non ancora') }]);
+    expect(out.rejected).toEqual([{ nodeId: INFLUENCER_NODE, why: expect.stringContaining('not run yet') }]);
   });
 });
 
@@ -374,7 +374,7 @@ describe('upstreamInputsFor — un modello sparito da ai_models blocca il nodo',
 
     expect(out.blocked).toBeNull();
     expect(out.referenceVideoUrls).toEqual([]);
-    expect(out.rejected).toEqual([{ nodeId: SOURCE_VIDEO_NODE, why: expect.stringContaining('connettore') }]);
+    expect(out.rejected).toEqual([{ nodeId: SOURCE_VIDEO_NODE, why: expect.stringContaining('has no') }]);
   });
 
   it('passa il medium a `modalitiesOf`, così l\'id interno si traduce sul listino giusto', async () => {
@@ -463,7 +463,7 @@ describe('upstreamInputsFor — un nodo testo apre le sue porte dal listino `cha
 
     expect(out.blocked).toBeNull();
     expect(out.referenceImageUrls).toEqual([]);
-    expect(out.rejected).toEqual([{ nodeId: IMAGE_NODE, why: expect.stringContaining('connettore') }]);
+    expect(out.rejected).toEqual([{ nodeId: IMAGE_NODE, why: expect.stringContaining('has no') }]);
   });
 });
 
@@ -615,7 +615,7 @@ describe('upstreamInputsFor — select: risolve ESATTAMENTE l\'item scelto dalla
     const out = await upstreamInputsFor(db, { orgId: ORG, canvasId: CANVAS, nodeId: IMAGE_NODE, model: 'qwen3-pro', medium: 'image' });
 
     expect(out.referenceImageUrls).toEqual([]);
-    expect(out.rejected).toEqual([{ nodeId: SELECT_NODE, why: expect.stringContaining('non ancora') }]);
+    expect(out.rejected).toEqual([{ nodeId: SELECT_NODE, why: expect.stringContaining('not run yet') }]);
   });
 
   it('un select senza lista a monte (referenza rotta) non alimenta niente', async () => {
@@ -633,7 +633,7 @@ describe('upstreamInputsFor — select: risolve ESATTAMENTE l\'item scelto dalla
     const out = await upstreamInputsFor(db, { orgId: ORG, canvasId: CANVAS, nodeId: IMAGE_NODE, model: 'qwen3-pro', medium: 'image' });
 
     expect(out.referenceImageUrls).toEqual([]);
-    expect(out.rejected).toEqual([{ nodeId: SELECT_NODE, why: expect.stringContaining('non ancora') }]);
+    expect(out.rejected).toEqual([{ nodeId: SELECT_NODE, why: expect.stringContaining('not run yet') }]);
   });
 });
 

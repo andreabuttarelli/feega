@@ -18,7 +18,7 @@ async function ownedProject(event: RequestEvent): Promise<OwnedProject> {
   const { data } = await db.from('projects').select('org_id, name').eq('id', projectId).is('archived_at', null).maybeSingle();
   const row = data as { org_id: string; name: string } | null;
   if (!row) {
-    throw error(404, 'progetto non trovato');
+    throw error(404, 'Project not found');
   }
 
   return { db, orgId: row.org_id, projectId, name: row.name };

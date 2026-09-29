@@ -10,7 +10,7 @@ export const GET: RequestHandler = async ({ params, locals: { supabase, safeGetS
   if (!session) return new Response('Unauthorized', { status: 401 });
 
   const brandSlug = await brandSlugOf(supabase, params.projectId);
-  if (!brandSlug) throw error(409, 'questo progetto non ha ancora un brand');
+  if (!brandSlug) throw error(409, 'This project has no brand yet');
 
   // RLS on brands (policy "brands via org") scopes the query to the user's org —
   // a user cannot read another user's brand by guessing the slug.

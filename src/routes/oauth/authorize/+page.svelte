@@ -3,31 +3,31 @@
   let { data } = $props();
 </script>
 
-<svelte:head><title>Autorizza accesso — feega</title></svelte:head>
+<svelte:head><title>Authorize access — feega</title></svelte:head>
 
 <div class="wrap">
   <div class="card">
     <div class="logo">feega</div>
 
     {#if data.fatal}
-      <h2>Richiesta non valida</h2>
+      <h2>Invalid request</h2>
       <p class="desc">{data.fatal}</p>
-      <a class="btn-cancel" href={HOME_PATH}>Torna ad feega</a>
+      <a class="btn-cancel" href={HOME_PATH}>Back to feega</a>
     {:else}
-      <h2>{data.clientName} vuole accedere al tuo account</h2>
+      <h2>{data.clientName} wants to access your account</h2>
       <p class="email">{data.userEmail}</p>
       <p class="desc">
-        Potrà leggere e gestire i tuoi brand e i tuoi contenuti tramite MCP, con le stesse
-        autorizzazioni del tuo account. Puoi disconnetterlo in qualsiasi momento dal client.
+        It will read and manage your brands and content through MCP, with the same
+        permissions as your account. You can disconnect it from the client at any time.
       </p>
 
       <!-- No use:enhance: the actions redirect to the client's loopback URL, which the browser
            has to follow as a real navigation. -->
       <form method="POST" action="{data.search}&/approve">
-        <button class="btn-primary" type="submit">Autorizza</button>
+        <button class="btn-primary" type="submit">Authorize</button>
       </form>
       <form method="POST" action="{data.search}&/deny">
-        <button class="btn-cancel" type="submit">Annulla</button>
+        <button class="btn-cancel" type="submit">Cancel</button>
       </form>
     {/if}
   </div>
@@ -44,6 +44,7 @@
   }
   .card {
     background: var(--paper, #fff);
+    border: 1px solid var(--line);
     padding: 40px 36px;
     max-width: 420px;
     width: 100%;

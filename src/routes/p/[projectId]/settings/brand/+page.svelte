@@ -1,10 +1,18 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
   import { RASTER_IMAGE_ACCEPT } from '$lib/raster-image';
+  import { Panel } from '$lib/components/ui/panel';
+  import { Field } from '$lib/components/ui/field';
+  import { Input } from '$lib/components/ui/input';
+  import { Textarea } from '$lib/components/ui/textarea';
+  import { Select } from '$lib/components/ui/select';
+  import { Button, buttonVariants } from '$lib/components/ui/button';
+  import { Notice } from '$lib/components/ui/notice';
 
   let { data, form } = $props();
 
   let busy = $state(false);
+
   const withBusy = () => {
     busy = true;
     return async ({ update }: { update: () => Promise<void> }) => {
@@ -14,50 +22,46 @@
   };
 </script>
 
-{#if !data.brand}
-  <section class="panel">
-    <h2 class="panel-title">No brand yet</h2>
-    <p class="panel-desc">
-      This project has no brand attached. Pick one of your org's brands, or create a new one.
-    </p>
+{#if form?.saved}<Notice tone="success">Saved.</Notice>{/if}
+{#if form?.error}<Notice tone="error">{form.error}</Notice>{/if}
 
+{#if !data.brand}
+  <Panel title="No brand yet" description="This project has no brand attached. Pick one of your org's brands, or create a new one.">
     {#if data.orgBrands.length}
-      <form method="POST" action="?/selectBrand" use:enhance={withBusy} class="pick-form">
-        <select name="brandId" class="pick-select">
+      <form method="POST" action="?/selectBrand" use:enhance={withBusy} class="flex flex-col gap-2 sm:flex-row">
+        <Select name="brandId" aria-label="Brand">
           {#each data.orgBrands as brand (brand.id)}
             <option value={brand.id}>{brand.name}</option>
           {/each}
-        </select>
-        <button class="btn primary" type="submit" disabled={busy}>Use this brand</button>
+        </Select>
+        <Button type="submit" disabled={busy}>Use this brand</Button>
       </form>
     {/if}
 
-    <form method="POST" action="?/createBrand" use:enhance={withBusy} class="create-form">
-      <label class="field">
-        <span>New brand name</span>
-        <input name="name" type="text" placeholder="Acme Coffee" required />
-      </label>
-      <button class="btn ghost" type="submit" disabled={busy}>Create brand</button>
+    <form method="POST" action="?/createBrand" use:enhance={withBusy} class="flex flex-col gap-2 sm:flex-row sm:items-end">
+      <Field label="New brand name" for="new-brand-name" class="flex-1">
+        <Input id="new-brand-name" name="name" type="text" placeholder="Acme Coffee" required class="h-9" />
+      </Field>
+      <Button variant="secondary" type="submit" disabled={busy}>Create brand</Button>
     </form>
 
-    <a href={`/p/${data.project.id}/brands/new`} class="wizard-link">Create a brand with the wizard</a>
-
-    {#if form?.error}<p class="msg warn">{form.error}</p>{/if}
-  </section>
+    <div>
+      <Button variant="link" href={`/p/${data.project.id}/brands/new`}>Create a brand with the wizard</Button>
+    </div>
+  </Panel>
 {:else}
-  <section class="panel">
-    <h2 class="panel-title">Brand</h2>
-
-    <div class="logo-row">
+  <Panel title="Brand">
+    <div class="flex flex-wrap items-center gap-4">
       <span class="logo-slot" class:empty={!data.brand.logoUrl}>
         {#if data.brand.logoUrl}<img src={data.brand.logoUrl} alt="" />{:else}—{/if}
       </span>
       <form method="POST" action="?/uploadLogo" enctype="multipart/form-data" use:enhance={withBusy}>
-        <label class="logo-upload">
+        <label class={buttonVariants({ variant: 'secondary', size: 'sm' })}>
           <input
             type="file"
             name="file"
             accept={RASTER_IMAGE_ACCEPT}
+            hidden
             onchange={(e) => e.currentTarget.form?.requestSubmit()}
           />
           {busy ? 'Saving…' : 'Upload logo'}
@@ -65,89 +69,52 @@
       </form>
       {#if data.brand.logoUrl}
         <form method="POST" action="?/removeLogo" use:enhance={withBusy}>
-          <button class="logo-remove" type="submit" disabled={busy}>Remove</button>
+          <Button variant="ghost" size="sm" type="submit" disabled={busy}>Remove</Button>
         </form>
       {/if}
     </div>
 
-    <form method="POST" action="?/update" use:enhance={withBusy} class="edit-form">
-      <label class="field">
-        <span>Name</span>
-        <input name="name" type="text" value={data.brand.name} required />
-      </label>
-      <label class="field">
-        <span>Slug</span>
-        <input type="text" value={data.brand.slug} disabled />
-      </label>
-      <label class="field">
-        <span>Website</span>
-        <input name="website" type="url" inputmode="url" value={data.brand.website ?? ''} placeholder="https://example.com" />
-      </label>
-      <label class="field">
-        <span>Short description</span>
-        <input name="short_description" type="text" value={data.brand.shortDescription ?? ''} placeholder="One line about the brand" />
-      </label>
-      <label class="field">
-        <span>Content</span>
-        <textarea name="content" rows="8" placeholder="Anything else worth knowing about the brand">{data.brand.content ?? ''}</textarea>
-      </label>
-      <div class="form-actions">
-        <button class="btn primary" type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>
+    <form method="POST" action="?/update" use:enhance={withBusy} class="flex flex-col gap-4">
+      <Field label="Name" for="brand-name">
+        <Input id="brand-name" name="name" type="text" value={data.brand.name} required class="h-9" />
+      </Field>
+      <Field label="Slug" for="brand-slug">
+        <Input id="brand-slug" type="text" value={data.brand.slug} disabled class="h-9" />
+      </Field>
+      <Field label="Website" for="brand-website">
+        <Input id="brand-website" name="website" type="url" inputmode="url" value={data.brand.website ?? ''} placeholder="https://example.com" class="h-9" />
+      </Field>
+      <Field label="Short description" for="brand-short">
+        <Input id="brand-short" name="short_description" type="text" value={data.brand.shortDescription ?? ''} placeholder="One line about the brand" class="h-9" />
+      </Field>
+      <Field label="Content" for="brand-content">
+        <Textarea id="brand-content" name="content" rows={8} placeholder="Anything else worth knowing about the brand" value={data.brand.content ?? ''} />
+      </Field>
+      <div class="flex justify-end">
+        <Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save'}</Button>
       </div>
     </form>
-
-    {#if form?.saved}<p class="msg ok">Saved.</p>{/if}
-    {#if form?.error}<p class="msg warn">{form.error}</p>{/if}
-  </section>
+  </Panel>
 {/if}
 
 <style>
-  .panel { display: flex; flex-direction: column; gap: 20px; max-width: 640px; }
-  .panel-title { font-size: 20px; font-weight: 600; margin: 0; color: var(--ink); }
-  .panel-desc { margin: 0; font-size: 14px; color: var(--ink-soft); line-height: 1.5; }
-
-  .pick-form { display: flex; gap: 8px; align-items: center; }
-  .pick-select {
-    flex: 1; font-size: 14px; color: var(--ink); background: var(--paper);
-    border: 1px solid var(--line); padding: 9px 10px; font-family: inherit;
-  }
-  .create-form { display: flex; gap: 8px; align-items: flex-end; }
-  :global([data-viewport='mobile']) .create-form, :global([data-viewport='mobile']) .pick-form { flex-direction: column; align-items: stretch; }
-  :global([data-viewport='mobile']) .btn { min-height: var(--touch-target); }
-  .wizard-link { font-size: 13px; font-weight: 600; color: var(--accent); text-decoration: none; }
-  .wizard-link:hover { text-decoration: underline; }
-
-  .logo-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
   .logo-slot {
-    width: 64px; height: 64px; border: 1px solid var(--line); background: var(--paper-2);
-    display: flex; align-items: center; justify-content: center; overflow: hidden; flex: none;
+    width: 64px;
+    height: 64px;
+    border: 1px solid var(--line);
+    background: var(--paper-2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    flex: none;
   }
-  .logo-slot.empty { color: var(--ink-faint); }
-  .logo-slot img { max-width: 80%; max-height: 80%; object-fit: contain; }
-  .logo-upload { position: relative; font-size: 13px; font-weight: 600; color: var(--accent); cursor: pointer; }
-  .logo-upload:hover { text-decoration: underline; }
-  .logo-upload input[type='file'] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
-  .logo-remove { background: none; border: none; padding: 0; font-size: 13px; color: var(--ink-faint); cursor: pointer; }
-  .logo-remove:hover { color: #c0392b; }
-
-  .edit-form, .field { display: flex; flex-direction: column; gap: 6px; }
-  .edit-form { gap: 14px; }
-  .field > span { font-size: 12px; font-weight: 600; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.04em; }
-  .field input, .field textarea {
-    width: 100%; font-size: 14px; color: var(--ink); background: var(--paper);
-    border: 1px solid var(--line); padding: 9px 10px; font-family: inherit; box-sizing: border-box;
+  .logo-slot.empty {
+    color: var(--ink-faint);
   }
-  .field input:disabled { color: var(--ink-faint); background: var(--paper-2); }
-  .field textarea { resize: vertical; line-height: 1.5; }
-
-  .form-actions { display: flex; justify-content: flex-end; }
-
-  .btn { font-size: 13px; font-weight: 600; padding: 9px 16px; cursor: pointer; border: 1px solid transparent; line-height: 1; }
-  .btn:disabled { opacity: 0.55; cursor: default; }
-  .btn.primary { background: var(--accent, #7c5cff); color: #fff; }
-  .btn.ghost { background: transparent; color: var(--ink-soft); border-color: var(--line); }
-
-  .msg { font-size: 13px; margin: 0; }
-  .msg.ok { color: var(--accent, #7c5cff); font-weight: 600; }
-  .msg.warn { color: #b25000; }
+  .logo-slot img {
+    max-width: 80%;
+    max-height: 80%;
+    object-fit: contain;
+  }
 </style>

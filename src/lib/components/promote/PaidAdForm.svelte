@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Button } from '$lib/components/ui/button';
   import { enhance } from '$app/forms';
   import CountryPicker from '$lib/components/CountryPicker.svelte';
   import { parseCountries } from '$lib/countries';
@@ -132,13 +133,13 @@
   <section class="gate">
     <h2>Pick a brand first</h2>
     <p>Ads run on a brand's Facebook and Instagram. Create one, then come back.</p>
-    <a class="btn primary" href={`/p/${projectId}/brands/new`}>Create a brand</a>
+    <Button href={`/p/${projectId}/brands/new`}>Create a brand</Button>
   </section>
 {:else if gate === 'no_ad_account'}
   <section class="gate" data-testid="connect-meta-cta">
     <h2>Connect a Meta ad account</h2>
     <p>{brandName} has no Meta ad account yet. Connect one to run ads on Facebook and Instagram.</p>
-    <a class="btn primary" href={`/p/${projectId}/ads/connect`} data-sveltekit-reload>Connect Meta ads</a>
+    <Button href={`/p/${projectId}/ads/connect`} data-sveltekit-reload>Connect Meta ads</Button>
   </section>
 {:else if gate === 'no_media'}
   <section class="gate">
@@ -149,7 +150,7 @@
   <section class="gate" data-testid="ad-proposed">
     <h2>Ad proposed</h2>
     <p>Nothing is spent yet. Review it in Ads and approve it to launch.</p>
-    <button class="btn primary" type="button" onclick={() => openSheet(projectId, '/ads', 'replace')}>Open Ads</button>
+    <Button onclick={() => openSheet(projectId, '/ads', 'replace')}>Open Ads</Button>
   </section>
 {:else}
   <form
@@ -293,9 +294,9 @@
 
         {#if serverError}<p class="err" role="alert">{serverError}</p>{/if}
         {#if problems.length}<p class="reason">{problems[0].reason}</p>{/if}
-        <button class="btn primary wide" type="submit" disabled={problems.length > 0 || submitting}>
+        <Button type="submit" class="w-full" disabled={problems.length > 0 || submitting}>
           {submitting ? 'Proposing…' : 'Propose ad'}
-        </button>
+        </Button>
       </aside>
     </div>
   </form>
@@ -304,7 +305,7 @@
 <style>
   .gate { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 28px 0; max-width: 460px; }
   .gate h2 { margin: 0; font-size: 1.05rem; font-weight: 650; }
-  .gate p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--muted, #6e6e73); }
+  .gate p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--ink-soft); }
   .grid { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 24px; }
   .fields section { margin-bottom: 20px; display: flex; flex-direction: column; gap: 8px; }
   .fields h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-soft, #6e6e73); margin: 0; }
@@ -336,12 +337,7 @@
   .cost dd { margin: 0; text-align: right; }
   .note, .reason { margin: 0; font-size: 12px; }
   .err { margin: 0; font-size: 12.5px; color: var(--danger, #b3261e); }
-  .btn { font-size: 13px; font-weight: 600; padding: 10px 16px; cursor: pointer; border: 1px solid transparent; text-decoration: none; display: inline-block; font-family: inherit; }
-  .btn:disabled { opacity: 0.55; cursor: default; }
-  .btn.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
-  .btn.wide { width: 100%; }
   @media (max-width: 720px) {
     .grid { grid-template-columns: 1fr; }
-    .btn { min-height: var(--touch-target, 44px); }
   }
 </style>

@@ -1,6 +1,9 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
   import { _ } from 'svelte-i18n';
+  import { Panel } from '$lib/components/ui/panel';
+  import { Button } from '$lib/components/ui/button';
+  import { Notice } from '$lib/components/ui/notice';
 
   let { data, form } = $props();
 
@@ -20,25 +23,23 @@
   }
 </script>
 
-<section class="panel">
-  <div class="panel-head">
-    <div class="t">{$_('app.settings.apiKeys.title')}</div>
-    <button class="approve-all" type="button" onclick={() => (apiKeyModalOpen = true)}>+ {$_('app.settings.apiKeys.createKey')}</button>
-  </div>
-  <div class="field"><div class="ftxt"><div class="fs">{$_('app.settings.apiKeys.subtitle')}</div></div></div>
+{#if form?.apiKeyError}<Notice tone="error">{form.apiKeyError}</Notice>{/if}
+{#if form?.apiKeyRevoked}<Notice tone="success">{$_('app.settings.apiKeys.keyRevoked')}</Notice>{/if}
+
+<Panel title={$_('app.settings.apiKeys.title')} description={$_('app.settings.apiKeys.subtitle')}>
+  {#snippet actions()}
+    <Button variant="secondary" size="sm" onclick={() => (apiKeyModalOpen = true)}>{$_('app.settings.apiKeys.createKey')}</Button>
+  {/snippet}
 
   {#if form?.apiKeyCreated && form?.apiKeyRaw}
     <div class="apikey-created">
       <div class="apikey-warning">{$_('app.settings.apiKeys.warning')}</div>
       <div class="apikey-copy-row">
         <code class="apikey-raw">{form.apiKeyRaw}</code>
-        <button class="mini connect" type="button" onclick={() => copyKey(form.apiKeyRaw)}>{copied ? $_('app.settings.apiKeys.copied') : $_('app.settings.apiKeys.copyKey')}</button>
+        <Button size="sm" onclick={() => copyKey(form.apiKeyRaw)}>{copied ? $_('app.settings.apiKeys.copied') : $_('app.settings.apiKeys.copyKey')}</Button>
       </div>
     </div>
   {/if}
-
-  {#if form?.apiKeyError}<div class="field"><div class="fs" style="color:#c0392b;">{form.apiKeyError}</div></div>{/if}
-  {#if form?.apiKeyRevoked}<div class="field"><div class="fs" style="color:var(--accent);">{$_('app.settings.apiKeys.keyRevoked')}</div></div>{/if}
 
   {#if data.apiKeys.length}
     <div class="apikey-list">
@@ -65,20 +66,20 @@
             <div class="disc-confirm">
               <form method="POST" action="?/revokeApiKey" use:enhance>
                 <input type="hidden" name="key_id" value={k.id} />
-                <button class="mini danger" type="submit">{$_('app.settings.apiKeys.revoke')}</button>
+                <Button variant="danger" size="sm" type="submit">{$_('app.settings.apiKeys.revoke')}</Button>
               </form>
-              <button class="mini ghost" type="button" onclick={() => (confirmingRevoke = null)}>{$_('app.settings.keep')}</button>
+              <Button variant="ghost" size="sm" onclick={() => (confirmingRevoke = null)}>{$_('app.settings.keep')}</Button>
             </div>
           {:else}
-            <button class="disc-btn" type="button" onclick={() => (confirmingRevoke = k.id)}>{$_('app.settings.apiKeys.revoke')}</button>
+            <Button variant="ghost" size="sm" onclick={() => (confirmingRevoke = k.id)}>{$_('app.settings.apiKeys.revoke')}</Button>
           {/if}
         </div>
       {/each}
     </div>
   {:else}
-    <div class="field"><div class="fs">{$_('app.settings.apiKeys.noKeys')}</div></div>
+    <p class="m-0 text-[0.8125rem] text-muted-foreground">{$_('app.settings.apiKeys.noKeys')}</p>
   {/if}
-</section>
+</Panel>
 
 {#if apiKeyModalOpen}
   <div
@@ -115,8 +116,8 @@
           </div>
         </div>
         <div class="cx-actions">
-          <button class="bbtn" type="button" onclick={closeApiKeyModal}>{$_('app.settings.close')}</button>
-          <button class="bbtn primary" type="submit">{$_('app.settings.apiKeys.createKey')}</button>
+          <Button variant="secondary" onclick={closeApiKeyModal}>{$_('app.settings.close')}</Button>
+          <Button type="submit">{$_('app.settings.apiKeys.createKey')}</Button>
         </div>
       </form>
     </div>

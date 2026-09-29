@@ -11,6 +11,8 @@
 
   let { projectId }: { projectId: string } = $props();
 
+  let sheetScroll = $state<HTMLDivElement | null>(null);
+
   /**
    * IL FOGLIO FLOTTANTE su Calendar/Ads/Settings — "usati AL POSTO della tela" (CLAUDE.md). Le
    * pagine sono le stesse che rispondono a un link diretto o a un refresh: un'implementazione,
@@ -44,8 +46,12 @@
       class="canvas-sheet"
       showOverlay={false}
       portalProps={{ disabled: true }}
+      onOpenAutoFocus={(e) => {
+        e.preventDefault();
+        sheetScroll?.focus();
+      }}
     >
-      <div class="sheet-scroll">
+      <div class="sheet-scroll" tabindex="-1" bind:this={sheetScroll}>
         {#if entry.id === 'settings'}
           <div class="settings-shell">
             <nav class="settings-switcher" aria-label={$_('app.nav.settings')}>
@@ -121,6 +127,7 @@
   }
 
   .sheet-scroll {
+    outline: none;
     height: 100%;
     min-height: 0;
     overflow-y: auto;
@@ -142,7 +149,7 @@
   .switcher-group {
     margin: 14px 0 4px;
     padding: 0 6px;
-    font-size: 10.5px;
+    font-size: 11px;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -169,8 +176,12 @@
     background: var(--paper-2, #f9f9f9);
   }
   .switcher-item.is-active {
-    background: var(--nav-on, color-mix(in srgb, var(--accent) 12%, transparent));
+    background: var(--paper-3);
     font-weight: 600;
+  }
+  .switcher-item:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
   }
 
   .settings-body {

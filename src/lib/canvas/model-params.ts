@@ -13,18 +13,18 @@ export type ModelParam =
   | { name: string; label: string; kind: 'number'; min?: number; max?: number };
 
 const EXCLUDED_PARAMS: Readonly<Record<string, string>> = {
-  aspect_ratio: 'ha il suo controllo dedicato (ModelChoice.aspectRatios)',
-  resolution: 'ha il suo controllo dedicato (ModelChoice.resolutions)',
-  input_references: 'wiring — quanti riferimenti il nodo inoltra, non un\'impostazione utente',
-  n: 'il prodotto ne rende sempre uno',
-  duration: 'ha il suo controllo dedicato (ModelChoice.durationOptions)',
-  generate_audio: 'ha il suo controllo dedicato (ModelChoice.generateAudio, il campo "audio")'
+  aspect_ratio: 'has its own control (ModelChoice.aspectRatios)',
+  resolution: 'has its own control (ModelChoice.resolutions)',
+  input_references: 'wiring: how many references the node forwards, not a user setting',
+  n: 'the product always renders one',
+  duration: 'has its own control (ModelChoice.durationOptions)',
+  generate_audio: 'has its own control (ModelChoice.generateAudio, the "audio" field)'
 };
 
 const LABEL_OVERRIDES: Readonly<Record<string, string>> = {
-  quality: 'Qualità',
-  background: 'Sfondo',
-  output_compression: 'Compressione',
+  quality: 'Quality',
+  background: 'Background',
+  output_compression: 'Compression',
   generate_audio: 'Audio',
   seed: 'Seed'
 };

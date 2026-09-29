@@ -170,7 +170,7 @@ export async function captureCompositionFrame(
 		scene.renderAt(t);
 		return await new Promise((resolve, reject) => {
 			canvas.toBlob((blob) => {
-				if (blob) { resolve(blob); } else { reject(new Error('impossibile esportare l\'immagine')); }
+				if (blob) { resolve(blob); } else { reject(new Error('could not export the image')); }
 			}, 'image/png');
 		});
 	} finally {

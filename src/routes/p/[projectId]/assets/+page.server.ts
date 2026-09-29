@@ -61,7 +61,7 @@ export const load: PageServerLoad = async ({ params, url, locals }) => {
   const memberships = await listMemberships(db, user.id);
   const found = await findProjectForUser(db, { projectId: params.projectId ?? '', memberships });
   if (!found) {
-    throw error(404, 'questo progetto non esiste, o non è tuo');
+    throw error(404, 'This project does not exist, or is not yours');
   }
 
   const { orgId, project } = found;
@@ -123,7 +123,7 @@ export const actions: Actions = {
     const memberships = await listMemberships(db, user.id);
     const found = await findProjectForUser(db, { projectId: params.projectId ?? '', memberships });
     if (!found) {
-      throw error(404, 'questo progetto non esiste, o non è tuo');
+      throw error(404, 'This project does not exist, or is not yours');
     }
 
     const fd = await request.formData();
@@ -132,7 +132,7 @@ export const actions: Actions = {
     const mimeType = String(fd.get('mime_type') ?? '');
     const bytes = Number(fd.get('bytes'));
     if (!path || !fileName || !mimeType || !Number.isFinite(bytes)) {
-      return fail(400, { error: 'richiesta non valida' });
+      return fail(400, { error: 'Invalid request' });
     }
 
     try {

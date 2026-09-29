@@ -554,7 +554,7 @@ describe('offerableModels — params dal param_schema sincronizzato', () => {
 
     const choice = out.choices.find((c) => c.id === GPT_IMAGE_2_MODEL);
     expect(choice?.params).toEqual([
-      { name: 'quality', label: 'Qualità', kind: 'enum', values: ['auto', 'low', 'medium', 'high'] }
+      { name: 'quality', label: 'Quality', kind: 'enum', values: ['auto', 'low', 'medium', 'high'] }
     ]);
   });
 
