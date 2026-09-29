@@ -125,6 +125,73 @@ describe('insert_row: org_id si impone, non si corregge in silenzio', () => {
   });
 });
 
+describe('insert_row su nodes_connections: rifiuta un arco verso un modello uncensored', () => {
+  function fakeAuthorityByTable(rowsByTable: Record<string, Array<Record<string, unknown>>>) {
+    const calls: Call[] = [];
+    const selectBuilder = (table: string) => {
+      const rec: Call = { op: 'select', table, filters: [] };
+      calls.push(rec);
+      const rows = rowsByTable[table] ?? [];
+      const b = {
+        eq: (c: string, v: unknown) => {
+          rec.filters.push([c, v as string]);
+          return b;
+        },
+        is: () => b,
+        maybeSingle: () => Promise.resolve({ data: rows[0] ?? null, error: null })
+      };
+      return b;
+    };
+    const writeBuilder = (op: string, table: string, values?: Record<string, unknown>) => {
+      const rec: Call = { op, table, filters: [], values };
+      calls.push(rec);
+      const b = {
+        select: () => b,
+        abortSignal: () => Promise.resolve({ data: [{ id: 'c1' }], error: null })
+      };
+      return b;
+    };
+    const supabase = {
+      from: (table: string) => ({
+        select: (cols: string) => (cols === '*' ? selectBuilder(table) : selectBuilder(table)),
+        insert: (values: Record<string, unknown>) => writeBuilder('insert', table, values)
+      })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any;
+    return { calls, supabase };
+  }
+
+  it('rifiuta la scrittura quando il nodo bersaglio usa un modello uncensored', async () => {
+    const { calls, supabase } = fakeAuthorityByTable({
+      nodes: [{ id: 'n2', org_id: 'org-mine', type: 'image', data: { model: 'wiro/nsfw-image' }, version: 1, deleted_at: null }],
+      ai_models: [{ uncensored: true }]
+    });
+
+    const out = await tools(supabase, 'org-mine').insertRow({
+      table: 'nodes_connections',
+      values: { canvas_id: 'c1', source_node_id: 'n1', target_node_id: 'n2' }
+    });
+
+    expect(out.error).toBe('uncensored_no_inputs');
+    expect(calls.some((c) => c.table === 'nodes_connections' && c.op === 'insert')).toBe(false);
+  });
+
+  it('scrive normalmente quando il nodo bersaglio non è uncensored', async () => {
+    const { calls, supabase } = fakeAuthorityByTable({
+      nodes: [{ id: 'n2', org_id: 'org-mine', type: 'image', data: { model: 'openai/gpt-image' }, version: 1, deleted_at: null }],
+      ai_models: [{ uncensored: false }]
+    });
+
+    const out = await tools(supabase, 'org-mine').insertRow({
+      table: 'nodes_connections',
+      values: { canvas_id: 'c1', source_node_id: 'n1', target_node_id: 'n2' }
+    });
+
+    expect(out.error).toBeUndefined();
+    expect(calls.some((c) => c.table === 'nodes_connections' && c.op === 'insert')).toBe(true);
+  });
+});
+
 describe('update_row / delete_row: org_id si impone sul filtro, un id di un\'altra org non trova niente', () => {
   it('update: un where su org_id passato da chi chiama viene ignorato, si usa quello della sessione', async () => {
     const { calls, supabase } = fakeAuthority({ count: 1, writeRows: [{ id: 'n1', org_id: 'org-mine' }] });
