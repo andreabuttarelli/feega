@@ -74,6 +74,11 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
     tables: ['reference_images']
   },
   {
+    path: 'src/lib/server/nsfw/age-verification.ts — recordAgeVerification',
+    why: "Un esito di verifica dell'età lo scrive il provider certificato, non l'utente: `user_age_verifications` non ha policy di scrittura, così nessuno può dichiararsi maggiorenne da solo. Lo user_id è quello della sessione che ha avviato la verifica, mai un valore scelto da chi chiama; si salva solo l'esito 18+, nessun documento.",
+    tables: ['user_age_verifications']
+  },
+  {
     path: 'scripts/backfill-signed-url-nodes.ts',
     why: 'Uno script una tantum, senza sessione utente: attraversa `nodes` di ogni org per trovare le righe con un url firmato scritto per errore in `data` (bug risolto in codice), cosa che nessun JWT di una singola org potrebbe fare.',
     tables: ['nodes']
