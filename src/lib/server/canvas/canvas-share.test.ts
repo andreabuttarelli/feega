@@ -98,6 +98,15 @@ describe('readSharedCanvas', () => {
     expect(await readSharedCanvas(db, '', sign)).toBeNull();
   });
 
+  it('a soft-deleted canvas reads as not found', async () => {
+    const { db } = fakeDb(
+      { canvases: [{ ...CANVAS, deleted_at: '2026-09-29T00:00:00.000Z' }] },
+      { filter: true }
+    );
+
+    expect(await readSharedCanvas(db, 'tok-live', sign)).toBeNull();
+  });
+
   it('a live token returns the nodes, signed media and text, without deleted nodes', async () => {
     const { db } = sharedDb();
 

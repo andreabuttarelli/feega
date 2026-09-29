@@ -729,6 +729,7 @@ export type Database = {
       canvases: {
         Row: {
           created_at: string
+          deleted_at: string | null
           id: string
           name: string
           org_id: string
@@ -740,6 +741,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          deleted_at?: string | null
           id?: string
           name: string
           org_id: string
@@ -751,6 +753,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          deleted_at?: string | null
           id?: string
           name?: string
           org_id?: string
