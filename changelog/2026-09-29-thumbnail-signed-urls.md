@@ -69,3 +69,19 @@ throws, called with `paths: []`, must never touch it. Fixed by making
 instead of the already-built bucket — the empty check now runs before the
 factory is ever invoked, in the one place that owns it, instead of
 duplicated at each of the three call sites.
+
+## CI break #2: `main()` ran on import, in CI, with no service-role key
+
+Same PR, second CI failure — this one self-inflicted by the new
+`seed-reference-images.test.ts`: the script's `main().catch(...)` ran
+unconditionally at module top level, with no guard for "am I the CLI entry
+point or just imported for `isHomeFile`?" Importing the module to test the
+skip rule ran `main()` for real, which called `createServiceRoleDb` with no
+`SUPABASE_SERVICE_ROLE_KEY` in CI, threw, and `process.exit(1)` inside a
+Vitest worker fails the whole run — 6729 real tests green, one exit call
+red.
+
+`db-seed.mjs`/`db-seed.test.ts` already had the fix for this exact shape:
+`if (import.meta.url === \`file://${process.argv[1]}\`)` around the
+top-level call. Applied the same guard here — no test change needed, since
+the test only ever imported `isHomeFile`, never called `main` itself.
