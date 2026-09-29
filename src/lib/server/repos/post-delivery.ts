@@ -1,6 +1,9 @@
 import type { Db } from '$lib/server/db/client';
 import type { SocialPublisher } from '$lib/server/publishing/port';
 import { formatFor, type Platform } from '$lib/platform-capabilities';
+import { providerMediaSigner } from '$lib/server/ads/provider-media';
+
+const ZERNIO_FETCH_WINDOW_SECONDS = 60 * 60 * 24 * 30;
 
 /**
  * ZERNIO È L'UNICA FONTE DI VERITÀ PER PROGRAMMAZIONE E PUBBLICAZIONE (decisione utente,
@@ -102,7 +105,7 @@ async function findAccounts(
   }));
 }
 
-type AssetForMedia = { id: string; type: string; url: string | null };
+type AssetForMedia = { id: string; type: string; url: string | null; source: string | null };
 
 async function resolveMediaAssets(
   db: Db,
@@ -111,7 +114,7 @@ async function resolveMediaAssets(
   if (!input.media.length) return [];
 
   const ids = input.media.map((m) => m.assetId);
-  const { data, error } = await db.from('assets').select('id, type, url').eq('org_id', input.orgId).in('id', ids);
+  const { data, error } = await db.from('assets').select('id, type, url, source').eq('org_id', input.orgId).in('id', ids);
   if (error) throw error;
 
   const byId = new Map(((data ?? []) as unknown as AssetForMedia[]).map((a) => [a.id, a]));
@@ -120,6 +123,14 @@ async function resolveMediaAssets(
     .sort((a, b) => a.order - b.order)
     .map((m) => byId.get(m.assetId))
     .filter((a): a is AssetForMedia => a !== undefined);
+}
+
+async function fetchableMediaUrls(db: Db, assets: AssetForMedia[]): Promise<string[]> {
+  const withUrl = assets.filter((a): a is AssetForMedia & { url: string } => Boolean(a.url));
+  const signed = await providerMediaSigner(db, ZERNIO_FETCH_WINDOW_SECONDS)(
+    withUrl.map((a) => ({ path: a.url, source: a.source }))
+  );
+  return withUrl.map((a) => signed.get(a.url)).filter((u): u is string => Boolean(u));
 }
 
 function captionFor(post: PostForDelivery, platform: Platform): string {
@@ -148,7 +159,7 @@ export async function scheduleDelivery(
   const accounts = await findAccounts(db, { orgId: input.orgId, brandId: post.brandId, accountIds: input.accountIds });
   const assets = await resolveMediaAssets(db, { orgId: input.orgId, media: post.media });
   const mediaKinds = assets.map((a) => ({ kind: a.type as 'image' | 'video' }));
-  const mediaUrls = assets.map((a) => a.url).filter((u): u is string => Boolean(u));
+  const mediaUrls = await fetchableMediaUrls(db, assets);
 
   const deliveries: DeliveryOutcome[] = [];
   const zernioPostIds: ZernioPostIds = { ...post.zernioPostIds };

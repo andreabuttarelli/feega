@@ -20,7 +20,7 @@ feega approve <slug> --all                      # Approve all pending
 feega post <slug> <id> edit --caption "..."     # Edit post
 feega calendar <slug>                           # Monthly scheduled posts
 feega products <slug> sync                      # Re-import catalog from the connected store
-feega ads <slug> --propose                      # Propose ad boosts from top organic posts
+feega ads <slug>                                 # List ad campaigns (--approve/--pause/--resume <id>)
 feega upgrade <slug>                            # Open billing checkout
 ```
 
