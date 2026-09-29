@@ -54,8 +54,8 @@
   import { listFeedingSelect } from '$lib/canvas/select-node';
   import { productItem, socialPostItem } from '$lib/canvas/select-sources';
   import { feedFiltersOf, filterPosts, filterProducts, productFiltersOf } from '$lib/canvas/source-filters';
-  import { inspectorOf } from '$lib/canvas/node-inspector';
-  import NodeInspector from '$lib/components/canvas/NodeInspector.svelte';
+  import { hasInspector, inspectorOf } from '$lib/canvas/node-inspector';
+  import SourceSettingsFrame from '$lib/components/canvas/SourceSettingsFrame.svelte';
   import {
     listConnectors,
     listKindOf,
@@ -89,7 +89,8 @@
   import type { FilledNodeDrag } from '$lib/canvas/drag-payload';
   import { tileNode } from '$lib/canvas/connect-rules';
   import { planDelete } from '$lib/canvas/delete-plan';
-  import { connectorsFor, orphanedByModelChange, type ConnectorType, connectorsForNode, outputConnectorOf } from '$lib/canvas/connectors';
+  import { connectorsFor, orphanedByModelChange, type ConnectorType, type GenerativeNodeKind, connectorsForNode } from '$lib/canvas/connectors';
+  import { portsOf } from '$lib/canvas/node-ports';
   import { planConnectSelection, type ConnectSource } from '$lib/canvas/connect-selection-plan';
   import {
     docData,
@@ -457,36 +458,19 @@
   let influencersOverride = $state<Record<string, InfluencerTile> | null>(null);
   const influencersByNode = $derived(influencersOverride ?? ((data.influencers ?? {}) as Record<string, InfluencerTile>));
 
-  /**
-   * LE PORTE DI UN NODO CHE PRODUCE, dal modello scelto — mai un elenco scritto a mano. Un
-   * modello assente dal catalogo (non sincronizzato: `offerableModels` non lo offre) disegna
-   * ZERO porte piuttosto che indovinare: `choice` è `undefined` e la funzione torna `[]`.
-   */
-  function connectorsOfNode(n: Tile): ConnectorType[] | undefined {
-    if (n.type === 'list') { return listPortsByNode[n.id]; }
-    if (n.type === 'effects') { return ['images', 'videos']; }
-    if (n.type === 'composition') { return ['images']; }
-    if (n.type !== 'text' && n.type !== 'image' && n.type !== 'video') { return undefined; }
-    const model = typeof n.data.model === 'string' ? n.data.model : null;
-    return connectorsForNode(n.type, model, catalogue[n.type] ?? []);
-  }
+  const itemPortOf = (kind: string | undefined): ConnectorType => (kind === 'text' ? 'text' : 'images');
 
-  /**
-   * L'USCITA DI `list`/`select` SEGUE IL MEDIUM DEI SUOI ITEM, non un tipo fisso come
-   * `outputConnectorOf` conosce per gli altri nodi: una lista di testo esce come `text`, una di
-   * immagini come `images` — e `select`, che porta il medium della lista a monte incapsulato nel
-   * proprio `data.item_kind` (`upstream.ts::resolveUpstreamInputs`, lo stesso campo), esce a
-   * valore SINGOLO sullo stesso connettore, mai `images` list-valued.
-   */
-  function outputConnectorOfTile(n: Tile): ConnectorType | null {
-    if (n.type === 'list') {
-      return listValuesByNode[n.id]?.itemKind === 'text' ? 'text' : 'images';
+  function portsOfTile(n: Tile): { inputs: ConnectorType[] | undefined; output: ConnectorType | null } {
+    if (!isNodeType(n.type)) {
+      return { inputs: undefined, output: null };
     }
-    if (n.type === 'select') {
-      return n.data.item_kind === 'text' ? 'text' : 'images';
-    }
-    const effectsKind = n.type === 'effects' ? upstreamEffectsMediaOf(n.id)?.kind : null;
-    return outputConnectorOf(n.type, effectsKind ?? (n.data.mediaKind === 'video' ? 'video' : 'image'));
+    const model = typeof n.data.model === 'string' ? n.data.model : null;
+    return portsOf(n.type, {
+      modelPorts: () => connectorsForNode(n.type as GenerativeNodeKind, model, catalogue[n.type as GenerativeNodeKind] ?? []),
+      listPorts: () => listPortsByNode[n.id] ?? [],
+      itemPort: () => itemPortOf(n.type === 'list' ? listValuesByNode[n.id]?.itemKind : upstreamListOf(n.id)?.itemKind),
+      mediaKind: () => upstreamEffectsMediaOf(n.id)?.kind ?? (n.data.mediaKind === 'video' ? 'video' : 'image')
+    });
   }
 
   /**
@@ -500,19 +484,20 @@
   }
 
   const tiles = $derived(
-    nodes.map((n) => ({
+    nodes.map((n) => ({ n, ports: portsOfTile(n) })).map(({ n, ports }) => ({
       id: n.id,
       x: n.x,
       y: n.y,
       w: n.w,
       h: tileHeight(n),
       connectable: true,
-      connectors: connectorsOfNode(n),
-      output: outputConnectorOfTile(n),
+      connectors: ports.inputs,
+      output: ports.output,
       kind: n.type,
       displayName: n.displayName,
       inPost: data.nodeIdsInPost.includes(n.id),
       select: n.select,
+      settings: hasInspector(n.type),
       minW: nodeSize(n.type).w,
       minH: nodeSize(n.type).h,
       node: n.type === 'effects'
@@ -581,13 +566,9 @@
   );
 
   let selectedIds = $state<string[]>([]);
-  let dismissedInspector = $state<string | null>(null);
-  const inspectedRow = $derived(selectedIds.length === 1 ? nodes.find((n) => n.id === selectedIds[0]) : undefined);
-  const inspector = $derived(inspectedRow && inspectedRow.id !== dismissedInspector ? inspectorOf(inspectedRow) : null);
 
   function selectionChanged(ids: string[]) {
     selectedIds = ids;
-    dismissedInspector = null;
   }
 
   $effect(() => {
@@ -1314,7 +1295,7 @@
   /**
    * "COLLEGA A NUOVO…": un nodo del tipo scelto nasce a destra della selezione, GIÀ CON UN
    * MODELLO — il primo del catalogo per quel medium — perché senza modello un nodo `image`/`video`
-   * non ha porte (`connectorsOfNode`, sopra: `!choice` → `[]`), e il piano di collegamento
+   * non ha porte (`portsOfTile`, sopra: `!choice` → `[]`), e il piano di collegamento
    * troverebbe zero connettori su un nodo appena nato. Il piano stesso (`planConnectSelection`) è
    * lo stesso che decide un collegamento a un nodo ESISTENTE (`connectExisting`, sotto): la
    * domanda "quale porta per quale sorgente" non cambia perché il bersaglio è appena nato.
@@ -1978,9 +1959,25 @@
             onshare={(on) => share(id, on)}
           />
         {:else if catalog}
-          <ProductsNode node={catalog} products={shownProducts[id] ?? []} total={products[id]?.length ?? 0} />
+          <SourceSettingsFrame
+            {selected}
+            view={selected ? inspectorOf(row) : null}
+            shown={shownProducts[id]?.length ?? 0}
+            onfield={(patch) => write(id, patch)}
+            onsync={() => sync(id)}
+          >
+            <ProductsNode node={catalog} products={shownProducts[id] ?? []} total={products[id]?.length ?? 0} />
+          </SourceSettingsFrame>
         {:else if feed}
-          <SocialFeedNode node={feed} posts={shownPosts[id] ?? []} total={socialPosts[id]?.length ?? 0} />
+          <SourceSettingsFrame
+            {selected}
+            view={selected ? inspectorOf(row) : null}
+            shown={shownPosts[id]?.length ?? 0}
+            onfield={(patch) => write(id, patch)}
+            onsync={() => sync(id)}
+          >
+            <SocialFeedNode node={feed} posts={shownPosts[id] ?? []} total={socialPosts[id]?.length ?? 0} />
+          </SourceSettingsFrame>
         {:else if influencer}
           <InfluencerNode
             name={influencersByNode[id]?.name ?? 'Influencer'}
@@ -2023,17 +2020,6 @@
       {/if}
     {/snippet}
   </CanvasFlow>
-
-  {#if inspector && inspectedRow}
-    {@const id = inspectedRow.id}
-    <NodeInspector
-      view={inspector}
-      shown={(inspectedRow.type === 'products' ? shownProducts[id] : shownPosts[id])?.length ?? 0}
-      onfield={(data) => write(id, data)}
-      onsync={() => sync(id)}
-      onclose={() => (dismissedInspector = id)}
-    />
-  {/if}
 
   {#if effectsEditing}
     {@const editingId = effectsEditing.id}

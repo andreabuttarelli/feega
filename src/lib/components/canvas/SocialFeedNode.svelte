@@ -33,5 +33,5 @@
   {total}
   syncStatus={node.syncStatus}
   syncError={node.syncError}
-  empty={node.handle.trim() ? 'No posts yet. Sync from the panel on the right.' : 'Choose the account in the panel on the right.'}
+  empty={node.handle.trim() ? 'No posts yet. Select the node to sync.' : 'Select the node to choose the account.'}
 />

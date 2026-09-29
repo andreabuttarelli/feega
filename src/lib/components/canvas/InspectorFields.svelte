@@ -1,6 +1,5 @@
 <script lang="ts">
   import RefreshCw from '@lucide/svelte/icons/refresh-cw';
-  import X from '@lucide/svelte/icons/x';
   import { AppliesAt, FieldKind, inputValueOf, parseFieldInput, commitHandleField, type FieldSpec, type InspectorView } from '$lib/canvas/node-inspector';
   import { syncBlockedReason } from '$lib/canvas/sync-state';
 
@@ -8,14 +7,12 @@
     view,
     shown,
     onfield,
-    onsync,
-    onclose
+    onsync
   }: {
     view: InspectorView;
     shown: number;
     onfield: (data: Record<string, unknown>) => void;
     onsync: () => void;
-    onclose: () => void;
   } = $props();
 
   const GROUPS = [
@@ -44,15 +41,8 @@
   }
 </script>
 
-<aside class="inspector" aria-label={`Settings: ${view.title}`} data-testid="node-inspector">
-  <header class="inspector-head">
-    <h2 class="inspector-title">{view.title}</h2>
-    <button type="button" class="inspector-close" onclick={onclose} aria-label="Close settings">
-      <X size={14} strokeWidth={1.8} />
-    </button>
-  </header>
-
-  <div class="inspector-body">
+<section class="inspector" aria-label={`Settings: ${view.title}`} data-testid="node-inspector">
+  <div class="inspector-body nowheel nodrag nopan">
     {#each GROUPS as group (group.at)}
       <section class="inspector-group">
         <h3 class="inspector-group-title">{group.title}</h3>
@@ -91,7 +81,7 @@
     {/each}
   </div>
 
-  <footer class="inspector-sync">
+  <footer class="inspector-sync nodrag">
     <p class="inspector-status" aria-live="polite">
       {#if running}
         Sta scaricando…
@@ -109,50 +99,21 @@
       Sync now
     </button>
   </footer>
-</aside>
+</section>
 
 <style>
   .inspector {
-    position: absolute;
-    z-index: 19;
-    top: 60px;
-    right: 8px;
-    bottom: 8px;
-    width: 300px;
-    max-width: calc(100vw - 16px);
+    height: 100%;
     display: flex;
     flex-direction: column;
     background: var(--paper, #fff);
-    border: 1px solid var(--line-2, #d2d2d7);
-    box-shadow: 0 4px 18px rgb(0 0 0 / 0.1);
-  }
-
-  .inspector-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 12px;
-    border-bottom: 1px solid var(--line, #e5e5e5);
-  }
-  .inspector-title {
-    margin: 0;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--ink, #1d1d1f);
-  }
-  .inspector-close {
-    display: inline-flex;
-    padding: 4px;
-    color: var(--ink-soft, #6e6e73);
-    background: none;
-    border: 0;
-    cursor: pointer;
   }
 
   .inspector-body {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
+    overscroll-behavior: contain;
     padding: 4px 12px 12px;
   }
 
