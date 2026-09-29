@@ -104,12 +104,12 @@ export function fakeDb(rows: Record<string, unknown[]>, options: FakeOptions = {
     }),
     storage: {
       from: (bucket: string) => ({
-        createSignedUrl: async (path: string) => {
-          calls.push({ table: `storage:${bucket}`, op: 'sign', filters: [['path', path]] });
+        createSignedUrl: async (path: string, _ttl?: number, transformOptions?: unknown) => {
+          calls.push({ table: `storage:${bucket}`, op: 'sign', filters: [['path', path], ['transform', transformOptions]] });
           return { data: { signedUrl: `https://signed.example/${bucket}/${path}` }, error: null };
         },
-        createSignedUrls: async (paths: string[]) => {
-          calls.push({ table: `storage:${bucket}`, op: 'sign', filters: [['paths', paths]] });
+        createSignedUrls: async (paths: string[], _ttl?: number, transformOptions?: unknown) => {
+          calls.push({ table: `storage:${bucket}`, op: 'sign', filters: [['paths', paths], ['transform', transformOptions]] });
           return {
             data: paths.map((path) => ({ path, signedUrl: `https://signed.example/${bucket}/${path}` })),
             error: null

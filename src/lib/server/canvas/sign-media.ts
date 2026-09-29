@@ -4,6 +4,7 @@ import { isRlsScoped } from '$lib/server/rls-client';
 import { signKnowledgePaths } from '$lib/server/media-archive';
 import { signAssetFiles } from '$lib/server/repos/asset-storage';
 import { SERVICE_ROLE_USES, type ServiceRoleUse } from '$lib/server/db/service-role-uses';
+import type { ThumbnailPreset } from '$lib/server/media-thumbnails';
 
 function assetSigningUse(): ServiceRoleUse {
   const use = SERVICE_ROLE_USES.find((entry) => entry.path.startsWith('src/lib/server/canvas/sign-media.ts'));
@@ -44,15 +45,16 @@ export async function signAssetPaths(
   userDb: Db,
   serviceDb: Db,
   paths: { generated: string[]; uploaded: string[] },
-  ttlSeconds?: number
+  ttlSeconds?: number,
+  preset?: ThumbnailPreset
 ): Promise<Map<string, string>> {
   if (!isRlsScoped(userDb)) {
     throw new Error('signAssetPaths richiede un client utente scoped RLS come prova di appartenenza');
   }
 
   const [rendered, uploaded] = await Promise.all([
-    ttlSeconds ? signKnowledgePaths(serviceDb as never, paths.generated, ttlSeconds) : signKnowledgePaths(serviceDb as never, paths.generated),
-    ttlSeconds ? signAssetFiles(serviceDb, paths.uploaded, ttlSeconds) : signAssetFiles(serviceDb, paths.uploaded)
+    signKnowledgePaths(serviceDb as never, paths.generated, ttlSeconds ?? 60 * 60 * 2, preset),
+    signAssetFiles(serviceDb, paths.uploaded, ttlSeconds ?? 300, preset)
   ]);
 
   return new Map([...rendered, ...uploaded]);

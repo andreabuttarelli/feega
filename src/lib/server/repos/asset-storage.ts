@@ -1,4 +1,5 @@
 import type { Db } from '$lib/server/db/client';
+import { signThumbnailUrls, type ThumbnailPreset } from '$lib/server/media-thumbnails';
 
 export const CANVAS_ASSET_BUCKET = 'canvas-assets';
 const SIGNED_URL_SECONDS = 300;
@@ -29,20 +30,11 @@ export async function signAssetFile(db: Db, path: string): Promise<string> {
   return data.signedUrl;
 }
 
-export async function signAssetFiles(db: Db, paths: string[], ttlSeconds = SIGNED_URL_SECONDS): Promise<Map<string, string>> {
-  const out = new Map<string, string>();
-  const clean = [...new Set(paths.filter(Boolean))];
-  if (!clean.length) {
-    return out;
-  }
-
-  const { data } = await db.storage
-    .from(CANVAS_ASSET_BUCKET)
-    .createSignedUrls(clean, ttlSeconds);
-  for (const row of data ?? []) {
-    if (row.signedUrl && row.path) {
-      out.set(row.path, row.signedUrl);
-    }
-  }
-  return out;
+export async function signAssetFiles(
+  db: Db,
+  paths: string[],
+  ttlSeconds = SIGNED_URL_SECONDS,
+  preset?: ThumbnailPreset
+): Promise<Map<string, string>> {
+  return signThumbnailUrls(db.storage.from(CANVAS_ASSET_BUCKET), paths, ttlSeconds, preset);
 }

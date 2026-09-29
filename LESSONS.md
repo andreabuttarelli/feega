@@ -2058,3 +2058,13 @@ someone's test run, not user traffic. Vitest loads `.env`, and a fail-open path 
 brand lookup) sent the fixture to the live project without failing the test.
 **Move:** `src/test/no-live-supabase.ts` fails any test that reaches `*.supabase.co`; mock the
 boundary it names (`gateOrgAiActionForForm`, `createAdminClient`, `orgCreditBalance`).
+
+## Supabase Storage `createSignedUrls` (batch) silently ignores `transform`
+
+**Signal:** a thumbnail request via the batch signer returns full-size bytes, no error, no type
+error either (the installed `storage-js` types don't even declare `transform` on the batch
+overload — only on `createSignedUrl` singular). Only a real curl of the returned URL, comparing
+byte sizes, catches it; a green test against a mock never would.
+**Move:** sign per-path in parallel with `createSignedUrl` when a thumbnail transform is needed;
+reserve the batch call for full-size, no-transform signing. `signThumbnailUrls`
+(`src/lib/server/media-thumbnails.ts`) is the one place that decides which.

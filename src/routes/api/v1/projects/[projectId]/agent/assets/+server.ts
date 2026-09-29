@@ -26,10 +26,13 @@ async function withSignedUrls(db: Db, assets: Asset[]): Promise<Map<string, stri
   const uploadPaths = assets.filter((a) => a.source === 'upload' && a.url).map((a) => a.url!);
   const generatedPaths = assets.filter((a) => a.source === 'generated' && a.url).map((a) => a.url!);
 
-  return signAssetPaths(db, createAssetSigningDb(), {
-    generated: generatedPaths,
-    uploaded: uploadPaths
-  });
+  return signAssetPaths(
+    db,
+    createAssetSigningDb(),
+    { generated: generatedPaths, uploaded: uploadPaths },
+    undefined,
+    'panelTile'
+  );
 }
 
 export const GET: RequestHandler = async ({ params, locals }) => {

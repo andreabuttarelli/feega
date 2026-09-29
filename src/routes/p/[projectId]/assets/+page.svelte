@@ -139,7 +139,7 @@
           <div class="tile">
             <span class="badge">global</span>
             {#if image.url}
-              <img src={image.url} alt={image.name} loading="lazy" decoding="async" />
+              <img src={image.url} alt={image.name} loading="lazy" decoding="async" width="180" height="140" />
             {:else}
               <span class="ph">image</span>
             {/if}
@@ -177,7 +177,7 @@
           </span>
 
           {#if item.type === 'image' && item.signedUrl}
-            <img src={item.signedUrl} alt="" loading="lazy" decoding="async" />
+            <img src={item.signedUrl} alt="" loading="lazy" decoding="async" width="180" height="140" />
           {:else if item.type === 'video' && item.signedUrl}
             <video src={item.signedUrl} muted playsinline preload="metadata"></video>
           {:else if item.type === 'text'}
