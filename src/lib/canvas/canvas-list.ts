@@ -23,3 +23,16 @@ export async function submitCanvasAction(canvasHref: string, action: CanvasActio
   }
   await applyAction(result);
 }
+
+export async function renameProjectAction(canvasHref: string, name: string): Promise<void> {
+  const body = new FormData();
+  body.set('name', name);
+
+  const res = await fetch(`${canvasHref}?/rename_project`, { method: 'POST', body });
+  const result = deserialize(await res.text());
+  if (result.type === 'success') {
+    await invalidate(CANVAS_LIST_DEPENDENCY);
+    return;
+  }
+  await applyAction(result);
+}

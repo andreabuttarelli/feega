@@ -63,6 +63,7 @@ import { ShareState, readCanvasShare, setCanvasShare } from '$lib/server/canvas/
 import { referenceLibrary } from '$lib/server/canvas/reference-library';
 import { CanvasRemoval, openNewCanvas, removeCanvas, renameCanvasTo } from '$lib/server/canvas/lifecycle';
 import { canvasPath } from '$lib/server/tenancy/entry';
+import { renameProject } from '$lib/server/repos/projects';
 
 // L'azione `run` aspetta la generazione DENTRO la richiesta — un'immagine ci mette fino a un
 // minuto, e il default della piattaforma è sotto quella soglia. Senza, la richiesta muore a metà
@@ -383,6 +384,28 @@ export const actions: Actions = {
       return fail(HTTP_CONFLICT, { error: 'last canvas' });
     }
     throw redirect(303, canvasPath(projectId, result.nextCanvasId));
+  },
+
+  rename_project: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const name = String((await request.formData()).get('name') ?? '').trim();
+    if (!name) {
+      return fail(400, { error: 'name required' });
+    }
+
+    const { data } = await scope.db
+      .from('projects')
+      .select('id')
+      .eq('id', scope.canvas.projectId)
+      .eq('org_id', scope.orgId)
+      .is('archived_at', null)
+      .maybeSingle();
+    if (!data) {
+      throw error(404, 'questo progetto non esiste, o non è tuo');
+    }
+
+    await renameProject(scope.db, { orgId: scope.orgId, projectId: scope.canvas.projectId, name });
+    return { renamed: true };
   },
 
   estimate_text_cost: async ({ request, params, locals }) => {

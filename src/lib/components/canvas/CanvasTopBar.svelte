@@ -13,7 +13,7 @@
   import Megaphone from '@lucide/svelte/icons/megaphone';
   import { canvasSelection, promotePath } from '$lib/canvas/promote-sheet';
   import { formatLastEdited } from '$lib/canvas/format-last-edited';
-  import { CanvasAction, submitCanvasAction } from '$lib/canvas/canvas-list';
+  import { CanvasAction, submitCanvasAction, renameProjectAction } from '$lib/canvas/canvas-list';
   import Plus from '@lucide/svelte/icons/plus';
   import Pencil from '@lucide/svelte/icons/pencil';
   import Trash from '@lucide/svelte/icons/trash-2';
@@ -66,6 +66,9 @@
   let confirmingDelete = $state(false);
   const lastCanvas = $derived(canvases.length <= 1);
 
+  let renamingProject = $state(false);
+  let draftProjectName = $state('');
+
   function startRename() {
     draftName = canvasName;
     renaming = true;
@@ -75,6 +78,17 @@
     event.preventDefault();
     renaming = false;
     await submitCanvasAction(canvasHref, CanvasAction.Rename, { name: draftName });
+  }
+
+  function startRenameProject() {
+    draftProjectName = projectName;
+    renamingProject = true;
+  }
+
+  async function saveRenameProject(event: SubmitEvent) {
+    event.preventDefault();
+    renamingProject = false;
+    await renameProjectAction(canvasHref, draftProjectName);
   }
 
   function askDeleteCurrent() {
@@ -99,8 +113,20 @@
   <div class="top-box left">
     <CanvasMenu {projectId} {profile} {org} {creditBalance} />
 
+    {#if renamingProject}
+      <form class="rename-form" onsubmit={saveRenameProject}>
+        <input
+          class="rename-input"
+          data-testid="project-rename-input"
+          bind:value={draftProjectName}
+          {@attach (el) => el.focus()}
+          onkeydown={(e) => e.key === 'Escape' && (renamingProject = false)}
+        />
+        <button type="submit" class="rename-save">{$_('app.shell.canvasActions.save')}</button>
+      </form>
+    {:else}
     <DropdownMenu.Root>
-      <DropdownMenu.Trigger class="switcher-btn">
+      <DropdownMenu.Trigger class="switcher-btn" data-testid="project-switcher">
         <span class="truncate">{projectName}</span>
         <ChevronDown size={13} />
       </DropdownMenu.Trigger>
@@ -118,8 +144,14 @@
             {/snippet}
           </DropdownMenu.Item>
         {/each}
+        <DropdownMenu.Separator />
+        <DropdownMenu.Item data-testid="project-rename" onSelect={startRenameProject}>
+          <Pencil size={14} />
+          {$_('app.shell.canvasActions.rename')}
+        </DropdownMenu.Item>
       </DropdownMenu.Content>
     </DropdownMenu.Root>
+    {/if}
 
     <span class="sep">/</span>
 

@@ -13,6 +13,7 @@ import { actions } from './+page.server';
 const ORG = 'org-1';
 const PROJECT = 'project-1';
 const canvasRow = (id: string, name: string) => ({ id, org_id: ORG, project_id: PROJECT, name, viewport: null });
+const projectRow = (id: string, name: string, orgId = ORG) => ({ id, org_id: orgId, name, archived_at: null });
 
 function eventWith(rows: Record<string, unknown[]>, form: Record<string, string> = {}) {
   const { db, calls } = fakeDb(rows, { filter: true });
@@ -71,5 +72,48 @@ describe('canvas lifecycle actions', () => {
 
     await expect(actions[name](ev)).rejects.toMatchObject({ status: 404 });
     expect(calls.some((c) => c.op !== 'select')).toBe(false);
+  });
+
+  it('rename_project renames the project', async () => {
+    const { ev, calls } = eventWith(
+      { canvases: [canvasRow('c-1', 'A')], projects: [projectRow(PROJECT, 'Old name')] },
+      { name: 'New name' }
+    );
+
+    await actions.rename_project(ev);
+
+    expect(calls.find((c) => c.table === 'projects' && c.op === 'update')?.payload).toMatchObject({ name: 'New name' });
+  });
+
+  it('rename_project refuses an empty name', async () => {
+    const { ev, calls } = eventWith(
+      { canvases: [canvasRow('c-1', 'A')], projects: [projectRow(PROJECT, 'Old name')] },
+      { name: '   ' }
+    );
+
+    const result = await actions.rename_project(ev);
+
+    expect(result).toMatchObject({ status: 400 });
+    expect(calls.some((c) => c.table === 'projects' && c.op === 'update')).toBe(false);
+  });
+
+  it('rename_project refuses a project of another org', async () => {
+    const { ev, calls } = eventWith(
+      { canvases: [canvasRow('c-1', 'A')], projects: [projectRow(PROJECT, 'Old name', 'org-2')] },
+      { name: 'New name' }
+    );
+
+    await expect(actions.rename_project(ev)).rejects.toMatchObject({ status: 404 });
+    expect(calls.some((c) => c.table === 'projects' && c.op === 'update')).toBe(false);
+  });
+
+  it('rename_project refuses an archived project', async () => {
+    const { ev, calls } = eventWith(
+      { canvases: [canvasRow('c-1', 'A')], projects: [{ ...projectRow(PROJECT, 'Old name'), archived_at: '2026-01-01' }] },
+      { name: 'New name' }
+    );
+
+    await expect(actions.rename_project(ev)).rejects.toMatchObject({ status: 404 });
+    expect(calls.some((c) => c.table === 'projects' && c.op === 'update')).toBe(false);
   });
 });

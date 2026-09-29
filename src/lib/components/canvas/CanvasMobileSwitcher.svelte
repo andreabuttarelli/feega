@@ -3,7 +3,8 @@
   import * as Sheet from '$lib/components/ui/sheet/index.js';
   import Check from '@lucide/svelte/icons/check';
   import { formatLastEdited } from '$lib/canvas/format-last-edited';
-  import { CanvasAction, submitCanvasAction } from '$lib/canvas/canvas-list';
+  import { CanvasAction, submitCanvasAction, renameProjectAction } from '$lib/canvas/canvas-list';
+  import Pencil from '@lucide/svelte/icons/pencil';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 
   type ProjectRow = { id: string; name: string; href: string; updatedAt: string };
@@ -32,12 +33,29 @@
   let confirmingDelete = $state(false);
   const lastCanvas = $derived(canvases.length <= 1);
 
+  let renamingProject = $state(false);
+  let draftProjectName = $state('');
+
   async function run(action: CanvasAction, fields: Record<string, string> = {}) {
     if (!canvasHref) {
       return;
     }
     onOpenChange(false);
     await submitCanvasAction(canvasHref, action, fields);
+  }
+
+  function startRenameProject() {
+    draftProjectName = projectName;
+    renamingProject = true;
+  }
+
+  async function saveRenameProject(event: SubmitEvent) {
+    event.preventDefault();
+    renamingProject = false;
+    if (!canvasHref) {
+      return;
+    }
+    await renameProjectAction(canvasHref, draftProjectName);
   }
 
   function startRename() {
@@ -119,7 +137,7 @@
     />
 
     <div class="section-label">{$_('app.shell.mobile.projects')}</div>
-    <div class="list list-last">
+    <div class="list">
       {#each projects as project (project.id)}
         <a href={project.href} class="row" onclick={() => onOpenChange(false)}>
           <span class="truncate">{project.name}</span>
@@ -130,6 +148,27 @@
         </a>
       {/each}
     </div>
+
+    {#if canvasHref}
+      {#if renamingProject}
+        <form class="rename-form list-last" onsubmit={saveRenameProject}>
+          <input
+            class="rename-input"
+            data-testid="project-rename-input"
+            bind:value={draftProjectName}
+            {@attach (el) => el.focus()}
+          />
+          <button type="submit" class="action">{$_('app.shell.canvasActions.save')}</button>
+        </form>
+      {:else}
+        <div class="actions list-last">
+          <button type="button" class="action" data-testid="project-rename" onclick={startRenameProject}>
+            <Pencil size={14} />
+            {$_('app.shell.canvasActions.rename')}
+          </button>
+        </div>
+      {/if}
+    {/if}
   </Sheet.Content>
 </Sheet.Root>
 
