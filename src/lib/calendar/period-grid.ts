@@ -75,6 +75,12 @@ export function periodTitle(view: CalendarView, anchorKey: string): string {
   return TITLE_OF[view](parseDayKey(anchorKey));
 }
 
+export type Placeable = { plannedFor: string | null; deliveries: { scheduledFor: string | null }[] };
+
+export function placedInstant(post: Placeable): string | null {
+  return post.deliveries.find((d) => d.scheduledFor)?.scheduledFor ?? post.plannedFor;
+}
+
 export function dayKeyOf(instant: string, timeZone: string): string {
   return localDayKey(instant, timeZone);
 }

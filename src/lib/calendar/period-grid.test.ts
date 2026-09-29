@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CalendarView, periodGrid, shiftAnchor, plannedInstant, dayKeyOf, gridDayKey, periodTitle } from './period-grid';
+import { CalendarView, periodGrid, shiftAnchor, plannedInstant, dayKeyOf, gridDayKey, periodTitle, placedInstant } from './period-grid';
 
 const TODAY = new Date('2026-09-29T08:00:00Z');
 
@@ -59,6 +59,17 @@ describe('periodTitle', () => {
   it('la settimana dice il lunedì, il mese dice mese e anno', () => {
     expect(periodTitle(CalendarView.Week, '2026-10-01')).toBe('Week of Sep 28, 2026');
     expect(periodTitle(CalendarView.Month, '2026-10-01')).toBe('October 2026');
+  });
+});
+
+describe('placedInstant', () => {
+  it('una consegna programmata vince sulla data pianificata', () => {
+    expect(placedInstant({ plannedFor: '2026-10-02T08:00:00Z', deliveries: [{ scheduledFor: '2026-10-03T08:00:00Z' }] })).toBe('2026-10-03T08:00:00Z');
+  });
+
+  it('una bozza sta dove è pianificata, o fuori dalla griglia', () => {
+    expect(placedInstant({ plannedFor: '2026-10-02T08:00:00Z', deliveries: [] })).toBe('2026-10-02T08:00:00Z');
+    expect(placedInstant({ plannedFor: null, deliveries: [] })).toBeNull();
   });
 });
 

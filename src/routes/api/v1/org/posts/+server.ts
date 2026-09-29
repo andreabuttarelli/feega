@@ -46,11 +46,17 @@ export const POST: RequestHandler = async ({ request, url }) => {
     link_url?: string;
     sources?: { node_id: string; role?: string }[];
     node_ids?: string[];
+    planned_for?: string;
   };
 
   if (!body.brand_id) {
     return json({ error: 'brand_id_required' }, { status: 400 });
   }
+
+  if (body.planned_for && Number.isNaN(Date.parse(body.planned_for))) {
+    return json({ error: 'invalid_planned_for' }, { status: 400 });
+  }
+  const plannedFor = body.planned_for ? new Date(body.planned_for).toISOString() : null;
 
   const actor = agentActor(userId, apiKeyId ? `api_key:${apiKeyId}` : 'sidebar');
 
@@ -59,7 +65,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
       const post = await promoteNodesToPost(
         db,
         { canvas: { listNodesByIds }, posts: { promoteToPost } },
-        { orgId, brandId: body.brand_id, nodeIds: body.node_ids, actorKind: actor.kind, actorId: actor.id }
+        { orgId, brandId: body.brand_id, nodeIds: body.node_ids, actorKind: actor.kind, actorId: actor.id, plannedFor }
       );
       return json({ post });
     } catch (e) {
@@ -83,7 +89,8 @@ export const POST: RequestHandler = async ({ request, url }) => {
     linkUrl: body.link_url ?? null,
     actorKind: actor.kind,
     actorId: actor.id,
-    sources: body.sources?.map((s) => ({ nodeId: s.node_id, role: s.role }))
+    sources: body.sources?.map((s) => ({ nodeId: s.node_id, role: s.role })),
+    plannedFor
   });
 
   return json({ post });

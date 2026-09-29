@@ -27,6 +27,7 @@
   import { invalidate } from '$app/navigation';
   import { CANVAS_LIST_DEPENDENCY } from '$lib/canvas/canvas-list';
   import { formatCredits } from '$lib/components/credit-amount-format';
+  import { untrack } from 'svelte';
   import CanvasFlow from '$lib/components/canvas/CanvasFlow.svelte';
   import GenNode from '$lib/components/canvas/GenNode.svelte';
   import IframeNode from '$lib/components/canvas/IframeNode.svelte';
@@ -45,6 +46,11 @@
   import EffectsNode from '$lib/components/canvas/EffectsNode.svelte';
   import EffectsEditor from '$lib/components/canvas/EffectsEditor.svelte';
   import CompositionNode from '$lib/components/canvas/CompositionNode.svelte';
+  import CalendarNode from '$lib/components/canvas/CalendarNode.svelte';
+  import { calendarData, calendarOf, CalendarScope, type CalendarNode as CalendarNodeState } from '$lib/canvas/calendar-node';
+  import { calendarError, type CalendarBrand, type CalendarPost } from '$lib/canvas/calendar-posts';
+  import { plannedInstant } from '$lib/calendar/period-grid';
+  import { DropVerdict, dayUnderPointer, type PointerPoint } from '$lib/canvas/canvas-drop';
   import { inputChanged } from '$lib/canvas/effects/editor';
   import { upstreamMedia } from '$lib/canvas/effects-node';
   import type { EffectStep } from '$lib/canvas/effects';
@@ -130,6 +136,113 @@
 
   function handlePromote(ids: string[]) {
     void openSheet(data.projectId, promotePath(ids));
+  }
+
+  type CalendarState = { posts: CalendarPost[] | null; brands: CalendarBrand[]; error: string | null; busy: boolean };
+  const CALENDAR_REFRESH_MS = 60_000;
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  let calendars = $state<Record<string, CalendarState>>({});
+
+  function calendarStateOf(id: string): CalendarState {
+    return calendars[id] ?? { posts: null, brands: [], error: null, busy: false };
+  }
+
+  function patchCalendar(id: string, patch: Partial<CalendarState>) {
+    calendars = { ...calendars, [id]: { ...calendarStateOf(id), ...patch } };
+  }
+
+  function answerError(answer: ActionAnswer): string {
+    const detail = (answer.data ?? {}) as { error?: unknown; message?: string; deliveries?: { error?: string }[] };
+    const reasons = (detail.deliveries ?? []).map((d) => d.error).filter(Boolean).join(', ');
+    return calendarError(detail.error, reasons || undefined);
+  }
+
+  async function loadCalendar(calendar: CalendarNodeState) {
+    const answer = await send('calendar_posts', { scope: calendar.scope, brand_id: calendar.brandId ?? '' });
+    if (answer.type !== 'success') {
+      patchCalendar(calendar.id, { posts: [], error: answerError(answer) });
+      return;
+    }
+    const result = answer.data as { posts: CalendarPost[]; brands: CalendarBrand[] };
+    patchCalendar(calendar.id, { posts: result.posts, brands: result.brands, error: null });
+  }
+
+  function calendarNodes(): CalendarNodeState[] {
+    return nodes.map((n) => calendarOf(n)).filter((c): c is CalendarNodeState => c !== null);
+  }
+
+  function refreshCalendars() {
+    for (const calendar of calendarNodes()) {
+      void loadCalendar(calendar);
+    }
+  }
+
+  const calendarQueries = $derived(calendarNodes().map((c) => `${c.id}:${c.scope}:${c.brandId ?? ''}`).join('|'));
+
+  $effect(() => {
+    void calendarQueries;
+    untrack(refreshCalendars);
+  });
+
+  $effect(() => {
+    const timer = setInterval(refreshCalendars, CALENDAR_REFRESH_MS);
+    window.addEventListener('focus', refreshCalendars);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('focus', refreshCalendars);
+    };
+  });
+
+  async function moveDraft(calendar: CalendarNodeState, post: CalendarPost, dayKey: string) {
+    patchCalendar(calendar.id, { busy: true });
+    const answer = await send('plan_post', {
+      post_id: post.id,
+      planned_for: plannedInstant(dayKey, timeZone, post.plannedFor),
+      expected_updated_at: post.updatedAt
+    });
+    patchCalendar(calendar.id, { busy: false, error: answer.type === 'success' ? null : answerError(answer) });
+    await loadCalendar(calendar);
+  }
+
+  async function scheduleDraft(calendar: CalendarNodeState, post: CalendarPost) {
+    patchCalendar(calendar.id, { busy: true });
+    const answer = await send('schedule_post', { post_id: post.id });
+    patchCalendar(calendar.id, { busy: false, error: answer.type === 'success' ? null : answerError(answer) });
+    await loadCalendar(calendar);
+  }
+
+  function highlightDay(ids: string[], at: PointerPoint) {
+    const target = dayUnderPointer(at, ids);
+    for (const el of document.querySelectorAll('.is-node-drop')) {
+      if (el !== target?.element) { el.classList.remove('is-node-drop'); }
+    }
+    target?.element.classList.add('is-node-drop');
+  }
+
+  function dropOnDay(ids: string[], at: PointerPoint): DropVerdict {
+    const target = dayUnderPointer(at, ids);
+    for (const el of document.querySelectorAll('.is-node-drop')) { el.classList.remove('is-node-drop'); }
+    const calendar = target ? calendarNodes().find((c) => c.id === target.calendarId) : null;
+    if (!target || !calendar) {
+      return DropVerdict.Ignored;
+    }
+    void draftOnDay(calendar, ids, target.dayKey);
+    return DropVerdict.Taken;
+  }
+
+  async function draftOnDay(calendar: CalendarNodeState, ids: string[], dayKey: string) {
+    if (!calendar.brandId) {
+      patchCalendar(calendar.id, { error: calendarError('brand_missing') });
+      return;
+    }
+    patchCalendar(calendar.id, { busy: true });
+    const answer = await send('create_post', {
+      brand_id: calendar.brandId,
+      node_id: ids,
+      planned_for: plannedInstant(dayKey, timeZone, null)
+    });
+    patchCalendar(calendar.id, { busy: false, error: answer.type === 'success' ? null : answerError(answer) });
+    await loadCalendar(calendar);
   }
 
   /** Una riga come la pagina la tiene: quel che il database ha, più dove sta sullo schermo. */
@@ -633,7 +746,7 @@
 
   $effect(() => onCanvasReveal(() => { void refresh(); }));
 
-  const READ_ACTIONS = new Set(['snapshot', 'estimate_text_cost']);
+  const READ_ACTIONS = new Set(['snapshot', 'estimate_text_cost', 'calendar_posts']);
 
   function formOf(fields: Record<string, string | number | File | string[]>): FormData {
     const body = new FormData();
@@ -1849,6 +1962,8 @@
     {edges}
     onMove={move}
     onMoveEnd={moveEnd}
+    onTileDragOver={highlightDay}
+    onTileDrop={dropOnDay}
     onResize={resize}
     onConnect={connect}
     onDelete={remove}
@@ -1885,6 +2000,7 @@
         {@const select = selectOf(row)}
         {@const effects = effectsOf(row)}
         {@const composition = compositionOf(row)}
+        {@const calendar = calendarOf(row)}
         {@const estimateRevision = textEstimateRevision(id)}
         {@const textCost = textCostEstimates[id]?.revision === estimateRevision ? textCostEstimates[id] : undefined}
         {@const uploaded = isUploadedNodeRow(row) ? uploadedNodeOf(row) : null}
@@ -2014,6 +2130,22 @@
             previewActive={compositionEditorId !== id}
             imageCount={upstreamCompositionRefsOf(id).length}
             onopeneditor={() => openCompositionEditor(id)}
+          />
+        {:else if calendar}
+          {@const calState = calendarStateOf(id)}
+          <CalendarNode
+            node={calendar}
+            posts={calState.posts}
+            brands={calState.brands}
+            error={calState.error}
+            busy={calState.busy}
+            {timeZone}
+            mediaUrl={(assetId) => assetUrl(assetId)}
+            onchange={(patch) => write(id, calendarData({ ...calendar, ...patch }))}
+            onmove={(post, dayKey) => moveDraft(calendar, post, dayKey)}
+            onschedule={(post) => scheduleDraft(calendar, post)}
+            onedit={(post) => handlePromote(post.sourceNodeIds)}
+            onrefresh={() => loadCalendar(calendar)}
           />
         {:else if isNodeType(row.type)}
           <EmptyNode type={row.type} />

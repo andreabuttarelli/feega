@@ -4,7 +4,7 @@
 > Non si modifica a mano: il prossimo che rigenera cancella le correzioni.
 
 **19 tool** — 6 in lettura, 10 in scrittura, 3 che distruggono.
-Il payload di `tools/list` pesa **19.139 caratteri**, circa **4785 token**, ed e' il costo che ogni sessione paga prima di dire una parola.
+Il payload di `tools/list` pesa **20.162 caratteri**, circa **5041 token**, ed e' il costo che ogni sessione paga prima di dire una parola.
 
 | gruppo | tool |
 |---|---:|
@@ -34,7 +34,7 @@ Remove rows that exist, in your org. `where` is required — a delete with no fi
 
 *Node data shapes*
 
-What `data` must look like on a `nodes` row, per `type` — the JSON Schema `insert_row`/`update_row` actually enforce on `nodes`, not a guess. Omit `type` for every type at once; name one to save tokens once you know which you need — an unknown `type` comes back as an error naming the ones that exist, so this list is never hand-maintained here. `list` holds N iteration values (images or text, never mixed); `select` picks exactly one item back out of a connected `list`, `products` or `social_account_feed` by a 1-based `index` — a synced catalogue or feed is an ordered list too, so `select` can pull one product or one post out of either the same way; `effects` holds a stack of image filters over an upstream image, each with its own params — set it with `update_row`, then render it with `apply_effects`. Limits (aspect ratios, durations, prompt length) are NOT here — those come from `get_media_models`, because they are a fact of the model, not the node. Free.
+What `data` must look like on a `nodes` row, per `type` — the JSON Schema `insert_row`/`update_row` actually enforce on `nodes`, not a guess. Omit `type` for every type at once; name one to save tokens once you know which you need — an unknown `type` comes back as an error naming the ones that exist, so this list is never hand-maintained here. `list` holds N iteration values (images or text, never mixed); `select` picks exactly one item back out of a connected `list`, `products` or `social_account_feed` by a 1-based `index` — a synced catalogue or feed is an ordered list too, so `select` can pull one product or one post out of either the same way; `effects` holds a stack of image filters over an upstream image, each with its own params — set it with `update_row`, then render it with `apply_effects`. Also returns `recommended_models` per medium (best, balanced, cheapest-good, each with price and release month) — prefer these over older models. Limits (aspect ratios, durations, prompt length) are NOT here — those come from `get_media_models`, because they are a fact of the model, not the node. Free.
 
 | campo | tipo | |
 |---|---|---|
@@ -176,7 +176,7 @@ How many combinations `run_node_loop` would queue on this node right now, and wh
 
 *Generate a node's content*
 
-Generate into an existing canvas node — text, image or video. This is the same engine the canvas Generate button calls; it never creates a node (`insert_row` does that). `medium` MUST match the node's own type, or the call is refused before anything is spent. Pass `version` as the node's current `nodes.version`: a stale value comes back `conflict` (never a silent overwrite) — re-read the node and retry with the fresh version. A `video` NEVER returns finished here: it comes back `queued` with an `external_job_id` on the run, and the render lands later, asynchronously — the node stays `running` until a later tick deposits the asset. Poll the node (`query`) rather than expecting a file now. A finished result returns `asset_ids` and `media` with `preview_url`/`full_url` (see `get_media`). Spends credits; a `credits_exhausted` failure means the org is out.
+Generate into an existing canvas node — text, image or video. This is the same engine the canvas Generate button calls; it never creates a node (`insert_row` does that). `medium` MUST match the node's own type, or the call is refused before anything is spent. Pass `version` as the node's current `nodes.version`: a stale value comes back `conflict` (never a silent overwrite) — re-read the node and retry with the fresh version. A `video` NEVER returns finished here: it comes back `queued` with an `external_job_id` on the run, and the render lands later, asynchronously — the node stays `running` until a later tick deposits the asset. Poll the node (`query`) rather than expecting a file now. A finished result returns `asset_ids` and `media` with `preview_url`/`full_url` (see `get_media`). Omit `model` to keep the node's own model, or the recommended balanced one for the medium when it has none (`describe_node_types` lists the recommended ones). A model the canvas does not offer is refused with the recommended alternatives; an old or weak one still runs but the result carries a `warning` naming the recommended one. Spends credits; a `credits_exhausted` failure means the org is out.
 
 | campo | tipo | |
 |---|---|---|
@@ -184,7 +184,7 @@ Generate into an existing canvas node — text, image or video. This is the same
 | `node_id` | string |  |
 | `medium` | `text` \| `image` \| `video` |  |
 | `prompt` | string |  |
-| `model` | string |  |
+| `model`? | string |  |
 | `version` | integer |  |
 | `params`? | object |  |
 
@@ -230,7 +230,7 @@ Rewrites a brief into the SHAPE the model you are about to render with wants —
 
 *See a node's media*
 
-View the image, video or text a node holds, a generation run produced, or an asset — by `node_ids`, `run_ids` and/or `asset_ids`. Per item: type, mime, width/height, duration, and two short-lived signed links: `preview_url` (images: 1024px long edge — FETCH THIS to look at the image and judge it against the prompt) and `full_url` (the original file — give this to the user). Videos have `full_url` only. Ids your org cannot see come back in `missing`. Reads only, spends nothing.
+View the image, video or text a node holds, a generation run produced, or an asset — by `node_ids`, `run_ids` and/or `asset_ids`. Per item: type, mime, width/height, duration, and two signed links: `preview_url` (images: 1024px long edge, valid 5 minutes — FETCH THIS to look at the image and judge it against the prompt) and `full_url` (the original file, valid 1 hour — give this to the user). Videos have `full_url` only. Ids your org cannot see come back in `missing`. Reads only, spends nothing.
 
 | campo | tipo | |
 |---|---|---|
@@ -257,12 +257,13 @@ Turn material into a post: this is what makes something publishable, distinct fr
 | `link_url`? | string |  |
 | `sources`? | object[] |  |
 | `node_ids`? | string[] | Resolve these canvas nodes into the post instead of passing caption/media directly. |
+| `planned_for`? | string | ISO date-time the draft is planned for. It shows on calendars; nothing is scheduled. |
 
 ### `list_posts` · R
 
 *List posts*
 
-Posts of one brand — the promoted artifacts, not canvas nodes. Filter by status (draft, ready, archived). Free.
+Posts of one brand — the promoted artifacts, not canvas nodes. Filter by status (draft, ready, archived). Each carries plannedFor, the day a draft is planned for. Free.
 
 | campo | tipo | |
 |---|---|---|

@@ -51,6 +51,7 @@
   import { setTileResize } from '$lib/canvas/tile-resize-context';
   import type { CanvasNode } from '$lib/canvas/graph';
   import { CANVAS_MODES, CanvasMode } from '$lib/canvas/canvas-mode';
+  import { DropVerdict, pointOf, type PointerPoint } from '$lib/canvas/canvas-drop';
 
   /**
    * Dove sta una tile e quanto è grande, in unità di tela — le stesse di `brand_canvas_items`.
@@ -102,6 +103,8 @@
     edges: incomingEdges = [],
     onMove,
     onMoveEnd,
+    onTileDragOver,
+    onTileDrop,
     onResize,
     onConnect,
     onDelete,
@@ -142,6 +145,8 @@
      * prop nessuno lo leggeva.
      */
     onMoveEnd?: (moves: { id: string; x: number; y: number }[]) => void;
+    onTileDragOver?: (ids: string[], at: PointerPoint) => void;
+    onTileDrop?: (ids: string[], at: PointerPoint) => DropVerdict;
     /**
      * Una linea appena tirata fra due tile, col verso già scelto: il primo che `edgeKindsFor`
      * propone su quella coppia. Un `kind` fisso qui sarebbe una derivazione salvata anche fra due
@@ -294,8 +299,29 @@
    * che il server non ha mai salvato riporterebbe un nodo a un `before` che coincide col suo
    * `after`, cioè a niente.
    */
-  function onNodeDragStop({ targetNode, nodes: dragged }: { targetNode: Node | null; nodes: Node[] }) {
+  let dragOrigin = new Map<string, { x: number; y: number }>();
+
+  function onNodeDragStart({ nodes: dragged }: { nodes: Node[] }) {
+    dragOrigin = new Map(dragged.map((n) => [n.id, { ...n.position }]));
+  }
+
+  function onNodeDrag({ nodes: dragged, event }: { nodes: Node[]; event: MouseEvent | TouchEvent }) {
+    onTileDragOver?.(dragged.map((n) => n.id), pointOf(event));
+  }
+
+  function returnToOrigin() {
+    nodes = nodes.map((n) => {
+      const origin = dragOrigin.get(n.id);
+      return origin ? { ...n, position: origin } : n;
+    });
+  }
+
+  function onNodeDragStop({ targetNode, nodes: dragged, event }: { targetNode: Node | null; nodes: Node[]; event: MouseEvent | TouchEvent }) {
     if (!targetNode) return;
+    if (onTileDrop?.(dragged.map((n) => n.id), pointOf(event)) === DropVerdict.Taken) {
+      returnToOrigin();
+      return;
+    }
     for (const n of dragged) {
       onMove?.(n.id, n.position.x, n.position.y);
     }
@@ -647,6 +673,8 @@
     bind:nodes
     bind:edges
     {nodeTypes}
+    onnodedragstart={onNodeDragStart}
+    onnodedrag={onNodeDrag}
     onnodedragstop={onNodeDragStop}
     onconnect={onConnected}
     onedgeclick={onEdgeClick}

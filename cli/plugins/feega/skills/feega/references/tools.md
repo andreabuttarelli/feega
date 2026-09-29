@@ -206,10 +206,11 @@ node, which is raw material. `post_sources` links a post back to the nodes it ca
 `list_posts({ org, brand_id, status? })` reads one brand's posts, filtered by `draft`, `ready` or
 `archived`. Free.
 
-`create_post({ org, brand_id, caption, media?, title?, link_url?, sources? })` turns material into
+`create_post({ org, brand_id, caption, media?, title?, link_url?, sources?, node_ids?, planned_for? })` turns material into
 a post: give it a brand, the copy (you write it — this calls no model) and its media (asset ids
 already in this org). `sources` optionally links back to the nodes it came from
-(`role: caption|media|reference`). Lands as `draft`; nothing is scheduled or published from here.
+(`role: caption|media|reference`). `planned_for` (ISO date-time) places the draft on the canvas
+Calendar node and the Calendar page. Lands as `draft`; nothing is scheduled or published from here.
 Free.
 
 `set_post_status({ org, id, status })` moves a post between `draft`, `ready` and `archived`. Does

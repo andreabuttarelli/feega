@@ -28,17 +28,18 @@ export type Post = {
   media: PostMedia[];
   linkUrl: string | null;
   status: PostStatus;
+  plannedFor: string | null;
   createdAt: string;
 };
 
 export type PostSource = { postId: string; nodeId: string; role: string | null };
 
 const POST_COLUMNS =
-  'id, brand_id, title, caption, per_platform, media, link_url, status, created_at';
+  'id, brand_id, title, caption, per_platform, media, link_url, status, planned_for, created_at';
 
 type PostColumns = Pick<
   PostRow,
-  'id' | 'brand_id' | 'title' | 'caption' | 'per_platform' | 'media' | 'link_url' | 'status' | 'created_at'
+  'id' | 'brand_id' | 'title' | 'caption' | 'per_platform' | 'media' | 'link_url' | 'status' | 'planned_for' | 'created_at'
 >;
 
 function toPost(row: PostColumns): Post {
@@ -51,6 +52,7 @@ function toPost(row: PostColumns): Post {
     media: ((row.media ?? []) as unknown as PostMedia[]),
     linkUrl: row.link_url,
     status: row.status as PostStatus,
+    plannedFor: row.planned_for ?? null,
     createdAt: row.created_at
   };
 }
