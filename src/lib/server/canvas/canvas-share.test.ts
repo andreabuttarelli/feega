@@ -280,4 +280,17 @@ describe('readSharedCanvas — i nodi sorgente', () => {
     expect(shared?.nodes[1].view).toEqual({ kind: 'ads', query: 'Nike', country: 'IT' });
     expect(JSON.stringify(shared)).not.toContain('123');
   });
+
+  it('a post, ads, embed or document with nothing in it reads as empty, not as a blank frame', async () => {
+    const { db } = sourceDb([
+      node('n-mock', 'social_post_mockup', {}),
+      node('n-ads', 'ads', {}),
+      node('n-frame', 'iframe', {}),
+      node('n-doc', 'doc', {})
+    ]);
+
+    const shared = await readSharedCanvas(db, 'tok-live', sign);
+
+    expect(shared?.nodes.map((n) => n.view)).toEqual([{ kind: 'empty' }, { kind: 'empty' }, { kind: 'empty' }, { kind: 'empty' }]);
+  });
 });

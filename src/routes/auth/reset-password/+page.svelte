@@ -69,6 +69,8 @@
   .card {
     width: 100%;
     max-width: 400px;
+    background: var(--paper);
+    border: 1px solid var(--line);
   }
   .brand {
     font-size: 22px;

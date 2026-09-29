@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { ChevronLeft, ChevronRight, X } from '@lucide/svelte';
+  import { Button } from '$lib/components/ui/button';
+  import { Select } from '$lib/components/ui/select';
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { _ } from 'svelte-i18n';
@@ -155,13 +158,13 @@
     <div class="title-row">
       <h1>{MONTH_NAMES[month - 1]} {year}</h1>
       <div class="nav-buttons">
-        <button type="button" onclick={() => navigateMonth(-1)} aria-label="Previous month">‹</button>
-        <button type="button" onclick={goToday}>Today</button>
-        <button type="button" onclick={() => navigateMonth(1)} aria-label="Next month">›</button>
+        <Button variant="secondary" size="icon-sm" onclick={() => navigateMonth(-1)} aria-label="Previous month"><ChevronLeft /></Button>
+        <Button variant="secondary" size="sm" onclick={goToday}>Today</Button>
+        <Button variant="secondary" size="icon-sm" onclick={() => navigateMonth(1)} aria-label="Next month"><ChevronRight /></Button>
       </div>
       {#if data.brands.length}
-        <select
-          class="brand-select"
+        <Select
+          class="brand-select w-44"
           aria-label="Brand"
           value={data.selection}
           onchange={(e) => withParam('brand', e.currentTarget.value)}
@@ -170,7 +173,7 @@
           {#each data.brands as b (b.id)}
             <option value={b.slug}>{b.name}</option>
           {/each}
-        </select>
+        </Select>
       {/if}
     </div>
   </header>
@@ -283,7 +286,7 @@
           {brandsById.get(selectedPost.brandId)?.name}
         </span>
         <span class="status-badge">{selectedPost.status}</span>
-        <button type="button" class="close-btn" onclick={closePost} aria-label="Close">×</button>
+        <Button variant="ghost" size="icon-sm" class="ml-auto" onclick={closePost} aria-label="Close"><X /></Button>
       </header>
       <p class="popover-caption">{selectedPost.caption}</p>
       {#if selectedPost.media.length}
@@ -299,17 +302,17 @@
               <input type="hidden" name="postId" value={selectedPost.id} />
               <input type="hidden" name="accountId" value={delivery.accountId} />
               <input type="hidden" name="scheduledFor" value={isoOf(scheduleLocal)} />
-              <button type="submit">Move</button>
+              <Button variant="secondary" size="sm" type="submit">Move</Button>
             </form>
             <form method="POST" action="?/publishNow" class="popover-action">
               <input type="hidden" name="postId" value={selectedPost.id} />
               <input type="hidden" name="accountId" value={delivery.accountId} />
-              <button type="submit">Publish now</button>
+              <Button size="sm" type="submit">Publish now</Button>
             </form>
             <form method="POST" action="?/cancel" class="popover-action">
               <input type="hidden" name="postId" value={selectedPost.id} />
               <input type="hidden" name="accountId" value={delivery.accountId} />
-              <button type="submit">Cancel</button>
+              <Button variant="ghost" size="sm" type="submit">Cancel</Button>
             </form>
           </li>
         {/each}
@@ -329,12 +332,12 @@
               {account.handle ?? account.displayName ?? account.platform}
             </label>
           {/each}
-          <button type="submit">Schedule</button>
+          <Button type="submit">Schedule</Button>
         </form>
       {:else if !selectedPost.deliveries.length}
         <p class="popover-media">
           No account connected for this brand.
-          <a href={`/p/${page.params.projectId}/settings/connected-accounts`}>Connect</a>
+          <Button variant="link" href={`/p/${page.params.projectId}/settings/connected-accounts`}>Connect</Button>
         </p>
       {/if}
     </div>
@@ -366,27 +369,8 @@
     gap: 4px;
   }
 
-  .nav-buttons button {
-    height: 32px;
-    min-width: 32px;
-    border: 1px solid var(--line, #ededef);
-    background: var(--paper, #fff);
-    padding: 0 10px;
-    font: inherit;
-    font-size: 13px;
-    cursor: pointer;
-    color: var(--ink, #1d1d1f);
-  }
-
-  .brand-select {
+  .title-row :global(.brand-select) {
     margin-left: auto;
-    height: 32px;
-    border: 1px solid var(--line, #ededef);
-    background: var(--paper, #fff);
-    padding: 0 8px;
-    font: inherit;
-    font-size: 13px;
-    color: var(--ink, #1d1d1f);
   }
 
   .brand-chip {
@@ -418,8 +402,7 @@
     font-size: 12px;
   }
 
-  .popover-when input,
-  .popover-schedule button {
+  .popover-when input {
     border: 1px solid var(--line, #ededef);
     background: transparent;
     padding: 4px 8px;
@@ -633,13 +616,6 @@
     color: var(--ink-faint, #9a9a9e);
   }
 
-  .close-btn {
-    border: 0;
-    background: transparent;
-    font-size: 16px;
-    cursor: pointer;
-  }
-
   .popover-caption {
     margin: 0;
     white-space: pre-wrap;
@@ -672,15 +648,6 @@
     margin: 0 0 0 auto;
   }
 
-  .popover-action button {
-    border: 1px solid var(--line, #ededef);
-    background: transparent;
-    padding: 2px 8px;
-    font-size: 11px;
-    cursor: pointer;
-    color: var(--ink, #1d1d1f);
-  }
-
   .agenda {
     display: none;
   }
@@ -695,12 +662,12 @@
   :global([data-viewport='mobile']) .title-row h1 {
     flex: 1 0 100%;
   }
-  :global([data-viewport='mobile']) .nav-buttons button,
-  :global([data-viewport='mobile']) .brand-select {
+  :global([data-viewport='mobile']) .title-row :global([data-slot='button']),
+  :global([data-viewport='mobile']) .title-row :global(select) {
     min-height: var(--touch-target);
     min-width: var(--touch-target);
   }
-  :global([data-viewport='mobile']) .brand-select {
+  :global([data-viewport='mobile']) .title-row :global(.brand-select) {
     flex: 1 1 auto;
   }
   :global([data-viewport='mobile']) .calendar-body {
@@ -803,10 +770,7 @@
   :global([data-viewport='mobile']) .popover-deliveries li {
     flex-wrap: wrap;
   }
-  :global([data-viewport='mobile']) .popover-action button,
-  :global([data-viewport='mobile']) .popover-when input,
-  :global([data-viewport='mobile']) .popover-schedule button,
-  :global([data-viewport='mobile']) .close-btn {
+  :global([data-viewport='mobile']) .popover-when input {
     min-height: var(--touch-target);
     min-width: var(--touch-target);
   }

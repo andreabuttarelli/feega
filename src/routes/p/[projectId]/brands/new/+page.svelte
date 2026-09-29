@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Button } from '$lib/components/ui/button';
   /**
    * IL WIZARD, UN PASSO ALLA VOLTA — sito → analisi → prodotti → target →
    * handle del brand → overview → approva. `STEPS` è la tabella: l'ordine e le etichette stanno
@@ -237,7 +238,7 @@
   const renderedContent = $derived(renderBrandContentHtml(draft.content));
 </script>
 
-<PageHead title="New brand" subtitle={`Step ${stepIndex + 1} of ${STEPS.length} — ${STEP_LABEL[step]}`} />
+<PageHead title="New brand" />
 
 <div class="wizard-shell">
   <div class="wizard">
@@ -282,8 +283,8 @@
           <input name="url" type="text" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="example.com" bind:value={draft.website} />
         {/if}
         <div class="row">
-          <button class="btn ghost" type="button" onclick={forward} disabled={busy}>Skip, no website</button>
-          <button class="btn primary" type="submit" disabled={busy || !draft.website}>{busy ? 'Reading…' : 'Analyze'}</button>
+          <Button variant="secondary" onclick={forward} disabled={busy}>Skip, no website</Button>
+          <Button type="submit" disabled={busy || !draft.website}>{busy ? 'Reading…' : 'Analyze'}</Button>
         </div>
       </form>
     </section>
@@ -303,7 +304,7 @@
         {:else}
           <div class="found-item">
             <h3 class="found-name">{draft.name || 'Untitled brand'}</h3>
-            <button class="btn ghost small" type="button" onclick={() => (editingField = 'name')}>Edit</button>
+            <Button variant="ghost" size="sm" onclick={() => (editingField = 'name')}>Edit</Button>
           </div>
         {/if}
 
@@ -315,7 +316,7 @@
         {:else}
           <div class="found-item">
             <p class="found-description">{draft.shortDescription || 'No description found.'}</p>
-            <button class="btn ghost small" type="button" onclick={() => (editingField = 'shortDescription')}>Edit</button>
+            <Button variant="ghost" size="sm" onclick={() => (editingField = 'shortDescription')}>Edit</Button>
           </div>
         {/if}
 
@@ -338,8 +339,8 @@
         <p class="hint">{draft.products.length} product{draft.products.length === 1 ? '' : 's'} detected.</p>
       </div>
       <div class="row">
-        <button class="btn ghost" type="button" onclick={back}>Back</button>
-        <button class="btn primary" type="button" onclick={forward}>Continue</button>
+        <Button variant="secondary" onclick={back}>Back</Button>
+        <Button onclick={forward}>Continue</Button>
       </div>
     </section>
   {/if}
@@ -363,8 +364,8 @@
         </ul>
       {/if}
       <div class="row">
-        <button class="btn ghost" type="button" onclick={back}>Back</button>
-        <button class="btn primary" type="button" onclick={forward}>Continue</button>
+        <Button variant="secondary" onclick={back}>Back</Button>
+        <Button onclick={forward}>Continue</Button>
       </div>
     </section>
   {/if}
@@ -389,16 +390,16 @@
                 />
               </label>
               <input type="text" bind:value={draft.colours[i]} placeholder="#rrggbb" />
-              <button class="btn ghost small" type="button" onclick={() => (draft.colours = draft.colours.filter((_, idx) => idx !== i))}>Remove</button>
+              <Button variant="ghost" size="sm" onclick={() => (draft.colours = draft.colours.filter((_, idx) => idx !== i))}>Remove</Button>
             </div>
           {/each}
         </div>
-        <button class="btn ghost" type="button" onclick={() => (draft.colours = [...draft.colours, '#000000'])}>+ Add colour</button>
+        <Button variant="secondary" onclick={() => (draft.colours = [...draft.colours, '#000000'])}>+ Add colour</Button>
       </div>
 
       <div class="row">
-        <button class="btn ghost" type="button" onclick={back}>Back</button>
-        <button class="btn primary" type="button" onclick={forward}>Continue</button>
+        <Button variant="secondary" onclick={back}>Back</Button>
+        <Button onclick={forward}>Continue</Button>
       </div>
     </section>
   {/if}
@@ -416,13 +417,13 @@
           </select>
           <PlatformGlyph platform={h.platform} />
           <input type="text" placeholder="handle" bind:value={h.handle} />
-          <button class="btn ghost small" type="button" onclick={() => (draft.brandHandles = removeHandle(draft.brandHandles, i))}>Remove</button>
+          <Button variant="ghost" size="sm" onclick={() => (draft.brandHandles = removeHandle(draft.brandHandles, i))}>Remove</Button>
         </div>
       {/each}
-      <button class="btn ghost" type="button" onclick={() => (draft.brandHandles = addHandle(draft.brandHandles))}>+ Add handle</button>
+      <Button variant="secondary" onclick={() => (draft.brandHandles = addHandle(draft.brandHandles))}>+ Add handle</Button>
       <div class="row">
-        <button class="btn ghost" type="button" onclick={back}>Back</button>
-        <button class="btn primary" type="button" onclick={forward}>Continue</button>
+        <Button variant="secondary" onclick={back}>Back</Button>
+        <Button onclick={forward}>Continue</Button>
       </div>
     </section>
   {/if}
@@ -475,8 +476,8 @@
         <input type="hidden" name="products" value={JSON.stringify(draft.products)} />
 
         <div class="row">
-          <button class="btn ghost" type="button" onclick={back}>Back</button>
-          <button class="btn primary" type="submit" disabled={busy || !draft.name.trim()}>{busy ? 'Creating…' : 'Approve'}</button>
+          <Button variant="secondary" onclick={back}>Back</Button>
+          <Button type="submit" disabled={busy || !draft.name.trim()}>{busy ? 'Creating…' : 'Approve'}</Button>
         </div>
       </form>
     </section>
@@ -574,22 +575,7 @@
     gap: 12px;
     padding-top: 4px;
   }
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid var(--line-2);
-    background: var(--paper);
-    color: var(--ink);
-    padding: 12px 22px;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-  }
-  .btn.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
-  .btn.ghost { background: transparent; }
-  .btn.small { padding: 6px 10px; font-size: 12px; }
-  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  input[type='checkbox'] { accent-color: var(--ink); }
 
   .msg.warn {
     font-size: 13px;
@@ -707,12 +693,12 @@
   .handle-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
   .handle-row select { flex: 0 0 auto; width: auto; }
   .handle-row input { flex: 1 1 160px; min-width: 0; }
-  .handle-row .btn.small { flex: 0 0 auto; margin-left: auto; }
+  .handle-row :global([data-slot='button']) { flex: 0 0 auto; margin-left: auto; }
 
   .colour-list { display: flex; flex-direction: column; gap: 8px; }
   .colour-row { display: flex; align-items: center; gap: 8px; }
   .colour-row input[type='text'] { flex: 1 1 auto; min-width: 0; }
-  .colour-row .btn.small { flex: 0 0 auto; }
+  .colour-row :global([data-slot='button']) { flex: 0 0 auto; }
 
   .colour-swatch-label {
     position: relative;
@@ -739,8 +725,8 @@
   :global([data-viewport='mobile']) .wizard-shell { min-height: 100%; padding: 20px var(--page-gutter) 32px; }
   :global([data-viewport='mobile']) .wizard-panel { padding: 20px 16px; }
   :global([data-viewport='mobile']) .row { flex-direction: column-reverse; }
-  :global([data-viewport='mobile']) .row .btn { width: 100%; min-height: var(--touch-target); }
+  :global([data-viewport='mobile']) .row :global([data-slot='button']) { width: 100%; min-height: var(--touch-target); }
   :global([data-viewport='mobile']) .handle-row select { flex: 1 1 auto; }
   :global([data-viewport='mobile']) .handle-row input { flex: 1 1 100%; order: 1; }
-  :global([data-viewport='mobile']) .handle-row .btn.small { flex: 1 1 auto; margin-left: 0; order: 2; }
+  :global([data-viewport='mobile']) .handle-row :global([data-slot='button']) { flex: 1 1 auto; margin-left: 0; order: 2; }
 </style>

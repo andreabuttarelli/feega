@@ -1,5 +1,10 @@
 <script lang="ts">
   import PageHead from '$lib/components/PageHead.svelte';
+  import { Upload, Images } from '@lucide/svelte';
+  import { Button } from '$lib/components/ui/button';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Notice } from '$lib/components/ui/notice';
+  import { EmptyState } from '$lib/components/ui/empty-state';
   import { deserialize } from '$app/forms';
   import { invalidateAll } from '$app/navigation';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
@@ -10,6 +15,13 @@
   let { data } = $props();
 
   type Filter = 'all' | 'generated' | 'upload' | 'global';
+
+  const EMPTY_HINT: Record<Filter, string> = {
+    all: 'Generate or upload something and it lands here.',
+    generated: 'Nothing generated yet. Run a node on the canvas to fill this in.',
+    upload: 'Nothing uploaded yet. Upload a file, or drop one onto a canvas.',
+    global: 'The shared reference catalogue is empty.'
+  };
 
   const FILTERS: { value: Filter; label: string }[] = [
     { value: 'all', label: 'All' },
@@ -23,7 +35,7 @@
   }
 
   function formatBytes(n: number | null): string {
-    if (n == null || !Number.isFinite(n)) return '—';
+    if (n == null || !Number.isFinite(n)) return '';
     if (n < 1024) return `${n} B`;
     if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
     return `${(n / (1024 * 1024)).toFixed(1)} MB`;
@@ -107,9 +119,11 @@
     {#each FILTERS as f (f.value)}
       <a class="filter" class:active={data.filter === f.value} href={filterHref(f.value)}>
         {f.label}
+        {#if data.filter === f.value}
+          <span class="count">{data.filter === 'global' ? data.catalogue.length : data.items.length}</span>
+        {/if}
       </a>
     {/each}
-    <span class="count">{data.filter === 'global' ? data.catalogue.length : data.items.length}</span>
 
     <input
       bind:this={fileInput}
@@ -118,26 +132,26 @@
       onchange={onFilePicked}
       accept="image/png,image/jpeg,image/webp,image/gif,image/avif,video/mp4,video/webm,video/quicktime,.pdf,.docx,.xlsx,.xls,.html,.htm,.csv,.txt,.md,.markdown,.xml,.rss,.atom,.ipynb"
     />
-    <button type="button" class="upload-btn" disabled={uploading} onclick={() => fileInput?.click()}>
+    <Button variant="secondary" size="sm" class="upload-btn" disabled={uploading} onclick={() => fileInput?.click()}>
+      <Upload />
       {uploading ? 'Uploading…' : 'Upload'}
-    </button>
+    </Button>
   </nav>
 
   {#if uploadError}
-    <p class="upload-error">{uploadError}</p>
+    <Notice tone="error">{uploadError}</Notice>
   {/if}
 
   {#if data.filter === 'global'}
     {#if !data.catalogue.length}
-      <div class="empty">
-        <h3>Nothing here yet</h3>
-        <p>The shared reference catalogue is empty.</p>
-      </div>
+      <EmptyState title="Nothing here yet" description={EMPTY_HINT.global}>
+        {#snippet icon()}<Images />{/snippet}
+      </EmptyState>
     {:else}
-      <div class="grid">
+      <div class="asset-grid">
         {#each data.catalogue as image (image.id)}
           <div class="tile">
-            <span class="badge">global</span>
+            <Badge variant="outline" class="tile-badge">global</Badge>
             {#if image.url}
               <img src={image.url} alt={image.name} loading="lazy" decoding="async" />
             {:else}
@@ -149,20 +163,11 @@
       </div>
     {/if}
   {:else if !data.items.length}
-    <div class="empty">
-      <h3>Nothing here yet</h3>
-      <p>
-        {#if data.filter === 'generated'}
-          Nothing generated yet. Run a node on the canvas to fill this in.
-        {:else if data.filter === 'upload'}
-          Nothing uploaded yet. Upload a file, or drop one onto a canvas.
-        {:else}
-          Generate or upload something and it lands here.
-        {/if}
-      </p>
-    </div>
+    <EmptyState title="Nothing here yet" description={EMPTY_HINT[data.filter as Filter]}>
+      {#snippet icon()}<Images />{/snippet}
+    </EmptyState>
   {:else}
-    <div class="grid">
+    <div class="asset-grid">
       {#each data.items as item (item.id)}
         <!-- svelte-ignore a11y_no_static_element_interactions -- trascinare una tile è una
              scorciatoia sulla libreria, non l'unico modo di portare l'asset sulla tela: chi usa
@@ -172,9 +177,9 @@
           draggable={Boolean(assetDrag(item))}
           ondragstart={(e) => onTileDragStart(e, item)}
         >
-          <span class="badge" class:generated={item.source === 'generated'}>
-            {item.source === 'generated' ? 'generated' : 'uploaded'}
-          </span>
+          <Badge variant="outline" class="tile-badge">
+            {item.source === 'generated' ? 'Generated' : 'Uploaded'}
+          </Badge>
 
           {#if item.type === 'image' && item.signedUrl}
             <img src={item.signedUrl} alt="" loading="lazy" decoding="async" />
@@ -190,7 +195,7 @@
 
           <div class="meta">
             <span class="dim">
-              {#if item.width && item.height}{item.width}×{item.height} · {/if}{formatBytes(item.bytes)}
+              {[item.width && item.height ? `${item.width}×${item.height}` : '', formatBytes(item.bytes)].filter(Boolean).join(' · ')}
             </span>
             {#if item.sourceNode}
               <a class="node-link" href={`/p/${data.project.id}/c/${item.sourceNode.canvasId}`}>
@@ -216,29 +221,18 @@
   }
   .filter:hover { color: var(--ink); }
   .filter.active { background: var(--paper-2); color: var(--ink); border-color: var(--line); }
-  .count { margin-left: auto; font-size: 12px; color: var(--ink-faint); }
+  .count { margin-left: 6px; font-size: 12px; font-weight: 500; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
 
   .file-input { display: none; }
-  .upload-btn {
-    font-size: 13px; font-weight: 600; padding: 7px 14px; margin-left: 10px;
-    color: var(--ink); background: var(--paper); border: 1px solid var(--line); cursor: pointer;
-  }
-  .upload-btn:hover { background: var(--paper-2); }
-  .upload-btn:disabled { opacity: 0.6; cursor: default; }
+  .filters :global(.upload-btn) { margin-left: auto; }
 
-  .upload-error { margin: 0 0 12px; font-size: 12px; color: var(--danger, #c0392b); }
-
-  .empty { text-align: center; padding: 48px 20px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
-  .empty h3 { margin: 0; font-size: 18px; }
-  .empty p { margin: 0; color: var(--ink-soft); max-width: 420px; line-height: 1.5; }
-
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+  .asset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
 
   :global([data-viewport='mobile']) .media-page { padding: 8px var(--page-gutter) 24px; }
   :global([data-viewport='mobile']) .filters { flex-wrap: wrap; gap: 4px; }
   :global([data-viewport='mobile']) .filter { min-height: var(--touch-target); display: inline-flex; align-items: center; padding: 0 12px; }
-  :global([data-viewport='mobile']) .upload-btn { min-height: var(--touch-target); margin-left: 0; }
-  :global([data-viewport='mobile']) .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  :global([data-viewport='mobile']) .filters :global(.upload-btn) { min-height: var(--touch-target); }
+  :global([data-viewport='mobile']) .asset-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .tile {
     position: relative; overflow: hidden; background: var(--paper-2);
     border: 1px solid var(--line); display: flex; flex-direction: column; min-height: 160px;
@@ -246,7 +240,7 @@
   .tile[draggable='true'] { cursor: grab; }
   .tile img, .tile video { width: 100%; height: 140px; object-fit: cover; display: block; }
   .text-preview {
-    margin: 0; padding: 14px; font-size: 12px; line-height: 1.4; color: var(--ink);
+    margin: 0; padding: 36px 12px 12px; font-size: 12px; line-height: 1.4; color: var(--ink);
     height: 140px; overflow: hidden;
   }
   .ph {
@@ -254,11 +248,10 @@
     text-transform: uppercase; letter-spacing: 0.06em;
   }
 
-  .badge {
-    position: absolute; top: 8px; left: 8px; z-index: 1; font-size: 10px; font-weight: 700;
-    padding: 2px 8px; background: rgba(0, 0, 0, 0.55); color: #fff;
+  .tile :global(.tile-badge) {
+    position: absolute; top: 8px; left: 8px; z-index: 1;
+    background: color-mix(in srgb, var(--paper) 90%, transparent); color: var(--ink-soft);
   }
-  .badge.generated { background: color-mix(in srgb, var(--accent, #6d4aff) 82%, #000); }
 
   .meta { padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; }
   .dim { font-size: 11px; color: var(--ink-faint); }

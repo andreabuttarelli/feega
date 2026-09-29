@@ -348,7 +348,7 @@
   .tile-name {
     flex: 0 0 auto;
     padding: 3px 5px;
-    font-size: 10px;
+    font-size: 12px;
     color: var(--ink-soft, #6e6e73);
     overflow: hidden;
     text-overflow: ellipsis;

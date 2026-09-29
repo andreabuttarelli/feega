@@ -44,6 +44,7 @@
   }
   .card {
     background: var(--paper, #fff);
+    border: 1px solid var(--line);
     padding: 40px 36px;
     max-width: 420px;
     width: 100%;

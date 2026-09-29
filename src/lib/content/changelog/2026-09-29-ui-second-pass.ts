@@ -8,7 +8,7 @@ export default {
     'Your credit balance now shows with a clear coin icon.',
     'Empty influencer, post preview and ads nodes say what to do next.',
     'Generation errors and canvas controls are now fully in English.',
-    'Settings pages share one consistent look for panels, fields and buttons.',
+    'Settings, assets, promote, calendar and the brand wizard share one consistent look.',
     'The CLI and MCP sign-in pages are now in English.'
   ]
 } satisfies ChangelogEntry;

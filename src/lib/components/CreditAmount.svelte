@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Coins } from '@lucide/svelte';
+  import { CircleDollarSign } from '@lucide/svelte';
   import { formatCredits } from './credit-amount-format';
 
   let { amount, approx = false }: { amount: number; approx?: boolean } = $props();
@@ -9,7 +9,7 @@
 </script>
 
 <span class="credit-amount" aria-label={label} title={label}>
-  <Coins class="credit-icon" aria-hidden="true" strokeWidth={1.8} />
+  <CircleDollarSign class="credit-icon" aria-hidden="true" strokeWidth={1.8} />
   <span aria-hidden="true">{displayed}</span>
 </span>
 
