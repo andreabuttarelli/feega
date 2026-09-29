@@ -73,8 +73,8 @@ export function registerNodeTools(server: McpServer) {
       description:
         'View the image, video or text a node holds, a generation run produced, or an asset — ' +
         'by `node_ids`, `run_ids` and/or `asset_ids`. Per item: type, mime, width/height, duration, ' +
-        'and two short-lived signed links: `preview_url` (images: 1024px long edge — FETCH THIS to ' +
-        'look at the image and judge it against the prompt) and `full_url` (the original file — ' +
+        'and two signed links: `preview_url` (images: 1024px long edge, valid 5 minutes — FETCH THIS to ' +
+        'look at the image and judge it against the prompt) and `full_url` (the original file, valid 1 hour — ' +
         'give this to the user). Videos have `full_url` only. Ids your org cannot see come back in ' +
         '`missing`. Reads only, spends nothing.',
       inputSchema: z.object({

@@ -9,7 +9,8 @@ const signStoredPreview = vi.fn();
 vi.mock('$lib/server/repos/assets', () => ({ findAssets: (...a: unknown[]) => findAssets(...a) }));
 vi.mock('$lib/server/repos/canvas', () => ({ findNode: (...a: unknown[]) => findNode(...a) }));
 vi.mock('$lib/server/repos/node-runs', () => ({ findRunOutputs: (...a: unknown[]) => findRunOutputs(...a) }));
-vi.mock('$lib/server/repos/asset-storage', () => ({
+vi.mock('$lib/server/repos/asset-storage', async (importActual) => ({
+  SIGNED_URL_TTL_S: (await importActual<typeof import('$lib/server/repos/asset-storage')>()).SIGNED_URL_TTL_S,
   CANVAS_ASSET_BUCKET: 'canvas-assets',
   signStoredFile: (...a: unknown[]) => signStoredFile(...a),
   signStoredPreview: (...a: unknown[]) => signStoredPreview(...a)
@@ -47,6 +48,13 @@ describe('loadMedia', () => {
     expect(out.items[0]).toMatchObject({ type: 'image', mimeType: 'image/png', width: 1366, height: 2048,
       fullUrl: 'https://s/brand-knowledge/u1/media/a-node.png', previewUrl: 'https://s/brand-knowledge/u1/media/a-node.png?w=1024' });
     expect(out.missing).toEqual([]);
+  });
+
+  it('signs the user link for an hour and the agent preview for five minutes', async () => {
+    await loadMedia({} as never, {} as never, { orgId: ORG, nodeIds: [], runIds: [], assetIds: ['a'] });
+
+    expect(signStoredFile).toHaveBeenCalledWith({}, 'brand-knowledge', 'u1/media/a.png', 3600);
+    expect(signStoredPreview).toHaveBeenCalledWith({}, 'brand-knowledge', 'u1/media/a.png', 300);
   });
 
   it('reports an asset of another org as missing, never signs it', async () => {

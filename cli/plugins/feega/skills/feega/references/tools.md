@@ -152,8 +152,8 @@ deposits the asset. Poll the node (`query`) rather than expecting a file now. Sp
 
 `get_media({ org, node_ids?, run_ids?, asset_ids? })` resolves nodes (their current output), runs
 (what that run produced) and assets to: type, mime, width/height, duration, and two signed links
-valid a few minutes — `preview_url` (images only, 1024px long edge: fetch it to see the image)
-and `full_url` (the original, for the user). Ids outside your org come back in `missing`; nothing
+— `preview_url` (images only, 1024px long edge, valid 5 minutes: fetch it to see the image)
+and `full_url` (the original, for the user, valid 1 hour). Ids outside your org come back in `missing`; nothing
 visible at all is a 404. Reads only.
 
 `apply_effects({ org, node_id })` renders an `effects` node's stack onto its upstream image and
