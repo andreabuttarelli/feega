@@ -2142,3 +2142,13 @@ Tailwind is `important`, so both are `!important` in `utilities` at equal specif
 winner is whichever chunk loads last — any unrelated merge can flip it.
 **Move:** override a primitive's utilities with strictly higher specificity (add `[data-side]`),
 never a tie. A `@real` e2e is skipped in CI: it guards nothing until someone runs it.
+
+## Typing in a canvas node loses characters and floods the server
+Signal: text typed fast shrinks back while typing; the network panel shows a `write`, a
+`snapshot` and an `estimate_text_cost` per keystroke, still firing seconds after the hands
+stop (measured: 200 chars → 374 requests, 28 chars kept). Cause: each keystroke saved at
+once, each response replaced `data` with a server row older than what was typed since, and
+every own write came back through realtime as a full snapshot. Move: edits go through
+`save-scheduler.ts`; a server row never overwrites a field in `dirtyKeys`; realtime updates
+for a node in flight or at a held version are echoes (`isOwnEcho`). A page callback that a
+child calls from its `$effect` must read `$state` through `untrack`, or the page loops.
