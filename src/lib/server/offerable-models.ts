@@ -9,6 +9,8 @@ import { videoCredits } from '$lib/server/content-cost';
 import { billedCreditsFor } from '$lib/credit-ladder';
 import { videoDurationOptions, VIDEO_RESOLUTIONS, MIN_DURATION } from '$lib/server/video';
 import { modelParamsOf } from '$lib/canvas/model-params';
+import { WIRO_PROVIDER } from './wiro-catalogue';
+import { wiroChoice } from './wiro-choice';
 
 const VIDEO_SPEC_IDS = [
   'bytedance/seedance-2-5',
@@ -31,6 +33,9 @@ type SyncedRow = {
   supported_resolutions: string[] | null;
   param_schema: Record<string, unknown> | null;
   pricing: unknown;
+  provider?: string | null;
+  uncensored?: boolean | null;
+  wire_spec?: unknown;
 };
 
 async function syncedRows(
@@ -39,7 +44,7 @@ async function syncedRows(
 ): Promise<{ rows: Map<string, SyncedRow>; synced: boolean }> {
   const { data } = await admin
     .from('ai_models')
-    .select('id, label, input_modalities, supported_parameters, supported_resolutions, param_schema, pricing')
+    .select('id, label, input_modalities, supported_parameters, supported_resolutions, param_schema, pricing, provider, uncensored, wire_spec')
     .eq('catalogue', catalogue);
 
   const rows = (data ?? []) as SyncedRow[];
@@ -94,6 +99,14 @@ function genericImageChoice(row: SyncedRow): ModelChoice {
  * migration) ripiega su `VIDEO_RESOLUTIONS`, il tetto misurato del nostro trasporto — mai un menu
  * senza selettore, che spedirebbe la resa di default silenziosa.
  */
+const CHOICE_OF_PROVIDER: Readonly<Record<string, (row: SyncedRow) => ModelChoice>> = {
+  [WIRO_PROVIDER]: wiroChoice
+};
+
+function unspeccedChoice(row: SyncedRow, generic: (row: SyncedRow) => ModelChoice): ModelChoice {
+  return (CHOICE_OF_PROVIDER[row.provider ?? ''] ?? generic)(row);
+}
+
 function videoResolutionsFor(row: SyncedRow): string[] {
   return row.supported_resolutions?.length ? row.supported_resolutions : [...VIDEO_RESOLUTIONS];
 }
@@ -327,7 +340,7 @@ async function offerableImages(admin: SupabaseClient): Promise<OfferableModels> 
   // non nascosta. Questo è il cambio che fa passare il menu da "le famiglie che abbiamo scritto a
   // mano" a "quello che OpenRouter pubblica davvero" (CLAUDE.md — l'app segue il catalogo).
   for (const [id, row] of rows) {
-    if (!specced.has(id)) choices.push(genericImageChoice(row));
+    if (!specced.has(id)) choices.push(unspeccedChoice(row, genericImageChoice));
   }
 
   return { synced, choices };
@@ -351,7 +364,7 @@ async function offerableVideos(admin: SupabaseClient): Promise<OfferableModels> 
   });
 
   for (const [id, row] of rows) {
-    if (!specced.has(id)) choices.push(genericVideoChoice(row));
+    if (!specced.has(id)) choices.push(unspeccedChoice(row, genericVideoChoice));
   }
 
   return { synced, choices };

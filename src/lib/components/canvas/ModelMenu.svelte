@@ -5,6 +5,7 @@
   import CreditAmount from '$lib/components/CreditAmount.svelte';
   import ModalityIcons from './ModalityIcons.svelte';
   import ProviderIcon from './ProviderIcon.svelte';
+  import { listedCredits } from '$lib/canvas/gen-cost';
 
   let {
     choices,
@@ -24,6 +25,9 @@
 </script>
 
 {#snippet tier(choice: ModelChoice)}
+  {#if choice.uncensored}
+    <span class="shrink-0 border border-destructive px-1 text-[0.625rem] leading-4 text-destructive" data-testid="uncensored-badge">Uncensored</span>
+  {/if}
   {#if choice.tiers?.[0]}
     <span class="shrink-0 border border-line-2 px-1 text-[0.625rem] leading-4 text-muted-foreground">{TIER_LABEL[choice.tiers[0]]}</span>
   {/if}
@@ -66,8 +70,8 @@
           {@render tier(choice)}
           <span class="ml-auto flex shrink-0 items-center gap-1.5 text-muted-foreground">
             <ModalityIcons inputModalities={choice.inputModalities ?? []} />
-            {#if typeof choice.unitCredits === 'number'}
-              <CreditAmount amount={choice.unitCredits} />
+            {#if typeof listedCredits(choice) === 'number'}
+              <CreditAmount amount={listedCredits(choice) ?? 0} />
             {/if}
           </span>
         </span>

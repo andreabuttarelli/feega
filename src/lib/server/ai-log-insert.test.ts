@@ -22,7 +22,7 @@ const REAL_COLUMNS = new Set([
   'status', 'error', 'latency_ms',
   'actor_kind', 'actor_id', 'agent_key',
   'node_id', 'node_run_id', 'thread_id', 'post_id',
-  'request_id', 'created_at'
+  'request_id', 'uncensored', 'created_at'
 ]);
 
 const REQUIRED_COLUMNS = ['org_id', 'provider', 'operation', 'status'];

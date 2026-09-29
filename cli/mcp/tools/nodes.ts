@@ -46,6 +46,9 @@ export function registerNodeTools(server: McpServer) {
         'when it has none (`describe_node_types` lists the recommended ones). A model the canvas does ' +
         'not offer is refused with the recommended alternatives; an old or weak one still runs but ' +
         'the result carries a `warning` naming the recommended one. ' +
+        'Models whose id starts with `wiro/` run on Wiro and are always queued like a video, after a ' +
+        'safety screen that refuses with a readable reason. Uncensored `wiro/` models run only when the ' +
+        'org owner turned them on in Settings; minors and real, identifiable people are refused regardless. ' +
         'Spends credits; a `credits_exhausted` failure means the org is out.',
       inputSchema: z.object({
         org,

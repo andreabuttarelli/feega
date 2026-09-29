@@ -232,7 +232,7 @@ export type AiCallLog = {
   //   'submitforbacklinks' a flat per-submission fee; 'sandbox' microVM seconds.
   //   'internal' is an agent EVENT, not a call: `cost_usd` stays null, so it can't touch credits or
   //   rate limits (both filter `cost_usd is not null`) and the Usage page excludes it by provider.
-  provider: 'openrouter' | 'opencode' | 'llm' | 'scrapecreators' | 'exa' | 'tavily' | 'dataforseo' | 'pagespeed' | 'ads' | 'submitforbacklinks' | 'sandbox' | 'elevenlabs' | 'internal';
+  provider: 'openrouter' | 'opencode' | 'llm' | 'scrapecreators' | 'exa' | 'tavily' | 'dataforseo' | 'pagespeed' | 'ads' | 'submitforbacklinks' | 'sandbox' | 'elevenlabs' | 'wiro' | 'jev' | 'internal';
   model?: string;
   // Flat per-request price for non-token providers; when set it wins over the token rates.
   flatCostUsd?: number;
@@ -262,6 +262,7 @@ export type AiCallLog = {
   actorId?: string | null;
   agentKey?: string | null;
   projectId?: string | null;
+  uncensored?: boolean;
 };
 
 // USD per 1M tokens. cachedTokens are a SUBSET of inputTokens, billed at the cache rate.
@@ -520,7 +521,8 @@ export function logAiCall(entry: AiCallLog): void {
         actor_kind: entry.actorKind ?? 'user',
         actor_id: entry.actorId ?? entry.userId ?? null,
         agent_key: entry.agentKey ?? null,
-        thread_id: entry.threadId ?? null
+        thread_id: entry.threadId ?? null,
+        uncensored: entry.uncensored ?? false
       };
       // Tipizzata contro AiCallInsert (generato da database.types.ts): una colonna sbagliata qui
       // è un errore di compilazione, non più un console.warn scoperto in produzione.

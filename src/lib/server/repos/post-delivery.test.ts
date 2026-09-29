@@ -62,6 +62,40 @@ function fakePublisher(overrides: Partial<SocialPublisher> = {}): SocialPublishe
   } as SocialPublisher;
 }
 
+describe('scheduleDelivery — media from an uncensored model', () => {
+  const rawAssets = [{ ...assetRows[0], uncensored: true }];
+
+  it('is blocked on a platform whose policy forbids adult content, even when confirmed', async () => {
+    const { db } = fakeDb({ posts: [postRow], social_accounts: [accountRows[0]], assets: rawAssets });
+    const publisher = fakePublisher();
+
+    const result = await scheduleDelivery(db, publisher, { orgId: ORG, postId: POST_ID, accountIds: [ACCOUNT_IG], confirmUncensored: true });
+
+    expect(publisher.publish).not.toHaveBeenCalled();
+    expect(result.deliveries).toEqual([{ accountId: ACCOUNT_IG, ok: false, error: 'adult_content_forbidden_on_instagram' }]);
+  });
+
+  it('needs an explicit confirmation where the platform allows it, so it is never auto-published', async () => {
+    const { db } = fakeDb({ posts: [postRow], social_accounts: [accountRows[1]], assets: rawAssets });
+    const publisher = fakePublisher();
+
+    const result = await scheduleDelivery(db, publisher, { orgId: ORG, postId: POST_ID, accountIds: [ACCOUNT_X] });
+
+    expect(publisher.publish).not.toHaveBeenCalled();
+    expect(result.deliveries).toEqual([{ accountId: ACCOUNT_X, ok: false, error: 'uncensored_needs_confirmation' }]);
+  });
+
+  it('publishes where allowed once confirmed', async () => {
+    const { db } = fakeDb({ posts: [postRow], social_accounts: [accountRows[1]], assets: rawAssets });
+    const publisher = fakePublisher();
+
+    const result = await scheduleDelivery(db, publisher, { orgId: ORG, postId: POST_ID, accountIds: [ACCOUNT_X], confirmUncensored: true });
+
+    expect(publisher.publish).toHaveBeenCalledOnce();
+    expect(result.deliveries[0]).toMatchObject({ ok: true });
+  });
+});
+
 describe('scheduleDelivery', () => {
   it('pubblica una volta per account e scrive il puntatore per quell account', async () => {
     const { db } = fakeDb({ posts: [postRow], social_accounts: [accountRows[0]], assets: assetRows });

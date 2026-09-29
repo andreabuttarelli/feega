@@ -87,6 +87,12 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     requiresBrand: false
   },
   {
+    path: 'content',
+    labelKey: 'app.settings.content.title',
+    scope: 'workspace',
+    requiresBrand: false
+  },
+  {
     path: 'profile',
     labelKey: 'app.settings.profile.title',
     scope: 'account',

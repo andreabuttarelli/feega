@@ -27,6 +27,8 @@ export function isGenMedium(x: string): x is GenMedium {
 }
 
 /** Quel che il catalogo dice di un modello — il sottoinsieme che il nodo usa per decidere. */
+export type PricedInputs = { inputs: Record<string, string>; credits: number };
+
 export type ModelChoice = {
   id: string;
   label: string;
@@ -63,6 +65,8 @@ export type ModelChoice = {
    *  un modello che non passa da `offerable-models.ts` (il testo) o dichiara zero campi extra. */
   params?: ModelParam[];
   wireId?: string;
+  uncensored?: boolean;
+  pricedInputs?: PricedInputs[];
   tiers?: RecommendationTier[];
   recommendedWhy?: string;
 };

@@ -485,6 +485,9 @@
       },
       "project": {
         "title": "Project"
+      },
+      "content": {
+        "title": "Content policy"
       }
     },
     "studio": {

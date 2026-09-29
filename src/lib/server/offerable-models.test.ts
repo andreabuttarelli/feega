@@ -42,6 +42,27 @@ describe('offerableModels — cosa un nodo può davvero scegliere', () => {
     expect(out.choices.map((c) => c.id)).toContain(GPT_IMAGE_2_MODEL);
   });
 
+  it('a synced Wiro row is offered through its own provider choice, flag included', async () => {
+    const admin = fakeAdmin([
+      {
+        id: 'wiro/wiro-partners/z-image-uncensored',
+        catalogue: 'image',
+        input_modalities: ['text'],
+        output_modalities: ['image'],
+        provider: 'wiro',
+        uncensored: true,
+        wire_spec: { owner: 'wiro-partners', project: 'z-image-uncensored', fields: { prompt: 'prompt', images: [] } },
+        pricing: { lines: [{ inputs: {}, usd: 0.02, method: 'cpr' }] }
+      } as never
+    ]);
+
+    const out = await offerableModels(admin, 'image');
+
+    expect(out.choices).toContainEqual(
+      expect.objectContaining({ id: 'wiro/wiro-partners/z-image-uncensored', providerLabel: 'Wiro', uncensored: true })
+    );
+  });
+
   it('ogni immagine offerta porta un unitCredits — il prezzo che il bottone "Genera" mostra', async () => {
     const admin = fakeAdmin([
       {

@@ -39,6 +39,7 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
   const body = (await request.json().catch(() => ({}))) as {
     account_ids?: string[];
     scheduled_for?: string;
+    confirm_uncensored?: boolean;
   };
 
   if (!body.account_ids?.length) {
@@ -50,7 +51,8 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
       orgId,
       postId: params.id ?? '',
       accountIds: body.account_ids,
-      scheduledFor: body.scheduled_for
+      scheduledFor: body.scheduled_for,
+      confirmUncensored: body.confirm_uncensored === true
     });
     return json(result);
   } catch (e) {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { creditsForRun, creditsForLoop } from './gen-cost';
+import { creditsForRun, creditsForLoop, listedCredits } from './gen-cost';
 import type { ModelChoice } from './gen-node';
 
 const imageChoice: ModelChoice = {
@@ -245,5 +245,38 @@ describe('creditsForRun — audio', () => {
 
   it('an operation on connected media has no price before it runs', () => {
     expect(creditsForRun({ medium: 'audio', model: null, params: { operation: 'voice_isolation' }, prompt: '' })).toBeNull();
+  });
+});
+
+describe('creditsForRun — a model priced per setting combination', () => {
+  const priced: ModelChoice = {
+    ...videoChoice,
+    unitCredits: undefined,
+    pricedInputs: [
+      { inputs: { resolution: '480p', duration: '5' }, credits: 25 },
+      { inputs: { resolution: '720p', duration: '5' }, credits: 50 }
+    ]
+  };
+
+  it('charges the line matching the chosen settings, not a per-second multiplier', () => {
+    expect(creditsForRun({ medium: 'video', model: priced, params: { resolution: '720p', duration: 5 } })).toBe(50);
+  });
+
+  it('is unknown when no line matches the settings', () => {
+    expect(creditsForRun({ medium: 'video', model: priced, params: { resolution: '1080p', duration: 5 } })).toBeNull();
+  });
+});
+
+describe('listedCredits — the price the model menu lists', () => {
+  it('is the unit price when the model has one', () => {
+    expect(listedCredits(imageChoice)).toBe(14);
+  });
+
+  it('is the cheapest combination for a model priced per setting', () => {
+    expect(listedCredits({ ...imageChoice, unitCredits: undefined, pricedInputs: [{ inputs: {}, credits: 9 }, { inputs: {}, credits: 4 }] })).toBe(4);
+  });
+
+  it('is absent when nothing is known', () => {
+    expect(listedCredits(unpricedChoice)).toBeUndefined();
   });
 });

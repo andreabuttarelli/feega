@@ -11,6 +11,7 @@ import {
   listNodeRuns,
   queuedAudioRuns,
   queuedVideoRuns,
+  queuedWiroRuns,
   releaseClaim,
   retryClaim,
   setExternalJob,
@@ -26,6 +27,7 @@ import { resolveNodeModel } from './node-model';
 import { finishAudioJob, runAudio, type AudioScope } from './audio-run';
 import { audioOperationOf, defaultAudioModel } from '$lib/canvas/audio-operations';
 import type { UpstreamInputs } from '$lib/canvas/upstream-inputs';
+import { WIRO_ID_PREFIX } from '$lib/server/wiro-catalogue';
 
 /**
  * FAR GIRARE UN NODO DELLA TELA, SULLO SCHEMA NUOVO.
@@ -125,7 +127,7 @@ async function depositVideo(
 async function land(db: Db, input: StartRun, run: NodeRun, asset: Asset, costUsd?: number | null): Promise<RunOutcome> {
   await completeRun(db, { orgId: input.orgId, runId: run.id, assetId: asset.id, costUsd });
 
-  const shown = await showRunState(db, input, { running: false, runId: run.id, refId: asset.id, error: null });
+  const shown = await showRunState(db, input, { running: false, runId: run.id, refId: asset.id, error: null, outputUncensored: false });
 
   if (!shown) {
     return { kind: 'conflict' };
@@ -225,6 +227,52 @@ async function runAudioNode(db: Db, input: StartRun, run: NodeRun, upstream: Ups
   }
 }
 
+type ProviderRun = (db: Db, input: StartRun, run: NodeRun, upstream: UpstreamInputs, prompt: string) => Promise<RunOutcome>;
+
+const WIRO_IMAGE_PATHS: Readonly<Record<string, (upstream: UpstreamInputs) => string[]>> = {
+  image: (upstream) => upstream.referenceImageUrls,
+  video: (upstream) => [...new Set([upstream.startFrameUrl, ...upstream.referenceImageUrls].filter((u): u is string => Boolean(u)))]
+};
+
+async function runWiroNode(db: Db, input: StartRun, run: NodeRun, upstream: UpstreamInputs, prompt: string): Promise<RunOutcome> {
+  const [{ wiroRunDeps }, { startWiroRun }, { upstreamProvenance }] = await Promise.all([
+    import('$lib/server/wiro-config'),
+    import('./wiro-run'),
+    import('./likeness-guard')
+  ]);
+  const node = await findNode(db, { orgId: input.orgId, nodeId: input.nodeId }).catch(() => null);
+  const [imageUrls, lastFrame, provenance] = await Promise.all([
+    signMediaPaths(db, WIRO_IMAGE_PATHS[input.medium]?.(upstream) ?? []),
+    signMediaPaths(db, upstream.endFrameUrl ? [upstream.endFrameUrl] : []),
+    upstreamProvenance(db, { orgId: input.orgId, canvasId: input.canvasId, nodeId: input.nodeId, data: node?.data ?? {} })
+  ]);
+
+  const out = await startWiroRun(wiroRunDeps(db), {
+    scope: audioScopeOf(input),
+    modelId: input.model ?? '',
+    prompt,
+    params: input.params,
+    imageUrls,
+    lastFrameUrl: lastFrame[0] ?? null,
+    provenance
+  });
+  if (out.kind === 'refused') {
+    await giveUp(db, input, run, out.error);
+    return out;
+  }
+  await setExternalJob(db, { orgId: input.orgId, runId: run.id, externalJobId: out.jobId });
+  return { kind: 'queued', run: { ...run, externalJobId: out.jobId } };
+}
+
+const GENERATION_PROVIDERS: ReadonlyArray<{ prefix: string; run: ProviderRun }> = [{ prefix: WIRO_ID_PREFIX, run: runWiroNode }];
+
+function providerRunOf(medium: GenMedium, model: string | null): ProviderRun | null {
+  if (medium === 'text' || !model) {
+    return null;
+  }
+  return GENERATION_PROVIDERS.find((p) => model.startsWith(p.prefix))?.run ?? null;
+}
+
 export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcome> {
   const pick = await resolveNodeModel(requested.medium, requested.model, requested.params);
   if (!pick.ok) {
@@ -308,6 +356,11 @@ export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcom
   const sentPrompt = await enhancedPromptFor(input, prompt);
   if (sentPrompt !== prompt) {
     await setRunPrompt(db, { orgId: input.orgId, runId: run.id, prompt: sentPrompt });
+  }
+
+  const providerRun = providerRunOf(input.medium, input.model);
+  if (providerRun) {
+    return providerRun(db, input, run, upstream, sentPrompt);
   }
 
   try {
@@ -629,7 +682,7 @@ export async function reconcileVideoNodeRuns(db: Db): Promise<VideoReconcileOutc
         { url: outcome.url, durationSeconds: outcome.durationSeconds }
       );
       await completeRun(db, { orgId: run.orgId, runId: run.id, assetId: asset.id, costUsd });
-      await showRunState(db, startRunShape, { running: false, runId: run.id, refId: asset.id, error: null });
+      await showRunState(db, startRunShape, { running: false, runId: run.id, refId: asset.id, error: null, outputUncensored: false });
       done += 1;
     } catch (error) {
       if (claimedRenderId) {
@@ -696,11 +749,67 @@ export async function reconcileAudioNodeRuns(db: Db): Promise<VideoReconcileOutc
       }
 
       await completeRun(db, { orgId: run.orgId, runId: run.id, assetId: progress.asset.id, costUsd: progress.costUsd });
-      await showRunState(db, shape, { running: false, runId: run.id, refId: progress.asset.id, error: null });
+      await showRunState(db, shape, { running: false, runId: run.id, refId: progress.asset.id, error: null, outputUncensored: false });
       outcome.done += 1;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'audio_reconcile_failed';
       if (run.attempts + 1 < AUDIO_RUN_MAX_ATTEMPTS) {
+        await retryClaim(db, { orgId: run.orgId, runId: run.id, attempts: run.attempts + 1, error: message }).catch(() => {});
+        outcome.pending += 1;
+        continue;
+      }
+      await giveUp(db, shape, finishing, message);
+      outcome.failed += 1;
+    }
+  }
+
+  return outcome;
+}
+
+const WIRO_RECONCILE_LIMIT = 20;
+const WIRO_RUN_MAX_ATTEMPTS = 8;
+
+export async function reconcileWiroNodeRuns(db: Db): Promise<VideoReconcileOutcome> {
+  const outcome: VideoReconcileOutcome = { checked: 0, done: 0, failed: 0, pending: 0 };
+  const [{ wiroRunDeps }, { finishWiroJob }] = await Promise.all([import('$lib/server/wiro-config'), import('./wiro-run')]);
+  const deps = wiroRunDeps(db);
+
+  for (const run of await queuedWiroRuns(db, { limit: WIRO_RECONCILE_LIMIT })) {
+    const claimed = await claimRun(db, { orgId: run.orgId, runId: run.id });
+    if (!claimed || !run.externalJobId) {
+      continue;
+    }
+    outcome.checked += 1;
+
+    const node = await findNode(db, { orgId: run.orgId, nodeId: run.nodeId }).catch(() => null);
+    if (!node) {
+      await failRun(db, { orgId: run.orgId, runId: run.id, error: 'node_deleted' }).catch(() => {});
+      outcome.failed += 1;
+      continue;
+    }
+
+    const shape: StartRun = { ...toStartRunShape(run), medium: node.type as GenMedium, projectId: node.projectId, canvasId: node.canvasId };
+    const finishing: NodeRun = { ...run, status: 'finishing' };
+    try {
+      const progress = await finishWiroJob(db, deps, { externalJobId: run.externalJobId, modelId: run.model ?? '', scope: audioScopeOf(shape) });
+
+      if (progress.state === 'pending') {
+        await releaseClaim(db, { orgId: run.orgId, runId: run.id });
+        outcome.pending += 1;
+        continue;
+      }
+      if (progress.state === 'failed') {
+        await giveUp(db, shape, finishing, progress.error);
+        outcome.failed += 1;
+        continue;
+      }
+
+      await completeRun(db, { orgId: run.orgId, runId: run.id, assetId: progress.asset.id, costUsd: progress.costUsd });
+      await showRunState(db, shape, { running: false, runId: run.id, refId: progress.asset.id, error: null, outputUncensored: progress.uncensored });
+      outcome.done += 1;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'wiro_reconcile_failed';
+      if (run.attempts + 1 < WIRO_RUN_MAX_ATTEMPTS) {
         await retryClaim(db, { orgId: run.orgId, runId: run.id, attempts: run.attempts + 1, error: message }).catch(() => {});
         outcome.pending += 1;
         continue;

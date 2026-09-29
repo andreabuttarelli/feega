@@ -1,0 +1,646 @@
+{
+ "result": true,
+ "errors": [],
+ "total": "4",
+ "tool": [
+  {
+   "id": "1985",
+   "title": "Z Image Uncensored (Wiro-Partners)",
+   "slugowner": "wiro-partners",
+   "slugproject": "z image uncensored",
+   "cleanslugowner": "wiro-partners",
+   "cleanslugproject": "z-image-uncensored",
+   "categories": [
+    "tool",
+    "partner",
+    "nogpu-pipeline",
+    "text-to-image"
+   ],
+   "parameters": [
+    {
+     "title": "",
+     "subtitle": "",
+     "items": [
+      {
+       "id": "prompt",
+       "type": "textarea",
+       "required": true,
+       "defaultvalue": "",
+       "options": [],
+       "label": "prompt"
+      },
+      {
+       "id": "ratio",
+       "type": "select",
+       "required": false,
+       "defaultvalue": "16:9",
+       "options": [
+        {
+         "value": "16:9",
+         "text": "16:9 (1536x864)"
+        },
+        {
+         "value": "9:16",
+         "text": "9:16 (864x1536)"
+        },
+        {
+         "value": "1:1",
+         "text": "1:1 (1536x1536)"
+        },
+        {
+         "value": "4:3",
+         "text": "4:3 (1536x1152)"
+        },
+        {
+         "value": "3:4",
+         "text": "3:4 (1152x1536)"
+        },
+        {
+         "value": "3:2",
+         "text": "3:2 (1536x1024)"
+        },
+        {
+         "value": "2:3",
+         "text": "2:3 (1024x1536)"
+        },
+        {
+         "value": "5:4",
+         "text": "5:4 (1536x1232)"
+        },
+        {
+         "value": "4:5",
+         "text": "4:5 (1232x1536)"
+        },
+        {
+         "value": "2:1",
+         "text": "2:1 (1536x768)"
+        },
+        {
+         "value": "1:2",
+         "text": "1:2 (768x1536)"
+        },
+        {
+         "value": "21:9",
+         "text": "21:9 (1536x656)"
+        },
+        {
+         "value": "9:21",
+         "text": "9:21 (656x1536)"
+        }
+       ],
+       "label": "Ratio"
+      },
+      {
+       "id": "promptExtend",
+       "type": "select",
+       "required": true,
+       "defaultvalue": "false",
+       "options": [
+        {
+         "value": "false",
+         "text": "false"
+        },
+        {
+         "value": "true",
+         "text": "true"
+        }
+       ],
+       "label": "Prompt Extend"
+      },
+      {
+       "id": "seed",
+       "type": "number",
+       "required": false,
+       "defaultvalue": "",
+       "options": [],
+       "label": "Seed"
+      }
+     ]
+    }
+   ],
+   "dynamicprice": "[{\"inputs\":{\"promptExtend\":\"false\"},\"price\":0.013,\"priceMethod\":\"cpr\"},{\"inputs\":{\"promptExtend\":\"true\"},\"price\":0.014,\"priceMethod\":\"cpr\"}]",
+   "time": "1790174561"
+  },
+  {
+   "id": "1973",
+   "title": "Wan 3.0 R2V Uncensored Video",
+   "slugowner": "wiro-partners",
+   "slugproject": "wan 3.0 r2v uncensored",
+   "cleanslugowner": "wiro-partners",
+   "cleanslugproject": "wan-3-0-r2v-uncensored",
+   "categories": [
+    "tool",
+    "partner",
+    "nogpu-pipeline",
+    "image-to-video",
+    "alibaba",
+    "video-to-video"
+   ],
+   "parameters": [
+    {
+     "title": "",
+     "subtitle": "",
+     "items": [
+      {
+       "id": "inputImage",
+       "type": "combinefileinput",
+       "required": false,
+       "defaultvalue": "",
+       "options": [],
+       "label": "Reference Images"
+      },
+      {
+       "id": "prompt",
+       "type": "textarea",
+       "required": true,
+       "defaultvalue": "",
+       "options": [],
+       "label": "prompt"
+      },
+      {
+       "id": "duration",
+       "type": "number",
+       "required": true,
+       "defaultvalue": "5",
+       "options": [],
+       "label": "Duration"
+      },
+      {
+       "id": "resolution",
+       "type": "select",
+       "required": true,
+       "defaultvalue": "480p",
+       "options": [
+        {
+         "value": "480p",
+         "text": "480p"
+        },
+        {
+         "value": "720p",
+         "text": "720p"
+        },
+        {
+         "value": "1080p",
+         "text": "1080p"
+        }
+       ],
+       "label": "Resolution"
+      },
+      {
+       "id": "ratio",
+       "type": "select",
+       "required": false,
+       "defaultvalue": "adaptive",
+       "options": [
+        {
+         "value": "adaptive",
+         "text": "adaptive"
+        },
+        {
+         "value": "16:9",
+         "text": "16:9"
+        },
+        {
+         "value": "4:3",
+         "text": "4:3"
+        },
+        {
+         "value": "1:1",
+         "text": "1:1"
+        },
+        {
+         "value": "3:4",
+         "text": "3:4"
+        },
+        {
+         "value": "9:16",
+         "text": "9:16"
+        }
+       ],
+       "label": "Ratio"
+      },
+      {
+       "id": "inputAudio",
+       "type": "combinefileinput",
+       "required": false,
+       "defaultvalue": "",
+       "options": [],
+       "label": "Reference Audios"
+      },
+      {
+       "id": "inputVideo",
+       "type": "combinefileinput",
+       "required": false,
+       "defaultvalue": "",
+       "options": [],
+       "label": "Reference Videos"
+      },
+      {
+       "id": "audioEnabled",
+       "type": "select",
+       "required": false,
+       "defaultvalue": "false",
+       "options": [
+        {
+         "value": "false",
+         "text": "false"
+        },
+        {
+         "value": "true",
+         "text": "true"
+        }
+       ],
+       "label": "Enabled audio"
+      },
+      {
+       "id": "promptExtend",
+       "type": "select",
+       "required": false,
+       "defaultvalue": "false",
+       "options": [
+        {
+         "value": "false",
+         "text": "false"
+        },
+        {
+         "value": "true",
+         "text": "true"
+        }
+       ],
+       "label": "Prompt Extend"
+      },
+      {
+       "id": "seed",
+       "type": "number",
+       "required": false,
+       "defaultvalue": "",
+       "options": [],
+       "label": "Seed"
+      }
+     ]
+    }
+   ],
+   "dynamicprice": "[{\"inputs\":{},\"price\":0,\"priceMethod\":\"cp-readoutput\",\"note\":\"Billed per second at the resolution tier rate: 480p $0.05, 720p $0.10, 1080p $0.20. Both the reference video duration and the generated video duration are billed.\"}]",
+   "time": "1789742043"
+  },
+  {
+   "id": "1972",
+   "title": "Wan 3.0 Uncensored Video Generator",
+   "slugowner": "wiro-partners",
+   "slugproject": "wan 3.0 uncensored",
+   "cleanslugowner": "wiro-partners",
+   "cleanslugproject": "wan-3-0-uncensored",
+   "categories": [
+    "tool",
+    "partner",
+    "nogpu-pipeline",
+    "image-to-video",
+    "alibaba",
+    "text-to-video"
+   ],
+   "parameters": [
+    {
+     "title": "",
+     "subtitle": "",
+     "items": [
+      {
+       "id": "inputImage",
+       "type": "combinefileinput",
+       "required": false,
+       "defaultvalue": "",
+       "options": [],
+       "label": "First Frame"
+      },
+      {
+       "id": "prompt",
+       "type": "textarea",
+       "required": true,
+       "defaultvalue": "",
+       "options": [],
+       "label": "prompt"
+      },
+      {
+       "id": "duration",
+       "type": "select",
+       "required": true,
+       "defaultvalue": "5",
+       "options": [
+        {
+         "value": "5",
+         "text": "5"
+        },
+        {
+         "value": "10",
+         "text": "10"
+        },
+        {
+         "value": "15",
+         "text": "15"
+        },
+        {
+         "value": "20",
+         "text": "20"
+        },
+        {
+         "value": "25",
+         "text": "25"
+        },
+        {
+         "value": "30",
+         "text": "30"
+        }
+       ],
+       "label": "Duration"
+      },
+      {
+       "id": "resolution",
+       "type": "select",
+       "required": true,
+       "defaultvalue": "480p",
+       "options": [
+        {
+         "value": "480p",
+         "text": "480p"
+        },
+        {
+         "value": "720p",
+         "text": "720p"
+        },
+        {
+         "value": "1080p",
+         "text": "1080p"
+        }
+       ],
+       "label": "Resolution"
+      },
+      {
+       "id": "ratio",
+       "type": "select",
+       "required": false,
+       "defaultvalue": "adaptive",
+       "options": [
+        {
+         "value": "adaptive",
+         "text": "adaptive"
+        },
+        {
+         "value": "16:9",
+         "text": "16:9"
+        },
+        {
+         "value": "4:3",
+         "text": "4:3"
+        },
+        {
+         "value": "1:1",
+         "text": "1:1"
+        },
+        {
+         "value": "3:4",
+         "text": "3:4"
+        },
+        {
+         "value": "9:16",
+         "text": "9:16"
+        }
+       ],
+       "label": "Ratio"
+      },
+      {
+       "id": "inputImageLast",
+       "type": "combinefileinput",
+       "required": false,
+       "defaultvalue": "",
+       "options": [],
+       "label": "Last Frame"
+      },
+      {
+       "id": "audioEnabled",
+       "type": "select",
+       "required": false,
+       "defaultvalue": "false",
+       "options": [
+        {
+         "value": "false",
+         "text": "false"
+        },
+        {
+         "value": "true",
+         "text": "true"
+        }
+       ],
+       "label": "Enabled audio"
+      },
+      {
+       "id": "promptExtend",
+       "type": "select",
+       "required": false,
+       "defaultvalue": "false",
+       "options": [
+        {
+         "value": "false",
+         "text": "false"
+        },
+        {
+         "value": "true",
+         "text": "true"
+        }
+       ],
+       "label": "Prompt Extend"
+      },
+      {
+       "id": "seed",
+       "type": "number",
+       "required": false,
+       "defaultvalue": "",
+       "options": [],
+       "label": "Seed"
+      }
+     ]
+    }
+   ],
+   "dynamicprice": "[{\"inputs\":{\"resolution\":\"480p\",\"duration\":\"5\"},\"price\":0.25,\"priceMethod\":\"cpr\"},{\"inputs\":{\"resolution\":\"480p\",\"duration\":\"10\"},\"price\":0.5,\"priceMethod\":\"cpr\"},{\"inputs\":{\"resolution\":\"480p\",\"duration\":\"15\"},\"price\":0.75,\"priceMethod\":\"cpr\"},{\"inputs\":{\"resolution\":\"480p\",\"duration\":\"20\"},\"price\":1,\"priceMethod\":\"cpr\"},{\"inputs\":{\"resolution\":\"480p\",\"duration\":\"25\"},\"price\":1.25,\"priceMethod\":\"cpr\"},{\"inputs\":{\"resolution\":\"480p\",\"duration\":\"30\"},\"price\":1.5,\"priceMethod\":\"cpr\"},{\"inputs\":{\"resolution\":\"720p\",\"duration\":\"5\"},\"price\":0.5,\"priceMethod\":\"cpr\"},{\"inputs\":{\"resolution\":\"720p\",\"duration\":\"10\"},\"price\":1,\"priceMethod\":\"cpr\"},{\"inputs\":{\"resolution\":\"720p\",\"duration\":\"15\"},\"price\":1.5,\"priceMethod\":\"cpr\"},{\"inputs\":{\"resolution\":\"720p\",\"duration\":\"20\"},\"price\":2,\"priceMethod\":\"cpr\"},{\"inputs\":{\"resolution\":\"720p\",\"duration\":\"25\"},\"price\":2.5,\"priceMethod\":\"cpr\"},{\"inputs\":{\"resolution\":\"720p\",\"duration\":\"30\"},\"price\":3,\"priceMethod\":\"cpr\"},{\"inputs\":{\"resolution\":\"1080p\",\"duration\":\"5\"},\"price\":1,\"priceMethod\":\"cpr\"},{\"inputs\":{\"resolution\":\"1080p\",\"duration\":\"10\"},\"price\":2,\"priceMethod\":\"cpr\"},{\"inputs\":{\"resolution\":\"1080p\",\"duration\":\"15\"},\"price\":3,\"priceMethod\":\"cpr\"},{\"inputs\":{\"resolution\":\"1080p\",\"duration\":\"20\"},\"price\":4,\"priceMethod\":\"cpr\"},{\"inputs\":{\"resolution\":\"1080p\",\"duration\":\"25\"},\"price\":5,\"priceMethod\":\"cpr\"},{\"inputs\":{\"resolution\":\"1080p\",\"duration\":\"30\"},\"price\":6,\"priceMethod\":\"cpr\"}]",
+   "time": "1789741702"
+  },
+  {
+   "id": "1989",
+   "title": "Alibaba Qwen Image 3.0 Pro",
+   "slugowner": "alibaba",
+   "slugproject": "qwen image 3.0 pro",
+   "cleanslugowner": "alibaba",
+   "cleanslugproject": "qwen-image-3-0-pro",
+   "categories": [
+    "tool",
+    "partner",
+    "nogpu-pipeline",
+    "alibaba",
+    "quick-showcase",
+    "text-to-image",
+    "image-to-image"
+   ],
+   "parameters": [
+    {
+     "title": "",
+     "subtitle": "",
+     "items": [
+      {
+       "id": "inputImage",
+       "type": "combinefileinput",
+       "required": false,
+       "defaultvalue": "",
+       "options": [],
+       "label": "Input Images"
+      },
+      {
+       "id": "prompt",
+       "type": "textarea",
+       "required": true,
+       "defaultvalue": "",
+       "options": [],
+       "label": "prompt"
+      },
+      {
+       "id": "resolution",
+       "type": "select",
+       "required": true,
+       "defaultvalue": "1K",
+       "options": [
+        {
+         "value": "1K",
+         "text": "1K"
+        },
+        {
+         "value": "2K",
+         "text": "2K"
+        }
+       ],
+       "label": "Resolution"
+      },
+      {
+       "id": "ratio",
+       "type": "select",
+       "required": false,
+       "defaultvalue": "auto",
+       "options": [
+        {
+         "value": "auto",
+         "text": "auto"
+        },
+        {
+         "value": "1:1",
+         "text": "1:1"
+        },
+        {
+         "value": "16:9",
+         "text": "16:9"
+        },
+        {
+         "value": "9:16",
+         "text": "9:16"
+        },
+        {
+         "value": "4:3",
+         "text": "4:3"
+        },
+        {
+         "value": "3:4",
+         "text": "3:4"
+        },
+        {
+         "value": "3:2",
+         "text": "3:2"
+        },
+        {
+         "value": "2:3",
+         "text": "2:3"
+        },
+        {
+         "value": "21:9",
+         "text": "21:9"
+        }
+       ],
+       "label": "Ratio"
+      },
+      {
+       "id": "n",
+       "type": "number",
+       "required": false,
+       "defaultvalue": "1",
+       "options": [],
+       "label": "Number of Images"
+      },
+      {
+       "id": "negativePrompt",
+       "type": "textarea",
+       "required": false,
+       "defaultvalue": "",
+       "options": [],
+       "label": "Negative Prompt"
+      },
+      {
+       "id": "promptExtend",
+       "type": "select",
+       "required": false,
+       "defaultvalue": "true",
+       "options": [
+        {
+         "value": "true",
+         "text": "true"
+        },
+        {
+         "value": "false",
+         "text": "false"
+        }
+       ],
+       "label": "Prompt Extend"
+      },
+      {
+       "id": "promptExtendMode",
+       "type": "select",
+       "required": false,
+       "defaultvalue": "direct",
+       "options": [
+        {
+         "value": "direct",
+         "text": "direct"
+        },
+        {
+         "value": "agent",
+         "text": "agent"
+        }
+       ],
+       "label": "Prompt Extend Mode"
+      },
+      {
+       "id": "enableThinking",
+       "type": "select",
+       "required": false,
+       "defaultvalue": "true",
+       "options": [
+        {
+         "value": "true",
+         "text": "true"
+        },
+        {
+         "value": "false",
+         "text": "false"
+        }
+       ],
+       "label": "Thinking Mode"
+      },
+      {
+       "id": "seed",
+       "type": "number",
+       "required": false,
+       "defaultvalue": "",
+       "options": [],
+       "label": "Seed"
+      }
+     ]
+    }
+   ],
+   "dynamicprice": "[{\"inputs\":{\"size\":\"1K\"},\"price\":0.05,\"priceMethod\":\"cpo\"},{\"inputs\":{\"size\":\"2K\"},\"price\":0.085,\"priceMethod\":\"cpo\"}]",
+   "time": "1790237399"
+  }
+ ]
+}

@@ -2,6 +2,7 @@ import type { Db } from '$lib/server/db/client';
 import type { SocialPublisher } from '$lib/server/publishing/port';
 import { formatFor, type Platform } from '$lib/platform-capabilities';
 import { providerMediaSigner } from '$lib/server/ads/provider-media';
+import { uncensoredDeliveryError, UncensoredConfirmation } from '$lib/platform-adult-policy';
 
 const ZERNIO_FETCH_WINDOW_SECONDS = 60 * 60 * 24 * 30;
 
@@ -105,7 +106,7 @@ async function findAccounts(
   }));
 }
 
-type AssetForMedia = { id: string; type: string; url: string | null; source: string | null };
+type AssetForMedia = { id: string; type: string; url: string | null; source: string | null; uncensored?: boolean | null };
 
 async function resolveMediaAssets(
   db: Db,
@@ -114,7 +115,7 @@ async function resolveMediaAssets(
   if (!input.media.length) return [];
 
   const ids = input.media.map((m) => m.assetId);
-  const { data, error } = await db.from('assets').select('id, type, url, source').eq('org_id', input.orgId).in('id', ids);
+  const { data, error } = await db.from('assets').select('id, type, url, source, uncensored').eq('org_id', input.orgId).in('id', ids);
   if (error) throw error;
 
   const byId = new Map(((data ?? []) as unknown as AssetForMedia[]).map((a) => [a.id, a]));
@@ -151,7 +152,7 @@ export type DeliveryOutcome =
 export async function scheduleDelivery(
   db: Db,
   publisher: SocialPublisher,
-  input: { orgId: string; postId: string; accountIds: string[]; scheduledFor?: string }
+  input: { orgId: string; postId: string; accountIds: string[]; scheduledFor?: string; confirmUncensored?: boolean }
 ): Promise<{ deliveries: DeliveryOutcome[] }> {
   const post = await findPostForDelivery(db, { orgId: input.orgId, postId: input.postId });
   if (!post) throw new Error(`post_not_found: ${input.postId}`);
@@ -160,11 +161,19 @@ export async function scheduleDelivery(
   const assets = await resolveMediaAssets(db, { orgId: input.orgId, media: post.media });
   const mediaKinds = assets.map((a) => ({ kind: a.type as 'image' | 'video' }));
   const mediaUrls = await fetchableMediaUrls(db, assets);
+  const uncensored = assets.some((a) => a.uncensored === true);
+  const confirmation = input.confirmUncensored ? UncensoredConfirmation.Given : UncensoredConfirmation.Missing;
 
   const deliveries: DeliveryOutcome[] = [];
   const zernioPostIds: ZernioPostIds = { ...post.zernioPostIds };
 
   for (const account of accounts) {
+    const blocked = uncensored ? uncensoredDeliveryError(account.platform, confirmation) : null;
+    if (blocked) {
+      deliveries.push({ accountId: account.id, ok: false, error: blocked });
+      continue;
+    }
+
     const format = formatFor(account.platform, mediaKinds);
     if (!format.ok) {
       deliveries.push({ accountId: account.id, ok: false, error: format.reason });
