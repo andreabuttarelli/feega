@@ -379,8 +379,6 @@ function isShareState(value: string): value is ShareState {
   return (Object.values(ShareState) as string[]).includes(value);
 }
 
-const HTTP_CONFLICT = 409;
-
 export const actions: Actions = {
   new_canvas: async ({ params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
