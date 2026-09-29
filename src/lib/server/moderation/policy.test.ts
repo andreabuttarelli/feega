@@ -29,6 +29,15 @@ describe('the moderation threshold table', () => {
     expect(verdict).toMatchObject({ kind: 'refuse', category: 'minors' });
   });
 
+  it.each(['violence_gore', 'animals_sexual'])('refuses %s with any non-trivial probability, without escalating', (category) => {
+    const verdict = judgeDecision(only('safe', { safe: 0.99, [category]: 0.01 }));
+    expect(verdict).toMatchObject({ kind: 'refuse', category });
+  });
+
+  it('refuses sexual content involving animals when it is the top choice', () => {
+    expect(judgeDecision(only('animals_sexual', { animals_sexual: 0.6, safe: 0.4 }))).toMatchObject({ kind: 'refuse', category: 'animals_sexual' });
+  });
+
   it('every category carries a readable refusal and a threshold', () => {
     for (const [name, category] of Object.entries(MODERATION_CATEGORIES)) {
       expect(category.instructions.length, name).toBeGreaterThan(10);

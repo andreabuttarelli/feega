@@ -38,8 +38,15 @@ export const MODERATION_CATEGORIES: Readonly<Record<string, ModerationCategory>>
   },
   violence_gore: {
     instructions: 'Graphic violence, gore, mutilation, torture or realistic depictions of killing.',
-    refusal: 'Refused: graphic violence and gore are not generated.',
-    escalateAbove: DOUBT
+    refusal: 'Refused: graphic violence and gore are never generated.',
+    escalateAbove: ZERO_TOLERANCE,
+    refuseAbove: ZERO_TOLERANCE
+  },
+  animals_sexual: {
+    instructions: 'Any animal in a sexual, suggestive or nude-erotic context, or any request combining animals with sexual acts (bestiality, zoophilia).',
+    refusal: 'Refused: sexual content involving animals is never generated.',
+    escalateAbove: ZERO_TOLERANCE,
+    refuseAbove: ZERO_TOLERANCE
   },
   self_harm: {
     instructions: 'Self-harm, suicide, eating disorders presented approvingly or instructionally.',
