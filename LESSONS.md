@@ -2104,3 +2104,14 @@ instead of `X`, so the empty check can run before that argument is ever construc
 tool wrote `nodes.data` without `validateNodeData`, or zod stripped an unknown key.
 **Move:** every agent write to `nodes.data` goes through `validateNewNodeData` (unknown keys
 refused) and returns the stored row; written copy belongs in `doc.content`, not `text`.
+
+## A chat turn lost on a tab switch: in-flight state lived in the component
+
+**Signal:** mid-turn, switching the mobile tab (or closing the desktop chat, or its Guide tab)
+and coming back shows only the user message, composer idle, no stop button; a reload later
+shows the full answer. The panel was under `{#if}`: the remount reloaded history while the old
+fetch kept streaming into a destroyed component.
+**Move:** in-flight state that must outlive a view lives in a module store keyed by scope
+(`chat-session.svelte.ts`), never in the component. Server side, `streamText` only finishes if
+someone reads it: `void result.consumeStream()` so `onFinish` persists the turn even when the
+client disconnects.

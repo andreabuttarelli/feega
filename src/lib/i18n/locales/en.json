@@ -519,6 +519,11 @@
     "accept": "Accept"
   },
   "chat": {
+    "leave": {
+      "title": "The assistant is still working. Leave anyway?",
+      "stay": "Stay",
+      "leave": "Leave"
+    },
     "panel": {
       "log": "Conversation",
       "agent": "Agent",
