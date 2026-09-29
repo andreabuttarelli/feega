@@ -61,6 +61,8 @@ import { applyEffectsNode } from '$lib/server/canvas/apply-effects';
 import { nodeAcceptsConnection } from '$lib/canvas/connector-ports';
 import { ShareState, readCanvasShare, setCanvasShare } from '$lib/server/canvas/canvas-share';
 import { referenceLibrary } from '$lib/server/canvas/reference-library';
+import { CanvasRemoval, openNewCanvas, removeCanvas, renameCanvasTo } from '$lib/server/canvas/lifecycle';
+import { canvasPath } from '$lib/server/tenancy/entry';
 
 // L'azione `run` aspetta la generazione DENTRO la richiesta — un'immagine ci mette fino a un
 // minuto, e il default della piattaforma è sotto quella soglia. Senza, la richiesta muore a metà
@@ -353,7 +355,36 @@ function isShareState(value: string): value is ShareState {
   return (Object.values(ShareState) as string[]).includes(value);
 }
 
+const HTTP_CONFLICT = 409;
+
 export const actions: Actions = {
+  new_canvas: async ({ params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const projectId = scope.canvas.projectId;
+    const canvas = await openNewCanvas(scope.db, { orgId: scope.orgId, projectId });
+    throw redirect(303, canvasPath(projectId, canvas.id));
+  },
+
+  rename_canvas: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const name = String((await request.formData()).get('name') ?? '');
+    const renamed = await renameCanvasTo(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, name });
+    if (!renamed) {
+      return fail(400, { error: 'name required' });
+    }
+    return { renamed: true };
+  },
+
+  delete_canvas: async ({ params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const projectId = scope.canvas.projectId;
+    const result = await removeCanvas(scope.db, { orgId: scope.orgId, projectId, canvasId: scope.canvasId });
+    if (result.outcome === CanvasRemoval.LastCanvas) {
+      return fail(HTTP_CONFLICT, { error: 'last canvas' });
+    }
+    throw redirect(303, canvasPath(projectId, result.nextCanvasId));
+  },
+
   estimate_text_cost: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();

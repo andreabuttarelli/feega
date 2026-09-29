@@ -26,8 +26,9 @@ function open(connection: ReturnType<typeof socket>) {
 	const onChange = vi.fn();
 	const onPeers = vi.fn();
 	const onReconnect = vi.fn();
-	const close = connectCanvas({ client: connection.client as unknown as SupabaseClient, canvasId: 'canvas', peer, onChange, onPeers, onReconnect });
-	return { close, onChange, onPeers, onReconnect };
+	const onCanvasList = vi.fn();
+	const close = connectCanvas({ client: connection.client as unknown as SupabaseClient, canvasId: 'canvas', projectId: 'proj', peer, onChange, onPeers, onReconnect, onCanvasList });
+	return { close, onChange, onPeers, onReconnect, onCanvasList };
 }
 
 describe('canvas collaboration', () => {
@@ -39,7 +40,8 @@ describe('canvas collaboration', () => {
 		const changes = connection.listeners.filter(({ kind }) => kind === 'postgres_changes');
 		expect(changes.map(({ filter }) => filter)).toEqual([
 			{ event: '*', schema: 'public', table: 'nodes', filter: 'canvas_id=eq.canvas' },
-			{ event: '*', schema: 'public', table: 'nodes_connections', filter: 'canvas_id=eq.canvas' }
+			{ event: '*', schema: 'public', table: 'nodes_connections', filter: 'canvas_id=eq.canvas' },
+			{ event: '*', schema: 'public', table: 'canvases', filter: 'project_id=eq.proj' }
 		]);
 		const event = { table: 'nodes', eventType: 'UPDATE', new: { id: 'node', canvas_id: 'canvas' }, old: {} };
 		changes[0].callback(event);
@@ -67,6 +69,16 @@ describe('canvas collaboration', () => {
 		expect(callbacks.onPeers).toHaveBeenLastCalledWith([]);
 		expect(callbacks.onChange).not.toHaveBeenCalled();
 		expect(callbacks.onReconnect).not.toHaveBeenCalled();
+	});
+
+	it('tells the shell when a canvas of the project is created, renamed or deleted', async () => {
+		const connection = socket();
+		const callbacks = open(connection);
+		await vi.waitFor(() => expect(connection.channel.subscribe).toHaveBeenCalled());
+		const canvases = connection.listeners.find(({ filter }) => filter?.table === 'canvases')!;
+		canvases.callback({ table: 'canvases', eventType: 'DELETE', old: { id: 'other' }, new: {} });
+		expect(callbacks.onCanvasList).toHaveBeenCalledTimes(1);
+		expect(callbacks.onChange).not.toHaveBeenCalled();
 	});
 
 	it('does not join a canvas after navigation while authentication is pending', async () => {

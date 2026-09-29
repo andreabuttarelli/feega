@@ -287,6 +287,14 @@
         "projects": "Projects",
         "canvases": "Canvases"
       },
+      "canvasActions": {
+        "new": "New canvas",
+        "rename": "Rename",
+        "delete": "Delete",
+        "save": "Save",
+        "confirmDelete": "Delete this canvas and everything on it?",
+        "lastCanvas": "A project keeps at least one canvas"
+      },
       "menu": {
         "open": "Menu",
         "home": "Home",

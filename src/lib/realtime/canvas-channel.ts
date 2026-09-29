@@ -6,15 +6,17 @@ export type CanvasChange = RealtimePostgresChangesPayload<Record<string, unknown
 type CanvasConnection = {
 	client: SupabaseClient;
 	canvasId: string;
+	projectId: string;
 	peer: PresencePeer;
 	onChange: (change: CanvasChange) => void;
 	onPeers: (peers: PresencePeer[]) => void;
 	onReconnect: () => void;
+	onCanvasList: () => void;
 	onError?: (error: unknown) => void;
 };
 
 export function connectCanvas(options: CanvasConnection): () => void {
-	const { client, canvasId, peer, onChange, onPeers, onReconnect } = options;
+	const { client, canvasId, projectId, peer, onChange, onPeers, onReconnect, onCanvasList } = options;
 	let closed = false;
 	let channel: RealtimeChannel | null = null;
 
@@ -42,6 +44,14 @@ export function connectCanvas(options: CanvasConnection): () => void {
 				}
 			});
 		}
+
+		channel.on('postgres_changes', {
+			event: '*', schema: 'public', table: 'canvases', filter: `project_id=eq.${projectId}`
+		}, () => {
+			if (!closed) {
+				onCanvasList();
+			}
+		});
 
 		channel.on('presence', { event: 'sync' }, () => {
 			if (!closed && channel) {

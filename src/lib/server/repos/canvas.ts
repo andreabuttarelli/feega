@@ -178,6 +178,32 @@ export async function createCanvas(
   return toCanvas(data);
 }
 
+export async function renameCanvas(
+  db: Db,
+  input: { orgId: string; canvasId: string; name: string }
+): Promise<Canvas | null> {
+  const { data, error } = await db
+    .from('canvases')
+    .update({ name: input.name, updated_at: new Date().toISOString() })
+    .eq('id', input.canvasId)
+    .eq('org_id', input.orgId)
+    .select(CANVAS_COLUMNS)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+  return data ? toCanvas(data) : null;
+}
+
+export async function deleteCanvas(db: Db, input: { orgId: string; canvasId: string }): Promise<void> {
+  const { error } = await db.from('canvases').delete().eq('id', input.canvasId).eq('org_id', input.orgId);
+
+  if (error) {
+    throw error;
+  }
+}
+
 export async function saveViewport(
   db: Db,
   input: { orgId: string; canvasId: string; viewport: { x: number; y: number; zoom: number } }
