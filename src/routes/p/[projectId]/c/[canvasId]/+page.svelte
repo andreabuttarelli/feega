@@ -2369,8 +2369,8 @@
     padding: 0 4px;
     font-size: 0.625rem;
     line-height: 1rem;
-    color: var(--destructive);
-    background: var(--background);
-    border: 1px solid var(--destructive);
+    color: var(--color-destructive);
+    background: var(--color-background);
+    border: 1px solid var(--color-destructive);
   }
 </style>

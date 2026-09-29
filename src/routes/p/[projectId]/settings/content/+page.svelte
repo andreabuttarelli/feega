@@ -1,11 +1,26 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
+  import type { SubmitFunction } from '@sveltejs/kit';
+  import { page } from '$app/state';
+  import { openSheet } from '$lib/canvas/sheet-nav';
   import { Panel } from '$lib/components/ui/panel';
   import { Field, FieldLayout } from '$lib/components/ui/field';
   import { Button } from '$lib/components/ui/button';
   import { Notice } from '$lib/components/ui/notice';
 
   let { data, form } = $props();
+  const SHEET_PATH = '/settings/content';
+  let failure = $state<string | null>(null);
+  const error = $derived(failure ?? (form as { error?: string } | null)?.error ?? null);
+
+  const refresh: SubmitFunction = () => async ({ result, update }) => {
+    failure = result.type === 'failure' ? String((result.data as { error?: string } | undefined)?.error ?? 'failed') : null;
+    if (page.state.sheet) {
+      await openSheet(page.params.projectId ?? '', SHEET_PATH, 'replace');
+      return;
+    }
+    await update();
+  };
   const access = $derived(data.access);
   const REASON_TEXT: Record<string, string> = {
     enabled: 'On',
@@ -26,14 +41,14 @@
       {#if access.optIn}· turned on {new Date(access.optIn.enabledAt).toLocaleString()}{/if}
     </p>
 
-    {#if form?.error}<Notice class="mb-0">{form.error}</Notice>{/if}
+    {#if error}<Notice class="mb-0">{error}</Notice>{/if}
 
     {#if access.allowed}
-      <form method="POST" action="?/disable" use:enhance>
+      <form method="POST" action="?/disable" use:enhance={refresh}>
         <Button variant="secondary" type="submit">Turn off uncensored models</Button>
       </form>
     {:else if access.entitled}
-      <form method="POST" action="?/enable" use:enhance class="flex flex-col gap-2">
+      <form method="POST" action="?/enable" use:enhance={refresh} class="flex flex-col gap-2">
         <label class="flex items-start gap-2">
           <input type="checkbox" name="attestAdult" required />
           I confirm I am 18 or older and the owner of this workspace.
@@ -59,7 +74,7 @@
     </p>
     {#each data.personas as persona (persona.id)}
       <Field label={persona.name} hint={persona.age ? `${persona.age} years` : 'Age not declared'} layout={FieldLayout.Row}>
-        <form method="POST" action="?/persona" use:enhance>
+        <form method="POST" action="?/persona" use:enhance={refresh}>
           <input type="hidden" name="influencerId" value={persona.id} />
           <input type="hidden" name="mark" value={persona.adult_persona_at ? 'off' : 'on'} />
           <Button variant="secondary" size="sm" type="submit">
