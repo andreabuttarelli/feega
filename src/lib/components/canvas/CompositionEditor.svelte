@@ -10,9 +10,10 @@
   import type { LayoutId, LayoutParams } from '$lib/canvas/composition/types';
   import type { CompositionMedia, CompositionScene } from '$lib/canvas/composition/scene';
   import type { ExportResolution } from '$lib/canvas/composition/export';
-  import { clampDuration, createSceneWhenMounted, defaultParamsFor, setLayoutParam } from '$lib/canvas/composition-editor';
+  import { clampDuration, controlFor, createSceneWhenMounted, defaultParamsFor, setLayoutParam } from '$lib/canvas/composition-editor';
   import type { CompositionAspect, CompositionNode } from '$lib/canvas/composition-node';
-  import CompositionParamControl from './CompositionParamControl.svelte';
+  import StudioParamControl from './StudioParamControl.svelte';
+  import { ColorField, ControlLayout, ControlRow, NumberField, OptionMenu, RatioChips } from '$lib/components/ui/control/index.js';
 
   const UNSAVED_PROMPT = 'Close without saving? Your changes will be lost.';
   const ASPECT_RATIOS: CompositionAspect[] = ['9:16', '1:1', '16:9'];
@@ -157,6 +158,10 @@
       scene?.dispose();
     };
   });
+
+  function optionsOf(table: Record<string, { label: string }>): { value: string; label: string }[] {
+    return Object.entries(table).map(([value, def]) => ({ value, label: def.label }));
+  }
 
   function onLayoutChange(next: LayoutId) {
     layout = next;
@@ -365,72 +370,51 @@
     </div>
 
     <aside class="cx-side">
-      <label class="cx-field">
-        Layout
-        <select value={layout} onchange={(e) => onLayoutChange(e.currentTarget.value as LayoutId)}>
-          {#each Object.entries(LAYOUTS) as [id, def] (id)}
-            <option value={id}>{def.label}</option>
-          {/each}
-        </select>
-      </label>
+      <ControlRow label="Layout">
+        <OptionMenu label="Layout" value={layout} options={optionsOf(LAYOUTS)} onchange={(v) => onLayoutChange(v as LayoutId)} />
+      </ControlRow>
 
       <div class="cx-param-grid">
         {#each LAYOUTS[layout].params as param (param.name)}
-          <CompositionParamControl
-            {param}
-            value={layoutParams[param.name]}
+          <StudioParamControl
+            label={param.label}
+            control={controlFor(param, layoutParams[param.name])}
             onchange={(value) => (layoutParams = setLayoutParam(layoutParams, param.name, value))}
           />
         {/each}
       </div>
 
-      <label class="cx-field">
-        Camera
-        <select
+      <ControlRow label="Camera">
+        <OptionMenu
+          label="Camera"
           value={cameraPreset}
+          options={optionsOf(CAMERA_PRESETS)}
           disabled={LAYOUTS[layout].camera === 'fixed'}
-          onchange={(e) => onCameraChange(e.currentTarget.value as CameraPresetId)}
-        >
-          {#each Object.entries(CAMERA_PRESETS) as [id, def] (id)}
-            <option value={id}>{def.label}</option>
-          {/each}
-        </select>
-      </label>
+          onchange={(v) => onCameraChange(v as CameraPresetId)}
+        />
+      </ControlRow>
 
       <div class="cx-param-grid">
         {#each CAMERA_PRESETS[cameraPreset].params as param (param.name)}
-          <CompositionParamControl
-            {param}
-            value={cameraParams[param.name]}
+          <StudioParamControl
+            label={param.label}
+            control={controlFor(param, cameraParams[param.name])}
             onchange={(value) => (cameraParams = setLayoutParam(cameraParams, param.name, value))}
           />
         {/each}
       </div>
 
-      <label class="cx-field">
-        Sfondo
-        <input type="color" value={backgroundColor} oninput={(e) => (backgroundColor = e.currentTarget.value)} />
-      </label>
+      <ControlRow label="Background" layout={ControlLayout.Inline}>
+        <ColorField label="Background" value={backgroundColor} onchange={(v) => (backgroundColor = String(v))} />
+      </ControlRow>
 
-      <label class="cx-field">
-        Durata (s)
-        <input
-          type="number"
-          min="0.5"
-          step="0.5"
-          value={duration}
-          onchange={(e) => (duration = clampDuration(Number(e.currentTarget.value)))}
-        />
-      </label>
+      <ControlRow label="Duration (s)" layout={ControlLayout.Inline}>
+        <NumberField label="Duration (s)" value={duration} min={0.5} step={0.5} onchange={(v) => (duration = clampDuration(Number(v)))} />
+      </ControlRow>
 
-      <label class="cx-field">
-        Formato
-        <select value={aspect} onchange={(e) => (aspect = e.currentTarget.value as CompositionAspect)}>
-          {#each ASPECT_RATIOS as ratio (ratio)}
-            <option value={ratio}>{ratio}</option>
-          {/each}
-        </select>
-      </label>
+      <ControlRow label="Aspect ratio">
+        <RatioChips label="Aspect ratio" value={aspect} options={ASPECT_RATIOS.map((r) => ({ value: r, label: r }))} onchange={(v) => (aspect = v as CompositionAspect)} />
+      </ControlRow>
 
       {#if exportError}
         <p class="cx-note cx-error">{exportError}</p>
@@ -600,36 +584,11 @@
   }
 
   .cx-param-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 14px 8px;
-    padding: 10px 8px 12px;
-    border: 1px solid var(--line, #ededef);
-    border-radius: 10px;
-    background: color-mix(in srgb, var(--paper-2, #f9f9f9) 72%, transparent);
-  }
-
-  .cx-field {
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    font-size: 12px;
-    color: var(--ink-soft, #6e6e73);
-  }
-  .cx-field select,
-  .cx-field input[type='number'] {
-    font: inherit;
-    padding: 6px 8px;
-    font-size: 13px;
-    color: var(--ink, #1d1d1f);
+    padding: 4px 0;
     border: 1px solid var(--line, #ededef);
-    background: var(--paper, #fff);
-  }
-  .cx-field input[type='color'] {
-    width: 48px;
-    height: 28px;
-    padding: 0;
-    border: 1px solid var(--line, #ededef);
+    background: color-mix(in srgb, var(--paper-2, #f9f9f9) 72%, transparent);
   }
 
   .cx-icon {

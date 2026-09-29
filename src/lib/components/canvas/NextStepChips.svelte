@@ -6,6 +6,8 @@
    * far arrivare in ordine sbagliato una risposta partita per un nodo che non è più selezionato.
    */
   import { deserialize } from '$app/forms';
+  import Sparkles from '@lucide/svelte/icons/sparkles';
+  import { clampCentre } from '$lib/canvas/toolbar-position';
 
   const SUGGEST_DEBOUNCE_MS = 400;
 
@@ -34,6 +36,8 @@
   } = $props();
 
   let suggestions = $state<Suggestion[]>([]);
+  let chipsWidth = $state(0);
+  let innerWidth = $state(0);
   let timer: ReturnType<typeof setTimeout> | null = null;
   let requestId = 0;
 
@@ -75,15 +79,19 @@
   });
 </script>
 
+<svelte:window bind:innerWidth />
+
 {#if box && suggestions.length}
   <div
     class="chips"
-    style={`left:${box.x + box.width / 2}px; top:${box.y + box.height + 8}px; --chips-scale:${zoom}`}
+    bind:offsetWidth={chipsWidth}
+    style={`left:${clampCentre(box.x + box.width / 2, chipsWidth, innerWidth)}px; top:${box.y + box.height + 8}px`}
     role="group"
-    aria-label="Suggerimenti"
+    aria-label="Next steps"
   >
     {#each suggestions as suggestion (suggestion.id)}
       <button type="button" class="chip" onclick={() => onpick?.(suggestion)}>
+        <Sparkles size={12} strokeWidth={1.8} aria-hidden="true" />
         {suggestion.label}
       </button>
     {/each}
@@ -99,26 +107,37 @@
     justify-content: center;
     gap: 4px;
     width: max-content;
-    max-width: 260px;
-    transform-origin: center top;
+    max-width: min(320px, calc(100vw - 16px));
     transform: translate(-50%, 0);
+    font-family: var(--sans);
   }
 
   .chip {
-    padding: 4px 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 32px;
+    padding: 0 10px;
     font: inherit;
-    font-size: 11px;
+    font-size: 12px;
     color: var(--ink-soft, #6e6e73);
     white-space: nowrap;
     cursor: pointer;
     background: var(--paper, #fff);
-    border: 1px dashed var(--line-2, #d2d2d7);
+    border: 1px solid var(--line-2, #d2d2d7);
     border-radius: 0;
   }
   .chip:hover,
   .chip:focus-visible {
     color: var(--ink, #1d1d1f);
     background: var(--paper-2, #f9f9f9);
-    border-style: solid;
+    outline: none;
+    border-color: var(--ink-soft, #6e6e73);
+  }
+
+  @media (max-width: 767px) {
+    .chip {
+      min-height: 44px;
+    }
   }
 </style>

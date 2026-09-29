@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { filterChoices, groupByProvider, recommendedFirst } from './model-picker';
+import { filterChoices, groupByProvider, modelGroupsOf, recommendedFirst } from './model-picker';
 import type { ModelChoice } from './gen-node';
 
 const choice = (over: Partial<ModelChoice> = {}): ModelChoice => ({
@@ -9,6 +9,22 @@ const choice = (over: Partial<ModelChoice> = {}): ModelChoice => ({
   provider: 'anthropic',
   providerLabel: 'Anthropic',
   ...over
+});
+
+describe('modelGroupsOf: il menu del modello come gruppi di voci', () => {
+  it('Recommended in cima, poi un gruppo per provider; un raccomandato compare anche sotto il suo provider', () => {
+    const top = choice({ id: 'top', label: 'Top', provider: 'google', providerLabel: 'Google', tiers: ['best'] });
+    const plain = choice({ id: 'plain', label: 'Plain', provider: 'openai', providerLabel: 'OpenAI' });
+
+    const groups = modelGroupsOf([top, plain]);
+
+    expect(groups.map((g) => g.id)).toEqual(['recommended', 'google', 'openai']);
+    expect(groups[0].items).toEqual([{ value: 'top', label: 'Top', keywords: 'Google' }]);
+  });
+
+  it("senza raccomandati non c'è la sezione", () => {
+    expect(modelGroupsOf([choice({ id: 'x' })]).map((g) => g.id)).not.toContain('recommended');
+  });
 });
 
 describe('filterChoices: cerca per nome del modello o del provider, senza badare al maiuscolo', () => {

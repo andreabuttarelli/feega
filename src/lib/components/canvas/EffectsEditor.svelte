@@ -6,9 +6,11 @@
   import LoaderCircle from '@lucide/svelte/icons/loader-circle';
   import Trash2 from '@lucide/svelte/icons/trash-2';
   import X from '@lucide/svelte/icons/x';
+  import Plus from '@lucide/svelte/icons/plus';
   import { applyStack, EFFECTS, type EffectId, type EffectStep, type Pixels } from '$lib/canvas/effects';
-  import { addStep, fitWithin, moveStep, removeStep, setParam, toggleStep } from '$lib/canvas/effects/editor';
-  import EffectParamControl from './EffectParamControl.svelte';
+  import { addStep, controlFor, fitWithin, moveStep, removeStep, setParam, toggleStep } from '$lib/canvas/effects/editor';
+  import StudioParamControl from './StudioParamControl.svelte';
+  import { ListMenu } from '$lib/components/ui/control/index.js';
 
   const PREVIEW_MAX_SIDE = 900;
   const PREVIEW_DEBOUNCE_MS = 80;
@@ -196,12 +198,10 @@
     }
   }
 
-  function add(event: Event & { currentTarget: HTMLSelectElement }) {
-    const id = event.currentTarget.value as EffectId;
-    event.currentTarget.value = '';
-    if (id) {
-      steps = addStep(steps, id);
-    }
+  const effectItems = $derived([{ id: 'effects', label: '', items: effectIds.map((id) => ({ value: id, label: EFFECTS[id].label })) }]);
+
+  function add(id: string) {
+    steps = addStep(steps, id as EffectId);
   }
 
   function onkeydown(event: KeyboardEvent) {
@@ -233,12 +233,14 @@
     </div>
 
     <aside class="fx-side">
-      <select class="fx-add" aria-label="Add effect" onchange={add}>
-        <option value="">+ Add effect</option>
-        {#each effectIds as id (id)}
-          <option value={id}>{EFFECTS[id].label}</option>
-        {/each}
-      </select>
+      <div class="fx-add">
+      <ListMenu label="Add effect" control="add-effect" groups={effectItems} value={null} onselect={add} triggerClass="w-full" contentClass="w-(--bits-floating-anchor-width)">
+        {#snippet trigger()}
+          <Plus class="size-3.5" aria-hidden="true" />
+          <span>Add effect</span>
+        {/snippet}
+      </ListMenu>
+      </div>
 
       <ol class="fx-stack">
         {#each steps as step, index (index)}
@@ -253,9 +255,9 @@
               <button type="button" class="fx-icon" aria-label="Rimuovi" onclick={() => (steps = removeStep(steps, index))}><Trash2 size={14} /></button>
             </div>
             {#each EFFECTS[step.id].params as param (param.name)}
-              <EffectParamControl
-                {param}
-                value={step.params[param.name]}
+              <StudioParamControl
+                label={param.label}
+                control={controlFor(param, step.params[param.name])}
                 onchange={(value) => (steps = setParam(steps, index, param.name, value))}
               />
             {/each}
@@ -277,6 +279,10 @@
 </section>
 
 <style>
+  .fx-add {
+    padding: 12px;
+  }
+
   .fx-backdrop {
     position: fixed;
     inset: 0;
@@ -381,14 +387,6 @@
     border-left: 1px solid var(--line, #ededef);
   }
 
-  .fx-add {
-    margin: 12px;
-    padding: 6px 8px;
-    font: inherit;
-    font-size: 13px;
-    border: 1px solid var(--line, #ededef);
-    background: var(--paper, #fff);
-  }
 
   .fx-stack {
     flex: 1;

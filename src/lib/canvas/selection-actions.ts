@@ -26,22 +26,29 @@ export type SelectionActionId =
   | 'copy-id'
   | 'delete';
 
+export type SelectionActionGroup = 'primary' | 'secondary' | 'overflow' | 'danger';
+
 export type SelectionAction = {
   id: SelectionActionId;
   label: string;
-  /** Le stesse etichette di `CANVAS_SHORTCUTS`, per chi vuole mostrarle nel `title` del bottone. */
+  group: SelectionActionGroup;
+  minNodes: number;
   keys?: string[];
 };
 
 export const SELECTION_ACTIONS: readonly SelectionAction[] = [
-  { id: 'duplicate', label: 'Duplicate', keys: ['mod', 'D'] },
-  { id: 'connect-new', label: 'Connect to new…' },
-  { id: 'connect-existing', label: 'Connect to…' },
-  { id: 'promote', label: 'Promote' },
-  { id: 'run-workflow', label: 'Esegui flusso' },
-  { id: 'copy-id', label: 'Copy id' },
-  { id: 'delete', label: 'Delete', keys: ['⌫'] }
+  { id: 'run-workflow', label: 'Run flow', group: 'primary', minNodes: 2 },
+  { id: 'connect-new', label: 'Connect to new…', group: 'secondary', minNodes: 1 },
+  { id: 'connect-existing', label: 'Connect to…', group: 'secondary', minNodes: 1 },
+  { id: 'duplicate', label: 'Duplicate', group: 'secondary', minNodes: 1, keys: ['mod', 'D'] },
+  { id: 'promote', label: 'Promote', group: 'secondary', minNodes: 1 },
+  { id: 'copy-id', label: 'Copy id', group: 'overflow', minNodes: 1 },
+  { id: 'delete', label: 'Delete', group: 'danger', minNodes: 1, keys: ['⌫'] }
 ];
+
+export function actionsIn(group: SelectionActionGroup, count: number): SelectionAction[] {
+  return SELECTION_ACTIONS.filter((a) => a.group === group && count >= a.minNodes);
+}
 
 export function enabledFor(
   id: SelectionActionId,
