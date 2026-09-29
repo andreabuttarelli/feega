@@ -260,7 +260,11 @@
   {/if}
 
   {#if references && node.medium !== 'text'}
-    {@render references()}
+    {#if choice?.uncensored}
+      <p class="gen-uncensored-note nodrag">Uncensored models don't accept references</p>
+    {:else}
+      {@render references()}
+    {/if}
   {/if}
 
   <footer class="gen-foot" class:is-full={!hasBody}>
@@ -468,6 +472,14 @@
      girato, CLAUDE.md): senza, l'altezza fissa del nodo lascerebbe uno spazio vuoto sotto la
      casella invece del bordo del nodo. Con `.gen-body` presente non cambia niente: `flex: 1` ha
      già preso lo spazio restante. */
+  .gen-uncensored-note {
+    margin: 0;
+    padding: 6px 9px;
+    font-size: 11px;
+    color: var(--ink-soft, #6e6e73);
+    border-top: 1px solid var(--line, #e5e5e5);
+  }
+
   .gen-foot {
     margin-top: auto;
     padding: 8px 9px 9px;
