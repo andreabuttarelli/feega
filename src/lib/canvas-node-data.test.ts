@@ -37,7 +37,8 @@ describe('cosa una riga di `nodes` può essere', () => {
       'list',
       'select',
       'effects',
-      'composition'
+      'composition',
+      'calendar'
     ]);
   });
 

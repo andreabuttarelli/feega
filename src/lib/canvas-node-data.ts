@@ -18,6 +18,7 @@ import type { EffectsNode } from '$lib/canvas/effects-node';
 import { LAYOUTS } from '$lib/canvas/composition/index';
 import { CAMERA_PRESETS } from '$lib/canvas/composition/camera';
 import type { CompositionNode } from '$lib/canvas/composition-node';
+import { newCalendarData } from '$lib/canvas/calendar-node';
 export { influencerNodeOf as influencerOf, type InfluencerNode } from '$lib/canvas/influencer-node';
 
 /**
@@ -50,7 +51,8 @@ export const NODE_TYPES = [
   'list',
   'select',
   'effects',
-  'composition'
+  'composition',
+  'calendar'
 ] as const;
 
 function syncStatusOf(v: unknown): SyncStatus {
@@ -343,6 +345,10 @@ export function newNodeRow(what: Addable): Record<string, unknown> {
       aspect: DEFAULT_COMPOSITION_ASPECT,
       refId: null
     };
+  }
+
+  if (what === 'calendar') {
+    return newCalendarData(new Date());
   }
 
   return { prompt: '', model: null, params: {}, refId: null };

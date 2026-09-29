@@ -25,7 +25,8 @@ const EXPECTED: Record<(typeof NODE_TYPES)[number], { inputs: boolean; output: b
   list: { inputs: true, output: true },
   select: { inputs: true, output: true },
   effects: { inputs: true, output: true },
-  composition: { inputs: true, output: true }
+  composition: { inputs: true, output: true },
+  calendar: { inputs: false, output: false }
 };
 
 describe('ogni tipo di nodo disegna le porte che la sua riga dichiara', () => {
