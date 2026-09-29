@@ -102,3 +102,53 @@ export async function disableUncensored(db: Db, input: { orgId: string; userId: 
 export function visibleChoices<C extends { uncensored?: boolean }>(choices: readonly C[], access: { allowed: boolean }): C[] {
   return access.allowed ? [...choices] : choices.filter((choice) => !choice.uncensored);
 }
+
+export function visibleCatalogue<K extends string, M extends { choices: readonly { uncensored?: boolean }[] }>(
+  catalogue: Record<K, M>,
+  access: { allowed: boolean }
+): Record<K, M> {
+  return Object.fromEntries(
+    Object.entries<M>(catalogue).map(([medium, entry]) => [medium, { ...entry, choices: visibleChoices(entry.choices, access) }])
+  ) as unknown as Record<K, M>;
+}
+
+export enum PersonaMark {
+  On = 'on',
+  Off = 'off'
+}
+
+const ADULT_AGE = 18;
+const AI_PERSONA_SOURCE = 'generated';
+
+type PersonaRow = { org_id: string | null; source: string; age: number | null };
+
+function personaProblem(row: PersonaRow | null, orgId: string): string | null {
+  if (!row || row.org_id !== orgId || row.source !== AI_PERSONA_SOURCE) {
+    return 'not_an_ai_persona';
+  }
+  return row.age !== null && row.age >= ADULT_AGE ? null : 'not_an_adult';
+}
+
+export async function markAdultPersona(
+  db: Db,
+  input: { orgId: string; userId: string; influencerId: string; mark: PersonaMark }
+): Promise<OptInOutcome> {
+  if (!(await isOrgOwner(untyped(db), input.orgId, input.userId))) {
+    return { ok: false, error: 'owner_only' };
+  }
+
+  if (input.mark === PersonaMark.On) {
+    const { data } = await untyped(db).from('influencers').select('org_id, source, age').eq('id', input.influencerId).maybeSingle();
+    const problem = personaProblem(data as PersonaRow | null, input.orgId);
+    if (problem) {
+      return { ok: false, error: problem };
+    }
+  }
+
+  const { error } = await untyped(db)
+    .from('influencers')
+    .update({ adult_persona_at: input.mark === PersonaMark.On ? new Date().toISOString() : null })
+    .eq('org_id', input.orgId)
+    .eq('id', input.influencerId);
+  return error ? { ok: false, error: error.message } : { ok: true };
+}

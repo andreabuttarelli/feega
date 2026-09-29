@@ -13,7 +13,7 @@ export type WiroRow = {
   input_modalities: string[] | null;
   supported_resolutions: string[] | null;
   param_schema: Record<string, unknown> | null;
-  pricing: unknown;
+  pricing?: unknown;
   uncensored?: boolean | null;
   wire_spec?: unknown;
 };

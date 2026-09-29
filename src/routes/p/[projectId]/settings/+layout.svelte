@@ -61,6 +61,9 @@
       [`${base}/billing`]: {
         title: $_('app.settings.billing.title')
       },
+      [`${base}/content`]: {
+        title: $_('app.settings.content.title')
+      },
       [`${base}/danger`]: {
         title: $_('app.settings.del.title')
       }

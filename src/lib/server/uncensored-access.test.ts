@@ -6,6 +6,9 @@ import {
   uncensoredAccess,
   UNCENSORED_ENTITLEMENT,
   UNCENSORED_POLICY_VERSION,
+  markAdultPersona,
+  PersonaMark,
+  visibleCatalogue,
   visibleChoices
 } from './uncensored-access';
 
@@ -97,8 +100,47 @@ describe('turning uncensored models on', () => {
 describe('the model menu an org sees', () => {
   const choices = [{ id: 'safe' }, { id: 'raw', uncensored: true }];
 
+  it('hides uncensored models from every medium of the catalogue', () => {
+    const catalogue = { image: { choices, synced: true }, text: { choices: [{ id: 't', uncensored: false }], synced: true } };
+    expect(visibleCatalogue(catalogue, { allowed: false }).image.choices.map((c) => c.id)).toEqual(['safe']);
+    expect(visibleCatalogue(catalogue, { allowed: false }).text.choices.map((c) => c.id)).toEqual(['t']);
+  });
+
   it('hides uncensored models until access is allowed', () => {
     expect(visibleChoices(choices, { allowed: false }).map((c) => c.id)).toEqual(['safe']);
     expect(visibleChoices(choices, { allowed: true }).map((c) => c.id)).toEqual(['safe', 'raw']);
+  });
+});
+
+describe('marking an AI influencer as a consenting adult persona', () => {
+  const persona = { id: 'inf-1', org_id: ORG, source: 'generated', age: 24 };
+
+  it('lets the owner mark a generated adult influencer of the org', async () => {
+    const { db, calls } = fakeDb({ orgs_members: members, influencers: [persona] }, { filter: true });
+    expect(await markAdultPersona(db, { orgId: ORG, userId: OWNER, influencerId: 'inf-1', mark: PersonaMark.On })).toEqual({ ok: true });
+    const update = calls.find((c) => c.table === 'influencers' && c.op === 'update');
+    expect(update?.payload).toMatchObject({ adult_persona_at: expect.any(String) });
+    expect(update?.filters).toEqual(expect.arrayContaining([['org_id', ORG], ['id', 'inf-1']]));
+  });
+
+  it.each([
+    [{ ...persona, source: 'upload' }, 'not_an_ai_persona'],
+    [{ ...persona, org_id: null, source: 'catalogue' }, 'not_an_ai_persona'],
+    [{ ...persona, age: 17 }, 'not_an_adult'],
+    [{ ...persona, age: null }, 'not_an_adult']
+  ])('refuses %o', async (row, error) => {
+    const { db } = fakeDb({ orgs_members: members, influencers: [row] }, { filter: true });
+    expect(await markAdultPersona(db, { orgId: ORG, userId: OWNER, influencerId: 'inf-1', mark: PersonaMark.On })).toEqual({ ok: false, error });
+  });
+
+  it('refuses a member who is not the owner', async () => {
+    const { db } = fakeDb({ orgs_members: members, influencers: [persona] }, { filter: true });
+    expect(await markAdultPersona(db, { orgId: ORG, userId: MEMBER, influencerId: 'inf-1', mark: PersonaMark.On })).toEqual({ ok: false, error: 'owner_only' });
+  });
+
+  it('unmarking clears the mark', async () => {
+    const { db, calls } = fakeDb({ orgs_members: members, influencers: [persona] }, { filter: true });
+    await markAdultPersona(db, { orgId: ORG, userId: OWNER, influencerId: 'inf-1', mark: PersonaMark.Off });
+    expect(calls.find((c) => c.table === 'influencers' && c.op === 'update')?.payload).toEqual({ adult_persona_at: null });
   });
 });

@@ -20,9 +20,10 @@ export const QUERY_TABLES =
   'credit_grants disruptive_ideas editorial_plans expert_requests graphic_designs gtm_plans incidents ' +
   'lifecycle_emails loop_cursors loop_ticks market_account_baselines market_account_fetch_attempts market_harvest_errors ' +
   'market_harvest_runs market_post_observations market_posts market_teardowns market_video_analyses media_generator_items ' +
-  'media_generator_prompts motion_craft_scores motion_reference_specs motion_video_prompts motion_video_references ' +
-  'motion_videos onboarding_drafts onboarding_errors onboarding_jobs onboarding_step_jobs org_members ' +
-  'org_usage organizations people post_links post_revisions post_verdicts post_visual_meta posts products ' +
-  'profiles publish_logs push_subscriptions reference_images rubrics sandbox_holders scheduler_runs scrapecreators_cache ' +
-  'shared_views social_accounts social_post_history social_thumb_cache talent_views talents thread_events ' +
-  'tool_usage video_renders video_requests video_reviews webhook_deliveries zernio_ad_accounts';
+  'media_generator_prompts moderation_checks motion_craft_scores motion_reference_specs motion_video_prompts ' +
+  'motion_video_references motion_videos onboarding_drafts onboarding_errors onboarding_jobs onboarding_step_jobs ' +
+  'org_members org_uncensored_optins org_usage organizations people post_links post_revisions post_verdicts ' +
+  'post_visual_meta posts products profiles publish_logs push_subscriptions reference_images rubrics ' +
+  'sandbox_holders scheduler_runs scrapecreators_cache shared_views social_accounts social_post_history ' +
+  'social_thumb_cache talent_views talents thread_events tool_usage video_renders video_requests video_reviews ' +
+  'webhook_deliveries zernio_ad_accounts';

@@ -2071,6 +2071,9 @@
               <!-- `/c/<tela>/assets/<id>` firma lo storage al volo: un URL firmato messo qui
                    scadrebbe in due ore, e una tela lasciata aperta tutto il giorno mostrerebbe
                    riquadri rotti. -->
+              {#if row.data.outputUncensored === true}
+                <span class="uncensored-output" data-testid="uncensored-output">Uncensored</span>
+              {/if}
               {#if gen.medium === 'text'}
                 <div class="gen-text-wrap">
                   <div class="gen-text-toggle" role="group" aria-label="Vista del testo">
@@ -2357,5 +2360,17 @@
     border: none;
     text-decoration: underline;
     cursor: pointer;
+  }
+  .uncensored-output {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    z-index: 2;
+    padding: 0 4px;
+    font-size: 0.625rem;
+    line-height: 1rem;
+    color: var(--destructive);
+    background: var(--background);
+    border: 1px solid var(--destructive);
   }
 </style>

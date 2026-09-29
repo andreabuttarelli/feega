@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { creditsForRun, creditsForLoop } from './gen-cost';
+import { creditsForRun, creditsForLoop, listedCredits } from './gen-cost';
 import type { ModelChoice } from './gen-node';
 
 const imageChoice: ModelChoice = {
@@ -264,5 +264,19 @@ describe('creditsForRun — a model priced per setting combination', () => {
 
   it('is unknown when no line matches the settings', () => {
     expect(creditsForRun({ medium: 'video', model: priced, params: { resolution: '1080p', duration: 5 } })).toBeNull();
+  });
+});
+
+describe('listedCredits — the price the model menu lists', () => {
+  it('is the unit price when the model has one', () => {
+    expect(listedCredits(imageChoice)).toBe(14);
+  });
+
+  it('is the cheapest combination for a model priced per setting', () => {
+    expect(listedCredits({ ...imageChoice, unitCredits: undefined, pricedInputs: [{ inputs: {}, credits: 9 }, { inputs: {}, credits: 4 }] })).toBe(4);
+  });
+
+  it('is absent when nothing is known', () => {
+    expect(listedCredits(unpricedChoice)).toBeUndefined();
   });
 });

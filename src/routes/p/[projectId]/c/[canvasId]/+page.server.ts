@@ -30,6 +30,7 @@ import { mintShareToken } from '$lib/canvas/doc-node';
 import { clearDocShare, setDocShare } from '$lib/server/repos/doc-share';
 import { isCanvasEdgeKind, isWireMode } from '$lib/canvas-edges';
 import { canvasModelCatalogue } from '$lib/server/canvas-catalogue';
+import { NO_UNCENSORED_ACCESS, uncensoredAccess, visibleCatalogue } from '$lib/server/uncensored-access';
 import { runGenNode, runsOf } from '$lib/server/canvas/generate';
 import { planLoop, enqueueLoop, cancelLoop, retryLoopCombination } from '$lib/server/canvas/loop';
 import { planWorkflowDryRun, enqueueWorkflow, cancelWorkflow, estimateWorkflowCredits } from '$lib/server/canvas/workflow';
@@ -202,13 +203,15 @@ async function loadInfluencerViews(
 export const load: PageServerLoad = async ({ params, locals }) => {
   const { db, orgId, canvasId, canvas } = await scopeFor(locals, params.canvasId);
 
-  const [nodes, connections, catalogue, shareToken, references] = await Promise.all([
+  const [nodes, connections, fullCatalogue, shareToken, references, uncensored] = await Promise.all([
     listNodes(db, { orgId, canvasId }),
     listConnections(db, { orgId, canvasId }),
     canvasModelCatalogue(),
     readCanvasShare(db, { orgId, canvasId }),
-    referenceLibrary(db, { orgId, projectId: canvas.projectId })
+    referenceLibrary(db, { orgId, projectId: canvas.projectId }),
+    uncensoredAccess(db, orgId).catch(() => NO_UNCENSORED_ACCESS)
   ]);
+  const catalogue = visibleCatalogue(fullCatalogue, uncensored);
 
   const [runs, { products, socialPosts, influencers }, sources] = await Promise.all([
     loadGenRuns(db, { orgId, nodes }),

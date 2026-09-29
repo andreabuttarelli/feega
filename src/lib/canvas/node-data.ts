@@ -556,7 +556,8 @@ export const SYSTEM_OWNED_FIELDS = [
   'running',
   'error',
   'params',
-  'html'
+  'html',
+  'outputUncensored'
 ] as const;
 
 export enum FieldScope {

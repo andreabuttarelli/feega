@@ -64,6 +64,14 @@ function pricedCredits(input: RunCostInput): number | null {
   return line.credits + enhanceExtra;
 }
 
+export function listedCredits(choice: ModelChoice): number | undefined {
+  if (typeof choice.unitCredits === 'number') {
+    return choice.unitCredits;
+  }
+  const priced = choice.pricedInputs?.map((line) => line.credits) ?? [];
+  return priced.length ? Math.min(...priced) : undefined;
+}
+
 export function creditsForRun(input: RunCostInput): number | null {
   if (input.model?.pricedInputs) {
     return pricedCredits(input);
