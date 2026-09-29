@@ -106,11 +106,11 @@ describe('POST /api/v1/brands/:slug/billing/checkout', () => {
 		expect(res.headers.get('location')).toBeNull();
 		expect(body.ok).toBe(true);
 		expect(body.url).toBe(CHECKOUT_URL);
-		expect(body.plans).toContainEqual({ usd: 32, label: '€32/mo' });
+		expect(body.plans).toContainEqual({ credits: 32, label: '€32/mo' });
 	});
 
 	it('sends the ORG subscription to the hosted plan picker, naming no price', async () => {
-		await call({ usd: 32 });
+		await call({ credits: 32 });
 
 		expect(createBillingPortalSession).toHaveBeenCalledWith({
 			customerId: 'cus_org',
@@ -127,7 +127,7 @@ describe('POST /api/v1/brands/:slug/billing/checkout', () => {
 	});
 
 	it('never charges, never changes a plan, never cancels', async () => {
-		await call({ usd: 32 });
+		await call({ credits: 32 });
 
 		expect(cancelSubscriptionAtPeriodEnd).not.toHaveBeenCalled();
 		expect(applyRetentionCoupon).not.toHaveBeenCalled();
@@ -143,11 +143,11 @@ describe('POST /api/v1/brands/:slug/billing/checkout', () => {
 	});
 
 	it('refuses a rung that is not on the ladder, before touching Stripe', async () => {
-		const { res, body } = await call({ usd: 7 });
+		const { res, body } = await call({ credits: 7 });
 
 		expect(res.status).toBe(400);
 		expect(body.error).toBe('unknown_plan');
-		expect(body.plans).toContainEqual({ usd: 32, label: '€32/mo' });
+		expect(body.plans).toContainEqual({ credits: 32, label: '€32/mo' });
 		expect(createBillingPortalSession).not.toHaveBeenCalled();
 	});
 
@@ -179,7 +179,7 @@ describe('POST /api/v1/brands/:slug/billing/checkout', () => {
 		});
 
 		it('creates a Checkout Session on the configured price, not a portal link', async () => {
-			const { res, body } = await call({ usd: 32 });
+			const { res, body } = await call({ credits: 32 });
 
 			expect(res.status).toBe(200);
 			expect(body.ok).toBe(true);
@@ -204,7 +204,7 @@ describe('POST /api/v1/brands/:slug/billing/checkout', () => {
 		it('says subscriptions_not_configured when no price id exists for the rung, and never mints a broken session', async () => {
 			subscriptionPriceIdFor.mockResolvedValue(undefined);
 
-			const { res, body } = await call({ usd: 32 });
+			const { res, body } = await call({ credits: 32 });
 
 			expect(res.status).toBe(409);
 			expect(body.error).toBe('subscriptions_not_configured');
@@ -216,7 +216,7 @@ describe('POST /api/v1/brands/:slug/billing/checkout', () => {
 		it('a Stripe outage while creating the subscription session is ours: 502', async () => {
 			createSubscriptionCheckout.mockRejectedValue(new Error('connection error'));
 
-			const { res, body } = await call({ usd: 32 });
+			const { res, body } = await call({ credits: 32 });
 
 			expect(res.status).toBe(502);
 			expect(body.error).toBe('stripe_unavailable');
@@ -286,7 +286,7 @@ describe('POST /api/v1/brands/:slug/billing/checkout', () => {
 	it('refuses to sell when a grant could not land — the sync engine trigger is not there yet', async () => {
 		billingGrantsReady.mockResolvedValue(false);
 
-		const { res, body } = await call({ usd: 32 });
+		const { res, body } = await call({ credits: 32 });
 
 		expect(res.status).toBe(409);
 		expect(body.error).toBe('purchases_not_ready');

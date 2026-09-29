@@ -44,7 +44,7 @@ Editing a SCHEDULED post re-syncs it to Zernio automatically, so what goes out i
 - `feega ads <slug> --pause <id>` / `--resume <id>` — Pause or resume a running campaign
 
 ### Account & billing
-- `feega upgrade <slug> [--eur N | --top-up N]` — Open Stripe checkout for a monthly plan (€8–€256) or a one-time top-up
+- `feega upgrade <slug> [--credits N | --top-up N]` — Open Stripe checkout for a monthly plan (8–256 credits, 1 credit = €1) or a one-time top-up
 
 ### System
 - `feega login [--email --password | --password-stdin]` — Authenticate

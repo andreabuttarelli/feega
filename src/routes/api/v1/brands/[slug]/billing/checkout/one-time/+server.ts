@@ -46,7 +46,7 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
     );
   }
 
-  const rung = rungFor(parsed.data.usd);
+  const rung = rungFor(parsed.data.credits);
   if (!rung) {
     return json(
       { error: 'unknown_plan' },

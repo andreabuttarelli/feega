@@ -3,15 +3,15 @@ import { callEndpoint } from '../lib/api.ts';
 import { CHECKOUT_LINK, ONE_TIME_CHECKOUT_LINK, type BrandEndpoint } from '../lib/contracts/index.ts';
 import { c, info } from '../lib/display.ts';
 
-export type UpgradeOptions = { eur?: string; topUp?: string };
+export type UpgradeOptions = { credits?: string; topUp?: string };
 
 type Purchase = { endpoint: BrandEndpoint; input: Record<string, number> };
 
 function purchaseOf(opts: UpgradeOptions): Purchase {
   if (opts.topUp) {
-    return { endpoint: ONE_TIME_CHECKOUT_LINK, input: { usd: Number(opts.topUp) } };
+    return { endpoint: ONE_TIME_CHECKOUT_LINK, input: { credits: Number(opts.topUp) } };
   }
-  return { endpoint: CHECKOUT_LINK, input: opts.eur ? { usd: Number(opts.eur) } : {} };
+  return { endpoint: CHECKOUT_LINK, input: opts.credits ? { credits: Number(opts.credits) } : {} };
 }
 
 function refusalOf(e: unknown): { error?: string; app_billing_url?: string } {
