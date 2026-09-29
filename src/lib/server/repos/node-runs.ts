@@ -205,13 +205,16 @@ export async function retryClaim(
  * filtro basta a distinguere i due mondi senza un `medium` sulla riga.
  */
 export const AUDIO_JOB_PREFIX = 'elevenlabs:';
+export const WIRO_JOB_PREFIX = 'wiro:';
 
-export async function queuedAudioRuns(db: Db, input: { limit: number }): Promise<NodeRun[]> {
+const OWN_RECONCILER_PREFIXES = [AUDIO_JOB_PREFIX, WIRO_JOB_PREFIX];
+
+async function queuedRunsWithPrefix(db: Db, input: { limit: number; prefix: string }): Promise<NodeRun[]> {
   const { data, error } = await db
     .from('node_runs')
     .select(RUN_COLUMNS)
     .eq('status', 'running')
-    .like('external_job_id', `${AUDIO_JOB_PREFIX}%`)
+    .like('external_job_id', `${input.prefix}%`)
     .order('started_at', { ascending: true })
     .limit(input.limit);
 
@@ -219,6 +222,14 @@ export async function queuedAudioRuns(db: Db, input: { limit: number }): Promise
     throw error;
   }
   return (data ?? []).map(toRun);
+}
+
+export async function queuedAudioRuns(db: Db, input: { limit: number }): Promise<NodeRun[]> {
+  return queuedRunsWithPrefix(db, { ...input, prefix: AUDIO_JOB_PREFIX });
+}
+
+export async function queuedWiroRuns(db: Db, input: { limit: number }): Promise<NodeRun[]> {
+  return queuedRunsWithPrefix(db, { ...input, prefix: WIRO_JOB_PREFIX });
 }
 
 export async function queuedVideoRuns(db: Db, input: { limit: number }): Promise<NodeRun[]> {
@@ -233,7 +244,7 @@ export async function queuedVideoRuns(db: Db, input: { limit: number }): Promise
   if (error) {
     throw error;
   }
-  return (data ?? []).map(toRun).filter((run) => !run.externalJobId?.startsWith(AUDIO_JOB_PREFIX));
+  return (data ?? []).map(toRun).filter((run) => !OWN_RECONCILER_PREFIXES.some((prefix) => run.externalJobId?.startsWith(prefix)));
 }
 
 export async function completeRun(
