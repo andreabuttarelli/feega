@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { resolveOrgCaller } from '$lib/server/org-data/auth';
 import { createOrgQueryTool } from '$lib/server/org-data/query-tool';
+import { hiddenFor } from '$lib/server/nsfw/hidden-scope';
 
 /**
  * `query` sul nuovo schema — org, project, canvas, brand, tutto sotto lo stesso org_id. Non un
@@ -16,8 +17,9 @@ export const POST: RequestHandler = async ({ request, url }) => {
   const resolved = await resolveOrgCaller(bearer, url.searchParams.get('org') ?? undefined);
   if ('error' in resolved) return json(resolved.error.body, { status: resolved.error.status });
 
-  const { authority, orgId, userId } = resolved.caller;
-  const { query } = createOrgQueryTool({ authority, orgId, userId });
+  const { authority, orgId, userId, db } = resolved.caller;
+  const hidden = await hiddenFor(db, { orgId, userId });
+  const { query } = createOrgQueryTool({ authority, orgId, userId, hidden });
   const read = query.execute as (input: unknown, options: unknown) => Promise<unknown>;
 
   return json(await read(await request.json().catch(() => ({})), {}));

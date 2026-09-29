@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { listMemberships } from '$lib/server/repos/orgs';
-import { findProjectForUser } from '$lib/server/projects/lookup';
+import { findReachableProject } from '$lib/server/projects/lookup';
 import { loadBrandDetails } from '$lib/server/brand-details';
 import type { RequestHandler } from './$types';
 
@@ -20,7 +20,7 @@ export const GET: RequestHandler = async ({ params, locals }) => {
   }
 
   const memberships = await listMemberships(db, user.id);
-  const found = await findProjectForUser(db, { projectId: params.projectId ?? '', memberships });
+  const found = await findReachableProject(db, { projectId: params.projectId ?? '', memberships, userId: user.id });
   if (!found) {
     return json({ error: 'project_not_found' }, { status: NOT_FOUND });
   }

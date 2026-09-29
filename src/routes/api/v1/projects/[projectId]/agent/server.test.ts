@@ -49,7 +49,7 @@ vi.mock('$lib/server/cli-auth', () => ({
 vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: async () => [] }));
 vi.mock('$lib/server/repos/canvas', () => ({ listCanvases: async () => [] }));
 vi.mock('$lib/server/projects/lookup', () => ({
-  findProjectForUser: async () => ({ orgId: 'org-1', project: { id: 'p-1', name: 'P', brandId: null } })
+  findReachableProject: async () => ({ orgId: 'org-1', project: { id: 'p-1', name: 'P', brandId: null } })
 }));
 vi.mock('$lib/server/repos/chat', () => ({
   openThread: async () => 'thread-1',

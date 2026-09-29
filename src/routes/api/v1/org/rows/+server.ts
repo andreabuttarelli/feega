@@ -1,4 +1,5 @@
 import { json } from '@sveltejs/kit';
+import { hiddenFor } from '$lib/server/nsfw/hidden-scope';
 import type { RequestHandler } from './$types';
 import { resolveOrgCaller } from '$lib/server/org-data/auth';
 import { createOrgWriteTools } from '$lib/server/org-data/write-tool';
@@ -17,13 +18,14 @@ const write = async (request: Request, url: URL, op: 'insert' | 'update' | 'dele
   const resolved = await resolveOrgCaller(bearer, url.searchParams.get('org') ?? undefined);
   if ('error' in resolved) return json(resolved.error.body, { status: resolved.error.status });
 
-  const { authority, orgId, userId, apiKeyId, writeAllowed } = resolved.caller;
+  const { authority, orgId, userId, apiKeyId, writeAllowed, db } = resolved.caller;
   if (!writeAllowed) {
     return json({ error: 'api_key_read_only' }, { status: 403 });
   }
 
   const actor = apiKeyId ? agentActor(userId, `api_key:${apiKeyId}`) : undefined;
-  const tools = createOrgWriteTools({ authority, orgId, userId, actor });
+  const hidden = await hiddenFor(db, { orgId, userId });
+  const tools = createOrgWriteTools({ authority, orgId, userId, actor, hidden });
   const contract = op === 'insert' ? INSERT_ROW : op === 'update' ? UPDATE_ROW : DELETE_ROW;
   const parsed = contract.input.safeParse(await request.json().catch(() => ({})));
   if (!parsed.success) {

@@ -3,7 +3,7 @@ import { fakeDb } from '$lib/server/db/fake-db';
 
 vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: vi.fn(async () => [{ orgId: 'org-1' }]) }));
 vi.mock('$lib/server/projects/lookup', () => ({
-  findProjectForUser: vi.fn(async (_db: unknown, input: { projectId: string }) =>
+  findReachableProject: vi.fn(async (_db: unknown, input: { projectId: string }) =>
     input.projectId === 'p1' ? { orgId: 'org-1', project: { id: 'p1' } } : null
   )
 }));

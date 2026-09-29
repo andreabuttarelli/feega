@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { listMemberships } from '$lib/server/repos/orgs';
 import { listProjectAssets, type Asset } from '$lib/server/repos/assets';
-import { findProjectForUser } from '$lib/server/projects/lookup';
+import { findReachableProject } from '$lib/server/projects/lookup';
 import { createAssetSigningDb, signAssetPaths } from '$lib/server/canvas/sign-media';
 import type { Db } from '$lib/server/db/client';
 import type { RequestHandler } from './$types';
@@ -45,7 +45,7 @@ export const GET: RequestHandler = async ({ params, locals }) => {
   }
 
   const memberships = await listMemberships(db, user.id);
-  const found = await findProjectForUser(db, { projectId: params.projectId ?? '', memberships });
+  const found = await findReachableProject(db, { projectId: params.projectId ?? '', memberships, userId: user.id });
   if (!found) {
     return json({ error: 'project_not_found' }, { status: 404 });
   }

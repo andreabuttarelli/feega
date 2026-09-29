@@ -1,7 +1,8 @@
 import type { Db } from '$lib/server/db/client';
 import type { Project } from '$lib/server/repos/projects';
 import type { Membership } from '$lib/server/repos/orgs';
-import { modeOf } from '$lib/project-mode';
+import { modeOf, ProjectMode } from '$lib/project-mode';
+import { NsfwLock } from '$lib/nsfw-access';
 
 /**
  * DA UN ID NELL'URL A UN PROGETTO CHE È DAVVERO SUO.
@@ -48,4 +49,16 @@ export async function findProjectForUser(
   }
 
   return null;
+}
+
+export async function findReachableProject(
+  db: Db,
+  input: { projectId: string; memberships: Membership[]; userId: string }
+): Promise<OpenProject | null> {
+  const found = await findProjectForUser(db, input);
+  if (!found || found.project.mode !== ProjectMode.Nsfw) {
+    return found;
+  }
+  const { nsfwLockFor } = await import('$lib/server/nsfw/nsfw-server');
+  return (await nsfwLockFor(db, { orgId: found.orgId, userId: input.userId })) === NsfwLock.Open ? found : null;
 }
