@@ -4,6 +4,7 @@
   import Check from '@lucide/svelte/icons/check';
   import { formatLastEdited } from '$lib/canvas/format-last-edited';
   import { CanvasAction, submitCanvasAction } from '$lib/canvas/canvas-list';
+  import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 
   type ProjectRow = { id: string; name: string; href: string; updatedAt: string };
   type CanvasRow = { id: string; name: string; href: string };
@@ -28,6 +29,7 @@
 
   let renaming = $state(false);
   let draftName = $state('');
+  let confirmingDelete = $state(false);
   const lastCanvas = $derived(canvases.length <= 1);
 
   async function run(action: CanvasAction, fields: Record<string, string> = {}) {
@@ -49,10 +51,14 @@
     await run(CanvasAction.Rename, { name: draftName });
   }
 
-  async function deleteCurrent() {
-    if (lastCanvas || !confirm($_('app.shell.canvasActions.confirmDelete'))) {
+  function askDeleteCurrent() {
+    if (lastCanvas) {
       return;
     }
+    confirmingDelete = true;
+  }
+
+  async function deleteCurrent() {
     await run(CanvasAction.Delete);
   }
 </script>
@@ -95,13 +101,22 @@
             data-testid="canvas-delete"
             disabled={lastCanvas}
             title={lastCanvas ? $_('app.shell.canvasActions.lastCanvas') : undefined}
-            onclick={deleteCurrent}
+            onclick={askDeleteCurrent}
           >
             {$_('app.shell.canvasActions.delete')}
           </button>
         </div>
       {/if}
     {/if}
+
+    <ConfirmDialog
+      bind:open={confirmingDelete}
+      title={$_('app.shell.canvasActions.confirmDeleteTitle')}
+      body={$_('app.shell.canvasActions.confirmDeleteBody')}
+      confirmLabel={$_('app.shell.canvasActions.confirmDeleteCta')}
+      cancelLabel={$_('app.shell.canvasActions.confirmDeleteCancel')}
+      onConfirm={deleteCurrent}
+    />
 
     <div class="section-label">{$_('app.shell.mobile.projects')}</div>
     <div class="list list-last">

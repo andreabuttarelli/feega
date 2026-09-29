@@ -154,6 +154,7 @@ export async function listCanvases(
     .select(CANVAS_COLUMNS)
     .eq('org_id', scope.orgId)
     .eq('project_id', scope.projectId)
+    .is('deleted_at', null)
     .order('created_at', { ascending: true });
 
   if (error) {
@@ -187,6 +188,7 @@ export async function renameCanvas(
     .update({ name: input.name, updated_at: new Date().toISOString() })
     .eq('id', input.canvasId)
     .eq('org_id', input.orgId)
+    .is('deleted_at', null)
     .select(CANVAS_COLUMNS)
     .maybeSingle();
 
@@ -196,8 +198,13 @@ export async function renameCanvas(
   return data ? toCanvas(data) : null;
 }
 
+/** Soft delete: nodi, archi e post_sources sopravvivono — un post pubblicato tiene la sua origine. */
 export async function deleteCanvas(db: Db, input: { orgId: string; canvasId: string }): Promise<void> {
-  const { error } = await db.from('canvases').delete().eq('id', input.canvasId).eq('org_id', input.orgId);
+  const { error } = await db
+    .from('canvases')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', input.canvasId)
+    .eq('org_id', input.orgId);
 
   if (error) {
     throw error;

@@ -17,6 +17,7 @@
   import Plus from '@lucide/svelte/icons/plus';
   import Pencil from '@lucide/svelte/icons/pencil';
   import Trash from '@lucide/svelte/icons/trash-2';
+  import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 
   type ProjectRow = { id: string; name: string; href: string; updatedAt: string };
   type CanvasRow = { id: string; name: string; href: string };
@@ -62,6 +63,7 @@
 
   let renaming = $state(false);
   let draftName = $state('');
+  let confirmingDelete = $state(false);
   const lastCanvas = $derived(canvases.length <= 1);
 
   function startRename() {
@@ -75,10 +77,14 @@
     await submitCanvasAction(canvasHref, CanvasAction.Rename, { name: draftName });
   }
 
-  async function deleteCurrent() {
-    if (lastCanvas || !confirm($_('app.shell.canvasActions.confirmDelete'))) {
+  function askDeleteCurrent() {
+    if (lastCanvas) {
       return;
     }
+    confirmingDelete = true;
+  }
+
+  async function deleteCurrent() {
     await submitCanvasAction(canvasHref, CanvasAction.Delete);
   }
 
@@ -160,7 +166,7 @@
           data-testid="canvas-delete"
           disabled={lastCanvas}
           title={lastCanvas ? $_('app.shell.canvasActions.lastCanvas') : undefined}
-          onSelect={deleteCurrent}
+          onSelect={askDeleteCurrent}
         >
           <Trash size={14} />
           {$_('app.shell.canvasActions.delete')}
@@ -169,6 +175,15 @@
     </DropdownMenu.Root>
     {/if}
   </div>
+
+  <ConfirmDialog
+    bind:open={confirmingDelete}
+    title={$_('app.shell.canvasActions.confirmDeleteTitle')}
+    body={$_('app.shell.canvasActions.confirmDeleteBody')}
+    confirmLabel={$_('app.shell.canvasActions.confirmDeleteCta')}
+    cancelLabel={$_('app.shell.canvasActions.confirmDeleteCancel')}
+    onConfirm={deleteCurrent}
+  />
 
   <div class="top-box right">
     <a href="#billing" class="credits" onclick={(e) => { e.preventDefault(); openBilling(); }}>

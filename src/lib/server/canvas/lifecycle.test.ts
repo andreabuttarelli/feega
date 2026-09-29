@@ -6,7 +6,14 @@ const ORG = 'org-1';
 const OTHER_ORG = 'org-2';
 const PROJECT = 'project-1';
 
-const canvasRow = (id: string, name: string, orgId = ORG) => ({ id, org_id: orgId, project_id: PROJECT, name, viewport: null });
+const canvasRow = (id: string, name: string, orgId = ORG, deletedAt: string | null = null) => ({
+  id,
+  org_id: orgId,
+  project_id: PROJECT,
+  name,
+  viewport: null,
+  deleted_at: deletedAt
+});
 
 describe('nextCanvasName', () => {
   it('starts at 1 on a project without untitled canvases', () => {
@@ -72,6 +79,29 @@ describe('removeCanvas', () => {
 
     expect(result).toEqual({ outcome: CanvasRemoval.Removed, nextCanvasId: 'c-2' });
     const del = calls.find((c) => c.table === 'canvases' && c.op === 'delete');
-    expect(del?.filters).toEqual(expect.arrayContaining([['id', 'c-1'], ['org_id', ORG]]));
+    expect(del).toBeUndefined();
+    const upd = calls.find((c) => c.table === 'canvases' && c.op === 'update');
+    expect(upd?.filters).toEqual(expect.arrayContaining([['id', 'c-1'], ['org_id', ORG]]));
+    expect(upd?.payload).toMatchObject({ deleted_at: expect.any(String) });
+  });
+
+  it('refuses to delete the only live canvas even when another is already soft-deleted', async () => {
+    const { db, calls } = fakeDb(
+      { canvases: [canvasRow('c-1', 'A', ORG, '2026-09-29T00:00:00.000Z'), canvasRow('c-2', 'B')] },
+      { filter: true }
+    );
+
+    const result = await removeCanvas(db, { orgId: ORG, projectId: PROJECT, canvasId: 'c-2' });
+
+    expect(result).toEqual({ outcome: CanvasRemoval.LastCanvas });
+    expect(calls.some((c) => c.op === 'update' && c.table === 'canvases')).toBe(false);
+  });
+
+  it('allows deleting when both canvases are live', async () => {
+    const { db } = fakeDb({ canvases: [canvasRow('c-1', 'A'), canvasRow('c-2', 'B')] }, { filter: true });
+
+    const result = await removeCanvas(db, { orgId: ORG, projectId: PROJECT, canvasId: 'c-1' });
+
+    expect(result).toEqual({ outcome: CanvasRemoval.Removed, nextCanvasId: 'c-2' });
   });
 });

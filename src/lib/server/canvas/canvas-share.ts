@@ -194,6 +194,7 @@ export async function readSharedCanvas(db: Db, token: string, sign: SignPaths): 
     .from('canvases')
     .select('id, org_id, name')
     .eq('share_token', token)
+    .is('deleted_at', null)
     .maybeSingle();
 
   if (error) {
@@ -268,6 +269,7 @@ export async function readCanvasShare(db: Db, scope: { orgId: string; canvasId: 
     .select('share_token')
     .eq('id', scope.canvasId)
     .eq('org_id', scope.orgId)
+    .is('deleted_at', null)
     .maybeSingle();
 
   if (error) {

@@ -14,14 +14,29 @@ canvas is a 404.
 Decisions:
 
 - New canvases are named `Untitled canvas N`, N one past the highest taken.
-- Delete is hard. `canvases` has no `deleted_at`, and deploys don't run
-  migrations, so a soft-delete column would ship code ahead of the schema. The
-  cascade removes nodes, connections, events and `post_sources` rows; posts
-  themselves survive. A browser confirm guards it.
-- The last canvas of a project cannot be deleted: the action answers 409 and
-  the menu item is disabled.
-- Other tabs see the list change: the canvas realtime channel now also listens
-  to `canvases` for the project and invalidates `app:canvases`.
+- Delete is soft (`20260929180000_canvases_soft_delete.sql`, applied to
+  production ahead of this branch by explicit authorization): `deleteCanvas`
+  sets `canvases.deleted_at` instead of removing the row. Nodes, connections,
+  `canvas_events` and `post_sources` are untouched — a published post keeps
+  its source links even after the canvas it came from is deleted. Every canvas
+  read (`listCanvases`, `findCanvasForUser`, the share viewer's lookup by
+  token) filters `deleted_at is null`, the same convention `nodes.deleted_at`
+  already uses. `confirm()` was replaced with `ConfirmDialog.svelte`
+  (`$lib/components/`), the same overlay pattern as `DeleteBrandDialog`, minus
+  the typed-confirmation requirement.
+- The last canvas of a project cannot be deleted, counting live canvases only:
+  a project with one soft-deleted and one live canvas still refuses to delete
+  the live one. The action answers 409 and the menu item is disabled.
+- Other tabs see the list change: the canvas realtime channel already routes
+  every `canvases` event (insert, rename, delete) to a full list refetch, so a
+  soft delete (an UPDATE with `deleted_at` set) drops out the same way a hard
+  DELETE would have — no special-casing needed in `canvas-channel.ts`.
+- Known gap: the generic MCP/CLI `query` tool (`cli/mcp/tools/org-data.ts` →
+  `src/lib/server/org-data/query-tool.ts`) applies no per-table filtering at
+  all — it doesn't exclude soft-deleted `nodes` today either, so a
+  soft-deleted canvas is visible to it the same way a soft-deleted node is.
+  Not fixed here: there is no existing convention to mirror, and inventing
+  generic per-table filtering was out of scope for this change.
 - Duplicate was dropped: `duplicateNodes` writes into the source canvas with an
   offset, so copying into a new canvas is a separate change, not a reuse.
 - No CLI or MCP surface: canvases have none today.

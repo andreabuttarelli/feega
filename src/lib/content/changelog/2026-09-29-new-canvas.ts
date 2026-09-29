@@ -6,7 +6,7 @@ export default {
   items: [
     'Create a new canvas from the canvas menu.',
     'Rename a canvas in place.',
-    'Delete a canvas; every project keeps at least one.',
+    'Delete a canvas; every project keeps at least one. Nothing on it is lost.',
     'Open tabs update the canvas list live.'
   ]
 } satisfies ChangelogEntry;

@@ -81,6 +81,21 @@ describe('canvas collaboration', () => {
 		expect(callbacks.onChange).not.toHaveBeenCalled();
 	});
 
+	it('treats a soft delete (UPDATE with deleted_at set) as a removal from the canvas list, same as a DELETE', async () => {
+		const connection = socket();
+		const callbacks = open(connection);
+		await vi.waitFor(() => expect(connection.channel.subscribe).toHaveBeenCalled());
+		const canvases = connection.listeners.find(({ filter }) => filter?.table === 'canvases')!;
+		canvases.callback({
+			table: 'canvases',
+			eventType: 'UPDATE',
+			old: { id: 'other' },
+			new: { id: 'other', deleted_at: '2026-09-29T00:00:00.000Z' }
+		});
+		expect(callbacks.onCanvasList).toHaveBeenCalledTimes(1);
+		expect(callbacks.onChange).not.toHaveBeenCalled();
+	});
+
 	it('does not join a canvas after navigation while authentication is pending', async () => {
 		const connection = socket();
 		const callbacks = open(connection);
