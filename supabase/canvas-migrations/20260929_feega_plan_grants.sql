@@ -36,6 +36,7 @@ create or replace function public.credits_from_price_id(price_id text) returns i
   select public.feega_credits(p._raw_data->'metadata'->>'credits')
   from stripe.prices p
   where p.id = price_id
+    and p._raw_data->>'currency' = 'eur'
     and p._raw_data->'metadata'->>'app' = 'feega';
 $$;
 

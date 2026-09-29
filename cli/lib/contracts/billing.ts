@@ -20,7 +20,7 @@ const CheckoutInputSchema = z
       .number()
       .positive()
       .optional()
-      .describe('Monthly plan in USD the human wants: 8, 16, 32, 64, 128 or 256')
+      .describe('Monthly plan in EUR the human wants: 8, 16, 32, 64, 128 or 256 (field name kept for compatibility)')
   })
   .strict();
 
@@ -95,7 +95,7 @@ const OneTimeCheckoutInputSchema = z
     usd: z
       .number()
       .positive()
-      .describe('One-time top-up in USD, 1 credit per dollar: 8, 16, 32, 64, 128 or 256')
+      .describe('One-time top-up in EUR, 1 credit per euro: 8, 16, 32, 64, 128 or 256')
   })
   .strict();
 

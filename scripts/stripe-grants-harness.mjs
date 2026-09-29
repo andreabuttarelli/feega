@@ -43,6 +43,7 @@ const feegaMeta = (extra = {}) => ({ app: 'feega', org_id: ORG, ...extra });
 const invoice = (id, overrides = {}) => ({
   id,
   status: 'paid',
+  currency: 'eur',
   billing_reason: 'subscription_cycle',
   parent: { subscription_details: { metadata: feegaMeta({ credits: '800' }) } },
   lines: { data: [{ pricing: { price_details: { price: 'price_8' } }, period: { end: 1893456000 } }] },
@@ -52,6 +53,7 @@ const invoice = (id, overrides = {}) => ({
 const checkout = (id, overrides = {}) => ({
   id,
   mode: 'payment',
+  currency: 'eur',
   status: 'complete',
   payment_status: 'paid',
   metadata: feegaMeta({ credits: '1600' }),
@@ -67,7 +69,7 @@ const SCENARIOS = [
   {
     name: 'the price decides the credits, not stale subscription metadata after a plan change',
     rows: [
-      ['prices', { id: 'price_32', metadata: { app: 'feega', credits: '3200' } }],
+      ['prices', { id: 'price_32', currency: 'eur', unit_amount: 3200, metadata: { app: 'feega', credits: '3200' } }],
       [
         'invoices',
         invoice('in_2', {
@@ -76,6 +78,19 @@ const SCENARIOS = [
       ]
     ],
     expect: [{ event: 'invoice:in_2', amount: 3200 }]
+  },
+  {
+    name: 'a non-euro price never decides the credits',
+    rows: [
+      ['prices', { id: 'price_usd', currency: 'usd', unit_amount: 3200, metadata: { app: 'feega', credits: '3200' } }],
+      [
+        'invoices',
+        invoice('in_10', {
+          lines: { data: [{ pricing: { price_details: { price: 'price_usd' } }, period: { end: 1893456000 } }] }
+        })
+      ]
+    ],
+    expect: [{ event: 'invoice:in_10', amount: 800 }]
   },
   {
     name: 'the first invoice of a subscription grants too',

@@ -84,7 +84,7 @@
             {#each data.credits.ladder as rung (rung.price)}
               {@const action = planAction(rung.price)}
               <tr>
-                <td>${rung.price}/mo</td>
+                <td>€{rung.price}/mo</td>
                 <td>{$_('app.account.billing.creditsIncluded', { values: { credits: rung.credits / DISPLAY_UNITS_PER_CREDIT } })}</td>
                 <td>
                   {#if action}

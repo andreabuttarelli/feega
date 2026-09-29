@@ -175,7 +175,7 @@ Remix di ads competitor/trending in brief creativi in brand voice.
 
 ### POST /api/v1/brands/:slug/billing/checkout
 
-Checkout Stripe per un piano mensile (`{ "usd": 8|16|32|64|128|256 }`, 1 credito = $1). Con un abbonamento attivo apre il portale per cambiare piano.
+Checkout Stripe per un piano mensile (`{ "usd": 8|16|32|64|128|256 }`, 1 credito = €1; campo `usd` storico, valore in euro). Con un abbonamento attivo apre il portale per cambiare piano.
 
 ### POST /api/v1/brands/:slug/billing/checkout/one-time
 

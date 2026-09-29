@@ -34,15 +34,17 @@ export const CREDITS_PER_USD_SUBSCRIPTION_LIST = 100 * (1 + AI_MARKUP); // 200
 // strategia, chat) oltre alla produzione dei post.
 export const CREDITS_PER_USD_GRANT = 100;
 
+export const PLAN_CURRENCY = 'eur';
+
 export type CreditRung = {
   price: number;
   credits: number;
   lookupKey: string;
 };
 
-const PLAN_PRICES_USD = [8, 16, 32, 64, 128, 256] as const;
+const PLAN_PRICES_EUR = [8, 16, 32, 64, 128, 256] as const;
 
-export const CREDIT_LADDER: readonly CreditRung[] = PLAN_PRICES_USD.map((price) => ({
+export const CREDIT_LADDER: readonly CreditRung[] = PLAN_PRICES_EUR.map((price) => ({
   price,
   credits: price * CREDITS_PER_USD_GRANT,
   lookupKey: `feega_monthly_${price}`

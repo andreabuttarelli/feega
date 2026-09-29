@@ -106,7 +106,7 @@ describe('POST /api/v1/brands/:slug/billing/checkout', () => {
 		expect(res.headers.get('location')).toBeNull();
 		expect(body.ok).toBe(true);
 		expect(body.url).toBe(CHECKOUT_URL);
-		expect(body.plans).toContainEqual({ usd: 32, label: '$32/mo' });
+		expect(body.plans).toContainEqual({ usd: 32, label: '€32/mo' });
 	});
 
 	it('sends the ORG subscription to the hosted plan picker, naming no price', async () => {
@@ -147,7 +147,7 @@ describe('POST /api/v1/brands/:slug/billing/checkout', () => {
 
 		expect(res.status).toBe(400);
 		expect(body.error).toBe('unknown_plan');
-		expect(body.plans).toContainEqual({ usd: 32, label: '$32/mo' });
+		expect(body.plans).toContainEqual({ usd: 32, label: '€32/mo' });
 		expect(createBillingPortalSession).not.toHaveBeenCalled();
 	});
 

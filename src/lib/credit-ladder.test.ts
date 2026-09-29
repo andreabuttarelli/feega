@@ -16,7 +16,7 @@ import { IMAGE_CREDITS, videoCredits } from './server/content-cost';
 
 describe('credit ladder never falls below the margin floor', () => {
   for (const rung of CREDIT_LADDER) {
-    it(`$${rung.price} clears the floor when every credit is spent`, () => {
+    it(`€${rung.price} clears the floor when every credit is spent`, () => {
       expect(marginForRung(rung.price, rung.credits)).toBeGreaterThanOrEqual(MARGIN_FLOOR);
     });
   }
@@ -33,7 +33,7 @@ describe('the plans feega.app sells', () => {
     expect(CREDIT_LADDER.map((r) => r.price)).toEqual([8, 16, 32, 64, 128, 256]);
   });
 
-  it('grant one displayed credit per dollar', () => {
+  it('grant one displayed credit per euro', () => {
     for (const rung of CREDIT_LADDER) {
       expect(rung.credits / DISPLAY_UNITS_PER_CREDIT).toBe(rung.price);
     }

@@ -14,7 +14,7 @@ import { CHECKOUT_LINK, statusForFailure } from '@feega/api-contracts';
 
 const SUBSCRIPTION_RUNGS = CREDIT_LADDER.map((rung) => ({
   usd: rung.price,
-  label: `$${rung.price}/mo`
+  label: `€${rung.price}/mo`
 }));
 
 /**

@@ -503,7 +503,7 @@
         "brandCol": "Brand",
         "creditsCol": "Credits used",
         "ladderTitle": "Plans",
-        "ladderDesc": "1 credit = $1. All features in every plan. Monthly credits renew each month; top-up credits never expire.",
+        "ladderDesc": "1 credit = €1. All features in every plan. Monthly credits renew each month; top-up credits never expire.",
         "priceCol": "Plan",
         "creditsIncluded": "{credits} credits / mo",
         "subscribe": "Subscribe",

@@ -225,7 +225,7 @@ const feegaPrice = (usd: number, id = `price_${usd}`) => ({
 	id,
 	lookup_key: `feega_monthly_${usd}`,
 	unit_amount: usd * 100,
-	currency: 'usd'
+	currency: 'eur'
 });
 
 describe('subscriptionPriceIdFor', () => {
@@ -267,6 +267,12 @@ describe('subscriptionPriceIdFor', () => {
 
 	it('refuses a price whose amount disagrees with the rung', async () => {
 		pricesList.mockResolvedValue({ data: [{ ...feegaPrice(8), unit_amount: 900 }] });
+		const { subscriptionPriceIdFor } = await import('./stripe');
+		expect(await subscriptionPriceIdFor(8)).toBeUndefined();
+	});
+
+	it('refuses a price in any currency but euro', async () => {
+		pricesList.mockResolvedValue({ data: [{ ...feegaPrice(8), currency: 'usd' }] });
 		const { subscriptionPriceIdFor } = await import('./stripe');
 		expect(await subscriptionPriceIdFor(8)).toBeUndefined();
 	});
@@ -315,7 +321,7 @@ describe('createOneTimeCreditCheckout', () => {
 			line_items: [
 				{
 					price_data: {
-						currency: 'usd',
+						currency: 'eur',
 						unit_amount: 1600,
 						product_data: { name: '16 feega credits' }
 					},

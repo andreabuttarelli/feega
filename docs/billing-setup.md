@@ -54,17 +54,17 @@ test:stripe-grants`.
 
 ## 2. Create the 6 subscription Prices
 
-Plans (`src/lib/credit-ladder.ts`): $8 / $16 / $32 / $64 / $128 / $256 per month, 1 credit = $1.
+Plans (`src/lib/credit-ladder.ts`): €8 / €16 / €32 / €64 / €128 / €256 per month, 1 credit = €1.
 The app finds each Price by `lookup_key` — no env var, no price id in code. One-time top-ups need
 no Price (the amount is inlined).
 
-For each tier N, a recurring monthly USD Price:
+For each tier N, a recurring monthly EUR Price (a Price in any other currency is ignored):
 
 | field | value |
 |---|---|
 | product name | `feega N` |
 | `lookup_key` | `feega_monthly_N` |
-| `unit_amount` | `N * 100` (cents) |
+| `unit_amount` | `N * 100` (euro cents) |
 | `metadata` | `app=feega`, `credits=N*100` (ledger units: 100 = 1 displayed credit) |
 
 A Price whose `unit_amount` disagrees with its tier is ignored. A tier with no Price answers

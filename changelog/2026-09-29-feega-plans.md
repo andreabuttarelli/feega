@@ -1,6 +1,6 @@
 # Billing aligned with feega.app plans
 
-**Why.** feega.app sells $8/16/32/64/128/256 a month at 1 credit = $1; the app sold a different
+**Why.** feega.app sells €8/16/32/64/128/256 a month at 1 credit = €1 (EUR prices, lookup keys already live in Stripe; USD prices inactive); the app sold a different
 ladder ($5–$400, 70:1 one-time) on price ids read from seven env vars, and
 `credits_from_price_id()` was a placeholder. No subscription could have granted credits.
 
@@ -8,7 +8,7 @@ ladder ($5–$400, 70:1 one-time) on price ids read from seven env vars, and
 - `CREDIT_LADDER` is the one plan table: price, credits (`price * 100` ledger units), Stripe
   `lookup_key` `feega_monthly_<price>`. Top-ups sell the same tiers at the same rate.
 - Stripe prices are resolved by lookup key (one `prices.list`, cached in memory; a price whose
-  amount disagrees with its tier is ignored). `STRIPE_PRICE_ID_SUBSCRIPTION_*` removed.
+  amount or currency (not `eur`) disagrees with its tier is ignored). The API field stays `usd` for compatibility; its value is euros. `STRIPE_PRICE_ID_SUBSCRIPTION_*` removed.
 - Removed dead Go/Starter/Pro Stripe code: `PRICES`, `priceFor`, `geoCouponFor`,
   `ensureBrandCustomer`, `createCheckoutSession`.
 - Checkout returns to `/p/<id>/settings/billing?checkout=success&session_id=…` on `appOrigin`;
@@ -24,7 +24,7 @@ ladder ($5–$400, 70:1 one-time) on price ids read from seven env vars, and
 - `scripts/stripe-grants-harness.mjs` (`npm run test:stripe-grants`) runs the triggers on a
   local Postgres against live-shaped stub tables.
 - CLI `feega upgrade` opened a dead `/app/billing` URL; it now mints the checkout link via the
-  API (`--usd`, `--top-up`).
+  API (`--eur`, `--top-up`).
 
 **Discarded.** Portal `subscription_update_confirm` with an exact price (needs the item id; the
 portal picker is enough). Mid-cycle proration invoices (`subscription_update`) grant nothing:

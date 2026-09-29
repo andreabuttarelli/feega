@@ -1,7 +1,7 @@
 import { env } from '$env/dynamic/private';
 import Stripe from 'stripe';
 import { createAdminClient } from './supabase-admin';
-import { CREDIT_LADDER, rungForLookupKey } from '$lib/credit-ladder';
+import { CREDIT_LADDER, PLAN_CURRENCY, rungForLookupKey } from '$lib/credit-ladder';
 import { DISPLAY_UNITS_PER_CREDIT } from '$lib/components/credit-amount-format';
 
 let client: Stripe | null = null;
@@ -15,7 +15,7 @@ function stripe(): Stripe {
 }
 
 const APP_TAG = 'feega';
-const CENTS_PER_USD = 100;
+const CENTS_PER_UNIT = 100;
 
 let rungPriceIds: Promise<Map<number, string>> | null = null;
 
@@ -29,7 +29,7 @@ async function fetchRungPriceIds(): Promise<Map<number, string>> {
   const ids = new Map<number, string>();
   for (const price of data) {
     const rung = rungForLookupKey(price.lookup_key);
-    if (!rung || price.unit_amount !== rung.price * CENTS_PER_USD) {
+    if (!rung || price.currency !== PLAN_CURRENCY || price.unit_amount !== rung.price * CENTS_PER_UNIT) {
       continue;
     }
     ids.set(rung.price, price.id);
@@ -85,8 +85,8 @@ export async function createOneTimeCreditCheckout(opts: {
     line_items: [
       {
         price_data: {
-          currency: 'usd',
-          unit_amount: Math.round(opts.price * CENTS_PER_USD),
+          currency: PLAN_CURRENCY,
+          unit_amount: Math.round(opts.price * CENTS_PER_UNIT),
           product_data: { name: `${opts.credits / DISPLAY_UNITS_PER_CREDIT} feega credits` }
         },
         quantity: 1
