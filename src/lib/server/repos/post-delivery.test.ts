@@ -96,6 +96,18 @@ describe('scheduleDelivery — media from an uncensored model', () => {
   });
 });
 
+describe('scheduleDelivery — media from an nsfw project', () => {
+  it('is never published, on any platform, confirmed or not', async () => {
+    const { db } = fakeDb({ posts: [postRow], social_accounts: [accountRows[1]], assets: [{ ...assetRows[0], nsfw: true }] });
+    const publisher = fakePublisher();
+
+    const result = await scheduleDelivery(db, publisher, { orgId: ORG, postId: POST_ID, accountIds: [ACCOUNT_X], confirmUncensored: true });
+
+    expect(publisher.publish).not.toHaveBeenCalled();
+    expect(result.deliveries).toEqual([{ accountId: ACCOUNT_X, ok: false, error: 'nsfw_not_publishable' }]);
+  });
+});
+
 describe('scheduleDelivery', () => {
   it('pubblica una volta per account e scrive il puntatore per quell account', async () => {
     const { db } = fakeDb({ posts: [postRow], social_accounts: [accountRows[0]], assets: assetRows });

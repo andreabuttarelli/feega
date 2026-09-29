@@ -30,6 +30,9 @@ import { mintShareToken } from '$lib/canvas/doc-node';
 import { clearDocShare, setDocShare } from '$lib/server/repos/doc-share';
 import { isCanvasEdgeKind, isWireMode } from '$lib/canvas-edges';
 import { canvasModelCatalogue } from '$lib/server/canvas-catalogue';
+import { Capability, catalogueIn, MODE_REFUSAL, modeAllows, ProjectMode } from '$lib/project-mode';
+import { NsfwLock } from '$lib/nsfw-access';
+import { nsfwLockFor, projectModeOf } from '$lib/server/nsfw/nsfw-server';
 import { NO_UNCENSORED_ACCESS, uncensoredAccess, visibleCatalogue } from '$lib/server/uncensored-access';
 import { runGenNode, runsOf } from '$lib/server/canvas/generate';
 import { planLoop, enqueueLoop, cancelLoop, retryLoopCombination } from '$lib/server/canvas/loop';
@@ -89,7 +92,7 @@ export const config = { maxDuration: 300 };
  * modo diverso di proposito — trascinare è last-write-wins, scrivere un prompt no — e qui si
  * rispetta quella divisione invece di uniformarla.
  */
-type Scope = { db: Db; orgId: string; canvasId: string; canvas: Canvas; userId: string };
+type Scope = { db: Db; orgId: string; canvasId: string; canvas: Canvas; userId: string; mode: ProjectMode };
 
 /** Ogni gesto della tela che passa da qui è di una persona, mai un `system` muto: `canvas_events` deve saperlo. */
 function userActor(scope: { userId: string }): Actor {
@@ -113,7 +116,20 @@ async function scopeFor(locals: App.Locals, canvasId: string): Promise<Scope> {
     throw error(404, 'questa tela non esiste, o non è tua');
   }
 
-  return { db, orgId: found.orgId, canvasId, canvas: found.canvas, userId: user.id };
+  const mode = await projectModeOf(db, { orgId: found.orgId, projectId: found.canvas.projectId });
+  if (mode === ProjectMode.Nsfw && (await nsfwLockFor(db, { orgId: found.orgId, userId: user.id })) !== NsfwLock.Open) {
+    throw error(404, 'questa tela non esiste, o non è tua');
+  }
+
+  return { db, orgId: found.orgId, canvasId, canvas: found.canvas, userId: user.id, mode };
+}
+
+async function scopeAllowing(locals: App.Locals, canvasId: string, capability: Capability): Promise<Scope> {
+  const scope = await scopeFor(locals, canvasId);
+  if (!modeAllows(scope.mode, capability)) {
+    throw error(403, MODE_REFUSAL[capability]);
+  }
+  return scope;
 }
 
 /** La storia dei giri, per nodo: quello che la striscia sotto il risultato deve poter mostrare. */
@@ -201,7 +217,7 @@ async function loadInfluencerViews(
 }
 
 export const load: PageServerLoad = async ({ params, locals }) => {
-  const { db, orgId, canvasId, canvas } = await scopeFor(locals, params.canvasId);
+  const { db, orgId, canvasId, canvas, mode } = await scopeFor(locals, params.canvasId);
 
   const [nodes, connections, fullCatalogue, shareToken, references, uncensored] = await Promise.all([
     listNodes(db, { orgId, canvasId }),
@@ -211,7 +227,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
     referenceLibrary(db, { orgId, projectId: canvas.projectId }),
     uncensoredAccess(db, orgId).catch(() => NO_UNCENSORED_ACCESS)
   ]);
-  const catalogue = visibleCatalogue(fullCatalogue, uncensored);
+  const catalogue = catalogueIn(mode, visibleCatalogue(fullCatalogue, uncensored));
 
   const [runs, { products, socialPosts, influencers }, sources] = await Promise.all([
     loadGenRuns(db, { orgId, nodes }),
@@ -234,7 +250,8 @@ export const load: PageServerLoad = async ({ params, locals }) => {
     orgId,
     nodeIdsInPost,
     shareToken,
-    references
+    references,
+    mode
   };
 };
 
@@ -1087,7 +1104,7 @@ export const actions: Actions = {
    * l'impronta, e «Nuovo link» ne conia un altro revocando quello di prima.
    */
   share: async ({ request, params, locals }) => {
-    const scope = await scopeFor(locals, params.canvasId);
+    const scope = await scopeAllowing(locals, params.canvasId, Capability.Share);
     const fd = await request.formData();
 
     const nodeId = String(fd.get('node_id') ?? '');
@@ -1125,7 +1142,7 @@ export const actions: Actions = {
   },
 
   share_canvas: async ({ request, params, locals }) => {
-    const scope = await scopeFor(locals, params.canvasId);
+    const scope = await scopeAllowing(locals, params.canvasId, Capability.Share);
     const fd = await request.formData();
 
     const state = String(fd.get('state') ?? '');
@@ -1434,7 +1451,7 @@ export const actions: Actions = {
    * `draft`, con un `scheduled_for` (e almeno un account) prova a consegnare via Zernio.
    */
   create_post: async ({ request, params, locals }) => {
-    const scope = await scopeFor(locals, params.canvasId);
+    const scope = await scopeAllowing(locals, params.canvasId, Capability.Publish);
     const fd = await request.formData();
 
     const brandId = String(fd.get('brand_id') ?? '');
@@ -1481,7 +1498,7 @@ export const actions: Actions = {
   },
 
   calendar_posts: async ({ request, params, locals }) => {
-    const scope = await scopeFor(locals, params.canvasId);
+    const scope = await scopeAllowing(locals, params.canvasId, Capability.Schedule);
     const fd = await request.formData();
     const brandId = String(fd.get('brand_id') ?? '');
     const planScope = String(fd.get('scope') ?? '') === PlanScope.Brand ? PlanScope.Brand : PlanScope.Canvas;
@@ -1510,7 +1527,7 @@ export const actions: Actions = {
   },
 
   plan_post: async ({ request, params, locals }) => {
-    const scope = await scopeFor(locals, params.canvasId);
+    const scope = await scopeAllowing(locals, params.canvasId, Capability.Schedule);
     const fd = await request.formData();
     const postId = String(fd.get('post_id') ?? '');
     const plannedFor = String(fd.get('planned_for') ?? '').trim() || null;
@@ -1525,7 +1542,7 @@ export const actions: Actions = {
   },
 
   schedule_post: async ({ request, params, locals }) => {
-    const scope = await scopeFor(locals, params.canvasId);
+    const scope = await scopeAllowing(locals, params.canvasId, Capability.Schedule);
     const postId = String((await request.formData()).get('post_id') ?? '');
     if (!postId) {
       return fail(HTTP_BAD_REQUEST, { error: 'post_required' });

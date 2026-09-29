@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   Capability,
+  catalogueIn,
   ModerationProfile,
   ProjectMode,
   modeAllows,
@@ -44,5 +45,19 @@ describe('project mode', () => {
     expect(moderationProfileOf(ProjectMode.Nsfw, false)).toBe(ModerationProfile.General);
     expect(moderationProfileOf(ProjectMode.Standard, true)).toBe(ModerationProfile.General);
     expect(moderationProfileOf(ProjectMode.Standard, false)).toBe(ModerationProfile.General);
+  });
+});
+
+describe('catalogueIn', () => {
+  it('drops wiro choices and recommendations from every medium of a standard project', () => {
+    const catalogue = {
+      image: { choices: [{ id: 'wiro/a' }, { id: 'openai/b' }], recommended: [{ id: 'wiro/a' }, { id: 'openai/b' }] },
+      video: { choices: [{ id: 'wiro/v' }], recommended: [] }
+    };
+    const standard = catalogueIn(ProjectMode.Standard, catalogue);
+    expect(standard.image.choices.map((c) => c.id)).toEqual(['openai/b']);
+    expect(standard.image.recommended.map((c) => c.id)).toEqual(['openai/b']);
+    expect(standard.video.choices).toEqual([]);
+    expect(catalogueIn(ProjectMode.Nsfw, catalogue)).toEqual(catalogue);
   });
 });

@@ -72,3 +72,14 @@ export function offerableIn<C extends { id: string }>(mode: ProjectMode, choices
 export function moderationProfileOf(mode: ProjectMode, uncensored: boolean): ModerationProfile {
   return MODERATION_PROFILE[mode][uncensored ? 'uncensored' : 'standard'];
 }
+
+type Offered = { choices: readonly { id: string }[]; recommended?: readonly { id: string }[] };
+
+export function catalogueIn<K extends string, M extends Offered>(mode: ProjectMode, catalogue: Record<K, M>): Record<K, M> {
+  return Object.fromEntries(
+    Object.entries<M>(catalogue).map(([medium, entry]) => [
+      medium,
+      { ...entry, choices: offerableIn(mode, entry.choices), ...(entry.recommended ? { recommended: offerableIn(mode, entry.recommended) } : {}) }
+    ])
+  ) as Record<K, M>;
+}

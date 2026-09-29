@@ -14,6 +14,7 @@ import type { NodeType } from '$lib/canvas/node-data';
 import { feedFiltersOf, filterPosts, filterProducts, mediaKindOf, productFiltersOf } from '$lib/canvas/source-filters';
 import { ShareState, type SharedCanvas, type SharedListItem, type SharedTile, type SharedView } from '$lib/canvas/shared-view';
 import { calendarOf } from '$lib/canvas/calendar-node';
+import { Capability, modeAllows, modeOf } from '$lib/project-mode';
 
 export { ShareState };
 
@@ -229,6 +230,11 @@ function shareable(assets: Map<string, Asset>): Map<string, Asset> {
   return new Map([...assets].filter(([, asset]) => !asset.uncensored));
 }
 
+async function projectShareable(db: Db, canvas: { org_id: string; project_id: string }): Promise<boolean> {
+  const { data } = await db.from('projects').select('mode').eq('id', canvas.project_id).eq('org_id', canvas.org_id).maybeSingle();
+  return modeAllows(modeOf(data?.mode), Capability.Share);
+}
+
 export async function readSharedCanvas(db: Db, token: string, sign: SignPaths): Promise<SharedCanvas | null> {
   if (!token) {
     return null;
@@ -236,7 +242,7 @@ export async function readSharedCanvas(db: Db, token: string, sign: SignPaths): 
 
   const { data: canvas, error } = await db
     .from('canvases')
-    .select('id, org_id, name')
+    .select('id, org_id, project_id, name')
     .eq('share_token', token)
     .is('deleted_at', null)
     .maybeSingle();
@@ -244,7 +250,7 @@ export async function readSharedCanvas(db: Db, token: string, sign: SignPaths): 
   if (error) {
     throw error;
   }
-  if (!canvas) {
+  if (!canvas || !(await projectShareable(db, canvas))) {
     return null;
   }
 
