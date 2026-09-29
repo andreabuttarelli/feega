@@ -764,6 +764,88 @@ describe('una run rimasta running non ha altra via se non il timeout', () => {
 });
 
 /**
+ * UN GIRO ASINCRONO PRESSO UN FORNITORE (`external_job_id` `elevenlabs:…`, `wiro:…`, un video in
+ * coda) NON VIVE DENTRO IL TETTO SINCRONO: il provider sta ancora lavorando ben oltre i 6 minuti
+ * che uccidono una generazione sincrona morta a metà. `JOB_TIMEOUTS_MS` è la tabella — una riga
+ * per genere di lavoro, nessun `if` sparso — e ogni genere scade sul proprio tetto, non su
+ * `RUN_STALE_MS`.
+ */
+describe('un giro asincrono presso un fornitore ha il proprio tetto, non quello sincrono', () => {
+  const startedAgo = (ms: number) => new Date(Date.now() - ms).toISOString();
+
+  it('una dubbing ElevenLabs a 20 minuti sopravvive', async () => {
+    const dubbingRow = { ...runRow, external_job_id: 'elevenlabs:dubbing:abc123', started_at: startedAgo(20 * 60_000) };
+    const { db, calls } = fakeDb({ node_runs: [dubbingRow], nodes: [nodeRow] });
+
+    const result = await expireStuckRuns(db);
+
+    expect(result).toMatchObject({ expired: 0 });
+    expect(calls.some((c) => c.table === 'node_runs' && c.op === 'update' && (c.payload as { status?: string })?.status === 'expired')).toBe(false);
+  });
+
+  it('un giro sincrono a 7 minuti scade comunque', async () => {
+    const syncRow = { ...runRow, external_job_id: null, started_at: startedAgo(7 * 60_000) };
+    const { db, calls } = fakeDb({ node_runs: [syncRow], nodes: [nodeRow] }, { updateRows: { node_runs: [syncRow], nodes: [nodeRow] } });
+
+    const result = await expireStuckRuns(db);
+
+    expect(result).toMatchObject({ expired: 1 });
+    const runUpdate = calls.find((c) => c.table === 'node_runs' && c.op === 'update' && (c.payload as { status?: string })?.status === 'expired');
+    expect(runUpdate).toBeDefined();
+  });
+
+  it('un video wiro a 25 minuti con un poll recente ancora in corso sopravvive', async () => {
+    const wiroRow = { ...runRow, external_job_id: 'wiro:task-1', started_at: startedAgo(25 * 60_000), attempts: 3 };
+    const wiroNode = { ...nodeRow, type: 'video' };
+    const { db, calls } = fakeDb({ node_runs: [wiroRow], nodes: [wiroNode] });
+
+    const result = await expireStuckRuns(db);
+
+    expect(result).toMatchObject({ expired: 0 });
+    expect(calls.some((c) => c.table === 'node_runs' && c.op === 'update' && (c.payload as { status?: string })?.status === 'expired')).toBe(false);
+  });
+
+  it('un video wiro oltre il proprio tetto di 30 minuti scade', async () => {
+    const wiroRow = { ...runRow, external_job_id: 'wiro:task-1', started_at: startedAgo(31 * 60_000), attempts: 3 };
+    const wiroNode = { ...nodeRow, type: 'video' };
+    const { db, calls } = fakeDb(
+      { node_runs: [wiroRow], nodes: [wiroNode] },
+      { updateRows: { node_runs: [wiroRow], nodes: [wiroNode] } }
+    );
+
+    const result = await expireStuckRuns(db);
+
+    expect(result).toMatchObject({ expired: 1 });
+    const runUpdate = calls.find((c) => c.table === 'node_runs' && c.op === 'update' && (c.payload as { status?: string })?.status === 'expired');
+    expect(runUpdate).toBeDefined();
+  });
+
+  it('un\'immagine wiro oltre il proprio tetto di 10 minuti scade', async () => {
+    const wiroRow = { ...runRow, external_job_id: 'wiro:task-1', started_at: startedAgo(11 * 60_000) };
+    const { db, calls } = fakeDb(
+      { node_runs: [wiroRow], nodes: [nodeRow] },
+      { updateRows: { node_runs: [wiroRow], nodes: [nodeRow] } }
+    );
+
+    const result = await expireStuckRuns(db);
+
+    expect(result).toMatchObject({ expired: 1 });
+    const runUpdate = calls.find((c) => c.table === 'node_runs' && c.op === 'update' && (c.payload as { status?: string })?.status === 'expired');
+    expect(runUpdate).toBeDefined();
+  });
+
+  it('un video generico in coda (non wiro/elevenlabs) sopravvive sotto i 20 minuti', async () => {
+    const videoRow = { ...runRow, external_job_id: 'kling:job-1', started_at: startedAgo(15 * 60_000) };
+    const { db, calls } = fakeDb({ node_runs: [videoRow], nodes: [nodeRow] });
+
+    const result = await expireStuckRuns(db);
+
+    expect(result).toMatchObject({ expired: 0 });
+    expect(calls.some((c) => c.table === 'node_runs' && c.op === 'update' && (c.payload as { status?: string })?.status === 'expired')).toBe(false);
+  });
+});
+
+/**
  * UNA TABELLA `nodes` CHE SI COMPORTA DAVVERO: la versione conta, e un UPDATE con la versione
  * sbagliata torna zero righe — esattamente il vincolo ottimistico che `fakeDb` (statico) non può
  * simulare, perché la stessa `updateRows` risponderebbe uguale a ogni chiamata.
