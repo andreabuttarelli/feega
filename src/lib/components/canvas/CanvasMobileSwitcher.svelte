@@ -82,7 +82,8 @@
 </script>
 
 <Sheet.Root {open} {onOpenChange}>
-  <Sheet.Content side="bottom">
+  <Sheet.Content side="bottom" class="switcher-sheet gap-0">
+    <div class="grabber" aria-hidden="true"></div>
     <Sheet.Header>
       <Sheet.Title>{$_('app.shell.mobile.switchTitle')}</Sheet.Title>
     </Sheet.Header>
@@ -173,8 +174,20 @@
 </Sheet.Root>
 
 <style>
+  :global(.switcher-sheet) {
+    max-height: 85dvh;
+    overflow-y: auto;
+  }
+
+  .grabber {
+    width: 32px;
+    height: 4px;
+    margin: 8px auto 0;
+    background: var(--line-2, #d2d2d7);
+  }
+
   .section-label {
-    padding: 12px 12px 4px;
+    padding: 16px 16px 4px;
     font-size: 11px;
     font-weight: 600;
     text-transform: uppercase;
@@ -199,7 +212,8 @@
     font-size: 14px;
     font-weight: 600;
   }
-  .row:hover {
+  .row:hover,
+  .row:active {
     background: var(--paper-2, #f9f9f9);
   }
 
@@ -227,6 +241,10 @@
   }
 
   .action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
     flex: 1 1 0;
     min-height: var(--touch-target);
     border: 1px solid var(--line, #e5e5e7);
@@ -235,6 +253,9 @@
     font-size: 13px;
     font-weight: 600;
     color: var(--ink, #1d1d1f);
+  }
+  .action:active {
+    background: var(--paper-3, #f4f4f4);
   }
   .action:disabled {
     color: var(--ink-faint, #9a9a9e);
