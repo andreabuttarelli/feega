@@ -124,7 +124,7 @@
     <div class="node-download-progress" role="status">
       <LoaderIcon size={14} strokeWidth={2} class="node-download-spin" />
       <span>{Math.round(progress * 100)}%</span>
-      <button type="button" class="node-download-cancel" onclick={cancel} aria-label="Annulla">
+      <button type="button" class="node-download-cancel" onclick={cancel} aria-label="Cancel">
         <XIcon size={12} strokeWidth={2} />
       </button>
     </div>
@@ -132,7 +132,7 @@
     <button
       type="button"
       class="node-download-trigger"
-      aria-label="Scarica"
+      aria-label="Download"
       aria-expanded={open}
       onclick={() => (open = !open)}
     >

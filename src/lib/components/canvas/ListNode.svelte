@@ -130,7 +130,7 @@
   role="list"
 >
   <header class="list-head">
-    <span class="list-kind">{itemKind === 'text' ? 'Testo' : 'Immagini'}</span>
+    <span class="list-kind">{itemKind === 'text' ? 'Text' : 'Images'}</span>
     <span class="list-head-right">
       <span class="list-count">{count}</span>
       <button type="button" class="list-help" onclick={() => requestGuide('loop')} aria-label="Guida">
@@ -143,8 +143,8 @@
     {#if empty}
       <p class="list-empty">
         {dragOver
-          ? 'Rilascia per aggiungere'
-          : 'Trascina qui immagini, scrivi una riga per elemento o collega dei nodi alla porta: ogni elemento è un giro del Loop'}
+          ? 'Drop to add'
+          : 'Drop images here, write one line per item or connect nodes to the port: each item is one Loop run'}
       </p>
     {:else}
       <ol class="list-items">
@@ -191,7 +191,7 @@
             {:else}
               <span class="list-item-text">{value.item.text ?? listLabel(value.item, index)}</span>
             {/if}
-            <span class="list-item-link" title="Collegato: si toglie togliendo il filo">
+            <span class="list-item-link" title="Connected: remove the wire to remove it">
               <Link size={12} strokeWidth={2} />
             </span>
           </li>
@@ -199,8 +199,8 @@
         {#each pending as nodeId (nodeId)}
           <li class="list-item list-item-wired list-item-pending">
             <span class="list-item-index">·</span>
-            <span class="list-item-text">In attesa del nodo collegato</span>
-            <span class="list-item-link" title="Collegato: non ha ancora un risultato">
+            <span class="list-item-text">Waiting for the connected node</span>
+            <span class="list-item-link" title="Connected: no result yet">
               <Link size={12} strokeWidth={2} />
             </span>
           </li>
@@ -214,11 +214,11 @@
       <input
         class="list-add-input"
         type="text"
-        placeholder="Aggiungi una riga…"
+        placeholder="Add a line…"
         bind:value={textDraft}
-        aria-label="Nuova riga di testo"
+        aria-label="New text line"
       />
-      <button type="submit" class="list-add-btn" aria-label="Aggiungi" disabled={!textDraft.trim()}>
+      <button type="submit" class="list-add-btn" aria-label="Add" disabled={!textDraft.trim()}>
         <Plus size={13} strokeWidth={2} />
       </button>
     </form>

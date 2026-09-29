@@ -23,7 +23,7 @@ export type SyncNode = {
 /** Perché il bottone "Sincronizza" è spento, o null quando può partire. */
 export function syncBlockedReason(node: SyncNode): string | null {
   if (node.syncStatus === 'running') {
-    return 'Sta scaricando…';
+    return 'Syncing…';
   }
   return null;
 }

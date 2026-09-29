@@ -49,7 +49,7 @@ const FEEDING_KINDS: readonly CanvasEdgeKind[] = CANVAS_EDGE_KINDS.filter(
 
 export function verdictBetween(at: NodeLookup, source: string, target: string): Verdict {
   if (source === target) {
-    return { ok: false, why: 'un nodo non si collega a se stesso' };
+    return { ok: false, why: 'A node cannot connect to itself' };
   }
 
   const from = at(source);

@@ -34,13 +34,13 @@ export type SelectionAction = {
 };
 
 export const SELECTION_ACTIONS: readonly SelectionAction[] = [
-  { id: 'duplicate', label: 'Duplica', keys: ['mod', 'D'] },
-  { id: 'connect-new', label: 'Collega a nuovo…' },
-  { id: 'connect-existing', label: 'Collega a…' },
+  { id: 'duplicate', label: 'Duplicate', keys: ['mod', 'D'] },
+  { id: 'connect-new', label: 'Connect to new…' },
+  { id: 'connect-existing', label: 'Connect to…' },
   { id: 'create-post', label: 'Crea post' },
   { id: 'run-workflow', label: 'Esegui flusso' },
-  { id: 'copy-id', label: 'Copia id' },
-  { id: 'delete', label: 'Elimina', keys: ['⌫'] }
+  { id: 'copy-id', label: 'Copy id' },
+  { id: 'delete', label: 'Delete', keys: ['⌫'] }
 ];
 
 export function enabledFor(
@@ -52,7 +52,7 @@ export function enabledFor(
     const composition = postCompositionFor(nodeSummaries);
     return {
       enabled: composition.enabled,
-      reason: composition.enabled ? undefined : 'Serve almeno un media o un testo nella selezione'
+      reason: composition.enabled ? undefined : 'Select at least one media or text node'
     };
   }
 

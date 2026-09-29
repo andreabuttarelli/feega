@@ -118,7 +118,7 @@ describe('quanti ingressi accetta un nodo, e dipende dal modello', () => {
 
     expect(out.accepted).toHaveLength(1);
     expect(out.rejected).toHaveLength(1);
-    expect(out.why).toMatch(/immagin/i);
+    expect(out.why).toMatch(/image/i);
   });
 
   it('oltre il tetto del modello, il sovrappiù si rifiuta', () => {

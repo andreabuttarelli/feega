@@ -70,23 +70,23 @@ export function planWorkflow(
   nodeTypesById: Map<string, string>
 ): WorkflowPlanResult {
   if (selectedIds.length < 2) {
-    return { ok: false, reason: 'servono almeno due nodi selezionati' };
+    return { ok: false, reason: 'Select at least two nodes' };
   }
 
   const nonGenerative = selectedIds.find((id) => !GENERATIVE_TYPES.has(nodeTypesById.get(id) ?? ''));
   if (nonGenerative) {
-    return { ok: false, reason: `il nodo ${nonGenerative} non è un nodo di generazione` };
+    return { ok: false, reason: `Node ${nonGenerative} is not a generation node` };
   }
 
   const { dependsOn, neighbors } = adjacency(selectedIds, edges);
 
   if (!isConnected(selectedIds, neighbors)) {
-    return { ok: false, reason: 'i nodi selezionati non sono tutti collegati fra loro' };
+    return { ok: false, reason: 'The selected nodes are not all connected' };
   }
 
   const steps = topologicalOrder(selectedIds, dependsOn);
   if (!steps) {
-    return { ok: false, reason: 'i collegamenti formano un ciclo' };
+    return { ok: false, reason: 'The connections form a cycle' };
   }
 
   return { ok: true, steps };

@@ -53,10 +53,10 @@
 
 <div class="add-bar">
   <span class="tool">
-    <button type="button" title="Carica file" aria-label="Carica file" onclick={pickFile}>
+    <button type="button" title="Upload file" aria-label="Upload file" onclick={pickFile}>
       <Upload size={17} strokeWidth={1.7} />
     </button>
-    <span class="add-tip" role="tooltip">Carica file</span>
+    <span class="add-tip" role="tooltip">Upload file</span>
   </span>
   <input
     bind:this={fileInput}
@@ -87,14 +87,14 @@
     <button
       type="button"
       class="keys-toggle"
-      title="Altri nodi"
-      aria-label="Altri nodi"
+      title="More nodes"
+      aria-label="More nodes"
       aria-expanded={showMore}
       onclick={() => (showMore = !showMore)}
     >
       <LayoutGrid size={17} strokeWidth={1.7} />
     </button>
-    <span class="add-tip" role="tooltip">Altri nodi</span>
+    <span class="add-tip" role="tooltip">More nodes</span>
   </span>
 
   {#if showMore}

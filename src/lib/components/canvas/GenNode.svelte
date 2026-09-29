@@ -182,11 +182,11 @@
   const hasBody = $derived(node.medium !== 'text' || state === 'running' || state === 'failed' || !!node.refId);
 
   const LABEL: Record<string, string> = {
-    empty: 'Scrivi cosa vuoi',
-    ready: 'Pronto',
+    empty: 'Write what you want',
+    ready: 'Ready',
     running: 'Sta lavorando…',
-    done: 'Fatto',
-    failed: 'Non è riuscito'
+    done: 'Done',
+    failed: 'Failed'
   };
 
   /**
@@ -255,7 +255,7 @@
           {#if node.error}
             <p class="gen-fail-why">{node.error}</p>
           {/if}
-          <button type="button" class="gen-unlock" onclick={() => onrun?.()} disabled={!canRun}>Riprova</button>
+          <button type="button" class="gen-unlock" onclick={() => onrun?.()} disabled={!canRun}>Try again</button>
         </div>
       {:else if node.refId && result}
         {@render result({ refId: node.refId, text: node.runs.find((r) => r.mediaId === node.refId)?.text ?? null })}
@@ -272,14 +272,14 @@
        Compare da DUE giri in su: con uno solo sarebbe una fila di un elemento che dice quel che il
        corpo del nodo già mostra, e ruberebbe altezza al risultato. -->
   {#if node.runs.length > 1}
-    <div class="gen-past" role="group" aria-label="Generazioni di prima">
+    <div class="gen-past" role="group" aria-label="Earlier generations">
       {#each node.runs as run, i (run.id)}
         <button
           type="button"
           class="gen-past-one"
           class:is-shown={i === shown}
           title={run.prompt}
-          aria-label={`Generazione ${i + 1} di ${node.runs.length}`}
+          aria-label={`Generation ${i + 1} of ${node.runs.length}`}
           aria-pressed={i === shown}
           onclick={() => onshow?.(run.id)}
         >
@@ -298,7 +298,7 @@
       class="gen-prompt nodrag"
       class:is-full={!hasBody}
       rows="2"
-      placeholder={node.medium === 'text' ? 'Di cosa deve parlare…' : 'Descrivi cosa vuoi vedere…'}
+      placeholder={node.medium === 'text' ? 'What should it be about…' : 'Describe what you want to see…'}
       value={node.prompt}
       oninput={(e) => onchange?.({ prompt: e.currentTarget.value })}
       use:scrollGuard
@@ -319,11 +319,11 @@
         </button>
       {:else if onrunloop && loopVisible}
         <button type="button" class="gen-loop" onclick={() => onrunloop?.()} disabled={!canRun}>
-          Loop ×{loopCombinationCount}{#if loopCredits !== null} · <CreditAmount amount={loopCredits} approx />{:else if pricedChoice?.variableCredits} · costo variabile{/if}
+          Loop ×{loopCombinationCount}{#if loopCredits !== null} · <CreditAmount amount={loopCredits} approx />{:else if pricedChoice?.variableCredits} · variable cost{/if}
         </button>
       {/if}
       <button type="button" onclick={() => onrun?.()} disabled={!canRun}>
-        {state === 'done' ? 'Rifai' : 'Genera'}{#if runCredits !== null} · <CreditAmount amount={runCredits} approx />{:else if pricedChoice?.variableCredits} · costo variabile{/if}
+        {state === 'done' ? 'Redo' : 'Generate'}{#if runCredits !== null} · <CreditAmount amount={runCredits} approx />{:else if pricedChoice?.variableCredits} · variable cost{/if}
       </button>
     </div>
   </footer>

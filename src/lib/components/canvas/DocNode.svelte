@@ -46,7 +46,7 @@
     const on = !node.public;
     const result = await onshare?.(on);
     if (!result) {
-      shareNote = 'Link non aggiornato';
+      shareNote = 'Link out of date';
       return;
     }
 
@@ -63,7 +63,7 @@
     shareNote = null;
     const result = await onshare?.(true);
     if (!result?.url) {
-      shareNote = 'Link non aggiornato';
+      shareNote = 'Link out of date';
       return;
     }
 
@@ -81,7 +81,7 @@
 
 <div class="doc">
   <header class="doc-head">
-    <div class="doc-modes" role="group" aria-label="Come si vede il documento">
+    <div class="doc-modes" role="group" aria-label="How the document looks">
       <button type="button" class:is-on={mode === 'view'} onclick={() => (mode = 'view')}>
         Leggi
       </button>
@@ -91,12 +91,12 @@
     </div>
 
     {#if node.public}
-      <button type="button" class="doc-share is-on" onclick={toggleShare} title="Revoca il link">
+      <button type="button" class="doc-share is-on" onclick={toggleShare} title="Revoke link">
         <LinkOff size={14} strokeWidth={1.7} />
         <span>Revoca</span>
       </button>
     {:else}
-      <button type="button" class="doc-share" onclick={toggleShare} title="Crea un link pubblico">
+      <button type="button" class="doc-share" onclick={toggleShare} title="Create a public link">
         <Link size={14} strokeWidth={1.7} />
         <span>Link pubblico</span>
       </button>
@@ -106,13 +106,13 @@
   {#if shareUrl}
     <div class="doc-link">
       <input class="doc-link-url" readonly value={shareUrl} aria-label="Link pubblico" />
-      <button type="button" class="doc-link-copy" onclick={copyShare}>Copia</button>
-      <a class="doc-link-open" href={shareUrl} target="_blank" rel="noopener noreferrer" aria-label="Apri il link">
+      <button type="button" class="doc-link-copy" onclick={copyShare}>Copy</button>
+      <a class="doc-link-open" href={shareUrl} target="_blank" rel="noopener noreferrer" aria-label="Open link">
         <ExternalLink size={14} strokeWidth={1.7} />
       </a>
     </div>
   {:else if node.public}
-    <p class="doc-note">Il link è attivo. «Nuovo link» ne conia uno diverso e revoca questo.</p>
+    <p class="doc-note">The link is live. “New link” makes a different one and revokes this.</p>
     <div class="doc-link-actions">
       <button type="button" class="doc-share" onclick={renewShare}>
         Nuovo link
@@ -127,7 +127,7 @@
   {#if mode === 'edit'}
     <textarea
       class="doc-write nodrag"
-      aria-label="Markdown del documento"
+      aria-label="Document markdown"
       value={node.content}
       oninput={(e) => commit(e.currentTarget.value)}
       onblur={(e) => commit(e.currentTarget.value)}
@@ -138,7 +138,7 @@
       {#await renderer then { renderDocHtml }}{@html renderDocHtml(node.content)}{/await}
     </article>
   {:else}
-    <p class="doc-empty">Documento vuoto. Passa a «Scrivi».</p>
+    <p class="doc-empty">Empty document. Switch to “Write”.</p>
   {/if}
 </div>
 

@@ -138,28 +138,28 @@
     class="toolbar"
     style={`left:${box.x + box.width / 2}px; top:${box.y}px; --toolbar-scale:${scale}`}
     role="toolbar"
-    aria-label="Azioni sulla selezione"
+    aria-label="Selection actions"
   >
     {#if properties.type}
-      <div class="props" role="group" aria-label="Proprietà del nodo">
+      <div class="props" role="group" aria-label="Node properties">
         {#if !choices.length && !catalogueSynced}
-          <span class="field warn">Catalogo non sincronizzato</span>
+          <span class="field warn">Catalog not synced</span>
         {:else}
           <DropdownMenu.Root onOpenChange={onModelMenuOpenChange}>
-            <DropdownMenu.Trigger class="field model-trigger" aria-label="Modello">
+            <DropdownMenu.Trigger class="field model-trigger" aria-label="Model">
               {#if properties.model.kind === 'mixed'}
                 Mixed
               {:else if choice}
                 {choice.label}
               {:else}
-                Modello…
+                Model…
               {/if}
             </DropdownMenu.Trigger>
             <DropdownMenu.Content align="start" class="model-menu">
               <input
                 type="text"
                 class="model-search"
-                placeholder="Cerca modello o provider…"
+                placeholder="Search model or provider…"
                 bind:value={modelQuery}
                 onkeydown={stopTypeahead}
                 use:focusOnMount
@@ -190,7 +190,7 @@
             class="field"
             value={valueOr(properties.aspectRatio, null) ?? ''}
             onchange={(e) => onpropertychange?.({ aspectRatio: e.currentTarget.value })}
-            aria-label="Formato"
+            aria-label="Format"
           >
             {#if properties.aspectRatio.kind === 'mixed'}
               <option value="" disabled selected>Mixed</option>
@@ -209,7 +209,7 @@
                 choice.durationOptions[0]
             )}
             onchange={(e) => onpropertychange?.({ duration: Number(e.currentTarget.value) })}
-            aria-label="Durata"
+            aria-label="Duration"
           >
             {#if properties.duration.kind === 'mixed'}
               <option value="" disabled selected>Mixed</option>
@@ -225,7 +225,7 @@
             class="field"
             value={valueOr(properties.resolution, choice.resolutions[0]) ?? ''}
             onchange={(e) => onpropertychange?.({ resolution: e.currentTarget.value })}
-            aria-label="Risoluzione"
+            aria-label="Resolution"
           >
             {#if properties.resolution.kind === 'mixed'}
               <option value="" disabled selected>Mixed</option>

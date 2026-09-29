@@ -52,18 +52,18 @@ export function planConnectSelection(input: {
   for (const source of input.sources) {
     const medium = MEDIUM_OF_TYPE[source.type];
     if (!medium) {
-      rejected.push({ sourceId: source.id, why: `${source.type} non alimenta un nodo che genera` });
+      rejected.push({ sourceId: source.id, why: `${source.type} cannot feed a generating node` });
       continue;
     }
 
     const connector = CONNECTOR_OF_MEDIUM[medium];
     if (!connectors.has(connector)) {
-      rejected.push({ sourceId: source.id, why: `questo modello non accetta ${connector} in ingresso` });
+      rejected.push({ sourceId: source.id, why: `This model takes no ${connector} input` });
       continue;
     }
 
     if (!isListValued(connector) && taken.has(connector)) {
-      rejected.push({ sourceId: source.id, why: `porta ${connector} già occupata da un'altra sorgente scelta` });
+      rejected.push({ sourceId: source.id, why: `Port ${connector} is already taken by another selected source` });
       continue;
     }
 

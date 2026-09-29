@@ -111,7 +111,7 @@ const EMBEDDABLE_PROTOCOLS = ['http:', 'https:'];
  */
 export function normalizeEmbedUrl(raw: string): UrlVerdict {
   const trimmed = raw.trim();
-  if (!trimmed) return { ok: false, why: 'Serve un indirizzo' };
+  if (!trimmed) return { ok: false, why: 'An address is required' };
 
   // Lo schema si legge PRIMA di completare: `javascript:alert(1)` senza questo passaggio
   // diventerebbe `https://javascript:alert(1)` e passerebbe il controllo travestito.
@@ -122,14 +122,14 @@ export function normalizeEmbedUrl(raw: string): UrlVerdict {
   try {
     parsed = new URL(candidate);
   } catch {
-    return { ok: false, why: 'Non è un indirizzo valido' };
+    return { ok: false, why: 'Not a valid address' };
   }
 
   if (!EMBEDDABLE_PROTOCOLS.includes(parsed.protocol)) {
-    return { ok: false, why: 'Si possono incorporare solo indirizzi http e https' };
+    return { ok: false, why: 'Only http and https addresses can be embedded' };
   }
   if (!parsed.hostname) {
-    return { ok: false, why: 'Manca il nome del sito' };
+    return { ok: false, why: 'Site name missing' };
   }
 
   return { ok: true, url: parsed.toString() };
@@ -208,4 +208,4 @@ export function newIframeNodeAt(at: { x: number; y: number }): NewIframeTile {
  * compare, invece di essere un guasto senza spiegazione.
  */
 export const EMBED_REFUSAL_HINT =
-  'Alcuni siti non si lasciano incorporare: se resta vuoto, aprilo in una scheda.';
+  'Some sites block embedding: if this stays blank, open it in a tab.';

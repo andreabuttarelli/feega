@@ -11,7 +11,7 @@ describe('enabledFor', () => {
   it('create-post è disabilitata senza media né testo, e dà una ragione', () => {
     const result = enabledFor('create-post', [{ id: '1', type: 'iframe', data: { url: 'x' } }]);
     expect(result.enabled).toBe(false);
-    expect(result.reason).toBe('Serve almeno un media o un testo nella selezione');
+    expect(result.reason).toBe('Select at least one media or text node');
   });
 
   it('duplicate è sempre abilitata, indipendentemente dal contenuto', () => {
@@ -37,6 +37,6 @@ describe('enabledFor', () => {
     ];
     const result = enabledFor('run-workflow', nodes, []);
     expect(result.enabled).toBe(false);
-    expect(result.reason).toBe('i nodi selezionati non sono tutti collegati fra loro');
+    expect(result.reason).toBe('The selected nodes are not all connected');
   });
 });

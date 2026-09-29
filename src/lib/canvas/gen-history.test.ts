@@ -126,8 +126,8 @@ describe('perché un nodo non parte', () => {
   it('lo dice invece di lasciare un bottone spento senza spiegazione', () => {
     // Un bottone disabilitato e muto è il difetto che l utente ha segnalato come «non funziona»:
     // non poteva distinguere «rotto» da «manca qualcosa».
-    expect(blockedReason(node({ prompt: '' }), choices)).toMatch(/cosa/i);
-    expect(blockedReason(node({ model: null }), [])).toMatch(/modello/i);
+    expect(blockedReason(node({ prompt: '' }), choices)).toMatch(/what you want/i);
+    expect(blockedReason(node({ model: null }), [])).toMatch(/model/i);
   });
 
   it('senza modello salvato ma con un catalogo, non ha niente da spiegare: il default lo risolve', () => {
@@ -135,7 +135,7 @@ describe('perché un nodo non parte', () => {
   });
 
   it('per il testo senza modello e senza catalogo dice di sceglierlo, come per gli altri', () => {
-    expect(blockedReason(node({ medium: 'text', model: null, prompt: 'x' }), [])).toMatch(/modello/i);
+    expect(blockedReason(node({ medium: 'text', model: null, prompt: 'x' }), [])).toMatch(/model/i);
   });
 
   it('un nodo che può partire non ha niente da spiegare', () => {

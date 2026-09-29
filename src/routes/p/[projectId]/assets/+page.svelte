@@ -72,7 +72,7 @@
       });
       const result = deserialize(await res.text());
       if (result.type !== 'success') {
-        uploadError = 'non caricato';
+        uploadError = 'Upload failed';
         return;
       }
       await invalidateAll();

@@ -28,12 +28,12 @@
       effects={sourceImageUrl ? node.effects : []}
     />
     {#if !node.refId}
-      <span class="effects-badge">Non applicato</span>
+      <span class="effects-badge">Not applied</span>
     {/if}
   {:else}
     <div class="effects-empty">
       <ImageIcon size={22} strokeWidth={1.5} />
-      <p>Collega un’immagine o un video</p>
+      <p>Connect an image or a video</p>
     </div>
   {/if}
 
@@ -44,7 +44,7 @@
     {#if node.refId && imageUrl}
       <NodeDownload kind={node.mediaKind} sourceUrl={imageUrl} nodeId={node.id} nodeType="effetti" />
     {/if}
-    <button type="button" class="effects-action nodrag" onclick={onopeneditor}>Apri editor</button>
+    <button type="button" class="effects-action nodrag" onclick={onopeneditor}>Open editor</button>
   </div>
 </div>
 

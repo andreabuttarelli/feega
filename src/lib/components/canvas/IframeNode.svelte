@@ -158,7 +158,7 @@
 
 <div class="frame">
   <header class="frame-head">
-    <div class="frame-modes" role="group" aria-label="Da dove viene il contenuto">
+    <div class="frame-modes" role="group" aria-label="Content source">
       <button
         type="button"
         class:is-on={node.source === 'url'}
@@ -181,7 +181,7 @@
         type="url"
         inputmode="url"
         placeholder="https://…"
-        aria-label="Indirizzo della pagina"
+        aria-label="Page address"
         bind:value={draft}
         onblur={commitUrl}
         onkeydown={(e) => e.key === 'Enter' && commitUrl()}
@@ -194,8 +194,8 @@
         target="_blank"
         rel="noopener noreferrer"
         aria-disabled={embedded ? undefined : 'true'}
-        title={embedded ? 'Apri in una scheda' : 'Scrivi prima un indirizzo'}
-        aria-label="Apri in una scheda"
+        title={embedded ? 'Open in a tab' : 'Enter an address first'}
+        aria-label="Open in a tab"
       >
         <ExternalLink size={15} strokeWidth={1.7} />
       </a>
@@ -223,14 +223,14 @@
       ></iframe>
     {:else if embedded}
       <iframe
-        title="Pagina incorporata"
+        title="Embedded page"
         src={embedded}
         sandbox={IFRAME_SANDBOX}
         referrerpolicy={IFRAME_REFERRER_POLICY}
         style={frameStyle}
       ></iframe>
     {:else}
-      <p class="frame-hint">{refusal ?? 'Incolla un indirizzo'}</p>
+      <p class="frame-hint">{refusal ?? 'Paste an address'}</p>
     {/if}
   </div>
 
@@ -241,7 +241,7 @@
         rows="3"
         spellcheck="false"
         placeholder="&lt;iframe src=…&gt; oppure dell'HTML"
-        aria-label="Codice da mostrare"
+        aria-label="Code to show"
         bind:value={htmlDraft}
         onblur={commitHtml}
       ></textarea>

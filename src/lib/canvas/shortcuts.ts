@@ -160,17 +160,17 @@ export const CANVAS_SHORTCUTS: readonly CanvasShortcutRow[] = [
   ...CANVAS_ADD_BAR.map((what, i) => ({
     id: 'add' as const,
     keys: [String(i + 1)],
-    label: `Aggiungi: ${ADDABLE_LABEL[what]}`
+    label: `Add: ${ADDABLE_LABEL[what]}`
   })),
-  { id: 'delete', keys: ['⌫'], label: 'Elimina la selezione' },
+  { id: 'delete', keys: ['⌫'], label: 'Delete selection' },
   { id: 'select-all', keys: ['mod', 'A'], label: 'Seleziona tutto' },
   { id: 'deselect', keys: ['Esc'], label: 'Deseleziona' },
-  { id: 'undo', keys: ['mod', 'Z'], label: 'Annulla' },
+  { id: 'undo', keys: ['mod', 'Z'], label: 'Undo' },
   { id: 'redo', keys: ['⇧', 'mod', 'Z'], label: 'Ripeti' },
-  { id: 'duplicate', keys: ['mod', 'D'], label: 'Duplica la selezione' },
-  { id: 'copy', keys: ['mod', 'C'], label: 'Copia la selezione' },
+  { id: 'duplicate', keys: ['mod', 'D'], label: 'Duplicate selection' },
+  { id: 'copy', keys: ['mod', 'C'], label: 'Copy selection' },
   { id: 'paste', keys: ['mod', 'V'], label: 'Incolla' },
-  { id: 'nudge', keys: ['←', '↑', '↓', '→'], label: 'Sposta la selezione (⇧ di più)' },
+  { id: 'nudge', keys: ['←', '↑', '↓', '→'], label: 'Move selection (⇧ for more)' },
   { id: 'fit', keys: ['0'], label: 'Inquadra tutto' },
   { id: 'zoom-in', keys: ['+'], label: 'Ingrandisci' },
   { id: 'zoom-out', keys: ['-'], label: 'Rimpicciolisci' }

@@ -27,7 +27,7 @@ test.describe('canvas @real', () => {
     test.skip(!process.env.OPENROUTER_API_KEY, 'OPENROUTER_API_KEY assente: salto la chiamata reale, unico step a pagamento');
 
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
-    await page.getByRole('button', { name: 'Testo' }).click();
+    await page.getByRole('button', { name: 'Text' }).click();
 
     const node = page.locator('.svelte-flow__node').last();
     await node.click();
@@ -35,8 +35,8 @@ test.describe('canvas @real', () => {
     // Il bottone resta spento senza un modello scelto (`blockedReason`, `gen-history.ts`): un
     // nodo testo non ne ha uno di default, il menù compare solo da nodo selezionato.
     await node.getByLabel('Modello').selectOption({ index: 1 });
-    await node.getByPlaceholder('Di cosa deve parlare…').fill('Scrivi una sola parola: pronto.');
-    await node.getByRole('button', { name: 'Genera' }).click();
+    await node.getByPlaceholder('What should it be about…').fill('Scrivi una sola parola: pronto.');
+    await node.getByRole('button', { name: 'Generate' }).click();
 
     await expect(node.locator('.gen-text')).not.toBeEmpty({ timeout: 60_000 });
   });
@@ -46,13 +46,13 @@ test.describe('canvas @real', () => {
     try {
       await signInE2e(page, session);
       await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
-      await page.getByRole('button', { name: 'Testo' }).click();
+      await page.getByRole('button', { name: 'Text' }).click();
 
       const node = page.locator('.svelte-flow__node').last();
       await node.click();
       await node.getByLabel('Modello').selectOption({ index: 1 });
-      await node.getByPlaceholder('Di cosa deve parlare…').fill('Scrivi una sola parola: pronto.');
-      await node.getByRole('button', { name: 'Genera' }).click();
+      await node.getByPlaceholder('What should it be about…').fill('Scrivi una sola parola: pronto.');
+      await node.getByRole('button', { name: 'Generate' }).click();
 
       await expect(page.getByRole('alert')).toContainText(/credit/i, { timeout: 15_000 });
       await expect(page.getByRole('link', { name: 'Buy credits' })).toBeVisible();

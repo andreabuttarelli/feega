@@ -344,17 +344,17 @@
     const targetKind = tiles.find((t) => t.id === target)?.kind ?? '';
     const portEdges = edges.map((e) => ({ id: e.id, target: e.target, targetHandle: e.targetHandle ?? null }));
     if (!nodeAcceptsConnection(portEdges, target, targetKind)) {
-      refusal = 'un nodo effetti prende un solo media';
+      refusal = 'An effects node takes one media input';
       return false;
     }
     if (output && connectors?.length && !anyPortAccepts(connectors, output)) {
-      refusal = `nessuna porta accetta ${output}`;
+      refusal = `No port accepts ${output}`;
       return false;
     }
     if (connector && connectors?.includes(connector)) {
       const free = connectorAccepts(portEdges, target, connector, portListValued(targetKind, connector));
       if (!free) {
-        refusal = `porta ${connector} già occupata`;
+        refusal = `Port ${connector} is already taken`;
         return false;
       }
     }
@@ -681,7 +681,7 @@
   {/if}
 
   {#if targeting}
-    <p class="edge-refusal" role="status">Scegli il nodo a cui collegare — Esc per annullare</p>
+    <p class="edge-refusal" role="status">Pick the node to connect to — Esc to cancel</p>
   {/if}
 
   {#if spec.chrome && onCreate}
