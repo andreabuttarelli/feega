@@ -8,6 +8,7 @@ import {
   type JevDecision,
   type JudgeVerdict
 } from './policy';
+import { JevOutage, MODERATION_PROFILES, profileOf, type ProfilePolicy } from './profiles';
 
 export type ModerationRecord = {
   stage: 'rules' | 'jev' | 'llm' | 'identifiability';
@@ -27,7 +28,7 @@ export type ScreenPorts = {
 
 export type ScreenRequest = { text: string; references: string[]; uncensored: boolean };
 
-export type ScreenOutcome = { ok: true } | { ok: false; error: string };
+export type ScreenOutcome = { ok: true } | { ok: false; error: string; unavailable?: true };
 
 const UNAVAILABLE = 'moderation_unavailable';
 
@@ -50,33 +51,43 @@ function errorOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-async function escalateContent(ports: ScreenPorts, state: string): Promise<ScreenOutcome> {
+async function escalateContent(ports: ScreenPorts, state: string, policy: ProfilePolicy): Promise<ScreenOutcome> {
   let verdict: JudgeVerdict;
   try {
     verdict = await ports.judge(state);
   } catch (error) {
     ports.record({ stage: 'llm', verdict: 'refuse', category: null, probabilities: {}, reason: errorOf(error) });
-    return { ok: false, error: `${UNAVAILABLE}: the safety review could not run` };
+    return { ok: false, error: `${UNAVAILABLE}: the safety review could not run`, unavailable: true };
   }
 
   ports.record({ stage: 'llm', verdict: verdict.allowed ? 'clear' : 'refuse', category: verdict.category, probabilities: {}, reason: verdict.reason });
   if (verdict.allowed) {
     return { ok: true };
   }
-  const message = MODERATION_CATEGORIES[verdict.category]?.refusal || 'Refused by the safety review';
+  const message = policy.categories[verdict.category]?.refusal || policy.judgeRefusal;
   return { ok: false, error: verdict.reason ? `${message} (${verdict.reason})` : message };
 }
 
-async function screenContent(ports: ScreenPorts, state: string): Promise<ScreenOutcome> {
+const ON_JEV_OUTAGE: Readonly<Record<JevOutage, (ports: ScreenPorts, state: string, policy: ProfilePolicy, error: unknown) => Promise<ScreenOutcome>>> = {
+  [JevOutage.Judge]: (ports, state, policy) => escalateContent(ports, state, policy),
+  [JevOutage.Refuse]: async (_ports, _state, _policy, error) => ({ ok: false, error: `${UNAVAILABLE}: ${errorOf(error)}`, unavailable: true })
+};
+
+const OUTAGE_VERDICT: Readonly<Record<JevOutage, ModerationRecord['verdict']>> = {
+  [JevOutage.Judge]: 'escalate',
+  [JevOutage.Refuse]: 'refuse'
+};
+
+async function screenContent(ports: ScreenPorts, state: string, policy: ProfilePolicy): Promise<ScreenOutcome> {
   let decision: JevDecision;
   try {
     decision = await ports.decide(state);
   } catch (error) {
-    ports.record({ stage: 'jev', verdict: 'refuse', category: null, probabilities: {}, reason: errorOf(error) });
-    return { ok: false, error: `${UNAVAILABLE}: ${errorOf(error)}` };
+    ports.record({ stage: 'jev', verdict: OUTAGE_VERDICT[policy.onJevOutage], category: null, probabilities: {}, reason: errorOf(error) });
+    return ON_JEV_OUTAGE[policy.onJevOutage](ports, state, policy, error);
   }
 
-  const verdict = judgeDecision(decision);
+  const verdict = judgeDecision(decision, policy.categories);
   ports.record({
     stage: 'jev',
     verdict: verdict.kind,
@@ -89,7 +100,7 @@ async function screenContent(ports: ScreenPorts, state: string): Promise<ScreenO
     return { ok: false, error: verdict.message };
   }
   if (verdict.kind === 'escalate') {
-    return escalateContent(ports, state);
+    return escalateContent(ports, state, policy);
   }
   return { ok: true };
 }
@@ -138,19 +149,20 @@ async function screenIdentifiability(ports: ScreenPorts, state: string): Promise
   return { ok: true };
 }
 
-const SCREEN_OF: Readonly<Record<'content' | 'identifiability', (ports: ScreenPorts, state: string) => Promise<ScreenOutcome>>> = {
+const SCREEN_OF: Readonly<Record<'content' | 'identifiability', (ports: ScreenPorts, state: string, policy: ProfilePolicy) => Promise<ScreenOutcome>>> = {
   content: screenContent,
   identifiability: screenIdentifiability
 };
 
 export async function screenGeneration(ports: ScreenPorts, request: ScreenRequest): Promise<ScreenOutcome> {
   const state = stateOf(request);
+  const policy = MODERATION_PROFILES[profileOf(request)];
 
   if (request.uncensored && mentionsMinor(`${request.text} ${request.references.join(' ')}`)) {
     ports.record({ stage: 'rules', verdict: 'refuse', category: MINORS, probabilities: {}, reason: 'minor keyword' });
     return { ok: false, error: MODERATION_CATEGORIES[MINORS].refusal };
   }
 
-  const outcomes = await Promise.all(stagesFor(request).map((stage) => SCREEN_OF[stage](ports, state)));
+  const outcomes = await Promise.all(stagesFor(request).map((stage) => SCREEN_OF[stage](ports, state, policy)));
   return outcomes.find((outcome) => !outcome.ok) ?? { ok: true };
 }

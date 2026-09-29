@@ -3,6 +3,9 @@ import { safeFetchBytes, ARCHIVE_USER_AGENT } from '$lib/server/tool-guard';
 import { generateImagesWithoutBrand } from '$lib/server/media-generate';
 import { createInfluencer, insertInfluencerViews, type CreateInfluencerInput } from '$lib/server/repos/influencers';
 import { FACE_FRONT_VIEW, INFLUENCER_VIEWS } from '$lib/canvas/influencer-views';
+import type { Db } from '$lib/server/db/client';
+import { screenModelInput } from '$lib/server/moderation/model-input';
+import { ModerationProfile } from '$lib/server/moderation/profiles';
 
 const INFLUENCER_BUCKET = 'influencers';
 const MAX_VIEW_BYTES = 8 * 1024 * 1024;
@@ -66,6 +69,15 @@ export async function generateInfluencer(
   db: SupabaseClient,
   input: GenerateInfluencerInput
 ): Promise<GenerateInfluencerResult> {
+  const screened = await screenModelInput(db as unknown as Db, {
+    profile: ModerationProfile.Standard,
+    texts: [input.facePrompt],
+    scope: { orgId: input.orgId, userId: input.userId }
+  });
+  if (!screened.ok) {
+    return { ok: false, error: screened.error };
+  }
+
   const faceJob = await generateImagesWithoutBrand(db as never, {
     orgId: input.orgId,
     userId: input.userId,

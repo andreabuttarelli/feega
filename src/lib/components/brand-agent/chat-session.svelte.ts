@@ -17,12 +17,20 @@ const SILENT_TOOLS = new Set(['reply']);
 
 const turns = $state({ running: 0 });
 
+type FailureBody = { error?: string; code?: string };
+
 class HttpFailure extends Error {
   status: number;
-  constructor(status: number) {
+  body: FailureBody;
+  constructor(status: number, body: FailureBody = {}) {
     super(String(status));
     this.status = status;
+    this.body = body;
   }
+}
+
+async function failureBody(res: Response): Promise<FailureBody> {
+  return ((await res.json().catch(() => ({}))) ?? {}) as FailureBody;
 }
 
 export class ChatSession {
@@ -30,6 +38,7 @@ export class ChatSession {
   sending = $state(false);
   loading = $state(true);
   failed = $state<Failure | ''>('');
+  failedDetail = $state('');
   revision = $state(0);
 
   #abort: AbortController | null = null;
@@ -76,6 +85,7 @@ export class ChatSession {
     }
 
     this.failed = '';
+    this.failedDetail = '';
     this.sending = true;
     turns.running++;
     this.#abort = new AbortController();
@@ -94,7 +104,7 @@ export class ChatSession {
         signal: this.#abort.signal
       });
       if (!res.ok || !res.body) {
-        throw new HttpFailure(res.status);
+        throw new HttpFailure(res.status, await failureBody(res));
       }
 
       await this.#stream(res);
@@ -190,9 +200,11 @@ export class ChatSession {
     }
 
     this.messages = this.messages.slice(0, -1);
-    if (!aborted) {
-      this.failed = e instanceof HttpFailure ? failureOfStatus(e.status) : 'send';
+    if (aborted) {
+      return;
     }
+    this.failed = e instanceof HttpFailure ? failureOfStatus(e.status, e.body.code) : 'send';
+    this.failedDetail = e instanceof HttpFailure ? (e.body.error ?? '') : '';
   }
 }
 
