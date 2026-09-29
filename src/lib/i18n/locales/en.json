@@ -397,7 +397,8 @@
         "changePayment": "Change payment method"
       },
       "usage": {
-        "creditsUsed": "Credits used"
+        "creditsUsed": "Credits used",
+        "balance": "Credit balance"
       },
       "cancel": {
         "back": "Back"

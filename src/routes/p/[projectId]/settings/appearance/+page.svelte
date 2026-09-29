@@ -1,6 +1,8 @@
 <script lang="ts">
   import { _ } from 'svelte-i18n';
   import { Moon, Sun } from '@lucide/svelte';
+  import { Panel } from '$lib/components/ui/panel';
+  import { Field } from '$lib/components/ui/field';
 
   let theme = $state<'light' | 'dark'>('light');
 
@@ -21,13 +23,8 @@
   }
 </script>
 
-<section class="panel">
-  <div class="panel-head"><div class="t">{$_('app.settings.appearance.title')}</div></div>
-  <div class="field col">
-    <div class="ftxt">
-      <div class="fh">{$_('app.settings.appearance.theme')}</div>
-      <div class="fs">{$_('app.settings.appearance.themeDesc')}</div>
-    </div>
+<Panel title={$_('app.settings.appearance.title')}>
+  <Field label={$_('app.settings.appearance.theme')} hint={$_('app.settings.appearance.themeDesc')}>
     <div class="theme-options" role="radiogroup" aria-label={$_('app.settings.appearance.theme')}>
       <button
         type="button"
@@ -52,8 +49,8 @@
         <span class="theme-swatch dark" aria-hidden="true"></span>
       </button>
     </div>
-  </div>
-</section>
+  </Field>
+</Panel>
 
 <style>
   .theme-options {
@@ -68,7 +65,7 @@
     align-items: flex-start;
     gap: 10px;
     padding: 14px;
-    border: 1.5px solid var(--line);
+    border: 1px solid var(--line);
     background: var(--paper);
     color: var(--ink);
     cursor: pointer;
@@ -82,15 +79,15 @@
     border-color: var(--line-2, #d2d2d7);
   }
   .theme-card.active {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.15);
+    border-color: var(--ink);
+    box-shadow: inset 0 0 0 1px var(--ink);
   }
   .theme-icon {
     display: flex;
     color: var(--ink-soft);
   }
   .theme-card.active .theme-icon {
-    color: var(--accent);
+    color: var(--ink);
   }
   .theme-label {
     font-size: 14px;

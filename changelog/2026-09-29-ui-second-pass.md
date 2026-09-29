@@ -22,3 +22,19 @@ Postgres rejects an empty uuid. It now returns the empty view without a query.
   `model-params.ts`, `upload-kind.ts`, download/export errors), the selection
   toolbar ("Migliora prompt") and route 404 messages is now English. The
   canvas page and its server action were left alone: another branch owns them.
+
+## Settings on primitives, global classes retired
+Every settings page (project, brand, products, connected accounts, API keys,
+team, billing, images & video, appearance, profile, danger zone) now renders
+with `Panel`, `Field`, `Button`, `Input`, `Select`, `Textarea` and `Notice`.
+Profile keeps the upload beside the avatar and a normal-width Save; billing
+labels the balance "Credit balance" (it read "Credits used").
+
+The legacy dashboard rules in `src/app.css` leaked into scoped components:
+`.content`, `.grid`, `.panel`, `.panel-head`, `.field`, `.btn*`, `.mini*`,
+`.approve-all`, `.acct`, `.status`, `.user` and `.head h1 !important` are gone,
+and the two real consumers that needed them (`+error.svelte` buttons, the
+settings column) carry their own scoped copy. The `* { margin: 0; padding: 0 }`
+reset now sits in `@layer base`, so layered utilities beat it instead of
+needing `!important`. The OAuth and CLI authorize pages were Italian; now
+English.

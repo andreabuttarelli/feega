@@ -4,6 +4,10 @@
   import { billingPath } from '$lib/billing-path';
   import { onMount } from 'svelte';
   import { _ } from 'svelte-i18n';
+  import { Panel } from '$lib/components/ui/panel';
+  import { Button } from '$lib/components/ui/button';
+  import { Notice } from '$lib/components/ui/notice';
+  import { Skeleton } from '$lib/components/ui/skeleton';
   import { PLATFORMS, ICONS } from '$lib/components/settings/platforms';
 
   let { data, form } = $props();
@@ -56,20 +60,23 @@
   });
 </script>
 
-<section class="panel">
-  <div class="panel-head">
-    <div class="t">{$_('app.settings.connectedAccounts')}</div>
+{#if form?.error}<Notice tone="error">{form.error}</Notice>{/if}
+{#if form?.synced}<Notice tone="success">{$_('app.settings.syncedToast')}</Notice>{/if}
+{#if form?.disconnected}<Notice tone="success">{$_('app.settings.disconnectedToast')}</Notice>{/if}
+
+<Panel title={$_('app.settings.connectedAccounts')}>
+  {#snippet actions()}
     <form method="POST" action="?/sync" use:enhance={withSpinner} bind:this={syncForm}>
-      <button class="approve-all" type="submit" disabled={syncing}>
-        {syncing ? $_('app.ads.syncing') : `↻ ${$_('app.settings.syncFromZernio')}`}
-      </button>
+      <Button variant="secondary" size="sm" type="submit" disabled={syncing}>
+        {syncing ? $_('app.ads.syncing') : $_('app.settings.syncFromZernio')}
+      </Button>
     </form>
-  </div>
+  {/snippet}
 
   {#if syncing}
-    <div class="acct skeleton">
-      <div class="glyph"></div>
-      <div class="nm"><div class="h"></div><div class="s"></div></div>
+    <div class="acct">
+      <Skeleton class="size-[34px]" />
+      <div class="nm"><Skeleton class="mb-1.5 h-3.5 w-40" /><Skeleton class="h-3 w-24" /></div>
     </div>
   {:else if connected.length}
     {#each connected as a (a.id)}
@@ -83,33 +90,31 @@
         {#if confirmingDisconnect === a.id}
           <form method="POST" action="?/disconnect" use:enhance={withDisconnectSpinner(a.id)} class="disc-confirm" aria-busy={disconnecting === a.id}>
             <input type="hidden" name="id" value={a.id} />
-            <button class="mini danger" type="submit" disabled={disconnecting === a.id}>
+            <Button variant="danger" size="sm" type="submit" disabled={disconnecting === a.id}>
               {disconnecting === a.id ? $_('app.settings.del.deleting') : $_('app.settings.remove')}
-            </button>
-            <button class="mini ghost" type="button" disabled={disconnecting === a.id} onclick={() => (confirmingDisconnect = null)}>{$_('app.settings.keep')}</button>
+            </Button>
+            <Button variant="ghost" size="sm" disabled={disconnecting === a.id} onclick={() => (confirmingDisconnect = null)}>{$_('app.settings.keep')}</Button>
           </form>
         {:else}
           <span class="status"><span class="d"></span>{$_('app.settings.active')}</span>
-          <button class="disc-btn" type="button" title={$_('app.settings.disconnect')} aria-label={$_('app.settings.disconnect')} onclick={() => (confirmingDisconnect = a.id)}>{$_('app.settings.disconnect')}</button>
+          <Button variant="ghost" size="sm" onclick={() => (confirmingDisconnect = a.id)}>{$_('app.settings.disconnect')}</Button>
         {/if}
       </div>
     {/each}
   {:else}
-    <div class="field"><div class="ftxt"><div class="fh">{$_('app.settings.noAccountsTitle')}</div><div class="fs">{$_('app.settings.noAccountsBody')}</div></div></div>
+    <div>
+      <p class="m-0 text-sm font-semibold">{$_('app.settings.noAccountsTitle')}</p>
+      <p class="m-0 text-[0.8125rem] text-muted-foreground">{$_('app.settings.noAccountsBody')}</p>
+    </div>
   {/if}
+</Panel>
 
-  {#if form?.error}<div class="field"><div class="fs" style="color:#c0392b;">{form.error}</div></div>{/if}
-  {#if form?.synced}<div class="field"><div class="fs" style="color:var(--accent);">{$_('app.settings.syncedToast')}</div></div>{/if}
-  {#if form?.disconnected}<div class="field"><div class="fs" style="color:var(--accent);">{$_('app.settings.disconnectedToast')}</div></div>{/if}
-</section>
-
-<section class="panel">
-  <div class="panel-head">
-    <div class="t">{$_('app.settings.connectPlatform')} <span style="color:var(--ink-faint);font-weight:500;">· {$_('app.settings.accountsUsed', { values: { used: data.used, limit: data.limit } })}</span></div>
-  </div>
-  <div class="field"><div class="fs">{$_('app.settings.seatCostMsg', { values: { cost: data.seatCostUsd } })}</div></div>
+<Panel
+  title={$_('app.settings.connectPlatform')}
+  description={`${$_('app.settings.accountsUsed', { values: { used: data.used, limit: data.limit } })} · ${$_('app.settings.seatCostMsg', { values: { cost: data.seatCostUsd } })}`}
+>
   {#if limitError}
-    <div class="field"><div class="fs" style="color:#a3700a;">{$_('app.settings.limitReachedMsg', { values: { limit: data.limit } })}</div></div>
+    <div><Notice tone="error" class="mb-0">{$_('app.settings.limitReachedMsg', { values: { limit: data.limit } })}</Notice></div>
   {/if}
   {#each PLATFORMS as p (p.key)}
     {@const count = connected.filter((a) => (a.platform ?? '').toLowerCase() === p.key).length}
@@ -119,20 +124,63 @@
       </div>
       <div class="nm"><div class="h">{p.label}</div><div class="s">{count ? $_('app.settings.connectedAddAnother', { values: { count } }) : $_('app.settings.connectViaOauth')}</div></div>
       {#if atLimit}
-        <a class="mini connect" href={billingPath($page.params.projectId ?? '')}>{$_('app.settings.connect')}</a>
+        <Button variant="secondary" size="sm" href={billingPath($page.params.projectId ?? '')}>{$_('app.settings.connect')}</Button>
       {:else}
-        <a class="mini connect" href={`${base}/settings/connect/${p.key}`} target="_blank" rel="noopener" onclick={() => (pendingConnect = true)}>{$_('app.settings.connect')}</a>
+        <Button variant="secondary" size="sm" href={`${base}/settings/connect/${p.key}`} target="_blank" rel="noopener" onclick={() => (pendingConnect = true)}>{$_('app.settings.connect')}</Button>
       {/if}
     </div>
   {/each}
-</section>
+</Panel>
 
 <style>
-  .skeleton .glyph, .skeleton .h, .skeleton .s {
-    background: var(--line, #e5e5e5);
-    animation: pulse 1.2s ease-in-out infinite;
+  .acct {
+    display: flex;
+    align-items: center;
+    gap: 12px;
   }
-  .skeleton .h { width: 160px; height: 14px; margin-bottom: 6px; }
-  .skeleton .s { width: 100px; height: 11px; }
-  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+  .glyph {
+    width: 34px;
+    height: 34px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .glyph svg {
+    width: 18px;
+    height: 18px;
+  }
+  .nm {
+    flex: 1;
+    min-width: 0;
+  }
+  .nm .h {
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .nm .s {
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+  .status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--sh-success);
+  }
+  .status .d {
+    width: 7px;
+    height: 7px;
+    background: currentColor;
+  }
+  .disc-confirm {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
 </style>
