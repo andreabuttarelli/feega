@@ -1,6 +1,6 @@
 import sharp from 'sharp';
 import type { Db } from '$lib/server/db/client';
-import { findNode, writeNodeData } from '$lib/server/repos/canvas';
+import { DataCheck, findNode, patchNodeData } from '$lib/server/repos/canvas';
 import { findAsset, insertAsset, type Asset } from '$lib/server/repos/assets';
 import { CANVAS_ASSET_BUCKET } from '$lib/server/repos/asset-storage';
 import type { Actor } from '$lib/server/repos/actor';
@@ -76,15 +76,15 @@ export async function applyEffectsNode(
     sourceNodeId: node.id
   });
 
-  const write = await writeNodeData(db, {
+  const write = await patchNodeData(db, {
     orgId: input.orgId,
     nodeId: node.id,
-    data: { ...node.data, refId: asset.id, sourceRefId, mediaKind: isVideo ? 'video' : 'image' },
-    expectedVersion: node.version,
+    patch: { refId: asset.id, sourceRefId, mediaKind: isVideo ? 'video' : 'image' },
+    check: DataCheck.None,
     actor: input.actor
   });
 
-  if (write.outcome === 'conflict') {
+  if (write.outcome !== 'written') {
     return { outcome: 'conflict' };
   }
 

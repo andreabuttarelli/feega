@@ -35,7 +35,11 @@ vi.mock('$lib/server/canvas/social-feed-sync', () => ({
 vi.mock('$lib/server/repos/canvas', async (importOriginal) => ({
 	...(await importOriginal<object>()),
 	findNode: (...a: unknown[]) => findNode(...a),
-	writeNodeData: (...a: unknown[]) => writeNodeData(...a)
+	writeNodeData: (...a: unknown[]) => writeNodeData(...a),
+	patchNodeData: async (_db: unknown, input: { patch: Record<string, unknown> }) => ({
+		outcome: 'written',
+		node: { id: 'node-1', data: input.patch }
+	})
 }));
 vi.mock('$lib/canvas/doc-node', async (importOriginal) => ({ ...(await importOriginal<object>()), mintShareToken: vi.fn() }));
 vi.mock('$lib/server/repos/doc-share', () => ({ clearDocShare: vi.fn(), setDocShare: vi.fn() }));

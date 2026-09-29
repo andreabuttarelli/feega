@@ -255,6 +255,24 @@ describe('update_row su nodes: data si valida DOPO la fusione con la riga esiste
     expect(calls.filter((c) => c.op === 'update')).toHaveLength(1);
   });
 
+  it('scrive la riga fusa, non la patch: il prompt che c\'era resta', async () => {
+    const { calls, supabase } = fakeAuthority({
+      count: 1,
+      currentRows: [{ id: 'n1', type: 'image', version: 4, data: { prompt: 'un gatto', status: 'idle' } }],
+      writeRows: [{ id: 'n1', type: 'image', data: { prompt: 'un gatto', status: 'running' } }]
+    });
+
+    await tools(supabase, 'org-mine').updateRow({
+      table: 'nodes',
+      where: [{ column: 'id', op: 'eq', value: 'n1' }],
+      values: { data: { status: 'running' } }
+    });
+
+    const update = calls.find((c) => c.op === 'update')!;
+    expect(update.values).toMatchObject({ data: { prompt: 'un gatto', status: 'running' }, version: 5 });
+    expect(update.filters).toContainEqual(['version', '4']);
+  });
+
   it('una patch che rompe lo schema fuso è rifiutata, e nomina il campo', async () => {
     const { calls, supabase } = fakeAuthority({
       count: 1,

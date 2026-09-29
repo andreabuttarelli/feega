@@ -3,6 +3,8 @@ import type { Database } from '$lib/database.types';
 import type { NarrowedDatabase } from '$lib/server/db/typed-database';
 import { actorCols, edgeActorCols, type Actor } from './actor';
 import { recordEvent } from './canvas-events';
+import { clashingKeys, mergeNodeData } from '$lib/canvas/node-patch';
+import { validateNodeData } from '$lib/canvas/node-data';
 
 /**
  * IL CANVAS: TELE, NODI, ARCHI.
@@ -364,9 +366,20 @@ export async function writeNodeData(
   }
 ): Promise<DataWrite> {
   const before = await findNode(db, { orgId: input.orgId, nodeId: input.nodeId });
+  return commitNodeData(db, { ...input, before });
+}
 
-  /** Stesso confine di `createNode`: `data` arriva senza `type` qui, quindi non può provare di
-   *  essere la forma giusta — chi valida la coppia è `write-tool.ts`, non questo repo. */
+async function commitNodeData(
+  db: Db,
+  input: {
+    orgId: string;
+    nodeId: string;
+    before: CanvasNodeRecord | null;
+    data: Record<string, unknown>;
+    expectedVersion: number;
+    actor?: Actor;
+  }
+): Promise<DataWrite> {
   const patch: NodeUpdate = {
     data: input.data,
     version: input.expectedVersion + 1,
@@ -396,12 +409,63 @@ export async function writeNodeData(
     canvasId: node.canvasId,
     kind: 'node.update',
     nodeId: node.id,
-    before: { data: before?.data ?? null },
+    before: { data: input.before?.data ?? null },
     after: { data: node.data },
     actor: input.actor
   });
 
   return { outcome: 'written', node };
+}
+
+export enum DataCheck {
+  Schema = 'schema',
+  None = 'none'
+}
+
+export type PatchWrite =
+  | { outcome: 'written'; node: CanvasNodeRecord }
+  | { outcome: 'conflict'; keys: string[] }
+  | { outcome: 'invalid'; error: string }
+  | { outcome: 'gone' };
+
+const PATCH_MAX_ATTEMPTS = 5;
+
+export async function patchNodeData(
+  db: Db,
+  input: {
+    orgId: string;
+    nodeId: string;
+    patch: Record<string, unknown>;
+    base?: Record<string, unknown>;
+    check: DataCheck;
+    actor?: Actor;
+  }
+): Promise<PatchWrite> {
+  for (let attempt = 0; attempt < PATCH_MAX_ATTEMPTS; attempt++) {
+    const before = await findNode(db, { orgId: input.orgId, nodeId: input.nodeId });
+    if (!before) {
+      return { outcome: 'gone' };
+    }
+
+    const keys = input.base ? clashingKeys(before.data, input.base, input.patch) : [];
+    if (keys.length) {
+      return { outcome: 'conflict', keys };
+    }
+
+    const data = mergeNodeData(before.data, input.patch);
+    if (input.check === DataCheck.Schema) {
+      const verdict = validateNodeData(before.type, data);
+      if (!verdict.ok) {
+        return { outcome: 'invalid', error: verdict.error };
+      }
+    }
+
+    const written = await commitNodeData(db, { ...input, before, data, expectedVersion: before.version });
+    if (written.outcome === 'written') {
+      return written;
+    }
+  }
+  return { outcome: 'conflict', keys: [] };
 }
 
 /** Soft delete: l'arco verso un nodo non svanisce mentre qualcuno lo guarda, e l'undo ha cosa riportare. */

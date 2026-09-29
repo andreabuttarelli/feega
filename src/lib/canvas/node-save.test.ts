@@ -42,7 +42,7 @@ describe('adoptIdleRows: a dropped snapshot still advances idle nodes', () => {
 
     const next = adoptIdleRows(local, server, (id) => id === 'b');
 
-    expect(next[0]).toEqual({ id: 'a', version: 4, data: { prompt: 'old', status: 'done' } });
+    expect(next[0]).toEqual({ id: 'a', version: 4, data: { prompt: 'old', status: 'done' }, saved: { prompt: 'old', status: 'done' } });
     expect(next[1]).toEqual(local[1]);
   });
 
@@ -53,35 +53,36 @@ describe('adoptIdleRows: a dropped snapshot still advances idle nodes', () => {
 });
 
 describe('writeWithRetry: a conflict reapplies the edit on the fresh row', () => {
-  it('rereads, merges the patch on top, and saves once more', async () => {
+  it('rereads, takes the fresh values as base, and sends the same patch once more', async () => {
     const send = vi
       .fn()
       .mockResolvedValueOnce({ type: 'failure', status: 409, data: { conflict: true } })
       .mockResolvedValueOnce({ type: 'success', status: 200, data: { node: { id: 'a', version: 8, data: { status: 'done', prompt: 'mine' } } } });
-    const reread = vi.fn().mockResolvedValue({ version: 7, data: { status: 'done', prompt: 'theirs' } });
+    const reread = vi.fn().mockResolvedValue({ status: 'done', prompt: 'theirs' });
 
-    const out = await writeWithRetry({ send, reread, version: 3, patch: { prompt: 'mine' }, data: { prompt: 'mine' } });
+    const out = await writeWithRetry({ send, reread, patch: { prompt: 'mine' }, base: { prompt: 'old' } });
 
-    expect(send).toHaveBeenNthCalledWith(2, 7, { status: 'done', prompt: 'mine' });
+    expect(send).toHaveBeenNthCalledWith(1, { prompt: 'mine' }, { prompt: 'old' });
+    expect(send).toHaveBeenNthCalledWith(2, { prompt: 'mine' }, { prompt: 'theirs' });
     expect(out).toEqual({ ok: true, node: { id: 'a', version: 8, data: { status: 'done', prompt: 'mine' } } });
   });
 
   it('a second conflict is reported, with the edit still in hand', async () => {
     const conflict = { type: 'failure', status: 409, data: { conflict: true } };
     const send = vi.fn().mockResolvedValue(conflict);
-    const reread = vi.fn().mockResolvedValue({ version: 7, data: {} });
+    const reread = vi.fn().mockResolvedValue({});
 
-    const out = await writeWithRetry({ send, reread, version: 3, patch: { prompt: 'mine' }, data: { prompt: 'mine' } });
+    const out = await writeWithRetry({ send, reread, patch: { prompt: 'mine' }, base: {} });
 
     expect(send).toHaveBeenCalledTimes(2);
-    expect(out).toMatchObject({ ok: false, reason: SaveFailure.Conflict, data: { prompt: 'mine' } });
+    expect(out).toMatchObject({ ok: false, reason: SaveFailure.Conflict, patch: { prompt: 'mine' } });
   });
 
   it('any other failure is not retried', async () => {
     const send = vi.fn().mockResolvedValue({ type: 'failure', status: 400, data: { error: 'x' } });
     const reread = vi.fn();
 
-    const out = await writeWithRetry({ send, reread, version: 3, patch: {}, data: {} });
+    const out = await writeWithRetry({ send, reread, patch: {}, base: {} });
 
     expect(reread).not.toHaveBeenCalled();
     expect(out).toMatchObject({ ok: false, reason: SaveFailure.Invalid });

@@ -49,25 +49,27 @@ const runRow = {
   actor_id: USER
 };
 
-describe('update_node — zero righe è un conflitto, mai un successo silenzioso', () => {
-  it('torna outcome conflict quando la versione è stantia', async () => {
-    const { db } = fakeDb({ nodes: [nodeRow] }, { updateRows: { nodes: [] } });
+describe('update_node — a patch on the current row, never a replacement', () => {
+  it('keeps the keys the agent did not send', async () => {
+    const rows = { nodes: [{ ...nodeRow, data: { ...nodeRow.data } }], canvas_events: [{}] };
+    const { db } = fakeDb(rows, { filter: true, mutate: true });
     const tools = createProjectTools({ db, orgId: ORG, projectId: PROJECT, userId: USER });
 
-    const out = await run(tools.update_node, { nodeId: NODE, data: { prompt: 'x' }, expectedVersion: 3 });
-
-    expect(out).toMatchObject({ outcome: 'conflict' });
-  });
-
-  it('dice scritto solo quando la riga torna davvero', async () => {
-    const written = { ...nodeRow, version: 4, data: { prompt: 'x' } };
-    const { db } = fakeDb({ nodes: [nodeRow] }, { updateRows: { nodes: [written] } });
-    const tools = createProjectTools({ db, orgId: ORG, projectId: PROJECT, userId: USER });
-
-    const out = await run(tools.update_node, { nodeId: NODE, data: { prompt: 'x' }, expectedVersion: 3 });
+    const out = await run(tools.update_node, { nodeId: NODE, data: { prompt: 'x' } });
 
     expect(out).toMatchObject({ outcome: 'written' });
-    expect((out as { node: { version: number } }).node.version).toBe(4);
+    expect(rows.nodes[0]).toMatchObject({ version: 4, data: { prompt: 'x', model: 'm1' } });
+  });
+
+  it('a merged row the schema refuses is reported, not written', async () => {
+    const rows = { nodes: [{ ...nodeRow, data: { ...nodeRow.data } }] };
+    const { db } = fakeDb(rows, { filter: true, mutate: true });
+    const tools = createProjectTools({ db, orgId: ORG, projectId: PROJECT, userId: USER });
+
+    const out = await run(tools.update_node, { nodeId: NODE, data: { prompt: 42 } });
+
+    expect(out).toMatchObject({ outcome: 'invalid' });
+    expect(rows.nodes[0].version).toBe(3);
   });
 });
 

@@ -20,6 +20,7 @@
  * primo campo aggiunto.
  */
 import { z } from 'zod';
+import { mergeNodeData, type NodeData } from './node-patch';
 import { SOCIAL_PLATFORMS } from './social-platforms';
 import { FEED_MEDIA, FEED_SORTS, PRODUCT_SORTS } from './source-filters';
 import { EFFECTS } from './effects';
@@ -504,7 +505,5 @@ export function validateNodeData(type: string, data: unknown): NodeDataVerdict {
  * ogni update parziale legittimo.
  */
 export function validateNodeDataPatch(type: string, current: unknown, patch: unknown): NodeDataVerdict {
-  const currentObj = (current ?? {}) as Record<string, unknown>;
-  const patchObj = (patch ?? {}) as Record<string, unknown>;
-  return validateNodeData(type, { ...currentObj, ...patchObj });
+  return validateNodeData(type, mergeNodeData((current ?? {}) as NodeData, (patch ?? {}) as NodeData));
 }
