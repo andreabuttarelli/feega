@@ -45,6 +45,10 @@ async function requirePost(event: RequestEvent): Promise<PostScope | null> {
 
 const postNotFound = () => fail(NOT_FOUND, { error: 'post_not_found' });
 
+const CONFIRMED = 'true';
+
+const confirmedUncensored = (fd: FormData) => fd.get('confirmUncensored') === CONFIRMED;
+
 export const actions: Actions = {
   schedule: async (event) => {
     const scope = await requirePost(event);
@@ -55,7 +59,7 @@ export const actions: Actions = {
     const scheduledFor = String(fd.get('scheduledFor') ?? '').trim() || undefined;
     if (!postId || !accountIds.length) return fail(400, { error: 'post_and_accounts_required' });
 
-    const result = await scheduleDelivery(db, publisher, { orgId, postId, accountIds, scheduledFor });
+    const result = await scheduleDelivery(db, publisher, { orgId, postId, accountIds, scheduledFor, confirmUncensored: confirmedUncensored(fd) });
     return { scheduled: true, result };
   },
 
@@ -67,7 +71,7 @@ export const actions: Actions = {
     const accountIds = fd.getAll('accountId').map(String);
     if (!postId || !accountIds.length) return fail(400, { error: 'post_and_accounts_required' });
 
-    const result = await scheduleDelivery(db, publisher, { orgId, postId, accountIds });
+    const result = await scheduleDelivery(db, publisher, { orgId, postId, accountIds, confirmUncensored: confirmedUncensored(fd) });
     return { published: true, result };
   },
 
@@ -101,7 +105,7 @@ export const actions: Actions = {
     } catch (e) {
       return fail(502, { error: 'reschedule_cancel_failed', message: e instanceof Error ? e.message : 'unknown' });
     }
-    const result = await scheduleDelivery(db, publisher, { orgId, postId, accountIds: [accountId], scheduledFor });
+    const result = await scheduleDelivery(db, publisher, { orgId, postId, accountIds: [accountId], scheduledFor, confirmUncensored: confirmedUncensored(fd) });
     return { rescheduled: true, result };
   }
 };

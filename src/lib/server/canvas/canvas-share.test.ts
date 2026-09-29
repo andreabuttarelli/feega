@@ -133,6 +133,28 @@ describe('readSharedCanvas', () => {
     expect(presets.get('u1/media/pic.png')).toBe('canvas1024');
   });
 
+  it('never shares or signs an output of an uncensored model', async () => {
+    const { db } = fakeDb(
+      {
+        canvases: [CANVAS],
+        nodes: [node('n-raw', 'image', { refId: 'a-raw' })],
+        nodes_connections: [],
+        assets: [{ id: 'a-raw', org_id: 'org-1', type: 'image', source: 'generated', url: 'u1/media/wiro/raw.png', content: null, uncensored: true }]
+      },
+      { filter: true }
+    );
+    const signed: string[] = [];
+    const recording = async (paths: { generated: string[]; uploaded: string[]; influencer: string[] }) => {
+      signed.push(...paths.generated, ...paths.uploaded);
+      return sign(paths);
+    };
+
+    const shared = await readSharedCanvas(db, 'tok-live', recording);
+
+    expect(signed).not.toContain('u1/media/wiro/raw.png');
+    expect(JSON.stringify(shared)).not.toContain('raw.png');
+  });
+
   it('never exposes the org, the project or the prompts', async () => {
     const { db } = sharedDb();
 

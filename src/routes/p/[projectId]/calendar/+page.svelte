@@ -25,7 +25,13 @@
     new Intl.DateTimeFormat(CALENDAR_LOCALE, { weekday: 'short', timeZone: 'UTC' }).format(MONDAY_2024_01_01 + i * DAY_MS)
   );
 
-  let { data } = $props();
+  let { data, form } = $props();
+
+  const NEEDS_ADULT_CONFIRMATION = 'uncensored_needs_confirmation';
+  type DeliveryReply = { accountId: string; ok: boolean; error?: string };
+  const lastDeliveries = $derived(((form as { result?: { deliveries?: DeliveryReply[] } } | null)?.result?.deliveries ?? []) as DeliveryReply[]);
+  const needsAdultConfirmation = $derived(lastDeliveries.some((d) => d.error === NEEDS_ADULT_CONFIRMATION));
+  const deliveryErrors = $derived(lastDeliveries.filter((d) => !d.ok && d.error).map((d) => d.error!));
 
   const BRAND_TONES = ['#1d1d1f', '#7c5cff', '#0a7d5a', '#c2410c', '#0369a1', '#a21caf'];
 
@@ -318,6 +324,9 @@
           </li>
         {/each}
       </ul>
+      {#if deliveryErrors.length}
+        <p class="popover-media" role="alert">{deliveryErrors.join(' · ')}</p>
+      {/if}
       <label class="popover-when">
         When
         <input type="datetime-local" bind:value={scheduleLocal} />
@@ -326,6 +335,12 @@
         <form method="POST" action="?/schedule" class="popover-schedule">
           <input type="hidden" name="postId" value={selectedPost.id} />
           <input type="hidden" name="scheduledFor" value={isoOf(scheduleLocal)} />
+          {#if needsAdultConfirmation}
+            <label class="account-row" data-testid="confirm-uncensored">
+              <input type="checkbox" name="confirmUncensored" value="true" required />
+              This post contains adult content from an uncensored model. Publish it where the platform allows adult content.
+            </label>
+          {/if}
           {#each undeliveredOf(selectedPost) as account (account.id)}
             <label class="account-row">
               <input type="checkbox" name="accountId" value={account.id} checked />

@@ -225,6 +225,10 @@ async function viewOf(input: ViewInput): Promise<SharedView> {
   return (await SHARED_VIEW_OF[input.node.type as NodeType]?.(input)) ?? EMPTY;
 }
 
+function shareable(assets: Map<string, Asset>): Map<string, Asset> {
+  return new Map([...assets].filter(([, asset]) => !asset.uncensored));
+}
+
 export async function readSharedCanvas(db: Db, token: string, sign: SignPaths): Promise<SharedCanvas | null> {
   if (!token) {
     return null;
@@ -248,7 +252,7 @@ export async function readSharedCanvas(db: Db, token: string, sign: SignPaths): 
   const [nodes, connections] = await Promise.all([listNodes(db, scope), listConnections(db, scope)]);
 
   const orgId = canvas.org_id;
-  const assets = await findAssets(db, { orgId, assetIds: nodes.flatMap(assetRefsOf) });
+  const assets = shareable(await findAssets(db, { orgId, assetIds: nodes.flatMap(assetRefsOf) }));
 
   const files = [...assets.values()].filter((a) => a.url && a.type !== 'text');
   const pathsOf = (list: Asset[]): SharedPaths => ({
