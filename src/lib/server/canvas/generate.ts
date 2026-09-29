@@ -2,10 +2,10 @@ import type { Db } from '$lib/server/db/client';
 import type { GenMedium, GenParams } from '$lib/canvas/gen-node';
 import { findAsset, insertAsset, type Asset } from '$lib/server/repos/assets';
 import {
+  AUDIO_JOB_PREFIX,
   claimRun,
   completeRun,
   createRun,
-  dueRuns,
   expireRun,
   failRun,
   listNodeRuns,
@@ -14,8 +14,10 @@ import {
   queuedWiroRuns,
   releaseClaim,
   retryClaim,
+  runningRuns,
   setExternalJob,
   setRunPrompt,
+  WIRO_JOB_PREFIX,
   type NodeRun
 } from '$lib/server/repos/node-runs';
 import { DataCheck, findNode, patchNodeData, writeNodeData } from '$lib/server/repos/canvas';
@@ -848,16 +850,46 @@ export { claimRun, completeRun, failRun };
 /**
  * QUANTO PUÒ RESTARE `running` UN GIRO PRIMA CHE SIA UN GIRO PERSO, non un giro lento.
  *
- * Un'immagine è sincrona — la funzione che la genera muore con la richiesta HTTP che la porta —
- * quindi non esiste, per lei, un cron che aspetta un provider. Se quella richiesta muore a metà
- * (il deploy, il timeout della piattaforma, la scheda chiusa dal browser) `node_runs` resta
- * `running` e nessuno lo saprà mai: né un secondo click, spento dal bottone, né una ricarica, che
- * rilegge la stessa riga ferma.
- *
- * La soglia sta sopra il `maxDuration` della rotta che genera (300s): sotto, questo giro
- * dichiarerebbe perso un giro che sta ancora lavorando dentro il suo tempo lecito.
+ * Un'immagine sincrona (la funzione che la genera muore con la richiesta HTTP che la porta) e un
+ * giro asincrono presso un fornitore (`external_job_id` scritto — ElevenLabs, Wiro, un video in
+ * coda) non condividono lo stesso tetto: il primo non ha nessun processo che lo riprenda se la
+ * richiesta muore a metà, il secondo sta ancora legittimamente lavorando dal lato del fornitore
+ * ben oltre `maxDuration` di una richiesta HTTP. Una riga per genere, qui e in nessun altro punto:
+ * il prossimo genere si aggiunge con una riga, non con un `if`.
  */
 export const RUN_STALE_MS = 6 * 60_000;
+const VIDEO_TIMEOUT_MS = 20 * 60_000;
+const WIRO_IMAGE_TIMEOUT_MS = 10 * 60_000;
+const WIRO_VIDEO_TIMEOUT_MS = 30 * 60_000;
+const DUBBING_TIMEOUT_MS = 60 * 60_000;
+
+type JobKind = 'sync' | 'video' | 'wiro_image' | 'wiro_video' | 'dubbing';
+
+const JOB_TIMEOUTS_MS: Record<JobKind, number> = {
+  sync: RUN_STALE_MS,
+  video: VIDEO_TIMEOUT_MS,
+  wiro_image: WIRO_IMAGE_TIMEOUT_MS,
+  wiro_video: WIRO_VIDEO_TIMEOUT_MS,
+  dubbing: DUBBING_TIMEOUT_MS
+};
+
+/**
+ * IL GENERE DI UN GIRO SI LEGGE DALL'`external_job_id`, non da un campo dedicato: `wiro:` e
+ * `elevenlabs:` sono i due fornitori con un riconciliatore proprio (`node-runs.ts`), e per Wiro
+ * il genere fine (immagine o video) sta sul nodo che lo ospita — l'ID del task non lo dice.
+ */
+function jobKindOf(run: { externalJobId: string | null }, nodeType: string | null): JobKind {
+  if (!run.externalJobId) {
+    return 'sync';
+  }
+  if (run.externalJobId.startsWith(AUDIO_JOB_PREFIX)) {
+    return 'dubbing';
+  }
+  if (run.externalJobId.startsWith(WIRO_JOB_PREFIX)) {
+    return nodeType === 'video' ? 'wiro_video' : 'wiro_image';
+  }
+  return 'video';
+}
 
 export type ExpireOutcome = { expired: number };
 
@@ -869,7 +901,7 @@ const RUN_TIMED_OUT = 'timed out — the request that ran it never came back';
  * 1000 combinazioni, drenate poche per tick) supera comodamente `RUN_STALE_MS`. Scambiarlo per un
  * giro perso lo chiuderebbe `expired` mentre aspettava solo il suo turno: il loop perderebbe
  * combinazioni non ancora partite, non solo quelle davvero bloccate. Un biglietto RECLAMATO
- * (`status: 'finishing'`) non passa comunque da questa funzione — `dueRuns` guarda solo
+ * (`status: 'finishing'`) non passa comunque da questa funzione — `runningRuns` guarda solo
  * `status = 'running'` — quindi qui basta riconoscere la forma del biglietto ancora in coda.
  */
 function isQueuedLoopTicket(run: { params: Record<string, unknown> }): boolean {
@@ -877,8 +909,14 @@ function isQueuedLoopTicket(run: { params: Record<string, unknown> }): boolean {
   return Boolean(loop && typeof loop === 'object' && (loop as { phase?: unknown }).phase === 'queued');
 }
 
+const EXPIRE_SWEEP_LIMIT = 2000;
+
 /**
- * UN GIRO SENZA VIA D'USCITA VIENE CHIUSO A MANO, DA FUORI.
+ * UN GIRO SENZA VIA D'USCITA VIENE CHIUSO A MANO, DA FUORI — ma solo quando ha superato IL PROPRIO
+ * tetto (`JOB_TIMEOUTS_MS`), non quello sincrono. Un giro asincrono ancora in coda presso il
+ * fornitore non è mai "perso per età" sotto quel tetto: il poll che lo riporta a `running`
+ * (`releaseClaim`/`retryClaim`, nei riconciliatori dedicati) è la prova che il fornitore lo dice
+ * ancora in corso, e quel poll è quanto di più recente questa riga sa.
  *
  * `claimRun` prima di ogni scrittura: due tick sovrapposti — o questo tick e la richiesta
  * originale che in realtà sta ancora rispondendo — non devono chiudere la stessa riga due volte.
@@ -888,11 +926,16 @@ function isQueuedLoopTicket(run: { params: Record<string, unknown> }): boolean {
  * verità e lo schermo continuerebbe a mentire — esattamente il difetto segnalato.
  */
 export async function expireStuckRuns(db: Db): Promise<ExpireOutcome> {
-  const before = new Date(Date.now() - RUN_STALE_MS).toISOString();
-  const stuck = (await dueRuns(db, { before })).filter((run) => !isQueuedLoopTicket(run));
+  const now = Date.now();
+  const running = (await runningRuns(db, { limit: EXPIRE_SWEEP_LIMIT })).filter((run) => !isQueuedLoopTicket(run));
 
   let expired = 0;
-  for (const run of stuck) {
+  for (const run of running) {
+    const node = run.externalJobId ? await findNode(db, { orgId: run.orgId, nodeId: run.nodeId }).catch(() => null) : null;
+    const kind = jobKindOf(run, node?.type ?? null);
+    const cap = JOB_TIMEOUTS_MS[kind];
+    if (now - new Date(run.startedAt).getTime() < cap) continue;
+
     const claimed = await claimRun(db, { orgId: run.orgId, runId: run.id });
     if (!claimed) continue;
 
