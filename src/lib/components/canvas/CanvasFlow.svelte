@@ -1,4 +1,5 @@
 <script lang="ts">
+  const MIN_ZOOM = 0.05;
   import { focusEdges } from '$lib/canvas/edge-focus';
   /**
    * LA TELA, SU SVELTEFLOW.
@@ -641,6 +642,7 @@
     `shortcuts.ts` e lo esegue `CanvasKeys`, che passa da chi la riga ce l'ha davvero.
   -->
   <SvelteFlow
+    minZoom={MIN_ZOOM}
     bind:nodes
     bind:edges
     {nodeTypes}
