@@ -25,7 +25,7 @@ elsewhere kept retrying into a 404.
   real difference, so own echoes stay silent.
 - `kit.version.pollInterval = 60s`; `updated.current` feeds the table and
   shows a Reload banner. No silent auto-reload.
-- Deleted canvas → `/p/<project>`, deleted project → `/app`, with a message
+- Deleted canvas → `/p/<project>`, deleted project → `/` (home), with a message
   carried across the navigation (`carryNotice` / `takeNotice`).
 
 **Discarded.** `max(updated_at)`: not every write path (RPC, agents) sets

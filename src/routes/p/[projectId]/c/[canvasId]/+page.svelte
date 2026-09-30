@@ -31,6 +31,7 @@
   import { deserialize } from '$app/forms';
   import { beforeNavigate, goto, invalidate } from '$app/navigation';
   import { updated } from '$app/state';
+  import { HOME_PATH } from '$lib/home-path';
   import { CANVAS_LIST_DEPENDENCY } from '$lib/canvas/canvas-list';
   import { formatCredits } from '$lib/components/credit-amount-format';
   import { untrack } from 'svelte';
@@ -841,7 +842,7 @@
       }
     },
     [Verdict.LeaveCanvas]: () => leave(`/p/${data.projectId}`, VERDICT_NOTICE[Verdict.LeaveCanvas]),
-    [Verdict.LeaveProject]: () => leave('/app', VERDICT_NOTICE[Verdict.LeaveProject]),
+    [Verdict.LeaveProject]: () => leave(HOME_PATH, VERDICT_NOTICE[Verdict.LeaveProject]),
     [Verdict.OfferReload]: () => { reloadOffered = true; }
   };
 
