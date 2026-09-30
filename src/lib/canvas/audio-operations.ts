@@ -1,4 +1,5 @@
 import { CREDITS_PER_USD_SUBSCRIPTION_LIST } from '$lib/credit-ladder';
+import type { ConnectorType } from './connectors';
 
 export type AudioSource = 'text' | 'media';
 export type AudioDelivery = 'now' | 'job';
@@ -15,6 +16,8 @@ export type AudioOperation = {
   billedPer: AudioBilling;
   defaultModel: string;
   usdPerUnit: Record<string, number>;
+  inputPorts: readonly ConnectorType[];
+  outputPorts: readonly ConnectorType[];
 };
 
 const SECONDS_PER_MINUTE = 60;
@@ -37,7 +40,9 @@ export const AUDIO_OPERATIONS = {
       eleven_v3: perThousandCharacters(0.08),
       eleven_flash_v2_5: perThousandCharacters(0.04),
       eleven_turbo_v2_5: perThousandCharacters(0.04)
-    }
+    },
+    inputPorts: ['text'],
+    outputPorts: ['audios']
   },
   voice_changer: {
     label: 'Voice changer',
@@ -48,7 +53,9 @@ export const AUDIO_OPERATIONS = {
     delivery: 'now',
     billedPer: 'second',
     defaultModel: 'eleven_multilingual_sts_v2',
-    usdPerUnit: { eleven_multilingual_sts_v2: perMinute(0.12), eleven_english_sts_v2: perMinute(0.12) }
+    usdPerUnit: { eleven_multilingual_sts_v2: perMinute(0.12), eleven_english_sts_v2: perMinute(0.12) },
+    inputPorts: ['audios', 'videos'],
+    outputPorts: ['audios']
   },
   dubbing: {
     label: 'Dubbing',
@@ -59,7 +66,9 @@ export const AUDIO_OPERATIONS = {
     delivery: 'job',
     billedPer: 'second',
     defaultModel: 'dubbing_v1',
-    usdPerUnit: { dubbing_v1: perMinute(0.5) }
+    usdPerUnit: { dubbing_v1: perMinute(0.5) },
+    inputPorts: ['videos', 'audios'],
+    outputPorts: ['audios', 'videos']
   },
   music: {
     label: 'Music',
@@ -70,7 +79,9 @@ export const AUDIO_OPERATIONS = {
     delivery: 'now',
     billedPer: 'second',
     defaultModel: 'music_v1',
-    usdPerUnit: { music_v1: perMinute(0.15) }
+    usdPerUnit: { music_v1: perMinute(0.15) },
+    inputPorts: ['text'],
+    outputPorts: ['audios']
   },
   sound_effects: {
     label: 'Sound effect',
@@ -81,7 +92,9 @@ export const AUDIO_OPERATIONS = {
     delivery: 'now',
     billedPer: 'second',
     defaultModel: 'eleven_text_to_sound_v2',
-    usdPerUnit: { eleven_text_to_sound_v2: perMinute(0.12) }
+    usdPerUnit: { eleven_text_to_sound_v2: perMinute(0.12) },
+    inputPorts: ['text'],
+    outputPorts: ['audios']
   },
   voice_isolation: {
     label: 'Voice isolation',
@@ -92,7 +105,9 @@ export const AUDIO_OPERATIONS = {
     delivery: 'now',
     billedPer: 'second',
     defaultModel: 'audio_isolation',
-    usdPerUnit: { audio_isolation: perMinute(0.12) }
+    usdPerUnit: { audio_isolation: perMinute(0.12) },
+    inputPorts: ['audios', 'videos'],
+    outputPorts: ['audios']
   }
 } as const satisfies Record<string, AudioOperation>;
 
@@ -145,6 +160,25 @@ export function audioOperationOf(params: { operation?: unknown }): AudioOperatio
 
 export function operationSpec(id: AudioOperationId): AudioOperation {
   return AUDIO_OPERATIONS[id];
+}
+
+export function audioInputPorts(id: AudioOperationId): ConnectorType[] {
+  return [...operationSpec(id).inputPorts];
+}
+
+export function audioOutputPorts(id: AudioOperationId): ConnectorType[] {
+  return [...operationSpec(id).outputPorts];
+}
+
+const MEDIUM_OF_CONNECTOR: Partial<Record<ConnectorType, 'text' | 'image' | 'video' | 'audio'>> = {
+  text: 'text',
+  images: 'image',
+  videos: 'video',
+  audios: 'audio'
+};
+
+export function audioInputMediums(id: AudioOperationId): ('text' | 'image' | 'video' | 'audio')[] {
+  return audioInputPorts(id).map((port) => MEDIUM_OF_CONNECTOR[port]).filter((m): m is 'text' | 'image' | 'video' | 'audio' => !!m);
 }
 
 export function defaultAudioModel(id: AudioOperationId): string {

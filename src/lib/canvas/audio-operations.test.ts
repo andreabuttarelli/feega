@@ -4,9 +4,11 @@ import {
   AUDIO_OPERATION_IDS,
   DEFAULT_AUDIO_OPERATION,
   audioCreditsFor,
+  audioInputPorts,
   audioInputProblem,
   audioModelsOf,
   audioOperationOf,
+  audioOutputPorts,
   audioUsdFor,
   defaultAudioModel
 } from './audio-operations';
@@ -30,6 +32,40 @@ describe('audio operations table', () => {
   it('marks only dubbing as asynchronous', () => {
     const async = AUDIO_OPERATION_IDS.filter((id) => AUDIO_OPERATIONS[id].delivery === 'job');
     expect(async).toEqual(['dubbing']);
+  });
+
+  it('gives every operation at least one input port and one output port', () => {
+    for (const id of AUDIO_OPERATION_IDS) {
+      expect(audioInputPorts(id).length).toBeGreaterThan(0);
+      expect(audioOutputPorts(id).length).toBeGreaterThan(0);
+    }
+  });
+
+  it('text to speech takes text and outputs audio only', () => {
+    expect(audioInputPorts('text_to_speech')).toEqual(['text']);
+    expect(audioOutputPorts('text_to_speech')).toEqual(['audios']);
+  });
+
+  it('voice changer takes audio or video, outputs audio only', () => {
+    expect(audioInputPorts('voice_changer')).toEqual(['audios', 'videos']);
+    expect(audioOutputPorts('voice_changer')).toEqual(['audios']);
+  });
+
+  it('dubbing takes video or audio, and outputs both audio and video', () => {
+    expect(audioInputPorts('dubbing')).toEqual(['videos', 'audios']);
+    expect(audioOutputPorts('dubbing')).toEqual(['audios', 'videos']);
+  });
+
+  it('music and sound effects take an optional text prompt, output audio only', () => {
+    expect(audioInputPorts('music')).toEqual(['text']);
+    expect(audioInputPorts('sound_effects')).toEqual(['text']);
+    expect(audioOutputPorts('music')).toEqual(['audios']);
+    expect(audioOutputPorts('sound_effects')).toEqual(['audios']);
+  });
+
+  it('voice isolation takes audio or video, outputs audio only', () => {
+    expect(audioInputPorts('voice_isolation')).toEqual(['audios', 'videos']);
+    expect(audioOutputPorts('voice_isolation')).toEqual(['audios']);
   });
 
   it('falls back to text to speech when the saved operation is unknown', () => {

@@ -1,14 +1,17 @@
 import type { ConnectorType } from './connectors';
 import type { NodeType } from './node-data';
+import { audioInputPorts, audioOutputPorts, audioOperationOf, type AudioOperationId } from './audio-operations';
 
 export enum InputRule {
   Model = 'model',
-  List = 'list'
+  List = 'list',
+  Audio = 'audio'
 }
 
 export enum OutputRule {
   Item = 'item',
-  Media = 'media'
+  Media = 'media',
+  Audio = 'audio'
 }
 
 type Ports = {
@@ -21,6 +24,7 @@ export type PortContext = {
   listPorts: () => ConnectorType[];
   itemPort: () => ConnectorType;
   mediaKind: () => 'image' | 'video';
+  audioOperation?: () => AudioOperationId;
 };
 
 const NONE: readonly ConnectorType[] = [];
@@ -41,17 +45,21 @@ export const NODE_PORTS: Record<NodeType, Ports> = {
   effects: { inputs: ['images', 'videos'], output: OutputRule.Media },
   composition: { inputs: ['images'], output: 'videos' },
   calendar: { inputs: NONE, output: null },
-  audio: { inputs: ['text', 'videos', 'audios'], output: 'audios' }
+  audio: { inputs: InputRule.Audio, output: OutputRule.Audio }
 };
+
+const DEFAULT_AUDIO_OPERATION_CTX = (): AudioOperationId => audioOperationOf({});
 
 const INPUTS: Record<InputRule, (ctx: PortContext) => ConnectorType[]> = {
   [InputRule.Model]: (ctx) => ctx.modelPorts(),
-  [InputRule.List]: (ctx) => ctx.listPorts()
+  [InputRule.List]: (ctx) => ctx.listPorts(),
+  [InputRule.Audio]: (ctx) => audioInputPorts((ctx.audioOperation ?? DEFAULT_AUDIO_OPERATION_CTX)())
 };
 
 const OUTPUTS: Record<OutputRule, (ctx: PortContext) => ConnectorType> = {
   [OutputRule.Item]: (ctx) => ctx.itemPort(),
-  [OutputRule.Media]: (ctx) => (ctx.mediaKind() === 'video' ? 'videos' : 'images')
+  [OutputRule.Media]: (ctx) => (ctx.mediaKind() === 'video' ? 'videos' : 'images'),
+  [OutputRule.Audio]: (ctx) => audioOutputPorts((ctx.audioOperation ?? DEFAULT_AUDIO_OPERATION_CTX)())[0]
 };
 
 const isRule = <R extends string>(value: unknown, rules: Record<R, unknown>): value is R =>
