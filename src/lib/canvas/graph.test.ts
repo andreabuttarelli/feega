@@ -79,6 +79,49 @@ describe('canConnect — un arco che non produrrebbe niente si rifiuta', () => {
   });
 });
 
+describe('canConnect — un nodo audio accetta i medium della sua operazione, non tutti sempre', () => {
+  it('senza operazione salvata (text to speech) un testo entra, un video no', () => {
+    expect(canConnect(node('t', 'text'), node('a', 'audio')).ok).toBe(true);
+    expect(canConnect(node('v', 'video'), node('a', 'audio')).ok).toBe(false);
+  });
+
+  it('voice changer prende audio o video, non testo', () => {
+    const target = node('a', 'audio', { operation: 'voice_changer' });
+    expect(canConnect(node('m', 'media', { mediaKind: 'audio' }), target).ok).toBe(true);
+    expect(canConnect(node('v', 'video'), target).ok).toBe(true);
+    expect(canConnect(node('t', 'text'), target).ok).toBe(false);
+  });
+
+  it('dubbing prende video o audio, non testo', () => {
+    const target = node('a', 'audio', { operation: 'dubbing' });
+    expect(canConnect(node('v', 'video'), target).ok).toBe(true);
+    expect(canConnect(node('m', 'media', { mediaKind: 'audio' }), target).ok).toBe(true);
+    expect(canConnect(node('t', 'text'), target).ok).toBe(false);
+  });
+
+  it('music e sound effects prendono solo testo, mai audio o video', () => {
+    for (const operation of ['music', 'sound_effects'] as const) {
+      const target = node('a', 'audio', { operation });
+      expect(canConnect(node('t', 'text'), target).ok, operation).toBe(true);
+      expect(canConnect(node('v', 'video'), target).ok, operation).toBe(false);
+      expect(canConnect(node('m', 'media', { mediaKind: 'audio' }), target).ok, operation).toBe(false);
+    }
+  });
+
+  it('voice isolation prende audio o video, non testo', () => {
+    const target = node('a', 'audio', { operation: 'voice_isolation' });
+    expect(canConnect(node('m', 'media', { mediaKind: 'audio' }), target).ok).toBe(true);
+    expect(canConnect(node('v', 'video'), target).ok).toBe(true);
+    expect(canConnect(node('t', 'text'), target).ok).toBe(false);
+  });
+
+  it('il rifiuto nomina l\'operazione', () => {
+    const verdict = canConnect(node('v', 'video'), node('a', 'audio', { operation: 'text_to_speech' }));
+    expect(verdict.ok).toBe(false);
+    expect(verdict.ok === false && verdict.why).toContain('text_to_speech');
+  });
+});
+
 describe('canConnect — un modello uncensored non riceve nessun ingresso', () => {
   it('un testo verso un nodo immagine uncensored si rifiuta', () => {
     const verdict = canConnect(node('t', 'text'), node('i', 'image', { uncensored: true }));
@@ -164,6 +207,20 @@ describe('quanti ingressi accetta un nodo, e dipende dal modello', () => {
 
     expect(out.accepted).toHaveLength(3); // maxRefs di qwen3-pro
     expect(out.rejected).toHaveLength(2);
+  });
+});
+
+describe('acceptedInputs — su un nodo audio segue la stessa operazione di canConnect', () => {
+  it('un video si rifiuta su text to speech, entra su voice changer', () => {
+    const video = node('v', 'video');
+
+    const tts = acceptedInputs(node('a', 'audio', { operation: 'text_to_speech' }), [video]);
+    expect(tts.accepted).toEqual([]);
+    expect(tts.rejected).toEqual([video]);
+
+    const changer = acceptedInputs(node('a', 'audio', { operation: 'voice_changer' }), [video]);
+    expect(changer.accepted).toEqual([video]);
+    expect(changer.rejected).toEqual([]);
   });
 });
 

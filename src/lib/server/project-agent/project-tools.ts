@@ -19,7 +19,7 @@ import { agentActor, type Actor } from '$lib/server/repos/actor';
 import { withBrandContext, withOrgContext } from '$lib/server/ai-log';
 import { GEN_MEDIUMS, isGenMedium, type GenParams } from '$lib/canvas/gen-node';
 import { audioDescription } from '$lib/server/canvas/audio-description';
-import { nodeModelError, targetTakesNoInputs, UNCENSORED_NO_INPUTS_ERROR } from '$lib/server/canvas/node-model';
+import { connectRefusal, nodeModelError, targetTakesNoInputs, UNCENSORED_NO_INPUTS_ERROR } from '$lib/server/canvas/node-model';
 import { describeNodeType, describeNodeTypes, isNodeType, unknownFieldsError, validateNewNodeData } from '$lib/canvas/node-data';
 
 /**
@@ -204,7 +204,7 @@ export function createProjectTools(deps: ProjectToolDeps): Record<string, Tool> 
 
     connect_nodes: tool({
       description:
-        'Connect two nodes on one canvas of THIS project. The edge is directed: source feeds target. Refused when the target node uses an uncensored model — those take no inputs of any kind, ever: switch the model first.',
+        'Connect two nodes on one canvas of THIS project. The edge is directed: source feeds target. Refused when the target node uses an uncensored model — those take no inputs of any kind, ever: switch the model first. Also refused when the source medium does not feed the target — an audio node only takes what its current operation needs (describe_node_types type "audio" lists them).',
       inputSchema: z
         .object({
           canvasId: z.string(),
@@ -217,6 +217,11 @@ export function createProjectTools(deps: ProjectToolDeps): Record<string, Tool> 
       execute: async (input: { canvasId: string; sourceNodeId: string; targetNodeId: string; sourceHandle?: string; targetHandle?: string }) => {
         if (await targetTakesNoInputs(deps.db, { orgId: deps.orgId, targetNodeId: input.targetNodeId })) {
           return UNCENSORED_TARGET_REFUSED;
+        }
+
+        const refusal = await connectRefusal(deps.db, { orgId: deps.orgId, sourceNodeId: input.sourceNodeId, targetNodeId: input.targetNodeId });
+        if (refusal) {
+          return { error: 'edge_refused', message: refusal };
         }
 
         const connection = await createConnection(deps.db, {

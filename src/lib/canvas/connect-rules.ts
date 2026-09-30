@@ -36,8 +36,9 @@ export function tileNode(n: {
   medium?: Medium | Exclude<NodeKind, Medium | 'iframe'> | null;
   model?: string | null;
   uncensored?: boolean;
+  operation?: CanvasNode['operation'];
 }): CanvasNode {
-  return { id: n.id, kind: n.medium ?? 'iframe', model: n.model ?? null, uncensored: n.uncensored ?? false };
+  return { id: n.id, kind: n.medium ?? 'iframe', model: n.model ?? null, uncensored: n.uncensored ?? false, operation: n.operation };
 }
 
 /** Il verso che si salva quando nessuno sceglie: il gesto disegna una derivazione. */

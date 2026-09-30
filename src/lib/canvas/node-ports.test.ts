@@ -51,9 +51,18 @@ describe('ogni tipo di nodo disegna le porte che la sua riga dichiara', () => {
     }
   });
 
-  it('un nodo audio prende testo, video e audio, ed esce audio', () => {
-    expect(portsOf('audio', ctx)).toEqual({ inputs: ['text', 'videos', 'audios'], output: 'audios' });
-    expect(anyPortAccepts(portsOf('audio', ctx).inputs, 'videos')).toBe(true);
+  it('un nodo audio senza operazione salvata prende testo (text to speech), ed esce audio', () => {
+    expect(portsOf('audio', ctx)).toEqual({ inputs: ['text'], output: 'audios' });
+  });
+
+  it('un nodo audio segue la sua operazione: voice changer prende audio o video', () => {
+    const audioCtx = { ...ctx, audioOperation: () => 'voice_changer' as const };
+    expect(portsOf('audio', audioCtx)).toEqual({ inputs: ['audios', 'videos'], output: 'audios' });
+  });
+
+  it('un nodo audio in dubbing prende video o audio, ed esce audio', () => {
+    const audioCtx = { ...ctx, audioOperation: () => 'dubbing' as const };
+    expect(portsOf('audio', audioCtx)).toEqual({ inputs: ['videos', 'audios'], output: 'audios' });
   });
 
   it('prodotti e feed escono come una lista di immagini', () => {

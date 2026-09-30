@@ -30,6 +30,7 @@
 import { videoRefCapacity } from '$lib/video-models';
 import { imageModelSpec } from '$lib/image-models';
 import { SELECTABLE_SOURCE_TYPES } from './select-node';
+import { audioInputMediums, audioOperationOf, type AudioOperationId } from './audio-operations';
 
 export const MEDIUMS = ['text', 'image', 'video', 'audio'] as const;
 export type Medium = (typeof MEDIUMS)[number];
@@ -70,6 +71,9 @@ export type CanvasNode = {
   /** Il modello scelto è un Wiro uncensored (`ai_models.uncensored`): non riceve ingressi, di
    *  nessun medium — la regola vive qui, l'unico posto che decide se un arco entra. */
   uncensored?: boolean;
+  /** Per un nodo `audio`: quale operazione ElevenLabs esegue. Decide quali medium accetta
+   *  (`AUDIO_OPERATIONS`, l'unica tabella). Assente = text to speech. */
+  operation?: AudioOperationId;
 };
 
 type NodeSpec = {
@@ -177,13 +181,27 @@ export function canConnect(from: CanvasNode, to: CanvasNode): Verdict {
     return { ok: false, why: `A ${to.kind} node takes a list, products or a social feed` };
   }
   const medium = mediumOf(from);
-  if (!target.accepts.includes(medium)) {
-    return { ok: false, why: `${MEDIUM_NAME[medium]} cannot feed a ${MEDIUM_NAME[mediumOf(to)] ?? to.kind} node` };
+  if (!acceptsOf(to).includes(medium)) {
+    const opWhy = to.kind === 'audio' ? ` for ${operationOf(to)}` : '';
+    return { ok: false, why: `${MEDIUM_NAME[medium]} cannot feed a ${MEDIUM_NAME[mediumOf(to)] ?? to.kind} node${opWhy}` };
   }
   return { ok: true };
 }
 
 const MEDIUM_NAME: Record<Medium, string> = { text: 'text', image: 'image', video: 'video', audio: 'audio' };
+
+function operationOf(node: CanvasNode): AudioOperationId {
+  return audioOperationOf({ operation: node.operation });
+}
+
+/** I medium che un nodo accetta ORA: fissi per la maggior parte dei tipi, per `audio` dipendono
+ *  dall'operazione scelta (`AUDIO_OPERATIONS`, l'unica tabella che li governa). */
+function acceptsOf(node: CanvasNode): readonly Medium[] {
+  if (node.kind === 'audio') {
+    return audioInputMediums(operationOf(node));
+  }
+  return CANVAS_NODE_SPECS[node.kind]?.accepts ?? [];
+}
 
 /** I medium che mancano perché il nodo possa produrre. Vuoto = pronto. */
 export function missingInputs(node: CanvasNode, incoming: CanvasNode[]): Medium[] {
@@ -232,7 +250,7 @@ export function acceptedInputs(node: CanvasNode, incoming: CanvasNode[]): InputV
   for (const source of incoming) {
     const medium = mediumOf(source);
     const room = caps[medium] ?? 0;
-    if (!spec.accepts.includes(medium)) {
+    if (!acceptsOf(node).includes(medium)) {
       rejected.push(source);
       why ??= `${MEDIUM_NAME[medium]} cannot feed this node`;
       continue;
