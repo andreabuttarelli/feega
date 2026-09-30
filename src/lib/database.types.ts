@@ -1992,6 +1992,7 @@ export type Database = {
         Row: {
           available: boolean | null
           brand_id: string | null
+          compare_at_price: number | null
           created_at: string
           currency: string | null
           description: string | null
@@ -2000,19 +2001,26 @@ export type Database = {
           id: string
           images: Json | null
           node_id: string | null
+          options: Json | null
           org_id: string
           platform: string
           price: number | null
+          product_type: string | null
           project_id: string | null
+          sku: string | null
           store_url: string | null
           synced_at: string
+          tags: string[] | null
           title: string
           updated_at: string
           url: string | null
+          variants: Json | null
+          vendor: string | null
         }
         Insert: {
           available?: boolean | null
           brand_id?: string | null
+          compare_at_price?: number | null
           created_at?: string
           currency?: string | null
           description?: string | null
@@ -2021,19 +2029,26 @@ export type Database = {
           id?: string
           images?: Json | null
           node_id?: string | null
+          options?: Json | null
           org_id: string
           platform: string
           price?: number | null
+          product_type?: string | null
           project_id?: string | null
+          sku?: string | null
           store_url?: string | null
           synced_at?: string
+          tags?: string[] | null
           title: string
           updated_at?: string
           url?: string | null
+          variants?: Json | null
+          vendor?: string | null
         }
         Update: {
           available?: boolean | null
           brand_id?: string | null
+          compare_at_price?: number | null
           created_at?: string
           currency?: string | null
           description?: string | null
@@ -2042,15 +2057,21 @@ export type Database = {
           id?: string
           images?: Json | null
           node_id?: string | null
+          options?: Json | null
           org_id?: string
           platform?: string
           price?: number | null
+          product_type?: string | null
           project_id?: string | null
+          sku?: string | null
           store_url?: string | null
           synced_at?: string
+          tags?: string[] | null
           title?: string
           updated_at?: string
           url?: string | null
+          variants?: Json | null
+          vendor?: string | null
         }
         Relationships: [
           {

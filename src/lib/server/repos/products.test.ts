@@ -22,8 +22,59 @@ const product = {
   currency: 'EUR',
   url: 'https://shop.example.com/products/widget',
   images: [{ url: 'https://cdn.example.com/w.jpg', position: 0 }],
-  available: true
+  available: true,
+  compareAtPrice: 29.9,
+  tags: ['sale'],
+  vendor: 'Acme',
+  productType: 'Gadgets',
+  sku: 'W-1',
+  variants: [{ id: '1', title: 'Red', sku: 'W-1', price: 19.9, compare_at_price: 29.9, available: true, options: { Color: 'Red' }, image: null }],
+  options: { Color: ['Red'] }
 };
+
+describe('i campi commerciali', () => {
+  it('upsert e insert del brand li scrivono entrambi', async () => {
+    const { db, calls } = fakeDb({});
+    await upsertNodeProducts(db, { orgId: ORG, projectId: PROJECT, nodeId: NODE, platform: 'shopify', products: [product] });
+    await insertBrandProducts(db, { orgId: ORG, brandId: BRAND, platform: 'shopify', products: [product] });
+
+    const written = calls.filter((c) => c.table === 'products' && c.op === 'upsert').map((c) => (c.payload as Array<Record<string, unknown>>)[0]);
+    for (const row of written) {
+      expect(row).toMatchObject({
+        compare_at_price: 29.9,
+        tags: ['sale'],
+        vendor: 'Acme',
+        product_type: 'Gadgets',
+        sku: 'W-1',
+        variants: product.variants,
+        options: { Color: ['Red'] }
+      });
+    }
+    expect(written).toHaveLength(2);
+  });
+
+  it('una riga sincronizzata prima delle colonne nuove si legge vuota, non rotta', async () => {
+    const { db } = fakeDb({
+      products: [
+        {
+          id: 'p1', node_id: NODE, project_id: PROJECT, platform: 'shopify', external_id: '1', handle: null, title: 'Old',
+          description: null, price: '10', currency: null, url: null, images: null, available: null, synced_at: '2026-01-01',
+          compare_at_price: null, tags: null, vendor: null, product_type: null, sku: null, variants: null, options: null
+        }
+      ]
+    });
+    const [row] = await listNodeProducts(db, { orgId: ORG, nodeId: NODE });
+    expect(row).toMatchObject({ compareAtPrice: null, tags: [], vendor: null, productType: null, sku: null, variants: [], options: {} });
+  });
+
+  it('il prezzo barrato numeric arriva come stringa e torna numero', async () => {
+    const { db } = fakeDb({
+      products: [{ id: 'p1', node_id: NODE, platform: 'shopify', external_id: '1', title: 'x', price: '98.00', compare_at_price: '140.00', images: [], synced_at: '' }]
+    });
+    const [row] = await listNodeProducts(db, { orgId: ORG, nodeId: NODE });
+    expect(row.compareAtPrice).toBe(140);
+  });
+});
 
 describe('upsertNodeProducts', () => {
   it('non scrive niente quando la pagina è vuota', async () => {

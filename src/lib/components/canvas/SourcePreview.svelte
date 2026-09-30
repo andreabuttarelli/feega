@@ -10,6 +10,7 @@
     label: string;
     caption: string | null;
     badge: 'carousel' | 'video' | null;
+    sale?: string | null;
   };
 
   let {
@@ -61,6 +62,9 @@
           {#if tile.badge}
             {@const Badge = BADGES[tile.badge].icon}
             <span class="preview-badge" aria-label={BADGES[tile.badge].label}><Badge size={11} strokeWidth={2} /></span>
+          {/if}
+          {#if tile.sale}
+            <span class="preview-sale">{tile.sale}</span>
           {/if}
           {#if tile.caption}
             <span class="preview-caption">{tile.caption}</span>
@@ -145,6 +149,16 @@
     padding: 2px;
     color: #fff;
     background: rgb(0 0 0 / 0.55);
+  }
+  .preview-sale {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    padding: 1px 4px;
+    font-size: 10px;
+    font-weight: 600;
+    color: #fff;
+    background: #d70015;
   }
   .preview-caption {
     position: absolute;

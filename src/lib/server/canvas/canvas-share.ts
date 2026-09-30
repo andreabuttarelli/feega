@@ -17,6 +17,7 @@ import type { NodeType } from '$lib/canvas/node-data';
 import { feedFiltersOf, filterPosts, filterProducts, mediaKindOf, productFiltersOf } from '$lib/canvas/source-filters';
 import { ShareState, type SharedCanvas, type SharedListItem, type SharedTile, type SharedView } from '$lib/canvas/shared-view';
 import { calendarOf } from '$lib/canvas/calendar-node';
+import { saleLabel } from '$lib/canvas/product-discount';
 import { Capability, modeAllows, modeOf } from '$lib/project-mode';
 
 export { ShareState };
@@ -142,7 +143,8 @@ async function productsView({ db, orgId, node }: ViewInput): Promise<SharedView>
       thumb: p.images[0]?.url ?? null,
       label: p.title,
       caption: p.price === null ? null : `${p.currency ?? ''} ${p.price}`.trim(),
-      badge: null
+      badge: null,
+      sale: saleLabel(p.price, p.compareAtPrice)
     })
   );
   return { kind: 'grid', total: products.length, tiles };

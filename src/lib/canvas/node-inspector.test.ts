@@ -22,6 +22,10 @@ describe('inspectorOf: una riga per tipo, nessun if sparso', () => {
       'filters.price_min',
       'filters.price_max',
       'filters.in_stock_only',
+      'filters.on_sale_only',
+      'filters.tag',
+      'filters.vendor',
+      'filters.product_type',
       'filters.sort'
     ]);
     expect(FEED_FIELDS.map((f) => f.path)).toEqual([

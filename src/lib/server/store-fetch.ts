@@ -17,19 +17,9 @@ import { safeFetchUrl, SafeFetchError } from '$lib/server/tool-guard';
  * pubblici usano già per un URL scritto da una persona.
  */
 
-export type FetchedProduct = {
-  externalId: string;
-  handle: string | null;
-  title: string;
-  description: string | null;
-  price: number | null;
-  currency: string | null;
-  url: string | null;
-  images: Array<{ url: string; alt?: string | null; position?: number }>;
-  available: boolean | null;
-};
+import { normaliseProduct, type FetchedProduct, type StorePlatform } from '$lib/server/store-product';
 
-export type StorePlatform = 'shopify' | 'woocommerce';
+export type { FetchedProduct, StorePlatform };
 
 export type StorePageOptions = { limit: number; after: string | null; onlyFirstPhoto: boolean; category?: string };
 
@@ -55,48 +45,6 @@ function originOf(storeUrl: string): URL | null {
   } catch {
     return null;
   }
-}
-
-/**
- * Solo la prima foto, quando il nodo lo chiede — un carosello con una miniatura per prodotto pesa
- * meno di uno con la galleria intera, e la card sulla tela ne mostra comunque una sola alla volta.
- */
-function limitPhotos(images: FetchedProduct['images'], onlyFirst: boolean): FetchedProduct['images'] {
-  return onlyFirst ? images.slice(0, 1) : images;
-}
-
-/** L'HTML resta HTML dentro `body_html`: il carosello mostra testo, non markup. */
-function stripHtml(html: unknown): string | null {
-  const text = String(html ?? '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-  return text || null;
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function shopifyProductOf(raw: any, origin: string, onlyFirstPhoto: boolean): FetchedProduct {
-  const variant = Array.isArray(raw.variants) ? raw.variants[0] : undefined;
-  const images: FetchedProduct['images'] = Array.isArray(raw.images)
-    ? raw.images
-        .map((img: unknown, i: number) => {
-          const src = typeof img === 'string' ? img : (img as { src?: string })?.src;
-          return src ? { url: src, position: i } : null;
-        })
-        .filter((x: unknown): x is FetchedProduct['images'][number] => x !== null)
-    : [];
-
-  const handle = typeof raw.handle === 'string' ? raw.handle.trim() : '';
-  const url = handle && !/[/?#\s]/.test(handle) ? `${origin}/products/${encodeURIComponent(handle)}` : null;
-
-  return {
-    externalId: String(raw.id ?? ''),
-    handle: handle || null,
-    title: String(raw.title ?? ''),
-    description: stripHtml(raw.body_html),
-    price: variant?.price != null ? Number(variant.price) : null,
-    currency: null,
-    url,
-    images: limitPhotos(images, onlyFirstPhoto),
-    available: typeof raw.available === 'boolean' ? raw.available : null
-  };
 }
 
 /**
@@ -135,53 +83,13 @@ export async function fetchShopifyPage(
       return { ok: false, error: 'store_invalid: /products.json has no "products" array — is this a Shopify store?' };
     }
 
-    const products = rawProducts.map((p) => shopifyProductOf(p, origin.origin, opts.onlyFirstPhoto));
+    const products = rawProducts.map((p) => normaliseProduct('shopify', p, { origin: origin.origin, divisor: 1, onlyFirstPhoto: opts.onlyFirstPhoto }));
     const after = rawProducts.length === limit ? String(page + 1) : null;
     return { ok: true, products, after };
   } catch (e) {
     if (e instanceof SafeFetchError) return { ok: false, error: `${e.reason}: ${e.message}` };
     return { ok: false, error: `fetch_failed: ${e instanceof Error ? e.message : String(e)}` };
   }
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function wooProductOf(raw: any, divisor: number, onlyFirstPhoto: boolean): FetchedProduct {
-  const images: FetchedProduct['images'] = Array.isArray(raw.images)
-    ? raw.images
-        .map((img: unknown, i: number) => {
-          const src = (img as { src?: string })?.src;
-          return src ? { url: src, position: i } : null;
-        })
-        .filter((x: unknown): x is FetchedProduct['images'][number] => x !== null)
-    : [];
-
-  const rawPrice = raw.prices?.price;
-  const price = rawPrice != null ? Number(rawPrice) / divisor : null;
-  const permalink = typeof raw.permalink === 'string' ? raw.permalink.trim() : '';
-
-  return {
-    externalId: String(raw.id ?? ''),
-    handle: typeof raw.slug === 'string' ? raw.slug : null,
-    title: decodeHtmlEntities(String(raw.name ?? '')),
-    description: stripHtml(raw.short_description || raw.description),
-    price,
-    currency: typeof raw.prices?.currency_code === 'string' ? raw.prices.currency_code : null,
-    url: /^https?:\/\//i.test(permalink) ? permalink : null,
-    images: limitPhotos(images, onlyFirstPhoto),
-    available: typeof raw.is_in_stock === 'boolean' ? raw.is_in_stock : null
-  };
-}
-
-function decodeHtmlEntities(s: string): string {
-  return s
-    .replace(/&#(\d+);/g, (_, code: string) => String.fromCharCode(parseInt(code, 10)))
-    .replace(/&#x([0-9a-fA-F]+);/g, (_, code: string) => String.fromCharCode(parseInt(code, 16)))
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&nbsp;/g, ' ');
 }
 
 /**
@@ -223,7 +131,7 @@ export async function fetchWooCommercePage(
     const minorUnit = Number(rawProducts[0]?.prices?.currency_minor_unit ?? 2);
     const divisor = Math.pow(10, Number.isFinite(minorUnit) ? minorUnit : 2);
 
-    const products = rawProducts.map((p) => wooProductOf(p, divisor, opts.onlyFirstPhoto));
+    const products = rawProducts.map((p) => normaliseProduct('woocommerce', p, { origin: origin.origin, divisor, onlyFirstPhoto: opts.onlyFirstPhoto }));
     const after = rawProducts.length === limit ? String(page + 1) : null;
     return { ok: true, products, after };
   } catch (e) {
@@ -267,7 +175,7 @@ export async function fetchShopifyProduct(storeUrl: string, handle: string, only
       return { ok: false, error: 'store_invalid: /products/<handle>.json has no "product" object' };
     }
 
-    return { ok: true, product: shopifyProductOf(raw, origin.origin, onlyFirstPhoto) };
+    return { ok: true, product: normaliseProduct('shopify', raw, { origin: origin.origin, divisor: 1, onlyFirstPhoto }) };
   } catch (e) {
     if (e instanceof SafeFetchError) return { ok: false, error: `${e.reason}: ${e.message}` };
     return { ok: false, error: `fetch_failed: ${e instanceof Error ? e.message : String(e)}` };
@@ -300,7 +208,7 @@ export async function fetchWooCommerceProductBySlug(storeUrl: string, slug: stri
     const minorUnit = Number(raw?.prices?.currency_minor_unit ?? 2);
     const divisor = Math.pow(10, Number.isFinite(minorUnit) ? minorUnit : 2);
 
-    return { ok: true, product: wooProductOf(raw, divisor, onlyFirstPhoto) };
+    return { ok: true, product: normaliseProduct('woocommerce', raw, { origin: origin.origin, divisor, onlyFirstPhoto }) };
   } catch (e) {
     if (e instanceof SafeFetchError) return { ok: false, error: `${e.reason}: ${e.message}` };
     return { ok: false, error: `fetch_failed: ${e instanceof Error ? e.message : String(e)}` };

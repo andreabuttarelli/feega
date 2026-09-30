@@ -23,6 +23,7 @@ export type SharedTile = {
   label: string;
   caption: string | null;
   badge: 'carousel' | 'video' | null;
+  sale?: string | null;
 };
 
 export type SharedOutput = { label: string; port: OutputPort; incompatible: boolean };

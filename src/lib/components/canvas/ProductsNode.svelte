@@ -3,6 +3,7 @@
   import SourcePreview, { type PreviewTile } from './SourcePreview.svelte';
   import type { ProductsNode } from '$lib/canvas/products-node';
   import type { Product } from '$lib/server/repos/products';
+  import { saleLabel } from '$lib/canvas/product-discount';
 
   let { node, products = [], total = 0 }: { node: ProductsNode; products?: Product[]; total?: number } = $props();
 
@@ -15,7 +16,8 @@
       thumb: product.images[0]?.url ?? null,
       label: product.title,
       caption: priceOf(product),
-      badge: product.images.length > 1 ? 'carousel' : null
+      badge: product.images.length > 1 ? 'carousel' : null,
+      sale: saleLabel(product.price, product.compareAtPrice)
     }))
   );
 

@@ -72,6 +72,10 @@ export const PRODUCT_FIELDS: readonly FieldSpec[] = [
   { path: 'filters.price_min', label: 'Minimum price', kind: FieldKind.Number, appliesAt: AppliesAt.Read },
   { path: 'filters.price_max', label: 'Maximum price', kind: FieldKind.Number, appliesAt: AppliesAt.Read },
   { path: 'filters.in_stock_only', label: 'In stock only', kind: FieldKind.Toggle, appliesAt: AppliesAt.Read },
+  { path: 'filters.on_sale_only', label: 'On sale only', kind: FieldKind.Toggle, appliesAt: AppliesAt.Read },
+  { path: 'filters.tag', label: 'Tag', kind: FieldKind.Text, appliesAt: AppliesAt.Read, placeholder: 'e.g. summer' },
+  { path: 'filters.vendor', label: 'Vendor', kind: FieldKind.Text, appliesAt: AppliesAt.Read },
+  { path: 'filters.product_type', label: 'Product type', kind: FieldKind.Text, appliesAt: AppliesAt.Read },
   { path: 'filters.sort', label: 'Sort by', kind: FieldKind.Select, appliesAt: AppliesAt.Read, options: options(PRODUCT_SORTS, OPTION_LABELS) }
 ];
 

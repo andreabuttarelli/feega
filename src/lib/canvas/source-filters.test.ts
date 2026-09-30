@@ -65,6 +65,43 @@ describe('filtri dei prodotti', () => {
     expect(catalog).toEqual(snapshot);
   });
 
+  describe('tag, marca, tipo e saldi', () => {
+    const shelf = [
+      { ...product('Runner', 98, true), compareAtPrice: 140, tags: ['Sale', 'running'], vendor: 'Allbirds', productType: 'Shoes' },
+      { ...product('Sock', 20, false), compareAtPrice: 20, tags: ['socks'], vendor: 'Allbirds', productType: 'Socks' },
+      { ...product('Cap', 30, true), compareAtPrice: null, tags: [], vendor: 'Other', productType: null },
+      product('Legacy', 10, true)
+    ];
+    const titles = (f: Partial<typeof DEFAULT_PRODUCT_FILTERS>) => filterProducts(shelf, { ...DEFAULT_PRODUCT_FILTERS, ...f }).map((p) => p.title);
+
+    it('per tag, senza maiuscole', () => {
+      expect(titles({ tag: 'sale' })).toEqual(['Runner']);
+    });
+
+    it('per marca e per tipo', () => {
+      expect(titles({ vendor: 'allbirds' })).toEqual(['Runner', 'Sock']);
+      expect(titles({ product_type: 'SHOES' })).toEqual(['Runner']);
+    });
+
+    it('solo in saldo tiene chi ha un barrato più alto del prezzo', () => {
+      expect(titles({ on_sale_only: true })).toEqual(['Runner']);
+    });
+
+    it('solo in saldo e disponibili insieme', () => {
+      expect(titles({ on_sale_only: true, in_stock_only: true })).toEqual(['Runner']);
+    });
+
+    it('i filtri nuovi sopravvivono al jsonb', () => {
+      expect(productFiltersOf({ tag: 'sale', vendor: 'A', product_type: 'B', on_sale_only: true })).toEqual({
+        ...DEFAULT_PRODUCT_FILTERS,
+        tag: 'sale',
+        vendor: 'A',
+        product_type: 'B',
+        on_sale_only: true
+      });
+    });
+  });
+
   it('un jsonb sporco diventa i filtri di default', () => {
     expect(productFiltersOf(undefined)).toEqual(DEFAULT_PRODUCT_FILTERS);
     expect(productFiltersOf({ price_min: 'x', sort: 'nope', query: 3 })).toEqual(DEFAULT_PRODUCT_FILTERS);
