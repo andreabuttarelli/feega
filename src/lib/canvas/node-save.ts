@@ -119,6 +119,11 @@ export function keepDirty<T extends Row>(fresh: T[], local: T[], dirtyKeys: (id:
   });
 }
 
+export function orphanedEdits(local: { id: string }[], server: { id: string }[], dirtyKeys: (id: string) => string[]): string[] {
+  const alive = new Set(server.map((row) => row.id));
+  return local.filter((tile) => !alive.has(tile.id) && dirtyKeys(tile.id).length).map((tile) => tile.id);
+}
+
 type RealtimeChange = { table: string; eventType: string; new: unknown };
 
 type ShownTile = { id: string; data: Record<string, unknown>; x?: number; y?: number; displayName?: string | null };

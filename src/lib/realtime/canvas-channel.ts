@@ -15,6 +15,8 @@ type CanvasConnection = {
 	onError?: (error: unknown) => void;
 };
 
+const DEAD_STATUSES = new Set(['CLOSED', 'TIMED_OUT']);
+
 export function connectCanvas(options: CanvasConnection): () => void {
 	const { client, canvasId, projectId, peer, onChange, onPeers, onReconnect, onCanvasList } = options;
 	let closed = false;
@@ -31,9 +33,10 @@ export function connectCanvas(options: CanvasConnection): () => void {
 			return;
 		}
 
-		channel = client.channel(`canvas:${canvasId}`, {
+		const joined = client.channel(`canvas:${canvasId}`, {
 			config: { private: true, presence: { key: peer.userId } }
 		});
+		channel = joined;
 
 		for (const table of ['nodes', 'nodes_connections']) {
 			channel.on('postgres_changes', {
@@ -60,7 +63,7 @@ export function connectCanvas(options: CanvasConnection): () => void {
 		});
 
 		channel.subscribe((status, error) => {
-			if (closed) {
+			if (closed || joined !== channel) {
 				return;
 			}
 			if (status === 'SUBSCRIBED') {
@@ -72,14 +75,30 @@ export function connectCanvas(options: CanvasConnection): () => void {
 			if (error) {
 				options.onError?.(error);
 			}
+			if (DEAD_STATUSES.has(status)) {
+				reopen();
+			}
 		});
 	}
 
-	void open().catch((error) => {
-		if (!closed) {
-			options.onError?.(error);
+	function reopen() {
+		const dead = channel;
+		channel = null;
+		if (dead) {
+			void client.removeChannel(dead);
 		}
-	});
+		start();
+	}
+
+	function start() {
+		void open().catch((error) => {
+			if (!closed) {
+				options.onError?.(error);
+			}
+		});
+	}
+
+	start();
 
 	return () => {
 		closed = true;

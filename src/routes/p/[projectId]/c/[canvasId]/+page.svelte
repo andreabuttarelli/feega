@@ -14,13 +14,14 @@
    * Qui si fa l'altra metà — quale riga sta dietro una tile, e cosa si scrive quando cambia.
    */
   import { onCanvasReveal } from '$lib/canvas/canvas-reveal';
+  import { DROPPED_EDIT_NOTICE, Trigger, VERDICT_NOTICE, Verdict, carryNotice, changedElsewhere, judge, takeNotice, type RemoteState } from '$lib/canvas/staleness';
   import { keepSame } from '$lib/canvas/snapshot-keep';
   import { AssetSize, sized } from '$lib/canvas/asset-url';
   import TieredImage from '$lib/components/canvas/TieredImage.svelte';
   import { SaveStatus, SaveTiming, SendResult, createSaveScheduler } from '$lib/canvas/save-scheduler';
   import { canvasActionUrl } from '$lib/canvas/canvas-action-url';
   import { baseOf, diffNodeData } from '$lib/canvas/node-patch';
-  import { SaveFailure, adoptIdleRows, failureOf, isOwnEcho, keepDirty, keepLocal, saveMessage, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
+  import { SaveFailure, adoptIdleRows, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
   import { createUndoStack } from '$lib/canvas/undo-stack';
   import type { Gesture, UndoItem } from '$lib/canvas/undo-plan';
   import { buildMoveGesture, checkMoveGesture, inverseMoveGesture, type MoveGesture } from '$lib/canvas/move-gesture';
@@ -28,7 +29,8 @@
   import type { PresencePeer } from '$lib/realtime/presence-peers';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import { deserialize } from '$app/forms';
-  import { beforeNavigate, invalidate } from '$app/navigation';
+  import { beforeNavigate, goto, invalidate } from '$app/navigation';
+  import { updated } from '$app/state';
   import { CANVAS_LIST_DEPENDENCY } from '$lib/canvas/canvas-list';
   import { formatCredits } from '$lib/components/credit-amount-format';
   import { untrack } from 'svelte';
@@ -789,24 +791,68 @@
     return () => canvasSelection.set([]);
   });
 
-  async function refresh() {
+  let seenRevision = '';
+  let reloadOffered = $state(false);
+
+  function dropOrphans(fresh: CanvasNodeRecord[]) {
+    const dropped = orphanedEdits(nodes, fresh, saves.dirtyKeys);
+    for (const id of dropped) {
+      saves.discard(id);
+    }
+    if (dropped.length) {
+      failed = DROPPED_EDIT_NOTICE;
+    }
+  }
+
+  async function refresh(): Promise<boolean> {
     const version = ++snapshotVersion;
     const snapshot = await post('snapshot', {});
     if (!snapshot) {
-      return;
+      return false;
     }
+    seenRevision = String(snapshot.revision ?? '');
+    dropOrphans(snapshot.nodes as CanvasNodeRecord[]);
     runsOverride = keepSame(runs, (snapshot.runs ?? {}) as Record<string, unknown[]>, Date.now());
     if (pending || version !== snapshotVersion) {
       nodes = adoptIdleRows(nodes, snapshot.nodes as CanvasNodeRecord[], saves.dirtyKeys);
       snapshotMissed = true;
-      return;
+      return true;
     }
     const now = Date.now();
+    const before = nodes;
     nodes = keepSame(nodes, keepDirty((snapshot.nodes as CanvasNodeRecord[]).map((n) => toTile(n)), nodes, saves.dirtyKeys), now);
     edges = keepSame(edges, (snapshot.connections as Connection[]).map(toEdge), now);
     productsOverride = keepSame(products, (snapshot.products ?? {}) as Record<string, Product[]>, now);
     socialPostsOverride = keepSame(socialPosts, (snapshot.socialPosts ?? {}) as Record<string, SocialPost[]>, now);
     influencersOverride = keepSame(influencersByNode, (snapshot.influencers ?? {}) as Record<string, InfluencerTile>, now);
+    return changedElsewhere(before, nodes);
+  }
+
+  function leave(path: string, notice: string) {
+    carryNotice(notice);
+    void goto(path, { invalidateAll: true });
+  }
+
+  const REACTIONS: Record<Verdict, () => Promise<void> | void> = {
+    [Verdict.Resync]: async () => {
+      void invalidate(CANVAS_LIST_DEPENDENCY);
+      if (await refresh()) {
+        failed = VERDICT_NOTICE[Verdict.Resync];
+      }
+    },
+    [Verdict.LeaveCanvas]: () => leave(`/p/${data.projectId}`, VERDICT_NOTICE[Verdict.LeaveCanvas]),
+    [Verdict.LeaveProject]: () => leave('/app', VERDICT_NOTICE[Verdict.LeaveProject]),
+    [Verdict.OfferReload]: () => { reloadOffered = true; }
+  };
+
+  async function checkStale(trigger: Trigger) {
+    const remote = (await post('revision', {})) as RemoteState | null;
+    if (!remote) {
+      return;
+    }
+    for (const verdict of judge({ seen: seenRevision, remote, trigger, appUpdated: updated.current })) {
+      await REACTIONS[verdict]();
+    }
   }
 
   $effect(() => {
@@ -814,6 +860,11 @@
     runsOverride = null;
     nodes = (data.nodes as CanvasNodeRecord[]).map((n) => toTile(n));
     edges = (data.connections as Connection[]).map(toEdge);
+    seenRevision = data.revision;
+    const carried = takeNotice();
+    if (carried) {
+      failed = carried;
+    }
     const user = data.session?.user;
     if (!user) { return; }
     return connectCanvas({
@@ -825,14 +876,20 @@
       onChange: (change) => {
         if (!isOwnEcho(change, nodes)) { refreshSoon(); }
       },
-      onReconnect: () => { void refresh(); },
+      onReconnect: () => { void checkStale(Trigger.Reconnect); },
       onCanvasList: () => { void invalidate(CANVAS_LIST_DEPENDENCY); },
       onPeers: (value) => { peers = value; },
       onError: () => { failed = 'Connessione in tempo reale interrotta'; }
     });
   });
 
-  $effect(() => onCanvasReveal(() => { void refresh(); }));
+  $effect(() => onCanvasReveal((trigger) => { void checkStale(trigger); }));
+
+  $effect(() => {
+    if (updated.current) {
+      void untrack(() => checkStale(Trigger.AppUpdated));
+    }
+  });
 
   let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -869,7 +926,7 @@
 
   beforeNavigate(() => { void saves.flush(); });
 
-  const READ_ACTIONS = new Set(['snapshot', 'estimate_text_cost', 'calendar_posts', 'audio_voices']);
+  const READ_ACTIONS = new Set(['snapshot', 'revision', 'estimate_text_cost', 'calendar_posts', 'audio_voices']);
 
   function formOf(fields: Record<string, string | number | File | string[]>): FormData {
     const body = new FormData();
@@ -2200,6 +2257,12 @@
       {/if}
     </p>
   {/if}
+  {#if reloadOffered}
+    <p class="warning reload" role="status">
+      {VERDICT_NOTICE[Verdict.OfferReload]}
+      <button type="button" onclick={() => location.reload()}>Reload</button>
+    </p>
+  {/if}
   {#if workflowRunning}
     <div class="workflow-chip" role="status">
       Flusso in corso
@@ -2590,6 +2653,11 @@
     background: var(--paper, #fff);
     border: 1px solid var(--line-2, #d2d2d7);
     border-radius: 0;
+  }
+
+  .warning.reload {
+    top: 40px;
+    color: inherit;
   }
 
   .workflow-chip {

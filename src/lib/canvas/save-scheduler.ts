@@ -205,5 +205,18 @@ export function createSaveScheduler(options: SchedulerOptions) {
     };
   }
 
-  return { schedule, flush, dirtyKeys, sending, unsent, status, hold };
+  function discard(id: string) {
+    const state = nodes.get(id);
+    if (!state) {
+      return;
+    }
+    if (state.timer) {
+      clearTimeout(state.timer);
+    }
+    nodes.delete(id);
+    settle([...state.pendingWaiters, ...state.inflightWaiters], false);
+    announce();
+  }
+
+  return { schedule, flush, dirtyKeys, sending, unsent, status, hold, discard };
 }

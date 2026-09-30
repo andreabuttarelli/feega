@@ -75,6 +75,7 @@ import { referenceLibrary } from '$lib/server/canvas/reference-library';
 import { CanvasRemoval, openNewCanvas, removeCanvas, renameCanvasTo } from '$lib/server/canvas/lifecycle';
 import { canvasPath } from '$lib/server/tenancy/entry';
 import { renameProject } from '$lib/server/repos/projects';
+import { canvasRevision, recordsRevision } from '$lib/server/canvas/revision';
 
 // L'azione `run` aspetta la generazione DENTRO la richiesta — un'immagine ci mette fino a un
 // minuto, e il default della piattaforma è sotto quella soglia. Senza, la richiesta muore a metà
@@ -242,6 +243,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
     canvas,
     nodes,
     connections,
+    revision: recordsRevision(nodes, connections),
     catalogue,
     runs,
     products,
@@ -541,7 +543,17 @@ export const actions: Actions = {
       loadGenRuns(scope.db, { orgId: scope.orgId, nodes }),
       loadDownloaded(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, nodes })
     ]);
-    return { nodes, connections, runs, products, socialPosts, influencers };
+    return { nodes, connections, runs, products, socialPosts, influencers, revision: recordsRevision(nodes, connections) };
+  },
+
+  revision: async ({ params, locals }) => {
+    const { session, user } = await locals.safeGetSession();
+    const db = await locals.db();
+    if (!session || !user || !db) {
+      throw redirect(303, '/login');
+    }
+    const memberships = await listMemberships(db, user.id);
+    return canvasRevision(db, { canvasId: params.canvasId, projectId: params.projectId, memberships });
   },
 
   run: async ({ request, params, locals }) => {

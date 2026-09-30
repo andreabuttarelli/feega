@@ -15,6 +15,7 @@ const deployTarget = process.env.DEPLOY_TARGET ?? '';
 // means redeploying the same commit no longer looks like a new version to connected clients.
 const commit = (process.env.VERCEL_GIT_COMMIT_SHA ?? '').slice(0, 12);
 const releaseName = `${pkg.version}+${commit || 'dev'}`;
+const VERSION_POLL_MS = 60_000;
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
@@ -26,7 +27,7 @@ const config = {
         : // Pin the Vercel runtime so local builds don't depend on the local Node version.
           vercelAdapter({ runtime: 'nodejs22.x', maxDuration: 300 }),
 
-    version: { name: releaseName },
+    version: { name: releaseName, pollInterval: VERSION_POLL_MS },
 
     // Kit's built-in check is all-or-nothing and rejects any form-encoded POST without an
     // `origin` header — which is exactly what an OAuth token request from a CLI looks like.
