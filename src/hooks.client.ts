@@ -4,6 +4,7 @@ import { env } from '$env/dynamic/public';
 import { dropIfInternal, isInternalViewer, trackerAllowed } from '$lib/analytics';
 import { Tracker } from '$lib/consent-model';
 import { drainErrors, rememberError } from '$lib/sentry-buffer';
+import { REPLAY_PRIVACY, SENTRY_PRIVACY, privateEvent } from '$lib/sentry-privacy';
 
 type SentryModule = typeof import('@sentry/sveltekit');
 
@@ -55,14 +56,12 @@ async function bootSentry(): Promise<SentryModule | null> {
     replaysSessionSampleRate: 0,
     replaysOnErrorSampleRate: 1.0,
 
-    // Enable sending user PII (Personally Identifiable Information)
-    // https://docs.sentry.io/platforms/javascript/guides/sveltekit/configuration/options/#sendDefaultPii
-    sendDefaultPii: true,
+    ...SENTRY_PRIVACY,
 
     // Guard 2 — chi sta guardando. Il client si inizializza lo stesso, ma ogni evento viene
     // scartato se il visitatore è dei nostri. Valutato a ogni invio, non una volta qui, così un
     // login lato client conta subito.
-    beforeSend: dropIfInternal,
+    beforeSend: (event) => privateEvent(event, dropIfInternal),
     beforeSendTransaction: dropIfInternal,
     beforeSendLog: dropIfInternal
   });
@@ -84,7 +83,7 @@ async function attachReplay(): Promise<void> {
   const Sentry = await bootSentry();
   if (!Sentry) return;
   try {
-    Sentry.addIntegration(Sentry.replayIntegration());
+    Sentry.addIntegration(Sentry.replayIntegration(REPLAY_PRIVACY));
   } catch {
     // ignore — Sentry may already have it, or client not ready
   }
