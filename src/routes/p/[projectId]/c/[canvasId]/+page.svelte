@@ -20,7 +20,7 @@
   import { SaveStatus, SaveTiming, SendResult, createSaveScheduler } from '$lib/canvas/save-scheduler';
   import { canvasActionUrl } from '$lib/canvas/canvas-action-url';
   import { baseOf, diffNodeData } from '$lib/canvas/node-patch';
-  import { SaveFailure, adoptIdleRows, failureOf, isOwnEcho, keepDirty, keepLocal, saveMessage, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
+  import { SaveFailure, adoptIdleRows, failureOf, isOwnEcho, keepDirty, keepLocal, saveMessage, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
   import { createUndoStack } from '$lib/canvas/undo-stack';
   import type { Gesture, UndoItem } from '$lib/canvas/undo-plan';
   import { buildMoveGesture, checkMoveGesture, inverseMoveGesture, type MoveGesture } from '$lib/canvas/move-gesture';
@@ -114,6 +114,7 @@
     frameOf,
     genData,
     genOf,
+    genPatch,
     influencerOf,
     listData,
     listOf,
@@ -388,9 +389,12 @@
     };
   }
 
+  let runsOverride = $state<Record<string, unknown[]> | null>(null);
+  const runs = $derived(runsOverride ?? ((data.runs ?? {}) as Record<string, unknown[]>));
+
   const runsByNode = $derived(
     Object.fromEntries(
-      Object.entries((data.runs ?? {}) as Record<string, unknown[]>).map(([id, rows]) => [
+      Object.entries(runs).map(([id, rows]) => [
         id,
         producedRuns((rows as Parameters<typeof toGenRun>[0][]).map(toGenRun))
       ])
@@ -440,7 +444,7 @@
    *  `toGenRun` scarti `status`/`params`, i due campi che dicono se una riga è un biglietto. */
   const loopQueuedByNode = $derived(
     Object.fromEntries(
-      Object.entries((data.runs ?? {}) as Record<string, { status?: string; params?: { loop?: { phase?: string } } }[]>).map(
+      Object.entries(runs as Record<string, { status?: string; params?: { loop?: { phase?: string } } }[]>).map(
         ([id, rows]) => [id, rows.filter((r) => r.status === 'running' && r.params?.loop?.phase === 'queued').length]
       )
     )
@@ -707,6 +711,7 @@
   let failedIsCreditsExhausted = $state(false);
   let peers = $state<PresencePeer[]>([]);
   let pending = 0;
+  let snapshotMissed = false;
   let snapshotVersion = 0;
   const SAVE_DEBOUNCE_MS = 400;
   const SAVE_MAX_WAIT_MS = 2000;
@@ -783,8 +788,10 @@
     if (!snapshot) {
       return;
     }
+    runsOverride = keepSame(runs, (snapshot.runs ?? {}) as Record<string, unknown[]>, Date.now());
     if (pending || version !== snapshotVersion) {
       nodes = adoptIdleRows(nodes, snapshot.nodes as CanvasNodeRecord[], saves.dirtyKeys);
+      snapshotMissed = true;
       return;
     }
     const now = Date.now();
@@ -797,6 +804,7 @@
 
   $effect(() => {
     snapshotVersion += 1;
+    runsOverride = null;
     nodes = (data.nodes as CanvasNodeRecord[]).map((n) => toTile(n));
     edges = (data.connections as Connection[]).map(toEdge);
     const user = data.session?.user;
@@ -808,7 +816,7 @@
       peer: { userId: user.id, name: user.email ?? 'Utente', avatar: null,
         path: `/p/${data.projectId}/c/${data.canvas.id}`, threadId: null },
       onChange: (change) => {
-        if (!isOwnEcho(change, nodes, saves.sending)) { refreshSoon(); }
+        if (!isOwnEcho(change, nodes)) { refreshSoon(); }
       },
       onReconnect: () => { void refresh(); },
       onCanvasList: () => { void invalidate(CANVAS_LIST_DEPENDENCY); },
@@ -820,6 +828,12 @@
   $effect(() => onCanvasReveal(() => { void refresh(); }));
 
   let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function retryMissed() {
+    if (pending || !snapshotMissed) { return; }
+    snapshotMissed = false;
+    refreshSoon();
+  }
 
   function refreshSoon() {
     if (refreshTimer) { clearTimeout(refreshTimer); }
@@ -913,7 +927,7 @@
       if (mutating) { failed = null; failedIsCreditsExhausted = false; }
       return (result.data ?? null) as Record<string, unknown> | null;
     } finally {
-      if (mutating) { pending -= 1; snapshotVersion += 1; }
+      if (mutating) { pending -= 1; snapshotVersion += 1; retryMissed(); }
     }
   }
 
@@ -1167,6 +1181,7 @@
     }
 
     pending += 1;
+    const release = saves.hold(id);
 
     const result = await post('run', {
       node_id: id,
@@ -1175,7 +1190,7 @@
       model: effectiveModel(gen.medium, gen.model, catalogue[gen.medium] ?? []) ?? '',
       params: JSON.stringify(gen.params),
       version: before.version
-    });
+    }).finally(release);
     pending -= 1;
 
     if (!result) {
@@ -1422,31 +1437,24 @@
   }
 
   async function saveNode(id: string, patch: Record<string, unknown>, base: Record<string, unknown>): Promise<WriteOutcome> {
-    pending += 1;
-    snapshotVersion += 1;
-    try {
-      const out = await writeWithRetry({
-        send: (changed, believed) =>
-          send('write', { node_id: id, patch: JSON.stringify(changed), base: JSON.stringify(believed) }),
-        reread: async () => {
-          const snapshot = await send('snapshot', {});
-          const rows = ((snapshot.data ?? {}) as { nodes?: CanvasNodeRecord[] }).nodes ?? [];
-          return rows.find((node) => node.id === id)?.data ?? null;
-        },
-        patch,
-        base
-      });
-      if (out.ok) {
-        failed = null;
-        failedIsCreditsExhausted = false;
-        return out;
-      }
-      announce('write', out.reason, out.detail);
+    const out = await writeWithRetry({
+      send: (changed, believed) =>
+        send('write', { node_id: id, patch: JSON.stringify(changed), base: JSON.stringify(believed) }),
+      reread: async () => {
+        const snapshot = await send('snapshot', {});
+        const rows = ((snapshot.data ?? {}) as { nodes?: CanvasNodeRecord[] }).nodes ?? [];
+        return rows.find((node) => node.id === id)?.data ?? null;
+      },
+      patch,
+      base
+    });
+    if (out.ok) {
+      failed = null;
+      failedIsCreditsExhausted = false;
       return out;
-    } finally {
-      pending -= 1;
-      snapshotVersion += 1;
     }
+    announce('write', out.reason, out.detail);
+    return out;
   }
 
   const SEND_RESULT: Record<SaveFailure, SendResult> = {
@@ -1462,7 +1470,7 @@
   async function sendSave(id: string, touched: Record<string, unknown>): Promise<SendResult> {
     const current = nodes.find((node) => node.id === id);
     if (!current) { return SendResult.Dropped; }
-    const change = diffNodeData(current.saved, current.data, Object.keys(touched));
+    const change = diffNodeData(current.saved, { ...current.data, ...serverWritten(touched) }, Object.keys(touched));
     if (!Object.keys(change).length) { return SendResult.Saved; }
 
     const out = await saveNode(id, change, baseOf(current.saved, change));
@@ -1499,7 +1507,7 @@
       delete next[id];
       textCostEstimates = next;
     }
-    void write(id, genData({ ...gen, ...patch }));
+    void write(id, genPatch(gen, patch));
   }
 
   async function estimateTextCost(id: string, prompt: string, model: string, revision: string) {

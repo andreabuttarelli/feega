@@ -581,6 +581,19 @@ export const SYSTEM_OWNED_FIELDS = [
   'outputUncensored'
 ] as const;
 
+export const SERVER_WRITTEN_FIELDS: readonly string[] = [
+  'refId',
+  'sourceRefId',
+  'mediaKind',
+  'assetId',
+  'runId',
+  'running',
+  'error',
+  'outputUncensored',
+  'sync_status',
+  'sync_error'
+];
+
 export enum FieldScope {
   Schema = 'schema',
   WithSystem = 'with-system'

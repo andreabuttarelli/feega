@@ -2149,6 +2149,20 @@ Signal: text typed fast shrinks back while typing; the network panel shows a `wr
 stop (measured: 200 chars → 374 requests, 28 chars kept). Cause: each keystroke saved at
 once, each response replaced `data` with a server row older than what was typed since, and
 every own write came back through realtime as a full snapshot. Move: edits go through
-`save-scheduler.ts`; a server row never overwrites a field in `dirtyKeys`; realtime updates
-for a node in flight or at a held version are echoes (`isOwnEcho`). A page callback that a
+`save-scheduler.ts`; a server row never overwrites a field in `dirtyKeys`; a realtime update
+is an echo only when it matches what the tab shows (`isOwnEcho`). A page callback that a
 child calls from its `$effect` must read `$state` through `untrack`, or the page loops.
+
+## A generation finishes but the node shows nothing until reload
+Signal: `nodes.data.refId` is set and `running` is false in the database, the node shows an
+empty text box (or stays spinning); a reload shows the result. Also: agent edits, moves or new
+nodes appear only after reload. Cause: the text lives in `node_runs`, and `refresh()` never
+read `snapshot.runs`; an edit made while a run was starting saved the whole gen state
+(`running: true`, stale `refId`) and made those server fields "dirty"; `isOwnEcho` skipped any
+update on a node with a save in flight or with an unchanged version (moves and soft deletes
+never bump it); `tile-sync` never moved a node that already existed. Move: server-written
+fields (`SERVER_WRITTEN_FIELDS`, `node-data.ts`) are never held locally; an edit writes only the
+keys it changed (`genPatch`); saves are held while a run starts (`saves.hold`); an echo is a row
+identical to what the tab shows. Proof is the real browser, not the unit suite:
+`tests/e2e/canvas.spec.ts` with `E2E_REAL_STACK=1` — the old spec for this path used a
+`Modello` label that no longer exists, so it had not run for weeks.
