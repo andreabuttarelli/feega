@@ -18,6 +18,11 @@ const TARGET_BY_OLD_PATH: Readonly<Record<string, string>> = {
   '/tools/80s-retro-video-maker': `${SITE}/80s-retro-video`,
   '/tools/anime-video-generator': `${SITE}/anime-video-generator`,
   '/tools/claymation-ai-generator': `${SITE}/claymation-ai`,
+  '/tools/spotify-canvas-maker': `${SITE}/spotify-canvas-maker`,
+  '/tools/text-to-video': `${SITE}/ai-video-generator`,
+  '/tools/image-to-video': `${SITE}/ai-video-generator`,
+  '/tools/realistic-ai-video': `${SITE}/ai-video-generator`,
+  '/tools/ai-video-generator-for-social-media': `${SITE}/ai-video-generator`,
   '/sign-in': `${APP}/login`,
   '/pricing': HOME,
   '/privacy': `${SITE}/privacy`,
@@ -27,6 +32,7 @@ const TARGET_BY_OLD_PATH: Readonly<Record<string, string>> = {
 
 const TARGET_BY_OLD_PREFIX: readonly (readonly [string, string])[] = [
   ['/tools/', STYLES_HUB],
+  ['/docs', `${SITE}/ai-node-editor`],
   ['/app/', `${APP}/`]
 ];
 

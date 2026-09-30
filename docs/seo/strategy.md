@@ -59,9 +59,10 @@ Rules, in order:
    locale prefix.
 2. Locale prefixes are stripped: a localized URL goes to its English equivalent (English pages
    only, by owner decision).
-3. Exact English path → its page.
-4. Any other `/tools/*` → `/ai-video-styles` hub.
-5. Everything else (docs, status, blog, not-served tools) → home.
+3. Exact English path → its page (text/image-to-video and realistic tools → `/ai-video-generator`,
+   Spotify Canvas → `/spotify-canvas-maker`).
+4. Any other `/tools/*` → `/ai-video-styles` hub; `/docs*` (node docs) → `/ai-node-editor`.
+5. Everything else (status, blog, not-served tools) → home.
 
 | Old path | Clicks | Impr. | New target |
 |---|---|---|---|
@@ -82,7 +83,7 @@ Rules, in order:
 | `/character-generator` | 2 | 9 | www.feega.app/ |
 | `/tools/explainer-video-ai` | 1 | 207 | www.feega.app/ai-video-styles |
 | `/sign-in` | 1 | 123 | oh.feega.app/login |
-| `/tools/text-to-video` | 1 | 39 | www.feega.app/ai-video-styles |
+| `/tools/text-to-video` | 1 | 39 | www.feega.app/ai-video-generator |
 | `/privacy` | 1 | 15 | www.feega.app/privacy |
 | `/es/tools/fantasy-video-maker` | 1 | 11 | www.feega.app/ai-video-styles |
 | `/it/tools/movie-trailer-generator` | 1 | 7 | www.feega.app/ai-video-styles |
@@ -90,68 +91,74 @@ Rules, in order:
 | `/pricing` | 0 | 307 | www.feega.app/ |
 | `/app/character-generator` | 0 | 213 | oh.feega.app/ |
 | `/app/image-generator` | 0 | 150 | oh.feega.app/ |
-| `/it/tools/spotify-canvas-maker` | 0 | 80 | www.feega.app/ai-video-styles |
+| `/it/tools/spotify-canvas-maker` | 0 | 80 | www.feega.app/spotify-canvas-maker |
 | `/status` | 0 | 74 | www.feega.app/ |
 | `/it/tools/claymation-ai-generator` | 0 | 53 | www.feega.app/claymation-ai |
-| `/docs/split-text-nodes` | 0 | 51 | www.feega.app/ |
+| `/docs/split-text-nodes` | 0 | 51 | www.feega.app/ai-node-editor |
 | `/app/generate` | 0 | 50 | oh.feega.app/ |
 | `/terms` | 0 | 41 | www.feega.app/terms |
-| `/es/tools/realistic-ai-video` | 0 | 37 | www.feega.app/ai-video-styles |
+| `/es/tools/realistic-ai-video` | 0 | 37 | www.feega.app/ai-video-generator |
 | `/app/node-editor` | 0 | 31 | oh.feega.app/ |
 | `/app/generate-video?mode=360` | 0 | 29 | oh.feega.app/?mode=360 |
-| `/docs/list-selector-nodes` | 0 | 26 | www.feega.app/ |
-| `/docs/html-nodes` | 0 | 25 | www.feega.app/ |
-| `/es/tools/spotify-canvas-maker` | 0 | 24 | www.feega.app/ai-video-styles |
-| `/docs/api/generate-image` | 0 | 19 | www.feega.app/ |
-| `/docs/prompt-concatenator-nodes` | 0 | 18 | www.feega.app/ |
-| `/docs/prompting-guide` | 0 | 18 | www.feega.app/ |
-| `/de/tools/spotify-canvas-maker` | 0 | 18 | www.feega.app/ai-video-styles |
+| `/docs/list-selector-nodes` | 0 | 26 | www.feega.app/ai-node-editor |
+| `/docs/html-nodes` | 0 | 25 | www.feega.app/ai-node-editor |
+| `/es/tools/spotify-canvas-maker` | 0 | 24 | www.feega.app/spotify-canvas-maker |
+| `/docs/api/generate-image` | 0 | 19 | www.feega.app/ai-node-editor |
+| `/docs/prompt-concatenator-nodes` | 0 | 18 | www.feega.app/ai-node-editor |
+| `/docs/prompting-guide` | 0 | 18 | www.feega.app/ai-node-editor |
+| `/de/tools/spotify-canvas-maker` | 0 | 18 | www.feega.app/spotify-canvas-maker |
 | `/it/tools/watercolor-video-generator` | 0 | 17 | www.feega.app/ai-video-styles |
-| `/docs/ai-voice-nodes` | 0 | 16 | www.feega.app/ |
-| `/docs/character-generator` | 0 | 15 | www.feega.app/ |
+| `/docs/ai-voice-nodes` | 0 | 16 | www.feega.app/ai-node-editor |
+| `/docs/character-generator` | 0 | 15 | www.feega.app/ai-node-editor |
 | `/es/tools/drone-video-generator` | 0 | 14 | www.feega.app/ai-video-styles |
 | `/cookie-policy` | 0 | 13 | www.feega.app/cookies |
 | `/de/tools/fantasy-video-maker` | 0 | 11 | www.feega.app/ai-video-styles |
 | `/free-background-remover` | 0 | 11 | www.feega.app/ |
-| `/docs/cookbook` | 0 | 9 | www.feega.app/ |
-| `/es/tools/ai-video-generator-for-social-media` | 0 | 9 | www.feega.app/ai-video-styles |
+| `/docs/cookbook` | 0 | 9 | www.feega.app/ai-node-editor |
+| `/es/tools/ai-video-generator-for-social-media` | 0 | 9 | www.feega.app/ai-video-generator |
 | `/fr/auto-caption` | 0 | 8 | www.feega.app/ |
-| `/it/tools/realistic-ai-video` | 0 | 8 | www.feega.app/ai-video-styles |
+| `/it/tools/realistic-ai-video` | 0 | 8 | www.feega.app/ai-video-generator |
 | `/it/sign-in` | 0 | 8 | oh.feega.app/login |
 | `/pt/remove-video-background` | 0 | 8 | www.feega.app/ |
 | `/pt/tools/ai-video-upscaler` | 0 | 7 | www.feega.app/ai-video-upscaler |
 | `/app/generated-content` | 0 | 6 | oh.feega.app/ |
 | `/shopify-photographer` | 0 | 6 | www.feega.app/ |
-| `/pt/tools/spotify-canvas-maker` | 0 | 6 | www.feega.app/ai-video-styles |
+| `/pt/tools/spotify-canvas-maker` | 0 | 6 | www.feega.app/spotify-canvas-maker |
 | `/remove-background` | 0 | 6 | www.feega.app/ |
-| `/tools/image-to-video` | 0 | 6 | www.feega.app/ai-video-styles |
+| `/tools/image-to-video` | 0 | 6 | www.feega.app/ai-video-generator |
 | `/#features` | 0 | 4 | www.feega.app/ |
-| `/docs` | 0 | 4 | www.feega.app/ |
+| `/docs` | 0 | 4 | www.feega.app/ai-node-editor |
 | `/es/tools/fashion-runway-ai` | 0 | 4 | www.feega.app/ai-video-styles |
 | `/blog` | 0 | 3 | www.feega.app/ |
 | `/fr/sign-in` | 0 | 3 | oh.feega.app/login |
 | `/es/tools/claymation-ai-generator` | 0 | 3 | www.feega.app/claymation-ai |
 | `/it/tools/horror-video-maker` | 0 | 3 | www.feega.app/ai-video-styles |
 | `/de/tools/time-lapse-video-maker` | 0 | 3 | www.feega.app/ai-video-styles |
-| `/pt/tools/text-to-video` | 0 | 3 | www.feega.app/ai-video-styles |
+| `/pt/tools/text-to-video` | 0 | 3 | www.feega.app/ai-video-generator |
 | `/draw-to-image` | 0 | 3 | www.feega.app/ |
-| `/tools/spotify-canvas-maker` | 0 | 3 | www.feega.app/ai-video-styles |
+| `/tools/spotify-canvas-maker` | 0 | 3 | www.feega.app/spotify-canvas-maker |
 | `/tools/faceless-youtube-channel-generator` | 0 | 3 | www.feega.app/ai-video-styles |
 | `/app/brands` | 0 | 2 | oh.feega.app/ |
 | `/es/tools/watercolor-video-generator` | 0 | 2 | www.feega.app/ai-video-styles |
 | `/fr/remove-background` | 0 | 1 | www.feega.app/ |
 | `/pt/docs/upscaler-nodes` | 0 | 1 | www.feega.app/ai-video-upscaler |
-| `/it/tools/ai-video-generator-for-social-media` | 0 | 1 | www.feega.app/ai-video-styles |
+| `/it/tools/ai-video-generator-for-social-media` | 0 | 1 | www.feega.app/ai-video-generator |
 | `/es/tools/3d-animation-maker` | 0 | 1 | www.feega.app/3d-animation-maker |
 | `/fr/tools/horror-video-maker` | 0 | 1 | www.feega.app/ai-video-styles |
 | `/es/draw-to-image` | 0 | 1 | www.feega.app/ |
 
 ## Page plan (Framer, created unpublished)
 
-All pages reuse the site's Navigation layout template (nav + footer) and the legal-page
-document layout (760 px column, `Headings/Title`, `Headings/Label`, `Body Styles/Body Wide`,
-`Link 2`). Each has a title and meta description, one H1, an answer-first intro, a CTA to
-`https://oh.feega.app`, how-to sections, a FAQ, and links to the sibling pages.
+All pages reuse the site's Navigation layout template (nav + footer), a 960 px column and the
+site text styles. Each has: title and meta description, one H1, an answer-first intro, a hero
+image, a "How it works on feega" section (add a node, connect, generate), how-to sections, an
+examples grid (before/after on the upscaler), a FAQ, **three CTAs** (hero, after examples, after
+FAQ) to `https://oh.feega.app/?utm_source=feega.app&utm_medium=seo&utm_campaign=<page-slug>`,
+and links to the home page and every other landing page.
+
+Images: 45 WebP files (43 generated with Seedream 5 Lite on OpenRouter, 2 "before" frames
+downscaled locally from the generated "after"), ~6 MB total, uploaded to Framer with keyword alt
+text. Generation cost: **$1.51** (43 images at $0.035; one prompt refused by moderation, not billed).
 
 | Path | H1 | Primary cluster |
 |---|---|---|
@@ -162,7 +169,10 @@ document layout (760 px column, `Headings/Title`, `Headings/Label`, `Body Styles
 | `/claymation-ai` | Claymation AI generator | claymation |
 | `/80s-retro-video` | 80s retro and VHS video generator | 80s / VHS |
 | `/anime-video-generator` | AI anime video generator | anime |
-| `/ai-video-styles` | AI video styles (hub) | generic AI video, long-tail styles |
+| `/ai-video-styles` | AI video styles (hub) | long-tail styles |
+| `/spotify-canvas-maker` | Spotify Canvas maker | spotify canvas (dalnulla pos 8–50, 5 old URLs) |
+| `/ai-video-generator` | AI video generator: text to video and image to video | generic AI video, text/image-to-video, realistic |
+| `/ai-node-editor` | AI node editor for images, video and audio | node-based workflows — what feega is |
 
 English only, by owner decision. Two IT/ES pages drafted earlier (`/it/video-ai`,
 `/es/video-ia`) were emptied and set to draft: the Framer API cannot delete pages — delete them
@@ -170,6 +180,23 @@ by hand in Framer.
 
 Not built, on purpose: pages for background removal, captions, colourization (not served);
 character/image generator (low intent, positions 46–97 — revisit after the video pages rank).
+
+## Keyword attack list (prioritised)
+
+Order = (existing position × volume × fit with the product). Served only.
+
+| # | Query group | Old pos. | Impr. | Page | Why now |
+|---|---|---|---|---|---|
+| 1 | vhs generator, vhs video generator, 80s generator, 80s video maker | 11–24 | ~110 | `/80s-retro-video` | Already page 1–2; clicks at 5 % CTR |
+| 2 | ai video upscaler, ai video upscale, video upscaler | 14–21 | ~130 | `/ai-video-upscaler` | Best position in the largest served cluster |
+| 3 | claymation, claymation ai generator | 9.5–11 | ~90 | `/claymation-ai` | Page 1 already |
+| 4 | paper cut-out animation, paper stop motion, paper animation ai | 23–29 | ~390 | `/paper-cutout-animation` | Volume at striking distance |
+| 5 | pixar 3d animation ai, 3d animation ai, ai 3d animation | 10–45 | ~740 | `/3d-animation-maker` | Largest cluster with one query already at 10 |
+| 6 | spotify canvas maker, spotify canvas | 8–50 | ~60 | `/spotify-canvas-maker` | Low competition, exact-match intent |
+| 7 | how to make free ai videos, text to video, ai video generator | 7.5–78 | ~70 | `/ai-video-generator` | Head term; long game, but the page catches generic intent |
+| 8 | ai node editor, ai canvas, node-based image/video generation, comfyui alternative online | — (no dalnulla data; `/app/node-editor` had 31 impr. at pos 6) | new | `/ai-node-editor` | Exactly what feega is; category-defining for GEO |
+| 9 | ai commercial maker, ai ad generator | 60–90 | ~1,500 | `/ai-commercial-maker` | Biggest volume, weakest position: needs links and depth |
+| 10 | video enhancer ai, enhance video quality | 40–85 | ~800 | `/ai-video-upscaler` | Secondary keywords on #2 |
 
 ## GEO
 
