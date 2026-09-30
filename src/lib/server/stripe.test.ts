@@ -5,6 +5,8 @@ const subscriptionsRetrieve = vi.fn();
 const subscriptionsUpdate = vi.fn();
 const subscriptionsCancel = vi.fn();
 const checkoutSessionsCreate = vi.fn();
+const checkoutSessionsRetrieve = vi.fn();
+const invoicePaymentsList = vi.fn();
 const customersCreate = vi.fn();
 const pricesList = vi.fn();
 
@@ -22,7 +24,8 @@ vi.mock('stripe', () => ({
 			update: subscriptionsUpdate,
 			cancel: subscriptionsCancel
 		};
-		checkout = { sessions: { create: checkoutSessionsCreate } };
+		checkout = { sessions: { create: checkoutSessionsCreate, retrieve: checkoutSessionsRetrieve } };
+		invoicePayments = { list: invoicePaymentsList };
 		customers = { create: customersCreate };
 		prices = { list: pricesList };
 	}
@@ -43,6 +46,8 @@ beforeEach(() => {
 	subscriptionsUpdate.mockReset();
 	subscriptionsCancel.mockReset();
 	checkoutSessionsCreate.mockReset();
+	checkoutSessionsRetrieve.mockReset();
+	invoicePaymentsList.mockReset();
 	customersCreate.mockReset();
 	pricesList.mockReset();
 	adminUpdateEq.mockReset().mockResolvedValue({ error: null });
@@ -53,6 +58,20 @@ beforeEach(() => {
 afterEach(() => {
 	vi.clearAllMocks();
 });
+
+const withdrawalConsent = {
+	consent_collection: { terms_of_service: 'required' },
+	custom_text: {
+		terms_of_service_acceptance: {
+			message:
+				'I agree to the [Terms](https://feega.app/terms) and the [Refund Policy](https://feega.app/refunds). I ask feega to supply the credits and the service immediately, and I acknowledge that I lose my 14-day right of withdrawal to the extent I use the credits.'
+		},
+		submit: {
+			message:
+				'Refundable within 14 days while you have used no more than 10% of the credits, up to 5 credits. Payment processing fees are not refunded.'
+		}
+	}
+};
 
 describe('createBillingPortalSession', () => {
 	it('opens the feega portal configuration when one is set', async () => {
@@ -351,7 +370,8 @@ describe('createOneTimeCreditCheckout', () => {
 			],
 			success_url: 'https://app/return?ok=1',
 			cancel_url: 'https://app/return?cancel=1',
-			metadata: { app: 'feega', org_id: 'org_1', credits: '1600' }
+			metadata: { app: 'feega', org_id: 'org_1', credits: '1600' },
+			...withdrawalConsent
 		});
 	});
 
@@ -394,7 +414,8 @@ describe('createSubscriptionCheckout', () => {
 			success_url: 'https://app/return?ok=1',
 			cancel_url: 'https://app/return?cancel=1',
 			subscription_data: { metadata: { app: 'feega', org_id: 'org_1', credits: '500' } },
-			metadata: { app: 'feega', org_id: 'org_1' }
+			metadata: { app: 'feega', org_id: 'org_1' },
+			...withdrawalConsent
 		});
 	});
 
@@ -412,5 +433,37 @@ describe('createSubscriptionCheckout', () => {
 				cancelUrl: 'https://app/return'
 			})
 		).rejects.toThrow('Stripe: no checkout URL');
+	});
+});
+
+describe('paymentProcessingFee', () => {
+	const charge = (fee: number) => ({ latest_charge: { balance_transaction: { fee } } });
+
+	it('reads the fee of a top-up from its checkout payment', async () => {
+		checkoutSessionsRetrieve.mockResolvedValue({ payment_intent: charge(49) });
+		const { paymentProcessingFee } = await import('./stripe');
+
+		expect(await paymentProcessingFee({ checkoutId: 'cs_1', invoiceId: null })).toBe(0.49);
+		expect(checkoutSessionsRetrieve).toHaveBeenCalledWith('cs_1', {
+			expand: ['payment_intent.latest_charge.balance_transaction']
+		});
+	});
+
+	it('sums the fees of every payment of a subscription invoice', async () => {
+		invoicePaymentsList.mockResolvedValue({
+			data: [{ payment: { payment_intent: charge(30) } }, { payment: { payment_intent: charge(20) } }]
+		});
+		const { paymentProcessingFee } = await import('./stripe');
+
+		expect(await paymentProcessingFee({ checkoutId: null, invoiceId: 'in_1' })).toBe(0.5);
+		expect(invoicePaymentsList).toHaveBeenCalledWith({
+			invoice: 'in_1',
+			expand: ['data.payment.payment_intent.latest_charge.balance_transaction']
+		});
+	});
+
+	it('is zero for a payment Stripe never saw', async () => {
+		const { paymentProcessingFee } = await import('./stripe');
+		expect(await paymentProcessingFee({ checkoutId: null, invoiceId: null })).toBe(0);
 	});
 });

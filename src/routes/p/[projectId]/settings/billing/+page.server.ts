@@ -5,6 +5,8 @@ import { billedCreditsFor, CREDIT_LADDER, rungFor } from '$lib/credit-ladder';
 import { isOrgOwner, orgBillingById } from '$lib/server/org-billing';
 import { appOrigin } from '$lib/server/app-url';
 import { billingGrantsReady } from '$lib/server/billing-readiness';
+import { latestRefund, type ProcessingFeeOf } from '$lib/server/refund-status';
+import { supportEmail } from '$lib/server/support-config';
 import {
   billingPortal,
   upgrade,
@@ -52,9 +54,10 @@ export const load: PageServerLoad = async ({ parent, url, locals: { supabase } }
       amount: row.expiring_credits
     }));
 
-  const [balance, currentPlanUsd] = await Promise.all([
+  const [balance, currentPlanUsd, refund] = await Promise.all([
     orgCreditBalance(supabase, orgId),
-    currentPlanOf(supabase, orgId)
+    currentPlanOf(supabase, orgId),
+    refundOf(supabase, orgId)
   ]);
 
   const spends = await Promise.all(
@@ -74,9 +77,31 @@ export const load: PageServerLoad = async ({ parent, url, locals: { supabase } }
     currentPlanUsd,
     checkoutOutcome: checkoutOutcomeOf(url),
     isOwner: (membership as { role?: string } | null)?.role === 'owner',
-    purchasesReady
+    purchasesReady,
+    refund,
+    supportEmail: supportEmail()
   };
 };
+
+async function refundOf(supabase: App.Locals['supabase'], orgId: string) {
+  const feeOf: ProcessingFeeOf = async (payment) => (await stripeApi()).paymentProcessingFee(payment);
+
+  try {
+    const refund = await latestRefund(supabase, orgId, new Date(), feeOf);
+    if (!refund) {
+      return null;
+    }
+
+    return {
+      eligible: refund.eligible,
+      amount: refund.amount,
+      until: refund.until?.toISOString() ?? null,
+      maxCreditsUsable: refund.maxCreditsUsable
+    };
+  } catch {
+    return null;
+  }
+}
 
 async function currentPlanOf(supabase: App.Locals['supabase'], orgId: string): Promise<number | null> {
   const billing = await orgBillingById(supabase, orgId);

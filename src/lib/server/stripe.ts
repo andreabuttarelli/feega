@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { createAdminClient } from './supabase-admin';
 import { CREDIT_LADDER, PLAN_CURRENCY, rungForLookupKey } from '$lib/credit-ladder';
 import { DISPLAY_UNITS_PER_CREDIT } from '$lib/components/credit-amount-format';
+import type { PaymentRef } from './refund-status';
 
 let client: Stripe | null = null;
 
@@ -16,6 +17,20 @@ function stripe(): Stripe {
 
 const APP_TAG = 'feega';
 const CENTS_PER_UNIT = 100;
+
+const WITHDRAWAL_CONSENT = {
+  consent_collection: { terms_of_service: 'required' as const },
+  custom_text: {
+    terms_of_service_acceptance: {
+      message:
+        'I agree to the [Terms](https://feega.app/terms) and the [Refund Policy](https://feega.app/refunds). I ask feega to supply the credits and the service immediately, and I acknowledge that I lose my 14-day right of withdrawal to the extent I use the credits.'
+    },
+    submit: {
+      message:
+        'Refundable within 14 days while you have used no more than 10% of the credits, up to 5 credits. Payment processing fees are not refunded.'
+    }
+  }
+};
 
 let rungPriceIds: Promise<Map<number, string>> | null = null;
 
@@ -94,7 +109,8 @@ export async function createOneTimeCreditCheckout(opts: {
     ],
     success_url: opts.successUrl,
     cancel_url: opts.cancelUrl,
-    metadata: { app: APP_TAG, org_id: opts.orgId, credits: String(opts.credits) }
+    metadata: { app: APP_TAG, org_id: opts.orgId, credits: String(opts.credits) },
+    ...WITHDRAWAL_CONSENT
   });
   if (!session.url) throw new Error('Stripe: no checkout URL');
 
@@ -116,7 +132,8 @@ export async function createSubscriptionCheckout(opts: {
     success_url: opts.successUrl,
     cancel_url: opts.cancelUrl,
     subscription_data: { metadata: { app: APP_TAG, org_id: opts.orgId, credits: String(opts.credits) } },
-    metadata: { app: APP_TAG, org_id: opts.orgId }
+    metadata: { app: APP_TAG, org_id: opts.orgId },
+    ...WITHDRAWAL_CONSENT
   });
   if (!session.url) throw new Error('Stripe: no checkout URL');
 
@@ -206,4 +223,37 @@ export async function ensureSubscriptionCanceled(subscriptionId: string): Promis
   }
   if (SETTLED_STATUSES.has(sub.status) || sub.cancel_at_period_end) return;
   throw new Error('active_plan');
+}
+
+const CHARGE_FEE_PATH = 'payment_intent.latest_charge.balance_transaction';
+
+function feeOfIntent(intent: string | Stripe.PaymentIntent | null | undefined): number {
+  if (!intent || typeof intent === 'string') {
+    return 0;
+  }
+
+  const charge = intent.latest_charge;
+  if (!charge || typeof charge === 'string') {
+    return 0;
+  }
+
+  const transaction = charge.balance_transaction;
+  return transaction && typeof transaction !== 'string' ? transaction.fee : 0;
+}
+
+export async function paymentProcessingFee(payment: PaymentRef): Promise<number> {
+  if (payment.checkoutId) {
+    const session = await stripe().checkout.sessions.retrieve(payment.checkoutId, { expand: [CHARGE_FEE_PATH] });
+    return feeOfIntent(session.payment_intent) / CENTS_PER_UNIT;
+  }
+  if (!payment.invoiceId) {
+    return 0;
+  }
+
+  const { data } = await stripe().invoicePayments.list({
+    invoice: payment.invoiceId,
+    expand: [`data.payment.${CHARGE_FEE_PATH}`]
+  });
+  const cents = data.reduce((sum, row) => sum + feeOfIntent(row.payment.payment_intent), 0);
+  return cents / CENTS_PER_UNIT;
 }

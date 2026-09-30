@@ -47,7 +47,7 @@ You must be at least **18 years old** and able to enter a binding contract. If y
 - Each connected social account may carry a **monthly credit fee**, shown before you connect it. If the balance cannot cover it, the account is paused.
 - Payments are processed by **Stripe**. We do not see or store full card numbers.
 - Credits have no cash value, cannot be transferred between workspaces or resold, and are not refunded when spent on a generation you did not like.
-- **Refunds:** [REFUND POLICY — to be defined]. Where you are a consumer in the EU, see §18 on the right of withdrawal.
+- **Refunds:** governed by our [Refund Policy](./REFUND.md). In short: within 14 days of buying a plan or a top-up, you can get a refund if you have used no more than 10% of the credits it granted and no more than 5 credits; we refund the amount paid minus the credits used (€1 each) and minus the payment processing fee. A renewal is refundable only if you cancel within 48 hours and have used none of its credits. Cancelling stops future renewals, with no pro-rata refunds. Welcome credits are never refundable.
 - We may change prices with at least [30] days' notice; changes apply from the next billing period.
 
 ## 6. Your content
@@ -120,7 +120,7 @@ To report content you believe is illegal or breaches these Terms, write to [LEGA
 
 - You can stop using the Service and close your account at any time [HOW — account deletion flow / email].
 - We may restrict, suspend or terminate access, remove content or disable share links if you breach these Terms, if required by law, or to protect users, third parties or the Service. Where reasonable we give notice and reasons first; for serious breaches (e.g. §8 "always prohibited") we may act immediately.
-- On termination unused subscription credits lapse. Unused top-up credits are [REFUNDED / FORFEITED — to confirm] when we terminate without your fault.
+- On termination unused subscription credits lapse. Unused top-up credits are refunded at face value (minus the payment processing fee) only if that top-up is still refundable under the [Refund Policy](./REFUND.md); otherwise they are forfeited.
 - Sections that by nature survive (content licence for retained copies, disclaimers, liability, law) survive termination.
 
 ## 14. Intellectual property of the Service
@@ -144,7 +144,7 @@ To the extent permitted by law, the Service is provided "as is" and "as availabl
 
 ## 18. Consumers in the EU
 
-If you are a consumer, you have a 14-day right of withdrawal from a paid subscription or top-up. By asking us to start providing the Service (and spending credits) within that period, you [expressly request immediate performance and acknowledge that you lose the right of withdrawal once the service is fully performed / credits are used — to confirm]. You may also use the EU consumer dispute resolution mechanisms available to you.
+If you are a consumer, you have a 14-day right of withdrawal from a paid subscription or top-up. At checkout you expressly request that we start supplying credits and the Service immediately, and you acknowledge that you lose the right of withdrawal to the extent you use the credits (Directive 2011/83/EU art. 16(m) and 14(3); Italian Consumer Code art. 59(1)(o) and 57). How this works in practice is set out in the [Refund Policy](./REFUND.md). You may also use the EU consumer dispute resolution mechanisms available to you.
 
 ## 19. Governing law and disputes
 

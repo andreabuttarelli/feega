@@ -5,7 +5,7 @@ export function opsEmail(): string {
 }
 
 export function supportEmail(): string {
-  return env.SUPPORT_EMAIL || 'hello@feega.app';
+  return env.SUPPORT_EMAIL || 'support@feega.app';
 }
 
 export function senderEmailDomain(): string {

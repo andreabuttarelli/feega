@@ -12,6 +12,7 @@
 
   let { data, form } = $props();
 
+  const REFUND_POLICY_URL = 'https://feega.app/refunds';
   const BALANCE_POLL_MS = 3000;
   const BALANCE_POLL_LIMIT = 20;
 
@@ -117,6 +118,18 @@
         </div>
       </Field>
     {/if}
+
+    <Field label={$_('app.settings.billing.refunds')} layout={FieldLayout.Row}>
+      <span class="text-[0.8125rem] text-muted-foreground">
+        {#if data.refund?.eligible && data.refund.until}
+          {$_('app.settings.billing.refundAvailable', { values: { amount: data.refund.amount, date: new Date(data.refund.until).toLocaleDateString(), credits: data.refund.maxCreditsUsable } })}
+          <a class="underline" href={`mailto:${data.supportEmail}?subject=Refund%20request`}>{$_('app.settings.billing.refundRequest')}</a> ·
+        {:else if data.refund}
+          {$_('app.settings.billing.refundUnavailable')}
+        {/if}
+        <a class="underline" href={REFUND_POLICY_URL} target="_blank" rel="noopener">{$_('app.settings.billing.refundPolicy')}</a>
+      </span>
+    </Field>
   {/if}
 </Panel>
 
