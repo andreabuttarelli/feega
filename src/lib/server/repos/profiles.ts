@@ -17,14 +17,26 @@ export type Profile = {
   email: string;
   name: string | null;
   avatarUrl: string | null;
+  termsAcceptedAt: string | null;
+  termsVersion: string | null;
 };
 
-const PROFILE_COLUMNS = 'id, email, name, avatar_url';
+const PROFILE_COLUMNS = 'id, email, name, avatar_url, terms_accepted_at, terms_version';
 
-type ProfileColumns = Pick<ProfileRow, 'id' | 'email' | 'name' | 'avatar_url'>;
+type ProfileColumns = Pick<
+  ProfileRow,
+  'id' | 'email' | 'name' | 'avatar_url' | 'terms_accepted_at' | 'terms_version'
+>;
 
 function toProfile(row: ProfileColumns): Profile {
-  return { id: row.id, email: row.email, name: row.name, avatarUrl: row.avatar_url };
+  return {
+    id: row.id,
+    email: row.email,
+    name: row.name,
+    avatarUrl: row.avatar_url,
+    termsAcceptedAt: row.terms_accepted_at,
+    termsVersion: row.terms_version
+  };
 }
 
 /** I nomi che i provider usano per la stessa cosa, dichiarati qui invece che in un `if` per volta. */
@@ -78,4 +90,15 @@ export async function ensureProfile(db: Db, user: User): Promise<Profile> {
     throw error;
   }
   return toProfile(data);
+}
+
+export async function recordTermsAcceptance(db: Db, userId: string, version: string): Promise<void> {
+  const { error } = await db
+    .from('profiles')
+    .update({ terms_accepted_at: new Date().toISOString(), terms_version: version })
+    .eq('id', userId);
+
+  if (error) {
+    throw error;
+  }
 }
