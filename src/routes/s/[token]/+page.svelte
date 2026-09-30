@@ -10,6 +10,7 @@
   import { DEFAULT_EDGE_KIND } from '$lib/canvas/connect-rules';
   import '$lib/styles/doc-prose.css';
   import { periodTitle } from '$lib/calendar/period-grid';
+  import { CONNECTOR_STYLE } from '$lib/canvas/connectors';
 
   let { data } = $props();
 
@@ -75,6 +76,13 @@
             </ol>
           {:else if node.view.kind === 'select'}
             <p class="big">#{node.view.index}</p>
+            {#if node.view.outputs.length}
+              <ul class="outputs">
+                {#each node.view.outputs as out (out.label)}
+                  <li class:flagged={out.incompatible} style={`--port:${CONNECTOR_STYLE[out.port].color}`}>{out.label}</li>
+                {/each}
+              </ul>
+            {/if}
           {:else if node.view.kind === 'influencer'}
             <figure class="face">
               {#if node.view.photo}
@@ -259,5 +267,24 @@
     letter-spacing: 0.02em;
     color: var(--ink-faint, #9a9a9e);
     text-decoration: none;
+  }
+  .outputs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: 0;
+    padding: 0 12px 12px;
+    list-style: none;
+  }
+  .outputs li {
+    padding: 2px 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--port);
+    border: 1px solid var(--port);
+  }
+  .outputs li.flagged {
+    border-style: dashed;
+    text-decoration: line-through;
   }
 </style>

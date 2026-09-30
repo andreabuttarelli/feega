@@ -1,3 +1,4 @@
+import type { OutputPort } from './select-sources';
 import type { CalendarView } from '$lib/calendar/period-grid';
 
 export type SharedView =
@@ -9,7 +10,7 @@ export type SharedView =
   | { kind: 'frame'; url: string; html: string }
   | { kind: 'grid'; total: number; tiles: SharedTile[] }
   | { kind: 'list'; items: SharedListItem[] }
-  | { kind: 'select'; index: number }
+  | { kind: 'select'; index: number; outputs: SharedOutput[] }
   | { kind: 'influencer'; name: string; summary: string | null; photo: string | null }
   | { kind: 'post'; caption: string; media: string[] }
   | { kind: 'ads'; query: string; country: string }
@@ -23,6 +24,8 @@ export type SharedTile = {
   caption: string | null;
   badge: 'carousel' | 'video' | null;
 };
+
+export type SharedOutput = { label: string; port: OutputPort; incompatible: boolean };
 
 export type SharedListItem = { label: string; text: string; url: string | null };
 

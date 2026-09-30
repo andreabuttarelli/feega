@@ -4,7 +4,8 @@ import { findAsset, findAssets } from '$lib/server/repos/assets';
 import { listInfluencerViews, signInfluencerViewFiles } from '$lib/server/repos/influencers';
 import { findReferenceImages, signReferenceImages } from '$lib/server/repos/reference-images';
 import { referencesOf } from '$lib/canvas/node-references';
-import { syncedSourceItems } from './synced-items';
+import { itemsOf, outputsAt, syncedSourceItems, syncedSourceRows } from './synced-items';
+import { selectOf } from '$lib/canvas-node-data';
 import {
   resolveUpstreamInputs,
   type UpstreamEdge,
@@ -284,11 +285,11 @@ async function toUpstreamNode(
     const source = listFeeding(node, connections, nodesById);
     if (!source) return { id: node.id, type: node.type, medium: 'image', model: null, text: null, mediaUrl: null };
 
-    const index = typeof node.data.index === 'number' ? node.data.index : 0;
+    const index = source.id in iterateSelection ? iterateSelection[source.id] : typeof node.data.index === 'number' ? node.data.index : 0;
 
     if (source.type === 'products' || source.type === 'social_account_feed') {
-      const items = await syncedSourceItems(db, orgId, source);
-      const item = syncedItemAt(items, index);
+      const synced = await syncedSourceRows(db, orgId, source);
+      const item = syncedItemAt(itemsOf(synced), index);
       const medium = item?.mediaUrls.length ? 'image' : 'text';
       return {
         id: node.id,
@@ -297,7 +298,8 @@ async function toUpstreamNode(
         model: null,
         text: item?.text ?? null,
         mediaUrl: item?.mediaUrls[0] ?? null,
-        mediaUrls: item?.mediaUrls ?? []
+        mediaUrls: item?.mediaUrls ?? [],
+        outputs: outputsAt(synced, index, selectOf({ id: node.id, type: node.type, data: node.data })?.outputs ?? [])
       };
     }
 

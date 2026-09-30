@@ -33,6 +33,8 @@ import type { CameraPresetId } from './composition/camera';
 import { CALENDAR_VIEWS } from '$lib/calendar/period-grid';
 import { CALENDAR_SCOPES } from './calendar-node';
 import { AUDIO_OPERATION_IDS, type AudioOperationId } from './audio-operations';
+import { MAX_CUSTOM_OUTPUTS, MAX_OUTPUT_LABEL } from './select-outputs';
+import { SOURCE_ITEM_FIELDS } from './select-sources';
 
 /** Lo stato di una generazione lunga: gli stessi campi per i tre tipi che generano davvero. */
 const GEN_STATUS = ['idle', 'running', 'done', 'failed'] as const;
@@ -280,8 +282,23 @@ const listSchema = z.object({
  * questo file non vede): lo dice `resolveUpstreamInputs`, con `rejected`/`blocked` come ogni altro
  * ingresso mancante.
  */
+const OUTPUT_FIELDS_DESCRIPTION = `Field of the connected source item; the edge from this node carries source_handle "out:field:<field>" (defaults: "out:images", "out:text"). ${Object.entries(
+  SOURCE_ITEM_FIELDS
+)
+  .map(([source, fields]) => `${source}: ${fields.map((f) => `${f.key} (${f.port})`).join(', ')}`)
+  .join('. ')}`;
+
+const selectOutputSchema = z
+  .object({
+    id: z.string().min(1),
+    field: z.string().min(1).describe(OUTPUT_FIELDS_DESCRIPTION),
+    label: z.string().max(MAX_OUTPUT_LABEL).optional()
+  })
+  .strict();
+
 const selectSchema = z.object({
-  index: z.number().int().positive()
+  index: z.number().int().positive(),
+  outputs: z.array(selectOutputSchema).max(MAX_CUSTOM_OUTPUTS).optional()
 });
 
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;

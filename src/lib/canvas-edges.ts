@@ -79,6 +79,7 @@ export type FlowEdge = {
   /** La porta di `target` su cui questo arco atterra (`ConnectorType` di `connectors.ts`). Assente
    *  sull'unico attacco generico di prima, o su un arco verso un nodo senza porte tipizzate. */
   targetHandle?: string | null;
+  sourceHandle?: string | null;
 };
 
 export function toFlowEdges(rows: CanvasEdgeRow[]): FlowEdge[] {

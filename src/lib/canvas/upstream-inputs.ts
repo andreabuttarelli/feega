@@ -75,6 +75,8 @@
 import { mediumOf, type CanvasNode, type Medium } from './graph';
 import { imageModelSpec } from '$lib/image-models';
 import { videoRefCapacity } from '$lib/video-models';
+import { isOutputHandle, type OutputValue } from './select-outputs';
+import type { OutputPort } from './select-sources';
 import { connectorsFor, CONNECTOR_LABEL, type ConnectorType, type GenerativeNodeKind, type Modalities } from './connectors';
 
 /** Gli stessi due valori di `frame_type` in `openrouter-video.ts`: un vocabolario solo. */
@@ -105,6 +107,7 @@ export type UpstreamNode = {
    *  anche un `mediaUrl` singolo da cui scegliere. */
   mediaUrls?: string[];
   referenceUrls?: string[];
+  outputs?: Record<string, OutputValue>;
 };
 
 export type UpstreamEdge = {
@@ -259,6 +262,22 @@ function connectorOf(edge: UpstreamEdge, medium: Medium): ConnectorType {
   return CONNECTOR_FOR_MEDIUM[medium];
 }
 
+const MEDIUM_OF_PORT: Record<OutputPort, Medium> = { text: 'text', images: 'image', videos: 'video' };
+
+function throughPort(node: UpstreamNode, handle: string | null | undefined): { node: UpstreamNode } | { why: string } {
+  if (!node.outputs || !isOutputHandle(handle)) {
+    return { node };
+  }
+
+  const value = node.outputs[handle];
+  if (!value) {
+    return { why: `output ${handle} is not available on this source` };
+  }
+  return {
+    node: { ...node, medium: MEDIUM_OF_PORT[value.port], text: value.text, mediaUrl: value.mediaUrls[0] ?? null, mediaUrls: value.mediaUrls }
+  };
+}
+
 /** Quanti fili un connettore a valore multiplo regge — dal catalogo del modello, mai un numero
  *  fisso: la stessa domanda che `graph.ts::capacityOf` faceva, spostata sul connettore. */
 function listCapacity(connector: ConnectorType, kind: GenerativeNodeKind, model: string | null): number {
@@ -334,8 +353,15 @@ export function resolveUpstreamInputs(
   const used: Partial<Record<ConnectorType, number>> = {};
 
   for (const edge of ordered) {
-    const source = at.get(edge.sourceNodeId);
-    if (!source) continue;
+    const wired = at.get(edge.sourceNodeId);
+    if (!wired) continue;
+
+    const port = throughPort(wired, edge.sourceHandle);
+    if ('why' in port) {
+      rejected.push({ nodeId: wired.id, why: port.why });
+      continue;
+    }
+    const source = port.node;
 
     const medium: Medium = mediumOf(toCanvasNode(source));
     const connector = connectorOf(edge, medium);

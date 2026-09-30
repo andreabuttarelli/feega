@@ -13,6 +13,7 @@ import {
 import { SYNC_STATUSES, type SyncStatus } from '$lib/canvas/sync-state';
 import { isListItemKind, type ListItem, type ListNode } from '$lib/canvas/list-node';
 import type { SelectNode } from '$lib/canvas/select-node';
+import type { CustomOutput } from '$lib/canvas/select-outputs';
 import { EFFECTS, type EffectStep } from '$lib/canvas/effects';
 import type { EffectsNode } from '$lib/canvas/effects-node';
 import { LAYOUTS } from '$lib/canvas/composition/index';
@@ -212,7 +213,19 @@ export function selectOf(row: NodeRow): SelectNode | null {
     return null;
   }
 
-  return { id: row.id, index: num(row.data.index, 1) };
+  return { id: row.id, index: num(row.data.index, 1), outputs: customOutputsOf(row.data.outputs) };
+}
+
+function customOutputOf(v: unknown): CustomOutput | null {
+  const o = record(v);
+  if (typeof o.id !== 'string' || typeof o.field !== 'string') {
+    return null;
+  }
+  return typeof o.label === 'string' ? { id: o.id, field: o.field, label: o.label } : { id: o.id, field: o.field };
+}
+
+function customOutputsOf(v: unknown): CustomOutput[] {
+  return Array.isArray(v) ? v.map(customOutputOf).filter((o): o is CustomOutput => o !== null) : [];
 }
 
 /** Un item della pila di `effects.data.effects`, con la stessa riserva per campo di ogni lettura
@@ -417,7 +430,7 @@ export function listData(node: ListNode): Record<string, unknown> {
 }
 
 export function selectData(node: SelectNode): Record<string, unknown> {
-  return { index: node.index };
+  return { index: node.index, outputs: node.outputs };
 }
 
 export function effectsData(node: EffectsNode): Record<string, unknown> {

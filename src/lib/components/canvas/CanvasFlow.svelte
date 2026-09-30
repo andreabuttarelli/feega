@@ -46,6 +46,7 @@
   import { syncNodes } from '$lib/canvas/tile-sync';
   import { ColumnAxis, withSettingsColumn } from '$lib/canvas/settings-column';
   import { MOBILE_QUERY } from '$lib/breakpoints';
+  import { isOutputHandle, portOfHandle, unavailableOutput, type SelectOutput } from '$lib/canvas/select-outputs';
   import { CANVAS_EDGE_KINDS, EDGE_KIND_LABEL, WIRE_MODES, WIRE_MODE_LABEL, type CanvasEdgeKind, type FlowEdge, type WireMode } from '$lib/canvas-edges';
   import { isAddable, type Addable } from '$lib/canvas/addable';
   import { DEFAULT_EDGE_KIND, edgeKindsFor, verdictBetween } from '$lib/canvas/connect-rules';
@@ -87,6 +88,7 @@
      *  un solo ingresso generico. */
     connectors?: ConnectorType[];
     output?: ConnectorType | null;
+    outputs?: SelectOutput[];
     /** `nodes.type`: la targhetta fuori dal corpo (`CanvasTile`) ne legge icona e nome di
      *  riserva. Assente su quel che non è un nodo del modello. */
     kind?: string;
@@ -160,7 +162,7 @@
      * propone su quella coppia. Un `kind` fisso qui sarebbe una derivazione salvata anche fra due
      * cose che non si derivano — cioè un dato falso scritto senza che nessuno l'abbia chiesto.
      */
-    onConnect?: (sourceItemId: string, targetItemId: string, kind: CanvasEdgeKind, targetHandle: ConnectorType | null) => void;
+    onConnect?: (sourceItemId: string, targetItemId: string, kind: CanvasEdgeKind, targetHandle: ConnectorType | null, sourceHandle: string | null) => void;
     /**
      * Le tile da togliere. Chiesto fuori e non fatto qui: SvelteFlow le toglierebbe dal proprio
      * stato e basta, e alla prima riconciliazione `syncNodes` le rimetterebbe dentro perché
@@ -267,6 +269,7 @@
       connectable: t.connectable !== false,
       connectors: t.connectors,
       output: t.output ?? null,
+      outputs: t.outputs,
       kind: t.kind,
       displayName: t.displayName,
       inPost: t.inPost,
@@ -377,9 +380,10 @@
   function isValidConnection(c: {
     source?: string | null;
     target?: string | null;
+    sourceHandle?: string | null;
     targetHandle?: string | null;
   }): boolean {
-    const { source, target, targetHandle } = c;
+    const { source, target, sourceHandle, targetHandle } = c;
     if (!source || !target) return false;
 
     const verdict = verdictBetween(lookup, source, target);
@@ -390,7 +394,12 @@
 
     const connector = targetHandle as ConnectorType | null | undefined;
     const connectors = connectorsOf.get(target);
-    const output = tiles.find((t) => t.id === source)?.output ?? null;
+    const sourceTile = tiles.find((t) => t.id === source);
+    if (sourceTile && unavailableOutput(sourceTile, sourceHandle)) {
+      refusal = 'This output is not available for the connected source';
+      return false;
+    }
+    const output = sourceTile ? portOfHandle(sourceTile, sourceHandle) : null;
     const targetKind = tiles.find((t) => t.id === target)?.kind ?? '';
     const portEdges = edges.map((e) => ({ id: e.id, target: e.target, targetHandle: e.targetHandle ?? null }));
     if (!nodeAcceptsConnection(portEdges, target, targetKind)) {
@@ -418,14 +427,16 @@
    * quando il server la restituisce con il suo id vero. Disegnarla subito con un id inventato
    * significherebbe averla due volte appena i dati tornano — la copia ottimista e quella vera.
    */
-  function onConnected(connection: { source?: string | null; target?: string | null; targetHandle?: string | null }) {
+  function onConnected(connection: { source?: string | null; target?: string | null; sourceHandle?: string | null; targetHandle?: string | null }) {
     const { source, target } = connection;
     if (!source || !target || source === target) return;
 
     refusal = null;
-    const output = tiles.find((t) => t.id === source)?.output ?? null;
+    const sourceTile = tiles.find((t) => t.id === source);
+    const output = sourceTile ? portOfHandle(sourceTile, connection.sourceHandle) : null;
     const handle = landingPort((connection.targetHandle as ConnectorType | null) ?? null, output, connectorsOf.get(target) ?? []);
-    onConnect?.(source, target, edgeKindsFor(lookup, source, target)[0] ?? DEFAULT_EDGE_KIND, handle);
+    const outputHandle = isOutputHandle(connection.sourceHandle) ? connection.sourceHandle : null;
+    onConnect?.(source, target, edgeKindsFor(lookup, source, target)[0] ?? DEFAULT_EDGE_KIND, handle, outputHandle);
   }
 
   /**

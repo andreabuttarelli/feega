@@ -364,11 +364,11 @@ describe('un nodo list, letto dalla riga', () => {
 
 describe('un nodo select, letto dalla riga', () => {
   it('index arriva da data', () => {
-    expect(selectOf({ id: 'n1', type: 'select', data: { index: 3 } })).toEqual({ id: 'n1', index: 3 });
+    expect(selectOf({ id: 'n1', type: 'select', data: { index: 3 } })).toEqual({ id: 'n1', index: 3, outputs: [] });
   });
 
   it('una riga appena nata non ha index: legge 1 di riserva', () => {
-    expect(selectOf({ id: 'n1', type: 'select', data: {} })).toEqual({ id: 'n1', index: 1 });
+    expect(selectOf({ id: 'n1', type: 'select', data: {} })).toEqual({ id: 'n1', index: 1, outputs: [] });
   });
 
   it('un index non numerico legge 1 invece di rompersi', () => {
@@ -379,8 +379,13 @@ describe('un nodo select, letto dalla riga', () => {
     expect(selectOf({ id: 'n1', type: 'list', data: {} })).toBeNull();
   });
 
+  it('gli output personalizzati arrivano da data, quelli malformati si scartano', () => {
+    const node = selectOf({ id: 'n1', type: 'select', data: { index: 1, outputs: [{ id: 'o1', field: 'price' }, { id: 2 }] } });
+    expect(node?.outputs).toEqual([{ id: 'o1', field: 'price' }]);
+  });
+
   it('fa il giro di andata e ritorno', () => {
-    const node = selectOf({ id: 'n1', type: 'select', data: { index: 5 } })!;
+    const node = selectOf({ id: 'n1', type: 'select', data: { index: 5, outputs: [{ id: 'o1', field: 'likes', label: 'Likes' }] } })!;
     const written = selectData(node);
     expect(selectOf({ id: 'n1', type: 'select', data: written })).toEqual(node);
   });

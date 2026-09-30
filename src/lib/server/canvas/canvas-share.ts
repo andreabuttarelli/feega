@@ -1,4 +1,7 @@
 import type { Db } from '$lib/server/db/client';
+import { listFeedingSelect } from '$lib/canvas/select-node';
+import { selectOutputs } from '$lib/canvas/select-outputs';
+import { selectOf } from '$lib/canvas-node-data';
 import { createServiceRoleDb } from '$lib/server/db/client';
 import { SERVICE_ROLE_USES, type ServiceRoleUse } from '$lib/server/db/service-role-uses';
 import { listConnections, listNodes, type CanvasNodeRecord } from '$lib/server/repos/canvas';
@@ -82,6 +85,7 @@ type ViewInput = {
   assets: Map<string, Asset>;
   signed: Map<string, string>;
   sign: SignPaths;
+  sourceType: string | null;
 };
 
 const EMPTY: SharedView = { kind: 'empty' };
@@ -200,6 +204,15 @@ function calendarView({ node }: ViewInput): SharedView {
   return calendar ? { kind: 'calendar', view: calendar.view, anchor: calendar.anchor } : EMPTY;
 }
 
+function selectView({ node, sourceType }: ViewInput): SharedView {
+  const outputs = selectOutputs(sourceType, selectOf(node)?.outputs ?? []);
+  return {
+    kind: 'select',
+    index: Number(node.data.index) || 1,
+    outputs: outputs.map((o) => ({ label: o.label, port: o.port, incompatible: o.incompatible }))
+  };
+}
+
 export const SHARED_VIEW_OF: Record<NodeType, (input: ViewInput) => SharedView | Promise<SharedView>> = {
   image: signedView('image'),
   video: signedView('video'),
@@ -215,7 +228,7 @@ export const SHARED_VIEW_OF: Record<NodeType, (input: ViewInput) => SharedView |
   ads: adsView,
   influencer: influencerView,
   list: listView,
-  select: ({ node }) => ({ kind: 'select', index: Number(node.data.index) || 1 }),
+  select: selectView,
   effects: resultView,
   composition: resultView,
   calendar: calendarView,
@@ -273,6 +286,8 @@ export async function readSharedCanvas(db: Db, token: string, sign: SignPaths): 
   const signed = new Map([...others, ...images]);
 
   const nodeIds = new Set(nodes.map((n) => n.id));
+  const nodesById = new Map(nodes.map((n) => [n.id, n]));
+  const sourceTypeOf = (id: string) => listFeedingSelect(id, connections, nodesById)?.type ?? null;
 
   return {
     name: canvas.name,
@@ -286,7 +301,7 @@ export async function readSharedCanvas(db: Db, token: string, sign: SignPaths): 
         y: node.position.y,
         w: node.size.width ?? fallback.w,
         h: node.size.height ?? fallback.h,
-        view: await viewOf({ db, orgId, node, assets, signed, sign })
+        view: await viewOf({ db, orgId, node, assets, signed, sign, sourceType: sourceTypeOf(node.id) })
       };
     })),
     edges: connections

@@ -294,7 +294,34 @@ describe('readSharedCanvas — i nodi sorgente', () => {
         { label: 'B', text: 'due', url: null }
       ]
     });
-    expect(shared?.nodes[1].view).toEqual({ kind: 'select', index: 2 });
+    expect(shared?.nodes[1].view).toEqual({ kind: 'select', index: 2, outputs: [] });
+  });
+
+  it('un select su un catalogo mostra le sue porte, di sola lettura', async () => {
+    const { db } = sourceDb(
+      [
+        node('n-prod', 'products', { type: 'shopify', url: 'https://shop.example' }),
+        node('n-sel', 'select', { index: 1, outputs: [{ id: 'o1', field: 'price' }, { id: 'o2', field: 'likes' }] })
+      ],
+      {
+        nodes_connections: [
+          { id: 'e1', canvas_id: 'canvas-1', org_id: 'org-1', source_node_id: 'n-prod', target_node_id: 'n-sel', source_handle: null, target_handle: null, mode: 'fixed' }
+        ]
+      }
+    );
+
+    const shared = await readSharedCanvas(db, 'tok-live', sign);
+
+    expect(shared?.nodes[1].view).toEqual({
+      kind: 'select',
+      index: 1,
+      outputs: [
+        { label: 'Images', port: 'images', incompatible: false },
+        { label: 'Text', port: 'text', incompatible: false },
+        { label: 'Price', port: 'text', incompatible: false },
+        { label: 'Likes', port: 'text', incompatible: true }
+      ]
+    });
   });
 
   it('effects e composition mostrano solo il risultato, mai i parametri', async () => {
