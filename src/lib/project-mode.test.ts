@@ -13,29 +13,29 @@ describe('project mode', () => {
   it('a missing or unknown mode is standard', () => {
     expect(modeOf(undefined)).toBe(ProjectMode.Standard);
     expect(modeOf('weird')).toBe(ProjectMode.Standard);
-    expect(modeOf('nsfw')).toBe(ProjectMode.Nsfw);
+    expect(modeOf('uncensored')).toBe(ProjectMode.Uncensored);
   });
 
   it.each([Capability.Share, Capability.Publish, Capability.Schedule, Capability.Promote, Capability.CatalogueWrite])(
-    'an nsfw project refuses %s, a standard one allows it',
+    'an uncensored project refuses %s, a standard one allows it',
     (capability) => {
-      expect(modeAllows(ProjectMode.Nsfw, capability)).toBe(false);
+      expect(modeAllows(ProjectMode.Uncensored, capability)).toBe(false);
       expect(modeAllows(ProjectMode.Standard, capability)).toBe(true);
     }
   );
 
-  it('wiro models live only in nsfw projects', () => {
+  it('wiro models live only in uncensored projects', () => {
     expect(modelAllowedIn(ProjectMode.Standard, 'wiro/some-model')).toBe(false);
-    expect(modelAllowedIn(ProjectMode.Nsfw, 'wiro/some-model')).toBe(true);
+    expect(modelAllowedIn(ProjectMode.Uncensored, 'wiro/some-model')).toBe(true);
     expect(modelAllowedIn(ProjectMode.Standard, 'google/gemini-image')).toBe(true);
-    expect(modelAllowedIn(ProjectMode.Nsfw, 'google/gemini-image')).toBe(true);
+    expect(modelAllowedIn(ProjectMode.Uncensored, 'google/gemini-image')).toBe(true);
     expect(modelAllowedIn(ProjectMode.Standard, null)).toBe(true);
   });
 
   it('the menu of a standard project carries no wiro model', () => {
     const choices = [{ id: 'wiro/a' }, { id: 'openai/b' }];
     expect(offerableIn(ProjectMode.Standard, choices).map((c) => c.id)).toEqual(['openai/b']);
-    expect(offerableIn(ProjectMode.Nsfw, choices).map((c) => c.id)).toEqual(['wiro/a', 'openai/b']);
+    expect(offerableIn(ProjectMode.Uncensored, choices).map((c) => c.id)).toEqual(['wiro/a', 'openai/b']);
   });
 
 });
@@ -51,6 +51,6 @@ describe('catalogueIn', () => {
     expect(standard.image.recommended.map((c) => c.id)).toEqual(['openai/b']);
     expect((standard.image as { candidates?: unknown[] }).candidates).toEqual([]);
     expect(standard.video.choices).toEqual([]);
-    expect(catalogueIn(ProjectMode.Nsfw, catalogue)).toEqual(catalogue);
+    expect(catalogueIn(ProjectMode.Uncensored, catalogue)).toEqual(catalogue);
   });
 });

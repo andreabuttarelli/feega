@@ -97,19 +97,19 @@ describe('il confine è org_id, imposto dal codice — non un affinamento facolt
   });
 });
 
-describe('an nsfw project stays out of reach of a caller whose nsfw access is locked', () => {
-  it('every read of a project-scoped table excludes the nsfw projects', async () => {
+describe('an uncensored project stays out of reach of a caller whose uncensored access is locked', () => {
+  it('every read of a project-scoped table excludes the uncensored projects', async () => {
     const { calls, supabase } = fakeAuthority({ rows: [] });
 
     await (
       createOrgQueryTool({
         authority: { kind: 'service', supabase },
         orgId: 'org-mine',
-        hidden: { projectIds: ['p-nsfw'], canvasIds: [], nodeIds: [] }
+        hidden: { projectIds: ['p-uncensored'], canvasIds: [], nodeIds: [] }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       }).query as any
     ).execute({ table: 'nodes' }, {});
 
-    expect(calls[0].filters).toContainEqual(['not.project_id.in', '(p-nsfw)']);
+    expect(calls[0].filters).toContainEqual(['not.project_id.in', '(p-uncensored)']);
   });
 });

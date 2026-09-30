@@ -96,15 +96,15 @@ describe('scheduleDelivery — media from an uncensored model', () => {
   });
 });
 
-describe('scheduleDelivery — media from an nsfw project', () => {
+describe('scheduleDelivery — media from an uncensored project', () => {
   it('is never published, on any platform, confirmed or not', async () => {
-    const { db } = fakeDb({ posts: [postRow], social_accounts: [accountRows[1]], assets: [{ ...assetRows[0], nsfw: true }] });
+    const { db } = fakeDb({ posts: [postRow], social_accounts: [accountRows[1]], assets: [{ ...assetRows[0], uncensored_project: true }] });
     const publisher = fakePublisher();
 
     const result = await scheduleDelivery(db, publisher, { orgId: ORG, postId: POST_ID, accountIds: [ACCOUNT_X], confirmUncensored: true });
 
     expect(publisher.publish).not.toHaveBeenCalled();
-    expect(result.deliveries).toEqual([{ accountId: ACCOUNT_X, ok: false, error: 'nsfw_not_publishable' }]);
+    expect(result.deliveries).toEqual([{ accountId: ACCOUNT_X, ok: false, error: 'uncensored_not_publishable' }]);
   });
 });
 

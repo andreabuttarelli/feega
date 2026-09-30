@@ -3,7 +3,7 @@ import { NOTHING_HIDDEN, exclusionsFor, touchesHidden } from './hidden-scope';
 
 const HIDDEN = { projectIds: ['p-n'], canvasIds: ['c-n'], nodeIds: ['n-n'] };
 
-describe('what an agent outside the NSFW workspace cannot see', () => {
+describe('what an agent outside the Uncensored workspace cannot see', () => {
   it.each([
     ['projects', [['id', ['p-n']]]],
     ['nodes', [['project_id', ['p-n']]]],
@@ -19,7 +19,7 @@ describe('what an agent outside the NSFW workspace cannot see', () => {
     expect(exclusionsFor('nodes', NOTHING_HIDDEN)).toEqual([]);
   });
 
-  it('a row pointing into an nsfw project, canvas or node is refused', () => {
+  it('a row pointing into an uncensored project, canvas or node is refused', () => {
     expect(touchesHidden('nodes', { project_id: 'p-n' }, HIDDEN)).toBe(true);
     expect(touchesHidden('nodes_connections', { canvas_id: 'c-n' }, HIDDEN)).toBe(true);
     expect(touchesHidden('nodes', { project_id: 'p-ok' }, HIDDEN)).toBe(false);

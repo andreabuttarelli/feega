@@ -36,7 +36,7 @@ export type Asset = {
 const ASSET_COLUMNS =
   'id, project_id, type, url, content, mime_type, bytes, width, height, duration_s, source, source_node_id, uncensored, created_at';
 
-type AssetColumns = Omit<AssetRow, 'org_id' | 'embedding' | 'updated_at' | 'nsfw' | 'ai_marked'>;
+type AssetColumns = Omit<AssetRow, 'org_id' | 'embedding' | 'updated_at' | 'uncensored_project' | 'ai_marked'>;
 
 function toAsset(row: AssetColumns): Asset {
   return {

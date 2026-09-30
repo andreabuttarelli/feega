@@ -17,7 +17,7 @@
  * Le 26 tabelle sono `ORG_TABLES` (org-data/tables.ts), non `QUERY_TABLES`: quel file resta dello
  * schema vecchio, letto da `brand-data/query-tool.ts`, e i due non si toccano.
  */
-import { exclusionsFor, inList, NOTHING_HIDDEN, type HiddenScope } from '$lib/server/nsfw/hidden-scope';
+import { exclusionsFor, inList, NOTHING_HIDDEN, type HiddenScope } from '$lib/server/uncensored-workspace/hidden-scope';
 import { tool } from 'ai';
 import { z } from 'zod';
 import type { SupabaseClient } from '@supabase/supabase-js';

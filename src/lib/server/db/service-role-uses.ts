@@ -25,7 +25,7 @@ export type ServiceRoleUse = {
 export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
   {
     path: 'src/lib/server/canvas/canvas-share.ts — readSharedCanvas + signSharedMedia (rotta pubblica /s/[token])',
-    why: "Chi apre un link condiviso non ha sessione: il token È l'autorizzazione. La riga si trova solo per canvases.share_token; l'org_id si LEGGE da quella riga e limita ogni lettura successiva (nodi non cancellati, connessioni, asset di quei nodi, prodotti e post scaricati da quei nodi). Gli influencer non hanno sempre un org_id: si legge quello referenziato dal nodo e passa solo se è del catalogo (org_id null) o della stessa org — mai il volto di un'altra. Un progetto NSFW non si condivide mai: `projects.mode` si legge solo per rifiutarlo. Sola lettura, e fuori esce solo il contenuto dei nodi con i file firmati — mai org, progetto, prompt, parametri o utenti.",
+    why: "Chi apre un link condiviso non ha sessione: il token È l'autorizzazione. La riga si trova solo per canvases.share_token; l'org_id si LEGGE da quella riga e limita ogni lettura successiva (nodi non cancellati, connessioni, asset di quei nodi, prodotti e post scaricati da quei nodi). Gli influencer non hanno sempre un org_id: si legge quello referenziato dal nodo e passa solo se è del catalogo (org_id null) o della stessa org — mai il volto di un'altra. Un progetto uncensored non si condivide mai: `projects.mode` si legge solo per rifiutarlo. Sola lettura, e fuori esce solo il contenuto dei nodi con i file firmati — mai org, progetto, prompt, parametri o utenti.",
     tables: ['canvases', 'projects', 'nodes', 'nodes_connections', 'assets', 'products', 'social_posts', 'influencers', 'influencer_views']
   },
   {
@@ -79,7 +79,7 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
     tables: ['orgs_members', 'orgs', 'account_deletions', 'profiles', 'chat_threads', 'nodes', 'posts', 'chat_messages']
   },
   {
-    path: 'src/lib/server/nsfw/age-verification.ts — recordAgeVerification',
+    path: 'src/lib/server/uncensored-workspace/age-verification.ts — recordAgeVerification',
     why: "Un esito di verifica dell'età lo scrive il provider certificato, non l'utente: `user_age_verifications` non ha policy di scrittura, così nessuno può dichiararsi maggiorenne da solo. Lo user_id è quello della sessione che ha avviato la verifica, mai un valore scelto da chi chiama; si salva solo l'esito 18+, nessun documento.",
     tables: ['user_age_verifications']
   },

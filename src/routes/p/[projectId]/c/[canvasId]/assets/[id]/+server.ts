@@ -6,7 +6,7 @@ import { findAsset } from '$lib/server/repos/assets';
 import { createAssetSigningDb, signAssetPaths } from '$lib/server/canvas/sign-media';
 import type { ThumbnailPreset } from '$lib/server/media-thumbnails';
 import { AssetSize, sizeOf } from '$lib/canvas/asset-url';
-import { canvasReachable } from '$lib/server/nsfw/nsfw-server';
+import { canvasReachable } from '$lib/server/uncensored-workspace/workspace-server';
 
 const IMAGE_PRESET_OF: Record<AssetSize, ThumbnailPreset | undefined> = {
   [AssetSize.Thumb]: 'nodeThumbnail',

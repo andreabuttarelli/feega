@@ -338,7 +338,7 @@
           {#if needsAdultConfirmation}
             <label class="account-row" data-testid="confirm-uncensored">
               <input type="checkbox" name="confirmUncensored" value="true" required />
-              This post contains adult content from an uncensored model. Publish it where the platform allows adult content.
+              This post contains media from an uncensored model. Publish it only where the platform allows it.
             </label>
           {/if}
           {#each undeliveredOf(selectedPost) as account (account.id)}

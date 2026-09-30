@@ -32,7 +32,7 @@ import { clearDocShare, setDocShare } from '$lib/server/repos/doc-share';
 import { isCanvasEdgeKind, isWireMode } from '$lib/canvas-edges';
 import { canvasModelCatalogue } from '$lib/server/canvas-catalogue';
 import { Capability, catalogueIn, MODE_REFUSAL, modeAllows, modeOf, type ProjectMode } from '$lib/project-mode';
-import { canvasReachable } from '$lib/server/nsfw/nsfw-server';
+import { canvasReachable } from '$lib/server/uncensored-workspace/workspace-server';
 import { NO_UNCENSORED_ACCESS, uncensoredAccess, visibleCatalogue } from '$lib/server/uncensored-access';
 import { runGenNode, runsOf } from '$lib/server/canvas/generate';
 import { planLoop, enqueueLoop, cancelLoop, retryLoopCombination } from '$lib/server/canvas/loop';

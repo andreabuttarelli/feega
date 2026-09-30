@@ -12,7 +12,7 @@
  * invece che in ogni chiamante — un tool nuovo che scrive `nodes` lo eredita per il fatto di passare
  * da questo file.
  */
-import { exclusionsFor, inList, NOTHING_HIDDEN, touchesHidden, type HiddenScope } from '$lib/server/nsfw/hidden-scope';
+import { exclusionsFor, inList, NOTHING_HIDDEN, touchesHidden, type HiddenScope } from '$lib/server/uncensored-workspace/hidden-scope';
 import { ORG_TABLES, CANVAS_WRITE_TABLES, type OrgTable } from './tables';
 import { ORG_TABLE_CHECKS } from './checks';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -279,7 +279,7 @@ export function createOrgWriteTools({ authority, orgId, userId, threadId, actor,
     if (touchesHidden(table, values, hidden)) {
       return finish(
         { error: 'not_found', message: 'That project, canvas or node is not reachable from this key.', fix: 'Target a project this key can see.' },
-        'org_db_write:refused:nsfw_hidden',
+        'org_db_write:refused:uncensored_hidden',
         t0
       );
     }

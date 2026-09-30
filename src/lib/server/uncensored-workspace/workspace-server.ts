@@ -6,18 +6,18 @@ import { createServiceRoleDb } from '$lib/server/db/client';
 import { SERVICE_ROLE_USES } from '$lib/server/db/service-role-uses';
 import { uncensoredAccess } from '$lib/server/uncensored-access';
 import { modelRefusal, modeOf, ProjectMode } from '$lib/project-mode';
-import { nsfwLock, NsfwLock, type NsfwFacts } from '$lib/nsfw-access';
+import { uncensoredLock, UncensoredLock, type UncensoredFacts } from '$lib/uncensored-lock';
 import { VerifierSetting, verifierFor, type AgeVerificationStore, type AgeVerifier } from './age-verification';
 
-const NSFW_FLAG = 'nsfw_mode';
-const VERIFICATION_WRITE_USE = 'src/lib/server/nsfw/age-verification.ts — recordAgeVerification';
+const UNCENSORED_FLAG = 'uncensored_mode';
+const VERIFICATION_WRITE_USE = 'src/lib/server/uncensored-workspace/age-verification.ts — recordAgeVerification';
 
 function untyped(db: Db): SupabaseClient {
   return db as unknown as SupabaseClient;
 }
 
 function devManualOn(): boolean {
-  return dev && env.NSFW_DEV_MANUAL_VERIFICATION === 'true';
+  return dev && env.UNCENSORED_DEV_MANUAL_VERIFICATION === 'true';
 }
 
 export function configuredVerifier(): AgeVerifier | null {
@@ -28,7 +28,7 @@ async function flagOn(db: Db): Promise<boolean> {
   if (devManualOn()) {
     return true;
   }
-  const { data } = await untyped(db).from('feature_flags').select('enabled').eq('key', NSFW_FLAG).maybeSingle();
+  const { data } = await untyped(db).from('feature_flags').select('enabled').eq('key', UNCENSORED_FLAG).maybeSingle();
   return (data as { enabled?: boolean } | null)?.enabled === true;
 }
 
@@ -57,7 +57,7 @@ export function ageStore(db: Db): AgeVerificationStore {
   };
 }
 
-export async function nsfwFacts(db: Db, input: { orgId: string; userId: string }): Promise<NsfwFacts> {
+export async function uncensoredFacts(db: Db, input: { orgId: string; userId: string }): Promise<UncensoredFacts> {
   const [flag, access, verified] = await Promise.all([
     flagOn(db),
     uncensoredAccess(db, input.orgId),
@@ -72,8 +72,8 @@ export async function nsfwFacts(db: Db, input: { orgId: string; userId: string }
   };
 }
 
-export async function nsfwLockFor(db: Db, input: { orgId: string; userId: string }): Promise<NsfwLock> {
-  return nsfwLock(await nsfwFacts(db, input));
+export async function uncensoredLockFor(db: Db, input: { orgId: string; userId: string }): Promise<UncensoredLock> {
+  return uncensoredLock(await uncensoredFacts(db, input));
 }
 
 export async function projectModeOf(db: Db, input: { orgId: string; projectId: string }): Promise<ProjectMode> {
@@ -86,12 +86,12 @@ export async function canvasModeOf(db: Db, input: { orgId: string; canvasId: str
   return modeOf((data as { projects?: { mode?: string } | null } | null)?.projects?.mode);
 }
 
-export async function nsfwProjectIds(db: Db, orgId: string): Promise<Set<string>> {
-  const { data } = await untyped(db).from('projects').select('id').eq('org_id', orgId).eq('mode', ProjectMode.Nsfw);
+export async function uncensoredProjectIds(db: Db, orgId: string): Promise<Set<string>> {
+  const { data } = await untyped(db).from('projects').select('id').eq('org_id', orgId).eq('mode', ProjectMode.Uncensored);
   return new Set(((data ?? []) as { id: string }[]).map((r) => r.id));
 }
 
-export const NSFW_LOCKED = 'nsfw_workspace_locked';
+export const UNCENSORED_LOCKED = 'uncensored_workspace_locked';
 
 export async function generationRefusal(
   db: Db,
@@ -102,15 +102,15 @@ export async function generationRefusal(
   if (refused) {
     return refused;
   }
-  if (mode !== ProjectMode.Nsfw) {
+  if (mode !== ProjectMode.Uncensored) {
     return null;
   }
-  return (await nsfwLockFor(db, input)) === NsfwLock.Open ? null : NSFW_LOCKED;
+  return (await uncensoredLockFor(db, input)) === UncensoredLock.Open ? null : UNCENSORED_LOCKED;
 }
 
 export async function canvasReachable(db: Db, found: { orgId: string; mode: ProjectMode }, userId: string): Promise<boolean> {
-  if (found.mode !== ProjectMode.Nsfw) {
+  if (found.mode !== ProjectMode.Uncensored) {
     return true;
   }
-  return (await nsfwLockFor(db, { orgId: found.orgId, userId })) === NsfwLock.Open;
+  return (await uncensoredLockFor(db, { orgId: found.orgId, userId })) === UncensoredLock.Open;
 }

@@ -45,7 +45,7 @@ const screen: ScreenPorts = { decide, judge, decideIdentifiability, judgeIdentif
 const { deps } = vi.hoisted(() => ({ deps: { current: null as null | ((db: Db) => WiroRunDeps) } }));
 vi.mock('$lib/server/wiro-config', () => ({ wiroRunDeps: (db: Db) => deps.current!(db) }));
 vi.mock('$app/environment', () => ({ dev: true, browser: false, building: false }));
-vi.mock('$env/dynamic/private', () => ({ env: { NSFW_DEV_MANUAL_VERIFICATION: 'true' } }));
+vi.mock('$env/dynamic/private', () => ({ env: { UNCENSORED_DEV_MANUAL_VERIFICATION: 'true' } }));
 vi.mock('./node-model', () => ({ resolveNodeModel: async (_m: string, model: string | null) => ({ ok: true, model }) }));
 vi.mock('$lib/server/canvas/upstream', () => ({
   upstreamInputsFor: async () => ({
@@ -113,7 +113,7 @@ const start = (model: string, prompt: string, params: Record<string, unknown> = 
 
 const paidOrg = { id: ORG, stripe_subscription_id: 'sub_1' };
 const optIn = { org_id: ORG, enabled_by: USER, enabled_at: '2026-09-29T10:00:00Z', disabled_at: null };
-const nsfwProject = { id: PROJECT, org_id: ORG, mode: 'nsfw' };
+const uncensoredProject = { id: PROJECT, org_id: ORG, mode: 'uncensored' };
 const verified = { id: 'v1', user_id: USER, provider: 'manual_admin', method: 'manual_admin', result: 'adult' };
 
 function canvas(extra: Record<string, unknown[]> = {}) {
@@ -124,7 +124,7 @@ function canvas(extra: Record<string, unknown[]> = {}) {
       assets: [],
       orgs: [paidOrg],
       org_uncensored_optins: [optIn],
-      projects: [nsfwProject],
+      projects: [uncensoredProject],
       user_age_verifications: [verified],
       ...extra
     },
@@ -139,20 +139,20 @@ const externalJobOf = (calls: ReturnType<typeof fakeDb>['calls']) =>
 
 describe('an image node on a Wiro model', () => {
   it('is refused in a standard project, by project mode, before any provider call', async () => {
-    const { db } = canvas({ projects: [{ ...nsfwProject, mode: 'standard' }] });
+    const { db } = canvas({ projects: [{ ...uncensoredProject, mode: 'standard' }] });
 
     const out = await runGenNode(db, start(SAFE, 'a lighthouse'));
 
-    expect(out).toEqual({ kind: 'refused', error: 'wiro_requires_nsfw_project' });
+    expect(out).toEqual({ kind: 'refused', error: 'wiro_requires_uncensored_project' });
     expect(gateway.run).not.toHaveBeenCalled();
   });
 
-  it('is refused in an nsfw project for a user without age verification', async () => {
+  it('is refused in an uncensored project for a user without age verification', async () => {
     const { db } = canvas({ user_age_verifications: [] });
 
     const out = await runGenNode(db, start(SAFE, 'a lighthouse'));
 
-    expect(out).toEqual({ kind: 'refused', error: 'nsfw_workspace_locked' });
+    expect(out).toEqual({ kind: 'refused', error: 'uncensored_workspace_locked' });
     expect(gateway.run).not.toHaveBeenCalled();
   });
 
@@ -161,7 +161,7 @@ describe('an image node on a Wiro model', () => {
 
     const out = await runGenNode(db, start(UNCENSORED, 'a woman on a balcony'));
 
-    expect(out).toEqual({ kind: 'refused', error: 'nsfw_workspace_locked' });
+    expect(out).toEqual({ kind: 'refused', error: 'uncensored_workspace_locked' });
     expect(gateway.run).not.toHaveBeenCalled();
   });
 
@@ -203,7 +203,7 @@ describe('an image node on a Wiro model', () => {
         assets: [],
         orgs: [paidOrg],
         org_uncensored_optins: [optIn],
-        projects: [nsfwProject],
+        projects: [uncensoredProject],
         user_age_verifications: [verified]
       },
       { updateRows: { nodes: [{ ...imageNode(), version: 2 }] } }
@@ -236,15 +236,15 @@ describe('an image node on a Wiro model', () => {
     expect(gateway.run).not.toHaveBeenCalled();
   });
 
-  it('runs a safe Wiro model in an open nsfw project, still screened', async () => {
+  it('runs a safe Wiro model in an open uncensored project, still screened', async () => {
     const { db } = canvas();
     expect((await runGenNode(db, start(SAFE, 'a mountain lake'))).kind).toBe('queued');
     expect(decide).toHaveBeenCalledOnce();
   });
 
-  it('refuses even a safe Wiro model once the owner turned nsfw mode off', async () => {
+  it('refuses even a safe Wiro model once the owner turned uncensored mode off', async () => {
     const { db } = canvas({ org_uncensored_optins: [] });
-    expect(await runGenNode(db, start(SAFE, 'a mountain lake'))).toEqual({ kind: 'refused', error: 'nsfw_workspace_locked' });
+    expect(await runGenNode(db, start(SAFE, 'a mountain lake'))).toEqual({ kind: 'refused', error: 'uncensored_workspace_locked' });
   });
 });
 
@@ -278,14 +278,14 @@ describe('the run tick finishes a Wiro task', () => {
 
   it('stores the output as a flagged asset, bills the real cost and marks the node', async () => {
     gateway.task.mockResolvedValue({ state: 'done', costUsd: 0.013, outputs: [{ url: 'https://cdn.wiro.test/0.png', contentType: 'image/png' }] });
-    const { db, calls } = fakeDb({ node_runs: [queued], nodes: [imageNode({ running: true, runId: RUN })], projects: [nsfwProject] });
+    const { db, calls } = fakeDb({ node_runs: [queued], nodes: [imageNode({ running: true, runId: RUN })], projects: [uncensoredProject] });
 
     expect(await reconcileWiroNodeRuns(db)).toMatchObject({ done: 1 });
 
     expect(gateway.task).toHaveBeenCalledWith('2221');
     const asset = calls.find((c) => c.table === 'assets' && c.op === 'insert')?.payload as Record<string, unknown>;
     expect(asset).toMatchObject({ type: 'image', uncensored: true, source: 'generated' });
-    expect(String(asset.url)).toMatch(new RegExp(`^${USER}/nsfw/wiro/.+\\.png$`));
+    expect(String(asset.url)).toMatch(new RegExp(`^${USER}/uncensored/wiro/.+\\.png$`));
     expect(bill).toHaveBeenCalledWith(expect.objectContaining({ costUsd: 0.013, uncensored: true }));
     const shown = calls.find((c) => c.table === 'nodes' && c.op === 'update' && JSON.stringify(c.payload).includes('outputUncensored'));
     expect(shown).toBeTruthy();
@@ -296,7 +296,7 @@ describe('the run tick finishes a Wiro task', () => {
     const png = await sharp({ create: { width: 8, height: 8, channels: 3, background: '#000' } }).png().toBuffer();
     vi.stubGlobal('fetch', vi.fn(async () => new Response(new Uint8Array(png), { headers: { 'content-type': 'image/png' } })));
     gateway.task.mockResolvedValue({ state: 'done', costUsd: 0.013, outputs: [{ url: 'https://cdn.wiro.test/0.png', contentType: 'image/png' }] });
-    const { db, calls } = fakeDb({ node_runs: [queued], nodes: [imageNode({ running: true, runId: RUN })], projects: [nsfwProject] });
+    const { db, calls } = fakeDb({ node_runs: [queued], nodes: [imageNode({ running: true, runId: RUN })], projects: [uncensoredProject] });
 
     await reconcileWiroNodeRuns(db);
 

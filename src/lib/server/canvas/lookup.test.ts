@@ -52,11 +52,11 @@ describe('aprire una tela dal suo id', () => {
   });
 
   it('carries the mode of the project the canvas belongs to', async () => {
-    const { db } = fakeDb({ canvases: [{ ...row, projects: { mode: 'nsfw' } }] });
+    const { db } = fakeDb({ canvases: [{ ...row, projects: { mode: 'uncensored' } }] });
 
     const found = await findCanvasForUser(db, { canvasId: CANVAS, memberships: [membership(ORG)] });
 
-    expect(found?.mode).toBe('nsfw');
+    expect(found?.mode).toBe('uncensored');
   });
 
   it('trovata nella prima org, la seconda non si chiede nemmeno', async () => {

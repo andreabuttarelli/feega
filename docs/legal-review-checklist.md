@@ -15,8 +15,8 @@
 
 ## Points to confirm
 
-1. **Age verification**: whether Italian/EU rules require it for NSFW generation, which certified provider, legal basis for storing the result.
-2. **Stripe and adult content**: Stripe restricts adult services; confirm NSFW mode may be sold through Stripe.
+1. **Age verification**: whether Italian/EU rules require it for uncensored generation, which certified provider, legal basis for storing the result.
+2. **Stripe and adult content**: Stripe restricts adult services; confirm uncensored mode may be sold through Stripe.
 3. **Refunds and consumer withdrawal**: waiver wording for credits used within 14 days (Codice del Consumo art. 59).
 4. **Liability caps and warranties**: enforceability for consumers vs businesses; conformity guarantee for digital services.
 5. **AI Act**: art. 50 labelling duties (provider vs deployer), art. 4 literacy, art. 5 list; machine-readable marking is claimed only "where technically feasible".
@@ -45,6 +45,6 @@
 23. **Detail level**: Privacy §4 lists recipient categories only (Art. 13(1)(e) allows categories); AI Transparency names no providers; DPA Annex 1 TOMs are generic. Confirm this is sufficient.
 18. **DPA**: acceptance by click-through with the Terms vs signature; SCC module choice; whether feega is controller or processor for brand analysis and public-profile scraping; liability cap interplay with GDPR Art. 82.
 19. **Breach notice** target 48h — confirm it is operationally achievable.
-20. **AI labelling**: only the IPTC XMP marker is live; C2PA signing is off (no certificate, dependency removed) and there is no visible "AI-generated" label outside the NSFW page copy. Confirm "being rolled out" wording is acceptable under Art. 50(2).
+20. **AI labelling**: only the IPTC XMP marker is live; C2PA signing is off (no certificate, dependency removed) and there is no visible "AI-generated" label outside the uncensored workspace page copy. Confirm "being rolled out" wording is acceptable under Art. 50(2).
 21. **Legal notice**: which Art. 7 D.Lgs. 70/2003 fields apply to the chosen legal form.
 22. **Framer marketing site**: cookies and its own consent banner.

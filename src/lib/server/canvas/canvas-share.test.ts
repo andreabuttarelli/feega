@@ -98,9 +98,9 @@ describe('readSharedCanvas', () => {
     expect(await readSharedCanvas(db, '', sign)).toBeNull();
   });
 
-  it('a canvas of an nsfw project reads as not found, even with a live token', async () => {
+  it('a canvas of an uncensored project reads as not found, even with a live token', async () => {
     const { db } = fakeDb(
-      { canvases: [CANVAS], projects: [{ id: 'project-1', org_id: 'org-1', mode: 'nsfw' }], nodes: [], nodes_connections: [], assets: [] },
+      { canvases: [CANVAS], projects: [{ id: 'project-1', org_id: 'org-1', mode: 'uncensored' }], nodes: [], nodes_connections: [], assets: [] },
       { filter: true }
     );
 

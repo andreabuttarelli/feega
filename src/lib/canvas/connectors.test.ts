@@ -227,8 +227,8 @@ describe('connectorsForNode: le porte seguono il modello che il nodo MOSTRA', ()
   });
 
   it('un modello uncensored scelto sul nodo non apre nessuna porta, nemmeno il testo', () => {
-    const uncensoredChoices = [{ id: 'wiro/nsfw-image', inputModalities: ['text', 'image'], uncensored: true }];
-    expect(connectorsForNode('image', 'wiro/nsfw-image', uncensoredChoices)).toEqual([]);
+    const uncensoredChoices = [{ id: 'wiro/uncensored-image', inputModalities: ['text', 'image'], uncensored: true }];
+    expect(connectorsForNode('image', 'wiro/uncensored-image', uncensoredChoices)).toEqual([]);
   });
 });
 

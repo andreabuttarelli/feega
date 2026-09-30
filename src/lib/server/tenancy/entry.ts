@@ -126,7 +126,7 @@ async function orgIdFor(db: Db, deps: EntryDeps, user: User, chosenOrgId: string
  * "Untitled" appena creato e mai più toccato.
  */
 async function projectIdFor(db: Db, deps: EntryDeps, orgId: string, lastProjectId: string | null): Promise<string> {
-  const projects = (await deps.listProjects(db, orgId)).filter((p) => p.mode !== ProjectMode.Nsfw);
+  const projects = (await deps.listProjects(db, orgId)).filter((p) => p.mode !== ProjectMode.Uncensored);
   if (projects.length > 0) {
     const last = lastProjectId ? projects.find((p) => p.id === lastProjectId) : undefined;
     return (last ?? projects[0]).id;

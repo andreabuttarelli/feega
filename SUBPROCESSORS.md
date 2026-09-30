@@ -21,7 +21,7 @@ feega (**[LEGAL ENTITY]**, VAT no. **[VAT]**, **[ADDRESS]**) uses the providers 
 | Provider | Purpose | Personal data | Location | Transfer mechanism |
 |---|---|---|---|---|
 | OpenRouter, and the model providers it routes each request to | text, chat, image and video generation; the second-stage moderation review | prompts, attachments, brand context, generated outputs | US / other, per model | SCCs [to confirm per provider] |
-| Wiro | image and video generation with the uncensored model catalogue (NSFW mode, not yet available) | prompts, reference media, generated outputs | [LOCATION] | [SCCs — to confirm] |
+| Wiro | image and video generation with the uncensored model catalogue (uncensored mode, not yet available) | prompts, reference media, generated outputs | [LOCATION] | [SCCs — to confirm] |
 | ElevenLabs | voice-over, music and sound generation | script text, chosen voice, generated audio | US / EU | DPF / SCCs |
 | TypeSafe (Jev classifier) | first-stage prompt moderation | prompt text, reference descriptions | [LOCATION] | [SCCs — to confirm] |
 
@@ -51,7 +51,7 @@ Google Gemini models are reached through OpenRouter; the current code does not c
 
 | Provider | Purpose | Status |
 |---|---|---|
-| [AGE VERIFICATION PROVIDER] | age verification for NSFW mode; we keep only the result | not chosen; NSFW mode is not available |
+| [AGE VERIFICATION PROVIDER] | age verification for uncensored mode; we keep only the result | not chosen; uncensored mode is not available |
 
 Platforms you publish to (Instagram, Facebook, TikTok and others) receive your content as independent controllers, not as our sub-processors.
 

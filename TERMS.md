@@ -91,15 +91,16 @@ Every generation prompt is screened automatically before it reaches a model, by 
 
 You also must not: probe, bypass or overload the moderation or rate limits; reverse-engineer or scrape the Service; share API keys outside your organisation; resell the Service without our written consent; use the Service for high-risk purposes listed in Annex III of the AI Act; or breach the terms of any connected platform.
 
-## 9. NSFW mode
+## 9. Uncensored mode
 
 > **Not yet available.** The rules below will apply once age verification is live.
 
-- NSFW mode is a **separate workspace area, off by default**. It requires a paid plan, the workspace owner's explicit opt-in and attestation, and each user's **age verification (18+) through a certified third-party provider**. We keep only the result, not identity documents.
-- Content created there stays isolated: NSFW projects are badged, listed apart, and **cannot be shared, published, scheduled or used in ads**.
+- Uncensored mode offers models without built-in content filters, for adults (18+). Our safety rules still apply.
+- Uncensored mode is a **separate workspace area, off by default**. It requires a paid plan, the workspace owner's explicit opt-in and attestation, and each user's **age verification (18+) through a certified third-party provider**. We keep only the result, not identity documents.
+- Content created there stays isolated: uncensored projects are badged, listed apart, and **cannot be shared, published, scheduled or used in ads**.
 - Every result is labelled as AI-generated, including in the downloaded file name.
 - All "always prohibited" rules in §8 continue to apply. Only fictional adults may be depicted.
-- We may withdraw NSFW mode, or access to it, at any time.
+- We may withdraw uncensored mode, or access to it, at any time.
 
 ## 10. Labelling of AI-generated content
 

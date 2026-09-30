@@ -53,7 +53,7 @@
     profile,
     org,
     projectMode = ProjectMode.Standard,
-    nsfw = null,
+    uncensored = null,
     brandName = null
   }: {
     projectId: string;
@@ -70,21 +70,21 @@
     profile: { name: string | null; email: string; avatarUrl: string | null };
     org: { name: string } | null;
     projectMode?: string;
-    nsfw?: { visible: boolean; text: string } | null;
+    uncensored?: { visible: boolean; text: string } | null;
     brandName?: string | null;
   } = $props();
 
   const ICON = 16;
   const EDGE = 8;
 
-  const standardProjects = $derived(projects.filter((p) => p.mode !== ProjectMode.Nsfw));
-  const nsfwProjects = $derived(projects.filter((p) => p.mode === ProjectMode.Nsfw));
+  const standardProjects = $derived(projects.filter((p) => p.mode !== ProjectMode.Uncensored));
+  const uncensoredProjects = $derived(projects.filter((p) => p.mode === ProjectMode.Uncensored));
 
   let projectQuery = $state('');
   let searchInput = $state<HTMLInputElement | null>(null);
   const projectSearch = $derived(needsSearch(projects.length));
   const shownProjects = $derived(matching(recentFirst(standardProjects), projectQuery));
-  const shownNsfwProjects = $derived(matching(recentFirst(nsfwProjects), projectQuery));
+  const shownUncensoredProjects = $derived(matching(recentFirst(uncensoredProjects), projectQuery));
 
   function focusSearch(event: Event) {
     if (!searchInput) {
@@ -113,7 +113,7 @@
       event.stopPropagation();
     }
   }
-  const inNsfw = $derived(projectMode === ProjectMode.Nsfw);
+  const inUncensored = $derived(projectMode === ProjectMode.Uncensored);
   const mode = $derived(modeOf(projectMode));
 
   let renaming = $state(false);
@@ -182,8 +182,8 @@
     {:else}
     <DropdownMenu.Root onOpenChange={() => (projectQuery = '')}>
       <DropdownMenu.Trigger class="switcher-btn" data-testid="project-switcher" title={projectName}>
-        {#if inNsfw}
-          <span class="nsfw-badge" data-testid="nsfw-project-badge">NSFW</span>
+        {#if inUncensored}
+          <span class="uncensored-badge" data-testid="uncensored-project-badge">Uncensored</span>
         {/if}
         <span class="truncate">{projectName}</span>
         <ChevronDown size={ICON} />
@@ -207,19 +207,19 @@
         {:else}
           <div class="sw-empty">{$_('app.shell.canvasActions.noMatch')}</div>
         {/each}
-        {#if nsfw?.visible}
+        {#if uncensored?.visible}
           <DropdownMenu.Separator />
-          <div class="sw-label sw-nsfw" data-testid="nsfw-section">
-            <span class="nsfw-badge">NSFW</span>18+
+          <div class="sw-label sw-uncensored" data-testid="uncensored-section">
+            <span class="uncensored-badge">Uncensored</span>18+
           </div>
-          {#each shownNsfwProjects as project (project.id)}
+          {#each shownUncensoredProjects as project (project.id)}
             {@render projectRow(project)}
           {/each}
           <DropdownMenu.Item class="sw-row">
             {#snippet child({ props })}
-              <a {...props} href={`/p/${projectId}/nsfw`} data-testid="nsfw-workspace-link">
+              <a {...props} href={`/p/${projectId}/uncensored`} data-testid="uncensored-workspace-link">
                 <span class="sw-lead"><ShieldAlert size={ICON} /></span>
-                <span class="sw-name">{nsfw.text}</span>
+                <span class="sw-name">{uncensored.text}</span>
               </a>
             {/snippet}
           </DropdownMenu.Item>
@@ -525,7 +525,7 @@
       max-width: 80px;
     }
   }
-  .nsfw-badge {
+  .uncensored-badge {
     border: 1px solid var(--color-destructive);
     color: var(--color-destructive);
     padding: 0 0.25rem;
@@ -569,7 +569,7 @@
     text-transform: uppercase;
     color: var(--ink-faint, #9a9a9e);
   }
-  :global(.sw-nsfw) {
+  :global(.sw-uncensored) {
     color: var(--color-destructive);
   }
 

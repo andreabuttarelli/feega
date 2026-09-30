@@ -5,7 +5,7 @@ import { fakeDb } from '$lib/server/db/fake-db';
 const { devManual } = vi.hoisted(() => ({ devManual: { on: 'true' } }));
 vi.mock('$app/environment', () => ({ dev: true, browser: false, building: false }));
 vi.mock('$env/dynamic/private', () => ({
-  env: new Proxy({}, { get: (_t, key) => (key === 'NSFW_DEV_MANUAL_VERIFICATION' ? devManual.on : undefined) })
+  env: new Proxy({}, { get: (_t, key) => (key === 'UNCENSORED_DEV_MANUAL_VERIFICATION' ? devManual.on : undefined) })
 }));
 
 const { writer } = vi.hoisted(() => ({ writer: { db: null as unknown } }));
@@ -28,7 +28,7 @@ function seed({ optedIn = true, paid = true, verified = true }: Seed = {}) {
     orgs: [{ id: ORG, stripe_subscription_id: paid ? 'sub_1' : null }],
     projects: [{ id: PROJECT, org_id: ORG, name: 'Main', slug: 'main', brand_id: null, archived_at: null, mode: 'standard', updated_at: '2026-09-29T00:00:00Z', canvases: [] }],
     org_uncensored_optins: optedIn ? [{ org_id: ORG, enabled_by: USER.id, enabled_at: '2026-09-29T00:00:00Z', disabled_at: null }] : [],
-    feature_flags: [{ key: 'nsfw_mode', enabled: false }],
+    feature_flags: [{ key: 'uncensored_mode', enabled: false }],
     user_age_verifications: verified ? [{ id: 'v1', user_id: USER.id, provider: 'manual_admin', method: 'manual_admin', result: 'adult' }] : []
   };
 }
@@ -59,7 +59,7 @@ beforeEach(() => {
   devManual.on = 'true';
 });
 
-describe('the NSFW workspace', () => {
+describe('the Uncensored workspace', () => {
   it('stays "coming soon" while no age verifier is configured', async () => {
     devManual.on = 'false';
     const { db } = fakeDb(seed({ verified: false }), { filter: true });
@@ -102,13 +102,13 @@ describe('the NSFW workspace', () => {
     });
   });
 
-  it('creates an nsfw project with its first canvas once open', async () => {
+  it('creates an uncensored project with its first canvas once open', async () => {
     const { db, calls } = fakeDb(seed(), { filter: true });
 
     const out = await settle(() => (actions.create as Fn)(event(db, { name: 'Night' })));
 
     expect(isRedirect(out)).toBe(true);
-    expect(calls.find((c) => c.table === 'projects' && c.op === 'insert')?.payload).toMatchObject({ org_id: ORG, name: 'Night', mode: 'nsfw' });
+    expect(calls.find((c) => c.table === 'projects' && c.op === 'insert')?.payload).toMatchObject({ org_id: ORG, name: 'Night', mode: 'uncensored' });
     expect(calls.some((c) => c.table === 'canvases' && c.op === 'insert')).toBe(true);
   });
 });
