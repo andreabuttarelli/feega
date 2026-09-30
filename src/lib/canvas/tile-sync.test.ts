@@ -7,6 +7,8 @@ const node = (id: string) => ({ id, position: { x: 0, y: 0 }, data: {}, type: 't
 /** Come `CanvasFlow` costruisce un nodo da una tile, ridotto a quel che serve qui. */
 const toNode = (t: { id: string }) => node(t.id);
 
+type MeasuredNode = ReturnType<typeof node> & { style?: string; measured?: { width: number; height: number } };
+
 describe('tenere i nodi della tela allineati alle tile', () => {
   it('porta dentro quelle nuove', () => {
     const out = syncNodes([node('a')], [tile('a'), tile('b')], toNode);
@@ -96,5 +98,23 @@ describe('tenere i nodi della tela allineati alle tile', () => {
     const out = syncNodes([alreadySelected], [tile('old'), tile('fromPeer')], toNodeSelectable);
 
     expect(out?.find((n) => n.id === 'old')?.selected).toBe(true);
+  });
+
+  it('un nodo ricostruito tiene la misura di SvelteFlow, o si nasconde e il campo in cui si scrive perde il focus', () => {
+    const measured: MeasuredNode = { ...node('a'), measured: { width: 360, height: 220 } };
+    const grown = (t: { id: string }): MeasuredNode => ({ ...node(t.id), style: 'height:260px' });
+
+    const out = syncNodes([measured], [tile('a')], grown);
+
+    expect(out?.[0]).toMatchObject({ style: 'height:260px', measured: { width: 360, height: 220 } });
+  });
+
+  it('un nodo che non cambia resta lo stesso oggetto quando ne cambia un altro', () => {
+    const still: MeasuredNode = { ...node('a'), measured: { width: 360, height: 220 } };
+    const moved = (t: { id: string }): MeasuredNode => (t.id === 'b' ? { ...node('b'), position: { x: 900, y: 0 } } : node(t.id));
+
+    const out = syncNodes([still, node('b')], [tile('a'), tile('b')], moved);
+
+    expect(out?.[0]).toBe(still);
   });
 });
