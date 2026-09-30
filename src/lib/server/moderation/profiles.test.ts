@@ -42,8 +42,8 @@ describe('the moderation profile table', () => {
   });
 
   it.each([
-    [ProjectMode.Nsfw, true, ModerationProfile.Uncensored],
-    [ProjectMode.Nsfw, false, ModerationProfile.Standard],
+    [ProjectMode.Uncensored, true, ModerationProfile.Uncensored],
+    [ProjectMode.Uncensored, false, ModerationProfile.Standard],
     [ProjectMode.Standard, true, ModerationProfile.Standard],
     [ProjectMode.Standard, false, ModerationProfile.Standard]
   ])('picks the profile from project mode %s and model uncensored=%s: %s', (mode, uncensored, profile) => {

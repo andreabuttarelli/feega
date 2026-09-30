@@ -1,8 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Db } from '$lib/server/db/client';
-import { NsfwLock } from '$lib/nsfw-access';
+import { UncensoredLock } from '$lib/uncensored-lock';
 import { ProjectMode } from '$lib/project-mode';
-import { nsfwLockFor } from './nsfw-server';
+import { uncensoredLockFor } from './workspace-server';
 
 export type HiddenScope = { projectIds: string[]; canvasIds: string[]; nodeIds: string[] };
 
@@ -52,10 +52,10 @@ async function idsOf(db: Db, table: string, column: string, values: string[]): P
 }
 
 export async function hiddenFor(db: Db, input: { orgId: string; userId: string }): Promise<HiddenScope> {
-  if ((await nsfwLockFor(db, input)) === NsfwLock.Open) {
+  if ((await uncensoredLockFor(db, input)) === UncensoredLock.Open) {
     return NOTHING_HIDDEN;
   }
-  const { data } = await (db as unknown as SupabaseClient).from('projects').select('id').eq('org_id', input.orgId).eq('mode', ProjectMode.Nsfw);
+  const { data } = await (db as unknown as SupabaseClient).from('projects').select('id').eq('org_id', input.orgId).eq('mode', ProjectMode.Uncensored);
   const projectIds = ((data ?? []) as { id: string }[]).map((r) => r.id);
   const [canvasIds, nodeIds] = await Promise.all([idsOf(db, 'canvases', 'project_id', projectIds), idsOf(db, 'nodes', 'project_id', projectIds)]);
   return { projectIds, canvasIds, nodeIds };

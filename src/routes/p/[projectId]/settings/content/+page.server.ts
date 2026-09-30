@@ -17,7 +17,7 @@ const AI_PERSONA_SOURCE = 'generated';
 
 const OPT_IN_ERRORS: Readonly<Record<string, string>> = {
   owner_only: 'Only the workspace owner can change this.',
-  confirmation_required: 'Confirm you are 18 or older and accept the adult content policy.',
+  confirmation_required: 'Confirm you are 18 or older and accept the uncensored mode policy.',
   plan_not_entitled: 'Uncensored models need a paid plan.',
   not_an_ai_persona: 'Only AI influencers created in this workspace can be marked.',
   not_an_adult: 'Only influencers declared 18 or older can be marked.'

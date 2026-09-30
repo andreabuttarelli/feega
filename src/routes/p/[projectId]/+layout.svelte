@@ -139,7 +139,7 @@
 
 <ChatLeaveGuard {projectId} />
 
-<div class="project-shell" class:is-sheet-pending={sheetPending} class:is-nsfw={data.project.mode === ProjectMode.Nsfw} data-viewport={viewport} data-mode={data.project.mode}>
+<div class="project-shell" class:is-sheet-pending={sheetPending} class:is-uncensored={data.project.mode === ProjectMode.Uncensored} data-viewport={viewport} data-mode={data.project.mode}>
   {#if isMobile}
     <MobileTopBar
       {projectId}
@@ -187,7 +187,7 @@
             mode: p.mode
           }))}
           projectMode={data.project.mode}
-          nsfw={data.nsfw}
+          uncensored={data.uncensored}
           brandName={data.brand?.name ?? null}
           canvasName={currentCanvas?.name ?? ''}
           canvasHref={currentCanvas?.href ?? ''}
@@ -238,7 +238,7 @@
 </div>
 
 <style>
-  .project-shell.is-nsfw {
+  .project-shell.is-uncensored {
     box-shadow: inset 0 3px 0 var(--color-destructive);
   }
   .project-shell {

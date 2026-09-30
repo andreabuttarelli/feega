@@ -20,7 +20,7 @@ This policy says what you may not do with feega. It is part of the [Terms of Ser
 
 ## 2. Modes
 
-| | Standard mode | NSFW mode (not yet available) |
+| | Standard mode | Uncensored mode (not yet available) |
 |---|---|---|
 | Who | every workspace, by default | paid plan, owner opt-in, each user age-verified 18+ |
 | Sexual or nude content | prohibited | allowed for **fictional adults** only |
@@ -42,7 +42,7 @@ This policy says what you may not do with feega. It is part of the [Terms of Ser
 
 1. **Refusal.** Prompts in a prohibited category are refused before they reach a model, and the decision is logged.
 2. **Removal.** We may remove content or disable share links that breach this policy.
-3. **Restriction.** We may withdraw NSFW mode, pause connected accounts or limit features.
+3. **Restriction.** We may withdraw uncensored mode, pause connected accounts or limit features.
 4. **Suspension or termination** of the account or workspace.
 5. **Report to authorities.** Content involving child sexual abuse is always reported.
 

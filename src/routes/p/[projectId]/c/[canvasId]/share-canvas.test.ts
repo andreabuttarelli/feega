@@ -46,9 +46,9 @@ vi.mock('$lib/server/canvas/canvas-share', () => ({
 	setCanvasShare: (...a: unknown[]) => setCanvasShare(...a)
 }));
 
-const nsfwLockFor = vi.fn();
-vi.mock('$lib/server/nsfw/nsfw-server', () => ({
-	canvasReachable: async (_db: unknown, found: { mode: string }) => found.mode !== 'nsfw' || (await nsfwLockFor()) === 'open'
+const uncensoredLockFor = vi.fn();
+vi.mock('$lib/server/uncensored-workspace/workspace-server', () => ({
+	canvasReachable: async (_db: unknown, found: { mode: string }) => found.mode !== 'uncensored' || (await uncensoredLockFor()) === 'open'
 }));
 
 import { actions } from './+page.server';
@@ -99,17 +99,17 @@ describe('actions.share_canvas', () => {
 		expect(setCanvasShare).not.toHaveBeenCalled();
 	});
 
-	it('a canvas of an nsfw project is never shared, even by a verified member', async () => {
-		findCanvasForUser.mockResolvedValue({ orgId: 'org-1', canvas: { projectId: 'project-1' }, mode: 'nsfw' });
-		nsfwLockFor.mockResolvedValue('open');
+	it('a canvas of an uncensored project is never shared, even by a verified member', async () => {
+		findCanvasForUser.mockResolvedValue({ orgId: 'org-1', canvas: { projectId: 'project-1' }, mode: 'uncensored' });
+		uncensoredLockFor.mockResolvedValue('open');
 
 		await expect(actions.share_canvas(fakeEvent({ state: 'on' }))).rejects.toMatchObject({ status: 403 });
 		expect(setCanvasShare).not.toHaveBeenCalled();
 	});
 
-	it('a canvas of an nsfw project is not found for a member whose nsfw access is locked', async () => {
-		findCanvasForUser.mockResolvedValue({ orgId: 'org-1', canvas: { projectId: 'project-1' }, mode: 'nsfw' });
-		nsfwLockFor.mockResolvedValue('age_unverified');
+	it('a canvas of an uncensored project is not found for a member whose uncensored access is locked', async () => {
+		findCanvasForUser.mockResolvedValue({ orgId: 'org-1', canvas: { projectId: 'project-1' }, mode: 'uncensored' });
+		uncensoredLockFor.mockResolvedValue('age_unverified');
 
 		await expect(actions.share_canvas(fakeEvent({ state: 'off' }))).rejects.toMatchObject({ status: 404 });
 	});

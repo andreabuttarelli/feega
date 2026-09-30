@@ -163,7 +163,7 @@ describe('insert_row su nodes_connections: rifiuta un arco verso un modello unce
 
   it('rifiuta la scrittura quando il nodo bersaglio usa un modello uncensored', async () => {
     const { calls, supabase } = fakeAuthorityByTable({
-      nodes: [{ id: 'n2', org_id: 'org-mine', type: 'image', data: { model: 'wiro/nsfw-image' }, version: 1, deleted_at: null }],
+      nodes: [{ id: 'n2', org_id: 'org-mine', type: 'image', data: { model: 'wiro/uncensored-image' }, version: 1, deleted_at: null }],
       ai_models: [{ uncensored: true }]
     });
 

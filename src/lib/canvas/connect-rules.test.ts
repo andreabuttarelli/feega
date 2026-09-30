@@ -120,10 +120,10 @@ describe('tileNode — da quel che la pagina ha in mano al vocabolario del model
   });
 
   it('un nodo col modello uncensored porta il segno con sé', () => {
-    expect(tileNode({ id: 'g1', medium: 'image', model: 'wiro/nsfw', uncensored: true })).toEqual({
+    expect(tileNode({ id: 'g1', medium: 'image', model: 'wiro/uncensored', uncensored: true })).toEqual({
       id: 'g1',
       kind: 'image',
-      model: 'wiro/nsfw',
+      model: 'wiro/uncensored',
       uncensored: true
     });
   });

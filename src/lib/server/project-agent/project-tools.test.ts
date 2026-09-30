@@ -142,9 +142,9 @@ describe('le scritture firmano agent per conto della persona', () => {
 
   it('connect_nodes rifiuta un arco verso un nodo con un modello uncensored', async () => {
     const sourceRow = { ...nodeRow, id: '77777777-7777-7777-7777-777777777777', data: { prompt: 'ciao' } };
-    const targetRow = { ...nodeRow, type: 'image', data: { model: 'wiro/nsfw-image' } };
+    const targetRow = { ...nodeRow, type: 'image', data: { model: 'wiro/uncensored-image' } };
     const { db, calls } = fakeDb(
-      { nodes: [sourceRow, targetRow], ai_models: [{ id: 'wiro/nsfw-image', uncensored: true }] },
+      { nodes: [sourceRow, targetRow], ai_models: [{ id: 'wiro/uncensored-image', uncensored: true }] },
       { filter: true }
     );
     const tools = createProjectTools({ db, orgId: ORG, projectId: PROJECT, userId: USER });

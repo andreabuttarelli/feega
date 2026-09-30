@@ -107,7 +107,7 @@ async function findAccounts(
   }));
 }
 
-type AssetForMedia = { id: string; type: string; url: string | null; source: string | null; uncensored?: boolean | null; nsfw?: boolean | null };
+type AssetForMedia = { id: string; type: string; url: string | null; source: string | null; uncensored?: boolean | null; uncensored_project?: boolean | null };
 
 async function resolveMediaAssets(
   db: Db,
@@ -116,7 +116,7 @@ async function resolveMediaAssets(
   if (!input.media.length) return [];
 
   const ids = input.media.map((m) => m.assetId);
-  const { data, error } = await db.from('assets').select('id, type, url, source, uncensored, nsfw').eq('org_id', input.orgId).in('id', ids);
+  const { data, error } = await db.from('assets').select('id, type, url, source, uncensored, uncensored_project').eq('org_id', input.orgId).in('id', ids);
   if (error) throw error;
 
   const byId = new Map(((data ?? []) as unknown as AssetForMedia[]).map((a) => [a.id, a]));
@@ -168,10 +168,10 @@ export async function scheduleDelivery(
   const deliveries: DeliveryOutcome[] = [];
   const zernioPostIds: ZernioPostIds = { ...post.zernioPostIds };
 
-  const fromNsfwProject = assets.some((a) => a.nsfw === true);
+  const fromUncensoredProject = assets.some((a) => a.uncensored_project === true);
 
   for (const account of accounts) {
-    const blocked = fromNsfwProject
+    const blocked = fromUncensoredProject
       ? MODE_REFUSAL[Capability.Publish]
       : uncensored
         ? uncensoredDeliveryError(account.platform, confirmation)

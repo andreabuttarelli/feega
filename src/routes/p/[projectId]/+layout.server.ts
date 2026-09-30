@@ -10,8 +10,8 @@ import { PROJECT_BRAND_SHELL_SELECT, projectBrandShellOf, type ProjectBrandShell
 import { orgCreditBalance } from '$lib/server/credits';
 import { env } from '$env/dynamic/private';
 import { ProjectMode } from '$lib/project-mode';
-import { NSFW_LOCK_TEXT, NsfwLock, nsfwSectionVisible } from '$lib/nsfw-access';
-import { nsfwLockFor } from '$lib/server/nsfw/nsfw-server';
+import { UNCENSORED_LOCK_TEXT, UncensoredLock, uncensoredSectionVisible } from '$lib/uncensored-lock';
+import { uncensoredLockFor } from '$lib/server/uncensored-workspace/workspace-server';
 import type { Db } from '$lib/server/db/client';
 import { CANVAS_LIST_DEPENDENCY } from '$lib/canvas/canvas-list';
 
@@ -46,8 +46,8 @@ export const load: LayoutServerLoad = async ({ params, locals, depends, cookies 
   }
 
   const { orgId, project } = found;
-  const nsfwLock = await nsfwLockFor(db, { orgId, userId: user.id });
-  if (project.mode === ProjectMode.Nsfw && nsfwLock !== NsfwLock.Open) {
+  const uncensoredLock = await uncensoredLockFor(db, { orgId, userId: user.id });
+  if (project.mode === ProjectMode.Uncensored && uncensoredLock !== UncensoredLock.Open) {
     throw error(404, 'This project does not exist, or is not yours');
   }
 
@@ -58,7 +58,7 @@ export const load: LayoutServerLoad = async ({ params, locals, depends, cookies 
     loadBrandShell(db, orgId, project.brandId),
     orgCreditBalance(db, orgId)
   ]);
-  const listed = allProjects.filter((p) => p.mode === ProjectMode.Standard || nsfwLock === NsfwLock.Open);
+  const listed = allProjects.filter((p) => p.mode === ProjectMode.Standard || uncensoredLock === UncensoredLock.Open);
 
   // Dove atterra chi rientra: l'ultimo progetto aperto, letto da `homePathFor` — non il più
   // nuovo per nascita (vedi `src/lib/server/tenancy/entry.ts`).
@@ -70,7 +70,7 @@ export const load: LayoutServerLoad = async ({ params, locals, depends, cookies 
     project,
     brand,
     creditBalance,
-    nsfw: { lock: nsfwLock, visible: nsfwSectionVisible(nsfwLock), text: NSFW_LOCK_TEXT[nsfwLock] },
+    uncensored: { lock: uncensoredLock, visible: uncensoredSectionVisible(uncensoredLock), text: UNCENSORED_LOCK_TEXT[uncensoredLock] },
     projects: listed.map((p) => {
       const first = p.id === project.id ? canvases[0] : undefined;
       return {

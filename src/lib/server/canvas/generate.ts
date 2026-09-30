@@ -243,7 +243,7 @@ async function runWiroNode(db: Db, input: StartRun, run: NodeRun, upstream: Upst
     import('$lib/server/wiro-config'),
     import('./wiro-run'),
     import('./likeness-guard'),
-    import('$lib/server/nsfw/nsfw-server')
+    import('$lib/server/uncensored-workspace/workspace-server')
   ]);
   const node = await findNode(db, { orgId: input.orgId, nodeId: input.nodeId }).catch(() => null);
   const [imageUrls, lastFrame, provenance] = await Promise.all([
@@ -296,7 +296,7 @@ export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcom
   }
   const input: StartRun = { ...requested, model: pick.model };
 
-  const { generationRefusal } = await import('$lib/server/nsfw/nsfw-server');
+  const { generationRefusal } = await import('$lib/server/uncensored-workspace/workspace-server');
   const refusal = await generationRefusal(db, { orgId: input.orgId, projectId: input.projectId, userId: input.userId, model: input.model });
   if (refusal) {
     return { kind: 'refused', error: refusal };
@@ -804,7 +804,7 @@ export async function reconcileWiroNodeRuns(db: Db): Promise<VideoReconcileOutco
   const [{ wiroRunDeps }, { finishWiroJob }, { projectModeOf }] = await Promise.all([
     import('$lib/server/wiro-config'),
     import('./wiro-run'),
-    import('$lib/server/nsfw/nsfw-server')
+    import('$lib/server/uncensored-workspace/workspace-server')
   ]);
   const deps = wiroRunDeps(db);
 

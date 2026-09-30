@@ -602,7 +602,7 @@ export type Database = {
           height: number | null
           id: string
           mime_type: string | null
-          nsfw: boolean
+          uncensored_project: boolean
           org_id: string
           project_id: string | null
           source: string | null
@@ -623,7 +623,7 @@ export type Database = {
           height?: number | null
           id?: string
           mime_type?: string | null
-          nsfw?: boolean
+          uncensored_project?: boolean
           org_id: string
           project_id?: string | null
           source?: string | null
@@ -644,7 +644,7 @@ export type Database = {
           height?: number | null
           id?: string
           mime_type?: string | null
-          nsfw?: boolean
+          uncensored_project?: boolean
           org_id?: string
           project_id?: string | null
           source?: string | null
@@ -2555,10 +2555,10 @@ export type Database = {
       feega_credits: { Args: { _value: string }; Returns: number }
       feega_org_from_metadata: { Args: { _metadata: Json }; Returns: string }
       org_credit_balance: { Args: { _org_id: string }; Returns: number }
-      project_is_nsfw: { Args: { p_project_id: string }; Returns: boolean }
+      project_is_uncensored: { Args: { p_project_id: string }; Returns: boolean }
     }
     Enums: {
-      project_mode: "standard" | "nsfw"
+      project_mode: "standard" | "uncensored"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2686,7 +2686,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      project_mode: ["standard", "nsfw"],
+      project_mode: ["standard", "uncensored"],
     },
   },
 } as const

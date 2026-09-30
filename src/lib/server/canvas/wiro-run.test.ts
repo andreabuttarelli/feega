@@ -5,9 +5,9 @@ import { startWiroRun, WIRO_REFUSALS, type WiroModel, type WiroRunDeps, type Wir
 const SCOPE = { orgId: 'org-1', projectId: 'p1', canvasId: 'c1', nodeId: 'n1', userId: 'u1' };
 
 const uncensoredModel: WiroModel = {
-  id: 'wiro/nsfw-image',
+  id: 'wiro/uncensored-image',
   catalogue: 'image',
-  spec: { owner: 'wiro-owner', project: 'nsfw-image', fields: { prompt: 'prompt', images: ['image_1'] } },
+  spec: { owner: 'wiro-owner', project: 'uncensored-image', fields: { prompt: 'prompt', images: ['image_1'] } },
   uncensored: true,
   paramSchema: {}
 };
@@ -32,7 +32,7 @@ function depsFor(model: WiroModel | null): { deps: WiroRunDeps; gatewayRun: Retu
 }
 
 const baseRequest: Omit<WiroRequest, 'scope' | 'modelId'> = {
-  mode: ProjectMode.Nsfw,
+  mode: ProjectMode.Uncensored,
   prompt: 'a picture',
   params: {},
   imageUrls: [],

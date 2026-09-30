@@ -1,6 +1,6 @@
 export enum ProjectMode {
   Standard = 'standard',
-  Nsfw = 'nsfw'
+  Uncensored = 'uncensored'
 }
 
 export enum Capability {
@@ -17,16 +17,16 @@ const EVERYTHING_BUT_WIRO = new Set(Object.values(Capability).filter((c) => c !=
 
 export const MODE_ALLOWS: Readonly<Record<ProjectMode, ReadonlySet<Capability>>> = {
   [ProjectMode.Standard]: EVERYTHING_BUT_WIRO,
-  [ProjectMode.Nsfw]: new Set([Capability.WiroModels, Capability.StandardModels])
+  [ProjectMode.Uncensored]: new Set([Capability.WiroModels, Capability.StandardModels])
 };
 
 export const MODE_REFUSAL: Readonly<Record<Capability, string>> = {
-  [Capability.Share]: 'nsfw_not_shareable',
-  [Capability.Publish]: 'nsfw_not_publishable',
-  [Capability.Schedule]: 'nsfw_not_publishable',
-  [Capability.Promote]: 'nsfw_not_publishable',
-  [Capability.CatalogueWrite]: 'nsfw_not_in_catalogue',
-  [Capability.WiroModels]: 'wiro_requires_nsfw_project',
+  [Capability.Share]: 'uncensored_not_shareable',
+  [Capability.Publish]: 'uncensored_not_publishable',
+  [Capability.Schedule]: 'uncensored_not_publishable',
+  [Capability.Promote]: 'uncensored_not_publishable',
+  [Capability.CatalogueWrite]: 'uncensored_not_in_catalogue',
+  [Capability.WiroModels]: 'wiro_requires_uncensored_project',
   [Capability.StandardModels]: 'model_not_in_this_project'
 };
 
@@ -41,11 +41,11 @@ export const SECTION_CAPABILITY: Readonly<Record<string, Capability>> = {
 
 export const STORAGE_FOLDER: Readonly<Record<ProjectMode, string>> = {
   [ProjectMode.Standard]: 'media',
-  [ProjectMode.Nsfw]: 'nsfw'
+  [ProjectMode.Uncensored]: 'uncensored'
 };
 
 export function modeOf(value: unknown): ProjectMode {
-  return value === ProjectMode.Nsfw ? ProjectMode.Nsfw : ProjectMode.Standard;
+  return value === ProjectMode.Uncensored ? ProjectMode.Uncensored : ProjectMode.Standard;
 }
 
 export function modeAllows(mode: ProjectMode, capability: Capability): boolean {

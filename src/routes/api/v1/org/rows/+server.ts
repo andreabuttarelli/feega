@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { hiddenFor } from '$lib/server/nsfw/hidden-scope';
+import { hiddenFor } from '$lib/server/uncensored-workspace/hidden-scope';
 import type { RequestHandler } from './$types';
 import { resolveOrgCaller } from '$lib/server/org-data/auth';
 import { createOrgWriteTools } from '$lib/server/org-data/write-tool';

@@ -32,10 +32,10 @@
 <Panel title="Uncensored models">
   <div class="flex flex-col gap-3 text-sm">
     <p>
-      Some image and video models generate adult content without filters. They are off by default. When on, every
+      Uncensored mode — models without built-in content filters, for adults (18+). Our safety rules still apply. They are off by default. When on, every
       request is still screened: sexual content involving minors, and sexual content depicting real, identifiable
       people, is always refused. Outputs are marked, never shown on public share links, and never published without
-      your confirmation — and never on platforms that forbid adult content.
+      your confirmation — and never on platforms that forbid it.
     </p>
     <p data-testid="uncensored-status">Status: <strong>{REASON_TEXT[access.reason]}</strong>
       {#if access.optIn}· turned on {new Date(access.optIn.enabledAt).toLocaleString()}{/if}
@@ -55,7 +55,7 @@
         </label>
         <label class="flex items-start gap-2">
           <input type="checkbox" name="acceptPolicy" required />
-          I accept the adult content policy (version {data.policyVersion}): no minors, no real people, no non-consensual
+          I accept the uncensored mode policy (version {data.policyVersion}): no minors, no real people, no non-consensual
           content, and I am responsible for where outputs are used.
         </label>
         <div><Button type="submit">Allow uncensored models</Button></div>

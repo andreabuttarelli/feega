@@ -920,7 +920,7 @@ describe('upstreamInputsFor — riferimenti scelti sul nodo', () => {
       nodes: [
         nodeRow(IMAGE_NODE, 'image', {
           prompt: 'x',
-          model: 'wiro/nsfw-image',
+          model: 'wiro/uncensored-image',
           references: [{ source: 'asset', id: IMAGE_ASSET_1 }]
         })
       ],
@@ -929,7 +929,7 @@ describe('upstreamInputsFor — riferimenti scelti sul nodo', () => {
       reference_images: []
     });
 
-    const out = await upstreamInputsFor(db, { orgId: ORG, canvasId: CANVAS, nodeId: IMAGE_NODE, model: 'wiro/nsfw-image', medium: 'image' });
+    const out = await upstreamInputsFor(db, { orgId: ORG, canvasId: CANVAS, nodeId: IMAGE_NODE, model: 'wiro/uncensored-image', medium: 'image' });
 
     expect(out.pickedImageUrls).toEqual([]);
     expect(out.rejected).toEqual([{ nodeId: IMAGE_NODE, why: expect.stringContaining('has no') }]);

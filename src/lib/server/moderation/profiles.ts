@@ -70,7 +70,7 @@ export const MODERATION_PROFILES: Readonly<Record<ModerationProfile, ProfilePoli
 
 const PROFILE_BY_MODE: Readonly<Record<ProjectMode, Readonly<Record<'uncensored' | 'standard', ModerationProfile>>>> = {
   [ProjectMode.Standard]: { uncensored: ModerationProfile.Standard, standard: ModerationProfile.Standard },
-  [ProjectMode.Nsfw]: { uncensored: ModerationProfile.Uncensored, standard: ModerationProfile.Standard }
+  [ProjectMode.Uncensored]: { uncensored: ModerationProfile.Uncensored, standard: ModerationProfile.Standard }
 };
 
 export function profileOf(input: { uncensored: boolean; mode: ProjectMode }): ModerationProfile {

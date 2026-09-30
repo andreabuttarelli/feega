@@ -2,7 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { resolveOrgCaller } from '$lib/server/org-data/auth';
 import { createOrgQueryTool } from '$lib/server/org-data/query-tool';
-import { hiddenFor } from '$lib/server/nsfw/hidden-scope';
+import { hiddenFor } from '$lib/server/uncensored-workspace/hidden-scope';
 
 /**
  * `query` sul nuovo schema — org, project, canvas, brand, tutto sotto lo stesso org_id. Non un

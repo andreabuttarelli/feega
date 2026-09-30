@@ -105,8 +105,8 @@ const csrf: Handle = async ({ event, resolve }) => {
   return resolve(event);
 };
 
-async function refuseNsfwSection(event: RequestEvent): Promise<void> {
-  const { guardedSection, sectionRefusal } = await import('$lib/server/nsfw/section-guard');
+async function refuseUncensoredSection(event: RequestEvent): Promise<void> {
+  const { guardedSection, sectionRefusal } = await import('$lib/server/uncensored-workspace/section-guard');
   const projectId = event.params.projectId;
   if (!projectId || !guardedSection(event.route.id)) {
     return;
@@ -189,7 +189,7 @@ export const handle: Handle = sequence(hostRedirect, csrf, Sentry.sentryHandle()
     throw redirect(302, await rootRedirectTarget(event));
   }
 
-  await refuseNsfwSection(event);
+  await refuseUncensoredSection(event);
 
   const doResolve = () =>
     resolve(event, {
