@@ -9,6 +9,8 @@ vi.mock('$lib/server/canvas/lookup', () => ({ findCanvasForUser: (...a: unknown[
 vi.mock('$lib/server/canvas-catalogue', () => ({ canvasModelCatalogue: vi.fn() }));
 
 import { actions } from './+page.server';
+import { Remote } from '$lib/canvas/staleness';
+import { revisionOf } from '$lib/server/canvas/revision';
 
 const ORG = 'org-1';
 const PROJECT = 'project-1';
@@ -117,3 +119,32 @@ describe('canvas lifecycle actions', () => {
     expect(calls.some((c) => c.table === 'projects' && c.op === 'update')).toBe(false);
   });
 });
+
+describe('revision: the cheap check a returning tab makes', () => {
+  const node = { id: 'n-1', org_id: ORG, canvas_id: 'c-1', version: 2, x: 0, y: 0, width: 100, height: 100, deleted_at: null };
+
+  it('a live canvas answers with the same revision a fresh load would carry', async () => {
+    const { ev } = eventWith({ nodes: [node], nodes_connections: [] });
+
+    const answer = await actions.revision(ev);
+
+    expect(answer).toEqual({ kind: Remote.Live, revision: revisionOf([node], []) });
+  });
+
+  it('a canvas deleted elsewhere in a live project answers CanvasGone', async () => {
+    findCanvasForUser.mockResolvedValue(null);
+    listMemberships.mockResolvedValue([{ org: { id: ORG } }]);
+    const { ev } = eventWith({ projects: [projectRow(PROJECT, 'P')] });
+
+    expect(await actions.revision(ev)).toEqual({ kind: Remote.CanvasGone });
+  });
+
+  it('a project deleted elsewhere answers ProjectGone', async () => {
+    findCanvasForUser.mockResolvedValue(null);
+    listMemberships.mockResolvedValue([{ org: { id: ORG } }]);
+    const { ev } = eventWith({ projects: [{ ...projectRow(PROJECT, 'P'), archived_at: '2026-09-30' }] });
+
+    expect(await actions.revision(ev)).toEqual({ kind: Remote.ProjectGone });
+  });
+});
+

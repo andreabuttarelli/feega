@@ -164,4 +164,17 @@ describe('save scheduler', () => {
     await vi.advanceTimersByTimeAsync(400);
     expect(sent.map((s) => s.patch)).toEqual([{ prompt: 'typed during run' }]);
   });
+
+  it('a node deleted elsewhere loses its unsent edit: nothing is sent and the waiter hears it was not saved', async () => {
+    const { saves, sent } = harness();
+    const saved = saves.schedule('a', { prompt: 'typed offline' });
+
+    saves.discard('a');
+    await vi.advanceTimersByTimeAsync(3000);
+
+    expect(sent).toHaveLength(0);
+    expect(saves.dirtyKeys('a')).toEqual([]);
+    expect(saves.unsent()).toBe(false);
+    await expect(saved).resolves.toBe(false);
+  });
 });

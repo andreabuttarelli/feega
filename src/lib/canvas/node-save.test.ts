@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { SaveFailure, adoptIdleRows, failureOf, isOwnEcho, keepDirty, keepLocal, saveMessage, writeWithRetry } from './node-save';
+import { SaveFailure, adoptIdleRows, failureOf, isOwnEcho, keepDirty, orphanedEdits, keepLocal, saveMessage, writeWithRetry } from './node-save';
 
 describe('failureOf: every server answer has one reason', () => {
   it.each([
@@ -184,5 +184,23 @@ describe('server-owned fields: a run result always reaches the screen', () => {
     const change = { table: 'nodes', eventType: 'UPDATE', new: { id: 'a', version: 6, data: runFinished, x: 0, y: 0, display_name: null, deleted_at: null } };
 
     expect(isOwnEcho(change, tiles)).toBe(false);
+  });
+});
+
+describe('orphanedEdits: an unsent edit on a node deleted elsewhere is dropped, the rest survive', () => {
+  it('names only the dirty nodes the server no longer has', () => {
+    const dirty: Record<string, string[]> = { kept: ['prompt'], gone: ['prompt'], idle: [] };
+    const local = [{ id: 'kept' }, { id: 'gone' }, { id: 'idle' }, { id: 'idleGone' }];
+
+    expect(orphanedEdits(local, [{ id: 'kept' }, { id: 'idle' }], (id) => dirty[id] ?? [])).toEqual(['gone']);
+  });
+
+  it('a surviving node keeps its local field but never a server-written one', () => {
+    const fresh = [{ id: 'kept', version: 3, data: { prompt: 'server', assetId: 'server-asset' } }];
+    const local = [{ id: 'kept', version: 2, data: { prompt: 'mine', assetId: 'stale-asset' } }];
+
+    const [merged] = keepDirty(fresh, local, () => ['prompt', 'assetId']);
+    expect(merged.data.prompt).toBe('mine');
+    expect(merged.data.assetId).toBe('server-asset');
   });
 });

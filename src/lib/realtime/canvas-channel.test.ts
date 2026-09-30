@@ -104,4 +104,20 @@ describe('canvas collaboration', () => {
 		expect(connection.client.channel).not.toHaveBeenCalled();
 	});
 
+
+	it('a channel that closed or timed out while the tab slept is opened again, and the rejoin refreshes', async () => {
+		for (const dead of ['CLOSED', 'TIMED_OUT']) {
+			const connection = socket();
+			const callbacks = open(connection);
+			await vi.waitFor(() => expect(connection.channel.subscribe).toHaveBeenCalledTimes(1));
+
+			connection.status(dead);
+			expect(connection.client.removeChannel).toHaveBeenCalledWith(connection.channel);
+			await vi.waitFor(() => expect(connection.channel.subscribe).toHaveBeenCalledTimes(2));
+
+			connection.status('SUBSCRIBED');
+			expect(callbacks.onReconnect).toHaveBeenCalledTimes(1);
+			callbacks.close();
+		}
+	});
 });
