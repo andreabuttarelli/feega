@@ -91,6 +91,45 @@ describe('validateNodeData — video', () => {
   });
 });
 
+describe('validateNodeData — audio: il giro dei controlli reali del nodo', () => {
+  it('accetta un nodo appena creato, vuoto', () => {
+    const out = validateNodeData('audio', { model: null, params: {}, prompt: '' });
+    expect(out.ok).toBe(true);
+  });
+
+  it('accetta la scelta dell\'operazione, poi del modello, poi della voce — tre scritture separate', () => {
+    let current: Record<string, unknown> = { model: null, params: {}, prompt: '' };
+
+    const afterOperation = validateNodeData('audio', { ...current, params: { operation: 'text_to_speech' } });
+    expect(afterOperation.ok).toBe(true);
+    current = afterOperation.ok ? afterOperation.data : current;
+
+    const afterModel = validateNodeData('audio', { ...current, model: 'eleven_multilingual_v2' });
+    expect(afterModel.ok).toBe(true);
+    current = afterModel.ok ? afterModel.data : current;
+
+    const afterVoice = validateNodeData('audio', {
+      ...current,
+      params: { ...(current.params as Record<string, unknown>), voiceId: 'v1', voiceName: 'Rachel' }
+    });
+    expect(afterVoice.ok).toBe(true);
+  });
+
+  it('accetta di scrivere il prompt su un nodo già configurato', () => {
+    const out = validateNodeData('audio', {
+      model: 'eleven_multilingual_v2',
+      params: { operation: 'text_to_speech', voiceId: 'v1' },
+      prompt: 'Ciao mondo'
+    });
+    expect(out.ok).toBe(true);
+  });
+
+  it('rifiuta un\'operazione che non è nella tabella', () => {
+    const out = validateNodeData('audio', { model: null, params: { operation: 'karaoke' }, prompt: '' });
+    expect(out.ok).toBe(false);
+  });
+});
+
 describe('validateNodeData — doc', () => {
   it('accetta content + public', () => {
     const out = validateNodeData('doc', { content: '# titolo', public: false });
