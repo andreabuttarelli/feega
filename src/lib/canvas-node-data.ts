@@ -380,6 +380,11 @@ export function genData(node: GenNode): Record<string, unknown> {
   };
 }
 
+export function genPatch(node: GenNode, patch: Partial<GenNode>): Record<string, unknown> {
+  const data = genData({ ...node, ...patch });
+  return Object.fromEntries(Object.keys(patch).filter((key) => key in data).map((key) => [key, data[key]]));
+}
+
 export function frameData(node: IframeNode): Record<string, unknown> {
   return { url: node.url, html: node.html };
 }

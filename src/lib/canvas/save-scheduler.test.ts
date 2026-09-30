@@ -150,4 +150,18 @@ describe('save scheduler', () => {
     expect(saves.dirtyKeys('a')).toEqual(['index']);
     expect(saves.dirtyKeys('b')).toEqual([]);
   });
+
+  it('typing while a run starts is held until the run answers, so the run never loses to its own prompt', async () => {
+    const { saves, sent } = harness();
+    const release = saves.hold('a');
+
+    saves.schedule('a', { prompt: 'typed during run' });
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(sent).toHaveLength(0);
+    expect(saves.dirtyKeys('a')).toEqual(['prompt']);
+
+    release();
+    await vi.advanceTimersByTimeAsync(400);
+    expect(sent.map((s) => s.patch)).toEqual([{ prompt: 'typed during run' }]);
+  });
 });

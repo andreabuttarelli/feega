@@ -39,6 +39,7 @@ type SchedulerOptions = {
 
 export function createSaveScheduler(options: SchedulerOptions) {
   const nodes = new Map<string, NodeSaves>();
+  const held = new Set<string>();
   let lastStatus = SaveStatus.Saved;
 
   function stateOf(id: string): NodeSaves {
@@ -100,7 +101,7 @@ export function createSaveScheduler(options: SchedulerOptions) {
       clearTimeout(state.timer);
       state.timer = null;
     }
-    if (state.inflight || !state.pending) {
+    if (state.inflight || !state.pending || held.has(id)) {
       return;
     }
 
@@ -194,5 +195,15 @@ export function createSaveScheduler(options: SchedulerOptions) {
     return status() !== SaveStatus.Saved;
   }
 
-  return { schedule, flush, dirtyKeys, sending, unsent, status };
+  function hold(id: string): () => void {
+    held.add(id);
+    return () => {
+      held.delete(id);
+      if (nodes.get(id)?.pending) {
+        armDebounced(id);
+      }
+    };
+  }
+
+  return { schedule, flush, dirtyKeys, sending, unsent, status, hold };
 }
