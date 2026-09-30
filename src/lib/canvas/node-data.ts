@@ -166,6 +166,10 @@ const productFiltersSchema = z.object({
   price_min: z.number().nonnegative().nullable().optional(),
   price_max: z.number().nonnegative().nullable().optional(),
   in_stock_only: z.boolean().optional(),
+  on_sale_only: z.boolean().optional(),
+  tag: z.string().optional(),
+  vendor: z.string().optional(),
+  product_type: z.string().optional(),
   sort: z.enum(PRODUCT_SORTS).optional()
 });
 

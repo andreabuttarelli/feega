@@ -13,6 +13,7 @@ import { runBrandAnalysis, type BrandProfile } from '$lib/server/brand-analysis'
 import { withOrgContext } from '$lib/server/ai-log';
 import { gateOrgCredits, CreditsExhaustedError } from '$lib/server/credits';
 import { insertBrandProducts } from '$lib/server/repos/products';
+import { NO_COMMERCE_FIELDS } from '$lib/server/store-product';
 import { setProjectBrand } from '$lib/server/repos/projects';
 import { SOCIAL_PLATFORMS } from '$lib/canvas/social-platforms';
 import type { StorePlatform } from '$lib/server/store-fetch';
@@ -189,7 +190,8 @@ export async function createBrandFromWizard(
         currency: p.currency,
         url: p.url,
         images: p.images,
-        available: p.available
+        available: p.available,
+        ...NO_COMMERCE_FIELDS
       }))
     });
   }

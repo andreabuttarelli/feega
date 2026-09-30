@@ -1,6 +1,7 @@
 import type { Db } from '$lib/server/db/client';
 import type { Database, Json } from '$lib/database.types';
 import type { FetchedProduct, StorePlatform } from '$lib/server/store-fetch';
+import type { ProductOptions, ProductVariant } from '$lib/canvas/product-shape';
 
 /**
  * IL CATALOGO CHE UN NODO `products` HA SCARICATO.
@@ -34,11 +35,18 @@ export type Product = {
   url: string | null;
   images: Array<{ url: string; alt?: string | null; position?: number }>;
   available: boolean | null;
+  compareAtPrice: number | null;
+  tags: string[];
+  vendor: string | null;
+  productType: string | null;
+  sku: string | null;
+  variants: ProductVariant[];
+  options: ProductOptions;
   syncedAt: string;
 };
 
 const PRODUCT_COLUMNS =
-  'id, node_id, project_id, platform, external_id, handle, title, description, price, currency, url, images, available, synced_at';
+  'id, node_id, project_id, platform, external_id, handle, title, description, price, currency, url, images, available, compare_at_price, tags, vendor, product_type, sku, variants, options, synced_at';
 
 type ProductColumns = Pick<
   ProductRow,
@@ -55,6 +63,13 @@ type ProductColumns = Pick<
   | 'url'
   | 'images'
   | 'available'
+  | 'compare_at_price'
+  | 'tags'
+  | 'vendor'
+  | 'product_type'
+  | 'sku'
+  | 'variants'
+  | 'options'
   | 'synced_at'
 >;
 
@@ -73,9 +88,26 @@ function toProduct(row: ProductColumns): Product {
     url: row.url,
     images: (row.images ?? []) as Product['images'],
     available: row.available,
+    compareAtPrice: row.compare_at_price === null ? null : Number(row.compare_at_price),
+    tags: row.tags ?? [],
+    vendor: row.vendor,
+    productType: row.product_type,
+    sku: row.sku,
+    variants: (row.variants ?? []) as ProductVariant[],
+    options: (row.options ?? {}) as ProductOptions,
     syncedAt: row.synced_at
   };
 }
+
+const richColumns = (p: FetchedProduct) => ({
+  compare_at_price: p.compareAtPrice,
+  tags: p.tags,
+  vendor: p.vendor,
+  product_type: p.productType,
+  sku: p.sku,
+  variants: p.variants as Json,
+  options: p.options as Json
+});
 
 export async function listNodeProducts(
   db: Db,
@@ -130,6 +162,7 @@ export async function upsertNodeProducts(
     url: p.url,
     images: p.images as Json,
     available: p.available,
+    ...richColumns(p),
     synced_at: syncedAt
   }));
 
@@ -187,6 +220,7 @@ export async function insertBrandProducts(
     url: p.url,
     images: p.images as Json,
     available: p.available,
+    ...richColumns(p),
     synced_at: syncedAt
   }));
 

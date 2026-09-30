@@ -260,8 +260,20 @@ describe('readSharedCanvas — i nodi sorgente', () => {
     expect(shared?.nodes[0].view).toEqual({
       kind: 'grid',
       total: 2,
-      tiles: [{ key: '0', thumb: 'https://cdn.example/p-cheap.jpg', label: 'Cap', caption: 'EUR 20', badge: null }]
+      tiles: [{ key: '0', thumb: 'https://cdn.example/p-cheap.jpg', label: 'Cap', caption: 'EUR 20', badge: null, sale: null }]
     });
+  });
+
+  it('un prodotto in saldo porta la sua etichetta −N% e il filtro saldi tiene solo lui', async () => {
+    const { db } = sourceDb(
+      [node('n-prod', 'products', { type: 'shopify', url: 'https://shop.example', filters: { on_sale_only: true } })],
+      { products: [{ ...product('p-sale', 'Runner', 98), compare_at_price: '140' }, product('p-full', 'Coat', 300)] }
+    );
+
+    const shared = await readSharedCanvas(db, 'tok-live', sign);
+    const view = shared?.nodes[0].view as { tiles: Array<{ label: string; sale?: string | null }> };
+
+    expect(view.tiles.map((t) => [t.label, t.sale])).toEqual([['Runner', '−30%']]);
   });
 
   it('social_account_feed mostra i post filtrati come sulla tela', async () => {
