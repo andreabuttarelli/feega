@@ -9,6 +9,7 @@
   import { Input } from '$lib/components/ui/input';
   import { Button, buttonVariants } from '$lib/components/ui/button';
   import { Notice } from '$lib/components/ui/notice';
+  import { openCookieSettings } from '$lib/consent';
 
   let { data, form } = $props();
 
@@ -125,6 +126,12 @@
     <form method="POST" action="/auth/signout">
       <Button variant="secondary" type="submit">{$_('app.account.signOut')}</Button>
     </form>
+  </Field>
+</Panel>
+
+<Panel title={$_('app.settings.profile.privacy')}>
+  <Field label={$_('cookie.settings')} hint={$_('app.settings.profile.cookieHint')} layout={FieldLayout.Row}>
+    <Button variant="secondary" type="button" onclick={openCookieSettings} data-testid="open-cookie-settings">{$_('cookie.settings')}</Button>
   </Field>
 </Panel>
 

@@ -40,7 +40,7 @@ We do not ask for special categories of data (Art. 9 GDPR). Do not include them 
 | Age verification for NSFW mode | Legal obligation / legitimate interest — Art. 6(1)(c)/(f) [to confirm] |
 | Handling DSA notices and authority requests | Legal obligation — Art. 6(1)(c) |
 | Error monitoring and debugging | Legitimate interest — Art. 6(1)(f) |
-| Anonymous aggregate analytics | Legitimate interest — Art. 6(1)(f) |
+| Cookieless aggregate page statistics (Vercel Web Analytics) | Legitimate interest — Art. 6(1)(f) |
 | Full analytics, session replay, advertising measurement | Consent — Art. 6(1)(a) |
 | Service emails (invites, notifications) | Contract / legitimate interest |
 
@@ -63,7 +63,7 @@ We do not sell personal data and do not use your content to train AI models. We 
 | ScrapeCreators | reading public social profiles and posts | US |
 | Resend | transactional email | US |
 | Sentry | error monitoring (may include user ID, email, IP) | US / EU |
-| PostHog | product analytics (anonymous; full with consent) | [US / EU] |
+| PostHog | product analytics (consent only) | [US / EU] |
 | Microsoft Clarity | session replay (consent only) | US |
 | Seline | web analytics | [LOCATION] |
 | Google (gtag.js conversion tracking), Meta Pixel | advertising conversion measurement | US |
@@ -93,10 +93,11 @@ Some providers are outside the EEA, mainly in the United States. Transfers rely 
 ## 7. Cookies and similar technologies
 
 - **Strictly necessary**: authentication session and preferences. No consent needed.
-- **Anonymous analytics**: PostHog in cookieless mode, Vercel Web Analytics, Seline [to confirm cookieless].
-- **With consent only**: PostHog with persistent cookies and session recording, Microsoft Clarity session replay, Meta Pixel and the Google gtag.js conversion tag.
+- **Cookieless page statistics**: Vercel Web Analytics.
+- **Analytics, consent only**: PostHog (cookies, session recording with masked text and inputs), Microsoft Clarity, Seline, Sentry session replay (fully masked).
+- **Marketing, consent only**: Meta Pixel and the Google gtag.js conversion tag (Google Consent Mode v2, default denied).
 
-You can change your choice at any time via "Cookie preferences". Details: [Cookie Policy](./COOKIES.md).
+You can change your choice at any time via "Cookie settings" in Settings → Profile. Details: [Cookie Policy](./COOKIES.md).
 
 ## 8. Your rights
 

@@ -1,7 +1,8 @@
 import type { HandleClientError } from '@sveltejs/kit';
 import { dev } from '$app/environment';
 import { env } from '$env/dynamic/public';
-import { dropIfInternal, isInternalViewer } from '$lib/analytics';
+import { dropIfInternal, isInternalViewer, trackerAllowed } from '$lib/analytics';
+import { Tracker } from '$lib/consent-model';
 import { drainErrors, rememberError } from '$lib/sentry-buffer';
 
 type SentryModule = typeof import('@sentry/sveltekit');
@@ -77,7 +78,9 @@ async function attachReplay(): Promise<void> {
   // basterebbe, ma il replay inizia a bufferizzare il DOM appena è agganciato ed è la cosa che
   // vogliamo evitare per prima. Arriviamo qui alla prima interazione o dopo 8–10s, quindi
   // l'identità è già nota da un pezzo (il layout la imposta all'idratazione).
-  if (dev || isInternalViewer()) return;
+  if (dev || isInternalViewer() || !trackerAllowed(Tracker.SentryReplay)) {
+    return;
+  }
   const Sentry = await bootSentry();
   if (!Sentry) return;
   try {

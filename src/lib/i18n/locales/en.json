@@ -394,7 +394,9 @@
         "avatarSaved": "Profile photo updated.",
         "avatarRemoved": "Profile photo removed.",
         "tooLarge": "Photo too large (max 2MB).",
-        "notImage": "File must be an image."
+        "notImage": "File must be an image.",
+        "privacy": "Privacy",
+        "cookieHint": "Choose which analytics and marketing cookies feega may use."
       },
       "appearance": {
         "title": "Appearance",
@@ -526,9 +528,19 @@
     }
   },
   "cookie": {
-    "text": "We use cookies to run feega and, with your consent, to understand how it's used and improve it.",
-    "reject": "Reject",
-    "accept": "Accept"
+    "title": "Cookies on feega",
+    "text": "We use strictly necessary cookies to sign you in and keep feega secure. With your consent we also use analytics to improve the product and marketing tags to measure our ads.",
+    "rejectAll": "Reject all",
+    "acceptAll": "Accept all",
+    "customise": "Customise",
+    "save": "Save choices",
+    "necessary": "Strictly necessary",
+    "necessaryHint": "Sign-in, session and security. Always on.",
+    "analytics": "Analytics",
+    "analyticsHint": "PostHog, Microsoft Clarity, Seline, error replays.",
+    "marketing": "Marketing",
+    "marketingHint": "Meta Pixel and the Google gtag.js conversion tag.",
+    "settings": "Cookie settings"
   },
   "chat": {
     "leave": {

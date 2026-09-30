@@ -29,13 +29,13 @@ With your consent, we use PostHog and Microsoft Clarity to understand how the pr
 
 With your consent, Microsoft Clarity records interactions (clicks, scrolls, page navigation) so we can identify UX issues and fix them. Recordings are anonymised — we do not capture keystrokes in password fields.
 
-## 3. Anonymous analytics (no consent required)
+## 3. Nothing before your choice
 
-We also run PostHog in a cookieless, anonymous mode that does not store any cookies and does not use a persistent identifier across sessions. Because the data is fully anonymised, this processing runs without requiring your consent under the GDPR and the Italian Garante's guidelines.
+No analytics or marketing tag loads until you choose in the cookie banner: "Accept all", "Reject all", or "Customise" by category (Analytics: PostHog, Microsoft Clarity, Seline, error replays; Marketing: Meta Pixel, Google gtag.js conversion tag). Your choice is stored for 6 months in the first-party cookie `feega_consent`, with the policy version and a timestamp; when this policy changes version, we ask again.
 
 ## 4. Managing your preferences
 
-You can change your cookie preferences at any time by clicking "Cookie preferences" in the footer of any page. You can also clear cookies through your browser settings. Note that blocking strictly-necessary cookies will prevent the service from working.
+You can change your cookie preferences at any time via "Cookie settings" in Settings → Profile. You can also clear cookies through your browser settings. Note that blocking strictly-necessary cookies will prevent the service from working.
 
 ## 5. Third-party cookies
 

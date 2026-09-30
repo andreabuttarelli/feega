@@ -4,7 +4,7 @@ import { selineSetUser } from '$lib/server/seline';
 import { isInternalEmail } from '$lib/server/internal-users';
 import { trackingAllowed } from '$lib/analytics';
 
-export const load: LayoutServerLoad = async ({ request, url, locals: { safeGetSession } }) => {
+export const load: LayoutServerLoad = async ({ url, locals: { safeGetSession } }) => {
   const { session, user } = await safeGetSession();
 
   // I due guard degli analytics, decisi qui una volta sola.
@@ -32,18 +32,12 @@ export const load: LayoutServerLoad = async ({ request, url, locals: { safeGetSe
     });
   }
 
-  // Visitor country (Vercel edge header) — gates the cookie banner: EEA/UK/CH require prior
-  // consent, everyone else gets full analytics with no banner. Null in dev / non-Vercel →
-  // treated as consent-required (safe default). See $lib/consent.initConsentForRegion.
-  const country = request.headers.get('x-vercel-ip-country');
-
   // planGo: Vercel FEATURE_PLAN_GO — toggle without rebuild via $env/dynamic.
   // `internalViewer` viaggia separato da `analyticsOptOut` perché serve a Sentry, che sui deploy di
   // preview deve restare acceso (vedi setInternalViewer in $lib/analytics). Anche qui al browser
   // arriva solo il booleano, mai la lista degli indirizzi.
   return {
     session,
-    country,
     analyticsOptOut,
     internalViewer,
     planGo: isPlanGoEnabled()

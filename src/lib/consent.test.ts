@@ -1,36 +1,84 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { CONSENT_COOKIE, CONSENT_VERSION, decodeConsent } from './consent-model';
 
 vi.mock('$app/environment', () => ({ browser: true }));
 
-function fakeLocalStorage() {
-  const store = new Map<string, string>();
-  return {
-    getItem: (key: string) => store.get(key) ?? null,
-    setItem: (key: string, value: string) => store.set(key, value),
-    clear: () => store.clear()
-  };
+const applied: unknown[] = [];
+vi.mock('./analytics', () => ({ applyConsent: (c: unknown) => applied.push(c) }));
+
+let jar: string[] = [];
+const reload = vi.fn();
+
+function cookieValue(): string | undefined {
+  const entry = jar.find((c) => c.startsWith(`${CONSENT_COOKIE}=`));
+  return entry?.split(';')[0].slice(CONSENT_COOKIE.length + 1);
 }
 
-describe('il consenso ai cookie persiste sotto la chiave rinominata', () => {
-  beforeEach(() => {
-    (globalThis as { localStorage?: unknown }).localStorage = fakeLocalStorage();
-    vi.resetModules();
+beforeEach(() => {
+  jar = [];
+  applied.length = 0;
+  reload.mockReset();
+  vi.resetModules();
+  (globalThis as Record<string, unknown>).document = {
+    get cookie() {
+      return jar.map((c) => c.split(';')[0]).join('; ');
+    },
+    set cookie(v: string) {
+      const name = v.split('=')[0];
+      jar = [...jar.filter((c) => !c.startsWith(`${name}=`)), v];
+    }
+  };
+  (globalThis as Record<string, unknown>).location = { protocol: 'https:', reload };
+});
+
+describe('la scelta sta in un cookie di prima parte con versione e data', () => {
+  it('rifiuta tutto scrive un cookie con entrambe le categorie negate', async () => {
+    const { rejectAll } = await import('./consent');
+    rejectAll();
+
+    const choice = decodeConsent(cookieValue());
+    expect(choice).toMatchObject({ version: CONSENT_VERSION, analytics: false, marketing: false });
+    expect(typeof choice?.at).toBe('number');
+    expect(jar[0]).toMatch(/Max-Age=\d+/);
+    expect(jar[0]).toMatch(/SameSite=Lax/);
   });
 
-  it('setConsent scrive sotto la chiave feega_', async () => {
-    const { setConsent } = await import('./consent');
-    await setConsent('denied');
+  it('accetta tutto applica il consenso ai tracker', async () => {
+    const { acceptAll } = await import('./consent');
+    acceptAll();
 
-    expect(localStorage.getItem('feega_cookie_consent_v1')).toBe('denied');
+    expect(applied).toHaveLength(1);
+    expect(applied[0]).toMatchObject({ analytics: true, marketing: true });
   });
 
-  it('legge ancora un consenso scritto sotto la chiave dazero_ prima della rinomina', async () => {
-    localStorage.setItem('dazero_cookie_consent_v1', 'granted');
-    const { consent } = await import('./consent');
+  it('una scelta di una versione precedente fa riapparire la banner', async () => {
+    jar = [`${CONSENT_COOKIE}=${encodeURIComponent(JSON.stringify({ version: CONSENT_VERSION - 1, at: 1, analytics: true, marketing: true }))}`];
+    const { initConsent, showBanner } = await import('./consent');
+    initConsent();
 
-    let current: string | null = null;
-    consent.subscribe((v) => (current = v))();
+    let shown = false;
+    showBanner.subscribe((v) => (shown = v))();
+    expect(shown).toBe(true);
+    expect(applied).toHaveLength(0);
+  });
 
-    expect(current).toBe('granted');
+  it('una scelta valida non chiede di nuovo e viene applicata', async () => {
+    const { saveConsent, initConsent, showBanner } = await import('./consent');
+    saveConsent({ analytics: true, marketing: false });
+    applied.length = 0;
+    initConsent();
+
+    let shown = true;
+    showBanner.subscribe((v) => (shown = v))();
+    expect(shown).toBe(false);
+    expect(applied[0]).toMatchObject({ analytics: true, marketing: false });
+  });
+
+  it('ritirare un consenso ricarica la pagina per spegnere i tracker già partiti', async () => {
+    const { acceptAll, rejectAll } = await import('./consent');
+    acceptAll();
+    rejectAll();
+
+    expect(reload).toHaveBeenCalledTimes(1);
   });
 });
