@@ -29,8 +29,6 @@
 - [80s retro / VHS video](https://www.feega.app/80s-retro-video)
 - [Anime video generator](https://www.feega.app/anime-video-generator)
 - [AI video styles](https://www.feega.app/ai-video-styles)
-- [Generatore di video AI (IT)](https://www.feega.app/it/video-ai)
-- [Generador de vídeos con IA (ES)](https://www.feega.app/es/video-ia)
 
 ## Legal
 

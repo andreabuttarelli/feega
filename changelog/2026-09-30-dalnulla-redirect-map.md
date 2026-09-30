@@ -7,13 +7,12 @@ has none of the old tool paths, so every old URL with Search Console traffic
 
 Now `host-redirects.ts` maps each old path to its best target in one hop on
 `https://www.feega.app`: a table of exact paths, a table of prefixes
-(`/tools/*` → styles hub, `/app*` → the app), localized hubs for `/it` and
-`/es`, home as fallback. `/sign-in` goes to `oh.feega.app/login`. 308 kept,
+(`/tools/*` → styles hub, `/app*` → the app), locale prefixes (`/it`, `/es`,
+`/pt`, `/de`, `/fr`) stripped to the English equivalent, home as fallback. `/sign-in` goes to `oh.feega.app/login`. 308 kept,
 query string kept.
 
 The targets are Framer pages created unpublished in the same work
 (`docs/seo/strategy.md`): the site must be published before this ships.
 
-Discarded: mapping each localized tool to its English page (IT/ES visitors
-get a page in their language instead); a Framer-side redirect table (the plan
+Discarded: IT/ES landing pages (owner decision: English only); a Framer-side redirect table (the plan
 does not include redirects).

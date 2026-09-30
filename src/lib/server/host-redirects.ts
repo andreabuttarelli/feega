@@ -4,12 +4,6 @@ const APP = 'https://oh.feega.app';
 const HOSTS_TO_PUBLIC_SITE: ReadonlySet<string> = new Set(['dalnulla.com', 'www.dalnulla.com', 'r.feega.app']);
 
 const OLD_LOCALES = ['it', 'es', 'pt', 'de', 'fr'] as const;
-type OldLocale = (typeof OLD_LOCALES)[number];
-
-const LOCALIZED_HUB: Partial<Record<OldLocale, string>> = {
-  it: `${SITE}/it/video-ai`,
-  es: `${SITE}/es/video-ia`
-};
 
 const STYLES_HUB = `${SITE}/ai-video-styles`;
 const HOME = `${SITE}/`;
@@ -33,17 +27,16 @@ const TARGET_BY_OLD_PATH: Readonly<Record<string, string>> = {
 
 const TARGET_BY_OLD_PREFIX: readonly (readonly [string, string])[] = [
   ['/tools/', STYLES_HUB],
-  ['/app', `${APP}/`]
+  ['/app/', `${APP}/`]
 ];
 
-function splitLocale(path: string): { locale: OldLocale | null; rest: string } {
+function withoutLocale(path: string): string {
   const [, first, ...tail] = path.split('/');
-  const locale = OLD_LOCALES.find((l) => l === first);
-  if (!locale) {
-    return { locale: null, rest: path };
+  if (!OLD_LOCALES.some((l) => l === first)) {
+    return path;
   }
 
-  return { locale, rest: `/${tail.join('/')}` };
+  return `/${tail.join('/')}`;
 }
 
 function normalize(pathname: string): string {
@@ -56,17 +49,8 @@ function normalize(pathname: string): string {
 }
 
 function targetFor(pathname: string): string {
-  const { locale, rest } = splitLocale(normalize(pathname));
-  const hub = locale ? LOCALIZED_HUB[locale] : undefined;
+  const rest = withoutLocale(normalize(pathname));
   const exact = TARGET_BY_OLD_PATH[rest];
-
-  if (exact?.startsWith(APP)) {
-    return exact;
-  }
-
-  if (hub) {
-    return hub;
-  }
 
   if (exact) {
     return exact;
