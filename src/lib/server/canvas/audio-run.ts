@@ -3,6 +3,7 @@ import { insertAsset, type Asset, type AssetType } from '$lib/server/repos/asset
 import { AUDIO_JOB_PREFIX } from '$lib/server/repos/node-runs';
 import type { Actor } from '$lib/server/repos/actor';
 import { logAiCall } from '$lib/server/ai-log';
+import { markGenerated } from '$lib/server/content-credentials';
 import {
   AUDIO_PROBLEM_MESSAGE,
   audioDurationOf,
@@ -141,12 +142,13 @@ function bill(scope: AudioScope, entry: { operation: AudioOperationId; model: st
   });
 }
 
-export async function depositAudio(db: Db, scope: AudioScope, file: AudioFile, seconds: number): Promise<Asset> {
+export async function depositAudio(db: Db, scope: AudioScope, file: AudioFile, seconds: number, model: string): Promise<Asset> {
   const extension = EXTENSION_OF_MIME[file.mime] ?? 'bin';
   const path = `${scope.userId}/media/audio/${crypto.randomUUID()}.${extension}`;
+  const marked = await markGenerated(Buffer.from(file.bytes), file.mime, { model, provider: PROVIDER });
   const { error } = await db.storage
     .from(GENERATED_MEDIA_BUCKET)
-    .upload(path, new Blob([file.bytes as BlobPart], { type: file.mime }), { contentType: file.mime, upsert: false });
+    .upload(path, new Blob([marked.bytes as BlobPart], { type: file.mime }), { contentType: file.mime, upsert: false });
   if (error) {
     throw new Error(`store_failed: ${error.message}`);
   }
@@ -158,9 +160,10 @@ export async function depositAudio(db: Db, scope: AudioScope, file: AudioFile, s
     source: 'generated',
     url: path,
     mimeType: file.mime,
-    bytes: file.bytes.byteLength,
+    bytes: marked.bytes.byteLength,
     durationS: seconds,
-    sourceNodeId: scope.nodeId
+    sourceNodeId: scope.nodeId,
+    aiMarked: marked.marked
   });
 }
 
@@ -193,7 +196,7 @@ export async function runAudio(db: Db, provider: AudioProvider, req: AudioReques
   const costUsd = audioUsdFor(req.operation, req.model, measureOf(req, seconds));
   bill(req.scope, { operation: req.operation, model: req.model, ms: Date.now() - startedAt, costUsd });
 
-  const asset = await depositAudio(db, req.scope, produced.file, seconds);
+  const asset = await depositAudio(db, req.scope, produced.file, seconds, req.model);
   return { kind: 'landed', asset, costUsd };
 }
 
@@ -223,6 +226,6 @@ export async function finishAudioJob(
   const costUsd = audioUsdFor('dubbing', job.model, { seconds });
   bill(job.scope, { operation: 'dubbing', model: job.model, ms: Date.now() - startedAt, costUsd });
 
-  const asset = await depositAudio(db, job.scope, file, seconds);
+  const asset = await depositAudio(db, job.scope, file, seconds, job.model);
   return { state: 'landed', asset, costUsd };
 }

@@ -10,7 +10,7 @@ This policy explains how feega processes personal data when you use feega.app, i
 **[LEGAL ENTITY]**, Italy, VAT no. **[VAT]**, **[ADDRESS]**.
 Privacy contact: [privacy@feega.app](mailto:privacy@feega.app). Data Protection Officer: [DPO — appointed / not required].
 
-When you upload data about other people (for example customers, models or influencers in your brand material), you are the controller of that data and we process it as your processor. [DPA — available on request / link].
+When you upload data about other people (for example customers, models or influencers in your brand material), you are the controller of that data and we process it as your processor. The terms are in our [Data Processing Agreement](./DPA.md).
 
 ## 2. Data we process
 
@@ -48,27 +48,24 @@ We do not sell personal data and do not use your content to train AI models. We 
 
 ## 4. Recipients (processors)
 
-| Provider | Purpose | Location |
-|---|---|---|
-| Supabase | database, authentication, file storage, realtime | [REGION — EU/US] |
-| Vercel | hosting, serverless functions, web analytics | US / global |
-| Stripe | payments and subscriptions | EU / US |
-| OpenRouter, and the model providers it routes to | text, image, video generation | US / other |
-| Google (Gemini API) | text and image generation | US / global |
-| Wiro | image and video generation | [LOCATION] |
-| ElevenLabs | voice, music and sound generation | US / EU |
-| TypeSafe (Jev classifier) and an LLM reviewer via OpenRouter | prompt moderation | [LOCATION] |
-| Zernio | connecting social accounts, publishing, reading account metrics | [LOCATION] |
-| Meta Platforms | ad campaigns on your ad account | IE / US |
-| ScrapeCreators | reading public social profiles and posts | US |
-| Resend | transactional email | US |
-| Sentry | error monitoring (may include user ID, email, IP) | US / EU |
-| PostHog | product analytics (consent only) | [US / EU] |
-| Microsoft Clarity | session replay (consent only) | US |
-| Seline | web analytics | [LOCATION] |
-| Google (gtag.js conversion tracking), Meta Pixel | advertising conversion measurement | US |
-| Framer | marketing website feega.app | NL / global |
-| [AGE VERIFICATION PROVIDER] | age verification (NSFW, not yet available) | [LOCATION] |
+We share personal data with these categories of recipients, each acting as our processor and only for the purpose shown:
+
+| Category | Purpose |
+|---|---|
+| Hosting and database | running the Service, storing accounts, content and files, authentication, realtime |
+| Payments | subscriptions, top-ups, invoices |
+| AI model providers | generating text, images and video from your prompts |
+| Voice and audio AI | voice-over, music and sound generation |
+| Content moderation | screening prompts before they reach a model |
+| Social publishing | connecting social accounts, publishing, reading account metrics and running ad campaigns on your ad account |
+| Data enrichment and scraping | reading public websites, stores and social profiles you point us to; web research |
+| Email delivery | invites and notifications |
+| Error monitoring | detecting and fixing errors (may include user ID, email, IP) |
+| Product analytics | understanding how the Service is used (consent) |
+| Advertising measurement | measuring which ads lead to sign-ups (consent) |
+| Age verification | NSFW mode, not yet available |
+
+The current list of sub-processors is available at [https://feega.app/subprocessors](./SUBPROCESSORS.md).
 
 When you publish, the content goes to the platform you chose (Instagram, Facebook, TikTok, etc.), which becomes an independent controller. When you share a link, anyone holding it can see the shared content. We may disclose data to authorities where required by law.
 
@@ -94,14 +91,14 @@ Some providers are outside the EEA, mainly in the United States. Transfers rely 
 
 - **Strictly necessary**: authentication session and preferences. No consent needed.
 - **Cookieless page statistics**: Vercel Web Analytics.
-- **Analytics, consent only**: PostHog (cookies, session recording with masked text and inputs), Microsoft Clarity, Seline, Sentry session replay (fully masked).
+- **Analytics, consent only**: PostHog, Microsoft Clarity, Seline, Sentry session replay (fully masked).
 - **Marketing, consent only**: Meta Pixel and the Google gtag.js conversion tag (Google Consent Mode v2, default denied).
 
 You can change your choice at any time via "Cookie settings" in Settings → Profile. Details: [Cookie Policy](./COOKIES.md).
 
 ## 8. Your rights
 
-You can request access, rectification, erasure, restriction, portability, and object to processing based on legitimate interest; you can withdraw consent at any time. Write to [privacy@feega.app](mailto:privacy@feega.app). We answer within one month. You can complain to the *Garante per la protezione dei dati personali* (garanteprivacy.it) or your local authority.
+You can request access, rectification, erasure, restriction, portability, and object to processing based on legitimate interest; you can withdraw consent at any time. You can delete your account and download your data yourself in Settings → Profile. For anything else, write to [privacy@feega.app](mailto:privacy@feega.app). We answer within one month. You can complain to the *Garante per la protezione dei dati personali* (garanteprivacy.it) or your local authority.
 
 ## 9. Minors
 
@@ -116,5 +113,7 @@ Encryption in transit, row-level access control per workspace, private storage b
 We will update the date above and, for material changes, notify you by email or in the Service.
 
 ---
+
+See also: [Terms](./TERMS.md) · [AI Transparency](./AI-TRANSPARENCY.md) · [Legal Notice](./LEGAL-NOTICE.md)
 
 Questions: [privacy@feega.app](mailto:privacy@feega.app)

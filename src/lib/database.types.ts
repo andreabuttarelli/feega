@@ -593,6 +593,7 @@ export type Database = {
       }
       assets: {
         Row: {
+          ai_marked: boolean | null
           bytes: number | null
           content: string | null
           created_at: string
@@ -613,6 +614,7 @@ export type Database = {
           width: number | null
         }
         Insert: {
+          ai_marked?: boolean | null
           bytes?: number | null
           content?: string | null
           created_at?: string
@@ -633,6 +635,7 @@ export type Database = {
           width?: number | null
         }
         Update: {
+          ai_marked?: boolean | null
           bytes?: number | null
           content?: string | null
           created_at?: string

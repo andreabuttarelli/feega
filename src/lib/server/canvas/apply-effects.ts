@@ -1,7 +1,8 @@
 import sharp from 'sharp';
 import type { Db } from '$lib/server/db/client';
 import { DataCheck, findNode, patchNodeData } from '$lib/server/repos/canvas';
-import { findAsset, insertAsset, type Asset } from '$lib/server/repos/assets';
+import { findAsset, insertAsset, type Asset, type AssetSource } from '$lib/server/repos/assets';
+import { DIGITAL_SOURCE_TYPE, markGenerated } from '$lib/server/content-credentials';
 import { CANVAS_ASSET_BUCKET } from '$lib/server/repos/asset-storage';
 import type { Actor } from '$lib/server/repos/actor';
 import { applyStack } from '$lib/canvas/effects';
@@ -52,12 +53,13 @@ export async function applyEffectsNode(
   const rendered = isVideo
     ? await renderVideoEffects(inputBytes, steps)
     : await renderImageEffects(inputBytes, steps);
+  const output = await markDerived(rendered.bytes, rendered.mimeType, sourceAsset.source);
 
   const extension = isVideo ? 'mp4' : 'png';
   const path = `${input.orgId}/${node.projectId}/effects/${node.id}-${Date.now()}.${extension}`;
   const { error: uploadError } = await db.storage
     .from(CANVAS_ASSET_BUCKET)
-    .upload(path, rendered.bytes, { contentType: rendered.mimeType, upsert: false });
+    .upload(path, output.bytes, { contentType: rendered.mimeType, upsert: false });
   if (uploadError) {
     return { outcome: 'refused', error: `store_failed: ${uploadError.message}` };
   }
@@ -72,8 +74,9 @@ export async function applyEffectsNode(
     width: rendered.width,
     height: rendered.height,
     durationS: isVideo ? sourceAsset.durationS : undefined,
-    bytes: rendered.bytes.length,
-    sourceNodeId: node.id
+    bytes: output.bytes.length,
+    sourceNodeId: node.id,
+    aiMarked: output.marked ?? undefined
   });
 
   const write = await patchNodeData(db, {
@@ -88,7 +91,14 @@ export async function applyEffectsNode(
     return { outcome: 'conflict' };
   }
 
-  return { outcome: 'applied', asset, bytes: rendered.bytes, ...(isVideo ? {} : { pngBytes: rendered.bytes }) };
+  return { outcome: 'applied', asset, bytes: output.bytes, ...(isVideo ? {} : { pngBytes: output.bytes }) };
+}
+
+async function markDerived(bytes: Buffer, mime: string, source: AssetSource | null): Promise<{ bytes: Buffer; marked: boolean | null }> {
+  if (source !== 'generated') {
+    return { bytes, marked: null };
+  }
+  return markGenerated(bytes, mime, { model: null, provider: null, sourceType: DIGITAL_SOURCE_TYPE.composite });
 }
 
 async function renderImageEffects(inputBytes: Buffer, steps: EffectStep[]) {
