@@ -48,6 +48,7 @@
   import NodeReferences from '$lib/components/canvas/NodeReferences.svelte';
   import AudioControls, { type VoiceChoice } from '$lib/components/canvas/AudioControls.svelte';
   import AudioPlayer from '$lib/components/canvas/AudioPlayer.svelte';
+  import { audioInputPorts, audioOperationOf, operationSpec, type AudioOperationId } from '$lib/canvas/audio-operations';
   import { referencesOf } from '$lib/canvas/node-references';
   import EffectsNode from '$lib/components/canvas/EffectsNode.svelte';
   import EffectsEditor from '$lib/components/canvas/EffectsEditor.svelte';
@@ -646,6 +647,10 @@
     return catalogue[n.type]?.find((c) => c.id === model)?.uncensored === true;
   }
 
+  function audioOperationOfTile(n: Tile): AudioOperationId {
+    return audioOperationOf((n.data.params ?? {}) as { operation?: unknown });
+  }
+
   function portsOfTile(n: Tile): { inputs: ConnectorType[] | undefined; output: ConnectorType | null } {
     if (!isNodeType(n.type)) {
       return { inputs: undefined, output: null };
@@ -655,7 +660,8 @@
       modelPorts: () => connectorsForNode(n.type as GenerativeNodeKind, model, catalogue[n.type as GenerativeNodeKind] ?? []),
       listPorts: () => listPortsByNode[n.id] ?? [],
       itemPort: () => itemPortOf(n.type === 'list' ? listValuesByNode[n.id]?.itemKind : upstreamListOf(n.id)?.itemKind),
-      mediaKind: () => upstreamEffectsMediaOf(n.id)?.kind ?? (n.data.mediaKind === 'video' ? 'video' : 'image')
+      mediaKind: () => upstreamEffectsMediaOf(n.id)?.kind ?? (n.data.mediaKind === 'video' ? 'video' : 'image'),
+      audioOperation: () => audioOperationOfTile(n)
     });
   }
 
@@ -691,9 +697,10 @@
         ? { id: n.id, kind: 'effects' as const, mediaKind: n.data.mediaKind === 'video' ? 'video' as const : 'image' as const }
         : tileNode({
         id: n.id,
-        medium: n.type === 'iframe' || n.type === 'document' || n.type === 'doc' ? null : (n.type as 'text' | 'image' | 'video' | 'list' | 'select' | 'products' | 'social_account_feed'),
+        medium: n.type === 'iframe' || n.type === 'document' || n.type === 'doc' ? null : (n.type as 'text' | 'image' | 'video' | 'audio' | 'list' | 'select' | 'products' | 'social_account_feed'),
         model: typeof n.data.model === 'string' ? n.data.model : null,
-        uncensored: uncensoredModelOf(n)
+        uncensored: uncensoredModelOf(n),
+        operation: n.type === 'audio' ? audioOperationOfTile(n) : undefined
       })
     }))
   );
@@ -1688,6 +1695,57 @@
     }
   });
 
+  let confirmingAudioOperationSwitch = $state(false);
+  let resolveAudioOperationSwitch: ((ok: boolean) => void) | null = null;
+
+  function confirmAudioOperationSwitch(): Promise<boolean> {
+    confirmingAudioOperationSwitch = true;
+    return new Promise((resolve) => {
+      resolveAudioOperationSwitch = resolve;
+    });
+  }
+
+  function settleAudioOperationSwitch(ok: boolean) {
+    resolveAudioOperationSwitch?.(ok);
+    resolveAudioOperationSwitch = null;
+  }
+
+  function onAudioOperationSwitchConfirmed() {
+    settleAudioOperationSwitch(true);
+  }
+
+  $effect(() => {
+    if (!confirmingAudioOperationSwitch) {
+      untrack(() => settleAudioOperationSwitch(false));
+    }
+  });
+
+  /**
+   * CAMBIARE OPERAZIONE SU UN NODO AUDIO PUÒ LASCIARE UN ARCO SENZA PORTA — voice changer prende
+   * audio/video, non testo: passare a text to speech con un testo collegato lo caccerebbe in
+   * silenzio. Stessa dottrina di `commonChange` sul modello: si chiede conferma PRIMA, si
+   * staccano solo gli archi che l'operazione nuova non accetta più, quelli compatibili restano.
+   */
+  async function changeAudioOperation(id: string, gen: GenNodeState, next: AudioOperationId) {
+    const wired: { edgeId: string; sourceNodeId: string; connector: ConnectorType }[] = edges
+      .filter((e) => e.target === id && e.targetHandle)
+      .map((e) => ({ edgeId: e.id, sourceNodeId: e.source, connector: e.targetHandle as ConnectorType }));
+    const orphaned = orphanedByModelChange(wired, audioInputPorts(next));
+
+    if (orphaned.length && !(await confirmAudioOperationSwitch())) {
+      return;
+    }
+
+    const droppedEdges: UndoItem[] = [];
+    for (const drop of orphaned) {
+      const item = await disconnect(drop.edgeId, false);
+      if (item) { droppedEdges.push(item); }
+    }
+
+    changeGen(id, gen, { params: { ...gen.params, operation: next }, model: operationSpec(next).defaultModel });
+    if (droppedEdges.length) { pushGesture({ items: droppedEdges }); }
+  }
+
   /**
    * LA BARRA DELLA SELEZIONE HA SCRITTO — un campo, applicato a ogni nodo selezionato, UNO o
    * MOLTI: con un nodo solo è la stessa funzione, non un percorso a parte, perché la domanda «un
@@ -2158,6 +2216,15 @@
     onConfirm={onUncensoredSwitchConfirmed}
   />
 
+  <ConfirmDialog
+    bind:open={confirmingAudioOperationSwitch}
+    title="Audio operation"
+    body="This operation takes different inputs. Switching removes the incoming connections this node no longer accepts."
+    confirmLabel="Switch operation"
+    cancelLabel="Cancel"
+    onConfirm={onAudioOperationSwitchConfirmed}
+  />
+
   <CanvasFlow
     actionUrl={(action: string) => canvasActionUrl({ projectId: data.projectId, canvasId: data.canvas.id }, action)}
     {tiles}
@@ -2291,6 +2358,7 @@
                   {voicesError}
                   onparams={(params) => changeGen(id, gen, { params })}
                   onmodel={(model) => changeGen(id, gen, { model })}
+                  onoperation={(next) => void changeAudioOperation(id, gen, next)}
                   onloadvoices={() => void loadVoices()}
                 />
               {:else}

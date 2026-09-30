@@ -127,4 +127,14 @@ describe('tileNode — da quel che la pagina ha in mano al vocabolario del model
       uncensored: true
     });
   });
+
+  it('un nodo audio porta la sua operazione, che decide quali medium accetta', () => {
+    expect(tileNode({ id: 'a1', medium: 'audio', model: 'eleven_multilingual_sts_v2', operation: 'voice_changer' })).toEqual({
+      id: 'a1',
+      kind: 'audio',
+      model: 'eleven_multilingual_sts_v2',
+      uncensored: false,
+      operation: 'voice_changer'
+    });
+  });
 });

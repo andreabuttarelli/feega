@@ -69,6 +69,7 @@ import { upstreamInputsFor } from '$lib/server/canvas/upstream';
 import { estimateCanvasTextCost } from '$lib/server/canvas/text-cost-estimate';
 import { applyEffectsNode } from '$lib/server/canvas/apply-effects';
 import { nodeAcceptsConnection } from '$lib/canvas/connector-ports';
+import { connectVerdict } from '$lib/server/canvas/node-model';
 import { ShareState, readCanvasShare, setCanvasShare } from '$lib/server/canvas/canvas-share';
 import { referenceLibrary } from '$lib/server/canvas/reference-library';
 import { CanvasRemoval, openNewCanvas, removeCanvas, renameCanvasTo } from '$lib/server/canvas/lifecycle';
@@ -1175,6 +1176,7 @@ export const actions: Actions = {
       return fail(400, { error: 'collegamento non valido' });
     }
 
+    const sourceNode = canvasNodes.find((node) => node.id === sourceNodeId);
     const targetNode = canvasNodes.find((node) => node.id === targetNodeId);
     const existing = (await listConnections(scope.db, scope)).map((edge) => ({
       id: edge.id,
@@ -1183,6 +1185,11 @@ export const actions: Actions = {
     }));
     if (!nodeAcceptsConnection(existing, targetNodeId, targetNode?.type ?? '')) {
       return fail(400, { error: 'un nodo effetti prende un solo media' });
+    }
+
+    const refusal = connectVerdict(sourceNode ?? null, targetNode ?? null);
+    if (refusal) {
+      return fail(400, { error: refusal });
     }
 
     const connection = await createConnection(scope.db, {

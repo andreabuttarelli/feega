@@ -19,6 +19,7 @@
     voicesError = null,
     onparams,
     onmodel,
+    onoperation,
     onloadvoices
   }: {
     node: GenNode;
@@ -26,6 +27,7 @@
     voicesError?: string | null;
     onparams: (params: GenParams) => void;
     onmodel: (model: string) => void;
+    onoperation: (next: AudioOperationId) => void;
     onloadvoices: () => void;
   } = $props();
 
@@ -53,8 +55,7 @@
   }
 
   function pickOperation(next: AudioOperationId) {
-    set({ operation: next });
-    onmodel(operationSpec(next).defaultModel);
+    onoperation(next);
   }
 
   function pickVoice(id: string) {
