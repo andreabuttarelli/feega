@@ -10,6 +10,7 @@ import { withBrandContext, withToolContext } from '$lib/server/ai-log';
 import { TOOL_HEADER, TOOL_HEADER_LEGACY, toolFromHeader } from '@feega/api-contracts';
 import { createAdminClient } from '$lib/server/supabase-admin';
 import { isCsrfForbidden } from '$lib/server/csrf';
+import { redirectFor } from '$lib/server/host-redirects';
 import { ENTRY_DEPS, homePathFor } from '$lib/server/tenancy/entry';
 import { ORG_COOKIE, LAST_PROJECT_COOKIE } from '$lib/server/tenancy/context';
 import type { RequestEvent } from '@sveltejs/kit';
@@ -83,6 +84,16 @@ async function brandIdFromSlug(slug: string): Promise<string | null> {
 
 // Replaces kit's built-in CSRF check (disabled in svelte.config.js) so /oauth/token can opt out —
 // see $lib/server/csrf for why.
+const PERMANENT_REDIRECT = 308;
+
+const hostRedirect: Handle = async ({ event, resolve }) => {
+  const target = redirectFor(event.url);
+  if (target) {
+    throw redirect(PERMANENT_REDIRECT, target);
+  }
+  return resolve(event);
+};
+
 const csrf: Handle = async ({ event, resolve }) => {
   if (isCsrfForbidden(event.request, event.url)) {
     const message = `Cross-site ${event.request.method} form submissions are forbidden`;
@@ -111,7 +122,7 @@ async function refuseNsfwSection(event: RequestEvent): Promise<void> {
   }
 }
 
-export const handle: Handle = sequence(csrf, Sentry.sentryHandle(), async ({ event, resolve }) => {
+export const handle: Handle = sequence(hostRedirect, csrf, Sentry.sentryHandle(), async ({ event, resolve }) => {
   // Per-request Supabase client bound to the request cookies (SSR auth).
   // Marchiato come RLS-scoped: chiave anon, quindi Postgres valuta le policy dell'utente. È la
   // dichiarazione su cui `query` decide di leggere — vedi $lib/server/rls-client.
