@@ -1,4 +1,4 @@
-# Legal review checklist — TERMS.md, PRIVACY.md
+# Legal review checklist — TERMS, PRIVACY, COOKIES, DPA, SUBPROCESSORS, AI-TRANSPARENCY, ACCEPTABLE-USE, LEGAL-NOTICE
 
 ## Placeholders
 
@@ -27,5 +27,23 @@
 10. **Sentry `sendDefaultPii: true`** — justify under legitimate interest or turn off.
 11. **Scraping** of public profiles (ScrapeCreators) and websites — legal basis and platform terms.
 12. Minimum age 18 for the whole Service.
-13. `COOKIES.md` is still the archived August version — update to match.
+13. `COOKIES.md` rewritten from the code on 30/09/2026; re-check after the consent fix.
 14. Third-party model provider terms passed through to users (Terms §7).
+
+## Placeholders added with the legal set (30/09/2026)
+
+- LEGAL-NOTICE: `[LEGAL FORM]`, `[REA — if applicable]`, `[SHARE CAPITAL — if a company]`, `[PEC]`.
+- DPA: `[SIGNED COPY — available on request]`, sub-processor notice `[30]` days, objection refund `[to confirm]`, DSR assistance `[10]` business days, audit notice `[30]` days, `[SECURITY CONTACT]`, `[BACKUP POLICY]`, encryption at rest `[confirm with Supabase plan]`, organisational measures `[to confirm]`.
+- SUBPROCESSORS: locations and transfer mechanisms for Kie.ai, Wiro, TypeSafe/Jev, Zernio, Browserless, Exa, Tavily, Unsplash, Seline, Framer; Supabase region; PostHog hosting.
+- COOKIES: Supabase auth cookie lifetime, PostHog cookie lifetime, `[FRAMER SITE COOKIES — to list]`.
+
+## Points to confirm — legal set
+
+15. **Consent gaps found in the code** (fix in progress elsewhere; COOKIES §5 describes them): gtag.js conversion tag and Meta Pixel load without consent; server sets `_fbc`/`_fbp` on Meta ad clicks without consent; Seline `cookieOnIdentify` sets a cookie on sign-in; `identifyUser` sends user ID and email to PostHog in the anonymous tier; `openCookieSettings` is not wired to any "Cookie preferences" link. Non-EEA visitors are auto-granted — confirm acceptable.
+16. **Sub-processors not in PRIVACY.md §4**: Kie.ai (video/image transport), Browserless, Exa, Tavily, Unsplash, Vercel Sandbox. Add to the Privacy Policy or confirm they are not used in production.
+17. **Google Gemini API** is listed in PRIVACY.md §4 but the code no longer calls it directly (Gemini models go via OpenRouter/Kie.ai). Remove or keep?
+18. **DPA**: acceptance by click-through with the Terms vs signature; SCC module choice; whether feega is controller or processor for brand analysis and public-profile scraping; liability cap interplay with GDPR Art. 82.
+19. **Breach notice** target 48h — confirm it is operationally achievable.
+20. **AI labelling**: only the IPTC XMP marker is live; C2PA signing is off (no certificate, dependency removed) and there is no visible "AI-generated" label outside the NSFW page copy. Confirm "being rolled out" wording is acceptable under Art. 50(2).
+21. **Legal notice**: which Art. 7 D.Lgs. 70/2003 fields apply to the chosen legal form.
+22. **Framer marketing site**: cookies and its own consent banner.

@@ -1,0 +1,68 @@
+# Sub-processors
+
+> **Draft — to be reviewed by a lawyer before publication.**
+> Last updated: 30 September 2026
+
+feega (**[LEGAL ENTITY]**, VAT no. **[VAT]**, **[ADDRESS]**) uses the providers below to run the Service. When we process personal data on behalf of a business customer, these are our sub-processors under the [Data Processing Agreement](./DPA.md). The same providers are listed in the [Privacy Policy](./PRIVACY.md).
+
+"SCCs" means the European Commission's Standard Contractual Clauses (Decision 2021/914). "DPF" means the EU–US Data Privacy Framework, relied on only where the provider is certified.
+
+## Infrastructure and payments
+
+| Provider | Purpose | Personal data | Location | Transfer mechanism |
+|---|---|---|---|---|
+| Supabase | database, authentication, file storage, realtime | all account, workspace, content, brand, social, ads and billing records; uploaded and generated files | [REGION — EU/US] | [DPF / SCCs — if outside the EEA] |
+| Vercel | hosting, serverless functions, web analytics; isolated code sandboxes for the agent, when enabled | request data, IP address, content processed during a request | US / global | DPF / SCCs |
+| Stripe | payments, subscriptions, invoices | name, email, billing address, VAT number, payment details (held by Stripe) | EU / US | DPF / SCCs |
+| Resend | transactional email (invites, notifications) | email address, name, message content | US | DPF / SCCs |
+
+## AI generation and moderation
+
+| Provider | Purpose | Personal data | Location | Transfer mechanism |
+|---|---|---|---|---|
+| OpenRouter, and the model providers it routes each request to | text, chat, image and video generation; the second-stage moderation review | prompts, attachments, brand context, generated outputs | US / other, per model | SCCs [to confirm per provider] |
+| Kie.ai | alternative transport for video and some image models, when configured | prompts, reference media, generated outputs | [LOCATION] | [SCCs — to confirm] |
+| Wiro | image and video generation with the uncensored model catalogue (NSFW mode, not yet available) | prompts, reference media, generated outputs | [LOCATION] | [SCCs — to confirm] |
+| ElevenLabs | voice-over, music and sound generation | script text, chosen voice, generated audio | US / EU | DPF / SCCs |
+| TypeSafe (Jev classifier) | first-stage prompt moderation | prompt text, reference descriptions | [LOCATION] | [SCCs — to confirm] |
+
+Google Gemini models are reached through OpenRouter or Kie.ai; the current code does not call the Google Gemini API directly.
+
+## Social, ads and research
+
+| Provider | Purpose | Personal data | Location | Transfer mechanism |
+|---|---|---|---|---|
+| Zernio | connecting social accounts, publishing, reading account metrics, Meta ads operations | account handle and profile, access tokens, posts, metrics | [LOCATION] | [SCCs — to confirm] |
+| Meta Platforms | ad campaigns on your ad account | ad account IDs, campaigns, creatives, metrics | IE / US | DPF / SCCs |
+| ScrapeCreators | reading public social profiles and posts you add to a feed | public profile data and posts | US | SCCs [to confirm] |
+| Browserless | rendering a brand's public website for analysis, when configured | content of public web pages | [LOCATION] | [SCCs — to confirm] |
+| Exa, Tavily | web search for research and brand analysis, when configured | search queries derived from your brand and prompts | US | [SCCs — to confirm] |
+| Unsplash | stock image search for research, when configured | search queries | US / global | [to confirm] |
+
+## Monitoring and analytics
+
+| Provider | Purpose | Personal data | Location | Transfer mechanism |
+|---|---|---|---|---|
+| Sentry | error monitoring; session replay only when an error occurs | user ID, email, IP address, browser data, error context | US / EU | DPF / SCCs |
+| PostHog | product analytics (anonymous without consent; persistent and session recording with consent) | pseudonymous ID, user ID and email once signed in, pages, clicks | EU (PostHog EU cloud) | none needed [to confirm hosting] |
+| Microsoft Clarity | session replay and heatmaps (consent only) | pseudonymous ID, interactions, device data | US | DPF / SCCs |
+| Seline | page-view analytics; linked to your user ID once signed in | pages, referrer, user ID | [LOCATION] | [to confirm] |
+| Google (gtag.js conversion tag) | advertising conversion measurement | cookie IDs, pages, conversion events, IP address | US | DPF / SCCs |
+| Meta Pixel | advertising conversion measurement | cookie IDs (`_fbp`, `_fbc`), pages, conversion events, IP address | IE / US | DPF / SCCs |
+| Framer | marketing website | visitor data on the marketing site | NL / global | [DPF / SCCs — to confirm] |
+
+## Not yet active
+
+| Provider | Purpose | Status |
+|---|---|---|
+| [AGE VERIFICATION PROVIDER] | age verification for NSFW mode; we keep only the result | not chosen; NSFW mode is not available |
+
+Platforms you publish to (Instagram, Facebook, TikTok and others) receive your content as independent controllers, not as our sub-processors.
+
+## Changes
+
+We give business customers at least [30] days' notice before adding or replacing a sub-processor, by email to the workspace owner or in the Service, and update this page. You may object on reasonable data-protection grounds as described in the [DPA](./DPA.md) §7.
+
+---
+
+Questions: [privacy@feega.app](mailto:privacy@feega.app)

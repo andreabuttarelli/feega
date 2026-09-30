@@ -10,7 +10,7 @@ This policy explains how feega processes personal data when you use feega.app, i
 **[LEGAL ENTITY]**, Italy, VAT no. **[VAT]**, **[ADDRESS]**.
 Privacy contact: [privacy@feega.app](mailto:privacy@feega.app). Data Protection Officer: [DPO — appointed / not required].
 
-When you upload data about other people (for example customers, models or influencers in your brand material), you are the controller of that data and we process it as your processor. [DPA — available on request / link].
+When you upload data about other people (for example customers, models or influencers in your brand material), you are the controller of that data and we process it as your processor. The terms are in our [Data Processing Agreement](./DPA.md).
 
 ## 2. Data we process
 
@@ -47,6 +47,8 @@ We do not ask for special categories of data (Art. 9 GDPR). Do not include them 
 We do not sell personal data and do not use your content to train AI models. We make no decisions with legal or similarly significant effects based solely on automated processing (Art. 22). Moderation refusals are automated but concern a request, not you; you can contact us to have one reviewed.
 
 ## 4. Recipients (processors)
+
+Full list with data, locations and transfer mechanisms: [Sub-processors](./SUBPROCESSORS.md).
 
 | Provider | Purpose | Location |
 |---|---|---|
@@ -115,5 +117,7 @@ Encryption in transit, row-level access control per workspace, private storage b
 We will update the date above and, for material changes, notify you by email or in the Service.
 
 ---
+
+See also: [Terms](./TERMS.md) · [AI Transparency](./AI-TRANSPARENCY.md) · [Legal Notice](./LEGAL-NOTICE.md)
 
 Questions: [privacy@feega.app](mailto:privacy@feega.app)
