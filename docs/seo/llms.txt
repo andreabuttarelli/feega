@@ -29,6 +29,9 @@
 - [80s retro / VHS video](https://www.feega.app/80s-retro-video)
 - [Anime video generator](https://www.feega.app/anime-video-generator)
 - [AI video styles](https://www.feega.app/ai-video-styles)
+- [AI video generator: text to video and image to video](https://www.feega.app/ai-video-generator)
+- [Spotify Canvas maker](https://www.feega.app/spotify-canvas-maker)
+- [AI node editor](https://www.feega.app/ai-node-editor)
 
 ## Legal
 
