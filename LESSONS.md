@@ -2166,3 +2166,12 @@ keys it changed (`genPatch`); saves are held while a run starts (`saves.hold`); 
 identical to what the tab shows. Proof is the real browser, not the unit suite:
 `tests/e2e/canvas.spec.ts` with `E2E_REAL_STACK=1` — the old spec for this path used a
 `Modello` label that no longer exists, so it had not run for weeks.
+
+## A canvas field loses focus mid-typing
+Signal: typing in a node freezes for a frame, characters vanish or trigger canvas shortcuts;
+on `focusout` the `.svelte-flow__node` style shows `visibility: hidden`. Cause: a node object
+handed to SvelteFlow without `measured` is treated as unmeasured and hidden until the
+ResizeObserver runs, and hiding blurs the focused field. Move: never rebuild SvelteFlow nodes
+wholesale; replace only the ones that changed, spread over the old object (`syncNodes`). Also:
+a page `$effect` that reads `data` re-runs on every layout invalidation; depend on the one
+field that means "new page load" (`$derived(data.nodes)`) and `untrack` the rest.

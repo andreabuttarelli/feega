@@ -856,10 +856,17 @@
     }
   }
 
+  const canvasLoad = $derived(data.nodes);
+
   $effect(() => {
+    const loaded = canvasLoad;
+    return untrack(() => openCanvas(loaded as CanvasNodeRecord[]));
+  });
+
+  function openCanvas(loaded: CanvasNodeRecord[]) {
     snapshotVersion += 1;
     runsOverride = null;
-    nodes = (data.nodes as CanvasNodeRecord[]).map((n) => toTile(n));
+    nodes = loaded.map((n) => toTile(n));
     edges = (data.connections as Connection[]).map(toEdge);
     seenRevision = data.revision;
     const carried = takeNotice();
@@ -882,7 +889,7 @@
       onPeers: (value) => { peers = value; },
       onError: () => { failed = 'Connessione in tempo reale interrotta'; }
     });
-  });
+  }
 
   $effect(() => onCanvasReveal((trigger) => { void checkStale(trigger); }));
 
