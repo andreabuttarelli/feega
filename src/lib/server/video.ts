@@ -519,8 +519,9 @@ async function persistMp4(
   supabase: SupabaseClient,
   userId: string,
   srcUrl: string,
+  model: string,
   opts: { captions?: boolean; fontName?: string; tighten?: boolean; headers?: Record<string, string> } = {}
-): Promise<string | undefined> {
+): Promise<{ path: string; aiMarked: boolean } | undefined> {
   const dl = await fetch(srcUrl, opts.headers ? { headers: opts.headers } : undefined);
   if (!dl.ok) return undefined;
   let bytes: Buffer = Buffer.from(await dl.arrayBuffer());
@@ -536,19 +537,16 @@ async function persistMp4(
     const { burnCaptions } = await import('$lib/server/captions');
     bytes = await burnCaptions(bytes, { fontName: opts.fontName });
   }
-  // AI Act Art. 50(2): il montaggio spedibile va marcato come sintetico. Stream copy, zero costo
-  // di qualità, e un tag fallito restituisce la clip intatta invece di perderla.
-  {
-    const { markVideoSynthetic } = await import('$lib/server/content-credentials');
-    bytes = await markVideoSynthetic(bytes);
-  }
+  const { markGenerated } = await import('$lib/server/content-credentials');
+  const marked = await markGenerated(bytes, 'video/mp4', { model, provider: 'openrouter' });
+  bytes = marked.bytes;
   const path = `${userId}/generated/${crypto.randomUUID()}.mp4`;
   const { error } = await supabase.storage.from('brand-knowledge').upload(path, bytes, {
     contentType: 'video/mp4',
     upsert: false
   });
   if (error) return undefined;
-  return path;
+  return { path, aiMarked: marked.marked };
 }
 
 /**
@@ -682,11 +680,12 @@ async function runPreparedRender(
     });
     if (!job) return undefined;
 
-    const url = await persistMp4(supabase, userId, job.url, {
+    const stored = await persistMp4(supabase, userId, job.url, model, {
       ...p.persistOpts,
       headers: openrouterVideoHeaders()
     });
-    if (!url) return undefined;
+    if (!stored) return undefined;
+    const url = stored.path;
     // taskId e risoluzione tornano indietro perché sono ciò che rende possibile l'upscale
     // all'approvazione senza rigenerare la clip. `thumbnailUrl` è la COVER: senza restituirla il
     // chiamante sovrascrive media_url con la clip e il frame è perso, con tutto il grounding
@@ -755,13 +754,13 @@ export async function transformVideo(opts: {
 
   // Niente sottotitoli e niente taglio: la clip di partenza e\' gia\' montata, e rimontarla qui
   // sposterebbe il timing di quello che l\'utente ha approvato.
-  const url = await persistMp4(opts.supabase, opts.userId, job.url, {
+  const stored = await persistMp4(opts.supabase, opts.userId, job.url, model, {
     captions: false,
     tighten: false,
     headers: openrouterVideoHeaders()
   });
-  if (!url) return undefined;
-  return { url, taskId: job.taskId, model };
+  if (!stored) return undefined;
+  return { url: stored.path, taskId: job.taskId, model };
 }
 
 /** A render the provider has accepted but not finished. Everything here must survive the request. */
@@ -848,7 +847,7 @@ export async function submitVideoRender(
 export type VideoRenderOutcome =
   /** Il fornitore sta ancora lavorando. Ask again later; nothing is held open in the meantime. */
   | { status: 'pending' }
-  | { status: 'done'; url: string; durationSeconds: number; resolution: string; thumbnailUrl?: string }
+  | { status: 'done'; url: string; aiMarked: boolean; durationSeconds: number; resolution: string; thumbnailUrl?: string }
   | { status: 'failed'; error: string; retryable?: boolean };
 
 /**
@@ -892,11 +891,11 @@ async function finishOpenrouterRender(
   if (outcome.status === 'timeout') return { status: 'pending' };
 
   // Si RIOSPITA prima e si fattura dopo: il download puo' fallire, e chi ci richiama e' un cron.
-  const url = await persistMp4(supabase, userId, outcome.url, {
+  const stored = await persistMp4(supabase, userId, outcome.url, submitted.model, {
     ...submitted.persistOpts,
     headers: openrouterVideoHeaders()
   });
-  if (!url) return { status: 'failed', error: 'clip rendered but could not be stored', retryable: true };
+  if (!stored) return { status: 'failed', error: 'clip rendered but could not be stored', retryable: true };
 
   logAiCall({
     label: 'video.render',
@@ -912,7 +911,8 @@ async function finishOpenrouterRender(
 
   return {
     status: 'done',
-    url,
+    url: stored.path,
+    aiMarked: stored.aiMarked,
     durationSeconds: submitted.durationSeconds,
     resolution: submitted.resolution,
     thumbnailUrl: submitted.coverUrl
@@ -976,6 +976,6 @@ async function upscaleOnOpenrouter(
   );
   if (out.status !== 'done') return undefined;
 
-  const url = await persistMp4(supabase, userId, out.url);
-  return url ? { url, resolution } : undefined;
+  const stored = await persistMp4(supabase, userId, out.url, OPENROUTER_UPSCALE_MODEL);
+  return stored ? { url: stored.path, resolution } : undefined;
 }

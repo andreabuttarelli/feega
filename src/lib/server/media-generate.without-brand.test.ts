@@ -18,6 +18,7 @@ const signKnowledgePaths = vi.fn();
 const withBrandContext = vi.fn();
 const withOrgContext = vi.fn();
 const loadBrandVisualContext = vi.fn();
+const markGenerated = vi.fn();
 
 const PNG_DATA_URL = 'data:image/png;base64,AAAA';
 
@@ -38,7 +39,7 @@ vi.mock('$lib/server/media-archive', () => ({
   signKnowledgePaths: (...args: unknown[]) => signKnowledgePaths(...args)
 }));
 vi.mock('$lib/server/content-credentials', () => ({
-  markImage: async (bytes: Buffer) => bytes,
+  markGenerated: (...args: unknown[]) => markGenerated(...args),
   DIGITAL_SOURCE_TYPE: { synthetic: 'trainedAlgorithmicMedia' }
 }));
 vi.mock('$lib/server/ai-log', () => ({
@@ -70,6 +71,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   billedUsd = 0.0336;
   renderPostImage.mockResolvedValue(PNG_DATA_URL);
+  markGenerated.mockImplementation(async (bytes: Buffer) => ({ bytes, marked: true }));
   storeBrandMediaBytes.mockResolvedValue({});
   insertBrandMedia.mockResolvedValue({ row: { id: 'media-new', kind: 'image', short_code: 'K7BX2MQ4' } });
   signKnowledgePaths.mockImplementation(async (_c: unknown, paths: string[]) => new Map(paths.map((p) => [p, SIGNED])));
@@ -126,6 +128,16 @@ describe('disegnare senza un brand', () => {
 
     expect(out.ok && out.media[0].url).toBe(SIGNED);
     expect(out.ok && out.media[0].storage_path).toMatch(/^user-1\/media\//);
+  });
+
+  it('marca il disegno col modello che lo ha fatto, e dice se la marcatura è riuscita', async () => {
+    markGenerated.mockImplementation(async (bytes: Buffer) => ({ bytes, marked: false }));
+
+    const out = await generateImagesWithoutBrand(supabaseThatHasNoBrands(), job);
+
+    expect(markGenerated).toHaveBeenCalledWith(expect.any(Buffer), 'image/png', { model: out.ok && out.model, provider: 'openrouter' });
+    expect(out.ok && out.media[0].ai_marked).toBe(false);
+    expect(storeBrandMediaBytes).toHaveBeenCalled();
   });
 
   it('più alternative, più render pagati, e il conto lo dice', async () => {

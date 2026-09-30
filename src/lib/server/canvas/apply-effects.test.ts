@@ -156,6 +156,25 @@ describe('applyEffectsNode', () => {
     expect(Buffer.compare(inMeta, outRaw)).not.toBe(0);
   });
 
+  it('un upload della persona resta senza marcatura AI', async () => {
+    const { db } = fakeDb({ node: baseNode, sourceAsset: sourceAssetRow, inputBytes: await tinyPng() });
+
+    const result = await applyEffectsNode(db, { orgId, nodeId, actor });
+
+    expect(result.outcome === 'applied' && (await sharp(result.bytes).metadata()).xmp).toBeFalsy();
+  });
+
+  it('un asset generato esce marcato come composito AI', async () => {
+    const { db } = fakeDb({ node: baseNode, sourceAsset: { ...sourceAssetRow, source: 'generated' }, inputBytes: await tinyPng() });
+
+    const result = await applyEffectsNode(db, { orgId, nodeId, actor });
+
+    expect(result.outcome).toBe('applied');
+    if (result.outcome !== 'applied') return;
+    expect((await sharp(result.bytes).metadata()).xmp?.toString()).toContain('compositeWithTrainedAlgorithmicMedia');
+    expect(Buffer.compare(result.bytes, result.pngBytes!)).toBe(0);
+  });
+
   it('nessun sourceRefId: errore chiaro, non un crash', async () => {
     const node = { ...baseNode, data: { effects: [], sourceRefId: null, refId: null } };
     const { db } = fakeDb({ node, sourceAsset: null, inputBytes: null });

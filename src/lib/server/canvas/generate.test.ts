@@ -229,13 +229,13 @@ describe('un nodo senza prompt proprio ma con un testo a monte collegato gira lo
     generateImagesWithoutBrand.mockReset();
     generateImagesWithoutBrand.mockResolvedValue({
       ok: true,
-      media: [{ storage_path: 'u/media/generated.png', mime: 'image/png', width: 1024, height: 1024 }],
+      media: [{ storage_path: 'u/media/generated.png', mime: 'image/png', width: 1024, height: 1024, ai_marked: true }],
       costUsd: 0.02
     });
   });
 
   it('chiama il render con il testo a monte come prompt, non rifiuta prompt_required', async () => {
-    const { db } = fakeDb(
+    const { db, calls } = fakeDb(
       {
         nodes: [
           freshNodeRow,
@@ -274,6 +274,7 @@ describe('un nodo senza prompt proprio ma con un testo a monte collegato gira lo
       expect.anything(),
       expect.objectContaining({ prompt: 'a cat wearing a hat' })
     );
+    expect(calls.find((c) => c.table === 'assets' && c.op === 'insert')?.payload).toMatchObject({ ai_marked: true });
   });
 
   it('senza prompt proprio e senza niente a monte, rifiuta prompt_required — dopo aver letto l\'upstream, non prima', async () => {
@@ -1390,7 +1391,8 @@ describe('reconcileVideoNodeRuns chiude un video in coda quando il fornitore ha 
       status: 'done',
       url: 'https://storage.example/media/user-1/generated/clip.mp4',
       durationSeconds: 1,
-      resolution: '480p'
+      resolution: '480p',
+      aiMarked: true
     });
 
     const { db, currentNode, currentRun, insertedAssets } = videoReconcileDb({
@@ -1402,7 +1404,7 @@ describe('reconcileVideoNodeRuns chiude un video in coda quando il fornitore ha 
 
     expect(result).toMatchObject({ checked: 1, done: 1, failed: 0, pending: 0 });
     expect(insertedAssets).toHaveLength(1);
-    expect(insertedAssets[0]).toMatchObject({ type: 'video', source: 'generated', url: expect.stringContaining('clip.mp4') });
+    expect(insertedAssets[0]).toMatchObject({ type: 'video', source: 'generated', url: expect.stringContaining('clip.mp4'), ai_marked: true });
 
     expect(currentRun().status).toBe('done');
     expect(currentRun().output_asset_id).toBe('asset-video-1');

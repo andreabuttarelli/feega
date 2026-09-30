@@ -36,7 +36,7 @@ export type Asset = {
 const ASSET_COLUMNS =
   'id, project_id, type, url, content, mime_type, bytes, width, height, duration_s, source, source_node_id, uncensored, created_at';
 
-type AssetColumns = Omit<AssetRow, 'org_id' | 'embedding' | 'updated_at'>;
+type AssetColumns = Omit<AssetRow, 'org_id' | 'embedding' | 'updated_at' | 'nsfw' | 'ai_marked'>;
 
 function toAsset(row: AssetColumns): Asset {
   return {
@@ -153,6 +153,7 @@ export async function insertAsset(
     durationS?: number | null;
     sourceNodeId?: string | null;
     uncensored?: boolean;
+    aiMarked?: boolean;
   }
 ): Promise<Asset> {
   const { data, error } = await db
@@ -170,7 +171,8 @@ export async function insertAsset(
       height: input.height ?? null,
       duration_s: input.durationS ?? null,
       source_node_id: input.sourceNodeId ?? null,
-      uncensored: input.uncensored ?? false
+      uncensored: input.uncensored ?? false,
+      ai_marked: input.aiMarked ?? null
     })
     .select(ASSET_COLUMNS)
     .single();
