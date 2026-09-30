@@ -11,6 +11,7 @@
   import '$lib/styles/doc-prose.css';
   import { periodTitle } from '$lib/calendar/period-grid';
   import { CONNECTOR_STYLE } from '$lib/canvas/connectors';
+  import LegalFooter from '$lib/components/LegalFooter.svelte';
 
   let { data } = $props();
 
@@ -111,6 +112,9 @@
   </CanvasFlow>
 
   <a class="mark" href="/">feega</a>
+  <div class="legal-mark">
+    <LegalFooter />
+  </div>
 </main>
 
 <style>
@@ -267,6 +271,12 @@
     letter-spacing: 0.02em;
     color: var(--ink-faint, #9a9a9e);
     text-decoration: none;
+  }
+  .legal-mark {
+    position: fixed;
+    right: calc(12px + env(safe-area-inset-right, 0px));
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    z-index: 10;
   }
   .outputs {
     display: flex;

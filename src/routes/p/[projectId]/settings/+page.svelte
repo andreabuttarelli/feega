@@ -2,6 +2,7 @@
   import { _ } from 'svelte-i18n';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import { SETTINGS_GROUPS } from '$lib/components/settings/platforms';
+  import LegalFooter from '$lib/components/LegalFooter.svelte';
 
   let { data } = $props();
 
@@ -23,6 +24,10 @@
     </ul>
   {/each}
 </nav>
+
+<div class="legal-wrap">
+  <LegalFooter />
+</div>
 
 <style>
   .sections {
@@ -58,5 +63,10 @@
     font-weight: 500;
     text-decoration: none;
     color: var(--ink, #1d1d1f);
+  }
+
+  .legal-wrap {
+    margin: 24px 0 0;
+    max-width: 560px;
   }
 </style>

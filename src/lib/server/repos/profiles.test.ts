@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ensureProfile, profileFromAuthUser } from '$lib/server/repos/profiles';
+import { ensureProfile, profileFromAuthUser, recordTermsAcceptance } from '$lib/server/repos/profiles';
 import { fakeDb } from '$lib/server/db/fake-db';
 import type { User } from '@supabase/supabase-js';
 
@@ -12,7 +12,9 @@ const row = {
   id: USER,
   email: 'chi@esempio.it',
   name: 'Chi Esempio',
-  avatar_url: 'https://esempio.it/a.png'
+  avatar_url: 'https://esempio.it/a.png',
+  terms_accepted_at: null,
+  terms_version: null
 };
 
 describe('il profilo si ricava dall utente di auth', () => {
@@ -62,7 +64,21 @@ describe('il profilo nasce al primo accesso', () => {
       id: USER,
       email: 'chi@esempio.it',
       name: 'Chi Esempio',
-      avatarUrl: 'https://esempio.it/a.png'
+      avatarUrl: 'https://esempio.it/a.png',
+      termsAcceptedAt: null,
+      termsVersion: null
     });
+  });
+});
+
+describe('l’accettazione dei termini si registra una volta', () => {
+  it('scrive la data e la versione sul profilo', async () => {
+    const { db, calls } = fakeDb({ profiles: [row] });
+
+    await recordTermsAcceptance(db, USER, '2026-09-30');
+
+    const update = calls.find((c) => c.op === 'update')!;
+    expect(update.payload).toMatchObject({ terms_version: '2026-09-30' });
+    expect(update.filters).toEqual([['id', USER]]);
   });
 });

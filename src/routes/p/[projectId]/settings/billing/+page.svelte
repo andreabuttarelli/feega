@@ -9,6 +9,7 @@
   import { invalidateAll } from '$app/navigation';
   import { CheckoutOutcome } from '$lib/billing-path';
   import { DISPLAY_UNITS_PER_CREDIT } from '$lib/components/credit-amount-format';
+  import LegalFooter from '$lib/components/LegalFooter.svelte';
 
   let { data, form } = $props();
 
@@ -140,7 +141,14 @@
   </Panel>
 {/if}
 
+<div class="legal-wrap">
+  <LegalFooter />
+</div>
+
 <style>
+  .legal-wrap {
+    margin-top: 1.5rem;
+  }
   .ladder {
     width: 100%;
     border-collapse: collapse;

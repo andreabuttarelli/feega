@@ -6,6 +6,8 @@
   import { isPlanKey, planByKey } from '$lib/plans';
   import { detectInAppBrowser, androidIntentUrl, type InAppBrowser } from '$lib/in-app-browser';
   import { sanitizeWebsiteParam } from '$lib/website-param';
+  import { legalHref } from '$lib/legal-links';
+  import LegalFooter from '$lib/components/LegalFooter.svelte';
   let { form, data } = $props();
   let loading = $state(false);
   let showPassword = $state(false);
@@ -94,6 +96,10 @@
   };
   const inviteToken = $derived(data.inviteToken ?? '');
   const inviteError = $derived(data.inviteError ? INVITE_ERROR_TEXT[data.inviteError] : '');
+
+  function legalLink(href: string, label: string): string {
+    return `<a href="${href}" target="_blank" rel="noopener">${label}</a>`;
+  }
 </script>
 
 <svelte:head>
@@ -234,7 +240,24 @@
             <button type="button" class="textlink" onclick={() => setMode(data.preferSignup ? 'signup' : 'signin')}>{$_('login.forgot.back')}</button>
           {/if}
         </p>
+
+        {#if mode !== 'forgot'}
+          <p class="legal-notice">
+            {@html $_('login.legal.notice', {
+              values: {
+                terms: legalLink(legalHref('terms'), $_('legal.terms')),
+                acceptableUse: legalLink(legalHref('acceptableUse'), $_('legal.acceptableUse')),
+                privacy: legalLink(legalHref('privacy'), $_('legal.privacy')),
+                cookies: legalLink(legalHref('cookies'), $_('legal.cookies'))
+              }
+            })}
+          </p>
+        {/if}
       {/if}
+
+      <div class="legal-wrap">
+        <LegalFooter />
+      </div>
     </div>
   </section>
   <aside class="pane visual-pane" aria-hidden="true"></aside>
@@ -454,6 +477,21 @@
     margin-top: 22px;
     font-size: 14px;
     color: var(--ink-soft, #6e6e73);
+  }
+
+  .legal-notice {
+    margin-top: 16px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--ink-faint, #9a9a9e);
+  }
+  .legal-notice :global(a) {
+    color: inherit;
+    text-decoration: underline;
+  }
+
+  .legal-wrap {
+    margin-top: 24px;
   }
 
   /* ---- CLI login notice ---- */

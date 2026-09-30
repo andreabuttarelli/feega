@@ -10,6 +10,7 @@
   import { Button, buttonVariants } from '$lib/components/ui/button';
   import { Notice } from '$lib/components/ui/notice';
   import { openCookieSettings } from '$lib/consent';
+  import LegalFooter from '$lib/components/LegalFooter.svelte';
 
   let { data, form } = $props();
 
@@ -160,7 +161,14 @@
   </form>
 </Panel>
 
+<div class="legal-wrap">
+  <LegalFooter />
+</div>
+
 <style>
+  .legal-wrap {
+    margin-top: 1.5rem;
+  }
   .avatar-preview {
     width: 64px;
     height: 64px;

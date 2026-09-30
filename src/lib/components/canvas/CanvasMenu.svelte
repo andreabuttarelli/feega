@@ -13,6 +13,8 @@
   import { openSheet } from '$lib/canvas/sheet-nav';
   import { BURGER_ENTRIES, mobileNavHref } from '$lib/shell-nav';
   import { NAV_ICONS } from './nav-icons';
+  import Scale from '@lucide/svelte/icons/scale';
+  import { FOOTER_LEGAL_LINKS, LEGAL_LINKS, legalHref } from '$lib/legal-links';
 
   type RailPages = 'include' | 'omit';
 
@@ -49,7 +51,7 @@
   );
 
   type MenuGroup = 'navigate' | 'help' | 'account';
-  type MenuAction = 'home' | 'settings' | 'billing' | 'shortcuts' | 'changelog' | 'logout';
+  type MenuAction = 'home' | 'settings' | 'billing' | 'shortcuts' | 'changelog' | 'legal' | 'logout';
 
   /**
    * UNA VOCE, UNA RIGA: aggiungere una voce al menu è aggiungere una riga qui, non un altro `if`
@@ -74,6 +76,7 @@
     { id: 'billing', group: 'navigate', labelKey: 'app.shell.menu.billing', icon: CreditCard, sheet: '/settings/billing' },
     { id: 'shortcuts', group: 'help', labelKey: 'app.shell.menu.shortcuts', icon: Keyboard, sub: true, desktopOnly: true },
     { id: 'changelog', group: 'help', labelKey: 'app.shell.menu.changelog', icon: Sparkles, href: '/changelog' },
+    { id: 'legal', group: 'help', labelKey: 'legal.menuLabel', icon: Scale, sub: true },
     { id: 'logout', group: 'account', labelKey: 'app.shell.menu.logout', icon: LogOut, danger: true }
   ];
 
@@ -174,7 +177,21 @@
     <DropdownMenu.Group>
       <DropdownMenu.GroupHeading class="menu-heading">{$_('app.shell.menu.help')}</DropdownMenu.GroupHeading>
       {#each helpItems as item (item.id)}
-        {#if item.sub}
+        {#if item.id === 'legal'}
+          <DropdownMenu.Sub>
+            <DropdownMenu.SubTrigger class="menu-row sub-trigger">
+              <item.icon size={16} />
+              <span>{$_(item.labelKey)}</span>
+            </DropdownMenu.SubTrigger>
+            <DropdownMenu.SubContent class="legal-content">
+              {#each FOOTER_LEGAL_LINKS as key (key)}
+                <a class="legal-row" href={legalHref(key)} target="_blank" rel="noopener">
+                  {$_(LEGAL_LINKS[key].labelKey)}
+                </a>
+              {/each}
+            </DropdownMenu.SubContent>
+          </DropdownMenu.Sub>
+        {:else if item.sub}
           <DropdownMenu.Sub>
             <DropdownMenu.SubTrigger class="menu-row sub-trigger">
               <item.icon size={16} />
@@ -426,6 +443,34 @@
     width: 240px;
     max-height: 60vh;
     overflow-y: auto;
+  }
+
+  :global(.legal-content) {
+    width: 220px;
+    max-height: 60vh;
+    padding: 4px;
+    overflow-y: auto;
+    background: var(--paper, #fff);
+    border: 1px solid var(--line-2, #d2d2d7);
+    box-shadow: 0 4px 18px rgb(0 0 0 / 0.1);
+  }
+  .legal-row {
+    display: flex;
+    align-items: center;
+    height: 34px;
+    padding: 0 8px;
+    font-size: 13px;
+    color: var(--ink, #1d1d1f);
+    text-decoration: none;
+  }
+  .legal-row:hover {
+    background: var(--paper-2, #f9f9f9);
+  }
+  @media (max-width: 767px) {
+    .legal-row {
+      min-height: var(--touch-target);
+      font-size: 15px;
+    }
   }
   .keys {
     margin: 0;

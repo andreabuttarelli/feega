@@ -11,12 +11,16 @@ function cookies(values: Record<string, string> = {}): Cookies {
   return { get: (name: string) => values[name] } as unknown as Cookies;
 }
 
-function deps(outcome: Awaited<ReturnType<LandingDeps['acceptInvite']>>) {
+function deps(outcome: Awaited<ReturnType<LandingDeps['acceptInvite']>>, termsAcceptedAt: string | null = null) {
   const order: string[] = [];
   return {
     order,
     ensureProfile: vi.fn(async () => {
       order.push('profile');
+      return { id: USER.id, email: USER.email, name: null, avatarUrl: null, termsAcceptedAt, termsVersion: null };
+    }),
+    recordTermsAcceptance: vi.fn(async () => {
+      order.push('terms');
     }),
     acceptInvite: vi.fn(async () => {
       order.push('accept');
@@ -52,7 +56,23 @@ describe('dove atterra chi è appena entrato', () => {
 
     await landingPath(DB, USER, cookies(), 'tok', d);
 
-    expect(d.order).toEqual(['profile', 'accept']);
+    expect(d.order).toEqual(['profile', 'terms', 'accept']);
+  });
+
+  it('un profilo nuovo registra l’accettazione dei termini', async () => {
+    const d = deps({ outcome: 'invalid' }, null);
+
+    await landingPath(DB, USER, cookies(), null, d);
+
+    expect(d.recordTermsAcceptance).toHaveBeenCalledWith(DB, USER.id, expect.any(String));
+  });
+
+  it('un profilo che ha già accettato non riscrive', async () => {
+    const d = deps({ outcome: 'invalid' }, '2026-01-01T00:00:00.000Z');
+
+    await landingPath(DB, USER, cookies(), null, d);
+
+    expect(d.recordTermsAcceptance).not.toHaveBeenCalled();
   });
 
   it('un invito non valido torna al login col motivo', async () => {

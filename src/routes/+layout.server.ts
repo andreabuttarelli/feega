@@ -1,11 +1,17 @@
 import type { LayoutServerLoad } from './$types';
+import type { Db } from '$lib/server/db/client';
 import { isPlanGoEnabled } from '$lib/server/feature-flags';
 import { selineSetUser } from '$lib/server/seline';
 import { isInternalEmail } from '$lib/server/internal-users';
 import { trackingAllowed } from '$lib/analytics';
+import { outdatedTermsVersion } from '$lib/terms-notice';
 
-export const load: LayoutServerLoad = async ({ url, locals: { safeGetSession } }) => {
+export const load: LayoutServerLoad = async ({ url, locals: { safeGetSession, db } }) => {
   const { session, user } = await safeGetSession();
+
+  // Chi ha già accettato una versione dei termini vede l'avviso solo quando la versione corrente
+  // è cambiata — non sul primo accesso, dove `landingPath` registra già quella corrente.
+  const termsNoticeVersion = await outdatedTermsNoticeFor(db, user?.id ?? null);
 
   // I due guard degli analytics, decisi qui una volta sola.
   //
@@ -40,6 +46,16 @@ export const load: LayoutServerLoad = async ({ url, locals: { safeGetSession } }
     session,
     analyticsOptOut,
     internalViewer,
-    planGo: isPlanGoEnabled()
+    planGo: isPlanGoEnabled(),
+    termsNoticeVersion
   };
 };
+
+async function outdatedTermsNoticeFor(db: () => Promise<Db | null>, userId: string | null): Promise<string | null> {
+  if (!userId) return null;
+  const client = await db();
+  if (!client) return null;
+
+  const { data } = await client.from('profiles').select('terms_version').eq('id', userId).maybeSingle();
+  return outdatedTermsVersion(data?.terms_version ?? null);
+}
