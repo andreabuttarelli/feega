@@ -23,13 +23,25 @@
    */
   import Upload from '@lucide/svelte/icons/upload';
   import LayoutGrid from '@lucide/svelte/icons/layout-grid';
+  import LayoutTemplate from '@lucide/svelte/icons/layout-template';
+  import CanvasTemplateGallery from './CanvasTemplateGallery.svelte';
   import { CANVAS_ADD_BAR, CANVAS_BAR_MAIN, CANVAS_BAR_MORE, ADDABLE_LABEL, type Addable } from '$lib/canvas/addable';
   import { ADDABLE_ICON } from '$lib/canvas/addable-icons';
   import { CANVAS_DRAG_MEDIUM } from '$lib/canvas/new-node';
 
-  let { onpick, onupload }: { onpick?: (what: Addable) => void; onupload?: (file: File) => void } = $props();
+  let {
+    onpick,
+    onupload,
+    ontemplate
+  }: { onpick?: (what: Addable) => void; onupload?: (file: File) => void; ontemplate?: (id: string) => void } = $props();
 
   let showMore = $state(false);
+  let showTemplates = $state(false);
+
+  function pickTemplate(id: string) {
+    showTemplates = false;
+    ontemplate?.(id);
+  }
 
   const slot = (what: Addable) => CANVAS_ADD_BAR.indexOf(what) + 1;
 
@@ -90,12 +102,38 @@
       title="More nodes"
       aria-label="More nodes"
       aria-expanded={showMore}
-      onclick={() => (showMore = !showMore)}
+      onclick={() => {
+        showMore = !showMore;
+        showTemplates = false;
+      }}
     >
       <LayoutGrid size={17} strokeWidth={1.7} />
     </button>
     <span class="add-tip" role="tooltip">More nodes</span>
   </span>
+
+  {#if ontemplate}
+    <span class="tool">
+      <button
+        type="button"
+        class="keys-toggle"
+        title="Templates"
+        aria-label="Templates"
+        aria-expanded={showTemplates}
+        onclick={() => {
+          showTemplates = !showTemplates;
+          showMore = false;
+        }}
+      >
+        <LayoutTemplate size={17} strokeWidth={1.7} />
+      </button>
+      <span class="add-tip" role="tooltip">Templates</span>
+    </span>
+  {/if}
+
+  {#if showTemplates}
+    <CanvasTemplateGallery onpick={pickTemplate} />
+  {/if}
 
   {#if showMore}
     <div class="more">
