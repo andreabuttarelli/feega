@@ -284,7 +284,6 @@
         "chat": "Chat",
         "backToCanvas": "Back to canvas",
         "switchView": "Canvas or chat",
-        "switchTitle": "Switch project or canvas",
         "projects": "Projects",
         "canvases": "Canvases"
       },
@@ -297,7 +296,11 @@
         "confirmDeleteBody": "It leaves the project. Nothing on it is lost — nodes, generations and posts made from it stay put.",
         "confirmDeleteCta": "Delete",
         "confirmDeleteCancel": "Cancel",
-        "lastCanvas": "A project keeps at least one canvas"
+        "lastCanvas": "A project keeps at least one canvas",
+        "renameProject": "Rename project",
+        "more": "More actions",
+        "searchProjects": "Find a project…",
+        "noMatch": "No project matches"
       },
       "menu": {
         "open": "Menu",

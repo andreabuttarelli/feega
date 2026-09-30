@@ -17,6 +17,12 @@
   import Plus from '@lucide/svelte/icons/plus';
   import Pencil from '@lucide/svelte/icons/pencil';
   import Trash from '@lucide/svelte/icons/trash-2';
+  import Search from '@lucide/svelte/icons/search';
+  import Ellipsis from '@lucide/svelte/icons/ellipsis';
+  import ShieldAlert from '@lucide/svelte/icons/shield-alert';
+  import { DropdownMenu as MenuPrimitive } from 'bits-ui';
+  import { Badge } from '$lib/components/ui/badge/index.js';
+  import { matching, needsSearch, recentFirst } from '$lib/canvas/switcher-list';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import { Capability, modeAllows, modeOf, ProjectMode } from '$lib/project-mode';
 
@@ -47,7 +53,8 @@
     profile,
     org,
     projectMode = ProjectMode.Standard,
-    nsfw = null
+    nsfw = null,
+    brandName = null
   }: {
     projectId: string;
     projectName: string;
@@ -64,10 +71,48 @@
     org: { name: string } | null;
     projectMode?: string;
     nsfw?: { visible: boolean; text: string } | null;
+    brandName?: string | null;
   } = $props();
+
+  const ICON = 16;
+  const EDGE = 8;
 
   const standardProjects = $derived(projects.filter((p) => p.mode !== ProjectMode.Nsfw));
   const nsfwProjects = $derived(projects.filter((p) => p.mode === ProjectMode.Nsfw));
+
+  let projectQuery = $state('');
+  let searchInput = $state<HTMLInputElement | null>(null);
+  const projectSearch = $derived(needsSearch(projects.length));
+  const shownProjects = $derived(matching(recentFirst(standardProjects), projectQuery));
+  const shownNsfwProjects = $derived(matching(recentFirst(nsfwProjects), projectQuery));
+
+  function focusSearch(event: Event) {
+    if (!searchInput) {
+      return;
+    }
+    event.preventDefault();
+    searchInput.focus();
+  }
+
+  function firstProjectLink(): HTMLElement | null {
+    return searchInput?.closest('[data-slot="dropdown-menu-content"]')?.querySelector<HTMLElement>('[data-sw-link]') ?? null;
+  }
+
+  function searchKeys(event: KeyboardEvent) {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      firstProjectLink()?.focus();
+      return;
+    }
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      firstProjectLink()?.click();
+      return;
+    }
+    if (event.key !== 'Escape' && event.key !== 'Tab') {
+      event.stopPropagation();
+    }
+  }
   const inNsfw = $derived(projectMode === ProjectMode.Nsfw);
   const mode = $derived(modeOf(projectMode));
 
@@ -135,56 +180,50 @@
         <button type="submit" class="rename-save">{$_('app.shell.canvasActions.save')}</button>
       </form>
     {:else}
-    <DropdownMenu.Root>
-      <DropdownMenu.Trigger class="switcher-btn" data-testid="project-switcher">
+    <DropdownMenu.Root onOpenChange={() => (projectQuery = '')}>
+      <DropdownMenu.Trigger class="switcher-btn" data-testid="project-switcher" title={projectName}>
         {#if inNsfw}
           <span class="nsfw-badge" data-testid="nsfw-project-badge">NSFW</span>
         {/if}
         <span class="truncate">{projectName}</span>
-        <ChevronDown size={13} />
+        <ChevronDown size={ICON} />
       </DropdownMenu.Trigger>
-      <DropdownMenu.Content align="start" class="w-64">
-        {#each standardProjects as project (project.id)}
-          <DropdownMenu.Item>
-            {#snippet child({ props })}
-              <a {...props} href={project.href} class="switcher-row">
-                <span class="truncate">{project.name}</span>
-                <span class="switcher-meta">{formatLastEdited(project.updatedAt)}</span>
-                {#if project.name === projectName}
-                  <Check size={14} />
-                {/if}
-              </a>
-            {/snippet}
-          </DropdownMenu.Item>
+      <DropdownMenu.Content align="start" collisionPadding={EDGE} class="sw-menu w-[300px]" onOpenAutoFocus={focusSearch}>
+        {#if projectSearch}
+          <div class="sw-search">
+            <Search size={ICON} />
+            <input
+              bind:this={searchInput}
+              bind:value={projectQuery}
+              data-testid="project-search"
+              placeholder={$_('app.shell.canvasActions.searchProjects')}
+              onkeydown={searchKeys}
+            />
+          </div>
+        {/if}
+        <DropdownMenu.Label class="sw-label">{$_('app.shell.mobile.projects')}</DropdownMenu.Label>
+        {#each shownProjects as project (project.id)}
+          {@render projectRow(project)}
+        {:else}
+          <div class="sw-empty">{$_('app.shell.canvasActions.noMatch')}</div>
         {/each}
         {#if nsfw?.visible}
           <DropdownMenu.Separator />
-          <div class="nsfw-section-label" data-testid="nsfw-section">NSFW · 18+</div>
-          {#each nsfwProjects as project (project.id)}
-            <DropdownMenu.Item>
-              {#snippet child({ props })}
-                <a {...props} href={project.href} class="switcher-row">
-                  <span class="truncate">{project.name}</span>
-                  {#if project.name === projectName}
-                    <Check size={14} />
-                  {/if}
-                </a>
-              {/snippet}
-            </DropdownMenu.Item>
+          <div class="sw-label sw-nsfw" data-testid="nsfw-section">
+            <span class="nsfw-badge">NSFW</span>18+
+          </div>
+          {#each shownNsfwProjects as project (project.id)}
+            {@render projectRow(project)}
           {/each}
-          <DropdownMenu.Item>
+          <DropdownMenu.Item class="sw-row">
             {#snippet child({ props })}
-              <a {...props} href={`/p/${projectId}/nsfw`} class="switcher-row" data-testid="nsfw-workspace-link">
-                <span class="truncate">{nsfw.text}</span>
+              <a {...props} href={`/p/${projectId}/nsfw`} data-testid="nsfw-workspace-link">
+                <span class="sw-lead"><ShieldAlert size={ICON} /></span>
+                <span class="sw-name">{nsfw.text}</span>
               </a>
             {/snippet}
           </DropdownMenu.Item>
         {/if}
-        <DropdownMenu.Separator />
-        <DropdownMenu.Item data-testid="project-rename" onSelect={startRenameProject}>
-          <Pencil size={14} />
-          {$_('app.shell.canvasActions.rename')}
-        </DropdownMenu.Item>
       </DropdownMenu.Content>
     </DropdownMenu.Root>
     {/if}
@@ -204,45 +243,104 @@
       </form>
     {:else}
     <DropdownMenu.Root>
-      <DropdownMenu.Trigger class="switcher-btn" data-testid="canvas-switcher">
+      <DropdownMenu.Trigger class="switcher-btn" data-testid="canvas-switcher" title={canvasName}>
         <span class="truncate canvas-name">{canvasName}</span>
-        <ChevronDown size={13} />
+        <ChevronDown size={ICON} />
       </DropdownMenu.Trigger>
-      <DropdownMenu.Content align="start" class="w-64">
+      <DropdownMenu.Content align="start" collisionPadding={EDGE} class="sw-menu w-[300px]">
+        <div class="sw-head">
+          <span class="sw-head-name" title={projectName}>{projectName}</span>
+          {#if brandName}
+            <Badge variant="outline" data-testid="switcher-brand">{brandName}</Badge>
+          {/if}
+        </div>
+        <DropdownMenu.Label class="sw-label">{$_('app.shell.mobile.canvases')}</DropdownMenu.Label>
         {#each canvases as canvas (canvas.id)}
-          <DropdownMenu.Item>
-            {#snippet child({ props })}
-              <a {...props} href={canvas.href} class="switcher-row">
-                <span class="truncate">{canvas.name}</span>
-                {#if canvas.name === canvasName}
-                  <Check size={14} />
-                {/if}
-              </a>
-            {/snippet}
-          </DropdownMenu.Item>
+          {@const current = canvas.name === canvasName}
+          <div class={cn('sw-line', current && 'is-current')} data-testid={current ? 'canvas-row-current' : undefined}>
+            <DropdownMenu.Item class="sw-row">
+              {#snippet child({ props })}
+                <a {...props} href={canvas.href} title={canvas.name}>
+                  <span class="sw-lead">{#if current}<Check size={ICON} />{/if}</span>
+                  <span class="sw-name">{canvas.name}</span>
+                </a>
+              {/snippet}
+            </DropdownMenu.Item>
+            {#if current}
+              <DropdownMenu.Item
+                class="sw-icon"
+                data-testid="canvas-rename"
+                aria-label={$_('app.shell.canvasActions.rename')}
+                title={$_('app.shell.canvasActions.rename')}
+                onSelect={startRename}
+              >
+                <Pencil size={ICON} />
+              </DropdownMenu.Item>
+              <DropdownMenu.Sub>
+                <MenuPrimitive.SubTrigger
+                  class="sw-icon sw-more"
+                  data-testid="canvas-more"
+                  aria-label={$_('app.shell.canvasActions.more')}
+                  title={$_('app.shell.canvasActions.more')}
+                >
+                  <Ellipsis size={ICON} />
+                </MenuPrimitive.SubTrigger>
+                <DropdownMenu.SubContent class="sw-menu w-44" collisionPadding={EDGE}>
+                  <DropdownMenu.Item class="sw-row" onSelect={startRename}>
+                    <span class="sw-lead"><Pencil size={ICON} /></span>
+                    {$_('app.shell.canvasActions.rename')}
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item
+                    class="sw-row"
+                    variant="destructive"
+                    data-testid="canvas-delete"
+                    disabled={lastCanvas}
+                    title={lastCanvas ? $_('app.shell.canvasActions.lastCanvas') : undefined}
+                    onSelect={askDeleteCurrent}
+                  >
+                    <span class="sw-lead"><Trash size={ICON} /></span>
+                    {$_('app.shell.canvasActions.delete')}
+                  </DropdownMenu.Item>
+                </DropdownMenu.SubContent>
+              </DropdownMenu.Sub>
+            {/if}
+          </div>
         {/each}
         <DropdownMenu.Separator />
-        <DropdownMenu.Item data-testid="canvas-new" onSelect={() => submitCanvasAction(canvasHref, CanvasAction.New)}>
-          <Plus size={14} />
+        <DropdownMenu.Item class="sw-row" data-testid="canvas-new" onSelect={() => submitCanvasAction(canvasHref, CanvasAction.New)}>
+          <span class="sw-lead"><Plus size={ICON} /></span>
           {$_('app.shell.canvasActions.new')}
-        </DropdownMenu.Item>
-        <DropdownMenu.Item data-testid="canvas-rename" onSelect={startRename}>
-          <Pencil size={14} />
-          {$_('app.shell.canvasActions.rename')}
-        </DropdownMenu.Item>
-        <DropdownMenu.Item
-          data-testid="canvas-delete"
-          disabled={lastCanvas}
-          title={lastCanvas ? $_('app.shell.canvasActions.lastCanvas') : undefined}
-          onSelect={askDeleteCurrent}
-        >
-          <Trash size={14} />
-          {$_('app.shell.canvasActions.delete')}
         </DropdownMenu.Item>
       </DropdownMenu.Content>
     </DropdownMenu.Root>
     {/if}
   </div>
+
+  {#snippet projectRow(project: ProjectRow)}
+    {@const current = project.id === projectId}
+    <div class={cn('sw-line', current && 'is-current')} data-testid={current ? 'project-row-current' : undefined}>
+      <DropdownMenu.Item class="sw-row">
+        {#snippet child({ props })}
+          <a {...props} href={project.href} title={project.name} data-sw-link>
+            <span class="sw-lead">{#if current}<Check size={ICON} />{/if}</span>
+            <span class="sw-name">{project.name}</span>
+            <span class="sw-meta">{formatLastEdited(project.updatedAt)}</span>
+          </a>
+        {/snippet}
+      </DropdownMenu.Item>
+      {#if current}
+        <DropdownMenu.Item
+          class="sw-icon"
+          data-testid="project-rename"
+          aria-label={$_('app.shell.canvasActions.renameProject')}
+          title={$_('app.shell.canvasActions.renameProject')}
+          onSelect={startRenameProject}
+        >
+          <Pencil size={ICON} />
+        </DropdownMenu.Item>
+      {/if}
+    </div>
+  {/snippet}
 
   <ConfirmDialog
     bind:open={confirmingDelete}
@@ -369,23 +467,6 @@
     cursor: pointer;
   }
 
-  .switcher-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    width: 100%;
-    text-decoration: none;
-    color: inherit;
-  }
-
-  .switcher-meta {
-    font-size: 11px;
-    font-weight: 400;
-    color: var(--ink-faint, #9a9a9e);
-    white-space: nowrap;
-  }
-
   .chat-toggle {
     display: grid;
     place-items: center;
@@ -451,9 +532,145 @@
     font-size: 0.625rem;
     line-height: 1rem;
   }
-  .nsfw-section-label {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.625rem;
+
+  :global(.sw-menu) {
+    --sw-row: 32px;
+    --sw-icon: 16px;
+    max-width: calc(100vw - 16px);
+    max-height: min(480px, var(--bits-dropdown-menu-content-available-height, 480px));
+    padding: 4px;
+    font-size: 13px;
+    color: var(--ink, #1d1d1f);
+  }
+  :global(.sw-head) {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    padding: 8px 8px 6px;
+  }
+  :global(.sw-head-name) {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-weight: 600;
+  }
+
+  :global(.sw-label) {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 8px 4px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink-faint, #9a9a9e);
+  }
+  :global(.sw-nsfw) {
     color: var(--color-destructive);
+  }
+
+  :global(.sw-search) {
+    position: sticky;
+    top: -4px;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: var(--sw-row);
+    margin: -4px -4px 4px;
+    padding: 0 12px;
+    background: var(--paper, #fff);
+    border-bottom: 1px solid var(--line, #ededef);
+    color: var(--ink-faint, #9a9a9e);
+  }
+  :global(.sw-search input) {
+    flex: 1 1 auto;
+    min-width: 0;
+    border: 0;
+    outline: none;
+    background: transparent;
+    font: inherit;
+    color: var(--ink, #1d1d1f);
+  }
+
+  :global(.sw-line) {
+    display: flex;
+    align-items: center;
+  }
+  :global(.sw-line.is-current) {
+    background: var(--paper-3, #efeff1);
+  }
+
+  :global(.sw-row) {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    height: var(--sw-row);
+    padding: 0 8px;
+    font-size: 13px;
+    color: inherit;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  :global(.sw-line.is-current .sw-row) {
+    font-weight: 600;
+  }
+
+  :global(.sw-lead) {
+    display: grid;
+    place-items: center;
+    width: var(--sw-icon);
+    flex-shrink: 0;
+  }
+
+  :global(.sw-name) {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  :global(.sw-meta) {
+    flex-shrink: 0;
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--ink-faint, #9a9a9e);
+    font-variant-numeric: tabular-nums;
+  }
+
+  :global(.sw-icon) {
+    display: grid;
+    place-items: center;
+    width: var(--sw-row);
+    height: var(--sw-row);
+    flex-shrink: 0;
+    color: var(--ink-soft, #6e6e73);
+    cursor: pointer;
+    outline: none;
+    opacity: 0;
+  }
+  :global(.sw-line:hover .sw-icon),
+  :global(.sw-line:focus-within .sw-icon),
+  :global(.sw-icon[data-state='open']) {
+    opacity: 1;
+  }
+  :global(.sw-icon:hover),
+  :global(.sw-icon[data-highlighted]),
+  :global(.sw-icon[data-state='open']) {
+    background: var(--paper-3, #efeff1);
+    color: var(--ink, #1d1d1f);
+  }
+
+  :global(.sw-empty) {
+    padding: 8px;
+    font-size: 12px;
+    color: var(--ink-faint, #9a9a9e);
   }
 </style>
