@@ -49,4 +49,4 @@ model is subject to its provider's terms.
 ## Something missing?
 
 If we use your work and have not credited it correctly, write to
-[hello@feega.app](mailto:hello@feega.app) and we will fix it.
+[support@feega.app](mailto:support@feega.app) and we will fix it.

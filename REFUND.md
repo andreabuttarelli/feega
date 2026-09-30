@@ -101,7 +101,7 @@ The **payment processing fee** is the fee our payment processor (Stripe) charged
 ## 12. How to ask for a refund
 
 1. Open **Settings → Billing** in the app. It shows whether your latest purchase is refundable, until when, and for how much.
-2. Use **Request a refund** there, or write to [hello@feega.app](mailto:hello@feega.app) from the email of your account, within the period in §4 or §6. Tell us which purchase (the date or the Stripe receipt is enough).
+2. Use **Request a refund** there, or write to [support@feega.app](mailto:support@feega.app) from the email of your account, within the period in §4 or §6. Tell us which purchase (the date or the Stripe receipt is enough).
 3. We answer **within 5 business days**.
 4. Approved refunds are paid **to the original payment method through Stripe**. Your bank normally shows them within **5–10 business days**.
 
@@ -115,4 +115,4 @@ If you buy for a business, trade or profession, you are not a consumer and the s
 
 We may update this policy. The version in force when you made a purchase applies to that purchase. We announce material changes as described in the [Terms](./TERMS.md).
 
-Questions: [hello@feega.app](mailto:hello@feega.app)
+Questions: [support@feega.app](mailto:support@feega.app)
