@@ -128,8 +128,8 @@ export function fakeDb(rows: Record<string, unknown[]>, options: FakeOptions = {
             error: null
           };
         },
-        upload: async (path: string) => {
-          calls.push({ table: `storage:${bucket}`, op: 'upload', filters: [['path', path]] });
+        upload: async (path: string, file?: unknown) => {
+          calls.push({ table: `storage:${bucket}`, op: 'upload', filters: [['path', path]], payload: file });
           return { data: { path }, error: null };
         }
       })

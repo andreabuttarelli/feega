@@ -1,4 +1,5 @@
 import type { Db } from '$lib/server/db/client';
+import { markGenerated } from '$lib/server/content-credentials';
 import type { Actor } from '$lib/server/repos/actor';
 import { insertAsset, type Asset, type AssetType } from '$lib/server/repos/assets';
 import { WIRO_JOB_PREFIX } from '$lib/server/repos/node-runs';
@@ -163,9 +164,10 @@ async function download(output: WiroOutput): Promise<{ bytes: Uint8Array; mime: 
 async function deposit(db: Db, job: { scope: WiroScope; mode: ProjectMode }, model: WiroModel, file: { bytes: Uint8Array; mime: string }): Promise<Asset> {
   const { scope } = job;
   const path = `${scope.userId}/${STORAGE_FOLDER[job.mode]}/wiro/${crypto.randomUUID()}.${EXTENSION_OF_MIME[file.mime] ?? 'bin'}`;
+  const marked = await markGenerated(Buffer.from(file.bytes), file.mime, { model: model.id, provider: 'wiro' });
   const { error } = await db.storage
     .from(GENERATED_MEDIA_BUCKET)
-    .upload(path, new Blob([file.bytes as BlobPart], { type: file.mime }), { contentType: file.mime, upsert: false });
+    .upload(path, new Blob([marked.bytes as BlobPart], { type: file.mime }), { contentType: file.mime, upsert: false });
   if (error) {
     throw new Error(`store_failed: ${error.message}`);
   }
@@ -177,9 +179,10 @@ async function deposit(db: Db, job: { scope: WiroScope; mode: ProjectMode }, mod
     source: 'generated',
     url: path,
     mimeType: file.mime,
-    bytes: file.bytes.byteLength,
+    bytes: marked.bytes.byteLength,
     sourceNodeId: scope.nodeId,
-    uncensored: model.uncensored
+    uncensored: model.uncensored,
+    aiMarked: marked.marked
   });
 }
 

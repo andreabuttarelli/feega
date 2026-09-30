@@ -1,5 +1,5 @@
 import { swallow } from '$lib/server/swallow';
-import { DIGITAL_SOURCE_TYPE, markImage } from '$lib/server/content-credentials';
+import { markGenerated } from '$lib/server/content-credentials';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import sharp from 'sharp';
 import { env } from '$env/dynamic/private';
@@ -795,10 +795,7 @@ export async function uploadPostImage(supabase: SupabaseClient, userId: string, 
   const mime = mimeMatch?.[1] ?? 'image/png';
   let bytes: Buffer<ArrayBufferLike> = Buffer.from(base64, 'base64');
   if (aspectRatio) bytes = await correctAspectRatio(bytes, aspectRatio);
-  // Output diretto del modello, quindi il termine forte. publishImageBufferAsPostMedia NON lo fa
-  // apposta: quel percorso porta anche le foto vere dell'utente, e marcare una fotografia come
-  // sintetica è un errore peggiore che non marcarla.
-  bytes = await markImage(bytes, mime, DIGITAL_SOURCE_TYPE.synthetic);
+  bytes = (await markGenerated(bytes, mime, { model: null, provider: 'openrouter' })).bytes;
   const ext = mime.includes('jpeg') || mime.includes('jpg') ? 'jpg' : mime.includes('webp') ? 'webp' : 'png';
   const path = `${userId}/onboarding/${crypto.randomUUID()}.${ext}`;
   const { error } = await supabase.storage.from(POST_MEDIA_BUCKET).upload(path, bytes, {

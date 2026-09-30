@@ -291,6 +291,22 @@ describe('the run tick finishes a Wiro task', () => {
     expect(shown).toBeTruthy();
   });
 
+  it('stores a Wiro png marked with the Wiro model, and records it', async () => {
+    const sharp = (await import('sharp')).default;
+    const png = await sharp({ create: { width: 8, height: 8, channels: 3, background: '#000' } }).png().toBuffer();
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(new Uint8Array(png), { headers: { 'content-type': 'image/png' } })));
+    gateway.task.mockResolvedValue({ state: 'done', costUsd: 0.013, outputs: [{ url: 'https://cdn.wiro.test/0.png', contentType: 'image/png' }] });
+    const { db, calls } = fakeDb({ node_runs: [queued], nodes: [imageNode({ running: true, runId: RUN })], projects: [nsfwProject] });
+
+    await reconcileWiroNodeRuns(db);
+
+    const asset = calls.find((c) => c.table === 'assets' && c.op === 'insert')?.payload as Record<string, unknown>;
+    expect(asset.ai_marked).toBe(true);
+    const upload = calls.find((c) => c.op === 'upload')?.payload as Blob;
+    const xmp = (await sharp(Buffer.from(await upload.arrayBuffer())).metadata()).xmp?.toString();
+    expect(xmp).toContain(`wiro/${UNCENSORED}`);
+  });
+
   it('fails the run with the Wiro reason', async () => {
     gateway.task.mockResolvedValue({ state: 'failed', error: 'wiro_task_failed: exit 1' });
     const { db, calls } = fakeDb({ node_runs: [queued], nodes: [imageNode({ running: true, runId: RUN })] });

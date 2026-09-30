@@ -83,7 +83,7 @@ async function depositText(db: Db, input: StartRun, text: string): Promise<Asset
   });
 }
 
-async function depositImage(db: Db, input: StartRun, media: { storage_path?: string; mime: string | null; width: number | null; height: number | null; bytes?: number }): Promise<Asset | null> {
+async function depositImage(db: Db, input: StartRun, media: { storage_path?: string; mime: string | null; width: number | null; height: number | null; bytes?: number; ai_marked?: boolean }): Promise<Asset | null> {
   if (!media.storage_path) {
     return null;
   }
@@ -98,14 +98,15 @@ async function depositImage(db: Db, input: StartRun, media: { storage_path?: str
     width: media.width,
     height: media.height,
     bytes: media.bytes ?? null,
-    sourceNodeId: input.nodeId
+    sourceNodeId: input.nodeId,
+    aiMarked: media.ai_marked
   });
 }
 
 async function depositVideo(
   db: Db,
   scope: { orgId: string; projectId: string; nodeId: string },
-  media: { url: string; durationSeconds: number | null }
+  media: { url: string; durationSeconds: number | null; aiMarked?: boolean }
 ): Promise<Asset> {
   return insertAsset(db, {
     orgId: scope.orgId,
@@ -115,7 +116,8 @@ async function depositVideo(
     url: media.url,
     mimeType: 'video/mp4',
     durationS: media.durationSeconds,
-    sourceNodeId: scope.nodeId
+    sourceNodeId: scope.nodeId,
+    aiMarked: media.aiMarked
   });
 }
 
@@ -707,7 +709,7 @@ export async function reconcileVideoNodeRuns(db: Db): Promise<VideoReconcileOutc
       const asset = await depositVideo(
         db,
         { orgId: run.orgId, projectId: node.projectId, nodeId: run.nodeId },
-        { url: outcome.url, durationSeconds: outcome.durationSeconds }
+        { url: outcome.url, durationSeconds: outcome.durationSeconds, aiMarked: outcome.aiMarked }
       );
       await completeRun(db, { orgId: run.orgId, runId: run.id, assetId: asset.id, costUsd });
       await showRunState(db, startRunShape, { running: false, runId: run.id, refId: asset.id, error: null, outputUncensored: false });

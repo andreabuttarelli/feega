@@ -25,7 +25,7 @@ import { mediaUrl } from '$lib/media-url';
 import { IMAGE_PART_MAX_BYTES } from '$lib/raster-image';
 import type { ImagePart, ImagePartRefusal } from '$lib/server/brand-context';
 import { safeProviderReason } from '$lib/server/provider-reason';
-import { markImage, DIGITAL_SOURCE_TYPE } from '$lib/server/content-credentials';
+import { markGenerated } from '$lib/server/content-credentials';
 import type { AspectRatio } from '$lib/server/media-generate.images';
 
 export type GeneratedMedia = {
@@ -43,6 +43,7 @@ export type GeneratedMedia = {
   url: string | null;
   /** Dov'è il file. Presente solo sul disegno senza brand, la cui `url` è una firma che scade. */
   storage_path?: string;
+  ai_marked?: boolean;
 };
 
 export type GenerateMediaOpts = {
@@ -246,6 +247,7 @@ type StoredDrawing = {
   bytes: number;
   width: number | null;
   height: number | null;
+  aiMarked: boolean;
 };
 
 export type DrawingStoreFailure = { reason: string };
@@ -262,14 +264,13 @@ export type DrawingStoreFailure = { reason: string };
 async function storeDrawing(
   supabase: SupabaseClient,
   folder: string,
-  dataUrl: string
+  dataUrl: string,
+  model: string | null
 ): Promise<StoredDrawing | DrawingStoreFailure> {
   const decoded = dataUrlBytes(dataUrl);
   if (!decoded) return { reason: 'the model returned no image data' };
 
-  // Marcata sintetica prima di toccare lo storage: un'immagine di modello che gira senza la sua
-  // provenienza è un problema che non si ripara a valle.
-  const bytes = await markImage(decoded.bytes, decoded.mime, DIGITAL_SOURCE_TYPE.synthetic);
+  const { bytes, marked } = await markGenerated(decoded.bytes, decoded.mime, { model, provider: 'openrouter' });
   const ext = decoded.mime.includes('jpeg') ? 'jpg' : decoded.mime.includes('webp') ? 'webp' : 'png';
   const fileName = `generated-${crypto.randomUUID()}.${ext}`;
   const storagePath = `${folder}/${fileName}`;
@@ -279,7 +280,7 @@ async function storeDrawing(
 
   const { width, height } = await probeImageDimensions(bytes);
 
-  return { storagePath, fileName, mime: decoded.mime, bytes: bytes.length, width, height };
+  return { storagePath, fileName, mime: decoded.mime, bytes: bytes.length, width, height, aiMarked: marked };
 }
 
 function isStoredDrawing(result: StoredDrawing | DrawingStoreFailure): result is StoredDrawing {
@@ -295,9 +296,10 @@ type DepositOutcome = { ok: true; media: GeneratedMedia } | { ok: false; reason:
 async function depositImage(
   supabase: SupabaseClient,
   opts: { brandId: string; userId: string; prompt: string; title?: string },
-  dataUrl: string
+  dataUrl: string,
+  model: string | null
 ): Promise<DepositOutcome> {
-  const drawn = await storeDrawing(supabase, `${opts.userId}/${opts.brandId}/media`, dataUrl);
+  const drawn = await storeDrawing(supabase, `${opts.userId}/${opts.brandId}/media`, dataUrl, model);
   if (!isStoredDrawing(drawn)) return { ok: false, reason: drawn.reason };
 
   const { row, error } = await insertBrandMedia(supabase, {
@@ -322,7 +324,8 @@ async function depositImage(
       mime: drawn.mime,
       width: drawn.width,
       height: drawn.height,
-      url: mediaUrl(row.short_code)
+      url: mediaUrl(row.short_code),
+      ai_marked: drawn.aiMarked
     }
   };
 }
@@ -336,9 +339,10 @@ async function depositImage(
 async function handOverImage(
   supabase: SupabaseClient,
   opts: { userId: string },
-  dataUrl: string
+  dataUrl: string,
+  model: string | null
 ): Promise<DepositOutcome> {
-  const drawn = await storeDrawing(supabase, `${opts.userId}/media`, dataUrl);
+  const drawn = await storeDrawing(supabase, `${opts.userId}/media`, dataUrl, model);
   if (!isStoredDrawing(drawn)) return { ok: false, reason: drawn.reason };
 
   // Senza un id, la firma è l'UNICO modo di raggiungere il file: consegnarla nulla lascerebbe chi
@@ -356,7 +360,8 @@ async function handOverImage(
       width: drawn.width,
       height: drawn.height,
       url,
-      storage_path: drawn.storagePath
+      storage_path: drawn.storagePath,
+      ai_marked: drawn.aiMarked
     }
   };
 }
@@ -565,8 +570,8 @@ async function runImageJob(
     if (!dataUrl) break;
 
     const filed = job.brandId
-      ? await depositImage(supabase, { ...job, brandId: job.brandId }, dataUrl)
-      : await handOverImage(supabase, job, dataUrl);
+      ? await depositImage(supabase, { ...job, brandId: job.brandId }, dataUrl, chosen)
+      : await handOverImage(supabase, job, dataUrl, chosen);
     if (!filed.ok) return { ok: false, error: 'store_failed', reason: filed.reason };
 
     media.push(filed.media);
