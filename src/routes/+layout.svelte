@@ -7,13 +7,11 @@
   import CanvasEntryShimmer from '$lib/components/CanvasEntryShimmer.svelte';
   import {
     identifyUser,
-    loadMetaPixel,
-    loadSeline,
     setAnalyticsOptOut,
     setInternalViewer,
     trackBookingClicks
   } from '$lib/analytics';
-  import { initConsentForRegion } from '$lib/consent';
+  import { initConsent } from '$lib/consent';
   import { onMount } from 'svelte';
   let { children, data } = $props();
 
@@ -36,12 +34,6 @@
   setInternalViewer(data?.internalViewer === true);
   $effect(() => {
     setInternalViewer(data?.internalViewer === true);
-  });
-
-  // Seline (page view, cookieless): prima stava come tag in app.html, dove partiva sempre. Chiamato
-  // su ogni pagina come prima — blog compresi — ma ora passa dai guard di $lib/analytics.
-  $effect(() => {
-    loadSeline();
   });
 
   function appNavScope(pathname: string): string | null {
@@ -96,13 +88,17 @@
     if (user?.id) identifyUser(user.id, user.email ? { email: user.email } : undefined);
   });
 
-  // Meta Pixel: on the app it loads immediately (unchanged behaviour, minus the app.html inline).
-  // On brand blogs it must NOT fire here — the blog's own cookie banner loads it only on consent.
-  $effect(() => { if (!isBlog) { loadMetaPixel(); trackBookingClicks(); } });
+  $effect(() => {
+    if (!isBlog) {
+      trackBookingClicks();
+    }
+  });
 
-  // Cookie banner is region-gated: EEA/UK/CH visitors are asked for consent, everyone else gets
-  // full analytics with no banner. Skipped on brand blogs (no feega analytics there at all).
-  $effect(() => { if (!isBlog) initConsentForRegion(data?.country); });
+  $effect(() => {
+    if (!isBlog) {
+      initConsent();
+    }
+  });
 
   // Resolve the colour theme for EVERY page (not just ones with the marketing nav): read the
   // saved choice or fall back to the OS preference, set data-theme, and keep it synced across

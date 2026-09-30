@@ -40,7 +40,7 @@ We do not ask for special categories of data (Art. 9 GDPR). Do not include them 
 | Age verification for NSFW mode | Legal obligation / legitimate interest — Art. 6(1)(c)/(f) [to confirm] |
 | Handling DSA notices and authority requests | Legal obligation — Art. 6(1)(c) |
 | Error monitoring and debugging | Legitimate interest — Art. 6(1)(f) |
-| Anonymous aggregate analytics | Legitimate interest — Art. 6(1)(f) |
+| Cookieless aggregate page statistics (Vercel Web Analytics) | Legitimate interest — Art. 6(1)(f) |
 | Full analytics, session replay, advertising measurement | Consent — Art. 6(1)(a) |
 | Service emails (invites, notifications) | Contract / legitimate interest |
 
@@ -61,7 +61,7 @@ We share personal data with these categories of recipients, each acting as our p
 | Data enrichment and scraping | reading public websites, stores and social profiles you point us to; web research |
 | Email delivery | invites and notifications |
 | Error monitoring | detecting and fixing errors (may include user ID, email, IP) |
-| Product analytics | understanding how the Service is used (anonymous; full with consent) |
+| Product analytics | understanding how the Service is used (consent) |
 | Advertising measurement | measuring which ads lead to sign-ups (consent) |
 | Age verification | NSFW mode, not yet available |
 
@@ -90,14 +90,15 @@ Some providers are outside the EEA, mainly in the United States. Transfers rely 
 ## 7. Cookies and similar technologies
 
 - **Strictly necessary**: authentication session and preferences. No consent needed.
-- **Anonymous analytics**: PostHog in cookieless mode, Vercel Web Analytics, Seline [to confirm cookieless].
-- **With consent only**: PostHog with persistent cookies and session recording, Microsoft Clarity session replay, Meta Pixel and the Google gtag.js conversion tag.
+- **Cookieless page statistics**: Vercel Web Analytics.
+- **Analytics, consent only**: PostHog, Microsoft Clarity, Seline, Sentry session replay (fully masked).
+- **Marketing, consent only**: Meta Pixel and the Google gtag.js conversion tag (Google Consent Mode v2, default denied).
 
-You can change your choice at any time via "Cookie preferences". Details: [Cookie Policy](./COOKIES.md).
+You can change your choice at any time via "Cookie settings" in Settings → Profile. Details: [Cookie Policy](./COOKIES.md).
 
 ## 8. Your rights
 
-You can request access, rectification, erasure, restriction, portability, and object to processing based on legitimate interest; you can withdraw consent at any time. Write to [privacy@feega.app](mailto:privacy@feega.app). We answer within one month. You can complain to the *Garante per la protezione dei dati personali* (garanteprivacy.it) or your local authority.
+You can request access, rectification, erasure, restriction, portability, and object to processing based on legitimate interest; you can withdraw consent at any time. You can delete your account and download your data yourself in Settings → Profile. For anything else, write to [privacy@feega.app](mailto:privacy@feega.app). We answer within one month. You can complain to the *Garante per la protezione dei dati personali* (garanteprivacy.it) or your local authority.
 
 ## 9. Minors
 

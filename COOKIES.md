@@ -17,7 +17,7 @@ Set without consent: the Service does not work without them.
 | `oauth_return` | cookie, first party, HttpOnly | returns you to an MCP/OAuth authorisation after login | 10 minutes |
 | `dz-last-project` | cookie, first party | reopens the last project you worked on | 1 year |
 | `sidebar_state` | cookie, first party | remembers whether the sidebar is open, so the page renders correctly on load | 1 year |
-| `feega_cookie_consent_v1` | localStorage | stores your cookie choice | until you clear it |
+| `feega_consent` | cookie, first party | stores your cookie choice, the policy version and when you chose | 180 days |
 | `theme` | localStorage | light or dark theme | until you clear it |
 | `feega.sidebarOpen`, `feega.sidebarPanePx`, `feega.sidebarPane`, `feega.chatPanelPx`, `feega.chatOpen`, `feega.chatTab` | localStorage | layout of sidebar and chat panel | until you clear them |
 | `feega:brands-panel-open:<project>` | localStorage | which brands are expanded in a project | until you clear it |
@@ -26,13 +26,11 @@ Set without consent: the Service does not work without them.
 
 Older `dazero…` keys with the same purposes may still be read and are no longer written.
 
-## 2. Analytics without consent (anonymous)
+## 2. Cookieless statistics
 
 | Tool | What it does | Storage |
 |---|---|---|
-| PostHog (EU cloud), cookieless mode | aggregate page views and clicks, no session recording | memory only, nothing stored on your device |
 | Vercel Web Analytics | aggregate page views | no cookies |
-| Seline | page views | no cookies until you sign in (see §5) |
 
 ## 3. Analytics with consent
 
@@ -40,6 +38,8 @@ Older `dazero…` keys with the same purposes may still be read and are no longe
 |---|---|---|---|
 | PostHog | `ph_<key>_posthog` cookie and localStorage | recognises returning visitors, product analytics, session recording | 1 year [to confirm] |
 | Microsoft Clarity | `_clck`, `_clsk`, `CLID` and related | session replay and heatmaps | `_clck` 1 year, `_clsk` 1 day, `CLID` 1 year |
+| Seline | cookie linked to your user ID after sign-in | page views | [to confirm] |
+| Sentry session replay | none | replay of an error, all text, inputs and media masked | — |
 
 ## 4. Marketing (advertising measurement)
 
@@ -50,16 +50,7 @@ Older `dazero…` keys with the same purposes may still be read and are no longe
 
 ## 5. Consent
 
-**Intended behaviour.** Visitors from the EEA, the United Kingdom and Switzerland, and visitors whose country is unknown, see a banner with equal **Accept** and **Reject** buttons before any non-essential cookie is set. Until they accept, only §1 and §2 run. Accepting enables §3 and §4; rejecting keeps them off. Visitors from other countries are not shown the banner and analytics are enabled. The choice is stored in `feega_cookie_consent_v1` and can be changed at any time via "Cookie preferences".
-
-**Current state of the code (being fixed).** As of the date above the code does not yet fully match that behaviour:
-
-- the Google gtag.js conversion tag loads after the first interaction or 10 seconds, without waiting for consent;
-- the Meta Pixel loads the same way (immediately after a Meta ad click), and the server sets `_fbc`/`_fbp` on arrival from a Meta ad, without consent;
-- when you sign in, Seline sets a cookie linked to your user ID and PostHog receives your user ID and email, without consent;
-- there is no "Cookie preferences" link yet to reopen the banner.
-
-These are tracked in the [legal review checklist](./docs/legal-review-checklist.md) and must be fixed before publication.
+Every visitor sees a banner with **Accept all**, **Reject all** (same size and style) and **Customise** (Analytics and Marketing separately) before any non-essential script loads. Until you choose, only §1 and §2 run; nothing from §3 or §4 makes a network request. Google Consent Mode v2 starts with every signal denied. The choice is stored in `feega_consent` with the policy version and a timestamp; when the policy version changes, we ask again. Change it any time via "Cookie settings" in Settings → Profile; withdrawing a category reloads the page so its tools stop.
 
 ## 6. Managing cookies
 

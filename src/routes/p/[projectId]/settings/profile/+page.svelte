@@ -9,8 +9,15 @@
   import { Input } from '$lib/components/ui/input';
   import { Button, buttonVariants } from '$lib/components/ui/button';
   import { Notice } from '$lib/components/ui/notice';
+  import { openCookieSettings } from '$lib/consent';
 
   let { data, form } = $props();
+
+  const DELETE_ERROR_KEY = {
+    confirm: 'app.settings.profile.deleteConfirmError',
+    reauth: 'app.settings.profile.deleteReauth',
+    transfer: 'app.settings.profile.deleteTransfer'
+  } as const;
 
   const busy = new SvelteSet<string>();
   const isBusy = (key: string) => busy.has(key);
@@ -126,6 +133,31 @@
       <Button variant="secondary" type="submit">{$_('app.account.signOut')}</Button>
     </form>
   </Field>
+</Panel>
+
+<Panel title={$_('app.settings.profile.privacy')}>
+  <Field label={$_('cookie.settings')} hint={$_('app.settings.profile.cookieHint')} layout={FieldLayout.Row}>
+    <Button variant="secondary" type="button" onclick={openCookieSettings} data-testid="open-cookie-settings">{$_('cookie.settings')}</Button>
+  </Field>
+  <Field label={$_('app.settings.profile.exportData')} hint={$_('app.settings.profile.exportHint')} layout={FieldLayout.Row}>
+    <a class={buttonVariants({ variant: 'secondary' })} href="/account/export" download data-testid="export-data">{$_('app.settings.profile.exportData')}</a>
+  </Field>
+</Panel>
+
+<Panel title={$_('app.settings.profile.deleteAccount')}>
+  <p class="m-0 text-[0.8125rem] text-muted-foreground">{$_('app.settings.profile.deleteHint')}</p>
+  {#if form?.deleteError}
+    <Notice tone="error">{$_(DELETE_ERROR_KEY[form.deleteError as keyof typeof DELETE_ERROR_KEY])}</Notice>
+  {/if}
+  <form method="POST" action="?/deleteAccount" use:enhance={withBusy('delete')} class="m-0 flex flex-col gap-3">
+    <label class="flex flex-col gap-1.5 text-[0.8125rem] text-muted-foreground" for="delete-confirm">
+      {$_('app.settings.profile.deleteConfirmLabel')}
+      <Input id="delete-confirm" name="confirm" autocomplete="off" class="h-9" data-testid="delete-confirm" />
+    </label>
+    <div>
+      <Button variant="danger" type="submit" disabled={isBusy('delete')} data-testid="delete-account">{$_('app.settings.profile.deleteAccount')}</Button>
+    </div>
+  </form>
 </Panel>
 
 <style>

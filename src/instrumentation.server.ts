@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/sveltekit';
+import { SENTRY_PRIVACY, scrubEvent } from '$lib/sentry-privacy';
 
 // Fuori dalla produzione Sentry non parte proprio — stessa scelta di hooks.client.ts, altrimenti
 // si spegne metà del rumore e sembra risolto: il server è la metà che manda le transazioni di ogni
@@ -15,7 +16,10 @@ if (process.env.NODE_ENV === 'production' && process.env.PUBLIC_SENTRY_DSN) {
     tracesSampleRate: 0.1,
 
     // Enable logs to be sent to Sentry
-    enableLogs: true
+    enableLogs: true,
+
+    ...SENTRY_PRIVACY,
+    beforeSend: scrubEvent
 
     // uncomment the line below to enable Spotlight (https://spotlightjs.com)
     // spotlight: import.meta.env.DEV,

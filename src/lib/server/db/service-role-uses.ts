@@ -74,6 +74,11 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
     tables: ['reference_images']
   },
   {
+    path: 'src/lib/server/account/account-server.ts — deleteAccount',
+    why: "Cancellare il proprio account (GDPR art. 17) tocca righe che la RLS non lascia toccare a nessun JWT: auth.users, i riferimenti actor_id in org condivise, lo storage `${userId}/` e quello delle org di cui l'utente era l'unico membro. Lo user_id è sempre quello della sessione, verificata di recente e confermata a mano; nessun org_id arriva da chi chiama. La funzione SQL delete_account rifiuta se un'org resterebbe senza proprietario, cancella solo le org senza altri membri, e scrive in account_deletions un conteggio senza dati personali.",
+    tables: ['orgs_members', 'orgs', 'account_deletions', 'profiles', 'chat_threads', 'nodes', 'posts', 'chat_messages']
+  },
+  {
     path: 'src/lib/server/nsfw/age-verification.ts — recordAgeVerification',
     why: "Un esito di verifica dell'età lo scrive il provider certificato, non l'utente: `user_age_verifications` non ha policy di scrittura, così nessuno può dichiararsi maggiorenne da solo. Lo user_id è quello della sessione che ha avviato la verifica, mai un valore scelto da chi chiama; si salva solo l'esito 18+, nessun documento.",
     tables: ['user_age_verifications']
