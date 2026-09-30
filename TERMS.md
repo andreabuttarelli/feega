@@ -144,7 +144,13 @@ To the extent permitted by law, the Service is provided "as is" and "as availabl
 - Nothing in these Terms limits liability for death or personal injury caused by negligence, for wilful misconduct or gross negligence, or any liability that cannot be limited by law.
 - **For business users**, to the extent permitted by law: we are not liable for indirect or consequential loss, lost profits, revenue, data or goodwill; our total liability is limited to the amounts you paid us in the [12] months before the event giving rise to the claim.
 - **For consumers**, we are liable in accordance with the mandatory rules of applicable law.
-- You will indemnify us against third-party claims arising from Your Content, your published or advertised outputs, or your breach of these Terms, to the extent permitted by law.
+- **Indemnity.** To the extent permitted by law, you will defend, indemnify and hold harmless us, our officers and suppliers from any third-party claim, and the resulting losses, damages, fines and reasonable legal fees, arising from:
+  - Your Content and the prompts, images, audio or other inputs you provide;
+  - outputs you generate, publish, advertise or otherwise use, including any that reproduce or resemble the face, body, voice, name or other likeness of a real person, whether or not you intended the resemblance;
+  - your infringement of image, publicity, privacy, data-protection, intellectual-property or personality rights of any person;
+  - your breach of these Terms or of the Acceptable Use Policy.
+
+  We will tell you promptly about any such claim, you will cooperate with us, and we may take part in or control the defence with counsel of our choosing. You may not settle a claim that imposes obligations on us without our written consent. **If you are a consumer**, this clause applies only where the claim results from your fault and within the limits of mandatory consumer law.
 
 ## 18. Consumers in the EU
 
