@@ -9,7 +9,7 @@ These Terms of Service ("Terms") govern your use of feega (the "Service"), avail
 
 The Service is operated by **[LEGAL ENTITY]**, established in Italy, VAT no. **[VAT]**, registered office **[ADDRESS]** ("feega", "we", "us").
 
-Contact: [SUPPORT EMAIL] · Privacy: [privacy@feega.app](mailto:privacy@feega.app) · Abuse and legal notices: [LEGAL NOTICE EMAIL]. Company details: [Legal Notice](./LEGAL-NOTICE.md).
+Contact: [SUPPORT EMAIL] · Privacy: [privacy@feega.app](mailto:privacy@feega.app) · Abuse and legal notices: support@feega.app. Company details: [Legal Notice](./LEGAL-NOTICE.md).
 
 ## 2. The Service
 
@@ -118,7 +118,9 @@ Consistent with Article 50 of the EU AI Act (details in [AI Transparency](./AI-T
 
 ## 12. Reporting illegal content (Digital Services Act)
 
-To report content you believe is illegal or breaches these Terms, write to [LEGAL NOTICE EMAIL] with: the link or location, why you think it is illegal, your name and email (unless the report concerns child sexual abuse material), and a statement of good faith. We will confirm receipt, decide without undue delay, and inform both you and the affected user of the decision and the reasons, including how to contest it. Our single point of contact for authorities and users under the DSA is [LEGAL NOTICE EMAIL]. Content involving child sexual abuse is reported to the competent authorities.
+To report content you believe is illegal or breaches these Terms, write to support@feega.app with: the link or location, why you think it is illegal, your name and email (unless the report concerns child sexual abuse material), and a statement of good faith. We will confirm receipt, decide without undue delay, and inform both you and the affected user of the decision and the reasons, including how to contest it. Our single point of contact for authorities and users under the DSA is support@feega.app. Content involving child sexual abuse is reported to the competent authorities.
+
+**Your likeness.** If you believe content generated or shared through the Service reproduces or resembles your face, body, voice or name without your consent, write to [support@feega.app](mailto:support@feega.app) with the link or a copy of the content and enough information to identify you. We will review the request and, where it is well founded, remove or disable the content and take action on the account involved.
 
 ## 13. Suspension and termination
 
