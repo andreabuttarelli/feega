@@ -48,3 +48,5 @@
 20. **AI labelling**: only the IPTC XMP marker is live; C2PA signing is off (no certificate, dependency removed) and there is no visible "AI-generated" label outside the NSFW page copy. Confirm "being rolled out" wording is acceptable under Art. 50(2).
 21. **Legal notice**: which Art. 7 D.Lgs. 70/2003 fields apply to the chosen legal form.
 22. **Framer marketing site**: cookies and its own consent banner.
+
+- **Indemnity (TERMS §17):** is the likeness-focused indemnity enforceable against business users, and is the fault-based consumer carve-out enough to avoid an unfair-term finding under Codice del Consumo art. 33?

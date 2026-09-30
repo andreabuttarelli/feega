@@ -9,7 +9,7 @@ These Terms of Service ("Terms") govern your use of feega (the "Service"), avail
 
 The Service is operated by **[LEGAL ENTITY]**, established in Italy, VAT no. **[VAT]**, registered office **[ADDRESS]** ("feega", "we", "us").
 
-Contact: [SUPPORT EMAIL] · Privacy: [privacy@feega.app](mailto:privacy@feega.app) · Abuse and legal notices: [LEGAL NOTICE EMAIL]. Company details: [Legal Notice](./LEGAL-NOTICE.md).
+Contact: [SUPPORT EMAIL] · Privacy: [privacy@feega.app](mailto:privacy@feega.app) · Abuse and legal notices: support@feega.app. Company details: [Legal Notice](./LEGAL-NOTICE.md).
 
 ## 2. The Service
 
@@ -118,7 +118,9 @@ Consistent with Article 50 of the EU AI Act (details in [AI Transparency](./AI-T
 
 ## 12. Reporting illegal content (Digital Services Act)
 
-To report content you believe is illegal or breaches these Terms, write to [LEGAL NOTICE EMAIL] with: the link or location, why you think it is illegal, your name and email (unless the report concerns child sexual abuse material), and a statement of good faith. We will confirm receipt, decide without undue delay, and inform both you and the affected user of the decision and the reasons, including how to contest it. Our single point of contact for authorities and users under the DSA is [LEGAL NOTICE EMAIL]. Content involving child sexual abuse is reported to the competent authorities.
+To report content you believe is illegal or breaches these Terms, write to support@feega.app with: the link or location, why you think it is illegal, your name and email (unless the report concerns child sexual abuse material), and a statement of good faith. We will confirm receipt, decide without undue delay, and inform both you and the affected user of the decision and the reasons, including how to contest it. Our single point of contact for authorities and users under the DSA is support@feega.app. Content involving child sexual abuse is reported to the competent authorities.
+
+**Your likeness.** If you believe content generated or shared through the Service reproduces or resembles your face, body, voice or name without your consent, write to [support@feega.app](mailto:support@feega.app) with the link or a copy of the content and enough information to identify you. We will review the request and, where it is well founded, remove or disable the content and take action on the account involved.
 
 ## 13. Suspension and termination
 
@@ -144,7 +146,13 @@ To the extent permitted by law, the Service is provided "as is" and "as availabl
 - Nothing in these Terms limits liability for death or personal injury caused by negligence, for wilful misconduct or gross negligence, or any liability that cannot be limited by law.
 - **For business users**, to the extent permitted by law: we are not liable for indirect or consequential loss, lost profits, revenue, data or goodwill; our total liability is limited to the amounts you paid us in the [12] months before the event giving rise to the claim.
 - **For consumers**, we are liable in accordance with the mandatory rules of applicable law.
-- You will indemnify us against third-party claims arising from Your Content, your published or advertised outputs, or your breach of these Terms, to the extent permitted by law.
+- **Indemnity.** To the extent permitted by law, you will defend, indemnify and hold harmless us, our officers and suppliers from any third-party claim, and the resulting losses, damages, fines and reasonable legal fees, arising from:
+  - Your Content and the prompts, images, audio or other inputs you provide;
+  - outputs you generate, publish, advertise or otherwise use, including any that reproduce or resemble the face, body, voice, name or other likeness of a real person, whether or not you intended the resemblance;
+  - your infringement of image, publicity, privacy, data-protection, intellectual-property or personality rights of any person;
+  - your breach of these Terms or of the Acceptable Use Policy.
+
+  We will tell you promptly about any such claim, you will cooperate with us, and we may take part in or control the defence with counsel of our choosing. You may not settle a claim that imposes obligations on us without our written consent. **If you are a consumer**, this clause applies only where the claim results from your fault and within the limits of mandatory consumer law.
 
 ## 18. Consumers in the EU
 
