@@ -14,6 +14,7 @@ Information under Art. 7 of Italian Legislative Decree 70/2003 and Art. 2250 of 
 | Companies register (REA) | [REA — if applicable] |
 | Share capital | [SHARE CAPITAL — if a company] |
 | Certified email (PEC) | [PEC] |
+| General contact | [hi@feega.app](mailto:hi@feega.app) |
 | Support | [SUPPORT EMAIL] |
 | Legal notices and DSA contact | [LEGAL NOTICE EMAIL] |
 | Privacy | [privacy@feega.app](mailto:privacy@feega.app) |
