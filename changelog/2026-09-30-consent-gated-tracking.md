@@ -19,6 +19,9 @@ region-gated (extra-EU auto-granted); Accept was the prominent button.
 - Banner: Accept all / Reject all same style, Customise per category.
   "Cookie settings" in Settings → Profile reopens it.
 - PostHog session recording masks inputs and text.
+- `_fbc`/`_fbp` from an ad click (`hooks.server.ts` → `seedMetaClickCookies`)
+  are written only when the request's `feega_consent` grants Marketing. Cost:
+  a first-visit ad click is attributed only if the visitor accepts on that page.
 
 **Discarded.** Region gating (Vercel country header): one rule for everyone is
 simpler and never wrong. Anonymous PostHog tier: still a network request

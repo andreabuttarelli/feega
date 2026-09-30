@@ -1,6 +1,7 @@
 import {sequence} from '@sveltejs/kit/hooks';
 import { error, json, redirect, text } from '@sveltejs/kit';
 import * as Sentry from '@sentry/sveltekit';
+import { seedMetaClickCookies } from '$lib/server/meta-click-cookies';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { markRlsScoped } from '$lib/server/rls-client';
 import { createUserDb, type Db } from '$lib/server/db/client';
@@ -175,32 +176,7 @@ export const handle: Handle = sequence(hostRedirect, csrf, Sentry.sentryHandle()
     return cachedDb;
   };
 
-  // Meta click id → first-party cookies, written server-side. The browser pixel is deferred (first
-  // interaction or 10s, see $lib/analytics) and consent/adblock can drop it entirely, so on an ad
-  // click `_fbc` was only ever written for ~2% of visits — leaving every downstream conversion
-  // (CompleteRegistration, Purchase, Schedule) unattributable to the ad that paid for it. Writing it
-  // here, on the request that actually carries `fbclid`, is independent of all that and survives the
-  // days between landing and checkout. Format + 90-day lifetime are Meta's spec, and the pixel reads
-  // back these same cookies, so the two halves agree instead of racing.
-  // Never on brand blogs: those are the brand's turf and stay tracking-free until the visitor consents.
-  const fbclid = event.url.searchParams.get('fbclid');
-  const isBlogRoute =
-    !!event.route.id &&
-    (event.route.id.startsWith('/_site') ||
-      event.route.id.startsWith('/blog/[site]') ||
-      event.route.id.startsWith('/blog-preview'));
-  if (fbclid && !isBlogRoute) {
-    // httpOnly:false so the pixel can read/reuse them; `secure` is left to SvelteKit (http on localhost).
-    const opts = { path: '/', maxAge: 60 * 60 * 24 * 90, httpOnly: false, sameSite: 'lax' as const };
-    // Last click wins (Meta's own attribution model), so a fresh fbclid always overwrites.
-    event.cookies.set('_fbc', `fb.1.${Date.now()}.${fbclid}`, opts);
-    // The pixel generates `_fbp` itself, but only once it has loaded — seeding it on ad clicks means
-    // even a visitor who bounces in under 10s carries a stable browser id the pixel then reuses.
-    // ponytail: only on ad clicks, so no new cookie for anyone we don't have to attribute.
-    if (!event.cookies.get('_fbp')) {
-      event.cookies.set('_fbp', `fb.1.${Date.now()}.${Math.floor(Math.random() * 1e10)}`, opts);
-    }
-  }
+  seedMetaClickCookies(event.cookies, event.url, event.route.id);
 
   // La radice è l'app, non più un sito di marketing. Il safety net dell'OAuth viene prima:
   // un bounce magic-link sul Site URL con ?code= deve arrivare a /auth/callback, non alla home,
