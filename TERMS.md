@@ -1,145 +1,159 @@
 # Terms of Service
 
-Archived 22 September 2026. This document was live at `/terms` until that date, when the
-public legal pages were removed from the product (no user data was being collected in the EU
-at the time). Kept here verbatim so it can be restored — re-published as-is or updated first —
-before the product collects personal data again.
+> **Draft — to be reviewed by a lawyer before publication.**
+> Last updated: 30 September 2026
 
-Last updated: 19 August 2026
-
-These Terms of Service ("Terms") govern your access to and use of feega (the "Service"). By creating an account or using the Service, you agree to these Terms. If you do not agree, do not use the Service.
+These Terms of Service ("Terms") govern your use of feega (the "Service"), available at feega.app, through its API, command-line tool (CLI) and MCP server. By creating an account or using the Service you accept these Terms. If you do not accept them, do not use the Service.
 
 ## 1. Who we are
 
-The Service is operated by **Marco Di Franco**, a sole proprietorship (*ditta individuale*) established in Italy, VAT no. (P.IVA) **IT18500501004** ("we", "us", "our"). You can contact us at [privacy@feega.app](mailto:privacy@feega.app).
+The Service is operated by **[LEGAL ENTITY]**, established in Italy, VAT no. **[VAT]**, registered office **[ADDRESS]** ("feega", "we", "us").
+
+Contact: [SUPPORT EMAIL] · Privacy: [privacy@feega.app](mailto:privacy@feega.app) · Abuse and legal notices: [LEGAL NOTICE EMAIL].
 
 ## 2. The Service
 
-feega is an AI assistant that helps you plan, create and publish social-media content. It drafts a content calendar, writes captions, generates images and videos, and — once you approve — can publish to the social accounts you connect. The Service is provided for business and professional use.
+feega is an AI workspace built on an infinite canvas. On the canvas you, a chat agent, or an external agent connected through the MCP server or API work with typed nodes. Depending on your plan, the Service lets you:
 
-## 3. Eligibility & accounts
+- generate and edit text, images, video and audio (voice-over, music, sound) with third-party AI models;
+- analyse a brand from its website and store its voice, palette and assets;
+- import products from a connected store's public endpoints and public posts from social profiles;
+- assemble posts, schedule them on a calendar and publish them to the social accounts you connect;
+- prepare and run Meta ad campaigns on the ad accounts you connect;
+- share a canvas or a node through a read-only link;
+- automate the above with API keys, the CLI and the MCP server.
 
-- You must be at least 18 years old and able to enter into a binding contract.
-- You are responsible for the accuracy of your account information and for keeping your credentials secure.
-- You are responsible for all activity that happens under your account.
-- Notify us promptly at [privacy@feega.app](mailto:privacy@feega.app) if you suspect unauthorised use.
+Features may be added, changed or removed. Some are marked beta or "coming soon" and may not be available to you.
 
-## 4. Connected social accounts
+## 3. Eligibility
 
-To publish on your behalf, the Service connects to third-party platforms such as Instagram, Facebook and TikTok. By connecting an account you authorise us to access and act on it as needed to provide the Service, and you agree to comply with each platform's own terms. We are not responsible for changes, outages or restrictions imposed by those platforms, including if they suspend access or change their APIs.
+You must be at least **18 years old** and able to enter a binding contract. If you use the Service for a company or other organisation, you confirm you are authorised to bind it; "you" then also means that organisation.
 
-## 5. Your content
+## 4. Accounts, workspaces and members
 
-You retain ownership of the brand materials, text, images and other content you provide ("Your Content"). You grant us a worldwide, non-exclusive licence to host, process and use Your Content solely to operate and provide the Service to you — including sending it to the AI and publishing providers described in our [Privacy Policy](./PRIVACY.md).
+- Your account belongs to you. Keep your credentials and API keys secret; you are responsible for activity under them, including actions taken by agents using your API keys or MCP connection.
+- Content lives in **workspaces** (organisations). A workspace owner can invite members by link or email; every member can see and change the workspace's projects, canvases, brands and connected accounts according to their role.
+- The owner is responsible for the members they invite and for the workspace's billing.
+- A user may belong to a limited number of free workspaces.
+- Tell us promptly at [SUPPORT EMAIL] if you suspect unauthorised access.
 
-You represent that you have the rights to Your Content and that it does not infringe the rights of others or break the law.
+## 5. Credits, plans and payments
 
-## 6. AI-generated content
+- AI actions are paid in **credits**. **1 credit = €1** of list price. The cost of an action is shown before or when it runs.
+- **Monthly plans**: €8, €16, €32, €64, €128 or €256 per month (prices in EUR, [VAT INCLUDED / EXCLUDED — to confirm]), each granting the same number of credits as its price. Subscriptions renew automatically each month until cancelled; cancellation takes effect at the end of the current period.
+- **Subscription credits expire** at the end of the billing period they were granted for and do not roll over.
+- **Top-ups** are one-time purchases at the same rate. Top-up credits **do not expire**.
+- **Welcome credits** granted to a new workspace expire after **14 days**.
+- Each connected social account may carry a **monthly credit fee**, shown before you connect it. If the balance cannot cover it, the account is paused.
+- Payments are processed by **Stripe**. We do not see or store full card numbers.
+- Credits have no cash value, cannot be transferred between workspaces or resold, and are not refunded when spent on a generation you did not like.
+- **Refunds:** [REFUND POLICY — to be defined]. Where you are a consumer in the EU, see §18 on the right of withdrawal.
+- We may change prices with at least [30] days' notice; changes apply from the next billing period.
 
-- The Service uses AI to generate captions, images and videos based on your input. AI output may be inaccurate, generic or unexpected.
-- **You are responsible for reviewing and approving content before it is published.** Nothing is published without your approval.
-- Given how generative AI works, similar output may be produced for other users; we make no guarantee that generated content is unique or free of third-party rights.
-- You are responsible for ensuring that anything you publish complies with applicable laws, advertising rules and the policies of each platform.
+## 6. Your content
 
-## 7. EU AI Act — our role and yours
+"Your Content" means what you put into the Service (prompts, text, images, video, audio, documents, brand data, product data) and the outputs generated for you.
 
-The Service is an AI system within the meaning of Regulation (EU) 2024/1689 (the "AI Act"). We are its provider — more precisely a downstream provider under Article 3(68): we build, and put into service under our own name, a system that integrates general-purpose AI models supplied by the third parties listed in our Privacy Policy. Those third parties remain the providers of their own models; we neither train nor supply models of our own. You are the deployer: you choose the brand, the audience and the message it works on, and you approve every output before it goes anywhere.
+- **You keep all rights** you have in Your Content.
+- You grant us a worldwide, non-exclusive, royalty-free licence to host, copy, process, transmit and display Your Content **only to operate, secure and improve the Service for you**, including sending it to the AI, publishing and infrastructure providers listed in the [Privacy Policy](./PRIVACY.md). The licence ends when Your Content is deleted, except for copies we must keep by law or in backups for their normal retention period.
+- We do **not** use Your Content to train our own or third-party models.
+- You confirm you have all rights and consents needed for Your Content, including for any person, brand, logo, product or voice it contains.
 
-The Service is a content-marketing tool. It is not intended for, and must not be used for, any purpose classified as high-risk under Annex III of the AI Act — including recruitment, worker management, access to essential public or private services, creditworthiness, education, law enforcement, migration or the administration of justice. If you use it for such a purpose, you do so on your own initiative and assume the obligations the AI Act places on the provider of that use.
+## 7. AI outputs
 
-Human oversight is not optional, and it is not a setting. Every post and every article the Service produces is held in an approval queue until you approve that specific item: the Service has no auto-publish mode and no per-account bypass to switch on. Approving is a human act — you are expected to read the caption, look at the image or video, and check facts, claims and figures before you approve.
+- Outputs are generated by third-party models. They can be inaccurate, offensive, similar to other users' outputs or to existing works. We give no guarantee that an output is unique, lawful, accurate or free of third-party rights.
+- As between you and us, we assign to you any rights we may have in outputs generated for you. Whether outputs are protected by copyright depends on applicable law.
+- Your use of an output must also respect the terms of the model provider that produced it; the models available and their providers are shown in the Service.
+- **You are responsible for reviewing outputs before using, publishing or advertising them**, and for their compliance with law, advertising rules and platform policies.
 
-Under Article 4 of the AI Act you agree to ensure that the people in your organisation who use the Service have a sufficient level of AI literacy: that they understand what it generates, how it can be wrong, and what they must check before publishing.
+## 8. Acceptable use and content policy
 
-## 8. Prohibited AI practices (Article 5 — the blacklist)
+Every generation prompt is screened automatically before it reaches a model, by a classifier and, when in doubt, a second AI review. Blocked requests are refused and the decision is logged. Automated screening can make mistakes in both directions; it does not relieve you of responsibility.
 
-Article 5 of the AI Act bans a short list of AI practices outright across the Union. No consent, contract or commercial justification makes them lawful. You must not use the Service — and must not instruct the AI assistant — to:
+**Always prohibited, in every mode:**
 
-- deploy subliminal, purposefully manipulative or deceptive techniques that materially distort a person's behaviour and cause, or are likely to cause, significant harm;
-- exploit the vulnerabilities of a person or group arising from their age, a disability, or a specific social or economic situation, so as to materially distort their behaviour and cause significant harm;
-- evaluate or classify people over time on the basis of their social behaviour or personal characteristics in order to treat them unfavourably ("social scoring");
-- assess or predict the risk that a person will commit a criminal offence on the basis of profiling or personality traits;
-- create or expand facial-recognition databases through untargeted scraping of facial images from the internet or from CCTV footage;
-- infer the emotions of a person in the workplace or in an education setting, other than for medical or safety reasons;
-- use biometric categorisation to deduce race, political opinions, trade-union membership, religious or philosophical beliefs, sex life or sexual orientation;
-- carry out real-time remote biometric identification of people in publicly accessible spaces.
+- any sexual, suggestive or nude content involving minors or persons who appear to be minors, including fictional, drawn or virtual depictions;
+- sexual or nude content depicting a real, identifiable person, and deepfakes of real people made to deceive, defame or harass;
+- non-consensual sexual content, sexual violence, voyeurism or "revenge" content;
+- graphic violence, gore, torture or realistic depictions of killing;
+- sexual content involving animals;
+- content promoting or instructing self-harm, suicide or eating disorders;
+- hate speech, harassment or dehumanisation of protected groups;
+- terrorist or extremist propaganda, or instructions for weapons or explosives;
+- the practices prohibited by Article 5 of the EU AI Act (manipulative or exploitative techniques causing significant harm, social scoring, predictive policing by profiling, untargeted facial-image scraping, emotion recognition at work or school, sensitive biometric categorisation, real-time remote biometric identification);
+- any other illegal content, IP infringement, spam, fraud, impersonation or misleading advertising.
 
-Ordinary persuasive advertising is not prohibited: benefits, real offers, real deadlines, emotion and humour are all legitimate. What Article 5 targets is influence a person cannot perceive, and pressure deliberately aimed at someone's vulnerability. Where the line is thin — content aimed at minors, at elderly or ill people, at people in debt or in grief, or copy that manufactures fear, shame or medical anxiety — we expect you to stay on the safe side.
+**Standard mode** (every workspace by default) also prohibits **all sexual or pornographic content**.
 
-The AI assistant is instructed to recognise these practices, to decline them, and to explain which one it declined and why. When a request appears to touch the list you will also see a compliance notice in the conversation naming the practice and the article; the check is automatic and can be wrong, and a notice is not by itself an accusation. We may suspend or terminate accounts that use the Service for a prohibited practice.
+You also must not: probe, bypass or overload the moderation or rate limits; reverse-engineer or scrape the Service; share API keys outside your organisation; resell the Service without our written consent; use the Service for high-risk purposes listed in Annex III of the AI Act; or breach the terms of any connected platform.
 
-## 9. Labelling AI-generated content (Article 50)
+## 9. NSFW mode
 
-Article 50 of the AI Act requires synthetic content to be recognisable as such. We do part of this for you; the rest is yours to do:
+> **Not yet available.** The rules below will apply once age verification is live.
 
-- **What we do**: every image and video the Service renders is marked, in the file itself, with the IPTC DigitalSourceType term that identifies content as AI-generated or AI-composited. The marking is machine-readable, written without altering a single pixel, and it is what the major platforms read to apply their own "AI info" labels. Where the underlying model adds its own marking (such as Google's SynthID) that travels with the file too, and when we publish on your behalf we set each platform's "AI-generated content" flag on media we generated, wherever the platform offers one. Media you uploaded yourself is never marked or flagged as AI. Note that some platforms strip file metadata on upload: the marking is a property of the file we produce and hand you, not a guarantee about what a third party stores afterwards.
-- **What you must do**: where content is a deepfake — an image, audio or video resembling real people, places or events that could falsely appear authentic — you must disclose that it is artificially generated or manipulated. The same applies to published text intended to inform the public on matters of public interest.
-- AI talent, generated avatars and synthetic voices depict people who do not exist. You must not present them as real customers, employees or testimonials. Generating the likeness or voice of a real, identifiable person requires that person's consent and compliance with image-rights and data-protection law.
-- None of this replaces the disclosure rules that already bind you — advertising and sponsorship transparency, health, financial and comparative claims — or the synthetic-media policy of each platform you publish on.
+- NSFW mode is a **separate workspace area, off by default**. It requires a paid plan, the workspace owner's explicit opt-in and attestation, and each user's **age verification (18+) through a certified third-party provider**. We keep only the result, not identity documents.
+- Content created there stays isolated: NSFW projects are badged, listed apart, and **cannot be shared, published, scheduled or used in ads**.
+- Every result is labelled as AI-generated, including in the downloaded file name.
+- All "always prohibited" rules in §8 continue to apply. Only fictional adults may be depicted.
+- We may withdraw NSFW mode, or access to it, at any time.
 
-Text is treated differently, and deliberately so. Article 50(2) exempts AI-generated text from synthetic-content marking where that text has undergone human review and a natural or legal person holds editorial responsibility for its publication. That is precisely what the approval queue is for: no caption and no article leaves the Service without a person approving it, and in approving it you take editorial responsibility for it. This is why we do not watermark captions or articles — and why the Service offers no way to switch the review off.
+## 10. Labelling of AI-generated content
 
-## 10. Acceptable use
+Consistent with Article 50 of the EU AI Act:
 
-You agree not to use the Service to:
+- You are always told when you interact with an AI system (the chat agent identifies itself as such).
+- Media generated by the Service is marked as AI-generated in a machine-readable way where technically feasible, and flagged as AI-generated when we publish it through a platform that supports it.
+- **You** must disclose that content is artificially generated or manipulated when it is a deepfake of real people, places or events, or text published to inform the public on matters of public interest without human editorial review. Do not present synthetic people or voices as real customers, employees or testimonials.
 
-- break any law or infringe anyone's intellectual-property, privacy or other rights;
-- create or publish unlawful, hateful, deceptive, harassing or otherwise harmful content;
-- send spam or violate the terms of any connected platform;
-- reverse-engineer, scrape, overload, or attempt to gain unauthorised access to the Service;
-- resell or provide the Service to third parties without our written permission;
-- use browser automation, saved credentials, or any other feature of the Service to sign in to, scrape, or act inside a service you do not own or are not authorised to automate, or in any way that breaches that service's own terms.
+## 11. Third parties: people, brands and platforms
 
-We may suspend or terminate accounts that breach these rules.
+- Using a real person's likeness or voice requires their consent. Using third-party trademarks, logos or copyrighted works requires the right to do so.
+- **Connected accounts.** Publishing and ads run through official APIs (social publishing via Zernio, ads via Meta). By connecting an account you authorise us to act on it as you instruct, and you remain bound by each platform's terms. Platforms may change or restrict access at any time; we are not responsible for that.
+- **Imported data.** Brand analysis, product import and social feeds read publicly available pages and endpoints. You must use that data lawfully and only for sources you are entitled to use.
+- **Share links.** Anyone who has a share link can view the shared canvas or node without logging in until you revoke it. You are responsible for what you share.
 
-## 11. Plans, billing & refunds
+## 12. Reporting illegal content (Digital Services Act)
 
-- Some features require a paid subscription. Prices and plan details are shown at checkout. Payments are processed by Stripe.
-- Subscriptions renew automatically for the same period unless cancelled before the renewal date. You can cancel at any time, effective at the end of the current billing period.
-- Except where required by law, payments are non-refundable and we do not provide refunds for partial periods.
-- We may change prices with reasonable advance notice; changes apply from your next billing cycle.
-- As a business customer, the EU consumer right of withdrawal generally does not apply; any statutory rights that do apply are unaffected.
+To report content you believe is illegal or breaches these Terms, write to [LEGAL NOTICE EMAIL] with: the link or location, why you think it is illegal, your name and email (unless the report concerns child sexual abuse material), and a statement of good faith. We will confirm receipt, decide without undue delay, and inform both you and the affected user of the decision and the reasons, including how to contest it. Our single point of contact for authorities and users under the DSA is [LEGAL NOTICE EMAIL]. Content involving child sexual abuse is reported to the competent authorities.
 
-## 12. Intellectual property
+## 13. Suspension and termination
 
-The Service itself — including its software, design, branding and the feega name — belongs to us and is protected by intellectual-property laws. These Terms do not grant you any right to our branding except as needed to use the Service. Subject to your compliance with these Terms and applicable third-party rights, you may use the content you generate for your own business purposes.
+- You can stop using the Service and close your account at any time [HOW — account deletion flow / email].
+- We may restrict, suspend or terminate access, remove content or disable share links if you breach these Terms, if required by law, or to protect users, third parties or the Service. Where reasonable we give notice and reasons first; for serious breaches (e.g. §8 "always prohibited") we may act immediately.
+- On termination unused subscription credits lapse. Unused top-up credits are [REFUNDED / FORFEITED — to confirm] when we terminate without your fault.
+- Sections that by nature survive (content licence for retained copies, disclaimers, liability, law) survive termination.
 
-## 13. Third-party services
+## 14. Intellectual property of the Service
 
-The Service relies on third-party providers (for hosting, AI, analytics, payments, email and social platforms). We are not responsible for those providers' services, and your use of connected platforms is also governed by their own terms.
+The Service, its software, design and the feega name and marks belong to us or our licensors. The CLI and MCP server are released under the Apache-2.0 licence; that licence governs the code, not the Service. Nothing in these Terms grants you rights in our brand.
 
-Some features drive a real browser on your behalf — for example capturing screenshots of your own product after signing in with demo credentials you save. You may only save credentials for a service you own or are authorised to automate, and that authorisation is your responsibility. We will not use them to sign in to third-party platforms such as Instagram, Facebook, LinkedIn or TikTok: automated sign-in and automated posting generally breach those platforms' terms and can get an account restricted, so the Service refuses it. Publishing happens only through the official APIs of the accounts you connect, after you approve the content.
+## 15. Availability
 
-Some features (radar/leads) read third-party public content on social platforms to suggest conversations worth joining, with draft comments and messages. The user is the only sender: the Service never messages third parties automatically — every draft requires the user's review and manual sending from their own account. The user is therefore the data controller of the contacts they send and is responsible for the message content, for complying with the terms of the platform they post on, and for honoring people's requests not to be contacted again. The Service minimizes the data of the people it finds (a summary and the post link, no copy of the text) and excludes them from all future suggestions when they ask not to be contacted.
+We aim to keep the Service available but do not guarantee uninterrupted or error-free operation. Third-party models may be slow, unavailable or withdrawn. We may perform maintenance and change features.
 
-## 14. Availability & changes
+## 16. Warranties
 
-We work to keep the Service available but do not guarantee it will be uninterrupted or error-free. We may modify, suspend or discontinue features at any time. The Service is currently offered in an evolving form and may include beta features.
+To the extent permitted by law, the Service is provided "as is" and "as available". We do not warrant that outputs will be accurate, lawful or fit for a particular purpose. **If you are a consumer, this does not limit your statutory rights**, including the legal guarantee of conformity for digital content and services under the Italian Consumer Code.
 
-## 15. Disclaimer of warranties
+## 17. Liability
 
-To the maximum extent permitted by law, the Service is provided "as is" and "as available", without warranties of any kind, whether express or implied, including fitness for a particular purpose, non-infringement, or that AI output will be accurate, lawful or suitable for your needs.
+- Nothing in these Terms limits liability for death or personal injury caused by negligence, for wilful misconduct or gross negligence, or any liability that cannot be limited by law.
+- **For business users**, to the extent permitted by law: we are not liable for indirect or consequential loss, lost profits, revenue, data or goodwill; our total liability is limited to the amounts you paid us in the [12] months before the event giving rise to the claim.
+- **For consumers**, we are liable in accordance with the mandatory rules of applicable law.
+- You will indemnify us against third-party claims arising from Your Content, your published or advertised outputs, or your breach of these Terms, to the extent permitted by law.
 
-## 16. Limitation of liability
+## 18. Consumers in the EU
 
-To the maximum extent permitted by law, we will not be liable for any indirect, incidental or consequential damages, or for lost profits, revenue, data or goodwill. Our total liability for any claim relating to the Service is limited to the amount you paid us in the 12 months before the event giving rise to the claim. Nothing in these Terms limits liability that cannot be excluded by law.
+If you are a consumer, you have a 14-day right of withdrawal from a paid subscription or top-up. By asking us to start providing the Service (and spending credits) within that period, you [expressly request immediate performance and acknowledge that you lose the right of withdrawal once the service is fully performed / credits are used — to confirm]. You may also use the EU consumer dispute resolution mechanisms available to you.
 
-## 17. Indemnity
+## 19. Governing law and disputes
 
-You agree to indemnify and hold us harmless from claims, losses and expenses arising out of Your Content, your use of the Service, or your breach of these Terms or of any third-party platform's rules.
-
-## 18. Termination
-
-You can stop using the Service and close your account at any time. We may suspend or terminate your access if you breach these Terms or if we discontinue the Service. On termination, your right to use the Service ends; sections that by their nature should survive (such as ownership, disclaimers and limitation of liability) will survive.
-
-## 19. Governing law & jurisdiction
-
-These Terms are governed by Italian law. Any dispute will be subject to the exclusive jurisdiction of the courts competent for the place where the data controller is established, without prejudice to any mandatory consumer-protection rules that may apply.
+These Terms are governed by **Italian law**. For business users, the courts of [CITY] have exclusive jurisdiction. If you are a consumer, the court of your place of residence or domicile is competent, and you keep the protection of the mandatory laws of your country of residence.
 
 ## 20. Changes to these Terms
 
-We may update these Terms from time to time. When we make material changes we will update the "Last updated" date and notify you through the Service or by email. Continuing to use the Service after changes take effect means you accept the updated Terms.
+We may update these Terms. For material changes we will notify you by email or in the Service at least [30] days before they apply, unless the change is required by law or to address abuse. If you do not accept the new Terms you can close your account before they take effect.
 
 ---
 
-Questions about these Terms? Write to [privacy@feega.app](mailto:privacy@feega.app).
+Questions: [SUPPORT EMAIL]
