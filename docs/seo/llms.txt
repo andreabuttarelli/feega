@@ -1,0 +1,39 @@
+# feega
+
+> feega is an AI infinite canvas. Text, image, video, audio and document nodes are generated, connected and edited on one board by a person, by the built-in chat, or by an external agent over MCP. Finished material is scheduled to social accounts and run as Meta ads.
+
+- App: https://oh.feega.app
+- MCP server: https://mcp.feega.app/mcp
+- Support: support@feega.app — General: hi@feega.app
+
+## What it does
+
+- Image generation: GPT Image, Nano Banana, Seedream, Qwen.
+- Video generation, text-to-video and image-to-video with first/last frame, up to 15 s per clip: Seedance 2.5, Kling 3.0, Grok Imagine.
+- Video upscaling up to 30 s per clip: FLUX Video Upscale.
+- Audio: text to speech, voice changer, dubbing, music, sound effects, voice isolation.
+- Image effects: glitch, RGB shift, dither, halftone, pixelate, posterize and more.
+- Products imported from a connected store; social calendar and publishing; Meta ad campaigns approved before they run.
+
+## What it does not do
+
+- Background removal, automatic captions, video colourization, 3D model export (GLB/FBX), ads outside Meta.
+
+## Pages
+
+- [AI video upscaler](https://www.feega.app/ai-video-upscaler)
+- [AI 3D animation maker](https://www.feega.app/3d-animation-maker)
+- [AI commercial and ad maker](https://www.feega.app/ai-commercial-maker)
+- [Paper cutout animation](https://www.feega.app/paper-cutout-animation)
+- [Claymation AI](https://www.feega.app/claymation-ai)
+- [80s retro / VHS video](https://www.feega.app/80s-retro-video)
+- [Anime video generator](https://www.feega.app/anime-video-generator)
+- [AI video styles](https://www.feega.app/ai-video-styles)
+- [Generatore di video AI (IT)](https://www.feega.app/it/video-ai)
+- [Generador de vídeos con IA (ES)](https://www.feega.app/es/video-ia)
+
+## Legal
+
+- [Privacy](https://www.feega.app/privacy)
+- [Terms](https://www.feega.app/terms)
+- [Legal notice](https://www.feega.app/legal-notice)
