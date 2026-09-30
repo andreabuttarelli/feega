@@ -44,7 +44,7 @@ vi.mock('$lib/server/media-archive', () => ({
   signKnowledgePaths: (...args: unknown[]) => signKnowledgePaths(...args)
 }));
 vi.mock('$lib/server/content-credentials', () => ({
-  markImage: async (bytes: Buffer) => bytes,
+  markGenerated: async (bytes: Buffer) => ({ bytes, marked: true }),
   DIGITAL_SOURCE_TYPE: { synthetic: 'trainedAlgorithmicMedia' }
 }));
 vi.mock('$lib/server/ai-log', () => ({
