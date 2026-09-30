@@ -2134,6 +2134,18 @@
     if (created.length) { pushGesture(createManyGesture(created, connected)); }
   }
 
+  async function insertTemplate(id: string, at: { x: number; y: number }) {
+    const result = await post('template', { template_id: id, x: at.x, y: at.y });
+    const created = (result?.nodes ?? []) as CanvasNodeRecord[];
+    const connected = (result?.connections ?? []) as Connection[];
+    if (!created.length) {
+      return;
+    }
+    nodes = [...nodes, ...created.map((n) => toTile(n, { select: true }))];
+    edges = [...edges, ...connected.map(toEdge)];
+    pushGesture(createManyGesture(created, connected));
+  }
+
   /**
    * ⌘Z / ⇧⌘Z: UNA SOLA AZIONE SERVER PER ENTRAMBI — annullare un gesto e ripeterne uno annullato
    * sono la STESSA domanda a `undoGesture` (lato server): applica le inverse del gesto che riceve
@@ -2309,6 +2321,7 @@
     onPromote={handlePromote}
     onCopy={copy}
     onPaste={paste}
+    onTemplate={insertTemplate}
     onUndo={undo}
     onRedo={redo}
     onConnectNew={connectNew}

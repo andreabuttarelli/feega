@@ -126,6 +126,7 @@
     onDuplicate,
     onCopy,
     onPaste,
+    onTemplate,
     onUndo,
     onRedo,
     onConnectNew,
@@ -196,6 +197,7 @@
     onCopy?: (ids: string[]) => void;
     /** ⌘V: incolla, al centro di quel che si sta guardando adesso. */
     onPaste?: (at: { x: number; y: number }) => void;
+    onTemplate?: (id: string, at: { x: number; y: number }) => void;
     /** ⌘Z: annulla l'ultimo gesto di questa scheda. */
     onUndo?: () => void;
     /** ⇧⌘Z: ripete l'ultimo gesto annullato. */
@@ -661,12 +663,26 @@
   }
 
   /** Il clic sulla barra: nessun punto scelto, quindi al centro di quel che si sta guardando. */
-  function addAtCentre(what: Addable) {
-    if (!toFlow) return;
+  function viewCentre(): { x: number; y: number } | null {
     const box = wrap?.getBoundingClientRect();
-    if (!box) return;
+    if (!toFlow || !box) {
+      return null;
+    }
+    return toFlow({ x: box.left + box.width / 2, y: box.top + box.height / 2 });
+  }
 
-    onCreate?.(what, toFlow({ x: box.left + box.width / 2, y: box.top + box.height / 2 }));
+  function addAtCentre(what: Addable) {
+    const at = viewCentre();
+    if (at) {
+      onCreate?.(what, at);
+    }
+  }
+
+  function templateAtCentre(id: string) {
+    const at = viewCentre();
+    if (at) {
+      onTemplate?.(id, at);
+    }
   }
 
   let wrap = $state<HTMLDivElement | null>(null);
@@ -754,7 +770,7 @@
   {/if}
 
   {#if spec.chrome && onCreate}
-    <CanvasAddBar onpick={addAtCentre} onupload={onUpload} />
+    <CanvasAddBar onpick={addAtCentre} onupload={onUpload} ontemplate={onTemplate ? templateAtCentre : undefined} />
   {/if}
 
   {#if spec.chrome}

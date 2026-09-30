@@ -39,6 +39,7 @@ import { planLoop, enqueueLoop, cancelLoop, retryLoopCombination } from '$lib/se
 import { planWorkflowDryRun, enqueueWorkflow, cancelWorkflow, estimateWorkflowCredits } from '$lib/server/canvas/workflow';
 import { listNodeRuns } from '$lib/server/repos/node-runs';
 import { duplicateNodes } from '$lib/server/canvas/duplicate';
+import { insertTemplate } from '$lib/server/canvas/templates';
 import { undoGesture } from '$lib/server/canvas/undo';
 import type { Gesture, UndoItem } from '$lib/canvas/undo-plan';
 import { gateOrgAiActionForForm } from '$lib/server/cli-auth';
@@ -1385,6 +1386,30 @@ export const actions: Actions = {
     }
 
     return { nodes, connections };
+  },
+
+  template: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+
+    const at = { x: Number(fd.get('x')), y: Number(fd.get('y')) };
+    if (!Number.isFinite(at.x) || !Number.isFinite(at.y)) {
+      return fail(400, { error: 'posizione non valida' });
+    }
+
+    const out = await insertTemplate(scope.db, {
+      orgId: scope.orgId,
+      projectId: scope.canvas.projectId,
+      canvasId: scope.canvasId,
+      templateId: String(fd.get('template_id') ?? ''),
+      at,
+      actor: userActor(scope)
+    });
+    if (!out) {
+      return fail(400, { error: 'template sconosciuto' });
+    }
+
+    return out;
   },
 
   /**
