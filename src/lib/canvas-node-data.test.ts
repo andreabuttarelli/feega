@@ -6,6 +6,7 @@ import {
   docOf,
   frameOf,
   genOf,
+  genPatch,
   influencerOf,
   isNodeType,
   listData,
@@ -495,5 +496,13 @@ describe('un nodo composition, letto dalla riga', () => {
     })!;
     const written = compositionData(node);
     expect(compositionOf({ id: 'n1', type: 'composition', data: written })).toEqual(node);
+  });
+});
+
+describe('genPatch: an edit writes only what the person changed', () => {
+  it('typing the prompt during a run never writes refId or running', () => {
+    const running = genOf({ id: 'n1', type: 'text', data: { prompt: 'a', running: true } })!;
+
+    expect(genPatch(running, { prompt: 'ab' })).toEqual({ prompt: 'ab' });
   });
 });

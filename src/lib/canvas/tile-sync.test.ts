@@ -30,11 +30,19 @@ describe('tenere i nodi della tela allineati alle tile', () => {
   });
 
   it('conserva il nodo che SvelteFlow sta già muovendo, non lo ricostruisce', () => {
-    const moving = { ...node('a'), position: { x: 999, y: 999 } };
+    const moving = { ...node('a'), position: { x: 999, y: 999 }, dragging: true };
 
     const out = syncNodes([moving], [tile('a'), tile('b')], toNode);
 
     expect(out?.find((n) => n.id === 'a')?.position).toEqual({ x: 999, y: 999 });
+  });
+
+  it('un nodo fermo spostato da un agente va dove la tile dice', () => {
+    const toPlaced = (t: { id: string; x: number; y: number }) => ({ ...node(t.id), position: { x: t.x, y: t.y } });
+
+    const out = syncNodes([node('a')], [{ ...tile('a'), x: 900 }], toPlaced);
+
+    expect(out?.[0].position).toEqual({ x: 900, y: 0 });
   });
 
   it('un nodo che resta prende comunque lo STILE nuovo della sua tile — un testo che cresce cambia altezza, non dati', () => {
