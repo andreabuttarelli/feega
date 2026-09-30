@@ -15,7 +15,7 @@
  *   immagine  →  sincrona, ~10s   →  { status: 'ready',     media: [...] }
  *   video     →  minuti           →  { status: 'rendering', jobId }  → check_media_job
  *
- * Aspettare un video non è un'opzione: il poll di kie arriva a 600s contro un muro di funzione a
+ * Aspettare un video non è un'opzione: il render arriva a minuti contro un muro di funzione a
  * 300s, quindi chi aspetta muore sempre a metà. È il reconciler del cron a finirlo.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -813,7 +813,7 @@ async function startVideo(opts: GenerateMediaOpts): Promise<VideoJobResult> {
 }
 
 /**
- * Un clip senza brand. Non torna pronto — kie ci mette minuti — e non c'è una libreria in cui
+ * Un clip senza brand. Non torna pronto — ci vogliono minuti — e non c'è una libreria in cui
  * depositarlo: il risultato vive sulla riga della coda, che porta addosso chi paga.
  */
 export async function generateVideoWithoutBrand(

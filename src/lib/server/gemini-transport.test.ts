@@ -39,37 +39,10 @@ describe('le superfici sul centralino (non lo SDK Google)', () => {
   });
 });
 
-/**
- * LE RIGHE VECCHIE SI PREZZANO ANCORA GIUSTE.
- *
- * In `ai_calls` ci sono 3.185 righe passate da un trasporto che non c'è più, e portano id scritti
- * con i TRATTINI — la forma di quel fornitore. Prezzarle a listino Google sarebbe 16 volte il
- * costo reale, e non fallirebbe: tornerebbe un numero credibile e sbagliato.
- */
 describe('la fatturazione di una riga storica', () => {
   beforeEach(() => {
     vi.resetModules();
     setEnv({ GEMINI_API_KEY: 'g' });
-  });
-
-  it('non prezza mai a listino Google: 16 volte il costo reale, e senza errori', async () => {
-    const { computeCostUsd } = await import('./ai-log');
-    const { GEMINI_FLASH, kieFlashId } = await import('./google-models');
-    const usage = { ms: 0, ok: true, inputTokens: 100_000, outputTokens: 10_000, thinkingTokens: 20_000 };
-    const google = computeCostUsd({ label: 'x', provider: 'llm', model: GEMINI_FLASH, ...usage });
-    const kie = computeCostUsd({ label: 'x', provider: 'llm', model: kieFlashId(GEMINI_FLASH), ...usage });
-    expect(google).toBeCloseTo((100_000 * 1.5 + 30_000 * 7.5) / 1e6, 6);
-    expect(kie).toBeCloseTo((100_000 * 0.225 + 30_000 * 1.125) / 1e6, 6);
-    expect(kie! * 6).toBeLessThan(google!);
-  });
-
-  it('quel trasporto non aveva il tier di cache: i token ripetuti costano pieni', async () => {
-    const { computeCostUsd } = await import('./ai-log');
-    const { GEMINI_FLASH, kieFlashId } = await import('./google-models');
-    const cached = { ms: 0, ok: true, inputTokens: 100_000, cachedTokens: 100_000, outputTokens: 0 };
-    const google = computeCostUsd({ label: 'x', provider: 'llm', model: GEMINI_FLASH, ...cached })!;
-    const kie = computeCostUsd({ label: 'x', provider: 'llm', model: kieFlashId(GEMINI_FLASH), ...cached })!;
-    expect(kie).toBeGreaterThan(google);
   });
 
   it('un id senza tariffa vale null — un buco che si interroga, non un numero sbagliato', async () => {

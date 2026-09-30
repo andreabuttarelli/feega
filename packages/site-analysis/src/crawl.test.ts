@@ -7,7 +7,7 @@ vi.mock('node:dns/promises', () => ({
     lookup: async () => [{ address: '93.184.216.34', family: 4 }]
 }));
 
-import { blockPageReason, classifyArchetype, discoverAnnouncementPages, discoverInternalPages, extractLogos, extractSocialHandles, harvestPageImages, isUrlSafe, loadPageHtml, matchTeamPhotos, resolveEntryUrl, svgToPng, type BrowserRenderer, type EntryProbe } from './crawl';
+import { blockPageReason, classifyArchetype, discoverAnnouncementPages, discoverInternalPages, extractLogos, extractSocialHandles, harvestPageImages, isUrlSafe, loadPageHtml, matchTeamPhotos, resolveEntryUrl, svgToPng, type EntryProbe } from './crawl';
 
 const linksHtml = (hrefs: string[]) =>
     `<html><body>${hrefs.map((h) => `<a href="${h}">x</a>`).join('')}</body></html>`;
@@ -236,9 +236,8 @@ describe('harvestPageImages', () => {
     });
 });
 
-describe('loadPageHtml — render-first when configured', () => {
-    const richHtml = `<html><body>${'word '.repeat(60)}</body></html>`; // >100 chars of visible text
-    const thinHtml = '<html><body><div id="app"></div></body></html>'; // SPA shell, ~0 visible text
+describe('loadPageHtml', () => {
+    const richHtml = `<html><body>${'word '.repeat(60)}</body></html>`;
 
     const mockStaticFetch = (body: string) =>
         vi.stubGlobal(
@@ -251,64 +250,16 @@ describe('loadPageHtml — render-first when configured', () => {
             }))
         );
 
-    // Injected fake browser — avoids real network and the SvelteKit/vitest module-mock quirk.
-    const renderer = (cfg: { configured: boolean; content?: () => Promise<string> }): BrowserRenderer => ({
-        isConfigured: () => cfg.configured,
-        content: vi.fn(cfg.content ?? (async () => ''))
-    });
-
     afterEach(() => vi.unstubAllGlobals());
 
-    it('renders via the browser on EVERY site when configured — even when static is rich', async () => {
+    it('returns the static HTML', async () => {
         mockStaticFetch(richHtml);
-        const rendered = `<html><body>${'rendered '.repeat(60)}</body></html>`;
-        const r = renderer({ configured: true, content: async () => rendered });
-        const onEscalate = vi.fn();
-
-        const out = await loadPageHtml('https://example.com', onEscalate, r);
-
-        expect(out).toBe(rendered);
-        expect(onEscalate).toHaveBeenCalledOnce();
-        expect(r.content).toHaveBeenCalledWith('https://example.com', { waitForTimeout: 2500 });
+        expect(await loadPageHtml('https://example.com')).toBe(richHtml);
     });
 
-    it('returns static HTML (no render) when Browserless is not configured', async () => {
-        mockStaticFetch(richHtml);
-        const r = renderer({ configured: false });
-        const out = await loadPageHtml('https://example.com', undefined, r);
-        expect(out).toBe(richHtml);
-        expect(r.content).not.toHaveBeenCalled();
-    });
-
-    it('falls back to static HTML if the render fails', async () => {
-        mockStaticFetch(richHtml);
-        const r = renderer({ configured: true, content: async () => { throw new Error('429'); } });
-        const out = await loadPageHtml('https://example.com', undefined, r);
-        expect(out).toBe(richHtml);
-    });
-
-    it('keeps the static HTML when the render comes back thinner', async () => {
-        mockStaticFetch(richHtml);
-        const r = renderer({ configured: true, content: async () => thinHtml });
-        const out = await loadPageHtml('https://example.com', undefined, r);
-        expect(out).toBe(richHtml);
-    });
-
-    // Il renderer esce da IP di datacenter e molte CDN li bloccano: torna una pagina di blocco,
-    // non il sito. Ha centinaia di caratteri, quindi la soglia "pagina magra = SPA" la lascia
-    // passare — e il brand veniva costruito sopra un errore 403 (illy.com, 31 agosto 2026).
     it('non scambia una pagina di blocco della CDN per il sito', async () => {
-        mockStaticFetch(richHtml);
-        const r = renderer({ configured: true, content: async () => CLOUDFRONT_BLOCK });
-        const out = await loadPageHtml('https://example.com', undefined, r);
-        expect(out).toBe(richHtml);
-    });
-
-    it('non restituisce niente quando anche la lettura diretta è bloccata', async () => {
         mockStaticFetch(CLOUDFRONT_BLOCK);
-        const r = renderer({ configured: true, content: async () => CLOUDFRONT_BLOCK });
-        const out = await loadPageHtml('https://example.com', undefined, r);
-        expect(out).toBe('');
+        expect(await loadPageHtml('https://example.com')).toBe('');
     });
 });
 

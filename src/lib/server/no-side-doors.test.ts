@@ -8,8 +8,7 @@ const SRC = join(HERE, '../..');
 
 /**
  * Gli SDK che parlano a UN fornitore preciso. `@ai-sdk/openai` non è qui: è la FORMA
- * OpenAI-compatibile, e la usano entrambi gli endpoint vivi (`llm.ts` per OpenRouter,
- * `director.ts` e `produce-agent.ts` per kie). Il vincolo è il fornitore, non il protocollo.
+ * OpenAI-compatibile, e la usa `llm.ts` per OpenRouter. Il vincolo è il fornitore, non il protocollo.
  */
 const VENDOR_SDKS = [
 	'@google/genai',
@@ -53,7 +52,7 @@ function vendorSdkImports(file: string): string[] {
 
 describe('nessuna porta laterale verso un fornitore', () => {
 	/**
-	 * TUTTO passa da OpenRouter, e le foto/voce/video da kie. Nessuna lista bianca, nemmeno per
+	 * TUTTO passa da OpenRouter. Nessuna lista bianca, nemmeno per
 	 * `gemini.ts`: una guardia con un'eccezione è una guardia che si allarga di un file alla volta,
 	 * ed è così che questo confine si era già svuotato.
 	 */
@@ -80,14 +79,5 @@ describe('nessuna porta laterale verso un fornitore', () => {
 		const typeImport = `import type { GoogleGenAI } from '@google/genai';\n`;
 		expect(VALUE_IMPORT('@google/genai').test(valueImport)).toBe(true);
 		expect(VALUE_IMPORT('@google/genai').test(typeImport)).toBe(false);
-	});
-});
-
-describe('il registro conosce due endpoint, e basta', () => {
-	it('Endpoint resta kie | openrouter', async () => {
-		const src = readFileSync(join(SRC, 'lib/server/model-routing.ts'), 'utf8');
-		const declared = src.match(/export type Endpoint =([^;]+);/)?.[1] ?? '';
-		const endpoints = [...declared.matchAll(/'([a-z-]+)'/g)].map((m) => m[1]).sort();
-		expect(endpoints).toEqual(['kie', 'openrouter']);
 	});
 });

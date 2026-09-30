@@ -24,7 +24,7 @@
   const SLOTS = $derived(data.modelSlots ?? []);
 
   // 720p costs exactly double per second and every draft is billed, shipped or not — so 480p is
-  // the recommendation, not merely the default. Kept a two-rung choice: kie offers nothing between.
+  // the recommendation, not merely the default.
   const RESOLUTIONS = ['480p', '720p'];
   const DEFAULT_RESOLUTION = '480p';
   const currentRes = $derived(String(data.brand?.content_prefs?.videoResolution ?? DEFAULT_RESOLUTION));

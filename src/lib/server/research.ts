@@ -4,8 +4,6 @@ import { fetchPage } from '$lib/server/brand-analysis';
 import { scrapeForOnboarding, type ScrapeTarget, type ScrapedPost } from '$lib/server/scrapecreators';
 import { aiStructured, aiText, parallelVariants } from '$lib/server/ai-text';
 import { requireBrandContext } from '$lib/server/ai-log';
-import { exaConfigured, exaGroundedAnswer } from '$lib/server/exa';
-import { tavilyConfigured, tavilyGroundedAnswer } from '$lib/server/tavily';
 import { llmGeminiSearchModel, llmImagesFromInline, llmStructured, llmText, type ReasoningEffort } from '$lib/server/llm';
 
 // Deep-research module for onboarding: discover competitors (web-grounded), resolve their social
@@ -24,60 +22,7 @@ export type Citation = { uri: string; title: string };
 
 // ---- grounding spine ------------------------------------------------------------------------
 
-// A web-grounded free-text call. Returns the model's prose + the de-duplicated web sources it
-// cited, which the UI surfaces as "researched N sources". NO responseSchema.
-// `ai` non viene più usato (la risposta arriva dai provider web, non da Gemini): la firma resta
-// com'era perché cambiarla vorrebbe dire toccare tutti i chiamanti per togliere un argomento.
 export async function groundedText(
-  prompt: string,
-  systemInstruction?: string,
-  opts?: { brandId?: string }
-): Promise<{ text: string; citations: Citation[] }> {
-  // Solo per il log: i provider web leggono il brand dal contesto async.
-  requireBrandContext(opts);
-
-  // NIENTE GOOGLE GROUNDING QUI. Prima questa funzione partiva da Gemini + googleSearch e teneva
-  // gli altri come ripiego. Costava ~$0.07 a risposta ($14/1k query di ricerca PIÙ i token) contro
-  // i $0.005-0.008 di Exa e Tavily: dieci volte tanto per una risposta che poi viene comunque
-  // normalizzata da una seconda chiamata. Il motore di ricerca lo scegliamo per prezzo perché qui
-  // nessuno misura CHI ha risposto — quando conta il nome del motore (audit GEO, "è citato il brand
-  // nelle risposte di Gemini?") il chiamante usa groundedGemini, che sul gateway è un Gemini con
-  // plugin web nativo, non lo SDK Google.
-  //
-  // Più provider e non uno solo perché il guasto tipico non è la rottura ma la raffica: Exa ha
-  // risposto 192 volte su 241 in 14 giorni e ha rate-limitato (429) le altre 49, 44 delle quali in
-  // una sola giornata storta. Ogni anello passa la mano su una risposta VUOTA, così una fase di
-  // ricerca non può perdere in silenzio il suo passaggio sul web.
-  //
-  //     exa ~$0.005  ·  tavily ~$0.008
-  //
-  // Qui NON si misura chi ha risposto, quindi la catena può scegliere per prezzo. Dove il nome del
-  // motore è il punto — l'audit GEO — non si passa di qui: `geo.ts` ha un ramo per motore.
-  const question = systemInstruction ? `${systemInstruction}\n\n${prompt}` : prompt;
-
-  const webProviders: Array<[string, () => Promise<{ text: string; citations: Citation[] }>]> = [];
-  if (exaConfigured()) webProviders.push(['exa', () => exaGroundedAnswer(question)]);
-  if (tavilyConfigured()) webProviders.push(['tavily', () => tavilyGroundedAnswer(question)]);
-  for (const [name, call] of webProviders) {
-    const res = await call().catch((error) => { swallow('call failed', error); return ({ text: '', citations: [] }); });
-    if (res.text.trim()) return res;
-    console.warn(`[AI] ${name} returned empty, trying the next web provider`);
-  }
-
-  console.warn('[AI] every web provider returned empty');
-  return { text: '', citations: [] };
-}
-
-/**
- * Risposta web-grounded da un GEMINI sul centralino (plugin OpenRouter `web` + `engine: native`).
- *
- * Serve ai chiamanti che vogliono UN motore nominato, non il più economico: passare per
- * groundedText etichetterebbe col nome chiesto la risposta di chiunque abbia risposto per primo.
- *
- * SENZA CHIAMANTI da quando l'audit GEO ha una tabella sua (`ANSWER_ENGINES` in `geo.ts`), che
- * fissa un id di modello per motore invece di ereditare il picker della chat.
- */
-export async function groundedGemini(
   prompt: string,
   systemInstruction?: string,
   opts?: { brandId?: string }
@@ -650,7 +595,6 @@ export type BuyerPersona = {
   objectives: string[];
   painPoints: string[];
   preferredChannels: string[];
-  imageUrl?: string;
 };
 
 // Compact "AUDIENCE PERSONAS" block from the stored Buyer Personas document (a JSON blob in
@@ -734,33 +678,7 @@ Output ONLY the JSON array, no markdown, no explanation.`;
   const result = await structured<BuyerPersona[]>(prompt, PERSONAS_SCHEMA);
   if (!Array.isArray(result)) return [];
 
-  // Fetch images from Unsplash for each persona
-  const personasWithImages = await Promise.all(
-    result.map(async (persona) => {
-      try {
-        const imageUrl = await fetchUnsplashImage(persona.name, persona.role);
-        return { ...persona, imageUrl };
-      } catch {
-        return persona;
-      }
-    })
-  );
-
-  return personasWithImages;
-}
-
-// Fetch a random image from Unsplash matching a query
-async function fetchUnsplashImage(name: string, role: string): Promise<string> {
-  const query = encodeURIComponent(`${role} professional`);
-  const url = `https://api.unsplash.com/photos/random?query=${query}&orientation=portrait&w=400&h=500&client_id=${process.env.UNSPLASH_ACCESS_KEY}`;
-  try {
-    const res = await fetch(url);
-    if (!res.ok) return '';
-    const data = (await res.json()) as AnyRec;
-    return data?.urls?.regular ?? '';
-  } catch {
-    return '';
-  }
+  return result;
 }
 
 export { genaiClient };

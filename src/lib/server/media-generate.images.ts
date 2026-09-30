@@ -13,7 +13,6 @@ import { GEMINI_NANO_BANANA_2, googleImageModel, imageModelSpec } from '$lib/ima
 import { structured } from '$lib/server/research';
 import { signKnowledgePaths } from '$lib/server/media-archive';
 import { generateImageOnOpenrouter } from '$lib/server/openrouter-image';
-import { route } from '$lib/server/model-routing';
 import { svgToPng } from '$lib/server/brand-analysis';
 import { normalizeContentFormat } from '$lib/content-formats';
 import { firstLogoUrl } from '$lib/brand-fields';
@@ -321,27 +320,15 @@ export async function renderPostImage(
 
   const req = buildImageRequest(imagePrompt, opts);
   const imageModel = req.model;
-  // La richiesta e' SINCRONA: niente createTask e niente polling, quindi non esiste il task
-  // abbandonato-e-fatturato. Nessun ritentativo qui — un fallimento torna gia' diagnosticato, e i
-  // due trasporti alzano l'eccezione invece di restituire un successo vuoto.
-  // Due trasporti, un bivio solo. L'API immagini quando il modello vive LÌ — i GPT Image 2.5 e
-  // nient'altro — e la via Gemini per il resto di OpenRouter. Il ramo si sceglie sul MODELLO e non
-  // sulla rotta, perché è il modello a esistere o non esistere su quell'endpoint: un brand che ha
-  // scelto Nano Banana continua a passare di sotto anche con lo slot su gpt-image.
-  if (route('image').endpoint === 'openrouter' && imageModelSpec(imageModel)?.openrouterImages) {
+  if (imageModelSpec(imageModel)?.openrouterImages) {
     const dataUrl = await generateImageOnOpenrouterImages(req, { context: `image:${imageModel}` });
     return await review(dataUrl);
   }
-  if (route('image').endpoint === 'openrouter') {
-    const dataUrl = await generateImageOnOpenrouter(
-      { ...req, model: googleImageModel(req.model, NANO_BANANA_2_LITE) },
-      { context: `image:${imageModel}` }
-    );
-    return await review(dataUrl);
-  }
-  throw new Error(
-    `AI_ROUTE_IMAGE non punta a openrouter e non c'e' un altro trasporto: ${imageModel} non ha dove renderizzare`
+  const dataUrl = await generateImageOnOpenrouter(
+    { ...req, model: googleImageModel(req.model, NANO_BANANA_2_LITE) },
+    { context: `image:${imageModel}` }
   );
+  return await review(dataUrl);
 }
 
 /**

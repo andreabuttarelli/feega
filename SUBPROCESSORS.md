@@ -12,7 +12,7 @@ feega (**[LEGAL ENTITY]**, VAT no. **[VAT]**, **[ADDRESS]**) uses the providers 
 | Provider | Purpose | Personal data | Location | Transfer mechanism |
 |---|---|---|---|---|
 | Supabase | database, authentication, file storage, realtime | all account, workspace, content, brand, social, ads and billing records; uploaded and generated files | [REGION — EU/US] | [DPF / SCCs — if outside the EEA] |
-| Vercel | hosting, serverless functions, web analytics; isolated code sandboxes for the agent, when enabled | request data, IP address, content processed during a request | US / global | DPF / SCCs |
+| Vercel | hosting, serverless functions, web analytics | request data, IP address, content processed during a request | US / global | DPF / SCCs |
 | Stripe | payments, subscriptions, invoices | name, email, billing address, VAT number, payment details (held by Stripe) | EU / US | DPF / SCCs |
 | Resend | transactional email (invites, notifications) | email address, name, message content | US | DPF / SCCs |
 
@@ -21,12 +21,11 @@ feega (**[LEGAL ENTITY]**, VAT no. **[VAT]**, **[ADDRESS]**) uses the providers 
 | Provider | Purpose | Personal data | Location | Transfer mechanism |
 |---|---|---|---|---|
 | OpenRouter, and the model providers it routes each request to | text, chat, image and video generation; the second-stage moderation review | prompts, attachments, brand context, generated outputs | US / other, per model | SCCs [to confirm per provider] |
-| Kie.ai | alternative transport for video and some image models, when configured | prompts, reference media, generated outputs | [LOCATION] | [SCCs — to confirm] |
 | Wiro | image and video generation with the uncensored model catalogue (NSFW mode, not yet available) | prompts, reference media, generated outputs | [LOCATION] | [SCCs — to confirm] |
 | ElevenLabs | voice-over, music and sound generation | script text, chosen voice, generated audio | US / EU | DPF / SCCs |
 | TypeSafe (Jev classifier) | first-stage prompt moderation | prompt text, reference descriptions | [LOCATION] | [SCCs — to confirm] |
 
-Google Gemini models are reached through OpenRouter or Kie.ai; the current code does not call the Google Gemini API directly.
+Google Gemini models are reached through OpenRouter; the current code does not call the Google Gemini API directly.
 
 ## Social, ads and research
 
@@ -35,9 +34,6 @@ Google Gemini models are reached through OpenRouter or Kie.ai; the current code 
 | Zernio | connecting social accounts, publishing, reading account metrics, Meta ads operations | account handle and profile, access tokens, posts, metrics | [LOCATION] | [SCCs — to confirm] |
 | Meta Platforms | ad campaigns on your ad account | ad account IDs, campaigns, creatives, metrics | IE / US | DPF / SCCs |
 | ScrapeCreators | reading public social profiles and posts you add to a feed | public profile data and posts | US | SCCs [to confirm] |
-| Browserless | rendering a brand's public website for analysis, when configured | content of public web pages | [LOCATION] | [SCCs — to confirm] |
-| Exa, Tavily | web search for research and brand analysis, when configured | search queries derived from your brand and prompts | US | [SCCs — to confirm] |
-| Unsplash | stock image search for research, when configured | search queries | US / global | [to confirm] |
 
 ## Monitoring and analytics
 
