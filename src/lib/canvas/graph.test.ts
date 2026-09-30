@@ -210,6 +210,20 @@ describe('quanti ingressi accetta un nodo, e dipende dal modello', () => {
   });
 });
 
+describe('acceptedInputs — su un nodo audio segue la stessa operazione di canConnect', () => {
+  it('un video si rifiuta su text to speech, entra su voice changer', () => {
+    const video = node('v', 'video');
+
+    const tts = acceptedInputs(node('a', 'audio', { operation: 'text_to_speech' }), [video]);
+    expect(tts.accepted).toEqual([]);
+    expect(tts.rejected).toEqual([video]);
+
+    const changer = acceptedInputs(node('a', 'audio', { operation: 'voice_changer' }), [video]);
+    expect(changer.accepted).toEqual([video]);
+    expect(changer.rejected).toEqual([]);
+  });
+});
+
 describe('una pagina incorporata è una sorgente, come un documento', () => {
   it('non si genera: la pagina esiste già, e un arco verso di lei non farebbe niente', () => {
     expect(CANVAS_NODE_SPECS.iframe.generated).toBe(false);

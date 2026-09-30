@@ -250,7 +250,7 @@ export function acceptedInputs(node: CanvasNode, incoming: CanvasNode[]): InputV
   for (const source of incoming) {
     const medium = mediumOf(source);
     const room = caps[medium] ?? 0;
-    if (!spec.accepts.includes(medium)) {
+    if (!acceptsOf(node).includes(medium)) {
       rejected.push(source);
       why ??= `${MEDIUM_NAME[medium]} cannot feed this node`;
       continue;
