@@ -17,6 +17,7 @@ const createOneTimeCreditCheckout = vi.fn();
 const billingGrantsReady = vi.fn();
 const orgBillingById = vi.fn();
 const subscribedRungPrice = vi.fn();
+const latestRefund = vi.fn();
 
 vi.mock('$lib/server/credits', () => ({
 	orgCreditBalance: (...a: unknown[]) => orgCreditBalance(...a)
@@ -37,6 +38,9 @@ vi.mock('$lib/server/stripe', () => ({
 	ensureOrgCustomer: (...a: unknown[]) => ensureOrgCustomer(...a),
 	createOneTimeCreditCheckout: (...a: unknown[]) => createOneTimeCreditCheckout(...a),
 	subscribedRungPrice: (...a: unknown[]) => subscribedRungPrice(...a)
+}));
+vi.mock('$lib/server/refund-status', () => ({
+	latestRefund: (...a: unknown[]) => latestRefund(...a)
 }));
 vi.mock('$lib/server/billing-readiness', () => ({
 	billingGrantsReady: (...a: unknown[]) => billingGrantsReady(...a)
@@ -129,6 +133,7 @@ beforeEach(() => {
 	createOneTimeCreditCheckout.mockResolvedValue('https://checkout.stripe.com/c/pay/cs_test_one_time');
 	billingGrantsReady.mockResolvedValue(true);
 	orgBillingById.mockResolvedValue({ subscriptionId: null });
+	latestRefund.mockResolvedValue(null);
 });
 
 describe('project settings billing', () => {
@@ -275,6 +280,32 @@ describe('project settings billing', () => {
 		);
 
 		expect(data.purchasesReady).toBe(false);
+	});
+
+	it('carries the refund eligibility of the latest purchase, as an ISO date the page can print', async () => {
+		latestRefund.mockResolvedValue({
+			eligible: true,
+			amount: 32,
+			reason: 'within_window',
+			until: new Date('2026-10-14T00:00:00Z'),
+			maxCreditsUsable: 3.2
+		});
+
+		const data = await run(ownerOrg());
+
+		expect(latestRefund).toHaveBeenCalledWith(expect.anything(), 'org-1', expect.any(Date), expect.any(Function));
+		expect(data.refund).toEqual({ eligible: true, amount: 32, until: '2026-10-14T00:00:00.000Z', maxCreditsUsable: 3.2 });
+	});
+
+	it('still renders when the refund status cannot be read', async () => {
+		latestRefund.mockRejectedValue(new Error('stripe down'));
+		const data = await run(ownerOrg());
+		expect(data.refund).toBeNull();
+	});
+
+	it('has no refund line without a paid purchase', async () => {
+		const data = await run(ownerOrg());
+		expect(data.refund).toBeNull();
 	});
 
 	describe('actions.buyOneTime', () => {

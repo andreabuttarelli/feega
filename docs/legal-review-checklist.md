@@ -6,7 +6,6 @@
 - `[SUPPORT EMAIL]`, `[LEGAL NOTICE EMAIL]` (DSA single point of contact).
 - `[DPO]`, `[DPA]` link.
 - `[VAT INCLUDED / EXCLUDED]` on plan prices.
-- `[REFUND POLICY]`; top-up fate on termination `[REFUNDED / FORFEITED]`.
 - Price-change and terms-change notice `[30]` days; liability cap `[12]` months; court `[CITY]`.
 - Account deletion flow `[HOW]` — no self-serve deletion found in the code.
 - Retention periods: account closure, backups, soft-deleted nodes purge, AI call logs, moderation logs, Sentry, analytics.
@@ -17,7 +16,7 @@
 
 1. **Age verification**: whether Italian/EU rules require it for NSFW generation, which certified provider, legal basis for storing the result.
 2. **Stripe and adult content**: Stripe restricts adult services; confirm NSFW mode may be sold through Stripe.
-3. **Refunds and consumer withdrawal**: waiver wording for credits used within 14 days (Codice del Consumo art. 59).
+3. **Refunds and consumer withdrawal** (`REFUND.md`): whether a usage threshold of min(10% of granted credits, 5 credits) is enforceable against consumers under Directive 2011/83/EU art. 16(m) / 14(3) and Codice del Consumo art. 59 lett. o / art. 57 — i.e. whether partial use lets us refuse withdrawal for the whole purchase; whether deducting the Stripe processing fee from a withdrawal refund is allowed (art. 13 requires reimbursing all payments); and whether the Stripe Checkout consent text (ToS checkbox + custom text) is a valid express request and acknowledgment on a durable medium (art. 8(7) confirmation).
 4. **Liability caps and warranties**: enforceability for consumers vs businesses; conformity guarantee for digital services.
 5. **AI Act**: art. 50 labelling duties (provider vs deployer), art. 4 literacy, art. 5 list; machine-readable marking is claimed only "where technically feasible".
 6. **DSA**: notice-and-action, statement of reasons, points of contact; hosting-service status given share links.

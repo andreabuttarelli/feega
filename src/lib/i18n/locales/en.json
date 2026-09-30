@@ -410,7 +410,12 @@
         "manage": "Manage",
         "manageInvoicesDesc": "Invoices and payment method.",
         "invoices": "Invoices",
-        "changePayment": "Change payment method"
+        "changePayment": "Change payment method",
+        "refunds": "Refunds",
+        "refundPolicy": "Refund policy",
+        "refundAvailable": "Refund of €{amount} available until {date} while you've used up to {credits} credits of your latest purchase.",
+        "refundUnavailable": "Your latest purchase is no longer refundable.",
+        "refundRequest": "Request a refund"
       },
       "usage": {
         "balance": "Credit balance"
