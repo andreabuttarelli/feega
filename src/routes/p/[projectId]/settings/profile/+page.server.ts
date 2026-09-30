@@ -4,6 +4,7 @@ import {
   uploadProfileAvatar,
   removeProfileAvatar
 } from '$lib/server/settings-actions';
+import { deleteAccountAction } from '$lib/server/account/account-server';
 
 function splitName(full: string | null | undefined): { firstName: string; lastName: string } {
   const parts = (full ?? '').trim().split(/\s+/).filter(Boolean);
@@ -43,5 +44,6 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
 export const actions: Actions = {
   updateProfile,
   uploadProfileAvatar,
-  removeProfileAvatar
+  removeProfileAvatar,
+  deleteAccount: deleteAccountAction
 };

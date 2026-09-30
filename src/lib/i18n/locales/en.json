@@ -396,7 +396,15 @@
         "tooLarge": "Photo too large (max 2MB).",
         "notImage": "File must be an image.",
         "privacy": "Privacy",
-        "cookieHint": "Choose which analytics and marketing cookies feega may use."
+        "cookieHint": "Choose which analytics and marketing cookies feega may use.",
+        "exportData": "Download my data",
+        "exportHint": "A JSON file with your profile, workspaces, projects, messages you wrote and the credit history of workspaces you own.",
+        "deleteAccount": "Delete account",
+        "deleteHint": "Deletes your login, profile, API keys and chats you started. Workspaces where you are the only member are deleted with their files, and their plan is cancelled at period end. Workspaces shared with others keep their work. This cannot be undone.",
+        "deleteConfirmLabel": "Type DELETE or your email to confirm",
+        "deleteConfirmError": "Type DELETE or your email exactly.",
+        "deleteReauth": "For safety, sign in again (within the last 15 minutes) and retry.",
+        "deleteTransfer": "You are the only owner of a workspace with other members. Make someone else owner, or remove the members, first."
       },
       "appearance": {
         "title": "Appearance",
