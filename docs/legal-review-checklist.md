@@ -23,7 +23,7 @@
 6. **DSA**: notice-and-action, statement of reasons, points of contact; hosting-service status given share links.
 7. **Credit expiry**: subscription credits expire at period end, welcome credits after 14 days, top-ups never — check against consumer law.
 8. **Monthly credit fee per connected social account** — disclosure adequacy.
-9. **Consent**: `src/app.html` loads the Google Ads tag after interaction or 10 s **without consent gating**; verify Meta Pixel and Seline gating in `src/lib/analytics.ts`. Likely non-compliant until fixed.
+9. **Consent**: `src/app.html` loads the Google gtag.js conversion tag after interaction or 10 s **without consent gating**; verify Meta Pixel and Seline gating in `src/lib/analytics.ts`. Likely non-compliant until fixed.
 10. **Sentry `sendDefaultPii: true`** — justify under legitimate interest or turn off.
 11. **Scraping** of public profiles (ScrapeCreators) and websites — legal basis and platform terms.
 12. Minimum age 18 for the whole Service.

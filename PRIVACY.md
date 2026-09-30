@@ -66,7 +66,7 @@ We do not sell personal data and do not use your content to train AI models. We 
 | PostHog | product analytics (anonymous; full with consent) | [US / EU] |
 | Microsoft Clarity | session replay (consent only) | US |
 | Seline | web analytics | [LOCATION] |
-| Google Ads, Meta Pixel | advertising conversion measurement | US |
+| Google (gtag.js conversion tracking), Meta Pixel | advertising conversion measurement | US |
 | Framer | marketing website feega.app | NL / global |
 | [AGE VERIFICATION PROVIDER] | age verification (NSFW, not yet available) | [LOCATION] |
 
@@ -94,7 +94,7 @@ Some providers are outside the EEA, mainly in the United States. Transfers rely 
 
 - **Strictly necessary**: authentication session and preferences. No consent needed.
 - **Anonymous analytics**: PostHog in cookieless mode, Vercel Web Analytics, Seline [to confirm cookieless].
-- **With consent only**: PostHog with persistent cookies and session recording, Microsoft Clarity session replay, Meta Pixel and Google Ads conversion tag.
+- **With consent only**: PostHog with persistent cookies and session recording, Microsoft Clarity session replay, Meta Pixel and the Google gtag.js conversion tag.
 
 You can change your choice at any time via "Cookie preferences". Details: [Cookie Policy](./COOKIES.md).
 
