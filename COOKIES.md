@@ -1,56 +1,78 @@
 # Cookie Policy
 
-Archived 22 September 2026. This document was live at `/cookies` until that date, when the
-public legal pages were removed from the product (no user data was being collected in the EU
-at the time). Kept here verbatim so it can be restored — re-published as-is or updated first —
-before the product collects personal data again.
+> **Draft — to be reviewed by a lawyer before publication.**
+> Last updated: 30 September 2026
 
-Last updated: 19 August 2026
+This policy lists the cookies and similar technologies (browser storage, pixels, scripts) that feega uses in the web app, under Art. 122 of Italian Legislative Decree 196/2003 and the Garante's guidelines of 10 June 2021. How we process the related personal data is in the [Privacy Policy](./PRIVACY.md); the providers are listed in [Sub-processors](./SUBPROCESSORS.md).
 
-This Cookie Policy explains how feega uses cookies and similar technologies when you visit our website. By continuing to use our site you agree to the use of cookies as described here.
+No tracker runs on development or preview hosts, and none runs for feega staff. Brand blogs hosted by feega load none of the analytics or advertising tools below.
 
-## 1. What are cookies?
+## 1. Strictly necessary
 
-Cookies are small text files placed on your device by the websites you visit. They are widely used to make websites work, improve the user experience and provide information to the site owners.
+Set without consent: the Service does not work without them.
 
-## 2. How we use cookies
+| Name | Type | Purpose | Duration |
+|---|---|---|---|
+| `sb-<project>-auth-token` (may be split into `.0`, `.1`) | cookie, first party | keeps you signed in (Supabase Auth session) | [up to 400 days, refreshed while you use the Service — to confirm] |
+| `oauth_return` | cookie, first party, HttpOnly | returns you to an MCP/OAuth authorisation after login | 10 minutes |
+| `dz-last-project` | cookie, first party | reopens the last project you worked on | 1 year |
+| `sidebar_state` | cookie, first party | remembers whether the sidebar is open, so the page renders correctly on load | 1 year |
+| `feega_cookie_consent_v1` | localStorage | stores your cookie choice | until you clear it |
+| `theme` | localStorage | light or dark theme | until you clear it |
+| `feega.sidebarOpen`, `feega.sidebarPanePx`, `feega.sidebarPane`, `feega.chatPanelPx`, `feega.chatOpen`, `feega.chatTab` | localStorage | layout of sidebar and chat panel | until you clear them |
+| `feega:brands-panel-open:<project>` | localStorage | which brands are expanded in a project | until you clear it |
+| `feega.warningsSeen.<brand>` | localStorage | which brand warnings you have already seen | until you clear it |
+| `feega:brand-wizard:<project>` | sessionStorage | draft of the brand setup wizard | until the tab is closed |
 
-We use the following types of cookies:
+Older `dazero…` keys with the same purposes may still be read and are no longer written.
 
-### Strictly necessary cookies
+## 2. Analytics without consent (anonymous)
 
-These cookies are essential for the service to function — for example, to keep you signed in. They cannot be switched off.
+| Tool | What it does | Storage |
+|---|---|---|
+| PostHog (EU cloud), cookieless mode | aggregate page views and clicks, no session recording | memory only, nothing stored on your device |
+| Vercel Web Analytics | aggregate page views | no cookies |
+| Seline | page views | no cookies until you sign in (see §5) |
 
-### Analytics cookies
+## 3. Analytics with consent
 
-With your consent, we use PostHog and Microsoft Clarity to understand how the product is used, measure page performance and improve the experience. These cookies store a persistent identifier so we can recognise returning visitors.
+| Tool | Name | Purpose | Duration |
+|---|---|---|---|
+| PostHog | `ph_<key>_posthog` cookie and localStorage | recognises returning visitors, product analytics, session recording | 1 year [to confirm] |
+| Microsoft Clarity | `_clck`, `_clsk`, `CLID` and related | session replay and heatmaps | `_clck` 1 year, `_clsk` 1 day, `CLID` 1 year |
 
-### Session replay cookies
+## 4. Marketing (advertising measurement)
 
-With your consent, Microsoft Clarity records interactions (clicks, scrolls, page navigation) so we can identify UX issues and fix them. Recordings are anonymised — we do not capture keystrokes in password fields.
+| Tool | Name | Purpose | Duration |
+|---|---|---|---|
+| Meta Pixel | `_fbp`, `_fbc` | measures which Meta ads lead to sign-ups, purchases and booked calls | 90 days |
+| Google gtag.js conversion tag | `_gcl_au` and related | measures which Google ad clicks lead to conversions | 90 days |
 
-## 3. Anonymous analytics (no consent required)
+## 5. Consent
 
-We also run PostHog in a cookieless, anonymous mode that does not store any cookies and does not use a persistent identifier across sessions. Because the data is fully anonymised, this processing runs without requiring your consent under the GDPR and the Italian Garante's guidelines.
+**Intended behaviour.** Visitors from the EEA, the United Kingdom and Switzerland, and visitors whose country is unknown, see a banner with equal **Accept** and **Reject** buttons before any non-essential cookie is set. Until they accept, only §1 and §2 run. Accepting enables §3 and §4; rejecting keeps them off. Visitors from other countries are not shown the banner and analytics are enabled. The choice is stored in `feega_cookie_consent_v1` and can be changed at any time via "Cookie preferences".
 
-## 4. Managing your preferences
+**Current state of the code (being fixed).** As of the date above the code does not yet fully match that behaviour:
 
-You can change your cookie preferences at any time by clicking "Cookie preferences" in the footer of any page. You can also clear cookies through your browser settings. Note that blocking strictly-necessary cookies will prevent the service from working.
+- the Google gtag.js conversion tag loads after the first interaction or 10 seconds, without waiting for consent;
+- the Meta Pixel loads the same way (immediately after a Meta ad click), and the server sets `_fbc`/`_fbp` on arrival from a Meta ad, without consent;
+- when you sign in, Seline sets a cookie linked to your user ID and PostHog receives your user ID and email, without consent;
+- there is no "Cookie preferences" link yet to reopen the banner.
 
-## 5. Third-party cookies
+These are tracked in the [legal review checklist](./docs/legal-review-checklist.md) and must be fixed before publication.
 
-Some cookies are placed by third-party services we use:
+## 6. Managing cookies
 
-| Provider | Purpose |
-|---|---|
-| PostHog | Product analytics and session replay |
-| Microsoft Clarity | Session replay and heatmaps |
-| Stripe | Payment processing (only on the billing page) |
+Besides the banner, you can delete or block cookies in your browser settings. Blocking strictly necessary cookies prevents you from signing in.
 
-## 6. Changes to this policy
+## 7. The marketing website
 
-We may update this Cookie Policy from time to time. When we do, we will revise the "Last updated" date above.
+The marketing site is built with Framer, which may set its own cookies. [FRAMER SITE COOKIES — to list].
+
+## 8. Changes
+
+We update this page and the date above when the list changes.
 
 ---
 
-Questions about cookies? Write to [privacy@feega.app](mailto:privacy@feega.app).
+Questions: [privacy@feega.app](mailto:privacy@feega.app)
