@@ -43,29 +43,21 @@ export function syncNodes<N extends WithId, T extends WithId>(
     const fresh = toNode(t);
     const dragging = (n as unknown as WithDragging).dragging === true;
     let next = dragging ? { ...fresh, position: (n as unknown as WithPosition).position } : fresh;
-    if (JSON.stringify((next as unknown as WithPosition).position) !== JSON.stringify((n as unknown as WithPosition).position)) {
-      changed = true;
-    }
-    // `selected` È DI SVELTEFLOW, come `position`: un clic sullo sfondo o un riquadro di
-    // selezione lo cambiano dentro la libreria, e `toNode` non lo sa. Si riporta com'era, tranne
-    // quando un nodo appena nato chiede la selezione — allora questo la perde, il gesto sposta la
-    // selezione da uno all'altro.
+    let differs = JSON.stringify((next as unknown as WithPosition).position) !== JSON.stringify((n as unknown as WithPosition).position);
     const wasSelected = (n as unknown as WithSelected).selected === true;
     if (selecting) {
       next = { ...next, selected: false };
-      if (wasSelected) changed = true;
+      differs ||= wasSelected;
     } else if ('selected' in (next as object)) {
       next = { ...next, selected: wasSelected };
     }
-    kept.push(next);
-    const freshComparable = fresh as { data?: unknown; style?: unknown };
-    const currentComparable = n as { data?: unknown; style?: unknown };
-    if (JSON.stringify(freshComparable.data) !== JSON.stringify(currentComparable.data)) {
-      changed = true;
-    }
-    if (freshComparable.style !== currentComparable.style) {
-      changed = true;
-    }
+    const freshComparable = fresh as { data?: unknown; style?: unknown; class?: unknown };
+    const currentComparable = n as { data?: unknown; style?: unknown; class?: unknown };
+    differs ||= JSON.stringify(freshComparable.data) !== JSON.stringify(currentComparable.data);
+    differs ||= freshComparable.style !== currentComparable.style;
+    differs ||= freshComparable.class !== currentComparable.class;
+    kept.push(differs ? { ...n, ...next } : n);
+    changed ||= differs;
   }
 
   if (!added.length && !changed && kept.length === current.length) return null;
