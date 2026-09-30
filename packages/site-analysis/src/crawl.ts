@@ -1,8 +1,8 @@
 /**
  * Leggere un sito, non interpretarlo.
  *
- * Qui c'è tutta la macchina di raccolta — risoluzione dell'indirizzo vero, guardia SSRF, fallback
- * su browser reale, riconoscimento delle pagine che una CDN mette al posto del sito, scoperta
+ * Qui c'è tutta la macchina di raccolta — risoluzione dell'indirizzo vero, guardia SSRF,
+ * riconoscimento delle pagine che una CDN mette al posto del sito, scoperta
  * delle pagine interne, cataloghi Shopify e WooCommerce, e l'estrazione di metadati, loghi,
  * colori, font, social e testo visibile.
  *
@@ -872,24 +872,6 @@ export async function fetchPage(url: string): Promise<string> {
 }
 
 /**
- * Browser-render dependency, injected for testability (mirrors how analyzeBrand/runBrandAnalysis
- * inject the GenAI client). Defaults to the real Browserless client.
- */
-export interface BrowserRenderer {
-    isConfigured: () => boolean;
-    content: (url: string, opts?: { waitForTimeout?: number }) => Promise<string>;
-}
-
-/**
- * Senza un renderer iniettato si resta al fetch semplice: il package non sa che esista un
- * browser headless, e chi lo usa decide se e come procurarne uno.
- */
-const noRenderer: BrowserRenderer = {
-    isConfigured: () => false,
-    content: async () => ''
-};
-
-/**
  * Le firme delle pagine che una CDN restituisce AL POSTO del sito. Stanno in una tabella sola:
  * la prossima CDN si aggiunge con una riga, e tutte restano visibili insieme.
  */
@@ -912,7 +894,7 @@ const BLOCK_PAGE_MAX_TEXT = 2000;
 /**
  * Dice se l'HTML che abbiamo in mano è la pagina di blocco di una CDN invece del sito, e quale.
  *
- * Serve perché il renderer esce da IP di datacenter che molte CDN rifiutano: la risposta è HTML
+ * Una CDN può rifiutare la richiesta: la risposta è HTML
  * valido, con un titolo e qualche centinaio di caratteri di testo, quindi supera ogni soglia
  * pensata per riconoscere una pagina MAGRA. Non era magra, era sbagliata — e il profilo di marca
  * veniva costruito sopra un errore 403 (illy.com, 31 agosto 2026).
@@ -987,69 +969,28 @@ export async function resolveEntryUrl(url: string, probe: EntryProbe = defaultEn
     return url;
 }
 
-/**
- * Load a page's HTML, preferring a REAL BROWSER RENDER whenever Browserless is configured — on
- * every site, not just SPAs. A render captures JS-injected nav links and lazy-loaded images (team
- * photos, galleries) that static HTML misses even on server-rendered sites, which is what lets us
- * reliably discover the other pages and the imagery. Falls back to static fetch when Browserless
- * isn't configured, the render fails, or the render comes back thinner than the static HTML.
- *
- * Cost note: this renders the homepage AND each internal page (bounded by MAX_INTERNAL_PAGES), so
- * an analysis makes up to ~1 + MAX_INTERNAL_PAGES Browserless calls. Intentional — finding the
- * real material is the priority. Disable by unsetting BROWSERLESS_API_KEY to revert to static.
- */
-export async function loadPageHtml(
-    url: string,
-    onEscalate?: () => void,
-    renderer: BrowserRenderer = noRenderer
-): Promise<string> {
+export async function loadPageHtml(url: string): Promise<string> {
     if (!(await isUrlSafeToFetch(url))) return '';
 
     // Una pagina di blocco non è il sito: meglio niente, così chi chiama lo dice all'utente
     // invece di far analizzare un errore 403 come se fosse il suo brand.
-    const siteOrNothing = async () => {
-        const html = await fetchPage(url);
-        return blockPageReason(html) ? '' : html;
-    };
-
-    // No browser available → static only.
-    if (!renderer.isConfigured()) return await siteOrNothing();
-
-    // Browser available → render. Browserless validates + fetches server-side.
-    onEscalate?.();
-    try {
-        const rendered = await renderer.content(url, { waitForTimeout: 2500 });
-        // Il render esce da IP di datacenter e la CDN può rifiutarlo. La sua pagina di errore ha
-        // abbastanza testo da superare la soglia qui sotto, quindi va riconosciuta PRIMA: si
-        // riprova in diretta, che spesso passa proprio dove il render viene bloccato.
-        if (blockPageReason(rendered || '')) return await siteOrNothing();
-
-        const renderedLen = extractVisibleText(rendered || '').length;
-        if (renderedLen >= MIN_VISIBLE_TEXT_LENGTH) return rendered;
-        // Render came back thin/empty — keep whichever of render/static has more visible text.
-        const staticHtml = await siteOrNothing();
-        return rendered && renderedLen >= extractVisibleText(staticHtml).length ? rendered : staticHtml;
-    } catch {
-        // render failed (timeout, rate limit, bad key) — fall back to static
-        return await siteOrNothing();
-    }
+    const html = await fetchPage(url);
+    return blockPageReason(html) ? '' : html;
 }
 
 /**
- * Fetch multiple pagine in parallelo. Each page tiers through loadPageHtml, so internal pages
- * on a JS-rendered site are rendered too (not just the homepage). Returns BOTH the visible text
+ * Fetch multiple pagine in parallelo. Returns BOTH the visible text
  * (for the LLM) AND the images harvested from each page — so e.g. team photos on /about or /team
  * are captured, not just homepage imagery.
  */
 export async function fetchInternalPages(
-    urls: string[],
-    renderer: BrowserRenderer = noRenderer
+    urls: string[]
 ): Promise<{ texts: Record<string, string>; images: string[] }> {
     const texts: Record<string, string> = {};
     const seen = new Set<string>();
     const images: string[] = [];
     const promises = urls.map(async (url) => {
-        const html = await loadPageHtml(url, undefined, renderer);
+        const html = await loadPageHtml(url);
         if (!html) return;
         texts[url] = extractVisibleText(html);
         for (const img of harvestPageImages(html, url)) {
@@ -1347,7 +1288,6 @@ export interface SiteCrawl {
 }
 
 export interface CrawlOptions {
-    renderer?: BrowserRenderer;
     onProgress?: ProgressCallback;
     maxInternalPages?: number;
 }
@@ -1360,14 +1300,13 @@ export interface CrawlOptions {
  * parte costosa — il giro di rete, le difese, il parsing — e divergere solo nella lettura.
  */
 export async function crawlSite(input: string, opts: CrawlOptions = {}): Promise<SiteCrawl> {
-    const renderer = opts.renderer ?? noRenderer;
     const say: ProgressCallback = opts.onProgress ?? (() => {});
 
     // L'indirizzo scritto può non essere quello da cui il sito risponde.
     const url = await resolveEntryUrl(input);
 
     say('fetching', `Leggo ${url}`);
-    const html = await loadPageHtml(url, () => say('rendering', 'Apro il sito in un browser vero'), renderer);
+    const html = await loadPageHtml(url);
     if (!html) throw new Error(`Non sono riuscito a leggere ${url}`);
 
     say('parsing', 'Estraggo metadati e collegamenti');
@@ -1376,7 +1315,7 @@ export async function crawlSite(input: string, opts: CrawlOptions = {}): Promise
 
     const internalUrls = discoverInternalPages(html, url).slice(0, opts.maxInternalPages ?? MAX_INTERNAL_PAGES);
     say('pages', `Seguo ${internalUrls.length} pagine interne`);
-    const internal = await fetchInternalPages(internalUrls, renderer);
+    const internal = await fetchInternalPages(internalUrls);
 
     // Il catalogo vero quando la piattaforma lo espone: dedurlo dal testo produce prodotti che
     // non esistono.

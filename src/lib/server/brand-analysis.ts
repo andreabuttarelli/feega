@@ -1,7 +1,7 @@
 /**
  * Brand Analysis — la LETTURA di un sito.
  *
- * La raccolta (fetch, guardia SSRF, browser reale, pagine interne, Shopify/Woo, parsing di
+ * La raccolta (fetch, guardia SSRF, pagine interne, Shopify/Woo, parsing di
  * metadati, loghi, colori, font, social) è uscita in `@feega/site-analysis/crawl`: è la stessa
  * per chiunque legga un sito. Qui resta ciò che è nostro — quali domande porre al materiale, con
  * quale schema, e come comporne un `BrandProfile`.
@@ -12,7 +12,6 @@
  */
 import { swallow } from '$lib/server/swallow';
 import { SITE_TYPES, clampSiteType, sanitizeThemeColor } from '$lib/brand-fields';
-import { browserlessContent, isBrowserlessConfigured } from './browserless';
 import { structured } from '$lib/server/research';
 import { llmStructured } from '$lib/server/llm';
 import {
@@ -45,7 +44,6 @@ import {
   parseHTMLMetadata,
   resolveEntryUrl,
   svgToPng,
-  type BrowserRenderer,
   type EntryProbe,
   type HTMLMetadata,
   type ProgressCallback,
@@ -78,20 +76,10 @@ export {
   parseHTMLMetadata,
   resolveEntryUrl,
   svgToPng,
-  type BrowserRenderer,
   type EntryProbe,
   type HTMLMetadata,
   type ProgressCallback,
   type SiteType
-};
-
-/**
- * Il browser vero, che il package non conosce: lui espone solo "dammi l'HTML di questo URL".
- * Passandolo a `loadPageHtml` si riottiene il comportamento di prima.
- */
-const browserRenderer: BrowserRenderer = {
-  isConfigured: isBrowserlessConfigured,
-  content: browserlessContent
 };
 
 const MAX_ANALYSIS_IMAGES = 3; // Immagini passate al LLM multimodale per leggere palette/stile reali
@@ -440,14 +428,8 @@ export async function runBrandAnalysis(
     // profilo — il brand non deve portarsi dietro un indirizzo che non risponde.
     url = await resolveEntryUrl(url);
 
-    // 1. Fetch homepage. When Browserless is configured we render it in a real browser (every
-    // site, not just SPAs) so JS nav links + lazy-loaded images are present in the HTML we parse.
     onProgress('fetching', `Fetching homepage: ${url}`);
-    const homepageHtml = await loadPageHtml(
-        url,
-        () => onProgress('rendering', 'Opening your site in a real browser to read every page and image…'),
-        browserRenderer
-    );
+    const homepageHtml = await loadPageHtml(url);
     if (!homepageHtml) throw new Error(`Could not fetch URL: ${url}`);
 
     // 2. Parse metadata
@@ -492,7 +474,7 @@ export async function runBrandAnalysis(
 
     if (internalUrls.length > 0) {
         onProgress('fetching', `Found ${internalUrls.length} internal pages, fetching...`);
-        const internal = await fetchInternalPages(internalUrls, browserRenderer);
+        const internal = await fetchInternalPages(internalUrls);
         Object.assign(pageTexts, internal.texts);
         // Fold in images harvested from internal pages (e.g. team photos on /about or /team) so
         // they're available for profile.images and team-photo matching — not just homepage imagery.
@@ -636,7 +618,7 @@ export async function runBrandAnalysis(
             onProgress('fetching', 'Checking for recent announcements…');
             const annTexts: Record<string, string> = {};
             for (const annUrl of annUrls.slice(0, 2)) {
-                const html = await loadPageHtml(annUrl, undefined, browserRenderer);
+                const html = await loadPageHtml(annUrl);
                 if (html) annTexts[annUrl] = extractVisibleText(html);
             }
             const announcements = await extractAnnouncements(annTexts, client);

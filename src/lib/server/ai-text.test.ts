@@ -259,8 +259,7 @@ describe('textRouteLabel — chi serve il testo, per il log di boot', () => {
     Object.assign(env, {
       LLM_API_KEY: 'k',
       LLM_DEFAULT_MODEL: 'z-ai/glm-5.3-flash',
-      AI_ROUTE_TEXT: 'grok@kie',
-      KIE_API_KEY: 'k'
+      AI_ROUTE_TEXT: 'grok@kie'
     });
     const { textRouteLabel } = await import('./ai-text');
     expect(textRouteLabel()).toBe('openrouter.ai (z-ai/glm-5.3-flash)');

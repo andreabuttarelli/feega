@@ -8,17 +8,11 @@ read it alongside [`infra/compose/docker-compose.yml`](../infra/compose/docker-c
 ## What you get, and what you don't
 
 The core product works self-hosted: onboarding, content generation, planning, scheduling and the
-chat agents. Three things degrade **on purpose**, loudly, instead of half-working:
+chat agents. Two things degrade **on purpose**, loudly, instead of half-working:
 
-- **AI providers.** Every model call reads an API key from env (`GEMINI_API_KEY`, `KIE_API_KEY`,
-  `DEEPSEEK_API_KEY`, …). Without one, that provider's feature says why it's off instead of
+- **AI providers.** Every model call reads an API key from env (`LLM_API_KEY`,
+  `OPENROUTER_API_KEY`, …). Without one, that provider's feature says why it's off instead of
   failing silently — see `.env.example` for the full list and what falls back to what.
-- **The in-chat sandbox shell and motion-video rendering.** Both run on Vercel Sandbox
-  (`@vercel/sandbox`), a Vercel-account-only Firecracker microVM service — there is no
-  self-hostable equivalent shipped here. `SANDBOX_DISABLED=1` turns the feature off cleanly
-  (the chat tool explains why instead of timing out). Building a local Docker-based sandbox
-  provider is a real follow-up, not done in this pass — see the note in
-  `infra/compose/docker-compose.yml`.
 - **Connecting social accounts, publishing, post analytics and ads.** All of it goes through
   Zernio (`ZERNIO_API_KEY`, `src/lib/server/zernio.ts`) — a hosted API with no self-hostable
   alternative shipped here and no provider interface to swap for your own. Without the key you

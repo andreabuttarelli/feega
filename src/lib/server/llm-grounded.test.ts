@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Il grounding di `groundedGemini` è il motore NOMINATO: l'audit GEO misura "il brand è citato
+// Il grounding di `groundedText` è il motore NOMINATO: l'audit GEO misura "il brand è citato
 // nelle risposte di Gemini". Se torna senza citazioni, quell'audit misura la memoria del modello
 // invece del web, e nessuno se ne accorge — è una risposta plausibile invece di un errore.
 //

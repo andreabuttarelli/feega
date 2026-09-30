@@ -1,8 +1,7 @@
 /**
  * Un trasporto OpenAI-compatibile (in produzione: OpenRouter) e un id modello per mestiere.
  *
- * Non è un secondo SDK Google, non è DeepSeek/Xiaomi/Kie per il testo: è IL tubo. Foto, video e
- * voce restano su Kie; i motori di ricerca restano i loro.
+ * Non è un secondo SDK Google, non è DeepSeek/Xiaomi per il testo: è IL tubo.
  */
 import { createOpenAI } from '@ai-sdk/openai';
 import { embedMany, generateObject, generateText, jsonSchema } from 'ai';
@@ -673,7 +672,7 @@ export function llmTtsModel(): string {
  *
  * Non è streaming, di proposito: la chat completions serve `openai/gpt-audio` e pretende
  * `stream: true` con `format: "pcm16"`, cioè cambia fornitore, cambia la voce e va ricomposta a
- * pezzi. Qui la famiglia resta Gemini, com'era su kie.
+ * pezzi. Qui la famiglia resta Gemini.
  *
  * `mp3` esiste come `response_format` sull'endpoint ma non per questo modello (400 esplicito), e
  * il costo NON torna: nessuna intestazione lo porta, e `GET /generation?id=` è già stato misurato

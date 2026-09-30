@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { gatewayRate } from '$lib/server/openrouter-models';
 import { createAdminClient } from '$lib/server/supabase-admin';
-import { GEMINI_FLASH, geminiFlash, isGeminiFlashId, isKieFlashId, kieFlashId, NANO_BANANA_PRO, isNanoBananaProId, geminiVisualCreditShare } from '$lib/server/google-models';
+import { GEMINI_FLASH, geminiFlash, isGeminiFlashId, NANO_BANANA_PRO, isNanoBananaProId, geminiVisualCreditShare } from '$lib/server/google-models';
 import { billedCreditsFor } from '$lib/credit-ladder';
 import type { Database } from '$lib/database.types';
 
@@ -107,7 +107,7 @@ export function withOrgContext<T>(orgId: string, fn: () => T): T {
 /**
  * Il costo che il gateway ci ha fatturato in questo scope. Un turno di chat è N chiamate (una per
  * passo con i tool) e ognuna ha la sua fattura: si sommano qui e la riga aggregata le scrive,
- * esattamente come i crediti kie qui sopra. `llmClient` le deposita leggendo `usage.cost` da una
+ *  `llmClient` le deposita leggendo `usage.cost` da una
  * copia della risposta, senza rallentare quella che sta leggendo l'utente.
  */
 export function noteLlmCost(usd: number): void {
@@ -144,9 +144,6 @@ function noteBilledUsd(usd: number): void {
 export function billedUsdInScope(): number | undefined {
   return brandStorage.getStore()?.billedUsd;
 }
-
-/** $5 = 1000 crediti kie. */
-export const KIE_CREDIT_USD = 0.005;
 
 /** Read the active brandId from the current async scope (null = not in a brand context). */
 export function getBrandContext(): string | null {
@@ -229,14 +226,14 @@ export type AiCallLog = {
   // LLM providers plus every paid non-LLM API that bills brand credits, so one timeline covers
   // every external call. Non-obvious members:
   //   'pagespeed' free (Google quota), logged anyway; 'ads' is the management fee, not an API call;
-  //   'submitforbacklinks' a flat per-submission fee; 'sandbox' microVM seconds.
+  //   'submitforbacklinks' a flat per-submission fee.
   //   'internal' is an agent EVENT, not a call: `cost_usd` stays null, so it can't touch credits or
   //   rate limits (both filter `cost_usd is not null`) and the Usage page excludes it by provider.
-  provider: 'openrouter' | 'opencode' | 'llm' | 'scrapecreators' | 'exa' | 'tavily' | 'dataforseo' | 'pagespeed' | 'ads' | 'submitforbacklinks' | 'sandbox' | 'elevenlabs' | 'wiro' | 'jev' | 'internal';
+  provider: 'openrouter' | 'opencode' | 'llm' | 'scrapecreators' | 'dataforseo' | 'pagespeed' | 'ads' | 'submitforbacklinks' | 'elevenlabs' | 'wiro' | 'jev' | 'internal';
   model?: string;
   // Flat per-request price for non-token providers; when set it wins over the token rates.
   flatCostUsd?: number;
-  // kie.ai credits_consumed, observability only — brand billing still sums cost_usd.
+  // Provider-reported credits, observability only — brand billing still sums cost_usd.
   providerCredits?: number;
   prompt?: string; // hashed + measured, never stored
   ms: number;
@@ -272,19 +269,8 @@ export type AiCallLog = {
 // bound. Same prudence everywhere below when two published figures disagree: take the higher.
 const RATES: Record<string, { input: number; cachedInput: number; output: number; imageOutput?: number; searchPerQuery?: number; thinkingInOutput?: boolean }> = {
   // Current Flash, priced at the post-intro standard rate. When you bump GEMINI_FLASH, add a
-  // historical alias below for the old id — and a kie rate for it, or `computeCostUsd` returns null.
+  // historical alias below for the old id, or `computeCostUsd` returns null.
   [GEMINI_FLASH]: { input: 1.5, cachedInput: 0.15, output: 7.5, searchPerQuery: 0.014 },
-  // LO STESSO Flash via kie.ai, sotto l'id con i TRATTINI: l'id in `ai_calls.model` dice da solo
-  // su quale trasporto è passata la riga, e le tariffe Google qui sopra non possono raggiungerla.
-  //
-  // `cachedInput` uguale a `input` NON è una svista: kie non ha tier di cache e rifattura ogni
-  // token ripetuto a prezzo pieno, quindi su un turno molto cacheato costa DI PIÙ di Google.
-  //
-  // Tariffe e non `credits_consumed`: l'SDK @google/genai scarta quel campo costruendo la
-  // risposta, e comunque sottostima (0.01 dichiarati contro 0.07 di saldo reale su cinque
-  // chiamate identiche). Le tariffe sono la stima migliore: $0.00039 contro $0.00035 reali.
-  [kieFlashId(GEMINI_FLASH)]: { input: 0.225, cachedInput: 0.225, output: 1.125 },
-  'gemini-3-6-flash': { input: 0.225, cachedInput: 0.225, output: 1.125 },
   // Historical alias: rows logged before the 3.7 bump recompute at the rate they actually ran on.
   'gemini-3.6-flash': { input: 1.5, cachedInput: 0.15, output: 7.5, searchPerQuery: 0.014 },
   // Historical alias: the OLD 3.5 rate (output $9), for rows logged before the 3.6 bump.
@@ -302,21 +288,12 @@ const RATES: Record<string, { input: number; cachedInput: number; output: number
   // Nano Banana 2: docs and AI Studio disagree on image output ($30 vs $60/M) — the higher wins.
   'gemini-3.1-flash-image': { input: 0.5, cachedInput: 0.5, output: 3, imageOutput: 60 },
   // Nano Banana 2 Lite: no published Google rate found — priced at Nano Banana 2 as the prudent
-  // upper bound. On kie (the default transport) the real cost comes from credits_consumed anyway.
+  // upper bound.
   'gemini-3.1-flash-lite-image': { input: 0.5, cachedInput: 0.5, output: 3, imageOutput: 60 },
   // DeepSeek ha una fascia oraria: peak 01:00-04:00 e 06:00-10:00 UTC si paga il DOPPIO, e i
   // nostri cron ci cadono quasi tutti dentro (06:00-09:00). Qui teniamo la tariffa PEAK.
   'deepseek-v4-flash': { input: 0.44, cachedInput: 0.014, output: 1.32 },
-  'deepseek-v4-pro': { input: 1.32, cachedInput: 0.044, output: 3.96 },
-  // Grok via kie: fallback token rates — flatCostUsd from credits_consumed wins when present.
-  'grok-4-5': { input: 0.8, cachedInput: 0.2, output: 2.4 },
-  'grok-4-6': { input: 0.8, cachedInput: 0.2, output: 2.4 },
-  // Citation-tier kie models, same fallback.
-  'grok-4-3': { input: 0.5, cachedInput: 0.125, output: 1.5 },
-  'gpt-5-6-luna': { input: 0.056, cachedInput: 0.0056, output: 0.336 },
-  'gpt-5-6-terra': { input: 2, cachedInput: 0.2, output: 12 },
-  'gpt-5-6-sol': { input: 5, cachedInput: 0.5, output: 30 },
-  'claude-haiku-4-5': { input: 0.8, cachedInput: 0.08, output: 4 }
+  'deepseek-v4-pro': { input: 1.32, cachedInput: 0.044, output: 3.96 }
 };
 
 function usesGeminiVisualCreditShare(entry: AiCallLog): boolean {
@@ -359,17 +336,11 @@ const COST_EXEMPT_PROVIDERS: ReadonlySet<AiCallLog['provider']> = new Set(['inte
 export function computeCostUsd(entry: AiCallLog, plan?: string | null): number | null {
   if (COST_EXEMPT_PROVIDERS.has(entry.provider)) return 0;
   // Flat-fee providers: la richiesta fallita non ce la fatturano, quindi non la fatturiamo.
-  // LA SANDBOX È L'ECCEZIONE: la microVM è stata accesa e ha consumato tempo macchina comunque.
-  // Esentarla su `ok = false` rendeva gratis il percorso più caro (32,1% dei secondi misurati non
-  // addebitati a nessuno) — cioè l'invito a riprovare all'infinito.
   if (entry.flatCostUsd != null) {
-    if (entry.ok || entry.provider === 'sandbox') return Math.round(entry.flatCostUsd * 1e6) / 1e6;
+    if (entry.ok) return Math.round(entry.flatCostUsd * 1e6) / 1e6;
     return null;
   }
   if (entry.inputTokens == null && entry.outputTokens == null) return null;
-  // Una riga kie non può cadere sulle tariffe Google: sono 16× il costo reale e niente fallisce.
-  // Id kie senza tariffa → null, un buco interrogabile invece di un numero sbagliato credibile.
-  if (isKieFlashId(entry.model) && !RATES[entry.model ?? '']) return null;
   // Modello ASSENTE su una chiamata gemini = Flash; modello PRESENTE ma ignoto deve restare null,
   // non essere prezzato come Flash.
   // `openrouter/z-ai/glm-5.3-flash`, `llm/z-ai/glm-5.3-flash` e `z-ai/glm-5.3-flash` sono lo
@@ -600,4 +571,4 @@ function tokenCount(v: unknown): number | undefined {
 
 // Qui stavano `extractGeminiUsage` e `extractXiaomiUsage`, i due lettori di consumo delle
 // risposte Google e MiMo. Nessuno dei due ha piu` una risposta da leggere: il consumo del
-// gateway lo legge `extractSdkUsage`, quello di kie arriva dai crediti che kie ha addebitato.
+// gateway lo legge `extractSdkUsage`.

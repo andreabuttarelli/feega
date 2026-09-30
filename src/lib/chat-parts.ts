@@ -82,7 +82,6 @@ export function toolLabel(name: string): string {
   if (name === 'delegate_task') return 'Sub-agent';
   if (name === 'run_task_pipeline') return 'Research → Execute → Verify';
   if (name === 'publish_artifact') return 'Artifact';
-  if (name.startsWith('sandbox_')) return `Sandbox · ${name.slice('sandbox_'.length).replace(/_/g, ' ')}`;
   return name.replace(/_/g, ' ');
 }
 

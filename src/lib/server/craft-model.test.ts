@@ -29,8 +29,8 @@ beforeEach(() => {
 
 describe('craftAgentModel', () => {
   it('la scappatoia del mestiere vince su tutto', () => {
-    expect(craftAgentModel({ envModel: '  kie/grok-4-6  ' })).toMatchObject({
-      modelId: 'kie/grok-4-6',
+    expect(craftAgentModel({ envModel: '  x-ai/grok-4-6  ' })).toMatchObject({
+      modelId: 'x-ai/grok-4-6',
       provider: 'llm'
     });
   });

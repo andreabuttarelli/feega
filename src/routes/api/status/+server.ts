@@ -58,10 +58,9 @@ async function checkAiText(): Promise<ServiceCheck> {
   });
 }
 
-// Pixel generation (Kie images) — not the text gateway.
 async function checkAiVision(): Promise<ServiceCheck> {
   return timed('ai:vision', async () => {
-    const key = env.KIE_API_KEY?.trim();
+    const key = env.OPENROUTER_API_KEY?.trim() || env.LLM_API_KEY?.trim();
     if (!key) throw new Error('image/video API key not set');
   });
 }

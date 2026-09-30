@@ -3,7 +3,7 @@
  *
  * Qui c'erano i due client Gemini — `makeGenaiClient` (kie o Google) e `googleGenaiClient` (Google
  * sempre) — piu` il trasporto che sceglieva fra i due. Sono spariti con l'ultimo chiamante: ogni
- * pixel passa dallo slot immagini, ogni testo dal centralino, e i due endpoint vivi sono kie e
+ * pixel passa dallo slot immagini, ogni testo dal centralino, e l'endpoint vivo è
  * OpenRouter. Restano gli ID e le tariffe, che servono al registro di cassa: un modello Gemini si
  * paga anche quando a servirlo e` qualcun altro.
  *
@@ -50,19 +50,4 @@ export const NANO_BANANA_2_LITE = GEMINI_NANO_BANANA_2_LITE;
  */
 export function geminiVisualCreditShare(plan?: string | null): number {
   return 1;
-}
-
-/** `gemini-3.7-flash` → `gemini-3-7-flash`, la forma che accetta il passthrough di kie. */
-export function kieFlashId(modelId: string): string {
-  return modelId.replace(/\./g, '-');
-}
-
-const KIE_FLASH_ID = /^gemini-\d+-\d+-flash$/;
-
-/**
- * Id Flash nella forma kie (trattini). `computeCostUsd` la usa per non far cadere una riga kie
- * sulle tariffe Google: sono 16 volte tanto e non darebbero nessun errore.
- */
-export function isKieFlashId(model: string | undefined): boolean {
-  return !!model && KIE_FLASH_ID.test(model);
 }

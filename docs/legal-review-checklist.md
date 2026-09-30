@@ -34,14 +34,14 @@
 
 - LEGAL-NOTICE: `[LEGAL FORM]`, `[REA — if applicable]`, `[SHARE CAPITAL — if a company]`, `[PEC]`.
 - DPA: `[SIGNED COPY — available on request]`, sub-processor notice `[30]` days, objection refund `[to confirm]`, DSR assistance `[10]` business days, audit notice `[30]` days, `[SECURITY CONTACT]`, `[BACKUP POLICY]`, encryption at rest `[confirm with Supabase plan]`, organisational measures `[to confirm]`.
-- SUBPROCESSORS: locations and transfer mechanisms for Kie.ai, Wiro, TypeSafe/Jev, Zernio, Browserless, Exa, Tavily, Unsplash, Seline, Framer; Supabase region; PostHog hosting.
+- SUBPROCESSORS: locations and transfer mechanisms for Wiro, TypeSafe/Jev, Zernio, Seline, Framer; Supabase region; PostHog hosting.
 - COOKIES: Supabase auth cookie lifetime, PostHog cookie lifetime, `[FRAMER SITE COOKIES — to list]`.
 
 ## Points to confirm — legal set
 
 15. **Consent gaps found in the code** (fix in progress elsewhere; COOKIES §5 describes them): gtag.js conversion tag and Meta Pixel load without consent; server sets `_fbc`/`_fbp` on Meta ad clicks without consent; Seline `cookieOnIdentify` sets a cookie on sign-in; `identifyUser` sends user ID and email to PostHog in the anonymous tier; `openCookieSettings` is not wired to any "Cookie preferences" link. Non-EEA visitors are auto-granted — confirm acceptable.
-16. **Sub-processors missing from the old Privacy list**: Kie.ai (video/image transport), Browserless, Exa, Tavily, Unsplash, Vercel Sandbox — now only in SUBPROCESSORS.md; Privacy §4 lists categories and links there. Confirm they run in production.
-17. **Google Gemini API** is not called directly (Gemini models go via OpenRouter/Kie.ai); dropped from SUBPROCESSORS.md.
+16. **Sub-processors removed from the code**: Kie.ai, Browserless, Exa, Tavily, Unsplash and Vercel Sandbox are no longer called, and are dropped from SUBPROCESSORS.md.
+17. **Google Gemini API** is not called directly (Gemini models go via OpenRouter); dropped from SUBPROCESSORS.md.
 23. **Detail level**: Privacy §4 lists recipient categories only (Art. 13(1)(e) allows categories); AI Transparency names no providers; DPA Annex 1 TOMs are generic. Confirm this is sufficient.
 18. **DPA**: acceptance by click-through with the Terms vs signature; SCC module choice; whether feega is controller or processor for brand analysis and public-profile scraping; liability cap interplay with GDPR Art. 82.
 19. **Breach notice** target 48h — confirm it is operationally achievable.
