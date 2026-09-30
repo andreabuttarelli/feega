@@ -1,7 +1,7 @@
 import type { Db } from '$lib/server/db/client';
 import type { Actor } from '$lib/server/repos/actor';
 import { createConnection, createNode, listConnections, listNodes, type CanvasNodeRecord, type Connection } from '$lib/server/repos/canvas';
-import { planDuplicate, DUPLICATE_OFFSET } from '$lib/canvas/duplicate-plan';
+import { planDuplicate, DUPLICATE_OFFSET, type DuplicatePlan } from '$lib/canvas/duplicate-plan';
 
 /**
  * DUPLICARE UNA SELEZIONE: N nodi nuovi, e le linee che stavano interamente dentro di lei.
@@ -45,6 +45,14 @@ export async function duplicateNodes(
     offset: DUPLICATE_OFFSET
   });
 
+  return writePlan(db, input, plan);
+}
+
+export async function writePlan(
+  db: Db,
+  input: { orgId: string; projectId: string; canvasId: string; actor?: Actor },
+  plan: DuplicatePlan
+): Promise<{ nodes: CanvasNodeRecord[]; connections: Connection[] }> {
   const nodes: CanvasNodeRecord[] = [];
   for (const planned of plan.nodes) {
     const node = await createNode(db, {
