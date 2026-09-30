@@ -1,4 +1,5 @@
 import { baseOf, type NodeData } from './node-patch';
+import { SERVER_WRITTEN_FIELDS } from './node-data';
 
 export enum SaveFailure {
   Conflict = 'conflict',
@@ -76,11 +77,18 @@ export function saveMessage(reason: SaveFailure, data: { message?: string } = {}
 
 type Row = { id: string; version: number; data: Record<string, unknown>; saved?: Record<string, unknown> };
 
+const SERVER_WRITTEN = new Set(SERVER_WRITTEN_FIELDS);
+
+export function serverWritten(data: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(data).filter(([key]) => SERVER_WRITTEN.has(key)));
+}
+
 export function keepLocal(data: Record<string, unknown>, local: Record<string, unknown>, keys: string[]): Record<string, unknown> {
-  if (!keys.length) {
+  const held = keys.filter((key) => !SERVER_WRITTEN.has(key));
+  if (!held.length) {
     return data;
   }
-  return { ...data, ...Object.fromEntries(keys.map((key) => [key, local[key]])) };
+  return { ...data, ...Object.fromEntries(held.map((key) => [key, local[key]])) };
 }
 
 export function adoptIdleRows<T extends Row>(local: T[], server: Row[], dirtyKeys: (id: string) => string[]): T[] {
@@ -100,6 +108,9 @@ export function keepDirty<T extends Row>(fresh: T[], local: T[], dirtyKeys: (id:
 
   return fresh.map((tile) => {
     const held = mine.get(tile.id);
+    if (held && held.version > tile.version) {
+      return held;
+    }
     const keys = dirtyKeys(tile.id);
     if (!held || !keys.length) {
       return tile;
@@ -110,16 +121,41 @@ export function keepDirty<T extends Row>(fresh: T[], local: T[], dirtyKeys: (id:
 
 type RealtimeChange = { table: string; eventType: string; new: unknown };
 
-export function isOwnEcho(change: RealtimeChange, tiles: Row[], saving: (id: string) => boolean): boolean {
+type ShownTile = { id: string; data: Record<string, unknown>; x?: number; y?: number; displayName?: string | null };
+
+type ChangedRow = {
+  id?: string;
+  data?: Record<string, unknown>;
+  x?: number;
+  y?: number;
+  display_name?: string | null;
+  deleted_at?: string | null;
+};
+
+function canonical(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(canonical).join(',')}]`;
+  }
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value).filter(([, v]) => v !== undefined).sort(([a], [b]) => a.localeCompare(b));
+    return `{${entries.map(([key, v]) => `${JSON.stringify(key)}:${canonical(v)}`).join(',')}}`;
+  }
+  return JSON.stringify(value ?? null);
+}
+
+export function isOwnEcho(change: RealtimeChange, tiles: ShownTile[]): boolean {
   if (change.table !== 'nodes' || change.eventType !== 'UPDATE') {
     return false;
   }
-  const row = (change.new ?? {}) as Partial<Row>;
+  const row = (change.new ?? {}) as ChangedRow;
   const tile = tiles.find((known) => known.id === row.id);
-  if (!tile || typeof row.version !== 'number') {
+  if (!tile || row.deleted_at) {
     return false;
   }
-  return saving(tile.id) || row.version <= tile.version;
+  return row.x === tile.x
+    && row.y === tile.y
+    && (row.display_name ?? null) === (tile.displayName ?? null)
+    && canonical(row.data ?? {}) === canonical(tile.data);
 }
 
 type Written = { id: string; version: number; data: Record<string, unknown> };

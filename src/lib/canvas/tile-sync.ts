@@ -22,6 +22,7 @@
 type WithId = { id: string };
 type WithPosition = WithId & { position: unknown };
 type WithSelected = WithId & { selected?: boolean };
+type WithDragging = WithId & { dragging?: boolean };
 
 export function syncNodes<N extends WithId, T extends WithId>(
   current: N[],
@@ -34,19 +35,17 @@ export function syncNodes<N extends WithId, T extends WithId>(
   const added = tiles.filter((t) => !known.has(t.id)).map(toNode);
   const selecting = added.some((n) => (n as unknown as WithSelected).selected);
 
-  // I nodi che restano tengono la POSIZIONE com'era — quella sola: è ciò che SvelteFlow sta
-  // muovendo, e riportarla indietro dalla tile butterebbe via un trascinamento in corso. Il resto
-  // (`data`, comprese le porte che il modello scelto apre, e `style`, larghezza e altezza) si
-  // rifà dalla tile ad ogni giro, o un cambio di modello o un testo che cresce non
-  // aggiornerebbero mai un nodo già sulla tela.
   const kept: N[] = [];
   let changed = false;
   for (const n of current) {
     const t = tileById.get(n.id);
     if (!t) continue;
     const fresh = toNode(t);
-    const hasPosition = 'position' in (n as object);
-    let next = hasPosition ? { ...fresh, position: (n as unknown as WithPosition).position } : fresh;
+    const dragging = (n as unknown as WithDragging).dragging === true;
+    let next = dragging ? { ...fresh, position: (n as unknown as WithPosition).position } : fresh;
+    if (JSON.stringify((next as unknown as WithPosition).position) !== JSON.stringify((n as unknown as WithPosition).position)) {
+      changed = true;
+    }
     // `selected` È DI SVELTEFLOW, come `position`: un clic sullo sfondo o un riquadro di
     // selezione lo cambiano dentro la libreria, e `toNode` non lo sa. Si riporta com'era, tranne
     // quando un nodo appena nato chiede la selezione — allora questo la perde, il gesto sposta la
