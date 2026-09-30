@@ -1,4 +1,5 @@
 import { registerCanvasUpload, registerUploadedAsset, UploadError } from '$lib/server/canvas/upload';
+import { isOutputHandle } from '$lib/canvas/select-outputs';
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import type { Db } from '$lib/server/db/client';
@@ -1161,6 +1162,7 @@ export const actions: Actions = {
     const targetNodeId = String(fd.get('target_node_id') ?? '');
     const kind = String(fd.get('kind') ?? '');
     const targetHandle = fd.get('target_handle');
+    const outputHandle = fd.get('source_handle');
     if (!sourceNodeId || !targetNodeId || !isCanvasEdgeKind(kind)) {
       return fail(400, { error: 'collegamento non valido' });
     }
@@ -1188,7 +1190,7 @@ export const actions: Actions = {
       canvasId: scope.canvasId,
       sourceNodeId,
       targetNodeId,
-      sourceHandle: kind,
+      sourceHandle: isOutputHandle(outputHandle) ? outputHandle : kind,
       // La porta tipizzata (`ConnectorType`) su cui questo arco atterra — assente per la maggior
       // parte dei gesti (l'attacco generico d'origine), presente quando chi collega SA già quale
       // porta vuole: "Collega a nuovo…"/"Collega a…" sulla selezione (`connect-selection-plan.ts`).

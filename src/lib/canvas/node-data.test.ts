@@ -320,6 +320,23 @@ describe('validateNodeData — select', () => {
     const negative = validateNodeData('select', { index: -1 });
     expect(negative.ok).toBe(false);
   });
+
+  it('accetta gli output personalizzati e li conserva', () => {
+    const out = validateNodeData('select', { index: 1, outputs: [{ id: 'o1', field: 'price', label: 'Prezzo' }] });
+    expect(out.ok && out.data.outputs).toEqual([{ id: 'o1', field: 'price', label: 'Prezzo' }]);
+  });
+
+  it('describe_node_types elenca i campi di ogni sorgente dalla tabella, con la loro porta', () => {
+    const text = JSON.stringify(describeNodeType('select'));
+    expect(text).toContain('products: images (images)');
+    expect(text).toContain('price (text)');
+    expect(text).toContain('social_account_feed: media (images)');
+    expect(text).toContain('likes (text)');
+  });
+
+  it('rifiuta un output senza campo', () => {
+    expect(validateNodeData('select', { index: 1, outputs: [{ id: 'o1' }] }).ok).toBe(false);
+  });
 });
 
 describe('validateNodeData — effects', () => {

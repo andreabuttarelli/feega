@@ -1,3 +1,4 @@
+import type { CustomOutput } from './select-outputs';
 /**
  * IL NODO `select`: sceglie UN item da una `list` a monte, per indice 1-based — la stessa cifra
  * che compare sul nodo e sul thumbnail cliccato (`node-data.ts::selectSchema`), senza una
@@ -10,6 +11,7 @@
 export type SelectNode = {
   id: string;
   index: number;
+  outputs: CustomOutput[];
 };
 
 const SELECT_NODE_SIZE = { w: 280, h: 220 };

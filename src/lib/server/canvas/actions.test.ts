@@ -159,6 +159,20 @@ describe('connect action', () => {
     expect(insert?.payload).toMatchObject({ target_handle: 'text' });
   });
 
+  it('writes a named output port on source_handle, for wiring a select output', async () => {
+    const input = event({ source_node_id: 'a', target_node_id: 'b', kind: 'derives_from', source_handle: 'out:field:price' });
+    await actions.connect(input as never);
+    const insert = input.calls.find((c) => c.table === 'nodes_connections' && c.op === 'insert');
+    expect(insert?.payload).toMatchObject({ source_handle: 'out:field:price' });
+  });
+
+  it('ignores a source_handle that is not an output port, keeping the kind', async () => {
+    const input = event({ source_node_id: 'a', target_node_id: 'b', kind: 'derives_from', source_handle: 'bogus' });
+    await actions.connect(input as never);
+    const insert = input.calls.find((c) => c.table === 'nodes_connections' && c.op === 'insert');
+    expect(insert?.payload).toMatchObject({ source_handle: 'derives_from' });
+  });
+
   it('leaves target_handle null when none is given, same as before', async () => {
     const input = event({ source_node_id: 'a', target_node_id: 'b', kind: 'derives_from' });
     await actions.connect(input as never);

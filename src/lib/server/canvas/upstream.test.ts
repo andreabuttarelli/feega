@@ -951,3 +951,125 @@ describe('upstreamInputsFor — riferimenti scelti sul nodo', () => {
     expect(out.blocked).toBeNull();
   });
 });
+
+describe('upstreamInputsFor — le porte nominate di un select: ogni filo porta SOLO il valore della sua porta', () => {
+  const productRows = [
+    { id: 'pr1', org_id: ORG, node_id: PRODUCTS_NODE, project_id: 'p1', platform: 'shopify', external_id: '1', handle: 'tree', title: 'Tree Runner', description: 'Light', price: 98, currency: 'USD', url: null, images: [{ url: 'canvas-assets/t1.png' }, { url: 'canvas-assets/t2.png' }], available: true, synced_at: 'now', created_at: 'now' },
+    { id: 'pr2', org_id: ORG, node_id: PRODUCTS_NODE, project_id: 'p1', platform: 'shopify', external_id: '2', handle: 'wool', title: 'Wool Runner', description: 'Warm', price: 110, currency: 'USD', url: null, images: [{ url: 'canvas-assets/w1.png' }], available: true, synced_at: 'now', created_at: 'now' }
+  ];
+
+  const feedRow = (id: string, caption: string, likes: number) => ({
+    id,
+    org_id: ORG,
+    node_id: FEED_NODE,
+    project_id: 'p1',
+    platform: 'instagram',
+    external_id: id,
+    handle: 'nike',
+    caption,
+    media: { items: [{ type: 'image', url: `canvas-assets/${id}.png` }] },
+    metrics: { likes },
+    permalink: null,
+    posted_at: 'now',
+    fetched_at: 'now'
+  });
+
+  function productsCanvas(outputs: unknown[], handle: string, target: { id: string; type: string; data: Record<string, unknown> }) {
+    return fakeDb({
+      nodes: [
+        nodeRow(PRODUCTS_NODE, 'products', { type: 'shopify', url: 'https://x.myshopify.com' }),
+        nodeRow(SELECT_NODE, 'select', { index: 1, outputs }),
+        nodeRow(target.id, target.type, target.data)
+      ],
+      nodes_connections: [
+        { id: 'e-products-select', canvas_id: CANVAS, source_node_id: PRODUCTS_NODE, target_node_id: SELECT_NODE, source_handle: null, target_handle: null },
+        { id: 'e-select-target', canvas_id: CANVAS, source_node_id: SELECT_NODE, target_node_id: target.id, source_handle: handle, target_handle: null }
+      ],
+      products: productRows,
+      assets: []
+    }).db;
+  }
+
+  it('price → un nodo testo riceve solo il prezzo', async () => {
+    const db = productsCanvas([{ id: 'o1', field: 'price' }], 'out:field:price', { id: TEXT_NODE, type: 'text', data: { prompt: '' } });
+
+    const out = await upstreamInputsFor(db, { orgId: ORG, canvasId: CANVAS, nodeId: TEXT_NODE, model: 'openai/gpt-5', medium: 'text' });
+
+    expect(out.text).toEqual(['98']);
+    expect(out.referenceImageUrls).toEqual([]);
+  });
+
+  it('first_image → un nodo immagine riceve una foto sola', async () => {
+    const db = productsCanvas([{ id: 'o1', field: 'first_image' }], 'out:field:first_image', { id: IMAGE_NODE, type: 'image', data: { prompt: '', model: 'qwen3-pro' } });
+
+    const out = await upstreamInputsFor(db, { orgId: ORG, canvasId: CANVAS, nodeId: IMAGE_NODE, model: 'qwen3-pro', medium: 'image' });
+
+    expect(out.referenceImageUrls).toEqual(['canvas-assets/t1.png']);
+    expect(out.text).toEqual([]);
+  });
+
+  it('images → tutte le foto, e nessun testo', async () => {
+    const db = productsCanvas([], 'out:images', { id: VIDEO_NODE, type: 'video', data: { prompt: '', model: MODEL } });
+
+    const out = await upstreamInputsFor(db, { orgId: ORG, canvasId: CANVAS, nodeId: VIDEO_NODE, model: MODEL, medium: 'video' });
+
+    expect(out.referenceImageUrls).toEqual(['canvas-assets/t1.png', 'canvas-assets/t2.png']);
+    expect(out.text).toEqual([]);
+  });
+
+  it('text da un feed → la didascalia', async () => {
+    const { db } = fakeDb({
+      nodes: [
+        nodeRow(FEED_NODE, 'social_account_feed', { platform: 'instagram', handle: 'nike' }),
+        nodeRow(SELECT_NODE, 'select', { index: 1 }),
+        nodeRow(TEXT_NODE, 'text', { prompt: '' })
+      ],
+      nodes_connections: [
+        { id: 'e-feed-select', canvas_id: CANVAS, source_node_id: FEED_NODE, target_node_id: SELECT_NODE, source_handle: null, target_handle: null },
+        { id: 'e-select-text', canvas_id: CANVAS, source_node_id: SELECT_NODE, target_node_id: TEXT_NODE, source_handle: 'out:text', target_handle: null }
+      ],
+      social_posts: [feedRow('sp1', 'Just do it', 10)],
+      assets: []
+    });
+
+    const out = await upstreamInputsFor(db, { orgId: ORG, canvasId: CANVAS, nodeId: TEXT_NODE, model: 'openai/gpt-5', medium: 'text' });
+
+    expect(out.text).toEqual(['Just do it']);
+  });
+
+  it('una porta segnalata (campo che la sorgente non ha) è rifiutata, non un valore a caso', async () => {
+    const db = productsCanvas([{ id: 'o1', field: 'likes' }], 'out:field:likes', { id: TEXT_NODE, type: 'text', data: { prompt: '' } });
+
+    const out = await upstreamInputsFor(db, { orgId: ORG, canvasId: CANVAS, nodeId: TEXT_NODE, model: 'openai/gpt-5', medium: 'text' });
+
+    expect(out.text).toEqual([]);
+    expect(out.rejected).toEqual([{ nodeId: SELECT_NODE, why: expect.stringContaining('out:field:likes') }]);
+  });
+
+  it("in un loop sul feed il select segue l'iterazione, con lo stesso campo", async () => {
+    const { db } = fakeDb({
+      nodes: [
+        nodeRow(FEED_NODE, 'social_account_feed', { platform: 'instagram', handle: 'nike' }),
+        nodeRow(SELECT_NODE, 'select', { index: 1, outputs: [{ id: 'o1', field: 'likes' }] }),
+        nodeRow(TEXT_NODE, 'text', { prompt: '' })
+      ],
+      nodes_connections: [
+        { id: 'e-feed-select', canvas_id: CANVAS, source_node_id: FEED_NODE, target_node_id: SELECT_NODE, source_handle: null, target_handle: null },
+        { id: 'e-select-text', canvas_id: CANVAS, source_node_id: SELECT_NODE, target_node_id: TEXT_NODE, source_handle: 'out:field:likes', target_handle: null }
+      ],
+      social_posts: [feedRow('sp1', 'one', 10), feedRow('sp2', 'two', 20)],
+      assets: []
+    });
+
+    const out = await upstreamInputsFor(db, {
+      orgId: ORG,
+      canvasId: CANVAS,
+      nodeId: TEXT_NODE,
+      model: 'openai/gpt-5',
+      medium: 'text',
+      iterateSelection: { [FEED_NODE]: 2 }
+    });
+
+    expect(out.text).toEqual(['20']);
+  });
+});

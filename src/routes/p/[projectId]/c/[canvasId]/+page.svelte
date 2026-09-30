@@ -63,7 +63,8 @@
   import { upstreamImageRefs } from '$lib/canvas/composition-node';
   import type { CompositionNode as CompositionNodeState } from '$lib/canvas/composition-node';
   import { listFeedingSelect } from '$lib/canvas/select-node';
-  import { productItem, socialPostItem } from '$lib/canvas/select-sources';
+  import { fieldValue, productItem, socialPostItem } from '$lib/canvas/select-sources';
+  import { isOutputHandle, outputValues, selectOutputs, type OutputValue, type SelectOutput } from '$lib/canvas/select-outputs';
   import { feedFiltersOf, filterPosts, filterProducts, productFiltersOf } from '$lib/canvas/source-filters';
   import { hasInspector, inspectorOf } from '$lib/canvas/node-inspector';
   import SourceSettingsFrame from '$lib/components/canvas/SourceSettingsFrame.svelte';
@@ -360,6 +361,7 @@
       source: connection.sourceNodeId,
       target: connection.targetNodeId,
       targetHandle: connection.targetHandle,
+      ...(isOutputHandle(connection.sourceHandle) ? { sourceHandle: connection.sourceHandle } : {}),
       kind,
       mode: connection.mode,
       ...(kind === 'groups_with' ? {} : { markerEnd: { type: 'arrowclosed' as const } })
@@ -415,8 +417,8 @@
   }
 
   const hasUpstreamTextByNode = $derived.by(() => {
-    const upstreamNodes = nodes.map((n) => ({ id: n.id, type: n.type, text: sourceTextOf(n) }));
-    const upstreamEdges = edges.map((e) => ({ id: e.id, sourceNodeId: e.source, targetNodeId: e.target }));
+    const upstreamNodes = nodes.map((n) => ({ id: n.id, type: n.type, text: sourceTextOf(n), outputs: selectValuesOf(n) }));
+    const upstreamEdges = edges.map((e) => ({ id: e.id, sourceNodeId: e.source, targetNodeId: e.target, sourceHandle: e.sourceHandle ?? null }));
     return Object.fromEntries(nodes.map((n) => [n.id, hasUpstreamText(upstreamNodes, upstreamEdges, n.id)]));
   });
 
@@ -544,6 +546,42 @@
     return values ? { id: source.id, itemKind: values.itemKind, items: values.values.map((v) => v.item) } : null;
   }
 
+  function selectSourceOf(selectId: string): { id: string; type: string } | null {
+    const upstreamEdges = edges.map((e) => ({ sourceNodeId: e.source, targetNodeId: e.target }));
+    return listFeedingSelect(selectId, upstreamEdges, nodesById);
+  }
+
+  function syncedRowAt(source: { id: string; type: string }, index: number) {
+    const rows = source.type === 'products' ? shownProducts[source.id] : source.type === 'social_account_feed' ? shownPosts[source.id] : undefined;
+    return rows?.[index - 1] ?? null;
+  }
+
+  function selectOutputsOf(n: Tile): SelectOutput[] {
+    const select = n.type === 'select' ? selectOf(n) : null;
+    return select ? selectOutputs(selectSourceOf(n.id)?.type ?? null, select.outputs) : [];
+  }
+
+  function selectValuesOf(n: Tile): Record<string, OutputValue> | undefined {
+    const select = n.type === 'select' ? selectOf(n) : null;
+    const source = select ? selectSourceOf(n.id) : null;
+    const row = source && select ? syncedRowAt(source, select.index) : null;
+    if (!select || !source || !row) {
+      return undefined;
+    }
+    return source.type === 'products'
+      ? outputValues('products', row as Product, select.outputs)
+      : outputValues('social_account_feed', row as SocialPost, select.outputs);
+  }
+
+  function selectFieldPreview(selectId: string, index: number, field: string) {
+    const source = selectSourceOf(selectId);
+    const row = source ? syncedRowAt(source, index) : null;
+    if (!source || !row) {
+      return null;
+    }
+    return source.type === 'products' ? fieldValue('products', field, row as Product) : fieldValue('social_account_feed', field, row as SocialPost);
+  }
+
   function upstreamEffectsMediaOf(effectsId: string) {
     return upstreamMedia(effectsId, edges, nodes);
   }
@@ -628,7 +666,7 @@
   }
 
   const tiles = $derived(
-    nodes.map((n) => ({ n, ports: portsOfTile(n) })).map(({ n, ports }) => ({
+    nodes.map((n) => ({ n, ports: portsOfTile(n), outputs: selectOutputsOf(n) })).map(({ n, ports, outputs }) => ({
       id: n.id,
       x: n.x,
       y: n.y,
@@ -636,7 +674,8 @@
       h: tileHeight(n),
       connectable: true,
       connectors: ports.inputs,
-      output: ports.output,
+      output: outputs.some((o) => !o.custom) ? null : ports.output,
+      outputs,
       kind: n.type,
       displayName: n.displayName,
       inPost: data.nodeIdsInPost.includes(n.id),
@@ -1505,12 +1544,13 @@
    * per averla due volte appena la vera arriva. Il verso l'ha già scelto la tela guardando i due
    * estremi — `edgeKindsFor` — e qui si salva quello, non un `derives_from` fisso.
    */
-  async function connect(source: string, target: string, kind: CanvasEdgeKind, targetHandle: ConnectorType | null) {
+  async function connect(source: string, target: string, kind: CanvasEdgeKind, targetHandle: ConnectorType | null, sourceHandle: string | null = null) {
     const res = await post('connect', {
       source_node_id: source,
       target_node_id: target,
       kind,
-      ...(targetHandle ? { target_handle: targetHandle } : {})
+      ...(targetHandle ? { target_handle: targetHandle } : {}),
+      ...(sourceHandle ? { source_handle: sourceHandle } : {})
     });
 
     const created = (res?.connection ?? null) as Connection | null;
@@ -2300,6 +2340,10 @@
           <SelectNode
             node={select}
             list={upstreamListOf(id)}
+            outputs={selectOutputsOf(row)}
+            values={selectValuesOf(row) ?? {}}
+            sourceType={selectSourceOf(id)?.type ?? null}
+            preview={(field) => selectFieldPreview(id, select.index, field)}
             onchange={(patch) => write(id, selectData({ ...select, ...patch }))}
           />
         {:else if effects}

@@ -26,6 +26,7 @@
   import { getTileRender } from '$lib/canvas/tile-render-context';
   import { getTileResize } from '$lib/canvas/tile-resize-context';
   import { growthOf } from '$lib/canvas/settings-column';
+  import { portOfHandle, type SelectOutput } from '$lib/canvas/select-outputs';
 
   type TileData = {
     id: string;
@@ -34,6 +35,7 @@
      *  generico — il caso di chi non ha ancora scelto un modello, o non produce affatto. */
     connectors?: ConnectorType[];
     output?: ConnectorType | null;
+    outputs?: SelectOutput[];
     /** `nodes.type`: decide icona e nome di riserva della targhetta fuori dal corpo. Assente su
      *  quel che non è un nodo del modello (il recap del brand) — niente targhetta in quel caso. */
     kind?: string;
@@ -64,7 +66,8 @@
       return null;
     }
     if (c.fromHandle.type === 'source') {
-      const output = (c.fromNode?.data as TileData | undefined)?.output ?? null;
+      const from = c.fromNode?.data as TileData | undefined;
+      const output = from ? portOfHandle(from, c.fromHandle.id) : null;
       return { side: 'source', type: output, nodeId: c.fromHandle.nodeId, handleId: c.fromHandle.id ?? null };
     }
     const port = c.fromHandle.id && c.fromHandle.id in CONNECTOR_STYLE ? (c.fromHandle.id as ConnectorType) : null;
@@ -145,6 +148,20 @@
   {:else if !kind}
     <Handle type="source" position={Position.Right} />
   {/if}
+  {#each tile.outputs ?? [] as out, i (out.handle)}
+    <Handle
+      type="source"
+      id={out.handle}
+      position={Position.Right}
+      isConnectable={!out.incompatible}
+      class={`typed-port port-out${out.incompatible ? ' port-flagged' : portActive(origin, 'source', out.port, { nodeId: tile.id, handleId: out.handle }) ? '' : ' port-off'}`}
+      style={`top:${((i + 1) / ((tile.outputs?.length ?? 0) + 1)) * 100}%;--port:${CONNECTOR_STYLE[out.port].color}`}
+      title={out.incompatible ? `${out.label}: not available for this source` : out.label}
+      aria-label={out.label}
+    >
+      <span class="port-name">{out.label}</span>
+    </Handle>
+  {/each}
 {/if}
 
 <style>
@@ -212,6 +229,13 @@
   :global(.svelte-flow__handle.port-off) {
     opacity: 0.12;
     pointer-events: none;
+  }
+  :global(.svelte-flow__handle.port-flagged) {
+    border-style: dashed;
+    cursor: not-allowed;
+  }
+  :global(.svelte-flow__handle.port-flagged .port-name) {
+    text-decoration: line-through;
   }
   :global(.svelte-flow__handle.port-off .port-name) {
     display: none;

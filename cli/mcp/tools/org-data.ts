@@ -110,7 +110,9 @@ export function registerOrgDataTools(server: McpServer) {
         'N iteration values (images or text, never mixed); `select` picks exactly one item back out ' +
         'of a connected `list`, `products` or `social_account_feed` by a 1-based `index` — a synced ' +
         'catalogue or feed is an ordered list too, so `select` can pull one product or one post out ' +
-        'of either the same way; `effects` holds a stack of image filters over an upstream ' +
+        'of either the same way, exposing named outputs (`out:images`, `out:text`, and ' +
+        '`out:field:<field>` for each entry of `data.outputs` — the fields per source are listed in ' +
+        'its schema) that an edge picks with `source_handle`; `effects` holds a stack of image filters over an upstream ' +
         'image, each with its own params — set it with `update_row`, then render it with ' +
         '`apply_effects`; `audio` runs one ElevenLabs operation — `audio_operations` lists each one\'s ' +
         'inputs, default model and price. Also returns `recommended_models` per medium (best, balanced, ' +

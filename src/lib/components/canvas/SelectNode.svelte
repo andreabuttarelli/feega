@@ -1,12 +1,5 @@
 <script lang="ts">
   import TieredImage from './TieredImage.svelte';
-  /**
-   * IL NODO `select`: sceglie UN item da una `list` a monte, per indice 1-based — la stessa cifra
-   * sul nodo e sul thumbnail cliccato (CLAUDE.md, il disegno concordato). `list` arriva da fuori,
-   * già risolta dalla pagina (`listFeedingSelect`, la stessa disciplina di `upstream.ts` lato
-   * server): `null` quando nessun arco porta a una `list`, e in quel caso non c'è niente da
-   * mostrare oltre il numero scritto a mano.
-   */
   import ChevronLeft from '@lucide/svelte/icons/chevron-left';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import ImageIcon from '@lucide/svelte/icons/image';
@@ -14,16 +7,57 @@
   import { clampIndex, type SelectNode } from '$lib/canvas/select-node';
   import { listLabel, type ListNode } from '$lib/canvas/list-node';
   import { requestGuide } from '$lib/canvas/guide-open';
+  import Plus from '@lucide/svelte/icons/plus';
+  import X from '@lucide/svelte/icons/x';
+  import { CONNECTOR_STYLE } from '$lib/canvas/connectors';
+  import { addOutput, fieldsFor, removeOutput, renameOutput, type OutputValue, type SelectOutput } from '$lib/canvas/select-outputs';
+  import type { FieldValue } from '$lib/canvas/select-sources';
 
   let {
     node,
     list = null,
+    outputs = [],
+    values = {},
+    sourceType = null,
+    preview,
     onchange
   }: {
     node: SelectNode;
     list?: ListNode | null;
+    outputs?: SelectOutput[];
+    values?: Record<string, OutputValue>;
+    sourceType?: string | null;
+    preview?: (field: string) => FieldValue | null;
     onchange?: (patch: Partial<SelectNode>) => void;
   } = $props();
+
+  const PREVIEW_CHARS = 60;
+
+  let picking = $state(false);
+  let query = $state('');
+
+  const fields = $derived(fieldsFor(sourceType));
+  const taken = $derived(new Set(node.outputs.map((o) => o.field)));
+  const matches = $derived(
+    fields.filter((f) => !taken.has(f.key) && `${f.label} ${f.key}`.toLowerCase().includes(query.trim().toLowerCase()))
+  );
+
+  function summary(value: FieldValue | null | undefined): string {
+    if (!value) {
+      return '—';
+    }
+    if (value.mediaUrls.length) {
+      return value.mediaUrls.length === 1 ? '1 file' : `${value.mediaUrls.length} files`;
+    }
+    const text = value.text?.trim() ?? '';
+    return text.length > PREVIEW_CHARS ? `${text.slice(0, PREVIEW_CHARS)}…` : text || '—';
+  }
+
+  function pick(field: string) {
+    onchange?.({ outputs: addOutput(node.outputs, field, () => crypto.randomUUID()) });
+    picking = false;
+    query = '';
+  }
 
   const length = $derived(list?.items.length ?? 0);
   const current = $derived(list && length ? list.items[Math.min(node.index, length) - 1] : null);
@@ -70,7 +104,7 @@
   <div class="select-body">
     {#if !list}
       <p class="select-empty">
-        Picks one item from a connected list, by number.<br />Connect a list
+        Picks one item from a connected list, by number.<br />Connect a list, products or a feed
       </p>
     {:else if !length}
       <p class="select-empty">Empty list</p>
@@ -84,6 +118,67 @@
       {/if}
     {/if}
   </div>
+
+  {#if outputs.length || fields.length}
+    <ul class="select-outputs nowheel nodrag" aria-label="Outputs">
+      {#each outputs as out (out.handle)}
+        <li class="select-output" class:is-flagged={out.incompatible} style={`--port:${CONNECTOR_STYLE[out.port].color}`}>
+          <span class="select-output-swatch" aria-hidden="true"></span>
+          {#if out.custom}
+            {@const custom = out.custom}
+            <input
+              class="select-output-label"
+              value={out.label}
+              aria-label="Output name"
+              onchange={(e) => onchange?.({ outputs: renameOutput(node.outputs, custom.id, e.currentTarget.value) })}
+            />
+          {:else}
+            <span class="select-output-label">{out.label}</span>
+          {/if}
+          {#if out.incompatible}
+            <span class="select-output-value" title="This field is not available for the connected source">Not available</span>
+          {:else}
+            {@const value = values[out.handle]}
+            {#if value?.mediaUrls[0] && out.port === 'images'}
+              <img class="select-output-thumb" src={value.mediaUrls[0]} alt="" loading="lazy" />
+            {/if}
+            <span class="select-output-value">{summary(value)}</span>
+          {/if}
+          {#if out.custom}
+            {@const custom = out.custom}
+            <button type="button" class="select-output-remove" aria-label="Remove output" onclick={() => onchange?.({ outputs: removeOutput(node.outputs, custom.id) })}>
+              <X size={12} strokeWidth={2} />
+            </button>
+          {/if}
+        </li>
+      {/each}
+    </ul>
+
+    {#if fields.length}
+      {#if picking}
+        <div class="select-picker nowheel nodrag">
+          <input class="select-picker-search" placeholder="Search fields" bind:value={query} aria-label="Search fields" />
+          <ul class="select-picker-list">
+            {#each matches as f (f.key)}
+              <li>
+                <button type="button" class="select-picker-item" style={`--port:${CONNECTOR_STYLE[f.port].color}`} onclick={() => pick(f.key)}>
+                  <span class="select-output-swatch" aria-hidden="true"></span>
+                  <span class="select-output-label">{f.label}</span>
+                  <span class="select-output-value">{summary(preview?.(f.key))}</span>
+                </button>
+              </li>
+            {:else}
+              <li class="select-empty">No field left</li>
+            {/each}
+          </ul>
+        </div>
+      {:else}
+        <button type="button" class="select-add nodrag" onclick={() => (picking = true)}>
+          <Plus size={12} strokeWidth={2} /> Output
+        </button>
+      {/if}
+    {/if}
+  {/if}
 </div>
 
 <style>
@@ -201,6 +296,110 @@
     display: grid;
     place-content: center;
     color: var(--ink-soft, #6e6e73);
+  }
+
+  .select-outputs,
+  .select-picker-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    max-height: 120px;
+    overflow: auto;
+    border-top: 1px solid var(--line, #e5e5e5);
+  }
+  .select-output,
+  .select-picker-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    padding: 4px 8px;
+    font: inherit;
+    font-size: 11px;
+    color: var(--ink, #1d1d1f);
+    background: none;
+    border: none;
+    text-align: left;
+  }
+  .select-picker-item {
+    cursor: pointer;
+  }
+  .select-picker-item:hover {
+    background: var(--paper-2, #f9f9f9);
+  }
+  .select-output.is-flagged {
+    color: var(--ink-soft, #6e6e73);
+  }
+  .select-output.is-flagged .select-output-label {
+    text-decoration: line-through;
+  }
+  .select-output-swatch {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    background: var(--port);
+  }
+  .select-output-label {
+    flex: none;
+    width: 84px;
+    padding: 0;
+    font: inherit;
+    font-weight: 600;
+    color: inherit;
+    background: none;
+    border: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .select-output-value {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--ink-soft, #6e6e73);
+  }
+  .select-output-thumb {
+    flex: none;
+    width: 18px;
+    height: 18px;
+    object-fit: cover;
+  }
+  .select-output-remove {
+    display: inline-flex;
+    flex: none;
+    padding: 0;
+    color: var(--ink-soft, #6e6e73);
+    background: none;
+    border: none;
+    cursor: pointer;
+  }
+  .select-add {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin: 4px 8px 6px;
+    padding: 2px 6px;
+    font: inherit;
+    font-size: 11px;
+    color: var(--ink, #1d1d1f);
+    background: none;
+    border: 1px dashed var(--line-2, #d2d2d7);
+    cursor: pointer;
+    align-self: flex-start;
+  }
+  .select-picker {
+    border-top: 1px solid var(--line, #e5e5e5);
+  }
+  .select-picker-search {
+    width: 100%;
+    padding: 4px 8px;
+    font: inherit;
+    font-size: 11px;
+    border: none;
+    border-bottom: 1px solid var(--line, #e5e5e5);
+    background: var(--paper-2, #f9f9f9);
   }
 
   .select-text {
