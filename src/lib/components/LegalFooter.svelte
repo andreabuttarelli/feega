@@ -1,6 +1,7 @@
 <script lang="ts">
   import { _ } from 'svelte-i18n';
   import { FOOTER_LEGAL_LINKS, LEGAL_LINKS, legalHref } from '$lib/legal-links';
+  import { openCookieSettings } from '$lib/consent';
 </script>
 
 <p class="legal-footer">
@@ -8,6 +9,8 @@
     {#if i > 0}<span class="dot" aria-hidden="true">·</span>{/if}
     <a href={legalHref(key)} target="_blank" rel="noopener">{$_(LEGAL_LINKS[key].labelKey)}</a>
   {/each}
+  <span class="dot" aria-hidden="true">·</span>
+  <button type="button" class="cookie-settings" onclick={openCookieSettings}>{$_('cookie.settings')}</button>
 </p>
 
 <style>
@@ -26,5 +29,15 @@
   }
   .dot {
     color: var(--ink-faint, #9a9a9e);
+  }
+  .cookie-settings {
+    appearance: none;
+    border: none;
+    padding: 0;
+    background: transparent;
+    font: inherit;
+    color: inherit;
+    text-decoration: underline;
+    cursor: pointer;
   }
 </style>

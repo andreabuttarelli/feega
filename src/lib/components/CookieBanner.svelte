@@ -1,42 +1,55 @@
 <script lang="ts">
-  // Small bottom-left cookie consent banner. Shows on first visit (no stored choice) and
-  // whenever the user re-opens preferences via openCookieSettings(). Anonymous, cookieless
-  // analytics run regardless; accepting upgrades to full (cookies + session replay).
-  import { onMount } from 'svelte';
   import { dev } from '$app/environment';
   import { _ } from 'svelte-i18n';
-  import { showBanner, consent, setConsent } from '$lib/consent';
-  import { startAnonymousAnalytics, enableFullAnalytics } from '$lib/analytics';
+  import { showBanner, consent, acceptAll, rejectAll, saveConsent } from '$lib/consent';
 
-  onMount(() => {
-    startAnonymousAnalytics(); // schedules PostHog for interaction / 10s
-    const unsub = consent.subscribe((v) => {
-      if (v === 'granted') enableFullAnalytics(); // tier 2 — already-accepted visitors
-    });
-    return unsub;
-  });
+  let customising = $state(false);
+  let analytics = $state(false);
+  let marketing = $state(false);
+
+  function customise() {
+    analytics = $consent?.analytics ?? false;
+    marketing = $consent?.marketing ?? false;
+    customising = true;
+  }
+
+  function save() {
+    saveConsent({ analytics, marketing });
+    customising = false;
+  }
 </script>
 
-<!--
-  Nascosta SOLO in `npm run dev`: a 1280x720 la banner copre la CTA di accesso e blocca il click nei
-  test automatici. `dev` da $app/environment è una costante di compilazione (true solo sotto
-  `vite dev`) — un build di produzione o di preview la vede false, quindi ai clienti veri la banner
-  resta esattamente com'era. Deve restare `dev`: un controllo sull'hostname o un `import.meta.env`
-  sbagliato farebbe sparire un obbligo di legge in produzione.
-
-  Si nasconde qui, nel markup, e NON in `initConsentForRegion`: il consenso resta `null` come per
-  chiunque non abbia ancora scelto, quindi in locale si continua a girare sul percorso "non ha
-  acconsentito" — lo stesso che vede un visitatore EEA. Nascondere non è acconsentire.
--->
 {#if $showBanner && !dev}
-  <div class="cc" role="dialog" aria-labelledby="cc-title">
-    <p id="cc-title">
-      {$_('cookie.text')}
-    </p>
-    <div class="cc-actions">
-      <button class="cc-btn ghost" type="button" onclick={() => setConsent('denied')}>{$_('cookie.reject')}</button>
-      <button class="cc-btn primary" type="button" onclick={() => setConsent('granted')}>{$_('cookie.accept')}</button>
-    </div>
+  <div class="cc" role="dialog" aria-labelledby="cc-title" data-testid="cookie-banner">
+    <p id="cc-title" class="cc-title">{$_('cookie.title')}</p>
+    <p class="cc-text">{$_('cookie.text')}</p>
+
+    {#if customising}
+      <fieldset class="cc-options">
+        <label class="cc-option">
+          <input type="checkbox" checked disabled />
+          <span><strong>{$_('cookie.necessary')}</strong>{$_('cookie.necessaryHint')}</span>
+        </label>
+        <label class="cc-option">
+          <input type="checkbox" bind:checked={analytics} data-testid="cookie-analytics" />
+          <span><strong>{$_('cookie.analytics')}</strong>{$_('cookie.analyticsHint')}</span>
+        </label>
+        <label class="cc-option">
+          <input type="checkbox" bind:checked={marketing} data-testid="cookie-marketing" />
+          <span><strong>{$_('cookie.marketing')}</strong>{$_('cookie.marketingHint')}</span>
+        </label>
+      </fieldset>
+      <div class="cc-actions">
+        <button class="cc-btn" type="button" onclick={rejectAll}>{$_('cookie.rejectAll')}</button>
+        <button class="cc-btn" type="button" onclick={save} data-testid="cookie-save">{$_('cookie.save')}</button>
+      </div>
+    {:else}
+      <div class="cc-actions">
+        <button class="cc-btn" type="button" onclick={rejectAll} data-testid="cookie-reject">{$_('cookie.rejectAll')}</button>
+        <button class="cc-btn" type="button" onclick={acceptAll} data-testid="cookie-accept">{$_('cookie.acceptAll')}</button>
+      </div>
+      <button class="cc-link" type="button" onclick={customise} data-testid="cookie-customise">{$_('cookie.customise')}</button>
+    {/if}
   </div>
 {/if}
 
@@ -47,77 +60,77 @@
     bottom: 16px;
     z-index: 9999;
     width: calc(100% - 32px);
-    max-width: 320px;
-    background: #fff;
-    border: 1px solid #d2d2d7;
+    max-width: 360px;
+    background: var(--background, #fff);
+    color: var(--foreground, #111);
+    border: 1px solid var(--border, #d2d2d7);
+    border-radius: 0;
     box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
-    padding: 14px 14px 12px;
-    font-family: var(--sans, Inter, -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Arial,
-      sans-serif);
-    color: #1d1d1f;
-    animation: cc-in 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+    padding: 16px;
+    font-family: var(--sans, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif);
   }
-  @keyframes cc-in {
-    from {
-      opacity: 0;
-      transform: translateY(14px);
-    }
-    to {
-      opacity: 1;
-      transform: none;
-    }
+  .cc-title {
+    font-size: 13px;
+    font-weight: 600;
+    margin: 0 0 6px;
   }
-  .cc p {
+  .cc-text {
     font-size: 12.5px;
     line-height: 1.5;
-    color: #424245;
+    opacity: 0.8;
     margin: 0 0 12px;
   }
-  .cc a {
-    color: #7c5cff;
-    text-decoration: none;
+  .cc-options {
+    border: 0;
+    padding: 0;
+    margin: 0 0 12px;
+    display: grid;
+    gap: 10px;
   }
-  .cc a:hover {
-    text-decoration: underline;
+  .cc-option {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    font-size: 12.5px;
+    line-height: 1.4;
+  }
+  .cc-option strong {
+    display: block;
+  }
+  .cc-option input {
+    border-radius: 0;
+    margin-top: 2px;
   }
   .cc-actions {
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 8px;
   }
   .cc-btn {
     appearance: none;
-    border: 1px solid transparent;
-    padding: 7px 14px;
+    border: 1px solid var(--foreground, #111);
+    border-radius: 0;
+    background: var(--foreground, #111);
+    color: var(--background, #fff);
+    padding: 8px 12px;
     font: inherit;
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
-    transition:
-      transform 0.15s ease,
-      background 0.15s ease,
-      border-color 0.15s ease;
   }
-  .cc-btn:active {
-    transform: scale(0.97);
+  .cc-btn:hover {
+    opacity: 0.85;
   }
-  .cc-btn.ghost {
-    background: #fff;
-    border-color: #d2d2d7;
-    color: #1d1d1f;
-  }
-  .cc-btn.ghost:hover {
-    border-color: #86868b;
-  }
-  .cc-btn.primary {
-    background: #7c5cff;
-    color: #fff;
-  }
-  .cc-btn.primary:hover {
-    background: #6b49f5;
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .cc {
-      animation: none;
-    }
+  .cc-link {
+    appearance: none;
+    background: none;
+    border: 0;
+    padding: 0;
+    margin-top: 10px;
+    font: inherit;
+    font-size: 12.5px;
+    color: inherit;
+    text-decoration: underline;
+    cursor: pointer;
   }
 </style>

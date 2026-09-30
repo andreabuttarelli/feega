@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_deletions: {
+        Row: {
+          deleted_at: string
+          id: string
+          orgs_deleted: number
+          orgs_kept: number
+        }
+        Insert: {
+          deleted_at?: string
+          id?: string
+          orgs_deleted: number
+          orgs_kept: number
+        }
+        Update: {
+          deleted_at?: string
+          id?: string
+          orgs_deleted?: number
+          orgs_kept?: number
+        }
+        Relationships: []
+      }
       ad_accounts: {
         Row: {
           brand_id: string
@@ -2530,6 +2551,7 @@ export type Database = {
       auth_org_ids: { Args: never; Returns: string[] }
       billing_grants_ready: { Args: never; Returns: boolean }
       credits_from_price_id: { Args: { price_id: string }; Returns: number }
+      delete_account: { Args: { p_user: string }; Returns: Json }
       feega_credits: { Args: { _value: string }; Returns: number }
       feega_org_from_metadata: { Args: { _metadata: Json }; Returns: string }
       org_credit_balance: { Args: { _org_id: string }; Returns: number }

@@ -7,13 +7,13 @@
  * questo file non viene rigenerato — e l'agente non resta cieco su una tabella nuova.
  */
 export const QUERY_TABLES =
-  'ad_campaigns ad_metrics admins ads_remix_briefs agent_computers agent_runs agent_sessions agent_templates ' +
-  'ai_calls ai_models api_keys app_flags article_views benchmark_runs billing_scopes blog_authors blog_categories ' +
-  'blog_integrations blog_month_jobs blog_tags brand_app_connections brand_article_tags brand_article_versions ' +
-  'brand_articles brand_backlink_opportunities brand_backlink_placements brand_canvas_edges brand_canvas_item_runs ' +
-  'brand_canvas_items brand_canvases brand_crawl_runs brand_demo_accounts brand_design_templates brand_doc_chunks ' +
-  'brand_documents brand_field_posts brand_geo_artifacts brand_geo_audits brand_internal_links brand_invites ' +
-  'brand_job_optouts brand_kit brand_knowledge_edges brand_knowledge_sources brand_market_references ' +
+  'account_deletions ad_campaigns ad_metrics admins ads_remix_briefs agent_computers agent_runs agent_sessions ' +
+  'agent_templates ai_calls ai_models api_keys app_flags article_views benchmark_runs billing_scopes ' +
+  'blog_authors blog_categories blog_integrations blog_month_jobs blog_tags brand_app_connections brand_article_tags ' +
+  'brand_article_versions brand_articles brand_backlink_opportunities brand_backlink_placements brand_canvas_edges ' +
+  'brand_canvas_item_runs brand_canvas_items brand_canvases brand_crawl_runs brand_demo_accounts brand_design_templates ' +
+  'brand_doc_chunks brand_documents brand_field_posts brand_geo_artifacts brand_geo_audits brand_internal_links ' +
+  'brand_invites brand_job_optouts brand_kit brand_knowledge_edges brand_knowledge_sources brand_market_references ' +
   'brand_media brand_members brand_memory brand_news_items brand_news_sources brand_pages brand_site_pages ' +
   'brand_sites brand_social_handles brand_strategy brand_triggers brand_usage brand_visual_insights brand_webhooks ' +
   'brands chat_artifacts chat_jobs chat_messages chat_model_catalog chat_threads competitors content_plans ' +

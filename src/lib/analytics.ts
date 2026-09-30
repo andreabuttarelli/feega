@@ -1,22 +1,6 @@
-// Analytics loader, due tier:
-//  1. Anonimo (nessun consenso) — PostHog cookieless: persistenza solo in memoria, niente cookie,
-//     niente registrazione di sessione, niente profili. È la modalità aggregata che il Garante
-//     tratta come esente da consenso preventivo. Gira su ogni visita.
-//  2. Pieno (dopo l'accettazione) — PostHog con cookie persistenti + session recording, più
-//     Clarity, che è session-replay per natura e non ha una modalità anonima.
-//
-// Le chiavi vengono dalle env pubbliche; chiave assente = strumento saltato. Gli script pesanti
-// partono alla prima interazione o dopo 10s, per non competere con LCP/TBT su mobile freddo.
-//
-// Per il tier 1 davvero anonimo va anche acceso "Discard client IP data" nelle impostazioni del
-// progetto PostHog.
-//
-// Sopra i due tier ci sono due guard che vengono PRIMA di tutto (`blocked()`): l'ambiente e chi sta
-// guardando. Decidono di NON inizializzare, non di inizializzare e poi disattivare — una volta che
-// PostHog è partito il pageview è già andato.
-
 import { browser, dev } from '$app/environment';
 import { env } from '$env/dynamic/public';
+import { Tracker, allows, consentModeState, type ConsentChoice } from './consent-model';
 
 type PostHog = {
   init: (key: string, opts: object) => void;
@@ -26,16 +10,14 @@ type PostHog = {
   identify?: (id: string, props?: Record<string, unknown>) => void;
 };
 
-let posthogScheduled = false;
-let posthogReady = false;
-let posthogUpgraded = false;
-let wantFullAnalytics = false;
-let clarityStarted = false;
-let metaPixelScheduled = false;
-let metaPixelReady = false;
+const GOOGLE_CONVERSION_TAG_ID = 'AW-740942237';
+
+const started = new Set<Tracker>();
+let consentChoice: ConsentChoice | null = null;
 let bookingClicksBound = false;
-let selineScheduled = false;
 let analyticsOptOut = false;
+
+const googleTagId = () => env.PUBLIC_GOOGLE_TAG_ID?.trim() || GOOGLE_CONVERSION_TAG_ID;
 
 // Nessun default per pixel e token: erano i NOSTRI, cablati come fallback — un'installazione
 // self-hosted caricava il pixel Meta di feega e identificava i propri utenti nel nostro
@@ -94,20 +76,23 @@ export function dropIfInternal<T>(x: T): T | null {
   return internalViewer ? null : x;
 }
 
-/**
- * L'unico cancello. Nessun tracker si inizializza se scatta un guard — non "parte e poi si
- * disattiva": `opt_out_capturing()` arriverebbe dopo il pageview già spedito. Non tocca il
- * consenso: un tracker zittito e una banner nascosta sono due cose diverse.
- */
-function blocked(): boolean {
-  return !browser || analyticsOptOut || !trackingAllowed(window.location.hostname);
+function blocked(tracker: Tracker): boolean {
+  if (!browser || analyticsOptOut || !trackingAllowed(window.location.hostname)) {
+    return true;
+  }
+  return !allows(consentChoice, tracker);
 }
 
-/** Run `fn` on first interaction, or 10s after window load — whichever comes first. */
+export function trackerAllowed(tracker: Tracker): boolean {
+  return !blocked(tracker);
+}
+
 function whenIdleOrInteract(fn: () => void) {
   let done = false;
   const run = () => {
-    if (done) return;
+    if (done) {
+      return;
+    }
     done = true;
     fn();
   };
@@ -115,33 +100,61 @@ function whenIdleOrInteract(fn: () => void) {
     window.addEventListener(e, run, { once: true, passive: true, capture: true });
   }
   const armTimer = () => setTimeout(run, 10000);
-  if (document.readyState === 'complete') armTimer();
-  else window.addEventListener('load', armTimer, { once: true });
+  if (document.readyState === 'complete') {
+    armTimer();
+    return;
+  }
+  window.addEventListener('load', armTimer, { once: true });
 }
 
-/**
- * Meta (Facebook) Pixel. Era fisso in app.html e partiva su OGNI pagina, blog dei brand inclusi,
- * prima di ogni consenso. Ora è una funzione: l'app lo carica deferito, un blog solo dopo
- * l'accettazione. Idempotente; no-op sul server.
- */
 export function loadMetaPixel() {
   const pixelId = metaPixelId();
-  if (blocked() || metaPixelScheduled || !pixelId) return;
-  metaPixelScheduled = true;
-  // Click pagato (`fbclid`) → carica SUBITO. Meta conta una Landing Page View solo se PageView
-  // parte dopo il click: deferire perde ogni visitatore che arriva e se ne va entro 10s, cioè
-  // nasconde i rimbalzi e allena la delivery su un segnale censurato.
+  if (blocked(Tracker.MetaPixel) || started.has(Tracker.MetaPixel) || !pixelId) {
+    return;
+  }
+  started.add(Tracker.MetaPixel);
+
   const paidClick = new URLSearchParams(window.location.search).has('fbclid');
-  const start = () => {
-    if (metaPixelReady) return;
-    metaPixelReady = true;
+  const start = () =>
     injectInline(
       `!(function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)})(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','${pixelId}');fbq('track','PageView');`
     );
-  };
-  if (paidClick) start();
-  else whenIdleOrInteract(start);
+  if (paidClick) {
+    start();
+    return;
+  }
+  whenIdleOrInteract(start);
 }
+
+type GtagWindow = { dataLayer?: unknown[]; gtag?: (...args: unknown[]) => void };
+
+function gtag(...args: unknown[]) {
+  const w = window as unknown as GtagWindow;
+  w.dataLayer ??= [];
+  w.gtag ??= function () {
+    w.dataLayer?.push(arguments);
+  };
+  w.gtag(...args);
+}
+
+export function loadGoogleTag() {
+  if (blocked(Tracker.GoogleTag) || started.has(Tracker.GoogleTag)) {
+    return;
+  }
+  started.add(Tracker.GoogleTag);
+
+  const id = googleTagId();
+  gtag('consent', 'update', consentModeState(consentChoice));
+  whenIdleOrInteract(() => {
+    const s = document.createElement('script');
+    s.async = true;
+    s.src = `https://www.googletagmanager.com/gtag/js?id=${id}`;
+    document.head.appendChild(s);
+    gtag('js', new Date());
+    gtag('config', id);
+  });
+}
+
 
 /**
  * Fire a Meta Pixel conversion event (e.g. CompleteRegistration) from the browser. There is no
@@ -192,32 +205,23 @@ function injectInline(code: string) {
   document.head.appendChild(s);
 }
 
-function upgradePostHog() {
-  if (posthogUpgraded || !posthog()) return;
-  posthogUpgraded = true;
-  posthog()?.set_config({ persistence: 'localStorage+cookie' });
-  posthog()?.startSessionRecording?.();
-}
-
 async function startClarity() {
   const clarityId = env.PUBLIC_CLARITY_ID;
-  if (blocked() || !clarityId || clarityStarted) return;
-  clarityStarted = true;
+  if (blocked(Tracker.Clarity) || !clarityId || started.has(Tracker.Clarity)) {
+    return;
+  }
+  started.add(Tracker.Clarity);
   const { default: Clarity } = await import('@microsoft/clarity');
   Clarity.init(clarityId);
   Clarity.consent();
 }
 
-/**
- * Seline — page view senza cookie. Stava in app.html come `<script>` fisso, e un tag nell'HTML non
- * sa né dove gira né chi ha davanti: contava localhost, i preview e noi. Qui passa dagli stessi due
- * guard di tutto il resto. Caricato subito e non al primo click: pesa poco, e la sua unica metrica
- * deferita di 10s si perderebbe. Idempotente; no-op sul server.
- */
 export function loadSeline() {
   const token = selineToken();
-  if (blocked() || selineScheduled || !token) return;
-  selineScheduled = true;
+  if (blocked(Tracker.Seline) || started.has(Tracker.Seline) || !token) {
+    return;
+  }
+  started.add(Tracker.Seline);
   const s = document.createElement('script');
   s.async = true;
   s.src = 'https://cdn.seline.com/seline.js';
@@ -226,12 +230,10 @@ export function loadSeline() {
   document.head.appendChild(s);
 }
 
-/**
- * Fire a semantic product event (e.g. onboarding steps). Safe to call anywhere: it no-ops on the
- * server and before PostHog has loaded the stub queues the call until the library is ready.
- */
 export function track(event: string, props?: Record<string, unknown>) {
-  if (!browser) return;
+  if (!browser) {
+    return;
+  }
   posthog()?.capture?.(event, props);
 }
 
@@ -243,57 +245,45 @@ function selineBrowser(): SelineBrowser | undefined {
   return (window as unknown as { seline?: SelineBrowser }).seline;
 }
 
-/**
- * Lega la sessione anonima a un utente loggato, così gli eventi di prodotto formano un funnel per
- * utente. Solo con un id reale di utente loggato. Identifica anche in Seline lato client, come fa
- * il server via @seline-analytics/node.
- */
 export function identifyUser(id: string, props?: Record<string, unknown>) {
-  // Il guard vale anche qui: identificare È tracciare, e questa funzione fa partire PostHog da sola.
-  if (blocked() || !id) return;
-  // Make sure PostHog is scheduled (in the app the consent banner may not have mounted yet).
-  startAnonymousAnalytics();
+  if (blocked(Tracker.PostHog) || !id) {
+    return;
+  }
+  startPostHog();
   posthog()?.identify?.(id, props);
-  // Client setUser links this browser visitor to the Profile (cookieOnIdentify in app.html).
   selineBrowser()?.setUser?.({ userId: id, ...props });
 }
 
-/** Tier 1 — anonymous, cookieless analytics. Safe to call on every page load, no consent needed. */
-export function startAnonymousAnalytics() {
-  if (blocked() || posthogScheduled) return;
+function startPostHog() {
   const key = env.PUBLIC_POSTHOG_KEY;
-  if (!key) return;
-  posthogScheduled = true;
+  if (blocked(Tracker.PostHog) || started.has(Tracker.PostHog) || !key) {
+    return;
+  }
+  started.add(Tracker.PostHog);
 
   whenIdleOrInteract(() => {
-    if (posthogReady) return;
-    posthogReady = true;
     injectInline(POSTHOG_SNIPPET);
     posthog()?.init(key, {
-      api_host: 'https://eu.i.posthog.com', // feega project lives on PostHog EU cloud
-      persistence: 'memory', // no cookies, no localStorage → anonymous
+      api_host: POSTHOG_EU_HOST,
+      persistence: 'localStorage+cookie',
       person_profiles: 'identified_only',
-      disable_session_recording: true,
       capture_pageview: true,
-      autocapture: true
+      autocapture: true,
+      session_recording: { maskAllInputs: true, maskTextSelector: '*' }
     });
-    if (wantFullAnalytics) {
-      upgradePostHog();
-      void startClarity();
-    }
   });
 }
 
-/** Tier 2 — called once the user accepts. Upgrades PostHog and loads Clarity (still deferred). */
-export async function enableFullAnalytics() {
-  if (blocked()) return;
-  wantFullAnalytics = true;
-  startAnonymousAnalytics();
-  if (posthogReady) {
-    upgradePostHog();
-    await startClarity();
-  }
+export function applyConsent(choice: ConsentChoice) {
+  consentChoice = choice;
+  startPostHog();
+  loadSeline();
+  void startClarity();
+  loadMetaPixel();
+  loadGoogleTag();
 }
+
+const POSTHOG_EU_HOST = 'https://eu.i.posthog.com';
 
 // Canonical PostHog snippet (https://posthog.com/docs/libraries/js) — the array stub that
 // queues calls until the real library finishes loading.

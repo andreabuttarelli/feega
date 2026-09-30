@@ -413,7 +413,17 @@
         "avatarSaved": "Profile photo updated.",
         "avatarRemoved": "Profile photo removed.",
         "tooLarge": "Photo too large (max 2MB).",
-        "notImage": "File must be an image."
+        "notImage": "File must be an image.",
+        "privacy": "Privacy",
+        "cookieHint": "Choose which analytics and marketing cookies feega may use.",
+        "exportData": "Download my data",
+        "exportHint": "A JSON file with your profile, workspaces, projects, messages you wrote and the credit history of workspaces you own.",
+        "deleteAccount": "Delete account",
+        "deleteHint": "Deletes your login, profile, API keys and chats you started. Workspaces where you are the only member are deleted with their files, and their plan is cancelled at period end. Workspaces shared with others keep their work. This cannot be undone.",
+        "deleteConfirmLabel": "Type DELETE or your email to confirm",
+        "deleteConfirmError": "Type DELETE or your email exactly.",
+        "deleteReauth": "For safety, sign in again (within the last 15 minutes) and retry.",
+        "deleteTransfer": "You are the only owner of a workspace with other members. Make someone else owner, or remove the members, first."
       },
       "appearance": {
         "title": "Appearance",
@@ -545,9 +555,19 @@
     }
   },
   "cookie": {
-    "text": "We use cookies to run feega and, with your consent, to understand how it's used and improve it.",
-    "reject": "Reject",
-    "accept": "Accept"
+    "title": "Cookies on feega",
+    "text": "We use strictly necessary cookies to sign you in and keep feega secure. With your consent we also use analytics to improve the product and marketing tags to measure our ads.",
+    "rejectAll": "Reject all",
+    "acceptAll": "Accept all",
+    "customise": "Customise",
+    "save": "Save choices",
+    "necessary": "Strictly necessary",
+    "necessaryHint": "Sign-in, session and security. Always on.",
+    "analytics": "Analytics",
+    "analyticsHint": "PostHog, Microsoft Clarity, Seline, error replays.",
+    "marketing": "Marketing",
+    "marketingHint": "Meta Pixel and the Google gtag.js conversion tag.",
+    "settings": "Cookie settings"
   },
   "chat": {
     "leave": {

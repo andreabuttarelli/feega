@@ -19,4 +19,10 @@ describe('il footer legale condiviso', () => {
     expect(FOOTER_LEGAL_LINKS).toHaveLength(9);
     expect(new Set(FOOTER_LEGAL_LINKS).size).toBe(9);
   });
+
+  it('porta anche le impostazioni cookie, dalla stessa funzione della pagina profilo', () => {
+    expect(component).toMatch(/import { openCookieSettings } from '\$lib\/consent'/);
+    expect(component).toMatch(/onclick={openCookieSettings}/);
+    expect(component).toMatch(/\$_\('cookie\.settings'\)/);
+  });
 });
