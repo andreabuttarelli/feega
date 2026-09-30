@@ -48,29 +48,24 @@ We do not sell personal data and do not use your content to train AI models. We 
 
 ## 4. Recipients (processors)
 
-Full list with data, locations and transfer mechanisms: [Sub-processors](./SUBPROCESSORS.md).
+We share personal data with these categories of recipients, each acting as our processor and only for the purpose shown:
 
-| Provider | Purpose | Location |
-|---|---|---|
-| Supabase | database, authentication, file storage, realtime | [REGION — EU/US] |
-| Vercel | hosting, serverless functions, web analytics | US / global |
-| Stripe | payments and subscriptions | EU / US |
-| OpenRouter, and the model providers it routes to | text, image, video generation | US / other |
-| Google (Gemini API) | text and image generation | US / global |
-| Wiro | image and video generation | [LOCATION] |
-| ElevenLabs | voice, music and sound generation | US / EU |
-| TypeSafe (Jev classifier) and an LLM reviewer via OpenRouter | prompt moderation | [LOCATION] |
-| Zernio | connecting social accounts, publishing, reading account metrics | [LOCATION] |
-| Meta Platforms | ad campaigns on your ad account | IE / US |
-| ScrapeCreators | reading public social profiles and posts | US |
-| Resend | transactional email | US |
-| Sentry | error monitoring (may include user ID, email, IP) | US / EU |
-| PostHog | product analytics (anonymous; full with consent) | [US / EU] |
-| Microsoft Clarity | session replay (consent only) | US |
-| Seline | web analytics | [LOCATION] |
-| Google (gtag.js conversion tracking), Meta Pixel | advertising conversion measurement | US |
-| Framer | marketing website feega.app | NL / global |
-| [AGE VERIFICATION PROVIDER] | age verification (NSFW, not yet available) | [LOCATION] |
+| Category | Purpose |
+|---|---|
+| Hosting and database | running the Service, storing accounts, content and files, authentication, realtime |
+| Payments | subscriptions, top-ups, invoices |
+| AI model providers | generating text, images and video from your prompts |
+| Voice and audio AI | voice-over, music and sound generation |
+| Content moderation | screening prompts before they reach a model |
+| Social publishing | connecting social accounts, publishing, reading account metrics and running ad campaigns on your ad account |
+| Data enrichment and scraping | reading public websites, stores and social profiles you point us to; web research |
+| Email delivery | invites and notifications |
+| Error monitoring | detecting and fixing errors (may include user ID, email, IP) |
+| Product analytics | understanding how the Service is used (anonymous; full with consent) |
+| Advertising measurement | measuring which ads lead to sign-ups (consent) |
+| Age verification | NSFW mode, not yet available |
+
+The current list of sub-processors is available at [https://feega.app/subprocessors](./SUBPROCESSORS.md).
 
 When you publish, the content goes to the platform you chose (Instagram, Facebook, TikTok, etc.), which becomes an independent controller. When you share a link, anyone holding it can see the shared content. We may disclose data to authorities where required by law.
 

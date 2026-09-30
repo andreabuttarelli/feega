@@ -53,7 +53,7 @@ feega implements the technical and organisational measures in **Annex 1**. The C
 - feega gives at least [30] days' notice before adding or replacing a sub-processor, by email to the workspace owner or in the Service.
 - The Customer may object in writing on reasonable data-protection grounds within that period. The parties will discuss in good faith; if no solution is found, the Customer may terminate the affected part of the Service and receive a pro-rata refund of prepaid, unused fees [to confirm].
 - feega imposes on each sub-processor data protection obligations equivalent to this DPA and remains liable to the Customer for their performance.
-- AI model providers are reached through OpenRouter, whose catalogue changes over time; the provider that served a request is recorded in the usage log and shown in the Service.
+- The model used for each request is recorded in the usage log and shown in the Service.
 
 ## 8. International transfers
 
@@ -94,18 +94,14 @@ This DPA lasts as long as feega processes Customer Personal Data. It is governed
 
 | Area | Measure |
 |---|---|
-| Tenant isolation | every table carries the workspace (`org_id`); row-level security is enabled on all tables and each query runs with the signed-in user's rights, so a user reads only the workspaces they belong to |
-| Privileged access | the database service key, which bypasses row-level security, is used only in declared code paths listed in a single registry that every use must reference |
-| Authentication | Supabase Auth sessions in secure cookies; API keys for CLI and MCP are shown once and stored hashed; OAuth for MCP clients |
-| Encryption in transit | HTTPS/TLS for the web app, API and every provider call |
-| Encryption at rest | database and file storage encrypted at rest by the infrastructure providers [confirm with Supabase plan] |
-| Storage | private buckets for uploaded and generated media, served through time-limited signed links; one public bucket only for avatars, logos and colour swatches |
-| Access control | roles inside each workspace; invites by link or email; share links read-only and revocable |
-| Concurrency and integrity | optimistic versioning on canvas nodes, so a conflicting write is refused rather than silently overwriting |
-| Logging | each AI action is logged with action, model, provider, credits, time and acting user or agent; every moderation decision is logged; canvas events record who changed what |
-| Moderation | every generation prompt is screened before reaching a model and refused when the screening cannot run (see [AI Transparency](./AI-TRANSPARENCY.md)) |
-| Monitoring | error monitoring with Sentry; internal staff sessions excluded |
-| Backups | [BACKUP POLICY — Supabase plan, frequency, retention] |
-| Secrets | provider keys held as server-side environment variables, never shipped to the browser; secrets redacted from logs |
-| Development | changes reviewed through pull requests with automated tests in CI; production data not used in tests |
-| People | confidentiality obligations; least-privilege access to production [to confirm organisational measures] |
+| Tenant isolation | each customer's data is logically separated and access is enforced by the database for every request |
+| Access control | role-based access inside each workspace; privileged administrative access limited to what operating the Service requires and restricted to authorised personnel |
+| Authentication | secure session management; API keys stored hashed and revocable |
+| Encryption | encryption in transit (TLS) for all connections; encryption at rest provided by our infrastructure providers |
+| Storage | uploaded and generated files kept private and served through time-limited links; share links read-only and revocable |
+| Logging and monitoring | logging of AI actions, moderation decisions and changes to content; error monitoring |
+| Content safety | automated screening of generation requests (see [AI Transparency](./AI-TRANSPARENCY.md)) |
+| Availability | backups and recovery provided by our infrastructure providers [BACKUP POLICY] |
+| Secrets | credentials held server-side only and excluded from logs |
+| Development | code review and automated testing before release; production data not used in testing |
+| People | confidentiality obligations; least-privilege access [to confirm organisational measures] |
