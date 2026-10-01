@@ -13,7 +13,7 @@
     shiftAnchor,
     CalendarView
   } from '$lib/calendar/period-grid';
-  import { CALENDAR_SCOPES, CalendarScope, type CalendarNode } from '$lib/canvas/calendar-node';
+  import { CALENDAR_HINT_TEXT, CALENDAR_SCOPES, calendarHint, CalendarScope, type CalendarNode } from '$lib/canvas/calendar-node';
   import type { CalendarPost, CalendarBrand } from '$lib/canvas/calendar-posts';
 
   const POST_DRAG_TYPE = 'application/x-feega-post';
@@ -24,6 +24,8 @@
 
   let {
     node,
+    brandId,
+    plan = null,
     posts,
     brands,
     error = null,
@@ -34,9 +36,13 @@
     onmove,
     onschedule,
     onedit,
-    onrefresh
+    onrefresh,
+    onplan,
+    oncancelplan
   }: {
     node: CalendarNode;
+    brandId: string | null;
+    plan?: { nodeIds: string[]; dayKey: string } | null;
     posts: CalendarPost[] | null;
     brands: CalendarBrand[];
     error?: string | null;
@@ -48,7 +54,21 @@
     onschedule: (post: CalendarPost) => void;
     onedit: (post: CalendarPost) => void;
     onrefresh: () => void;
+    onplan: (dayKey: string, brandId: string) => void;
+    oncancelplan: () => void;
   } = $props();
+
+  let planDay = $state('');
+  let planBrand = $state('');
+
+  $effect(() => {
+    if (plan) {
+      planDay = plan.dayKey;
+      planBrand = brandId ?? '';
+    }
+  });
+
+  const hint = $derived(calendarHint(brandId, posts));
 
   let openId = $state<string | null>(null);
   let dropKey = $state<string | null>(null);
@@ -128,7 +148,7 @@
     <select
       class="cal-brand"
       aria-label="Brand"
-      value={node.brandId ?? ''}
+      value={brandId ?? ''}
       onchange={(e) => onchange({ brandId: e.currentTarget.value || null })}
     >
       <option value="">Pick a brand…</option>
@@ -198,8 +218,49 @@
     </footer>
   {/if}
 
-  {#if posts === null}
+  {#if posts === null && brandId}
     <p class="cal-empty">Loading…</p>
+  {/if}
+
+  {#if hint && !plan}
+    <p class="cal-hint" data-calendar-hint={hint}>{CALENDAR_HINT_TEXT[hint]}</p>
+  {/if}
+
+  {#if plan}
+    <form
+      class="cal-pop cal-plan nodrag nowheel"
+      aria-label="Plan on a day"
+      onsubmit={(e) => {
+        e.preventDefault();
+        if (planDay && planBrand) {
+          onplan(planDay, planBrand);
+        }
+      }}
+    >
+      <header>
+        <strong>Plan {plan.nodeIds.length === 1 ? 'this' : `these ${plan.nodeIds.length}`} on…</strong>
+        <button type="button" class="cal-nav" aria-label="Close" onclick={oncancelplan}><X size={13} strokeWidth={2} /></button>
+      </header>
+      {#if !brandId}
+        <label>
+          Brand
+          <select class="cal-brand" bind:value={planBrand} required>
+            <option value="">Pick a brand…</option>
+            {#each brands as brand (brand.id)}
+              <option value={brand.id}>{brand.name}</option>
+            {/each}
+          </select>
+        </label>
+      {/if}
+      <label>
+        Day
+        <input class="cal-brand" type="date" bind:value={planDay} required />
+      </label>
+      <footer>
+        <button type="button" class="cal-btn" onclick={oncancelplan}>Cancel</button>
+        <button type="submit" class="cal-btn is-primary" disabled={busy || !planDay || !planBrand}>Plan draft</button>
+      </footer>
+    </form>
   {/if}
 
   {#if opened}
@@ -407,6 +468,26 @@
     inset: auto 0 8px;
     margin: 0;
     text-align: center;
+    color: var(--ink-soft, #6e6e73);
+  }
+
+  .cal-hint {
+    position: absolute;
+    inset: 50% 16px auto;
+    transform: translateY(-50%);
+    margin: 0;
+    padding: 10px 12px;
+    text-align: center;
+    color: var(--ink-soft, #6e6e73);
+    background: var(--paper, #fff);
+    border: 1px dashed var(--line-2, #d2d2d7);
+    pointer-events: none;
+  }
+
+  .cal-plan label {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
     color: var(--ink-soft, #6e6e73);
   }
 

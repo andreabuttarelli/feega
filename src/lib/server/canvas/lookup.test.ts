@@ -47,8 +47,17 @@ describe('aprire una tela dal suo id', () => {
     ).toEqual({
       orgId: ORG,
       canvas: { id: CANVAS, projectId: PROJECT, name: 'Untitled', viewport: null },
-      mode: 'standard'
+      mode: 'standard',
+      projectBrandId: null
     });
+  });
+
+  it("carries the project's brand, the calendar's default", async () => {
+    const { db } = fakeDb({ canvases: [{ ...row, projects: { mode: 'standard', brand_id: 'brand-1' } }] });
+
+    const found = await findCanvasForUser(db, { canvasId: CANVAS, memberships: [membership(ORG)] });
+
+    expect(found?.projectBrandId).toBe('brand-1');
   });
 
   it('carries the mode of the project the canvas belongs to', async () => {

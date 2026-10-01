@@ -57,7 +57,7 @@
   import EffectsEditor from '$lib/components/canvas/EffectsEditor.svelte';
   import CompositionNode from '$lib/components/canvas/CompositionNode.svelte';
   import CalendarNode from '$lib/components/canvas/CalendarNode.svelte';
-  import { calendarData, calendarOf, CalendarScope, type CalendarNode as CalendarNodeState } from '$lib/canvas/calendar-node';
+  import { calendarBrand, calendarData, calendarOf, CalendarScope, type CalendarNode as CalendarNodeState } from '$lib/canvas/calendar-node';
   import { calendarError, type CalendarBrand, type CalendarPost } from '$lib/canvas/calendar-posts';
   import { plannedInstant } from '$lib/calendar/period-grid';
   import { DropVerdict, dayUnderPointer, type PointerPoint } from '$lib/canvas/canvas-drop';
@@ -168,13 +168,14 @@
     void openSheet(data.projectId, promotePath(ids));
   }
 
-  type CalendarState = { posts: CalendarPost[] | null; brands: CalendarBrand[]; error: string | null; busy: boolean };
+  type CalendarPlan = { nodeIds: string[]; dayKey: string };
+  type CalendarState = { posts: CalendarPost[] | null; brands: CalendarBrand[]; error: string | null; busy: boolean; plan: CalendarPlan | null };
   const CALENDAR_REFRESH_MS = 60_000;
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   let calendars = $state<Record<string, CalendarState>>({});
 
   function calendarStateOf(id: string): CalendarState {
-    return calendars[id] ?? { posts: null, brands: [], error: null, busy: false };
+    return calendars[id] ?? { posts: null, brands: [], error: null, busy: false, plan: null };
   }
 
   function patchCalendar(id: string, patch: Partial<CalendarState>) {
@@ -187,8 +188,12 @@
     return calendarError(detail.error, reasons || undefined);
   }
 
+  function brandOfCalendar(calendar: CalendarNodeState): string | null {
+    return calendarBrand(calendar, data.projectBrandId);
+  }
+
   async function loadCalendar(calendar: CalendarNodeState) {
-    const answer = await send('calendar_posts', { scope: calendar.scope, brand_id: calendar.brandId ?? '' });
+    const answer = await send('calendar_posts', { scope: calendar.scope, brand_id: brandOfCalendar(calendar) ?? '' });
     if (answer.type !== 'success') {
       patchCalendar(calendar.id, { posts: [], error: answerError(answer) });
       return;
@@ -256,23 +261,35 @@
     if (!target || !calendar) {
       return DropVerdict.Ignored;
     }
-    void draftOnDay(calendar, ids, target.dayKey);
+    const brandId = brandOfCalendar(calendar);
+    if (!brandId) {
+      patchCalendar(calendar.id, { plan: { nodeIds: ids, dayKey: target.dayKey } });
+      return DropVerdict.Taken;
+    }
+    void draftOnDay(calendar, ids, target.dayKey, brandId);
     return DropVerdict.Taken;
   }
 
-  async function draftOnDay(calendar: CalendarNodeState, ids: string[], dayKey: string) {
-    if (!calendar.brandId) {
-      patchCalendar(calendar.id, { error: calendarError('brand_missing') });
-      return;
+  async function draftOnDay(calendar: CalendarNodeState, ids: string[], dayKey: string, brandId: string) {
+    patchCalendar(calendar.id, { busy: true, plan: null });
+    if (!calendar.brandId && brandId !== data.projectBrandId) {
+      void write(calendar.id, calendarData({ ...calendar, brandId }));
     }
-    patchCalendar(calendar.id, { busy: true });
     const answer = await send('create_post', {
-      brand_id: calendar.brandId,
+      brand_id: brandId,
       node_id: ids,
       planned_for: plannedInstant(dayKey, timeZone, null)
     });
     patchCalendar(calendar.id, { busy: false, error: answer.type === 'success' ? null : answerError(answer) });
     await loadCalendar(calendar);
+  }
+
+  function askToPlan(sourceId: string, targetId: string) {
+    const calendar = calendarNodes().find((c) => c.id === targetId);
+    if (!calendar) {
+      return;
+    }
+    patchCalendar(calendar.id, { plan: { nodeIds: [sourceId], dayKey: calendar.anchor } });
   }
 
   /** Una riga come la pagina la tiene: quel che il database ha, più dove sta sullo schermo. */
@@ -1642,6 +1659,7 @@
     pushGesture({
       items: [{ kind: 'edge.create', edgeId: created.id, sourceNodeId: created.sourceNodeId, targetNodeId: created.targetNodeId }]
     });
+    askToPlan(created.sourceNodeId, created.targetNodeId);
   }
 
   /**
@@ -2528,6 +2546,8 @@
           {@const calState = calendarStateOf(id)}
           <CalendarNode
             node={calendar}
+            brandId={brandOfCalendar(calendar)}
+            plan={calState.plan}
             posts={calState.posts}
             brands={calState.brands}
             error={calState.error}
@@ -2539,6 +2559,8 @@
             onschedule={(post) => scheduleDraft(calendar, post)}
             onedit={(post) => handlePromote(post.sourceNodeIds)}
             onrefresh={() => loadCalendar(calendar)}
+            onplan={(dayKey, brandId) => calState.plan && draftOnDay(calendar, calState.plan.nodeIds, dayKey, brandId)}
+            oncancelplan={() => patchCalendar(id, { plan: null })}
           />
         {:else if isNodeType(row.type)}
           <EmptyNode type={row.type} />

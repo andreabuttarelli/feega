@@ -55,7 +55,8 @@ export const NODE_KINDS = [
   'social_account_feed',
   'effects',
   'composition',
-  'audio'
+  'audio',
+  'calendar'
 ] as const;
 export type NodeKind = (typeof NODE_KINDS)[number];
 
@@ -136,7 +137,8 @@ export const CANVAS_NODE_SPECS: Record<NodeKind, NodeSpec> = {
   // Un nodo `composition` compone più immagini in una scena 3D animata: produce un video (fase 3),
   // richiede almeno un'immagine collegata — senza materiale la scena non ha cosa mostrare.
   composition: { medium: 'video', generated: true, accepts: ['image'], requires: ['image'] },
-  audio: { medium: 'audio', generated: true, accepts: ['text', 'audio', 'video'], requires: [] }
+  audio: { medium: 'audio', generated: true, accepts: ['text', 'audio', 'video'], requires: [] },
+  calendar: { medium: null, generated: true, accepts: ['text', 'image', 'video', 'audio'], requires: [] }
 };
 
 /** Da `posts.content_type` al medium: è il ruolo che porta dentro il medium, e qui si separano. */

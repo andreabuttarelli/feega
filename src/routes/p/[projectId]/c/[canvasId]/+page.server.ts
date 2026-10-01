@@ -95,7 +95,7 @@ export const config = { maxDuration: 300 };
  * modo diverso di proposito — trascinare è last-write-wins, scrivere un prompt no — e qui si
  * rispetta quella divisione invece di uniformarla.
  */
-type Scope = { db: Db; orgId: string; canvasId: string; canvas: Canvas; userId: string; mode: ProjectMode };
+type Scope = { db: Db; orgId: string; canvasId: string; canvas: Canvas; userId: string; mode: ProjectMode; projectBrandId: string | null };
 
 /** Ogni gesto della tela che passa da qui è di una persona, mai un `system` muto: `canvas_events` deve saperlo. */
 function userActor(scope: { userId: string }): Actor {
@@ -124,7 +124,7 @@ async function scopeFor(locals: App.Locals, canvasId: string): Promise<Scope> {
     throw error(404, 'questa tela non esiste, o non è tua');
   }
 
-  return { db, orgId: found.orgId, canvasId, canvas: found.canvas, userId: user.id, mode };
+  return { db, orgId: found.orgId, canvasId, canvas: found.canvas, userId: user.id, mode, projectBrandId: found.projectBrandId };
 }
 
 async function scopeAllowing(locals: App.Locals, canvasId: string, capability: Capability): Promise<Scope> {
@@ -220,7 +220,7 @@ async function loadInfluencerViews(
 }
 
 export const load: PageServerLoad = async ({ params, locals }) => {
-  const { db, orgId, canvasId, canvas, mode } = await scopeFor(locals, params.canvasId);
+  const { db, orgId, canvasId, canvas, mode, projectBrandId } = await scopeFor(locals, params.canvasId);
 
   const [nodes, connections, fullCatalogue, shareToken, references, uncensored] = await Promise.all([
     listNodes(db, { orgId, canvasId }),
@@ -255,7 +255,8 @@ export const load: PageServerLoad = async ({ params, locals }) => {
     nodeIdsInPost,
     shareToken,
     references,
-    mode
+    mode,
+    projectBrandId
   };
 };
 
