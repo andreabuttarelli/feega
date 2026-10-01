@@ -2175,3 +2175,11 @@ ResizeObserver runs, and hiding blurs the focused field. Move: never rebuild Sve
 wholesale; replace only the ones that changed, spread over the old object (`syncNodes`). Also:
 a page `$effect` that reads `data` re-runs on every layout invalidation; depend on the one
 field that means "new page load" (`$derived(data.nodes)`) and `untrack` the rest.
+
+## "Failed to save" while the writes land
+Signal: the canvas banner says the server failed to save, yet Supabase edge logs show `PATCH
+/rest/v1/nodes` 200. Cause: a read action (here `audio_voices`, 503 without
+`ELEVENLABS_API_KEY` on Vercel) went through the same failure path as a write. Move: read the
+browser console line `canvas read <action> failed` before chasing the write path; a read belongs
+in `READ_ACTIONS` (`node-save.ts`), never in the banner. Check `vercel env ls production` for a
+key the local `.env` has.
