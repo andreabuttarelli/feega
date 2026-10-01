@@ -165,7 +165,7 @@ export type Verdict = { ok: true } | { ok: false; why: string };
  * Questo arco può esistere? Si risponde PRIMA di eseguire, mentre il puntatore è ancora in aria:
  * scoprire che una connessione non produce niente dopo aver speso è il modo peggiore di dirlo.
  */
-export function canConnect(from: CanvasNode, to: CanvasNode): Verdict {
+export function canConnect(from: CanvasNode, to: CanvasNode, fromMedium: Medium = mediumOf(from)): Verdict {
   if (from.id === to.id) {
     return { ok: false, why: 'A node cannot connect to itself' };
   }
@@ -182,7 +182,7 @@ export function canConnect(from: CanvasNode, to: CanvasNode): Verdict {
   if (target.sources && !target.sources.includes(from.kind)) {
     return { ok: false, why: `A ${to.kind} node takes a list, products or a social feed` };
   }
-  const medium = mediumOf(from);
+  const medium = fromMedium;
   if (!acceptsOf(to).includes(medium)) {
     const opWhy = to.kind === 'audio' ? ` for ${operationOf(to)}` : '';
     return { ok: false, why: `${MEDIUM_NAME[medium]} cannot feed a ${MEDIUM_NAME[mediumOf(to)] ?? to.kind} node${opWhy}` };

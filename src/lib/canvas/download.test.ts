@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	audioNodeFiles,
 	IMAGE_FORMATS,
 	VIDEO_FORMATS,
 	formatsFor,
@@ -74,5 +75,28 @@ describe('kind guard', () => {
 	it('accepts image and video as the only kinds', () => {
 		const kinds: MediaKind[] = ['image', 'video'];
 		expect(kinds).toHaveLength(2);
+	});
+});
+
+describe('audioNodeFiles', () => {
+	const base = { nodeId: 'abcdef123456', displayName: 'Promo', language: 'it' };
+
+	it('a dubbed video offers the video and its audio track, named after the node and the language', () => {
+		const files = audioNodeFiles({ ...base, videoUrl: '/v', audioUrl: '/a' });
+
+		expect(files.map((f) => [f.label, f.url, f.filename])).toEqual([
+			['Video (MP4)', '/v', 'promo-it-abcdef-ai-generated.mp4'],
+			['Audio (MP3)', '/a', 'promo-it-abcdef-ai-generated.mp3']
+		]);
+	});
+
+	it('an audio-only output offers the audio file alone', () => {
+		const files = audioNodeFiles({ ...base, displayName: null, language: null, videoUrl: null, audioUrl: '/a' });
+
+		expect(files.map((f) => f.filename)).toEqual(['audio-abcdef-ai-generated.mp3']);
+	});
+
+	it('nothing generated yet offers nothing', () => {
+		expect(audioNodeFiles({ ...base, videoUrl: null, audioUrl: null })).toEqual([]);
 	});
 });

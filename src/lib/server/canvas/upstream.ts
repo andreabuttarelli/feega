@@ -15,6 +15,9 @@ import {
 import type { Modalities } from '$lib/canvas/connectors';
 import { AUDIO_INPUT_MODALITIES } from '$lib/canvas/audio-operations';
 import { isSelectableSourceType } from '$lib/canvas/select-node';
+import { portHandle, type OutputValue } from '$lib/canvas/select-outputs';
+import type { OutputPort } from '$lib/canvas/select-sources';
+import type { Medium } from '$lib/canvas/graph';
 import type { SelectableItem } from '$lib/canvas/select-sources';
 import {
   isListItemKind,
@@ -308,6 +311,10 @@ async function toUpstreamNode(
     return { id: node.id, type: node.type, medium: values.itemKind === 'text' ? 'text' : 'image', model: null, text: value.text, mediaUrl: value.mediaUrl };
   }
 
+  if (node.type === 'audio') {
+    return audioUpstreamNode(db, orgId, node);
+  }
+
   const refId = typeof node.data.refId === 'string' ? node.data.refId : null;
   const asset = refId ? await findAsset(db, { orgId, assetId: refId }) : null;
 
@@ -317,6 +324,38 @@ async function toUpstreamNode(
     model: typeof node.data.model === 'string' ? node.data.model : null,
     text: sourceText(node, asset),
     mediaUrl: sourceMediaUrl(asset)
+  };
+}
+
+const MEDIUM_OF_ASSET: Partial<Record<string, Medium>> = { audio: 'audio', video: 'video' };
+
+function outputRefsOf(node: CanvasNodeRecord): Partial<Record<OutputPort, string>> {
+  const refs = node.data.outputRefs;
+  return refs && typeof refs === 'object' ? (refs as Partial<Record<OutputPort, string>>) : {};
+}
+
+async function audioUpstreamNode(db: Db, orgId: string, node: CanvasNodeRecord): Promise<UpstreamNode> {
+  const refId = typeof node.data.refId === 'string' ? node.data.refId : null;
+  const refs = outputRefsOf(node);
+  const assets = await findAssets(db, { orgId, assetIds: [...new Set([refId, ...Object.values(refs)].filter((id): id is string => Boolean(id)))] });
+  const primary = refId ? (assets.get(refId) ?? null) : null;
+
+  const outputs: Record<string, OutputValue> = {};
+  for (const [port, assetId] of Object.entries(refs) as [OutputPort, string][]) {
+    const url = assets.get(assetId)?.url;
+    if (url) {
+      outputs[portHandle(port)] = { port, text: null, mediaUrls: [url] };
+    }
+  }
+
+  return {
+    id: node.id,
+    type: node.type,
+    medium: primary ? MEDIUM_OF_ASSET[primary.type] : undefined,
+    model: typeof node.data.model === 'string' ? node.data.model : null,
+    text: sourceText(node, primary),
+    mediaUrl: sourceMediaUrl(primary),
+    outputs
   };
 }
 

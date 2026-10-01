@@ -75,8 +75,7 @@
 import { mediumOf, type CanvasNode, type Medium } from './graph';
 import { imageModelSpec } from '$lib/image-models';
 import { videoRefCapacity } from '$lib/video-models';
-import { isOutputHandle, type OutputValue } from './select-outputs';
-import type { OutputPort } from './select-sources';
+import { isOutputHandle, MEDIUM_OF_PORT, type OutputValue } from './select-outputs';
 import { connectorsFor, CONNECTOR_LABEL, type ConnectorType, type GenerativeNodeKind, type Modalities } from './connectors';
 
 /** Gli stessi due valori di `frame_type` in `openrouter-video.ts`: un vocabolario solo. */
@@ -261,8 +260,6 @@ function connectorOf(edge: UpstreamEdge, medium: Medium): ConnectorType {
   }
   return CONNECTOR_FOR_MEDIUM[medium];
 }
-
-const MEDIUM_OF_PORT: Record<OutputPort, Medium> = { text: 'text', images: 'image', videos: 'video' };
 
 function throughPort(node: UpstreamNode, handle: string | null | undefined): { node: UpstreamNode } | { why: string } {
   if (!node.outputs || !isOutputHandle(handle)) {

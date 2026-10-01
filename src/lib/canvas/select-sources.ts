@@ -40,7 +40,7 @@ export type SyncedSourceType = 'products' | 'social_account_feed';
 
 type RowOf = { products: ProductRow; social_account_feed: PostRow };
 
-export type OutputPort = Extract<ConnectorType, 'text' | 'images' | 'videos'>;
+export type OutputPort = Extract<ConnectorType, 'text' | 'images' | 'videos' | 'audios'>;
 
 export type SourceField<Row> = {
   key: string;

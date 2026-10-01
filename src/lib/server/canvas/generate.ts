@@ -26,7 +26,7 @@ import { signMediaPaths } from './sign-media';
 import { composePrompt } from '$lib/canvas/compose-prompt';
 import { textRequest } from '$lib/canvas/text-request';
 import { resolveNodeModel } from './node-model';
-import { finishAudioJob, runAudio, type AudioScope } from './audio-run';
+import { finishAudioJob, outputRefsOf, runAudio, type AudioScope } from './audio-run';
 import { audioOperationOf, defaultAudioModel } from '$lib/canvas/audio-operations';
 import type { UpstreamInputs } from '$lib/canvas/upstream-inputs';
 import { WIRO_ID_PREFIX } from '$lib/server/wiro-catalogue';
@@ -128,10 +128,24 @@ async function depositVideo(
  * il nodo non mostra — recuperabile. Il contrario perderebbe il legame fra il nodo e quel che ha
  * fatto, che è la cosa che nessuna ricerca a mano in una libreria ricostruisce.
  */
-async function land(db: Db, input: StartRun, run: NodeRun, asset: Asset, costUsd?: number | null): Promise<RunOutcome> {
+async function land(
+  db: Db,
+  input: StartRun,
+  run: NodeRun,
+  asset: Asset,
+  costUsd?: number | null,
+  shownWith: Record<string, unknown> = {}
+): Promise<RunOutcome> {
   await completeRun(db, { orgId: input.orgId, runId: run.id, assetId: asset.id, costUsd });
 
-  const shown = await showRunState(db, input, { running: false, runId: run.id, refId: asset.id, error: null, outputUncensored: false });
+  const shown = await showRunState(db, input, {
+    running: false,
+    runId: run.id,
+    refId: asset.id,
+    error: null,
+    outputUncensored: false,
+    ...shownWith
+  });
 
   if (!shown) {
     return { kind: 'conflict' };
@@ -223,7 +237,7 @@ async function runAudioNode(db: Db, input: StartRun, run: NodeRun, upstream: Ups
       await setExternalJob(db, { orgId: input.orgId, runId: run.id, externalJobId: out.jobId });
       return { kind: 'queued', run: { ...run, externalJobId: out.jobId } };
     }
-    return land(db, input, run, out.asset, out.costUsd);
+    return land(db, input, run, out.asset, out.costUsd, { outputRefs: outputRefsOf(out.outputs) });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'audio_failed';
     await giveUp(db, input, run, message);
@@ -779,7 +793,14 @@ export async function reconcileAudioNodeRuns(db: Db): Promise<VideoReconcileOutc
       }
 
       await completeRun(db, { orgId: run.orgId, runId: run.id, assetId: progress.asset.id, costUsd: progress.costUsd });
-      await showRunState(db, shape, { running: false, runId: run.id, refId: progress.asset.id, error: null, outputUncensored: false });
+      await showRunState(db, shape, {
+        running: false,
+        runId: run.id,
+        refId: progress.asset.id,
+        outputRefs: outputRefsOf(progress.outputs),
+        error: null,
+        outputUncensored: false
+      });
       outcome.done += 1;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'audio_reconcile_failed';

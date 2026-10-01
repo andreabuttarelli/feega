@@ -1,10 +1,14 @@
 import { CREDITS_PER_USD_SUBSCRIPTION_LIST } from '$lib/credit-ladder';
 import type { ConnectorType } from './connectors';
+import { portHandle, type SelectOutput } from './select-outputs';
+import type { OutputPort } from './select-sources';
 
 export type AudioSource = 'text' | 'media';
 export type AudioDelivery = 'now' | 'job';
 export type AudioBilling = 'character' | 'second';
 export type DurationRange = { min: number; max: number; initial: number };
+export type AudioInputKind = 'text' | 'audio' | 'video';
+export type OutputsByInput = Record<AudioInputKind, readonly ConnectorType[]>;
 
 export type AudioOperation = {
   label: string;
@@ -17,13 +21,16 @@ export type AudioOperation = {
   defaultModel: string;
   usdPerUnit: Record<string, number>;
   inputPorts: readonly ConnectorType[];
-  outputPorts: readonly ConnectorType[];
+  outputPorts: OutputsByInput;
 };
 
 const SECONDS_PER_MINUTE = 60;
 const CHARACTERS_PER_THOUSAND = 1000;
 const perMinute = (usd: number) => usd / SECONDS_PER_MINUTE;
 const perThousandCharacters = (usd: number) => usd / CHARACTERS_PER_THOUSAND;
+
+const AUDIO_ONLY: OutputsByInput = { text: ['audios'], audio: ['audios'], video: ['audios'] };
+const SAME_MEDIUM_AND_TRACK: OutputsByInput = { text: ['audios'], audio: ['audios'], video: ['videos', 'audios'] };
 
 export const AUDIO_OPERATIONS = {
   text_to_speech: {
@@ -42,7 +49,7 @@ export const AUDIO_OPERATIONS = {
       eleven_turbo_v2_5: perThousandCharacters(0.04)
     },
     inputPorts: ['text'],
-    outputPorts: ['audios']
+    outputPorts: AUDIO_ONLY
   },
   voice_changer: {
     label: 'Voice changer',
@@ -55,7 +62,7 @@ export const AUDIO_OPERATIONS = {
     defaultModel: 'eleven_multilingual_sts_v2',
     usdPerUnit: { eleven_multilingual_sts_v2: perMinute(0.12), eleven_english_sts_v2: perMinute(0.12) },
     inputPorts: ['audios', 'videos'],
-    outputPorts: ['audios']
+    outputPorts: AUDIO_ONLY
   },
   dubbing: {
     label: 'Dubbing',
@@ -68,7 +75,7 @@ export const AUDIO_OPERATIONS = {
     defaultModel: 'dubbing_v1',
     usdPerUnit: { dubbing_v1: perMinute(0.5) },
     inputPorts: ['videos', 'audios'],
-    outputPorts: ['audios', 'videos']
+    outputPorts: SAME_MEDIUM_AND_TRACK
   },
   music: {
     label: 'Music',
@@ -81,7 +88,7 @@ export const AUDIO_OPERATIONS = {
     defaultModel: 'music_v1',
     usdPerUnit: { music_v1: perMinute(0.15) },
     inputPorts: ['text'],
-    outputPorts: ['audios']
+    outputPorts: AUDIO_ONLY
   },
   sound_effects: {
     label: 'Sound effect',
@@ -94,7 +101,7 @@ export const AUDIO_OPERATIONS = {
     defaultModel: 'eleven_text_to_sound_v2',
     usdPerUnit: { eleven_text_to_sound_v2: perMinute(0.12) },
     inputPorts: ['text'],
-    outputPorts: ['audios']
+    outputPorts: AUDIO_ONLY
   },
   voice_isolation: {
     label: 'Voice isolation',
@@ -107,7 +114,7 @@ export const AUDIO_OPERATIONS = {
     defaultModel: 'audio_isolation',
     usdPerUnit: { audio_isolation: perMinute(0.12) },
     inputPorts: ['audios', 'videos'],
-    outputPorts: ['audios']
+    outputPorts: AUDIO_ONLY
   }
 } as const satisfies Record<string, AudioOperation>;
 
@@ -166,8 +173,36 @@ export function audioInputPorts(id: AudioOperationId): ConnectorType[] {
   return [...operationSpec(id).inputPorts];
 }
 
-export function audioOutputPorts(id: AudioOperationId): ConnectorType[] {
-  return [...operationSpec(id).outputPorts];
+export function audioOutputPorts(id: AudioOperationId, input: AudioInputKind): ConnectorType[] {
+  return [...operationSpec(id).outputPorts[input]];
+}
+
+export function audioInputKindOf(wired: readonly ConnectorType[]): AudioInputKind {
+  if (wired.includes('audios')) {
+    return 'audio';
+  }
+  return wired.includes('videos') ? 'video' : 'text';
+}
+
+const OUTPUT_LABEL: Partial<Record<ConnectorType, string>> = { videos: 'Dubbed video', audios: 'Audio' };
+
+export function audioNamedOutputs(id: AudioOperationId, input: AudioInputKind): SelectOutput[] {
+  const ports = audioOutputPorts(id, input) as OutputPort[];
+  if (ports.length < 2) {
+    return [];
+  }
+  return ports.map((port) => ({
+    handle: portHandle(port),
+    label: OUTPUT_LABEL[port] ?? port,
+    port,
+    field: port,
+    custom: null,
+    incompatible: false
+  }));
+}
+
+export function dubbedInputKind(mime: string): AudioInputKind {
+  return mime.startsWith('video/') ? 'video' : 'audio';
 }
 
 const MEDIUM_OF_CONNECTOR: Partial<Record<ConnectorType, 'text' | 'image' | 'video' | 'audio'>> = {

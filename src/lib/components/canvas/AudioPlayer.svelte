@@ -4,7 +4,7 @@
   import Download from '@lucide/svelte/icons/download';
   import { waveformOf, WAVEFORM_BARS } from '$lib/canvas/waveform';
 
-  let { src, cacheKey, filename = 'audio.mp3' }: { src: string; cacheKey: string; filename?: string } = $props();
+  let { src, cacheKey, filename = 'audio.mp3' }: { src: string; cacheKey: string; filename?: string | null } = $props();
 
   const FLAT_BAR = 0.08;
   const ICON_SIZE = 14;
@@ -69,9 +69,11 @@
     {/each}
   </button>
 
-  <a class="download" href={src} download={filename} aria-label="Download audio">
-    <Download size={ICON_SIZE} />
-  </a>
+  {#if filename}
+    <a class="download" href={src} download={filename} aria-label="Download audio">
+      <Download size={ICON_SIZE} />
+    </a>
+  {/if}
 </div>
 
 <style>

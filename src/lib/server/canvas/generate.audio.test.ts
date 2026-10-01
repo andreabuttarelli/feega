@@ -1,4 +1,9 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach, beforeAll } from 'vitest';
+import { execFileSync } from 'node:child_process';
+import { mkdtemp, readFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { ensureFfmpegPath } from '$lib/server/ffmpeg-bin';
 import { fakeDb } from '$lib/server/db/fake-db';
 import { reconcileAudioNodeRuns, runGenNode } from './generate';
 import type { AudioProvider } from './audio-provider';
@@ -257,21 +262,59 @@ describe('the run tick finishes a dubbing job', () => {
     expect(provider.dubbedFile).not.toHaveBeenCalled();
   });
 
-  it('deposits the dubbed video, bills its seconds and closes the run', async () => {
+  let dubbedMp4: Uint8Array;
+
+  beforeAll(async () => {
+    const ffmpeg = await ensureFfmpegPath();
+    if (!ffmpeg) {
+      throw new Error('ffmpeg missing: the dubbed video fixture cannot be built');
+    }
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'dubbed-'));
+    const file = path.join(dir, 'dubbed.mp4');
+    execFileSync(ffmpeg, [
+      '-y', '-loglevel', 'error',
+      '-f', 'lavfi', '-i', 'color=c=blue:s=32x32:d=1',
+      '-f', 'lavfi', '-i', 'sine=frequency=440:duration=1',
+      '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest', file
+    ]);
+    dubbedMp4 = new Uint8Array(await readFile(file));
+  });
+
+  const insertedAssets = (calls: { table: string; op: string; payload?: unknown }[]) =>
+    calls.filter((c) => c.table === 'assets' && c.op === 'insert').map((c) => c.payload as Record<string, unknown>);
+
+  it('deposits the dubbed video and its audio track as two assets, bills its seconds once and closes the run', async () => {
     provider.dubbingStatus.mockResolvedValue({ state: 'done', seconds: 60 });
-    provider.dubbedFile.mockResolvedValue({ bytes: new Uint8Array([9]), mime: 'video/mp4' });
+    provider.dubbedFile.mockResolvedValue({ bytes: dubbedMp4, mime: 'video/mp4' });
     const { db, calls } = fakeDb({ node_runs: [queued], nodes: [audioNode({ running: true, runId: RUN })] });
 
     const out = await reconcileAudioNodeRuns(db);
 
     expect(out).toMatchObject({ done: 1 });
     expect(provider.dubbedFile).toHaveBeenCalledWith('d1', 'it');
-    const asset = calls.find((c) => c.table === 'assets' && c.op === 'insert')?.payload as Record<string, unknown>;
-    expect(asset).toMatchObject({ type: 'video', mime_type: 'video/mp4', duration_s: 60 });
-    expect(String(asset.url)).toMatch(/\.mp4$/);
+    const [video, track] = insertedAssets(calls);
+    expect(video).toMatchObject({ type: 'video', mime_type: 'video/mp4', duration_s: 60, ai_marked: true });
+    expect(String(video.url)).toMatch(/\/media\/video\/.+\.mp4$/);
+    expect(track).toMatchObject({ type: 'audio', mime_type: 'audio/mpeg', duration_s: 60, ai_marked: true });
+    expect(String(track.url)).toMatch(/\/media\/audio\/.+\.mp3$/);
+    expect(logAiCall).toHaveBeenCalledTimes(1);
     expect(logAiCall).toHaveBeenCalledWith(expect.objectContaining({ ok: true, flatCostUsd: expect.closeTo(0.5, 6) }));
+    const shown = calls.find((c) => c.table === 'nodes' && c.op === 'update')?.payload as { data: Record<string, unknown> };
+    expect(Object.keys(shown.data.outputRefs as object)).toEqual(['videos', 'audios']);
     const done = calls.find((c) => c.table === 'node_runs' && c.op === 'update' && (c.payload as Record<string, unknown>)?.status === 'done');
     expect(done).toBeTruthy();
+  });
+
+  it('dubbing an audio file deposits one audio asset, as before', async () => {
+    provider.dubbingStatus.mockResolvedValue({ state: 'done', seconds: 1 });
+    provider.dubbedFile.mockResolvedValue(oneSecondMp3());
+    const { db, calls } = fakeDb({ node_runs: [queued], nodes: [audioNode({ running: true, runId: RUN })] });
+
+    await reconcileAudioNodeRuns(db);
+
+    const assets = insertedAssets(calls);
+    expect(assets).toHaveLength(1);
+    expect(assets[0]).toMatchObject({ type: 'audio', mime_type: 'audio/mpeg' });
   });
 
   it('fails the run with the provider reason', async () => {

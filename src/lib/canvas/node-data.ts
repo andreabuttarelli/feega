@@ -115,6 +115,7 @@ const audioSchema = z.object({
       style: z.number().min(0).max(1).optional()
     })
     .optional(),
+  outputRefs: z.object({ videos: z.string().optional(), audios: z.string().optional() }).optional(),
   ...genState,
   ...libraryMedia
 });
