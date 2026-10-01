@@ -36,6 +36,22 @@ test.describe('canvas templates @real', () => {
     expect(events?.length).toBe(CANVAS_TEMPLATES.reduce((sum, t) => sum + t.nodes.length, 0));
   });
 
+  test('la galleria si percorre da tastiera, filtra per categoria e si chiude con Esc', async ({ page, session }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    await page.getByRole('button', { name: 'Templates', exact: true }).click();
+
+    await expect(page.getByRole('menuitem').first()).toBeFocused();
+    await page.keyboard.press('ArrowRight');
+    await expect(page.getByRole('menuitem').nth(1)).toBeFocused();
+
+    await page.getByRole('tab', { name: /^Audio/ }).click();
+    await expect(page.getByRole('menuitem')).toHaveCount(CANVAS_TEMPLATES.filter((t) => t.category === 'audio').length);
+
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+  });
+
   test('un nodo testo di un template genera davvero', async ({ page, session }) => {
     test.skip(!process.env.OPENROUTER_API_KEY, 'OPENROUTER_API_KEY assente: salto la chiamata reale');
 

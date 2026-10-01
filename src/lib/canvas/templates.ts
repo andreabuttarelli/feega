@@ -14,8 +14,24 @@ export type TemplateNode = {
 
 export type TemplateEdge = { from: string; to: string; handle: ConnectorType };
 
+export const TEMPLATE_CATEGORIES = [
+  { id: 'image', label: 'Image' },
+  { id: 'video', label: 'Video' },
+  { id: 'audio', label: 'Audio' },
+  { id: 'social', label: 'Social' }
+] as const;
+
+export type TemplateCategory = (typeof TEMPLATE_CATEGORIES)[number]['id'];
+
+export const ALL_TEMPLATES = 'all';
+
+export type TemplateFilter = TemplateCategory | typeof ALL_TEMPLATES;
+
+const THUMBNAIL_DIR = '/templates';
+
 export type CanvasTemplate = {
   id: string;
+  category: TemplateCategory;
   name: string;
   description: string;
   nodes: TemplateNode[];
@@ -100,6 +116,7 @@ const STYLE_SOURCE = 'Portrait photo of a smiling young woman in a denim jacket 
 export const CANVAS_TEMPLATES: CanvasTemplate[] = [
   {
     id: 'product-lifestyle',
+    category: 'image',
     name: 'Product → lifestyle shots',
     description: 'One product photo becomes three lifestyle scenes for a carousel.',
     nodes: [
@@ -116,6 +133,7 @@ export const CANVAS_TEMPLATES: CanvasTemplate[] = [
   },
   {
     id: 'ugc-video-ad',
+    category: 'video',
     name: 'UGC video ad',
     description: 'A creator-style clip with the product, plus a voice-over script.',
     nodes: [
@@ -133,6 +151,7 @@ export const CANVAS_TEMPLATES: CanvasTemplate[] = [
   },
   {
     id: 'start-end-video',
+    category: 'video',
     name: 'Start → end frame video',
     description: 'Two stills define where a clip begins and ends; the video fills the motion.',
     nodes: [
@@ -147,6 +166,7 @@ export const CANVAS_TEMPLATES: CanvasTemplate[] = [
   },
   {
     id: 'brief-to-reel',
+    category: 'video',
     name: 'Brief → image → reel',
     description: 'A text brief writes the visual, the image becomes the first frame of a reel.',
     nodes: [
@@ -161,6 +181,7 @@ export const CANVAS_TEMPLATES: CanvasTemplate[] = [
   },
   {
     id: 'style-transfer',
+    category: 'image',
     name: 'Style transfer pack',
     description: 'One photo redrawn as claymation, 80s VHS, anime and 3D render.',
     nodes: [
@@ -179,6 +200,7 @@ export const CANVAS_TEMPLATES: CanvasTemplate[] = [
   },
   {
     id: 'voice-over',
+    category: 'audio',
     name: 'Script → voice-over',
     description: 'Write a script and turn it into a voice-over with a music bed.',
     nodes: [
@@ -190,6 +212,7 @@ export const CANVAS_TEMPLATES: CanvasTemplate[] = [
   },
   {
     id: 'podcast-intro',
+    category: 'audio',
     name: 'Podcast intro',
     description: 'Host intro, theme music and a transition sting for an episode.',
     nodes: [
@@ -207,6 +230,7 @@ export const CANVAS_TEMPLATES: CanvasTemplate[] = [
   },
   {
     id: 'moodboard',
+    category: 'image',
     name: 'Brand moodboard',
     description: 'A brand description becomes four moodboard tiles.',
     nodes: [
@@ -225,6 +249,7 @@ export const CANVAS_TEMPLATES: CanvasTemplate[] = [
   },
   {
     id: 'caption-pack',
+    category: 'social',
     name: 'One idea, every platform',
     description: 'A single idea rewritten for Instagram, TikTok, LinkedIn and X.',
     nodes: [
@@ -243,6 +268,7 @@ export const CANVAS_TEMPLATES: CanvasTemplate[] = [
   },
   {
     id: 'thumbnail-cover',
+    category: 'social',
     name: 'Thumbnail + story cover',
     description: 'One title becomes a YouTube thumbnail and a vertical story cover.',
     nodes: [
@@ -257,6 +283,7 @@ export const CANVAS_TEMPLATES: CanvasTemplate[] = [
   },
   {
     id: 'product-teaser',
+    category: 'video',
     name: 'Product teaser with sound',
     description: 'A hero shot animated into a short teaser, with a matching sound effect.',
     nodes: [
@@ -270,6 +297,21 @@ export const CANVAS_TEMPLATES: CanvasTemplate[] = [
 
 export function templateById(id: string): CanvasTemplate | undefined {
   return CANVAS_TEMPLATES.find((t) => t.id === id);
+}
+
+export function templatesIn(filter: TemplateFilter): CanvasTemplate[] {
+  if (filter === ALL_TEMPLATES) {
+    return CANVAS_TEMPLATES;
+  }
+  return CANVAS_TEMPLATES.filter((t) => t.category === filter);
+}
+
+export function templateThumbnail(template: CanvasTemplate): string {
+  return `${THUMBNAIL_DIR}/${template.id}.webp`;
+}
+
+export function templateNodeTypes(template: CanvasTemplate): NodeType[] {
+  return [...new Set(template.nodes.map((n) => n.type))];
 }
 
 const middle = (values: number[]) => (Math.min(...values) + Math.max(...values)) / 2;
