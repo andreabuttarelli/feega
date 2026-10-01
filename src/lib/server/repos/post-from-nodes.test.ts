@@ -86,7 +86,7 @@ describe('promoteNodesToPost: ordine scelto dal composer', () => {
 
   it('ignora nel mediaOrder un id senza asset media (es. la caption)', async () => {
     const nodes = [
-      node({ id: 'text-1', type: 'text', data: { prompt: 'ciao', status: 'done', output_asset_id: 'text-asset' } }),
+      node({ id: 'text-1', type: 'text', data: { prompt: 'ciao', running: false, refId: 'text-asset', error: null } }),
       node({ id: 'img-a', type: 'image', y: 0, data: { assetId: 'asset-a' } }),
       node({ id: 'img-b', type: 'image', y: 10, data: { assetId: 'asset-b' } })
     ];
@@ -155,21 +155,28 @@ describe('promoteNodesToPost: risoluzione asset per tipo di nodo', () => {
     );
   });
 
-  it('un nodo generato prende data.output_asset_id, solo se lo stato e done', async () => {
-    const nodes = [node({ type: 'video', data: { status: 'done', output_asset_id: 'generated-1' } })];
-    const canvasRepo = fakeCanvasRepo(nodes);
+  it.each([
+    ['immagine', 'image', { prompt: 'a cat', model: 'seedream', params: {}, running: false, runId: 'run-1', refId: 'image-asset', error: null, outputUncensored: false }, 'image-asset'],
+    ['video', 'video', { prompt: 'a cat walks', model: 'kling', params: {}, running: false, runId: 'run-2', refId: 'video-asset', error: null, outputUncensored: false }, 'video-asset'],
+    [
+      'audio doppiato',
+      'audio',
+      { prompt: '', params: { operation: 'dubbing', targetLanguage: 'it' }, running: false, runId: 'run-3', refId: 'track-asset', error: null, outputRefs: { videos: 'dubbed-video-asset', audios: 'track-asset' } },
+      'dubbed-video-asset'
+    ]
+  ])('un nodo %s generato porta il suo file nel post', async (_label, type, data, expected) => {
     const postsRepo = fakePostsRepo();
 
-    await promoteNodesToPost(FAKE_DB, { canvas: canvasRepo, posts: postsRepo }, { orgId: ORG, brandId: BRAND, nodeIds: ['node-1'] });
+    await promoteNodesToPost(FAKE_DB, { canvas: fakeCanvasRepo([node({ type, data })]), posts: postsRepo }, { orgId: ORG, brandId: BRAND, nodeIds: ['node-1'] });
 
     expect(postsRepo.promoteToPost).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ media: [{ assetId: 'generated-1', order: 0, role: 'media' }] })
+      expect.objectContaining({ media: [{ assetId: expected, order: 0, role: 'media' }] })
     );
   });
 
   it('un nodo generato ancora in corso non porta media, non un id vuoto', async () => {
-    const nodes = [node({ type: 'video', data: { status: 'running' } })];
+    const nodes = [node({ type: 'video', data: { prompt: 'x', running: true, runId: 'run-1', refId: null, error: null } })];
     const canvasRepo = fakeCanvasRepo(nodes);
     const postsRepo = fakePostsRepo();
 
@@ -180,7 +187,7 @@ describe('promoteNodesToPost: risoluzione asset per tipo di nodo', () => {
 
   it('un nodo testo o doc alimenta la caption, non i media', async () => {
     const nodes = [
-      node({ id: 'text-1', type: 'text', data: { prompt: 'ciao', status: 'done', output_asset_id: 'text-asset' } }),
+      node({ id: 'text-1', type: 'text', data: { prompt: 'ciao', running: false, refId: 'text-asset', error: null } }),
       node({ id: 'img-1', type: 'image', y: 10, data: { assetId: 'asset-1' } })
     ];
     const canvasRepo = fakeCanvasRepo(nodes);
@@ -228,7 +235,7 @@ describe('promoteNodesToPost: risoluzione asset per tipo di nodo', () => {
 describe('promoteNodesToPost: post_sources', () => {
   it('registra ogni nodo come sorgente, con il ruolo giusto', async () => {
     const nodes = [
-      node({ id: 'text-1', type: 'text', data: { prompt: 'ciao', status: 'done', output_asset_id: 'text-asset' } }),
+      node({ id: 'text-1', type: 'text', data: { prompt: 'ciao', running: false, refId: 'text-asset', error: null } }),
       node({ id: 'img-1', type: 'image', data: { assetId: 'asset-1' } })
     ];
     const canvasRepo = fakeCanvasRepo(nodes);

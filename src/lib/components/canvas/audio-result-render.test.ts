@@ -6,7 +6,9 @@ import { render } from 'svelte/server';
 import AudioResult from './AudioResult.svelte';
 import { audioNodeFiles } from '$lib/canvas/download';
 
-const page = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../../routes/p/[projectId]/c/[canvasId]/+page.svelte'), 'utf8');
+const routes = join(dirname(fileURLToPath(import.meta.url)), '../../../routes');
+const page = readFileSync(join(routes, 'p/[projectId]/c/[canvasId]/+page.svelte'), 'utf8');
+const sharedPage = readFileSync(join(routes, 's/[token]/+page.svelte'), 'utf8');
 
 function html(videoUrl: string | null, audioUrl: string | null): string {
   const files = audioNodeFiles({ nodeId: 'abcdef12', displayName: 'Promo', language: 'it', videoUrl, audioUrl });
@@ -32,5 +34,9 @@ describe('the audio node result', () => {
 
   it('the canvas renders it for every audio node, with the files named after node and language', () => {
     expect(page).toMatch(/<AudioResult nodeId=\{id\} \{\.\.\.audioUrlsOf\(row\)\} files=\{audioFilesOf\(row, gen\.params\.targetLanguage/);
+  });
+
+  it('the shared canvas renders it too, so a dubbed video is not reduced to its track', () => {
+    expect(sharedPage).toMatch(/<AudioResult nodeId=\{node\.id\} videoUrl=\{node\.view\.videoUrl\} audioUrl=\{node\.view\.audioUrl\}/);
   });
 });

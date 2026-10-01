@@ -2,7 +2,7 @@ import { canvasModelCatalogue } from '$lib/server/canvas-catalogue';
 import { pickModel, type ModelPick, type OfferedModels } from '$lib/canvas/default-models';
 import { isGenMedium, type GenMedium, type GenParams } from '$lib/canvas/gen-node';
 import { audioModelFor, audioOperationOf } from '$lib/canvas/audio-operations';
-import { canConnect, type CanvasNode } from '$lib/canvas/graph';
+import { canConnect, NODE_KINDS, type CanvasNode, type NodeKind } from '$lib/canvas/graph';
 import { tileNode } from '$lib/canvas/connect-rules';
 import type { Db } from '$lib/server/db/client';
 import { findNode } from '$lib/server/repos/canvas';
@@ -16,11 +16,11 @@ export async function targetTakesNoInputs(db: Db, input: { orgId: string; target
   return isUncensoredModel(db, typeof model === 'string' ? model : null);
 }
 
-type ConnectableMedium = Exclude<Parameters<typeof tileNode>[0]['medium'], null | undefined>;
+type TiledKind = Exclude<NodeKind, 'iframe'>;
 
-const MEDIUM_NODE_TYPES = new Set<string>([
-  'text', 'image', 'video', 'audio', 'list', 'select', 'products', 'social_account_feed', 'calendar'
-] satisfies ConnectableMedium[]);
+function tiledKindOf(type: string): TiledKind | null {
+  return type !== 'iframe' && (NODE_KINDS as readonly string[]).includes(type) ? (type as TiledKind) : null;
+}
 
 /**
  * UNA RIGA DI `nodes` NEL VOCABOLARIO DI `canConnect` — lo stesso `tileNode` che la tela usa
@@ -33,12 +33,8 @@ export function canvasNodeOf(row: { type: string; data: Record<string, unknown> 
   }
   const model = typeof row.data.model === 'string' ? row.data.model : null;
   const operation = row.type === 'audio' ? audioOperationOf((row.data.params ?? {}) as { operation?: unknown }) : undefined;
-  return tileNode({
-    id,
-    medium: MEDIUM_NODE_TYPES.has(row.type) ? (row.type as ConnectableMedium) : null,
-    model,
-    operation
-  });
+  const mediaKind = row.type === 'effects' && row.data.mediaKind === 'video' ? 'video' : undefined;
+  return { ...tileNode({ id, medium: tiledKindOf(row.type), model, operation }), mediaKind };
 }
 
 /**
