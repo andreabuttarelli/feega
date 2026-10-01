@@ -7,7 +7,8 @@ vi.mock('$lib/server/tenancy/entry', async (orig) => ({
 }));
 vi.mock('$lib/server/repos/profiles', () => ({
 	ensureProfile: vi.fn(async () => ({ id: 'u1', email: 'u1@esempio.it', name: null, avatarUrl: null, termsAcceptedAt: '2026-09-30T00:00:00.000Z', termsVersion: '2026-09-30' })),
-	recordTermsAcceptance: vi.fn(async () => {})
+	recordTermsAcceptance: vi.fn(async () => {}),
+	claimCampaignTemplate: vi.fn(async () => false)
 }));
 
 const { load } = await import('./+page.server');
