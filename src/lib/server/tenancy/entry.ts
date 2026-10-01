@@ -7,6 +7,8 @@ import { ProjectMode } from '$lib/project-mode';
 import { createCanvas, listCanvases } from '$lib/server/repos/canvas';
 import { createFirstOrg } from '$lib/server/tenancy/bootstrap';
 import { chooseOrg } from '$lib/server/tenancy/context';
+import { seedWelcome } from '$lib/server/onboarding/welcome';
+import { WELCOME_PARAM, type Campaign } from '$lib/onboarding/campaigns';
 
 /**
  * ENTRARE NELL'APP È UN BOOTSTRAP SILENZIOSO, NON UN MODULO DA COMPILARE.
@@ -36,6 +38,7 @@ export type EntryDeps = {
   createProject: typeof createProject;
   listCanvases: typeof listCanvases;
   createCanvas: typeof createCanvas;
+  seedWelcome: typeof seedWelcome;
 };
 
 export const ENTRY_DEPS: EntryDeps = {
@@ -45,7 +48,8 @@ export const ENTRY_DEPS: EntryDeps = {
   listProjects,
   createProject,
   listCanvases,
-  createCanvas
+  createCanvas,
+  seedWelcome
 };
 
 /** Il canvas vive DENTRO il progetto: `/p/<projectId>/c/<canvasId>`, come le altre pagine del progetto. */
@@ -179,8 +183,15 @@ export async function homePathFor(
   deps: EntryDeps,
   user: User,
   chosenOrgId: string | null = null,
-  lastProjectId: string | null = null
+  lastProjectId: string | null = null,
+  campaign: Campaign | null = null
 ): Promise<string> {
-  const { projectId, canvasId } = await enterApp(db, deps, user, chosenOrgId, lastProjectId);
-  return canvasPath(projectId, canvasId);
+  const entry = await enterApp(db, deps, user, chosenOrgId, lastProjectId);
+  const path = canvasPath(entry.projectId, entry.canvasId);
+  if (!campaign) {
+    return path;
+  }
+
+  const seeded = await deps.seedWelcome(db, { userId: user.id, ...entry }, campaign);
+  return seeded ? `${path}?${WELCOME_PARAM}=${campaign}` : path;
 }

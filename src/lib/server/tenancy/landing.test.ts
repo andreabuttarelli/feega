@@ -8,7 +8,12 @@ const USER = { id: 'u1', email: 'b@esempio.it' } as User;
 const DB = {} as never;
 
 function cookies(values: Record<string, string> = {}): Cookies {
-  return { get: (name: string) => values[name] } as unknown as Cookies;
+  return {
+    get: (name: string) => values[name],
+    delete: (name: string) => {
+      delete values[name];
+    }
+  } as unknown as Cookies;
 }
 
 function deps(outcome: Awaited<ReturnType<LandingDeps['acceptInvite']>>, termsAcceptedAt: string | null = null) {
@@ -38,7 +43,7 @@ describe('dove atterra chi è appena entrato', () => {
 
     expect(path).toBe('/p/proj/c/canvas');
     expect(d.acceptInvite).not.toHaveBeenCalled();
-    expect(d.homePathFor.mock.calls[0].slice(3)).toEqual(['o1', 'p1']);
+    expect(d.homePathFor.mock.calls[0].slice(3)).toEqual(['o1', 'p1', null]);
   });
 
   it("con un invito valido, nell'org che ha invitato, ignorando l'ultimo progetto", async () => {
@@ -85,5 +90,17 @@ describe('dove atterra chi è appena entrato', () => {
     expect(await landingPath(DB, USER, cookies(), 'tok', deps({ outcome: 'wrong_email' }))).toBe(
       '/login?invite_error=wrong_email'
     );
+  });
+});
+
+describe('a signup that came from a landing page', () => {
+  it('hands the stored campaign to the landing canvas and spends the cookie', async () => {
+    const d = deps({ outcome: 'invalid' });
+    const jar: Record<string, string> = { feega_campaign: 'anime-video-generator' };
+
+    await landingPath(DB, USER, cookies(jar), null, d);
+
+    expect(d.homePathFor.mock.calls[0][5]).toBe('anime-video-generator');
+    expect(jar.feega_campaign).toBeUndefined();
   });
 });

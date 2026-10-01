@@ -102,3 +102,17 @@ export async function recordTermsAcceptance(db: Db, userId: string, version: str
     throw error;
   }
 }
+
+export async function claimCampaignTemplate(db: Db, userId: string, campaign: string): Promise<boolean> {
+  const { data, error } = await db
+    .from('profiles')
+    .update({ signup_campaign: campaign, campaign_template_at: new Date().toISOString() })
+    .eq('id', userId)
+    .is('campaign_template_at', null)
+    .select('id');
+
+  if (error) {
+    throw error;
+  }
+  return (data ?? []).length > 0;
+}

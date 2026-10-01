@@ -180,3 +180,54 @@ describe('la radice non porta mai a /app', () => {
 		expect(redirected?.location).toBe('/p/proj1/c/canvas1');
 	});
 });
+
+describe('the landing campaign survives the trip to signup', () => {
+	const landFrom = async (search: string, jar: Record<string, string> = {}) => {
+		const set = vi.fn((name: string, value: string) => {
+			jar[name] = value;
+		});
+		const remove = vi.fn((name: string) => {
+			delete jar[name];
+		});
+		try {
+			await handle({
+				event: {
+					request: new Request(`http://localhost/${search}`),
+					url: new URL(`http://localhost/${search}`),
+					route: { id: '/' },
+					params: {},
+					cookies: { getAll: () => [], get: (name: string) => jar[name], set, delete: remove },
+					locals: {}
+				},
+				resolve: async () => new Response('never')
+			} as any);
+		} catch {
+			return { set, jar };
+		}
+		return { set, jar };
+	};
+
+	it('a known campaign is kept in a first-party functional cookie before the login redirect', async () => {
+		mockSession = { session: null, user: null };
+		const { set } = await landFrom('?utm_source=feega.app&utm_medium=seo&utm_campaign=anime-video-generator');
+		expect(set).toHaveBeenCalledWith(
+			'feega_campaign',
+			'anime-video-generator',
+			expect.objectContaining({ httpOnly: true, sameSite: 'lax', path: '/' })
+		);
+	});
+
+	it('an unknown campaign leaves no cookie', async () => {
+		mockSession = { session: null, user: null };
+		const { set } = await landFrom('?utm_campaign=spring-sale');
+		expect(set).not.toHaveBeenCalledWith('feega_campaign', expect.anything(), expect.anything());
+	});
+
+	it('a signed-in visitor hands the campaign to the landing canvas and the cookie is spent', async () => {
+		mockSession = { session: { access_token: 'tok' }, user: { id: 'user-1', email: 'chi@esempio.it' } };
+		const { homePathFor } = await import('$lib/server/tenancy/entry');
+		const { jar } = await landFrom('?utm_campaign=claymation-ai');
+		expect(vi.mocked(homePathFor).mock.lastCall?.[5]).toBe('claymation-ai');
+		expect(jar.feega_campaign).toBeUndefined();
+	});
+});

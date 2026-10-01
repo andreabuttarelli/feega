@@ -29,8 +29,10 @@
   import type { PresencePeer } from '$lib/realtime/presence-peers';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import { deserialize } from '$app/forms';
-  import { beforeNavigate, goto, invalidate } from '$app/navigation';
-  import { updated } from '$app/state';
+  import { beforeNavigate, goto, invalidate, replaceState } from '$app/navigation';
+  import { page, updated } from '$app/state';
+  import { track } from '$lib/analytics';
+  import { TEMPLATE_AUTO_INSERTED, WELCOME_PARAM, campaignOf } from '$lib/onboarding/campaigns';
   import { HOME_PATH } from '$lib/home-path';
   import { CANVAS_LIST_DEPENDENCY } from '$lib/canvas/canvas-list';
   import { formatCredits } from '$lib/components/credit-amount-format';
@@ -148,6 +150,22 @@
   import { billingPath } from '$lib/billing-path';
 
   let { data } = $props();
+
+  function announceWelcome() {
+    const campaign = campaignOf(page.url.searchParams.get(WELCOME_PARAM));
+    if (!campaign) {
+      return;
+    }
+
+    track(TEMPLATE_AUTO_INSERTED, { campaign });
+    const clean = new URL(page.url);
+    clean.searchParams.delete(WELCOME_PARAM);
+    replaceState(clean, page.state);
+  }
+
+  $effect(() => {
+    untrack(announceWelcome);
+  });
   type TextCostEstimate = { inputTokens: number; outputTokens: number; variableInput: boolean; revision: string; asked: string };
   let textCostEstimates = $state<Record<string, TextCostEstimate>>({});
   let voices = $state<VoiceChoice[]>([]);

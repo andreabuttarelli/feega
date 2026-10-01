@@ -6,6 +6,7 @@ import { acceptInvite } from '$lib/server/tenancy/bootstrap';
 import { ENTRY_DEPS, homePathFor } from '$lib/server/tenancy/entry';
 import { ORG_COOKIE, LAST_PROJECT_COOKIE } from '$lib/server/tenancy/context';
 import { CURRENT_TERMS_VERSION } from '$lib/legal-links';
+import { takeCampaign } from '$lib/server/onboarding/campaign-cookie';
 
 export const INVITE_PARAM = 'invite_token';
 export const INVITE_ERROR_PARAM = 'invite_error';
@@ -40,7 +41,7 @@ export async function landingPath(
   await recordFirstAcceptance(db, deps, user.id, profile.termsAcceptedAt);
 
   if (!inviteToken) {
-    return deps.homePathFor(db, ENTRY_DEPS, user, cookies.get(ORG_COOKIE) ?? null, cookies.get(LAST_PROJECT_COOKIE) ?? null);
+    return deps.homePathFor(db, ENTRY_DEPS, user, cookies.get(ORG_COOKIE) ?? null, cookies.get(LAST_PROJECT_COOKIE) ?? null, takeCampaign(cookies));
   }
 
   const result = await deps.acceptInvite({ token: inviteToken, userId: user.id, email: user.email ?? '' });
