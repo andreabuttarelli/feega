@@ -36,6 +36,7 @@
   import { CoachStep, ONBOARDING_EVENT, OnboardingStatus, chainOf, stepOf, type CoachChain } from '$lib/onboarding/coach';
   import { DEMO_PRESET, exampleFor, isDemoMedium } from '$lib/onboarding/demo';
   import OnboardingCoach from '$lib/components/canvas/OnboardingCoach.svelte';
+  import { placeBeside, type Rect } from '$lib/canvas/placement';
   import { HOME_PATH } from '$lib/home-path';
   import { CANVAS_LIST_DEPENDENCY } from '$lib/canvas/canvas-list';
   import { formatCredits } from '$lib/components/credit-amount-format';
@@ -448,6 +449,7 @@
     untrack(() => {
       if (coachSeenStep !== null && coachSeenStep !== step) {
         track(ONBOARDING_EVENT.stepCompleted, { step: coachSeenStep });
+        focusOn(coachIds(coachChain));
       }
       coachSeenStep = step;
     });
@@ -495,6 +497,7 @@
     coachBusy = false;
     if (result) {
       await refresh();
+      focusOn(coachIds(coachChain));
     }
   }
 
@@ -1835,7 +1838,18 @@
    * lo stesso che decide un collegamento a un nodo ESISTENTE (`connectExisting`, sotto): la
    * domanda "quale porta per quale sorgente" non cambia perché il bersaglio è appena nato.
    */
-  async function connectNew(ids: string[], medium: GenMedium, at: { x: number; y: number }, prompt = '') {
+  let focus = $state<{ ids: string[]; key: number } | null>(null);
+
+  function focusOn(ids: string[]) {
+    focus = { ids, key: (focus?.key ?? 0) + 1 };
+  }
+
+  function rectOf(id: string): Rect | null {
+    const tile = tiles.find((t) => t.id === id);
+    return tile ? { x: tile.x, y: tile.y, w: tile.w, h: tile.h } : null;
+  }
+
+  async function connectNew(ids: string[], medium: GenMedium, prompt = '') {
     const sources: ConnectSource[] = nodes
       .filter((n) => ids.includes(n.id))
       .map((n) => ({ id: n.id, type: n.type }));
@@ -1844,11 +1858,14 @@
     const model = effectiveModel(medium, null, catalogue[medium] ?? []);
     const modalities = model ? { input: catalogue[medium].find((c) => c.id === model)?.inputModalities ?? [] } : { input: [] };
 
-    const { w, h } = genNodeSize(medium);
+    const size = genNodeSize(medium);
+    const from = ids.map(rectOf).filter((r): r is Rect => r !== null);
+    const occupied = tiles.map((t) => ({ x: t.x, y: t.y, w: t.w, h: t.h }));
+    const at = placeBeside(from, size, occupied);
     const created = await post('create', {
       type: medium,
-      x: at.x - w / 2,
-      y: at.y - h / 2,
+      x: at.x,
+      y: at.y,
       data: JSON.stringify({ ...newNodeRow(medium), model, ...(prompt ? { prompt } : {}) })
     });
     const node = (created?.node ?? null) as CanvasNodeRecord | null;
@@ -1875,6 +1892,7 @@
       failed = `Non collegato: ${plan.rejected.map((r) => r.why).join('; ')}`;
     }
     pushGesture({ items });
+    focusOn([...ids, node.id]);
   }
 
   /**
@@ -2515,6 +2533,7 @@
     onUndo={undo}
     onRedo={redo}
     onConnectNew={connectNew}
+    {focus}
     onConnectExisting={connectExisting}
     onRunWorkflow={runWorkflow}
     {runQuoteFor}

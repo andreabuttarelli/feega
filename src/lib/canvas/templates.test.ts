@@ -14,6 +14,8 @@ import {
   type TemplateNode
 } from './templates';
 import { validateNewNodeData } from './node-data';
+import { nodeSize } from './node-size';
+import { PLACEMENT_GAP } from './placement';
 import { NODE_PORTS } from './node-ports';
 import { portAccepts, type ConnectorType } from './connectors';
 import { IMAGE_MODEL_CHOICES, imageModelSpec } from '$lib/image-models';
@@ -114,6 +116,20 @@ describe('planTemplate', () => {
     const mid = (values: number[]) => (Math.min(...values) + Math.max(...values)) / 2;
     expect(mid(plan.nodes.map((n) => n.x)) + TEMPLATE_NODE_HALF.x).toBeCloseTo(at.x);
     expect(mid(plan.nodes.map((n) => n.y)) + TEMPLATE_NODE_HALF.y).toBeCloseTo(at.y);
+  });
+
+  it('no two nodes of any template overlap, and neighbours keep the placement gap', () => {
+    for (const template of CANVAS_TEMPLATES) {
+      const plan = planTemplate(template, { x: 0, y: 0 });
+      const rects = plan.nodes.map((n) => ({ x: n.x, y: n.y, ...nodeSize(n.type) }));
+      for (const [i, a] of rects.entries()) {
+        for (const b of rects.slice(i + 1)) {
+          const apartX = a.x + a.w + PLACEMENT_GAP <= b.x || b.x + b.w + PLACEMENT_GAP <= a.x;
+          const apartY = a.y + a.h + PLACEMENT_GAP <= b.y || b.y + b.h + PLACEMENT_GAP <= a.y;
+          expect(apartX || apartY, template.id).toBe(true);
+        }
+      }
+    }
   });
 
   it('gli archi puntano agli indici dei nodi, con la porta di arrivo del template', () => {
