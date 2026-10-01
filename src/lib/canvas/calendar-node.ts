@@ -54,3 +54,27 @@ export function calendarOf(row: { id: string; type: string; data: Record<string,
 export function calendarData(node: CalendarNode): Record<string, unknown> {
   return { view: node.view, scope: node.scope, brand_id: node.brandId, anchor: node.anchor };
 }
+
+export function calendarBrand(node: CalendarNode, projectBrandId: string | null): string | null {
+  return node.brandId ?? projectBrandId;
+}
+
+export enum CalendarHint {
+  PickBrand = 'pick_brand',
+  Empty = 'empty'
+}
+
+export const CALENDAR_HINT_TEXT: Record<CalendarHint, string> = {
+  [CalendarHint.PickBrand]: 'Pick a brand first: posts are planned for a brand.',
+  [CalendarHint.Empty]: 'Connect or drop images, videos or text here to plan posts.'
+};
+
+export function calendarHint(brandId: string | null, posts: readonly unknown[] | null): CalendarHint | null {
+  if (!brandId) {
+    return CalendarHint.PickBrand;
+  }
+  if (posts === null || posts.length) {
+    return null;
+  }
+  return CalendarHint.Empty;
+}

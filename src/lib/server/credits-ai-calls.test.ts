@@ -15,7 +15,8 @@ beforeEach(() => {
 
 describe('orgCreditsUsage reads spend from ai_calls (no RPC)', () => {
   it('sums cost_usd for the org within the period, ignoring rows outside it', async () => {
-    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-09-25T00:00:00Z') });
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-25T00:00:00Z'));
     onTestFinished(() => vi.useRealTimers());
     const { client } = createTestSupabase({
       ai_calls: [

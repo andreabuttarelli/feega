@@ -67,10 +67,17 @@ You must be at least **18 years old** and able to enter a binding contract. If y
 - As between you and us, we assign to you any rights we may have in outputs generated for you. Whether outputs are protected by copyright depends on applicable law.
 - Your use of an output must also respect the terms of the model provider that produced it; the models available and their providers are shown in the Service.
 - **You are responsible for reviewing outputs before using, publishing or advertising them**, and for their compliance with law, advertising rules and platform policies.
+- Outputs are generated automatically. **We do not review or approve each output before delivery, and we do not endorse or adopt an output** because it was generated through the Service.
+- You decide whether and how to use an output, and you are responsible for every downstream use: publication, distribution, commercialisation, reliance, and actions performed by workflows, agents or other automated systems.
+- Apply qualified human review before using an output in any context that may affect a person's rights, health, safety, finances, employment, education, legal interests or access to essential services. Outputs are **not** legal, medical, financial or other professional advice.
+- These responsibilities apply however you reach a model: the canvas, the chat agent, an external agent through the MCP server or API, scheduled or automated workflows, or integrations. Using an intermediary does not shift any of them to us.
+- We may add, change, suspend or remove models at any time.
 
 ## 8. Acceptable use and content policy
 
 The same rules, with enforcement steps, are in the [Acceptable Use Policy](./ACCEPTABLE-USE.md).
+
+We have the right, but not the obligation, to monitor content on the Service and to remove material that breaches these Terms or the law.
 
 Every generation prompt is screened automatically before it reaches a model, by a classifier and, when in doubt, a second AI review. Blocked requests are refused and the decision is logged. Automated screening can make mistakes in both directions; it does not relieve you of responsibility.
 
@@ -89,7 +96,7 @@ Every generation prompt is screened automatically before it reaches a model, by 
 
 **Standard mode** (every workspace by default) also prohibits **all sexual or pornographic content**.
 
-You also must not: probe, bypass or overload the moderation or rate limits; reverse-engineer or scrape the Service; share API keys outside your organisation; resell the Service without our written consent; use the Service for high-risk purposes listed in Annex III of the AI Act; or breach the terms of any connected platform.
+You also must not: probe, bypass or overload the moderation or rate limits; reverse-engineer, decompile or scrape the Service or any model; disrupt, overload or attack the Service or the systems connected to it, or introduce malware; gain or attempt unauthorised access; use the Service or any output to develop a competing product or to train a competing model; generate or distribute disinformation or misleading political content; carry out biometric processing, surveillance or monitoring of people without their explicit consent; share API keys outside your organisation; resell the Service without our written consent; use the Service for high-risk purposes listed in Annex III of the AI Act; or breach the terms of any connected platform.
 
 ## 9. Uncensored mode
 

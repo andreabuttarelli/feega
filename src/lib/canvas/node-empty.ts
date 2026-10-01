@@ -15,6 +15,6 @@ export const NODE_EMPTY_HINT: Record<NodeType, string> = {
   select: 'Connect a list to pick one item.',
   effects: 'Connect an image or a video to apply effects.',
   composition: 'Connect images to compose them.',
-  calendar: 'Drop a selection on a day to plan a draft.',
+  calendar: 'Connect or drop images, videos or text here to plan posts.',
   audio: 'Pick an operation, then write or connect what to voice.'
 };
