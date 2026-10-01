@@ -26,7 +26,7 @@ const EXPECTED: Record<(typeof NODE_TYPES)[number], { inputs: boolean; output: b
   select: { inputs: true, output: true },
   effects: { inputs: true, output: true },
   composition: { inputs: true, output: true },
-  calendar: { inputs: false, output: false },
+  calendar: { inputs: true, output: false },
   audio: { inputs: true, output: true }
 };
 
@@ -49,6 +49,10 @@ describe('ogni tipo di nodo disegna le porte che la sua riga dichiara', () => {
       if (!spec) continue;
       expect(portsOf(type, ctx).inputs.length > 0).toBe(spec.generated && spec.accepts.length > 0);
     }
+  });
+
+  it('a calendar accepts media and text, so connecting material plans it', () => {
+    expect(portsOf('calendar', ctx).inputs).toEqual(['images', 'videos', 'audios', 'text']);
   });
 
   it('un nodo audio senza operazione salvata prende testo (text to speech), ed esce audio', () => {

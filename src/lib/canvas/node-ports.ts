@@ -44,7 +44,7 @@ export const NODE_PORTS: Record<NodeType, Ports> = {
   select: { inputs: ['text', 'images'], output: OutputRule.Item },
   effects: { inputs: ['images', 'videos'], output: OutputRule.Media },
   composition: { inputs: ['images'], output: 'videos' },
-  calendar: { inputs: NONE, output: null },
+  calendar: { inputs: ['images', 'videos', 'audios', 'text'], output: null },
   audio: { inputs: InputRule.Audio, output: OutputRule.Audio }
 };
 

@@ -15,9 +15,9 @@ import { modeOf, type ProjectMode } from '$lib/project-mode';
  * Una per una e non in un `in`: le org di una persona sono una o due, la prima risponde quasi
  * sempre, e un giro in più costa meno di una query che il doppio del client non sa riprodurre.
  */
-export type OpenCanvas = { orgId: string; canvas: Canvas; mode: ProjectMode };
+export type OpenCanvas = { orgId: string; canvas: Canvas; mode: ProjectMode; projectBrandId: string | null };
 
-const CANVAS_COLUMNS = 'id, project_id, name, viewport, projects(mode)';
+const CANVAS_COLUMNS = 'id, project_id, name, viewport, projects(mode, brand_id)';
 
 export async function findCanvasForUser(
   db: Db,
@@ -39,6 +39,7 @@ export async function findCanvasForUser(
       continue;
     }
 
+    const project = data.projects as { mode?: string; brand_id?: string | null } | null;
     return {
       orgId: org.id,
       canvas: {
@@ -47,7 +48,8 @@ export async function findCanvasForUser(
         name: data.name,
         viewport: (data.viewport as Canvas['viewport']) ?? null
       },
-      mode: modeOf((data.projects as { mode?: string } | null)?.mode)
+      mode: modeOf(project?.mode),
+      projectBrandId: project?.brand_id ?? null
     };
   }
 

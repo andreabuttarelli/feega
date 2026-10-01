@@ -19,7 +19,7 @@ export async function targetTakesNoInputs(db: Db, input: { orgId: string; target
 type ConnectableMedium = Exclude<Parameters<typeof tileNode>[0]['medium'], null | undefined>;
 
 const MEDIUM_NODE_TYPES = new Set<string>([
-  'text', 'image', 'video', 'audio', 'list', 'select', 'products', 'social_account_feed'
+  'text', 'image', 'video', 'audio', 'list', 'select', 'products', 'social_account_feed', 'calendar'
 ] satisfies ConnectableMedium[]);
 
 /**

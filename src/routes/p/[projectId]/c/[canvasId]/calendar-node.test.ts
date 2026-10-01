@@ -33,6 +33,7 @@ function seed(over: Record<string, unknown> = {}) {
   return {
     brands: [{ id: BRAND, org_id: ORG, name: 'Acme', slug: 'acme' }],
     nodes: [
+      { id: 'node-cal', org_id: ORG, canvas_id: CANVAS, deleted_at: null, type: 'calendar', data: { view: 'week', scope: 'canvas', anchor: '2099-10-01' }, position: { x: 0, y: 0 } },
       { id: 'node-img', org_id: ORG, canvas_id: CANVAS, deleted_at: null, type: 'image', data: { assetId: 'asset-1' }, position: { x: 0, y: 0 } }
     ],
     post_sources: [{ post_id: 'post-1', node_id: 'node-img', role: 'media' }],
@@ -172,5 +173,21 @@ describe('actions.schedule_post: dalla bozza al provider', () => {
     const result = await actions.schedule_post(event({ post_id: 'post-1' }, db));
 
     expect(result).toMatchObject({ status: 422, data: { error: 'delivery_failed' } });
+  });
+});
+
+describe('connecting material to a calendar plans it', () => {
+  it('the edge lands, then create_post drafts the source on the picked day', async () => {
+    const { db, calls } = fakeDb({ ...seed(), nodes_connections: [] }, { filter: true });
+
+    const connected = await actions.connect(
+      event({ source_node_id: 'node-img', target_node_id: 'node-cal', kind: 'derives_from', target_handle: 'images' }, db)
+    );
+    expect(connected).toMatchObject({ connection: { sourceNodeId: 'node-img', targetNodeId: 'node-cal' } });
+
+    await actions.create_post(event({ brand_id: BRAND, node_id: ['node-img'], planned_for: PLANNED }, db));
+
+    const insert = calls.find((c) => c.table === 'posts' && c.op === 'insert');
+    expect(insert?.payload).toMatchObject({ planned_for: PLANNED, brand_id: BRAND });
   });
 });
