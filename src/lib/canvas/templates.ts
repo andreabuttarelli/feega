@@ -3,6 +3,8 @@ import type { ConnectorType } from './connectors';
 import type { DuplicatePlan } from './duplicate-plan';
 import { NANO_BANANA_2_MODEL, SEEDREAM_5_LITE_MODEL } from '$lib/image-models';
 import { DEFAULT_MODEL } from './default-models';
+import { nodeSize } from './node-size';
+import { PLACEMENT_GAP } from './placement';
 
 export type TemplateNode = {
   key: string;
@@ -37,8 +39,6 @@ export type CanvasTemplate = {
   nodes: TemplateNode[];
   edges: TemplateEdge[];
 };
-
-export const TEMPLATE_STEP = { x: 440, y: 520 };
 
 export const TEMPLATE_NODE_HALF = { x: 180, y: 230 };
 
@@ -440,13 +440,15 @@ export function planTemplate(template: CanvasTemplate, at: { x: number; y: numbe
   const midCol = middle(template.nodes.map((n) => n.col));
   const midRow = middle(template.nodes.map((n) => n.row));
   const indexOf = new Map(template.nodes.map((n, i) => [n.key, i]));
+  const sizes = template.nodes.map((n) => nodeSize(n.type));
+  const step = { x: Math.max(...sizes.map((z) => z.w)) + PLACEMENT_GAP, y: Math.max(...sizes.map((z) => z.h)) + PLACEMENT_GAP };
 
   const nodes = template.nodes.map((n, i) => ({
     sourceIndex: i,
     type: n.type,
     data: structuredClone(n.data),
-    x: at.x - TEMPLATE_NODE_HALF.x + (n.col - midCol) * TEMPLATE_STEP.x,
-    y: at.y - TEMPLATE_NODE_HALF.y + (n.row - midRow) * TEMPLATE_STEP.y
+    x: at.x - TEMPLATE_NODE_HALF.x + (n.col - midCol) * step.x,
+    y: at.y - TEMPLATE_NODE_HALF.y + (n.row - midRow) * step.y
   }));
 
   const edges = template.edges.map((e) => ({

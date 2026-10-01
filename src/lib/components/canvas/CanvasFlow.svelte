@@ -39,6 +39,8 @@
   import SelectionToolbar from './SelectionToolbar.svelte';
   import NextStepChips from './NextStepChips.svelte';
   import ConnectPicker from './ConnectPicker.svelte';
+  import CanvasFocus from './CanvasFocus.svelte';
+  import { FIT_PADDING, READABLE_ZOOM } from '$lib/canvas/placement';
   import type { SelectionActionId } from '$lib/canvas/selection-actions';
   import type { GenMedium, ModelChoice } from '$lib/canvas/gen-node';
   import { CANVAS_DRAG_MEDIUM } from '$lib/canvas/new-node';
@@ -138,6 +140,7 @@
     modelChoicesFor,
     catalogueSyncedFor,
     onPropertyChange,
+    focus = null,
     onSelectionChange,
     mode = CanvasMode.Edit,
     tile
@@ -202,12 +205,8 @@
     onUndo?: () => void;
     /** ⇧⌘Z: ripete l'ultimo gesto annullato. */
     onRedo?: () => void;
-    /**
-     * "Collega a nuovo…": la scelta del tipo la fa questo componente (`ConnectPicker`), il nodo e
-     * i fili li fa chi monta la tela — la stessa divisione di `onCreate`, dove il PUNTO lo decide
-     * `CanvasFlow` e la SCRITTURA la pagina. `at` è già in unità di tela, a destra della selezione.
-     */
-    onConnectNew?: (ids: string[], medium: GenMedium, at: { x: number; y: number }, prompt?: string) => void;
+    onConnectNew?: (ids: string[], medium: GenMedium, prompt?: string) => void;
+    focus?: { ids: string[]; key: number } | null;
     /** "Collega a…": gli id scelti e il nodo su cui si è cliccato per chiudere la modalità bersaglio. */
     onConnectExisting?: (ids: string[], targetId: string) => void;
     /** "Esegui flusso": gli id scelti, così com'è per `onDelete`/`onPromote`. */
@@ -591,9 +590,9 @@
   );
 
   function pickConnectMedium(medium: GenMedium) {
-    if (!connectPickerAt || !toFlow) { connectPickerAt = null; return; }
+    if (!connectPickerAt) { return; }
 
-    onConnectNew?.(selection.ids, medium, toFlow(connectPickerAt));
+    onConnectNew?.(selection.ids, medium);
     connectPickerAt = null;
   }
 
@@ -614,8 +613,7 @@
     }
     if (!suggestion.createsNodeType) return;
 
-    const at = toFlow({ x: selection.box.x + selection.box.width + 24, y: selection.box.y });
-    onConnectNew?.(selection.ids, suggestion.createsNodeType, at, suggestion.promptTemplate);
+    onConnectNew?.(selection.ids, suggestion.createsNodeType, suggestion.promptTemplate);
   }
 
   const nextStepNodeId = $derived(selection.ids.length === 1 ? selection.ids[0] : null);
@@ -732,10 +730,12 @@
     onconnectend={() => (refusal = null)}
     {...spec.flow}
     fitView
+    fitViewOptions={{ padding: FIT_PADDING, maxZoom: READABLE_ZOOM }}
     proOptions={ATTRIBUTION_IN_CREDITS_PAGE}
     multiSelectionKey={['Meta', 'Control', 'Shift']}
   >
     <CanvasPointer onready={(fn) => (toFlow = fn)} />
+    <CanvasFocus {focus} />
     {#if spec.chrome}
     <CanvasKeys
       onadd={addAtCentre}
