@@ -745,3 +745,40 @@ describe('resolveUpstreamInputs — riferimenti scelti sul nodo', () => {
     expect(out.startFrameUrl).toBeNull();
   });
 });
+
+describe('a dubbed video feeds downstream through the handle it was wired on', () => {
+  const seedance = 'bytedance/seedance-2-5';
+  const dubbed = node({
+    id: 'dub',
+    type: 'audio',
+    medium: 'video',
+    mediaUrl: 'https://cdn/dubbed.mp4',
+    outputs: {
+      'out:videos': { port: 'videos', text: null, mediaUrls: ['https://cdn/dubbed.mp4'] },
+      'out:audios': { port: 'audios', text: null, mediaUrls: ['https://cdn/track.mp3'] }
+    }
+  });
+
+  it('the video handle gives the dubbed video, the audio handle its track', () => {
+    const nodes = [node({ id: 'v1', type: 'video', model: seedance }), dubbed];
+    const edges = [
+      edge({ id: 'e1', sourceNodeId: 'dub', targetNodeId: 'v1', sourceHandle: 'out:videos' }),
+      edge({ id: 'e2', sourceNodeId: 'dub', targetNodeId: 'v1', sourceHandle: 'out:audios' })
+    ];
+
+    const out = resolveUpstreamInputs(nodes, edges, 'v1', TEXT_IMAGE_VIDEO_AUDIO);
+
+    expect(out.referenceVideoUrls).toEqual(['https://cdn/dubbed.mp4']);
+    expect(out.referenceAudioUrls).toEqual(['https://cdn/track.mp3']);
+  });
+
+  it('an edge without a handle takes the dubbed video, never the mp4 as audio', () => {
+    const nodes = [node({ id: 'v1', type: 'video', model: seedance }), dubbed];
+    const edges = [edge({ id: 'e1', sourceNodeId: 'dub', targetNodeId: 'v1' })];
+
+    const out = resolveUpstreamInputs(nodes, edges, 'v1', TEXT_IMAGE_VIDEO_AUDIO);
+
+    expect(out.referenceVideoUrls).toEqual(['https://cdn/dubbed.mp4']);
+    expect(out.referenceAudioUrls).toEqual([]);
+  });
+});

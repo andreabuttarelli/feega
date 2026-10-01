@@ -10,7 +10,7 @@
   import DownloadIcon from '@lucide/svelte/icons/download';
   import LoaderIcon from '@lucide/svelte/icons/loader-circle';
   import XIcon from '@lucide/svelte/icons/x';
-  import { formatsFor, buildDownloadFilename, clampGifPlan, MediaOrigin, type DownloadFormat, type MediaKind } from '$lib/canvas/download';
+  import { formatsFor, buildDownloadFilename, clampGifPlan, MediaOrigin, type DownloadFile, type DownloadFormat, type MediaKind } from '$lib/canvas/download';
   import { avifEncodable } from '$lib/canvas/avif-support';
 
   let {
@@ -19,7 +19,8 @@
     nodeId,
     nodeType,
     displayName = null,
-    origin = MediaOrigin.Other
+    origin = MediaOrigin.Other,
+    files = []
   }: {
     kind: MediaKind;
     sourceUrl: string;
@@ -27,6 +28,7 @@
     nodeType: string;
     displayName?: string | null;
     origin?: MediaOrigin;
+    files?: DownloadFile[];
   } = $props();
 
   let open = $state(false);
@@ -43,19 +45,29 @@
 
   const formats = $derived(formatsFor(kind, { avifEncodable: avifOk }));
 
-  function triggerDownload(blob: Blob, extension: string) {
+  function saveBlob(blob: Blob, filename: string) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = buildDownloadFilename({ displayName, nodeId, nodeType, extension, origin });
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  function triggerDownload(blob: Blob, extension: string) {
+    saveBlob(blob, buildDownloadFilename({ displayName, nodeId, nodeType, extension, origin }));
   }
 
   async function downloadOriginal(extension: string) {
     const res = await fetch(sourceUrl);
     const blob = await res.blob();
     triggerDownload(blob, extension || guessExtension(blob.type));
+  }
+
+  async function downloadFile(file: DownloadFile) {
+    open = false;
+    const res = await fetch(file.url);
+    saveBlob(await res.blob(), file.filename);
   }
 
   function guessExtension(mime: string): string {
@@ -142,10 +154,16 @@
     </button>
     {#if open}
       <div class="node-download-menu" role="menu">
-        {#each formats as format (format.id)}
-          <button type="button" role="menuitem" onclick={() => downloadAs(format)}>
-            {format.label}
+        {#each files as file (file.id)}
+          <button type="button" role="menuitem" onclick={() => downloadFile(file)}>
+            {file.label}
           </button>
+        {:else}
+          {#each formats as format (format.id)}
+            <button type="button" role="menuitem" onclick={() => downloadAs(format)}>
+              {format.label}
+            </button>
+          {/each}
         {/each}
       </div>
     {/if}

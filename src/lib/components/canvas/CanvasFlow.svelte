@@ -388,7 +388,7 @@
     const { source, target, sourceHandle, targetHandle } = c;
     if (!source || !target) return false;
 
-    const verdict = verdictBetween(lookup, source, target);
+    const verdict = verdictBetween(lookup, source, target, sourceHandle);
     if (!verdict.ok) {
       refusal = verdict.why;
       return false;
@@ -438,7 +438,7 @@
     const output = sourceTile ? portOfHandle(sourceTile, connection.sourceHandle) : null;
     const handle = landingPort((connection.targetHandle as ConnectorType | null) ?? null, output, connectorsOf.get(target) ?? []);
     const outputHandle = isOutputHandle(connection.sourceHandle) ? connection.sourceHandle : null;
-    onConnect?.(source, target, edgeKindsFor(lookup, source, target)[0] ?? DEFAULT_EDGE_KIND, handle, outputHandle);
+    onConnect?.(source, target, edgeKindsFor(lookup, source, target, outputHandle)[0] ?? DEFAULT_EDGE_KIND, handle, outputHandle);
   }
 
   /**
@@ -455,7 +455,7 @@
   let picked = $state<{ edge: FlowEdge; screen: { x: number; y: number } } | null>(null);
 
   const pickedKinds = $derived(
-    picked ? edgeKindsFor(lookup, picked.edge.source, picked.edge.target) : []
+    picked ? edgeKindsFor(lookup, picked.edge.source, picked.edge.target, picked.edge.sourceHandle) : []
   );
 
   function onEdgeClick({ edge, event }: { edge: FlowEdge; event: MouseEvent | TouchEvent }) {

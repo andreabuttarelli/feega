@@ -64,6 +64,11 @@ describe('ogni tipo di nodo disegna le porte che la sua riga dichiara', () => {
     expect(portsOf('audio', audioCtx)).toEqual({ inputs: ['audios', 'videos'], output: 'audios' });
   });
 
+  it('un nodo audio in dubbing su un video esce prima il video doppiato', () => {
+    const audioCtx = { ...ctx, audioOperation: () => 'dubbing' as const, audioInput: () => 'video' as const };
+    expect(portsOf('audio', audioCtx).output).toBe('videos');
+  });
+
   it('un nodo audio in dubbing prende video o audio, ed esce audio', () => {
     const audioCtx = { ...ctx, audioOperation: () => 'dubbing' as const };
     expect(portsOf('audio', audioCtx)).toEqual({ inputs: ['videos', 'audios'], output: 'audios' });

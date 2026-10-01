@@ -138,3 +138,21 @@ describe('tileNode — da quel che la pagina ha in mano al vocabolario del model
     });
   });
 });
+
+describe('verdictBetween — a named output speaks for its own medium', () => {
+  const dub: CanvasNode = { id: 'd', kind: 'audio', operation: 'dubbing' };
+  const effects: CanvasNode = { id: 'fx', kind: 'effects' };
+
+  it('the dubbed video handle feeds an effects node, which takes no audio', () => {
+    const at = lookup({ d: dub, fx: effects });
+
+    expect(verdictBetween(at, 'd', 'fx', 'out:videos')).toEqual({ ok: true });
+    expect(verdictBetween(at, 'd', 'fx', 'out:audios').ok).toBe(false);
+  });
+
+  it('without a handle the audio node is audio, as before', () => {
+    const at = lookup({ d: dub, fx: effects });
+
+    expect(verdictBetween(at, 'd', 'fx').ok).toBe(false);
+  });
+});

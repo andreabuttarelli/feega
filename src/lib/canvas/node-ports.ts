@@ -1,6 +1,6 @@
 import type { ConnectorType } from './connectors';
 import type { NodeType } from './node-data';
-import { audioInputPorts, audioOutputPorts, audioOperationOf, type AudioOperationId } from './audio-operations';
+import { audioInputPorts, audioOutputPorts, audioOperationOf, type AudioInputKind, type AudioOperationId } from './audio-operations';
 
 export enum InputRule {
   Model = 'model',
@@ -25,6 +25,7 @@ export type PortContext = {
   itemPort: () => ConnectorType;
   mediaKind: () => 'image' | 'video';
   audioOperation?: () => AudioOperationId;
+  audioInput?: () => AudioInputKind;
 };
 
 const NONE: readonly ConnectorType[] = [];
@@ -49,6 +50,7 @@ export const NODE_PORTS: Record<NodeType, Ports> = {
 };
 
 const DEFAULT_AUDIO_OPERATION_CTX = (): AudioOperationId => audioOperationOf({});
+const DEFAULT_AUDIO_INPUT_CTX = (): AudioInputKind => 'text';
 
 const INPUTS: Record<InputRule, (ctx: PortContext) => ConnectorType[]> = {
   [InputRule.Model]: (ctx) => ctx.modelPorts(),
@@ -59,7 +61,8 @@ const INPUTS: Record<InputRule, (ctx: PortContext) => ConnectorType[]> = {
 const OUTPUTS: Record<OutputRule, (ctx: PortContext) => ConnectorType> = {
   [OutputRule.Item]: (ctx) => ctx.itemPort(),
   [OutputRule.Media]: (ctx) => (ctx.mediaKind() === 'video' ? 'videos' : 'images'),
-  [OutputRule.Audio]: (ctx) => audioOutputPorts((ctx.audioOperation ?? DEFAULT_AUDIO_OPERATION_CTX)())[0]
+  [OutputRule.Audio]: (ctx) =>
+    audioOutputPorts((ctx.audioOperation ?? DEFAULT_AUDIO_OPERATION_CTX)(), (ctx.audioInput ?? DEFAULT_AUDIO_INPUT_CTX)())[0]
 };
 
 const isRule = <R extends string>(value: unknown, rules: Record<R, unknown>): value is R =>

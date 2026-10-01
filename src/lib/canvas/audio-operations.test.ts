@@ -8,7 +8,10 @@ import {
   audioInputProblem,
   audioModelsOf,
   audioOperationOf,
+  audioInputKindOf,
+  audioNamedOutputs,
   audioOutputPorts,
+  dubbedInputKind,
   audioUsdFor,
   defaultAudioModel
 } from './audio-operations';
@@ -37,35 +40,49 @@ describe('audio operations table', () => {
   it('gives every operation at least one input port and one output port', () => {
     for (const id of AUDIO_OPERATION_IDS) {
       expect(audioInputPorts(id).length).toBeGreaterThan(0);
-      expect(audioOutputPorts(id).length).toBeGreaterThan(0);
+      for (const input of ['text', 'audio', 'video'] as const) {
+        expect(audioOutputPorts(id, input).length).toBeGreaterThan(0);
+      }
     }
   });
 
   it('text to speech takes text and outputs audio only', () => {
     expect(audioInputPorts('text_to_speech')).toEqual(['text']);
-    expect(audioOutputPorts('text_to_speech')).toEqual(['audios']);
+    expect(audioOutputPorts('text_to_speech', 'video')).toEqual(['audios']);
   });
 
   it('voice changer takes audio or video, outputs audio only', () => {
     expect(audioInputPorts('voice_changer')).toEqual(['audios', 'videos']);
-    expect(audioOutputPorts('voice_changer')).toEqual(['audios']);
+    expect(audioOutputPorts('voice_changer', 'video')).toEqual(['audios']);
   });
 
-  it('dubbing takes video or audio, and outputs both audio and video', () => {
+  it('dubbing a video outputs the dubbed video and its audio track; dubbing audio outputs audio only', () => {
     expect(audioInputPorts('dubbing')).toEqual(['videos', 'audios']);
-    expect(audioOutputPorts('dubbing')).toEqual(['audios', 'videos']);
+    expect(audioOutputPorts('dubbing', 'video')).toEqual(['videos', 'audios']);
+    expect(audioOutputPorts('dubbing', 'audio')).toEqual(['audios']);
+  });
+
+  it('reads the input kind from what is wired, audio first like the run does', () => {
+    expect(audioInputKindOf(['videos'])).toBe('video');
+    expect(audioInputKindOf(['videos', 'audios'])).toBe('audio');
+    expect(audioInputKindOf(['text'])).toBe('text');
+  });
+
+  it('reads the input kind of a dub from the file ElevenLabs returns, which keeps the source format', () => {
+    expect(dubbedInputKind('video/mp4')).toBe('video');
+    expect(dubbedInputKind('audio/mpeg')).toBe('audio');
   });
 
   it('music and sound effects take an optional text prompt, output audio only', () => {
     expect(audioInputPorts('music')).toEqual(['text']);
     expect(audioInputPorts('sound_effects')).toEqual(['text']);
-    expect(audioOutputPorts('music')).toEqual(['audios']);
-    expect(audioOutputPorts('sound_effects')).toEqual(['audios']);
+    expect(audioOutputPorts('music', 'video')).toEqual(['audios']);
+    expect(audioOutputPorts('sound_effects', 'video')).toEqual(['audios']);
   });
 
   it('voice isolation takes audio or video, outputs audio only', () => {
     expect(audioInputPorts('voice_isolation')).toEqual(['audios', 'videos']);
-    expect(audioOutputPorts('voice_isolation')).toEqual(['audios']);
+    expect(audioOutputPorts('voice_isolation', 'video')).toEqual(['audios']);
   });
 
   it('falls back to text to speech when the saved operation is unknown', () => {
@@ -129,5 +146,19 @@ describe('audio cost', () => {
   it('turns dollars into credit units at the subscription list rate', () => {
     expect(audioCreditsFor('text_to_speech', 'eleven_multilingual_v2', { characters: 1000 })).toBe(16);
     expect(audioCreditsFor('sound_effects', 'eleven_text_to_sound_v2', { seconds: 5 })).toBe(2);
+  });
+});
+
+describe('audio node named outputs', () => {
+  it('a dubbed video exposes a dubbed-video handle and an audio handle', () => {
+    expect(audioNamedOutputs('dubbing', 'video').map((o) => [o.handle, o.port])).toEqual([
+      ['out:videos', 'videos'],
+      ['out:audios', 'audios']
+    ]);
+  });
+
+  it('a single output needs no named handle', () => {
+    expect(audioNamedOutputs('dubbing', 'audio')).toEqual([]);
+    expect(audioNamedOutputs('text_to_speech', 'text')).toEqual([]);
   });
 });

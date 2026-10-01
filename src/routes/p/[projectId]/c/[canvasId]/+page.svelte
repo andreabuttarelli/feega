@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { MediaOrigin } from '$lib/canvas/download';
+  import { MediaOrigin, audioNodeFiles } from '$lib/canvas/download';
   /**
    * LA TELA.
    *
@@ -48,10 +48,10 @@
   import ListNode from '$lib/components/canvas/ListNode.svelte';
   import SelectNode from '$lib/components/canvas/SelectNode.svelte';
   import NodeDownload from '$lib/components/canvas/NodeDownload.svelte';
+  import AudioResult from '$lib/components/canvas/AudioResult.svelte';
   import NodeReferences from '$lib/components/canvas/NodeReferences.svelte';
   import AudioControls, { type VoiceChoice } from '$lib/components/canvas/AudioControls.svelte';
-  import AudioPlayer from '$lib/components/canvas/AudioPlayer.svelte';
-  import { audioInputPorts, audioOperationOf, operationSpec, type AudioOperationId } from '$lib/canvas/audio-operations';
+  import { audioInputKindOf, audioInputPorts, audioNamedOutputs, audioOperationOf, operationSpec, type AudioInputKind, type AudioOperationId } from '$lib/canvas/audio-operations';
   import { referencesOf } from '$lib/canvas/node-references';
   import EffectsNode from '$lib/components/canvas/EffectsNode.svelte';
   import EffectsEditor from '$lib/components/canvas/EffectsEditor.svelte';
@@ -68,7 +68,7 @@
   import type { CompositionNode as CompositionNodeState } from '$lib/canvas/composition-node';
   import { listFeedingSelect } from '$lib/canvas/select-node';
   import { fieldValue, productItem, socialPostItem } from '$lib/canvas/select-sources';
-  import { isOutputHandle, outputValues, selectOutputs, type OutputValue, type SelectOutput } from '$lib/canvas/select-outputs';
+  import { isOutputHandle, outputValues, portOfOutputHandle, selectOutputs, type OutputValue, type SelectOutput } from '$lib/canvas/select-outputs';
   import { feedFiltersOf, filterPosts, filterProducts, productFiltersOf } from '$lib/canvas/source-filters';
   import { hasInspector, inspectorOf } from '$lib/canvas/node-inspector';
   import SourceSettingsFrame from '$lib/components/canvas/SourceSettingsFrame.svelte';
@@ -671,6 +671,33 @@
     return audioOperationOf((n.data.params ?? {}) as { operation?: unknown });
   }
 
+  function wiredPortOf(edge: { source: string; sourceHandle?: string | null }): ConnectorType | null {
+    const source = nodes.find((n) => n.id === edge.source);
+    if (!source) {
+      return null;
+    }
+    return portOfOutputHandle(edge.sourceHandle) ?? (source.type === 'audio' ? 'audios' : portsOfTile(source).output);
+  }
+
+  function audioInputOfTile(n: Tile): AudioInputKind {
+    const wired = edges.filter((e) => e.target === n.id).map(wiredPortOf);
+    return audioInputKindOf(wired.filter((port): port is ConnectorType => port !== null));
+  }
+
+  function outputsOfTile(n: Tile): SelectOutput[] {
+    return n.type === 'audio' ? audioNamedOutputs(audioOperationOfTile(n), audioInputOfTile(n)) : selectOutputsOf(n);
+  }
+
+  function audioUrlsOf(n: Tile): { videoUrl: string | null; audioUrl: string | null } {
+    const refs = (n.data.outputRefs ?? {}) as Partial<Record<ConnectorType, string>>;
+    const refId = typeof n.data.refId === 'string' ? n.data.refId : null;
+    return { videoUrl: assetUrl(refs.videos ?? null), audioUrl: assetUrl(refs.audios ?? (refs.videos ? null : refId)) };
+  }
+
+  function audioFilesOf(n: Tile, language: string | null) {
+    return audioNodeFiles({ ...audioUrlsOf(n), nodeId: n.id, displayName: n.displayName, language });
+  }
+
   function portsOfTile(n: Tile): { inputs: ConnectorType[] | undefined; output: ConnectorType | null } {
     if (!isNodeType(n.type)) {
       return { inputs: undefined, output: null };
@@ -681,7 +708,8 @@
       listPorts: () => listPortsByNode[n.id] ?? [],
       itemPort: () => itemPortOf(n.type === 'list' ? listValuesByNode[n.id]?.itemKind : upstreamListOf(n.id)?.itemKind),
       mediaKind: () => upstreamEffectsMediaOf(n.id)?.kind ?? (n.data.mediaKind === 'video' ? 'video' : 'image'),
-      audioOperation: () => audioOperationOfTile(n)
+      audioOperation: () => audioOperationOfTile(n),
+      audioInput: () => audioInputOfTile(n)
     });
   }
 
@@ -696,7 +724,7 @@
   }
 
   const tiles = $derived(
-    nodes.map((n) => ({ n, ports: portsOfTile(n), outputs: selectOutputsOf(n) })).map(({ n, ports, outputs }) => ({
+    nodes.map((n) => ({ n, ports: portsOfTile(n), outputs: outputsOfTile(n) })).map(({ n, ports, outputs }) => ({
       id: n.id,
       x: n.x,
       y: n.y,
@@ -2438,7 +2466,7 @@
                   {/if}
                 </div>
               {:else if gen.medium === 'audio'}
-                <AudioPlayer src={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} cacheKey={refId} />
+                <AudioResult nodeId={id} {...audioUrlsOf(row)} files={audioFilesOf(row, gen.params.targetLanguage ?? null)} />
               {:else if gen.medium === 'video'}
                 <!-- svelte-ignore a11y_media_has_caption -->
                 <video src={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} controls playsinline></video>

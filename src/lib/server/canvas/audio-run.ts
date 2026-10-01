@@ -4,10 +4,13 @@ import { AUDIO_JOB_PREFIX } from '$lib/server/repos/node-runs';
 import type { Actor } from '$lib/server/repos/actor';
 import { logAiCall } from '$lib/server/ai-log';
 import { markGenerated } from '$lib/server/content-credentials';
+import type { ConnectorType } from '$lib/canvas/connectors';
 import {
   AUDIO_PROBLEM_MESSAGE,
   audioDurationOf,
   audioInputProblem,
+  audioOutputPorts,
+  dubbedInputKind,
   audioUsdFor,
   operationSpec,
   type AudioMeasure,
@@ -15,6 +18,7 @@ import {
   type AudioParams
 } from '$lib/canvas/audio-operations';
 import type { AudioFile, AudioProvider, VoiceSettings } from './audio-provider';
+import { extractAudioTrack } from './audio-track';
 
 const GENERATED_MEDIA_BUCKET = 'brand-knowledge';
 const MP3_BYTES_PER_SECOND = 16_000;
@@ -46,8 +50,10 @@ export type AudioRequest = {
   videoUrls: string[];
 };
 
+export type AudioOutputs = Partial<Record<ConnectorType, Asset>>;
+
 export type AudioResult =
-  | { kind: 'landed'; asset: Asset; costUsd: number | null }
+  | { kind: 'landed'; asset: Asset; outputs: AudioOutputs; costUsd: number | null }
   | { kind: 'job'; jobId: string }
   | { kind: 'refused'; error: string };
 
@@ -115,6 +121,15 @@ function assetTypeOf(mime: string): AssetType {
   return mime.startsWith(VIDEO_MIME_PREFIX) ? 'video' : 'audio';
 }
 
+const FILE_FOR_PORT: Partial<Record<ConnectorType, (dubbed: AudioFile) => Promise<AudioFile>>> = {
+  videos: async (dubbed) => dubbed,
+  audios: async (dubbed) => (assetTypeOf(dubbed.mime) === 'video' ? extractAudioTrack(dubbed) : dubbed)
+};
+
+export function outputRefsOf(outputs: AudioOutputs): Record<string, string> {
+  return Object.fromEntries(Object.entries(outputs).map(([port, asset]) => [port, asset!.id]));
+}
+
 export function mp3Seconds(file: AudioFile): number {
   return Math.round((file.bytes.byteLength / MP3_BYTES_PER_SECOND) * 100) / 100;
 }
@@ -144,7 +159,8 @@ function bill(scope: AudioScope, entry: { operation: AudioOperationId; model: st
 
 export async function depositAudio(db: Db, scope: AudioScope, file: AudioFile, seconds: number, model: string): Promise<Asset> {
   const extension = EXTENSION_OF_MIME[file.mime] ?? 'bin';
-  const path = `${scope.userId}/media/audio/${crypto.randomUUID()}.${extension}`;
+  const type = assetTypeOf(file.mime);
+  const path = `${scope.userId}/media/${type}/${crypto.randomUUID()}.${extension}`;
   const marked = await markGenerated(Buffer.from(file.bytes), file.mime, { model, provider: PROVIDER });
   const { error } = await db.storage
     .from(GENERATED_MEDIA_BUCKET)
@@ -156,7 +172,7 @@ export async function depositAudio(db: Db, scope: AudioScope, file: AudioFile, s
   return insertAsset(db, {
     orgId: scope.orgId,
     projectId: scope.projectId,
-    type: assetTypeOf(file.mime),
+    type,
     source: 'generated',
     url: path,
     mimeType: file.mime,
@@ -197,13 +213,13 @@ export async function runAudio(db: Db, provider: AudioProvider, req: AudioReques
   bill(req.scope, { operation: req.operation, model: req.model, ms: Date.now() - startedAt, costUsd });
 
   const asset = await depositAudio(db, req.scope, produced.file, seconds, req.model);
-  return { kind: 'landed', asset, costUsd };
+  return { kind: 'landed', asset, outputs: { audios: asset }, costUsd };
 }
 
 export type JobProgress =
   | { state: 'pending' }
   | { state: 'failed'; error: string }
-  | { state: 'landed'; asset: Asset; costUsd: number | null };
+  | { state: 'landed'; asset: Asset; outputs: AudioOutputs; costUsd: number | null };
 
 export async function finishAudioJob(
   db: Db,
@@ -226,6 +242,11 @@ export async function finishAudioJob(
   const costUsd = audioUsdFor('dubbing', job.model, { seconds });
   bill(job.scope, { operation: 'dubbing', model: job.model, ms: Date.now() - startedAt, costUsd });
 
-  const asset = await depositAudio(db, job.scope, file, seconds, job.model);
-  return { state: 'landed', asset, costUsd };
+  const ports = audioOutputPorts('dubbing', dubbedInputKind(file.mime));
+  const outputs: AudioOutputs = {};
+  for (const port of ports) {
+    const output = await FILE_FOR_PORT[port]!(file);
+    outputs[port] = await depositAudio(db, job.scope, output, seconds, job.model);
+  }
+  return { state: 'landed', asset: outputs[ports[0]]!, outputs, costUsd };
 }

@@ -1,4 +1,5 @@
 import type { ConnectorType } from './connectors';
+import type { Medium } from './graph';
 import {
   DEFAULT_FIELDS,
   fieldOf,
@@ -37,6 +38,22 @@ const DEFAULT_OUTPUTS = [
 
 export function isOutputHandle(handle: unknown): handle is string {
   return typeof handle === 'string' && handle.startsWith(OUTPUT_HANDLE_PREFIX);
+}
+
+const OUTPUT_PORTS: readonly OutputPort[] = ['text', 'images', 'videos', 'audios'];
+
+export const MEDIUM_OF_PORT: Record<OutputPort, Medium> = { text: 'text', images: 'image', videos: 'video', audios: 'audio' };
+
+export const portHandle = (port: OutputPort) => `${OUTPUT_HANDLE_PREFIX}${port}`;
+
+export function portOfOutputHandle(handle: string | null | undefined): OutputPort | null {
+  const port = isOutputHandle(handle) ? handle.slice(OUTPUT_HANDLE_PREFIX.length) : null;
+  return OUTPUT_PORTS.find((p) => p === port) ?? null;
+}
+
+export function mediumOfHandle(handle: string | null | undefined): Medium | null {
+  const port = portOfOutputHandle(handle);
+  return port ? MEDIUM_OF_PORT[port] : null;
 }
 
 export const fieldHandle = (field: string) => `${FIELD_HANDLE_PREFIX}${field}`;

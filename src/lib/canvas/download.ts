@@ -94,3 +94,24 @@ export function clampGifPlan(source: { width: number; height: number; durationS:
 		durationS: Math.min(source.durationS, GIF_MAX_DURATION_S)
 	};
 }
+
+export type DownloadFile = { id: string; label: string; url: string; filename: string };
+
+const AUDIO_NODE_FILES = [
+	{ id: 'video', label: 'Video (MP4)', extension: 'mp4', urlOf: (u: AudioNodeUrls) => u.videoUrl },
+	{ id: 'audio', label: 'Audio (MP3)', extension: 'mp3', urlOf: (u: AudioNodeUrls) => u.audioUrl }
+] as const;
+
+type AudioNodeUrls = { videoUrl: string | null; audioUrl: string | null };
+
+export function audioNodeFiles(input: AudioNodeUrls & { nodeId: string; displayName: string | null; language: string | null }): DownloadFile[] {
+	const displayName = [input.displayName || 'audio', input.language].filter(Boolean).join(' ');
+	return AUDIO_NODE_FILES.flatMap((file) => {
+		const url = file.urlOf(input);
+		if (!url) {
+			return [];
+		}
+		const filename = buildDownloadFilename({ displayName, nodeId: input.nodeId, nodeType: 'audio', extension: file.extension, origin: MediaOrigin.Generated });
+		return [{ id: file.id, label: file.label, url, filename }];
+	});
+}

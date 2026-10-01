@@ -1073,3 +1073,46 @@ describe('upstreamInputsFor — le porte nominate di un select: ogni filo porta 
     expect(out.text).toEqual(['20']);
   });
 });
+
+describe('upstreamInputsFor — a dubbed video node gives video and its track on separate handles', () => {
+  const DUB_NODE = '12121212-1212-1212-1212-121212121212';
+  const TRACK_ASSET = '13131313-1313-1313-1313-131313131313';
+  const asset = (id: string, type: string, url: string, mime: string) => ({
+    id, project_id: 'p1', type, url, content: null, mime_type: mime, bytes: null, width: null, height: null,
+    duration_s: 5, source: 'generated', source_node_id: DUB_NODE, created_at: 'now'
+  });
+  const wire = (id: string, sourceHandle: string | null) => ({
+    id, canvas_id: CANVAS, source_node_id: DUB_NODE, target_node_id: VIDEO_NODE, source_handle: sourceHandle, target_handle: null
+  });
+  const dubDb = (edges: ReturnType<typeof wire>[]) =>
+    fakeDb({
+      nodes: [
+        nodeRow(DUB_NODE, 'audio', {
+          prompt: '',
+          params: { operation: 'dubbing', targetLanguage: 'it' },
+          refId: VIDEO_ASSET,
+          outputRefs: { videos: VIDEO_ASSET, audios: TRACK_ASSET }
+        }),
+        nodeRow(VIDEO_NODE, 'video', { prompt: '', model: MODEL })
+      ],
+      nodes_connections: edges,
+      assets: [asset(VIDEO_ASSET, 'video', 'https://cdn/dubbed.mp4', 'video/mp4'), asset(TRACK_ASSET, 'audio', 'https://cdn/track.mp3', 'audio/mpeg')]
+    });
+
+  const resolve = (db: ReturnType<typeof dubDb>['db']) =>
+    upstreamInputsFor(db, { orgId: ORG, canvasId: CANVAS, nodeId: VIDEO_NODE, model: MODEL, medium: 'video' });
+
+  it('out:videos feeds the dubbed video, out:audios its track', async () => {
+    const out = await resolve(dubDb([wire('e1', 'out:videos'), wire('e2', 'out:audios')]).db);
+
+    expect(out.referenceVideoUrls).toEqual(['https://cdn/dubbed.mp4']);
+    expect(out.referenceAudioUrls).toEqual(['https://cdn/track.mp3']);
+  });
+
+  it('an edge drawn before the outputs existed feeds the dubbed video as video, not as audio', async () => {
+    const out = await resolve(dubDb([wire('e1', null)]).db);
+
+    expect(out.referenceVideoUrls).toEqual(['https://cdn/dubbed.mp4']);
+    expect(out.referenceAudioUrls).toEqual([]);
+  });
+});

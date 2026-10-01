@@ -19,6 +19,7 @@
  * rifiutato da `canConnect` non è un arco impossibile: è un arco che non può essere quel verso lì.
  */
 import { CANVAS_EDGE_KINDS, type CanvasEdgeKind } from '$lib/canvas-edges';
+import { mediumOfHandle } from './select-outputs';
 import { canConnect, type CanvasNode, type Medium, type NodeKind, type Verdict } from './graph';
 
 /** Cosa c'è dietro una tile, quando il chiamante lo sa. Null vale «non lo so», mai «non si può». */
@@ -49,7 +50,7 @@ const FEEDING_KINDS: readonly CanvasEdgeKind[] = CANVAS_EDGE_KINDS.filter(
   (kind) => kind !== 'groups_with'
 );
 
-export function verdictBetween(at: NodeLookup, source: string, target: string): Verdict {
+export function verdictBetween(at: NodeLookup, source: string, target: string, sourceHandle?: string | null): Verdict {
   if (source === target) {
     return { ok: false, why: 'A node cannot connect to itself' };
   }
@@ -58,17 +59,17 @@ export function verdictBetween(at: NodeLookup, source: string, target: string): 
   const to = at(target);
   if (!from || !to) return { ok: true };
 
-  return canConnect(from, to);
+  return canConnect(from, to, mediumOfHandle(sourceHandle) ?? undefined);
 }
 
 /**
  * I versi che si possono proporre su questa coppia, nell'ordine in cui si mostrano. Mai vuoto:
  * due cose sulla stessa tela possono sempre stare insieme.
  */
-export function edgeKindsFor(at: NodeLookup, source: string, target: string): CanvasEdgeKind[] {
+export function edgeKindsFor(at: NodeLookup, source: string, target: string, sourceHandle?: string | null): CanvasEdgeKind[] {
   if (source === target) return [];
 
-  return verdictBetween(at, source, target).ok
+  return verdictBetween(at, source, target, sourceHandle).ok
     ? [...CANVAS_EDGE_KINDS]
     : CANVAS_EDGE_KINDS.filter((kind) => !FEEDING_KINDS.includes(kind));
 }
