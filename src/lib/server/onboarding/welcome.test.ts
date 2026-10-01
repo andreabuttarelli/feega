@@ -5,7 +5,7 @@ import { seedWelcome, WELCOME_ORIGIN, type WelcomeDeps } from './welcome';
 const db = {} as Db;
 const place = { userId: 'u1', orgId: 'o1', projectId: 'p1', canvasId: 'c1' };
 
-function deps(over: Partial<WelcomeDeps> = {}) {
+function deps(over: Partial<Record<keyof WelcomeDeps, unknown>> = {}) {
   return {
     listNodes: vi.fn(async () => []),
     claimCampaign: vi.fn(async () => true),

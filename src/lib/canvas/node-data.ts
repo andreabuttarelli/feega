@@ -46,7 +46,8 @@ const genState = {
   output_asset_id: z.string().optional(),
   started_at: z.string().optional(),
   finished_at: z.string().optional(),
-  cost_usd: z.number().optional()
+  cost_usd: z.number().optional(),
+  example: z.boolean().optional()
 };
 
 /**

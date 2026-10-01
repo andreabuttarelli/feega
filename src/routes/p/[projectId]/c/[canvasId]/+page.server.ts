@@ -40,6 +40,8 @@ import { planWorkflowDryRun, enqueueWorkflow, cancelWorkflow, estimateWorkflowCr
 import { listNodeRuns } from '$lib/server/repos/node-runs';
 import { duplicateNodes } from '$lib/server/canvas/duplicate';
 import { insertTemplate } from '$lib/server/canvas/templates';
+import { endOnboarding, firstRunFor, runDemo } from '$lib/server/onboarding/first-run';
+import { OnboardingStatus } from '$lib/onboarding/coach';
 import { undoGesture } from '$lib/server/canvas/undo';
 import type { Gesture, UndoItem } from '$lib/canvas/undo-plan';
 import { gateOrgAiActionForForm } from '$lib/server/cli-auth';
@@ -220,7 +222,7 @@ async function loadInfluencerViews(
 }
 
 export const load: PageServerLoad = async ({ params, locals }) => {
-  const { db, orgId, canvasId, canvas, mode, projectBrandId } = await scopeFor(locals, params.canvasId);
+  const { db, orgId, canvasId, canvas, mode, projectBrandId, userId } = await scopeFor(locals, params.canvasId);
 
   const [nodes, connections, fullCatalogue, shareToken, references, uncensored] = await Promise.all([
     listNodes(db, { orgId, canvasId }),
@@ -232,10 +234,11 @@ export const load: PageServerLoad = async ({ params, locals }) => {
   ]);
   const catalogue = catalogueIn(mode, visibleCatalogue(fullCatalogue, uncensored));
 
-  const [runs, { products, socialPosts, influencers }, sources] = await Promise.all([
+  const [runs, { products, socialPosts, influencers }, sources, onboarding] = await Promise.all([
     loadGenRuns(db, { orgId, nodes }),
     loadDownloaded(db, { orgId, canvasId, nodes }),
-    listSourcesForNodes(db, nodes.map((node) => node.id))
+    listSourcesForNodes(db, nodes.map((node) => node.id)),
+    firstRunFor(db, { userId, orgId, nodeCount: nodes.length })
   ]);
 
   const nodeIdsInPost = [...new Set(sources.map((source) => source.nodeId))];
@@ -256,7 +259,8 @@ export const load: PageServerLoad = async ({ params, locals }) => {
     shareToken,
     references,
     mode,
-    projectBrandId
+    projectBrandId,
+    onboarding
   };
 };
 
@@ -1387,6 +1391,26 @@ export const actions: Actions = {
     }
 
     return { nodes, connections };
+  },
+
+  demo_run: async ({ params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+
+    const nodes = await runDemo(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, actor: userActor(scope) });
+    if (!nodes) {
+      return fail(HTTP_BAD_REQUEST, { error: 'chain_incomplete' });
+    }
+    return { nodes };
+  },
+
+  onboarding_end: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const to = String((await request.formData()).get('status') ?? '');
+    if (to !== OnboardingStatus.Dismissed && to !== OnboardingStatus.Completed) {
+      return fail(HTTP_BAD_REQUEST, { error: 'stato non valido' });
+    }
+
+    return { ended: await endOnboarding(scope.db, scope.userId, to) };
   },
 
   template: async ({ request, params, locals }) => {

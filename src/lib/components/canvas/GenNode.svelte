@@ -19,6 +19,7 @@
   import { scrollGuard } from '$lib/canvas/scroll-guard';
   import CreditAmount from '$lib/components/CreditAmount.svelte';
   import { untrack } from 'svelte';
+  import { EXAMPLE_LABEL, type DemoResult } from '$lib/onboarding/demo';
 
   let {
     node,
@@ -42,7 +43,8 @@
     onmeasure,
     onestimate,
     result,
-    references
+    references,
+    example = null
   }: {
     node: GenNode;
     /** I modelli che questo medium può usare, dal catalogo del brand. */
@@ -96,6 +98,7 @@
     /** Come si disegna quel che è uscito. Il nodo non sa da dove venga l'URL firmato. */
     result?: import('svelte').Snippet<[{ refId: string; text: string | null }]>;
     references?: import('svelte').Snippet;
+    example?: DemoResult | null;
   } = $props();
 
   /**
@@ -142,7 +145,8 @@
    * un corpo, il prompt riempie tutto il nodo invece di restare una striscia di due righe sopra
    * uno spazio vuoto.
    */
-  const hasBody = $derived(node.medium !== 'text' || state === 'running' || state === 'failed' || !!node.refId);
+  const shownExample = $derived(node.refId ? null : example);
+  const hasBody = $derived(node.medium !== 'text' || state === 'running' || state === 'failed' || !!node.refId || !!shownExample);
 
   const PROMPT_PLACEHOLDER: Record<GenNode['medium'], string> = {
     text: 'What should it be about…',
@@ -229,6 +233,17 @@
         </div>
       {:else if node.refId && result}
         {@render result({ refId: node.refId, text: node.runs.find((r) => r.mediaId === node.refId)?.text ?? null })}
+      {:else if shownExample}
+        <div class="gen-example" data-testid="example-result">
+          <span class="gen-example-mark">{EXAMPLE_LABEL}</span>
+          {#if shownExample.text}
+            <p class="gen-example-text nodrag" use:scrollGuard>{shownExample.text}</p>
+          {:else if shownExample.medium === 'video'}
+            <video src={shownExample.src} autoplay muted loop playsinline></video>
+          {:else}
+            <img src={shownExample.src} alt={EXAMPLE_LABEL} />
+          {/if}
+        </div>
       {:else}
         <p class="gen-hint">{LABEL[state]}</p>
       {/if}
@@ -410,6 +425,42 @@
     height: 100%;
     object-fit: contain;
     display: block;
+  }
+
+  .gen-example {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .gen-example img,
+  .gen-example video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .gen-example-text {
+    margin: 0;
+    padding: 28px 12px 12px;
+    height: 100%;
+    overflow: auto;
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--ink, #1d1d1f);
+  }
+  .gen-example-mark {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    z-index: 2;
+    padding: 0 6px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    line-height: 1.25rem;
+    color: var(--paper, #fff);
+    background: var(--accent-ink, #6d28d9);
   }
 
   .gen-hint {
