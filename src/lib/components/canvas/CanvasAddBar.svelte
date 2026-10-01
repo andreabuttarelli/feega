@@ -131,8 +131,8 @@
     </span>
   {/if}
 
-  {#if showTemplates}
-    <CanvasTemplateGallery onpick={pickTemplate} />
+  {#if ontemplate}
+    <CanvasTemplateGallery bind:open={showTemplates} onpick={pickTemplate} />
   {/if}
 
   {#if showMore}

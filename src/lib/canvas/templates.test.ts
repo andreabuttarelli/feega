@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { CANVAS_TEMPLATES, planTemplate, templateById, TEMPLATE_NODE_HALF, type TemplateNode } from './templates';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+import {
+  ALL_TEMPLATES,
+  CANVAS_TEMPLATES,
+  planTemplate,
+  TEMPLATE_CATEGORIES,
+  templateById,
+  templateNodeTypes,
+  templatesIn,
+  templateThumbnail,
+  TEMPLATE_NODE_HALF,
+  type TemplateNode
+} from './templates';
 import { validateNewNodeData } from './node-data';
 import { NODE_PORTS } from './node-ports';
 import { portAccepts, type ConnectorType } from './connectors';
@@ -9,6 +22,8 @@ import { audioInputPorts, audioModelsOf, audioOperationOf } from './audio-operat
 import { DEFAULT_MODEL } from './default-models';
 
 const MIN_TEMPLATES = 8;
+
+const STATIC_DIR = join(process.cwd(), 'static');
 
 type Model = string | null | undefined;
 
@@ -116,5 +131,34 @@ describe('planTemplate', () => {
   it('templateById trova un template e rifiuta un id sconosciuto', () => {
     expect(templateById(first.id)).toBe(first);
     expect(templateById('non-esiste')).toBeUndefined();
+  });
+});
+
+describe('la galleria dei template', () => {
+  it('ogni categoria ha almeno un template, e ogni template una categoria nota', () => {
+    const known = TEMPLATE_CATEGORIES.map((c) => c.id);
+    for (const t of CANVAS_TEMPLATES) {
+      expect(known, t.id).toContain(t.category);
+    }
+    for (const category of known) {
+      expect(templatesIn(category).length, category).toBeGreaterThan(0);
+    }
+  });
+
+  it('il filtro "all" mostra tutti i template', () => {
+    expect(templatesIn(ALL_TEMPLATES)).toEqual(CANVAS_TEMPLATES);
+  });
+
+  it.each(CANVAS_TEMPLATES)('$id: ha una miniatura WebP fra gli asset statici', (t) => {
+    const path = templateThumbnail(t);
+    expect(path).toMatch(/\.webp$/);
+    expect(existsSync(join(STATIC_DIR, path)), path).toBe(true);
+  });
+
+  it('i tipi di nodo compaiono una volta, nell\'ordine in cui li incontra', () => {
+    const t = templateById('ugc-video-ad')!;
+    const types = templateNodeTypes(t);
+    expect(new Set(types).size).toBe(types.length);
+    expect(types).toEqual([...new Set(t.nodes.map((n) => n.type))]);
   });
 });
