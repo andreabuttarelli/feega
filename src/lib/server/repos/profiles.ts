@@ -102,3 +102,43 @@ export async function recordTermsAcceptance(db: Db, userId: string, version: str
     throw error;
   }
 }
+
+export async function claimCampaignTemplate(db: Db, userId: string, campaign: string): Promise<boolean> {
+  const { data, error } = await db
+    .from('profiles')
+    .update({ signup_campaign: campaign, campaign_template_at: new Date().toISOString() })
+    .eq('id', userId)
+    .is('campaign_template_at', null)
+    .select('id');
+
+  if (error) {
+    throw error;
+  }
+  return (data ?? []).length > 0;
+}
+
+export type FirstRun = { signupCampaign: string | null; onboardingStatus: string | null };
+
+export async function readFirstRun(db: Db, userId: string): Promise<FirstRun> {
+  const { data, error } = await db
+    .from('profiles')
+    .select('signup_campaign, onboarding_status')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+  return { signupCampaign: data?.signup_campaign ?? null, onboardingStatus: data?.onboarding_status ?? null };
+}
+
+export async function moveOnboarding(db: Db, userId: string, input: { from: string | null; to: string }): Promise<boolean> {
+  const update = db.from('profiles').update({ onboarding_status: input.to }).eq('id', userId);
+  const guarded = input.from === null ? update.is('onboarding_status', null) : update.eq('onboarding_status', input.from);
+  const { data, error } = await guarded.select('id');
+
+  if (error) {
+    throw error;
+  }
+  return (data ?? []).length > 0;
+}

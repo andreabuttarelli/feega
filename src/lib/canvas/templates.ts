@@ -48,6 +48,7 @@ const TEXT_MODEL = DEFAULT_MODEL.text;
 const IMAGE_MODEL = NANO_BANANA_2_MODEL;
 const CHEAP_IMAGE_MODEL = SEEDREAM_5_LITE_MODEL;
 const VIDEO_MODEL = 'bytedance/seedance-2-fast';
+const CHEAP_VIDEO_MODEL = 'bytedance/seedance-2-mini';
 const VOICE_MODEL = 'eleven_multilingual_v2';
 const MUSIC_MODEL = 'music_v1';
 const SFX_MODEL = 'eleven_text_to_sound_v2';
@@ -76,12 +77,28 @@ const image = (key: string, col: number, row: number, prompt: string, aspect_rat
   data: { prompt, model, aspect_ratio }
 });
 
-const video = (key: string, col: number, row: number, prompt: string, aspect_ratio = '9:16'): TemplateNode => ({
+const video = (key: string, col: number, row: number, prompt: string, aspect_ratio = '9:16', model = VIDEO_MODEL): TemplateNode => ({
   key,
   type: 'video',
   col,
   row,
-  data: { prompt, model: VIDEO_MODEL, aspect_ratio, audio: true }
+  data: { prompt, model, aspect_ratio, audio: true }
+});
+
+const styledClip = (style: { id: string; name: string; description: string; subject: string; look: string; motion: string }): CanvasTemplate => ({
+  id: style.id,
+  category: 'video',
+  name: style.name,
+  description: style.description,
+  nodes: [
+    note('subject', 0, 0, `${style.subject} Replace with your own.`),
+    image('frame', 1, 0, `Opening frame for a vertical clip about the subject in the input. ${style.look}`, '9:16', CHEAP_IMAGE_MODEL),
+    video('clip', 2, 0, style.motion, '9:16', CHEAP_VIDEO_MODEL)
+  ],
+  edges: [
+    { from: 'subject', to: 'frame', handle: 'text' },
+    { from: 'frame', to: 'clip', handle: 'first_frame' }
+  ]
 });
 
 const voiceOver = (key: string, col: number, row: number): TemplateNode => ({
@@ -292,6 +309,109 @@ export const CANVAS_TEMPLATES: CanvasTemplate[] = [
       soundEffect('whoosh', 1, 1, 'Deep cinematic whoosh with a soft magnetic click at the end.')
     ],
     edges: [{ from: 'hero', to: 'teaser', handle: 'first_frame' }]
+  },
+  styledClip({
+    id: 'anime-video',
+    name: 'Anime video',
+    description: 'A subject drawn as a 90s anime cel, then animated into a vertical clip.',
+    subject: 'Subject: a girl with a red scarf on a Tokyo rooftop at dusk, wind in her hair.',
+    look: '90s anime cel style: clean line art, flat shading, painted sky background, film grain.',
+    motion: 'Anime-style animation: hair and scarf flutter in the wind, clouds drift, slow camera push-in, limited-animation feel.'
+  }),
+  styledClip({
+    id: 'claymation-video',
+    name: 'Claymation video',
+    description: 'A subject sculpted in plasticine, then animated stop-motion style.',
+    subject: 'Subject: a small fox baker pulling a loaf out of a wood oven in a cosy kitchen.',
+    look: 'Stop-motion claymation: plasticine textures with fingerprints, miniature set, soft studio lighting.',
+    motion: 'Stop-motion animation at 12 frames per second: the fox lifts the loaf and smiles, steam rises, slight jitter between frames.'
+  }),
+  styledClip({
+    id: 'paper-cutout',
+    name: 'Paper cutout animation',
+    description: 'A layered paper-craft scene, then animated like a cutout puppet show.',
+    subject: 'Subject: a whale swimming over a sleeping seaside village under the moon.',
+    look: 'Layered paper cutout diorama: visible paper texture, soft drop shadows between layers, muted pastel palette.',
+    motion: 'Paper cutout animation: layers slide with parallax, the whale glides across, stars twinkle, slight stop-motion stutter.'
+  }),
+  styledClip({
+    id: 'retro-vhs',
+    name: '80s retro VHS video',
+    description: 'A neon 80s still with VHS artefacts, then animated as a retro clip.',
+    subject: 'Subject: a skater cruising down a neon-lit boulevard at night, palm trees, synthwave sunset.',
+    look: '80s VHS still: neon magenta and cyan, tracking lines, colour bleed, grain, timestamp in the corner.',
+    motion: 'Retro 80s footage: the skater rolls toward camera, neon signs flicker, VHS tracking glitches, slight tape wobble.'
+  }),
+  styledClip({
+    id: '3d-animation',
+    name: '3D animation',
+    description: 'A glossy 3D character render, then animated like an animated-feature shot.',
+    subject: 'Subject: a curious little robot discovering a flower in a sunny meadow.',
+    look: 'Glossy 3D animated-feature render: soft global illumination, subsurface materials, shallow depth of field.',
+    motion: '3D animated-feature shot: the robot tilts its head, reaches for the flower, petals sway, gentle camera orbit.'
+  }),
+  {
+    id: 'spotify-canvas',
+    category: 'video',
+    name: 'Spotify Canvas loop',
+    description: 'Album-art style still turned into a seamless vertical loop for Spotify Canvas.',
+    nodes: [
+      note('track', 0, 0, 'Track: a dreamy synth-pop song about driving at night. Replace with your own.'),
+      image('art', 1, 0, 'Vertical visual for the track described in the input: album-art mood, one strong central subject, no text.', '9:16', CHEAP_IMAGE_MODEL),
+      video('loop', 2, 0, 'Seamless loop: subtle ambient motion only — light shimmer, drifting particles, slow breathing camera. Ends exactly where it starts.', '9:16', CHEAP_VIDEO_MODEL)
+    ],
+    edges: [
+      { from: 'track', to: 'art', handle: 'text' },
+      { from: 'art', to: 'loop', handle: 'first_frame' },
+      { from: 'art', to: 'loop', handle: 'last_frame' }
+    ]
+  },
+  {
+    id: 'ai-commercial',
+    category: 'video',
+    name: 'AI commercial',
+    description: 'Product photo to hero shot to a cinematic ad clip, with a voice-over.',
+    nodes: [
+      image('product', 0, 0, PRODUCT_SHOT, '1:1', CHEAP_IMAGE_MODEL),
+      image('hero', 1, 0, 'Cinematic commercial hero shot of the product from the reference on a sunlit marble counter, dramatic light. Keep the product identical.', '16:9', CHEAP_IMAGE_MODEL),
+      video('ad', 2, 0, 'Premium TV commercial shot: slow dolly-in on the product, light sweeps across it, shallow depth of field.', '16:9', CHEAP_VIDEO_MODEL),
+      text('script', 0, 1, 'Write a 10-second TV commercial voice-over for this product: one bold claim, one benefit, the brand name at the end. Spoken sentences only.'),
+      voiceOver('voice', 1, 1)
+    ],
+    edges: [
+      { from: 'product', to: 'hero', handle: 'images' },
+      { from: 'hero', to: 'ad', handle: 'first_frame' },
+      { from: 'script', to: 'voice', handle: 'text' }
+    ]
+  },
+  {
+    id: 'text-to-video',
+    category: 'video',
+    name: 'Text → video',
+    description: 'Describe a scene in words; the brief writes the shot and the video renders it.',
+    nodes: [
+      text('brief', 0, 0, 'Write one cinematic video prompt (max 60 words) for a 5-second vertical shot of: a hot-air balloon rising over misty mountains at sunrise.'),
+      video('clip', 1, 0, '', '9:16', CHEAP_VIDEO_MODEL)
+    ],
+    edges: [{ from: 'brief', to: 'clip', handle: 'text' }]
+  },
+  {
+    id: 'hd-clip',
+    category: 'video',
+    name: 'Sharp HD clip',
+    description: 'A detailed still animated at 1080p. To upscale a clip you already have, upload it and pick FLUX Video Upscale.',
+    nodes: [
+      note('how', 0, 1, 'To upscale an existing clip: upload it to the canvas, select it and choose the FLUX Video Upscale model. The nodes on the right make a new sharp clip instead.'),
+      image('still', 1, 0, 'Ultra-detailed 16:9 landscape photo: a lighthouse on a cliff in a storm, crashing waves, crisp textures, 8k detail.', '16:9', CHEAP_IMAGE_MODEL),
+      {
+        key: 'clip',
+        type: 'video',
+        col: 2,
+        row: 0,
+        data: { prompt: 'Waves crash against the cliff, rain sweeps across, lighthouse beam rotates, steady tripod shot.', model: CHEAP_VIDEO_MODEL, aspect_ratio: '16:9', resolution: '1080p', audio: true }
+      }
+    ],
+    edges: [{ from: 'still', to: 'clip', handle: 'first_frame' }]
   }
 ];
 

@@ -25,6 +25,7 @@ function deps(overrides: Partial<Parameters<typeof enterApp>[1]>) {
     createProject: vi.fn(async () => project),
     listCanvases: vi.fn(async () => [canvas]),
     createCanvas: vi.fn(async () => canvas),
+    seedWelcome: vi.fn(async () => true),
     ...overrides
   };
 }
@@ -191,5 +192,29 @@ describe('la home di chi è già dentro è la sua tela, mai /app', () => {
     await homePathFor(db, d, user, chosenOrg);
 
     expect(d.listProjects).toHaveBeenCalledWith(db, chosenOrg);
+  });
+});
+
+describe('a landing campaign lands with its template', () => {
+  it('the canvas path carries the campaign when the template was inserted', async () => {
+    const d = deps({});
+
+    const path = await homePathFor(db, d, user, null, null, 'anime-video-generator');
+
+    expect(d.seedWelcome).toHaveBeenCalledWith(db, { userId: USER, orgId: ORG, projectId: PROJECT, canvasId: CANVAS }, 'anime-video-generator');
+    expect(path).toBe(`/p/${PROJECT}/c/${CANVAS}?welcome=anime-video-generator`);
+  });
+
+  it('no campaign, no seeding', async () => {
+    const d = deps({});
+
+    expect(await homePathFor(db, d, user)).toBe(`/p/${PROJECT}/c/${CANVAS}`);
+    expect(d.seedWelcome).not.toHaveBeenCalled();
+  });
+
+  it('a campaign already spent lands on the plain canvas', async () => {
+    const d = deps({ seedWelcome: vi.fn(async () => false) });
+
+    expect(await homePathFor(db, d, user, null, null, 'claymation-ai')).toBe(`/p/${PROJECT}/c/${CANVAS}`);
   });
 });

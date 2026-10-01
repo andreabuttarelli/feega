@@ -389,3 +389,12 @@ export async function runsByIds(db: Db, input: { ids: string[] }): Promise<NodeR
   }
   return (data ?? []).map(toRun);
 }
+
+export async function hasAnyRun(db: Db, orgId: string): Promise<boolean> {
+  const { count, error } = await db.from('node_runs').select('id', { count: 'exact', head: true }).eq('org_id', orgId);
+
+  if (error) {
+    throw error;
+  }
+  return (count ?? 0) > 0;
+}

@@ -12,6 +12,7 @@ import { TOOL_HEADER, TOOL_HEADER_LEGACY, toolFromHeader } from '@feega/api-cont
 import { createAdminClient } from '$lib/server/supabase-admin';
 import { isCsrfForbidden } from '$lib/server/csrf';
 import { redirectFor } from '$lib/server/host-redirects';
+import { rememberCampaign, takeCampaign } from '$lib/server/onboarding/campaign-cookie';
 import { ENTRY_DEPS, homePathFor } from '$lib/server/tenancy/entry';
 import { ORG_COOKIE, LAST_PROJECT_COOKIE } from '$lib/server/tenancy/context';
 import type { RequestEvent } from '@sveltejs/kit';
@@ -50,7 +51,8 @@ async function rootRedirectTarget(event: RequestEvent): Promise<string> {
     ENTRY_DEPS,
     user,
     event.cookies.get(ORG_COOKIE) ?? null,
-    event.cookies.get(LAST_PROJECT_COOKIE) ?? null
+    event.cookies.get(LAST_PROJECT_COOKIE) ?? null,
+    takeCampaign(event.cookies)
   );
 }
 
@@ -183,6 +185,7 @@ export const handle: Handle = sequence(hostRedirect, csrf, Sentry.sentryHandle()
   // o il code si perde e il login fallisce in silenzio. `/app` è deprecato: chi è dentro va
   // diritto alla propria tela, chi non lo è va al login — mai a una dashboard che non esiste più.
   if (isRootPath(event.url.pathname)) {
+    rememberCampaign(event.cookies, event.url);
     if (event.url.searchParams.has('code') || event.url.searchParams.has('error_description')) {
       throw redirect(303, `/auth/callback${event.url.search}`);
     }

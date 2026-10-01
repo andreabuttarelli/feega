@@ -602,13 +602,13 @@ export type Database = {
           height: number | null
           id: string
           mime_type: string | null
-          uncensored_project: boolean
           org_id: string
           project_id: string | null
           source: string | null
           source_node_id: string | null
           type: string
           uncensored: boolean
+          uncensored_project: boolean
           updated_at: string
           url: string | null
           width: number | null
@@ -623,13 +623,13 @@ export type Database = {
           height?: number | null
           id?: string
           mime_type?: string | null
-          uncensored_project?: boolean
           org_id: string
           project_id?: string | null
           source?: string | null
           source_node_id?: string | null
           type: string
           uncensored?: boolean
+          uncensored_project?: boolean
           updated_at?: string
           url?: string | null
           width?: number | null
@@ -644,13 +644,13 @@ export type Database = {
           height?: number | null
           id?: string
           mime_type?: string | null
-          uncensored_project?: boolean
           org_id?: string
           project_id?: string | null
           source?: string | null
           source_node_id?: string | null
           type?: string
           uncensored?: boolean
+          uncensored_project?: boolean
           updated_at?: string
           url?: string | null
           width?: number | null
@@ -2131,30 +2131,39 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          campaign_template_at: string | null
           created_at: string
           email: string
           id: string
           name: string | null
+          onboarding_status: string | null
+          signup_campaign: string | null
           terms_accepted_at: string | null
           terms_version: string | null
           updated_at: string
         }
         Insert: {
           avatar_url?: string | null
+          campaign_template_at?: string | null
           created_at?: string
           email: string
           id: string
           name?: string | null
+          onboarding_status?: string | null
+          signup_campaign?: string | null
           terms_accepted_at?: string | null
           terms_version?: string | null
           updated_at?: string
         }
         Update: {
           avatar_url?: string | null
+          campaign_template_at?: string | null
           created_at?: string
           email?: string
           id?: string
           name?: string | null
+          onboarding_status?: string | null
+          signup_campaign?: string | null
           terms_accepted_at?: string | null
           terms_version?: string | null
           updated_at?: string
@@ -2441,6 +2450,7 @@ export type Database = {
           error: string | null
           finished_at: string | null
           id: string
+          media_url: string | null
           model: string | null
           org_id: string
           persist_opts: Json | null
@@ -2463,6 +2473,7 @@ export type Database = {
           error?: string | null
           finished_at?: string | null
           id?: string
+          media_url?: string | null
           model?: string | null
           org_id: string
           persist_opts?: Json | null
@@ -2485,6 +2496,7 @@ export type Database = {
           error?: string | null
           finished_at?: string | null
           id?: string
+          media_url?: string | null
           model?: string | null
           org_id?: string
           persist_opts?: Json | null
@@ -2555,7 +2567,10 @@ export type Database = {
       feega_credits: { Args: { _value: string }; Returns: number }
       feega_org_from_metadata: { Args: { _metadata: Json }; Returns: string }
       org_credit_balance: { Args: { _org_id: string }; Returns: number }
-      project_is_uncensored: { Args: { p_project_id: string }; Returns: boolean }
+      project_is_uncensored: {
+        Args: { p_project_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       project_mode: "standard" | "uncensored"

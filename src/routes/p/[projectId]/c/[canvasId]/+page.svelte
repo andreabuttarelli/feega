@@ -29,8 +29,13 @@
   import type { PresencePeer } from '$lib/realtime/presence-peers';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import { deserialize } from '$app/forms';
-  import { beforeNavigate, goto, invalidate } from '$app/navigation';
-  import { updated } from '$app/state';
+  import { beforeNavigate, goto, invalidate, replaceState } from '$app/navigation';
+  import { page, updated } from '$app/state';
+  import { track } from '$lib/analytics';
+  import { TEMPLATE_AUTO_INSERTED, WELCOME_PARAM, campaignOf } from '$lib/onboarding/campaigns';
+  import { CoachStep, ONBOARDING_EVENT, OnboardingStatus, chainOf, stepOf, type CoachChain } from '$lib/onboarding/coach';
+  import { DEMO_PRESET, exampleFor, isDemoMedium } from '$lib/onboarding/demo';
+  import OnboardingCoach from '$lib/components/canvas/OnboardingCoach.svelte';
   import { HOME_PATH } from '$lib/home-path';
   import { CANVAS_LIST_DEPENDENCY } from '$lib/canvas/canvas-list';
   import { formatCredits } from '$lib/components/credit-amount-format';
@@ -148,6 +153,41 @@
   import { billingPath } from '$lib/billing-path';
 
   let { data } = $props();
+
+  function announceWelcome() {
+    const campaign = campaignOf(page.url.searchParams.get(WELCOME_PARAM));
+    if (!campaign) {
+      return;
+    }
+
+    track(TEMPLATE_AUTO_INSERTED, { campaign });
+    const clean = new URL(page.url);
+    clean.searchParams.delete(WELCOME_PARAM);
+    replaceState(clean, page.state);
+  }
+
+  $effect(() => {
+    untrack(announceWelcome);
+  });
+
+  let coachOpen = $state(untrack(() => data.onboarding.visible));
+  let coachBusy = $state(false);
+  let generatedOnce = untrack(() => data.onboarding.hasGenerated);
+  let coachSeenStep: CoachStep | null = null;
+
+  $effect(() => {
+    if (untrack(() => data.onboarding.started)) {
+      track(ONBOARDING_EVENT.started);
+    }
+  });
+
+  function noteFirstGeneration() {
+    if (generatedOnce) {
+      return;
+    }
+    generatedOnce = true;
+    track(ONBOARDING_EVENT.firstRealGeneration);
+  }
   type TextCostEstimate = { inputTokens: number; outputTokens: number; variableInput: boolean; revision: string; asked: string };
   let textCostEstimates = $state<Record<string, TextCostEstimate>>({});
   let voices = $state<VoiceChoice[]>([]);
@@ -392,6 +432,98 @@
   }
 
   let edges = $state<FlowEdge[]>((data.connections as Connection[]).map(toEdge));
+
+  const coachGraph = $derived({
+    nodes: nodes.map((n) => ({ id: n.id, type: n.type, example: n.data.example === true })),
+    edges: edges.map((e) => ({ source: e.source, target: e.target }))
+  });
+  const coachChain = $derived(chainOf(coachGraph));
+  const coachStep = $derived(stepOf(coachGraph));
+
+  $effect(() => {
+    const step = coachStep;
+    if (!coachOpen) {
+      return;
+    }
+    untrack(() => {
+      if (coachSeenStep !== null && coachSeenStep !== step) {
+        track(ONBOARDING_EVENT.stepCompleted, { step: coachSeenStep });
+      }
+      coachSeenStep = step;
+    });
+  });
+
+  $effect(() => {
+    const chain = coachChain;
+    if (!coachOpen) {
+      return;
+    }
+    untrack(() => prefillCoach(chain));
+  });
+
+  function coachIds(chain: CoachChain): string[] {
+    return [chain.text, chain.image, chain.video].filter((id): id is string => !!id);
+  }
+
+  function prefillCoach(chain: CoachChain) {
+    for (const id of coachIds(chain)) {
+      const row = nodes.find((n) => n.id === id);
+      const gen = row ? genOf(row) : null;
+      if (!gen || gen.prompt || !isDemoMedium(gen.medium)) {
+        continue;
+      }
+      const preset = DEMO_PRESET[gen.medium];
+      changeGen(id, gen, { ...preset, params: { ...gen.params, ...preset.params } });
+    }
+  }
+
+  function cheapestForRealRun(chain: CoachChain) {
+    for (const id of coachIds(chain)) {
+      const row = nodes.find((n) => n.id === id);
+      const gen = row ? genOf(row) : null;
+      if (!gen || !isDemoMedium(gen.medium) || !DEMO_PRESET[gen.medium].model) {
+        continue;
+      }
+      const preset = DEMO_PRESET[gen.medium];
+      changeGen(id, gen, { model: preset.model, params: { ...gen.params, ...preset.params } });
+    }
+  }
+
+  async function coachRun() {
+    coachBusy = true;
+    const result = await post('demo_run', {});
+    coachBusy = false;
+    if (result) {
+      await refresh();
+    }
+  }
+
+  async function endCoach(status: OnboardingStatus.Dismissed | OnboardingStatus.Completed) {
+    coachOpen = false;
+    await post('onboarding_end', { status });
+  }
+
+  async function coachDismiss() {
+    track(ONBOARDING_EVENT.dismissed, { step: coachStep });
+    await endCoach(OnboardingStatus.Dismissed);
+  }
+
+  async function coachGenerate() {
+    const chain = coachChain;
+    const ids = coachIds(chain);
+    cheapestForRealRun(chain);
+    await Promise.all(ids.map((id) => saves.flush(id)));
+
+    coachBusy = true;
+    const started = await runWorkflow(ids);
+    coachBusy = false;
+    if (!started) {
+      return;
+    }
+
+    track(ONBOARDING_EVENT.completed);
+    await endCoach(OnboardingStatus.Completed);
+  }
 
   function toGenRun(run: {
     id: string;
@@ -1323,6 +1455,7 @@
       return;
     }
 
+    noteFirstGeneration();
     await refresh();
     void invalidate('app:credits');
   }
@@ -1379,14 +1512,14 @@
   let workflowId = $state<string | null>(null);
   let workflowNodeIds = $state<string[]>([]);
 
-  async function runWorkflow(ids: string[]) {
+  async function runWorkflow(ids: string[]): Promise<boolean> {
     const plan = await post('workflow_plan', { node_id: ids });
-    if (!plan) return;
+    if (!plan) return false;
 
     const ok = confirm(
       `${(plan.steps as unknown[]).length} passi, circa ${formatCredits(plan.estimatedCredits as number)} crediti. Avviare il flusso?`
     );
-    if (!ok) return;
+    if (!ok) return false;
 
     const markRunning = (fn: (gen: GenNodeState) => GenNodeState) => {
       nodes = nodes.map((node) => {
@@ -1401,13 +1534,15 @@
     const result = await post('run_workflow', { node_id: ids });
     if (!result) {
       markRunning(unlockRun);
-      return;
+      return false;
     }
 
     workflowId = result.workflowId as string;
     workflowNodeIds = ids;
+    noteFirstGeneration();
     await refresh();
     void invalidate('app:credits');
+    return true;
   }
 
   const workflowRunning = $derived(
@@ -2434,6 +2569,7 @@
             onunlock={() => unlock(id)}
             onshow={(runId) => restore(id, gen, runId)}
             onmeasure={(contentHeight) => (grownHeights[id] = contentHeight)}
+            example={exampleFor(row)}
           >
             {#snippet result({ refId, text })}
               <!-- `/c/<tela>/assets/<id>` firma lo storage al volo: un URL firmato messo qui
@@ -2624,6 +2760,17 @@
         onclose={() => (compositionEditorId = null)}
       />
     {/key}
+  {/if}
+
+  {#if coachOpen}
+    <OnboardingCoach
+      step={coachStep}
+      chain={coachChain}
+      busy={coachBusy}
+      onrun={() => void coachRun()}
+      ongenerate={() => void coachGenerate()}
+      ondismiss={() => void coachDismiss()}
+    />
   {/if}
 </div>
 
