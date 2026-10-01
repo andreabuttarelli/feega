@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { createTestSupabase } from '$lib/testkit/supabase';
 
 // The two RPCs credits.ts used to call — sum_org_ai_cost_usd, sum_brand_ai_cost_usd — do not
@@ -15,6 +15,8 @@ beforeEach(() => {
 
 describe('orgCreditsUsage reads spend from ai_calls (no RPC)', () => {
   it('sums cost_usd for the org within the period, ignoring rows outside it', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-09-25T00:00:00Z') });
+    onTestFinished(() => vi.useRealTimers());
     const { client } = createTestSupabase({
       ai_calls: [
         { id: '1', org_id: 'org-1', cost_usd: 1.5, created_at: '2026-09-10T00:00:00Z' },
