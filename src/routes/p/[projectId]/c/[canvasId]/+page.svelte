@@ -21,7 +21,7 @@
   import { SaveStatus, SaveTiming, SendResult, createSaveScheduler } from '$lib/canvas/save-scheduler';
   import { canvasActionUrl } from '$lib/canvas/canvas-action-url';
   import { baseOf, diffNodeData } from '$lib/canvas/node-patch';
-  import { SaveFailure, adoptIdleRows, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
+  import { ActionKind, SaveFailure, actionKind, adoptIdleRows, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
   import { createUndoStack } from '$lib/canvas/undo-stack';
   import type { Gesture, UndoItem } from '$lib/canvas/undo-plan';
   import { buildMoveGesture, checkMoveGesture, inverseMoveGesture, type MoveGesture } from '$lib/canvas/move-gesture';
@@ -951,8 +951,6 @@
 
   beforeNavigate(() => { void saves.flush(); });
 
-  const READ_ACTIONS = new Set(['snapshot', 'revision', 'estimate_text_cost', 'calendar_posts', 'audio_voices']);
-
   function formOf(fields: Record<string, string | number | File | string[]>): FormData {
     const body = new FormData();
     for (const [key, value] of Object.entries(fields)) {
@@ -997,6 +995,10 @@
   }
 
   function report(action: string, result: ActionAnswer) {
+    if (saveBanner(action, result) === null) {
+      console.warn(`canvas read ${action} failed: ${failureOf(result)}`, result.data ?? result);
+      return;
+    }
     announce(action, failureOf(result), result.data ?? result);
   }
 
@@ -1004,7 +1006,7 @@
     action: string,
     fields: Record<string, string | number | File | string[]>
   ): Promise<Record<string, unknown> | null> {
-    const mutating = !READ_ACTIONS.has(action);
+    const mutating = actionKind(action) === ActionKind.Write;
     if (mutating) { pending += 1; snapshotVersion += 1; }
     try {
       const result = await send(action, fields);

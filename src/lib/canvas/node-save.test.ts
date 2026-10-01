@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { SaveFailure, adoptIdleRows, failureOf, isOwnEcho, keepDirty, orphanedEdits, keepLocal, saveMessage, writeWithRetry } from './node-save';
+import { ActionKind, SaveFailure, actionKind, adoptIdleRows, failureOf, isOwnEcho, keepDirty, orphanedEdits, keepLocal, saveBanner, saveMessage, writeWithRetry } from './node-save';
 
 describe('failureOf: every server answer has one reason', () => {
   it.each([
@@ -202,5 +202,23 @@ describe('orphanedEdits: an unsent edit on a node deleted elsewhere is dropped, 
     const [merged] = keepDirty(fresh, local, () => ['prompt', 'assetId']);
     expect(merged.data.prompt).toBe('mine');
     expect(merged.data.assetId).toBe('server-asset');
+  });
+});
+
+describe('saveBanner: a failed read never claims a save failed', () => {
+  it('audio_voices answering 503 without ElevenLabs shows no save banner', () => {
+    expect(saveBanner('audio_voices', { type: 'failure', status: 503, data: { error: 'elevenlabs_not_configured' } })).toBeNull();
+  });
+
+  it('every read action stays silent on a server error', () => {
+    for (const action of ['snapshot', 'revision', 'estimate_text_cost', 'calendar_posts', 'audio_voices']) {
+      expect(actionKind(action)).toBe(ActionKind.Read);
+      expect(saveBanner(action, { type: 'error', status: 500 })).toBeNull();
+    }
+  });
+
+  it('a failed write still shows the save banner', () => {
+    expect(actionKind('write')).toBe(ActionKind.Write);
+    expect(saveBanner('write', { type: 'error', status: 500 })).toBe(saveMessage(SaveFailure.Server));
   });
 });

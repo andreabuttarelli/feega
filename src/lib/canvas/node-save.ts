@@ -68,6 +68,25 @@ export function failureOf(result: ActionAnswer): SaveFailure {
   return SaveFailure.Invalid;
 }
 
+export enum ActionKind {
+  Read = 'read',
+  Write = 'write'
+}
+
+const READ_ACTIONS: ReadonlySet<string> = new Set(['snapshot', 'revision', 'estimate_text_cost', 'calendar_posts', 'audio_voices']);
+
+export function actionKind(action: string): ActionKind {
+  return READ_ACTIONS.has(action) ? ActionKind.Read : ActionKind.Write;
+}
+
+export function saveBanner(action: string, result: ActionAnswer): string | null {
+  if (actionKind(action) === ActionKind.Read) {
+    return null;
+  }
+
+  return saveMessage(failureOf(result), dataOf(result));
+}
+
 export function saveMessage(reason: SaveFailure, data: { message?: string } = {}): string {
   if (reason === SaveFailure.Credits && data.message) {
     return data.message;
