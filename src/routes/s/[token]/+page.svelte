@@ -6,7 +6,7 @@
   import { NODE_KIND_ICON } from '$lib/canvas/node-label';
   import type { NodeType } from '$lib/canvas/node-data';
   import SourcePreview from '$lib/components/canvas/SourcePreview.svelte';
-  import AudioPlayer from '$lib/components/canvas/AudioPlayer.svelte';
+  import AudioResult from '$lib/components/canvas/AudioResult.svelte';
   import { DEFAULT_EDGE_KIND } from '$lib/canvas/connect-rules';
   import '$lib/styles/doc-prose.css';
   import { periodTitle } from '$lib/calendar/period-grid';
@@ -44,7 +44,7 @@
             <!-- svelte-ignore a11y_media_has_caption -->
             <video src={node.view.url} controls playsinline class="nodrag"></video>
           {:else if node.view.kind === 'audio'}
-            <AudioPlayer src={node.view.url} cacheKey={node.id} />
+            <AudioResult nodeId={node.id} videoUrl={node.view.videoUrl} audioUrl={node.view.audioUrl} files={[]} />
           {:else if node.view.kind === 'text'}
             <div class="prose doc-prose nowheel">{@html renderDocHtml(node.view.text)}</div>
           {:else if node.view.kind === 'doc'}

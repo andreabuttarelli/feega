@@ -49,6 +49,7 @@
   import SelectNode from '$lib/components/canvas/SelectNode.svelte';
   import NodeDownload from '$lib/components/canvas/NodeDownload.svelte';
   import AudioResult from '$lib/components/canvas/AudioResult.svelte';
+  import { audioOutputIds } from '$lib/canvas/node-media';
   import NodeReferences from '$lib/components/canvas/NodeReferences.svelte';
   import AudioControls, { type VoiceChoice } from '$lib/components/canvas/AudioControls.svelte';
   import { audioInputKindOf, audioInputPorts, audioNamedOutputs, audioOperationOf, operationSpec, type AudioInputKind, type AudioOperationId } from '$lib/canvas/audio-operations';
@@ -689,9 +690,8 @@
   }
 
   function audioUrlsOf(n: Tile): { videoUrl: string | null; audioUrl: string | null } {
-    const refs = (n.data.outputRefs ?? {}) as Partial<Record<ConnectorType, string>>;
-    const refId = typeof n.data.refId === 'string' ? n.data.refId : null;
-    return { videoUrl: assetUrl(refs.videos ?? null), audioUrl: assetUrl(refs.audios ?? (refs.videos ? null : refId)) };
+    const { videoId, audioId } = audioOutputIds(n.data);
+    return { videoUrl: assetUrl(videoId), audioUrl: assetUrl(audioId) };
   }
 
   function audioFilesOf(n: Tile, language: string | null) {

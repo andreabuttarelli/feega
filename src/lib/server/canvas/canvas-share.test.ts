@@ -177,15 +177,16 @@ describe('readSharedCanvas', () => {
 });
 
 describe('readSharedCanvas — audio', () => {
-  it('an audio node shares a player, a dubbed video shares a video', async () => {
+  it('an audio node shares a player, a dubbed video shares the video and its track', async () => {
     const { db } = fakeDb(
       {
         canvases: [CANVAS],
-        nodes: [node('n-voice', 'audio', { prompt: 'p', refId: 'a-mp3' }), node('n-dub', 'audio', { prompt: '', refId: 'a-dub' })],
+        nodes: [node('n-voice', 'audio', { prompt: 'p', refId: 'a-mp3' }), node('n-dub', 'audio', { prompt: '', refId: 'a-dub', outputRefs: { videos: 'a-dub', audios: 'a-track' } })],
         nodes_connections: [],
         assets: [
           { id: 'a-mp3', org_id: 'org-1', type: 'audio', source: 'generated', url: 'u1/media/audio/v.mp3', content: null },
-          { id: 'a-dub', org_id: 'org-1', type: 'video', source: 'generated', url: 'u1/media/audio/d.mp4', content: null }
+          { id: 'a-dub', org_id: 'org-1', type: 'video', source: 'generated', url: 'u1/media/audio/d.mp4', content: null },
+          { id: 'a-track', org_id: 'org-1', type: 'audio', source: 'generated', url: 'u1/media/audio/d.mp3', content: null }
         ]
       },
       { filter: true }
@@ -194,8 +195,8 @@ describe('readSharedCanvas — audio', () => {
     const shared = await readSharedCanvas(db, 'tok-live', sign);
 
     expect(shared?.nodes.map((n) => n.view)).toEqual([
-      { kind: 'audio', url: 'https://signed/u1/media/audio/v.mp3' },
-      { kind: 'video', url: 'https://signed/u1/media/audio/d.mp4' }
+      { kind: 'audio', videoUrl: null, audioUrl: 'https://signed/u1/media/audio/v.mp3' },
+      { kind: 'audio', videoUrl: 'https://signed/u1/media/audio/d.mp4', audioUrl: 'https://signed/u1/media/audio/d.mp3' }
     ]);
   });
 });

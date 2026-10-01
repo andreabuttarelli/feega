@@ -2,21 +2,8 @@ import type { Db } from '$lib/server/db/client';
 import type { CanvasNodeRecord } from '$lib/server/repos/canvas';
 import type { PostMedia, Post } from '$lib/server/repos/posts';
 import type { ActorKind } from '$lib/server/repos/posts';
-import { uploadedNodeOf } from '$lib/canvas/uploaded-node';
+import { nodeMediaAsset } from '$lib/canvas/node-media';
 
-/**
- * DAI NODI DELLA TELA A UN POST — la promozione (NEW_DATABASE_STRUCTURE.md: "canvas → post").
- * Ogni nodo passato diventa una sorgente (`post_sources`), e i nodi che portano un asset (image,
- * video, doc/text caricati o generati) entrano in `posts.media` nell'ordine di `mediaOrder`, se
- * chi chiama lo passa (il composer, dopo che l'utente ha riordinato); senza `mediaOrder` si torna
- * all'ordine di lettura della tela: alto→basso, poi sinistra→destra.
- *
- * UN ASSET SI RISOLVE IN DUE MODI, MAI UN TERZO: `data.assetId` per un nodo caricato
- * (`uploaded-node.ts`), `data.output_asset_id` per un nodo generato — e solo quando
- * `data.status === 'done'`: una generazione ancora in corso non ha un file da promuovere, e
- * promuoverne uno a metà (o nessuno silenziosamente) sarebbe un post con un buco che nessuno nota
- * finché non prova a pubblicarlo.
- */
 
 type CanvasRepo = {
   listNodesByIds: (db: Db, scope: { orgId: string; nodeIds: string[] }) => Promise<CanvasNodeRecord[]>;
@@ -42,19 +29,9 @@ function readingOrder(a: CanvasNodeRecord, b: CanvasNodeRecord): number {
   return a.position.y - b.position.y || a.position.x - b.position.x;
 }
 
-function assetIdOf(node: CanvasNodeRecord): string | null {
-  const uploaded = uploadedNodeOf({ id: node.id, data: node.data });
-  if (uploaded) return uploaded.assetId;
-
-  if (node.data.status === 'done' && typeof node.data.output_asset_id === 'string') {
-    return node.data.output_asset_id;
-  }
-  return null;
-}
-
 function captionOf(node: CanvasNodeRecord): string | null {
   if (node.type === 'doc' && typeof node.data.content === 'string') return node.data.content;
-  if (node.type === 'text' && node.data.status === 'done' && typeof node.data.output_asset_id === 'string') {
+  if (node.type === 'text' && node.data.running !== true && typeof node.data.refId === 'string') {
     return typeof node.data.prompt === 'string' ? node.data.prompt : null;
   }
   return null;
@@ -102,7 +79,7 @@ export async function promoteNodesToPost(
       continue;
     }
 
-    const assetId = assetIdOf(node);
+    const assetId = nodeMediaAsset(node);
     if (assetId) {
       mediaAssets.push({ nodeId: node.id, assetId });
       sources.push({ nodeId: node.id, role: 'media' });

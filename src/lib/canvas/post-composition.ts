@@ -1,3 +1,5 @@
+import { nodeMediaAsset } from './node-media';
+
 export type PostCompositionNode = {
   id: string;
   type: string;
@@ -13,12 +15,6 @@ export type PostComposition = {
   captions: PostCompositionCaption[];
   enabled: boolean;
 };
-
-const MEDIA_TYPES = new Set(['image', 'video']);
-
-function mediaAssetId(node: PostCompositionNode): string | null {
-  return MEDIA_TYPES.has(node.type) && typeof node.data.refId === 'string' ? node.data.refId : null;
-}
 
 const CAPTION_OF: Record<string, (node: PostCompositionNode) => unknown> = {
   doc: (node) => node.data.content,
@@ -41,7 +37,7 @@ export function postCompositionFor(nodes: PostCompositionNode[]): PostCompositio
       continue;
     }
 
-    const assetId = mediaAssetId(node);
+    const assetId = nodeMediaAsset(node);
     if (assetId) {
       media.push({ nodeId: node.id, assetId });
     }

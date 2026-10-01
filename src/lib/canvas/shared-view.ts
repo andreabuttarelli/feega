@@ -4,7 +4,7 @@ import type { CalendarView } from '$lib/calendar/period-grid';
 export type SharedView =
   | { kind: 'image'; url: string }
   | { kind: 'video'; url: string }
-  | { kind: 'audio'; url: string }
+  | { kind: 'audio'; videoUrl: string | null; audioUrl: string | null }
   | { kind: 'text'; text: string }
   | { kind: 'doc'; content: string }
   | { kind: 'frame'; url: string; html: string }

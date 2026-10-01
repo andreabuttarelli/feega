@@ -2183,3 +2183,10 @@ Signal: the canvas banner says the server failed to save, yet Supabase edge logs
 browser console line `canvas read <action> failed` before chasing the write path; a read belongs
 in `READ_ACTIONS` (`node-save.ts`), never in the banner. Check `vercel env ls production` for a
 key the local `.env` has.
+
+## A green test on a node payload nobody writes
+Signal: posts from generated nodes have no media, edges into `effects` are refused, yet the
+tests pass. Cause: fixtures used `output_asset_id`/`status: 'done'` (never on `nodes.data`), and
+`canvasNodeOf` mapped unknown types to `iframe`. Move: build fixtures from what `generate.ts`
+writes (`refId`, `running`, `error`, `outputRefs`); read node media only via
+`node-media.ts`; map a row to its graph kind from `NODE_KINDS`, not a hand list.

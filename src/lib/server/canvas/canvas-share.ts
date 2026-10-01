@@ -19,6 +19,7 @@ import { ShareState, type SharedCanvas, type SharedListItem, type SharedTile, ty
 import { calendarOf } from '$lib/canvas/calendar-node';
 import { saleLabel } from '$lib/canvas/product-discount';
 import { Capability, modeAllows, modeOf } from '$lib/project-mode';
+import { audioOutputIds } from '$lib/canvas/node-media';
 
 export { ShareState };
 
@@ -64,6 +65,11 @@ function refOf(node: CanvasNodeRecord): string[] {
   return typeof ref === 'string' && ref ? [ref] : [];
 }
 
+function audioRefsOf(node: CanvasNodeRecord): string[] {
+  const { videoId, audioId } = audioOutputIds(node.data);
+  return [videoId, audioId].filter((id): id is string => Boolean(id));
+}
+
 const listAssetIds = (node: CanvasNodeRecord): string[] =>
   list(node.data.items).map((item) => str(record(item).asset_id)).filter(Boolean);
 
@@ -73,7 +79,7 @@ const ASSET_REFS_OF: Partial<Record<NodeType, (node: CanvasNodeRecord) => string
   text: refOf,
   effects: refOf,
   composition: refOf,
-  audio: refOf,
+  audio: audioRefsOf,
   list: listAssetIds
 };
 
@@ -114,9 +120,11 @@ function resultView(input: ViewInput): SharedView {
 }
 
 function audioView(input: ViewInput): SharedView {
-  const asset = assetOf(input);
-  const url = signedUrl(input, asset);
-  return url ? { kind: asset?.type === 'video' ? 'video' : 'audio', url } : EMPTY;
+  const { videoId, audioId } = audioOutputIds(input.node.data);
+  const urlOf = (id: string | null) => (id ? signedUrl(input, input.assets.get(id) ?? null) : null);
+  const videoUrl = urlOf(videoId);
+  const audioUrl = urlOf(audioId);
+  return videoUrl || audioUrl ? { kind: 'audio', videoUrl, audioUrl } : EMPTY;
 }
 
 const BADGE_OF = { carousel: 'carousel', video: 'video', image: null } as const;
