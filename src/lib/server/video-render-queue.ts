@@ -226,11 +226,13 @@ async function settle(
 	row: VideoRenderRow,
 	patch: Record<string, unknown>
 ): Promise<void> {
-	await admin
+	const { error } = await admin
 		.from('video_renders')
-		.update({ ...patch, completed_at: new Date().toISOString() })
-		.eq('id', row.id)
-		.then(undefined, () => {});
+		.update({ ...patch, finished_at: new Date().toISOString() })
+		.eq('id', row.id);
+	if (error) {
+		console.error(`[video-render] settle failed id=${row.id}:`, error.message);
+	}
 }
 
 /**

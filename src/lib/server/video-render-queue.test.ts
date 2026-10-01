@@ -225,6 +225,19 @@ describe('reconcileVideoRenders', () => {
 		expect(tables.posts[0].video_render_status).toBe('failed');
 	});
 
+	it('closes a render on finished_at, the column the live table has', async () => {
+		const { VIDEO_RENDER_MAX_AGE_MS } = await import('./video-render-queue');
+		const { tables, client } = makeDb({
+			video_renders: [renderRow({ submitted_at: new Date(Date.now() - VIDEO_RENDER_MAX_AGE_MS - 60_000).toISOString() })],
+			posts: [{ id: 'post-1' }]
+		});
+
+		await reconcile(client);
+
+		expect(typeof tables.video_renders[0].finished_at).toBe('string');
+		expect(tables.video_renders[0]).not.toHaveProperty('completed_at');
+	});
+
 	// `error` is what check_media_job hands verbatim to whoever asks why the clip never came: it
 	// must name the transport that actually held the task, so they know which dashboard to open.
 	it('names the transport that held the task', async () => {
