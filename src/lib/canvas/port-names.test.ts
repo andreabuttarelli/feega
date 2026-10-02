@@ -41,3 +41,18 @@ describe('il nome di una porta si vede solo quando serve', () => {
     expect(ports.every((port) => port.includes('aria-label='))).toBe(true);
   });
 });
+
+describe('una porta è solo il quadrato pieno e il suo nome', () => {
+  const chip = style.slice(style.indexOf(':global(.svelte-flow__handle.typed-port) {'));
+  const rule = chip.slice(0, chip.indexOf('}'));
+
+  it('senza bordo e senza sfondo', () => {
+    expect(rule).toMatch(/border:\s*none;/);
+    expect(rule).toMatch(/background:\s*transparent;/);
+  });
+
+  it('nessun contorno doppio quando accetta un filo', () => {
+    const lit = style.slice(style.indexOf(':global(.svelte-flow__handle.port-lit)'));
+    expect(lit.slice(0, lit.indexOf('}'))).not.toMatch(/outline:\s*2px/);
+  });
+});
