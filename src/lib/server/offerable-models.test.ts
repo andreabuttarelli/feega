@@ -30,6 +30,31 @@ function fakeAdmin(
   return admin;
 }
 
+describe('the 3D models a node can pick', () => {
+  it('offers a reviewed model with its price per run and only the settings we curated', async () => {
+    const admin = fakeAdmin([
+      {
+        id: 'wiro/microsoft/trellis-2',
+        catalogue: 'model3d',
+        input_modalities: ['image'],
+        output_modalities: ['model3d'],
+        provider: 'wiro',
+        wire_spec: { owner: 'microsoft', project: 'trellis-2', fields: { images: ['inputImage'] } },
+        param_schema: {
+          pipeline_type: { type: 'enum', values: ['512', '1024_cascade', '1536_cascade'] },
+          texture_size: { type: 'enum', values: ['1024', '2048'] }
+        },
+        pricing: { lines: [{ inputs: { pipeline_type: '512' }, usd: 0.25, method: 'cpr' }] }
+      } as never
+    ]);
+
+    const [trellis] = (await offerableModels(admin, 'model3d')).choices;
+
+    expect(trellis.pricedInputs).toEqual([{ inputs: { pipeline_type: '512' }, credits: expect.any(Number) }]);
+    expect(trellis.params?.map((p) => [p.name, p.label])).toEqual([['pipeline_type', 'Resolution']]);
+  });
+});
+
 describe('offerableModels — cosa un nodo può davvero scegliere', () => {
   it('un modello sincronizzato CON i nostri fatti di integrazione è offerto', async () => {
     const admin = fakeAdmin([

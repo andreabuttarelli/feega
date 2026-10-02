@@ -52,14 +52,14 @@ describe('ogni tipo di nodo disegna le porte che la sua riga dichiara', () => {
     }
   });
 
-  it('a 3D model takes the image its model reads and feeds nothing downstream', () => {
-    expect(portsOf('model3d', { ...ctx, modelPorts: () => ['images'] })).toEqual({ inputs: ['images'], output: null });
+  it('a 3D model takes an image or a text, whatever its model reads, and feeds nothing downstream', () => {
+    expect(portsOf('model3d', { ...ctx, modelPorts: () => ['images'] })).toEqual({ inputs: ['images', 'text'], output: null });
   });
 
-  it('an image can feed a 3D model, a text cannot', () => {
+  it('an image and a text can both feed a 3D model', () => {
     const model3d = { id: 'm', kind: 'model3d' as const };
     expect(canConnect({ id: 'i', kind: 'image' }, model3d)).toEqual({ ok: true });
-    expect(canConnect({ id: 't', kind: 'text' }, model3d).ok).toBe(false);
+    expect(canConnect({ id: 't', kind: 'text' }, model3d)).toEqual({ ok: true });
   });
 
   it('a calendar accepts media and text, so connecting material plans it', () => {

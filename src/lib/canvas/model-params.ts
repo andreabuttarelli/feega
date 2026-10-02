@@ -8,7 +8,7 @@
 export type ParamSchemaEntry = { type: 'enum'; values: string[] } | { type: 'boolean' } | { type: 'range'; min: number; max: number };
 
 export type ModelParam =
-  | { name: string; label: string; kind: 'enum'; values: string[] }
+  | { name: string; label: string; kind: 'enum'; values: string[]; optionLabels?: Readonly<Record<string, string>> }
   | { name: string; label: string; kind: 'boolean' }
   | { name: string; label: string; kind: 'number'; min?: number; max?: number };
 

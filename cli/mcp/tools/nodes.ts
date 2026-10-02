@@ -41,8 +41,9 @@ export function registerNodeTools(server: McpServer) {
         'later tick deposits the asset. Poll the node (`query`) rather than expecting a file now. ' +
         'An `audio` node runs one ElevenLabs operation set in `params.operation` (see `audio_operations` ' +
         'in `describe_node_types`); `describe_node_types` with `type: audio` also lists the voices. Audio `dubbing` is queued like a video. ' +
-        'A `model3d` node turns ONE connected image into a GLB 3D model on a `wiro/` image-to-3D model; it takes no prompt ' +
-        '(pass an empty string) and is refused with `image_required` when no image is connected. ' +
+        'A `model3d` node turns ONE connected image into a GLB 3D model on a `wiro/` image-to-3D model. With no image but a ' +
+        'prompt or connected text, it first draws a white-background product shot on the cheapest image model (billed too), ' +
+        'then models that; with neither it is refused. Settings go in `params` (Trellis/Pixal3D `pipeline_type`, Hunyuan3D `generate_texture`). ' +
         'A finished result returns `asset_ids` and `media` with `preview_url`/`full_url` (see `get_media`). ' +
         'Omit `model` to keep the node\'s own model, or the recommended balanced one for the medium ' +
         'when it has none (`describe_node_types` lists the recommended ones). A model the canvas does ' +

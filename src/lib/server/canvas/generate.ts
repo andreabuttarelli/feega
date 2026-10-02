@@ -30,6 +30,8 @@ import { finishAudioJob, outputRefsOf, runAudio, type AudioScope } from './audio
 import { audioOperationOf, defaultAudioModel } from '$lib/canvas/audio-operations';
 import type { UpstreamInputs } from '$lib/canvas/upstream-inputs';
 import { WIRO_ID_PREFIX } from '$lib/server/wiro-catalogue';
+import { model3dParamsOf } from '$lib/model3d-models';
+import { cheapestImageChoice, Model3dPath, model3dPathOf, productShotPrompt } from '$lib/canvas/model3d-run';
 
 /**
  * FAR GIRARE UN NODO DELLA TELA, SULLO SCHEMA NUOVO.
@@ -291,14 +293,66 @@ async function runWiroNode(db: Db, input: StartRun, run: NodeRun, upstream: Upst
   return { kind: 'queued', run: { ...run, externalJobId: out.jobId } };
 }
 
-const IMAGE_REQUIRED = 'image_required';
+const NO_IMAGE_MODEL = 'No image model is available to turn this text into a 3D model.';
+const PRODUCT_SHOT_ASPECT = '1:1';
 
-async function runModel3dNode(db: Db, input: StartRun, run: NodeRun, upstream: UpstreamInputs, prompt: string): Promise<RunOutcome> {
-  if (!upstream.referenceImageUrls.length) {
-    await giveUp(db, input, run, IMAGE_REQUIRED);
-    return { kind: 'refused', error: IMAGE_REQUIRED };
+async function refuse(db: Db, input: StartRun, run: NodeRun, error: string): Promise<RunOutcome> {
+  await giveUp(db, input, run, error);
+  return { kind: 'refused', error };
+}
+
+async function productShotOf(db: Db, input: StartRun, prompt: string): Promise<{ ok: true; asset: Asset } | { ok: false; error: string }> {
+  const screened = await screenStandardRun(db, input, [prompt]);
+  if (!screened.ok) {
+    return { ok: false, error: screened.error };
   }
-  return runWiroNode(db, input, run, upstream, prompt);
+
+  const [{ offerableModels }, { generateImagesWithoutBrand }] = await Promise.all([
+    import('$lib/server/offerable-models'),
+    import('$lib/server/media-generate')
+  ]);
+  const choice = cheapestImageChoice((await offerableModels(db as never, 'image')).choices);
+  if (!choice) {
+    return { ok: false, error: NO_IMAGE_MODEL };
+  }
+
+  const out = await generateImagesWithoutBrand(db as never, {
+    orgId: input.orgId,
+    userId: input.userId,
+    prompt: productShotPrompt(prompt),
+    model: choice.id,
+    count: ONE_RENDER,
+    aspectRatio: PRODUCT_SHOT_ASPECT as never
+  });
+  if (!out.ok) {
+    return { ok: false, error: 'reason' in out && out.reason ? `${out.error}: ${out.reason}` : out.error };
+  }
+
+  const asset = out.media[0] ? await depositImage(db, input, out.media[0]) : null;
+  return asset ? { ok: true, asset } : { ok: false, error: 'store_failed' };
+}
+
+async function runModel3dNode(db: Db, requested: StartRun, run: NodeRun, upstream: UpstreamInputs, prompt: string): Promise<RunOutcome> {
+  const settings = model3dParamsOf(requested.model ?? '', requested.params as Record<string, unknown>);
+  if (!settings.ok) {
+    return refuse(db, requested, run, settings.error);
+  }
+  const input: StartRun = { ...requested, params: settings.params as GenParams };
+
+  const start = model3dPathOf({ hasImage: upstream.referenceImageUrls.length > 0, hasText: Boolean(prompt.trim()) });
+  if (start.kind === 'refused') {
+    return refuse(db, input, run, start.error);
+  }
+  if (start.path === Model3dPath.FromImage) {
+    return runWiroNode(db, input, run, upstream, prompt);
+  }
+
+  const shot = await productShotOf(db, input, prompt);
+  if (!shot.ok) {
+    return refuse(db, input, run, shot.error);
+  }
+  await showRunState(db, input, { posterRefId: shot.asset.id });
+  return runWiroNode(db, input, run, { ...upstream, referenceImageUrls: [shot.asset.url ?? ''] }, '');
 }
 
 const MEDIUM_RUNS: Partial<Record<GenMedium, ProviderRun>> = { audio: runAudioNode, model3d: runModel3dNode };

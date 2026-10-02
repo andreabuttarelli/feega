@@ -4,7 +4,7 @@
   import { actionsIn, enabledFor, type SelectionAction, type SelectionActionId } from '$lib/canvas/selection-actions';
   import type { WorkflowEdge } from '$lib/canvas/workflow-plan';
   import { SELECTION_ACTION_ICON } from '$lib/canvas/selection-action-icons';
-  import { commonPropertiesOf, dynamicParamsOf } from '$lib/canvas/common-properties';
+  import { commonPropertiesOf, dynamicParamsOf, type GenPropertyType } from '$lib/canvas/common-properties';
   import { effectiveModel } from '$lib/canvas/default-models';
   import { nodeControlsOf, type SelectionPatch } from '$lib/canvas/node-controls';
   import type { RunQuote } from '$lib/canvas/run-quote';
@@ -39,7 +39,7 @@
     count: number;
     nodeSummaries?: { id: string; type: string; data: Record<string, unknown> }[];
     edges?: WorkflowEdge[];
-    choicesFor?: (type: 'text' | 'image' | 'video') => ModelChoice[];
+    choicesFor?: (type: GenPropertyType) => ModelChoice[];
     catalogueSynced?: boolean;
     runQuote?: RunQuote | null;
     onrun?: () => void;

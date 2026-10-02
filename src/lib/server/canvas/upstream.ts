@@ -63,6 +63,13 @@ type CheckedMedium = 'image' | 'video' | 'model3d';
 
 const MODALITY_CHECKED_MEDIUMS: ReadonlySet<string> = new Set<CheckedMedium>(['image', 'video', 'model3d']);
 
+const NODE_ADDED_MODALITIES: Readonly<Partial<Record<CheckedMedium, readonly string[]>>> = { model3d: ['text'] };
+
+function withNodeModalities(medium: CheckedMedium, modalities: Modalities): Modalities {
+  const added = NODE_ADDED_MODALITIES[medium] ?? [];
+  return { ...modalities, input: [...new Set([...modalities.input, ...added])] };
+}
+
 async function modalitiesFor(model: string, medium: CheckedMedium): Promise<Modalities | null> {
   const { modalitiesOf } = await import('$lib/server/ai-models-sync');
   const { createAdminClient } = await import('$lib/server/supabase-admin');
@@ -428,7 +435,8 @@ export async function upstreamInputsFor(
   }
 ): Promise<UpstreamInputs> {
   const checkable = scope.model && MODALITY_CHECKED_MEDIUMS.has(scope.medium ?? '');
-  const modalities = checkable ? await modalitiesFor(scope.model!, scope.medium as CheckedMedium) : null;
+  const modelModalities = checkable ? await modalitiesFor(scope.model!, scope.medium as CheckedMedium) : null;
+  const modalities = modelModalities && withNodeModalities(scope.medium as CheckedMedium, modelModalities);
 
   if (checkable && !modalities) {
     return {

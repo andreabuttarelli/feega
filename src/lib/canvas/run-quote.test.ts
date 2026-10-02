@@ -45,3 +45,40 @@ describe('il preventivo di un giro, lo stesso per il nodo e per la barra', () =>
     expect(quote.credits).toBeNull();
   });
 });
+
+describe('the quote of a 3D run', () => {
+  const TRELLIS = 'wiro/microsoft/trellis-2';
+  const trellis: ModelChoice = {
+    id: TRELLIS,
+    label: 'TRELLIS.2',
+    provider: 'microsoft',
+    providerLabel: 'Microsoft',
+    aspectRatios: ['1:1'],
+    pricedInputs: [
+      { inputs: { pipeline_type: '512' }, credits: 30 },
+      { inputs: { pipeline_type: '1024_cascade' }, credits: 36 }
+    ]
+  };
+  const cheapImage: ModelChoice = { ...image, id: 'cheap', unitCredits: 4, inputModalities: ['text'] };
+  const model3d = (patch: Partial<GenNode> = {}) => node({ medium: 'model3d', model: TRELLIS, prompt: '', ...patch });
+
+  it('prices a node that never picked a resolution at the 512 default', () => {
+    expect(runQuoteOf({ node: model3d(), choices: [trellis], hasUpstreamImage: true }).credits).toBe(30);
+  });
+
+  it('prices the chosen resolution', () => {
+    expect(runQuoteOf({ node: model3d({ params: { pipeline_type: '1024_cascade' } as never }), choices: [trellis], hasUpstreamImage: true }).credits).toBe(36);
+  });
+
+  it('adds the image step when text alone has to become an image first', () => {
+    const quote = runQuoteOf({ node: model3d({ prompt: 'a teapot' }), choices: [trellis], imageChoices: [image, cheapImage] });
+
+    expect(quote.credits).toBe(34);
+  });
+
+  it('does not add it when an image is connected', () => {
+    const quote = runQuoteOf({ node: model3d({ prompt: 'a teapot' }), choices: [trellis], imageChoices: [cheapImage], hasUpstreamImage: true });
+
+    expect(quote.credits).toBe(30);
+  });
+});

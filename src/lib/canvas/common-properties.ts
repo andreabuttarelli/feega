@@ -77,7 +77,7 @@ export const GEN_FIELDS: readonly GenField[] = [
 
 export type CommonProperties = {
   /** Solo quando OGNI nodo selezionato è dello stesso `type` gen (text/image/video). */
-  type: 'text' | 'image' | 'video' | null;
+  type: GenPropertyType | null;
   model: CommonValue<string | null>;
   aspectRatio: CommonValue<string>;
   duration: CommonValue<number>;
@@ -87,7 +87,9 @@ export type CommonProperties = {
   repeat: CommonValue<number>;
 };
 
-const GEN_TYPES = new Set(['text', 'image', 'video']);
+export type GenPropertyType = 'text' | 'image' | 'video' | 'model3d';
+
+const GEN_TYPES: ReadonlySet<string> = new Set<GenPropertyType>(['text', 'image', 'video', 'model3d']);
 
 function commonOf<T>(values: T[]): CommonValue<T> {
   const [first, ...rest] = values;
@@ -136,7 +138,7 @@ export function commonPropertiesOf(nodes: NodeSummary[]): CommonProperties {
 
   const sameType = commonOf(nodes.map((n) => n.type));
   if (sameType.kind !== 'same') return empty;
-  const type = sameType.value as 'text' | 'image' | 'video';
+  const type = sameType.value as GenPropertyType;
 
   const byId = Object.fromEntries(GEN_FIELDS.map((f) => [f.id, f])) as Record<GenFieldId, GenField>;
 
