@@ -13,7 +13,7 @@ const PREVIEWABLE: Record<AssetType, boolean> = {
   audio: false
 };
 
-const NODE_ASSET_FIELDS = ['refId', 'assetId'] as const;
+export const NODE_ASSET_FIELDS = ['refId', 'assetId'] as const;
 
 export type MediaRequest = { orgId: string; nodeIds: string[]; runIds: string[]; assetIds: string[] };
 

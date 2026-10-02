@@ -3,6 +3,7 @@ import { SERVICE_ROLE_USES } from '$lib/server/db/service-role-uses';
 import { sendEmail } from '$lib/server/email';
 import { internalEmails } from '$lib/server/internal-users';
 import type { BanHours, ReportDeps } from './reports';
+import { storageMover } from '$lib/server/canvas/asset-quarantine';
 
 const USE = SERVICE_ROLE_USES.find((u) => u.path.startsWith('src/lib/server/reports/report-deps.ts'))!;
 const LIFT_BAN = 'none';
@@ -22,6 +23,7 @@ export function reportDeps(origin: string): ReportDeps {
     db,
     send: (to, mail) => sendEmail({ to, ...mail }),
     ban: banWith(db),
+    move: storageMover(db),
     now: () => new Date(),
     internalRecipients: internalEmails,
     origin
