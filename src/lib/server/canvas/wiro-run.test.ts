@@ -166,3 +166,36 @@ describe('startWiroRun — a 3D model', () => {
     expect(gatewayRun).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('an image-only 3D run in a standard project', () => {
+  const trellis: WiroModel = {
+    id: 'wiro/microsoft/trellis-2',
+    catalogue: 'model3d',
+    spec: { owner: 'microsoft', project: 'trellis-2', fields: { images: ['inputImage'] } },
+    uncensored: false,
+    paramSchema: {}
+  };
+
+  it('is not refused by a judge that cannot see the reference', async () => {
+    const { deps, gatewayRun } = depsFor(trellis);
+    const doubting = deps.screen(SCOPE, trellis);
+    deps.screen = () => ({
+      ...doubting,
+      decide: async () => ({ choice: 'safe', probabilities: { safe: 0.9, hate: 0.05 } }),
+      judge: async () => ({ allowed: false, category: 'adult_sexual', reason: 'attached reference media cannot be inspected' })
+    });
+
+    const out = await startWiroRun(deps, {
+      ...baseRequest,
+      mode: ProjectMode.Standard,
+      prompt: '',
+      scope: SCOPE,
+      modelId: trellis.id,
+      imageUrls: ['https://example.com/product.png'],
+      provenance: [{ kind: Provenance.UploadedMedia, label: 'product.png' }]
+    });
+
+    expect(out).toEqual({ kind: 'job', jobId: 'wiro:job-1' });
+    expect(gatewayRun).toHaveBeenCalledTimes(1);
+  });
+});

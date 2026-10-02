@@ -164,7 +164,8 @@ export async function startWiroRun(deps: WiroRunDeps, req: WiroRequest): Promise
   const screened = await screenGeneration(deps.screen(req.scope, model), {
     text: req.prompt,
     references: req.provenance.map((p) => p.label),
-    uncensored: profileOf({ uncensored: model.uncensored, mode: req.mode }) === ModerationProfile.Uncensored
+    uncensored: profileOf({ uncensored: model.uncensored, mode: req.mode }) === ModerationProfile.Uncensored,
+    operation: model.catalogue
   });
   if (!screened.ok) {
     return { kind: 'refused', error: screened.error };
