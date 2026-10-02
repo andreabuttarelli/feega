@@ -33,7 +33,7 @@ You must be at least **18 years old** and able to enter a binding contract. If y
 
 ## 4. Accounts, workspaces and members
 
-- Your account belongs to you. Keep your credentials and API keys secret; you are responsible for activity under them, including actions taken by agents using your API keys or MCP connection.
+- Your account belongs to you. If you sign in with Google or GitHub, the data we receive from them (name, email address and profile picture) is used only to authenticate you and to create and access your account; it is not used for anything else. Keep your credentials and API keys secret; you are responsible for activity under them, including actions taken by agents using your API keys or MCP connection.
 - Content lives in **workspaces** (organisations). A workspace owner can invite members by link or email; every member can see and change the workspace's projects, canvases, brands and connected accounts according to their role.
 - The owner is responsible for the members they invite and for the workspace's billing.
 - A user may belong to a limited number of free workspaces.
