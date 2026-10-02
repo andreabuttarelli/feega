@@ -106,24 +106,24 @@ describe('the identifiability check on uncensored generations', () => {
   });
 
   it('runs the content and identifiability checks concurrently, not one after the other', async () => {
-    const started: string[] = [];
-    const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+    const events: string[] = [];
+    const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
     const p = ports({
       decide: vi.fn(async () => {
-        started.push('content');
-        await wait(10);
+        events.push('content:start');
+        await tick();
+        events.push('content:end');
         return safe;
       }),
       decideIdentifiability: vi.fn(async () => {
-        started.push('identifiability');
-        await wait(10);
+        events.push('identifiability:start');
+        await tick();
+        events.push('identifiability:end');
         return generic;
       })
     });
-    const startedAt = Date.now();
     expect(await screenGeneration(p, request('a portrait', true))).toEqual({ ok: true });
-    expect(Date.now() - startedAt).toBeLessThan(20);
-    expect(started.sort()).toEqual(['content', 'identifiability']);
+    expect(events.slice(0, 2).sort()).toEqual(['content:start', 'identifiability:start']);
   });
 
   it('clears when both checks clear', async () => {
