@@ -32,6 +32,14 @@ describe('project mode', () => {
     expect(modelAllowedIn(ProjectMode.Standard, null)).toBe(true);
   });
 
+  it.each(['wiro/microsoft/trellis-2', 'wiro/tencent/hunyuan3d-2-1', 'wiro/tencentarc/pixal3d'])(
+    'the reviewed 3D model %s runs in every project',
+    (model) => {
+      expect(modelAllowedIn(ProjectMode.Standard, model)).toBe(true);
+      expect(modelAllowedIn(ProjectMode.Uncensored, model)).toBe(true);
+    }
+  );
+
   it('the menu of a standard project carries no wiro model', () => {
     const choices = [{ id: 'wiro/a' }, { id: 'openai/b' }];
     expect(offerableIn(ProjectMode.Standard, choices).map((c) => c.id)).toEqual(['openai/b']);

@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { IMAGE_MODEL_CHOICES, imageModelSpec, IMAGE_REFS_BUDGET, type ImageModelSpec } from '$lib/image-models';
 import { videoModelSpec, type VideoModelSpec } from '$lib/video-models';
-import type { GenMedium, ModelChoice } from '$lib/canvas/gen-node';
+import type { ModelChoice } from '$lib/canvas/gen-node';
 import type { MediaModelSlot } from '$lib/media-model-slots';
 import { wireModelId, type ImagePricingLine } from '$lib/server/ai-models-sync';
 import { providerOf } from '$lib/canvas/model-provider';
@@ -11,6 +11,7 @@ import { videoDurationOptions, VIDEO_RESOLUTIONS, MIN_DURATION } from '$lib/serv
 import { modelParamsOf } from '$lib/canvas/model-params';
 import { WIRO_PROVIDER } from './wiro-catalogue';
 import { wiroChoice } from './wiro-choice';
+import { REVIEWED_MODEL3D_MODELS } from '$lib/model3d-models';
 
 const VIDEO_SPEC_IDS = [
   'bytedance/seedance-2-5',
@@ -23,7 +24,7 @@ const VIDEO_SPEC_IDS = [
   'black-forest-labs/flux-video-upscale'
 ];
 
-type SyncedCatalogue = 'image' | 'video';
+type SyncedCatalogue = 'image' | 'video' | 'model3d';
 
 type SyncedRow = {
   id: string;
@@ -379,8 +380,20 @@ export type OfferableModels = { synced: boolean; choices: ModelChoice[] };
  * `canvas-catalogue.ts`, non di questo file, che serve immagine e video: i due medium dove un
  * nostro spec (`imageField`/`videoField`, `maxRefs`, prezzo) decide se il render riesce o no.
  */
-export async function offerableModels(admin: SupabaseClient, medium: Exclude<GenMedium, 'text'>): Promise<OfferableModels> {
-  return medium === 'image' ? offerableImages(admin) : offerableVideos(admin);
+async function offerableModels3d(admin: SupabaseClient): Promise<OfferableModels> {
+  const { rows, synced } = await syncedRows(admin, 'model3d');
+  const reviewed = [...rows.values()].filter((row) => REVIEWED_MODEL3D_MODELS.has(row.id));
+  return { synced, choices: reviewed.map(wiroChoice) };
+}
+
+const OFFERABLE: Readonly<Record<SyncedCatalogue, (admin: SupabaseClient) => Promise<OfferableModels>>> = {
+  image: offerableImages,
+  video: offerableVideos,
+  model3d: offerableModels3d
+};
+
+export async function offerableModels(admin: SupabaseClient, medium: SyncedCatalogue): Promise<OfferableModels> {
+  return OFFERABLE[medium](admin);
 }
 
 /**

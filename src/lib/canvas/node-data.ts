@@ -121,6 +121,14 @@ const audioSchema = z.object({
   ...libraryMedia
 });
 
+const model3dSchema = z.object({
+  prompt: z.string(),
+  model: z.string().nullable().optional(),
+  posterRefId: z.string().optional(),
+  ...genState,
+  ...libraryMedia
+});
+
 const docSchema = z.object({
   content: z.string(),
   public: z.boolean()
@@ -434,7 +442,8 @@ export const NODE_DATA_SCHEMAS = {
   effects: effectsSchema,
   composition: compositionSchema,
   calendar: calendarSchema,
-  audio: audioSchema
+  audio: audioSchema,
+  model3d: model3dSchema
 } as const;
 
 export type NodeType = keyof typeof NODE_DATA_SCHEMAS;

@@ -54,7 +54,8 @@ export const NODE_TYPES = [
   'effects',
   'composition',
   'calendar',
-  'audio'
+  'audio',
+  'model3d'
 ] as const;
 
 function syncStatusOf(v: unknown): SyncStatus {

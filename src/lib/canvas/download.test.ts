@@ -24,6 +24,12 @@ describe('formatsFor', () => {
 		expect(formats.find((f) => f.id === 'mp4')?.lossy).toBe(false);
 	});
 
+	it('offers a 3D model as the stored GLB, never converted', () => {
+		const formats = formatsFor('model3d');
+		expect(formats.map((f) => [f.id, f.mime, f.extension])).toEqual([['glb', 'model/gltf-binary', 'glb']]);
+		expect(formats[0].asStored).toBe(true);
+	});
+
 	it('hides avif when the browser cannot encode it', () => {
 		const formats = formatsFor('image', { avifEncodable: false });
 		expect(formats.some((f) => f.id === 'avif')).toBe(false);
@@ -72,9 +78,9 @@ describe('clampGifPlan', () => {
 });
 
 describe('kind guard', () => {
-	it('accepts image and video as the only kinds', () => {
-		const kinds: MediaKind[] = ['image', 'video'];
-		expect(kinds).toHaveLength(2);
+	it('accepts image, video and model3d as the only kinds', () => {
+		const kinds: MediaKind[] = ['image', 'video', 'model3d'];
+		expect(kinds).toHaveLength(3);
 	});
 });
 

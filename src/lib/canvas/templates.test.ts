@@ -22,6 +22,7 @@ import { IMAGE_MODEL_CHOICES, imageModelSpec } from '$lib/image-models';
 import { VIDEO_MODEL_CHOICES, videoModelSpec } from '$lib/video-models';
 import { audioInputPorts, audioModelsOf, audioOperationOf } from './audio-operations';
 import { DEFAULT_MODEL } from './default-models';
+import { MODEL3D_MODELS } from '$lib/model3d-models';
 
 const MIN_TEMPLATES = 8;
 
@@ -37,14 +38,16 @@ const KNOWN_MODELS: Record<string, (node: TemplateNode) => readonly string[]> = 
   text: () => [DEFAULT_MODEL.text],
   image: () => IMAGE_MODEL_CHOICES.map((c) => c.id),
   video: () => VIDEO_MODEL_CHOICES.map((c) => c.id),
-  audio: (node) => audioModelsOf(audioOperation(node))
+  audio: (node) => audioModelsOf(audioOperation(node)),
+  model3d: () => Object.values(MODEL3D_MODELS)
 };
 
 const ACCEPTED_HANDLES: Record<string, (node: TemplateNode) => ConnectorType[]> = {
   text: () => ['text'],
   image: (node) => ((imageModelSpec(modelOf(node))?.maxRefs ?? 0) > 0 ? ['text', 'images'] : ['text']),
   video: (node) => (videoModelSpec(modelOf(node))?.roles.includes('image') ? ['text', 'images', 'first_frame', 'last_frame'] : ['text']),
-  audio: (node) => audioInputPorts(audioOperation(node))
+  audio: (node) => audioInputPorts(audioOperation(node)),
+  model3d: () => ['images']
 };
 
 const everyNode = CANVAS_TEMPLATES.flatMap((t) => t.nodes.map((node) => ({ template: t.id, node })));
@@ -169,6 +172,14 @@ describe('la galleria dei template', () => {
     const path = templateThumbnail(t);
     expect(path).toMatch(/\.webp$/);
     expect(existsSync(join(STATIC_DIR, path)), path).toBe(true);
+  });
+
+  it('Product → 3D model turns a product image into a 3D node, under 3D', () => {
+    const t = templateById('product-3d')!;
+
+    expect(t.category).toBe('3d');
+    expect(templateNodeTypes(t)).toEqual(['image', 'model3d']);
+    expect(t.edges).toEqual([{ from: 'product', to: 'model', handle: 'images' }]);
   });
 
   it('i tipi di nodo compaiono una volta, nell\'ordine in cui li incontra', () => {

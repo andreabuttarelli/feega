@@ -36,7 +36,7 @@ import { effectiveModel } from './default-models';
  * porte con la STESSA funzione che il resolver usa per collegarle.
  */
 
-export const CONNECTOR_TYPES = ['text', 'images', 'first_frame', 'last_frame', 'videos', 'audios'] as const;
+export const CONNECTOR_TYPES = ['text', 'images', 'first_frame', 'last_frame', 'videos', 'audios', 'models3d'] as const;
 export type ConnectorType = (typeof CONNECTOR_TYPES)[number];
 
 /** Quanti fili un connettore porta. Il resto è "uno solo": un secondo filo è un conflitto. */
@@ -64,6 +64,7 @@ export const CONNECTOR_STYLE: Record<ConnectorType, { label: string; color: stri
   images: { label: 'Images', color: '#16a34a' },
   videos: { label: 'Video', color: '#db2777' },
   audios: { label: 'Audio', color: '#d97706' },
+  models3d: { label: '3D model', color: '#0f766e' },
   first_frame: { label: 'First frame', color: '#7c3aed' },
   last_frame: { label: 'Last frame', color: '#0891b2' }
 };
@@ -108,10 +109,11 @@ const CONNECTOR_MODALITY: Record<Exclude<ConnectorType, 'first_frame' | 'last_fr
   text: 'text',
   images: 'image',
   videos: 'video',
-  audios: 'audio'
+  audios: 'audio',
+  models3d: 'model3d'
 };
 
-export type GenerativeNodeKind = 'text' | 'image' | 'video' | 'audio';
+export type GenerativeNodeKind = 'text' | 'image' | 'video' | 'audio' | 'model3d';
 
 /**
  * I CONNETTORI DI QUESTO NODO, ORA — in un ORDINE STABILE (`CONNECTOR_TYPES`), perché la UI li
@@ -181,6 +183,7 @@ const PORTS_ACCEPTING: Record<ConnectorType, readonly ConnectorType[]> = {
   images: ['images', 'first_frame', 'last_frame'],
   videos: ['videos'],
   audios: ['audios'],
+  models3d: [],
   first_frame: [],
   last_frame: []
 };

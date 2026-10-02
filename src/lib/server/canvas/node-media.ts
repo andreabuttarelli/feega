@@ -10,7 +10,8 @@ const PREVIEWABLE: Record<AssetType, boolean> = {
   text: false,
   iframe: false,
   document: false,
-  audio: false
+  audio: false,
+  model3d: false
 };
 
 export const NODE_ASSET_FIELDS = ['refId', 'assetId'] as const;

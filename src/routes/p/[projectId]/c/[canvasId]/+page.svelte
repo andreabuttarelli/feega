@@ -56,6 +56,8 @@
   import SelectNode from '$lib/components/canvas/SelectNode.svelte';
   import NodeDownload from '$lib/components/canvas/NodeDownload.svelte';
   import AudioResult from '$lib/components/canvas/AudioResult.svelte';
+  import Model3dViewer from '$lib/components/canvas/Model3dViewer.svelte';
+  import { RENDER_VIEWS } from '$lib/canvas/model3d-views';
   import { audioOutputIds } from '$lib/canvas/node-media';
   import NodeReferences from '$lib/components/canvas/NodeReferences.svelte';
   import AudioControls, { type VoiceChoice } from '$lib/components/canvas/AudioControls.svelte';
@@ -1216,6 +1218,34 @@
     });
     const created = result?.node as CanvasNodeRecord | undefined;
     if (created) { nodes = [...nodes.filter((node) => node.id !== created.id), toTile(created, { select: true })]; }
+  }
+
+  const RENDER_VIEW_GAP = 24;
+
+  async function renderModelViews(id: string, views: Blob[]) {
+    const source = nodes.find((node) => node.id === id);
+    if (!source) {
+      return;
+    }
+    const right = source.x + source.w + RENDER_VIEW_GAP;
+    const tile = genNodeSize('image');
+    await Promise.all(
+      views.map(async (view, i) => {
+        const name = `${RENDER_VIEWS[i]?.name ?? i}-view.png`;
+        const path = `${canvasUploadPrefix(data.orgId, data.projectId)}${crypto.randomUUID()}-${name}`;
+        const up = await supabase.storage.from('canvas-assets').upload(path, view, { contentType: view.type, upsert: false });
+        if (up.error) {
+          failed = up.error.message;
+          return;
+        }
+        const result = await post('upload', {
+          path, file_name: name, mime_type: view.type, bytes: view.size,
+          x: right + i * (tile.w + RENDER_VIEW_GAP), y: source.y
+        });
+        const created = result?.node as CanvasNodeRecord | undefined;
+        if (created) { nodes = [...nodes.filter((node) => node.id !== created.id), toTile(created)]; }
+      })
+    );
   }
 
   async function uploadToLibrary(file: File): Promise<string | null> {
@@ -2623,6 +2653,13 @@
                     <pre class="gen-text nodrag" use:scrollGuard>{text ?? ''}</pre>
                   {/if}
                 </div>
+              {:else if gen.medium === 'model3d'}
+                <Model3dViewer
+                  src={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`}
+                  nodeId={id}
+                  poster={typeof row.data.posterRefId === 'string' ? `/p/${data.projectId}/c/${data.canvas.id}/assets/${row.data.posterRefId}` : null}
+                  onrender={(views) => renderModelViews(id, views)}
+                />
               {:else if gen.medium === 'audio'}
                 <AudioResult nodeId={id} {...audioUrlsOf(row)} files={audioFilesOf(row, gen.params.targetLanguage ?? null)} />
               {:else if gen.medium === 'video'}

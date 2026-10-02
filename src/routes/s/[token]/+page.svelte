@@ -7,6 +7,7 @@
   import type { NodeType } from '$lib/canvas/node-data';
   import SourcePreview from '$lib/components/canvas/SourcePreview.svelte';
   import AudioResult from '$lib/components/canvas/AudioResult.svelte';
+  import Model3dViewer from '$lib/components/canvas/Model3dViewer.svelte';
   import { DEFAULT_EDGE_KIND } from '$lib/canvas/connect-rules';
   import '$lib/styles/doc-prose.css';
   import { periodTitle } from '$lib/calendar/period-grid';
@@ -45,6 +46,8 @@
           {:else if node.view.kind === 'video'}
             <!-- svelte-ignore a11y_media_has_caption -->
             <video src={node.view.url} controls playsinline preload="metadata" class="nodrag"></video>
+          {:else if node.view.kind === 'model3d'}
+            <Model3dViewer nodeId={node.id} src={node.view.url} poster={node.view.poster} />
           {:else if node.view.kind === 'audio'}
             <AudioResult nodeId={node.id} videoUrl={node.view.videoUrl} audioUrl={node.view.audioUrl} files={[]} />
           {:else if node.view.kind === 'text'}

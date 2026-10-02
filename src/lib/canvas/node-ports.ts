@@ -46,7 +46,8 @@ export const NODE_PORTS: Record<NodeType, Ports> = {
   effects: { inputs: ['images', 'videos'], output: OutputRule.Media },
   composition: { inputs: ['images'], output: 'videos' },
   calendar: { inputs: ['images', 'videos', 'audios', 'text'], output: null },
-  audio: { inputs: InputRule.Audio, output: OutputRule.Audio }
+  audio: { inputs: InputRule.Audio, output: OutputRule.Audio },
+  model3d: { inputs: InputRule.Model, output: null }
 };
 
 const DEFAULT_AUDIO_OPERATION_CTX = (): AudioOperationId => audioOperationOf({});

@@ -1,7 +1,8 @@
-export type GenerativeMedium = 'text' | 'image' | 'video' | 'audio';
+export type GenerativeMedium = 'text' | 'image' | 'video' | 'audio' | 'model3d';
 
 import { TIER_ORDER, type RecommendationTier } from './recommended-models';
 import { DEFAULT_AUDIO_OPERATION, defaultAudioModel } from './audio-operations';
+import { DEFAULT_MODEL3D_MODEL } from '$lib/model3d-models';
 
 export type ModelChoiceLike = { id: string; tiers?: readonly RecommendationTier[] };
 
@@ -9,14 +10,16 @@ const MEDIUM_PHRASE: Record<GenerativeMedium, string> = {
   text: 'a text',
   image: 'an image',
   video: 'a video',
-  audio: 'an audio'
+  audio: 'an audio',
+  model3d: 'a 3D model'
 };
 
 export const DEFAULT_MODEL: Record<GenerativeMedium, string> = {
   text: 'anthropic/claude-haiku-4.5',
   image: 'nano-banana-2',
   video: 'bytedance/seedance-2-fast',
-  audio: defaultAudioModel(DEFAULT_AUDIO_OPERATION)
+  audio: defaultAudioModel(DEFAULT_AUDIO_OPERATION),
+  model3d: DEFAULT_MODEL3D_MODEL
 };
 
 export function effectiveModel(

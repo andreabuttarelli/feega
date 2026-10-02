@@ -1,4 +1,6 @@
-export type MediaKind = 'image' | 'video';
+import { MODEL3D_MIME } from '$lib/model3d-models';
+
+export type MediaKind = 'image' | 'video' | 'model3d';
 
 export type DownloadFormat = {
 	id: string;
@@ -6,6 +8,7 @@ export type DownloadFormat = {
 	mime: string;
 	extension: string;
 	lossy: boolean;
+	asStored: boolean;
 	supported: (env: BrowserSupport) => boolean;
 };
 
@@ -14,31 +17,41 @@ export type BrowserSupport = {
 };
 
 const IMAGE_FORMAT_TABLE: DownloadFormat[] = [
-	{ id: 'original', label: 'Originale', mime: '', extension: '', lossy: false, supported: () => true },
-	{ id: 'png', label: 'PNG', mime: 'image/png', extension: 'png', lossy: false, supported: () => true },
-	{ id: 'jpeg', label: 'JPEG', mime: 'image/jpeg', extension: 'jpeg', lossy: true, supported: () => true },
-	{ id: 'webp', label: 'WebP', mime: 'image/webp', extension: 'webp', lossy: true, supported: () => true },
+	{ id: 'original', label: 'Originale', mime: '', extension: '', lossy: false, asStored: true, supported: () => true },
+	{ id: 'png', label: 'PNG', mime: 'image/png', extension: 'png', lossy: false, asStored: false, supported: () => true },
+	{ id: 'jpeg', label: 'JPEG', mime: 'image/jpeg', extension: 'jpeg', lossy: true, asStored: false, supported: () => true },
+	{ id: 'webp', label: 'WebP', mime: 'image/webp', extension: 'webp', lossy: true, asStored: false, supported: () => true },
 	{
 		id: 'avif',
 		label: 'AVIF',
 		mime: 'image/avif',
 		extension: 'avif',
 		lossy: true,
+		asStored: false,
 		supported: (env) => env.avifEncodable !== false
 	}
 ];
 
 const VIDEO_FORMAT_TABLE: DownloadFormat[] = [
-	{ id: 'mp4', label: 'MP4', mime: 'video/mp4', extension: 'mp4', lossy: false, supported: () => true },
-	{ id: 'gif', label: 'GIF', mime: 'image/gif', extension: 'gif', lossy: true, supported: () => true }
+	{ id: 'mp4', label: 'MP4', mime: 'video/mp4', extension: 'mp4', lossy: false, asStored: true, supported: () => true },
+	{ id: 'gif', label: 'GIF', mime: 'image/gif', extension: 'gif', lossy: true, asStored: false, supported: () => true }
 ];
+
+const MODEL3D_FORMAT_TABLE: DownloadFormat[] = [
+	{ id: 'glb', label: 'GLB', mime: MODEL3D_MIME, extension: 'glb', lossy: false, asStored: true, supported: () => true }
+];
+
+const FORMAT_TABLE: Record<MediaKind, DownloadFormat[]> = {
+	image: IMAGE_FORMAT_TABLE,
+	video: VIDEO_FORMAT_TABLE,
+	model3d: MODEL3D_FORMAT_TABLE
+};
 
 export const IMAGE_FORMATS = IMAGE_FORMAT_TABLE;
 export const VIDEO_FORMATS = VIDEO_FORMAT_TABLE;
 
 export function formatsFor(kind: MediaKind, env: BrowserSupport = {}): DownloadFormat[] {
-	const table = kind === 'image' ? IMAGE_FORMAT_TABLE : VIDEO_FORMAT_TABLE;
-	return table.filter((format) => format.supported(env));
+	return FORMAT_TABLE[kind].filter((format) => format.supported(env));
 }
 
 const SHORT_ID_LENGTH = 6;

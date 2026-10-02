@@ -70,6 +70,11 @@ function audioRefsOf(node: CanvasNodeRecord): string[] {
   return [videoId, audioId].filter((id): id is string => Boolean(id));
 }
 
+function model3dRefsOf(node: CanvasNodeRecord): string[] {
+  const poster = str(node.data.posterRefId);
+  return [...refOf(node), ...(poster ? [poster] : [])];
+}
+
 const listAssetIds = (node: CanvasNodeRecord): string[] =>
   list(node.data.items).map((item) => str(record(item).asset_id)).filter(Boolean);
 
@@ -80,6 +85,7 @@ const ASSET_REFS_OF: Partial<Record<NodeType, (node: CanvasNodeRecord) => string
   effects: refOf,
   composition: refOf,
   audio: audioRefsOf,
+  model3d: model3dRefsOf,
   list: listAssetIds
 };
 
@@ -111,6 +117,13 @@ function signedView(kind: 'image' | 'video') {
     const url = signedUrl(input, assetOf(input));
     return url ? { kind, url } : EMPTY;
   };
+}
+
+function model3dView(input: ViewInput): SharedView {
+  const url = signedUrl(input, assetOf(input));
+  const posterId = str(input.node.data.posterRefId);
+  const poster = posterId ? signedUrl(input, input.assets.get(posterId) ?? null) : null;
+  return url ? { kind: 'model3d', url, poster } : EMPTY;
 }
 
 function resultView(input: ViewInput): SharedView {
@@ -242,7 +255,8 @@ export const SHARED_VIEW_OF: Record<NodeType, (input: ViewInput) => SharedView |
   effects: resultView,
   composition: resultView,
   calendar: calendarView,
-  audio: audioView
+  audio: audioView,
+  model3d: model3dView
 };
 
 async function viewOf(input: ViewInput): Promise<SharedView> {

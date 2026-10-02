@@ -27,7 +27,8 @@ const EXPECTED: Record<(typeof NODE_TYPES)[number], { inputs: boolean; output: b
   effects: { inputs: true, output: true },
   composition: { inputs: true, output: true },
   calendar: { inputs: true, output: false },
-  audio: { inputs: true, output: true }
+  audio: { inputs: true, output: true },
+  model3d: { inputs: true, output: false }
 };
 
 describe('ogni tipo di nodo disegna le porte che la sua riga dichiara', () => {
@@ -49,6 +50,16 @@ describe('ogni tipo di nodo disegna le porte che la sua riga dichiara', () => {
       if (!spec) continue;
       expect(portsOf(type, ctx).inputs.length > 0).toBe(spec.generated && spec.accepts.length > 0);
     }
+  });
+
+  it('a 3D model takes the image its model reads and feeds nothing downstream', () => {
+    expect(portsOf('model3d', { ...ctx, modelPorts: () => ['images'] })).toEqual({ inputs: ['images'], output: null });
+  });
+
+  it('an image can feed a 3D model, a text cannot', () => {
+    const model3d = { id: 'm', kind: 'model3d' as const };
+    expect(canConnect({ id: 'i', kind: 'image' }, model3d)).toEqual({ ok: true });
+    expect(canConnect({ id: 't', kind: 'text' }, model3d).ok).toBe(false);
   });
 
   it('a calendar accepts media and text, so connecting material plans it', () => {

@@ -1,3 +1,5 @@
+import { REVIEWED_MODEL3D_MODELS } from './model3d-models';
+
 export enum ProjectMode {
   Standard = 'standard',
   Uncensored = 'uncensored'
@@ -53,7 +55,8 @@ export function modeAllows(mode: ProjectMode, capability: Capability): boolean {
 }
 
 function capabilityOfModel(model: string): Capability {
-  return model.startsWith(WIRO_PREFIX) ? Capability.WiroModels : Capability.StandardModels;
+  const uncensoredOnly = model.startsWith(WIRO_PREFIX) && !REVIEWED_MODEL3D_MODELS.has(model);
+  return uncensoredOnly ? Capability.WiroModels : Capability.StandardModels;
 }
 
 export function sectionAllowed(mode: ProjectMode, section: string): boolean {

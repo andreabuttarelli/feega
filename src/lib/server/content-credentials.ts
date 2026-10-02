@@ -205,6 +205,73 @@ const CONTAINER = {
   wav: { extension: 'wav', recognises: (buf: Buffer) => isRiff(buf, 'WAVE'), muxerArgs: [] }
 } satisfies Record<string, Container>;
 
+const GLB_MAGIC = 'glTF';
+const GLB_HEADER_BYTES = 12;
+const GLB_CHUNK_HEADER_BYTES = 8;
+const GLB_JSON_CHUNK = 0x4e4f534a;
+const GLB_PADDING = 0x20;
+const GLTF_XMP_EXTENSION = 'KHR_xmp_json_ld';
+const XMP_JSON_LD_CONTEXT = {
+  Iptc4xmpExt: 'http://iptc.org/std/Iptc4xmpExt/2008-02-29/',
+  photoshop: 'http://ns.adobe.com/photoshop/1.0/',
+  xmp: XMP_NS
+};
+
+type GltfJson = Record<string, any>;
+
+function isGlb(buf: Buffer): boolean {
+  return (
+    buf.length > GLB_HEADER_BYTES + GLB_CHUNK_HEADER_BYTES &&
+    buf.toString('ascii', 0, 4) === GLB_MAGIC &&
+    buf.readUInt32LE(GLB_HEADER_BYTES + 4) === GLB_JSON_CHUNK
+  );
+}
+
+export function readGlbJson(buf: Buffer): GltfJson {
+  const length = buf.readUInt32LE(GLB_HEADER_BYTES);
+  const start = GLB_HEADER_BYTES + GLB_CHUNK_HEADER_BYTES;
+  return JSON.parse(buf.toString('utf8', start, start + length));
+}
+
+function xmpPacketOf(claim: Claim): Record<string, unknown> {
+  return {
+    '@context': XMP_JSON_LD_CONTEXT,
+    'Iptc4xmpExt:DigitalSourceType': claim.sourceTypeIri,
+    ...(claim.system ? { 'Iptc4xmpExt:AISystemUsed': claim.system } : {}),
+    'photoshop:Credit': `AI-generated with ${GENERATOR}`,
+    'xmp:CreatorTool': GENERATOR
+  };
+}
+
+function withXmpPacket(json: GltfJson, claim: Claim): GltfJson {
+  const packets = [...(json.extensions?.[GLTF_XMP_EXTENSION]?.packets ?? []), xmpPacketOf(claim)];
+  return {
+    ...json,
+    extensionsUsed: [...new Set([...(json.extensionsUsed ?? []), GLTF_XMP_EXTENSION])],
+    extensions: { ...json.extensions, [GLTF_XMP_EXTENSION]: { packets } },
+    asset: { ...json.asset, extensions: { ...json.asset?.extensions, [GLTF_XMP_EXTENSION]: { packet: packets.length - 1 } } }
+  };
+}
+
+function glbWithXmp(buf: Buffer, claim: Claim): Buffer | null {
+  if (!isGlb(buf)) {
+    return null;
+  }
+
+  const oldLength = buf.readUInt32LE(GLB_HEADER_BYTES);
+  const rest = buf.subarray(GLB_HEADER_BYTES + GLB_CHUNK_HEADER_BYTES + oldLength);
+  const raw = Buffer.from(JSON.stringify(withXmpPacket(readGlbJson(buf), claim)), 'utf8');
+  const json = Buffer.concat([raw, Buffer.alloc((4 - (raw.length % 4)) % 4, GLB_PADDING)]);
+
+  const header = Buffer.alloc(GLB_HEADER_BYTES + GLB_CHUNK_HEADER_BYTES);
+  header.write(GLB_MAGIC, 0, 'ascii');
+  header.writeUInt32LE(buf.readUInt32LE(4), 4);
+  header.writeUInt32LE(header.length + json.length + rest.length, 8);
+  header.writeUInt32LE(json.length, GLB_HEADER_BYTES);
+  header.writeUInt32LE(GLB_JSON_CHUNK, GLB_HEADER_BYTES + 4);
+  return Buffer.concat([header, json, rest]);
+}
+
 function containerTags(claim: Claim): string[] {
   const tags = { DigitalSourceType: claim.sourceTypeIri, AISystemUsed: claim.system, comment: claim.statement };
   return Object.entries(tags).flatMap(([key, value]) => (value ? ['-metadata', `${key}=${value}`] : []));
@@ -251,7 +318,8 @@ export const MARKING_STRATEGY: Record<string, Marker> = {
   'audio/mp3': containerMarker(CONTAINER.mp3),
   'audio/wav': containerMarker(CONTAINER.wav),
   'audio/wave': containerMarker(CONTAINER.wav),
-  'audio/x-wav': containerMarker(CONTAINER.wav)
+  'audio/x-wav': containerMarker(CONTAINER.wav),
+  'model/gltf-binary': async (bytes, claim) => glbWithXmp(bytes, claim)
 };
 
 function reason(error: unknown): string {

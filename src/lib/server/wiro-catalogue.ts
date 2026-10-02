@@ -7,10 +7,17 @@ const LIST_LIMIT = '500';
 const CATALOGUE_QUERIES: ReadonlyArray<Record<string, unknown>> = [
   { categories: ['text-to-image'] },
   { categories: ['text-to-video'] },
+  { categories: ['3d-generation'] },
   { search: 'uncensored' }
 ];
 
-const VIDEO_CATEGORIES = new Set(['text-to-video', 'image-to-video', 'video-to-video']);
+const CATALOGUE_OF_CATEGORY: Readonly<Record<string, AiModelCatalogue>> = {
+  'text-to-video': 'video',
+  'image-to-video': 'video',
+  'video-to-video': 'video',
+  '3d-generation': 'model3d'
+};
+const PROMPTLESS_CATALOGUES: ReadonlySet<AiModelCatalogue> = new Set(['model3d']);
 const FILE_INPUT_TYPES = new Set(['combinefileinput', 'fileinput', 'multifileinput']);
 const PROMPT_FIELD = 'prompt';
 const UNCENSORED = /uncensored/i;
@@ -42,7 +49,7 @@ export type WiroTool = {
 };
 
 export type WiroFields = {
-  prompt: string;
+  prompt?: string;
   aspectRatio?: string;
   resolution?: string;
   duration?: string;
@@ -65,7 +72,8 @@ function optionValues(param: WiroParam): string[] {
 }
 
 function catalogueOf(tool: WiroTool): AiModelCatalogue {
-  return (tool.categories ?? []).some((c) => VIDEO_CATEGORIES.has(c)) ? 'video' : 'image';
+  const matched = (tool.categories ?? []).map((c) => CATALOGUE_OF_CATEGORY[c]).find(Boolean);
+  return matched ?? 'image';
 }
 
 function pricingOf(raw: string | null | undefined): WiroPricing {
@@ -92,16 +100,17 @@ function isFile(param: WiroParam): boolean {
   return FILE_INPUT_TYPES.has(param.type ?? '');
 }
 
-function wiringOf(params: WiroParam[]): { fields: WiroFields; controls: Set<string> } | null {
-  if (!params.some((p) => p.id === PROMPT_FIELD)) {
+function wiringOf(params: WiroParam[], catalogue: AiModelCatalogue): { fields: WiroFields; controls: Set<string> } | null {
+  const hasPrompt = params.some((p) => p.id === PROMPT_FIELD);
+  if (!hasPrompt && !PROMPTLESS_CATALOGUES.has(catalogue)) {
     return null;
   }
   if (params.some((p) => isFile(p) && p.required && NON_IMAGE_FILE.test(p.id!))) {
     return null;
   }
 
-  const fields: WiroFields = { prompt: PROMPT_FIELD, images: [] };
-  const controls = new Set<string>([PROMPT_FIELD]);
+  const fields: WiroFields = hasPrompt ? { prompt: PROMPT_FIELD, images: [] } : { images: [] };
+  const controls = new Set<string>(hasPrompt ? [PROMPT_FIELD] : []);
   for (const [control, alias] of Object.entries(CONTROL_ALIASES) as Array<[keyof typeof CONTROL_ALIASES, (typeof CONTROL_ALIASES)[keyof typeof CONTROL_ALIASES]]>) {
     const match = params.find((p) => alias.wire.includes(p.id!) && optionValues(p).length);
     if (match) {
@@ -147,12 +156,12 @@ export function wiroModelRow(tool: WiroTool, syncedAt: string): (AiModelRow & { 
     return null;
   }
   const params = paramsOf(tool);
-  const wiring = wiringOf(params);
+  const catalogue = catalogueOf(tool);
+  const wiring = wiringOf(params, catalogue);
   if (!wiring) {
     return null;
   }
 
-  const catalogue = catalogueOf(tool);
   const resolutionParam = params.find((p) => p.id === wiring.fields.resolution);
   const label = tool.title?.trim() || `${tool.cleanslugowner}/${tool.cleanslugproject}`;
   return {
@@ -160,7 +169,7 @@ export function wiroModelRow(tool: WiroTool, syncedAt: string): (AiModelRow & { 
     catalogue,
     provider: WIRO_PROVIDER,
     label,
-    input_modalities: wiring.fields.images.length ? ['text', 'image'] : ['text'],
+    input_modalities: [...(wiring.fields.prompt ? ['text'] : []), ...(wiring.fields.images.length ? ['image'] : [])],
     output_modalities: [catalogue],
     supported_parameters: params.map((p) => p.id!),
     supported_resolutions: resolutionParam ? optionValues(resolutionParam) : [],

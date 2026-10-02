@@ -27,7 +27,7 @@ const CENTS_PER_USD = 100;
 
 const PER_RUN_METHODS = new Set(['cpr', 'cpo']);
 
-const CATALOGUE_OF: Record<CatalogueMedium, AiModelCatalogue> = { text: 'chat', image: 'image', video: 'video' };
+const CATALOGUE_OF: Record<CatalogueMedium, AiModelCatalogue> = { text: 'chat', image: 'image', video: 'video', model3d: 'model3d' };
 
 const IMAGE_LINE_USD: Record<string, (cost: number) => number> = {
   image: (cost) => cost,
@@ -84,7 +84,8 @@ function videoCost(pricing: unknown): number | null {
 const UNIT_COST: Record<CatalogueMedium, (pricing: unknown) => number | null> = {
   text: textCost,
   image: imageCost,
-  video: videoCost
+  video: videoCost,
+  model3d: imageCost
 };
 
 function declaredOptions(row: ReleaseRow): number {
@@ -94,7 +95,8 @@ function declaredOptions(row: ReleaseRow): number {
 const CAPABILITY: Record<CatalogueMedium, (row: ReleaseRow) => number> = {
   text: (row) => row.context_length ?? 0,
   image: declaredOptions,
-  video: declaredOptions
+  video: declaredOptions,
+  model3d: declaredOptions
 };
 
 export function candidateOf(medium: CatalogueMedium, row: ReleaseRow): CandidateModel {

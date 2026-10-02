@@ -52,6 +52,7 @@ describe('the marking table', () => {
         'image/jpg',
         'image/png',
         'image/webp',
+        'model/gltf-binary',
         'video/mp4',
         'video/quicktime',
         'video/webm'

@@ -5,6 +5,7 @@ import { NANO_BANANA_2_MODEL, SEEDREAM_5_LITE_MODEL } from '$lib/image-models';
 import { DEFAULT_MODEL } from './default-models';
 import { nodeSize } from './node-size';
 import { PLACEMENT_GAP } from './placement';
+import { DEFAULT_MODEL3D_MODEL } from '$lib/model3d-models';
 
 export type TemplateNode = {
   key: string;
@@ -20,6 +21,7 @@ export const TEMPLATE_CATEGORIES = [
   { id: 'image', label: 'Image' },
   { id: 'video', label: 'Video' },
   { id: 'audio', label: 'Audio' },
+  { id: '3d', label: '3D' },
   { id: 'social', label: 'Social' }
 ] as const;
 
@@ -125,6 +127,14 @@ const soundEffect = (key: string, col: number, row: number, prompt: string): Tem
   data: { prompt, model: SFX_MODEL, params: { operation: 'sound_effects', duration: 5 } }
 });
 
+const model3d = (key: string, col: number, row: number): TemplateNode => ({
+  key,
+  type: 'model3d',
+  col,
+  row,
+  data: { prompt: '', model: DEFAULT_MODEL3D_MODEL }
+});
+
 const PRODUCT_SHOT =
   'Studio packshot of a minimalist ceramic coffee mug on a seamless off-white background, soft daylight, product centred. Replace this with your own product.';
 
@@ -147,6 +157,14 @@ export const CANVAS_TEMPLATES: CanvasTemplate[] = [
       { from: 'product', to: 'outdoor', handle: 'images' },
       { from: 'product', to: 'flatlay', handle: 'images' }
     ]
+  },
+  {
+    id: 'product-3d',
+    category: '3d',
+    name: 'Product → 3D model',
+    description: 'One product photo becomes a 3D model you can spin, download as GLB and render from any side.',
+    nodes: [image('product', 0, 0, PRODUCT_SHOT, '1:1'), model3d('model', 1, 0)],
+    edges: [{ from: 'product', to: 'model', handle: 'images' }]
   },
   {
     id: 'ugc-video-ad',

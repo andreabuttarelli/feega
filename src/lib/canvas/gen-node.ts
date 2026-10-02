@@ -147,11 +147,17 @@ export function hasPrompt(node: GenNode, upstream: UpstreamTextAvailability = { 
   return Boolean(node.prompt.trim()) || upstream.hasUpstreamText;
 }
 
+const PROMPTLESS_MEDIUMS: ReadonlySet<GenMedium> = new Set(['model3d']);
+
+export function takesPrompt(medium: GenMedium): boolean {
+  return !PROMPTLESS_MEDIUMS.has(medium);
+}
+
 export function runStateOf(node: GenNode, upstream: UpstreamTextAvailability = { hasUpstreamText: false }): RunState {
   if (node.running) return 'running';
   if (node.error) return 'failed';
   if (node.refId) return 'done';
-  return hasPrompt(node, upstream) ? 'ready' : 'empty';
+  return !takesPrompt(node.medium) || hasPrompt(node, upstream) ? 'ready' : 'empty';
 }
 
 /**
@@ -218,7 +224,8 @@ const GEN_NODE_SIZES: Record<GenMedium, { w: number; h: number }> = {
   text: { w: 360, h: 220 },
   image: { w: 360, h: 460 },
   video: { w: 360, h: 460 },
-  audio: { w: 360, h: 320 }
+  audio: { w: 360, h: 320 },
+  model3d: { w: 360, h: 420 }
 };
 
 export function genNodeSize(medium: GenMedium): { w: number; h: number } {
