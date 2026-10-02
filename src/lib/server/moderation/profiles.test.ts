@@ -17,10 +17,10 @@ describe('the moderation profile table', () => {
     });
   });
 
-  it('does not refuse adult sexual content in uncensored mode, where it is not a category', () => {
+  it('has no blanket adult category in uncensored mode, where artistic nudity is allowed', () => {
     expect(MODERATION_PROFILES[ModerationProfile.Uncensored].categories[ADULT_SEXUAL]).toBeUndefined();
-    expect(MODERATION_PROFILES[ModerationProfile.Uncensored].categories[SAFE].instructions).toMatch(/consensual adult/);
-    expect(MODERATION_PROFILES[ModerationProfile.Standard].categories[SAFE].instructions).not.toMatch(/adult/);
+    expect(MODERATION_PROFILES[ModerationProfile.Uncensored].categories[SAFE].instructions).toMatch(/artistic nudity/);
+    expect(MODERATION_PROFILES[ModerationProfile.Standard].categories[SAFE].instructions).not.toMatch(/nud/);
   });
 
   it.each(['minors', 'real_person_sexual', 'non_consensual_sexual', 'violence_gore', 'animals_sexual', 'self_harm', 'hate', 'weapons_terror', ADULT_SEXUAL])(

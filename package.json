@@ -36,6 +36,7 @@
     "eval:image-node": "vite-node --config scripts/vite-node.config.ts scripts/eval/image-node.ts",
     "eval:gen-node": "vite-node --config scripts/vite-node.config.ts scripts/eval/gen-node.ts",
     "eval:bootstrap": "vite-node --config scripts/vite-node.config.ts scripts/eval/bootstrap.ts",
+    "eval:moderation": "vite-node --config scripts/vite-node.config.ts scripts/eval/moderation-edges.ts",
     "docs:mcp-tools": "node scripts/mcp-inventory.mjs --write"
   },
   "devDependencies": {

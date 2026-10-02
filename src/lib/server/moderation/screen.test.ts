@@ -93,7 +93,7 @@ describe('screening a generation before it reaches the provider', () => {
 
   it('sends reference descriptions to Jev together with the prompt', async () => {
     const p = ports();
-    await screenGeneration(p, { text: 'make it sexy', references: ['uploaded photo'], uncensored: true });
+    await screenGeneration(p, { text: 'a product on a table', references: ['uploaded photo'], uncensored: false });
     expect(p.decide).toHaveBeenCalledWith(expect.stringContaining('uploaded photo'));
   });
 });
