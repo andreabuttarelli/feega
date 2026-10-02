@@ -25,7 +25,7 @@ When you upload data about other people (for example customers, models or influe
 | Billing | plan, credit balance and ledger, Stripe customer and invoice IDs, billing address/VAT if given | you, Stripe (we never see full card numbers) |
 | Usage logs | log of each AI action: action, model, provider, credits, time, acting user or agent | the Service |
 | Moderation | for each screened prompt: verdict, category, scores, reason, acting user | the Service |
-| Age verification (uncensored mode, not yet available) | only the result: verified yes/no, provider, method, date — **no identity documents** | certified verification provider |
+| Age verification (uncensored mode) | only the result: verified 18+, provider (Didit), check session ID, date — **no selfie, no identity document** | Didit, after a selfie age estimate (ID document only if the estimate is not conclusive); Didit erases the check once decided |
 | Technical | IP address, browser, device, pages, errors | your device |
 
 We do not ask for special categories of data (Art. 9 GDPR). Do not include them in prompts unless necessary.
@@ -63,7 +63,7 @@ We share personal data with these categories of recipients, each acting as our p
 | Error monitoring | detecting and fixing errors (may include user ID, email, IP) |
 | Product analytics | understanding how the Service is used (consent) |
 | Advertising measurement | measuring which ads lead to sign-ups (consent) |
-| Age verification | Uncensored mode, not yet available |
+| Age verification | one-time 18+ check for uncensored mode (Didit, EU) |
 
 The current list of sub-processors is available at [https://feega.app/subprocessors](./SUBPROCESSORS.md).
 

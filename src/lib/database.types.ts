@@ -2412,6 +2412,7 @@ export type Database = {
           id: string
           method: string
           provider: string
+          provider_session_id: string | null
           result: string
           user_id: string
           verified_at: string
@@ -2420,6 +2421,7 @@ export type Database = {
           id?: string
           method: string
           provider: string
+          provider_session_id?: string | null
           result: string
           user_id: string
           verified_at?: string
@@ -2428,6 +2430,7 @@ export type Database = {
           id?: string
           method?: string
           provider?: string
+          provider_session_id?: string | null
           result?: string
           user_id?: string
           verified_at?: string

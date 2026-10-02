@@ -12,7 +12,7 @@ const SLUG_BYTES = 4;
 
 export type WorkspaceOutcome = { ok: true; projectId: string; canvasId: string } | { ok: false; error: string };
 
-export type VerifyOutcome = { ok: true } | { ok: false; error: string };
+export type VerifyOutcome = { ok: true } | { ok: false; error: string } | { ok: false; redirect: string };
 
 function slugFor(): string {
   const suffix = [...crypto.getRandomValues(new Uint8Array(SLUG_BYTES))].map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -30,7 +30,7 @@ export async function openUncensoredProject(db: Db, input: { orgId: string; user
   return { ok: true, projectId: project.id, canvasId: canvas.id };
 }
 
-export async function verifyUserAge(db: Db, input: { orgId: string; userId: string }): Promise<VerifyOutcome> {
+export async function verifyUserAge(db: Db, input: { orgId: string; userId: string; returnUrl: string }): Promise<VerifyOutcome> {
   const verifier = configuredVerifier();
   const lock = await uncensoredLockFor(db, input);
   if (lock === UncensoredLock.Open) {
@@ -39,5 +39,5 @@ export async function verifyUserAge(db: Db, input: { orgId: string; userId: stri
   if (!verifier || lock !== UncensoredLock.AgeUnverified) {
     return { ok: false, error: lock };
   }
-  return verifyAge(verifier, ageStore(db), input.userId);
+  return verifyAge(verifier, ageStore(db), input.userId, input.returnUrl);
 }
