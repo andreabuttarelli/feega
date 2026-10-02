@@ -202,9 +202,9 @@
     width: auto;
     height: 22px;
     min-width: 0;
-    padding: 0 4px;
-    border: 2px solid var(--port);
-    background: var(--paper, #fff);
+    padding: 0;
+    border: none;
+    background: transparent;
     opacity: 1;
     cursor: crosshair;
     transition: opacity 120ms ease;
@@ -230,15 +230,15 @@
     pointer-events: none;
   }
   :global(.svelte-flow__handle.port-flagged) {
-    border-style: dashed;
+    opacity: 0.5;
     cursor: not-allowed;
   }
   :global(.svelte-flow__handle.port-flagged .port-name) {
     text-decoration: line-through;
   }
-  :global(.svelte-flow__handle.port-lit) {
-    outline: 2px solid var(--port);
-    outline-offset: 2px;
+  :global(.svelte-flow__handle.port-lit::before) {
+    width: 12px;
+    height: 12px;
   }
   .port-name {
     max-width: 0;
