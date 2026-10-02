@@ -1,6 +1,7 @@
 <script lang="ts">
   const MIN_ZOOM = 0.05;
   import { focusEdges } from '$lib/canvas/edge-focus';
+  import type { GenPropertyType } from '$lib/canvas/common-properties';
   /**
    * LA TELA, SU SVELTEFLOW.
    *
@@ -217,10 +218,10 @@
     /** `type`/`data` di ogni tile — la forma grezza che `commonPropertiesOf` legge, non `Tile`. */
     nodeSummaries?: { id: string; type: string; data: Record<string, unknown> }[];
     /** I modelli offribili per un medium che genera, dal catalogo di chi monta la tela. */
-    modelChoicesFor?: (type: 'text' | 'image' | 'video') => ModelChoice[];
+    modelChoicesFor?: (type: GenPropertyType) => ModelChoice[];
     /** Il catalogo di un medium è già sincronizzato? Come `GenNode`, per il campo modello della
      *  barra quando la selezione è di un solo tipo. */
-    catalogueSyncedFor?: (type: 'text' | 'image' | 'video') => boolean;
+    catalogueSyncedFor?: (type: GenPropertyType) => boolean;
     onSelectionChange?: (ids: string[]) => void;
     /** La barra ha scritto: un campo, applicato a ogni nodo selezionato — uno o molti, stessa
      *  concorrenza ottimistica di `write`, N scritture indipendenti per una barra sola. */
@@ -589,7 +590,7 @@
   });
   const selectionMedium = $derived(
     selectedSummaries.length && selectedSummaries.every((n) => n.type === selectedSummaries[0].type)
-      ? (selectedSummaries[0].type as 'text' | 'image' | 'video')
+      ? (selectedSummaries[0].type as GenPropertyType)
       : null
   );
 

@@ -26,19 +26,24 @@ export type ScreenPorts = {
   record(entry: ModerationRecord): void;
 };
 
-export type ScreenRequest = { text: string; references: string[]; uncensored: boolean };
+export type ScreenRequest = { text: string; references: string[]; uncensored: boolean; operation?: string };
 
 export type ScreenOutcome = { ok: true } | { ok: false; error: string; unavailable?: true };
 
 const UNAVAILABLE = 'moderation_unavailable';
 
-const SCREEN_STAGES: Readonly<Record<'yes' | 'no', readonly ('content' | 'identifiability')[]>> = {
-  yes: ['content', 'identifiability'],
-  no: ['content']
-};
+type ScreenStage = 'content' | 'identifiability';
 
-function stagesFor(request: ScreenRequest): readonly ('content' | 'identifiability')[] {
-  return SCREEN_STAGES[request.uncensored ? 'yes' : 'no'];
+type StageRule = { applies: (request: ScreenRequest) => boolean; stages: readonly ScreenStage[]; skipped?: string };
+
+const STAGE_RULES: readonly StageRule[] = [
+  { applies: (r) => r.operation === 'model3d' && !r.text.trim(), stages: [], skipped: 'skipped: no text (model3d)' },
+  { applies: (r) => r.uncensored, stages: ['content', 'identifiability'] },
+  { applies: () => true, stages: ['content'] }
+];
+
+function ruleFor(request: ScreenRequest): StageRule {
+  return STAGE_RULES.find((rule) => rule.applies(request))!;
 }
 
 function stateOf(request: ScreenRequest): string {
@@ -149,7 +154,7 @@ async function screenIdentifiability(ports: ScreenPorts, state: string): Promise
   return { ok: true };
 }
 
-const SCREEN_OF: Readonly<Record<'content' | 'identifiability', (ports: ScreenPorts, state: string, policy: ProfilePolicy) => Promise<ScreenOutcome>>> = {
+const SCREEN_OF: Readonly<Record<ScreenStage, (ports: ScreenPorts, state: string, policy: ProfilePolicy) => Promise<ScreenOutcome>>> = {
   content: screenContent,
   identifiability: screenIdentifiability
 };
@@ -163,6 +168,11 @@ export async function screenGeneration(ports: ScreenPorts, request: ScreenReques
     return { ok: false, error: MODERATION_CATEGORIES[MINORS].refusal };
   }
 
-  const outcomes = await Promise.all(stagesFor(request).map((stage) => SCREEN_OF[stage](ports, state, policy)));
+  const rule = ruleFor(request);
+  if (rule.skipped) {
+    ports.record({ stage: 'rules', verdict: 'clear', category: null, probabilities: {}, reason: rule.skipped });
+  }
+
+  const outcomes = await Promise.all(rule.stages.map((stage) => SCREEN_OF[stage](ports, state, policy)));
   return outcomes.find((outcome) => !outcome.ok) ?? { ok: true };
 }

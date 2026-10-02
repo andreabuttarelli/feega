@@ -124,6 +124,7 @@ const audioSchema = z.object({
 const model3dSchema = z.object({
   prompt: z.string(),
   model: z.string().nullable().optional(),
+  params: z.record(z.string(), z.unknown()).optional(),
   posterRefId: z.string().optional(),
   ...genState,
   ...libraryMedia

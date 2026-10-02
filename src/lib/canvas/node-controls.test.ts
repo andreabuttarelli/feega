@@ -141,3 +141,35 @@ describe('ogni valore torna indietro nella stessa forma che il salvataggio già 
     ]);
   });
 });
+
+describe('a 3D node shows its settings in the same toolbar', () => {
+  const trellis: ModelChoice = {
+    id: 'wiro/microsoft/trellis-2',
+    label: 'TRELLIS.2',
+    provider: 'microsoft',
+    providerLabel: 'Microsoft',
+    aspectRatios: ['1:1'],
+    params: [
+      { name: 'pipeline_type', label: 'Resolution', kind: 'enum', values: ['512', '1024_cascade'], optionLabels: { '512': '512', '1024_cascade': '1024' } }
+    ]
+  };
+
+  it('in Output, with readable option labels and the cheapest value by default', () => {
+    const nodes = [{ type: 'model3d', data: {} }];
+    const control = byId(nodeControlsOf(commonPropertiesOf(nodes), trellis, dynamicParamsOf(nodes, ['pipeline_type'])), 'pipeline_type');
+
+    expect(control.section).toBe('output');
+    expect(control.options).toEqual([
+      { value: '512', label: '512' },
+      { value: '1024_cascade', label: '1024' }
+    ]);
+    expect(control.value).toBe('512');
+  });
+
+  it('a 3D selection reads its model like any generating node', () => {
+    expect(commonPropertiesOf([{ type: 'model3d', data: { model: 'wiro/microsoft/trellis-2' } }])).toMatchObject({
+      type: 'model3d',
+      model: { kind: 'same', value: 'wiro/microsoft/trellis-2' }
+    });
+  });
+});

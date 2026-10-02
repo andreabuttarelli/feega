@@ -258,7 +258,7 @@ export function createProjectTools(deps: ProjectToolDeps): Record<string, Tool> 
 
     run_node: tool({
       description:
-        'Generate on a producing node of THIS project (text, image, video, audio or model3d — a model3d node turns one connected image into a GLB, takes no prompt and is always queued). Costs credits: only when the user asked. Versioned like update_node — conflict means re-read and retry. A video or an audio dubbing may come back queued; poll with list_runs. An audio node runs params.operation (describe_node_types type "audio" lists operations and voices).',
+        'Generate on a producing node of THIS project (text, image, video, audio or model3d — a model3d node turns one connected image, or its prompt via a generated product shot, into a GLB and is always queued). Costs credits: only when the user asked. Versioned like update_node — conflict means re-read and retry. A video or an audio dubbing may come back queued; poll with list_runs. An audio node runs params.operation (describe_node_types type "audio" lists operations and voices).',
       inputSchema: z
         .object({
           nodeId: z.string(),

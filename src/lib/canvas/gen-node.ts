@@ -147,17 +147,17 @@ export function hasPrompt(node: GenNode, upstream: UpstreamTextAvailability = { 
   return Boolean(node.prompt.trim()) || upstream.hasUpstreamText;
 }
 
-const PROMPTLESS_MEDIUMS: ReadonlySet<GenMedium> = new Set(['model3d']);
+const PROMPT_OPTIONAL_MEDIUMS: ReadonlySet<GenMedium> = new Set(['model3d']);
 
-export function takesPrompt(medium: GenMedium): boolean {
-  return !PROMPTLESS_MEDIUMS.has(medium);
+export function promptRequired(medium: GenMedium): boolean {
+  return !PROMPT_OPTIONAL_MEDIUMS.has(medium);
 }
 
 export function runStateOf(node: GenNode, upstream: UpstreamTextAvailability = { hasUpstreamText: false }): RunState {
   if (node.running) return 'running';
   if (node.error) return 'failed';
   if (node.refId) return 'done';
-  return !takesPrompt(node.medium) || hasPrompt(node, upstream) ? 'ready' : 'empty';
+  return !promptRequired(node.medium) || hasPrompt(node, upstream) ? 'ready' : 'empty';
 }
 
 /**

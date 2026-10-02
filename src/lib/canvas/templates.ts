@@ -167,6 +167,14 @@ export const CANVAS_TEMPLATES: CanvasTemplate[] = [
     edges: [{ from: 'product', to: 'model', handle: 'images' }]
   },
   {
+    id: 'text-3d',
+    category: '3d',
+    name: 'Text → 3D model',
+    description: 'Describe an object and get a 3D model: a product shot is drawn first, then turned into a GLB.',
+    nodes: [note('object', 0, 0, 'A silver bell with gilded leaves on top. Replace this with your own object.'), model3d('model', 1, 0)],
+    edges: [{ from: 'object', to: 'model', handle: 'text' }]
+  },
+  {
     id: 'ugc-video-ad',
     category: 'video',
     name: 'UGC video ad',

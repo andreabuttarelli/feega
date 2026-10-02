@@ -47,7 +47,7 @@ const ACCEPTED_HANDLES: Record<string, (node: TemplateNode) => ConnectorType[]> 
   image: (node) => ((imageModelSpec(modelOf(node))?.maxRefs ?? 0) > 0 ? ['text', 'images'] : ['text']),
   video: (node) => (videoModelSpec(modelOf(node))?.roles.includes('image') ? ['text', 'images', 'first_frame', 'last_frame'] : ['text']),
   audio: (node) => audioInputPorts(audioOperation(node)),
-  model3d: () => ['images']
+  model3d: () => ['images', 'text']
 };
 
 const everyNode = CANVAS_TEMPLATES.flatMap((t) => t.nodes.map((node) => ({ template: t.id, node })));
@@ -180,6 +180,15 @@ describe('la galleria dei template', () => {
     expect(t.category).toBe('3d');
     expect(templateNodeTypes(t)).toEqual(['image', 'model3d']);
     expect(t.edges).toEqual([{ from: 'product', to: 'model', handle: 'images' }]);
+  });
+
+  it('Text → 3D model feeds a written description into a 3D node, no image needed', () => {
+    const t = templateById('text-3d')!;
+
+    expect(t.category).toBe('3d');
+    expect(templateNodeTypes(t)).toEqual(['doc', 'model3d']);
+    expect(t.edges).toEqual([{ from: 'object', to: 'model', handle: 'text' }]);
+    expect(t.nodes[1].data.model).toBe(MODEL3D_MODELS.trellis2);
   });
 
   it('i tipi di nodo compaiono una volta, nell\'ordine in cui li incontra', () => {

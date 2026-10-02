@@ -106,24 +106,24 @@ describe('the identifiability check on uncensored generations', () => {
   });
 
   it('runs the content and identifiability checks concurrently, not one after the other', async () => {
-    const started: string[] = [];
-    const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+    const events: string[] = [];
+    const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
     const p = ports({
       decide: vi.fn(async () => {
-        started.push('content');
-        await wait(10);
+        events.push('content:start');
+        await tick();
+        events.push('content:end');
         return safe;
       }),
       decideIdentifiability: vi.fn(async () => {
-        started.push('identifiability');
-        await wait(10);
+        events.push('identifiability:start');
+        await tick();
+        events.push('identifiability:end');
         return generic;
       })
     });
-    const startedAt = Date.now();
     expect(await screenGeneration(p, request('a portrait', true))).toEqual({ ok: true });
-    expect(Date.now() - startedAt).toBeLessThan(20);
-    expect(started.sort()).toEqual(['content', 'identifiability']);
+    expect(events.slice(0, 2).sort()).toEqual(['content:start', 'identifiability:start']);
   });
 
   it('clears when both checks clear', async () => {
@@ -180,5 +180,36 @@ describe('the identifiability check on uncensored generations', () => {
     const stages = (p.record as ReturnType<typeof vi.fn>).mock.calls.map((call) => (call[0] as { stage: string }).stage);
     expect(stages).toContain('jev');
     expect(stages).toContain('identifiability');
+  });
+});
+
+describe('an image-only 3D run has no text to screen', () => {
+  const inDoubt = () =>
+    ports({
+      decide: vi.fn(async () => doubtful),
+      judge: vi.fn(async () => ({ allowed: false, category: 'adult_sexual', reason: 'unverifiable attached content' }))
+    });
+  const model3d = (text: string) => ({ text, references: ['product.png'], uncensored: false, operation: 'model3d' });
+
+  it('clears without asking the classifier or the judge, and logs why', async () => {
+    const p = inDoubt();
+
+    expect(await screenGeneration(p, model3d(''))).toEqual({ ok: true });
+    expect(p.decide).not.toHaveBeenCalled();
+    expect(p.judge).not.toHaveBeenCalled();
+    expect(p.record).toHaveBeenCalledWith(expect.objectContaining({ stage: 'rules', verdict: 'clear', reason: 'skipped: no text (model3d)' }));
+  });
+
+  it('still screens the text a 3D run carries', async () => {
+    const p = inDoubt();
+
+    expect(await screenGeneration(p, model3d('a red teapot'))).toMatchObject({ ok: false });
+    expect(p.judge).toHaveBeenCalledOnce();
+  });
+
+  it('still screens a textless image run of any other kind', async () => {
+    const p = inDoubt();
+
+    expect(await screenGeneration(p, { ...model3d(''), operation: 'video' })).toMatchObject({ ok: false });
   });
 });

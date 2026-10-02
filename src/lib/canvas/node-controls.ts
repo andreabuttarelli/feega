@@ -57,11 +57,13 @@ export function numberKindOf(min: number | undefined, max: number | undefined): 
 const PARAM_SECTION: Readonly<Record<string, ControlSection>> = {
   quality: 'output',
   background: 'output',
-  style: 'output'
+  style: 'output',
+  pipeline_type: 'output',
+  generate_texture: 'output'
 };
 
-function optionsOf(values: readonly string[]): ControlOption[] {
-  return values.map((value) => ({ value, label: value }));
+function optionsOf(values: readonly string[], labels: Readonly<Record<string, string>> = {}): ControlOption[] {
+  return values.map((value) => ({ value, label: labels[value] ?? value }));
 }
 
 function current<T>(v: CommonValue<T>, fallback: T | null): { value: T | null; mixed: boolean } {
@@ -148,7 +150,7 @@ function paramControlOf(param: ModelParam, value: CommonValue<unknown> | undefin
   } as const;
 
   if (param.kind === 'enum') {
-    return { ...base, kind: enumKindOf(param.values.length), valueType: 'string', options: optionsOf(param.values), ...current(common as CommonValue<string>, param.values[0]) };
+    return { ...base, kind: enumKindOf(param.values.length), valueType: 'string', options: optionsOf(param.values, param.optionLabels), ...current(common as CommonValue<string>, param.values[0]) };
   }
   if (param.kind === 'boolean') {
     return { ...base, kind: 'switch', valueType: 'boolean', options: [], ...current(common as CommonValue<boolean>, false) };

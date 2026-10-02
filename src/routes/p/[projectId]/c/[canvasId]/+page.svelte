@@ -97,6 +97,7 @@
   import { verdictForUpload, canvasUploadPrefix } from '$lib/canvas/upload-kind';
   import { isUploadedNodeRow, uploadedNodeOf } from '$lib/canvas/uploaded-node';
   import { genNodeSize, startRun, unlockRun, type GenNode as GenNodeState, type GenMedium, type ModelChoice } from '$lib/canvas/gen-node';
+  import type { GenPropertyType } from '$lib/canvas/common-properties';
   import { hasUpstreamText } from '$lib/canvas/upstream-inputs';
   import { effectiveModel } from '$lib/canvas/default-models';
   import { nearestVideoDuration } from '$lib/video-models';
@@ -896,7 +897,9 @@
    *  `model`/`params` come campi diretti. */
   const nodeSummaries = $derived(nodes.map((n) => ({ id: n.id, type: n.type, data: n.data })));
 
-  function modelChoicesFor(type: 'text' | 'image' | 'video'): ModelChoice[] {
+  const DYNAMIC_PARAM_TYPES: ReadonlySet<string> = new Set<GenMedium>(['image', 'video', 'model3d']);
+
+  function modelChoicesFor(type: GenPropertyType): ModelChoice[] {
     return catalogue[type] ?? [];
   }
 
@@ -1439,7 +1442,9 @@
       variableTextInput: estimate?.variableInput ?? (gen.medium === 'text' && revision !== '[]'),
       enhanceUnitCredits: catalogueEntry.enhanceUnitCredits,
       estimatedTextInputTokens: estimate?.inputTokens,
-      estimatedTextOutputTokens: estimate?.outputTokens
+      estimatedTextOutputTokens: estimate?.outputTokens,
+      hasUpstreamImage: edges.some((e) => e.target === row.id && e.targetHandle === 'images'),
+      imageChoices: catalogue.image
     });
   }
 
@@ -2162,8 +2167,8 @@
       // risoluzione, sul modello che dichiara loro: un nome che il modello nuovo non conosce più
       // sparisce, un valore fuori dal suo elenco scivola al primo valido — mai un token che il
       // provider appena scelto rifiuta.
-      if (model !== undefined && (n.type === 'image' || n.type === 'video')) {
-        const nextModel = catalogue[n.type]?.find((c) => c.id === model);
+      if (model !== undefined && DYNAMIC_PARAM_TYPES.has(n.type)) {
+        const nextModel = catalogue[n.type as GenMedium]?.find((c) => c.id === model);
         const savedParams = (n.data.params as Record<string, unknown> | undefined) ?? {};
         const dynamic = nextParams as unknown as Record<string, unknown>;
         const snapped = snapDynamicParams(nextModel?.params ?? [], { ...savedParams, ...dynamic });

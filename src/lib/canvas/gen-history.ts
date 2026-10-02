@@ -15,7 +15,7 @@
  * — l'ultima? — significherebbe che tornare indietro su una vecchia generazione dura finché non
  * si chiude la scheda.
  */
-import { hasPrompt, takesPrompt, type GenMedium, type GenNode, type GenRun, type UpstreamTextAvailability } from './gen-node';
+import { hasPrompt, promptRequired, type GenMedium, type GenNode, type GenRun, type UpstreamTextAvailability } from './gen-node';
 import { effectiveModel, type ModelChoiceLike } from './default-models';
 import { audioOperationOf, operationSpec } from './audio-operations';
 
@@ -35,7 +35,7 @@ function runnable(medium: GenMedium): boolean {
 }
 
 function readsConnectedMedia(node: GenNode): boolean {
-  if (!takesPrompt(node.medium)) {
+  if (!promptRequired(node.medium)) {
     return true;
   }
   return node.medium === 'audio' && operationSpec(audioOperationOf(node.params)).source === 'media';

@@ -6,7 +6,7 @@ import {
   isGenMedium,
   promptTooLong,
   runStateOf,
-  takesPrompt,
+  promptRequired,
   snapResolution,
   startRun,
   unlockRun,
@@ -49,10 +49,10 @@ describe('lo stato di un nodo', () => {
     expect(runStateOf(node({ prompt: '   ' }))).toBe('empty');
   });
 
-  it('a 3D model needs no prompt: it is ready with its image alone', () => {
+  it('a 3D model may run without a prompt: it is ready with its image alone', () => {
     expect(runStateOf(node({ medium: 'model3d', prompt: '' }))).toBe('ready');
-    expect(takesPrompt('model3d')).toBe(false);
-    expect(takesPrompt('image')).toBe(true);
+    expect(promptRequired('model3d')).toBe(false);
+    expect(promptRequired('image')).toBe(true);
   });
 
   it('col prompt è pronto a girare', () => {

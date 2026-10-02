@@ -11,7 +11,7 @@ import { videoDurationOptions, VIDEO_RESOLUTIONS, MIN_DURATION } from '$lib/serv
 import { modelParamsOf } from '$lib/canvas/model-params';
 import { WIRO_PROVIDER } from './wiro-catalogue';
 import { wiroChoice } from './wiro-choice';
-import { REVIEWED_MODEL3D_MODELS } from '$lib/model3d-models';
+import { model3dChoiceParams, REVIEWED_MODEL3D_MODELS } from '$lib/model3d-models';
 
 const VIDEO_SPEC_IDS = [
   'bytedance/seedance-2-5',
@@ -383,7 +383,7 @@ export type OfferableModels = { synced: boolean; choices: ModelChoice[] };
 async function offerableModels3d(admin: SupabaseClient): Promise<OfferableModels> {
   const { rows, synced } = await syncedRows(admin, 'model3d');
   const reviewed = [...rows.values()].filter((row) => REVIEWED_MODEL3D_MODELS.has(row.id));
-  return { synced, choices: reviewed.map(wiroChoice) };
+  return { synced, choices: reviewed.map((row) => ({ ...wiroChoice(row), params: model3dChoiceParams(row.id) })) };
 }
 
 const OFFERABLE: Readonly<Record<SyncedCatalogue, (admin: SupabaseClient) => Promise<OfferableModels>>> = {

@@ -7,6 +7,7 @@ import { reconcileWiroNodeRuns, runGenNode } from './generate';
 import type { WiroModel, WiroRunDeps } from './wiro-run';
 import type { ScreenPorts } from '$lib/server/moderation/screen';
 import { readGlbJson } from '$lib/server/content-credentials';
+import { MODEL3D_INPUT_REQUIRED } from '$lib/canvas/model3d-run';
 
 const ORG = '11111111-1111-1111-1111-111111111111';
 const NODE = '22222222-2222-2222-2222-222222222222';
@@ -37,16 +38,34 @@ const screen: ScreenPorts = {
   record: vi.fn()
 };
 
-const { deps, upstream } = vi.hoisted(() => ({
+const { deps, upstream, imageStep, moderation } = vi.hoisted(() => ({
   deps: { current: null as null | ((db: Db) => WiroRunDeps) },
-  upstream: { referenceImageUrls: [] as string[] }
+  upstream: { referenceImageUrls: [] as string[], text: [] as string[] },
+  imageStep: { generate: null as unknown as ReturnType<typeof import('vitest').vi.fn> },
+  moderation: { screen: null as unknown as ReturnType<typeof import('vitest').vi.fn> }
+}));
+imageStep.generate = vi.fn();
+moderation.screen = vi.fn();
+vi.mock('$lib/server/media-generate', () => ({ generateImagesWithoutBrand: (...args: unknown[]) => imageStep.generate(...args) }));
+vi.mock('$lib/server/moderation/model-input', () => ({ screenModelInput: (...args: unknown[]) => moderation.screen(...args) }));
+vi.mock('$lib/server/offerable-models', () => ({
+  offerableModels: async () => ({
+    synced: true,
+    choices: [
+      { id: 'pricey-image', label: 'Pricey', provider: 'x', providerLabel: 'X', aspectRatios: ['1:1'], inputModalities: ['text'], unitCredits: 20 },
+      { id: 'cheap-image', label: 'Cheap', provider: 'x', providerLabel: 'X', aspectRatios: ['1:1'], inputModalities: ['text'], unitCredits: 2 }
+    ]
+  })
+}));
+vi.mock('./sign-media', () => ({
+  signMediaPaths: async (_db: unknown, paths: string[]) => paths.map((p) => (p.startsWith('https://') ? p : `https://signed.test/${p}`))
 }));
 vi.mock('$lib/server/wiro-config', () => ({ wiroRunDeps: (db: Db) => deps.current!(db) }));
 vi.mock('$env/dynamic/private', () => ({ env: {} }));
 vi.mock('./node-model', () => ({ resolveNodeModel: async (_m: string, model: string | null) => ({ ok: true, model }) }));
 vi.mock('$lib/server/canvas/upstream', () => ({
   upstreamInputsFor: async () => ({
-    text: [],
+    text: upstream.text,
     referenceImageUrl: upstream.referenceImageUrls[0] ?? null,
     referenceImageUrls: upstream.referenceImageUrls,
     pickedImageUrls: [],
@@ -96,6 +115,17 @@ beforeEach(() => {
   }
   gateway.run.mockResolvedValue({ taskId: '9001' });
   upstream.referenceImageUrls = [];
+  upstream.text = [];
+  imageStep.generate.mockReset();
+  imageStep.generate.mockResolvedValue({
+    ok: true,
+    media: [{ storage_path: `${USER}/media/teapot.png`, mime: 'image/png', width: 1024, height: 1024, ai_marked: true }],
+    model: 'cheap-image',
+    renders: 1,
+    costUsd: 0.02
+  });
+  moderation.screen.mockReset();
+  moderation.screen.mockResolvedValue({ ok: true });
   deps.current = () => ({
     gateway,
     model: async (id) => (id === TRELLIS ? trellis : null),
@@ -126,12 +156,93 @@ describe('a 3D node on a Wiro image-to-3D model', () => {
     expect((job?.payload as Record<string, unknown>).external_job_id).toBe('wiro:9001');
   });
 
-  it('refuses without a connected image, before calling Wiro', async () => {
+  it('refuses with neither an image nor a text, before spending anything', async () => {
     const { db } = canvas();
 
     const out = await runGenNode(db, start());
 
-    expect(out).toEqual({ kind: 'refused', error: 'image_required' });
+    expect(out).toEqual({ kind: 'refused', error: MODEL3D_INPUT_REQUIRED });
+    expect(imageStep.generate).not.toHaveBeenCalled();
+    expect(gateway.run).not.toHaveBeenCalled();
+  });
+
+  it('refuses a resolution the model does not offer, before spending anything', async () => {
+    upstream.referenceImageUrls = [PRODUCT_URL];
+    const { db } = canvas();
+
+    const out = await runGenNode(db, { ...start(), params: { pipeline_type: '2048' } as Record<string, unknown> });
+
+    expect(out).toEqual({ kind: 'refused', error: 'Resolution "2048" is not offered by this 3D model.' });
+    expect(gateway.run).not.toHaveBeenCalled();
+  });
+
+  it('sends Trellis at 512 when the node never picked a resolution, and nothing it does not offer', async () => {
+    upstream.referenceImageUrls = [PRODUCT_URL];
+    const { db } = canvas();
+
+    await runGenNode(db, { ...start(), params: { repeat: 2 } as Record<string, unknown> });
+
+    expect(gateway.run).toHaveBeenCalledWith({ owner: 'microsoft', project: 'trellis-2' }, { inputImage: PRODUCT_URL, pipeline_type: '512' });
+  });
+});
+
+describe('a 3D node with text and no image', () => {
+  it('first renders a white-background product shot on the cheapest image model, then queues the 3D job on it', async () => {
+    const { db, calls } = canvas();
+
+    const out = await runGenNode(db, { ...start(), prompt: 'a red ceramic teapot' });
+
+    expect(out.kind).toBe('queued');
+    expect(imageStep.generate).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        orgId: ORG,
+        userId: USER,
+        model: 'cheap-image',
+        count: 1,
+        aspectRatio: '1:1',
+        prompt: expect.stringMatching(/a red ceramic teapot.*white background/s)
+      })
+    );
+    expect(gateway.run).toHaveBeenCalledWith(
+      { owner: 'microsoft', project: 'trellis-2' },
+      { inputImage: `https://signed.test/${USER}/media/teapot.png`, pipeline_type: '512' }
+    );
+
+    const poster = calls.find((c) => c.table === 'assets' && c.op === 'insert' && (c.payload as Record<string, unknown>).type === 'image');
+    expect(poster?.payload).toMatchObject({ url: `${USER}/media/teapot.png`, source: 'generated', source_node_id: NODE });
+    const shown = calls.find((c) => c.table === 'nodes' && c.op === 'update' && JSON.stringify(c.payload).includes('posterRefId'));
+    expect(shown).toBeTruthy();
+  });
+
+  it('reads a connected text the same way as its own prompt', async () => {
+    upstream.text = ['a brass desk lamp'];
+    const { db } = canvas();
+
+    await runGenNode(db, start());
+
+    expect(imageStep.generate).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ prompt: expect.stringContaining('a brass desk lamp') }));
+  });
+
+  it('screens the text before the image step, and a refusal spends nothing', async () => {
+    moderation.screen.mockResolvedValue({ ok: false, error: 'moderation_refused' });
+    const { db } = canvas();
+
+    const out = await runGenNode(db, { ...start(), prompt: 'something refused' });
+
+    expect(out).toEqual({ kind: 'refused', error: 'moderation_refused' });
+    expect(moderation.screen).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ texts: expect.arrayContaining(['something refused']) }));
+    expect(imageStep.generate).not.toHaveBeenCalled();
+    expect(gateway.run).not.toHaveBeenCalled();
+  });
+
+  it('a failed image step stops the run before the 3D job', async () => {
+    imageStep.generate.mockResolvedValue({ ok: false, error: 'render_failed' });
+    const { db } = canvas();
+
+    const out = await runGenNode(db, { ...start(), prompt: 'a red ceramic teapot' });
+
+    expect(out).toEqual({ kind: 'refused', error: 'render_failed' });
     expect(gateway.run).not.toHaveBeenCalled();
   });
 });

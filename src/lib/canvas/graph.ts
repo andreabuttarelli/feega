@@ -139,7 +139,7 @@ export const CANVAS_NODE_SPECS: Record<NodeKind, NodeSpec> = {
   // richiede almeno un'immagine collegata — senza materiale la scena non ha cosa mostrare.
   composition: { medium: 'video', generated: true, accepts: ['image'], requires: ['image'] },
   audio: { medium: 'audio', generated: true, accepts: ['text', 'audio', 'video'], requires: [] },
-  model3d: { medium: 'model3d', generated: true, accepts: ['image'], requires: ['image'] },
+  model3d: { medium: 'model3d', generated: true, accepts: ['image', 'text'], requires: [], requiresOneOf: ['image', 'text'] },
   calendar: { medium: null, generated: true, accepts: ['text', 'image', 'video', 'audio'], requires: [] }
 };
 
@@ -280,7 +280,7 @@ export function acceptedInputs(node: CanvasNode, incoming: CanvasNode[]): InputV
 
 /** Quanti ingressi per medium: dal modello quando c'è, altrimenti uno per tipo. */
 function capacityOf(node: CanvasNode): Partial<Record<Medium, number>> {
-  if (node.kind === 'model3d') return { image: 1 };
+  if (node.kind === 'model3d') return { image: 1, text: 1 };
   if (node.kind === 'effects') return { text: 0, image: 1, video: 1, audio: 0 };
   if (node.kind === 'audio') return { text: 1, image: 0, video: 1, audio: 1 };
   if (node.kind === 'video') {

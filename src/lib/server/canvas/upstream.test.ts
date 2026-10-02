@@ -77,6 +77,26 @@ describe('upstreamInputsFor — dal database alla forma pura', () => {
     expect(out.blocked).toBeNull();
   });
 
+  it('a 3D node reads connected text even though its image-to-3D model takes images only', async () => {
+    modalitiesOf.mockResolvedValue({ input: ['image'], output: ['model3d'], synced_at: 'now', uncensored: false });
+    const MODEL3D_NODE = IMAGE_NODE;
+    const { db } = fakeDb({
+      nodes: [
+        nodeRow(TEXT_NODE, 'text', { prompt: 'scrivi qualcosa', refId: ASSET }),
+        nodeRow(MODEL3D_NODE, 'model3d', { prompt: '', model: 'wiro/microsoft/trellis-2' })
+      ],
+      nodes_connections: [
+        { id: 'e1', canvas_id: CANVAS, source_node_id: TEXT_NODE, target_node_id: MODEL3D_NODE, source_handle: null, target_handle: 'text' }
+      ],
+      assets: [{ id: ASSET, project_id: 'p1', type: 'text', url: null, content: 'a brass desk lamp', mime_type: 'text/plain', bytes: null, width: null, height: null, duration_s: null, source: 'generated', source_node_id: TEXT_NODE, created_at: 'now' }]
+    });
+
+    const out = await upstreamInputsFor(db, { orgId: ORG, canvasId: CANVAS, nodeId: MODEL3D_NODE, model: 'wiro/microsoft/trellis-2', medium: 'model3d' });
+
+    expect(out.text).toEqual(['a brass desk lamp']);
+    expect(out.blocked).toBeNull();
+  });
+
   it('un nodo testo mai girato alimenta col suo prompt, non con niente', async () => {
     const { db } = fakeDb({
       nodes: [
