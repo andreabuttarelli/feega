@@ -16,6 +16,7 @@
   import { onCanvasReveal } from '$lib/canvas/canvas-reveal';
   import { DROPPED_EDIT_NOTICE, Trigger, VERDICT_NOTICE, Verdict, carryNotice, changedElsewhere, judge, takeNotice, type RemoteState } from '$lib/canvas/staleness';
   import { keepSame } from '$lib/canvas/snapshot-keep';
+  import { CANVAS_POLLS } from '$lib/canvas/idle-reads';
   import { AssetSize, sized } from '$lib/canvas/asset-url';
   import TieredImage from '$lib/components/canvas/TieredImage.svelte';
   import { SaveStatus, SaveTiming, SendResult, createSaveScheduler } from '$lib/canvas/save-scheduler';
@@ -212,7 +213,7 @@
 
   type CalendarPlan = { nodeIds: string[]; dayKey: string };
   type CalendarState = { posts: CalendarPost[] | null; brands: CalendarBrand[]; error: string | null; busy: boolean; plan: CalendarPlan | null };
-  const CALENDAR_REFRESH_MS = 60_000;
+  const CALENDAR_REFRESH_MS = CANVAS_POLLS.calendar.everyMs;
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   let calendars = $state<Record<string, CalendarState>>({});
 
@@ -2626,7 +2627,7 @@
                 <AudioResult nodeId={id} {...audioUrlsOf(row)} files={audioFilesOf(row, gen.params.targetLanguage ?? null)} />
               {:else if gen.medium === 'video'}
                 <!-- svelte-ignore a11y_media_has_caption -->
-                <video src={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} controls playsinline></video>
+                <video src={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} controls playsinline preload="metadata"></video>
                 <div class="gen-download">
                   <NodeDownload kind="video" sourceUrl={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} nodeId={id} nodeType={gen.medium} origin={MediaOrigin.Generated} />
                 </div>

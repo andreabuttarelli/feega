@@ -21,7 +21,7 @@
       <TieredImage src={node.url} nodeId={node.id} alt={node.name} />
     {:else}
       <!-- svelte-ignore a11y_media_has_caption -->
-      <video src={node.url} controls playsinline></video>
+      <video src={node.url} controls playsinline preload="metadata"></video>
     {/if}
   </div>
 </div>
