@@ -1,14 +1,8 @@
 import type { Db } from '$lib/server/db/client';
-import { findAssets, type Asset, type AssetSource, type AssetType } from '$lib/server/repos/assets';
+import { findAssets, type Asset, type AssetType } from '$lib/server/repos/assets';
 import { findNode } from '$lib/server/repos/canvas';
 import { findRunOutputs } from '$lib/server/repos/node-runs';
-import { CANVAS_ASSET_BUCKET, SIGNED_URL_TTL_S, signStoredFile, signStoredPreview } from '$lib/server/repos/asset-storage';
-
-const BUCKET_BY_SOURCE: Record<AssetSource, string> = {
-  generated: 'brand-knowledge',
-  upload: CANVAS_ASSET_BUCKET,
-  imported: CANVAS_ASSET_BUCKET
-};
+import { BUCKET_BY_SOURCE, SIGNED_URL_TTL_S, signStoredFile, signStoredPreview } from '$lib/server/repos/asset-storage';
 
 const PREVIEWABLE: Record<AssetType, boolean> = {
   image: true,
@@ -19,7 +13,7 @@ const PREVIEWABLE: Record<AssetType, boolean> = {
   audio: false
 };
 
-const NODE_ASSET_FIELDS = ['refId', 'assetId'] as const;
+export const NODE_ASSET_FIELDS = ['refId', 'assetId'] as const;
 
 export type MediaRequest = { orgId: string; nodeIds: string[]; runIds: string[]; assetIds: string[] };
 

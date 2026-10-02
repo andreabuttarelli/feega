@@ -11,7 +11,7 @@ vi.mock('$lib/server/repos/canvas', () => ({ findNode: (...a: unknown[]) => find
 vi.mock('$lib/server/repos/node-runs', () => ({ findRunOutputs: (...a: unknown[]) => findRunOutputs(...a) }));
 vi.mock('$lib/server/repos/asset-storage', async (importActual) => ({
   SIGNED_URL_TTL_S: (await importActual<typeof import('$lib/server/repos/asset-storage')>()).SIGNED_URL_TTL_S,
-  CANVAS_ASSET_BUCKET: 'canvas-assets',
+  BUCKET_BY_SOURCE: (await importActual<typeof import('$lib/server/repos/asset-storage')>()).BUCKET_BY_SOURCE,
   signStoredFile: (...a: unknown[]) => signStoredFile(...a),
   signStoredPreview: (...a: unknown[]) => signStoredPreview(...a)
 }));

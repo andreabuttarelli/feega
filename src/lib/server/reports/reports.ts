@@ -22,6 +22,7 @@ import {
   type Mail,
   type ReportMailView
 } from './report-emails';
+import { quarantineNode, releaseQuarantine, type ObjectMover } from '$lib/server/canvas/asset-quarantine';
 
 export const REPORTS_PER_HOUR = 5;
 export const COUNTER_NOTICE_BUSINESS_DAYS = 10;
@@ -39,6 +40,7 @@ export type ReportDeps = {
   db: Db;
   send: Outbox;
   ban: Banner;
+  move: ObjectMover;
   now: () => Date;
   internalRecipients: () => string[];
   origin: string;
@@ -229,6 +231,9 @@ async function removeContent(deps: ReportDeps, row: ReportRow): Promise<string |
   if (row.node_id) {
     await deps.db.from('nodes').update({ deleted_at: at, public_token_hash: null, public_expires_at: null }).eq('id', row.node_id);
   }
+  if (row.node_id && row.org_id) {
+    await quarantineNode(deps.db, deps.move, { orgId: row.org_id, reportId: row.id, nodeId: row.node_id });
+  }
   if (!row.canvas_id) {
     return null;
   }
@@ -241,6 +246,9 @@ async function removeContent(deps: ReportDeps, row: ReportRow): Promise<string |
 async function restoreContent(deps: ReportDeps, row: ReportRow): Promise<string | null> {
   if (row.node_id) {
     await deps.db.from('nodes').update({ deleted_at: null }).eq('id', row.node_id);
+  }
+  if (row.org_id) {
+    await releaseQuarantine(deps.db, deps.move, { orgId: row.org_id, reportId: row.id });
   }
   if (row.canvas_id && row.removed_share_token) {
     await deps.db

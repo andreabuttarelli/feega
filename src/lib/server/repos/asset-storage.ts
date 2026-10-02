@@ -1,9 +1,16 @@
 import type { Db } from '$lib/server/db/client';
+import type { AssetSource } from '$lib/server/repos/assets';
 import { signThumbnailUrls, type ThumbnailPreset } from '$lib/server/media-thumbnails';
 
 export const CANVAS_ASSET_BUCKET = 'canvas-assets';
+
+export const BUCKET_BY_SOURCE: Record<AssetSource, string> = {
+  generated: 'brand-knowledge',
+  upload: CANVAS_ASSET_BUCKET,
+  imported: CANVAS_ASSET_BUCKET
+};
 export const SIGNED_URL_TTL_S = {
-  canvas: 7200,
+  canvas: 86_400,
   agentPreview: 300,
   providerInput: 300,
   userLink: 3600

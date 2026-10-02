@@ -43,7 +43,7 @@ export type SigningBucket = { name: string; open: () => SignedUrlBucket };
 type Minted = { url: string; renewAt: number };
 
 const MS_PER_S = 1000;
-const REUSABLE_SHARE_OF_TTL = 0.5;
+export const REUSABLE_SHARE_OF_TTL = 0.5;
 const MINTED_CAPACITY = 5000;
 const minted = new Map<string, Minted>();
 
@@ -68,6 +68,14 @@ function remember(key: string, url: string, ttlSeconds: number, now: number) {
   const oldest = minted.keys().next().value;
   if (oldest !== undefined) {
     minted.delete(oldest);
+  }
+}
+
+export function forgetSignedUrls(bucket: string, path: string): void {
+  for (const key of minted.keys()) {
+    if (key.startsWith(`${bucket}|`) && key.endsWith(`|${path}`)) {
+      minted.delete(key);
+    }
   }
 }
 
