@@ -1,0 +1,413 @@
+{
+ "tool": [
+  {
+   "title": "Pixal3D Image-to-3D GLB Generator",
+   "cleanslugowner": "tencentarc",
+   "cleanslugproject": "pixal3d",
+   "categories": [
+    "tool",
+    "persistent",
+    "3d-generation",
+    "price-list",
+    "H200"
+   ],
+   "parameters": [
+    {
+     "items": [
+      {
+       "id": "inputImage",
+       "type": "combinefileinput",
+       "required": true,
+       "options": []
+      },
+      {
+       "id": "pipeline_type",
+       "type": "select",
+       "required": false,
+       "options": [
+        {
+         "text": "1024",
+         "value": "1024_cascade"
+        },
+        {
+         "text": "1536",
+         "value": "1536_cascade"
+        }
+       ]
+      },
+      {
+       "id": "texture_size",
+       "type": "select",
+       "required": false,
+       "options": [
+        {
+         "text": "1024",
+         "value": "1024"
+        },
+        {
+         "text": "2048",
+         "value": "2048"
+        },
+        {
+         "text": "4096",
+         "value": "4096"
+        },
+        {
+         "text": "8192",
+         "value": "8192"
+        }
+       ]
+      },
+      {
+       "id": "max_num_tokens",
+       "type": "number",
+       "required": false,
+       "options": []
+      },
+      {
+       "id": "seed",
+       "type": "text",
+       "required": false,
+       "options": []
+      },
+      {
+       "id": "decimation_target",
+       "type": "number",
+       "required": false,
+       "options": []
+      },
+      {
+       "id": "ss_steps",
+       "type": "number",
+       "required": false,
+       "options": []
+      },
+      {
+       "id": "ss_guidance_strength",
+       "type": "float",
+       "required": false,
+       "options": []
+      },
+      {
+       "id": "ss_guidance_rescale",
+       "type": "float",
+       "required": false,
+       "options": []
+      },
+      {
+       "id": "ss_rescale_t",
+       "type": "float",
+       "required": false,
+       "options": []
+      },
+      {
+       "id": "shape_steps",
+       "type": "number",
+       "required": false,
+       "options": []
+      },
+      {
+       "id": "shape_guidance_strength",
+       "type": "float",
+       "required": false,
+       "options": []
+      },
+      {
+       "id": "shape_guidance_rescale",
+       "type": "float",
+       "required": false,
+       "options": []
+      },
+      {
+       "id": "shape_rescale_t",
+       "type": "float",
+       "required": false,
+       "options": []
+      },
+      {
+       "id": "tex_steps",
+       "type": "number",
+       "required": false,
+       "options": []
+      },
+      {
+       "id": "tex_guidance_strength",
+       "type": "float",
+       "required": false,
+       "options": []
+      },
+      {
+       "id": "tex_guidance_rescale",
+       "type": "float",
+       "required": false,
+       "options": []
+      },
+      {
+       "id": "tex_rescale_t",
+       "type": "float",
+       "required": false,
+       "options": []
+      }
+     ]
+    }
+   ],
+   "dynamicprice": "[{\"inputs\":{\"pipeline_type\":\"1024_cascade\"},\"price\":0.3,\"priceMethod\":\"cpr\",\"note\":\"$0.30 for 1024P\"},{\"inputs\":{\"pipeline_type\":\"1536_cascade\"},\"price\":0.42,\"priceMethod\":\"cpr\",\"note\":\"$0.42 for 1536P\"}]",
+   "time": "1779096122"
+  },
+  {
+   "title": "Trellis-2 3D Mesh Generator",
+   "cleanslugowner": "microsoft",
+   "cleanslugproject": "trellis-2",
+   "categories": [
+    "tool",
+    "persistent",
+    "3d-generation",
+    "price-list",
+    "H200"
+   ],
+   "parameters": [
+    {
+     "items": [
+      {
+       "id": "inputImage",
+       "type": "combinefileinput",
+       "required": true,
+       "options": []
+      },
+      {
+       "id": "pipeline_type",
+       "type": "select",
+       "required": false,
+       "options": [
+        {
+         "text": "512",
+         "value": "512"
+        },
+        {
+         "text": "1024",
+         "value": "1024_cascade"
+        },
+        {
+         "text": "1536",
+         "value": "1536_cascade"
+        }
+       ]
+      },
+      {
+       "id": "seed",
+       "type": "text",
+       "required": false,
+       "options": []
+      },
+      {
+       "id": "texture_size",
+       "type": "select",
+       "required": false,
+       "options": [
+        {
+         "text": "1024",
+         "value": "1024"
+        },
+        {
+         "text": "2048",
+         "value": "2048"
+        },
+        {
+         "text": "4096",
+         "value": "4096"
+        },
+        {
+         "text": "8192",
+         "value": "8192"
+        }
+       ]
+      },
+      {
+       "id": "decimation_target",
+       "type": "number",
+       "required": false,
+       "options": []
+      },
+      {
+       "id": "ss_steps",
+       "type": "number",
+       "required": false,
+       "options": []
+      },
+      {
+       "id": "ss_guidance_strength",
+       "type": "float",
+       "required": false,
+       "options": []
+      },
+      {
+       "id": "ss_guidance_rescale",
+       "type": "float",
+       "required": false,
+       "options": []
+      },
+      {
+       "id": "ss_rescale_t",
+       "type": "float",
+       "required": false,
+       "options": []
+      },
+      {
+       "id": "shape_steps",
+       "type": "number",
+       "required": false,
+       "options": []
+      },
+      {
+       "id": "shape_guidance_strength",
+       "type": "float",
+       "required": false,
+       "options": []
+      },
+      {
+       "id": "shape_guidance_rescale",
+       "type": "float",
+       "required": false,
+       "options": []
+      },
+      {
+       "id": "shape_rescale_t",
+       "type": "float",
+       "required": false,
+       "options": []
+      },
+      {
+       "id": "tex_steps",
+       "type": "number",
+       "required": false,
+       "options": []
+      },
+      {
+       "id": "tex_guidance_strength",
+       "type": "float",
+       "required": false,
+       "options": []
+      },
+      {
+       "id": "tex_guidance_rescale",
+       "type": "float",
+       "required": false,
+       "options": []
+      },
+      {
+       "id": "tex_rescale_t",
+       "type": "float",
+       "required": false,
+       "options": []
+      }
+     ]
+    }
+   ],
+   "dynamicprice": "[{\"inputs\":{\"pipeline_type\":\"512\"},\"price\":0.25,\"priceMethod\":\"cpr\",\"note\":\"$0.25 for 512P\"},{\"inputs\":{\"pipeline_type\":\"1024_cascade\"},\"price\":0.3,\"priceMethod\":\"cpr\",\"note\":\"$0.30 for 1024P\"},{\"inputs\":{\"pipeline_type\":\"1536_cascade\"},\"price\":0.35,\"priceMethod\":\"cpr\",\"note\":\"$0.35 for 1536P\"}]",
+   "time": "1771598273"
+  },
+  {
+   "title": "Hunyuan3D-2.1 3D Model Generator",
+   "cleanslugowner": "tencent",
+   "cleanslugproject": "hunyuan3d-2-1",
+   "categories": [
+    "tool",
+    "persistent",
+    "price-list",
+    "3d-generation"
+   ],
+   "parameters": [
+    {
+     "items": [
+      {
+       "id": "inputImage",
+       "type": "combinefileinput",
+       "required": true,
+       "options": []
+      },
+      {
+       "id": "steps",
+       "type": "number",
+       "required": false,
+       "options": []
+      },
+      {
+       "id": "scale",
+       "type": "float",
+       "required": false,
+       "options": []
+      },
+      {
+       "id": "seed",
+       "type": "text",
+       "required": false,
+       "options": []
+      },
+      {
+       "id": "octree_resolution",
+       "type": "number",
+       "required": false,
+       "options": []
+      },
+      {
+       "id": "num_chunks",
+       "type": "number",
+       "required": false,
+       "options": []
+      },
+      {
+       "id": "max_num_view",
+       "type": "number",
+       "required": false,
+       "options": []
+      },
+      {
+       "id": "texture_resolution",
+       "type": "number",
+       "required": false,
+       "options": []
+      },
+      {
+       "id": "max_facenum",
+       "type": "number",
+       "required": false,
+       "options": []
+      },
+      {
+       "id": "remove_background",
+       "type": "select",
+       "required": false,
+       "options": [
+        {
+         "text": "True",
+         "value": "true"
+        },
+        {
+         "text": "False",
+         "value": "false"
+        }
+       ]
+      },
+      {
+       "id": "generate_texture",
+       "type": "select",
+       "required": false,
+       "options": [
+        {
+         "text": "True",
+         "value": "true"
+        },
+        {
+         "text": "False",
+         "value": "false"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "dynamicprice": "[{\"inputs\":{\"generate_texture\":\"true\"},\"price\":0.9,\"priceMethod\":\"cpr\",\"note\":\"$0.9 for textured mesh\"},{\"inputs\":{\"generate_texture\":\"false\"},\"price\":0.3,\"priceMethod\":\"cpr\",\"note\":\"$0.30 for untextured white mesh.\"}]",
+   "time": "1770983236"
+  }
+ ]
+}

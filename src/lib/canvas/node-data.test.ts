@@ -31,7 +31,8 @@ describe('NODE_DATA_SCHEMAS — una riga per tipo, tutti i 10 valori di nodes_ty
         'social_post_mockup',
         'text',
         'video',
-        'audio'
+        'audio',
+        'model3d'
       ].sort()
     );
   });

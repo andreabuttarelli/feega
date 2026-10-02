@@ -201,6 +201,30 @@ describe('readSharedCanvas — audio', () => {
   });
 });
 
+describe('readSharedCanvas — 3D model', () => {
+  it('a 3D node shares its GLB and the poster to show before it loads', async () => {
+    const { db } = fakeDb(
+      {
+        canvases: [CANVAS],
+        nodes: [node('n-3d', 'model3d', { prompt: '', refId: 'a-glb', posterRefId: 'a-poster' }), node('n-bare', 'model3d', { prompt: '', refId: 'a-glb' })],
+        nodes_connections: [],
+        assets: [
+          { id: 'a-glb', org_id: 'org-1', type: 'model3d', source: 'generated', url: 'u1/media/wiro/m.glb', content: null },
+          { id: 'a-poster', org_id: 'org-1', type: 'image', source: 'generated', url: 'u1/media/wiro/m.png', content: null }
+        ]
+      },
+      { filter: true }
+    );
+
+    const shared = await readSharedCanvas(db, 'tok-live', sign);
+
+    expect(shared?.nodes.map((n) => n.view)).toEqual([
+      { kind: 'model3d', url: 'https://signed/u1/media/wiro/m.glb', poster: expect.stringContaining('u1/media/wiro/m.png') },
+      { kind: 'model3d', url: 'https://signed/u1/media/wiro/m.glb', poster: null }
+    ]);
+  });
+});
+
 describe('SHARED_VIEW_OF', () => {
   it('ha una vista per ogni tipo che nodes_type_check ammette, e nessuna di troppo', () => {
     expect(Object.keys(SHARED_VIEW_OF).sort()).toEqual([...NODE_TYPES].sort());

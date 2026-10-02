@@ -32,7 +32,7 @@ import { imageModelSpec } from '$lib/image-models';
 import { SELECTABLE_SOURCE_TYPES } from './select-node';
 import { audioInputMediums, audioOperationOf, type AudioOperationId } from './audio-operations';
 
-export const MEDIUMS = ['text', 'image', 'video', 'audio'] as const;
+export const MEDIUMS = ['text', 'image', 'video', 'audio', 'model3d'] as const;
 export type Medium = (typeof MEDIUMS)[number];
 
 /**
@@ -56,6 +56,7 @@ export const NODE_KINDS = [
   'effects',
   'composition',
   'audio',
+  'model3d',
   'calendar'
 ] as const;
 export type NodeKind = (typeof NODE_KINDS)[number];
@@ -138,6 +139,7 @@ export const CANVAS_NODE_SPECS: Record<NodeKind, NodeSpec> = {
   // richiede almeno un'immagine collegata — senza materiale la scena non ha cosa mostrare.
   composition: { medium: 'video', generated: true, accepts: ['image'], requires: ['image'] },
   audio: { medium: 'audio', generated: true, accepts: ['text', 'audio', 'video'], requires: [] },
+  model3d: { medium: 'model3d', generated: true, accepts: ['image'], requires: ['image'] },
   calendar: { medium: null, generated: true, accepts: ['text', 'image', 'video', 'audio'], requires: [] }
 };
 
@@ -190,7 +192,7 @@ export function canConnect(from: CanvasNode, to: CanvasNode, fromMedium: Medium 
   return { ok: true };
 }
 
-const MEDIUM_NAME: Record<Medium, string> = { text: 'text', image: 'image', video: 'video', audio: 'audio' };
+const MEDIUM_NAME: Record<Medium, string> = { text: 'text', image: 'image', video: 'video', audio: 'audio', model3d: '3D model' };
 
 function operationOf(node: CanvasNode): AudioOperationId {
   return audioOperationOf({ operation: node.operation });
@@ -246,7 +248,7 @@ export function acceptedInputs(node: CanvasNode, incoming: CanvasNode[]): InputV
   const caps = capacityOf(node);
   const accepted: CanvasNode[] = [];
   const rejected: CanvasNode[] = [];
-  const used: Record<Medium, number> = { text: 0, image: 0, video: 0, audio: 0 };
+  const used: Record<Medium, number> = { text: 0, image: 0, video: 0, audio: 0, model3d: 0 };
   let why: string | null = null;
 
   for (const source of incoming) {
@@ -277,7 +279,8 @@ export function acceptedInputs(node: CanvasNode, incoming: CanvasNode[]): InputV
 }
 
 /** Quanti ingressi per medium: dal modello quando c'è, altrimenti uno per tipo. */
-function capacityOf(node: CanvasNode): Record<Medium, number> {
+function capacityOf(node: CanvasNode): Partial<Record<Medium, number>> {
+  if (node.kind === 'model3d') return { image: 1 };
   if (node.kind === 'effects') return { text: 0, image: 1, video: 1, audio: 0 };
   if (node.kind === 'audio') return { text: 1, image: 0, video: 1, audio: 1 };
   if (node.kind === 'video') {

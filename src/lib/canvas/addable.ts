@@ -74,5 +74,6 @@ export const ADDABLE_LABEL: Record<Addable, string> = {
   effects: 'Effects',
   composition: 'Composition',
   calendar: 'Calendar',
-  audio: 'Audio'
+  audio: 'Audio',
+  model3d: '3D model'
 };

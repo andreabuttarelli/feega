@@ -1,5 +1,6 @@
 import { ProjectMode } from '$lib/project-mode';
 import { describe, expect, it, vi } from 'vitest';
+import { Provenance } from './likeness-guard';
 import { startWiroRun, WIRO_REFUSALS, type WiroModel, type WiroRunDeps, type WiroRequest } from './wiro-run';
 
 const SCOPE = { orgId: 'org-1', projectId: 'p1', canvasId: 'c1', nodeId: 'n1', userId: 'u1' };
@@ -101,6 +102,64 @@ describe('startWiroRun — un modello uncensored non porta MAI ingressi al provi
       scope: SCOPE,
       modelId: censoredModel.id,
       imageUrls: ['https://example.com/ref.png']
+    });
+
+    expect(out.kind).toBe('job');
+    expect(gatewayRun).toHaveBeenCalledTimes(1);
+  });
+});
+
+const model3d: WiroModel = {
+  id: 'wiro/microsoft/trellis-2',
+  catalogue: 'model3d',
+  spec: { owner: 'microsoft', project: 'trellis-2', fields: { images: ['inputImage'] } },
+  uncensored: false,
+  paramSchema: { pipeline_type: { type: 'enum', values: ['512'] } }
+};
+
+describe('startWiroRun — a 3D model', () => {
+  it('sends only the image and its own params: the tool has no prompt field', async () => {
+    const { deps, gatewayRun } = depsFor(model3d);
+
+    await startWiroRun(deps, {
+      ...baseRequest,
+      mode: ProjectMode.Standard,
+      scope: SCOPE,
+      modelId: model3d.id,
+      params: { pipeline_type: '512' } as WiroRequest['params'],
+      imageUrls: ['https://example.com/product.png']
+    });
+
+    expect(gatewayRun).toHaveBeenCalledWith(
+      { owner: 'microsoft', project: 'trellis-2' },
+      { inputImage: 'https://example.com/product.png', pipeline_type: '512' }
+    );
+  });
+
+  it('in an uncensored project refuses an uploaded reference, which may show a real person', async () => {
+    const { deps, gatewayRun } = depsFor(model3d);
+
+    const out = await startWiroRun(deps, {
+      ...baseRequest,
+      scope: SCOPE,
+      modelId: model3d.id,
+      imageUrls: ['https://example.com/upload.png'],
+      provenance: [{ kind: Provenance.UploadedMedia, label: 'upload' }]
+    });
+
+    expect(out.kind).toBe('refused');
+    expect(gatewayRun).not.toHaveBeenCalled();
+  });
+
+  it('in an uncensored project accepts a generated reference', async () => {
+    const { deps, gatewayRun } = depsFor(model3d);
+
+    const out = await startWiroRun(deps, {
+      ...baseRequest,
+      scope: SCOPE,
+      modelId: model3d.id,
+      imageUrls: ['https://example.com/gen.png'],
+      provenance: [{ kind: Provenance.GeneratedMedia, label: 'gen' }]
     });
 
     expect(out.kind).toBe('job');

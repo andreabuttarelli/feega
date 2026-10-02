@@ -33,7 +33,8 @@ beforeEach(() => {
     text: { recommended: [REC('t')], candidates: [] },
     image: { recommended: [REC('i')], candidates: [] },
     video: { recommended: [], candidates: [] },
-    audio: { recommended: [], candidates: [] }
+    audio: { recommended: [], candidates: [] },
+    model3d: { recommended: [], candidates: [] }
   });
 });
 
@@ -46,7 +47,8 @@ describe('GET /api/v1/org/node-types', () => {
       text: [{ tier: 'balanced', id: 't', label: 't', why: WHY }],
       image: [{ tier: 'balanced', id: 'i', label: 'i', why: WHY }],
       video: [],
-      audio: []
+      audio: [],
+      model3d: []
     });
     expect(body.types).toBeTruthy();
   });

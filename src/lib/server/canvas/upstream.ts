@@ -59,7 +59,11 @@ import {
  * (`wireModelId`, in `ai-models-sync.ts`) — lo stesso spec che `offerable-models.ts` legge per
  * decidere cosa offrire, non una seconda copia della stessa tabella.
  */
-async function modalitiesFor(model: string, medium: 'image' | 'video'): Promise<Modalities | null> {
+type CheckedMedium = 'image' | 'video' | 'model3d';
+
+const MODALITY_CHECKED_MEDIUMS: ReadonlySet<string> = new Set<CheckedMedium>(['image', 'video', 'model3d']);
+
+async function modalitiesFor(model: string, medium: CheckedMedium): Promise<Modalities | null> {
   const { modalitiesOf } = await import('$lib/server/ai-models-sync');
   const { createAdminClient } = await import('$lib/server/supabase-admin');
   const modalities = await modalitiesOf(createAdminClient(), model, medium);
@@ -417,14 +421,14 @@ export async function upstreamInputsFor(
     canvasId: string;
     nodeId: string;
     model?: string | null;
-    medium?: 'text' | 'image' | 'video' | 'audio';
+    medium?: 'text' | 'image' | 'video' | 'audio' | 'model3d';
     /** Un'iterazione di loop (`loop.ts`): quale item (1-based) di ogni `list` nominata qui vede
      *  QUESTA chiamata, invece della lista intera. Assente = comportamento `fixed`, invariato. */
     iterateSelection?: Record<string, number>;
   }
 ): Promise<UpstreamInputs> {
-  const checkable = scope.model && (scope.medium === 'image' || scope.medium === 'video');
-  const modalities = checkable ? await modalitiesFor(scope.model!, scope.medium as 'image' | 'video') : null;
+  const checkable = scope.model && MODALITY_CHECKED_MEDIUMS.has(scope.medium ?? '');
+  const modalities = checkable ? await modalitiesFor(scope.model!, scope.medium as CheckedMedium) : null;
 
   if (checkable && !modalities) {
     return {

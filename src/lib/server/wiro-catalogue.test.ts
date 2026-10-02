@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import fixture from './wiro-tool-list.fixture.json';
+import fixture3d from './wiro-3d-tool-list.fixture.json';
 import { fetchWiroCatalogue, wiroModelRow, wiroUsdFor } from './wiro-catalogue';
 
 const SYNCED = '2026-09-29T00:00:00.000Z';
@@ -49,7 +50,42 @@ describe('a Wiro tool becomes an ai_models row', () => {
   });
 });
 
+describe('a Wiro 3D tool becomes a model3d row', () => {
+  const tool3d = (project: string) => fixture3d.tool.find((t) => t.cleanslugproject === project)!;
+
+  it('maps an image-to-3D tool without a prompt: the image is its only input', () => {
+    const row = wiroModelRow(tool3d('trellis-2'), SYNCED)!;
+
+    expect(row).toMatchObject({
+      id: 'wiro/microsoft/trellis-2',
+      catalogue: 'model3d',
+      input_modalities: ['image'],
+      output_modalities: ['model3d'],
+      wire_spec: { owner: 'microsoft', project: 'trellis-2', fields: { images: ['inputImage'] } }
+    });
+    expect(row.wire_spec.fields.prompt).toBeUndefined();
+    expect(row.param_schema).toMatchObject({ pipeline_type: { type: 'enum', values: ['512', '1024_cascade', '1536_cascade'] } });
+    expect(wiroUsdFor(row.pricing, { pipeline_type: '512' })).toBe(0.25);
+  });
+
+  it('prices Hunyuan3D by texture', () => {
+    const row = wiroModelRow(tool3d('hunyuan3d-2-1'), SYNCED)!;
+
+    expect(row.catalogue).toBe('model3d');
+    expect(wiroUsdFor(row.pricing, { generate_texture: 'true' })).toBe(0.9);
+  });
+});
+
 describe('fetching the Wiro catalogue', () => {
+  it('asks for the 3D generation category too', async () => {
+    const fetchFn = vi.fn(async () => Response.json(fixture3d));
+    const out = await fetchWiroCatalogue(fetchFn as unknown as typeof fetch, 'https://wiro.test/v1', SYNCED);
+
+    const bodies = fetchFn.mock.calls.map((call) => JSON.parse(String((call as unknown as [string, RequestInit])[1].body)));
+    expect(bodies).toEqual(expect.arrayContaining([expect.objectContaining({ categories: ['3d-generation'] })]));
+    expect(out.rows.map((r) => r.id)).toContain('wiro/tencentarc/pixal3d');
+  });
+
   it('reads text-to-image, text-to-video and the uncensored search, once per model', async () => {
     const fetchFn = vi.fn(async () => Response.json(fixture));
     const out = await fetchWiroCatalogue(fetchFn as unknown as typeof fetch, 'https://wiro.test/v1', SYNCED);

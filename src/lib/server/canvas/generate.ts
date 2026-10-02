@@ -255,7 +255,8 @@ type ProviderRun = (db: Db, input: StartRun, run: NodeRun, upstream: UpstreamInp
 
 const WIRO_IMAGE_PATHS: Readonly<Record<string, (upstream: UpstreamInputs) => string[]>> = {
   image: (upstream) => upstream.referenceImageUrls,
-  video: (upstream) => [...new Set([upstream.startFrameUrl, ...upstream.referenceImageUrls].filter((u): u is string => Boolean(u)))]
+  video: (upstream) => [...new Set([upstream.startFrameUrl, ...upstream.referenceImageUrls].filter((u): u is string => Boolean(u)))],
+  model3d: (upstream) => upstream.referenceImageUrls
 };
 
 async function runWiroNode(db: Db, input: StartRun, run: NodeRun, upstream: UpstreamInputs, prompt: string): Promise<RunOutcome> {
@@ -289,6 +290,18 @@ async function runWiroNode(db: Db, input: StartRun, run: NodeRun, upstream: Upst
   await setExternalJob(db, { orgId: input.orgId, runId: run.id, externalJobId: out.jobId });
   return { kind: 'queued', run: { ...run, externalJobId: out.jobId } };
 }
+
+const IMAGE_REQUIRED = 'image_required';
+
+async function runModel3dNode(db: Db, input: StartRun, run: NodeRun, upstream: UpstreamInputs, prompt: string): Promise<RunOutcome> {
+  if (!upstream.referenceImageUrls.length) {
+    await giveUp(db, input, run, IMAGE_REQUIRED);
+    return { kind: 'refused', error: IMAGE_REQUIRED };
+  }
+  return runWiroNode(db, input, run, upstream, prompt);
+}
+
+const MEDIUM_RUNS: Partial<Record<GenMedium, ProviderRun>> = { audio: runAudioNode, model3d: runModel3dNode };
 
 const GENERATION_PROVIDERS: ReadonlyArray<{ prefix: string; run: ProviderRun }> = [{ prefix: WIRO_ID_PREFIX, run: runWiroNode }];
 
@@ -391,8 +404,9 @@ export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcom
     }
   }
 
-  if (input.medium === 'audio') {
-    return runAudioNode(db, input, run, upstream, prompt);
+  const mediumRun = MEDIUM_RUNS[input.medium];
+  if (mediumRun) {
+    return mediumRun(db, input, run, upstream, prompt);
   }
 
   // NÉ IL PROPRIO PROMPT NÉ UN TESTO A MONTE: solo ORA si sa che non c'è niente da mandare al
@@ -867,7 +881,8 @@ export async function reconcileWiroNodeRuns(db: Db): Promise<VideoReconcileOutco
       }
 
       await completeRun(db, { orgId: run.orgId, runId: run.id, assetId: progress.asset.id, costUsd: progress.costUsd });
-      await showRunState(db, shape, { running: false, runId: run.id, refId: progress.asset.id, error: null, outputUncensored: progress.uncensored });
+      const poster = progress.poster ? { posterRefId: progress.poster.id } : {};
+      await showRunState(db, shape, { running: false, runId: run.id, refId: progress.asset.id, error: null, outputUncensored: progress.uncensored, ...poster });
       outcome.done += 1;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'wiro_reconcile_failed';

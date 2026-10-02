@@ -26,7 +26,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { fetchWiroCatalogue } from './wiro-catalogue';
 import { DEFAULT_WIRO_BASE_URL } from './wiro';
 
-export type AiModelCatalogue = 'chat' | 'image' | 'video';
+export type AiModelCatalogue = 'chat' | 'image' | 'video' | 'model3d';
 
 type RawReleaseFacts = {
   created?: number;

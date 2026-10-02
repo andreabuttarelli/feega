@@ -70,9 +70,10 @@ export async function canvasModelCatalogue(): Promise<Record<GenMedium, MediumCa
   await ensureGatewayModels().catch(() => {});
   const admin = createAdminClient();
 
-  const [image, video, textModalities, textSynced, imageSynced, videoSynced] = await Promise.all([
+  const [image, video, model3d, textModalities, textSynced, imageSynced, videoSynced] = await Promise.all([
     offerableModels(admin, 'image'),
     offerableModels(admin, 'video'),
+    offerableModels(admin, 'model3d'),
     chatInputModalities(admin),
     syncedCandidates(admin, 'text'),
     syncedCandidates(admin, 'image'),
@@ -98,6 +99,7 @@ export async function canvasModelCatalogue(): Promise<Record<GenMedium, MediumCa
     text: { ...withRecommendations('text', textChoices, textSynced, now), synced: true },
     image: { ...image, ...withRecommendations('image', image.choices, imageSynced, now), enhanceUnitCredits: TEXT_NODE_CREDITS },
     video: { ...video, ...withRecommendations('video', video.choices, videoSynced, now), enhanceUnitCredits: TEXT_NODE_CREDITS },
-    audio: { choices: audioChoices(), synced: true, recommended: [], candidates: [] }
+    audio: { choices: audioChoices(), synced: true, recommended: [], candidates: [] },
+    model3d: { ...model3d, recommended: [], candidates: [] }
   };
 }

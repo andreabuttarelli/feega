@@ -8,9 +8,10 @@ import type { WiroFields, WiroWireSpec } from '$lib/server/wiro-catalogue';
 import { screenGeneration, type ScreenPorts } from '$lib/server/moderation/screen';
 import type { WiroGateway, WiroOutput } from './wiro-gateway';
 import type { Purgers } from './provider-purge';
-import { STORAGE_FOLDER, type ProjectMode } from '$lib/project-mode';
+import { ProjectMode, STORAGE_FOLDER } from '$lib/project-mode';
 import { ModerationProfile, profileOf } from '$lib/server/moderation/profiles';
 import { likenessRefusal, type ProvenanceEntry } from './likeness-guard';
+import { MODEL3D_MIME } from '$lib/model3d-models';
 
 const GENERATED_MEDIA_BUCKET = 'brand-knowledge';
 export const WIRO_LABEL = 'canvas.wiro';
@@ -21,10 +22,36 @@ const EXTENSION_OF_MIME: Readonly<Record<string, string>> = {
   'image/jpeg': 'jpg',
   'image/webp': 'webp',
   'video/mp4': 'mp4',
-  'video/webm': 'webm'
+  'video/webm': 'webm',
+  [MODEL3D_MIME]: 'glb'
 };
 
-const ASSET_TYPE_OF_MEDIUM: Readonly<Record<string, AssetType>> = { image: 'image', video: 'video' };
+const MIME_OF_EXTENSION: Readonly<Record<string, string>> = Object.fromEntries(
+  Object.entries(EXTENSION_OF_MIME).map(([mime, extension]) => [extension, mime])
+);
+
+const ASSET_TYPE_OF_MIME_FAMILY: Readonly<Record<string, AssetType>> = { image: 'image', video: 'video', model: 'model3d' };
+
+const isGlbOutput = (output: WiroOutput): boolean => output.contentType === MODEL3D_MIME || extensionOf(output.url) === 'glb';
+const isImageOutput = (output: WiroOutput): boolean => output.contentType.startsWith('image/') || mimeOfUrl(output.url)?.startsWith('image/') === true;
+
+const PRIMARY_OUTPUT: Readonly<Record<WiroCatalogue, (outputs: WiroOutput[]) => WiroOutput | undefined>> = {
+  image: (outputs) => outputs[0],
+  video: (outputs) => outputs[0],
+  model3d: (outputs) => outputs.find(isGlbOutput)
+};
+
+const POSTER_OUTPUT: Readonly<Partial<Record<WiroCatalogue, (outputs: WiroOutput[]) => WiroOutput | undefined>>> = {
+  model3d: (outputs) => outputs.find(isImageOutput)
+};
+
+function extensionOf(url: string): string {
+  return new URL(url).pathname.split('.').pop()?.toLowerCase() ?? '';
+}
+
+function mimeOfUrl(url: string): string | undefined {
+  return MIME_OF_EXTENSION[extensionOf(url)];
+}
 
 export const WIRO_REFUSALS = {
   notConfigured: 'wiro_not_configured',
@@ -36,7 +63,9 @@ export const WIRO_REFUSALS = {
 
 export type WiroScope = { orgId: string; projectId: string; nodeId: string; userId: string; actor?: Actor };
 
-export type WiroModel = { id: string; catalogue: 'image' | 'video'; spec: WiroWireSpec; uncensored: boolean; paramSchema: Record<string, unknown> };
+export type WiroCatalogue = 'image' | 'video' | 'model3d';
+
+export type WiroModel = { id: string; catalogue: WiroCatalogue; spec: WiroWireSpec; uncensored: boolean; paramSchema: Record<string, unknown> };
 
 export type WiroBill = {
   model: string;
@@ -83,7 +112,7 @@ function extraInputs(params: GenParams, schema: Record<string, unknown>): Record
 }
 
 export function wiroInputs(fields: WiroFields, input: Omit<WiroRequest, 'scope' | 'mode' | 'modelId' | 'provenance'>, schema: Record<string, unknown>): Record<string, unknown> {
-  const inputs: Record<string, unknown> = { ...extraInputs(input.params, schema), [fields.prompt]: input.prompt };
+  const inputs: Record<string, unknown> = { ...extraInputs(input.params, schema), ...(fields.prompt ? { [fields.prompt]: input.prompt } : {}) };
   const controls: Array<[string | undefined, unknown]> = [
     [fields.aspectRatio, input.params.aspectRatio],
     [fields.resolution, input.params.resolution],
@@ -105,6 +134,12 @@ export function wiroInputs(fields: WiroFields, input: Omit<WiroRequest, 'scope' 
   return inputs;
 }
 
+const LIKENESS_GUARDED_IN_UNCENSORED_PROJECTS: ReadonlySet<WiroCatalogue> = new Set(['model3d']);
+
+function guardsLikeness(model: WiroModel, mode: ProjectMode): boolean {
+  return model.uncensored || (mode === ProjectMode.Uncensored && LIKENESS_GUARDED_IN_UNCENSORED_PROJECTS.has(model.catalogue));
+}
+
 export async function startWiroRun(deps: WiroRunDeps, req: WiroRequest): Promise<WiroStart> {
   const model = await deps.model(req.modelId);
   if (!model) {
@@ -120,7 +155,7 @@ export async function startWiroRun(deps: WiroRunDeps, req: WiroRequest): Promise
     return { kind: 'refused', error: WIRO_REFUSALS.notConfigured };
   }
 
-  const likeness = model.uncensored ? likenessRefusal(req.provenance) : null;
+  const likeness = guardsLikeness(model, req.mode) ? likenessRefusal(req.provenance) : null;
   if (likeness) {
     deps.refuseLikeness(req.scope, model, likeness);
     return { kind: 'refused', error: likeness };
@@ -152,14 +187,15 @@ export async function startWiroRun(deps: WiroRunDeps, req: WiroRequest): Promise
 export type WiroProgress =
   | { state: 'pending' }
   | { state: 'failed'; error: string }
-  | { state: 'landed'; asset: Asset; costUsd: number; uncensored: boolean };
+  | { state: 'landed'; asset: Asset; poster: Asset | null; costUsd: number; uncensored: boolean };
 
 async function download(output: WiroOutput): Promise<{ bytes: Uint8Array; mime: string }> {
   const res = await fetch(output.url);
   if (!res.ok) {
     throw new Error(`wiro_download_failed: HTTP ${res.status}`);
   }
-  return { bytes: new Uint8Array(await res.arrayBuffer()), mime: res.headers.get('content-type') ?? output.contentType };
+  const declared = res.headers.get('content-type') ?? output.contentType;
+  return { bytes: new Uint8Array(await res.arrayBuffer()), mime: mimeOfUrl(output.url) ?? declared };
 }
 
 async function deposit(db: Db, job: { scope: WiroScope; mode: ProjectMode }, model: WiroModel, file: { bytes: Uint8Array; mime: string }): Promise<Asset> {
@@ -176,7 +212,7 @@ async function deposit(db: Db, job: { scope: WiroScope; mode: ProjectMode }, mod
   return insertAsset(db, {
     orgId: scope.orgId,
     projectId: scope.projectId,
-    type: ASSET_TYPE_OF_MEDIUM[model.catalogue],
+    type: ASSET_TYPE_OF_MIME_FAMILY[file.mime.split('/')[0]] ?? 'image',
     source: 'generated',
     url: path,
     mimeType: file.mime,
@@ -207,14 +243,18 @@ export async function finishWiroJob(
     return task;
   }
 
-  const output = task.outputs[0];
+  const output = PRIMARY_OUTPUT[model.catalogue](task.outputs);
   if (!output) {
     return { state: 'failed', error: WIRO_REFUSALS.noOutput };
   }
   deps.bill({ model: model.id, ms: Date.now() - startedAt, costUsd: task.costUsd, uncensored: model.uncensored, scope: job.scope });
 
-  const asset = await deposit(db, job, model, await download(output));
-  return { state: 'landed', asset, costUsd: task.costUsd, uncensored: model.uncensored };
+  const posterOutput = POSTER_OUTPUT[model.catalogue]?.(task.outputs);
+  const [asset, poster] = await Promise.all([
+    deposit(db, job, model, await download(output)),
+    posterOutput ? download(posterOutput).then((file) => deposit(db, job, model, file)) : null
+  ]);
+  return { state: 'landed', asset, poster, costUsd: task.costUsd, uncensored: model.uncensored };
 }
 
 export function wiroPurgers(gateway: WiroGateway): Purgers {

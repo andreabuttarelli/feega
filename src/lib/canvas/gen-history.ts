@@ -15,7 +15,7 @@
  * — l'ultima? — significherebbe che tornare indietro su una vecchia generazione dura finché non
  * si chiude la scheda.
  */
-import { hasPrompt, type GenMedium, type GenNode, type GenRun, type UpstreamTextAvailability } from './gen-node';
+import { hasPrompt, takesPrompt, type GenMedium, type GenNode, type GenRun, type UpstreamTextAvailability } from './gen-node';
 import { effectiveModel, type ModelChoiceLike } from './default-models';
 import { audioOperationOf, operationSpec } from './audio-operations';
 
@@ -28,13 +28,16 @@ export type { GenRun };
  * un testo non aveva una riga in cui depositarsi. Ora l'uscita atterra su `assets`, che ha una
  * colonna `content` e un tipo `text`: il posto c'è, e il bottone del nodo testo si accende.
  */
-export const RUNNABLE_MEDIUMS = ['text', 'image', 'video', 'audio'] as const satisfies readonly GenMedium[];
+export const RUNNABLE_MEDIUMS = ['text', 'image', 'video', 'audio', 'model3d'] as const satisfies readonly GenMedium[];
 
 function runnable(medium: GenMedium): boolean {
   return (RUNNABLE_MEDIUMS as readonly string[]).includes(medium);
 }
 
 function readsConnectedMedia(node: GenNode): boolean {
+  if (!takesPrompt(node.medium)) {
+    return true;
+  }
   return node.medium === 'audio' && operationSpec(audioOperationOf(node.params)).source === 'media';
 }
 

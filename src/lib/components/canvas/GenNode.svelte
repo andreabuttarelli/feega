@@ -12,7 +12,7 @@
    * risultato, storia — e legge ancora il catalogo (`choices`) perché `tooLong` e il motivo per
    * cui "Genera" è spento dipendono dal modello scelto, che il nodo continua a sapere.
    */
-  import { runStateOf, type GenNode, type ModelChoice } from '$lib/canvas/gen-node';
+  import { runStateOf, takesPrompt, type GenNode, type ModelChoice } from '$lib/canvas/gen-node';
   import { shownIndex } from '$lib/canvas/gen-history';
   import { loopCreditsOf, runQuoteOf } from '$lib/canvas/run-quote';
   import { effectiveModel } from '$lib/canvas/default-models';
@@ -148,7 +148,7 @@
   const shownExample = $derived(node.refId ? null : example);
   const hasBody = $derived(node.medium !== 'text' || state === 'running' || state === 'failed' || !!node.refId || !!shownExample);
 
-  const PROMPT_PLACEHOLDER: Record<GenNode['medium'], string> = {
+  const PROMPT_PLACEHOLDER: Partial<Record<GenNode['medium'], string>> = {
     text: 'What should it be about…',
     image: 'Describe what you want to see…',
     video: 'Describe what you want to see…',
@@ -283,15 +283,17 @@
   {/if}
 
   <footer class="gen-foot" class:is-full={!hasBody}>
-    <textarea
-      class="gen-prompt nodrag"
-      class:is-full={!hasBody}
-      rows="2"
-      placeholder={PROMPT_PLACEHOLDER[node.medium]}
-      value={node.prompt}
-      oninput={(e) => onchange?.({ prompt: e.currentTarget.value })}
-      use:scrollGuard
-    ></textarea>
+    {#if takesPrompt(node.medium)}
+      <textarea
+        class="gen-prompt nodrag"
+        class:is-full={!hasBody}
+        rows="2"
+        placeholder={PROMPT_PLACEHOLDER[node.medium]}
+        value={node.prompt}
+        oninput={(e) => onchange?.({ prompt: e.currentTarget.value })}
+        use:scrollGuard
+      ></textarea>
+    {/if}
 
     <div class="gen-actions">
       <!-- Il perché sta ACCANTO al bottone spento, non altrove: un motivo che non si vede da dove

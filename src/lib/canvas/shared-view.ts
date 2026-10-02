@@ -5,6 +5,7 @@ export type SharedView =
   | { kind: 'image'; url: string }
   | { kind: 'video'; url: string }
   | { kind: 'audio'; videoUrl: string | null; audioUrl: string | null }
+  | { kind: 'model3d'; url: string; poster: string | null }
   | { kind: 'text'; text: string }
   | { kind: 'doc'; content: string }
   | { kind: 'frame'; url: string; html: string }

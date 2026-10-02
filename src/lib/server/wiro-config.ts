@@ -5,7 +5,7 @@ import { wiro } from './wiro';
 import { WIRO_PROVIDER } from './wiro-catalogue';
 import { wireSpecOf } from './wiro-choice';
 import type { WiroGateway } from './canvas/wiro-gateway';
-import type { WiroBill, WiroModel, WiroRunDeps, WiroScope } from './canvas/wiro-run';
+import type { WiroBill, WiroCatalogue, WiroModel, WiroRunDeps, WiroScope } from './canvas/wiro-run';
 import { WIRO_LABEL } from './canvas/wiro-run';
 import { uncensoredAccess } from './uncensored-access';
 import { moderationPorts, recordModeration } from './moderation/moderation-config';
@@ -17,6 +17,8 @@ export function configuredWiro(): WiroGateway | null {
   }
   return wiro({ apiKey, apiSecret: env.WIRO_API_SECRET?.trim() || undefined, baseUrl: env.WIRO_BASE_URL?.trim() || undefined });
 }
+
+const WIRO_CATALOGUES: ReadonlySet<WiroCatalogue> = new Set(['image', 'video', 'model3d']);
 
 type WiroModelRow = { id: string; catalogue: string; uncensored: boolean | null; wire_spec: unknown; param_schema: Record<string, unknown> | null };
 
@@ -35,7 +37,7 @@ async function wiroModel(modelId: string): Promise<WiroModel | null> {
   }
   return {
     id: row.id,
-    catalogue: row.catalogue === 'video' ? 'video' : 'image',
+    catalogue: WIRO_CATALOGUES.has(row.catalogue as WiroCatalogue) ? (row.catalogue as WiroCatalogue) : 'image',
     spec,
     uncensored: row.uncensored === true,
     paramSchema: row.param_schema ?? {}

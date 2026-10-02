@@ -77,7 +77,7 @@
   async function downloadAs(format: DownloadFormat) {
     open = false;
 
-    if (format.id === 'original' || format.id === 'mp4') {
+    if (format.asStored) {
       await downloadOriginal(format.extension);
       return;
     }

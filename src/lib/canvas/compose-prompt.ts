@@ -20,7 +20,8 @@ const COMPOSER: Record<GenMedium, Composer> = {
   text: frameAsMaterial,
   image: joinPlain,
   video: joinPlain,
-  audio: joinPlain
+  audio: joinPlain,
+  model3d: joinPlain
 };
 
 export function composePrompt(medium: GenMedium, material: string[], own: string): string {

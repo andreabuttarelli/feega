@@ -96,7 +96,7 @@ describe('connectorsFor — un modello uncensored non ha porte, di nessun tipo',
 
 describe('CONNECTOR_TYPES — il vocabolario chiuso', () => {
   it('sono esattamente i sei dichiarati, in un ordine stabile', () => {
-    expect(CONNECTOR_TYPES).toEqual(['text', 'images', 'first_frame', 'last_frame', 'videos', 'audios']);
+    expect(CONNECTOR_TYPES).toEqual(['text', 'images', 'first_frame', 'last_frame', 'videos', 'audios', 'models3d']);
   });
 });
 

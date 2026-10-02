@@ -31,7 +31,8 @@ const NODE_SIZE: Record<NodeType, () => Size> = {
   effects: effectsNodeSize,
   composition: compositionNodeSize,
   calendar: calendarNodeSize,
-  audio: () => genNodeSize('audio')
+  audio: () => genNodeSize('audio'),
+  model3d: () => genNodeSize('model3d')
 };
 
 export function nodeSize(type: string): Size {

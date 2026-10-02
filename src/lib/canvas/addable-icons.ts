@@ -24,6 +24,7 @@ import WandSparkles from '@lucide/svelte/icons/wand-sparkles';
 import Orbit from '@lucide/svelte/icons/orbit';
 import CalendarDays from '@lucide/svelte/icons/calendar-days';
 import AudioLines from '@lucide/svelte/icons/audio-lines';
+import Box from '@lucide/svelte/icons/box';
 import type { Component } from 'svelte';
 import type { Addable } from './addable';
 
@@ -40,5 +41,6 @@ export const ADDABLE_ICON: Record<Addable, Component> = {
   effects: WandSparkles,
   composition: Orbit,
   calendar: CalendarDays,
-  audio: AudioLines
+  audio: AudioLines,
+  model3d: Box
 };

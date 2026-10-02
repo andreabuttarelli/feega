@@ -16,5 +16,6 @@ export const NODE_EMPTY_HINT: Record<NodeType, string> = {
   effects: 'Connect an image or a video to apply effects.',
   composition: 'Connect images to compose them.',
   calendar: 'Connect or drop images, videos or text here to plan posts.',
-  audio: 'Pick an operation, then write or connect what to voice.'
+  audio: 'Pick an operation, then write or connect what to voice.',
+  model3d: 'Connect a product image to turn it into a 3D model.'
 };

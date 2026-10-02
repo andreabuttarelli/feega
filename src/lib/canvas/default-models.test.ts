@@ -26,7 +26,7 @@ describe('il modello di un nodo', () => {
   });
 
   it('ogni medium generativo ha un default', () => {
-    expect(Object.keys(DEFAULT_MODEL).sort()).toEqual(['audio', 'image', 'text', 'video']);
+    expect(Object.keys(DEFAULT_MODEL).sort()).toEqual(['audio', 'image', 'model3d', 'text', 'video']);
   });
 });
 

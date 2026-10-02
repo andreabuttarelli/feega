@@ -6,6 +6,7 @@ import {
   isGenMedium,
   promptTooLong,
   runStateOf,
+  takesPrompt,
   snapResolution,
   startRun,
   unlockRun,
@@ -33,7 +34,7 @@ const node = (over: Partial<GenNode> = {}): GenNode => ({
 
 describe('il medium di un nodo che produce', () => {
   it('sono i tre della tela, e nient altro', () => {
-    expect(GEN_MEDIUMS).toEqual(['text', 'image', 'video', 'audio']);
+    expect(GEN_MEDIUMS).toEqual(['text', 'image', 'video', 'audio', 'model3d']);
   });
 
   it('rifiuta un medium inventato prima che arrivi al check', () => {
@@ -46,6 +47,12 @@ describe('lo stato di un nodo', () => {
   it('senza prompt non è pronto: manca la sola cosa che serve sempre', () => {
     expect(runStateOf(node({ prompt: '' }))).toBe('empty');
     expect(runStateOf(node({ prompt: '   ' }))).toBe('empty');
+  });
+
+  it('a 3D model needs no prompt: it is ready with its image alone', () => {
+    expect(runStateOf(node({ medium: 'model3d', prompt: '' }))).toBe('ready');
+    expect(takesPrompt('model3d')).toBe(false);
+    expect(takesPrompt('image')).toBe(true);
   });
 
   it('col prompt è pronto a girare', () => {

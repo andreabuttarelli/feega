@@ -130,6 +130,10 @@ describe('perché un nodo non parte', () => {
     expect(blockedReason(node({ model: null }), [])).toMatch(/model/i);
   });
 
+  it('a 3D node without a prompt is not blocked: the image is what it reads', () => {
+    expect(blockedReason(node({ medium: 'model3d', prompt: '', model: 'wiro/microsoft/trellis-2' }), choices)).toBeNull();
+  });
+
   it('senza modello salvato ma con un catalogo, non ha niente da spiegare: il default lo risolve', () => {
     expect(blockedReason(node({ model: null }), choices)).toBeNull();
   });
@@ -147,7 +151,7 @@ describe('perché un nodo non parte', () => {
   });
 
   it('girano tutti e tre i medium che producono: il testo atterra su un asset', () => {
-    expect(RUNNABLE_MEDIUMS).toEqual(['text', 'image', 'video', 'audio']);
+    expect(RUNNABLE_MEDIUMS).toEqual(['text', 'image', 'video', 'audio', 'model3d']);
   });
 });
 
