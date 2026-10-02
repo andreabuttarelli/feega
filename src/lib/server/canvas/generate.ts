@@ -23,6 +23,7 @@ import {
 import { DataCheck, findNode, patchNodeData, writeNodeData } from '$lib/server/repos/canvas';
 import type { Actor } from '$lib/server/repos/actor';
 import { signMediaPaths } from './sign-media';
+import { peopleScreened, ReferenceMedium } from '$lib/server/moderation/people';
 import { composePrompt } from '$lib/canvas/compose-prompt';
 import { textRequest } from '$lib/canvas/text-request';
 import { resolveNodeModel } from './node-model';
@@ -376,6 +377,27 @@ async function screenStandardRun(db: Db, input: StartRun, texts: Array<string | 
   });
 }
 
+const RUN_REFERENCES: Readonly<Record<ReferenceMedium, (upstream: UpstreamInputs) => string[]>> = {
+  [ReferenceMedium.Image]: (u) =>
+    [...new Set([u.referenceImageUrl, ...u.referenceImageUrls, ...u.pickedImageUrls, u.startFrameUrl, u.endFrameUrl])].filter((p): p is string => Boolean(p)),
+  [ReferenceMedium.Video]: (u) => u.referenceVideoUrls
+};
+
+async function screenRunReferences(db: Db, input: StartRun, upstream: UpstreamInputs) {
+  const { projectModeOf } = await import('$lib/server/uncensored-workspace/workspace-server');
+  const mode = await projectModeOf(db, input);
+  if (!peopleScreened(mode)) {
+    return { ok: true as const };
+  }
+
+  const { screenModelReferences } = await import('$lib/server/moderation/model-input');
+
+  const signed = await Promise.all(
+    Object.values(ReferenceMedium).map(async (medium) => (await signMediaPaths(db, RUN_REFERENCES[medium](upstream))).map((url) => ({ medium, url })))
+  );
+  return screenModelReferences({ orgId: input.orgId, mode, references: signed.flat() });
+}
+
 export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcome> {
   const pick = await resolveNodeModel(requested.medium, requested.model, requested.params);
   if (!pick.ok) {
@@ -444,6 +466,12 @@ export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcom
   if (upstream.blocked) {
     await giveUp(db, input, run, upstream.blocked);
     return { kind: 'refused', error: upstream.blocked };
+  }
+
+  const people = await screenRunReferences(db, input, upstream);
+  if (!people.ok) {
+    await giveUp(db, input, run, people.error);
+    return { kind: 'refused', error: people.error };
   }
 
   const textInput = input.medium === 'text' ? textRequest(upstream.text, input.prompt) : null;

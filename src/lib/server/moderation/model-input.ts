@@ -3,6 +3,8 @@ import type { Db } from '$lib/server/db/client';
 import type { Actor } from '$lib/server/repos/actor';
 import { ModerationProfile } from './profiles';
 import { screenGeneration, type ScreenOutcome, type ScreenPorts } from './screen';
+import { screenReferences, type PeopleDetector, type Reference } from './people';
+import type { ProjectMode } from '$lib/project-mode';
 
 export const SCREEN_CACHE_TTL_MS = 10 * 60_000;
 const SCREEN_CACHE_MAX_ENTRIES = 2000;
@@ -87,4 +89,12 @@ export async function screenModelInput(db: Db, input: ModelInput, ports?: Screen
   });
   remember(key, outcome);
   return outcome;
+}
+
+export async function screenModelReferences(
+  input: { orgId: string; mode: ProjectMode; references: readonly Reference[] },
+  detect?: PeopleDetector
+): Promise<ScreenOutcome> {
+  const detector = detect ?? (await import('./moderation-config')).peopleDetector(input.orgId);
+  return screenReferences(detector, input.mode, input.references);
 }
