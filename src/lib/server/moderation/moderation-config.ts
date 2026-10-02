@@ -7,12 +7,15 @@ import { IDENTIFIABILITY_CATEGORIES, IDENTIFIABILITY_JUDGE_SYSTEM, judgeSystem, 
 import { JudgeTier, MODERATION_PROFILES, carriedProfile } from './profiles';
 import type { RecommendationTier } from '$lib/canvas/recommended-models';
 import type { ModerationRecord, ScreenPorts } from './screen';
+import { parsePeopleVerdict, PEOPLE_DETECTOR_SYSTEM, ReferenceMedium, type PeopleDetector } from './people';
 
 const JEV_LABEL = 'moderation.jev';
 const IDENTIFIABILITY_JEV_LABEL = 'moderation.jev.identifiability';
 const JUDGE_LABEL = 'moderation.judge';
 const IDENTIFIABILITY_JUDGE_LABEL = 'moderation.judge.identifiability';
 const JEV_NOT_CONFIGURED = 'jev_not_configured';
+const PEOPLE_LABEL = 'moderation.people';
+const PEOPLE_QUESTION = 'Does this reference show any person?';
 
 export type ModerationScope = {
   orgId: string;
@@ -103,5 +106,26 @@ export function moderationPorts(db: Db, scope: ModerationScope): ScreenPorts {
     judge: (state) => judgeWith(scope, JUDGE_LABEL, judgeSystem(categories), state),
     judgeIdentifiability: (state) => judgeWith(scope, IDENTIFIABILITY_JUDGE_LABEL, IDENTIFIABILITY_JUDGE_SYSTEM, state),
     record: (entry) => recordModeration(db, scope, entry)
+  };
+}
+
+const UPSTREAM_KEY_OF: Readonly<Record<ReferenceMedium, 'imageUrls' | 'videoUrls'>> = {
+  [ReferenceMedium.Image]: 'imageUrls',
+  [ReferenceMedium.Video]: 'videoUrls'
+};
+
+export function peopleDetector(orgId: string): PeopleDetector {
+  return async (reference) => {
+    const [{ llmText, llmVideoReviewerModel }, { withOrgContext }] = await Promise.all([import('$lib/server/llm'), import('$lib/server/ai-log')]);
+    const { text } = await withOrgContext(orgId, () =>
+      llmText({
+        prompt: PEOPLE_QUESTION,
+        system: PEOPLE_DETECTOR_SYSTEM,
+        model: llmVideoReviewerModel(),
+        label: PEOPLE_LABEL,
+        upstream: { [UPSTREAM_KEY_OF[reference.medium]]: [reference.url] }
+      })
+    );
+    return parsePeopleVerdict(text);
   };
 }
