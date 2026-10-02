@@ -45,18 +45,15 @@ export function costFromStreamText(text: string): number | null {
   return last;
 }
 
-/**
- * Il corpo della richiesta con la contabilità chiesta, o null se non c'è niente da cambiare.
- * Solo verso OpenRouter: su un altro gateway OpenAI-compatibile un campo sconosciuto nel corpo
- * è un 400 su ogni chiamata.
- */
-export function withUsageAccounting(body: string, baseUrl: string): string | null {
+export const OPENROUTER_DATA_POLICY = { data_collection: 'deny' } as const;
+
+export function withOpenrouterDefaults(body: string, baseUrl: string): string | null {
   if (!new URL(baseUrl).hostname.endsWith(OPENROUTER_HOST)) return null;
   try {
     const parsed = JSON.parse(body) as Record<string, unknown>;
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
-    if (parsed.usage) return null;
-    return JSON.stringify({ ...parsed, usage: { include: true } });
+    const provider = { ...(parsed.provider as Record<string, unknown> | undefined), ...OPENROUTER_DATA_POLICY };
+    return JSON.stringify({ ...parsed, usage: parsed.usage ?? { include: true }, provider });
   } catch {
     return null;
   }

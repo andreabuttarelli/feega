@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { costFromJson, costFromStreamText, withUsageAccounting } from './llm-usage-cost';
+import { costFromJson, costFromStreamText, withOpenrouterDefaults } from './llm-usage-cost';
 
 describe('costo reale dal gateway', () => {
   it('legge il costo dalla risposta non-streaming', () => {
@@ -31,11 +31,21 @@ describe('costo reale dal gateway', () => {
    */
   it('chiede il conto solo a OpenRouter', () => {
     const body = JSON.stringify({ model: 'x', messages: [] });
-    expect(JSON.parse(withUsageAccounting(body, 'https://openrouter.ai/api/v1')!).usage).toEqual({ include: true });
-    expect(withUsageAccounting(body, 'https://api.openai.com/v1')).toBeNull();
+    expect(JSON.parse(withOpenrouterDefaults(body, 'https://openrouter.ai/api/v1')!).usage).toEqual({ include: true });
+    expect(withOpenrouterDefaults(body, 'https://api.openai.com/v1')).toBeNull();
   });
 
   it('un corpo che non è JSON resta intatto', () => {
-    expect(withUsageAccounting('non-json', 'https://openrouter.ai/api/v1')).toBeNull();
+    expect(withOpenrouterDefaults('non-json', 'https://openrouter.ai/api/v1')).toBeNull();
+  });
+
+  it('chiede a OpenRouter solo provider che non raccolgono i dati', () => {
+    const body = JSON.stringify({ model: 'x', messages: [] });
+    expect(JSON.parse(withOpenrouterDefaults(body, 'https://openrouter.ai/api/v1')!).provider).toEqual({ data_collection: 'deny' });
+  });
+
+  it('la politica sui dati vale anche quando il conto è già chiesto', () => {
+    const body = JSON.stringify({ model: 'x', usage: { include: true }, provider: { order: ['Google'], data_collection: 'allow' } });
+    expect(JSON.parse(withOpenrouterDefaults(body, 'https://openrouter.ai/api/v1')!).provider).toEqual({ order: ['Google'], data_collection: 'deny' });
   });
 });
