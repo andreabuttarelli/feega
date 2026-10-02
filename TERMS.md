@@ -126,9 +126,22 @@ Consistent with Article 50 of the EU AI Act (details in [AI Transparency](./AI-T
 
 ## 12. Reporting illegal content (Digital Services Act)
 
-To report content you believe is illegal or breaches these Terms, write to support@feega.app with: the link or location, why you think it is illegal, your name and email (unless the report concerns child sexual abuse material), and a statement of good faith. We will confirm receipt, decide without undue delay, and inform both you and the affected user of the decision and the reasons, including how to contest it. Our single point of contact for authorities and users under the DSA is support@feega.app. Content involving child sexual abuse is reported to the competent authorities.
+To report content you believe is illegal or breaches these Terms, use the report form at [feega.app/report](https://feega.app/report) — every shared page and the in-app menu link to it — or write to support@feega.app. A notice must include the link or location, why you think the content is illegal, your name and email (not required if the report concerns child sexual abuse material), and a statement of good faith. We confirm receipt, decide without undue delay, and inform both you and the affected user of the decision and the reasons (what we did, the facts, the legal or contractual ground, whether automated means were used, and how to contest it). Our single point of contact for authorities and users under the DSA is support@feega.app. Reports of child sexual abuse material or threats to life are escalated immediately, and content involving child sexual abuse is reported to the competent authorities (DSA art. 18).
 
-**Your likeness.** If you believe content generated or shared through the Service reproduces or resembles your face, body, voice or name without your consent, write to [support@feega.app](mailto:support@feega.app) with the link or a copy of the content and enough information to identify you. We will review the request and, where it is well founded, remove or disable the content and take action on the account involved.
+**Your likeness.** If you believe content generated or shared through the Service reproduces or resembles your face, body, voice or name without your consent, use the report form ("My likeness or voice used without consent") or write to [support@feega.app](mailto:support@feega.app) with the link or a copy of the content and enough information to identify you. We will review the request and, where it is well founded, remove or disable the content and take action on the account involved.
+
+**Contesting a decision.** You can contest any decision on a report, or on your content or account, by replying to the decision email or writing to support@feega.app within six months. You may also use a certified out-of-court dispute settlement body (DSA art. 21) or go to court.
+
+## 12A. Copyright (DMCA)
+
+We respond to notices of alleged copyright infringement under the US Digital Millennium Copyright Act (17 U.S.C. §512) and equivalent EU rules. The full policy is in the [DMCA policy](https://feega.app/dmca).
+
+- **Designated agent:** [DMCA AGENT — registration pending], support@feega.app.
+- **Notice:** use the report form ("Copyright infringement (DMCA)") at [feega.app/report](https://feega.app/report) or email the agent with: identification of the copyrighted work; the URL of the infringing material; your name, postal address, email and phone; a statement of good-faith belief that the use is not authorized; a statement that the notice is accurate and, under penalty of perjury, that you are authorized to act for the owner; your physical or electronic signature.
+- **What we do:** we remove or disable the material, forward the notice to the user, and tell them how to send a counter-notice.
+- **Counter-notice:** the user can send one through the link in our email. We forward it to the claimant and restore the material no sooner than 10 and no later than 14 business days later, unless the claimant tells us they have filed a court action.
+- **Repeat infringers:** each upheld notice is a strike on the account. One strike is a warning, two suspend the account for 30 days, three terminate it. Reports of likeness misuse count as two strikes and child sexual abuse material as three.
+- Knowingly false notices or counter-notices may make you liable for damages (17 U.S.C. §512(f)).
 
 ## 13. Suspension and termination
 

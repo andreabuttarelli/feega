@@ -24,6 +24,7 @@ export type SelectionActionId =
   | 'promote'
   | 'run-workflow'
   | 'copy-id'
+  | 'report'
   | 'delete';
 
 export type SelectionActionGroup = 'primary' | 'secondary' | 'overflow' | 'danger';
@@ -43,6 +44,7 @@ export const SELECTION_ACTIONS: readonly SelectionAction[] = [
   { id: 'duplicate', label: 'Duplicate', group: 'secondary', minNodes: 1, keys: ['mod', 'D'] },
   { id: 'promote', label: 'Promote', group: 'secondary', minNodes: 1 },
   { id: 'copy-id', label: 'Copy id', group: 'overflow', minNodes: 1 },
+  { id: 'report', label: 'Report content', group: 'overflow', minNodes: 1 },
   { id: 'delete', label: 'Delete', group: 'danger', minNodes: 1, keys: ['⌫'] }
 ];
 

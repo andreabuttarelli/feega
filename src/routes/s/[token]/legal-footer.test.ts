@@ -10,3 +10,9 @@ describe('il visore condiviso mostra il footer legale', () => {
     expect(page).toMatch(/<LegalFooter/);
   });
 });
+
+describe('il visore condiviso si può segnalare senza login', () => {
+  it('linka il modulo con il token della condivisione', () => {
+    expect(page).toMatch(/reportHref\(\{ share: page\.params\.token \}\)/);
+  });
+});

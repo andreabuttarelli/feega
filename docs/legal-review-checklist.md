@@ -51,3 +51,10 @@
 24. **AI provider retention** (SUBPROCESSORS "What stays at AI providers"): deletion at Wiro and ElevenLabs is best-effort with a 7-day retry window; Wiro keeps task parameters including the prompt; OpenRouter images/videos endpoints and ElevenLabs music, sound effects and isolation are not covered unless a history item is reported. Confirm the wording and whether ZDR or ElevenLabs zero retention is required.
 
 - **Indemnity (TERMS §17):** is the likeness-focused indemnity enforceable against business users, and is the fault-based consumer carve-out enough to avoid an unfair-term finding under Codice del Consumo art. 33?
+
+## DSA / DMCA notice-and-action (02/10/2026)
+
+- [ ] **Register the DMCA designated agent** at [dmca.copyright.gov](https://dmca.copyright.gov) ($6, renew every 3 years), then replace `[DMCA AGENT — registration pending]` in TERMS.md §12A and DMCA.md. Without it the §512(c) safe harbour does not apply.
+- [ ] Copy TERMS §12/§12A and DMCA.md to the Framer site (`/terms`, new `/dmca`); the in-app form links to `feega.app/terms`.
+- [ ] Confirm the strike policy (1 warning, 2 = 30-day suspension, 3 = termination; likeness ×2, CSAM ×3).
+- [ ] Confirm the escalation contacts in `docs/legal/serious-crime-escalation.md` (CNCPO, NCMEC, 112).

@@ -233,6 +233,13 @@ Mandato a OpenRouter un `reference_images` con un URL invalido: accettato, quind
 ### Il giudice che non sbaglia mai non sta guardando
 Un giudizio LLM su un artefatto reso va provato su DUE input, o non è provato: uno pulito e uno costruito apposta per rompere ogni controllo. Il giudice del mestiere fotografico (`photo-craft-review.ts`) dà `6/6 passati` su un barattolo reso bene e `5 su 6 caduti` su un brief che ordina esplicitamente il tappo tolto, il softbox in scena e il testo inventato — e nomina proprio quelli. Un solo giro verde non distingue «l'immagine è a posto» da «il modello risponde true a tutto», che è il modo normale in cui un controllo estetico muore. Mossa: prima di fidarti di un giudice, rendigli un input che DEVE bocciare; se non lo boccia, il difetto è nella domanda — troppo vaga, o non decidibile guardando.
 
+### 402 dalla sonda di drift e «Unauthorized» da `db:types`: è la quota di egress, non il codice
+Con il progetto Supabase oltre la quota di egress, PostgREST risponde 402 a tutto (lo
+schema-drift-check fallisce il proprio autotest) e la generazione dei tipi via MCP dice
+`exceed_egress_quota`; `apply_migration` ed `execute_sql` via MCP invece funzionano. Segnale: 402
+ovunque, anche su tabelle esistenti. Mossa: applica la migration via MCP, scrivi a mano le voci in
+`database.types.ts` nel formato generato, dillo nel changelog e rigenera appena la quota torna.
+
 ### Il test della PR può aspettare il vecchio contratto
 `toHaveBeenCalledWith` con 6 argomenti contro un executor passato a 7 (dev ha aggiunto la riga `job`): fallisce nel merge senza che nessuno abbia toccato il file. Mossa: nel riesame di un merge, fai girare PRIMA i test dei file in conflitto — sono gli unici che fanno da spec su entrambi i lati.
 

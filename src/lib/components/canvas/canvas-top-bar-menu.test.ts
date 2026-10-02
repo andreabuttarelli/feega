@@ -38,6 +38,10 @@ describe('la tabella delle voci del menu', () => {
     expect(menu).not.toMatch(/['"`]\/app['"`]/);
   });
 
+  it('segnala un contenuto apre il modulo DSA/DMCA', () => {
+    expect(menu).toMatch(/id: 'report'.*href: REPORT_PATH/);
+  });
+
   it('esci invia il POST a /auth/signout, lo stesso della pagina profilo', () => {
     expect(menu).toMatch(/\/auth\/signout/);
   });

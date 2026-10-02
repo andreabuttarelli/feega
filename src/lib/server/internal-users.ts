@@ -35,7 +35,7 @@ function internalDomains(): string[] {
 // igiene mancata (audit pre-pubblicazione, 23/8). Stessi valori, spostati in INTERNAL_EMAILS.
 // Per CHIAMATA, non al load del modulo: $env/dynamic è dinamica apposta (e i test la iniettano
 // dopo l'import — una costante congelata li vedrebbe sempre vuoti).
-function internalEmails(): string[] {
+export function internalEmails(): string[] {
   return (env.INTERNAL_EMAILS ?? '')
     .split(',')
     .map((e) => e.trim().toLowerCase())

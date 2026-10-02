@@ -12,6 +12,8 @@
   import { periodTitle } from '$lib/calendar/period-grid';
   import { CONNECTOR_STYLE } from '$lib/canvas/connectors';
   import LegalFooter from '$lib/components/LegalFooter.svelte';
+  import { page } from '$app/state';
+  import { reportHref } from '$lib/reports/report-link';
 
   let { data } = $props();
 
@@ -113,6 +115,7 @@
 
   <a class="mark" href="/">feega</a>
   <div class="legal-mark">
+    <a class="report" href={reportHref({ share: page.params.token })} rel="nofollow">Report</a>
     <LegalFooter />
   </div>
 </main>
@@ -272,7 +275,14 @@
     color: var(--ink-faint, #9a9a9e);
     text-decoration: none;
   }
+  .report {
+    margin-right: 10px;
+    font-size: 11px;
+    color: var(--ink-faint, #9a9a9e);
+  }
   .legal-mark {
+    display: flex;
+    align-items: center;
     position: fixed;
     right: calc(12px + env(safe-area-inset-right, 0px));
     bottom: calc(10px + env(safe-area-inset-bottom, 0px));
