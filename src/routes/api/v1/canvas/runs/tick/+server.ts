@@ -10,6 +10,8 @@ import { pruneOldCanvasEvents } from '$lib/server/canvas/retention';
 import { renewAccountSeats } from '$lib/server/account-billing';
 import { purgeProviderCopies } from '$lib/server/canvas/provider-purge';
 import { configuredPurgers } from '$lib/server/provider-purgers';
+import { restoreDueReports } from '$lib/server/reports/reports';
+import { reportDeps } from '$lib/server/reports/report-deps';
 
 const USE = SERVICE_ROLE_USES.find((u) => u.path.startsWith('src/routes/api/v1/canvas/runs/tick'))!;
 
@@ -96,7 +98,12 @@ export const GET: RequestHandler = async ({ request }) => {
         })
       : { charged: 0, paused: 0, alreadyCharged: 0, skipped: true };
 
-  return json({ ...runs, videos, audios, wiro, purge, loops, workflows, events, seats });
+  const reports = await restoreDueReports(reportDeps(new URL(request.url).origin)).catch((e) => {
+    console.error('[reports] counter-notice restore failed', e);
+    return { restored: 0 };
+  });
+
+  return json({ ...runs, videos, audios, wiro, purge, loops, workflows, events, seats, reports });
 };
 
 export const POST = GET;

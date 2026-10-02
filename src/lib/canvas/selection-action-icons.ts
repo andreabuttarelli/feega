@@ -10,6 +10,7 @@ import Megaphone from '@lucide/svelte/icons/megaphone';
 import Play from '@lucide/svelte/icons/play';
 import Trash2 from '@lucide/svelte/icons/trash-2';
 import Hash from '@lucide/svelte/icons/hash';
+import Flag from '@lucide/svelte/icons/flag';
 import type { Component } from 'svelte';
 import type { SelectionActionId } from './selection-actions';
 
@@ -20,5 +21,6 @@ export const SELECTION_ACTION_ICON: Record<SelectionActionId, Component> = {
   promote: Megaphone,
   'run-workflow': Play,
   'copy-id': Hash,
+  report: Flag,
   delete: Trash2
 };

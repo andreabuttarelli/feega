@@ -87,5 +87,10 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
     path: 'scripts/backfill-signed-url-nodes.ts',
     why: 'Uno script una tantum, senza sessione utente: attraversa `nodes` di ogni org per trovare le righe con un url firmato scritto per errore in `data` (bug risolto in codice), cosa che nessun JWT di una singola org potrebbe fare.',
     tables: ['nodes']
+  },
+  {
+    path: 'src/lib/server/reports/report-deps.ts — segnalazioni DSA/DMCA (rotte /report, /report/counter/[id], /admin/reports, tick)',
+    why: "Chi segnala da un link condiviso non ha sessione, e content_reports/account_strikes non hanno policy per nessun JWT: le legge e le scrive solo questo percorso. L'invio risolve org e autore dal token di condivisione o dall'id del nodo, senza restituire nulla a chi chiama. Le decisioni passano solo dopo isInternalEmail sulla sessione (/admin/reports) o dal cron (restauro dopo una contro-notifica); agiscono sulla riga del report, non su un org_id scelto da fuori. La sospensione usa auth.admin (ban) sull'utente letto dal report. La contro-notifica è autorizzata dall'impronta del token mandato all'autore.",
+    tables: ['content_reports', 'account_strikes', 'canvases', 'nodes', 'orgs_members', 'profiles', 'auth.users']
   }
 ] as const;

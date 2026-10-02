@@ -35,6 +35,54 @@ export type Database = {
         }
         Relationships: []
       }
+      account_strikes: {
+        Row: {
+          created_at: string
+          id: string
+          org_id: string | null
+          reason: string
+          report_id: string
+          revoked_at: string | null
+          user_id: string
+          weight: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          org_id?: string | null
+          reason: string
+          report_id: string
+          revoked_at?: string | null
+          user_id: string
+          weight: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          org_id?: string | null
+          reason?: string
+          report_id?: string
+          revoked_at?: string | null
+          user_id?: string
+          weight?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_strikes_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "account_strikes_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "content_reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ad_accounts: {
         Row: {
           brand_id: string
@@ -1016,6 +1064,127 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_reports: {
+        Row: {
+          affected_user_id: string | null
+          automated: boolean
+          canvas_id: string | null
+          counter_notice: Json | null
+          counter_noticed_at: string | null
+          counter_token_hash: string | null
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          decision: string | null
+          decision_note: string | null
+          details: Json
+          escalated_at: string | null
+          ground: string | null
+          id: string
+          node_id: string | null
+          org_id: string | null
+          priority: number
+          reason: string
+          removed_share_token: string | null
+          reporter_email: string | null
+          reporter_fingerprint: string
+          reporter_name: string | null
+          reporter_user_id: string | null
+          restore_after: string | null
+          share_token: string | null
+          status: string
+          suit_filed_at: string | null
+          target_url: string
+          updated_at: string
+        }
+        Insert: {
+          affected_user_id?: string | null
+          automated?: boolean
+          canvas_id?: string | null
+          counter_notice?: Json | null
+          counter_noticed_at?: string | null
+          counter_token_hash?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision?: string | null
+          decision_note?: string | null
+          details?: Json
+          escalated_at?: string | null
+          ground?: string | null
+          id?: string
+          node_id?: string | null
+          org_id?: string | null
+          priority: number
+          reason: string
+          removed_share_token?: string | null
+          reporter_email?: string | null
+          reporter_fingerprint: string
+          reporter_name?: string | null
+          reporter_user_id?: string | null
+          restore_after?: string | null
+          share_token?: string | null
+          status?: string
+          suit_filed_at?: string | null
+          target_url: string
+          updated_at?: string
+        }
+        Update: {
+          affected_user_id?: string | null
+          automated?: boolean
+          canvas_id?: string | null
+          counter_notice?: Json | null
+          counter_noticed_at?: string | null
+          counter_token_hash?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision?: string | null
+          decision_note?: string | null
+          details?: Json
+          escalated_at?: string | null
+          ground?: string | null
+          id?: string
+          node_id?: string | null
+          org_id?: string | null
+          priority?: number
+          reason?: string
+          removed_share_token?: string | null
+          reporter_email?: string | null
+          reporter_fingerprint?: string
+          reporter_name?: string | null
+          reporter_user_id?: string | null
+          restore_after?: string | null
+          share_token?: string | null
+          status?: string
+          suit_filed_at?: string | null
+          target_url?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_reports_canvas_id_fkey"
+            columns: ["canvas_id"]
+            isOneToOne: false
+            referencedRelation: "canvases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_reports_node_id_fkey"
+            columns: ["node_id"]
+            isOneToOne: false
+            referencedRelation: "nodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_reports_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
             referencedColumns: ["id"]
           },
         ]

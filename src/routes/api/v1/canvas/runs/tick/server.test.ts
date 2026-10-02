@@ -19,6 +19,8 @@ vi.mock('$lib/server/canvas/workflow', () => ({ drainWorkflowQueue: step('workfl
 vi.mock('$lib/server/canvas/retention', () => ({ pruneOldCanvasEvents: step('events', {}) }));
 vi.mock('$lib/server/account-billing', () => ({ renewAccountSeats: step('seats', {}) }));
 vi.mock('$lib/server/provider-purgers', () => ({ configuredPurgers: () => ({}) }));
+vi.mock('$lib/server/reports/report-deps', () => ({ reportDeps: () => ({}) }));
+vi.mock('$lib/server/reports/reports', () => ({ restoreDueReports: step('reports', { restored: 1 }) }));
 vi.mock('$lib/server/canvas/provider-purge', () => ({ purgeProviderCopies: step('purge', { purged: 2, waiting: 0, failed: 0 }) }));
 
 describe('the canvas run tick', () => {
@@ -30,5 +32,13 @@ describe('the canvas run tick', () => {
     expect(order.indexOf('purge')).toBeGreaterThan(order.indexOf('wiro'));
     expect(order.indexOf('purge')).toBeGreaterThan(order.indexOf('audios'));
     expect((await res.json()).purge).toEqual({ purged: 2, waiting: 0, failed: 0 });
+  });
+
+  it('restores DMCA content whose counter-notice period has run out', async () => {
+    const { GET } = await import('./+server');
+
+    const res = await GET({ request: new Request('https://x.test') } as Parameters<typeof GET>[0]);
+
+    expect((await res.json()).reports).toEqual({ restored: 1 });
   });
 });

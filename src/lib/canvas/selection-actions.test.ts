@@ -4,7 +4,7 @@ import { actionsIn, enabledFor } from './selection-actions';
 describe('la barra ha lo stesso ordine per ogni tipo di nodo', () => {
   it('secondarie, overflow e distruttive in gruppi fissi', () => {
     expect(actionsIn('secondary', 1).map((a) => a.id)).toEqual(['connect-new', 'connect-existing', 'duplicate', 'promote']);
-    expect(actionsIn('overflow', 1).map((a) => a.id)).toEqual(['copy-id']);
+    expect(actionsIn('overflow', 1).map((a) => a.id)).toEqual(['copy-id', 'report']);
     expect(actionsIn('danger', 1).map((a) => a.id)).toEqual(['delete']);
   });
 

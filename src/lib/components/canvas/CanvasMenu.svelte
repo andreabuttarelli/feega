@@ -14,6 +14,8 @@
   import { BURGER_ENTRIES, mobileNavHref } from '$lib/shell-nav';
   import { NAV_ICONS } from './nav-icons';
   import Scale from '@lucide/svelte/icons/scale';
+  import Flag from '@lucide/svelte/icons/flag';
+  import { REPORT_PATH } from '$lib/reports/report-link';
   import { FOOTER_LEGAL_LINKS, LEGAL_LINKS, legalHref } from '$lib/legal-links';
 
   type RailPages = 'include' | 'omit';
@@ -51,7 +53,7 @@
   );
 
   type MenuGroup = 'navigate' | 'help' | 'account';
-  type MenuAction = 'home' | 'settings' | 'billing' | 'shortcuts' | 'changelog' | 'legal' | 'logout';
+  type MenuAction = 'home' | 'settings' | 'billing' | 'shortcuts' | 'changelog' | 'report' | 'legal' | 'logout';
 
   /**
    * UNA VOCE, UNA RIGA: aggiungere una voce al menu è aggiungere una riga qui, non un altro `if`
@@ -76,6 +78,7 @@
     { id: 'billing', group: 'navigate', labelKey: 'app.shell.menu.billing', icon: CreditCard, sheet: '/settings/billing' },
     { id: 'shortcuts', group: 'help', labelKey: 'app.shell.menu.shortcuts', icon: Keyboard, sub: true, desktopOnly: true },
     { id: 'changelog', group: 'help', labelKey: 'app.shell.menu.changelog', icon: Sparkles, href: '/changelog' },
+    { id: 'report', group: 'help', labelKey: 'app.shell.menu.report', icon: Flag, href: REPORT_PATH },
     { id: 'legal', group: 'help', labelKey: 'legal.menuLabel', icon: Scale, sub: true },
     { id: 'logout', group: 'account', labelKey: 'app.shell.menu.logout', icon: LogOut, danger: true }
   ];

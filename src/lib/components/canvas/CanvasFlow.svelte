@@ -42,6 +42,7 @@
   import CanvasFocus from './CanvasFocus.svelte';
   import { FIT_PADDING, READABLE_ZOOM } from '$lib/canvas/placement';
   import type { SelectionActionId } from '$lib/canvas/selection-actions';
+  import { reportHref } from '$lib/reports/report-link';
   import type { GenMedium, ModelChoice } from '$lib/canvas/gen-node';
   import { CANVAS_DRAG_MEDIUM } from '$lib/canvas/new-node';
   import { CANVAS_DRAG_FILLED_NODE, parseFilledNodeDrag, type FilledNodeDrag } from '$lib/canvas/drag-payload';
@@ -560,6 +561,9 @@
     'run-workflow': (ids) => onRunWorkflow?.(ids),
     'copy-id': (ids) => {
       void navigator.clipboard?.writeText(ids.join('\n'));
+    },
+    report: (ids) => {
+      window.open(reportHref({ node: ids[0] }), '_blank', 'noopener');
     },
     delete: (ids) => onDelete?.(ids)
   };
