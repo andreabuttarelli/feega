@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { thumbnailTransform, signThumbnailUrls } from './media-thumbnails';
+import { thumbnailTransform, signThumbnailUrls, forgetSignedUrls } from './media-thumbnails';
 
 describe('thumbnailTransform', () => {
   it('sizes the picker tile at 2x the rendered 96px tile', () => {
@@ -144,5 +144,33 @@ describe('signThumbnailUrls: a file keeps one URL while it is fresh, so the brow
     await signThumbnailUrls(source, ['a.png'], 3600, 'canvas1024');
 
     expect(calls).toEqual(['a.png', 'a.png']);
+  });
+
+  it('keeps reusing a canvas URL until half of its 24h lifetime is gone', async () => {
+    vi.useFakeTimers();
+    const { bucket, calls } = stampedBucket();
+    const source = { name: 'memo-day', open: () => bucket };
+    const day = 86_400;
+
+    await signThumbnailUrls(source, ['a.png'], day);
+    vi.advanceTimersByTime((day / 2 - 1) * 1000);
+    await signThumbnailUrls(source, ['a.png'], day);
+    vi.advanceTimersByTime(2 * 1000);
+    await signThumbnailUrls(source, ['a.png'], day);
+
+    expect(calls).toEqual(['a.png', 'a.png']);
+  });
+
+  it('a forgotten path is signed again, at every size, while others stay reused', async () => {
+    const { bucket, calls } = stampedBucket();
+    const source = { name: 'memo-forget', open: () => bucket };
+
+    await signThumbnailUrls(source, ['a.png', 'b.png'], 3600);
+    await signThumbnailUrls(source, ['a.png'], 3600, 'canvas256');
+    forgetSignedUrls('memo-forget', 'a.png');
+    await signThumbnailUrls(source, ['a.png', 'b.png'], 3600);
+    await signThumbnailUrls(source, ['a.png'], 3600, 'canvas256');
+
+    expect(calls).toEqual(['a.png', 'b.png', 'a.png', 'a.png', 'a.png']);
   });
 });

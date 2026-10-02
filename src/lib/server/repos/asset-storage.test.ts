@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { signAssetFiles } from './asset-storage';
+import { CANVAS_REDIRECT_MAX_AGE_S, SIGNED_URL_TTL_S, signAssetFiles } from './asset-storage';
+import { REUSABLE_SHARE_OF_TTL } from '$lib/server/media-thumbnails';
 import type { Db } from '$lib/server/db/client';
 
 function dbWithoutStorage(): Db {
@@ -15,5 +16,18 @@ describe('signAssetFiles', () => {
     const signed = await signAssetFiles(dbWithoutStorage(), []);
 
     expect(signed.size).toBe(0);
+  });
+});
+
+describe('signed URL lifetimes', () => {
+  it('canvas media lives a day, what a model provider fetches lives five minutes', () => {
+    expect(SIGNED_URL_TTL_S).toEqual({ canvas: 86_400, agentPreview: 300, providerInput: 300, userLink: 3600 });
+  });
+
+  it('a cached redirect to the oldest reused URL still lands before that URL expires', () => {
+    const oldestReusedAge = SIGNED_URL_TTL_S.canvas * REUSABLE_SHARE_OF_TTL;
+
+    expect(oldestReusedAge + CANVAS_REDIRECT_MAX_AGE_S).toBeLessThan(SIGNED_URL_TTL_S.canvas);
+    expect(CANVAS_REDIRECT_MAX_AGE_S).toBe(21_600);
   });
 });
