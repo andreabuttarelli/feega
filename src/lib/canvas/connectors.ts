@@ -219,6 +219,15 @@ export function portActive(origin: DragOrigin, side: PortSide, type: ConnectorTy
   return side === 'target' ? portAccepts(type, origin.type) : portAccepts(origin.type, type);
 }
 
+export type PortLook = 'quiet' | 'lit' | 'off';
+
+export function portLook(origin: DragOrigin, side: PortSide, type: ConnectorType, at?: PortAt): PortLook {
+  if (!origin) {
+    return 'quiet';
+  }
+  return portActive(origin, side, type, at) ? 'lit' : 'off';
+}
+
 export function landingPort(
   dropped: ConnectorType | null,
   output: ConnectorType | null,

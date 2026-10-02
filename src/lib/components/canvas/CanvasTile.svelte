@@ -20,7 +20,7 @@
    * riassume il brand no. Due puntini su quest'ultimo inviterebbero a un gesto che poi fallisce.
    */
   import { Handle, NodeResizer, Position, useConnection, type NodeProps } from '@xyflow/svelte';
-  import { CONNECTOR_STYLE, portActive, type ConnectorType, type DragOrigin } from '$lib/canvas/connectors';
+  import { CONNECTOR_STYLE, portLook, type ConnectorType, type DragOrigin } from '$lib/canvas/connectors';
   import { NODE_KIND_ICON, NODE_KIND_LABEL } from '$lib/canvas/node-label';
   import { isNodeType } from '$lib/canvas/node-data';
   import { getTileRender } from '$lib/canvas/tile-render-context';
@@ -92,7 +92,7 @@
         type="target"
         id={connector}
         position={Position.Left}
-        class={`typed-port port-in${portActive(origin, 'target', connector, { nodeId: tile.id, handleId: connector }) ? '' : ' port-off'}`}
+        class={`typed-port port-in port-${portLook(origin, 'target', connector, { nodeId: tile.id, handleId: connector })}`}
         style={`top:${((i + 1) / (tile.connectors.length + 1)) * 100}%;--port:${CONNECTOR_STYLE[connector].color}`}
         title={CONNECTOR_STYLE[connector].label}
         aria-label={CONNECTOR_STYLE[connector].label}
@@ -138,7 +138,7 @@
     <Handle
       type="source"
       position={Position.Right}
-      class={`typed-port port-out${portActive(origin, 'source', tile.output, { nodeId: tile.id, handleId: null }) ? '' : ' port-off'}`}
+      class={`typed-port port-out port-${portLook(origin, 'source', tile.output, { nodeId: tile.id, handleId: null })}`}
       style={`--port:${CONNECTOR_STYLE[tile.output].color}`}
       title={CONNECTOR_STYLE[tile.output].label}
       aria-label={CONNECTOR_STYLE[tile.output].label}
@@ -154,7 +154,7 @@
       id={out.handle}
       position={Position.Right}
       isConnectable={!out.incompatible}
-      class={`typed-port port-out${out.incompatible ? ' port-flagged' : portActive(origin, 'source', out.port, { nodeId: tile.id, handleId: out.handle }) ? '' : ' port-off'}`}
+      class={`typed-port port-out ${out.incompatible ? 'port-flagged' : `port-${portLook(origin, 'source', out.port, { nodeId: tile.id, handleId: out.handle })}`}`}
       style={`top:${((i + 1) / ((tile.outputs?.length ?? 0) + 1)) * 100}%;--port:${CONNECTOR_STYLE[out.port].color}`}
       title={out.incompatible ? `${out.label}: not available for this source` : out.label}
       aria-label={out.label}
@@ -199,11 +199,10 @@
   :global(.svelte-flow__handle.typed-port) {
     display: flex;
     align-items: center;
-    gap: 6px;
     width: auto;
     height: 22px;
     min-width: 0;
-    padding: 0 8px;
+    padding: 0 4px;
     border: 2px solid var(--port);
     background: var(--paper, #fff);
     opacity: 1;
@@ -237,16 +236,41 @@
   :global(.svelte-flow__handle.port-flagged .port-name) {
     text-decoration: line-through;
   }
-  :global(.svelte-flow__handle.port-off .port-name) {
-    display: none;
+  :global(.svelte-flow__handle.port-lit) {
+    outline: 2px solid var(--port);
+    outline-offset: 2px;
   }
   .port-name {
+    max-width: 0;
+    overflow: hidden;
+    opacity: 0;
     font-size: 11px;
     line-height: 1;
     font-weight: 600;
     white-space: nowrap;
     color: var(--port);
     pointer-events: none;
+    transition: opacity 120ms ease;
+  }
+  :global(.svelte-flow__node.selected .typed-port:not(.port-off)) .port-name,
+  :global(.typed-port.port-lit) .port-name,
+  :global(.typed-port:focus-visible) .port-name {
+    max-width: none;
+    margin: 0 6px;
+    opacity: 1;
+  }
+  @media (hover: hover) {
+    :global(.svelte-flow__node:hover .typed-port.port-quiet) .port-name,
+    :global(.typed-port:hover:not(.port-off)) .port-name {
+      max-width: none;
+      margin: 0 6px;
+      opacity: 1;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .port-name {
+      transition: none;
+    }
   }
 
   /*

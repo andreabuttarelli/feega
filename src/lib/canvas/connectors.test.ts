@@ -9,6 +9,7 @@ import {
   anyPortAccepts,
   portListValued,
   portActive,
+  portLook,
   modalityBadges,
   type Modalities,
   type WiredConnector
@@ -318,5 +319,23 @@ describe('le porte di una lista: tipizzate, a più fili', () => {
     expect(portListValued('list', 'text')).toBe(true);
     expect(portListValued('text', 'text')).toBe(false);
     expect(portListValued('image', 'images')).toBe(true);
+  });
+});
+
+describe('portLook — il nome della porta si vede solo quando serve', () => {
+  it('senza un filo in corso la porta è quieta: il nome aspetta hover o selezione', () => {
+    expect(portLook(null, 'target', 'text')).toBe('quiet');
+  });
+
+  it('tirando un filo, una porta che lo accetta si accende col nome', () => {
+    expect(portLook({ side: 'source', type: 'images' }, 'target', 'first_frame')).toBe('lit');
+  });
+
+  it('tirando un filo, una porta incompatibile si spegne', () => {
+    expect(portLook({ side: 'source', type: 'images' }, 'target', 'text')).toBe('off');
+  });
+
+  it('un filo da una porta senza tipo accende tutto', () => {
+    expect(portLook({ side: 'source', type: null }, 'target', 'videos')).toBe('lit');
   });
 });
