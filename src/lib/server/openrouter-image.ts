@@ -16,6 +16,7 @@
  */
 import { env } from '$env/dynamic/private';
 import { logAiCall } from '$lib/server/ai-log';
+import { OPENROUTER_DATA_POLICY } from '$lib/server/llm-usage-cost';
 import type { GeminiImageRequest } from '$lib/server/image-request';
 
 const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
@@ -83,7 +84,8 @@ export async function generateImageOnOpenrouter(
     messages: [{ role: 'user', content: messageContent(req.contents?.[0]?.parts ?? []) }],
     modalities: IMAGE_MODALITIES,
     ...(aspectRatio ? { image_config: { aspect_ratio: aspectRatio } } : {}),
-    usage: { include: true }
+    usage: { include: true },
+    provider: OPENROUTER_DATA_POLICY
   };
 
   const fail = (error: string): never => {

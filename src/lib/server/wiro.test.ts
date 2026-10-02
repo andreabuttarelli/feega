@@ -66,4 +66,48 @@ describe('Wiro adapter', () => {
     expect(headers['x-api-key']).toBe('key');
     expect(headers['x-signature']).toBeUndefined();
   });
+
+  describe('purge', () => {
+    function sequence(...replies: Array<() => Response>) {
+      const calls: { url: string; init: RequestInit }[] = [];
+      const fetchFn = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+        calls.push({ url: String(url), init: init ?? {} });
+        return replies[calls.length - 1]();
+      });
+      return { calls, gateway: wiro({ apiKey: 'key', baseUrl: 'https://wiro.test/v1', fetchFn: fetchFn as typeof fetch }) };
+    }
+
+    it('deletes inputs and outputs of a finished task by its token', async () => {
+      const { calls, gateway } = sequence(
+        () => task({ status: 'task_postprocess_end', socketaccesstoken: 'tok' }),
+        () => Response.json({ result: true, errors: [] })
+      );
+      expect(await gateway.purge('534574')).toBe('purged');
+      expect(calls[1].url).toBe('https://wiro.test/v1/Task/InputOutputDelete');
+      expect(JSON.parse(String(calls[1].init.body))).toEqual({ tasktoken: 'tok' });
+    });
+
+    it('deletes a cancelled task too', async () => {
+      const { calls, gateway } = sequence(
+        () => task({ status: 'task_cancel', socketaccesstoken: 'tok' }),
+        () => Response.json({ result: true, errors: [] })
+      );
+      expect(await gateway.purge('1')).toBe('purged');
+      expect(calls).toHaveLength(2);
+    });
+
+    it('waits while the task is not terminal, without asking for a delete', async () => {
+      const { calls, gateway } = sequence(() => task({ status: 'task_start', socketaccesstoken: 'tok' }));
+      expect(await gateway.purge('1')).toBe('not_ready');
+      expect(calls).toHaveLength(1);
+    });
+
+    it('throws when Wiro refuses the delete, so the caller retries', async () => {
+      const { gateway } = sequence(
+        () => task({ status: 'task_postprocess_end', socketaccesstoken: 'tok' }),
+        () => Response.json({ result: false, errors: [{ message: 'nope' }] })
+      );
+      await expect(gateway.purge('1')).rejects.toThrow(/nope/);
+    });
+  });
 });

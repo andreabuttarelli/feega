@@ -27,6 +27,13 @@ feega (**[LEGAL ENTITY]**, VAT no. **[VAT]**, **[ADDRESS]**) uses the providers 
 
 Google Gemini models are reached through OpenRouter; the current code does not call the Google Gemini API directly.
 
+### What stays at AI providers after a generation
+
+- **Input files** are sent as signed links that expire after 5 minutes.
+- **Wiro**: once the output is stored in our storage, or the task has failed or been cancelled, we ask Wiro to delete the task's input and output files. Failed requests are retried every minute for up to 7 days. Wiro keeps the task record and its parameters, including the prompt.
+- **ElevenLabs**: a dubbing project is deleted once the dubbed file is stored, or once the dubbing has failed. When ElevenLabs reports a history item for a generation (text-to-speech, voice changer), that item is deleted after our copy is stored. Same retry window. ElevenLabs zero-retention mode is not used (enterprise plans only); other outputs and ElevenLabs' own logs follow its retention policy.
+- **OpenRouter**: text, chat, embedding and Gemini image requests are routed only to upstream providers that do not collect or train on request data. Image requests through OpenRouter's images endpoint and video requests are not restricted. Zero data retention is not enforced; each provider's own retention applies.
+
 ## Social, ads and research
 
 | Provider | Purpose | Personal data | Location | Transfer mechanism |

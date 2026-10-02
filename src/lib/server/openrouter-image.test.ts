@@ -65,6 +65,14 @@ describe('il render su OpenRouter', () => {
     expect(body.modalities).toEqual(['image', 'text']);
   });
 
+  it('chiede solo fornitori che non raccolgono i dati', async () => {
+    const f = reply(withImage());
+    vi.stubGlobal('fetch', f);
+    const { generateImageOnOpenrouter } = await import('./openrouter-image');
+    await generateImageOnOpenrouter(REQ);
+    expect(sentBody(f).provider).toEqual({ data_collection: 'deny' });
+  });
+
   it('il modello va col fornitore davanti: è così che OpenRouter lo chiama', async () => {
     const f = reply(withImage());
     vi.stubGlobal('fetch', f);

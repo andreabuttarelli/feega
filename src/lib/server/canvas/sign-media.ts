@@ -2,7 +2,7 @@ import type { Db } from '$lib/server/db/client';
 import { createServiceRoleDb } from '$lib/server/db/client';
 import { isRlsScoped } from '$lib/server/rls-client';
 import { signKnowledgePaths } from '$lib/server/media-archive';
-import { signAssetFiles } from '$lib/server/repos/asset-storage';
+import { signAssetFiles, SIGNED_URL_TTL_S } from '$lib/server/repos/asset-storage';
 import { SERVICE_ROLE_USES, type ServiceRoleUse } from '$lib/server/db/service-role-uses';
 import type { ThumbnailPreset } from '$lib/server/media-thumbnails';
 
@@ -15,12 +15,13 @@ function assetSigningUse(): ServiceRoleUse {
 }
 
 const ABSOLUTE_URL = /^https?:\/\//;
+const PROVIDER_INPUT_TTL_S = SIGNED_URL_TTL_S.providerInput;
 
 export async function signMediaPaths(db: Db, paths: string[]): Promise<string[]> {
   const stored = paths.filter((p) => !ABSOLUTE_URL.test(p));
   const [rendered, uploaded] = await Promise.all([
-    signKnowledgePaths(db as never, stored),
-    signAssetFiles(db, stored)
+    signKnowledgePaths(db as never, stored, PROVIDER_INPUT_TTL_S),
+    signAssetFiles(db, stored, PROVIDER_INPUT_TTL_S)
   ]);
 
   return paths

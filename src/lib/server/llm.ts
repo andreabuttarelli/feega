@@ -7,7 +7,7 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { embedMany, generateObject, generateText, jsonSchema } from 'ai';
 import { env } from '$env/dynamic/private';
 import { extractSdkUsage, logAiCall, noteLlmCost } from '$lib/server/ai-log';
-import { costFromJson, costFromStreamText, withUsageAccounting } from '$lib/server/llm-usage-cost';
+import { costFromJson, costFromStreamText, OPENROUTER_DATA_POLICY, withOpenrouterDefaults } from '$lib/server/llm-usage-cost';
 import { gatewayModel } from '$lib/server/openrouter-models';
 
 export const LLM_UNCONFIGURED = 'llm_unconfigured';
@@ -103,7 +103,7 @@ let cachedSig = '';
  * quando `logAiCall` scrive la riga.
  */
 const billedFetch: typeof fetch = async (input, init) => {
-	const patched = typeof init?.body === 'string' ? withUsageAccounting(init.body, llmBaseUrl()) : null;
+	const patched = typeof init?.body === 'string' ? withOpenrouterDefaults(init.body, llmBaseUrl()) : null;
 	const res = await fetch(input, patched ? { ...init, body: patched } : init);
 	if (!patched) return res;
 	const copy = res.clone();
@@ -358,7 +358,8 @@ async function groundedCall(
 			model: modelId,
 			messages,
 			...(mode === 'native' ? { plugins: WEB_PLUGIN } : {}),
-			usage: { include: true }
+			usage: { include: true },
+			provider: OPENROUTER_DATA_POLICY
 		}),
 		signal: AbortSignal.timeout(LLM_TIMEOUT_MS)
 	});
@@ -442,7 +443,7 @@ async function mediaCall(
 	const res = await fetch(`${llmBaseUrl()}/chat/completions`, {
 		method: 'POST',
 		headers: { authorization: `Bearer ${llmApiKey() ?? ''}`, 'content-type': 'application/json' },
-		body: JSON.stringify({ model: modelId, messages, usage: { include: true } }),
+		body: JSON.stringify({ model: modelId, messages, usage: { include: true }, provider: OPENROUTER_DATA_POLICY }),
 		signal: AbortSignal.timeout(LLM_TIMEOUT_MS)
 	});
 	const body = (await res.json()) as {

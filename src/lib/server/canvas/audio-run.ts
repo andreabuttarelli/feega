@@ -1,6 +1,7 @@
 import type { Db } from '$lib/server/db/client';
 import { insertAsset, type Asset, type AssetType } from '$lib/server/repos/assets';
-import { AUDIO_JOB_PREFIX } from '$lib/server/repos/node-runs';
+import { AUDIO_HISTORY_PREFIX, AUDIO_JOB_PREFIX } from '$lib/server/repos/node-runs';
+import type { Purgers } from './provider-purge';
 import type { Actor } from '$lib/server/repos/actor';
 import { logAiCall } from '$lib/server/ai-log';
 import { markGenerated } from '$lib/server/content-credentials';
@@ -53,7 +54,7 @@ export type AudioRequest = {
 export type AudioOutputs = Partial<Record<ConnectorType, Asset>>;
 
 export type AudioResult =
-  | { kind: 'landed'; asset: Asset; outputs: AudioOutputs; costUsd: number | null }
+  | { kind: 'landed'; asset: Asset; outputs: AudioOutputs; costUsd: number | null; historyJobId: string | null }
   | { kind: 'job'; jobId: string }
   | { kind: 'refused'; error: string };
 
@@ -107,6 +108,22 @@ export function parseDubbingJob(externalJobId: string): { providerId: string; la
     return null;
   }
   return { providerId, language };
+}
+
+export function audioPurgers(provider: AudioProvider): Purgers {
+  return {
+    [AUDIO_JOB_PREFIX]: async (externalJobId) => {
+      const job = parseDubbingJob(externalJobId);
+      if (job) {
+        await provider.forgetDubbing(job.providerId);
+      }
+      return 'purged';
+    },
+    [AUDIO_HISTORY_PREFIX]: async (externalJobId) => {
+      await provider.forgetHistoryItem(externalJobId.slice(AUDIO_HISTORY_PREFIX.length));
+      return 'purged';
+    }
+  };
 }
 
 async function download(url: string): Promise<AudioFile> {
@@ -213,7 +230,8 @@ export async function runAudio(db: Db, provider: AudioProvider, req: AudioReques
   bill(req.scope, { operation: req.operation, model: req.model, ms: Date.now() - startedAt, costUsd });
 
   const asset = await depositAudio(db, req.scope, produced.file, seconds, req.model);
-  return { kind: 'landed', asset, outputs: { audios: asset }, costUsd };
+  const historyJobId = produced.file.historyItemId ? `${AUDIO_HISTORY_PREFIX}${produced.file.historyItemId}` : null;
+  return { kind: 'landed', asset, outputs: { audios: asset }, costUsd, historyJobId };
 }
 
 export type JobProgress =

@@ -1450,6 +1450,7 @@ export type Database = {
           output_asset_id: string | null
           params: Json | null
           prompt: string | null
+          provider_purged_at: string | null
           started_at: string
           status: string
         }
@@ -1470,6 +1471,7 @@ export type Database = {
           output_asset_id?: string | null
           params?: Json | null
           prompt?: string | null
+          provider_purged_at?: string | null
           started_at?: string
           status?: string
         }
@@ -1490,6 +1492,7 @@ export type Database = {
           output_asset_id?: string | null
           params?: Json | null
           prompt?: string | null
+          provider_purged_at?: string | null
           started_at?: string
           status?: string
         }

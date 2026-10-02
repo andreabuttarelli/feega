@@ -73,6 +73,7 @@ const MODEL_CALLERS: Readonly<Record<string, string>> = {
   'src/routes/api/v1/brands/[slug]/prompts/enhance/+server.ts': SCREENED,
   'src/routes/api/v1/projects/[projectId]/agent/+server.ts': SCREENED,
   'src/lib/server/moderation/moderation-config.ts': 'the moderator itself: Jev and the LLM judge',
+  'src/lib/server/provider-purgers.ts': 'deletes stored provider copies, sends no prompt',
   'src/lib/server/brand-analysis.ts': 'brand wizard: reads a third-party website, the user types only its URL',
   'src/lib/server/brand-context.ts': 'brand research over site, catalogue and competitor material',
   'src/lib/server/brand-media.ts': 'brand research over site, catalogue and competitor material',

@@ -15,7 +15,7 @@ const uncensoredModel: WiroModel = {
 function depsFor(model: WiroModel | null): { deps: WiroRunDeps; gatewayRun: ReturnType<typeof vi.fn> } {
   const gatewayRun = vi.fn().mockResolvedValue({ taskId: 'job-1' });
   const deps: WiroRunDeps = {
-    gateway: { run: gatewayRun, task: vi.fn() },
+    gateway: { run: gatewayRun, task: vi.fn(), purge: vi.fn() },
     model: async () => model,
     access: async () => ({ allowed: true }),
     screen: () => ({

@@ -206,6 +206,9 @@ export async function retryClaim(
  */
 export const AUDIO_JOB_PREFIX = 'elevenlabs:';
 export const WIRO_JOB_PREFIX = 'wiro:';
+export const AUDIO_HISTORY_PREFIX = 'elevenlabs-history:';
+
+const SETTLED_STATUSES: NodeRunStatus[] = ['done', 'failed', 'expired'];
 
 const OWN_RECONCILER_PREFIXES = [AUDIO_JOB_PREFIX, WIRO_JOB_PREFIX];
 
@@ -397,4 +400,33 @@ export async function hasAnyRun(db: Db, orgId: string): Promise<boolean> {
     throw error;
   }
   return (count ?? 0) > 0;
+}
+
+export async function unpurgedRuns(db: Db, input: { prefix: string; since: string; limit: number }): Promise<NodeRun[]> {
+  const { data, error } = await db
+    .from('node_runs')
+    .select(RUN_COLUMNS)
+    .in('status', SETTLED_STATUSES)
+    .is('provider_purged_at', null)
+    .like('external_job_id', `${input.prefix}%`)
+    .gt('finished_at', input.since)
+    .order('finished_at', { ascending: false })
+    .limit(input.limit);
+
+  if (error) {
+    throw error;
+  }
+  return (data ?? []).map(toRun).filter((run) => run.externalJobId?.startsWith(input.prefix));
+}
+
+export async function markProviderPurged(db: Db, input: { orgId: string; runId: string; at: string }): Promise<void> {
+  const { error } = await db
+    .from('node_runs')
+    .update({ provider_purged_at: input.at })
+    .eq('id', input.runId)
+    .eq('org_id', input.orgId);
+
+  if (error) {
+    throw error;
+  }
 }

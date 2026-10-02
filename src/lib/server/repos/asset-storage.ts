@@ -5,6 +5,7 @@ export const CANVAS_ASSET_BUCKET = 'canvas-assets';
 export const SIGNED_URL_TTL_S = {
   canvas: 300,
   agentPreview: 300,
+  providerInput: 300,
   userLink: 3600
 } as const;
 

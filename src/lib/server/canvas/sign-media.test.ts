@@ -36,6 +36,26 @@ describe('un file in Storage arriva al modello come URL firmato, non come percor
   });
 });
 
+describe('un URL dato a un fornitore scade presto', () => {
+  it('firma render e upload per cinque minuti, non per ore', async () => {
+    const ttls: Record<string, number> = {};
+    const db = {
+      storage: {
+        from: (bucket: string) => ({
+          createSignedUrls: async (paths: string[], ttl: number) => {
+            ttls[bucket] = ttl;
+            return { data: paths.map((path) => ({ path, signedUrl: `https://signed/${bucket}/${path}` })) };
+          }
+        })
+      }
+    } as unknown as Db;
+
+    await signMediaPaths(db, ['u/media/generated.png']);
+
+    expect(ttls).toEqual({ 'brand-knowledge': 300, 'canvas-assets': 300 });
+  });
+});
+
 describe('un asset è visibile a chiunque legga la sua riga, non solo a chi lo ha generato', () => {
   it('firma un render con il client di servizio, non con quello dell\'utente', async () => {
     const userDb = markRlsScoped(

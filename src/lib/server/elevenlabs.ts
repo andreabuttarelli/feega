@@ -8,6 +8,8 @@ const MS_PER_SECOND = 1000;
 const DUBBED = 'dubbed';
 const FAILED = 'failed';
 const DEFAULT_AUDIO_MIME = 'audio/mpeg';
+const HISTORY_ITEM_HEADER = 'history-item-id';
+const HTTP_NOT_FOUND = 404;
 
 type Config = { apiKey: string; baseUrl?: string; fetchFn?: typeof fetch };
 
@@ -60,7 +62,9 @@ export function elevenLabs(config: Config): AudioProvider {
 
   async function audioOf(res: Response): Promise<AudioFile> {
     const bytes = new Uint8Array(await res.arrayBuffer());
-    return { bytes, mime: res.headers.get('content-type') ?? DEFAULT_AUDIO_MIME };
+    const mime = res.headers.get('content-type') ?? DEFAULT_AUDIO_MIME;
+    const historyItemId = res.headers.get(HISTORY_ITEM_HEADER);
+    return historyItemId ? { bytes, mime, historyItemId } : { bytes, mime };
   }
 
   function postJson(path: string, body: unknown): Promise<AudioFile> {
@@ -71,7 +75,22 @@ export function elevenLabs(config: Config): AudioProvider {
     }).then(audioOf);
   }
 
+  async function forget(path: string): Promise<void> {
+    const res = await fetchFn(`${base}${path}`, { method: 'DELETE', headers: auth });
+    if (!res.ok && res.status !== HTTP_NOT_FOUND) {
+      throw await readableError(res);
+    }
+  }
+
   return {
+    forgetDubbing(jobId) {
+      return forget(`/v1/dubbing/${encodeURIComponent(jobId)}`);
+    },
+
+    forgetHistoryItem(historyItemId) {
+      return forget(`/v1/history/${encodeURIComponent(historyItemId)}`);
+    },
+
     speak({ text, voiceId, model, settings }) {
       const body = hasSettings(settings)
         ? { text, model_id: model, voice_settings: settings }
