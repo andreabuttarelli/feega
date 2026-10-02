@@ -7,7 +7,6 @@
   import { detectInAppBrowser, androidIntentUrl, type InAppBrowser } from '$lib/in-app-browser';
   import { sanitizeWebsiteParam } from '$lib/website-param';
   import { legalHref } from '$lib/legal-links';
-  import LegalFooter from '$lib/components/LegalFooter.svelte';
   let { form, data } = $props();
   let loading = $state(false);
   let showPassword = $state(false);
@@ -255,9 +254,6 @@
         {/if}
       {/if}
 
-      <div class="legal-wrap">
-        <LegalFooter />
-      </div>
     </div>
   </section>
   <aside class="pane visual-pane" aria-hidden="true"></aside>
@@ -490,9 +486,6 @@
     text-decoration: underline;
   }
 
-  .legal-wrap {
-    margin-top: 24px;
-  }
 
   /* ---- CLI login notice ---- */
   .cli-notice {

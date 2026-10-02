@@ -27,10 +27,9 @@ describe('la pagina di accesso mostra la notizia legale', () => {
   });
 });
 
-describe('la pagina di accesso porta anche il footer legale completo', () => {
-  it('monta LegalFooter', () => {
-    expect(page).toMatch(/import LegalFooter from '\$lib\/components\/LegalFooter\.svelte'/);
-    expect(page).toMatch(/<LegalFooter/);
+describe('la pagina di accesso tiene solo i link dell avviso', () => {
+  it('non monta LegalFooter', () => {
+    expect(page).not.toMatch(/LegalFooter/);
   });
 });
 
