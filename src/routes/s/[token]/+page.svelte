@@ -44,7 +44,7 @@
             <img src={node.view.url} alt={node.displayName ?? ''} />
           {:else if node.view.kind === 'video'}
             <!-- svelte-ignore a11y_media_has_caption -->
-            <video src={node.view.url} controls playsinline class="nodrag"></video>
+            <video src={node.view.url} controls playsinline preload="metadata" class="nodrag"></video>
           {:else if node.view.kind === 'audio'}
             <AudioResult nodeId={node.id} videoUrl={node.view.videoUrl} audioUrl={node.view.audioUrl} files={[]} />
           {:else if node.view.kind === 'text'}

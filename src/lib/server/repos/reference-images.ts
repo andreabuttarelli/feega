@@ -73,7 +73,7 @@ export async function findReferenceImages(db: Db, ids: string[]): Promise<Map<st
 }
 
 export async function signReferenceImages(db: Db, paths: string[], preset?: ThumbnailPreset): Promise<Map<string, string>> {
-  return signThumbnailUrls(() => untyped(db).storage.from(REFERENCE_IMAGES_BUCKET), paths, SIGNED_URL_SECONDS, preset);
+  return signThumbnailUrls({ name: REFERENCE_IMAGES_BUCKET, open: () => untyped(db).storage.from(REFERENCE_IMAGES_BUCKET) }, paths, SIGNED_URL_SECONDS, preset);
 }
 
 export type CatalogueImage = { id: string; name: string; url: string | null };

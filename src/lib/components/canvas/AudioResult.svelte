@@ -19,7 +19,7 @@
 <div class="audio-result" data-testid="audio-result">
   {#if videoUrl}
     <!-- svelte-ignore a11y_media_has_caption -->
-    <video src={videoUrl} controls playsinline data-testid="dubbed-video"></video>
+    <video src={videoUrl} controls playsinline preload="metadata" data-testid="dubbed-video"></video>
   {/if}
   {#if audioUrl}
     <AudioPlayer src={audioUrl} cacheKey={audioUrl} filename={null} />
