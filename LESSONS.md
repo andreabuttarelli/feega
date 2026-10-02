@@ -2206,3 +2206,10 @@ tests pass. Cause: fixtures used `output_asset_id`/`status: 'done'` (never on `n
 `canvasNodeOf` mapped unknown types to `iframe`. Move: build fixtures from what `generate.ts`
 writes (`refId`, `running`, `error`, `outputRefs`); read node media only via
 `node-media.ts`; map a row to its graph kind from `NODE_KINDS`, not a hand list.
+
+## Layout broken until reload
+Signal: the canvas (or any app page) gains margins or odd spacing; a reload fixes it. Cause: a
+page that imports a global stylesheet (`landing.css` on `/changelog`) was reached by client
+navigation; Vite keeps its CSS in the document, and its bare class names (`.wrap`, `.btn`) hit
+app components on the way back. Move: in DevTools, find the rule on the element and its source
+file; a link from the app to such a page carries `data-sveltekit-reload`.
