@@ -111,4 +111,34 @@ describe('elevenLabs adapter', () => {
       'ElevenLabs 401: This request exceeds your quota.'
     );
   });
+
+  it('carries the history item id ElevenLabs keeps for a generation', async () => {
+    const { provider } = recorder(() => new Response(MP3, { status: 200, headers: { 'content-type': 'audio/mpeg', 'history-item-id': 'h1' } }));
+    const out = await provider.speak({ text: 'Ciao', voiceId: 'v1', model: 'm', settings: {} });
+    expect(out.historyItemId).toBe('h1');
+  });
+
+  it('deletes a dubbing project with DELETE /v1/dubbing/{id}', async () => {
+    const { calls, provider } = recorder(() => Response.json({ status: 'ok' }));
+    await provider.forgetDubbing('dub1');
+    expect(calls[0].url).toBe('https://api.test/v1/dubbing/dub1');
+    expect(calls[0].init.method).toBe('DELETE');
+  });
+
+  it('deletes a history item with DELETE /v1/history/{id}', async () => {
+    const { calls, provider } = recorder(() => Response.json({ status: 'ok' }));
+    await provider.forgetHistoryItem('h1');
+    expect(calls[0].url).toBe('https://api.test/v1/history/h1');
+    expect(calls[0].init.method).toBe('DELETE');
+  });
+
+  it('a delete of something already gone counts as done', async () => {
+    const { provider } = recorder(() => Response.json({ detail: 'not found' }, { status: 404 }));
+    await expect(provider.forgetDubbing('gone')).resolves.toBeUndefined();
+  });
+
+  it('a delete ElevenLabs refuses throws, so the caller retries', async () => {
+    const { provider } = recorder(() => Response.json({ detail: 'boom' }, { status: 500 }));
+    await expect(provider.forgetHistoryItem('h1')).rejects.toThrow(/500/);
+  });
 });

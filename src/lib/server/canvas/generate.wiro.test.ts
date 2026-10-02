@@ -33,7 +33,7 @@ const models: Record<string, WiroModel> = {
   }
 };
 
-const gateway = { run: vi.fn(), task: vi.fn() };
+const gateway = { run: vi.fn(), task: vi.fn(), purge: vi.fn() };
 const bill = vi.fn();
 const decide = vi.fn();
 const judge = vi.fn();
@@ -63,7 +63,7 @@ vi.mock('$lib/server/canvas/upstream', () => ({
 }));
 
 beforeEach(async () => {
-  for (const fn of [gateway.run, gateway.task, bill, decide, judge, decideIdentifiability, judgeIdentifiability, record]) {
+  for (const fn of [gateway.run, gateway.task, gateway.purge, bill, decide, judge, decideIdentifiability, judgeIdentifiability, record]) {
     fn.mockReset();
   }
   decide.mockResolvedValue({ choice: 'safe', probabilities: { safe: 0.999 } });
@@ -287,6 +287,7 @@ describe('the run tick finishes a Wiro task', () => {
     expect(asset).toMatchObject({ type: 'image', uncensored: true, source: 'generated' });
     expect(String(asset.url)).toMatch(new RegExp(`^${USER}/uncensored/wiro/.+\\.png$`));
     expect(bill).toHaveBeenCalledWith(expect.objectContaining({ costUsd: 0.013, uncensored: true }));
+    expect(gateway.purge).not.toHaveBeenCalled();
     const shown = calls.find((c) => c.table === 'nodes' && c.op === 'update' && JSON.stringify(c.payload).includes('outputUncensored'));
     expect(shown).toBeTruthy();
   });
@@ -314,5 +315,15 @@ describe('the run tick finishes a Wiro task', () => {
     expect(await reconcileWiroNodeRuns(db)).toMatchObject({ failed: 1 });
     const failed = calls.find((c) => c.table === 'node_runs' && c.op === 'update' && (c.payload as Record<string, unknown>)?.status === 'failed');
     expect((failed?.payload as Record<string, unknown>).error).toBe('wiro_task_failed: exit 1');
+  });
+});
+
+describe('wiroPurgers', () => {
+  it('deletes a task at Wiro by its own task id', async () => {
+    const { wiroPurgers } = await import('./wiro-run');
+    gateway.purge.mockResolvedValue('purged');
+
+    expect(await wiroPurgers(gateway)['wiro:']('wiro:2221')).toBe('purged');
+    expect(gateway.purge).toHaveBeenCalledWith('2221');
   });
 });

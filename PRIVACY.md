@@ -81,6 +81,8 @@ Some providers are outside the EEA, mainly in the United States. Transfers rely 
 | Deleted canvas nodes | soft-deleted, then [PURGE PERIOD] |
 | Social access tokens | until you disconnect the account |
 | Usage logs (AI calls) | [PERIOD] |
+| Inputs and outputs at Wiro and ElevenLabs (dubbing projects, history items) | deletion requested once our copy is stored or the job has failed; retried for up to 7 days |
+| Inputs and outputs at other AI providers | per provider retention |
 | Moderation logs | [PERIOD] |
 | Age-verification result | while the account exists |
 | Invoices and billing records | 10 years (Italian tax law) |

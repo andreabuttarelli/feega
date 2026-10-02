@@ -48,5 +48,6 @@
 20. **AI labelling**: only the IPTC XMP marker is live; C2PA signing is off (no certificate, dependency removed) and there is no visible "AI-generated" label outside the uncensored workspace page copy. Confirm "being rolled out" wording is acceptable under Art. 50(2).
 21. **Legal notice**: which Art. 7 D.Lgs. 70/2003 fields apply to the chosen legal form.
 22. **Framer marketing site**: cookies and its own consent banner.
+24. **AI provider retention** (SUBPROCESSORS "What stays at AI providers"): deletion at Wiro and ElevenLabs is best-effort with a 7-day retry window; Wiro keeps task parameters including the prompt; OpenRouter images/videos endpoints and ElevenLabs music, sound effects and isolation are not covered unless a history item is reported. Confirm the wording and whether ZDR or ElevenLabs zero retention is required.
 
 - **Indemnity (TERMS §17):** is the likeness-focused indemnity enforceable against business users, and is the fault-based consumer carve-out enough to avoid an unfair-term finding under Codice del Consumo art. 33?

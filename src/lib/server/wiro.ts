@@ -1,4 +1,5 @@
 import { createHmac } from 'node:crypto';
+import type { PurgeOutcome } from './canvas/provider-purge';
 import type { WiroGateway, WiroTask } from './canvas/wiro-gateway';
 
 export const DEFAULT_WIRO_BASE_URL = 'https://api.wiro.ai/v1';
@@ -6,6 +7,7 @@ export const DEFAULT_WIRO_BASE_URL = 'https://api.wiro.ai/v1';
 const FINISHED = 'task_postprocess_end';
 const FAILED_STATUSES = new Set(['task_cancel', 'task_error', 'task_kill']);
 const SUCCESS_EXIT = '0';
+const PURGEABLE_STATUSES = new Set([FINISHED, 'task_cancel']);
 
 type WiroConfig = {
   apiKey: string;
@@ -19,6 +21,7 @@ type WiroReply = { result?: boolean; errors?: Array<{ message?: string } | strin
 
 type TaskRow = {
   status?: string;
+  socketaccesstoken?: string;
   pexit?: string;
   totalcost?: string;
   debugoutput?: string;
@@ -92,6 +95,16 @@ export function wiro(config: WiroConfig): WiroGateway {
     async task(taskId) {
       const reply = await post<WiroReply & { tasklist?: TaskRow[] }>('/Task/Detail', { taskid: taskId });
       return taskOf(reply.tasklist?.[0]);
+    },
+
+    async purge(taskId): Promise<PurgeOutcome> {
+      const reply = await post<WiroReply & { tasklist?: TaskRow[] }>('/Task/Detail', { taskid: taskId });
+      const row = reply.tasklist?.[0];
+      if (!row?.socketaccesstoken || !PURGEABLE_STATUSES.has(row.status ?? '')) {
+        return 'not_ready';
+      }
+      await post('/Task/InputOutputDelete', { tasktoken: row.socketaccesstoken });
+      return 'purged';
     }
   };
 }

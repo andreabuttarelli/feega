@@ -7,6 +7,7 @@ import type { GenParams } from '$lib/canvas/gen-node';
 import type { WiroFields, WiroWireSpec } from '$lib/server/wiro-catalogue';
 import { screenGeneration, type ScreenPorts } from '$lib/server/moderation/screen';
 import type { WiroGateway, WiroOutput } from './wiro-gateway';
+import type { Purgers } from './provider-purge';
 import { STORAGE_FOLDER, type ProjectMode } from '$lib/project-mode';
 import { ModerationProfile, profileOf } from '$lib/server/moderation/profiles';
 import { likenessRefusal, type ProvenanceEntry } from './likeness-guard';
@@ -216,3 +217,6 @@ export async function finishWiroJob(
   return { state: 'landed', asset, costUsd: task.costUsd, uncensored: model.uncensored };
 }
 
+export function wiroPurgers(gateway: WiroGateway): Purgers {
+  return { [WIRO_JOB_PREFIX]: (externalJobId) => gateway.purge(externalJobId.slice(WIRO_JOB_PREFIX.length)) };
+}

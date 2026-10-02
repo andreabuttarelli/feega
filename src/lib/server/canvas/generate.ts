@@ -237,7 +237,13 @@ async function runAudioNode(db: Db, input: StartRun, run: NodeRun, upstream: Ups
       await setExternalJob(db, { orgId: input.orgId, runId: run.id, externalJobId: out.jobId });
       return { kind: 'queued', run: { ...run, externalJobId: out.jobId } };
     }
-    return land(db, input, run, out.asset, out.costUsd, { outputRefs: outputRefsOf(out.outputs) });
+    const landed = await land(db, input, run, out.asset, out.costUsd, { outputRefs: outputRefsOf(out.outputs) });
+    if (out.historyJobId) {
+      await setExternalJob(db, { orgId: input.orgId, runId: run.id, externalJobId: out.historyJobId }).catch((e) =>
+        console.warn('[audio] history item left at ElevenLabs', out.historyJobId, e)
+      );
+    }
+    return landed;
   } catch (error) {
     const message = error instanceof Error ? error.message : 'audio_failed';
     await giveUp(db, input, run, message);

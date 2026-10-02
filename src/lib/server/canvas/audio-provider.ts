@@ -1,4 +1,4 @@
-export type AudioFile = { bytes: Uint8Array; mime: string };
+export type AudioFile = { bytes: Uint8Array; mime: string; historyItemId?: string };
 
 export type VoiceSettings = { stability?: number; similarity_boost?: number; style?: number };
 
@@ -25,4 +25,6 @@ export type AudioProvider = {
   dubbingStatus(jobId: string): Promise<DubbingStatus>;
   dubbedFile(jobId: string, language: string): Promise<AudioFile>;
   voices(): Promise<Voice[]>;
+  forgetDubbing(jobId: string): Promise<void>;
+  forgetHistoryItem(historyItemId: string): Promise<void>;
 };
