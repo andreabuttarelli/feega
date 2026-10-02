@@ -7,10 +7,11 @@ import { SERVICE_ROLE_USES } from '$lib/server/db/service-role-uses';
 import { uncensoredAccess } from '$lib/server/uncensored-access';
 import { modelRefusal, modeOf, ProjectMode } from '$lib/project-mode';
 import { uncensoredLock, UncensoredLock, type UncensoredFacts } from '$lib/uncensored-lock';
-import { VerifierSetting, verifierFor, type AgeVerificationStore, type AgeVerifier } from './age-verification';
+import { VerifierSetting, recordAdult, verifierFor, type AgeVerificationStore, type AgeVerifier } from './age-verification';
+import { AgeVerdict, DIDIT_PROVIDER, diditFromEnv, diditVerifier, type Didit, type DiditResult } from './didit';
 
 const UNCENSORED_FLAG = 'uncensored_mode';
-const VERIFICATION_WRITE_USE = 'src/lib/server/uncensored-workspace/age-verification.ts — recordAgeVerification';
+const VERIFICATION_WRITE_USE = 'src/lib/server/uncensored-workspace/age-verification.ts — recordAdult';
 
 function untyped(db: Db): SupabaseClient {
   return db as unknown as SupabaseClient;
@@ -20,8 +21,16 @@ function devManualOn(): boolean {
   return dev && env.UNCENSORED_DEV_MANUAL_VERIFICATION === 'true';
 }
 
+export function configuredDidit(): Didit | null {
+  const config = diditFromEnv(env);
+  if (!config) {
+    return null;
+  }
+  return diditVerifier(config, { fetch: globalThis.fetch, now: () => Math.floor(Date.now() / 1000) });
+}
+
 export function configuredVerifier(): AgeVerifier | null {
-  return verifierFor(devManualOn() ? VerifierSetting.DevManual : VerifierSetting.None);
+  return configuredDidit() ?? verifierFor(devManualOn() ? VerifierSetting.DevManual : VerifierSetting.None);
 }
 
 async function flagOn(db: Db): Promise<boolean> {
@@ -43,9 +52,11 @@ function writerDb(): Db {
 export function ageStore(db: Db): AgeVerificationStore {
   return {
     async save(row) {
-      const { error } = await untyped(writerDb())
-        .from('user_age_verifications')
-        .insert({ user_id: row.userId, provider: row.provider, method: row.method, result: 'adult' });
+      const table = untyped(writerDb()).from('user_age_verifications');
+      const fields = { user_id: row.userId, provider: row.provider, method: row.method, result: 'adult' };
+      const { error } = row.sessionId
+        ? await table.upsert({ ...fields, provider_session_id: row.sessionId }, { onConflict: 'provider_session_id', ignoreDuplicates: true })
+        : await table.insert(fields);
       if (error) {
         throw error;
       }
@@ -113,4 +124,14 @@ export async function canvasReachable(db: Db, found: { orgId: string; mode: Proj
     return true;
   }
   return (await uncensoredLockFor(db, { orgId: found.orgId, userId })) === UncensoredLock.Open;
+}
+
+export async function settleDidit(didit: Didit, result: DiditResult): Promise<void> {
+  if (result.verdict === AgeVerdict.Pending) {
+    return;
+  }
+  if (result.verdict === AgeVerdict.Adult) {
+    await recordAdult(ageStore(writerDb()), { provider: DIDIT_PROVIDER, userId: result.userId, sessionId: result.sessionId });
+  }
+  await didit.forget(result.sessionId).catch((err: unknown) => console.error("didit_erase_failed", result.sessionId, err));
 }

@@ -49,7 +49,11 @@ export const load: PageServerLoad = async (event) => {
 export const actions: Actions = {
   verify: async (event) => {
     const { db, orgId, userId } = await scopeFor(event);
-    const out = await verifyUserAge(db, { orgId, userId });
+    const returnUrl = new URL(`/p/${event.params.projectId}/uncensored/verified`, event.url.origin).href;
+    const out = await verifyUserAge(db, { orgId, userId, returnUrl });
+    if ('redirect' in out) {
+      throw redirect(303, out.redirect);
+    }
     if (!out.ok) {
       return fail(HTTP_FORBIDDEN, { error: out.error });
     }

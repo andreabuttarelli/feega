@@ -79,7 +79,7 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
     tables: ['orgs_members', 'orgs', 'account_deletions', 'profiles', 'chat_threads', 'nodes', 'posts', 'chat_messages']
   },
   {
-    path: 'src/lib/server/uncensored-workspace/age-verification.ts — recordAgeVerification',
+    path: 'src/lib/server/uncensored-workspace/age-verification.ts — recordAdult',
     why: "Un esito di verifica dell'età lo scrive il provider certificato, non l'utente: `user_age_verifications` non ha policy di scrittura, così nessuno può dichiararsi maggiorenne da solo. Lo user_id è quello della sessione che ha avviato la verifica, mai un valore scelto da chi chiama; si salva solo l'esito 18+, nessun documento.",
     tables: ['user_age_verifications']
   },

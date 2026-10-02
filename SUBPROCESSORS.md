@@ -25,6 +25,14 @@ feega (**[LEGAL ENTITY]**, VAT no. **[VAT]**, **[ADDRESS]**) uses the providers 
 | ElevenLabs | voice-over, music and sound generation | script text, chosen voice, generated audio | US / EU | DPF / SCCs |
 | TypeSafe (Jev classifier) | first-stage prompt moderation | prompt text, reference descriptions | [LOCATION] | [SCCs — to confirm] |
 
+## Age verification
+
+| Provider | Purpose | Personal data | Location | Transfer mechanism |
+|---|---|---|---|---|
+| Didit (Didit Identity Spain, S.L., Barcelona) | one-time 18+ check for uncensored mode: age estimation from a selfie, ID document only when the estimate is not conclusive | selfie and liveness capture; ID document only on fallback; our user ID as session reference | EU — AWS Ireland (eu-west-1) | none needed (EEA); Didit's DPA is Annex 2 of its Business Terms |
+
+Didit sends us only the outcome (over 18 or not) and a session ID. Once the outcome is final we ask Didit to erase the session, without keeping face templates.
+
 Google Gemini models are reached through OpenRouter; the current code does not call the Google Gemini API directly.
 
 ### What stays at AI providers after a generation

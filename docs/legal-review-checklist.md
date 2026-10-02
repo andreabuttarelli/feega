@@ -11,7 +11,7 @@
 - Account deletion flow `[HOW]` — no self-serve deletion found in the code.
 - Retention periods: account closure, backups, soft-deleted nodes purge, AI call logs, moderation logs, Sentry, analytics.
 - Provider locations: Supabase region, Wiro, TypeSafe/Jev, Zernio, PostHog host, Seline.
-- `[AGE VERIFICATION PROVIDER]` — not chosen; the code has no certified verifier yet.
+- Age verification provider: **Didit** (Didit Identity Spain, S.L.; EU processing, AWS Ireland). Didit is **not** claimed AGCOM-compliant (AGCOM's double-anonymity scheme targets pornographic sites); acceptable because uncensored mode excludes pornographic content. Holds FSM Jugendschutz certification (Germany). Confirm the DPA (Annex 2 of Didit's Business Terms) and that the per-session privacy erasure we request is enough without a console retention setting.
 
 ## Points to confirm
 

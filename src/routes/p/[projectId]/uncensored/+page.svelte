@@ -3,10 +3,18 @@
   import { Panel } from '$lib/components/ui/panel';
   import { Button } from '$lib/components/ui/button';
   import { Notice } from '$lib/components/ui/notice';
+  import { page } from '$app/state';
+  import { legalHref } from '$lib/legal-links';
   import { UNCENSORED_LOCK_TEXT, UncensoredLock } from '$lib/uncensored-lock';
+
+  const AGE_NOTICE: Readonly<Record<string, string>> = {
+    failed: 'We could not confirm you are 18 or over. You can try again.',
+    pending: 'Your check is being reviewed. Come back in a few minutes.'
+  };
 
   let { data, form } = $props();
   const failure = $derived((form as { error?: string } | null)?.error ?? null);
+  const ageNotice = $derived(AGE_NOTICE[page.url.searchParams.get('age') ?? ''] ?? null);
 </script>
 
 <div class="uncensored-page" data-testid="uncensored-workspace">
@@ -22,8 +30,13 @@
     {#if data.lock === UncensoredLock.ComingSoon}
       <div data-testid="uncensored-coming-soon"><Notice class="mb-0">{data.text}</Notice></div>
     {:else if data.lock === UncensoredLock.AgeUnverified}
-      <form method="POST" action="?/verify" use:enhance>
+      <form method="POST" action="?/verify" use:enhance data-testid="uncensored-age-step">
         <p>{data.text}</p>
+        <p>We check your age once with Didit, an age-verification provider, using a quick selfie. An ID document is asked only if the selfie is not conclusive.</p>
+        <p>We keep only the result — over 18 or not — with the date. No photo or document reaches us, and we ask Didit to delete the check as soon as it is decided. <a href={legalHref('privacy')} target="_blank" rel="noopener">Privacy policy</a></p>
+        {#if ageNotice}
+          <Notice class="mb-0">{ageNotice}</Notice>
+        {/if}
         <Button type="submit" data-testid="uncensored-verify">Verify my age</Button>
       </form>
     {:else}
