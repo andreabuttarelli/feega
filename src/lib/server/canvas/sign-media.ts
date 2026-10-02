@@ -54,8 +54,8 @@ export async function signAssetPaths(
   }
 
   const [rendered, uploaded] = await Promise.all([
-    signKnowledgePaths(serviceDb as never, paths.generated, ttlSeconds ?? 60 * 60 * 2, preset),
-    signAssetFiles(serviceDb, paths.uploaded, ttlSeconds ?? 300, preset)
+    signKnowledgePaths(serviceDb as never, paths.generated, ttlSeconds ?? SIGNED_URL_TTL_S.canvas, preset),
+    signAssetFiles(serviceDb, paths.uploaded, ttlSeconds ?? SIGNED_URL_TTL_S.canvas, preset)
   ]);
 
   return new Map([...rendered, ...uploaded]);

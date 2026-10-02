@@ -7,6 +7,7 @@ import { createAssetSigningDb, signAssetPaths } from '$lib/server/canvas/sign-me
 import type { ThumbnailPreset } from '$lib/server/media-thumbnails';
 import { AssetSize, sizeOf } from '$lib/canvas/asset-url';
 import { canvasReachable } from '$lib/server/uncensored-workspace/workspace-server';
+import { CANVAS_REDIRECT_MAX_AGE_S } from '$lib/server/repos/asset-storage';
 
 const IMAGE_PRESET_OF: Record<AssetSize, ThumbnailPreset | undefined> = {
   [AssetSize.Thumb]: 'nodeThumbnail',
@@ -77,6 +78,6 @@ export const GET: RequestHandler = async ({ params, locals, url }) => {
 
   return new Response(null, {
     status: 302,
-    headers: { Location: signed, 'Cache-Control': 'no-store' }
+    headers: { Location: signed, 'Cache-Control': `private, max-age=${CANVAS_REDIRECT_MAX_AGE_S}` }
   });
 };

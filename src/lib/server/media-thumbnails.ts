@@ -38,55 +38,86 @@ type SignedUrlBucket = {
   createSignedUrls: (paths: string[], ttl: number) => Promise<{ data: { path: string | null; signedUrl: string | null }[] | null; error: unknown }>;
 };
 
-/**
- * FIRMA UN LOTTO DI PATH, CON O SENZA MINIATURA.
- *
- * `createSignedUrls` (il batch) non applica `transform`: l'endpoint lo ignora in silenzio — una
- * miniatura richiesta a lotti torna piena, e il risparmio di banda che questo file esiste per dare
- * sparisce senza un errore che lo segnali. `createSignedUrl` (singolare) lo applica, quindi con un
- * preset si firma un path alla volta, in parallelo — nessun lotto quando la miniatura conta.
- *
- * `bucket` È UNA FABBRICA, NON L'OGGETTO GIÀ COSTRUITO: `db.storage.from(...)` deve restare non
- * chiamato quando `paths` è vuoto — un client di test senza `.storage` (`generate.test.ts`) non lo
- * implementa, e valutarlo comunque lo fa esplodere per un giro che non aveva niente da firmare.
- */
-export async function signThumbnailUrls(
-  bucket: () => SignedUrlBucket,
+export type SigningBucket = { name: string; open: () => SignedUrlBucket };
+
+type Minted = { url: string; renewAt: number };
+
+const MS_PER_S = 1000;
+const REUSABLE_SHARE_OF_TTL = 0.5;
+const MINTED_CAPACITY = 5000;
+const minted = new Map<string, Minted>();
+
+function mintedKey(bucket: string, path: string, ttlSeconds: number, preset: ThumbnailPreset | undefined): string {
+  return [bucket, ttlSeconds, preset ?? 'full', path].join('|');
+}
+
+function reusable(key: string, now: number): string | null {
+  const entry = minted.get(key);
+  if (!entry || entry.renewAt <= now) {
+    return null;
+  }
+  return entry.url;
+}
+
+function remember(key: string, url: string, ttlSeconds: number, now: number) {
+  minted.delete(key);
+  minted.set(key, { url, renewAt: now + ttlSeconds * MS_PER_S * REUSABLE_SHARE_OF_TTL });
+  if (minted.size <= MINTED_CAPACITY) {
+    return;
+  }
+  const oldest = minted.keys().next().value;
+  if (oldest !== undefined) {
+    minted.delete(oldest);
+  }
+}
+
+async function mint(
+  storage: SignedUrlBucket,
   paths: string[],
   ttlSeconds: number,
-  preset?: ThumbnailPreset
-): Promise<Map<string, string>> {
-  const clean = [...new Set(paths.filter(Boolean))];
-  if (!clean.length) {
-    return new Map();
-  }
-
-  const storage = bucket();
-
+  preset: ThumbnailPreset | undefined
+): Promise<[string, string][]> {
   if (!preset) {
-    const { data } = await storage.createSignedUrls(clean, ttlSeconds);
-    const signed = new Map<string, string>();
-    for (const row of data ?? []) {
-      if (row.signedUrl && row.path) {
-        signed.set(row.path, row.signedUrl);
-      }
-    }
-    return signed;
+    const { data } = await storage.createSignedUrls(paths, ttlSeconds);
+    return (data ?? []).flatMap((row) => (row.signedUrl && row.path ? [[row.path, row.signedUrl] as [string, string]] : []));
   }
 
   const transform = thumbnailTransform(preset);
   const results = await Promise.all(
-    clean.map(async (path) => {
+    paths.map(async (path) => {
       const { data } = await storage.createSignedUrl(path, ttlSeconds, { transform });
       return [path, data?.signedUrl ?? null] as const;
     })
   );
+  return results.flatMap(([path, url]) => (url ? [[path, url] as [string, string]] : []));
+}
 
+export async function signThumbnailUrls(
+  bucket: SigningBucket,
+  paths: string[],
+  ttlSeconds: number,
+  preset?: ThumbnailPreset
+): Promise<Map<string, string>> {
+  const now = Date.now();
   const signed = new Map<string, string>();
-  for (const [path, signedUrl] of results) {
-    if (signedUrl) {
-      signed.set(path, signedUrl);
+  const missing: string[] = [];
+
+  for (const path of new Set(paths.filter(Boolean))) {
+    const url = reusable(mintedKey(bucket.name, path, ttlSeconds, preset), now);
+    if (url) {
+      signed.set(path, url);
+      continue;
     }
+    missing.push(path);
+  }
+
+  if (!missing.length) {
+    return signed;
+  }
+
+  for (const [path, url] of await mint(bucket.open(), missing, ttlSeconds, preset)) {
+    remember(mintedKey(bucket.name, path, ttlSeconds, preset), url, ttlSeconds, now);
+    signed.set(path, url);
   }
   return signed;
 }

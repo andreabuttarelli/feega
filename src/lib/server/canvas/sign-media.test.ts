@@ -50,7 +50,7 @@ describe('un URL dato a un fornitore scade presto', () => {
       }
     } as unknown as Db;
 
-    await signMediaPaths(db, ['u/media/generated.png']);
+    await signMediaPaths(db, ['u/media/for-provider.png']);
 
     expect(ttls).toEqual({ 'brand-knowledge': 300, 'canvas-assets': 300 });
   });

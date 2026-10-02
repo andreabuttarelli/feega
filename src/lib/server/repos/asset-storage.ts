@@ -3,13 +3,15 @@ import { signThumbnailUrls, type ThumbnailPreset } from '$lib/server/media-thumb
 
 export const CANVAS_ASSET_BUCKET = 'canvas-assets';
 export const SIGNED_URL_TTL_S = {
-  canvas: 300,
+  canvas: 7200,
   agentPreview: 300,
   providerInput: 300,
   userLink: 3600
 } as const;
 
 const SIGNED_URL_SECONDS = SIGNED_URL_TTL_S.canvas;
+const REDIRECT_SHARE_OF_TTL = 4;
+export const CANVAS_REDIRECT_MAX_AGE_S = SIGNED_URL_SECONDS / REDIRECT_SHARE_OF_TTL;
 
 export async function storeAssetFile(db: Db, path: string, file: File): Promise<void> {
   const { error } = await db.storage.from(CANVAS_ASSET_BUCKET).upload(path, file, {
@@ -40,10 +42,10 @@ export async function signAssetFile(db: Db, path: string): Promise<string> {
 export async function signAssetFiles(
   db: Db,
   paths: string[],
-  ttlSeconds = SIGNED_URL_SECONDS,
+  ttlSeconds: number = SIGNED_URL_SECONDS,
   preset?: ThumbnailPreset
 ): Promise<Map<string, string>> {
-  return signThumbnailUrls(() => db.storage.from(CANVAS_ASSET_BUCKET), paths, ttlSeconds, preset);
+  return signThumbnailUrls({ name: CANVAS_ASSET_BUCKET, open: () => db.storage.from(CANVAS_ASSET_BUCKET) }, paths, ttlSeconds, preset);
 }
 
 export const PREVIEW_EDGE_PX = 1024;

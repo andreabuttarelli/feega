@@ -245,7 +245,7 @@ const INFLUENCER_BUCKET = 'influencers';
 const SIGNED_URL_SECONDS = 300;
 
 export async function signInfluencerViewFiles(db: Db, paths: string[], preset?: ThumbnailPreset): Promise<Map<string, string>> {
-  return signThumbnailUrls(() => db.storage.from(INFLUENCER_BUCKET) as never, paths, SIGNED_URL_SECONDS, preset);
+  return signThumbnailUrls({ name: INFLUENCER_BUCKET, open: () => db.storage.from(INFLUENCER_BUCKET) as never }, paths, SIGNED_URL_SECONDS, preset);
 }
 
 export async function insertInfluencerViews(db: Db, views: CreateInfluencerViewInput[]): Promise<InfluencerView[]> {

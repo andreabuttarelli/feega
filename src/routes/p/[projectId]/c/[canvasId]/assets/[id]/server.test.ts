@@ -51,6 +51,13 @@ describe('GET canvas asset', () => {
     expect(vi.mocked(signAssetPaths).mock.calls[0][4]).toBeUndefined();
   });
 
+  it('il redirect a un file firmato si tiene in cache, così il browser non riscarica il file a ogni montaggio', async () => {
+    vi.mocked(signAssetPaths).mockResolvedValueOnce(new Map([['org-1/p1/x.png', 'https://signed.example/x.png?token=1']]));
+    const res = await call(asset({ source: 'upload', url: 'org-1/p1/x.png' }), '?size=512');
+    expect(res.status).toBe(302);
+    expect(res.headers.get('Cache-Control')).toMatch(/^private, max-age=[1-9]\d*$/);
+  });
+
   it('senza size l\'immagine resta intera, per il download e l\'editor', async () => {
     vi.mocked(signAssetPaths).mockClear();
     await Promise.resolve(call(asset({ source: 'upload', url: 'org-1/p1/x.png' }))).catch(() => null);

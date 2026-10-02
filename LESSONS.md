@@ -240,6 +240,15 @@ schema-drift-check fallisce il proprio autotest) e la generazione dei tipi via M
 ovunque, anche su tabelle esistenti. Mossa: applica la migration via MCP, scrivi a mano le voci in
 `database.types.ts` nel formato generato, dillo nel changelog e rigenera appena la quota torna.
 
+### Egress alto con un database minuscolo: guarda gli URL firmati, non le query
+Quota di egress superata con 5 utenti e un database da 100 KB. Gli edge logs per conteggio
+mettono in cima `node_runs` e `assets` (migliaia di GET), ma sommando
+`response.headers.content_length` per path il REST pesa < 1 MB: i byte stanno in
+`/storage/v1/object/sign/...` e `render/image/sign`, con `cf_cache_status` HIT ≈ 0 e lo stesso
+file scaricato decine di volte al giorno. Segnale: stesso path, token diverso a ogni richiesta.
+Mossa: ordina per byte, non per richieste; un file privato deve avere UN URL finché la firma è
+fresca (`signThumbnailUrls` lo ricorda), e un redirect a una firma non è `no-store`.
+
 ### Il test della PR può aspettare il vecchio contratto
 `toHaveBeenCalledWith` con 6 argomenti contro un executor passato a 7 (dev ha aggiunto la riga `job`): fallisce nel merge senza che nessuno abbia toccato il file. Mossa: nel riesame di un merge, fai girare PRIMA i test dei file in conflitto — sono gli unici che fanno da spec su entrambi i lati.
 
