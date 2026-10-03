@@ -16,7 +16,11 @@
   import X from '@lucide/svelte/icons/x';
   import MotionPreview from '$lib/components/motion/MotionPreview.svelte';
   import type { StreamData } from '$lib/components/brand-agent/chat-session.svelte';
-  import { FRAMES_REQUEST, type FramesRequest } from '$lib/motion/frames-request';
+  import { CHECK_REQUEST, FRAMES_REQUEST, type CheckRequest, type FramesRequest } from '$lib/motion/frames-request';
+  import { runCheck, type CheckPorts } from '$lib/motion/custom/run-check';
+  import { recordCheck } from '$lib/motion/custom/ops';
+  import { unverified } from '$lib/motion/custom/determinism';
+  import { CheckState, sourceHash } from '$lib/motion/custom/component';
   import MotionTimeline from '$lib/components/motion/MotionTimeline.svelte';
   import MotionInspector from '$lib/components/motion/MotionInspector.svelte';
   import MaskOverlay from '$lib/components/motion/MaskOverlay.svelte';
@@ -43,9 +47,9 @@
     type KeyRef,
     type OpResult
   } from '$lib/motion/timeline';
-  import { amend, canRedo, canUndo, record, redo, startHistory, undo, type History } from '$lib/motion/history';
+  import { amend, canRedo, canUndo, previousSource, record, redo, startHistory, undo, type History } from '$lib/motion/history';
   import { Snap, clampZoom, timecode } from '$lib/motion/timeline-view';
-  import { parseDecimal, secondsLabel } from '$lib/motion/inspector';
+  import { InspectorTab, parseDecimal, secondsLabel } from '$lib/motion/inspector';
   import { Command, commandFor } from '$lib/motion/shortcuts';
   import { composeHtml } from '$lib/motion/hyperframes/compose';
   import { feegaTrailer } from '$lib/motion/trailer';
@@ -54,6 +58,8 @@
   import type { PageData } from './$types';
 
   const SAVE_DEBOUNCE_MS = 700;
+  const CHECK_WIDTH = 480;
+  const CHECK_DEBOUNCE_MS = 900;
   const COALESCE_MS = 800;
   const HEAD_POLL_TRIES = 6;
   const HEAD_POLL_MS = 500;
@@ -85,6 +91,7 @@
   let waveforms = $state<Record<string, number[]>>({});
   const loadingWaves = new Set<string>();
   let sheet = $state<Sheet>(Sheet.None);
+  let inspectorTab = $state<InspectorTab>(InspectorTab.Properties);
   let preview = $state<MotionPreview | null>(null);
 
   let lastEdit = { summary: '', at: 0 };
@@ -182,11 +189,69 @@
     }
   }
 
-  async function showFrames(part: StreamData) {
-    if (part.type !== FRAMES_REQUEST || !preview) {
+  const checkPorts: CheckPorts = {
+    compose: (d) => composeHtml({ doc: d, tokens: data.tokens, assets: assetUrls }),
+    capture: (times, source) => (preview ? preview.capture(times, source, CHECK_WIDTH) : Promise.reject(new Error('the preview is still loading')))
+  };
+
+  async function answerCheck(request: CheckRequest) {
+    const run = await runCheck(request.doc, request.name, checkPorts);
+    const verdict = { ok: run.check.state === CheckState.Passed, problems: run.check.problems };
+    await fetch(`${agentUrl}/frames`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ callId: request.callId, frames: run.offending, verdict }) });
+  }
+
+  let checking = false;
+  let checkTimer: ReturnType<typeof setTimeout> | null = null;
+
+  async function checkPending() {
+    const next = unverified(history.present).find((u) => u.state === CheckState.Unchecked);
+    if (checking || !next || !preview) {
       return;
     }
-    const request = part.data as FramesRequest;
+    checking = true;
+    try {
+      const run = await runCheck(history.present, next.name, checkPorts);
+      const current = history.present.components[next.name];
+      if (!current || sourceHash(current) !== run.check.hash) {
+        return;
+      }
+      const recorded = recordCheck(history.present, next.name, run.check);
+      if (recorded.ok) {
+        history = amend(history, recorded.doc);
+        scheduleSave(`Checked ${next.name}`);
+      }
+    } finally {
+      checking = false;
+    }
+  }
+
+  $effect(() => {
+    const waiting = unverified(doc).some((u) => u.state === CheckState.Unchecked);
+    if (!waiting) {
+      return;
+    }
+    if (checkTimer) {
+      clearTimeout(checkTimer);
+    }
+    checkTimer = setTimeout(() => void checkPending().then(() => (checkTimer = null)), CHECK_DEBOUNCE_MS);
+  });
+
+  const AGENT_DATA: Record<string, (data: unknown) => Promise<void>> = {
+    [FRAMES_REQUEST]: (d) => showFrames(d as FramesRequest),
+    [CHECK_REQUEST]: (d) => answerCheck(d as CheckRequest)
+  };
+
+  function onAgentData(part: StreamData) {
+    const handle = AGENT_DATA[part.type];
+    if (handle && preview) {
+      void handle(part.data).catch((e) => console.error('[motion] agent request not answered', part.type, e));
+    }
+  }
+
+  async function showFrames(request: FramesRequest) {
+    if (!preview) {
+      return;
+    }
     const agentHtml = composeHtml({ doc: request.doc, tokens: data.tokens, assets: assetUrls });
     const times = request.times.map((t) => Math.min(t, (request.doc.durationInFrames - 1) / FPS));
     const frames = await preview.capture(times, agentHtml).catch((e) => {
@@ -406,7 +471,7 @@
     />
   {/if}
 
-  <div class="body">
+  <div class="body" class:coding={inspectorTab === InspectorTab.Code && selected?.component === 'Custom'}>
     <section class="left">
       <div class="preview">
         <MotionPreview bind:this={preview} {html} width={doc.width} height={doc.height} bind:frame bind:playing>
@@ -466,7 +531,7 @@
     <aside class="props" class:open={sheet === Sheet.Properties} aria-label="Properties">
       <div class="sheet-head"><span>Properties</span><button type="button" aria-label="Close" onclick={() => (sheet = Sheet.None)}><X size={16} /></button></div>
       {#if selected}
-        <MotionInspector {doc} clip={selected} tokens={data.tokens} {assets} {frame} onchange={edit} />
+        <MotionInspector {doc} clip={selected} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} bind:tab={inspectorTab} onchange={edit} />
       {:else}
         <p class="hint">{selection.length > 1 ? `${selection.length} clips selected.` : 'Select a clip in the timeline to edit its properties.'}</p>
       {/if}
@@ -474,7 +539,7 @@
 
     <aside class="chat" class:open={sheet === Sheet.Agent} aria-label="Agent">
       <div class="sheet-head"><span>Agent</span><button type="button" aria-label="Close" onclick={() => (sheet = Sheet.None)}><X size={16} /></button></div>
-      <ChatPanel projectId={data.projectId} motionNodeId={data.node.id} context={() => ({ selection })} onturnend={() => void pullAgentEdit()} ondata={(part) => void showFrames(part)} />
+      <ChatPanel projectId={data.projectId} motionNodeId={data.node.id} context={() => ({ selection })} onturnend={() => void pullAgentEdit()} ondata={onAgentData} />
     </aside>
   </div>
 
@@ -562,6 +627,10 @@
     min-height: 0;
     display: grid;
     grid-template-columns: minmax(0, 1fr) 280px 380px;
+  }
+
+  .body.coding {
+    grid-template-columns: minmax(0, 1fr) 560px 340px;
   }
 
   .left {

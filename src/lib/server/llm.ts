@@ -62,6 +62,12 @@ export function llmVideoReviewerModel(): string {
 	throw new Error(LLM_VIDEO_UNCONFIGURED);
 }
 
+export const DEFAULT_CODE_MODEL = 'anthropic/claude-sonnet-5.5';
+
+export function llmCodeModel(): string {
+	return env.LLM_CODE_MODEL?.trim() || DEFAULT_CODE_MODEL;
+}
+
 export function llmVisionModel(): string | null {
 	try {
 		return llmVideoReviewerModel();

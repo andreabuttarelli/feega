@@ -9,8 +9,8 @@ type Exec = (input: unknown, options: { toolCallId: string }) => Promise<Record<
 
 function setup() {
   let n = 0;
-  const session: MotionSession = { doc: newMotionDoc(MotionFormat.Square), baseVersion: 1, edits: [], selection: [], frames: new Map(), views: 0, checkedAt: 0 };
-  const tools = createMotionTools({ session, assets: [], newId: () => `id${++n}`, voiceover: vi.fn(), frames: vi.fn() });
+  const session: MotionSession = { doc: newMotionDoc(MotionFormat.Square), baseVersion: 1, edits: [], selection: [], frames: new Map(), views: 0, checkedAt: 0, codeWrites: 0 };
+  const tools = createMotionTools({ session, assets: [], newId: () => `id${++n}`, voiceover: vi.fn(), frames: vi.fn(), check: vi.fn() });
   const run = (name: string, input: unknown) => (tools[name] as Tool & { execute: Exec }).execute(input, { toolCallId: 'c' });
   return { session, run };
 }
@@ -75,7 +75,7 @@ describe('motion agent keyframe tools', () => {
 
   it('the catalogue lists what each component animates', async () => {
     const { run } = setup();
-    const catalogue = (await run('list_components', {})) as unknown as { id: string; animates: string[] }[];
+    const catalogue = ((await run('list_components', {})) as unknown as { library: { id: string; animates: string[] }[] }).library;
 
     expect(catalogue.find((c) => c.id === 'Model3D')!.animates).toContain('orbit');
   });

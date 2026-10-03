@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { COMPONENT_IDS, AssetKind, Control, Group, defaultProps } from './components';
 import { Ease } from './design';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
-import { editAt, fieldGroups, fieldsOf, keyAt, keyedField, parseDecimal, secondsLabel, toggleKey, valueAt } from './inspector';
+import { clipFieldGroups, editAt, fieldGroups, fieldsOf, keyAt, keyedField, parseDecimal, secondsLabel, toggleKey, valueAt } from './inspector';
 import { addClip, setKeyframes, setTransform, type OpResult } from './timeline';
+import { writeComponent } from './custom/ops';
+import { PropFormat } from './custom/component';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -148,5 +150,42 @@ describe('which component props are keyframed from the inspector', () => {
     for (const key of ['x', 'y', 'scale', 'opacity']) {
       expect(keyedField('ProductCard', key)).toBe(false);
     }
+  });
+});
+
+describe('properties of a custom clip come from its props schema', () => {
+  it('maps each schema prop to the inspector control that edits it', () => {
+    const doc = must(
+      writeComponent(newMotionDoc(MotionFormat.Landscape), 'Calendar', {
+        source: { html: '', css: '', js: '' },
+        propsSchema: {
+          type: 'object',
+          properties: {
+            month: { type: 'string', title: 'Month', default: 'October' },
+            note: { type: 'string', format: PropFormat.Textarea, default: '' },
+            accent: { type: 'string', format: PropFormat.Color, default: 'brand.accent' },
+            view: { type: 'string', enum: ['week', 'month'], default: 'month' },
+            posts: { type: 'number', minimum: 0, maximum: 30, step: 1, default: 12 },
+            picture: { type: 'string', format: PropFormat.Asset, default: '' },
+            live: { type: 'boolean', default: true }
+          }
+        }
+      })
+    );
+    const clip = findClip(must(addClip(doc, { component: 'Custom', from: 0, props: { name: 'Calendar' } }, 'k')), 'k')!.clip;
+
+    const fields = clipFieldGroups(doc, clip).flatMap((g) => g.fields);
+
+    expect(fields.map((f) => [f.key, f.control])).toEqual([
+      ['month', Control.Text],
+      ['note', Control.Textarea],
+      ['accent', Control.Color],
+      ['view', Control.Select],
+      ['posts', Control.Range],
+      ['picture', Control.Asset],
+      ['live', Control.Toggle]
+    ]);
+    expect(fields[0].label).toBe('Month');
+    expect(fields.find((f) => f.key === 'posts')).toMatchObject({ min: 0, max: 30, step: 1 });
   });
 });

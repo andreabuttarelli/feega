@@ -1,4 +1,5 @@
 import type { MotionDoc } from './doc';
+import type { CustomSource } from './custom/component';
 
 export const HISTORY_LIMIT = 100;
 
@@ -38,4 +39,15 @@ export function canUndo(h: History): boolean {
 
 export function canRedo(h: History): boolean {
   return h.future.length > 0;
+}
+
+export function previousSource(h: History, name: string): CustomSource | null {
+  const now = JSON.stringify(h.present.components[name]?.source ?? null);
+  for (const doc of [...h.past].reverse()) {
+    const source = doc.components?.[name]?.source;
+    if (source && JSON.stringify(source) !== now) {
+      return source;
+    }
+  }
+  return null;
 }

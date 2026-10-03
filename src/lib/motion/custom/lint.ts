@@ -40,6 +40,8 @@ const FORBIDDEN_GLOBALS: Record<string, string> = {
   postMessage: 'no messaging'
 };
 
+export const FORBIDDEN_NAMES = Object.keys(FORBIDDEN_GLOBALS);
+
 const FORBIDDEN_MEMBERS: Record<string, Record<string, string>> = {
   Date: { now: 'time comes from tl, not the clock' },
   Math: { random: 'use rand(), seeded per clip' },

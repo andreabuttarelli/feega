@@ -5,6 +5,7 @@ import { fieldsOf } from '$lib/motion/inspector';
 import type { MotionDoc } from '$lib/motion/doc';
 
 export const VIEW_FRAMES = 'view_frames';
+const FRAME_TOOLS: ReadonlySet<string> = new Set([VIEW_FRAMES, 'write_component', 'patch_component']);
 export const MAX_FRAMES_PER_VIEW = 6;
 export const MAX_VIEWS_PER_TURN = 3;
 export const MAX_FRAME_BYTES = 200_000;
@@ -17,13 +18,15 @@ const SECONDS_PRECISION = 100;
 
 export type Frame = { time: number; bytes: Buffer };
 
-export const FrameUpload = z.object({
-  callId: z.string().regex(/^[A-Za-z0-9_-]{1,80}$/),
-  frames: z
-    .array(z.object({ time: z.number().min(0), data: z.string().max(Math.ceil((MAX_FRAME_BYTES * 4) / 3) + 64) }))
-    .min(1)
-    .max(MAX_FRAMES_PER_VIEW)
-});
+export const FrameUpload = z
+  .object({
+    callId: z.string().regex(/^[A-Za-z0-9_-]{1,80}$/),
+    frames: z
+      .array(z.object({ time: z.number().min(0), data: z.string().max(Math.ceil((MAX_FRAME_BYTES * 4) / 3) + 64) }))
+      .max(MAX_FRAMES_PER_VIEW),
+    verdict: z.object({ ok: z.boolean(), problems: z.array(z.string().max(500)).max(20) }).optional()
+  })
+  .refine((u) => u.frames.length > 0 || u.verdict, 'nothing to upload');
 
 export function decodeFrame(dataUrl: string): Buffer | null {
   const match = JPEG_DATA_URL.exec(dataUrl);
@@ -71,7 +74,7 @@ function framesMessage(frames: Frame[]): ModelMessage {
 }
 
 export function visionStep(input: VisionStepInput): { model?: string; messages?: ModelMessage[] } | undefined {
-  const viewed = input.lastCalls.filter((c) => c.toolName === VIEW_FRAMES).flatMap((c) => input.frames.get(c.toolCallId) ?? []);
+  const viewed = input.lastCalls.filter((c) => FRAME_TOOLS.has(c.toolName)).flatMap((c) => input.frames.get(c.toolCallId) ?? []);
   if (viewed.length) {
     return { model: input.visionModel, messages: [...withoutImages(input.messages), framesMessage(viewed)] };
   }
@@ -94,7 +97,25 @@ export function selfCheckDue(state: CheckState, vision: Vision): boolean {
 
 const TEXT_CONTROLS = new Set([Control.Text, Control.Textarea]);
 
+const TAG = /<[^>]*>/g;
+const STRING_LITERAL = /(['"`])((?:\\.|(?!\1)[^\\])*)\1/g;
+const WORDS = /[a-zA-Z]{3,}\s+[a-zA-Z]/;
+
+function literals(js: string): string[] {
+  return [...js.matchAll(STRING_LITERAL)].map((m) => m[2]).filter((text) => WORDS.test(text));
+}
+
+function customTexts(doc: MotionDoc): string[] {
+  const shown = Object.values(doc.components).flatMap((c) => [c.source.html.replace(TAG, '').replace(/\s+/g, ' ').trim(), ...literals(c.source.js)]);
+  const values = doc.tracks.flatMap((t) => t.clips.filter((c) => c.component === 'Custom').flatMap((c) => Object.entries(c.props).filter(([k]) => k !== 'name').map(([, v]) => v)));
+  return [...shown, ...values].filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
+}
+
 export function docTexts(doc: MotionDoc): string[] {
+  return [...libraryTexts(doc), ...customTexts(doc)];
+}
+
+function libraryTexts(doc: MotionDoc): string[] {
   return doc.tracks.flatMap((t) =>
     t.clips.flatMap((c) =>
       fieldsOf(c.component)

@@ -1,12 +1,12 @@
 <script lang="ts">
   import { onMount, type Snippet } from 'svelte';
   import { FPS } from '$lib/motion/design';
-  import { CAPTURE_REPLY, FrameFormat, type CaptureReply } from '$lib/motion/hyperframes/capture';
+  import { CAPTURE_REPLY, FrameFormat, type CaptureReply, type ClipError } from '$lib/motion/hyperframes/capture';
   import { previewDriver, type ShotRequest } from '$lib/motion/hyperframes/preview-driver';
 
   type Player = HTMLElement & { seek: (t: number) => void; play: () => void; pause: () => void; currentTime: number; iframeElement: HTMLIFrameElement };
 
-  export type CapturedFrame = { time: number; data: string };
+  export type CapturedFrame = { time: number; data: string; layout: string; errors: ClipError[] };
   export type FrameSize = { width: number; height: number };
 
   const RELOAD_DEBOUNCE_MS = 250;
@@ -125,12 +125,13 @@
     }
   }
 
-  export function capture(times: number[], source: string): Promise<CapturedFrame[]> {
-    const request = { format: FrameFormat.Jpeg, width: CAPTURE_WIDTH, height: Math.round((CAPTURE_WIDTH * height) / width), quality: CAPTURE_QUALITY };
+  export function capture(times: number[], source: string, captureWidth = CAPTURE_WIDTH): Promise<CapturedFrame[]> {
+    const request = { format: FrameFormat.Jpeg, width: captureWidth, height: Math.round((captureWidth * height) / width), quality: CAPTURE_QUALITY };
     return borrowed(source, async () => {
       const frames: CapturedFrame[] = [];
       for (const time of times) {
-        frames.push({ time, data: (await shoot(time, request)).url ?? '' });
+        const reply = await shoot(time, request);
+        frames.push({ time, data: reply.url ?? '', layout: reply.layout ?? '', errors: reply.errors ?? [] });
       }
       return frames;
     });

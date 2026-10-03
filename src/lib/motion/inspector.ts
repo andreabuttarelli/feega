@@ -1,10 +1,16 @@
 import { z } from 'zod';
-import { COMPONENTS, Control, Group, type AssetKind, type ComponentId } from './components';
+import { AssetKind, COMPONENTS, Control, Group, type ComponentId } from './components';
 import { FPS } from './design';
 import { Source, ValueKind, animProp, baseValue, sampleColor, sampleTrack, type Animated, type KeyValue } from './keyframes';
 import type { MotionClip, MotionDoc } from './doc';
 import { MASK_PROPS, type MaskKey } from './mask';
 import { removeKeyframes, setKeyframe, setMask, setProps, setTransform, type OpResult } from './timeline';
+import { PropFormat, type PropSpec, type PropsSchema } from './custom/component';
+
+export enum InspectorTab {
+  Properties = 'properties',
+  Code = 'code'
+}
 
 export type Field = {
   key: string;
@@ -73,6 +79,48 @@ export function fieldsOf(id: ComponentId): Field[] {
 export function fieldGroups(id: ComponentId): { group: Group; fields: Field[] }[] {
   const fields = fieldsOf(id);
   return GROUP_ORDER.map((group) => ({ group, fields: fields.filter((f) => f.group === group) })).filter((g) => g.fields.length > 0);
+}
+
+const RANGE_FALLBACK_MAX = 100;
+
+const FORMAT_CONTROL: Record<PropFormat, Control> = {
+  [PropFormat.Color]: Control.Color,
+  [PropFormat.Textarea]: Control.Textarea,
+  [PropFormat.Asset]: Control.Asset
+};
+
+const TYPE_CONTROL: Record<PropSpec['type'], (spec: PropSpec) => Control> = {
+  string: (spec) => (spec.format ? FORMAT_CONTROL[spec.format] : spec.enum ? Control.Select : Control.Text),
+  number: () => Control.Range,
+  boolean: () => Control.Toggle
+};
+
+export function customFields(schema: PropsSchema): Field[] {
+  return Object.entries(schema.properties).map(([key, spec]) => {
+    const control = TYPE_CONTROL[spec.type](spec);
+    const fallback = spec.default;
+    return {
+      key,
+      label: spec.title ?? key,
+      group: Group.Content,
+      control,
+      min: spec.type === 'number' ? (spec.minimum ?? 0) : undefined,
+      max: spec.type === 'number' ? (spec.maximum ?? Math.max(RANGE_FALLBACK_MAX, Number(fallback ?? 0) * 4)) : undefined,
+      step: spec.type === 'number' ? (spec.step ?? 1) : undefined,
+      options: spec.enum,
+      assetKind: control === Control.Asset ? AssetKind.Image : undefined,
+      fallback
+    };
+  });
+}
+
+export function clipFieldGroups(doc: MotionDoc, clip: MotionClip): { group: Group; fields: Field[] }[] {
+  if (clip.component !== 'Custom') {
+    return fieldGroups(clip.component);
+  }
+  const component = doc.components[String(clip.props.name)];
+  const fields = component ? customFields(component.propsSchema) : [];
+  return fields.length ? [{ group: Group.Content, fields }] : [];
 }
 
 const SECONDS_PRECISION = 100;

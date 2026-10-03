@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CheckState, Strictness, checkState, customValues, parseComponent, sourceHash, type CustomComponent } from './component';
+import { CheckState, PropFormat, Strictness, checkState, customValues, parseComponent, sourceHash, type CustomComponent } from './component';
 
 const counter: CustomComponent = {
   source: { html: '<div class="n"></div>', css: '.n{font-size:120px}', js: 'tl.to(root.querySelector(".n"),{x:100,duration:1});' },
@@ -8,7 +8,7 @@ const counter: CustomComponent = {
     properties: {
       label: { type: 'string', title: 'Label', default: 'Posts' },
       count: { type: 'number', title: 'Count', default: 12, minimum: 0, maximum: 1000 },
-      accent: { type: 'string', format: 'color', default: 'brand.accent' },
+      accent: { type: 'string', format: PropFormat.Color, default: 'brand.accent' },
       layout: { type: 'string', enum: ['row', 'stack'], default: 'row' },
       glow: { type: 'boolean', default: true }
     }
@@ -41,7 +41,8 @@ describe('a custom component', () => {
     const edited = { ...counter, source: { ...counter.source, css: '.n{font-size:100px}' } };
 
     expect(sourceHash(edited)).not.toBe(sourceHash(counter));
-    expect(sourceHash({ ...counter, check: { hash: 'x', state: CheckState.Passed, problems: [] } })).toBe(sourceHash(counter));
+    const checked: CustomComponent = { ...counter, check: { hash: 'x', state: CheckState.Passed, problems: [] } };
+    expect(sourceHash(checked)).toBe(sourceHash(counter));
   });
 
   it('counts as unchecked once the code changed after a passing check', () => {

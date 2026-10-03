@@ -2272,3 +2272,15 @@ Cause: `ready` from the previous `srcdoc` load resolved the wait for the new one
 navigation commits, `contentWindow` is the old document and answers the capture. Move: trust a
 frame only if its reply carries the stamp of the composition you loaded (`preview-driver.ts`),
 and serialize every borrowed capture.
+
+## A motion agent tool fails twenty times on one argument
+Signal: every `write_component` fails with "expected object, received string" and the turn burns
+a dollar retrying. Cause: a `z.unknown()` tool input becomes a JSON schema with no type, and the
+model sends a string. Move: give every tool argument a concrete schema (accept the JSON string
+too), and count refused calls against the per-turn cap.
+
+## A motion turn on Claude dies and saves nothing
+Signal: `tool_choice: type "tool" ... not supported for this model` in the log, revision stays
+at the old version, no `ai_calls` row. Cause: the self-check round forces `view_frames`, which
+Anthropic models on OpenRouter refuse; the error escaped before `finishTurn`. Move: force a tool
+only on models that accept it (`FORCES_TOOL`), and a failed round must still save the edits.

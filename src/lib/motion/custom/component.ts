@@ -85,6 +85,9 @@ type ValueRule = (spec: PropSpec, value: unknown) => string | null;
 
 const TYPE_RULES: Record<PropSpec['type'], ValueRule> = {
   string: (spec, value) => {
+    if (value === null && spec.format === PropFormat.Asset) {
+      return null;
+    }
     if (typeof value !== 'string') {
       return 'expected text';
     }

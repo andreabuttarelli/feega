@@ -20,6 +20,9 @@ export function framesPrefix(scope: FrameScope, callId: string): string {
 
 const nameOf = (index: number, time: number) => `${index}_${time}.jpg`;
 const FRAME_NAME = /^(\d+)_([\d.]+)\.jpg$/;
+const VERDICT_NAME = 'verdict.json';
+
+export type StoredVerdict = { ok: boolean; problems: string[] };
 
 export async function putFrames(bucket: FrameBucket, prefix: string, frames: Frame[]): Promise<boolean> {
   const results = await Promise.all(frames.map((f, i) => bucket.upload(`${prefix}/${nameOf(i, f.time)}`, f.bytes, { contentType: 'image/jpeg', upsert: true })));
@@ -47,6 +50,28 @@ export async function awaitFrames(bucket: FrameBucket, prefix: string, count: nu
     const names = (data ?? []).map((f) => f.name).filter((n) => FRAME_NAME.test(n));
     if (names.length >= count) {
       return readAll(bucket, prefix, names);
+    }
+    await new Promise((r) => setTimeout(r, timing.pollMs));
+  }
+  return null;
+}
+
+export async function putVerdict(bucket: FrameBucket, prefix: string, verdict: StoredVerdict): Promise<boolean> {
+  const { error } = await bucket.upload(`${prefix}/${VERDICT_NAME}`, Buffer.from(JSON.stringify(verdict)), { contentType: 'application/json', upsert: true });
+  return !error;
+}
+
+export async function awaitVerdict(bucket: FrameBucket, prefix: string, timing = { timeoutMs: FRAME_WAIT_MS, pollMs: FRAME_POLL_MS }): Promise<(StoredVerdict & { frames: Frame[] }) | null> {
+  const deadline = Date.now() + timing.timeoutMs;
+  while (Date.now() < deadline) {
+    const { data } = await bucket.list(prefix);
+    const names = (data ?? []).map((f) => f.name);
+    if (names.includes(VERDICT_NAME)) {
+      const { data: blob } = await bucket.download(`${prefix}/${VERDICT_NAME}`);
+      const verdict = JSON.parse(blob ? await blob.text() : '{}') as StoredVerdict;
+      const frames = await readAll(bucket, prefix, names.filter((n) => FRAME_NAME.test(n)));
+      await bucket.remove([`${prefix}/${VERDICT_NAME}`]);
+      return { ok: verdict.ok === true, problems: verdict.problems ?? [], frames };
     }
     await new Promise((r) => setTimeout(r, timing.pollMs));
   }

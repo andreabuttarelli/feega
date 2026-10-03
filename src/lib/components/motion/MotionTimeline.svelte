@@ -194,8 +194,9 @@
   }
 
   function clipLabel(clip: MotionClip): string {
-    const p = clip.props as { text?: string; title?: string };
-    return p.text?.split('\n')[0] ?? p.title ?? COMPONENTS[clip.component].label;
+    const p = clip.props as { text?: string; title?: string; name?: string };
+    const label = clip.component === 'Custom' ? p.name : undefined;
+    return label ?? p.text?.split('\n')[0] ?? p.title ?? COMPONENTS[clip.component].label;
   }
 </script>
 
