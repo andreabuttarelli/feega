@@ -1,11 +1,12 @@
 import { z } from 'zod';
 import { AssetKind, COMPONENTS, Control, Group, type ComponentId } from './components';
 import { FPS } from './design';
-import { Source, ValueKind, animProp, baseValue, sampleColor, sampleTrack, type Animated, type KeyValue } from './keyframes';
+import { Source, ValueKind, animProp, baseValue, sampleColor, sampleTrack, type AnimProp, type Animated, type KeyValue } from './keyframes';
 import type { MotionClip, MotionDoc } from './doc';
 import { MASK_PROPS, type MaskKey } from './mask';
 import { removeKeyframes, setKeyframe, setMask, setProps, setTransform, type OpResult } from './timeline';
 import { PropFormat, type PropSpec, type PropsSchema } from './custom/component';
+import { paramProps, withParams } from './custom/params';
 
 export enum InspectorTab {
   Properties = 'properties',
@@ -102,13 +103,13 @@ export function customFields(schema: PropsSchema): Field[] {
     return {
       key,
       label: spec.title ?? key,
-      group: Group.Content,
+      group: (spec.group as Group | undefined) ?? Group.Content,
       control,
       min: spec.type === 'number' ? (spec.minimum ?? 0) : undefined,
       max: spec.type === 'number' ? (spec.maximum ?? Math.max(RANGE_FALLBACK_MAX, Number(fallback ?? 0) * 4)) : undefined,
       step: spec.type === 'number' ? (spec.step ?? 1) : undefined,
       options: spec.enum,
-      assetKind: control === Control.Asset ? AssetKind.Image : undefined,
+      assetKind: control === Control.Asset ? ((spec.assetKind as AssetKind | undefined) ?? AssetKind.Image) : undefined,
       fallback
     };
   });
@@ -120,7 +121,7 @@ export function clipFieldGroups(doc: MotionDoc, clip: MotionClip): { group: Grou
   }
   const component = doc.components[String(clip.props.name)];
   const fields = component ? customFields(component.propsSchema) : [];
-  return fields.length ? [{ group: Group.Content, fields }] : [];
+  return GROUP_ORDER.map((group) => ({ group, fields: fields.filter((f) => f.group === group) })).filter((g) => g.fields.length > 0);
 }
 
 const SECONDS_PRECISION = 100;
@@ -146,11 +147,14 @@ export function valueAt(clip: Placed, key: string, frame: number, resolve: (colo
     return baseValue(clip, key);
   }
   const local = frame - clip.from;
-  return animProp(clip.component, key)?.kind === ValueKind.Color ? sampleColor(track, local, resolve) : sampleTrack(track, local);
+  return animProp(clip.component, key, clip.params)?.kind === ValueKind.Color ? sampleColor(track, local, resolve) : sampleTrack(track, local);
 }
 
-export function keyedField(component: ComponentId, key: string): boolean {
-  return animProp(component, key)?.source === Source.Prop;
+const KEYED_SOURCES: ReadonlySet<Source> = new Set([Source.Prop, Source.Param]);
+
+export function keyedField(component: ComponentId, key: string, params: readonly AnimProp[] = []): boolean {
+  const source = animProp(component, key, params)?.source;
+  return source !== undefined && KEYED_SOURCES.has(source);
 }
 
 export function keyAt(clip: Placed, key: string, frame: number): boolean {
@@ -161,11 +165,12 @@ const EDIT_BASE: Record<Source, (doc: MotionDoc, clip: MotionClip, key: string, 
   [Source.Transform]: (doc, clip, key, value) => setTransform(doc, clip.id, { [key]: Number(value) }),
   [Source.Prop]: (doc, clip, key, value) => setProps(doc, clip.id, { [key]: value }),
   [Source.Scene]: (doc, clip, key, value, local) => setKeyframe(doc, clip.id, key, local, value),
+  [Source.Param]: (doc, clip, key, value) => setProps(doc, clip.id, { [key]: value }),
   [Source.Mask]: (doc, clip, key, value) => (clip.mask ? setMask(doc, clip.id, { ...clip.mask, [MASK_PROPS[key as MaskKey].field]: Number(value) }) : { ok: false, error: 'add a mask first' })
 };
 
 export function editAt(doc: MotionDoc, clip: MotionClip, key: string, value: KeyValue, frame: number): OpResult {
-  const prop = animProp(clip.component, key);
+  const prop = animProp(clip.component, key, paramProps(doc, clip));
   if (!prop) {
     return { ok: false, error: `${clip.component} cannot animate ${key}` };
   }
@@ -181,7 +186,7 @@ export function toggleKey(doc: MotionDoc, clip: MotionClip, key: string, frame: 
   if (keyAt(clip, key, frame)) {
     return removeKeyframes(doc, clip.id, key, [local]);
   }
-  const value = valueAt(clip, key, frame, resolve);
+  const value = valueAt(withParams(doc, clip), key, frame, resolve);
   if (value === null) {
     return { ok: false, error: `${clip.component} cannot animate ${key}` };
   }

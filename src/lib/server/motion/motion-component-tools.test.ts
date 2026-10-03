@@ -59,6 +59,14 @@ describe('component tools', () => {
     expect(session.doc.components.ChatPanel.check?.state).toBe(CheckState.Failed);
   });
 
+  it('builds the props schema from param() calls when none is given', async () => {
+    const { session, run } = setup();
+    const { props_schema: _schema, ...rest } = CHAT;
+    await run(WRITE_COMPONENT, { ...rest, js: `${CHAT.js} param('message', 'Hi', { type: 'text' });` });
+
+    expect(Object.keys(session.doc.components.ChatPanel.propsSchema.properties)).toEqual(['message']);
+  });
+
   it('takes the props schema as an object or as a JSON string', async () => {
     const { run, schema } = setup();
 
@@ -122,7 +130,7 @@ describe('the authoring contract in the prompt', () => {
   it('names what the static check refuses and how to animate instead', () => {
     const prompt = motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Available, frame: { width: 1080, height: 1920 } });
 
-    for (const name of ['setTimeout', 'requestAnimationFrame', 'fetch', 'Math.random', '@keyframes', 'tl', 'rand()', '1080×1920']) {
+    for (const name of ['param(', 'var(--param-', 'setTimeout', 'requestAnimationFrame', 'fetch', 'Math.random', '@keyframes', 'tl', 'rand()', '1080×1920']) {
       expect(prompt).toContain(name);
     }
   });

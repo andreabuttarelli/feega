@@ -67,6 +67,7 @@ const LANE: Record<Source, (input: LaneInput) => Lane[]> = {
   },
   [Source.Prop]: ({ clip, key, track, resolve }) => [{ target: target(Wrapper.Scale, clip), source: Source.Prop, track, vars: (v) => ({ [cssVar(key)]: resolve(String(v)) }) }],
   [Source.Scene]: () => [],
+  [Source.Param]: () => [],
   [Source.Mask]: ({ clip, key, track, frame }) =>
     clip.mask
       ? MASK_LANES[key as MaskKey].map((a) => ({ target: `#${maskTarget(MaskScope.Own, a.part, clip.id)}`, source: Source.Mask, track, vars: (v) => ({ attr: { [a.attr]: a.out(Number(v), frame) } }) }))

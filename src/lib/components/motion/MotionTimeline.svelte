@@ -4,6 +4,7 @@
   import { COMPONENTS, TrackKind } from '$lib/motion/components';
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
   import { ClipEdge, moveClip, moveKeyframes, moveTrack, setKeyEase, trimClip, type KeyRef, type OpResult } from '$lib/motion/timeline';
+  import { withParams } from '$lib/motion/custom/params';
   import { Grip, Snap, edgeHandles, frameAt, keyLanes, pxPerFrame, rulerTicks, snapped, stackRows, type KeyLane } from '$lib/motion/timeline-view';
   import { MASK_KINDS, Matte } from '$lib/motion/mask';
   import type { MotionTrack } from '$lib/motion/doc';
@@ -293,7 +294,7 @@
         </div>
       </div>
       {#each laneClips(track) as clip (clip.id)}
-        {@const all = keyLanes(clip)}
+        {@const all = keyLanes(withParams(shown, clip))}
         {@const masked = all.filter((l) => l.source === Source.Mask)}
         {#each all.filter((l) => l.source !== Source.Mask) as lane (lane.prop)}{@render keyLane(clip, lane)}{/each}
         {#if masked.length}

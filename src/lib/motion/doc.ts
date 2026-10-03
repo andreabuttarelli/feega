@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { COMPONENT_IDS, CUSTOM_NAME, TrackKind, parseProps, type ComponentId, type PropsVerdict } from './components';
+import { withParams } from './custom/params';
 import { MAX_COMPONENTS, Strictness, customComponentSchema, customValues, type CustomComponents } from './custom/component';
 import { FPS, TRANSITION_KINDS, TransitionKind } from './design';
 import { keyframeSchema, keyframesProblem, transformSchema } from './keyframes';
@@ -137,7 +138,7 @@ function clipProblem(doc: MotionDoc, clip: MotionClip): string | null {
   }
   clip.props = verdict.props;
   clip.keyframes = Object.fromEntries(Object.entries(clip.keyframes).map(([key, track]) => [key, byFrame(track)]));
-  return keyframesProblem(clip);
+  return keyframesProblem(withParams(doc, clip));
 }
 
 function propsProblem(doc: MotionDoc): string | null {

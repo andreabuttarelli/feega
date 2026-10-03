@@ -29,7 +29,8 @@ export enum Source {
   Transform = 'transform',
   Prop = 'prop',
   Scene = 'scene',
-  Mask = 'mask'
+  Mask = 'mask',
+  Param = 'param'
 }
 
 type Range = { label: string; min: number; max: number; step: number; fallback: number };
@@ -105,11 +106,11 @@ export const ANIMATABLE: Record<ComponentId, readonly AnimProp[]> = {
   Custom: visual()
 };
 
-export function animProp(component: ComponentId, key: string): AnimProp | null {
-  return ANIMATABLE[component].find((p) => p.key === key) ?? null;
+export function animProp(component: ComponentId, key: string, params: readonly AnimProp[] = []): AnimProp | null {
+  return ANIMATABLE[component].find((p) => p.key === key) ?? params.find((p) => p.key === key) ?? null;
 }
 
-export type Animated = { component: ComponentId; props: Record<string, unknown>; transform: Transform; keyframes: Keyframes; mask: Mask | null };
+export type Animated = { component: ComponentId; props: Record<string, unknown>; transform: Transform; keyframes: Keyframes; mask: Mask | null; params?: readonly AnimProp[] };
 
 const SCENE_FROM_PROPS: Partial<Record<SceneKey, string>> = { orbit: 'startAngle', dolly: 'zoom' };
 
@@ -120,11 +121,12 @@ const BASE: Record<Source, (clip: Animated, prop: AnimProp) => KeyValue> = {
     const from = SCENE_FROM_PROPS[prop.key as SceneKey];
     return from ? Number(clip.props[from]) : prop.fallback;
   },
-  [Source.Mask]: (clip, prop) => (clip.mask ? maskValue(clip.mask, prop.key as MaskKey) : prop.fallback)
+  [Source.Mask]: (clip, prop) => (clip.mask ? maskValue(clip.mask, prop.key as MaskKey) : prop.fallback),
+  [Source.Param]: (clip, prop) => (prop.kind === ValueKind.Color ? String(clip.props[prop.key]) : Number(clip.props[prop.key]))
 };
 
 export function baseValue(clip: Animated, key: string): KeyValue | null {
-  const prop = animProp(clip.component, key);
+  const prop = animProp(clip.component, key, clip.params);
   return prop ? BASE[prop.source](clip, prop) : null;
 }
 
@@ -146,15 +148,16 @@ const SOURCE_PROBLEM: Record<Source, (clip: Pick<Animated, 'mask'>, key: string)
   [Source.Transform]: () => null,
   [Source.Prop]: () => null,
   [Source.Scene]: () => null,
-  [Source.Mask]: (clip, key) => (clip.mask ? null : `${key}: the clip has no mask, add one first (set_mask)`)
+  [Source.Mask]: (clip, key) => (clip.mask ? null : `${key}: the clip has no mask, add one first (set_mask)`),
+  [Source.Param]: () => null
 };
 
-export function keyframesProblem(clip: Pick<Animated, 'component' | 'keyframes' | 'mask'>): string | null {
+export function keyframesProblem(clip: Pick<Animated, 'component' | 'keyframes' | 'mask' | 'params'>): string | null {
   const { component } = clip;
   for (const [key, track] of Object.entries(clip.keyframes)) {
-    const prop = animProp(component, key);
+    const prop = animProp(component, key, clip.params);
     if (!prop) {
-      const allowed = ANIMATABLE[component].map((p) => p.key).join(', ') || 'nothing';
+      const allowed = [...ANIMATABLE[component], ...(clip.params ?? [])].map((p) => p.key).join(', ') || 'nothing';
       return `${component} cannot animate ${key}; it animates: ${allowed}`;
     }
     const missing = SOURCE_PROBLEM[prop.source](clip, key);

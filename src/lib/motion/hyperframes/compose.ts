@@ -1,6 +1,6 @@
 import { THREE_D_COMPONENTS, type ComponentId } from '../components';
 import { Ease, TransitionKind, type Edge } from '../design';
-import { GSAP_EASE } from '../keyframes';
+import { GSAP_EASE, easeName } from '../keyframes';
 import type { MotionClip, MotionDoc } from '../doc';
 import { resolveColor, type BrandTokens } from '../brand';
 import { css, esc, js, seconds } from './html';
@@ -220,7 +220,12 @@ function customRun(clip: MotionClip, ctx: TemplateCtx<ComponentId>, components: 
   const values = Object.fromEntries(
     Object.entries(component.propsSchema.properties).map(([key, spec]) => [key, spec.format ? RESOLVE[spec.format](given[key], ctx) : given[key]])
   );
-  return { id: clip.id, name, start: ctx.start, length: ctx.length, fps: ctx.fps, values, seed: seedOf(clip.id) };
+  const keys = Object.fromEntries(
+    Object.entries(clip.keyframes)
+      .filter(([key]) => key in component.propsSchema.properties)
+      .map(([key, track]) => [key, track.map((k) => ({ at: round(k.frame / ctx.fps), value: typeof k.value === 'string' ? ctx.color(k.value) : k.value, ease: easeName(k.ease) }))])
+  );
+  return { id: clip.id, name, start: ctx.start, length: ctx.length, fps: ctx.fps, values, seed: seedOf(clip.id), ...(Object.keys(keys).length ? { keys } : {}) };
 }
 
 const LIBRARY_TAGS: Record<Library, { scripts: string[]; tag: string }> = {

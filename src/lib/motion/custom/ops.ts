@@ -2,6 +2,7 @@ import { CUSTOM_NAME } from '../components';
 import { clipsOf, parseMotionDoc, type MotionDoc } from '../doc';
 import type { OpResult } from '../timeline';
 import { lintReport, lintSource } from './lint';
+import { extractParams } from './params';
 import { parseComponent, type ComponentCheck, type CustomSource, type PropsSchema, type SourceFile } from './component';
 
 export type ComponentDraft = { source: CustomSource; propsSchema: PropsSchema };
@@ -22,8 +23,15 @@ export function writeComponent(doc: MotionDoc, name: string, draft: ComponentDra
   if (problems.length) {
     return fail(`the code breaks the authoring contract:\n${lintReport(problems)}`);
   }
+  let declared: ReturnType<typeof extractParams>;
+  try {
+    declared = extractParams(draft.source.js);
+  } catch (e) {
+    return fail(e instanceof Error ? e.message : String(e));
+  }
+  const propsSchema = { type: 'object' as const, properties: { ...draft.propsSchema.properties, ...declared } };
   const previous = doc.components[name];
-  const parsed = parseComponent({ ...draft, version: (previous?.version ?? 0) + 1, check: null });
+  const parsed = parseComponent({ ...draft, propsSchema, version: (previous?.version ?? 0) + 1, check: null });
   if (!parsed.ok) {
     return fail(parsed.error);
   }

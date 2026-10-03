@@ -27,12 +27,14 @@ const propSpecSchema = z
     type: z.enum(['string', 'number', 'boolean']),
     title: z.string().max(60).optional(),
     description: z.string().max(200).optional(),
-    default: z.union([z.string().max(2000), z.number(), z.boolean()]).optional(),
+    default: z.union([z.string().max(2000), z.number(), z.boolean(), z.null()]).optional(),
     minimum: z.number().optional(),
     maximum: z.number().optional(),
     step: z.number().positive().optional(),
     enum: z.array(z.string().max(60)).min(1).max(20).optional(),
     format: z.enum([PropFormat.Color, PropFormat.Textarea, PropFormat.Asset]).optional(),
+    assetKind: z.enum(['image', 'video', 'model3d']).optional(),
+    group: z.enum(['Content', 'Style', 'Layout', 'Motion', 'Camera']).optional(),
     maxLength: z.number().int().positive().max(2000).optional()
   })
   .strict();
@@ -117,7 +119,10 @@ const FALLBACK: Record<PropSpec['type'], (spec: PropSpec) => string | number | b
   boolean: () => false
 };
 
-export function defaultOf(spec: PropSpec): string | number | boolean {
+export function defaultOf(spec: PropSpec): string | number | boolean | null {
+  if (spec.default === null && spec.format === PropFormat.Asset) {
+    return null;
+  }
   return spec.default ?? FALLBACK[spec.type](spec);
 }
 

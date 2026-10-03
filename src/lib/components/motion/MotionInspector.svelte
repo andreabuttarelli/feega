@@ -9,6 +9,7 @@
   import { ANIMATABLE, Source, TRANSFORM, type AnimProp, type KeyValue } from '$lib/motion/keyframes';
   import Dial from './Dial.svelte';
   import CodeEditor from './CodeEditor.svelte';
+  import { withParams } from '$lib/motion/custom/params';
   import type { CustomSource } from '$lib/motion/custom/component';
 
 
@@ -41,6 +42,7 @@
   let error = $state('');
 
   const groups = $derived(clipFieldGroups(doc, clip));
+  const animated = $derived(withParams(doc, clip));
   const customName = $derived(clip.component === 'Custom' ? String(clip.props.name) : null);
   const spec = $derived(COMPONENTS[clip.component]);
   const transformProps = $derived(ANIMATABLE[clip.component].filter((p) => p.source === Source.Transform));
@@ -60,7 +62,7 @@
   }
 
   function setProp(field: Field, value: unknown) {
-    if (keyedField(clip.component, field.key)) {
+    if (keyedField(clip.component, field.key, animated.params)) {
       animate(field.key, value as KeyValue);
       return;
     }
@@ -124,9 +126,9 @@
     commit(setMask(doc, clip.id, { ...mask, ...patch }), 'Edited the mask');
   }
 
-  const shown = (key: string) => valueAt(clip, key, frame, resolve);
+  const shown = (key: string) => valueAt(animated, key, frame, resolve);
   const numberShown = (prop: AnimProp) => Math.round(Number(shown(prop.key)) * 1000) / 1000;
-  const value = (field: Field) => (keyedField(clip.component, field.key) ? shown(field.key) : (clip.props as Record<string, unknown>)[field.key]);
+  const value = (field: Field) => (keyedField(clip.component, field.key, animated.params) ? shown(field.key) : (clip.props as Record<string, unknown>)[field.key]);
   const isHex = (v: unknown) => typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v);
 </script>
 
@@ -251,7 +253,7 @@
       <h4>{group}</h4>
       {#each fields as field (field.key)}
         <div class="row">
-          <label for={`f-${field.key}`}>{#if keyedField(clip.component, field.key)}{@render diamond(field.key)}{/if}{field.label}</label>
+          <label for={`f-${field.key}`}>{#if keyedField(clip.component, field.key, animated.params)}{@render diamond(field.key)}{/if}{field.label}</label>
           {#if field.control === Control.Text}
             <input id={`f-${field.key}`} type="text" value={String(value(field) ?? '')} onchange={(e) => setProp(field, e.currentTarget.value)} />
           {:else if field.control === Control.Textarea}

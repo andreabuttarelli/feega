@@ -63,6 +63,16 @@ describe('a custom component at runtime', () => {
   });
 });
 
+describe('callbacks under the HyperFrames seek', () => {
+  it('an onUpdate on tl still runs when the runtime seeks with events suppressed', () => {
+    const { master, root } = run('Typer', 'tl.to({}, { duration: 1, ease: "none", onUpdate() { root.dataset.p = String(Math.round(this.progress() * 10)); } });', 0);
+
+    master.totalTime(0.5, true);
+
+    expect(root.dataset.p).toBe('5');
+  });
+});
+
 describe('libraries', () => {
   it('loads only the libraries the used code names', () => {
     const components = { A: { source: { html: '', css: '', js: 'new SplitText(root)' } }, B: { source: { html: '', css: '', js: 'lottie.loadAnimation({})' } } } as never;
