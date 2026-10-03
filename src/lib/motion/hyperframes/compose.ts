@@ -7,6 +7,9 @@ import { css, esc, js, seconds } from './html';
 import { TEMPLATES, Timing, type PropsOf, type TemplateCtx, type Tween, type Vars } from './templates';
 import { LIGHTING, threeImportMap, threeScript, type ThreeClip } from './three';
 import { ANIMATE_CSS, animationScript, colourOverrides, sceneKeys, wrapAnimated } from './animate';
+import { MASK_CSS, MaskScope, maskLayer, startValues } from './masks';
+import { hiddenMattes, matteMask, matteSource } from '../matte';
+import { Matte, type Mask } from '../mask';
 
 export const HYPERFRAMES_VERSION = '0.8.114';
 export const GSAP_VERSION = '3.14.2';
@@ -98,16 +101,46 @@ function ctxOf(clip: MotionClip, input: ComposeInput): TemplateCtx<ComponentId> 
   };
 }
 
-function clipHtml(clip: MotionClip, ctx: TemplateCtx<ComponentId>, layer: number, trackIndex: number): string {
-  const template = TEMPLATES[clip.component] as (typeof TEMPLATES)[ComponentId];
-  const inner = wrapAnimated(clip, ctx, template.html(ctx as never));
-  const fx = `<div class="fx" id="fx-${clip.id}">${inner}</div>`;
-  const style = css({ zIndex: layer });
-
-  if (template.timing === Timing.Media) {
-    return `<div class="layer" data-clip="${esc(clip.id)}" style="${style}">${fx}</div>`;
+function ownMask(clip: MotionClip, ctx: TemplateCtx<ComponentId>, inner: string): string {
+  if (!clip.mask) {
+    return inner;
   }
-  return `<div id="c-${clip.id}" class="clip layer" data-clip="${esc(clip.id)}" data-start="${ctx.start}" data-duration="${ctx.length}" data-track-index="${trackIndex}" style="${style}">${fx}</div>`;
+  return maskLayer({ scope: MaskScope.Own, clipId: clip.id, mask: clip.mask, values: startValues(clip.mask, clip.keyframes), frame: ctx, url: ctx.asset(clip.mask.assetId) }, inner);
+}
+
+function matteOf(doc: MotionDoc, clip: MotionClip): Mask | null {
+  if (clip.matte === Matte.None) {
+    return null;
+  }
+  const source = matteSource(doc, clip.id);
+  return source ? matteMask(source, clip.matte) : null;
+}
+
+function matted(clip: MotionClip, ctx: TemplateCtx<ComponentId>, matte: Mask | null, inner: string): string {
+  if (!matte) {
+    return inner;
+  }
+  return maskLayer({ scope: MaskScope.Matte, clipId: clip.id, mask: matte, values: startValues(matte, {}), frame: ctx, url: ctx.asset(matte.assetId) }, inner);
+}
+
+enum Visibility {
+  Shown = 'shown',
+  MatteSource = 'matte-source'
+}
+
+type Placed = { layer: number; trackIndex: number; matte: Mask | null; visibility: Visibility };
+
+function clipHtml(clip: MotionClip, ctx: TemplateCtx<ComponentId>, placed: Placed): string {
+  const template = TEMPLATES[clip.component] as (typeof TEMPLATES)[ComponentId];
+  const inner = matted(clip, ctx, placed.matte, wrapAnimated(clip, ctx, ownMask(clip, ctx, template.html(ctx as never))));
+  const fx = `<div class="fx" id="fx-${clip.id}">${inner}</div>`;
+  const style = css({ zIndex: placed.layer });
+  const layer =
+    template.timing === Timing.Media
+      ? `<div class="layer" data-clip="${esc(clip.id)}" style="${style}">${fx}</div>`
+      : `<div id="c-${clip.id}" class="clip layer" data-clip="${esc(clip.id)}" data-start="${ctx.start}" data-duration="${ctx.length}" data-track-index="${placed.trackIndex}" style="${style}">${fx}</div>`;
+
+  return placed.visibility === Visibility.MatteSource ? `<div class="matte-src" style="display:none">${layer}</div>` : layer;
 }
 
 function tweenLine(t: Tween): string {
@@ -156,7 +189,8 @@ const BASE_CSS = [
   '.layer{position:absolute;inset:0}',
   '.fx{position:absolute;inset:0;will-change:transform,opacity}',
   '.li{display:block;will-change:transform}',
-  ANIMATE_CSS
+  ANIMATE_CSS,
+  MASK_CSS
 ].join('');
 
 function captureScript(doc: MotionDoc): string {
@@ -171,6 +205,7 @@ export function composeHtml(input: ComposeInput): string {
   const holds: Hold[] = [];
   const three: ThreeClip[] = [];
   const clips: MotionClip[] = [];
+  const hidden = hiddenMattes(doc);
   let layer = 0;
 
   for (const { track, index } of bottomFirst) {
@@ -179,7 +214,7 @@ export function composeHtml(input: ComposeInput): string {
       clips.push(clip);
       const template = TEMPLATES[clip.component] as (typeof TEMPLATES)[ComponentId];
       layer += 1;
-      layers.push(clipHtml(clip, ctx, layer, index));
+      layers.push(clipHtml(clip, ctx, { layer, trackIndex: index, matte: matteOf(doc, clip), visibility: hidden.has(clip.id) ? Visibility.MatteSource : Visibility.Shown }));
       const own = template.tweens?.(ctx as never) ?? [];
       tweens.push(...edgeTweens(clip, doc.fps), ...moveTweens(clip, doc.fps), ...own);
       holds.push(...heldUntilStart(own, ctx.start));
