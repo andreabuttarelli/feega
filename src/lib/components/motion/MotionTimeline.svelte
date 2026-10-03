@@ -4,9 +4,8 @@
   import { COMPONENTS, TrackKind } from '$lib/motion/components';
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
   import { ClipEdge, moveClip, moveTrack, trimClip, type OpResult } from '$lib/motion/timeline';
-  import { Snap, frameAt, pxPerFrame, rulerTicks, snapped } from '$lib/motion/timeline-view';
+  import { Grip, Snap, edgeHandles, frameAt, pxPerFrame, rulerTicks, snapped } from '$lib/motion/timeline-view';
 
-  const EDGE_PX = 7;
   const HEADER_PX = 132;
 
   const Drag = { Move: 'move', TrimStart: 'trim-start', TrimEnd: 'trim-end', Scrub: 'scrub' } as const;
@@ -47,23 +46,17 @@
     }
   }
 
-  function dragKindAt(e: PointerEvent, el: HTMLElement): Drag {
-    const rect = el.getBoundingClientRect();
-    if (e.clientX - rect.left <= EDGE_PX) {
-      return Drag.TrimStart;
-    }
-    if (rect.right - e.clientX <= EDGE_PX) {
-      return Drag.TrimEnd;
-    }
-    return Drag.Move;
-  }
+  const GRIP_DRAG: Record<Grip, Drag> = { [Grip.Start]: Drag.TrimStart, [Grip.End]: Drag.TrimEnd };
 
-  function startClip(e: PointerEvent, clip: MotionClip, trackId: string) {
+  function startClip(e: PointerEvent, clip: MotionClip, trackId: string, kind: Drag = Drag.Move) {
     e.stopPropagation();
     select(clip.id, e);
-    const el = e.currentTarget as HTMLElement;
-    el.setPointerCapture(e.pointerId);
-    gesture = { kind: dragKindAt(e, el), clipId: clip.id, trackId, grabFrame: frameOfPointer(e), originFrom: clip.from, base: doc };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    gesture = { kind, clipId: clip.id, trackId, grabFrame: frameOfPointer(e), originFrom: clip.from, base: doc };
+  }
+
+  function clipById(id: string): MotionClip {
+    return shown.tracks.flatMap((t) => t.clips).find((c) => c.id === id) as MotionClip;
   }
 
   function startScrub(e: PointerEvent) {
@@ -166,6 +159,17 @@
               <span class="kind">{COMPONENTS[clip.component].label}</span>
               <span class="label">{clipLabel(clip as MotionClip)}</span>
             </div>
+          {/each}
+          {#each edgeHandles(track.clips, ppf) as handle (`${handle.clipId}-${handle.grip}`)}
+            <div
+              class="grip"
+              data-grip={handle.grip}
+              data-grip-clip={handle.clipId}
+              role="separator"
+              aria-label={`Trim ${handle.grip}`}
+              style={`left: ${handle.left}px; width: ${handle.width}px;`}
+              onpointerdown={(e) => startClip(e, clipById(handle.clipId), track.id, GRIP_DRAG[handle.grip])}
+            ></div>
           {/each}
         </div>
       </div>
@@ -298,22 +302,16 @@
     white-space: nowrap;
   }
 
-  .bar::before,
-  .bar::after {
-    content: '';
+  .grip {
     position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 6px;
+    top: 5px;
+    bottom: 5px;
+    z-index: 2;
     cursor: ew-resize;
   }
 
-  .bar::before {
-    left: 0;
-  }
-
-  .bar::after {
-    right: 0;
+  .grip:hover {
+    background: color-mix(in srgb, #0099ff 45%, transparent);
   }
 
   .bar.selected {

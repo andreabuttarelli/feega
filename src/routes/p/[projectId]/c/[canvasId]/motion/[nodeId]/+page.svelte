@@ -418,10 +418,7 @@
     justify-content: center;
     padding: 16px;
     background: var(--paper-2);
-  }
-
-  .preview :global([data-testid='motion-preview']) {
-    height: 100%;
+    container-type: size;
   }
 
   .transport {

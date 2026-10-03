@@ -90,6 +90,15 @@ describe('MotionDoc to HyperFrames composition', () => {
     }
   });
 
+  it('a long title in a vertical frame shrinks to fit inside the safe area', () => {
+    const vertical = must(addClip(newMotionDoc(MotionFormat.Vertical), { component: 'Title', from: 0, props: { text: 'Your whole marketing,\non one canvas', size: 0.15, width: 1, height: 0.15 } }, 't'));
+    const html = compose(vertical);
+    const size = Number(/font-size:([\d.]+)px;line-height:0.95/.exec(html)?.[1]);
+
+    expect(size).toBeLessThan(0.15 * 1080);
+    expect(html).toContain('left:54px');
+  });
+
   it('a staggered title line is held hidden from the clip start until its own reveal begins', () => {
     const html = compose(doc);
 

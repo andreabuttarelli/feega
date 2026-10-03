@@ -2,6 +2,7 @@ import type { z } from 'zod';
 import type { COMPONENTS, ComponentId } from '../components';
 import { Ease } from '../design';
 import { boxOf, type Box } from '../layout';
+import { TITLE_LINE_HEIGHT, fitTitleSize, safeBox } from '../fit';
 import { css, esc, px } from './html';
 
 export type PropsOf<K extends ComponentId> = z.output<(typeof COMPONENTS)[K]['schema']>;
@@ -53,8 +54,7 @@ function boxCss(box: Box): Record<string, string> {
   return { position: 'absolute', left: px(box.left), top: px(box.top), width: px(box.width), height: px(box.height) };
 }
 
-export function placed(ctx: { id: string; width: number; height: number }, p: Placed, inner: string, clip = false): string {
-  const box = boxOf(p, ctx);
+export function placed(ctx: { id: string; width: number; height: number }, p: Placed, inner: string, clip = false, box: Box = boxOf(p, ctx)): string {
   const style = css({
     ...boxCss(box),
     display: 'flex',
@@ -79,7 +79,8 @@ const cover = (url: string, fit: string) => `<img src="${esc(url)}" alt="" style
 const Title: Template<'Title'> = {
   timing: Timing.Wrapper,
   html: (ctx) => {
-    const size = ctx.p.size * ctx.unit;
+    const box = safeBox(boxOf(ctx.p, ctx), ctx);
+    const size = fitTitleSize(ctx.p.text, ctx.p.size * ctx.unit, box);
     const lines = ctx.p.text
       .split('\n')
       .map(
@@ -87,8 +88,8 @@ const Title: Template<'Title'> = {
           `<div style="${css({ overflow: 'hidden', paddingBottom: px(size * 0.08), marginBottom: px(-size * 0.08) })}"><div class="li" id="li-${ctx.id}-${i}">${esc(line) || '&nbsp;'}</div></div>`
       )
       .join('');
-    const style = css({ fontFamily: FONT_FAMILY[ctx.p.font], fontWeight: 500, fontSize: px(size), lineHeight: 0.95, letterSpacing: '-0.045em', color: ctx.color(ctx.p.color) });
-    return placed(ctx, ctx.p, `<div style="${style}">${lines}</div>`);
+    const style = css({ fontFamily: FONT_FAMILY[ctx.p.font], fontWeight: 500, fontSize: px(size), lineHeight: TITLE_LINE_HEIGHT, letterSpacing: '-0.045em', color: ctx.color(ctx.p.color) });
+    return placed(ctx, ctx.p, `<div style="${style}">${lines}</div>`, false, box);
   },
   tweens: (ctx) =>
     ctx.p.text.split('\n').map((_, i) => ({

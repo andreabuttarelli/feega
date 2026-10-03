@@ -52,3 +52,31 @@ export function snapped(doc: MotionDoc, frame: number, input: { playhead: number
   }
   return snapFrame(frame, snapTargets(doc, input), Math.max(1, Math.round(SNAP_PX / pxPerFrame(input.zoom))));
 }
+
+export const HANDLE_PX = 8;
+const MIN_BODY_SHARE = 3;
+
+export enum Grip {
+  Start = 'start',
+  End = 'end'
+}
+
+export type Handle = { clipId: string; grip: Grip; left: number; width: number };
+
+type Span = { id: string; from: number; durationInFrames: number };
+
+export function edgeHandles(clips: readonly Span[], ppf: number): Handle[] {
+  return clips.flatMap((clip) => {
+    const left = clip.from * ppf;
+    const right = (clip.from + clip.durationInFrames) * ppf;
+    const width = Math.min(HANDLE_PX, (right - left) / MIN_BODY_SHARE);
+    return [
+      { clipId: clip.id, grip: Grip.Start, left, width },
+      { clipId: clip.id, grip: Grip.End, left: right - width, width }
+    ];
+  });
+}
+
+export function handleAt(handles: readonly Handle[], x: number): Handle | null {
+  return handles.find((h) => x >= h.left && x < h.left + h.width) ?? null;
+}

@@ -87,4 +87,24 @@ describe('motion agent tools', () => {
     expect((await run('get_motion_doc', {})).selected).toEqual(['id1']);
     expect(selectionNote(session.doc, ['id1'])).toContain('Title id1 (0s–3s)');
   });
+
+  it('a set_props with a timing key says which props exist and that timing is set_timing', async () => {
+    const { run } = setup();
+    await run('add_clip', { component: 'BrandBackground', start: 0 });
+    const out = await run('set_props', { clip_id: 'id1', props: { duration: 20 } });
+
+    expect(out.ok).toBe(false);
+    expect(out.error).toContain('duration');
+    expect(out.error).toContain('set_timing');
+    expect(out.error).toContain('fill');
+  });
+
+  it('an unknown clip id lists the clips that exist', async () => {
+    const { run } = setup();
+    await run('add_clip', { component: 'Title', start: 0 });
+    const out = await run('set_props', { clip_id: 'nope', props: { text: 'x' } });
+
+    expect(out).toMatchObject({ ok: false });
+    expect(out.error).toContain('id1');
+  });
 });

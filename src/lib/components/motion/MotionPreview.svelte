@@ -92,15 +92,13 @@
   });
 </script>
 
-<div class="stage" style={`aspect-ratio: ${width} / ${height};`} data-testid="motion-preview">
+<div class="stage" style={`aspect-ratio: ${width} / ${height}; width: min(100cqw, calc(100cqh * ${width / height}));`} data-testid="motion-preview">
   <div class="host" bind:this={host}></div>
 </div>
 
 <style>
   .stage {
     position: relative;
-    max-width: 100%;
-    max-height: 100%;
     background: #000;
     outline: 1px solid var(--line);
   }
