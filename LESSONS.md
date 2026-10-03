@@ -2284,3 +2284,10 @@ Signal: `tool_choice: type "tool" ... not supported for this model` in the log, 
 at the old version, no `ai_calls` row. Cause: the self-check round forces `view_frames`, which
 Anthropic models on OpenRouter refuse; the error escaped before `finishTurn`. Move: force a tool
 only on models that accept it (`FORCES_TOOL`), and a failed round must still save the edits.
+
+## A motion component types nothing in preview but passes every check
+Signal: text that should type, bars that should fill stay at their first state in the preview
+and the MP4; the determinism check passes. Cause: the HyperFrames runtime seeks with
+`totalTime(t, true)`, which suppresses GSAP callbacks, so `onUpdate` never runs. Move: route
+callbacks through a render plugin (`feegaRender` in `custom/runtime.ts`); test with
+`totalTime(t, true)`, never `seek(t)`.

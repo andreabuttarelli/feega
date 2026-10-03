@@ -118,7 +118,7 @@
   <div class="status" class:bad={checked === CheckState.Failed || error} data-testid="code-status">
     <span>{name} · v{component?.version ?? 0} · {STATE_LABEL[checked]}</span>
     {#if error}<pre role="alert">{error}</pre>{/if}
-    {#each problems as problem (problem)}<pre>{problem}</pre>{/each}
+    {#each problems as problem, i (i)}<pre>{problem}</pre>{/each}
   </div>
 </div>
 

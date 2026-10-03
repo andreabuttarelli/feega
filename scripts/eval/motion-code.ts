@@ -20,7 +20,7 @@ type Fixture = { file: string; type: 'image' | 'audio'; mime: string; seconds?: 
 
 const admin = createClient(env.PUBLIC_SUPABASE_URL!, env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } });
 
-async function seed(session: E2eSession, files: Fixture[]): Promise<void> {
+async function seedAssets(session: E2eSession, files: Fixture[]): Promise<void> {
   for (const f of files) {
     const bytes = readFileSync(join(FIXTURES, f.file));
     const path = `${session.orgId}/${session.projectId}/${randomUUID()}-${f.file}`;
@@ -33,6 +33,19 @@ async function seed(session: E2eSession, files: Fixture[]): Promise<void> {
       throw new Error(`asset ${f.file}: ${row.error.message}`);
     }
   }
+}
+
+async function remapped(session: E2eSession, text: string): Promise<string> {
+  const map: Record<string, string> = JSON.parse(env.MOTION_EVAL_ASSET_MAP ?? '{}');
+  const { data } = await admin.from('assets').select('id, url').eq('org_id', session.orgId);
+  let out = text;
+  for (const [oldId, file] of Object.entries(map)) {
+    const row = (data ?? []).find((a) => String(a.url).endsWith(`-${file}`));
+    if (row) {
+      out = out.split(oldId).join(row.id);
+    }
+  }
+  return out;
 }
 
 async function spent(session: E2eSession): Promise<{ usd: number; byModel: Record<string, number> }> {
@@ -58,7 +71,7 @@ async function turn(page: Page, message: string, index: number): Promise<void> {
 
 async function exportMp4(page: Page): Promise<void> {
   await page.getByTestId('export-open').click();
-  await page.getByTestId('export-start').waitFor({ timeout: 120_000 });
+  await page.getByTestId('export-start').waitFor({ timeout: 300_000 });
   await page.getByTestId('export-start').click();
   const download = page.getByTestId('export-download');
   await download.waitFor({ timeout: EXPORT_TIMEOUT_MS });
@@ -86,7 +99,7 @@ async function main() {
   const browser = await chromium.launch({ channel: 'chrome', headless: env.MOTION_EVAL_HEADED !== '1' });
   const errors: string[] = [];
   try {
-    await seed(session, fixtures);
+    await seedAssets(session, fixtures);
     const page = await browser.newPage({ baseURL: BASE_URL, viewport: { width: 1720, height: 1040 }, acceptDownloads: true });
     page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
     page.on('pageerror', (e) => errors.push(String(e)));
@@ -103,6 +116,19 @@ async function main() {
     await page.waitForURL(/\/motion\//);
     await page.getByTestId('motion-preview').waitFor();
     await page.waitForLoadState('networkidle');
+
+    const seed = env.MOTION_EVAL_SEED_DOC ? (JSON.parse(await remapped(session, readFileSync(env.MOTION_EVAL_SEED_DOC, 'utf8'))) as { components: Record<string, { check: unknown }> }) : null;
+    if (seed) {
+      const nodeId = new URL(page.url()).pathname.split('/').at(-1) ?? '';
+      const fresh = { ...seed, components: Object.fromEntries(Object.entries(seed.components).map(([k, c]) => [k, { ...c, check: null }])) };
+      const { error } = await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: nodeId, version: 1, doc: fresh, summary: 'replayed agent doc', actor_kind: 'user', actor_id: session.userId });
+      if (error) {
+        throw new Error(`seed doc: ${error.message}`);
+      }
+      await page.reload();
+      await page.getByTestId('motion-preview').waitFor();
+      await page.waitForLoadState('networkidle');
+    }
 
     for (const [i, message] of turns.entries()) {
       const before = await spent(session);

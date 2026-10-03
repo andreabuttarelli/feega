@@ -16,7 +16,7 @@ export type Verdict = { ok: boolean; problems: string[]; offending: Shot[] };
 export function seekPlan(seconds: number, fps: number): number[] {
   const last = Math.max(0, Math.floor(seconds * fps) - 1);
   const points = SPREAD.map((f) => Math.min(last, Math.round(seconds * f * fps)) / fps);
-  return [...points, ...[...points].reverse(), ...SCRAMBLE.map((i) => points[i])];
+  return [...points, ...points, ...[...points].reverse(), ...SCRAMBLE.map((i) => points[i])];
 }
 
 const seconds = (t: number) => `${Math.round(t * 100) / 100}s`;
@@ -27,6 +27,9 @@ export function verdictOf(shots: Shot[]): Verdict {
   const first = new Map<number, Shot>();
 
   for (const [order, shot] of shots.entries()) {
+    if (order < CHECK_POINTS) {
+      continue;
+    }
     const seen = first.get(shot.time);
     if (!seen) {
       first.set(shot.time, shot);
@@ -44,7 +47,7 @@ export function verdictOf(shots: Shot[]): Verdict {
   }
 
   const thrown = [...new Set(shots.flatMap((s) => s.errors.map((e) => `${e.component || 'the page'} threw: ${e.message}`)))];
-  const all = [...thrown, ...problems].slice(0, MAX_PROBLEMS);
+  const all = [...new Set([...thrown, ...problems])].slice(0, MAX_PROBLEMS);
   return { ok: all.length === 0, problems: all, offending: offending.slice(0, 2) };
 }
 

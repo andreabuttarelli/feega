@@ -21,8 +21,9 @@ describe('the seek-determinism check', () => {
 
     expect(points.length).toBe(5);
     expect(plan.slice(0, 5)).toEqual(points);
-    expect(plan.slice(5, 10)).toEqual([...points].reverse());
-    expect(plan.slice(10)).not.toEqual(points);
+    expect(plan.slice(5, 10)).toEqual(points);
+    expect(plan.slice(10, 15)).toEqual([...points].reverse());
+    expect(plan.slice(15)).not.toEqual(points);
     expect(plan.every((t) => Number.isInteger(Math.round(t * 30)) && t < 4)).toBe(true);
   });
 
@@ -34,20 +35,35 @@ describe('the seek-determinism check', () => {
 
   it('fails on a frame that depends on where the playhead came from, with both frames', () => {
     const plan = seekPlan(4, 30);
-    const shots = plan.map((t, i) => (i === 7 ? shot(t, 'drifted') : shot(t)));
+    const shots = plan.map((t, i) => (i === 12 ? shot(t, 'drifted') : shot(t)));
 
     const verdict = verdictOf(shots);
 
     expect(verdict.ok).toBe(false);
     expect(verdict.problems[0]).toMatch(/differs/);
-    expect(verdict.offending.map((s) => s.image)).toEqual([`img@${plan[7]}`, 'drifted']);
+    expect(verdict.offending.map((s) => s.image)).toEqual([`img@${plan[12]}`, 'drifted']);
   });
 
   it('fails on boxes that move between visits even when pixels match', () => {
     const plan = seekPlan(4, 30);
-    const shots = plan.map((t, i) => (i === 12 ? shot(t, `img@${t}`, 'moved') : shot(t)));
+    const shots = plan.map((t, i) => (i === 17 ? shot(t, `img@${t}`, 'moved') : shot(t)));
 
     expect(verdictOf(shots).problems.join(' ')).toMatch(/layout/);
+  });
+
+  it('ignores the warm-up pass, where pictures and fonts may still be arriving', () => {
+    const plan = seekPlan(4, 30);
+    const shots = plan.map((t, i) => (i < 5 ? shot(t, 'loading', 'unsized') : shot(t)));
+
+    expect(verdictOf(shots).ok).toBe(true);
+  });
+
+  it('reports a repeated problem once', () => {
+    const plan = seekPlan(4, 30);
+    const shots = plan.map((t, i) => (i >= 10 ? shot(t, `img@${t}`, 'moved') : shot(t)));
+
+    const problems = verdictOf(shots).problems;
+    expect(new Set(problems).size).toBe(problems.length);
   });
 
   it('fails on a component that threw', () => {

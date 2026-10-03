@@ -222,6 +222,9 @@
       }
     } finally {
       checking = false;
+      if (unverified(history.present).some((u) => u.state === CheckState.Unchecked)) {
+        checkTimer = setTimeout(() => void checkPending(), CHECK_DEBOUNCE_MS);
+      }
     }
   }
 

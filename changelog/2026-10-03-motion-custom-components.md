@@ -54,3 +54,21 @@ check). Le props si editano da `propsSchema` (`customFields`).
 
 Scartati: shadow DOM per lo scoping (html-to-image non lo cattura), `new Function` per isolare i
 componenti (bloccato dalla CSP, giustamente), un secondo processo di render server-side.
+
+**Variabili dichiarate nel codice** (`custom/params.ts`). Il JS dichiara le variabili con
+`param('nome', default, { type, min, max, step, options, label, group })`; tipi text, textarea,
+number, color, boolean, select, asset (kind image|video|model3d), font, ease. `extractParams`
+(acorn) le legge a ogni scrittura e ricostruisce `propsSchema` (lo schema passato a mano resta
+solo per chiavi senza `param`): l'agente non mantiene uno schema separato. L'inspector le mostra
+per `group`; number e color sono keyframeabili (`Source.Param`, `withParams(doc, clip)` porta le
+loro `AnimProp` dove serve validare o campionare). A runtime `param()` e `props.nome` restituiscono
+il valore; per un parametro con keyframe `props.nome` è un getter che campiona la traccia al
+tempo della clip (non un tween: in seek all'indietro GSAP rende i figli in ordine inverso e un
+tween su `props` arriverebbe dopo il codice che lo legge). Il CSS legge `var(--param-nome)`,
+interpolata da tween sul root. Cambiare un valore non richiede l'agente.
+
+**onUpdate in seek.** Il runtime HyperFrames fa `totalTime(t, true)`: eventi soppressi, quindi
+ogni `onUpdate` dei componenti non girava in anteprima né in export (testo che non si scrive,
+barre ferme) e il check di determinismo passava su frame vuoti. Il `tl` dato al componente
+sposta `onUpdate` in un plugin di render (`feegaRender`, `rawVars`), che GSAP esegue anche con
+eventi soppressi. `tl.call`/`onComplete` restano non supportati (detto nel prompt).
