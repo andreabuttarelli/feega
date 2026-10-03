@@ -23,7 +23,7 @@
   import ExportDialog from '$lib/components/motion/ExportDialog.svelte';
   import SoundDialog, { type Made, type SoundKind } from '$lib/components/motion/SoundDialog.svelte';
   import ChatPanel from '$lib/components/brand-agent/ChatPanel.svelte';
-  import { AssetKind, COMPONENTS, COMPONENT_IDS, TrackKind, type ComponentId } from '$lib/motion/components';
+  import { AssetKind, COMPONENTS, LIBRARY_IDS, TrackKind, type ComponentId } from '$lib/motion/components';
   import { FPS } from '$lib/motion/design';
   import { FORMATS, MOTION_FORMATS, MAX_SECONDS, findClip, formatOf, type MotionDoc, type MotionFormat } from '$lib/motion/doc';
   import {
@@ -426,7 +426,7 @@
             <div class="menu" role="menu">
               <div class="col">
                 <span class="menu-head">Elements</span>
-                {#each COMPONENT_IDS as id (id)}
+                {#each LIBRARY_IDS as id (id)}
                   <button type="button" role="menuitem" onclick={() => add(id)}>{COMPONENTS[id].label}</button>
                 {/each}
               </div>

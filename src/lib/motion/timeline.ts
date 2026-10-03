@@ -1,6 +1,7 @@
-import { COMPONENTS, TrackKind, defaultProps, parseProps, type ComponentId } from './components';
+import { COMPONENTS, TrackKind, defaultProps, type ComponentId } from './components';
+import { Strictness } from './custom/component';
 import { FPS, TransitionKind, type Edge } from './design';
-import { FORMATS, MAX_FRAMES, byFrame, findClip, type MotionClip, type MotionDoc, type MotionFormat, type MotionTrack } from './doc';
+import { FORMATS, MAX_FRAMES, byFrame, clipProps, findClip, type MotionClip, type MotionDoc, type MotionFormat, type MotionTrack } from './doc';
 import { Ease } from './design';
 import { Matte, isMaskKey, maskSchema, type MaskInput } from './mask';
 import { matteMask, matteSource } from './matte';
@@ -84,7 +85,7 @@ export function addClip(doc: MotionDoc, input: NewClip, id: string): OpResult {
     return fail(track);
   }
 
-  const props = parseProps(input.component, { ...defaultProps(input.component), ...input.props });
+  const props = clipProps(doc.components, input.component, { ...defaultProps(input.component), ...input.props }, Strictness.Strict);
   if (!props.ok) {
     return fail(props.error);
   }
@@ -193,7 +194,7 @@ export function removeClips(doc: MotionDoc, ids: readonly string[]): OpResult {
 
 export function setProps(doc: MotionDoc, clipId: string, patch: Record<string, unknown>): OpResult {
   return editClip(doc, clipId, (clip) => {
-    const verdict = parseProps(clip.component, { ...clip.props, ...patch });
+    const verdict = clipProps(doc.components, clip.component, { ...clip.props, ...patch }, Strictness.Strict);
     return verdict.ok ? { ...clip, props: verdict.props } : verdict.error;
   });
 }

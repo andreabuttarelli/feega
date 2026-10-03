@@ -4,6 +4,7 @@ import { Ease } from '../design';
 import { boxOf, type Box } from '../layout';
 import { TITLE_LINE_HEIGHT, fitTitleSize, safeBox } from '../fit';
 import { css, esc, px } from './html';
+import type { CustomComponents } from '../custom/component';
 
 export type PropsOf<K extends ComponentId> = z.output<(typeof COMPONENTS)[K]['schema']>;
 
@@ -25,6 +26,7 @@ export type TemplateCtx<K extends ComponentId> = {
   logoUrl: string | null;
   brandName: string;
   mediaStart: number;
+  components: CustomComponents;
 };
 
 export enum Timing {
@@ -287,6 +289,19 @@ const Shape3D: Template<'Shape3D'> = {
   }
 };
 
+const scopedCss = (id: string, css: string) => `<style>@scope (#cc-${id}) {${css.replace(/<\/(style)/gi, '<\\/$1')}}</style>`;
+
+const Custom: Template<'Custom'> = {
+  timing: Timing.Wrapper,
+  html: (ctx) => {
+    const component = ctx.components[ctx.p.name];
+    if (!component) {
+      return missing(`No component ${ctx.p.name}`);
+    }
+    return `<div class="cc" id="cc-${ctx.id}" data-component="${esc(ctx.p.name)}">${scopedCss(ctx.id, component.source.css)}${component.source.html}</div>`;
+  }
+};
+
 export const TEMPLATES: { [K in ComponentId]: Template<K> } = {
   Title,
   Text,
@@ -302,5 +317,6 @@ export const TEMPLATES: { [K in ComponentId]: Template<K> } = {
   SocialMockup,
   CanvasMock,
   Model3D,
-  Shape3D
+  Shape3D,
+  Custom
 };

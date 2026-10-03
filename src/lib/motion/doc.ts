@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { COMPONENT_IDS, TrackKind, parseProps, type ComponentId } from './components';
+import { COMPONENT_IDS, CUSTOM_NAME, TrackKind, parseProps, type ComponentId, type PropsVerdict } from './components';
+import { MAX_COMPONENTS, Strictness, customComponentSchema, customValues, type CustomComponents } from './custom/component';
 import { FPS, TRANSITION_KINDS, TransitionKind } from './design';
 import { keyframeSchema, keyframesProblem, transformSchema } from './keyframes';
 import { MATTES, Matte, maskSchema } from './mask';
@@ -68,7 +69,11 @@ export const motionDocSchema = z
     height: z.number().int().min(16).max(MAX_SIDE),
     durationInFrames: z.number().int().min(1).max(MAX_FRAMES),
     tracks: z.array(trackSchema).max(20),
-    assets: z.array(assetRefSchema).default([])
+    assets: z.array(assetRefSchema).default([]),
+    components: z
+      .record(z.string().regex(CUSTOM_NAME, 'component names are PascalCase, e.g. NodeGraph'), customComponentSchema)
+      .refine((c) => Object.keys(c).length <= MAX_COMPONENTS, `at most ${MAX_COMPONENTS} custom components`)
+      .default({})
   })
   .refine((d) => Math.min(d.width, d.height) <= MAX_SHORT_SIDE, 'resolution above 1080p');
 
@@ -110,8 +115,23 @@ export function byFrame<T extends { frame: number }>(track: readonly T[]): T[] {
   return [...last.values()].sort((a, b) => a.frame - b.frame);
 }
 
-function clipProblem(clip: MotionClip): string | null {
-  const verdict = parseProps(clip.component, clip.props);
+export function clipProps(components: CustomComponents, component: ComponentId, props: unknown, strictness: Strictness): PropsVerdict {
+  const base = parseProps(component, props);
+  if (!base.ok || component !== 'Custom') {
+    return base;
+  }
+  const { name, ...given } = base.props as { name: string };
+  const custom = components[name];
+  if (!custom) {
+    const known = Object.keys(components);
+    return { ok: false, error: `no custom component ${name}: write_component first${known.length ? `; this video has ${known.join(', ')}` : ''}` };
+  }
+  const values = customValues(custom, given, strictness);
+  return values.ok ? { ok: true, props: { name, ...values.values } } : { ok: false, error: `${name}: ${values.error}` };
+}
+
+function clipProblem(doc: MotionDoc, clip: MotionClip): string | null {
+  const verdict = clipProps(doc.components, clip.component, clip.props, Strictness.Lenient);
   if (!verdict.ok) {
     return verdict.error;
   }
@@ -122,7 +142,7 @@ function clipProblem(clip: MotionClip): string | null {
 
 function propsProblem(doc: MotionDoc): string | null {
   for (const clip of clipsOf(doc)) {
-    const problem = clipProblem(clip);
+    const problem = clipProblem(doc, clip);
     if (problem) {
       return problem;
     }
@@ -156,7 +176,8 @@ export function newMotionDoc(format: MotionFormat): MotionDoc {
       { id: 'v1', kind: TrackKind.Visual, name: 'Video 1', clips: [] },
       { id: 'a1', kind: TrackKind.Audio, name: 'Audio 1', clips: [] }
     ],
-    assets: []
+    assets: [],
+    components: {}
   };
 }
 

@@ -101,7 +101,8 @@ export const ANIMATABLE: Record<ComponentId, readonly AnimProp[]> = {
   SocialMockup: visual(),
   CanvasMock: visual(),
   Model3D: visual(sceneProps),
-  Shape3D: visual(sceneProps)
+  Shape3D: visual(sceneProps),
+  Custom: visual()
 };
 
 export function animProp(component: ComponentId, key: string): AnimProp | null {

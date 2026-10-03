@@ -8,7 +8,11 @@ import { TEMPLATES, Timing, type PropsOf, type TemplateCtx, type Tween, type Var
 import { LIGHTING, threeImportMap, threeScript, type ThreeClip } from './three';
 import { ANIMATE_CSS, animationScript, colourOverrides, sceneKeys, wrapAnimated } from './animate';
 import { MASK_CSS, MaskScope, maskLayer, startValues } from './masks';
-import { captureScript, contentStamp } from './capture';
+import { SCREENSHOT_URL, captureScript, contentStamp } from './capture';
+import { cspMeta } from './csp';
+import { THREE_VERSION } from './three';
+import { Library, THREE_GLOBAL, bootScript, definitionScript, librariesOf, seedOf, type CustomRun } from '../custom/runtime';
+import { PropFormat, type CustomComponents } from '../custom/component';
 import { hiddenMattes, matteMask, matteSource } from '../matte';
 import { Matte, type Mask } from '../mask';
 
@@ -20,6 +24,10 @@ export const COMPOSITION_ID = 'main';
 
 const RUNTIME_URL = `https://cdn.jsdelivr.net/npm/@hyperframes/core@${HYPERFRAMES_VERSION}/dist/hyperframe.runtime.iife.js`;
 const GSAP_URL = `https://cdn.jsdelivr.net/npm/gsap@${GSAP_VERSION}/dist/gsap.min.js`;
+const SPLIT_TEXT_URL = `https://cdn.jsdelivr.net/npm/gsap@${GSAP_VERSION}/dist/SplitText.min.js`;
+export const LOTTIE_VERSION = '5.13.0';
+const LOTTIE_URL = `https://cdn.jsdelivr.net/npm/lottie-web@${LOTTIE_VERSION}/build/player/lottie_light.min.js`;
+const THREE_BASE = `https://cdn.jsdelivr.net/npm/three@${THREE_VERSION}/`;
 const FONTS_URL = 'https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Fragment+Mono&display=block';
 
 const SHOWN: Vars = { opacity: 1, xPercent: 0, yPercent: 0, scale: 1, clipPath: 'inset(0 0% 0 0)', filter: 'blur(0px)' };
@@ -97,7 +105,8 @@ function ctxOf(clip: MotionClip, input: ComposeInput): TemplateCtx<ComponentId> 
     asset: (id) => (id ? (assets[id] ?? null) : null),
     logoUrl: tokens.logoUrl,
     brandName: tokens.name,
-    mediaStart: Number(seconds(clip.trimStart, doc.fps))
+    mediaStart: Number(seconds(clip.trimStart, doc.fps)),
+    components: doc.components
   };
 }
 
@@ -193,6 +202,37 @@ const BASE_CSS = [
   MASK_CSS
 ].join('');
 
+type ValueResolver = (value: unknown, ctx: TemplateCtx<ComponentId>) => unknown;
+
+const RESOLVE: Record<PropFormat, ValueResolver> = {
+  [PropFormat.Color]: (v, ctx) => ctx.color(String(v)),
+  [PropFormat.Asset]: (v, ctx) => ctx.asset(typeof v === 'string' ? v : null),
+  [PropFormat.Textarea]: (v) => v
+};
+
+function customRun(clip: MotionClip, ctx: TemplateCtx<ComponentId>, components: CustomComponents): CustomRun | null {
+  const { name, ...given } = clip.props as { name: string } & Record<string, unknown>;
+  const component = components[name];
+  if (!component) {
+    return null;
+  }
+  const values = Object.fromEntries(
+    Object.entries(component.propsSchema.properties).map(([key, spec]) => [key, spec.format ? RESOLVE[spec.format](given[key], ctx) : given[key]])
+  );
+  return { id: clip.id, name, start: ctx.start, length: ctx.length, fps: ctx.fps, values, seed: seedOf(clip.id) };
+}
+
+const LIBRARY_TAGS: Record<Library, { scripts: string[]; tag: string }> = {
+  [Library.SplitText]: { scripts: [SPLIT_TEXT_URL], tag: `<script src="${SPLIT_TEXT_URL}"></script><script>gsap.registerPlugin(SplitText);</script>` },
+  [Library.Lottie]: { scripts: [LOTTIE_URL], tag: `<script src="${LOTTIE_URL}"></script>` },
+  [Library.Three]: { scripts: [THREE_BASE], tag: '' }
+};
+
+function brandEnv(tokens: BrandTokens) {
+  const colors = Object.fromEntries(Object.entries(tokens.colors).map(([k, v]) => [k.replace('brand.', ''), v]));
+  return { name: tokens.name, colors, logoUrl: tokens.logoUrl };
+}
+
 export function composeHtml(input: ComposeInput): string {
   const { doc, tokens } = input;
   const bottomFirst = doc.tracks.map((track, index) => ({ track, index })).reverse();
@@ -201,6 +241,7 @@ export function composeHtml(input: ComposeInput): string {
   const holds: Hold[] = [];
   const three: ThreeClip[] = [];
   const clips: MotionClip[] = [];
+  const runs: CustomRun[] = [];
   const hidden = hiddenMattes(doc);
   let layer = 0;
 
@@ -217,19 +258,38 @@ export function composeHtml(input: ComposeInput): string {
       if (THREE_D_COMPONENTS.includes(clip.component)) {
         three.push(threeClipOf(clip, ctx));
       }
+      const run = clip.component === 'Custom' ? customRun(clip, ctx, doc.components) : null;
+      if (run) {
+        runs.push(run);
+      }
     }
   }
 
   const duration = seconds(doc.durationInFrames, doc.fps);
   const background = tokens.colors['brand.background'];
   const animation = animationScript(clips, doc, (v) => resolveColor(v, tokens));
+  const used = new Set(runs.map((r) => r.name));
+  const libraries = librariesOf(doc.components, used);
+  const threeCustom = libraries.has(Library.Three);
+  const env = { assets: input.assets, brand: brandEnv(tokens) };
+  const boot = bootScript(runs, env, `window.__timelines[${js(COMPOSITION_ID)}]`);
+  const definitions = [...used].map((name) => definitionScript(name, doc.components[name].source.js)).join('');
+  const customBoot = threeCustom
+    ? `<script type="module">import * as THREE from 'three';window.${THREE_GLOBAL}=THREE;${boot}</script>`
+    : boot
+      ? `<script>${boot}</script>`
+      : '';
+  const scripts = [RUNTIME_URL, GSAP_URL, SCREENSHOT_URL, ...(three.length ? [THREE_BASE] : []), ...[...libraries].flatMap((lib) => LIBRARY_TAGS[lib].scripts)];
+  const assetUrls = [...Object.values(input.assets), ...(tokens.logoUrl ? [tokens.logoUrl] : [])];
 
   const page = [
     '<!doctype html><html lang="en"><head><meta charset="UTF-8" />',
     `<meta name="viewport" content="width=${doc.width}, height=${doc.height}" />`,
+    cspMeta({ scripts: [...new Set(scripts)], assetUrls }),
     `<script src="${RUNTIME_URL}"></script>`,
     `<script src="${GSAP_URL}"></script>`,
-    three.length ? threeImportMap() : '',
+    ...[...libraries].map((lib) => LIBRARY_TAGS[lib].tag),
+    three.length || threeCustom ? threeImportMap() : '',
     `<link rel="stylesheet" crossorigin="anonymous" href="${FONTS_URL}" />`,
     `<style>${BASE_CSS}#root{background:${esc(background)}}</style>`,
     '</head><body>',
@@ -237,6 +297,8 @@ export function composeHtml(input: ComposeInput): string {
     layers.join(''),
     '</div>',
     `<script>${animation.setup}const tl=gsap.timeline({paused:true});${holds.map(holdLine).join('')}${tweens.map(tweenLine).join('')}${animation.timeline}tl.set({}, {}, ${duration});window.__timelines=window.__timelines||{};window.__timelines[${js(COMPOSITION_ID)}]=tl;</script>`,
+    definitions,
+    customBoot,
     threeScript(three, Number(duration))
   ].join('');
   return `${page}${captureScript(doc, contentStamp(page))}</body></html>`;

@@ -29,6 +29,8 @@ export enum Group {
 export const BRAND_COLORS = ['brand.primary', 'brand.secondary', 'brand.accent', 'brand.background', 'brand.text'] as const;
 export type BrandColor = (typeof BRAND_COLORS)[number];
 
+export const CUSTOM_NAME = /^[A-Z][A-Za-z0-9]{1,39}$/;
+
 export const COLOR = /^(#[0-9a-fA-F]{6}|brand\.(primary|secondary|accent|background|text)|transparent)$/;
 
 const color = (fallback: string, label: string) =>
@@ -262,6 +264,13 @@ export const COMPONENTS = {
     schema: z
       .object({ shape: choice(SHAPES_3D, 'torus', 'Shape', Group.Content), fill: color('brand.accent', 'Colour'), ...camera, ...position3d })
       .strict()
+  },
+  Custom: {
+    label: 'Custom',
+    description: 'A component written in code for this video (write_component); its props come from its own props schema.',
+    track: TrackKind.Visual,
+    durationInFrames: seconds(4),
+    schema: z.object({ name: z.string().regex(CUSTOM_NAME, 'a custom component name, e.g. NodeGraph') }).catchall(z.unknown())
   }
 } satisfies Record<string, Spec>;
 
@@ -271,12 +280,16 @@ export const COMPONENT_IDS = Object.keys(COMPONENTS) as [ComponentId, ...Compone
 
 export const THREE_D_COMPONENTS: readonly ComponentId[] = ['Model3D', 'Shape3D'];
 
+export const CODE_COMPONENTS: readonly ComponentId[] = ['Custom'];
+
+export const LIBRARY_IDS = COMPONENT_IDS.filter((id) => !CODE_COMPONENTS.includes(id));
+
 export function isComponentId(x: string): x is ComponentId {
   return (COMPONENT_IDS as readonly string[]).includes(x);
 }
 
 export function defaultProps(id: ComponentId): Record<string, unknown> {
-  return COMPONENTS[id].schema.parse({}) as Record<string, unknown>;
+  return (COMPONENTS[id].schema.safeParse({}).data ?? {}) as Record<string, unknown>;
 }
 
 export type PropsVerdict = { ok: true; props: Record<string, unknown> } | { ok: false; error: string };
