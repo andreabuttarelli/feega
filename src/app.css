@@ -523,13 +523,6 @@ h1, h2 { font-family: var(--serif); font-weight: var(--heading-weight); letter-s
 /* ============================================================
    ANALYTICS PAGE
    ============================================================ */
-.charts { display: grid; grid-template-columns: 1.5fr 1fr; gap: 16px; align-items: start; }
-.bars { display: flex; align-items: flex-end; gap: 12px; height: 210px; padding: 16px 22px 14px; }
-.bar { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; height: 100%; justify-content: flex-end; }
-.bar .col { width: 100%; max-width: 44px;
-  background: linear-gradient(180deg, var(--accent-2), var(--accent)); }
-.bar .bv { font-size: 12px; font-weight: 600; }
-.bar .bl { font-size: 11.5px; color: var(--ink-faint); }
 .linechart { padding: 12px 18px 18px; }
 .linechart svg { width: 100%; height: 170px; overflow: visible; }
 .hbars { padding: 8px 22px 18px; }
