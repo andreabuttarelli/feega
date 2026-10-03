@@ -19,6 +19,7 @@
   import { FRAMES_REQUEST, type FramesRequest } from '$lib/motion/frames-request';
   import MotionTimeline from '$lib/components/motion/MotionTimeline.svelte';
   import MotionInspector from '$lib/components/motion/MotionInspector.svelte';
+  import MaskOverlay from '$lib/components/motion/MaskOverlay.svelte';
   import ChatPanel from '$lib/components/brand-agent/ChatPanel.svelte';
   import { AssetKind, COMPONENTS, COMPONENT_IDS, TrackKind, type ComponentId } from '$lib/motion/components';
   import { FPS } from '$lib/motion/design';
@@ -352,7 +353,9 @@
   <div class="body">
     <section class="left">
       <div class="preview">
-        <MotionPreview bind:this={preview} {html} width={doc.width} height={doc.height} bind:frame bind:playing />
+        <MotionPreview bind:this={preview} {html} width={doc.width} height={doc.height} bind:frame bind:playing>
+          {#if selected?.mask && !playing}<MaskOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
+        </MotionPreview>
       </div>
 
       <div class="transport">
