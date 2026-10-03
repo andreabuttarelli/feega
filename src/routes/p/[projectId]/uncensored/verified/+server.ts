@@ -15,7 +15,7 @@ export const GET: RequestHandler = async ({ url, params, locals }) => {
     throw redirect(303, '/login');
   }
 
-  const back = `/p/${params.projectId}/uncensored`;
+  const back = `/p/${params.projectId}/settings/project`;
   const didit = configuredDidit();
   const sessionId = url.searchParams.get('verificationSessionId');
   const result = didit && sessionId ? await didit.decision(sessionId) : null;

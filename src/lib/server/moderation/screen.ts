@@ -169,9 +169,9 @@ export async function screenGeneration(ports: ScreenPorts, request: ScreenReques
   const state = stateOf(request);
   const policy = MODERATION_PROFILES[carriedProfile(request)];
 
-  const rule = UNCENSORED_RULES.find(([, applies]) => request.uncensored && applies(request));
-  if (rule) {
-    const [category, , reason] = rule;
+  const refused = UNCENSORED_RULES.find(([, applies]) => request.uncensored && applies(request));
+  if (refused) {
+    const [category, , reason] = refused;
     ports.record({ stage: 'rules', verdict: 'refuse', category, probabilities: {}, reason });
     return { ok: false, error: MODERATION_CATEGORIES[category].refusal };
   }

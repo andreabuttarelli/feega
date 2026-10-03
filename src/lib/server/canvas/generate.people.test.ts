@@ -34,7 +34,7 @@ const models: Record<string, WiroModel> = {
   }
 };
 
-const gateway = { run: vi.fn(), task: vi.fn() };
+const gateway = { run: vi.fn(), task: vi.fn(), purge: vi.fn() };
 const bill = vi.fn();
 const decide = vi.fn();
 const judge = vi.fn();
