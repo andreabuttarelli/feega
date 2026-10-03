@@ -2213,3 +2213,18 @@ page that imports a global stylesheet (`landing.css` on `/changelog`) was reache
 navigation; Vite keeps its CSS in the document, and its bare class names (`.wrap`, `.btn`) hit
 app components on the way back. Move: in DevTools, find the rule on the element and its source
 file; a link from the app to such a page carries `data-sveltekit-reload`.
+
+## A products node wired into an image node renders the wrong thing, or nothing
+Signal: `source_not_found` on an image node fed by a products node, or a render that shows a
+picked reference instead of the product. Cause: the image branch of `runGenNode` sent the first
+upstream image as `baseMediaId`, which only resolves the user's own storage paths — a store
+photo is an absolute URL. Move: an external first reference travels in `referenceImageUrls`
+(`imageInputs` in `generate.ts`), and a prompt that mixes subject and style references must say
+which one is the subject ("the first reference image is the product").
+
+## A synced image model in the menu can still be unable to render
+Signal: `render_failed: … No endpoints found that support the requested output modalities:
+image, text` for a model the catalogue offers (e.g. a cheap synced one). Models without a spec in
+`image-models.ts` go through the chat transport. Move: a feature that picks a model on its own
+(the studio's "cheapest") picks only `isKnownImageModelId`; `wiro/*` ones additionally refuse
+outside uncensored projects.

@@ -1561,6 +1561,64 @@ describe('i riferimenti scelti sul nodo arrivano al render immagine', () => {
   });
 });
 
+describe('la foto di un prodotto del negozio arriva al render immagine', () => {
+  const PRODUCTS = '88888888-8888-8888-8888-888888888888';
+  const CATALOGUE_ID = '77777777-7777-7777-7777-777777777777';
+  const SHOP_PHOTO = 'https://cdn.shop.example/tee.jpg';
+
+  beforeEach(() => {
+    generateImagesWithoutBrand.mockReset();
+    generateImagesWithoutBrand.mockResolvedValue({
+      ok: true,
+      media: [{ storage_path: 'u/media/generated.png', mime: 'image/png', width: 1024, height: 1024 }],
+      costUsd: 0.02
+    });
+  });
+
+  it('un URL del negozio va come riferimento, non come base da modificare', async () => {
+    const imageNode = { ...freshNodeRow, data: { prompt: 'packshot', references: [{ source: 'catalogue', id: CATALOGUE_ID }] } };
+    const { db } = fakeDb(
+      {
+        nodes: [imageNode, { ...freshNodeRow, id: PRODUCTS, type: 'products', data: { type: 'shopify', url: '' } }],
+        nodes_connections: [{ id: 'e1', canvas_id: CANVAS, source_node_id: PRODUCTS, target_node_id: NODE, source_handle: null, target_handle: null, mode: 'iterate' }],
+        products: [
+          {
+            id: 'p1', org_id: ORG, node_id: PRODUCTS, project_id: PROJECT, platform: 'shopify', external_id: '1', handle: null, title: 'Tee',
+            description: null, price: null, currency: null, url: null, images: [{ url: SHOP_PHOTO }], available: true, compare_at_price: null,
+            tags: [], vendor: null, product_type: null, sku: null, variants: [], options: {}, synced_at: '2026-10-03T00:00:00Z', created_at: '2026-10-03T00:00:00Z'
+          }
+        ],
+        assets: [],
+        reference_images: [{ id: CATALOGUE_ID, org_id: null, name: 'Leaf', storage_path: 'catalogue/leaf.png', mime_type: 'image/png', width: null, height: null, sort_order: 0 }]
+      },
+      { updateRows: { nodes: [{ ...imageNode, version: 2 }] } }
+    );
+
+    const result = await runGenNode(db, {
+      orgId: ORG,
+      projectId: PROJECT,
+      canvasId: CANVAS,
+      nodeId: NODE,
+      userId: USER,
+      medium: 'image',
+      prompt: 'packshot',
+      model: 'qwen3-pro',
+      params: {},
+      expectedVersion: 1,
+      iterateSelection: { [PRODUCTS]: 1 }
+    });
+
+    expect(result.kind).toBe('done');
+    expect(generateImagesWithoutBrand).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        baseMediaId: undefined,
+        referenceImageUrls: expect.arrayContaining([SHOP_PHOTO])
+      })
+    );
+  });
+});
+
 describe('a standard generation is screened before anything reaches the provider', () => {
   const GORE = "This prompt was blocked: violence and gore aren't allowed in feega's standard mode.";
   const DOC = 'ffffffff-ffff-ffff-ffff-ffffffffffff';

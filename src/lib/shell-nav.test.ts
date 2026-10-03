@@ -6,8 +6,8 @@ describe('la rail: due gruppi, un comportamento a testa', () => {
     expect(navEntriesByGroup('panel').map((e) => e.id)).toEqual(['assets', 'brands', 'influencers']);
   });
 
-  it('il gruppo "workbench" è Calendar, Ads, Settings, in quest\'ordine', () => {
-    expect(navEntriesByGroup('workbench').map((e) => e.id)).toEqual(['calendar', 'ads', 'settings']);
+  it('il gruppo "workbench" è Calendar, Ads, Studio, Settings, in quest\'ordine', () => {
+    expect(navEntriesByGroup('workbench').map((e) => e.id)).toEqual(['calendar', 'ads', 'studio', 'settings']);
   });
 
   it('ogni voce del gruppo panel apre un pannello, ogni voce workbench un foglio', () => {
@@ -91,7 +91,9 @@ describe('un link diretto a un foglio su desktop apre la tela con il foglio', ()
     ['/settings/billing', '', 'mobile', 'page'],
     ['/assets', '', 'desktop', 'page'],
     ['/brands/new', '', 'desktop', 'page'],
-    ['/c/abc', '', 'desktop', 'page']
+    ['/c/abc', '', 'desktop', 'page'],
+    ['/studio', '', 'desktop', 'sheet'],
+    ['/studio/batch-1', '', 'desktop', 'page']
   ];
 
   it.each(cases)('%s%s su %s → %s', (path, search, viewport, expected) => {

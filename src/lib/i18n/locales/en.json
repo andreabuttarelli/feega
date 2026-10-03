@@ -260,7 +260,8 @@
     "nav2": {
       "materials": "Assets",
       "brands": "Brands",
-      "influencers": "Influencers"
+      "influencers": "Influencers",
+      "studio": "Photo studio"
     },
     "nav": {
       "settings": "Settings",
