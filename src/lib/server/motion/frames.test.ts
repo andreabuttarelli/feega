@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ModelMessage } from 'ai';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { addClip } from '$lib/motion/timeline';
-import { FrameUpload, MAX_FRAME_BYTES, MAX_FRAMES_PER_VIEW, MAX_VIEWS_PER_TURN, VIEW_FRAMES, decodeFrame, docTexts, keyFrameTimes, selfCheckDue, Vision, visionStep } from './frames';
+import { FrameUpload, MAX_FRAME_BYTES, MAX_FRAMES_PER_VIEW, MAX_VIEWS_PER_TURN, VIEW_FRAMES, decodeFrame, docTexts, keyFrameTimes, selfCheckDue, usageByModel, Vision, visionStep } from './frames';
 
 const jpeg = (bytes: number) => `data:image/jpeg;base64,${Buffer.alloc(bytes, 1).toString('base64')}`;
 
@@ -93,5 +93,15 @@ describe('what the safety review reads before frames reach a model', () => {
     const doc = must(addClip(newMotionDoc(MotionFormat.Square), { component: 'Title', from: 0, props: { text: 'Hello\nworld' } }, 't'));
 
     expect(docTexts(doc)).toEqual(['Hello\nworld']);
+  });
+});
+
+describe('billing a turn that mixed models', () => {
+  it('each step is billed to the model that actually ran it', () => {
+    const usage = (inputTokens: number) => ({ inputTokens, outputTokens: 10 });
+    const byModel = usageByModel([usage(100), usage(400), usage(50)], ['text', 'vision', 'text']);
+
+    expect(byModel.get('text')).toEqual({ inputTokens: 150, outputTokens: 20 });
+    expect(byModel.get('vision')).toEqual({ inputTokens: 400, outputTokens: 10 });
   });
 });

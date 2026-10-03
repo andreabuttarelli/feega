@@ -17,7 +17,7 @@ import { motionAgentPrompt } from '$lib/server/motion/motion-prompt';
 import { speakVoiceover } from '$lib/server/motion/voiceover';
 import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
 import { motionAgentScope } from '$lib/server/motion/agent-scope';
-import { SELF_CHECK_MAX_STEPS, VIEW_FRAMES, Vision, docTexts, keyFrameTimes, selfCheckDue, selfCheckPrompt, visionStep } from '$lib/server/motion/frames';
+import { SELF_CHECK_MAX_STEPS, VIEW_FRAMES, Vision, docTexts, keyFrameTimes, selfCheckDue, selfCheckPrompt, usageByModel, visionStep } from '$lib/server/motion/frames';
 import { awaitFrames, framesPrefix, type FrameBucket } from '$lib/server/motion/frame-store';
 import { CANVAS_ASSET_BUCKET } from '$lib/server/repos/asset-storage';
 import { FRAMES_REQUEST, type FramesRequest } from '$lib/motion/frames-request';
@@ -41,22 +41,7 @@ const ROUND_STOPS: Record<Round, (t0: number) => Stop[]> = {
   [Round.SelfCheck]: (t0) => [agentStopWhen(t0), selfCheckSpent]
 };
 
-type TurnStep = Parameters<typeof finishedTurn>[0][number] & { model: { modelId: string }; usage: unknown };
-
-type Usage = ReturnType<typeof extractSdkUsage>;
-
-function addUsage(a: Usage, b: Usage): Usage {
-  const sum = (x?: number, y?: number) => (x == null && y == null ? undefined : (x ?? 0) + (y ?? 0));
-  return { inputTokens: sum(a.inputTokens, b.inputTokens), outputTokens: sum(a.outputTokens, b.outputTokens), cachedTokens: sum(a.cachedTokens, b.cachedTokens), thinkingTokens: sum(a.thinkingTokens, b.thinkingTokens) };
-}
-
-function usageByModel(steps: TurnStep[]): Map<string, Usage> {
-  const byModel = new Map<string, Usage>();
-  for (const step of steps) {
-    byModel.set(step.model.modelId, addUsage(byModel.get(step.model.modelId) ?? {}, extractSdkUsage(step.usage)));
-  }
-  return byModel;
-}
+type TurnStep = Parameters<typeof finishedTurn>[0][number] & { usage: unknown };
 
 const bodySchema = z.object({ message: z.string().trim().min(1).max(8000), selection: z.array(z.string()).max(50).default([]) });
 
@@ -124,6 +109,7 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
   const toolNames = Object.keys(tools).filter((name) => vision === Vision.Available || name !== VIEW_FRAMES);
   const system = motionAgentPrompt({ brandName: project.brandId ? tokens.name : null, selectionNote: selectionNote(head.doc, selection), vision });
   const t0 = Date.now();
+  const stepModels: string[] = [];
   const opening = [...history, { role: 'user', content: message }] as ModelMessage[];
 
   const round = (messages: ModelMessage[], kind: Round) =>
@@ -136,6 +122,7 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
       stopWhen: ROUND_STOPS[kind](t0),
       prepareStep: ({ steps, messages: current, stepNumber }) => {
         const routed = visionModel ? visionStep({ lastCalls: steps.at(-1)?.toolCalls ?? [], messages: current, frames: session.frames, visionModel }) : undefined;
+        stepModels.push(routed?.model ?? model);
         const forced = kind === Round.SelfCheck && stepNumber === 0 ? { toolChoice: { type: 'tool' as const, toolName: VIEW_FRAMES } } : {};
         return { ...(routed?.model ? { model: llmLanguageModel(routed.model) } : {}), ...(routed?.messages ? { messages: routed.messages } : {}), ...forced };
       }
@@ -175,7 +162,7 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
     const turn = finishedTurn(steps);
     await saveTurn(db, { orgId, threadId, role: 'assistant', ...turn, actor }).catch((e) => console.error('[motion-agent] assistant turn not saved', { threadId }, e));
 
-    for (const [modelId, usage] of usageByModel(steps)) {
+    for (const [modelId, usage] of usageByModel(steps.map((s) => extractSdkUsage(s.usage)), stepModels)) {
       withOrgContext(orgId, () =>
         logAiCall({
           label: modelId === visionModel ? 'motion-agent-vision' : 'motion-agent',

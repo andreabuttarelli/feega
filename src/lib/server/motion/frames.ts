@@ -108,3 +108,22 @@ export function docTexts(doc: MotionDoc): string[] {
 export function selfCheckPrompt(times: number[]): string {
   return `Self-check: call ${VIEW_FRAMES} with times [${times.join(', ')}] and look at the result. If text is clipped or overflows, overlaps another element, has poor contrast or leaves the safe area, fix it once with the editing tools; otherwise change nothing. Then say in one line what you checked.`;
 }
+
+export type TokenUsage = Partial<Record<'inputTokens' | 'outputTokens' | 'cachedTokens' | 'thinkingTokens', number>>;
+
+function added(a: TokenUsage, b: TokenUsage): TokenUsage {
+  const sum: TokenUsage = { ...a };
+  for (const [key, value] of Object.entries(b) as [keyof TokenUsage, number | undefined][]) {
+    if (value === undefined) {
+      continue;
+    }
+    sum[key] = (sum[key] ?? 0) + value;
+  }
+  return sum;
+}
+
+export function usageByModel(usages: readonly TokenUsage[], models: readonly string[]): Map<string, TokenUsage> {
+  const byModel = new Map<string, TokenUsage>();
+  usages.forEach((usage, i) => byModel.set(models[i], added(byModel.get(models[i]) ?? {}, usage)));
+  return byModel;
+}

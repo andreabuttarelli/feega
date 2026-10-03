@@ -144,7 +144,10 @@
     const request = part.data as FramesRequest;
     const agentHtml = composeHtml({ doc: request.doc, tokens: data.tokens, assets: assetUrls });
     const times = request.times.map((t) => Math.min(t, (request.doc.durationInFrames - 1) / FPS));
-    const frames = await preview.capture(times, agentHtml).catch(() => null);
+    const frames = await preview.capture(times, agentHtml).catch((e) => {
+      console.error('[motion] frames not captured', e);
+      return null;
+    });
     if (!frames) {
       return;
     }

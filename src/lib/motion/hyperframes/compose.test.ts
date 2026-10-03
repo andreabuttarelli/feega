@@ -99,6 +99,13 @@ describe('MotionDoc to HyperFrames composition', () => {
     expect(html).toContain('left:54px');
   });
 
+  it('every animated layer is composited from the first frame, so seek history cannot change the pixels', () => {
+    const html = compose(doc);
+
+    expect(html).toContain('.fx{position:absolute;inset:0;will-change:transform,opacity}');
+    expect(html).toContain('.li{display:block;will-change:transform}');
+  });
+
   it('a staggered title line is held hidden from the clip start until its own reveal begins', () => {
     const html = compose(doc);
 
@@ -111,6 +118,7 @@ describe('MotionDoc to HyperFrames composition', () => {
 
     expect(html).toContain(`"${CAPTURE_REQUEST}"`);
     expect(html).toContain(`"${CAPTURE_REPLY}"`);
-    expect(html).toContain('modern-screenshot@');
+    expect(html).toContain('html-to-image@');
+    expect(html).toMatch(/<link rel="stylesheet" crossorigin="anonymous" href="https:\/\/fonts\.googleapis\.com/);
   });
 });

@@ -2228,3 +2228,10 @@ image, text` for a model the catalogue offers (e.g. a cheap synced one). Models 
 `image-models.ts` go through the chat transport. Move: a feature that picks a model on its own
 (the studio's "cheapest") picks only `isKnownImageModelId`; `wiro/*` ones additionally refuse
 outside uncensored projects.
+
+## streamText reports the outer model for every step
+Signal: an `ai_calls` row billed to the default model for a step `prepareStep` routed to another
+model (ai v7). Cause: `StepResult.model` is built from the model passed to `streamText`, not the
+one the step ran. Move: record the model per step in `prepareStep` and bill from that list
+(`usageByModel` in `server/motion/frames.ts`).
+
