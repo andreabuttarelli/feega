@@ -8,6 +8,7 @@ import { fakeDb } from '$lib/server/db/fake-db';
 import { reconcileAudioNodeRuns, runGenNode } from './generate';
 import { audioPurgers } from './audio-run';
 import type { AudioProvider } from './audio-provider';
+import { DEFAULT_VOICE } from '$lib/canvas/audio-operations';
 
 const ORG = '11111111-1111-1111-1111-111111111111';
 const NODE = '22222222-2222-2222-2222-222222222222';
@@ -189,13 +190,12 @@ describe('an audio node speaks the text connected to it', () => {
     expect(stored).toContain('elevenlabs/eleven_multilingual_v2');
   });
 
-  it('refuses before calling the provider when no voice is picked', async () => {
+  it('speaks with the default voice when no voice is picked', async () => {
     const { db } = fakeDb({ nodes: [audioNode()], nodes_connections: [], assets: [] }, { updateRows: { nodes: [{ ...audioNode(), version: 2 }] } });
 
-    const out = await runGenNode(db, start({ operation: 'text_to_speech' }, 'ciao'));
+    await runGenNode(db, start({ operation: 'text_to_speech' }, 'ciao'));
 
-    expect(out).toEqual({ kind: 'refused', error: 'Pick a voice' });
-    expect(provider.speak).not.toHaveBeenCalled();
+    expect(provider.speak).toHaveBeenCalledWith(expect.objectContaining({ voiceId: DEFAULT_VOICE.id }));
   });
 
   it('says the key is missing instead of failing silently', async () => {

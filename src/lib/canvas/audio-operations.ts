@@ -157,6 +157,12 @@ export type AudioParams = {
   style?: number;
 };
 
+export const DEFAULT_VOICE = { id: 'JBFqnCBsd6RMkjVDRZzb', name: 'George' } as const;
+
+export function voiceIdOf(params: AudioParams): string {
+  return params.voiceId || DEFAULT_VOICE.id;
+}
+
 export function isAudioOperation(x: unknown): x is AudioOperationId {
   return typeof x === 'string' && x in AUDIO_OPERATIONS;
 }
@@ -241,7 +247,6 @@ export type AudioInputs = { text: string; audio: number; video: number };
 export type AudioInputProblem =
   | 'text_required'
   | 'media_required'
-  | 'voice_required'
   | 'language_required'
   | 'duration_out_of_range';
 
@@ -253,9 +258,6 @@ export function audioInputProblem(id: AudioOperationId, inputs: AudioInputs, par
   }
   if (op.source === 'media' && inputs.audio + inputs.video === 0) {
     return 'media_required';
-  }
-  if (op.needsVoice && !params.voiceId) {
-    return 'voice_required';
   }
   if (op.needsLanguage && !params.targetLanguage) {
     return 'language_required';
@@ -271,7 +273,6 @@ export function audioInputProblem(id: AudioOperationId, inputs: AudioInputs, par
 export const AUDIO_PROBLEM_MESSAGE: Record<AudioInputProblem, string> = {
   text_required: 'Write the text or connect a text node',
   media_required: 'Connect an audio or video node',
-  voice_required: 'Pick a voice',
   language_required: 'Pick a target language',
   duration_out_of_range: 'Duration out of range'
 };
