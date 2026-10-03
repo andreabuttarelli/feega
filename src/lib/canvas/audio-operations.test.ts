@@ -3,6 +3,8 @@ import {
   AUDIO_OPERATIONS,
   AUDIO_OPERATION_IDS,
   DEFAULT_AUDIO_OPERATION,
+  DEFAULT_VOICE,
+  voiceIdOf,
   audioCreditsFor,
   audioInputPorts,
   audioInputProblem,
@@ -105,9 +107,11 @@ describe('audio inputs per operation', () => {
     expect(audioInputProblem('text_to_speech', { ...none, text: 'Ciao' }, { voiceId: 'v1' })).toBeNull();
   });
 
-  it('text to speech and voice changer need a voice', () => {
-    expect(audioInputProblem('text_to_speech', { ...none, text: 'Ciao' }, {})).toBe('voice_required');
-    expect(audioInputProblem('voice_changer', { ...none, audio: 1 }, {})).toBe('voice_required');
+  it('text to speech and voice changer run on the default voice when none is picked', () => {
+    expect(audioInputProblem('text_to_speech', { ...none, text: 'Ciao' }, {})).toBeNull();
+    expect(audioInputProblem('voice_changer', { ...none, audio: 1 }, {})).toBeNull();
+    expect(voiceIdOf({})).toBe(DEFAULT_VOICE.id);
+    expect(voiceIdOf({ voiceId: 'v1' })).toBe('v1');
   });
 
   it('media operations need a connected audio or video', () => {
