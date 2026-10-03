@@ -4,8 +4,6 @@ import { z } from 'zod';
 import { llmLanguageModel, llmModelForPicker } from '$lib/server/llm';
 import { extractSdkUsage, logAiCall, withOrgContext } from '$lib/server/ai-log';
 import { gateOrgAiAction } from '$lib/server/cli-auth';
-import { listMemberships } from '$lib/server/repos/orgs';
-import { findReachableProject } from '$lib/server/projects/lookup';
 import { loadTurns, openNodeThread, promptHistory, saveTurn } from '$lib/server/repos/chat';
 import { finishedTurn } from '$lib/server/project-agent/finished-turn';
 import { agentActor } from '$lib/server/repos/actor';
@@ -13,11 +11,12 @@ import { AGENT_MAX_DURATION_S, agentStopWhen } from '$lib/server/project-agent/l
 import { screenModelInput } from '$lib/server/moderation/model-input';
 import { ModerationProfile } from '$lib/server/moderation/profiles';
 import { blockedPrompt } from '$lib/server/moderation/blocked-response';
-import { findMotionNode, headOrNew, motionAssets, motionTokens, saveMotionDoc } from '$lib/server/motion/editor';
+import { headOrNew, motionAssets, motionTokens, saveMotionDoc } from '$lib/server/motion/editor';
 import { createMotionTools, selectionNote, type MotionSession } from '$lib/server/motion/motion-tools';
 import { motionAgentPrompt } from '$lib/server/motion/motion-prompt';
 import { speakVoiceover } from '$lib/server/motion/voiceover';
 import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
+import { motionAgentScope } from '$lib/server/motion/agent-scope';
 import type { RequestHandler } from './$types';
 
 export const config = { maxDuration: AGENT_MAX_DURATION_S };
@@ -26,29 +25,8 @@ const MOTION_AGENT_KEY = 'motion';
 
 const bodySchema = z.object({ message: z.string().trim().min(1).max(8000), selection: z.array(z.string()).max(50).default([]) });
 
-async function scopeOf(locals: App.Locals, params: { projectId?: string; nodeId?: string }) {
-  const { session, user } = await locals.safeGetSession();
-  if (!session?.access_token || !user) {
-    return json({ error: 'unauthenticated' }, { status: 401 });
-  }
-  const db = await locals.db();
-  if (!db) {
-    return json({ error: 'no_client' }, { status: 500 });
-  }
-  const memberships = await listMemberships(db, user.id);
-  const found = await findReachableProject(db, { projectId: params.projectId ?? '', memberships, userId: user.id });
-  if (!found) {
-    return json({ error: 'project_not_found' }, { status: 404 });
-  }
-  const motion = await findMotionNode(db, { orgId: found.orgId, nodeId: params.nodeId ?? '', place: { projectId: found.project.id } });
-  if (!motion) {
-    return json({ error: 'node_not_found' }, { status: 404 });
-  }
-  return { db, user, orgId: found.orgId, project: found.project, motion } as const;
-}
-
 export const POST: RequestHandler = async ({ request, params, locals }) => {
-  const scope = await scopeOf(locals, params);
+  const scope = await motionAgentScope(locals, params);
   if (scope instanceof Response) {
     return scope;
   }
@@ -138,7 +116,7 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
 };
 
 export const GET: RequestHandler = async ({ params, locals }) => {
-  const scope = await scopeOf(locals, params);
+  const scope = await motionAgentScope(locals, params);
   if (scope instanceof Response) {
     return scope;
   }
