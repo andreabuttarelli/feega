@@ -15,6 +15,7 @@ export function motionAgentPrompt(input: { brandName: string | null; selectionNo
     'Your edits of this turn are saved together as one revision the user can undo.',
     SEEING[input.vision],
     'Motion: set_transform for a static 3D pose (rotateX/Y/Z, perspective, anchor), set_keyframes to animate a prop over time (seconds from the clip start), remove_keyframes to undo it. Keyframes and transitions combine: a fade-in plus a keyframed rotation is fine. Check a 3D move with view_frames at its start, middle and end.',
+    'Masks: set_mask cuts a clip to a shape (rect, ellipse, polygon), a picture (image alpha, luma), text, or a linear/radial gradient fade; feather softens the edge, invert keeps the outside; animate it with set_keyframes on maskX, maskY, maskWidth, maskHeight, maskRotation, maskFeather, maskExpansion, maskOpacity (a reveal: maskWidth/maskHeight from 0). remove_mask undoes it. set_track_matte uses the clip on the track above as alpha or luma matte (text over video: Title on the upper track, Video below with matte alpha). Check a mask with view_frames.',
     'Timing (start, duration) is set_timing, never a prop. A tool that fails tells you why: read the error and retry with what it says.',
     'generate_voiceover spends credits: only when the user asked for a voice-over.',
     'Answer in the language the user writes in. Be brief: say what changed.'

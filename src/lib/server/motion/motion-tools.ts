@@ -4,7 +4,8 @@ import { AssetKind, COMPONENTS, COMPONENT_IDS, TrackKind } from '$lib/motion/com
 import { fieldsOf } from '$lib/motion/inspector';
 import { Ease, FPS, TRANSITION_KINDS } from '$lib/motion/design';
 import { MOTION_FORMATS, findClip, type MotionDoc } from '$lib/motion/doc';
-import { ClipEdge, Side, addClip, addTrack, moveClip, removeClips, removeKeyframes, setCanvas, setKeyframes, setProps, setTiming, setTransform, setTransition, trimClip, type OpResult } from '$lib/motion/timeline';
+import { ClipEdge, Side, addClip, addTrack, moveClip, removeClips, removeKeyframes, setCanvas, setKeyframes, setMask, setProps, setTiming, setTrackMatte, setTransform, setTransition, trimClip, type OpResult } from '$lib/motion/timeline';
+import { MASK_KEYS, MASK_KIND_IDS, MATTES } from '$lib/motion/mask';
 import { ANIMATABLE, TRANSFORM_KEYS, easeSchema, transformSchema } from '$lib/motion/keyframes';
 import type { MotionAsset } from './editor';
 import { MAX_FRAMES_PER_VIEW, MAX_VIEWS_PER_TURN, VIEW_FRAMES, type Frame } from './frames';
@@ -42,6 +43,8 @@ function summary(doc: MotionDoc, selection: string[]) {
         in: c.transitionIn.kind,
         out: c.transitionOut.kind,
         transform: c.transform,
+        mask: c.mask,
+        matte: c.matte,
         keyframes: Object.fromEntries(Object.entries(c.keyframes).map(([prop, track]) => [prop, track.map((k) => ({ time: secs(k.frame), value: k.value, ease: k.ease }))]))
       }))
     }))
@@ -211,6 +214,49 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: 'Remove the keyframes of one prop of a clip, all of them or only those at the given times (seconds from the clip start).',
       inputSchema: z.object({ clip_id: z.string(), prop: z.string(), times: z.array(z.number().min(0)).optional() }),
       execute: async (input) => apply(removeKeyframes(session.doc, input.clip_id, input.prop, input.times?.map(frames)), `removed keyframes of ${input.prop}`)
+    }),
+
+    set_mask: tool({
+      description: `Mask a clip: only the inside of the mask shows (invert shows the outside). kind: ${MASK_KIND_IDS.join(', ')}. x/y are the mask centre and width/height its size, in fractions of the frame; rotation in degrees; feather (blur) and expansion (grow, negative shrinks) in pixels; opacity 0..1. polygon takes points [[x,y],...] inside the mask box (0..1); image (alpha) and luma (brightness) take an assetId from list_assets; text takes text. Replaces the whole mask. Animate it with set_keyframes on ${MASK_KEYS.join(', ')}.`,
+      inputSchema: z.object({
+        clip_id: z.string(),
+        mask: z
+          .object({
+            kind: z.enum(MASK_KIND_IDS),
+            x: z.number().optional(),
+            y: z.number().optional(),
+            width: z.number().optional(),
+            height: z.number().optional(),
+            rotation: z.number().optional(),
+            feather: z.number().optional(),
+            expansion: z.number().optional(),
+            opacity: z.number().optional(),
+            invert: z.boolean().optional(),
+            points: z.array(z.tuple([z.number(), z.number()])).optional(),
+            assetId: z.string().optional(),
+            text: z.string().optional()
+          })
+          .strict()
+      }),
+      execute: async (input) => {
+        if (!assetKnown(input.mask.assetId)) {
+          return { ok: false, error: 'unknown asset id: call list_assets' };
+        }
+        return apply(registered(setMask(session.doc, input.clip_id, input.mask), input.mask.assetId), `masked ${input.clip_id}`);
+      }
+    }),
+
+    remove_mask: tool({
+      description: 'Remove the mask of a clip and its mask keyframes.',
+      inputSchema: z.object({ clip_id: z.string() }),
+      execute: async (input) => apply(setMask(session.doc, input.clip_id, null), `unmasked ${input.clip_id}`)
+    }),
+
+    set_track_matte: tool({
+      description:
+        'Use the clip directly above (on the track above, overlapping in time) as a matte for this clip: alpha shows this clip only where that clip is drawn (text, shape, picture), luma where it is bright. The matte clip is hidden. none turns it off.',
+      inputSchema: z.object({ clip_id: z.string(), matte: z.enum(MATTES) }),
+      execute: async (input) => apply(setTrackMatte(session.doc, input.clip_id, input.matte), `matte ${input.matte} on ${input.clip_id}`)
     }),
 
     add_track: tool({
