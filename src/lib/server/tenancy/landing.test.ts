@@ -3,6 +3,7 @@ import type { User } from '@supabase/supabase-js';
 import type { Cookies } from '@sveltejs/kit';
 import { landingPath, type LandingDeps } from '$lib/server/tenancy/landing';
 import { ORG_COOKIE, LAST_PROJECT_COOKIE } from '$lib/server/tenancy/context';
+import { EntryVia } from '$lib/server/tenancy/entry';
 
 const USER = { id: 'u1', email: 'b@esempio.it' } as User;
 const DB = {} as never;
@@ -53,7 +54,7 @@ describe('dove atterra chi è appena entrato', () => {
 
     expect(path).toBe('/p/proj/c/canvas');
     expect(d.acceptInvite).toHaveBeenCalledWith({ token: 'tok', userId: 'u1', email: 'b@esempio.it' });
-    expect(d.homePathFor.mock.calls[0].slice(3)).toEqual(['org-a', null]);
+    expect(d.homePathFor.mock.calls[0].slice(3)).toEqual(['org-a', null, null, EntryVia.Invite]);
   });
 
   it("chi si è appena registrato ha un profilo prima che l'invito lo renda membro", async () => {

@@ -28,7 +28,43 @@ export const DEFAULT_CANVAS_NAME = 'Untitled';
 const DEFAULT_WORKSPACE_NAME = 'My workspace';
 const DEFAULT_PROJECT_SLUG = 'untitled';
 
-export type Entry = { orgId: string; projectId: string; canvasId: string };
+export type Entry = { orgId: string; projectId: string; canvasId: string; firstRun: boolean };
+
+export const DASHBOARD_PATH = '/app';
+
+export enum EntryVia {
+  Direct = 'direct',
+  Invite = 'invite'
+}
+
+export enum Arrival {
+  Returning = 'returning',
+  FirstRun = 'first_run',
+  Campaign = 'campaign',
+  Invite = 'invite'
+}
+
+export enum Landing {
+  Dashboard = 'dashboard',
+  Canvas = 'canvas'
+}
+
+export const ARRIVAL_LANDING: Record<Arrival, Landing> = {
+  [Arrival.Returning]: Landing.Dashboard,
+  [Arrival.FirstRun]: Landing.Canvas,
+  [Arrival.Campaign]: Landing.Canvas,
+  [Arrival.Invite]: Landing.Canvas
+};
+
+export function arrivalOf(input: { campaign: boolean; via: EntryVia; firstRun: boolean }): Arrival {
+  if (input.campaign) {
+    return Arrival.Campaign;
+  }
+  if (input.via === EntryVia.Invite) {
+    return Arrival.Invite;
+  }
+  return input.firstRun ? Arrival.FirstRun : Arrival.Returning;
+}
 
 export type EntryDeps = {
   ensureProfile: typeof ensureProfile;
@@ -129,11 +165,16 @@ async function orgIdFor(db: Db, deps: EntryDeps, user: User, chosenOrgId: string
  * (`listProjects` ordina già così) — mai il più nuovo per nascita, che è il caso di un
  * "Untitled" appena creato e mai più toccato.
  */
-async function projectIdFor(db: Db, deps: EntryDeps, orgId: string, lastProjectId: string | null): Promise<string> {
+async function projectIdFor(
+  db: Db,
+  deps: EntryDeps,
+  orgId: string,
+  lastProjectId: string | null
+): Promise<{ projectId: string; created: boolean }> {
   const projects = (await deps.listProjects(db, orgId)).filter((p) => p.mode !== ProjectMode.Uncensored);
   if (projects.length > 0) {
     const last = lastProjectId ? projects.find((p) => p.id === lastProjectId) : undefined;
-    return (last ?? projects[0]).id;
+    return { projectId: (last ?? projects[0]).id, created: false };
   }
 
   const project = await firstProjectOnce(deps.createProject, db, {
@@ -142,7 +183,7 @@ async function projectIdFor(db: Db, deps: EntryDeps, orgId: string, lastProjectI
     slug: DEFAULT_PROJECT_SLUG,
     brandId: null
   });
-  return project.id;
+  return { projectId: project.id, created: true };
 }
 
 async function canvasIdFor(db: Db, deps: EntryDeps, scope: { orgId: string; projectId: string }): Promise<string> {
@@ -165,33 +206,32 @@ export async function enterApp(
   await deps.ensureProfile(db, user);
 
   const orgId = await orgIdFor(db, deps, user, chosenOrgId);
-  const projectId = await projectIdFor(db, deps, orgId, lastProjectId);
+  const { projectId, created } = await projectIdFor(db, deps, orgId, lastProjectId);
   const canvasId = await canvasIdFor(db, deps, { orgId, projectId });
 
-  return { orgId, projectId, canvasId };
+  return { orgId, projectId, canvasId, firstRun: created };
 }
 
-/**
- * DOVE ATTERRA CHI È GIÀ DENTRO: LA PROPRIA TELA, MAI `/app`.
- *
- * `/app` era la dashboard vecchia; oggi è solo un bootstrap che questa funzione assorbe. Stesso
- * gradino di `enterApp` — profilo, org, progetto, tela, ognuno creato solo se manca — ma la
- * risposta è già il percorso su cui mandare la persona, non i tre id sciolti.
- */
 export async function homePathFor(
   db: Db,
   deps: EntryDeps,
   user: User,
   chosenOrgId: string | null = null,
   lastProjectId: string | null = null,
-  campaign: Campaign | null = null
+  campaign: Campaign | null = null,
+  via: EntryVia = EntryVia.Direct
 ): Promise<string> {
   const entry = await enterApp(db, deps, user, chosenOrgId, lastProjectId);
   const path = canvasPath(entry.projectId, entry.canvasId);
+  const arrival = arrivalOf({ campaign: campaign !== null, via, firstRun: entry.firstRun });
+  if (ARRIVAL_LANDING[arrival] === Landing.Dashboard) {
+    return DASHBOARD_PATH;
+  }
   if (!campaign) {
     return path;
   }
 
-  const seeded = await deps.seedWelcome(db, { userId: user.id, ...entry }, campaign);
+  const scope = { userId: user.id, orgId: entry.orgId, projectId: entry.projectId, canvasId: entry.canvasId };
+  const seeded = await deps.seedWelcome(db, scope, campaign);
   return seeded ? `${path}?${WELCOME_PARAM}=${campaign}` : path;
 }
