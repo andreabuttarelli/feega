@@ -6,8 +6,8 @@ describe('la rail: due gruppi, un comportamento a testa', () => {
     expect(navEntriesByGroup('panel').map((e) => e.id)).toEqual(['assets', 'brands', 'influencers']);
   });
 
-  it('il gruppo "workbench" è Calendar, Ads, Settings, in quest\'ordine', () => {
-    expect(navEntriesByGroup('workbench').map((e) => e.id)).toEqual(['calendar', 'ads', 'settings']);
+  it('il gruppo "workbench" è Calendar, Ads, Studio, Settings, in quest\'ordine', () => {
+    expect(navEntriesByGroup('workbench').map((e) => e.id)).toEqual(['calendar', 'ads', 'studio', 'settings']);
   });
 
   it('ogni voce del gruppo panel apre un pannello, ogni voce workbench un foglio', () => {

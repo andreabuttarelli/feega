@@ -6,6 +6,7 @@ import { cronAuthorized } from '$lib/server/cron-auth';
 import { expireStuckRuns, reconcileAudioNodeRuns, reconcileVideoNodeRuns, reconcileWiroNodeRuns } from '$lib/server/canvas/generate';
 import { drainLoopQueue } from '$lib/server/canvas/loop';
 import { drainWorkflowQueue } from '$lib/server/canvas/workflow';
+import { drainStudio } from '$lib/server/studio/studio-drain';
 import { pruneOldCanvasEvents } from '$lib/server/canvas/retention';
 import { renewAccountSeats } from '$lib/server/account-billing';
 import { purgeProviderCopies } from '$lib/server/canvas/provider-purge';
@@ -77,6 +78,11 @@ export const GET: RequestHandler = async ({ request }) => {
     return { claimed: 0, done: 0, failed: 0, blocked: 0 };
   });
 
+  const studio = await drainStudio(db).catch((e) => {
+    console.error('[canvas runs] studio drain failed', e);
+    return { claimed: 0, done: 0, failed: 0, blocked: 0, requeued: 0 };
+  });
+
   const runs = await expireStuckRuns(db).catch((e) => {
     console.error('[canvas runs] tick failed', e);
     return { expired: 0 };
@@ -103,7 +109,7 @@ export const GET: RequestHandler = async ({ request }) => {
     return { restored: 0 };
   });
 
-  return json({ ...runs, videos, audios, wiro, purge, loops, workflows, events, seats, reports });
+  return json({ ...runs, videos, audios, wiro, purge, loops, workflows, studio, events, seats, reports });
 };
 
 export const POST = GET;
