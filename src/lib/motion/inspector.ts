@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { COMPONENTS, Control, Group, type AssetKind, type ComponentId } from './components';
 import { FPS } from './design';
+import { ValueKind, animProp, baseValue, sampleColor, sampleTrack, type Animated, type KeyValue } from './keyframes';
 
 export type Field = {
   key: string;
@@ -84,4 +85,19 @@ export function parseDecimal(text: string): number | null {
   }
   const value = Number(trimmed);
   return Number.isFinite(value) ? value : null;
+}
+
+type Placed = Animated & { from: number };
+
+export function valueAt(clip: Placed, key: string, frame: number, resolve: (color: string) => string): KeyValue | null {
+  const track = clip.keyframes[key];
+  if (!track?.length) {
+    return baseValue(clip, key);
+  }
+  const local = frame - clip.from;
+  return animProp(clip.component, key)?.kind === ValueKind.Color ? sampleColor(track, local, resolve) : sampleTrack(track, local);
+}
+
+export function keyAt(clip: Placed, key: string, frame: number): boolean {
+  return (clip.keyframes[key] ?? []).some((k) => k.frame === frame - clip.from);
 }

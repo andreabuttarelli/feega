@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { COMPONENT_IDS, TrackKind, parseProps, type ComponentId } from './components';
 import { FPS, TRANSITION_KINDS, TransitionKind } from './design';
+import { keyframeSchema, keyframesProblem, transformSchema } from './keyframes';
 
 export enum MotionFormat {
   Landscape = '16:9',
@@ -23,6 +24,7 @@ export const MAX_FRAMES = MAX_SECONDS * FPS;
 export const MAX_SIDE = 1920;
 export const MAX_SHORT_SIDE = 1080;
 export const DEFAULT_SECONDS = 15;
+export const DOC_VERSION = 2;
 
 const edgeSchema = z.object({
   kind: z.enum(TRANSITION_KINDS),
@@ -37,7 +39,9 @@ const clipSchema = z.object({
   component: z.enum(COMPONENT_IDS),
   props: z.record(z.string(), z.unknown()).default({}),
   transitionIn: edgeSchema.default({ kind: TransitionKind.None, durationInFrames: 0 }),
-  transitionOut: edgeSchema.default({ kind: TransitionKind.None, durationInFrames: 0 })
+  transitionOut: edgeSchema.default({ kind: TransitionKind.None, durationInFrames: 0 }),
+  transform: transformSchema.default({}),
+  keyframes: z.record(z.string(), z.array(keyframeSchema).min(1)).default({})
 });
 
 const trackSchema = z.object({
@@ -55,6 +59,7 @@ const assetRefSchema = z.object({
 
 export const motionDocSchema = z
   .object({
+    version: z.literal(DOC_VERSION),
     fps: z.literal(FPS),
     width: z.number().int().min(16).max(MAX_SIDE),
     height: z.number().int().min(16).max(MAX_SIDE),
@@ -71,21 +76,56 @@ export type AssetRef = MotionDoc['assets'][number];
 
 export type DocVerdict = { ok: true; doc: MotionDoc } | { ok: false; error: string };
 
+type Raw = Record<string, unknown> & { tracks?: { clips?: Record<string, unknown>[] }[] };
+
+const MIGRATIONS: Record<number, (doc: Raw) => Raw> = {
+  1: (doc) => ({
+    ...doc,
+    version: 2,
+    tracks: (doc.tracks ?? []).map((t) => ({ ...t, clips: (t.clips ?? []).map((c) => ({ transform: {}, keyframes: {}, ...c })) }))
+  })
+};
+
+export function upgradeDoc(input: unknown): unknown {
+  if (!input || typeof input !== 'object') {
+    return input;
+  }
+  let doc = input as Raw;
+  let version = typeof doc.version === 'number' ? doc.version : 1;
+  while (MIGRATIONS[version]) {
+    doc = MIGRATIONS[version](doc);
+    version += 1;
+  }
+  return doc;
+}
+
+export function byFrame<T extends { frame: number }>(track: readonly T[]): T[] {
+  const last = new Map(track.map((k) => [k.frame, k]));
+  return [...last.values()].sort((a, b) => a.frame - b.frame);
+}
+
+function clipProblem(clip: MotionClip): string | null {
+  const verdict = parseProps(clip.component, clip.props);
+  if (!verdict.ok) {
+    return verdict.error;
+  }
+  clip.props = verdict.props;
+  clip.keyframes = Object.fromEntries(Object.entries(clip.keyframes).map(([key, track]) => [key, byFrame(track)]));
+  return keyframesProblem(clip.component, clip.keyframes);
+}
+
 function propsProblem(doc: MotionDoc): string | null {
-  for (const track of doc.tracks) {
-    for (const clip of track.clips) {
-      const verdict = parseProps(clip.component, clip.props);
-      if (!verdict.ok) {
-        return verdict.error;
-      }
-      clip.props = verdict.props;
+  for (const clip of clipsOf(doc)) {
+    const problem = clipProblem(clip);
+    if (problem) {
+      return problem;
     }
   }
   return null;
 }
 
 export function parseMotionDoc(input: unknown): DocVerdict {
-  const parsed = motionDocSchema.safeParse(input);
+  const parsed = motionDocSchema.safeParse(upgradeDoc(input));
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ') };
   }
@@ -101,6 +141,7 @@ export function parseMotionDoc(input: unknown): DocVerdict {
 export function newMotionDoc(format: MotionFormat): MotionDoc {
   const { width, height } = FORMATS[format];
   return {
+    version: DOC_VERSION,
     fps: FPS,
     width,
     height,

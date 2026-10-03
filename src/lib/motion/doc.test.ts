@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FORMATS, MAX_FRAMES, MotionFormat, newMotionDoc, parseMotionDoc } from './doc';
+import { DOC_VERSION, FORMATS, MAX_FRAMES, MotionFormat, newMotionDoc, parseMotionDoc, upgradeDoc } from './doc';
 
 function clip(component: string) {
   return {
@@ -59,5 +59,71 @@ describe('MotionDoc', () => {
     const doc = { ...newMotionDoc(MotionFormat.Landscape), width: 3840, height: 2160 };
 
     expect(parseMotionDoc(doc).ok).toBe(false);
+  });
+
+  it('a new doc carries the current schema version', () => {
+    expect(newMotionDoc(MotionFormat.Square).version).toBe(DOC_VERSION);
+  });
+
+  it('a clip keeps its transform and keyframes', () => {
+    const doc = newMotionDoc(MotionFormat.Square);
+    const keyed = { ...clip('Title'), transform: { rotateY: 30, perspective: 800 }, keyframes: { rotateX: [{ frame: 0, value: 0 }, { frame: 20, value: 90, ease: [0.2, 0, 0.2, 1] }] } };
+    const parsed = parseMotionDoc({ ...doc, tracks: [{ ...doc.tracks[0], clips: [keyed] }, doc.tracks[1]] });
+
+    expect(parsed.ok && parsed.doc.tracks[0].clips[0].transform).toEqual({ rotateY: 30, perspective: 800 });
+    expect(parsed.ok && parsed.doc.tracks[0].clips[0].keyframes.rotateX[0].ease).toBe('standard');
+  });
+
+  it('refuses keyframes on a prop the component cannot animate', () => {
+    const doc = newMotionDoc(MotionFormat.Square);
+    const keyed = { ...clip('Title'), keyframes: { orbit: [{ frame: 0, value: 0 }] } };
+
+    expect(parseMotionDoc({ ...doc, tracks: [{ ...doc.tracks[0], clips: [keyed] }, doc.tracks[1]] }).ok).toBe(false);
+  });
+
+  it('keyframes come back ordered by frame, one per frame', () => {
+    const doc = newMotionDoc(MotionFormat.Square);
+    const keyed = { ...clip('Title'), keyframes: { rotateZ: [{ frame: 20, value: 2 }, { frame: 0, value: 0 }, { frame: 20, value: 3 }] } };
+    const parsed = parseMotionDoc({ ...doc, tracks: [{ ...doc.tracks[0], clips: [keyed] }, doc.tracks[1]] });
+
+    expect(parsed.ok && parsed.doc.tracks[0].clips[0].keyframes.rotateZ.map((k) => [k.frame, k.value])).toEqual([
+      [0, 0],
+      [20, 3]
+    ]);
+  });
+});
+
+describe('stored docs from older versions', () => {
+  const v1 = { fps: 30, width: 1080, height: 1080, durationInFrames: 90, tracks: [{ id: 'v1', kind: 'visual', name: 'Video 1', clips: [clip('Title')] }], assets: [] };
+
+  it('a doc without a version is version 1 and upgrades to the current one', () => {
+    const upgraded = upgradeDoc(v1) as { version: number; tracks: { clips: { transform: unknown; keyframes: unknown }[] }[] };
+
+    expect(upgraded.version).toBe(DOC_VERSION);
+    expect(upgraded.tracks[0].clips[0].transform).toEqual({});
+    expect(upgraded.tracks[0].clips[0].keyframes).toEqual({});
+  });
+
+  it('does not touch its input', () => {
+    const before = structuredClone(v1);
+    upgradeDoc(v1);
+
+    expect(v1).toEqual(before);
+  });
+
+  it('a current doc passes through unchanged', () => {
+    const doc = newMotionDoc(MotionFormat.Square);
+
+    expect(upgradeDoc(doc)).toEqual(doc);
+  });
+
+  it('loading parses a version 1 doc', () => {
+    const parsed = parseMotionDoc(v1);
+
+    expect(parsed.ok && parsed.doc.version).toBe(DOC_VERSION);
+  });
+
+  it('refuses a doc from a newer version than this code knows', () => {
+    expect(parseMotionDoc({ ...newMotionDoc(MotionFormat.Square), version: DOC_VERSION + 1 }).ok).toBe(false);
   });
 });
