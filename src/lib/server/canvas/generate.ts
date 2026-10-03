@@ -73,6 +73,16 @@ export type RunOutcome =
   | { kind: 'refused'; error: string }
   | { kind: 'conflict' };
 
+const EXTERNAL_URL = /^https?:\/\//;
+
+async function imageInputs(db: Db, upstream: UpstreamInputs): Promise<{ baseMediaId: string | undefined; referenceImageUrls: string[] }> {
+  const base = upstream.referenceImageUrl;
+  if (base && EXTERNAL_URL.test(base)) {
+    return { baseMediaId: undefined, referenceImageUrls: await signMediaPaths(db, upstream.referenceImageUrls) };
+  }
+  return { baseMediaId: base ?? undefined, referenceImageUrls: await signMediaPaths(db, upstream.pickedImageUrls) };
+}
+
 async function depositText(db: Db, input: StartRun, text: string): Promise<Asset> {
   return insertAsset(db, {
     orgId: input.orgId,
@@ -522,8 +532,7 @@ export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcom
         // Un solo riferimento: `ImageJob.baseMediaId` è un campo, non una lista — anche quando il
         // modello ne accetterebbe di più (`upstream.referenceImageUrls`, dal catalogo in
         // `graph.ts`). Il tetto vero sta lì; qui si spedisce solo quel che il trasporto sa portare.
-        baseMediaId: upstream.referenceImageUrl ?? undefined,
-        referenceImageUrls: await signMediaPaths(db, upstream.pickedImageUrls),
+        ...(await imageInputs(db, upstream)),
         params: extraParamsOf(input.params as unknown as Record<string, unknown>, declared)
       });
       if (!out.ok) {
