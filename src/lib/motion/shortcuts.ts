@@ -12,7 +12,11 @@ export enum Command {
   ZoomIn = 'zoom-in',
   ZoomOut = 'zoom-out',
   SelectAll = 'select-all',
-  Deselect = 'deselect'
+  Deselect = 'deselect',
+  PrevKeyframe = 'prev-keyframe',
+  NextKeyframe = 'next-keyframe',
+  Copy = 'copy',
+  Paste = 'paste'
 }
 
 export type KeyPress = { key: string; mod: boolean; shift: boolean };
@@ -35,7 +39,11 @@ export const SHORTCUTS: readonly Binding[] = [
   { key: '+', command: Command.ZoomIn, label: '+' },
   { key: '-', command: Command.ZoomOut, label: '−' },
   { key: 'a', mod: true, command: Command.SelectAll, label: '⌘A' },
-  { key: 'Escape', command: Command.Deselect, label: 'Esc' }
+  { key: 'Escape', command: Command.Deselect, label: 'Esc' },
+  { key: 'j', command: Command.PrevKeyframe, label: 'J' },
+  { key: 'k', command: Command.NextKeyframe, label: 'K' },
+  { key: 'c', mod: true, command: Command.Copy, label: '⌘C' },
+  { key: 'v', mod: true, command: Command.Paste, label: '⌘V' }
 ];
 
 export function commandFor(press: KeyPress): Command | null {

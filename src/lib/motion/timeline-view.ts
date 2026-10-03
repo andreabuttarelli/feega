@@ -1,6 +1,7 @@
 import { FPS } from './design';
 import { snapFrame, snapTargets } from './timeline';
-import type { MotionDoc } from './doc';
+import type { MotionClip, MotionDoc } from './doc';
+import { ANIMATABLE, sampleTrack, type EaseSpec } from './keyframes';
 
 export const ZOOM_MIN = 0.5;
 export const ZOOM_MAX = 16;
@@ -92,4 +93,27 @@ export function stackRows(clips: readonly Span[]): Record<string, number> {
 
 export function handleAt(handles: readonly Handle[], x: number): Handle | null {
   return handles.findLast((h) => x >= h.left && x < h.left + h.width) ?? null;
+}
+
+export type KeyLane = { prop: string; label: string; frames: number[] };
+
+export function keyLanes(clip: MotionClip): KeyLane[] {
+  return ANIMATABLE[clip.component]
+    .filter((p) => clip.keyframes[p.key]?.length)
+    .map((p) => ({ prop: p.key, label: p.label, frames: clip.keyframes[p.key].map((k) => k.frame) }));
+}
+
+const CURVE_STEPS = 24;
+
+export function easePath(ease: EaseSpec, size: number): string {
+  const track = [
+    { frame: 0, value: 0, ease },
+    { frame: CURVE_STEPS, value: 1, ease: 'linear' }
+  ];
+  const point = (i: number) => `${round2((i / CURVE_STEPS) * size)},${round2(size - sampleTrack(track, i) * size)}`;
+  return `M${point(0)}${Array.from({ length: CURVE_STEPS }, (_, i) => `L${point(i + 1)}`).join('')}`;
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
 }

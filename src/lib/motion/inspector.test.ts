@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { COMPONENT_IDS, AssetKind, Control, Group, defaultProps } from './components';
 import { Ease } from './design';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
-import { fieldGroups, fieldsOf, keyAt, parseDecimal, secondsLabel, valueAt } from './inspector';
+import { editAt, fieldGroups, fieldsOf, keyAt, keyedField, parseDecimal, secondsLabel, toggleKey, valueAt } from './inspector';
 import { addClip, setKeyframes, setTransform, type OpResult } from './timeline';
 
 function must(r: OpResult): MotionDoc {
@@ -94,5 +94,59 @@ describe('value at the playhead', () => {
 
     expect(keyAt(keyed, 'rotateX', 35)).toBe(true);
     expect(keyAt(keyed, 'rotateX', 36)).toBe(false);
+  });
+});
+
+describe('editing at the playhead', () => {
+  const doc = must(addClip(newMotionDoc(MotionFormat.Square), { component: 'Title', from: 30, durationInFrames: 90 }, 't'));
+  const resolve = (v: string) => v;
+  const clipOf = (d: MotionDoc, id = 't') => findClip(d, id)!.clip;
+
+  it('a prop without keyframes edits its base value', () => {
+    const next = must(editAt(doc, clipOf(doc), 'rotateY', 30, 50));
+
+    expect(clipOf(next).transform.rotateY).toBe(30);
+    expect(clipOf(next).keyframes).toEqual({});
+  });
+
+  it('a colour without keyframes edits the prop', () => {
+    expect(clipOf(must(editAt(doc, clipOf(doc), 'color', '#123456', 50))).props.color).toBe('#123456');
+  });
+
+  it('a prop with keyframes gets a keyframe at the playhead', () => {
+    const keyed = must(setKeyframes(doc, 't', 'rotateY', [{ frame: 0, value: 0, ease: Ease.Linear }]));
+    const next = must(editAt(keyed, clipOf(keyed), 'rotateY', 90, 50));
+
+    expect(clipOf(next).keyframes.rotateY.map((k) => [k.frame, k.value])).toEqual([
+      [0, 0],
+      [20, 90]
+    ]);
+  });
+
+  it('a camera prop without keyframes is keyed straight away, it has no base of its own', () => {
+    const model = must(addClip(doc, { component: 'Model3D', from: 0 }, 'm'));
+    const next = must(editAt(model, clipOf(model, 'm'), 'fov', 50, 12));
+
+    expect(clipOf(next, 'm').keyframes.fov).toEqual([{ frame: 12, value: 50, ease: Ease.Standard }]);
+  });
+
+  it('the diamond adds a keyframe with the value shown, and removes the one on the playhead', () => {
+    const added = must(toggleKey(must(setTransform(doc, 't', { rotateX: 25 })), clipOf(must(setTransform(doc, 't', { rotateX: 25 }))), 'rotateX', 40, resolve));
+    const removed = must(toggleKey(added, clipOf(added), 'rotateX', 40, resolve));
+
+    expect(clipOf(added).keyframes.rotateX).toEqual([{ frame: 10, value: 25, ease: Ease.Standard }]);
+    expect(clipOf(removed).keyframes).toEqual({});
+  });
+});
+
+describe('which component props are keyframed from the inspector', () => {
+  it('a colour prop is', () => {
+    expect(keyedField('ProductCard', 'card')).toBe(true);
+  });
+
+  it('a layout prop named like a transform key is not: layout x is not the transform offset x', () => {
+    for (const key of ['x', 'y', 'scale', 'opacity']) {
+      expect(keyedField('ProductCard', key)).toBe(false);
+    }
   });
 });

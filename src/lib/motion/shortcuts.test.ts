@@ -18,6 +18,16 @@ describe('editor shortcuts', () => {
     expect(press('ArrowRight', false, true)).toBe(Command.SecondForward);
   });
 
+  it('j and k jump to the previous and next keyframe', () => {
+    expect(press('j')).toBe(Command.PrevKeyframe);
+    expect(press('k')).toBe(Command.NextKeyframe);
+  });
+
+  it('cmd+c and cmd+v copy and paste', () => {
+    expect(press('c', true)).toBe(Command.Copy);
+    expect(press('v', true)).toBe(Command.Paste);
+  });
+
   it('an unbound key does nothing', () => {
     expect(press('q')).toBeNull();
   });

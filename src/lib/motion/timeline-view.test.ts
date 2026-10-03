@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc } from './doc';
-import { Grip, HANDLE_PX, Snap, edgeHandles, frameAt, handleAt, stackRows, pxPerFrame, rulerTicks, snapped, timecode } from './timeline-view';
+import { MotionFormat, findClip, newMotionDoc } from './doc';
+import { Ease } from './design';
+import { addClip, setKeyframes, type OpResult } from './timeline';
+import { Grip, HANDLE_PX, Snap, easePath, edgeHandles, frameAt, handleAt, keyLanes, stackRows, pxPerFrame, rulerTicks, snapped, timecode } from './timeline-view';
 
 describe('timeline view', () => {
   it('at zoom 1 a second is 60 px', () => {
@@ -73,5 +75,39 @@ describe('timeline view', () => {
 
     expect(start.width).toBeLessThan(HANDLE_PX);
     expect(start.left + start.width).toBeLessThan(end.left);
+  });
+});
+
+describe('keyframe lanes', () => {
+  const must = (r: OpResult) => {
+    if (!r.ok) {
+      throw new Error(r.error);
+    }
+    return r.doc;
+  };
+  const doc = must(addClip(newMotionDoc(MotionFormat.Square), { component: 'Title', from: 0 }, 't'));
+  const keyed = must(
+    setKeyframes(must(setKeyframes(doc, 't', 'color', [{ frame: 4, value: '#ffffff', ease: Ease.Linear }])), 't', 'rotateX', [
+      { frame: 0, value: 0, ease: Ease.Linear },
+      { frame: 10, value: 5, ease: Ease.Linear }
+    ])
+  );
+
+  it('one lane per animated prop, in the order the component lists them, with its label', () => {
+    expect(keyLanes(findClip(keyed, 't')!.clip)).toEqual([
+      { prop: 'rotateX', label: 'Rotate X', frames: [0, 10] },
+      { prop: 'color', label: 'Colour', frames: [4] }
+    ]);
+  });
+
+  it('a clip without keyframes has no lanes', () => {
+    expect(keyLanes(findClip(doc, 't')!.clip)).toEqual([]);
+  });
+
+  it('the ease preview is a path from the bottom-left to the top-right corner', () => {
+    const path = easePath(Ease.Linear, 40);
+
+    expect(path.startsWith('M0,40')).toBe(true);
+    expect(path.endsWith('L40,0')).toBe(true);
   });
 });

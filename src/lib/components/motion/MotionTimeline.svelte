@@ -3,26 +3,36 @@
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import { COMPONENTS, TrackKind } from '$lib/motion/components';
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
-  import { ClipEdge, moveClip, moveTrack, trimClip, type OpResult } from '$lib/motion/timeline';
-  import { Grip, Snap, edgeHandles, frameAt, pxPerFrame, rulerTicks, snapped, stackRows } from '$lib/motion/timeline-view';
+  import { ClipEdge, moveClip, moveKeyframes, moveTrack, setKeyEase, trimClip, type KeyRef, type OpResult } from '$lib/motion/timeline';
+  import { Grip, Snap, edgeHandles, frameAt, keyLanes, pxPerFrame, rulerTicks, snapped, stackRows } from '$lib/motion/timeline-view';
+  import type { MotionTrack } from '$lib/motion/doc';
+  import type { EaseSpec } from '$lib/motion/keyframes';
+  import EasePicker from './EasePicker.svelte';
 
   const HEADER_PX = 132;
   const ROW_PX = 30;
   const LANE_PAD_PX = 5;
 
-  const Drag = { Move: 'move', TrimStart: 'trim-start', TrimEnd: 'trim-end', Scrub: 'scrub' } as const;
+  const KEY_ROW_PX = 20;
+  const DIAMOND_PX = 10;
+
+  const Drag = { Move: 'move', TrimStart: 'trim-start', TrimEnd: 'trim-end', Scrub: 'scrub', Keys: 'keys' } as const;
   type Drag = (typeof Drag)[keyof typeof Drag];
 
-  type Gesture = { kind: Drag; clipId: string; trackId: string; grabFrame: number; originFrom: number; base: MotionDoc };
+  type Gesture = { kind: Drag; clipId: string; trackId: string; grabFrame: number; originFrom: number; base: MotionDoc; refs: KeyRef[]; delta: number };
 
   let {
     doc,
     frame = $bindable(0),
     selection = $bindable<string[]>([]),
+    keySelection = $bindable<KeyRef[]>([]),
     zoom,
     snap,
     onchange
-  }: { doc: MotionDoc; frame?: number; selection?: string[]; zoom: number; snap: Snap; onchange: (doc: MotionDoc, summary: string) => void } = $props();
+  }: { doc: MotionDoc; frame?: number; selection?: string[]; keySelection?: KeyRef[]; zoom: number; snap: Snap; onchange: (doc: MotionDoc, summary: string) => void } = $props();
+
+  let collapsed = $state<string[]>([]);
+  let easing = $state<{ ref: KeyRef; ease: EaseSpec; left: number; top: number } | null>(null);
 
   let draft = $state<MotionDoc | null>(null);
   let gesture: Gesture | null = null;
@@ -53,8 +63,51 @@
   function startClip(e: PointerEvent, clip: MotionClip, trackId: string, kind: Drag = Drag.Move) {
     e.stopPropagation();
     select(clip.id, e);
+    keySelection = [];
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    gesture = { kind, clipId: clip.id, trackId, grabFrame: frameOfPointer(e), originFrom: clip.from, base: doc };
+    gesture = { kind, clipId: clip.id, trackId, grabFrame: frameOfPointer(e), originFrom: clip.from, base: doc, refs: [], delta: 0 };
+  }
+
+  const sameKey = (a: KeyRef, b: KeyRef) => a.clipId === b.clipId && a.prop === b.prop && a.frame === b.frame;
+
+  function startKey(e: PointerEvent, clip: MotionClip, ref: KeyRef) {
+    e.stopPropagation();
+    easing = null;
+    const picked = keySelection.some((k) => sameKey(k, ref));
+    if (e.shiftKey || e.metaKey || e.ctrlKey) {
+      keySelection = picked ? keySelection.filter((k) => !sameKey(k, ref)) : [...keySelection, ref];
+    } else if (!picked) {
+      keySelection = [ref];
+    }
+    frame = clip.from + ref.frame;
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    gesture = { kind: Drag.Keys, clipId: clip.id, trackId: '', grabFrame: clip.from + ref.frame, originFrom: clip.from + ref.frame, base: doc, refs: keySelection, delta: 0 };
+  }
+
+  function openEase(e: MouseEvent, clip: MotionClip, ref: KeyRef, ease: EaseSpec) {
+    e.stopPropagation();
+    const rect = lanes!.getBoundingClientRect();
+    easing = { ref, ease, left: e.clientX - rect.left + lanes!.scrollLeft, top: e.clientY - rect.top + lanes!.scrollTop + 8 };
+  }
+
+  function pickEase(ease: EaseSpec) {
+    if (!easing) {
+      return;
+    }
+    const result = setKeyEase(doc, easing.ref, ease);
+    if (result.ok) {
+      easing = { ...easing, ease };
+      onchange(result.doc, 'Changed an ease');
+    }
+  }
+
+  function toggleLanes(e: Event, clipId: string) {
+    e.stopPropagation();
+    collapsed = collapsed.includes(clipId) ? collapsed.filter((id) => id !== clipId) : [...collapsed, clipId];
+  }
+
+  function laneClips(track: MotionTrack): MotionClip[] {
+    return (track.clips as MotionClip[]).filter((c) => selection.includes(c.id) && !collapsed.includes(c.id) && Object.keys(c.keyframes).length > 0);
   }
 
   function clipById(id: string): MotionClip {
@@ -63,7 +116,7 @@
 
   function startScrub(e: PointerEvent) {
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    gesture = { kind: Drag.Scrub, clipId: '', trackId: '', grabFrame: 0, originFrom: 0, base: doc };
+    gesture = { kind: Drag.Scrub, clipId: '', trackId: '', grabFrame: 0, originFrom: 0, base: doc, refs: [], delta: 0 };
     frame = Math.min(frameOfPointer(e), doc.durationInFrames - 1);
   }
 
@@ -84,7 +137,11 @@
       return moveClip(g.base, g.clipId, { from: target, trackId: over && sameKind ? over : undefined });
     },
     [Drag.TrimStart]: (g, at) => trimClip(g.base, g.clipId, ClipEdge.Start, snapped(g.base, at, { playhead: frame, exclude: [g.clipId], zoom, snap })),
-    [Drag.TrimEnd]: (g, at) => trimClip(g.base, g.clipId, ClipEdge.End, snapped(g.base, at, { playhead: frame, exclude: [g.clipId], zoom, snap }))
+    [Drag.TrimEnd]: (g, at) => trimClip(g.base, g.clipId, ClipEdge.End, snapped(g.base, at, { playhead: frame, exclude: [g.clipId], zoom, snap })),
+    [Drag.Keys]: (g, at) => {
+      g.delta = snapped(g.base, g.originFrom + (at - g.grabFrame), { playhead: g.originFrom, exclude: [], zoom, snap }) - g.originFrom;
+      return moveKeyframes(g.base, g.refs, g.delta);
+    }
   };
 
   function onMove(e: PointerEvent) {
@@ -102,11 +159,15 @@
     }
   }
 
-  const SUMMARY: Record<Drag, string> = { [Drag.Move]: 'Moved a clip', [Drag.TrimStart]: 'Trimmed a clip', [Drag.TrimEnd]: 'Trimmed a clip', [Drag.Scrub]: '' };
+  const SUMMARY: Record<Drag, string> = { [Drag.Move]: 'Moved a clip', [Drag.TrimStart]: 'Trimmed a clip', [Drag.TrimEnd]: 'Trimmed a clip', [Drag.Scrub]: '', [Drag.Keys]: 'Moved keyframes' };
 
   function onUp() {
     if (gesture && draft && gesture.kind !== Drag.Scrub) {
       onchange(draft, SUMMARY[gesture.kind]);
+    }
+    if (gesture?.kind === Drag.Keys && draft) {
+      const delta = gesture.delta;
+      keySelection = gesture.refs.map((r) => ({ ...r, frame: Math.max(0, r.frame + delta) }));
     }
     gesture = null;
     draft = null;
@@ -160,7 +221,12 @@
               style={`left: ${clip.from * ppf}px; width: ${Math.max(4, clip.durationInFrames * ppf)}px; top: ${LANE_PAD_PX + rows[clip.id] * ROW_PX}px; height: ${ROW_PX - 2}px;`}
               onpointerdown={(e) => startClip(e, clip as MotionClip, track.id)}
             >
-              <span class="kind">{COMPONENTS[clip.component].label}</span>
+              <span class="kind">
+                {COMPONENTS[clip.component].label}
+                {#if Object.keys(clip.keyframes).length}
+                  <button type="button" class="lanes-toggle" aria-label="Show keyframes" aria-expanded={selection.includes(clip.id) && !collapsed.includes(clip.id)} onpointerdown={(e) => e.stopPropagation()} onclick={(e) => (selection.includes(clip.id) ? toggleLanes(e, clip.id) : (selection = [clip.id]))}>◆</button>
+                {/if}
+              </span>
               <span class="label">{clipLabel(clip as MotionClip)}</span>
             </div>
           {/each}
@@ -177,7 +243,46 @@
           {/each}
         </div>
       </div>
+      {#each laneClips(track) as clip (clip.id)}
+        {#each keyLanes(clip) as lane (lane.prop)}
+          {@const keys = clip.keyframes[lane.prop]}
+          <div class="lane sub" data-key-lane={`${clip.id}:${lane.prop}`} style={`height: ${KEY_ROW_PX}px;`}>
+            <div class="head" style={`width: ${HEADER_PX}px;`}><span class="name prop">{lane.label}</span></div>
+            <div class="clips">
+              {#each keys.slice(0, -1) as key, i (key.frame)}
+                <button
+                  type="button"
+                  class="segment"
+                  title="Ease"
+                  aria-label={`Ease after ${lane.label} keyframe`}
+                  style={`left: ${(clip.from + key.frame) * ppf}px; width: ${(keys[i + 1].frame - key.frame) * ppf}px;`}
+                  onclick={(e) => openEase(e, clip, { clipId: clip.id, prop: lane.prop, frame: key.frame }, key.ease)}
+                ></button>
+              {/each}
+              {#each keys as key (key.frame)}
+                {@const ref = { clipId: clip.id, prop: lane.prop, frame: key.frame }}
+                <div
+                  class="diamond"
+                  class:picked={keySelection.some((k) => sameKey(k, ref))}
+                  role="button"
+                  tabindex="-1"
+                  aria-label={`${lane.label} keyframe at ${clip.from + key.frame}`}
+                  data-key-frame={clip.from + key.frame}
+                  style={`left: ${(clip.from + key.frame) * ppf - DIAMOND_PX / 2}px; width: ${DIAMOND_PX}px; height: ${DIAMOND_PX}px; top: ${(KEY_ROW_PX - DIAMOND_PX) / 2}px;`}
+                  onpointerdown={(e) => startKey(e, clip, ref)}
+                ></div>
+              {/each}
+            </div>
+          </div>
+        {/each}
+      {/each}
     {/each}
+
+    {#if easing}
+      <div class="ease-at" style={`left: ${Math.max(HEADER_PX, easing.left - 120)}px; top: ${easing.top}px;`}>
+        <EasePicker ease={easing.ease} onpick={pickEase} onclose={() => (easing = null)} />
+      </div>
+    {/if}
 
     <div class="playhead" style={`left: ${HEADER_PX + frame * ppf}px;`}></div>
   </div>
@@ -330,6 +435,62 @@
     overflow: hidden;
     text-overflow: ellipsis;
     color: var(--ink);
+  }
+
+  .lane.sub {
+    background: var(--paper-2);
+  }
+
+  .head .prop {
+    padding-left: 12px;
+    font-weight: 400;
+    color: var(--ink-soft);
+  }
+
+  .segment {
+    position: absolute;
+    top: 50%;
+    height: 8px;
+    transform: translateY(-50%);
+    cursor: pointer;
+  }
+
+  .segment::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    border-top: 1px dashed var(--ink-soft);
+  }
+
+  .segment:hover::after {
+    border-top: 1px solid #a855f7;
+  }
+
+  .diamond {
+    position: absolute;
+    z-index: 2;
+    background: var(--ink);
+    transform: rotate(45deg) scale(0.8);
+    cursor: ew-resize;
+  }
+
+  .diamond.picked {
+    background: #a855f7;
+    outline: 1px solid #a855f7;
+    outline-offset: 2px;
+  }
+
+  .lanes-toggle {
+    margin-left: 4px;
+    font-size: 9px;
+    color: #a855f7;
+  }
+
+  .ease-at {
+    position: absolute;
+    z-index: 6;
   }
 
   .playhead {

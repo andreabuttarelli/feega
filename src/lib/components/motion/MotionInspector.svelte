@@ -3,8 +3,10 @@
   import { FPS, TRANSITION_KINDS, type Edge } from '$lib/motion/design';
   import { resolveColor, type BrandTokens } from '$lib/motion/brand';
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
-  import { fieldGroups, parseDecimal, secondsLabel, type Field } from '$lib/motion/inspector';
-  import { setProps, setTiming, setTransition, Side, type OpResult } from '$lib/motion/timeline';
+  import { editAt, fieldGroups, keyAt, keyedField, parseDecimal, secondsLabel, toggleKey, valueAt, type Field } from '$lib/motion/inspector';
+  import { setProps, setTiming, setTransform, setTransition, Side, type OpResult } from '$lib/motion/timeline';
+  import { ANIMATABLE, Source, TRANSFORM, type AnimProp, type KeyValue } from '$lib/motion/keyframes';
+  import Dial from './Dial.svelte';
 
   type Asset = { id: string; kind: AssetKind; label: string; previewUrl: string };
 
@@ -13,13 +15,21 @@
     clip,
     tokens,
     assets,
+    frame,
     onchange
-  }: { doc: MotionDoc; clip: MotionClip; tokens: BrandTokens; assets: Asset[]; onchange: (doc: MotionDoc, summary: string) => void } = $props();
+  }: { doc: MotionDoc; clip: MotionClip; tokens: BrandTokens; assets: Asset[]; frame: number; onchange: (doc: MotionDoc, summary: string) => void } = $props();
+
+  const DIALS = new Set(['rotateX', 'rotateY', 'rotateZ', 'objectRotateX', 'objectRotateY', 'objectRotateZ', 'orbit']);
+  const ANCHOR_STOPS = [0, 0.5, 1] as const;
+  const KEY_STATE = { On: 'on', Lane: 'lane', None: 'none' } as const;
 
   let error = $state('');
 
   const groups = $derived(fieldGroups(clip.component));
   const spec = $derived(COMPONENTS[clip.component]);
+  const transformProps = $derived(ANIMATABLE[clip.component].filter((p) => p.source === Source.Transform));
+  const sceneProps = $derived(ANIMATABLE[clip.component].filter((p) => p.source === Source.Scene));
+  const resolve = (v: string) => resolveColor(v, tokens);
 
   function commit(result: OpResult, summary: string) {
     if (!result.ok) {
@@ -31,6 +41,10 @@
   }
 
   function setProp(field: Field, value: unknown) {
+    if (keyedField(clip.component, field.key)) {
+      animate(field.key, value as KeyValue);
+      return;
+    }
     commit(setProps(doc, clip.id, { [field.key]: value }), `Edited ${field.label.toLowerCase()}`);
   }
 
@@ -55,7 +69,31 @@
     setEdge(side, { durationInFrames: Math.round(seconds * FPS) });
   }
 
-  const value = (field: Field) => (clip.props as Record<string, unknown>)[field.key];
+  function animate(key: string, value: KeyValue) {
+    commit(editAt(doc, clip, key, value, frame), `Edited ${key}`);
+  }
+
+  function animateText(prop: AnimProp, text: string) {
+    const parsed = parseDecimal(text);
+    if (parsed !== null) {
+      animate(prop.key, Math.min(prop.max, Math.max(prop.min, parsed)));
+    }
+  }
+
+  function toggle(key: string) {
+    commit(toggleKey(doc, clip, key, frame, resolve), 'Toggled a keyframe');
+  }
+
+  function keyState(key: string) {
+    if (keyAt(clip, key, frame)) {
+      return KEY_STATE.On;
+    }
+    return clip.keyframes[key]?.length ? KEY_STATE.Lane : KEY_STATE.None;
+  }
+
+  const shown = (key: string) => valueAt(clip, key, frame, resolve);
+  const numberShown = (prop: AnimProp) => Math.round(Number(shown(prop.key)) * 1000) / 1000;
+  const value = (field: Field) => (keyedField(clip.component, field.key) ? shown(field.key) : (clip.props as Record<string, unknown>)[field.key]);
   const isHex = (v: unknown) => typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v);
 </script>
 
@@ -85,12 +123,52 @@
     {/each}
   </section>
 
+  {#snippet diamond(key: string)}
+    <button type="button" class="key {keyState(key)}" title="Keyframe at playhead" aria-label={`Keyframe ${key}`} aria-pressed={keyState(key) === KEY_STATE.On} onclick={() => toggle(key)}>◆</button>
+  {/snippet}
+
+  {#snippet animRow(prop: AnimProp)}
+    <div class="row anim" data-prop={prop.key}>
+      <span class="name">{@render diamond(prop.key)}{prop.label}</span>
+      <div class="range">
+        {#if DIALS.has(prop.key)}<Dial value={numberShown(prop)} label={prop.label} onchange={(v) => animate(prop.key, v)} />{/if}
+        <input type="range" min={prop.min} max={prop.max} step={prop.step} value={numberShown(prop)} oninput={(e) => animate(prop.key, Number(e.currentTarget.value))} />
+        <input class="num" type="text" inputmode="decimal" aria-label={prop.label} value={String(numberShown(prop))} onchange={(e) => animateText(prop, e.currentTarget.value)} />
+      </div>
+    </div>
+  {/snippet}
+
+  {#if transformProps.length}
+    <section data-testid="transform-section">
+      <h4>3D transform</h4>
+      {#each transformProps as prop (prop.key)}{@render animRow(prop)}{/each}
+      <div class="row anim">
+        <span class="name">Anchor</span>
+        <div class="anchor" role="group" aria-label="Anchor">
+          {#each ANCHOR_STOPS as ay (ay)}
+            {#each ANCHOR_STOPS as ax (ax)}
+              {@const on = (clip.transform.anchorX ?? TRANSFORM.anchorX.fallback) === ax && (clip.transform.anchorY ?? TRANSFORM.anchorY.fallback) === ay}
+              <button type="button" class:on aria-label={`Anchor ${ax} ${ay}`} onclick={() => commit(setTransform(doc, clip.id, { anchorX: ax, anchorY: ay }), 'Moved the anchor')}></button>
+            {/each}
+          {/each}
+        </div>
+      </div>
+    </section>
+  {/if}
+
+  {#if sceneProps.length}
+    <section>
+      <h4>3D scene</h4>
+      {#each sceneProps as prop (prop.key)}{@render animRow(prop)}{/each}
+    </section>
+  {/if}
+
   {#each groups as { group, fields } (group)}
     <section>
       <h4>{group}</h4>
       {#each fields as field (field.key)}
         <div class="row">
-          <label for={`f-${field.key}`}>{field.label}</label>
+          <label for={`f-${field.key}`}>{#if keyedField(clip.component, field.key)}{@render diamond(field.key)}{/if}{field.label}</label>
           {#if field.control === Control.Text}
             <input id={`f-${field.key}`} type="text" value={String(value(field) ?? '')} onchange={(e) => setProp(field, e.currentTarget.value)} />
           {:else if field.control === Control.Textarea}
@@ -276,6 +354,50 @@
   .empty {
     grid-column: 1 / -1;
     color: var(--ink-soft);
+  }
+
+  .anim .name {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .num {
+    width: 56px !important;
+    flex: none;
+  }
+
+  .key {
+    font-size: 10px;
+    line-height: 1;
+    width: 14px;
+    color: var(--line);
+  }
+
+  .key.lane {
+    color: var(--ink-soft);
+  }
+
+  .key.on {
+    color: #a855f7;
+  }
+
+  .anchor {
+    display: grid;
+    grid-template-columns: repeat(3, 14px);
+    gap: 3px;
+  }
+
+  .anchor button {
+    width: 14px;
+    height: 14px;
+    border: 1px solid var(--line);
+    background: var(--paper);
+  }
+
+  .anchor button.on {
+    background: #a855f7;
+    border-color: #a855f7;
   }
 
   .error {
