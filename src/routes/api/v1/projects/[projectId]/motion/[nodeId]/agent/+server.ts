@@ -163,7 +163,7 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
       const first = round(openingMessages, Round.Edit);
       writer.merge(first.toUIMessageStream({ sendFinish: false, sendReasoning: false }));
       const steps: TurnStep[] = [
-        ...(await first.steps.catch((e) => {
+        ...(await Promise.resolve(first.steps).catch((e: unknown) => {
           console.error('[motion-agent] round failed, keeping the edits made so far', e);
           return [];
         }))
@@ -174,7 +174,7 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
         const answered = (await first.response).messages as ModelMessage[];
         const check = round([...openingMessages, ...answered, { role: 'user', content: selfCheckPrompt(times) }], Round.SelfCheck);
         writer.merge(check.toUIMessageStream({ sendStart: false, sendReasoning: false }));
-        steps.push(...(await check.steps.catch((e) => {
+        steps.push(...(await Promise.resolve(check.steps).catch((e: unknown) => {
           console.error('[motion-agent] self-check failed, keeping the edits', e);
           return [];
         })));

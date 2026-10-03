@@ -278,6 +278,10 @@ describe('custom components in the composition', () => {
     expect(html).toContain('<div class="cc" id="cc-g1" data-component="NodeGraph"><style>@scope (#cc-g1) {.node{background:#111}}</style><div class="node"></div></div>');
   });
 
+  it('gives the component root the full frame, so code can measure it', () => {
+    expect(html).toContain('.cc{position:absolute;inset:0;overflow:hidden}');
+  });
+
   it('defines the component code once and boots it at the clip start with resolved props', () => {
     expect(html).toContain('["NodeGraph"]=function(ctx,window,self,');
     expect(html).toContain('"start":1,"length":2');

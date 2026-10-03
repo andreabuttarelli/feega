@@ -197,6 +197,7 @@ const BASE_CSS = [
   '#root{position:relative;width:100%;height:100%;overflow:hidden}',
   '.layer{position:absolute;inset:0}',
   '.fx{position:absolute;inset:0;will-change:transform,opacity}',
+  '.cc{position:absolute;inset:0;overflow:hidden}',
   '.li{display:block;will-change:transform}',
   ANIMATE_CSS,
   MASK_CSS
