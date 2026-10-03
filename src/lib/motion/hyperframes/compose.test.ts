@@ -81,7 +81,15 @@ describe('MotionDoc to HyperFrames composition', () => {
     const html = compose(withVideo, { v: '/assets/v' });
 
     expect(html).toContain('<div class="layer" data-clip="vid"');
-    expect(html).toMatch(/<video id="c-vid" src="\/assets\/v" muted playsinline data-start="1"/);
+    expect(html).toMatch(/<video id="c-vid" src="\/assets\/v" crossorigin="anonymous" preload="auto" muted playsinline data-start="1"/);
+  });
+
+  it('media is fetched with CORS so a captured frame or an export never taints the canvas', () => {
+    const withAudio = must(addClip(must(addClip(doc, { component: 'Video', from: 0, props: { assetId: 'v' } }, 'vid')), { component: 'Audio', from: 0, props: { assetId: 'a' } }, 'mus'));
+    const html = compose(withAudio, { v: '/v.mp4', a: '/a.mp3' });
+
+    expect(html).toContain('<video id="c-vid" src="/v.mp4" crossorigin="anonymous"');
+    expect(html).toContain('<audio id="c-mus" src="/a.mp3" crossorigin="anonymous"');
   });
 
   it('is deterministic', () => {
@@ -125,6 +133,14 @@ describe('MotionDoc to HyperFrames composition', () => {
     expect(html).toContain(`"${CAPTURE_REPLY}"`);
     expect(html).toContain('html-to-image@');
     expect(html).toMatch(/<link rel="stylesheet" crossorigin="anonymous" href="https:\/\/fonts\.googleapis\.com/);
+  });
+
+  it('hands an export a full-size bitmap, only once every video has finished seeking', () => {
+    const html = compose(doc);
+
+    expect(html).toContain('createImageBitmap');
+    expect(html).toContain('seeked');
+    expect(html).toContain('getFontEmbedCSS');
   });
 });
 

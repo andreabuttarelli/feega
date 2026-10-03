@@ -20,6 +20,8 @@
   import MotionTimeline from '$lib/components/motion/MotionTimeline.svelte';
   import MotionInspector from '$lib/components/motion/MotionInspector.svelte';
   import MaskOverlay from '$lib/components/motion/MaskOverlay.svelte';
+  import ExportDialog from '$lib/components/motion/ExportDialog.svelte';
+  import SoundDialog, { type Made, type SoundKind } from '$lib/components/motion/SoundDialog.svelte';
   import ChatPanel from '$lib/components/brand-agent/ChatPanel.svelte';
   import { AssetKind, COMPONENTS, COMPONENT_IDS, TrackKind, type ComponentId } from '$lib/motion/components';
   import { FPS } from '$lib/motion/design';
@@ -46,8 +48,9 @@
   import { parseDecimal, secondsLabel } from '$lib/motion/inspector';
   import { Command, commandFor } from '$lib/motion/shortcuts';
   import { composeHtml } from '$lib/motion/hyperframes/compose';
-  import { renderQuote } from '$lib/motion/render-quote';
   import { feegaTrailer } from '$lib/motion/trailer';
+  import { loadPeaks } from '$lib/motion/waveform';
+  import { AD_TEMPLATES, AD_TEMPLATE_IDS, templateAssets, type AdTemplate } from '$lib/motion/ad-templates';
   import type { PageData } from './$types';
 
   const SAVE_DEBOUNCE_MS = 700;
@@ -76,7 +79,11 @@
   let saveState = $state<SaveState>(SaveState.Saved);
   let notice = $state('');
   let adding = $state(false);
-  let rendering = $state(false);
+  let exporting = $state(false);
+  let sounding = $state<SoundKind | null>(null);
+  let madeAssets = $state<PageData['assets']>([]);
+  let waveforms = $state<Record<string, number[]>>({});
+  const loadingWaves = new Set<string>();
   let sheet = $state<Sheet>(Sheet.None);
   let preview = $state<MotionPreview | null>(null);
 
@@ -85,12 +92,31 @@
   let unsavedSummary = '';
 
   const doc = $derived(history.present);
-  const assetUrls = $derived(Object.fromEntries(data.assets.filter((a) => a.url).map((a) => [a.id, a.url as string])));
+  const assets = $derived([...madeAssets, ...data.assets]);
+  const assetUrls = $derived(Object.fromEntries(assets.filter((a) => a.url).map((a) => [a.id, a.url as string])));
   const html = $derived(composeHtml({ doc, tokens: data.tokens, assets: assetUrls }));
   const selected = $derived(selection.length === 1 ? (findClip(doc, selection[0])?.clip ?? null) : null);
-  const quote = $derived(renderQuote(doc));
   const editorUrl = $derived(`/p/${data.projectId}/c/${data.canvas.id}/motion/${data.node.id}`);
   const agentUrl = $derived(`/api/v1/projects/${data.projectId}/motion/${data.node.id}/agent`);
+
+  const soundAssets = $derived(findSoundAssets(doc));
+
+  function findSoundAssets(d: MotionDoc): [string, string][] {
+    const ids = new Set(d.tracks.flatMap((t) => t.clips.map((c) => (c.props as { assetId?: string | null }).assetId ?? '')));
+    return [...ids].filter((id) => assetUrls[id] && assets.some((a) => a.id === id && (a.kind === AssetKind.Audio || a.kind === AssetKind.Video))).map((id) => [id, assetUrls[id]]);
+  }
+
+  $effect(() => {
+    for (const [id, url] of soundAssets) {
+      if (loadingWaves.has(id)) {
+        continue;
+      }
+      loadingWaves.add(id);
+      loadPeaks(url)
+        .then((peaks) => (waveforms = { ...waveforms, [id]: peaks }))
+        .catch(() => {});
+    }
+  });
 
   function edit(next: MotionDoc, summary: string) {
     const now = Date.now();
@@ -182,10 +208,31 @@
     selection = [id];
   }
 
+  const firstOf = (kind: AssetKind) => assets.find((a) => a.kind === kind)?.id ?? null;
+
   function startTrailer() {
     adding = false;
-    const firstOf = (kind: AssetKind) => data.assets.find((a) => a.kind === kind)?.id ?? null;
     edit(feegaTrailer({ modelId: firstOf(AssetKind.Model3d), imageId: firstOf(AssetKind.Image) }), 'Started from the feega trailer');
+    notice = 'Template applied. ⌘Z to undo.';
+  }
+
+  function startTemplate(id: AdTemplate) {
+    adding = false;
+    edit(AD_TEMPLATES[id].build(templateAssets(assets)), `Started from ${AD_TEMPLATES[id].label}`);
+    selection = [];
+    frame = 0;
+    notice = 'Template applied. Swap pictures, text and colours in Properties. ⌘Z to undo.';
+  }
+
+  const SOUND_LABEL: Record<SoundKind, string> = { voice: 'Voice-over', music: 'Music' };
+
+  function placeSound(kind: SoundKind, made: Made) {
+    sounding = null;
+    madeAssets = [{ id: made.assetId, kind: AssetKind.Audio, label: `${SOUND_LABEL[kind]} · ${made.assetId.slice(0, 6)}`, previewUrl: '', url: made.url, seconds: made.seconds }, ...madeAssets];
+    const id = newId();
+    const durationInFrames = Math.max(FPS, Math.ceil(made.seconds * FPS));
+    apply(addClip(doc, { component: 'Audio', from: frame, durationInFrames, props: { assetId: made.assetId } }, id), `Added ${SOUND_LABEL[kind].toLowerCase()}`);
+    selection = [id];
   }
 
   function newTrack(kind: TrackKind) {
@@ -277,14 +324,11 @@
     apply(setCanvas(doc, { durationInFrames: Math.round(seconds * FPS) }), 'Changed duration');
   }
 
-  async function render() {
-    rendering = true;
-    const form = new FormData();
-    form.set('doc', JSON.stringify(doc));
-    const res = await fetch(`${editorUrl}?/render`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
-    const result = deserialize(await res.text());
-    notice = result.type === 'success' ? 'Rendering started.' : 'Rendering not configured';
-    rendering = false;
+  function exportFrames(...args: Parameters<MotionPreview['render']>) {
+    if (!preview) {
+      return Promise.reject(new Error('the preview is still loading'));
+    }
+    return preview.render(...args);
   }
 
   const COMMANDS: Record<Command, () => void> = {
@@ -313,7 +357,7 @@
 
   function onKey(e: KeyboardEvent) {
     const target = e.target as HTMLElement | null;
-    if (target?.closest('input, textarea, select, [contenteditable="true"]')) {
+    if (exporting || sounding || target?.closest('input, textarea, select, [contenteditable="true"]')) {
       return;
     }
     const command = commandFor({ key: e.key, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey });
@@ -343,12 +387,24 @@
       <input type="text" inputmode="decimal" title={`1–${MAX_SECONDS} s`} value={secondsLabel(doc.durationInFrames)} onchange={(e) => setDuration(e.currentTarget.value)} />
     </label>
     <span class="save" data-testid="save-state">{saveState} · v{version}</span>
-    {#if data.renderConfigured}
-      <button type="button" class="render" disabled={rendering} onclick={render}><Film size={14} /> Render · {quote.credits} credits</button>
-    {:else}
-      <button type="button" class="render" disabled title="Rendering to MP4 needs the render service set up"><Film size={14} /> Rendering not configured</button>
-    {/if}
+    <button type="button" class="render" onclick={() => (exporting = true)} data-testid="export-open"><Film size={14} /> Export</button>
   </header>
+
+  {#if sounding}
+    <SoundDialog kind={sounding} {editorUrl} seconds={doc.durationInFrames / FPS} onclose={() => (sounding = null)} onmade={(made) => placeSound(sounding ?? 'voice', made)} />
+  {/if}
+
+  {#if exporting}
+    <ExportDialog
+      {doc}
+      assetUrls={assetUrls}
+      scope={{ orgId: data.orgId, projectId: data.projectId, nodeId: data.node.id }}
+      {editorUrl}
+      fileName={data.node.name ?? 'motion'}
+      render={exportFrames}
+      onclose={() => (exporting = false)}
+    />
+  {/if}
 
   <div class="body">
     <section class="left">
@@ -368,13 +424,25 @@
           <button type="button" onclick={() => (adding = !adding)}><Plus size={14} /> Add</button>
           {#if adding}
             <div class="menu" role="menu">
-              {#each COMPONENT_IDS as id (id)}
-                <button type="button" role="menuitem" onclick={() => add(id)}>{COMPONENTS[id].label}</button>
-              {/each}
-              <hr />
-              <button type="button" role="menuitem" onclick={startTrailer}>feega trailer template</button>
-              <button type="button" role="menuitem" onclick={() => newTrack(TrackKind.Visual)}>Video track</button>
-              <button type="button" role="menuitem" onclick={() => newTrack(TrackKind.Audio)}>Audio track</button>
+              <div class="col">
+                <span class="menu-head">Elements</span>
+                {#each COMPONENT_IDS as id (id)}
+                  <button type="button" role="menuitem" onclick={() => add(id)}>{COMPONENTS[id].label}</button>
+                {/each}
+              </div>
+              <div class="col">
+                <span class="menu-head">Ad templates</span>
+                {#each AD_TEMPLATE_IDS as id (id)}
+                  <button type="button" role="menuitem" onclick={() => startTemplate(id)}>{AD_TEMPLATES[id].label}</button>
+                {/each}
+                <button type="button" role="menuitem" onclick={startTrailer}>feega trailer template</button>
+                <span class="menu-head">Audio</span>
+                <button type="button" role="menuitem" onclick={() => ((adding = false), (sounding = 'voice'))}>Generate voice-over…</button>
+                <button type="button" role="menuitem" onclick={() => ((adding = false), (sounding = 'music'))}>Generate music…</button>
+                <span class="menu-head">Tracks</span>
+                <button type="button" role="menuitem" onclick={() => newTrack(TrackKind.Visual)}>Video track</button>
+                <button type="button" role="menuitem" onclick={() => newTrack(TrackKind.Audio)}>Audio track</button>
+              </div>
             </div>
           {/if}
         </div>
@@ -391,14 +459,14 @@
       </div>
 
       <div class="tl">
-        <MotionTimeline {doc} bind:frame bind:selection bind:keySelection {zoom} {snap} onchange={edit} />
+        <MotionTimeline {doc} bind:frame bind:selection bind:keySelection {zoom} {snap} {waveforms} onchange={edit} />
       </div>
     </section>
 
     <aside class="props" class:open={sheet === Sheet.Properties} aria-label="Properties">
       <div class="sheet-head"><span>Properties</span><button type="button" aria-label="Close" onclick={() => (sheet = Sheet.None)}><X size={16} /></button></div>
       {#if selected}
-        <MotionInspector {doc} clip={selected} tokens={data.tokens} assets={data.assets} {frame} onchange={edit} />
+        <MotionInspector {doc} clip={selected} tokens={data.tokens} {assets} {frame} onchange={edit} />
       {:else}
         <p class="hint">{selection.length > 1 ? `${selection.length} clips selected.` : 'Select a clip in the timeline to edit its properties.'}</p>
       {/if}
@@ -569,13 +637,20 @@
     bottom: 30px;
     left: 0;
     z-index: 20;
-    display: flex;
-    flex-direction: column;
-    min-width: 170px;
+    display: grid;
+    grid-template-columns: 160px 220px;
+    gap: 4px;
+    max-height: calc(100vh - 120px);
+    overflow: auto;
     padding: 4px;
     background: var(--paper);
     border: 1px solid var(--line);
     box-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
+  }
+
+  .menu .col {
+    display: flex;
+    flex-direction: column;
   }
 
   .menu button {
@@ -587,11 +662,14 @@
     background: var(--paper-3);
   }
 
-  .menu hr {
-    border: 0;
-    border-top: 1px solid var(--line);
-    margin: 4px 0;
+  .menu-head {
+    padding: 4px 8px 2px;
+    font-family: 'Fragment Mono', ui-monospace, monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    color: var(--ink-soft);
   }
+
 
   .notice {
     margin-left: 8px;
@@ -676,6 +754,8 @@
     .menu {
       position: fixed;
       left: 8px;
+      right: 8px;
+      grid-template-columns: 1fr 1fr;
       bottom: 104px;
       max-height: 50vh;
       overflow: auto;

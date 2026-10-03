@@ -186,7 +186,8 @@ describe('frames the agent sees', () => {
 
     expect(capture).toContain('.km,.kt');
     expect(capture).toContain('luminanceToAlpha');
-    expect(capture.indexOf('freezeMasks')).toBeLessThan(capture.indexOf('toJpeg'));
+    expect(capture.indexOf('freeze().then')).toBeLessThan(capture.indexOf('output[m.format]'));
+    expect(capture.indexOf('freeze().then')).toBeGreaterThan(-1);
   });
 });
 

@@ -87,7 +87,7 @@
     "heic-decode": "^2.1.0",
     "marked": "^18.0.5",
     "markitdown-ts": "^0.0.10",
-    "mediabunny": "^1.60.0",
+    "mediabunny": "1.61.0",
     "pg": "^8.13.1",
     "sharp": "^0.35.3",
     "simple-icons": "^16.22.0",

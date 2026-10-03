@@ -10,6 +10,9 @@ import { composeHtml } from '$lib/motion/hyperframes/compose';
 import { parseMotionDoc } from '$lib/motion/doc';
 import { renderQuote } from '$lib/motion/render-quote';
 import { gateOrgAiActionForForm } from '$lib/server/cli-auth';
+import { saveExport } from '$lib/server/motion/export';
+import { Sound, generateSound } from '$lib/server/motion/voiceover';
+import { withOrgContext } from '$lib/server/ai-log';
 
 const HTTP_CONFLICT = 409;
 const HTTP_BAD_REQUEST = 400;
@@ -50,7 +53,8 @@ export const load: PageServerLoad = async ({ locals, params }) => {
   return {
     projectId: params.projectId,
     canvas: { id: scope.canvas.id, name: scope.canvas.name },
-    node: { id: scope.motion.record.id, name: scope.motion.record.displayName },
+    orgId: scope.orgId,
+    node: { id: scope.motion.record.id, name: scope.motion.record.displayName, lastRenderAssetId: scope.motion.node.lastRenderAssetId },
     head: { version: head.version, doc: head.doc },
     tokens,
     assets,
@@ -88,6 +92,41 @@ export const actions: Actions = {
       return fail(HTTP_BAD_REQUEST, { error: write.error });
     }
     return { version: write.head.version };
+  },
+
+  exported: async ({ locals, params, request }) => {
+    const scope = await scopeFor(locals, params);
+    const form = await request.formData();
+    const saved = await saveExport(scope.db, {
+      orgId: scope.orgId,
+      projectId: params.projectId,
+      nodeId: scope.motion.record.id,
+      actor: { kind: 'user', id: scope.userId },
+      path: String(form.get('path') ?? ''),
+      width: Number(form.get('width')),
+      height: Number(form.get('height')),
+      seconds: Number(form.get('seconds'))
+    });
+    return saved.ok ? { assetId: saved.assetId } : fail(HTTP_BAD_REQUEST, { error: saved.error });
+  },
+
+  sound: async ({ locals, params, request }) => {
+    const scope = await scopeFor(locals, params);
+    const form = await request.formData();
+    const sound = String(form.get('sound')) as Sound;
+    const text = String(form.get('text') ?? '').trim();
+    if (!Object.values(Sound).includes(sound) || !text) {
+      return fail(HTTP_BAD_REQUEST, { error: 'invalid_sound' });
+    }
+
+    const denied = await gateOrgAiActionForForm(scope.orgId);
+    if (denied) {
+      return fail(denied.status, denied.data);
+    }
+
+    const soundScope = { orgId: scope.orgId, projectId: params.projectId, nodeId: scope.motion.record.id, userId: scope.userId, actor: { kind: 'user' as const, id: scope.userId } };
+    const made = await withOrgContext(scope.orgId, () => generateSound(scope.db, soundScope, sound, { text, seconds: Number(form.get('seconds')) || undefined }));
+    return made.ok ? { assetId: made.assetId, seconds: made.seconds, url: made.url } : fail(HTTP_UNAVAILABLE, { error: made.error });
   },
 
   render: async ({ locals, params, request }) => {

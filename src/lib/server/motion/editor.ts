@@ -10,7 +10,7 @@ import { formatOf, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { AssetKind } from '$lib/motion/components';
 import { FEEGA_TOKENS, brandTokens, paletteFrom, type BrandTokens } from '$lib/motion/brand';
 
-export type MotionAsset = { id: string; kind: AssetKind; label: string; previewUrl: string; url: string | null };
+export type MotionAsset = { id: string; kind: AssetKind; label: string; previewUrl: string; url: string | null; seconds?: number | null };
 
 export type MotionScope = { db: Db; orgId: string; projectId: string; canvasId: string; nodeId: string };
 
@@ -68,6 +68,7 @@ export async function motionAssets(scope: MotionScope): Promise<MotionAsset[]> {
       kind,
       label: assetLabel(asset, kind),
       previewUrl: `/p/${scope.projectId}/c/${scope.canvasId}/assets/${asset.id}`,
+      seconds: asset.durationS,
       url: /^https?:\/\//.test(path) ? path : (signed.get(path) ?? null)
     };
   });
