@@ -9,12 +9,8 @@
   const EDGE_PX = 7;
   const HEADER_PX = 132;
 
-  enum Drag {
-    Move = 'move',
-    TrimStart = 'trim-start',
-    TrimEnd = 'trim-end',
-    Scrub = 'scrub'
-  }
+  const Drag = { Move: 'move', TrimStart: 'trim-start', TrimEnd: 'trim-end', Scrub: 'scrub' } as const;
+  type Drag = (typeof Drag)[keyof typeof Drag];
 
   type Gesture = { kind: Drag; clipId: string; trackId: string; grabFrame: number; originFrom: number; base: MotionDoc };
 
@@ -81,7 +77,7 @@
     return (hit as HTMLElement | undefined)?.dataset.trackId ?? null;
   }
 
-  const GESTURES: Record<Exclude<Drag, Drag.Scrub>, (g: Gesture, at: number, e: PointerEvent) => OpResult> = {
+  const GESTURES: Record<Exclude<Drag, typeof Drag.Scrub>, (g: Gesture, at: number, e: PointerEvent) => OpResult> = {
     [Drag.Move]: (g, at, e) => {
       const from = g.originFrom + (at - g.grabFrame);
       const clip = g.base.tracks.flatMap((t) => t.clips).find((c) => c.id === g.clipId)!;

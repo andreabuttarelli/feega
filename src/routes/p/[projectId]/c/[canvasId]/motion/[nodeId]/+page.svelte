@@ -17,7 +17,7 @@
   import MotionTimeline from '$lib/components/motion/MotionTimeline.svelte';
   import MotionInspector from '$lib/components/motion/MotionInspector.svelte';
   import ChatPanel from '$lib/components/brand-agent/ChatPanel.svelte';
-  import { COMPONENTS, COMPONENT_IDS, TrackKind, type ComponentId } from '$lib/motion/components';
+  import { AssetKind, COMPONENTS, COMPONENT_IDS, TrackKind, type ComponentId } from '$lib/motion/components';
   import { FPS } from '$lib/motion/design';
   import { FORMATS, MOTION_FORMATS, MAX_SECONDS, findClip, formatOf, type MotionDoc, type MotionFormat } from '$lib/motion/doc';
   import { addClip, addTrack, duplicateClip, removeClips, setCanvas, splitClip, type OpResult } from '$lib/motion/timeline';
@@ -26,6 +26,7 @@
   import { Command, commandFor } from '$lib/motion/shortcuts';
   import { composeHtml } from '$lib/motion/hyperframes/compose';
   import { renderQuote } from '$lib/motion/render-quote';
+  import { feegaTrailer } from '$lib/motion/trailer';
   import type { PageData } from './$types';
 
   const SAVE_DEBOUNCE_MS = 700;
@@ -34,13 +35,8 @@
   const HEAD_POLL_MS = 500;
   const ZOOM_STEP = 1.25;
 
-  enum SaveState {
-    Saved = 'Saved',
-    Saving = 'Saving…',
-    Pending = 'Unsaved',
-    Conflict = 'Reloaded the latest version',
-    Failed = 'Not saved'
-  }
+  const SaveState = { Saved: 'Saved', Saving: 'Saving…', Pending: 'Unsaved', Conflict: 'Reloaded the latest version', Failed: 'Not saved' } as const;
+  type SaveState = (typeof SaveState)[keyof typeof SaveState];
 
   let { data }: { data: PageData } = $props();
 
@@ -51,7 +47,7 @@
   let playing = $state(false);
   let zoom = $state(1.5);
   let snap = $state(Snap.On);
-  let saveState = $state(SaveState.Saved);
+  let saveState = $state<SaveState>(SaveState.Saved);
   let notice = $state('');
   let adding = $state(false);
   let rendering = $state(false);
@@ -139,6 +135,12 @@
     const id = newId();
     apply(addClip(doc, { component, from: frame }, id), `Added ${COMPONENTS[component].label}`);
     selection = [id];
+  }
+
+  function startTrailer() {
+    adding = false;
+    const firstOf = (kind: AssetKind) => data.assets.find((a) => a.kind === kind)?.id ?? null;
+    edit(feegaTrailer({ modelId: firstOf(AssetKind.Model3d), imageId: firstOf(AssetKind.Image) }), 'Started from the feega trailer');
   }
 
   function newTrack(kind: TrackKind) {
@@ -284,6 +286,7 @@
                 <button type="button" role="menuitem" onclick={() => add(id)}>{COMPONENTS[id].label}</button>
               {/each}
               <hr />
+              <button type="button" role="menuitem" onclick={startTrailer}>feega trailer template</button>
               <button type="button" role="menuitem" onclick={() => newTrack(TrackKind.Visual)}>Video track</button>
               <button type="button" role="menuitem" onclick={() => newTrack(TrackKind.Audio)}>Audio track</button>
             </div>
