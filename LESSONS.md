@@ -2265,3 +2265,29 @@ the page); the music is the longest audio (`templateAssets`), so seed fixtures w
 Signal: `__vite_ssr_dynamic_import__ is not defined` from a Playwright script run with
 `vite-node`. Cause: vite-node rewrites `import()` inside the function shipped to the browser.
 Move: run browser-side probes with plain `node` (`.mjs`), or pass the function as a string.
+
+## A motion export contains frames of another video
+Signal: an MP4 (or `view_frames`) shows clips of the doc loaded before, usually at the start.
+Cause: `ready` from the previous `srcdoc` load resolved the wait for the new one; until the
+navigation commits, `contentWindow` is the old document and answers the capture. Move: trust a
+frame only if its reply carries the stamp of the composition you loaded (`preview-driver.ts`),
+and serialize every borrowed capture.
+
+## A motion agent tool fails twenty times on one argument
+Signal: every `write_component` fails with "expected object, received string" and the turn burns
+a dollar retrying. Cause: a `z.unknown()` tool input becomes a JSON schema with no type, and the
+model sends a string. Move: give every tool argument a concrete schema (accept the JSON string
+too), and count refused calls against the per-turn cap.
+
+## A motion turn on Claude dies and saves nothing
+Signal: `tool_choice: type "tool" ... not supported for this model` in the log, revision stays
+at the old version, no `ai_calls` row. Cause: the self-check round forces `view_frames`, which
+Anthropic models on OpenRouter refuse; the error escaped before `finishTurn`. Move: force a tool
+only on models that accept it (`FORCES_TOOL`), and a failed round must still save the edits.
+
+## A motion component types nothing in preview but passes every check
+Signal: text that should type, bars that should fill stay at their first state in the preview
+and the MP4; the determinism check passes. Cause: the HyperFrames runtime seeks with
+`totalTime(t, true)`, which suppresses GSAP callbacks, so `onUpdate` never runs. Move: route
+callbacks through a render plugin (`feegaRender` in `custom/runtime.ts`); test with
+`totalTime(t, true)`, never `seek(t)`.

@@ -10,6 +10,8 @@
   import { capabilities, encodeMp4, mixAudio } from '$lib/motion/export/encode';
   import { saveExport } from '$lib/motion/export/save';
   import type { FrameSize } from './MotionPreview.svelte';
+  import { unverified } from '$lib/motion/custom/determinism';
+  import { CheckState } from '$lib/motion/custom/component';
 
   type Renderer = (times: number[], size: FrameSize, onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>, signal: AbortSignal) => Promise<void>;
 
@@ -57,6 +59,8 @@
   const size = $derived<Size>(exportSize(doc, resolution));
   const remaining = $derived(eta({ done, total, elapsedMs: now - startedAt }));
   const busy = $derived(phase === Phase.Mixing || phase === Phase.Rendering || phase === Phase.Saving);
+  const blockers = $derived(unverified(doc));
+  const BLOCKER_LABEL: Record<CheckState, string> = { [CheckState.Unchecked]: 'is still being checked', [CheckState.Failed]: 'failed the seek check', [CheckState.Passed]: '' };
   const audioOn = $derived(withAudio && support.audio === AudioMode.On && sounds.length > 0);
 
   onMount(() => {
@@ -173,6 +177,10 @@
       <a class="primary" href={downloadUrl} download={`${fileName}.mp4`} data-testid="export-download"><Download size={14} /> Download MP4</a>
     {:else if busy}
       <button type="button" class="secondary" disabled={phase === Phase.Saving} onclick={cancel}>Cancel</button>
+    {:else if blockers.length}
+      <p class="warn" role="alert" data-testid="export-blocked">
+        Export waits for custom components: {blockers.map((b) => `${b.name} ${BLOCKER_LABEL[b.state]}`).join(', ')}. Fix them in the Code tab or ask the agent.
+      </p>
     {:else}
       <button type="button" class="primary" onclick={start} data-testid="export-start">Export {resolution}</button>
     {/if}

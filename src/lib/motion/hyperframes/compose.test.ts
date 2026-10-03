@@ -4,12 +4,14 @@ import { TransitionKind } from '../design';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '../doc';
 import gsap from 'gsap';
 import { addClip, setKeyframes, setTransform, setTransition, Side, type OpResult } from '../timeline';
-import { COMPONENT_IDS } from '../components';
+import { LIBRARY_IDS } from '../components';
 import { Ease } from '../design';
 import { findClip } from '../doc';
 import { easeName, sampleTrack } from '../keyframes';
 import { keyframeTweens } from './animate';
 import { CAPTURE_REPLY, CAPTURE_REQUEST, composeHtml } from './compose';
+import { writeComponent } from '../custom/ops';
+import { PropFormat } from '../custom/component';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -97,7 +99,7 @@ describe('MotionDoc to HyperFrames composition', () => {
   });
 
   it('every component composes with its defaults', () => {
-    for (const component of COMPONENT_IDS) {
+    for (const component of LIBRARY_IDS) {
       const one = must(addClip(newMotionDoc(MotionFormat.Square), { component, from: 0 }, 'k'));
       expect(compose(one)).toContain('data-clip="k"');
     }
@@ -261,5 +263,38 @@ describe('keyframes and 3D transforms', () => {
 
     expect(html).toContain('"keys":{"orbit":[{"frame":0,"value":-30,"ease":"linear"},{"frame":60,"value":30,"ease":"standard"}]}');
     expect(html).toContain('function sampleTrack(');
+  });
+});
+
+describe('custom components in the composition', () => {
+  const graph = {
+    source: { html: '<div class="node"></div>', css: '.node{background:#111}', js: 'tl.from(root.querySelector(".node"),{scale:0,duration:0.4});' },
+    propsSchema: { type: 'object' as const, properties: { accent: { type: 'string' as const, format: PropFormat.Color, default: 'brand.accent' }, picture: { type: 'string' as const, format: PropFormat.Asset, default: '' } } }
+  };
+  const custom = must(addClip(must(writeComponent(newMotionDoc(MotionFormat.Landscape), 'NodeGraph', graph)), { component: 'Custom', from: 30, durationInFrames: 60, props: { name: 'NodeGraph', picture: 'img1' } }, 'g1'));
+  const html = compose(custom, { img1: 'https://store.supabase.co/storage/v1/object/sign/a.png?token=t' });
+
+  it('renders the component markup under a root scoped to the clip', () => {
+    expect(html).toContain('<div class="cc" id="cc-g1" data-component="NodeGraph"><style>@scope (#cc-g1) {.node{background:#111}}</style><div class="node"></div></div>');
+  });
+
+  it('gives the component root the full frame, so code can measure it', () => {
+    expect(html).toContain('.cc{position:absolute;inset:0;overflow:hidden}');
+  });
+
+  it('defines the component code once and boots it at the clip start with resolved props', () => {
+    expect(html).toContain('["NodeGraph"]=function(ctx,window,self,');
+    expect(html).toContain('"start":1,"length":2');
+    expect(html).toContain('"accent":"#0099ff","picture":"https://store.supabase.co/storage/v1/object/sign/a.png?token=t"');
+  });
+
+  it('declares a policy that allows media only from the asset origin and no other network', () => {
+    const policy = (/http-equiv="Content-Security-Policy" content="([^"]+)"/.exec(html)?.[1] ?? '').replace(/&#39;/g, "'");
+    const connect = policy.split('; ').find((d) => d.startsWith('connect-src'));
+
+    expect(policy).toContain("default-src 'none'");
+    expect(policy).toContain('img-src data: blob: https://store.supabase.co');
+    expect(policy).not.toContain('unsafe-eval');
+    expect(connect).toBe('connect-src data: blob: https://fonts.googleapis.com https://fonts.gstatic.com https://store.supabase.co');
   });
 });

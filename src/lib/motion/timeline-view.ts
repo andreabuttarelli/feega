@@ -1,3 +1,4 @@
+import type { AnimProp } from './keyframes';
 import { FPS } from './design';
 import { snapFrame, snapTargets } from './timeline';
 import type { MotionClip, MotionDoc } from './doc';
@@ -97,8 +98,8 @@ export function handleAt(handles: readonly Handle[], x: number): Handle | null {
 
 export type KeyLane = { prop: string; label: string; source: Source; frames: number[] };
 
-export function keyLanes(clip: MotionClip): KeyLane[] {
-  return ANIMATABLE[clip.component]
+export function keyLanes(clip: MotionClip & { params?: readonly AnimProp[] }): KeyLane[] {
+  return [...ANIMATABLE[clip.component], ...(clip.params ?? [])]
     .filter((p) => clip.keyframes[p.key]?.length)
     .map((p) => ({ prop: p.key, label: p.label, source: p.source, frames: clip.keyframes[p.key].map((k) => k.frame) }));
 }

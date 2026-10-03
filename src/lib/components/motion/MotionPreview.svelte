@@ -1,17 +1,17 @@
 <script lang="ts">
   import { onMount, type Snippet } from 'svelte';
   import { FPS } from '$lib/motion/design';
-  import { CAPTURE_REPLY, CAPTURE_REQUEST, FrameFormat, type CaptureReply, type CaptureRequest } from '$lib/motion/hyperframes/capture';
+  import { CAPTURE_REPLY, FrameFormat, type CaptureReply, type ClipError } from '$lib/motion/hyperframes/capture';
+  import { previewDriver, type ShotRequest } from '$lib/motion/hyperframes/preview-driver';
 
   type Player = HTMLElement & { seek: (t: number) => void; play: () => void; pause: () => void; currentTime: number; iframeElement: HTMLIFrameElement };
 
-  export type CapturedFrame = { time: number; data: string };
+  export type CapturedFrame = { time: number; data: string; layout: string; errors: ClipError[] };
   export type FrameSize = { width: number; height: number };
 
   const RELOAD_DEBOUNCE_MS = 250;
   const CAPTURE_WIDTH = 640;
   const CAPTURE_QUALITY = 0.72;
-  const CAPTURE_TIMEOUT_MS = 15_000;
 
   let {
     html,
@@ -29,7 +29,7 @@
   let pending: ReturnType<typeof setTimeout> | null = null;
   let capturing = false;
 
-  function load(next: string) {
+  function setSource(next: string) {
     if (!player) {
       return;
     }
@@ -66,7 +66,7 @@
       el.addEventListener('ended', () => (playing = false));
       host.appendChild(el);
       player = el;
-      load(html);
+      driver.load(html);
     });
     return () => {
       disposed = true;
@@ -75,40 +75,43 @@
     };
   });
 
-  function shoot(time: number, request: Omit<CaptureRequest, 'type' | 'id'>): Promise<CaptureReply> {
-    const target = player?.iframeElement?.contentWindow;
-    if (!player || !target) {
-      return Promise.reject(new Error('preview not ready'));
-    }
-    const id = crypto.randomUUID();
-    player.seek(time);
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => done(() => reject(new Error('capture timed out'))), CAPTURE_TIMEOUT_MS);
+  const driver = previewDriver({
+    load: setSource,
+    seek: (t) => player?.seek(t),
+    post: (message) => {
+      const target = player?.iframeElement?.contentWindow;
+      if (!target) {
+        return false;
+      }
+      target.postMessage(message, '*');
+      return true;
+    },
+    onReady: (listener) => {
+      const el = player;
+      el?.addEventListener('ready', listener);
+      return () => el?.removeEventListener('ready', listener);
+    },
+    onReply: (listener) => {
       const onMessage = (e: MessageEvent) => {
         const m = e.data as CaptureReply;
-        if (e.source !== target || m?.type !== CAPTURE_REPLY || m.id !== id) {
+        if (e.source !== player?.iframeElement?.contentWindow || m?.type !== CAPTURE_REPLY) {
           return;
         }
-        done(() => (m.error ? reject(new Error(m.error)) : resolve(m)));
-      };
-      const done = (settle: () => void) => {
-        clearTimeout(timer);
-        window.removeEventListener('message', onMessage);
-        settle();
+        listener(m);
       };
       window.addEventListener('message', onMessage);
-      target.postMessage({ type: CAPTURE_REQUEST, id, ...request }, '*');
-    });
+      return () => window.removeEventListener('message', onMessage);
+    }
+  });
+
+  const shoot = (time: number, request: ShotRequest) => driver.shoot(time, request);
+  const loaded = (next: string) => driver.loaded(next);
+
+  function borrowed<T>(source: string, work: () => Promise<T>): Promise<T> {
+    return driver.exclusive(() => swapped(source, work));
   }
 
-  function loaded(next: string): Promise<void> {
-    return new Promise((resolve) => {
-      player?.addEventListener('ready', () => resolve(), { once: true });
-      load(next);
-    });
-  }
-
-  async function borrowed<T>(source: string, work: () => Promise<T>): Promise<T> {
+  async function swapped<T>(source: string, work: () => Promise<T>): Promise<T> {
     playing = false;
     const back = frame;
     capturing = true;
@@ -122,12 +125,13 @@
     }
   }
 
-  export function capture(times: number[], source: string): Promise<CapturedFrame[]> {
-    const request = { format: FrameFormat.Jpeg, width: CAPTURE_WIDTH, height: Math.round((CAPTURE_WIDTH * height) / width), quality: CAPTURE_QUALITY };
+  export function capture(times: number[], source: string, captureWidth = CAPTURE_WIDTH): Promise<CapturedFrame[]> {
+    const request = { format: FrameFormat.Jpeg, width: captureWidth, height: Math.round((captureWidth * height) / width), quality: CAPTURE_QUALITY };
     return borrowed(source, async () => {
       const frames: CapturedFrame[] = [];
       for (const time of times) {
-        frames.push({ time, data: (await shoot(time, request)).url ?? '' });
+        const reply = await shoot(time, request);
+        frames.push({ time, data: reply.url ?? '', layout: reply.layout ?? '', errors: reply.errors ?? [] });
       }
       return frames;
     });
@@ -153,7 +157,7 @@
     }
     pending = setTimeout(() => {
       if (!capturing) {
-        load(next);
+        driver.load(next);
       }
     }, RELOAD_DEBOUNCE_MS);
   });

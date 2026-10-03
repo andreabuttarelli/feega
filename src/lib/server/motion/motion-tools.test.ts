@@ -9,13 +9,14 @@ type Exec = (input: unknown, options: { toolCallId: string }) => Promise<Record<
 
 function setup(overrides: Partial<MotionToolDeps> = {}) {
   let n = 0;
-  const session: MotionSession = { doc: newMotionDoc(MotionFormat.Vertical), baseVersion: 3, edits: [], selection: [], frames: new Map(), views: 0, checkedAt: 0 };
+  const session: MotionSession = { doc: newMotionDoc(MotionFormat.Vertical), baseVersion: 3, edits: [], selection: [], frames: new Map(), views: 0, checkedAt: 0, codeWrites: 0 };
   const deps: MotionToolDeps = {
     session,
     assets: [{ id: 'glb-1', kind: AssetKind.Model3d, label: 'shoe', previewUrl: '/x', url: 'https://cdn/x.glb' }],
     newId: () => `id${++n}`,
     voiceover: vi.fn(async () => ({ ok: true as const, assetId: 'vo-1', seconds: 4, url: 'https://cdn/vo.mp3' })),
     frames: vi.fn(async (_callId: string, times: number[]) => times.map((time) => ({ time, bytes: Buffer.from([1]) }))),
+    check: vi.fn(async () => null),
     ...overrides
   };
   const tools = createMotionTools(deps);

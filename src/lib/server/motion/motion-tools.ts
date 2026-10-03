@@ -9,8 +9,15 @@ import { MASK_KEYS, MASK_KIND_IDS, MATTES } from '$lib/motion/mask';
 import { ANIMATABLE, TRANSFORM_KEYS, easeSchema, transformSchema } from '$lib/motion/keyframes';
 import type { MotionAsset } from './editor';
 import { MAX_FRAMES_PER_VIEW, MAX_VIEWS_PER_TURN, VIEW_FRAMES, type Frame } from './frames';
+import { CheckState, MAX_CSS, MAX_HTML, MAX_JS, SOURCE_FILES, checkState, propsSchemaSchema, sourceHash, type CustomComponent } from '$lib/motion/custom/component';
+import { patchComponent, recordCheck, removeComponent, writeComponent } from '$lib/motion/custom/ops';
+import { PATCH_COMPONENT, READ_COMPONENT, WRITE_COMPONENT } from './model-route';
 
-export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number };
+export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number };
+
+export type CheckResult = { ok: boolean; problems: string[]; frames: Frame[] };
+
+export const MAX_CODE_WRITES_PER_TURN = 12;
 
 export type Voiceover = { ok: true; assetId: string; seconds: number; url: string | null } | { ok: false; error: string };
 
@@ -20,6 +27,7 @@ export type MotionToolDeps = {
   newId: () => string;
   voiceover: (input: { text: string; voiceId?: string }) => Promise<Voiceover>;
   frames: (callId: string, times: number[]) => Promise<Frame[] | null>;
+  check: (callId: string, doc: MotionDoc, name: string) => Promise<CheckResult | null>;
 };
 
 const frames = (s: number) => Math.round(s * FPS);
@@ -47,11 +55,29 @@ function summary(doc: MotionDoc, selection: string[]) {
         matte: c.matte,
         keyframes: Object.fromEntries(Object.entries(c.keyframes).map(([prop, track]) => [prop, track.map((k) => ({ time: secs(k.frame), value: k.value, ease: k.ease }))]))
       }))
-    }))
+    })),
+    components: Object.entries(doc.components).map(([name, c]) => customSummary(name, c))
   };
 }
 
-function componentCatalogue() {
+function customSummary(name: string, c: CustomComponent) {
+  return {
+    name,
+    version: c.version,
+    check: checkState(c),
+    props: Object.fromEntries(Object.entries(c.propsSchema.properties).map(([key, spec]) => [key, spec.enum?.join('|') ?? spec.format ?? spec.type]))
+  };
+}
+
+function componentCatalogue(doc: MotionDoc) {
+  return {
+    library: libraryCatalogue(),
+    custom: Object.entries(doc.components).map(([name, c]) => customSummary(name, c)),
+    note: 'A custom component is used with add_clip component "Custom" and props { name, ...its props }.'
+  };
+}
+
+function libraryCatalogue() {
   return COMPONENT_IDS.map((id) => ({
     id,
     track: COMPONENTS[id].track,
@@ -95,6 +121,33 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     return { ok: true, doc: summary(session.doc, session.selection) };
   };
 
+  async function codeWrite(result: OpResult, name: string, what: string, callId: string) {
+    if (session.codeWrites >= MAX_CODE_WRITES_PER_TURN) {
+      return { ok: false, error: `code budget for this turn is spent (${MAX_CODE_WRITES_PER_TURN} writes): finish with what you have` };
+    }
+    session.codeWrites += 1;
+    if (!result.ok) {
+      return { ok: false, error: result.error };
+    }
+    session.doc = result.doc;
+    session.edits.push(what);
+    const version = result.doc.components[name].version;
+
+    const check = await deps.check(callId, result.doc, name);
+    if (!check) {
+      return { ok: true, version, check: CheckState.Unchecked, note: 'no editor preview answered: the editor checks it when opened, and export waits for it' };
+    }
+    const state = check.ok ? CheckState.Passed : CheckState.Failed;
+    const recorded = recordCheck(session.doc, name, { hash: sourceHash(result.doc.components[name]), state, problems: check.problems });
+    session.doc = recorded.ok ? recorded.doc : session.doc;
+    if (check.ok) {
+      return { ok: true, version, check: state };
+    }
+    session.frames.set(callId, check.frames);
+    const shown = check.frames.length ? ' The two frames that should be identical follow as images.' : '';
+    return { ok: false, error: `${name} v${version} is saved but failed the seek-determinism check, so it cannot be exported:\n- ${check.problems.join('\n- ')}\nFix it with patch_component: build every change on tl from props and time only.${shown}` };
+  }
+
   const assetKnown = (id: unknown) => typeof id !== 'string' || deps.assets.some((a) => a.id === id);
 
   const registered = (result: OpResult, assetId: unknown): OpResult => {
@@ -113,9 +166,9 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     list_components: tool({
-      description: 'The motion library: every component a clip can use, its track and the props it takes (ranges are relative to the frame: x/y/width/height go 0..1).',
+      description: 'Every component a clip can use: the library (its track and props; x/y/width/height go 0..1) and the custom components written in code for this video.',
       inputSchema: z.object({}).strict(),
-      execute: async () => componentCatalogue()
+      execute: async () => componentCatalogue(session.doc)
     }),
 
     list_assets: tool({
@@ -283,6 +336,56 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       }
     }),
 
+    [READ_COMPONENT]: tool({
+      description: 'Read the code (html, css, js), props schema, version and determinism check of a custom component.',
+      inputSchema: z.object({ name: z.string() }),
+      execute: async (input) => {
+        const component = session.doc.components[input.name];
+        if (!component) {
+          return { ok: false, error: `no custom component ${input.name}; this video has ${Object.keys(session.doc.components).join(', ') || 'none'}` };
+        }
+        return { ok: true, name: input.name, ...component.source, props_schema: component.propsSchema, version: component.version, check: checkState(component), problems: component.check?.problems ?? [] };
+      }
+    }),
+
+    [WRITE_COMPONENT]: tool({
+      description: `Create or replace a custom component written in code. The editor runs it in a sandbox and checks that seeking gives the same frame from any direction; a failing check comes back as an error with the offending frames. Use it in clips with add_clip component "Custom", props { name, ...props }.`,
+      inputSchema: z.object({
+        name: z.string().describe('PascalCase, e.g. NodeGraph'),
+        html: z.string().max(MAX_HTML).describe('markup inside the component root; no script, style, iframe, media or external urls'),
+        css: z.string().max(MAX_CSS).describe('scoped to the component root (:scope is the root); no animation, transition, @keyframes, @import or external url()'),
+        js: z.string().max(MAX_JS).describe('body of a function receiving root, props, tl, duration, fps, assets, brand, rand, gsap, SplitText, lottie, THREE; build every animation on tl'),
+        props_schema: z.union([propsSchemaSchema, z.string()]).optional().describe('optional: param() calls in js build it. ' + 'what a person may edit: { type: "object", properties: { key: { type: string|number|boolean, title, default, minimum, maximum, enum, format: color|textarea|asset } } }')
+      }),
+      execute: async (input, { toolCallId }) => {
+        if (session.codeWrites >= MAX_CODE_WRITES_PER_TURN) {
+          return { ok: false, error: `code budget for this turn is spent (${MAX_CODE_WRITES_PER_TURN} writes): finish with what you have` };
+        }
+        const schema = propsSchemaSchema.safeParse(typeof input.props_schema === 'string' ? parsedJson(input.props_schema) : (input.props_schema ?? { type: 'object', properties: {} }));
+        if (!schema.success) {
+          session.codeWrites += 1;
+          return { ok: false, error: `props_schema: ${schema.error.issues.map((i) => `${i.path.join('.')} ${i.message}`).join('; ')}` };
+        }
+        const draft = { source: { html: input.html, css: input.css, js: input.js }, propsSchema: schema.data };
+        return codeWrite(writeComponent(session.doc, input.name, draft), input.name, `wrote ${input.name}`, toolCallId);
+      }
+    }),
+
+    [PATCH_COMPONENT]: tool({
+      description: 'Change a custom component by replacing text in one of its files; each find must occur exactly once. Cheaper than rewriting it. The determinism check runs again.',
+      inputSchema: z.object({
+        name: z.string(),
+        edits: z.array(z.object({ file: z.enum(SOURCE_FILES), find: z.string().min(1), replace: z.string() })).min(1).max(20)
+      }),
+      execute: async (input, { toolCallId }) => codeWrite(patchComponent(session.doc, input.name, input.edits), input.name, `patched ${input.name}`, toolCallId)
+    }),
+
+    remove_component: tool({
+      description: 'Delete a custom component no clip uses.',
+      inputSchema: z.object({ name: z.string() }),
+      execute: async (input) => apply(removeComponent(session.doc, input.name), `removed ${input.name}`)
+    }),
+
     [VIEW_FRAMES]: tool({
       description: `See the video: the editor preview renders these exact times (seconds, up to ${MAX_FRAMES_PER_VIEW}) and you get the frames as images. Use it to check text that is clipped or overflows, overlaps, contrast and the safe area before and after edits.`,
       inputSchema: z.object({ times: z.array(z.number().min(0)).min(1).max(MAX_FRAMES_PER_VIEW) }),
@@ -317,6 +420,14 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       }
     })
   };
+}
+
+function parsedJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
 }
 
 export function selectionNote(doc: MotionDoc, selection: string[]): string {

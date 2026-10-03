@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ModelMessage } from 'ai';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { addClip } from '$lib/motion/timeline';
+import { writeComponent } from '$lib/motion/custom/ops';
 import { FrameUpload, MAX_FRAME_BYTES, MAX_FRAMES_PER_VIEW, MAX_VIEWS_PER_TURN, VIEW_FRAMES, decodeFrame, docTexts, keyFrameTimes, selfCheckDue, usageByModel, Vision, visionStep } from './frames';
 
 const jpeg = (bytes: number) => `data:image/jpeg;base64,${Buffer.alloc(bytes, 1).toString('base64')}`;
@@ -19,6 +20,11 @@ describe('frames sent by the preview', () => {
 
     expect(FrameUpload.safeParse({ callId: 'call_1', frames }).success).toBe(false);
     expect(FrameUpload.safeParse({ callId: 'call_1', frames: frames.slice(1) }).success).toBe(true);
+  });
+
+  it('a determinism verdict may come with no frames, but an upload always carries something', () => {
+    expect(FrameUpload.safeParse({ callId: 'call_1', frames: [], verdict: { ok: true, problems: [] } }).success).toBe(true);
+    expect(FrameUpload.safeParse({ callId: 'call_1', frames: [] }).success).toBe(false);
   });
 
   it('a frame is a small JPEG, nothing else', () => {
@@ -60,6 +66,12 @@ describe('only the step that inspects frames goes to the vision model', () => {
     expect(JSON.stringify(last.content)).toContain('image/jpeg');
   });
 
+  it('the frames of a failed determinism check are shown like viewed frames', () => {
+    const step = visionStep({ lastCalls: [{ toolName: 'write_component', toolCallId: 'c1' }], messages: base, frames: images, visionModel: 'vision' });
+
+    expect(JSON.stringify(step?.messages?.at(-1)?.content)).toContain('image/jpeg');
+  });
+
   it('any other step keeps the default model and drops images already seen', () => {
     const seen: ModelMessage[] = [...base, { role: 'user', content: [{ type: 'file', mediaType: 'image/jpeg', data: Buffer.from([1]) }] }];
     const step = visionStep({ lastCalls: [{ toolName: 'set_props', toolCallId: 'c2' }], messages: seen, frames: images, visionModel: 'vision' });
@@ -93,6 +105,12 @@ describe('what the safety review reads before frames reach a model', () => {
     const doc = must(addClip(newMotionDoc(MotionFormat.Square), { component: 'Title', from: 0, props: { text: 'Hello\nworld' } }, 't'));
 
     expect(docTexts(doc)).toEqual(['Hello\nworld']);
+  });
+
+  it('the text a custom component shows is screened too', () => {
+    const doc = must(addClip(must(writeComponent(newMotionDoc(MotionFormat.Landscape), 'Card', { source: { html: '<h1>Big <b>sale</b></h1>', css: '', js: '' }, propsSchema: { type: 'object', properties: { line: { type: 'string', default: 'x' } } } })), { component: 'Custom', from: 0, props: { name: 'Card', line: 'Buy now' } }, 'c'));
+
+    expect(docTexts(doc)).toEqual(expect.arrayContaining(['Big sale', 'Buy now']));
   });
 });
 

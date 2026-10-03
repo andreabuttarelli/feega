@@ -3,11 +3,15 @@
   import { FPS, TRANSITION_KINDS, type Edge } from '$lib/motion/design';
   import { resolveColor, type BrandTokens } from '$lib/motion/brand';
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
-  import { editAt, fieldGroups, keyAt, keyedField, parseDecimal, secondsLabel, toggleKey, valueAt, type Field } from '$lib/motion/inspector';
+  import { InspectorTab, clipFieldGroups, editAt, keyAt, keyedField, parseDecimal, secondsLabel, toggleKey, valueAt, type Field } from '$lib/motion/inspector';
   import { setMask, setProps, setTiming, setTrackMatte, setTransform, setTransition, Side, type OpResult } from '$lib/motion/timeline';
   import { MASK_KINDS, MASK_KIND_IDS, MATTES, MaskKind, Matte, Needs, newMask, type Mask } from '$lib/motion/mask';
   import { ANIMATABLE, Source, TRANSFORM, type AnimProp, type KeyValue } from '$lib/motion/keyframes';
   import Dial from './Dial.svelte';
+  import CodeEditor from './CodeEditor.svelte';
+  import { withParams } from '$lib/motion/custom/params';
+  import type { CustomSource } from '$lib/motion/custom/component';
+
 
   type Asset = { id: string; kind: AssetKind; label: string; previewUrl: string };
 
@@ -17,8 +21,19 @@
     tokens,
     assets,
     frame,
+    previousSource = () => null,
+    tab = $bindable<InspectorTab>(InspectorTab.Properties),
     onchange
-  }: { doc: MotionDoc; clip: MotionClip; tokens: BrandTokens; assets: Asset[]; frame: number; onchange: (doc: MotionDoc, summary: string) => void } = $props();
+  }: {
+    doc: MotionDoc;
+    clip: MotionClip;
+    tokens: BrandTokens;
+    assets: Asset[];
+    frame: number;
+    previousSource?: (name: string) => CustomSource | null;
+    tab?: InspectorTab;
+    onchange: (doc: MotionDoc, summary: string) => void;
+  } = $props();
 
   const DIALS = new Set(['rotateX', 'rotateY', 'rotateZ', 'objectRotateX', 'objectRotateY', 'objectRotateZ', 'orbit', 'maskRotation']);
   const ANCHOR_STOPS = [0, 0.5, 1] as const;
@@ -26,7 +41,9 @@
 
   let error = $state('');
 
-  const groups = $derived(fieldGroups(clip.component));
+  const groups = $derived(clipFieldGroups(doc, clip));
+  const animated = $derived(withParams(doc, clip));
+  const customName = $derived(clip.component === 'Custom' ? String(clip.props.name) : null);
   const spec = $derived(COMPONENTS[clip.component]);
   const transformProps = $derived(ANIMATABLE[clip.component].filter((p) => p.source === Source.Transform));
   const sceneProps = $derived(ANIMATABLE[clip.component].filter((p) => p.source === Source.Scene));
@@ -45,7 +62,7 @@
   }
 
   function setProp(field: Field, value: unknown) {
-    if (keyedField(clip.component, field.key)) {
+    if (keyedField(clip.component, field.key, animated.params)) {
       animate(field.key, value as KeyValue);
       return;
     }
@@ -109,17 +126,28 @@
     commit(setMask(doc, clip.id, { ...mask, ...patch }), 'Edited the mask');
   }
 
-  const shown = (key: string) => valueAt(clip, key, frame, resolve);
+  const shown = (key: string) => valueAt(animated, key, frame, resolve);
   const numberShown = (prop: AnimProp) => Math.round(Number(shown(prop.key)) * 1000) / 1000;
-  const value = (field: Field) => (keyedField(clip.component, field.key) ? shown(field.key) : (clip.props as Record<string, unknown>)[field.key]);
+  const value = (field: Field) => (keyedField(clip.component, field.key, animated.params) ? shown(field.key) : (clip.props as Record<string, unknown>)[field.key]);
   const isHex = (v: unknown) => typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v);
 </script>
 
 <div class="inspector" data-testid="motion-inspector">
   <header>
-    <span class="kind">{spec.label}</span>
+    <span class="kind">{customName ?? spec.label}</span>
     <span class="id">{clip.id}</span>
   </header>
+
+  {#if customName}
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" aria-selected={tab === InspectorTab.Properties} class:on={tab === InspectorTab.Properties} onclick={() => (tab = InspectorTab.Properties)}>Properties</button>
+      <button type="button" role="tab" aria-selected={tab === InspectorTab.Code} class:on={tab === InspectorTab.Code} onclick={() => (tab = InspectorTab.Code)} data-testid="code-tab-open">Code</button>
+    </div>
+  {/if}
+
+  {#if customName && tab === InspectorTab.Code}
+    <CodeEditor {doc} name={customName} previous={previousSource(customName)} {onchange} />
+  {:else}
 
   <section>
     <h4>Timing</h4>
@@ -225,7 +253,7 @@
       <h4>{group}</h4>
       {#each fields as field (field.key)}
         <div class="row">
-          <label for={`f-${field.key}`}>{#if keyedField(clip.component, field.key)}{@render diamond(field.key)}{/if}{field.label}</label>
+          <label for={`f-${field.key}`}>{#if keyedField(clip.component, field.key, animated.params)}{@render diamond(field.key)}{/if}{field.label}</label>
           {#if field.control === Control.Text}
             <input id={`f-${field.key}`} type="text" value={String(value(field) ?? '')} onchange={(e) => setProp(field, e.currentTarget.value)} />
           {:else if field.control === Control.Textarea}
@@ -265,6 +293,8 @@
     </section>
   {/each}
 
+  {/if}
+
   {#if error}<p class="error" role="alert">{error}</p>{/if}
 </div>
 
@@ -283,6 +313,23 @@
     align-items: baseline;
     padding: 10px 12px;
     border-bottom: 1px solid var(--line);
+  }
+
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .tabs button {
+    flex: 1;
+    padding: 6px 0;
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+
+  .tabs button.on {
+    color: var(--ink);
+    box-shadow: inset 0 -2px 0 var(--ink);
   }
 
   .kind {
