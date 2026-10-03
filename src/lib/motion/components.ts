@@ -29,7 +29,7 @@ export enum Group {
 export const BRAND_COLORS = ['brand.primary', 'brand.secondary', 'brand.accent', 'brand.background', 'brand.text'] as const;
 export type BrandColor = (typeof BRAND_COLORS)[number];
 
-const COLOR = /^(#[0-9a-fA-F]{6}|brand\.(primary|secondary|accent|background|text)|transparent)$/;
+export const COLOR = /^(#[0-9a-fA-F]{6}|brand\.(primary|secondary|accent|background|text)|transparent)$/;
 
 const color = (fallback: string, label: string) =>
   z.string().regex(COLOR, 'expected #rrggbb, transparent or a brand colour').default(fallback).meta({ control: Control.Color, label, group: Group.Style });

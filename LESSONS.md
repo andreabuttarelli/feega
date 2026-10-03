@@ -2235,3 +2235,9 @@ model (ai v7). Cause: `StepResult.model` is built from the model passed to `stre
 one the step ran. Move: record the model per step in `prepareStep` and bill from that list
 (`usageByModel` in `server/motion/frames.ts`).
 
+
+## Motion playhead jumps back after an edit
+Signal: an inspector edit or keyframe lands at frame 0 or an older frame, not at the playhead.
+Cause: the HyperFrames player emits `timeupdate` (often at 0) when the composition reloads, and
+the editor took it as the new frame. Move: while paused the editor owns the frame; follow
+`timeupdate` only while playing (`MotionPreview.svelte`).

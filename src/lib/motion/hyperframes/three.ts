@@ -1,4 +1,5 @@
 import { js } from './html';
+import { SCENE, sampleTrack, type Keyframe, type SceneKey } from '../keyframes';
 
 export const THREE_VERSION = '0.181.2';
 
@@ -17,6 +18,8 @@ export type ThreeClip = {
   lighting: string;
   shadow: boolean;
   ease: string;
+  fps: number;
+  keys: Partial<Record<SceneKey, Keyframe[]>>;
 };
 
 export const LIGHTING = {
@@ -49,7 +52,7 @@ function stage(c) {
   renderer.setPixelRatio(1);
   renderer.setSize(canvas.width, canvas.height, false);
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(35, canvas.width / canvas.height, 0.1, 100);
+  const camera = new THREE.PerspectiveCamera(FOV, canvas.width / canvas.height, 0.1, 100);
   camera.position.set(0, 0.3, 4.6 / c.zoom);
   const light = LIGHTING[c.lighting] || LIGHTING.studio;
   scene.add(new THREE.AmbientLight(0xffffff, light.ambient));
@@ -60,8 +63,10 @@ function stage(c) {
     shadow.rotation.x = -Math.PI / 2; shadow.position.y = -1.05; scene.add(shadow);
   }
   const pivot = new THREE.Group();
+  const object = new THREE.Group();
+  pivot.add(object);
   scene.add(pivot);
-  return { renderer, scene, camera, pivot };
+  return { renderer, scene, camera, pivot, object };
 }
 
 function loadModel(c, s) {
@@ -75,7 +80,7 @@ function loadModel(c, s) {
       const scale = 2 / Math.max(size.x, size.y, size.z, 1e-6);
       root.scale.setScalar(scale);
       root.position.set(-center.x * scale, -center.y * scale, -center.z * scale);
-      s.pivot.add(root);
+      s.object.add(root);
       resolve();
     }, undefined, () => resolve());
   });
@@ -85,17 +90,26 @@ const scenes = CLIPS.map((c) => {
   const s = stage(c);
   if (!s) return null;
   if (c.kind === 'shape') {
-    s.pivot.add(new THREE.Mesh(geometry[c.shape](), new THREE.MeshStandardMaterial({ color: c.color, roughness: 0.35, metalness: 0.1 })));
+    s.object.add(new THREE.Mesh(geometry[c.shape](), new THREE.MeshStandardMaterial({ color: c.color, roughness: 0.35, metalness: 0.1 })));
     s.pivot.rotation.set(0.35, 0, 0.1);
   }
   return { c, s, ready: c.kind === 'model' ? loadModel(c, s) : Promise.resolve() };
 }).filter(Boolean);
 
+function legacyOrbit(c, local) {
+  const t = window.gsap ? window.gsap.parseEase(c.ease)(c.length > 0 ? local / c.length : 1) : local / c.length;
+  return c.startAngle + (c.endAngle - c.startAngle) * t + c.orbitSpeed * local;
+}
+
 function renderAt(time) {
   for (const { c, s } of scenes) {
     const local = Math.min(Math.max(time - c.start, 0), c.length);
-    const t = window.gsap ? window.gsap.parseEase(c.ease)(c.length > 0 ? local / c.length : 1) : local / c.length;
-    s.pivot.rotation.y = (c.startAngle + (c.endAngle - c.startAngle) * t + c.orbitSpeed * local) * DEG;
+    const at = (key, fallback) => (c.keys[key] ? sampleTrack(c.keys[key], local * c.fps) : fallback);
+    s.pivot.rotation.y = at('orbit', legacyOrbit(c, local)) * DEG;
+    s.object.rotation.set(at('objectRotateX', 0) * DEG, at('objectRotateY', 0) * DEG, at('objectRotateZ', 0) * DEG);
+    s.camera.position.z = 4.6 / at('dolly', c.zoom);
+    s.camera.fov = at('fov', FOV);
+    s.camera.updateProjectionMatrix();
     s.renderer.render(s.scene, s.camera);
   }
 }
@@ -115,5 +129,5 @@ export function threeScript(clips: ThreeClip[], duration: number): string {
   if (!clips.length) {
     return '';
   }
-  return `<script type="module">const CLIPS = ${js(clips)};const LIGHTING = ${js(LIGHTING)};const DURATION = ${js(duration)};${SCENE_SCRIPT}</script>`;
+  return `<script type="module">const CLIPS = ${js(clips)};const LIGHTING = ${js(LIGHTING)};const DURATION = ${js(duration)};const FOV = ${SCENE.fov.fallback};const sampleTrack = (${sampleTrack.toString()});${SCENE_SCRIPT}</script>`;
 }

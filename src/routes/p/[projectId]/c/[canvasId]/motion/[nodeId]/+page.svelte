@@ -23,7 +23,23 @@
   import { AssetKind, COMPONENTS, COMPONENT_IDS, TrackKind, type ComponentId } from '$lib/motion/components';
   import { FPS } from '$lib/motion/design';
   import { FORMATS, MOTION_FORMATS, MAX_SECONDS, findClip, formatOf, type MotionDoc, type MotionFormat } from '$lib/motion/doc';
-  import { addClip, addTrack, duplicateClip, removeClips, setCanvas, splitClip, type OpResult } from '$lib/motion/timeline';
+  import {
+    Direction,
+    addClip,
+    addTrack,
+    adjacentKeyframe,
+    copyKeyframes,
+    deleteKeyframes,
+    duplicateClip,
+    keyframeFrames,
+    pasteKeyframes,
+    removeClips,
+    setCanvas,
+    splitClip,
+    type KeyBoard,
+    type KeyRef,
+    type OpResult
+  } from '$lib/motion/timeline';
   import { amend, canRedo, canUndo, record, redo, startHistory, undo, type History } from '$lib/motion/history';
   import { Snap, clampZoom, timecode } from '$lib/motion/timeline-view';
   import { parseDecimal, secondsLabel } from '$lib/motion/inspector';
@@ -50,6 +66,8 @@
   let history = $state<History>(startHistory(data.head.doc as MotionDoc));
   let version = $state(data.head.version);
   let selection = $state<string[]>([]);
+  let keySelection = $state<KeyRef[]>([]);
+  let keyBoard: KeyBoard = [];
   let frame = $state(0);
   let playing = $state(false);
   let zoom = $state(1.5);
@@ -196,6 +214,11 @@
   }
 
   function remove() {
+    if (keySelection.length) {
+      apply(deleteKeyframes(doc, keySelection), 'Deleted keyframes');
+      keySelection = [];
+      return;
+    }
     if (!selection.length) {
       return;
     }
@@ -216,6 +239,29 @@
   function step(frames: number) {
     playing = false;
     frame = Math.min(Math.max(0, frame + frames), doc.durationInFrames - 1);
+  }
+
+  function jumpKey(direction: Direction) {
+    const ids = selection.length ? selection : doc.tracks.flatMap((t) => t.clips.map((c) => c.id));
+    const next = adjacentKeyframe(keyframeFrames(doc, ids), frame, direction);
+    if (next !== null) {
+      playing = false;
+      frame = Math.min(next, doc.durationInFrames - 1);
+    }
+  }
+
+  function copyKeys() {
+    if (keySelection.length) {
+      keyBoard = copyKeyframes(doc, keySelection);
+    }
+  }
+
+  function pasteKeys() {
+    const target = selected;
+    if (!target || !keyBoard.length) {
+      return;
+    }
+    apply(pasteKeyframes(doc, target.id, keyBoard, frame - target.from), 'Pasted keyframes');
   }
 
   function setFormat(format: MotionFormat) {
@@ -254,7 +300,14 @@
     [Command.ZoomIn]: () => (zoom = clampZoom(zoom * ZOOM_STEP)),
     [Command.ZoomOut]: () => (zoom = clampZoom(zoom / ZOOM_STEP)),
     [Command.SelectAll]: () => (selection = doc.tracks.flatMap((t) => t.clips.map((c) => c.id))),
-    [Command.Deselect]: () => (selection = [])
+    [Command.Deselect]: () => {
+      selection = [];
+      keySelection = [];
+    },
+    [Command.PrevKeyframe]: () => jumpKey(Direction.Back),
+    [Command.NextKeyframe]: () => jumpKey(Direction.Forward),
+    [Command.Copy]: copyKeys,
+    [Command.Paste]: pasteKeys
   };
 
   function onKey(e: KeyboardEvent) {
@@ -335,14 +388,14 @@
       </div>
 
       <div class="tl">
-        <MotionTimeline {doc} bind:frame bind:selection {zoom} {snap} onchange={edit} />
+        <MotionTimeline {doc} bind:frame bind:selection bind:keySelection {zoom} {snap} onchange={edit} />
       </div>
     </section>
 
     <aside class="props" class:open={sheet === Sheet.Properties} aria-label="Properties">
       <div class="sheet-head"><span>Properties</span><button type="button" aria-label="Close" onclick={() => (sheet = Sheet.None)}><X size={16} /></button></div>
       {#if selected}
-        <MotionInspector {doc} clip={selected} tokens={data.tokens} assets={data.assets} onchange={edit} />
+        <MotionInspector {doc} clip={selected} tokens={data.tokens} assets={data.assets} {frame} onchange={edit} />
       {:else}
         <p class="hint">{selection.length > 1 ? `${selection.length} clips selected.` : 'Select a clip in the timeline to edit its properties.'}</p>
       {/if}

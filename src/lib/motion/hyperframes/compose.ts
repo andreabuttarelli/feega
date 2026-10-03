@@ -1,10 +1,12 @@
 import { THREE_D_COMPONENTS, type ComponentId } from '../components';
 import { Ease, TransitionKind, type Edge } from '../design';
+import { GSAP_EASE } from '../keyframes';
 import type { MotionClip, MotionDoc } from '../doc';
 import { resolveColor, type BrandTokens } from '../brand';
 import { css, esc, js, seconds } from './html';
 import { TEMPLATES, Timing, type PropsOf, type TemplateCtx, type Tween, type Vars } from './templates';
 import { LIGHTING, threeImportMap, threeScript, type ThreeClip } from './three';
+import { ANIMATE_CSS, animationScript, colourOverrides, sceneKeys, wrapAnimated } from './animate';
 
 export const HYPERFRAMES_VERSION = '0.8.114';
 export const GSAP_VERSION = '3.14.2';
@@ -16,14 +18,6 @@ const SCREENSHOT_URL = 'https://cdn.jsdelivr.net/npm/html-to-image@1.11.13/dist/
 const RUNTIME_URL = `https://cdn.jsdelivr.net/npm/@hyperframes/core@${HYPERFRAMES_VERSION}/dist/hyperframe.runtime.iife.js`;
 const GSAP_URL = `https://cdn.jsdelivr.net/npm/gsap@${GSAP_VERSION}/dist/gsap.min.js`;
 const FONTS_URL = 'https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Fragment+Mono&display=block';
-
-export const GSAP_EASE: Record<Ease, string> = {
-  [Ease.Standard]: 'power3.out',
-  [Ease.Enter]: 'power2.out',
-  [Ease.Exit]: 'power2.in',
-  [Ease.Linear]: 'none',
-  [Ease.Overshoot]: 'back.out(1.7)'
-};
 
 const SHOWN: Vars = { opacity: 1, xPercent: 0, yPercent: 0, scale: 1, clipPath: 'inset(0 0% 0 0)', filter: 'blur(0px)' };
 
@@ -89,14 +83,14 @@ function ctxOf(clip: MotionClip, input: ComposeInput): TemplateCtx<ComponentId> 
   const { doc, tokens, assets } = input;
   return {
     id: clip.id,
-    p: clip.props as never,
+    p: { ...clip.props, ...colourOverrides(clip) } as never,
     width: doc.width,
     height: doc.height,
     unit: Math.min(doc.width, doc.height),
     start: Number(seconds(clip.from, doc.fps)),
     length: Number(seconds(clip.durationInFrames, doc.fps)),
     fps: doc.fps,
-    color: (v) => resolveColor(v, tokens),
+    color: (v) => (v.startsWith('var(') ? v : resolveColor(v, tokens)),
     asset: (id) => (id ? (assets[id] ?? null) : null),
     logoUrl: tokens.logoUrl,
     brandName: tokens.name,
@@ -106,7 +100,7 @@ function ctxOf(clip: MotionClip, input: ComposeInput): TemplateCtx<ComponentId> 
 
 function clipHtml(clip: MotionClip, ctx: TemplateCtx<ComponentId>, layer: number, trackIndex: number): string {
   const template = TEMPLATES[clip.component] as (typeof TEMPLATES)[ComponentId];
-  const inner = template.html(ctx as never);
+  const inner = wrapAnimated(clip, ctx, template.html(ctx as never));
   const fx = `<div class="fx" id="fx-${clip.id}">${inner}</div>`;
   const style = css({ zIndex: layer });
 
@@ -150,7 +144,9 @@ function threeClipOf(clip: MotionClip, ctx: TemplateCtx<ComponentId>): ThreeClip
     zoom: p.zoom,
     lighting: p.lighting in LIGHTING ? p.lighting : 'studio',
     shadow: p.shadow,
-    ease: GSAP_EASE[p.easing]
+    ease: GSAP_EASE[p.easing],
+    fps: ctx.fps,
+    keys: sceneKeys(clip)
   };
 }
 
@@ -159,7 +155,8 @@ const BASE_CSS = [
   '#root{position:relative;width:100%;height:100%;overflow:hidden}',
   '.layer{position:absolute;inset:0}',
   '.fx{position:absolute;inset:0;will-change:transform,opacity}',
-  '.li{display:block;will-change:transform}'
+  '.li{display:block;will-change:transform}',
+  ANIMATE_CSS
 ].join('');
 
 function captureScript(doc: MotionDoc): string {
@@ -173,11 +170,13 @@ export function composeHtml(input: ComposeInput): string {
   const tweens: Tween[] = [];
   const holds: Hold[] = [];
   const three: ThreeClip[] = [];
+  const clips: MotionClip[] = [];
   let layer = 0;
 
   for (const { track, index } of bottomFirst) {
     for (const clip of track.clips as MotionClip[]) {
       const ctx = ctxOf(clip, input);
+      clips.push(clip);
       const template = TEMPLATES[clip.component] as (typeof TEMPLATES)[ComponentId];
       layer += 1;
       layers.push(clipHtml(clip, ctx, layer, index));
@@ -192,6 +191,7 @@ export function composeHtml(input: ComposeInput): string {
 
   const duration = seconds(doc.durationInFrames, doc.fps);
   const background = tokens.colors['brand.background'];
+  const animation = animationScript(clips, doc, (v) => resolveColor(v, tokens));
 
   return [
     '<!doctype html><html lang="en"><head><meta charset="UTF-8" />',
@@ -205,7 +205,7 @@ export function composeHtml(input: ComposeInput): string {
     `<div id="root" data-composition-id="${COMPOSITION_ID}" data-start="0" data-width="${doc.width}" data-height="${doc.height}" data-duration="${duration}" data-fps="${doc.fps}">`,
     layers.join(''),
     '</div>',
-    `<script>const tl=gsap.timeline({paused:true});${holds.map(holdLine).join('')}${tweens.map(tweenLine).join('')}tl.set({}, {}, ${duration});window.__timelines=window.__timelines||{};window.__timelines[${js(COMPOSITION_ID)}]=tl;</script>`,
+    `<script>${animation.setup}const tl=gsap.timeline({paused:true});${holds.map(holdLine).join('')}${tweens.map(tweenLine).join('')}${animation.timeline}tl.set({}, {}, ${duration});window.__timelines=window.__timelines||{};window.__timelines[${js(COMPOSITION_ID)}]=tl;</script>`,
     threeScript(three, Number(duration)),
     captureScript(doc),
     '</body></html>'

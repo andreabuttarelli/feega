@@ -52,6 +52,9 @@
         el.seek(frame / FPS);
       });
       el.addEventListener('timeupdate', (e) => {
+        if (!playing) {
+          return;
+        }
         const next = Math.round(((e as CustomEvent<{ currentTime: number }>).detail.currentTime ?? 0) * FPS);
         reported = next;
         frame = next;

@@ -2,11 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { FEEGA_TOKENS } from '../brand';
 import { TransitionKind } from '../design';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '../doc';
-import { addClip, setTransition, Side } from '../timeline';
+import gsap from 'gsap';
+import { addClip, setKeyframes, setTransform, setTransition, Side, type OpResult } from '../timeline';
 import { COMPONENT_IDS } from '../components';
+import { Ease } from '../design';
+import { findClip } from '../doc';
+import { easeName, sampleTrack } from '../keyframes';
+import { keyframeTweens } from './animate';
 import { CAPTURE_REPLY, CAPTURE_REQUEST, composeHtml } from './compose';
 
-function must(r: { ok: true; doc: MotionDoc } | { ok: false; error: string }): MotionDoc {
+function must(r: OpResult): MotionDoc {
   if (!r.ok) {
     throw new Error(r.error);
   }
@@ -120,5 +125,125 @@ describe('MotionDoc to HyperFrames composition', () => {
     expect(html).toContain(`"${CAPTURE_REPLY}"`);
     expect(html).toContain('html-to-image@');
     expect(html).toMatch(/<link rel="stylesheet" crossorigin="anonymous" href="https:\/\/fonts\.googleapis\.com/);
+  });
+});
+
+describe('keyframes and 3D transforms', () => {
+  const card = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Shape', from: 30, durationInFrames: 120, props: { shape: 'rect', x: 0.25, y: 0.5, width: 0.2, height: 0.4 } }, 'card'));
+  const spun = must(
+    setKeyframes(
+      must(setTransform(must(setTransition(card, 'card', Side.In, { kind: TransitionKind.Fade, durationInFrames: 10 })), 'card', { perspective: 900, anchorX: 0, rotateX: 15 })),
+      'card',
+      'rotateY',
+      [
+        { frame: 0, value: 0, ease: Ease.Linear },
+        { frame: 60, value: 180, ease: [0.2, 0.8, 0.2, 1] },
+        { frame: 100, value: 360, ease: Ease.Overshoot }
+      ]
+    )
+  );
+  const moved = must(setKeyframes(spun, 'card', 'x', [{ frame: 0, value: 0, ease: Ease.Standard }, { frame: 90, value: 0.5, ease: Ease.Linear }]));
+  const coloured = must(setKeyframes(moved, 'card', 'fill', [{ frame: 0, value: '#ff0000', ease: Ease.Linear }, { frame: 30, value: 'brand.accent', ease: Ease.Linear }]));
+
+  it('a clip without transform or keyframes keeps its plain markup', () => {
+    expect(compose(card)).not.toContain('id="kf-card"');
+  });
+
+  it('a transformed clip nests perspective, transform and scale wrappers inside its transition wrapper', () => {
+    const html = compose(spun);
+
+    expect(html).toMatch(/<div class="fx" id="fx-card"><div class="kp" id="kp-card" style="[^"]*perspective:900px[^"]*"><div class="kf" id="kf-card"[^>]*><div class="ks" id="ks-card"/);
+    expect(html).toContain('.kf,.ks{position:absolute;inset:0;transform-style:preserve-3d;backface-visibility:visible;will-change:transform,opacity,filter}');
+  });
+
+  it('the anchor is a point of the clip box, not of the frame', () => {
+    expect(compose(spun)).toMatch(/id="kf-card" style="transform-origin:288px 540px"/);
+  });
+
+  it('base transform values are set before the timeline exists', () => {
+    expect(compose(spun)).toContain('gsap.set("#kf-card",{"rotationX":15,"rotationY":0});');
+  });
+
+  it('each keyframe segment is one tween on the transform wrapper, with its own ease', () => {
+    const html = compose(spun);
+
+    expect(html).toContain('tl.fromTo("#kf-card",{"rotationY":0},{"rotationY":180,"duration":2,"ease":"none","immediateRender":false},1);');
+    expect(html).toContain(`tl.fromTo("#kf-card",{"rotationY":180},{"rotationY":360,"duration":1.3333333333333333,"ease":${JSON.stringify(easeName([0.2, 0.8, 0.2, 1]))},"immediateRender":false},3);`);
+    expect(html).toContain(`gsap.registerEase(${JSON.stringify(easeName([0.2, 0.8, 0.2, 1]))}`);
+  });
+
+  it('a lane holds its first value from the clip start', () => {
+    expect(compose(spun)).toContain('tl.set("#kf-card",{"rotationY":0},1);');
+  });
+
+  it('an offset is a fraction of the frame, tweened in pixels', () => {
+    expect(compose(moved)).toContain('tl.fromTo("#kf-card",{"x":0},{"x":960,"duration":3,"ease":"power3.out","immediateRender":false},1);');
+  });
+
+  it('a colour keyframe tweens a CSS variable the template reads, brand colours resolved', () => {
+    const html = compose(coloured);
+
+    expect(html).toContain('background:var(--kc-fill)');
+    expect(html).toContain(`tl.fromTo("#ks-card",{"--kc-fill":"#ff0000"},{"--kc-fill":"${FEEGA_TOKENS.colors['brand.accent']}"`);
+  });
+
+  it('no element and property is tweened by two sources', () => {
+    const html = compose(must(setKeyframes(coloured, 'card', 'opacity', [{ frame: 0, value: 0, ease: Ease.Linear }, { frame: 10, value: 1, ease: Ease.Linear }])));
+    const owners = new Map<string, string>();
+    for (const [, target, vars] of html.matchAll(/tl\.fromTo\("([^"]+)",(\{[^}]*\})/g)) {
+      for (const prop of Object.keys(JSON.parse(vars))) {
+        const lane = `${target} ${prop}`;
+        const source = target.split('-')[0];
+        expect(owners.get(lane) ?? source).toBe(source);
+        owners.set(lane, source);
+      }
+    }
+    expect(owners.get('#fx-card opacity')).toBeDefined();
+    expect(owners.get('#kf-card opacity')).toBeDefined();
+  });
+
+  it('the generated tweens land on the sampled value at every frame, whatever order the frames are sought in', () => {
+    const clip = findClip(moved, 'card')!.clip;
+    const tweens = keyframeTweens(clip, moved, (c) => c).filter((t) => t.target === '#kf-card');
+    const bezier = (p: number) => sampleTrack([{ frame: 0, value: 0, ease: [0.2, 0.8, 0.2, 1] }, { frame: 1, value: 1, ease: 'linear' }], p);
+    const run = () => {
+      const target = { rotationY: 0, x: 0 };
+      const tl = gsap.timeline({ paused: true });
+      for (const t of tweens) {
+        tl.fromTo(target, t.from, { ...t.to, duration: t.duration, ease: t.ease.startsWith('kf-bz') ? bezier : t.ease, immediateRender: false }, t.at);
+      }
+      return { target, tl };
+    };
+    const expected = (frame: number) => ({
+      rotationY: sampleTrack(clip.keyframes.rotateY, frame - clip.from),
+      x: sampleTrack(clip.keyframes.x, frame - clip.from) * moved.width
+    });
+
+    const ordered = run();
+    const shuffled = run();
+    const frames = Array.from({ length: 121 }, (_, i) => 30 + i);
+    const random = [...frames].sort((a, b) => Math.sin(a * 12.9898) - Math.sin(b * 12.9898));
+    const seen = new Map<number, { rotationY: number; x: number }>();
+
+    for (const f of frames) {
+      ordered.tl.seek(f / 30);
+      seen.set(f, { ...ordered.target });
+    }
+    for (const f of random) {
+      shuffled.tl.seek(f / 30);
+      expect(shuffled.target.rotationY).toBeCloseTo(seen.get(f)!.rotationY, 6);
+      expect(shuffled.target.x).toBeCloseTo(seen.get(f)!.x, 6);
+      expect(shuffled.target.rotationY).toBeCloseTo(expected(f).rotationY, 3);
+      expect(shuffled.target.x).toBeCloseTo(expected(f).x, 3);
+    }
+  });
+
+  it('3D model keyframes drive the three.js object and camera with the same sampler', () => {
+    const model = must(addClip(newMotionDoc(MotionFormat.Square), { component: 'Model3D', from: 0, props: { assetId: 'glb' } }, 'm'));
+    const orbit = must(setKeyframes(model, 'm', 'orbit', [{ frame: 0, value: -30, ease: Ease.Linear }, { frame: 60, value: 30, ease: Ease.Standard }]));
+    const html = compose(orbit, { glb: '/assets/glb' });
+
+    expect(html).toContain('"keys":{"orbit":[{"frame":0,"value":-30,"ease":"linear"},{"frame":60,"value":30,"ease":"standard"}]}');
+    expect(html).toContain('function sampleTrack(');
   });
 });

@@ -1,6 +1,9 @@
 import { z } from 'zod';
 import { COMPONENTS, Control, Group, type AssetKind, type ComponentId } from './components';
 import { FPS } from './design';
+import { Source, ValueKind, animProp, baseValue, sampleColor, sampleTrack, type Animated, type KeyValue } from './keyframes';
+import type { MotionClip, MotionDoc } from './doc';
+import { removeKeyframes, setKeyframe, setProps, setTransform, type OpResult } from './timeline';
 
 export type Field = {
   key: string;
@@ -84,4 +87,53 @@ export function parseDecimal(text: string): number | null {
   }
   const value = Number(trimmed);
   return Number.isFinite(value) ? value : null;
+}
+
+type Placed = Animated & { from: number };
+
+export function valueAt(clip: Placed, key: string, frame: number, resolve: (color: string) => string): KeyValue | null {
+  const track = clip.keyframes[key];
+  if (!track?.length) {
+    return baseValue(clip, key);
+  }
+  const local = frame - clip.from;
+  return animProp(clip.component, key)?.kind === ValueKind.Color ? sampleColor(track, local, resolve) : sampleTrack(track, local);
+}
+
+export function keyedField(component: ComponentId, key: string): boolean {
+  return animProp(component, key)?.source === Source.Prop;
+}
+
+export function keyAt(clip: Placed, key: string, frame: number): boolean {
+  return (clip.keyframes[key] ?? []).some((k) => k.frame === frame - clip.from);
+}
+
+const EDIT_BASE: Record<Source, (doc: MotionDoc, clip: MotionClip, key: string, value: KeyValue, local: number) => OpResult> = {
+  [Source.Transform]: (doc, clip, key, value) => setTransform(doc, clip.id, { [key]: Number(value) }),
+  [Source.Prop]: (doc, clip, key, value) => setProps(doc, clip.id, { [key]: value }),
+  [Source.Scene]: (doc, clip, key, value, local) => setKeyframe(doc, clip.id, key, local, value)
+};
+
+export function editAt(doc: MotionDoc, clip: MotionClip, key: string, value: KeyValue, frame: number): OpResult {
+  const prop = animProp(clip.component, key);
+  if (!prop) {
+    return { ok: false, error: `${clip.component} cannot animate ${key}` };
+  }
+  const local = frame - clip.from;
+  if (clip.keyframes[key]?.length) {
+    return setKeyframe(doc, clip.id, key, local, value);
+  }
+  return EDIT_BASE[prop.source](doc, clip, key, value, local);
+}
+
+export function toggleKey(doc: MotionDoc, clip: MotionClip, key: string, frame: number, resolve: (color: string) => string): OpResult {
+  const local = frame - clip.from;
+  if (keyAt(clip, key, frame)) {
+    return removeKeyframes(doc, clip.id, key, [local]);
+  }
+  const value = valueAt(clip, key, frame, resolve);
+  if (value === null) {
+    return { ok: false, error: `${clip.component} cannot animate ${key}` };
+  }
+  return setKeyframe(doc, clip.id, key, local, value);
 }

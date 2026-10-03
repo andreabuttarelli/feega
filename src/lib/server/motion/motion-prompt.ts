@@ -14,6 +14,7 @@ export function motionAgentPrompt(input: { brandName: string | null; selectionNo
     'House style: one idea per beat, 1.5–3 s per title, a Kicker above a Title, slide-up or fade transitions of 0.3–0.5 s, a BrandBackground under everything.',
     'Your edits of this turn are saved together as one revision the user can undo.',
     SEEING[input.vision],
+    'Motion: set_transform for a static 3D pose (rotateX/Y/Z, perspective, anchor), set_keyframes to animate a prop over time (seconds from the clip start), remove_keyframes to undo it. Keyframes and transitions combine: a fade-in plus a keyframed rotation is fine. Check a 3D move with view_frames at its start, middle and end.',
     'Timing (start, duration) is set_timing, never a prop. A tool that fails tells you why: read the error and retry with what it says.',
     'generate_voiceover spends credits: only when the user asked for a voice-over.',
     'Answer in the language the user writes in. Be brief: say what changed.'
