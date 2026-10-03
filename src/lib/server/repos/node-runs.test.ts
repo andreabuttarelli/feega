@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fakeDb, filtersOf } from '$lib/server/db/fake-db';
-import { claimRun, completeRun, createRun, failRun, listNodeRuns, runningRuns } from './node-runs';
+import { claimRun, completeRun, createRun, failRun, listNodeRuns, queuedVideoRuns, RENDER_JOB_PREFIX, runningRuns, setRunParams } from './node-runs';
 
 const ORG = '11111111-1111-1111-1111-111111111111';
 const NODE = '22222222-2222-2222-2222-222222222222';
@@ -117,5 +117,25 @@ describe('runningRuns — ogni run ancora in corsa, per un tick da drenare', () 
     expect(filtersOf(calls, 'select')).toEqual({ status: 'running' });
     expect(call.limit).toBe(10);
     expect(call.order?.[0]).toBe('started_at');
+  });
+});
+
+describe('un render motion non è un video in coda presso un fornitore', () => {
+  it('il riconciliatore video non lo vede', async () => {
+    const { db } = fakeDb({ node_runs: [{ ...row, external_job_id: `${RENDER_JOB_PREFIX}7` }, { ...row, id: 'v', external_job_id: 'kling:1' }] });
+
+    const runs = await queuedVideoRuns(db, { limit: 10 });
+
+    expect(runs.map((r) => r.id)).toEqual(['v']);
+  });
+
+  it('il suo avanzamento si scrive sui params del giro, nella propria org', async () => {
+    const { db, calls } = fakeDb({ node_runs: [row] });
+
+    await setRunParams(db, { orgId: ORG, runId: RUN, params: { progress: { stage: 'rendering' } } });
+
+    const call = calls.find((c) => c.op === 'update')!;
+    expect(call.payload).toEqual({ params: { progress: { stage: 'rendering' } } });
+    expect(filtersOf(calls, 'update')).toEqual({ id: RUN, org_id: ORG });
   });
 });

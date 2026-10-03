@@ -5,10 +5,10 @@ import { findCanvasForUser } from '$lib/server/canvas/lookup';
 import { canvasReachable } from '$lib/server/uncensored-workspace/workspace-server';
 import { assetUrls, findMotionNode, headOrNew, motionAssets, motionTokens, saveMotionDoc } from '$lib/server/motion/editor';
 import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
-import { motionRenderer, RENDER_NOT_CONFIGURED } from '$lib/server/motion/renderer';
-import { composeHtml } from '$lib/motion/hyperframes/compose';
-import { parseMotionDoc } from '$lib/motion/doc';
-import { renderQuote } from '$lib/motion/render-quote';
+import { motionRenderFarm } from '$lib/server/motion/renderer';
+import { farmJob, renderView, startRender } from '$lib/server/motion/render-run';
+import { listNodeRuns } from '$lib/server/repos/node-runs';
+import { SIGNED_URL_TTL_S } from '$lib/server/repos/asset-storage';
 import { gateOrgAiActionForForm } from '$lib/server/cli-auth';
 import { saveExport } from '$lib/server/motion/export';
 import { Sound, generateSound } from '$lib/server/motion/voiceover';
@@ -44,10 +44,11 @@ async function scopeFor(locals: App.Locals, params: { projectId: string; canvasI
 export const load: PageServerLoad = async ({ locals, params }) => {
   const scope = await scopeFor(locals, params);
   const nodeScope = { orgId: scope.orgId, nodeId: scope.motion.record.id };
-  const [head, tokens, assets] = await Promise.all([
+  const [head, tokens, assets, runs] = await Promise.all([
     headOrNew(scope.db, nodeScope, scope.motion.node),
     motionTokens(scope.db, { orgId: scope.orgId, brandId: scope.projectBrandId }),
-    motionAssets({ db: scope.db, orgId: scope.orgId, projectId: params.projectId, canvasId: scope.canvas.id, nodeId: scope.motion.record.id })
+    motionAssets({ db: scope.db, orgId: scope.orgId, projectId: params.projectId, canvasId: scope.canvas.id, nodeId: scope.motion.record.id }),
+    listNodeRuns(scope.db, nodeScope)
   ]);
 
   return {
@@ -58,7 +59,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
     head: { version: head.version, doc: head.doc },
     tokens,
     assets,
-    renderConfigured: motionRenderer().configured
+    serverRender: { configured: motionRenderFarm() !== null, latest: renderView(runs) }
   };
 };
 
@@ -131,26 +132,34 @@ export const actions: Actions = {
 
   render: async ({ locals, params, request }) => {
     const scope = await scopeFor(locals, params);
-    const parsed = parseMotionDoc(JSON.parse(String((await request.formData()).get('doc') ?? 'null')));
-    if (!parsed.ok) {
-      return fail(HTTP_BAD_REQUEST, { error: parsed.error });
+    const version = Number((await request.formData()).get('version'));
+    const nodeScope = { orgId: scope.orgId, nodeId: scope.motion.record.id };
+    const head = await headOrNew(scope.db, nodeScope, scope.motion.node);
+    if (head.version !== version) {
+      return fail(HTTP_CONFLICT, { error: 'save_first' });
     }
 
-    const renderer = motionRenderer();
-    if (!renderer.configured) {
-      return fail(HTTP_UNAVAILABLE, { error: RENDER_NOT_CONFIGURED });
-    }
-
-    const quote = renderQuote(parsed.doc);
     const denied = await gateOrgAiActionForForm(scope.orgId);
     if (denied) {
       return fail(denied.status, denied.data);
     }
 
-    const assets = await motionAssets({ db: scope.db, orgId: scope.orgId, projectId: params.projectId, canvasId: scope.canvas.id, nodeId: scope.motion.record.id });
-    const tokens = await motionTokens(scope.db, { orgId: scope.orgId, brandId: scope.projectBrandId });
-    const html = composeHtml({ doc: parsed.doc, tokens, assets: assetUrls(assets) });
-    const started = await renderer.start({ html, width: parsed.doc.width, height: parsed.doc.height, fps: parsed.doc.fps, durationInFrames: parsed.doc.durationInFrames });
-    return started.ok ? { renderId: started.renderId, quote } : fail(HTTP_UNAVAILABLE, { error: started.error });
+    const [assets, tokens] = await Promise.all([
+      motionAssets({ db: scope.db, orgId: scope.orgId, projectId: params.projectId, canvasId: scope.canvas.id, nodeId: scope.motion.record.id }, SIGNED_URL_TTL_S.render),
+      motionTokens(scope.db, { orgId: scope.orgId, brandId: scope.projectBrandId })
+    ]);
+    const doc = head.doc;
+    const job = farmJob({ doc, tokens, assets: assetUrls(assets) });
+
+    const editorUrl = `/p/${params.projectId}/c/${params.canvasId}/motion/${params.nodeId}`;
+    const renderScope = { ...nodeScope, projectId: params.projectId, userId: scope.userId, editorUrl };
+    const started = await startRender(scope.db, motionRenderFarm(), renderScope, { version, doc, job });
+    return started.ok ? { runId: started.runId, quote: started.quote } : fail(HTTP_UNAVAILABLE, { error: started.error });
+  },
+
+  renderStatus: async ({ locals, params }) => {
+    const scope = await scopeFor(locals, params);
+    const runs = await listNodeRuns(scope.db, { orgId: scope.orgId, nodeId: scope.motion.record.id });
+    return { render: renderView(runs) };
   }
 };

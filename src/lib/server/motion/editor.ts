@@ -51,14 +51,14 @@ function assetLabel(asset: Asset, kind: AssetKind): string {
   return `${kind} · ${asset.createdAt.slice(0, 10)} · ${asset.id.slice(0, 6)}`;
 }
 
-export async function motionAssets(scope: MotionScope): Promise<MotionAsset[]> {
+export async function motionAssets(scope: MotionScope, ttlSeconds?: number): Promise<MotionAsset[]> {
   const all = await listProjectAssets(scope.db, { orgId: scope.orgId, projectId: scope.projectId });
   const usable = all.filter((a) => MOTION_ASSET_KINDS[a.type] && a.url).slice(0, ASSET_LIMIT);
 
   const signed = await signAssetPaths(scope.db, createAssetSigningDb(), {
     generated: usable.filter((a) => a.source === 'generated').map((a) => a.url ?? ''),
     uploaded: usable.filter((a) => a.source !== 'generated' && !/^https?:\/\//.test(a.url ?? '')).map((a) => a.url ?? '')
-  });
+  }, ttlSeconds);
 
   return usable.map((asset) => {
     const kind = MOTION_ASSET_KINDS[asset.type] as AssetKind;
