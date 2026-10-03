@@ -12,6 +12,7 @@ import {
   queuedAudioRuns,
   queuedVideoRuns,
   queuedWiroRuns,
+  RENDER_JOB_PREFIX,
   releaseClaim,
   retryClaim,
   runningRuns,
@@ -1000,15 +1001,17 @@ const VIDEO_TIMEOUT_MS = 20 * 60_000;
 const WIRO_IMAGE_TIMEOUT_MS = 10 * 60_000;
 const WIRO_VIDEO_TIMEOUT_MS = 30 * 60_000;
 const DUBBING_TIMEOUT_MS = 60 * 60_000;
+const MOTION_RENDER_TIMEOUT_MS = 8 * 60_000;
 
-type JobKind = 'sync' | 'video' | 'wiro_image' | 'wiro_video' | 'dubbing';
+type JobKind = 'sync' | 'video' | 'wiro_image' | 'wiro_video' | 'dubbing' | 'motion_render';
 
 const JOB_TIMEOUTS_MS: Record<JobKind, number> = {
   sync: RUN_STALE_MS,
   video: VIDEO_TIMEOUT_MS,
   wiro_image: WIRO_IMAGE_TIMEOUT_MS,
   wiro_video: WIRO_VIDEO_TIMEOUT_MS,
-  dubbing: DUBBING_TIMEOUT_MS
+  dubbing: DUBBING_TIMEOUT_MS,
+  motion_render: MOTION_RENDER_TIMEOUT_MS
 };
 
 /**
@@ -1025,6 +1028,9 @@ function jobKindOf(run: { externalJobId: string | null }, nodeType: string | nul
   }
   if (run.externalJobId.startsWith(WIRO_JOB_PREFIX)) {
     return nodeType === 'video' ? 'wiro_video' : 'wiro_image';
+  }
+  if (run.externalJobId.startsWith(RENDER_JOB_PREFIX)) {
+    return 'motion_render';
   }
   return 'video';
 }

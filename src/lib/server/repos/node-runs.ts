@@ -207,10 +207,11 @@ export async function retryClaim(
 export const AUDIO_JOB_PREFIX = 'elevenlabs:';
 export const WIRO_JOB_PREFIX = 'wiro:';
 export const AUDIO_HISTORY_PREFIX = 'elevenlabs-history:';
+export const RENDER_JOB_PREFIX = 'motion-render:';
 
 const SETTLED_STATUSES: NodeRunStatus[] = ['done', 'failed', 'expired'];
 
-const OWN_RECONCILER_PREFIXES = [AUDIO_JOB_PREFIX, WIRO_JOB_PREFIX];
+const OWN_RECONCILER_PREFIXES = [AUDIO_JOB_PREFIX, WIRO_JOB_PREFIX, RENDER_JOB_PREFIX];
 
 async function queuedRunsWithPrefix(db: Db, input: { limit: number; prefix: string }): Promise<NodeRun[]> {
   const { data, error } = await db
@@ -320,6 +321,21 @@ export async function expireRun(
       error: input.error,
       finished_at: new Date().toISOString()
     })
+    .eq('id', input.runId)
+    .eq('org_id', input.orgId);
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function setRunParams(
+  db: Db,
+  input: { orgId: string; runId: string; params: Record<string, unknown> }
+): Promise<void> {
+  const { error } = await db
+    .from('node_runs')
+    .update({ params: input.params as never })
     .eq('id', input.runId)
     .eq('org_id', input.orgId);
 
