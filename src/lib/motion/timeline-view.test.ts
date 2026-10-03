@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, findClip, newMotionDoc } from './doc';
 import { Ease } from './design';
+import { Source } from './keyframes';
 import { addClip, setKeyframes, type OpResult } from './timeline';
 import { Grip, HANDLE_PX, Snap, easePath, edgeHandles, frameAt, handleAt, keyLanes, stackRows, pxPerFrame, rulerTicks, snapped, timecode } from './timeline-view';
 
@@ -95,8 +96,8 @@ describe('keyframe lanes', () => {
 
   it('one lane per animated prop, in the order the component lists them, with its label', () => {
     expect(keyLanes(findClip(keyed, 't')!.clip)).toEqual([
-      { prop: 'rotateX', label: 'Rotate X', frames: [0, 10] },
-      { prop: 'color', label: 'Colour', frames: [4] }
+      { prop: 'rotateX', label: 'Rotate X', source: Source.Transform, frames: [0, 10] },
+      { prop: 'color', label: 'Colour', source: Source.Prop, frames: [4] }
     ]);
   });
 

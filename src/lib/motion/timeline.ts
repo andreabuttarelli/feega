@@ -2,6 +2,8 @@ import { COMPONENTS, TrackKind, defaultProps, parseProps, type ComponentId } fro
 import { FPS, TransitionKind, type Edge } from './design';
 import { FORMATS, MAX_FRAMES, byFrame, findClip, type MotionClip, type MotionDoc, type MotionFormat, type MotionTrack } from './doc';
 import { Ease } from './design';
+import { Matte, isMaskKey, maskSchema, type MaskInput } from './mask';
+import { matteMask, matteSource } from './matte';
 import { keyframesProblem, transformSchema, type EaseSpec, type KeyValue, type Keyframe, type Keyframes, type Transform } from './keyframes';
 
 export type OpResult = { ok: true; doc: MotionDoc } | { ok: false; error: string };
@@ -97,7 +99,9 @@ export function addClip(doc: MotionDoc, input: NewClip, id: string): OpResult {
     transitionIn: input.transitionIn ?? NO_EDGE,
     transitionOut: input.transitionOut ?? NO_EDGE,
     transform: {},
-    keyframes: {}
+    keyframes: {},
+    mask: null,
+    matte: Matte.None
   };
 
   return fitted({ ...doc, tracks: doc.tracks.map((t) => (t.id === track.id ? { ...t, clips: [...t.clips, clip] } : t)) });
@@ -278,7 +282,7 @@ function withKeyframes(clip: MotionClip, keyframes: Keyframes): MotionClip | str
       .filter(([, track]) => track.length > 0)
       .map(([prop, track]) => [prop, byFrame(track)])
   );
-  return keyframesProblem(clip.component, kept) ?? { ...clip, keyframes: kept };
+  return keyframesProblem({ ...clip, keyframes: kept }) ?? { ...clip, keyframes: kept };
 }
 
 export function setTransform(doc: MotionDoc, clipId: string, patch: Transform): OpResult {
@@ -377,4 +381,29 @@ export function adjacentKeyframe(frames: readonly number[], frame: number, direc
     return frames.find((f) => f > frame) ?? null;
   }
   return frames.findLast((f) => f < frame) ?? null;
+}
+
+const issues = (error: { issues: { path: PropertyKey[]; message: string }[] }) => error.issues.map((i) => `${i.path.join('.') || 'mask'}: ${i.message}`).join('; ');
+
+export function setMask(doc: MotionDoc, clipId: string, input: MaskInput | null): OpResult {
+  return editClip(doc, clipId, (clip) => {
+    if (input === null) {
+      return { ...clip, mask: null, keyframes: Object.fromEntries(Object.entries(clip.keyframes).filter(([key]) => !isMaskKey(key))) };
+    }
+    const parsed = maskSchema.safeParse(input);
+    return parsed.success ? { ...clip, mask: parsed.data } : issues(parsed.error);
+  });
+}
+
+export function setTrackMatte(doc: MotionDoc, clipId: string, matte: Matte): OpResult {
+  if (matte !== Matte.None) {
+    const source = matteSource(doc, clipId);
+    if (!source) {
+      return fail('no clip above this one, on the track above and overlapping it in time, to use as matte');
+    }
+    if (!matteMask(source, matte)) {
+      return fail(`${source.component} ${source.id} cannot be a matte: use a Title, Text, Kicker, Caption, Shape, Image or Logo with a picture`);
+    }
+  }
+  return editClip(doc, clipId, (clip) => ({ ...clip, matte }));
 }

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { COMPONENT_IDS, TrackKind, parseProps, type ComponentId } from './components';
 import { FPS, TRANSITION_KINDS, TransitionKind } from './design';
 import { keyframeSchema, keyframesProblem, transformSchema } from './keyframes';
+import { MATTES, Matte, maskSchema } from './mask';
 
 export enum MotionFormat {
   Landscape = '16:9',
@@ -24,7 +25,7 @@ export const MAX_FRAMES = MAX_SECONDS * FPS;
 export const MAX_SIDE = 1920;
 export const MAX_SHORT_SIDE = 1080;
 export const DEFAULT_SECONDS = 15;
-export const DOC_VERSION = 2;
+export const DOC_VERSION = 3;
 
 const edgeSchema = z.object({
   kind: z.enum(TRANSITION_KINDS),
@@ -41,7 +42,9 @@ const clipSchema = z.object({
   transitionIn: edgeSchema.default({ kind: TransitionKind.None, durationInFrames: 0 }),
   transitionOut: edgeSchema.default({ kind: TransitionKind.None, durationInFrames: 0 }),
   transform: transformSchema.default({}),
-  keyframes: z.record(z.string(), z.array(keyframeSchema).min(1)).default({})
+  keyframes: z.record(z.string(), z.array(keyframeSchema).min(1)).default({}),
+  mask: maskSchema.nullable().default(null),
+  matte: z.enum(MATTES).default(Matte.None)
 });
 
 const trackSchema = z.object({
@@ -78,12 +81,15 @@ export type DocVerdict = { ok: true; doc: MotionDoc } | { ok: false; error: stri
 
 type Raw = Record<string, unknown> & { tracks?: { clips?: Record<string, unknown>[] }[] };
 
+const withClips = (doc: Raw, version: number, defaults: Record<string, unknown>): Raw => ({
+  ...doc,
+  version,
+  tracks: (doc.tracks ?? []).map((t) => ({ ...t, clips: (t.clips ?? []).map((c) => ({ ...defaults, ...c })) }))
+});
+
 const MIGRATIONS: Record<number, (doc: Raw) => Raw> = {
-  1: (doc) => ({
-    ...doc,
-    version: 2,
-    tracks: (doc.tracks ?? []).map((t) => ({ ...t, clips: (t.clips ?? []).map((c) => ({ transform: {}, keyframes: {}, ...c })) }))
-  })
+  1: (doc) => withClips(doc, 2, { transform: {}, keyframes: {} }),
+  2: (doc) => withClips(doc, 3, { mask: null, matte: Matte.None })
 };
 
 export function upgradeDoc(input: unknown): unknown {
@@ -111,7 +117,7 @@ function clipProblem(clip: MotionClip): string | null {
   }
   clip.props = verdict.props;
   clip.keyframes = Object.fromEntries(Object.entries(clip.keyframes).map(([key, track]) => [key, byFrame(track)]));
-  return keyframesProblem(clip.component, clip.keyframes);
+  return keyframesProblem(clip);
 }
 
 function propsProblem(doc: MotionDoc): string | null {

@@ -92,9 +92,9 @@ describe('what can be animated', () => {
   });
 
   it('refuses a keyframe on a prop the component cannot animate, or out of range', () => {
-    expect(keyframesProblem('Title', { orbit: [{ frame: 0, value: 1, ease: Ease.Linear }] })).toMatch(/orbit/);
-    expect(keyframesProblem('Title', { rotateX: [{ frame: 0, value: 9999, ease: Ease.Linear }] })).toMatch(/rotateX/);
-    expect(keyframesProblem('Title', { color: [{ frame: 0, value: 3, ease: Ease.Linear }] })).toMatch(/colour/);
-    expect(keyframesProblem('Title', { color: [{ frame: 0, value: 'brand.accent', ease: Ease.Linear }], rotateZ: [{ frame: 3, value: 45, ease: Ease.Linear }] })).toBeNull();
+    expect(keyframesProblem({ component: 'Title', mask: null, keyframes: { orbit: [{ frame: 0, value: 1, ease: Ease.Linear }] } })).toMatch(/orbit/);
+    expect(keyframesProblem({ component: 'Title', mask: null, keyframes: { rotateX: [{ frame: 0, value: 9999, ease: Ease.Linear }] } })).toMatch(/rotateX/);
+    expect(keyframesProblem({ component: 'Title', mask: null, keyframes: { color: [{ frame: 0, value: 3, ease: Ease.Linear }] } })).toMatch(/colour/);
+    expect(keyframesProblem({ component: 'Title', mask: null, keyframes: { color: [{ frame: 0, value: 'brand.accent', ease: Ease.Linear }], rotateZ: [{ frame: 3, value: 45, ease: Ease.Linear }] } })).toBeNull();
   });
 });
