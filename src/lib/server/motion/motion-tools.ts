@@ -2,9 +2,10 @@ import { tool, type Tool } from 'ai';
 import { z } from 'zod';
 import { AssetKind, COMPONENTS, COMPONENT_IDS, TrackKind } from '$lib/motion/components';
 import { fieldsOf } from '$lib/motion/inspector';
-import { FPS, TRANSITION_KINDS } from '$lib/motion/design';
+import { Ease, FPS, TRANSITION_KINDS } from '$lib/motion/design';
 import { MOTION_FORMATS, findClip, type MotionDoc } from '$lib/motion/doc';
-import { ClipEdge, Side, addClip, addTrack, moveClip, removeClips, setCanvas, setProps, setTiming, setTransition, trimClip, type OpResult } from '$lib/motion/timeline';
+import { ClipEdge, Side, addClip, addTrack, moveClip, removeClips, removeKeyframes, setCanvas, setKeyframes, setProps, setTiming, setTransform, setTransition, trimClip, type OpResult } from '$lib/motion/timeline';
+import { ANIMATABLE, TRANSFORM_KEYS, easeSchema, transformSchema } from '$lib/motion/keyframes';
 import type { MotionAsset } from './editor';
 import { MAX_FRAMES_PER_VIEW, MAX_VIEWS_PER_TURN, VIEW_FRAMES, type Frame } from './frames';
 
@@ -39,7 +40,9 @@ function summary(doc: MotionDoc, selection: string[]) {
         duration: secs(c.durationInFrames),
         props: c.props,
         in: c.transitionIn.kind,
-        out: c.transitionOut.kind
+        out: c.transitionOut.kind,
+        transform: c.transform,
+        keyframes: Object.fromEntries(Object.entries(c.keyframes).map(([prop, track]) => [prop, track.map((k) => ({ time: secs(k.frame), value: k.value, ease: k.ease }))]))
       }))
     }))
   };
@@ -50,6 +53,7 @@ function componentCatalogue() {
     id,
     track: COMPONENTS[id].track,
     about: COMPONENTS[id].description,
+    animates: ANIMATABLE[id].map((p) => p.key),
     props: Object.fromEntries(fieldsOf(id).map((f) => [f.key, f.options ? f.options.join('|') : f.min !== undefined ? `${f.min}..${f.max}` : f.control]))
   }));
 }
@@ -183,6 +187,30 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: 'Remove one or more clips.',
       inputSchema: z.object({ clip_ids: z.array(z.string()).min(1) }),
       execute: async (input) => apply(removeClips(session.doc, input.clip_ids), `removed ${input.clip_ids.length} clip(s)`)
+    }),
+
+    set_transform: tool({
+      description: `Set base transform values of a clip; the rest are kept. Keys: ${TRANSFORM_KEYS.join(', ')}. x/y are offsets in fractions of the frame, rotations and skews in degrees, z and perspective in pixels, anchorX/anchorY the pivot inside the clip box (0..1), blur in pixels.`,
+      inputSchema: z.object({ clip_id: z.string(), transform: transformSchema }),
+      execute: async (input) => apply(setTransform(session.doc, input.clip_id, input.transform), `transformed ${input.clip_id}`)
+    }),
+
+    set_keyframes: tool({
+      description:
+        'Animate one prop of a clip: replaces its keyframes. time is seconds from the clip start; ease is the curve leaving that keyframe (standard, enter, exit, linear, overshoot, or a cubic-bezier [x1,y1,x2,y2]). Colour props take #rrggbb or brand colours. list_components says what each component animates.',
+      inputSchema: z.object({
+        clip_id: z.string(),
+        prop: z.string(),
+        keyframes: z.array(z.object({ time: z.number().min(0), value: z.union([z.number(), z.string()]), ease: easeSchema.default(Ease.Standard) })).min(1)
+      }),
+      execute: async (input) =>
+        apply(setKeyframes(session.doc, input.clip_id, input.prop, input.keyframes.map((k) => ({ frame: frames(k.time), value: k.value, ease: k.ease }))), `animated ${input.prop} of ${input.clip_id}`)
+    }),
+
+    remove_keyframes: tool({
+      description: 'Remove the keyframes of one prop of a clip, all of them or only those at the given times (seconds from the clip start).',
+      inputSchema: z.object({ clip_id: z.string(), prop: z.string(), times: z.array(z.number().min(0)).optional() }),
+      execute: async (input) => apply(removeKeyframes(session.doc, input.clip_id, input.prop, input.times?.map(frames)), `removed keyframes of ${input.prop}`)
     }),
 
     add_track: tool({
