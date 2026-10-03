@@ -20,6 +20,7 @@
   import MotionTimeline from '$lib/components/motion/MotionTimeline.svelte';
   import MotionInspector from '$lib/components/motion/MotionInspector.svelte';
   import MaskOverlay from '$lib/components/motion/MaskOverlay.svelte';
+  import ExportDialog from '$lib/components/motion/ExportDialog.svelte';
   import ChatPanel from '$lib/components/brand-agent/ChatPanel.svelte';
   import { AssetKind, COMPONENTS, COMPONENT_IDS, TrackKind, type ComponentId } from '$lib/motion/components';
   import { FPS } from '$lib/motion/design';
@@ -46,7 +47,6 @@
   import { parseDecimal, secondsLabel } from '$lib/motion/inspector';
   import { Command, commandFor } from '$lib/motion/shortcuts';
   import { composeHtml } from '$lib/motion/hyperframes/compose';
-  import { renderQuote } from '$lib/motion/render-quote';
   import { feegaTrailer } from '$lib/motion/trailer';
   import type { PageData } from './$types';
 
@@ -76,7 +76,7 @@
   let saveState = $state<SaveState>(SaveState.Saved);
   let notice = $state('');
   let adding = $state(false);
-  let rendering = $state(false);
+  let exporting = $state(false);
   let sheet = $state<Sheet>(Sheet.None);
   let preview = $state<MotionPreview | null>(null);
 
@@ -88,7 +88,6 @@
   const assetUrls = $derived(Object.fromEntries(data.assets.filter((a) => a.url).map((a) => [a.id, a.url as string])));
   const html = $derived(composeHtml({ doc, tokens: data.tokens, assets: assetUrls }));
   const selected = $derived(selection.length === 1 ? (findClip(doc, selection[0])?.clip ?? null) : null);
-  const quote = $derived(renderQuote(doc));
   const editorUrl = $derived(`/p/${data.projectId}/c/${data.canvas.id}/motion/${data.node.id}`);
   const agentUrl = $derived(`/api/v1/projects/${data.projectId}/motion/${data.node.id}/agent`);
 
@@ -277,14 +276,11 @@
     apply(setCanvas(doc, { durationInFrames: Math.round(seconds * FPS) }), 'Changed duration');
   }
 
-  async function render() {
-    rendering = true;
-    const form = new FormData();
-    form.set('doc', JSON.stringify(doc));
-    const res = await fetch(`${editorUrl}?/render`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
-    const result = deserialize(await res.text());
-    notice = result.type === 'success' ? 'Rendering started.' : 'Rendering not configured';
-    rendering = false;
+  function exportFrames(...args: Parameters<MotionPreview['render']>) {
+    if (!preview) {
+      return Promise.reject(new Error('the preview is still loading'));
+    }
+    return preview.render(...args);
   }
 
   const COMMANDS: Record<Command, () => void> = {
@@ -343,12 +339,20 @@
       <input type="text" inputmode="decimal" title={`1–${MAX_SECONDS} s`} value={secondsLabel(doc.durationInFrames)} onchange={(e) => setDuration(e.currentTarget.value)} />
     </label>
     <span class="save" data-testid="save-state">{saveState} · v{version}</span>
-    {#if data.renderConfigured}
-      <button type="button" class="render" disabled={rendering} onclick={render}><Film size={14} /> Render · {quote.credits} credits</button>
-    {:else}
-      <button type="button" class="render" disabled title="Rendering to MP4 needs the render service set up"><Film size={14} /> Rendering not configured</button>
-    {/if}
+    <button type="button" class="render" onclick={() => (exporting = true)} data-testid="export-open"><Film size={14} /> Export</button>
   </header>
+
+  {#if exporting}
+    <ExportDialog
+      {doc}
+      assetUrls={assetUrls}
+      scope={{ orgId: data.orgId, projectId: data.projectId, nodeId: data.node.id }}
+      {editorUrl}
+      fileName={data.node.name ?? 'motion'}
+      render={exportFrames}
+      onclose={() => (exporting = false)}
+    />
+  {/if}
 
   <div class="body">
     <section class="left">
