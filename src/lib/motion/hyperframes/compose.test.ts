@@ -81,7 +81,7 @@ describe('MotionDoc to HyperFrames composition', () => {
     const html = compose(withVideo, { v: '/assets/v' });
 
     expect(html).toContain('<div class="layer" data-clip="vid"');
-    expect(html).toMatch(/<video id="c-vid" src="\/assets\/v" crossorigin="anonymous" muted playsinline data-start="1"/);
+    expect(html).toMatch(/<video id="c-vid" src="\/assets\/v" crossorigin="anonymous" preload="auto" muted playsinline data-start="1"/);
   });
 
   it('media is fetched with CORS so a captured frame or an export never taints the canvas', () => {

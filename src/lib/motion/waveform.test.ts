@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clipPeaks, peaksOf, PEAKS_PER_SECOND } from './waveform';
+import { clipPeaks, peaksOf, wavePath, PEAKS_PER_SECOND } from './waveform';
 
 describe('waveform', () => {
   it('a peak is the loudest absolute sample of its bucket', () => {
@@ -18,5 +18,10 @@ describe('waveform', () => {
 
     expect(slice[0]).toBe(PEAKS_PER_SECOND);
     expect(slice).toHaveLength(PEAKS_PER_SECOND);
+  });
+
+  it('draws one centred bar per peak, as tall as the peak', () => {
+    expect(wavePath([1, 0.5])).toBe('M0 0V1M1 0.25V0.75');
+    expect(wavePath([])).toBe('');
   });
 });

@@ -9,6 +9,7 @@
   import type { MotionTrack } from '$lib/motion/doc';
   import { Source, type EaseSpec } from '$lib/motion/keyframes';
   import EasePicker from './EasePicker.svelte';
+  import { PEAKS_PER_SECOND, clipPeaks, wavePath } from '$lib/motion/waveform';
 
   const HEADER_PX = 132;
   const ROW_PX = 30;
@@ -29,8 +30,9 @@
     keySelection = $bindable<KeyRef[]>([]),
     zoom,
     snap,
+    waveforms = {},
     onchange
-  }: { doc: MotionDoc; frame?: number; selection?: string[]; keySelection?: KeyRef[]; zoom: number; snap: Snap; onchange: (doc: MotionDoc, summary: string) => void } = $props();
+  }: { doc: MotionDoc; frame?: number; selection?: string[]; keySelection?: KeyRef[]; zoom: number; snap: Snap; waveforms?: Record<string, number[]>; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 
   let collapsed = $state<string[]>([]);
   let easing = $state<{ ref: KeyRef; ease: EaseSpec; left: number; top: number } | null>(null);
@@ -182,6 +184,15 @@
     }
   }
 
+  function waveOf(clip: MotionClip): { path: string; width: number } | null {
+    const peaks = waveforms[(clip.props as { assetId?: string | null }).assetId ?? ''];
+    if (!peaks) {
+      return null;
+    }
+    const width = Math.max(1, Math.round((clip.durationInFrames / shown.fps) * PEAKS_PER_SECOND));
+    return { path: wavePath(clipPeaks(peaks, { trimStart: clip.trimStart, durationInFrames: clip.durationInFrames, fps: shown.fps })), width };
+  }
+
   function clipLabel(clip: MotionClip): string {
     const p = clip.props as { text?: string; title?: string };
     return p.text?.split('\n')[0] ?? p.title ?? COMPONENTS[clip.component].label;
@@ -244,6 +255,7 @@
         </div>
         <div class="clips" data-track-id={track.id}>
           {#each track.clips as clip (clip.id)}
+            {@const wave = waveOf(clip as MotionClip)}
             <div
               class="bar"
               class:selected={selection.includes(clip.id)}
@@ -263,6 +275,7 @@
                 {#if clip.matte !== Matte.None}<span class="tag" title="Track matte">· {clip.matte} matte</span>{/if}
               </span>
               <span class="label">{clipLabel(clip as MotionClip)}</span>
+              {#if wave}<svg class="wave" viewBox={`0 0 ${wave.width} 1`} preserveAspectRatio="none" aria-hidden="true"><path d={wave.path} /></svg>{/if}
             </div>
           {/each}
           {#each edgeHandles(track.clips, ppf, selection) as handle (`${handle.clipId}-${handle.grip}`)}
@@ -364,6 +377,21 @@
     position: relative;
     display: flex;
     border-bottom: 1px solid var(--line);
+  }
+
+  .wave {
+    position: absolute;
+    inset: 2px 0;
+    width: 100%;
+    height: calc(100% - 4px);
+    pointer-events: none;
+    opacity: 0.45;
+  }
+
+  .wave path {
+    stroke: #d97706;
+    stroke-width: 1.5;
+    vector-effect: non-scaling-stroke;
   }
 
   .lane.audio .bar {

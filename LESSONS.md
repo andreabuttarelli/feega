@@ -2254,3 +2254,14 @@ Cause: html-to-image inlines computed styles, and a computed `url(#id)` resolves
 srcdoc URL, which the cloned SVG image cannot reach. Move: before capture, freeze each mask into
 a data-URL image (`freezeMasks` in `hyperframes/masks.ts`), restore after. Same signal on a doc
 with a Video clip is a different cause: `<video>` without `crossorigin` taints the canvas.
+
+## An exported motion video goes silent halfway
+Signal: the MP4 has an AAC track for the full length but `ebur128` shows digital silence after a
+few seconds. Cause: not the encoder — the template picked a 4 s voice-over as the music bed
+(assets come newest first). Move: check the mix before the muxer (`mixAudio` RMS per second in
+the page); the music is the longest audio (`templateAssets`), so seed fixtures with `duration_s`.
+
+## `page.evaluate` breaks under vite-node
+Signal: `__vite_ssr_dynamic_import__ is not defined` from a Playwright script run with
+`vite-node`. Cause: vite-node rewrites `import()` inside the function shipped to the browser.
+Move: run browser-side probes with plain `node` (`.mjs`), or pass the function as a string.

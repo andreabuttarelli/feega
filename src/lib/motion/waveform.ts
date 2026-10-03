@@ -20,6 +20,12 @@ export function clipPeaks(peaks: readonly number[], clip: { trimStart: number; d
   return peaks.slice(start, start + count);
 }
 
+const round = (n: number) => Math.round(n * 1000) / 1000;
+
+export function wavePath(peaks: readonly number[]): string {
+  return peaks.map((p, i) => `M${i} ${round((1 - p) / 2)}V${round((1 + p) / 2)}`).join('');
+}
+
 export async function loadPeaks(url: string): Promise<number[]> {
   const response = await fetch(url);
   const context = new OfflineAudioContext(1, 1, 44_100);

@@ -44,7 +44,8 @@
   const failedDetail = $derived(session?.failedDetail ?? '');
   const starts = $derived(speakerStarts(messages));
   const failure = $derived(failed ? FAILURES[failed] : null);
-  const suggestions = $derived(($json('chat.panel.suggestions') as string[] | undefined) ?? []);
+  const copyKey = $derived(motionNodeId ? 'chat.panel.motion' : 'chat.panel');
+  const suggestions = $derived(($json(`${copyKey}.suggestions`) as string[] | undefined) ?? []);
   const showEmpty = $derived(!loading && failed !== 'load' && !messages.length);
 
   function on(event: FollowEvent) {
@@ -147,8 +148,8 @@
         {:else if showEmpty}
           <section class="empty">
             <span class="empty-mark" aria-hidden="true"></span>
-            <h2>{$_('chat.panel.emptyTitle')}</h2>
-            <p>{$_('chat.panel.emptyBody')}</p>
+            <h2>{$_(`${copyKey}.emptyTitle`)}</h2>
+            <p>{$_(`${copyKey}.emptyBody`)}</p>
             <ul class="suggestions">
               {#each suggestions as text (text)}
                 <li>

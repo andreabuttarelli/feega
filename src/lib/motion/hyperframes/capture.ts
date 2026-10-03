@@ -4,7 +4,7 @@ import { js } from './html';
 export const CAPTURE_REQUEST = 'feega:capture';
 export const CAPTURE_REPLY = 'feega:frame';
 const SCREENSHOT_URL = 'https://cdn.jsdelivr.net/npm/html-to-image@1.11.13/dist/html-to-image.js';
-const MEDIA_TIMEOUT_MS = 4000;
+const MEDIA_TIMEOUT_MS = 8000;
 
 export enum FrameFormat {
   Jpeg = 'jpeg',
@@ -37,17 +37,27 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>) {
     }));
   const frame = () => new Promise<void>((r) => requestAnimationFrame(() => r()));
   const painted = () => frame().then(frame);
-  const settled = (v: HTMLVideoElement) =>
-    v.seeking || v.readyState < 2
-      ? new Promise<void>((r) => {
-          v.addEventListener('seeked', () => r(), { once: true });
-          v.addEventListener('loadeddata', () => r(), { once: true });
-          setTimeout(r, cfg.mediaTimeoutMs);
-        })
-      : Promise.resolve();
+  const settled = (v: HTMLVideoElement) => {
+    if (!v.seeking && (v.readyState >= 2 || v.offsetParent === null)) {
+      return Promise.resolve();
+    }
+    return new Promise<void>((r) => {
+      v.addEventListener('seeked', () => r(), { once: true });
+      v.addEventListener('loadeddata', () => r(), { once: true });
+      setTimeout(r, cfg.mediaTimeoutMs);
+      if (!v.seeking) {
+        v.currentTime = v.currentTime;
+      }
+    });
+  };
+  const drawable = (node: Node) => !(node instanceof HTMLVideoElement) || (node.offsetParent !== null && node.readyState >= 2 && node.videoWidth > 0);
+  const reason = (err: unknown) => {
+    const src = (err as Event)?.target instanceof HTMLElement ? ((err as Event).target as HTMLImageElement).src?.slice(0, 80) : '';
+    return err instanceof Event ? `a picture or video in this frame could not be drawn${src ? ` (${src})` : ''}` : String(err);
+  };
   const mediaReady = () => Promise.all([...document.querySelectorAll('video')].map(settled));
 
-  const size = (m: CaptureRequest, embed: string) => ({ width: cfg.width, height: cfg.height, canvasWidth: m.width, canvasHeight: m.height, pixelRatio: 1, fontEmbedCSS: embed });
+  const size = (m: CaptureRequest, embed: string) => ({ width: cfg.width, height: cfg.height, canvasWidth: m.width, canvasHeight: m.height, pixelRatio: 1, fontEmbedCSS: embed, filter: drawable });
   const output: Record<string, (root: HTMLElement, m: CaptureRequest, embed: string) => Promise<Shot>> = {
     jpeg: (root, m, embed) => tool().toJpeg(root, { ...size(m, embed), quality: m.quality }).then((url) => ({ body: { url }, transfer: [] })),
     bitmap: (root, m, embed) =>
@@ -75,7 +85,7 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>) {
       .then((embed) => freeze().then((thaw) => output[m.format](root, m, embed).finally(thaw)))
       .then(
         (shot) => reply(shot.body, shot.transfer),
-        (err) => reply({ error: String(err) }, [])
+        (err) => reply({ error: reason(err) }, [])
       );
   });
 }

@@ -590,6 +590,16 @@
         "Create an image node for a minimal hero shot and connect it to my text",
         "Summarise the assets this project has produced"
       ],
+      "motion": {
+        "emptyTitle": "What should this video do?",
+        "emptyBody": "The agent edits this video: clips, text, keyframes, masks, audio. It checks its work on real frames.",
+        "suggestions": [
+          "Make the opening title bigger and blue",
+          "Add a 3-second end card with our URL",
+          "Tighten the cuts to the beat of the music",
+          "Check the frames for overflowing text"
+        ]
+      },
       "placeholder": "Ask the agent…",
       "hint": "Enter to send · Shift+Enter for a new line",
       "send": "Send",
