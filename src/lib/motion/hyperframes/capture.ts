@@ -1,4 +1,5 @@
 import { freezeMasks } from './masks';
+import { inlineMedia, shrinkImage } from './inline-media';
 import { js } from './html';
 import { ERRORS } from '../custom/runtime';
 export { contentStamp } from '../stamp';
@@ -25,7 +26,8 @@ type HtmlToImage = {
   getFontEmbedCSS: (node: HTMLElement) => Promise<string>;
 };
 
-function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>) {
+function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, inline: typeof inlineMedia, shrink: typeof shrinkImage) {
+  const shrunk = new Map<string, Promise<string>>();
   let lib: Promise<unknown> | null = null;
   let fonts: Promise<string> | null = null;
   const tool = () => (window as unknown as { htmlToImage: HtmlToImage }).htmlToImage;
@@ -98,6 +100,7 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>) {
       .then(painted)
       .then(mediaReady)
       .then(painted)
+      .then(() => inline(root, shrink, shrunk))
       .then(() => (fonts ??= tool().getFontEmbedCSS(root)))
       .then((embed) => freeze().then((thaw) => output[m.format](root, m, embed).finally(thaw)))
       .then(
@@ -115,5 +118,5 @@ export function stampOf(html: string): string | null {
 
 export function captureScript(doc: { width: number; height: number }, stamp: string): string {
   const cfg: RuntimeConfig = { request: CAPTURE_REQUEST, reply: CAPTURE_REPLY, lib: SCREENSHOT_URL, width: doc.width, height: doc.height, mediaTimeoutMs: MEDIA_TIMEOUT_MS, stamp, errorsKey: ERRORS };
-  return `<script>(${captureRuntime.toString()})(${js(cfg)},(${freezeMasks.toString()}));</script>`;
+  return `<script>(${captureRuntime.toString()})(${js(cfg)},(${freezeMasks.toString()}),(${inlineMedia.toString()}),(${shrinkImage.toString()}));</script>`;
 }
