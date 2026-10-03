@@ -5,6 +5,7 @@ import { createCanvas, createConnection, createNode } from '$lib/server/repos/ca
 import { listNodeProducts, upsertNodeProducts } from '$lib/server/repos/products';
 import { orgCreditBalance } from '$lib/server/credits';
 import { nodeReferenceSchema } from '$lib/canvas/node-references';
+import { newStudioBatchData } from '$lib/canvas/studio-batch-node';
 import { Environment, ENVIRONMENTS } from '$lib/studio/environments';
 import { Shot, SHOTS } from '$lib/studio/shots';
 import { BATCH_MAX, cellKey, lockedPrompt, MAX_VARIATIONS, planBatch, previewItems, styleRefBudget, type BatchPlan, type PlannedItem } from '$lib/studio/plan';
@@ -151,6 +152,20 @@ async function placeModels(db: Db, ctx: StudioCtx, canvasId: string, models: Stu
   return placed;
 }
 
+async function placeSummary(db: Db, ctx: StudioCtx, canvasId: string, batch: { id: string; name: string }): Promise<void> {
+  await createNode(db, {
+    orgId: ctx.orgId,
+    projectId: ctx.projectId,
+    canvasId,
+    type: 'studio_batch',
+    x: 0,
+    y: -CELL_SPACING_Y,
+    displayName: batch.name,
+    data: newStudioBatchData(batch.id),
+    actor: actorOf(ctx)
+  });
+}
+
 async function productIndexes(db: Db, orgId: string, productsNodeId: string, products: StudioProduct[]): Promise<Map<string, number>> {
   const copied = await listNodeProducts(db, { orgId, nodeId: productsNodeId });
   const byExternal = new Map(copied.map((p, i) => [`${p.platform}:${p.externalId}`, i + 1]));
@@ -259,6 +274,7 @@ export async function startPreview(db: Db, ctx: StudioCtx, selection: Selection,
   const canvas = await createCanvas(db, { orgId: ctx.orgId, projectId: ctx.projectId, name: `Studio · ${selection.name}` });
   const productsNodeId = await copyProducts(db, ctx, canvas.id, quote.products, batch.id);
   const modelNodes = await placeModels(db, ctx, canvas.id, quote.models);
+  await placeSummary(db, ctx, canvas.id, { id: batch.id, name: selection.name });
   const materialised: Batch = { ...batch, canvasId: canvas.id, productsNodeId, spec: { ...spec, modelNodes } };
   await updateBatch(db, { orgId: ctx.orgId, batchId: batch.id, patch: { canvas_id: canvas.id, products_node_id: productsNodeId, spec: materialised.spec } });
 

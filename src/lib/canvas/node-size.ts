@@ -11,6 +11,7 @@ import { effectsNodeSize } from './effects-node';
 import { compositionNodeSize } from './composition-node';
 import { calendarNodeSize } from './calendar-node';
 import { motionNodeSize } from './motion-node';
+import { studioBatchNodeSize } from './studio-batch-node';
 
 type Size = { w: number; h: number };
 
@@ -34,7 +35,8 @@ const NODE_SIZE: Record<NodeType, () => Size> = {
   calendar: calendarNodeSize,
   audio: () => genNodeSize('audio'),
   model3d: () => genNodeSize('model3d'),
-  motion: motionNodeSize
+  motion: motionNodeSize,
+  studio_batch: studioBatchNodeSize
 };
 
 export function nodeSize(type: string): Size {

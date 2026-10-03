@@ -257,7 +257,8 @@ export const SHARED_VIEW_OF: Record<NodeType, (input: ViewInput) => SharedView |
   calendar: calendarView,
   audio: audioView,
   model3d: model3dView,
-  motion: () => EMPTY
+  motion: () => EMPTY,
+  studio_batch: () => EMPTY
 };
 
 async function viewOf(input: ViewInput): Promise<SharedView> {

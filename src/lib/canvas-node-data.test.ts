@@ -42,7 +42,8 @@ describe('cosa una riga di `nodes` può essere', () => {
       'calendar',
       'audio',
       'model3d',
-      'motion'
+      'motion',
+      'studio_batch'
     ]);
   });
 

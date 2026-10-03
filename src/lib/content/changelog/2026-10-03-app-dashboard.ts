@@ -7,6 +7,7 @@ export default {
     'A new dashboard shows your projects, recent canvases and tools in one place.',
     'Photo studio is now its own page: pick the project to shoot from, no canvas needed.',
     'Motion videos are listed together, and a new one starts from the dashboard.',
+    'A Studio batch node shows a photo batch on any canvas and passes its approved photos to the nodes you connect.',
     'The menu on every canvas has a Dashboard link back.'
   ]
 } satisfies ChangelogEntry;

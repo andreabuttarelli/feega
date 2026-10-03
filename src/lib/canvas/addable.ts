@@ -31,7 +31,8 @@ export const CANVAS_ADDABLE = [
   'effects',
   'composition',
   'calendar',
-  'motion'
+  'motion',
+  'studio_batch'
 ] as const;
 
 export type Addable = (typeof CANVAS_ADDABLE)[number];
@@ -77,5 +78,6 @@ export const ADDABLE_LABEL: Record<Addable, string> = {
   calendar: 'Calendar',
   audio: 'Audio',
   model3d: '3D model',
-  motion: 'Motion'
+  motion: 'Motion',
+  studio_batch: 'Studio batch'
 };

@@ -26,7 +26,8 @@ describe('cosa si può mettere sulla tela', () => {
       'effects',
       'composition',
       'calendar',
-      'motion'
+      'motion',
+      'studio_batch'
     ]);
   });
 

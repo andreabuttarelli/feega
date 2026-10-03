@@ -21,6 +21,16 @@ see projects side by side or to reach a tool without first opening a canvas.
   new one (`startMotion`, `src/lib/server/motion/start.ts`): on the chosen canvas, to the right
   of what is there, or on a "Motion" canvas created once per project. Storage is unchanged —
   a motion video is still a `motion` node and its editor still lives under the canvas.
+- Canvas node `studio_batch` (`src/lib/canvas/studio-batch-node.ts`, one row in every node
+  table): shows a batch's approved/finished thumbnails and status counts
+  (`/app/studio/[batchId]/card`), links to the batch grid, and outputs the approved photos as
+  `images` (`approvedPhotoUrls` in `server/canvas/upstream.ts`). Added from the add bar with a
+  batch picker (`/app/studio/cards?project=`); `startPreview` places one on every batch canvas.
+  Needs `supabase/canvas-migrations/20261004_studio_batch_node.sql` (adds the type to
+  `nodes_type_check`) applied before deploy, or creating a batch fails on the constraint.
+  Limit: Calendar and Promote read media from node assets client-side, so a wire into them
+  does not draft posts yet; generation nodes (image, video, composition, 3D) do receive the
+  photos.
 - Burger menu "Home" became "Dashboard" and points to `/app` from every canvas and page.
 
 **Entry rule.** One table in `src/lib/server/tenancy/entry.ts` (`ARRIVAL_LANDING`): returning →

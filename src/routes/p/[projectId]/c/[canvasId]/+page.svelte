@@ -69,6 +69,8 @@
   import CalendarNode from '$lib/components/canvas/CalendarNode.svelte';
   import MotionNode from '$lib/components/canvas/MotionNode.svelte';
   import { motionEditorPath, motionOf } from '$lib/canvas/motion-node';
+  import { newStudioBatchData, studioBatchOf } from '$lib/canvas/studio-batch-node';
+  import StudioBatchNode from '$lib/components/canvas/StudioBatchNode.svelte';
   import { calendarBrand, calendarData, calendarOf, CalendarScope, type CalendarNode as CalendarNodeState } from '$lib/canvas/calendar-node';
   import { calendarError, type CalendarBrand, type CalendarPost } from '$lib/canvas/calendar-posts';
   import { plannedInstant } from '$lib/calendar/period-grid';
@@ -2597,6 +2599,7 @@
         {@const composition = compositionOf(row)}
         {@const calendar = calendarOf(row)}
         {@const motion = motionOf(row)}
+        {@const studioBatch = studioBatchOf(row)}
         {@const estimateRevision = textEstimateRevision(id)}
         {@const textCost = textCostEstimates[id]?.revision === estimateRevision ? textCostEstimates[id] : undefined}
         {@const uploaded = isUploadedNodeRow(row) ? uploadedNodeOf(row) : null}
@@ -2775,6 +2778,8 @@
           />
         {:else if motion}
           <MotionNode node={motion} href={motionEditorPath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId: id })} />
+        {:else if studioBatch}
+          <StudioBatchNode node={studioBatch} projectId={data.projectId} onpick={(batchId) => write(id, newStudioBatchData(batchId), SaveTiming.Now)} />
         {:else if calendar}
           {@const calState = calendarStateOf(id)}
           <CalendarNode
