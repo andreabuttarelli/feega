@@ -27,7 +27,7 @@ export const ORG_TABLE_CHECKS: Record<string, string> = {
   canvas_events_kind_check: "kind in ('node.create', 'node.update', 'node.delete', 'edge.create', 'edge.delete')",
   chat_messages_actor_kind_check: "actor_kind in ('user', 'agent', 'system')",
   chat_messages_role_check: "role in ('user', 'assistant', 'tool', 'system')",
-  chat_threads_surface_check: "surface in ('sidebar', 'mcp', 'cli')",
+  chat_threads_surface_check: "surface in ('sidebar', 'mcp', 'cli', 'motion')",
   competitor_ads_found_via_check: "found_via in ('page', 'search')",
   competitor_ads_platform_check: "platform = 'meta'",
   influencers_source_check: "source in ('catalogue', 'generated', 'upload')",
@@ -40,7 +40,7 @@ export const ORG_TABLE_CHECKS: Record<string, string> = {
   nodes_connections_mode_check: "mode in ('fixed', 'iterate')",
   nodes_lock_actor_kind_check: "lock_actor_kind in ('user', 'agent', 'system')",
   nodes_type_check:
-    "type in ('text', 'image', 'video', 'doc', 'iframe', 'social_account_feed', 'social_post_mockup', 'products', 'ads', 'influencer', 'list', 'select', 'effects', 'composition', 'calendar', 'audio', 'model3d')",
+    "type in ('text', 'image', 'video', 'doc', 'iframe', 'social_account_feed', 'social_post_mockup', 'products', 'ads', 'influencer', 'list', 'select', 'effects', 'composition', 'calendar', 'audio', 'model3d', 'motion')",
   orgs_invites_role_check: "role in ('owner', 'admin', 'member')",
   orgs_members_role_check: "role in ('owner', 'admin', 'member')",
   post_sources_role_check: "role in ('caption', 'media', 'reference')",

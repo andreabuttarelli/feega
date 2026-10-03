@@ -32,6 +32,7 @@ import type { LayoutId } from './composition/types';
 import type { CameraPresetId } from './composition/camera';
 import { CALENDAR_VIEWS } from '$lib/calendar/period-grid';
 import { CALENDAR_SCOPES } from './calendar-node';
+import { motionNodeSchema } from './motion-node';
 import { AUDIO_OPERATION_IDS, type AudioOperationId } from './audio-operations';
 import { MAX_CUSTOM_OUTPUTS, MAX_OUTPUT_LABEL } from './select-outputs';
 import { SOURCE_ITEM_FIELDS } from './select-sources';
@@ -444,7 +445,8 @@ export const NODE_DATA_SCHEMAS = {
   composition: compositionSchema,
   calendar: calendarSchema,
   audio: audioSchema,
-  model3d: model3dSchema
+  model3d: model3dSchema,
+  motion: motionNodeSchema
 } as const;
 
 export type NodeType = keyof typeof NODE_DATA_SCHEMAS;

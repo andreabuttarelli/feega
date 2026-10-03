@@ -57,7 +57,8 @@ export const NODE_KINDS = [
   'composition',
   'audio',
   'model3d',
-  'calendar'
+  'calendar',
+  'motion'
 ] as const;
 export type NodeKind = (typeof NODE_KINDS)[number];
 
@@ -140,7 +141,8 @@ export const CANVAS_NODE_SPECS: Record<NodeKind, NodeSpec> = {
   composition: { medium: 'video', generated: true, accepts: ['image'], requires: ['image'] },
   audio: { medium: 'audio', generated: true, accepts: ['text', 'audio', 'video'], requires: [] },
   model3d: { medium: 'model3d', generated: true, accepts: ['image', 'text'], requires: [], requiresOneOf: ['image', 'text'] },
-  calendar: { medium: null, generated: true, accepts: ['text', 'image', 'video', 'audio'], requires: [] }
+  calendar: { medium: null, generated: true, accepts: ['text', 'image', 'video', 'audio'], requires: [] },
+  motion: { medium: null, generated: false, accepts: [], requires: [] }
 };
 
 /** Da `posts.content_type` al medium: è il ruolo che porta dentro il medium, e qui si separano. */

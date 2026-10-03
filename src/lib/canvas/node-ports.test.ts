@@ -28,7 +28,8 @@ const EXPECTED: Record<(typeof NODE_TYPES)[number], { inputs: boolean; output: b
   composition: { inputs: true, output: true },
   calendar: { inputs: true, output: false },
   audio: { inputs: true, output: true },
-  model3d: { inputs: true, output: false }
+  model3d: { inputs: true, output: false },
+  motion: { inputs: false, output: false }
 };
 
 describe('ogni tipo di nodo disegna le porte che la sua riga dichiara', () => {
