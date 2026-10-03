@@ -13,7 +13,10 @@
   import ZoomIn from '@lucide/svelte/icons/zoom-in';
   import ZoomOut from '@lucide/svelte/icons/zoom-out';
   import Film from '@lucide/svelte/icons/film';
+  import X from '@lucide/svelte/icons/x';
   import MotionPreview from '$lib/components/motion/MotionPreview.svelte';
+  import type { StreamData } from '$lib/components/brand-agent/chat-session.svelte';
+  import { FRAMES_REQUEST, type FramesRequest } from '$lib/motion/frames-request';
   import MotionTimeline from '$lib/components/motion/MotionTimeline.svelte';
   import MotionInspector from '$lib/components/motion/MotionInspector.svelte';
   import ChatPanel from '$lib/components/brand-agent/ChatPanel.svelte';
@@ -23,6 +26,7 @@
   import { addClip, addTrack, duplicateClip, removeClips, setCanvas, splitClip, type OpResult } from '$lib/motion/timeline';
   import { amend, canRedo, canUndo, record, redo, startHistory, undo, type History } from '$lib/motion/history';
   import { Snap, clampZoom, timecode } from '$lib/motion/timeline-view';
+  import { parseDecimal, secondsLabel } from '$lib/motion/inspector';
   import { Command, commandFor } from '$lib/motion/shortcuts';
   import { composeHtml } from '$lib/motion/hyperframes/compose';
   import { renderQuote } from '$lib/motion/render-quote';
@@ -38,6 +42,9 @@
   const SaveState = { Saved: 'Saved', Saving: 'Saving…', Pending: 'Unsaved', Conflict: 'Reloaded the latest version', Failed: 'Not saved' } as const;
   type SaveState = (typeof SaveState)[keyof typeof SaveState];
 
+  const Sheet = { None: 'none', Properties: 'properties', Agent: 'agent' } as const;
+  type Sheet = (typeof Sheet)[keyof typeof Sheet];
+
   let { data }: { data: PageData } = $props();
 
   let history = $state<History>(startHistory(data.head.doc as MotionDoc));
@@ -51,6 +58,8 @@
   let notice = $state('');
   let adding = $state(false);
   let rendering = $state(false);
+  let sheet = $state<Sheet>(Sheet.None);
+  let preview = $state<MotionPreview | null>(null);
 
   let lastEdit = { summary: '', at: 0 };
   let saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -128,6 +137,20 @@
     }
   }
 
+  async function showFrames(part: StreamData) {
+    if (part.type !== FRAMES_REQUEST || !preview) {
+      return;
+    }
+    const request = part.data as FramesRequest;
+    const agentHtml = composeHtml({ doc: request.doc, tokens: data.tokens, assets: assetUrls });
+    const times = request.times.map((t) => Math.min(t, (request.doc.durationInFrames - 1) / FPS));
+    const frames = await preview.capture(times, agentHtml).catch(() => null);
+    if (!frames) {
+      return;
+    }
+    await fetch(`${agentUrl}/frames`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ callId: request.callId, frames }) });
+  }
+
   const newId = () => crypto.randomUUID().slice(0, 8);
 
   function add(component: ComponentId) {
@@ -196,7 +219,11 @@
     apply(setCanvas(doc, { format }), 'Changed format');
   }
 
-  function setDuration(seconds: number) {
+  function setDuration(text: string) {
+    const seconds = parseDecimal(text);
+    if (seconds === null) {
+      return;
+    }
     apply(setCanvas(doc, { durationInFrames: Math.round(seconds * FPS) }), 'Changed duration');
   }
 
@@ -256,7 +283,7 @@
     </label>
     <label class="field">
       Length (s)
-      <input type="number" min="1" max={MAX_SECONDS} step="0.5" value={doc.durationInFrames / FPS} onchange={(e) => setDuration(Number(e.currentTarget.value))} />
+      <input type="text" inputmode="decimal" title={`1–${MAX_SECONDS} s`} value={secondsLabel(doc.durationInFrames)} onchange={(e) => setDuration(e.currentTarget.value)} />
     </label>
     <span class="save" data-testid="save-state">{saveState} · v{version}</span>
     {#if data.renderConfigured}
@@ -269,7 +296,7 @@
   <div class="body">
     <section class="left">
       <div class="preview">
-        <MotionPreview {html} width={doc.width} height={doc.height} bind:frame bind:playing />
+        <MotionPreview bind:this={preview} {html} width={doc.width} height={doc.height} bind:frame bind:playing />
       </div>
 
       <div class="transport">
@@ -309,7 +336,8 @@
       </div>
     </section>
 
-    <aside class="props">
+    <aside class="props" class:open={sheet === Sheet.Properties} aria-label="Properties">
+      <div class="sheet-head"><span>Properties</span><button type="button" aria-label="Close" onclick={() => (sheet = Sheet.None)}><X size={16} /></button></div>
       {#if selected}
         <MotionInspector {doc} clip={selected} tokens={data.tokens} assets={data.assets} onchange={edit} />
       {:else}
@@ -317,10 +345,16 @@
       {/if}
     </aside>
 
-    <aside class="chat">
-      <ChatPanel projectId={data.projectId} motionNodeId={data.node.id} context={() => ({ selection })} onturnend={() => void pullAgentEdit()} />
+    <aside class="chat" class:open={sheet === Sheet.Agent} aria-label="Agent">
+      <div class="sheet-head"><span>Agent</span><button type="button" aria-label="Close" onclick={() => (sheet = Sheet.None)}><X size={16} /></button></div>
+      <ChatPanel projectId={data.projectId} motionNodeId={data.node.id} context={() => ({ selection })} onturnend={() => void pullAgentEdit()} ondata={(part) => void showFrames(part)} />
     </aside>
   </div>
+
+  <nav class="tabs" aria-label="Panels">
+    <button type="button" class:on={sheet === Sheet.Properties} onclick={() => (sheet = sheet === Sheet.Properties ? Sheet.None : Sheet.Properties)}>Properties</button>
+    <button type="button" class:on={sheet === Sheet.Agent} onclick={() => (sheet = sheet === Sheet.Agent ? Sheet.None : Sheet.Agent)}>Agent</button>
+  </nav>
 </div>
 
 <style>
@@ -527,5 +561,130 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
+  }
+
+  .sheet-head,
+  .tabs {
+    display: none;
+  }
+
+  @media (max-width: 760px) {
+    .bar {
+      gap: 8px;
+      height: auto;
+      min-height: 44px;
+      flex-wrap: wrap;
+      padding: 6px 12px;
+    }
+
+    .bar .title {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .bar .save,
+    .bar .render {
+      display: none;
+    }
+
+    .body {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .left {
+      flex: 1;
+    }
+
+    .preview {
+      flex: 0 0 auto;
+      height: 34vh;
+      padding: 8px;
+    }
+
+    .transport {
+      overflow-x: auto;
+      flex-wrap: nowrap;
+    }
+
+    .transport > * {
+      flex-shrink: 0;
+    }
+
+    .menu {
+      position: fixed;
+      left: 8px;
+      bottom: 104px;
+      max-height: 50vh;
+      overflow: auto;
+    }
+
+    .tl {
+      flex: 1;
+      height: auto;
+      min-height: 160px;
+    }
+
+    .props,
+    .chat {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 48px;
+      height: 70vh;
+      z-index: 30;
+      display: none;
+      flex-direction: column;
+      background: var(--paper);
+      border-left: 0;
+      border-top: 1px solid var(--line);
+      box-shadow: 0 -12px 32px rgb(0 0 0 / 0.16);
+    }
+
+    .props.open,
+    .chat.open {
+      display: flex;
+    }
+
+    .props.open {
+      overflow: auto;
+    }
+
+    .sheet-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--line);
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+
+    .chat :global(> :last-child) {
+      flex: 1;
+      min-height: 0;
+    }
+
+    .tabs {
+      display: flex;
+      flex-shrink: 0;
+      height: 48px;
+      border-top: 1px solid var(--line);
+    }
+
+    .tabs button {
+      flex: 1;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--ink-soft);
+    }
+
+    .tabs button.on {
+      color: var(--ink);
+      box-shadow: inset 0 2px 0 var(--ink);
+    }
   }
 </style>

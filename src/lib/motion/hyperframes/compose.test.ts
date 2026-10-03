@@ -4,7 +4,7 @@ import { TransitionKind } from '../design';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '../doc';
 import { addClip, setTransition, Side } from '../timeline';
 import { COMPONENT_IDS } from '../components';
-import { composeHtml } from './compose';
+import { CAPTURE_REPLY, CAPTURE_REQUEST, composeHtml } from './compose';
 
 function must(r: { ok: true; doc: MotionDoc } | { ok: false; error: string }): MotionDoc {
   if (!r.ok) {
@@ -104,5 +104,13 @@ describe('MotionDoc to HyperFrames composition', () => {
 
     expect(html).toContain('tl.set("#li-title-1",{"yPercent":105},0.5);');
     expect(html).not.toContain('tl.set("#li-title-0"');
+  });
+
+  it('answers a capture request with a JPEG of the root, so the agent can see frames', () => {
+    const html = compose(doc);
+
+    expect(html).toContain(`"${CAPTURE_REQUEST}"`);
+    expect(html).toContain(`"${CAPTURE_REPLY}"`);
+    expect(html).toContain('modern-screenshot@');
   });
 });

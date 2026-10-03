@@ -12,6 +12,10 @@ export type ChatMessage = {
 
 export type UserEcho = 'append-user' | 'reuse-user';
 
+export type StreamData = { type: string; data: unknown };
+
+const DATA_PREFIX = 'data-';
+
 const HTTP_NOT_FOUND = 404;
 const SILENT_TOOLS = new Set(['reply']);
 
@@ -42,6 +46,7 @@ export class ChatSession {
   revision = $state(0);
   context: () => Record<string, unknown> = () => ({});
   onTurnEnd: (() => void) | null = null;
+  onData: ((part: StreamData) => void) | null = null;
 
   #abort: AbortController | null = null;
   readonly #endpoint: string;
@@ -169,6 +174,7 @@ export class ChatSession {
       const { events, rest } = readSseEvents(buffered);
       buffered = rest;
       for (const evt of events) {
+        this.#announce(evt);
         if (applyChatStreamEvent(state, evt)) {
           this.#foldLive(state);
         }
@@ -178,6 +184,14 @@ export class ChatSession {
 
     closeDanglingToolCalls(state);
     this.#foldLive(state);
+  }
+
+  #announce(evt: unknown) {
+    const e = evt as { type?: string; data?: unknown };
+    if (!e.type?.startsWith(DATA_PREFIX)) {
+      return;
+    }
+    this.onData?.({ type: e.type, data: e.data });
   }
 
   #settleDone() {

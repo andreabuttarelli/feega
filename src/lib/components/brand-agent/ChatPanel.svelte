@@ -4,7 +4,7 @@
   import { page } from '$app/stores';
   import { nearBottom } from '$lib/chat-scroll';
   import { chatEndpoint } from './chat-endpoint';
-  import { chatSession, type ChatSession } from './chat-session.svelte';
+  import { chatSession, type ChatSession, type StreamData } from './chat-session.svelte';
   import { nextFollow, type Follow, type FollowEvent } from './chat-follow';
   import { FAILURES, keyboardInset, speakerStarts } from './chat-view';
   import ChatComposer from './ChatComposer.svelte';
@@ -14,8 +14,9 @@
     projectId = '',
     motionNodeId = '',
     context,
-    onturnend
-  }: { projectId?: string; motionNodeId?: string; context?: () => Record<string, unknown>; onturnend?: () => void } = $props();
+    onturnend,
+    ondata
+  }: { projectId?: string; motionNodeId?: string; context?: () => Record<string, unknown>; onturnend?: () => void; ondata?: (part: StreamData) => void } = $props();
 
   let draft = $state('');
   let follow = $state<Follow>('following');
@@ -34,6 +35,7 @@
     }
     session.context = context ?? (() => ({}));
     session.onTurnEnd = onturnend ?? null;
+    session.onData = ondata ?? null;
   });
   const messages = $derived(session?.messages ?? []);
   const sending = $derived(session?.sending ?? false);

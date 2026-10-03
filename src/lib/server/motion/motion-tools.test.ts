@@ -3,21 +3,24 @@ import type { Tool } from 'ai';
 import { MotionFormat, findClip, newMotionDoc } from '$lib/motion/doc';
 import { AssetKind } from '$lib/motion/components';
 import { createMotionTools, selectionNote, type MotionSession, type MotionToolDeps } from './motion-tools';
+import { MAX_VIEWS_PER_TURN } from './frames';
 
-type Exec = (input: unknown) => Promise<Record<string, unknown>>;
+type Exec = (input: unknown, options: { toolCallId: string }) => Promise<Record<string, unknown>>;
 
 function setup(overrides: Partial<MotionToolDeps> = {}) {
   let n = 0;
-  const session: MotionSession = { doc: newMotionDoc(MotionFormat.Vertical), baseVersion: 3, edits: [], selection: [] };
+  const session: MotionSession = { doc: newMotionDoc(MotionFormat.Vertical), baseVersion: 3, edits: [], selection: [], frames: new Map(), views: 0, checkedAt: 0 };
   const deps: MotionToolDeps = {
     session,
     assets: [{ id: 'glb-1', kind: AssetKind.Model3d, label: 'shoe', previewUrl: '/x', url: 'https://cdn/x.glb' }],
     newId: () => `id${++n}`,
     voiceover: vi.fn(async () => ({ ok: true as const, assetId: 'vo-1', seconds: 4, url: 'https://cdn/vo.mp3' })),
+    frames: vi.fn(async (_callId: string, times: number[]) => times.map((time) => ({ time, bytes: Buffer.from([1]) }))),
     ...overrides
   };
   const tools = createMotionTools(deps);
-  const run = (name: string, input: unknown) => (tools[name] as Tool & { execute: Exec }).execute(input);
+  let call = 0;
+  const run = (name: string, input: unknown) => (tools[name] as Tool & { execute: Exec }).execute(input, { toolCallId: `call-${++call}` });
   const schema = (name: string) => (tools[name] as Tool & { inputSchema: { safeParse: (x: unknown) => { success: boolean } } }).inputSchema;
   return { session, deps, run, schema };
 }
@@ -106,5 +109,40 @@ describe('motion agent tools', () => {
 
     expect(out).toMatchObject({ ok: false });
     expect(out.error).toContain('id1');
+  });
+
+  it('view_frames asks the open preview for those exact times and keeps the frames for the next step', async () => {
+    const { session, run, deps } = setup();
+    const out = await run('view_frames', { times: [0.5, 2] });
+
+    expect(deps.frames).toHaveBeenCalledWith('call-1', [0.5, 2]);
+    expect(out).toMatchObject({ ok: true, times: [0.5, 2] });
+    expect(session.frames.get('call-1')).toHaveLength(2);
+  });
+
+  it('view_frames takes at most six times', () => {
+    const { schema } = setup();
+
+    expect(schema('view_frames').safeParse({ times: [0, 1, 2, 3, 4, 5, 6] }).success).toBe(false);
+    expect(schema('view_frames').safeParse({ times: [] }).success).toBe(false);
+  });
+
+  it('with no preview open the agent is told so instead of waiting forever', async () => {
+    const { run } = setup({ frames: async () => null });
+    const out = await run('view_frames', { times: [1] });
+
+    expect(out.ok).toBe(false);
+    expect(String(out.error)).toContain('preview');
+  });
+
+  it('a turn cannot look at frames more than its budget allows', async () => {
+    const { run, deps } = setup();
+    for (let i = 0; i < MAX_VIEWS_PER_TURN; i++) {
+      await run('view_frames', { times: [1] });
+    }
+    const out = await run('view_frames', { times: [1] });
+
+    expect(out.ok).toBe(false);
+    expect(deps.frames).toHaveBeenCalledTimes(MAX_VIEWS_PER_TURN);
   });
 });

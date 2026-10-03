@@ -6,8 +6,9 @@ import { FPS, TRANSITION_KINDS } from '$lib/motion/design';
 import { MOTION_FORMATS, findClip, type MotionDoc } from '$lib/motion/doc';
 import { ClipEdge, Side, addClip, addTrack, moveClip, removeClips, setCanvas, setProps, setTiming, setTransition, trimClip, type OpResult } from '$lib/motion/timeline';
 import type { MotionAsset } from './editor';
+import { MAX_FRAMES_PER_VIEW, MAX_VIEWS_PER_TURN, VIEW_FRAMES, type Frame } from './frames';
 
-export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[] };
+export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number };
 
 export type Voiceover = { ok: true; assetId: string; seconds: number; url: string | null } | { ok: false; error: string };
 
@@ -16,6 +17,7 @@ export type MotionToolDeps = {
   assets: MotionAsset[];
   newId: () => string;
   voiceover: (input: { text: string; voiceId?: string }) => Promise<Voiceover>;
+  frames: (callId: string, times: number[]) => Promise<Frame[] | null>;
 };
 
 const frames = (s: number) => Math.round(s * FPS);
@@ -204,6 +206,26 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
           return { ok: false, error: 'unknown asset id: call list_assets' };
         }
         return apply(registered({ ok: true, doc: session.doc }, asset.id), `registered asset ${asset.id}`);
+      }
+    }),
+
+    [VIEW_FRAMES]: tool({
+      description: `See the video: the editor preview renders these exact times (seconds, up to ${MAX_FRAMES_PER_VIEW}) and you get the frames as images. Use it to check text that is clipped or overflows, overlaps, contrast and the safe area before and after edits.`,
+      inputSchema: z.object({ times: z.array(z.number().min(0)).min(1).max(MAX_FRAMES_PER_VIEW) }),
+      execute: async (input, { toolCallId }) => {
+        if (session.views >= MAX_VIEWS_PER_TURN) {
+          return { ok: false, error: `frame budget for this turn is spent (${MAX_VIEWS_PER_TURN} views): finish with what you saw` };
+        }
+        session.views += 1;
+        const end = session.doc.durationInFrames / FPS;
+        const times = input.times.map((t) => Math.min(t, end));
+        const frames = await deps.frames(toolCallId, times);
+        if (!frames) {
+          return { ok: false, error: 'no editor preview answered: the frames cannot be seen right now, continue without them' };
+        }
+        session.frames.set(toolCallId, frames);
+        session.checkedAt = session.edits.length;
+        return { ok: true, times: frames.map((f) => f.time), note: 'The frames follow as images in the next message.' };
       }
     }),
 

@@ -9,6 +9,9 @@ import { LIGHTING, threeImportMap, threeScript, type ThreeClip } from './three';
 export const HYPERFRAMES_VERSION = '0.8.114';
 export const GSAP_VERSION = '3.14.2';
 export const COMPOSITION_ID = 'main';
+export const CAPTURE_REQUEST = 'feega:capture';
+export const CAPTURE_REPLY = 'feega:frame';
+const SCREENSHOT_URL = 'https://cdn.jsdelivr.net/npm/modern-screenshot@4.7.0/dist/index.js';
 
 const RUNTIME_URL = `https://cdn.jsdelivr.net/npm/@hyperframes/core@${HYPERFRAMES_VERSION}/dist/hyperframe.runtime.iife.js`;
 const GSAP_URL = `https://cdn.jsdelivr.net/npm/gsap@${GSAP_VERSION}/dist/gsap.min.js`;
@@ -159,6 +162,10 @@ const BASE_CSS = [
   '.li{display:block}'
 ].join('');
 
+function captureScript(doc: MotionDoc): string {
+  return `<script>(function(){var lib=null;function load(){return lib||(lib=new Promise(function(ok,ko){var s=document.createElement('script');s.src=${js(SCREENSHOT_URL)};s.onload=ok;s.onerror=ko;document.head.appendChild(s);}));}function painted(){return new Promise(function(r){requestAnimationFrame(function(){requestAnimationFrame(r);});});}addEventListener('message',function(e){var m=e.data;if(!m||m.type!==${js(CAPTURE_REQUEST)})return;var reply=function(body){e.source&&e.source.postMessage(Object.assign({type:${js(CAPTURE_REPLY)},id:m.id},body),'*');};load().then(function(){return document.fonts.ready;}).then(painted).then(function(){return window.modernScreenshot.domToJpeg(document.getElementById('root'),{width:${doc.width},height:${doc.height},scale:m.width/${doc.width},quality:m.quality});}).then(function(url){reply({url:url});},function(err){reply({error:String(err)});});});})();</script>`;
+}
+
 export function composeHtml(input: ComposeInput): string {
   const { doc, tokens } = input;
   const bottomFirst = doc.tracks.map((track, index) => ({ track, index })).reverse();
@@ -200,6 +207,7 @@ export function composeHtml(input: ComposeInput): string {
     '</div>',
     `<script>const tl=gsap.timeline({paused:true});${holds.map(holdLine).join('')}${tweens.map(tweenLine).join('')}tl.set({}, {}, ${duration});window.__timelines=window.__timelines||{};window.__timelines[${js(COMPOSITION_ID)}]=tl;</script>`,
     threeScript(three, Number(duration)),
+    captureScript(doc),
     '</body></html>'
   ].join('');
 }
