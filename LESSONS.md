@@ -2241,3 +2241,16 @@ Signal: an inspector edit or keyframe lands at frame 0 or an older frame, not at
 Cause: the HyperFrames player emits `timeupdate` (often at 0) when the composition reloads, and
 the editor took it as the new frame. Move: while paused the editor owns the frame; follow
 `timeupdate` only while playing (`MotionPreview.svelte`).
+
+## GSAP `attr` tweens do nothing under vitest
+Signal: `Invalid property attr ... Missing plugin?` in a node test, attributes never set. Cause:
+GSAP queues its core plugins (`attr` included) until a `window` exists. Move: in the test,
+`vi.stubGlobal('window', globalThis)`, `gsap.ticker.wake()`, `sleep()`, unstub
+(`hyperframes/masks.test.ts`). The browser build is not affected.
+
+## Captured motion frames ignore SVG masks
+Signal: `view_frames` / html-to-image JPEGs show clips unmasked while the preview masks them.
+Cause: html-to-image inlines computed styles, and a computed `url(#id)` resolves against the
+srcdoc URL, which the cloned SVG image cannot reach. Move: before capture, freeze each mask into
+a data-URL image (`freezeMasks` in `hyperframes/masks.ts`), restore after. Same signal on a doc
+with a Video clip is a different cause: `<video>` without `crossorigin` taints the canvas.
