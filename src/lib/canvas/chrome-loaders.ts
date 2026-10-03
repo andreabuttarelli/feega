@@ -11,6 +11,7 @@ export const ENTRY_PREFETCH: Record<string, () => Promise<{ default: unknown }>>
   influencers: CHROME_LOADERS.leftPanel,
   calendar: SHEET_PAGE_LOADERS.calendar,
   ads: SHEET_PAGE_LOADERS.ads,
+  studio: SHEET_PAGE_LOADERS.studio,
   settings: SHEET_PAGE_LOADERS.settingsLayout,
   promote: SHEET_PAGE_LOADERS.promote
 };
