@@ -4,9 +4,11 @@
   import { COMPONENTS, TrackKind } from '$lib/motion/components';
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
   import { ClipEdge, moveClip, moveTrack, trimClip, type OpResult } from '$lib/motion/timeline';
-  import { Grip, Snap, edgeHandles, frameAt, pxPerFrame, rulerTicks, snapped } from '$lib/motion/timeline-view';
+  import { Grip, Snap, edgeHandles, frameAt, pxPerFrame, rulerTicks, snapped, stackRows } from '$lib/motion/timeline-view';
 
   const HEADER_PX = 132;
+  const ROW_PX = 30;
+  const LANE_PAD_PX = 5;
 
   const Drag = { Move: 'move', TrimStart: 'trim-start', TrimEnd: 'trim-end', Scrub: 'scrub' } as const;
   type Drag = (typeof Drag)[keyof typeof Drag];
@@ -138,7 +140,9 @@
     </div>
 
     {#each shown.tracks as track, index (track.id)}
-      <div class="lane" data-track-id={track.id} class:audio={track.kind === TrackKind.Audio}>
+      {@const rows = stackRows(track.clips)}
+      {@const rowCount = Math.max(1, ...Object.values(rows).map((r) => r + 1))}
+      <div class="lane" data-track-id={track.id} class:audio={track.kind === TrackKind.Audio} style={`height: ${rowCount * ROW_PX + 2 * LANE_PAD_PX}px;`}>
         <div class="head" style={`width: ${HEADER_PX}px;`}>
           <span class="name">{track.name || track.id}</span>
           <button type="button" aria-label="Move track up" disabled={index === 0} onclick={() => reorder(track.id, -1)}><ChevronUp size={12} /></button>
@@ -153,21 +157,21 @@
               role="button"
               tabindex="0"
               aria-label={`${COMPONENTS[clip.component].label} clip`}
-              style={`left: ${clip.from * ppf}px; width: ${Math.max(4, clip.durationInFrames * ppf)}px;`}
+              style={`left: ${clip.from * ppf}px; width: ${Math.max(4, clip.durationInFrames * ppf)}px; top: ${LANE_PAD_PX + rows[clip.id] * ROW_PX}px; height: ${ROW_PX - 2}px;`}
               onpointerdown={(e) => startClip(e, clip as MotionClip, track.id)}
             >
               <span class="kind">{COMPONENTS[clip.component].label}</span>
               <span class="label">{clipLabel(clip as MotionClip)}</span>
             </div>
           {/each}
-          {#each edgeHandles(track.clips, ppf) as handle (`${handle.clipId}-${handle.grip}`)}
+          {#each edgeHandles(track.clips, ppf, selection) as handle (`${handle.clipId}-${handle.grip}`)}
             <div
               class="grip"
               data-grip={handle.grip}
               data-grip-clip={handle.clipId}
               role="separator"
               aria-label={`Trim ${handle.grip}`}
-              style={`left: ${handle.left}px; width: ${handle.width}px;`}
+              style={`left: ${handle.left}px; width: ${handle.width}px; top: ${LANE_PAD_PX + rows[handle.clipId] * ROW_PX}px; height: ${ROW_PX - 2}px;`}
               onpointerdown={(e) => startClip(e, clipById(handle.clipId), track.id, GRIP_DRAG[handle.grip])}
             ></div>
           {/each}
@@ -240,7 +244,6 @@
   .lane {
     position: relative;
     display: flex;
-    height: 40px;
     border-bottom: 1px solid var(--line);
   }
 
@@ -289,8 +292,6 @@
 
   .bar {
     position: absolute;
-    top: 5px;
-    bottom: 5px;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -304,8 +305,6 @@
 
   .grip {
     position: absolute;
-    top: 5px;
-    bottom: 5px;
     z-index: 2;
     cursor: ew-resize;
   }

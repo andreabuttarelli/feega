@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, newMotionDoc } from './doc';
-import { Grip, HANDLE_PX, Snap, edgeHandles, frameAt, handleAt, pxPerFrame, rulerTicks, snapped, timecode } from './timeline-view';
+import { Grip, HANDLE_PX, Snap, edgeHandles, frameAt, handleAt, stackRows, pxPerFrame, rulerTicks, snapped, timecode } from './timeline-view';
 
 describe('timeline view', () => {
   it('at zoom 1 a second is 60 px', () => {
@@ -46,6 +46,26 @@ describe('timeline view', () => {
 
     expect(handleAt(handles, 90 - 1)).toMatchObject({ clipId: 'a', grip: Grip.End });
     expect(handleAt(handles, 90 + 1)).toMatchObject({ clipId: 'b', grip: Grip.Start });
+  });
+
+  it('two clips ending on the same frame: the selected one owns the shared edge', () => {
+    const clips = [
+      { id: 'k', from: 0, durationInFrames: 90 },
+      { id: 't', from: 24, durationInFrames: 66 }
+    ];
+
+    expect(handleAt(edgeHandles(clips, 3, ['k']), 90 * 3 - 2)).toMatchObject({ clipId: 'k', grip: Grip.End });
+    expect(handleAt(edgeHandles(clips, 3, ['t']), 90 * 3 - 2)).toMatchObject({ clipId: 't', grip: Grip.End });
+  });
+
+  it('clips overlapping in time on one track stack in rows, so none hides another', () => {
+    const rows = stackRows([
+      { id: 'k', from: 9, durationInFrames: 90 },
+      { id: 't', from: 11, durationInFrames: 88 },
+      { id: 'next', from: 99, durationInFrames: 30 }
+    ]);
+
+    expect(rows).toEqual({ k: 0, t: 1, next: 0 });
   });
 
   it('a tiny clip keeps a body to drag between its two edges', () => {

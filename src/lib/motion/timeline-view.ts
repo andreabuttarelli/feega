@@ -65,8 +65,9 @@ export type Handle = { clipId: string; grip: Grip; left: number; width: number }
 
 type Span = { id: string; from: number; durationInFrames: number };
 
-export function edgeHandles(clips: readonly Span[], ppf: number): Handle[] {
-  return clips.flatMap((clip) => {
+export function edgeHandles(clips: readonly Span[], ppf: number, selected: readonly string[] = []): Handle[] {
+  const topmostLast = [...clips.filter((c) => !selected.includes(c.id)), ...clips.filter((c) => selected.includes(c.id))];
+  return topmostLast.flatMap((clip) => {
     const left = clip.from * ppf;
     const right = (clip.from + clip.durationInFrames) * ppf;
     const width = Math.min(HANDLE_PX, (right - left) / MIN_BODY_SHARE);
@@ -77,6 +78,18 @@ export function edgeHandles(clips: readonly Span[], ppf: number): Handle[] {
   });
 }
 
+export function stackRows(clips: readonly Span[]): Record<string, number> {
+  const rowEnds: number[] = [];
+  const rows: Record<string, number> = {};
+  for (const clip of [...clips].sort((a, b) => a.from - b.from)) {
+    const free = rowEnds.findIndex((end) => end <= clip.from);
+    const row = free < 0 ? rowEnds.length : free;
+    rowEnds[row] = clip.from + clip.durationInFrames;
+    rows[clip.id] = row;
+  }
+  return rows;
+}
+
 export function handleAt(handles: readonly Handle[], x: number): Handle | null {
-  return handles.find((h) => x >= h.left && x < h.left + h.width) ?? null;
+  return handles.findLast((h) => x >= h.left && x < h.left + h.width) ?? null;
 }
