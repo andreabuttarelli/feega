@@ -1,7 +1,7 @@
 import { FPS } from './design';
 import { snapFrame, snapTargets } from './timeline';
 import type { MotionClip, MotionDoc } from './doc';
-import { ANIMATABLE, sampleTrack, type EaseSpec } from './keyframes';
+import { ANIMATABLE, Source, sampleTrack, type EaseSpec } from './keyframes';
 
 export const ZOOM_MIN = 0.5;
 export const ZOOM_MAX = 16;
@@ -95,12 +95,12 @@ export function handleAt(handles: readonly Handle[], x: number): Handle | null {
   return handles.findLast((h) => x >= h.left && x < h.left + h.width) ?? null;
 }
 
-export type KeyLane = { prop: string; label: string; frames: number[] };
+export type KeyLane = { prop: string; label: string; source: Source; frames: number[] };
 
 export function keyLanes(clip: MotionClip): KeyLane[] {
   return ANIMATABLE[clip.component]
     .filter((p) => clip.keyframes[p.key]?.length)
-    .map((p) => ({ prop: p.key, label: p.label, frames: clip.keyframes[p.key].map((k) => k.frame) }));
+    .map((p) => ({ prop: p.key, label: p.label, source: p.source, frames: clip.keyframes[p.key].map((k) => k.frame) }));
 }
 
 const CURVE_STEPS = 24;

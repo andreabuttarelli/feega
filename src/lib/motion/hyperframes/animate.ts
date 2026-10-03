@@ -2,7 +2,8 @@ import { boxOf, type Box, type Placement } from '../layout';
 import type { MotionClip } from '../doc';
 import { Source, TRANSFORM, ValueKind, animProp, easeName, sampleTrack, type EaseSpec, type Keyframe, type SceneKey, type TransformKey } from '../keyframes';
 import { css, js, px } from './html';
-import type { Vars } from './templates';
+import { MASK_LANES, MaskScope, maskTarget } from './masks';
+import type { MaskKey } from '../mask';
 
 type Frame = { width: number; height: number; fps: number };
 
@@ -35,9 +36,11 @@ const CHANNELS: Record<Exclude<TransformKey, 'anchorX' | 'anchorY'>, Channel> = 
 
 export const ANIMATE_CSS = '.kp{position:absolute;inset:0}.kf,.ks{position:absolute;inset:0;transform-style:preserve-3d;backface-visibility:visible;will-change:transform,opacity,filter}';
 
-export type KfTween = { target: string; from: Vars; to: Vars; at: number; duration: number; ease: string };
+type TweenVars = Record<string, unknown>;
 
-type Lane = { target: string; prop: string; track: Keyframe[]; out: (value: Keyframe['value']) => number | string };
+export type KfTween = { target: string; from: TweenVars; to: TweenVars; at: number; duration: number; ease: string };
+
+type Lane = { target: string; source: Source; track: Keyframe[]; vars: (value: Keyframe['value']) => TweenVars };
 
 function round(n: number): number {
   return Math.round(n * 10000) / 10000;
@@ -60,10 +63,14 @@ type LaneInput = { clip: MotionClip; key: string; track: Keyframe[]; frame: Fram
 const LANE: Record<Source, (input: LaneInput) => Lane[]> = {
   [Source.Transform]: ({ clip, key, track, frame }) => {
     const channel = CHANNELS[key as keyof typeof CHANNELS];
-    return [{ target: target(channel.wrapper, clip), prop: channel.gsap, track, out: (v) => channel.out(Number(v), frame) }];
+    return [{ target: target(channel.wrapper, clip), source: Source.Transform, track, vars: (v) => ({ [channel.gsap]: channel.out(Number(v), frame) }) }];
   },
-  [Source.Prop]: ({ clip, key, track, resolve }) => [{ target: target(Wrapper.Scale, clip), prop: cssVar(key), track, out: (v) => resolve(String(v)) }],
-  [Source.Scene]: () => []
+  [Source.Prop]: ({ clip, key, track, resolve }) => [{ target: target(Wrapper.Scale, clip), source: Source.Prop, track, vars: (v) => ({ [cssVar(key)]: resolve(String(v)) }) }],
+  [Source.Scene]: () => [],
+  [Source.Mask]: ({ clip, key, track, frame }) =>
+    clip.mask
+      ? MASK_LANES[key as MaskKey].map((a) => ({ target: `#${maskTarget(MaskScope.Own, a.part, clip.id)}`, source: Source.Mask, track, vars: (v) => ({ attr: { [a.attr]: a.out(Number(v), frame) } }) }))
+      : []
 };
 
 function lanes(clip: MotionClip, frame: Frame, resolve: (color: string) => string): Lane[] {
@@ -79,8 +86,8 @@ export function keyframeTweens(clip: MotionClip, frame: Frame, resolve: (color: 
       const next = lane.track[i + 1];
       return {
         target: lane.target,
-        from: { [lane.prop]: lane.out(k.value) },
-        to: { [lane.prop]: lane.out(next.value) },
+        from: lane.vars(k.value),
+        to: lane.vars(next.value),
         at: (clip.from + k.frame) / frame.fps,
         duration: (next.frame - k.frame) / frame.fps,
         ease: easeName(k.ease)
@@ -91,11 +98,11 @@ export function keyframeTweens(clip: MotionClip, frame: Frame, resolve: (color: 
 
 function holds(clip: MotionClip, frame: Frame, resolve: (color: string) => string): string[] {
   const start = clip.from / frame.fps;
-  return lanes(clip, frame, resolve).map((lane) => `tl.set(${js(lane.target)},${js({ [lane.prop]: lane.out(lane.track[0].value) })},${start});`);
+  return lanes(clip, frame, resolve).map((lane) => `tl.set(${js(lane.target)},${js(lane.vars(lane.track[0].value))},${start});`);
 }
 
 function initial(clip: MotionClip, frame: Frame, resolve: (color: string) => string): string[] {
-  const vars = new Map<string, Vars>();
+  const vars = new Map<string, TweenVars>();
   const put = (t: string, prop: string, value: number | string) => vars.set(t, { ...vars.get(t), [prop]: value });
 
   for (const [key, channel] of Object.entries(CHANNELS) as [keyof typeof CHANNELS, Channel][]) {
@@ -106,8 +113,8 @@ function initial(clip: MotionClip, frame: Frame, resolve: (color: string) => str
     }
     put(target(channel.wrapper, clip), channel.gsap, channel.out(value, frame));
   }
-  for (const lane of lanes(clip, frame, resolve).filter((l) => l.prop.startsWith(CSS_VAR_PREFIX))) {
-    put(lane.target, lane.prop, lane.out(lane.track[0].value));
+  for (const lane of lanes(clip, frame, resolve).filter((l) => l.source === Source.Prop)) {
+    vars.set(lane.target, { ...vars.get(lane.target), ...lane.vars(lane.track[0].value) });
   }
   return [...vars].map(([t, v]) => `gsap.set(${js(t)},${js(v)});`);
 }

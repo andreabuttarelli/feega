@@ -3,7 +3,8 @@ import { COMPONENTS, Control, Group, type AssetKind, type ComponentId } from './
 import { FPS } from './design';
 import { Source, ValueKind, animProp, baseValue, sampleColor, sampleTrack, type Animated, type KeyValue } from './keyframes';
 import type { MotionClip, MotionDoc } from './doc';
-import { removeKeyframes, setKeyframe, setProps, setTransform, type OpResult } from './timeline';
+import { MASK_PROPS, type MaskKey } from './mask';
+import { removeKeyframes, setKeyframe, setMask, setProps, setTransform, type OpResult } from './timeline';
 
 export type Field = {
   key: string;
@@ -111,7 +112,8 @@ export function keyAt(clip: Placed, key: string, frame: number): boolean {
 const EDIT_BASE: Record<Source, (doc: MotionDoc, clip: MotionClip, key: string, value: KeyValue, local: number) => OpResult> = {
   [Source.Transform]: (doc, clip, key, value) => setTransform(doc, clip.id, { [key]: Number(value) }),
   [Source.Prop]: (doc, clip, key, value) => setProps(doc, clip.id, { [key]: value }),
-  [Source.Scene]: (doc, clip, key, value, local) => setKeyframe(doc, clip.id, key, local, value)
+  [Source.Scene]: (doc, clip, key, value, local) => setKeyframe(doc, clip.id, key, local, value),
+  [Source.Mask]: (doc, clip, key, value) => (clip.mask ? setMask(doc, clip.id, { ...clip.mask, [MASK_PROPS[key as MaskKey].field]: Number(value) }) : { ok: false, error: 'add a mask first' })
 };
 
 export function editAt(doc: MotionDoc, clip: MotionClip, key: string, value: KeyValue, frame: number): OpResult {

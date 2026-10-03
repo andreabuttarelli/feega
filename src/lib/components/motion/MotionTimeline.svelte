@@ -4,9 +4,10 @@
   import { COMPONENTS, TrackKind } from '$lib/motion/components';
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
   import { ClipEdge, moveClip, moveKeyframes, moveTrack, setKeyEase, trimClip, type KeyRef, type OpResult } from '$lib/motion/timeline';
-  import { Grip, Snap, edgeHandles, frameAt, keyLanes, pxPerFrame, rulerTicks, snapped, stackRows } from '$lib/motion/timeline-view';
+  import { Grip, Snap, edgeHandles, frameAt, keyLanes, pxPerFrame, rulerTicks, snapped, stackRows, type KeyLane } from '$lib/motion/timeline-view';
+  import { MASK_KINDS, Matte } from '$lib/motion/mask';
   import type { MotionTrack } from '$lib/motion/doc';
-  import type { EaseSpec } from '$lib/motion/keyframes';
+  import { Source, type EaseSpec } from '$lib/motion/keyframes';
   import EasePicker from './EasePicker.svelte';
 
   const HEADER_PX = 132;
@@ -189,6 +190,38 @@
 
 <svelte:window onpointermove={onMove} onpointerup={onUp} />
 
+  {#snippet keyLane(clip: MotionClip, lane: KeyLane)}
+    {@const keys = clip.keyframes[lane.prop]}
+    <div class="lane sub" data-key-lane={`${clip.id}:${lane.prop}`} style={`height: ${KEY_ROW_PX}px;`}>
+      <div class="head" style={`width: ${HEADER_PX}px;`}><span class="name prop">{lane.label}</span></div>
+      <div class="clips">
+        {#each keys.slice(0, -1) as key, i (key.frame)}
+          <button
+            type="button"
+            class="segment"
+            title="Ease"
+            aria-label={`Ease after ${lane.label} keyframe`}
+            style={`left: ${(clip.from + key.frame) * ppf}px; width: ${(keys[i + 1].frame - key.frame) * ppf}px;`}
+            onclick={(e) => openEase(e, clip, { clipId: clip.id, prop: lane.prop, frame: key.frame }, key.ease)}
+          ></button>
+        {/each}
+        {#each keys as key (key.frame)}
+          {@const ref = { clipId: clip.id, prop: lane.prop, frame: key.frame }}
+          <div
+            class="diamond"
+            class:picked={keySelection.some((k) => sameKey(k, ref))}
+            role="button"
+            tabindex="-1"
+            aria-label={`${lane.label} keyframe at ${clip.from + key.frame}`}
+            data-key-frame={clip.from + key.frame}
+            style={`left: ${(clip.from + key.frame) * ppf - DIAMOND_PX / 2}px; width: ${DIAMOND_PX}px; height: ${DIAMOND_PX}px; top: ${(KEY_ROW_PX - DIAMOND_PX) / 2}px;`}
+            onpointerdown={(e) => startKey(e, clip, ref)}
+          ></div>
+        {/each}
+      </div>
+    </div>
+  {/snippet}
+
 <div class="timeline" bind:this={lanes} data-testid="motion-timeline">
   <div class="inner" style={`width: ${width + HEADER_PX}px;`}>
     <div class="ruler" role="slider" tabindex="-1" aria-label="Playhead" aria-valuenow={frame} onpointerdown={startScrub}>
@@ -226,6 +259,8 @@
                 {#if Object.keys(clip.keyframes).length}
                   <button type="button" class="lanes-toggle" aria-label="Show keyframes" aria-expanded={selection.includes(clip.id) && !collapsed.includes(clip.id)} onpointerdown={(e) => e.stopPropagation()} onclick={(e) => (selection.includes(clip.id) ? toggleLanes(e, clip.id) : (selection = [clip.id]))}>◆</button>
                 {/if}
+                {#if clip.mask}<span class="tag" title="Masked">· mask</span>{/if}
+                {#if clip.matte !== Matte.None}<span class="tag" title="Track matte">· {clip.matte} matte</span>{/if}
               </span>
               <span class="label">{clipLabel(clip as MotionClip)}</span>
             </div>
@@ -244,37 +279,16 @@
         </div>
       </div>
       {#each laneClips(track) as clip (clip.id)}
-        {#each keyLanes(clip) as lane (lane.prop)}
-          {@const keys = clip.keyframes[lane.prop]}
-          <div class="lane sub" data-key-lane={`${clip.id}:${lane.prop}`} style={`height: ${KEY_ROW_PX}px;`}>
-            <div class="head" style={`width: ${HEADER_PX}px;`}><span class="name prop">{lane.label}</span></div>
-            <div class="clips">
-              {#each keys.slice(0, -1) as key, i (key.frame)}
-                <button
-                  type="button"
-                  class="segment"
-                  title="Ease"
-                  aria-label={`Ease after ${lane.label} keyframe`}
-                  style={`left: ${(clip.from + key.frame) * ppf}px; width: ${(keys[i + 1].frame - key.frame) * ppf}px;`}
-                  onclick={(e) => openEase(e, clip, { clipId: clip.id, prop: lane.prop, frame: key.frame }, key.ease)}
-                ></button>
-              {/each}
-              {#each keys as key (key.frame)}
-                {@const ref = { clipId: clip.id, prop: lane.prop, frame: key.frame }}
-                <div
-                  class="diamond"
-                  class:picked={keySelection.some((k) => sameKey(k, ref))}
-                  role="button"
-                  tabindex="-1"
-                  aria-label={`${lane.label} keyframe at ${clip.from + key.frame}`}
-                  data-key-frame={clip.from + key.frame}
-                  style={`left: ${(clip.from + key.frame) * ppf - DIAMOND_PX / 2}px; width: ${DIAMOND_PX}px; height: ${DIAMOND_PX}px; top: ${(KEY_ROW_PX - DIAMOND_PX) / 2}px;`}
-                  onpointerdown={(e) => startKey(e, clip, ref)}
-                ></div>
-              {/each}
-            </div>
+        {@const all = keyLanes(clip)}
+        {@const masked = all.filter((l) => l.source === Source.Mask)}
+        {#each all.filter((l) => l.source !== Source.Mask) as lane (lane.prop)}{@render keyLane(clip, lane)}{/each}
+        {#if masked.length}
+          <div class="lane sub group" data-mask-lanes={clip.id} style={`height: ${KEY_ROW_PX}px;`}>
+            <div class="head" style={`width: ${HEADER_PX}px;`}><span class="name prop">Mask{clip.mask ? ` · ${MASK_KINDS[clip.mask.kind].label}` : ''}</span></div>
+            <div class="clips"></div>
           </div>
-        {/each}
+          {#each masked as lane (lane.prop)}{@render keyLane(clip, lane)}{/each}
+        {/if}
       {/each}
     {/each}
 
@@ -439,6 +453,16 @@
 
   .lane.sub {
     background: var(--paper-2);
+  }
+
+  .bar .tag {
+    color: #a855f7;
+  }
+
+  .lane.group .prop {
+    font-family: 'Fragment Mono', ui-monospace, monospace;
+    font-size: 10px;
+    text-transform: uppercase;
   }
 
   .head .prop {

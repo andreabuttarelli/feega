@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, type Snippet } from 'svelte';
   import { FPS } from '$lib/motion/design';
   import { CAPTURE_REPLY, CAPTURE_REQUEST } from '$lib/motion/hyperframes/compose';
 
@@ -17,8 +17,9 @@
     width,
     height,
     frame = $bindable(0),
-    playing = $bindable(false)
-  }: { html: string; width: number; height: number; frame?: number; playing?: boolean } = $props();
+    playing = $bindable(false),
+    children
+  }: { html: string; width: number; height: number; frame?: number; playing?: boolean; children?: Snippet } = $props();
 
   let host = $state<HTMLDivElement | null>(null);
   let player: Player | null = null;
@@ -159,6 +160,7 @@
 
 <div class="stage" style={`aspect-ratio: ${width} / ${height}; width: min(100cqw, calc(100cqh * ${width / height}));`} data-testid="motion-preview">
   <div class="host" bind:this={host}></div>
+  {@render children?.()}
 </div>
 
 <style>

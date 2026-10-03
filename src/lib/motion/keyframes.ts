@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { COLOR, type ComponentId } from './components';
 import { EASE_IDS, Ease } from './design';
+import { MASK_KEYS, MASK_PROPS, maskValue, type Mask, type MaskKey } from './mask';
 
 export type Bezier = [number, number, number, number];
 export type EaseSpec = Ease | Bezier;
@@ -27,7 +28,8 @@ export enum ValueKind {
 export enum Source {
   Transform = 'transform',
   Prop = 'prop',
-  Scene = 'scene'
+  Scene = 'scene',
+  Mask = 'mask'
 }
 
 type Range = { label: string; min: number; max: number; step: number; fallback: number };
@@ -75,32 +77,38 @@ const ANCHORS: readonly TransformKey[] = ['anchorX', 'anchorY'];
 
 const transformProps: AnimProp[] = TRANSFORM_KEYS.filter((k) => !ANCHORS.includes(k)).map((key) => ({ key, kind: ValueKind.Number, source: Source.Transform, ...TRANSFORM[key] }));
 const sceneProps: AnimProp[] = SCENE_KEYS.map((key) => ({ key, kind: ValueKind.Number, source: Source.Scene, ...SCENE[key] }));
+const maskProps: AnimProp[] = MASK_KEYS.map((key) => {
+  const { label, min, max, step, fallback } = MASK_PROPS[key];
+  return { key, label, min, max, step, fallback, kind: ValueKind.Number, source: Source.Mask };
+});
 const colours = (...entries: [string, string][]): AnimProp[] =>
   entries.map(([key, label]) => ({ key, label, kind: ValueKind.Color, source: Source.Prop, min: 0, max: 0, step: 0, fallback: 0 }));
 
+const visual = (...extra: AnimProp[][]): AnimProp[] => [...transformProps, ...extra.flat(), ...maskProps];
+
 export const ANIMATABLE: Record<ComponentId, readonly AnimProp[]> = {
-  Title: [...transformProps, ...colours(['color', 'Colour'])],
-  Text: [...transformProps, ...colours(['color', 'Colour'])],
-  Kicker: [...transformProps, ...colours(['color', 'Colour'])],
-  Caption: [...transformProps, ...colours(['color', 'Colour'], ['background', 'Box'])],
-  Image: transformProps,
-  Video: transformProps,
+  Title: visual(colours(['color', 'Colour'])),
+  Text: visual(colours(['color', 'Colour'])),
+  Kicker: visual(colours(['color', 'Colour'])),
+  Caption: visual(colours(['color', 'Colour'], ['background', 'Box'])),
+  Image: visual(),
+  Video: visual(),
   Audio: [],
-  Shape: [...transformProps, ...colours(['fill', 'Fill'])],
-  Logo: transformProps,
-  BrandBackground: [...transformProps, ...colours(['fill', 'Fill'])],
-  ProductCard: [...transformProps, ...colours(['color', 'Colour'], ['card', 'Card'])],
-  SocialMockup: transformProps,
-  CanvasMock: transformProps,
-  Model3D: [...transformProps, ...sceneProps],
-  Shape3D: [...transformProps, ...sceneProps]
+  Shape: visual(colours(['fill', 'Fill'])),
+  Logo: visual(),
+  BrandBackground: visual(colours(['fill', 'Fill'])),
+  ProductCard: visual(colours(['color', 'Colour'], ['card', 'Card'])),
+  SocialMockup: visual(),
+  CanvasMock: visual(),
+  Model3D: visual(sceneProps),
+  Shape3D: visual(sceneProps)
 };
 
 export function animProp(component: ComponentId, key: string): AnimProp | null {
   return ANIMATABLE[component].find((p) => p.key === key) ?? null;
 }
 
-export type Animated = { component: ComponentId; props: Record<string, unknown>; transform: Transform; keyframes: Keyframes };
+export type Animated = { component: ComponentId; props: Record<string, unknown>; transform: Transform; keyframes: Keyframes; mask: Mask | null };
 
 const SCENE_FROM_PROPS: Partial<Record<SceneKey, string>> = { orbit: 'startAngle', dolly: 'zoom' };
 
@@ -110,7 +118,8 @@ const BASE: Record<Source, (clip: Animated, prop: AnimProp) => KeyValue> = {
   [Source.Scene]: (clip, prop) => {
     const from = SCENE_FROM_PROPS[prop.key as SceneKey];
     return from ? Number(clip.props[from]) : prop.fallback;
-  }
+  },
+  [Source.Mask]: (clip, prop) => (clip.mask ? maskValue(clip.mask, prop.key as MaskKey) : prop.fallback)
 };
 
 export function baseValue(clip: Animated, key: string): KeyValue | null {
@@ -132,12 +141,24 @@ function valueProblem(prop: AnimProp, value: KeyValue): string | null {
   return value < prop.min || value > prop.max ? `${prop.key}: ${value} is outside ${prop.min}..${prop.max}` : null;
 }
 
-export function keyframesProblem(component: ComponentId, keyframes: Keyframes): string | null {
-  for (const [key, track] of Object.entries(keyframes)) {
+const SOURCE_PROBLEM: Record<Source, (clip: Pick<Animated, 'mask'>, key: string) => string | null> = {
+  [Source.Transform]: () => null,
+  [Source.Prop]: () => null,
+  [Source.Scene]: () => null,
+  [Source.Mask]: (clip, key) => (clip.mask ? null : `${key}: the clip has no mask, add one first (set_mask)`)
+};
+
+export function keyframesProblem(clip: Pick<Animated, 'component' | 'keyframes' | 'mask'>): string | null {
+  const { component } = clip;
+  for (const [key, track] of Object.entries(clip.keyframes)) {
     const prop = animProp(component, key);
     if (!prop) {
       const allowed = ANIMATABLE[component].map((p) => p.key).join(', ') || 'nothing';
       return `${component} cannot animate ${key}; it animates: ${allowed}`;
+    }
+    const missing = SOURCE_PROBLEM[prop.source](clip, key);
+    if (missing) {
+      return missing;
     }
     for (const k of track) {
       const problem = valueProblem(prop, k.value);

@@ -4,7 +4,8 @@
   import { resolveColor, type BrandTokens } from '$lib/motion/brand';
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
   import { editAt, fieldGroups, keyAt, keyedField, parseDecimal, secondsLabel, toggleKey, valueAt, type Field } from '$lib/motion/inspector';
-  import { setProps, setTiming, setTransform, setTransition, Side, type OpResult } from '$lib/motion/timeline';
+  import { setMask, setProps, setTiming, setTrackMatte, setTransform, setTransition, Side, type OpResult } from '$lib/motion/timeline';
+  import { MASK_KINDS, MASK_KIND_IDS, MATTES, MaskKind, Matte, Needs, newMask, type Mask } from '$lib/motion/mask';
   import { ANIMATABLE, Source, TRANSFORM, type AnimProp, type KeyValue } from '$lib/motion/keyframes';
   import Dial from './Dial.svelte';
 
@@ -19,7 +20,7 @@
     onchange
   }: { doc: MotionDoc; clip: MotionClip; tokens: BrandTokens; assets: Asset[]; frame: number; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 
-  const DIALS = new Set(['rotateX', 'rotateY', 'rotateZ', 'objectRotateX', 'objectRotateY', 'objectRotateZ', 'orbit']);
+  const DIALS = new Set(['rotateX', 'rotateY', 'rotateZ', 'objectRotateX', 'objectRotateY', 'objectRotateZ', 'orbit', 'maskRotation']);
   const ANCHOR_STOPS = [0, 0.5, 1] as const;
   const KEY_STATE = { On: 'on', Lane: 'lane', None: 'none' } as const;
 
@@ -29,6 +30,9 @@
   const spec = $derived(COMPONENTS[clip.component]);
   const transformProps = $derived(ANIMATABLE[clip.component].filter((p) => p.source === Source.Transform));
   const sceneProps = $derived(ANIMATABLE[clip.component].filter((p) => p.source === Source.Scene));
+  const maskProps = $derived(ANIMATABLE[clip.component].filter((p) => p.source === Source.Mask));
+  const NO_MASK = 'none';
+  const pictures = $derived(assets.filter((a) => a.kind === 'image'));
   const resolve = (v: string) => resolveColor(v, tokens);
 
   function commit(result: OpResult, summary: string) {
@@ -89,6 +93,20 @@
       return KEY_STATE.On;
     }
     return clip.keyframes[key]?.length ? KEY_STATE.Lane : KEY_STATE.None;
+  }
+
+  function pickMask(kind: string) {
+    if (kind === NO_MASK) {
+      commit(setMask(doc, clip.id, null), 'Removed the mask');
+      return;
+    }
+    const picture = (clip.props as { assetId?: string | null }).assetId;
+    const asset = pictures.find((a) => a.id === picture)?.id ?? pictures[0]?.id ?? null;
+    commit(setMask(doc, clip.id, newMask(kind as MaskKind, asset)), 'Added a mask');
+  }
+
+  function editMask(mask: Mask, patch: Partial<Mask>) {
+    commit(setMask(doc, clip.id, { ...mask, ...patch }), 'Edited the mask');
   }
 
   const shown = (key: string) => valueAt(clip, key, frame, resolve);
@@ -160,6 +178,45 @@
     <section>
       <h4>3D scene</h4>
       {#each sceneProps as prop (prop.key)}{@render animRow(prop)}{/each}
+    </section>
+  {/if}
+
+  {#if maskProps.length}
+    <section data-testid="mask-section">
+      <h4>Mask</h4>
+      <div class="row two">
+        <label>
+          Shape
+          <select data-testid="mask-kind" value={clip.mask?.kind ?? NO_MASK} onchange={(e) => pickMask(e.currentTarget.value)}>
+            <option value={NO_MASK}>None</option>
+            {#each MASK_KIND_IDS as kind (kind)}<option value={kind}>{MASK_KINDS[kind].label}</option>{/each}
+          </select>
+        </label>
+        <label>
+          Track matte
+          <select data-testid="track-matte" value={clip.matte} onchange={(e) => commit(setTrackMatte(doc, clip.id, e.currentTarget.value as Matte), 'Changed the track matte')}>
+            {#each MATTES as matte (matte)}<option value={matte}>{matte === Matte.None ? 'None' : `${matte} of the clip above`}</option>{/each}
+          </select>
+        </label>
+      </div>
+      {#if clip.mask}
+        {@const mask = clip.mask}
+        <label class="check"><input type="checkbox" checked={mask.invert} onchange={(e) => editMask(mask, { invert: e.currentTarget.checked })} />Invert</label>
+        {#if MASK_KINDS[mask.kind].needs === Needs.Text}
+          <div class="row"><label for="mask-text">Text</label><input id="mask-text" type="text" value={mask.text} onchange={(e) => editMask(mask, { text: e.currentTarget.value })} /></div>
+        {:else if MASK_KINDS[mask.kind].needs === Needs.Asset}
+          <div class="assets">
+            {#each pictures as asset (asset.id)}
+              <button type="button" class="asset" class:on={mask.assetId === asset.id} title={asset.label} onclick={() => editMask(mask, { assetId: asset.id })}><img src={asset.previewUrl} alt="" /></button>
+            {:else}
+              <span class="empty">No image assets on this canvas yet.</span>
+            {/each}
+          </div>
+        {:else if MASK_KINDS[mask.kind].needs === Needs.Points}
+          <p class="hint">Drag the points on the preview.</p>
+        {/if}
+        {#each maskProps as prop (prop.key)}{@render animRow(prop)}{/each}
+      {/if}
     </section>
   {/if}
 
@@ -398,6 +455,18 @@
   .anchor button.on {
     background: #a855f7;
     border-color: #a855f7;
+  }
+
+  .check {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+
+  .hint {
+    margin: 0 0 8px;
+    color: var(--ink-soft);
   }
 
   .error {
