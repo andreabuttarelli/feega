@@ -117,6 +117,16 @@ function tweenLine(t: Tween): string {
   return `tl.fromTo(${js(t.target)},${js(t.from)},${js({ ...t.to, duration: round(t.duration), ease: GSAP_EASE[t.ease], immediateRender: false })},${round(t.at)});`;
 }
 
+type Hold = { target: string; vars: Vars; at: number };
+
+function heldUntilStart(tweens: Tween[], clipStart: number): Hold[] {
+  return tweens.filter((t) => t.at > clipStart).map((t) => ({ target: t.target, vars: t.from, at: clipStart }));
+}
+
+function holdLine(h: Hold): string {
+  return `tl.set(${js(h.target)},${js(h.vars)},${round(h.at)});`;
+}
+
 function round(n: number): number {
   return Math.round(n * 10000) / 10000;
 }
@@ -154,6 +164,7 @@ export function composeHtml(input: ComposeInput): string {
   const bottomFirst = doc.tracks.map((track, index) => ({ track, index })).reverse();
   const layers: string[] = [];
   const tweens: Tween[] = [];
+  const holds: Hold[] = [];
   const three: ThreeClip[] = [];
   let layer = 0;
 
@@ -163,7 +174,9 @@ export function composeHtml(input: ComposeInput): string {
       const template = TEMPLATES[clip.component] as (typeof TEMPLATES)[ComponentId];
       layer += 1;
       layers.push(clipHtml(clip, ctx, layer, index));
-      tweens.push(...edgeTweens(clip, doc.fps), ...moveTweens(clip, doc.fps), ...(template.tweens?.(ctx as never) ?? []));
+      const own = template.tweens?.(ctx as never) ?? [];
+      tweens.push(...edgeTweens(clip, doc.fps), ...moveTweens(clip, doc.fps), ...own);
+      holds.push(...heldUntilStart(own, ctx.start));
       if (THREE_D_COMPONENTS.includes(clip.component)) {
         three.push(threeClipOf(clip, ctx));
       }
@@ -185,7 +198,7 @@ export function composeHtml(input: ComposeInput): string {
     `<div id="root" data-composition-id="${COMPOSITION_ID}" data-start="0" data-width="${doc.width}" data-height="${doc.height}" data-duration="${duration}" data-fps="${doc.fps}">`,
     layers.join(''),
     '</div>',
-    `<script>const tl=gsap.timeline({paused:true});${tweens.map(tweenLine).join('')}tl.set({}, {}, ${duration});window.__timelines=window.__timelines||{};window.__timelines[${js(COMPOSITION_ID)}]=tl;</script>`,
+    `<script>const tl=gsap.timeline({paused:true});${holds.map(holdLine).join('')}${tweens.map(tweenLine).join('')}tl.set({}, {}, ${duration});window.__timelines=window.__timelines||{};window.__timelines[${js(COMPOSITION_ID)}]=tl;</script>`,
     threeScript(three, Number(duration)),
     '</body></html>'
   ].join('');

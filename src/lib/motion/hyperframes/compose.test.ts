@@ -89,4 +89,11 @@ describe('MotionDoc to HyperFrames composition', () => {
       expect(compose(one)).toContain('data-clip="k"');
     }
   });
+
+  it('a staggered title line is held hidden from the clip start until its own reveal begins', () => {
+    const html = compose(doc);
+
+    expect(html).toContain('tl.set("#li-title-1",{"yPercent":105},0.5);');
+    expect(html).not.toContain('tl.set("#li-title-0"');
+  });
 });
