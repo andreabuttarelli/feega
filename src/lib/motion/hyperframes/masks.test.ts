@@ -179,6 +179,17 @@ describe('animated masks', () => {
   });
 });
 
+describe('frames the agent sees', () => {
+  it('a capture freezes each mask into a self-contained image first, since a cloned url(#id) points nowhere', () => {
+    const html = masked({ kind: MaskKind.Ellipse });
+    const capture = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]).find((s) => s.includes('feega:capture'))!;
+
+    expect(capture).toContain('.km,.kt');
+    expect(capture).toContain('luminanceToAlpha');
+    expect(capture.indexOf('freezeMasks')).toBeLessThan(capture.indexOf('toJpeg'));
+  });
+});
+
 describe('track matte composition', () => {
   const stacked = must(
     addClip(must(addTrack(base, TrackKind.Visual, 'top')), { component: 'Title', from: 30, durationInFrames: 120, trackId: 'top', props: { text: 'GO', width: 0.6, height: 0.4 } }, 'title')

@@ -7,7 +7,7 @@ import { css, esc, js, seconds } from './html';
 import { TEMPLATES, Timing, type PropsOf, type TemplateCtx, type Tween, type Vars } from './templates';
 import { LIGHTING, threeImportMap, threeScript, type ThreeClip } from './three';
 import { ANIMATE_CSS, animationScript, colourOverrides, sceneKeys, wrapAnimated } from './animate';
-import { MASK_CSS, MaskScope, maskLayer, startValues } from './masks';
+import { MASK_CSS, MaskScope, freezeMasks, maskLayer, startValues } from './masks';
 import { hiddenMattes, matteMask, matteSource } from '../matte';
 import { Matte, type Mask } from '../mask';
 
@@ -194,7 +194,7 @@ const BASE_CSS = [
 ].join('');
 
 function captureScript(doc: MotionDoc): string {
-  return `<script>(function(){var lib=null;function load(){return lib||(lib=new Promise(function(ok,ko){var s=document.createElement('script');s.src=${js(SCREENSHOT_URL)};s.onload=ok;s.onerror=ko;document.head.appendChild(s);}));}function painted(){return new Promise(function(r){requestAnimationFrame(function(){requestAnimationFrame(r);});});}addEventListener('message',function(e){var m=e.data;if(!m||m.type!==${js(CAPTURE_REQUEST)})return;var reply=function(body){e.source&&e.source.postMessage(Object.assign({type:${js(CAPTURE_REPLY)},id:m.id},body),'*');};load().then(function(){return document.fonts.ready;}).then(painted).then(function(){return window.htmlToImage.toJpeg(document.getElementById('root'),{width:${doc.width},height:${doc.height},canvasWidth:m.width,canvasHeight:Math.round(m.width*${doc.height / doc.width}),pixelRatio:1,quality:m.quality});}).then(function(url){reply({url:url});},function(err){reply({error:String(err)});});});})();</script>`;
+  return `<script>(function(){var freezeMasks=(${freezeMasks.toString()});var lib=null;function load(){return lib||(lib=new Promise(function(ok,ko){var s=document.createElement('script');s.src=${js(SCREENSHOT_URL)};s.onload=ok;s.onerror=ko;document.head.appendChild(s);}));}function painted(){return new Promise(function(r){requestAnimationFrame(function(){requestAnimationFrame(r);});});}addEventListener('message',function(e){var m=e.data;if(!m||m.type!==${js(CAPTURE_REQUEST)})return;var reply=function(body){e.source&&e.source.postMessage(Object.assign({type:${js(CAPTURE_REPLY)},id:m.id},body),'*');};load().then(function(){return document.fonts.ready;}).then(painted).then(freezeMasks).then(function(thaw){return window.htmlToImage.toJpeg(document.getElementById('root'),{width:${doc.width},height:${doc.height},canvasWidth:m.width,canvasHeight:Math.round(m.width*${doc.height / doc.width}),pixelRatio:1,quality:m.quality}).finally(thaw);}).then(function(url){reply({url:url});},function(err){reply({error:String(err)});});});})();</script>`;
 }
 
 export function composeHtml(input: ComposeInput): string {

@@ -129,3 +129,50 @@ export function maskLayer(layer: MaskLayer, inner: string): string {
 }
 
 export const MASK_CSS = '.km,.kt{position:absolute;inset:0}.kd{position:absolute;width:0;height:0;overflow:hidden}';
+
+export async function freezeMasks(): Promise<() => void> {
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const asData = (url: string) =>
+    fetch(url)
+      .then((r) => r.blob())
+      .then((blob) => new Promise<string>((resolve) => Object.assign(new FileReader(), { onload: (e: ProgressEvent<FileReader>) => resolve(String(e.target?.result)) }).readAsDataURL(blob)));
+  const undo: (() => void)[] = [];
+
+  for (const el of Array.from(document.querySelectorAll<HTMLElement>('.km,.kt'))) {
+    const defs = el.previousElementSibling?.querySelector('defs');
+    const mask = defs?.querySelector('mask');
+    if (!defs || !mask) {
+      continue;
+    }
+
+    const width = el.offsetWidth;
+    const height = el.offsetHeight;
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('width', String(width));
+    svg.setAttribute('height', String(height));
+    svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    svg.innerHTML = `<filter id="kl" filterUnits="userSpaceOnUse" x="0" y="0" width="${width}" height="${height}" color-interpolation-filters="sRGB"><feColorMatrix type="luminanceToAlpha" result="l"/><feComposite in="l" in2="SourceGraphic" operator="in"/></filter>`;
+
+    const copy = defs.cloneNode(true) as Element;
+    copy.querySelector('mask')?.remove();
+    const body = document.createElementNS(SVG_NS, 'g');
+    body.setAttribute('filter', 'url(#kl)');
+    body.append(...Array.from(mask.cloneNode(true).childNodes));
+    svg.append(copy, body);
+
+    for (const image of Array.from(svg.querySelectorAll('image'))) {
+      const href = image.getAttribute('href');
+      if (href && !href.startsWith('data:')) {
+        image.setAttribute('href', await asData(href).catch(() => href));
+      }
+    }
+
+    const before = el.getAttribute('style') ?? '';
+    const frozen = `url("data:image/svg+xml;charset=utf-8,${encodeURIComponent(new XMLSerializer().serializeToString(svg))}") 0 0 / 100% 100% no-repeat`;
+    el.style.setProperty('mask', frozen);
+    el.style.setProperty('-webkit-mask', frozen);
+    undo.push(() => el.setAttribute('style', before));
+  }
+
+  return () => undo.forEach((restore) => restore());
+}
