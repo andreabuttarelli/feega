@@ -58,3 +58,8 @@
 - [ ] Copy TERMS §12/§12A and DMCA.md to the Framer site (`/terms`, new `/dmca`); the in-app form links to `feega.app/terms`.
 - [ ] Confirm the strike policy (1 warning, 2 = 30-day suspension, 3 = termination; likeness ×2, CSAM ×3).
 - [ ] Confirm the escalation contacts in `docs/legal/serious-crime-escalation.md` (CNCPO, NCMEC, 112).
+
+## Motion editor (03/10/2026)
+
+- [ ] **Engine licence**: the editor runs on HyperFrames (Apache-2.0). Remotion was tried and removed; if it ever comes back, its company licence is required above 3 employees and server rendering is billed per render (automator pricing). Nothing bought.
+- [ ] **AWS Lambda rendering** (not live): adds AWS as a sub-processor for rendered videos once configured.

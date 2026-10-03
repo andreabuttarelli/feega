@@ -10,7 +10,12 @@
   import ChatComposer from './ChatComposer.svelte';
   import ChatMessage from './ChatMessage.svelte';
 
-  let { projectId = '' }: { projectId?: string } = $props();
+  let {
+    projectId = '',
+    motionNodeId = '',
+    context,
+    onturnend
+  }: { projectId?: string; motionNodeId?: string; context?: () => Record<string, unknown>; onturnend?: () => void } = $props();
 
   let draft = $state('');
   let follow = $state<Follow>('following');
@@ -20,8 +25,16 @@
 
   const routeProjectId = $derived($page.params.projectId ?? '');
   const scopeProjectId = $derived(projectId || routeProjectId);
-  const endpoint = $derived(chatEndpoint({ projectId: scopeProjectId }));
+  const endpoint = $derived(chatEndpoint({ projectId: scopeProjectId, motionNodeId }));
   const session = $derived<ChatSession | null>(endpoint ? chatSession(endpoint) : null);
+
+  $effect(() => {
+    if (!session) {
+      return;
+    }
+    session.context = context ?? (() => ({}));
+    session.onTurnEnd = onturnend ?? null;
+  });
   const messages = $derived(session?.messages ?? []);
   const sending = $derived(session?.sending ?? false);
   const loading = $derived(session?.loading ?? false);

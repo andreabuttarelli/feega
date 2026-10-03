@@ -10,6 +10,7 @@ import { selectNodeSize } from './select-node';
 import { effectsNodeSize } from './effects-node';
 import { compositionNodeSize } from './composition-node';
 import { calendarNodeSize } from './calendar-node';
+import { motionNodeSize } from './motion-node';
 
 type Size = { w: number; h: number };
 
@@ -32,7 +33,8 @@ const NODE_SIZE: Record<NodeType, () => Size> = {
   composition: compositionNodeSize,
   calendar: calendarNodeSize,
   audio: () => genNodeSize('audio'),
-  model3d: () => genNodeSize('model3d')
+  model3d: () => genNodeSize('model3d'),
+  motion: motionNodeSize
 };
 
 export function nodeSize(type: string): Size {

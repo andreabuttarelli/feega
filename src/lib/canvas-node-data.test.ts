@@ -41,7 +41,8 @@ describe('cosa una riga di `nodes` può essere', () => {
       'composition',
       'calendar',
       'audio',
-      'model3d'
+      'model3d',
+      'motion'
     ]);
   });
 

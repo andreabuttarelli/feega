@@ -40,6 +40,8 @@ export class ChatSession {
   failed = $state<Failure | ''>('');
   failedDetail = $state('');
   revision = $state(0);
+  context: () => Record<string, unknown> = () => ({});
+  onTurnEnd: (() => void) | null = null;
 
   #abort: AbortController | null = null;
   readonly #endpoint: string;
@@ -100,7 +102,7 @@ export class ChatSession {
       const res = await this.#fetch(this.#endpoint, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify({ ...this.context(), message: text }),
         signal: this.#abort.signal
       });
       if (!res.ok || !res.body) {
@@ -116,6 +118,7 @@ export class ChatSession {
       turns.running--;
       this.#abort = null;
       this.revision++;
+      this.onTurnEnd?.();
     }
   }
 

@@ -1,0 +1,534 @@
+<script lang="ts">
+  import { deserialize } from '$app/forms';
+  import ArrowLeft from '@lucide/svelte/icons/arrow-left';
+  import Play from '@lucide/svelte/icons/play';
+  import Pause from '@lucide/svelte/icons/pause';
+  import Scissors from '@lucide/svelte/icons/scissors';
+  import Copy from '@lucide/svelte/icons/copy';
+  import Trash from '@lucide/svelte/icons/trash-2';
+  import Undo from '@lucide/svelte/icons/undo-2';
+  import Redo from '@lucide/svelte/icons/redo-2';
+  import Magnet from '@lucide/svelte/icons/magnet';
+  import Plus from '@lucide/svelte/icons/plus';
+  import ZoomIn from '@lucide/svelte/icons/zoom-in';
+  import ZoomOut from '@lucide/svelte/icons/zoom-out';
+  import Film from '@lucide/svelte/icons/film';
+  import MotionPreview from '$lib/components/motion/MotionPreview.svelte';
+  import MotionTimeline from '$lib/components/motion/MotionTimeline.svelte';
+  import MotionInspector from '$lib/components/motion/MotionInspector.svelte';
+  import ChatPanel from '$lib/components/brand-agent/ChatPanel.svelte';
+  import { AssetKind, COMPONENTS, COMPONENT_IDS, TrackKind, type ComponentId } from '$lib/motion/components';
+  import { FPS } from '$lib/motion/design';
+  import { FORMATS, MOTION_FORMATS, MAX_SECONDS, findClip, formatOf, type MotionDoc, type MotionFormat } from '$lib/motion/doc';
+  import { addClip, addTrack, duplicateClip, removeClips, setCanvas, splitClip, type OpResult } from '$lib/motion/timeline';
+  import { amend, canRedo, canUndo, record, redo, startHistory, undo, type History } from '$lib/motion/history';
+  import { Snap, clampZoom, timecode } from '$lib/motion/timeline-view';
+  import { Command, commandFor } from '$lib/motion/shortcuts';
+  import { composeHtml } from '$lib/motion/hyperframes/compose';
+  import { renderQuote } from '$lib/motion/render-quote';
+  import { feegaTrailer } from '$lib/motion/trailer';
+  import type { PageData } from './$types';
+
+  const SAVE_DEBOUNCE_MS = 700;
+  const COALESCE_MS = 800;
+  const HEAD_POLL_TRIES = 6;
+  const HEAD_POLL_MS = 500;
+  const ZOOM_STEP = 1.25;
+
+  const SaveState = { Saved: 'Saved', Saving: 'Saving…', Pending: 'Unsaved', Conflict: 'Reloaded the latest version', Failed: 'Not saved' } as const;
+  type SaveState = (typeof SaveState)[keyof typeof SaveState];
+
+  let { data }: { data: PageData } = $props();
+
+  let history = $state<History>(startHistory(data.head.doc as MotionDoc));
+  let version = $state(data.head.version);
+  let selection = $state<string[]>([]);
+  let frame = $state(0);
+  let playing = $state(false);
+  let zoom = $state(1.5);
+  let snap = $state(Snap.On);
+  let saveState = $state<SaveState>(SaveState.Saved);
+  let notice = $state('');
+  let adding = $state(false);
+  let rendering = $state(false);
+
+  let lastEdit = { summary: '', at: 0 };
+  let saveTimer: ReturnType<typeof setTimeout> | null = null;
+  let unsavedSummary = '';
+
+  const doc = $derived(history.present);
+  const assetUrls = $derived(Object.fromEntries(data.assets.filter((a) => a.url).map((a) => [a.id, a.url as string])));
+  const html = $derived(composeHtml({ doc, tokens: data.tokens, assets: assetUrls }));
+  const selected = $derived(selection.length === 1 ? (findClip(doc, selection[0])?.clip ?? null) : null);
+  const quote = $derived(renderQuote(doc));
+  const editorUrl = $derived(`/p/${data.projectId}/c/${data.canvas.id}/motion/${data.node.id}`);
+  const agentUrl = $derived(`/api/v1/projects/${data.projectId}/motion/${data.node.id}/agent`);
+
+  function edit(next: MotionDoc, summary: string) {
+    const now = Date.now();
+    history = summary === lastEdit.summary && now - lastEdit.at < COALESCE_MS ? amend(history, next) : record(history, next);
+    lastEdit = { summary, at: now };
+    scheduleSave(summary);
+  }
+
+  function apply(result: OpResult, summary: string) {
+    if (!result.ok) {
+      notice = result.error;
+      return;
+    }
+    notice = '';
+    edit(result.doc, summary);
+  }
+
+  function scheduleSave(summary: string) {
+    unsavedSummary = summary;
+    saveState = SaveState.Pending;
+    if (saveTimer) {
+      clearTimeout(saveTimer);
+    }
+    saveTimer = setTimeout(() => void save(), SAVE_DEBOUNCE_MS);
+  }
+
+  async function save() {
+    saveState = SaveState.Saving;
+    const form = new FormData();
+    form.set('doc', JSON.stringify(history.present));
+    form.set('version', String(version));
+    form.set('summary', unsavedSummary);
+    const res = await fetch(`${editorUrl}?/save`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
+    const result = deserialize(await res.text());
+
+    if (result.type === 'success') {
+      version = Number(result.data?.version ?? version);
+      saveState = SaveState.Saved;
+      return;
+    }
+    if (result.type === 'failure' && result.data?.error === 'conflict') {
+      const head = result.data.head as { version: number; doc: MotionDoc };
+      history = record(history, head.doc);
+      version = head.version;
+      saveState = SaveState.Conflict;
+      return;
+    }
+    saveState = SaveState.Failed;
+    notice = result.type === 'failure' ? String(result.data?.error ?? '') : '';
+  }
+
+  async function pullAgentEdit() {
+    for (let i = 0; i < HEAD_POLL_TRIES; i++) {
+      const res = await fetch(agentUrl);
+      const body = (await res.json().catch(() => null)) as { head?: { version: number; doc: MotionDoc } } | null;
+      if (body?.head && body.head.version > version) {
+        history = record(history, body.head.doc);
+        version = body.head.version;
+        selection = selection.filter((id) => findClip(body.head!.doc, id));
+        return;
+      }
+      await new Promise((r) => setTimeout(r, HEAD_POLL_MS));
+    }
+  }
+
+  const newId = () => crypto.randomUUID().slice(0, 8);
+
+  function add(component: ComponentId) {
+    adding = false;
+    const id = newId();
+    apply(addClip(doc, { component, from: frame }, id), `Added ${COMPONENTS[component].label}`);
+    selection = [id];
+  }
+
+  function startTrailer() {
+    adding = false;
+    const firstOf = (kind: AssetKind) => data.assets.find((a) => a.kind === kind)?.id ?? null;
+    edit(feegaTrailer({ modelId: firstOf(AssetKind.Model3d), imageId: firstOf(AssetKind.Image) }), 'Started from the feega trailer');
+  }
+
+  function newTrack(kind: TrackKind) {
+    apply(addTrack(doc, kind, newId()), 'Added a track');
+  }
+
+  function split() {
+    for (const id of selection) {
+      const result = splitClip(history.present, id, frame, newId());
+      if (result.ok) {
+        edit(result.doc, 'Split');
+      }
+    }
+  }
+
+  function duplicate() {
+    const copies: string[] = [];
+    for (const id of selection) {
+      const copy = newId();
+      const result = duplicateClip(history.present, id, copy);
+      if (result.ok) {
+        edit(result.doc, 'Duplicated');
+        copies.push(copy);
+      }
+    }
+    selection = copies;
+  }
+
+  function remove() {
+    if (!selection.length) {
+      return;
+    }
+    apply(removeClips(doc, selection), 'Deleted');
+    selection = [];
+  }
+
+  function undoEdit() {
+    history = undo(history);
+    scheduleSave('Undo');
+  }
+
+  function redoEdit() {
+    history = redo(history);
+    scheduleSave('Redo');
+  }
+
+  function step(frames: number) {
+    playing = false;
+    frame = Math.min(Math.max(0, frame + frames), doc.durationInFrames - 1);
+  }
+
+  function setFormat(format: MotionFormat) {
+    apply(setCanvas(doc, { format }), 'Changed format');
+  }
+
+  function setDuration(seconds: number) {
+    apply(setCanvas(doc, { durationInFrames: Math.round(seconds * FPS) }), 'Changed duration');
+  }
+
+  async function render() {
+    rendering = true;
+    const form = new FormData();
+    form.set('doc', JSON.stringify(doc));
+    const res = await fetch(`${editorUrl}?/render`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
+    const result = deserialize(await res.text());
+    notice = result.type === 'success' ? 'Rendering started.' : 'Rendering not configured';
+    rendering = false;
+  }
+
+  const COMMANDS: Record<Command, () => void> = {
+    [Command.TogglePlay]: () => (playing = !playing),
+    [Command.Delete]: remove,
+    [Command.Split]: split,
+    [Command.Duplicate]: duplicate,
+    [Command.Undo]: undoEdit,
+    [Command.Redo]: redoEdit,
+    [Command.StepBack]: () => step(-1),
+    [Command.StepForward]: () => step(1),
+    [Command.SecondBack]: () => step(-FPS),
+    [Command.SecondForward]: () => step(FPS),
+    [Command.ZoomIn]: () => (zoom = clampZoom(zoom * ZOOM_STEP)),
+    [Command.ZoomOut]: () => (zoom = clampZoom(zoom / ZOOM_STEP)),
+    [Command.SelectAll]: () => (selection = doc.tracks.flatMap((t) => t.clips.map((c) => c.id))),
+    [Command.Deselect]: () => (selection = [])
+  };
+
+  function onKey(e: KeyboardEvent) {
+    const target = e.target as HTMLElement | null;
+    if (target?.closest('input, textarea, select, [contenteditable="true"]')) {
+      return;
+    }
+    const command = commandFor({ key: e.key, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey });
+    if (!command) {
+      return;
+    }
+    e.preventDefault();
+    COMMANDS[command]();
+  }
+</script>
+
+<svelte:head><title>{data.node.name ?? 'Motion'} · Motion editor</title></svelte:head>
+<svelte:window onkeydown={onKey} />
+
+<div class="editor" data-testid="motion-editor">
+  <header class="bar">
+    <a class="back" href={`/p/${data.projectId}/c/${data.canvas.id}`}><ArrowLeft size={14} /> {data.canvas.name}</a>
+    <span class="title">{data.node.name ?? 'Motion'}</span>
+    <label class="field">
+      Format
+      <select value={formatOf(doc)} onchange={(e) => setFormat(e.currentTarget.value as MotionFormat)}>
+        {#each MOTION_FORMATS as format (format)}<option value={format}>{FORMATS[format].label}</option>{/each}
+      </select>
+    </label>
+    <label class="field">
+      Length (s)
+      <input type="number" min="1" max={MAX_SECONDS} step="0.5" value={doc.durationInFrames / FPS} onchange={(e) => setDuration(Number(e.currentTarget.value))} />
+    </label>
+    <span class="save" data-testid="save-state">{saveState} · v{version}</span>
+    {#if data.renderConfigured}
+      <button type="button" class="render" disabled={rendering} onclick={render}><Film size={14} /> Render · {quote.credits} credits</button>
+    {:else}
+      <button type="button" class="render" disabled title="Rendering to MP4 needs the render service set up"><Film size={14} /> Rendering not configured</button>
+    {/if}
+  </header>
+
+  <div class="body">
+    <section class="left">
+      <div class="preview">
+        <MotionPreview {html} width={doc.width} height={doc.height} bind:frame bind:playing />
+      </div>
+
+      <div class="transport">
+        <button type="button" aria-label={playing ? 'Pause' : 'Play'} onclick={() => (playing = !playing)}>
+          {#if playing}<Pause size={14} />{:else}<Play size={14} />{/if}
+        </button>
+        <span class="tc" data-testid="timecode">{timecode(frame)} / {timecode(doc.durationInFrames)}</span>
+        <span class="sep"></span>
+        <div class="add">
+          <button type="button" onclick={() => (adding = !adding)}><Plus size={14} /> Add</button>
+          {#if adding}
+            <div class="menu" role="menu">
+              {#each COMPONENT_IDS as id (id)}
+                <button type="button" role="menuitem" onclick={() => add(id)}>{COMPONENTS[id].label}</button>
+              {/each}
+              <hr />
+              <button type="button" role="menuitem" onclick={startTrailer}>feega trailer template</button>
+              <button type="button" role="menuitem" onclick={() => newTrack(TrackKind.Visual)}>Video track</button>
+              <button type="button" role="menuitem" onclick={() => newTrack(TrackKind.Audio)}>Audio track</button>
+            </div>
+          {/if}
+        </div>
+        <button type="button" title="Split at playhead (S)" disabled={!selection.length} onclick={split}><Scissors size={14} /></button>
+        <button type="button" title="Duplicate (⌘D)" disabled={!selection.length} onclick={duplicate}><Copy size={14} /></button>
+        <button type="button" title="Delete (Del)" disabled={!selection.length} onclick={remove}><Trash size={14} /></button>
+        <button type="button" title="Undo (⌘Z)" disabled={!canUndo(history)} onclick={undoEdit}><Undo size={14} /></button>
+        <button type="button" title="Redo (⇧⌘Z)" disabled={!canRedo(history)} onclick={redoEdit}><Redo size={14} /></button>
+        <button type="button" title="Snap" class:on={snap === Snap.On} onclick={() => (snap = snap === Snap.On ? Snap.Off : Snap.On)}><Magnet size={14} /></button>
+        <span class="sep"></span>
+        <button type="button" title="Zoom out (−)" onclick={COMMANDS[Command.ZoomOut]}><ZoomOut size={14} /></button>
+        <button type="button" title="Zoom in (+)" onclick={COMMANDS[Command.ZoomIn]}><ZoomIn size={14} /></button>
+        {#if notice}<span class="notice" role="status">{notice}</span>{/if}
+      </div>
+
+      <div class="tl">
+        <MotionTimeline {doc} bind:frame bind:selection {zoom} {snap} onchange={edit} />
+      </div>
+    </section>
+
+    <aside class="props">
+      {#if selected}
+        <MotionInspector {doc} clip={selected} tokens={data.tokens} assets={data.assets} onchange={edit} />
+      {:else}
+        <p class="hint">{selection.length > 1 ? `${selection.length} clips selected.` : 'Select a clip in the timeline to edit its properties.'}</p>
+      {/if}
+    </aside>
+
+    <aside class="chat">
+      <ChatPanel projectId={data.projectId} motionNodeId={data.node.id} context={() => ({ selection })} onturnend={() => void pullAgentEdit()} />
+    </aside>
+  </div>
+</div>
+
+<style>
+  .editor {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'DM Sans', system-ui, sans-serif;
+    z-index: 10;
+  }
+
+  .bar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    height: 48px;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--line);
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+
+  .back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--ink-soft);
+  }
+
+  .title {
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .field {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--ink-soft);
+  }
+
+  .field select,
+  .field input {
+    width: 72px;
+    padding: 3px 5px;
+    border: 1px solid var(--line);
+    background: var(--paper);
+    color: var(--ink);
+    font: inherit;
+  }
+
+  .save {
+    margin-left: auto;
+    font-family: 'Fragment Mono', ui-monospace, monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+  }
+
+  .render {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--ink);
+    color: var(--paper);
+    font-size: 12px;
+  }
+
+  .render:disabled {
+    opacity: 0.5;
+  }
+
+  .body {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 280px 380px;
+  }
+
+  .left {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .preview {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: var(--paper-2);
+  }
+
+  .preview :global([data-testid='motion-preview']) {
+    height: 100%;
+  }
+
+  .transport {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-top: 1px solid var(--line);
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+
+  .transport > button,
+  .add > button {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 26px;
+    padding: 0 7px;
+    color: var(--ink);
+  }
+
+  .transport button:hover:not(:disabled) {
+    background: var(--paper-3);
+  }
+
+  .transport button:disabled {
+    opacity: 0.35;
+  }
+
+  .transport button.on {
+    background: var(--paper-3);
+    color: #0099ff;
+  }
+
+  .tc {
+    font-family: 'Fragment Mono', ui-monospace, monospace;
+    font-size: 11px;
+    padding: 0 6px;
+  }
+
+  .sep {
+    width: 1px;
+    height: 18px;
+    background: var(--line);
+    margin: 0 4px;
+  }
+
+  .add {
+    position: relative;
+  }
+
+  .menu {
+    position: absolute;
+    bottom: 30px;
+    left: 0;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    min-width: 170px;
+    padding: 4px;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    box-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
+  }
+
+  .menu button {
+    text-align: left;
+    padding: 5px 8px;
+  }
+
+  .menu button:hover {
+    background: var(--paper-3);
+  }
+
+  .menu hr {
+    border: 0;
+    border-top: 1px solid var(--line);
+    margin: 4px 0;
+  }
+
+  .notice {
+    margin-left: 8px;
+    color: var(--ink-soft);
+  }
+
+  .tl {
+    height: 240px;
+    flex-shrink: 0;
+  }
+
+  .props {
+    border-left: 1px solid var(--line);
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .hint {
+    padding: 16px 12px;
+    color: var(--ink-soft);
+    font-size: 12px;
+  }
+
+  .chat {
+    border-left: 1px solid var(--line);
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+</style>

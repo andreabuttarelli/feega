@@ -998,6 +998,7 @@ export type Database = {
           created_by: string | null
           id: string
           last_message_at: string | null
+          node_id: string | null
           org_id: string
           project_id: string | null
           surface: string
@@ -1011,6 +1012,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           last_message_at?: string | null
+          node_id?: string | null
           org_id: string
           project_id?: string | null
           surface?: string
@@ -1024,6 +1026,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           last_message_at?: string | null
+          node_id?: string | null
           org_id?: string
           project_id?: string | null
           surface?: string
@@ -1600,6 +1603,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      motion_revisions: {
+        Row: {
+          actor_id: string | null
+          actor_kind: string
+          agent_key: string | null
+          created_at: string
+          doc: Json
+          id: string
+          node_id: string
+          org_id: string
+          summary: string | null
+          version: number
+        }
+        Insert: {
+          actor_id?: string | null
+          actor_kind: string
+          agent_key?: string | null
+          created_at?: string
+          doc: Json
+          id?: string
+          node_id: string
+          org_id: string
+          summary?: string | null
+          version: number
+        }
+        Update: {
+          actor_id?: string | null
+          actor_kind?: string
+          agent_key?: string | null
+          created_at?: string
+          doc?: Json
+          id?: string
+          node_id?: string
+          org_id?: string
+          summary?: string | null
+          version?: number
+        }
+        Relationships: []
       }
       node_runs: {
         Row: {
