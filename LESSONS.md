@@ -2291,3 +2291,15 @@ and the MP4; the determinism check passes. Cause: the HyperFrames runtime seeks 
 `totalTime(t, true)`, which suppresses GSAP callbacks, so `onUpdate` never runs. Move: route
 callbacks through a render plugin (`feegaRender` in `custom/runtime.ts`); test with
 `totalTime(t, true)`, never `seek(t)`.
+
+## A Vercel Sandbox snapshot is "not found" from the deployment
+Signal: `Snapshot not found` (404) creating a sandbox from a snapshot id that works locally.
+Cause: snapshots belong to the project of the credentials that made them; the local
+`VERCEL_PROJECT_ID` is not the app project the deployment's OIDC speaks for. Move: no snapshot
+ids in env — keep a named persistent base sandbox per version and `Sandbox.fork` it
+(`vercel-farm.ts`); it is rebuilt where it is first used.
+
+## Headless Chrome will not start in a Vercel Sandbox
+Signal: HyperFrames says `Chrome cannot launch (missing system libraries)`: libnss3, libnspr4.
+Cause: the sandbox image is a bare Ubuntu 26.04. Move: apt-install the Chrome libraries
+(`libasound2t64`, not `libasound2`) in the base setup, next to ffmpeg.

@@ -470,6 +470,7 @@
       {editorUrl}
       fileName={data.node.name ?? 'motion'}
       render={exportFrames}
+      server={{ ...data.serverRender, version, saved: saveState === SaveState.Saved, assetHref: (id: string) => `/p/${data.projectId}/c/${data.canvas.id}/assets/${id}` }}
       onclose={() => (exporting = false)}
     />
   {/if}

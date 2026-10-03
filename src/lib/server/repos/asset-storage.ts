@@ -13,7 +13,8 @@ export const SIGNED_URL_TTL_S = {
   canvas: 86_400,
   agentPreview: 300,
   providerInput: 300,
-  userLink: 3600
+  userLink: 3600,
+  render: 900
 } as const;
 
 const SIGNED_URL_SECONDS = SIGNED_URL_TTL_S.canvas;

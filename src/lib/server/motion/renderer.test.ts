@@ -1,26 +1,20 @@
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('$env/dynamic/private', () => ({ env: {} }));
+vi.mock('@vercel/sandbox', () => ({ Sandbox: {} }));
 
-import { LAMBDA_ENV, RENDER_NOT_CONFIGURED, motionRenderer } from './renderer';
+import { motionRenderFarm } from './renderer';
 
-const job = { html: '<html></html>', width: 1080, height: 1920, fps: 30, durationInFrames: 450 };
-
-describe('motion renderer', () => {
-  it('without AWS settings it is not configured and refuses to start', async () => {
-    const renderer = motionRenderer({});
-
-    expect(renderer.configured).toBe(false);
-    expect(await renderer.start(job)).toEqual({ ok: false, error: RENDER_NOT_CONFIGURED });
+describe('motion render farm', () => {
+  it('off Vercel and without a sandbox token there is no farm: the editor offers the browser export only', () => {
+    expect(motionRenderFarm({})).toBeNull();
   });
 
-  it('one missing setting is the same as none', () => {
-    const partial = Object.fromEntries(LAMBDA_ENV.slice(1).map((k) => [k, 'x']));
-
-    expect(motionRenderer(partial).configured).toBe(false);
+  it('a deployment on Vercel renders on sandboxes with its own identity', () => {
+    expect(motionRenderFarm({ VERCEL: '1' })).not.toBeNull();
   });
 
-  it('every setting present makes it configured', () => {
-    expect(motionRenderer(Object.fromEntries(LAMBDA_ENV.map((k) => [k, 'x']))).configured).toBe(true);
+  it('a local checkout with a token, team and project renders on sandboxes too', () => {
+    expect(motionRenderFarm({ VERCEL_TOKEN: 't', VERCEL_TEAM_ID: 'team', VERCEL_PROJECT_ID: 'p' })).not.toBeNull();
   });
 });

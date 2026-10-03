@@ -9,6 +9,9 @@ export enum RenderStage {
 
 export type ChunkPlan = { size: number; count: number };
 export type RenderProgress = { stage: RenderStage; chunksDone: number; chunks: number; totalFrames: number };
+export type RenderRunStatus = 'running' | 'finishing' | 'done' | 'failed' | 'expired';
+export type RenderView = { id: string; status: RenderRunStatus; progress: RenderProgress | null; error: string | null; assetId: string | null; credits: number | null };
+export type ServerRender = { configured: boolean; version: number; saved: boolean; latest: RenderView | null; assetHref: (id: string) => string };
 export type RenderEvent = { kind: 'chunk' | 'assembling' | 'saving' | 'done' | 'failed' };
 
 const CHUNK_TARGET_FRAMES = 120;
