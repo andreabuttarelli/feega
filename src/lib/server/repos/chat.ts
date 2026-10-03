@@ -68,6 +68,47 @@ export async function openThread(
   return data.id as string;
 }
 
+export const MOTION_SURFACE = 'motion';
+
+export async function openNodeThread(
+  db: Db,
+  input: { orgId: string; projectId: string; nodeId: string; userId: string; brandId?: string | null }
+): Promise<string> {
+  const { data: existing } = await db
+    .from('chat_threads')
+    .select('id')
+    .eq('org_id', input.orgId)
+    .eq('node_id', input.nodeId)
+    .eq('created_by', input.userId)
+    .eq('surface', MOTION_SURFACE)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (existing?.id) {
+    return existing.id as string;
+  }
+
+  const { data, error } = await db
+    .from('chat_threads')
+    .insert({
+      org_id: input.orgId,
+      project_id: input.projectId,
+      node_id: input.nodeId,
+      brand_id: input.brandId ?? null,
+      created_by: input.userId,
+      surface: MOTION_SURFACE,
+      title: 'Motion'
+    } as never)
+    .select('id')
+    .single();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+  return data.id as string;
+}
+
 /** Gli ULTIMI messaggi, rimessi in ordine cronologico: il modello non legge la chat al contrario. */
 export async function loadTurns(
   db: Db,

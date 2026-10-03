@@ -28,6 +28,10 @@ export function redo(h: History): History {
   return { past: [...h.past, h.present], present: next, future };
 }
 
+export function amend(h: History, doc: MotionDoc): History {
+  return { ...h, present: doc, future: [] };
+}
+
 export function canUndo(h: History): boolean {
   return h.past.length > 0;
 }

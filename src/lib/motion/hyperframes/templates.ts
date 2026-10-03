@@ -249,7 +249,7 @@ const CanvasMock: Template<'CanvasMock'> = {
       true
     );
   },
-  tweens: (ctx) => [
+  tweens: (ctx): Tween[] => [
     { target: `#pr-${ctx.id}`, from: { clipPath: 'inset(0 100% 0 0)' }, to: { clipPath: 'inset(0 0% 0 0)' }, at: ctx.start, duration: frames(ctx, 45), ease: Ease.Linear },
     { target: `#wr-${ctx.id}`, from: { strokeDashoffset: 1 }, to: { strokeDashoffset: 0 }, at: ctx.start + frames(ctx, 45), duration: frames(ctx, 20), ease: Ease.Standard },
     { target: `#rs-${ctx.id}`, from: { clipPath: 'inset(0 0 100% 0)' }, to: { clipPath: 'inset(0 0 0% 0)' }, at: ctx.start + frames(ctx, 70), duration: frames(ctx, 20), ease: Ease.Standard }

@@ -56,3 +56,13 @@ export async function findBrand(db: Db, input: { orgId: string; brandId: string 
   if (error) throw error;
   return data ? toBrand(data as unknown as BrandColumns) : null;
 }
+
+export type BrandLook = { name: string; content: string | null; logoUrl: string | null };
+
+export async function findBrandLook(db: Db, input: { orgId: string; brandId: string }): Promise<BrandLook | null> {
+  const { data, error } = await db.from('brands').select('name, content, logo_url').eq('org_id', input.orgId).eq('id', input.brandId).maybeSingle();
+  if (error) {
+    throw error;
+  }
+  return data ? { name: data.name as string, content: (data.content as string | null) ?? null, logoUrl: (data.logo_url as string | null) ?? null } : null;
+}

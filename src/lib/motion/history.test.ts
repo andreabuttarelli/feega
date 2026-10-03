@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, newMotionDoc } from './doc';
-import { HISTORY_LIMIT, canRedo, canUndo, record, redo, startHistory, undo } from './history';
+import { HISTORY_LIMIT, amend, canRedo, canUndo, record, redo, startHistory, undo } from './history';
 import { setCanvas } from './timeline';
 
 const base = newMotionDoc(MotionFormat.Landscape);
@@ -30,6 +30,13 @@ describe('undo and redo', () => {
   it('nothing to undo at the start', () => {
     expect(canUndo(startHistory(base))).toBe(false);
     expect(undo(startHistory(base)).present).toBe(base);
+  });
+
+  it('amend replaces the present without a new undo step, so a slider drag undoes in one go', () => {
+    const h = amend(record(startHistory(base), longer), { ...base, durationInFrames: 700 });
+
+    expect(h.past).toEqual([base]);
+    expect(undo(h).present).toBe(base);
   });
 
   it('keeps a bounded past', () => {

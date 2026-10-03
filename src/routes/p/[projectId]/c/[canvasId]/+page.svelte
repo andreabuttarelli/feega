@@ -67,6 +67,8 @@
   import EffectsEditor from '$lib/components/canvas/EffectsEditor.svelte';
   import CompositionNode from '$lib/components/canvas/CompositionNode.svelte';
   import CalendarNode from '$lib/components/canvas/CalendarNode.svelte';
+  import MotionNode from '$lib/components/canvas/MotionNode.svelte';
+  import { motionEditorPath, motionOf } from '$lib/canvas/motion-node';
   import { calendarBrand, calendarData, calendarOf, CalendarScope, type CalendarNode as CalendarNodeState } from '$lib/canvas/calendar-node';
   import { calendarError, type CalendarBrand, type CalendarPost } from '$lib/canvas/calendar-posts';
   import { plannedInstant } from '$lib/calendar/period-grid';
@@ -2594,6 +2596,7 @@
         {@const effects = effectsOf(row)}
         {@const composition = compositionOf(row)}
         {@const calendar = calendarOf(row)}
+        {@const motion = motionOf(row)}
         {@const estimateRevision = textEstimateRevision(id)}
         {@const textCost = textCostEstimates[id]?.revision === estimateRevision ? textCostEstimates[id] : undefined}
         {@const uploaded = isUploadedNodeRow(row) ? uploadedNodeOf(row) : null}
@@ -2770,6 +2773,8 @@
             imageCount={upstreamCompositionRefsOf(id).length}
             onopeneditor={() => openCompositionEditor(id)}
           />
+        {:else if motion}
+          <MotionNode node={motion} href={motionEditorPath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId: id })} />
         {:else if calendar}
           {@const calState = calendarStateOf(id)}
           <CalendarNode
