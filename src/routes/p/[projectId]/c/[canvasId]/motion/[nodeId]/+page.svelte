@@ -354,7 +354,7 @@
     <section class="left">
       <div class="preview">
         <MotionPreview bind:this={preview} {html} width={doc.width} height={doc.height} bind:frame bind:playing>
-          {#if selected?.mask && !playing}<MaskOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
+          {#if selected?.mask && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<MaskOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         </MotionPreview>
       </div>
 

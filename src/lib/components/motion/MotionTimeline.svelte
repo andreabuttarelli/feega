@@ -259,10 +259,10 @@
                 {#if Object.keys(clip.keyframes).length}
                   <button type="button" class="lanes-toggle" aria-label="Show keyframes" aria-expanded={selection.includes(clip.id) && !collapsed.includes(clip.id)} onpointerdown={(e) => e.stopPropagation()} onclick={(e) => (selection.includes(clip.id) ? toggleLanes(e, clip.id) : (selection = [clip.id]))}>◆</button>
                 {/if}
+                {#if clip.mask}<span class="tag" title="Masked">· mask</span>{/if}
+                {#if clip.matte !== Matte.None}<span class="tag" title="Track matte">· {clip.matte} matte</span>{/if}
               </span>
               <span class="label">{clipLabel(clip as MotionClip)}</span>
-              {#if clip.mask}<span class="tag" title="Masked">mask</span>{/if}
-              {#if clip.matte !== Matte.None}<span class="tag" title="Track matte">{clip.matte} matte</span>{/if}
             </div>
           {/each}
           {#each edgeHandles(track.clips, ppf, selection) as handle (`${handle.clipId}-${handle.grip}`)}
@@ -456,12 +456,7 @@
   }
 
   .bar .tag {
-    flex: none;
-    padding: 0 3px;
-    font-family: 'Fragment Mono', ui-monospace, monospace;
-    font-size: 9px;
-    border: 1px solid currentColor;
-    color: var(--ink-soft);
+    color: #a855f7;
   }
 
   .lane.group .prop {
