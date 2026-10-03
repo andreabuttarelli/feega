@@ -2265,3 +2265,10 @@ the page); the music is the longest audio (`templateAssets`), so seed fixtures w
 Signal: `__vite_ssr_dynamic_import__ is not defined` from a Playwright script run with
 `vite-node`. Cause: vite-node rewrites `import()` inside the function shipped to the browser.
 Move: run browser-side probes with plain `node` (`.mjs`), or pass the function as a string.
+
+## A motion export contains frames of another video
+Signal: an MP4 (or `view_frames`) shows clips of the doc loaded before, usually at the start.
+Cause: `ready` from the previous `srcdoc` load resolved the wait for the new one; until the
+navigation commits, `contentWindow` is the old document and answers the capture. Move: trust a
+frame only if its reply carries the stamp of the composition you loaded (`preview-driver.ts`),
+and serialize every borrowed capture.

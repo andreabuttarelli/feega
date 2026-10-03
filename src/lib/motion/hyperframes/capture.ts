@@ -12,9 +12,9 @@ export enum FrameFormat {
 }
 
 export type CaptureRequest = { type: typeof CAPTURE_REQUEST; id: string; format: FrameFormat; width: number; height: number; quality?: number };
-export type CaptureReply = { type: typeof CAPTURE_REPLY; id: string; url?: string; bitmap?: ImageBitmap; error?: string };
+export type CaptureReply = { type: typeof CAPTURE_REPLY; id: string; stamp?: string; url?: string; bitmap?: ImageBitmap; error?: string };
 
-type RuntimeConfig = { request: string; reply: string; lib: string; width: number; height: number; mediaTimeoutMs: number };
+type RuntimeConfig = { request: string; reply: string; lib: string; width: number; height: number; mediaTimeoutMs: number; stamp: string };
 type Shot = { body: Record<string, unknown>; transfer: Transferable[] };
 type HtmlToImage = {
   toJpeg: (node: HTMLElement, options: Record<string, unknown>) => Promise<string>;
@@ -73,7 +73,7 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>) {
       return;
     }
     const source = e.source as Window | null;
-    const reply = (body: Record<string, unknown>, transfer: Transferable[]) => source?.postMessage({ type: cfg.reply, id: m.id, ...body }, { targetOrigin: '*', transfer });
+    const reply = (body: Record<string, unknown>, transfer: Transferable[]) => source?.postMessage({ type: cfg.reply, id: m.id, stamp: cfg.stamp, ...body }, { targetOrigin: '*', transfer });
     const root = document.getElementById('root') as HTMLElement;
 
     load()
@@ -90,7 +90,21 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>) {
   });
 }
 
-export function captureScript(doc: { width: number; height: number }): string {
-  const cfg: RuntimeConfig = { request: CAPTURE_REQUEST, reply: CAPTURE_REPLY, lib: SCREENSHOT_URL, width: doc.width, height: doc.height, mediaTimeoutMs: MEDIA_TIMEOUT_MS };
+const STAMP = /"stamp":"([a-z0-9-]+)"/;
+
+export function stampOf(html: string): string | null {
+  return STAMP.exec(html)?.[1] ?? null;
+}
+
+export function contentStamp(content: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < content.length; i++) {
+    hash = Math.imul(hash ^ content.charCodeAt(i), 0x01000193);
+  }
+  return `${(hash >>> 0).toString(36)}-${content.length.toString(36)}`;
+}
+
+export function captureScript(doc: { width: number; height: number }, stamp: string): string {
+  const cfg: RuntimeConfig = { request: CAPTURE_REQUEST, reply: CAPTURE_REPLY, lib: SCREENSHOT_URL, width: doc.width, height: doc.height, mediaTimeoutMs: MEDIA_TIMEOUT_MS, stamp };
   return `<script>(${captureRuntime.toString()})(${js(cfg)},(${freezeMasks.toString()}));</script>`;
 }

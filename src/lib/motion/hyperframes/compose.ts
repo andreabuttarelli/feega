@@ -8,7 +8,7 @@ import { TEMPLATES, Timing, type PropsOf, type TemplateCtx, type Tween, type Var
 import { LIGHTING, threeImportMap, threeScript, type ThreeClip } from './three';
 import { ANIMATE_CSS, animationScript, colourOverrides, sceneKeys, wrapAnimated } from './animate';
 import { MASK_CSS, MaskScope, maskLayer, startValues } from './masks';
-import { captureScript } from './capture';
+import { captureScript, contentStamp } from './capture';
 import { hiddenMattes, matteMask, matteSource } from '../matte';
 import { Matte, type Mask } from '../mask';
 
@@ -224,7 +224,7 @@ export function composeHtml(input: ComposeInput): string {
   const background = tokens.colors['brand.background'];
   const animation = animationScript(clips, doc, (v) => resolveColor(v, tokens));
 
-  return [
+  const page = [
     '<!doctype html><html lang="en"><head><meta charset="UTF-8" />',
     `<meta name="viewport" content="width=${doc.width}, height=${doc.height}" />`,
     `<script src="${RUNTIME_URL}"></script>`,
@@ -237,8 +237,7 @@ export function composeHtml(input: ComposeInput): string {
     layers.join(''),
     '</div>',
     `<script>${animation.setup}const tl=gsap.timeline({paused:true});${holds.map(holdLine).join('')}${tweens.map(tweenLine).join('')}${animation.timeline}tl.set({}, {}, ${duration});window.__timelines=window.__timelines||{};window.__timelines[${js(COMPOSITION_ID)}]=tl;</script>`,
-    threeScript(three, Number(duration)),
-    captureScript(doc),
-    '</body></html>'
+    threeScript(three, Number(duration))
   ].join('');
+  return `${page}${captureScript(doc, contentStamp(page))}</body></html>`;
 }

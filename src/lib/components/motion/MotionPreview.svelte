@@ -29,7 +29,7 @@
   let pending: ReturnType<typeof setTimeout> | null = null;
   let capturing = false;
 
-  function load(next: string) {
+  function setSource(next: string) {
     if (!player) {
       return;
     }
@@ -66,7 +66,7 @@
       el.addEventListener('ended', () => (playing = false));
       host.appendChild(el);
       player = el;
-      load(html);
+      driver.load(html);
     });
     return () => {
       disposed = true;
@@ -76,7 +76,7 @@
   });
 
   const driver = previewDriver({
-    load,
+    load: setSource,
     seek: (t) => player?.seek(t),
     post: (message) => {
       const target = player?.iframeElement?.contentWindow;
@@ -107,7 +107,11 @@
   const shoot = (time: number, request: ShotRequest) => driver.shoot(time, request);
   const loaded = (next: string) => driver.loaded(next);
 
-  async function borrowed<T>(source: string, work: () => Promise<T>): Promise<T> {
+  function borrowed<T>(source: string, work: () => Promise<T>): Promise<T> {
+    return driver.exclusive(() => swapped(source, work));
+  }
+
+  async function swapped<T>(source: string, work: () => Promise<T>): Promise<T> {
     playing = false;
     const back = frame;
     capturing = true;
@@ -152,7 +156,7 @@
     }
     pending = setTimeout(() => {
       if (!capturing) {
-        load(next);
+        driver.load(next);
       }
     }, RELOAD_DEBOUNCE_MS);
   });
