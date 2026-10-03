@@ -18,5 +18,6 @@ export const NODE_EMPTY_HINT: Record<NodeType, string> = {
   calendar: 'Connect or drop images, videos or text here to plan posts.',
   audio: 'Pick an operation, then write or connect what to voice.',
   model3d: 'Connect a product image to turn it into a 3D model.',
-  motion: 'Open the editor to build a video from titles, media and 3D.'
+  motion: 'Open the editor to build a video from titles, media and 3D.',
+  studio_batch: 'Pick a Photo studio batch: its approved photos flow to the nodes you connect.'
 };

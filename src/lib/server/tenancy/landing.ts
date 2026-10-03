@@ -3,7 +3,7 @@ import type { User } from '@supabase/supabase-js';
 import type { Db } from '$lib/server/db/client';
 import { ensureProfile, recordTermsAcceptance } from '$lib/server/repos/profiles';
 import { acceptInvite } from '$lib/server/tenancy/bootstrap';
-import { ENTRY_DEPS, homePathFor } from '$lib/server/tenancy/entry';
+import { ENTRY_DEPS, EntryVia, homePathFor } from '$lib/server/tenancy/entry';
 import { ORG_COOKIE, LAST_PROJECT_COOKIE } from '$lib/server/tenancy/context';
 import { CURRENT_TERMS_VERSION } from '$lib/legal-links';
 import { takeCampaign } from '$lib/server/onboarding/campaign-cookie';
@@ -49,5 +49,5 @@ export async function landingPath(
     return `/login?${INVITE_ERROR_PARAM}=${result.outcome}`;
   }
 
-  return deps.homePathFor(db, ENTRY_DEPS, user, result.orgId, null);
+  return deps.homePathFor(db, ENTRY_DEPS, user, result.orgId, null, null, EntryVia.Invite);
 }

@@ -1,5 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
-import { DEFAULT_CANVAS_NAME, DEFAULT_PROJECT_NAME, canvasPath, enterApp, homePathFor, workspaceNameFor } from '$lib/server/tenancy/entry';
+import {
+  ARRIVAL_LANDING,
+  Arrival,
+  DASHBOARD_PATH,
+  DEFAULT_CANVAS_NAME,
+  DEFAULT_PROJECT_NAME,
+  EntryVia,
+  Landing,
+  arrivalOf,
+  canvasPath,
+  enterApp,
+  homePathFor,
+  workspaceNameFor
+} from '$lib/server/tenancy/entry';
 import type { Db } from '$lib/server/db/client';
 import type { Membership } from '$lib/server/repos/orgs';
 import type { User } from '@supabase/supabase-js';
@@ -54,7 +67,7 @@ describe('entrare la prima volta crea tutto, una volta sola', () => {
     const entry = await enterApp(db, d, user);
 
     expect(d.createFirstOrg).toHaveBeenCalledOnce();
-    expect(entry).toEqual({ orgId: ORG, projectId: PROJECT, canvasId: CANVAS });
+    expect(entry).toMatchObject({ orgId: ORG, projectId: PROJECT, canvasId: CANVAS });
   });
 
   it('il profilo nasce prima di tutto: orgs_members lo referenzia', async () => {
@@ -165,22 +178,40 @@ describe('la tela ha un indirizzo, e non è quello del brand', () => {
   });
 });
 
-describe('la home di chi è già dentro è la sua tela, mai /app', () => {
-  it('chi ha già tutto atterra sulla tela esistente', async () => {
-    const d = deps({});
-
-    const path = await homePathFor(db, d, user);
-
-    expect(path).toBe(`/p/${PROJECT}/c/${CANVAS}`);
+describe('where an arrival lands: one rule table', () => {
+  it('a returning user lands on the dashboard', async () => {
+    expect(await homePathFor(db, deps({}), user)).toBe(DASHBOARD_PATH);
   });
 
-  it('chi arriva per la prima volta ottiene il bootstrap, non un 404', async () => {
-    const d = deps({ listMemberships: vi.fn(async () => []) });
+  it('a first-run user goes straight to the canvas the bootstrap built', async () => {
+    const d = deps({ listMemberships: vi.fn(async () => []), listProjects: vi.fn(async () => []) });
 
     const path = await homePathFor(db, d, user);
 
     expect(path).toBe(`/p/${PROJECT}/c/${CANVAS}`);
     expect(d.createFirstOrg).toHaveBeenCalledOnce();
+  });
+
+  it('an invited user opens the invited org canvas, not the dashboard of another org', async () => {
+    expect(await homePathFor(db, deps({}), user, ORG, null, null, EntryVia.Invite)).toBe(`/p/${PROJECT}/c/${CANVAS}`);
+  });
+
+  it('the table names a landing for every arrival', () => {
+    expect(ARRIVAL_LANDING).toEqual({
+      [Arrival.Returning]: Landing.Dashboard,
+      [Arrival.FirstRun]: Landing.Canvas,
+      [Arrival.Campaign]: Landing.Canvas,
+      [Arrival.Invite]: Landing.Canvas
+    });
+  });
+
+  it.each([
+    [{ campaign: true, via: EntryVia.Invite, firstRun: true }, Arrival.Campaign],
+    [{ campaign: false, via: EntryVia.Invite, firstRun: true }, Arrival.Invite],
+    [{ campaign: false, via: EntryVia.Direct, firstRun: true }, Arrival.FirstRun],
+    [{ campaign: false, via: EntryVia.Direct, firstRun: false }, Arrival.Returning]
+  ])('%o is a %s arrival', (input, arrival) => {
+    expect(arrivalOf(input)).toBe(arrival);
   });
 
   it('rispetta l org scelta quando ce ne sono più di una', async () => {
@@ -208,7 +239,7 @@ describe('a landing campaign lands with its template', () => {
   it('no campaign, no seeding', async () => {
     const d = deps({});
 
-    expect(await homePathFor(db, d, user)).toBe(`/p/${PROJECT}/c/${CANVAS}`);
+    expect(await homePathFor(db, d, user)).toBe(DASHBOARD_PATH);
     expect(d.seedWelcome).not.toHaveBeenCalled();
   });
 

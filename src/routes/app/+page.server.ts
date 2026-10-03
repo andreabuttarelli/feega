@@ -1,23 +1,60 @@
-import { redirect } from '@sveltejs/kit';
-import type { PageServerLoad } from './$types';
-import { ENTRY_DEPS, homePathFor } from '$lib/server/tenancy/entry';
-import { ORG_COOKIE, LAST_PROJECT_COOKIE } from '$lib/server/tenancy/context';
+import { fail, redirect } from '@sveltejs/kit';
+import type { Actions, PageServerLoad } from './$types';
+import { DASHBOARD_PATH, DEFAULT_CANVAS_NAME, DEFAULT_PROJECT_NAME, ENTRY_DEPS, canvasPath, homePathFor } from '$lib/server/tenancy/entry';
+import { chooseOrg, LAST_PROJECT_COOKIE, ORG_COOKIE } from '$lib/server/tenancy/context';
+import { takeCampaign } from '$lib/server/onboarding/campaign-cookie';
+import { signedInDb } from '$lib/server/dashboard/app-shell';
+import { DASHBOARD_DEPS, dashboardFor } from '$lib/server/dashboard/dashboard';
+import { listMemberships } from '$lib/server/repos/orgs';
+import { createProject } from '$lib/server/repos/projects';
+import { createCanvas } from '$lib/server/repos/canvas';
+import { TOOLS } from '$lib/tools';
 
-/**
- * `/app` È DEPRECATO: bookmark ed email vecchie ci atterrano ancora, quindi resta un 308
- * permanente verso la home vera — mai un 404, e nessun codice nuovo ci punta più.
- */
-export const load: PageServerLoad = async ({ cookies, locals }) => {
-  const { session, user } = await locals.safeGetSession();
-  if (!session || !user) {
-    throw redirect(308, '/login');
+const HTTP_SEE_OTHER = 303;
+const HTTP_NOT_FOUND = 404;
+const ORG_COOKIE_MAX_AGE_S = 60 * 60 * 24 * 365;
+const SLUG_BYTES = 4;
+
+export const load: PageServerLoad = async (event) => {
+  const { db, user } = await signedInDb(event);
+  const { cookies } = event;
+  const path = await homePathFor(db, ENTRY_DEPS, user, cookies.get(ORG_COOKIE) ?? null, cookies.get(LAST_PROJECT_COOKIE) ?? null, takeCampaign(cookies));
+  if (path !== DASHBOARD_PATH) {
+    throw redirect(HTTP_SEE_OTHER, path);
   }
 
-  const db = await locals.db();
-  if (!db) {
-    throw redirect(308, '/login');
-  }
+  const { org } = await event.parent();
+  return { dashboard: await dashboardFor(db, DASHBOARD_DEPS, org.id), tools: TOOLS };
+};
 
-  const path = await homePathFor(db, ENTRY_DEPS, user, cookies.get(ORG_COOKIE) ?? null, cookies.get(LAST_PROJECT_COOKIE) ?? null);
-  throw redirect(308, path);
+function projectSlug(): string {
+  const suffix = [...crypto.getRandomValues(new Uint8Array(SLUG_BYTES))].map((b) => b.toString(16).padStart(2, '0')).join('');
+  return `project-${suffix}`;
+}
+
+export const actions: Actions = {
+  project: async (event) => {
+    const { db, user } = await signedInDb(event);
+    const membership = chooseOrg(await listMemberships(db, user.id), event.cookies.get(ORG_COOKIE) ?? null);
+    if (!membership) {
+      return fail(HTTP_NOT_FOUND, { error: 'No workspace' });
+    }
+
+    const name = String((await event.request.formData()).get('name') ?? '').trim() || DEFAULT_PROJECT_NAME;
+    const project = await createProject(db, { orgId: membership.org.id, name, slug: projectSlug() });
+    const canvas = await createCanvas(db, { orgId: membership.org.id, projectId: project.id, name: DEFAULT_CANVAS_NAME });
+    throw redirect(HTTP_SEE_OTHER, canvasPath(project.id, canvas.id));
+  },
+
+  workspace: async (event) => {
+    const { db, user } = await signedInDb(event);
+    const orgId = String((await event.request.formData()).get('orgId') ?? '');
+    const memberships = await listMemberships(db, user.id);
+    if (!memberships.some((m) => m.org.id === orgId)) {
+      return fail(HTTP_NOT_FOUND, { error: 'Not your workspace' });
+    }
+
+    event.cookies.set(ORG_COOKIE, orgId, { path: '/', maxAge: ORG_COOKIE_MAX_AGE_S });
+    throw redirect(HTTP_SEE_OTHER, DASHBOARD_PATH);
+  }
 };

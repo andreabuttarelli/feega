@@ -11,8 +11,10 @@ describe('CHROME_LOADERS: la chat e il pannello a sinistra non pesano sul primo 
 });
 
 describe('ENTRY_PREFETCH: passare sopra una voce della rail ne scarica il codice', () => {
-  it('ogni voce della rail ha il suo prefetch', () => {
-    const missing = NAV_ENTRIES.map((entry) => entry.id).filter((id) => !(id in ENTRY_PREFETCH));
+  it('ogni voce della rail che apre un foglio o un pannello ha il suo prefetch', () => {
+    const missing = NAV_ENTRIES.filter((entry) => entry.family !== 'route')
+      .map((entry) => entry.id)
+      .filter((id) => !(id in ENTRY_PREFETCH));
     expect(missing).toEqual([]);
   });
 

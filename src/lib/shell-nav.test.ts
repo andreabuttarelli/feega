@@ -10,13 +10,20 @@ describe('la rail: due gruppi, un comportamento a testa', () => {
     expect(navEntriesByGroup('workbench').map((e) => e.id)).toEqual(['calendar', 'ads', 'studio', 'settings']);
   });
 
-  it('ogni voce del gruppo panel apre un pannello, ogni voce workbench un foglio', () => {
+  it('ogni voce del gruppo panel apre un pannello, ogni voce workbench un foglio o una pagina sua', () => {
     for (const entry of navEntriesByGroup('panel')) {
       expect(entry.family).toBe('panel');
     }
     for (const entry of navEntriesByGroup('workbench')) {
-      expect(entry.family).toBe('sheet');
+      expect(['sheet', 'route']).toContain(entry.family);
     }
+  });
+
+  it('the photo studio is its own page, carrying the project as its source', () => {
+    const studio = NAV_ENTRIES.find((e) => e.id === 'studio')!;
+    expect(studio.family).toBe('route');
+    expect(navHref('proj1', studio)).toBe('/app/studio?project=proj1');
+    expect(mobileNavHref('proj1', studio)).toBe('/app/studio?project=proj1');
   });
 
   it('navHref antepone il progetto al path della voce', () => {
@@ -92,8 +99,7 @@ describe('un link diretto a un foglio su desktop apre la tela con il foglio', ()
     ['/assets', '', 'desktop', 'page'],
     ['/brands/new', '', 'desktop', 'page'],
     ['/c/abc', '', 'desktop', 'page'],
-    ['/studio', '', 'desktop', 'sheet'],
-    ['/studio/batch-1', '', 'desktop', 'page']
+    ['/studio', '', 'desktop', 'page']
   ];
 
   it.each(cases)('%s%s su %s → %s', (path, search, viewport, expected) => {

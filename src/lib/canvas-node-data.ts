@@ -21,6 +21,7 @@ import { CAMERA_PRESETS } from '$lib/canvas/composition/camera';
 import type { CompositionNode } from '$lib/canvas/composition-node';
 import { newCalendarData } from '$lib/canvas/calendar-node';
 import { newMotionData } from '$lib/canvas/motion-node';
+import { newStudioBatchData } from '$lib/canvas/studio-batch-node';
 export { influencerNodeOf as influencerOf, type InfluencerNode } from '$lib/canvas/influencer-node';
 
 /**
@@ -57,7 +58,8 @@ export const NODE_TYPES = [
   'calendar',
   'audio',
   'model3d',
-  'motion'
+  'motion',
+  'studio_batch'
 ] as const;
 
 function syncStatusOf(v: unknown): SyncStatus {
@@ -370,6 +372,10 @@ export function newNodeRow(what: Addable): Record<string, unknown> {
 
   if (what === 'motion') {
     return newMotionData();
+  }
+
+  if (what === 'studio_batch') {
+    return newStudioBatchData();
   }
 
   return { prompt: '', model: null, params: {}, refId: null };

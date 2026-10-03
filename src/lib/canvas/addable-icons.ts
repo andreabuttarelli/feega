@@ -26,6 +26,7 @@ import CalendarDays from '@lucide/svelte/icons/calendar-days';
 import AudioLines from '@lucide/svelte/icons/audio-lines';
 import Box from '@lucide/svelte/icons/box';
 import Clapperboard from '@lucide/svelte/icons/clapperboard';
+import Camera from '@lucide/svelte/icons/camera';
 import type { Component } from 'svelte';
 import type { Addable } from './addable';
 
@@ -44,5 +45,6 @@ export const ADDABLE_ICON: Record<Addable, Component> = {
   calendar: CalendarDays,
   audio: AudioLines,
   model3d: Box,
-  motion: Clapperboard
+  motion: Clapperboard,
+  studio_batch: Camera
 };

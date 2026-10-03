@@ -144,11 +144,7 @@ describe('il tool che ha chiesto il lavoro', () => {
 	});
 });
 
-/**
- * `/app` non esiste più come destinazione: la radice manda al login chi non è dentro,
- * alla propria tela chi lo è. Nessun 404 in mezzo.
- */
-describe('la radice non porta mai a /app', () => {
+describe('la radice manda dove dice la regola di ingresso', () => {
 	const rootRequestTo = async () => {
 		try {
 			await handle({
@@ -174,7 +170,7 @@ describe('la radice non porta mai a /app', () => {
 		expect(redirected?.location).toBe('/login');
 	});
 
-	it('con sessione va dritto alla propria tela, non a /app', async () => {
+	it('con sessione va dove homePathFor decide', async () => {
 		mockSession = { session: { access_token: 'tok' }, user: { id: 'user-1', email: 'chi@esempio.it' } };
 		const redirected = await rootRequestTo();
 		expect(redirected?.location).toBe('/p/proj1/c/canvas1');

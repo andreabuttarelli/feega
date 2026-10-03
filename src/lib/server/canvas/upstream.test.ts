@@ -1136,3 +1136,41 @@ describe('upstreamInputsFor — a dubbed video node gives video and its track on
     expect(out.referenceAudioUrls).toEqual([]);
   });
 });
+
+describe('upstreamInputsFor — a studio batch node hands on its approved photos', () => {
+  const BATCH_NODE = '12121212-1212-1212-1212-121212121212';
+  const BATCH = '13131313-1313-1313-1313-131313131313';
+  const item = (id: string, status: string, approval: string, assetId: string | null) => ({ id, org_id: ORG, batch_id: BATCH, status, approval, asset_id: assetId, created_at: 'now' });
+  const asset = (id: string, url: string) => ({ id, org_id: ORG, project_id: 'p1', type: 'image', url, content: null, mime_type: 'image/png', bytes: null, width: null, height: null, duration_s: null, source: 'generated', source_node_id: null, uncensored: false, created_at: 'now' });
+
+  it('only the approved, finished photos reach the node downstream', async () => {
+    const { db } = fakeDb({
+      nodes: [nodeRow(BATCH_NODE, 'studio_batch', { batchId: BATCH }), nodeRow(IMAGE_NODE, 'image', { prompt: 'a poster', model: 'qwen3-pro' })],
+      nodes_connections: [{ id: 'e1', canvas_id: CANVAS, source_node_id: BATCH_NODE, target_node_id: IMAGE_NODE, source_handle: null, target_handle: null }],
+      product_batch_items: [
+        item('i1', 'done', 'approved', IMAGE_ASSET_1),
+        item('i2', 'done', 'pending', IMAGE_ASSET_2),
+        item('i3', 'running', 'approved', null)
+      ],
+      assets: [asset(IMAGE_ASSET_1, 'u1/media/studio/one.png'), asset(IMAGE_ASSET_2, 'u1/media/studio/two.png')]
+    });
+
+    const out = await upstreamInputsFor(db, { orgId: ORG, canvasId: CANVAS, nodeId: IMAGE_NODE, model: 'qwen3-pro', medium: 'image' });
+
+    expect(out.blocked).toBeNull();
+    expect(out.referenceImageUrls).toEqual(['u1/media/studio/one.png']);
+  });
+
+  it('a node with no batch picked feeds nothing', async () => {
+    const { db } = fakeDb({
+      nodes: [nodeRow(BATCH_NODE, 'studio_batch', { batchId: null }), nodeRow(IMAGE_NODE, 'image', { prompt: 'a poster', model: 'qwen3-pro' })],
+      nodes_connections: [{ id: 'e1', canvas_id: CANVAS, source_node_id: BATCH_NODE, target_node_id: IMAGE_NODE, source_handle: null, target_handle: null }],
+      product_batch_items: [],
+      assets: []
+    });
+
+    const out = await upstreamInputsFor(db, { orgId: ORG, canvasId: CANVAS, nodeId: IMAGE_NODE, model: 'qwen3-pro', medium: 'image' });
+
+    expect(out.referenceImageUrls).toEqual([]);
+  });
+});

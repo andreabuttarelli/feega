@@ -58,7 +58,8 @@ export const NODE_KINDS = [
   'audio',
   'model3d',
   'calendar',
-  'motion'
+  'motion',
+  'studio_batch'
 ] as const;
 export type NodeKind = (typeof NODE_KINDS)[number];
 
@@ -142,7 +143,8 @@ export const CANVAS_NODE_SPECS: Record<NodeKind, NodeSpec> = {
   audio: { medium: 'audio', generated: true, accepts: ['text', 'audio', 'video'], requires: [] },
   model3d: { medium: 'model3d', generated: true, accepts: ['image', 'text'], requires: [], requiresOneOf: ['image', 'text'] },
   calendar: { medium: null, generated: true, accepts: ['text', 'image', 'video', 'audio'], requires: [] },
-  motion: { medium: null, generated: false, accepts: [], requires: [] }
+  motion: { medium: null, generated: false, accepts: [], requires: [] },
+  studio_batch: { medium: 'image', generated: false, accepts: [], requires: [] }
 };
 
 /** Da `posts.content_type` al medium: è il ruolo che porta dentro il medium, e qui si separano. */

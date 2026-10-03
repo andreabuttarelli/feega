@@ -18,8 +18,8 @@ const options: StudioOptions = {
   previewModel: 'lite'
 };
 
-vi.mock('$lib/server/studio/studio-scope', () => ({
-  studioScope: vi.fn(async () => ({ db: {}, orgId: 'org', projectId: 'proj', userId: 'u' }))
+vi.mock('$lib/server/dashboard/tool-scope', () => ({
+  toolScope: vi.fn(async () => ({ db: {}, orgId: 'org', projectId: 'proj', userId: 'u' }))
 }));
 vi.mock('$lib/server/studio/studio-options', () => ({ studioOptions: vi.fn(async () => options) }));
 vi.mock('$lib/server/cli-auth', () => ({ gateOrgAiActionForForm: vi.fn(async () => undefined) }));

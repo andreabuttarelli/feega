@@ -2,7 +2,7 @@
   import { _ } from 'svelte-i18n';
   import * as Tooltip from '$lib/components/ui/tooltip/index.js';
   import { cn } from '$lib/utils';
-  import { navEntriesByGroup, type NavEntry } from '$lib/shell-nav';
+  import { navEntriesByGroup, type NavEntry, type NavFamily } from '$lib/shell-nav';
   import { prefetchEntry } from '$lib/canvas/chrome-loaders';
   import { NAV_ICONS } from './nav-icons';
   import { ProjectMode, sectionAllowed } from '$lib/project-mode';
@@ -18,24 +18,37 @@
     activeSheet = null,
     onPanel,
     onSheet,
+    onRoute,
     mode = ProjectMode.Standard
   }: {
     activePanel?: string | null;
     activeSheet?: string | null;
     onPanel: (entry: NavEntry) => void;
     onSheet: (entry: NavEntry) => void;
+    onRoute: (entry: NavEntry) => void;
     mode?: ProjectMode;
   } = $props();
 
   const sheets = $derived(navEntriesByGroup('workbench').filter((entry) => sectionAllowed(mode, entry.id)));
 
+  const OPEN: Record<NavFamily, (entry: NavEntry) => void> = {
+    panel: (entry) => onPanel(entry),
+    sheet: (entry) => onSheet(entry),
+    route: (entry) => onRoute(entry)
+  };
+
+  const ACTIVE: Record<NavFamily, (entry: NavEntry) => boolean> = {
+    panel: (entry) => activePanel === entry.id,
+    sheet: (entry) => activeSheet === entry.id,
+    route: () => false
+  };
+
   function onClick(entry: NavEntry) {
-    if (entry.family === 'panel') onPanel(entry);
-    else onSheet(entry);
+    OPEN[entry.family](entry);
   }
 
   function isActive(entry: NavEntry): boolean {
-    return entry.family === 'panel' ? activePanel === entry.id : activeSheet === entry.id;
+    return ACTIVE[entry.family](entry);
   }
 </script>
 

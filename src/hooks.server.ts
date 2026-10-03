@@ -33,8 +33,6 @@ function isSessionCookie(name: string): boolean {
   return name === SESSION_COOKIE_NAME || name.startsWith(SESSION_COOKIE_PREFIX);
 }
 
-// Chi visita la radice: al login se non è dentro, alla propria tela se lo è — mai a /app, che
-// è solo un bootstrap deprecato dietro un redirect permanente.
 async function rootRedirectTarget(event: RequestEvent): Promise<string> {
   const { session, user } = await event.locals.safeGetSession();
   if (!session || !user) {
@@ -180,10 +178,6 @@ export const handle: Handle = sequence(hostRedirect, csrf, Sentry.sentryHandle()
 
   seedMetaClickCookies(event.cookies, event.url, event.route.id);
 
-  // La radice è l'app, non più un sito di marketing. Il safety net dell'OAuth viene prima:
-  // un bounce magic-link sul Site URL con ?code= deve arrivare a /auth/callback, non alla home,
-  // o il code si perde e il login fallisce in silenzio. `/app` è deprecato: chi è dentro va
-  // diritto alla propria tela, chi non lo è va al login — mai a una dashboard che non esiste più.
   if (isRootPath(event.url.pathname)) {
     rememberCampaign(event.cookies, event.url);
     if (event.url.searchParams.has('code') || event.url.searchParams.has('error_description')) {

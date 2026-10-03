@@ -110,13 +110,13 @@ describe('settings/project actions', () => {
     expect(projectUpdate(calls)).toBeUndefined();
   });
 
-  it('delete col nome esatto archivia il progetto e atterra sul progetto rimasto', async () => {
+  it('delete col nome esatto archivia il progetto e atterra sulla dashboard', async () => {
     const { db, calls } = entryDb([{ id: OTHER, org_id: ORG, name: 'Other', updated_at: '2026-01-01', canvases: [] }]);
 
     const result = await run('delete', { confirmName: NAME }, db);
 
     expect(isRedirect(result)).toBe(true);
-    expect((result as { location: string }).location).toBe(`/p/${OTHER}/c/${CANVAS}`);
+    expect((result as { location: string }).location).toBe('/app');
     expect(projectUpdate(calls)?.payload).toHaveProperty('archived_at');
     expect(calls.find((c) => c.op === 'delete')).toBeUndefined();
   });
