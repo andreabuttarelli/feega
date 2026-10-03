@@ -4,10 +4,11 @@ import { listNodeProducts, type Product } from '$lib/server/repos/products';
 import { listInfluencers, listInfluencerViewsByIds, signInfluencerViewFiles } from '$lib/server/repos/influencers';
 import { canvasModelCatalogue } from '$lib/server/canvas-catalogue';
 import { creditsForRun } from '$lib/canvas/gen-cost';
+import type { ModelChoice } from '$lib/canvas/gen-node';
+import { isKnownImageModelId } from '$lib/image-models';
 import { castingVerdict, isKidsProduct, ModelVerdict, MODEL_VERDICT_TEXT } from '$lib/studio/casting';
 
 export const FIDELITY_MODEL = 'nano-banana-pro';
-const FALLBACK_MAX_REFS = 3;
 
 export type StudioProduct = {
   id: string;
@@ -73,11 +74,15 @@ async function castableModels(db: Db): Promise<StudioModel[]> {
   });
 }
 
+export function acceptsProductPhoto(choice: Pick<ModelChoice, 'id' | 'inputModalities' | 'maxRefs'>): boolean {
+  return isKnownImageModelId(choice.id) && (choice.inputModalities ?? []).includes('image') && (choice.maxRefs ?? 0) > 0;
+}
+
 export async function imageModels(): Promise<StudioImageModel[]> {
   const { choices } = (await canvasModelCatalogue()).image;
-  return choices.flatMap((choice) => {
+  return choices.filter(acceptsProductPhoto).flatMap((choice) => {
     const credits = creditsForRun({ medium: 'image', model: choice, params: {} });
-    return credits === null ? [] : [{ id: choice.id, label: choice.label, credits, maxRefs: choice.maxRefs ?? FALLBACK_MAX_REFS }];
+    return credits === null ? [] : [{ id: choice.id, label: choice.label, credits, maxRefs: choice.maxRefs ?? 0 }];
   });
 }
 

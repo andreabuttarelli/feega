@@ -92,7 +92,7 @@ export function cellKey(item: Pick<PlannedItem, 'environment' | 'shot' | 'influe
 }
 
 const FIDELITY =
-  'Preserve the product exactly as in its reference photo: same shape, proportions, colour, material, logo and label text. Do not add any text, watermark or extra logo.';
+  'The first reference image is the product: it is the subject of this photo. Preserve it exactly: same shape, proportions, colour, material, logo and label text. Do not add any text, watermark or extra logo.';
 
 export function lockedPrompt(input: { environment: Environment; shot: Shot; withModel: boolean; styleRefs: number }): string {
   const parts = [
@@ -104,7 +104,7 @@ export function lockedPrompt(input: { environment: Environment; shot: Shot; with
     parts.push('The person is the adult model shown in the model reference views: keep the same face, body and look.');
   }
   if (input.styleRefs > 0) {
-    parts.push('Use the style references only for scene, light and colour mood; never copy any person from them.');
+    parts.push('The last reference images are style references: use them only for scene, light and colour mood. Never show the objects or subjects of the style references, and never copy any person from them.');
   }
   return parts.join(' ');
 }

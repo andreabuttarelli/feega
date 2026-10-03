@@ -91,7 +91,9 @@ describe('un link diretto a un foglio su desktop apre la tela con il foglio', ()
     ['/settings/billing', '', 'mobile', 'page'],
     ['/assets', '', 'desktop', 'page'],
     ['/brands/new', '', 'desktop', 'page'],
-    ['/c/abc', '', 'desktop', 'page']
+    ['/c/abc', '', 'desktop', 'page'],
+    ['/studio', '', 'desktop', 'sheet'],
+    ['/studio/batch-1', '', 'desktop', 'page']
   ];
 
   it.each(cases)('%s%s su %s → %s', (path, search, viewport, expected) => {

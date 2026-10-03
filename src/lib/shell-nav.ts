@@ -72,7 +72,7 @@ export const BURGER_ENTRIES: NavEntry[] = [...navEntriesByGroup('panel'), ...nav
 
 export type DirectLoadMode = 'sheet' | 'page';
 
-const PAGE_ONLY_PREFIXES = ['/settings/facebook', '/settings/linkedin', '/settings/connect/'];
+const PAGE_ONLY_PREFIXES = ['/settings/facebook', '/settings/linkedin', '/settings/connect/', '/studio/'];
 const PAGE_ONLY_QUERY_KEYS = ['connected'];
 
 const VIEWPORT_ALLOWS_SHEET: Record<Viewport, boolean> = {

@@ -1,11 +1,15 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
+  import { goto } from '$app/navigation';
   import { page } from '$app/state';
+  import type { SubmitFunction } from '@sveltejs/kit';
   import PageHead from '$lib/components/PageHead.svelte';
   import NodeReferences from '$lib/components/canvas/NodeReferences.svelte';
   import type { NodeReference } from '$lib/canvas/node-references';
 
-  let { data, form } = $props();
+  type Quote = { count: number; overLimit: boolean; perImage: number; total: number; previewPerImage: number; previewModel: string; droppedRefs: number; skipped: string[] };
+
+  let { data } = $props();
 
   let name = $state(`Catalogue ${new Date().toISOString().slice(0, 10)}`);
   let productIds = $state<string[]>([]);
@@ -20,18 +24,34 @@
 
   const selection = $derived(JSON.stringify({ name, productIds, modelIds, environments, shots, variations, model, styleRefs, noPeopleConfirmed }));
   const projectId = $derived(page.params.projectId);
-  const quote = $derived(form && 'quote' in form ? form.quote : null);
-  const failure = $derived(form && 'error' in form ? form.error : null);
+  const castable = $derived(data.models.filter((m) => m.allowed));
+  const hidden = $derived(data.models.length - castable.length);
+  const actionBase = $derived(`/p/${projectId}/studio`);
+  let quote = $state<Quote | null>(null);
+  let failure = $state<string | null>(null);
 
   function toggle(list: string[], id: string): string[] {
     return list.includes(id) ? list.filter((x) => x !== id) : [...list, id];
   }
 
-  const submit = () => {
+  const submit: SubmitFunction = () => {
     busy = true;
-    return async ({ update }: { update: (o?: { reset?: boolean }) => Promise<void> }) => {
-      await update({ reset: false });
+    failure = null;
+    return async ({ result }) => {
       busy = false;
+      if (result.type === 'redirect') {
+        await goto(result.location);
+        return;
+      }
+      if (result.type === 'success') {
+        quote = (result.data?.quote as Quote | undefined) ?? null;
+        return;
+      }
+      if (result.type === 'failure') {
+        failure = String(result.data?.error ?? 'Something went wrong.');
+        return;
+      }
+      failure = 'Something went wrong.';
     };
   };
 </script>
@@ -69,15 +89,19 @@
 
   <section>
     <h3>2 · Models <span class="muted">optional, synthetic only, 21+</span></h3>
-    <div class="tiles">
-      {#each data.models as m (m.id)}
-        <button type="button" class="tile" class:on={modelIds.includes(m.id)} disabled={!m.allowed} title={m.why} onclick={() => (modelIds = toggle(modelIds, m.id))}>
-          {#if m.cover}<img src={m.cover} alt="" loading="lazy" />{/if}
-          <span>{m.name}</span>
-          {#if !m.allowed}<small>{m.why}</small>{/if}
-        </button>
-      {/each}
-    </div>
+    {#if castable.length}
+      <div class="tiles">
+        {#each castable as m (m.id)}
+          <button type="button" class="tile" class:on={modelIds.includes(m.id)} onclick={() => (modelIds = toggle(modelIds, m.id))}>
+            {#if m.cover}<img src={m.cover} alt="" loading="lazy" />{/if}
+            <span>{m.name}</span>
+          </button>
+        {/each}
+      </div>
+    {:else}
+      <p class="muted">No synthetic models yet. <a href={`/p/${projectId}/influencers`}>Create one with AI</a> (age 21+) to shoot on-model.</p>
+    {/if}
+    {#if hidden}<p class="muted">{hidden} catalogue or photo-based influencers are hidden: the studio casts only synthetic people.</p>{/if}
   </section>
 
   <section>
@@ -124,11 +148,11 @@
   </section>
 
   <section class="actions">
-    <form method="POST" action="?/quote" use:enhance={submit}>
+    <form method="POST" action={`${actionBase}?/quote`} use:enhance={submit}>
       <input type="hidden" name="selection" value={selection} />
       <button type="submit" disabled={busy}>Estimate</button>
     </form>
-    <form method="POST" action="?/preview" use:enhance={submit}>
+    <form method="POST" action={`${actionBase}?/preview`} use:enhance={submit}>
       <input type="hidden" name="selection" value={selection} />
       <button type="submit" class="primary" disabled={busy || !quote || quote.overLimit}>Preview 3 on the cheap model</button>
     </form>

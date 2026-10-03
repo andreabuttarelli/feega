@@ -108,6 +108,12 @@ describe('prompt e riferimenti', () => {
     expect(lockedPrompt({ environment: Environment.Marble, shot: Shot.Lifestyle, withModel: true, styleRefs: 2 })).toMatch(/never copy any person/);
   });
 
+  it('il primo riferimento è il soggetto; quelli di stile non diventano il soggetto', () => {
+    const prompt = lockedPrompt({ environment: Environment.WhiteEcom, shot: Shot.Packshot, withModel: false, styleRefs: 1 });
+    expect(prompt).toMatch(/first reference image is the product/i);
+    expect(prompt).toMatch(/never show the objects or subjects of the style references/i);
+  });
+
   it('i riferimenti di stile cedono il posto a prodotto e modello', () => {
     expect(styleRefBudget({ maxRefs: 10, productImages: 3, modelViews: 4, styleRefs: 5 })).toEqual({ kept: 3, dropped: 2 });
     expect(styleRefBudget({ maxRefs: 3, productImages: 3, modelViews: 2, styleRefs: 1 })).toEqual({ kept: 0, dropped: 1 });
