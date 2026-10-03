@@ -1,10 +1,34 @@
 <script lang="ts">
-  // Dashboard-only styling: Tailwind v4 + shadcn-svelte live here, scoped to /app so the
-  // preflight/utilities never reach the hand-rolled marketing pages. The brand tokens
-  // (colours, dark mode) come from app.css, already loaded by the root layout.
   import '$lib/styles/tailwind.css';
+  import AppHeader from '$lib/components/app/AppHeader.svelte';
 
-  let { children } = $props();
+  let { data, children } = $props();
+
+  const menuProjectId = $derived(data.projects[0]?.id ?? null);
 </script>
 
-{@render children()}
+<div class="app-shell">
+  {#if menuProjectId}
+    <AppHeader {menuProjectId} profile={data.profile} org={data.org} workspaces={data.workspaces} creditBalance={data.creditBalance} />
+  {/if}
+  <main class="app-main">
+    {@render children()}
+  </main>
+</div>
+
+<style>
+  .app-shell {
+    min-height: 100dvh;
+    background: var(--paper-2);
+  }
+
+  .app-main {
+    padding: var(--content-pad-top) var(--content-pad-x) var(--content-pad-bottom);
+  }
+
+  @media (max-width: 640px) {
+    .app-main {
+      padding: 16px 16px var(--content-pad-bottom);
+    }
+  }
+</style>

@@ -15,7 +15,8 @@
   import MobileViewSwitch from '$lib/components/canvas/MobileViewSwitch.svelte';
   import { watchKeyboard } from '$lib/canvas/keyboard-inset';
   import DesktopPageBar from '$lib/components/canvas/DesktopPageBar.svelte';
-  import { sheetEntryForPath, directLoadMode, type NavEntry } from '$lib/shell-nav';
+  import { sheetEntryForPath, directLoadMode, navHref, type NavEntry } from '$lib/shell-nav';
+  import { goto } from '$app/navigation';
   import { INITIAL_MOBILE_VIEW, chatBadge, showView, turnEnded, type MobileView, type ChatTurn } from '$lib/canvas/mobile-view';
   import { anyChatRunning } from '$lib/components/brand-agent/chat-session.svelte';
   import { MOBILE_QUERY, type Viewport } from '$lib/breakpoints';
@@ -205,6 +206,7 @@
           activeSheet={activeSheetId}
           onPanel={onRailPanel}
           onSheet={onRailSheet}
+          onRoute={(entry) => goto(navHref(projectId, entry))}
           mode={modeOf(data.project.mode)}
         />
         {#if browser && leftPanel}

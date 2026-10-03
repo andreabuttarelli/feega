@@ -1,7 +1,6 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
   import { goto } from '$app/navigation';
-  import { page } from '$app/state';
   import type { SubmitFunction } from '@sveltejs/kit';
   import PageHead from '$lib/components/PageHead.svelte';
   import NodeReferences from '$lib/components/canvas/NodeReferences.svelte';
@@ -23,10 +22,10 @@
   let busy = $state(false);
 
   const selection = $derived(JSON.stringify({ name, productIds, modelIds, environments, shots, variations, model, styleRefs, noPeopleConfirmed }));
-  const projectId = $derived(page.params.projectId);
+  const projectId = $derived(data.projectId);
   const castable = $derived(data.models.filter((m) => m.allowed));
   const hidden = $derived(data.models.length - castable.length);
-  const actionBase = $derived(`/p/${projectId}/studio`);
+  const actionBase = $derived(`/app/studio?project=${projectId}`);
   let quote = $state<Quote | null>(null);
   let failure = $state<string | null>(null);
 
@@ -59,12 +58,21 @@
 <div class="studio">
   <PageHead title="Photo studio" subtitle="Consistent catalogue photos for many products at once: pick products, synthetic models, scenes and shots." />
 
+  <label class="source">
+    <span class="muted">Products and media from</span>
+    <select value={projectId} onchange={(e) => goto(`/app/studio?project=${e.currentTarget.value}`)} data-testid="studio-project">
+      {#each data.projects as p (p.id)}
+        <option value={p.id}>{p.name}</option>
+      {/each}
+    </select>
+  </label>
+
   {#if data.batches.length}
     <section>
       <h3>Batches</h3>
       <ul class="batches">
         {#each data.batches as batch (batch.id)}
-          <li><a href={`/p/${projectId}/studio/${batch.id}`} data-sveltekit-reload>{batch.name}</a> <span class="muted">{batch.status}</span></li>
+          <li><a href={`/app/studio/${batch.id}`}>{batch.name}</a> <span class="muted">{batch.status}</span></li>
         {/each}
       </ul>
     </section>
@@ -148,11 +156,11 @@
   </section>
 
   <section class="actions">
-    <form method="POST" action={`${actionBase}?/quote`} use:enhance={submit}>
+    <form method="POST" action={`${actionBase}&/quote`} use:enhance={submit}>
       <input type="hidden" name="selection" value={selection} />
       <button type="submit" disabled={busy}>Estimate</button>
     </form>
-    <form method="POST" action={`${actionBase}?/preview`} use:enhance={submit}>
+    <form method="POST" action={`${actionBase}&/preview`} use:enhance={submit}>
       <input type="hidden" name="selection" value={selection} />
       <button type="submit" class="primary" disabled={busy || !quote || quote.overLimit}>Preview 3 on the cheap model</button>
     </form>
@@ -198,5 +206,7 @@
   .quote p { margin: 2px 0; }
   .error { color: var(--danger, #c0392b); font-size: 12.5px; }
   .warn { color: var(--warn, #9a6700); font-size: 12.5px; }
+  .source { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  .source select { padding: 4px 6px; border: 1px solid var(--line-2, #d2d2d7); background: var(--paper, #fff); font-size: 13px; }
   .batches { list-style: none; padding: 0; margin: 0; font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
 </style>

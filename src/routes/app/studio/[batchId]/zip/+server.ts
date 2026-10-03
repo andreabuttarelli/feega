@@ -1,8 +1,8 @@
 import { error } from '@sveltejs/kit';
 import { zipSync } from 'fflate';
 import type { RequestHandler } from './$types';
-import { studioScope } from '$lib/server/studio/studio-scope';
-import { findBatch, listItems } from '$lib/server/repos/product-batches';
+import { batchScope } from '$lib/server/dashboard/tool-scope';
+import { listItems } from '$lib/server/repos/product-batches';
 import { signedAssets } from '$lib/server/studio/studio-media';
 import { approvedFiles, slug } from '$lib/studio/zip-names';
 import { Approval, ItemStatus } from '$lib/studio/batch-state';
@@ -12,11 +12,7 @@ export const config = { maxDuration: 300 };
 const HTTP_NOT_FOUND = 404;
 
 export const GET: RequestHandler = async (event) => {
-  const { db, orgId, projectId } = await studioScope(event);
-  const batch = await findBatch(db, { orgId, batchId: event.params.batchId });
-  if (!batch || batch.projectId !== projectId) {
-    throw error(HTTP_NOT_FOUND, 'Batch not found');
-  }
+  const { db, orgId, batch } = await batchScope(event);
 
   const items = (await listItems(db, { orgId, batchId: batch.id })).filter((i) => i.status === ItemStatus.Done && i.approval === Approval.Approved && i.assetId);
   if (!items.length) {

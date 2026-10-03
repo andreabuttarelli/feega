@@ -1,10 +1,10 @@
-import { error, fail } from '@sveltejs/kit';
+import { fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
-import { studioScope } from '$lib/server/studio/studio-scope';
+import { batchScope } from '$lib/server/dashboard/tool-scope';
 import { studioOptions } from '$lib/server/studio/studio-options';
 import { approveItem, cancelBatch, moreVariations, requeueItems, runBatch } from '$lib/server/studio/studio-batch';
 import { drainStudio } from '$lib/server/studio/studio-drain';
-import { findBatch, listItems } from '$lib/server/repos/product-batches';
+import { listItems } from '$lib/server/repos/product-batches';
 import { signedAssets } from '$lib/server/studio/studio-media';
 import { gateOrgAiActionForForm } from '$lib/server/cli-auth';
 import { orgCreditBalance } from '$lib/server/credits';
@@ -15,15 +15,10 @@ import { MAX_VARIATIONS } from '$lib/studio/plan';
 
 export const config = { maxDuration: 300 };
 
-const HTTP_NOT_FOUND = 404;
 const HTTP_UNPROCESSABLE = 422;
 
 export const load: PageServerLoad = async (event) => {
-  const { db, orgId, projectId } = await studioScope(event);
-  const batch = await findBatch(db, { orgId, batchId: event.params.batchId });
-  if (!batch || batch.projectId !== projectId) {
-    throw error(HTTP_NOT_FOUND, 'Batch not found');
-  }
+  const { db, orgId, projectId, batch } = await batchScope(event);
   event.depends(`studio:batch:${batch.id}`);
 
   const [items, balance, options] = await Promise.all([
@@ -36,6 +31,7 @@ export const load: PageServerLoad = async (event) => {
   const modelNames = Object.fromEntries(options.models.map((m) => [m.id, m.name]));
 
   return {
+    projectId,
     batch: { id: batch.id, name: batch.name, status: batch.status, canvasId: batch.canvasId, model: batch.model, previewModel: batch.previewModel, droppedRefs: batch.spec.droppedRefs },
     items: items.map((i) => ({
       id: i.id,
@@ -67,7 +63,7 @@ async function gated(orgId: string) {
 
 export const actions: Actions = {
   run: async (event) => {
-    const scope = await studioScope(event);
+    const scope = await batchScope(event);
     const denied = await gated(scope.orgId);
     if (denied) {
       return denied;
@@ -77,7 +73,7 @@ export const actions: Actions = {
   },
 
   more: async (event) => {
-    const scope = await studioScope(event);
+    const scope = await batchScope(event);
     const denied = await gated(scope.orgId);
     if (denied) {
       return denied;
@@ -88,12 +84,12 @@ export const actions: Actions = {
   },
 
   cancel: async (event) => {
-    const scope = await studioScope(event);
+    const scope = await batchScope(event);
     return { cancelled: await cancelBatch(scope.db, scope, event.params.batchId) };
   },
 
   retry: async (event) => {
-    const scope = await studioScope(event);
+    const scope = await batchScope(event);
     const denied = await gated(scope.orgId);
     if (denied) {
       return denied;
@@ -103,7 +99,7 @@ export const actions: Actions = {
   },
 
   regenerate: async (event) => {
-    const scope = await studioScope(event);
+    const scope = await batchScope(event);
     const denied = await gated(scope.orgId);
     if (denied) {
       return denied;
@@ -113,25 +109,21 @@ export const actions: Actions = {
   },
 
   approve: async (event) => {
-    const scope = await studioScope(event);
+    const scope = await batchScope(event);
     const [itemId] = idsOf(await event.request.formData());
     await approveItem(scope.db, scope, { itemId, approval: Approval.Approved });
     return { ok: true };
   },
 
   reject: async (event) => {
-    const scope = await studioScope(event);
+    const scope = await batchScope(event);
     const [itemId] = idsOf(await event.request.formData());
     await approveItem(scope.db, scope, { itemId, approval: Approval.Rejected });
     return { ok: true };
   },
 
   drain: async (event) => {
-    const scope = await studioScope(event);
-    const batch = await findBatch(scope.db, { orgId: scope.orgId, batchId: event.params.batchId });
-    if (!batch) {
-      return fail(HTTP_NOT_FOUND, { error: 'Batch not found' });
-    }
-    return { drained: await drainStudio(scope.db, { batchId: batch.id }) };
+    const scope = await batchScope(event);
+    return { drained: await drainStudio(scope.db, { batchId: scope.batch.id }) };
   }
 };

@@ -1,11 +1,11 @@
 import type { Viewport } from '$lib/breakpoints';
 
-export type NavFamily = 'panel' | 'sheet';
+export type NavFamily = 'panel' | 'sheet' | 'route';
 
 export type NavEntry = {
   id: string;
   labelKey: string;
-  icon: 'images' | 'building' | 'user-round' | 'calendar-days' | 'megaphone' | 'settings';
+  icon: 'images' | 'building' | 'user-round' | 'calendar-days' | 'megaphone' | 'settings' | 'camera';
   family: NavFamily;
   path: string;
   mobilePath?: string;
@@ -24,7 +24,7 @@ export const NAV_ENTRIES: NavEntry[] = [
   { id: 'influencers', labelKey: 'app.nav2.influencers', icon: 'user-round', family: 'panel', path: '/influencers', group: 'panel' },
   { id: 'calendar', labelKey: 'app.hub.publish.calendar', icon: 'calendar-days', family: 'sheet', path: '/calendar', group: 'workbench' },
   { id: 'ads', labelKey: 'app.hub.ads.social', icon: 'megaphone', family: 'sheet', path: '/ads', group: 'workbench' },
-  { id: 'studio', labelKey: 'app.nav2.studio', icon: 'images', family: 'sheet', path: '/studio', group: 'workbench' },
+  { id: 'studio', labelKey: 'app.nav2.studio', icon: 'camera', family: 'route', path: '/app/studio', group: 'workbench' },
   { id: 'settings', labelKey: 'app.nav.settings', icon: 'settings', family: 'sheet', path: '/settings/connected-accounts', mobilePath: '/settings', group: 'workbench' },
   { id: 'promote', labelKey: 'app.hub.publish.promote', icon: 'megaphone', family: 'sheet', path: '/promote', group: 'hidden' }
 ];
@@ -39,12 +39,20 @@ export function navEntriesByGroup(group: NavEntry['group']): NavEntry[] {
   return NAV_ENTRIES.filter((entry) => entry.group === group);
 }
 
+const projectPath = (projectId: string, path: string) => `/p/${projectId}${path}`;
+
+const HREF_OF_FAMILY: Record<NavFamily, (projectId: string, path: string) => string> = {
+  panel: projectPath,
+  sheet: projectPath,
+  route: (projectId, path) => `${path}?project=${projectId}`
+};
+
 export function navHref(projectId: string, entry: NavEntry): string {
-  return `/p/${projectId}${entry.path}`;
+  return HREF_OF_FAMILY[entry.family](projectId, entry.path);
 }
 
 export function mobileNavHref(projectId: string, entry: NavEntry): string {
-  return `/p/${projectId}${entry.mobilePath ?? entry.path}`;
+  return HREF_OF_FAMILY[entry.family](projectId, entry.mobilePath ?? entry.path);
 }
 
 /**
@@ -72,7 +80,7 @@ export const BURGER_ENTRIES: NavEntry[] = [...navEntriesByGroup('panel'), ...nav
 
 export type DirectLoadMode = 'sheet' | 'page';
 
-const PAGE_ONLY_PREFIXES = ['/settings/facebook', '/settings/linkedin', '/settings/connect/', '/studio/'];
+const PAGE_ONLY_PREFIXES = ['/settings/facebook', '/settings/linkedin', '/settings/connect/'];
 const PAGE_ONLY_QUERY_KEYS = ['connected'];
 
 const VIEWPORT_ALLOWS_SHEET: Record<Viewport, boolean> = {

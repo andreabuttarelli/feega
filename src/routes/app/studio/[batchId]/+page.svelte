@@ -1,7 +1,6 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
   import { invalidate } from '$app/navigation';
-  import { page } from '$app/state';
   import PageHead from '$lib/components/PageHead.svelte';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import { watchBatch } from '$lib/realtime/batch-channel';
@@ -9,7 +8,7 @@
   let { data, form } = $props();
 
   const POLL_MS = 5000;
-  const projectId = $derived(page.params.projectId);
+  const projectId = $derived(data.projectId);
   const dependency = $derived(`studio:batch:${data.batch.id}`);
   const pending = $derived(data.items.filter((i) => i.status === 'queued' || i.status === 'running').length);
   const queued = $derived(data.items.some((i) => i.status === 'queued'));
@@ -86,8 +85,9 @@
         <button type="submit">Retry failed ({failed.length})</button>
       </form>
     {/if}
+    <a class="link" href={`/app/studio?project=${projectId}`}>All batches</a>
     {#if data.batch.canvasId}<a class="link" href={`/p/${projectId}/c/${data.batch.canvasId}`}>Open canvas</a>{/if}
-    {#if approved}<a class="link" href={`/p/${projectId}/studio/${data.batch.id}/zip`} download>Download approved ({approved})</a>{/if}
+    {#if approved}<a class="link" href={`/app/studio/${data.batch.id}/zip`} download>Download approved ({approved})</a>{/if}
   </div>
 
   {#if data.batch.droppedRefs}<p class="warn">{data.batch.droppedRefs} style reference(s) were over the model's limit and are not sent.</p>{/if}

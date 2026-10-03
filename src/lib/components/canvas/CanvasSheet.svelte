@@ -90,10 +90,6 @@
           {#await SHEET_PAGE_LOADERS.ads() then { default: AdsSocialPage }}
             <AdsSocialPage data={sheet.data as never} form={null} />
           {/await}
-        {:else if entry.id === 'studio'}
-          {#await SHEET_PAGE_LOADERS.studio() then { default: StudioPage }}
-            <StudioPage data={sheet.data as never} form={null} />
-          {/await}
         {:else if entry.id === 'promote'}
           {#await SHEET_PAGE_LOADERS.promote() then { default: PromotePage }}
             <PromotePage data={sheet.data as never} form={null} />

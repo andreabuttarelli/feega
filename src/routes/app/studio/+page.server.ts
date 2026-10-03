@@ -1,6 +1,6 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
-import { studioScope } from '$lib/server/studio/studio-scope';
+import { toolScope } from '$lib/server/dashboard/tool-scope';
 import { studioOptions } from '$lib/server/studio/studio-options';
 import { selectionSchema, startPreview, quoteSelection } from '$lib/server/studio/studio-batch';
 import { listBatches } from '$lib/server/repos/product-batches';
@@ -17,7 +17,7 @@ const HTTP_UNPROCESSABLE = 422;
 const HTTP_SEE_OTHER = 303;
 
 export const load: PageServerLoad = async (event) => {
-  const { db, orgId, projectId } = await studioScope(event);
+  const { db, orgId, projectId } = await toolScope(event);
   const [options, batches, references, balance] = await Promise.all([
     studioOptions(db, { orgId, projectId }),
     listBatches(db, { orgId, projectId }),
@@ -34,6 +34,7 @@ export const load: PageServerLoad = async (event) => {
     environments: Object.entries(ENVIRONMENTS).map(([id, e]) => ({ id, label: e.label })),
     shots: Object.entries(SHOTS).map(([id, s]) => ({ id, label: s.label, casting: s.casting })),
     references: { catalogue: references.catalogue, media: references.media, mediaUrls: (await signedAssets(db, orgId, references.media.map((m) => m.id), 'pickerTile')).urls },
+    projectId,
     batches: batches.map((b) => ({ id: b.id, name: b.name, status: b.status, createdAt: b.createdAt })),
     balance
   };
@@ -49,7 +50,7 @@ function parseSelection(raw: FormDataEntryValue | null) {
 
 export const actions: Actions = {
   quote: async (event) => {
-    const { db, orgId, projectId } = await studioScope(event);
+    const { db, orgId, projectId } = await toolScope(event);
     const parsed = parseSelection((await event.request.formData()).get('selection'));
     if (!parsed.success) {
       return fail(HTTP_BAD_REQUEST, { error: 'Pick at least one product, environment and shot.' });
@@ -73,7 +74,7 @@ export const actions: Actions = {
   },
 
   preview: async (event) => {
-    const scope = await studioScope(event);
+    const scope = await toolScope(event);
     const denied = await gateOrgAiActionForForm(scope.orgId);
     if (denied) {
       return fail(denied.status, { error: denied.data.message });
@@ -86,6 +87,6 @@ export const actions: Actions = {
     if ('error' in outcome) {
       return fail(HTTP_UNPROCESSABLE, { error: outcome.error });
     }
-    throw redirect(HTTP_SEE_OTHER, `/p/${scope.projectId}/studio/${outcome.batchId}`);
+    throw redirect(HTTP_SEE_OTHER, `/app/studio/${outcome.batchId}`);
   }
 };

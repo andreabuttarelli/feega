@@ -3,6 +3,7 @@
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
   import Menu from '@lucide/svelte/icons/menu';
   import House from '@lucide/svelte/icons/house';
+  import LayoutGrid from '@lucide/svelte/icons/layout-grid';
   import Keyboard from '@lucide/svelte/icons/keyboard';
   import Settings from '@lucide/svelte/icons/settings';
   import CreditCard from '@lucide/svelte/icons/credit-card';
@@ -19,6 +20,8 @@
   import { FOOTER_LEGAL_LINKS, LEGAL_LINKS, legalHref } from '$lib/legal-links';
 
   type RailPages = 'include' | 'omit';
+
+  const DASHBOARD_HREF = '/app';
 
   let {
     projectId,
@@ -74,7 +77,7 @@
     marketingPage?: true;
     desktopOnly?: true;
   }> = [
-    { id: 'home', group: 'navigate', labelKey: 'app.shell.menu.home', icon: House, href: `/p/${projectId}` },
+    { id: 'home', group: 'navigate', labelKey: 'app.shell.menu.home', icon: LayoutGrid, href: DASHBOARD_HREF },
     { id: 'settings', group: 'navigate', labelKey: 'app.shell.menu.settings', icon: Settings, sheet: '/settings/connected-accounts' },
     { id: 'billing', group: 'navigate', labelKey: 'app.shell.menu.billing', icon: CreditCard, sheet: '/settings/billing' },
     { id: 'shortcuts', group: 'help', labelKey: 'app.shell.menu.shortcuts', icon: Keyboard, sub: true, desktopOnly: true },

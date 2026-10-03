@@ -33,9 +33,8 @@ describe('la tabella delle voci del menu', () => {
     expect(menu).toMatch(/logout/);
   });
 
-  it('home porta alla home del progetto, mai a /app che è deprecata', () => {
-    expect(menu).toMatch(/\/p\/\$\{projectId\}/);
-    expect(menu).not.toMatch(/['"`]\/app['"`]/);
+  it('home porta alla dashboard', () => {
+    expect(menu).toMatch(/DASHBOARD_HREF = '\/app'/);
   });
 
   it('segnala un contenuto apre il modulo DSA/DMCA', () => {
