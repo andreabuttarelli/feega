@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { COMPONENT_IDS, AssetKind, Control, Group, defaultProps } from './components';
-import { fieldGroups, fieldsOf } from './inspector';
+import { fieldGroups, fieldsOf, parseDecimal, secondsLabel } from './inspector';
 
 describe('properties inspector from the component schema', () => {
   it('every component describes every prop it takes', () => {
@@ -31,5 +31,18 @@ describe('properties inspector from the component schema', () => {
 
   it('groups come content first', () => {
     expect(fieldGroups('Title')[0].group).toBe(Group.Content);
+  });
+
+  it('seconds read rounded, with a dot, whatever the locale', () => {
+    expect(secondsLabel(8)).toBe('0.27');
+    expect(secondsLabel(9)).toBe('0.3');
+    expect(secondsLabel(90)).toBe('3');
+  });
+
+  it('a decimal typed with a comma or a dot is the same number', () => {
+    expect(parseDecimal('0,27')).toBe(0.27);
+    expect(parseDecimal(' 1.5 ')).toBe(1.5);
+    expect(parseDecimal('abc')).toBeNull();
+    expect(parseDecimal('')).toBeNull();
   });
 });

@@ -3,7 +3,7 @@
   import { FPS, TRANSITION_KINDS, type Edge } from '$lib/motion/design';
   import { resolveColor, type BrandTokens } from '$lib/motion/brand';
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
-  import { fieldGroups, type Field } from '$lib/motion/inspector';
+  import { fieldGroups, parseDecimal, secondsLabel, type Field } from '$lib/motion/inspector';
   import { setProps, setTiming, setTransition, Side, type OpResult } from '$lib/motion/timeline';
 
   type Asset = { id: string; kind: AssetKind; label: string; previewUrl: string };
@@ -34,8 +34,9 @@
     commit(setProps(doc, clip.id, { [field.key]: value }), `Edited ${field.label.toLowerCase()}`);
   }
 
-  function setSeconds(key: 'from' | 'durationInFrames', seconds: number) {
-    if (!Number.isFinite(seconds)) {
+  function setSeconds(key: 'from' | 'durationInFrames', text: string) {
+    const seconds = parseDecimal(text);
+    if (seconds === null) {
       return;
     }
     commit(setTiming(doc, clip.id, { [key]: Math.round(seconds * FPS) }), 'Changed timing');
@@ -44,6 +45,14 @@
   function setEdge(side: Side, edge: Partial<Edge>) {
     const current = side === Side.In ? clip.transitionIn : clip.transitionOut;
     commit(setTransition(doc, clip.id, side, { ...current, ...edge }), 'Changed transition');
+  }
+
+  function setEdgeSeconds(side: Side, text: string) {
+    const seconds = parseDecimal(text);
+    if (seconds === null) {
+      return;
+    }
+    setEdge(side, { durationInFrames: Math.round(seconds * FPS) });
   }
 
   const value = (field: Field) => (clip.props as Record<string, unknown>)[field.key];
@@ -59,8 +68,8 @@
   <section>
     <h4>Timing</h4>
     <div class="row two">
-      <label>Start (s)<input type="number" step="0.1" min="0" value={clip.from / FPS} onchange={(e) => setSeconds('from', Number(e.currentTarget.value))} /></label>
-      <label>Length (s)<input type="number" step="0.1" min="0.1" value={clip.durationInFrames / FPS} onchange={(e) => setSeconds('durationInFrames', Number(e.currentTarget.value))} /></label>
+      <label>Start (s)<input type="text" inputmode="decimal" value={secondsLabel(clip.from)} onchange={(e) => setSeconds('from', e.currentTarget.value)} /></label>
+      <label>Length (s)<input type="text" inputmode="decimal" value={secondsLabel(clip.durationInFrames)} onchange={(e) => setSeconds('durationInFrames', e.currentTarget.value)} /></label>
     </div>
     {#each [Side.In, Side.Out] as side (side)}
       {@const edge = side === Side.In ? clip.transitionIn : clip.transitionOut}
@@ -71,7 +80,7 @@
             {#each TRANSITION_KINDS as kind (kind)}<option value={kind}>{kind}</option>{/each}
           </select>
         </label>
-        <label>Duration (s)<input type="number" step="0.05" min="0" max="2" value={edge.durationInFrames / FPS} onchange={(e) => setEdge(side, { durationInFrames: Math.round(Number(e.currentTarget.value) * FPS) })} /></label>
+        <label>Duration (s)<input type="text" inputmode="decimal" value={secondsLabel(edge.durationInFrames)} onchange={(e) => setEdgeSeconds(side, e.currentTarget.value)} /></label>
       </div>
     {/each}
   </section>

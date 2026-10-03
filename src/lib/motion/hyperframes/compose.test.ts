@@ -4,7 +4,7 @@ import { TransitionKind } from '../design';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '../doc';
 import { addClip, setTransition, Side } from '../timeline';
 import { COMPONENT_IDS } from '../components';
-import { composeHtml } from './compose';
+import { CAPTURE_REPLY, CAPTURE_REQUEST, composeHtml } from './compose';
 
 function must(r: { ok: true; doc: MotionDoc } | { ok: false; error: string }): MotionDoc {
   if (!r.ok) {
@@ -88,5 +88,37 @@ describe('MotionDoc to HyperFrames composition', () => {
       const one = must(addClip(newMotionDoc(MotionFormat.Square), { component, from: 0 }, 'k'));
       expect(compose(one)).toContain('data-clip="k"');
     }
+  });
+
+  it('a long title in a vertical frame shrinks to fit inside the safe area', () => {
+    const vertical = must(addClip(newMotionDoc(MotionFormat.Vertical), { component: 'Title', from: 0, props: { text: 'Your whole marketing,\non one canvas', size: 0.15, width: 1, height: 0.15 } }, 't'));
+    const html = compose(vertical);
+    const size = Number(/font-size:([\d.]+)px;line-height:0.95/.exec(html)?.[1]);
+
+    expect(size).toBeLessThan(0.15 * 1080);
+    expect(html).toContain('left:54px');
+  });
+
+  it('every animated layer is composited from the first frame, so seek history cannot change the pixels', () => {
+    const html = compose(doc);
+
+    expect(html).toContain('.fx{position:absolute;inset:0;will-change:transform,opacity}');
+    expect(html).toContain('.li{display:block;will-change:transform}');
+  });
+
+  it('a staggered title line is held hidden from the clip start until its own reveal begins', () => {
+    const html = compose(doc);
+
+    expect(html).toContain('tl.set("#li-title-1",{"yPercent":105},0.5);');
+    expect(html).not.toContain('tl.set("#li-title-0"');
+  });
+
+  it('answers a capture request with a JPEG of the root, so the agent can see frames', () => {
+    const html = compose(doc);
+
+    expect(html).toContain(`"${CAPTURE_REQUEST}"`);
+    expect(html).toContain(`"${CAPTURE_REPLY}"`);
+    expect(html).toContain('html-to-image@');
+    expect(html).toMatch(/<link rel="stylesheet" crossorigin="anonymous" href="https:\/\/fonts\.googleapis\.com/);
   });
 });

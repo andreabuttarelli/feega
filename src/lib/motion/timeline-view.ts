@@ -52,3 +52,44 @@ export function snapped(doc: MotionDoc, frame: number, input: { playhead: number
   }
   return snapFrame(frame, snapTargets(doc, input), Math.max(1, Math.round(SNAP_PX / pxPerFrame(input.zoom))));
 }
+
+export const HANDLE_PX = 8;
+const MIN_BODY_SHARE = 3;
+
+export enum Grip {
+  Start = 'start',
+  End = 'end'
+}
+
+export type Handle = { clipId: string; grip: Grip; left: number; width: number };
+
+type Span = { id: string; from: number; durationInFrames: number };
+
+export function edgeHandles(clips: readonly Span[], ppf: number, selected: readonly string[] = []): Handle[] {
+  const topmostLast = [...clips.filter((c) => !selected.includes(c.id)), ...clips.filter((c) => selected.includes(c.id))];
+  return topmostLast.flatMap((clip) => {
+    const left = clip.from * ppf;
+    const right = (clip.from + clip.durationInFrames) * ppf;
+    const width = Math.min(HANDLE_PX, (right - left) / MIN_BODY_SHARE);
+    return [
+      { clipId: clip.id, grip: Grip.Start, left, width },
+      { clipId: clip.id, grip: Grip.End, left: right - width, width }
+    ];
+  });
+}
+
+export function stackRows(clips: readonly Span[]): Record<string, number> {
+  const rowEnds: number[] = [];
+  const rows: Record<string, number> = {};
+  for (const clip of [...clips].sort((a, b) => a.from - b.from)) {
+    const free = rowEnds.findIndex((end) => end <= clip.from);
+    const row = free < 0 ? rowEnds.length : free;
+    rowEnds[row] = clip.from + clip.durationInFrames;
+    rows[clip.id] = row;
+  }
+  return rows;
+}
+
+export function handleAt(handles: readonly Handle[], x: number): Handle | null {
+  return handles.findLast((h) => x >= h.left && x < h.left + h.width) ?? null;
+}

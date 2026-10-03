@@ -62,6 +62,14 @@ export function llmVideoReviewerModel(): string {
 	throw new Error(LLM_VIDEO_UNCONFIGURED);
 }
 
+export function llmVisionModel(): string | null {
+	try {
+		return llmVideoReviewerModel();
+	} catch {
+		return null;
+	}
+}
+
 export function llmEmbeddingModel(): string {
 	const id = env.EMBEDDING_MODEL?.trim();
 	if (!id) throw new Error(LLM_EMBEDDING_UNCONFIGURED);

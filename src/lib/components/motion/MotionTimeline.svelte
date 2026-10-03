@@ -4,10 +4,11 @@
   import { COMPONENTS, TrackKind } from '$lib/motion/components';
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
   import { ClipEdge, moveClip, moveTrack, trimClip, type OpResult } from '$lib/motion/timeline';
-  import { Snap, frameAt, pxPerFrame, rulerTicks, snapped } from '$lib/motion/timeline-view';
+  import { Grip, Snap, edgeHandles, frameAt, pxPerFrame, rulerTicks, snapped, stackRows } from '$lib/motion/timeline-view';
 
-  const EDGE_PX = 7;
   const HEADER_PX = 132;
+  const ROW_PX = 30;
+  const LANE_PAD_PX = 5;
 
   const Drag = { Move: 'move', TrimStart: 'trim-start', TrimEnd: 'trim-end', Scrub: 'scrub' } as const;
   type Drag = (typeof Drag)[keyof typeof Drag];
@@ -47,23 +48,17 @@
     }
   }
 
-  function dragKindAt(e: PointerEvent, el: HTMLElement): Drag {
-    const rect = el.getBoundingClientRect();
-    if (e.clientX - rect.left <= EDGE_PX) {
-      return Drag.TrimStart;
-    }
-    if (rect.right - e.clientX <= EDGE_PX) {
-      return Drag.TrimEnd;
-    }
-    return Drag.Move;
-  }
+  const GRIP_DRAG: Record<Grip, Drag> = { [Grip.Start]: Drag.TrimStart, [Grip.End]: Drag.TrimEnd };
 
-  function startClip(e: PointerEvent, clip: MotionClip, trackId: string) {
+  function startClip(e: PointerEvent, clip: MotionClip, trackId: string, kind: Drag = Drag.Move) {
     e.stopPropagation();
     select(clip.id, e);
-    const el = e.currentTarget as HTMLElement;
-    el.setPointerCapture(e.pointerId);
-    gesture = { kind: dragKindAt(e, el), clipId: clip.id, trackId, grabFrame: frameOfPointer(e), originFrom: clip.from, base: doc };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    gesture = { kind, clipId: clip.id, trackId, grabFrame: frameOfPointer(e), originFrom: clip.from, base: doc };
+  }
+
+  function clipById(id: string): MotionClip {
+    return shown.tracks.flatMap((t) => t.clips).find((c) => c.id === id) as MotionClip;
   }
 
   function startScrub(e: PointerEvent) {
@@ -145,7 +140,9 @@
     </div>
 
     {#each shown.tracks as track, index (track.id)}
-      <div class="lane" data-track-id={track.id} class:audio={track.kind === TrackKind.Audio}>
+      {@const rows = stackRows(track.clips)}
+      {@const rowCount = Math.max(1, ...Object.values(rows).map((r) => r + 1))}
+      <div class="lane" data-track-id={track.id} class:audio={track.kind === TrackKind.Audio} style={`height: ${rowCount * ROW_PX + 2 * LANE_PAD_PX}px;`}>
         <div class="head" style={`width: ${HEADER_PX}px;`}>
           <span class="name">{track.name || track.id}</span>
           <button type="button" aria-label="Move track up" disabled={index === 0} onclick={() => reorder(track.id, -1)}><ChevronUp size={12} /></button>
@@ -160,12 +157,23 @@
               role="button"
               tabindex="0"
               aria-label={`${COMPONENTS[clip.component].label} clip`}
-              style={`left: ${clip.from * ppf}px; width: ${Math.max(4, clip.durationInFrames * ppf)}px;`}
+              style={`left: ${clip.from * ppf}px; width: ${Math.max(4, clip.durationInFrames * ppf)}px; top: ${LANE_PAD_PX + rows[clip.id] * ROW_PX}px; height: ${ROW_PX - 2}px;`}
               onpointerdown={(e) => startClip(e, clip as MotionClip, track.id)}
             >
               <span class="kind">{COMPONENTS[clip.component].label}</span>
               <span class="label">{clipLabel(clip as MotionClip)}</span>
             </div>
+          {/each}
+          {#each edgeHandles(track.clips, ppf, selection) as handle (`${handle.clipId}-${handle.grip}`)}
+            <div
+              class="grip"
+              data-grip={handle.grip}
+              data-grip-clip={handle.clipId}
+              role="separator"
+              aria-label={`Trim ${handle.grip}`}
+              style={`left: ${handle.left}px; width: ${handle.width}px; top: ${LANE_PAD_PX + rows[handle.clipId] * ROW_PX}px; height: ${ROW_PX - 2}px;`}
+              onpointerdown={(e) => startClip(e, clipById(handle.clipId), track.id, GRIP_DRAG[handle.grip])}
+            ></div>
           {/each}
         </div>
       </div>
@@ -236,7 +244,6 @@
   .lane {
     position: relative;
     display: flex;
-    height: 40px;
     border-bottom: 1px solid var(--line);
   }
 
@@ -285,8 +292,6 @@
 
   .bar {
     position: absolute;
-    top: 5px;
-    bottom: 5px;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -298,22 +303,14 @@
     white-space: nowrap;
   }
 
-  .bar::before,
-  .bar::after {
-    content: '';
+  .grip {
     position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 6px;
+    z-index: 2;
     cursor: ew-resize;
   }
 
-  .bar::before {
-    left: 0;
-  }
-
-  .bar::after {
-    right: 0;
+  .grip:hover {
+    background: color-mix(in srgb, #0099ff 45%, transparent);
   }
 
   .bar.selected {

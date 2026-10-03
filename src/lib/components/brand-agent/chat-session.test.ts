@@ -111,4 +111,18 @@ describe('chatSession', () => {
     expect(session.failedDetail).toBe(reason);
     expect(session.messages.map((m) => m.role)).toEqual(['user']);
   });
+
+  it('a data part the page must answer reaches it while the turn is still streaming', async () => {
+    forgetChatSessions();
+    const evt = { type: 'data-motion-frames', data: { callId: 'call_1', times: [1] } };
+    const fetcher = (async (_url: string, init?: RequestInit) =>
+      init?.method === 'POST' ? new Response(sse(evt), { status: 200 }) : new Response(JSON.stringify({ messages: [] }), { status: 200 })) as typeof fetch;
+    const session = chatSession('/api/v1/projects/p/motion/n/agent', fetcher);
+    const seen: unknown[] = [];
+    session.onData = (part) => seen.push(part);
+
+    await session.send('look', 'append-user');
+
+    expect(seen).toEqual([evt]);
+  });
 });

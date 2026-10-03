@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { COMPONENTS, Control, Group, type AssetKind, type ComponentId } from './components';
+import { FPS } from './design';
 
 export type Field = {
   key: string;
@@ -68,4 +69,19 @@ export function fieldsOf(id: ComponentId): Field[] {
 export function fieldGroups(id: ComponentId): { group: Group; fields: Field[] }[] {
   const fields = fieldsOf(id);
   return GROUP_ORDER.map((group) => ({ group, fields: fields.filter((f) => f.group === group) })).filter((g) => g.fields.length > 0);
+}
+
+const SECONDS_PRECISION = 100;
+
+export function secondsLabel(frames: number): string {
+  return String(Math.round((frames / FPS) * SECONDS_PRECISION) / SECONDS_PRECISION);
+}
+
+export function parseDecimal(text: string): number | null {
+  const trimmed = text.trim().replace(',', '.');
+  if (!trimmed) {
+    return null;
+  }
+  const value = Number(trimmed);
+  return Number.isFinite(value) ? value : null;
 }

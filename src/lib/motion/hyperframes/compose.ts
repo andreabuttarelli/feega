@@ -9,6 +9,9 @@ import { LIGHTING, threeImportMap, threeScript, type ThreeClip } from './three';
 export const HYPERFRAMES_VERSION = '0.8.114';
 export const GSAP_VERSION = '3.14.2';
 export const COMPOSITION_ID = 'main';
+export const CAPTURE_REQUEST = 'feega:capture';
+export const CAPTURE_REPLY = 'feega:frame';
+const SCREENSHOT_URL = 'https://cdn.jsdelivr.net/npm/html-to-image@1.11.13/dist/html-to-image.js';
 
 const RUNTIME_URL = `https://cdn.jsdelivr.net/npm/@hyperframes/core@${HYPERFRAMES_VERSION}/dist/hyperframe.runtime.iife.js`;
 const GSAP_URL = `https://cdn.jsdelivr.net/npm/gsap@${GSAP_VERSION}/dist/gsap.min.js`;
@@ -117,6 +120,16 @@ function tweenLine(t: Tween): string {
   return `tl.fromTo(${js(t.target)},${js(t.from)},${js({ ...t.to, duration: round(t.duration), ease: GSAP_EASE[t.ease], immediateRender: false })},${round(t.at)});`;
 }
 
+type Hold = { target: string; vars: Vars; at: number };
+
+function heldUntilStart(tweens: Tween[], clipStart: number): Hold[] {
+  return tweens.filter((t) => t.at > clipStart).map((t) => ({ target: t.target, vars: t.from, at: clipStart }));
+}
+
+function holdLine(h: Hold): string {
+  return `tl.set(${js(h.target)},${js(h.vars)},${round(h.at)});`;
+}
+
 function round(n: number): number {
   return Math.round(n * 10000) / 10000;
 }
@@ -145,15 +158,20 @@ const BASE_CSS = [
   'html,body{margin:0;padding:0;background:transparent}',
   '#root{position:relative;width:100%;height:100%;overflow:hidden}',
   '.layer{position:absolute;inset:0}',
-  '.fx{position:absolute;inset:0}',
-  '.li{display:block}'
+  '.fx{position:absolute;inset:0;will-change:transform,opacity}',
+  '.li{display:block;will-change:transform}'
 ].join('');
+
+function captureScript(doc: MotionDoc): string {
+  return `<script>(function(){var lib=null;function load(){return lib||(lib=new Promise(function(ok,ko){var s=document.createElement('script');s.src=${js(SCREENSHOT_URL)};s.onload=ok;s.onerror=ko;document.head.appendChild(s);}));}function painted(){return new Promise(function(r){requestAnimationFrame(function(){requestAnimationFrame(r);});});}addEventListener('message',function(e){var m=e.data;if(!m||m.type!==${js(CAPTURE_REQUEST)})return;var reply=function(body){e.source&&e.source.postMessage(Object.assign({type:${js(CAPTURE_REPLY)},id:m.id},body),'*');};load().then(function(){return document.fonts.ready;}).then(painted).then(function(){return window.htmlToImage.toJpeg(document.getElementById('root'),{width:${doc.width},height:${doc.height},canvasWidth:m.width,canvasHeight:Math.round(m.width*${doc.height / doc.width}),pixelRatio:1,quality:m.quality});}).then(function(url){reply({url:url});},function(err){reply({error:String(err)});});});})();</script>`;
+}
 
 export function composeHtml(input: ComposeInput): string {
   const { doc, tokens } = input;
   const bottomFirst = doc.tracks.map((track, index) => ({ track, index })).reverse();
   const layers: string[] = [];
   const tweens: Tween[] = [];
+  const holds: Hold[] = [];
   const three: ThreeClip[] = [];
   let layer = 0;
 
@@ -163,7 +181,9 @@ export function composeHtml(input: ComposeInput): string {
       const template = TEMPLATES[clip.component] as (typeof TEMPLATES)[ComponentId];
       layer += 1;
       layers.push(clipHtml(clip, ctx, layer, index));
-      tweens.push(...edgeTweens(clip, doc.fps), ...moveTweens(clip, doc.fps), ...(template.tweens?.(ctx as never) ?? []));
+      const own = template.tweens?.(ctx as never) ?? [];
+      tweens.push(...edgeTweens(clip, doc.fps), ...moveTweens(clip, doc.fps), ...own);
+      holds.push(...heldUntilStart(own, ctx.start));
       if (THREE_D_COMPONENTS.includes(clip.component)) {
         three.push(threeClipOf(clip, ctx));
       }
@@ -179,14 +199,15 @@ export function composeHtml(input: ComposeInput): string {
     `<script src="${RUNTIME_URL}"></script>`,
     `<script src="${GSAP_URL}"></script>`,
     three.length ? threeImportMap() : '',
-    `<link rel="stylesheet" href="${FONTS_URL}" />`,
+    `<link rel="stylesheet" crossorigin="anonymous" href="${FONTS_URL}" />`,
     `<style>${BASE_CSS}#root{background:${esc(background)}}</style>`,
     '</head><body>',
     `<div id="root" data-composition-id="${COMPOSITION_ID}" data-start="0" data-width="${doc.width}" data-height="${doc.height}" data-duration="${duration}" data-fps="${doc.fps}">`,
     layers.join(''),
     '</div>',
-    `<script>const tl=gsap.timeline({paused:true});${tweens.map(tweenLine).join('')}tl.set({}, {}, ${duration});window.__timelines=window.__timelines||{};window.__timelines[${js(COMPOSITION_ID)}]=tl;</script>`,
+    `<script>const tl=gsap.timeline({paused:true});${holds.map(holdLine).join('')}${tweens.map(tweenLine).join('')}tl.set({}, {}, ${duration});window.__timelines=window.__timelines||{};window.__timelines[${js(COMPOSITION_ID)}]=tl;</script>`,
     threeScript(three, Number(duration)),
+    captureScript(doc),
     '</body></html>'
   ].join('');
 }
