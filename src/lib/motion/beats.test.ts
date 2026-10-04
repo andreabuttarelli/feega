@@ -42,6 +42,13 @@ describe('hitFrames', () => {
     expect(hitFrames(scene(), analyses, Hit.Onsets)).toEqual([69]);
   });
 
+  it('beats come from the music bed, not from a voice-over with a tempo of its own', () => {
+    const voice = { ...music, duration: 3, beats: [0.1, 0.4], onsets: [0.2] };
+    const withVo = must(addClip(scene(), { component: 'Audio', from: 0, durationInFrames: 60, trackId: undefined, props: { assetId: 'v' } }, 'vo'));
+
+    expect(hitFrames(withVo, { ...analyses, v: voice }, Hit.Beats).slice(0, 2)).toEqual([45, 60]);
+  });
+
   it('a clip without an analysis has no beats', () => {
     expect(hitFrames(scene(), {}, Hit.Beats)).toEqual([]);
   });

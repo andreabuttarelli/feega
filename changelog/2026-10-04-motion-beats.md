@@ -1,7 +1,9 @@
 # Motion editor: beat sul righello, snap e «Cut to beat»
 
-I beat dell'analisi audio (PR precedente) diventano frame di timeline con `hitFrames`: per ogni
-clip Audio analizzata, `frame = from + t·fps − trimStart`, tenuti solo quelli dentro la clip.
+I beat dell'analisi audio (PR precedente) diventano frame di timeline con `hitFrames`, dalla sola
+*base musicale* (`musicBed`: la clip Audio più lunga con un tempo analizzato — anche un voice-over
+ha un «BPM», e i suoi beat sporcavano la griglia): `frame = from + t·fps − trimStart`, tenuti
+solo quelli dentro la clip.
 
 - **Righello**: un trattino per beat.
 - **Snap**: `snapped` accetta `beats` come bersagli in più; spostare o tagliare una clip si

@@ -1,5 +1,5 @@
 import type { AudioAnalysis } from './audio-analysis';
-import { clipsOf, findClip, type MotionDoc } from './doc';
+import { clipsOf, findClip, type MotionClip, type MotionDoc } from './doc';
 import { setTiming, type OpResult } from './timeline';
 
 export enum Hit {
@@ -12,18 +12,21 @@ const TIMES: Record<Hit, (a: AudioAnalysis) => number[]> = {
   [Hit.Onsets]: (a) => a.onsets
 };
 
+export function musicBed(doc: MotionDoc, analyses: Record<string, AudioAnalysis>): MotionClip | null {
+  const tempo = clipsOf(doc).filter((c) => c.component === 'Audio' && analyses[String(c.props.assetId ?? '')]?.bpm);
+  return tempo.reduce<MotionClip | null>((longest, c) => (!longest || c.durationInFrames > longest.durationInFrames ? c : longest), null);
+}
+
 export function hitFrames(doc: MotionDoc, analyses: Record<string, AudioAnalysis>, hit: Hit): number[] {
-  const frames = clipsOf(doc).flatMap((clip) => {
-    const analysis = analyses[String(clip.props.assetId ?? '')];
-    if (clip.component !== 'Audio' || !analysis) {
-      return [];
-    }
-    const end = clip.from + clip.durationInFrames;
-    return TIMES[hit](analysis)
-      .map((t) => Math.round(clip.from + t * doc.fps - clip.trimStart))
-      .filter((f) => f >= clip.from && f < end);
-  });
-  return [...new Set(frames)].sort((a, b) => a - b);
+  const clip = musicBed(doc, analyses);
+  if (!clip) {
+    return [];
+  }
+  const analysis = analyses[String(clip.props.assetId)];
+  const end = clip.from + clip.durationInFrames;
+  return TIMES[hit](analysis)
+    .map((t) => Math.round(clip.from + t * doc.fps - clip.trimStart))
+    .filter((f) => f >= clip.from && f < end);
 }
 
 function nearest(beats: readonly number[], frame: number): number {
