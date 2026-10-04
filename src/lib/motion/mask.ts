@@ -42,8 +42,8 @@ type Range = { field: MaskField; label: string; min: number; max: number; step: 
 type MaskField = 'x' | 'y' | 'width' | 'height' | 'rotation' | 'feather' | 'expansion' | 'opacity';
 
 export const MASK_PROPS = {
-  maskX: { field: 'x', label: 'Mask X', min: -1, max: 2, step: 0.01, fallback: 0.5 },
-  maskY: { field: 'y', label: 'Mask Y', min: -1, max: 2, step: 0.01, fallback: 0.5 },
+  maskX: { field: 'x', label: 'Mask X', min: -30, max: 30, step: 0.01, fallback: 0.5 },
+  maskY: { field: 'y', label: 'Mask Y', min: -30, max: 30, step: 0.01, fallback: 0.5 },
   maskWidth: { field: 'width', label: 'Mask width', min: 0, max: 60, step: 0.01, fallback: 0.5 },
   maskHeight: { field: 'height', label: 'Mask height', min: 0, max: 60, step: 0.01, fallback: 0.5 },
   maskRotation: { field: 'rotation', label: 'Mask rotation', min: -1080, max: 1080, step: 1, fallback: 0 },

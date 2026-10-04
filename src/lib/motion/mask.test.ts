@@ -53,6 +53,7 @@ describe('mask schema', () => {
 
     expect(setKeyframes(doc, 'img', 'maskWidth', [{ frame: 0, value: 0.6, ease: Ease.Linear }, { frame: 30, value: 40, ease: Ease.Linear }]).ok).toBe(true);
     expect(setMask(base, 'img', { kind: MaskKind.Text, text: 'CANVAS', width: 40, height: 20 }).ok).toBe(true);
+    expect(setKeyframes(doc, 'img', 'maskX', [{ frame: 0, value: 0.5, ease: Ease.Linear }, { frame: 30, value: 9.5, ease: Ease.Linear }]).ok).toBe(true);
   });
 
   it('a masked doc survives a save and a load', () => {

@@ -2,8 +2,8 @@
 
 Found while building a transitions showcase by hand in the editor.
 
-- **Mask size cap 4 → 60.** A text mask that opens onto the next scene has to grow until one letter
-  stroke is wider than the frame: a 520 px word needs ~55×. At 4× the word never covered the frame.
+- **Mask size cap 4 → 60, centre range −1..2 → −30..30.** A text mask that opens onto the next scene has to grow until one letter
+  stroke is wider than the frame: a 520 px word needs ~55×. At 4× the word never covered the frame; zooming about a letter stem moves the mask centre far off-frame.
 - **`trimStart` honoured by custom components.** The runtime always started a component at its own
   zero, so a scene split in two clips (one masked as text, the next as an iris) restarted its
   animation at the cut. The run now carries `trim`; the component timeline is scrubbed from `trim`
