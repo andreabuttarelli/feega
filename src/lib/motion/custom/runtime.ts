@@ -58,7 +58,7 @@ export function librariesOf(components: CustomComponents, used: Iterable<string>
 }
 
 export type ParamKey = { at: number; value: number | string; ease: string };
-export type CustomRun = { id: string; name: string; start: number; length: number; fps: number; values: Record<string, unknown>; seed: number; keys?: Record<string, ParamKey[]> };
+export type CustomRun = { id: string; name: string; start: number; length: number; fps: number; values: Record<string, unknown>; seed: number; keys?: Record<string, ParamKey[]>; trim?: number };
 
 export type CustomEnv = { assets: Record<string, string>; brand: { name: string; colors: Record<string, string>; logoUrl: string | null } };
 
@@ -159,8 +159,9 @@ function bootCustom(cfg: { registry: string; errors: string; three: string; shad
         root.style.setProperty(cssVar(key), String(value));
       }
     }
+    const trim = run.trim ?? 0;
     const sampled = (track: ParamKey[]) => {
-      const t = child.time();
+      const t = child.time() - trim;
       const next = track.findIndex((k) => k.at > t);
       if (next <= 0) {
         return next === 0 ? track[0].value : track[track.length - 1].value;
@@ -172,11 +173,11 @@ function bootCustom(cfg: { registry: string; errors: string; three: string; shad
     for (const [key, track] of Object.entries(run.keys ?? {})) {
       Object.defineProperty(values, key, { get: () => sampled(track), enumerable: true });
       root.style.setProperty(cssVar(key), String(track[0].value));
-      child.set(root, { [cssVar(key)]: track[0].value }, 0);
+      child.set(root, { [cssVar(key)]: track[0].value }, trim);
       for (let i = 0; i + 1 < track.length; i++) {
         const a = track[i];
         const b = track[i + 1];
-        child.fromTo(root, { [cssVar(key)]: a.value }, { [cssVar(key)]: b.value, duration: Math.max(0.0001, b.at - a.at), ease: a.ease, immediateRender: false, lazy: false }, a.at);
+        child.fromTo(root, { [cssVar(key)]: a.value }, { [cssVar(key)]: b.value, duration: Math.max(0.0001, b.at - a.at), ease: a.ease, immediateRender: false, lazy: false }, a.at + trim);
       }
     }
     const param = (name: string, fallback: unknown) => (name in values ? values[name] : fallback);
@@ -189,8 +190,13 @@ function bootCustom(cfg: { registry: string; errors: string; three: string; shad
       errors.push({ clip: run.id, component: run.name, message: e instanceof Error ? e.message : String(e) });
       root.setAttribute('data-error', '');
     }
-    child.set({}, {}, run.length);
-    master.add(child, run.start);
+    child.set({}, {}, run.length + trim);
+    if (!trim) {
+      master.add(child, run.start);
+      continue;
+    }
+    child.paused(true);
+    master.add(child.tweenFromTo(trim, trim + run.length, { duration: run.length, ease: 'none', immediateRender: false }), run.start);
   }
 }
 

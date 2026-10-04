@@ -225,7 +225,7 @@ function customRun(clip: MotionClip, ctx: TemplateCtx<ComponentId>, components: 
       .filter(([key]) => key in component.propsSchema.properties)
       .map(([key, track]) => [key, track.map((k) => ({ at: round(k.frame / ctx.fps), value: typeof k.value === 'string' ? ctx.color(k.value) : k.value, ease: easeName(k.ease) }))])
   );
-  return { id: clip.id, name, start: ctx.start, length: ctx.length, fps: ctx.fps, values, seed: seedOf(clip.id), ...(Object.keys(keys).length ? { keys } : {}) };
+  return { id: clip.id, name, start: ctx.start, length: ctx.length, fps: ctx.fps, values, seed: seedOf(clip.id), ...(Object.keys(keys).length ? { keys } : {}), ...(ctx.mediaStart ? { trim: ctx.mediaStart } : {}) };
 }
 
 const LIBRARY_TAGS: Record<Library, { scripts: string[]; tag: string }> = {

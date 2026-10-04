@@ -54,6 +54,12 @@ describe('params declared in code', () => {
     expect(Object.keys(edited.components.Grid.propsSchema.properties)).toEqual(['gap']);
   });
 
+  it('refuse a param named like a clip prop the editor owns, which would corrupt the doc on reload', () => {
+    const named = writeComponent(newMotionDoc(MotionFormat.Landscape), 'Drag', { ...draft, source: { ...draft.source, js: "param('name', 'Giulia', { type: 'text' });" } });
+
+    expect(named.ok).toBe(false);
+  });
+
   it('refuse a param whose name or options are not literals', () => {
     expect(writeComponent(newMotionDoc(MotionFormat.Landscape), 'Bad', { ...draft, source: { ...draft.source, js: 'const n = "x"; param(n, 1);' } }).ok).toBe(false);
   });
@@ -90,6 +96,13 @@ describe('keyframed params', () => {
     expect(valueAt(clip, 'speed', 45, (v) => v)).toBe(2);
   });
 
+  it('a trimmed custom clip tells the composition where its component starts', () => {
+    const doc = structuredClone(keyed);
+    findClip(doc, 'g')!.clip.trimStart = 45;
+
+    expect(composeHtml({ doc, tokens: FEEGA_TOKENS, assets: {} })).toContain('"trim":1.5');
+  });
+
   it('reach the composition as tracks in clip seconds', () => {
     expect(composeHtml({ doc: keyed, tokens: FEEGA_TOKENS, assets: {} })).toContain('"keys":{"speed":[{"at":0,"value":0,"ease":"none"},{"at":1,"value":4,"ease":"none"}]}');
   });
@@ -104,14 +117,14 @@ describe('param injection at runtime', () => {
     delete w[ERRORS];
   });
 
-  function boot(js: string, keys: Record<string, { at: number; value: number | string; ease: string }[]> = {}) {
+  function boot(js: string, keys: Record<string, { at: number; value: number | string; ease: string }[]> = {}, trim = 0) {
     document.body.innerHTML = '<div id="cc-c1"></div>';
     const w = window as unknown as Record<string, unknown>;
     w.gsap = gsap;
     const master = gsap.timeline({ paused: true });
     w.__master = master;
     window.eval(definitionScript('P', js).replace(/^<script>|<\/script>$/g, ''));
-    window.eval(bootScript([{ id: 'c1', name: 'P', start: 0, length: 2, fps: 30, values: { speed: 1, accent: '#0099ff' }, seed: seedOf('c1'), keys }], { assets: {}, brand: { name: 'f', colors: {}, logoUrl: null } }, 'window.__master'));
+    window.eval(bootScript([{ id: 'c1', name: 'P', start: 0, length: 2, fps: 30, values: { speed: 1, accent: '#0099ff' }, seed: seedOf('c1'), keys, ...(trim ? { trim } : {}) }], { assets: {}, brand: { name: 'f', colors: {}, logoUrl: null } }, 'window.__master'));
     return { master, root: document.getElementById('cc-c1')! };
   }
 
@@ -135,5 +148,14 @@ describe('param injection at runtime', () => {
 
     expect(forward).toEqual(['2', '2']);
     expect([dot.dataset.s, root.style.getPropertyValue('--param-speed')]).toEqual(forward);
+  });
+
+  it('a trimmed clip starts its component at the trim, not at its own zero', () => {
+    const js = "const dot = document.createElement('i'); root.appendChild(dot); tl.to({}, { duration: 3, onUpdate() { dot.dataset.t = this.time().toFixed(2); } }, 0);";
+    const { master, root } = boot(js, {}, 1);
+
+    master.totalTime(0.5, SUPPRESS_EVENTS);
+
+    expect((root.querySelector('i') as HTMLElement).dataset.t).toBe('1.50');
   });
 });

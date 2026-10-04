@@ -12,6 +12,8 @@ export const PARAM_EASES = ['none', 'power1.out', 'power2.out', 'power3.out', 'p
 
 const UNBOUNDED = 1_000_000;
 
+const CLIP_OWNED: Record<string, string> = { name: 'the clip uses it to find its component' };
+
 type Options = { type?: string; min?: number; max?: number; step?: number; options?: string[]; label?: string; group?: string; kind?: string };
 type AnyNode = Node & Record<string, unknown>;
 
@@ -63,6 +65,9 @@ export function extractParams(js: string): Record<string, PropSpec> {
     const name = literal(nameNode);
     if (typeof name !== 'string') {
       throw new Error('param() needs a literal name as first argument');
+    }
+    if (name in CLIP_OWNED) {
+      throw new Error(`param ${name}: reserved, ${CLIP_OWNED[name]}; pick another name`);
     }
     const fallback = literal(fallbackNode);
     const options = (literal(optionsNode) ?? {}) as Options;
