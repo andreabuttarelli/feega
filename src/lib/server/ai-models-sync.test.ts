@@ -326,6 +326,35 @@ describe('syncAiModels — dai tre listini del gateway alla tabella', () => {
     expect(grok.param_schema).toEqual({ generate_audio: { type: 'boolean' } });
   });
 
+  it('an upscaler carries its factor and creativity windows as ranges the toolbar can show', async () => {
+    const { admin, upserts } = fakeAdmin();
+    const upscaler = {
+      id: 'black-forest-labs/flux-video-upscale',
+      name: 'FLUX Video Upscale',
+      upscale_factor: { min: 1.5, max: 3 },
+      creativity: [0, 1],
+      generate_audio: false,
+      seed: false,
+      pricing_skus: { cents_per_megapixel_second_precise: '7.5' }
+    };
+    const fetchImpl = fetchImplFor({
+      '/models': { body: CHAT_MODELS },
+      '/images/models': { body: IMAGE_MODELS },
+      '/videos/models': { body: { data: [upscaler] } }
+    });
+
+    await syncAiModels(admin, { fetchImpl, baseUrl: 'https://openrouter.ai/api/v1' });
+
+    const row = upserts.find((r) => (r as Record<string, unknown>).id === upscaler.id) as Record<string, unknown>;
+    expect(row.param_schema).toEqual({
+      generate_audio: { type: 'boolean' },
+      seed: { type: 'boolean' },
+      upscale_factor: { type: 'range', min: 1.5, max: 3 },
+      creativity: { type: 'range', min: 0, max: 1 }
+    });
+    expect(row.input_modalities).toEqual(['text', 'video']);
+  });
+
   it('quando la colonna param_schema non esiste ancora, riprova senza e scrive comunque', async () => {
     const upserts: unknown[] = [];
     let firstAttempt = true;

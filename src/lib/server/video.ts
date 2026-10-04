@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { videoModel } from '$lib/server/model-routing';
-import { OPENROUTER_UPSCALE_MODEL } from '$lib/video-models';
+import { OPENROUTER_UPSCALE_MODEL, upscaleLimitsOf } from '$lib/video-models';
 import { videoCraftFor } from '$lib/design/video-craft';
 import { getBrandContext, getOrgContext, logAiCall } from '$lib/server/ai-log';
 import { isVideoUrl } from '$lib/content-formats';
@@ -625,7 +625,7 @@ export async function prepareVideoRender(
   const resolution = clampVideoResolution(opts.resolution ?? DEFAULT_RESOLUTION);
   // Si taglia solo se il copione supera ancora la durata dopo la risoluzione.
   const script = opts.script?.trim() ? fitScriptToDuration(opts.script, durationSeconds) : undefined;
-  const prompt = buildVideoPrompt(imagePrompt, {
+  const prompt = upscaleLimitsOf(model) ? imagePrompt.trim() : buildVideoPrompt(imagePrompt, {
     hasCover: !!cover || hasRefs,
     visualStyle: opts.visualStyle,
     script,

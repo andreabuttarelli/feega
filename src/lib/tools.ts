@@ -1,10 +1,12 @@
+import type { Campaign } from '$lib/onboarding/campaigns';
+
 export enum ToolStatus {
   Available = 'available',
   Beta = 'beta',
   ComingSoon = 'coming_soon'
 }
 
-export type ToolIcon = 'camera' | 'clapperboard';
+export type ToolIcon = 'camera' | 'clapperboard' | 'upscale';
 
 export type Tool = {
   id: string;
@@ -13,6 +15,7 @@ export type Tool = {
   icon: ToolIcon;
   route: string | null;
   status: ToolStatus;
+  campaign?: Campaign;
 };
 
 export const TOOLS: readonly Tool[] = [
@@ -31,6 +34,15 @@ export const TOOLS: readonly Tool[] = [
     icon: 'clapperboard',
     route: '/app/motion',
     status: ToolStatus.Beta
+  },
+  {
+    id: 'upscale',
+    name: 'AI Video Upscaler',
+    description: 'Sharpen a clip to 2× or 4K, with a before/after preview.',
+    icon: 'upscale',
+    route: '/app/upscale',
+    status: ToolStatus.Beta,
+    campaign: 'ai-video-upscaler'
   }
 ];
 
@@ -45,4 +57,8 @@ export function toolHref(tool: Tool, projectId: string | null): string | null {
     return null;
   }
   return projectId ? `${tool.route}?project=${projectId}` : tool.route;
+}
+
+export function toolForCampaign(campaign: Campaign): Tool | null {
+  return TOOLS.find((tool) => tool.campaign === campaign) ?? null;
 }

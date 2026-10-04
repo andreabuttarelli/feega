@@ -55,6 +55,12 @@ describe('lo stato di un nodo', () => {
     expect(promptRequired('image')).toBe(true);
   });
 
+  it('an upscale needs a clip, not a prompt', () => {
+    expect(runStateOf(node({ medium: 'video', model: 'black-forest-labs/flux-video-upscale', prompt: '' }))).toBe('ready');
+    expect(promptRequired('video', 'black-forest-labs/flux-video-upscale')).toBe(false);
+    expect(promptRequired('video', 'bytedance/seedance-2-fast')).toBe(true);
+  });
+
   it('col prompt è pronto a girare', () => {
     expect(runStateOf(node())).toBe('ready');
   });

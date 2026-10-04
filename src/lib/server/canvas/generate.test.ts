@@ -94,6 +94,13 @@ vi.mock('$lib/server/ai-models-sync', async (importOriginal) => ({
 }));
 vi.mock('$lib/server/supabase-admin', () => ({ createAdminClient: () => ({}) }));
 
+const { offerableSpy } = vi.hoisted(() => ({ offerableSpy: vi.fn() }));
+vi.mock('$lib/server/offerable-models', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('$lib/server/offerable-models')>();
+  offerableSpy.mockImplementation(actual.offerableModels);
+  return { ...actual, offerableModels: offerableSpy };
+});
+
 const EMPTY_OFFER = { choices: [], recommended: [] };
 const { canvasModelCatalogue } = vi.hoisted(() => ({ canvasModelCatalogue: vi.fn() }));
 vi.mock('$lib/server/canvas-catalogue', () => ({ canvasModelCatalogue }));
@@ -1696,5 +1703,72 @@ describe('a standard generation is screened before anything reaches the provider
 
     expect((await runGenNode(db, start('text', 'a haiku about the sea'))).kind).toBe('done');
     expect(llmText).toHaveBeenCalledOnce();
+  });
+});
+
+describe('a video node on the upscale model upscales the clip wired into it', () => {
+  const SOURCE = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
+  const UPSCALER = 'black-forest-labs/flux-video-upscale';
+  const upscaleNode = { ...freshNodeRow, type: 'video', data: { model: UPSCALER } };
+
+  beforeEach(() => {
+    offerableSpy.mockResolvedValueOnce({
+      choices: [{ id: UPSCALER, params: [{ name: 'upscale_factor', label: 'Upscale factor', kind: 'number', min: 1.5, max: 3 }, { name: 'creativity', label: 'Creativity', kind: 'number', min: 0, max: 1 }] }],
+      recommended: []
+    });
+    generateVideoWithoutBrand.mockReset();
+    generateVideoWithoutBrand.mockResolvedValue({ ok: true, jobId: 'job-up' });
+    modalitiesOf.mockResolvedValue({ input: ['text', 'video'], output: ['video'], synced_at: 'now' });
+    canvasModelCatalogue.mockResolvedValue({
+      text: EMPTY_OFFER,
+      image: EMPTY_OFFER,
+      video: {
+        choices: [{ id: UPSCALER, params: [{ name: 'upscale_factor', label: 'Upscale factor', kind: 'number', min: 1.5, max: 3 }, { name: 'creativity', label: 'Creativity', kind: 'number', min: 0, max: 1 }] }],
+        recommended: []
+      }
+    });
+  });
+
+  const run = (db: Db) =>
+    runGenNode(db, {
+      orgId: ORG,
+      projectId: PROJECT,
+      canvasId: CANVAS,
+      nodeId: NODE,
+      userId: USER,
+      medium: 'video',
+      prompt: '',
+      model: UPSCALER,
+      params: { upscale_factor: 2, creativity: 0 } as never,
+      expectedVersion: 1
+    });
+
+  it('runs without a prompt and sends the source clip with the factor', async () => {
+    const { db } = fakeDb(
+      {
+        nodes: [upscaleNode, { ...freshNodeRow, id: SOURCE, type: 'video', data: { assetId: 'asset-v' } }],
+        nodes_connections: [{ id: 'e1', canvas_id: CANVAS, source_node_id: SOURCE, target_node_id: NODE, source_handle: null, target_handle: null }],
+        assets: [{ id: 'asset-v', org_id: ORG, project_id: PROJECT, type: 'video', url: 'https://cdn.example/source.mp4', mime_type: 'video/mp4' }]
+      },
+      { updateRows: { nodes: [{ ...upscaleNode, version: 2 }] } }
+    );
+
+    const result = await run(db);
+
+    expect(result).toMatchObject({ kind: 'queued' });
+    expect(generateVideoWithoutBrand).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: UPSCALER,
+        referenceVideoUrls: ['https://cdn.example/source.mp4'],
+        params: expect.objectContaining({ upscale_factor: 2, creativity: 0 })
+      })
+    );
+  });
+
+  it('without a source clip it refuses before spending', async () => {
+    const { db } = fakeDb({ nodes: [upscaleNode], nodes_connections: [], assets: [] }, { updateRows: { nodes: [{ ...upscaleNode, version: 2 }] } });
+
+    expect(await run(db)).toMatchObject({ kind: 'refused', error: 'source_video_required' });
+    expect(generateVideoWithoutBrand).not.toHaveBeenCalled();
   });
 });

@@ -99,6 +99,7 @@ const videoSchema = z.object({
   aspect_ratio: z.string().optional(),
   resolution: z.string().optional(),
   references: z.array(nodeReferenceSchema).optional(),
+  params: z.record(z.string(), z.unknown()).optional(),
   ...genState,
   ...libraryMedia
 });

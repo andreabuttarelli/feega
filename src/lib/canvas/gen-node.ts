@@ -12,6 +12,7 @@
  * `defaultParamsFor` non ha nessun valore di riserva: se un modello non dichiara i formati, il
  * nodo nasce senza formato — il vuoto è onesto, un «1:1» inventato no.
  */
+import { upscaleLimitsOf } from '$lib/video-models';
 import { MEDIUMS, type Medium } from './graph';
 import type { ModelParam } from './model-params';
 import type { RecommendationTier } from './recommended-models';
@@ -149,15 +150,15 @@ export function hasPrompt(node: GenNode, upstream: UpstreamTextAvailability = { 
 
 const PROMPT_OPTIONAL_MEDIUMS: ReadonlySet<GenMedium> = new Set(['model3d']);
 
-export function promptRequired(medium: GenMedium): boolean {
-  return !PROMPT_OPTIONAL_MEDIUMS.has(medium);
+export function promptRequired(medium: GenMedium, model: string | null = null): boolean {
+  return !PROMPT_OPTIONAL_MEDIUMS.has(medium) && !upscaleLimitsOf(model);
 }
 
 export function runStateOf(node: GenNode, upstream: UpstreamTextAvailability = { hasUpstreamText: false }): RunState {
   if (node.running) return 'running';
   if (node.error) return 'failed';
   if (node.refId) return 'done';
-  return !promptRequired(node.medium) || hasPrompt(node, upstream) ? 'ready' : 'empty';
+  return !promptRequired(node.medium, node.model) || hasPrompt(node, upstream) ? 'ready' : 'empty';
 }
 
 /**

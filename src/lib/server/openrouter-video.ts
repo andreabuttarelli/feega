@@ -17,7 +17,7 @@
  */
 import { env } from '$env/dynamic/private';
 import { logAiCall } from '$lib/server/ai-log';
-import { clampVideoPrompt, videoModelSpec } from '$lib/video-models';
+import { clampVideoPrompt, upscaleLimitsOf, videoModelSpec } from '$lib/video-models';
 
 const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 const POLL_INTERVAL_MS = 5000;
@@ -101,6 +101,16 @@ type InputReference =
 
 const clean = (urls?: string[]): string[] => (urls ?? []).map((u) => u.trim()).filter(Boolean);
 
+function upscaleInput(model: string, render: OpenrouterVideoRender, references: InputReference[]): Record<string, unknown> {
+  const prompt = clampVideoPrompt(render.prompt, render.model).trim();
+  return {
+    model,
+    ...(prompt ? { prompt } : {}),
+    input_references: references,
+    ...render.params
+  };
+}
+
 export function buildOpenrouterVideoInput(
   model: string,
   render: OpenrouterVideoRender
@@ -119,6 +129,10 @@ export function buildOpenrouterVideoInput(
     ...clean(render.referenceAudioUrls).map((url): InputReference => ({ type: 'audio_url', audio_url: { url } })),
     ...clean(render.referenceVideoUrls).map((url): InputReference => ({ type: 'video_url', video_url: { url } }))
   ];
+
+  if (upscaleLimitsOf(render.model)) {
+    return upscaleInput(model, render, references);
+  }
 
   return {
     model,

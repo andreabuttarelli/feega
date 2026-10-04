@@ -1,5 +1,6 @@
 import type { Db } from '$lib/server/db/client';
-import type { GenMedium, GenParams } from '$lib/canvas/gen-node';
+import { promptRequired, type GenMedium, type GenParams } from '$lib/canvas/gen-node';
+import { upscaleLimitsOf } from '$lib/video-models';
 import { findAsset, insertAsset, type Asset } from '$lib/server/repos/assets';
 import {
   AUDIO_JOB_PREFIX,
@@ -377,6 +378,13 @@ function providerRunOf(medium: GenMedium, model: string | null): ProviderRun | n
   return GENERATION_PROVIDERS.find((p) => model.startsWith(p.prefix))?.run ?? null;
 }
 
+function missingInputOf(input: StartRun, upstream: UpstreamInputs, prompt: string): string | null {
+  if (upscaleLimitsOf(input.model)) {
+    return upstream.referenceVideoUrls.length ? null : 'source_video_required';
+  }
+  return promptRequired(input.medium, input.model) && !prompt.trim() ? 'prompt_required' : null;
+}
+
 async function screenStandardRun(db: Db, input: StartRun, texts: Array<string | null | undefined>) {
   const { screenModelInput } = await import('$lib/server/moderation/model-input');
   const { ModerationProfile } = await import('$lib/server/moderation/profiles');
@@ -478,9 +486,10 @@ export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcom
   // modello — prima di questa riga `upstream.text` non era ancora stato letto. Il messaggio è
   // lo stesso che il client mostra (`gen-history.ts::BLOCKED`, "Scrivi cosa vuoi"), la stessa
   // regola in un posto solo, non due verità che possono divergere.
-  if (!prompt.trim()) {
-    await giveUp(db, input, run, 'prompt_required');
-    return { kind: 'refused', error: 'prompt_required' };
+  const missing = missingInputOf(input, upstream, prompt);
+  if (missing) {
+    await giveUp(db, input, run, missing);
+    return { kind: 'refused', error: missing };
   }
 
   const sentPrompt = await enhancedPromptFor(input, prompt);
