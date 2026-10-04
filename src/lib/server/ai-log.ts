@@ -279,11 +279,11 @@ const RATES: Record<string, { input: number; cachedInput: number; output: number
   // openrouter. L'id si cerca anche senza il prefisso `openrouter/` che il bridge gli mette
   // davanti (vedi la normalizzazione in `computeCostUsd`): una riga non prezzata non tocca i
   // crediti, quindi un modello nuovo qui si aggiunge PRIMA di mandarci del traffico.
-  'z-ai/glm-5.3-flash': { input: 0.075, cachedInput: 0.015, output: 0.25 },
+  'z-ai/glm-5.3-flash': { input: 0.075, cachedInput: 0.015, output: 0.25, thinkingInOutput: true },
   // Il tier pro, cioe` chi scrive le composizioni motion: 27x l'input e 40x l'output del fast.
   // Senza questa riga quei turni tornerebbero a `cost_usd` NULL — cioe` l'agente piu` caro del
   // prodotto smetterebbe di toccare i crediti proprio spostandolo sul modello piu` costoso.
-  'openai/gpt-5.6-sol': { input: 2, cachedInput: 0.2, output: 10 },
+  'openai/gpt-5.6-sol': { input: 2, cachedInput: 0.2, output: 10, thinkingInOutput: true },
   [NANO_BANANA_PRO]: { input: 2, cachedInput: 2, output: 12, imageOutput: 120 },
   // Nano Banana 2: docs and AI Studio disagree on image output ($30 vs $60/M) — the higher wins.
   'gemini-3.1-flash-image': { input: 0.5, cachedInput: 0.5, output: 3, imageOutput: 60 },
@@ -333,6 +333,11 @@ const COST_EXEMPT_PROVIDERS: ReadonlySet<AiCallLog['provider']> = new Set(['inte
  * a `0` li renderebbe visibili al tetto orario della chat — che oggi scarta le righe nulle — cioè
  * farebbe pagare all'utente i turni che gli sono andati storti.
  */
+function gatewayCompletionRate(model: string | undefined) {
+  const rate = gatewayRate(model);
+  return rate ? { ...rate, thinkingInOutput: true } : null;
+}
+
 export function computeCostUsd(entry: AiCallLog, plan?: string | null): number | null {
   if (COST_EXEMPT_PROVIDERS.has(entry.provider)) return 0;
   // Flat-fee providers: la richiesta fallita non ce la fatturano, quindi non la fatturiamo.
@@ -359,7 +364,7 @@ export function computeCostUsd(entry: AiCallLog, plan?: string | null): number |
     // Il listino del gateway, chiesto al gateway: è ciò che rende fatturabile un modello che
     // l'utente ha scelto e che nessuno ha scritto qui sopra. Vuoto finché `ensureGatewayModels`
     // non ha caricato — e allora decidono le RATES, come prima.
-    gatewayRate(entry.model) ??
+    gatewayCompletionRate(entry.model) ??
     (isGeminiFlashId(entry.model) ? RATES[GEMINI_FLASH] : null) ??
     // Una riga senza modello non è senza prezzo: il chiamante non l'ha scritto, ma la chiamata è
     // stata pagata. Flash è il bound conservativo, e `null` qui vorrebbe dire «gratis».

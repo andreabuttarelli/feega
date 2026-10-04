@@ -7,6 +7,7 @@ export type ChatMessage = {
   pending?: boolean;
   at?: number | null;
   tools?: ToolCall[];
+  reasoning?: string;
   live?: boolean;
 };
 
@@ -153,6 +154,7 @@ export class ChatSession {
       return;
     }
     last.content = state.text;
+    last.reasoning = state.reasoning;
     last.pending = !state.text;
     last.tools = state.tools
       .filter((t) => !SILENT_TOOLS.has(t.toolName))

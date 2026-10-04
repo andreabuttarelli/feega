@@ -1,7 +1,8 @@
 import { json } from '@sveltejs/kit';
 import { streamText, type ModelMessage } from 'ai';
 import type { Db } from '$lib/server/db/client';
-import { llmLanguageModel, llmModelForPicker } from '$lib/server/llm';
+import { llmLanguageModel } from '$lib/server/llm';
+import { offeredChatModels, reasoningProviderOptions, resolveChoice } from '$lib/server/chat-model/catalogue';
 import { extractSdkUsage, logAiCall, withBrandContext, withOrgContext } from '$lib/server/ai-log';
 import { gateAiAction, gateOrgAiAction } from '$lib/server/cli-auth';
 import { listMemberships } from '$lib/server/repos/orgs';
@@ -70,9 +71,15 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
   const gated = brand ? await gateAiAction(brand, undefined) : await gateOrgAiAction(orgId, undefined);
   if (gated) return gated;
 
-  const { message } = (await request.json()) as { message?: string };
+  const { message, model: askedModel, reasoning: askedReasoning } = (await request.json()) as { message?: string; model?: unknown; reasoning?: unknown };
   const text = message?.trim();
   if (!text) return json({ error: 'empty_message' }, { status: 400 });
+
+  const resolved = resolveChoice(await offeredChatModels(), { model: askedModel, reasoning: askedReasoning });
+  if (!resolved.ok) {
+    return json({ error: resolved.error }, { status: 400 });
+  }
+  const { model, reasoning } = resolved.choice;
 
   const screening = screenModelInput(db, {
     profile: ModerationProfile.Standard,
@@ -111,10 +118,10 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
     accessToken: session.access_token
   });
 
-  const model = llmModelForPicker(null);
   const t0 = Date.now();
+  const billedScope = <T>(fn: () => T): T => (brand ? withBrandContext(brand.id, fn) : withOrgContext(orgId, fn));
 
-  const result = streamText({
+  const result = billedScope(() => streamText({
     model: llmLanguageModel(model),
     system: projectAgentPrompt({
       project: { id: project.id, name: project.name },
@@ -124,6 +131,7 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
     allowSystemInMessages: true,
     messages: [...history, { role: 'user', content: text }] as ModelMessage[],
     tools: agent.tools,
+    providerOptions: reasoningProviderOptions(reasoning),
     stopWhen: [agentStopWhen(t0)],
     onFinish: async ({ steps, totalUsage }) => {
       await agent.close().catch((e) => console.error('[project-agent] tools not closed:', e));
@@ -133,35 +141,28 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
         console.error('[project-agent] assistant turn not saved', { threadId, orgId }, e)
       );
 
-      const log = () =>
-        logAiCall({
-          label: 'project-agent',
-          provider: 'llm',
-          model,
-          ms: Date.now() - t0,
-          ok: true,
-          brandId: brand?.id,
-          orgId,
-          userId: user.id,
-          threadId,
-          projectId: project.id,
-          actorKind: 'agent',
-          actorId: user.id,
-          agentKey: SIDEBAR_AGENT_KEY,
-          ...extractSdkUsage(totalUsage)
-        });
-
-      if (brand) {
-        withBrandContext(brand.id, log);
-      } else {
-        withOrgContext(orgId, log);
-      }
+      logAiCall({
+        label: 'project-agent',
+        provider: 'llm',
+        model,
+        ms: Date.now() - t0,
+        ok: true,
+        brandId: brand?.id,
+        orgId,
+        userId: user.id,
+        threadId,
+        projectId: project.id,
+        actorKind: 'agent',
+        actorId: user.id,
+        agentKey: SIDEBAR_AGENT_KEY,
+        ...extractSdkUsage(totalUsage)
+      });
     }
-  });
+  }));
 
   void result.consumeStream({ onError: (e) => console.error('[project-agent] turn failed after client left', e) });
 
-  return result.toUIMessageStreamResponse({ sendReasoning: false });
+  return result.toUIMessageStreamResponse({ sendReasoning: true });
 };
 
 export const GET: RequestHandler = async ({ params, locals }) => {

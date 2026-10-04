@@ -28,7 +28,10 @@ export type GatewayModel = {
   rate: GatewayRate;
   /** Gli agenti chiamano tool e leggono immagini: senza, il turno muore a metà. */
   usable: boolean;
+  tools: boolean;
   reasoning: boolean;
+  efforts: string[];
+  defaultEffort: string | null;
   /** Quando il gateway ha pubblicato il modello: e` cosi` che il cron riconosce l'ultimo uscito. */
   created: number;
 };
@@ -57,6 +60,7 @@ type RawModel = {
   supported_parameters?: string[];
   architecture?: { input_modalities?: string[] };
   pricing?: Record<string, unknown>;
+  reasoning?: { supported_efforts?: string[]; default_effort?: string };
 };
 
 export async function ensureGatewayModels(opts: { fetchImpl?: typeof fetch; baseUrl?: string } = {}): Promise<void> {
@@ -85,7 +89,10 @@ export async function ensureGatewayModels(opts: { fetchImpl?: typeof fetch; base
             output: perMillion(m.pricing?.completion)
           },
           usable: params.includes('tools') && (m.architecture?.input_modalities ?? []).includes('image'),
+          tools: params.includes('tools'),
           reasoning: params.includes('reasoning'),
+          efforts: m.reasoning?.supported_efforts ?? [],
+          defaultEffort: m.reasoning?.default_effort ?? null,
           created: Number(m.created) || 0
         });
       }

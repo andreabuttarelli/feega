@@ -4,6 +4,8 @@
   import ChatToolRow from './ChatToolRow.svelte';
   import type { ToolCall } from './chat-view';
 
+  const REASONING_PLACEHOLDER = '\u200b';
+
   let {
     role,
     content,
@@ -11,6 +13,7 @@
     pending = false,
     at = null,
     tools = [],
+    reasoning = '',
     live = false,
     first = true
   }: {
@@ -20,6 +23,7 @@
     pending?: boolean;
     at?: number | null;
     tools?: ToolCall[];
+    reasoning?: string;
     live?: boolean;
     first?: boolean;
   } = $props();
@@ -27,6 +31,8 @@
   const time = $derived(at ? new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '');
   const html = $derived(role === 'assistant' && content ? renderDocHtml(content) : '');
   const thinking = $derived(pending && !content);
+  const trace = $derived(reasoning.replace(REASONING_PLACEHOLDER, '').trim());
+  const reasoningLive = $derived(live && !!reasoning && !content);
 </script>
 
 <div class="msg is-{role}" class:first class:live role="group" aria-label={role === 'user' ? $_('chat.panel.you') : $_('chat.panel.agent')}>
@@ -39,6 +45,13 @@
         <span>{$_('chat.panel.agent')}</span>
         {#if time && !live}<time>{time}</time>{/if}
       </div>
+    {/if}
+
+    {#if reasoning}
+      <details class="trace" open={reasoningLive}>
+        <summary class:live={reasoningLive}>{$_('chat.panel.reasoningTrace')}</summary>
+        {#if trace}<p>{trace}</p>{/if}
+      </details>
     {/if}
 
     {#if tools.length}
@@ -108,6 +121,36 @@
     padding: 0;
     border: 1px solid var(--line, #ededef);
     background: var(--paper, #fff);
+  }
+
+  .trace {
+    font-size: 12.5px;
+    color: var(--ink-soft, #6e6e73);
+  }
+  .trace summary {
+    cursor: pointer;
+    width: fit-content;
+  }
+  .trace summary.live {
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+  .trace summary:focus-visible {
+    outline: 2px solid var(--accent, #c485fe);
+    outline-offset: 2px;
+  }
+  .trace p {
+    margin: 6px 0 0;
+    padding-left: 10px;
+    border-left: 2px solid var(--line, #ededef);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    max-height: 240px;
+    overflow-y: auto;
+  }
+  @keyframes pulse {
+    50% {
+      opacity: 0.45;
+    }
   }
 
   .thinking {

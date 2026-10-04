@@ -9,6 +9,8 @@
   import { FAILURES, keyboardInset, speakerStarts } from './chat-view';
   import ChatComposer from './ChatComposer.svelte';
   import ChatMessage from './ChatMessage.svelte';
+  import ChatModelPicker from './ChatModelPicker.svelte';
+  import { chatModelPrefs } from './chat-model-prefs.svelte';
 
   let {
     projectId = '',
@@ -28,12 +30,17 @@
   const scopeProjectId = $derived(projectId || routeProjectId);
   const endpoint = $derived(chatEndpoint({ projectId: scopeProjectId, motionNodeId }));
   const session = $derived<ChatSession | null>(endpoint ? chatSession(endpoint) : null);
+  const models = chatModelPrefs();
+
+  $effect(() => {
+    void models.load();
+  });
 
   $effect(() => {
     if (!session) {
       return;
     }
-    session.context = context ?? (() => ({}));
+    session.context = () => ({ ...(context?.() ?? {}), ...models.turnFields() });
     session.onTurnEnd = onturnend ?? null;
     session.onData = ondata ?? null;
   });
@@ -171,6 +178,7 @@
             pending={message.pending}
             at={message.at}
             tools={message.tools}
+            reasoning={message.reasoning}
             live={message.live}
             first={starts[i]}
           />
@@ -204,7 +212,13 @@
         enabled={!loading}
         onsend={() => send(draft.trim())}
         onstop={stop}
-      />
+      >
+        {#snippet controls()}
+          {#if models.choice && models.groups.length}
+            <ChatModelPicker groups={models.groups} choice={models.choice} onchoose={(next) => void models.choose(next)} />
+          {/if}
+        {/snippet}
+      </ChatComposer>
       <span class="sr-only" aria-live="polite">{sending ? $_('chat.panel.responding') : ''}</span>
     </div>
   {/if}
