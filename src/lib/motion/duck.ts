@@ -1,9 +1,9 @@
 import { findClip, type MotionDoc } from './doc';
 import { Ease } from './design';
 import type { Keyframe } from './keyframes';
+import type { Region } from './audio-analysis';
 import { setKeyframes, type OpResult } from './timeline';
 
-export type Region = { start: number; end: number };
 export type DuckOptions = { depth: number; attack: number; release: number };
 
 export const DUCK_DEFAULTS: DuckOptions = {

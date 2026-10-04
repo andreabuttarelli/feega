@@ -71,7 +71,7 @@
   import { Command, commandFor } from '$lib/motion/shortcuts';
   import { composeHtml } from '$lib/motion/hyperframes/compose';
   import { feegaTrailer } from '$lib/motion/trailer';
-  import { loadPeaks } from '$lib/motion/waveform';
+  import type { AudioAnalysis } from '$lib/motion/audio-analysis';
   import { audioPlan } from '$lib/motion/audio-plan';
   import { previewAudio } from '$lib/motion/preview-audio';
   import { AD_TEMPLATES, AD_TEMPLATE_IDS, templateAssets, type AdTemplate } from '$lib/motion/ad-templates';
@@ -113,8 +113,9 @@
   let exporting = $state(false);
   let sounding = $state<SoundKind | null>(null);
   let madeAssets = $state<PageData['assets']>([]);
-  let waveforms = $state<Record<string, number[]>>({});
-  const loadingWaves = new Set<string>();
+  let analyses = $state<Record<string, AudioAnalysis>>({});
+  const waveforms = $derived(Object.fromEntries(Object.entries(analyses).map(([id, a]) => [id, a.amp])));
+  const analysing = new Set<string>();
   let sheet = $state<Sheet>(Sheet.None);
   let inspectorTab = $state<InspectorTab>(InspectorTab.Properties);
   let preview = $state<MotionPreview | null>(null);
@@ -149,16 +150,27 @@
     return () => speaker.stop();
   });
 
-  $effect(() => {
-    for (const [id, url] of soundAssets) {
-      if (loadingWaves.has(id)) {
-        continue;
-      }
-      loadingWaves.add(id);
-      loadPeaks(url)
-        .then((peaks) => (waveforms = { ...waveforms, [id]: peaks }))
-        .catch(() => {});
+  async function analyse(ids: string[]) {
+    const form = new FormData();
+    for (const id of ids) {
+      form.append('assetId', id);
     }
+    const res = await fetch(`${editorUrl}?/analyze`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
+    const result = deserialize(await res.text());
+    if (result.type === 'success') {
+      analyses = { ...analyses, ...((result.data as { analyses: Record<string, AudioAnalysis> }).analyses ?? {}) };
+    }
+  }
+
+  $effect(() => {
+    const fresh = soundAssets.map(([id]) => id).filter((id) => !analysing.has(id));
+    if (!fresh.length) {
+      return;
+    }
+    for (const id of fresh) {
+      analysing.add(id);
+    }
+    void analyse(fresh).catch(() => {});
   });
 
   function edit(next: MotionDoc, summary: string) {
@@ -718,7 +730,7 @@
         <CameraInspector {doc} {frame} onchange={edit} />
         <LookInspector {doc} onchange={edit} />
       {:else if selected}
-        <MotionInspector {doc} clip={selected} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} />
+        <MotionInspector {doc} {analyses} clip={selected} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} />
         {#if selected.component === 'Device3D'}<DevicePresets {doc} clip={selected} onchange={edit} />{/if}
         {#if THREE_D_COMPONENTS.includes(selected.component)}<LookInspector {doc} onchange={edit} />{/if}
       {:else}
