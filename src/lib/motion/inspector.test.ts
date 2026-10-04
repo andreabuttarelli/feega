@@ -33,8 +33,9 @@ describe('properties inspector from the component schema', () => {
     expect(opacity).toMatchObject({ control: Control.Range, min: 0, max: 1, step: 0.01 });
   });
 
-  it('a select carries its options', () => {
-    expect(fieldsOf('Title').find((f) => f.key === 'font')?.options).toEqual(['sans', 'mono']);
+  it('a select carries its options; the font is a font picker', () => {
+    expect(fieldsOf('Title').find((f) => f.key === 'align')?.options).toEqual(['left', 'center', 'right']);
+    expect(fieldsOf('Title').find((f) => f.key === 'font')?.control).toBe(Control.Font);
   });
 
   it('the 3D model picker lists only 3D assets', () => {

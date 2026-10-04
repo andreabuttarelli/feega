@@ -1,5 +1,8 @@
 <script lang="ts">
   import { deserialize } from '$app/forms';
+  import { createSupabaseBrowserClient } from '$lib/supabase/client';
+  import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
+  import { registerUpload } from '$lib/motion/fonts/ops';
   import ArrowLeft from '@lucide/svelte/icons/arrow-left';
   import Play from '@lucide/svelte/icons/play';
   import Pause from '@lucide/svelte/icons/pause';
@@ -89,6 +92,8 @@
   let snap = $state(Snap.On);
   let saveState = $state<SaveState>(SaveState.Saved);
   let notice = $state('');
+  const supabase = createSupabaseBrowserClient();
+  const UPLOAD_WEIGHT = 400;
   let adding = $state(false);
   let exporting = $state(false);
   let sounding = $state<SoundKind | null>(null);
@@ -178,6 +183,36 @@
     }
     saveState = SaveState.Failed;
     notice = result.type === 'failure' ? String(result.data?.error ?? '') : '';
+  }
+
+  const FONT_EXTENSION = /\.(ttf|otf|woff2?)$/i;
+
+  function familyOf(fileName: string): string {
+    const base = fileName.replace(FONT_EXTENSION, '').replace(/[^A-Za-z0-9 \-]+/g, ' ').trim();
+    return (base || 'Uploaded font').slice(0, 60);
+  }
+
+  async function uploadFont(file: File): Promise<string | null> {
+    const path = `${canvasUploadPrefix(data.orgId, data.projectId)}${crypto.randomUUID()}-${file.name.replace(/[^\w.-]+/g, '_')}`;
+    const up = await supabase.storage.from('canvas-assets').upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
+    if (up.error) {
+      return up.error.message;
+    }
+    const form = new FormData();
+    form.set('path', path);
+    const res = await fetch(`${editorUrl}?/uploadFont`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
+    const result = deserialize(await res.text());
+    if (result.type !== 'success' || !result.data?.asset) {
+      return result.type === 'failure' ? String(result.data?.error ?? 'Upload refused') : 'Upload failed';
+    }
+    const asset = result.data.asset as PageData['assets'][number];
+    madeAssets = [asset, ...madeAssets];
+    const registered = registerUpload(history.present, { assetId: asset.id, family: familyOf(file.name), weights: [UPLOAD_WEIGHT], italic: false });
+    if (!registered.ok) {
+      return registered.error;
+    }
+    edit(registered.doc, `Uploaded the font ${familyOf(file.name)}`);
+    return null;
   }
 
   async function pullAgentEdit() {
@@ -554,7 +589,7 @@
       {#if cameraOpen && !selection.length}
         <CameraInspector {doc} {frame} onchange={edit} />
       {:else if selected}
-        <MotionInspector {doc} clip={selected} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} />
+        <MotionInspector {doc} clip={selected} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} />
       {:else}
         <p class="hint">{selection.length > 1 ? `${selection.length} clips selected.` : 'Select a clip in the timeline to edit its properties.'}</p>
       {/if}

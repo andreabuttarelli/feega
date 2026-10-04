@@ -42,7 +42,7 @@ describe('params declared in code', () => {
     expect(props.accent).toMatchObject({ type: 'string', format: 'color', default: 'brand.accent', group: 'Style' });
     expect(props.layout).toMatchObject({ type: 'string', enum: ['grid', 'list'], default: 'grid' });
     expect(props.picture).toMatchObject({ type: 'string', format: 'asset', assetKind: 'image' });
-    expect(props.face.enum).toContain('sans');
+    expect(props.face).toMatchObject({ format: 'font', default: 'sans' });
     expect(props.curve.enum).toContain('power2.out');
   });
 
@@ -69,7 +69,7 @@ describe('params declared in code', () => {
     const groups = clipFieldGroups(doc, findClip(doc, 'g')!.clip);
 
     expect(groups.map((g) => g.group)).toEqual(['Content', 'Style', 'Motion']);
-    expect(groups.flatMap((g) => g.fields).find((f) => f.key === 'face')?.control).toBe(Control.Select);
+    expect(groups.flatMap((g) => g.fields).find((f) => f.key === 'face')?.control).toBe(Control.Font);
     expect(must(setProps(doc, 'g', { speed: 3 })).tracks[0].clips[0].props).toMatchObject({ speed: 3 });
   });
 });

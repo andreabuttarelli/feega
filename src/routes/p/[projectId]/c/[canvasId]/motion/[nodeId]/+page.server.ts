@@ -13,6 +13,7 @@ import { gateOrgAiActionForForm } from '$lib/server/cli-auth';
 import { saveExport } from '$lib/server/motion/export';
 import { Sound, generateSound } from '$lib/server/motion/voiceover';
 import { withOrgContext } from '$lib/server/ai-log';
+import { saveFontUpload } from '$lib/server/motion/font-upload';
 
 const HTTP_CONFLICT = 409;
 const HTTP_BAD_REQUEST = 400;
@@ -109,6 +110,17 @@ export const actions: Actions = {
       seconds: Number(form.get('seconds'))
     });
     return saved.ok ? { assetId: saved.assetId } : fail(HTTP_BAD_REQUEST, { error: saved.error });
+  },
+
+  uploadFont: async ({ locals, params, request }) => {
+    const scope = await scopeFor(locals, params);
+    const form = await request.formData();
+    const saved = await saveFontUpload(scope.db, { orgId: scope.orgId, projectId: params.projectId, path: String(form.get('path') ?? '') });
+    if (!saved.ok) {
+      return fail(HTTP_BAD_REQUEST, { error: saved.error });
+    }
+    const assets = await motionAssets({ db: scope.db, orgId: scope.orgId, projectId: params.projectId, canvasId: scope.canvas.id, nodeId: scope.motion.record.id });
+    return { asset: assets.find((a) => a.id === saved.assetId) ?? null };
   },
 
   sound: async ({ locals, params, request }) => {

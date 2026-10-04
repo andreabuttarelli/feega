@@ -8,6 +8,7 @@ import { MATTES, Matte, maskSchema } from './mask';
 import { DEPTH, SPACES, Space, cameraSchema, depthSchema } from './camera';
 import { PARENT_OPACITIES, ParentOpacity, parentProblem } from './parent';
 import { expressionsSchema, expressionsProblem } from './expression/schema';
+import { fontRefProblem, fontsSchema, usedFaces } from './fonts/model';
 import { effectsSchema, effectsProblem } from './effects/model';
 import { BLEND_MODES, BlendMode } from './blend';
 
@@ -70,7 +71,7 @@ const trackSchema = z.object({
 
 const assetRefSchema = z.object({
   id: z.string().min(1),
-  kind: z.enum(['image', 'video', 'audio', 'model3d']),
+  kind: z.enum(['image', 'video', 'audio', 'model3d', 'font']),
   name: z.string().max(200).default('')
 });
 
@@ -84,6 +85,7 @@ export const motionDocSchema = z
     tracks: z.array(trackSchema).max(20),
     assets: z.array(assetRefSchema).default([]),
     camera: cameraSchema.nullable().default(null),
+    fonts: fontsSchema,
     components: z
       .record(z.string().regex(CUSTOM_NAME, 'component names are PascalCase, e.g. NodeGraph'), customComponentSchema)
       .refine((c) => Object.keys(c).length <= MAX_COMPONENTS, `at most ${MAX_COMPONENTS} custom components`)
@@ -166,6 +168,20 @@ function propsProblem(doc: MotionDoc): string | null {
   return null;
 }
 
+function fontsProblem(doc: MotionDoc): string | null {
+  for (const face of usedFaces(doc)) {
+    const problem = fontRefProblem(face.family, doc.fonts);
+    if (problem) {
+      return problem;
+    }
+  }
+  return null;
+}
+
+export function fontsOfClip(doc: MotionDoc, clip: Pick<MotionClip, 'component' | 'props'>): string | null {
+  return fontsProblem({ ...doc, tracks: [{ id: '', kind: TrackKind.Visual, name: '', clips: [clip as MotionClip] }] });
+}
+
 export function parseMotionDoc(input: unknown): DocVerdict {
   const parsed = motionDocSchema.safeParse(upgradeDoc(input));
   if (!parsed.success) {
@@ -173,7 +189,7 @@ export function parseMotionDoc(input: unknown): DocVerdict {
   }
 
   const doc = structuredClone(parsed.data);
-  const problem = parentProblem(doc) ?? propsProblem(doc);
+  const problem = parentProblem(doc) ?? propsProblem(doc) ?? fontsProblem(doc);
   if (problem) {
     return { ok: false, error: problem };
   }
@@ -194,6 +210,7 @@ export function newMotionDoc(format: MotionFormat): MotionDoc {
     ],
     assets: [],
     camera: null,
+    fonts: [],
     components: {}
   };
 }

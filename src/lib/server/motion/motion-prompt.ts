@@ -40,6 +40,7 @@ export function motionAgentPrompt(input: { brandName: string | null; selectionNo
     `Expressions: set_expression drives a number property per frame, like After Effects. ${EXPRESSION_EXAMPLES}`,
     `Effects: add_effect stacks per-clip effects (${EFFECT_KINDS.join(', ')}); set_effect changes params, order, on/off; remove_effect drops one. Every number or colour param animates with set_keyframes and numbers with set_expression, prop fx.<effect id>.<param>. Keep them subtle: a drop-shadow on cards, a glow on a logo, grain or a vignette over a background.`,
     'Blend modes: set_blend_mode (screen for light leaks and glows over footage, multiply for textures and shadows, overlay or soft-light for colour washes).',
+    'Fonts: any Google Fonts family works. list_fonts searches the catalogue; set_font sets family, weight and italic on a text clip; register_font adds a family for a custom component font param; remove_font drops an unused one. Pair a display face for titles with a plain one for body text; prefer the brand fonts when the brand names them.',
     'Timing (start, duration) is set_timing, never a prop. A tool that fails tells you why: read the error and retry with what it says.',
     componentContract(input.frame ?? { width: 1920, height: 1080 }),
     'generate_voiceover spends credits: only when the user asked for a voice-over.',

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { FONT_NAME } from '../fonts/model';
 import { COLOR, CUSTOM_NAME } from '../components';
 import { contentStamp } from '../stamp';
 
@@ -13,7 +14,8 @@ const PROP_KEY = /^[a-zA-Z][a-zA-Z0-9_]{0,39}$/;
 export enum PropFormat {
   Color = 'color',
   Textarea = 'textarea',
-  Asset = 'asset'
+  Asset = 'asset',
+  Font = 'font'
 }
 
 export enum CheckState {
@@ -32,7 +34,7 @@ const propSpecSchema = z
     maximum: z.number().optional(),
     step: z.number().positive().optional(),
     enum: z.array(z.string().max(60)).min(1).max(20).optional(),
-    format: z.enum([PropFormat.Color, PropFormat.Textarea, PropFormat.Asset]).optional(),
+    format: z.enum([PropFormat.Color, PropFormat.Textarea, PropFormat.Asset, PropFormat.Font]).optional(),
     assetKind: z.enum(['image', 'video', 'model3d']).optional(),
     group: z.enum(['Content', 'Style', 'Layout', 'Motion', 'Camera']).optional(),
     maxLength: z.number().int().positive().max(2000).optional()
@@ -98,6 +100,9 @@ const TYPE_RULES: Record<PropSpec['type'], ValueRule> = {
     }
     if (spec.format === PropFormat.Color && !COLOR.test(value)) {
       return 'expected #rrggbb, transparent or a brand colour';
+    }
+    if (spec.format === PropFormat.Font && !FONT_NAME.test(value)) {
+      return 'expected a font family name';
     }
     return value.length > (spec.maxLength ?? 2000) ? 'text too long' : null;
   },

@@ -18,6 +18,9 @@ import { ParentOpacity } from '$lib/motion/parent';
 import { addNull, nullFromSelection, setParent, setParentOpacity } from '$lib/motion/parent-ops';
 import { setCameraExpression, setExpression } from '$lib/motion/expression/ops';
 import { EXPRESSION_GUIDE } from '$lib/motion/expression/guide';
+import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
+import { BuiltinFont, FONT_WEIGHTS, searchFonts } from '$lib/motion/fonts/model';
+import { registerFont, removeFont, setFont } from '$lib/motion/fonts/ops';
 import { EFFECTS, EFFECT_KINDS } from '$lib/motion/effects/registry';
 import { addEffect, removeEffect, setEffect } from '$lib/motion/effects/ops';
 import { effectKey } from '$lib/motion/effects/model';
@@ -77,6 +80,7 @@ function summary(doc: MotionDoc, selection: string[]) {
       }))
     })),
     assets: doc.assets,
+    fonts: doc.fonts,
     camera: cameraSummary(doc.camera),
     components: Object.entries(doc.components).map(([name, c]) => customSummary(name, c))
   };
@@ -95,6 +99,9 @@ function cameraSummary(camera: Camera | null) {
 }
 
 const EFFECT_CATALOGUE = EFFECT_KINDS.map((k) => `${k} (${EFFECTS[k].about}; ${EFFECTS[k].params.map((p) => `${p.key} ${p.kind === ValueKind.Color ? 'colour' : `${p.min}..${p.max}`}`).join(', ')})`).join('; ');
+
+const MAX_FONT_RESULTS = 50;
+const DEFAULT_FONT_RESULTS = 12;
 
 const CAMERA_UNITS = `${CAMERA_KEYS.map((k) => `${k} ${CAMERA[k].min}..${CAMERA[k].max}`).join(', ')}. x/y are fractions of the frame, z is the dolly in pixels (positive moves forward), rotations and fov in degrees, focusDistance is the depth in focus (same units as clip depth), aperture the blur strength (px of blur per 100 px out of focus)`;
 
@@ -467,6 +474,30 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: `Blend a visual clip with the layers below it, like a layer mode in After Effects: ${BLEND_MODES.join(', ')}. normal turns it off. Blending is per clip (children do not inherit it); with the camera on, a blended world clip keeps its camera motion and paints over the world layers, blending with them.`,
       inputSchema: z.object({ clip_id: z.string(), mode: z.enum(BLEND_MODES) }),
       execute: async (input) => apply(setBlendMode(session.doc, input.clip_id, input.mode), `${input.mode} blend on ${input.clip_id}`)
+    }),
+
+    list_fonts: tool({
+      description: `Search the Google Fonts catalogue (${GOOGLE_FONTS.length} families, most popular first): family, category, weights, italic. Built-ins: ${Object.values(BuiltinFont).join(', ')}. Fonts this video already has are in get_motion_doc fonts.`,
+      inputSchema: z.object({ query: z.string().max(60).default(''), limit: z.number().int().min(1).max(MAX_FONT_RESULTS).default(DEFAULT_FONT_RESULTS) }),
+      execute: async (input) => ({ fonts: searchFonts(GOOGLE_FONTS, input.query, [], input.limit).map((f) => ({ family: f.f, category: f.c, weights: f.w, italic: f.i === 1 })) })
+    }),
+
+    set_font: tool({
+      description: `Set the font of a text clip (Title, Text, Kicker, Caption, ProductCard): any Google Fonts family (registered in the video automatically), an uploaded font, or a built-in (${Object.values(BuiltinFont).join(', ')}). weight ${FONT_WEIGHTS[0]}..${FONT_WEIGHTS[FONT_WEIGHTS.length - 1]}; the nearest weight the family has is used.`,
+      inputSchema: z.object({ clip_id: z.string(), family: z.string().max(64), weight: z.number().int().min(100).max(900).optional(), italic: z.boolean().optional() }),
+      execute: async (input) => apply(setFont(session.doc, input.clip_id, { family: input.family, weight: input.weight, italic: input.italic }, GOOGLE_FONTS), `font ${input.family} on ${input.clip_id}`)
+    }),
+
+    register_font: tool({
+      description: 'Add a Google Fonts family to the video without using it yet, e.g. for a custom component font param (then set_props with that family).',
+      inputSchema: z.object({ family: z.string().max(64) }),
+      execute: async (input) => apply(registerFont(session.doc, input.family, GOOGLE_FONTS), `registered font ${input.family}`)
+    }),
+
+    remove_font: tool({
+      description: 'Remove a font from the video. Refused while a clip uses it.',
+      inputSchema: z.object({ family: z.string().max(64) }),
+      execute: async (input) => apply(removeFont(session.doc, input.family), `removed font ${input.family}`)
     }),
 
     add_track: tool({

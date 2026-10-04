@@ -14,6 +14,9 @@
   import { ANIMATABLE, Source, TRANSFORM, ValueKind, type AnimProp, type KeyValue } from '$lib/motion/keyframes';
   import Dial from './Dial.svelte';
   import CodeEditor from './CodeEditor.svelte';
+  import FontPicker from './FontPicker.svelte';
+  import { registerFont, setFont } from '$lib/motion/fonts/ops';
+  import type { CatalogueFont } from '$lib/motion/fonts/model';
   import { withParams } from '$lib/motion/custom/params';
   import type { CustomSource } from '$lib/motion/custom/component';
   import { setExpression } from '$lib/motion/expression/ops';
@@ -36,7 +39,8 @@
     previousSource = () => null,
     composeHref = null,
     tab = $bindable<InspectorTab>(InspectorTab.Properties),
-    onchange
+    onchange,
+    onuploadfont
   }: {
     doc: MotionDoc;
     clip: MotionClip;
@@ -47,6 +51,7 @@
     composeHref?: string | null;
     tab?: InspectorTab;
     onchange: (doc: MotionDoc, summary: string) => void;
+    onuploadfont?: (file: File) => Promise<string | null>;
   } = $props();
 
   const DIALS = new Set(['rotateX', 'rotateY', 'rotateZ', 'objectRotateX', 'objectRotateY', 'objectRotateZ', 'orbit', 'maskRotation']);
@@ -82,6 +87,15 @@
       return;
     }
     commit(setProps(doc, clip.id, { [field.key]: value }), `Edited ${field.label.toLowerCase()}`);
+  }
+
+  function pickFont(field: Field, family: string, catalogue: CatalogueFont[]) {
+    if (clip.component !== 'Custom') {
+      commit(setFont(doc, clip.id, { family }, catalogue), `Set the font to ${family}`);
+      return;
+    }
+    const registered = registerFont(doc, family, catalogue);
+    commit(registered.ok ? setProps(registered.doc, clip.id, { [field.key]: family }) : registered, `Set ${field.label.toLowerCase()} to ${family}`);
   }
 
   function setSeconds(key: 'from' | 'durationInFrames', text: string) {
@@ -437,6 +451,8 @@
                 <span class="empty">No {field.assetKind} assets on this canvas yet.</span>
               {/each}
             </div>
+          {:else if field.control === Control.Font}
+            <FontPicker value={String(value(field))} fonts={doc.fonts} brand={tokens.fonts ?? []} onpick={(family, catalogue) => pickFont(field, family, catalogue)} onupload={onuploadfont} />
           {:else if field.control === Control.Managed}
             <span class="managed">{managedSummary(value(field))}{#if composeHref} · <a href={composeHref}>Edit in Compositions</a>{/if}</span>
           {/if}
