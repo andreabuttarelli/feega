@@ -43,6 +43,13 @@ cancellate dal percorso dei clip, `CAMERA_LANE`); inspector camera con mappa dal
 contagocce "focus on clip", preset; campo Depth e toggle screen space sui clip. Tool:
 `set_camera`, `set_camera_keyframes`, `apply_camera_preset`, `set_clip_depth`.
 
+**Costo del render (Vercel Sandbox, demo 14 s 1080p con DOF, rack focus, orbit su GLB con
+bokeh).** Senza camera 83 s, con camera 183 s; poi 128 s togliendo tre sprechi: la scena three.js
+si ridisegnava (e passava dal bokeh) anche fuori dal suo clip, il bokeh campionava ogni pixel
+(ora salta quelli a fuoco e lo sfondo senza oggetti vicini, 24 tap), e uno sfondo pieno veniva
+sfocato a tutto schermo (`LOOKS_THE_SAME_BLURRED`). In locale, SwiftShader: 751 → 373 ms/frame nel
+tratto con blur CSS, 467 → 277 nell'orbita (senza camera 171/183).
+
 **Verifiche.** html-to-image (`view_frames`, export nel browser) cattura trasformazioni 3D e filtri
 come lo schermo. Scartato: tween GSAP per ogni valore della camera (il dolly zoom lega fov e
 posizione, un campionamento per frame è più semplice e deterministico).
