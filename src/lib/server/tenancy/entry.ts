@@ -9,6 +9,7 @@ import { createFirstOrg } from '$lib/server/tenancy/bootstrap';
 import { chooseOrg } from '$lib/server/tenancy/context';
 import { seedWelcome } from '$lib/server/onboarding/welcome';
 import { WELCOME_PARAM, type Campaign } from '$lib/onboarding/campaigns';
+import { toolForCampaign, toolHref } from '$lib/tools';
 
 /**
  * ENTRARE NELL'APP È UN BOOTSTRAP SILENZIOSO, NON UN MODULO DA COMPILARE.
@@ -233,5 +234,9 @@ export async function homePathFor(
 
   const scope = { userId: user.id, orgId: entry.orgId, projectId: entry.projectId, canvasId: entry.canvasId };
   const seeded = await deps.seedWelcome(db, scope, campaign);
+  const tool = toolForCampaign(campaign);
+  if (seeded && tool) {
+    return toolHref(tool, entry.projectId) ?? path;
+  }
   return seeded ? `${path}?${WELCOME_PARAM}=${campaign}` : path;
 }

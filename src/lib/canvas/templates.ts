@@ -6,6 +6,7 @@ import { DEFAULT_MODEL } from './default-models';
 import { nodeSize } from './node-size';
 import { PLACEMENT_GAP } from './placement';
 import { DEFAULT_MODEL3D_MODEL } from '$lib/model3d-models';
+import { OPENROUTER_UPSCALE_MODEL } from '$lib/video-models';
 
 export type TemplateNode = {
   key: string;
@@ -425,9 +426,9 @@ export const CANVAS_TEMPLATES: CanvasTemplate[] = [
     id: 'hd-clip',
     category: 'video',
     name: 'Sharp HD clip',
-    description: 'A detailed still animated at 1080p. To upscale a clip you already have, upload it and pick FLUX Video Upscale.',
+    description: 'A detailed still animated at 1080p. To upscale a clip you already have, use the Video upscaler template.',
     nodes: [
-      note('how', 0, 1, 'To upscale an existing clip: upload it to the canvas, select it and choose the FLUX Video Upscale model. The nodes on the right make a new sharp clip instead.'),
+      note('how', 0, 1, 'To upscale a clip you already have, use the Video upscaler template or the AI Video Upscaler tool. The nodes on the right make a new sharp clip instead.'),
       image('still', 1, 0, 'Ultra-detailed 16:9 landscape photo: a lighthouse on a cliff in a storm, crashing waves, crisp textures, 8k detail.', '16:9', CHEAP_IMAGE_MODEL),
       {
         key: 'clip',
@@ -438,6 +439,24 @@ export const CANVAS_TEMPLATES: CanvasTemplate[] = [
       }
     ],
     edges: [{ from: 'still', to: 'clip', handle: 'first_frame' }]
+  },
+  {
+    id: 'video-upscale',
+    category: 'video',
+    name: 'Video upscaler',
+    description: 'Drop a clip, wire it into the upscaler and get it back at 2× or 4K.',
+    nodes: [
+      note('how', 0, 1, 'Replace the sample clip: drop your own MP4 (up to 20 s, 1440p, 50 MB) and connect it to the upscaler. Factor 2 doubles each side; 3 takes 720p to about 4K. Creativity 0 keeps faces and text exact, 1 restores finer detail.'),
+      { key: 'clip', type: 'video', col: 0, row: 0, data: { prompt: 'A red fox trotting through fresh snow in a pine forest, soft morning light, static wide shot.', model: CHEAP_VIDEO_MODEL, aspect_ratio: '16:9', resolution: '480p', audio: false } },
+      {
+        key: 'upscale',
+        type: 'video',
+        col: 1,
+        row: 0,
+        data: { prompt: '', model: OPENROUTER_UPSCALE_MODEL, params: { upscale_factor: 2, creativity: 0 } }
+      }
+    ],
+    edges: [{ from: 'clip', to: 'upscale', handle: 'videos' }]
   }
 ];
 
