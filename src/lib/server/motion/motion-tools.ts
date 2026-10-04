@@ -12,6 +12,8 @@ import { MAX_FRAMES_PER_VIEW, MAX_VIEWS_PER_TURN, VIEW_FRAMES, type Frame } from
 import { CheckState, MAX_CSS, MAX_HTML, MAX_JS, SOURCE_FILES, checkState, propsSchemaSchema, sourceHash, type CustomComponent } from '$lib/motion/custom/component';
 import { patchComponent, recordCheck, removeComponent, writeComponent } from '$lib/motion/custom/ops';
 import { PATCH_COMPONENT, READ_COMPONENT, WRITE_COMPONENT } from './model-route';
+import { CAMERA, CAMERA_KEYS, SPACES, type Camera } from '$lib/motion/camera';
+import { CAMERA_PRESETS, PRESETS, applyPreset, removeCamera, setCamera, setCameraKeyframes, setClipDepth } from '$lib/motion/camera-ops';
 
 export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number };
 
@@ -53,12 +55,25 @@ function summary(doc: MotionDoc, selection: string[]) {
         transform: c.transform,
         mask: c.mask,
         matte: c.matte,
-        keyframes: Object.fromEntries(Object.entries(c.keyframes).map(([prop, track]) => [prop, track.map((k) => ({ time: secs(k.frame), value: k.value, ease: k.ease }))]))
+        keyframes: inSeconds(c.keyframes),
+        depth: c.depth,
+        space: c.space
       }))
     })),
+    camera: cameraSummary(doc.camera),
     components: Object.entries(doc.components).map(([name, c]) => customSummary(name, c))
   };
 }
+
+function inSeconds(keyframes: Record<string, { frame: number; value: unknown; ease: unknown }[] | undefined>) {
+  return Object.fromEntries(Object.entries(keyframes).map(([prop, track]) => [prop, (track ?? []).map((k) => ({ time: secs(k.frame), value: k.value, ease: k.ease }))]));
+}
+
+function cameraSummary(camera: Camera | null) {
+  return camera ? { values: camera.base, dof: camera.dof, keyframes: inSeconds(camera.keyframes) } : null;
+}
+
+const CAMERA_UNITS = `${CAMERA_KEYS.map((k) => `${k} ${CAMERA[k].min}..${CAMERA[k].max}`).join(', ')}. x/y are fractions of the frame, z is the dolly in pixels (positive moves forward), rotations and fov in degrees, focusDistance is the depth in focus (same units as clip depth), aperture the blur strength (px of blur per 100 px out of focus)`;
 
 function customSummary(name: string, c: CustomComponent) {
   return {
@@ -310,6 +325,55 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         'Use the clip directly above (on the track above, overlapping in time) as a matte for this clip: alpha shows this clip only where that clip is drawn (text, shape, picture), luma where it is bright. The matte clip is hidden. none turns it off.',
       inputSchema: z.object({ clip_id: z.string(), matte: z.enum(MATTES) }),
       execute: async (input) => apply(setTrackMatte(session.doc, input.clip_id, input.matte), `matte ${input.matte} on ${input.clip_id}`)
+    }),
+
+    set_camera: tool({
+      description: `Turn on the virtual camera of the video, change its base values, or turn it off (enabled false). With a camera, clips sit in a 3D world at their depth (set_clip_depth) and camera moves give parallax. Values: ${CAMERA_UNITS}. dof turns depth of field on.`,
+      inputSchema: z.object({
+        enabled: z.boolean().optional(),
+        values: z.object(Object.fromEntries(CAMERA_KEYS.map((k) => [k, z.number().optional()]))).partial().optional(),
+        dof: z.boolean().optional()
+      }),
+      execute: async (input) => {
+        if (input.enabled === false) {
+          return apply(removeCamera(session.doc), 'removed the camera');
+        }
+        return apply(setCamera(session.doc, { base: input.values as Partial<Record<(typeof CAMERA_KEYS)[number], number>>, dof: input.dof }), 'set the camera');
+      }
+    }),
+
+    set_camera_keyframes: tool({
+      description: `Animate one camera value: replaces its keyframes. time is seconds from the START OF THE VIDEO (the camera spans the whole video); ease as in set_keyframes. Props: ${CAMERA_KEYS.join(', ')}. An empty list removes the animation.`,
+      inputSchema: z.object({
+        prop: z.enum(CAMERA_KEYS),
+        keyframes: z.array(z.object({ time: z.number().min(0), value: z.number(), ease: easeSchema.default(Ease.Standard) }))
+      }),
+      execute: async (input) => apply(setCameraKeyframes(session.doc, input.prop, input.keyframes.map((k) => ({ frame: frames(k.time), value: k.value, ease: k.ease }))), `animated the camera ${input.prop}`)
+    }),
+
+    apply_camera_preset: tool({
+      description: `Add a ready-made camera move between start and start+duration (seconds of the video); it starts from wherever the camera is then and keeps keys outside that span, so moves chain. Presets: ${CAMERA_PRESETS.map((p) => `${p} — ${PRESETS[p].about}`).join('; ')}. target is the depth the orbit, crane and dolly zoom aim at (default the focus distance).`,
+      inputSchema: z.object({
+        preset: z.enum(CAMERA_PRESETS),
+        start: z.number().min(0),
+        duration: z.number().positive(),
+        amount: z.number().optional(),
+        target: z.number().optional(),
+        from_clip: z.string().optional(),
+        to_clip: z.string().optional(),
+        ease: easeSchema.optional()
+      }),
+      execute: async (input) =>
+        apply(
+          applyPreset(session.doc, input.preset, { start: frames(input.start), duration: frames(input.duration), amount: input.amount, target: input.target, from: input.from_clip, to: input.to_clip, ease: input.ease }),
+          `camera ${input.preset}`
+        )
+    }),
+
+    set_clip_depth: tool({
+      description: 'Place a clip in the camera world: depth in pixels behind the focus plane 0 (negative comes forward; a far background 1500–4000, a foreground card -200..0). It keeps its size at rest and shows parallax when the camera moves. space "screen" keeps a caption or overlay flat on top, ignoring the camera.',
+      inputSchema: z.object({ clip_id: z.string(), depth: z.number().optional(), space: z.enum(SPACES).optional() }),
+      execute: async (input) => apply(setClipDepth(session.doc, input.clip_id, { depth: input.depth, space: input.space }), `placed ${input.clip_id} in depth`)
     }),
 
     add_track: tool({
