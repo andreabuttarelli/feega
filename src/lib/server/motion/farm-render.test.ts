@@ -61,7 +61,7 @@ describe('launchPiece', () => {
   it('starts the chunk detached on its own worker and returns the worker name the tick finds it by', async () => {
     const { farm, workers } = fakeFarm();
 
-    const name = await launchPiece(farm, job, 3, { upload: 'https://s.supabase.co/up/c3', storageHost: STORAGE });
+    const name = await launchPiece(farm, job, 3, { upload: 'https://s.supabase.co/up/c3', storageHost: STORAGE, maxBytes: 1000 });
 
     expect(name).toBe('w0');
     expect(specOf(workers[0])).toMatchObject({ route: 'chunked', index: 3, config: { fps: 30, width: 1920, height: 1080, chunkSize: 120 } });
@@ -71,17 +71,18 @@ describe('launchPiece', () => {
   it('a chunk other than the first uploads itself to its signed URL, the first stays on the worker that assembles', async () => {
     const { farm, workers } = fakeFarm();
 
-    await launchPiece(farm, job, 0, { upload: null, storageHost: STORAGE });
-    await launchPiece(farm, job, 2, { upload: 'https://s.supabase.co/up/c2', storageHost: STORAGE });
+    await launchPiece(farm, job, 0, { upload: null, storageHost: STORAGE, maxBytes: 1000 });
+    await launchPiece(farm, job, 2, { upload: 'https://s.supabase.co/up/c2', storageHost: STORAGE, maxBytes: 1000 });
 
     expect(steps(workers[0], FarmTask.Piece).map(line)).toEqual([expect.stringContaining('render-chunk.mjs')]);
+    expect(line(steps(workers[1], FarmTask.Piece).at(-2)!)).toContain('-le 1000');
     expect(steps(workers[1], FarmTask.Piece).at(-1)!.args).toEqual(expect.arrayContaining(['-T', '/vercel/sandbox/job/c2.mp4', 'https://s.supabase.co/up/c2']));
   });
 
   it('only the asset origin, storage and the runtime CDNs are reachable', async () => {
     const { farm, specs } = fakeFarm();
 
-    await launchPiece(farm, job, 0, { upload: null, storageHost: STORAGE });
+    await launchPiece(farm, job, 0, { upload: null, storageHost: STORAGE, maxBytes: 1000 });
 
     expect(specs[0].allowHosts).toEqual(['x.supabase.co', STORAGE, 'cdn.jsdelivr.net', 'fonts.googleapis.com', 'fonts.gstatic.com']);
   });
@@ -89,7 +90,7 @@ describe('launchPiece', () => {
   it.each([25, 50])('a %i fps video renders whole on 8 vCPUs, since chunked renders take 24, 30 or 60', async (fps) => {
     const { farm, workers, specs } = fakeFarm();
 
-    await launchPiece(farm, { ...job, fps }, 0, { upload: null, storageHost: STORAGE });
+    await launchPiece(farm, { ...job, fps }, 0, { upload: null, storageHost: STORAGE, maxBytes: 1000 });
 
     expect(specOf(workers[0])).toMatchObject({ route: 'whole', config: { fps } });
     expect(specs[0].vcpus).toBe(8);
@@ -99,7 +100,7 @@ describe('launchPiece', () => {
   it('motion blur renders whole and passes the shutter to the engine', async () => {
     const { farm, workers } = fakeFarm();
 
-    await launchPiece(farm, { ...job, motionBlur: blur }, 0, { upload: null, storageHost: STORAGE });
+    await launchPiece(farm, { ...job, motionBlur: blur }, 0, { upload: null, storageHost: STORAGE, maxBytes: 1000 });
 
     expect(specOf(workers[0])).toMatchObject({ route: 'whole', config: { motionBlur: { shutterAngle: 180, shutterPhase: -90, samplesPerFrame: 8 } } });
   });
@@ -107,7 +108,7 @@ describe('launchPiece', () => {
   it('only an mp4 master names a codec, the producer refuses one on other containers', async () => {
     const { farm, workers } = fakeFarm();
 
-    await launchPiece(farm, { ...job, format: ExportFormat.WebmAlpha }, 1, { upload: 'u', storageHost: STORAGE });
+    await launchPiece(farm, { ...job, format: ExportFormat.WebmAlpha }, 1, { upload: 'u', storageHost: STORAGE, maxBytes: 1000 });
 
     expect(specOf(workers[0]).config).not.toHaveProperty('codec');
     expect(specOf(workers[0]).out).toBe('/vercel/sandbox/job/c1.webm');
@@ -134,7 +135,7 @@ describe('launchAssembly', () => {
 
   async function assembled(j: FarmJob = job) {
     const { farm, workers } = fakeFarm();
-    await launchPiece(farm, j, 0, { upload: null, storageHost: STORAGE });
+    await launchPiece(farm, j, 0, { upload: null, storageHost: STORAGE, maxBytes: 1000 });
     await launchAssembly(farm, workers[0].name, j, links);
     return { worker: workers[0], lines: steps(workers[0], FarmTask.Assembly).map(line) };
   }
@@ -170,14 +171,14 @@ describe('launchAssembly', () => {
 describe('checkTask', () => {
   it('a worker without a result is still working', async () => {
     const { farm } = fakeFarm();
-    const name = await launchPiece(farm, job, 0, { upload: null, storageHost: STORAGE });
+    const name = await launchPiece(farm, job, 0, { upload: null, storageHost: STORAGE, maxBytes: 1000 });
 
     expect(await checkTask(farm, name, FarmTask.Piece)).toEqual({ state: TaskState.Running, error: null });
   });
 
   it('reads the result the worker wrote, success or the failing step with its output', async () => {
     const { farm, workers } = fakeFarm();
-    const name = await launchPiece(farm, job, 0, { upload: null, storageHost: STORAGE });
+    const name = await launchPiece(farm, job, 0, { upload: null, storageHost: STORAGE, maxBytes: 1000 });
 
     workers[0].files.set('/vercel/sandbox/job/result-piece.json', Buffer.from(JSON.stringify({ ok: false, error: 'render failed: chrome crashed' })));
     expect(await checkTask(farm, name, FarmTask.Piece)).toEqual({ state: TaskState.Failed, error: 'render failed: chrome crashed' });

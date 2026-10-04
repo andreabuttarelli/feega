@@ -27,7 +27,7 @@ export enum TaskState {
 
 export type Step = { what: string; cmd: string; args: string[] };
 export type TaskCheck = { state: TaskState; error: string | null };
-export type PieceLinks = { upload: string | null; storageHost: string };
+export type PieceLinks = { upload: string | null; storageHost: string; maxBytes: number };
 export type AssemblyLinks = { pieces: string[]; output: string; maxBytes: number };
 
 const RUNTIME_HOSTS = ['cdn.jsdelivr.net', new URL(FONT_CSS_ORIGIN).host, new URL(FONT_FILE_ORIGIN).host];
@@ -148,10 +148,10 @@ const curl = (args: string[]) => ['-sS', '--fail-with-body', '--retry', '3', ...
 const uploadStep = (what: string, file: string, mime: string, url: string): Step => ({ what, cmd: 'curl', args: curl(['-T', file, '-H', `content-type: ${mime}`, '-H', 'x-upsert: true', url]) });
 const downloadStep = (what: string, url: string, file: string): Step => ({ what, cmd: 'curl', args: curl(['-L', url, '-o', file]) });
 
-function sizeStep(file: string, maxBytes: number): Step {
+function sizeStep(what: string, subject: string, file: string, maxBytes: number): Step {
   const mb = Math.round(maxBytes / BYTES_PER_MB);
-  const script = `size=$(stat -c%s ${file}); [ "$size" -le ${maxBytes} ] || { echo "too_large: the file is $((size / ${BYTES_PER_MB})) MB, over the ${mb} MB this project's storage accepts per file. Nothing was charged."; exit 1; }`;
-  return { what: 'size check', cmd: 'bash', args: ['-c', script] };
+  const script = `size=$(stat -c%s ${file}); [ "$size" -le ${maxBytes} ] || { echo "too_large: ${subject} is $((size / ${BYTES_PER_MB})) MB, over the ${mb} MB this project's storage accepts per file. Nothing was charged."; exit 1; }`;
+  return { what, cmd: 'bash', args: ['-c', script] };
 }
 
 async function startSteps(worker: FarmWorker, task: FarmTask, steps: Step[]): Promise<void> {
@@ -168,7 +168,8 @@ export async function launchPiece(farm: RenderFarm, job: FarmJob, index: number,
   const worker = await farm.open({ allowHosts: hosts, timeoutMs: WORKER[route].timeoutMs, vcpus: WORKER[route].vcpus });
 
   const render: Step = { what: `chunk ${index}`, cmd: 'node', args: [CHUNK_SCRIPT, SPEC] };
-  const upload = links.upload ? [uploadStep(`chunk ${index} upload`, chunkPath(job, index), 'application/octet-stream', links.upload)] : [];
+  const file = chunkPath(job, index);
+  const upload = links.upload ? [sizeStep(`chunk ${index} size check`, 'a part of this render', file, links.maxBytes), uploadStep(`chunk ${index} upload`, file, 'application/octet-stream', links.upload)] : [];
 
   await worker.write([
     { path: `${PROJECT_DIR}/index.html`, content: Buffer.from(job.html) },
@@ -206,7 +207,7 @@ export async function launchAssembly(farm: RenderFarm, name: string, job: FarmJo
     ...downloads,
     ...mix,
     ...joinSteps(job, mixArgs ? MIX : null),
-    sizeStep(outPath(job), links.maxBytes),
+    sizeStep('size check', 'the file', outPath(job), links.maxBytes),
     uploadStep('upload', outPath(job), FORMAT[job.format].mime, links.output)
   ]);
 }

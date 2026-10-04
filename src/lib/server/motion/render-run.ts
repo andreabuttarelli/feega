@@ -126,7 +126,7 @@ async function loadJob(db: Db, path: string): Promise<FarmJob> {
 
 async function pieceLinks(db: Db, storage: RenderStorage, scope: RenderScope, runId: string, job: FarmJob, index: number) {
   const upload = index === 0 ? null : await signedUpload(db, workPath(scope, runId, pieceFile(job, index)));
-  return { upload, storageHost: storage.host };
+  return { upload, storageHost: storage.host, maxBytes: await storage.limit() };
 }
 
 function stateOf(run: NodeRun): RenderState {
@@ -220,9 +220,11 @@ async function advancePieces(db: Db, farm: RenderFarm, storage: RenderStorage, r
   const pending = (p: Piece): Promise<TaskCheck> => (p.state === TaskState.Done ? Promise.resolve({ state: TaskState.Done, error: null }) : checkTask(farm, p.worker, FarmTask.Piece));
   const checks = await Promise.all(state.farm.pieces.map(pending));
 
-  const spent = checks.findIndex((c, i) => c.state === TaskState.Failed && state.farm.pieces[i].attempt >= MAX_ATTEMPTS);
+  const hopeless = (c: TaskCheck, i: number) => c.state === TaskState.Failed && (state.farm.pieces[i].attempt >= MAX_ATTEMPTS || TOO_LARGE.test(c.error ?? ''));
+  const spent = checks.findIndex(hopeless);
   if (spent >= 0) {
-    return fail(db, farm, run, state, checks[spent].error ?? 'render failed', job);
+    const error = checks[spent].error ?? 'render failed';
+    return fail(db, farm, run, state, error.match(TOO_LARGE)?.[0] ?? error, job);
   }
 
   const landed = state.farm.pieces.filter((p, i) => i > 0 && p.state !== TaskState.Done && checks[i].state === TaskState.Done);

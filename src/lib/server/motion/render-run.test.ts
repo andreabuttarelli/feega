@@ -134,8 +134,8 @@ describe('startRender only enqueues and starts the workers', () => {
 
     expect(uploads).toEqual(['org/prj/motion/node/work/run-1/job.json']);
     expect(farmCalls.launchPiece).toHaveBeenCalledTimes(7);
-    expect(farmCalls.launchPiece.mock.calls[0][3]).toEqual({ upload: null, storageHost: 's.supabase.co' });
-    expect(farmCalls.launchPiece.mock.calls[2][3]).toEqual({ upload: 'https://s.supabase.co/up/org/prj/motion/node/work/run-1/c2.mp4', storageHost: 's.supabase.co' });
+    expect(farmCalls.launchPiece.mock.calls[0][3]).toEqual({ upload: null, storageHost: 's.supabase.co', maxBytes: LIMIT });
+    expect(farmCalls.launchPiece.mock.calls[2][3]).toEqual({ upload: 'https://s.supabase.co/up/org/prj/motion/node/work/run-1/c2.mp4', storageHost: 's.supabase.co', maxBytes: LIMIT });
     expect(lastParams().farm.pieces.map((p: { worker: string }) => p.worker)).toEqual(['box-0', 'box-1', 'box-2', 'box-3', 'box-4', 'box-5', 'box-6']);
     expect(lastParams().progress).toMatchObject({ stage: RenderStage.Rendering, chunksDone: 0, chunks: 7 });
     expect(saveExport).not.toHaveBeenCalled();
@@ -247,6 +247,18 @@ describe('reconcileRenders', () => {
     expect(runs.failRun).toHaveBeenCalledWith(db, expect.objectContaining({ error: expect.stringMatching(/^too_large: the file is 812 MB/) }));
     expect(farmCalls.launchAssembly).toHaveBeenCalledTimes(1);
     expect(logAiCall).not.toHaveBeenCalled();
+  });
+
+  it('a piece over the storage limit fails the render at once: a retry would be just as large', async () => {
+    const run = await started(request(trailer(), settingsOf(Preset.Master)));
+    runs.queuedRenderRuns.mockResolvedValue([run]);
+    farmCalls.checkTask.mockImplementation(async (_f, name: string) => (name === 'box-2' ? { state: TaskState.Failed, error: 'chunk 2 size check failed: too_large: a part of this render is 70 MB, over the 50 MB this project\'s storage accepts per file. Nothing was charged.' } : running));
+    const { db } = fakeDb();
+
+    await reconcileRenders(db, farm, storage);
+
+    expect(runs.failRun).toHaveBeenCalledWith(db, expect.objectContaining({ error: expect.stringMatching(/^too_large: a part of this render is 70 MB/) }));
+    expect(farmCalls.launchPiece).toHaveBeenCalledTimes(7);
   });
 
   it('a run another tick holds is left alone', async () => {
