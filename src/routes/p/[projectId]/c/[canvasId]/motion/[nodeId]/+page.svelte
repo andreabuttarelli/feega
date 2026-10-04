@@ -129,7 +129,7 @@
   const beats = $derived(hitFrames(doc, analyses, Hit.Beats));
   const assets = $derived([...madeAssets, ...data.assets]);
   const assetUrls = $derived(Object.fromEntries(assets.filter((a) => a.url).map((a) => [a.id, a.url as string])));
-  const html = $derived(composeHtml({ doc, tokens: data.tokens, assets: assetUrls }));
+  const html = $derived(composeHtml({ doc, tokens: data.tokens, assets: assetUrls, analyses }));
   const selected = $derived(selection.length === 1 ? (findClip(doc, selection[0])?.clip ?? null) : null);
   const editorUrl = $derived(`/p/${data.projectId}/c/${data.canvas.id}/motion/${data.node.id}`);
   const agentUrl = $derived(`/api/v1/projects/${data.projectId}/motion/${data.node.id}/agent`);
@@ -286,7 +286,7 @@
   }
 
   const checkPorts: CheckPorts = {
-    compose: (d) => composeHtml({ doc: d, tokens: data.tokens, assets: assetUrls }),
+    compose: (d) => composeHtml({ doc: d, tokens: data.tokens, assets: assetUrls, analyses }),
     capture: (times, source) => (preview ? preview.capture(times, source, CHECK_WIDTH) : Promise.reject(new Error('the preview is still loading')))
   };
 
@@ -351,7 +351,7 @@
     if (!preview) {
       return;
     }
-    const agentHtml = composeHtml({ doc: request.doc, tokens: data.tokens, assets: assetUrls });
+    const agentHtml = composeHtml({ doc: request.doc, tokens: data.tokens, assets: assetUrls, analyses });
     const times = request.times.map((t) => Math.min(t, (request.doc.durationInFrames - 1) / request.doc.fps));
     const frames = await preview.capture(times, agentHtml).catch((e) => {
       console.error('[motion] frames not captured', e);

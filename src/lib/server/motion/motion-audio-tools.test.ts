@@ -82,3 +82,15 @@ describe('motion agent beat tools', () => {
     ]);
   });
 });
+
+describe('pulse_with_music', () => {
+  it('sets an audio-reactive scale on a clip, following the music', async () => {
+    const { session, run } = setup();
+    await run('add_clip', { component: 'Audio', start: 0, duration: 4, props: { assetId: 'music' } });
+    await run('add_clip', { component: 'Shape', start: 0, duration: 4 });
+    const out = await run('pulse_with_music', { clip_id: 'id2', prop: 'scale' });
+
+    expect(out.ok).toBe(true);
+    expect(findClip(session.doc, 'id2')!.clip.expressions.scale).toContain('audio.amp("id1"');
+  });
+});
