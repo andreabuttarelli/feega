@@ -5,7 +5,7 @@
   import type { MotionDoc } from '$lib/motion/doc';
   import { Background, FORMATS, formatOf } from '$lib/motion/doc';
   import { Resolution } from '$lib/motion/render-quote';
-  import { AudioMode, Support, eta, exportSize, exportSupport, frameTimes, samplesPerFrame, type ExportScope, type ExportSupport, type Size } from '$lib/motion/export-plan';
+  import { AudioMode, Support, eta, exportSize, exportSupport, frameTimes, outputSize, samplesPerFrame, type ExportScope, type ExportSupport, type Size } from '$lib/motion/export-plan';
   import { audioPlan } from '$lib/motion/audio-plan';
   import { capabilities, encodeMp4, mixAudio } from '$lib/motion/export/encode';
   import { saveExport } from '$lib/motion/export/save';
@@ -82,7 +82,8 @@
     const paced = setFrameRate(doc, settings.fps);
     return paced.ok ? paced.doc : doc;
   });
-  const quote = $derived(renderQuote(target));
+  const quote = $derived(renderQuote(target, settings.resolution));
+  const output = $derived(outputSize(doc, settings.resolution));
   const problem = $derived(exportProblem(target, settings));
   const spec = $derived(FORMAT[settings.format]);
   const megabytes = $derived(Math.max(1, Math.round(estimateBytes(target, settings) / BYTES_PER_MB)));
@@ -257,6 +258,12 @@
           {#each FRAME_RATES as rate (rate)}<option value={rate}>{rate} fps</option>{/each}
         </select>
       </dd>
+      <dt>Resolution</dt>
+      <dd>
+        <select bind:value={settings.resolution} disabled={jobRunning} data-testid="export-resolution">
+          {#each Object.values(Resolution) as r (r)}<option value={r}>{r === Resolution.P2160 ? '4K (2160p)' : r}</option>{/each}
+        </select>
+      </dd>
       <dt>Quality</dt>
       <dd class="choice">
         <label><input type="radio" name="quality" value={Quality.High} bind:group={settings.quality} disabled={jobRunning} /> High</label>
@@ -264,7 +271,7 @@
       </dd>
       <dt>Output</dt>
       <dd>
-        {FORMATS[formatOf(doc)].label} · {doc.width}×{doc.height} · {settings.fps} fps · {Math.round(quote.seconds)} s · {spec.audio ? 'audio mixed in' : 'no audio'} · up to ~{megabytes} MB (a saved file can be {Math.round(MAX_EXPORT_BYTES / BYTES_PER_MB)} MB)
+        {FORMATS[formatOf(doc)].label} · {output.width}×{output.height} · {settings.fps} fps · {Math.round(quote.seconds)} s · {spec.audio ? 'audio mixed in' : 'no audio'} · up to ~{megabytes} MB (a saved file can be {Math.round(MAX_EXPORT_BYTES / BYTES_PER_MB)} MB)
         {#if spec.alpha && doc.background !== Background.Transparent}<br /><span class="muted">Keeps alpha only where nothing is painted: set the background to Transparent for a see-through file.</span>{/if}
       </dd>
       <dt>Cost</dt>
@@ -301,7 +308,7 @@
   {:else}
     <dl>
       <dt>Format</dt>
-      <dd>{FORMATS[formatOf(doc)].label} · {size.width}×{size.height} · {doc.fps} fps · {Math.round(doc.durationInFrames / doc.fps)} s<br /><span class="muted">MP4 H.264 only. ProRes, HEVC, transparent WebM, GIF and PNG render on our servers.</span></dd>
+      <dd>{FORMATS[formatOf(doc)].label} · {size.width}×{size.height} · {doc.fps} fps · {Math.round(doc.durationInFrames / doc.fps)} s<br /><span class="muted">MP4 H.264 up to 1080p only. 4K, ProRes, HEVC, transparent WebM, GIF and PNG render on our servers.</span></dd>
       <dt>Quality</dt>
       <dd class="choice">
         <label><input type="radio" name="res" value={Resolution.P1080} bind:group={resolution} disabled={busy || support.support === Support.Only720} /> 1080p</label>

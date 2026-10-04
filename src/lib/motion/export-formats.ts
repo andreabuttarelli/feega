@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { FRAME_RATES, type FrameRate } from './design';
 import type { MotionDoc } from './doc';
+import { Resolution } from './render-quote';
+import { MAX_RENDER_SIDE, outputSize } from './export-plan';
 
 export enum ExportFormat {
   Mp4H264 = 'mp4-h264',
@@ -53,16 +55,17 @@ const BITS_PER_BYTE = 8;
 export const settingsSchema = z.object({
   format: z.enum(EXPORT_FORMATS),
   fps: z.literal(FRAME_RATES),
-  quality: z.enum([Quality.Standard, Quality.High])
+  quality: z.enum([Quality.Standard, Quality.High]),
+  resolution: z.enum(Object.values(Resolution) as [Resolution, ...Resolution[]]).default(Resolution.P1080)
 });
 
 export type RenderSettings = z.infer<typeof settingsSchema>;
 
 export const PRESETS: Record<Preset, RenderSettings & { label: string }> = {
-  [Preset.Social]: { label: 'Social · MP4 1080p30', format: ExportFormat.Mp4H264, fps: 30, quality: Quality.High },
-  [Preset.Master]: { label: 'Master · ProRes 4444', format: ExportFormat.ProRes4444, fps: 30, quality: Quality.High },
-  [Preset.Web]: { label: 'Web · transparent WebM', format: ExportFormat.WebmAlpha, fps: 30, quality: Quality.High },
-  [Preset.Gif]: { label: 'GIF', format: ExportFormat.Gif, fps: 30, quality: Quality.Standard }
+  [Preset.Social]: { label: 'Social · MP4 1080p30', format: ExportFormat.Mp4H264, fps: 30, quality: Quality.High, resolution: Resolution.P1080 },
+  [Preset.Master]: { label: 'Master · 4K ProRes 4444', format: ExportFormat.ProRes4444, fps: 30, quality: Quality.High, resolution: Resolution.P2160 },
+  [Preset.Web]: { label: 'Web · transparent WebM', format: ExportFormat.WebmAlpha, fps: 30, quality: Quality.High, resolution: Resolution.P1080 },
+  [Preset.Gif]: { label: 'GIF', format: ExportFormat.Gif, fps: 30, quality: Quality.Standard, resolution: Resolution.P1080 }
 };
 
 export type SettingsVerdict = { ok: true; settings: RenderSettings } | { ok: false; error: string };
@@ -80,8 +83,8 @@ export function parseSettings(raw: string | null): SettingsVerdict {
 }
 
 export function settingsOf(preset: Preset): RenderSettings {
-  const { format, fps, quality } = PRESETS[preset];
-  return { format, fps, quality };
+  const { format, fps, quality, resolution } = PRESETS[preset];
+  return { format, fps, quality, resolution };
 }
 
 function gifSize(doc: Pick<MotionDoc, 'width' | 'height'>): { width: number; height: number } {
@@ -92,7 +95,7 @@ function gifSize(doc: Pick<MotionDoc, 'width' | 'height'>): { width: number; hei
 export function estimateBytes(doc: Pick<MotionDoc, 'width' | 'height' | 'durationInFrames' | 'fps'>, settings: RenderSettings): number {
   const seconds = doc.durationInFrames / doc.fps;
   const gif = settings.format === ExportFormat.Gif;
-  const { width, height } = gif ? gifSize(doc) : doc;
+  const { width, height } = gif ? gifSize(doc) : outputSize(doc, settings.resolution);
   const frames = seconds * (gif ? GIF.fps : settings.fps);
   return Math.round((width * height * frames * FORMAT[settings.format].bitsPerPixel) / BITS_PER_BYTE);
 }
@@ -101,6 +104,10 @@ export function exportProblem(doc: Pick<MotionDoc, 'width' | 'height' | 'duratio
   const seconds = doc.durationInFrames / doc.fps;
   if (settings.format === ExportFormat.Gif && seconds > GIF.maxSeconds) {
     return `a GIF can be at most ${GIF.maxSeconds} s: shorten the video or pick a video format`;
+  }
+  const out = outputSize(doc, settings.resolution);
+  if (Math.max(out.width, out.height) > MAX_RENDER_SIDE) {
+    return `${out.width}×${out.height} is over ${MAX_RENDER_SIDE} px on a side: pick a lower resolution`;
   }
   return null;
 }

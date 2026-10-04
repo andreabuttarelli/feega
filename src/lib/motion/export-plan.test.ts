@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, newMotionDoc } from './doc';
 import { Resolution } from './render-quote';
-import { AudioMode, Support, eta, exportSize, exportSupport, frameTimes, samplesPerFrame } from './export-plan';
+import { AudioMode, BROWSER_RESOLUTIONS, Support, eta, exportSize, exportSupport, frameTimes, outputSize, samplesPerFrame } from './export-plan';
 import { BROWSER_SAMPLES } from './motion-blur';
 
 describe('export plan', () => {
@@ -28,6 +28,16 @@ describe('export plan', () => {
     expect(times).toHaveLength(2 * BROWSER_SAMPLES);
     expect(times[2] * 30).toBeGreaterThan(0.75);
     expect(times[3] * 30).toBeLessThan(1.25);
+  });
+
+  it('a server render scales the doc up to the asked short side, 4K included', () => {
+    expect(outputSize(newMotionDoc(MotionFormat.Landscape), Resolution.P2160)).toEqual({ width: 3840, height: 2160, scale: 2 });
+    expect(outputSize(newMotionDoc(MotionFormat.Portrait), Resolution.P2160)).toEqual({ width: 2160, height: 2700, scale: 2 });
+    expect(outputSize(newMotionDoc(MotionFormat.Square), Resolution.P1080)).toEqual({ width: 1080, height: 1080, scale: 1 });
+  });
+
+  it('the browser export stops at 1080p', () => {
+    expect(BROWSER_RESOLUTIONS).not.toContain(Resolution.P2160);
   });
 
   it('the ETA comes from the frames already done', () => {
