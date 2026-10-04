@@ -68,9 +68,9 @@ describe('what can be animated', () => {
     expect(isAnimatable('Image', 'blur')).toBe(true);
   });
 
-  it('anchors and audio are not animated', () => {
+  it('anchors are not animated; audio animates only its volume and pan', () => {
     expect(isAnimatable('Title', 'anchorX')).toBe(false);
-    expect(ANIMATABLE.Audio).toEqual([]);
+    expect(ANIMATABLE.Audio.map((p) => p.key)).toEqual(['volume', 'pan']);
   });
 
   it('colour props animate on the components that have them', () => {

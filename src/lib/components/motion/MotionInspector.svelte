@@ -1,5 +1,6 @@
 <script lang="ts">
   import { setMotionPath } from '$lib/motion/path-ops';
+  import { duckUnder, voicesOver } from '$lib/motion/duck';
   import { BRAND_COLORS, COMPONENTS, Control, TrackKind, type AssetKind } from '$lib/motion/components';
   import { DEPTH, Space } from '$lib/motion/camera';
   import { setClipDepth } from '$lib/motion/camera-ops';
@@ -66,6 +67,8 @@
   const KEY_STATE = { On: 'on', Lane: 'lane', None: 'none' } as const;
 
   let error = $state('');
+  const voices = $derived(voicesOver(doc, clip.id));
+  let voice = $state('');
 
   const groups = $derived(clipFieldGroups(doc, clip));
   const animated = $derived(withParams(doc, clip));
@@ -292,6 +295,18 @@
       </div>
     {/each}
   </section>
+
+  {#if voices.length}
+    <section data-testid="duck-section">
+      <h4>Ducking</h4>
+      <div class="row two">
+        <select aria-label="Voice-over" value={voice || voices[0]} onchange={(e) => (voice = e.currentTarget.value)}>
+          {#each voices as id (id)}<option value={id}>{clipName(id)}</option>{/each}
+        </select>
+        <button type="button" data-testid="duck" onclick={() => commit(duckUnder(doc, clip.id, voices.includes(voice) ? voice : voices[0], null), 'Ducked the music')}>Duck under voice-over</button>
+      </div>
+    </section>
+  {/if}
 
   {#snippet diamond(key: string)}
     <button type="button" class="key {keyState(key)}" title="Keyframe at playhead" aria-label={`Keyframe ${key}`} aria-pressed={keyState(key) === KEY_STATE.On} onclick={() => toggle(key)}>◆</button>

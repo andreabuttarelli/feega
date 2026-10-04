@@ -1,4 +1,4 @@
-import type { AudioEntry } from '$lib/motion/audio-plan';
+import type { AudioEntry, GainPoint } from '$lib/motion/audio-plan';
 import { ExportFormat, GIF } from '$lib/motion/export-formats';
 
 const QUIET = ['-y', '-v', 'error'];
@@ -11,16 +11,29 @@ export type AssembleInput = { list: string; audio: string | null; out: string; f
 
 const round = (n: number) => Math.round(n * MS_PER_S) / MS_PER_S;
 
+const SPLIT_SAMPLES = 64;
+
+function segment(a: GainPoint, b: GainPoint): string {
+  const slope = round((b.value - a.value) / (b.time - a.time));
+  return `gte(t,${round(a.time)})*lt(t,${round(b.time)})*(${round(a.value)}+${slope}*(t-${round(a.time)}))`;
+}
+
+function curveExpr(points: GainPoint[], at: number): string {
+  const local = points.map((p) => ({ time: p.time - at, value: p.value }));
+  if (local.every((p) => p.value === local[0].value)) {
+    return String(round(local[0].value));
+  }
+  const last = local[local.length - 1];
+  const ramps = local.slice(1).map((b, i) => segment(local[i], b));
+  return `'${[...ramps, `gte(t,${round(last.time)})*${round(last.value)}`].join('+')}'`;
+}
+
 function clipFilter(e: AudioEntry, i: number): string {
-  const steps = [`aresample=${SAMPLE_RATE}`, `volume=${round(e.volume)}`];
-  if (e.fadeIn > 0) {
-    steps.push(`afade=t=in:st=0:d=${round(e.fadeIn)}`);
-  }
-  if (e.fadeOut > 0) {
-    steps.push(`afade=t=out:st=${round(e.duration - e.fadeOut)}:d=${round(e.fadeOut)}`);
-  }
-  steps.push(`adelay=${Math.round(e.at * MS_PER_S)}:all=1`);
-  return `[${i}:a]${steps.join(',')}[a${i}]`;
+  const head = `[${i}:a]aresample=${SAMPLE_RATE},aformat=channel_layouts=stereo,asetnsamples=n=${SPLIT_SAMPLES},channelsplit=channel_layout=stereo[l${i}][r${i}]`;
+  const left = `[l${i}]volume=${curveExpr(e.left, e.at)}:eval=frame[gl${i}]`;
+  const right = `[r${i}]volume=${curveExpr(e.right, e.at)}:eval=frame[gr${i}]`;
+  const join = `[gl${i}][gr${i}]join=inputs=2:channel_layout=stereo,adelay=${Math.round(e.at * MS_PER_S)}:all=1[a${i}]`;
+  return [head, left, right, join].join(';');
 }
 
 export function audioMixArgs(entries: AudioEntry[], seconds: number, out: string): string[] | null {

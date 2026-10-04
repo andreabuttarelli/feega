@@ -53,6 +53,7 @@ import { DEGREES, MAX_SAMPLES } from '$lib/motion/motion-blur';
 import { MODIFIERS, MODIFIER_KINDS } from '$lib/motion/shape/modifiers';
 import { addModifier, morphTo, removeModifier, setModifier, setPath } from '$lib/motion/shape/ops';
 import { SHAPE_KINDS, modifierKey } from '$lib/motion/shape/schema';
+import { DUCK_DEFAULTS, duckUnder } from '$lib/motion/duck';
 
 export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number };
 
@@ -476,6 +477,19 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         'Bend the motion path at the position keyframe at time (seconds from the clip start): in and out are the bezier handles as [dx, dy] offsets from the key point, in fractions of the frame (like x/y). Omitted handles are flat ([0,0]).',
       inputSchema: z.object({ clip_id: z.string(), time: z.number().min(0), in: z.tuple([z.number(), z.number()]).optional(), out: z.tuple([z.number(), z.number()]).optional() }),
       execute: async (input) => apply(setPathTangent(session.doc, input.clip_id, { frame: frames(input.time), in: input.in ?? [0, 0], out: input.out ?? [0, 0] }), `bent the path of ${input.clip_id}`)
+    }),
+
+    duck_audio: tool({
+      description: `Duck music under a voice-over: writes volume keyframes on the music clip so it drops while the voice speaks and comes back after. depth is the music level under the voice as a fraction of its volume (default ${DUCK_DEFAULTS.depth}); attack/release in seconds (default ${DUCK_DEFAULTS.attack}/${DUCK_DEFAULTS.release}). Replaces the music's volume keyframes. Volume and pan of Audio/Video clips animate with set_keyframes too.`,
+      inputSchema: z.object({
+        music_clip_id: z.string(),
+        voice_clip_id: z.string(),
+        depth: z.number().min(0).max(1).optional(),
+        attack: z.number().min(0).max(2).optional(),
+        release: z.number().min(0).max(4).optional()
+      }),
+      execute: async (input) =>
+        apply(duckUnder(session.doc, input.music_clip_id, input.voice_clip_id, null, { depth: input.depth, attack: input.attack, release: input.release }), `ducked ${input.music_clip_id} under ${input.voice_clip_id}`)
     }),
 
     remove_keyframes: tool({
