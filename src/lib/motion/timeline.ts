@@ -2,7 +2,7 @@ import { COMPONENTS, TrackKind, defaultProps, type ComponentId } from './compone
 import { Strictness } from './custom/component';
 import { withParams } from './custom/params';
 import { FPS, MAX_SECONDS, TransitionKind, maxFrames, type Edge } from './design';
-import { FORMATS, byFrame, clipProps, findClip, fontsOfClip, newClip, type MotionClip, type MotionDoc, type MotionFormat, type MotionTrack } from './doc';
+import { FORMATS, byFrame, clipProps, findClip, fontsOfClip, newClip, type Background, type MotionClip, type MotionDoc, type MotionFormat, type MotionTrack } from './doc';
 import { Ease } from './design';
 import { Matte, isMaskKey, maskSchema, type MaskInput } from './mask';
 import { matteMask, matteSource } from './matte';
@@ -257,7 +257,7 @@ export function moveTrack(doc: MotionDoc, trackId: string, toIndex: number): OpR
   return { ok: true, doc: { ...doc, tracks: [...rest.slice(0, at), track, ...rest.slice(at)] } };
 }
 
-export function setCanvas(doc: MotionDoc, input: { format?: MotionFormat; durationInFrames?: number }): OpResult {
+export function setCanvas(doc: MotionDoc, input: { format?: MotionFormat; durationInFrames?: number; background?: Background }): OpResult {
   const size = input.format ? FORMATS[input.format] : { width: doc.width, height: doc.height };
   const durationInFrames = Math.round(input.durationInFrames ?? doc.durationInFrames);
   const end = Math.max(0, ...doc.tracks.flatMap((t) => t.clips.map(clipEnd)));
@@ -268,7 +268,7 @@ export function setCanvas(doc: MotionDoc, input: { format?: MotionFormat; durati
   if (durationInFrames > maxFrames(doc.fps)) {
     return fail(`the video can be at most ${MAX_SECONDS} seconds`);
   }
-  return { ok: true, doc: { ...doc, width: size.width, height: size.height, durationInFrames } };
+  return { ok: true, doc: { ...doc, width: size.width, height: size.height, durationInFrames, background: input.background ?? doc.background } };
 }
 
 export function snapFrame(frame: number, targets: readonly number[], threshold: number): number {

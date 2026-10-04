@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { FEEGA_TOKENS } from '../brand';
 import { TransitionKind } from '../design';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '../doc';
+import { Background, MotionFormat, newMotionDoc, type MotionDoc } from '../doc';
 import gsap from 'gsap';
 import { addClip, setKeyframes, setTransform, setTransition, Side, type OpResult } from '../timeline';
 import { LIBRARY_IDS } from '../components';
@@ -143,6 +143,20 @@ describe('MotionDoc to HyperFrames composition', () => {
     expect(html).toContain('createImageBitmap');
     expect(html).toContain('seeked');
     expect(html).toContain('getFontEmbedCSS');
+  });
+});
+
+describe('background of the frame', () => {
+  it('paints the brand background by default', () => {
+    expect(composeHtml({ doc, tokens: FEEGA_TOKENS, assets: {} })).toContain(`#root{background:${FEEGA_TOKENS.colors['brand.background']}}`);
+  });
+
+  it('a transparent video paints nothing behind its clips, so alpha formats keep the alpha', () => {
+    const html = composeHtml({ doc: { ...doc, background: Background.Transparent }, tokens: FEEGA_TOKENS, assets: {} });
+
+    expect(html).toContain('#root{background:transparent}');
+    expect(html).not.toContain('data-clip="bg"');
+    expect(html).toContain('data-clip="title"');
   });
 });
 

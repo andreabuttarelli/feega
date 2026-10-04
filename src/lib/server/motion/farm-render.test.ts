@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { renderOnFarm, RenderFailure, type FarmJob } from './farm-render';
 import type { FarmFile, FarmRun, FarmWorker, RenderFarm, WorkerSpec } from './render-farm';
 import type { RenderEvent } from '$lib/motion/server-render';
+import { ExportFormat, Quality } from '$lib/motion/export-formats';
 
 type FakeWorker = FarmWorker & { id: number; files: FarmFile[]; runs: string[]; stopped: boolean };
 
@@ -45,7 +46,9 @@ const job: FarmJob = {
   fps: 30,
   totalFrames: 840,
   audio: [{ clipId: 'm', url: 'https://x.supabase.co/m.mp3', at: 0, offset: 0, duration: 28, volume: 1, fadeIn: 1, fadeOut: 2 }],
-  allowHosts: ['x.supabase.co']
+  allowHosts: ['x.supabase.co'],
+  format: ExportFormat.Mp4H264,
+  quality: Quality.High
 };
 
 describe('renderOnFarm', () => {
@@ -119,5 +122,58 @@ describe('renderOnFarm', () => {
     await renderOnFarm(farm, job, () => {});
 
     expect(workers.every((w) => w.stopped)).toBe(true);
+  });
+});
+
+describe('renderOnFarm by export format', () => {
+  it.each([
+    [ExportFormat.Mp4H265, { format: 'mp4', codec: 'h265' }, 'mp4', 'mp4'],
+    [ExportFormat.ProRes4444, { format: 'mov' }, 'mov', 'mov'],
+    [ExportFormat.ProRes422, { format: 'mov' }, 'mov', 'mov'],
+    [ExportFormat.WebmAlpha, { format: 'webm' }, 'webm', 'webm'],
+    [ExportFormat.Gif, { format: 'webm' }, 'webm', 'gif']
+  ])('%s chunks render a %o master and the head writes the .%s → .%s file', async (format, master, chunkExt, outExt) => {
+    const { farm, workers } = fakeFarm();
+
+    const bytes = await renderOnFarm(farm, { ...job, format }, () => {});
+
+    expect(specOf(workers[1]).config).toMatchObject(master);
+    expect(specOf(workers[1]).out).toBe(`/vercel/sandbox/job/c1.${chunkExt}`);
+    expect(bytes.toString()).toBe(`w0:/vercel/sandbox/job/out.${outExt}`);
+  });
+
+  it('only an mp4 master names a codec, the producer refuses one on other containers', async () => {
+    const { farm, workers } = fakeFarm();
+
+    await renderOnFarm(farm, { ...job, format: ExportFormat.WebmAlpha }, () => {});
+
+    expect(specOf(workers[0]).config).not.toHaveProperty('codec');
+  });
+
+  it('a GIF and a PNG sequence carry no audio, so nothing is mixed', async () => {
+    for (const format of [ExportFormat.Gif, ExportFormat.PngSequence]) {
+      const { farm, workers } = fakeFarm();
+
+      await renderOnFarm(farm, { ...job, format }, () => {});
+
+      expect(workers[0].runs.some((r) => r.includes('amix'))).toBe(false);
+    }
+  });
+
+  it('a PNG sequence writes frames into a folder and zips it', async () => {
+    const { farm, workers } = fakeFarm();
+
+    const bytes = await renderOnFarm(farm, { ...job, format: ExportFormat.PngSequence }, () => {});
+
+    expect(workers[0].runs.some((r) => r.includes('/vercel/sandbox/job/frames/frame_%05d.png'))).toBe(true);
+    expect(workers[0].runs.at(-1)).toContain('zip -q');
+    expect(bytes.toString()).toBe('w0:/vercel/sandbox/job/out.zip');
+  });
+
+  it('H.265 is refused before any worker opens when the video must render whole', async () => {
+    const { farm, workers } = fakeFarm();
+
+    await expect(renderOnFarm(farm, { ...job, fps: 25, format: ExportFormat.Mp4H265 }, () => {})).rejects.toThrow(/H\.265/);
+    expect(workers).toHaveLength(0);
   });
 });

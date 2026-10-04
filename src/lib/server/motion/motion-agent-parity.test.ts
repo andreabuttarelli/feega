@@ -10,6 +10,7 @@ type Access = { write: string[]; read: string } | { fixed: string };
 const DOC: Record<string, Access> = {
   version: { fixed: 'schema version, set by the editor' },
   fps: { write: ['set_canvas'], read: 'fps' },
+  background: { write: ['set_canvas'], read: 'background' },
   width: { write: ['set_canvas'], read: 'width' },
   height: { write: ['set_canvas'], read: 'height' },
   durationInFrames: { write: ['set_canvas'], read: 'duration' },

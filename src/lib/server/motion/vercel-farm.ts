@@ -4,7 +4,7 @@ import { FARM_RUNTIME_DIR, type FarmWorker, type RenderFarm, type WorkerSpec } f
 
 export type FarmAccess = { token?: string; teamId?: string; projectId?: string };
 
-const BASE_SETUP_REVISION = 1;
+const BASE_SETUP_REVISION = 2;
 export const FARM_BASE = `feega-motion-render-${HYPERFRAMES_VERSION.replaceAll('.', '-')}-r${BASE_SETUP_REVISION}`;
 
 const WORKER_VCPUS = 4;
@@ -14,7 +14,7 @@ const BASE_SETUP_TIMEOUT_MS = 10 * 60_000;
 const CHROME_LIBS = 'libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libatspi2.0-0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libpango-1.0-0 libcairo2 libasound2t64';
 
 const BASE_SETUP = [
-  `sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ffmpeg fonts-noto-color-emoji ${CHROME_LIBS}`,
+  `sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ffmpeg zip fonts-noto-color-emoji ${CHROME_LIBS}`,
   `mkdir -p ${FARM_RUNTIME_DIR} && cd ${FARM_RUNTIME_DIR} && npm init -y && npm i --no-audit --no-fund hyperframes@${HYPERFRAMES_VERSION} @hyperframes/producer@${HYPERFRAMES_VERSION}`,
   `cd ${FARM_RUNTIME_DIR} && npx hyperframes browser ensure`
 ];

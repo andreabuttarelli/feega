@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { assembleArgs, audioMixArgs, concatList } from './render-commands';
 import type { AudioEntry } from '$lib/motion/audio-plan';
+import { ExportFormat } from '$lib/motion/export-formats';
 
 const music: AudioEntry = { clipId: 'm', url: 'https://x.supabase.co/a.mp3?token=t', at: 0, offset: 0, duration: 28, volume: 1, fadeIn: 1, fadeOut: 2 };
 const vo: AudioEntry = { clipId: 'v', url: 'https://x.supabase.co/v.mp3?token=t', at: 2.5, offset: 0.5, duration: 4, volume: 0.6, fadeIn: 0, fadeOut: 0 };
@@ -46,15 +47,52 @@ describe('assemble', () => {
   });
 
   it('joins chunks without re-encoding and muxes the mix, web-ready', () => {
-    expect(assembleArgs({ list: 'l.txt', audio: 'mix.m4a', out: 'o.mp4' })).toEqual([
+    expect(assembleArgs({ list: 'l.txt', audio: 'mix.m4a', out: 'o.mp4', format: ExportFormat.Mp4H264 })).toEqual([
       '-y', '-v', 'error', '-f', 'concat', '-safe', '0', '-i', 'l.txt', '-i', 'mix.m4a',
       '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'copy', '-movflags', '+faststart', 'o.mp4'
     ]);
   });
 
   it('a silent video is the concat alone', () => {
-    expect(assembleArgs({ list: 'l.txt', audio: null, out: 'o.mp4' })).toEqual([
+    expect(assembleArgs({ list: 'l.txt', audio: null, out: 'o.mp4', format: ExportFormat.Mp4H264 })).toEqual([
       '-y', '-v', 'error', '-f', 'concat', '-safe', '0', '-i', 'l.txt', '-map', '0:v', '-c:v', 'copy', '-movflags', '+faststart', 'o.mp4'
     ]);
+  });
+});
+
+describe('finishing each format', () => {
+  const args = (format: ExportFormat, audio: string | null = 'mix.m4a') => assembleArgs({ list: 'l.txt', audio, out: 'o', format }).join(' ');
+
+  it('HEVC is copied and tagged so Apple players open it', () => {
+    expect(args(ExportFormat.Mp4H265)).toContain('-c:v copy -tag:v hvc1');
+  });
+
+  it('ProRes 4444 keeps the master and its alpha, with PCM audio', () => {
+    expect(args(ExportFormat.ProRes4444)).toContain('-c:v copy -c:a pcm_s16le');
+    expect(args(ExportFormat.ProRes4444)).not.toContain('faststart');
+  });
+
+  it('ProRes 422 HQ is re-encoded from the master at profile 3, 10-bit 4:2:2', () => {
+    expect(args(ExportFormat.ProRes422)).toContain('-c:v prores_ks -profile:v 3 -pix_fmt yuv422p10le');
+  });
+
+  it('WebM keeps VP9 alpha and carries Opus audio', () => {
+    expect(args(ExportFormat.WebmAlpha)).toContain('-c:v copy -c:a libopus');
+  });
+
+  it('a GIF is decoded with its alpha, palette-optimised, capped, silent and looping', () => {
+    const gif = args(ExportFormat.Gif);
+
+    expect(gif).toContain('-c:v libvpx-vp9 -f concat');
+    expect(gif).toMatch(/fps=15,scale='min\(640,iw\)':-2.*palettegen.*paletteuse/);
+    expect(gif).not.toContain('mix.m4a');
+    expect(gif).toContain('-loop 0');
+  });
+
+  it('a PNG sequence writes numbered frames, silent', () => {
+    const png = args(ExportFormat.PngSequence);
+
+    expect(png).toContain('frame_%05d.png');
+    expect(png).not.toContain('mix.m4a');
   });
 });
