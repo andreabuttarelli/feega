@@ -65,7 +65,7 @@ const MOVE: Record<PropsOf<'Image'>['move'], { from: Vars; to: Vars }> = {
   'pan-right': { from: { scale: 1.12, xPercent: -3 }, to: { scale: 1.12, xPercent: 3 } }
 };
 
-export type ComposeInput = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string> };
+export type ComposeInput = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; scale?: number };
 
 function pick(vars: Vars, keys: string[]): Vars {
   return Object.fromEntries(keys.map((k) => [k, vars[k]]));
@@ -306,9 +306,15 @@ function withoutBackdrop(doc: MotionDoc): MotionDoc {
   return { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.filter((c) => !BACKDROPS.has(c.component as ComponentId)) })) };
 }
 
+function zoomed(doc: MotionDoc, scale: number): string {
+  return scale === 1 ? '' : `#root{width:${doc.width}px;height:${doc.height}px;zoom:${scale}}`;
+}
+
 export function composeHtml(raw: ComposeInput): string {
   const input = { ...raw, doc: bakeExpressions(withoutBackdrop(raw.doc)) };
   const { doc, tokens } = input;
+  const scale = raw.scale ?? 1;
+  const frame = { width: Math.round(doc.width * scale), height: Math.round(doc.height * scale) };
   const bottomFirst = doc.tracks.map((track, index) => ({ track, index })).reverse();
   const layers: string[] = [];
   const tweens: Tween[] = [];
@@ -369,7 +375,7 @@ export function composeHtml(raw: ComposeInput): string {
 
   const page = [
     '<!doctype html><html lang="en"><head><meta charset="UTF-8" />',
-    `<meta name="viewport" content="width=${doc.width}, height=${doc.height}" />`,
+    `<meta name="viewport" content="width=${frame.width}, height=${frame.height}" />`,
     cspMeta({ scripts: [...new Set(scripts)], assetUrls }),
     `<script src="${RUNTIME_URL}"></script>`,
     `<script src="${GSAP_URL}"></script>`,
@@ -378,9 +384,9 @@ export function composeHtml(raw: ComposeInput): string {
     `<link rel="stylesheet" crossorigin="anonymous" href="${FONTS_URL}" />`,
     fitScript(),
     fontLinks(doc, input.assets),
-    `<style>${BASE_CSS}#root{background:${esc(background)}}${stage ? STAGE_CSS + stageRootStyle(stage) : ''}</style>`,
+    `<style>${BASE_CSS}#root{background:${esc(background)}}${zoomed(doc, scale)}${stage ? STAGE_CSS + stageRootStyle(stage) : ''}</style>`,
     '</head><body>',
-    `<div id="root" data-composition-id="${COMPOSITION_ID}" data-start="0" data-width="${doc.width}" data-height="${doc.height}" data-duration="${duration}" data-fps="${doc.fps}">`,
+    `<div id="root" data-composition-id="${COMPOSITION_ID}" data-start="0" data-width="${frame.width}" data-height="${frame.height}" data-duration="${duration}" data-fps="${doc.fps}">`,
     stage ? `<div id="world" class="world">${world.join('')}</div><!--/world-->` : '',
     layers.join(''),
     fontProbe(doc),
@@ -392,5 +398,5 @@ export function composeHtml(raw: ComposeInput): string {
     threeScript(three, Number(duration), stage),
     compositionScript(compositions, Number(duration))
   ].join('');
-  return `${page}${captureScript(doc, contentStamp(page))}</body></html>`;
+  return `${page}${captureScript(frame, contentStamp(page))}</body></html>`;
 }

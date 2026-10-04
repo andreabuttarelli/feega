@@ -2,10 +2,13 @@ import type { MotionDoc } from './doc';
 
 export enum Resolution {
   P720 = '720p',
-  P1080 = '1080p'
+  P1080 = '1080p',
+  P1440 = '1440p',
+  P2160 = '2160p'
 }
 
-const RESOLUTION_FACTOR: Record<Resolution, number> = { [Resolution.P720]: 1, [Resolution.P1080]: 2 };
+const RESOLUTION_FACTOR: Record<Resolution, number> = { [Resolution.P720]: 1, [Resolution.P1080]: 2, [Resolution.P1440]: 4, [Resolution.P2160]: 8 };
+const BASE_FPS = 30;
 const SECONDS_PER_UNIT = 10;
 const FULL_HD_SHORT_SIDE = 1080;
 
@@ -15,9 +18,9 @@ export function resolutionOf(doc: Pick<MotionDoc, 'width' | 'height'>): Resoluti
   return Math.min(doc.width, doc.height) >= FULL_HD_SHORT_SIDE ? Resolution.P1080 : Resolution.P720;
 }
 
-export function renderQuote(doc: Pick<MotionDoc, 'width' | 'height' | 'durationInFrames' | 'fps'> & Partial<Pick<MotionDoc, 'motionBlur'>>): RenderQuote {
+export function renderQuote(doc: Pick<MotionDoc, 'width' | 'height' | 'durationInFrames' | 'fps'> & Partial<Pick<MotionDoc, 'motionBlur'>>, resolution: Resolution = resolutionOf(doc)): RenderQuote {
   const seconds = doc.durationInFrames / doc.fps;
-  const resolution = resolutionOf(doc);
+  const pace = Math.ceil(doc.fps / BASE_FPS);
   const samples = doc.motionBlur?.enabled ? doc.motionBlur.samples : 1;
-  return { seconds, resolution, credits: Math.ceil(seconds / SECONDS_PER_UNIT) * RESOLUTION_FACTOR[resolution] * samples };
+  return { seconds, resolution, credits: Math.ceil(seconds / SECONDS_PER_UNIT) * RESOLUTION_FACTOR[resolution] * pace * samples };
 }

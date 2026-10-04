@@ -18,7 +18,10 @@ export type Capabilities = { webCodecs: boolean; h264: boolean; h264At720: boole
 export type ExportSupport = { support: Support; audio: AudioMode };
 export type Size = { width: number; height: number };
 
-const SHORT_SIDE: Record<Resolution, number> = { [Resolution.P720]: 720, [Resolution.P1080]: 1080 };
+const SHORT_SIDE: Record<Resolution, number> = { [Resolution.P720]: 720, [Resolution.P1080]: 1080, [Resolution.P1440]: 1440, [Resolution.P2160]: 2160 };
+
+export const BROWSER_RESOLUTIONS: readonly Resolution[] = [Resolution.P720, Resolution.P1080];
+export const MAX_RENDER_SIDE = 3840;
 const MS_PER_S = 1000;
 const MP4_EXT = 'mp4';
 
@@ -33,6 +36,11 @@ type Timed = Pick<MotionDoc, 'durationInFrames' | 'fps' | 'motionBlur'>;
 
 export function samplesPerFrame(doc: Timed): number {
   return sampleTimes(0, doc.fps, doc.motionBlur, BROWSER_SAMPLES).length;
+}
+
+export function outputSize(doc: Pick<MotionDoc, 'width' | 'height'>, resolution: Resolution): Size & { scale: number } {
+  const scale = SHORT_SIDE[resolution] / Math.min(doc.width, doc.height);
+  return { width: even(doc.width * scale), height: even(doc.height * scale), scale };
 }
 
 export function frameTimes(doc: Timed): number[] {

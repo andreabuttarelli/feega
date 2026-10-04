@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ExportFormat, EXPORT_FORMATS, FORMAT, MAX_EXPORT_BYTES, Preset, PRESETS, estimateBytes, exportProblem, oversize, parseSettings, settingsOf } from './export-formats';
 import { MotionFormat, newMotionDoc } from './doc';
+import { Resolution } from './render-quote';
 
 const doc = (seconds: number, fps = 30) => ({ ...newMotionDoc(MotionFormat.Landscape), fps: fps as 30, durationInFrames: seconds * fps });
 
@@ -17,7 +18,8 @@ describe('export formats', () => {
     expect(PRESETS[Preset.Social]).toMatchObject({ format: ExportFormat.Mp4H264, fps: 30 });
     expect(PRESETS[Preset.Web].format).toBe(ExportFormat.WebmAlpha);
     expect(PRESETS[Preset.Gif].format).toBe(ExportFormat.Gif);
-    expect(PRESETS[Preset.Master].format).toBe(ExportFormat.ProRes4444);
+    expect(PRESETS[Preset.Master]).toMatchObject({ format: ExportFormat.ProRes4444, resolution: Resolution.P2160 });
+    expect(PRESETS[Preset.Social].resolution).toBe(Resolution.P1080);
   });
 
   it('settings from a form fall back to the social preset and refuse what does not exist', () => {
@@ -37,6 +39,13 @@ describe('export formats', () => {
     expect(oversize(MAX_EXPORT_BYTES, ExportFormat.ProRes4444)).toBeNull();
     expect(oversize(MAX_EXPORT_BYTES + 1, ExportFormat.ProRes4444)).toMatch(/^too_large: ProRes 4444.* is 50 MB, over the 50 MB/);
     expect(exportProblem(doc(60), PRESETS[Preset.Master])).toBeNull();
+  });
+
+  it('an output side above 3840 is refused, 4K of every format fits', () => {
+    const wide = { ...doc(5), width: 1920, height: 600 };
+
+    expect(exportProblem(wide, { ...settingsOf(Preset.Social), resolution: Resolution.P2160 })).toMatch(/3840/);
+    expect(exportProblem({ ...doc(5), width: 1080, height: 1920 }, { ...settingsOf(Preset.Social), resolution: Resolution.P2160 })).toBeNull();
   });
 
   it('a GIF longer than its cap is refused', () => {

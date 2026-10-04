@@ -24,6 +24,7 @@ import { farmJob, finishRender, RenderRefusal, renderRequest, renderView, startR
 import { FEEGA_TOKENS } from '$lib/motion/brand';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { RenderStage } from '$lib/motion/server-render';
+import { Resolution } from '$lib/motion/render-quote';
 import { addClip } from '$lib/motion/timeline';
 import { writeComponent } from '$lib/motion/custom/ops';
 import type { NodeRun } from '$lib/server/repos/node-runs';
@@ -219,6 +220,23 @@ describe('render settings', () => {
     const req = renderRequest(12, { doc: trailer(), tokens: FEEGA_TOKENS, assets: {} }, { ...settingsOf(Preset.Social), fps: 60 });
 
     expect([req.doc.fps, req.job.fps, req.job.totalFrames]).toEqual([60, 60, 1680]);
+  });
+});
+
+describe('4K', () => {
+  it('a 4K render composes the 1080p doc zoomed into a 3840×2160 frame', () => {
+    const job = farmJob({ doc: trailer(), tokens: FEEGA_TOKENS, assets: {} }, { ...settingsOf(Preset.Social), resolution: Resolution.P2160 });
+
+    expect([job.width, job.height]).toEqual([3840, 2160]);
+    expect(job.html).toContain('zoom:2');
+  });
+
+  it('the quote follows the output resolution', async () => {
+    const { db } = fakeDb();
+
+    const started = await startRender(db, farm, scope, request(trailer(), { ...settingsOf(Preset.Social), resolution: Resolution.P2160 }));
+
+    expect(started).toMatchObject({ ok: true, quote: { resolution: Resolution.P2160, credits: 24 } });
   });
 });
 

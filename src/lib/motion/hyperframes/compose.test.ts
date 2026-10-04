@@ -163,6 +163,20 @@ describe('motion blur in the composition', () => {
   });
 });
 
+describe('rendering above the doc size', () => {
+  it('a scaled render zooms the doc into a bigger frame, so layout stays in doc pixels and vectors stay sharp', () => {
+    const html = composeHtml({ doc, tokens: FEEGA_TOKENS, assets: {}, scale: 2 });
+
+    expect(html).toContain('data-width="3840" data-height="2160"');
+    expect(html).toContain('<meta name="viewport" content="width=3840, height=2160" />');
+    expect(html).toContain('#root{width:1920px;height:1080px;zoom:2}');
+  });
+
+  it('the editor composes at the doc size, unzoomed', () => {
+    expect(composeHtml({ doc, tokens: FEEGA_TOKENS, assets: {} })).not.toContain('zoom:');
+  });
+});
+
 describe('background of the frame', () => {
   it('paints the brand background by default', () => {
     expect(composeHtml({ doc, tokens: FEEGA_TOKENS, assets: {} })).toContain(`#root{background:${FEEGA_TOKENS.colors['brand.background']}}`);

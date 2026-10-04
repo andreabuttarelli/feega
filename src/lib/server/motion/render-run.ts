@@ -8,7 +8,7 @@ import { formatOf, type MotionDoc } from '$lib/motion/doc';
 import { renderQuote, type RenderQuote } from '$lib/motion/render-quote';
 import { advance, startProgress, progressOf, type RenderEvent, type RenderProgress, type RenderView } from '$lib/motion/server-render';
 import { unverified } from '$lib/motion/custom/determinism';
-import { exportPath } from '$lib/motion/export-plan';
+import { exportPath, outputSize } from '$lib/motion/export-plan';
 import { composeHtml, HYPERFRAMES_VERSION, type ComposeInput } from '$lib/motion/hyperframes/compose';
 import { assetOrigins } from '$lib/motion/hyperframes/csp';
 import { audioPlan } from '$lib/motion/audio-plan';
@@ -35,10 +35,11 @@ const RENDER_MODEL = `hyperframes@${HYPERFRAMES_VERSION}`;
 export function farmJob(input: ComposeInput, settings: RenderSettings): FarmJob {
   const { doc, tokens, assets } = input;
   const reachable = assetOrigins([...Object.values(assets), tokens.logoUrl ?? '']);
+  const out = outputSize(doc, settings.resolution);
   return {
-    html: composeHtml(input),
-    width: doc.width,
-    height: doc.height,
+    html: composeHtml({ ...input, scale: out.scale }),
+    width: out.width,
+    height: out.height,
     fps: doc.fps,
     totalFrames: doc.durationInFrames,
     audio: audioPlan(doc, assets),
@@ -86,7 +87,7 @@ export async function startRender(db: Db, farm: RenderFarm | null, scope: Render
     return { ok: false, error: RenderRefusal.Unsupported, detail: problem };
   }
 
-  const quote = renderQuote(req.doc);
+  const quote = renderQuote(req.doc, req.settings.resolution);
   const run = await createRun(db, {
     orgId: scope.orgId,
     nodeId: scope.nodeId,
@@ -135,8 +136,8 @@ async function store(db: Db, scope: RenderScope, run: NodeRun, req: RenderReques
     nodeId: scope.nodeId,
     actor: { kind: 'user', id: scope.userId },
     path,
-    width: req.doc.width,
-    height: req.doc.height,
+    width: req.job.width,
+    height: req.job.height,
     seconds: req.doc.durationInFrames / req.doc.fps,
     format: req.settings.format
   });
@@ -172,7 +173,7 @@ export async function finishRender(db: Db, farm: RenderFarm, scope: RenderScope,
     return;
   }
 
-  const costUsd = charge(scope, renderQuote(req.doc), Date.now() - started);
+  const costUsd = charge(scope, renderQuote(req.doc, req.settings.resolution), Date.now() - started);
   await completeRun(db, { orgId: run.orgId, runId: run.id, assetId: saved.assetId, costUsd });
   await record({ kind: 'done' });
   await sendPushToUser(db as never, scope.userId, { title: 'feega', body: 'Your video is ready', url: scope.editorUrl, tag: `motion-render-${run.id}`, skipIfFocused: true }).catch(() => {});
