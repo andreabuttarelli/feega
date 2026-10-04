@@ -152,24 +152,23 @@ async function fail(db: Db, farm: RenderFarm, run: NodeRun, state: RenderState, 
   return Step.Failed;
 }
 
-export async function startRender(db: Db, farm: RenderFarm | null, scope: RenderScope, req: RenderRequest, storage: RenderStorage): Promise<RenderStart> {
+type Refusal = { error: RenderRefusal; detail?: string };
+
+function refusal(farm: RenderFarm | null, runs: NodeRun[], plan: string | null, req: RenderRequest): Refusal | null {
   if (!farm) {
-    return { ok: false, error: RenderRefusal.NotConfigured };
+    return { error: RenderRefusal.NotConfigured };
   }
   if (unverified(req.doc).length) {
-    return { ok: false, error: RenderRefusal.Unverified };
+    return { error: RenderRefusal.Unverified };
   }
-
-  const runs = await listNodeRuns(db, { orgId: scope.orgId, nodeId: scope.nodeId });
   if (runs.some(isActive)) {
-    return { ok: false, error: RenderRefusal.Busy };
+    return { error: RenderRefusal.Busy };
   }
+  const problem = lengthProblem(req.doc.durationInFrames / req.doc.fps, plan) ?? exportProblem(req.doc, req.settings) ?? farmProblem(req.job);
+  return problem ? { error: RenderRefusal.Unsupported, detail: problem } : null;
+}
 
-  const problem = lengthProblem(req.doc.durationInFrames / req.doc.fps, scope.plan ?? null) ?? exportProblem(req.doc, req.settings) ?? farmProblem(req.job);
-  if (problem) {
-    return { ok: false, error: RenderRefusal.Unsupported, detail: problem };
-  }
-
+async function enqueue(db: Db, scope: RenderScope, req: RenderRequest, extra: Record<string, unknown> = {}): Promise<NodeRun> {
   const quote = renderQuote(req.doc, req.settings.resolution);
   const count = farmChunks(req.job).count;
   const output: Output = { width: req.job.width, height: req.job.height, seconds: req.doc.durationInFrames / req.doc.fps, format: req.settings.format };
@@ -178,28 +177,45 @@ export async function startRender(db: Db, farm: RenderFarm | null, scope: Render
     nodeId: scope.nodeId,
     prompt: `render v${req.version}`,
     model: RENDER_MODEL,
-    params: { revision: req.version, format: formatOf(req.doc), settings: req.settings, quote, scope, output, farm: { pieces: [], assembly: null }, progress: startProgress(req.doc.durationInFrames, count) },
+    params: { revision: req.version, format: formatOf(req.doc), settings: req.settings, quote, scope, output, farm: { pieces: [], assembly: null }, progress: startProgress(req.doc.durationInFrames, count), ...extra },
     actorKind: 'user',
     actorId: scope.userId,
     externalJobId: `${RENDER_JOB_PREFIX}${req.version}`
   });
+  await storeJob(db, workPath(scope, run.id, JOB_FILE), req.job);
+  return run;
+}
 
+async function launch(db: Db, farm: RenderFarm, storage: RenderStorage, run: NodeRun, job: FarmJob): Promise<string | null> {
   const state = stateOf(run);
-  const launched = await Promise.allSettled([
-    storeJob(db, workPath(scope, run.id, JOB_FILE), req.job),
-    ...Array.from({ length: count }, async (_, i) => launchPiece(farm, req.job, i, await pieceLinks(db, storage, scope, run.id, req.job, i)))
-  ]);
-  const pieces = launched.slice(1).flatMap((l) => (l.status === 'fulfilled' ? [{ worker: l.value as string, attempt: 1, state: TaskState.Running }] : []));
+  const count = farmChunks(job).count;
+  const launched = await Promise.allSettled(Array.from({ length: count }, async (_, i) => launchPiece(farm, job, i, await pieceLinks(db, storage, state.scope, run.id, job, i))));
+  const pieces = launched.flatMap((l) => (l.status === 'fulfilled' ? [{ worker: l.value, attempt: 1, state: TaskState.Running }] : []));
   const refused = launched.find((l): l is PromiseRejectedResult => l.status === 'rejected');
 
   if (refused) {
     const detail = refused.reason instanceof Error ? refused.reason.message : String(refused.reason);
-    await fail(db, farm, run, { ...state, farm: { pieces, assembly: null } }, detail, req.job);
-    return { ok: false, error: RenderRefusal.Unavailable, detail };
+    await fail(db, farm, run, { ...state, farm: { pieces, assembly: null } }, detail, job);
+    return detail;
   }
 
   await saveState(db, run, { ...state, farm: { pieces, assembly: null } }, { kind: 'started' });
-  return { ok: true, runId: run.id, quote };
+  return null;
+}
+
+export async function startRender(db: Db, farm: RenderFarm | null, scope: RenderScope, req: RenderRequest, storage: RenderStorage): Promise<RenderStart> {
+  const runs = farm ? await listNodeRuns(db, { orgId: scope.orgId, nodeId: scope.nodeId }) : [];
+  const refused = refusal(farm, runs, scope.plan ?? null, req);
+  if (refused || !farm) {
+    return { ok: false, ...(refused ?? { error: RenderRefusal.NotConfigured }) };
+  }
+
+  const run = await enqueue(db, scope, req);
+  const detail = await launch(db, farm, storage, run, req.job);
+  if (detail) {
+    return { ok: false, error: RenderRefusal.Unavailable, detail };
+  }
+  return { ok: true, runId: run.id, quote: stateOf(run).quote };
 }
 
 async function retryPiece(db: Db, farm: RenderFarm, storage: RenderStorage, run: NodeRun, job: FarmJob, piece: Piece, index: number): Promise<Piece> {
