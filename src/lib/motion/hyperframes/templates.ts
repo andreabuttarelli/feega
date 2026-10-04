@@ -2,7 +2,8 @@ import type { z } from 'zod';
 import type { COMPONENTS, ComponentId } from '../components';
 import { Ease } from '../design';
 import { boxOf, type Box } from '../layout';
-import { TITLE_LINE_HEIGHT, fitTitleSize, safeBox } from '../fit';
+import { safeBox } from '../fit';
+import { typeStyle } from './type-style';
 import { css, esc, px } from './html';
 import type { CustomComponents } from '../custom/component';
 import { compositionVideoId, resolvedMedia } from './composition';
@@ -45,7 +46,8 @@ export type Template<K extends ComponentId> = {
 
 export const SANS = "'DM Sans', system-ui, sans-serif";
 export const MONO = "'Fragment Mono', ui-monospace, monospace";
-const italicOf = (p: { italic: boolean }) => (p.italic ? 'italic' : undefined);
+const DESCENDER = '0.08em';
+const typeSize = (ctx: { p: { size: number }; unit: number }) => Math.round(ctx.p.size * ctx.unit * 100) / 100;
 export const INK = { paper: '#ffffff', paper2: '#f5f5f3', line: '#e4e4e2', ink: '#111111', inkSoft: '#6b6b6b', select: '#a855f7' } as const;
 
 const JUSTIFY = { left: 'flex-start', center: 'center', right: 'flex-end' } as const;
@@ -85,16 +87,13 @@ const Title: Template<'Title'> = {
   timing: Timing.Wrapper,
   html: (ctx) => {
     const box = safeBox(boxOf(ctx.p, ctx), ctx);
-    const size = fitTitleSize(ctx.p.text, ctx.p.size * ctx.unit, box);
+    const size = typeSize(ctx);
     const lines = ctx.p.text
       .split('\n')
-      .map(
-        (line, i) =>
-          `<div style="${css({ overflow: 'hidden', paddingBottom: px(size * 0.08), marginBottom: px(-size * 0.08) })}"><div class="li" id="li-${ctx.id}-${i}">${esc(line) || '&nbsp;'}</div></div>`
-      )
+      .map((line, i) => `<div style="${css({ overflow: 'hidden', paddingBottom: DESCENDER, marginBottom: `-${DESCENDER}` })}"><div class="li" id="li-${ctx.id}-${i}">${esc(line) || '&nbsp;'}</div></div>`)
       .join('');
-    const style = css({ fontFamily: ctx.font(ctx.p.font), fontWeight: ctx.weight(ctx.p.font, ctx.p.weight), fontStyle: italicOf(ctx.p), fontSize: px(size), lineHeight: TITLE_LINE_HEIGHT, letterSpacing: '-0.045em', color: ctx.color(ctx.p.color) });
-    return placed(ctx, ctx.p, `<div style="${style}">${lines}</div>`, false, box);
+    const style = css({ ...typeStyle(ctx, ctx.p, size), color: ctx.color(ctx.p.color) });
+    return placed(ctx, ctx.p, `<div data-fit="${size}" style="${style}">${lines}</div>`, false, box);
   },
   tweens: (ctx) =>
     ctx.p.text.split('\n').map((_, i) => ({
@@ -110,8 +109,9 @@ const Title: Template<'Title'> = {
 const Text: Template<'Text'> = {
   timing: Timing.Wrapper,
   html: (ctx) => {
-    const style = css({ fontFamily: ctx.font(ctx.p.font), fontWeight: ctx.weight(ctx.p.font, ctx.p.weight), fontStyle: italicOf(ctx.p), fontSize: px(ctx.p.size * ctx.unit), lineHeight: 1.3, letterSpacing: '-0.01em', color: ctx.color(ctx.p.color), whiteSpace: 'pre-wrap' });
-    return placed(ctx, ctx.p, `<div id="tx-${ctx.id}" style="${style}">${esc(ctx.p.text)}</div>`);
+    const size = typeSize(ctx);
+    const style = css({ ...typeStyle(ctx, ctx.p, size), color: ctx.color(ctx.p.color), whiteSpace: 'pre-wrap' });
+    return placed(ctx, ctx.p, `<div id="tx-${ctx.id}" data-fit="${size}" style="${style}">${esc(ctx.p.text)}</div>`);
   },
   tweens: (ctx) => [{ target: `#tx-${ctx.id}`, from: { opacity: 0, y: 16 }, to: { opacity: 1, y: 0 }, at: ctx.start, duration: frames(ctx, FADE), ease: ctx.p.easing }]
 };
@@ -122,7 +122,7 @@ const Kicker: Template<'Kicker'> = {
     placed(
       ctx,
       ctx.p,
-      `<div style="${css({ fontFamily: ctx.font(ctx.p.font), fontWeight: ctx.weight(ctx.p.font, ctx.p.weight), fontStyle: italicOf(ctx.p), fontSize: px(ctx.p.size * ctx.unit), color: ctx.color(ctx.p.color), letterSpacing: '0.02em', textTransform: 'uppercase' })}">${esc(ctx.p.text)}</div>`
+      `<div data-fit="${typeSize(ctx)}" style="${css({ ...typeStyle(ctx, ctx.p, typeSize(ctx)), color: ctx.color(ctx.p.color), textTransform: 'uppercase' })}">${esc(ctx.p.text)}</div>`
     )
 };
 
@@ -131,16 +131,12 @@ const Caption: Template<'Caption'> = {
   html: (ctx) => {
     const size = ctx.p.size * ctx.unit;
     const style = css({
-      fontFamily: ctx.font(ctx.p.font),
-      fontSize: px(size),
-      fontWeight: ctx.weight(ctx.p.font, ctx.p.weight),
-      fontStyle: italicOf(ctx.p),
+      ...typeStyle(ctx, ctx.p, size),
       color: ctx.color(ctx.p.color),
       background: ctx.color(ctx.p.background),
-      padding: `${px(size * 0.25)} ${px(size * 0.5)}`,
-      lineHeight: 1.25
+      padding: '0.25em 0.5em'
     });
-    return placed(ctx, ctx.p, `<span style="${style}">${esc(ctx.p.text)}</span>`);
+    return placed(ctx, ctx.p, `<span data-fit="${size}" style="${style}">${esc(ctx.p.text)}</span>`);
   }
 };
 
@@ -215,7 +211,7 @@ const ProductCard: Template<'ProductCard'> = {
   html: (ctx) => {
     const url = ctx.asset(ctx.p.assetId);
     const size = ctx.p.size * ctx.unit;
-    const card = css({ width: '100%', height: '100%', background: ctx.color(ctx.p.card), border: `1px solid ${INK.line}`, display: 'flex', flexDirection: 'column', fontFamily: ctx.font(ctx.p.font), fontWeight: ctx.weight(ctx.p.font, ctx.p.weight), fontStyle: italicOf(ctx.p) });
+    const card = css({ width: '100%', height: '100%', background: ctx.color(ctx.p.card), border: `1px solid ${INK.line}`, display: 'flex', flexDirection: 'column', ...typeStyle(ctx, ctx.p, size) });
     const row = css({ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: px(size * 0.6), fontSize: px(size), color: ctx.color(ctx.p.color) });
     return placed(
       ctx,

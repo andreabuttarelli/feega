@@ -21,6 +21,11 @@ export enum FontCategory {
 export const FONT_NAME = /^[A-Za-z0-9][A-Za-z0-9 \-.']{0,63}$/;
 export const MAX_FONTS = 24;
 export const FONT_WEIGHTS = [100, 200, 300, 400, 500, 600, 700, 800, 900] as const;
+const MIN_WEIGHT = 100;
+const MAX_WEIGHT = 1000;
+export const AXIS_TAG = /^[A-Za-z0-9]{4}$/;
+const MAX_AXES = 16;
+const REQUESTED_AXES = new Set(['opsz', 'slnt', 'wdth', 'wght']);
 
 const BUILTIN: Record<BuiltinFont, string> = {
   [BuiltinFont.Sans]: "'DM Sans', system-ui, sans-serif",
@@ -39,8 +44,9 @@ export const fontFaceSchema = z.object({
   family: z.string().regex(FONT_NAME),
   source: z.enum([FontSource.Google, FontSource.Upload]),
   category: z.enum(Object.values(FontCategory) as [FontCategory, ...FontCategory[]]).default(FontCategory.Sans),
-  weights: z.array(z.number().int().min(100).max(900)).min(1).max(FONT_WEIGHTS.length),
+  weights: z.array(z.number().int().min(MIN_WEIGHT).max(MAX_WEIGHT)).min(1).max(MAX_WEIGHT / MIN_WEIGHT),
   italic: z.boolean().default(false),
+  axes: z.array(z.tuple([z.string().regex(AXIS_TAG), z.number(), z.number()])).max(MAX_AXES).default([]),
   assetId: z.string().min(1).optional()
 });
 
@@ -48,7 +54,9 @@ export const fontsSchema = z.array(fontFaceSchema).max(MAX_FONTS).default([]);
 
 export type FontFace = z.infer<typeof fontFaceSchema>;
 
-export type CatalogueFont = { f: string; c: string; w: number[]; i: number };
+export type Axis = [tag: string, min: number, max: number];
+
+export type CatalogueFont = { f: string; c: string; w: number[]; i: number; a?: Axis[] };
 
 export type Face = { family: string; weight: number; italic: boolean };
 
@@ -88,6 +96,33 @@ export function uniqueFaces(faces: readonly Face[]): Face[] {
   return [...new Map(faces.map((f) => [faceKey(f), f])).values()];
 }
 
+const tupleOrder = (t: string) => t.split(',').map((n) => Number(n.split('..')[0]));
+const byTuple = (a: string, b: string) => tupleOrder(a).reduce((d, n, i) => d || n - tupleOrder(b)[i], 0);
+const plus = (family: string) => family.replace(/ /g, '+');
+
+function variableQuery(entry: FontFace, italics: Set<number>): string {
+  const axes = entry.axes.filter(([tag]) => REQUESTED_AXES.has(tag)).sort(([a], [b]) => (a < b ? -1 : 1));
+  const ranges = axes.map(([, min, max]) => `${min}..${max}`).join(',');
+  const names = axes.map(([tag]) => tag);
+  if (!entry.italic || !italics.has(1)) {
+    return `family=${plus(entry.family)}:${names.join(',')}@${ranges}`;
+  }
+  const tuples = [...italics].sort().map((i) => `${i},${ranges}`);
+  return `family=${plus(entry.family)}:ital,${names.join(',')}@${tuples.join(';')}`;
+}
+
+function familyQuery(entry: FontFace, tuples: Set<string>): string {
+  const italics = new Set([...tuples].map((t) => Number(t.split(',')[0])));
+  if (entry.axes.some(([tag]) => tag === 'wght')) {
+    return variableQuery(entry, italics);
+  }
+  if (!entry.italic) {
+    const weights = [...new Set([...tuples].map((t) => Number(t.split(',')[1])))].sort((a, b) => a - b);
+    return `family=${plus(entry.family)}:wght@${weights.join(';')}`;
+  }
+  return `family=${plus(entry.family)}:ital,wght@${[...tuples].sort(byTuple).join(';')}`;
+}
+
 export function googleFontsUrl(faces: readonly Face[], registry: readonly FontFace[]): string | null {
   const families = new Map<string, Set<string>>();
   for (const face of faces) {
@@ -103,13 +138,7 @@ export function googleFontsUrl(faces: readonly Face[], registry: readonly FontFa
   if (!families.size) {
     return null;
   }
-  const order = (t: string) => t.split(',').map(Number);
-  const query = [...families]
-    .map(([family, tuples]) => {
-      const sorted = [...tuples].sort((a, b) => order(a)[0] - order(b)[0] || order(a)[1] - order(b)[1]);
-      return `family=${family.replace(/ /g, '+')}:ital,wght@${sorted.join(';')}`;
-    })
-    .join('&');
+  const query = [...families].map(([family, tuples]) => familyQuery(registry.find((f) => f.family === family)!, tuples)).join('&');
   return `${GOOGLE_CSS}?${query}&display=block`;
 }
 
@@ -150,8 +179,21 @@ function clipFaces(clip: TextClip, doc: FontDoc): Face[] {
   return [{ family: clip.props.font, weight: Number(clip.props.weight ?? DEFAULT_WEIGHT), italic: clip.props.italic === true }];
 }
 
+function allFaces(doc: FontDoc): Face[] {
+  return uniqueFaces(doc.tracks.flatMap((t) => t.clips.flatMap((c) => clipFaces(c, doc))));
+}
+
 export function usedFaces(doc: FontDoc): Face[] {
-  return uniqueFaces(doc.tracks.flatMap((t) => t.clips.flatMap((c) => clipFaces(c, doc))).filter((f) => !isBuiltin(f.family)));
+  return allFaces(doc).filter((f) => !isBuiltin(f.family));
+}
+
+const BUILTIN_NAME: Record<BuiltinFont, string> = {
+  [BuiltinFont.Sans]: 'DM Sans',
+  [BuiltinFont.Mono]: 'Fragment Mono'
+};
+
+export function loadDescriptors(doc: FontDoc): string[] {
+  return [...new Set(allFaces(doc).map((f) => faceDescriptor({ ...f, family: isBuiltin(f.family) ? BUILTIN_NAME[f.family] : f.family })))];
 }
 
 export function searchFonts(catalogue: readonly CatalogueFont[], query: string, brand: readonly string[], limit: number): CatalogueFont[] {

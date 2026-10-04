@@ -37,7 +37,7 @@ describe('fonts', () => {
   it('set_font registers a Google family with its real weights and sets the clip; unknown names come back with suggestions', () => {
     const doc = ok(setFont(titled(), 'title', { family: 'Playfair Display', weight: 700, italic: true }, CATALOGUE));
 
-    expect(doc.fonts).toEqual([{ family: 'Playfair Display', source: 'google', category: 'serif', weights: [400, 500, 600, 700, 800, 900], italic: true }]);
+    expect(doc.fonts).toEqual([{ family: 'Playfair Display', source: 'google', category: 'serif', weights: [400, 500, 600, 700, 800, 900], italic: true, axes: [] }]);
     expect(findClip(doc, 'title')!.clip.props).toMatchObject({ font: 'Playfair Display', weight: 700, italic: true });
     expect(setFont(titled(), 'title', { family: 'Playfare' }, CATALOGUE)).toMatchObject({ ok: false, error: expect.stringContaining('Playfair Display') });
     expect(setFont(titled(), 'title', { family: 'Bebas Neue', italic: true }, CATALOGUE)).toMatchObject({ ok: false, error: expect.stringContaining('italic') });
