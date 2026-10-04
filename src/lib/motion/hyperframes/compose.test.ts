@@ -12,6 +12,8 @@ import { keyframeTweens } from './animate';
 import { CAPTURE_REPLY, CAPTURE_REQUEST, composeHtml } from './compose';
 import { writeComponent } from '../custom/ops';
 import { PropFormat } from '../custom/component';
+import { setExpression } from '../expression/ops';
+import { bakeExpressions, expressionValue } from '../expression/bake';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -303,5 +305,24 @@ describe('custom components in the composition', () => {
 
     expect(policy).toContain("img-src 'self' data: blob:");
     expect(policy).toContain("media-src 'self' data: blob:");
+  });
+  it('an expression renders as the keyframes it bakes to, and lands on its value whatever order the frames are sought in', () => {
+    const shaky = must(setExpression(must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Shape', from: 30, durationInFrames: 90 }, 'card')), 'card', 'x', 'wiggle(3, 0.05) + time * 0.1'));
+    const baked = bakeExpressions(shaky);
+
+    expect(compose(shaky)).toBe(compose(baked));
+    expect(compose(shaky)).toContain('#kf-card');
+
+    const tweens = keyframeTweens(findClip(baked, 'card')!.clip, baked, (c) => c).filter((t) => t.target === '#kf-card');
+    const target = { x: 0 };
+    const tl = gsap.timeline({ paused: true });
+    for (const t of tweens) {
+      tl.fromTo(target, t.from, { ...t.to, duration: t.duration, ease: t.ease, immediateRender: false }, t.at);
+    }
+    const frames = Array.from({ length: 90 }, (_, i) => 30 + i).sort((a, b) => Math.sin(a * 12.9898) - Math.sin(b * 12.9898));
+    for (const f of frames) {
+      tl.seek(f / 30);
+      expect(target.x / baked.width).toBeCloseTo(expressionValue(shaky, 'card', 'x', f), 3);
+    }
   });
 });

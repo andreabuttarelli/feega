@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { THREE_D_COMPONENTS, TrackKind, type ComponentId } from './components';
 import { keyframeSchema, type Keyframe } from './keyframes';
+import { MAX_SOURCE } from './expression/language';
 
 export enum Space {
   World = 'world',
@@ -41,13 +42,14 @@ const cameraKeyframe = (key: CameraKey) => keyframeSchema.extend({ value: ranged
 export const cameraSchema = z.object({
   base: z.object(Object.fromEntries(CAMERA_KEYS.map((k) => [k, ranged(k).optional()]))).partial().default({}) as z.ZodType<Partial<CameraValues>>,
   dof: z.boolean().default(false),
-  keyframes: z.object(Object.fromEntries(CAMERA_KEYS.map((k) => [k, z.array(cameraKeyframe(k)).min(1).optional()]))).default({}) as z.ZodType<Partial<Record<CameraKey, Keyframe[]>>>
+  keyframes: z.object(Object.fromEntries(CAMERA_KEYS.map((k) => [k, z.array(cameraKeyframe(k)).min(1).optional()]))).default({}) as z.ZodType<Partial<Record<CameraKey, Keyframe[]>>>,
+  expressions: z.object(Object.fromEntries(CAMERA_KEYS.map((k) => [k, z.string().max(MAX_SOURCE).optional()]))).default({}) as z.ZodType<Partial<Record<CameraKey, string>>>
 });
 
 export type Camera = z.infer<typeof cameraSchema>;
 
 export function newCamera(): Camera {
-  return { base: {}, dof: false, keyframes: {} };
+  return { base: {}, dof: false, keyframes: {}, expressions: {} };
 }
 
 export function baseValues(camera: Camera): CameraValues {

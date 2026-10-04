@@ -3,11 +3,13 @@
   import { COMPONENTS } from '$lib/motion/components';
   import { FPS } from '$lib/motion/design';
   import { clipsOf, type DocVerdict, type MotionDoc } from '$lib/motion/doc';
-  import { CAMERA, Space, type CameraKey } from '$lib/motion/camera';
+  import { CAMERA, CAMERA_LANE, Space, type CameraKey } from '$lib/motion/camera';
   import { CAMERA_PRESETS, CameraPreset, PRESETS, applyPreset, cameraEditAt, cameraKeyToggle, cameraValueAt, focusOn, removeCamera, setCamera } from '$lib/motion/camera-ops';
   import { parseDecimal } from '$lib/motion/inspector';
   import Dial from './Dial.svelte';
   import SceneMap from './SceneMap.svelte';
+  import { setCameraExpression } from '$lib/motion/expression/ops';
+  import { expressionErrors } from '$lib/motion/expression/bake';
 
   let { doc, frame, onchange }: { doc: MotionDoc; frame: number; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 
@@ -58,6 +60,15 @@
       return KEY_STATE.On;
     }
     return track.length ? KEY_STATE.Lane : KEY_STATE.None;
+  }
+
+  const faults = $derived(Object.fromEntries(expressionErrors(doc).filter((f) => f.clipId === CAMERA_LANE).map((f) => [f.key, f.error])));
+  const DEFAULT_EXPRESSION = 'value';
+  const expressionOf = (key: CameraKey) => doc.camera?.expressions[key];
+
+  function toggleExpression(key: CameraKey) {
+    const off = expressionOf(key) !== undefined;
+    commit(setCameraExpression(doc, key, off ? null : DEFAULT_EXPRESSION), off ? `Removed the camera ${key} expression` : `Added a camera ${key} expression`);
   }
 
   function pickPreset(next: CameraPreset) {
@@ -113,6 +124,7 @@
       <div class="row anim" data-camera-prop={key}>
         <span class="name">
           <button type="button" class="key {keyState(key)}" title="Keyframe at playhead" aria-label={`Keyframe camera ${key}`} aria-pressed={keyState(key) === KEY_STATE.On} onclick={() => commit(cameraKeyToggle(doc, key, frame), 'Toggled a camera keyframe')}>◆</button>
+          <button type="button" class="expr-toggle" class:on={expressionOf(key) !== undefined} title="Expression" aria-label={`Expression camera ${key}`} aria-pressed={expressionOf(key) !== undefined} onclick={() => toggleExpression(key)}>=</button>
           {spec.label}
         </span>
         <div class="range">
@@ -121,6 +133,12 @@
           <input class="num" type="text" inputmode="decimal" aria-label={`Camera ${spec.label}`} value={String(shown(key))} onchange={(e) => editText(key, e.currentTarget.value)} />
         </div>
       </div>
+      {#if expressionOf(key) !== undefined}
+        <div class="expr" data-expression={key}>
+          <textarea class="code" rows="2" spellcheck="false" aria-label={`Camera ${key} expression`} value={expressionOf(key)} onchange={(e) => commit(setCameraExpression(doc, key, e.currentTarget.value), `Edited the camera ${key} expression`)}></textarea>
+          {#if faults[key]}<p class="expr-error" role="alert">{faults[key]}</p>{/if}
+        </div>
+      {/if}
     {/snippet}
 
     {#each GROUPS as group (group.title)}
@@ -262,6 +280,37 @@
   .num {
     width: 56px !important;
     flex: none;
+  }
+
+  .expr-toggle {
+    width: 16px;
+    margin-right: 4px;
+    font-family: 'Fragment Mono', monospace;
+    font-size: 11px;
+    color: var(--muted-foreground, #888);
+  }
+
+  .expr-toggle.on {
+    color: #a855f7;
+  }
+
+  .expr {
+    display: grid;
+    gap: 4px;
+    margin: 0 0 8px;
+  }
+
+  .expr .code {
+    width: 100%;
+    font-family: 'Fragment Mono', monospace;
+    font-size: 11px;
+    resize: vertical;
+  }
+
+  .expr-error {
+    color: #e11d48;
+    font-size: 11px;
+    margin: 0;
   }
 
   .key {
