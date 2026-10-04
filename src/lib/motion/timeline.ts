@@ -8,6 +8,7 @@ import { Matte, isMaskKey, maskSchema, type MaskInput } from './mask';
 import { matteMask, matteSource } from './matte';
 import { CAMERA_LANE, DEPTH, Space, type CameraKey } from './camera';
 import { editCameraLane } from './camera-ops';
+import { ParentOpacity } from './parent';
 import { keyframesProblem, transformSchema, type EaseSpec, type KeyValue, type Keyframe, type Keyframes, type Transform } from './keyframes';
 
 export type OpResult = { ok: true; doc: MotionDoc } | { ok: false; error: string };
@@ -107,7 +108,9 @@ export function addClip(doc: MotionDoc, input: NewClip, id: string): OpResult {
     mask: null,
     matte: Matte.None,
     depth: DEPTH.fallback,
-    space: Space.World
+    space: Space.World,
+    parent: null,
+    parentOpacity: ParentOpacity.Inherit
   };
 
   return fitted({ ...doc, tracks: doc.tracks.map((t) => (t.id === track.id ? { ...t, clips: [...t.clips, clip] } : t)) });
@@ -194,7 +197,8 @@ export function removeClips(doc: MotionDoc, ids: readonly string[]): OpResult {
   if (missing) {
     return fail(`no clip ${missing}`);
   }
-  return { ok: true, doc: { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.filter((c) => !ids.includes(c.id)) })) } };
+  const orphan = (c: MotionTrack['clips'][number]) => (c.parent && ids.includes(c.parent) ? { ...c, parent: null } : c);
+  return { ok: true, doc: { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.filter((c) => !ids.includes(c.id)).map(orphan) })) } };
 }
 
 export function setProps(doc: MotionDoc, clipId: string, patch: Record<string, unknown>): OpResult {

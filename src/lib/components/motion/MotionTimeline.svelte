@@ -11,6 +11,8 @@
   import { Source, type EaseSpec, type Keyframe } from '$lib/motion/keyframes';
   import { CAMERA_LANE } from '$lib/motion/camera';
   import { cameraLanes } from '$lib/motion/camera-ops';
+  import { ancestorsOf } from '$lib/motion/parent';
+  import { setParent } from '$lib/motion/parent-ops';
   import EasePicker from './EasePicker.svelte';
   import { PEAKS_PER_SECOND, clipPeaks, wavePath } from '$lib/motion/waveform';
 
@@ -20,6 +22,7 @@
 
   const KEY_ROW_PX = 20;
   const DIAMOND_PX = 10;
+  const INDENT_PX = 10;
 
   const Drag = { Move: 'move', TrimStart: 'trim-start', TrimEnd: 'trim-end', Scrub: 'scrub', Keys: 'keys' } as const;
   type Drag = (typeof Drag)[keyof typeof Drag];
@@ -42,6 +45,7 @@
 
   let collapsed = $state<string[]>([]);
   let easing = $state<{ ref: KeyRef; ease: EaseSpec; left: number; top: number } | null>(null);
+  let whip = $state<{ clipId: string; x0: number; y0: number; x: number; y: number } | null>(null);
 
   let draft = $state<MotionDoc | null>(null);
   let gesture: Gesture | null = null;
@@ -133,6 +137,37 @@
     keySelection = [];
   }
 
+  function pointInTimeline(e: PointerEvent): { x: number; y: number } {
+    const rect = lanes!.getBoundingClientRect();
+    return { x: e.clientX - rect.left + lanes!.scrollLeft, y: e.clientY - rect.top + lanes!.scrollTop };
+  }
+
+  function startWhip(e: PointerEvent, clipId: string) {
+    e.stopPropagation();
+    e.preventDefault();
+    const at = pointInTimeline(e);
+    whip = { clipId, x0: at.x, y0: at.y, x: at.x, y: at.y };
+  }
+
+  function dropWhip(e: PointerEvent) {
+    const from = whip!.clipId;
+    whip = null;
+    const hit = document.elementsFromPoint(e.clientX, e.clientY).find((n) => (n as HTMLElement).dataset?.clipId) as HTMLElement | undefined;
+    const target = hit?.dataset.clipId;
+    if (!target || target === from) {
+      return;
+    }
+    const result = setParent(doc, from, target, { at: frame });
+    if (result.ok) {
+      onchange(result.doc, 'Parented a clip');
+    }
+  }
+
+  function parentLabel(clip: MotionClip): string {
+    const parent = clip.parent ? shown.tracks.flatMap((t) => t.clips).find((c) => c.id === clip.parent) : null;
+    return parent ? `↳ ${clipLabel(parent as MotionClip)} · ` : '';
+  }
+
   function startScrub(e: PointerEvent) {
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     gesture = { kind: Drag.Scrub, clipId: '', trackId: '', grabFrame: 0, originFrom: 0, base: doc, refs: [], delta: 0 };
@@ -164,6 +199,11 @@
   };
 
   function onMove(e: PointerEvent) {
+    if (whip) {
+      const at = pointInTimeline(e);
+      whip = { ...whip, x: at.x, y: at.y };
+      return;
+    }
     if (!gesture) {
       return;
     }
@@ -180,7 +220,11 @@
 
   const SUMMARY: Record<Drag, string> = { [Drag.Move]: 'Moved a clip', [Drag.TrimStart]: 'Trimmed a clip', [Drag.TrimEnd]: 'Trimmed a clip', [Drag.Scrub]: '', [Drag.Keys]: 'Moved keyframes' };
 
-  function onUp() {
+  function onUp(e: PointerEvent) {
+    if (whip) {
+      dropWhip(e);
+      return;
+    }
     if (gesture && draft && gesture.kind !== Drag.Scrub) {
       onchange(draft, SUMMARY[gesture.kind]);
     }
@@ -314,7 +358,10 @@
                 {#if clip.mask}<span class="tag" title="Masked">· mask</span>{/if}
                 {#if clip.matte !== Matte.None}<span class="tag" title="Track matte">· {clip.matte} matte</span>{/if}
               </span>
-              <span class="label">{clipLabel(clip as MotionClip)}</span>
+              <span class="label" style={`padding-left: ${INDENT_PX * ancestorsOf(shown, clip.id).length}px;`}>{#if clip.parent}<em class="parent">{parentLabel(clip as MotionClip)}</em> {/if}{clipLabel(clip as MotionClip)}</span>
+              {#if track.kind === TrackKind.Visual}
+                <button type="button" class="whip" title="Drag onto another clip to parent this one to it" aria-label="Parent pick-whip" data-whip={clip.id} onpointerdown={(e) => startWhip(e, clip.id)}>@</button>
+              {/if}
               {#if wave}<svg class="wave" viewBox={`0 0 ${wave.width} 1`} preserveAspectRatio="none" aria-hidden="true"><path d={wave.path} /></svg>{/if}
             </div>
           {/each}
@@ -349,6 +396,10 @@
       <div class="ease-at" style={`left: ${Math.max(HEADER_PX, easing.left - 120)}px; top: ${easing.top}px;`}>
         <EasePicker ease={easing.ease} onpick={pickEase} onclose={() => (easing = null)} />
       </div>
+    {/if}
+
+    {#if whip}
+      <svg class="whip-line" aria-hidden="true"><line x1={whip.x0} y1={whip.y0} x2={whip.x} y2={whip.y} /></svg>
     {/if}
 
     <div class="playhead" style={`left: ${HEADER_PX + frame * ppf}px;`}></div>
@@ -498,6 +549,40 @@
 
   .grip:hover {
     background: color-mix(in srgb, #0099ff 45%, transparent);
+  }
+
+  .whip {
+    position: absolute;
+    z-index: 3;
+    right: 12px;
+    top: 2px;
+    width: 14px;
+    height: 14px;
+    font-size: 10px;
+    line-height: 14px;
+    color: #a855f7;
+    cursor: crosshair;
+  }
+
+  .parent {
+    font-style: normal;
+    color: #a855f7;
+  }
+
+  .whip-line {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 7;
+    overflow: visible;
+  }
+
+  .whip-line line {
+    stroke: #a855f7;
+    stroke-width: 1.5;
+    stroke-dasharray: 4 3;
   }
 
   .camera-bar {

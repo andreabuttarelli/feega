@@ -6,6 +6,7 @@ import { FPS, TRANSITION_KINDS, TransitionKind } from './design';
 import { keyframeSchema, keyframesProblem, transformSchema } from './keyframes';
 import { MATTES, Matte, maskSchema } from './mask';
 import { DEPTH, SPACES, Space, cameraSchema, depthSchema } from './camera';
+import { PARENT_OPACITIES, ParentOpacity, parentProblem } from './parent';
 
 export enum MotionFormat {
   Landscape = '16:9',
@@ -28,7 +29,7 @@ export const MAX_FRAMES = MAX_SECONDS * FPS;
 export const MAX_SIDE = 1920;
 export const MAX_SHORT_SIDE = 1080;
 export const DEFAULT_SECONDS = 15;
-export const DOC_VERSION = 4;
+export const DOC_VERSION = 5;
 
 const edgeSchema = z.object({
   kind: z.enum(TRANSITION_KINDS),
@@ -49,7 +50,9 @@ const clipSchema = z.object({
   mask: maskSchema.nullable().default(null),
   matte: z.enum(MATTES).default(Matte.None),
   depth: depthSchema.default(DEPTH.fallback),
-  space: z.enum(SPACES).default(Space.World)
+  space: z.enum(SPACES).default(Space.World),
+  parent: z.string().min(1).nullable().default(null),
+  parentOpacity: z.enum(PARENT_OPACITIES).default(ParentOpacity.Inherit)
 });
 
 const trackSchema = z.object({
@@ -100,7 +103,8 @@ const withClips = (doc: Raw, version: number, defaults: Record<string, unknown>)
 const MIGRATIONS: Record<number, (doc: Raw) => Raw> = {
   1: (doc) => withClips(doc, 2, { transform: {}, keyframes: {} }),
   2: (doc) => withClips(doc, 3, { mask: null, matte: Matte.None }),
-  3: (doc) => ({ camera: null, ...withClips(doc, 4, { depth: DEPTH.fallback, space: Space.World }) })
+  3: (doc) => ({ camera: null, ...withClips(doc, 4, { depth: DEPTH.fallback, space: Space.World }) }),
+  4: (doc) => withClips(doc, 5, { parent: null, parentOpacity: ParentOpacity.Inherit })
 };
 
 export function upgradeDoc(input: unknown): unknown {
@@ -163,7 +167,7 @@ export function parseMotionDoc(input: unknown): DocVerdict {
   }
 
   const doc = structuredClone(parsed.data);
-  const problem = propsProblem(doc);
+  const problem = parentProblem(doc) ?? propsProblem(doc);
   if (problem) {
     return { ok: false, error: problem };
   }

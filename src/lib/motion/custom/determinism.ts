@@ -3,6 +3,7 @@ import { TrackKind } from '../components';
 import { TransitionKind } from '../design';
 import { Matte } from '../mask';
 import { DEPTH, Space } from '../camera';
+import { ParentOpacity } from '../parent';
 import { clipsOf, type MotionDoc } from '../doc';
 import { CheckState, checkState } from './component';
 
@@ -72,7 +73,9 @@ export function checkDoc(doc: MotionDoc, name: string): MotionDoc {
     mask: null,
     matte: Matte.None,
     depth: DEPTH.fallback,
-    space: Space.World
+    space: Space.World,
+    parent: null,
+    parentOpacity: ParentOpacity.Inherit
   };
   return {
     ...doc,

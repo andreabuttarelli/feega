@@ -14,6 +14,8 @@ import { patchComponent, recordCheck, removeComponent, writeComponent } from '$l
 import { PATCH_COMPONENT, READ_COMPONENT, WRITE_COMPONENT } from './model-route';
 import { CAMERA, CAMERA_KEYS, SPACES, type Camera } from '$lib/motion/camera';
 import { CAMERA_PRESETS, PRESETS, applyPreset, removeCamera, setCamera, setCameraKeyframes, setClipDepth } from '$lib/motion/camera-ops';
+import { ParentOpacity } from '$lib/motion/parent';
+import { addNull, nullFromSelection, setParent, setParentOpacity } from '$lib/motion/parent-ops';
 
 export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number };
 
@@ -57,7 +59,9 @@ function summary(doc: MotionDoc, selection: string[]) {
         matte: c.matte,
         keyframes: inSeconds(c.keyframes),
         depth: c.depth,
-        space: c.space
+        space: c.space,
+        parent: c.parent,
+        parentOpacity: c.parentOpacity
       }))
     })),
     camera: cameraSummary(doc.camera),
@@ -374,6 +378,37 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: 'Place a clip in the camera world: depth in pixels behind the focus plane 0 (negative comes forward; a far background 1500–4000, a foreground card -200..0). It keeps its size at rest and shows parallax when the camera moves. space "screen" keeps a caption or overlay flat on top, ignoring the camera.',
       inputSchema: z.object({ clip_id: z.string(), depth: z.number().optional(), space: z.enum(SPACES).optional() }),
       execute: async (input) => apply(setClipDepth(session.doc, input.clip_id, { depth: input.depth, space: input.space }), `placed ${input.clip_id} in depth`)
+    }),
+
+    add_null: tool({
+      description: 'Add a Null: an invisible handle that draws nothing. Parent clips to it (set_parent / parent_clips) and animate its transform (set_transform, set_keyframes on x, y, z, rotateX/Y/Z, scale, opacity) to move, turn or scale them together. x/y is its pivot in fractions of the frame.',
+      inputSchema: z.object({ start: z.number().min(0), duration: z.number().positive().optional(), x: z.number().min(0).max(1).optional(), y: z.number().min(0).max(1).optional(), track_id: z.string().optional() }),
+      execute: async (input) => apply(addNull(session.doc, { from: frames(input.start), durationInFrames: input.duration === undefined ? undefined : frames(input.duration), x: input.x, y: input.y, trackId: input.track_id }, deps.newId()), 'added a null')
+    }),
+
+    set_parent: tool({
+      description: 'Parent a clip to another visual clip or a Null (parent_id null unparents). The child keeps where it is on screen: its transform is recomputed relative to the parent at the child start. From then on the parent transform applies on top of the child at every frame; outside the parent time range its first or last keyframe holds. inherit_opacity false keeps the child opacity independent. Loops are refused.',
+      inputSchema: z.object({ clip_id: z.string(), parent_id: z.string().nullable(), inherit_opacity: z.boolean().optional() }),
+      execute: async (input) => {
+        const parented = setParent(session.doc, input.clip_id, input.parent_id);
+        const opacity = input.inherit_opacity === undefined || !parented.ok ? parented : setParentOpacity(parented.doc, input.clip_id, input.inherit_opacity ? ParentOpacity.Inherit : ParentOpacity.Ignore);
+        return apply(opacity, input.parent_id ? `parented ${input.clip_id} to ${input.parent_id}` : `unparented ${input.clip_id}`);
+      }
+    }),
+
+    parent_clips: tool({
+      description: 'Parent several clips at once, keeping them where they are. Without parent_id a new Null is created at the centre of their boxes, spanning their time, and its id comes back as null_id: animate it to move the group.',
+      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1), parent_id: z.string().optional() }),
+      execute: async (input) => {
+        if (input.parent_id) {
+          const parentId = input.parent_id;
+          const result = input.clip_ids.reduce<OpResult>((r, id) => (r.ok ? setParent(r.doc, id, parentId) : r), { ok: true, doc: session.doc });
+          return apply(result, `parented ${input.clip_ids.length} clip(s) to ${parentId}`);
+        }
+        const id = deps.newId();
+        const out = apply(nullFromSelection(session.doc, input.clip_ids, Math.min(...input.clip_ids.map((c) => findClip(session.doc, c)?.clip.from ?? 0)), id), `grouped ${input.clip_ids.length} clip(s) under a null`);
+        return out.ok ? { ...out, null_id: id } : out;
+      }
     }),
 
     add_track: tool({

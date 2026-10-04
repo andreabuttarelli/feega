@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CAMERA, MAX_DOF_LAYERS, Space, cameraMath, newCamera, stageSpec, type StageSpec } from './camera';
-import { DOC_VERSION, MotionFormat, newMotionDoc, parseMotionDoc, upgradeDoc, type MotionDoc } from './doc';
+import { MotionFormat, newMotionDoc, parseMotionDoc, upgradeDoc, type MotionDoc } from './doc';
 import { sampleTrack, type Keyframe } from './keyframes';
 import { Ease } from './design';
 import { addClip, type OpResult } from './timeline';
@@ -42,7 +42,6 @@ describe('the camera in the doc', () => {
     const up = upgradeDoc(v3) as MotionDoc;
     const parsed = parseMotionDoc(v3);
 
-    expect(DOC_VERSION).toBe(4);
     expect(up.camera).toBeNull();
     expect(up.tracks[0].clips[0]).toMatchObject({ depth: 0, space: Space.World });
     expect(parsed.ok).toBe(true);

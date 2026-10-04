@@ -7,6 +7,7 @@ import { FPS, TransitionKind } from './design';
 import { FORMATS, MotionFormat, formatOf, parseMotionDoc, type DocVerdict, type MotionClip, type MotionDoc, type MotionTrack } from './doc';
 import { Matte } from './mask';
 import { DEPTH, Space } from './camera';
+import { ParentOpacity } from './parent';
 import type { PropsOf } from './hyperframes/templates';
 
 export type ComposeMedia = PropsOf<'Composition'>['media'][number];
@@ -105,7 +106,9 @@ function clipOf(id: string, component: MotionClip['component'], frames: number, 
     mask: null,
     matte: Matte.None,
     depth: DEPTH.fallback,
-    space: Space.World
+    space: Space.World,
+    parent: null,
+    parentOpacity: ParentOpacity.Inherit
   };
 }
 
