@@ -2,14 +2,12 @@ import { COMPONENTS, TrackKind, defaultProps, type ComponentId } from './compone
 import { Strictness } from './custom/component';
 import { withParams } from './custom/params';
 import { FPS, TransitionKind, type Edge } from './design';
-import { FORMATS, MAX_FRAMES, byFrame, clipProps, findClip, type MotionClip, type MotionDoc, type MotionFormat, type MotionTrack } from './doc';
+import { FORMATS, MAX_FRAMES, byFrame, clipProps, findClip, newClip, type MotionClip, type MotionDoc, type MotionFormat, type MotionTrack } from './doc';
 import { Ease } from './design';
 import { Matte, isMaskKey, maskSchema, type MaskInput } from './mask';
 import { matteMask, matteSource } from './matte';
-import { CAMERA_LANE, DEPTH, Space, type CameraKey } from './camera';
+import { CAMERA_LANE, type CameraKey } from './camera';
 import { editCameraLane } from './camera-ops';
-import { ParentOpacity } from './parent';
-import { BlendMode } from './blend';
 import { keyframesProblem, transformSchema, type EaseSpec, type KeyValue, type Keyframe, type Keyframes, type Transform } from './keyframes';
 
 export type OpResult = { ok: true; doc: MotionDoc } | { ok: false; error: string };
@@ -95,27 +93,15 @@ export function addClip(doc: MotionDoc, input: NewClip, id: string): OpResult {
     return fail(props.error);
   }
 
-  const clip: MotionClip = {
+  const clip = newClip({
     id,
     from: Math.max(0, Math.round(input.from)),
     durationInFrames: Math.max(MIN_FRAMES, Math.round(input.durationInFrames ?? spec.durationInFrames)),
-    trimStart: 0,
     component: input.component,
     props: props.props,
     transitionIn: input.transitionIn ?? NO_EDGE,
-    transitionOut: input.transitionOut ?? NO_EDGE,
-    transform: {},
-    keyframes: {},
-    mask: null,
-    matte: Matte.None,
-    depth: DEPTH.fallback,
-    space: Space.World,
-    parent: null,
-    parentOpacity: ParentOpacity.Inherit,
-    expressions: {},
-    effects: [],
-    blend: BlendMode.Normal
-  };
+    transitionOut: input.transitionOut ?? NO_EDGE
+  });
 
   return fitted({ ...doc, tracks: doc.tracks.map((t) => (t.id === track.id ? { ...t, clips: [...t.clips, clip] } : t)) });
 }

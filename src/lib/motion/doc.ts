@@ -198,6 +198,28 @@ export function newMotionDoc(format: MotionFormat): MotionDoc {
   };
 }
 
+const STILL = { kind: TransitionKind.None, durationInFrames: 0 };
+
+export function newClip(fields: Pick<MotionClip, 'id' | 'from' | 'durationInFrames' | 'component' | 'props'> & Partial<MotionClip>): MotionClip {
+  return {
+    trimStart: 0,
+    transitionIn: STILL,
+    transitionOut: STILL,
+    transform: {},
+    keyframes: {},
+    mask: null,
+    matte: Matte.None,
+    depth: DEPTH.fallback,
+    space: Space.World,
+    parent: null,
+    parentOpacity: ParentOpacity.Inherit,
+    expressions: {},
+    effects: [],
+    blend: BlendMode.Normal,
+    ...fields
+  };
+}
+
 export function formatOf(doc: Pick<MotionDoc, 'width' | 'height'>): MotionFormat {
   const match = MOTION_FORMATS.find((f) => FORMATS[f].width === doc.width && FORMATS[f].height === doc.height);
   return match ?? MotionFormat.Landscape;
