@@ -16,7 +16,14 @@ export enum Command {
   PrevKeyframe = 'prev-keyframe',
   NextKeyframe = 'next-keyframe',
   Copy = 'copy',
-  Paste = 'paste'
+  Paste = 'paste',
+  AddMarker = 'add-marker',
+  WorkIn = 'work-in',
+  WorkOut = 'work-out',
+  NudgeBack = 'nudge-back',
+  NudgeForward = 'nudge-forward',
+  NudgeBackMore = 'nudge-back-more',
+  NudgeForwardMore = 'nudge-forward-more'
 }
 
 export type KeyPress = { key: string; mod: boolean; shift: boolean };
@@ -43,7 +50,14 @@ export const SHORTCUTS: readonly Binding[] = [
   { key: 'j', command: Command.PrevKeyframe, label: 'J' },
   { key: 'k', command: Command.NextKeyframe, label: 'K' },
   { key: 'c', mod: true, command: Command.Copy, label: '⌘C' },
-  { key: 'v', mod: true, command: Command.Paste, label: '⌘V' }
+  { key: 'v', mod: true, command: Command.Paste, label: '⌘V' },
+  { key: 'm', command: Command.AddMarker, label: 'M' },
+  { key: 'b', command: Command.WorkIn, label: 'B' },
+  { key: 'n', command: Command.WorkOut, label: 'N' },
+  { key: '[', command: Command.NudgeBack, label: '[' },
+  { key: ']', command: Command.NudgeForward, label: ']' },
+  { key: '{', shift: true, command: Command.NudgeBackMore, label: '⇧[' },
+  { key: '}', shift: true, command: Command.NudgeForwardMore, label: '⇧]' }
 ];
 
 export function commandFor(press: KeyPress): Command | null {

@@ -291,7 +291,8 @@ export function snapTargets(doc: MotionDoc, input: { playhead: number; exclude: 
   const edges = kept.flatMap((c) => [c.from, clipEnd(c)]);
   const keys = keyframeFrames(doc, kept.map((c) => c.id));
   const seconds = Array.from({ length: Math.floor(doc.durationInFrames / doc.fps) + 1 }, (_, i) => i * doc.fps);
-  return [...new Set([...edges, ...keys, input.playhead, ...seconds])];
+  const markers = [...(doc.markers ?? []).map((m) => m.frame), ...kept.flatMap((c) => (c.markers ?? []).map((m) => c.from + m.frame))];
+  return [...new Set([...edges, ...keys, ...markers, input.playhead, ...seconds])];
 }
 
 export type KeyRef = { clipId: string; prop: string; frame: number };

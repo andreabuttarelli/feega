@@ -48,6 +48,12 @@ const edgeSchema = z.object({
   durationInFrames: z.number().int().min(0).max(FASTEST_RATE * 2)
 });
 
+export const MAX_MARKERS = 100;
+
+export const markerSchema = z.object({ frame: z.number().int().min(0), label: z.string().min(1).max(40) });
+
+export type Marker = z.infer<typeof markerSchema>;
+
 const clipSchema = z.object({
   id: z.string().min(1),
   from: z.number().int().min(0).max(FRAMES_CEILING),
@@ -70,14 +76,19 @@ const clipSchema = z.object({
   blend: z.enum(BLEND_MODES).default(BlendMode.Normal),
   animators: animatorsSchema,
   motionBlur: z.boolean().default(true),
-  path: motionPathSchema.nullable().default(null)
+  path: motionPathSchema.nullable().default(null),
+  hidden: z.boolean().optional(),
+  locked: z.boolean().optional(),
+  markers: z.array(markerSchema).max(MAX_MARKERS).optional()
 });
 
 const trackSchema = z.object({
   id: z.string().min(1),
   kind: z.enum([TrackKind.Visual, TrackKind.Audio]),
   name: z.string().max(60).default(''),
-  clips: z.array(clipSchema)
+  clips: z.array(clipSchema),
+  hidden: z.boolean().optional(),
+  locked: z.boolean().optional()
 });
 
 const assetRefSchema = z.object({
@@ -102,7 +113,9 @@ export const motionDocSchema = z
     components: z
       .record(z.string().regex(CUSTOM_NAME, 'component names are PascalCase, e.g. NodeGraph'), customComponentSchema)
       .refine((c) => Object.keys(c).length <= MAX_COMPONENTS, `at most ${MAX_COMPONENTS} custom components`)
-      .default({})
+      .default({}),
+    markers: z.array(markerSchema).max(MAX_MARKERS).optional(),
+    workArea: z.object({ from: z.number().int().min(0), to: z.number().int().min(1) }).nullable().optional()
   })
   .refine((d) => Math.min(d.width, d.height) <= MAX_SHORT_SIDE, 'resolution above 1080p')
   .refine((d) => d.durationInFrames <= maxFrames(d.fps), { message: `the video can be at most ${MAX_SECONDS} seconds`, path: ['durationInFrames'] });
