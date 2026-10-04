@@ -220,7 +220,7 @@ export const COMPONENTS = {
   },
   Video: {
     label: 'Video',
-    description: 'A video clip from the canvas assets.',
+    description: 'A video clip from the canvas assets. speed plays it faster or slower, reverse backwards; keyframes on time (source seconds) remap it freely, one keyframe freezes it. A remapped video is silent.',
     track: TrackKind.Visual,
     durationInFrames: seconds(4),
     schema: z
@@ -230,6 +230,8 @@ export const COMPONENTS = {
         volume: range(0, 1, 0.01, 0, 'Volume', Group.Style),
         fadeIn: fade('Fade in (s)'),
         fadeOut: fade('Fade out (s)'),
+        speed: range(0.1, 10, 0.01, 1, 'Speed', Group.Motion),
+        reverse: toggle(false, 'Reverse', Group.Motion),
         ...layout({ width: 1, height: 1 })
       })
       .strict()

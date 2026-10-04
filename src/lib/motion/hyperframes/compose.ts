@@ -25,6 +25,7 @@ import { sampleTrack } from '../keyframes';
 import { STAGE_CSS, stageRootStyle, stageScript } from './stage';
 import { shapeBake, shapeScript, type ShapeBake } from './shapes';
 import { particleBake, particleScript } from './particles';
+import { remappedSegments } from '../time-remap';
 import type { ParticleBake } from '../particles/simulate';
 import { bakeExpressions } from '../expression/bake';
 import { FIT_TEXT, fitScript } from './fit-runtime';
@@ -127,7 +128,8 @@ function ctxOf(clip: MotionClip, input: ComposeInput): TemplateCtx<ComponentId> 
     components: doc.components,
     font: (family) => fontStack(family, doc.fonts),
     weight: (family, weight) => loadedWeight(family, weight, doc.fonts),
-    text: textRender(clip.id, clip.animators, (v) => resolveColor(v, tokens))
+    text: textRender(clip.id, clip.animators, (v) => resolveColor(v, tokens)),
+    remap: () => remappedSegments(clip, doc.fps)
   };
 }
 

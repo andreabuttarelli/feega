@@ -53,6 +53,7 @@ import { DEGREES, MAX_SAMPLES } from '$lib/motion/motion-blur';
 import { MODIFIERS, MODIFIER_KINDS } from '$lib/motion/shape/modifiers';
 import { addModifier, morphTo, removeModifier, setModifier, setPath } from '$lib/motion/shape/ops';
 import { SHAPE_KINDS, modifierKey } from '$lib/motion/shape/schema';
+import { MAX_RATE, MIN_RATE, REMAP_KEY, clearTimeRemap, freezeFrame } from '$lib/motion/time-remap';
 import { PARTICLE_PRESETS, PRESET_PROPS as PARTICLE_PRESET, applyParticlePreset } from '$lib/motion/particles/presets';
 
 export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number };
@@ -566,6 +567,34 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: `Restyle a Particles clip with a preset (${PARTICLE_PRESETS.join(', ')}); its seed and keyframes are kept.`,
       inputSchema: z.object({ clip_id: z.string(), preset: z.enum(PARTICLE_PRESETS) }),
       execute: async (input) => apply(applyParticlePreset(session.doc, input.clip_id, input.preset), `${input.preset} particles on ${input.clip_id}`)
+    }),
+
+    set_time_remap: tool({
+      description: `Retime a Video clip, in every render path. speed ${MIN_RATE}..${MAX_RATE} (1 = normal), reverse plays backwards; keyframes map clip time (seconds from the clip start) to source time (seconds into the video file) and win over speed/reverse: a ramp, a slow-mo, a jump back. clear: true returns to plain playback first. A retimed video is silent.`,
+      inputSchema: z.object({
+        clip_id: z.string(),
+        clear: z.boolean().optional(),
+        speed: z.number().min(MIN_RATE).max(MAX_RATE).optional(),
+        reverse: z.boolean().optional(),
+        keyframes: z.array(z.object({ time: z.number().min(0), source: z.number().min(0), ease: easeSchema.default(Ease.Linear), ...keyShape })).min(1).optional()
+      }),
+      execute: async (input) => {
+        let result: OpResult = input.clear ? clearTimeRemap(session.doc, input.clip_id) : { ok: true, doc: session.doc };
+        const playback = Object.fromEntries(Object.entries({ speed: input.speed, reverse: input.reverse }).filter(([, v]) => v !== undefined));
+        if (result.ok && Object.keys(playback).length) {
+          result = setProps(result.doc, input.clip_id, playback);
+        }
+        if (result.ok && input.keyframes) {
+          result = setKeyframes(result.doc, input.clip_id, REMAP_KEY, input.keyframes.map((k) => asKey({ ...k, value: k.source })));
+        }
+        return apply(result, `retimed ${input.clip_id}`);
+      }
+    }),
+
+    freeze_frame: tool({
+      description: 'Freeze a Video clip on the source frame showing at a time of the video (seconds), for the whole clip. Split the clip first to freeze only a part, or use set_time_remap with a hold keyframe.',
+      inputSchema: z.object({ clip_id: z.string(), at: z.number().min(0) }),
+      execute: async (input) => apply(freezeFrame(session.doc, input.clip_id, frames(input.at)), `froze ${input.clip_id}`)
     }),
 
     add_device_row: tool({

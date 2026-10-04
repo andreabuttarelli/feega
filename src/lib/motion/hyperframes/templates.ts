@@ -11,6 +11,7 @@ import { compositionVideoId, resolvedMedia } from './composition';
 import { shapeHtml } from './shapes';
 import { particleHtml } from './particles';
 import { ParticleShape } from '../particles/model';
+import type { MediaSegment } from '../time-remap';
 import { ShapeKind } from '../shape/schema';
 import type { ShapeLook } from '../shape/render';
 
@@ -38,6 +39,7 @@ export type TemplateCtx<K extends ComponentId> = {
   font: (family: string) => string;
   weight: (family: string, weight: number) => number;
   text: TextRender;
+  remap: () => MediaSegment[] | null;
 };
 
 export enum Timing {
@@ -157,12 +159,25 @@ const Image: Template<'Image'> = {
   }
 };
 
+const SECONDS = 10000;
+const exact = (n: number) => Math.round(n * SECONDS) / SECONDS;
+
+function segmentVideo(clipId: string, index: number, url: string, s: MediaSegment, fit: string): string {
+  const style = css({ position: 'absolute', left: '0', top: '0', width: '100%', height: '100%', objectFit: fit, display: 'block' });
+  const preload = index === 0 ? 'auto' : 'metadata';
+  return `<video id="c-${clipId}-s${index}" src="${esc(url)}" crossorigin="anonymous" preload="${preload}" muted playsinline data-start="${exact(s.at)}" data-duration="${exact(s.duration)}" data-media-start="${exact(s.mediaStart)}" data-playback-rate="${exact(s.rate)}" style="${style}"></video>`;
+}
+
 const Video: Template<'Video'> = {
   timing: Timing.Media,
   html: (ctx) => {
     const url = ctx.asset(ctx.p.assetId);
     if (!url) {
       return placed(ctx, ctx.p, missing('Pick a video'), true);
+    }
+    const segments = ctx.remap();
+    if (segments) {
+      return placed(ctx, ctx.p, segments.map((s, i) => segmentVideo(ctx.id, i, url, s, ctx.p.fit)).join(''), true);
     }
     const media = ctx.p.volume > 0 ? `data-has-audio="true" data-volume="${ctx.p.volume}"` : 'muted';
     const video = `<video id="c-${ctx.id}" src="${esc(url)}" crossorigin="anonymous" preload="auto" ${media} playsinline data-start="${ctx.start}" data-duration="${ctx.length}" data-media-start="${ctx.mediaStart}" style="${css({ width: '100%', height: '100%', objectFit: ctx.p.fit, display: 'block' })}"></video>`;

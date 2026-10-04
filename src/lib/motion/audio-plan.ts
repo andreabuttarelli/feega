@@ -1,14 +1,15 @@
 import type { ComponentId } from './components';
 import { clipsOf, type MotionClip, type MotionDoc } from './doc';
+import { isRemapped } from './time-remap';
 
 export type AudioEntry = { clipId: string; url: string; at: number; offset: number; duration: number; volume: number; fadeIn: number; fadeOut: number };
 export type GainPoint = { time: number; value: number };
 
 type Sound = { assetId?: string | null; volume?: number; fadeIn?: number; fadeOut?: number };
 
-const AUDIBLE: Partial<Record<ComponentId, (p: Sound) => boolean>> = {
+const AUDIBLE: Partial<Record<ComponentId, (p: Sound, clip: MotionClip) => boolean>> = {
   Audio: (p) => (p.volume ?? 0) > 0,
-  Video: (p) => (p.volume ?? 0) > 0
+  Video: (p, clip) => (p.volume ?? 0) > 0 && !isRemapped(clip)
 };
 
 function entryOf(clip: MotionClip, doc: MotionDoc, url: string): AudioEntry | null {
@@ -36,7 +37,7 @@ export function audioPlan(doc: MotionDoc, urls: Record<string, string>): AudioEn
     const audible = AUDIBLE[clip.component];
     const p = clip.props as Sound;
     const url = p.assetId ? urls[p.assetId] : undefined;
-    if (!audible?.(p) || !url) {
+    if (!audible?.(p, clip) || !url) {
       return [];
     }
     const entry = entryOf(clip, doc, url);

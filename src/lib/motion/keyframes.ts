@@ -63,7 +63,8 @@ export enum Source {
   Param = 'param',
   Effect = 'effect',
   Animator = 'animator',
-  Modifier = 'modifier'
+  Modifier = 'modifier',
+  Remap = 'remap'
 }
 
 type Range = { label: string; min: number; max: number; step: number; fallback: number };
@@ -106,6 +107,10 @@ export const DEVICE_SCENE = {
   lid: { label: 'Lid open', min: 0, max: 135, step: 1, fallback: 110 },
   screenScroll: { label: 'Screen scroll', min: 0, max: 1, step: 0.01, fallback: 0 }
 } as const satisfies Record<string, Range>;
+
+export const REMAP_KEY = 'time';
+const MAX_SOURCE_SECONDS = 3600;
+const remapProps: AnimProp[] = [{ key: REMAP_KEY, label: 'Time remap (source s)', kind: ValueKind.Number, source: Source.Remap, min: 0, max: MAX_SOURCE_SECONDS, step: 0.01, fallback: 0 }];
 
 export type SceneKey = keyof typeof SCENE | keyof typeof DEVICE_SCENE;
 export const SCENE_KEYS = Object.keys(SCENE) as SceneKey[];
@@ -165,7 +170,7 @@ export const ANIMATABLE: Record<ComponentId, readonly AnimProp[]> = {
   Kicker: visual(colours(['color', 'Colour']), typeNumbers),
   Caption: visual(colours(['color', 'Colour'], ['background', 'Box']), typeNumbers),
   Image: visual(),
-  Video: visual(),
+  Video: visual(remapProps),
   Audio: [],
   Shape: visual(colours(['fill', 'Fill'], ['fill2', 'Gradient end'], ['stroke', 'Stroke colour']), SHAPE_NUMBERS),
   Logo: visual(),
@@ -203,7 +208,8 @@ const BASE: Record<Source, (clip: Animated, prop: AnimProp) => KeyValue> = {
   [Source.Param]: (clip, prop) => (prop.kind === ValueKind.Color ? String(clip.props[prop.key]) : Number(clip.props[prop.key])),
   [Source.Effect]: (_clip, prop) => prop.base ?? prop.fallback,
   [Source.Animator]: (_clip, prop) => prop.base ?? prop.fallback,
-  [Source.Modifier]: (_clip, prop) => prop.base ?? prop.fallback
+  [Source.Modifier]: (_clip, prop) => prop.base ?? prop.fallback,
+  [Source.Remap]: (_clip, prop) => prop.fallback
 };
 
 export function baseValue(clip: Animated, key: string): KeyValue | null {
@@ -233,7 +239,8 @@ const SOURCE_PROBLEM: Record<Source, (clip: Pick<Animated, 'mask'>, key: string)
   [Source.Param]: () => null,
   [Source.Effect]: () => null,
   [Source.Animator]: () => null,
-  [Source.Modifier]: () => null
+  [Source.Modifier]: () => null,
+  [Source.Remap]: () => null
 };
 
 export function keyframesProblem(clip: Pick<Animated, 'component' | 'keyframes' | 'mask' | 'params'>): string | null {
