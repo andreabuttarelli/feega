@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
-import gsap from 'gsap';
+import { installEngine, testTimeline } from '../engine/testing';
 import { FEEGA_TOKENS } from '../brand';
 import { Space, cameraMath, stageSpec } from '../camera';
 import { CameraPreset, applyPreset, setCamera, setClipDepth } from '../camera-ops';
@@ -66,9 +66,8 @@ describe('the stage in the composition', () => {
 function boot(doc: MotionDoc) {
   const spec = stageSpec(doc);
   document.body.innerHTML = `<div id="root"><div id="world">${spec.layers.map((l) => `<div class="layer" data-clip="${l.id}"></div>`).join('')}</div></div>`;
-  const tl = gsap.timeline({ paused: true });
+  const tl = testTimeline(installEngine());
   const w = window as unknown as Record<string, unknown>;
-  w.gsap = gsap;
   w.__timelines = { main: tl };
   window.eval(stageScript(spec, doc.fps, doc.durationInFrames / doc.fps));
   tl.set({}, {}, doc.durationInFrames / doc.fps);
@@ -86,10 +85,9 @@ afterEach(() => {
 
 describe('driving a page renderer from the timeline', () => {
   it('runs on a seek with callbacks suppressed, the way the HyperFrames runtime seeks', () => {
-    const tl = gsap.timeline({ paused: true });
+    const tl = testTimeline(installEngine());
     const seen: number[] = [];
     const w = window as unknown as Record<string, unknown>;
-    w.gsap = gsap;
     w.__timelines = { main: tl };
     w.probe = (t: number) => seen.push(Math.round(t * 100) / 100);
     window.eval(`const tl=window.__timelines.main;${seekDriver('feegaProbe', 4, 'probe')}`);

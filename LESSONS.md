@@ -2293,12 +2293,6 @@ Cause: the HyperFrames player emits `timeupdate` (often at 0) when the compositi
 the editor took it as the new frame. Move: while paused the editor owns the frame; follow
 `timeupdate` only while playing (`MotionPreview.svelte`).
 
-## GSAP `attr` tweens do nothing under vitest
-Signal: `Invalid property attr ... Missing plugin?` in a node test, attributes never set. Cause:
-GSAP queues its core plugins (`attr` included) until a `window` exists. Move: in the test,
-`vi.stubGlobal('window', globalThis)`, `gsap.ticker.wake()`, `sleep()`, unstub
-(`hyperframes/masks.test.ts`). The browser build is not affected.
-
 ## Captured motion frames ignore SVG masks
 Signal: `view_frames` / html-to-image JPEGs show clips unmasked while the preview masks them.
 Cause: html-to-image inlines computed styles, and a computed `url(#id)` resolves against the
@@ -2339,9 +2333,9 @@ only on models that accept it (`FORCES_TOOL`), and a failed round must still sav
 ## A motion component types nothing in preview but passes every check
 Signal: text that should type, bars that should fill stay at their first state in the preview
 and the MP4; the determinism check passes. Cause: the HyperFrames runtime seeks with
-`totalTime(t, true)`, which suppresses GSAP callbacks, so `onUpdate` never runs. Move: route
-callbacks through a render plugin (`feegaRender` in `custom/runtime.ts`); test with
-`totalTime(t, true)`, never `seek(t)`.
+`totalTime(t, true)`, which suppressed GSAP callbacks, so `onUpdate` never ran. Move: the motion
+engine (`motion/engine/engine.ts`) calls every `onUpdate` on every render and never runs `call()`,
+`onStart`, `onComplete`; test with `totalTime(t, true)`, never `seek(t)`.
 
 ## A Vercel Sandbox snapshot is "not found" from the deployment
 Signal: `Snapshot not found` (404) creating a sandbox from a snapshot id that works locally.
@@ -2368,7 +2362,7 @@ Signal: a Model3D / Shape3D (or anything a page script draws per frame) shows it
 every time in an MP4 or a captured frame, while the editor's playing preview animates it.
 Cause: same root as the typing component above — the runtime seeks with callbacks suppressed, and
 the three.js scene redrew from a `tl.to({}, { onUpdate })`. Move: drive any per-frame page
-renderer through `seekDriver` (`hyperframes/stage.ts`, a GSAP render plugin); to probe a
+renderer through `seekDriver` (`hyperframes/stage.ts`, an `onUpdate` the engine runs on every seek); to probe a
 standalone composition, seek with `window.__player.renderSeek(t)`, not `tl.totalTime`, or clips
 past their start never become visible.
 
@@ -2395,3 +2389,12 @@ Google Fonts does not count as declared. Signal: one font looks right in preview
 export but narrower or different on the server. Move: declare every family in the page
 (`declaredFamilyCss`: a `@font-face` that matches nothing), and compare a server frame with a
 browser-export frame for each new font path.
+
+### The HyperFrames producer reads the timeline, not just the frames
+Replacing GSAP, the producer kept working only because the new timeline answers what it asks:
+`totalTime(t, true)`/`seek` to draw, `play`/`pause`/`time` for the preview transport, and
+`getChildren()` with `startTime`/`duration`/`totalDuration`/`vars` for static-frame dedup (frames
+outside every child are captured once and reused). Signal: a render with frames frozen on a
+moving element, or `static-frame dedup` reasons like `no GSAP tweens` in the log and a slower
+render. Move: any timeline handed to `window.__timelines` keeps that surface, with a child's
+`startTime` relative to its parent; compare `static-frame dedup` lines of two renders.

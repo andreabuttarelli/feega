@@ -268,7 +268,7 @@ export const EASE_BEZIER: Record<Ease, Bezier> = {
   [Ease.Overshoot]: [0.175, 0.885, 0.32, 1.275]
 };
 
-export const GSAP_EASE: Record<Ease, string> = {
+export const EASE_NAME: Record<Ease, string> = {
   [Ease.Standard]: 'power3.out',
   [Ease.Enter]: 'power2.out',
   [Ease.Exit]: 'power2.in',
@@ -277,7 +277,7 @@ export const GSAP_EASE: Record<Ease, string> = {
 };
 
 export function easeName(ease: EaseSpec): string {
-  return typeof ease === 'string' ? GSAP_EASE[ease] : `kf-bz-${ease.map((n) => String(n).replace('.', '_').replace('-', 'm')).join('-')}`;
+  return typeof ease === 'string' ? EASE_NAME[ease] : `kf-bz-${ease.map((n) => String(n).replace('.', '_').replace('-', 'm')).join('-')}`;
 }
 
 export type SampledKey = { frame: number; value: number | string; ease: string | number[]; in?: string; out?: string; roving?: boolean };

@@ -49,6 +49,7 @@ type TweenItem = {
   targets: Target[];
   vars: Vars;
   onUpdate: ((this: unknown) => void) | null;
+  segments: Segment[];
   handle: Handle;
 };
 
@@ -798,6 +799,12 @@ export function motionEngine(win: Window & Record<string, unknown>): MotionEngin
         totalDuration: () => totalOf(item.dur, item.repeat, item.repeatDelay),
         startTime: () => item.start,
         targets: () => item.targets,
+        parent: api,
+        invalidate: () => {
+          item.ease = item.vars.ease === undefined ? item.ease : parseEase(item.vars.ease);
+          item.segments.forEach((segment) => (segment.ease = item.ease));
+          return h;
+        },
         isActive: () => false,
         kill: () => h,
         pause: () => h,
@@ -840,6 +847,7 @@ export function motionEngine(win: Window & Record<string, unknown>): MotionEngin
           targets: group,
           vars: to,
           onUpdate,
+          segments: [],
           handle: {}
         };
         item.handle = handleOf(item);
@@ -862,6 +870,7 @@ export function motionEngine(win: Window & Record<string, unknown>): MotionEngin
               repeatDelay
             };
             channel.segments.push(segment);
+            item.segments.push(segment);
             if (immediate) {
               snap(channel);
               apply(channel, resolvedFrom(channel, segment), false);
@@ -1062,20 +1071,15 @@ export function motionEngine(win: Window & Record<string, unknown>): MotionEngin
     function childEntry(child: Handle, pos: unknown) {
       const start = position(pos);
       const dur = Number((child.totalDuration as () => number)());
-      const handle: Handle = {
-        vars: child.vars,
-        getChildren: child.getChildren,
-        duration: child.duration,
-        totalDuration: child.totalDuration,
-        startTime: () => start
-      };
+      child.startTime = () => start;
+      child.parent = api;
       const item: ChildItem = {
         kind: 'child',
         order: counter++,
         start,
         dur,
         render: child.renderAt as (t: number) => void,
-        handle
+        handle: child
       };
       items.push(item);
       track(start, start + dur);
@@ -1110,7 +1114,7 @@ export function motionEngine(win: Window & Record<string, unknown>): MotionEngin
           totalDuration: () => span,
           duration: () => span,
           startTime: () => 0,
-          getChildren: () => [],
+          targets: () => [api],
           pause: () => remap,
           paused: () => true
         };
@@ -1126,7 +1130,13 @@ export function motionEngine(win: Window & Record<string, unknown>): MotionEngin
       duration: () => duration,
       totalDuration: () => duration,
       startTime: () => 0,
-      getChildren: () => items.map((i) => i.handle),
+      getChildren: (nested = true, tweens = true, timelines = true): Handle[] =>
+        items.flatMap((item) => {
+          const h = item.handle;
+          const children = h.getChildren as ((n: boolean, t: boolean, l: boolean) => Handle[]) | undefined;
+          const own = children ? timelines : tweens;
+          return [...(own ? [h] : []), ...(nested && children ? children(true, tweens, timelines) : [])];
+        }),
       paused: (value?: unknown) => {
         if (value === undefined) {
           return !playing;

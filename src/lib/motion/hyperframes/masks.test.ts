@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import gsap from 'gsap';
+import { installEngine, testTimeline } from '../engine/testing';
 import { FEEGA_TOKENS } from '../brand';
 import { TrackKind } from '../components';
 import { Ease } from '../design';
@@ -132,10 +132,6 @@ describe('animated masks', () => {
   });
 
   it('lands on the sampled value at every frame, whatever order the frames are sought in', () => {
-    vi.stubGlobal('window', globalThis);
-    gsap.ticker.wake();
-    gsap.ticker.sleep();
-    vi.unstubAllGlobals();
     const clip = findClip(moved, 'img')!.clip;
     const tweens = keyframeTweens(clip, moved, (c) => c).filter((t) => t.target.startsWith('#m'));
     const bezier = (p: number) => sampleTrack([{ frame: 0, value: 0, ease: [0.2, 0.8, 0.2, 1] }, { frame: 1, value: 1, ease: 'linear' }], p);
@@ -145,7 +141,7 @@ describe('animated masks', () => {
     };
     const run = () => {
       const els: Record<string, ReturnType<typeof element>> = { '#mw-img': element(), '#mx-img': element() };
-      const tl = gsap.timeline({ paused: true });
+      const tl = testTimeline(installEngine());
       for (const t of tweens) {
         tl.fromTo(els[t.target], t.from, { ...t.to, duration: t.duration, ease: t.ease.startsWith('kf-bz') ? bezier : t.ease, immediateRender: false }, t.at);
       }

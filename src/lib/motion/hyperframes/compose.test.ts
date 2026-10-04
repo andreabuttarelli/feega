@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { FEEGA_TOKENS } from '../brand';
 import { TransitionKind } from '../design';
 import { Background, MotionFormat, newMotionDoc, type MotionDoc } from '../doc';
-import gsap from 'gsap';
+import { installEngine, testTimeline } from '../engine/testing';
+import { engineScript } from '../engine/engine';
 import { addClip, setKeyframes, setTransform, setTransition, Side, type OpResult } from '../timeline';
 import { LIBRARY_IDS } from '../components';
 import { Ease } from '../design';
@@ -48,6 +49,14 @@ describe('MotionDoc to HyperFrames composition', () => {
 
   it('registers one paused timeline under the composition id', () => {
     expect(compose(doc)).toContain('window.__timelines["main"]=tl');
+  });
+
+  it('runs on the feega engine inlined in the page and loads no GSAP, whose licence excludes the editor', () => {
+    const html = compose(doc);
+
+    expect(html).toContain(`<script>${engineScript()}</script>`);
+    expect(html).toContain('const tl=window.__feegaMotion.timeline();');
+    expect(html).not.toMatch(/npm\/gsap@|gsap\.timeline|registerPlugin/);
   });
 
   it('a title reveals each line', () => {
@@ -224,7 +233,7 @@ describe('keyframes and 3D transforms', () => {
   });
 
   it('base transform values are set before the timeline exists', () => {
-    expect(compose(spun)).toContain('gsap.set("#kf-card",{"rotationX":15,"rotationY":0});');
+    expect(compose(spun)).toContain('window.__feegaMotion.set("#kf-card",{"rotationX":15,"rotationY":0});');
   });
 
   it('each keyframe segment is one tween on the transform wrapper, with its own ease', () => {
@@ -232,7 +241,7 @@ describe('keyframes and 3D transforms', () => {
 
     expect(html).toContain('tl.fromTo("#kf-card",{"rotationY":0},{"rotationY":180,"duration":2,"ease":"none","immediateRender":false},1);');
     expect(html).toContain(`tl.fromTo("#kf-card",{"rotationY":180},{"rotationY":360,"duration":1.3333333333333333,"ease":${JSON.stringify(easeName([0.2, 0.8, 0.2, 1]))},"immediateRender":false},3);`);
-    expect(html).toContain(`gsap.registerEase(${JSON.stringify(easeName([0.2, 0.8, 0.2, 1]))}`);
+    expect(html).toContain(`window.__feegaMotion.registerEase(${JSON.stringify(easeName([0.2, 0.8, 0.2, 1]))}`);
   });
 
   it('a lane holds its first value from the clip start', () => {
@@ -271,7 +280,7 @@ describe('keyframes and 3D transforms', () => {
     const bezier = (p: number) => sampleTrack([{ frame: 0, value: 0, ease: [0.2, 0.8, 0.2, 1] }, { frame: 1, value: 1, ease: 'linear' }], p);
     const run = () => {
       const target = { rotationY: 0, x: 0 };
-      const tl = gsap.timeline({ paused: true });
+      const tl = testTimeline(installEngine());
       for (const t of tweens) {
         tl.fromTo(target, t.from, { ...t.to, duration: t.duration, ease: t.ease.startsWith('kf-bz') ? bezier : t.ease, immediateRender: false }, t.at);
       }
@@ -312,7 +321,7 @@ describe('keyframes and 3D transforms', () => {
     const clip = findClip(keyed, 'title')!.clip;
     const tweens = keyframeTweens(clip, keyed, (c) => c).filter((t) => t.target.startsWith('#kf-title'));
     const target = { rotation: 0 };
-    const tl = gsap.timeline({ paused: true });
+    const tl = testTimeline(installEngine());
     for (const t of tweens) {
       tl.fromTo(target, t.from, { ...t.to, duration: t.duration, ease: t.ease, immediateRender: false }, t.at);
     }
@@ -379,7 +388,7 @@ describe('custom components in the composition', () => {
 
     const tweens = keyframeTweens(findClip(baked, 'card')!.clip, baked, (c) => c).filter((t) => t.target === '#kf-card');
     const target = { x: 0 };
-    const tl = gsap.timeline({ paused: true });
+    const tl = testTimeline(installEngine());
     for (const t of tweens) {
       tl.fromTo(target, t.from, { ...t.to, duration: t.duration, ease: t.ease, immediateRender: false }, t.at);
     }

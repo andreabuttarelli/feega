@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import gsap from 'gsap';
+import { motionEngine } from './engine/engine';
 import { Ease } from './design';
 import { ANIMATABLE, EASE_BEZIER, Interp, TRANSFORM, easeName, isAnimatable, keyframesProblem, mixColor, sampleTrack, type Keyframe } from './keyframes';
 
@@ -28,12 +28,13 @@ describe('keyframe interpolation', () => {
     expect(half).toBeCloseTo(90 + 90 * (1 - 0.5 ** 4), 6);
   });
 
-  it('every named ease matches the GSAP ease the generator emits', () => {
+  it('every named ease matches the engine ease the generator emits', () => {
+    const engine = motionEngine({ document: undefined } as unknown as Window & Record<string, unknown>);
     for (const ease of Object.values(Ease)) {
-      const gsapEase = gsap.parseEase(easeName(ease));
+      const engineEase = engine.parseEase(easeName(ease));
       for (let i = 0; i <= 20; i++) {
         const p = i / 20;
-        expect(sampleTrack([{ frame: 0, value: 0, ease }, { frame: 20, value: 1, ease: Ease.Linear }], i)).toBeCloseTo(gsapEase(p), 9);
+        expect(sampleTrack([{ frame: 0, value: 0, ease }, { frame: 20, value: 1, ease: Ease.Linear }], i)).toBeCloseTo(engineEase(p), 9);
       }
     }
   });

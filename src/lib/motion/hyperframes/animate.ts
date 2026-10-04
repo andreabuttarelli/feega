@@ -7,6 +7,9 @@ import type { MaskKey } from '../mask';
 import { ParentOpacity, pivotOf } from '../parent';
 import { animatorOfKey, animatorProps, cssName } from '../text-animators/model';
 import { textHostId } from '../text-animators/render';
+import { ENGINE_GLOBAL } from '../engine/engine';
+
+export const ENGINE = `window.${ENGINE_GLOBAL}`;
 
 type Frame = { width: number; height: number; fps: number };
 
@@ -16,25 +19,25 @@ enum Wrapper {
   Scale = 'ks'
 }
 
-type Channel = { wrapper: Wrapper; gsap: string; out: (value: number, frame: Frame) => number | string };
+type Channel = { wrapper: Wrapper; prop: string; out: (value: number, frame: Frame) => number | string };
 
 const same = (v: number) => v;
 
 const CHANNELS: Record<Exclude<TransformKey, 'anchorX' | 'anchorY'>, Channel> = {
-  x: { wrapper: Wrapper.Transform, gsap: 'x', out: (v, f) => round(v * f.width) },
-  y: { wrapper: Wrapper.Transform, gsap: 'y', out: (v, f) => round(v * f.height) },
-  z: { wrapper: Wrapper.Transform, gsap: 'z', out: same },
-  scale: { wrapper: Wrapper.Scale, gsap: 'scale', out: same },
-  scaleX: { wrapper: Wrapper.Transform, gsap: 'scaleX', out: same },
-  scaleY: { wrapper: Wrapper.Transform, gsap: 'scaleY', out: same },
-  rotateX: { wrapper: Wrapper.Transform, gsap: 'rotationX', out: same },
-  rotateY: { wrapper: Wrapper.Transform, gsap: 'rotationY', out: same },
-  rotateZ: { wrapper: Wrapper.Transform, gsap: 'rotation', out: same },
-  skewX: { wrapper: Wrapper.Transform, gsap: 'skewX', out: same },
-  skewY: { wrapper: Wrapper.Transform, gsap: 'skewY', out: same },
-  perspective: { wrapper: Wrapper.Perspective, gsap: 'perspective', out: (v) => px(v) },
-  opacity: { wrapper: Wrapper.Transform, gsap: 'opacity', out: same },
-  blur: { wrapper: Wrapper.Transform, gsap: 'filter', out: (v) => `blur(${px(v)})` }
+  x: { wrapper: Wrapper.Transform, prop: 'x', out: (v, f) => round(v * f.width) },
+  y: { wrapper: Wrapper.Transform, prop: 'y', out: (v, f) => round(v * f.height) },
+  z: { wrapper: Wrapper.Transform, prop: 'z', out: same },
+  scale: { wrapper: Wrapper.Scale, prop: 'scale', out: same },
+  scaleX: { wrapper: Wrapper.Transform, prop: 'scaleX', out: same },
+  scaleY: { wrapper: Wrapper.Transform, prop: 'scaleY', out: same },
+  rotateX: { wrapper: Wrapper.Transform, prop: 'rotationX', out: same },
+  rotateY: { wrapper: Wrapper.Transform, prop: 'rotationY', out: same },
+  rotateZ: { wrapper: Wrapper.Transform, prop: 'rotation', out: same },
+  skewX: { wrapper: Wrapper.Transform, prop: 'skewX', out: same },
+  skewY: { wrapper: Wrapper.Transform, prop: 'skewY', out: same },
+  perspective: { wrapper: Wrapper.Perspective, prop: 'perspective', out: (v) => px(v) },
+  opacity: { wrapper: Wrapper.Transform, prop: 'opacity', out: same },
+  blur: { wrapper: Wrapper.Transform, prop: 'filter', out: (v) => `blur(${px(v)})` }
 };
 
 export const ANIMATE_CSS = '.kp{position:absolute;inset:0}.kf,.ks{position:absolute;inset:0;transform-style:preserve-3d;backface-visibility:visible;will-change:transform,opacity,filter}';
@@ -74,7 +77,7 @@ type LaneInput = { clip: MotionClip; key: string; track: Keyframe[]; frame: Fram
 const LANE: Record<Source, (input: LaneInput) => Lane[]> = {
   [Source.Transform]: ({ clip, key, track, frame, parents }) => {
     const channel = CHANNELS[key as keyof typeof CHANNELS];
-    return [{ target: target(channel.wrapper, clip, key, parents), source: Source.Transform, track, vars: (v) => ({ [channel.gsap]: channel.out(Number(v), frame) }) }];
+    return [{ target: target(channel.wrapper, clip, key, parents), source: Source.Transform, track, vars: (v) => ({ [channel.prop]: channel.out(Number(v), frame) }) }];
   },
   [Source.Prop]: ({ clip, key, track, resolve }) => [{ target: target(Wrapper.Scale, clip), source: Source.Prop, track, vars: (v) => ({ [cssVar(key)]: resolve(String(v)) }) }],
   [Source.Scene]: () => [],
@@ -144,12 +147,12 @@ function initial(clip: MotionClip, frame: Frame, resolve: (color: string) => str
     if (value === undefined || channel.wrapper === Wrapper.Perspective) {
       continue;
     }
-    put(target(channel.wrapper, clip, key, parents), channel.gsap, channel.out(value, frame));
+    put(target(channel.wrapper, clip, key, parents), channel.prop, channel.out(value, frame));
   }
   for (const lane of lanes(clip, frame, resolve, parents).filter((l) => l.source === Source.Prop)) {
     vars.set(lane.target, { ...vars.get(lane.target), ...lane.vars(lane.track[0].value) });
   }
-  return [...vars].map(([t, v]) => `gsap.set(${js(t)},${js(v)});`);
+  return [...vars].map(([t, v]) => `${ENGINE}.set(${js(t)},${js(v)});`);
 }
 
 function bezierEases(clips: MotionClip[]): string[] {
@@ -159,7 +162,7 @@ function bezierEases(clips: MotionClip[]): string[] {
       curves.set(easeName(k.ease), k.ease);
     }
   }
-  return [...curves].map(([name, ease]) => `gsap.registerEase(${js(name)},function(p){return KF_SAMPLE([{frame:0,value:0,ease:${js(ease)}},{frame:1,value:1,ease:"linear"}],p);});`);
+  return [...curves].map(([name, ease]) => `${ENGINE}.registerEase(${js(name)},function(p){return KF_SAMPLE([{frame:0,value:0,ease:${js(ease)}},{frame:1,value:1,ease:"linear"}],p);});`);
 }
 
 export function animationScript(clips: MotionClip[], frame: Frame, resolve: (color: string) => string, parents: Parents = new Set()): { setup: string; timeline: string } {

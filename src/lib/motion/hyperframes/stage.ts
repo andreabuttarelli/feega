@@ -35,7 +35,7 @@ stageAt(0);
 }
 
 export function seekDriver(name: string, duration: number | string, render: string): string {
-  return `if(tl){gsap.registerPlugin({name:${js(name)},rawVars:1,init:function(){},render:function(ratio){${render}(ratio*${duration});}});tl.to({},{duration:${duration},ease:'none',${name}:1},0);}`;
+  return `if(tl){tl.to({},{id:${js(name)},duration:${duration},ease:'none',onUpdate:function(){${render}(this.time());}},0);}`;
 }
 
 export function stageRootStyle(spec: StageSpec): string {

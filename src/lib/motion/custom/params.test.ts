@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
-import gsap from 'gsap';
+import { installEngine, testTimeline } from '../engine/testing';
 import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from '../doc';
 import { addClip, setKeyframes, setProps, type OpResult } from '../timeline';
 import { Ease } from '../design';
@@ -120,8 +120,7 @@ describe('param injection at runtime', () => {
   function boot(js: string, keys: Record<string, { at: number; value: number | string; ease: string }[]> = {}, trim = 0) {
     document.body.innerHTML = '<div id="cc-c1"></div>';
     const w = window as unknown as Record<string, unknown>;
-    w.gsap = gsap;
-    const master = gsap.timeline({ paused: true });
+    const master = testTimeline(installEngine());
     w.__master = master;
     window.eval(definitionScript('P', js).replace(/^<script>|<\/script>$/g, ''));
     window.eval(bootScript([{ id: 'c1', name: 'P', start: 0, length: 2, fps: 30, values: { speed: 1, accent: '#0099ff' }, seed: seedOf('c1'), keys, ...(trim ? { trim } : {}) }], { assets: {}, brand: { name: 'f', colors: {}, logoUrl: null } }, 'window.__master'));

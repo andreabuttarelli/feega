@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
-import gsap from 'gsap';
+import { installEngine, type TestTimeline } from '../engine/testing';
 import { FEEGA_TOKENS } from '../brand';
 import { Ease } from '../design';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '../doc';
@@ -59,12 +59,12 @@ describe('parenting in the composition', () => {
 function boot(doc: MotionDoc) {
   const html = compose(doc);
   const root = html.slice(html.indexOf('<div id="root"'), html.lastIndexOf('</div>', html.indexOf('<script>const tl') > 0 ? html.indexOf('<script>const tl') : html.length) + 6);
-  const script = /<script>([^<]*const tl=gsap\.timeline[\s\S]*?)<\/script>/.exec(html)![1];
+  const script = /<script>([^<]*const tl=window\.__feegaMotion\.timeline[\s\S]*?)<\/script>/.exec(html)![1];
   document.body.innerHTML = root;
   const w = window as unknown as Record<string, unknown>;
-  w.gsap = gsap;
+  installEngine();
   window.eval(script);
-  return (w.__timelines as Record<string, gsap.core.Timeline>).main;
+  return (w.__timelines as Record<string, TestTimeline>).main;
 }
 
 afterEach(() => {
