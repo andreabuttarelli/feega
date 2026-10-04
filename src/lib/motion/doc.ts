@@ -11,6 +11,7 @@ import { expressionsSchema, expressionsProblem } from './expression/schema';
 import { fontRefProblem, fontsSchema, usedFaces } from './fonts/model';
 import { effectsSchema, effectsProblem } from './effects/model';
 import { BLEND_MODES, BlendMode } from './blend';
+import { animatorsSchema } from './text-animators/model';
 
 export enum MotionFormat {
   Landscape = '16:9',
@@ -59,7 +60,8 @@ const clipSchema = z.object({
   parentOpacity: z.enum(PARENT_OPACITIES).default(ParentOpacity.Inherit),
   expressions: expressionsSchema,
   effects: effectsSchema,
-  blend: z.enum(BLEND_MODES).default(BlendMode.Normal)
+  blend: z.enum(BLEND_MODES).default(BlendMode.Normal),
+  animators: animatorsSchema
 });
 
 const trackSchema = z.object({
@@ -233,6 +235,7 @@ export function newClip(fields: Pick<MotionClip, 'id' | 'from' | 'durationInFram
     expressions: {},
     effects: [],
     blend: BlendMode.Normal,
+    animators: [],
     ...fields
   };
 }

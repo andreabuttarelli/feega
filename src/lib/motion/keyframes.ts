@@ -31,7 +31,8 @@ export enum Source {
   Scene = 'scene',
   Mask = 'mask',
   Param = 'param',
-  Effect = 'effect'
+  Effect = 'effect',
+  Animator = 'animator'
 }
 
 type Range = { label: string; min: number; max: number; step: number; fallback: number };
@@ -136,7 +137,8 @@ const BASE: Record<Source, (clip: Animated, prop: AnimProp) => KeyValue> = {
   },
   [Source.Mask]: (clip, prop) => (clip.mask ? maskValue(clip.mask, prop.key as MaskKey) : prop.fallback),
   [Source.Param]: (clip, prop) => (prop.kind === ValueKind.Color ? String(clip.props[prop.key]) : Number(clip.props[prop.key])),
-  [Source.Effect]: (_clip, prop) => prop.base ?? prop.fallback
+  [Source.Effect]: (_clip, prop) => prop.base ?? prop.fallback,
+  [Source.Animator]: (_clip, prop) => prop.base ?? prop.fallback
 };
 
 export function baseValue(clip: Animated, key: string): KeyValue | null {
@@ -164,7 +166,8 @@ const SOURCE_PROBLEM: Record<Source, (clip: Pick<Animated, 'mask'>, key: string)
   [Source.Scene]: () => null,
   [Source.Mask]: (clip, key) => (clip.mask ? null : `${key}: the clip has no mask, add one first (set_mask)`),
   [Source.Param]: () => null,
-  [Source.Effect]: () => null
+  [Source.Effect]: () => null,
+  [Source.Animator]: () => null
 };
 
 export function keyframesProblem(clip: Pick<Animated, 'component' | 'keyframes' | 'mask' | 'params'>): string | null {

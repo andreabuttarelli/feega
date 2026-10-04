@@ -4,6 +4,7 @@ import { Ease } from '../design';
 import { boxOf, type Box } from '../layout';
 import { safeBox } from '../fit';
 import { typeStyle } from './type-style';
+import type { TextRender } from '../text-animators/render';
 import { css, esc, px } from './html';
 import type { CustomComponents } from '../custom/component';
 import { compositionVideoId, resolvedMedia } from './composition';
@@ -31,6 +32,7 @@ export type TemplateCtx<K extends ComponentId> = {
   components: CustomComponents;
   font: (family: string) => string;
   weight: (family: string, weight: number) => number;
+  text: TextRender;
 };
 
 export enum Timing {
@@ -47,6 +49,7 @@ export type Template<K extends ComponentId> = {
 export const SANS = "'DM Sans', system-ui, sans-serif";
 export const MONO = "'Fragment Mono', ui-monospace, monospace";
 const DESCENDER = '0.08em';
+const hostId = (ctx: { text: TextRender }) => (ctx.text.id ? ` id="${ctx.text.id}"` : '');
 const typeSize = (ctx: { p: { size: number }; unit: number }) => Math.round(ctx.p.size * ctx.unit * 100) / 100;
 export const INK = { paper: '#ffffff', paper2: '#f5f5f3', line: '#e4e4e2', ink: '#111111', inkSoft: '#6b6b6b', select: '#a855f7' } as const;
 
@@ -88,12 +91,12 @@ const Title: Template<'Title'> = {
   html: (ctx) => {
     const box = safeBox(boxOf(ctx.p, ctx), ctx);
     const size = typeSize(ctx);
-    const lines = ctx.p.text
-      .split('\n')
-      .map((line, i) => `<div style="${css({ overflow: 'hidden', paddingBottom: DESCENDER, marginBottom: `-${DESCENDER}` })}"><div class="li" id="li-${ctx.id}-${i}">${esc(line) || '&nbsp;'}</div></div>`)
+    const lines = ctx.text
+      .lines(ctx.p.text)
+      .map((line, i) => `<div style="${css({ overflow: 'hidden', paddingBottom: DESCENDER, marginBottom: `-${DESCENDER}` })}"><div class="li" id="li-${ctx.id}-${i}">${line || '&nbsp;'}</div></div>`)
       .join('');
-    const style = css({ ...typeStyle(ctx, ctx.p, size), color: ctx.color(ctx.p.color) });
-    return placed(ctx, ctx.p, `<div data-fit="${size}" style="${style}">${lines}</div>`, false, box);
+    const style = css({ ...typeStyle(ctx, ctx.p, size), color: ctx.color(ctx.p.color), ...ctx.text.vars });
+    return placed(ctx, ctx.p, `<div${hostId(ctx)} data-fit="${size}" style="${style}">${ctx.text.style}${lines}</div>`, false, box);
   },
   tweens: (ctx) =>
     ctx.p.text.split('\n').map((_, i) => ({
@@ -110,8 +113,8 @@ const Text: Template<'Text'> = {
   timing: Timing.Wrapper,
   html: (ctx) => {
     const size = typeSize(ctx);
-    const style = css({ ...typeStyle(ctx, ctx.p, size), color: ctx.color(ctx.p.color), whiteSpace: 'pre-wrap' });
-    return placed(ctx, ctx.p, `<div id="tx-${ctx.id}" data-fit="${size}" style="${style}">${esc(ctx.p.text)}</div>`);
+    const style = css({ ...typeStyle(ctx, ctx.p, size), color: ctx.color(ctx.p.color), whiteSpace: 'pre-wrap', ...ctx.text.vars });
+    return placed(ctx, ctx.p, `<div id="tx-${ctx.id}" data-fit="${size}" style="${style}"><span${hostId(ctx)}>${ctx.text.style}${ctx.text.lines(ctx.p.text).join('\n')}</span></div>`);
   },
   tweens: (ctx) => [{ target: `#tx-${ctx.id}`, from: { opacity: 0, y: 16 }, to: { opacity: 1, y: 0 }, at: ctx.start, duration: frames(ctx, FADE), ease: ctx.p.easing }]
 };
@@ -122,7 +125,7 @@ const Kicker: Template<'Kicker'> = {
     placed(
       ctx,
       ctx.p,
-      `<div data-fit="${typeSize(ctx)}" style="${css({ ...typeStyle(ctx, ctx.p, typeSize(ctx)), color: ctx.color(ctx.p.color), textTransform: 'uppercase' })}">${esc(ctx.p.text)}</div>`
+      `<div${hostId(ctx)} data-fit="${typeSize(ctx)}" style="${css({ ...typeStyle(ctx, ctx.p, typeSize(ctx)), color: ctx.color(ctx.p.color), textTransform: 'uppercase', ...ctx.text.vars })}">${ctx.text.style}${ctx.text.lines(ctx.p.text).join('\n')}</div>`
     )
 };
 
@@ -134,9 +137,10 @@ const Caption: Template<'Caption'> = {
       ...typeStyle(ctx, ctx.p, size),
       color: ctx.color(ctx.p.color),
       background: ctx.color(ctx.p.background),
-      padding: '0.25em 0.5em'
+      padding: '0.25em 0.5em',
+      ...ctx.text.vars
     });
-    return placed(ctx, ctx.p, `<span data-fit="${size}" style="${style}">${esc(ctx.p.text)}</span>`);
+    return placed(ctx, ctx.p, `<span${hostId(ctx)} data-fit="${size}" style="${style}">${ctx.text.style}${ctx.text.lines(ctx.p.text).join('\n')}</span>`);
   }
 };
 

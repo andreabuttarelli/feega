@@ -25,6 +25,8 @@ import { EFFECTS, EFFECT_KINDS } from '$lib/motion/effects/registry';
 import { addEffect, removeEffect, setEffect } from '$lib/motion/effects/ops';
 import { effectKey } from '$lib/motion/effects/model';
 import { BLEND_MODES } from '$lib/motion/blend';
+import { ANIMATOR_UNITS, SELECTOR_SHAPES, SELECTOR_KEYS, VALUES, VALUE_KEYS, animatorKey } from '$lib/motion/text-animators/model';
+import { PRESETS as TEXT_PRESET_SPECS, TEXT_PRESETS, addAnimator, applyPreset as applyTextPreset, removeAnimator, setAnimator } from '$lib/motion/text-animators/ops';
 import { setBlendMode } from '$lib/motion/blend-ops';
 
 export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number };
@@ -76,7 +78,8 @@ function summary(doc: MotionDoc, selection: string[]) {
         parentOpacity: c.parentOpacity,
         expressions: c.expressions,
         effects: c.effects,
-        blend: c.blend
+        blend: c.blend,
+        animators: c.animators
       }))
     })),
     assets: doc.assets,
@@ -102,6 +105,20 @@ const EFFECT_CATALOGUE = EFFECT_KINDS.map((k) => `${k} (${EFFECTS[k].about}; ${E
 
 const MAX_FONT_RESULTS = 50;
 const DEFAULT_FONT_RESULTS = 12;
+
+const ANIMATOR_VALUES = `${VALUE_KEYS.map((k) => `${k} ${VALUES[k].min}..${VALUES[k].max}`).join(', ')}, color`;
+
+const animatorValues = z.object({ ...Object.fromEntries(VALUE_KEYS.map((k) => [k, z.number().optional()])), color: z.string().optional() }).partial();
+
+const animatorFields = {
+  shape: z.enum(SELECTOR_SHAPES).optional(),
+  seed: z.number().int().nullable().optional(),
+  start: z.number().optional(),
+  end: z.number().optional(),
+  offset: z.number().optional(),
+  softness: z.number().optional(),
+  values: animatorValues.optional()
+};
 
 const CAMERA_UNITS = `${CAMERA_KEYS.map((k) => `${k} ${CAMERA[k].min}..${CAMERA[k].max}`).join(', ')}. x/y are fractions of the frame, z is the dolly in pixels (positive moves forward), rotations and fov in degrees, focusDistance is the depth in focus (same units as clip depth), aperture the blur strength (px of blur per 100 px out of focus)`;
 
@@ -498,6 +515,43 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: 'Remove a font from the video. Refused while a clip uses it.',
       inputSchema: z.object({ family: z.string().max(64) }),
       execute: async (input) => apply(removeFont(session.doc, input.family), `removed font ${input.family}`)
+    }),
+
+    add_text_animator: tool({
+      description: `Animate a text clip (Title, Text, Kicker, Caption) per character, word or line, like an After Effects text animator. The text is split into units; a range selector (start..end %, shifted by offset %, edges softened by softness 0..1 with shape square|ramp|smooth, order shuffled by seed) picks the units, and the selected ones get values: ${ANIMATOR_VALUES} (x/y in em, scale multiplier, rotation degrees, blur px, tracking em). Animate offset (or start/end) with set_keyframes on ta.<animator id>.offset to sweep the selection; every value is keyframable and expressionable the same way. All animators of a clip share one unit.`,
+      inputSchema: z.object({ clip_id: z.string(), unit: z.enum(ANIMATOR_UNITS), ...animatorFields }),
+      execute: async (input) => {
+        const id = deps.newId();
+        const { clip_id, ...animator } = input;
+        const out = apply(addAnimator(session.doc, clip_id, id, animator as never), `text animator on ${clip_id}`);
+        const values = Object.keys(input.values ?? {});
+        return out.ok ? { ...out, animator_id: id, animate: [...SELECTOR_KEYS, ...values].map((k) => animatorKey(id, k)) } : out;
+      }
+    }),
+
+    set_text_animator: tool({
+      description: 'Change a text animator: shape, seed, start/end/offset/softness, values (merged; the rest are kept), or its order (index).',
+      inputSchema: z.object({ clip_id: z.string(), animator_id: z.string(), unit: z.enum(ANIMATOR_UNITS).optional(), index: z.number().int().min(0).optional(), ...animatorFields }),
+      execute: async (input) => {
+        const { clip_id, animator_id, ...patch } = input;
+        return apply(setAnimator(session.doc, clip_id, animator_id, patch as never), `changed text animator ${animator_id}`);
+      }
+    }),
+
+    remove_text_animator: tool({
+      description: 'Remove a text animator with its keyframes and expressions.',
+      inputSchema: z.object({ clip_id: z.string(), animator_id: z.string() }),
+      execute: async (input) => apply(removeAnimator(session.doc, input.clip_id, input.animator_id), `removed text animator ${input.animator_id}`)
+    }),
+
+    apply_text_preset: tool({
+      description: `Add a ready-made text animation that plays between start and start+duration (seconds from the clip start): ${TEXT_PRESETS.map((p) => `${p} — ${TEXT_PRESET_SPECS[p].about}`).join('; ')}. Returns animator_id to tweak with set_text_animator.`,
+      inputSchema: z.object({ clip_id: z.string(), preset: z.enum(TEXT_PRESETS), start: z.number().min(0).default(0), duration: z.number().positive().default(1) }),
+      execute: async (input) => {
+        const id = deps.newId();
+        const out = apply(applyTextPreset(session.doc, input.clip_id, input.preset, { start: frames(input.start), duration: frames(input.duration) }, id), `${input.preset} on ${input.clip_id}`);
+        return out.ok ? { ...out, animator_id: id } : out;
+      }
     }),
 
     add_track: tool({

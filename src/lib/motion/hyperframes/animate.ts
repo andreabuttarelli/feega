@@ -4,6 +4,8 @@ import { css, js, px } from './html';
 import { MASK_LANES, MaskScope, maskTarget } from './masks';
 import type { MaskKey } from '../mask';
 import { ParentOpacity, pivotOf } from '../parent';
+import { animatorOfKey, animatorProps, cssName } from '../text-animators/model';
+import { textHostId } from '../text-animators/render';
 
 type Frame = { width: number; height: number; fps: number };
 
@@ -77,6 +79,10 @@ const LANE: Record<Source, (input: LaneInput) => Lane[]> = {
   [Source.Scene]: () => [],
   [Source.Param]: () => [],
   [Source.Effect]: () => [],
+  [Source.Animator]: ({ clip, key, track, resolve }) => {
+    const ref = animatorOfKey(key);
+    return ref ? [{ target: `#${textHostId(clip.id)}`, source: Source.Animator, track, vars: (v) => ({ [cssName(ref.id, ref.field)]: typeof v === 'string' ? resolve(v) : v }) }] : [];
+  },
   [Source.Mask]: ({ clip, key, track, frame }) =>
     clip.mask
       ? MASK_LANES[key as MaskKey].map((a) => ({ target: `#${maskTarget(MaskScope.Own, a.part, clip.id)}`, source: Source.Mask, track, vars: (v) => ({ attr: { [a.attr]: a.out(Number(v), frame) } }) }))
@@ -85,7 +91,7 @@ const LANE: Record<Source, (input: LaneInput) => Lane[]> = {
 
 function lanes(clip: MotionClip, frame: Frame, resolve: (color: string) => string, parents: Parents): Lane[] {
   return Object.entries(clip.keyframes).flatMap(([key, track]) => {
-    const prop = animProp(clip.component, key);
+    const prop = animProp(clip.component, key, animatorProps(clip.animators));
     return prop ? LANE[prop.source]({ clip, key, track, frame, resolve, parents }) : [];
   });
 }

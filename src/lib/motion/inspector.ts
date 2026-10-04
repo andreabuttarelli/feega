@@ -9,6 +9,8 @@ import { PropFormat, type PropSpec, type PropsSchema } from './custom/component'
 import { withParams } from './custom/params';
 import { effectOfKey } from './effects/model';
 import { setEffect } from './effects/ops';
+import { SELECTOR, animatorOfKey } from './text-animators/model';
+import { setAnimator } from './text-animators/ops';
 
 export enum InspectorTab {
   Properties = 'properties',
@@ -172,6 +174,14 @@ const EDIT_BASE: Record<Source, (doc: MotionDoc, clip: MotionClip, key: string, 
   [Source.Effect]: (doc, clip, key, value) => {
     const ref = effectOfKey(key);
     return ref ? setEffect(doc, clip.id, ref.effectId, { params: { [ref.param]: value } }) : { ok: false, error: `no effect for ${key}` };
+  },
+  [Source.Animator]: (doc, clip, key, value) => {
+    const ref = animatorOfKey(key);
+    if (!ref) {
+      return { ok: false, error: `no text animator for ${key}` };
+    }
+    const patch = ref.field in SELECTOR ? { [ref.field]: Number(value) } : { values: { [ref.field]: value } };
+    return setAnimator(doc, clip.id, ref.id, patch);
   },
   [Source.Mask]: (doc, clip, key, value) => (clip.mask ? setMask(doc, clip.id, { ...clip.mask, [MASK_PROPS[key as MaskKey].field]: Number(value) }) : { ok: false, error: 'add a mask first' })
 };

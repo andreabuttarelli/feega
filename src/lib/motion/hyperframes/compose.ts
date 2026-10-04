@@ -22,6 +22,7 @@ import { sampleTrack } from '../keyframes';
 import { STAGE_CSS, stageRootStyle, stageScript } from './stage';
 import { bakeExpressions } from '../expression/bake';
 import { FIT_TEXT, fitScript } from './fit-runtime';
+import { ANIMATOR_CSS, textRender } from '../text-animators/render';
 import { declaredFamilyCss, fontStack, loadDescriptors, googleFontsUrl, loadedWeight, uploadFaceCss, usedFaces } from '../fonts/model';
 import { EFFECT_CSS, effectLayer, effectScript, effectTimeline } from '../effects/render';
 import { blendStyle } from '../blend';
@@ -118,7 +119,8 @@ function ctxOf(clip: MotionClip, input: ComposeInput): TemplateCtx<ComponentId> 
     mediaStart: Number(seconds(clip.trimStart, doc.fps)),
     components: doc.components,
     font: (family) => fontStack(family, doc.fonts),
-    weight: (family, weight) => loadedWeight(family, weight, doc.fonts)
+    weight: (family, weight) => loadedWeight(family, weight, doc.fonts),
+    text: textRender(clip.id, clip.animators, (v) => resolveColor(v, tokens))
   };
 }
 
@@ -220,6 +222,7 @@ const BASE_CSS = [
   ANIMATE_CSS,
   MASK_CSS,
   EFFECT_CSS,
+  ANIMATOR_CSS,
   '.font-probe{position:absolute;left:0;top:0;opacity:0;pointer-events:none}'
 ].join('');
 

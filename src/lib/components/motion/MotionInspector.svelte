@@ -23,6 +23,8 @@
   import { EFFECTS, EFFECT_KINDS, type EffectKind } from '$lib/motion/effects/registry';
   import { addEffect, removeEffect, setEffect } from '$lib/motion/effects/ops';
   import { effectKey } from '$lib/motion/effects/model';
+  import { SELECTOR_SHAPES, animatorKey, type SelectorShape } from '$lib/motion/text-animators/model';
+  import { TEXT_COMPONENTS, TEXT_PRESETS, applyPreset as applyTextPreset, removeAnimator, setAnimator, type TextPreset } from '$lib/motion/text-animators/ops';
   import { BLEND_MODES, type BlendMode } from '$lib/motion/blend';
   import { setBlendMode } from '$lib/motion/blend-ops';
   import { expressionErrors, expressionValue } from '$lib/motion/expression/bake';
@@ -168,6 +170,17 @@
   let draggedEffect = $state<string | null>(null);
   const effectParams = (effectId: string) => animated.params.filter((p) => p.source === Source.Effect && p.key.startsWith(`${effectKey(effectId, '')}`));
 
+  const animatorRows = (id: string) => animated.params.filter((p) => p.source === Source.Animator && p.key.startsWith(animatorKey(id, '')));
+  const TEXT_PRESET_SECONDS = 1;
+
+  function addTextPreset(select: HTMLSelectElement) {
+    const preset = select.value as TextPreset;
+    select.value = '';
+    if (preset) {
+      commit(applyTextPreset(doc, clip.id, preset, { start: Math.max(0, frame - clip.from), duration: TEXT_PRESET_SECONDS * FPS }, crypto.randomUUID().slice(0, 8)), `Added ${preset}`);
+    }
+  }
+
   function addEffectOf(select: HTMLSelectElement) {
     const kind = select.value as EffectKind;
     select.value = '';
@@ -294,6 +307,33 @@
             {/each}
           {/each}
         </div>
+      </div>
+    </section>
+  {/if}
+
+  {#if TEXT_COMPONENTS.has(clip.component)}
+    <section data-testid="text-animators-section">
+      <h4>Text animators</h4>
+      {#each clip.animators as animator, i (animator.id)}
+        <div class="effect" data-animator={animator.id}>
+          <div class="effect-head">
+            <span class="effect-name">Animator {i + 1} · {animator.unit}</span>
+            <select aria-label="Selector shape" value={animator.shape} onchange={(e) => commit(setAnimator(doc, clip.id, animator.id, { shape: e.currentTarget.value as SelectorShape }), 'Changed a text animator')}>
+              {#each SELECTOR_SHAPES as shape (shape)}<option value={shape}>{shape}</option>{/each}
+            </select>
+            <button type="button" aria-label="Shuffle order" title="Randomise the order (seeded)" onclick={() => commit(setAnimator(doc, clip.id, animator.id, { seed: animator.seed === null ? 1 : null }), 'Changed a text animator')}>{animator.seed === null ? '↯' : '→'}</button>
+            <button type="button" aria-label={`Remove animator ${i + 1}`} onclick={() => commit(removeAnimator(doc, clip.id, animator.id), 'Removed a text animator')}>×</button>
+          </div>
+          {#each animatorRows(animator.id) as prop (prop.key)}
+            {#if prop.kind === ValueKind.Number}{@render animRow({ ...prop, label: prop.label.split(' · ')[1] })}{/if}
+          {/each}
+        </div>
+      {/each}
+      <div class="row">
+        <select aria-label="Add text preset" data-testid="add-text-preset" value="" onchange={(e) => addTextPreset(e.currentTarget)}>
+          <option value="">Add text animation…</option>
+          {#each TEXT_PRESETS as preset (preset)}<option value={preset}>{preset}</option>{/each}
+        </select>
       </div>
     </section>
   {/if}
