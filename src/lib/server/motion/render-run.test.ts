@@ -223,6 +223,23 @@ describe('render settings', () => {
   });
 });
 
+describe('length by plan', () => {
+  const long = () => ({ ...trailer(), durationInFrames: 90 * 30 });
+
+  it('a video longer than the plan renders is refused before a run, with the limit', async () => {
+    const { db } = fakeDb();
+
+    expect(await startRender(db, farm, scope, request(long()))).toMatchObject({ ok: false, error: RenderRefusal.Unsupported, detail: expect.stringMatching(/60 s/) });
+    expect(runs.createRun).not.toHaveBeenCalled();
+  });
+
+  it('a plan with a longer limit renders it', async () => {
+    const { db } = fakeDb();
+
+    expect(await startRender(db, farm, { ...scope, plan: 'starter' }, request(long()))).toMatchObject({ ok: true });
+  });
+});
+
 describe('4K', () => {
   it('a 4K render composes the 1080p doc zoomed into a 3840×2160 frame', () => {
     const job = farmJob({ doc: trailer(), tokens: FEEGA_TOKENS, assets: {} }, { ...settingsOf(Preset.Social), resolution: Resolution.P2160 });

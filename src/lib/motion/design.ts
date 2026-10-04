@@ -2,7 +2,7 @@ export const FPS = 30;
 export const FRAME_RATES = [24, 25, 30, 50, 60] as const;
 export type FrameRate = (typeof FRAME_RATES)[number];
 export const FASTEST_RATE = Math.max(...FRAME_RATES);
-export const MAX_SECONDS = 60;
+export const MAX_SECONDS = 180;
 
 export const maxFrames = (fps: number) => MAX_SECONDS * fps;
 

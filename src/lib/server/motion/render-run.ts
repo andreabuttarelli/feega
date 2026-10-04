@@ -16,6 +16,7 @@ import { CREDITS_PER_USD_SUBSCRIPTION_LIST } from '$lib/credit-ladder';
 import { farmChunks, farmProblem, renderOnFarm, type FarmJob } from './farm-render';
 import { FORMAT, exportProblem, oversize, type RenderSettings } from '$lib/motion/export-formats';
 import { setFrameRate } from '$lib/motion/frame-rate';
+import { lengthProblem } from '$lib/motion/render-length';
 import { saveExport } from './export';
 import type { RenderFarm } from './render-farm';
 
@@ -26,7 +27,7 @@ export enum RenderRefusal {
   Unsupported = 'render_unsupported'
 }
 
-export type RenderScope = { orgId: string; projectId: string; nodeId: string; userId: string; editorUrl: string };
+export type RenderScope = { orgId: string; projectId: string; nodeId: string; userId: string; editorUrl: string; plan?: string | null };
 export type RenderRequest = { version: number; doc: MotionDoc; settings: RenderSettings; job: FarmJob };
 export type RenderStart = { ok: true; runId: string; quote: RenderQuote } | { ok: false; error: RenderRefusal; detail?: string };
 
@@ -82,7 +83,7 @@ export async function startRender(db: Db, farm: RenderFarm | null, scope: Render
     return { ok: false, error: RenderRefusal.Busy };
   }
 
-  const problem = exportProblem(req.doc, req.settings) ?? farmProblem(req.job);
+  const problem = lengthProblem(req.doc.durationInFrames / req.doc.fps, scope.plan ?? null) ?? exportProblem(req.doc, req.settings) ?? farmProblem(req.job);
   if (problem) {
     return { ok: false, error: RenderRefusal.Unsupported, detail: problem };
   }
