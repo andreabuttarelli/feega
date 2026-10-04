@@ -30,7 +30,7 @@ code (`src/lib/video-models.ts`, `src/lib/image-models.ts`, `src/lib/canvas/audi
 | Cluster | Queries | Clicks | Impr. | Best pos. | Intent | feega today | Target page |
 |---|---|---|---|---|---|---|---|
 | AI commercial / ad maker | ~125 | 1 | ~1,500 | 38 (tv commercial maker) | make product video ads | Served: products node, image+video gen, voice-over/music, Meta ads (Meta only) | `/ai-commercial-maker` |
-| Video upscale / enhance | 167 | 13 | 937 | 14 | upscale a clip, sharpen, "4k" | Served: FLUX Video Upscale, clips ≤ 30 s. No "4K" promise | `/ai-video-upscaler` |
+| Video upscale / enhance | 167 | 13 | 937 | 14 | upscale a clip, sharpen, "4k" | Served: `/app/upscale` + canvas, FLUX Video Upscale, MP4 ≤ 20 s, ≤ 1440p in, 2× or 4K out. Not served: denoise, stabilise, colourise, fps | `/ai-video-upscaler` |
 | 3D animation | 75 | 4 | 742 | 10 (pixar 3d) | 3D-looking animated video | Served as video (Seedance/Kling). Not served: 3D model export | `/3d-animation-maker` |
 | Paper cutout / stop motion | 47 | 0 | 392 | 23 | paper stop-motion style | Served (style prompt + first frame) | `/paper-cutout-animation` |
 | Brand | 4 | 53 | 194 | 1 | find the product | Served | `/` |
@@ -236,3 +236,26 @@ Order = (existing position × volume × fit with the product). Served only.
 | 6–8 | Add example clips and prompt galleries to the commercial and 3D pages | Position trend on the two largest clusters |
 | 8–10 | Comparison/alternative content for "ai commercial maker" and "video enhancer" (positions 60–90 need depth and links) | Position trend on the commercial cluster |
 | 10–13 | Review: prune pages with no impressions, add character/image page if demand holds; GEO check (ask ChatGPT/Perplexity the target queries, record citations) | Clicks on feega.app ≥ the dalnulla baseline (185 / period) |
+
+## Video upscaler plan (2026-10-04)
+
+Baseline (GSC): "ai video upscaler" 92 impr, pos 13.5; "video upscaler" 42 impr, pos 18.8.
+Product now delivers the promise: tool `/app/upscale`, campaign `ai-video-upscaler` lands there.
+
+1. **Landing rewrite** — `docs/seo/upscaler-page.md`: H1 "AI Video Upscaler", answer-first
+   intro, real before/after (from a real run), 3 steps, specs, honest comparison, 5-question
+   FAQ, FAQPage + SoftwareApplication + VideoObject JSON-LD, CTA with UTM to `/app/upscale`.
+   Fix first: the live page says 30 s (model takes 20 s).
+2. **Internal links** — home tools list → `/ai-video-upscaler`; `/ai-video-generator` and
+   `/ai-commercial-maker` link it ("then upscale it").
+3. **Supporting articles** (drafts in `docs/seo/articles/`): how to upscale video to 4K; upscale
+   old/blurry video; best AI video upscalers 2026. Each links the landing with one anchor.
+4. **Not targeted**: "video upscaler online free" as a head term (we are paid) — answered in the
+   FAQ only; "ai video enhancer" beyond upscale (denoise/colour not served).
+
+KPIs (Search Console, page `/ai-video-upscaler`, 28-day windows vs baseline):
+- avg position for "ai video upscaler" < 10 by +8 weeks; "video upscaler" < 15;
+- impressions on "upscale video to 4k" cluster (new queries) > 100/28 d;
+- CTR on the page ≥ 3 % once on page 1;
+- FAQ rich result shown (Enhancements report, no FAQ errors);
+- downstream: sign-ups with `utm_campaign=ai-video-upscaler` and first `/app/upscale` run.
