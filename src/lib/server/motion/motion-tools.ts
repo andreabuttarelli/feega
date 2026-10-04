@@ -6,7 +6,7 @@ import { Ease, FPS, TRANSITION_KINDS } from '$lib/motion/design';
 import { MOTION_FORMATS, findClip, type MotionDoc } from '$lib/motion/doc';
 import { ClipEdge, Side, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyframes, setMask, setProps, setTiming, setTrackMatte, setTransform, setTransition, trimClip, type OpResult } from '$lib/motion/timeline';
 import { MASK_KEYS, MASK_KIND_IDS, MATTES } from '$lib/motion/mask';
-import { ANIMATABLE, TRANSFORM_KEYS, easeSchema, transformSchema } from '$lib/motion/keyframes';
+import { ANIMATABLE, TRANSFORM_KEYS, ValueKind, easeSchema, transformSchema } from '$lib/motion/keyframes';
 import type { MotionAsset } from './editor';
 import { MAX_FRAMES_PER_VIEW, MAX_VIEWS_PER_TURN, VIEW_FRAMES, type Frame } from './frames';
 import { CheckState, MAX_CSS, MAX_HTML, MAX_JS, SOURCE_FILES, checkState, propsSchemaSchema, sourceHash, type CustomComponent } from '$lib/motion/custom/component';
@@ -18,6 +18,9 @@ import { ParentOpacity } from '$lib/motion/parent';
 import { addNull, nullFromSelection, setParent, setParentOpacity } from '$lib/motion/parent-ops';
 import { setCameraExpression, setExpression } from '$lib/motion/expression/ops';
 import { EXPRESSION_GUIDE } from '$lib/motion/expression/guide';
+import { EFFECTS, EFFECT_KINDS } from '$lib/motion/effects/registry';
+import { addEffect, removeEffect, setEffect } from '$lib/motion/effects/ops';
+import { effectKey } from '$lib/motion/effects/model';
 
 export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number };
 
@@ -66,7 +69,8 @@ function summary(doc: MotionDoc, selection: string[]) {
         space: c.space,
         parent: c.parent,
         parentOpacity: c.parentOpacity,
-        expressions: c.expressions
+        expressions: c.expressions,
+        effects: c.effects
       }))
     })),
     assets: doc.assets,
@@ -86,6 +90,8 @@ function inSeconds(keyframes: Record<string, { frame: number; value: unknown; ea
 function cameraSummary(camera: Camera | null) {
   return camera ? { values: camera.base, dof: camera.dof, keyframes: inSeconds(camera.keyframes), expressions: camera.expressions } : null;
 }
+
+const EFFECT_CATALOGUE = EFFECT_KINDS.map((k) => `${k} (${EFFECTS[k].about}; ${EFFECTS[k].params.map((p) => `${p.key} ${p.kind === ValueKind.Color ? 'colour' : `${p.min}..${p.max}`}`).join(', ')})`).join('; ');
 
 const CAMERA_UNITS = `${CAMERA_KEYS.map((k) => `${k} ${CAMERA[k].min}..${CAMERA[k].max}`).join(', ')}. x/y are fractions of the frame, z is the dolly in pixels (positive moves forward), rotations and fov in degrees, focusDistance is the depth in focus (same units as clip depth), aperture the blur strength (px of blur per 100 px out of focus)`;
 
@@ -430,6 +436,28 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         }
         return apply(setExpression(session.doc, input.clip_id ?? '', input.prop, input.expression), `${input.prop} expression on ${input.clip_id}`);
       }
+    }),
+
+    add_effect: tool({
+      description: `Add an effect at the end of a clip's effect stack (applied top to bottom, inside the clip transform). Kinds and params: ${EFFECT_CATALOGUE}. Params not given take their defaults. Returns effect_id and the keys to animate: set_keyframes / set_expression with prop fx.<effect id>.<param>.`,
+      inputSchema: z.object({ clip_id: z.string(), kind: z.enum(EFFECT_KINDS), params: z.record(z.string(), z.union([z.number(), z.string()])).optional() }),
+      execute: async (input) => {
+        const id = deps.newId();
+        const out = apply(addEffect(session.doc, input.clip_id, input.kind, id, input.params), `added ${input.kind} to ${input.clip_id}`);
+        return out.ok ? { ...out, effect_id: id, animate: EFFECTS[input.kind].params.map((p) => effectKey(id, p.key)) } : out;
+      }
+    }),
+
+    set_effect: tool({
+      description: 'Change an effect of a clip: some params (the rest are kept), enabled on/off, or its position in the stack (index 0 applies first).',
+      inputSchema: z.object({ clip_id: z.string(), effect_id: z.string(), params: z.record(z.string(), z.union([z.number(), z.string()])).optional(), enabled: z.boolean().optional(), index: z.number().int().min(0).optional() }),
+      execute: async (input) => apply(setEffect(session.doc, input.clip_id, input.effect_id, { params: input.params, enabled: input.enabled, index: input.index }), `changed effect ${input.effect_id}`)
+    }),
+
+    remove_effect: tool({
+      description: 'Remove an effect from a clip, with its keyframes and expressions.',
+      inputSchema: z.object({ clip_id: z.string(), effect_id: z.string() }),
+      execute: async (input) => apply(removeEffect(session.doc, input.clip_id, input.effect_id), `removed effect ${input.effect_id}`)
     }),
 
     add_track: tool({

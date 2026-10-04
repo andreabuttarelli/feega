@@ -30,7 +30,8 @@ export enum Source {
   Prop = 'prop',
   Scene = 'scene',
   Mask = 'mask',
-  Param = 'param'
+  Param = 'param',
+  Effect = 'effect'
 }
 
 type Range = { label: string; min: number; max: number; step: number; fallback: number };
@@ -72,7 +73,7 @@ export const SCENE = {
 export type SceneKey = keyof typeof SCENE;
 export const SCENE_KEYS = Object.keys(SCENE) as SceneKey[];
 
-export type AnimProp = { key: string; label: string; kind: ValueKind; source: Source; min: number; max: number; step: number; fallback: number };
+export type AnimProp = { key: string; label: string; kind: ValueKind; source: Source; min: number; max: number; step: number; fallback: number; base?: KeyValue };
 
 const ANCHORS: readonly TransformKey[] = ['anchorX', 'anchorY'];
 
@@ -124,7 +125,8 @@ const BASE: Record<Source, (clip: Animated, prop: AnimProp) => KeyValue> = {
     return from ? Number(clip.props[from]) : prop.fallback;
   },
   [Source.Mask]: (clip, prop) => (clip.mask ? maskValue(clip.mask, prop.key as MaskKey) : prop.fallback),
-  [Source.Param]: (clip, prop) => (prop.kind === ValueKind.Color ? String(clip.props[prop.key]) : Number(clip.props[prop.key]))
+  [Source.Param]: (clip, prop) => (prop.kind === ValueKind.Color ? String(clip.props[prop.key]) : Number(clip.props[prop.key])),
+  [Source.Effect]: (_clip, prop) => prop.base ?? prop.fallback
 };
 
 export function baseValue(clip: Animated, key: string): KeyValue | null {
@@ -151,7 +153,8 @@ const SOURCE_PROBLEM: Record<Source, (clip: Pick<Animated, 'mask'>, key: string)
   [Source.Prop]: () => null,
   [Source.Scene]: () => null,
   [Source.Mask]: (clip, key) => (clip.mask ? null : `${key}: the clip has no mask, add one first (set_mask)`),
-  [Source.Param]: () => null
+  [Source.Param]: () => null,
+  [Source.Effect]: () => null
 };
 
 export function keyframesProblem(clip: Pick<Animated, 'component' | 'keyframes' | 'mask' | 'params'>): string | null {

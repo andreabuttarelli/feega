@@ -11,12 +11,15 @@
   import { InspectorTab, clipFieldGroups, editAt, keyAt, keyedField, parseDecimal, secondsLabel, toggleKey, valueAt, type Field } from '$lib/motion/inspector';
   import { setMask, setProps, setTiming, setTrackMatte, setTransform, setTransition, Side, type OpResult } from '$lib/motion/timeline';
   import { MASK_KINDS, MASK_KIND_IDS, MATTES, MaskKind, Matte, Needs, newMask, type Mask } from '$lib/motion/mask';
-  import { ANIMATABLE, Source, TRANSFORM, type AnimProp, type KeyValue } from '$lib/motion/keyframes';
+  import { ANIMATABLE, Source, TRANSFORM, ValueKind, type AnimProp, type KeyValue } from '$lib/motion/keyframes';
   import Dial from './Dial.svelte';
   import CodeEditor from './CodeEditor.svelte';
   import { withParams } from '$lib/motion/custom/params';
   import type { CustomSource } from '$lib/motion/custom/component';
   import { setExpression } from '$lib/motion/expression/ops';
+  import { EFFECTS, EFFECT_KINDS, type EffectKind } from '$lib/motion/effects/registry';
+  import { addEffect, removeEffect, setEffect } from '$lib/motion/effects/ops';
+  import { effectKey } from '$lib/motion/effects/model';
   import { expressionErrors, expressionValue } from '$lib/motion/expression/bake';
 
 
@@ -145,6 +148,24 @@
     }
   }
 
+  let draggedEffect = $state<string | null>(null);
+  const effectParams = (effectId: string) => animated.params.filter((p) => p.source === Source.Effect && p.key.startsWith(`${effectKey(effectId, '')}`));
+
+  function addEffectOf(select: HTMLSelectElement) {
+    const kind = select.value as EffectKind;
+    select.value = '';
+    if (kind) {
+      commit(addEffect(doc, clip.id, kind, crypto.randomUUID().slice(0, 8)), `Added ${EFFECTS[kind].label.toLowerCase()}`);
+    }
+  }
+
+  function dropEffect(index: number) {
+    if (draggedEffect) {
+      commit(setEffect(doc, clip.id, draggedEffect, { index }), 'Reordered effects');
+    }
+    draggedEffect = null;
+  }
+
   function toggle(key: string) {
     commit(toggleKey(doc, clip, key, frame, resolve), 'Toggled a keyframe');
   }
@@ -257,6 +278,37 @@
           {/each}
         </div>
       </div>
+    </section>
+  {/if}
+
+  {#if spec.track === TrackKind.Visual && clip.component !== 'Null'}
+    <section data-testid="effects-section">
+      <h4>Effects</h4>
+      {#each clip.effects as effect, i (effect.id)}
+        <div class="effect" class:off={!effect.enabled} role="listitem" draggable="true" data-effect={effect.id} ondragstart={() => (draggedEffect = effect.id)} ondragover={(e) => e.preventDefault()} ondrop={() => dropEffect(i)}>
+          <div class="effect-head">
+            <span class="grip" aria-hidden="true">⋮⋮</span>
+            <label class="effect-name"><input type="checkbox" checked={effect.enabled} aria-label={`Enable ${EFFECTS[effect.kind].label}`} onchange={(e) => commit(setEffect(doc, clip.id, effect.id, { enabled: e.currentTarget.checked }), 'Toggled an effect')} />{EFFECTS[effect.kind].label}</label>
+            <button type="button" aria-label="Move effect up" disabled={i === 0} onclick={() => commit(setEffect(doc, clip.id, effect.id, { index: i - 1 }), 'Reordered effects')}>↑</button>
+            <button type="button" aria-label="Move effect down" disabled={i === clip.effects.length - 1} onclick={() => commit(setEffect(doc, clip.id, effect.id, { index: i + 1 }), 'Reordered effects')}>↓</button>
+            <button type="button" aria-label={`Remove ${EFFECTS[effect.kind].label}`} onclick={() => commit(removeEffect(doc, clip.id, effect.id), 'Removed an effect')}>×</button>
+          </div>
+          {#each effectParams(effect.id) as prop (prop.key)}
+            {#if prop.kind === ValueKind.Color}
+              <div class="row anim" data-prop={prop.key}>
+                <span class="name">{@render diamond(prop.key)}{prop.label.split(' · ')[1]}</span>
+                <input type="color" aria-label={prop.label} value={resolve(String(shown(prop.key)))} onchange={(e) => animate(prop.key, e.currentTarget.value)} />
+              </div>
+            {:else}
+              {@render animRow({ ...prop, label: prop.label.split(' · ')[1] })}
+            {/if}
+          {/each}
+        </div>
+      {/each}
+      <select aria-label="Add effect" data-testid="add-effect" value="" onchange={(e) => addEffectOf(e.currentTarget)}>
+        <option value="">Add effect…</option>
+        {#each EFFECT_KINDS as kind (kind)}<option value={kind}>{EFFECTS[kind].label}</option>{/each}
+      </select>
     </section>
   {/if}
 
@@ -567,6 +619,35 @@
   .num {
     width: 56px !important;
     flex: none;
+  }
+
+  .effect {
+    border: 1px solid var(--border, #ddd);
+    padding: 6px;
+    margin-bottom: 6px;
+  }
+
+  .effect.off {
+    opacity: 0.5;
+  }
+
+  .effect-head {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 4px;
+  }
+
+  .effect-name {
+    flex: 1;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .grip {
+    cursor: grab;
+    color: var(--muted-foreground, #888);
   }
 
   .expr-toggle {

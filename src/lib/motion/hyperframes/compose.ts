@@ -21,6 +21,7 @@ import { cameraMath, stageSpec } from '../camera';
 import { sampleTrack } from '../keyframes';
 import { STAGE_CSS, stageRootStyle, stageScript } from './stage';
 import { bakeExpressions } from '../expression/bake';
+import { EFFECT_CSS, effectLayer, effectScript, effectTimeline } from '../effects/render';
 
 export { CAPTURE_REPLY, CAPTURE_REQUEST } from './capture';
 
@@ -147,7 +148,7 @@ type Placed = { layer: number; trackIndex: number; matte: Mask | null; visibilit
 
 function clipHtml(clip: MotionClip, ctx: TemplateCtx<ComponentId>, placed: Placed): string {
   const template = TEMPLATES[clip.component] as (typeof TEMPLATES)[ComponentId];
-  const inner = matted(clip, ctx, placed.matte, wrapParents(placed.chain, clip, ctx, wrapAnimated(clip, ctx, ownMask(clip, ctx, template.html(ctx as never)))));
+  const inner = matted(clip, ctx, placed.matte, wrapParents(placed.chain, clip, ctx, wrapAnimated(clip, ctx, effectLayer(clip, ctx, ctx.color, ownMask(clip, ctx, template.html(ctx as never))))));
   const fx = `<div class="fx" id="fx-${clip.id}">${inner}</div>`;
   const style = css({ zIndex: placed.layer, transform: placed.transform });
   const layer =
@@ -212,7 +213,8 @@ const BASE_CSS = [
   '.cc{position:absolute;inset:0;overflow:hidden}',
   '.li{display:block;will-change:transform}',
   ANIMATE_CSS,
-  MASK_CSS
+  MASK_CSS,
+  EFFECT_CSS
 ].join('');
 
 type ValueResolver = (value: unknown, ctx: TemplateCtx<ComponentId>) => unknown;
@@ -326,7 +328,7 @@ export function composeHtml(raw: ComposeInput): string {
     stage ? `<div id="world" class="world">${world.join('')}</div><!--/world-->` : '',
     layers.join(''),
     '</div>',
-    `<script>${animation.setup}const tl=gsap.timeline({paused:true});${holds.map(holdLine).join('')}${tweens.map(tweenLine).join('')}${animation.timeline}tl.set({}, {}, ${duration});window.__timelines=window.__timelines||{};window.__timelines[${js(COMPOSITION_ID)}]=tl;</script>`,
+    `<script>${animation.setup}const tl=gsap.timeline({paused:true});${holds.map(holdLine).join('')}${tweens.map(tweenLine).join('')}${animation.timeline}${effectScript(clips.flatMap((c) => effectTimeline(c, doc, (v) => resolveColor(v, tokens))))}tl.set({}, {}, ${duration});window.__timelines=window.__timelines||{};window.__timelines[${js(COMPOSITION_ID)}]=tl;</script>`,
     definitions,
     customBoot,
     stage ? `<script>${stageScript(stage, doc.fps, Number(duration))}</script>` : '',

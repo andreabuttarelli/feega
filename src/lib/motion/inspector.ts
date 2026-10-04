@@ -6,7 +6,9 @@ import type { MotionClip, MotionDoc } from './doc';
 import { MASK_PROPS, type MaskKey } from './mask';
 import { removeKeyframes, setKeyframe, setMask, setProps, setTransform, type OpResult } from './timeline';
 import { PropFormat, type PropSpec, type PropsSchema } from './custom/component';
-import { paramProps, withParams } from './custom/params';
+import { withParams } from './custom/params';
+import { effectOfKey } from './effects/model';
+import { setEffect } from './effects/ops';
 
 export enum InspectorTab {
   Properties = 'properties',
@@ -166,11 +168,15 @@ const EDIT_BASE: Record<Source, (doc: MotionDoc, clip: MotionClip, key: string, 
   [Source.Prop]: (doc, clip, key, value) => setProps(doc, clip.id, { [key]: value }),
   [Source.Scene]: (doc, clip, key, value, local) => setKeyframe(doc, clip.id, key, local, value),
   [Source.Param]: (doc, clip, key, value) => setProps(doc, clip.id, { [key]: value }),
+  [Source.Effect]: (doc, clip, key, value) => {
+    const ref = effectOfKey(key);
+    return ref ? setEffect(doc, clip.id, ref.effectId, { params: { [ref.param]: value } }) : { ok: false, error: `no effect for ${key}` };
+  },
   [Source.Mask]: (doc, clip, key, value) => (clip.mask ? setMask(doc, clip.id, { ...clip.mask, [MASK_PROPS[key as MaskKey].field]: Number(value) }) : { ok: false, error: 'add a mask first' })
 };
 
 export function editAt(doc: MotionDoc, clip: MotionClip, key: string, value: KeyValue, frame: number): OpResult {
-  const prop = animProp(clip.component, key, paramProps(doc, clip));
+  const prop = animProp(clip.component, key, withParams(doc, clip).params);
   if (!prop) {
     return { ok: false, error: `${clip.component} cannot animate ${key}` };
   }
