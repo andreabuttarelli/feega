@@ -87,3 +87,47 @@ describe('motion agent keyframe tools', () => {
     expect(prompt).toContain('set_transform');
   });
 });
+
+describe('motion agent keyframe interpolation', () => {
+  it('set_keyframes takes in/out kinds and roving per keyframe', async () => {
+    const { session, run } = setup();
+    await run('add_clip', { component: 'Title', start: 0, duration: 3 });
+    const out = await run('set_keyframes', {
+      clip_id: 'id1',
+      prop: 'x',
+      keyframes: [
+        { time: 0, value: 0, out: 'auto' },
+        { time: 1, value: 0.1, in: 'auto', out: 'hold', roving: true },
+        { time: 2, value: 0.3, in: 'linear' }
+      ]
+    });
+
+    expect(out.ok).toBe(true);
+    expect(findClip(session.doc, 'id1')!.clip.keyframes.x.map((k) => [k.in, k.out, k.roving])).toEqual([
+      [undefined, 'auto', undefined],
+      ['auto', 'hold', true],
+      ['linear', undefined, undefined]
+    ]);
+  });
+
+  it('set_key_interpolation changes keyframes already there, all or only at the given times', async () => {
+    const { session, run } = setup();
+    await run('add_clip', { component: 'Title', start: 0, duration: 3 });
+    await run('set_keyframes', { clip_id: 'id1', prop: 'scale', keyframes: [{ time: 0, value: 1 }, { time: 1, value: 2 }, { time: 2, value: 1 }] });
+    const out = await run('set_key_interpolation', { clip_id: 'id1', prop: 'scale', times: [1], out: 'hold' });
+
+    expect(out.ok).toBe(true);
+    expect(findClip(session.doc, 'id1')!.clip.keyframes.scale.map((k) => k.out)).toEqual([undefined, 'hold', undefined]);
+  });
+
+  it('get_motion_doc shows the interpolation of each keyframe', async () => {
+    const { run } = setup();
+    await run('add_clip', { component: 'Title', start: 0, duration: 3 });
+    await run('set_keyframes', { clip_id: 'id1', prop: 'x', keyframes: [{ time: 0, value: 0, out: 'continuous' }, { time: 1, value: 0.2, roving: true }, { time: 2, value: 0.4 }] });
+    const doc = (await run('get_motion_doc', {})) as { tracks: { clips: { keyframes: Record<string, Record<string, unknown>[]> }[] }[] };
+    const keys = doc.tracks[0].clips[0].keyframes.x;
+
+    expect(keys[0]).toMatchObject({ out: 'continuous' });
+    expect(keys[1]).toMatchObject({ roving: true });
+  });
+});

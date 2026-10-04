@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import gsap from 'gsap';
 import { Ease } from './design';
-import { ANIMATABLE, TRANSFORM, easeName, isAnimatable, keyframesProblem, mixColor, sampleTrack, type Keyframe } from './keyframes';
+import { ANIMATABLE, Interp, TRANSFORM, easeName, isAnimatable, keyframesProblem, mixColor, sampleTrack, type Keyframe } from './keyframes';
 
 const track: Keyframe[] = [
   { frame: 0, value: 0, ease: Ease.Linear },
@@ -96,5 +96,84 @@ describe('what can be animated', () => {
     expect(keyframesProblem({ component: 'Title', mask: null, keyframes: { rotateX: [{ frame: 0, value: 9999, ease: Ease.Linear }] } })).toMatch(/rotateX/);
     expect(keyframesProblem({ component: 'Title', mask: null, keyframes: { color: [{ frame: 0, value: 3, ease: Ease.Linear }] } })).toMatch(/colour/);
     expect(keyframesProblem({ component: 'Title', mask: null, keyframes: { color: [{ frame: 0, value: 'brand.accent', ease: Ease.Linear }], rotateZ: [{ frame: 3, value: 45, ease: Ease.Linear }] } })).toBeNull();
+  });
+});
+
+const key = (frame: number, value: number, extra: Partial<Keyframe> = {}): Keyframe => ({ frame, value, ease: Ease.Standard, ...extra });
+const slope = (t: Keyframe[], f: number, side: number) => (sampleTrack(t, f + side * 1e-4) - sampleTrack(t, f)) / (side * 1e-4);
+
+describe('interpolation kinds per keyframe', () => {
+  it('without in/out a keyframe keeps its bezier ease, as before', () => {
+    expect(sampleTrack([key(0, 0), key(30, 90)], 15)).toBeCloseTo(90 * (1 - 0.5 ** 4), 9);
+  });
+
+  it('hold out keeps the value until the next keyframe, then jumps', () => {
+    const t = [key(0, 0, { out: Interp.Hold }), key(10, 100)];
+    expect(sampleTrack(t, 9.99)).toBe(0);
+    expect(sampleTrack(t, 10)).toBe(100);
+  });
+
+  it('hold in on the next keyframe holds the segment too', () => {
+    expect(sampleTrack([key(0, 5), key(10, 100, { in: Interp.Hold })], 7)).toBe(5);
+  });
+
+  it('linear out and linear in ignore the ease and draw a straight line', () => {
+    const t = [key(0, 0, { out: Interp.Linear }), key(30, 90, { in: Interp.Linear })];
+    expect(sampleTrack(t, 10)).toBeCloseTo(30, 9);
+  });
+
+  it('auto-bezier is smooth through a middle keyframe', () => {
+    const t = [key(0, 0, { out: Interp.Auto }), key(20, 50, { in: Interp.Auto, out: Interp.Auto }), key(30, 100, { in: Interp.Auto })];
+    expect(slope(t, 20, -1)).toBeCloseTo(slope(t, 20, 1), 2);
+    expect(slope(t, 20, 1)).toBeCloseTo(100 / 30, 2);
+  });
+
+  it('auto-bezier flattens at a peak instead of overshooting it', () => {
+    const t = [key(0, 0, { out: Interp.Auto }), key(10, 100, { in: Interp.Auto, out: Interp.Auto }), key(30, 0, { in: Interp.Auto })];
+    for (let f = 0; f <= 30; f += 0.5) {
+      expect(sampleTrack(t, f)).toBeLessThanOrEqual(100 + 1e-9);
+    }
+    expect(slope(t, 10, 1)).toBeCloseTo(0, 2);
+  });
+
+  it('continuous keeps the through-velocity even at a peak', () => {
+    const t = [key(0, 0, { out: Interp.Continuous }), key(10, 100, { in: Interp.Continuous, out: Interp.Continuous }), key(20, 50, { in: Interp.Continuous })];
+    expect(slope(t, 10, -1)).toBeCloseTo(slope(t, 10, 1), 2);
+    expect(slope(t, 10, 1)).toBeCloseTo((50 - 0) / 20, 2);
+  });
+
+  it('two equal values stay flat whatever the kind', () => {
+    const t = [key(0, 3, { out: Interp.Continuous }), key(10, 3, { in: Interp.Continuous })];
+    expect(sampleTrack(t, 4)).toBe(3);
+  });
+
+  it('a bezier side meets an auto side with the slope of its own handle', () => {
+    const t = [key(0, 0, { ease: [0.5, 0, 0.5, 1] }), key(10, 100, { in: Interp.Linear })];
+    expect(slope(t, 0, 1)).toBeCloseTo(0, 1);
+    expect(slope(t, 10, -1)).toBeCloseTo(10, 1);
+  });
+
+  it('a roving keyframe is retimed so the speed is even between its fixed neighbours', () => {
+    const t = [key(0, 0, { ease: Ease.Linear }), key(10, 50, { ease: Ease.Linear, roving: true }), key(40, 100, { ease: Ease.Linear })];
+    expect(sampleTrack(t, 20)).toBeCloseTo(50, 9);
+    expect(sampleTrack(t, 10)).toBeCloseTo(25, 9);
+  });
+
+  it('the first and last keyframes never rove', () => {
+    const t = [key(0, 0, { ease: Ease.Linear, roving: true }), key(10, 100, { ease: Ease.Linear, roving: true })];
+    expect(sampleTrack(t, 5)).toBeCloseTo(50, 9);
+  });
+
+  it('every kind samples the same in the serialised sampler', () => {
+    const revived = new Function(`return (${sampleTrack.toString()})`)() as typeof sampleTrack;
+    const t = [key(0, 0, { out: Interp.Auto }), key(7, 40, { in: Interp.Continuous, out: Interp.Hold }), key(12, 60, { roving: true }), key(30, 10, { in: Interp.Linear })];
+    for (let f = 0; f <= 30; f += 0.25) {
+      expect(revived(t, f)).toBe(sampleTrack(t, f));
+    }
+  });
+
+  it('roving is only for spatial props', () => {
+    expect(keyframesProblem({ component: 'Title', mask: null, keyframes: { opacity: [key(0, 0), key(5, 1, { roving: true }), key(9, 0)] } })).toMatch(/roving/);
+    expect(keyframesProblem({ component: 'Title', mask: null, keyframes: { x: [key(0, 0), key(5, 0.2, { roving: true }), key(9, 0.4)] } })).toBeNull();
   });
 });

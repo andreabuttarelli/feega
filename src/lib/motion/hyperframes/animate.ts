@@ -1,6 +1,7 @@
 import type { MotionClip } from '../doc';
-import { Source, TRANSFORM, animProp, easeName, sampleTrack, type EaseSpec, type Keyframe, type SceneKey, type TransformKey } from '../keyframes';
+import { Source, TRANSFORM, animProp, easeName, isPlainTrack, sampleColor, sampleTrack, type EaseSpec, type Keyframe, type SceneKey, type TransformKey } from '../keyframes';
 import { css, js, px } from './html';
+import { Ease } from '../design';
 import { MASK_LANES, MaskScope, maskTarget } from './masks';
 import type { MaskKey } from '../mask';
 import { ParentOpacity, pivotOf } from '../parent';
@@ -96,8 +97,23 @@ function lanes(clip: MotionClip, frame: Frame, resolve: (color: string) => strin
   });
 }
 
+function frameByFrame(track: Keyframe[], resolve: (color: string) => string): Keyframe[] {
+  const first = track[0].frame;
+  const last = track[track.length - 1].frame;
+  const colour = typeof track[0].value === 'string';
+  return Array.from({ length: last - first + 1 }, (_, i) => ({
+    frame: first + i,
+    value: colour ? sampleColor(track, first + i, resolve) : sampleTrack(track, first + i),
+    ease: Ease.Linear
+  }));
+}
+
+function bakedLane(lane: Lane, resolve: (color: string) => string): Lane {
+  return isPlainTrack(lane.track) ? lane : { ...lane, track: frameByFrame(lane.track, resolve) };
+}
+
 export function keyframeTweens(clip: MotionClip, frame: Frame, resolve: (color: string) => string, parents: Parents = new Set()): KfTween[] {
-  return lanes(clip, frame, resolve, parents).flatMap((lane) =>
+  return lanes(clip, frame, resolve, parents).map((lane) => bakedLane(lane, resolve)).flatMap((lane) =>
     lane.track.slice(0, -1).map((k, i) => {
       const next = lane.track[i + 1];
       return {

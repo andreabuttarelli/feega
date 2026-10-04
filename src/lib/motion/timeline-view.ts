@@ -96,6 +96,11 @@ export function handleAt(handles: readonly Handle[], x: number): Handle | null {
   return handles.findLast((h) => x >= h.left && x < h.left + h.width) ?? null;
 }
 
+export enum KeySide {
+  Out = 'out',
+  In = 'in'
+}
+
 export type KeyLane = { prop: string; label: string; source: Source; frames: number[] };
 
 export function keyLanes(clip: MotionClip & { params?: readonly AnimProp[] }): KeyLane[] {

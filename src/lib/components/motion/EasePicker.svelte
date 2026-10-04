@@ -1,14 +1,22 @@
 <script lang="ts">
   import { EASE_IDS, EASE_LABEL } from '$lib/motion/design';
-  import type { Bezier, EaseSpec } from '$lib/motion/keyframes';
-  import { easePath } from '$lib/motion/timeline-view';
+  import { INTERPS, INTERP_LABEL, Interp, type Bezier, type EaseSpec } from '$lib/motion/keyframes';
+  import { KeySide, easePath } from '$lib/motion/timeline-view';
   import { parseDecimal } from '$lib/motion/inspector';
 
   const CURVE_PX = 28;
   const PREVIEW_PX = 64;
   const DEFAULT_BEZIER: Bezier = [0.25, 0.1, 0.25, 1];
 
-  let { ease, onpick, onclose }: { ease: EaseSpec; onpick: (ease: EaseSpec) => void; onclose: () => void } = $props();
+  const SIDE_LABEL: Record<KeySide, string> = { [KeySide.Out]: 'Leaving', [KeySide.In]: 'Entering next' };
+
+  let {
+    ease,
+    kinds = { [KeySide.Out]: Interp.Bezier, [KeySide.In]: Interp.Bezier },
+    onpick,
+    onkind,
+    onclose
+  }: { ease: EaseSpec; kinds?: Record<KeySide, Interp>; onpick: (ease: EaseSpec) => void; onkind?: (side: KeySide, kind: Interp) => void; onclose: () => void } = $props();
 
   const bezier = $derived<Bezier>(typeof ease === 'string' ? DEFAULT_BEZIER : ease);
 
@@ -35,6 +43,16 @@
       </button>
     {/each}
   </div>
+  {#if onkind}
+    {#each Object.values(KeySide) as side (side)}
+      <div class="kinds" role="group" aria-label={SIDE_LABEL[side]} data-key-side={side}>
+        <span>{SIDE_LABEL[side]}</span>
+        {#each INTERPS as kind (kind)}
+          <button type="button" class:on={kinds[side] === kind} aria-pressed={kinds[side] === kind} onclick={() => onkind(side, kind)}>{INTERP_LABEL[kind]}</button>
+        {/each}
+      </div>
+    {/each}
+  {/if}
   <div class="bezier">
     <span>cubic-bezier</span>
     {#each bezier as point, i (i)}
@@ -94,6 +112,31 @@
   .named button.on {
     outline: 2px solid var(--ui-accent);
     outline-offset: -1px;
+  }
+
+  .kinds {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 3px;
+  }
+
+  .kinds span {
+    width: 100%;
+    font-family: var(--ui-mono);
+    color: var(--ui-ink-2);
+  }
+
+  .kinds button {
+    padding: 1px 4px;
+    border: 1px solid var(--ui-line);
+    font-size: 9px;
+  }
+
+  .kinds button.on {
+    background: var(--ui-accent-wash);
+    border-color: var(--ui-accent);
+    color: var(--ui-accent);
   }
 
   .bezier {
