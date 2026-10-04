@@ -15,6 +15,9 @@ import { Library, THREE_GLOBAL, bootScript, definitionScript, librariesOf, seedO
 import { PropFormat, type CustomComponents } from '../custom/component';
 import { hiddenMattes, matteMask, matteSource } from '../matte';
 import { Matte, type Mask } from '../mask';
+import { cameraMath, stageSpec } from '../camera';
+import { sampleTrack } from '../keyframes';
+import { STAGE_CSS, stageRootStyle, stageScript } from './stage';
 
 export { CAPTURE_REPLY, CAPTURE_REQUEST } from './capture';
 
@@ -137,13 +140,13 @@ enum Visibility {
   MatteSource = 'matte-source'
 }
 
-type Placed = { layer: number; trackIndex: number; matte: Mask | null; visibility: Visibility };
+type Placed = { layer: number; trackIndex: number; matte: Mask | null; visibility: Visibility; transform?: string };
 
 function clipHtml(clip: MotionClip, ctx: TemplateCtx<ComponentId>, placed: Placed): string {
   const template = TEMPLATES[clip.component] as (typeof TEMPLATES)[ComponentId];
   const inner = matted(clip, ctx, placed.matte, wrapAnimated(clip, ctx, ownMask(clip, ctx, template.html(ctx as never))));
   const fx = `<div class="fx" id="fx-${clip.id}">${inner}</div>`;
-  const style = css({ zIndex: placed.layer });
+  const style = css({ zIndex: placed.layer, transform: placed.transform });
   const layer =
     template.timing === Timing.Media
       ? `<div class="layer" data-clip="${esc(clip.id)}" style="${style}">${fx}</div>`
@@ -170,7 +173,7 @@ function round(n: number): number {
   return Math.round(n * 10000) / 10000;
 }
 
-function threeClipOf(clip: MotionClip, ctx: TemplateCtx<ComponentId>): ThreeClip {
+function threeClipOf(clip: MotionClip, ctx: TemplateCtx<ComponentId>, staged: boolean): ThreeClip {
   const p = clip.props as PropsOf<'Model3D'> & Partial<PropsOf<'Shape3D'>>;
   return {
     id: clip.id,
@@ -188,7 +191,8 @@ function threeClipOf(clip: MotionClip, ctx: TemplateCtx<ComponentId>): ThreeClip
     shadow: p.shadow,
     ease: GSAP_EASE[p.easing],
     fps: ctx.fps,
-    keys: sceneKeys(clip)
+    keys: sceneKeys(clip),
+    depth: staged ? clip.depth : null
   };
 }
 
@@ -249,6 +253,10 @@ export function composeHtml(input: ComposeInput): string {
   const clips: MotionClip[] = [];
   const runs: CustomRun[] = [];
   const hidden = hiddenMattes(doc);
+  const stage = doc.camera ? stageSpec(doc) : null;
+  const onStage = new Set(stage?.layers.map((l) => l.id));
+  const startPose = new Map(stage ? cameraMath(sampleTrack).frameAt(stage, 0).layers.map((l) => [l.id, l.transform]) : []);
+  const world: string[] = [];
   let layer = 0;
 
   for (const { track, index } of bottomFirst) {
@@ -257,12 +265,13 @@ export function composeHtml(input: ComposeInput): string {
       clips.push(clip);
       const template = TEMPLATES[clip.component] as (typeof TEMPLATES)[ComponentId];
       layer += 1;
-      layers.push(clipHtml(clip, ctx, { layer, trackIndex: index, matte: matteOf(doc, clip), visibility: hidden.has(clip.id) ? Visibility.MatteSource : Visibility.Shown }));
+      const html = clipHtml(clip, ctx, { layer, trackIndex: index, matte: matteOf(doc, clip), visibility: hidden.has(clip.id) ? Visibility.MatteSource : Visibility.Shown, transform: startPose.get(clip.id) });
+      (onStage.has(clip.id) ? world : layers).push(html);
       const own = template.tweens?.(ctx as never) ?? [];
       tweens.push(...edgeTweens(clip, doc.fps), ...moveTweens(clip, doc.fps), ...own);
       holds.push(...heldUntilStart(own, ctx.start));
       if (THREE_D_COMPONENTS.includes(clip.component)) {
-        three.push(threeClipOf(clip, ctx));
+        three.push(threeClipOf(clip, ctx, onStage.has(clip.id)));
       }
       const run = clip.component === 'Custom' ? customRun(clip, ctx, doc.components) : null;
       if (run) {
@@ -297,15 +306,17 @@ export function composeHtml(input: ComposeInput): string {
     ...[...libraries].map((lib) => LIBRARY_TAGS[lib].tag),
     three.length || threeCustom ? threeImportMap() : '',
     `<link rel="stylesheet" crossorigin="anonymous" href="${FONTS_URL}" />`,
-    `<style>${BASE_CSS}#root{background:${esc(background)}}</style>`,
+    `<style>${BASE_CSS}#root{background:${esc(background)}}${stage ? STAGE_CSS + stageRootStyle(stage) : ''}</style>`,
     '</head><body>',
     `<div id="root" data-composition-id="${COMPOSITION_ID}" data-start="0" data-width="${doc.width}" data-height="${doc.height}" data-duration="${duration}" data-fps="${doc.fps}">`,
+    stage ? `<div id="world" class="world">${world.join('')}</div><!--/world-->` : '',
     layers.join(''),
     '</div>',
     `<script>${animation.setup}const tl=gsap.timeline({paused:true});${holds.map(holdLine).join('')}${tweens.map(tweenLine).join('')}${animation.timeline}tl.set({}, {}, ${duration});window.__timelines=window.__timelines||{};window.__timelines[${js(COMPOSITION_ID)}]=tl;</script>`,
     definitions,
     customBoot,
-    threeScript(three, Number(duration))
+    stage ? `<script>${stageScript(stage, doc.fps, Number(duration))}</script>` : '',
+    threeScript(three, Number(duration), stage)
   ].join('');
   return `${page}${captureScript(doc, contentStamp(page))}</body></html>`;
 }
