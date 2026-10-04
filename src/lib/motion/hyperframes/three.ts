@@ -1,9 +1,10 @@
 import { js } from './html';
 import { SCENE, sampleTrack, type Keyframe, type SceneKey } from '../keyframes';
 import type { StageSpec } from '../camera';
-import { cameraRuntime } from './stage';
+import { cameraRuntime, seekDriver } from './stage';
 
 export const THREE_VERSION = '0.181.2';
+export const THREE_TIMELINE = 'feegaThree';
 
 export type ThreeClip = {
   id: string;
@@ -187,9 +188,8 @@ window.__hf.buildReady = window.__hf.buildReady || {};
 window.__hf.buildReady['motion-three'] = Promise.all(scenes.map((x) => x.ready)).then(() => renderAt(window.__hfThreeTime || 0));
 window.addEventListener('hf-seek', (e) => renderAt(e.detail.time));
 const tl = window.__timelines && window.__timelines.main;
-if (tl) {
-  tl.to({}, { duration: DURATION, onUpdate: () => renderAt(tl.time()) }, 0);
-}
+const gsap = window.gsap;
+DRIVER
 renderAt(window.__hfThreeTime || 0);
 `;
 
@@ -197,5 +197,5 @@ export function threeScript(clips: ThreeClip[], duration: number, stage: StageSp
   if (!clips.length) {
     return '';
   }
-  return `<script type="module">const CLIPS = ${js(clips)};const LIGHTING = ${js(LIGHTING)};const DURATION = ${js(duration)};const FOV = ${SCENE.fov.fallback};const STAGE = ${js(stage)};${cameraRuntime()}const sampleTrack = (${sampleTrack.toString()});${SCENE_SCRIPT}</script>`;
+  return `<script type="module">const CLIPS = ${js(clips)};const LIGHTING = ${js(LIGHTING)};const DURATION = ${js(duration)};const FOV = ${SCENE.fov.fallback};const STAGE = ${js(stage)};${cameraRuntime()}const sampleTrack = (${sampleTrack.toString()});${SCENE_SCRIPT.replace('DRIVER', seekDriver(THREE_TIMELINE, 'DURATION', 'renderAt'))}</script>`;
 }

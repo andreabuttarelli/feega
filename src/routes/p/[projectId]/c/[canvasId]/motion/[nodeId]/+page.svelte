@@ -23,6 +23,7 @@
   import { CheckState, sourceHash } from '$lib/motion/custom/component';
   import MotionTimeline from '$lib/components/motion/MotionTimeline.svelte';
   import MotionInspector from '$lib/components/motion/MotionInspector.svelte';
+  import CameraInspector from '$lib/components/motion/CameraInspector.svelte';
   import MaskOverlay from '$lib/components/motion/MaskOverlay.svelte';
   import ExportDialog from '$lib/components/motion/ExportDialog.svelte';
   import SoundDialog, { type Made, type SoundKind } from '$lib/components/motion/SoundDialog.svelte';
@@ -76,6 +77,7 @@
   let history = $state<History>(startHistory(data.head.doc as MotionDoc));
   let version = $state(data.head.version);
   let selection = $state<string[]>([]);
+  let cameraOpen = $state(false);
   let keySelection = $state<KeyRef[]>([]);
   let keyBoard: KeyBoard = [];
   let frame = $state(0);
@@ -528,13 +530,15 @@
       </div>
 
       <div class="tl">
-        <MotionTimeline {doc} bind:frame bind:selection bind:keySelection {zoom} {snap} {waveforms} onchange={edit} />
+        <MotionTimeline {doc} bind:frame bind:selection bind:keySelection bind:camera={cameraOpen} {zoom} {snap} {waveforms} onchange={edit} />
       </div>
     </section>
 
     <aside class="props" class:open={sheet === Sheet.Properties} aria-label="Properties">
       <div class="sheet-head"><span>Properties</span><button type="button" aria-label="Close" onclick={() => (sheet = Sheet.None)}><X size={16} /></button></div>
-      {#if selected}
+      {#if cameraOpen && !selection.length}
+        <CameraInspector {doc} {frame} onchange={edit} />
+      {:else if selected}
         <MotionInspector {doc} clip={selected} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} bind:tab={inspectorTab} onchange={edit} />
       {:else}
         <p class="hint">{selection.length > 1 ? `${selection.length} clips selected.` : 'Select a clip in the timeline to edit its properties.'}</p>

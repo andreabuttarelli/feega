@@ -9,7 +9,8 @@ import { sampleTrack } from '../keyframes';
 import { addClip, type OpResult } from '../timeline';
 import { seekPlan } from '../custom/determinism';
 import { composeHtml } from './compose';
-import { STAGE_TIMELINE, stageScript } from './stage';
+import { STAGE_TIMELINE, seekDriver, stageScript } from './stage';
+import { THREE_TIMELINE } from './three';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -81,6 +82,29 @@ function boot(doc: MotionDoc) {
 
 afterEach(() => {
   delete (window as unknown as Record<string, unknown>).__timelines;
+});
+
+describe('driving a page renderer from the timeline', () => {
+  it('runs on a seek with callbacks suppressed, the way the HyperFrames runtime seeks', () => {
+    const tl = gsap.timeline({ paused: true });
+    const seen: number[] = [];
+    const w = window as unknown as Record<string, unknown>;
+    w.gsap = gsap;
+    w.__timelines = { main: tl };
+    w.probe = (t: number) => seen.push(Math.round(t * 100) / 100);
+    window.eval(`const tl=window.__timelines.main;${seekDriver('feegaProbe', 4, 'probe')}`);
+
+    tl.totalTime(1.5, true);
+    tl.totalTime(0.5, true);
+
+    expect(seen.slice(-2)).toEqual([1.5, 0.5]);
+  });
+
+  it('a 3D scene is redrawn by the same driver, not by an onUpdate the runtime never calls', () => {
+    const doc = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Shape3D', from: 0, durationInFrames: 60 }, 'cube'));
+
+    expect(compose(doc)).toContain(seekDriver(THREE_TIMELINE, 'DURATION', 'renderAt'));
+  });
 });
 
 describe('the stage at runtime', () => {

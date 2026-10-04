@@ -8,7 +8,9 @@
   import { Grip, Snap, edgeHandles, frameAt, keyLanes, pxPerFrame, rulerTicks, snapped, stackRows, type KeyLane } from '$lib/motion/timeline-view';
   import { MASK_KINDS, Matte } from '$lib/motion/mask';
   import type { MotionTrack } from '$lib/motion/doc';
-  import { Source, type EaseSpec } from '$lib/motion/keyframes';
+  import { Source, type EaseSpec, type Keyframe } from '$lib/motion/keyframes';
+  import { CAMERA_LANE } from '$lib/motion/camera';
+  import { cameraLanes } from '$lib/motion/camera-ops';
   import EasePicker from './EasePicker.svelte';
   import { PEAKS_PER_SECOND, clipPeaks, wavePath } from '$lib/motion/waveform';
 
@@ -22,6 +24,8 @@
   const Drag = { Move: 'move', TrimStart: 'trim-start', TrimEnd: 'trim-end', Scrub: 'scrub', Keys: 'keys' } as const;
   type Drag = (typeof Drag)[keyof typeof Drag];
 
+  type KeyOwner = { id: string; from: number; keyframes: Partial<Record<string, Keyframe[]>> };
+
   type Gesture = { kind: Drag; clipId: string; trackId: string; grabFrame: number; originFrom: number; base: MotionDoc; refs: KeyRef[]; delta: number };
 
   let {
@@ -29,11 +33,12 @@
     frame = $bindable(0),
     selection = $bindable<string[]>([]),
     keySelection = $bindable<KeyRef[]>([]),
+    camera = $bindable(false),
     zoom,
     snap,
     waveforms = {},
     onchange
-  }: { doc: MotionDoc; frame?: number; selection?: string[]; keySelection?: KeyRef[]; zoom: number; snap: Snap; waveforms?: Record<string, number[]>; onchange: (doc: MotionDoc, summary: string) => void } = $props();
+  }: { doc: MotionDoc; frame?: number; selection?: string[]; keySelection?: KeyRef[]; camera?: boolean; zoom: number; snap: Snap; waveforms?: Record<string, number[]>; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 
   let collapsed = $state<string[]>([]);
   let easing = $state<{ ref: KeyRef; ease: EaseSpec; left: number; top: number } | null>(null);
@@ -53,6 +58,7 @@
   }
 
   function select(clipId: string, e: PointerEvent) {
+    camera = false;
     if (e.shiftKey || e.metaKey || e.ctrlKey) {
       selection = selection.includes(clipId) ? selection.filter((id) => id !== clipId) : [...selection, clipId];
       return;
@@ -74,7 +80,7 @@
 
   const sameKey = (a: KeyRef, b: KeyRef) => a.clipId === b.clipId && a.prop === b.prop && a.frame === b.frame;
 
-  function startKey(e: PointerEvent, clip: MotionClip, ref: KeyRef) {
+  function startKey(e: PointerEvent, clip: KeyOwner, ref: KeyRef) {
     e.stopPropagation();
     easing = null;
     const picked = keySelection.some((k) => sameKey(k, ref));
@@ -88,7 +94,7 @@
     gesture = { kind: Drag.Keys, clipId: clip.id, trackId: '', grabFrame: clip.from + ref.frame, originFrom: clip.from + ref.frame, base: doc, refs: keySelection, delta: 0 };
   }
 
-  function openEase(e: MouseEvent, clip: MotionClip, ref: KeyRef, ease: EaseSpec) {
+  function openEase(e: MouseEvent, clip: KeyOwner, ref: KeyRef, ease: EaseSpec) {
     e.stopPropagation();
     const rect = lanes!.getBoundingClientRect();
     easing = { ref, ease, left: e.clientX - rect.left + lanes!.scrollLeft, top: e.clientY - rect.top + lanes!.scrollTop + 8 };
@@ -116,6 +122,15 @@
 
   function clipById(id: string): MotionClip {
     return shown.tracks.flatMap((t) => t.clips).find((c) => c.id === id) as MotionClip;
+  }
+
+  const cameraOwner = $derived<KeyOwner | null>(shown.camera ? { id: CAMERA_LANE, from: 0, keyframes: shown.camera.keyframes } : null);
+
+  function pickCamera(e: PointerEvent) {
+    e.stopPropagation();
+    camera = true;
+    selection = [];
+    keySelection = [];
   }
 
   function startScrub(e: PointerEvent) {
@@ -203,8 +218,8 @@
 
 <svelte:window onpointermove={onMove} onpointerup={onUp} />
 
-  {#snippet keyLane(clip: MotionClip, lane: KeyLane)}
-    {@const keys = clip.keyframes[lane.prop]}
+  {#snippet keyLane(clip: KeyOwner, lane: { prop: string; label: string })}
+    {@const keys = clip.keyframes[lane.prop] ?? []}
     <div class="lane sub" data-key-lane={`${clip.id}:${lane.prop}`} style={`height: ${KEY_ROW_PX}px;`}>
       <div class="head" style={`width: ${HEADER_PX}px;`}><span class="name prop">{lane.label}</span></div>
       <div class="clips">
@@ -245,6 +260,29 @@
         </span>
       {/each}
     </div>
+
+    <div class="lane camera-track" data-camera-track style={`height: ${ROW_PX + 2 * LANE_PAD_PX}px;`}>
+      <div class="head" style={`width: ${HEADER_PX}px;`}><span class="name">Camera</span></div>
+      <div class="clips">
+        <div
+          class="bar camera-bar"
+          class:selected={camera}
+          class:ghost={!shown.camera}
+          role="button"
+          tabindex="0"
+          aria-label="Camera"
+          data-testid="camera-bar"
+          style={`left: 0; width: ${Math.max(4, shown.durationInFrames * ppf)}px; top: ${LANE_PAD_PX}px; height: ${ROW_PX - 2}px;`}
+          onpointerdown={pickCamera}
+        >
+          <span class="kind">Camera{#if shown.camera?.dof}<span class="tag"> · depth of field</span>{/if}</span>
+          <span class="label">{shown.camera ? `${cameraLanes(shown.camera).length} animated values` : 'Add a camera for 3D moves'}</span>
+        </div>
+      </div>
+    </div>
+    {#if cameraOwner}
+      {#each cameraLanes(shown.camera) as lane (lane.prop)}{@render keyLane(cameraOwner, lane)}{/each}
+    {/if}
 
     {#each shown.tracks as track, index (track.id)}
       {@const rows = stackRows(track.clips)}
@@ -460,6 +498,17 @@
 
   .grip:hover {
     background: color-mix(in srgb, #0099ff 45%, transparent);
+  }
+
+  .camera-bar {
+    background: color-mix(in srgb, #a855f7 12%, var(--paper));
+    border-color: #a855f7;
+    cursor: pointer;
+  }
+
+  .camera-bar.ghost {
+    background: transparent;
+    border-style: dashed;
   }
 
   .bar.selected {

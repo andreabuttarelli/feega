@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CAMERA_LANE, Space, cameraMath, stageSpec, type StageSpec } from './camera';
-import { CameraPreset, applyPreset, removeCamera, setCamera, setCameraKeyframe, setCameraKeyframes, setClipDepth } from './camera-ops';
+import { CameraPreset, applyPreset, cameraEditAt, cameraKeyToggle, cameraLanes, cameraValueAt, focusOn, removeCamera, setCamera, setCameraKeyframe, setCameraKeyframes, setClipDepth } from './camera-ops';
 import { Ease } from './design';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
 import { sampleTrack } from './keyframes';
@@ -146,5 +146,41 @@ describe('camera presets', () => {
 
   it('a move past the end of the video is refused', () => {
     expect(applyPreset(layered(), CameraPreset.DollyIn, { start: 400, duration: 90 })).toMatchObject({ ok: false });
+  });
+});
+
+describe('camera edits at the playhead', () => {
+  it('a value without keyframes changes the base, a keyed one gets a key at the playhead', () => {
+    let doc = must(cameraEditAt(layered(), 'fov', 30, 45));
+    expect(doc.camera!.base.fov).toBe(30);
+
+    doc = must(cameraKeyToggle(doc, 'z', 0));
+    doc = must(cameraEditAt(doc, 'z', 400, 60));
+    expect(doc.camera!.keyframes.z!.map((k) => [k.frame, k.value])).toEqual([
+      [0, 0],
+      [60, 400]
+    ]);
+    expect(cameraValueAt(doc, 'z', 30)).toBeGreaterThan(0);
+    expect(must(cameraKeyToggle(doc, 'z', 60)).camera!.keyframes.z!.map((k) => k.frame)).toEqual([0]);
+  });
+
+  it('focus on a clip sets the focus distance to its depth', () => {
+    const doc = must(focusOn(layered(), 'product', 0));
+
+    expect(doc.camera!.base.focusDistance).toBe(1200);
+    expect(focusOn(layered(), 'ghost', 0).ok).toBe(false);
+  });
+});
+
+describe('the camera timeline lanes', () => {
+  it('lists the animated camera values in table order, with their frames', () => {
+    let doc = must(setCameraKeyframes(layered(), 'focusDistance', [{ frame: 10, value: 0, ease: Ease.Linear }]));
+    doc = must(setCameraKeyframes(doc, 'z', [{ frame: 0, value: 0, ease: Ease.Linear }, { frame: 30, value: 9, ease: Ease.Linear }]));
+
+    expect(cameraLanes(doc.camera)).toEqual([
+      { prop: 'z', label: 'Dolly Z', frames: [0, 30] },
+      { prop: 'focusDistance', label: 'Focus distance', frames: [10] }
+    ]);
+    expect(cameraLanes(null)).toEqual([]);
   });
 });

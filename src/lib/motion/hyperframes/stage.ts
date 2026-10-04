@@ -28,13 +28,14 @@ function stageAt(time){
   });
 }
 const tl=window.__timelines&&window.__timelines.main;
-if(tl){
-  gsap.registerPlugin({name:${js(STAGE_TIMELINE)},rawVars:1,init:function(){},render:function(ratio){stageAt(ratio*${duration});}});
-  tl.to({},{duration:${duration},ease:'none',${STAGE_TIMELINE}:1},0);
-}
+${seekDriver(STAGE_TIMELINE, duration, 'stageAt')}
 window.addEventListener('hf-seek',function(e){stageAt(e.detail.time);});
 stageAt(0);
 })();`;
+}
+
+export function seekDriver(name: string, duration: number | string, render: string): string {
+  return `if(tl){gsap.registerPlugin({name:${js(name)},rawVars:1,init:function(){},render:function(ratio){${render}(ratio*${duration});}});tl.to({},{duration:${duration},ease:'none',${name}:1},0);}`;
 }
 
 export function stageRootStyle(spec: StageSpec): string {

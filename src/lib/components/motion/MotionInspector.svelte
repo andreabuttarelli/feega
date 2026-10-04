@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { BRAND_COLORS, COMPONENTS, Control, type AssetKind } from '$lib/motion/components';
+  import { BRAND_COLORS, COMPONENTS, Control, TrackKind, type AssetKind } from '$lib/motion/components';
+  import { DEPTH, Space } from '$lib/motion/camera';
+  import { setClipDepth } from '$lib/motion/camera-ops';
   import { FPS, TRANSITION_KINDS, type Edge } from '$lib/motion/design';
   import { resolveColor, type BrandTokens } from '$lib/motion/brand';
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
@@ -101,6 +103,13 @@
     }
   }
 
+  function setDepthText(text: string) {
+    const depth = parseDecimal(text);
+    if (depth !== null) {
+      commit(setClipDepth(doc, clip.id, { depth }), 'Changed depth');
+    }
+  }
+
   function toggle(key: string) {
     commit(toggleKey(doc, clip, key, frame, resolve), 'Toggled a keyframe');
   }
@@ -199,6 +208,21 @@
           {/each}
         </div>
       </div>
+    </section>
+  {/if}
+
+  {#if spec.track === TrackKind.Visual}
+    <section data-testid="depth-section">
+      <h4>Camera depth</h4>
+      <div class="row anim">
+        <span class="name">{DEPTH.label}</span>
+        <div class="range">
+          <input type="range" min={DEPTH.min} max={DEPTH.max} step={DEPTH.step} value={clip.depth} disabled={clip.space === Space.Screen} oninput={(e) => commit(setClipDepth(doc, clip.id, { depth: Number(e.currentTarget.value) }), 'Changed depth')} />
+          <input class="num" type="text" inputmode="decimal" aria-label="Depth" value={String(clip.depth)} disabled={clip.space === Space.Screen} onchange={(e) => setDepthText(e.currentTarget.value)} />
+        </div>
+      </div>
+      <label class="check"><input type="checkbox" data-testid="screen-space" checked={clip.space === Space.Screen} onchange={(e) => commit(setClipDepth(doc, clip.id, { space: e.currentTarget.checked ? Space.Screen : Space.World }), 'Changed space')} />Screen space: ignores the camera</label>
+      {#if !doc.camera}<p class="hint">Depth shows once the video has a camera (Camera track).</p>{/if}
     </section>
   {/if}
 

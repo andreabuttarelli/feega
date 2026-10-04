@@ -1,4 +1,4 @@
-import { CAMERA, cameraMath, cameraSchema, depthSchema, newCamera, stageSpec, type Camera, type CameraKey, type CameraValues, type Space } from './camera';
+import { CAMERA, CAMERA_KEYS, cameraMath, cameraSchema, depthSchema, newCamera, stageSpec, type Camera, type CameraKey, type CameraValues, type Space } from './camera';
 import { Ease, FPS } from './design';
 import { byFrame, findClip, type DocVerdict, type MotionDoc } from './doc';
 import { sampleTrack, type EaseSpec, type KeyValue, type Keyframe } from './keyframes';
@@ -45,6 +45,36 @@ export function setCameraKeyframe(doc: MotionDoc, key: CameraKey, frame: number,
 
 export function removeCameraKeyframes(doc: MotionDoc, key: CameraKey, frames?: readonly number[]): DocVerdict {
   return editCameraLane(doc, key, (track) => (frames ? track.filter((k) => !frames.includes(k.frame)) : []));
+}
+
+export function cameraValueAt(doc: MotionDoc, key: CameraKey, frame: number): number {
+  return cameraMath(sampleTrack).valuesAt(stageSpec(doc), frame)[key];
+}
+
+export function cameraEditAt(doc: MotionDoc, key: CameraKey, value: number, frame: number): DocVerdict {
+  if (doc.camera?.keyframes[key]?.length) {
+    return setCameraKeyframe(doc, key, frame, value);
+  }
+  return setCamera(doc, { base: { [key]: value } });
+}
+
+export function cameraKeyToggle(doc: MotionDoc, key: CameraKey, frame: number): DocVerdict {
+  const at = Math.max(0, Math.round(frame));
+  if (doc.camera?.keyframes[key]?.some((k) => k.frame === at)) {
+    return removeCameraKeyframes(doc, key, [at]);
+  }
+  return setCameraKeyframe(doc, key, at, cameraValueAt(doc, key, at));
+}
+
+export function focusOn(doc: MotionDoc, clipId: string, frame: number): DocVerdict {
+  const clip = findClip(doc, clipId)?.clip;
+  return clip ? cameraEditAt(doc, 'focusDistance', clip.depth, frame) : fail(`no clip ${clipId}`);
+}
+
+export type CameraLane = { prop: CameraKey; label: string; frames: number[] };
+
+export function cameraLanes(camera: Camera | null): CameraLane[] {
+  return CAMERA_KEYS.filter((k) => camera?.keyframes[k]?.length).map((k) => ({ prop: k, label: CAMERA[k].label, frames: camera!.keyframes[k]!.map((f) => f.frame) }));
 }
 
 export function setClipDepth(doc: MotionDoc, clipId: string, patch: { depth?: number; space?: Space }): DocVerdict {
