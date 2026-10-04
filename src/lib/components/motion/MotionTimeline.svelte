@@ -320,7 +320,7 @@
           onpointerdown={pickCamera}
         >
           <span class="kind">Camera{#if shown.camera?.dof}<span class="tag"> · depth of field</span>{/if}</span>
-          <span class="label">{shown.camera ? `${cameraLanes(shown.camera).length} animated values` : 'Add a camera for 3D moves'}</span>
+          <span class="label">{shown.camera ? `${cameraLanes(shown.camera).length} animated values${Object.keys(shown.camera.expressions).length ? ` · = ${Object.keys(shown.camera.expressions).join(', ')}` : ''}` : 'Add a camera for 3D moves'}</span>
         </div>
       </div>
     </div>
@@ -355,6 +355,7 @@
                 {#if Object.keys(clip.keyframes).length}
                   <button type="button" class="lanes-toggle" aria-label="Show keyframes" aria-expanded={selection.includes(clip.id) && !collapsed.includes(clip.id)} onpointerdown={(e) => e.stopPropagation()} onclick={(e) => (selection.includes(clip.id) ? toggleLanes(e, clip.id) : (selection = [clip.id]))}>◆</button>
                 {/if}
+                {#if Object.keys(clip.expressions ?? {}).length}<span class="tag expr" data-expr-marker={clip.id} title={`Expressions: ${Object.keys(clip.expressions).join(', ')}`}>· = {Object.keys(clip.expressions).join(', ')}</span>{/if}
                 {#if clip.mask}<span class="tag" title="Masked">· mask</span>{/if}
                 {#if clip.matte !== Matte.None}<span class="tag" title="Track matte">· {clip.matte} matte</span>{/if}
               </span>
@@ -668,6 +669,11 @@
     background: #a855f7;
     outline: 1px solid #a855f7;
     outline-offset: 2px;
+  }
+
+  .tag.expr {
+    color: #a855f7;
+    font-family: 'Fragment Mono', monospace;
   }
 
   .lanes-toggle {

@@ -110,7 +110,8 @@ export function addClip(doc: MotionDoc, input: NewClip, id: string): OpResult {
     depth: DEPTH.fallback,
     space: Space.World,
     parent: null,
-    parentOpacity: ParentOpacity.Inherit
+    parentOpacity: ParentOpacity.Inherit,
+    expressions: {}
   };
 
   return fitted({ ...doc, tracks: doc.tracks.map((t) => (t.id === track.id ? { ...t, clips: [...t.clips, clip] } : t)) });

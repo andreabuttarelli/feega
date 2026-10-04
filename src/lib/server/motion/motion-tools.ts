@@ -16,6 +16,8 @@ import { CAMERA, CAMERA_KEYS, SPACES, type Camera } from '$lib/motion/camera';
 import { CAMERA_PRESETS, PRESETS, applyPreset, removeCamera, setCamera, setCameraKeyframes, setClipDepth } from '$lib/motion/camera-ops';
 import { ParentOpacity } from '$lib/motion/parent';
 import { addNull, nullFromSelection, setParent, setParentOpacity } from '$lib/motion/parent-ops';
+import { setCameraExpression, setExpression } from '$lib/motion/expression/ops';
+import { EXPRESSION_GUIDE } from '$lib/motion/expression/guide';
 
 export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number };
 
@@ -63,7 +65,8 @@ function summary(doc: MotionDoc, selection: string[]) {
         depth: c.depth,
         space: c.space,
         parent: c.parent,
-        parentOpacity: c.parentOpacity
+        parentOpacity: c.parentOpacity,
+        expressions: c.expressions
       }))
     })),
     assets: doc.assets,
@@ -81,7 +84,7 @@ function inSeconds(keyframes: Record<string, { frame: number; value: unknown; ea
 }
 
 function cameraSummary(camera: Camera | null) {
-  return camera ? { values: camera.base, dof: camera.dof, keyframes: inSeconds(camera.keyframes) } : null;
+  return camera ? { values: camera.base, dof: camera.dof, keyframes: inSeconds(camera.keyframes), expressions: camera.expressions } : null;
 }
 
 const CAMERA_UNITS = `${CAMERA_KEYS.map((k) => `${k} ${CAMERA[k].min}..${CAMERA[k].max}`).join(', ')}. x/y are fractions of the frame, z is the dolly in pixels (positive moves forward), rotations and fov in degrees, focusDistance is the depth in focus (same units as clip depth), aperture the blur strength (px of blur per 100 px out of focus)`;
@@ -415,6 +418,17 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const id = deps.newId();
         const out = apply(nullFromSelection(session.doc, input.clip_ids, Math.min(...input.clip_ids.map((c) => findClip(session.doc, c)?.clip.from ?? 0)), id), `grouped ${input.clip_ids.length} clip(s) under a null`);
         return out.ok ? { ...out, null_id: id } : out;
+      }
+    }),
+
+    set_expression: tool({
+      description: `Drive one number property with an expression evaluated at every frame, on top of its keyframes (value is the keyframed value). ${EXPRESSION_GUIDE} camera true targets the camera (props: ${CAMERA_KEYS.join(', ')}). expression null removes it.`,
+      inputSchema: z.object({ clip_id: z.string().optional(), camera: z.boolean().optional(), prop: z.string(), expression: z.string().nullable() }),
+      execute: async (input) => {
+        if (input.camera) {
+          return apply(setCameraExpression(session.doc, input.prop as (typeof CAMERA_KEYS)[number], input.expression), `camera ${input.prop} expression`);
+        }
+        return apply(setExpression(session.doc, input.clip_id ?? '', input.prop, input.expression), `${input.prop} expression on ${input.clip_id}`);
       }
     }),
 
