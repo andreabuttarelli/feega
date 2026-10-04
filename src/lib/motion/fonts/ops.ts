@@ -5,12 +5,13 @@ import { FontCategory, FontSource, isBuiltin, searchFonts, usedFaces, type Catal
 const fail = (error: string): OpResult => ({ ok: false, error });
 
 const SUGGESTIONS = 5;
+const SUGGEST_PREFIX = 4;
 const CATEGORIES = new Set<string>(Object.values(FontCategory));
 
 export type FontChoice = { family: string; weight?: number; italic?: boolean };
 
 function googleFace(entry: CatalogueFont): FontFace {
-  return { family: entry.f, source: FontSource.Google, category: (CATEGORIES.has(entry.c) ? entry.c : FontCategory.Sans) as FontCategory, weights: entry.w, italic: entry.i === 1 };
+  return { family: entry.f, source: FontSource.Google, category: (CATEGORIES.has(entry.c) ? entry.c : FontCategory.Sans) as FontCategory, weights: entry.w, italic: entry.i === 1, axes: entry.a ?? [] };
 }
 
 function registered(doc: MotionDoc, family: string, catalogue: readonly CatalogueFont[]): { doc: MotionDoc; face: FontFace | null } | string {
@@ -23,7 +24,7 @@ function registered(doc: MotionDoc, family: string, catalogue: readonly Catalogu
   }
   const entry = catalogue.find((f) => f.f.toLowerCase() === family.toLowerCase());
   if (!entry) {
-    const close = searchFonts(catalogue, family.slice(0, 3), [], SUGGESTIONS).map((f) => f.f);
+    const close = searchFonts(catalogue, family.slice(0, SUGGEST_PREFIX), [], SUGGESTIONS).map((f) => f.f);
     return `no Google font "${family}"${close.length ? `; close: ${close.join(', ')}` : ''}. Upload a font file to use one outside Google Fonts.`;
   }
   const face = googleFace(entry);
@@ -58,7 +59,7 @@ export function registerUpload(doc: MotionDoc, input: { assetId: string; family:
   if (isBuiltin(input.family) || doc.fonts.some((f) => f.family === input.family)) {
     return fail(`a font named ${input.family} is already in this video`);
   }
-  const face: FontFace = { family: input.family, source: FontSource.Upload, category: FontCategory.Sans, weights: input.weights, italic: input.italic, assetId: input.assetId };
+  const face: FontFace = { family: input.family, source: FontSource.Upload, category: FontCategory.Sans, weights: input.weights, italic: input.italic, axes: [], assetId: input.assetId };
   const assets = doc.assets.some((a) => a.id === input.assetId) ? doc.assets : [...doc.assets, { id: input.assetId, kind: 'font' as const, name: input.family }];
   return { ok: true, doc: { ...doc, fonts: [...doc.fonts, face], assets } };
 }

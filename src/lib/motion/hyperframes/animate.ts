@@ -1,5 +1,5 @@
 import type { MotionClip } from '../doc';
-import { Source, TRANSFORM, ValueKind, animProp, easeName, sampleTrack, type EaseSpec, type Keyframe, type SceneKey, type TransformKey } from '../keyframes';
+import { Source, TRANSFORM, animProp, easeName, sampleTrack, type EaseSpec, type Keyframe, type SceneKey, type TransformKey } from '../keyframes';
 import { css, js, px } from './html';
 import { MASK_LANES, MaskScope, maskTarget } from './masks';
 import type { MaskKey } from '../mask';
@@ -195,10 +195,10 @@ export function wrapParents(chain: readonly MotionClip[], child: MotionClip, fra
     );
 }
 
-export function colourOverrides(clip: MotionClip): Record<string, string> {
+export function keyedOverrides(clip: MotionClip): Record<string, string> {
   return Object.fromEntries(
     Object.keys(clip.keyframes)
-      .filter((key) => animProp(clip.component, key)?.kind === ValueKind.Color)
+      .filter((key) => animProp(clip.component, key)?.source === Source.Prop)
       .map((key) => [key, `var(${cssVar(key)})`])
   );
 }

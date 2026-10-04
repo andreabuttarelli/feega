@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { COLOR, type ComponentId } from './components';
+import { COLOR, TYPE, type ComponentId } from './components';
 import { EASE_IDS, Ease } from './design';
 import { MASK_KEYS, MASK_PROPS, maskValue, type Mask, type MaskKey } from './mask';
 
@@ -88,11 +88,21 @@ const colours = (...entries: [string, string][]): AnimProp[] =>
 
 const visual = (...extra: AnimProp[][]): AnimProp[] => [...transformProps, ...extra.flat(), ...maskProps];
 
+const typeNumbers: AnimProp[] = (
+  [
+    ['weight', 'Weight', 400],
+    ['tracking', 'Tracking', 0],
+    ['leading', 'Leading', 1.2],
+    ['stretch', 'Width axis', TYPE.stretch.fallback],
+    ['slant', 'Slant axis', TYPE.slant.fallback]
+  ] as const
+).map(([key, label, fallback]) => ({ key, label, kind: ValueKind.Number, source: Source.Prop, min: TYPE[key].min, max: TYPE[key].max, step: TYPE[key].step, fallback }));
+
 export const ANIMATABLE: Record<ComponentId, readonly AnimProp[]> = {
-  Title: visual(colours(['color', 'Colour'])),
-  Text: visual(colours(['color', 'Colour'])),
-  Kicker: visual(colours(['color', 'Colour'])),
-  Caption: visual(colours(['color', 'Colour'], ['background', 'Box'])),
+  Title: visual(colours(['color', 'Colour']), typeNumbers),
+  Text: visual(colours(['color', 'Colour']), typeNumbers),
+  Kicker: visual(colours(['color', 'Colour']), typeNumbers),
+  Caption: visual(colours(['color', 'Colour'], ['background', 'Box']), typeNumbers),
   Image: visual(),
   Video: visual(),
   Audio: [],
@@ -119,7 +129,7 @@ const SCENE_FROM_PROPS: Partial<Record<SceneKey, string>> = { orbit: 'startAngle
 
 const BASE: Record<Source, (clip: Animated, prop: AnimProp) => KeyValue> = {
   [Source.Transform]: (clip, prop) => clip.transform[prop.key as TransformKey] ?? prop.fallback,
-  [Source.Prop]: (clip, prop) => String(clip.props[prop.key]),
+  [Source.Prop]: (clip, prop) => (prop.kind === ValueKind.Color ? String(clip.props[prop.key]) : Number(clip.props[prop.key] ?? prop.fallback)),
   [Source.Scene]: (clip, prop) => {
     const from = SCENE_FROM_PROPS[prop.key as SceneKey];
     return from ? Number(clip.props[from]) : prop.fallback;

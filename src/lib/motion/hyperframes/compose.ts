@@ -7,7 +7,7 @@ import { css, esc, js, seconds } from './html';
 import { TEMPLATES, Timing, type PropsOf, type TemplateCtx, type Tween, type Vars } from './templates';
 import { LIGHTING, threeImportMap, threeScript, type ThreeClip } from './three';
 import { bakeComposition, compositionScript, type TimedBake } from './composition';
-import { ANIMATE_CSS, animationScript, colourOverrides, sceneKeys, wrapAnimated, wrapParents } from './animate';
+import { ANIMATE_CSS, animationScript, keyedOverrides, sceneKeys, wrapAnimated, wrapParents } from './animate';
 import { ancestorsOf, parentsWithChildren } from '../parent';
 import { MASK_CSS, MaskScope, maskLayer, startValues } from './masks';
 import { SCREENSHOT_URL, captureScript, contentStamp } from './capture';
@@ -21,7 +21,8 @@ import { Composite, cameraMath, stageSpec } from '../camera';
 import { sampleTrack } from '../keyframes';
 import { STAGE_CSS, stageRootStyle, stageScript } from './stage';
 import { bakeExpressions } from '../expression/bake';
-import { declaredFamilyCss, faceDescriptor, fontStack, googleFontsUrl, loadedWeight, uploadFaceCss, usedFaces } from '../fonts/model';
+import { FIT_TEXT, fitScript } from './fit-runtime';
+import { declaredFamilyCss, fontStack, loadDescriptors, googleFontsUrl, loadedWeight, uploadFaceCss, usedFaces } from '../fonts/model';
 import { EFFECT_CSS, effectLayer, effectScript, effectTimeline } from '../effects/render';
 import { blendStyle } from '../blend';
 
@@ -103,7 +104,7 @@ function ctxOf(clip: MotionClip, input: ComposeInput): TemplateCtx<ComponentId> 
   const { doc, tokens, assets } = input;
   return {
     id: clip.id,
-    p: { ...clip.props, ...colourOverrides(clip) } as never,
+    p: { ...clip.props, ...keyedOverrides(clip) } as never,
     width: doc.width,
     height: doc.height,
     unit: Math.min(doc.width, doc.height),
@@ -266,11 +267,11 @@ function fontLinks(doc: MotionDoc, assets: Record<string, string>): string {
   const faces = usedFaces(doc);
   const google = googleFontsUrl(faces, doc.fonts);
   const uploads = uploadFaceCss(doc.fonts, assets) + declaredFamilyCss(faces, doc.fonts);
-  const loads = faces.map((f) => `document.fonts.load(${js(faceDescriptor(f))}).catch(function(){return [];})`).join(',');
+  const loads = loadDescriptors(doc).map((d) => `document.fonts.load(${js(d)}).catch(function(){return [];})`).join(',');
   return [
     google ? `<link id="${FONT_SHEET}" rel="stylesheet" crossorigin="anonymous" href="${esc(google)}" />` : '',
     uploads ? `<style>${uploads}</style>` : '',
-    `<script>(function(){var l=document.getElementById(${js(FONT_SHEET)});var sheet=l&&!l.sheet?new Promise(function(r){l.addEventListener('load',r);l.addEventListener('error',r);}):Promise.resolve();window.${FONTS_READY}=sheet.then(function(){return Promise.all([${loads}]);}).then(function(){return document.fonts.ready;});})();</script>`
+    `<script>(function(){var l=document.getElementById(${js(FONT_SHEET)});var sheet=l&&!l.sheet?new Promise(function(r){l.addEventListener('load',r);l.addEventListener('error',r);}):Promise.resolve();window.${FONTS_READY}=sheet.then(function(){return Promise.all([${loads}]);}).then(function(){return document.fonts.ready;}).then(${FIT_TEXT});})();</script>`
   ].join('');
 }
 
@@ -355,6 +356,7 @@ export function composeHtml(raw: ComposeInput): string {
     ...[...libraries].map((lib) => LIBRARY_TAGS[lib].tag),
     three.length || compositions.length || threeCustom ? threeImportMap() : '',
     `<link rel="stylesheet" crossorigin="anonymous" href="${FONTS_URL}" />`,
+    fitScript(),
     fontLinks(doc, input.assets),
     `<style>${BASE_CSS}#root{background:${esc(background)}}${stage ? STAGE_CSS + stageRootStyle(stage) : ''}</style>`,
     '</head><body>',

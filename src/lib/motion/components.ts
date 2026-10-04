@@ -83,12 +83,29 @@ const layout = (box: { x?: number; y?: number; width?: number; height?: number }
 
 const font = () => z.string().regex(FONT_NAME, 'expected a font family name').default(BuiltinFont.Sans).meta({ control: Control.Font, label: 'Font', group: Group.Style });
 
-const typography = (size: number, fallbackColor: string, weight = REGULAR) => ({
+export const TYPE = {
+  tracking: { min: -0.2, max: 1, step: 0.005 },
+  leading: { min: 0.6, max: 3, step: 0.01 },
+  weight: { min: 100, max: 1000, step: 1 },
+  stretch: { min: 25, max: 200, step: 1, fallback: 100 },
+  slant: { min: -20, max: 20, step: 0.5, fallback: 0 }
+} as const;
+
+export const AXES = /^('[A-Za-z0-9]{4}' -?\d+(\.\d+)?)(, '[A-Za-z0-9]{4}' -?\d+(\.\d+)?)*$|^$/;
+
+type Look = { weight?: number; tracking: number; leading: number };
+
+const typography = (size: number, fallbackColor: string, look: Look) => ({
   color: color(fallbackColor, 'Colour'),
   font: font(),
-  weight: range(100, 900, 100, weight, 'Weight', Group.Style),
+  weight: range(TYPE.weight.min, TYPE.weight.max, TYPE.weight.step, look.weight ?? REGULAR, 'Weight', Group.Style),
   italic: toggle(false, 'Italic', Group.Style),
-  size: range(0.01, 0.4, 0.005, size, 'Size', Group.Style)
+  size: range(0.01, 0.4, 0.005, size, 'Size', Group.Style),
+  tracking: range(TYPE.tracking.min, TYPE.tracking.max, TYPE.tracking.step, look.tracking, 'Tracking', Group.Style),
+  leading: range(TYPE.leading.min, TYPE.leading.max, TYPE.leading.step, look.leading, 'Leading', Group.Style),
+  stretch: range(TYPE.stretch.min, TYPE.stretch.max, TYPE.stretch.step, TYPE.stretch.fallback, 'Width axis', Group.Style),
+  slant: range(TYPE.slant.min, TYPE.slant.max, TYPE.slant.step, TYPE.slant.fallback, 'Slant axis', Group.Style),
+  axes: z.string().max(200).regex(AXES, "axes look like 'GRAD' 50, 'CASL' 1").default('').meta({ control: Control.Text, label: 'Other axes', group: Group.Style })
 });
 
 export const LIGHTINGS = ['studio', 'soft', 'dramatic'] as const;
@@ -143,21 +160,21 @@ export const COMPONENTS = {
     description: 'Large headline, lines reveal one after another. Use \\n for line breaks.',
     track: TrackKind.Visual,
     durationInFrames: seconds(3),
-    schema: z.object({ text: text('Better marketing\non canvas.', 'Text', true), ...typography(0.11, 'brand.text', MEDIUM), ...layout({ height: 0.4 }) }).strict()
+    schema: z.object({ text: text('Better marketing\non canvas.', 'Text', true), ...typography(0.11, 'brand.text', { weight: MEDIUM, tracking: -0.045, leading: 0.95 }), ...layout({ height: 0.4 }) }).strict()
   },
   Text: {
     label: 'Text',
     description: 'Body copy that fades up.',
     track: TrackKind.Visual,
     durationInFrames: seconds(3),
-    schema: z.object({ text: text('Write something.', 'Text', true), ...typography(0.04, 'brand.text'), ...layout({ y: 0.65, height: 0.2 }) }).strict()
+    schema: z.object({ text: text('Write something.', 'Text', true), ...typography(0.04, 'brand.text', { tracking: -0.01, leading: 1.3 }), ...layout({ y: 0.65, height: 0.2 }) }).strict()
   },
   Kicker: {
     label: 'Kicker',
     description: 'Small monospaced uppercase label above a title.',
     track: TrackKind.Visual,
     durationInFrames: seconds(3),
-    schema: z.object({ text: text('( feega )', 'Text'), ...typography(0.025, 'brand.accent'), ...layout({ y: 0.3, height: 0.06 }) }).strict()
+    schema: z.object({ text: text('( feega )', 'Text'), ...typography(0.025, 'brand.accent', { tracking: 0.02, leading: 1.2 }), ...layout({ y: 0.3, height: 0.06 }) }).strict()
   },
   Caption: {
     label: 'Caption',
@@ -165,7 +182,7 @@ export const COMPONENTS = {
     track: TrackKind.Visual,
     durationInFrames: seconds(2),
     schema: z
-      .object({ text: text('A caption', 'Text'), ...typography(0.035, '#ffffff', MEDIUM), background: color('#111111', 'Box'), ...layout({ y: 0.85, height: 0.1 }) })
+      .object({ text: text('A caption', 'Text'), ...typography(0.035, '#ffffff', { weight: MEDIUM, tracking: 0, leading: 1.25 }), background: color('#111111', 'Box'), ...layout({ y: 0.85, height: 0.1 }) })
       .strict()
   },
   Image: {
@@ -243,7 +260,7 @@ export const COMPONENTS = {
         assetId: asset(AssetKind.Image, 'Product image'),
         title: text('Linen tee', 'Name'),
         price: text('€ 39', 'Price'),
-        ...typography(0.035, '#111111'),
+        ...typography(0.035, '#111111', { tracking: 0, leading: 1.2 }),
         card: color('#ffffff', 'Card'),
         ...layout({ width: 0.5, height: 0.6 })
       })
