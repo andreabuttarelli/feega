@@ -40,7 +40,7 @@ const CLIP: Record<string, Access> = {
   durationInFrames: { write: ['set_timing', 'trim_clip'], read: 'duration' },
   trimStart: { write: ['trim_clip'], read: 'trimStart' },
   component: { write: ['add_clip'], read: 'component' },
-  props: { write: ['set_props'], read: 'props' },
+  props: { write: ['set_props', 'add_particles', 'apply_particle_preset'], read: 'props' },
   transitionIn: { write: ['set_transition'], read: 'in' },
   transitionOut: { write: ['set_transition'], read: 'out' },
   transform: { write: ['set_transform'], read: 'transform' },

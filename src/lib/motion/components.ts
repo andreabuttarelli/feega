@@ -7,6 +7,7 @@ import { LAYOUTS } from '../canvas/composition/index';
 import { CAMERA_PRESETS } from '../canvas/composition/camera';
 import type { CameraPresetId } from '../canvas/composition/camera';
 import type { LayoutId } from '../canvas/composition/types';
+import { EMITTERS, Emitter, PARTICLE_COLOURS, PARTICLE_COLOUR_KEYS, PARTICLE_NUMBERS, PARTICLE_NUMBER_KEYS, PARTICLE_SHAPES, ParticleSection, ParticleShape, SEED } from './particles/model';
 import { CAPS, FILL_KINDS, FILL_RULES, FillKind, JOINS, MAX_MODIFIERS, MAX_MORPHS, SHAPE_KINDS, STROKE_KINDS, ShapeKind, StrokeKind, modifierSchema, pathString } from './shape/schema';
 
 export enum Control {
@@ -163,6 +164,21 @@ type Spec = {
 };
 
 const seconds = (n: number) => n * FPS;
+
+const PARTICLE_GROUP: Record<ParticleSection, Group> = {
+  [ParticleSection.Emitter]: Group.Layout,
+  [ParticleSection.Motion]: Group.Motion,
+  [ParticleSection.Look]: Group.Style
+};
+
+const particleNumbers = Object.fromEntries(
+  PARTICLE_NUMBER_KEYS.map((key) => {
+    const p = PARTICLE_NUMBERS[key];
+    return [key, range(p.min, p.max, p.step, p.fallback, p.label, PARTICLE_GROUP[p.section])];
+  })
+);
+
+const particleColours = Object.fromEntries(PARTICLE_COLOUR_KEYS.map((key) => [key, color(PARTICLE_COLOURS[key].fallback, PARTICLE_COLOURS[key].label)]));
 
 export const COMPONENTS = {
   Title: {
@@ -399,6 +415,23 @@ export const COMPONENTS = {
         cameraParams: compositionParams('Camera settings'),
         background: color('#000000', 'Background'),
         loop: range(0.5, 60, 0.5, 6, 'Loop (s)', Group.Motion)
+      })
+      .strict()
+  },
+  Particles: {
+    label: 'Particles',
+    description: 'A seeded particle emitter (sparks, dust, confetti, bokeh, snow…): every frame is computed from the seed and the time, so seeking and rendering always agree. Sizes and speeds are fractions of the short side of the frame per second; direction in degrees (-90 = up), gravity pulls down.',
+    track: TrackKind.Visual,
+    durationInFrames: seconds(4),
+    schema: z
+      .object({
+        seed: range(SEED.min, SEED.max, 1, SEED.fallback, 'Seed', Group.Content),
+        emitter: choice(EMITTERS, Emitter.Point, 'Emitter', Group.Content),
+        shape: choice(PARTICLE_SHAPES, ParticleShape.Circle, 'Shape', Group.Content),
+        sprite: asset(AssetKind.Image, 'Sprite (shape: sprite)'),
+        prewarm: toggle(false, 'Prewarm', Group.Motion),
+        ...particleNumbers,
+        ...particleColours
       })
       .strict()
   },

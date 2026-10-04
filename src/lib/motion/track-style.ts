@@ -57,6 +57,7 @@ const COMPONENT_FAMILY: Record<ComponentId, ClipFamily> = {
   Device3D: ClipFamily.ThreeD,
   Composition: ClipFamily.ThreeD,
   Null: ClipFamily.Null,
+  Particles: ClipFamily.Shape,
   Custom: ClipFamily.Custom
 };
 

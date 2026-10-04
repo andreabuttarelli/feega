@@ -1,0 +1,133 @@
+import { describe, expect, it } from 'vitest';
+import { FEEGA_TOKENS } from '../brand';
+import { COMPONENTS } from '../components';
+import { Ease } from '../design';
+import { MotionFormat, findClip, newMotionDoc, type MotionClip, type MotionDoc } from '../doc';
+import { keyframesProblem } from '../keyframes';
+import { addClip, setKeyframes, type OpResult } from '../timeline';
+import { composeHtml } from '../hyperframes/compose';
+import { particleBake } from '../hyperframes/particles';
+import { particlesAt, type ParticleBake } from './simulate';
+import { PARTICLE_PRESETS, ParticlePreset, applyParticlePreset, PRESET_PROPS } from './presets';
+import { Emitter } from './model';
+
+function must(r: OpResult): MotionDoc {
+  if (!r.ok) {
+    throw new Error(r.error);
+  }
+  return r.doc;
+}
+
+const env = { width: 1000, height: 1000, unit: 1000, fps: 30, color: (v: string) => v };
+
+const clipOf = (props: Record<string, unknown> = {}, keyframes: MotionClip['keyframes'] = {}, durationInFrames = 120): MotionClip =>
+  ({ id: 'p1', component: 'Particles', from: 0, durationInFrames, props: COMPONENTS.Particles.schema.parse(props), keyframes, transform: {} }) as unknown as MotionClip;
+
+const bakeOf = (props: Record<string, unknown> = {}, keyframes: MotionClip['keyframes'] = {}): ParticleBake => particleBake(clipOf(props, keyframes), env);
+
+describe('particles are a pure function of time', () => {
+  it('a frame reached by seeking straight to it equals the same frame reached after playing up to it', () => {
+    const bake = bakeOf({ rate: 90, gravity: 1, drag: 0.5, wobble: 0.02 });
+    const direct = particlesAt(bake, 47);
+    for (let f = 0; f < 47; f++) {
+      particlesAt(bake, f);
+    }
+    expect(particlesAt(bake, 47)).toEqual(direct);
+    expect(direct.length).toBeGreaterThan(10);
+  });
+
+  it('the same seed draws the same particles, another seed draws others', () => {
+    const one = particlesAt(bakeOf({ seed: 7 }), 30);
+    expect(particlesAt(bakeOf({ seed: 7 }), 30)).toEqual(one);
+    expect(particlesAt(bakeOf({ seed: 8 }), 30)).not.toEqual(one);
+  });
+
+  it('the runtime copy of the simulation is self-contained and gives the same answer', () => {
+    const bake = bakeOf({ emitter: Emitter.Ring, rate: 120 });
+    const copy = new Function(`return (${particlesAt.toString()})`)() as typeof particlesAt;
+    expect(copy(bake, 33.5)).toEqual(particlesAt(bake, 33.5));
+  });
+
+  it('emits rate particles per second and none before the clip starts', () => {
+    const bake = bakeOf({ rate: 60, life: 10, lifeVariance: 0 });
+    expect(particlesAt(bake, -1)).toHaveLength(0);
+    expect(particlesAt(bake, 30)).toHaveLength(61);
+  });
+
+  it('a particle is gone once its life is over', () => {
+    const bake = bakeOf({ rate: 30, life: 0.5, lifeVariance: 0 }, { rate: [{ frame: 0, value: 30, ease: Ease.Linear, out: 'hold' as never }, { frame: 10, value: 0, ease: Ease.Linear }] });
+    expect(particlesAt(bake, 12).length).toBeGreaterThan(0);
+    expect(particlesAt(bake, 40)).toHaveLength(0);
+  });
+
+  it('gravity pulls particles down the frame', () => {
+    const still = { rate: 10, speed: 0, speedVariance: 0, life: 10, emitter: Emitter.Point };
+    const floating = particlesAt(bakeOf({ ...still, gravity: 0 }), 30)[0];
+    const falling = particlesAt(bakeOf({ ...still, gravity: 1 }), 30)[0];
+    expect(falling.x).toBeCloseTo(floating.x);
+    expect(falling.y).toBeGreaterThan(floating.y + 100);
+  });
+
+  it('colour and size move from start to end over a particle life', () => {
+    const bake = bakeOf({ rate: 30, life: 1, lifeVariance: 0, sizeVariance: 0, sizeStart: 0.1, sizeEnd: 0, colorStart: '#ff0000', colorEnd: '#0000ff' });
+    const [oldest] = particlesAt(bake, 15);
+    expect(oldest.size).toBeCloseTo(50, 0);
+    expect(oldest.r).toBeCloseTo(127.5, 0);
+    expect(oldest.b).toBeCloseTo(127.5, 0);
+  });
+
+  it('prewarm fills the frame at the first frame, as if it had been running', () => {
+    expect(particlesAt(bakeOf({ prewarm: false }), 0).length).toBeLessThanOrEqual(1);
+    expect(particlesAt(bakeOf({ prewarm: true }), 0).length).toBeGreaterThan(20);
+  });
+
+  it('a still emitter bakes one row, a keyed one bakes a row per frame', () => {
+    expect(bakeOf().rows).toHaveLength(1);
+    const keyed = bakeOf({}, { speed: [{ frame: 0, value: 0.1, ease: Ease.Linear }, { frame: 60, value: 1, ease: Ease.Linear }] });
+    expect(keyed.rows).toHaveLength(120);
+    expect(keyed.rows[60].speed).toBeCloseTo(1);
+  });
+});
+
+describe('every particle parameter is keyframable', () => {
+  it.each(['rate', 'life', 'speed', 'direction', 'spread', 'gravity', 'sizeStart', 'sizeEnd', 'opacityEnd', 'colorStart', 'colorEnd', 'emitterX', 'emitterY', 'emitterWidth'])('%s takes keyframes', (key) => {
+    const value = key.startsWith('color') ? '#ff8800' : 0.1;
+    expect(keyframesProblem({ component: 'Particles', mask: null, keyframes: { [key]: [{ frame: 0, value, ease: Ease.Linear }] } })).toBeNull();
+  });
+});
+
+describe('particle presets', () => {
+  it.each(PARTICLE_PRESETS)('%s is a valid set of particle props', (preset) => {
+    expect(COMPONENTS.Particles.schema.safeParse(PRESET_PROPS[preset].props).success).toBe(true);
+  });
+
+  it('a preset replaces the look and keeps the seed', () => {
+    const doc = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Particles', from: 0, durationInFrames: 60, props: { seed: 42 } }, 'p'));
+    const snowy = must(applyParticlePreset(doc, 'p', ParticlePreset.Snow));
+    const props = findClip(snowy, 'p')!.clip.props;
+    expect(props.seed).toBe(42);
+    expect(props.gravity).toBe(PRESET_PROPS[ParticlePreset.Snow].props.gravity);
+  });
+
+  it('a preset on a clip that is not particles is refused', () => {
+    const doc = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Title', from: 0, durationInFrames: 60 }, 't'));
+    expect(applyParticlePreset(doc, 't', ParticlePreset.Snow).ok).toBe(false);
+  });
+});
+
+describe('particles in the composition', () => {
+  it('draws on a canvas the size of the frame, driven by the timeline', () => {
+    const doc = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Particles', from: 15, durationInFrames: 60 }, 'p'));
+    const html = composeHtml({ doc, tokens: FEEGA_TOKENS, assets: {} });
+    expect(html).toContain('<canvas id="pt-p" width="1920" height="1080"');
+    expect(html).toContain('const PT_AT=(');
+    expect(html).toContain('"id":"p","from":15');
+  });
+
+  it('a keyed rate reaches the runtime as one row per frame', () => {
+    const base = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Particles', from: 0, durationInFrames: 30 }, 'p'));
+    const doc = must(setKeyframes(base, 'p', 'rate', [{ frame: 0, value: 0, ease: Ease.Linear }, { frame: 29, value: 200, ease: Ease.Linear }]));
+    const html = composeHtml({ doc, tokens: FEEGA_TOKENS, assets: {} });
+    expect(html.match(/"rate":/g)?.length).toBe(30);
+  });
+});

@@ -53,6 +53,7 @@ import { DEGREES, MAX_SAMPLES } from '$lib/motion/motion-blur';
 import { MODIFIERS, MODIFIER_KINDS } from '$lib/motion/shape/modifiers';
 import { addModifier, morphTo, removeModifier, setModifier, setPath } from '$lib/motion/shape/ops';
 import { SHAPE_KINDS, modifierKey } from '$lib/motion/shape/schema';
+import { PARTICLE_PRESETS, PRESET_PROPS as PARTICLE_PRESET, applyParticlePreset } from '$lib/motion/particles/presets';
 
 export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number };
 
@@ -546,6 +547,25 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: `Animate a Device3D clip with a ready-made move over the clip: ${DEVICE_PRESETS.map((p) => `${p} — ${DEVICE_PRESET[p].about}`).join('; ')}. Replaces the keyframes it sets; presets combine (spin-in then screen-scroll).`,
       inputSchema: z.object({ clip_id: z.string(), preset: z.enum(DEVICE_PRESETS) }),
       execute: async (input) => apply(applyDevicePreset(session.doc, input.clip_id, input.preset), `${input.preset} on ${input.clip_id}`)
+    }),
+
+    add_particles: tool({
+      description: `Add a Particles clip (seeded, deterministic emitter) from a preset: ${PARTICLE_PRESETS.map((p) => `${p} — ${PARTICLE_PRESET[p].about}`).join('; ')}. props override the preset (seed, emitter, shape, rate, life, speed, direction, spread, gravity, drag, wobble, spin, sizeStart/End, colorStart/End, opacityStart/End, softness, prewarm; list_components has the ranges). Every numeric and colour prop takes set_keyframes.`,
+      inputSchema: z.object({ preset: z.enum(PARTICLE_PRESETS), start: z.number().min(0), duration: z.number().positive().optional(), track_id: z.string().optional(), props: z.record(z.string(), z.unknown()).optional() }),
+      execute: async (input) => {
+        if (!assetKnown(input.props?.sprite)) {
+          return { ok: false, error: 'unknown asset id: call list_assets' };
+        }
+        const props = { ...PARTICLE_PRESET[input.preset].props, ...input.props };
+        const result = addClip(session.doc, { component: 'Particles', from: frames(input.start), durationInFrames: input.duration ? frames(input.duration) : undefined, trackId: input.track_id, props }, deps.newId());
+        return apply(registered(result, input.props?.sprite), `added ${input.preset} particles`);
+      }
+    }),
+
+    apply_particle_preset: tool({
+      description: `Restyle a Particles clip with a preset (${PARTICLE_PRESETS.join(', ')}); its seed and keyframes are kept.`,
+      inputSchema: z.object({ clip_id: z.string(), preset: z.enum(PARTICLE_PRESETS) }),
+      execute: async (input) => apply(applyParticlePreset(session.doc, input.clip_id, input.preset), `${input.preset} particles on ${input.clip_id}`)
     }),
 
     add_device_row: tool({

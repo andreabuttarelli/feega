@@ -9,6 +9,8 @@ import { css, esc, px } from './html';
 import type { CustomComponents } from '../custom/component';
 import { compositionVideoId, resolvedMedia } from './composition';
 import { shapeHtml } from './shapes';
+import { particleHtml } from './particles';
+import { ParticleShape } from '../particles/model';
 import { ShapeKind } from '../shape/schema';
 import type { ShapeLook } from '../shape/render';
 
@@ -359,6 +361,11 @@ const Custom: Template<'Custom'> = {
   }
 };
 
+const Particles: Template<'Particles'> = {
+  timing: Timing.Wrapper,
+  html: (ctx) => particleHtml(ctx.id, ctx.width, ctx.height, ctx.p.shape === ParticleShape.Sprite ? ctx.asset(ctx.p.sprite) : null)
+};
+
 export const TEMPLATES: { [K in ComponentId]: Template<K> } = {
   Title,
   Text,
@@ -380,5 +387,6 @@ export const TEMPLATES: { [K in ComponentId]: Template<K> } = {
   Logo3D,
   Device3D,
   Composition,
+  Particles,
   Custom
 };
