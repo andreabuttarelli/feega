@@ -12,6 +12,7 @@ import { fontRefProblem, fontsSchema, usedFaces } from './fonts/model';
 import { effectsSchema, effectsProblem } from './effects/model';
 import { BLEND_MODES, BlendMode } from './blend';
 import { animatorsSchema } from './text-animators/model';
+import { DEFAULT_MOTION_BLUR, motionBlurSchema } from './motion-blur';
 
 export enum MotionFormat {
   Landscape = '16:9',
@@ -66,7 +67,8 @@ const clipSchema = z.object({
   expressions: expressionsSchema,
   effects: effectsSchema,
   blend: z.enum(BLEND_MODES).default(BlendMode.Normal),
-  animators: animatorsSchema
+  animators: animatorsSchema,
+  motionBlur: z.boolean().default(true)
 });
 
 const trackSchema = z.object({
@@ -94,6 +96,7 @@ export const motionDocSchema = z
     camera: cameraSchema.nullable().default(null),
     fonts: fontsSchema,
     background: z.enum([Background.Brand, Background.Transparent]).default(Background.Brand),
+    motionBlur: motionBlurSchema,
     components: z
       .record(z.string().regex(CUSTOM_NAME, 'component names are PascalCase, e.g. NodeGraph'), customComponentSchema)
       .refine((c) => Object.keys(c).length <= MAX_COMPONENTS, `at most ${MAX_COMPONENTS} custom components`)
@@ -221,6 +224,7 @@ export function newMotionDoc(format: MotionFormat): MotionDoc {
     camera: null,
     fonts: [],
     background: Background.Brand,
+    motionBlur: DEFAULT_MOTION_BLUR,
     components: {}
   };
 }
@@ -244,6 +248,7 @@ export function newClip(fields: Pick<MotionClip, 'id' | 'from' | 'durationInFram
     effects: [],
     blend: BlendMode.Normal,
     animators: [],
+    motionBlur: true,
     ...fields
   };
 }

@@ -37,7 +37,7 @@ function trailer(): MotionDoc {
 }
 
 function request(doc = trailer(), settings = settingsOf(Preset.Social)): RenderRequest {
-  return { version: 12, doc, settings, job: { html: '<html/>', width: doc.width, height: doc.height, fps: doc.fps, totalFrames: doc.durationInFrames, audio: [], allowHosts: [], format: settings.format, quality: settings.quality } };
+  return { version: 12, doc, settings, job: { html: '<html/>', width: doc.width, height: doc.height, fps: doc.fps, totalFrames: doc.durationInFrames, audio: [], allowHosts: [], format: settings.format, quality: settings.quality, motionBlur: null } };
 }
 
 function runOf(params: Record<string, unknown>): NodeRun {

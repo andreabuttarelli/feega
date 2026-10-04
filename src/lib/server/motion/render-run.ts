@@ -44,7 +44,8 @@ export function farmJob(input: ComposeInput, settings: RenderSettings): FarmJob 
     audio: audioPlan(doc, assets),
     allowHosts: reachable.map((origin) => new URL(origin).host),
     format: settings.format,
-    quality: settings.quality
+    quality: settings.quality,
+    motionBlur: doc.motionBlur.enabled ? { shutterAngle: doc.motionBlur.shutterAngle, shutterPhase: doc.motionBlur.shutterPhase, samples: doc.motionBlur.samples } : null
   };
 }
 

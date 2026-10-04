@@ -15,8 +15,9 @@ export function resolutionOf(doc: Pick<MotionDoc, 'width' | 'height'>): Resoluti
   return Math.min(doc.width, doc.height) >= FULL_HD_SHORT_SIDE ? Resolution.P1080 : Resolution.P720;
 }
 
-export function renderQuote(doc: Pick<MotionDoc, 'width' | 'height' | 'durationInFrames' | 'fps'>): RenderQuote {
+export function renderQuote(doc: Pick<MotionDoc, 'width' | 'height' | 'durationInFrames' | 'fps'> & Partial<Pick<MotionDoc, 'motionBlur'>>): RenderQuote {
   const seconds = doc.durationInFrames / doc.fps;
   const resolution = resolutionOf(doc);
-  return { seconds, resolution, credits: Math.ceil(seconds / SECONDS_PER_UNIT) * RESOLUTION_FACTOR[resolution] };
+  const samples = doc.motionBlur?.enabled ? doc.motionBlur.samples : 1;
+  return { seconds, resolution, credits: Math.ceil(seconds / SECONDS_PER_UNIT) * RESOLUTION_FACTOR[resolution] * samples };
 }

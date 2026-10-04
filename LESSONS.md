@@ -25,6 +25,13 @@ dal contenuto (ProRes di grafica piatta: 17 Mbit/s, non i 330 nominali), quindi 
 basta per rifiutare prima. Mossa: `oversize` in `export-formats.ts` fallisce il giro con il peso
 vero e niente addebito; per file più grandi si alza il limite globale di Storage, non il codice.
 
+### Un render con motion blur non diventa più veloce con più vCPU
+Il producer distribuito non ha `motionBlur`: il blur gira intero su una sandbox, e
+`createRenderJob` senza `workers` resta su un solo browser anche con 8 vCPU (186 s per 240
+frame × 8 campioni a 1080p, uguale a 4 vCPU). Segnale: tempo identico cambiando le vCPU. Mossa:
+`workers` esplicito nella config intera (6 su 8 vCPU: 99 s, ~51 ms per campione) e un tetto di
+campioni (`BLUR_BUDGET` in `farm-render.ts`) che stia nei 300 s della funzione.
+
 ### Un render che fallisce dopo minuti senza log: guarda prima la durata del doc di prova
 Un doc costruito a mano con `addClip` si allunga da solo quando una clip arrotondata finisce oltre
 la fine: 51 frame invece di 50 sembrano un errore del producer. Mossa: stampa `job.totalFrames`

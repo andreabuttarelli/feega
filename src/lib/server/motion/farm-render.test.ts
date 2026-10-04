@@ -48,7 +48,8 @@ const job: FarmJob = {
   audio: [{ clipId: 'm', url: 'https://x.supabase.co/m.mp3', at: 0, offset: 0, duration: 28, volume: 1, fadeIn: 1, fadeOut: 2 }],
   allowHosts: ['x.supabase.co'],
   format: ExportFormat.Mp4H264,
-  quality: Quality.High
+  quality: Quality.High,
+  motionBlur: null
 };
 
 describe('renderOnFarm', () => {
@@ -62,12 +63,13 @@ describe('renderOnFarm', () => {
   });
 
   it.each([25, 50])('a %i fps video renders whole on one worker, since chunked renders take 24, 30 or 60', async (fps) => {
-    const { farm, workers } = fakeFarm();
+    const { farm, workers, specs } = fakeFarm();
 
     await renderOnFarm(farm, { ...job, fps }, () => {});
 
     expect(workers).toHaveLength(1);
     expect(specOf(workers[0])).toMatchObject({ route: 'whole', config: { fps } });
+    expect(specs[0].vcpus).toBe(8);
   });
 
   it('only the asset origin and the runtime CDNs are reachable', async () => {
@@ -122,6 +124,42 @@ describe('renderOnFarm', () => {
     await renderOnFarm(farm, job, () => {});
 
     expect(workers.every((w) => w.stopped)).toBe(true);
+  });
+});
+
+describe('renderOnFarm with motion blur', () => {
+  const blur = { shutterAngle: 180, shutterPhase: -90, samples: 8 };
+
+  it('renders whole on one worker, since the distributed producer has no motion blur, and passes the shutter to the engine', async () => {
+    const { farm, workers } = fakeFarm();
+
+    await renderOnFarm(farm, { ...job, totalFrames: 120, motionBlur: blur }, () => {});
+
+    expect(workers).toHaveLength(1);
+    expect(specOf(workers[0])).toMatchObject({ route: 'whole', config: { motionBlur: { shutterAngle: 180, shutterPhase: -90, samplesPerFrame: 8 } } });
+  });
+
+  it('a video clip cannot blur, the engine extracts its frames once per output frame', async () => {
+    const { farm, workers } = fakeFarm();
+
+    await expect(renderOnFarm(farm, { ...job, html: '<video id="c-v" src="x">', motionBlur: blur }, () => {})).rejects.toThrow(/Video/);
+    expect(workers).toHaveLength(0);
+  });
+
+  it('more blurred samples than one machine renders in time are refused, with what to lower', async () => {
+    const { farm, workers } = fakeFarm();
+
+    await expect(renderOnFarm(farm, { ...job, fps: 60, totalFrames: 600, motionBlur: blur }, () => {})).rejects.toThrow(/samples/);
+    expect(workers).toHaveLength(0);
+    await expect(renderOnFarm(farm, { ...job, fps: 60, totalFrames: 480, motionBlur: blur }, () => {})).resolves.toBeDefined();
+  });
+
+  it('without blur the config carries none', async () => {
+    const { farm, workers } = fakeFarm();
+
+    await renderOnFarm(farm, job, () => {});
+
+    expect(specOf(workers[0]).config).not.toHaveProperty('motionBlur');
   });
 });
 

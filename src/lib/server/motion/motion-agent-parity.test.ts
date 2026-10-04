@@ -11,6 +11,7 @@ const DOC: Record<string, Access> = {
   version: { fixed: 'schema version, set by the editor' },
   fps: { write: ['set_canvas'], read: 'fps' },
   background: { write: ['set_canvas'], read: 'background' },
+  motionBlur: { write: ['set_motion_blur'], read: 'motionBlur' },
   width: { write: ['set_canvas'], read: 'width' },
   height: { write: ['set_canvas'], read: 'height' },
   durationInFrames: { write: ['set_canvas'], read: 'duration' },
@@ -48,7 +49,8 @@ const CLIP: Record<string, Access> = {
   expressions: { write: ['set_expression'], read: 'expressions' },
   effects: { write: ['add_effect', 'set_effect', 'remove_effect'], read: 'effects' },
   blend: { write: ['set_blend_mode'], read: 'blend' },
-  animators: { write: ['add_text_animator', 'set_text_animator', 'remove_text_animator', 'apply_text_preset'], read: 'animators' }
+  animators: { write: ['add_text_animator', 'set_text_animator', 'remove_text_animator', 'apply_text_preset'], read: 'animators' },
+  motionBlur: { write: ['set_motion_blur'], read: 'motionBlur' }
 };
 
 const CAMERA: Record<string, Access> = {

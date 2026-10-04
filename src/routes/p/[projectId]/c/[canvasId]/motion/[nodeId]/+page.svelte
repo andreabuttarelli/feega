@@ -36,6 +36,7 @@
   import { AssetKind, COMPONENTS, LIBRARY_IDS, TrackKind, type ComponentId } from '$lib/motion/components';
   import { FRAME_RATES, type FrameRate } from '$lib/motion/design';
   import { setFrameRate } from '$lib/motion/frame-rate';
+  import { setMotionBlur } from '$lib/motion/motion-blur-ops';
   import { Background, FORMATS, MOTION_FORMATS, MAX_SECONDS, findClip, formatOf, type MotionDoc, type MotionFormat } from '$lib/motion/doc';
   import {
     Direction,
@@ -519,6 +520,24 @@
         <option value={Background.Transparent}>Transparent</option>
       </select>
     </label>
+    <label class="field" title="Real motion blur on server renders; the browser export takes 2 samples, the preview none">
+      <input type="checkbox" checked={doc.motionBlur.enabled} onchange={(e) => apply(setMotionBlur(doc, { enabled: e.currentTarget.checked }), 'Changed motion blur')} data-testid="motion-blur" />
+      Motion blur
+    </label>
+    {#if doc.motionBlur.enabled}
+      <label class="field">
+        Shutter °
+        <input type="number" min="1" max="360" value={doc.motionBlur.shutterAngle} onchange={(e) => apply(setMotionBlur(doc, { shutterAngle: Number(e.currentTarget.value) }), 'Changed shutter angle')} data-testid="shutter-angle" />
+      </label>
+      <label class="field">
+        Phase °
+        <input type="number" min="-360" max="360" value={doc.motionBlur.shutterPhase} onchange={(e) => apply(setMotionBlur(doc, { shutterPhase: Number(e.currentTarget.value) }), 'Changed shutter phase')} data-testid="shutter-phase" />
+      </label>
+      <label class="field">
+        Samples
+        <input type="number" min="2" max="32" value={doc.motionBlur.samples} onchange={(e) => apply(setMotionBlur(doc, { samples: Number(e.currentTarget.value) }), 'Changed blur samples')} data-testid="blur-samples" />
+      </label>
+    {/if}
     <span class="save" data-testid="save-state">{saveState} · v{version}</span>
     <button type="button" class="render" onclick={() => (exporting = true)} data-testid="export-open"><Film size={14} /> Export</button>
   </header>

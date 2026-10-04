@@ -27,6 +27,7 @@
   import { TEXT_COMPONENTS, TEXT_PRESETS, applyPreset as applyTextPreset, removeAnimator, setAnimator, type TextPreset } from '$lib/motion/text-animators/ops';
   import { BLEND_MODES, type BlendMode } from '$lib/motion/blend';
   import { setBlendMode } from '$lib/motion/blend-ops';
+  import { setClipsBlur } from '$lib/motion/motion-blur-ops';
   import { expressionErrors, expressionValue } from '$lib/motion/expression/bake';
 
 
@@ -378,6 +379,13 @@
         </select>
       </div>
     </section>
+
+    {#if doc.motionBlur.enabled}
+      <section data-testid="clip-blur-section">
+        <h4>Motion blur</h4>
+        <label class="row"><input type="checkbox" data-testid="clip-blur" checked={clip.motionBlur} onchange={(e) => commit(setClipsBlur(doc, [clip.id], e.currentTarget.checked), 'Changed motion blur')} /> Blur this clip</label>
+      </section>
+    {/if}
 
     <section data-testid="parent-section">
       <h4>Parent</h4>

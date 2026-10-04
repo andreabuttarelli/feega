@@ -3,7 +3,7 @@ export const FARM_JOB_DIR = '/vercel/sandbox/job';
 
 export type FarmFile = { path: string; content: Buffer };
 export type FarmRun = { exitCode: number; output: string };
-export type WorkerSpec = { allowHosts: string[]; timeoutMs: number };
+export type WorkerSpec = { allowHosts: string[]; timeoutMs: number; vcpus: number };
 
 export type FarmWorker = {
   write: (files: FarmFile[]) => Promise<void>;

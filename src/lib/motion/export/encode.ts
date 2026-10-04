@@ -12,7 +12,7 @@ const KEYFRAME_SECONDS = 2;
 
 export type FrameRenderer = (onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>) => Promise<void>;
 
-export type EncodeJob = { size: Size; fps: number; frames: number; render: FrameRenderer; audio: AudioBuffer | null; onFrame: (done: number) => void; signal: AbortSignal };
+export type EncodeJob = { size: Size; fps: number; frames: number; samples: number; render: FrameRenderer; audio: AudioBuffer | null; onFrame: (done: number) => void; signal: AbortSignal };
 
 export async function capabilities(doc: Pick<MotionDoc, 'width' | 'height'>): Promise<Capabilities> {
   if (typeof VideoEncoder === 'undefined') {
@@ -80,11 +80,20 @@ export async function encodeMp4(job: EncodeJob): Promise<Blob> {
       await audio.add(job.audio);
       audio.close();
     }
-    await job.render(async (bitmap, index) => {
+    await job.render(async (bitmap, sample) => {
+      const frame = Math.floor(sample / job.samples);
+      const k = sample % job.samples;
+      if (k === 0) {
+        paint.clearRect(0, 0, job.size.width, job.size.height);
+      }
+      paint.globalAlpha = 1 / (k + 1);
       paint.drawImage(bitmap, 0, 0, job.size.width, job.size.height);
       bitmap.close();
-      await video.add(index / job.fps, 1 / job.fps);
-      job.onFrame(index + 1);
+      if (k < job.samples - 1) {
+        return;
+      }
+      await video.add(frame / job.fps, 1 / job.fps);
+      job.onFrame(frame + 1);
     });
     job.signal.throwIfAborted();
     await output.finalize();

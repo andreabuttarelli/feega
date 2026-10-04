@@ -5,7 +5,7 @@
   import type { MotionDoc } from '$lib/motion/doc';
   import { Background, FORMATS, formatOf } from '$lib/motion/doc';
   import { Resolution } from '$lib/motion/render-quote';
-  import { AudioMode, Support, eta, exportSize, exportSupport, frameTimes, type ExportScope, type ExportSupport, type Size } from '$lib/motion/export-plan';
+  import { AudioMode, Support, eta, exportSize, exportSupport, frameTimes, samplesPerFrame, type ExportScope, type ExportSupport, type Size } from '$lib/motion/export-plan';
   import { audioPlan } from '$lib/motion/audio-plan';
   import { capabilities, encodeMp4, mixAudio } from '$lib/motion/export/encode';
   import { saveExport } from '$lib/motion/export/save';
@@ -192,7 +192,8 @@
       const blob = await encodeMp4({
         size,
         fps: doc.fps,
-        frames: times.length,
+        frames: doc.durationInFrames,
+        samples: samplesPerFrame(doc),
         audio,
         signal,
         render: (onFrame) => render(times, size, onFrame, signal),
