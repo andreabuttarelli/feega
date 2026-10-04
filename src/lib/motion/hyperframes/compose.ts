@@ -6,6 +6,7 @@ import { resolveColor, type BrandTokens } from '../brand';
 import { css, esc, js, seconds } from './html';
 import { TEMPLATES, Timing, type PropsOf, type TemplateCtx, type Tween, type Vars } from './templates';
 import { LIGHTING, threeImportMap, threeScript, type ThreeClip } from './three';
+import { bakeComposition, compositionScript, type TimedBake } from './composition';
 import { ANIMATE_CSS, animationScript, colourOverrides, sceneKeys, wrapAnimated } from './animate';
 import { MASK_CSS, MaskScope, maskLayer, startValues } from './masks';
 import { SCREENSHOT_URL, captureScript, contentStamp } from './capture';
@@ -192,6 +193,11 @@ function threeClipOf(clip: MotionClip, ctx: TemplateCtx<ComponentId>): ThreeClip
   };
 }
 
+function compositionBake(clip: MotionClip, ctx: TemplateCtx<ComponentId>): TimedBake {
+  const bake = bakeComposition(clip.id, clip.props as PropsOf<'Composition'>, ctx, ctx.asset);
+  return { ...bake, start: ctx.start, length: ctx.length };
+}
+
 const BASE_CSS = [
   'html,body{margin:0;padding:0;background:transparent}',
   '#root{position:relative;width:100%;height:100%;overflow:hidden}',
@@ -246,6 +252,7 @@ export function composeHtml(input: ComposeInput): string {
   const tweens: Tween[] = [];
   const holds: Hold[] = [];
   const three: ThreeClip[] = [];
+  const compositions: TimedBake[] = [];
   const clips: MotionClip[] = [];
   const runs: CustomRun[] = [];
   const hidden = hiddenMattes(doc);
@@ -263,6 +270,9 @@ export function composeHtml(input: ComposeInput): string {
       holds.push(...heldUntilStart(own, ctx.start));
       if (THREE_D_COMPONENTS.includes(clip.component)) {
         three.push(threeClipOf(clip, ctx));
+      }
+      if (clip.component === 'Composition') {
+        compositions.push(compositionBake(clip, ctx));
       }
       const run = clip.component === 'Custom' ? customRun(clip, ctx, doc.components) : null;
       if (run) {
@@ -285,7 +295,7 @@ export function composeHtml(input: ComposeInput): string {
     : boot
       ? `<script>${boot}</script>`
       : '';
-  const scripts = [RUNTIME_URL, GSAP_URL, SCREENSHOT_URL, ...(three.length ? [THREE_BASE] : []), ...[...libraries].flatMap((lib) => LIBRARY_TAGS[lib].scripts)];
+  const scripts = [RUNTIME_URL, GSAP_URL, SCREENSHOT_URL, ...(three.length || compositions.length ? [THREE_BASE] : []), ...[...libraries].flatMap((lib) => LIBRARY_TAGS[lib].scripts)];
   const assetUrls = [...Object.values(input.assets), ...(tokens.logoUrl ? [tokens.logoUrl] : [])];
 
   const page = [
@@ -295,7 +305,7 @@ export function composeHtml(input: ComposeInput): string {
     `<script src="${RUNTIME_URL}"></script>`,
     `<script src="${GSAP_URL}"></script>`,
     ...[...libraries].map((lib) => LIBRARY_TAGS[lib].tag),
-    three.length || threeCustom ? threeImportMap() : '',
+    three.length || compositions.length || threeCustom ? threeImportMap() : '',
     `<link rel="stylesheet" crossorigin="anonymous" href="${FONTS_URL}" />`,
     `<style>${BASE_CSS}#root{background:${esc(background)}}</style>`,
     '</head><body>',
@@ -305,7 +315,8 @@ export function composeHtml(input: ComposeInput): string {
     `<script>${animation.setup}const tl=gsap.timeline({paused:true});${holds.map(holdLine).join('')}${tweens.map(tweenLine).join('')}${animation.timeline}tl.set({}, {}, ${duration});window.__timelines=window.__timelines||{};window.__timelines[${js(COMPOSITION_ID)}]=tl;</script>`,
     definitions,
     customBoot,
-    threeScript(three, Number(duration))
+    threeScript(three, Number(duration)),
+    compositionScript(compositions, Number(duration))
   ].join('');
   return `${page}${captureScript(doc, contentStamp(page))}</body></html>`;
 }

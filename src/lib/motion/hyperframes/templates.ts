@@ -289,6 +289,17 @@ const Shape3D: Template<'Shape3D'> = {
   }
 };
 
+const Composition: Template<'Composition'> = {
+  timing: Timing.Wrapper,
+  html: (ctx) => {
+    if (!ctx.p.media.some((m) => ctx.asset(m.assetId))) {
+      return missing('Add images or videos');
+    }
+    const fill = css({ position: 'absolute', inset: '0', width: '100%', height: '100%' });
+    return `<div style="${css({ position: 'absolute', inset: '0', background: ctx.color(ctx.p.background) })}"></div><canvas id="comp-${ctx.id}" width="${ctx.width}" height="${ctx.height}" style="${fill}"></canvas>`;
+  }
+};
+
 const scopedCss = (id: string, css: string) => `<style>@scope (#cc-${id}) {${css.replace(/<\/(style)/gi, '<\\/$1')}}</style>`;
 
 const Custom: Template<'Custom'> = {
@@ -318,5 +329,6 @@ export const TEMPLATES: { [K in ComponentId]: Template<K> } = {
   CanvasMock,
   Model3D,
   Shape3D,
+  Composition,
   Custom
 };
