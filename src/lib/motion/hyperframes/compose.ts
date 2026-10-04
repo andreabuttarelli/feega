@@ -7,6 +7,8 @@ import { css, esc, js, seconds } from './html';
 import { TEMPLATES, Timing, type PropsOf, type TemplateCtx, type Tween, type Vars } from './templates';
 import { LIGHTING, OPENTYPE_URL, ThreeKind, lookRuntime, surfaceOf, threeAssetUrls, threeImportMap, threeScript, type ThreeClip } from './three';
 import { outlineUrl } from '../fonts/outline';
+import { Finish } from '../devices';
+import { deviceRuntime } from './device-runtime';
 import { bakeComposition, compositionScript, type TimedBake } from './composition';
 import { ANIMATE_CSS, animationScript, keyedOverrides, sceneKeys, wrapAnimated, wrapParents } from './animate';
 import { ancestorsOf, parentsWithChildren } from '../parent';
@@ -191,17 +193,19 @@ const THREE_KIND: Partial<Record<ComponentId, ThreeKind>> = {
   Model3D: ThreeKind.Model,
   Shape3D: ThreeKind.Shape,
   Text3D: ThreeKind.Text,
-  Logo3D: ThreeKind.Logo
+  Logo3D: ThreeKind.Logo,
+  Device3D: ThreeKind.Device
 };
 
-type ThreeProps = PropsOf<'Model3D'> & Partial<PropsOf<'Shape3D'>> & Partial<PropsOf<'Text3D'>> & Partial<PropsOf<'Logo3D'>>;
+type ThreeProps = PropsOf<'Model3D'> & Partial<PropsOf<'Shape3D'>> & Partial<PropsOf<'Text3D'>> & Partial<PropsOf<'Logo3D'>> & Partial<PropsOf<'Device3D'>>;
 
 function threeUrl(kind: ThreeKind, p: ThreeProps, ctx: TemplateCtx<ComponentId>, input: ComposeInput): string | null {
   const URL_OF: Record<ThreeKind, () => string | null> = {
     [ThreeKind.Model]: () => ctx.asset(p.assetId ?? null),
     [ThreeKind.Shape]: () => null,
     [ThreeKind.Logo]: () => ctx.asset(p.assetId ?? null) ?? ctx.logoUrl ?? null,
-    [ThreeKind.Text]: () => outlineUrl(p.font ?? '', p.weight ?? 400, input.doc.fonts, input.assets)
+    [ThreeKind.Text]: () => outlineUrl(p.font ?? '', p.weight ?? 400, input.doc.fonts, input.assets),
+    [ThreeKind.Device]: () => ctx.asset(p.screen ?? null)
   };
   return URL_OF[kind]();
 }
@@ -230,7 +234,9 @@ function threeClipOf(clip: MotionClip, ctx: TemplateCtx<ComponentId>, staged: bo
     surface: surfaceOf(p.material),
     text: p.text ?? '',
     extrude: p.extrude ?? 0,
-    bevel: p.bevel ?? 0
+    bevel: p.bevel ?? 0,
+    device: p.device ? deviceRuntime(p.device, p.finish ?? Finish.Default, ctx) : null,
+    video: Boolean(ctx.asset(p.screenVideo ?? null))
   };
 }
 

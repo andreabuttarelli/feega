@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { BuiltinFont, FONT_NAME } from './fonts/model';
 import { DURATION, EASE_IDS, Ease, FPS } from './design';
 import { MATERIALS, Material } from './materials';
+import { DEVICES, Device, FINISHES, Finish } from './devices';
 import { LAYOUTS } from '../canvas/composition/index';
 import { CAMERA_PRESETS } from '../canvas/composition/camera';
 import type { CameraPresetId } from '../canvas/composition/camera';
@@ -337,6 +338,22 @@ export const COMPONENTS = {
       .object({ assetId: asset(AssetKind.Image, 'SVG logo'), fill: color('brand.primary', 'Colour'), ...extrusion, material: choice(MATERIALS, Material.Metal, 'Material', Group.Style), ...camera, ...position3d })
       .strict()
   },
+  Device3D: {
+    label: 'Device mockup',
+    description: 'A 3D phone, laptop, monitor, tablet or browser window with an image or video mapped on its screen, lit by the look of the video. Animate lid (laptops, degrees open) and screenScroll (0..1, scrolls a tall screenshot); apply_device_preset adds spin-in, hero turn, lid opening or screen scroll.',
+    track: TrackKind.Visual,
+    durationInFrames: seconds(4),
+    schema: z
+      .object({
+        device: choice(DEVICES, Device.PhonePro, 'Device', Group.Content),
+        screen: asset(AssetKind.Image, 'Screen image'),
+        screenVideo: asset(AssetKind.Video, 'Screen video'),
+        finish: choice(FINISHES, Finish.Default, 'Finish', Group.Style),
+        ...camera,
+        ...position3d
+      })
+      .strict()
+  },
   Composition: {
     label: 'Composition',
     description: 'Many images or videos arranged in 3D (grid, carousel, helix, coverflow…) and looping every `loop` seconds.',
@@ -371,7 +388,7 @@ export type ComponentId = keyof typeof COMPONENTS;
 
 export const COMPONENT_IDS = Object.keys(COMPONENTS) as [ComponentId, ...ComponentId[]];
 
-export const THREE_D_COMPONENTS: readonly ComponentId[] = ['Model3D', 'Shape3D', 'Text3D', 'Logo3D'];
+export const THREE_D_COMPONENTS: readonly ComponentId[] = ['Model3D', 'Shape3D', 'Text3D', 'Logo3D', 'Device3D'];
 
 export const CODE_COMPONENTS: readonly ComponentId[] = ['Custom'];
 
