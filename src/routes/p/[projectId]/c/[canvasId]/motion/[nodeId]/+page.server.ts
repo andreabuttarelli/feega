@@ -16,6 +16,7 @@ import { Sound, generateSound } from '$lib/server/motion/voiceover';
 import { withOrgContext } from '$lib/server/ai-log';
 import { saveFontUpload } from '$lib/server/motion/font-upload';
 import { analyzeSounds, storageAnalysis } from '$lib/server/motion/audio-analysis';
+import { clipsOf } from '$lib/motion/doc';
 
 const HTTP_CONFLICT = 409;
 const HTTP_BAD_REQUEST = 400;
@@ -175,7 +176,9 @@ export const actions: Actions = {
       motionAssets({ db: scope.db, orgId: scope.orgId, projectId: params.projectId, canvasId: scope.canvas.id, nodeId: scope.motion.record.id }, SIGNED_URL_TTL_S.render),
       motionTokens(scope.db, { orgId: scope.orgId, brandId: scope.projectBrandId })
     ]);
-    const req = renderRequest(version, { doc: head.doc, tokens, assets: assetUrls(assets) }, settings.settings);
+    const soundIds = clipsOf(head.doc).map((c) => String(c.props.assetId ?? ''));
+    const analyses = await analyzeSounds(storageAnalysis(scope.db), { orgId: scope.orgId, projectId: params.projectId }, assets, soundIds);
+    const req = renderRequest(version, { doc: head.doc, tokens, assets: assetUrls(assets), analyses }, settings.settings);
 
     const editorUrl = `/p/${params.projectId}/c/${params.canvasId}/motion/${params.nodeId}`;
     const renderScope = { ...nodeScope, projectId: params.projectId, userId: scope.userId, editorUrl };

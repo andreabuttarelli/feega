@@ -56,6 +56,7 @@ import { SHAPE_KINDS, modifierKey } from '$lib/motion/shape/schema';
 import { DUCK_DEFAULTS, duckUnder } from '$lib/motion/duck';
 import type { AudioAnalysis } from '$lib/motion/audio-analysis';
 import { Hit, cutToBeat, hitFrames, markHits } from '$lib/motion/beats';
+import { PULSE_PROPS, pulseWithMusic } from '$lib/motion/pulse';
 
 export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number };
 
@@ -508,6 +509,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const { duration, bpm, beats, onsets, speech } = analysis;
         return { ok: true, duration, bpm, beats, onsets, speech };
       }
+    }),
+
+    pulse_with_music: tool({
+      description: `Make a clip pulse with the music: sets an audio-reactive expression on ${PULSE_PROPS.join(', ')} (scale and opacity follow the loudness, blur flashes on each beat). source is the audio clip to follow (default: the longest audio clip); strength 0..1 (default per prop). Edit it afterwards with set_expression.`,
+      inputSchema: z.object({ clip_id: z.string(), prop: z.enum(PULSE_PROPS), source: z.string().optional(), strength: z.number().min(0).max(1).optional() }),
+      execute: async (input) => apply(pulseWithMusic(session.doc, input.clip_id, input.prop, { source: input.source, strength: input.strength }), `pulsed ${input.prop} of ${input.clip_id} with the music`)
     }),
 
     beat_times: tool({

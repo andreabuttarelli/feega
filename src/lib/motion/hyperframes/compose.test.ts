@@ -407,3 +407,13 @@ describe('custom components in the composition', () => {
     }
   });
 });
+
+describe('audio-reactive composition', () => {
+  it('bakes audio expressions from the analyses it is given', () => {
+    const withMusic = must(addClip(must(addClip(doc, { component: 'Audio', from: 0, durationInFrames: 60, props: { assetId: 'm' } }, 'music')), { component: 'Shape', from: 0, durationInFrames: 60 }, 'dot'));
+    const reactive = must(setExpression(withMusic, 'dot', 'opacity', 'audio.amp()'));
+    const analyses = { m: { version: 1, fps: 30, duration: 2, amp: Array.from({ length: 60 }, () => 0.5), onsets: [], bpm: null, beats: [], speech: [] } };
+
+    expect(composeHtml({ doc: reactive, tokens: FEEGA_TOKENS, assets: { m: '/m.mp3' }, analyses })).not.toBe(composeHtml({ doc: reactive, tokens: FEEGA_TOKENS, assets: { m: '/m.mp3' } }));
+  });
+});

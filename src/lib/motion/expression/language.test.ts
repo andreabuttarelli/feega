@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Ease } from '../design';
-import { MAX_SOURCE, compileExpression, runExpression, type Scope } from './language';
+import { MAX_SOURCE, SILENT_AUDIO, compileExpression, runExpression, type Scope } from './language';
 
 const scope = (extra: Partial<Scope> = {}): Scope => ({
   time: 1,
@@ -12,6 +12,7 @@ const scope = (extra: Partial<Scope> = {}): Scope => ({
   track: [],
   thisLayer: { get: () => 0 },
   layer: () => ({ get: () => 0 }),
+  audio: SILENT_AUDIO,
   ...extra
 });
 
@@ -128,5 +129,32 @@ describe('expression language', () => {
 
   it('keeps arrays for index access', () => {
     expect(run('[3, value, 5][1] + [1, 2].length')).toBe(12);
+  });
+});
+
+describe('audio', () => {
+  const audio = {
+    amp: (ref: string | number | null, smoothing: number) => (ref === 'vo' ? 0.2 : 0.5 + smoothing / 100),
+    beat: () => 1,
+    onset: () => 0.25
+  };
+
+  it('audio.amp reads the music, or the clip or track named, smoothed over frames', () => {
+    expect(run('audio.amp()', { audio })).toBe(0.51);
+    expect(run('audio.amp("vo")', { audio })).toBe(0.2);
+    expect(run('audio.amp("music", 10)', { audio })).toBe(0.6);
+  });
+
+  it('audio.beat and audio.onset pulse with the hits', () => {
+    expect(run('value * (1 + audio.beat())', { audio })).toBe(20);
+    expect(run('audio.onset()', { audio })).toBe(0.25);
+  });
+
+  it('without analysed audio everything is silent', () => {
+    expect(run('audio.amp() + audio.beat() + audio.onset()')).toBe(0);
+  });
+
+  it('amp takes a name or an index and a number', () => {
+    expect(error('audio.amp([1])')).toMatch(/audio.amp/);
   });
 });

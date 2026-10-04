@@ -4,6 +4,8 @@ import { Ease } from '../design';
 import { clipsOf, type MotionClip, type MotionDoc } from '../doc';
 import { ValueKind, animProp, baseValue, sampleTrack, type AnimProp, type Keyframe } from '../keyframes';
 import { ExpressionError, compileExpression, runExpression, type LayerHandle, type Program } from './language';
+import type { AudioAnalysis } from '../audio-analysis';
+import { audioPort } from './audio-port';
 
 export type ExpressionFault = { clipId: string; key: string; error: string };
 
@@ -29,7 +31,10 @@ class Evaluator {
   private readonly memo = new Map<string, number>();
   private readonly visiting: string[] = [];
 
-  constructor(private readonly doc: MotionDoc) {
+  constructor(
+    private readonly doc: MotionDoc,
+    private readonly analyses: Record<string, AudioAnalysis> = {}
+  ) {
     this.order = clipsOf(doc);
     this.byId = new Map(this.order.map((c) => [c.id, c]));
   }
@@ -64,7 +69,8 @@ class Evaluator {
         seed: seedOf(name),
         track: lane.track,
         thisLayer: this.handle(id, frame),
-        layer: (ref) => this.handle(this.resolve(ref), frame)
+        layer: (ref) => this.handle(this.resolve(ref), frame),
+        audio: audioPort(this.doc, this.analyses, frame)
       });
       const clamped = clamp(result, lane.range);
       this.memo.set(memoKey, clamped);
@@ -204,11 +210,11 @@ function hasExpressions(doc: MotionDoc): boolean {
   return Object.keys(doc.camera?.expressions ?? {}).length > 0 || clipsOf(doc).some((c) => Object.keys(c.expressions).length > 0);
 }
 
-function bake(doc: MotionDoc): Baked {
+function bake(doc: MotionDoc, analyses: Record<string, AudioAnalysis>): Baked {
   if (!hasExpressions(doc)) {
     return { doc, faults: [] };
   }
-  const evaluator = new Evaluator(doc);
+  const evaluator = new Evaluator(doc, analyses);
   const faults: ExpressionFault[] = [];
 
   const tracks = doc.tracks.map((t) => ({
@@ -230,14 +236,14 @@ function bake(doc: MotionDoc): Baked {
   return { doc: { ...doc, tracks, camera }, faults };
 }
 
-export function bakeExpressions(doc: MotionDoc): MotionDoc {
-  return bake(doc).doc;
+export function bakeExpressions(doc: MotionDoc, analyses: Record<string, AudioAnalysis> = {}): MotionDoc {
+  return bake(doc, analyses).doc;
 }
 
-export function expressionErrors(doc: MotionDoc): ExpressionFault[] {
-  return bake(doc).faults;
+export function expressionErrors(doc: MotionDoc, analyses: Record<string, AudioAnalysis> = {}): ExpressionFault[] {
+  return bake(doc, analyses).faults;
 }
 
-export function expressionValue(doc: MotionDoc, clipId: string, key: string, frame: number): number {
-  return new Evaluator(doc).value(clipId, key, frame);
+export function expressionValue(doc: MotionDoc, clipId: string, key: string, frame: number, analyses: Record<string, AudioAnalysis> = {}): number {
+  return new Evaluator(doc, analyses).value(clipId, key, frame);
 }
