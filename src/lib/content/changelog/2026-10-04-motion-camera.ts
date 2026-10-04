@@ -8,6 +8,7 @@ export default {
     'Depth of field blurs what is out of focus; rack focus moves it from one layer to another in one click.',
     '3D models turn with the camera and get real bokeh.',
     'Captions and overlays can stay on screen while the camera moves.',
-    'The motion agent can set up camera moves for you.'
+    'The motion agent can set up camera moves for you.',
+    'Pictures now show up in videos rendered on our servers, and 3D models animate there too.'
   ]
 } satisfies ChangelogEntry;
