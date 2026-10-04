@@ -23,7 +23,7 @@ describe('motion agent camera tools', () => {
     const on = await run('set_camera', { values: { fov: 35, focusDistance: 400 }, dof: true });
 
     expect(on.ok).toBe(true);
-    expect(session.doc.camera).toEqual({ base: { fov: 35, focusDistance: 400 }, dof: true, keyframes: {} });
+    expect(session.doc.camera).toEqual({ base: { fov: 35, focusDistance: 400 }, dof: true, keyframes: {}, expressions: {} });
 
     await run('set_camera', { enabled: false });
     expect(session.doc.camera).toBeNull();

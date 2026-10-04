@@ -7,6 +7,7 @@ import { keyframeSchema, keyframesProblem, transformSchema } from './keyframes';
 import { MATTES, Matte, maskSchema } from './mask';
 import { DEPTH, SPACES, Space, cameraSchema, depthSchema } from './camera';
 import { PARENT_OPACITIES, ParentOpacity, parentProblem } from './parent';
+import { expressionsSchema, expressionsProblem } from './expression/schema';
 
 export enum MotionFormat {
   Landscape = '16:9',
@@ -52,7 +53,8 @@ const clipSchema = z.object({
   depth: depthSchema.default(DEPTH.fallback),
   space: z.enum(SPACES).default(Space.World),
   parent: z.string().min(1).nullable().default(null),
-  parentOpacity: z.enum(PARENT_OPACITIES).default(ParentOpacity.Inherit)
+  parentOpacity: z.enum(PARENT_OPACITIES).default(ParentOpacity.Inherit),
+  expressions: expressionsSchema
 });
 
 const trackSchema = z.object({
@@ -147,7 +149,7 @@ function clipProblem(doc: MotionDoc, clip: MotionClip): string | null {
   }
   clip.props = verdict.props;
   clip.keyframes = Object.fromEntries(Object.entries(clip.keyframes).map(([key, track]) => [key, byFrame(track)]));
-  return keyframesProblem(withParams(doc, clip));
+  return keyframesProblem(withParams(doc, clip)) ?? expressionsProblem(withParams(doc, clip));
 }
 
 function propsProblem(doc: MotionDoc): string | null {

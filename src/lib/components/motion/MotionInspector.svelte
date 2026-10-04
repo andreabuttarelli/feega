@@ -16,6 +16,8 @@
   import CodeEditor from './CodeEditor.svelte';
   import { withParams } from '$lib/motion/custom/params';
   import type { CustomSource } from '$lib/motion/custom/component';
+  import { setExpression } from '$lib/motion/expression/ops';
+  import { expressionErrors, expressionValue } from '$lib/motion/expression/bake';
 
 
   type Asset = { id: string; kind: AssetKind; label: string; previewUrl: string };
@@ -123,6 +125,26 @@
     }
   }
 
+  const faults = $derived(Object.fromEntries(expressionErrors(doc).filter((f) => f.clipId === clip.id).map((f) => [f.key, f.error])));
+  const DEFAULT_EXPRESSION = 'value';
+
+  function toggleExpression(key: string) {
+    const off = clip.expressions[key] !== undefined;
+    commit(setExpression(doc, clip.id, key, off ? null : DEFAULT_EXPRESSION), off ? `Removed the ${key} expression` : `Added a ${key} expression`);
+  }
+
+  function editExpression(key: string, source: string) {
+    commit(setExpression(doc, clip.id, key, source), `Edited the ${key} expression`);
+  }
+
+  function expressionNow(key: string): string {
+    try {
+      return String(Math.round(expressionValue(doc, clip.id, key, clip.from + Math.max(0, frame - clip.from)) * 1000) / 1000);
+    } catch {
+      return '—';
+    }
+  }
+
   function toggle(key: string) {
     commit(toggleKey(doc, clip, key, frame, resolve), 'Toggled a keyframe');
   }
@@ -195,15 +217,29 @@
     <button type="button" class="key {keyState(key)}" title="Keyframe at playhead" aria-label={`Keyframe ${key}`} aria-pressed={keyState(key) === KEY_STATE.On} onclick={() => toggle(key)}>◆</button>
   {/snippet}
 
+  {#snippet exprToggle(key: string)}
+    <button type="button" class="expr-toggle" class:on={clip.expressions[key] !== undefined} title="Expression" aria-label={`Expression ${key}`} aria-pressed={clip.expressions[key] !== undefined} onclick={() => toggleExpression(key)}>=</button>
+  {/snippet}
+
+  {#snippet exprEditor(key: string)}
+    {#if clip.expressions[key] !== undefined}
+      <div class="expr" data-expression={key}>
+        <textarea class="code" rows="2" spellcheck="false" aria-label={`${key} expression`} value={clip.expressions[key]} onchange={(e) => editExpression(key, e.currentTarget.value)}></textarea>
+        {#if faults[key]}<p class="expr-error" role="alert">{faults[key]}</p>{:else}<output class="expr-now">= {expressionNow(key)}</output>{/if}
+      </div>
+    {/if}
+  {/snippet}
+
   {#snippet animRow(prop: AnimProp)}
     <div class="row anim" data-prop={prop.key}>
-      <span class="name">{@render diamond(prop.key)}{prop.label}</span>
+      <span class="name">{@render diamond(prop.key)}{@render exprToggle(prop.key)}{prop.label}</span>
       <div class="range">
         {#if DIALS.has(prop.key)}<Dial value={numberShown(prop)} label={prop.label} onchange={(v) => animate(prop.key, v)} />{/if}
         <input type="range" min={prop.min} max={prop.max} step={prop.step} value={numberShown(prop)} oninput={(e) => animate(prop.key, Number(e.currentTarget.value))} />
         <input class="num" type="text" inputmode="decimal" aria-label={prop.label} value={String(numberShown(prop))} onchange={(e) => animateText(prop, e.currentTarget.value)} />
       </div>
     </div>
+    {@render exprEditor(prop.key)}
   {/snippet}
 
   {#if transformProps.length}
@@ -303,7 +339,7 @@
       <h4>{group}</h4>
       {#each fields as field (field.key)}
         <div class="row">
-          <label for={`f-${field.key}`}>{#if keyedField(clip.component, field.key, animated.params)}{@render diamond(field.key)}{/if}{field.label}</label>
+          <label for={`f-${field.key}`}>{#if keyedField(clip.component, field.key, animated.params)}{@render diamond(field.key)}{#if field.control === Control.Range}{@render exprToggle(field.key)}{/if}{/if}{field.label}</label>
           {#if field.control === Control.Text}
             <input id={`f-${field.key}`} type="text" value={String(value(field) ?? '')} onchange={(e) => setProp(field, e.currentTarget.value)} />
           {:else if field.control === Control.Textarea}
@@ -341,6 +377,7 @@
             <span class="managed">{managedSummary(value(field))}{#if composeHref} · <a href={composeHref}>Edit in Compositions</a>{/if}</span>
           {/if}
         </div>
+        {#if keyedField(clip.component, field.key, animated.params) && field.control === Control.Range}{@render exprEditor(field.key)}{/if}
       {/each}
     </section>
   {/each}
@@ -530,6 +567,43 @@
   .num {
     width: 56px !important;
     flex: none;
+  }
+
+  .expr-toggle {
+    width: 16px;
+    margin-right: 4px;
+    font-family: 'Fragment Mono', monospace;
+    font-size: 11px;
+    color: var(--muted-foreground, #888);
+  }
+
+  .expr-toggle.on {
+    color: #a855f7;
+  }
+
+  .expr {
+    display: grid;
+    gap: 4px;
+    margin: 0 0 8px;
+  }
+
+  .expr .code {
+    width: 100%;
+    font-family: 'Fragment Mono', monospace;
+    font-size: 11px;
+    resize: vertical;
+  }
+
+  .expr-error {
+    color: #e11d48;
+    font-size: 11px;
+    margin: 0;
+  }
+
+  .expr-now {
+    font-family: 'Fragment Mono', monospace;
+    font-size: 10px;
+    color: #a855f7;
   }
 
   .key {

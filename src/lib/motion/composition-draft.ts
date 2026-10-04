@@ -108,7 +108,8 @@ function clipOf(id: string, component: MotionClip['component'], frames: number, 
     depth: DEPTH.fallback,
     space: Space.World,
     parent: null,
-    parentOpacity: ParentOpacity.Inherit
+    parentOpacity: ParentOpacity.Inherit,
+    expressions: {}
   };
 }
 

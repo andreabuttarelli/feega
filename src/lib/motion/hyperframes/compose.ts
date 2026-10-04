@@ -20,6 +20,7 @@ import { Matte, type Mask } from '../mask';
 import { cameraMath, stageSpec } from '../camera';
 import { sampleTrack } from '../keyframes';
 import { STAGE_CSS, stageRootStyle, stageScript } from './stage';
+import { bakeExpressions } from '../expression/bake';
 
 export { CAPTURE_REPLY, CAPTURE_REQUEST } from './capture';
 
@@ -250,7 +251,8 @@ function brandEnv(tokens: BrandTokens) {
   return { name: tokens.name, colors, logoUrl: tokens.logoUrl };
 }
 
-export function composeHtml(input: ComposeInput): string {
+export function composeHtml(raw: ComposeInput): string {
+  const input = { ...raw, doc: bakeExpressions(raw.doc) };
   const { doc, tokens } = input;
   const bottomFirst = doc.tracks.map((track, index) => ({ track, index })).reverse();
   const layers: string[] = [];

@@ -34,7 +34,7 @@ describe('camera edits', () => {
   it('set_camera creates the camera with the values given, and validates them', () => {
     const doc = must(setCamera(newMotionDoc(MotionFormat.Landscape), { base: { fov: 35 }, dof: true }));
 
-    expect(doc.camera).toEqual({ base: { fov: 35 }, dof: true, keyframes: {} });
+    expect(doc.camera).toEqual({ base: { fov: 35 }, dof: true, keyframes: {}, expressions: {} });
     expect(setCamera(doc, { base: { fov: 400 } }).ok).toBe(false);
     expect(must(removeCamera(doc)).camera).toBeNull();
   });

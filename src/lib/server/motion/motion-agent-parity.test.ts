@@ -42,13 +42,15 @@ const CLIP: Record<string, Access> = {
   depth: { write: ['set_clip_depth'], read: 'depth' },
   space: { write: ['set_clip_depth'], read: 'space' },
   parent: { write: ['set_parent', 'parent_clips'], read: 'parent' },
-  parentOpacity: { write: ['set_parent'], read: 'parentOpacity' }
+  parentOpacity: { write: ['set_parent'], read: 'parentOpacity' },
+  expressions: { write: ['set_expression'], read: 'expressions' }
 };
 
 const CAMERA: Record<string, Access> = {
   base: { write: ['set_camera', 'apply_camera_preset'], read: 'values' },
   dof: { write: ['set_camera'], read: 'dof' },
-  keyframes: { write: ['set_camera_keyframes', 'apply_camera_preset'], read: 'keyframes' }
+  keyframes: { write: ['set_camera_keyframes', 'apply_camera_preset'], read: 'keyframes' },
+  expressions: { write: ['set_expression'], read: 'expressions' }
 };
 
 type Shaped = { shape: Record<string, z.ZodType> };
