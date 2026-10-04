@@ -44,6 +44,21 @@ describe('analyzeAudio', () => {
     expect(a.onsets[1]).toBeCloseTo(0.6, 1);
   });
 
+  it('a swelling pad under the kicks is not a hit, the kicks are', () => {
+    const kicks = silence(4);
+    for (let i = 0; i < kicks.length; i++) {
+      const t = i / RATE;
+      const sinceKick = (t - 0.2) % 0.5;
+      kicks[i] = t >= 0.2 ? 0.8 * Math.sin(2 * Math.PI * 55 * t) * Math.exp(-12 * sinceKick) : 0;
+      kicks[i] += 0.12 * (Math.sin(2 * Math.PI * 220 * t) + Math.sin(2 * Math.PI * 277.2 * t) + Math.sin(2 * Math.PI * 329.6 * t));
+    }
+    const a = analyzeAudio(kicks, RATE, 30);
+
+    expect(a.onsets.map((t) => Math.round(t * 10) / 10)).toEqual([0, 0.2, 0.7, 1.2, 1.7, 2.2, 2.7, 3.2, 3.7]);
+    expect(a.bpm).toBe(120);
+    expect(a.beats[0]).toBeCloseTo(0.2, 1);
+  });
+
   it('the amplitude envelope has one value per frame, loudest at 1', () => {
     const a = analyzeAudio(tone(silence(2), 1, 2), RATE, 30);
 

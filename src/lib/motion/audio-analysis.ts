@@ -16,6 +16,7 @@ export type AudioAnalysis = {
 const HOP_S = 0.01;
 const EPS = 1e-10;
 const ONSET_RISE = 1.5;
+const ONSET_CONTEXT = 5;
 const ONSET_FLOOR_DB = -40;
 const ONSET_GAP_S = 0.1;
 const PEAK_RADIUS = 3;
@@ -64,7 +65,9 @@ function envelope(samples: Float32Array, rate: number, fps: number): number[] {
 function onsetStrength(energy: number[], peak: number): number[] {
   const floor = peak * 10 ** (ONSET_FLOOR_DB / 10);
   return energy.map((e, k) => {
-    const rise = Math.log((e + EPS) / ((energy[k - 1] ?? 0) + EPS));
+    const before = energy.slice(Math.max(0, k - ONSET_CONTEXT), k);
+    const level = before.length ? before.reduce((sum, v) => sum + v, 0) / before.length : 0;
+    const rise = Math.log((e + EPS) / (level + EPS));
     return e > floor && rise > ONSET_RISE ? rise : 0;
   });
 }
@@ -81,6 +84,14 @@ function peaks(strength: number[], hopS: number): number[] {
     picked.push(time);
   }
   return picked;
+}
+
+function impulses(onsets: number[], length: number, hopS: number): number[] {
+  const out = new Array<number>(length).fill(0);
+  for (const t of onsets) {
+    out[Math.round(t / hopS)] = 1;
+  }
+  return out;
 }
 
 const near = (strength: number[], at: number) => Math.max(strength[at - 1] ?? 0, strength[at] ?? 0, strength[at + 1] ?? 0);
@@ -146,7 +157,8 @@ export function analyzeAudio(samples: Float32Array, rate: number, fps: number): 
   const peak = Math.max(0, ...energy);
   const strength = onsetStrength(energy, peak);
   const onsets = peaks(strength, hopS).map(ms);
-  const bpm = onsets.length >= MIN_ONSETS_FOR_TEMPO ? tempo(strength, hopS) : null;
+  const pulses = impulses(onsets, energy.length, hopS);
+  const bpm = onsets.length >= MIN_ONSETS_FOR_TEMPO ? tempo(pulses, hopS) : null;
 
   return {
     version: ANALYSIS_VERSION,
@@ -155,7 +167,7 @@ export function analyzeAudio(samples: Float32Array, rate: number, fps: number): 
     amp: envelope(samples, rate, fps),
     onsets,
     bpm,
-    beats: bpm ? beatGrid(strength, hopS, bpm, duration) : [],
+    beats: bpm ? beatGrid(pulses, hopS, bpm, duration) : [],
     speech: voiced(energy, peak, hopS)
   };
 }
