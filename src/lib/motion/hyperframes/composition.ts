@@ -22,6 +22,12 @@ export const INSTANCE_FIELDS = 10;
 export const COMPOSITION_READY = 'motion-composition';
 
 const PRECISION = 10000;
+const VIDEO_READY_TIMEOUT_MS = 8000;
+
+export function compositionVideoId(clipId: string, mediaIndex: number): string {
+  return `cv-${clipId}-${mediaIndex}`;
+}
+
 const round = (n: number) => Math.round(n * PRECISION) / PRECISION;
 
 export function resolvedMedia(p: Pick<CompositionProps, 'media'>, asset: (id: string) => string | null): BakedMedia[] {
@@ -64,14 +70,16 @@ export function bakeComposition(id: string, p: CompositionProps, size: { width: 
 const STAGE_SCRIPT = `
 import * as THREE from 'three';
 
-function texture(m, loads) {
+function texture(b, m, i, loads) {
   if (m.kind === 'video') {
-    const video = document.createElement('video');
-    video.src = m.url; video.crossOrigin = 'anonymous'; video.muted = true; video.playsInline = true; video.preload = 'auto';
-    loads.push(new Promise((resolve) => { video.addEventListener('loadeddata', resolve, { once: true }); video.addEventListener('error', resolve, { once: true }); }));
-    const t = new THREE.Texture(video);
+    const id = 'cv-' + b.id + '-' + i;
+    const video = document.getElementById(id);
+    if (video && video.readyState < 2) {
+      loads.push(new Promise((resolve) => { video.addEventListener('loadeddata', resolve, { once: true }); video.addEventListener('error', resolve, { once: true }); setTimeout(resolve, VIDEO_READY_MS); }));
+    }
+    const t = new THREE.Texture();
     t.minFilter = THREE.LinearFilter; t.generateMipmaps = false;
-    return { t, video };
+    return { t, video, frameId: '__render_frame_' + id + '__' };
   }
   const t = new THREE.Texture();
   loads.push(new Promise((resolve) => {
@@ -90,7 +98,7 @@ function stage(b) {
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(50, canvas.width / canvas.height, 0.1, 500);
   const loads = [];
-  const sources = b.media.map((m) => texture(m, loads));
+  const sources = b.media.map((m, i) => texture(b, m, i, loads));
   for (const { t } of sources) { t.colorSpace = THREE.SRGBColorSpace; t.flipY = false; t.premultiplyAlpha = false; }
   const meshes = b.instances.map((index) => {
     const material = new THREE.ShaderMaterial({
@@ -125,9 +133,12 @@ function renderAt(time) {
       mesh.scale.set(f[k + 6], f[k + 7], f[k + 8]);
       mesh.material.uniforms.opacity.value = f[k + 9];
     });
-    for (const { t, video } of s.sources) {
-      if (!video || video.readyState < 2) continue;
-      video.currentTime = local % (video.duration || 1);
+    for (const { t, video, frameId } of s.sources) {
+      if (!video) continue;
+      const injected = document.getElementById(frameId);
+      const frame = injected && injected.complete && injected.naturalWidth ? injected : video.readyState >= 2 ? video : null;
+      if (!frame) continue;
+      t.image = frame;
       t.needsUpdate = true;
     }
     s.renderer.render(s.scene, s.camera);
@@ -158,7 +169,8 @@ export function compositionScript(bakes: TimedBake[], duration: number): string 
     RADIUS: MEDIA_UNIFORMS.radius,
     VERTEX: MEDIA_VERTEX_SHADER,
     FRAGMENT: MEDIA_FRAGMENT_SHADER,
-    READY: COMPOSITION_READY
+    READY: COMPOSITION_READY,
+    VIDEO_READY_MS: VIDEO_READY_TIMEOUT_MS
   };
   const declarations = Object.entries(constants).map(([name, value]) => `const ${name} = ${js(value)};`).join('');
   return `<script type="module">${declarations}${STAGE_SCRIPT}</script>`;

@@ -85,6 +85,14 @@ describe('Composition clip in a motion doc', () => {
     expect(html).toContain(ASSETS.v);
   });
 
+  it('gives each video a timed element the renderer can extract frames from', () => {
+    const html = composeHtml({ doc, tokens: FEEGA_TOKENS, assets: ASSETS });
+
+    expect(html).toContain(`<video id="cv-comp-2" src="${ASSETS.v}"`);
+    expect(html).toContain('data-start="0" data-duration="6"');
+    expect(html).not.toContain('<video id="cv-comp-0"');
+  });
+
   it('asks for media when none of it resolves', () => {
     const html = composeHtml({ doc, tokens: FEEGA_TOKENS, assets: {} });
 

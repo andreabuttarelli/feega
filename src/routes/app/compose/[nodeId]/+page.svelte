@@ -37,9 +37,9 @@
   let { data } = $props();
 
   const supabase = createSupabaseBrowserClient();
-  let doc = $state<MotionDoc>(data.head.doc);
+  let doc = $state.raw<MotionDoc>(data.head.doc);
   let version = $state(data.head.version);
-  let draft = $state<ComposeDraft | null>(data.draft);
+  let draft = $state.raw<ComposeDraft | null>(data.draft);
   let saveState = $state<SaveState>(SaveState.Saved);
   let notice = $state('');
   let frame = $state(0);
