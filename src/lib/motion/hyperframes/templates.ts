@@ -8,6 +8,9 @@ import type { TextRender } from '../text-animators/render';
 import { css, esc, px } from './html';
 import type { CustomComponents } from '../custom/component';
 import { compositionVideoId, resolvedMedia } from './composition';
+import { shapeHtml } from './shapes';
+import { ShapeKind } from '../shape/schema';
+import type { ShapeLook } from '../shape/render';
 
 export type PropsOf<K extends ComponentId> = z.output<(typeof COMPONENTS)[K]['schema']>;
 
@@ -176,10 +179,11 @@ const Audio: Template<'Audio'> = {
 const Shape: Template<'Shape'> = {
   timing: Timing.Wrapper,
   html: (ctx) => {
-    const style = css({ width: '100%', height: '100%', background: ctx.color(ctx.p.fill), clipPath: ctx.p.shape === 'circle' ? 'circle(50%)' : undefined, transformOrigin: 'left center' });
-    return placed(ctx, ctx.p, `<div id="sh-${ctx.id}" style="${style}"></div>`, true);
+    const box = boxOf(ctx.p, ctx);
+    const svg = shapeHtml(ctx.id, ctx.p as unknown as ShapeLook, ctx, { w: box.width, h: box.height });
+    return placed(ctx, ctx.p, `<div id="sh-${ctx.id}" style="${css({ width: '100%', height: '100%', transformOrigin: 'left center' })}">${svg}</div>`);
   },
-  tweens: (ctx) => (ctx.p.shape === 'line' ? [{ target: `#sh-${ctx.id}`, from: { scaleX: 0 }, to: { scaleX: 1 }, at: ctx.start, duration: frames(ctx, REVEAL), ease: ctx.p.easing }] : [])
+  tweens: (ctx) => (ctx.p.shape === ShapeKind.Line ? [{ target: `#sh-${ctx.id}`, from: { scaleX: 0 }, to: { scaleX: 1 }, at: ctx.start, duration: frames(ctx, REVEAL), ease: ctx.p.easing }] : [])
 };
 
 const Logo: Template<'Logo'> = {

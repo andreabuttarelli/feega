@@ -24,6 +24,9 @@
   import { EFFECTS, EFFECT_KINDS, type EffectKind } from '$lib/motion/effects/registry';
   import { addEffect, removeEffect, setEffect } from '$lib/motion/effects/ops';
   import { effectKey } from '$lib/motion/effects/model';
+  import { MODIFIERS, MODIFIER_KINDS, type ModifierKind } from '$lib/motion/shape/modifiers';
+  import { addModifier, morphTo, removeModifier, setModifier, setPath, shapePath, type ShapeParams } from '$lib/motion/shape/ops';
+  import { SHAPE_KINDS, ShapeKind, modifierKey, type Modifier } from '$lib/motion/shape/schema';
   import { SELECTOR_SHAPES, animatorKey, type SelectorShape } from '$lib/motion/text-animators/model';
   import { TEXT_COMPONENTS, TEXT_PRESETS, applyPreset as applyTextPreset, removeAnimator, setAnimator, type TextPreset } from '$lib/motion/text-animators/ops';
   import { BLEND_MODES, type BlendMode } from '$lib/motion/blend';
@@ -191,6 +194,30 @@
     }
   }
 
+  const shapeModifiers = $derived(clip.component === 'Shape' ? ((clip.props.modifiers as Modifier[]) ?? []) : []);
+  const shapeMorphs = $derived(clip.component === 'Shape' ? ((clip.props.morphs as string[]) ?? []) : []);
+  const modifierParams = (id: string) => animated.params.filter((p) => p.source === Source.Modifier && p.key.startsWith(modifierKey(id, '')));
+
+  function addModifierOf(select: HTMLSelectElement) {
+    const kind = select.value as ModifierKind;
+    select.value = '';
+    if (kind) {
+      commit(addModifier(doc, clip.id, kind, crypto.randomUUID().slice(0, 8)), `Added ${MODIFIERS[kind].label.toLowerCase()}`);
+    }
+  }
+
+  function addMorphOf(select: HTMLSelectElement) {
+    const kind = select.value as ShapeKind;
+    select.value = '';
+    if (kind) {
+      commit(morphTo(doc, clip.id, { kind }), 'Added a morph target');
+    }
+  }
+
+  function convertToPath() {
+    commit(setPath(doc, clip.id, shapePath(clip.props as unknown as ShapeParams)), 'Converted the shape to a path');
+  }
+
   function dropEffect(index: number) {
     if (draggedEffect) {
       commit(setEffect(doc, clip.id, draggedEffect, { index }), 'Reordered effects');
@@ -345,6 +372,48 @@
           {#each TEXT_PRESETS as preset (preset)}<option value={preset}>{preset}</option>{/each}
         </select>
       </div>
+    </section>
+  {/if}
+
+  {#if clip.component === 'Shape'}
+    <section data-testid="shape-section">
+      <h4>Path</h4>
+      <div class="row">
+        {#if clip.props.shape !== ShapeKind.Path}
+          <button type="button" data-testid="convert-to-path" onclick={convertToPath}>Convert to editable path</button>
+        {:else}
+          <span class="managed">Edit points on the preview with the pen tool.</span>
+        {/if}
+      </div>
+      <h4>Morph</h4>
+      {#each shapeMorphs as _target, i (i)}
+        <div class="row">
+          <span class="managed">Target {i + 1}</span>
+          <button type="button" aria-label={`Remove morph target ${i + 1}`} onclick={() => commit(setProps(doc, clip.id, { morphs: shapeMorphs.filter((_, j) => j !== i) }), 'Removed a morph target')}>×</button>
+        </div>
+      {/each}
+      <select aria-label="Add morph target" data-testid="add-morph" value="" onchange={(e) => addMorphOf(e.currentTarget)}>
+        <option value="">Morph into…</option>
+        {#each SHAPE_KINDS.filter((k) => k !== ShapeKind.Path) as kind (kind)}<option value={kind}>{kind}</option>{/each}
+      </select>
+      <h4>Modifiers</h4>
+      {#each shapeModifiers as modifier, i (modifier.id)}
+        <div class="effect" class:off={!modifier.enabled} data-modifier={modifier.id}>
+          <div class="effect-head">
+            <label class="effect-name"><input type="checkbox" checked={modifier.enabled} aria-label={`Enable ${MODIFIERS[modifier.kind].label}`} onchange={(e) => commit(setModifier(doc, clip.id, modifier.id, { enabled: e.currentTarget.checked }), 'Toggled a modifier')} />{MODIFIERS[modifier.kind].label}</label>
+            <button type="button" aria-label="Move modifier up" disabled={i === 0} onclick={() => commit(setModifier(doc, clip.id, modifier.id, { index: i - 1 }), 'Reordered modifiers')}>↑</button>
+            <button type="button" aria-label="Move modifier down" disabled={i === shapeModifiers.length - 1} onclick={() => commit(setModifier(doc, clip.id, modifier.id, { index: i + 1 }), 'Reordered modifiers')}>↓</button>
+            <button type="button" aria-label={`Remove ${MODIFIERS[modifier.kind].label}`} onclick={() => commit(removeModifier(doc, clip.id, modifier.id), 'Removed a modifier')}>×</button>
+          </div>
+          {#each modifierParams(modifier.id) as prop (prop.key)}
+            {@render animRow({ ...prop, label: prop.label.split(' · ')[1] })}
+          {/each}
+        </div>
+      {/each}
+      <select aria-label="Add modifier" data-testid="add-modifier" value="" onchange={(e) => addModifierOf(e.currentTarget)}>
+        <option value="">Add modifier…</option>
+        {#each MODIFIER_KINDS as kind (kind)}<option value={kind}>{MODIFIERS[kind].label}</option>{/each}
+      </select>
     </section>
   {/if}
 

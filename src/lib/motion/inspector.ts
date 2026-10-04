@@ -1,3 +1,5 @@
+import { withModifierParam } from './shape/model';
+import { modifierOfKey, shapeFieldShown, type Modifier, type ShapeKind } from './shape/schema';
 import { z } from 'zod';
 import { AssetKind, COMPONENTS, Control, Group, type ComponentId } from './components';
 import { FPS } from './design';
@@ -121,6 +123,10 @@ export function customFields(schema: PropsSchema): Field[] {
 }
 
 export function clipFieldGroups(doc: MotionDoc, clip: MotionClip): { group: Group; fields: Field[] }[] {
+  if (clip.component === 'Shape') {
+    const kind = clip.props.shape as ShapeKind;
+    return fieldGroups('Shape').map((g) => ({ ...g, fields: g.fields.filter((f) => shapeFieldShown(kind, f.key)) }));
+  }
   if (clip.component !== 'Custom') {
     return fieldGroups(clip.component);
   }
@@ -182,6 +188,11 @@ const EDIT_BASE: Record<Source, (doc: MotionDoc, clip: MotionClip, key: string, 
     }
     const patch = ref.field in SELECTOR ? { [ref.field]: Number(value) } : { values: { [ref.field]: value } };
     return setAnimator(doc, clip.id, ref.id, patch);
+  },
+  [Source.Modifier]: (doc, clip, key, value) => {
+    const ref = modifierOfKey(key);
+    const next = ref ? withModifierParam((clip.props.modifiers as Modifier[] | undefined) ?? [], ref.id, ref.param, Number(value)) : `no modifier for ${key}`;
+    return typeof next === 'string' ? { ok: false, error: next } : setProps(doc, clip.id, { modifiers: next });
   },
   [Source.Mask]: (doc, clip, key, value) => (clip.mask ? setMask(doc, clip.id, { ...clip.mask, [MASK_PROPS[key as MaskKey].field]: Number(value) }) : { ok: false, error: 'add a mask first' })
 };

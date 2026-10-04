@@ -7,6 +7,7 @@ import { LAYOUTS } from '../canvas/composition/index';
 import { CAMERA_PRESETS } from '../canvas/composition/camera';
 import type { CameraPresetId } from '../canvas/composition/camera';
 import type { LayoutId } from '../canvas/composition/types';
+import { CAPS, FILL_KINDS, FILL_RULES, FillKind, JOINS, MAX_MODIFIERS, MAX_MORPHS, SHAPE_KINDS, STROKE_KINDS, ShapeKind, StrokeKind, modifierSchema, pathString } from './shape/schema';
 
 export enum Control {
   Text = 'text',
@@ -113,7 +114,7 @@ const typography = (size: number, fallbackColor: string, look: Look) => ({
 export const LIGHTINGS = ['studio', 'soft', 'dramatic'] as const;
 export const BACKDROPS = ['transparent', 'brand', 'dark', 'light'] as const;
 export const SHAPES_3D = ['cube', 'sphere', 'torus', 'cone'] as const;
-export const SHAPES_2D = ['rect', 'circle', 'line'] as const;
+export const SHAPES_2D = SHAPE_KINDS;
 
 const camera = {
   startAngle: range(-360, 360, 1, -20, 'Start angle', Group.Camera),
@@ -226,10 +227,36 @@ export const COMPONENTS = {
   },
   Shape: {
     label: 'Shape',
-    description: 'Rectangle, circle or line.',
+    description: 'Vector shape: rectangle, ellipse, polygon, star or a free path, with gradient fill, stroke, morph and modifiers.',
     track: TrackKind.Visual,
     durationInFrames: seconds(3),
-    schema: z.object({ shape: choice(SHAPES_2D, 'line', 'Shape', Group.Content), fill: color('brand.accent', 'Fill'), ...layout({ y: 0.6, height: 0.004 }) }).strict()
+    schema: z
+      .object({
+        shape: choice(SHAPES_2D, ShapeKind.Line, 'Shape', Group.Content),
+        path: pathString.default('').meta(managed('Path')),
+        roundness: range(0, 0.5, 0.01, 0, 'Roundness', Group.Content),
+        sides: range(3, 64, 1, 6, 'Sides', Group.Content),
+        points: range(3, 64, 1, 5, 'Points', Group.Content),
+        innerRadius: range(0.05, 1, 0.01, 0.5, 'Inner radius', Group.Content),
+        morphs: z.array(pathString).max(MAX_MORPHS).default([]).meta(managed('Morph targets')),
+        morph: range(0, MAX_MORPHS, 0.01, 0, 'Morph', Group.Content),
+        morphStart: range(0, 1, 0.01, 0, 'Morph start point', Group.Content),
+        modifiers: z.array(modifierSchema).max(MAX_MODIFIERS).default([]).meta(managed('Modifiers')),
+        fillKind: choice(FILL_KINDS, FillKind.Solid, 'Fill type', Group.Style),
+        fill: color('brand.accent', 'Fill'),
+        fill2: color('brand.primary', 'Gradient end'),
+        gradientAngle: range(-360, 360, 1, 90, 'Gradient angle', Group.Style),
+        fillRule: choice(FILL_RULES, 'nonzero', 'Fill rule', Group.Style),
+        strokeKind: choice(STROKE_KINDS, StrokeKind.None, 'Stroke', Group.Style),
+        stroke: color('brand.text', 'Stroke colour'),
+        strokeWidth: range(0, 0.2, 0.001, 0.01, 'Stroke width', Group.Style),
+        dash: range(0, 0.5, 0.001, 0, 'Dash', Group.Style),
+        gap: range(0, 0.5, 0.001, 0, 'Gap', Group.Style),
+        cap: choice(CAPS, 'butt', 'Cap', Group.Style),
+        join: choice(JOINS, 'miter', 'Join', Group.Style),
+        ...layout({ y: 0.6, height: 0.004 })
+      })
+      .strict()
   },
   Logo: {
     label: 'Logo',

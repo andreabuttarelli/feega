@@ -61,7 +61,8 @@ export enum Source {
   Mask = 'mask',
   Param = 'param',
   Effect = 'effect',
-  Animator = 'animator'
+  Animator = 'animator',
+  Modifier = 'modifier'
 }
 
 type Range = { label: string; min: number; max: number; step: number; fallback: number };
@@ -134,6 +135,21 @@ const typeNumbers: AnimProp[] = (
   ] as const
 ).map(([key, label, fallback]) => ({ key, label, kind: ValueKind.Number, source: Source.Prop, min: TYPE[key].min, max: TYPE[key].max, step: TYPE[key].step, fallback }));
 
+const SHAPE_NUMBERS: AnimProp[] = (
+  [
+    ['roundness', 'Roundness', 0, 0.5, 0.01, 0],
+    ['sides', 'Sides', 3, 64, 1, 6],
+    ['points', 'Points', 3, 64, 1, 5],
+    ['innerRadius', 'Inner radius', 0.05, 1, 0.01, 0.5],
+    ['morph', 'Morph', 0, 16, 0.01, 0],
+    ['morphStart', 'Morph start point', 0, 1, 0.01, 0],
+    ['gradientAngle', 'Gradient angle', -360, 360, 1, 90],
+    ['strokeWidth', 'Stroke width', 0, 0.2, 0.001, 0.01],
+    ['dash', 'Dash', 0, 0.5, 0.001, 0],
+    ['gap', 'Gap', 0, 0.5, 0.001, 0]
+  ] as const
+).map(([key, label, min, max, step, fallback]) => ({ key, label, min, max, step, fallback, kind: ValueKind.Number, source: Source.Param }));
+
 export const ANIMATABLE: Record<ComponentId, readonly AnimProp[]> = {
   Title: visual(colours(['color', 'Colour']), typeNumbers),
   Text: visual(colours(['color', 'Colour']), typeNumbers),
@@ -142,7 +158,7 @@ export const ANIMATABLE: Record<ComponentId, readonly AnimProp[]> = {
   Image: visual(),
   Video: visual(),
   Audio: [],
-  Shape: visual(colours(['fill', 'Fill'])),
+  Shape: visual(colours(['fill', 'Fill'], ['fill2', 'Gradient end'], ['stroke', 'Stroke colour']), SHAPE_NUMBERS),
   Logo: visual(),
   Null: transformProps,
   BrandBackground: visual(colours(['fill', 'Fill'])),
@@ -176,7 +192,8 @@ const BASE: Record<Source, (clip: Animated, prop: AnimProp) => KeyValue> = {
   [Source.Mask]: (clip, prop) => (clip.mask ? maskValue(clip.mask, prop.key as MaskKey) : prop.fallback),
   [Source.Param]: (clip, prop) => (prop.kind === ValueKind.Color ? String(clip.props[prop.key]) : Number(clip.props[prop.key])),
   [Source.Effect]: (_clip, prop) => prop.base ?? prop.fallback,
-  [Source.Animator]: (_clip, prop) => prop.base ?? prop.fallback
+  [Source.Animator]: (_clip, prop) => prop.base ?? prop.fallback,
+  [Source.Modifier]: (_clip, prop) => prop.base ?? prop.fallback
 };
 
 export function baseValue(clip: Animated, key: string): KeyValue | null {
@@ -205,7 +222,8 @@ const SOURCE_PROBLEM: Record<Source, (clip: Pick<Animated, 'mask'>, key: string)
   [Source.Mask]: (clip, key) => (clip.mask ? null : `${key}: the clip has no mask, add one first (set_mask)`),
   [Source.Param]: () => null,
   [Source.Effect]: () => null,
-  [Source.Animator]: () => null
+  [Source.Animator]: () => null,
+  [Source.Modifier]: () => null
 };
 
 export function keyframesProblem(clip: Pick<Animated, 'component' | 'keyframes' | 'mask' | 'params'>): string | null {
