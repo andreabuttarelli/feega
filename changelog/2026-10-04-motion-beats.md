@@ -14,6 +14,6 @@ solo quelli dentro la clip.
   meno possibile.
 - **Agente**: `beat_times` (beat o onset in secondi di timeline) e `cut_to_beat`.
 
-**Marker.** I marker della timeline sono in una PR parallela non ancora unita: qui non si
-aggiunge un secondo modello di marker. I beat restano nell'analisi e sono esposti (righello,
-`beat_times`); «aggiungi marker sui beat» si collega al modello di quella PR quando entra.
+**Marker.** «Mark beats» (`markHits`) mette un marker di composizione per beat (`beat N`) o
+per onset (`hit N`) nel modello di marker della timeline; rifarlo sostituisce i propri marker e
+lascia gli altri; si ferma a `MAX_MARKERS`. Agente: `mark_beats`.

@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
 import { addClip, trimClip, ClipEdge, type OpResult } from './timeline';
 import { ANALYSIS_VERSION, type AudioAnalysis } from './audio-analysis';
-import { Hit, cutToBeat, hitFrames } from './beats';
+import { Hit, cutToBeat, hitFrames, markHits } from './beats';
+import { MAX_MARKERS } from './doc';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -92,5 +93,31 @@ describe('cutToBeat', () => {
   it('needs beats and clips', () => {
     expect(cutToBeat(cuts(), ['a'], []).ok).toBe(false);
     expect(cutToBeat(cuts(), [], [0, 15]).ok).toBe(false);
+  });
+});
+
+describe('markHits', () => {
+  it('adds a numbered marker on each beat, keeping the markers already there', () => {
+    const doc = must(markHits({ ...scene(), markers: [{ frame: 0, label: 'intro' }] }, [45, 60], Hit.Beats));
+
+    expect(doc.markers).toEqual([
+      { frame: 0, label: 'intro' },
+      { frame: 45, label: 'beat 1' },
+      { frame: 60, label: 'beat 2' }
+    ]);
+  });
+
+  it('marking again replaces the old beat markers instead of piling up', () => {
+    const once = must(markHits(scene(), [45, 60], Hit.Beats));
+    expect(must(markHits(once, [75], Hit.Beats)).markers).toEqual([{ frame: 75, label: 'beat 1' }]);
+  });
+
+  it('stops at the marker limit', () => {
+    const many = Array.from({ length: 300 }, (_, i) => i);
+    expect(must(markHits(scene(), many, Hit.Onsets)).markers).toHaveLength(MAX_MARKERS);
+  });
+
+  it('no hits, no markers', () => {
+    expect(markHits(scene(), [], Hit.Beats).ok).toBe(false);
   });
 });

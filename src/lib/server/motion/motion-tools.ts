@@ -55,7 +55,7 @@ import { addModifier, morphTo, removeModifier, setModifier, setPath } from '$lib
 import { SHAPE_KINDS, modifierKey } from '$lib/motion/shape/schema';
 import { DUCK_DEFAULTS, duckUnder } from '$lib/motion/duck';
 import type { AudioAnalysis } from '$lib/motion/audio-analysis';
-import { Hit, cutToBeat, hitFrames } from '$lib/motion/beats';
+import { Hit, cutToBeat, hitFrames, markHits } from '$lib/motion/beats';
 
 export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number };
 
@@ -514,6 +514,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: 'Where the music hits, on the timeline: the beat grid (hit: beats) or every detected onset (hit: onsets) of the Audio clips, in seconds from the start of the video. Use them to place cuts, keyframes and markers on the music.',
       inputSchema: z.object({ hit: z.enum([Hit.Beats, Hit.Onsets]).default(Hit.Beats) }),
       execute: async (input) => ({ ok: true, times: (await docBeats(input.hit)).map((f) => Math.round((f / session.doc.fps) * 1000) / 1000) })
+    }),
+
+    mark_beats: tool({
+      description: 'Add a timeline marker on every beat (hit: beats, labelled "beat N") or every onset of the music (hit: onsets, "hit N"). Marking again replaces those markers; other markers stay. move_clip can then snap a clip to a marker by label.',
+      inputSchema: z.object({ hit: z.enum([Hit.Beats, Hit.Onsets]).default(Hit.Beats) }),
+      execute: async (input) => apply(markHits(session.doc, await docBeats(input.hit), input.hit), `marked the ${input.hit}`)
     }),
 
     cut_to_beat: tool({

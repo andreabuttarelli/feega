@@ -72,7 +72,7 @@
   import { composeHtml } from '$lib/motion/hyperframes/compose';
   import { feegaTrailer } from '$lib/motion/trailer';
   import type { AudioAnalysis } from '$lib/motion/audio-analysis';
-  import { Hit, cutToBeat, hitFrames } from '$lib/motion/beats';
+  import { Hit, cutToBeat, hitFrames, markHits } from '$lib/motion/beats';
   import { audioPlan } from '$lib/motion/audio-plan';
   import { previewAudio } from '$lib/motion/preview-audio';
   import { AD_TEMPLATES, AD_TEMPLATE_IDS, templateAssets, type AdTemplate } from '$lib/motion/ad-templates';
@@ -151,6 +151,13 @@
     void speaker.play(audioPlan(doc, assetUrls), untrack(() => frame) / doc.fps);
     return () => speaker.stop();
   });
+
+  function markBeats() {
+    const result = markHits(doc, beats, Hit.Beats);
+    if (result.ok) {
+      edit(result.doc, 'Marked the beats');
+    }
+  }
 
   function cutSelectionToBeat() {
     const result = cutToBeat(doc, selection, beats);
@@ -680,6 +687,9 @@
         </button>
         <span class="tc" data-testid="timecode">{timecode(frame, doc.fps)} / {timecode(doc.durationInFrames, doc.fps)}</span>
         <span class="sep"></span>
+        {#if beats.length}
+          <button type="button" data-testid="mark-beats" onclick={markBeats}>Mark beats</button>
+        {/if}
         {#if beats.length && selection.length}
           <button type="button" data-testid="cut-to-beat" onclick={cutSelectionToBeat}>Cut to beat</button>
         {/if}

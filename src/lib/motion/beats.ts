@@ -1,5 +1,5 @@
 import type { AudioAnalysis } from './audio-analysis';
-import { clipsOf, findClip, type MotionClip, type MotionDoc } from './doc';
+import { MAX_MARKERS, clipsOf, findClip, type MotionClip, type MotionDoc } from './doc';
 import { setTiming, type OpResult } from './timeline';
 
 export enum Hit {
@@ -54,4 +54,17 @@ export function cutToBeat(doc: MotionDoc, clipIds: readonly string[], beats: rea
     start = end;
   }
   return result;
+}
+
+const HIT_LABEL: Record<Hit, string> = { [Hit.Beats]: 'beat', [Hit.Onsets]: 'hit' };
+
+export function markHits(doc: MotionDoc, frames: readonly number[], hit: Hit): OpResult {
+  if (!frames.length) {
+    return { ok: false, error: 'no beats to mark: add a music clip with an analysed beat' };
+  }
+  const label = HIT_LABEL[hit];
+  const ours = new RegExp(`^${label} \\d+$`);
+  const kept = (doc.markers ?? []).filter((m) => !ours.test(m.label));
+  const added = frames.slice(0, Math.max(0, MAX_MARKERS - kept.length)).map((frame, i) => ({ frame, label: `${label} ${i + 1}` }));
+  return { ok: true, doc: { ...doc, markers: [...kept, ...added].sort((a, b) => a.frame - b.frame) } };
 }

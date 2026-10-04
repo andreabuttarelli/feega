@@ -59,6 +59,12 @@ describe('motion agent beat tools', () => {
     expect(out).toMatchObject({ ok: true, times: [1, 1.5, 2] });
   });
 
+  it('mark_beats puts a marker on each beat of the music', async () => {
+    const { session, run } = await withMusic();
+    expect((await run('mark_beats', { hit: 'beats' })).ok).toBe(true);
+    expect(session.doc.markers?.map((m) => m.frame)).toEqual([30, 45, 60]);
+  });
+
   it('cut_to_beat re-times the clips so every cut lands on a beat', async () => {
     const { session, run } = await withMusic();
     await run('add_clip', { component: 'Shape', start: 1.1, duration: 0.4 });
