@@ -34,6 +34,7 @@
   import CameraInspector from '$lib/components/motion/CameraInspector.svelte';
   import MaskOverlay from '$lib/components/motion/MaskOverlay.svelte';
   import MotionPathOverlay from '$lib/components/motion/MotionPathOverlay.svelte';
+  import { Align, addMarker, alignClips, allMarkers, distributeClips, loopFrame, nudgeClips, sequenceClips, setWorkArea, staggerClips } from '$lib/motion/organize';
   import ExportDialog from '$lib/components/motion/ExportDialog.svelte';
   import SoundDialog, { type Made, type SoundKind } from '$lib/components/motion/SoundDialog.svelte';
   import ChatPanel from '$lib/components/brand-agent/ChatPanel.svelte';
@@ -457,6 +458,56 @@
     return preview.render(...args);
   }
 
+  const NUDGE_MORE = 10;
+  const STAGGER_FRAMES = 3;
+
+  function nudge(frames: number) {
+    if (selection.length) {
+      apply(nudgeClips(doc, selection, frames), 'Nudged');
+    }
+  }
+
+  function markHere() {
+    const taken = new Set(allMarkers(doc).map((m) => m.label));
+    let n = 1;
+    while (taken.has(`M${n}`)) {
+      n++;
+    }
+    apply(addMarker(doc, { frame, label: `M${n}` }), 'Added a marker');
+  }
+
+  function workEdge(edge: 'in' | 'out') {
+    const area = doc.workArea ?? { from: 0, to: doc.durationInFrames };
+    apply(setWorkArea(doc, edge === 'in' ? { from: frame, to: area.to } : { from: area.from, to: frame + 1 }), 'Set the work area');
+  }
+
+  const ARRANGE: Record<string, { label: string; run: () => OpResult }> = {
+    sequence: { label: 'Sequence layers', run: () => sequenceClips(doc, selection, 0) },
+    stagger: { label: 'Stagger by 3 frames', run: () => staggerClips(doc, selection, STAGGER_FRAMES) },
+    alignStart: { label: 'Align starts', run: () => alignClips(doc, selection, Align.Start) },
+    alignEnd: { label: 'Align ends', run: () => alignClips(doc, selection, Align.End) },
+    distribute: { label: 'Distribute in time', run: () => distributeClips(doc, selection) }
+  };
+
+  function arrange(id: string) {
+    const op = ARRANGE[id];
+    if (op && selection.length > 1) {
+      apply(op.run(), op.label);
+    }
+  }
+
+  $effect(() => {
+    if (!playing || !doc.workArea) {
+      return;
+    }
+    const next = loopFrame(doc, frame);
+    if (next !== frame) {
+      playing = false;
+      frame = next;
+      queueMicrotask(() => (playing = true));
+    }
+  });
+
   const COMMANDS: Record<Command, () => void> = {
     [Command.TogglePlay]: () => (playing = !playing),
     [Command.Delete]: remove,
@@ -478,7 +529,14 @@
     [Command.PrevKeyframe]: () => jumpKey(Direction.Back),
     [Command.NextKeyframe]: () => jumpKey(Direction.Forward),
     [Command.Copy]: copyKeys,
-    [Command.Paste]: pasteKeys
+    [Command.Paste]: pasteKeys,
+    [Command.AddMarker]: markHere,
+    [Command.WorkIn]: () => workEdge('in'),
+    [Command.WorkOut]: () => workEdge('out'),
+    [Command.NudgeBack]: () => nudge(-1),
+    [Command.NudgeForward]: () => nudge(1),
+    [Command.NudgeBackMore]: () => nudge(-NUDGE_MORE),
+    [Command.NudgeForwardMore]: () => nudge(NUDGE_MORE)
   };
 
   function onKey(e: KeyboardEvent) {
@@ -614,6 +672,12 @@
         <button type="button" title="Redo (⇧⌘Z)" disabled={!canRedo(history)} onclick={redoEdit}><Redo size={14} /></button>
         <button type="button" title="Snap" class:on={snap === Snap.On} onclick={() => (snap = snap === Snap.On ? Snap.Off : Snap.On)}><Magnet size={14} /></button>
         <button type="button" title="Graph editor" aria-pressed={graphOpen} data-testid="graph-toggle" class:on={graphOpen} onclick={() => (graphOpen = !graphOpen)}><ChartSpline size={14} /></button>
+        <select class="arrange" aria-label="Arrange" data-testid="arrange" disabled={selection.length < 2} value="" onchange={(e) => (arrange(e.currentTarget.value), (e.currentTarget.value = ''))}>
+          <option value="" disabled>Arrange</option>
+          {#each Object.entries(ARRANGE) as [id, op] (id)}<option value={id}>{op.label}</option>{/each}
+        </select>
+        <button type="button" title="Add marker (M)" data-testid="add-marker" onclick={markHere}>M</button>
+        <button type="button" title={doc.workArea ? 'Clear work area' : 'Work area: set in/out with B and N'} class:on={!!doc.workArea} onclick={() => apply(setWorkArea(doc, null), 'Cleared the work area')} disabled={!doc.workArea}>[ ]</button>
         <span class="sep"></span>
         <button type="button" title="Zoom out (−)" onclick={COMMANDS[Command.ZoomOut]}><ZoomOut size={14} /></button>
         <button type="button" title="Zoom in (+)" onclick={COMMANDS[Command.ZoomIn]}><ZoomIn size={14} /></button>

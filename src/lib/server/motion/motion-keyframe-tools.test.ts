@@ -180,3 +180,36 @@ describe('motion agent paths', () => {
     expect(findClip(session.doc, 'id1')!.clip.path).toEqual({ autoOrient: true, tangents: [{ frame: 0, in: [0, 0], out: [0.2, -0.3] }] });
   });
 });
+
+describe('motion agent timeline organisation', () => {
+  async function three() {
+    const t = setup();
+    await t.run('add_clip', { component: 'Title', start: 0, duration: 1 });
+    await t.run('add_clip', { component: 'Title', start: 0.5, duration: 1 });
+    await t.run('add_clip', { component: 'Title', start: 2, duration: 1 });
+    return t;
+  }
+
+  it('markers are set by label and clips move to them by name', async () => {
+    const { session, run } = await three();
+    expect((await run('set_marker', { label: 'Drop', time: 4 })).ok).toBe(true);
+    expect((await run('move_clip', { clip_id: 'id3', marker: 'Drop' })).ok).toBe(true);
+    expect(findClip(session.doc, 'id3')!.clip.from).toBe(120);
+    expect((await run('move_clip', { clip_id: 'id3', marker: 'Nope' })).ok).toBe(false);
+  });
+
+  it('arrange_clips sequences and staggers the given clips', async () => {
+    const { session, run } = await three();
+    expect((await run('arrange_clips', { clip_ids: ['id1', 'id2', 'id3'], op: 'stagger', seconds: 0.2 })).ok).toBe(true);
+    expect(['id1', 'id2', 'id3'].map((id) => findClip(session.doc, id)!.clip.from)).toEqual([0, 6, 12]);
+  });
+
+  it('set_visibility hides a clip and the work area is shown in get_motion_doc', async () => {
+    const { session, run } = await three();
+    await run('set_visibility', { clip_id: 'id1', hidden: true });
+    await run('set_work_area', { start: 0.5, end: 2 });
+    expect(findClip(session.doc, 'id1')!.clip.hidden).toBe(true);
+    const doc = (await run('get_motion_doc', {})) as Record<string, unknown>;
+    expect(doc.workArea).toEqual({ start: 0.5, end: 2 });
+  });
+});

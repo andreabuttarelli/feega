@@ -8,6 +8,18 @@ import { Background, MOTION_FORMATS, findClip, type MotionDoc } from '$lib/motio
 import { ClipEdge, Side, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyInterp, setKeyframes, setMask, shaped, setProps, setTiming, setTrackMatte, setTransform, setTransition, trimClip, applyEasePreset, setKeyEase, type OpResult } from '$lib/motion/timeline';
 import { MASK_KEYS, MASK_KIND_IDS, MATTES } from '$lib/motion/mask';
 import { pathProblem } from '$lib/motion/path';
+import { Align, addMarker, alignClips, allMarkers, distributeClips, markerFrame, nudgeClips, removeMarker, sequenceClips, setClipFlags, setTrackFlags, setWorkArea, staggerClips } from '$lib/motion/organize';
+
+const ARRANGE_OPS = ['nudge', 'sequence', 'stagger', 'align_start', 'align_end', 'distribute'] as const;
+
+const ARRANGE: Record<(typeof ARRANGE_OPS)[number], (doc: MotionDoc, ids: string[], amount: number) => OpResult> = {
+  nudge: (doc, ids, amount) => nudgeClips(doc, ids, amount),
+  sequence: (doc, ids, amount) => sequenceClips(doc, ids, amount),
+  stagger: (doc, ids, amount) => staggerClips(doc, ids, amount),
+  align_start: (doc, ids) => alignClips(doc, ids, Align.Start),
+  align_end: (doc, ids) => alignClips(doc, ids, Align.End),
+  distribute: (doc, ids) => distributeClips(doc, ids)
+};
 import { setMotionPath, setPathTangent } from '$lib/motion/path-ops';
 import { EASE_PRESETS, EASE_PRESET_IDS, easeHandles, withHandles } from '$lib/motion/graph';
 import { ANIMATABLE, INTERPS, Interp, SPATIAL_KEYS, TRANSFORM_KEYS, ValueKind, easeSchema, transformSchema, type Keyframe } from '$lib/motion/keyframes';
@@ -74,6 +86,8 @@ function summary(doc: MotionDoc, selection: string[]) {
       id: t.id,
       kind: t.kind,
       name: t.name,
+      hidden: t.hidden ?? false,
+      locked: t.locked ?? false,
       clips: t.clips.map((c) => ({
         id: c.id,
         component: c.component,
@@ -96,11 +110,16 @@ function summary(doc: MotionDoc, selection: string[]) {
         blend: c.blend,
         animators: c.animators,
         motionBlur: c.motionBlur,
+        hidden: c.hidden ?? false,
+        locked: c.locked ?? false,
+        markers: (c.markers ?? []).map((m) => ({ label: m.label, time: secs(m.frame) })),
         path: c.path ? { autoOrient: c.path.autoOrient, tangents: c.path.tangents.map(({ frame, ...rest }) => ({ time: secs(frame), ...rest })), problem: pathProblem(c) } : null
       }))
     })),
     assets: doc.assets,
     fonts: doc.fonts,
+    markers: (doc.markers ?? []).map((m) => ({ label: m.label, time: secs(m.frame) })),
+    workArea: doc.workArea ? { start: secs(doc.workArea.from), end: secs(doc.workArea.to) } : null,
     camera: cameraSummary(doc.camera),
     components: Object.entries(doc.components).map(([name, c]) => customSummary(name, c))
   };
@@ -309,9 +328,49 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     move_clip: tool({
-      description: 'Move a clip to a new start time, and optionally to another track of the same kind.',
-      inputSchema: z.object({ clip_id: z.string(), start: z.number().min(0), track_id: z.string().optional() }),
-      execute: async (input) => apply(moveClip(session.doc, input.clip_id, { from: frames(input.start), trackId: input.track_id }), `moved ${input.clip_id}`)
+      description: 'Move a clip to a new start time (seconds) or to a marker by its label, and optionally to another track of the same kind.',
+      inputSchema: z.object({ clip_id: z.string(), start: z.number().min(0).optional(), marker: z.string().optional(), track_id: z.string().optional() }),
+      execute: async (input) => {
+        const from = input.marker === undefined ? frames(input.start ?? 0) : markerFrame(session.doc, input.marker);
+        if (from === null) {
+          return { ok: false, error: `no marker called ${input.marker}: markers are ${allMarkers(session.doc).map((m) => m.label).join(', ') || 'none'}` };
+        }
+        return apply(moveClip(session.doc, input.clip_id, { from, trackId: input.track_id }), `moved ${input.clip_id}`);
+      }
+    }),
+
+    set_marker: tool({
+      description: 'Add a labelled marker at time (seconds): on the video, or on a clip (time from the clip start) with clip_id. Markers are snap points and can be targeted by label (move_clip marker).',
+      inputSchema: z.object({ label: z.string().min(1).max(40), time: z.number().min(0), clip_id: z.string().optional() }),
+      execute: async (input) => apply(addMarker(session.doc, { frame: frames(input.time), label: input.label, clipId: input.clip_id }), `marker ${input.label}`)
+    }),
+
+    remove_marker: tool({
+      description: 'Remove a marker by its label, from the video or from a clip (clip_id).',
+      inputSchema: z.object({ label: z.string(), clip_id: z.string().optional() }),
+      execute: async (input) => apply(removeMarker(session.doc, input.label, input.clip_id), `removed marker ${input.label}`)
+    }),
+
+    set_work_area: tool({
+      description: 'Set the work area (seconds) the editor previews and loops, or clear it with clear true.',
+      inputSchema: z.object({ start: z.number().min(0).optional(), end: z.number().min(0).optional(), clear: z.boolean().optional() }),
+      execute: async (input) => apply(setWorkArea(session.doc, input.clear ? null : { from: frames(input.start ?? 0), to: input.end === undefined ? session.doc.durationInFrames : frames(input.end) }), 'set the work area')
+    }),
+
+    set_visibility: tool({
+      description: 'Hide (left out of the render) or lock (not moved by edits) a track (track_id) or a clip (clip_id).',
+      inputSchema: z.object({ track_id: z.string().optional(), clip_id: z.string().optional(), hidden: z.boolean().optional(), locked: z.boolean().optional() }),
+      execute: async (input) => {
+        const flags = { ...(input.hidden === undefined ? {} : { hidden: input.hidden }), ...(input.locked === undefined ? {} : { locked: input.locked }) };
+        const result = input.clip_id ? setClipFlags(session.doc, input.clip_id, flags) : input.track_id ? setTrackFlags(session.doc, input.track_id, flags) : { ok: false as const, error: 'give a track_id or a clip_id' };
+        return apply(result, 'changed visibility');
+      }
+    }),
+
+    arrange_clips: tool({
+      description: `Arrange clips in time, in their start order: nudge (move all by seconds, negative earlier), sequence (end to end, seconds = gap), stagger (each start seconds after the previous), align_start, align_end, distribute (even starts between first and last). Locked clips are refused.`,
+      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1), op: z.enum(ARRANGE_OPS), seconds: z.number().optional() }),
+      execute: async (input) => apply(ARRANGE[input.op](session.doc, input.clip_ids, frames(Math.abs(input.seconds ?? 0)) * Math.sign(input.seconds ?? 0)), `${input.op} ${input.clip_ids.length} clips`)
     }),
 
     remove_clip: tool({

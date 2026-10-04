@@ -28,6 +28,13 @@
   import { ancestorsOf } from '$lib/motion/parent';
   import { setParent } from '$lib/motion/parent-ops';
   import EasePicker from './EasePicker.svelte';
+  import Eye from '@lucide/svelte/icons/eye';
+  import EyeOff from '@lucide/svelte/icons/eye-off';
+  import Lock from '@lucide/svelte/icons/lock';
+  import LockOpen from '@lucide/svelte/icons/lock-open';
+  import Headphones from '@lucide/svelte/icons/headphones';
+  import Ghost from '@lucide/svelte/icons/ghost';
+  import { allMarkers, isLocked, setTrackFlags, shownTracks } from '$lib/motion/organize';
   import { PEAKS_PER_SECOND, clipPeaks, wavePath } from '$lib/motion/waveform';
 
   const HEADER_PX = 176;
@@ -77,6 +84,10 @@
   }: { doc: MotionDoc; frame?: number; selection?: string[]; keySelection?: KeyRef[]; camera?: boolean; zoom: number; snap: Snap; waveforms?: Record<string, number[]>; assetUrls?: Record<string, string>; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 
   let folded = $state<string[]>([]);
+  let solo = $state<string[]>([]);
+  let shy = $state<string[]>([]);
+  let hideShy = $state(false);
+  let filter = $state('');
   let viewportWidth = $state(1440);
   const headPx = $derived(viewportWidth < COMPACT_BELOW_PX ? COMPACT_HEADER_PX : HEADER_PX);
   let strips = $state<Record<string, Strip>>({});
@@ -91,6 +102,18 @@
 
   const shown = $derived(draft ?? doc);
   const ppf = $derived(pxPerFrame(zoom, doc.fps));
+  const tracks = $derived(shownTracks(shown, { solo, shy, hideShy, filter }));
+  const markers = $derived(allMarkers(shown));
+
+  const toggled = (list: string[], id: string) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
+
+  function flag(trackId: string, flags: { hidden?: boolean; locked?: boolean }, summary: string) {
+    const result = setTrackFlags(doc, trackId, flags);
+    if (result.ok) {
+      onchange(result.doc, summary);
+    }
+  }
+
   const width = $derived(Math.max(shown.durationInFrames * ppf + 120, 400));
   const ticks = $derived(rulerTicks(shown.durationInFrames, zoom, doc.fps));
 
@@ -116,6 +139,9 @@
     e.stopPropagation();
     select(clip.id, e);
     keySelection = [];
+    if (isLocked(doc, clip.id)) {
+      return;
+    }
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     gesture = { kind, clipId: clip.id, trackId, grabFrame: frameOfPointer(e), originFrom: clip.from, base: doc, refs: [], delta: 0 };
   }
@@ -406,7 +432,16 @@
 <div class="timeline" bind:this={lanes} data-testid="motion-timeline">
   <div class="inner" style={`width: ${width + headPx}px;`}>
     <div class="ruler" role="slider" tabindex="-1" aria-label="Playhead" aria-valuenow={frame} onpointerdown={startScrub}>
-      <div class="corner" style={`width: ${headPx}px;`}></div>
+      <div class="corner" style={`width: ${headPx}px;`}>
+        <input class="search" type="search" placeholder="Search layers" aria-label="Search layers" bind:value={filter} onpointerdown={(e) => e.stopPropagation()} />
+        <button type="button" class="shy-toggle" class:on={hideShy} aria-pressed={hideShy} title="Hide shy tracks" onpointerdown={(e) => e.stopPropagation()} onclick={() => (hideShy = !hideShy)}><Ghost size={12} /></button>
+      </div>
+      {#if shown.workArea}
+        <span class="work-area" data-testid="work-area" style={`left: ${headPx + shown.workArea.from * ppf}px; width: ${(shown.workArea.to - shown.workArea.from) * ppf}px;`}></span>
+      {/if}
+      {#each markers as m (`${m.clipId}:${m.label}`)}
+        <span class="marker" class:clip-marker={m.clipId} data-marker={m.label} title={m.label} style={`left: ${headPx + m.frame * ppf}px;`}><em>{m.label}</em></span>
+      {/each}
       {#each ticks as tick (tick.frame)}
         <span class="tick" class:major={tick.label} style={`left: ${headPx + tick.frame * ppf}px;`}>
           {#if tick.label}<em>{tick.label}</em>{/if}
@@ -437,7 +472,7 @@
       {#each cameraLanes(shown.camera) as lane (lane.prop)}{@render keyLane(cameraOwner, lane)}{/each}
     {/if}
 
-    {#each shown.tracks as track, index (track.id)}
+    {#each tracks as track, index (track.id)}
       {@const rows = stackRows(track.clips)}
       {@const rowCount = Math.max(1, ...Object.values(rows).map((r) => r + 1))}
       {@const row = rowPx(track)}
@@ -450,6 +485,12 @@
           </button>
           <span class="chip" title={CLIP_FAMILIES[family].label}><TrackIcon size={12} /></span>
           <span class="name">{track.name || track.id}</span>
+          <span class="flags">
+            <button type="button" aria-label={track.hidden ? 'Show track' : 'Hide track'} aria-pressed={!!track.hidden} data-flag="hide" class:on={track.hidden} onclick={() => flag(track.id, { hidden: !track.hidden }, track.hidden ? 'Showed a track' : 'Hid a track')}>{#if track.hidden}<EyeOff size={12} />{:else}<Eye size={12} />{/if}</button>
+            <button type="button" aria-label={track.locked ? 'Unlock track' : 'Lock track'} aria-pressed={!!track.locked} data-flag="lock" class:on={track.locked} onclick={() => flag(track.id, { locked: !track.locked }, track.locked ? 'Unlocked a track' : 'Locked a track')}>{#if track.locked}<Lock size={12} />{:else}<LockOpen size={12} />{/if}</button>
+            <button type="button" aria-label="Solo track" aria-pressed={solo.includes(track.id)} data-flag="solo" class:on={solo.includes(track.id)} onclick={() => (solo = toggled(solo, track.id))}><Headphones size={12} /></button>
+            <button type="button" aria-label="Shy track" aria-pressed={shy.includes(track.id)} data-flag="shy" class:on={shy.includes(track.id)} onclick={() => (shy = toggled(shy, track.id))}><Ghost size={12} /></button>
+          </span>
           <span class="order">
             <button type="button" aria-label="Move track up" disabled={index === 0} onclick={() => reorder(track.id, -1)}><ChevronUp size={12} /></button>
             <button type="button" aria-label="Move track down" disabled={index === shown.tracks.length - 1} onclick={() => reorder(track.id, 1)}><ChevronDown size={12} /></button>
@@ -464,6 +505,8 @@
             <div
               class="bar"
               class:selected={selection.includes(clip.id)}
+              class:muted={track.hidden || clip.hidden}
+              class:locked={track.locked || clip.locked}
               data-clip-id={clip.id}
               data-family={clipFamily}
               role="button"
@@ -964,6 +1007,98 @@
   .ease-at {
     position: absolute;
     z-index: 6;
+  }
+
+  .flags {
+    display: flex;
+    flex-shrink: 0;
+  }
+
+  .flags button:not(.on) {
+    display: none;
+  }
+
+  .head:hover .flags button,
+  .head:focus-within .flags button {
+    display: grid;
+  }
+
+  .flags button.on {
+    color: var(--ui-accent);
+  }
+
+  .bar.muted {
+    opacity: 0.4;
+  }
+
+  .bar.locked {
+    cursor: not-allowed;
+    background-image: repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, var(--hue) 12%, transparent) 6px 8px);
+  }
+
+  .corner {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 4px;
+  }
+
+  .search {
+    flex: 1;
+    min-width: 0;
+    height: 20px;
+    padding: 0 4px;
+    border: 1px solid var(--ui-line);
+    background: var(--ui-bg);
+    color: var(--ui-ink);
+    font: inherit;
+  }
+
+  .shy-toggle {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    color: var(--ui-ink-3);
+  }
+
+  .shy-toggle.on {
+    color: var(--ui-accent);
+  }
+
+  .work-area {
+    position: absolute;
+    top: 0;
+    height: 6px;
+    background: color-mix(in srgb, var(--ui-accent) 45%, transparent);
+    pointer-events: none;
+  }
+
+  .marker {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    margin-left: -1px;
+    background: #f5a524;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .marker.clip-marker {
+    background: #8b5cf6;
+  }
+
+  .marker em {
+    position: absolute;
+    top: 6px;
+    left: 4px;
+    padding: 0 3px;
+    font-style: normal;
+    font-size: 10px;
+    color: #111;
+    background: inherit;
+    white-space: nowrap;
   }
 
   .playhead {

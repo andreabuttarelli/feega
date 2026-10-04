@@ -19,14 +19,18 @@ const DOC: Record<string, Access> = {
   assets: { write: ['add_asset', 'remove_asset'], read: 'assets' },
   camera: { write: ['set_camera'], read: 'camera' },
   fonts: { write: ['set_font', 'register_font', 'remove_font'], read: 'fonts' },
-  components: { write: ['write_component', 'patch_component', 'remove_component'], read: 'components' }
+  components: { write: ['write_component', 'patch_component', 'remove_component'], read: 'components' },
+  markers: { write: ['set_marker', 'remove_marker'], read: 'markers' },
+  workArea: { write: ['set_work_area'], read: 'workArea' }
 };
 
 const TRACK: Record<string, Access> = {
   id: { write: ['add_track'], read: 'id' },
   kind: { write: ['add_track'], read: 'kind' },
   name: { write: ['set_track'], read: 'name' },
-  clips: { write: ['add_clip', 'move_clip', 'remove_clip'], read: 'clips' }
+  clips: { write: ['add_clip', 'move_clip', 'remove_clip'], read: 'clips' },
+  hidden: { write: ['set_visibility'], read: 'hidden' },
+  locked: { write: ['set_visibility'], read: 'locked' }
 };
 
 const CLIP: Record<string, Access> = {
@@ -51,7 +55,10 @@ const CLIP: Record<string, Access> = {
   blend: { write: ['set_blend_mode'], read: 'blend' },
   animators: { write: ['add_text_animator', 'set_text_animator', 'remove_text_animator', 'apply_text_preset'], read: 'animators' },
   motionBlur: { write: ['set_motion_blur'], read: 'motionBlur' },
-  path: { write: ['set_motion_path', 'set_path_tangent'], read: 'path' }
+  path: { write: ['set_motion_path', 'set_path_tangent'], read: 'path' },
+  hidden: { write: ['set_visibility'], read: 'hidden' },
+  locked: { write: ['set_visibility'], read: 'locked' },
+  markers: { write: ['set_marker', 'remove_marker'], read: 'markers' }
 };
 
 const CAMERA: Record<string, Access> = {

@@ -32,3 +32,15 @@ describe('editor shortcuts', () => {
     expect(press('q')).toBeNull();
   });
 });
+
+describe('timeline organisation keys', () => {
+  it('M adds a marker, B and N set the work area, [ and ] nudge, shift nudges by ten', () => {
+    expect(commandFor({ key: 'm', mod: false, shift: false })).toBe(Command.AddMarker);
+    expect(commandFor({ key: 'b', mod: false, shift: false })).toBe(Command.WorkIn);
+    expect(commandFor({ key: 'n', mod: false, shift: false })).toBe(Command.WorkOut);
+    expect(commandFor({ key: '[', mod: false, shift: false })).toBe(Command.NudgeBack);
+    expect(commandFor({ key: ']', mod: false, shift: false })).toBe(Command.NudgeForward);
+    expect(commandFor({ key: '{', mod: false, shift: true })).toBe(Command.NudgeBackMore);
+    expect(commandFor({ key: '}', mod: false, shift: true })).toBe(Command.NudgeForwardMore);
+  });
+});
