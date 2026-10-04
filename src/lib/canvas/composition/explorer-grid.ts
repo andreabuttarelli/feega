@@ -3,15 +3,15 @@ import type { CameraState } from './camera';
 import type { LayoutParam, LayoutParams, Transform } from './types';
 
 export const params: LayoutParam[] = [
-	{ name: 'columns', label: 'Colonne', kind: 'range', min: 2, max: 3, step: 1, default: 3 },
-	{ name: 'rows', label: 'Righe', kind: 'range', min: 2, max: 3, step: 1, default: 3 },
-	{ name: 'gapX', label: 'Spazio orizzontale', kind: 'range', min: 1, max: 4, step: 0.1, default: 1.8 },
-	{ name: 'gapY', label: 'Spazio verticale', kind: 'range', min: 1, max: 5, step: 0.1, default: 2.1 },
-	{ name: 'stops', label: 'Focus per loop', kind: 'range', min: 2, max: 8, step: 1, default: 4 },
-	{ name: 'pause', label: 'Sosta', kind: 'range', min: 0, max: 0.7, step: 0.05, default: 0.25 },
-	{ name: 'scale', label: 'Scala media', kind: 'range', min: 0.5, max: 2, step: 0.05, default: 1.05 },
-	{ name: 'focusScale', label: 'Zoom focus', kind: 'range', min: 1, max: 2, step: 0.05, default: 1.25 },
-	{ name: 'seed', label: 'Percorso', kind: 'seed', default: 17 }
+	{ name: 'columns', label: 'Columns', kind: 'range', min: 2, max: 3, step: 1, default: 3 },
+	{ name: 'rows', label: 'Rows', kind: 'range', min: 2, max: 3, step: 1, default: 3 },
+	{ name: 'gapX', label: 'Horizontal gap', kind: 'range', min: 1, max: 4, step: 0.1, default: 1.8 },
+	{ name: 'gapY', label: 'Vertical gap', kind: 'range', min: 1, max: 5, step: 0.1, default: 2.1 },
+	{ name: 'stops', label: 'Focus stops per loop', kind: 'range', min: 2, max: 8, step: 1, default: 4 },
+	{ name: 'pause', label: 'Hold', kind: 'range', min: 0, max: 0.7, step: 0.05, default: 0.25 },
+	{ name: 'scale', label: 'Media scale', kind: 'range', min: 0.5, max: 2, step: 0.05, default: 1.05 },
+	{ name: 'focusScale', label: 'Focus zoom', kind: 'range', min: 1, max: 2, step: 0.05, default: 1.25 },
+	{ name: 'seed', label: 'Path', kind: 'seed', default: 17 }
 ];
 
 const DIRECTIONS = [

@@ -1,8 +1,8 @@
 import * as THREE from 'three';
-import { CAMERA_PRESETS, cameraAt, type CameraPresetId } from './camera';
-import { fitViewport } from './explorer-grid';
-import { instanceCountFor, LAYOUTS, mediaIndexFor } from './index';
-import { closedExpoPhase, closedExpoProgress } from './motion';
+import { CAMERA_PRESETS, type CameraPresetId } from './camera';
+import { LAYOUTS } from './index';
+import { instancesOf, poseAt, type PoseInput } from './pose';
+import { MEDIA_FRAGMENT_SHADER, MEDIA_UNIFORMS, MEDIA_VERTEX_SHADER } from './shader';
 import type { LayoutId, LayoutParams } from './types';
 
 export type MediaKind = 'image' | 'video';
@@ -51,18 +51,12 @@ export function createCompositionScene(canvas: HTMLCanvasElement, options: Compo
 
 	function renderAt(t: number): void {
 		const meshes = built.map(({ mesh }) => mesh);
-		const layout = LAYOUTS[current.layout];
-		const motionTime = layout.motion === 'cycle'
-			? closedExpoPhase(t, current.duration)
-			: closedExpoProgress(t, current.duration);
-		const layoutParams = activeLayoutParams();
-		const transforms = LAYOUTS[current.layout].transforms(meshes.length, layoutParams, motionTime);
+		const pose = poseAt(poseInput(), t, meshes.length);
 		for (let i = 0; i < meshes.length; i++) {
-			applyTransform(meshes[i], transforms[i]);
+			applyTransform(meshes[i], pose.transforms[i]);
 		}
 
-		const cameraTime = layout.camera === 'fixed' ? 0 : motionTime;
-		const cameraState = cameraAt(current.camera, current.cameraParams, cameraTime);
+		const cameraState = pose.camera;
 		camera.position.set(cameraState.position.x, cameraState.position.y, cameraState.position.z);
 		camera.lookAt(cameraState.target.x, cameraState.target.y, cameraState.target.z);
 		camera.fov = cameraState.fov;
@@ -107,10 +101,9 @@ export function createCompositionScene(canvas: HTMLCanvasElement, options: Compo
 	}
 
 	function syncInstances(): void {
-		const layoutParams = activeLayoutParams();
-		const desired = instanceCountFor(current.layout, current.media.length, layoutParams);
+		const instances = instancesOf(poseInput());
 
-		while (built.length > desired) {
+		while (built.length > instances.length) {
 			const item = built.pop();
 			if (item) {
 				scene.remove(item.mesh);
@@ -118,14 +111,8 @@ export function createCompositionScene(canvas: HTMLCanvasElement, options: Compo
 			}
 		}
 
-		while (built.length < desired) {
-			const mediaIndex = mediaIndexFor(
-				current.layout,
-				built.length,
-				desired,
-				layoutParams,
-				current.media.length
-			);
+		while (built.length < instances.length) {
+			const mediaIndex = instances[built.length];
 			const media = current.media[mediaIndex];
 			if (!media) {
 				break;
@@ -137,13 +124,7 @@ export function createCompositionScene(canvas: HTMLCanvasElement, options: Compo
 		}
 
 		for (let index = 0; index < built.length; index++) {
-			const mediaIndex = mediaIndexFor(
-				current.layout,
-				index,
-				desired,
-				layoutParams,
-				current.media.length
-			);
+			const mediaIndex = instances[index];
 			if (built[index].mediaIndex === mediaIndex) {
 				continue;
 			}
@@ -160,13 +141,16 @@ export function createCompositionScene(canvas: HTMLCanvasElement, options: Compo
 		}
 	}
 
-	function activeLayoutParams(): LayoutParams {
-		if (current.layout !== 'explorer-grid') {
-			return current.layoutParams;
-		}
-
-		const state = cameraAt(current.camera, current.cameraParams, 0);
-		return fitViewport(current.layoutParams, state, camera.aspect).params;
+	function poseInput(): PoseInput {
+		return {
+			layout: current.layout,
+			layoutParams: current.layoutParams,
+			camera: current.camera,
+			cameraParams: current.cameraParams,
+			duration: current.duration,
+			mediaCount: current.media.length,
+			aspect: camera.aspect
+		};
 	}
 
 	return { renderAt, resize, update, dispose };
@@ -233,31 +217,11 @@ function createMediaMaterial(): THREE.ShaderMaterial {
 		uniforms: {
 			mediaTexture: { value: null },
 			hasTexture: { value: 0 },
-			radius: { value: 0.075 },
+			radius: { value: MEDIA_UNIFORMS.radius },
 			opacity: { value: 1 }
 		},
-		vertexShader: `
-			varying vec2 mediaUv;
-			void main() {
-				mediaUv = vec2(uv.x, 1.0 - uv.y);
-				gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-			}
-		`,
-		fragmentShader: `
-			uniform sampler2D mediaTexture;
-			uniform float hasTexture;
-			uniform float radius;
-			uniform float opacity;
-			varying vec2 mediaUv;
-			void main() {
-				vec2 edge = abs(mediaUv - 0.5) - (0.5 - radius);
-				float distanceToEdge = length(max(edge, 0.0)) + min(max(edge.x, edge.y), 0.0) - radius;
-				float mask = 1.0 - smoothstep(-0.008, 0.008, distanceToEdge);
-				vec4 media = hasTexture > 0.5 ? texture2D(mediaTexture, mediaUv) : vec4(0.12, 0.12, 0.14, 1.0);
-				if (media.a * mask * opacity < 0.02) discard;
-				gl_FragColor = vec4(media.rgb, media.a * mask * opacity);
-			}
-		`
+		vertexShader: MEDIA_VERTEX_SHADER,
+		fragmentShader: MEDIA_FRAGMENT_SHADER
 	});
 }
 

@@ -2,15 +2,15 @@ import { clampParams } from './clamp';
 import type { LayoutParam, LayoutParams, Transform } from './types';
 
 export const params: LayoutParam[] = [
-	{ name: 'slots', label: 'Numero media', kind: 'range', min: 3, max: 24, step: 1, default: 7 },
-	{ name: 'radius', label: 'Raggio', kind: 'range', min: 1, max: 20, step: 0.5, default: 4.5 },
-	{ name: 'frontScale', label: 'Scala frontale', kind: 'range', min: 0.5, max: 3, step: 0.05, default: 1.8 },
-	{ name: 'backScale', label: 'Scala posteriore', kind: 'range', min: 0.1, max: 2, step: 0.05, default: 0.7 },
-	{ name: 'depth', label: 'Profondità', kind: 'range', min: 0, max: 10, step: 0.5, default: 2.5 },
-	{ name: 'rotationSpeed', label: 'Giri per loop', kind: 'range', min: -3, max: 3, step: 1, default: 1 },
-	{ name: 'pauseStrength', label: 'Fuoco frontale', kind: 'range', min: 0, max: 1, step: 0.05, default: 0.4 },
-	{ name: 'verticalWave', label: 'Ventaglio verticale', kind: 'range', min: 0, max: 8, step: 0.1, default: 1.2 },
-	{ name: 'cardTilt', label: 'Inclinazione media', kind: 'range', min: -30, max: 30, step: 1, default: -6 }
+	{ name: 'slots', label: 'Media count', kind: 'range', min: 3, max: 24, step: 1, default: 7 },
+	{ name: 'radius', label: 'Radius', kind: 'range', min: 1, max: 20, step: 0.5, default: 4.5 },
+	{ name: 'frontScale', label: 'Front scale', kind: 'range', min: 0.5, max: 3, step: 0.05, default: 1.8 },
+	{ name: 'backScale', label: 'Back scale', kind: 'range', min: 0.1, max: 2, step: 0.05, default: 0.7 },
+	{ name: 'depth', label: 'Depth', kind: 'range', min: 0, max: 10, step: 0.5, default: 2.5 },
+	{ name: 'rotationSpeed', label: 'Turns per loop', kind: 'range', min: -3, max: 3, step: 1, default: 1 },
+	{ name: 'pauseStrength', label: 'Front focus', kind: 'range', min: 0, max: 1, step: 0.05, default: 0.4 },
+	{ name: 'verticalWave', label: 'Vertical fan', kind: 'range', min: 0, max: 8, step: 0.1, default: 1.2 },
+	{ name: 'cardTilt', label: 'Media tilt', kind: 'range', min: -30, max: 30, step: 1, default: -6 }
 ];
 
 const DEGREES_TO_RADIANS = Math.PI / 180;

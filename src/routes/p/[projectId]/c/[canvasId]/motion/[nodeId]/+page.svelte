@@ -56,6 +56,7 @@
   import { feegaTrailer } from '$lib/motion/trailer';
   import { loadPeaks } from '$lib/motion/waveform';
   import { AD_TEMPLATES, AD_TEMPLATE_IDS, templateAssets, type AdTemplate } from '$lib/motion/ad-templates';
+  import { composeEditorPath } from '$lib/motion/composition-draft';
   import type { PageData } from './$types';
 
   const SAVE_DEBOUNCE_MS = 700;
@@ -539,7 +540,7 @@
       {#if cameraOpen && !selection.length}
         <CameraInspector {doc} {frame} onchange={edit} />
       {:else if selected}
-        <MotionInspector {doc} clip={selected} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} bind:tab={inspectorTab} onchange={edit} />
+        <MotionInspector {doc} clip={selected} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} />
       {:else}
         <p class="hint">{selection.length > 1 ? `${selection.length} clips selected.` : 'Select a clip in the timeline to edit its properties.'}</p>
       {/if}

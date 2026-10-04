@@ -24,6 +24,7 @@
     assets,
     frame,
     previousSource = () => null,
+    composeHref = null,
     tab = $bindable<InspectorTab>(InspectorTab.Properties),
     onchange
   }: {
@@ -33,6 +34,7 @@
     assets: Asset[];
     frame: number;
     previousSource?: (name: string) => CustomSource | null;
+    composeHref?: string | null;
     tab?: InspectorTab;
     onchange: (doc: MotionDoc, summary: string) => void;
   } = $props();
@@ -53,6 +55,7 @@
   const NO_MASK = 'none';
   const pictures = $derived(assets.filter((a) => a.kind === 'image'));
   const resolve = (v: string) => resolveColor(v, tokens);
+  const managedSummary = (v: unknown) => `${Array.isArray(v) ? v.length : Object.keys(v ?? {}).length} set`;
 
   function commit(result: OpResult, summary: string) {
     if (!result.ok) {
@@ -311,6 +314,8 @@
                 <span class="empty">No {field.assetKind} assets on this canvas yet.</span>
               {/each}
             </div>
+          {:else if field.control === Control.Managed}
+            <span class="managed">{managedSummary(value(field))}{#if composeHref} · <a href={composeHref}>Edit in Compositions</a>{/if}</span>
           {/if}
         </div>
       {/each}
@@ -323,6 +328,15 @@
 </div>
 
 <style>
+  .managed {
+    color: var(--ink-soft);
+  }
+
+  .managed a {
+    color: var(--ink);
+    text-decoration: underline;
+  }
+
   .inspector {
     display: flex;
     flex-direction: column;

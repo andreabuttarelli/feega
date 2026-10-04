@@ -5,6 +5,7 @@ import { boxOf, type Box } from '../layout';
 import { TITLE_LINE_HEIGHT, fitTitleSize, safeBox } from '../fit';
 import { css, esc, px } from './html';
 import type { CustomComponents } from '../custom/component';
+import { compositionVideoId, resolvedMedia } from './composition';
 
 export type PropsOf<K extends ComponentId> = z.output<(typeof COMPONENTS)[K]['schema']>;
 
@@ -289,6 +290,21 @@ const Shape3D: Template<'Shape3D'> = {
   }
 };
 
+const Composition: Template<'Composition'> = {
+  timing: Timing.Wrapper,
+  html: (ctx) => {
+    const media = resolvedMedia(ctx.p, ctx.asset);
+    if (!media.length) {
+      return missing('Add images or videos');
+    }
+    const fill = css({ position: 'absolute', inset: '0', width: '100%', height: '100%' });
+    const videos = media
+      .map((m, i) => (m.kind === 'video' ? `<video id="${compositionVideoId(ctx.id, i)}" src="${esc(m.url)}" crossorigin="anonymous" preload="auto" muted playsinline data-start="${ctx.start}" data-duration="${ctx.length}" data-media-start="0" style="${css({ position: 'absolute', inset: '0', width: '100%', height: '100%', objectFit: 'cover' })}"></video>` : ''))
+      .join('');
+    return `${videos}<div style="${css({ position: 'absolute', inset: '0', background: ctx.color(ctx.p.background) })}"></div><canvas id="comp-${ctx.id}" width="${ctx.width}" height="${ctx.height}" style="${fill}"></canvas>`;
+  }
+};
+
 const scopedCss = (id: string, css: string) => `<style>@scope (#cc-${id}) {${css.replace(/<\/(style)/gi, '<\\/$1')}}</style>`;
 
 const Custom: Template<'Custom'> = {
@@ -318,5 +334,6 @@ export const TEMPLATES: { [K in ComponentId]: Template<K> } = {
   CanvasMock,
   Model3D,
   Shape3D,
+  Composition,
   Custom
 };
