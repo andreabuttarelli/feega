@@ -3,6 +3,7 @@ import { COMPONENT_IDS, CUSTOM_NAME, TrackKind, parseProps, type ComponentId, ty
 import { withParams } from './custom/params';
 import { MAX_COMPONENTS, Strictness, customComponentSchema, customValues, type CustomComponents } from './custom/component';
 import { FASTEST_RATE, FPS, FRAME_RATES, MAX_SECONDS, TRANSITION_KINDS, TransitionKind, maxFrames } from './design';
+import { motionPathSchema } from './path';
 import { keyframeSchema, keyframesProblem, transformSchema } from './keyframes';
 import { MATTES, Matte, maskSchema } from './mask';
 import { DEPTH, SPACES, Space, cameraSchema, depthSchema } from './camera';
@@ -68,7 +69,8 @@ const clipSchema = z.object({
   effects: effectsSchema,
   blend: z.enum(BLEND_MODES).default(BlendMode.Normal),
   animators: animatorsSchema,
-  motionBlur: z.boolean().default(true)
+  motionBlur: z.boolean().default(true),
+  path: motionPathSchema.nullable().default(null)
 });
 
 const trackSchema = z.object({
@@ -249,6 +251,7 @@ export function newClip(fields: Pick<MotionClip, 'id' | 'from' | 'durationInFram
     blend: BlendMode.Normal,
     animators: [],
     motionBlur: true,
+    path: null,
     ...fields
   };
 }

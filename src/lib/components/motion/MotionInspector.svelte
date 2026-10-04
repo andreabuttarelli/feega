@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { setMotionPath } from '$lib/motion/path-ops';
   import { BRAND_COLORS, COMPONENTS, Control, TrackKind, type AssetKind } from '$lib/motion/components';
   import { DEPTH, Space } from '$lib/motion/camera';
   import { setClipDepth } from '$lib/motion/camera-ops';
@@ -309,6 +310,14 @@
           {/each}
         </div>
       </div>
+      {#if clip.keyframes.x?.length && clip.keyframes.y?.length}
+        <div class="row" data-testid="path-row">
+          <label><input type="checkbox" checked={!!clip.path} onchange={(e) => commit(setMotionPath(doc, clip.id, { enabled: e.currentTarget.checked }), 'Toggled the motion path')} /> Motion path</label>
+          {#if clip.path}
+            <label><input type="checkbox" checked={clip.path.autoOrient} onchange={(e) => commit(setMotionPath(doc, clip.id, { autoOrient: e.currentTarget.checked }), 'Toggled auto-orient')} /> Auto-orient</label>
+          {/if}
+        </div>
+      {/if}
     </section>
   {/if}
 

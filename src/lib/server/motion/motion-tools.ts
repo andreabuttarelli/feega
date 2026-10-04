@@ -7,6 +7,8 @@ import { setFrameRate } from '$lib/motion/frame-rate';
 import { Background, MOTION_FORMATS, findClip, type MotionDoc } from '$lib/motion/doc';
 import { ClipEdge, Side, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyInterp, setKeyframes, setMask, shaped, setProps, setTiming, setTrackMatte, setTransform, setTransition, trimClip, applyEasePreset, setKeyEase, type OpResult } from '$lib/motion/timeline';
 import { MASK_KEYS, MASK_KIND_IDS, MATTES } from '$lib/motion/mask';
+import { pathProblem } from '$lib/motion/path';
+import { setMotionPath, setPathTangent } from '$lib/motion/path-ops';
 import { EASE_PRESETS, EASE_PRESET_IDS, easeHandles, withHandles } from '$lib/motion/graph';
 import { ANIMATABLE, INTERPS, Interp, SPATIAL_KEYS, TRANSFORM_KEYS, ValueKind, easeSchema, transformSchema, type Keyframe } from '$lib/motion/keyframes';
 import type { MotionAsset } from './editor';
@@ -93,7 +95,8 @@ function summary(doc: MotionDoc, selection: string[]) {
         effects: c.effects,
         blend: c.blend,
         animators: c.animators,
-        motionBlur: c.motionBlur
+        motionBlur: c.motionBlur,
+        path: c.path ? { autoOrient: c.path.autoOrient, tangents: c.path.tangents.map(({ frame, ...rest }) => ({ time: secs(frame), ...rest })), problem: pathProblem(c) } : null
       }))
     })),
     assets: doc.assets,
@@ -389,6 +392,20 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const both = out.ok ? setKeyInterp(out.doc, [{ ...ref, frame: b.frame }], { in: Interp.Bezier }) : out;
         return apply(both, `shaped the ease of ${input.prop}`);
       }
+    }),
+
+    set_motion_path: tool({
+      description:
+        'Turn the x/y position keyframes of a clip into one curved motion path (enabled true) or back to separate x and y animations (false). x and y must be keyed at the same times. The path is smooth through the keys; bend it with set_path_tangent. The x keyframes time the travel along the path (their ease, in/out and roving). auto_orient turns the clip along the direction of travel (added to rotateZ).',
+      inputSchema: z.object({ clip_id: z.string(), enabled: z.boolean().optional(), auto_orient: z.boolean().optional() }),
+      execute: async (input) => apply(setMotionPath(session.doc, input.clip_id, { enabled: input.enabled, autoOrient: input.auto_orient }), `motion path on ${input.clip_id}`)
+    }),
+
+    set_path_tangent: tool({
+      description:
+        'Bend the motion path at the position keyframe at time (seconds from the clip start): in and out are the bezier handles as [dx, dy] offsets from the key point, in fractions of the frame (like x/y). Omitted handles are flat ([0,0]).',
+      inputSchema: z.object({ clip_id: z.string(), time: z.number().min(0), in: z.tuple([z.number(), z.number()]).optional(), out: z.tuple([z.number(), z.number()]).optional() }),
+      execute: async (input) => apply(setPathTangent(session.doc, input.clip_id, { frame: frames(input.time), in: input.in ?? [0, 0], out: input.out ?? [0, 0] }), `bent the path of ${input.clip_id}`)
     }),
 
     remove_keyframes: tool({
