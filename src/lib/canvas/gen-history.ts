@@ -35,7 +35,7 @@ function runnable(medium: GenMedium): boolean {
 }
 
 function readsConnectedMedia(node: GenNode): boolean {
-  if (!promptRequired(node.medium)) {
+  if (!promptRequired(node.medium, node.model)) {
     return true;
   }
   return node.medium === 'audio' && operationSpec(audioOperationOf(node.params)).source === 'media';

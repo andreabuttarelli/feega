@@ -50,6 +50,8 @@ type RawVideoModel = RawReleaseFacts & {
   supported_frame_images?: unknown;
   generate_audio?: unknown;
   seed?: unknown;
+  upscale_factor?: unknown;
+  creativity?: unknown;
   supported_resolutions?: unknown;
   pricing_skus?: Record<string, unknown>;
 };
@@ -174,13 +176,34 @@ function videoModalitiesOf(m: RawVideoModel): { input: string[]; output: string[
   const input = ['text'];
   if (frames.length) input.push('image');
   if (m.generate_audio === true) input.push('audio');
+  if (rangeOf(m.upscale_factor)) input.push('video');
   return { input, output: ['video'] };
+}
+
+type RangeSchema = { type: 'range'; min: number; max: number };
+
+function rangeOf(declared: unknown): RangeSchema | null {
+  const [min, max] = Array.isArray(declared)
+    ? declared
+    : [(declared as { min?: unknown } | null)?.min, (declared as { max?: unknown } | null)?.max];
+  if (typeof min !== 'number' || typeof max !== 'number') {
+    return null;
+  }
+  return { type: 'range', min, max };
 }
 
 function videoParamSchema(m: RawVideoModel): Record<string, unknown> {
   const schema: Record<string, unknown> = {};
   if (typeof m.generate_audio === 'boolean') schema.generate_audio = { type: 'boolean' };
   if (typeof m.seed === 'boolean') schema.seed = { type: 'boolean' };
+  const factor = rangeOf(m.upscale_factor);
+  if (factor) {
+    schema.upscale_factor = factor;
+  }
+  const creativity = rangeOf(m.creativity);
+  if (creativity) {
+    schema.creativity = creativity;
+  }
   return schema;
 }
 

@@ -8,7 +8,7 @@ vi.mock('$lib/server/ai-log', () => ({
 }));
 
 const { buildVideoPrompt, prepareVideoRender } = await import('./video');
-const { GROK_IMAGINE_VIDEO_MODEL, KLING_3_VIDEO_MODEL, SEEDANCE_25_MODEL } = await import('$lib/video-models');
+const { GROK_IMAGINE_VIDEO_MODEL, KLING_3_VIDEO_MODEL, OPENROUTER_UPSCALE_MODEL, SEEDANCE_25_MODEL } = await import('$lib/video-models');
 
 const SCENE = 'A barista pulling a shot of espresso on a marble counter';
 
@@ -69,5 +69,13 @@ describe('il craft del modello arriva al prompt video', () => {
 
     expect(p).toContain('MODEL NOTES');
     expect(p.lastIndexOf('CLEAN FRAME')).toBeGreaterThan(p.indexOf('MODEL NOTES'));
+  });
+
+  it('an upscale sends the scene as written: no direction brief around a clip that already exists', async () => {
+    const steered = await prepareVideoRender('sharp fur', { model: OPENROUTER_UPSCALE_MODEL, referenceVideoUrls: ['https://x/a.mp4'] });
+    const bare = await prepareVideoRender('', { model: OPENROUTER_UPSCALE_MODEL, referenceVideoUrls: ['https://x/a.mp4'] });
+
+    expect(steered.prompt).toBe('sharp fur');
+    expect(bare.prompt).toBe('');
   });
 });

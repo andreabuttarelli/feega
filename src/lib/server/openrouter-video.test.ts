@@ -254,3 +254,31 @@ describe('buildOpenrouterVideoInput — i riferimenti', () => {
     expect(out.input_references).toHaveLength(1);
   });
 });
+
+describe('buildOpenrouterVideoInput — upscale starts from the file, not from a shot', () => {
+  const upscale = {
+    model: 'black-forest-labs/flux-video-upscale',
+    prompt: '',
+    durationSeconds: 2,
+    resolution: '720p',
+    aspectRatio: '16:9',
+    referenceVideoUrls: ['https://x/clip.mp4']
+  };
+
+  it('sends the source clip and the upscale fields, never duration, resolution or ratio', async () => {
+    const { buildOpenrouterVideoInput } = await import('./openrouter-video');
+    const out = buildOpenrouterVideoInput(upscale.model, { ...upscale, params: { upscale_factor: 2, creativity: 0 } });
+
+    expect(out).toEqual({
+      model: 'black-forest-labs/flux-video-upscale',
+      input_references: [{ type: 'video_url', video_url: { url: 'https://x/clip.mp4' } }],
+      upscale_factor: 2,
+      creativity: 0
+    });
+  });
+
+  it('keeps an optional prompt that steers the detail', async () => {
+    const { buildOpenrouterVideoInput } = await import('./openrouter-video');
+    expect(buildOpenrouterVideoInput(upscale.model, { ...upscale, prompt: 'sharp fur' }).prompt).toBe('sharp fur');
+  });
+});
