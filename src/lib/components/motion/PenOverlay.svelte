@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
   import { boxOf } from '$lib/motion/layout';
-  import { parsePath, pathData, type Outline, type Pt } from '$lib/motion/shape/geometry';
+  import { mapOutline, parsePath, pathData, type Outline, type Pt } from '$lib/motion/shape/geometry';
   import { Handle, Mirror, addPoint, deletePoint, dragHandle, movePoint, toggleClosed, type PointRef } from '$lib/motion/shape/pen';
   import { setPath } from '$lib/motion/shape/ops';
 
@@ -104,9 +104,7 @@
 <div class="overlay" class:pen bind:this={host} data-testid="pen-overlay" role="presentation" onpointerdown={place} onpointermove={move} onpointerup={end} onpointercancel={end}>
   <svg viewBox={`0 0 ${doc.width} ${doc.height}`} preserveAspectRatio="none" aria-hidden="true">
     <rect class="frame" x={box.left} y={box.top} width={box.width} height={box.height} />
-    <g transform={`translate(${box.left} ${box.top}) scale(${box.width} ${box.height})`}>
-      <path class="outline" d={pathData(outline)} />
-    </g>
+    <path class="outline" d={pathData(mapOutline(outline, (p) => [box.left + p[0] * box.width, box.top + p[1] * box.height]))} />
     {#if selected}
       {#each handles(selected) as [, h] (h.join())}
         {@const a = toFrame(outline[selected.contour].vertices[selected.index].p)}

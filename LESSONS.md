@@ -12,6 +12,14 @@ solo quando la camera è accesa. Mossa: confrontare un frame dei due export (`ff
 con e senza la proprietà sospetta; ogni proprietà di raggruppamento (`mix-blend-mode`,
 `isolation`, `filter`, `opacity<1` sul contenitore) va tenuta fuori da `#world`.
 
+### Un overlay SVG scalato ×1000 sopra la preview la ridisegna spostata e ingrandita
+Disegnare un tracciato in coordinate 0..1 dentro un `<g transform="scale(larghezza altezza)">`
+nell'overlay dell'editor fa dipingere a Chrome un fantasma dell'iframe della preview, più grande
+e fuori posto, sopra la barra in alto. Nessun errore, `elementFromPoint` non lo vede: è solo
+composizione. Segnale: uno screenshot con un rettangolo scuro che sborda dalla preview appena
+compare l'overlay. Mossa: portare i punti in pixel del frame prima di scrivere `d` (come fa
+`MaskOverlay`), mai una scala enorme su un gruppo.
+
 ### Un file toccato nel worktree durante un giro Playwright ricarica la pagina
 Vite osserva anche `changelog/*.md`: scriverne uno mentre l'harness naviga l'editor fa
 `page reload` e il `goto` muore con `net::ERR_ABORTED`. Segnale: nel log del dev server
