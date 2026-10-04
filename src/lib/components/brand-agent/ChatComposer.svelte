@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import { composerHeight } from './composer-height';
   import { _ } from 'svelte-i18n';
 
@@ -7,13 +8,15 @@
     busy = false,
     enabled = true,
     onsend,
-    onstop
+    onstop,
+    controls
   }: {
     value: string;
     busy?: boolean;
     enabled?: boolean;
     onsend: () => void;
     onstop: () => void;
+    controls?: Snippet;
   } = $props();
 
   let textarea = $state<HTMLTextAreaElement | null>(null);
@@ -69,7 +72,11 @@
   ></textarea>
 
   <div class="row">
-    <span class="hint">{$_('chat.panel.hint')}</span>
+    {#if controls}
+      <div class="controls">{@render controls()}</div>
+    {:else}
+      <span class="hint">{$_('chat.panel.hint')}</span>
+    {/if}
     {#if busy}
       <button type="button" class="act stop" onclick={onstop} aria-label={$_('chat.panel.stop')} title={$_('chat.panel.stop')}>
         <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><rect x="3" y="3" width="10" height="10" fill="currentColor" /></svg>
@@ -123,6 +130,10 @@
     justify-content: space-between;
     gap: 8px;
   }
+  .controls {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
   .hint {
     font-size: 11.5px;
     color: var(--ink-faint, #86868b);
@@ -173,6 +184,19 @@
     }
     .hint {
       display: none;
+    }
+    .composer:has(.controls) {
+      flex-wrap: wrap;
+    }
+    .composer:has(.controls) textarea {
+      flex: 1 1 0;
+    }
+    .composer:has(.controls) .row {
+      display: contents;
+    }
+    .controls {
+      order: 2;
+      flex-basis: 100%;
     }
   }
 </style>

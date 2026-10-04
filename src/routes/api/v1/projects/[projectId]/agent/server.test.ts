@@ -40,8 +40,11 @@ function slowModel() {
 }
 
 vi.mock('$lib/server/llm', () => ({
-  llmModelForPicker: () => 'mock-model',
   llmLanguageModel: () => slowModel()
+}));
+vi.mock('$lib/server/chat-model/catalogue', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('$lib/server/chat-model/catalogue')>()),
+  offeredChatModels: async () => []
 }));
 vi.mock('$lib/server/ai-log', () => ({
   extractSdkUsage: () => ({}),

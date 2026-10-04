@@ -1,7 +1,8 @@
 import { json } from '@sveltejs/kit';
 import { createUIMessageStream, createUIMessageStreamResponse, streamText, type ModelMessage } from 'ai';
 import { z } from 'zod';
-import { llmCodeModel, llmLanguageModel, llmModelForPicker, llmVisionModel } from '$lib/server/llm';
+import { llmCodeModel, llmLanguageModel, llmVisionModel } from '$lib/server/llm';
+import { offeredChatModels, reasoningProviderOptions, resolveChoice } from '$lib/server/chat-model/catalogue';
 import { ensureGatewayModels, gatewayRate } from '$lib/server/openrouter-models';
 import { MOTION_TURN_CAP_USD, Tier, activeTools, openingTier, spentUsd, stepTier } from '$lib/server/motion/model-route';
 import { extractSdkUsage, logAiCall, withOrgContext } from '$lib/server/ai-log';
@@ -48,7 +49,7 @@ const FORCES_TOOL: Record<Tier, boolean> = { [Tier.Edit]: true, [Tier.Code]: fal
 
 type TurnStep = Parameters<typeof finishedTurn>[0][number] & { usage: unknown };
 
-const bodySchema = z.object({ message: z.string().trim().min(1).max(8000), selection: z.array(z.string()).max(50).default([]) });
+const bodySchema = z.object({ message: z.string().trim().min(1).max(8000), selection: z.array(z.string()).max(50).default([]), model: z.unknown().optional(), reasoning: z.unknown().optional() });
 
 export const POST: RequestHandler = async ({ request, params, locals }) => {
   const scope = await motionAgentScope(locals, params);
@@ -67,6 +68,12 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
     return json({ error: 'empty_message' }, { status: 400 });
   }
   const { message, selection } = body.data;
+
+  const resolved = resolveChoice(await offeredChatModels(), { model: body.data.model, reasoning: body.data.reasoning });
+  if (!resolved.ok) {
+    return json({ error: resolved.error }, { status: 400 });
+  }
+  const { model, reasoning } = resolved.choice;
 
   const userActor = { kind: 'user' as const, id: user.id };
   const actor = agentActor(user.id, MOTION_AGENT_KEY);
@@ -117,7 +124,6 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
     }
   });
 
-  const model = llmModelForPicker(null);
   const codeModel = llmCodeModel();
   const opening = openingTier({ message, doc: head.doc, selection });
   await ensureGatewayModels();
@@ -152,7 +158,7 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
         const stepModel = routed?.model ?? tierModel;
         stepModels.push(stepModel);
         const forced = kind === Round.SelfCheck && stepNumber === 0 && FORCES_TOOL[tier] ? { toolChoice: { type: 'tool' as const, toolName: VIEW_FRAMES } } : {};
-        return { model: llmLanguageModel(stepModel), activeTools: activeTools(tier, toolNames), ...(routed?.messages ? { messages: routed.messages } : {}), ...forced };
+        return { model: llmLanguageModel(stepModel), providerOptions: stepModel === model ? reasoningProviderOptions(reasoning) : {}, activeTools: activeTools(tier, toolNames), ...(routed?.messages ? { messages: routed.messages } : {}), ...forced };
       }
     });
 
@@ -161,7 +167,7 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
       askPreview = (request) => writer.write({ type: FRAMES_REQUEST, data: request });
       askCheck = (request) => writer.write({ type: CHECK_REQUEST, data: request });
       const first = round(openingMessages, Round.Edit);
-      writer.merge(first.toUIMessageStream({ sendFinish: false, sendReasoning: false }));
+      writer.merge(first.toUIMessageStream({ sendFinish: false, sendReasoning: true }));
       const steps: TurnStep[] = [
         ...(await Promise.resolve(first.steps).catch((e: unknown) => {
           console.error('[motion-agent] round failed, keeping the edits made so far', e);
@@ -173,7 +179,7 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
         const times = keyFrameTimes(session.doc);
         const answered = (await first.response).messages as ModelMessage[];
         const check = round([...openingMessages, ...answered, { role: 'user', content: selfCheckPrompt(times) }], Round.SelfCheck);
-        writer.merge(check.toUIMessageStream({ sendStart: false, sendReasoning: false }));
+        writer.merge(check.toUIMessageStream({ sendStart: false, sendReasoning: true }));
         steps.push(...(await Promise.resolve(check.steps).catch((e: unknown) => {
           console.error('[motion-agent] self-check failed, keeping the edits', e);
           return [];
