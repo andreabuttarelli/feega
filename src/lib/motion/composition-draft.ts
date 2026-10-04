@@ -3,12 +3,8 @@ import { LAYOUTS } from '../canvas/composition/index';
 import type { LayoutId, LayoutParams } from '../canvas/composition/types';
 import type { CompositionAspect, CompositionNode } from '../canvas/composition-node';
 import { TrackKind, defaultProps } from './components';
-import { FPS, TransitionKind } from './design';
-import { FORMATS, MotionFormat, formatOf, parseMotionDoc, type DocVerdict, type MotionClip, type MotionDoc, type MotionTrack } from './doc';
-import { Matte } from './mask';
-import { DEPTH, Space } from './camera';
-import { ParentOpacity } from './parent';
-import { BlendMode } from './blend';
+import { FPS } from './design';
+import { FORMATS, MotionFormat, formatOf, newClip, parseMotionDoc, type DocVerdict, type MotionClip, type MotionDoc, type MotionTrack } from './doc';
 import type { PropsOf } from './hyperframes/templates';
 
 export type ComposeMedia = PropsOf<'Composition'>['media'][number];
@@ -93,27 +89,7 @@ export function draftFromNode(node: CompositionNode, media: ComposeMedia[]): Com
 }
 
 function clipOf(id: string, component: MotionClip['component'], frames: number, props: Record<string, unknown>): MotionClip {
-  return {
-    id,
-    from: 0,
-    durationInFrames: frames,
-    trimStart: 0,
-    component,
-    props: { ...defaultProps(component), ...props },
-    transitionIn: { kind: TransitionKind.None, durationInFrames: 0 },
-    transitionOut: { kind: TransitionKind.None, durationInFrames: 0 },
-    transform: {},
-    keyframes: {},
-    mask: null,
-    matte: Matte.None,
-    depth: DEPTH.fallback,
-    space: Space.World,
-    parent: null,
-    parentOpacity: ParentOpacity.Inherit,
-    expressions: {},
-    effects: [],
-    blend: BlendMode.Normal
-  };
+  return newClip({ id, from: 0, durationInFrames: frames, component, props: { ...defaultProps(component), ...props } });
 }
 
 function upsert(track: MotionTrack, clip: MotionClip | null, id: string): MotionTrack {

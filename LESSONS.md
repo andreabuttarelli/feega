@@ -2344,3 +2344,11 @@ downloads every remote `<img>`/`<video>`/`<audio>` src and rewrites it to `_remo
 own file server; the composition CSP allowed images only from the asset origin. Move: `img-src`
 and `media-src` carry `'self'` (`hyperframes/csp.ts`); anything the producer localizes must be
 allowed from the page origin.
+
+### A clip written as a literal misses the next field, and only the browser notices
+`checkDoc` built its clip by hand; when `expressions` joined the schema, the literal did not get
+it and `bakeExpressions` threw on `Object.keys(undefined)` — every custom component failed its
+seek check (`the preview could not render it: Cannot convert undefined or null to object`) and
+export stayed blocked. Unit tests were green: none composed the check doc. Signal: a check or
+export refused with a TypeError that names no field. Move: every clip comes from `newClip` in
+`doc.ts` (one place for defaults), and a test composes the derived doc, not just its shape.

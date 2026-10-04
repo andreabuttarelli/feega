@@ -1,10 +1,7 @@
 import type { ClipError } from '../hyperframes/capture';
 import { TrackKind } from '../components';
 import { TransitionKind } from '../design';
-import { Matte } from '../mask';
-import { DEPTH, Space } from '../camera';
-import { ParentOpacity } from '../parent';
-import { clipsOf, type MotionDoc } from '../doc';
+import { clipsOf, newClip, type MotionDoc } from '../doc';
 import { CheckState, checkState } from './component';
 
 export const CHECK_POINTS = 5;
@@ -54,29 +51,11 @@ export function verdictOf(shots: Shot[]): Verdict {
 }
 
 const DEFAULT_CHECK_FRAMES = 120;
-const STILL = { kind: TransitionKind.None, durationInFrames: 0 };
 
 export function checkDoc(doc: MotionDoc, name: string): MotionDoc {
   const first = clipsOf(doc).find((c) => c.component === 'Custom' && c.props.name === name);
   const durationInFrames = first?.durationInFrames ?? DEFAULT_CHECK_FRAMES;
-  const clip = {
-    id: 'check',
-    from: 0,
-    durationInFrames,
-    trimStart: 0,
-    component: 'Custom' as const,
-    props: first?.props ?? { name },
-    transitionIn: STILL,
-    transitionOut: STILL,
-    transform: {},
-    keyframes: {},
-    mask: null,
-    matte: Matte.None,
-    depth: DEPTH.fallback,
-    space: Space.World,
-    parent: null,
-    parentOpacity: ParentOpacity.Inherit
-  };
+  const clip = newClip({ id: 'check', from: 0, durationInFrames, component: 'Custom', props: first?.props ?? { name } });
   return {
     ...doc,
     durationInFrames,

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { checkDoc, seekPlan, unverified, verdictOf, type Shot } from './determinism';
-import { MotionFormat, clipsOf, newMotionDoc, type MotionDoc } from '../doc';
+import { MotionFormat, clipsOf, newMotionDoc, parseMotionDoc, type MotionDoc } from '../doc';
+import { composeHtml } from '../hyperframes/compose';
+import { FEEGA_TOKENS } from '../brand';
 import { addClip, type OpResult } from '../timeline';
 import { CheckState, sourceHash } from './component';
 import { recordCheck, writeComponent } from './ops';
@@ -89,6 +91,22 @@ describe('what the check renders and what export accepts', () => {
     expect(clips[0]).toMatchObject({ from: 0, durationInFrames: 90, props: { name: 'Pulse', n: 4 } });
     expect(doc.durationInFrames).toBe(90);
     expect([doc.width, doc.height]).toEqual([used.width, used.height]);
+  });
+
+  it('the check doc is a valid doc that composes, so the check can render the component at all', () => {
+    const doc = checkDoc(used, 'Pulse');
+
+    expect(parseMotionDoc(JSON.parse(JSON.stringify(doc))).ok).toBe(true);
+    expect(() => composeHtml({ doc, tokens: FEEGA_TOKENS, assets: {} })).not.toThrow();
+  });
+
+  it('the check clip carries every clip field the schema knows (expressions, effects, blend and whatever comes next)', () => {
+    const [clip] = clipsOf(checkDoc(used, 'Pulse'));
+    const parsed = parseMotionDoc(JSON.parse(JSON.stringify(checkDoc(used, 'Pulse'))));
+    const schemaKeys = parsed.ok ? Object.keys(clipsOf(parsed.doc)[0]).sort() : [];
+
+    expect(Object.keys(clip).sort()).toEqual(schemaKeys);
+    expect(clip).toMatchObject({ expressions: {}, effects: [], blend: 'normal' });
   });
 
   it('blocks export while a used component has not passed the check for its current code', () => {
