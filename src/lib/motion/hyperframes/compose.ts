@@ -7,7 +7,8 @@ import { css, esc, js, seconds } from './html';
 import { TEMPLATES, Timing, type PropsOf, type TemplateCtx, type Tween, type Vars } from './templates';
 import { LIGHTING, threeImportMap, threeScript, type ThreeClip } from './three';
 import { bakeComposition, compositionScript, type TimedBake } from './composition';
-import { ANIMATE_CSS, animationScript, colourOverrides, sceneKeys, wrapAnimated } from './animate';
+import { ANIMATE_CSS, animationScript, colourOverrides, sceneKeys, wrapAnimated, wrapParents } from './animate';
+import { ancestorsOf, parentsWithChildren } from '../parent';
 import { MASK_CSS, MaskScope, maskLayer, startValues } from './masks';
 import { SCREENSHOT_URL, captureScript, contentStamp } from './capture';
 import { cspMeta } from './csp';
@@ -141,11 +142,11 @@ enum Visibility {
   MatteSource = 'matte-source'
 }
 
-type Placed = { layer: number; trackIndex: number; matte: Mask | null; visibility: Visibility; transform?: string };
+type Placed = { layer: number; trackIndex: number; matte: Mask | null; visibility: Visibility; transform?: string; chain: MotionClip[] };
 
 function clipHtml(clip: MotionClip, ctx: TemplateCtx<ComponentId>, placed: Placed): string {
   const template = TEMPLATES[clip.component] as (typeof TEMPLATES)[ComponentId];
-  const inner = matted(clip, ctx, placed.matte, wrapAnimated(clip, ctx, ownMask(clip, ctx, template.html(ctx as never))));
+  const inner = matted(clip, ctx, placed.matte, wrapParents(placed.chain, clip, ctx, wrapAnimated(clip, ctx, ownMask(clip, ctx, template.html(ctx as never)))));
   const fx = `<div class="fx" id="fx-${clip.id}">${inner}</div>`;
   const style = css({ zIndex: placed.layer, transform: placed.transform });
   const layer =
@@ -264,6 +265,7 @@ export function composeHtml(input: ComposeInput): string {
   const onStage = new Set(stage?.layers.map((l) => l.id));
   const startPose = new Map(stage ? cameraMath(sampleTrack).frameAt(stage, 0).layers.map((l) => [l.id, l.transform]) : []);
   const world: string[] = [];
+  const byId = new Map(doc.tracks.flatMap((t) => t.clips as MotionClip[]).map((c) => [c.id, c]));
   let layer = 0;
 
   for (const { track, index } of bottomFirst) {
@@ -272,7 +274,7 @@ export function composeHtml(input: ComposeInput): string {
       clips.push(clip);
       const template = TEMPLATES[clip.component] as (typeof TEMPLATES)[ComponentId];
       layer += 1;
-      const html = clipHtml(clip, ctx, { layer, trackIndex: index, matte: matteOf(doc, clip), visibility: hidden.has(clip.id) ? Visibility.MatteSource : Visibility.Shown, transform: startPose.get(clip.id) });
+      const html = clipHtml(clip, ctx, { layer, trackIndex: index, matte: matteOf(doc, clip), visibility: hidden.has(clip.id) ? Visibility.MatteSource : Visibility.Shown, transform: startPose.get(clip.id), chain: ancestorsOf(doc, clip.id).map((id) => byId.get(id)!) });
       (onStage.has(clip.id) ? world : layers).push(html);
       const own = template.tweens?.(ctx as never) ?? [];
       tweens.push(...edgeTweens(clip, doc.fps), ...moveTweens(clip, doc.fps), ...own);
@@ -292,7 +294,7 @@ export function composeHtml(input: ComposeInput): string {
 
   const duration = seconds(doc.durationInFrames, doc.fps);
   const background = tokens.colors['brand.background'];
-  const animation = animationScript(clips, doc, (v) => resolveColor(v, tokens));
+  const animation = animationScript(clips, doc, (v) => resolveColor(v, tokens), parentsWithChildren(doc));
   const used = new Set(runs.map((r) => r.name));
   const libraries = librariesOf(doc.components, used);
   const threeCustom = libraries.has(Library.Three);
