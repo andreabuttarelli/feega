@@ -16,6 +16,7 @@ const DOC: Record<string, Access> = {
   tracks: { write: ['add_track', 'set_track', 'remove_track'], read: 'tracks' },
   assets: { write: ['add_asset', 'remove_asset'], read: 'assets' },
   camera: { write: ['set_camera'], read: 'camera' },
+  fonts: { write: ['set_font', 'register_font', 'remove_font'], read: 'fonts' },
   components: { write: ['write_component', 'patch_component', 'remove_component'], read: 'components' }
 };
 

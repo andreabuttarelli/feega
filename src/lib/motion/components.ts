@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { BuiltinFont, FONT_NAME } from './fonts/model';
 import { DURATION, EASE_IDS, Ease, FPS } from './design';
 import { LAYOUTS } from '../canvas/composition/index';
 import { CAMERA_PRESETS } from '../canvas/composition/camera';
@@ -13,14 +14,16 @@ export enum Control {
   Select = 'select',
   Toggle = 'toggle',
   Asset = 'asset',
-  Managed = 'managed'
+  Managed = 'managed',
+  Font = 'font'
 }
 
 export enum AssetKind {
   Image = 'image',
   Video = 'video',
   Audio = 'audio',
-  Model3d = 'model3d'
+  Model3d = 'model3d',
+  Font = 'font'
 }
 
 export enum Group {
@@ -58,7 +61,9 @@ const fade = (label: string) => range(0, 5, 0.1, 0, label, Group.Style);
 const toggle = (fallback: boolean, label: string, group: Group) =>
   z.boolean().default(fallback).meta({ control: Control.Toggle, label, group });
 
-export const FONTS = ['sans', 'mono'] as const;
+export const FONTS = [BuiltinFont.Sans, BuiltinFont.Mono] as const;
+const REGULAR = 400;
+const MEDIUM = 500;
 export const ALIGNS = ['left', 'center', 'right'] as const;
 export const MOVES = ['none', 'drift-up', 'zoom-in', 'zoom-out', 'pan-left', 'pan-right'] as const;
 export type Move = (typeof MOVES)[number];
@@ -76,9 +81,13 @@ const layout = (box: { x?: number; y?: number; width?: number; height?: number }
   easing: choice(EASE_IDS, Ease.Standard, 'Easing', Group.Motion)
 });
 
-const typography = (size: number, fallbackColor: string) => ({
+const font = () => z.string().regex(FONT_NAME, 'expected a font family name').default(BuiltinFont.Sans).meta({ control: Control.Font, label: 'Font', group: Group.Style });
+
+const typography = (size: number, fallbackColor: string, weight = REGULAR) => ({
   color: color(fallbackColor, 'Colour'),
-  font: choice(FONTS, 'sans', 'Font', Group.Style),
+  font: font(),
+  weight: range(100, 900, 100, weight, 'Weight', Group.Style),
+  italic: toggle(false, 'Italic', Group.Style),
   size: range(0.01, 0.4, 0.005, size, 'Size', Group.Style)
 });
 
@@ -134,7 +143,7 @@ export const COMPONENTS = {
     description: 'Large headline, lines reveal one after another. Use \\n for line breaks.',
     track: TrackKind.Visual,
     durationInFrames: seconds(3),
-    schema: z.object({ text: text('Better marketing\non canvas.', 'Text', true), ...typography(0.11, 'brand.text'), ...layout({ height: 0.4 }) }).strict()
+    schema: z.object({ text: text('Better marketing\non canvas.', 'Text', true), ...typography(0.11, 'brand.text', MEDIUM), ...layout({ height: 0.4 }) }).strict()
   },
   Text: {
     label: 'Text',
@@ -156,7 +165,7 @@ export const COMPONENTS = {
     track: TrackKind.Visual,
     durationInFrames: seconds(2),
     schema: z
-      .object({ text: text('A caption', 'Text'), ...typography(0.035, '#ffffff'), background: color('#111111', 'Box'), ...layout({ y: 0.85, height: 0.1 }) })
+      .object({ text: text('A caption', 'Text'), ...typography(0.035, '#ffffff', MEDIUM), background: color('#111111', 'Box'), ...layout({ y: 0.85, height: 0.1 }) })
       .strict()
   },
   Image: {

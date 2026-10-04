@@ -24,7 +24,7 @@ export function cspPolicy(input: CspInput): string {
     'default-src': "'none'",
     'script-src': `'unsafe-inline' ${input.scripts.join(' ')}`,
     'style-src': `'unsafe-inline' ${FONT_CSS_ORIGIN}`,
-    'font-src': `${FONT_FILE_ORIGIN} data:`,
+    'font-src': `'self' ${FONT_FILE_ORIGIN} data: ${media}`,
     'img-src': `'self' data: blob: ${media}`,
     'media-src': `'self' data: blob: ${media}`,
     'connect-src': `data: blob: ${FONT_CSS_ORIGIN} ${FONT_FILE_ORIGIN} ${media}`,

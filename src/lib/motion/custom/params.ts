@@ -29,7 +29,7 @@ const PARAM_TYPES: Record<string, (fallback: unknown, o: Options) => PropSpec> =
   boolean: (d, o) => spec({ type: 'boolean', default: Boolean(d) }, o),
   select: (d, o) => spec({ type: 'string', enum: o.options, default: String(d ?? o.options?.[0] ?? '') }, o),
   asset: (_, o) => spec({ type: 'string', format: PropFormat.Asset, assetKind: (o.kind ?? 'image') as PropSpec['assetKind'], default: null }, o),
-  font: (d, o) => spec({ type: 'string', enum: [...FONTS], default: String(d ?? FONTS[0]) }, o),
+  font: (d, o) => spec({ type: 'string', format: PropFormat.Font, default: String(d ?? FONTS[0]) }, o),
   ease: (d, o) => spec({ type: 'string', enum: [...PARAM_EASES], default: String(d ?? PARAM_EASES[2]) }, o)
 };
 

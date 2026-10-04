@@ -2352,3 +2352,11 @@ seek check (`the preview could not render it: Cannot convert undefined or null t
 export stayed blocked. Unit tests were green: none composed the check doc. Signal: a check or
 export refused with a TypeError that names no field. Move: every clip comes from `newClip` in
 `doc.ts` (one place for defaults), and a test composes the derived doc, not just its shape.
+
+### The server renderer swaps some fonts for bundled look-alikes
+The HyperFrames producer injects its own `@font-face` for every family the page does not declare
+itself, and for an alias list it uses bundled fonts (`Bebas Neue` → League Gothic). A `<link>` to
+Google Fonts does not count as declared. Signal: one font looks right in preview and browser
+export but narrower or different on the server. Move: declare every family in the page
+(`declaredFamilyCss`: a `@font-face` that matches nothing), and compare a server frame with a
+browser-export frame for each new font path.

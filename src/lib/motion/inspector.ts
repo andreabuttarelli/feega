@@ -89,7 +89,8 @@ const RANGE_FALLBACK_MAX = 100;
 const FORMAT_CONTROL: Record<PropFormat, Control> = {
   [PropFormat.Color]: Control.Color,
   [PropFormat.Textarea]: Control.Textarea,
-  [PropFormat.Asset]: Control.Asset
+  [PropFormat.Asset]: Control.Asset,
+  [PropFormat.Font]: Control.Font
 };
 
 const TYPE_CONTROL: Record<PropSpec['type'], (spec: PropSpec) => Control> = {

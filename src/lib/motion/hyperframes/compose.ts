@@ -21,6 +21,7 @@ import { Composite, cameraMath, stageSpec } from '../camera';
 import { sampleTrack } from '../keyframes';
 import { STAGE_CSS, stageRootStyle, stageScript } from './stage';
 import { bakeExpressions } from '../expression/bake';
+import { declaredFamilyCss, faceDescriptor, fontStack, googleFontsUrl, loadedWeight, uploadFaceCss, usedFaces } from '../fonts/model';
 import { EFFECT_CSS, effectLayer, effectScript, effectTimeline } from '../effects/render';
 import { blendStyle } from '../blend';
 
@@ -114,7 +115,9 @@ function ctxOf(clip: MotionClip, input: ComposeInput): TemplateCtx<ComponentId> 
     logoUrl: tokens.logoUrl,
     brandName: tokens.name,
     mediaStart: Number(seconds(clip.trimStart, doc.fps)),
-    components: doc.components
+    components: doc.components,
+    font: (family) => fontStack(family, doc.fonts),
+    weight: (family, weight) => loadedWeight(family, weight, doc.fonts)
   };
 }
 
@@ -215,7 +218,8 @@ const BASE_CSS = [
   '.li{display:block;will-change:transform}',
   ANIMATE_CSS,
   MASK_CSS,
-  EFFECT_CSS
+  EFFECT_CSS,
+  '.font-probe{position:absolute;left:0;top:0;opacity:0;pointer-events:none}'
 ].join('');
 
 type ValueResolver = (value: unknown, ctx: TemplateCtx<ComponentId>) => unknown;
@@ -223,7 +227,8 @@ type ValueResolver = (value: unknown, ctx: TemplateCtx<ComponentId>) => unknown;
 const RESOLVE: Record<PropFormat, ValueResolver> = {
   [PropFormat.Color]: (v, ctx) => ctx.color(String(v)),
   [PropFormat.Asset]: (v, ctx) => ctx.asset(typeof v === 'string' ? v : null),
-  [PropFormat.Textarea]: (v) => v
+  [PropFormat.Textarea]: (v) => v,
+  [PropFormat.Font]: (v, ctx) => ctx.font(String(v))
 };
 
 function customRun(clip: MotionClip, ctx: TemplateCtx<ComponentId>, components: CustomComponents): CustomRun | null {
@@ -252,6 +257,33 @@ const LIBRARY_TAGS: Record<Library, { scripts: string[]; tag: string }> = {
 function brandEnv(tokens: BrandTokens) {
   const colors = Object.fromEntries(Object.entries(tokens.colors).map(([k, v]) => [k.replace('brand.', ''), v]));
   return { name: tokens.name, colors, logoUrl: tokens.logoUrl };
+}
+
+export const FONTS_READY = '__fontsReady';
+const FONT_SHEET = 'kf-fonts';
+
+function fontLinks(doc: MotionDoc, assets: Record<string, string>): string {
+  const faces = usedFaces(doc);
+  const google = googleFontsUrl(faces, doc.fonts);
+  const uploads = uploadFaceCss(doc.fonts, assets) + declaredFamilyCss(faces, doc.fonts);
+  const loads = faces.map((f) => `document.fonts.load(${js(faceDescriptor(f))}).catch(function(){return [];})`).join(',');
+  return [
+    google ? `<link id="${FONT_SHEET}" rel="stylesheet" crossorigin="anonymous" href="${esc(google)}" />` : '',
+    uploads ? `<style>${uploads}</style>` : '',
+    `<script>(function(){var l=document.getElementById(${js(FONT_SHEET)});var sheet=l&&!l.sheet?new Promise(function(r){l.addEventListener('load',r);l.addEventListener('error',r);}):Promise.resolve();window.${FONTS_READY}=sheet.then(function(){return Promise.all([${loads}]);}).then(function(){return document.fonts.ready;});})();</script>`
+  ].join('');
+}
+
+function fontProbe(doc: MotionDoc): string {
+  const spans = usedFaces(doc)
+    .map((f) => `<span style="${css({ fontFamily: fontStack(f.family, doc.fonts), fontWeight: loadedWeight(f.family, f.weight, doc.fonts), fontStyle: f.italic ? 'italic' : 'normal' })}">Aa</span>`)
+    .join('');
+  return spans ? `<div class="font-probe" aria-hidden="true">${spans}</div>` : '';
+}
+
+function gated(script: string): string {
+  const rerender = `var m=window.__timelines&&window.__timelines[${js(COMPOSITION_ID)}];if(m){m.render(m.totalTime(),false,true);}`;
+  return script ? `(window.${FONTS_READY}||Promise.resolve()).then(function(){${script}${rerender}});` : '';
 }
 
 export function composeHtml(raw: ComposeInput): string {
@@ -304,7 +336,7 @@ export function composeHtml(raw: ComposeInput): string {
   const libraries = librariesOf(doc.components, used);
   const threeCustom = libraries.has(Library.Three);
   const env = { assets: input.assets, brand: brandEnv(tokens) };
-  const boot = bootScript(runs, env, `window.__timelines[${js(COMPOSITION_ID)}]`);
+  const boot = gated(bootScript(runs, env, `window.__timelines[${js(COMPOSITION_ID)}]`));
   const definitions = [...used].map((name) => definitionScript(name, doc.components[name].source.js)).join('');
   const customBoot = threeCustom
     ? `<script type="module">import * as THREE from 'three';window.${THREE_GLOBAL}=THREE;${boot}</script>`
@@ -323,11 +355,13 @@ export function composeHtml(raw: ComposeInput): string {
     ...[...libraries].map((lib) => LIBRARY_TAGS[lib].tag),
     three.length || compositions.length || threeCustom ? threeImportMap() : '',
     `<link rel="stylesheet" crossorigin="anonymous" href="${FONTS_URL}" />`,
+    fontLinks(doc, input.assets),
     `<style>${BASE_CSS}#root{background:${esc(background)}}${stage ? STAGE_CSS + stageRootStyle(stage) : ''}</style>`,
     '</head><body>',
     `<div id="root" data-composition-id="${COMPOSITION_ID}" data-start="0" data-width="${doc.width}" data-height="${doc.height}" data-duration="${duration}" data-fps="${doc.fps}">`,
     stage ? `<div id="world" class="world">${world.join('')}</div><!--/world-->` : '',
     layers.join(''),
+    fontProbe(doc),
     '</div>',
     `<script>${animation.setup}const tl=gsap.timeline({paused:true});${holds.map(holdLine).join('')}${tweens.map(tweenLine).join('')}${animation.timeline}${effectScript(clips.flatMap((c) => effectTimeline(c, doc, (v) => resolveColor(v, tokens))))}tl.set({}, {}, ${duration});window.__timelines=window.__timelines||{};window.__timelines[${js(COMPOSITION_ID)}]=tl;</script>`,
     definitions,

@@ -2,7 +2,7 @@ import { COMPONENTS, TrackKind, defaultProps, type ComponentId } from './compone
 import { Strictness } from './custom/component';
 import { withParams } from './custom/params';
 import { FPS, TransitionKind, type Edge } from './design';
-import { FORMATS, MAX_FRAMES, byFrame, clipProps, findClip, newClip, type MotionClip, type MotionDoc, type MotionFormat, type MotionTrack } from './doc';
+import { FORMATS, MAX_FRAMES, byFrame, clipProps, findClip, fontsOfClip, newClip, type MotionClip, type MotionDoc, type MotionFormat, type MotionTrack } from './doc';
 import { Ease } from './design';
 import { Matte, isMaskKey, maskSchema, type MaskInput } from './mask';
 import { matteMask, matteSource } from './matte';
@@ -91,6 +91,10 @@ export function addClip(doc: MotionDoc, input: NewClip, id: string): OpResult {
   const props = clipProps(doc.components, input.component, { ...defaultProps(input.component), ...input.props }, Strictness.Strict);
   if (!props.ok) {
     return fail(props.error);
+  }
+  const missingFont = fontsOfClip(doc, { component: input.component, props: props.props });
+  if (missingFont) {
+    return fail(missingFont);
   }
 
   const clip = newClip({
@@ -194,7 +198,10 @@ export function removeClips(doc: MotionDoc, ids: readonly string[]): OpResult {
 export function setProps(doc: MotionDoc, clipId: string, patch: Record<string, unknown>): OpResult {
   return editClip(doc, clipId, (clip) => {
     const verdict = clipProps(doc.components, clip.component, { ...clip.props, ...patch }, Strictness.Strict);
-    return verdict.ok ? { ...clip, props: verdict.props } : verdict.error;
+    if (!verdict.ok) {
+      return verdict.error;
+    }
+    return fontsOfClip(doc, { component: clip.component, props: verdict.props }) ?? { ...clip, props: verdict.props };
   });
 }
 

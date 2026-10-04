@@ -96,6 +96,7 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
     const root = document.getElementById('root') as HTMLElement;
 
     load()
+      .then(() => (window as unknown as { __fontsReady?: Promise<unknown> }).__fontsReady ?? document.fonts.ready)
       .then(() => document.fonts.ready)
       .then(painted)
       .then(mediaReady)
