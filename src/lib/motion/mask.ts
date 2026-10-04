@@ -44,8 +44,8 @@ type MaskField = 'x' | 'y' | 'width' | 'height' | 'rotation' | 'feather' | 'expa
 export const MASK_PROPS = {
   maskX: { field: 'x', label: 'Mask X', min: -1, max: 2, step: 0.01, fallback: 0.5 },
   maskY: { field: 'y', label: 'Mask Y', min: -1, max: 2, step: 0.01, fallback: 0.5 },
-  maskWidth: { field: 'width', label: 'Mask width', min: 0, max: 4, step: 0.01, fallback: 0.5 },
-  maskHeight: { field: 'height', label: 'Mask height', min: 0, max: 4, step: 0.01, fallback: 0.5 },
+  maskWidth: { field: 'width', label: 'Mask width', min: 0, max: 60, step: 0.01, fallback: 0.5 },
+  maskHeight: { field: 'height', label: 'Mask height', min: 0, max: 60, step: 0.01, fallback: 0.5 },
   maskRotation: { field: 'rotation', label: 'Mask rotation', min: -1080, max: 1080, step: 1, fallback: 0 },
   maskFeather: { field: 'feather', label: 'Feather', min: 0, max: 400, step: 1, fallback: 0 },
   maskExpansion: { field: 'expansion', label: 'Expansion', min: -400, max: 400, step: 1, fallback: 0 },

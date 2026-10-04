@@ -48,6 +48,13 @@ describe('mask schema', () => {
     }
   });
 
+  it('a text mask can grow until one letter is wider than the frame, so a word can open onto the next scene', () => {
+    const doc = must(setMask(base, 'img', { kind: MaskKind.Text, text: 'CANVAS' }));
+
+    expect(setKeyframes(doc, 'img', 'maskWidth', [{ frame: 0, value: 0.6, ease: Ease.Linear }, { frame: 30, value: 40, ease: Ease.Linear }]).ok).toBe(true);
+    expect(setMask(base, 'img', { kind: MaskKind.Text, text: 'CANVAS', width: 40, height: 20 }).ok).toBe(true);
+  });
+
   it('a masked doc survives a save and a load', () => {
     const doc = must(setMask(base, 'img', { kind: MaskKind.Text, text: 'SALE', feather: 12 }));
     const parsed = parseMotionDoc(JSON.parse(JSON.stringify(doc)));
