@@ -17,8 +17,9 @@ basso arrotonda al frame più vicino e due keyframe che cadono sullo stesso fram
 **Render.** Il producer distribuito di HyperFrames accetta solo 24/30/60: 25 e 50 vanno sulla
 rotta `whole` (un worker, `createRenderJob`/`executeRenderJob` in-process). La scelta della rotta è
 una tabella (`WHOLE_ONLY` in `farm-render.ts`); il worker riceve la config come `spec.json`, non
-come argv posizionali. Un render intero può durare più di uno a blocchi: timeout worker 12 min,
-`maxDuration` 800 s sull'editor (il lavoro gira in `waitUntil`), scadenza `motion_render` a 14 min.
+come argv posizionali. Il render gira in `waitUntil` della richiesta, quindi dentro i 300 s
+dell'adapter: una `maxDuration` per rotta creerebbe un'altra funzione (`single-function.test.ts`).
+Un render intero lungo a 25/50 fps sta in quel tetto o fallisce senza addebito.
 Provato su Vercel Sandbox: 2 s a 25 fps, 20 s dall'avvio al file.
 
 L'agente lo imposta con `set_canvas { fps }` e lo legge in `get_motion_doc`; i suoi tempi restano in

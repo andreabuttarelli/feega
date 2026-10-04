@@ -59,13 +59,12 @@ describe('renderOnFarm', () => {
   });
 
   it.each([25, 50])('a %i fps video renders whole on one worker, since chunked renders take 24, 30 or 60', async (fps) => {
-    const { farm, workers, specs } = fakeFarm();
+    const { farm, workers } = fakeFarm();
 
     await renderOnFarm(farm, { ...job, fps }, () => {});
 
     expect(workers).toHaveLength(1);
     expect(specOf(workers[0])).toMatchObject({ route: 'whole', config: { fps } });
-    expect(specs[0].timeoutMs).toBeGreaterThan(5 * 60_000);
   });
 
   it('only the asset origin and the runtime CDNs are reachable', async () => {

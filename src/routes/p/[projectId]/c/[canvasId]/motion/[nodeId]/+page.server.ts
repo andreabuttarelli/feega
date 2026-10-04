@@ -64,8 +64,6 @@ export const load: PageServerLoad = async ({ locals, params }) => {
   };
 };
 
-export const config = { maxDuration: 800 };
-
 export const actions: Actions = {
   save: async ({ locals, params, request }) => {
     const scope = await scopeFor(locals, params);

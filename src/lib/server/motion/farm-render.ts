@@ -17,10 +17,7 @@ const RUNTIME_HOSTS = ['cdn.jsdelivr.net', new URL(FONT_CSS_ORIGIN).host, new UR
 const OUTPUT_TAIL = 600;
 const MAX_PARALLEL_CHUNKS = 16;
 
-const WORKER_TIMEOUT_MS: Record<RenderRoute, number> = {
-  [RenderRoute.Chunked]: 5 * 60_000,
-  [RenderRoute.Whole]: 12 * 60_000
-};
+const WORKER_TIMEOUT_MS = 5 * 60_000;
 
 const WHOLE_ONLY: { because: string; applies: (job: FarmJob) => boolean }[] = [{ because: 'chunked renders run at 24, 30 or 60 fps only', applies: (job) => ![24, 30, 60].includes(job.fps) }];
 
@@ -102,7 +99,7 @@ async function collect(head: FarmWorker, others: FarmWorker[], count: number): P
 
 export async function renderOnFarm(farm: RenderFarm, job: FarmJob, onEvent: (e: RenderEvent) => void): Promise<Buffer> {
   const { size, count } = farmChunks(job);
-  const spec = { allowHosts: [...new Set([...job.allowHosts, ...RUNTIME_HOSTS])], timeoutMs: WORKER_TIMEOUT_MS[routeOf(job)] };
+  const spec = { allowHosts: [...new Set([...job.allowHosts, ...RUNTIME_HOSTS])], timeoutMs: WORKER_TIMEOUT_MS };
   const opened = await Promise.allSettled(Array.from({ length: count }, () => farm.open(spec)));
   const workers = opened.flatMap((o) => (o.status === 'fulfilled' ? [o.value] : []));
 
