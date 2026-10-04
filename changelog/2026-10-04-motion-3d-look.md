@@ -16,7 +16,9 @@ Poly Haven (CC0) presi dagli esempi di three.js su jsDelivr, fissati al tag `r18
 `dev`, dava una dominante verde al blu del brand. Tone mapping `Neutral` (Khronos PBR Neutral)
 invece di ACES: ACES spostava `#0099ff` verso il ciano.
 
-**Ombre.** Shadow map PCF soft a 512 su un disco `ShadowMaterial` + un blob radiale di contatto.
+**Ombre.** Shadow map PCF soft a 512 su un piano `ShadowMaterial` che sfuma radialmente (0.4→1.25
+unità) + un blob radiale di contatto. Ogni clip 3D ha il suo canvas: un piano netto mostrava il
+bordo del canvas come bordo del pavimento, la sfumatura lo chiude prima.
 VSM scartato: bande. Con il look acceso le luci preset del clip sono dimezzate, perché l'ambiente
 già illumina.
 

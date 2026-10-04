@@ -209,10 +209,23 @@ function contactBlob() {
   grad.addColorStop(1, 'rgba(0,0,0,0)');
   g.fillStyle = grad;
   g.fillRect(0, 0, size, size);
-  const blob = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 2.6), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true, depthWrite: false }));
+  const blob = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 1.7), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true, depthWrite: false }));
   blob.rotation.x = -Math.PI / 2;
   blob.position.y = FLOOR + 0.001;
   return blob;
+}
+
+const CATCHER = 8;
+const FADE_FROM = 0.4;
+const FADE_TO = 1.25;
+
+function fadingShadow() {
+  const material = new THREE.ShadowMaterial({ opacity: 0.32 });
+  material.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\\nvarying vec2 vFloor;').replace('#include <begin_vertex>', '#include <begin_vertex>\\nvFloor = position.xy;');
+    shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\\nvarying vec2 vFloor;').replace('#include <fog_fragment>', 'gl_FragColor.a *= 1.0 - smoothstep(' + FADE_FROM.toFixed(2) + ', ' + FADE_TO.toFixed(2) + ', length(vFloor));\\n#include <fog_fragment>');
+  };
+  return material;
 }
 
 function ground(scene, c) {
@@ -223,7 +236,7 @@ function ground(scene, c) {
     return;
   }
   if (LOOK.softShadows) {
-    const catcher = new THREE.Mesh(new THREE.CircleGeometry(3, 64), new THREE.ShadowMaterial({ opacity: 0.32 }));
+    const catcher = new THREE.Mesh(new THREE.PlaneGeometry(CATCHER, CATCHER), fadingShadow());
     catcher.rotation.x = -Math.PI / 2; catcher.position.y = FLOOR; catcher.receiveShadow = true; scene.add(catcher);
   }
   if (LOOK.contactShadow) scene.add(contactBlob());
