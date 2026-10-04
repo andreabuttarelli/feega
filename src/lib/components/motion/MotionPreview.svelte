@@ -2,7 +2,7 @@
   import { onMount, type Snippet } from 'svelte';
   import { FPS } from '$lib/motion/design';
   import { CAPTURE_REPLY, FrameFormat, type CaptureReply, type ClipError } from '$lib/motion/hyperframes/capture';
-  import { previewDriver, type ShotRequest } from '$lib/motion/hyperframes/preview-driver';
+  import { Playback, previewDriver, type ShotRequest } from '$lib/motion/hyperframes/preview-driver';
 
   type Player = HTMLElement & { seek: (t: number) => void; play: () => void; pause: () => void; currentTime: number; iframeElement: HTMLIFrameElement };
 
@@ -53,6 +53,7 @@
       el.addEventListener('ready', () => {
         ready = true;
         el.seek(frame / fps);
+        driver.ready();
       });
       el.addEventListener('timeupdate', (e) => {
         if (!playing) {
@@ -79,6 +80,8 @@
   const driver = previewDriver({
     load: setSource,
     seek: (t) => player?.seek(t),
+    play: () => player?.play(),
+    pause: () => player?.pause(),
     post: (message) => {
       const target = player?.iframeElement?.contentWindow;
       if (!target) {
@@ -173,14 +176,7 @@
   });
 
   $effect(() => {
-    if (!player || !ready) {
-      return;
-    }
-    if (playing) {
-      player.play();
-    } else {
-      player.pause();
-    }
+    driver.playback(playing ? Playback.Playing : Playback.Paused);
   });
 </script>
 
