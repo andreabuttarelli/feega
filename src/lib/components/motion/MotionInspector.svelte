@@ -1,6 +1,7 @@
 <script lang="ts">
   import { setMotionPath } from '$lib/motion/path-ops';
   import { duckUnder, voicesOver } from '$lib/motion/duck';
+  import type { AudioAnalysis } from '$lib/motion/audio-analysis';
   import { BRAND_COLORS, COMPONENTS, Control, TrackKind, type AssetKind } from '$lib/motion/components';
   import { DEPTH, Space } from '$lib/motion/camera';
   import { setClipDepth } from '$lib/motion/camera-ops';
@@ -40,6 +41,7 @@
 
   let {
     doc,
+    analyses = {},
     clip,
     tokens,
     assets,
@@ -51,6 +53,7 @@
     onuploadfont
   }: {
     doc: MotionDoc;
+    analyses?: Record<string, AudioAnalysis>;
     clip: MotionClip;
     tokens: BrandTokens;
     assets: Asset[];
@@ -69,6 +72,12 @@
   let error = $state('');
   const voices = $derived(voicesOver(doc, clip.id));
   let voice = $state('');
+
+  function duck() {
+    const voiceId = voices.includes(voice) ? voice : voices[0];
+    const assetId = String(findClip(doc, voiceId)?.clip.props.assetId ?? '');
+    commit(duckUnder(doc, clip.id, voiceId, analyses[assetId]?.speech ?? null), 'Ducked the music');
+  }
 
   const groups = $derived(clipFieldGroups(doc, clip));
   const animated = $derived(withParams(doc, clip));
@@ -303,7 +312,7 @@
         <select aria-label="Voice-over" value={voice || voices[0]} onchange={(e) => (voice = e.currentTarget.value)}>
           {#each voices as id (id)}<option value={id}>{clipName(id)}</option>{/each}
         </select>
-        <button type="button" data-testid="duck" onclick={() => commit(duckUnder(doc, clip.id, voices.includes(voice) ? voice : voices[0], null), 'Ducked the music')}>Duck under voice-over</button>
+        <button type="button" data-testid="duck" onclick={duck}>Duck under voice-over</button>
       </div>
     </section>
   {/if}

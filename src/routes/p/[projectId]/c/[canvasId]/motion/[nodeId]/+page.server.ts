@@ -15,6 +15,7 @@ import { saveExport } from '$lib/server/motion/export';
 import { Sound, generateSound } from '$lib/server/motion/voiceover';
 import { withOrgContext } from '$lib/server/ai-log';
 import { saveFontUpload } from '$lib/server/motion/font-upload';
+import { analyzeSounds, storageAnalysis } from '$lib/server/motion/audio-analysis';
 
 const HTTP_CONFLICT = 409;
 const HTTP_BAD_REQUEST = 400;
@@ -122,6 +123,14 @@ export const actions: Actions = {
     }
     const assets = await motionAssets({ db: scope.db, orgId: scope.orgId, projectId: params.projectId, canvasId: scope.canvas.id, nodeId: scope.motion.record.id });
     return { asset: assets.find((a) => a.id === saved.assetId) ?? null };
+  },
+
+  analyze: async ({ locals, params, request }) => {
+    const scope = await scopeFor(locals, params);
+    const form = await request.formData();
+    const ids = form.getAll('assetId').map(String);
+    const assets = await motionAssets({ db: scope.db, orgId: scope.orgId, projectId: params.projectId, canvasId: scope.canvas.id, nodeId: scope.motion.record.id });
+    return { analyses: await analyzeSounds(storageAnalysis(scope.db), { orgId: scope.orgId, projectId: params.projectId }, assets, ids) };
   },
 
   sound: async ({ locals, params, request }) => {

@@ -54,6 +54,7 @@ import { MODIFIERS, MODIFIER_KINDS } from '$lib/motion/shape/modifiers';
 import { addModifier, morphTo, removeModifier, setModifier, setPath } from '$lib/motion/shape/ops';
 import { SHAPE_KINDS, modifierKey } from '$lib/motion/shape/schema';
 import { DUCK_DEFAULTS, duckUnder } from '$lib/motion/duck';
+import type { AudioAnalysis } from '$lib/motion/audio-analysis';
 
 export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number };
 
@@ -70,6 +71,7 @@ export type MotionToolDeps = {
   voiceover: (input: { text: string; voiceId?: string }) => Promise<Voiceover>;
   frames: (callId: string, times: number[]) => Promise<Frame[] | null>;
   check: (callId: string, doc: MotionDoc, name: string) => Promise<CheckResult | null>;
+  analysis?: (assetId: string) => Promise<AudioAnalysis | null>;
 };
 
 const framesAt = (s: number, fps: number) => Math.round(s * fps);
@@ -252,6 +254,13 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     session.frames.set(callId, check.frames);
     const shown = check.frames.length ? ' The two frames that should be identical follow as images.' : '';
     return { ok: false, error: `${name} v${version} is saved but failed the seek-determinism check, so it cannot be exported:\n- ${check.problems.join('\n- ')}\nFix it with patch_component: build every change on tl from props and time only.${shown}` };
+  }
+
+  const analysisOf = (assetId: string) => (deps.analysis ? deps.analysis(assetId) : Promise.resolve(null));
+
+  async function speechOf(clipId: string) {
+    const assetId = findClip(session.doc, clipId)?.clip.props.assetId;
+    return typeof assetId === 'string' ? ((await analysisOf(assetId))?.speech ?? null) : null;
   }
 
   const assetKnown = (id: unknown) => typeof id !== 'string' || deps.assets.some((a) => a.id === id);
@@ -479,8 +488,22 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       execute: async (input) => apply(setPathTangent(session.doc, input.clip_id, { frame: frames(input.time), in: input.in ?? [0, 0], out: input.out ?? [0, 0] }), `bent the path of ${input.clip_id}`)
     }),
 
+    analyze_audio: tool({
+      description:
+        'Analyse an audio or video asset (from list_assets): tempo in BPM, beat grid and onsets (seconds in the file), speech regions (seconds in the file). Map file seconds to the timeline through the clip: timeline = clip start + (file time - clip trimStart). Expressions read it per frame with audio.amp/beat/onset.',
+      inputSchema: z.object({ asset_id: z.string() }),
+      execute: async (input) => {
+        const analysis = await analysisOf(input.asset_id);
+        if (!analysis) {
+          return { ok: false, error: `no analysis for ${input.asset_id}: it must be an audio or video asset with a file` };
+        }
+        const { duration, bpm, beats, onsets, speech } = analysis;
+        return { ok: true, duration, bpm, beats, onsets, speech };
+      }
+    }),
+
     duck_audio: tool({
-      description: `Duck music under a voice-over: writes volume keyframes on the music clip so it drops while the voice speaks and comes back after. depth is the music level under the voice as a fraction of its volume (default ${DUCK_DEFAULTS.depth}); attack/release in seconds (default ${DUCK_DEFAULTS.attack}/${DUCK_DEFAULTS.release}). Replaces the music's volume keyframes. Volume and pan of Audio/Video clips animate with set_keyframes too.`,
+      description: `Duck music under a voice-over: writes volume keyframes on the music clip so it drops while the voice speaks (its analysed speech regions, or the whole clip) and comes back after. depth is the music level under the voice as a fraction of its volume (default ${DUCK_DEFAULTS.depth}); attack/release in seconds (default ${DUCK_DEFAULTS.attack}/${DUCK_DEFAULTS.release}). Replaces the music's volume keyframes. Volume and pan of Audio/Video clips animate with set_keyframes too.`,
       inputSchema: z.object({
         music_clip_id: z.string(),
         voice_clip_id: z.string(),
@@ -489,7 +512,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         release: z.number().min(0).max(4).optional()
       }),
       execute: async (input) =>
-        apply(duckUnder(session.doc, input.music_clip_id, input.voice_clip_id, null, { depth: input.depth, attack: input.attack, release: input.release }), `ducked ${input.music_clip_id} under ${input.voice_clip_id}`)
+        apply(duckUnder(session.doc, input.music_clip_id, input.voice_clip_id, await speechOf(input.voice_clip_id), { depth: input.depth, attack: input.attack, release: input.release }), `ducked ${input.music_clip_id} under ${input.voice_clip_id}`)
     }),
 
     remove_keyframes: tool({

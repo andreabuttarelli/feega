@@ -16,6 +16,7 @@ import { ModerationProfile } from '$lib/server/moderation/profiles';
 import { blockedPrompt } from '$lib/server/moderation/blocked-response';
 import { headOrNew, motionAssets, motionTokens, saveMotionDoc } from '$lib/server/motion/editor';
 import { createMotionTools, selectionNote, type MotionSession } from '$lib/server/motion/motion-tools';
+import { analyzeSounds, storageAnalysis } from '$lib/server/motion/audio-analysis';
 import { motionAgentPrompt } from '$lib/server/motion/motion-prompt';
 import { speakVoiceover } from '$lib/server/motion/voiceover';
 import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
@@ -105,6 +106,7 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
     session,
     assets,
     newId: () => crypto.randomUUID().slice(0, 8),
+    analysis: async (assetId) => (await analyzeSounds(storageAnalysis(db), { orgId, projectId: project.id }, assets, [assetId]))[assetId] ?? null,
     voiceover: (input) => withOrgContext(orgId, () => speakVoiceover(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId: user.id, actor }, input)),
     frames: async (callId, times) => {
       const review = await screenModelInput(db, { profile: ModerationProfile.Standard, texts: docTexts(session.doc), scope: moderationScope });
