@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Ease } from './design';
 import { Interp } from './keyframes';
+import { EasePreset } from './graph';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
 import {
   Direction,
@@ -14,6 +15,9 @@ import {
   removeKeyframes,
   setKeyEase,
   setKeyInterp,
+  applyEasePreset,
+  copyEase,
+  pasteEase,
   setKeyframe,
   setKeyframes,
   setTransform,
@@ -209,5 +213,31 @@ describe('interpolation of selected keyframes', () => {
     const held = must(setKeyInterp(keyed, refs, { out: Interp.Auto }));
     const pasted = must(pasteKeyframes(held, 't', copyKeyframes(held, refs), 70));
     expect(track(pasted).find((k) => k.frame === 70)?.out).toBe(Interp.Auto);
+  });
+});
+
+describe('ease presets and the ease clipboard', () => {
+  const at = (frame: number) => ({ clipId: 't', prop: 'rotateY', frame });
+  const track = (doc: MotionDoc) => findClip(doc, 't')!.clip.keyframes.rotateY;
+
+  it('easy ease on a keyframe flattens both sides of it: its own leaving half and the entering half before it', () => {
+    const eased = must(applyEasePreset(keyed, [at(30)], EasePreset.EasyEase));
+    const [first, middle] = track(eased);
+    expect((first.ease as number[]).slice(2)).toEqual([2 / 3, 1]);
+    expect((middle.ease as number[]).slice(0, 2)).toEqual([1 / 3, 0]);
+  });
+
+  it('an Apple curve replaces the segment leaving the keyframe and turns it back to bezier', () => {
+    const held = must(setKeyInterp(keyed, [at(0)], { out: Interp.Hold }));
+    const eased = must(applyEasePreset(held, [at(0)], EasePreset.AppleEaseInOut));
+    expect(track(eased)[0]).toEqual({ frame: 0, value: 0, ease: [0.42, 0, 0.58, 1] });
+  });
+
+  it('a copied ease pastes onto every selected keyframe with its interpolation', () => {
+    const source = must(setKeyInterp(must(applyEasePreset(keyed, [at(0)], EasePreset.AppleEaseOut)), [at(0)], { in: Interp.Linear }));
+    const board = copyEase(source, at(0))!;
+    const pasted = must(pasteEase(source, [at(30), at(60)], board));
+    expect(track(pasted)[1]).toMatchObject({ ease: [0, 0, 0.58, 1], in: Interp.Linear });
+    expect(track(pasted)[2]).toMatchObject({ ease: [0, 0, 0.58, 1], in: Interp.Linear });
   });
 });

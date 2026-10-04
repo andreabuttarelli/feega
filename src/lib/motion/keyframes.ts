@@ -233,6 +233,14 @@ function interpProblem(prop: AnimProp, track: readonly Keyframe[]): string | nul
   return prop.kind === ValueKind.Color && smooth ? `${prop.key}: a colour keyframe takes ${COLOUR_INTERPS.join(', ')} interpolation` : null;
 }
 
+export const EASE_BEZIER: Record<Ease, Bezier> = {
+  [Ease.Standard]: [0.165, 0.84, 0.44, 1],
+  [Ease.Enter]: [0.215, 0.61, 0.355, 1],
+  [Ease.Exit]: [0.55, 0.055, 0.675, 0.19],
+  [Ease.Linear]: [1 / 3, 1 / 3, 2 / 3, 2 / 3],
+  [Ease.Overshoot]: [0.175, 0.885, 0.32, 1.275]
+};
+
 export const GSAP_EASE: Record<Ease, string> = {
   [Ease.Standard]: 'power3.out',
   [Ease.Enter]: 'power2.out',

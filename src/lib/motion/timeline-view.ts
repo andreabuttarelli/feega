@@ -2,7 +2,11 @@ import type { AnimProp } from './keyframes';
 import { FPS } from './design';
 import { snapFrame, snapTargets } from './timeline';
 import type { MotionClip, MotionDoc } from './doc';
-import { ANIMATABLE, Source, sampleTrack, type EaseSpec } from './keyframes';
+import { ANIMATABLE, Source, sampleTrack, type EaseSpec, type Keyframe } from './keyframes';
+import { CAMERA_LANE } from './camera';
+import { cameraLanes } from './camera-ops';
+import { withParams } from './custom/params';
+import type { KeyRef } from './timeline';
 
 export const ZOOM_MIN = 0.5;
 export const ZOOM_MAX = 16;
@@ -122,4 +126,20 @@ export function easePath(ease: EaseSpec, size: number): string {
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+export type GraphLane = { clipId: string; prop: string; label: string; from: number; track: Keyframe[] };
+
+export function graphLanes(doc: MotionDoc, selection: readonly string[], keySelection: readonly KeyRef[], camera: boolean): GraphLane[] {
+  const cameraOwned: GraphLane[] = cameraLanes(doc.camera).map((l) => ({ clipId: CAMERA_LANE, prop: l.prop, label: `Camera · ${l.label}`, from: 0, track: doc.camera!.keyframes[l.prop]! }));
+  const clipOwned: GraphLane[] = doc.tracks
+    .flatMap((t) => t.clips)
+    .flatMap((c) => keyLanes(withParams(doc, c)).map((l) => ({ clipId: c.id, prop: l.prop, label: l.label, from: c.from, track: c.keyframes[l.prop] })));
+  const numeric = [...cameraOwned, ...clipOwned].filter((l) => typeof l.track[0]?.value === 'number');
+
+  const picked = new Set(keySelection.map((r) => `${r.clipId} ${r.prop}`));
+  if (picked.size) {
+    return numeric.filter((l) => picked.has(`${l.clipId} ${l.prop}`));
+  }
+  return numeric.filter((l) => selection.includes(l.clipId) || (camera && l.clipId === CAMERA_LANE));
 }

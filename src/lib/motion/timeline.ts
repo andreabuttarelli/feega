@@ -8,6 +8,7 @@ import { Matte, isMaskKey, maskSchema, type MaskInput } from './mask';
 import { matteMask, matteSource } from './matte';
 import { CAMERA_LANE, type CameraKey } from './camera';
 import { editCameraLane } from './camera-ops';
+import { Around, EASE_PRESETS, Half, presetEase, withHalf, type EasePreset } from './graph';
 import { Interp, keyframesProblem, transformSchema, type EaseSpec, type KeyValue, type Keyframe, type Keyframes, type Transform } from './keyframes';
 
 export type OpResult = { ok: true; doc: MotionDoc } | { ok: false; error: string };
@@ -393,6 +394,41 @@ export function shaped(key: Keyframe, shape: KeyShape): Keyframe {
 
 export function setKeyInterp(doc: MotionDoc, refs: readonly KeyRef[], shape: KeyShape): OpResult {
   return editRefs(doc, refs, (track, frames) => track.map((k) => (frames.includes(k.frame) ? shaped(k, shape) : k)));
+}
+
+export type EaseBoard = { ease: EaseSpec } & KeyShape;
+
+function keyOf(doc: MotionDoc, ref: KeyRef): Keyframe | undefined {
+  const lanes: Partial<Record<string, Keyframe[]>> | undefined = ref.clipId === CAMERA_LANE ? doc.camera?.keyframes : findClip(doc, ref.clipId)?.clip.keyframes;
+  return lanes?.[ref.prop]?.find((k) => k.frame === ref.frame);
+}
+
+export function copyEase(doc: MotionDoc, ref: KeyRef): EaseBoard | null {
+  const key = keyOf(doc, ref);
+  return key ? { ease: key.ease, in: key.in, out: key.out } : null;
+}
+
+export function pasteEase(doc: MotionDoc, refs: readonly KeyRef[], board: EaseBoard): OpResult {
+  return editRefs(doc, refs, (track, frames) => track.map((k) => (frames.includes(k.frame) ? shaped({ ...k, ease: board.ease }, { in: board.in, out: board.out }) : k)));
+}
+
+const PRESET_AROUND: Record<Around, (track: Keyframe[], picked: (i: number) => boolean, preset: EasePreset) => Keyframe[]> = {
+  [Around.Segment]: (track, picked, preset) => track.map((k, i) => (picked(i) ? shaped({ ...k, ease: presetEase(preset, k.ease) }, { out: Interp.Bezier }) : k)),
+  [Around.Keyframe]: (track, picked, preset) => {
+    const { halves, bezier } = EASE_PRESETS[preset];
+    const leaving = halves.includes(Half.Leaving);
+    const entering = halves.includes(Half.Entering);
+    return track.map((k, i) => {
+      const own = leaving && picked(i);
+      const before = entering && picked(i + 1);
+      const ease = [own ? Half.Leaving : null, before ? Half.Entering : null].reduce<EaseSpec>((e, half) => (half ? withHalf(half, e, bezier) : e), k.ease);
+      return shaped({ ...k, ease }, { ...(own ? { out: Interp.Bezier } : {}), ...(entering && picked(i) ? { in: Interp.Bezier } : {}) });
+    });
+  }
+};
+
+export function applyEasePreset(doc: MotionDoc, refs: readonly KeyRef[], preset: EasePreset): OpResult {
+  return editRefs(doc, refs, (track, frames) => PRESET_AROUND[EASE_PRESETS[preset].around](track, (i) => i < track.length && frames.includes(track[i]?.frame), preset));
 }
 
 export function copyKeyframes(doc: MotionDoc, refs: readonly KeyRef[]): KeyBoard {

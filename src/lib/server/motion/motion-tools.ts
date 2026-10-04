@@ -5,9 +5,10 @@ import { fieldsOf } from '$lib/motion/inspector';
 import { Ease, FRAME_RATES, MAX_SECONDS, TRANSITION_KINDS } from '$lib/motion/design';
 import { setFrameRate } from '$lib/motion/frame-rate';
 import { Background, MOTION_FORMATS, findClip, type MotionDoc } from '$lib/motion/doc';
-import { ClipEdge, Side, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyInterp, setKeyframes, setMask, shaped, setProps, setTiming, setTrackMatte, setTransform, setTransition, trimClip, type OpResult } from '$lib/motion/timeline';
+import { ClipEdge, Side, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyInterp, setKeyframes, setMask, shaped, setProps, setTiming, setTrackMatte, setTransform, setTransition, trimClip, applyEasePreset, setKeyEase, type OpResult } from '$lib/motion/timeline';
 import { MASK_KEYS, MASK_KIND_IDS, MATTES } from '$lib/motion/mask';
-import { ANIMATABLE, INTERPS, SPATIAL_KEYS, TRANSFORM_KEYS, ValueKind, easeSchema, transformSchema, type Keyframe } from '$lib/motion/keyframes';
+import { EASE_PRESETS, EASE_PRESET_IDS, easeHandles, withHandles } from '$lib/motion/graph';
+import { ANIMATABLE, INTERPS, Interp, SPATIAL_KEYS, TRANSFORM_KEYS, ValueKind, easeSchema, transformSchema, type Keyframe } from '$lib/motion/keyframes';
 import type { MotionAsset } from './editor';
 import { MAX_FRAMES_PER_VIEW, MAX_VIEWS_PER_TURN, VIEW_FRAMES, type Frame } from './frames';
 import { CheckState, MAX_CSS, MAX_HTML, MAX_JS, SOURCE_FILES, checkState, propsSchemaSchema, sourceHash, type CustomComponent } from '$lib/motion/custom/component';
@@ -341,6 +342,52 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const picked = input.times ? input.times.map(frames) : track.map((k) => k.frame);
         const refs = picked.map((frame) => ({ clipId: input.clip_id, prop: input.prop, frame }));
         return apply(setKeyInterp(session.doc, refs, { in: input.in, out: input.out, roving: input.roving }), `interpolation of ${input.prop} on ${input.clip_id}`);
+      }
+    }),
+
+    apply_ease_preset: tool({
+      description: `Apply an ease preset to keyframes of one prop (all, or those at the given times in seconds from the clip start). ${EASE_PRESET_IDS.map((p) => `${p}: ${EASE_PRESETS[p].label}`).join('; ')}. Easy ease presets work around the keyframe (the segment before and after it), Apple presets replace the segment leaving it.`,
+      inputSchema: z.object({ clip_id: z.string(), prop: z.string(), times: z.array(z.number().min(0)).optional(), preset: z.enum(EASE_PRESET_IDS) }),
+      execute: async (input) => {
+        const track = findClip(session.doc, input.clip_id)?.clip.keyframes[input.prop] ?? [];
+        const picked = input.times ? input.times.map(frames) : track.map((k) => k.frame);
+        const refs = picked.map((frame) => ({ clipId: input.clip_id, prop: input.prop, frame }));
+        return apply(applyEasePreset(session.doc, refs, input.preset), `${input.preset} on ${input.prop}`);
+      }
+    }),
+
+    set_ease_handles: tool({
+      description:
+        'Shape the segment leaving the keyframe at time (seconds from the clip start), like dragging the bezier handles in a graph editor: influence 0..100 (% of the segment the handle reaches), speed in prop units per second (0 = eased to a stop). Values not given are kept.',
+      inputSchema: z.object({
+        clip_id: z.string(),
+        prop: z.string(),
+        time: z.number().min(0),
+        out_influence: z.number().min(0).max(100).optional(),
+        out_speed: z.number().optional(),
+        in_influence: z.number().min(0).max(100).optional(),
+        in_speed: z.number().optional()
+      }),
+      execute: async (input) => {
+        const track = findClip(session.doc, input.clip_id)?.clip.keyframes[input.prop] ?? [];
+        const at = track.findIndex((k) => k.frame === frames(input.time));
+        if (at < 0 || at === track.length - 1) {
+          return { ok: false, error: `no segment leaves a ${input.prop} keyframe at ${input.time}s: keyframes are at ${track.map((k) => secondsAt(k.frame, session.doc.fps)).join(', ')}s` };
+        }
+        const [a, b] = [track[at], track[at + 1]];
+        const h = easeHandles(a, b, session.doc.fps);
+        const percent = (n: number | undefined, fallback: number) => (n === undefined ? fallback : n / 100);
+        const ease = withHandles(
+          { outInfluence: percent(input.out_influence, h.outInfluence), outSpeed: input.out_speed ?? h.outSpeed, inInfluence: percent(input.in_influence, h.inInfluence), inSpeed: input.in_speed ?? h.inSpeed },
+          a,
+          b,
+          session.doc.fps
+        );
+        const ref = { clipId: input.clip_id, prop: input.prop, frame: a.frame };
+        const eased = setKeyEase(session.doc, ref, ease);
+        const out = eased.ok ? setKeyInterp(eased.doc, [ref], { out: Interp.Bezier }) : eased;
+        const both = out.ok ? setKeyInterp(out.doc, [{ ...ref, frame: b.frame }], { in: Interp.Bezier }) : out;
+        return apply(both, `shaped the ease of ${input.prop}`);
       }
     }),
 
