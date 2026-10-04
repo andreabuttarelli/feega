@@ -2320,3 +2320,11 @@ the three.js scene redrew from a `tl.to({}, { onUpdate })`. Move: drive any per-
 renderer through `seekDriver` (`hyperframes/stage.ts`, a GSAP render plugin); to probe a
 standalone composition, seek with `window.__player.renderSeek(t)`, not `tl.totalTime`, or clips
 past their start never become visible.
+
+## A picture is a broken icon only in the server-rendered MP4
+Signal: the preview and the browser export show an Image clip; the Vercel Sandbox MP4 shows a
+broken-image box, while a GLB from the same signed host loads. Cause: the HyperFrames producer
+downloads every remote `<img>`/`<video>`/`<audio>` src and rewrites it to `_remote_media/…` on its
+own file server; the composition CSP allowed images only from the asset origin. Move: `img-src`
+and `media-src` carry `'self'` (`hyperframes/csp.ts`); anything the producer localizes must be
+allowed from the page origin.

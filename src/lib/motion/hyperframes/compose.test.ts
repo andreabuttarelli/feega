@@ -293,8 +293,15 @@ describe('custom components in the composition', () => {
     const connect = policy.split('; ').find((d) => d.startsWith('connect-src'));
 
     expect(policy).toContain("default-src 'none'");
-    expect(policy).toContain('img-src data: blob: https://store.supabase.co');
+    expect(policy).toContain("img-src 'self' data: blob: https://store.supabase.co");
     expect(policy).not.toContain('unsafe-eval');
     expect(connect).toBe('connect-src data: blob: https://fonts.googleapis.com https://fonts.gstatic.com https://store.supabase.co');
+  });
+
+  it('lets a picture or clip load from the page origin, where the server renderer moves remote media', () => {
+    const policy = (/http-equiv="Content-Security-Policy" content="([^"]+)"/.exec(html)?.[1] ?? '').replace(/&#39;/g, "'");
+
+    expect(policy).toContain("img-src 'self' data: blob:");
+    expect(policy).toContain("media-src 'self' data: blob:");
   });
 });
