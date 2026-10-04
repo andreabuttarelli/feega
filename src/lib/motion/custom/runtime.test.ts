@@ -1,15 +1,14 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
-import gsap from 'gsap';
+import { installEngine, testTimeline, type TestTimeline } from '../engine/testing';
 import { ERRORS, REGISTRY, bootScript, definitionScript, librariesOf, Library, seedOf, type CustomRun } from './runtime';
 
 const ENV = { assets: {}, brand: { name: 'feega', colors: { accent: '#0099ff' }, logoUrl: null } };
 
-function run(name: string, js: string, at = 1, length = 2): { master: gsap.core.Timeline; errors: { message: string }[]; root: HTMLElement } {
+function run(name: string, js: string, at = 1, length = 2): { master: TestTimeline; errors: { message: string }[]; root: HTMLElement } {
   document.body.innerHTML = `<div id="cc-c1"><div class="dot"></div></div>`;
   const w = window as unknown as Record<string, unknown>;
-  w.gsap = gsap;
-  const master = gsap.timeline({ paused: true });
+  const master = testTimeline(installEngine());
   w.__master = master;
   const runs: CustomRun[] = [{ id: 'c1', name, start: at, length, fps: 30, values: { label: 'Hi' }, seed: seedOf('c1') }];
   const definition = definitionScript(name, js).replace(/^<script>|<\/script>$/g, '');
@@ -75,8 +74,9 @@ describe('callbacks under the HyperFrames seek', () => {
 
 describe('libraries', () => {
   it('loads only the libraries the used code names', () => {
-    const components = { A: { source: { html: '', css: '', js: 'new SplitText(root)' } }, B: { source: { html: '', css: '', js: 'lottie.loadAnimation({})' } } } as never;
+    const components = { A: { source: { html: '', css: '', js: 'motion.split(root)' } }, B: { source: { html: '', css: '', js: 'lottie.loadAnimation({})' } } } as never;
 
-    expect([...librariesOf(components, ['A'])]).toEqual([Library.SplitText]);
+    expect([...librariesOf(components, ['A'])]).toEqual([]);
+    expect([...librariesOf(components, ['B'])]).toEqual([Library.Lottie]);
   });
 });

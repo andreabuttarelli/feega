@@ -1,14 +1,14 @@
 import type { MotionBlur } from '../motion-blur';
 import { js } from './html';
+import { ENGINE_GLOBAL } from '../engine/engine';
 
 type Tweenish = { vars: { ease?: unknown }; targets: () => unknown[]; startTime: () => number; duration: () => number; parent: Tweenish | null; invalidate: () => void };
 type Timelineish = Tweenish & { getChildren: (nested: boolean, tweens: boolean, timelines: boolean) => Tweenish[] };
-type Gsapish = { parseEase: (ease: unknown) => (p: number) => number };
+type Easing = { parseEase: (ease: unknown) => (p: number) => number };
 
 export const HELD = 'data-blur="off"';
 
-export function holdStill(tl: Timelineish, isHeld: (target: never) => boolean, fps: number, blur: Pick<MotionBlur, 'shutterAngle' | 'shutterPhase'>, gsapLib?: Gsapish): void {
-  const lib = gsapLib ?? (globalThis as unknown as { gsap: Gsapish }).gsap;
+export function holdStill(tl: Timelineish, isHeld: (target: never) => boolean, fps: number, blur: Pick<MotionBlur, 'shutterAngle' | 'shutterPhase'>, engine: Easing): void {
   const centre = (blur.shutterPhase + blur.shutterAngle / 2) / 360;
   const frameTime = (t: number) => Math.max(0, Math.round(t * fps - centre)) / fps;
   const globalStart = (t: Tweenish) => {
@@ -26,7 +26,7 @@ export function holdStill(tl: Timelineish, isHeld: (target: never) => boolean, f
       continue;
     }
     const start = globalStart(tween);
-    const eased = lib.parseEase(tween.vars.ease ?? 'power1.out');
+    const eased = engine.parseEase(tween.vars.ease ?? 'power1.out');
     tween.vars.ease = (p: number) => eased(Math.min(1, Math.max(0, (frameTime(start + p * duration) - start) / duration)));
     tween.invalidate();
   }
@@ -34,5 +34,5 @@ export function holdStill(tl: Timelineish, isHeld: (target: never) => boolean, f
 
 export function holdScript(fps: number, blur: Pick<MotionBlur, 'shutterAngle' | 'shutterPhase'>): string {
   const held = `function(el){return Boolean(el&&el.closest&&el.closest('[${HELD}]'));}`;
-  return `(${holdStill.toString()})(tl,${held},${fps},${js({ shutterAngle: blur.shutterAngle, shutterPhase: blur.shutterPhase })});`;
+  return `(${holdStill.toString()})(tl,${held},${fps},${js({ shutterAngle: blur.shutterAngle, shutterPhase: blur.shutterPhase })},window.${ENGINE_GLOBAL});`;
 }

@@ -5,6 +5,7 @@ import { hdriUrl, type Look } from '../look';
 import { SURFACE, type Material, type Surface } from '../materials';
 import { cameraRuntime, seekDriver } from './stage';
 import { DEVICE_SCRIPT, type DeviceRuntime } from './device-runtime';
+import { ENGINE_GLOBAL } from '../engine/engine';
 
 export const THREE_VERSION = '0.181.2';
 export const THREE_TIMELINE = 'feegaThree';
@@ -386,7 +387,7 @@ const scenes = CLIPS.map((c) => {
 }).filter(Boolean);
 
 function legacyOrbit(c, local) {
-  const t = window.gsap ? window.gsap.parseEase(c.ease)(c.length > 0 ? local / c.length : 1) : local / c.length;
+  const t = window.${ENGINE_GLOBAL}.parseEase(c.ease)(c.length > 0 ? local / c.length : 1);
   return c.startAngle + (c.endAngle - c.startAngle) * t + c.orbitSpeed * local;
 }
 
@@ -445,7 +446,6 @@ window.__hf.buildReady = window.__hf.buildReady || {};
 window.__hf.buildReady['motion-three'] = Promise.all(scenes.map((x) => x.ready)).then(() => renderAt(window.__hfThreeTime || 0));
 window.addEventListener('hf-seek', (e) => renderAt(e.detail.time));
 const tl = window.__timelines && window.__timelines.main;
-const gsap = window.gsap;
 DRIVER
 renderAt(window.__hfThreeTime || 0);
 `;

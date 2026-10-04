@@ -1,6 +1,7 @@
 import { contentStamp } from '../stamp';
 import { js } from '../hyperframes/html';
 import type { CustomComponents } from './component';
+import { ENGINE_GLOBAL } from '../engine/engine';
 
 export const REGISTRY = '__feegaComponents';
 export const ERRORS = '__feegaErrors';
@@ -41,13 +42,11 @@ export const SHADOWED = [
 ] as const;
 
 export enum Library {
-  SplitText = 'SplitText',
   Lottie = 'lottie',
   Three = 'THREE'
 }
 
 const USES: Record<Library, RegExp> = {
-  [Library.SplitText]: /\bSplitText\b/,
   [Library.Lottie]: /\blottie\b/,
   [Library.Three]: /\bTHREE\b/
 };
@@ -68,17 +67,17 @@ export function seedOf(clipId: string): number {
 
 export function definitionScript(name: string, code: string): string {
   const body = code.replace(/<\/(script)/gi, '<\\/$1');
-  return `<script>(window.${REGISTRY}=window.${REGISTRY}||{})[${js(name)}]=function(ctx,${SHADOWED.join(',')}){"use strict";const {root,props,tl,duration,fps,assets,brand,rand,param,gsap,SplitText,lottie,THREE}=ctx;\n${body}\n};</script>`;
+  return `<script>(window.${REGISTRY}=window.${REGISTRY}||{})[${js(name)}]=function(ctx,${SHADOWED.join(',')}){"use strict";const {root,props,tl,duration,fps,assets,brand,rand,param,motion,gsap,SplitText,lottie,THREE}=ctx;\n${body}\n};</script>`;
 }
 
-type Vars = Record<string, unknown> & { onUpdate?: unknown };
-type Gsap = { timeline: () => Timeline; registerPlugin: (plugin: object) => void; parseEase: (ease: string) => (p: number) => number; utils: { interpolate: (a: unknown, b: unknown, p: number) => unknown } };
-type BootWindow = Window & Record<string, unknown> & { gsap: Gsap };
-type Timeline = { time: () => number; set: (t: object, v: object, at: number) => void; add: (child: Timeline, at: number) => void; fromTo: (t: object, a: object, b: object, at: number) => void };
+type Engine = { timeline: () => Timeline; parseEase: (ease: string) => (p: number) => number; utils: { interpolate: (a: unknown, b: unknown, p: number) => unknown }; split: unknown; SplitText: unknown };
+type BootWindow = Window & Record<string, unknown>;
+type Timeline = { time: () => number; set: (t: object, v: object, at: number) => void; add: (child: object, at: number) => void; fromTo: (t: object, a: object, b: object, at: number) => void; tweenFromTo: (from: number, to: number, vars: object) => object };
 type ClipError = { clip: string; component: string; message: string };
 
-function bootCustom(cfg: { registry: string; errors: string; three: string; shadowed: string[] }, runs: CustomRun[], env: CustomEnv, master: Timeline) {
+function bootCustom(cfg: { registry: string; errors: string; three: string; engine: string; shadowed: string[] }, runs: CustomRun[], env: CustomEnv, master: Timeline) {
   const w = window as unknown as BootWindow;
+  const engine = w[cfg.engine] as Engine;
   const errors = ((w[cfg.errors] as ClipError[] | undefined) ??= []);
   const registry = (w[cfg.registry] ?? {}) as Record<string, (ctx: object, ...shadows: unknown[]) => void>;
   const refuse = (what: string, instead: string) => () => {
@@ -107,41 +106,6 @@ function bootCustom(cfg: { registry: string; errors: string; three: string; shad
     };
   };
 
-  const RENDER = 'feegaRender';
-  w.gsap.registerPlugin({
-    name: RENDER,
-    rawVars: 1,
-    init(this: Record<string, unknown>, _target: object, value: unknown, tween: object) {
-      this.fn = value;
-      this.tween = tween;
-    },
-    render(_ratio: number, data: { fn: (this: object) => void; tween: object }) {
-      data.fn.call(data.tween);
-    }
-  });
-  const lift = (vars: Vars | undefined) => {
-    if (!vars || typeof vars.onUpdate !== 'function') {
-      return vars;
-    }
-    const { onUpdate, ...rest } = vars;
-    return { ...rest, [RENDER]: onUpdate };
-  };
-  const authored = (child: Timeline): Timeline => {
-    const proxy: Timeline = new Proxy(child, {
-      get(target, key) {
-        const value = Reflect.get(target, key) as unknown;
-        if (key === 'to' || key === 'from') {
-          return (t: object, vars: Vars, at?: unknown) => ((target as unknown as Record<string, (...a: unknown[]) => unknown>)[key](t, lift(vars), at), proxy);
-        }
-        if (key === 'fromTo') {
-          return (t: object, from: Vars, to: Vars, at?: unknown) => ((target as unknown as Record<string, (...a: unknown[]) => unknown>).fromTo(t, from, lift(to), at), proxy);
-        }
-        return typeof value === 'function' ? (value as (...a: unknown[]) => unknown).bind(target) : value;
-      }
-    });
-    return proxy;
-  };
-
   addEventListener('error', (e) => errors.push({ clip: '', component: '', message: String((e as ErrorEvent).message ?? e) }));
 
   for (const run of runs) {
@@ -151,7 +115,7 @@ function bootCustom(cfg: { registry: string; errors: string; three: string; shad
       errors.push({ clip: run.id, component: run.name, message: 'the component code did not load (syntax error?)' });
       continue;
     }
-    const child = w.gsap.timeline();
+    const child = engine.timeline();
     const values = { ...run.values };
     const cssVar = (key: string) => `--param-${key}`;
     for (const [key, value] of Object.entries(values)) {
@@ -168,7 +132,7 @@ function bootCustom(cfg: { registry: string; errors: string; three: string; shad
       }
       const a = track[next - 1];
       const b = track[next];
-      return w.gsap.utils.interpolate(a.value, b.value, w.gsap.parseEase(a.ease)((t - a.at) / (b.at - a.at)));
+      return engine.utils.interpolate(a.value, b.value, engine.parseEase(a.ease)((t - a.at) / (b.at - a.at)));
     };
     for (const [key, track] of Object.entries(run.keys ?? {})) {
       Object.defineProperty(values, key, { get: () => sampled(track), enumerable: true });
@@ -183,7 +147,7 @@ function bootCustom(cfg: { registry: string; errors: string; three: string; shad
     const param = (name: string, fallback: unknown) => (name in values ? values[name] : fallback);
     try {
       make(
-        { root, props: values, tl: authored(child), param, duration: run.length, fps: run.fps, assets: env.assets, brand: env.brand, rand: seeded(run.seed), gsap: w.gsap, SplitText: w.SplitText ?? null, lottie: w.lottie ?? null, THREE: w[cfg.three] ?? null },
+        { root, props: values, tl: child, param, duration: run.length, fps: run.fps, assets: env.assets, brand: env.brand, rand: seeded(run.seed), motion: engine, gsap: engine, SplitText: engine.SplitText, lottie: w.lottie ?? null, THREE: w[cfg.three] ?? null },
         ...shadows
       );
     } catch (e) {
@@ -195,7 +159,6 @@ function bootCustom(cfg: { registry: string; errors: string; three: string; shad
       master.add(child, run.start);
       continue;
     }
-    child.paused(true);
     master.add(child.tweenFromTo(trim, trim + run.length, { duration: run.length, ease: 'none', immediateRender: false }), run.start);
   }
 }
@@ -204,6 +167,6 @@ export function bootScript(runs: CustomRun[], env: CustomEnv, master: string): s
   if (!runs.length) {
     return '';
   }
-  const cfg = { registry: REGISTRY, errors: ERRORS, three: THREE_GLOBAL, shadowed: [...SHADOWED] };
+  const cfg = { registry: REGISTRY, errors: ERRORS, three: THREE_GLOBAL, engine: ENGINE_GLOBAL, shadowed: [...SHADOWED] };
   return `(${bootCustom.toString()})(${js(cfg)},${js(runs)},${js(env)},${master});`;
 }

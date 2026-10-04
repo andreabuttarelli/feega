@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import gsap from 'gsap';
+import { installEngine, testTimeline } from '../engine/testing';
 import { Ease } from '../design';
 import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from '../doc';
 import { addClip, setKeyframes, type OpResult } from '../timeline';
@@ -85,7 +85,7 @@ describe('layer effects', () => {
     doc = ok(setKeyframes(doc, 'card', effectKey('a', 'radius'), [{ frame: 0, value: 0, ease: Ease.Linear }, { frame: 30, value: 30, ease: Ease.Linear }]));
     const sets = effectTimeline(clipOf(doc), frame, plain);
     const target = { style: { filter: 'blur(0px)' } };
-    const tl = gsap.timeline({ paused: true });
+    const tl = testTimeline(installEngine());
     for (const s of sets) {
       tl.set(target.style, { filter: String(s.vars.filter) }, s.at);
     }

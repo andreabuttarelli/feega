@@ -63,6 +63,7 @@
 
 - [ ] **Engine licence**: the editor runs on HyperFrames (Apache-2.0). Remotion was tried and removed; if it ever comes back, its company licence is required above 3 employees and server rendering is billed per render (automator pricing). Nothing bought.
 - [ ] **AWS Lambda rendering** (not live): adds AWS as a sub-processor for rendered videos once configured.
+- [x] **GSAP removed (04/10/2026)**: GSAP's Standard "No Charge" licence forbids use in no-code visual animation builders that compete with Webflow, which is what the motion editor is. The editor, the renders and custom components now run on feega's own timeline engine (`src/lib/motion/engine/`); no GSAP file, CDN URL or plugin (SplitText included) is loaded. Do not reintroduce it.
 
 ## Motion 3D look (04/10/2026)
 

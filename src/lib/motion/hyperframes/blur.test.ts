@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import gsap from 'gsap';
+import { installEngine, testTimeline } from '../engine/testing';
 import { DEFAULT_MOTION_BLUR, sampleTimes } from '../motion-blur';
 import { holdStill } from './blur';
 
@@ -9,10 +9,11 @@ const FPS = 30;
 function scene() {
   const sharp = { x: 0, held: true };
   const blurred = { x: 0, held: false };
-  const tl = gsap.timeline({ paused: true });
+  const engine = installEngine();
+  const tl = testTimeline(engine);
   tl.fromTo(sharp, { x: 0 }, { x: 300, duration: 1, ease: 'none' }, 0.5);
   tl.fromTo(blurred, { x: 0 }, { x: 300, duration: 1, ease: 'none' }, 0.5);
-  holdStill(tl as never, ((t: { held?: boolean }) => Boolean(t.held)) as never, FPS, blur, gsap as never);
+  holdStill(tl as never, ((t: { held?: boolean }) => Boolean(t.held)) as never, FPS, blur, engine as never);
   return { tl, sharp, blurred };
 }
 
