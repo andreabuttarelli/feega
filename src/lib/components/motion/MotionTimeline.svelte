@@ -80,9 +80,10 @@
     zoom,
     snap,
     waveforms = {},
+    beats = [],
     assetUrls = {},
     onchange
-  }: { doc: MotionDoc; frame?: number; selection?: string[]; keySelection?: KeyRef[]; camera?: boolean; zoom: number; snap: Snap; waveforms?: Record<string, number[]>; assetUrls?: Record<string, string>; onchange: (doc: MotionDoc, summary: string) => void } = $props();
+  }: { doc: MotionDoc; frame?: number; selection?: string[]; keySelection?: KeyRef[]; camera?: boolean; zoom: number; snap: Snap; waveforms?: Record<string, number[]>; beats?: number[]; assetUrls?: Record<string, string>; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 
   let folded = $state<string[]>([]);
   let solo = $state<string[]>([]);
@@ -270,19 +271,19 @@
     [Drag.Move]: (g, at, e) => {
       const from = g.originFrom + (at - g.grabFrame);
       const clip = g.base.tracks.flatMap((t) => t.clips).find((c) => c.id === g.clipId)!;
-      const start = snapped(g.base, from, { playhead: frame, exclude: [g.clipId], zoom, snap });
-      const endSnap = snapped(g.base, from + clip.durationInFrames, { playhead: frame, exclude: [g.clipId], zoom, snap }) - clip.durationInFrames;
+      const start = snapped(g.base, from, { playhead: frame, exclude: [g.clipId], zoom, snap, beats });
+      const endSnap = snapped(g.base, from + clip.durationInFrames, { playhead: frame, exclude: [g.clipId], zoom, snap, beats }) - clip.durationInFrames;
       const target = start !== from ? start : endSnap;
       const over = trackUnder(e);
       const sameKind = g.base.tracks.find((t) => t.id === over)?.kind === g.base.tracks.find((t) => t.id === g.trackId)?.kind;
       return moveClip(g.base, g.clipId, { from: target, trackId: over && sameKind ? over : undefined });
     },
-    [Drag.TrimStart]: (g, at) => trimClip(g.base, g.clipId, ClipEdge.Start, snapped(g.base, at, { playhead: frame, exclude: [g.clipId], zoom, snap })),
-    [Drag.TrimEnd]: (g, at) => trimClip(g.base, g.clipId, ClipEdge.End, snapped(g.base, at, { playhead: frame, exclude: [g.clipId], zoom, snap })),
+    [Drag.TrimStart]: (g, at) => trimClip(g.base, g.clipId, ClipEdge.Start, snapped(g.base, at, { playhead: frame, exclude: [g.clipId], zoom, snap, beats })),
+    [Drag.TrimEnd]: (g, at) => trimClip(g.base, g.clipId, ClipEdge.End, snapped(g.base, at, { playhead: frame, exclude: [g.clipId], zoom, snap, beats })),
     [Drag.FadeIn]: (g, at) => dragFade(g.base, g.clipId, FadeEdge.In, at),
     [Drag.FadeOut]: (g, at) => dragFade(g.base, g.clipId, FadeEdge.Out, at),
     [Drag.Keys]: (g, at) => {
-      g.delta = snapped(g.base, g.originFrom + (at - g.grabFrame), { playhead: g.originFrom, exclude: [], zoom, snap }) - g.originFrom;
+      g.delta = snapped(g.base, g.originFrom + (at - g.grabFrame), { playhead: g.originFrom, exclude: [], zoom, snap, beats }) - g.originFrom;
       return moveKeyframes(g.base, g.refs, g.delta);
     }
   };
@@ -452,6 +453,7 @@
           {#if tick.label}<em>{tick.label}</em>{/if}
         </span>
       {/each}
+      {#each beats as beat (beat)}<span class="beat" data-beat={beat} style={`left: ${headPx + beat * ppf}px;`}></span>{/each}
     </div>
 
     <div class="lane camera-track" data-camera-track style={`height: ${ROW_PX + 2 * LANE_PAD_PX}px; ${hueOf(ClipFamily.Camera)}`}>
@@ -642,6 +644,16 @@
     background: var(--ui-bg);
     border-right: 1px solid var(--ui-line);
     z-index: 6;
+  }
+
+  .beat {
+    position: absolute;
+    top: 0;
+    width: 2px;
+    height: 6px;
+    margin-left: -1px;
+    background: var(--ui-accent);
+    pointer-events: none;
   }
 
   .tick {

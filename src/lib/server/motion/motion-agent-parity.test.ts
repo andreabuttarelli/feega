@@ -21,7 +21,7 @@ const DOC: Record<string, Access> = {
   look: { write: ['set_look', 'set_light', 'remove_light', 'set_light_keyframes'], read: 'look' },
   fonts: { write: ['set_font', 'register_font', 'remove_font'], read: 'fonts' },
   components: { write: ['write_component', 'patch_component', 'remove_component'], read: 'components' },
-  markers: { write: ['set_marker', 'remove_marker'], read: 'markers' },
+  markers: { write: ['set_marker', 'remove_marker', 'mark_beats'], read: 'markers' },
   workArea: { write: ['set_work_area'], read: 'workArea' }
 };
 
