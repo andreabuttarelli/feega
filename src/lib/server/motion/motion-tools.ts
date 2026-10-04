@@ -31,6 +31,8 @@ import { PATCH_COMPONENT, READ_COMPONENT, WRITE_COMPONENT } from './model-route'
 import { CAMERA, CAMERA_KEYS, SPACES, type Camera } from '$lib/motion/camera';
 import { ENV_PRESETS, HDRI, LIGHT, LIGHT_KEYS, LIGHT_KINDS, type Look } from '$lib/motion/look';
 import { removeLight, removeLook, setLight, setLightKeyframes, setLook } from '$lib/motion/look-ops';
+import { DEVICE, DEVICES } from '$lib/motion/devices';
+import { DEVICE_PRESETS, PRESET as DEVICE_PRESET, addDeviceRow, applyDevicePreset } from '$lib/motion/device-presets';
 import { CAMERA_PRESETS, PRESETS, applyPreset, removeCamera, setCamera, setCameraKeyframes, setClipDepth } from '$lib/motion/camera-ops';
 import { ParentOpacity } from '$lib/motion/parent';
 import { addNull, nullFromSelection, setParent, setParentOpacity } from '$lib/motion/parent-ops';
@@ -533,6 +535,19 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         }
         return apply(setCamera(session.doc, { base: input.values as Partial<Record<(typeof CAMERA_KEYS)[number], number>>, dof: input.dof }), 'set the camera');
       }
+    }),
+
+    apply_device_preset: tool({
+      description: `Animate a Device3D clip with a ready-made move over the clip: ${DEVICE_PRESETS.map((p) => `${p} — ${DEVICE_PRESET[p].about}`).join('; ')}. Replaces the keyframes it sets; presets combine (spin-in then screen-scroll).`,
+      inputSchema: z.object({ clip_id: z.string(), preset: z.enum(DEVICE_PRESETS) }),
+      execute: async (input) => apply(applyDevicePreset(session.doc, input.clip_id, input.preset), `${input.preset} on ${input.clip_id}`)
+    }),
+
+    add_device_row: tool({
+      description: `Add three Device3D clips side by side that enter staggered and turn at different rates (parallax row). device: ${DEVICES.map((d) => `${d} (${DEVICE[d].label})`).join(', ')}. screens: up to three image asset ids, the first fills any missing.`,
+      inputSchema: z.object({ device: z.enum(DEVICES), start: z.number().min(0), duration: z.number().positive(), screens: z.array(z.string()).max(3).default([]) }),
+      execute: async (input) =>
+        apply(addDeviceRow(session.doc, { device: input.device, screens: input.screens ?? [], from: frames(input.start), durationInFrames: frames(input.duration), ids: [deps.newId(), deps.newId(), deps.newId()] }), `a row of ${input.device}`)
     }),
 
     set_look: tool({

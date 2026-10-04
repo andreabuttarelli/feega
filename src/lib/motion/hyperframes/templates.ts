@@ -315,6 +315,18 @@ const Logo3D: Template<'Logo3D'> = {
   }
 };
 
+const DEVICE_VIDEO_STYLE = css({ position: 'absolute', left: '0', top: '0', width: '64px', height: '64px', opacity: '0', pointerEvents: 'none' });
+
+const Device3D: Template<'Device3D'> = {
+  timing: Timing.Wrapper,
+  html: (ctx) => {
+    const backdrop = BACKDROP[ctx.p.backdrop];
+    const video = ctx.asset(ctx.p.screenVideo);
+    const source = video ? `<video id="dv-${ctx.id}" src="${esc(video)}" crossorigin="anonymous" preload="auto" muted playsinline data-start="${ctx.start}" data-duration="${ctx.length}" data-media-start="${ctx.mediaStart}" style="${DEVICE_VIDEO_STYLE}"></video>` : '';
+    return source + threeStage(ctx, ctx.p, backdrop ? ctx.color(backdrop) : null);
+  }
+};
+
 const Composition: Template<'Composition'> = {
   timing: Timing.Wrapper,
   html: (ctx) => {
@@ -362,6 +374,7 @@ export const TEMPLATES: { [K in ComponentId]: Template<K> } = {
   Shape3D,
   Text3D,
   Logo3D,
+  Device3D,
   Composition,
   Custom
 };

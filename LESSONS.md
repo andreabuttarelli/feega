@@ -37,6 +37,14 @@ Un doc costruito a mano con `addClip` si allunga da solo quando una clip arroton
 la fine: 51 frame invece di 50 sembrano un errore del producer. Mossa: stampa `job.totalFrames`
 prima di accusare il render.
 
+### In three.js `envMapIntensity` non conta se c'è `scene.environment`
+Un riflesso additivo sullo schermo dei mockup sbiancava il laptop e abbassare `envMapIntensity`
+non cambiava un pixel. Segnale: un parametro di materiale che «non ha effetto» con un ambiente
+di scena acceso. Mossa: la forza la dà `scene.environmentIntensity` (per tutta la scena) o, per
+un solo materiale, `specularIntensity` di `MeshPhysicalMaterial`. E prima di toccare i
+materiali, togli lo strato sospetto dall'HTML generato e rifai lo snapshot: dice in un minuto
+quale strato è.
+
 ## Ambiente e worktree
 
 ### I tempi di idratazione misurati in dev non dicono niente

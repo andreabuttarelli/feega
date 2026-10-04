@@ -100,7 +100,12 @@ export const SCENE = {
   fov: { label: 'Camera FOV', min: 10, max: 120, step: 1, fallback: 35 }
 } as const satisfies Record<string, Range>;
 
-export type SceneKey = keyof typeof SCENE;
+export const DEVICE_SCENE = {
+  lid: { label: 'Lid open', min: 0, max: 135, step: 1, fallback: 110 },
+  screenScroll: { label: 'Screen scroll', min: 0, max: 1, step: 0.01, fallback: 0 }
+} as const satisfies Record<string, Range>;
+
+export type SceneKey = keyof typeof SCENE | keyof typeof DEVICE_SCENE;
 export const SCENE_KEYS = Object.keys(SCENE) as SceneKey[];
 
 export type AnimProp = { key: string; label: string; kind: ValueKind; source: Source; min: number; max: number; step: number; fallback: number; base?: KeyValue };
@@ -108,7 +113,8 @@ export type AnimProp = { key: string; label: string; kind: ValueKind; source: So
 const ANCHORS: readonly TransformKey[] = ['anchorX', 'anchorY'];
 
 const transformProps: AnimProp[] = TRANSFORM_KEYS.filter((k) => !ANCHORS.includes(k)).map((key) => ({ key, kind: ValueKind.Number, source: Source.Transform, ...TRANSFORM[key] }));
-const sceneProps: AnimProp[] = SCENE_KEYS.map((key) => ({ key, kind: ValueKind.Number, source: Source.Scene, ...SCENE[key] }));
+const sceneProps: AnimProp[] = SCENE_KEYS.map((key) => ({ key, kind: ValueKind.Number, source: Source.Scene, ...SCENE[key as keyof typeof SCENE] }));
+const deviceProps: AnimProp[] = (Object.keys(DEVICE_SCENE) as (keyof typeof DEVICE_SCENE)[]).map((key) => ({ key, kind: ValueKind.Number, source: Source.Scene, ...DEVICE_SCENE[key] }));
 const maskProps: AnimProp[] = MASK_KEYS.map((key) => {
   const { label, min, max, step, fallback } = MASK_PROPS[key];
   return { key, label, min, max, step, fallback, kind: ValueKind.Number, source: Source.Mask };
@@ -147,6 +153,7 @@ export const ANIMATABLE: Record<ComponentId, readonly AnimProp[]> = {
   Shape3D: visual(sceneProps),
   Text3D: visual(sceneProps),
   Logo3D: visual(sceneProps),
+  Device3D: visual(sceneProps, deviceProps),
   Composition: visual(),
   Custom: visual()
 };

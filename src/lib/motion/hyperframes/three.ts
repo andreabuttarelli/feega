@@ -4,6 +4,7 @@ import type { StageSpec } from '../camera';
 import { hdriUrl, type Look } from '../look';
 import { SURFACE, type Material, type Surface } from '../materials';
 import { cameraRuntime, seekDriver } from './stage';
+import { DEVICE_SCRIPT, type DeviceRuntime } from './device-runtime';
 
 export const THREE_VERSION = '0.181.2';
 export const THREE_TIMELINE = 'feegaThree';
@@ -17,7 +18,8 @@ export enum ThreeKind {
   Model = 'model',
   Shape = 'shape',
   Text = 'text',
-  Logo = 'logo'
+  Logo = 'logo',
+  Device = 'device'
 }
 
 export type ThreeClip = {
@@ -42,6 +44,8 @@ export type ThreeClip = {
   text: string;
   extrude: number;
   bevel: number;
+  device: DeviceRuntime | null;
+  video: boolean;
 };
 
 export const LIGHTING = {
@@ -358,7 +362,9 @@ function loadText(c, s) {
     .catch(() => undefined);
 }
 
+${DEVICE_SCRIPT}
 const LOADERS = {
+  device: loadDevice,
   model: loadModel,
   logo: loadLogo,
   text: loadText,
@@ -399,6 +405,7 @@ function renderAt(time) {
       light.position.set(lightAt(spec, 'x', frame), lightAt(spec, 'y', frame), lightAt(spec, 'z', frame));
       if (light.isRectAreaLight) light.lookAt(0, 0, 0);
     }
+    updateDevice(c, s, at);
     s.pivot.rotation.y = at('orbit', legacyOrbit(c, local)) * DEG;
     s.object.rotation.set(at('objectRotateX', 0) * DEG, at('objectRotateY', 0) * DEG, at('objectRotateZ', 0) * DEG);
     const distance = 4.6 / at('dolly', c.zoom);

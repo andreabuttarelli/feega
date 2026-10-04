@@ -69,3 +69,13 @@
 - [ ] **HDRI environments**: Poly Haven files (CC0, no attribution required) served from the three.js repo on jsDelivr, pinned to tag `r181`: `pedestrian_overpass_1k`, `venice_sunset_1k`, `spruit_sunrise_1k`, `quarry_01_1k`, `moonless_golf_1k`. Credit kept in CREDITS.md as courtesy.
 - [ ] **3D text fonts**: outlines come from Fontsource on jsDelivr (Google Fonts, SIL OFL / Apache-2.0: embedding in rendered video is allowed) or from the user's uploaded file — the user warrants the rights to an uploaded font (Terms §user content).
 - [ ] **opentype.js** 1.3.4 (MIT) loaded in the render page to read font outlines.
+
+## Motion device mockups (04/10/2026)
+
+Decision: **our own procedural geometry, generic names, no third-party device art.**
+
+- [x] **Apple Design Resources (product bezels)**: refused. The App Store marketing guidelines allow the bezels only "to display your app", "as is and without modification" — no animating, tilting, reflections or shadows — and list "rendering in 3D or creating any simulation of an Apple product" as not permitted. A SaaS letting users animate devices in 3D breaks all three. Source: developer.apple.com/app-store/marketing/guidelines/.
+- [x] **Google device art (Device Art Generator)**: site content is CC BY 2.5, but trademarks and brand features are excluded (developer.android.com/license; about.google/brand-resource-center/rules/). Not used.
+- [x] **Names**: no trademarks in UI, ids or agent text — "Phone Pro 6.3″", "Android Phone 6.3″", "Laptop Pro 14″", "Laptop Air 13″", "Studio Monitor 27″", "Tablet 11″", "Browser window". A test fails if a label or id contains iPhone/iPad/iMac/MacBook/Apple/Pixel/Google/Galaxy/Samsung; the motion agent is told never to name brands on screen.
+- [ ] **Trade dress**: proportions follow official published dimensions (public facts); the shapes are generic (no logos, no exact button artwork). Confirm with counsel that a recognisable silhouette (camera plateau, island) stays clear of design-right/trade-dress claims, or simplify those features.
+- [x] **No 3D models from third parties**: none shipped, so no CC-BY attribution owed. Reference photos (Apple Newsroom, GSMArena) are used only in the internal QC sheet, never in the product.
