@@ -53,21 +53,21 @@
     gap: 6px;
     width: 240px;
     padding: 8px;
-    background: var(--paper);
-    border: 1px solid var(--line);
+    background: var(--ui-bg);
+    border: 1px solid var(--ui-line);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
     font-size: 11px;
   }
 
   path {
     fill: none;
-    stroke: #a855f7;
+    stroke: var(--ui-accent);
     stroke-width: 1.5;
   }
 
   .preview {
     align-self: center;
-    background: var(--paper-2);
+    background: var(--ui-surface);
     overflow: visible;
   }
 
@@ -83,7 +83,7 @@
     align-items: center;
     gap: 2px;
     padding: 3px 0;
-    border: 1px solid var(--line);
+    border: 1px solid var(--ui-line);
     font-size: 8px;
   }
 
@@ -92,7 +92,7 @@
   }
 
   .named button.on {
-    outline: 2px solid #a855f7;
+    outline: 2px solid var(--ui-accent);
     outline-offset: -1px;
   }
 
@@ -103,22 +103,22 @@
   }
 
   .bezier span {
-    font-family: 'Fragment Mono', ui-monospace, monospace;
-    color: var(--ink-soft);
+    font-family: var(--ui-mono);
+    color: var(--ui-ink-2);
   }
 
   .bezier input {
     width: 34px;
     padding: 2px;
-    border: 1px solid var(--line);
-    background: var(--paper);
-    color: var(--ink);
+    border: 1px solid var(--ui-line);
+    background: var(--ui-bg);
+    color: var(--ui-ink);
     font: inherit;
   }
 
   .close {
     align-self: flex-end;
     padding: 2px 8px;
-    border: 1px solid var(--line);
+    border: 1px solid var(--ui-line);
   }
 </style>

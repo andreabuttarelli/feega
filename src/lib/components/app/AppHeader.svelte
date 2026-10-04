@@ -62,8 +62,8 @@
     gap: 8px;
     height: var(--shell-top-h);
     padding: 0 16px 0 8px;
-    border-bottom: 1px solid var(--line);
-    background: var(--paper);
+    border-bottom: 1px solid var(--ui-line);
+    background: var(--ui-bg);
   }
 
   .home {
@@ -72,7 +72,7 @@
     gap: 8px;
     height: 32px;
     padding: 0 6px;
-    color: var(--ink);
+    color: var(--ui-ink);
     text-decoration: none;
   }
 
@@ -83,7 +83,7 @@
   }
 
   .slash {
-    color: var(--line-2);
+    color: var(--ui-line-strong);
   }
 
   .title {
@@ -93,7 +93,7 @@
     text-overflow: ellipsis;
     font-size: 14px;
     font-weight: 600;
-    color: var(--ink);
+    color: var(--ui-ink);
   }
 
   .spacer {
@@ -102,15 +102,15 @@
 
   .org {
     font-size: 13px;
-    color: var(--ink-soft);
+    color: var(--ui-ink-2);
   }
 
   .workspace select {
     height: 32px;
     padding: 0 8px;
-    border: 1px solid var(--line-2);
-    background: var(--paper);
-    color: var(--ink);
+    border: 1px solid var(--ui-line-strong);
+    background: var(--ui-bg);
+    color: var(--ui-ink);
     font-size: 13px;
   }
 
@@ -121,13 +121,13 @@
     padding: 0 8px;
     font-size: 13px;
     font-weight: 600;
-    color: var(--ink);
+    color: var(--ui-ink);
     text-decoration: none;
   }
 
   .home:focus-visible,
   .credits:focus-visible {
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--ui-accent);
     outline-offset: 2px;
   }
 

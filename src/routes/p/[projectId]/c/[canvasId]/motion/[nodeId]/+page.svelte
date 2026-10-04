@@ -545,7 +545,7 @@
       </div>
 
       <div class="tl">
-        <MotionTimeline {doc} bind:frame bind:selection bind:keySelection bind:camera={cameraOpen} {zoom} {snap} {waveforms} onchange={edit} />
+        <MotionTimeline {doc} bind:frame bind:selection bind:keySelection bind:camera={cameraOpen} {zoom} {snap} {waveforms} {assetUrls} onchange={edit} />
       </div>
     </section>
 
@@ -578,9 +578,10 @@
     inset: 0;
     display: flex;
     flex-direction: column;
-    background: var(--paper);
-    color: var(--ink);
+    background: var(--ui-bg);
+    color: var(--ui-ink);
     font-family: 'DM Sans', system-ui, sans-serif;
+    accent-color: var(--ui-accent);
     z-index: 10;
   }
 
@@ -588,10 +589,11 @@
     display: flex;
     align-items: center;
     gap: 14px;
-    height: 48px;
-    padding: 0 12px;
-    border-bottom: 1px solid var(--line);
-    font-size: 13px;
+    height: var(--ui-bar-h);
+    padding: 0 var(--ui-space-3);
+    border-bottom: 1px solid var(--ui-line);
+    background: var(--ui-bg);
+    font-size: var(--ui-text-md);
     flex-shrink: 0;
   }
 
@@ -599,7 +601,7 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    color: var(--ink-soft);
+    color: var(--ui-ink-2);
   }
 
   .title {
@@ -611,34 +613,37 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    color: var(--ink-soft);
+    color: var(--ui-ink-2);
   }
 
   .field select,
   .field input {
     width: 72px;
-    padding: 3px 5px;
-    border: 1px solid var(--line);
-    background: var(--paper);
-    color: var(--ink);
+    height: 28px;
+    padding: 0 6px;
+    border: 1px solid var(--ui-line);
+    background: var(--ui-bg);
+    color: var(--ui-ink);
     font: inherit;
   }
 
   .save {
     margin-left: auto;
-    font-family: 'Fragment Mono', ui-monospace, monospace;
+    font-family: var(--ui-mono);
     font-size: 11px;
-    color: var(--ink-soft);
+    color: var(--ui-ink-2);
   }
 
   .render {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 12px;
-    background: var(--ink);
-    color: var(--paper);
-    font-size: 12px;
+    height: 30px;
+    padding: 0 12px;
+    background: var(--ui-accent);
+    color: var(--ui-accent-ink);
+    font-size: var(--ui-text-sm);
+    font-weight: 600;
   }
 
   .render:disabled {
@@ -670,7 +675,7 @@
     align-items: center;
     justify-content: center;
     padding: 16px;
-    background: var(--paper-2);
+    background: var(--ui-surface);
     container-type: size;
   }
 
@@ -678,9 +683,11 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    padding: 4px 8px;
-    border-top: 1px solid var(--line);
-    font-size: 12px;
+    height: 40px;
+    padding: 0 var(--ui-space-2);
+    border-top: 1px solid var(--ui-line);
+    background: var(--ui-bg);
+    font-size: var(--ui-text-sm);
     flex-shrink: 0;
   }
 
@@ -691,11 +698,11 @@
     gap: 4px;
     height: 26px;
     padding: 0 7px;
-    color: var(--ink);
+    color: var(--ui-ink);
   }
 
   .transport button:hover:not(:disabled) {
-    background: var(--paper-3);
+    background: var(--ui-hover);
   }
 
   .transport button:disabled {
@@ -703,12 +710,12 @@
   }
 
   .transport button.on {
-    background: var(--paper-3);
-    color: #0099ff;
+    background: var(--ui-accent-wash);
+    color: var(--ui-accent);
   }
 
   .tc {
-    font-family: 'Fragment Mono', ui-monospace, monospace;
+    font-family: var(--ui-mono);
     font-size: 11px;
     padding: 0 6px;
   }
@@ -716,7 +723,7 @@
   .sep {
     width: 1px;
     height: 18px;
-    background: var(--line);
+    background: var(--ui-line);
     margin: 0 4px;
   }
 
@@ -735,8 +742,8 @@
     max-height: calc(100vh - 120px);
     overflow: auto;
     padding: 4px;
-    background: var(--paper);
-    border: 1px solid var(--line);
+    background: var(--ui-bg);
+    border: 1px solid var(--ui-line);
     box-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
   }
 
@@ -751,42 +758,42 @@
   }
 
   .menu button:hover {
-    background: var(--paper-3);
+    background: var(--ui-hover);
   }
 
   .menu-head {
     padding: 4px 8px 2px;
-    font-family: 'Fragment Mono', ui-monospace, monospace;
+    font-family: var(--ui-mono);
     font-size: 10px;
     text-transform: uppercase;
-    color: var(--ink-soft);
+    color: var(--ui-ink-2);
   }
 
 
   .notice {
     margin-left: 8px;
-    color: var(--ink-soft);
+    color: var(--ui-ink-2);
   }
 
   .tl {
-    height: 240px;
+    height: 300px;
     flex-shrink: 0;
   }
 
   .props {
-    border-left: 1px solid var(--line);
+    border-left: 1px solid var(--ui-line);
     min-height: 0;
     overflow: hidden;
   }
 
   .hint {
     padding: 16px 12px;
-    color: var(--ink-soft);
+    color: var(--ui-ink-2);
     font-size: 12px;
   }
 
   .chat {
-    border-left: 1px solid var(--line);
+    border-left: 1px solid var(--ui-line);
     min-height: 0;
     display: flex;
     flex-direction: column;
@@ -869,9 +876,9 @@
       z-index: 30;
       display: none;
       flex-direction: column;
-      background: var(--paper);
+      background: var(--ui-bg);
       border-left: 0;
-      border-top: 1px solid var(--line);
+      border-top: 1px solid var(--ui-line);
       box-shadow: 0 -12px 32px rgb(0 0 0 / 0.16);
     }
 
@@ -889,7 +896,7 @@
       align-items: center;
       justify-content: space-between;
       padding: 8px 12px;
-      border-bottom: 1px solid var(--line);
+      border-bottom: 1px solid var(--ui-line);
       font-weight: 600;
       flex-shrink: 0;
     }
@@ -903,19 +910,19 @@
       display: flex;
       flex-shrink: 0;
       height: 48px;
-      border-top: 1px solid var(--line);
+      border-top: 1px solid var(--ui-line);
     }
 
     .tabs button {
       flex: 1;
       font-size: 13px;
       font-weight: 500;
-      color: var(--ink-soft);
+      color: var(--ui-ink-2);
     }
 
     .tabs button.on {
-      color: var(--ink);
-      box-shadow: inset 0 2px 0 var(--ink);
+      color: var(--ui-ink);
+      box-shadow: inset 0 2px 0 var(--ui-ink);
     }
   }
 </style>

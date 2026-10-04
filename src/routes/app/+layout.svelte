@@ -7,7 +7,7 @@
   const menuProjectId = $derived(data.projects[0]?.id ?? null);
 </script>
 
-<div class="app-shell">
+<div class="app-shell ui-app">
   {#if menuProjectId}
     <AppHeader {menuProjectId} profile={data.profile} org={data.org} workspaces={data.workspaces} creditBalance={data.creditBalance} />
   {/if}
@@ -19,7 +19,8 @@
 <style>
   .app-shell {
     min-height: 100dvh;
-    background: var(--paper-2);
+    background: var(--ui-bg);
+    color: var(--ui-ink);
   }
 
   .app-main {

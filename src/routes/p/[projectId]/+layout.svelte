@@ -140,7 +140,7 @@
 
 <ChatLeaveGuard {projectId} />
 
-<div class="project-shell" class:is-sheet-pending={sheetPending} class:is-uncensored={data.project.mode === ProjectMode.Uncensored} data-viewport={viewport} data-mode={data.project.mode}>
+<div class="project-shell ui-app" class:is-sheet-pending={sheetPending} class:is-uncensored={data.project.mode === ProjectMode.Uncensored} data-viewport={viewport} data-mode={data.project.mode}>
   {#if isMobile}
     <MobileTopBar
       {projectId}
@@ -247,7 +247,7 @@
     height: 100dvh;
     display: flex;
     flex-direction: column;
-    background: var(--paper-2, #f9f9f9);
+    background: var(--ui-bg);
   }
 
   .canvas-row {

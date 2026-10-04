@@ -322,9 +322,9 @@
     flex-direction: column;
     gap: 12px;
     padding: 16px;
-    background: var(--paper);
-    color: var(--ink);
-    border: 1px solid var(--line);
+    background: var(--ui-bg);
+    color: var(--ui-ink);
+    border: 1px solid var(--ui-line);
     box-shadow: 0 16px 48px rgb(0 0 0 / 0.2);
     font-size: 13px;
   }
@@ -344,7 +344,7 @@
   }
 
   dt {
-    color: var(--ink-soft);
+    color: var(--ui-ink-2);
   }
 
   dd {
@@ -364,11 +364,11 @@
 
   .modes {
     padding-bottom: 4px;
-    border-bottom: 1px solid var(--line);
+    border-bottom: 1px solid var(--ui-line);
   }
 
   .muted {
-    color: var(--ink-soft);
+    color: var(--ui-ink-2);
     margin: 0;
   }
 
@@ -381,18 +381,18 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
-    font-family: 'Fragment Mono', ui-monospace, monospace;
+    font-family: var(--ui-mono);
     font-size: 11px;
   }
 
   .track {
     height: 4px;
-    background: var(--paper-3);
+    background: var(--ui-hover);
   }
 
   .fill {
     height: 100%;
-    background: var(--ink);
+    background: var(--ui-accent);
     transition: width 120ms linear;
   }
 
@@ -407,11 +407,11 @@
   }
 
   .primary {
-    background: var(--ink);
-    color: var(--paper);
+    background: var(--ui-accent);
+    color: var(--ui-accent-ink);
   }
 
   .secondary {
-    border: 1px solid var(--line);
+    border: 1px solid var(--ui-line);
   }
 </style>

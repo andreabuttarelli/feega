@@ -1,6 +1,20 @@
 <script lang="ts">
   import ChevronUp from '@lucide/svelte/icons/chevron-up';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
+  import Type from '@lucide/svelte/icons/type';
+  import ImageIcon from '@lucide/svelte/icons/image';
+  import Clapperboard from '@lucide/svelte/icons/clapperboard';
+  import AudioLines from '@lucide/svelte/icons/audio-lines';
+  import Square from '@lucide/svelte/icons/square';
+  import Box from '@lucide/svelte/icons/box';
+  import Code from '@lucide/svelte/icons/code';
+  import Crosshair from '@lucide/svelte/icons/crosshair';
+  import Video from '@lucide/svelte/icons/video';
+  import SquareDashed from '@lucide/svelte/icons/square-dashed';
+  import type { Component } from 'svelte';
+  import { CLIP_FAMILIES, ClipFamily, Preview, familyOf, tileFrames } from '$lib/motion/track-style';
+  import { filmstrip, type Strip } from '$lib/motion/filmstrip';
   import { COMPONENTS, TrackKind } from '$lib/motion/components';
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
   import { ClipEdge, moveClip, moveKeyframes, moveTrack, setKeyEase, trimClip, type KeyRef, type OpResult } from '$lib/motion/timeline';
@@ -16,9 +30,27 @@
   import EasePicker from './EasePicker.svelte';
   import { PEAKS_PER_SECOND, clipPeaks, wavePath } from '$lib/motion/waveform';
 
-  const HEADER_PX = 132;
-  const ROW_PX = 30;
-  const LANE_PAD_PX = 5;
+  const HEADER_PX = 176;
+  const COMPACT_HEADER_PX = 112;
+  const COMPACT_BELOW_PX = 760;
+  const ROW_PX = 34;
+  const FOLDED_ROW_PX = 12;
+  const LANE_PAD_PX = 6;
+  const TILE_PX = 64;
+  const MAX_TILES = 48;
+
+  const FAMILY_ICONS: Record<ClipFamily, Component> = {
+    [ClipFamily.Text]: Type,
+    [ClipFamily.Image]: ImageIcon,
+    [ClipFamily.Video]: Clapperboard,
+    [ClipFamily.Audio]: AudioLines,
+    [ClipFamily.Shape]: Square,
+    [ClipFamily.ThreeD]: Box,
+    [ClipFamily.Custom]: Code,
+    [ClipFamily.Null]: Crosshair,
+    [ClipFamily.Camera]: Video,
+    [ClipFamily.Mask]: SquareDashed
+  };
 
   const KEY_ROW_PX = 20;
   const DIAMOND_PX = 10;
@@ -40,8 +72,14 @@
     zoom,
     snap,
     waveforms = {},
+    assetUrls = {},
     onchange
-  }: { doc: MotionDoc; frame?: number; selection?: string[]; keySelection?: KeyRef[]; camera?: boolean; zoom: number; snap: Snap; waveforms?: Record<string, number[]>; onchange: (doc: MotionDoc, summary: string) => void } = $props();
+  }: { doc: MotionDoc; frame?: number; selection?: string[]; keySelection?: KeyRef[]; camera?: boolean; zoom: number; snap: Snap; waveforms?: Record<string, number[]>; assetUrls?: Record<string, string>; onchange: (doc: MotionDoc, summary: string) => void } = $props();
+
+  let folded = $state<string[]>([]);
+  let viewportWidth = $state(1440);
+  const headPx = $derived(viewportWidth < COMPACT_BELOW_PX ? COMPACT_HEADER_PX : HEADER_PX);
+  let strips = $state<Record<string, Strip>>({});
 
   let collapsed = $state<string[]>([]);
   let easing = $state<{ ref: KeyRef; ease: EaseSpec; left: number; top: number } | null>(null);
@@ -58,7 +96,7 @@
 
   function frameOfPointer(e: PointerEvent): number {
     const rect = lanes!.getBoundingClientRect();
-    return frameAt(e.clientX - rect.left + lanes!.scrollLeft - HEADER_PX, zoom);
+    return frameAt(e.clientX - rect.left + lanes!.scrollLeft - headPx, zoom);
   }
 
   function select(clipId: string, e: PointerEvent) {
@@ -253,6 +291,55 @@
     return { path: wavePath(clipPeaks(peaks, { trimStart: clip.trimStart, durationInFrames: clip.durationInFrames, fps: shown.fps })), width };
   }
 
+  function trackFamily(track: MotionTrack): ClipFamily {
+    if (track.kind === TrackKind.Audio) {
+      return ClipFamily.Audio;
+    }
+    const first = track.clips[0];
+    return first ? familyOf(first.component) : ClipFamily.Video;
+  }
+
+  function hueOf(family: ClipFamily): string {
+    return `--hue: ${CLIP_FAMILIES[family].hue};`;
+  }
+
+  function rowPx(track: MotionTrack): number {
+    return folded.includes(track.id) ? FOLDED_ROW_PX : ROW_PX;
+  }
+
+  function toggleFold(trackId: string) {
+    folded = folded.includes(trackId) ? folded.filter((id) => id !== trackId) : [...folded, trackId];
+  }
+
+  function assetOf(clip: MotionClip): string | null {
+    const id = (clip.props as { assetId?: string | null }).assetId;
+    return id ? (assetUrls[id] ?? null) : null;
+  }
+
+  function stripTiles(clip: MotionClip, url: string): string[] {
+    const strip = strips[url];
+    if (!strip) {
+      return [];
+    }
+    const tiles = Math.min(MAX_TILES, Math.max(1, Math.ceil((clip.durationInFrames * ppf) / TILE_PX)));
+    const picks = tileFrames({ samples: strip.frames.length, sourceSeconds: strip.seconds, trimSeconds: clip.trimStart / shown.fps, clipSeconds: clip.durationInFrames / shown.fps, tiles });
+    return picks.map((i) => strip.frames[i]);
+  }
+
+  function whenVisible(node: HTMLElement, url: string) {
+    const watcher = new IntersectionObserver((entries) => {
+      if (!entries.some((e) => e.isIntersecting)) {
+        return;
+      }
+      watcher.disconnect();
+      filmstrip(url)
+        .then((strip) => (strips = { ...strips, [url]: strip }))
+        .catch(() => {});
+    });
+    watcher.observe(node);
+    return { destroy: () => watcher.disconnect() };
+  }
+
   function clipLabel(clip: MotionClip): string {
     const p = clip.props as { text?: string; title?: string; name?: string };
     const label = clip.component === 'Custom' ? p.name : undefined;
@@ -260,12 +347,12 @@
   }
 </script>
 
-<svelte:window onpointermove={onMove} onpointerup={onUp} />
+<svelte:window bind:innerWidth={viewportWidth} onpointermove={onMove} onpointerup={onUp} />
 
   {#snippet keyLane(clip: KeyOwner, lane: { prop: string; label: string })}
     {@const keys = clip.keyframes[lane.prop] ?? []}
     <div class="lane sub" data-key-lane={`${clip.id}:${lane.prop}`} style={`height: ${KEY_ROW_PX}px;`}>
-      <div class="head" style={`width: ${HEADER_PX}px;`}><span class="name prop">{lane.label}</span></div>
+      <div class="head" style={`width: ${headPx}px;`}><span class="name prop">{lane.label}</span></div>
       <div class="clips">
         {#each keys.slice(0, -1) as key, i (key.frame)}
           <button
@@ -295,18 +382,18 @@
   {/snippet}
 
 <div class="timeline" bind:this={lanes} data-testid="motion-timeline">
-  <div class="inner" style={`width: ${width + HEADER_PX}px;`}>
+  <div class="inner" style={`width: ${width + headPx}px;`}>
     <div class="ruler" role="slider" tabindex="-1" aria-label="Playhead" aria-valuenow={frame} onpointerdown={startScrub}>
-      <div class="corner" style={`width: ${HEADER_PX}px;`}></div>
+      <div class="corner" style={`width: ${headPx}px;`}></div>
       {#each ticks as tick (tick.frame)}
-        <span class="tick" class:major={tick.label} style={`left: ${HEADER_PX + tick.frame * ppf}px;`}>
+        <span class="tick" class:major={tick.label} style={`left: ${headPx + tick.frame * ppf}px;`}>
           {#if tick.label}<em>{tick.label}</em>{/if}
         </span>
       {/each}
     </div>
 
-    <div class="lane camera-track" data-camera-track style={`height: ${ROW_PX + 2 * LANE_PAD_PX}px;`}>
-      <div class="head" style={`width: ${HEADER_PX}px;`}><span class="name">Camera</span></div>
+    <div class="lane camera-track" data-camera-track style={`height: ${ROW_PX + 2 * LANE_PAD_PX}px; ${hueOf(ClipFamily.Camera)}`}>
+      <div class="head" style={`width: ${headPx}px;`}><span class="fold-space"></span><span class="chip"><Video size={12} /></span><span class="name">Camera</span></div>
       <div class="clips">
         <div
           class="bar camera-bar"
@@ -331,25 +418,45 @@
     {#each shown.tracks as track, index (track.id)}
       {@const rows = stackRows(track.clips)}
       {@const rowCount = Math.max(1, ...Object.values(rows).map((r) => r + 1))}
-      <div class="lane" data-track-id={track.id} class:audio={track.kind === TrackKind.Audio} style={`height: ${rowCount * ROW_PX + 2 * LANE_PAD_PX}px;`}>
-        <div class="head" style={`width: ${HEADER_PX}px;`}>
+      {@const row = rowPx(track)}
+      {@const family = trackFamily(track)}
+      {@const TrackIcon = FAMILY_ICONS[family]}
+      <div class="lane track" data-track-id={track.id} class:alt={index % 2 === 1} class:folded={folded.includes(track.id)} style={`height: ${rowCount * row + 2 * LANE_PAD_PX}px; ${hueOf(family)}`}>
+        <div class="head" style={`width: ${headPx}px;`}>
+          <button type="button" class="fold" aria-label={folded.includes(track.id) ? 'Expand track' : 'Collapse track'} aria-expanded={!folded.includes(track.id)} onclick={() => toggleFold(track.id)}>
+            {#if folded.includes(track.id)}<ChevronRight size={12} />{:else}<ChevronDown size={12} />{/if}
+          </button>
+          <span class="chip" title={CLIP_FAMILIES[family].label}><TrackIcon size={12} /></span>
           <span class="name">{track.name || track.id}</span>
-          <button type="button" aria-label="Move track up" disabled={index === 0} onclick={() => reorder(track.id, -1)}><ChevronUp size={12} /></button>
-          <button type="button" aria-label="Move track down" disabled={index === shown.tracks.length - 1} onclick={() => reorder(track.id, 1)}><ChevronDown size={12} /></button>
+          <span class="order">
+            <button type="button" aria-label="Move track up" disabled={index === 0} onclick={() => reorder(track.id, -1)}><ChevronUp size={12} /></button>
+            <button type="button" aria-label="Move track down" disabled={index === shown.tracks.length - 1} onclick={() => reorder(track.id, 1)}><ChevronDown size={12} /></button>
+          </span>
         </div>
         <div class="clips" data-track-id={track.id}>
           {#each track.clips as clip (clip.id)}
             {@const wave = waveOf(clip as MotionClip)}
+            {@const clipFamily = familyOf(clip.component)}
+            {@const preview = CLIP_FAMILIES[clipFamily].preview}
+            {@const url = assetOf(clip as MotionClip)}
             <div
               class="bar"
               class:selected={selection.includes(clip.id)}
               data-clip-id={clip.id}
+              data-family={clipFamily}
               role="button"
               tabindex="0"
               aria-label={`${COMPONENTS[clip.component].label} clip`}
-              style={`left: ${clip.from * ppf}px; width: ${Math.max(4, clip.durationInFrames * ppf)}px; top: ${LANE_PAD_PX + rows[clip.id] * ROW_PX}px; height: ${ROW_PX - 2}px;`}
+              style={`left: ${clip.from * ppf}px; width: ${Math.max(4, clip.durationInFrames * ppf)}px; top: ${LANE_PAD_PX + rows[clip.id] * row}px; height: ${row - 2}px; ${hueOf(clipFamily)}`}
               onpointerdown={(e) => startClip(e, clip as MotionClip, track.id)}
             >
+              {#if url && preview === Preview.Thumb}
+                <span class="thumbs" style={`background-image: url("${url}");`} aria-hidden="true"></span>
+              {:else if url && preview === Preview.Filmstrip}
+                <span class="strip" use:whenVisible={url} aria-hidden="true">
+                  {#each stripTiles(clip as MotionClip, url) as tile, i (i)}<img src={tile} alt="" />{/each}
+                </span>
+              {/if}
               <span class="kind">
                 {COMPONENTS[clip.component].label}
                 {#if Object.keys(clip.keyframes).length}
@@ -373,7 +480,7 @@
               data-grip-clip={handle.clipId}
               role="separator"
               aria-label={`Trim ${handle.grip}`}
-              style={`left: ${handle.left}px; width: ${handle.width}px; top: ${LANE_PAD_PX + rows[handle.clipId] * ROW_PX}px; height: ${ROW_PX - 2}px;`}
+              style={`left: ${handle.left}px; width: ${handle.width}px; top: ${LANE_PAD_PX + rows[handle.clipId] * row}px; height: ${row - 2}px;`}
               onpointerdown={(e) => startClip(e, clipById(handle.clipId), track.id, GRIP_DRAG[handle.grip])}
             ></div>
           {/each}
@@ -385,7 +492,7 @@
         {#each all.filter((l) => l.source !== Source.Mask) as lane (lane.prop)}{@render keyLane(clip, lane)}{/each}
         {#if masked.length}
           <div class="lane sub group" data-mask-lanes={clip.id} style={`height: ${KEY_ROW_PX}px;`}>
-            <div class="head" style={`width: ${HEADER_PX}px;`}><span class="name prop">Mask{clip.mask ? ` · ${MASK_KINDS[clip.mask.kind].label}` : ''}</span></div>
+            <div class="head" style={`width: ${headPx}px;`}><span class="name prop">Mask{clip.mask ? ` · ${MASK_KINDS[clip.mask.kind].label}` : ''}</span></div>
             <div class="clips"></div>
           </div>
           {#each masked as lane (lane.prop)}{@render keyLane(clip, lane)}{/each}
@@ -394,7 +501,7 @@
     {/each}
 
     {#if easing}
-      <div class="ease-at" style={`left: ${Math.max(HEADER_PX, easing.left - 120)}px; top: ${easing.top}px;`}>
+      <div class="ease-at" style={`left: ${Math.max(headPx, easing.left - 120)}px; top: ${easing.top}px;`}>
         <EasePicker ease={easing.ease} onpick={pickEase} onclose={() => (easing = null)} />
       </div>
     {/if}
@@ -403,7 +510,7 @@
       <svg class="whip-line" aria-hidden="true"><line x1={whip.x0} y1={whip.y0} x2={whip.x} y2={whip.y} /></svg>
     {/if}
 
-    <div class="playhead" style={`left: ${HEADER_PX + frame * ppf}px;`}></div>
+    <div class="playhead" style={`left: ${headPx + frame * ppf}px;`}></div>
   </div>
 </div>
 
@@ -411,10 +518,11 @@
   .timeline {
     position: relative;
     overflow: auto;
-    background: var(--paper);
-    border-top: 1px solid var(--line);
+    background: var(--ui-bg);
+    border-top: 1px solid var(--ui-line);
     user-select: none;
-    font-size: 11px;
+    font-size: var(--ui-text-xs);
+    color: var(--ui-ink);
     height: 100%;
   }
 
@@ -427,88 +535,95 @@
     position: sticky;
     top: 0;
     z-index: 3;
-    height: 24px;
-    background: var(--paper-2);
-    border-bottom: 1px solid var(--line);
+    height: 28px;
+    background: var(--ui-bg);
+    border-bottom: 1px solid var(--ui-line);
     cursor: ew-resize;
   }
 
   .corner {
-    position: absolute;
+    position: sticky;
+    float: left;
     left: 0;
     top: 0;
-    bottom: 0;
-    background: var(--paper-2);
-    border-right: 1px solid var(--line);
+    height: 100%;
+    background: var(--ui-bg);
+    border-right: 1px solid var(--ui-line);
+    z-index: 6;
   }
 
   .tick {
     position: absolute;
     bottom: 0;
     width: 1px;
-    height: 5px;
-    background: var(--line);
+    height: 4px;
+    background: var(--ui-line-strong);
   }
 
   .tick.major {
-    height: 10px;
-    background: var(--ink-soft);
+    height: 8px;
+    background: var(--ui-ink-3);
   }
 
   .tick em {
     position: absolute;
-    bottom: 11px;
-    left: 3px;
+    bottom: 10px;
+    left: 4px;
     font-style: normal;
-    font-family: 'Fragment Mono', ui-monospace, monospace;
-    color: var(--ink-soft);
+    font-family: var(--ui-mono);
+    font-size: 10px;
+    color: var(--ui-ink-3);
     white-space: nowrap;
   }
 
   .lane {
     position: relative;
     display: flex;
-    border-bottom: 1px solid var(--line);
+    border-bottom: 1px solid var(--ui-line);
   }
 
-  .wave {
-    position: absolute;
-    inset: 2px 0;
-    width: 100%;
-    height: calc(100% - 4px);
-    pointer-events: none;
-    opacity: 0.45;
-  }
-
-  .wave path {
-    stroke: #d97706;
-    stroke-width: 1.5;
-    vector-effect: non-scaling-stroke;
-  }
-
-  .lane.audio .bar {
-    background: color-mix(in srgb, #d97706 18%, var(--paper));
-    border-color: #d97706;
+  .lane.alt {
+    background: var(--ui-surface);
   }
 
   .head {
     position: sticky;
     left: 0;
-    z-index: 2;
+    z-index: 5;
     display: flex;
-    align-items: center;
-    gap: 2px;
-    padding: 0 6px;
-    background: var(--paper-2);
-    border-right: 1px solid var(--line);
+    align-items: flex-start;
+    gap: 6px;
+    padding: 12px 8px 0 4px;
+    margin-bottom: -1px;
+    background: var(--ui-bg);
+    border-right: 1px solid var(--ui-line);
+    border-bottom: 1px solid var(--ui-line);
     flex-shrink: 0;
+  }
+
+  @media (max-width: 760px) {
+    .head .chip,
+    .head .order {
+      display: none;
+    }
+  }
+
+  .lane.sub > .head {
+    align-items: center;
+    padding-top: 0;
+  }
+
+  .lane.alt > .head {
+    background: var(--ui-surface);
   }
 
   .head .name {
     flex: 1;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-size: var(--ui-text-sm);
     font-weight: 500;
   }
 
@@ -517,11 +632,42 @@
     place-items: center;
     width: 18px;
     height: 18px;
-    color: var(--ink-soft);
+    color: var(--ui-ink-3);
+  }
+
+  .head button:hover:not(:disabled) {
+    color: var(--ui-ink);
+    background: var(--ui-hover);
   }
 
   .head button:disabled {
     opacity: 0.3;
+  }
+
+  .fold-space {
+    width: 18px;
+    flex-shrink: 0;
+  }
+
+  .chip {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    background: color-mix(in srgb, var(--hue) 14%, transparent);
+    color: var(--hue);
+  }
+
+  .order {
+    display: flex;
+    opacity: 0;
+    transition: opacity 120ms;
+  }
+
+  .head:hover .order,
+  .head:focus-within .order {
+    opacity: 1;
   }
 
   .clips {
@@ -534,12 +680,103 @@
     display: flex;
     flex-direction: column;
     justify-content: center;
-    padding: 0 8px;
+    gap: 1px;
+    padding: 0 8px 0 10px;
     overflow: hidden;
-    background: color-mix(in srgb, #0099ff 14%, var(--paper));
-    border: 1px solid #0099ff;
+    background: color-mix(in srgb, var(--hue) 10%, var(--ui-bg));
+    border: 1px solid color-mix(in srgb, var(--hue) 30%, transparent);
+    box-shadow: inset 3px 0 0 var(--hue);
     cursor: grab;
     white-space: nowrap;
+    transition: background 120ms;
+  }
+
+  .bar:hover {
+    background: color-mix(in srgb, var(--hue) 16%, var(--ui-bg));
+  }
+
+  .bar.selected {
+    border-color: var(--ui-accent);
+    outline: 1px solid var(--ui-accent);
+    z-index: 1;
+  }
+
+  .thumbs,
+  .strip {
+    position: absolute;
+    inset: 0 0 0 3px;
+    pointer-events: none;
+  }
+
+  .thumbs {
+    background-repeat: repeat-x;
+    background-size: auto 100%;
+    opacity: 0.9;
+  }
+
+  .strip {
+    display: flex;
+    overflow: hidden;
+  }
+
+  .strip img {
+    flex: 0 0 64px;
+    width: 64px;
+    height: 100%;
+    object-fit: cover;
+    border-right: 1px solid color-mix(in srgb, #000 25%, transparent);
+  }
+
+  .thumbs ~ .kind,
+  .thumbs ~ .label,
+  .strip ~ .kind,
+  .strip ~ .label {
+    position: relative;
+    align-self: flex-start;
+    max-width: 100%;
+    padding: 0 4px;
+    background: color-mix(in srgb, var(--ui-bg) 88%, transparent);
+  }
+
+  .bar .kind {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-family: var(--ui-mono);
+    font-size: 9px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: color-mix(in srgb, var(--hue) 75%, var(--ui-ink));
+  }
+
+  .bar .label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: var(--ui-text-sm);
+    color: var(--ui-ink);
+  }
+
+  .lane.folded .bar .kind,
+  .lane.folded .bar .label,
+  .lane.folded .bar .whip,
+  .lane.folded .bar .strip,
+  .lane.folded .bar .thumbs {
+    display: none;
+  }
+
+  .wave {
+    position: absolute;
+    inset: 4px 0 4px 3px;
+    width: calc(100% - 3px);
+    height: calc(100% - 8px);
+    pointer-events: none;
+    opacity: 0.55;
+  }
+
+  .wave path {
+    stroke: var(--hue);
+    stroke-width: 1.5;
+    vector-effect: non-scaling-stroke;
   }
 
   .grip {
@@ -549,25 +786,35 @@
   }
 
   .grip:hover {
-    background: color-mix(in srgb, #0099ff 45%, transparent);
+    background: color-mix(in srgb, var(--ui-accent) 45%, transparent);
   }
 
   .whip {
     position: absolute;
     z-index: 3;
-    right: 12px;
-    top: 2px;
+    right: 8px;
+    top: 3px;
     width: 14px;
     height: 14px;
     font-size: 10px;
     line-height: 14px;
-    color: #a855f7;
+    color: var(--ui-ink-3);
     cursor: crosshair;
+    opacity: 0;
+  }
+
+  .bar:hover .whip,
+  .bar.selected .whip {
+    opacity: 1;
+  }
+
+  .whip:hover {
+    color: var(--ui-accent);
   }
 
   .parent {
     font-style: normal;
-    color: #a855f7;
+    color: var(--ui-ink-3);
   }
 
   .whip-line {
@@ -581,59 +828,49 @@
   }
 
   .whip-line line {
-    stroke: #a855f7;
+    stroke: var(--ui-accent);
     stroke-width: 1.5;
     stroke-dasharray: 4 3;
   }
 
   .camera-bar {
-    background: color-mix(in srgb, #a855f7 12%, var(--paper));
-    border-color: #a855f7;
     cursor: pointer;
   }
 
   .camera-bar.ghost {
     background: transparent;
     border-style: dashed;
+    box-shadow: none;
   }
 
-  .bar.selected {
-    outline: 2px solid #a855f7;
-    outline-offset: 1px;
-    z-index: 1;
-  }
-
-  .bar .kind {
-    font-family: 'Fragment Mono', ui-monospace, monospace;
-    font-size: 9px;
-    text-transform: uppercase;
-    color: var(--ink-soft);
-  }
-
-  .bar .label {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    color: var(--ink);
+  .camera-bar.ghost .label {
+    color: var(--ui-ink-3);
   }
 
   .lane.sub {
-    background: var(--paper-2);
+    background: var(--ui-surface);
   }
 
   .bar .tag {
-    color: #a855f7;
+    color: var(--ui-ink-2);
+    text-transform: none;
+  }
+
+  .lane.group {
+    --hue: #978365;
   }
 
   .lane.group .prop {
-    font-family: 'Fragment Mono', ui-monospace, monospace;
+    font-family: var(--ui-mono);
     font-size: 10px;
     text-transform: uppercase;
+    color: var(--hue);
   }
 
   .head .prop {
-    padding-left: 12px;
+    padding-left: 28px;
     font-weight: 400;
-    color: var(--ink-soft);
+    color: var(--ui-ink-2);
   }
 
   .segment {
@@ -650,36 +887,42 @@
     left: 0;
     right: 0;
     top: 50%;
-    border-top: 1px dashed var(--ink-soft);
+    border-top: 1px solid var(--ui-line-strong);
   }
 
   .segment:hover::after {
-    border-top: 1px solid #a855f7;
+    border-top-color: var(--ui-accent);
   }
 
   .diamond {
     position: absolute;
     z-index: 2;
-    background: var(--ink);
-    transform: rotate(45deg) scale(0.8);
+    background: var(--ui-bg);
+    border: 1.5px solid var(--ui-ink-2);
+    transform: rotate(45deg) scale(0.75);
     cursor: ew-resize;
   }
 
+  .diamond:hover {
+    border-color: var(--ui-ink);
+  }
+
   .diamond.picked {
-    background: #a855f7;
-    outline: 1px solid #a855f7;
-    outline-offset: 2px;
+    background: var(--ui-accent);
+    border-color: var(--ui-accent);
   }
 
   .tag.expr {
-    color: #a855f7;
-    font-family: 'Fragment Mono', monospace;
+    font-family: var(--ui-mono);
   }
 
   .lanes-toggle {
-    margin-left: 4px;
     font-size: 9px;
-    color: #a855f7;
+    color: var(--ui-ink-3);
+  }
+
+  .lanes-toggle[aria-expanded='true'] {
+    color: var(--ui-accent);
   }
 
   .ease-at {
@@ -692,8 +935,19 @@
     top: 0;
     bottom: 0;
     width: 1px;
-    background: #e11d48;
+    background: var(--ui-ink);
     pointer-events: none;
     z-index: 4;
+  }
+
+  .playhead::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -5px;
+    width: 11px;
+    height: 10px;
+    background: var(--ui-ink);
+    clip-path: polygon(0 0, 100% 0, 100% 60%, 50% 100%, 0 60%);
   }
 </style>

@@ -203,7 +203,7 @@
     justify-content: space-between;
     align-items: baseline;
     padding: 10px 12px;
-    border-bottom: 1px solid var(--line);
+    border-bottom: 1px solid var(--ui-line);
   }
 
   .kind {
@@ -212,22 +212,22 @@
   }
 
   .link {
-    color: var(--ink-soft);
+    color: var(--ui-ink-2);
     text-decoration: underline;
   }
 
   section {
     padding: 8px 12px 12px;
-    border-bottom: 1px solid var(--line);
+    border-bottom: 1px solid var(--ui-line);
   }
 
   h4 {
     margin: 0 0 6px;
-    font-family: 'Fragment Mono', ui-monospace, monospace;
+    font-family: var(--ui-mono);
     font-size: 10px;
     font-weight: 400;
     text-transform: uppercase;
-    color: var(--ink-soft);
+    color: var(--ui-ink-2);
   }
 
   .row {
@@ -255,9 +255,9 @@
   select {
     width: 100%;
     padding: 4px 6px;
-    border: 1px solid var(--line);
-    background: var(--paper);
-    color: var(--ink);
+    border: 1px solid var(--ui-line);
+    background: var(--ui-bg);
+    color: var(--ui-ink);
     font: inherit;
   }
 
@@ -285,13 +285,13 @@
   .expr-toggle {
     width: 16px;
     margin-right: 4px;
-    font-family: 'Fragment Mono', monospace;
+    font-family: var(--ui-mono);
     font-size: 11px;
-    color: var(--muted-foreground, #888);
+    color: var(--ui-ink-3);
   }
 
   .expr-toggle.on {
-    color: #a855f7;
+    color: var(--ui-accent);
   }
 
   .expr {
@@ -302,7 +302,7 @@
 
   .expr .code {
     width: 100%;
-    font-family: 'Fragment Mono', monospace;
+    font-family: var(--ui-mono);
     font-size: 11px;
     resize: vertical;
   }
@@ -317,15 +317,15 @@
     font-size: 10px;
     line-height: 1;
     width: 14px;
-    color: var(--line);
+    color: var(--ui-line);
   }
 
   .key.lane {
-    color: var(--ink-soft);
+    color: var(--ui-ink-2);
   }
 
   .key.on {
-    color: #a855f7;
+    color: var(--ui-accent);
   }
 
   .check {
@@ -340,24 +340,24 @@
     align-items: center;
     gap: 4px;
     padding: 4px 6px;
-    border: 1px solid var(--line);
+    border: 1px solid var(--ui-line);
     white-space: nowrap;
   }
 
   .tool.on {
-    border-color: #a855f7;
-    color: #a855f7;
+    border-color: var(--ui-accent);
+    color: var(--ui-accent);
   }
 
   .primary {
     padding: 5px 10px;
-    background: var(--ink);
-    color: var(--paper);
+    background: var(--ui-accent);
+    color: var(--ui-accent-ink);
   }
 
   .hint {
     margin: 0 0 8px;
-    color: var(--ink-soft);
+    color: var(--ui-ink-2);
   }
 
   .error {

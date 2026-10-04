@@ -103,7 +103,7 @@
   .frame,
   .shape {
     fill: none;
-    stroke: #a855f7;
+    stroke: var(--ui-accent);
     stroke-width: 1.5px;
     vector-effect: non-scaling-stroke;
   }
@@ -123,20 +123,20 @@
     width: 10px;
     height: 10px;
     background: #fff;
-    border: 1.5px solid #a855f7;
+    border: 1.5px solid var(--ui-accent);
     cursor: nwse-resize;
   }
 
   .point {
-    background: #a855f7;
+    background: var(--ui-accent);
     cursor: move;
   }
 
   .body {
     width: 18px;
     height: 18px;
-    background: color-mix(in srgb, #a855f7 35%, transparent);
-    border: 1.5px solid #a855f7;
+    background: color-mix(in srgb, var(--ui-accent) 35%, transparent);
+    border: 1.5px solid var(--ui-accent);
     cursor: move;
   }
 </style>

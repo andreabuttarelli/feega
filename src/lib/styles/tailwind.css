@@ -30,8 +30,8 @@
   --sh-card-foreground: var(--ink);
   --sh-popover: var(--paper-2);
   --sh-popover-foreground: var(--ink);
-  --sh-primary: var(--ink);
-  --sh-primary-foreground: var(--paper);
+  --sh-primary: var(--ui-accent);
+  --sh-primary-foreground: var(--ui-accent-ink);
   --sh-secondary: var(--paper-3);
   --sh-secondary-foreground: var(--ink);
   --sh-muted: var(--paper-2);
@@ -41,9 +41,9 @@
   --sh-destructive: #c0392b;
   --sh-destructive-foreground: #fff;
   --sh-success: #1f8a4c;
-  --sh-border: var(--line);
+  --sh-border: var(--ui-line);
   --sh-input: var(--line);
-  --sh-ring: var(--accent);
+  --sh-ring: var(--ui-accent);
   --radius: 0rem;
   --mobile-topbar-h: 48px;
   --touch-target: 44px;

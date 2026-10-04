@@ -9,6 +9,13 @@
 /* Self-hosted DM Sans — latin + latin-ext only (covers EN/IT/ES/FR). No Google Fonts CSS,
    no italic axis, no unused unicode scripts. font-display:swap keeps text visible. */
 @font-face {
+  font-family: 'Fragment Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/fragment-mono-latin.woff2') format('woff2');
+}
+@font-face {
   font-family: 'DM Sans';
   font-style: normal;
   font-weight: 100 1000;
@@ -131,6 +138,33 @@
   --sidebar-bg: var(--paper);
   /* Same as the rest of the app borders */
   --sidebar-line: var(--line);
+  --ui-bg: #ffffff;
+  --ui-surface: #fafaf8;
+  --ui-hover: #f2f2ef;
+  --ui-line: #ececea;
+  --ui-line-strong: #dcdcd8;
+  --ui-ink: #111111;
+  --ui-ink-2: #5c5c58;
+  --ui-ink-3: #93938e;
+  --ui-accent: #0099ff;
+  --ui-accent-ink: #ffffff;
+  --ui-accent-wash: color-mix(in srgb, var(--ui-accent) 10%, transparent);
+  --ui-bar-h: 48px;
+  --ui-mono: "Fragment Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --ui-text-xs: 11px;
+  --ui-text-sm: 12px;
+  --ui-text-md: 13px;
+  --ui-text-lg: 15px;
+  --ui-text-xl: 20px;
+  --ui-space-1: 4px;
+  --ui-space-2: 8px;
+  --ui-space-3: 12px;
+  --ui-space-4: 16px;
+  --ui-space-6: 24px;
+  --ui-space-8: 32px;
+  --ui-icon: 16px;
+  --ui-icon-sm: 14px;
+  --ui-focus: 0 0 0 2px var(--ui-bg), 0 0 0 3px var(--ui-accent);
 }
 
 @media (max-width: 1023px) {
@@ -160,10 +194,25 @@
   /* Inverse of light: deep gray with a hint of violet */
   --sidebar-bg: var(--paper);
   --sidebar-line: var(--line);
+  --ui-bg: #0b0b0b;
+  --ui-surface: #121212;
+  --ui-hover: #1b1b1b;
+  --ui-line: #222222;
+  --ui-line-strong: #333333;
+  --ui-ink: #ededed;
+  --ui-ink-2: #a3a3a0;
+  --ui-ink-3: #6b6b68;
 }
 
 @layer base {
   * { margin: 0; padding: 0; box-sizing: border-box; }
+}
+
+.ui-app {
+  --accent: var(--ui-accent);
+  --accent-rgb: 0, 153, 255;
+  --accent-ink: color-mix(in srgb, var(--ui-accent) 70%, var(--ui-ink));
+  --accent-solid: color-mix(in srgb, var(--ui-accent) 85%, #000);
 }
 /* Shared shell chrome: top bar + sidebar header divider alignment */
 .shell-top-header {

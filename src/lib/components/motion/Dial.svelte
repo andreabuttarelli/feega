@@ -53,12 +53,12 @@
   }
 
   .frame {
-    fill: var(--paper-2);
-    stroke: var(--line);
+    fill: var(--ui-surface);
+    stroke: var(--ui-line);
   }
 
   .needle {
-    stroke: #a855f7;
+    stroke: var(--ui-accent);
     stroke-width: 2;
   }
 </style>

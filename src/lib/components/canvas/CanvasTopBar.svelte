@@ -458,9 +458,9 @@
   }
 
   .rename-save {
-    border: 1px solid var(--ink, #1d1d1f);
-    background: var(--ink, #1d1d1f);
-    color: var(--paper, #fff);
+    border: 1px solid var(--ui-accent);
+    background: var(--ui-accent);
+    color: var(--ui-accent-ink);
     padding: 4px 8px;
     font: inherit;
     font-size: 12px;
@@ -495,9 +495,9 @@
     height: 30px;
     padding: 0 10px;
     flex-shrink: 0;
-    border: 1px solid var(--ink, #1d1d1f);
-    background: var(--ink, #1d1d1f);
-    color: var(--paper, #fff);
+    border: 1px solid var(--ui-line-strong);
+    background: var(--ui-bg);
+    color: var(--ui-ink);
     font: inherit;
     font-size: 12.5px;
     font-weight: 600;
