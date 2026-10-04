@@ -19,6 +19,8 @@
   import X from '@lucide/svelte/icons/x';
   import Crosshair from '@lucide/svelte/icons/crosshair';
   import ThemeSwitch from '$lib/components/ThemeSwitch.svelte';
+  import ChartSpline from '@lucide/svelte/icons/chart-spline';
+  import GraphEditor from '$lib/components/motion/GraphEditor.svelte';
   import { nullFromSelection } from '$lib/motion/parent-ops';
   import MotionPreview from '$lib/components/motion/MotionPreview.svelte';
   import type { StreamData } from '$lib/components/brand-agent/chat-session.svelte';
@@ -93,6 +95,7 @@
   let playing = $state(false);
   let zoom = $state(1.5);
   let snap = $state(Snap.On);
+  let graphOpen = $state(false);
   let saveState = $state<SaveState>(SaveState.Saved);
   let notice = $state('');
   const supabase = createSupabaseBrowserClient();
@@ -608,6 +611,7 @@
         <button type="button" title="Undo (⌘Z)" disabled={!canUndo(history)} onclick={undoEdit}><Undo size={14} /></button>
         <button type="button" title="Redo (⇧⌘Z)" disabled={!canRedo(history)} onclick={redoEdit}><Redo size={14} /></button>
         <button type="button" title="Snap" class:on={snap === Snap.On} onclick={() => (snap = snap === Snap.On ? Snap.Off : Snap.On)}><Magnet size={14} /></button>
+        <button type="button" title="Graph editor" aria-pressed={graphOpen} data-testid="graph-toggle" class:on={graphOpen} onclick={() => (graphOpen = !graphOpen)}><ChartSpline size={14} /></button>
         <span class="sep"></span>
         <button type="button" title="Zoom out (−)" onclick={COMMANDS[Command.ZoomOut]}><ZoomOut size={14} /></button>
         <button type="button" title="Zoom in (+)" onclick={COMMANDS[Command.ZoomIn]}><ZoomIn size={14} /></button>
@@ -615,7 +619,11 @@
       </div>
 
       <div class="tl">
-        <MotionTimeline {doc} bind:frame bind:selection bind:keySelection bind:camera={cameraOpen} {zoom} {snap} {waveforms} {assetUrls} onchange={edit} />
+        {#if graphOpen}
+          <GraphEditor {doc} {frame} {selection} bind:keySelection camera={cameraOpen} onchange={edit} />
+        {:else}
+          <MotionTimeline {doc} bind:frame bind:selection bind:keySelection bind:camera={cameraOpen} {zoom} {snap} {waveforms} {assetUrls} onchange={edit} />
+        {/if}
       </div>
     </section>
 

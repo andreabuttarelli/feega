@@ -178,7 +178,7 @@
     const preset = select.value as TextPreset;
     select.value = '';
     if (preset) {
-      commit(applyTextPreset(doc, clip.id, preset, { start: Math.max(0, frame - clip.from), duration: TEXT_PRESET_SECONDS * FPS }, crypto.randomUUID().slice(0, 8)), `Added ${preset}`);
+      commit(applyTextPreset(doc, clip.id, preset, { start: Math.max(0, frame - clip.from), duration: TEXT_PRESET_SECONDS * doc.fps }, crypto.randomUUID().slice(0, 8)), `Added ${preset}`);
     }
   }
 

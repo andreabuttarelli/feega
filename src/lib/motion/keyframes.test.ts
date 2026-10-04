@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import gsap from 'gsap';
 import { Ease } from './design';
-import { ANIMATABLE, Interp, TRANSFORM, easeName, isAnimatable, keyframesProblem, mixColor, sampleTrack, type Keyframe } from './keyframes';
+import { ANIMATABLE, EASE_BEZIER, Interp, TRANSFORM, easeName, isAnimatable, keyframesProblem, mixColor, sampleTrack, type Keyframe } from './keyframes';
 
 const track: Keyframe[] = [
   { frame: 0, value: 0, ease: Ease.Linear },
@@ -175,5 +175,15 @@ describe('interpolation kinds per keyframe', () => {
   it('roving is only for spatial props', () => {
     expect(keyframesProblem({ component: 'Title', mask: null, keyframes: { opacity: [key(0, 0), key(5, 1, { roving: true }), key(9, 0)] } })).toMatch(/roving/);
     expect(keyframesProblem({ component: 'Title', mask: null, keyframes: { x: [key(0, 0), key(5, 0.2, { roving: true }), key(9, 0.4)] } })).toBeNull();
+  });
+});
+
+describe('named ease handles', () => {
+  it('the sampler meets a non-bezier side with the same handle the graph editor shows', () => {
+    for (const ease of Object.values(Ease)) {
+      const [x1, y1] = EASE_BEZIER[ease];
+      const t = [key(0, 0, { ease }), key(10, 100, { in: Interp.Linear })];
+      expect(slope(t, 0, 1)).toBeCloseTo((y1 / x1) * 10, 1);
+    }
   });
 });

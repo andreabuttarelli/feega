@@ -131,3 +131,39 @@ describe('motion agent keyframe interpolation', () => {
     expect(keys[1]).toMatchObject({ roving: true });
   });
 });
+
+describe('motion agent graph tools', () => {
+  async function keyed() {
+    const t = setup();
+    await t.run('add_clip', { component: 'Title', start: 0, duration: 3 });
+    await t.run('set_keyframes', { clip_id: 'id1', prop: 'rotateZ', keyframes: [{ time: 0, value: 0, ease: 'standard' }, { time: 1, value: 90, ease: 'standard' }, { time: 2, value: 0, ease: 'standard' }] });
+    return t;
+  }
+
+  it('apply_ease_preset easy-eases the keyframes at the given times', async () => {
+    const { session, run } = await keyed();
+    const out = await run('apply_ease_preset', { clip_id: 'id1', prop: 'rotateZ', times: [1], preset: 'easy-ease' });
+
+    expect(out.ok).toBe(true);
+    const track = findClip(session.doc, 'id1')!.clip.keyframes.rotateZ;
+    expect((track[1].ease as number[]).slice(0, 2)).toEqual([1 / 3, 0]);
+  });
+
+  it('set_ease_handles takes influence in percent and speed in units per second', async () => {
+    const { session, run } = await keyed();
+    const out = await run('set_ease_handles', { clip_id: 'id1', prop: 'rotateZ', time: 0, out_influence: 50, out_speed: 0, in_influence: 25, in_speed: 90 });
+
+    expect(out.ok).toBe(true);
+    const ease = findClip(session.doc, 'id1')!.clip.keyframes.rotateZ[0].ease as number[];
+    expect(ease[0]).toBeCloseTo(0.5, 9);
+    expect(ease[1]).toBeCloseTo(0, 9);
+    expect(ease[2]).toBeCloseTo(0.75, 9);
+    expect(ease[3]).toBeCloseTo(1 - (90 * 0.25 * 30) / (90 * 30), 9);
+  });
+
+  it('set_ease_handles on the last keyframe says there is no segment after it', async () => {
+    const { run } = await keyed();
+    const out = await run('set_ease_handles', { clip_id: 'id1', prop: 'rotateZ', time: 2, out_influence: 50 });
+    expect(out.ok).toBe(false);
+  });
+});
