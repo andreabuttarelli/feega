@@ -6,6 +6,13 @@ describe('render quote', () => {
     expect(renderQuote({ width: 1080, height: 1920, durationInFrames: 450, fps: 30 })).toEqual({ seconds: 15, resolution: Resolution.P1080, credits: 4 });
   });
 
+  it('motion blur costs one render per sample', () => {
+    const blur = { enabled: true, shutterAngle: 180, shutterPhase: -90, samples: 8 };
+
+    expect(renderQuote({ width: 1080, height: 1920, durationInFrames: 450, fps: 30, motionBlur: blur }).credits).toBe(32);
+    expect(renderQuote({ width: 1080, height: 1920, durationInFrames: 450, fps: 30, motionBlur: { ...blur, enabled: false } }).credits).toBe(4);
+  });
+
   it('720p costs one credit per started ten seconds', () => {
     expect(renderQuote({ width: 1280, height: 720, durationInFrames: 301, fps: 30 }).credits).toBe(2);
     expect(renderQuote({ width: 1280, height: 720, durationInFrames: 300, fps: 30 }).credits).toBe(1);

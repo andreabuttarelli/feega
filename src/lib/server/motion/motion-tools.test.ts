@@ -60,6 +60,34 @@ describe('motion agent tools at another frame rate', () => {
   });
 });
 
+describe('motion blur through the agent', () => {
+  it('set_motion_blur turns the shutter on for the video and keeps the rest as it was', async () => {
+    const { session, run } = setup();
+
+    expect((await run('set_motion_blur', { enabled: true, shutter_angle: 270 })).ok).toBe(true);
+    expect(session.doc.motionBlur).toEqual({ enabled: true, shutterAngle: 270, shutterPhase: -90, samples: 8 });
+    expect(((await run('get_motion_doc', {})) as { motionBlur: { enabled: boolean } }).motionBlur.enabled).toBe(true);
+  });
+
+  it('set_motion_blur leaves chosen clips sharp and the agent reads it back per clip', async () => {
+    const { session, run } = setup();
+    await run('add_clip', { component: 'Title', start: 0 });
+
+    expect((await run('set_motion_blur', { clip_ids: ['id1'], clips_blur: false })).ok).toBe(true);
+    expect(findClip(session.doc, 'id1')?.clip.motionBlur).toBe(false);
+    const doc = (await run('get_motion_doc', {})) as { tracks: { clips: { motionBlur: boolean }[] }[] };
+    expect(doc.tracks[0].clips[0].motionBlur).toBe(false);
+  });
+
+  it('an unknown clip is refused and nothing changes', async () => {
+    const { session, run } = setup();
+    const before = session.doc;
+
+    expect((await run('set_motion_blur', { clip_ids: ['nope'], clips_blur: false })).ok).toBe(false);
+    expect(session.doc).toBe(before);
+  });
+});
+
 describe('motion agent tools', () => {
   it('set_track renames and reorders a track; remove_track drops it with its clips', async () => {
     const { session, run } = setup();

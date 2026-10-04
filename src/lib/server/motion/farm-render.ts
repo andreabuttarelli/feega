@@ -5,7 +5,9 @@ import { ExportFormat, FORMAT, Master, Quality } from '$lib/motion/export-format
 import { assembleArgs, audioMixArgs, concatList, zipArgs } from './render-commands';
 import { FARM_JOB_DIR, FARM_RUNTIME_DIR, type FarmWorker, type RenderFarm } from './render-farm';
 
-export type FarmJob = { html: string; width: number; height: number; fps: number; totalFrames: number; audio: AudioEntry[]; allowHosts: string[]; format: ExportFormat; quality: Quality };
+export type FarmJob = { html: string; width: number; height: number; fps: number; totalFrames: number; audio: AudioEntry[]; allowHosts: string[]; format: ExportFormat; quality: Quality; motionBlur: Shutter | null };
+
+export type Shutter = { shutterAngle: number; shutterPhase: number; samples: number };
 
 export class RenderFailure extends Error {}
 
@@ -17,14 +19,31 @@ export enum RenderRoute {
 const RUNTIME_HOSTS = ['cdn.jsdelivr.net', new URL(FONT_CSS_ORIGIN).host, new URL(FONT_FILE_ORIGIN).host];
 const OUTPUT_TAIL = 600;
 const MAX_PARALLEL_CHUNKS = 16;
+const WHOLE_CAPTURE_WORKERS = 6;
+const BLUR_BUDGET = 4000;
+const FULL_HD_PIXELS = 1920 * 1080;
+
+const blurWork = (job: FarmJob) => (job.motionBlur ? (job.totalFrames * job.motionBlur.samples * job.width * job.height) / FULL_HD_PIXELS : 0);
+
+const WORKER_VCPUS: Record<RenderRoute, number> = {
+  [RenderRoute.Chunked]: 4,
+  [RenderRoute.Whole]: 8
+};
 
 const WORKER_TIMEOUT_MS = 5 * 60_000;
 
 type Rule = { because: string; applies: (job: FarmJob) => boolean };
 
-const WHOLE_ONLY: Rule[] = [{ because: 'chunked renders run at 24, 30 or 60 fps only', applies: (job) => ![24, 30, 60].includes(job.fps) }];
+const WHOLE_ONLY: Rule[] = [
+  { because: 'chunked renders run at 24, 30 or 60 fps only', applies: (job) => ![24, 30, 60].includes(job.fps) },
+  { because: 'the distributed producer has no motion blur', applies: (job) => job.motionBlur !== null }
+];
 
-const REFUSED: Rule[] = [{ because: 'H.265 renders at 24, 30 or 60 fps', applies: (job) => FORMAT[job.format].master === Master.H265 && routeOf(job) === RenderRoute.Whole }];
+const REFUSED: Rule[] = [
+  { because: 'H.265 renders at 24, 30 or 60 fps without motion blur', applies: (job) => FORMAT[job.format].master === Master.H265 && routeOf(job) === RenderRoute.Whole },
+  { because: 'motion blur cannot render Video clips: turn it off or remove the video', applies: (job) => job.motionBlur !== null && job.html.includes('<video') },
+  { because: `motion blur renders up to ${BLUR_BUDGET} samples at 1080p on one machine: lower the samples, the frame rate or the length`, applies: (job) => blurWork(job) > BLUR_BUDGET }
+];
 
 const MASTER: Record<Master, { format: string; codec?: string; ext: string }> = {
   [Master.H264]: { format: 'mp4', codec: 'h264', ext: 'mp4' },
@@ -74,9 +93,10 @@ type WorkerSpec = { route: RenderRoute; project: string; planDir: string; index:
 
 function workerSpec(job: FarmJob, index: number, chunkSize: number): WorkerSpec {
   const { format, codec } = masterOf(job);
-  const base = { fps: job.fps, quality: job.quality, format };
+  const blur = job.motionBlur ? { motionBlur: { shutterAngle: job.motionBlur.shutterAngle, shutterPhase: job.motionBlur.shutterPhase, samplesPerFrame: job.motionBlur.samples } } : {};
+  const base = { fps: job.fps, quality: job.quality, format, ...blur };
   const route = routeOf(job);
-  const config = route === RenderRoute.Chunked ? { ...base, ...(codec ? { codec } : {}), width: job.width, height: job.height, chunkSize, maxParallelChunks: MAX_PARALLEL_CHUNKS, runtimeCap: 'none' } : base;
+  const config = route === RenderRoute.Chunked ? { ...base, ...(codec ? { codec } : {}), width: job.width, height: job.height, chunkSize, maxParallelChunks: MAX_PARALLEL_CHUNKS, runtimeCap: 'none' } : { ...base, workers: WHOLE_CAPTURE_WORKERS };
   return { route, project: PROJECT_DIR, planDir: PLAN_DIR, index, out: chunkPath(job, index), config };
 }
 
@@ -132,7 +152,7 @@ export async function renderOnFarm(farm: RenderFarm, job: FarmJob, onEvent: (e: 
     throw new RenderFailure(refused);
   }
   const { size, count } = farmChunks(job);
-  const spec = { allowHosts: [...new Set([...job.allowHosts, ...RUNTIME_HOSTS])], timeoutMs: WORKER_TIMEOUT_MS };
+  const spec = { allowHosts: [...new Set([...job.allowHosts, ...RUNTIME_HOSTS])], timeoutMs: WORKER_TIMEOUT_MS, vcpus: WORKER_VCPUS[routeOf(job)] };
   const opened = await Promise.allSettled(Array.from({ length: count }, () => farm.open(spec)));
   const workers = opened.flatMap((o) => (o.status === 'fulfilled' ? [o.value] : []));
 

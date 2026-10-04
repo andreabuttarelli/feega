@@ -29,6 +29,8 @@ import { BLEND_MODES } from '$lib/motion/blend';
 import { ANIMATOR_UNITS, SELECTOR_SHAPES, SELECTOR_KEYS, VALUES, VALUE_KEYS, animatorKey } from '$lib/motion/text-animators/model';
 import { PRESETS as TEXT_PRESET_SPECS, TEXT_PRESETS, addAnimator, applyPreset as applyTextPreset, removeAnimator, setAnimator } from '$lib/motion/text-animators/ops';
 import { setBlendMode } from '$lib/motion/blend-ops';
+import { setClipsBlur, setMotionBlur } from '$lib/motion/motion-blur-ops';
+import { DEGREES, MAX_SAMPLES } from '$lib/motion/motion-blur';
 
 export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number };
 
@@ -62,6 +64,7 @@ function summary(doc: MotionDoc, selection: string[]) {
     height: doc.height,
     fps: doc.fps,
     background: doc.background,
+    motionBlur: doc.motionBlur,
     duration: secs(doc.durationInFrames),
     selected: selection,
     tracks: doc.tracks.map((t) => ({
@@ -88,7 +91,8 @@ function summary(doc: MotionDoc, selection: string[]) {
         expressions: c.expressions,
         effects: c.effects,
         blend: c.blend,
-        animators: c.animators
+        animators: c.animators,
+        motionBlur: c.motionBlur
       }))
     })),
     assets: doc.assets,
@@ -489,6 +493,24 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: `Blend a visual clip with the layers below it, like a layer mode in After Effects: ${BLEND_MODES.join(', ')}. normal turns it off. Blending is per clip (children do not inherit it); with the camera on, a blended world clip keeps its camera motion and paints over the world layers, blending with them.`,
       inputSchema: z.object({ clip_id: z.string(), mode: z.enum(BLEND_MODES) }),
       execute: async (input) => apply(setBlendMode(session.doc, input.clip_id, input.mode), `${input.mode} blend on ${input.clip_id}`)
+    }),
+
+    set_motion_blur: tool({
+      description: `Real motion blur, like After Effects: each frame averages sub-frame samples across the shutter, so fast moves smear. Video-wide: enabled, shutter_angle (degrees open, 180 is film), shutter_phase (degrees, -90 centres the shutter on the frame), samples (2..${MAX_SAMPLES}, 8 is enough for most moves; more costs more render time). Per clip: clip_ids with clips_blur false keeps those clips sharp. Renders on our servers in one pass; videos with Video clips cannot blur.`,
+      inputSchema: z.object({
+        enabled: z.boolean().optional(),
+        shutter_angle: z.number().min(1).max(DEGREES).optional(),
+        shutter_phase: z.number().min(-DEGREES).max(DEGREES).optional(),
+        samples: z.number().int().min(2).max(MAX_SAMPLES).optional(),
+        clip_ids: z.array(z.string()).optional(),
+        clips_blur: z.boolean().optional()
+      }),
+      execute: async (input) => {
+        const patch = Object.fromEntries(Object.entries({ enabled: input.enabled, shutterAngle: input.shutter_angle, shutterPhase: input.shutter_phase, samples: input.samples }).filter(([, v]) => v !== undefined));
+        const shutter = setMotionBlur(session.doc, patch);
+        const clips = shutter.ok && input.clip_ids ? setClipsBlur(shutter.doc, input.clip_ids, input.clips_blur ?? true) : shutter;
+        return apply(clips, 'changed motion blur');
+      }
     }),
 
     list_fonts: tool({

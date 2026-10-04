@@ -146,6 +146,23 @@ describe('MotionDoc to HyperFrames composition', () => {
   });
 });
 
+describe('motion blur in the composition', () => {
+  const blurred = { ...doc, motionBlur: { ...doc.motionBlur, enabled: true } };
+  const sharpTitle = { ...blurred, tracks: blurred.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === 'title' ? { ...c, motionBlur: false } : c)) })) };
+
+  it('a clip that opts out is marked and its tweens are held on the frame', () => {
+    const html = composeHtml({ doc: sharpTitle, tokens: FEEGA_TOKENS, assets: {} });
+
+    expect(html).toMatch(/data-clip="title"[^>]*data-blur="off"/);
+    expect(html).toContain('function holdStill');
+  });
+
+  it('nothing is held when every clip blurs or blur is off', () => {
+    expect(composeHtml({ doc: blurred, tokens: FEEGA_TOKENS, assets: {} })).not.toContain('holdStill');
+    expect(composeHtml({ doc: { ...sharpTitle, motionBlur: doc.motionBlur }, tokens: FEEGA_TOKENS, assets: {} })).not.toContain('data-blur');
+  });
+});
+
 describe('background of the frame', () => {
   it('paints the brand background by default', () => {
     expect(composeHtml({ doc, tokens: FEEGA_TOKENS, assets: {} })).toContain(`#root{background:${FEEGA_TOKENS.colors['brand.background']}}`);

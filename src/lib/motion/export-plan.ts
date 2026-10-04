@@ -1,5 +1,6 @@
 import type { MotionDoc } from './doc';
 import { Resolution } from './render-quote';
+import { BROWSER_SAMPLES, sampleTimes } from './motion-blur';
 
 export enum Support {
   Full = 'full',
@@ -28,8 +29,14 @@ export function exportSize(doc: Pick<MotionDoc, 'width' | 'height'>, resolution:
   return { width: even(doc.width * factor), height: even(doc.height * factor) };
 }
 
-export function frameTimes(doc: Pick<MotionDoc, 'durationInFrames' | 'fps'>): number[] {
-  return Array.from({ length: doc.durationInFrames }, (_, i) => i / doc.fps);
+type Timed = Pick<MotionDoc, 'durationInFrames' | 'fps' | 'motionBlur'>;
+
+export function samplesPerFrame(doc: Timed): number {
+  return sampleTimes(0, doc.fps, doc.motionBlur, BROWSER_SAMPLES).length;
+}
+
+export function frameTimes(doc: Timed): number[] {
+  return Array.from({ length: doc.durationInFrames }, (_, i) => sampleTimes(i, doc.fps, doc.motionBlur, BROWSER_SAMPLES)).flat();
 }
 
 export function eta(progress: { done: number; total: number; elapsedMs: number }): number | null {

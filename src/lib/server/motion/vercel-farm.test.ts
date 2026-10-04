@@ -52,11 +52,11 @@ describe('vercelFarm', () => {
     sdk.getOrCreate.mockResolvedValue(fakeSandbox());
     sdk.fork.mockResolvedValue(fakeSandbox('running'));
 
-    await vercelFarm({ token: 't', teamId: 'team', projectId: 'prj' }).open({ allowHosts: ['x.supabase.co'], timeoutMs: 60_000 });
+    await vercelFarm({ token: 't', teamId: 'team', projectId: 'prj' }).open({ allowHosts: ['x.supabase.co'], timeoutMs: 60_000, vcpus: 8 });
 
     expect(sdk.getOrCreate).toHaveBeenCalledWith(expect.objectContaining({ name: FARM_BASE, persistent: true, token: 't' }));
     const forked = sdk.fork.mock.calls[0][0];
-    expect(forked).toMatchObject({ sourceSandbox: FARM_BASE, networkPolicy: { allow: ['x.supabase.co'] }, timeout: 60_000, persistent: false, env: {} });
+    expect(forked).toMatchObject({ sourceSandbox: FARM_BASE, networkPolicy: { allow: ['x.supabase.co'] }, timeout: 60_000, resources: { vcpus: 8 }, persistent: false, env: {} });
   });
 
   it('a base still running after its setup is stopped, so forks start from its snapshot', async () => {
@@ -64,7 +64,7 @@ describe('vercelFarm', () => {
     sdk.getOrCreate.mockResolvedValue(base);
     sdk.fork.mockResolvedValue(fakeSandbox('running'));
 
-    await vercelFarm({}).open({ allowHosts: [], timeoutMs: 1 });
+    await vercelFarm({}).open({ allowHosts: [], timeoutMs: 1, vcpus: 4 });
 
     expect(base.stop).toHaveBeenCalled();
   });
@@ -74,7 +74,7 @@ describe('vercelFarm', () => {
     sdk.fork.mockResolvedValue(fakeSandbox('running'));
     const farm = vercelFarm({});
 
-    await Promise.all([farm.open({ allowHosts: [], timeoutMs: 1 }), farm.open({ allowHosts: [], timeoutMs: 1 })]);
+    await Promise.all([farm.open({ allowHosts: [], timeoutMs: 1, vcpus: 4 }), farm.open({ allowHosts: [], timeoutMs: 1, vcpus: 4 })]);
 
     expect(sdk.getOrCreate).toHaveBeenCalledTimes(1);
     expect(sdk.fork).toHaveBeenCalledTimes(2);
@@ -84,7 +84,7 @@ describe('vercelFarm', () => {
     const box = fakeSandbox('running');
     sdk.getOrCreate.mockResolvedValue(fakeSandbox());
     sdk.fork.mockResolvedValue(box);
-    const worker = await vercelFarm({}).open({ allowHosts: [], timeoutMs: 1 });
+    const worker = await vercelFarm({}).open({ allowHosts: [], timeoutMs: 1, vcpus: 4 });
 
     expect(await worker.run('ffmpeg', ['-v'])).toEqual({ exitCode: 0, output: 'out\nerr\n' });
     await worker.write([{ path: '/a', content: Buffer.from('x') }]);
@@ -101,8 +101,8 @@ describe('vercelFarm', () => {
     sdk.fork.mockResolvedValue(fakeSandbox('running'));
     const farm = vercelFarm({});
 
-    await expect(farm.open({ allowHosts: [], timeoutMs: 1 })).rejects.toThrow('quota');
-    await farm.open({ allowHosts: [], timeoutMs: 1 });
+    await expect(farm.open({ allowHosts: [], timeoutMs: 1, vcpus: 4 })).rejects.toThrow('quota');
+    await farm.open({ allowHosts: [], timeoutMs: 1, vcpus: 4 });
 
     expect(sdk.getOrCreate).toHaveBeenCalledTimes(2);
   });

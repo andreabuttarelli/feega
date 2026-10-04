@@ -7,7 +7,6 @@ export type FarmAccess = { token?: string; teamId?: string; projectId?: string }
 const BASE_SETUP_REVISION = 2;
 export const FARM_BASE = `feega-motion-render-${HYPERFRAMES_VERSION.replaceAll('.', '-')}-r${BASE_SETUP_REVISION}`;
 
-const WORKER_VCPUS = 4;
 const BASE_VCPUS = 8;
 const BASE_SETUP_TIMEOUT_MS = 10 * 60_000;
 
@@ -73,7 +72,7 @@ export function vercelFarm(access: FarmAccess): RenderFarm {
       const sandbox = await Sandbox.fork({
         ...access,
         sourceSandbox: FARM_BASE,
-        resources: { vcpus: WORKER_VCPUS },
+        resources: { vcpus: spec.vcpus },
         timeout: spec.timeoutMs,
         networkPolicy: { allow: spec.allowHosts },
         persistent: false,

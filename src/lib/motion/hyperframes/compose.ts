@@ -1,7 +1,7 @@
 import { THREE_D_COMPONENTS, type ComponentId } from '../components';
 import { Ease, TransitionKind, type Edge } from '../design';
 import { GSAP_EASE, easeName } from '../keyframes';
-import { Background, type MotionClip, type MotionDoc } from '../doc';
+import { Background, clipsOf, type MotionClip, type MotionDoc } from '../doc';
 import { resolveColor, type BrandTokens } from '../brand';
 import { css, esc, js, seconds } from './html';
 import { TEMPLATES, Timing, type PropsOf, type TemplateCtx, type Tween, type Vars } from './templates';
@@ -26,6 +26,7 @@ import { ANIMATOR_CSS, textRender } from '../text-animators/render';
 import { declaredFamilyCss, fontStack, loadDescriptors, googleFontsUrl, loadedWeight, uploadFaceCss, usedFaces } from '../fonts/model';
 import { EFFECT_CSS, effectLayer, effectScript, effectTimeline } from '../effects/render';
 import { blendStyle } from '../blend';
+import { HELD, holdScript } from './blur';
 
 export { CAPTURE_REPLY, CAPTURE_REQUEST } from './capture';
 
@@ -151,17 +152,18 @@ enum Visibility {
   MatteSource = 'matte-source'
 }
 
-type Placed = { layer: number; trackIndex: number; matte: Mask | null; visibility: Visibility; transform?: string; chain: MotionClip[] };
+type Placed = { layer: number; trackIndex: number; matte: Mask | null; visibility: Visibility; transform?: string; chain: MotionClip[]; held: boolean };
 
 function clipHtml(clip: MotionClip, ctx: TemplateCtx<ComponentId>, placed: Placed): string {
   const template = TEMPLATES[clip.component] as (typeof TEMPLATES)[ComponentId];
   const inner = matted(clip, ctx, placed.matte, wrapParents(placed.chain, clip, ctx, wrapAnimated(clip, ctx, effectLayer(clip, ctx, ctx.color, ownMask(clip, ctx, template.html(ctx as never))))));
   const fx = `<div class="fx" id="fx-${clip.id}">${inner}</div>`;
   const style = css({ zIndex: placed.layer, transform: placed.transform, mixBlendMode: blendStyle(clip.blend) });
+  const blur = placed.held ? ` ${HELD}` : '';
   const layer =
     template.timing === Timing.Media
-      ? `<div class="layer" data-clip="${esc(clip.id)}" style="${style}">${fx}</div>`
-      : `<div id="c-${clip.id}" class="clip layer" data-clip="${esc(clip.id)}" data-start="${ctx.start}" data-duration="${ctx.length}" data-track-index="${placed.trackIndex}" style="${style}">${fx}</div>`;
+      ? `<div class="layer" data-clip="${esc(clip.id)}"${blur} style="${style}">${fx}</div>`
+      : `<div id="c-${clip.id}" class="clip layer" data-clip="${esc(clip.id)}" data-start="${ctx.start}" data-duration="${ctx.length}" data-track-index="${placed.trackIndex}"${blur} style="${style}">${fx}</div>`;
 
   return placed.visibility === Visibility.MatteSource ? `<div class="matte-src" style="display:none">${layer}</div>` : layer;
 }
@@ -321,6 +323,7 @@ export function composeHtml(raw: ComposeInput): string {
   const startPose = new Map(stage ? cameraMath(sampleTrack).frameAt(stage, 0).layers.map((l) => [l.id, l.transform]) : []);
   const world: string[] = [];
   const byId = new Map(doc.tracks.flatMap((t) => t.clips as MotionClip[]).map((c) => [c.id, c]));
+  const held = new Set(doc.motionBlur.enabled ? clipsOf(doc).filter((c) => !c.motionBlur).map((c) => c.id) : []);
   let layer = 0;
 
   for (const { track, index } of bottomFirst) {
@@ -329,7 +332,7 @@ export function composeHtml(raw: ComposeInput): string {
       clips.push(clip);
       const template = TEMPLATES[clip.component] as (typeof TEMPLATES)[ComponentId];
       layer += 1;
-      const html = clipHtml(clip, ctx, { layer, trackIndex: index, matte: matteOf(doc, clip), visibility: hidden.has(clip.id) ? Visibility.MatteSource : Visibility.Shown, transform: startPose.get(clip.id), chain: ancestorsOf(doc, clip.id).map((id) => byId.get(id)!) });
+      const html = clipHtml(clip, ctx, { layer, trackIndex: index, matte: matteOf(doc, clip), visibility: hidden.has(clip.id) ? Visibility.MatteSource : Visibility.Shown, transform: startPose.get(clip.id), chain: ancestorsOf(doc, clip.id).map((id) => byId.get(id)!), held: held.has(clip.id) });
       (onStage.has(clip.id) ? world : layers).push(html);
       const own = template.tweens?.(ctx as never) ?? [];
       tweens.push(...edgeTweens(clip, doc.fps), ...moveTweens(clip, doc.fps), ...own);
@@ -382,7 +385,7 @@ export function composeHtml(raw: ComposeInput): string {
     layers.join(''),
     fontProbe(doc),
     '</div>',
-    `<script>${animation.setup}const tl=gsap.timeline({paused:true});${holds.map(holdLine).join('')}${tweens.map(tweenLine).join('')}${animation.timeline}${effectScript(clips.flatMap((c) => effectTimeline(c, doc, (v) => resolveColor(v, tokens))))}tl.set({}, {}, ${duration});window.__timelines=window.__timelines||{};window.__timelines[${js(COMPOSITION_ID)}]=tl;</script>`,
+    `<script>${animation.setup}const tl=gsap.timeline({paused:true});${holds.map(holdLine).join('')}${tweens.map(tweenLine).join('')}${animation.timeline}${effectScript(clips.flatMap((c) => effectTimeline(c, doc, (v) => resolveColor(v, tokens))))}${held.size ? holdScript(doc.fps, doc.motionBlur) : ''}tl.set({}, {}, ${duration});window.__timelines=window.__timelines||{};window.__timelines[${js(COMPOSITION_ID)}]=tl;</script>`,
     definitions,
     customBoot,
     stage ? `<script>${stageScript(stage, doc.fps, Number(duration))}</script>` : '',
