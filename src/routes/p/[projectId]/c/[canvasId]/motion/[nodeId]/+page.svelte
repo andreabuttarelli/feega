@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { deserialize } from '$app/forms';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
@@ -71,6 +72,8 @@
   import { composeHtml } from '$lib/motion/hyperframes/compose';
   import { feegaTrailer } from '$lib/motion/trailer';
   import { loadPeaks } from '$lib/motion/waveform';
+  import { audioPlan } from '$lib/motion/audio-plan';
+  import { previewAudio } from '$lib/motion/preview-audio';
   import { AD_TEMPLATES, AD_TEMPLATE_IDS, templateAssets, type AdTemplate } from '$lib/motion/ad-templates';
   import { composeEditorPath } from '$lib/motion/composition-draft';
   import type { PageData } from './$types';
@@ -134,6 +137,17 @@
     const ids = new Set(d.tracks.flatMap((t) => t.clips.map((c) => (c.props as { assetId?: string | null }).assetId ?? '')));
     return [...ids].filter((id) => assetUrls[id] && assets.some((a) => a.id === id && (a.kind === AssetKind.Audio || a.kind === AssetKind.Video))).map((id) => [id, assetUrls[id]]);
   }
+
+  const speaker = previewAudio();
+
+  $effect(() => {
+    if (!playing) {
+      speaker.stop();
+      return;
+    }
+    void speaker.play(audioPlan(doc, assetUrls), untrack(() => frame) / doc.fps);
+    return () => speaker.stop();
+  });
 
   $effect(() => {
     for (const [id, url] of soundAssets) {

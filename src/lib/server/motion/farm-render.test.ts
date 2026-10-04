@@ -45,7 +45,7 @@ const job: FarmJob = {
   height: 1080,
   fps: 30,
   totalFrames: 840,
-  audio: [{ clipId: 'm', url: 'https://x.supabase.co/m.mp3', at: 0, offset: 0, duration: 28, volume: 1, fadeIn: 1, fadeOut: 2 }],
+  audio: [{ clipId: 'm', url: 'https://x.supabase.co/m.mp3', at: 0, offset: 0, duration: 28, left: [{ time: 0, value: 1 }, { time: 28, value: 1 }], right: [{ time: 0, value: 1 }, { time: 28, value: 1 }] }],
   allowHosts: ['x.supabase.co'],
   format: ExportFormat.Mp4H264,
   quality: Quality.High,

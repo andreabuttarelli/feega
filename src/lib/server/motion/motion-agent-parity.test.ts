@@ -44,7 +44,7 @@ const CLIP: Record<string, Access> = {
   transitionIn: { write: ['set_transition'], read: 'in' },
   transitionOut: { write: ['set_transition'], read: 'out' },
   transform: { write: ['set_transform'], read: 'transform' },
-  keyframes: { write: ['set_keyframes', 'remove_keyframes'], read: 'keyframes' },
+  keyframes: { write: ['set_keyframes', 'remove_keyframes', 'duck_audio'], read: 'keyframes' },
   mask: { write: ['set_mask', 'remove_mask'], read: 'mask' },
   matte: { write: ['set_track_matte'], read: 'matte' },
   depth: { write: ['set_clip_depth'], read: 'depth' },

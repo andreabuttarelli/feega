@@ -102,7 +102,15 @@ describe('MotionDoc to HyperFrames composition', () => {
     const html = compose(withAudio, { v: '/v.mp4', a: '/a.mp3' });
 
     expect(html).toContain('<video id="c-vid" src="/v.mp4" crossorigin="anonymous"');
-    expect(html).toContain('<audio id="c-mus" src="/a.mp3" crossorigin="anonymous"');
+  });
+
+  it('sound stays out of the composition: one mixer plays it in preview and export alike', () => {
+    const loud = must(addClip(doc, { component: 'Video', from: 0, props: { assetId: 'v', volume: 1 } }, 'vid'));
+    const withAudio = must(addClip(loud, { component: 'Audio', from: 0, props: { assetId: 'a' } }, 'mus'));
+    const html = compose(withAudio, { v: '/v.mp4', a: '/a.mp3' });
+
+    expect(html).not.toContain('<audio');
+    expect(html).toMatch(/<video id="c-vid"[^>]* muted /);
   });
 
   it('is deterministic', () => {
