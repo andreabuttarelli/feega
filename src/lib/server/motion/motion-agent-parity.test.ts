@@ -43,7 +43,8 @@ const CLIP: Record<string, Access> = {
   space: { write: ['set_clip_depth'], read: 'space' },
   parent: { write: ['set_parent', 'parent_clips'], read: 'parent' },
   parentOpacity: { write: ['set_parent'], read: 'parentOpacity' },
-  expressions: { write: ['set_expression'], read: 'expressions' }
+  expressions: { write: ['set_expression'], read: 'expressions' },
+  effects: { write: ['add_effect', 'set_effect', 'remove_effect'], read: 'effects' }
 };
 
 const CAMERA: Record<string, Access> = {

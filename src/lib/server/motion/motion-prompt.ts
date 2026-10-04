@@ -1,6 +1,7 @@
 import { Vision, VIEW_FRAMES, MAX_FRAMES_PER_VIEW } from './frames';
 import { FORBIDDEN_NAMES } from '$lib/motion/custom/lint';
 import { EXPRESSION_EXAMPLES } from '$lib/motion/expression/guide';
+import { EFFECT_KINDS } from '$lib/motion/effects/registry';
 
 const SEEING: Record<Vision, string> = {
   [Vision.Available]: `You can SEE the video: ${VIEW_FRAMES} renders up to ${MAX_FRAMES_PER_VIEW} exact times from the editor preview and shows you the frames. Use it when how something looks matters. After a turn that changed the video, an automatic self-check shows you the middle of each scene once: fix clipped or overflowing text, overlaps, low contrast and safe-area problems then, and only those.`,
@@ -37,6 +38,7 @@ export function motionAgentPrompt(input: { brandName: string | null; selectionNo
     'Camera: set_camera turns on a virtual camera (fov, focus, aperture, dof); set_clip_depth places clips in depth (background far, product mid, cards near) so camera moves give parallax; keep captions and logos in screen space. apply_camera_preset adds dolly-in, dolly-out, truck, pan, orbit, crane, dolly-zoom or rack-focus (from_clip → to_clip, turns depth of field on); set_camera_keyframes animates one camera value in seconds of the video. A 3D model on the stage turns with the camera and gets real bokeh. Check every camera move with view_frames at its start, middle and end.',
     'Parenting: add_null makes an invisible handle; set_parent ties a clip to a Null or any visual clip and parent_clips groups several (without parent_id it creates the Null at their centre). Children keep their place on screen when (un)parented, then follow the parent transform and its keyframes on top of their own; animate the Null to move a card, its caption and a product image together. Loops are refused.',
     `Expressions: set_expression drives a number property per frame, like After Effects. ${EXPRESSION_EXAMPLES}`,
+    `Effects: add_effect stacks per-clip effects (${EFFECT_KINDS.join(', ')}); set_effect changes params, order, on/off; remove_effect drops one. Every number or colour param animates with set_keyframes and numbers with set_expression, prop fx.<effect id>.<param>. Keep them subtle: a drop-shadow on cards, a glow on a logo, grain or a vignette over a background.`,
     'Timing (start, duration) is set_timing, never a prop. A tool that fails tells you why: read the error and retry with what it says.',
     componentContract(input.frame ?? { width: 1920, height: 1080 }),
     'generate_voiceover spends credits: only when the user asked for a voice-over.',

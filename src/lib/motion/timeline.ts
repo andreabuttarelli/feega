@@ -111,7 +111,8 @@ export function addClip(doc: MotionDoc, input: NewClip, id: string): OpResult {
     space: Space.World,
     parent: null,
     parentOpacity: ParentOpacity.Inherit,
-    expressions: {}
+    expressions: {},
+    effects: []
   };
 
   return fitted({ ...doc, tracks: doc.tracks.map((t) => (t.id === track.id ? { ...t, clips: [...t.clips, clip] } : t)) });
