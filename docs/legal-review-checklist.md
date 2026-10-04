@@ -63,3 +63,9 @@
 
 - [ ] **Engine licence**: the editor runs on HyperFrames (Apache-2.0). Remotion was tried and removed; if it ever comes back, its company licence is required above 3 employees and server rendering is billed per render (automator pricing). Nothing bought.
 - [ ] **AWS Lambda rendering** (not live): adds AWS as a sub-processor for rendered videos once configured.
+
+## Motion 3D look (04/10/2026)
+
+- [ ] **HDRI environments**: Poly Haven files (CC0, no attribution required) served from the three.js repo on jsDelivr, pinned to tag `r181`: `pedestrian_overpass_1k`, `venice_sunset_1k`, `spruit_sunrise_1k`, `quarry_01_1k`, `moonless_golf_1k`. Credit kept in CREDITS.md as courtesy.
+- [ ] **3D text fonts**: outlines come from Fontsource on jsDelivr (Google Fonts, SIL OFL / Apache-2.0: embedding in rendered video is allowed) or from the user's uploaded file — the user warrants the rights to an uploaded font (Terms §user content).
+- [ ] **opentype.js** 1.3.4 (MIT) loaded in the render page to read font outlines.

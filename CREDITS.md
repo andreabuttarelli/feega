@@ -23,6 +23,11 @@ software we use, as their licenses ask.
 - **Inter** by Rasmus Andersson, [SIL Open Font License 1.1](https://openfontlicense.org/).
 - **Fraunces** by Undercase Type, [SIL Open Font License 1.1](https://openfontlicense.org/).
 
+## 3D environments
+
+- Environment lighting for 3D clips uses HDRIs from [Poly Haven](https://polyhaven.com/) (CC0):
+  Pedestrian Overpass, Venice Sunset, Spruit Sunrise, Quarry 01, Moonless Golf.
+
 ## Open-source software
 
 feega runs on open-source software. The main projects:
@@ -37,6 +42,8 @@ feega runs on open-source software. The main projects:
 | [svelte-i18n](https://github.com/kaisermann/svelte-i18n) | translations | MIT |
 | [Supabase JS](https://github.com/supabase/supabase-js) | data and storage client | MIT |
 | [AI SDK](https://ai-sdk.dev/) | calling AI models | Apache 2.0 |
+| [three.js](https://threejs.org/) | 3D clips in motion videos | MIT |
+| [opentype.js](https://opentype.js.org/) | reading font outlines for 3D text | MIT |
 
 The complete list of dependencies and their licenses ships with the source code.
 

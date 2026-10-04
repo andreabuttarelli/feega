@@ -14,6 +14,8 @@ import { CheckState, MAX_CSS, MAX_HTML, MAX_JS, SOURCE_FILES, checkState, propsS
 import { patchComponent, recordCheck, removeComponent, writeComponent } from '$lib/motion/custom/ops';
 import { PATCH_COMPONENT, READ_COMPONENT, WRITE_COMPONENT } from './model-route';
 import { CAMERA, CAMERA_KEYS, SPACES, type Camera } from '$lib/motion/camera';
+import { ENV_PRESETS, HDRI, LIGHT, LIGHT_KEYS, LIGHT_KINDS, type Look } from '$lib/motion/look';
+import { removeLight, removeLook, setLight, setLightKeyframes, setLook } from '$lib/motion/look-ops';
 import { CAMERA_PRESETS, PRESETS, applyPreset, removeCamera, setCamera, setCameraKeyframes, setClipDepth } from '$lib/motion/camera-ops';
 import { ParentOpacity } from '$lib/motion/parent';
 import { addNull, nullFromSelection, setParent, setParentOpacity } from '$lib/motion/parent-ops';
@@ -58,6 +60,7 @@ function summary(doc: MotionDoc, selection: string[]) {
   const inSeconds = (keyframes: Record<string, { frame: number; value: unknown; ease: unknown }[] | undefined>) =>
     Object.fromEntries(Object.entries(keyframes).map(([prop, track]) => [prop, (track ?? []).map((k) => ({ time: secs(k.frame), value: k.value, ease: k.ease }))]));
   const cameraSummary = (camera: Camera | null) => (camera ? { values: camera.base, dof: camera.dof, keyframes: inSeconds(camera.keyframes), expressions: camera.expressions } : null);
+  const lookSummary = (look: Look | null) => (look ? { ...look, lights: look.lights.map((l) => ({ ...l, keyframes: inSeconds(l.keyframes) })) } : null);
 
   return {
     width: doc.width,
@@ -98,6 +101,7 @@ function summary(doc: MotionDoc, selection: string[]) {
     assets: doc.assets,
     fonts: doc.fonts,
     camera: cameraSummary(doc.camera),
+    look: lookSummary(doc.look),
     components: Object.entries(doc.components).map(([name, c]) => customSummary(name, c))
   };
 }
@@ -389,6 +393,53 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         }
         return apply(setCamera(session.doc, { base: input.values as Partial<Record<(typeof CAMERA_KEYS)[number], number>>, dof: input.dof }), 'set the camera');
       }
+    }),
+
+    set_look: tool({
+      description: `Set how 3D clips (3D model, 3D shape, 3D text, 3D logo) are lit: image-based environment (presets: ${ENV_PRESETS.map((p) => `${p} — ${HDRI[p].about}`).join('; ')}), its intensity (0–5) and rotation (degrees), soft shadow maps and a contact shadow under the object. enabled false removes the look (each clip falls back to its own lighting preset). Lights are added with set_light.`,
+      inputSchema: z.object({
+        enabled: z.boolean().optional(),
+        environment: z.object({ preset: z.enum(ENV_PRESETS).optional(), intensity: z.number().optional(), rotation: z.number().optional() }).optional(),
+        soft_shadows: z.boolean().optional(),
+        contact_shadow: z.boolean().optional()
+      }),
+      execute: async (input) => {
+        if (input.enabled === false) {
+          return apply(removeLook(session.doc), 'removed the look');
+        }
+        return apply(setLook(session.doc, { environment: input.environment, softShadows: input.soft_shadows, contactShadow: input.contact_shadow }), 'set the look');
+      }
+    }),
+
+    set_light: tool({
+      description: `Add or edit a light of the 3D look by id (kind is required to add one): ${LIGHT_KINDS.join(', ')} (area is a soft rectangular panel, it casts no shadow map). Position x/y/z in scene units (the object is ~2 units wide at the origin, floor at y -1; range ${LIGHT.x.min}..${LIGHT.x.max}); intensity ${LIGHT.intensity.min}..${LIGHT.intensity.max} (directional ~1–2 with an environment, spot/point ~10–30 since they fade with distance). Lights point at the object.`,
+      inputSchema: z.object({
+        id: z.string().min(1).max(40),
+        kind: z.enum(LIGHT_KINDS).optional(),
+        color: z.string().optional(),
+        intensity: z.number().optional(),
+        x: z.number().optional(),
+        y: z.number().optional(),
+        z: z.number().optional(),
+        cast_shadow: z.boolean().optional()
+      }),
+      execute: async ({ id, cast_shadow, ...patch }) => apply(setLight(session.doc, id, { ...patch, castShadow: cast_shadow }), `light ${id}`)
+    }),
+
+    remove_light: tool({
+      description: 'Remove a light of the 3D look by id.',
+      inputSchema: z.object({ id: z.string() }),
+      execute: async (input) => apply(removeLight(session.doc, input.id), `removed light ${input.id}`)
+    }),
+
+    set_light_keyframes: tool({
+      description: `Animate one value of a light: replaces its keyframes. time is seconds from the START OF THE VIDEO; ease as in set_keyframes. Props: ${LIGHT_KEYS.join(', ')}. An empty list removes the animation.`,
+      inputSchema: z.object({
+        id: z.string(),
+        prop: z.enum(LIGHT_KEYS),
+        keyframes: z.array(z.object({ time: z.number().min(0), value: z.number(), ease: easeSchema.default(Ease.Standard) }))
+      }),
+      execute: async (input) => apply(setLightKeyframes(session.doc, input.id, input.prop, input.keyframes.map((k) => ({ frame: frames(k.time), value: k.value, ease: k.ease }))), `animated light ${input.id} ${input.prop}`)
     }),
 
     set_camera_keyframes: tool({

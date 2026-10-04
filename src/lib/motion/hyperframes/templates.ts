@@ -298,6 +298,23 @@ const Shape3D: Template<'Shape3D'> = {
   }
 };
 
+const Text3D: Template<'Text3D'> = {
+  timing: Timing.Wrapper,
+  html: (ctx) => {
+    const backdrop = BACKDROP[ctx.p.backdrop];
+    return threeStage(ctx, ctx.p, backdrop ? ctx.color(backdrop) : null);
+  }
+};
+
+const Logo3D: Template<'Logo3D'> = {
+  timing: Timing.Wrapper,
+  html: (ctx) => {
+    const backdrop = BACKDROP[ctx.p.backdrop];
+    const stage = threeStage(ctx, ctx.p, backdrop ? ctx.color(backdrop) : null);
+    return (ctx.asset(ctx.p.assetId) ?? ctx.logoUrl) ? stage : missing('Pick an SVG logo');
+  }
+};
+
 const Composition: Template<'Composition'> = {
   timing: Timing.Wrapper,
   html: (ctx) => {
@@ -343,6 +360,8 @@ export const TEMPLATES: { [K in ComponentId]: Template<K> } = {
   CanvasMock,
   Model3D,
   Shape3D,
+  Text3D,
+  Logo3D,
   Composition,
   Custom
 };

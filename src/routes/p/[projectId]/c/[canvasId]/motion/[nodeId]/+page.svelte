@@ -29,6 +29,8 @@
   import MotionTimeline from '$lib/components/motion/MotionTimeline.svelte';
   import MotionInspector from '$lib/components/motion/MotionInspector.svelte';
   import CameraInspector from '$lib/components/motion/CameraInspector.svelte';
+  import LookInspector from '$lib/components/motion/LookInspector.svelte';
+  import { THREE_D_COMPONENTS } from '$lib/motion/components';
   import MaskOverlay from '$lib/components/motion/MaskOverlay.svelte';
   import ExportDialog from '$lib/components/motion/ExportDialog.svelte';
   import SoundDialog, { type Made, type SoundKind } from '$lib/components/motion/SoundDialog.svelte';
@@ -621,8 +623,10 @@
       <div class="sheet-head"><span>Properties</span><button type="button" aria-label="Close" onclick={() => (sheet = Sheet.None)}><X size={16} /></button></div>
       {#if cameraOpen && !selection.length}
         <CameraInspector {doc} {frame} onchange={edit} />
+        <LookInspector {doc} onchange={edit} />
       {:else if selected}
         <MotionInspector {doc} clip={selected} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} />
+        {#if THREE_D_COMPONENTS.includes(selected.component)}<LookInspector {doc} onchange={edit} />{/if}
       {:else}
         <p class="hint">{selection.length > 1 ? `${selection.length} clips selected.` : 'Select a clip in the timeline to edit its properties.'}</p>
       {/if}
