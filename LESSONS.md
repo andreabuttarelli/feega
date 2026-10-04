@@ -2303,3 +2303,11 @@ ids in env — keep a named persistent base sandbox per version and `Sandbox.for
 Signal: HyperFrames says `Chrome cannot launch (missing system libraries)`: libnss3, libnspr4.
 Cause: the sandbox image is a bare Ubuntu 26.04. Move: apt-install the Chrome libraries
 (`libasound2t64`, not `libasound2`) in the base setup, next to ffmpeg.
+
+## A model in the catalogue still cannot run on the canvas
+Signal: a node on a synced model refuses (`source_video_required`, `prompt_required`) or its
+input edge is dropped, while unit tests on the model spec are green.
+Cause: four gates decide it, not one: `videoRefCapacity`, `ai_models.input_modalities` (video rows
+have no `architecture`: the sync derives them), `promptRequired`, the transport payload. Uploaded
+nodes carry `data.assetId`, generated ones `data.refId`. Move: write a `runGenNode` test with a
+real upstream node and the synced modalities before claiming a model works, then one real run.

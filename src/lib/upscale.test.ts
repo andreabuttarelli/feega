@@ -59,13 +59,13 @@ describe('quoteUpscale', () => {
     if (!plan.ok) throw new Error('plan');
     const quote = quoteUpscale(plan, SD.seconds, PRICING, UpscaleMode.Precise);
     expect(quote.usd).toBeCloseTo(1.63968 * 2 * 0.075, 5);
-    expect(quote.credits).toBe(Math.round(quote.usd * 200));
+    expect(quote.credits).toBe(Math.round((quote.usd ?? 0) * 200));
   });
 
   it('creative costs more than precise', () => {
     const plan = planUpscale(SD, UpscaleTarget.Double, LIMITS);
     if (!plan.ok) throw new Error('plan');
-    expect(quoteUpscale(plan, 2, PRICING, UpscaleMode.Creative).usd).toBeGreaterThan(quoteUpscale(plan, 2, PRICING, UpscaleMode.Precise).usd);
+    expect(quoteUpscale(plan, 2, PRICING, UpscaleMode.Creative).usd).toBeGreaterThan(quoteUpscale(plan, 2, PRICING, UpscaleMode.Precise).usd ?? Infinity);
   });
 
   it('a catalogue without the rate says unknown, never zero', () => {
