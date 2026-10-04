@@ -8,6 +8,12 @@ describe('the tools registry', () => {
     expect(toolHref(upscaler!, 'p1')).toBe('/app/upscale?project=p1');
   });
 
+  it('lists Compositions at /app/compose', () => {
+    const compose = TOOLS.find((t) => t.id === 'compose');
+    expect(compose).toMatchObject({ name: 'Compositions', route: '/app/compose' });
+    expect(toolHref(compose!, 'p1')).toBe('/app/compose?project=p1');
+  });
+
   it('the upscaler landing campaign is served by the upscaler tool', () => {
     expect(toolForCampaign('ai-video-upscaler')?.id).toBe('upscale');
   });

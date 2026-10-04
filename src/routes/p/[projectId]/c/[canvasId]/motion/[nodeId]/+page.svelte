@@ -55,6 +55,7 @@
   import { feegaTrailer } from '$lib/motion/trailer';
   import { loadPeaks } from '$lib/motion/waveform';
   import { AD_TEMPLATES, AD_TEMPLATE_IDS, templateAssets, type AdTemplate } from '$lib/motion/ad-templates';
+  import { composeEditorPath } from '$lib/motion/composition-draft';
   import type { PageData } from './$types';
 
   const SAVE_DEBOUNCE_MS = 700;
@@ -535,7 +536,7 @@
     <aside class="props" class:open={sheet === Sheet.Properties} aria-label="Properties">
       <div class="sheet-head"><span>Properties</span><button type="button" aria-label="Close" onclick={() => (sheet = Sheet.None)}><X size={16} /></button></div>
       {#if selected}
-        <MotionInspector {doc} clip={selected} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} bind:tab={inspectorTab} onchange={edit} />
+        <MotionInspector {doc} clip={selected} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} />
       {:else}
         <p class="hint">{selection.length > 1 ? `${selection.length} clips selected.` : 'Select a clip in the timeline to edit its properties.'}</p>
       {/if}

@@ -6,7 +6,7 @@ export enum ToolStatus {
   ComingSoon = 'coming_soon'
 }
 
-export type ToolIcon = 'camera' | 'clapperboard' | 'upscale';
+export type ToolIcon = 'camera' | 'clapperboard' | 'upscale' | 'orbit';
 
 export type Tool = {
   id: string;
@@ -33,6 +33,14 @@ export const TOOLS: readonly Tool[] = [
     description: 'Short videos from titles, media and 3D, edited with an agent.',
     icon: 'clapperboard',
     route: '/app/motion',
+    status: ToolStatus.Beta
+  },
+  {
+    id: 'compose',
+    name: 'Compositions',
+    description: 'Many images and videos in a looping 3D layout, from a template.',
+    icon: 'orbit',
+    route: '/app/compose',
     status: ToolStatus.Beta
   },
   {

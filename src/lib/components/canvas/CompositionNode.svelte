@@ -11,6 +11,7 @@
     mediaUrls = [],
     previewActive = true,
     imageCount = 0,
+    composeIn = null,
     onopeneditor
   }: {
     node: CompositionNode;
@@ -18,6 +19,7 @@
     mediaUrls?: string[];
     previewActive?: boolean;
     imageCount?: number;
+    composeIn?: { project: string; canvas: string } | null;
     onopeneditor: () => void;
   } = $props();
 
@@ -38,7 +40,7 @@
   {:else if imageCount > 0}
     <div class="composition-ready">
       <Orbit size={22} strokeWidth={1.5} />
-      <p>{imageCount} immagini collegate</p>
+      <p>{imageCount} images connected</p>
     </div>
   {:else}
     <div class="composition-empty">
@@ -52,6 +54,14 @@
       <NodeDownload kind="video" sourceUrl={posterUrl} nodeId={node.id} nodeType="composizione" />
     {/if}
     <button type="button" class="composition-action nodrag" onclick={onopeneditor}>Open editor</button>
+    {#if composeIn}
+      <form method="POST" action="/app/compose?/fromNode" class="nodrag">
+        <input type="hidden" name="project" value={composeIn.project} />
+        <input type="hidden" name="canvas" value={composeIn.canvas} />
+        <input type="hidden" name="node" value={node.id} />
+        <button type="submit" class="composition-action" title="Turn this into a video in Compositions: server export, timeline and motion editor">Open in Compositions</button>
+      </form>
+    {/if}
   </div>
 </div>
 

@@ -1,5 +1,9 @@
 import { z } from 'zod';
 import { DURATION, EASE_IDS, Ease, FPS } from './design';
+import { LAYOUTS } from '../canvas/composition/index';
+import { CAMERA_PRESETS } from '../canvas/composition/camera';
+import type { CameraPresetId } from '../canvas/composition/camera';
+import type { LayoutId } from '../canvas/composition/types';
 
 export enum Control {
   Text = 'text',
@@ -8,7 +12,8 @@ export enum Control {
   Color = 'color',
   Select = 'select',
   Toggle = 'toggle',
-  Asset = 'asset'
+  Asset = 'asset',
+  Managed = 'managed'
 }
 
 export enum AssetKind {
@@ -99,6 +104,14 @@ const position3d = {
   width: range(0.1, 1, 0.01, 1, 'Width', Group.Layout),
   height: range(0.1, 1, 0.01, 1, 'Height', Group.Layout)
 };
+
+export const COMPOSITION_LAYOUTS = Object.keys(LAYOUTS) as [LayoutId, ...LayoutId[]];
+export const COMPOSITION_CAMERAS = Object.keys(CAMERA_PRESETS) as [CameraPresetId, ...CameraPresetId[]];
+export const COMPOSITION_MEDIA_KINDS = ['image', 'video'] as const;
+export const MAX_COMPOSITION_MEDIA = 40;
+
+const managed = (label: string) => ({ control: Control.Managed, label, group: Group.Content });
+const compositionParams = (label: string) => z.record(z.string(), z.union([z.number(), z.string()])).default({}).meta(managed(label));
 
 export enum TrackKind {
   Visual = 'visual',
@@ -263,6 +276,27 @@ export const COMPONENTS = {
     durationInFrames: seconds(3),
     schema: z
       .object({ shape: choice(SHAPES_3D, 'torus', 'Shape', Group.Content), fill: color('brand.accent', 'Colour'), ...camera, ...position3d })
+      .strict()
+  },
+  Composition: {
+    label: 'Composition',
+    description: 'Many images or videos arranged in 3D (grid, carousel, helix, coverflow…) and looping every `loop` seconds.',
+    track: TrackKind.Visual,
+    durationInFrames: seconds(6),
+    schema: z
+      .object({
+        layout: choice(COMPOSITION_LAYOUTS, 'tilted-grid', 'Template', Group.Content),
+        media: z
+          .array(z.object({ assetId: z.string().min(1), kind: z.enum(COMPOSITION_MEDIA_KINDS) }).strict())
+          .max(MAX_COMPOSITION_MEDIA)
+          .default([])
+          .meta(managed('Media')),
+        layoutParams: compositionParams('Template settings'),
+        camera: choice(COMPOSITION_CAMERAS, 'slow-orbit', 'Camera', Group.Camera),
+        cameraParams: compositionParams('Camera settings'),
+        background: color('#000000', 'Background'),
+        loop: range(0.5, 60, 0.5, 6, 'Loop (s)', Group.Motion)
+      })
       .strict()
   },
   Custom: {

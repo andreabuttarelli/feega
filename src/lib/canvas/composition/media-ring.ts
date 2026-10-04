@@ -2,14 +2,14 @@ import { clampParams } from './clamp';
 import type { LayoutParam, LayoutParams, Transform } from './types';
 
 export const params: LayoutParam[] = [
-	{ name: 'radius', label: 'Raggio', kind: 'range', min: 1, max: 20, step: 0.5, default: 4.5 },
-	{ name: 'rings', label: 'Anelli', kind: 'range', min: 1, max: 6, step: 1, default: 1 },
-	{ name: 'itemsPerRing', label: 'Media per anello', kind: 'range', min: 3, max: 24, step: 1, default: 8 },
-	{ name: 'ringGap', label: 'Distanza tra anelli', kind: 'range', min: 0.2, max: 8, step: 0.1, default: 2.2 },
-	{ name: 'spinSpeed', label: 'Velocità rotazione', kind: 'range', min: -2, max: 2, step: 0.05, default: 0.08 },
-	{ name: 'wave', label: 'Moto verticale', kind: 'range', min: 0, max: 3, step: 0.05, default: 0.15 },
-	{ name: 'pitch', label: 'Inclinazione card', kind: 'range', min: -30, max: 30, step: 1, default: -3 },
-	{ name: 'scale', label: 'Scala', kind: 'range', min: 0.4, max: 4, step: 0.05, default: 1.1 }
+	{ name: 'radius', label: 'Radius', kind: 'range', min: 1, max: 20, step: 0.5, default: 4.5 },
+	{ name: 'rings', label: 'Rings', kind: 'range', min: 1, max: 6, step: 1, default: 1 },
+	{ name: 'itemsPerRing', label: 'Media per ring', kind: 'range', min: 3, max: 24, step: 1, default: 8 },
+	{ name: 'ringGap', label: 'Ring gap', kind: 'range', min: 0.2, max: 8, step: 0.1, default: 2.2 },
+	{ name: 'spinSpeed', label: 'Spin speed', kind: 'range', min: -2, max: 2, step: 0.05, default: 0.08 },
+	{ name: 'wave', label: 'Vertical motion', kind: 'range', min: 0, max: 3, step: 0.05, default: 0.15 },
+	{ name: 'pitch', label: 'Card tilt', kind: 'range', min: -30, max: 30, step: 1, default: -3 },
+	{ name: 'scale', label: 'Scale', kind: 'range', min: 0.4, max: 4, step: 0.05, default: 1.1 }
 ];
 
 const FULL_TURN = Math.PI * 2;

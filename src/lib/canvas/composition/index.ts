@@ -11,6 +11,7 @@ import type { LayoutId, LayoutParam, LayoutParams, Transform } from './types';
 
 type LayoutDefinition = {
 	label: string;
+	description: string;
 	motion: 'cycle' | 'ping-pong';
 	camera: 'fixed' | 'selected';
 	params: LayoutParam[];
@@ -20,7 +21,8 @@ type LayoutDefinition = {
 
 export const LAYOUTS: Record<LayoutId, LayoutDefinition> = {
 	'tilted-grid': {
-		label: 'Griglia cinetica',
+		label: 'Kinetic grid',
+		description: 'A tilted wall of cards that sways back and forth.',
 		motion: 'ping-pong',
 		camera: 'selected',
 		params: tiltedGrid.params,
@@ -28,7 +30,8 @@ export const LAYOUTS: Record<LayoutId, LayoutDefinition> = {
 		transforms: tiltedGrid.transforms
 	},
 	'carousel-3d': {
-		label: 'Carosello orbitale',
+		label: 'Orbital carousel',
+		description: 'Cards orbit a centre like a 3D carousel.',
 		motion: 'cycle',
 		camera: 'fixed',
 		params: carousel3d.params,
@@ -36,7 +39,8 @@ export const LAYOUTS: Record<LayoutId, LayoutDefinition> = {
 		transforms: carousel3d.transforms
 	},
 	'media-cloud': {
-		label: 'Nube cinematica',
+		label: 'Cinematic cloud',
+		description: 'Cards drift through depth in a loose cloud.',
 		motion: 'cycle',
 		camera: 'fixed',
 		params: mediaCloud.params,
@@ -44,7 +48,8 @@ export const LAYOUTS: Record<LayoutId, LayoutDefinition> = {
 		transforms: mediaCloud.transforms
 	},
 	'media-ring': {
-		label: 'Anelli sincronizzati',
+		label: 'Synced rings',
+		description: 'Rings of cards turning in step.',
 		motion: 'ping-pong',
 		camera: 'selected',
 		params: mediaRing.params,
@@ -53,7 +58,8 @@ export const LAYOUTS: Record<LayoutId, LayoutDefinition> = {
 		transforms: mediaRing.transforms
 	},
 	helix: {
-		label: 'Flusso elicoidale',
+		label: 'Helix',
+		description: 'A spiral of cards turning around its axis.',
 		motion: 'ping-pong',
 		camera: 'selected',
 		params: helix.params,
@@ -61,7 +67,8 @@ export const LAYOUTS: Record<LayoutId, LayoutDefinition> = {
 		transforms: helix.transforms
 	},
 	'explorer-grid': {
-		label: 'Griglia esplorativa',
+		label: 'Explorer grid',
+		description: 'An endless grid that glides from card to card.',
 		motion: 'cycle',
 		camera: 'fixed',
 		params: explorerGrid.params,
@@ -69,7 +76,8 @@ export const LAYOUTS: Record<LayoutId, LayoutDefinition> = {
 		transforms: explorerGrid.transforms
 	},
 	'staggered-grid': {
-		label: 'Colonne oblique',
+		label: 'Staggered columns',
+		description: 'Columns scrolling at offset heights.',
 		motion: 'cycle',
 		camera: 'fixed',
 		params: staggeredGrid.params,
@@ -78,7 +86,8 @@ export const LAYOUTS: Record<LayoutId, LayoutDefinition> = {
 		transforms: staggeredGrid.transforms
 	},
 	'vertical-flow': {
-		label: 'Flusso verticale',
+		label: 'Vertical flow',
+		description: 'A stream of cards rising through the frame.',
 		motion: 'cycle',
 		camera: 'fixed',
 		params: verticalFlow.params,
@@ -86,7 +95,8 @@ export const LAYOUTS: Record<LayoutId, LayoutDefinition> = {
 		transforms: verticalFlow.transforms
 	},
 	coverflow: {
-		label: 'Coverflow editoriale',
+		label: 'Editorial coverflow',
+		description: 'A front card with its neighbours angled away.',
 		motion: 'cycle',
 		camera: 'fixed',
 		params: coverflow.params,

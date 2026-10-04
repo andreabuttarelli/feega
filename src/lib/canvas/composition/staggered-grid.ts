@@ -2,13 +2,13 @@ import { clampParams } from './clamp';
 import type { LayoutParam, LayoutParams, Transform } from './types';
 
 export const params: LayoutParam[] = [
-  { name: 'columns', label: 'Colonne', kind: 'range', min: 2, max: 6, step: 1, default: 3 },
-  { name: 'rows', label: 'Righe visibili', kind: 'range', min: 2, max: 8, step: 1, default: 3 },
-  { name: 'gapX', label: 'Spazio orizzontale', kind: 'range', min: 1, max: 6, step: 0.1, default: 2.7 },
-  { name: 'gapY', label: 'Spazio verticale', kind: 'range', min: 1, max: 6, step: 0.1, default: 2.3 },
-  { name: 'slant', label: 'Obliquità', kind: 'range', min: -0.6, max: 0.6, step: 0.02, default: 0.18 },
-  { name: 'speed', label: 'Velocità', kind: 'range', min: -2, max: 2, step: 1, default: 1 },
-  { name: 'scale', label: 'Scala', kind: 'range', min: 0.2, max: 2, step: 0.05, default: 0.92 }
+  { name: 'columns', label: 'Columns', kind: 'range', min: 2, max: 6, step: 1, default: 3 },
+  { name: 'rows', label: 'Visible rows', kind: 'range', min: 2, max: 8, step: 1, default: 3 },
+  { name: 'gapX', label: 'Horizontal gap', kind: 'range', min: 1, max: 6, step: 0.1, default: 2.7 },
+  { name: 'gapY', label: 'Vertical gap', kind: 'range', min: 1, max: 6, step: 0.1, default: 2.3 },
+  { name: 'slant', label: 'Skew', kind: 'range', min: -0.6, max: 0.6, step: 0.02, default: 0.18 },
+  { name: 'speed', label: 'Speed', kind: 'range', min: -2, max: 2, step: 1, default: 1 },
+  { name: 'scale', label: 'Scale', kind: 'range', min: 0.2, max: 2, step: 0.05, default: 0.92 }
 ];
 
 export function transforms(count: number, rawParams: LayoutParams, t: number): Transform[] {
