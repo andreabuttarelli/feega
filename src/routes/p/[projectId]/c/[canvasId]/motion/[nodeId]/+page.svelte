@@ -33,6 +33,7 @@
   import MotionInspector from '$lib/components/motion/MotionInspector.svelte';
   import CameraInspector from '$lib/components/motion/CameraInspector.svelte';
   import MaskOverlay from '$lib/components/motion/MaskOverlay.svelte';
+  import MotionPathOverlay from '$lib/components/motion/MotionPathOverlay.svelte';
   import ExportDialog from '$lib/components/motion/ExportDialog.svelte';
   import SoundDialog, { type Made, type SoundKind } from '$lib/components/motion/SoundDialog.svelte';
   import ChatPanel from '$lib/components/brand-agent/ChatPanel.svelte';
@@ -569,6 +570,7 @@
       <div class="preview">
         <MotionPreview bind:this={preview} {html} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing>
           {#if selected?.mask && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<MaskOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
+          {#if selected?.path && !playing}<MotionPathOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         </MotionPreview>
       </div>
 

@@ -167,3 +167,16 @@ describe('motion agent graph tools', () => {
     expect(out.ok).toBe(false);
   });
 });
+
+describe('motion agent paths', () => {
+  it('set_motion_path turns x/y keys into a curved path, and set_path_tangent bends it', async () => {
+    const { session, run } = setup();
+    await run('add_clip', { component: 'Shape', start: 0, duration: 3 });
+    await run('set_keyframes', { clip_id: 'id1', prop: 'x', keyframes: [{ time: 0, value: -0.3, ease: 'linear' }, { time: 2, value: 0.3, ease: 'linear' }] });
+    await run('set_keyframes', { clip_id: 'id1', prop: 'y', keyframes: [{ time: 0, value: 0, ease: 'linear' }, { time: 2, value: 0, ease: 'linear' }] });
+
+    expect((await run('set_motion_path', { clip_id: 'id1', enabled: true, auto_orient: true })).ok).toBe(true);
+    expect((await run('set_path_tangent', { clip_id: 'id1', time: 0, out: [0.2, -0.3] })).ok).toBe(true);
+    expect(findClip(session.doc, 'id1')!.clip.path).toEqual({ autoOrient: true, tangents: [{ frame: 0, in: [0, 0], out: [0.2, -0.3] }] });
+  });
+});

@@ -24,6 +24,7 @@ import { bakeExpressions } from '../expression/bake';
 import { FIT_TEXT, fitScript } from './fit-runtime';
 import { ANIMATOR_CSS, textRender } from '../text-animators/render';
 import { declaredFamilyCss, fontStack, loadDescriptors, googleFontsUrl, loadedWeight, uploadFaceCss, usedFaces } from '../fonts/model';
+import { bakePaths } from '../path';
 import { EFFECT_CSS, effectLayer, effectScript, effectTimeline } from '../effects/render';
 import { blendStyle } from '../blend';
 import { HELD, holdScript } from './blur';
@@ -311,7 +312,7 @@ function zoomed(doc: MotionDoc, scale: number): string {
 }
 
 export function composeHtml(raw: ComposeInput): string {
-  const input = { ...raw, doc: bakeExpressions(withoutBackdrop(raw.doc)) };
+  const input = { ...raw, doc: bakeExpressions(bakePaths(withoutBackdrop(raw.doc))) };
   const { doc, tokens } = input;
   const scale = raw.scale ?? 1;
   const frame = { width: Math.round(doc.width * scale), height: Math.round(doc.height * scale) };
