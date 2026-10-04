@@ -97,6 +97,7 @@ export const ANIMATABLE: Record<ComponentId, readonly AnimProp[]> = {
   Audio: [],
   Shape: visual(colours(['fill', 'Fill'])),
   Logo: visual(),
+  Null: transformProps,
   BrandBackground: visual(colours(['fill', 'Fill'])),
   ProductCard: visual(colours(['color', 'Colour'], ['card', 'Card'])),
   SocialMockup: visual(),

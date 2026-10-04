@@ -203,6 +203,13 @@ export const COMPONENTS = {
     durationInFrames: seconds(3),
     schema: z.object({ assetId: asset(AssetKind.Image, 'Logo (empty = brand logo)'), ...layout({ width: 0.2, height: 0.2 }) }).strict()
   },
+  Null: {
+    label: 'Null',
+    description: 'Invisible handle, draws nothing: parent clips to it and animate it to move, turn or scale them together. x/y is its pivot.',
+    track: TrackKind.Visual,
+    durationInFrames: seconds(5),
+    schema: z.object({ x: range(0, 1, 0.01, 0.5, 'Pivot X', Group.Layout), y: range(0, 1, 0.01, 0.5, 'Pivot Y', Group.Layout) }).strict()
+  },
   BrandBackground: {
     label: 'Background',
     description: 'Full-frame background in the brand colours.',
