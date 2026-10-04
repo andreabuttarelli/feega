@@ -4,7 +4,7 @@ import { AssetKind, COMPONENTS, COMPONENT_IDS, TrackKind } from '$lib/motion/com
 import { fieldsOf } from '$lib/motion/inspector';
 import { Ease, FPS, TRANSITION_KINDS } from '$lib/motion/design';
 import { MOTION_FORMATS, findClip, type MotionDoc } from '$lib/motion/doc';
-import { ClipEdge, Side, addClip, addTrack, moveClip, removeClips, removeKeyframes, setCanvas, setKeyframes, setMask, setProps, setTiming, setTrackMatte, setTransform, setTransition, trimClip, type OpResult } from '$lib/motion/timeline';
+import { ClipEdge, Side, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyframes, setMask, setProps, setTiming, setTrackMatte, setTransform, setTransition, trimClip, type OpResult } from '$lib/motion/timeline';
 import { MASK_KEYS, MASK_KIND_IDS, MATTES } from '$lib/motion/mask';
 import { ANIMATABLE, TRANSFORM_KEYS, easeSchema, transformSchema } from '$lib/motion/keyframes';
 import type { MotionAsset } from './editor';
@@ -46,14 +46,16 @@ function summary(doc: MotionDoc, selection: string[]) {
     tracks: doc.tracks.map((t) => ({
       id: t.id,
       kind: t.kind,
+      name: t.name,
       clips: t.clips.map((c) => ({
         id: c.id,
         component: c.component,
         start: secs(c.from),
         duration: secs(c.durationInFrames),
+        trimStart: secs(c.trimStart),
         props: c.props,
-        in: c.transitionIn.kind,
-        out: c.transitionOut.kind,
+        in: edgeSummary(c.transitionIn),
+        out: edgeSummary(c.transitionOut),
         transform: c.transform,
         mask: c.mask,
         matte: c.matte,
@@ -64,9 +66,14 @@ function summary(doc: MotionDoc, selection: string[]) {
         parentOpacity: c.parentOpacity
       }))
     })),
+    assets: doc.assets,
     camera: cameraSummary(doc.camera),
     components: Object.entries(doc.components).map(([name, c]) => customSummary(name, c))
   };
+}
+
+function edgeSummary(edge: { kind: string; durationInFrames: number }) {
+  return { kind: edge.kind, duration: secs(edge.durationInFrames) };
 }
 
 function inSeconds(keyframes: Record<string, { frame: number; value: unknown; ease: unknown }[] | undefined>) {
@@ -417,6 +424,26 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       execute: async (input) => apply(addTrack(session.doc, input.kind, deps.newId()), `added ${input.kind} track`)
     }),
 
+    set_track: tool({
+      description: 'Rename a track or move it in the stack (index 0 is the top track).',
+      inputSchema: z.object({ track_id: z.string(), name: z.string().max(60).optional(), index: z.number().int().min(0).optional() }),
+      execute: async (input) => {
+        const renamed = input.name === undefined ? ({ ok: true, doc: session.doc } as OpResult) : renameTrack(session.doc, input.track_id, input.name);
+        const moved = input.index === undefined || !renamed.ok ? renamed : moveTrack(renamed.doc, input.track_id, input.index);
+        return apply(moved, `changed track ${input.track_id}`);
+      }
+    }),
+
+    remove_track: tool({
+      description: 'Remove a track and every clip on it.',
+      inputSchema: z.object({ track_id: z.string() }),
+      execute: async (input) => {
+        const track = session.doc.tracks.find((t) => t.id === input.track_id);
+        const cleared = track ? removeClips(session.doc, track.clips.map((c) => c.id)) : ({ ok: true, doc: session.doc } as OpResult);
+        return apply(cleared.ok ? removeTrack(cleared.doc, input.track_id) : cleared, `removed track ${input.track_id}`);
+      }
+    }),
+
     set_canvas: tool({
       description: 'Change the format (16:9, 9:16, 1:1, 4:5) or the total duration in seconds (max 60).',
       inputSchema: z.object({ format: z.enum(MOTION_FORMATS).optional(), duration: z.number().positive().max(60).optional() }),
@@ -433,6 +460,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         }
         return apply(registered({ ok: true, doc: session.doc }, asset.id), `registered asset ${asset.id}`);
       }
+    }),
+
+    remove_asset: tool({
+      description: 'Unregister an asset from the video. Refused while a clip or mask still uses it.',
+      inputSchema: z.object({ asset_id: z.string() }),
+      execute: async (input) => apply(removeAsset(session.doc, input.asset_id), `unregistered asset ${input.asset_id}`)
     }),
 
     [READ_COMPONENT]: tool({

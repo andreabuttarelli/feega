@@ -27,6 +27,28 @@ function setup(overrides: Partial<MotionToolDeps> = {}) {
 }
 
 describe('motion agent tools', () => {
+  it('set_track renames and reorders a track; remove_track drops it with its clips', async () => {
+    const { session, run } = setup();
+    await run('add_track', { kind: 'visual' });
+    await run('add_clip', { component: 'Title', start: 0, track_id: 'v1' });
+
+    expect((await run('set_track', { track_id: 'v1', name: 'Titles', index: 0 })).ok).toBe(true);
+    expect(session.doc.tracks[0]).toMatchObject({ id: 'v1', name: 'Titles' });
+    expect((await run('remove_track', { track_id: 'v1' })).ok).toBe(true);
+    expect(session.doc.tracks.some((t) => t.id === 'v1')).toBe(false);
+    expect(findClip(session.doc, 'id2')).toBeNull();
+  });
+
+  it('remove_asset unregisters an asset only when nothing uses it', async () => {
+    const { session, run } = setup();
+    await run('add_clip', { component: 'Model3D', start: 0, props: { assetId: 'glb-1' } });
+
+    expect(String((await run('remove_asset', { asset_id: 'glb-1' })).error)).toContain('id1');
+    await run('remove_clip', { clip_ids: ['id1'] });
+    expect((await run('remove_asset', { asset_id: 'glb-1' })).ok).toBe(true);
+    expect(session.doc.assets).toEqual([]);
+  });
+
   it('add_clip places a library component at a time in seconds', async () => {
     const { session, run } = setup();
     const out = await run('add_clip', { component: 'Title', start: 1, duration: 2, props: { text: 'Hi' } });

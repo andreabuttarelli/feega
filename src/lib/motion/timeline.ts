@@ -231,6 +231,24 @@ export function removeTrack(doc: MotionDoc, trackId: string): OpResult {
   return { ok: true, doc: { ...doc, tracks: doc.tracks.filter((t) => t.id !== trackId) } };
 }
 
+export function renameTrack(doc: MotionDoc, trackId: string, name: string): OpResult {
+  if (!doc.tracks.some((t) => t.id === trackId)) {
+    return fail(`no track ${trackId}`);
+  }
+  return { ok: true, doc: { ...doc, tracks: doc.tracks.map((t) => (t.id === trackId ? { ...t, name } : t)) } };
+}
+
+export function removeAsset(doc: MotionDoc, assetId: string): OpResult {
+  if (!doc.assets.some((a) => a.id === assetId)) {
+    return fail(`no asset ${assetId} in this video`);
+  }
+  const users = doc.tracks.flatMap((t) => t.clips).filter((c) => JSON.stringify([c.props, c.mask]).includes(JSON.stringify(assetId)));
+  if (users.length) {
+    return fail(`asset ${assetId} is used by ${users.map((c) => c.id).join(', ')}: remove or change those first`);
+  }
+  return { ok: true, doc: { ...doc, assets: doc.assets.filter((a) => a.id !== assetId) } };
+}
+
 export function moveTrack(doc: MotionDoc, trackId: string, toIndex: number): OpResult {
   const track = doc.tracks.find((t) => t.id === trackId);
   if (!track) {
