@@ -18,6 +18,7 @@
   import Film from '@lucide/svelte/icons/film';
   import X from '@lucide/svelte/icons/x';
   import Crosshair from '@lucide/svelte/icons/crosshair';
+  import ThemeSwitch from '$lib/components/ThemeSwitch.svelte';
   import { nullFromSelection } from '$lib/motion/parent-ops';
   import MotionPreview from '$lib/components/motion/MotionPreview.svelte';
   import type { StreamData } from '$lib/components/brand-agent/chat-session.svelte';
@@ -538,6 +539,7 @@
         <input type="number" min="2" max="32" value={doc.motionBlur.samples} onchange={(e) => apply(setMotionBlur(doc, { samples: Number(e.currentTarget.value) }), 'Changed blur samples')} data-testid="blur-samples" />
       </label>
     {/if}
+    <ThemeSwitch />
     <span class="save" data-testid="save-state">{saveState} · v{version}</span>
     <button type="button" class="render" onclick={() => (exporting = true)} data-testid="export-open"><Film size={14} /> Export</button>
   </header>

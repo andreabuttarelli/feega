@@ -532,8 +532,6 @@
     },
     "account": {
       "signOut": "Sign out",
-      "lightMode": "Light mode",
-      "darkMode": "Dark mode",
       "billing": {
         "poolDesc": "One subscription covers every brand in your account.",
         "breakdownTitle": "Usage by brand",
