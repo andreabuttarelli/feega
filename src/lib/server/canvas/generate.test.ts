@@ -1436,6 +1436,19 @@ describe('reconcileVideoNodeRuns chiude un video in coda quando il fornitore ha 
     expect(data.refId).toBe('asset-video-1');
   });
 
+  it('un render motion in corso non è un video: il riconciliatore video non lo reclama né lo chiude', async () => {
+    const { db, currentRun } = videoReconcileDb({
+      node: { id: NODE, orgId: ORG, data: { running: true }, version: 1 },
+      run: { id: RUN, taskId: 'motion-render:12' }
+    });
+
+    const result = await reconcileVideoNodeRuns(db);
+
+    expect(result).toMatchObject({ checked: 0, failed: 0 });
+    expect(currentRun()).toMatchObject({ status: 'running', attempts: 0, error: null });
+    expect(finishVideoRender).not.toHaveBeenCalled();
+  });
+
   it('pending: rilascia il claim senza consumare un tentativo', async () => {
     finishVideoRender.mockResolvedValue({ status: 'pending' });
 

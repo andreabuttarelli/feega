@@ -34,6 +34,13 @@ basta per rifiutare prima. Mossa: la sandbox confronta il peso vero con il limit
 `storage-limit.ts` (POST TUS a zero byte: 413 = oltre) e fallisce senza addebito; per file più
 grandi si alza il limite globale di Storage, non il codice.
 
+### Un run render prende `video_reconcile_failed` e `attempts` che salgono
+Solo `reconcileVideoNodeRuns` scrive quell'errore, e su main esclude `motion-render:`. Se succede
+lo stesso, un checkout locale vecchio (dev server sul DB di produzione) sta girando il tick con
+`OWN_RECONCILER_PREFIXES` senza `RENDER_JOB_PREFIX`. Segnale: production ed eventuali altri
+progetti Vercel sono su main, eppure le righe cambiano. Mossa: `grep OWN_RECONCILER_PREFIXES`
+nei checkout con un dev server acceso, aggiornarli o spegnerli.
+
 ### Un comando staccato della sandbox non dice mai di aver finito
 `sandbox.getCommand(id).exitCode` resta `null` anche a comando concluso, letto da un'altra
 sessione. Segnale: render fermo in `rendering` con la sandbox viva e l'uscita già scritta.
