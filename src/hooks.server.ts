@@ -16,6 +16,7 @@ import { rememberCampaign, takeCampaign } from '$lib/server/onboarding/campaign-
 import { ENTRY_DEPS, homePathFor } from '$lib/server/tenancy/entry';
 import { ORG_COOKIE, LAST_PROJECT_COOKIE } from '$lib/server/tenancy/context';
 import type { RequestEvent } from '@sveltejs/kit';
+import { THEME_COOKIE, THEME_COOKIE_MAX_AGE_S, THEME_METADATA_KEY, ThemePref, htmlThemeAttrs, parseThemePref } from '$lib/theme';
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
@@ -188,10 +189,11 @@ export const handle: Handle = sequence(hostRedirect, csrf, Sentry.sentryHandle()
 
   await refuseUncensoredSection(event);
 
+  const themePref = await themePrefFor(event);
   const doResolve = () =>
     resolve(event, {
       transformPageChunk: ({ html }) => {
-        let out = html;
+        let out = html.replace('<html', `<html${htmlThemeAttrs(themePref)}`);
         // Keep in sync with +layout.svelte — scopes landing.css away from /app on SSR too.
         if (event.url.pathname.startsWith('/app') || event.url.pathname.startsWith('/c') || event.url.pathname.startsWith('/p/')) {
           out = out.replace('<html', '<html data-shell="app"');
@@ -234,3 +236,18 @@ export const handle: Handle = sequence(hostRedirect, csrf, Sentry.sentryHandle()
   return inTool(doResolve);
 });
 export const handleError = Sentry.handleErrorWithSentry();
+
+async function themePrefFor(event: RequestEvent): Promise<ThemePref> {
+  const cookie = event.cookies.get(THEME_COOKIE);
+  if (cookie) {
+    return parseThemePref(cookie);
+  }
+  const { user } = await event.locals.safeGetSession();
+  const saved = user?.user_metadata?.[THEME_METADATA_KEY];
+  if (!saved) {
+    return ThemePref.System;
+  }
+  const pref = parseThemePref(saved);
+  event.cookies.set(THEME_COOKIE, pref, { path: '/', maxAge: THEME_COOKIE_MAX_AGE_S, httpOnly: false, sameSite: 'lax' });
+  return pref;
+}

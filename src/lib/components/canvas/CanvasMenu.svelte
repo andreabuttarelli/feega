@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ThemeSwitch from '$lib/components/ThemeSwitch.svelte';
   import { _ } from 'svelte-i18n';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
   import Menu from '@lucide/svelte/icons/menu';
@@ -234,6 +235,7 @@
 
     <DropdownMenu.Group>
       <DropdownMenu.GroupHeading class="menu-heading">{$_('app.shell.menu.account')}</DropdownMenu.GroupHeading>
+      <div class="menu-row theme-row"><span>Theme</span><ThemeSwitch /></div>
       <DropdownMenu.Item class="menu-row is-danger" variant="destructive">
         {#snippet child({ props })}
           <form {...props} method="POST" action="/auth/signout">
@@ -249,6 +251,13 @@
 </DropdownMenu.Root>
 
 <style>
+  .theme-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
   :global(.burger-btn) {
     display: grid;
     place-items: center;

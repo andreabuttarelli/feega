@@ -10,3 +10,12 @@ la cupola e l'anello sotto, un solo tracciato a 24px, angoli squadrati.
 al frame 0 (immagine, video e forma a frame 0 si vedono al caricamento e dopo uno scrub) e
 spazio vuoto fra righello e prima traccia. Il nero visto prima veniva da un `BrandBackground`
 (fill `#0a0a0a`) in una traccia sopra il footage: la traccia in alto copre quelle sotto.
+
+# Tema chiaro/scuro per account
+
+Selettore Sistema/Chiaro/Scuro (`ThemeSwitch`) nel menu account, nell'intestazione del motion
+editor e in Impostazioni › Aspetto. La scelta va in `user_metadata.theme` (come il modello della
+chat) e nel cookie `theme`; `hooks.server.ts` mette `data-theme` sull'`<html>` già nell'SSR
+(dal cookie, o dai metadata alla prima richiesta dopo il login), quindi niente lampo. «Sistema»
+si risolve prima del paint con uno script inline in `app.html` e segue il cambio dell'OS.
+Verificati in scuro: dashboard, tela, motion editor, upscaler, compositions.
