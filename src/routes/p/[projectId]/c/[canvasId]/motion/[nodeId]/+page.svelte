@@ -14,6 +14,8 @@
   import ZoomOut from '@lucide/svelte/icons/zoom-out';
   import Film from '@lucide/svelte/icons/film';
   import X from '@lucide/svelte/icons/x';
+  import Crosshair from '@lucide/svelte/icons/crosshair';
+  import { nullFromSelection } from '$lib/motion/parent-ops';
   import MotionPreview from '$lib/components/motion/MotionPreview.svelte';
   import type { StreamData } from '$lib/components/brand-agent/chat-session.svelte';
   import { CHECK_REQUEST, FRAMES_REQUEST, type CheckRequest, type FramesRequest } from '$lib/motion/frames-request';
@@ -319,6 +321,17 @@
     }
   }
 
+  function groupUnderNull() {
+    const id = newId();
+    const result = nullFromSelection(history.present, selection, frame, id);
+    if (!result.ok) {
+      notice = result.error;
+      return;
+    }
+    edit(result.doc, 'Created a null');
+    selection = [id];
+  }
+
   function duplicate() {
     const copies: string[] = [];
     for (const id of selection) {
@@ -520,6 +533,7 @@
         </div>
         <button type="button" title="Split at playhead (S)" disabled={!selection.length} onclick={split}><Scissors size={14} /></button>
         <button type="button" title="Duplicate (⌘D)" disabled={!selection.length} onclick={duplicate}><Copy size={14} /></button>
+        <button type="button" title="Create null from selection" data-testid="null-from-selection" disabled={!selection.length} onclick={groupUnderNull}><Crosshair size={14} /></button>
         <button type="button" title="Delete (Del)" disabled={!selection.length} onclick={remove}><Trash size={14} /></button>
         <button type="button" title="Undo (⌘Z)" disabled={!canUndo(history)} onclick={undoEdit}><Undo size={14} /></button>
         <button type="button" title="Redo (⇧⌘Z)" disabled={!canRedo(history)} onclick={redoEdit}><Redo size={14} /></button>

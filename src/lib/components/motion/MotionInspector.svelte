@@ -2,6 +2,9 @@
   import { BRAND_COLORS, COMPONENTS, Control, TrackKind, type AssetKind } from '$lib/motion/components';
   import { DEPTH, Space } from '$lib/motion/camera';
   import { setClipDepth } from '$lib/motion/camera-ops';
+  import { ParentOpacity, parentChoices } from '$lib/motion/parent';
+  import { setParent, setParentOpacity } from '$lib/motion/parent-ops';
+  import { findClip } from '$lib/motion/doc';
   import { FPS, TRANSITION_KINDS, type Edge } from '$lib/motion/design';
   import { resolveColor, type BrandTokens } from '$lib/motion/brand';
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
@@ -104,6 +107,13 @@
     if (parsed !== null) {
       animate(prop.key, Math.min(prop.max, Math.max(prop.min, parsed)));
     }
+  }
+
+  const NO_PARENT = '';
+
+  function clipName(id: string): string {
+    const other = findClip(doc, id)?.clip;
+    return other ? `${COMPONENTS[other.component].label} · ${id}` : id;
   }
 
   function setDepthText(text: string) {
@@ -215,6 +225,19 @@
   {/if}
 
   {#if spec.track === TrackKind.Visual}
+    <section data-testid="parent-section">
+      <h4>Parent</h4>
+      <div class="row">
+        <select aria-label="Parent" data-testid="parent-select" value={clip.parent ?? NO_PARENT} onchange={(e) => commit(setParent(doc, clip.id, e.currentTarget.value === NO_PARENT ? null : e.currentTarget.value, { at: frame }), 'Changed the parent')}>
+          <option value={NO_PARENT}>None</option>
+          {#each parentChoices(doc, clip.id) as id (id)}<option value={id}>{clipName(id)}</option>{/each}
+        </select>
+      </div>
+      {#if clip.parent}
+        <label class="check"><input type="checkbox" data-testid="parent-opacity" checked={clip.parentOpacity === ParentOpacity.Inherit} onchange={(e) => commit(setParentOpacity(doc, clip.id, e.currentTarget.checked ? ParentOpacity.Inherit : ParentOpacity.Ignore), 'Changed opacity inheritance')} />Inherit the parent opacity</label>
+      {/if}
+    </section>
+
     <section data-testid="depth-section">
       <h4>Camera depth</h4>
       <div class="row anim">

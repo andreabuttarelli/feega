@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Ease } from './design';
 import { DOC_VERSION, MotionFormat, findClip, newMotionDoc, parseMotionDoc, upgradeDoc, type MotionDoc } from './doc';
-import { ParentOpacity, ancestorsOf, apply2d, childrenOf, worldAt } from './parent';
+import { ParentOpacity, ancestorsOf, apply2d, childrenOf, parentChoices, worldAt } from './parent';
 import { KeepWorld, addNull, nullFromSelection, setParent, setParentOpacity } from './parent-ops';
 import { addClip, setKeyframes, setTransform, type OpResult } from './timeline';
 
@@ -108,6 +108,16 @@ describe('composing transforms', () => {
     doc = must(setParent(doc, 'card', 'rig', { at: 0, keep: KeepWorld.Yes }));
 
     expect(findClip(doc, 'card')!.clip.keyframes.x!.map((k) => k.value)).toEqual([-0.1, 0.1]);
+  });
+});
+
+describe('choosing a parent', () => {
+  it('offers every visual clip except the clip itself and its descendants', () => {
+    let doc = must(addNull(base, { from: 0, durationInFrames: 120 }, 'rig'));
+    doc = must(setParent(doc, 'card', 'rig'));
+
+    expect(parentChoices(doc, 'rig').sort()).toEqual(['caption', 'product']);
+    expect(parentChoices(doc, 'card').sort()).toEqual(['caption', 'product', 'rig']);
   });
 });
 

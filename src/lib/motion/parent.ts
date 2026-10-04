@@ -66,6 +66,11 @@ export function childrenOf(doc: Tracks, clipId: string): string[] {
     .map((c) => c.id);
 }
 
+export function parentChoices(doc: Tracks, clipId: string): string[] {
+  const descends = (id: string) => id === clipId || ancestorsOf(doc, id).includes(clipId);
+  return [...visualIds(doc)].filter((id) => !descends(id));
+}
+
 export function parentsWithChildren(doc: Tracks): Set<string> {
   return new Set(clipsOf(doc).flatMap((c) => (c.parent ? [c.parent] : [])));
 }
