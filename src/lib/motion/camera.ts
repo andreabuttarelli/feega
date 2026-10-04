@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { THREE_D_COMPONENTS, TrackKind, type ComponentId } from './components';
 import { keyframeSchema, type Keyframe } from './keyframes';
+import { BlendMode } from './blend';
 import { MAX_SOURCE } from './expression/language';
 
 export enum Space {
@@ -61,7 +62,12 @@ export enum LayerKind {
   Billboard = 'billboard'
 }
 
-export type StageLayer = { id: string; depth: number; kind: `${LayerKind}`; dof: boolean };
+export enum Composite {
+  World = 'world',
+  Projected = 'projected'
+}
+
+export type StageLayer = { id: string; depth: number; kind: `${LayerKind}`; dof: boolean; composite: `${Composite}` };
 
 export type StageSpec = {
   width: number;
@@ -73,7 +79,7 @@ export type StageSpec = {
   layers: StageLayer[];
 };
 
-type StageClip = { id: string; component: ComponentId; depth: number; space: Space; props: Record<string, unknown> };
+type StageClip = { id: string; component: ComponentId; depth: number; space: Space; props: Record<string, unknown>; blend?: string };
 
 const LOOKS_THE_SAME_BLURRED: Partial<Record<ComponentId, (props: Record<string, unknown>) => boolean>> = {
   BrandBackground: (props) => props.pattern === 'solid'
@@ -95,7 +101,8 @@ export function stageSpec(doc: StageDoc): StageSpec {
     const billboard = THREE_D_COMPONENTS.includes(c.component);
     const dof = blurrable(c) && dofSlots > 0;
     dofSlots -= dof ? 1 : 0;
-    return { id: c.id, depth: c.depth, kind: billboard ? LayerKind.Billboard : LayerKind.Flat, dof };
+    const composite = (c.blend ?? BlendMode.Normal) === BlendMode.Normal ? Composite.World : Composite.Projected;
+    return { id: c.id, depth: c.depth, kind: billboard ? LayerKind.Billboard : LayerKind.Flat, dof, composite };
   });
   return { width: doc.width, height: doc.height, rest: cameraMath(() => 0).perspectiveOf(base.fov, doc.height), dof: camera.dof, base, keyframes: camera.keyframes, layers };
 }
@@ -187,12 +194,15 @@ export function cameraMath(sample: Sampler) {
 
   const frameAt = (spec: Spec, frame: number) => {
     const v = valuesAt(spec, frame);
+    const perspective = round(perspectiveOf(v.fov, spec.height));
+    const world = worldMatrix(v, spec);
+    const own = (l: StageLayer) => (l.kind === 'billboard' ? matrixCss(billboardMatrix(v, spec, l.depth)) : flatTransform(spec, l.depth));
     return {
-      perspective: round(perspectiveOf(v.fov, spec.height)),
-      world: worldMatrix(v, spec),
+      perspective,
+      world,
       layers: spec.layers.map((l) => ({
         id: l.id,
-        transform: l.kind === 'billboard' ? matrixCss(billboardMatrix(v, spec, l.depth)) : flatTransform(spec, l.depth),
+        transform: l.composite === 'projected' ? `${matrixCss(world)} ${own(l)}` : own(l),
         blur: spec.dof && l.dof ? dofBlur(v.aperture, l.depth, v.focusDistance) : 0
       }))
     };

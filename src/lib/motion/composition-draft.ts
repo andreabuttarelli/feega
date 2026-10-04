@@ -8,6 +8,7 @@ import { FORMATS, MotionFormat, formatOf, parseMotionDoc, type DocVerdict, type 
 import { Matte } from './mask';
 import { DEPTH, Space } from './camera';
 import { ParentOpacity } from './parent';
+import { BlendMode } from './blend';
 import type { PropsOf } from './hyperframes/templates';
 
 export type ComposeMedia = PropsOf<'Composition'>['media'][number];
@@ -110,7 +111,8 @@ function clipOf(id: string, component: MotionClip['component'], frames: number, 
     parent: null,
     parentOpacity: ParentOpacity.Inherit,
     expressions: {},
-    effects: []
+    effects: [],
+    blend: BlendMode.Normal
   };
 }
 

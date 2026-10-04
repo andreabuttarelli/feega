@@ -20,6 +20,8 @@
   import { EFFECTS, EFFECT_KINDS, type EffectKind } from '$lib/motion/effects/registry';
   import { addEffect, removeEffect, setEffect } from '$lib/motion/effects/ops';
   import { effectKey } from '$lib/motion/effects/model';
+  import { BLEND_MODES, type BlendMode } from '$lib/motion/blend';
+  import { setBlendMode } from '$lib/motion/blend-ops';
   import { expressionErrors, expressionValue } from '$lib/motion/expression/bake';
 
 
@@ -130,6 +132,7 @@
 
   const faults = $derived(Object.fromEntries(expressionErrors(doc).filter((f) => f.clipId === clip.id).map((f) => [f.key, f.error])));
   const DEFAULT_EXPRESSION = 'value';
+  const BLEND_LABEL = Object.fromEntries(BLEND_MODES.map((m) => [m, m.split('-').map((w) => w[0].toUpperCase() + w.slice(1)).join(' ')])) as Record<BlendMode, string>;
 
   function toggleExpression(key: string) {
     const off = clip.expressions[key] !== undefined;
@@ -313,6 +316,15 @@
   {/if}
 
   {#if spec.track === TrackKind.Visual}
+    <section data-testid="blend-section">
+      <h4>Blend mode</h4>
+      <div class="row">
+        <select aria-label="Blend mode" data-testid="blend-select" value={clip.blend} onchange={(e) => commit(setBlendMode(doc, clip.id, e.currentTarget.value as BlendMode), 'Changed the blend mode')}>
+          {#each BLEND_MODES as mode (mode)}<option value={mode}>{BLEND_LABEL[mode]}</option>{/each}
+        </select>
+      </div>
+    </section>
+
     <section data-testid="parent-section">
       <h4>Parent</h4>
       <div class="row">

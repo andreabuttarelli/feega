@@ -110,7 +110,7 @@ describe('the camera as the inverse transform of the world', () => {
   });
 
   it('the same frame gives the same state whatever was asked before (seek determinism)', () => {
-    const s = spec({ ...newCamera(), dof: true, keyframes: { rotateY: [{ frame: 0, value: -20, ease: Ease.Standard }, { frame: 90, value: 20, ease: Ease.Linear }], focusDistance: [{ frame: 0, value: 0, ease: Ease.Linear }, { frame: 90, value: 1500, ease: Ease.Linear }] } }, [{ id: 'a', depth: 1500, kind: 'flat', dof: true }]);
+    const s = spec({ ...newCamera(), dof: true, keyframes: { rotateY: [{ frame: 0, value: -20, ease: Ease.Standard }, { frame: 90, value: 20, ease: Ease.Linear }], focusDistance: [{ frame: 0, value: 0, ease: Ease.Linear }, { frame: 90, value: 1500, ease: Ease.Linear }] } }, [{ id: 'a', depth: 1500, kind: 'flat', dof: true, composite: 'world' }]);
     const order = [60, 10, 89, 0, 60, 30, 10, 89];
     const seen = new Map<number, string>();
     for (const f of order) {
@@ -135,9 +135,9 @@ describe('depth of field', () => {
 
   it('only a layer that takes part and a camera with depth of field on blur', () => {
     const layers: StageSpec['layers'] = [
-      { id: 'near', depth: 0, kind: 'flat', dof: true },
-      { id: 'far', depth: 1000, kind: 'flat', dof: true },
-      { id: 'capped', depth: 1000, kind: 'flat', dof: false }
+      { id: 'near', depth: 0, kind: 'flat', dof: true, composite: 'world' },
+      { id: 'far', depth: 1000, kind: 'flat', dof: true, composite: 'world' },
+      { id: 'capped', depth: 1000, kind: 'flat', dof: false, composite: 'world' }
     ];
     const on = math.frameAt(spec({ ...newCamera(), dof: true, base: { aperture: 2 } }, layers), 0);
     const off = math.frameAt(spec({ ...newCamera(), dof: false, base: { aperture: 2 } }, layers), 0);
