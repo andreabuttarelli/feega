@@ -5,6 +5,7 @@ import { Source, ValueKind, type AnimProp } from '../keyframes';
 import type { MotionClip, MotionDoc } from '../doc';
 import { PropFormat, type PropSpec } from './component';
 import { effectProps, type Effect } from '../effects/model';
+import { animatorProps, type TextAnimator } from '../text-animators/model';
 
 export const PARAM_CALL = 'param';
 export const PARAM_CSS_PREFIX = '--param-';
@@ -98,6 +99,6 @@ export function paramProps(doc: Pick<MotionDoc, 'components'>, clip: Pick<Motion
     .filter((p): p is AnimProp => p !== null);
 }
 
-export function withParams<C extends Pick<MotionClip, 'component' | 'props'> & { effects?: Effect[] }>(doc: Pick<MotionDoc, 'components'>, clip: C): C & { params: AnimProp[] } {
-  return { ...clip, params: [...paramProps(doc, clip), ...effectProps(clip.effects ?? [])] };
+export function withParams<C extends Pick<MotionClip, 'component' | 'props'> & { effects?: Effect[]; animators?: TextAnimator[] }>(doc: Pick<MotionDoc, 'components'>, clip: C): C & { params: AnimProp[] } {
+  return { ...clip, params: [...paramProps(doc, clip), ...effectProps(clip.effects ?? []), ...animatorProps(clip.animators ?? [])] };
 }

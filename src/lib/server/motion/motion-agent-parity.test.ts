@@ -46,7 +46,8 @@ const CLIP: Record<string, Access> = {
   parentOpacity: { write: ['set_parent'], read: 'parentOpacity' },
   expressions: { write: ['set_expression'], read: 'expressions' },
   effects: { write: ['add_effect', 'set_effect', 'remove_effect'], read: 'effects' },
-  blend: { write: ['set_blend_mode'], read: 'blend' }
+  blend: { write: ['set_blend_mode'], read: 'blend' },
+  animators: { write: ['add_text_animator', 'set_text_animator', 'remove_text_animator', 'apply_text_preset'], read: 'animators' }
 };
 
 const CAMERA: Record<string, Access> = {
