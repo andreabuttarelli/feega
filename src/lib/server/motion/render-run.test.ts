@@ -18,7 +18,7 @@ vi.mock('./export', () => ({ saveExport }));
 vi.mock('$lib/server/ai-log', () => ({ logAiCall }));
 vi.mock('$lib/server/web-push', () => ({ sendPushToUser }));
 vi.mock('$lib/server/background-work', () => ({ runInBackground: (work: () => Promise<unknown>) => void work() }));
-vi.mock('./farm-render', () => ({ renderOnFarm, RenderFailure: class extends Error {} }));
+vi.mock('./farm-render', async (original) => ({ ...(await original<typeof import('./farm-render')>()), renderOnFarm, RenderFailure: class extends Error {} }));
 
 import { farmJob, finishRender, RenderRefusal, renderView, startRender, type RenderRequest } from './render-run';
 import { FEEGA_TOKENS } from '$lib/motion/brand';

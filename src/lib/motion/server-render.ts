@@ -33,8 +33,8 @@ export function chunkPlan(totalFrames: number): ChunkPlan {
   return { size, count: Math.ceil(totalFrames / size) };
 }
 
-export function startProgress(totalFrames: number): RenderProgress {
-  return { stage: RenderStage.Starting, chunksDone: 0, chunks: chunkPlan(totalFrames).count, totalFrames };
+export function startProgress(totalFrames: number, chunks: number = chunkPlan(totalFrames).count): RenderProgress {
+  return { stage: RenderStage.Starting, chunksDone: 0, chunks, totalFrames };
 }
 
 export function advance(p: RenderProgress, event: RenderEvent): RenderProgress {

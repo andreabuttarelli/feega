@@ -112,3 +112,12 @@ describe('keyframe lanes', () => {
     expect(path.endsWith('L40,0')).toBe(true);
   });
 });
+
+describe('timeline view at another frame rate', () => {
+  it('a second keeps its width and its timecode at 60 fps', () => {
+    expect(pxPerFrame(1, 60) * 60).toBe(60);
+    expect(frameAt(60, 1, 60)).toBe(60);
+    expect(timecode(90, 60)).toBe('0:01.30');
+    expect(rulerTicks(120, 1, 60).at(-1)?.frame).toBe(120);
+  });
+});

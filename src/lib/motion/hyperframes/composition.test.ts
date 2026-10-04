@@ -11,7 +11,7 @@ import { CAMERA_FIELDS, INSTANCE_FIELDS, bakeComposition, type CompositionProps 
 
 const TOLERANCE = 1e-3;
 const SAMPLED_FRAMES = [0, 7, 45, 90, 133, 179];
-const PORTRAIT = { width: 1080, height: 1920 };
+const PORTRAIT = { width: 1080, height: 1920, fps: FPS };
 const ASSETS = { a: 'https://cdn.test/a.png', b: 'https://cdn.test/b.png', v: 'https://cdn.test/v.mp4' };
 
 function propsFor(layout: LayoutId): CompositionProps {
@@ -65,6 +65,12 @@ describe('bakeComposition', () => {
 
     expect(bake.loopFrames).toBe(2 * FPS);
     expect(bake.frames).toHaveLength(2 * FPS * (CAMERA_FIELDS + bake.instances.length * INSTANCE_FIELDS));
+  });
+
+  it('bakes the loop at the frame rate of the video', () => {
+    const bake = bakeComposition('c1', { ...propsFor('helix'), loop: 2 }, { ...PORTRAIT, fps: 60 }, (id) => ASSETS[id as keyof typeof ASSETS] ?? null);
+
+    expect([bake.loopFrames, bake.fps]).toEqual([120, 60]);
   });
 
   it('drops media whose asset is gone instead of showing a hole', () => {

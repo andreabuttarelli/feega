@@ -1,7 +1,6 @@
 <script lang="ts">
   import Pipette from '@lucide/svelte/icons/pipette';
   import { COMPONENTS } from '$lib/motion/components';
-  import { FPS } from '$lib/motion/design';
   import { clipsOf, type DocVerdict, type MotionDoc } from '$lib/motion/doc';
   import { CAMERA, CAMERA_LANE, Space, type CameraKey } from '$lib/motion/camera';
   import { CAMERA_PRESETS, CameraPreset, PRESETS, applyPreset, cameraEditAt, cameraKeyToggle, cameraValueAt, focusOn, removeCamera, setCamera } from '$lib/motion/camera-ops';
@@ -82,7 +81,7 @@
       error = 'the move needs a length in seconds';
       return;
     }
-    const params = { start: frame, duration: Math.round(duration * FPS), amount: parseDecimal(amount) ?? undefined, from: rackFrom || undefined, to: rackTo || undefined };
+    const params = { start: frame, duration: Math.round(duration * doc.fps), amount: parseDecimal(amount) ?? undefined, from: rackFrom || undefined, to: rackTo || undefined };
     commit(applyPreset(doc, preset, params), `Camera ${PRESETS[preset].label.toLowerCase()}`);
   }
 

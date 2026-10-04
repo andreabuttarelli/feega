@@ -22,7 +22,6 @@
   import type { LayoutId } from '$lib/canvas/composition/types';
   import { controlFor, setLayoutParam } from '$lib/canvas/composition-editor';
   import { BRAND_COLORS, COMPOSITION_LAYOUTS, MAX_COMPOSITION_MEDIA, AssetKind } from '$lib/motion/components';
-  import { FPS } from '$lib/motion/design';
   import { FORMATS, MOTION_FORMATS, type MotionDoc, MotionFormat } from '$lib/motion/doc';
   import { resolveColor } from '$lib/motion/brand';
   import { composeHtml } from '$lib/motion/hyperframes/compose';
@@ -55,7 +54,7 @@
   const html = $derived(composeHtml({ doc, tokens: data.tokens, assets: assetUrls }));
   const picked = $derived(new Map((draft?.media ?? []).map((m, i) => [m.assetId, i])));
   const fixedCamera = $derived(draft ? LAYOUTS[draft.layout].camera === 'fixed' : false);
-  const seconds = $derived(doc.durationInFrames / FPS);
+  const seconds = $derived(doc.durationInFrames / doc.fps);
 
   onDestroy(() => {
     if (saveTimer) {
@@ -211,14 +210,14 @@
   <div class="body">
     <section class="stage-col">
       <div class="preview">
-        <MotionPreview bind:this={preview} {html} width={doc.width} height={doc.height} bind:frame bind:playing />
+        <MotionPreview bind:this={preview} {html} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing />
       </div>
       <div class="transport">
         <button type="button" class="icon" aria-label={playing ? 'Pause' : 'Play'} onclick={() => (playing = !playing)}>
           {#if playing}<Pause size={14} />{:else}<Play size={14} />{/if}
         </button>
         <input type="range" min="0" max={doc.durationInFrames - 1} step="1" bind:value={frame} aria-label="Time" oninput={() => (playing = false)} />
-        <span class="time">{(frame / FPS).toFixed(1)} / {seconds.toFixed(1)}s</span>
+        <span class="time">{(frame / doc.fps).toFixed(1)} / {seconds.toFixed(1)}s</span>
       </div>
       {#if notice}<p class="notice" role="alert">{notice}</p>{/if}
     </section>

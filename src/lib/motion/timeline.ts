@@ -1,8 +1,8 @@
 import { COMPONENTS, TrackKind, defaultProps, type ComponentId } from './components';
 import { Strictness } from './custom/component';
 import { withParams } from './custom/params';
-import { FPS, TransitionKind, type Edge } from './design';
-import { FORMATS, MAX_FRAMES, byFrame, clipProps, findClip, fontsOfClip, newClip, type MotionClip, type MotionDoc, type MotionFormat, type MotionTrack } from './doc';
+import { FPS, MAX_SECONDS, TransitionKind, maxFrames, type Edge } from './design';
+import { FORMATS, byFrame, clipProps, findClip, fontsOfClip, newClip, type MotionClip, type MotionDoc, type MotionFormat, type MotionTrack } from './doc';
 import { Ease } from './design';
 import { Matte, isMaskKey, maskSchema, type MaskInput } from './mask';
 import { matteMask, matteSource } from './matte';
@@ -33,8 +33,8 @@ function clipEnd(clip: Pick<MotionClip, 'from' | 'durationInFrames'>): number {
 
 function fitted(doc: MotionDoc): OpResult {
   const end = Math.max(0, ...doc.tracks.flatMap((t) => t.clips.map(clipEnd)));
-  if (end > MAX_FRAMES) {
-    return fail(`the video can be at most ${MAX_FRAMES / FPS} seconds`);
+  if (end > maxFrames(doc.fps)) {
+    return fail(`the video can be at most ${MAX_SECONDS} seconds`);
   }
   return { ok: true, doc: { ...doc, durationInFrames: Math.max(doc.durationInFrames, end) } };
 }
@@ -100,7 +100,7 @@ export function addClip(doc: MotionDoc, input: NewClip, id: string): OpResult {
   const clip = newClip({
     id,
     from: Math.max(0, Math.round(input.from)),
-    durationInFrames: Math.max(MIN_FRAMES, Math.round(input.durationInFrames ?? spec.durationInFrames)),
+    durationInFrames: Math.max(MIN_FRAMES, Math.round(input.durationInFrames ?? (spec.durationInFrames * doc.fps) / FPS)),
     component: input.component,
     props: props.props,
     transitionIn: input.transitionIn ?? NO_EDGE,
@@ -265,8 +265,8 @@ export function setCanvas(doc: MotionDoc, input: { format?: MotionFormat; durati
   if (durationInFrames < Math.max(1, end)) {
     return fail(`a clip ends at frame ${end}: move or trim it before shortening the video`);
   }
-  if (durationInFrames > MAX_FRAMES) {
-    return fail(`the video can be at most ${MAX_FRAMES / FPS} seconds`);
+  if (durationInFrames > maxFrames(doc.fps)) {
+    return fail(`the video can be at most ${MAX_SECONDS} seconds`);
   }
   return { ok: true, doc: { ...doc, width: size.width, height: size.height, durationInFrames } };
 }

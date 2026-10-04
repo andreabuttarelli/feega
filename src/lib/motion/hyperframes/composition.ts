@@ -1,6 +1,5 @@
 import { instancesOf, poseAt, type PoseInput } from '../../canvas/composition/pose';
 import { MEDIA_FRAGMENT_SHADER, MEDIA_UNIFORMS, MEDIA_VERTEX_SHADER } from '../../canvas/composition/shader';
-import { FPS } from '../design';
 import { js } from './html';
 import type { PropsOf } from './templates';
 
@@ -12,6 +11,7 @@ export type CompositionBake = {
   media: BakedMedia[];
   instances: number[];
   loopFrames: number;
+  fps: number;
   frames: number[];
 };
 
@@ -49,22 +49,22 @@ export function poseInputOf(p: CompositionProps, mediaCount: number, size: { wid
   };
 }
 
-export function bakeComposition(id: string, p: CompositionProps, size: { width: number; height: number }, asset: (id: string) => string | null): CompositionBake {
+export function bakeComposition(id: string, p: CompositionProps, size: { width: number; height: number; fps: number }, asset: (id: string) => string | null): CompositionBake {
   const media = resolvedMedia(p, asset);
   const input = poseInputOf(p, media.length, size);
   const instances = instancesOf(input);
-  const loopFrames = Math.max(1, Math.round(p.loop * FPS));
+  const loopFrames = Math.max(1, Math.round(p.loop * size.fps));
   const frames: number[] = [];
 
   for (let frame = 0; frame < loopFrames; frame++) {
-    const { camera, transforms } = poseAt(input, frame / FPS, instances.length);
+    const { camera, transforms } = poseAt(input, frame / size.fps, instances.length);
     frames.push(camera.position.x, camera.position.y, camera.position.z, camera.target.x, camera.target.y, camera.target.z, camera.fov);
     for (const t of transforms) {
       frames.push(t.position.x, t.position.y, t.position.z, t.rotation.x, t.rotation.y, t.rotation.z, t.scale.x, t.scale.y, t.scale.z, t.opacity ?? 1);
     }
   }
 
-  return { id, media, instances, loopFrames, frames: frames.map(round) };
+  return { id, media, instances, loopFrames, fps: size.fps, frames: frames.map(round) };
 }
 
 const STAGE_SCRIPT = `
@@ -120,7 +120,7 @@ function renderAt(time) {
   for (const s of stages) {
     const local = Math.min(Math.max(time - s.b.start, 0), s.b.length);
     const stride = CAMERA_FIELDS + s.meshes.length * INSTANCE_FIELDS;
-    const o = (Math.round(local * FPS) % s.b.loopFrames) * stride;
+    const o = (Math.round(local * s.b.fps) % s.b.loopFrames) * stride;
     const f = s.b.frames;
     s.camera.position.set(f[o], f[o + 1], f[o + 2]);
     s.camera.lookAt(f[o + 3], f[o + 4], f[o + 5]);
@@ -163,7 +163,6 @@ export function compositionScript(bakes: TimedBake[], duration: number): string 
   const constants = {
     BAKES: bakes,
     DURATION: duration,
-    FPS,
     CAMERA_FIELDS,
     INSTANCE_FIELDS,
     RADIUS: MEDIA_UNIFORMS.radius,

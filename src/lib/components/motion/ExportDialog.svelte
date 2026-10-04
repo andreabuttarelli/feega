@@ -225,7 +225,7 @@
   {#if mode === Mode.Server}
     <dl>
       <dt>Format</dt>
-      <dd>{FORMATS[formatOf(doc)].label} · {doc.width}×{doc.height} · 30 fps · {Math.round(quote.seconds)} s · audio mixed in</dd>
+      <dd>{FORMATS[formatOf(doc)].label} · {doc.width}×{doc.height} · {doc.fps} fps · {Math.round(quote.seconds)} s · audio mixed in</dd>
       <dt>Cost</dt>
       <dd data-testid="export-quote">{quote.credits} credits, charged only when the video is ready.</dd>
     </dl>
@@ -259,7 +259,7 @@
   {:else}
     <dl>
       <dt>Format</dt>
-      <dd>{FORMATS[formatOf(doc)].label} · {size.width}×{size.height} · 30 fps · {Math.round(doc.durationInFrames / doc.fps)} s</dd>
+      <dd>{FORMATS[formatOf(doc)].label} · {size.width}×{size.height} · {doc.fps} fps · {Math.round(doc.durationInFrames / doc.fps)} s</dd>
       <dt>Quality</dt>
       <dd class="choice">
         <label><input type="radio" name="res" value={Resolution.P1080} bind:group={resolution} disabled={busy || support.support === Support.Only720} /> 1080p</label>

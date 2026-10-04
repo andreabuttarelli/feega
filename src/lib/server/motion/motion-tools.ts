@@ -2,7 +2,8 @@ import { tool, type Tool } from 'ai';
 import { z } from 'zod';
 import { AssetKind, COMPONENTS, COMPONENT_IDS, TrackKind } from '$lib/motion/components';
 import { fieldsOf } from '$lib/motion/inspector';
-import { Ease, FPS, TRANSITION_KINDS } from '$lib/motion/design';
+import { Ease, FRAME_RATES, MAX_SECONDS, TRANSITION_KINDS } from '$lib/motion/design';
+import { setFrameRate } from '$lib/motion/frame-rate';
 import { MOTION_FORMATS, findClip, type MotionDoc } from '$lib/motion/doc';
 import { ClipEdge, Side, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyframes, setMask, setProps, setTiming, setTrackMatte, setTransform, setTransition, trimClip, type OpResult } from '$lib/motion/timeline';
 import { MASK_KEYS, MASK_KIND_IDS, MATTES } from '$lib/motion/mask';
@@ -46,13 +47,20 @@ export type MotionToolDeps = {
   check: (callId: string, doc: MotionDoc, name: string) => Promise<CheckResult | null>;
 };
 
-const frames = (s: number) => Math.round(s * FPS);
-const secs = (f: number) => Math.round((f / FPS) * 100) / 100;
+const framesAt = (s: number, fps: number) => Math.round(s * fps);
+const secondsAt = (f: number, fps: number) => Math.round((f / fps) * 100) / 100;
 
 function summary(doc: MotionDoc, selection: string[]) {
+  const secs = (f: number) => secondsAt(f, doc.fps);
+  const edgeSummary = (edge: { kind: string; durationInFrames: number }) => ({ kind: edge.kind, duration: secs(edge.durationInFrames) });
+  const inSeconds = (keyframes: Record<string, { frame: number; value: unknown; ease: unknown }[] | undefined>) =>
+    Object.fromEntries(Object.entries(keyframes).map(([prop, track]) => [prop, (track ?? []).map((k) => ({ time: secs(k.frame), value: k.value, ease: k.ease }))]));
+  const cameraSummary = (camera: Camera | null) => (camera ? { values: camera.base, dof: camera.dof, keyframes: inSeconds(camera.keyframes), expressions: camera.expressions } : null);
+
   return {
     width: doc.width,
     height: doc.height,
+    fps: doc.fps,
     duration: secs(doc.durationInFrames),
     selected: selection,
     tracks: doc.tracks.map((t) => ({
@@ -87,18 +95,6 @@ function summary(doc: MotionDoc, selection: string[]) {
     camera: cameraSummary(doc.camera),
     components: Object.entries(doc.components).map(([name, c]) => customSummary(name, c))
   };
-}
-
-function edgeSummary(edge: { kind: string; durationInFrames: number }) {
-  return { kind: edge.kind, duration: secs(edge.durationInFrames) };
-}
-
-function inSeconds(keyframes: Record<string, { frame: number; value: unknown; ease: unknown }[] | undefined>) {
-  return Object.fromEntries(Object.entries(keyframes).map(([prop, track]) => [prop, (track ?? []).map((k) => ({ time: secs(k.frame), value: k.value, ease: k.ease }))]));
-}
-
-function cameraSummary(camera: Camera | null) {
-  return camera ? { values: camera.base, dof: camera.dof, keyframes: inSeconds(camera.keyframes), expressions: camera.expressions } : null;
 }
 
 const EFFECT_CATALOGUE = EFFECT_KINDS.map((k) => `${k} (${EFFECTS[k].about}; ${EFFECTS[k].params.map((p) => `${p.key} ${p.kind === ValueKind.Color ? 'colour' : `${p.min}..${p.max}`}`).join(', ')})`).join('; ');
@@ -173,6 +169,7 @@ function propsError(doc: MotionDoc, clipId: string, patch: Record<string, unknow
 
 export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
   const { session } = deps;
+  const frames = (s: number) => framesAt(s, session.doc.fps);
 
   const apply = (result: OpResult, what: string) => {
     if (!result.ok) {
@@ -581,9 +578,13 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_canvas: tool({
-      description: 'Change the format (16:9, 9:16, 1:1, 4:5) or the total duration in seconds (max 60).',
-      inputSchema: z.object({ format: z.enum(MOTION_FORMATS).optional(), duration: z.number().positive().max(60).optional() }),
-      execute: async (input) => apply(setCanvas(session.doc, { format: input.format, durationInFrames: input.duration === undefined ? undefined : frames(input.duration) }), 'changed the canvas')
+      description: `Change the format (16:9, 9:16, 1:1, 4:5), the total duration in seconds (max ${MAX_SECONDS}) or the frame rate (${FRAME_RATES.join(', ')} fps; times keep their seconds). 30 fps is the social default, 24 reads as film, 60 makes fast motion smooth.`,
+      inputSchema: z.object({ format: z.enum(MOTION_FORMATS).optional(), duration: z.number().positive().max(MAX_SECONDS).optional(), fps: z.literal(FRAME_RATES).optional() }),
+      execute: async (input) => {
+        const paced = input.fps === undefined ? ({ ok: true, doc: session.doc } as OpResult) : setFrameRate(session.doc, input.fps);
+        const sized = paced.ok ? setCanvas(paced.doc, { format: input.format, durationInFrames: input.duration === undefined ? undefined : framesAt(input.duration, paced.doc.fps) }) : paced;
+        return apply(sized, 'changed the canvas');
+      }
     }),
 
     add_asset: tool({
@@ -662,7 +663,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
           return { ok: false, error: `frame budget for this turn is spent (${MAX_VIEWS_PER_TURN} views): finish with what you saw` };
         }
         session.views += 1;
-        const end = session.doc.durationInFrames / FPS;
+        const end = session.doc.durationInFrames / session.doc.fps;
         const times = input.times.map((t) => Math.min(t, end));
         const frames = await deps.frames(toolCallId, times);
         if (!frames) {
@@ -703,5 +704,5 @@ export function selectionNote(doc: MotionDoc, selection: string[]): string {
   if (!clips.length) {
     return 'Nothing is selected in the timeline.';
   }
-  return `The user has selected: ${clips.map((c) => `${c.component} ${c.id} (${secs(c.from)}s–${secs(c.from + c.durationInFrames)}s)`).join(', ')}. "This", "it" or "the selected layer" mean these clips.`;
+  return `The user has selected: ${clips.map((c) => `${c.component} ${c.id} (${secondsAt(c.from, doc.fps)}s–${secondsAt(c.from + c.durationInFrames, doc.fps)}s)`).join(', ')}. "This", "it" or "the selected layer" mean these clips.`;
 }

@@ -131,8 +131,8 @@ export function clipFieldGroups(doc: MotionDoc, clip: MotionClip): { group: Grou
 
 const SECONDS_PRECISION = 100;
 
-export function secondsLabel(frames: number): string {
-  return String(Math.round((frames / FPS) * SECONDS_PRECISION) / SECONDS_PRECISION);
+export function secondsLabel(frames: number, fps: number = FPS): string {
+  return String(Math.round((frames / fps) * SECONDS_PRECISION) / SECONDS_PRECISION);
 }
 
 export function parseDecimal(text: string): number | null {

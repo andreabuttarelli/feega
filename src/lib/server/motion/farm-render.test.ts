@@ -36,6 +36,8 @@ function fakeFarm(fail: (w: number, cmd: string) => boolean = () => false) {
   return { farm, workers, specs };
 }
 
+const specOf = (w: FakeWorker) => JSON.parse(w.files.find((f) => f.path.endsWith('spec.json'))?.content.toString() ?? 'null');
+
 const job: FarmJob = {
   html: '<html></html>',
   width: 1920,
@@ -53,7 +55,16 @@ describe('renderOnFarm', () => {
     await renderOnFarm(farm, job, () => {});
 
     expect(workers).toHaveLength(7);
-    workers.forEach((w, i) => expect(w.runs.find((r) => r.includes('render-chunk.mjs'))).toMatch(new RegExp(` 30 1920 1080 120 ${i} `)));
+    workers.forEach((w, i) => expect(specOf(w)).toMatchObject({ route: 'chunked', index: i, config: { fps: 30, width: 1920, height: 1080, chunkSize: 120 } }));
+  });
+
+  it.each([25, 50])('a %i fps video renders whole on one worker, since chunked renders take 24, 30 or 60', async (fps) => {
+    const { farm, workers } = fakeFarm();
+
+    await renderOnFarm(farm, { ...job, fps }, () => {});
+
+    expect(workers).toHaveLength(1);
+    expect(specOf(workers[0])).toMatchObject({ route: 'whole', config: { fps } });
   });
 
   it('only the asset origin and the runtime CDNs are reachable', async () => {

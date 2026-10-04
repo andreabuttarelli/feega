@@ -9,12 +9,12 @@ export const ZOOM_MAX = 16;
 export const BASE_PX_PER_SECOND = 60;
 export const SNAP_PX = 8;
 
-export function pxPerFrame(zoom: number): number {
-  return (BASE_PX_PER_SECOND * zoom) / FPS;
+export function pxPerFrame(zoom: number, fps: number = FPS): number {
+  return (BASE_PX_PER_SECOND * zoom) / fps;
 }
 
-export function frameAt(px: number, zoom: number): number {
-  return Math.max(0, Math.round(px / pxPerFrame(zoom)));
+export function frameAt(px: number, zoom: number, fps: number = FPS): number {
+  return Math.max(0, Math.round(px / pxPerFrame(zoom, fps)));
 }
 
 export function clampZoom(zoom: number): number {
@@ -27,19 +27,19 @@ const TICK_STEPS_S = [0.1, 0.25, 0.5, 1, 2, 5, 10] as const;
 const MIN_TICK_PX = 14;
 const LABEL_EVERY = 5;
 
-export function rulerTicks(durationInFrames: number, zoom: number): Tick[] {
-  const step = TICK_STEPS_S.find((s) => s * FPS * pxPerFrame(zoom) >= MIN_TICK_PX) ?? TICK_STEPS_S.at(-1)!;
-  const stepFrames = Math.max(1, Math.round(step * FPS));
+export function rulerTicks(durationInFrames: number, zoom: number, fps: number = FPS): Tick[] {
+  const step = TICK_STEPS_S.find((s) => s * fps * pxPerFrame(zoom, fps) >= MIN_TICK_PX) ?? TICK_STEPS_S.at(-1)!;
+  const stepFrames = Math.max(1, Math.round(step * fps));
   const ticks: Tick[] = [];
   for (let frame = 0, i = 0; frame <= durationInFrames; frame += stepFrames, i++) {
-    ticks.push({ frame, label: i % LABEL_EVERY === 0 ? timecode(frame) : null });
+    ticks.push({ frame, label: i % LABEL_EVERY === 0 ? timecode(frame, fps) : null });
   }
   return ticks;
 }
 
-export function timecode(frame: number): string {
-  const seconds = Math.floor(frame / FPS);
-  const rest = frame % FPS;
+export function timecode(frame: number, fps: number = FPS): string {
+  const seconds = Math.floor(frame / fps);
+  const rest = frame % fps;
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}.${String(rest).padStart(2, '0')}`;
 }
 

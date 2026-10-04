@@ -26,6 +26,32 @@ function setup(overrides: Partial<MotionToolDeps> = {}) {
   return { session, deps, run, schema };
 }
 
+describe('motion agent tools at another frame rate', () => {
+  it('set_canvas changes the frame rate and every time the agent reads or writes stays in seconds', async () => {
+    const { session, run } = setup();
+    await run('add_clip', { component: 'Title', start: 1, duration: 2 });
+
+    expect((await run('set_canvas', { fps: 60 })).ok).toBe(true);
+    expect(session.doc.fps).toBe(60);
+    expect(session.doc.tracks[0].clips[0]).toMatchObject({ from: 60, durationInFrames: 120 });
+
+    await run('add_clip', { component: 'Title', start: 4, duration: 1 });
+    const doc = (await run('get_motion_doc', {})) as { fps: number; tracks: { clips: { start: number; duration: number }[] }[] };
+
+    expect(doc.fps).toBe(60);
+    expect(doc.tracks[0].clips.map((c) => [c.start, c.duration])).toEqual([
+      [1, 2],
+      [4, 1]
+    ]);
+  });
+
+  it('set_canvas refuses a rate the renderer does not make', async () => {
+    const { schema } = setup();
+
+    expect(schema('set_canvas').safeParse({ fps: 29 }).success).toBe(false);
+  });
+});
+
 describe('motion agent tools', () => {
   it('set_track renames and reorders a track; remove_track drops it with its clips', async () => {
     const { session, run } = setup();

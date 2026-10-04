@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_FRAMES, MotionFormat, newMotionDoc, findClip, type MotionDoc } from './doc';
+import { MotionFormat, newMotionDoc, findClip, type MotionDoc } from './doc';
+import { maxFrames } from './design';
 import {
   ClipEdge,
   addClip,
@@ -56,7 +57,7 @@ describe('timeline operations', () => {
   });
 
   it('refuses a clip past the 60 second limit', () => {
-    const result = addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Title', from: MAX_FRAMES - 10, durationInFrames: 60 }, 't');
+    const result = addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Title', from: maxFrames(30) - 10, durationInFrames: 60 }, 't');
 
     expect(result.ok).toBe(false);
   });
