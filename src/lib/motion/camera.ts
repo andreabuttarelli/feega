@@ -71,7 +71,13 @@ export type StageSpec = {
   layers: StageLayer[];
 };
 
-type StageClip = { id: string; component: ComponentId; depth: number; space: Space };
+type StageClip = { id: string; component: ComponentId; depth: number; space: Space; props: Record<string, unknown> };
+
+const LOOKS_THE_SAME_BLURRED: Partial<Record<ComponentId, (props: Record<string, unknown>) => boolean>> = {
+  BrandBackground: (props) => props.pattern === 'solid'
+};
+
+const blurrable = (c: StageClip) => !THREE_D_COMPONENTS.includes(c.component) && !LOOKS_THE_SAME_BLURRED[c.component]?.(c.props);
 type StageDoc = { width: number; height: number; camera: Camera | null; tracks?: { kind: string; clips: unknown[] }[] };
 
 function stageClips(doc: StageDoc): StageClip[] {
@@ -85,7 +91,7 @@ export function stageSpec(doc: StageDoc): StageSpec {
   let dofSlots = MAX_DOF_LAYERS;
   const layers = stageClips(doc).map((c): StageLayer => {
     const billboard = THREE_D_COMPONENTS.includes(c.component);
-    const dof = !billboard && dofSlots > 0;
+    const dof = blurrable(c) && dofSlots > 0;
     dofSlots -= dof ? 1 : 0;
     return { id: c.id, depth: c.depth, kind: billboard ? LayerKind.Billboard : LayerKind.Flat, dof };
   });

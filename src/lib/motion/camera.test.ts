@@ -158,6 +158,17 @@ describe('depth of field', () => {
     expect(s.layers[0]).toMatchObject({ id: 's0', dof: true });
   });
 
+  it('a solid background is never blurred: it would look the same and costs a full-frame filter', () => {
+    let doc = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'BrandBackground', from: 0 }, 'solid'));
+    doc = must(addClip(doc, { component: 'BrandBackground', from: 0, props: { pattern: 'dots' } }, 'dots'));
+    const s = stageSpec({ ...doc, camera: { ...newCamera(), dof: true } });
+
+    expect(s.layers.map((l) => [l.id, l.dof])).toEqual([
+      ['solid', false],
+      ['dots', true]
+    ]);
+  });
+
   it('a screen-space clip is not on the stage, a 3D clip faces the camera', () => {
     let doc = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Caption', from: 0 }, 'cap'));
     doc = must(addClip(doc, { component: 'Shape3D', from: 0 }, 'cube'));
