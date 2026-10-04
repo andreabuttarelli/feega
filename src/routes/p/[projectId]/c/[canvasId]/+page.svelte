@@ -2774,6 +2774,7 @@
             mediaUrls={upstreamCompositionRefsOf(id).map((refId) => assetUrl(refId)).filter((url): url is string => url !== null).map((url) => sized(url, AssetSize.Px1024))}
             previewActive={compositionEditorId !== id}
             imageCount={upstreamCompositionRefsOf(id).length}
+            composeIn={{ project: data.projectId, canvas: data.canvas.id }}
             onopeneditor={() => openCompositionEditor(id)}
           />
         {:else if motion}

@@ -2,14 +2,14 @@ import { clampParams } from './clamp';
 import type { LayoutParam, LayoutParams, Transform } from './types';
 
 export const params: LayoutParam[] = [
-	{ name: 'density', label: 'Densità media', kind: 'range', min: 3, max: 9, step: 1, default: 7 },
-	{ name: 'spreadX', label: 'Ampiezza', kind: 'range', min: 1, max: 12, step: 0.5, default: 7 },
-	{ name: 'spreadY', label: 'Altezza', kind: 'range', min: 1, max: 12, step: 0.5, default: 6 },
-	{ name: 'spreadZ', label: 'Profondità', kind: 'range', min: 0, max: 8, step: 0.5, default: 3 },
-	{ name: 'scaleMin', label: 'Scala lontana', kind: 'range', min: 0.4, max: 2, step: 0.05, default: 0.8 },
-	{ name: 'scaleMax', label: 'Scala vicina', kind: 'range', min: 0.5, max: 2.5, step: 0.05, default: 1.3 },
-	{ name: 'drift', label: 'Movimento', kind: 'range', min: 0, max: 1.5, step: 0.05, default: 0.45 },
-	{ name: 'seed', label: 'Distribuzione', kind: 'seed', default: 42 }
+	{ name: 'density', label: 'Media density', kind: 'range', min: 3, max: 9, step: 1, default: 7 },
+	{ name: 'spreadX', label: 'Amplitude', kind: 'range', min: 1, max: 12, step: 0.5, default: 7 },
+	{ name: 'spreadY', label: 'Height', kind: 'range', min: 1, max: 12, step: 0.5, default: 6 },
+	{ name: 'spreadZ', label: 'Depth', kind: 'range', min: 0, max: 8, step: 0.5, default: 3 },
+	{ name: 'scaleMin', label: 'Far scale', kind: 'range', min: 0.4, max: 2, step: 0.05, default: 0.8 },
+	{ name: 'scaleMax', label: 'Near scale', kind: 'range', min: 0.5, max: 2.5, step: 0.05, default: 1.3 },
+	{ name: 'drift', label: 'Motion', kind: 'range', min: 0, max: 1.5, step: 0.05, default: 0.45 },
+	{ name: 'seed', label: 'Spread', kind: 'seed', default: 42 }
 ];
 
 const FULL_TURN = Math.PI * 2;

@@ -2,13 +2,13 @@ import { clampParams } from './clamp';
 import type { LayoutParam, LayoutParams, Transform } from './types';
 
 export const params: LayoutParam[] = [
-	{ name: 'items', label: 'Numero media', kind: 'range', min: 3, max: 30, step: 1, default: 7 },
-	{ name: 'radius', label: 'Raggio', kind: 'range', min: 1, max: 20, step: 0.5, default: 3 },
-	{ name: 'height', label: 'Altezza', kind: 'range', min: 1, max: 40, step: 0.5, default: 5 },
-	{ name: 'turns', label: 'Giri', kind: 'range', min: 0.5, max: 8, step: 0.25, default: 2 },
-	{ name: 'spinSpeed', label: 'Velocità rotazione', kind: 'range', min: -2, max: 2, step: 0.05, default: 0.12 },
-	{ name: 'scale', label: 'Scala', kind: 'range', min: 0.1, max: 4, step: 0.05, default: 0.9 },
-	{ name: 'pulse', label: 'Pulsazione', kind: 'range', min: 0, max: 1.5, step: 0.05, default: 0.1 }
+	{ name: 'items', label: 'Media count', kind: 'range', min: 3, max: 30, step: 1, default: 7 },
+	{ name: 'radius', label: 'Radius', kind: 'range', min: 1, max: 20, step: 0.5, default: 3 },
+	{ name: 'height', label: 'Height', kind: 'range', min: 1, max: 40, step: 0.5, default: 5 },
+	{ name: 'turns', label: 'Turns', kind: 'range', min: 0.5, max: 8, step: 0.25, default: 2 },
+	{ name: 'spinSpeed', label: 'Spin speed', kind: 'range', min: -2, max: 2, step: 0.05, default: 0.12 },
+	{ name: 'scale', label: 'Scale', kind: 'range', min: 0.1, max: 4, step: 0.05, default: 0.9 },
+	{ name: 'pulse', label: 'Pulse', kind: 'range', min: 0, max: 1.5, step: 0.05, default: 0.1 }
 ];
 
 const FULL_TURN = Math.PI * 2;

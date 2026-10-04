@@ -28,10 +28,10 @@ const DEFAULT_FOV = 50;
 
 export const CAMERA_PRESETS: Record<CameraPresetId, CameraPresetDefinition> = {
 	static: {
-		label: 'Fisso',
+		label: 'Still',
 		params: [
-			{ name: 'distance', label: 'Distanza', kind: 'range', min: 1, max: 40, step: 0.5, default: 12 },
-			{ name: 'fov', label: 'Campo visivo', kind: 'range', min: 20, max: 100, step: 1, default: DEFAULT_FOV }
+			{ name: 'distance', label: 'Distance', kind: 'range', min: 1, max: 40, step: 0.5, default: 12 },
+			{ name: 'fov', label: 'Field of view', kind: 'range', min: 20, max: 100, step: 1, default: DEFAULT_FOV }
 		],
 		cameraAt: (params) => ({
 			position: { x: 0, y: 0, z: Number(params.distance) },
@@ -40,12 +40,12 @@ export const CAMERA_PRESETS: Record<CameraPresetId, CameraPresetDefinition> = {
 		})
 	},
 	'slow-orbit': {
-		label: 'Orbita lenta',
+		label: 'Slow orbit',
 		params: [
-			{ name: 'radius', label: 'Raggio', kind: 'range', min: 1, max: 40, step: 0.5, default: 12 },
-			{ name: 'height', label: 'Altezza', kind: 'range', min: -20, max: 20, step: 0.5, default: 2 },
-			{ name: 'speed', label: 'Velocità', kind: 'range', min: 0.01, max: 1, step: 0.01, default: 0.1 },
-			{ name: 'fov', label: 'Campo visivo', kind: 'range', min: 20, max: 100, step: 1, default: DEFAULT_FOV }
+			{ name: 'radius', label: 'Radius', kind: 'range', min: 1, max: 40, step: 0.5, default: 12 },
+			{ name: 'height', label: 'Height', kind: 'range', min: -20, max: 20, step: 0.5, default: 2 },
+			{ name: 'speed', label: 'Speed', kind: 'range', min: 0.01, max: 1, step: 0.01, default: 0.1 },
+			{ name: 'fov', label: 'Field of view', kind: 'range', min: 20, max: 100, step: 1, default: DEFAULT_FOV }
 		],
 		cameraAt: (params, t) => {
 			const angle = Number(params.speed) * t * Math.PI * 2;
@@ -61,12 +61,12 @@ export const CAMERA_PRESETS: Record<CameraPresetId, CameraPresetDefinition> = {
 		}
 	},
 	'push-in': {
-		label: 'Avvicinamento',
+		label: 'Push in',
 		params: [
-			{ name: 'startDistance', label: 'Distanza iniziale', kind: 'range', min: 5, max: 60, step: 0.5, default: 25 },
-			{ name: 'endDistance', label: 'Distanza finale', kind: 'range', min: 1, max: 30, step: 0.5, default: 6 },
-			{ name: 'duration', label: 'Durata (s)', kind: 'range', min: 1, max: 60, step: 1, default: 10 },
-			{ name: 'fov', label: 'Campo visivo', kind: 'range', min: 20, max: 100, step: 1, default: DEFAULT_FOV }
+			{ name: 'startDistance', label: 'Start distance', kind: 'range', min: 5, max: 60, step: 0.5, default: 25 },
+			{ name: 'endDistance', label: 'End distance', kind: 'range', min: 1, max: 30, step: 0.5, default: 6 },
+			{ name: 'duration', label: 'Duration (s)', kind: 'range', min: 1, max: 60, step: 1, default: 10 },
+			{ name: 'fov', label: 'Field of view', kind: 'range', min: 20, max: 100, step: 1, default: DEFAULT_FOV }
 		],
 		cameraAt: (params, t) => {
 			const progress = Math.min(1, Math.max(0, Number(params.duration) === 0 ? 1 : t / Number(params.duration)));
@@ -75,12 +75,12 @@ export const CAMERA_PRESETS: Record<CameraPresetId, CameraPresetDefinition> = {
 		}
 	},
 	dolly: {
-		label: 'Carrello',
+		label: 'Dolly',
 		params: [
-			{ name: 'distance', label: 'Distanza', kind: 'range', min: 1, max: 40, step: 0.5, default: 12 },
-			{ name: 'travel', label: 'Estensione', kind: 'range', min: 1, max: 40, step: 0.5, default: 10 },
-			{ name: 'speed', label: 'Velocità', kind: 'range', min: 0.01, max: 1, step: 0.01, default: 0.1 },
-			{ name: 'fov', label: 'Campo visivo', kind: 'range', min: 20, max: 100, step: 1, default: DEFAULT_FOV }
+			{ name: 'distance', label: 'Distance', kind: 'range', min: 1, max: 40, step: 0.5, default: 12 },
+			{ name: 'travel', label: 'Travel', kind: 'range', min: 1, max: 40, step: 0.5, default: 10 },
+			{ name: 'speed', label: 'Speed', kind: 'range', min: 0.01, max: 1, step: 0.01, default: 0.1 },
+			{ name: 'fov', label: 'Field of view', kind: 'range', min: 20, max: 100, step: 1, default: DEFAULT_FOV }
 		],
 		cameraAt: (params, t) => {
 			const x = Math.sin(Number(params.speed) * t * Math.PI * 2) * Number(params.travel);

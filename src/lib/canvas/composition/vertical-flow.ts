@@ -2,14 +2,14 @@ import { clampParams } from './clamp';
 import type { LayoutParam, LayoutParams, Transform } from './types';
 
 export const params: LayoutParam[] = [
-	{ name: 'items', label: 'Numero media', kind: 'range', min: 3, max: 20, step: 1, default: 5 },
-	{ name: 'gap', label: 'Spaziatura verticale', kind: 'range', min: 0.5, max: 8, step: 0.1, default: 1.7 },
-	{ name: 'depth', label: 'Profondità', kind: 'range', min: 0, max: 8, step: 0.1, default: 0.9 },
-	{ name: 'focusScale', label: 'Scala protagonista', kind: 'range', min: 0.5, max: 4, step: 0.05, default: 2.2 },
-	{ name: 'edgeScale', label: 'Scala ai bordi', kind: 'range', min: 0.1, max: 2, step: 0.05, default: 0.95 },
-	{ name: 'tilt', label: 'Inclinazione', kind: 'range', min: 0, max: 45, step: 1, default: 12 },
-	{ name: 'speed', label: 'Giri per loop', kind: 'range', min: -3, max: 3, step: 1, default: 1 },
-	{ name: 'drift', label: 'Deriva laterale', kind: 'range', min: 0, max: 4, step: 0.1, default: 0.25 }
+	{ name: 'items', label: 'Media count', kind: 'range', min: 3, max: 20, step: 1, default: 5 },
+	{ name: 'gap', label: 'Vertical spacing', kind: 'range', min: 0.5, max: 8, step: 0.1, default: 1.7 },
+	{ name: 'depth', label: 'Depth', kind: 'range', min: 0, max: 8, step: 0.1, default: 0.9 },
+	{ name: 'focusScale', label: 'Hero scale', kind: 'range', min: 0.5, max: 4, step: 0.05, default: 2.2 },
+	{ name: 'edgeScale', label: 'Edge scale', kind: 'range', min: 0.1, max: 2, step: 0.05, default: 0.95 },
+	{ name: 'tilt', label: 'Tilt', kind: 'range', min: 0, max: 45, step: 1, default: 12 },
+	{ name: 'speed', label: 'Turns per loop', kind: 'range', min: -3, max: 3, step: 1, default: 1 },
+	{ name: 'drift', label: 'Side drift', kind: 'range', min: 0, max: 4, step: 0.1, default: 0.25 }
 ];
 
 const DEGREES_TO_RADIANS = Math.PI / 180;

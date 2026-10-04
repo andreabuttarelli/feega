@@ -2,24 +2,24 @@ import { clampParams } from './clamp';
 import type { LayoutParam, LayoutParams, Transform } from './types';
 
 export const params: LayoutParam[] = [
-	{ name: 'columns', label: 'Colonne', kind: 'range', min: 1, max: 8, step: 1, default: 3 },
-	{ name: 'rows', label: 'Righe', kind: 'range', min: 1, max: 8, step: 1, default: 3 },
-	{ name: 'gapX', label: 'Spaziatura orizzontale', kind: 'range', min: 0.1, max: 10, step: 0.1, default: 2 },
-	{ name: 'gapY', label: 'Spaziatura verticale', kind: 'range', min: 0.1, max: 10, step: 0.1, default: 2 },
-	{ name: 'tiltX', label: 'Inclinazione X', kind: 'range', min: -45, max: 45, step: 1, default: 0 },
-	{ name: 'tiltY', label: 'Inclinazione Y', kind: 'range', min: -45, max: 45, step: 1, default: 0 },
-	{ name: 'tiltZ', label: 'Inclinazione Z', kind: 'range', min: -45, max: 45, step: 1, default: 0 },
-	{ name: 'scrollSpeed', label: 'Velocità scorrimento', kind: 'range', min: 0, max: 5, step: 0.1, default: 0 },
-	{ name: 'waveDepth', label: 'Onda in profondità', kind: 'range', min: 0, max: 8, step: 0.1, default: 1.2 },
-	{ name: 'waveSpeed', label: 'Velocità onda', kind: 'range', min: 0, max: 4, step: 0.05, default: 0.6 },
-	{ name: 'cardScale', label: 'Scala media', kind: 'range', min: 0.5, max: 3, step: 0.05, default: 1.15 },
+	{ name: 'columns', label: 'Columns', kind: 'range', min: 1, max: 8, step: 1, default: 3 },
+	{ name: 'rows', label: 'Rows', kind: 'range', min: 1, max: 8, step: 1, default: 3 },
+	{ name: 'gapX', label: 'Horizontal spacing', kind: 'range', min: 0.1, max: 10, step: 0.1, default: 2 },
+	{ name: 'gapY', label: 'Vertical spacing', kind: 'range', min: 0.1, max: 10, step: 0.1, default: 2 },
+	{ name: 'tiltX', label: 'Tilt X', kind: 'range', min: -45, max: 45, step: 1, default: 0 },
+	{ name: 'tiltY', label: 'Tilt Y', kind: 'range', min: -45, max: 45, step: 1, default: 0 },
+	{ name: 'tiltZ', label: 'Tilt Z', kind: 'range', min: -45, max: 45, step: 1, default: 0 },
+	{ name: 'scrollSpeed', label: 'Scroll speed', kind: 'range', min: 0, max: 5, step: 0.1, default: 0 },
+	{ name: 'waveDepth', label: 'Depth wave', kind: 'range', min: 0, max: 8, step: 0.1, default: 1.2 },
+	{ name: 'waveSpeed', label: 'Wave speed', kind: 'range', min: 0, max: 4, step: 0.05, default: 0.6 },
+	{ name: 'cardScale', label: 'Media scale', kind: 'range', min: 0.5, max: 3, step: 0.05, default: 1.15 },
 	{
 		name: 'scrollDirection',
-		label: 'Direzione scorrimento',
+		label: 'Scroll direction',
 		kind: 'select',
 		options: [
-			{ value: 'vertical', label: 'Verticale' },
-			{ value: 'horizontal', label: 'Orizzontale' }
+			{ value: 'vertical', label: 'Vertical' },
+			{ value: 'horizontal', label: 'Horizontal' }
 		],
 		default: 'vertical'
 	}
