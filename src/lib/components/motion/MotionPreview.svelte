@@ -192,7 +192,7 @@
   .stage {
     position: relative;
     background: #000;
-    outline: 1px solid var(--line);
+    outline: 1px solid var(--ui-line);
   }
 
   .host {

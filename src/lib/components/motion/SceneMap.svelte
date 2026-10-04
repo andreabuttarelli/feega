@@ -49,16 +49,16 @@
     display: block;
     width: 100%;
     height: 150px;
-    background: var(--paper-2);
-    border: 1px solid var(--line);
+    background: var(--ui-surface);
+    border: 1px solid var(--ui-line);
   }
 
   .cone {
-    fill: color-mix(in srgb, #a855f7 12%, transparent);
+    fill: color-mix(in srgb, var(--ui-accent) 12%, transparent);
   }
 
   .focus {
-    stroke: #a855f7;
+    stroke: var(--ui-accent);
   }
 
   .focus.off {
@@ -66,7 +66,7 @@
   }
 
   .layer {
-    stroke: var(--ink);
+    stroke: var(--ui-ink);
     cursor: pointer;
   }
 
@@ -75,7 +75,7 @@
   }
 
   .layer.picked {
-    stroke: #0099ff;
+    stroke: var(--ui-accent);
   }
 
   .camera {

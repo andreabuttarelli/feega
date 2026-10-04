@@ -135,19 +135,19 @@
     align-items: center;
     gap: 2px;
     padding: 4px 8px;
-    border-bottom: 1px solid var(--line);
+    border-bottom: 1px solid var(--ui-line);
   }
 
   .files button {
     padding: 3px 8px;
-    font-family: 'Fragment Mono', ui-monospace, monospace;
+    font-family: var(--ui-mono);
     font-size: 11px;
-    color: var(--ink-soft);
+    color: var(--ui-ink-2);
   }
 
   .files button.on {
-    color: var(--ink);
-    box-shadow: inset 0 -2px 0 var(--ink);
+    color: var(--ui-ink);
+    box-shadow: inset 0 -2px 0 var(--ui-ink);
   }
 
   .diff {
@@ -156,7 +156,7 @@
     gap: 4px;
     align-items: center;
     font-size: 11px;
-    color: var(--ink-soft);
+    color: var(--ui-ink-2);
   }
 
   .editor {
@@ -166,10 +166,10 @@
   }
 
   .status {
-    border-top: 1px solid var(--line);
+    border-top: 1px solid var(--ui-line);
     padding: 6px 10px;
     font-size: 11px;
-    color: var(--ink-soft);
+    color: var(--ui-ink-2);
     max-height: 30%;
     overflow: auto;
   }
@@ -181,7 +181,7 @@
   pre {
     margin: 4px 0 0;
     white-space: pre-wrap;
-    font-family: 'Fragment Mono', ui-monospace, monospace;
+    font-family: var(--ui-mono);
     font-size: 11px;
   }
 </style>

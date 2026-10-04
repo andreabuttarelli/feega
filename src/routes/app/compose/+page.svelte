@@ -98,12 +98,12 @@
     margin: 0 0 12px;
     font-size: 15px;
     font-weight: 600;
-    color: var(--ink);
+    color: var(--ui-ink);
   }
 
   .muted {
     font-size: 12px;
-    color: var(--ink-soft);
+    color: var(--ui-ink-2);
   }
 
   .error {
@@ -118,8 +118,8 @@
     align-items: flex-end;
     gap: 16px;
     padding: 16px;
-    border: 1px solid var(--line);
-    background: var(--paper);
+    border: 1px solid var(--ui-line);
+    background: var(--ui-bg);
   }
 
   .options label {
@@ -127,22 +127,22 @@
     flex-direction: column;
     gap: 4px;
     font-size: 12px;
-    color: var(--ink-soft);
+    color: var(--ui-ink-2);
   }
 
   .options select {
     height: 32px;
     min-width: 200px;
     padding: 0 8px;
-    border: 1px solid var(--line-2);
-    background: var(--paper);
-    color: var(--ink);
+    border: 1px solid var(--ui-line-strong);
+    background: var(--ui-bg);
+    color: var(--ui-ink);
     font-size: 13px;
   }
 
   .formats {
     display: flex;
-    border: 1px solid var(--line-2);
+    border: 1px solid var(--ui-line-strong);
   }
 
   .formats button {
@@ -152,9 +152,9 @@
     height: 32px;
     padding: 0 12px;
     font-size: 12.5px;
-    color: var(--ink-soft);
-    background: var(--paper);
-    border-right: 1px solid var(--line-2);
+    color: var(--ui-ink-2);
+    background: var(--ui-bg);
+    border-right: 1px solid var(--ui-line-strong);
     cursor: pointer;
   }
 
@@ -163,8 +163,8 @@
   }
 
   .formats button.on {
-    background: var(--ink);
-    color: var(--paper);
+    background: var(--ui-accent-wash);
+    color: var(--ui-accent);
   }
 
   .ratio-glyph {
@@ -193,16 +193,16 @@
     width: 100%;
     height: 100%;
     padding: 0;
-    border: 1px solid var(--line);
-    background: var(--paper);
-    color: var(--ink);
+    border: 1px solid var(--ui-line);
+    background: var(--ui-bg);
+    color: var(--ui-ink);
     text-align: left;
     cursor: pointer;
   }
 
   .template-button:hover,
   .template-button:focus-visible {
-    border-color: var(--ink);
+    border-color: var(--ui-ink);
   }
 
   .stage {
@@ -231,12 +231,12 @@
     padding: 0;
     display: flex;
     flex-direction: column;
-    border: 1px solid var(--line);
-    background: var(--paper);
+    border: 1px solid var(--ui-line);
+    background: var(--ui-bg);
   }
 
   .recent li + li {
-    border-top: 1px solid var(--line);
+    border-top: 1px solid var(--ui-line);
   }
 
   .recent-item {
@@ -244,12 +244,12 @@
     align-items: center;
     gap: 10px;
     padding: 10px 12px;
-    color: var(--ink);
+    color: var(--ui-ink);
     text-decoration: none;
   }
 
   .recent-item:hover {
-    background: var(--paper-2);
+    background: var(--ui-surface);
   }
 
   .recent-name {

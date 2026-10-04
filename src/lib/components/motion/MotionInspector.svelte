@@ -469,11 +469,11 @@
 
 <style>
   .managed {
-    color: var(--ink-soft);
+    color: var(--ui-ink-2);
   }
 
   .managed a {
-    color: var(--ink);
+    color: var(--ui-ink);
     text-decoration: underline;
   }
 
@@ -490,24 +490,24 @@
     justify-content: space-between;
     align-items: baseline;
     padding: 10px 12px;
-    border-bottom: 1px solid var(--line);
+    border-bottom: 1px solid var(--ui-line);
   }
 
   .tabs {
     display: flex;
-    border-bottom: 1px solid var(--line);
+    border-bottom: 1px solid var(--ui-line);
   }
 
   .tabs button {
     flex: 1;
     padding: 6px 0;
     font-size: 12px;
-    color: var(--ink-soft);
+    color: var(--ui-ink-2);
   }
 
   .tabs button.on {
-    color: var(--ink);
-    box-shadow: inset 0 -2px 0 var(--ink);
+    color: var(--ui-ink);
+    box-shadow: inset 0 -2px 0 var(--ui-accent);
   }
 
   .kind {
@@ -516,22 +516,23 @@
   }
 
   .id {
-    font-family: 'Fragment Mono', ui-monospace, monospace;
-    color: var(--ink-soft);
+    font-family: var(--ui-mono);
+    color: var(--ui-ink-2);
   }
 
   section {
-    padding: 8px 12px 12px;
-    border-bottom: 1px solid var(--line);
+    padding: 12px 12px 14px;
+    border-bottom: 1px solid var(--ui-line);
   }
 
   h4 {
     margin: 0 0 6px;
-    font-family: 'Fragment Mono', ui-monospace, monospace;
+    font-family: var(--ui-mono);
     font-size: 10px;
     font-weight: 400;
     text-transform: uppercase;
-    color: var(--ink-soft);
+    letter-spacing: 0.06em;
+    color: var(--ui-ink-3);
   }
 
   .row {
@@ -559,10 +560,18 @@
   select {
     width: 100%;
     padding: 4px 6px;
-    border: 1px solid var(--line);
-    background: var(--paper);
-    color: var(--ink);
+    border: 1px solid var(--ui-line);
+    background: var(--ui-bg);
+    color: var(--ui-ink);
     font: inherit;
+  }
+
+  input[type='text']:focus,
+  input[type='number']:focus,
+  textarea:focus,
+  select:focus {
+    outline: none;
+    border-color: var(--ui-accent);
   }
 
   .range {
@@ -578,7 +587,7 @@
   output {
     width: 40px;
     text-align: right;
-    font-family: 'Fragment Mono', ui-monospace, monospace;
+    font-family: var(--ui-mono);
   }
 
   .swatches {
@@ -590,11 +599,11 @@
   .swatch {
     width: 20px;
     height: 20px;
-    border: 1px solid var(--line);
+    border: 1px solid var(--ui-line);
   }
 
   .swatch.on {
-    outline: 2px solid #a855f7;
+    outline: 2px solid var(--ui-accent);
     outline-offset: 1px;
   }
 
@@ -602,7 +611,7 @@
     width: 28px;
     height: 22px;
     padding: 0;
-    border: 1px solid var(--line);
+    border: 1px solid var(--ui-line);
     background: none;
   }
 
@@ -614,8 +623,8 @@
 
   .asset {
     aspect-ratio: 1;
-    border: 1px solid var(--line);
-    background: var(--paper-2);
+    border: 1px solid var(--ui-line);
+    background: var(--ui-surface);
     overflow: hidden;
     font-size: 9px;
     padding: 2px;
@@ -629,13 +638,13 @@
   }
 
   .asset.on {
-    outline: 2px solid #a855f7;
+    outline: 2px solid var(--ui-accent);
     outline-offset: 1px;
   }
 
   .empty {
     grid-column: 1 / -1;
-    color: var(--ink-soft);
+    color: var(--ui-ink-2);
   }
 
   .anim .name {
@@ -650,7 +659,7 @@
   }
 
   .effect {
-    border: 1px solid var(--border, #ddd);
+    border: 1px solid var(--ui-line);
     padding: 6px;
     margin-bottom: 6px;
   }
@@ -675,19 +684,19 @@
 
   .grip {
     cursor: grab;
-    color: var(--muted-foreground, #888);
+    color: var(--ui-ink-3);
   }
 
   .expr-toggle {
     width: 16px;
     margin-right: 4px;
-    font-family: 'Fragment Mono', monospace;
+    font-family: var(--ui-mono);
     font-size: 11px;
-    color: var(--muted-foreground, #888);
+    color: var(--ui-ink-3);
   }
 
   .expr-toggle.on {
-    color: #a855f7;
+    color: var(--ui-accent);
   }
 
   .expr {
@@ -698,7 +707,7 @@
 
   .expr .code {
     width: 100%;
-    font-family: 'Fragment Mono', monospace;
+    font-family: var(--ui-mono);
     font-size: 11px;
     resize: vertical;
   }
@@ -710,24 +719,24 @@
   }
 
   .expr-now {
-    font-family: 'Fragment Mono', monospace;
+    font-family: var(--ui-mono);
     font-size: 10px;
-    color: #a855f7;
+    color: var(--ui-accent);
   }
 
   .key {
     font-size: 10px;
     line-height: 1;
     width: 14px;
-    color: var(--line);
+    color: var(--ui-line);
   }
 
   .key.lane {
-    color: var(--ink-soft);
+    color: var(--ui-ink-2);
   }
 
   .key.on {
-    color: #a855f7;
+    color: var(--ui-accent);
   }
 
   .anchor {
@@ -739,13 +748,13 @@
   .anchor button {
     width: 14px;
     height: 14px;
-    border: 1px solid var(--line);
-    background: var(--paper);
+    border: 1px solid var(--ui-line);
+    background: var(--ui-bg);
   }
 
   .anchor button.on {
-    background: #a855f7;
-    border-color: #a855f7;
+    background: var(--ui-accent);
+    border-color: var(--ui-accent);
   }
 
   .check {
@@ -757,7 +766,7 @@
 
   .hint {
     margin: 0 0 8px;
-    color: var(--ink-soft);
+    color: var(--ui-ink-2);
   }
 
   .error {

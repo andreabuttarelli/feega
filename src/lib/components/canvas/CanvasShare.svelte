@@ -85,9 +85,9 @@
     height: 30px;
     flex-shrink: 0;
     appearance: none;
-    border: 1px solid var(--line, #ededef);
-    background: var(--ink, #1d1d1f);
-    color: var(--paper, #fff);
+    border: 1px solid var(--ui-accent);
+    background: var(--ui-accent);
+    color: var(--ui-accent-ink);
     padding: 0 10px;
     font: inherit;
     font-size: 12px;

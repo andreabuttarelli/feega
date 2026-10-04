@@ -193,17 +193,18 @@
   h3 { font-size: 13px; font-weight: 600; margin: 0 0 8px; }
   .muted { color: var(--ink-3, #6e6e73); font-size: 12px; font-weight: 400; }
   .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin-top: 6px; }
-  .tile { padding: 0; border: 1px solid var(--line-2, #d2d2d7); background: #000; cursor: pointer; }
+  .tile { padding: 0; border: 1px solid var(--ui-line-strong); background: #000; cursor: pointer; }
   .tile video { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; display: block; }
-  .on { outline: 2px solid var(--ink); outline-offset: -2px; }
+  .on { outline: 2px solid var(--ui-ink); outline-offset: -2px; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
-  .chip { padding: 6px 10px; font-size: 12.5px; border: 1px solid var(--line-2, #d2d2d7); background: var(--paper, #fff); cursor: pointer; }
-  .chip.on { background: var(--ink); color: var(--paper); }
+  .chip { padding: 6px 10px; font-size: 12.5px; border: 1px solid var(--ui-line-strong); background: var(--ui-bg); cursor: pointer; }
+  .chip:hover { border-color: var(--ui-ink-3); }
+  .chip.on { background: var(--ui-accent-wash); color: var(--ui-accent); border-color: var(--ui-accent); }
   .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
-  .actions button, .actions a { padding: 8px 14px; font-size: 12.5px; font-weight: 600; border: 1px solid var(--line-2, #d2d2d7); background: var(--paper, #fff); color: inherit; cursor: pointer; text-decoration: none; }
-  .actions .primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .actions button, .actions a { padding: 8px 14px; font-size: 12.5px; font-weight: 600; border: 1px solid var(--ui-line-strong); background: var(--ui-bg); color: inherit; cursor: pointer; text-decoration: none; }
+  .actions .primary { background: var(--ui-accent); color: var(--ui-accent-ink); border-color: var(--ui-accent); }
   .actions button:disabled { opacity: 0.5; cursor: not-allowed; }
-  .quote { border: 1px solid var(--line-2, #d2d2d7); padding: 12px; font-size: 13px; }
+  .quote { border: 1px solid var(--ui-line-strong); padding: 12px; font-size: 13px; }
   .quote p { margin: 2px 0; }
   .error { color: var(--danger, #c0392b); font-size: 12.5px; }
 </style>

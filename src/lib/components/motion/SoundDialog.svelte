@@ -79,9 +79,9 @@
     flex-direction: column;
     gap: 12px;
     padding: 16px;
-    background: var(--paper);
-    color: var(--ink);
-    border: 1px solid var(--line);
+    background: var(--ui-bg);
+    color: var(--ui-ink);
+    border: 1px solid var(--ui-line);
     box-shadow: 0 16px 48px rgb(0 0 0 / 0.2);
     font-size: 13px;
   }
@@ -96,7 +96,7 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
-    color: var(--ink-soft);
+    color: var(--ui-ink-2);
   }
 
   .inline {
@@ -107,9 +107,9 @@
   textarea,
   input {
     padding: 6px 8px;
-    border: 1px solid var(--line);
-    background: var(--paper);
-    color: var(--ink);
+    border: 1px solid var(--ui-line);
+    background: var(--ui-bg);
+    color: var(--ui-ink);
     font: inherit;
   }
 
@@ -124,8 +124,8 @@
 
   .primary {
     padding: 8px 12px;
-    background: var(--ink);
-    color: var(--paper);
+    background: var(--ui-accent);
+    color: var(--ui-accent-ink);
     font-size: 12px;
   }
 
