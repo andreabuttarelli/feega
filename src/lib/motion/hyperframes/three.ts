@@ -6,6 +6,10 @@ import { cameraRuntime, seekDriver } from './stage';
 export const THREE_VERSION = '0.181.2';
 export const THREE_TIMELINE = 'feegaThree';
 
+export function onScreen(clip: { start: number; length: number }, time: number): boolean {
+  return time >= clip.start && time <= clip.start + clip.length;
+}
+
 export type ThreeClip = {
   id: string;
   kind: 'model' | 'shape';
@@ -49,7 +53,8 @@ const geometry = {
   cone: () => new THREE.ConeGeometry(0.9, 1.6, 64)
 };
 
-const BOKEH_TAPS = 32;
+const BOKEH_TAPS = 24;
+const PROBES = 8;
 const BOKEH_VERTEX = 'varying vec2 vUv;void main(){vUv=uv;gl_Position=vec4(position.xy,0.0,1.0);}';
 const BOKEH_FRAGMENT = [
   '#include <packing>',
@@ -61,12 +66,19 @@ const BOKEH_FRAGMENT = [
   '  float d=texture2D(tDepth,vUv).x;',
   '  float coc=d>=1.0?blurOf(clipDepth):blurOf(clipDepth+(-perspectiveDepthToViewZ(d,near,far)-rest)*pxPerUnit);',
   '  vec4 sum=vec4(0.0);',
-  '  for(int i=0;i<' + BOKEH_TAPS + ';i++){',
-  '    float a=float(i)*2.39996;float r=sqrt((float(i)+0.5)/' + BOKEH_TAPS + '.0)*coc;',
-  '    vec4 c=texture2D(tColor,vUv+vec2(cos(a),sin(a))*r/size);',
-  '    sum+=vec4(c.rgb*c.a,c.a);',
+  '  if(coc<0.5){vec4 c=texture2D(tColor,vUv);sum=vec4(c.rgb*c.a,c.a);}',
+  '  else{',
+  '    float cover=0.0;',
+  '    for(int i=0;i<' + PROBES + ';i++){float a=float(i)*6.28318/' + PROBES + '.0;vec2 o=vec2(cos(a),sin(a))*coc/size;cover+=texture2D(tColor,vUv+o).a+texture2D(tColor,vUv+o*0.5).a;}',
+  '    if(d<1.0||cover>0.0){',
+  '      for(int i=0;i<' + BOKEH_TAPS + ';i++){',
+  '        float a=float(i)*2.39996;float r=sqrt((float(i)+0.5)/' + BOKEH_TAPS + '.0)*coc;',
+  '        vec4 c=texture2D(tColor,vUv+vec2(cos(a),sin(a))*r/size);',
+  '        sum+=vec4(c.rgb*c.a,c.a);',
+  '      }',
+  '      sum/=' + BOKEH_TAPS + '.0;',
+  '    }',
   '  }',
-  '  sum/=' + BOKEH_TAPS + '.0;',
   '  gl_FragColor=vec4(sum.a>0.0?sum.rgb/sum.a:vec3(0.0),sum.a);',
   '  #include <colorspace_fragment>',
   '  gl_FragColor.rgb*=gl_FragColor.a;',
@@ -147,6 +159,7 @@ function legacyOrbit(c, local) {
 
 function renderAt(time) {
   for (const { c, s } of scenes) {
+    if (!onScreen(c, time)) continue;
     const local = Math.min(Math.max(time - c.start, 0), c.length);
     const at = (key, fallback) => (c.keys[key] ? sampleTrack(c.keys[key], local * c.fps) : fallback);
     s.pivot.rotation.y = at('orbit', legacyOrbit(c, local)) * DEG;
@@ -197,5 +210,5 @@ export function threeScript(clips: ThreeClip[], duration: number, stage: StageSp
   if (!clips.length) {
     return '';
   }
-  return `<script type="module">const CLIPS = ${js(clips)};const LIGHTING = ${js(LIGHTING)};const DURATION = ${js(duration)};const FOV = ${SCENE.fov.fallback};const STAGE = ${js(stage)};${cameraRuntime()}const sampleTrack = (${sampleTrack.toString()});${SCENE_SCRIPT.replace('DRIVER', seekDriver(THREE_TIMELINE, 'DURATION', 'renderAt'))}</script>`;
+  return `<script type="module">const CLIPS = ${js(clips)};const LIGHTING = ${js(LIGHTING)};const DURATION = ${js(duration)};const FOV = ${SCENE.fov.fallback};const STAGE = ${js(stage)};${cameraRuntime()}const sampleTrack = (${sampleTrack.toString()});const onScreen = (${onScreen.toString()});${SCENE_SCRIPT.replace('DRIVER', seekDriver(THREE_TIMELINE, 'DURATION', 'renderAt'))}</script>`;
 }

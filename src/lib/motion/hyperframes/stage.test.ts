@@ -10,7 +10,7 @@ import { addClip, type OpResult } from '../timeline';
 import { seekPlan } from '../custom/determinism';
 import { composeHtml } from './compose';
 import { STAGE_TIMELINE, seekDriver, stageScript } from './stage';
-import { THREE_TIMELINE } from './three';
+import { THREE_TIMELINE, onScreen } from './three';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -98,6 +98,13 @@ describe('driving a page renderer from the timeline', () => {
     tl.totalTime(0.5, true);
 
     expect(seen.slice(-2)).toEqual([1.5, 0.5]);
+  });
+
+  it('a 3D scene is drawn only while its clip is on screen, so a hidden model costs no frames', () => {
+    const doc = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Shape3D', from: 60, durationInFrames: 60 }, 'cube'));
+
+    expect([1.9, 2, 3, 4, 4.1].map((t) => onScreen({ start: 2, length: 2 }, t))).toEqual([false, true, true, true, false]);
+    expect(compose(doc)).toContain('if (!onScreen(c, time)) continue;');
   });
 
   it('a 3D scene is redrawn by the same driver, not by an onUpdate the runtime never calls', () => {
