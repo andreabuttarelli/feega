@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { COMPONENT_IDS, CUSTOM_NAME, TrackKind, parseProps, type ComponentId, type PropsVerdict } from './components';
 import { withParams } from './custom/params';
 import { MAX_COMPONENTS, Strictness, customComponentSchema, customValues, type CustomComponents } from './custom/component';
-import { FPS, TRANSITION_KINDS, TransitionKind } from './design';
+import { FASTEST_RATE, FPS, FRAME_RATES, MAX_SECONDS, TRANSITION_KINDS, TransitionKind, maxFrames } from './design';
 import { keyframeSchema, keyframesProblem, transformSchema } from './keyframes';
 import { MATTES, Matte, maskSchema } from './mask';
 import { DEPTH, SPACES, Space, cameraSchema, depthSchema } from './camera';
@@ -28,8 +28,8 @@ export const FORMATS: Record<MotionFormat, { width: number; height: number; labe
 
 export const MOTION_FORMATS = Object.values(MotionFormat) as [MotionFormat, ...MotionFormat[]];
 
-export const MAX_SECONDS = 60;
-export const MAX_FRAMES = MAX_SECONDS * FPS;
+export { MAX_SECONDS };
+const FRAMES_CEILING = maxFrames(FASTEST_RATE);
 export const MAX_SIDE = 1920;
 export const MAX_SHORT_SIDE = 1080;
 export const DEFAULT_SECONDS = 15;
@@ -37,13 +37,13 @@ export const DOC_VERSION = 5;
 
 const edgeSchema = z.object({
   kind: z.enum(TRANSITION_KINDS),
-  durationInFrames: z.number().int().min(0).max(FPS * 2)
+  durationInFrames: z.number().int().min(0).max(FASTEST_RATE * 2)
 });
 
 const clipSchema = z.object({
   id: z.string().min(1),
-  from: z.number().int().min(0).max(MAX_FRAMES),
-  durationInFrames: z.number().int().min(1).max(MAX_FRAMES),
+  from: z.number().int().min(0).max(FRAMES_CEILING),
+  durationInFrames: z.number().int().min(1).max(FRAMES_CEILING),
   trimStart: z.number().int().min(0).default(0),
   component: z.enum(COMPONENT_IDS),
   props: z.record(z.string(), z.unknown()).default({}),
@@ -78,10 +78,10 @@ const assetRefSchema = z.object({
 export const motionDocSchema = z
   .object({
     version: z.literal(DOC_VERSION),
-    fps: z.literal(FPS),
+    fps: z.literal(FRAME_RATES).default(FPS),
     width: z.number().int().min(16).max(MAX_SIDE),
     height: z.number().int().min(16).max(MAX_SIDE),
-    durationInFrames: z.number().int().min(1).max(MAX_FRAMES),
+    durationInFrames: z.number().int().min(1).max(FRAMES_CEILING),
     tracks: z.array(trackSchema).max(20),
     assets: z.array(assetRefSchema).default([]),
     camera: cameraSchema.nullable().default(null),
@@ -91,7 +91,8 @@ export const motionDocSchema = z
       .refine((c) => Object.keys(c).length <= MAX_COMPONENTS, `at most ${MAX_COMPONENTS} custom components`)
       .default({})
   })
-  .refine((d) => Math.min(d.width, d.height) <= MAX_SHORT_SIDE, 'resolution above 1080p');
+  .refine((d) => Math.min(d.width, d.height) <= MAX_SHORT_SIDE, 'resolution above 1080p')
+  .refine((d) => d.durationInFrames <= maxFrames(d.fps), { message: `the video can be at most ${MAX_SECONDS} seconds`, path: ['durationInFrames'] });
 
 export type MotionDoc = z.infer<typeof motionDocSchema>;
 export type MotionTrack = MotionDoc['tracks'][number];

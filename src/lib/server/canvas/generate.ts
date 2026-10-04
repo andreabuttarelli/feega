@@ -1010,7 +1010,7 @@ const VIDEO_TIMEOUT_MS = 20 * 60_000;
 const WIRO_IMAGE_TIMEOUT_MS = 10 * 60_000;
 const WIRO_VIDEO_TIMEOUT_MS = 30 * 60_000;
 const DUBBING_TIMEOUT_MS = 60 * 60_000;
-const MOTION_RENDER_TIMEOUT_MS = 8 * 60_000;
+const MOTION_RENDER_TIMEOUT_MS = 14 * 60_000;
 
 type JobKind = 'sync' | 'video' | 'wiro_image' | 'wiro_video' | 'dubbing' | 'motion_render';
 

@@ -3,7 +3,6 @@ import { LAYOUTS } from '../canvas/composition/index';
 import type { LayoutId, LayoutParams } from '../canvas/composition/types';
 import type { CompositionAspect, CompositionNode } from '../canvas/composition-node';
 import { TrackKind, defaultProps } from './components';
-import { FPS } from './design';
 import { FORMATS, MotionFormat, formatOf, newClip, parseMotionDoc, type DocVerdict, type MotionClip, type MotionDoc, type MotionTrack } from './doc';
 import type { PropsOf } from './hyperframes/templates';
 
@@ -123,7 +122,7 @@ function withOverlayTrack(doc: MotionDoc): MotionDoc {
 }
 
 export function applyDraft(base: MotionDoc, draft: ComposeDraft): DocVerdict {
-  const frames = Math.round(clampSeconds(draft.seconds) * FPS);
+  const frames = Math.round(clampSeconds(draft.seconds) * base.fps);
   const { width, height } = FORMATS[draft.format];
   let doc: MotionDoc = withOverlayTrack({ ...structuredClone(base), width, height, durationInFrames: frames });
 
@@ -166,7 +165,7 @@ export function draftFromDoc(doc: MotionDoc): ComposeDraft | null {
     camera: p.camera,
     cameraParams: p.cameraParams,
     background: p.background,
-    seconds: doc.durationInFrames / FPS,
+    seconds: doc.durationInFrames / doc.fps,
     format: formatOf(doc),
     media: p.media,
     headline: headline?.text ?? '',

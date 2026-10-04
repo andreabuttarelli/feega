@@ -1,5 +1,5 @@
 import { CAMERA, CAMERA_KEYS, cameraMath, cameraSchema, depthSchema, newCamera, stageSpec, type Camera, type CameraKey, type CameraValues, type Space } from './camera';
-import { Ease, FPS } from './design';
+import { Ease } from './design';
 import { byFrame, findClip, type DocVerdict, type MotionDoc } from './doc';
 import { sampleTrack, type EaseSpec, type KeyValue, type Keyframe } from './keyframes';
 
@@ -225,7 +225,7 @@ export function applyPreset(doc: MotionDoc, preset: CameraPreset, params: Preset
   const start = Math.max(0, Math.round(params.start));
   const end = start + Math.max(1, Math.round(params.duration));
   if (end > doc.durationInFrames) {
-    return fail(`the move ends at ${round(end / FPS)}s, after the end of the video (${round(doc.durationInFrames / FPS)}s)`);
+    return fail(`the move ends at ${round(end / doc.fps)}s, after the end of the video (${round(doc.durationInFrames / doc.fps)}s)`);
   }
 
   const spec = PRESETS[preset];

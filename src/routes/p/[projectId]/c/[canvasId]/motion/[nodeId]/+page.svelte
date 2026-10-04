@@ -34,7 +34,8 @@
   import SoundDialog, { type Made, type SoundKind } from '$lib/components/motion/SoundDialog.svelte';
   import ChatPanel from '$lib/components/brand-agent/ChatPanel.svelte';
   import { AssetKind, COMPONENTS, LIBRARY_IDS, TrackKind, type ComponentId } from '$lib/motion/components';
-  import { FPS } from '$lib/motion/design';
+  import { FRAME_RATES, type FrameRate } from '$lib/motion/design';
+  import { setFrameRate } from '$lib/motion/frame-rate';
   import { FORMATS, MOTION_FORMATS, MAX_SECONDS, findClip, formatOf, type MotionDoc, type MotionFormat } from '$lib/motion/doc';
   import {
     Direction,
@@ -296,7 +297,7 @@
       return;
     }
     const agentHtml = composeHtml({ doc: request.doc, tokens: data.tokens, assets: assetUrls });
-    const times = request.times.map((t) => Math.min(t, (request.doc.durationInFrames - 1) / FPS));
+    const times = request.times.map((t) => Math.min(t, (request.doc.durationInFrames - 1) / request.doc.fps));
     const frames = await preview.capture(times, agentHtml).catch((e) => {
       console.error('[motion] frames not captured', e);
       return null;
@@ -338,7 +339,7 @@
     sounding = null;
     madeAssets = [{ id: made.assetId, kind: AssetKind.Audio, label: `${SOUND_LABEL[kind]} · ${made.assetId.slice(0, 6)}`, previewUrl: '', url: made.url, seconds: made.seconds }, ...madeAssets];
     const id = newId();
-    const durationInFrames = Math.max(FPS, Math.ceil(made.seconds * FPS));
+    const durationInFrames = Math.max(doc.fps, Math.ceil(made.seconds * doc.fps));
     apply(addClip(doc, { component: 'Audio', from: frame, durationInFrames, props: { assetId: made.assetId } }, id), `Added ${SOUND_LABEL[kind].toLowerCase()}`);
     selection = [id];
   }
@@ -440,7 +441,7 @@
     if (seconds === null) {
       return;
     }
-    apply(setCanvas(doc, { durationInFrames: Math.round(seconds * FPS) }), 'Changed duration');
+    apply(setCanvas(doc, { durationInFrames: Math.round(seconds * doc.fps) }), 'Changed duration');
   }
 
   function exportFrames(...args: Parameters<MotionPreview['render']>) {
@@ -459,8 +460,8 @@
     [Command.Redo]: redoEdit,
     [Command.StepBack]: () => step(-1),
     [Command.StepForward]: () => step(1),
-    [Command.SecondBack]: () => step(-FPS),
-    [Command.SecondForward]: () => step(FPS),
+    [Command.SecondBack]: () => step(-doc.fps),
+    [Command.SecondForward]: () => step(doc.fps),
     [Command.ZoomIn]: () => (zoom = clampZoom(zoom * ZOOM_STEP)),
     [Command.ZoomOut]: () => (zoom = clampZoom(zoom / ZOOM_STEP)),
     [Command.SelectAll]: () => (selection = doc.tracks.flatMap((t) => t.clips.map((c) => c.id))),
@@ -503,14 +504,20 @@
     </label>
     <label class="field">
       Length (s)
-      <input type="text" inputmode="decimal" title={`1–${MAX_SECONDS} s`} value={secondsLabel(doc.durationInFrames)} onchange={(e) => setDuration(e.currentTarget.value)} />
+      <input type="text" inputmode="decimal" title={`1–${MAX_SECONDS} s`} value={secondsLabel(doc.durationInFrames, doc.fps)} onchange={(e) => setDuration(e.currentTarget.value)} />
+    </label>
+    <label class="field">
+      Frame rate
+      <select value={doc.fps} onchange={(e) => apply(setFrameRate(doc, Number(e.currentTarget.value) as FrameRate), 'Changed frame rate')} data-testid="frame-rate">
+        {#each FRAME_RATES as rate (rate)}<option value={rate}>{rate} fps</option>{/each}
+      </select>
     </label>
     <span class="save" data-testid="save-state">{saveState} · v{version}</span>
     <button type="button" class="render" onclick={() => (exporting = true)} data-testid="export-open"><Film size={14} /> Export</button>
   </header>
 
   {#if sounding}
-    <SoundDialog kind={sounding} {editorUrl} seconds={doc.durationInFrames / FPS} onclose={() => (sounding = null)} onmade={(made) => placeSound(sounding ?? 'voice', made)} />
+    <SoundDialog kind={sounding} {editorUrl} seconds={doc.durationInFrames / doc.fps} onclose={() => (sounding = null)} onmade={(made) => placeSound(sounding ?? 'voice', made)} />
   {/if}
 
   {#if exporting}
@@ -529,7 +536,7 @@
   <div class="body" class:coding={inspectorTab === InspectorTab.Code && selected?.component === 'Custom'}>
     <section class="left">
       <div class="preview">
-        <MotionPreview bind:this={preview} {html} width={doc.width} height={doc.height} bind:frame bind:playing>
+        <MotionPreview bind:this={preview} {html} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing>
           {#if selected?.mask && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<MaskOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         </MotionPreview>
       </div>
@@ -538,7 +545,7 @@
         <button type="button" aria-label={playing ? 'Pause' : 'Play'} onclick={() => (playing = !playing)}>
           {#if playing}<Pause size={14} />{:else}<Play size={14} />{/if}
         </button>
-        <span class="tc" data-testid="timecode">{timecode(frame)} / {timecode(doc.durationInFrames)}</span>
+        <span class="tc" data-testid="timecode">{timecode(frame, doc.fps)} / {timecode(doc.durationInFrames, doc.fps)}</span>
         <span class="sep"></span>
         <div class="add">
           <button type="button" onclick={() => (adding = !adding)}><Plus size={14} /> Add</button>

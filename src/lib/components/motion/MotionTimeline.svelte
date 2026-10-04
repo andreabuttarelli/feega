@@ -90,13 +90,13 @@
   let lanes = $state<HTMLDivElement | null>(null);
 
   const shown = $derived(draft ?? doc);
-  const ppf = $derived(pxPerFrame(zoom));
+  const ppf = $derived(pxPerFrame(zoom, doc.fps));
   const width = $derived(Math.max(shown.durationInFrames * ppf + 120, 400));
-  const ticks = $derived(rulerTicks(shown.durationInFrames, zoom));
+  const ticks = $derived(rulerTicks(shown.durationInFrames, zoom, doc.fps));
 
   function frameOfPointer(e: PointerEvent): number {
     const rect = lanes!.getBoundingClientRect();
-    return frameAt(e.clientX - rect.left + lanes!.scrollLeft - headPx, zoom);
+    return frameAt(e.clientX - rect.left + lanes!.scrollLeft - headPx, zoom, doc.fps);
   }
 
   function select(clipId: string, e: PointerEvent) {

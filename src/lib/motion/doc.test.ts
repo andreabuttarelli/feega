@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { DOC_VERSION, FORMATS, MAX_FRAMES, MotionFormat, newMotionDoc, parseMotionDoc, upgradeDoc } from './doc';
+import { DOC_VERSION, FORMATS, MotionFormat, newMotionDoc, parseMotionDoc, upgradeDoc } from './doc';
+import { maxFrames } from './design';
 
 function clip(component: string) {
   return {
@@ -28,7 +29,7 @@ describe('MotionDoc', () => {
   });
 
   it('refuses a doc longer than the limit', () => {
-    const doc = { ...newMotionDoc(MotionFormat.Square), durationInFrames: MAX_FRAMES + 1 };
+    const doc = { ...newMotionDoc(MotionFormat.Square), durationInFrames: maxFrames(30) + 1 };
 
     expect(parseMotionDoc(doc).ok).toBe(false);
   });

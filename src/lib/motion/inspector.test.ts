@@ -190,3 +190,10 @@ describe('properties of a custom clip come from its props schema', () => {
     expect(fields.find((f) => f.key === 'posts')).toMatchObject({ min: 0, max: 30, step: 1 });
   });
 });
+
+describe('seconds at another frame rate', () => {
+  it('reads frames at the doc rate', () => {
+    expect(secondsLabel(25, 25)).toBe('1');
+    expect(secondsLabel(30, 60)).toBe('0.5');
+  });
+});

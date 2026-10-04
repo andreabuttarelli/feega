@@ -13,7 +13,7 @@ import { composeHtml, HYPERFRAMES_VERSION, type ComposeInput } from '$lib/motion
 import { assetOrigins } from '$lib/motion/hyperframes/csp';
 import { audioPlan } from '$lib/motion/audio-plan';
 import { CREDITS_PER_USD_SUBSCRIPTION_LIST } from '$lib/credit-ladder';
-import { renderOnFarm, type FarmJob } from './farm-render';
+import { farmChunks, renderOnFarm, type FarmJob } from './farm-render';
 import { saveExport } from './export';
 import type { RenderFarm } from './render-farm';
 
@@ -76,7 +76,7 @@ export async function startRender(db: Db, farm: RenderFarm | null, scope: Render
     nodeId: scope.nodeId,
     prompt: `render v${req.version}`,
     model: RENDER_MODEL,
-    params: { revision: req.version, format: formatOf(req.doc), quote, progress: startProgress(req.doc.durationInFrames) },
+    params: { revision: req.version, format: formatOf(req.doc), quote, progress: startProgress(req.doc.durationInFrames, farmChunks(req.job).count) },
     actorKind: 'user',
     actorId: scope.userId,
     externalJobId: `${RENDER_JOB_PREFIX}${req.version}`

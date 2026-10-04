@@ -5,7 +5,7 @@
   import { ParentOpacity, parentChoices } from '$lib/motion/parent';
   import { setParent, setParentOpacity } from '$lib/motion/parent-ops';
   import { findClip } from '$lib/motion/doc';
-  import { FPS, TRANSITION_KINDS, type Edge } from '$lib/motion/design';
+  import { TRANSITION_KINDS, type Edge } from '$lib/motion/design';
   import { resolveColor, type BrandTokens } from '$lib/motion/brand';
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
   import { InspectorTab, clipFieldGroups, editAt, keyAt, keyedField, parseDecimal, secondsLabel, toggleKey, valueAt, type Field } from '$lib/motion/inspector';
@@ -103,7 +103,7 @@
     if (seconds === null) {
       return;
     }
-    commit(setTiming(doc, clip.id, { [key]: Math.round(seconds * FPS) }), 'Changed timing');
+    commit(setTiming(doc, clip.id, { [key]: Math.round(seconds * doc.fps) }), 'Changed timing');
   }
 
   function setEdge(side: Side, edge: Partial<Edge>) {
@@ -116,7 +116,7 @@
     if (seconds === null) {
       return;
     }
-    setEdge(side, { durationInFrames: Math.round(seconds * FPS) });
+    setEdge(side, { durationInFrames: Math.round(seconds * doc.fps) });
   }
 
   function animate(key: string, value: KeyValue) {
@@ -234,8 +234,8 @@
   <section>
     <h4>Timing</h4>
     <div class="row two">
-      <label>Start (s)<input type="text" inputmode="decimal" value={secondsLabel(clip.from)} onchange={(e) => setSeconds('from', e.currentTarget.value)} /></label>
-      <label>Length (s)<input type="text" inputmode="decimal" value={secondsLabel(clip.durationInFrames)} onchange={(e) => setSeconds('durationInFrames', e.currentTarget.value)} /></label>
+      <label>Start (s)<input type="text" inputmode="decimal" value={secondsLabel(clip.from, doc.fps)} onchange={(e) => setSeconds('from', e.currentTarget.value)} /></label>
+      <label>Length (s)<input type="text" inputmode="decimal" value={secondsLabel(clip.durationInFrames, doc.fps)} onchange={(e) => setSeconds('durationInFrames', e.currentTarget.value)} /></label>
     </div>
     {#each [Side.In, Side.Out] as side (side)}
       {@const edge = side === Side.In ? clip.transitionIn : clip.transitionOut}
@@ -246,7 +246,7 @@
             {#each TRANSITION_KINDS as kind (kind)}<option value={kind}>{kind}</option>{/each}
           </select>
         </label>
-        <label>Duration (s)<input type="text" inputmode="decimal" value={secondsLabel(edge.durationInFrames)} onchange={(e) => setEdgeSeconds(side, e.currentTarget.value)} /></label>
+        <label>Duration (s)<input type="text" inputmode="decimal" value={secondsLabel(edge.durationInFrames, doc.fps)} onchange={(e) => setEdgeSeconds(side, e.currentTarget.value)} /></label>
       </div>
     {/each}
   </section>

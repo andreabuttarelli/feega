@@ -17,10 +17,11 @@
     html,
     width,
     height,
+    fps = FPS,
     frame = $bindable(0),
     playing = $bindable(false),
     children
-  }: { html: string; width: number; height: number; frame?: number; playing?: boolean; children?: Snippet } = $props();
+  }: { html: string; width: number; height: number; fps?: number; frame?: number; playing?: boolean; children?: Snippet } = $props();
 
   let host = $state<HTMLDivElement | null>(null);
   let player: Player | null = null;
@@ -51,13 +52,13 @@
       el.style.height = '100%';
       el.addEventListener('ready', () => {
         ready = true;
-        el.seek(frame / FPS);
+        el.seek(frame / fps);
       });
       el.addEventListener('timeupdate', (e) => {
         if (!playing) {
           return;
         }
-        const next = Math.round(((e as CustomEvent<{ currentTime: number }>).detail.currentTime ?? 0) * FPS);
+        const next = Math.round(((e as CustomEvent<{ currentTime: number }>).detail.currentTime ?? 0) * fps);
         reported = next;
         frame = next;
       });
@@ -121,7 +122,7 @@
     } finally {
       capturing = false;
       await loaded(html);
-      player?.seek(back / FPS);
+      player?.seek(back / fps);
     }
   }
 
@@ -168,7 +169,7 @@
       return;
     }
     reported = target;
-    player.seek(target / FPS);
+    player.seek(target / fps);
   });
 
   $effect(() => {
