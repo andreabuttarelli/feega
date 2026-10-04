@@ -12,6 +12,7 @@ const DOC: Record<string, Access> = {
   fps: { write: ['set_canvas'], read: 'fps' },
   background: { write: ['set_canvas'], read: 'background' },
   motionBlur: { write: ['set_motion_blur'], read: 'motionBlur' },
+  fields: { write: ['expose_field', 'unexpose_field'], read: 'fields' },
   width: { write: ['set_canvas'], read: 'width' },
   height: { write: ['set_canvas'], read: 'height' },
   durationInFrames: { write: ['set_canvas'], read: 'duration' },

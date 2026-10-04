@@ -62,6 +62,10 @@ import { DUCK_DEFAULTS, duckUnder } from '$lib/motion/duck';
 import type { AudioAnalysis } from '$lib/motion/audio-analysis';
 import { Hit, cutToBeat, hitFrames, markHits } from '$lib/motion/beats';
 import { PULSE_PROPS, pulseWithMusic } from '$lib/motion/pulse';
+import { applyValues, exposeField, fieldValues, removeField } from '$lib/motion/template/fields';
+import { FIELD_TYPES } from '$lib/motion/template/field-model';
+import { DEFAULT_NAME_PATTERN, MAX_BATCH_ROWS, outputName } from '$lib/motion/template/batch';
+import { renderQuote } from '$lib/motion/render-quote';
 
 export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number };
 
@@ -80,6 +84,7 @@ export type MotionToolDeps = {
   frames: (callId: string, times: number[]) => Promise<Frame[] | null>;
   check: (callId: string, doc: MotionDoc, name: string) => Promise<CheckResult | null>;
   analysis?: (assetId: string) => Promise<AudioAnalysis | null>;
+  batch?: (input: { doc: MotionDoc; rows: { name: string; values: Record<string, string> }[] }) => Promise<Record<string, unknown>>;
 };
 
 const framesAt = (s: number, fps: number) => Math.round(s * fps);
@@ -136,6 +141,7 @@ function summary(doc: MotionDoc, selection: string[]) {
       }))
     })),
     assets: doc.assets,
+    fields: doc.fields,
     fonts: doc.fonts,
     markers: (doc.markers ?? []).map((m) => ({ label: m.label, time: secs(m.frame) })),
     workArea: doc.workArea ? { start: secs(doc.workArea.from), end: secs(doc.workArea.to) } : null,
@@ -903,6 +909,43 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: `Blend a visual clip with the layers below it, like a layer mode in After Effects: ${BLEND_MODES.join(', ')}. normal turns it off. Blending is per clip (children do not inherit it); with the camera on, a blended world clip keeps its camera motion and paints over the world layers, blending with them.`,
       inputSchema: z.object({ clip_id: z.string(), mode: z.enum(BLEND_MODES) }),
       execute: async (input) => apply(setBlendMode(session.doc, input.clip_id, input.mode), `${input.mode} blend on ${input.clip_id}`)
+    }),
+
+    expose_field: tool({
+      description: 'Expose a clip prop as a named template field (After Effects Essential Graphics): text, a custom component param, a colour, an asset slot. key is snake_case and names the CSV column a batch fills; default is the prop value now unless given.',
+      inputSchema: z.object({ key: z.string().max(40), label: z.string().min(1).max(60), type: z.enum(FIELD_TYPES), clip_id: z.string(), prop: z.string().max(60), default: z.unknown().optional() }),
+      execute: async (input) => apply(exposeField(session.doc, { key: input.key, label: input.label, type: input.type, clipId: input.clip_id, prop: input.prop, default: input.default }), `exposed field ${input.key}`)
+    }),
+
+    unexpose_field: tool({
+      description: 'Remove an exposed template field. The clip keeps its value.',
+      inputSchema: z.object({ key: z.string() }),
+      execute: async (input) => apply(removeField(session.doc, input.key), `removed field ${input.key}`)
+    }),
+
+    list_fields: tool({
+      description: 'List the exposed template fields with their clip, prop, type, default and current value. missing means its clip was deleted.',
+      inputSchema: z.object({}).strict(),
+      execute: async () => ({ fields: fieldValues(session.doc) })
+    }),
+
+    render_batch: tool({
+      description: `Render one video per data row on our servers, each row filling the exposed fields (keys as in list_fields; missing keys keep the default). Costs credits per video. First call with confirm false: it returns the quote; tell the user and call again with confirm true only after they agree. name_pattern names files with {{n}} (row number) and {{field_key}}. At most ${MAX_BATCH_ROWS} rows; the saved video is rendered, so edits of this turn must be saved first.`,
+      inputSchema: z.object({ rows: z.array(z.record(z.string(), z.string())).min(1).max(MAX_BATCH_ROWS), name_pattern: z.string().max(120).default(DEFAULT_NAME_PATTERN), confirm: z.boolean() }),
+      execute: async (input) => {
+        const bad = input.rows.map((values, i) => [i, applyValues(session.doc, values)] as const).find(([, r]) => !r.ok);
+        if (bad && !bad[1].ok) {
+          return { ok: false, error: `row ${bad[0] + 1}: ${bad[1].error}` };
+        }
+        const rows = input.rows.map((values, i) => ({ name: outputName(input.name_pattern ?? DEFAULT_NAME_PATTERN, values, i + 1), values }));
+        if (!input.confirm) {
+          return { ok: false, needs_confirmation: true, rows: rows.length, credits: rows.length * renderQuote(session.doc).credits, names: rows.map((r) => r.name) };
+        }
+        if (!deps.batch) {
+          return { ok: false, error: 'batch rendering is not available here' };
+        }
+        return deps.batch({ doc: session.doc, rows });
+      }
     }),
 
     set_motion_blur: tool({

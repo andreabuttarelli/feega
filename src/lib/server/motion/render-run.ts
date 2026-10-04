@@ -31,12 +31,17 @@ export type RenderScope = { orgId: string; projectId: string; nodeId: string; us
 export type RenderRequest = { version: number; doc: MotionDoc; settings: RenderSettings; job: FarmJob };
 export type RenderStart = { ok: true; runId: string; quote: RenderQuote } | { ok: false; error: RenderRefusal; detail?: string };
 export type RenderStorage = { host: string; limit: () => Promise<number> };
+export type BatchRow = { req: RenderRequest; name: string };
+export type BatchStart = { ok: true; batchId: string; rows: number; credits: number } | { ok: false; error: RenderRefusal; detail?: string };
+export type BatchCell = { row: number; name: string; runId: string; status: NodeRun['status']; progress: RenderProgress | null; error: string | null; assetId: string | null };
+export type BatchView = { id: string; credits: number; rows: BatchCell[] };
 export type ReconcileOutcome = { checked: number; done: number; failed: number; pending: number };
 
 type Piece = { worker: string; attempt: number; state: TaskState };
 type Output = { width: number; height: number; seconds: number; format: ExportFormat };
 type FarmProgress = { pieces: Piece[]; assembly: { attempt: number } | null };
-type RenderState = { scope: RenderScope; output: Output; quote: RenderQuote; farm: FarmProgress; progress: RenderProgress };
+type BatchTag = { id: string; row: number; name: string; rows: number };
+type RenderState = { scope: RenderScope; output: Output; quote: RenderQuote; farm: FarmProgress; progress: RenderProgress; batch?: BatchTag };
 
 enum Step {
   Pending = 'pending',
@@ -45,7 +50,8 @@ enum Step {
 }
 
 const RENDER_MODEL = `hyperframes@${HYPERFRAMES_VERSION}`;
-const RECONCILE_BATCH = 10;
+const RECONCILE_BATCH = 50;
+export const BATCH_CONCURRENCY = 3;
 const DOWNLOAD_TTL_S = 2 * 60 * 60;
 const CANCELLED = 'cancelled';
 const TOO_LARGE = /too_large: .*/;
@@ -82,7 +88,7 @@ function isRender(run: NodeRun): boolean {
 const isActive = (run: NodeRun) => isRender(run) && (run.status === 'running' || run.status === 'finishing');
 
 export function renderView(runs: NodeRun[]): RenderView | null {
-  const run = runs.filter(isRender).at(-1);
+  const run = runs.filter((r) => isRender(r) && !r.params.batch).at(-1);
   if (!run) {
     return null;
   }
@@ -218,6 +224,56 @@ export async function startRender(db: Db, farm: RenderFarm | null, scope: Render
   return { ok: true, runId: run.id, quote: stateOf(run).quote };
 }
 
+export async function startBatch(db: Db, farm: RenderFarm | null, scope: RenderScope, rows: BatchRow[], storage: RenderStorage): Promise<BatchStart> {
+  const runs = farm ? await listNodeRuns(db, { orgId: scope.orgId, nodeId: scope.nodeId }) : [];
+  for (const [i, row] of rows.entries()) {
+    const refused = refusal(farm, runs, scope.plan ?? null, row.req);
+    if (refused) {
+      return { ok: false, error: refused.error, detail: refused.detail ? `row ${i + 1}: ${refused.detail}` : undefined };
+    }
+  }
+  if (!farm) {
+    return { ok: false, error: RenderRefusal.NotConfigured };
+  }
+
+  const id = crypto.randomUUID();
+  const queued: NodeRun[] = [];
+  for (const [i, row] of rows.entries()) {
+    queued.push(await enqueue(db, scope, row.req, { batch: { id, row: i + 1, name: row.name, rows: rows.length } }));
+  }
+  await Promise.all(queued.slice(0, BATCH_CONCURRENCY).map((run, i) => launch(db, farm, storage, run, rows[i].req.job)));
+
+  const credits = queued.reduce((sum, run) => sum + stateOf(run).quote.credits, 0);
+  return { ok: true, batchId: id, rows: rows.length, credits };
+}
+
+const batchOf = (run: NodeRun) => stateOf(run).batch;
+const launched = (run: NodeRun) => (stateOf(run).farm?.pieces.length ?? 0) > 0;
+
+export function batchView(runs: NodeRun[]): BatchView | null {
+  const id = runs.filter((r) => isRender(r) && batchOf(r)).at(-1)?.params.batch as BatchTag | undefined;
+  if (!id) {
+    return null;
+  }
+  const rows = runs.filter((r) => batchOf(r)?.id === id.id).sort((a, b) => batchOf(a)!.row - batchOf(b)!.row);
+  return {
+    id: id.id,
+    credits: rows.reduce((sum, r) => sum + (stateOf(r).quote?.credits ?? 0), 0),
+    rows: rows.map((r) => ({ row: batchOf(r)!.row, name: batchOf(r)!.name, runId: r.id, status: r.status, progress: progressOf(r.params), error: r.error, assetId: r.outputAssetId }))
+  };
+}
+
+async function launchQueued(db: Db, farm: RenderFarm, storage: RenderStorage, run: NodeRun, job: FarmJob): Promise<Step> {
+  const batch = batchOf(run);
+  const siblings = await listNodeRuns(db, { orgId: run.orgId, nodeId: run.nodeId });
+  const busy = siblings.filter((r) => r.id !== run.id && isActive(r) && batchOf(r)?.id === batch?.id && launched(r)).length;
+  if (busy >= BATCH_CONCURRENCY) {
+    return Step.Pending;
+  }
+  const detail = await launch(db, farm, storage, run, job);
+  return detail ? Step.Failed : Step.Pending;
+}
+
 async function retryPiece(db: Db, farm: RenderFarm, storage: RenderStorage, run: NodeRun, job: FarmJob, piece: Piece, index: number): Promise<Piece> {
   await Promise.allSettled([stopWorker(farm, piece.worker)]);
   const worker = await launchPiece(farm, job, index, await pieceLinks(db, storage, stateOf(run).scope, run.id, job, index));
@@ -308,6 +364,9 @@ async function advanceRender(db: Db, farm: RenderFarm, storage: RenderStorage, r
   const state = stateOf(run);
   const job = await loadJob(db, workPath(state.scope, run.id, JOB_FILE));
   const assembly = state.farm.assembly;
+  if (!state.farm.pieces.length) {
+    return launchQueued(db, farm, storage, run, job);
+  }
   return assembly ? advanceAssembly(db, farm, storage, run, state, job, assembly.attempt) : advancePieces(db, farm, storage, run, state, job);
 }
 
