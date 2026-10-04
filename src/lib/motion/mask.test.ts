@@ -78,7 +78,6 @@ describe('version 2 docs', () => {
   it('upgrade to the current version with no mask and no matte', () => {
     const upgraded = upgradeDoc(v2) as { version: number; tracks: { clips: { mask: unknown; matte: unknown }[] }[] };
 
-    expect(DOC_VERSION).toBe(3);
     expect(upgraded.version).toBe(DOC_VERSION);
     expect(upgraded.tracks[0].clips[0].mask).toBeNull();
     expect(upgraded.tracks[0].clips[0].matte).toBe('none');

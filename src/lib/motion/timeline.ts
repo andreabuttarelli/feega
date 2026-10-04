@@ -6,6 +6,8 @@ import { FORMATS, MAX_FRAMES, byFrame, clipProps, findClip, type MotionClip, typ
 import { Ease } from './design';
 import { Matte, isMaskKey, maskSchema, type MaskInput } from './mask';
 import { matteMask, matteSource } from './matte';
+import { CAMERA_LANE, DEPTH, Space, type CameraKey } from './camera';
+import { editCameraLane } from './camera-ops';
 import { keyframesProblem, transformSchema, type EaseSpec, type KeyValue, type Keyframe, type Keyframes, type Transform } from './keyframes';
 
 export type OpResult = { ok: true; doc: MotionDoc } | { ok: false; error: string };
@@ -103,7 +105,9 @@ export function addClip(doc: MotionDoc, input: NewClip, id: string): OpResult {
     transform: {},
     keyframes: {},
     mask: null,
-    matte: Matte.None
+    matte: Matte.None,
+    depth: DEPTH.fallback,
+    space: Space.World
   };
 
   return fitted({ ...doc, tracks: doc.tracks.map((t) => (t.id === track.id ? { ...t, clips: [...t.clips, clip] } : t)) });
@@ -329,6 +333,10 @@ function editRefs(doc: MotionDoc, refs: readonly KeyRef[], edit: (track: Keyfram
     const { clipId, prop } = group[0];
     const frames = group.map((r) => r.frame);
     const current = result.doc;
+    if (clipId === CAMERA_LANE) {
+      result = editCameraLane(current, prop as CameraKey, (track) => edit(track, frames));
+      continue;
+    }
     result = editClip(current, clipId, (clip) => withKeyframes(current, clip, { ...clip.keyframes, [prop]: edit(clip.keyframes[prop] ?? [], frames) }));
   }
   return result;

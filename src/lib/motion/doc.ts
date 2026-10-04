@@ -5,6 +5,7 @@ import { MAX_COMPONENTS, Strictness, customComponentSchema, customValues, type C
 import { FPS, TRANSITION_KINDS, TransitionKind } from './design';
 import { keyframeSchema, keyframesProblem, transformSchema } from './keyframes';
 import { MATTES, Matte, maskSchema } from './mask';
+import { DEPTH, SPACES, Space, cameraSchema, depthSchema } from './camera';
 
 export enum MotionFormat {
   Landscape = '16:9',
@@ -27,7 +28,7 @@ export const MAX_FRAMES = MAX_SECONDS * FPS;
 export const MAX_SIDE = 1920;
 export const MAX_SHORT_SIDE = 1080;
 export const DEFAULT_SECONDS = 15;
-export const DOC_VERSION = 3;
+export const DOC_VERSION = 4;
 
 const edgeSchema = z.object({
   kind: z.enum(TRANSITION_KINDS),
@@ -46,7 +47,9 @@ const clipSchema = z.object({
   transform: transformSchema.default({}),
   keyframes: z.record(z.string(), z.array(keyframeSchema).min(1)).default({}),
   mask: maskSchema.nullable().default(null),
-  matte: z.enum(MATTES).default(Matte.None)
+  matte: z.enum(MATTES).default(Matte.None),
+  depth: depthSchema.default(DEPTH.fallback),
+  space: z.enum(SPACES).default(Space.World)
 });
 
 const trackSchema = z.object({
@@ -71,6 +74,7 @@ export const motionDocSchema = z
     durationInFrames: z.number().int().min(1).max(MAX_FRAMES),
     tracks: z.array(trackSchema).max(20),
     assets: z.array(assetRefSchema).default([]),
+    camera: cameraSchema.nullable().default(null),
     components: z
       .record(z.string().regex(CUSTOM_NAME, 'component names are PascalCase, e.g. NodeGraph'), customComponentSchema)
       .refine((c) => Object.keys(c).length <= MAX_COMPONENTS, `at most ${MAX_COMPONENTS} custom components`)
@@ -95,7 +99,8 @@ const withClips = (doc: Raw, version: number, defaults: Record<string, unknown>)
 
 const MIGRATIONS: Record<number, (doc: Raw) => Raw> = {
   1: (doc) => withClips(doc, 2, { transform: {}, keyframes: {} }),
-  2: (doc) => withClips(doc, 3, { mask: null, matte: Matte.None })
+  2: (doc) => withClips(doc, 3, { mask: null, matte: Matte.None }),
+  3: (doc) => ({ camera: null, ...withClips(doc, 4, { depth: DEPTH.fallback, space: Space.World }) })
 };
 
 export function upgradeDoc(input: unknown): unknown {
@@ -178,6 +183,7 @@ export function newMotionDoc(format: MotionFormat): MotionDoc {
       { id: 'a1', kind: TrackKind.Audio, name: 'Audio 1', clips: [] }
     ],
     assets: [],
+    camera: null,
     components: {}
   };
 }

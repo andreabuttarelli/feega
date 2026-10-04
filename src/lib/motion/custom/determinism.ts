@@ -2,6 +2,7 @@ import type { ClipError } from '../hyperframes/capture';
 import { TrackKind } from '../components';
 import { TransitionKind } from '../design';
 import { Matte } from '../mask';
+import { DEPTH, Space } from '../camera';
 import { clipsOf, type MotionDoc } from '../doc';
 import { CheckState, checkState } from './component';
 
@@ -69,7 +70,9 @@ export function checkDoc(doc: MotionDoc, name: string): MotionDoc {
     transform: {},
     keyframes: {},
     mask: null,
-    matte: Matte.None
+    matte: Matte.None,
+    depth: DEPTH.fallback,
+    space: Space.World
   };
   return {
     ...doc,
