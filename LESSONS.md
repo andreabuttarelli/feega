@@ -2,6 +2,22 @@
 
 Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa riconoscere, e la mossa che li risolve. Una sezione per tema. Una lezione nova entra qui nel commit che l'ha pagata.
 
+## Motion editor
+
+### `mix-blend-mode` dentro `preserve-3d` appiattisce il mondo, e solo il render lo mostra
+Un clip con fusione dentro `#world` (camera accesa) fa appiattire a Chrome tutto il contesto 3D:
+la preview sembra giusta, ma render su server ed export dal browser divergono (PSNR 10 dB invece
+di ~26) e il render dura il doppio. Segnale: due export dello stesso doc che non si somigliano,
+solo quando la camera è accesa. Mossa: confrontare un frame dei due export (`ffmpeg -lavfi psnr`)
+con e senza la proprietà sospetta; ogni proprietà di raggruppamento (`mix-blend-mode`,
+`isolation`, `filter`, `opacity<1` sul contenitore) va tenuta fuori da `#world`.
+
+### Un file toccato nel worktree durante un giro Playwright ricarica la pagina
+Vite osserva anche `changelog/*.md`: scriverne uno mentre l'harness naviga l'editor fa
+`page reload` e il `goto` muore con `net::ERR_ABORTED`. Segnale: nel log del dev server
+`page reload <file>` all'ora del fallimento. Mossa: niente edit nel worktree servito finché il
+giro non è finito, o un dev server da un checkout separato.
+
 ## Ambiente e worktree
 
 ### I tempi di idratazione misurati in dev non dicono niente

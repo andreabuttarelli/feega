@@ -17,11 +17,12 @@ import { Library, THREE_GLOBAL, bootScript, definitionScript, librariesOf, seedO
 import { PropFormat, type CustomComponents } from '../custom/component';
 import { hiddenMattes, matteMask, matteSource } from '../matte';
 import { Matte, type Mask } from '../mask';
-import { cameraMath, stageSpec } from '../camera';
+import { Composite, cameraMath, stageSpec } from '../camera';
 import { sampleTrack } from '../keyframes';
 import { STAGE_CSS, stageRootStyle, stageScript } from './stage';
 import { bakeExpressions } from '../expression/bake';
 import { EFFECT_CSS, effectLayer, effectScript, effectTimeline } from '../effects/render';
+import { blendStyle } from '../blend';
 
 export { CAPTURE_REPLY, CAPTURE_REQUEST } from './capture';
 
@@ -150,7 +151,7 @@ function clipHtml(clip: MotionClip, ctx: TemplateCtx<ComponentId>, placed: Place
   const template = TEMPLATES[clip.component] as (typeof TEMPLATES)[ComponentId];
   const inner = matted(clip, ctx, placed.matte, wrapParents(placed.chain, clip, ctx, wrapAnimated(clip, ctx, effectLayer(clip, ctx, ctx.color, ownMask(clip, ctx, template.html(ctx as never))))));
   const fx = `<div class="fx" id="fx-${clip.id}">${inner}</div>`;
-  const style = css({ zIndex: placed.layer, transform: placed.transform });
+  const style = css({ zIndex: placed.layer, transform: placed.transform, mixBlendMode: blendStyle(clip.blend) });
   const layer =
     template.timing === Timing.Media
       ? `<div class="layer" data-clip="${esc(clip.id)}" style="${style}">${fx}</div>`
@@ -207,7 +208,7 @@ function compositionBake(clip: MotionClip, ctx: TemplateCtx<ComponentId>): Timed
 
 const BASE_CSS = [
   'html,body{margin:0;padding:0;background:transparent}',
-  '#root{position:relative;width:100%;height:100%;overflow:hidden}',
+  '#root{position:relative;width:100%;height:100%;overflow:hidden;isolation:isolate}',
   '.layer{position:absolute;inset:0}',
   '.fx{position:absolute;inset:0;will-change:transform,opacity}',
   '.cc{position:absolute;inset:0;overflow:hidden}',
@@ -266,7 +267,7 @@ export function composeHtml(raw: ComposeInput): string {
   const runs: CustomRun[] = [];
   const hidden = hiddenMattes(doc);
   const stage = doc.camera ? stageSpec(doc) : null;
-  const onStage = new Set(stage?.layers.map((l) => l.id));
+  const onStage = new Set(stage?.layers.filter((l) => l.composite === Composite.World).map((l) => l.id));
   const startPose = new Map(stage ? cameraMath(sampleTrack).frameAt(stage, 0).layers.map((l) => [l.id, l.transform]) : []);
   const world: string[] = [];
   const byId = new Map(doc.tracks.flatMap((t) => t.clips as MotionClip[]).map((c) => [c.id, c]));

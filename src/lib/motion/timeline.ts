@@ -9,6 +9,7 @@ import { matteMask, matteSource } from './matte';
 import { CAMERA_LANE, DEPTH, Space, type CameraKey } from './camera';
 import { editCameraLane } from './camera-ops';
 import { ParentOpacity } from './parent';
+import { BlendMode } from './blend';
 import { keyframesProblem, transformSchema, type EaseSpec, type KeyValue, type Keyframe, type Keyframes, type Transform } from './keyframes';
 
 export type OpResult = { ok: true; doc: MotionDoc } | { ok: false; error: string };
@@ -112,7 +113,8 @@ export function addClip(doc: MotionDoc, input: NewClip, id: string): OpResult {
     parent: null,
     parentOpacity: ParentOpacity.Inherit,
     expressions: {},
-    effects: []
+    effects: [],
+    blend: BlendMode.Normal
   };
 
   return fitted({ ...doc, tracks: doc.tracks.map((t) => (t.id === track.id ? { ...t, clips: [...t.clips, clip] } : t)) });

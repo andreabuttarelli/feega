@@ -9,6 +9,7 @@ import { DEPTH, SPACES, Space, cameraSchema, depthSchema } from './camera';
 import { PARENT_OPACITIES, ParentOpacity, parentProblem } from './parent';
 import { expressionsSchema, expressionsProblem } from './expression/schema';
 import { effectsSchema, effectsProblem } from './effects/model';
+import { BLEND_MODES, BlendMode } from './blend';
 
 export enum MotionFormat {
   Landscape = '16:9',
@@ -56,7 +57,8 @@ const clipSchema = z.object({
   parent: z.string().min(1).nullable().default(null),
   parentOpacity: z.enum(PARENT_OPACITIES).default(ParentOpacity.Inherit),
   expressions: expressionsSchema,
-  effects: effectsSchema
+  effects: effectsSchema,
+  blend: z.enum(BLEND_MODES).default(BlendMode.Normal)
 });
 
 const trackSchema = z.object({

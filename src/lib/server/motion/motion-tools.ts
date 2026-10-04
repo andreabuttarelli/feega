@@ -21,6 +21,8 @@ import { EXPRESSION_GUIDE } from '$lib/motion/expression/guide';
 import { EFFECTS, EFFECT_KINDS } from '$lib/motion/effects/registry';
 import { addEffect, removeEffect, setEffect } from '$lib/motion/effects/ops';
 import { effectKey } from '$lib/motion/effects/model';
+import { BLEND_MODES } from '$lib/motion/blend';
+import { setBlendMode } from '$lib/motion/blend-ops';
 
 export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number };
 
@@ -70,7 +72,8 @@ function summary(doc: MotionDoc, selection: string[]) {
         parent: c.parent,
         parentOpacity: c.parentOpacity,
         expressions: c.expressions,
-        effects: c.effects
+        effects: c.effects,
+        blend: c.blend
       }))
     })),
     assets: doc.assets,
@@ -458,6 +461,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: 'Remove an effect from a clip, with its keyframes and expressions.',
       inputSchema: z.object({ clip_id: z.string(), effect_id: z.string() }),
       execute: async (input) => apply(removeEffect(session.doc, input.clip_id, input.effect_id), `removed effect ${input.effect_id}`)
+    }),
+
+    set_blend_mode: tool({
+      description: `Blend a visual clip with the layers below it, like a layer mode in After Effects: ${BLEND_MODES.join(', ')}. normal turns it off. Blending is per clip (children do not inherit it); with the camera on, a blended world clip keeps its camera motion and paints over the world layers, blending with them.`,
+      inputSchema: z.object({ clip_id: z.string(), mode: z.enum(BLEND_MODES) }),
+      execute: async (input) => apply(setBlendMode(session.doc, input.clip_id, input.mode), `${input.mode} blend on ${input.clip_id}`)
     }),
 
     add_track: tool({

@@ -39,6 +39,7 @@ export function motionAgentPrompt(input: { brandName: string | null; selectionNo
     'Parenting: add_null makes an invisible handle; set_parent ties a clip to a Null or any visual clip and parent_clips groups several (without parent_id it creates the Null at their centre). Children keep their place on screen when (un)parented, then follow the parent transform and its keyframes on top of their own; animate the Null to move a card, its caption and a product image together. Loops are refused.',
     `Expressions: set_expression drives a number property per frame, like After Effects. ${EXPRESSION_EXAMPLES}`,
     `Effects: add_effect stacks per-clip effects (${EFFECT_KINDS.join(', ')}); set_effect changes params, order, on/off; remove_effect drops one. Every number or colour param animates with set_keyframes and numbers with set_expression, prop fx.<effect id>.<param>. Keep them subtle: a drop-shadow on cards, a glow on a logo, grain or a vignette over a background.`,
+    'Blend modes: set_blend_mode (screen for light leaks and glows over footage, multiply for textures and shadows, overlay or soft-light for colour washes).',
     'Timing (start, duration) is set_timing, never a prop. A tool that fails tells you why: read the error and retry with what it says.',
     componentContract(input.frame ?? { width: 1920, height: 1080 }),
     'generate_voiceover spends credits: only when the user asked for a voice-over.',
