@@ -48,8 +48,6 @@ export const FORMAT: Record<ExportFormat, FormatSpec> = {
 export const EXPORT_FORMATS = Object.values(ExportFormat) as [ExportFormat, ...ExportFormat[]];
 
 export const GIF = { fps: 15, maxWidth: 640, maxSeconds: 15 } as const;
-export const MAX_EXPORT_BYTES = 50 * 1024 * 1024;
-const BYTES_PER_MB = 1024 * 1024;
 const BITS_PER_BYTE = 8;
 
 export const settingsSchema = z.object({
@@ -110,14 +108,6 @@ export function exportProblem(doc: Pick<MotionDoc, 'width' | 'height' | 'duratio
     return `${out.width}×${out.height} is over ${MAX_RENDER_SIDE} px on a side: pick a lower resolution`;
   }
   return null;
-}
-
-export function oversize(bytes: number, format: ExportFormat): string | null {
-  if (bytes <= MAX_EXPORT_BYTES) {
-    return null;
-  }
-  const mb = (n: number) => Math.round(n / BYTES_PER_MB);
-  return `too_large: ${FORMAT[format].label} of this video is ${mb(bytes)} MB, over the ${mb(MAX_EXPORT_BYTES)} MB a saved file can be. Shorten it or pick MP4. Nothing was charged.`;
 }
 
 export type { FrameRate };

@@ -30,15 +30,22 @@ giro non è finito, o un dev server da un checkout separato.
 Storage del progetto accetta al massimo 50 MB per file (limite globale, non del bucket): un
 ProRes, un 4K o un PNG lungo esce dal farm e muore all'upload con `413`. La dimensione dipende
 dal contenuto (ProRes di grafica piatta: 17 Mbit/s, non i 330 nominali), quindi una stima non
-basta per rifiutare prima. Mossa: `oversize` in `export-formats.ts` fallisce il giro con il peso
-vero e niente addebito; per file più grandi si alza il limite globale di Storage, non il codice.
+basta per rifiutare prima. Mossa: la sandbox confronta il peso vero con il limite misurato da
+`storage-limit.ts` (POST TUS a zero byte: 413 = oltre) e fallisce senza addebito; per file più
+grandi si alza il limite globale di Storage, non il codice.
+
+### Un comando staccato della sandbox non dice mai di aver finito
+`sandbox.getCommand(id).exitCode` resta `null` anche a comando concluso, letto da un'altra
+sessione. Segnale: render fermo in `rendering` con la sandbox viva e l'uscita già scritta.
+Mossa: il processo scrive `result-<task>.json` alla fine e il tick legge quello; sandbox non più
+`running` senza risultato = morta.
 
 ### Un render con motion blur non diventa più veloce con più vCPU
 Il producer distribuito non ha `motionBlur`: il blur gira intero su una sandbox, e
 `createRenderJob` senza `workers` resta su un solo browser anche con 8 vCPU (186 s per 240
 frame × 8 campioni a 1080p, uguale a 4 vCPU). Segnale: tempo identico cambiando le vCPU. Mossa:
-`workers` esplicito nella config intera (6 su 8 vCPU: 99 s, ~51 ms per campione) e un tetto di
-campioni (`BLUR_BUDGET` in `farm-render.ts`) che stia nei 300 s della funzione.
+`workers` esplicito nella config intera (6 su 8 vCPU: 99 s, ~51 ms per campione). Il render gira
+staccato dalla richiesta: il tetto è la vita della sandbox (`WORKER` in `farm-render.ts`).
 
 ### Un render che fallisce dopo minuti senza log: guarda prima la durata del doc di prova
 Un doc costruito a mano con `addClip` si allunga da solo quando una clip arrotondata finisce oltre
