@@ -246,7 +246,7 @@ describe('keyframes and 3D transforms', () => {
   it('a colour keyframe tweens a CSS variable the template reads, brand colours resolved', () => {
     const html = compose(coloured);
 
-    expect(html).toContain('background:var(--kc-fill)');
+    expect(html).toContain('fill:var(--kc-fill)');
     expect(html).toContain(`tl.fromTo("#ks-card",{"--kc-fill":"#ff0000"},{"--kc-fill":"${FEEGA_TOKENS.colors['brand.accent']}"`);
   });
 

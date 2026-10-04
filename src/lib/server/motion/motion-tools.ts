@@ -50,6 +50,9 @@ import { PRESETS as TEXT_PRESET_SPECS, TEXT_PRESETS, addAnimator, applyPreset as
 import { setBlendMode } from '$lib/motion/blend-ops';
 import { setClipsBlur, setMotionBlur } from '$lib/motion/motion-blur-ops';
 import { DEGREES, MAX_SAMPLES } from '$lib/motion/motion-blur';
+import { MODIFIERS, MODIFIER_KINDS } from '$lib/motion/shape/modifiers';
+import { addModifier, morphTo, removeModifier, setModifier, setPath } from '$lib/motion/shape/ops';
+import { SHAPE_KINDS, modifierKey } from '$lib/motion/shape/schema';
 
 export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number };
 
@@ -137,6 +140,8 @@ const INTERP_HELP = `in/out set how the value enters and leaves a keyframe: bezi
 
 type KeyInput = { time: number; value: Keyframe['value']; ease: Keyframe['ease']; in?: Keyframe['in']; out?: Keyframe['out']; roving?: boolean };
 
+const MODIFIER_CATALOGUE = MODIFIER_KINDS.map((k) => `${k} (${MODIFIERS[k].params.map((p) => `${p.key} ${p.options ? p.options.map((o, i) => `${i}=${o}`).join('/') : `${p.min}..${p.max}`}`).join(', ')})`).join('; ');
+const PATH_GUIDE = 'SVG path data (M L H V C S Q T Z, absolute or relative) in the shape box: 0,0 is its top-left and 1,1 its bottom-right';
 const EFFECT_CATALOGUE = EFFECT_KINDS.map((k) => `${k} (${EFFECTS[k].about}; ${EFFECTS[k].params.map((p) => `${p.key} ${p.kind === ValueKind.Color ? 'colour' : `${p.min}..${p.max}`}`).join(', ')})`).join('; ');
 
 const MAX_FONT_RESULTS = 50;
@@ -671,6 +676,65 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         }
         return apply(setExpression(session.doc, input.clip_id ?? '', input.prop, input.expression), `${input.prop} expression on ${input.clip_id}`);
       }
+    }),
+
+    add_shape: tool({
+      description: `Add a vector Shape clip. kind: ${SHAPE_KINDS.join(', ')}; path takes ${PATH_GUIDE}. Fill: fill_kind solid/linear/radial/none with fill, fill2 (gradient end) and gradientAngle; stroke: strokeKind none/solid/gradient, stroke, strokeWidth/dash/gap in fractions of the short side of the frame, cap, join. Other props as add_clip. Returns the clip id.`,
+      inputSchema: z.object({ kind: z.enum(SHAPE_KINDS), start: z.number().min(0), duration: z.number().positive().optional(), path: z.string().optional(), props: z.record(z.string(), z.unknown()).optional() }),
+      execute: async (input) => {
+        const id = deps.newId();
+        const props = { ...input.props, shape: input.kind, ...(input.path ? { path: input.path } : {}) };
+        const out = apply(addClip(session.doc, { component: 'Shape', from: frames(input.start), durationInFrames: input.duration ? frames(input.duration) : undefined, props }, id), `added ${input.kind} shape`);
+        return out.ok ? { ...out, clip_id: id } : out;
+      }
+    }),
+
+    set_path: tool({
+      description: `Replace the outline of a Shape clip with ${PATH_GUIDE}. The clip becomes a free path.`,
+      inputSchema: z.object({ clip_id: z.string(), path: z.string() }),
+      execute: async (input) => apply(setPath(session.doc, input.clip_id, input.path), `set the path of ${input.clip_id}`)
+    }),
+
+    morph_to: tool({
+      description: `Add a morph target to a Shape clip: a path (${PATH_GUIDE}) or a parametric kind (${SHAPE_KINDS.join(', ')}) with its roundness/sides/points/innerRadius. The shape morphs through its targets as its "morph" prop goes 0, 1, 2…; with start and end (seconds inside the clip) the morph to this target is keyed for you. morphStart (0..1) turns where the outlines start matching.`,
+      inputSchema: z.object({
+        clip_id: z.string(),
+        path: z.string().optional(),
+        kind: z.enum(SHAPE_KINDS).optional(),
+        roundness: z.number().optional(),
+        sides: z.number().optional(),
+        points: z.number().optional(),
+        innerRadius: z.number().optional(),
+        start: z.number().min(0).optional(),
+        end: z.number().min(0).optional()
+      }),
+      execute: async (input) =>
+        apply(
+          morphTo(session.doc, input.clip_id, { ...input, from: input.start === undefined ? undefined : frames(input.start), to: input.end === undefined ? undefined : frames(input.end) }),
+          `morph target on ${input.clip_id}`
+        )
+    }),
+
+    add_modifier: tool({
+      description: `Add a modifier at the end of a Shape clip's stack (applied top to bottom). Kinds and params: ${MODIFIER_CATALOGUE}. trim start/end/offset draws a path on; repeater steps each copy by offset/rotation/scale around the box centre (rotation 360/copies makes a radial pattern); wiggle is seeded and moves with speed. Returns modifier_id and the keys to animate with set_keyframes / set_expression: mod.<modifier id>.<param>.`,
+      inputSchema: z.object({ clip_id: z.string(), kind: z.enum(MODIFIER_KINDS), params: z.record(z.string(), z.number()).optional() }),
+      execute: async (input) => {
+        const id = deps.newId();
+        const out = apply(addModifier(session.doc, input.clip_id, input.kind, id, input.params), `added ${input.kind} to ${input.clip_id}`);
+        return out.ok ? { ...out, modifier_id: id, animate: MODIFIERS[input.kind].params.map((p) => modifierKey(id, p.key)) } : out;
+      }
+    }),
+
+    set_modifier: tool({
+      description: 'Change a modifier of a Shape clip: some params (the rest are kept), enabled on/off, or its position in the stack (index 0 applies first).',
+      inputSchema: z.object({ clip_id: z.string(), modifier_id: z.string(), params: z.record(z.string(), z.number()).optional(), enabled: z.boolean().optional(), index: z.number().int().min(0).optional() }),
+      execute: async (input) => apply(setModifier(session.doc, input.clip_id, input.modifier_id, { params: input.params, enabled: input.enabled, index: input.index }), `changed modifier ${input.modifier_id}`)
+    }),
+
+    remove_modifier: tool({
+      description: 'Remove a modifier from a Shape clip, with its keyframes and expressions.',
+      inputSchema: z.object({ clip_id: z.string(), modifier_id: z.string() }),
+      execute: async (input) => apply(removeModifier(session.doc, input.clip_id, input.modifier_id), `removed modifier ${input.modifier_id}`)
     }),
 
     add_effect: tool({

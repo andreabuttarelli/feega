@@ -1,4 +1,8 @@
-import { TrackKind, type ComponentId } from './components';
+import { COMPONENTS, TrackKind, type ComponentId } from './components';
+import { flatten } from './shape/geometry';
+import { resample } from './shape/morph';
+import { baseOutline, type ShapeLook } from './shape/render';
+import { ShapeKind } from './shape/schema';
 import { findClip, type MotionClip, type MotionDoc } from './doc';
 import { MaskKind, Matte, maskSchema, type Mask, type MaskInput } from './mask';
 
@@ -13,14 +17,37 @@ const PICTURE: Record<Exclude<Matte, Matte.None>, MaskKind> = { [Matte.Alpha]: M
 
 const pictureMatte = (p: Props, matte: Exclude<Matte, Matte.None>): MaskInput | null => (p.assetId ? { ...boxOf(p), kind: PICTURE[matte], assetId: p.assetId } : null);
 
-const SHAPE: Record<string, MaskKind> = { rect: MaskKind.Rect, circle: MaskKind.Ellipse, line: MaskKind.Rect };
+const MAX_MASK_POINTS = 64;
+const clampUnit = (n: number) => Math.min(1, Math.max(0, Math.round(n * 10000) / 10000));
+
+function outlinePoints(p: Props): [number, number][] {
+  const [contour] = baseOutline(COMPONENTS.Shape.schema.parse(p) as unknown as ShapeLook, { w: 1, h: 1 });
+  if (!contour) {
+    return [];
+  }
+  const flat = flatten(contour);
+  const points = flat.length > MAX_MASK_POINTS ? resample(contour, MAX_MASK_POINTS) : flat;
+  return points.map(([x, y]) => [clampUnit(x), clampUnit(y)]);
+}
+
+const box = (kind: MaskKind) => (p: Props): MaskInput => ({ ...boxOf(p), kind });
+
+const SHAPE: Record<ShapeKind, (p: Props) => MaskInput> = {
+  [ShapeKind.Rect]: box(MaskKind.Rect),
+  [ShapeKind.Line]: box(MaskKind.Rect),
+  [ShapeKind.Circle]: box(MaskKind.Ellipse),
+  [ShapeKind.Ellipse]: box(MaskKind.Ellipse),
+  [ShapeKind.Polygon]: (p) => ({ ...boxOf(p), kind: MaskKind.Polygon, points: outlinePoints(p) }),
+  [ShapeKind.Star]: (p) => ({ ...boxOf(p), kind: MaskKind.Polygon, points: outlinePoints(p) }),
+  [ShapeKind.Path]: (p) => ({ ...boxOf(p), kind: MaskKind.Polygon, points: outlinePoints(p) })
+};
 
 const MATTE: Partial<Record<ComponentId, (p: Props, matte: Exclude<Matte, Matte.None>) => MaskInput | null>> = {
   Title: textMatte,
   Text: textMatte,
   Kicker: textMatte,
   Caption: textMatte,
-  Shape: (p) => ({ ...boxOf(p), kind: SHAPE[p.shape ?? 'rect'] }),
+  Shape: (p) => SHAPE[(p.shape as ShapeKind) ?? ShapeKind.Rect](p),
   Image: pictureMatte,
   Logo: pictureMatte
 };

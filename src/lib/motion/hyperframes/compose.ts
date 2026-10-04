@@ -23,6 +23,7 @@ import { Matte, type Mask } from '../mask';
 import { Composite, cameraMath, stageSpec } from '../camera';
 import { sampleTrack } from '../keyframes';
 import { STAGE_CSS, stageRootStyle, stageScript } from './stage';
+import { shapeBake, shapeScript, type ShapeBake } from './shapes';
 import { bakeExpressions } from '../expression/bake';
 import { FIT_TEXT, fitScript } from './fit-runtime';
 import { ANIMATOR_CSS, textRender } from '../text-animators/render';
@@ -354,6 +355,7 @@ export function composeHtml(raw: ComposeInput): string {
   const holds: Hold[] = [];
   const three: ThreeClip[] = [];
   const compositions: TimedBake[] = [];
+  const shapes: ShapeBake[] = [];
   const clips: MotionClip[] = [];
   const runs: CustomRun[] = [];
   const hidden = hiddenMattes(doc);
@@ -381,6 +383,10 @@ export function composeHtml(raw: ComposeInput): string {
       }
       if (clip.component === 'Composition') {
         compositions.push(compositionBake(clip, ctx));
+      }
+      const shape = clip.component === 'Shape' ? shapeBake({ ...clip, props: ctx.p as Record<string, unknown> }, ctx) : null;
+      if (shape) {
+        shapes.push(shape);
       }
       const run = clip.component === 'Custom' ? customRun(clip, ctx, doc.components) : null;
       if (run) {
@@ -431,7 +437,8 @@ export function composeHtml(raw: ComposeInput): string {
     customBoot,
     stage ? `<script>${stageScript(stage, doc.fps, Number(duration))}</script>` : '',
     threeScript(three, Number(duration), stage, look),
-    compositionScript(compositions, Number(duration))
+    compositionScript(compositions, Number(duration)),
+    shapeScript(shapes, doc.fps, Number(duration))
   ].join('');
   return `${page}${captureScript(frame, contentStamp(page))}</body></html>`;
 }

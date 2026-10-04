@@ -1,3 +1,5 @@
+import { modifierProps } from '../shape/model';
+import type { Modifier } from '../shape/schema';
 import { parse, type Node } from 'acorn';
 import { full } from 'acorn-walk';
 import { FONTS } from '../components';
@@ -99,6 +101,10 @@ export function paramProps(doc: Pick<MotionDoc, 'components'>, clip: Pick<Motion
     .filter((p): p is AnimProp => p !== null);
 }
 
+function shapeModifierProps(clip: Pick<MotionClip, 'component' | 'props'>): AnimProp[] {
+  return clip.component === 'Shape' ? modifierProps((clip.props.modifiers as Modifier[] | undefined) ?? []) : [];
+}
+
 export function withParams<C extends Pick<MotionClip, 'component' | 'props'> & { effects?: Effect[]; animators?: TextAnimator[] }>(doc: Pick<MotionDoc, 'components'>, clip: C): C & { params: AnimProp[] } {
-  return { ...clip, params: [...paramProps(doc, clip), ...effectProps(clip.effects ?? []), ...animatorProps(clip.animators ?? [])] };
+  return { ...clip, params: [...paramProps(doc, clip), ...effectProps(clip.effects ?? []), ...animatorProps(clip.animators ?? []), ...shapeModifierProps(clip)] };
 }
