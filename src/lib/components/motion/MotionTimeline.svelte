@@ -144,6 +144,7 @@
 
   function startWhip(e: PointerEvent, clipId: string) {
     e.stopPropagation();
+    e.preventDefault();
     const at = pointInTimeline(e);
     whip = { clipId, x0: at.x, y0: at.y, x: at.x, y: at.y };
   }
@@ -164,7 +165,7 @@
 
   function parentLabel(clip: MotionClip): string {
     const parent = clip.parent ? shown.tracks.flatMap((t) => t.clips).find((c) => c.id === clip.parent) : null;
-    return parent ? `↳ ${clipLabel(parent as MotionClip)}` : '';
+    return parent ? `↳ ${clipLabel(parent as MotionClip)} · ` : '';
   }
 
   function startScrub(e: PointerEvent) {
