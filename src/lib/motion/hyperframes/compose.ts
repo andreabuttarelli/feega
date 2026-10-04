@@ -5,7 +5,8 @@ import { Background, clipsOf, type MotionClip, type MotionDoc } from '../doc';
 import { resolveColor, type BrandTokens } from '../brand';
 import { css, esc, js, seconds } from './html';
 import { TEMPLATES, Timing, type PropsOf, type TemplateCtx, type Tween, type Vars } from './templates';
-import { LIGHTING, threeImportMap, threeScript, type ThreeClip } from './three';
+import { LIGHTING, OPENTYPE_URL, ThreeKind, lookRuntime, surfaceOf, threeAssetUrls, threeImportMap, threeScript, type ThreeClip } from './three';
+import { outlineUrl } from '../fonts/outline';
 import { bakeComposition, compositionScript, type TimedBake } from './composition';
 import { ANIMATE_CSS, animationScript, keyedOverrides, sceneKeys, wrapAnimated, wrapParents } from './animate';
 import { ancestorsOf, parentsWithChildren } from '../parent';
@@ -188,12 +189,32 @@ function round(n: number): number {
   return Math.round(n * 10000) / 10000;
 }
 
-function threeClipOf(clip: MotionClip, ctx: TemplateCtx<ComponentId>, staged: boolean): ThreeClip {
-  const p = clip.props as PropsOf<'Model3D'> & Partial<PropsOf<'Shape3D'>>;
+const THREE_KIND: Partial<Record<ComponentId, ThreeKind>> = {
+  Model3D: ThreeKind.Model,
+  Shape3D: ThreeKind.Shape,
+  Text3D: ThreeKind.Text,
+  Logo3D: ThreeKind.Logo
+};
+
+type ThreeProps = PropsOf<'Model3D'> & Partial<PropsOf<'Shape3D'>> & Partial<PropsOf<'Text3D'>> & Partial<PropsOf<'Logo3D'>>;
+
+function threeUrl(kind: ThreeKind, p: ThreeProps, ctx: TemplateCtx<ComponentId>, input: ComposeInput): string | null {
+  const URL_OF: Record<ThreeKind, () => string | null> = {
+    [ThreeKind.Model]: () => ctx.asset(p.assetId ?? null),
+    [ThreeKind.Shape]: () => null,
+    [ThreeKind.Logo]: () => ctx.asset(p.assetId ?? null) ?? ctx.logoUrl ?? null,
+    [ThreeKind.Text]: () => outlineUrl(p.font ?? '', p.weight ?? 400, input.doc.fonts, input.assets)
+  };
+  return URL_OF[kind]();
+}
+
+function threeClipOf(clip: MotionClip, ctx: TemplateCtx<ComponentId>, staged: boolean, input: ComposeInput): ThreeClip {
+  const p = clip.props as ThreeProps;
+  const kind = THREE_KIND[clip.component] ?? ThreeKind.Shape;
   return {
     id: clip.id,
-    kind: clip.component === 'Model3D' ? 'model' : 'shape',
-    url: ctx.asset(p.assetId ?? null),
+    kind,
+    url: threeUrl(kind, p, ctx, input),
     shape: p.shape ?? 'cube',
     color: ctx.color(p.fill ?? 'brand.accent'),
     start: ctx.start,
@@ -207,7 +228,11 @@ function threeClipOf(clip: MotionClip, ctx: TemplateCtx<ComponentId>, staged: bo
     ease: GSAP_EASE[p.easing],
     fps: ctx.fps,
     keys: sceneKeys(clip),
-    depth: staged ? clip.depth : null
+    depth: staged ? clip.depth : null,
+    surface: surfaceOf(p.material),
+    text: p.text ?? '',
+    extrude: p.extrude ?? 0,
+    bevel: p.bevel ?? 0
   };
 }
 
@@ -346,7 +371,7 @@ export function composeHtml(raw: ComposeInput): string {
       tweens.push(...edgeTweens(clip, doc.fps), ...moveTweens(clip, doc.fps), ...own);
       holds.push(...heldUntilStart(own, ctx.start));
       if (THREE_D_COMPONENTS.includes(clip.component)) {
-        three.push(threeClipOf(clip, ctx, onStage.has(clip.id)));
+        three.push(threeClipOf(clip, ctx, onStage.has(clip.id), input));
       }
       if (clip.component === 'Composition') {
         compositions.push(compositionBake(clip, ctx));
@@ -360,6 +385,8 @@ export function composeHtml(raw: ComposeInput): string {
 
   const duration = seconds(doc.durationInFrames, doc.fps);
   const background = ROOT_BACKGROUND[doc.background](tokens);
+  const look = lookRuntime(doc.look);
+  const outlines = three.some((c) => c.kind === ThreeKind.Text) ? [OPENTYPE_URL] : [];
   const animation = animationScript(clips, doc, (v) => resolveColor(v, tokens), parentsWithChildren(doc));
   const used = new Set(runs.map((r) => r.name));
   const libraries = librariesOf(doc.components, used);
@@ -372,8 +399,8 @@ export function composeHtml(raw: ComposeInput): string {
     : boot
       ? `<script>${boot}</script>`
       : '';
-  const scripts = [RUNTIME_URL, GSAP_URL, SCREENSHOT_URL, ...(three.length || compositions.length ? [THREE_BASE] : []), ...[...libraries].flatMap((lib) => LIBRARY_TAGS[lib].scripts)];
-  const assetUrls = [...Object.values(input.assets), ...(tokens.logoUrl ? [tokens.logoUrl] : [])];
+  const scripts = [RUNTIME_URL, GSAP_URL, SCREENSHOT_URL, ...(three.length || compositions.length ? [THREE_BASE] : []), ...outlines, ...[...libraries].flatMap((lib) => LIBRARY_TAGS[lib].scripts)];
+  const assetUrls = [...Object.values(input.assets), ...(tokens.logoUrl ? [tokens.logoUrl] : []), ...threeAssetUrls(look, three)];
 
   const page = [
     '<!doctype html><html lang="en"><head><meta charset="UTF-8" />',
@@ -397,7 +424,7 @@ export function composeHtml(raw: ComposeInput): string {
     definitions,
     customBoot,
     stage ? `<script>${stageScript(stage, doc.fps, Number(duration))}</script>` : '',
-    threeScript(three, Number(duration), stage),
+    threeScript(three, Number(duration), stage, look),
     compositionScript(compositions, Number(duration))
   ].join('');
   return `${page}${captureScript(frame, contentStamp(page))}</body></html>`;

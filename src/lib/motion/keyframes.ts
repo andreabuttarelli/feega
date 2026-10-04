@@ -145,6 +145,8 @@ export const ANIMATABLE: Record<ComponentId, readonly AnimProp[]> = {
   CanvasMock: visual(),
   Model3D: visual(sceneProps),
   Shape3D: visual(sceneProps),
+  Text3D: visual(sceneProps),
+  Logo3D: visual(sceneProps),
   Composition: visual(),
   Custom: visual()
 };

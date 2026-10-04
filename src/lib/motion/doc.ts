@@ -6,6 +6,7 @@ import { FASTEST_RATE, FPS, FRAME_RATES, MAX_SECONDS, TRANSITION_KINDS, Transiti
 import { motionPathSchema } from './path';
 import { keyframeSchema, keyframesProblem, transformSchema } from './keyframes';
 import { MATTES, Matte, maskSchema } from './mask';
+import { lookSchema } from './look';
 import { DEPTH, SPACES, Space, cameraSchema, depthSchema } from './camera';
 import { PARENT_OPACITIES, ParentOpacity, parentProblem } from './parent';
 import { expressionsSchema, expressionsProblem } from './expression/schema';
@@ -107,6 +108,7 @@ export const motionDocSchema = z
     tracks: z.array(trackSchema).max(20),
     assets: z.array(assetRefSchema).default([]),
     camera: cameraSchema.nullable().default(null),
+    look: lookSchema.nullable().default(null),
     fonts: fontsSchema,
     background: z.enum([Background.Brand, Background.Transparent]).default(Background.Brand),
     motionBlur: motionBlurSchema,
@@ -237,6 +239,7 @@ export function newMotionDoc(format: MotionFormat): MotionDoc {
     ],
     assets: [],
     camera: null,
+    look: null,
     fonts: [],
     background: Background.Brand,
     motionBlur: DEFAULT_MOTION_BLUR,

@@ -52,6 +52,8 @@ const COMPONENT_FAMILY: Record<ComponentId, ClipFamily> = {
   BrandBackground: ClipFamily.Shape,
   Model3D: ClipFamily.ThreeD,
   Shape3D: ClipFamily.ThreeD,
+  Text3D: ClipFamily.ThreeD,
+  Logo3D: ClipFamily.ThreeD,
   Composition: ClipFamily.ThreeD,
   Null: ClipFamily.Null,
   Custom: ClipFamily.Custom

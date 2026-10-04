@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { BuiltinFont, FONT_NAME } from './fonts/model';
 import { DURATION, EASE_IDS, Ease, FPS } from './design';
+import { MATERIALS, Material } from './materials';
 import { LAYOUTS } from '../canvas/composition/index';
 import { CAMERA_PRESETS } from '../canvas/composition/camera';
 import type { CameraPresetId } from '../canvas/composition/camera';
@@ -122,6 +123,13 @@ const camera = {
   backdrop: choice(BACKDROPS, 'transparent', 'Background', Group.Camera),
   shadow: toggle(true, 'Shadow', Group.Camera),
   easing: choice(EASE_IDS, Ease.Standard, 'Easing', Group.Motion)
+};
+
+const surface = { material: choice(MATERIALS, Material.Original, 'Material', Group.Style) };
+
+const extrusion = {
+  extrude: range(0.02, 1.5, 0.01, 0.35, 'Depth', Group.Style),
+  bevel: range(0, 0.2, 0.005, 0.03, 'Bevel', Group.Style)
 };
 
 const position3d = {
@@ -300,7 +308,7 @@ export const COMPONENTS = {
     description: 'A GLB model from the canvas, turned by an orbiting camera between a start and an end angle.',
     track: TrackKind.Visual,
     durationInFrames: seconds(4),
-    schema: z.object({ assetId: asset(AssetKind.Model3d, '3D model'), ...camera, ...position3d }).strict()
+    schema: z.object({ assetId: asset(AssetKind.Model3d, '3D model'), ...surface, ...camera, ...position3d }).strict()
   },
   Shape3D: {
     label: '3D shape',
@@ -308,7 +316,25 @@ export const COMPONENTS = {
     track: TrackKind.Visual,
     durationInFrames: seconds(3),
     schema: z
-      .object({ shape: choice(SHAPES_3D, 'torus', 'Shape', Group.Content), fill: color('brand.accent', 'Colour'), ...camera, ...position3d })
+      .object({ shape: choice(SHAPES_3D, 'torus', 'Shape', Group.Content), fill: color('brand.accent', 'Colour'), ...surface, ...camera, ...position3d })
+      .strict()
+  },
+  Text3D: {
+    label: '3D text',
+    description: 'Extruded 3D lettering in any Google or uploaded font, with depth, bevel and a material, lit by the look of the video.',
+    track: TrackKind.Visual,
+    durationInFrames: seconds(3),
+    schema: z
+      .object({ text: text('Hello', 'Text'), font: font(), weight: range(100, 900, 100, 700, 'Weight', Group.Style), fill: color('brand.accent', 'Colour'), ...extrusion, material: choice(MATERIALS, Material.Plastic, 'Material', Group.Style), ...camera, ...position3d })
+      .strict()
+  },
+  Logo3D: {
+    label: '3D logo',
+    description: 'An SVG logo extruded into a solid with depth, bevel and a material; without an asset it uses the brand logo when that is an SVG.',
+    track: TrackKind.Visual,
+    durationInFrames: seconds(3),
+    schema: z
+      .object({ assetId: asset(AssetKind.Image, 'SVG logo'), fill: color('brand.primary', 'Colour'), ...extrusion, material: choice(MATERIALS, Material.Metal, 'Material', Group.Style), ...camera, ...position3d })
       .strict()
   },
   Composition: {
@@ -345,7 +371,7 @@ export type ComponentId = keyof typeof COMPONENTS;
 
 export const COMPONENT_IDS = Object.keys(COMPONENTS) as [ComponentId, ...ComponentId[]];
 
-export const THREE_D_COMPONENTS: readonly ComponentId[] = ['Model3D', 'Shape3D'];
+export const THREE_D_COMPONENTS: readonly ComponentId[] = ['Model3D', 'Shape3D', 'Text3D', 'Logo3D'];
 
 export const CODE_COMPONENTS: readonly ComponentId[] = ['Custom'];
 
