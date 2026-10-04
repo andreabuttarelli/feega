@@ -4,7 +4,7 @@ import { AssetKind, COMPONENTS, COMPONENT_IDS, TrackKind } from '$lib/motion/com
 import { fieldsOf } from '$lib/motion/inspector';
 import { Ease, FRAME_RATES, MAX_SECONDS, TRANSITION_KINDS } from '$lib/motion/design';
 import { setFrameRate } from '$lib/motion/frame-rate';
-import { Background, MOTION_FORMATS, findClip, type MotionDoc } from '$lib/motion/doc';
+import { Background, MOTION_FORMATS, clipsOf, findClip, type MotionDoc } from '$lib/motion/doc';
 import { ClipEdge, Side, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyInterp, setKeyframes, setMask, shaped, setProps, setTiming, setTrackMatte, setTransform, setTransition, trimClip, applyEasePreset, setKeyEase, type OpResult } from '$lib/motion/timeline';
 import { MASK_KEYS, MASK_KIND_IDS, MATTES } from '$lib/motion/mask';
 import { pathProblem } from '$lib/motion/path';
@@ -55,6 +55,7 @@ import { addModifier, morphTo, removeModifier, setModifier, setPath } from '$lib
 import { SHAPE_KINDS, modifierKey } from '$lib/motion/shape/schema';
 import { DUCK_DEFAULTS, duckUnder } from '$lib/motion/duck';
 import type { AudioAnalysis } from '$lib/motion/audio-analysis';
+import { Hit, cutToBeat, hitFrames } from '$lib/motion/beats';
 
 export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number };
 
@@ -257,6 +258,13 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
   }
 
   const analysisOf = (assetId: string) => (deps.analysis ? deps.analysis(assetId) : Promise.resolve(null));
+
+  async function docBeats(hit: Hit) {
+    const ids = [...new Set(clipsOf(session.doc).flatMap((c) => (c.component === 'Audio' && typeof c.props.assetId === 'string' ? [c.props.assetId] : [])))];
+    const found = await Promise.all(ids.map(async (id) => [id, await analysisOf(id)] as const));
+    const analyses = Object.fromEntries(found.flatMap(([id, a]) => (a ? [[id, a]] : [])));
+    return hitFrames(session.doc, analyses, hit);
+  }
 
   async function speechOf(clipId: string) {
     const assetId = findClip(session.doc, clipId)?.clip.props.assetId;
@@ -500,6 +508,18 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const { duration, bpm, beats, onsets, speech } = analysis;
         return { ok: true, duration, bpm, beats, onsets, speech };
       }
+    }),
+
+    beat_times: tool({
+      description: 'Where the music hits, on the timeline: the beat grid (hit: beats) or every detected onset (hit: onsets) of the Audio clips, in seconds from the start of the video. Use them to place cuts, keyframes and markers on the music.',
+      inputSchema: z.object({ hit: z.enum([Hit.Beats, Hit.Onsets]).default(Hit.Beats) }),
+      execute: async (input) => ({ ok: true, times: (await docBeats(input.hit)).map((f) => Math.round((f / session.doc.fps) * 1000) / 1000) })
+    }),
+
+    cut_to_beat: tool({
+      description: 'Re-time clips to the beat: in time order, the first starts on the nearest beat and each one ends on the beat nearest its length, the next starting there, so every cut lands on a beat.',
+      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1) }),
+      execute: async (input) => apply(cutToBeat(session.doc, input.clip_ids, await docBeats(Hit.Beats)), `cut ${input.clip_ids.length} clips to the beat`)
     }),
 
     duck_audio: tool({

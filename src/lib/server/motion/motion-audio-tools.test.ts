@@ -44,3 +44,35 @@ describe('motion agent audio tools', () => {
     expect(findClip(session.doc, 'id1')!.clip.keyframes.volume.map((k) => k.frame)).toEqual([0, 84, 90, 120, 132]);
   });
 });
+
+describe('motion agent beat tools', () => {
+  async function withMusic() {
+    const kit = setup();
+    await kit.run('add_clip', { component: 'Audio', start: 1, duration: 8, props: { assetId: 'music' } });
+    return kit;
+  }
+
+  it('beat_times gives the beats of the music on the timeline, in seconds', async () => {
+    const { run } = await withMusic();
+    const out = await run('beat_times', { hit: 'beats' });
+
+    expect(out).toMatchObject({ ok: true, times: [1, 1.5, 2] });
+  });
+
+  it('cut_to_beat re-times the clips so every cut lands on a beat', async () => {
+    const { session, run } = await withMusic();
+    await run('add_clip', { component: 'Shape', start: 1.1, duration: 0.4 });
+    await run('add_clip', { component: 'Shape', start: 1.5, duration: 0.6 });
+    const out = await run('cut_to_beat', { clip_ids: ['id2', 'id3'] });
+    const span = (id: string) => {
+      const c = findClip(session.doc, id)!.clip;
+      return [c.from, c.from + c.durationInFrames];
+    };
+
+    expect(out.ok).toBe(true);
+    expect([span('id2'), span('id3')]).toEqual([
+      [30, 45],
+      [45, 60]
+    ]);
+  });
+});

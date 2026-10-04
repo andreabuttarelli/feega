@@ -72,6 +72,7 @@
   import { composeHtml } from '$lib/motion/hyperframes/compose';
   import { feegaTrailer } from '$lib/motion/trailer';
   import type { AudioAnalysis } from '$lib/motion/audio-analysis';
+  import { Hit, cutToBeat, hitFrames } from '$lib/motion/beats';
   import { audioPlan } from '$lib/motion/audio-plan';
   import { previewAudio } from '$lib/motion/preview-audio';
   import { AD_TEMPLATES, AD_TEMPLATE_IDS, templateAssets, type AdTemplate } from '$lib/motion/ad-templates';
@@ -125,6 +126,7 @@
   let unsavedSummary = '';
 
   const doc = $derived(history.present);
+  const beats = $derived(hitFrames(doc, analyses, Hit.Beats));
   const assets = $derived([...madeAssets, ...data.assets]);
   const assetUrls = $derived(Object.fromEntries(assets.filter((a) => a.url).map((a) => [a.id, a.url as string])));
   const html = $derived(composeHtml({ doc, tokens: data.tokens, assets: assetUrls }));
@@ -149,6 +151,15 @@
     void speaker.play(audioPlan(doc, assetUrls), untrack(() => frame) / doc.fps);
     return () => speaker.stop();
   });
+
+  function cutSelectionToBeat() {
+    const result = cutToBeat(doc, selection, beats);
+    if (!result.ok) {
+      notice = result.error;
+      return;
+    }
+    edit(result.doc, 'Cut to the beat');
+  }
 
   async function analyse(ids: string[]) {
     const form = new FormData();
@@ -669,6 +680,9 @@
         </button>
         <span class="tc" data-testid="timecode">{timecode(frame, doc.fps)} / {timecode(doc.durationInFrames, doc.fps)}</span>
         <span class="sep"></span>
+        {#if beats.length && selection.length}
+          <button type="button" data-testid="cut-to-beat" onclick={cutSelectionToBeat}>Cut to beat</button>
+        {/if}
         <div class="add">
           <button type="button" onclick={() => (adding = !adding)}><Plus size={14} /> Add</button>
           {#if adding}
@@ -719,7 +733,7 @@
         {#if graphOpen}
           <GraphEditor {doc} {frame} {selection} bind:keySelection camera={cameraOpen} onchange={edit} />
         {:else}
-          <MotionTimeline {doc} bind:frame bind:selection bind:keySelection bind:camera={cameraOpen} {zoom} {snap} {waveforms} {assetUrls} onchange={edit} />
+          <MotionTimeline {doc} bind:frame bind:selection bind:keySelection bind:camera={cameraOpen} {zoom} {snap} {waveforms} {beats} {assetUrls} onchange={edit} />
         {/if}
       </div>
     </section>
