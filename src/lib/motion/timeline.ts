@@ -8,7 +8,7 @@ import { Matte, isMaskKey, maskSchema, type MaskInput } from './mask';
 import { matteMask, matteSource } from './matte';
 import { CAMERA_LANE, type CameraKey } from './camera';
 import { editCameraLane } from './camera-ops';
-import { keyframesProblem, transformSchema, type EaseSpec, type KeyValue, type Keyframe, type Keyframes, type Transform } from './keyframes';
+import { Interp, keyframesProblem, transformSchema, type EaseSpec, type KeyValue, type Keyframe, type Keyframes, type Transform } from './keyframes';
 
 export type OpResult = { ok: true; doc: MotionDoc } | { ok: false; error: string };
 
@@ -294,7 +294,7 @@ export function snapTargets(doc: MotionDoc, input: { playhead: number; exclude: 
 }
 
 export type KeyRef = { clipId: string; prop: string; frame: number };
-export type KeyBoard = { prop: string; offset: number; value: KeyValue; ease: EaseSpec }[];
+export type KeyBoard = ({ prop: string; offset: number; value: KeyValue; ease: EaseSpec } & KeyShape)[];
 
 export enum Direction {
   Back = 'back',
@@ -378,13 +378,30 @@ export function setKeyEase(doc: MotionDoc, ref: KeyRef, ease: EaseSpec): OpResul
   return editRefs(doc, [ref], (track) => track.map((k) => (k.frame === ref.frame ? { ...k, ease } : k)));
 }
 
+export type KeyShape = { in?: Interp; out?: Interp; roving?: boolean };
+
+export function shaped(key: Keyframe, shape: KeyShape): Keyframe {
+  const next = { ...key, ...shape };
+  const { in: inKind, out, roving, ...rest } = next;
+  return {
+    ...rest,
+    ...(inKind && inKind !== Interp.Bezier ? { in: inKind } : {}),
+    ...(out && out !== Interp.Bezier ? { out } : {}),
+    ...(roving ? { roving } : {})
+  };
+}
+
+export function setKeyInterp(doc: MotionDoc, refs: readonly KeyRef[], shape: KeyShape): OpResult {
+  return editRefs(doc, refs, (track, frames) => track.map((k) => (frames.includes(k.frame) ? shaped(k, shape) : k)));
+}
+
 export function copyKeyframes(doc: MotionDoc, refs: readonly KeyRef[]): KeyBoard {
   const picked = refs.flatMap((ref) => {
     const key = findClip(doc, ref.clipId)?.clip.keyframes[ref.prop]?.find((k) => k.frame === ref.frame);
     return key ? [{ prop: ref.prop, key }] : [];
   });
   const earliest = Math.min(...picked.map((p) => p.key.frame));
-  return picked.map(({ prop, key }) => ({ prop, offset: key.frame - earliest, value: key.value, ease: key.ease }));
+  return picked.map(({ prop, key }) => ({ prop, offset: key.frame - earliest, value: key.value, ease: key.ease, in: key.in, out: key.out, roving: key.roving }));
 }
 
 export function pasteKeyframes(doc: MotionDoc, clipId: string, board: KeyBoard, at: number): OpResult {
@@ -392,7 +409,7 @@ export function pasteKeyframes(doc: MotionDoc, clipId: string, board: KeyBoard, 
     const next: Keyframes = { ...clip.keyframes };
     for (const item of board) {
       const frame = Math.max(0, Math.round(at + item.offset));
-      next[item.prop] = [...(next[item.prop] ?? []).filter((k) => k.frame !== frame), { frame, value: item.value, ease: item.ease }];
+      next[item.prop] = [...(next[item.prop] ?? []).filter((k) => k.frame !== frame), shaped({ frame, value: item.value, ease: item.ease }, { in: item.in, out: item.out, roving: item.roving })];
     }
     return withKeyframes(doc, clip, next);
   });

@@ -17,12 +17,12 @@
   import { filmstrip, type Strip } from '$lib/motion/filmstrip';
   import { COMPONENTS, TrackKind } from '$lib/motion/components';
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
-  import { ClipEdge, moveClip, moveKeyframes, moveTrack, setKeyEase, trimClip, type KeyRef, type OpResult } from '$lib/motion/timeline';
+  import { ClipEdge, moveClip, moveKeyframes, moveTrack, setKeyEase, setKeyInterp, trimClip, type KeyRef, type OpResult } from '$lib/motion/timeline';
   import { withParams } from '$lib/motion/custom/params';
-  import { Grip, Snap, edgeHandles, frameAt, keyLanes, pxPerFrame, rulerTicks, snapped, stackRows, type KeyLane } from '$lib/motion/timeline-view';
+  import { Grip, KeySide, Snap, edgeHandles, frameAt, keyLanes, pxPerFrame, rulerTicks, snapped, stackRows, type KeyLane } from '$lib/motion/timeline-view';
   import { MASK_KINDS, Matte } from '$lib/motion/mask';
   import type { MotionTrack } from '$lib/motion/doc';
-  import { Source, type EaseSpec, type Keyframe } from '$lib/motion/keyframes';
+  import { Interp, Source, type EaseSpec, type Keyframe } from '$lib/motion/keyframes';
   import { CAMERA_LANE } from '$lib/motion/camera';
   import { cameraLanes } from '$lib/motion/camera-ops';
   import { ancestorsOf } from '$lib/motion/parent';
@@ -82,7 +82,7 @@
   let strips = $state<Record<string, Strip>>({});
 
   let collapsed = $state<string[]>([]);
-  let easing = $state<{ ref: KeyRef; ease: EaseSpec; left: number; top: number } | null>(null);
+  let easing = $state<{ ref: KeyRef; next: KeyRef; ease: EaseSpec; left: number; top: number } | null>(null);
   let whip = $state<{ clipId: string; x0: number; y0: number; x: number; y: number } | null>(null);
 
   let draft = $state<MotionDoc | null>(null);
@@ -136,10 +136,10 @@
     gesture = { kind: Drag.Keys, clipId: clip.id, trackId: '', grabFrame: clip.from + ref.frame, originFrom: clip.from + ref.frame, base: doc, refs: keySelection, delta: 0 };
   }
 
-  function openEase(e: MouseEvent, clip: KeyOwner, ref: KeyRef, ease: EaseSpec) {
+  function openEase(e: MouseEvent, clip: KeyOwner, ref: KeyRef, next: KeyRef, ease: EaseSpec) {
     e.stopPropagation();
     const rect = lanes!.getBoundingClientRect();
-    easing = { ref, ease, left: e.clientX - rect.left + lanes!.scrollLeft, top: e.clientY - rect.top + lanes!.scrollTop + 8 };
+    easing = { ref, next, ease, left: e.clientX - rect.left + lanes!.scrollLeft, top: e.clientY - rect.top + lanes!.scrollTop + 8 };
   }
 
   function pickEase(ease: EaseSpec) {
@@ -150,6 +150,26 @@
     if (result.ok) {
       easing = { ...easing, ease };
       onchange(result.doc, 'Changed an ease');
+    }
+  }
+
+  function keyAt(ref: KeyRef): Keyframe | undefined {
+    const owner = ref.clipId === CAMERA_LANE ? shown.camera?.keyframes : clipById(ref.clipId)?.keyframes;
+    return (owner as Partial<Record<string, Keyframe[]>> | undefined)?.[ref.prop]?.find((k) => k.frame === ref.frame);
+  }
+
+  function segmentKinds(at: { ref: KeyRef; next: KeyRef }): Record<KeySide, Interp> {
+    return { [KeySide.Out]: keyAt(at.ref)?.out ?? Interp.Bezier, [KeySide.In]: keyAt(at.next)?.in ?? Interp.Bezier };
+  }
+
+  function pickKind(side: KeySide, kind: Interp) {
+    if (!easing) {
+      return;
+    }
+    const target = side === KeySide.Out ? easing.ref : easing.next;
+    const result = setKeyInterp(doc, [target], { [side]: kind });
+    if (result.ok) {
+      onchange(result.doc, 'Changed an interpolation');
     }
   }
 
@@ -361,7 +381,7 @@
             title="Ease"
             aria-label={`Ease after ${lane.label} keyframe`}
             style={`left: ${(clip.from + key.frame) * ppf}px; width: ${(keys[i + 1].frame - key.frame) * ppf}px;`}
-            onclick={(e) => openEase(e, clip, { clipId: clip.id, prop: lane.prop, frame: key.frame }, key.ease)}
+            onclick={(e) => openEase(e, clip, { clipId: clip.id, prop: lane.prop, frame: key.frame }, { clipId: clip.id, prop: lane.prop, frame: keys[i + 1].frame }, key.ease)}
           ></button>
         {/each}
         {#each keys as key (key.frame)}
@@ -373,6 +393,8 @@
             tabindex="-1"
             aria-label={`${lane.label} keyframe at ${clip.from + key.frame}`}
             data-key-frame={clip.from + key.frame}
+            data-interp={key.out ?? Interp.Bezier}
+            class:roving={key.roving}
             style={`left: ${(clip.from + key.frame) * ppf - DIAMOND_PX / 2}px; width: ${DIAMOND_PX}px; height: ${DIAMOND_PX}px; top: ${(KEY_ROW_PX - DIAMOND_PX) / 2}px;`}
             onpointerdown={(e) => startKey(e, clip, ref)}
           ></div>
@@ -502,7 +524,7 @@
 
     {#if easing}
       <div class="ease-at" style={`left: ${Math.max(headPx, easing.left - 120)}px; top: ${easing.top}px;`}>
-        <EasePicker ease={easing.ease} onpick={pickEase} onclose={() => (easing = null)} />
+        <EasePicker ease={easing.ease} kinds={segmentKinds(easing)} onpick={pickEase} onkind={pickKind} onclose={() => (easing = null)} />
       </div>
     {/if}
 
@@ -901,6 +923,20 @@
     border: 1.5px solid var(--ui-ink-2);
     transform: rotate(45deg) scale(0.75);
     cursor: ew-resize;
+  }
+
+  .diamond[data-interp='hold'] {
+    transform: scale(0.75);
+  }
+
+  .diamond[data-interp='auto'],
+  .diamond[data-interp='continuous'] {
+    transform: scale(0.8);
+    clip-path: polygon(30% 0, 70% 0, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0 70%, 0 30%);
+  }
+
+  .diamond.roving {
+    border-style: dashed;
   }
 
   .diamond:hover {

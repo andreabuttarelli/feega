@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Ease } from './design';
+import { Interp } from './keyframes';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
 import {
   Direction,
@@ -12,6 +13,7 @@ import {
   pasteKeyframes,
   removeKeyframes,
   setKeyEase,
+  setKeyInterp,
   setKeyframe,
   setKeyframes,
   setTransform,
@@ -174,5 +176,38 @@ describe('keyframe navigation and snapping', () => {
 
   it('keyframes are snap targets', () => {
     expect(snapTargets(must(setKeyframe(keyed, 't', 'rotateY', 15, 10)), { playhead: 0, exclude: [] })).toContain(45);
+  });
+});
+
+describe('interpolation of selected keyframes', () => {
+  const refs = [
+    { clipId: 't', prop: 'rotateY', frame: 30 },
+    { clipId: 't', prop: 'rotateY', frame: 60 }
+  ];
+  const track = (doc: MotionDoc) => findClip(doc, 't')!.clip.keyframes.rotateY;
+
+  it('sets in, out or both on every selected keyframe and leaves the others', () => {
+    const held = must(setKeyInterp(keyed, refs, { out: Interp.Hold, in: Interp.Linear }));
+    expect(track(held).map((k) => [k.in, k.out])).toEqual([
+      [undefined, undefined],
+      [Interp.Linear, Interp.Hold],
+      [Interp.Linear, Interp.Hold]
+    ]);
+  });
+
+  it('bezier on both sides goes back to the plain eased keyframe', () => {
+    const held = must(setKeyInterp(keyed, refs, { out: Interp.Hold }));
+    const back = must(setKeyInterp(held, refs, { in: Interp.Bezier, out: Interp.Bezier }));
+    expect(track(back)).toEqual(track(keyed));
+  });
+
+  it('roving is refused where it does not apply', () => {
+    expect(setKeyInterp(keyed, refs, { roving: true }).ok).toBe(false);
+  });
+
+  it('copy and paste keep the interpolation', () => {
+    const held = must(setKeyInterp(keyed, refs, { out: Interp.Auto }));
+    const pasted = must(pasteKeyframes(held, 't', copyKeyframes(held, refs), 70));
+    expect(track(pasted).find((k) => k.frame === 70)?.out).toBe(Interp.Auto);
   });
 });

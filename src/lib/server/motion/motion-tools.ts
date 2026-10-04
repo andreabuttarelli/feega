@@ -5,9 +5,9 @@ import { fieldsOf } from '$lib/motion/inspector';
 import { Ease, FRAME_RATES, MAX_SECONDS, TRANSITION_KINDS } from '$lib/motion/design';
 import { setFrameRate } from '$lib/motion/frame-rate';
 import { Background, MOTION_FORMATS, findClip, type MotionDoc } from '$lib/motion/doc';
-import { ClipEdge, Side, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyframes, setMask, setProps, setTiming, setTrackMatte, setTransform, setTransition, trimClip, type OpResult } from '$lib/motion/timeline';
+import { ClipEdge, Side, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyInterp, setKeyframes, setMask, shaped, setProps, setTiming, setTrackMatte, setTransform, setTransition, trimClip, type OpResult } from '$lib/motion/timeline';
 import { MASK_KEYS, MASK_KIND_IDS, MATTES } from '$lib/motion/mask';
-import { ANIMATABLE, TRANSFORM_KEYS, ValueKind, easeSchema, transformSchema } from '$lib/motion/keyframes';
+import { ANIMATABLE, INTERPS, SPATIAL_KEYS, TRANSFORM_KEYS, ValueKind, easeSchema, transformSchema, type Keyframe } from '$lib/motion/keyframes';
 import type { MotionAsset } from './editor';
 import { MAX_FRAMES_PER_VIEW, MAX_VIEWS_PER_TURN, VIEW_FRAMES, type Frame } from './frames';
 import { CheckState, MAX_CSS, MAX_HTML, MAX_JS, SOURCE_FILES, checkState, propsSchemaSchema, sourceHash, type CustomComponent } from '$lib/motion/custom/component';
@@ -55,8 +55,8 @@ const secondsAt = (f: number, fps: number) => Math.round((f / fps) * 100) / 100;
 function summary(doc: MotionDoc, selection: string[]) {
   const secs = (f: number) => secondsAt(f, doc.fps);
   const edgeSummary = (edge: { kind: string; durationInFrames: number }) => ({ kind: edge.kind, duration: secs(edge.durationInFrames) });
-  const inSeconds = (keyframes: Record<string, { frame: number; value: unknown; ease: unknown }[] | undefined>) =>
-    Object.fromEntries(Object.entries(keyframes).map(([prop, track]) => [prop, (track ?? []).map((k) => ({ time: secs(k.frame), value: k.value, ease: k.ease }))]));
+  const inSeconds = (keyframes: Record<string, Keyframe[] | undefined>) =>
+    Object.fromEntries(Object.entries(keyframes).map(([prop, track]) => [prop, (track ?? []).map(({ frame, ...rest }) => ({ time: secs(frame), ...rest }))]));
   const cameraSummary = (camera: Camera | null) => (camera ? { values: camera.base, dof: camera.dof, keyframes: inSeconds(camera.keyframes), expressions: camera.expressions } : null);
 
   return {
@@ -101,6 +101,12 @@ function summary(doc: MotionDoc, selection: string[]) {
     components: Object.entries(doc.components).map(([name, c]) => customSummary(name, c))
   };
 }
+
+const keyShape = { in: z.enum(INTERPS).optional(), out: z.enum(INTERPS).optional(), roving: z.boolean().optional() };
+
+const INTERP_HELP = `in/out set how the value enters and leaves a keyframe: bezier (default, uses ease), linear, hold (no change until the next keyframe), auto (smooth, never overshoots), continuous (smooth, keeps speed through). roving true (${SPATIAL_KEYS.join(', ')} only) retimes a middle keyframe so the speed is even.`;
+
+type KeyInput = { time: number; value: Keyframe['value']; ease: Keyframe['ease']; in?: Keyframe['in']; out?: Keyframe['out']; roving?: boolean };
 
 const EFFECT_CATALOGUE = EFFECT_KINDS.map((k) => `${k} (${EFFECTS[k].about}; ${EFFECTS[k].params.map((p) => `${p.key} ${p.kind === ValueKind.Color ? 'colour' : `${p.min}..${p.max}`}`).join(', ')})`).join('; ');
 
@@ -175,6 +181,7 @@ function propsError(doc: MotionDoc, clipId: string, patch: Record<string, unknow
 export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
   const { session } = deps;
   const frames = (s: number) => framesAt(s, session.doc.fps);
+  const asKey = (k: KeyInput): Keyframe => shaped({ frame: frames(k.time), value: k.value, ease: k.ease }, { in: k.in, out: k.out, roving: k.roving });
 
   const apply = (result: OpResult, what: string) => {
     if (!result.ok) {
@@ -317,14 +324,24 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
 
     set_keyframes: tool({
       description:
-        'Animate one prop of a clip: replaces its keyframes. time is seconds from the clip start; ease is the curve leaving that keyframe (standard, enter, exit, linear, overshoot, or a cubic-bezier [x1,y1,x2,y2]). Colour props take #rrggbb or brand colours. list_components says what each component animates.',
+        `Animate one prop of a clip: replaces its keyframes. time is seconds from the clip start; ease is the curve leaving that keyframe (standard, enter, exit, linear, overshoot, or a cubic-bezier [x1,y1,x2,y2]). ${INTERP_HELP} Colour props take #rrggbb or brand colours. list_components says what each component animates.`,
       inputSchema: z.object({
         clip_id: z.string(),
         prop: z.string(),
-        keyframes: z.array(z.object({ time: z.number().min(0), value: z.union([z.number(), z.string()]), ease: easeSchema.default(Ease.Standard) })).min(1)
+        keyframes: z.array(z.object({ time: z.number().min(0), value: z.union([z.number(), z.string()]), ease: easeSchema.default(Ease.Standard), ...keyShape })).min(1)
       }),
-      execute: async (input) =>
-        apply(setKeyframes(session.doc, input.clip_id, input.prop, input.keyframes.map((k) => ({ frame: frames(k.time), value: k.value, ease: k.ease }))), `animated ${input.prop} of ${input.clip_id}`)
+      execute: async (input) => apply(setKeyframes(session.doc, input.clip_id, input.prop, input.keyframes.map(asKey)), `animated ${input.prop} of ${input.clip_id}`)
+    }),
+
+    set_key_interpolation: tool({
+      description: `Change the interpolation of keyframes a clip already has on one prop, all of them or only those at the given times (seconds from the clip start). ${INTERP_HELP}`,
+      inputSchema: z.object({ clip_id: z.string(), prop: z.string(), times: z.array(z.number().min(0)).optional(), ...keyShape }),
+      execute: async (input) => {
+        const track = findClip(session.doc, input.clip_id)?.clip.keyframes[input.prop] ?? [];
+        const picked = input.times ? input.times.map(frames) : track.map((k) => k.frame);
+        const refs = picked.map((frame) => ({ clipId: input.clip_id, prop: input.prop, frame }));
+        return apply(setKeyInterp(session.doc, refs, { in: input.in, out: input.out, roving: input.roving }), `interpolation of ${input.prop} on ${input.clip_id}`);
+      }
     }),
 
     remove_keyframes: tool({
@@ -392,12 +409,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_camera_keyframes: tool({
-      description: `Animate one camera value: replaces its keyframes. time is seconds from the START OF THE VIDEO (the camera spans the whole video); ease as in set_keyframes. Props: ${CAMERA_KEYS.join(', ')}. An empty list removes the animation.`,
+      description: `Animate one camera value: replaces its keyframes. time is seconds from the START OF THE VIDEO (the camera spans the whole video); ease, in and out as in set_keyframes. Props: ${CAMERA_KEYS.join(', ')}. An empty list removes the animation.`,
       inputSchema: z.object({
         prop: z.enum(CAMERA_KEYS),
-        keyframes: z.array(z.object({ time: z.number().min(0), value: z.number(), ease: easeSchema.default(Ease.Standard) }))
+        keyframes: z.array(z.object({ time: z.number().min(0), value: z.number(), ease: easeSchema.default(Ease.Standard), in: keyShape.in, out: keyShape.out }))
       }),
-      execute: async (input) => apply(setCameraKeyframes(session.doc, input.prop, input.keyframes.map((k) => ({ frame: frames(k.time), value: k.value, ease: k.ease }))), `animated the camera ${input.prop}`)
+      execute: async (input) => apply(setCameraKeyframes(session.doc, input.prop, input.keyframes.map(asKey)), `animated the camera ${input.prop}`)
     }),
 
     apply_camera_preset: tool({

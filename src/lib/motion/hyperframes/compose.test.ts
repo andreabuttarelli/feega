@@ -7,7 +7,7 @@ import { addClip, setKeyframes, setTransform, setTransition, Side, type OpResult
 import { LIBRARY_IDS } from '../components';
 import { Ease } from '../design';
 import { findClip } from '../doc';
-import { easeName, sampleTrack } from '../keyframes';
+import { Interp, easeName, sampleTrack } from '../keyframes';
 import { keyframeTweens } from './animate';
 import { CAPTURE_REPLY, CAPTURE_REQUEST, composeHtml } from './compose';
 import { writeComponent } from '../custom/ops';
@@ -298,6 +298,27 @@ describe('keyframes and 3D transforms', () => {
       expect(shuffled.target.x).toBeCloseTo(seen.get(f)!.x, 6);
       expect(shuffled.target.rotationY).toBeCloseTo(expected(f).rotationY, 3);
       expect(shuffled.target.x).toBeCloseTo(expected(f).x, 3);
+    }
+  });
+
+  it('a track with hold, auto or roving keys renders the sampled value at every frame', () => {
+    const keyed = must(
+      setKeyframes(doc, 'title', 'rotateZ', [
+        { frame: 0, value: 0, ease: Ease.Standard, out: Interp.Auto },
+        { frame: 20, value: 90, ease: Ease.Standard, in: Interp.Auto, out: Interp.Hold },
+        { frame: 40, value: 30, ease: Ease.Standard, in: Interp.Linear }
+      ])
+    );
+    const clip = findClip(keyed, 'title')!.clip;
+    const tweens = keyframeTweens(clip, keyed, (c) => c).filter((t) => t.target.startsWith('#kf-title'));
+    const target = { rotation: 0 };
+    const tl = gsap.timeline({ paused: true });
+    for (const t of tweens) {
+      tl.fromTo(target, t.from, { ...t.to, duration: t.duration, ease: t.ease, immediateRender: false }, t.at);
+    }
+    for (let f = 0; f <= 40; f++) {
+      tl.seek((clip.from + f) / 30);
+      expect(target.rotation).toBeCloseTo(sampleTrack(clip.keyframes.rotateZ, f), 6);
     }
   });
 
