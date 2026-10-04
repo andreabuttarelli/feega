@@ -13,24 +13,26 @@ import { composeHtml, HYPERFRAMES_VERSION, type ComposeInput } from '$lib/motion
 import { assetOrigins } from '$lib/motion/hyperframes/csp';
 import { audioPlan } from '$lib/motion/audio-plan';
 import { CREDITS_PER_USD_SUBSCRIPTION_LIST } from '$lib/credit-ladder';
-import { farmChunks, renderOnFarm, type FarmJob } from './farm-render';
+import { farmChunks, farmProblem, renderOnFarm, type FarmJob } from './farm-render';
+import { FORMAT, exportProblem, oversize, type RenderSettings } from '$lib/motion/export-formats';
+import { setFrameRate } from '$lib/motion/frame-rate';
 import { saveExport } from './export';
 import type { RenderFarm } from './render-farm';
 
 export enum RenderRefusal {
   NotConfigured = 'rendering_not_configured',
   Unverified = 'components_unverified',
-  Busy = 'render_in_progress'
+  Busy = 'render_in_progress',
+  Unsupported = 'render_unsupported'
 }
 
 export type RenderScope = { orgId: string; projectId: string; nodeId: string; userId: string; editorUrl: string };
-export type RenderRequest = { version: number; doc: MotionDoc; job: FarmJob };
-export type RenderStart = { ok: true; runId: string; quote: RenderQuote } | { ok: false; error: RenderRefusal };
+export type RenderRequest = { version: number; doc: MotionDoc; settings: RenderSettings; job: FarmJob };
+export type RenderStart = { ok: true; runId: string; quote: RenderQuote } | { ok: false; error: RenderRefusal; detail?: string };
 
-const MP4_MIME = 'video/mp4';
 const RENDER_MODEL = `hyperframes@${HYPERFRAMES_VERSION}`;
 
-export function farmJob(input: ComposeInput): FarmJob {
+export function farmJob(input: ComposeInput, settings: RenderSettings): FarmJob {
   const { doc, tokens, assets } = input;
   const reachable = assetOrigins([...Object.values(assets), tokens.logoUrl ?? '']);
   return {
@@ -40,8 +42,16 @@ export function farmJob(input: ComposeInput): FarmJob {
     fps: doc.fps,
     totalFrames: doc.durationInFrames,
     audio: audioPlan(doc, assets),
-    allowHosts: reachable.map((origin) => new URL(origin).host)
+    allowHosts: reachable.map((origin) => new URL(origin).host),
+    format: settings.format,
+    quality: settings.quality
   };
+}
+
+export function renderRequest(version: number, input: ComposeInput, settings: RenderSettings): RenderRequest {
+  const paced = setFrameRate(input.doc, settings.fps);
+  const doc = paced.ok ? paced.doc : input.doc;
+  return { version, doc, settings, job: farmJob({ ...input, doc }, settings) };
 }
 
 function isRender(run: NodeRun): boolean {
@@ -70,13 +80,18 @@ export async function startRender(db: Db, farm: RenderFarm | null, scope: Render
     return { ok: false, error: RenderRefusal.Busy };
   }
 
+  const problem = exportProblem(req.doc, req.settings) ?? farmProblem(req.job);
+  if (problem) {
+    return { ok: false, error: RenderRefusal.Unsupported, detail: problem };
+  }
+
   const quote = renderQuote(req.doc);
   const run = await createRun(db, {
     orgId: scope.orgId,
     nodeId: scope.nodeId,
     prompt: `render v${req.version}`,
     model: RENDER_MODEL,
-    params: { revision: req.version, format: formatOf(req.doc), quote, progress: startProgress(req.doc.durationInFrames, farmChunks(req.job).count) },
+    params: { revision: req.version, format: formatOf(req.doc), settings: req.settings, quote, progress: startProgress(req.doc.durationInFrames, farmChunks(req.job).count) },
     actorKind: 'user',
     actorId: scope.userId,
     externalJobId: `${RENDER_JOB_PREFIX}${req.version}`
@@ -103,8 +118,13 @@ async function fail(db: Db, run: NodeRun, error: string, record: (e: RenderEvent
 }
 
 async function store(db: Db, scope: RenderScope, run: NodeRun, req: RenderRequest, bytes: Buffer) {
-  const path = exportPath(scope, run.id);
-  const upload = await db.storage.from(CANVAS_ASSET_BUCKET).upload(path, bytes, { contentType: MP4_MIME, upsert: true });
+  const tooLarge = oversize(bytes.length, req.settings.format);
+  if (tooLarge) {
+    return { ok: false as const, error: tooLarge };
+  }
+  const spec = FORMAT[req.settings.format];
+  const path = exportPath(scope, run.id, spec.ext);
+  const upload = await db.storage.from(CANVAS_ASSET_BUCKET).upload(path, bytes, { contentType: spec.mime, upsert: true });
   if (upload.error) {
     return { ok: false as const, error: `store_failed: ${upload.error.message}` };
   }
@@ -116,7 +136,8 @@ async function store(db: Db, scope: RenderScope, run: NodeRun, req: RenderReques
     path,
     width: req.doc.width,
     height: req.doc.height,
-    seconds: req.doc.durationInFrames / req.doc.fps
+    seconds: req.doc.durationInFrames / req.doc.fps,
+    format: req.settings.format
   });
 }
 

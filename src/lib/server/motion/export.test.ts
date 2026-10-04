@@ -10,6 +10,7 @@ vi.mock('$lib/server/content-credentials', () => ({ markGenerated, DIGITAL_SOURC
 
 const { saveExport } = await import('./export');
 const { exportPath } = await import('$lib/motion/export-plan');
+const { ExportFormat } = await import('$lib/motion/export-formats');
 
 const MP4 = Buffer.from('....ftypisom-movie');
 const scope = { orgId: 'org', projectId: 'prj', nodeId: 'node', actor: { kind: 'user' as const, id: 'u' } };
@@ -77,5 +78,34 @@ describe('saving a browser export', () => {
 
     expect(uploads).toEqual([]);
     expect(insertAsset).toHaveBeenCalledWith(db, expect.objectContaining({ aiMarked: false }));
+  });
+});
+
+describe('saving a server render in another format', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    insertAsset.mockResolvedValue({ id: 'asset-2' });
+    patchNodeData.mockResolvedValue({ outcome: 'written' });
+    markGenerated.mockImplementation(async (bytes: Buffer) => ({ bytes, marked: false }));
+  });
+
+  it.each([
+    [ExportFormat.WebmAlpha, 'webm', 'video/webm', 'video'],
+    [ExportFormat.ProRes4444, 'mov', 'video/quicktime', 'video'],
+    [ExportFormat.Gif, 'gif', 'image/gif', 'image'],
+    [ExportFormat.PngSequence, 'zip', 'application/zip', 'document']
+  ])('%s is stored as .%s with %s, as a %s asset', async (format, ext, mime, type) => {
+    const { db } = fakeDb(MP4);
+    const path = exportPath(scope, 'r1', ext);
+
+    expect(await saveExport(db, { ...scope, ...file, path, format })).toEqual({ ok: true, assetId: 'asset-2' });
+    expect(markGenerated).toHaveBeenCalledWith(MP4, mime, expect.anything());
+    expect(insertAsset).toHaveBeenCalledWith(db, expect.objectContaining({ type, url: path, mimeType: mime }));
+  });
+
+  it('a file whose extension is not its format is refused', async () => {
+    const { db } = fakeDb(MP4);
+
+    expect(await saveExport(db, { ...scope, ...file, path: exportPath(scope, 'r1', 'mp4'), format: ExportFormat.Gif })).toEqual({ ok: false, error: 'invalid_path' });
   });
 });

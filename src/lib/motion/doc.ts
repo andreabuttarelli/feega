@@ -35,6 +35,11 @@ export const MAX_SHORT_SIDE = 1080;
 export const DEFAULT_SECONDS = 15;
 export const DOC_VERSION = 5;
 
+export enum Background {
+  Brand = 'brand',
+  Transparent = 'transparent'
+}
+
 const edgeSchema = z.object({
   kind: z.enum(TRANSITION_KINDS),
   durationInFrames: z.number().int().min(0).max(FASTEST_RATE * 2)
@@ -86,6 +91,7 @@ export const motionDocSchema = z
     assets: z.array(assetRefSchema).default([]),
     camera: cameraSchema.nullable().default(null),
     fonts: fontsSchema,
+    background: z.enum([Background.Brand, Background.Transparent]).default(Background.Brand),
     components: z
       .record(z.string().regex(CUSTOM_NAME, 'component names are PascalCase, e.g. NodeGraph'), customComponentSchema)
       .refine((c) => Object.keys(c).length <= MAX_COMPONENTS, `at most ${MAX_COMPONENTS} custom components`)
@@ -212,6 +218,7 @@ export function newMotionDoc(format: MotionFormat): MotionDoc {
     assets: [],
     camera: null,
     fonts: [],
+    background: Background.Brand,
     components: {}
   };
 }

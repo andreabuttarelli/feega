@@ -36,7 +36,7 @@
   import { AssetKind, COMPONENTS, LIBRARY_IDS, TrackKind, type ComponentId } from '$lib/motion/components';
   import { FRAME_RATES, type FrameRate } from '$lib/motion/design';
   import { setFrameRate } from '$lib/motion/frame-rate';
-  import { FORMATS, MOTION_FORMATS, MAX_SECONDS, findClip, formatOf, type MotionDoc, type MotionFormat } from '$lib/motion/doc';
+  import { Background, FORMATS, MOTION_FORMATS, MAX_SECONDS, findClip, formatOf, type MotionDoc, type MotionFormat } from '$lib/motion/doc';
   import {
     Direction,
     addClip,
@@ -510,6 +510,13 @@
       Frame rate
       <select value={doc.fps} onchange={(e) => apply(setFrameRate(doc, Number(e.currentTarget.value) as FrameRate), 'Changed frame rate')} data-testid="frame-rate">
         {#each FRAME_RATES as rate (rate)}<option value={rate}>{rate} fps</option>{/each}
+      </select>
+    </label>
+    <label class="field">
+      Background
+      <select value={doc.background} onchange={(e) => apply(setCanvas(doc, { background: e.currentTarget.value as Background }), 'Changed background')} data-testid="background">
+        <option value={Background.Brand}>Brand</option>
+        <option value={Background.Transparent}>Transparent</option>
       </select>
     </label>
     <span class="save" data-testid="save-state">{saveState} · v{version}</span>

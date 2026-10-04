@@ -20,13 +20,14 @@ vi.mock('$lib/server/web-push', () => ({ sendPushToUser }));
 vi.mock('$lib/server/background-work', () => ({ runInBackground: (work: () => Promise<unknown>) => void work() }));
 vi.mock('./farm-render', async (original) => ({ ...(await original<typeof import('./farm-render')>()), renderOnFarm, RenderFailure: class extends Error {} }));
 
-import { farmJob, finishRender, RenderRefusal, renderView, startRender, type RenderRequest } from './render-run';
+import { farmJob, finishRender, RenderRefusal, renderRequest, renderView, startRender, type RenderRequest } from './render-run';
 import { FEEGA_TOKENS } from '$lib/motion/brand';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { RenderStage } from '$lib/motion/server-render';
 import { addClip } from '$lib/motion/timeline';
 import { writeComponent } from '$lib/motion/custom/ops';
 import type { NodeRun } from '$lib/server/repos/node-runs';
+import { ExportFormat, MAX_EXPORT_BYTES, Preset, settingsOf } from '$lib/motion/export-formats';
 
 const farm = { open: vi.fn() };
 const scope = { orgId: 'org', projectId: 'prj', nodeId: 'node', userId: 'u', editorUrl: '/p/prj/c/c/motion/node' };
@@ -35,8 +36,8 @@ function trailer(): MotionDoc {
   return { ...newMotionDoc(MotionFormat.Landscape), durationInFrames: 840 };
 }
 
-function request(doc = trailer()): RenderRequest {
-  return { version: 12, doc, job: { html: '<html/>', width: doc.width, height: doc.height, fps: doc.fps, totalFrames: doc.durationInFrames, audio: [], allowHosts: [] } };
+function request(doc = trailer(), settings = settingsOf(Preset.Social)): RenderRequest {
+  return { version: 12, doc, settings, job: { html: '<html/>', width: doc.width, height: doc.height, fps: doc.fps, totalFrames: doc.durationInFrames, audio: [], allowHosts: [], format: settings.format, quality: settings.quality } };
 }
 
 function runOf(params: Record<string, unknown>): NodeRun {
@@ -166,11 +167,58 @@ describe('finishRender', () => {
 describe('farmJob', () => {
   it('the sandbox may reach the hosts of the signed assets and of the brand logo, nothing else', () => {
     const tokens = { ...FEEGA_TOKENS, logoUrl: 'https://media.example.com/logo.png' };
-    const job = farmJob({ doc: trailer(), tokens, assets: { a: 'https://x.supabase.co/storage/v1/object/sign/a?token=t', b: 'https://x.supabase.co/b' } });
+    const job = farmJob({ doc: trailer(), tokens, assets: { a: 'https://x.supabase.co/storage/v1/object/sign/a?token=t', b: 'https://x.supabase.co/b' } }, settingsOf(Preset.Social));
 
     expect(job.allowHosts).toEqual(['media.example.com', 'x.supabase.co']);
     expect([job.width, job.height, job.fps, job.totalFrames]).toEqual([1920, 1080, 30, 840]);
     expect(job.html).toContain('<html');
+  });
+});
+
+describe('render settings', () => {
+  it('a GIF over its length cap is refused before a run is created, with the reason', async () => {
+    const { db } = fakeDb();
+
+    const started = await startRender(db, farm, scope, request(trailer(), settingsOf(Preset.Gif)));
+
+    expect(started).toMatchObject({ ok: false, error: RenderRefusal.Unsupported, detail: expect.stringMatching(/GIF/) });
+    expect(runs.createRun).not.toHaveBeenCalled();
+  });
+
+  it('a file over the storage limit fails the run with its size, never uploads and charges nothing', async () => {
+    renderOnFarm.mockResolvedValue(Buffer.alloc(MAX_EXPORT_BYTES + 1));
+    const { db, uploads } = fakeDb();
+
+    await finishRender(db, farm, scope, runOf({ progress: { stage: RenderStage.Starting, chunksDone: 0, chunks: 7, totalFrames: 840 } }), request(trailer(), settingsOf(Preset.Master)));
+
+    expect(runs.failRun).toHaveBeenCalledWith(db, expect.objectContaining({ error: expect.stringMatching(/^too_large: ProRes 4444/) }));
+    expect(uploads).toEqual([]);
+    expect(logAiCall).not.toHaveBeenCalled();
+  });
+
+  it('the run records the settings it renders with', async () => {
+    const { db } = fakeDb();
+    const web = settingsOf(Preset.Web);
+
+    await startRender(db, farm, scope, request(trailer(), web));
+
+    expect(runs.createRun).toHaveBeenCalledWith(db, expect.objectContaining({ params: expect.objectContaining({ settings: web }) }));
+  });
+
+  it('a WebM is stored as .webm and saved as that format', async () => {
+    const { db, uploads } = fakeDb();
+    const web = settingsOf(Preset.Web);
+
+    await finishRender(db, farm, scope, runOf({ progress: { stage: RenderStage.Starting, chunksDone: 0, chunks: 7, totalFrames: 840 } }), request(trailer(), web));
+
+    expect(uploads).toEqual(['org/prj/motion/node/run-1.webm']);
+    expect(saveExport).toHaveBeenCalledWith(db, expect.objectContaining({ path: 'org/prj/motion/node/run-1.webm', format: ExportFormat.WebmAlpha }));
+  });
+
+  it('rendering at another rate retimes the saved doc, so the seconds stay and the frames follow', () => {
+    const req = renderRequest(12, { doc: trailer(), tokens: FEEGA_TOKENS, assets: {} }, { ...settingsOf(Preset.Social), fps: 60 });
+
+    expect([req.doc.fps, req.job.fps, req.job.totalFrames]).toEqual([60, 60, 1680]);
   });
 });
 

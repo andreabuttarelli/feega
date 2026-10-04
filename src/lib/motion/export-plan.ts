@@ -19,6 +19,7 @@ export type Size = { width: number; height: number };
 
 const SHORT_SIDE: Record<Resolution, number> = { [Resolution.P720]: 720, [Resolution.P1080]: 1080 };
 const MS_PER_S = 1000;
+const MP4_EXT = 'mp4';
 
 const even = (n: number) => Math.round(n / 2) * 2;
 
@@ -62,6 +63,6 @@ export function exportFolder(scope: ExportScope): string {
   return `${scope.orgId}/${scope.projectId}/motion/${scope.nodeId}/`;
 }
 
-export function exportPath(scope: ExportScope, id: string): string {
-  return `${exportFolder(scope)}${id}.mp4`;
+export function exportPath(scope: ExportScope, id: string, ext: string = MP4_EXT): string {
+  return `${exportFolder(scope)}${id}.${ext}`;
 }

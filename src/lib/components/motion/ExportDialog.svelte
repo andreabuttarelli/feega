@@ -3,7 +3,7 @@
   import X from '@lucide/svelte/icons/x';
   import Download from '@lucide/svelte/icons/download';
   import type { MotionDoc } from '$lib/motion/doc';
-  import { FORMATS, formatOf } from '$lib/motion/doc';
+  import { Background, FORMATS, formatOf } from '$lib/motion/doc';
   import { Resolution } from '$lib/motion/render-quote';
   import { AudioMode, Support, eta, exportSize, exportSupport, frameTimes, type ExportScope, type ExportSupport, type Size } from '$lib/motion/export-plan';
   import { audioPlan } from '$lib/motion/audio-plan';
@@ -14,6 +14,9 @@
   import { CheckState } from '$lib/motion/custom/component';
   import { deserialize } from '$app/forms';
   import { renderQuote } from '$lib/motion/render-quote';
+  import { EXPORT_FORMATS, FORMAT, MAX_EXPORT_BYTES, PRESETS, Preset, Quality, estimateBytes, exportProblem, settingsOf, type RenderSettings } from '$lib/motion/export-formats';
+  import { FRAME_RATES } from '$lib/motion/design';
+  import { setFrameRate } from '$lib/motion/frame-rate';
   import { RenderStage, framesDone, type RenderView, type ServerRender } from '$lib/motion/server-render';
 
   type Renderer = (times: number[], size: FrameSize, onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>, signal: AbortSignal) => Promise<void>;
@@ -34,6 +37,7 @@
   };
   const SETTLED = new Set(['done', 'failed', 'expired']);
   const POLL_MS = 2000;
+  const BYTES_PER_MB = 1024 * 1024;
   const REFUSAL_LABEL: Record<string, string> = {
     save_first: 'Save your changes first: the server renders the saved version.',
     render_in_progress: 'A render of this video is already running.',
@@ -73,9 +77,18 @@
   let serverError = $state('');
   let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
-  const quote = $derived(renderQuote(doc));
+  let settings = $state<RenderSettings>({ ...settingsOf(Preset.Social), fps: doc.fps });
+  const target = $derived.by(() => {
+    const paced = setFrameRate(doc, settings.fps);
+    return paced.ok ? paced.doc : doc;
+  });
+  const quote = $derived(renderQuote(target));
+  const problem = $derived(exportProblem(target, settings));
+  const spec = $derived(FORMAT[settings.format]);
+  const megabytes = $derived(Math.max(1, Math.round(estimateBytes(target, settings) / BYTES_PER_MB)));
   const jobRunning = $derived(job !== null && !SETTLED.has(job.status));
   const jobFrames = $derived(job?.progress ? framesDone(job.progress) : 0);
+  const jobTotal = $derived(job?.progress?.totalFrames ?? target.durationInFrames);
 
   let phase = $state<Phase>(Phase.Checking);
   let support = $state<ExportSupport>({ support: Support.None, audio: AudioMode.Off });
@@ -126,10 +139,11 @@
     }
     const form = new FormData();
     form.set('version', String(server.version));
+    form.set('settings', JSON.stringify(settings));
     const started = await postAction('render', form);
     if (!started.ok) {
       const code = String(started.data.error ?? '');
-      serverError = REFUSAL_LABEL[code] ?? `Server render refused: ${code}`;
+      serverError = String(started.data.detail ?? '') || (REFUSAL_LABEL[code] ?? `Server render refused: ${code}`);
       return;
     }
     job = { id: String(started.data.runId), status: 'running', progress: null, error: null, assetId: null, credits: quote.credits };
@@ -211,7 +225,7 @@
 <div class="scrim" role="presentation" onclick={() => !busy && onclose()}></div>
 <div class="dialog" role="dialog" aria-modal="true" aria-label="Export video" data-testid="export-dialog">
   <header>
-    <span>Export MP4</span>
+    <span>Export</span>
     <button type="button" aria-label="Close" disabled={busy} onclick={onclose}><X size={16} /></button>
   </header>
 
@@ -224,21 +238,47 @@
 
   {#if mode === Mode.Server}
     <dl>
-      <dt>Format</dt>
-      <dd>{FORMATS[formatOf(doc)].label} · {doc.width}×{doc.height} · {doc.fps} fps · {Math.round(quote.seconds)} s · audio mixed in</dd>
+      <dt>Preset</dt>
+      <dd class="choice" data-testid="export-presets">
+        {#each Object.values(Preset) as preset (preset)}
+          <button type="button" class="secondary" disabled={jobRunning} onclick={() => (settings = settingsOf(preset))}>{PRESETS[preset].label}</button>
+        {/each}
+      </dd>
+      <dt>File</dt>
+      <dd>
+        <select bind:value={settings.format} disabled={jobRunning} data-testid="export-format">
+          {#each EXPORT_FORMATS as format (format)}<option value={format}>{FORMAT[format].label}</option>{/each}
+        </select>
+      </dd>
+      <dt>Frame rate</dt>
+      <dd>
+        <select bind:value={settings.fps} disabled={jobRunning} data-testid="export-fps">
+          {#each FRAME_RATES as rate (rate)}<option value={rate}>{rate} fps</option>{/each}
+        </select>
+      </dd>
+      <dt>Quality</dt>
+      <dd class="choice">
+        <label><input type="radio" name="quality" value={Quality.High} bind:group={settings.quality} disabled={jobRunning} /> High</label>
+        <label><input type="radio" name="quality" value={Quality.Standard} bind:group={settings.quality} disabled={jobRunning} /> Standard</label>
+      </dd>
+      <dt>Output</dt>
+      <dd>
+        {FORMATS[formatOf(doc)].label} · {doc.width}×{doc.height} · {settings.fps} fps · {Math.round(quote.seconds)} s · {spec.audio ? 'audio mixed in' : 'no audio'} · up to ~{megabytes} MB (a saved file can be {Math.round(MAX_EXPORT_BYTES / BYTES_PER_MB)} MB)
+        {#if spec.alpha && doc.background !== Background.Transparent}<br /><span class="muted">Keeps alpha only where nothing is painted: set the background to Transparent for a see-through file.</span>{/if}
+      </dd>
       <dt>Cost</dt>
       <dd data-testid="export-quote">{quote.credits} credits, charged only when the video is ready.</dd>
     </dl>
 
     {#if job && jobRunning}
       <div class="progress" data-testid="export-progress">
-        <div class="track"><div class="fill" style={`width: ${(jobFrames / total) * 100}%`}></div></div>
-        <span>{job.progress ? STAGE_LABEL[job.progress.stage] : STAGE_LABEL[RenderStage.Starting]} {#if job.progress?.stage === RenderStage.Rendering}{jobFrames}/{total}{/if}</span>
+        <div class="track"><div class="fill" style={`width: ${(jobFrames / jobTotal) * 100}%`}></div></div>
+        <span>{job.progress ? STAGE_LABEL[job.progress.stage] : STAGE_LABEL[RenderStage.Starting]} {#if job.progress?.stage === RenderStage.Rendering}{jobFrames}/{jobTotal}{/if}</span>
       </div>
       <p class="muted">You can close this tab: the video lands in your assets when it is ready.</p>
     {:else if job?.status === 'done' && job.assetId}
       <p class="muted" data-testid="export-saved">Saved to the canvas assets and attached to this video.</p>
-      <a class="primary" href={server.assetHref(job.assetId)} download={`${fileName}.mp4`} data-testid="export-download"><Download size={14} /> Download MP4</a>
+      <a class="primary" href={server.assetHref(job.assetId)} download={`${fileName}.${spec.ext}`} data-testid="export-download"><Download size={14} /> Download {spec.ext.toUpperCase()}</a>
     {:else}
       {#if job && (job.status === 'failed' || job.status === 'expired')}
         <p class="warn" role="alert" data-testid="export-failed">Server render failed: {job.error ?? job.status}. Nothing was charged. Try again, or render in this browser.</p>
@@ -249,7 +289,8 @@
           Export waits for custom components: {blockers.map((b) => `${b.name} ${BLOCKER_LABEL[b.state]}`).join(', ')}. Fix them in the Code tab or ask the agent.
         </p>
       {:else}
-        <button type="button" class="primary" onclick={startServer} disabled={!server.saved} data-testid="export-start-server">{server.saved ? `Render · ${quote.credits} credits` : 'Saving your changes…'}</button>
+        {#if problem}<p class="warn" role="alert" data-testid="export-problem">{problem}</p>{/if}
+        <button type="button" class="primary" onclick={startServer} disabled={!server.saved || problem !== null} data-testid="export-start-server">{server.saved ? `Render · ${quote.credits} credits` : 'Saving your changes…'}</button>
       {/if}
     {/if}
   {:else if phase === Phase.Checking}
@@ -259,7 +300,7 @@
   {:else}
     <dl>
       <dt>Format</dt>
-      <dd>{FORMATS[formatOf(doc)].label} · {size.width}×{size.height} · {doc.fps} fps · {Math.round(doc.durationInFrames / doc.fps)} s</dd>
+      <dd>{FORMATS[formatOf(doc)].label} · {size.width}×{size.height} · {doc.fps} fps · {Math.round(doc.durationInFrames / doc.fps)} s<br /><span class="muted">MP4 H.264 only. ProRes, HEVC, transparent WebM, GIF and PNG render on our servers.</span></dd>
       <dt>Quality</dt>
       <dd class="choice">
         <label><input type="radio" name="res" value={Resolution.P1080} bind:group={resolution} disabled={busy || support.support === Support.Only720} /> 1080p</label>

@@ -18,6 +18,18 @@ Vite osserva anche `changelog/*.md`: scriverne uno mentre l'harness naviga l'edi
 `page reload <file>` all'ora del fallimento. Mossa: niente edit nel worktree servito finché il
 giro non è finito, o un dev server da un checkout separato.
 
+### Un render server riesce e il salvataggio fallisce con `EntityTooLarge`
+Storage del progetto accetta al massimo 50 MB per file (limite globale, non del bucket): un
+ProRes, un 4K o un PNG lungo esce dal farm e muore all'upload con `413`. La dimensione dipende
+dal contenuto (ProRes di grafica piatta: 17 Mbit/s, non i 330 nominali), quindi una stima non
+basta per rifiutare prima. Mossa: `oversize` in `export-formats.ts` fallisce il giro con il peso
+vero e niente addebito; per file più grandi si alza il limite globale di Storage, non il codice.
+
+### Un render che fallisce dopo minuti senza log: guarda prima la durata del doc di prova
+Un doc costruito a mano con `addClip` si allunga da solo quando una clip arrotondata finisce oltre
+la fine: 51 frame invece di 50 sembrano un errore del producer. Mossa: stampa `job.totalFrames`
+prima di accusare il render.
+
 ## Ambiente e worktree
 
 ### I tempi di idratazione misurati in dev non dicono niente

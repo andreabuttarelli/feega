@@ -1,7 +1,7 @@
 import { THREE_D_COMPONENTS, type ComponentId } from '../components';
 import { Ease, TransitionKind, type Edge } from '../design';
 import { GSAP_EASE, easeName } from '../keyframes';
-import type { MotionClip, MotionDoc } from '../doc';
+import { Background, type MotionClip, type MotionDoc } from '../doc';
 import { resolveColor, type BrandTokens } from '../brand';
 import { css, esc, js, seconds } from './html';
 import { TEMPLATES, Timing, type PropsOf, type TemplateCtx, type Tween, type Vars } from './templates';
@@ -286,8 +286,22 @@ function gated(script: string): string {
   return script ? `(window.${FONTS_READY}||Promise.resolve()).then(function(){${script}${rerender}});` : '';
 }
 
+const ROOT_BACKGROUND: Record<Background, (tokens: BrandTokens) => string> = {
+  [Background.Brand]: (tokens) => tokens.colors['brand.background'],
+  [Background.Transparent]: () => 'transparent'
+};
+
+const BACKDROPS: ReadonlySet<ComponentId> = new Set(['BrandBackground']);
+
+function withoutBackdrop(doc: MotionDoc): MotionDoc {
+  if (doc.background !== Background.Transparent) {
+    return doc;
+  }
+  return { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.filter((c) => !BACKDROPS.has(c.component as ComponentId)) })) };
+}
+
 export function composeHtml(raw: ComposeInput): string {
-  const input = { ...raw, doc: bakeExpressions(raw.doc) };
+  const input = { ...raw, doc: bakeExpressions(withoutBackdrop(raw.doc)) };
   const { doc, tokens } = input;
   const bottomFirst = doc.tracks.map((track, index) => ({ track, index })).reverse();
   const layers: string[] = [];
@@ -330,7 +344,7 @@ export function composeHtml(raw: ComposeInput): string {
   }
 
   const duration = seconds(doc.durationInFrames, doc.fps);
-  const background = tokens.colors['brand.background'];
+  const background = ROOT_BACKGROUND[doc.background](tokens);
   const animation = animationScript(clips, doc, (v) => resolveColor(v, tokens), parentsWithChildren(doc));
   const used = new Set(runs.map((r) => r.name));
   const libraries = librariesOf(doc.components, used);

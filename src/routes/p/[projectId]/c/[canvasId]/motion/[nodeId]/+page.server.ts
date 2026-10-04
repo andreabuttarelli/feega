@@ -6,7 +6,8 @@ import { canvasReachable } from '$lib/server/uncensored-workspace/workspace-serv
 import { assetUrls, findMotionNode, headOrNew, motionAssets, motionTokens, saveMotionDoc } from '$lib/server/motion/editor';
 import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
 import { motionRenderFarm } from '$lib/server/motion/renderer';
-import { farmJob, renderView, startRender } from '$lib/server/motion/render-run';
+import { renderRequest, renderView, startRender } from '$lib/server/motion/render-run';
+import { parseSettings } from '$lib/motion/export-formats';
 import { listNodeRuns } from '$lib/server/repos/node-runs';
 import { SIGNED_URL_TTL_S } from '$lib/server/repos/asset-storage';
 import { gateOrgAiActionForForm } from '$lib/server/cli-auth';
@@ -144,7 +145,12 @@ export const actions: Actions = {
 
   render: async ({ locals, params, request }) => {
     const scope = await scopeFor(locals, params);
-    const version = Number((await request.formData()).get('version'));
+    const form = await request.formData();
+    const version = Number(form.get('version'));
+    const settings = parseSettings(form.get('settings') as string | null);
+    if (!settings.ok) {
+      return fail(HTTP_BAD_REQUEST, { error: settings.error });
+    }
     const nodeScope = { orgId: scope.orgId, nodeId: scope.motion.record.id };
     const head = await headOrNew(scope.db, nodeScope, scope.motion.node);
     if (head.version !== version) {
@@ -160,13 +166,12 @@ export const actions: Actions = {
       motionAssets({ db: scope.db, orgId: scope.orgId, projectId: params.projectId, canvasId: scope.canvas.id, nodeId: scope.motion.record.id }, SIGNED_URL_TTL_S.render),
       motionTokens(scope.db, { orgId: scope.orgId, brandId: scope.projectBrandId })
     ]);
-    const doc = head.doc;
-    const job = farmJob({ doc, tokens, assets: assetUrls(assets) });
+    const req = renderRequest(version, { doc: head.doc, tokens, assets: assetUrls(assets) }, settings.settings);
 
     const editorUrl = `/p/${params.projectId}/c/${params.canvasId}/motion/${params.nodeId}`;
     const renderScope = { ...nodeScope, projectId: params.projectId, userId: scope.userId, editorUrl };
-    const started = await startRender(scope.db, motionRenderFarm(), renderScope, { version, doc, job });
-    return started.ok ? { runId: started.runId, quote: started.quote } : fail(HTTP_UNAVAILABLE, { error: started.error });
+    const started = await startRender(scope.db, motionRenderFarm(), renderScope, req);
+    return started.ok ? { runId: started.runId, quote: started.quote } : fail(HTTP_UNAVAILABLE, { error: started.error, detail: started.detail });
   },
 
   renderStatus: async ({ locals, params }) => {

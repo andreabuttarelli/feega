@@ -4,7 +4,7 @@ import { AssetKind, COMPONENTS, COMPONENT_IDS, TrackKind } from '$lib/motion/com
 import { fieldsOf } from '$lib/motion/inspector';
 import { Ease, FRAME_RATES, MAX_SECONDS, TRANSITION_KINDS } from '$lib/motion/design';
 import { setFrameRate } from '$lib/motion/frame-rate';
-import { MOTION_FORMATS, findClip, type MotionDoc } from '$lib/motion/doc';
+import { Background, MOTION_FORMATS, findClip, type MotionDoc } from '$lib/motion/doc';
 import { ClipEdge, Side, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyframes, setMask, setProps, setTiming, setTrackMatte, setTransform, setTransition, trimClip, type OpResult } from '$lib/motion/timeline';
 import { MASK_KEYS, MASK_KIND_IDS, MATTES } from '$lib/motion/mask';
 import { ANIMATABLE, TRANSFORM_KEYS, ValueKind, easeSchema, transformSchema } from '$lib/motion/keyframes';
@@ -59,6 +59,7 @@ function summary(doc: MotionDoc, selection: string[]) {
     width: doc.width,
     height: doc.height,
     fps: doc.fps,
+    background: doc.background,
     duration: secs(doc.durationInFrames),
     selected: selection,
     tracks: doc.tracks.map((t) => ({
@@ -524,11 +525,11 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_canvas: tool({
-      description: `Change the format (16:9, 9:16, 1:1, 4:5), the total duration in seconds (max ${MAX_SECONDS}) or the frame rate (${FRAME_RATES.join(', ')} fps; times keep their seconds). 30 fps is the social default, 24 reads as film, 60 makes fast motion smooth.`,
-      inputSchema: z.object({ format: z.enum(MOTION_FORMATS).optional(), duration: z.number().positive().max(MAX_SECONDS).optional(), fps: z.literal(FRAME_RATES).optional() }),
+      description: `Change the format (16:9, 9:16, 1:1, 4:5), the total duration in seconds (max ${MAX_SECONDS}) or the frame rate (${FRAME_RATES.join(', ')} fps; times keep their seconds). 30 fps is the social default, 24 reads as film, 60 makes fast motion smooth. background "transparent" drops the brand background so ProRes 4444, WebM and GIF exports keep alpha (an end card over footage).`,
+      inputSchema: z.object({ format: z.enum(MOTION_FORMATS).optional(), duration: z.number().positive().max(MAX_SECONDS).optional(), fps: z.literal(FRAME_RATES).optional(), background: z.enum([Background.Brand, Background.Transparent]).optional() }),
       execute: async (input) => {
         const paced = input.fps === undefined ? ({ ok: true, doc: session.doc } as OpResult) : setFrameRate(session.doc, input.fps);
-        const sized = paced.ok ? setCanvas(paced.doc, { format: input.format, durationInFrames: input.duration === undefined ? undefined : framesAt(input.duration, paced.doc.fps) }) : paced;
+        const sized = paced.ok ? setCanvas(paced.doc, { format: input.format, durationInFrames: input.duration === undefined ? undefined : framesAt(input.duration, paced.doc.fps), background: input.background }) : paced;
         return apply(sized, 'changed the canvas');
       }
     }),

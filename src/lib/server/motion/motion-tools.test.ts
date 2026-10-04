@@ -45,6 +45,14 @@ describe('motion agent tools at another frame rate', () => {
     ]);
   });
 
+  it('set_canvas makes the background transparent for alpha exports', async () => {
+    const { session, run } = setup();
+
+    expect((await run('set_canvas', { background: 'transparent' })).ok).toBe(true);
+    expect(session.doc.background).toBe('transparent');
+    expect(((await run('get_motion_doc', {})) as { background: string }).background).toBe('transparent');
+  });
+
   it('set_canvas refuses a rate the renderer does not make', async () => {
     const { schema } = setup();
 
