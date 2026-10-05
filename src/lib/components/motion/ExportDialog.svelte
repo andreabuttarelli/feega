@@ -79,6 +79,8 @@
   let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
   let settings = $state<RenderSettings>({ ...settingsOf(Preset.Social), fps: doc.fps });
+  const SETTING_KEYS = ['format', 'fps', 'quality', 'resolution'] as const;
+  const isPreset = (preset: Preset) => SETTING_KEYS.every((k) => settingsOf(preset)[k] === settings[k]);
   const target = $derived.by(() => {
     const paced = setFrameRate(doc, settings.fps);
     return paced.ok ? paced.doc : doc;
@@ -249,9 +251,10 @@
   {#if mode === Mode.Server}
     <dl>
       <dt>Preset</dt>
-      <dd class="choice" data-testid="export-presets">
+      <dd class="presets" data-testid="export-presets">
         {#each Object.values(Preset) as preset (preset)}
-          <button type="button" class="secondary" disabled={jobRunning} onclick={() => (settings = settingsOf(preset))}>{PRESETS[preset].label}</button>
+          {@const [name, detail] = PRESETS[preset].label.split(' · ')}
+          <button type="button" class="preset" aria-pressed={isPreset(preset)} disabled={jobRunning} onclick={() => (settings = settingsOf(preset))}><b>{name}</b><span>{detail}</span></button>
         {/each}
       </dd>
       <dt>File</dt>
@@ -365,7 +368,7 @@
   .scrim {
     position: fixed;
     inset: 0;
-    background: rgb(0 0 0 / 0.35);
+    background: rgb(0 0 0 / 0.4);
     z-index: 40;
   }
 
@@ -374,39 +377,79 @@
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: min(440px, calc(100vw - 32px));
+    width: min(520px, calc(100vw - 32px));
+    max-height: calc(100vh - 48px);
+    overflow: auto;
     z-index: 41;
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    padding: 16px;
+    gap: 14px;
+    padding: 0 16px 16px;
     background: var(--ui-bg);
     color: var(--ui-ink);
-    border: 1px solid var(--ui-line);
-    box-shadow: 0 16px 48px rgb(0 0 0 / 0.2);
-    font-size: 13px;
+    border: 1px solid var(--ui-line-strong);
+    box-shadow: 0 24px 64px rgb(0 0 0 / 0.24);
+    font-size: var(--ui-text-sm);
   }
 
   header {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    height: 44px;
+    margin: 0 -16px;
+    padding: 0 8px 0 16px;
+    border-bottom: 1px solid var(--ui-line);
+    font-size: var(--ui-text-md);
     font-weight: 600;
+  }
+
+  header button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    color: var(--ui-ink-2);
+  }
+
+  header button:hover {
+    background: var(--ui-hover);
   }
 
   dl {
     display: grid;
-    grid-template-columns: 70px 1fr;
+    grid-template-columns: 96px minmax(0, 1fr);
+    align-items: center;
     gap: 8px 12px;
     margin: 0;
   }
 
   dt {
     color: var(--ui-ink-2);
+    align-self: start;
+    padding-top: 4px;
   }
 
   dd {
     margin: 0;
+    min-width: 0;
+  }
+
+  select {
+    width: 100%;
+    height: 26px;
+    padding: 0 6px;
+    border: 1px solid var(--ui-line-strong);
+    border-radius: 0;
+    background: var(--ui-bg);
+    color: var(--ui-ink);
+    font: inherit;
+  }
+
+  select:focus-visible {
+    outline: none;
+    border-color: var(--ui-accent);
   }
 
   .choice {
@@ -421,8 +464,79 @@
   }
 
   .modes {
-    padding-bottom: 4px;
-    border-bottom: 1px solid var(--ui-line);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    margin-top: 2px;
+    border: 1px solid var(--ui-line-strong);
+  }
+
+  .modes label {
+    justify-content: center;
+    height: 30px;
+    color: var(--ui-ink-2);
+    cursor: pointer;
+  }
+
+  .modes label + label {
+    border-left: 1px solid var(--ui-line-strong);
+  }
+
+  .modes input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .modes label:has(input:checked) {
+    background: var(--ui-accent-wash);
+    color: var(--ui-accent);
+    font-weight: 600;
+  }
+
+  .modes label:has(input:focus-visible) {
+    outline: 1px solid var(--ui-accent);
+    outline-offset: -1px;
+  }
+
+  .presets {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--ui-line);
+  }
+
+  .preset {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 40px;
+    padding: 0 12px;
+    border-left: 2px solid transparent;
+    text-align: left;
+  }
+
+  .preset + .preset {
+    border-top: 1px solid var(--ui-line);
+  }
+
+  .preset:hover:not(:disabled) {
+    background: var(--ui-hover);
+  }
+
+  .preset[aria-pressed='true'] {
+    background: var(--ui-accent-wash);
+    border-left-color: var(--ui-accent);
+  }
+
+  .preset b {
+    font-size: var(--ui-text-sm);
+    font-weight: 600;
+  }
+
+  .preset span {
+    font-family: var(--ui-mono);
+    font-size: 10px;
+    color: var(--ui-ink-3);
   }
 
   .muted {
@@ -431,7 +545,7 @@
   }
 
   .warn {
-    color: #b45309;
+    color: var(--ui-warn);
     margin: 0;
   }
 
@@ -460,8 +574,11 @@
     align-items: center;
     justify-content: center;
     gap: 6px;
-    padding: 8px 12px;
-    font-size: 12px;
+    align-self: flex-end;
+    height: 30px;
+    padding: 0 14px;
+    font-size: var(--ui-text-sm);
+    font-weight: 600;
   }
 
   .primary {
@@ -469,7 +586,12 @@
     color: var(--ui-accent-ink);
   }
 
+  .primary:disabled {
+    background: var(--ui-hover);
+    color: var(--ui-ink-3);
+  }
+
   .secondary {
-    border: 1px solid var(--ui-line);
+    border: 1px solid var(--ui-line-strong);
   }
 </style>

@@ -18,7 +18,7 @@ const isGeometric = (key: string) => modifierOfKey(key) !== null || animProp('Sh
 
 const runsByItself = (m: Modifier) => m.enabled && movesOverTime({ kind: m.kind, values: modifierValues(m) });
 
-function lookAt(clip: MotionClip, frame: number): ShapeLook {
+export function lookAt(clip: MotionClip, frame: number): ShapeLook {
   const look = { ...(clip.props as unknown as ShapeLook) };
   const params = new Map<string, Record<string, number>>();
   for (const [key, track] of Object.entries(clip.keyframes)) {

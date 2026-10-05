@@ -59,6 +59,7 @@ const CLIP: Record<string, Access> = {
   blend: { write: ['set_blend_mode'], read: 'blend' },
   animators: { write: ['add_text_animator', 'set_text_animator', 'remove_text_animator', 'apply_text_preset'], read: 'animators' },
   motionBlur: { write: ['set_motion_blur'], read: 'motionBlur' },
+  textPath: { write: ['set_text_path', 'remove_text_path'], read: 'textPath' },
   path: { write: ['set_motion_path', 'set_path_tangent'], read: 'path' },
   physics: { write: ['set_physics', 'apply_physics_preset'], read: 'physics' },
   hidden: { write: ['set_visibility'], read: 'hidden' },
@@ -114,6 +115,12 @@ describe('every editable part of a motion video has an agent path', () => {
       const missing = 'write' in access ? access.write.filter((t) => !tools[t]) : [];
       expect({ field, missing }).toEqual({ field, missing: [] });
     }
+  });
+
+  it('the agent can bring a brand in from outside the doc: a site, an org brand, a picture', () => {
+    const { tools } = setup();
+
+    expect(['analyze_site', 'use_brand', 'import_asset'].filter((t) => !tools[t])).toEqual([]);
   });
 
   it('get_motion_doc shows every writable field of the doc, its tracks, clips and camera', async () => {

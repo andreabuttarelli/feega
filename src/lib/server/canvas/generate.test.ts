@@ -1651,6 +1651,43 @@ describe('la foto di un prodotto del negozio arriva al render immagine', () => {
       })
     );
   });
+
+  it('una foto caricata, in canvas-assets della org, va firmata come riferimento: come base cadeva in source_not_found', async () => {
+    const LIST = 'list-node';
+    const UPLOAD_PATH = `${ORG}/${PROJECT}/abc-mug.jpg`;
+    const imageNode = { ...freshNodeRow, data: { prompt: 'packshot' } };
+    const { db } = fakeDb(
+      {
+        nodes: [imageNode, { ...freshNodeRow, id: LIST, type: 'list', data: { item_kind: 'image', items: [{ asset_id: 'up-1', label: 'Mug' }] } }],
+        nodes_connections: [{ id: 'e1', canvas_id: CANVAS, source_node_id: LIST, target_node_id: NODE, source_handle: null, target_handle: null, mode: 'iterate' }],
+        assets: [{ id: 'up-1', org_id: ORG, project_id: PROJECT, type: 'image', source: 'upload', url: UPLOAD_PATH, mime_type: 'image/jpeg' }]
+      },
+      { updateRows: { nodes: [{ ...imageNode, version: 2 }] } }
+    );
+
+    const result = await runGenNode(db, {
+      orgId: ORG,
+      projectId: PROJECT,
+      canvasId: CANVAS,
+      nodeId: NODE,
+      userId: USER,
+      medium: 'image',
+      prompt: 'packshot',
+      model: 'qwen3-pro',
+      params: {},
+      expectedVersion: 1,
+      iterateSelection: { [LIST]: 1 }
+    });
+
+    expect(result.kind).toBe('done');
+    expect(generateImagesWithoutBrand).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        baseMediaId: undefined,
+        referenceImageUrls: [expect.stringMatching(new RegExp(`^https://signed\\.example/.+/${UPLOAD_PATH}$`))]
+      })
+    );
+  });
 });
 
 describe('a standard generation is screened before anything reaches the provider', () => {

@@ -5,6 +5,7 @@ import * as helix from './helix';
 import * as staggeredGrid from './staggered-grid';
 import * as mediaCloud from './media-cloud';
 import * as mediaRing from './media-ring';
+import * as ring from './ring';
 import * as tiltedGrid from './tilted-grid';
 import * as verticalFlow from './vertical-flow';
 import type { LayoutId, LayoutParam, LayoutParams, Transform } from './types';
@@ -102,6 +103,15 @@ export const LAYOUTS: Record<LayoutId, LayoutDefinition> = {
 		params: coverflow.params,
 		instances: (mediaCount, values) => filledCount(mediaCount, valueOf(values, 'items', 5)),
 		transforms: coverflow.transforms
+	},
+	ring: {
+		label: 'UI ring',
+		description: 'Cards curved on a tilted, turning cylinder; the ones behind show through.',
+		motion: 'cycle',
+		camera: 'fixed',
+		params: ring.params,
+		instances: (mediaCount, values) => filledCount(mediaCount, valueOf(values, 'count', ring.RING_COUNT.fallback)),
+		transforms: ring.transforms
 	}
 };
 

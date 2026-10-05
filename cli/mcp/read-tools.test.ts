@@ -64,11 +64,14 @@ const RESTANO = [
   'run_node_loop',
   'preview_node_loop',
   'cancel_node_loop',
-  'get_media'
+  'get_media',
+  'ask_motion_agent',
+  'get_motion_run',
+  'get_motion_summary'
 ];
 
-describe('la superficie MCP è le diciannove dichiarate', () => {
-  test('tools/list è esattamente questi diciannove nomi', async () => {
+describe('la superficie MCP è le ventidue dichiarate', () => {
+  test('tools/list è esattamente questi ventidue nomi', async () => {
     const names = (await tools()).map((t) => t.name).sort();
 
     expect(names).toEqual([...RESTANO].sort());

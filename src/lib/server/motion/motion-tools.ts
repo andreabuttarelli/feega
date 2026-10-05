@@ -49,6 +49,8 @@ import { EffectKind } from '$lib/motion/effects/registry';
 import { LUT_PRESETS, LUT_PRESET_IDS, applyLut, compileLut, lutFromCube } from '$lib/motion/effects/lut';
 import { BLEND_MODES } from '$lib/motion/blend';
 import { ANIMATOR_UNITS, SELECTOR_SHAPES, SELECTOR_KEYS, VALUES, VALUE_KEYS, animatorKey } from '$lib/motion/text-animators/model';
+import { PATH_ALIGNS, PATH_PRESETS, PathSourceKind, TEXT_PATH, TEXT_PATH_KEYS, textPathKey, type PathSource } from '$lib/motion/text-path/model';
+import { removeTextPath, setTextPath } from '$lib/motion/text-path/ops';
 import { PRESETS as TEXT_PRESET_SPECS, TEXT_PRESETS, addAnimator, applyPreset as applyTextPreset, removeAnimator, setAnimator } from '$lib/motion/text-animators/ops';
 import { setBlendMode } from '$lib/motion/blend-ops';
 import { setClipsBlur, setMotionBlur } from '$lib/motion/motion-blur-ops';
@@ -92,14 +94,23 @@ export type MotionToolDeps = {
   analysis?: (assetId: string) => Promise<AudioAnalysis | null>;
   batch?: (input: { doc: MotionDoc; rows: { name: string; values: Record<string, string> }[] }) => Promise<Record<string, unknown>>;
   templates?: TemplateLibrary;
+  site?: (url: string) => Promise<SourceRead>;
+  brand?: (name?: string) => Promise<SourceRead>;
+  importAsset?: (url: string, label?: string) => Promise<AssetImport>;
 };
+
+export type SourceRead = { ok: true } & Record<string, unknown> | { ok: false; error: string };
+
+export type AssetImport = { ok: true; asset: MotionAsset; width: number | null; height: number | null } | { ok: false; error: string };
+
+const UNREADABLE = (what: string) => ({ ok: false as const, error: `${what} is not available in this workspace` });
 
 const fieldSpec = (f: ExposedField) => ({ key: f.key, label: f.label, type: f.type, min: f.min, max: f.max, unit: f.unit, options: f.options, aspect: f.aspect });
 
 const framesAt = (s: number, fps: number) => Math.round(s * fps);
 const secondsAt = (f: number, fps: number) => Math.round((f / fps) * 100) / 100;
 
-function summary(doc: MotionDoc, selection: string[]) {
+export function docSummary(doc: MotionDoc, selection: string[]) {
   const secs = (f: number) => secondsAt(f, doc.fps);
   const edgeSummary = (edge: { kind: string; durationInFrames: number }) => ({ kind: edge.kind, duration: secs(edge.durationInFrames) });
   const inSeconds = (keyframes: Record<string, Keyframe[] | undefined>) =>
@@ -144,6 +155,7 @@ function summary(doc: MotionDoc, selection: string[]) {
         effects: c.effects,
         blend: c.blend,
         animators: c.animators,
+        textPath: c.textPath,
         motionBlur: c.motionBlur,
         hidden: c.hidden ?? false,
         locked: c.locked ?? false,
@@ -285,7 +297,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }
     session.doc = result.doc;
     session.edits.push(what);
-    return { ok: true, doc: summary(session.doc, session.selection) };
+    return { ok: true, doc: docSummary(session.doc, session.selection) };
   };
 
   async function codeWrite(result: OpResult, name: string, what: string, callId: string) {
@@ -343,7 +355,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     get_motion_doc: tool({
       description: 'Read the video being edited: size, duration in seconds, tracks and clips (start/duration in seconds), and the clips the user has selected.',
       inputSchema: z.object({}).strict(),
-      execute: async () => summary(session.doc, session.selection)
+      execute: async () => docSummary(session.doc, session.selection)
     }),
 
     list_components: tool({
@@ -1097,6 +1109,38 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       }
     }),
 
+    set_text_path: tool({
+      description: `Put a text clip (Title, Text, Kicker, Caption) on a path, like After Effects Path Options. The path is a preset (${PATH_PRESETS.join(', ')}; radius px and arc degrees bend it: arc is the sweep of an arc and the phase sweep of a wave) or shape_clip_id, a Shape clip whose outline (pen paths, morphs and modifiers included) the text follows frame by frame, centred on the text box. align ${PATH_ALIGNS.join('|')}; firstMargin/lastMargin are % of the path length (animate firstMargin to slide the text along it, 100 = one turn of a closed path); reverse runs the text the other way (inside a circle); perpendicular false keeps glyphs upright; forceAlignment spreads the text from margin to margin. Every value animates with set_keyframes or set_expression on ${TEXT_PATH_KEYS.map((k) => textPathKey(k)).join(', ')} (booleans: 0/1, align: 0 start, 0.5 center, 1 end). Text animators keep working per character. Omitted fields keep their value.`,
+      inputSchema: z.object({
+        clip_id: z.string(),
+        preset: z.enum(PATH_PRESETS).optional(),
+        shape_clip_id: z.string().optional(),
+        align: z.enum(PATH_ALIGNS).optional(),
+        reverse: z.boolean().optional(),
+        perpendicular: z.boolean().optional(),
+        forceAlignment: z.boolean().optional(),
+        firstMargin: z.number().min(TEXT_PATH.firstMargin.min).max(TEXT_PATH.firstMargin.max).optional(),
+        lastMargin: z.number().min(TEXT_PATH.lastMargin.min).max(TEXT_PATH.lastMargin.max).optional(),
+        radius: z.number().min(TEXT_PATH.radius.min).max(TEXT_PATH.radius.max).optional(),
+        arc: z.number().min(TEXT_PATH.arc.min).max(TEXT_PATH.arc.max).optional()
+      }),
+      execute: async (input) => {
+        const { clip_id, preset, shape_clip_id, forceAlignment, ...rest } = input;
+        if (preset && shape_clip_id) {
+          return { ok: false, error: 'pick one path: preset or shape_clip_id' };
+        }
+        const source: PathSource | undefined = preset ? { kind: PathSourceKind.Preset, preset } : shape_clip_id ? { kind: PathSourceKind.Clip, clip: shape_clip_id } : undefined;
+        const out = apply(setTextPath(session.doc, clip_id, { ...rest, forceAlign: forceAlignment, source }), `text path on ${clip_id}`);
+        return out.ok ? { ...out, animate: TEXT_PATH_KEYS.map((k) => textPathKey(k)) } : out;
+      }
+    }),
+
+    remove_text_path: tool({
+      description: 'Take a text clip off its path, with the path keyframes and expressions.',
+      inputSchema: z.object({ clip_id: z.string() }),
+      execute: async (input) => apply(removeTextPath(session.doc, input.clip_id), `removed text path from ${input.clip_id}`)
+    }),
+
     add_track: tool({
       description: 'Add a visual or audio track. A new visual track goes on top.',
       inputSchema: z.object({ kind: z.enum([TrackKind.Visual, TrackKind.Audio]) }),
@@ -1130,6 +1174,31 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const paced = input.fps === undefined ? ({ ok: true, doc: session.doc } as OpResult) : setFrameRate(session.doc, input.fps);
         const sized = paced.ok ? setCanvas(paced.doc, { format: input.format, durationInFrames: input.duration === undefined ? undefined : framesAt(input.duration, paced.doc.fps), background: input.background }) : paced;
         return apply(sized, 'changed the canvas');
+      }
+    }),
+
+    analyze_site: tool({
+      description: 'Read a public website for a brand: name, tagline, description, logos (svg first, then favicon, apple-touch-icon, og:image), palette (theme, logo, CSS), fonts (google true = usable by name with set_font), images with width and height (og, hero, product), products and social links. Nothing is stored: import_asset the logo and the pictures you will use.',
+      inputSchema: z.object({ url: z.string().min(4).max(2000).describe('the site, e.g. https://www.allbirds.com or allbirds.com') }),
+      execute: async (input) => (deps.site ? deps.site(input.url) : UNREADABLE('reading sites'))
+    }),
+
+    use_brand: tool({
+      description: "Read a brand of this workspace: the project brand without a name, or the brand the user names. Returns name, website, logo url, palette, fonts, voice notes and products. import_asset its logo and product pictures to use them in clips.",
+      inputSchema: z.object({ name: z.string().max(120).optional().describe('brand name or slug; omit for the project brand') }),
+      execute: async (input) => (deps.brand ? deps.brand(input.name) : UNREADABLE('reading brands'))
+    }),
+
+    import_asset: tool({
+      description: 'Download a picture or logo from a public https url (PNG, JPEG, WebP, GIF, AVIF or SVG, max 12MB) into the project assets and return its asset_id for Image, Logo, Logo3D (SVG), ProductCard or Device3D screen.',
+      inputSchema: z.object({ url: z.string().url().max(2000), label: z.string().max(60).optional() }),
+      execute: async (input) => {
+        const imported = deps.importAsset ? await deps.importAsset(input.url, input.label) : UNREADABLE('importing pictures');
+        if (!imported.ok) {
+          return imported;
+        }
+        deps.assets.push(imported.asset);
+        return { ok: true, asset_id: imported.asset.id, kind: imported.asset.kind, width: imported.width, height: imported.height };
       }
     }),
 
@@ -1262,10 +1331,10 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
           for (const [index, call] of input.calls.entries()) {
             const out = await nestedCall(call.tool, call.input, options);
             if (out.ok === false) {
-              return { ok: false, failed: index, error: `${call.tool}: ${out.error}`, doc: summary(session.doc, []) };
+              return { ok: false, failed: index, error: `${call.tool}: ${out.error}`, doc: docSummary(session.doc, []) };
             }
           }
-          return { ok: true, doc: summary(session.doc, []) };
+          return { ok: true, doc: docSummary(session.doc, []) };
         } finally {
           session.doc = mergeView(root, [input.comp], session.doc);
         }

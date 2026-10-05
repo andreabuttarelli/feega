@@ -103,6 +103,27 @@ program
     await cmdMedia(opts);
   });
 
+const motion = program.command('motion').description('Motion videos: ask the editor agent to change one');
+
+motion
+  .command('ask <nodeId> <prompt>')
+  .description('Ask the motion editor agent to edit a video (spends credits)')
+  .option('--no-wait', 'Return the run id without waiting for the turn to end')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (nodeId: string, prompt: string, opts) => {
+    const { cmdMotionAsk } = await import('./commands/motion.ts');
+    await cmdMotionAsk(nodeId, prompt, opts);
+  });
+
+motion
+  .command('run <runId>')
+  .description('State of a motion agent run')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (runId: string, opts) => {
+    const { cmdMotionRun } = await import('./commands/motion.ts');
+    await cmdMotionRun(runId, opts);
+  });
+
 program
   .command('upgrade <slug>')
   .description('Open Stripe checkout: a monthly plan (--credits 8|16|32|64|128|256) or a one-time top-up (--top-up)')
