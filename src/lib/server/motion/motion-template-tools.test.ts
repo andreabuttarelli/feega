@@ -100,6 +100,17 @@ describe('motion agent template library tools', () => {
     expect(JSON.stringify(session.doc)).toContain('Grace Hopper');
   });
 
+  it('a composition is a template too: the agent inserts the ring and turns its knobs with the template tools', async () => {
+    const { run, session } = withLibrary();
+
+    const placed = await run('insert_template', { template_id: 'builtin:composition-ring', start: 0 });
+    const clip = String(placed.clip_id);
+
+    expect((await run('set_template_fields', { clip_id: clip, values: { tilt_x: -30, corner_radius: 24, turns: 2 } })).ok).toBe(true);
+    const ring = Object.values(session.doc.comps).flatMap((c) => c.tracks.flatMap((t) => t.clips)).find((c) => c.component === 'Composition');
+    expect(ring?.props.layoutParams).toMatchObject({ tiltX: -30, cornerRadius: 24, turns: 2 });
+  });
+
   it('edit_comp refuses a template until detach_template unlocks it', async () => {
     const { run, session } = withLibrary();
     const clip = String((await run('insert_template', { template_id: 'builtin:quote', start: 0 })).clip_id);

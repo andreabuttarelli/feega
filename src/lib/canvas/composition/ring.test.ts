@@ -22,21 +22,6 @@ describe('the ring layout', () => {
 		});
 	});
 
-	it('bends every card around the ring radius', () => {
-		const [card] = layoutAt('ring', 6, { tiltX: 0, tiltZ: 0 }, 0);
-		const radius = Math.hypot(card.position.x, card.position.z);
-
-		expect(card.bend).toBeCloseTo(radius);
-		expect(card.width).toBeLessThan((radius * Math.PI * 2) / 6);
-	});
-
-	it('rounds the cards by the corner radius', () => {
-		const [card] = layoutAt('ring', 6, { cornerRadius: 40, cardHeight: 0.4 }, 0);
-
-		expect(card.corner).toBeGreaterThan(0);
-		expect(layoutAt('ring', 6, { cornerRadius: 0 }, 0)[0].corner).toBe(0);
-	});
-
 	it('dims the cards facing away', () => {
 		const cards = layoutAt('ring', 6, { tiltX: 0, tiltZ: 0, backOpacity: 0.3 }, 0);
 

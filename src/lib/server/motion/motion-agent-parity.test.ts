@@ -4,6 +4,8 @@ import type { z } from 'zod';
 import { MotionFormat, motionDocSchema, newMotionDoc } from '$lib/motion/doc';
 import { cameraSchema } from '$lib/motion/camera';
 import { createMotionTools, type MotionSession } from './motion-tools';
+import { LAYOUTS } from '$lib/canvas/composition/index';
+import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
 
 type Access = { write: string[]; read: string } | { fixed: string };
 
@@ -114,6 +116,15 @@ describe('every editable part of a motion video has an agent path', () => {
     for (const [field, access] of Object.entries(table)) {
       const missing = 'write' in access ? access.write.filter((t) => !tools[t]) : [];
       expect({ field, missing }).toEqual({ field, missing: [] });
+    }
+  });
+
+  it('every composition layout is a template the agent inserts and fills with its template tools, every setting a field', () => {
+    for (const [layout, def] of Object.entries(LAYOUTS)) {
+      const entry = BUILTIN_TEMPLATES.find((e) => e.id === `builtin:composition-${layout}`);
+      const props = entry?.template.doc.fields.map((f) => f.prop) ?? [];
+
+      expect({ layout, missing: def.params.map((p) => `layoutParams.${p.name}`).filter((p) => !props.includes(p)) }).toEqual({ layout, missing: [] });
     }
   });
 

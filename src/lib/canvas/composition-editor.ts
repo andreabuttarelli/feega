@@ -1,6 +1,4 @@
 import type { LayoutParam, LayoutParams } from './composition/types';
-import type { CameraPresetId } from './composition/camera';
-import type { CompositionAspect } from './composition-node';
 
 export type Control =
 	| { kind: 'slider'; min: number; max: number; step: number; value: number }
@@ -34,37 +32,4 @@ export function controlFor(param: LayoutParam, value: unknown): Control {
 
 export function setLayoutParam(params: LayoutParams, name: string, value: number | string): LayoutParams {
 	return { ...params, [name]: value };
-}
-
-export async function createSceneWhenMounted<T>(
-	canvas: HTMLCanvasElement,
-	isMounted: () => boolean,
-	load: () => Promise<(canvas: HTMLCanvasElement) => T>
-): Promise<T | null> {
-	const create = await load();
-	if (!isMounted()) {
-		return null;
-	}
-
-	return create(canvas);
-}
-
-export type CompositionEditorState = {
-	layout: string;
-	layoutParams: LayoutParams;
-	cameraPreset: CameraPresetId;
-	cameraParams: LayoutParams;
-	backgroundColor: string;
-	duration: number;
-	aspect: CompositionAspect;
-};
-
-export function defaultParamsFor(defs: readonly { name: string; default: number | string }[]): LayoutParams {
-	return Object.fromEntries(defs.map((def) => [def.name, def.default]));
-}
-
-const MIN_DURATION_SECONDS = 0.5;
-
-export function clampDuration(value: number): number {
-	return Math.max(MIN_DURATION_SECONDS, value);
 }

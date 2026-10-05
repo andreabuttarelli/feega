@@ -62,7 +62,19 @@ export function setDeepProps(doc: MotionDoc, clipId: string, patch: Record<strin
   return inner.ok ? { ok: true, doc: mergeView(doc, found.path, inner.doc) } : inner;
 }
 
-const propOf = (doc: MotionDoc, field: Pick<ExposedField, 'clipId' | 'prop'>) => locateClip(doc, field.clipId)?.clip.props[field.prop];
+const PATH = '.';
+
+const propOf = (doc: MotionDoc, field: Pick<ExposedField, 'clipId' | 'prop'>) =>
+  field.prop.split(PATH).reduce<unknown>((at, key) => (at as Record<string, unknown> | undefined)?.[key], locateClip(doc, field.clipId)?.clip.props);
+
+export function setField(doc: MotionDoc, field: Pick<ExposedField, 'clipId' | 'prop'>, value: unknown): OpResult {
+  const [head, ...rest] = field.prop.split(PATH);
+  if (!rest.length) {
+    return setDeepProps(doc, field.clipId, { [head]: value });
+  }
+  const parent = (locateClip(doc, field.clipId)?.clip.props[head] ?? {}) as Record<string, unknown>;
+  return setDeepProps(doc, field.clipId, { [head]: { ...parent, [rest.join(PATH)]: value } });
+}
 
 export function exposeField(doc: MotionDoc, input: FieldInput): OpResult {
   if (!FIELD_KEY.test(input.key)) {
@@ -107,7 +119,7 @@ export function applyValues(doc: MotionDoc, values: Record<string, string>): OpR
     if (!coerced.ok) {
       return coerced;
     }
-    current = setDeepProps(current.doc, field.clipId, { [field.prop]: coerced.value });
+    current = setField(current.doc, field, coerced.value);
   }
   return current;
 }

@@ -1,5 +1,5 @@
 import { LAYOUTS } from '$lib/canvas/composition/index';
-import type { LayoutId } from '$lib/canvas/composition/types';
+import type { LayoutId, LayoutParam } from '$lib/canvas/composition/types';
 import { COMPOSITION_CAMERAS, TrackKind } from '$lib/motion/components';
 import { Ease, TransitionKind } from '$lib/motion/design';
 import { MotionFormat, type MotionDoc } from '$lib/motion/doc';
@@ -134,6 +134,19 @@ const DESIGNS: Design[] = [
 
 const COMPOSITION_SECONDS = 6;
 
+const snake = (name: string) => name.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
+
+const LAYOUT_FIELD: Record<LayoutParam['kind'], (p: LayoutParam) => Partial<Field>> = {
+  range: (p) => (p.kind === 'range' ? { type: FieldType.Number, min: p.min, max: p.max } : {}),
+  seed: () => ({ type: FieldType.Number }),
+  color: () => ({ type: FieldType.Color }),
+  select: (p) => (p.kind === 'select' ? { type: FieldType.Select, options: p.options.map((o) => o.value) } : {})
+};
+
+function layoutField(p: LayoutParam): Field {
+  return { key: snake(p.name), label: p.label, clipId: 'grid', prop: `layoutParams.${p.name}`, default: p.default, ...LAYOUT_FIELD[p.kind](p) } as Field;
+}
+
 function compositionDesign(layout: LayoutId): Design {
   return {
     id: `composition-${layout}`,
@@ -145,7 +158,8 @@ function compositionDesign(layout: LayoutId): Design {
       { key: 'media', label: 'Pictures and videos', type: FieldType.MediaList, clipId: 'grid', prop: 'media' },
       colour('background', 'Background', 'grid', 'background'),
       { key: 'camera', label: 'Camera', type: FieldType.Select, clipId: 'grid', prop: 'camera', options: [...COMPOSITION_CAMERAS] },
-      { key: 'loop', label: 'Loop', type: FieldType.Number, clipId: 'grid', prop: 'loop', min: 0.5, max: 60, unit: 's' }
+      { key: 'loop', label: 'Loop', type: FieldType.Number, clipId: 'grid', prop: 'loop', min: 0.5, max: 60, unit: 's' },
+      ...LAYOUTS[layout].params.map(layoutField)
     ]
   };
 }

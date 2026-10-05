@@ -3,7 +3,7 @@
   import { AssetKind } from '$lib/motion/components';
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
   import { FieldType } from '$lib/motion/template/field-model';
-  import { locateClip, setDeepProps } from '$lib/motion/template/fields';
+  import { locateClip, setDeepProps, setField } from '$lib/motion/template/fields';
   import { detachTemplate, instanceComp, setTemplateValues, templateFields, type TemplateFieldValue } from '$lib/motion/template/library';
 
   type Asset = { id: string; kind: AssetKind; label: string; previewUrl: string };
@@ -37,7 +37,7 @@
   function toggleMedia(f: TemplateFieldValue, asset: Asset) {
     const list = (f.value as Media[] | null) ?? [];
     const next = list.some((m) => m.assetId === asset.id) ? list.filter((m) => m.assetId !== asset.id) : [...list, { assetId: asset.id, kind: asset.kind as Media['kind'] }];
-    done(setDeepProps(doc, f.clipId, { [f.prop]: next }), `Set ${f.label}`);
+    done(setField(doc, f, next), `Set ${f.label}`);
   }
 </script>
 

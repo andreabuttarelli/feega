@@ -31,6 +31,15 @@ describe('exposed fields', () => {
     expect(removed.ok && removed.doc.fields).toEqual([]);
   });
 
+  it('a field can name a setting nested in a prop, like a composition layout number', () => {
+    const added = addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Composition', from: 0, durationInFrames: 60, props: { layout: 'ring', layoutParams: { turns: 1, tiltX: -10 } } }, 'c1');
+    const exposed = added.ok ? exposeField(added.doc, { key: 'turns', label: 'Turns', type: FieldType.Number, clipId: 'c1', prop: 'layoutParams.turns' }) : added;
+    const filled = exposed.ok ? applyValues(exposed.doc, { turns: '3' }) : exposed;
+
+    expect(exposed.ok && fieldValues(exposed.doc)[0].value).toBe(1);
+    expect(filled.ok && filled.doc.tracks.flatMap((t) => t.clips)[0].props.layoutParams).toEqual({ turns: 3, tiltX: -10 });
+  });
+
   it('a field on a clip that does not exist is refused', () => {
     expect(exposeField(withTitle(), { ...headline, clipId: 'nope' })).toEqual({ ok: false, error: expect.stringMatching(/nope/) });
   });

@@ -19,6 +19,15 @@ describe('built-in motion templates', () => {
     expect(layouts.sort()).toEqual(Object.keys(LAYOUTS).sort());
   });
 
+  it('a composition template exposes every setting of its layout: speed, shape, colours', () => {
+    for (const layout of Object.keys(LAYOUTS) as (keyof typeof LAYOUTS)[]) {
+      const entry = builtinTemplate(`builtin:composition-${layout}`)!;
+      const props = entry.template.doc.fields.map((f) => f.prop);
+
+      expect(props).toEqual(expect.arrayContaining(LAYOUTS[layout].params.map((p) => `layoutParams.${p.name}`)));
+    }
+  });
+
   it('ships the designed ones too', () => {
     const designed = ['lower-third', 'title-card', 'product-reveal', 'end-card', 'social-stat', 'quote'];
 

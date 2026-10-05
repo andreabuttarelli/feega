@@ -62,12 +62,13 @@ export function newCompositionNodeAt(at: { x: number; y: number }): NewCompositi
 
 const IMAGE_REF_FIELDS = ['refId', 'assetId'] as const;
 
-export function upstreamImageRefs(
-  targetId: string,
-  edges: { source: string; target: string }[],
-  nodes: { id: string; data: Record<string, unknown> }[]
-): string[] {
-  const refs: string[] = [];
+export type UpstreamMedia = { assetId: string; kind: 'image' | 'video' };
+type Source = { id: string; type?: string; data: Record<string, unknown> };
+
+const VIDEO_TYPE = 'video';
+
+export function upstreamMedia(targetId: string, edges: { source: string; target: string }[], nodes: Source[]): UpstreamMedia[] {
+  const media: UpstreamMedia[] = [];
 
   for (const edge of edges) {
     if (edge.target !== targetId) {
@@ -84,7 +85,7 @@ export function upstreamImageRefs(
       for (const item of listItems) {
         const assetId = (item as Record<string, unknown>)?.asset_id;
         if (typeof assetId === 'string' && assetId) {
-          refs.push(assetId);
+          media.push({ assetId, kind: 'image' });
         }
       }
       continue;
@@ -92,9 +93,13 @@ export function upstreamImageRefs(
 
     const ref = IMAGE_REF_FIELDS.map((field) => source.data[field]).find((v) => typeof v === 'string' && v);
     if (typeof ref === 'string') {
-      refs.push(ref);
+      media.push({ assetId: ref, kind: source.type === VIDEO_TYPE ? 'video' : 'image' });
     }
   }
 
-  return refs;
+  return media;
+}
+
+export function upstreamImageRefs(targetId: string, edges: { source: string; target: string }[], nodes: Source[]): string[] {
+  return upstreamMedia(targetId, edges, nodes).map((m) => m.assetId);
 }
