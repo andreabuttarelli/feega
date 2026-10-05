@@ -27,8 +27,6 @@
   import type { LayoutStore } from '$lib/motion/editor-layout';
   import CodeEditor from './CodeEditor.svelte';
   import FontPicker from './FontPicker.svelte';
-  import RingCards from './RingCards.svelte';
-  import type { RingCard } from '$lib/motion/ring/model';
   import LutPicker from './LutPicker.svelte';
   import { registerFont, setFont } from '$lib/motion/fonts/ops';
   import type { CatalogueFont } from '$lib/motion/fonts/model';
@@ -501,8 +499,6 @@
             </select>
             <button type="button" data-testid="open-comp" disabled={!doc.comps[String(value(field))]} onclick={() => onopen?.(String(value(field)))}>Open</button>
           </div>
-        {:else if field.control === Control.Cards}
-          <RingCards cards={(value(field) ?? []) as RingCard[]} {doc} {assets} onchange={(cards) => setProp(field, cards)} />
         {:else if field.control === Control.Managed}
           <span class="managed">{managedSummary(value(field))}{#if composeHref} · <a href={composeHref}>Edit in Compositions</a>{/if}</span>
         {/if}

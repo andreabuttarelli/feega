@@ -2,11 +2,11 @@ import type { ChangelogEntry } from './index';
 
 const entry: ChangelogEntry = {
   date: '2026-10-05',
-  title: 'Rings of curved cards',
+  title: 'Ring layout for compositions',
   items: [
-    'New Ring clip: cards curved on a turning, tilted cylinder, with the cards behind showing through',
-    'Cards show images, videos or compositions you build in the editor, and every ring setting can be keyframed',
-    'New "UI ring" template with animated dashboard cards, and the chat can build rings for you'
+    'New "UI ring" composition layout: cards curved on a tilted, turning cylinder, readable from behind',
+    'In videos, ring cards can show compositions you build in the editor, with keyframable radius, tilt, corners and camera',
+    'New "UI ring" video template with animated dashboard cards'
   ]
 };
 

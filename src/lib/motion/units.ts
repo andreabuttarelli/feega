@@ -110,6 +110,7 @@ export const PROPERTY_UNITS: Readonly<Record<string, Rule>> = {
   backOpacity: percent(),
   backBlur: px(Basis.Same),
   shadowOpacity: percent(),
+  cornerRadius: px(Basis.Same),
   cameraDistance: px(Basis.Same),
   cameraHeight: px(Basis.Height, ONE_FRAME),
   restitution: percent(),

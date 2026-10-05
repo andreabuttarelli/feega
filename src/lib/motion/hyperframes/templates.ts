@@ -9,7 +9,6 @@ import { css, esc, px } from './html';
 import type { CustomComponents } from '../custom/component';
 import { compositionVideoId, resolvedMedia } from './composition';
 import { shapeHtml } from './shapes';
-import { ringHtml } from './ring';
 import { particleHtml } from './particles';
 import { ParticleShape } from '../particles/model';
 import type { MediaSegment } from '../time-remap';
@@ -228,11 +227,6 @@ const Precomp: Template<'Precomp'> = {
   html: () => ''
 };
 
-const Ring: Template<'Ring'> = {
-  timing: Timing.Wrapper,
-  html: (ctx) => ringHtml(ctx, '')
-};
-
 const Adjustment: Template<'Adjustment'> = {
   timing: Timing.Media,
   html: () => ''
@@ -416,7 +410,6 @@ export const TEMPLATES: { [K in ComponentId]: Template<K> } = {
   Composition,
   Particles,
   Precomp,
-  Ring,
   Adjustment,
   Custom
 };

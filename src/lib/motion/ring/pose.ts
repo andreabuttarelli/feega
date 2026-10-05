@@ -1,4 +1,4 @@
-import type { RingNumberKey } from './model';
+import type { RingNumberKey } from '../../canvas/composition/ring';
 
 export type RingRow = Record<RingNumberKey, number>;
 
@@ -15,12 +15,11 @@ export type RingBake = {
   loopFrames: number;
   turns: number;
   direction: 1 | -1;
-  doubleSided: boolean;
   content: { width: number; height: number };
   rows: RingRow[];
 };
 
-export type SlicePose = { transform: string; width: number; height: number; offset: number; opacity: number; blur: number };
+export type SlicePose = { transform: string; width: number; height: number; offset: number; fade: number; shade: number; blur: number; mirror: boolean; corners: string };
 
 export type RingPose = {
   perspective: number;
@@ -39,6 +38,7 @@ export function ringAt(bake: RingBake, frame: number): RingPose {
   const MAX_GAP_SHARE = 0.9;
   const FACING_SHARPNESS = 3;
   const SHADOW_DROP = 0.15;
+  const BACK_SHADE = 0.6;
   const SHADOW_SPREAD = 2.6;
   const PRECISION = 1000;
   const round = (v: number) => Math.round(v * PRECISION) / PRECISION;
@@ -66,24 +66,44 @@ export function ringAt(bake: RingBake, frame: number): RingPose {
     return { x: zx, y: zy * Math.cos(tx) - z * Math.sin(tx), z: zy * Math.sin(tx) + z * Math.cos(tx) };
   };
 
+  const facingAt = (theta: number) => {
+    const phi = theta + angle * DEGREE;
+    const normal = world(Math.sin(phi), 0, Math.cos(phi));
+    const at = world(radius * Math.sin(phi), 0, radius * Math.cos(phi));
+    const toCamera = { x: camera.x - at.x, y: camera.y - at.y, z: camera.z - at.z };
+    const length = Math.hypot(toCamera.x, toCamera.y, toCamera.z) || 1;
+    return (normal.x * toCamera.x + normal.y * toCamera.y + normal.z * toCamera.z) / length;
+  };
+
+  const corner = round(Math.min(row.cornerRadius, sliceWidth, height / 2));
+  const last = bake.slices - 1;
+  const cornersOf = (s: number) => {
+    if (!corner || (s > 0 && s < last)) {
+      return '0';
+    }
+    if (last === 0) {
+      return `${corner}px`;
+    }
+    return s === 0 ? `${corner}px 0 0 ${corner}px` : `0 ${corner}px ${corner}px 0`;
+  };
+
   const slices: SlicePose[] = [];
   for (let card = 0; card < bake.count; card++) {
+    const mirror = facingAt(card * pitch + pitch / 2) < 0;
     for (let s = 0; s < bake.slices; s++) {
       const theta = card * pitch + gapAngle / 2 + (s + 0.5) * sliceAngle;
-      const phi = theta + angle * DEGREE;
-      const normal = world(Math.sin(phi), 0, Math.cos(phi));
-      const at = world(radius * Math.sin(phi), 0, radius * Math.cos(phi));
-      const toCamera = { x: camera.x - at.x, y: camera.y - at.y, z: camera.z - at.z };
-      const length = Math.hypot(toCamera.x, toCamera.y, toCamera.z) || 1;
-      const facing = (normal.x * toCamera.x + normal.y * toCamera.y + normal.z * toCamera.z) / length;
+      const facing = facingAt(theta);
       const front = Math.min(1, Math.max(0, 0.5 + facing * FACING_SHARPNESS));
       slices.push({
         transform: `rotateY(${round(theta / DEGREE)}deg) translateZ(${round(radius)}px) translate(${round(-sliceWidth / 2)}px,${round(-height / 2)}px)`,
         width: round(sliceWidth),
         height: round(height),
         offset: round(-(s * cardWidth) / bake.slices - (sliceWidth - cardWidth / bake.slices) / 2),
-        opacity: round(row.backOpacity + (1 - row.backOpacity) * front),
-        blur: round(row.backBlur * (1 - front))
+        fade: round(row.backOpacity + (1 - row.backOpacity) * front),
+        shade: round(BACK_SHADE + (1 - BACK_SHADE) * front),
+        blur: round(row.backBlur * (1 - front)),
+        mirror,
+        corners: cornersOf(s)
       });
     }
   }

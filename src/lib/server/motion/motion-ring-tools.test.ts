@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Tool } from 'ai';
 import { AssetKind } from '$lib/motion/components';
 import { MotionFormat, clipsOf, newMotionDoc, type MotionClip } from '$lib/motion/doc';
-import { CardKind, type RingCard } from '$lib/motion/ring/model';
 import { createMotionTools, type MotionSession } from './motion-tools';
 
 function setup() {
@@ -11,42 +10,27 @@ function setup() {
   const assets = [{ id: 'shot', kind: AssetKind.Image, label: 'Dashboard shot', url: 'https://cdn.example/shot.png' }];
   const tools = createMotionTools({ session, assets: assets as never, newId: () => `id${++n}`, voiceover: vi.fn(), frames: vi.fn(), check: vi.fn() });
   const run = (name: string, input: unknown) => (tools[name] as Tool & { execute: (i: unknown, o: { toolCallId: string }) => Promise<Record<string, unknown>> }).execute(input, { toolCallId: 'c' });
-  const ring = () => clipsOf(session.doc).find((c) => c.component === 'Ring') as MotionClip | undefined;
+  const ring = () => clipsOf(session.doc).find((c) => c.component === 'Composition') as MotionClip | undefined;
   return { session, run, ring };
 }
 
-describe('ring tools', () => {
-  it('adds a ring whose cards are dashboard compositions it builds', async () => {
+describe('the agent builds a ring with the composition tools it already has', () => {
+  it('lays a composition out as a ring of UI cards built in a precomp', async () => {
     const { session, run, ring } = setup();
+    await run('add_clip', { component: 'Title', start: 0, duration: 4 });
+    const title = clipsOf(session.doc)[0].id;
+    await run('precompose', { clip_ids: [title], name: 'KPI' });
+    const comp = Object.keys(session.doc.comps)[0];
 
-    const result = await run('add_ring', { start: 0, duration: 8, sample: true });
+    const result = await run('add_clip', { component: 'Composition', start: 0, duration: 8, props: { layout: 'ring', media: [{ kind: 'comp', assetId: comp }], layoutParams: { count: 6, tiltX: -20 } } });
 
     expect(result).toMatchObject({ ok: true });
-    const cards = ring()!.props.cards as RingCard[];
-    expect(cards.length).toBeGreaterThanOrEqual(4);
-    expect(cards.every((c) => c.kind === CardKind.Comp && session.doc.comps[c.ref])).toBe(true);
+    expect(ring()!.props).toMatchObject({ layout: 'ring', layoutParams: { count: 6, tiltX: -20 } });
   });
 
-  it('puts pictures and existing compositions on the cards, with the ring settings it is given', async () => {
+  it('keyframes the ring numbers', async () => {
     const { run, ring } = setup();
-
-    await run('add_ring', { start: 0, cards: [{ kind: 'image', ref: 'shot' }], props: { count: 5, tiltX: -20, ringRadius: 540 } });
-
-    expect(ring()!.props).toMatchObject({ count: 5, tiltX: -20, cards: [{ kind: 'image', ref: 'shot' }] });
-    expect(ring()!.props.ringRadius).toBeCloseTo(0.5);
-  });
-
-  it('refuses a card that names nothing the video has', async () => {
-    const { run, ring } = setup();
-
-    expect(await run('add_ring', { start: 0, cards: [{ kind: 'image', ref: 'ghost' }] })).toMatchObject({ ok: false });
-    expect(await run('add_ring', { start: 0, cards: [{ kind: 'comp', ref: 'ghost' }] })).toMatchObject({ ok: false });
-    expect(ring()).toBeUndefined();
-  });
-
-  it('keyframes the ring like any other prop', async () => {
-    const { run, ring } = setup();
-    await run('add_ring', { start: 0, sample: true });
+    await run('add_clip', { component: 'Composition', start: 0, duration: 8, props: { layout: 'ring' } });
 
     const result = await run('set_keyframes', { clip_id: ring()!.id, prop: 'tiltZ', keyframes: [{ time: 0, value: -10 }, { time: 2, value: 10 }] });
 

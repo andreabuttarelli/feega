@@ -4,7 +4,7 @@ import { TransitionKind } from './design';
 import type { Keyframes } from './keyframes';
 import { withoutHidden } from './organize';
 import { addClip, type OpResult } from './timeline';
-import { CardKind, SLICES_PER_CARD, cardAt, ringSliceId, type RingCard } from './ring/model';
+import { ringCards, ringRadiusPx, ringSliceId, slicesFor } from './ring/model';
 
 export type CompPath = readonly string[];
 export type GroupProps = { span?: number };
@@ -140,10 +140,11 @@ function sliceHost(ring: MotionClip, card: number, slice: number, comp: string):
 }
 
 function ringTracks(doc: MotionDoc, track: MotionTrack, ring: MotionClip, depth: number): MotionTrack[] {
-  const p = ring.props as { cards: RingCard[]; count: number };
-  const hosts = Array.from({ length: p.count }, (_, card) => ({ card, shown: cardAt(p.cards, card) })).flatMap(({ card, shown }) =>
-    shown?.kind === CardKind.Comp && doc.comps[shown.ref]
-      ? Array.from({ length: SLICES_PER_CARD }, (_, slice) => ({ ...track, id: `${ringSliceId(ring.id, card, slice)}${SEPARATOR}host`, clips: [sliceHost(ring, card, slice, shown.ref)] }))
+  const cards = ringCards(ring.props as never);
+  const slices = slicesFor(cards.length, ringRadiusPx(ring.props as never, Math.min(doc.width, doc.height)));
+  const hosts = cards.flatMap((shown, card) =>
+    shown?.kind === COMP_CARD && doc.comps[shown.assetId]
+      ? Array.from({ length: slices }, (_, slice) => ({ ...track, id: `${ringSliceId(ring.id, card, slice)}${SEPARATOR}host`, clips: [sliceHost(ring, card, slice, shown.assetId)] }))
       : []
   );
   const inner = expand(doc, hosts, depth);
@@ -151,9 +152,11 @@ function ringTracks(doc: MotionDoc, track: MotionTrack, ring: MotionClip, depth:
   return [{ ...track, id: `${ring.id}${SEPARATOR}group`, clips: [group] }, ...inner];
 }
 
+const COMP_CARD = 'comp';
+
 const EXPANDERS: Partial<Record<MotionClip['component'], Expander>> = {
   Precomp: precompTracks,
-  Ring: ringTracks
+  Composition: ringTracks
 };
 
 const isHost = (doc: MotionDoc, clip: MotionClip, depth: number) =>

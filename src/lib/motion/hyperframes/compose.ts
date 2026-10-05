@@ -10,6 +10,7 @@ import { outlineUrl } from '../fonts/outline';
 import { Finish } from '../devices';
 import { deviceRuntime } from './device-runtime';
 import { ringBake, ringHtml, ringScript } from './ring';
+import { isRing } from '../ring/model';
 import type { RingBake } from '../ring/pose';
 import { bakeComposition, compositionScript, type TimedBake } from './composition';
 import { ANIMATE_CSS, ENGINE, animationScript, keyedOverrides, sceneKeys, wrapAnimated, wrapParents } from './animate';
@@ -187,12 +188,12 @@ const GROUPS: Partial<Record<ComponentId, GroupSpec>> = {
     html: (clip, ctx, placed, content) => `${clipHtml(clip, ctx, { ...placed, group: clip.id }, content)}<!--/group:${esc(clip.id)}-->`,
     effects: (clip, ctx) => effectTimeline(clip, ctx, ctx.color)
   },
-  Ring: {
+  Composition: {
     firstLayer: (clip, trackIndex, starts) => {
       const span = (clip.props as GroupProps).span;
       return span ? (starts.get(trackIndex + span) ?? 0) : Number.POSITIVE_INFINITY;
     },
-    html: (clip, ctx, placed, content) => clipHtml(clip, ctx, placed, ringHtml(ctx as TemplateCtx<'Ring'>, content)),
+    html: (clip, ctx, placed, content) => clipHtml(clip, ctx, placed, isRing(clip.props) ? ringHtml(ctx as TemplateCtx<'Composition'>, content) : TEMPLATES.Composition.html(ctx as TemplateCtx<'Composition'>)),
     effects: (clip, ctx) => effectTimeline(clip, ctx, ctx.color)
   },
   Adjustment: {
@@ -422,7 +423,7 @@ export function composeHtml(raw: ComposeInput): string {
       if (THREE_D_COMPONENTS.includes(clip.component)) {
         three.push(threeClipOf(clip, ctx, onStage.has(clip.id), input));
       }
-      if (clip.component === 'Composition') {
+      if (clip.component === 'Composition' && !isRing(clip.props)) {
         compositions.push(compositionBake(clip, ctx));
       }
       const shape = clip.component === 'Shape' ? shapeBake({ ...clip, props: ctx.p as Record<string, unknown> }, ctx) : null;
@@ -432,7 +433,7 @@ export function composeHtml(raw: ComposeInput): string {
       if (clip.component === 'Particles') {
         particles.push(particleBake(clip, ctx));
       }
-      if (clip.component === 'Ring') {
+      if (clip.component === 'Composition' && isRing(clip.props)) {
         rings.push(ringBake(clip, ctx));
       }
       const run = clip.component === 'Custom' ? customRun(clip, ctx, doc.components) : null;

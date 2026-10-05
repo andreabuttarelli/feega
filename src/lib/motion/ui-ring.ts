@@ -1,7 +1,7 @@
 import { TrackKind } from './components';
 import { Ease, TransitionKind } from './design';
 import { MotionFormat, parseMotionDoc, type MotionComp, type MotionDoc } from './doc';
-import { CardKind, Spin, type RingCard } from './ring/model';
+import { RING_LAYOUT, Spin, type RingCard } from './ring/model';
 import { FillKind, ShapeKind, StrokeKind, modifierKey } from './shape/schema';
 import { ModifierKind } from './shape/modifiers';
 import { assemble, edge, s, type Beat, type TrackSpec } from './template-kit';
@@ -91,18 +91,15 @@ const CARDS: [id: string, name: string, beats: (id: string) => Beat[]][] = [
   ['reach', 'Weekly reach', reach]
 ];
 
-export const DASHBOARD_CARD_COUNT = CARDS.length;
-
 function card(id: string, name: string, beats: Beat[]): MotionComp {
   const doc = assemble({ format: MotionFormat.Landscape, seconds: CARD_SECONDS, tracks: TRACKS, beats });
   return { name, durationInFrames: s(CARD_SECONDS), tracks: doc.tracks.map((t) => ({ ...t, id: `${id}-${t.id}` })) };
 }
 
-export function dashboardCards(prefix = ''): { comps: Record<string, MotionComp>; cards: RingCard[] } {
-  const ids = CARDS.map(([id, name, beats]) => [`${prefix}${id}`, name, beats] as const);
+function dashboardCards(): { comps: Record<string, MotionComp>; cards: RingCard[] } {
   return {
-    comps: Object.fromEntries(ids.map(([id, name, beats]) => [id, card(id, name, beats(id))])),
-    cards: ids.map(([id]) => ({ kind: CardKind.Comp, ref: id }))
+    comps: Object.fromEntries(CARDS.map(([id, name, beats]) => [id, card(id, name, beats(id))])),
+    cards: CARDS.map(([id]) => ({ kind: 'comp', assetId: id }))
   };
 }
 
@@ -119,10 +116,10 @@ export function uiRing(): MotionDoc {
       {
         id: 'ui-ring',
         track: 'ring',
-        component: 'Ring',
+        component: 'Composition',
         at: 0,
         len: UI_RING_SECONDS,
-        props: { count: 6, ringRadius: 0.56, cardHeight: 0.32, gap: 0.03, tiltX: -16, tiltZ: -18, loop: UI_RING_SECONDS, turns: 1, direction: Spin.Left, backOpacity: 0.35, backBlur: 2, shadowOpacity: 0.45, cardColor: CARD, cameraDistance: 1900, cameraHeight: 0.12 },
+        props: { layout: RING_LAYOUT, loop: UI_RING_SECONDS, background: 'transparent', layoutParams: { count: 6, turns: 1, direction: Spin.Left, cardColor: CARD, ringRadius: 0.56, cardHeight: 0.32, gap: 0.03, tiltX: -16, tiltZ: -18, backOpacity: 0.45, backBlur: 0, shadowOpacity: 0.45, cornerRadius: 28, cameraDistance: 1900, cameraHeight: 0.12 } },
         keys: { tiltX: [[0, -16], [UI_RING_SECONDS / 2, -9, Ease.Standard], [UI_RING_SECONDS, -16, Ease.Standard]] }
       }
     ]
@@ -131,7 +128,7 @@ export function uiRing(): MotionDoc {
   const verdict = parseMotionDoc({
     ...shell,
     comps,
-    tracks: shell.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.component === 'Ring' ? { ...c, props: { ...c.props, cards } } : c)) }))
+    tracks: shell.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.component === 'Composition' ? { ...c, props: { ...c.props, media: cards } } : c)) }))
   });
   if (!verdict.ok) {
     throw new Error(verdict.error);

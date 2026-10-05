@@ -17,7 +17,6 @@ import { animatorsSchema } from './text-animators/model';
 import { DEFAULT_MOTION_BLUR, motionBlurSchema } from './motion-blur';
 import { fieldsSchema } from './template/field-model';
 import { physicsSchema } from './physics/model';
-import { CardKind, type RingCard } from './ring/model';
 
 export enum MotionFormat {
   Landscape = '16:9',
@@ -230,9 +229,13 @@ export function compOf(clip: Pick<MotionClip, 'component' | 'props'>): string | 
   return clip.component === 'Precomp' ? String(clip.props.comp) : null;
 }
 
+type CompositionCard = { assetId: string; kind: string };
+const COMP_CARD = 'comp';
+const RING_LAYOUT = 'ring';
+
 export function compsOf(clip: Pick<MotionClip, 'component' | 'props'>): string[] {
-  if (clip.component === 'Ring') {
-    return ((clip.props.cards ?? []) as RingCard[]).filter((c) => c.kind === CardKind.Comp).map((c) => c.ref);
+  if (clip.component === 'Composition') {
+    return clip.props.layout !== RING_LAYOUT ? [] : ((clip.props.media ?? []) as CompositionCard[]).filter((m) => m.kind === COMP_CARD).map((m) => m.assetId);
   }
   const id = compOf(clip);
   return id === null ? [] : [id];
