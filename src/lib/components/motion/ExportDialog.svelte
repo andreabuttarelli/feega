@@ -18,13 +18,16 @@
   import { FRAME_RATES } from '$lib/motion/design';
   import { setFrameRate } from '$lib/motion/frame-rate';
   import { RenderStage, framesDone, type RenderView, type ServerRender } from '$lib/motion/server-render';
+  import type { BrandTokens } from '$lib/motion/brand';
+  import type { AudioAnalysis } from '$lib/motion/audio-analysis';
+  import InteractiveExport from './InteractiveExport.svelte';
 
   type Renderer = (times: number[], size: FrameSize, onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>, signal: AbortSignal) => Promise<void>;
 
   const Phase = { Checking: 'checking', Ready: 'ready', Mixing: 'mixing', Rendering: 'rendering', Saving: 'saving', Done: 'done', Failed: 'failed' } as const;
   type Phase = (typeof Phase)[keyof typeof Phase];
 
-  const Mode = { Server: 'server', Browser: 'browser' } as const;
+  const Mode = { Server: 'server', Browser: 'browser', Interactive: 'interactive' } as const;
   type Mode = (typeof Mode)[keyof typeof Mode];
 
   const STAGE_LABEL: Record<RenderStage, string> = {
@@ -61,6 +64,8 @@
     fileName,
     render,
     server,
+    tokens,
+    analyses = {},
     onclose
   }: {
     doc: MotionDoc;
@@ -70,6 +75,8 @@
     fileName: string;
     render: Renderer;
     server: ServerRender;
+    tokens: BrandTokens;
+    analyses?: Record<string, AudioAnalysis>;
     onclose: () => void;
   } = $props();
 
@@ -241,14 +248,15 @@
     <button type="button" aria-label="Close" disabled={busy} onclick={onclose}><X size={16} /></button>
   </header>
 
-  {#if server.configured}
-    <div class="choice modes" role="radiogroup" aria-label="Where to render">
-      <label><input type="radio" name="mode" value={Mode.Server} bind:group={mode} disabled={busy} data-testid="export-mode-server" /> On our servers (fast)</label>
-      <label><input type="radio" name="mode" value={Mode.Browser} bind:group={mode} disabled={busy || jobRunning} data-testid="export-mode-browser" /> In this browser</label>
-    </div>
-  {/if}
+  <div class="choice modes" role="radiogroup" aria-label="Where to render">
+    {#if server.configured}<label><input type="radio" name="mode" value={Mode.Server} bind:group={mode} disabled={busy} data-testid="export-mode-server" /> On our servers (fast)</label>{/if}
+    <label><input type="radio" name="mode" value={Mode.Browser} bind:group={mode} disabled={busy || jobRunning} data-testid="export-mode-browser" /> In this browser</label>
+    <label><input type="radio" name="mode" value={Mode.Interactive} bind:group={mode} disabled={busy} data-testid="export-mode-interactive" /> Interactive (web)</label>
+  </div>
 
-  {#if mode === Mode.Server}
+  {#if mode === Mode.Interactive}
+    <InteractiveExport {doc} {tokens} {assetUrls} {analyses} {fileName} />
+  {:else if mode === Mode.Server}
     <dl>
       <dt>Preset</dt>
       <dd class="presets" data-testid="export-presets">

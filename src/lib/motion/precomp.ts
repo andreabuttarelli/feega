@@ -12,7 +12,7 @@ export type GroupProps = { span?: number };
 
 export const MAX_COMP_DEPTH = 8;
 const MAX_LOOPS = 600;
-const SEPARATOR = '__';
+export const SEPARATOR = '__';
 const STILL = { kind: TransitionKind.None, durationInFrames: 0 };
 
 const fail = (error: string): OpResult => ({ ok: false, error });

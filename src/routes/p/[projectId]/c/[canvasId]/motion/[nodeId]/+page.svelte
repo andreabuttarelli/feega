@@ -60,6 +60,10 @@
   import TextPathOverlay from '$lib/components/motion/TextPathOverlay.svelte';
   import { Align, addMarker, alignClips, allMarkers, clipsTo, distributeClips, trimClipsAt, loopFrame, nudgeClips, sequenceClips, setWorkArea, staggerClips } from '$lib/motion/organize';
   import ExportDialog from '$lib/components/motion/ExportDialog.svelte';
+  import InteractivePanel from '$lib/components/motion/InteractivePanel.svelte';
+  import { Liveness } from '$lib/motion/interactive/settings';
+  import { applyInteractivePreset } from '$lib/motion/interactive/presets';
+  import { InputKey } from '$lib/motion/expression/inputs';
   import TemplateDialog from '$lib/components/motion/TemplateDialog.svelte';
   import TemplateLibrary from '$lib/components/motion/TemplateLibrary.svelte';
   import TemplateInspector from '$lib/components/motion/TemplateInspector.svelte';
@@ -199,7 +203,10 @@
   const beats = $derived(hitFrames(doc, analyses, Hit.Beats));
   const assets = $derived([...madeAssets, ...data.assets]);
   const assetUrls = $derived(Object.fromEntries(assets.filter((a) => a.url).map((a) => [a.id, a.url as string])));
-  const html = $derived(composeHtml({ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls, analyses }));
+  let interactive = $state(false);
+  let tiltX = $state(0);
+  let tiltY = $state(0);
+  const html = $derived(composeHtml({ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls, analyses, liveness: interactive ? Liveness.Live : Liveness.Baked }));
   const selected = $derived(selection.length === 1 ? (findClip(doc, selection[0])?.clip ?? null) : null);
   const blank = $derived(!path.length && doc.tracks.every((t) => !t.clips.length));
 
@@ -871,6 +878,8 @@
       {editorUrl}
       fileName={data.node.name ?? 'motion'}
       render={exportFrames}
+      tokens={data.tokens}
+      {analyses}
       server={{ ...data.serverRender, version, saved: saveState === SaveState.Saved, assetHref: (id: string) => `/p/${data.projectId}/c/${data.canvas.id}/assets/${id}` }}
       onclose={() => (exporting = false)}
     />
@@ -908,13 +917,16 @@
 
   <div class="body" bind:this={body} style={`--tl-h: ${layout.timelinePx}px;`} class:coding={inspectorTab === InspectorTab.Code && selected?.component === 'Custom'} class:no-props={layout.inspector === Panel.Closed} class:no-chat={layout.chat === Panel.Closed}>
     <section class="stage" aria-label="Preview">
-      <MotionPreview bind:this={preview} {html} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing>
+      <MotionPreview bind:this={preview} {html} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null}>
         {#if !playing}<SelectionOverlay {doc} {frame} {html} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} />{/if}
         {#if selected?.mask && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<MaskOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected?.component === 'Shape' && selected.props.shape === 'path' && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<PenOverlay {doc} clip={selected} onchange={edit} />{/if}
         {#if selected?.path && !playing}<MotionPathOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected?.textPath && !playing}<TextPathOverlay {doc} clip={selected} {frame} />{/if}
       </MotionPreview>
+      <div class="live-bar">
+        <InteractivePanel bind:active={interactive} bind:tiltX bind:tiltY clipId={selected?.id ?? null} onpreset={(preset) => apply(applyInteractivePreset(doc, preset, selected?.id ?? null), preset)} />
+      </div>
       {#if blank}
         <div class="empty-state" data-testid="empty-state">
           <p>Start with a template, a clip or a prompt</p>
@@ -1338,6 +1350,17 @@
 
   .stage {
     position: relative;
+  }
+
+  .live-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 0 var(--ui-space-2, 8px);
+    background: var(--ui-surface);
+    border-top: 1px solid var(--ui-line);
+    outline: none;
   }
 
   :global([data-theme='dark']) .stage {

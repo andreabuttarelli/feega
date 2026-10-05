@@ -135,4 +135,12 @@ describe('audio-reactive expressions', () => {
     expect(expressionErrors(reactive())).toEqual([]);
     expect(expressionValue(reactive(), 'a', 'scale', 40)).toBe(1);
   });
+
+  it('bakes an input expression exactly as its defaults, so the video never depends on a cursor', () => {
+    const live = ok(setExpression(ok(setExpression(twoShapes(), 'a', 'rotateY', '(input.pointer.x - 0.5) * 30 + input.tilt.x * 20')), 'a', 'x', 'value + input.scroll + input.time * 0'));
+    const literal = ok(setExpression(ok(setExpression(twoShapes(), 'a', 'rotateY', '(0.5 - 0.5) * 30 + 0 * 20')), 'a', 'x', 'value + 0'));
+
+    expect(bakeExpressions(live)).toEqual(bakeExpressions(literal));
+    expect(bakeExpressions(live)).toEqual(bakeExpressions(live));
+  });
 });

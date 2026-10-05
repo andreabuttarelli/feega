@@ -4,6 +4,13 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 ## Motion editor
 
+### Un modulo virtuale Vite che fa fallire suite intere senza un errore leggibile
+`this.addWatchFile` con un percorso relativo (`node_modules/zod/...`, come lo restituisce il
+metafile di esbuild) fa trattare a vitest quel file come import del modulo virtuale: ogni test che
+lo raggiunge muore con `(0 test)` e nessun messaggio a schermo. Segnale: suite rosse senza stack,
+`--reporter=json --outputFile` mostra `Failed to resolve import "node_modules/..."`. Mossa:
+passare percorsi assoluti (`path.resolve`).
+
 ### `MotionPreview.capture()` con lo stesso html che sta già suonando non torna mai
 `capture(times, source)` ricarica `srcdoc` e aspetta `ready`; se `source` è identico all'html
 corrente il player non ricarica, `ready` non arriva e la promessa resta appesa senza timeout.

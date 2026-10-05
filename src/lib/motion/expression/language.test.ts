@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Ease } from '../design';
 import { MAX_SOURCE, SILENT_AUDIO, compileExpression, runExpression, type Scope } from './language';
+import { InputKey, fallbackPort, valuesPort } from './inputs';
 
 const scope = (extra: Partial<Scope> = {}): Scope => ({
   time: 1,
@@ -13,6 +14,7 @@ const scope = (extra: Partial<Scope> = {}): Scope => ({
   thisLayer: { get: () => 0 },
   layer: () => ({ get: () => 0 }),
   audio: SILENT_AUDIO,
+  input: fallbackPort(1),
   ...extra
 });
 
@@ -157,4 +159,37 @@ describe('audio', () => {
   it('amp takes a name or an index and a number', () => {
     expect(error('audio.amp([1])')).toMatch(/audio.amp/);
   });
+
+  it('reads every live input at its default when nothing is connected', () => {
+    expect(run('input.pointer.x + input.pointer.y')).toBe(1);
+    expect(run('input.pointer.down + input.hover + input.tilt.x + input.tilt.y + input.scroll')).toBe(0);
+    expect(run('input.time')).toBe(1);
+  });
+
+  it('reads simulated inputs and leaves missing ones at their default', () => {
+    const input = valuesPort({ [InputKey.PointerX]: 0.9, [InputKey.TiltY]: -0.5, [InputKey.Scroll]: 0.25 }, 2, (_s, t) => t);
+
+    expect(run('(input.pointer.x - 0.5) * 100', { input })).toBeCloseTo(40);
+    expect(run('input.tilt.y * 20 + input.scroll', { input })).toBeCloseTo(-9.75);
+    expect(run('input.pointer.y + input.time', { input })).toBe(2.5);
+  });
+
+  it('smooths through the port, one slot per call in reading order', () => {
+    const calls: [number, number, number][] = [];
+    const input = valuesPort({}, 0, (slot, target, seconds) => {
+      calls.push([slot, target, seconds]);
+      return target / 2;
+    });
+
+    expect(run('input.smooth(input.pointer.x, 0.15) + input.smooth(4, 0.3)', { input })).toBe(2.25);
+    expect(calls).toEqual([
+      [0, 0.5, 0.15],
+      [1, 4, 0.3]
+    ]);
+  });
+
+  it('refuses an input that does not exist', () => {
+    expect(error('input.mouse')).toContain('unknown member "mouse"');
+  });
 });
+

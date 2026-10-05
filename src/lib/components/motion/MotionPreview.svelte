@@ -4,6 +4,8 @@
   import { CAPTURE_REPLY, FrameFormat, type CaptureReply, type ClipError } from '$lib/motion/hyperframes/capture';
   import { Playback, previewDriver, type ShotRequest } from '$lib/motion/hyperframes/preview-driver';
   import { MEASURE_REPLY, MEASURE_REQUEST, type MeasureReply, type MeasuredBox } from '$lib/motion/hyperframes/measure';
+  import { InputKey, type InputValues } from '$lib/motion/expression/inputs';
+  import { INPUT_MESSAGE } from '$lib/motion/interactive/runtime';
 
   type Player = HTMLElement & { seek: (t: number) => void; play: () => void; pause: () => void; currentTime: number; muted: boolean; loop: boolean; iframeElement: HTMLIFrameElement };
 
@@ -23,8 +25,26 @@
     playing = $bindable(false),
     muted = false,
     loop = false,
+    live = null,
     children
-  }: { html: string; width: number; height: number; fps?: number; frame?: number; playing?: boolean; muted?: boolean; loop?: boolean; children?: Snippet } = $props();
+  }: { html: string; width: number; height: number; fps?: number; frame?: number; playing?: boolean; muted?: boolean; loop?: boolean; live?: InputValues | null; children?: Snippet } = $props();
+
+  let pointer = $state<InputValues>({});
+
+  function sendInputs(values: InputValues) {
+    player?.iframeElement?.contentWindow?.postMessage({ type: INPUT_MESSAGE, values }, '*');
+  }
+
+  function track(e: PointerEvent) {
+    const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    pointer = { ...pointer, [InputKey.PointerX]: (e.clientX - box.left) / box.width, [InputKey.PointerY]: (e.clientY - box.top) / box.height, [InputKey.Hover]: 1 };
+  }
+
+  $effect(() => {
+    if (live) {
+      sendInputs({ ...live, ...pointer });
+    }
+  });
 
   let host = $state<HTMLDivElement | null>(null);
   let player: Player | null = null;
@@ -227,6 +247,20 @@
 <div class="stage" style={`aspect-ratio: ${width} / ${height}; width: min(100cqw, calc(100cqh * ${width / height}));`} data-testid="motion-preview">
   <div class="host" bind:this={host}></div>
   {@render children?.()}
+  {#if live}
+    <div
+      class="live-pad"
+      role="presentation"
+      data-testid="interactive-pad"
+      onpointermove={track}
+      onpointerdown={(e) => {
+        track(e);
+        pointer = { ...pointer, [InputKey.PointerDown]: 1 };
+      }}
+      onpointerup={() => (pointer = { ...pointer, [InputKey.PointerDown]: 0 })}
+      onpointerleave={() => (pointer = {})}
+    ></div>
+  {/if}
 </div>
 
 <style>
@@ -239,5 +273,12 @@
   .host {
     position: absolute;
     inset: 0;
+  }
+
+  .live-pad {
+    position: absolute;
+    inset: 0;
+    cursor: crosshair;
+    touch-action: none;
   }
 </style>
