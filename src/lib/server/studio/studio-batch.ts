@@ -242,6 +242,27 @@ async function enqueue(
 
 export type StartOutcome = { batchId: string } | StudioRefusal;
 
+async function materialise(db: Db, ctx: StudioCtx, selection: Selection, quote: Quote): Promise<Batch> {
+  const spec: BatchSpec & { selection: Selection } = { styleRefs: selection.styleRefs, cells: {}, modelNodes: {}, droppedRefs: quote.droppedRefs, selection };
+  const batch = await insertBatch(db, {
+    orgId: ctx.orgId,
+    projectId: ctx.projectId,
+    name: selection.name,
+    model: quote.model.id,
+    previewModel: quote.previewModel.id,
+    spec,
+    actorId: ctx.userId
+  });
+
+  const canvas = await createCanvas(db, { orgId: ctx.orgId, projectId: ctx.projectId, name: `Studio · ${selection.name}` });
+  const productsNodeId = await copyProducts(db, ctx, canvas.id, quote.products, batch.id);
+  const modelNodes = await placeModels(db, ctx, canvas.id, quote.models);
+  await placeSummary(db, ctx, canvas.id, { id: batch.id, name: selection.name });
+  const materialised: Batch = { ...batch, canvasId: canvas.id, productsNodeId, spec: { ...spec, modelNodes } };
+  await updateBatch(db, { orgId: ctx.orgId, batchId: batch.id, patch: { canvas_id: canvas.id, products_node_id: productsNodeId, spec: materialised.spec } });
+  return materialised;
+}
+
 export async function startPreview(db: Db, ctx: StudioCtx, selection: Selection, options: StudioOptions): Promise<StartOutcome> {
   const quote = quoteSelection(selection, options);
   if ('error' in quote) {
@@ -260,26 +281,9 @@ export async function startPreview(db: Db, ctx: StudioCtx, selection: Selection,
     return { error: `Not enough credits: the preview costs ${credits.total}, you have ${credits.balance}.` };
   }
 
-  const spec: BatchSpec & { selection: Selection } = { styleRefs: selection.styleRefs, cells: {}, modelNodes: {}, droppedRefs: quote.droppedRefs, selection };
-  const batch = await insertBatch(db, {
-    orgId: ctx.orgId,
-    projectId: ctx.projectId,
-    name: selection.name,
-    model: quote.model.id,
-    previewModel: quote.previewModel.id,
-    spec,
-    actorId: ctx.userId
-  });
-
-  const canvas = await createCanvas(db, { orgId: ctx.orgId, projectId: ctx.projectId, name: `Studio · ${selection.name}` });
-  const productsNodeId = await copyProducts(db, ctx, canvas.id, quote.products, batch.id);
-  const modelNodes = await placeModels(db, ctx, canvas.id, quote.models);
-  await placeSummary(db, ctx, canvas.id, { id: batch.id, name: selection.name });
-  const materialised: Batch = { ...batch, canvasId: canvas.id, productsNodeId, spec: { ...spec, modelNodes } };
-  await updateBatch(db, { orgId: ctx.orgId, batchId: batch.id, patch: { canvas_id: canvas.id, products_node_id: productsNodeId, spec: materialised.spec } });
-
+  const materialised = await materialise(db, ctx, selection, quote);
   await enqueue(db, ctx, materialised, quote, preview, { preview: true, model: quote.previewModel.id });
-  return { batchId: batch.id };
+  return { batchId: materialised.id };
 }
 
 function selectionOf(batch: Batch): Selection | null {
