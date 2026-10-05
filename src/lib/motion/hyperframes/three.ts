@@ -6,6 +6,7 @@ import { SURFACE, type Material, type Surface } from '../materials';
 import { cameraRuntime, seekDriver } from './stage';
 import { DEVICE_SCRIPT, type DeviceRuntime } from './device-runtime';
 import { ENGINE_GLOBAL } from '../engine/engine';
+import { drawOnce, screenKey } from './three-draw';
 import { strokePolygons } from './stroke-outline';
 import { ON_DISPOSE, hotScope, hotSeek, keptGl } from './hot';
 
@@ -439,7 +440,12 @@ function lightAt(spec, key, frame) {
   return spec.keyframes[key] ? sampleTrack(spec.keyframes[key], frame) : spec[key];
 }
 
-function renderAt(time) {
+const screens = () => scenes.map(({ c, s }) => (s.device ? screenKey(deviceSource(c, s), 0) : '')).join(',');
+const painter = drawOnce(drawAt, screens);
+const renderAt = (time) => painter.at(time);
+const redraw = (time) => painter.again(time);
+
+function drawAt(time) {
   if (!live) return;
   for (const { c, s } of scenes) {
     if (!onScreen(c, time)) continue;
@@ -489,7 +495,7 @@ function renderAt(time) {
 window.__hf = window.__hf || {};
 window.__hf.buildReady = window.__hf.buildReady || {};
 window.__hf.buildReady['motion-three'] = Promise.all(scenes.map((x) => x.ready)).then(() => {
-  renderAt(window.__hfThreeTime || 0);
+  redraw(window.__hfThreeTime || 0);
   replaced.forEach((dispose) => dispose());
 });
 ${hotSeek('renderAt')}
@@ -502,5 +508,5 @@ export function threeScript(clips: ThreeClip[], duration: number, stage: StageSp
   if (!clips.length) {
     return '';
   }
-  return `<script type="module">const CLIPS = ${js(clips)};const LIGHTING = ${js(LIGHTING)};const LOOK = ${js(look)};const DURATION = ${js(duration)};const FOV = ${SCENE.fov.fallback};const STAGE = ${js(stage)};${cameraRuntime()}const sampleTrack = (${sampleTrack.toString()});const onScreen = (${onScreen.toString()});const strokePolygons = (${strokePolygons.toString()});${SCENE_SCRIPT.replace('DRIVER', seekDriver(THREE_TIMELINE, 'DURATION', 'renderAt'))}</script>`;
+  return `<script type="module">const CLIPS = ${js(clips)};const LIGHTING = ${js(LIGHTING)};const LOOK = ${js(look)};const DURATION = ${js(duration)};const FOV = ${SCENE.fov.fallback};const STAGE = ${js(stage)};${cameraRuntime()}const sampleTrack = (${sampleTrack.toString()});const onScreen = (${onScreen.toString()});const drawOnce = (${drawOnce.toString()});const screenKey = (${screenKey.toString()});const strokePolygons = (${strokePolygons.toString()});${SCENE_SCRIPT.replace('DRIVER', seekDriver(THREE_TIMELINE, 'DURATION', 'renderAt'))}</script>`;
 }

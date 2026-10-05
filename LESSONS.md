@@ -72,6 +72,14 @@ Un doc costruito a mano con `addClip` si allunga da solo quando una clip arroton
 la fine: 51 frame invece di 50 sembrano un errore del producer. Mossa: stampa `job.totalFrames`
 prima di accusare il render.
 
+### Un frame 3D che in locale costa 70 ms sul farm ne costa 1.600
+Il WebGL della sandbox è SwiftShader con JIT Subzero (`UNMASKED_RENDERER_WEBGL` lo dice), quello
+del Mac SwiftShader LLVM: profilare in locale con `--use-angle=swiftshader` dà l'ordine delle
+voci, non i numeri. E il tempo JS di `renderAt` è ~0: il lavoro GPU si paga alla lettura dei
+pixel. Mossa: misurare sul farm un chunk solo (`launchPiece` con indice 0, log degli step con
+`ms`), varianti dell'HTML in parallelo su sandbox diverse, e ripetere la base: tra sandbox il
+rumore arriva al 20%.
+
 ### La bolletta Sandbox sale e nessun render è stato addebitato
 Segnale: Vercel mostra Active CPU / Provisioned Memory in crescita, `ai_calls` non ha righe `motion_render`. Le sandbox del farm vivono nel progetto Vercel **anomalia**, non in feega: `GET /v1/sandboxes?project=<id>&teamId=…` (token di `vercel login`) dà `vcpus`, `timeout`, `activeCpuDurationMs`, `startedAt`/`stoppedAt` per ognuna. Il 5/10 l'87% della spesa motion veniva da bench degli agenti (timeout non usati dal codice), e una sandbox che vive `timeout` pieno con poca CPU è un worker orfano. Mossa: un bench chiama `stopWorker` in `finally`; il minimo fatturato è 1 min di memoria per sandbox, quindi un bench a molti chunk corti costa il minimo × chunk.
 
