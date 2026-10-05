@@ -28,7 +28,7 @@ export const params: LayoutParam[] = [
   { name: 'columns', label: 'Columns', kind: 'range', min: BENTO_GRID.min, max: BENTO_GRID.max, step: 1, default: BENTO_DEFAULTS.columns },
   { name: 'rows', label: 'Rows', kind: 'range', min: BENTO_GRID.min, max: BENTO_GRID.max, step: 1, default: BENTO_DEFAULTS.rows },
   { name: 'gap', label: 'Gap (px at 1080p)', kind: 'range', min: 0, max: 160, step: 1, default: BENTO_DEFAULTS.gap },
-  { name: 'radius', label: BENTO_RADIUS.label, kind: 'range', min: BENTO_RADIUS.min, max: BENTO_RADIUS.max, step: BENTO_RADIUS.step, default: BENTO_RADIUS.fallback },
+  { name: 'cornerRadius', label: BENTO_RADIUS.label, kind: 'range', min: BENTO_RADIUS.min, max: BENTO_RADIUS.max, step: BENTO_RADIUS.step, default: BENTO_RADIUS.fallback },
   { name: 'cellColor', label: 'Cell colour', kind: 'color', default: BENTO_DEFAULTS.cellColor },
   {
     name: 'enter',

@@ -241,11 +241,11 @@ export function compOf(clip: Pick<MotionClip, 'component' | 'props'>): string | 
 
 type CompositionCard = { assetId: string; kind: string };
 const COMP_CARD = 'comp';
-const RING_LAYOUT = 'ring';
+const LAYOUTS_WITH_COMP_CARDS: ReadonlySet<unknown> = new Set(['ring', 'bento']);
 
 export function compsOf(clip: Pick<MotionClip, 'component' | 'props'>): string[] {
   if (clip.component === 'Composition') {
-    return clip.props.layout !== RING_LAYOUT ? [] : ((clip.props.media ?? []) as CompositionCard[]).filter((m) => m.kind === COMP_CARD).map((m) => m.assetId);
+    return !LAYOUTS_WITH_COMP_CARDS.has(clip.props.layout) ? [] : ((clip.props.media ?? []) as CompositionCard[]).filter((m) => m.kind === COMP_CARD).map((m) => m.assetId);
   }
   const id = compOf(clip);
   return id === null ? [] : [id];
