@@ -28,6 +28,7 @@ import { particleBake, particleScript } from './particles';
 import { remappedSegments } from '../time-remap';
 import type { ParticleBake } from '../particles/simulate';
 import { bakeExpressions } from '../expression/bake';
+import type { AudioAnalysis } from '../audio-analysis';
 import { FIT_TEXT, fitScript } from './fit-runtime';
 import { ANIMATOR_CSS, textRender } from '../text-animators/render';
 import { declaredFamilyCss, fontStack, loadDescriptors, googleFontsUrl, loadedWeight, uploadFaceCss, usedFaces } from '../fonts/model';
@@ -72,7 +73,7 @@ const MOVE: Record<PropsOf<'Image'>['move'], { from: Vars; to: Vars }> = {
   'pan-right': { from: { scale: 1.12, xPercent: -3 }, to: { scale: 1.12, xPercent: 3 } }
 };
 
-export type ComposeInput = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; scale?: number };
+export type ComposeInput = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; scale?: number; analyses?: Record<string, AudioAnalysis> };
 
 function pick(vars: Vars, keys: string[]): Vars {
   return Object.fromEntries(keys.map((k) => [k, vars[k]]));
@@ -346,7 +347,7 @@ function zoomed(doc: MotionDoc, scale: number): string {
 }
 
 export function composeHtml(raw: ComposeInput): string {
-  const input = { ...raw, doc: bakeExpressions(bakePaths(withoutHidden(withoutBackdrop(raw.doc)))) };
+  const input = { ...raw, doc: bakeExpressions(bakePaths(withoutHidden(withoutBackdrop(raw.doc))), raw.analyses) };
   const { doc, tokens } = input;
   const scale = raw.scale ?? 1;
   const frame = { width: Math.round(doc.width * scale), height: Math.round(doc.height * scale) };

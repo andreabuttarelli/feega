@@ -179,18 +179,14 @@ const Video: Template<'Video'> = {
     if (segments) {
       return placed(ctx, ctx.p, segments.map((s, i) => segmentVideo(ctx.id, i, url, s, ctx.p.fit)).join(''), true);
     }
-    const media = ctx.p.volume > 0 ? `data-has-audio="true" data-volume="${ctx.p.volume}"` : 'muted';
-    const video = `<video id="c-${ctx.id}" src="${esc(url)}" crossorigin="anonymous" preload="auto" ${media} playsinline data-start="${ctx.start}" data-duration="${ctx.length}" data-media-start="${ctx.mediaStart}" style="${css({ width: '100%', height: '100%', objectFit: ctx.p.fit, display: 'block' })}"></video>`;
+    const video = `<video id="c-${ctx.id}" src="${esc(url)}" crossorigin="anonymous" preload="auto" muted playsinline data-start="${ctx.start}" data-duration="${ctx.length}" data-media-start="${ctx.mediaStart}" style="${css({ width: '100%', height: '100%', objectFit: ctx.p.fit, display: 'block' })}"></video>`;
     return placed(ctx, ctx.p, video, true);
   }
 };
 
 const Audio: Template<'Audio'> = {
   timing: Timing.Media,
-  html: (ctx) => {
-    const url = ctx.asset(ctx.p.assetId);
-    return url ? `<audio id="c-${ctx.id}" src="${esc(url)}" crossorigin="anonymous" data-start="${ctx.start}" data-duration="${ctx.length}" data-media-start="${ctx.mediaStart}" data-volume="${ctx.p.volume}"></audio>` : '';
-  }
+  html: () => ''
 };
 
 const Shape: Template<'Shape'> = {

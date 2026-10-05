@@ -161,7 +161,7 @@ export function valueAt(clip: Placed, key: string, frame: number, resolve: (colo
   return animProp(clip.component, key, clip.params)?.kind === ValueKind.Color ? sampleColor(track, local, resolve) : sampleTrack(track, local);
 }
 
-const KEYED_SOURCES: ReadonlySet<Source> = new Set([Source.Prop, Source.Param]);
+const KEYED_SOURCES: ReadonlySet<Source> = new Set([Source.Prop, Source.Param, Source.Sound]);
 
 export function keyedField(component: ComponentId, key: string, params: readonly AnimProp[] = []): boolean {
   const source = animProp(component, key, params)?.source;
@@ -178,6 +178,7 @@ const EDIT_BASE: Record<Source, (doc: MotionDoc, clip: MotionClip, key: string, 
   [Source.Scene]: (doc, clip, key, value, local) => setKeyframe(doc, clip.id, key, local, value),
   [Source.Remap]: (doc, clip, key, value, local) => setKeyframe(doc, clip.id, key, local, value),
   [Source.Param]: (doc, clip, key, value) => setProps(doc, clip.id, { [key]: value }),
+  [Source.Sound]: (doc, clip, key, value) => setProps(doc, clip.id, { [key]: value }),
   [Source.Effect]: (doc, clip, key, value) => {
     const ref = effectOfKey(key);
     return ref ? setEffect(doc, clip.id, ref.effectId, { params: { [ref.param]: value } }) : { ok: false, error: `no effect for ${key}` };

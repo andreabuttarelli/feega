@@ -14,7 +14,7 @@
   import { CheckState } from '$lib/motion/custom/component';
   import { deserialize } from '$app/forms';
   import { renderQuote } from '$lib/motion/render-quote';
-  import { EXPORT_FORMATS, FORMAT, MAX_EXPORT_BYTES, PRESETS, Preset, Quality, estimateBytes, exportProblem, settingsOf, type RenderSettings } from '$lib/motion/export-formats';
+  import { EXPORT_FORMATS, FORMAT, PRESETS, Preset, Quality, estimateBytes, exportProblem, settingsOf, type RenderSettings } from '$lib/motion/export-formats';
   import { FRAME_RATES } from '$lib/motion/design';
   import { setFrameRate } from '$lib/motion/frame-rate';
   import { RenderStage, framesDone, type RenderView, type ServerRender } from '$lib/motion/server-render';
@@ -43,7 +43,8 @@
     render_in_progress: 'A render of this video is already running.',
     components_unverified: 'A custom component has not passed the seek check.',
     rendering_not_configured: 'Server rendering is not available right now. Use the browser export.',
-    credits_exhausted: 'Not enough credits for a server render.'
+    credits_exhausted: 'Not enough credits for a server render.',
+    render_unavailable: 'The render machines could not start. Try again in a minute.'
   };
 
   const PROGRESS_LABEL: Partial<Record<Phase, string>> = {
@@ -149,6 +150,13 @@
     }
     job = { id: String(started.data.runId), status: 'running', progress: null, error: null, assetId: null, credits: quote.credits };
     pollTimer = setTimeout(poll, POLL_MS);
+  }
+
+  async function cancelServer() {
+    const cancelled = await postAction('cancelRender', new FormData()).catch(() => null);
+    if (cancelled?.ok && job) {
+      job = { ...job, status: 'failed', error: 'cancelled' };
+    }
   }
 
   onMount(() => {
@@ -271,7 +279,7 @@
       </dd>
       <dt>Output</dt>
       <dd>
-        {FORMATS[formatOf(doc)].label} · {output.width}×{output.height} · {settings.fps} fps · {Math.round(quote.seconds)} s · {spec.audio ? 'audio mixed in' : 'no audio'} · up to ~{megabytes} MB (a saved file can be {Math.round(MAX_EXPORT_BYTES / BYTES_PER_MB)} MB)
+        {FORMATS[formatOf(doc)].label} · {output.width}×{output.height} · {settings.fps} fps · {Math.round(quote.seconds)} s · {spec.audio ? 'audio mixed in' : 'no audio'} · up to ~{megabytes} MB{#if server.uploadLimit} (a saved file can be {Math.round(server.uploadLimit / BYTES_PER_MB)} MB){/if}
         {#if spec.alpha && doc.background !== Background.Transparent}<br /><span class="muted">Keeps alpha only where nothing is painted: set the background to Transparent for a see-through file.</span>{/if}
       </dd>
       <dt>Cost</dt>
@@ -284,6 +292,7 @@
         <span>{job.progress ? STAGE_LABEL[job.progress.stage] : STAGE_LABEL[RenderStage.Starting]} {#if job.progress?.stage === RenderStage.Rendering}{jobFrames}/{jobTotal}{/if}</span>
       </div>
       <p class="muted">You can close this tab: the video lands in your assets when it is ready.</p>
+      <button type="button" onclick={cancelServer} data-testid="export-cancel">Cancel render</button>
     {:else if job?.status === 'done' && job.assetId}
       <p class="muted" data-testid="export-saved">Saved to the canvas assets and attached to this video.</p>
       <a class="primary" href={server.assetHref(job.assetId)} download={`${fileName}.${spec.ext}`} data-testid="export-download"><Download size={14} /> Download {spec.ext.toUpperCase()}</a>

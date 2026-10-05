@@ -8,6 +8,7 @@ const BASE_SETUP_REVISION = 2;
 export const FARM_BASE = `feega-motion-render-${HYPERFRAMES_VERSION.replaceAll('.', '-')}-r${BASE_SETUP_REVISION}`;
 
 const BASE_VCPUS = 8;
+const RUNNING = 'running';
 const BASE_SETUP_TIMEOUT_MS = 10 * 60_000;
 
 const CHROME_LIBS = 'libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libatspi2.0-0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libpango-1.0-0 libcairo2 libasound2t64';
@@ -37,17 +38,21 @@ async function setUp(sandbox: Sandbox): Promise<void> {
 
 async function prepareBase(access: FarmAccess): Promise<void> {
   const base = await Sandbox.getOrCreate({ ...access, name: FARM_BASE, persistent: true, resources: { vcpus: BASE_VCPUS }, timeout: BASE_SETUP_TIMEOUT_MS, onCreate: setUp });
-  if (base.status === 'running') {
+  if (base.status === RUNNING) {
     await base.stop();
   }
 }
 
 function workerOf(sandbox: Sandbox): FarmWorker {
   return {
+    name: sandbox.name,
     write: (files) => sandbox.writeFiles(files),
     run: async (cmd, args) => {
       const done = await sandbox.runCommand(cmd, args);
       return { exitCode: done.exitCode ?? 1, output: (await done.stdout()) + (await done.stderr()) };
+    },
+    spawn: async (cmd, args) => {
+      await sandbox.runCommand({ cmd, args, detached: true });
     },
     read: (path) => sandbox.readFileToBuffer({ path }),
     stop: async () => {
@@ -79,6 +84,10 @@ export function vercelFarm(access: FarmAccess): RenderFarm {
         env: {}
       });
       return workerOf(sandbox);
+    },
+    attach: async (name: string) => {
+      const sandbox = await Sandbox.get({ ...access, name }).catch(() => null);
+      return sandbox?.status === RUNNING ? workerOf(sandbox) : null;
     }
   };
 }

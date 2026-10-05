@@ -89,6 +89,7 @@ const LANE: Record<Source, (input: LaneInput) => Lane[]> = {
     const ref = animatorOfKey(key);
     return ref ? [{ target: `#${textHostId(clip.id)}`, source: Source.Animator, track, vars: (v) => ({ [cssName(ref.id, ref.field)]: typeof v === 'string' ? resolve(v) : v }) }] : [];
   },
+  [Source.Sound]: () => [],
   [Source.Mask]: ({ clip, key, track, frame }) =>
     clip.mask
       ? MASK_LANES[key as MaskKey].map((a) => ({ target: `#${maskTarget(MaskScope.Own, a.part, clip.id)}`, source: Source.Mask, track, vars: (v) => ({ attr: { [a.attr]: a.out(Number(v), frame) } }) }))
