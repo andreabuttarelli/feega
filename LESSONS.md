@@ -4,6 +4,12 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 ## Motion editor
 
+### `MotionPreview.capture()` con lo stesso html che sta già suonando non torna mai
+`capture(times, source)` ricarica `srcdoc` e aspetta `ready`; se `source` è identico all'html
+corrente il player non ricarica, `ready` non arriva e la promessa resta appesa senza timeout.
+Segnale: il poster del nodo motion non nasce e il player non si smonta mai. Mossa: per un
+fotogramma del documento corrente usa `still(time)`, che scatta senza ricaricare.
+
 ### `mix-blend-mode` dentro `preserve-3d` appiattisce il mondo, e solo il render lo mostra
 Un clip con fusione dentro `#world` (camera accesa) fa appiattire a Chrome tutto il contesto 3D:
 la preview sembra giusta, ma render su server ed export dal browser divergono (PSNR 10 dB invece
