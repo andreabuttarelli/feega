@@ -103,6 +103,19 @@ describe('elevenLabs adapter', () => {
     expect(calls[0].url).toBe('https://api.test/v2/voices?page_size=100');
   });
 
+  it('lists only premade voices, never the custom voices other workspaces made on the shared account', async () => {
+    const { provider } = recorder(() =>
+      Response.json({
+        voices: [
+          { voice_id: 'v1', name: 'Rachel', category: 'premade' },
+          { voice_id: 'c1', name: 'Someone else', category: 'cloned' },
+          { voice_id: 'g1', name: 'Designed', category: 'generated' }
+        ]
+      })
+    );
+    expect((await provider.voices()).map((v) => v.id)).toEqual(['v1']);
+  });
+
   it('turns an API error into a readable message', async () => {
     const { provider } = recorder(() =>
       Response.json({ detail: { status: 'quota_exceeded', message: 'This request exceeds your quota.' } }, { status: 401 })

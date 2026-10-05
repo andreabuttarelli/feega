@@ -10,6 +10,7 @@ const FAILED = 'failed';
 const DEFAULT_AUDIO_MIME = 'audio/mpeg';
 const HISTORY_ITEM_HEADER = 'history-item-id';
 const HTTP_NOT_FOUND = 404;
+const PREMADE = 'premade';
 
 type Config = { apiKey: string; baseUrl?: string; fetchFn?: typeof fetch };
 
@@ -35,7 +36,7 @@ function mediaForm(field: string, media: AudioFile, extra: Record<string, string
   return form;
 }
 
-async function readableError(res: Response): Promise<Error> {
+export async function readableError(res: Response): Promise<Error> {
   const body = (await res.json().catch(() => null)) as { detail?: { message?: string } | string } | null;
   const detail = body?.detail;
   const message = typeof detail === 'string' ? detail : detail?.message ?? res.statusText;
@@ -152,7 +153,7 @@ export function elevenLabs(config: Config): AudioProvider {
     async voices(): Promise<Voice[]> {
       const res = await send(`/v2/voices?page_size=${VOICE_PAGE_SIZE}`, { method: 'GET' });
       const body = (await res.json()) as { voices?: VoiceRow[] };
-      return (body.voices ?? []).map((v) => ({
+      return (body.voices ?? []).filter((v) => v.category === PREMADE).map((v) => ({
         id: v.voice_id,
         name: v.name,
         previewUrl: v.preview_url ?? null,
