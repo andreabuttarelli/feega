@@ -106,6 +106,7 @@ export const SCENE = {
 
 export const DEVICE_SCENE = {
   lid: { label: 'Lid open', min: 0, max: 135, step: 1, fallback: 110 },
+  fold: { label: 'Fold open', min: 0, max: 180, step: 1, fallback: 180 },
   screenScroll: { label: 'Screen scroll', min: 0, max: 1, step: 0.01, fallback: 0 }
 } as const satisfies Record<string, Range>;
 

@@ -31,4 +31,10 @@ describe('device table', () => {
     expect((body.width - screen.width) / 2).toBeGreaterThan(2);
     expect((body.width - screen.width) / 2).toBeLessThan(3);
   });
+
+  it('the foldable opens to a landscape inner screen', () => {
+    const { screen, kind } = DEVICE['foldable'];
+    expect(kind).toBe(DeviceKind.Foldable);
+    expect(screen.width).toBeGreaterThan(screen.height);
+  });
 });
