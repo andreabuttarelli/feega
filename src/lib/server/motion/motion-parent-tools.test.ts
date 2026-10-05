@@ -19,7 +19,7 @@ function setup() {
 describe('motion agent parenting tools', () => {
   it('add_null places an invisible handle at a pivot, in seconds', async () => {
     const { session, run } = setup();
-    const out = await run('add_null', { start: 1, duration: 4, x: 0.3, y: 0.6 });
+    const out = await run('add_null', { start: 1, duration: 4, x: 576, y: 648 });
 
     expect(out.ok).toBe(true);
     expect(findClip(session.doc, 'id1')!.clip).toMatchObject({ component: 'Null', from: 30, durationInFrames: 120, props: { x: 0.3, y: 0.6 } });
@@ -29,7 +29,7 @@ describe('motion agent parenting tools', () => {
     const { session, run } = setup();
     await run('add_clip', { component: 'Shape', start: 0, duration: 4 });
     await run('add_null', { start: 0, duration: 4 });
-    await run('set_transform', { clip_id: 'id2', transform: { x: 0.1 } });
+    await run('set_transform', { clip_id: 'id2', transform: { x: 192 } });
 
     const out = await run('set_parent', { clip_id: 'id1', parent_id: 'id2', inherit_opacity: false });
     const loop = await run('set_parent', { clip_id: 'id2', parent_id: 'id1' });
@@ -44,8 +44,8 @@ describe('motion agent parenting tools', () => {
 
   it('parent_clips without a parent makes a null at their centre and says its id', async () => {
     const { session, run } = setup();
-    await run('add_clip', { component: 'Shape', start: 0, duration: 4, props: { x: 0.2, y: 0.5, width: 0.1, height: 0.1 } });
-    await run('add_clip', { component: 'Text', start: 0, duration: 4, props: { x: 0.6, y: 0.5, width: 0.1, height: 0.1 } });
+    await run('add_clip', { component: 'Shape', start: 0, duration: 4, props: { x: 384, y: 540, width: 192, height: 108 } });
+    await run('add_clip', { component: 'Text', start: 0, duration: 4, props: { x: 1152, y: 540, width: 192, height: 108 } });
     const out = await run('parent_clips', { clip_ids: ['id1', 'id2'] });
 
     expect(out.null_id).toBe('id3');
