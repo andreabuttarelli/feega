@@ -91,7 +91,11 @@ const frames = (ctx: { fps: number }, n: number) => n / ctx.fps;
 const missing = (label: string) =>
   `<div style="${css({ width: '100%', height: '100%', background: INK.paper2, color: INK.inkSoft, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: MONO, fontSize: '24px' })}">${esc(label)}</div>`;
 
-const cover = (url: string, fit: string) => `<img src="${esc(url)}" alt="" style="${css({ width: '100%', height: '100%', objectFit: fit, display: 'block' })}" />`;
+type Framing = { fit: string; focusX: number; focusY: number };
+
+const PERCENT = 100;
+const focus = (f: Framing) => `${Math.round(f.focusX * PERCENT)}% ${Math.round(f.focusY * PERCENT)}%`;
+const cover = (url: string, f: Framing) => `<img src="${esc(url)}" alt="" style="${css({ width: '100%', height: '100%', objectFit: f.fit, objectPosition: focus(f), display: 'block' })}" />`;
 
 const Title: Template<'Title'> = {
   timing: Timing.Wrapper,
@@ -155,15 +159,15 @@ const Image: Template<'Image'> = {
   timing: Timing.Wrapper,
   html: (ctx) => {
     const url = ctx.asset(ctx.p.assetId);
-    return placed(ctx, ctx.p, url ? cover(url, ctx.p.fit) : missing('Pick an image'), true);
+    return placed(ctx, ctx.p, url ? cover(url, ctx.p) : missing('Pick an image'), true);
   }
 };
 
 const SECONDS = 10000;
 const exact = (n: number) => Math.round(n * SECONDS) / SECONDS;
 
-function segmentVideo(clipId: string, index: number, url: string, s: MediaSegment, fit: string): string {
-  const style = css({ position: 'absolute', left: '0', top: '0', width: '100%', height: '100%', objectFit: fit, display: 'block' });
+function segmentVideo(clipId: string, index: number, url: string, s: MediaSegment, f: Framing): string {
+  const style = css({ position: 'absolute', left: '0', top: '0', width: '100%', height: '100%', objectFit: f.fit, objectPosition: focus(f), display: 'block' });
   const preload = index === 0 ? 'auto' : 'metadata';
   return `<video id="c-${clipId}-s${index}" src="${esc(url)}" crossorigin="anonymous" preload="${preload}" muted playsinline data-start="${exact(s.at)}" data-duration="${exact(s.duration)}" data-media-start="${exact(s.mediaStart)}" data-playback-rate="${exact(s.rate)}" style="${style}"></video>`;
 }
@@ -177,9 +181,9 @@ const Video: Template<'Video'> = {
     }
     const segments = ctx.remap();
     if (segments) {
-      return placed(ctx, ctx.p, segments.map((s, i) => segmentVideo(ctx.id, i, url, s, ctx.p.fit)).join(''), true);
+      return placed(ctx, ctx.p, segments.map((s, i) => segmentVideo(ctx.id, i, url, s, ctx.p)).join(''), true);
     }
-    const video = `<video id="c-${ctx.id}" src="${esc(url)}" crossorigin="anonymous" preload="auto" muted playsinline data-start="${ctx.start}" data-duration="${ctx.length}" data-media-start="${ctx.mediaStart}" style="${css({ width: '100%', height: '100%', objectFit: ctx.p.fit, display: 'block' })}"></video>`;
+    const video = `<video id="c-${ctx.id}" src="${esc(url)}" crossorigin="anonymous" preload="auto" muted playsinline data-start="${ctx.start}" data-duration="${ctx.length}" data-media-start="${ctx.mediaStart}" style="${css({ width: '100%', height: '100%', objectFit: ctx.p.fit, objectPosition: focus(ctx.p), display: 'block' })}"></video>`;
     return placed(ctx, ctx.p, video, true);
   }
 };

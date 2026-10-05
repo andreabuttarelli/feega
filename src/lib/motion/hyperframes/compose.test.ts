@@ -52,6 +52,17 @@ describe('MotionDoc to HyperFrames composition', () => {
     expect(html.indexOf('c-bg')).toBeLessThan(html.indexOf('c-title'));
   });
 
+  it('a picture or video is cropped around its focus point', () => {
+    const base = newMotionDoc(MotionFormat.Landscape);
+    const pic = must(addClip(base, { component: 'Image', from: 0, durationInFrames: 30, props: { assetId: 'a', focusX: 0.2, focusY: 0.9 } }, 'pic'));
+    const vid = must(addClip(pic, { component: 'Video', from: 0, durationInFrames: 30, props: { assetId: 'v', focusX: 1, focusY: 0 } }, 'vid'));
+
+    const html = compose(vid, { a: 'https://x/a.png', v: 'https://x/v.mp4' });
+
+    expect(html).toContain('object-position:20% 90%');
+    expect(html).toContain('object-position:100% 0%');
+  });
+
   it('registers one paused timeline under the composition id', () => {
     expect(compose(doc)).toContain('window.__timelines["main"]=tl');
   });
