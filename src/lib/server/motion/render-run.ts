@@ -11,7 +11,7 @@ import { exportFolder, exportPath, outputSize } from '$lib/motion/export-plan';
 import { composeHtml, HYPERFRAMES_VERSION, type ComposeInput } from '$lib/motion/hyperframes/compose';
 import { assetOrigins } from '$lib/motion/hyperframes/csp';
 import { audioPlan } from '$lib/motion/audio-plan';
-import { holdCredits, releaseCredits } from '$lib/server/credit-hold';
+import { holdCredits, releaseCredits, splitPortions, type Portion } from '$lib/server/credit-hold';
 import { checkTask, FarmTask, farmChunks, farmProblem, firstSlices, framesOf, halves, launchAssembly, launchPiece, MAX_ATTEMPTS, pieceFile, stopWorker, TaskState, WORKER_GONE, type FarmJob, type Slice, type TaskCheck } from './farm-render';
 import { costSpans } from '$lib/motion/render-cost';
 import { FORMAT, exportProblem, type ExportFormat, type RenderSettings } from '$lib/motion/export-formats';
@@ -40,7 +40,7 @@ export type BatchView = { id: string; credits: number; rows: BatchCell[] };
 export type ReconcileOutcome = { checked: number; done: number; failed: number; pending: number; reaped: number };
 
 type Piece = { worker: string; attempt: number; state: TaskState; slice: Slice; spent?: string[] };
-type Billing = { held: number };
+type Billing = { held: number; portions?: Portion[] };
 type Output = { width: number; height: number; seconds: number; format: ExportFormat };
 type FarmProgress = { pieces: Piece[]; assembly: { attempt: number } | null };
 type BatchTag = { id: string; row: number; name: string; rows: number };
@@ -159,9 +159,13 @@ async function cleanUp(db: Db, farm: RenderFarm, run: NodeRun, state: RenderStat
 const heldOf = (quote: RenderQuote) => Math.ceil(quote.credits * HOLD_BUFFER);
 const holdNote = (what: string) => `motion render hold ${what}`;
 
-async function release(run: NodeRun, state: RenderState): Promise<void> {
-  await releaseCredits(run.orgId, state.billing?.held ?? 0, holdNote(run.id)).catch((e) => console.error('[motion render] hold not released', run.id, e));
+export async function releaseHold(run: NodeRun): Promise<void> {
+  const billing = (run.params as Partial<RenderState>).billing;
+  const portions = billing?.portions ?? [{ amount: billing?.held ?? 0, expiresAt: null }];
+  await releaseCredits(run.orgId, portions, holdNote(run.id)).catch((e) => console.error('[motion render] hold not released', run.id, e));
 }
+
+const release = (run: NodeRun, state: RenderState) => releaseHold({ ...run, params: { ...run.params, billing: state.billing } });
 
 async function fail(db: Db, farm: RenderFarm, run: NodeRun, state: RenderState, error: string, job: FarmJob | null): Promise<Step> {
   await failRun(db, { orgId: run.orgId, runId: run.id, error });
@@ -187,9 +191,9 @@ function refusal(farm: RenderFarm | null, runs: NodeRun[], plan: string | null, 
   return problem ? { error: RenderRefusal.Unsupported, detail: problem } : null;
 }
 
-async function enqueue(db: Db, scope: RenderScope, req: RenderRequest, extra: Record<string, unknown> = {}): Promise<NodeRun> {
+async function enqueue(db: Db, scope: RenderScope, req: RenderRequest, portions: Portion[], extra: Record<string, unknown> = {}): Promise<NodeRun> {
   const quote = renderQuote(req.doc, req.settings.resolution);
-  const billing: Billing = { held: heldOf(quote) };
+  const billing: Billing = { held: heldOf(quote), portions };
   const count = farmChunks(req.job).count;
   const output: Output = { width: req.job.width, height: req.job.height, seconds: req.doc.durationInFrames / req.doc.fps, format: req.settings.format };
   const run = await createRun(db, {
@@ -230,10 +234,11 @@ export async function startRender(db: Db, farm: RenderFarm | null, scope: Render
     return { ok: false, ...(refused ?? { error: RenderRefusal.NotConfigured }) };
   }
 
-  if (!(await holdCredits(scope.orgId, heldOf(renderQuote(req.doc, req.settings.resolution)), holdNote(scope.nodeId)))) {
+  const portions = await holdCredits(scope.orgId, heldOf(renderQuote(req.doc, req.settings.resolution)), holdNote(scope.nodeId));
+  if (!portions) {
     return { ok: false, error: RenderRefusal.NoCredits };
   }
-  const run = await enqueue(db, scope, req);
+  const run = await enqueue(db, scope, req, portions);
   const detail = await launch(db, farm, storage, run, req.job);
   if (detail) {
     return { ok: false, error: RenderRefusal.Unavailable, detail };
@@ -253,15 +258,17 @@ export async function startBatch(db: Db, farm: RenderFarm | null, scope: RenderS
     return { ok: false, error: RenderRefusal.NotConfigured };
   }
 
-  const held = rows.reduce((sum, row) => sum + heldOf(renderQuote(row.req.doc, row.req.settings.resolution)), 0);
-  if (!(await holdCredits(scope.orgId, held, holdNote(scope.nodeId)))) {
+  const helds = rows.map((row) => heldOf(renderQuote(row.req.doc, row.req.settings.resolution)));
+  const portions = await holdCredits(scope.orgId, helds.reduce((sum, h) => sum + h, 0), holdNote(scope.nodeId));
+  if (!portions) {
     return { ok: false, error: RenderRefusal.NoCredits };
   }
+  const perRow = splitPortions(portions, helds);
 
   const id = crypto.randomUUID();
   const queued: NodeRun[] = [];
   for (const [i, row] of rows.entries()) {
-    queued.push(await enqueue(db, scope, row.req, { batch: { id, row: i + 1, name: row.name, rows: rows.length } }));
+    queued.push(await enqueue(db, scope, row.req, perRow[i], { batch: { id, row: i + 1, name: row.name, rows: rows.length } }));
   }
   await Promise.all(queued.slice(0, BATCH_CONCURRENCY).map((run, i) => launch(db, farm, storage, run, rows[i].req.job)));
 

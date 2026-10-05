@@ -21,7 +21,7 @@ vi.mock('$lib/server/repos/node-runs', () => ({ ...runs, RENDER_JOB_PREFIX: 'mot
 vi.mock('./export', () => ({ saveExport }));
 vi.mock('$lib/server/ai-log', () => ({ logAiCall }));
 vi.mock('$lib/server/web-push', () => ({ sendPushToUser }));
-vi.mock('$lib/server/credit-hold', () => hold);
+vi.mock('$lib/server/credit-hold', async (original) => ({ ...(await original<typeof import('$lib/server/credit-hold')>()), ...hold }));
 vi.mock('./farm-render', async (original) => ({ ...(await original<typeof import('./farm-render')>()), ...farmCalls }));
 
 import { BATCH_CONCURRENCY, batchView, cancelRender, farmJob, reconcileRenders, RenderRefusal, renderRequest, renderView, startBatch, startRender, type RenderRequest } from './render-run';
@@ -90,7 +90,7 @@ beforeEach(() => {
   runs.activeRenderRuns.mockResolvedValue([]);
   farm.running.mockResolvedValue([]);
   farm.usage.mockResolvedValue(MINUTE_OF_8GB);
-  hold.holdCredits.mockResolvedValue(true);
+  hold.holdCredits.mockImplementation(async (_org: string, amount: number) => [{ amount, expiresAt: null }]);
   hold.releaseCredits.mockResolvedValue(undefined);
   runs.createRun.mockImplementation(async (_db, input) => runOf(input.params));
   runs.claimRun.mockImplementation(async (_db, input) => ({ ...runOf({}), id: input.runId }));
@@ -328,7 +328,7 @@ describe('a render is paid by the sandbox time it really used', () => {
     const run = await started();
     expect(hold.holdCredits).toHaveBeenCalledWith('org', heldFor(run), expect.any(String));
 
-    hold.holdCredits.mockResolvedValue(false);
+    hold.holdCredits.mockResolvedValue(null);
     const { db } = fakeDb();
     const refused = await startRender(db, farm, longScope, request(sevenChunks()), storage);
 
@@ -352,7 +352,7 @@ describe('a render is paid by the sandbox time it really used', () => {
     const cost = sandboxCostUsd(Array(7).fill(MINUTE_OF_8GB));
     expect(order.indexOf('usage')).toBeGreaterThan(order.lastIndexOf('stop'));
     expect(logAiCall.mock.calls[0][0]).toMatchObject({ flatCostUsd: cost, creditCap: heldFor(run) });
-    expect(hold.releaseCredits).toHaveBeenCalledWith('org', heldFor(run), expect.any(String));
+    expect(hold.releaseCredits).toHaveBeenCalledWith('org', [{ amount: heldFor(run), expiresAt: null }], expect.any(String));
     expect(runs.completeRun).toHaveBeenCalledWith(db, expect.objectContaining({ costUsd: cost }));
   });
 
@@ -390,7 +390,7 @@ describe('a render is paid by the sandbox time it really used', () => {
     }
 
     expect(logAiCall).not.toHaveBeenCalled();
-    expect(hold.releaseCredits).toHaveBeenCalledWith('org', heldFor(run), expect.any(String));
+    expect(hold.releaseCredits).toHaveBeenCalledWith('org', [{ amount: heldFor(run), expiresAt: null }], expect.any(String));
   });
 });
 
