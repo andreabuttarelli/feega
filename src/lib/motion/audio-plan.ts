@@ -1,5 +1,6 @@
 import type { ComponentId } from './components';
 import { clipsOf, type MotionClip, type MotionDoc } from './doc';
+import { flattenComps } from './precomp';
 import { SOUND, sampleTrack } from './keyframes';
 
 export type GainPoint = { time: number; value: number };
@@ -83,7 +84,7 @@ function entryOf(clip: MotionClip, doc: MotionDoc, url: string): AudioEntry | nu
 }
 
 export function audioPlan(doc: MotionDoc, urls: Record<string, string>): AudioEntry[] {
-  return clipsOf(doc).flatMap((clip) => {
+  return clipsOf(flattenComps(doc)).flatMap((clip) => {
     const p = clip.props as Sound;
     const url = p.assetId ? urls[p.assetId] : undefined;
     if (!SOUNDING.has(clip.component) || !url) {

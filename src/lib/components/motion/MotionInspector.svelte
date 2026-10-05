@@ -51,7 +51,8 @@
     composeHref = null,
     tab = $bindable<InspectorTab>(InspectorTab.Properties),
     onchange,
-    onuploadfont
+    onuploadfont,
+    onopen
   }: {
     doc: MotionDoc;
     analyses?: Record<string, AudioAnalysis>;
@@ -64,6 +65,7 @@
     tab?: InspectorTab;
     onchange: (doc: MotionDoc, summary: string) => void;
     onuploadfont?: (file: File) => Promise<string | null>;
+    onopen?: (comp: string) => void;
   } = $props();
 
   const DIALS = new Set(['rotateX', 'rotateY', 'rotateZ', 'objectRotateX', 'objectRotateY', 'objectRotateZ', 'orbit', 'maskRotation']);
@@ -614,6 +616,13 @@
             </div>
           {:else if field.control === Control.Font}
             <FontPicker value={String(value(field))} fonts={doc.fonts} brand={tokens.fonts ?? []} onpick={(family, catalogue) => pickFont(field, family, catalogue)} onupload={onuploadfont} />
+          {:else if field.control === Control.Comp}
+            <div class="comp">
+              <select id={`f-${field.key}`} value={String(value(field))} onchange={(e) => setProp(field, e.currentTarget.value)}>
+                {#each Object.entries(doc.comps) as [id, comp] (id)}<option value={id}>{comp.name}</option>{/each}
+              </select>
+              <button type="button" data-testid="open-comp" disabled={!doc.comps[String(value(field))]} onclick={() => onopen?.(String(value(field)))}>Open</button>
+            </div>
           {:else if field.control === Control.Managed}
             <span class="managed">{managedSummary(value(field))}{#if composeHref} · <a href={composeHref}>Edit in Compositions</a>{/if}</span>
           {/if}
@@ -629,6 +638,30 @@
 </div>
 
 <style>
+  .comp {
+    display: flex;
+    gap: var(--ui-space-1);
+  }
+
+  .comp select {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .comp button {
+    border: 1px solid var(--ui-line);
+    border-radius: 0;
+    background: var(--ui-bg);
+    color: var(--ui-ink);
+    padding: 0 var(--ui-space-2);
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .comp button:hover:not(:disabled) {
+    background: var(--ui-hover);
+  }
+
   .managed {
     color: var(--ui-ink-2);
   }

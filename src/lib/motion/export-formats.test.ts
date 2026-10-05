@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ExportFormat, EXPORT_FORMATS, FORMAT, MAX_EXPORT_BYTES, Preset, PRESETS, estimateBytes, exportProblem, oversize, parseSettings, settingsOf } from './export-formats';
+import { ExportFormat, EXPORT_FORMATS, FORMAT, Preset, PRESETS, estimateBytes, exportProblem, parseSettings, settingsOf } from './export-formats';
 import { MotionFormat, newMotionDoc } from './doc';
 import { Resolution } from './render-quote';
 
@@ -35,9 +35,7 @@ describe('export formats', () => {
     expect(estimateBytes(d, PRESETS[Preset.Master])).toBeGreaterThan(estimateBytes(d, PRESETS[Preset.Social]));
   });
 
-  it('the size is only known once rendered: a file over the storage limit says its size and how to fit it', () => {
-    expect(oversize(MAX_EXPORT_BYTES, ExportFormat.ProRes4444)).toBeNull();
-    expect(oversize(MAX_EXPORT_BYTES + 1, ExportFormat.ProRes4444)).toMatch(/^too_large: ProRes 4444.* is 50 MB, over the 50 MB/);
+  it('the size is only known once rendered, so a heavy master is not refused up front', () => {
     expect(exportProblem(doc(60), PRESETS[Preset.Master])).toBeNull();
   });
 

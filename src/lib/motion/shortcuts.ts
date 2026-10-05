@@ -40,7 +40,8 @@ export enum Command {
   ZoomOut = 'zoom-out',
   ToggleChat = 'toggle-chat',
   ToggleInspector = 'toggle-inspector',
-  Help = 'help'
+  Help = 'help',
+  Precompose = 'precompose'
 }
 
 export enum ShortcutGroup {
@@ -81,6 +82,7 @@ export const SHORTCUTS: readonly Binding[] = [
   { key: 'd', mod: true, shift: true, command: Command.Split, label: '⇧⌘D', does: 'Split at the playhead', group: ShortcutGroup.Editing },
   { key: 'z', mod: true, command: Command.Undo, label: '⌘Z', does: 'Undo', group: ShortcutGroup.Editing },
   { key: 'z', mod: true, shift: true, command: Command.Redo, label: '⇧⌘Z', does: 'Redo', group: ShortcutGroup.Editing },
+  { key: 'c', mod: true, shift: true, command: Command.Precompose, label: '⇧⌘C', does: 'Precompose the selection', group: ShortcutGroup.Layers },
   { key: 'c', mod: true, command: Command.Copy, label: '⌘C', does: 'Copy keyframes', group: ShortcutGroup.Editing },
   { key: 'v', mod: true, command: Command.Paste, label: '⌘V', does: 'Paste keyframes', group: ShortcutGroup.Editing },
   { key: 'a', mod: true, command: Command.SelectAll, label: '⌘A', does: 'Select all clips', group: ShortcutGroup.Editing },

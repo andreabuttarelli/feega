@@ -128,4 +128,9 @@ describe('typing', () => {
     expect(isTyping(field(false))).toBe(false);
     expect(isTyping(null)).toBe(false);
   });
+
+  it('shift+cmd+c precomposes the selection, cmd+c still copies', () => {
+    expect(press('c', { mod: true, shift: true })).toBe(Command.Precompose);
+    expect(press('c', { mod: true })).toBe(Command.Copy);
+  });
 });

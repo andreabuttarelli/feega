@@ -232,6 +232,10 @@ export async function queuedAudioRuns(db: Db, input: { limit: number }): Promise
   return queuedRunsWithPrefix(db, { ...input, prefix: AUDIO_JOB_PREFIX });
 }
 
+export async function queuedRenderRuns(db: Db, input: { limit: number }): Promise<NodeRun[]> {
+  return queuedRunsWithPrefix(db, { ...input, prefix: RENDER_JOB_PREFIX });
+}
+
 export async function queuedWiroRuns(db: Db, input: { limit: number }): Promise<NodeRun[]> {
   return queuedRunsWithPrefix(db, { ...input, prefix: WIRO_JOB_PREFIX });
 }

@@ -205,6 +205,16 @@ const Null: Template<'Null'> = {
   html: () => ''
 };
 
+const Precomp: Template<'Precomp'> = {
+  timing: Timing.Media,
+  html: () => ''
+};
+
+const Adjustment: Template<'Adjustment'> = {
+  timing: Timing.Media,
+  html: () => ''
+};
+
 const BrandBackground: Template<'BrandBackground'> = {
   timing: Timing.Wrapper,
   html: (ctx) => `<div style="${css({ position: 'absolute', inset: '0', background: ctx.color(ctx.p.fill), opacity: ctx.p.opacity, ...PATTERNS[ctx.p.pattern](ctx.color(ctx.p.accent)) })}"></div>`
@@ -376,5 +386,7 @@ export const TEMPLATES: { [K in ComponentId]: Template<K> } = {
   Logo3D,
   Device3D,
   Composition,
+  Precomp,
+  Adjustment,
   Custom
 };

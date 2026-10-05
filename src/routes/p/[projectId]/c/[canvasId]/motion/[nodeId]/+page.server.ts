@@ -5,8 +5,8 @@ import { findCanvasForUser } from '$lib/server/canvas/lookup';
 import { canvasReachable } from '$lib/server/uncensored-workspace/workspace-server';
 import { assetUrls, findMotionNode, headOrNew, motionAssets, motionTokens, saveMotionDoc } from '$lib/server/motion/editor';
 import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
-import { motionRenderFarm } from '$lib/server/motion/renderer';
-import { renderRequest, renderView, startRender } from '$lib/server/motion/render-run';
+import { motionRenderFarm, motionRenderStorage } from '$lib/server/motion/renderer';
+import { cancelRender, renderRequest, renderView, startRender } from '$lib/server/motion/render-run';
 import { parseSettings } from '$lib/motion/export-formats';
 import { listNodeRuns } from '$lib/server/repos/node-runs';
 import { SIGNED_URL_TTL_S } from '$lib/server/repos/asset-storage';
@@ -48,11 +48,13 @@ async function scopeFor(locals: App.Locals, params: { projectId: string; canvasI
 export const load: PageServerLoad = async ({ locals, params }) => {
   const scope = await scopeFor(locals, params);
   const nodeScope = { orgId: scope.orgId, nodeId: scope.motion.record.id };
-  const [head, tokens, assets, runs] = await Promise.all([
+  const farm = motionRenderFarm();
+  const [head, tokens, assets, runs, uploadLimit] = await Promise.all([
     headOrNew(scope.db, nodeScope, scope.motion.node),
     motionTokens(scope.db, { orgId: scope.orgId, brandId: scope.projectBrandId }),
     motionAssets({ db: scope.db, orgId: scope.orgId, projectId: params.projectId, canvasId: scope.canvas.id, nodeId: scope.motion.record.id }),
-    listNodeRuns(scope.db, nodeScope)
+    listNodeRuns(scope.db, nodeScope),
+    farm ? motionRenderStorage().limit().catch(() => null) : null
   ]);
 
   return {
@@ -63,7 +65,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
     head: { version: head.version, doc: head.doc },
     tokens,
     assets,
-    serverRender: { configured: motionRenderFarm() !== null, latest: renderView(runs) }
+    serverRender: { configured: farm !== null, latest: renderView(runs), uploadLimit }
   };
 };
 
@@ -182,8 +184,18 @@ export const actions: Actions = {
 
     const editorUrl = `/p/${params.projectId}/c/${params.canvasId}/motion/${params.nodeId}`;
     const renderScope = { ...nodeScope, projectId: params.projectId, userId: scope.userId, editorUrl };
-    const started = await startRender(scope.db, motionRenderFarm(), renderScope, req);
+    const started = await startRender(scope.db, motionRenderFarm(), renderScope, req, motionRenderStorage());
     return started.ok ? { runId: started.runId, quote: started.quote } : fail(HTTP_UNAVAILABLE, { error: started.error, detail: started.detail });
+  },
+
+  cancelRender: async ({ locals, params }) => {
+    const scope = await scopeFor(locals, params);
+    const farm = motionRenderFarm();
+    if (!farm) {
+      return fail(HTTP_UNAVAILABLE, { error: 'rendering_not_configured' });
+    }
+    const cancelled = await cancelRender(scope.db, farm, { orgId: scope.orgId, nodeId: scope.motion.record.id });
+    return cancelled.ok ? { cancelled: true } : fail(HTTP_CONFLICT, { error: 'nothing_to_cancel' });
   },
 
   renderStatus: async ({ locals, params }) => {

@@ -92,6 +92,17 @@ const trackSchema = z.object({
   locked: z.boolean().optional()
 });
 
+export const MAX_TRACKS = 20;
+
+const compSchema = z.object({
+  name: z.string().min(1).max(60),
+  durationInFrames: z.number().int().min(1).max(FRAMES_CEILING),
+  tracks: z
+    .array(trackSchema)
+    .max(MAX_TRACKS)
+    .refine((tracks) => tracks.every((t) => t.kind === TrackKind.Visual), 'a composition holds video tracks only')
+});
+
 const assetRefSchema = z.object({
   id: z.string().min(1),
   kind: z.enum(['image', 'video', 'audio', 'model3d', 'font']),
@@ -105,7 +116,8 @@ export const motionDocSchema = z
     width: z.number().int().min(16).max(MAX_SIDE),
     height: z.number().int().min(16).max(MAX_SIDE),
     durationInFrames: z.number().int().min(1).max(FRAMES_CEILING),
-    tracks: z.array(trackSchema).max(20),
+    tracks: z.array(trackSchema).max(MAX_TRACKS),
+    comps: z.record(z.string().min(1), compSchema).default({}),
     assets: z.array(assetRefSchema).default([]),
     camera: cameraSchema.nullable().default(null),
     look: lookSchema.nullable().default(null),
@@ -126,6 +138,7 @@ export type MotionDoc = z.infer<typeof motionDocSchema>;
 export type MotionTrack = MotionDoc['tracks'][number];
 export type MotionClip = Omit<MotionTrack['clips'][number], 'component'> & { component: ComponentId };
 export type AssetRef = MotionDoc['assets'][number];
+export type MotionComp = MotionDoc['comps'][string];
 
 export type DocVerdict = { ok: true; doc: MotionDoc } | { ok: false; error: string };
 
@@ -188,7 +201,7 @@ function clipProblem(doc: MotionDoc, clip: MotionClip): string | null {
 }
 
 function propsProblem(doc: MotionDoc): string | null {
-  for (const clip of clipsOf(doc)) {
+  for (const clip of everyClip(doc)) {
     const problem = clipProblem(doc, clip);
     if (problem) {
       return problem;
@@ -207,6 +220,52 @@ function fontsProblem(doc: MotionDoc): string | null {
   return null;
 }
 
+export function compOf(clip: Pick<MotionClip, 'component' | 'props'>): string | null {
+  return clip.component === 'Precomp' ? String(clip.props.comp) : null;
+}
+
+function compsUsed(tracks: readonly MotionTrack[]): string[] {
+  return tracks.flatMap((t) => (t.clips as MotionClip[]).map(compOf).filter((id): id is string => id !== null));
+}
+
+export function compRefProblem(doc: Pick<MotionDoc, 'comps'>, clip: Pick<MotionClip, 'component' | 'props'>): string | null {
+  const id = compOf(clip);
+  if (id === null || doc.comps[id]) {
+    return null;
+  }
+  const known = Object.keys(doc.comps);
+  return `no composition ${id}${known.length ? `: this video has ${known.join(', ')}` : ': precompose clips first'}`;
+}
+
+function cycleFrom(doc: MotionDoc, id: string, trail: readonly string[]): string | null {
+  if (trail.includes(id)) {
+    return `composition ${id} contains itself`;
+  }
+  for (const next of compsUsed(doc.comps[id]?.tracks ?? [])) {
+    const problem = cycleFrom(doc, next, [...trail, id]);
+    if (problem) {
+      return problem;
+    }
+  }
+  return null;
+}
+
+function compsProblem(doc: MotionDoc): string | null {
+  for (const clip of everyClip(doc)) {
+    const problem = compRefProblem(doc, clip);
+    if (problem) {
+      return problem;
+    }
+  }
+  for (const [id, comp] of Object.entries(doc.comps)) {
+    const problem = parentProblem({ ...doc, tracks: comp.tracks }) ?? cycleFrom(doc, id, []);
+    if (problem) {
+      return problem;
+    }
+  }
+  return null;
+}
+
 export function fontsOfClip(doc: MotionDoc, clip: Pick<MotionClip, 'component' | 'props'>): string | null {
   return fontsProblem({ ...doc, tracks: [{ id: '', kind: TrackKind.Visual, name: '', clips: [clip as MotionClip] }] });
 }
@@ -218,7 +277,7 @@ export function parseMotionDoc(input: unknown): DocVerdict {
   }
 
   const doc = structuredClone(parsed.data);
-  const problem = parentProblem(doc) ?? propsProblem(doc) ?? fontsProblem(doc);
+  const problem = parentProblem(doc) ?? compsProblem(doc) ?? propsProblem(doc) ?? fontsProblem(doc);
   if (problem) {
     return { ok: false, error: problem };
   }
@@ -237,6 +296,7 @@ export function newMotionDoc(format: MotionFormat): MotionDoc {
       { id: 'v1', kind: TrackKind.Visual, name: 'Video 1', clips: [] },
       { id: 'a1', kind: TrackKind.Audio, name: 'Audio 1', clips: [] }
     ],
+    comps: {},
     assets: [],
     camera: null,
     look: null,
@@ -279,6 +339,10 @@ export function formatOf(doc: Pick<MotionDoc, 'width' | 'height'>): MotionFormat
 
 export function clipsOf(doc: MotionDoc): MotionClip[] {
   return doc.tracks.flatMap((t) => t.clips as MotionClip[]);
+}
+
+export function everyClip(doc: Pick<MotionDoc, 'tracks' | 'comps'>): MotionClip[] {
+  return [doc.tracks, ...Object.values(doc.comps).map((c) => c.tracks)].flatMap((tracks) => tracks.flatMap((t) => t.clips as MotionClip[]));
 }
 
 export function findClip(doc: MotionDoc, clipId: string): { track: MotionTrack; clip: MotionClip } | null {

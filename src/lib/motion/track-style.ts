@@ -10,7 +10,9 @@ export enum ClipFamily {
   Custom = 'custom',
   Null = 'null',
   Camera = 'camera',
-  Mask = 'mask'
+  Mask = 'mask',
+  Precomp = 'precomp',
+  Adjustment = 'adjustment'
 }
 
 export enum Preview {
@@ -33,7 +35,9 @@ export const CLIP_FAMILIES: Record<ClipFamily, FamilyStyle> = {
   [ClipFamily.Custom]: { label: 'Code', hue: '#46a758', preview: Preview.Icon },
   [ClipFamily.Null]: { label: 'Null', hue: '#8b8d98', preview: Preview.Icon },
   [ClipFamily.Camera]: { label: 'Camera', hue: '#00a2c7', preview: Preview.Icon },
-  [ClipFamily.Mask]: { label: 'Mask', hue: '#978365', preview: Preview.Icon }
+  [ClipFamily.Mask]: { label: 'Mask', hue: '#978365', preview: Preview.Icon },
+  [ClipFamily.Precomp]: { label: 'Precomp', hue: '#3e63dd', preview: Preview.Icon },
+  [ClipFamily.Adjustment]: { label: 'Adjustment', hue: '#6e56cf', preview: Preview.Icon }
 };
 
 const COMPONENT_FAMILY: Record<ComponentId, ClipFamily> = {
@@ -57,6 +61,8 @@ const COMPONENT_FAMILY: Record<ComponentId, ClipFamily> = {
   Device3D: ClipFamily.ThreeD,
   Composition: ClipFamily.ThreeD,
   Null: ClipFamily.Null,
+  Precomp: ClipFamily.Precomp,
+  Adjustment: ClipFamily.Adjustment,
   Custom: ClipFamily.Custom
 };
 
