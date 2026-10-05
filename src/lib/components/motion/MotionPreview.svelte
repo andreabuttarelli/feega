@@ -9,7 +9,6 @@
   export type CapturedFrame = { time: number; data: string; layout: string; errors: ClipError[] };
   export type FrameSize = { width: number; height: number };
 
-  const RELOAD_DEBOUNCE_MS = 250;
   const CAPTURE_WIDTH = 640;
   const CAPTURE_QUALITY = 0.72;
 
@@ -27,7 +26,7 @@
   let player: Player | null = null;
   let reported = -1;
   let ready = false;
-  let pending: ReturnType<typeof setTimeout> | null = null;
+  let pending: number | null = null;
   let capturing = false;
 
   function setSource(next: string) {
@@ -157,13 +156,13 @@
   $effect(() => {
     const next = html;
     if (pending) {
-      clearTimeout(pending);
+      cancelAnimationFrame(pending);
     }
-    pending = setTimeout(() => {
+    pending = requestAnimationFrame(() => {
       if (!capturing) {
-        driver.load(next);
+        driver.update(next);
       }
-    }, RELOAD_DEBOUNCE_MS);
+    });
   });
 
   $effect(() => {

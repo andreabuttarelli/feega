@@ -86,7 +86,7 @@ describe('an adjustment layer in the composed page', () => {
 function boot(doc: MotionDoc) {
   const html = compose(doc);
   const root = html.slice(html.indexOf('<div id="root"'), html.indexOf('<script>const tl'));
-  const script = /<script>([^<]*const tl=window\.__feegaMotion\.timeline[\s\S]*?)<\/script>/.exec(html)![1];
+  const script = /<script(?: data-hot)?>([^<]*const tl=window\.__feegaMotion\.timeline[\s\S]*?)<\/script>/.exec(html)![1];
   document.body.innerHTML = root;
   installEngine();
   window.eval(script);
