@@ -1,4 +1,5 @@
-import { sampleTrack, type Keyframe } from '../keyframes';
+import { sampleTrack } from '../sample-track';
+import type { Keyframe } from '../keyframes';
 import { INPUT_KEYS, type InputPort } from './inputs';
 
 export const MAX_SOURCE = 2000;
