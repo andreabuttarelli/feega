@@ -120,9 +120,12 @@ function stage(b) {
 
 const stages = BAKES.map(stage).filter(Boolean);
 dropUnused('comp-', BAKES.map((b) => 'comp-' + b.id));
+const STALE = '__feegaStaleComposition';
+const replaced = window[STALE] || [];
+window[STALE] = [];
 ${ON_DISPOSE}(() => {
   live = false;
-  stages.forEach((s) => disposeScene(s.scene));
+  window[STALE].push(() => stages.forEach((s) => disposeScene(s.scene)));
 });
 
 function renderAt(time) {
@@ -157,7 +160,10 @@ function renderAt(time) {
 
 window.__hf = window.__hf || {};
 window.__hf.buildReady = window.__hf.buildReady || {};
-window.__hf.buildReady[READY] = Promise.all(stages.map((s) => s.ready)).then(() => renderAt(window.__hfThreeTime || 0));
+window.__hf.buildReady[READY] = Promise.all(stages.map((s) => s.ready)).then(() => {
+  renderAt(window.__hfThreeTime || 0);
+  replaced.forEach((dispose) => dispose());
+});
 ${hotSeek('renderAt')}
 const tl = window.__timelines && window.__timelines.main;
 if (tl) {

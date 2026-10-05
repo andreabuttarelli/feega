@@ -773,6 +773,10 @@
       {/if}
     {/each}
 
+    {#if shown.tracks.every((t) => !t.clips.length)}
+      <div class="empty-drop" data-testid="timeline-empty">Press <b>+ Add</b> to place your first element</div>
+    {/if}
+
     {#if easing}
       <div class="ease-at" style={`left: ${Math.max(headPx, easing.left - 120)}px; top: ${easing.top}px;`}>
         <EasePicker ease={easing.ease} kinds={segmentKinds(easing)} onpick={pickEase} onkind={pickKind} onclose={() => (easing = null)} />
@@ -1460,6 +1464,28 @@
   .key.picked {
     background: var(--ui-accent);
     border-color: var(--ui-accent);
+  }
+
+  .empty-drop {
+    position: sticky;
+    left: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: min(480px, calc(100vw - 48px));
+    height: 56px;
+    margin: 12px;
+    border: 1px dashed var(--ui-line-strong);
+    background: var(--ui-bg);
+    color: var(--ui-ink-3);
+    font-size: var(--ui-text-sm);
+    z-index: 5;
+  }
+
+  .empty-drop b {
+    margin: 0 4px;
+    color: var(--ui-ink-2);
+    font-weight: 600;
   }
 
   .ease-at {

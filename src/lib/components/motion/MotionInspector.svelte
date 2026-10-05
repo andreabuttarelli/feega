@@ -28,6 +28,7 @@
   import CodeEditor from './CodeEditor.svelte';
   import FontPicker from './FontPicker.svelte';
   import LutPicker from './LutPicker.svelte';
+  import TextPathSection from './TextPathSection.svelte';
   import { registerFont, setFont } from '$lib/motion/fonts/ops';
   import type { CatalogueFont } from '$lib/motion/fonts/model';
   import { withParams } from '$lib/motion/custom/params';
@@ -633,6 +634,7 @@
         {#each TEXT_PRESETS as preset (preset)}<option value={preset}>{preset}</option>{/each}
       </select>
     </div>
+    <TextPathSection {doc} {clip} params={animated.params} row={animField} {commit} />
   {/if}
   {#if pulseShown}
     <div class="line" data-testid="pulse-section">

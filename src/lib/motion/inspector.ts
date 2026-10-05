@@ -13,6 +13,8 @@ import { effectOfKey } from './effects/model';
 import { setEffect } from './effects/ops';
 import { SELECTOR, animatorOfKey } from './text-animators/model';
 import { setAnimator } from './text-animators/ops';
+import { textPathPatch } from './text-path/model';
+import { setTextPath } from './text-path/ops';
 
 export enum InspectorTab {
   Properties = 'properties',
@@ -196,6 +198,10 @@ const EDIT_BASE: Record<Source, (doc: MotionDoc, clip: MotionClip, key: string, 
     const ref = modifierOfKey(key);
     const next = ref ? withModifierParam((clip.props.modifiers as Modifier[] | undefined) ?? [], ref.id, ref.param, Number(value)) : `no modifier for ${key}`;
     return typeof next === 'string' ? { ok: false, error: next } : setProps(doc, clip.id, { modifiers: next });
+  },
+  [Source.TextPath]: (doc, clip, key, value) => {
+    const patch = textPathPatch(key, value);
+    return patch ? setTextPath(doc, clip.id, patch) : { ok: false, error: `no text path for ${key}` };
   },
   [Source.Mask]: (doc, clip, key, value) => (clip.mask ? setMask(doc, clip.id, { ...clip.mask, [MASK_PROPS[key as MaskKey].field]: Number(value) }) : { ok: false, error: 'add a mask first' })
 };

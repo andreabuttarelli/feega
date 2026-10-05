@@ -69,9 +69,9 @@ export const GET: RequestHandler = async ({ request }) => {
   const renders = farm
     ? await reconcileRenders(db, farm, motionRenderStorage()).catch((e) => {
         console.error('[canvas runs] render reconcile failed', e);
-        return { checked: 0, done: 0, failed: 0, pending: 0 };
+        return { checked: 0, done: 0, failed: 0, pending: 0, reaped: 0 };
       })
-    : { checked: 0, done: 0, failed: 0, pending: 0 };
+    : { checked: 0, done: 0, failed: 0, pending: 0, reaped: 0 };
 
   const purge = await purgeProviderCopies(db, configuredPurgers()).catch((e) => {
     console.error('[canvas runs] provider purge failed', e);

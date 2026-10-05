@@ -399,15 +399,20 @@ const scenes = CLIPS.map((c) => {
   return { c, s, ready: Promise.all([LOADERS[c.kind](c, s), environment(s)]) };
 }).filter(Boolean);
 dropUnused('three-', CLIPS.map((c) => 'three-' + c.id));
+const STALE = '__feegaStaleThree';
+const replaced = window[STALE] || [];
+window[STALE] = [];
 ${ON_DISPOSE}(() => {
   live = false;
-  for (const { s } of scenes) {
-    disposeScene(s.scene);
-    if (s.bokeh) {
-      s.bokeh.target.dispose();
-      disposeScene(s.bokeh.scene);
+  window[STALE].push(() => {
+    for (const { s } of scenes) {
+      disposeScene(s.scene);
+      if (s.bokeh) {
+        s.bokeh.target.dispose();
+        disposeScene(s.bokeh.scene);
+      }
     }
-  }
+  });
 });
 
 function legacyOrbit(c, local) {
@@ -468,7 +473,10 @@ function renderAt(time) {
 
 window.__hf = window.__hf || {};
 window.__hf.buildReady = window.__hf.buildReady || {};
-window.__hf.buildReady['motion-three'] = Promise.all(scenes.map((x) => x.ready)).then(() => renderAt(window.__hfThreeTime || 0));
+window.__hf.buildReady['motion-three'] = Promise.all(scenes.map((x) => x.ready)).then(() => {
+  renderAt(window.__hfThreeTime || 0);
+  replaced.forEach((dispose) => dispose());
+});
 ${hotSeek('renderAt')}
 const tl = window.__timelines && window.__timelines.main;
 DRIVER

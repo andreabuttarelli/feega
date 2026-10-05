@@ -45,6 +45,8 @@ const WORKER: Record<RenderRoute, { vcpus: number; timeoutMs: number }> = {
   [RenderRoute.Whole]: { vcpus: 8, timeoutMs: 120 * MINUTE_MS }
 };
 
+const LIFETIME = { bootMs: 2 * MINUTE_MS, msPerFullHdFrame: 500, assemblyMs: 5 * MINUTE_MS };
+
 export const MAX_ATTEMPTS = 2;
 export const RENDER_DEADLINE_MS = (MAX_ATTEMPTS + 1) * WORKER[RenderRoute.Whole].timeoutMs;
 
@@ -128,6 +130,14 @@ export function farmProblem(job: FarmJob): string | null {
   return REFUSED.find((rule) => rule.applies(job))?.because ?? null;
 }
 
+function lifetimeMs(job: FarmJob, index: number): number {
+  const route = routeOf(job);
+  const frames = farmChunks(job).size * (job.motionBlur?.samples ?? 1);
+  const work = LIFETIME.bootMs + (frames * job.width * job.height * LIFETIME.msPerFullHdFrame) / FULL_HD_PIXELS;
+  const head = index === 0 ? LIFETIME.assemblyMs : 0;
+  return Math.round(Math.min(WORKER[route].timeoutMs, work + head));
+}
+
 export function farmChunks(job: FarmJob): ChunkPlan {
   return routeOf(job) === RenderRoute.Whole ? { size: job.totalFrames, count: 1 } : chunkPlan(job.totalFrames);
 }
@@ -165,18 +175,23 @@ async function startSteps(worker: FarmWorker, task: FarmTask, steps: Step[]): Pr
 export async function launchPiece(farm: RenderFarm, job: FarmJob, index: number, links: PieceLinks): Promise<string> {
   const route = routeOf(job);
   const hosts = [...new Set([...job.allowHosts, links.storageHost, ...RUNTIME_HOSTS])];
-  const worker = await farm.open({ allowHosts: hosts, timeoutMs: WORKER[route].timeoutMs, vcpus: WORKER[route].vcpus });
+  const worker = await farm.open({ allowHosts: hosts, timeoutMs: lifetimeMs(job, index), vcpus: WORKER[route].vcpus });
 
   const render: Step = { what: `chunk ${index}`, cmd: 'node', args: [CHUNK_SCRIPT, SPEC] };
   const file = chunkPath(job, index);
   const upload = links.upload ? [sizeStep(`chunk ${index} size check`, 'a part of this render', file, links.maxBytes), uploadStep(`chunk ${index} upload`, file, 'application/octet-stream', links.upload)] : [];
 
-  await worker.write([
-    { path: `${PROJECT_DIR}/index.html`, content: Buffer.from(job.html) },
-    { path: CHUNK_SCRIPT, content: Buffer.from(CHUNK_SOURCE) },
-    { path: SPEC, content: Buffer.from(JSON.stringify(chunkSpec(job, index))) }
-  ]);
-  await startSteps(worker, FarmTask.Piece, [render, ...upload]);
+  try {
+    await worker.write([
+      { path: `${PROJECT_DIR}/index.html`, content: Buffer.from(job.html) },
+      { path: CHUNK_SCRIPT, content: Buffer.from(CHUNK_SOURCE) },
+      { path: SPEC, content: Buffer.from(JSON.stringify(chunkSpec(job, index))) }
+    ]);
+    await startSteps(worker, FarmTask.Piece, [render, ...upload]);
+  } catch (e) {
+    await worker.stop().catch(() => {});
+    throw e;
+  }
   return worker.name;
 }
 
