@@ -107,7 +107,7 @@ function stage(b) {
   const meshes = b.instances.map((index) => {
     const material = new THREE.ShaderMaterial({
       transparent: true, side: THREE.DoubleSide, depthWrite: true,
-      uniforms: { mediaTexture: { value: sources[index].t }, hasTexture: { value: 0 }, radius: { value: RADIUS }, opacity: { value: 1 } },
+      uniforms: { mediaTexture: { value: sources[index].t }, hasTexture: { value: 0 }, radius: { value: RADIUS }, opacity: { value: 1 }, bend: { value: 0 } },
       vertexShader: VERTEX, fragmentShader: FRAGMENT
     });
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material);

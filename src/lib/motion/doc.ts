@@ -231,13 +231,25 @@ export function compOf(clip: Pick<MotionClip, 'component' | 'props'>): string | 
   return clip.component === 'Precomp' ? String(clip.props.comp) : null;
 }
 
+type CompositionCard = { assetId: string; kind: string };
+const COMP_CARD = 'comp';
+const RING_LAYOUT = 'ring';
+
+export function compsOf(clip: Pick<MotionClip, 'component' | 'props'>): string[] {
+  if (clip.component === 'Composition') {
+    return clip.props.layout !== RING_LAYOUT ? [] : ((clip.props.media ?? []) as CompositionCard[]).filter((m) => m.kind === COMP_CARD).map((m) => m.assetId);
+  }
+  const id = compOf(clip);
+  return id === null ? [] : [id];
+}
+
 function compsUsed(tracks: readonly MotionTrack[]): string[] {
-  return tracks.flatMap((t) => (t.clips as MotionClip[]).map(compOf).filter((id): id is string => id !== null));
+  return tracks.flatMap((t) => (t.clips as MotionClip[]).flatMap(compsOf));
 }
 
 export function compRefProblem(doc: Pick<MotionDoc, 'comps'>, clip: Pick<MotionClip, 'component' | 'props'>): string | null {
-  const id = compOf(clip);
-  if (id === null || doc.comps[id]) {
+  const id = compsOf(clip).find((ref) => !doc.comps[ref]);
+  if (id === undefined) {
     return null;
   }
   const known = Object.keys(doc.comps);

@@ -77,6 +77,13 @@ un solo materiale, `specularIntensity` di `MeshPhysicalMaterial`. E prima di toc
 materiali, togli lo strato sospetto dall'HTML generato e rifai lo snapshot: dice in un minuto
 quale strato è.
 
+### Copie di DOM dentro elementi 3D: `will-change` le fa costare un secondo a frame
+Il ring copia ogni clip di una composizione in ogni fetta: `.fx{will-change:transform}` dava a
+ognuna un layer di compositing a piena risoluzione, centinaia per frame. JS e layout restano a
+4 ms, il frame a 1 s. Segnale: tempo per frame che cresce col numero di copie mentre il seek è
+istantaneo. Mossa: confrontare varianti dell'HTML con un CSS in più (`will-change:auto`) e
+misurare ms per screenshot; dentro le copie si spegne il `will-change`.
+
 ## Ambiente e worktree
 
 ### I tempi di idratazione misurati in dev non dicono niente

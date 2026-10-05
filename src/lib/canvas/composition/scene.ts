@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { CAMERA_PRESETS, type CameraPresetId } from './camera';
 import { LAYOUTS } from './index';
 import { instancesOf, poseAt, type PoseInput } from './pose';
-import { MEDIA_FRAGMENT_SHADER, MEDIA_UNIFORMS, MEDIA_VERTEX_SHADER } from './shader';
+import { BEND_SEGMENTS, MEDIA_FRAGMENT_SHADER, MEDIA_UNIFORMS, MEDIA_VERTEX_SHADER } from './shader';
 import type { LayoutId, LayoutParams } from './types';
 
 export type MediaKind = 'image' | 'video';
@@ -163,7 +163,7 @@ function createMesh(
 	mediaIndex: number,
 	onTextureReady?: () => void
 ): BuiltMedia {
-	const geometry = new THREE.PlaneGeometry(media.aspect, 1);
+	const geometry = new THREE.PlaneGeometry(media.aspect, 1, BEND_SEGMENTS, 1);
 	const material = createMediaMaterial();
 	const mesh = new THREE.Mesh(geometry, material);
 
@@ -218,7 +218,8 @@ function createMediaMaterial(): THREE.ShaderMaterial {
 			mediaTexture: { value: null },
 			hasTexture: { value: 0 },
 			radius: { value: MEDIA_UNIFORMS.radius },
-			opacity: { value: 1 }
+			opacity: { value: 1 },
+			bend: { value: 0 }
 		},
 		vertexShader: MEDIA_VERTEX_SHADER,
 		fragmentShader: MEDIA_FRAGMENT_SHADER
@@ -243,6 +244,9 @@ function createVideoElement(url: string): HTMLVideoElement {
 function applyTransform(mesh: THREE.Mesh, transform: ReturnType<(typeof LAYOUTS)[LayoutId]['transforms']>[number]): void {
 	mesh.position.set(transform.position.x, transform.position.y, transform.position.z);
 	mesh.rotation.set(transform.rotation.x, transform.rotation.y, transform.rotation.z);
-	mesh.scale.set(transform.scale.x, transform.scale.y, transform.scale.z);
+	const across = transform.width ? transform.width / (mesh.geometry as THREE.PlaneGeometry).parameters.width : transform.scale.x;
+	mesh.scale.set(across, transform.scale.y, transform.width ? across : transform.scale.z);
 	(mesh.material as THREE.ShaderMaterial).uniforms.opacity.value = transform.opacity ?? 1;
+	(mesh.material as THREE.ShaderMaterial).uniforms.bend.value = transform.bend ? transform.bend / across : 0;
+	(mesh.material as THREE.ShaderMaterial).uniforms.radius.value = transform.corner ?? MEDIA_UNIFORMS.radius;
 }

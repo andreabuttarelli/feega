@@ -181,6 +181,7 @@ const EDIT_BASE: Record<Source, (doc: MotionDoc, clip: MotionClip, key: string, 
   [Source.Remap]: (doc, clip, key, value, local) => setKeyframe(doc, clip.id, key, local, value),
   [Source.Param]: (doc, clip, key, value) => setProps(doc, clip.id, { [key]: value }),
   [Source.Sound]: (doc, clip, key, value) => setProps(doc, clip.id, { [key]: value }),
+  [Source.Layout]: (doc, clip, key, value) => setProps(doc, clip.id, { layoutParams: { ...(clip.props.layoutParams as Record<string, unknown>), [key]: value } }),
   [Source.Effect]: (doc, clip, key, value) => {
     const ref = effectOfKey(key);
     return ref ? setEffect(doc, clip.id, ref.effectId, { params: { [ref.param]: value } }) : { ok: false, error: `no effect for ${key}` };
