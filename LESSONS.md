@@ -130,6 +130,16 @@ Segnale: la preview non si aggiorna e non parte, nessun errore in `console`; con
 server vanno in `$state.raw` (si sostituisce l'oggetto intero), e nei giri Playwright si ascolta
 `pageerror`, non solo `console`.
 
+### Una tela vuota per un solo nodo: `structuredClone` su un proxy, di nuovo
+Segnale: la tela intera resta bianca, `DataCloneError: … could not be cloned` con
+`parseMotionDoc`/`applyDraft` nello stack. Il `$state.raw` sopra copriva i doc caricati, non il
+nodo e le card che il componente passa a `nodeDoc` dritti dallo stato della tela. Mossa: una
+funzione pura che copia un doc usa `cloneDoc` (JSON), mai `structuredClone` — tollera i proxy, e
+la regola sta in un posto invece che in ogni chiamante. Ogni nodo sta in `NodeBoundary`, così un
+render che lancia resta dentro il suo nodo. Un test con proxy veri vuole
+`// @vitest-environment jsdom` in un `.svelte.test.ts`: in ambiente node `$state` compila lato
+server e non crea proxy, e il test passa senza provare niente.
+
 ### Uno screenshot di un frame HTML del motore senza le clip che partono dopo lo 0
 Segnale: in un harness Playwright le clip con `from` > 0 non compaiono mai, anche senza keyframe;
 sul farm e nel player sì. `__timelines.main.seek(t)` muove solo GSAP, non la visibilità delle clip

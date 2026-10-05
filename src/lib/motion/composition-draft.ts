@@ -5,7 +5,7 @@ import type { CompositionAspect, CompositionNode, UpstreamCard } from '../canvas
 import { COMP_CARD_LAYOUTS } from './card-layouts';
 import { embedMotion, motionCompId } from './embed';
 import { TrackKind, defaultProps, type CellSpec } from './components';
-import { FORMATS, MotionFormat, formatOf, newClip, newMotionDoc, parseMotionDoc, type DocVerdict, type MotionClip, type MotionDoc, type MotionTrack } from './doc';
+import { FORMATS, MotionFormat, cloneDoc, formatOf, newClip, newMotionDoc, parseMotionDoc, type DocVerdict, type MotionClip, type MotionDoc, type MotionTrack } from './doc';
 import type { PropsOf } from './hyperframes/templates';
 
 export type ComposeMedia = PropsOf<'Composition'>['media'][number];
@@ -126,7 +126,7 @@ function withOverlayTrack(doc: MotionDoc): MotionDoc {
 export function applyDraft(base: MotionDoc, draft: ComposeDraft): DocVerdict {
   const frames = Math.round(clampSeconds(draft.seconds) * base.fps);
   const { width, height } = FORMATS[draft.format];
-  let doc: MotionDoc = withOverlayTrack({ ...structuredClone(base), width, height, durationInFrames: frames });
+  let doc: MotionDoc = withOverlayTrack({ ...cloneDoc(base), width, height, durationInFrames: frames });
 
   const composition = clipOf(COMPOSITION_CLIP, 'Composition', frames, {
     layout: draft.layout,
