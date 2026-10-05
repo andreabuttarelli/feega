@@ -102,6 +102,17 @@ describe('typed fields', () => {
     expect(exposed.ok && applyValues(exposed.doc, { align: 'up' })).toEqual({ ok: false, error: 'align expects one of left, center, right, got "up"' });
   });
 
+  it('a media list field takes asset ids separated by commas, video: marking a video', () => {
+    const added = addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Composition', from: 0, durationInFrames: 60 }, 'grid');
+    const exposed = added.ok ? exposeField(added.doc, { key: 'media', label: 'Media', type: FieldType.MediaList, clipId: 'grid', prop: 'media' }) : added;
+    const filled = exposed.ok ? applyValues(exposed.doc, { media: 'a1, video:v1' }) : exposed;
+
+    expect(filled.ok && fieldValues(filled.doc)[0].value).toEqual([
+      { assetId: 'a1', kind: 'image' },
+      { assetId: 'v1', kind: 'video' }
+    ]);
+  });
+
   it('a number field refuses a value outside its range', () => {
     const exposed = exposeField(withTitle(), { ...headline, key: 'size', type: FieldType.Number, prop: 'size', min: 0.02, max: 0.2 });
 

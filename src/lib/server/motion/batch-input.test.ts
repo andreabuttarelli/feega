@@ -6,6 +6,7 @@ import { exposeField, FieldType } from '$lib/motion/template/fields';
 import { FEEGA_TOKENS } from '$lib/motion/brand';
 import { Preset, settingsOf } from '$lib/motion/export-formats';
 import { MAX_BATCH_ROWS } from '$lib/motion/template/batch';
+import { insertTemplate, templateFromDoc } from '$lib/motion/template/library';
 
 function template(): MotionDoc {
   const added = addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Title', from: 0, durationInFrames: 60, props: { text: 'Hello' } }, 't1');
@@ -36,6 +37,16 @@ describe('rowRequests', () => {
       ['a', 4, true, false],
       ['b', 4, false, true]
     ]);
+  });
+
+  it('a row fills the fields of an inserted template, inside its precomp, and reaches the rendered page', () => {
+    const saved = templateFromDoc(template(), { name: 'Card' });
+    const placed = saved.ok ? insertTemplate(newMotionDoc(MotionFormat.Landscape), { id: 'org:card', template: saved.template }, { from: 0, newId: (() => { let n = 0; return () => `i${++n}`; })() }) : saved;
+    const doc = placed.ok ? placed.doc : template();
+
+    const made = rowRequests({ version: 2, doc }, [{ name: 'a', values: { headline: 'Zqx3inside' } }], { tokens: FEEGA_TOKENS, assets: {} }, settingsOf(Preset.Social));
+
+    expect(made.ok && made.rows[0].req.job.html.includes('Zqx3inside')).toBe(true);
   });
 
   it('a value of the wrong type names its row', () => {

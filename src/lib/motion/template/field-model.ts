@@ -6,10 +6,21 @@ export enum FieldType {
   Color = 'color',
   Asset = 'asset',
   Boolean = 'boolean',
-  Select = 'select'
+  Select = 'select',
+  MediaList = 'media_list'
 }
 
 export const FIELD_TYPES = Object.values(FieldType) as [FieldType, ...FieldType[]];
+
+export const FIELD_TYPE_LABEL: Record<FieldType, string> = {
+  [FieldType.Text]: 'Text',
+  [FieldType.Number]: 'Number',
+  [FieldType.Color]: 'Colour',
+  [FieldType.Asset]: 'Media',
+  [FieldType.Boolean]: 'Yes / no',
+  [FieldType.Select]: 'Choice',
+  [FieldType.MediaList]: 'Media list'
+};
 export const FIELD_KEY = /^[a-z][a-z0-9_]{0,39}$/;
 export const MAX_FIELDS = 50;
 export const MAX_OPTIONS = 20;

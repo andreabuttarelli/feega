@@ -24,8 +24,20 @@ const COERCE: Record<FieldType, Coerce> = {
   [FieldType.Color]: { expects: () => 'a #rrggbb colour', parse: (raw) => (HEX.test(raw) ? raw.toLowerCase() : undefined) },
   [FieldType.Asset]: { expects: () => 'an asset id', parse: (raw) => raw },
   [FieldType.Boolean]: { expects: () => 'yes or no', parse: (raw) => (TRUE.has(raw.toLowerCase()) ? true : FALSE.has(raw.toLowerCase()) ? false : undefined) },
-  [FieldType.Select]: { expects: (f) => `one of ${(f.options ?? []).join(', ')}`, parse: (raw, f) => (f.options?.includes(raw) ? raw : undefined) }
+  [FieldType.Select]: { expects: (f) => `one of ${(f.options ?? []).join(', ')}`, parse: (raw, f) => (f.options?.includes(raw) ? raw : undefined) },
+  [FieldType.MediaList]: { expects: () => 'asset ids separated by commas (video:id for a video)', parse: (raw) => mediaList(raw) }
 };
+
+const VIDEO_PREFIX = 'video:';
+
+function mediaList(raw: string): { assetId: string; kind: 'image' | 'video' }[] | undefined {
+  const items = raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((s) => (s.startsWith(VIDEO_PREFIX) ? { assetId: s.slice(VIDEO_PREFIX.length).trim(), kind: 'video' as const } : { assetId: s, kind: 'image' as const }));
+  return items.length && items.every((i) => i.assetId) ? items : undefined;
+}
 
 export function locateClip(doc: MotionDoc, clipId: string): Located | null {
   const root = findClip(doc, clipId);
