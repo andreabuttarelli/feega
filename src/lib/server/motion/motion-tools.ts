@@ -89,7 +89,16 @@ export type MotionToolDeps = {
   check: (callId: string, doc: MotionDoc, name: string) => Promise<CheckResult | null>;
   analysis?: (assetId: string) => Promise<AudioAnalysis | null>;
   batch?: (input: { doc: MotionDoc; rows: { name: string; values: Record<string, string> }[] }) => Promise<Record<string, unknown>>;
+  site?: (url: string) => Promise<SourceRead>;
+  brand?: (name?: string) => Promise<SourceRead>;
+  importAsset?: (url: string, label?: string) => Promise<AssetImport>;
 };
+
+export type SourceRead = { ok: true } & Record<string, unknown> | { ok: false; error: string };
+
+export type AssetImport = { ok: true; asset: MotionAsset; width: number | null; height: number | null } | { ok: false; error: string };
+
+const UNREADABLE = (what: string) => ({ ok: false as const, error: `${what} is not available in this workspace` });
 
 const framesAt = (s: number, fps: number) => Math.round(s * fps);
 const secondsAt = (f: number, fps: number) => Math.round((f / fps) * 100) / 100;
@@ -1125,6 +1134,31 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const paced = input.fps === undefined ? ({ ok: true, doc: session.doc } as OpResult) : setFrameRate(session.doc, input.fps);
         const sized = paced.ok ? setCanvas(paced.doc, { format: input.format, durationInFrames: input.duration === undefined ? undefined : framesAt(input.duration, paced.doc.fps), background: input.background }) : paced;
         return apply(sized, 'changed the canvas');
+      }
+    }),
+
+    analyze_site: tool({
+      description: 'Read a public website for a brand: name, tagline, description, logos (svg first, then favicon, apple-touch-icon, og:image), palette (theme, logo, CSS), fonts (google true = usable by name with set_font), images with width and height (og, hero, product), products and social links. Nothing is stored: import_asset the logo and the pictures you will use.',
+      inputSchema: z.object({ url: z.string().min(4).max(2000).describe('the site, e.g. https://www.allbirds.com or allbirds.com') }),
+      execute: async (input) => (deps.site ? deps.site(input.url) : UNREADABLE('reading sites'))
+    }),
+
+    use_brand: tool({
+      description: "Read a brand of this workspace: the project brand without a name, or the brand the user names. Returns name, website, logo url, palette, fonts, voice notes and products. import_asset its logo and product pictures to use them in clips.",
+      inputSchema: z.object({ name: z.string().max(120).optional().describe('brand name or slug; omit for the project brand') }),
+      execute: async (input) => (deps.brand ? deps.brand(input.name) : UNREADABLE('reading brands'))
+    }),
+
+    import_asset: tool({
+      description: 'Download a picture or logo from a public https url (PNG, JPEG, WebP, GIF, AVIF or SVG, max 12MB) into the project assets and return its asset_id for Image, Logo, Logo3D (SVG), ProductCard or Device3D screen.',
+      inputSchema: z.object({ url: z.string().url().max(2000), label: z.string().max(60).optional() }),
+      execute: async (input) => {
+        const imported = deps.importAsset ? await deps.importAsset(input.url, input.label) : UNREADABLE('importing pictures');
+        if (!imported.ok) {
+          return imported;
+        }
+        deps.assets.push(imported.asset);
+        return { ok: true, asset_id: imported.asset.id, kind: imported.asset.kind, width: imported.width, height: imported.height };
       }
     }),
 

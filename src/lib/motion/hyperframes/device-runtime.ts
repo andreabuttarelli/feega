@@ -17,6 +17,8 @@ export function deviceRuntime(device: Device, finish: Finish, ctx: { color: (v: 
 
 export const DEVICE_SCRIPT = `
 const DEVICE_LID = ${DEVICE_SCENE.lid.fallback};
+const DEVICE_FOLD = ${DEVICE_SCENE.fold.fallback};
+const FOLD_GAP = 0.9;
 const SCREEN_TEXTURE_MAX = 1024;
 const LAYER_GAP = 0.0012;
 const SCREEN_REFLECTION = 0.03;
@@ -38,6 +40,20 @@ function roundedRect(w, h, r) {
   return shape;
 }
 
+function halfRect(w, h, r, side) {
+  const k = Math.min(r, w, h / 2), y = -h / 2;
+  const outer = side * w;
+  const shape = new THREE.Shape();
+  shape.moveTo(0, y);
+  shape.lineTo(outer - side * k, y);
+  shape.quadraticCurveTo(outer, y, outer, y + k);
+  shape.lineTo(outer, -y - k);
+  shape.quadraticCurveTo(outer, -y, outer - side * k, -y);
+  shape.lineTo(0, -y);
+  shape.lineTo(0, y);
+  return shape;
+}
+
 function flat(shape, w, h) {
   const geo = new THREE.ShapeGeometry(shape, 24);
   const pos = geo.attributes.position, uv = geo.attributes.uv;
@@ -45,9 +61,11 @@ function flat(shape, w, h) {
   return geo;
 }
 
-function slab(w, h, d, r, material) {
-  const bevel = Math.min(d * 0.45, 2.2);
-  const geo = new THREE.ExtrudeGeometry(roundedRect(w - bevel * 1.6, h - bevel * 1.6, Math.max(r - bevel * 0.8, 0.5)), { depth: Math.max(d - bevel * 2, 0.1), bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel * 0.8, bevelSegments: 6, curveSegments: 24 });
+const bevelOf = (d) => Math.min(d * 0.45, 2.2);
+
+function slab(w, h, d, r, material, outline = roundedRect) {
+  const bevel = bevelOf(d);
+  const geo = new THREE.ExtrudeGeometry(outline(w - bevel * 1.6, h - bevel * 1.6, Math.max(r - bevel * 0.8, 0.5)), { depth: Math.max(d - bevel * 2, 0.1), bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel * 0.8, bevelSegments: 6, curveSegments: 24 });
   geo.translate(0, 0, -d / 2 + bevel);
   return new THREE.Mesh(geo, material);
 }
@@ -289,7 +307,44 @@ function browser(spec) {
   return { root: group, slot, lid: null };
 }
 
-const BUILD = { phone: handheld, tablet: handheld, laptop, monitor, browser };
+function leaf(spec, side, material, slot) {
+  const { body, screen } = spec;
+  const half = new THREE.Group();
+  const w = body.width / 2;
+  const shell = slab(w, body.height, body.depth, body.radius, material, (sw, sh, r) => halfRect(sw, sh, r, side));
+  shell.position.set(side * bevelOf(body.depth) * 0.8, 0, -body.depth / 2);
+  half.add(shell);
+  const step = Math.max(body.width, body.height) * LAYER_GAP;
+  half.add(plate(halfRect(w - 0.7, body.height - 1.4, body.radius - 0.7, side), body.width, body.height, step, new THREE.MeshPhysicalMaterial(GLASS)));
+  const display = plate(halfRect(screen.width / 2, screen.height, screen.radius, side), screen.width, screen.height, step * 2, new THREE.MeshBasicMaterial({ map: slot.texture, toneMapped: false, ...LIFT }));
+  half.add(display);
+  const back = plate(halfRect(w - 0.7, body.height - 1.4, body.radius - 0.7, -side), body.width, body.height, -body.depth - 0.02, side < 0 ? new THREE.MeshPhysicalMaterial({ color: new THREE.Color(spec.color), roughness: 0.45, metalness: 0.1, clearcoat: 0.6 }) : new THREE.MeshPhysicalMaterial(GLASS));
+  back.rotation.y = Math.PI;
+  half.add(back);
+  return half;
+}
+
+function foldable(spec) {
+  const root = new THREE.Group();
+  const material = frameMaterial(spec);
+  const slot = screenCanvas(spec);
+  const right = leaf(spec, 1, material, slot);
+  root.add(right);
+  const hinge = new THREE.Group();
+  hinge.position.x = -FOLD_GAP / 2;
+  const left = leaf(spec, -1, material, slot);
+  const lens = new THREE.Group();
+  CAMERA[spec.camera]({ ...spec, body: { ...spec.body, width: spec.body.width / 2 } }, lens, -spec.body.depth - 0.02, material);
+  lens.position.x = -spec.body.width / 4;
+  lens.scale.x = -1;
+  left.add(lens);
+  hinge.add(left);
+  right.position.x = FOLD_GAP / 2;
+  root.add(hinge);
+  return { root, slot, lid: null, fold: hinge };
+}
+
+const BUILD = { phone: handheld, foldable, tablet: handheld, laptop, monitor, browser };
 
 function deviceSource(c, s) {
   const video = document.getElementById('dv-' + c.id);
@@ -305,10 +360,15 @@ function setLid(s, angle) {
   if (s.device.lid) s.device.lid.rotation.x = (90 - angle) * DEG;
 }
 
+function setFold(s, angle) {
+  if (s.device.fold) s.device.fold.rotation.y = (180 - angle) * DEG;
+}
+
 function loadDevice(c, s) {
   const built = BUILD[c.device.kind](c.device);
   s.device = built;
   setLid(s, DEVICE_LID);
+  setFold(s, DEVICE_FOLD);
   finish(built.root, { surface: null });
   s.object.add(fitted(built.root));
   if (c.video) {
@@ -335,6 +395,7 @@ function loadDevice(c, s) {
 function updateDevice(c, s, at) {
   if (!s.device) return;
   setLid(s, at('lid', DEVICE_LID));
+  setFold(s, at('fold', DEVICE_FOLD));
   drawScreen(s.device.slot, deviceSource(c, s), at('screenScroll', 0));
 }
 `;

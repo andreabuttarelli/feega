@@ -25,6 +25,12 @@ describe('device presets', () => {
     expect(applyDevicePreset(withDevice(Device.PhonePro), 'd', DevicePreset.LidOpen).ok).toBe(false);
   });
 
+  it('unfolds a foldable flat, and refuses it on a laptop', () => {
+    const foldable = findClip(must(applyDevicePreset(withDevice(Device.Foldable), 'd', DevicePreset.FoldOpen)), 'd')!.clip;
+    expect(foldable.keyframes.fold?.map((k) => k.value)).toEqual([0, 180]);
+    expect(applyDevicePreset(withDevice(Device.LaptopPro), 'd', DevicePreset.FoldOpen).ok).toBe(false);
+  });
+
   it('screen scroll runs to the end of the clip', () => {
     const clip = findClip(must(applyDevicePreset(withDevice(Device.Tablet), 'd', DevicePreset.ScreenScroll)), 'd')!.clip;
     expect(clip.keyframes.screenScroll?.at(-1)).toMatchObject({ value: 1, frame: 105 });

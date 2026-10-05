@@ -388,7 +388,7 @@ export const COMPONENTS = {
   },
   Device3D: {
     label: 'Device mockup',
-    description: 'A 3D phone, laptop, monitor, tablet or browser window with an image or video mapped on its screen, lit by the look of the video. Animate lid (laptops, degrees open) and screenScroll (0..1, scrolls a tall screenshot); apply_device_preset adds spin-in, hero turn, lid opening or screen scroll.',
+    description: 'A 3D phone, foldable phone, laptop, monitor, tablet or browser window with an image or video mapped on its screen, lit by the look of the video. Animate lid (laptops, degrees open), fold (foldable, 0 closed..180 flat) and screenScroll (0..1, scrolls a tall screenshot); apply_device_preset adds spin-in, hero turn, lid opening, fold opening or screen scroll.',
     track: TrackKind.Visual,
     durationInFrames: seconds(4),
     schema: z
