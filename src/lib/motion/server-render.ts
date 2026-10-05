@@ -14,7 +14,7 @@ export type RenderView = { id: string; status: RenderRunStatus; progress: Render
 export type ServerRender = { configured: boolean; version: number; saved: boolean; latest: RenderView | null; uploadLimit?: number | null; assetHref: (id: string) => string };
 export type RenderEvent = { kind: 'started' | 'chunk' | 'assembling' | 'saving' | 'done' | 'failed' };
 
-const CHUNK_TARGET_FRAMES = 120;
+const CHUNK_TARGET_FRAMES = 450;
 const MAX_CHUNKS = 8;
 const MAX_HEAVY_CHUNKS = 16;
 const CHUNK_BUDGET_MS = 2 * 60_000;

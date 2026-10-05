@@ -22,7 +22,7 @@ export const TOOLS: readonly Tool[] = [
   {
     id: 'studio',
     name: 'Photo studio',
-    description: 'Consistent catalogue photos for many products at once.',
+    description: 'Product photos for your store from one picture, in three steps.',
     icon: 'camera',
     route: '/app/studio',
     status: ToolStatus.Beta

@@ -1,7 +1,8 @@
 <script lang="ts">
-  import { onMount, untrack } from 'svelte';
+  import { onMount, tick, untrack } from 'svelte';
   import { deserialize } from '$app/forms';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
+  import { watchMotionNode } from '$lib/realtime/motion-channel';
   import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
   import { registerUpload } from '$lib/motion/fonts/ops';
   import ArrowLeft from '@lucide/svelte/icons/arrow-left';
@@ -16,24 +17,30 @@
   import Plus from '@lucide/svelte/icons/plus';
   import ZoomIn from '@lucide/svelte/icons/zoom-in';
   import ZoomOut from '@lucide/svelte/icons/zoom-out';
-  import Film from '@lucide/svelte/icons/film';
+  import SkipBack from '@lucide/svelte/icons/skip-back';
+  import SkipForward from '@lucide/svelte/icons/skip-forward';
+  import StepBack from '@lucide/svelte/icons/step-back';
+  import StepForward from '@lucide/svelte/icons/step-forward';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
+  import Bookmark from '@lucide/svelte/icons/bookmark';
+  import Brackets from '@lucide/svelte/icons/brackets';
+  import PanelRight from '@lucide/svelte/icons/panel-right';
+  import CompositionSettings from '$lib/components/motion/CompositionSettings.svelte';
+  import { SAVE_TONE, SaveState, TimeDisplay, clockLabel, compositionLabel, compositionShort, nextDisplay } from '$lib/motion/editor-bar';
   import X from '@lucide/svelte/icons/x';
   import Crosshair from '@lucide/svelte/icons/crosshair';
   import Keyboard from '@lucide/svelte/icons/keyboard';
-  import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
   import BotMessageSquare from '@lucide/svelte/icons/bot-message-square';
   import ShortcutHelp from '$lib/components/motion/ShortcutHelp.svelte';
-  import { DEFAULT_LAYOUT, Panel, flip, readLayout, timelineHeight, writeLayout, type EditorLayout, type LayoutStore } from '$lib/motion/editor-layout';
+  import { CHAT_PLACE, ChatPlace, DEFAULT_LAYOUT, Panel, flip, readLayout, timelineHeight, viewportOf, writeLayout, type EditorLayout, type LayoutStore } from '$lib/motion/editor-layout';
+  import { provideSelection } from '$lib/motion/selection-context';
   import Layers from '@lucide/svelte/icons/layers';
-  import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import { addAdjustment, mergeView, pathNames, precompose, viewOf } from '$lib/motion/precomp';
-  import ThemeSwitch from '$lib/components/ThemeSwitch.svelte';
-  import ChartSpline from '@lucide/svelte/icons/chart-spline';
   import GraphEditor from '$lib/components/motion/GraphEditor.svelte';
   import { nullFromSelection } from '$lib/motion/parent-ops';
   import MotionPreview from '$lib/components/motion/MotionPreview.svelte';
   import type { StreamData } from '$lib/components/brand-agent/chat-session.svelte';
-  import { CHECK_REQUEST, FRAMES_REQUEST, type CheckRequest, type FramesRequest } from '$lib/motion/frames-request';
+  import { CHECK_REQUEST, FRAMES_REQUEST, adoptAgentAssets, type CheckRequest, type FramesRequest } from '$lib/motion/frames-request';
   import { runCheck, type CheckPorts } from '$lib/motion/custom/run-check';
   import { recordCheck } from '$lib/motion/custom/ops';
   import { unverified } from '$lib/motion/custom/determinism';
@@ -50,16 +57,14 @@
   import PenOverlay from '$lib/components/motion/PenOverlay.svelte';
   import SelectionOverlay from '$lib/components/motion/SelectionOverlay.svelte';
   import MotionPathOverlay from '$lib/components/motion/MotionPathOverlay.svelte';
+  import TextPathOverlay from '$lib/components/motion/TextPathOverlay.svelte';
   import { Align, addMarker, alignClips, allMarkers, clipsTo, distributeClips, trimClipsAt, loopFrame, nudgeClips, sequenceClips, setWorkArea, staggerClips } from '$lib/motion/organize';
   import ExportDialog from '$lib/components/motion/ExportDialog.svelte';
   import TemplateDialog from '$lib/components/motion/TemplateDialog.svelte';
   import SoundDialog, { type Made, type SoundKind } from '$lib/components/motion/SoundDialog.svelte';
   import ChatPanel from '$lib/components/brand-agent/ChatPanel.svelte';
   import { AssetKind, COMPONENTS, LIBRARY_IDS, TrackKind, type ComponentId } from '$lib/motion/components';
-  import { FRAME_RATES, type FrameRate } from '$lib/motion/design';
-  import { setFrameRate } from '$lib/motion/frame-rate';
-  import { setMotionBlur } from '$lib/motion/motion-blur-ops';
-  import { Background, FORMATS, MOTION_FORMATS, MAX_SECONDS, findClip, formatOf, type MotionDoc, type MotionFormat } from '$lib/motion/doc';
+  import { findClip, type MotionDoc } from '$lib/motion/doc';
   import {
     ClipEdge,
     Direction,
@@ -72,15 +77,14 @@
     keyframeFrames,
     pasteKeyframes,
     removeClips,
-    setCanvas,
     splitClip,
     type KeyBoard,
     type KeyRef,
     type OpResult
   } from '$lib/motion/timeline';
   import { amend, canRedo, canUndo, previousSource, record, redo, startHistory, undo, type History } from '$lib/motion/history';
-  import { Reveal, Snap, clampZoom, timecode } from '$lib/motion/timeline-view';
-  import { InspectorTab, parseDecimal, secondsLabel } from '$lib/motion/inspector';
+  import { Reveal, Snap, ZOOM_MAX, ZOOM_MIN, clampZoom } from '$lib/motion/timeline-view';
+  import { InspectorTab } from '$lib/motion/inspector';
   import { Command, commandFor, isTyping } from '$lib/motion/shortcuts';
   import { composeHtml } from '$lib/motion/hyperframes/compose';
   import { feegaTrailer } from '$lib/motion/trailer';
@@ -100,9 +104,6 @@
   const HEAD_POLL_MS = 500;
   const ZOOM_STEP = 1.25;
   const STEP_MORE = 10;
-
-  const SaveState = { Saved: 'Saved', Saving: 'Saving…', Pending: 'Unsaved', Conflict: 'Reloaded the latest version', Failed: 'Not saved' } as const;
-  type SaveState = (typeof SaveState)[keyof typeof SaveState];
 
   const Sheet = { None: 'none', Properties: 'properties', Agent: 'agent' } as const;
   type Sheet = (typeof Sheet)[keyof typeof Sheet];
@@ -140,6 +141,12 @@
   let reveal = $state(Reveal.Animated);
   let helpOpen = $state(false);
   let layout = $state<EditorLayout>(DEFAULT_LAYOUT);
+  let chatReload = $state(0);
+  let display = $state(TimeDisplay.Timecode);
+  let width = $state(1440);
+  const viewport = $derived(viewportOf(width));
+  const chatPlace = $derived(CHAT_PLACE[viewport]);
+  let settingsOpen = $state(false);
 
   function browserStore(): LayoutStore | null {
     try {
@@ -151,6 +158,7 @@
 
   onMount(() => {
     layout = readLayout(browserStore());
+    return watchMotionNode(supabase, data.node.id, () => void pullExternalEdit());
   });
   let body = $state<HTMLDivElement | null>(null);
 
@@ -188,6 +196,32 @@
   const assetUrls = $derived(Object.fromEntries(assets.filter((a) => a.url).map((a) => [a.id, a.url as string])));
   const html = $derived(composeHtml({ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls, analyses }));
   const selected = $derived(selection.length === 1 ? (findClip(doc, selection[0])?.clip ?? null) : null);
+  const blank = $derived(!path.length && doc.tracks.every((t) => !t.clips.length));
+
+  const OPEN_CHAT: Record<ChatPlace, () => void> = {
+    [ChatPlace.Column]: () => relayout({ chat: Panel.Open }),
+    [ChatPlace.Drawer]: () => (sheet = Sheet.Agent),
+    [ChatPlace.Sheet]: () => (sheet = Sheet.Agent)
+  };
+
+  async function askAgent() {
+    OPEN_CHAT[chatPlace]();
+    await tick();
+    document.querySelector<HTMLTextAreaElement>('aside.chat textarea')?.focus();
+  }
+
+  provideSelection({
+    get ids() {
+      return selection;
+    },
+    get clip() {
+      return selected;
+    },
+    select: (ids) => {
+      selection = ids;
+      cameraOpen = false;
+    }
+  });
   const editorUrl = $derived(`/p/${data.projectId}/c/${data.canvas.id}/motion/${data.node.id}`);
   const agentUrl = $derived(`/api/v1/projects/${data.projectId}/motion/${data.node.id}/agent`);
 
@@ -329,6 +363,18 @@
     return null;
   }
 
+  async function pullExternalEdit() {
+    const res = await fetch(agentUrl);
+    const body = (await res.json().catch(() => null)) as { head?: { version: number; doc: MotionDoc; actorKind: string } } | null;
+    if (!body?.head || body.head.version <= version || body.head.actorKind !== 'agent') {
+      return;
+    }
+    history = record(history, body.head.doc);
+    version = body.head.version;
+    selection = selection.filter((id) => findClip(body.head!.doc, id));
+    chatReload++;
+  }
+
   async function pullAgentEdit() {
     for (let i = 0; i < HEAD_POLL_TRIES; i++) {
       const res = await fetch(agentUrl);
@@ -400,6 +446,7 @@
 
   function onAgentData(part: StreamData) {
     const handle = AGENT_DATA[part.type];
+    madeAssets = adoptAgentAssets(madeAssets, (part.data as { assets?: PageData['assets'] } | null)?.assets);
     if (handle && preview) {
       void handle(part.data).catch((e) => console.error('[motion] agent request not answered', part.type, e));
     }
@@ -579,18 +626,6 @@
     apply(pasteKeyframes(doc, target.id, keyBoard, frame - target.from), 'Pasted keyframes');
   }
 
-  function setFormat(format: MotionFormat) {
-    apply(setCanvas(doc, { format }), 'Changed format');
-  }
-
-  function setDuration(text: string) {
-    const seconds = parseDecimal(text);
-    if (seconds === null) {
-      return;
-    }
-    apply(setCanvas(doc, { durationInFrames: Math.round(seconds * doc.fps) }), 'Changed duration');
-  }
-
   function exportFrames(...args: Parameters<MotionPreview['render']>) {
     if (!preview) {
       return Promise.reject(new Error('the preview is still loading'));
@@ -665,6 +700,13 @@
     }
   });
 
+  const CHAT_TOGGLE: Record<ChatPlace, () => void> = {
+    [ChatPlace.Column]: () => relayout({ chat: flip(layout.chat) }),
+    [ChatPlace.Drawer]: () => (sheet = sheet === Sheet.Agent ? Sheet.None : Sheet.Agent),
+    [ChatPlace.Sheet]: () => (sheet = sheet === Sheet.Agent ? Sheet.None : Sheet.Agent)
+  };
+  const chatShown = $derived(chatPlace === ChatPlace.Column ? layout.chat === Panel.Open : sheet === Sheet.Agent);
+
   const COMMANDS: Record<Command, () => void> = {
     [Command.TogglePlay]: () => (playing = !playing),
     [Command.Delete]: remove,
@@ -709,13 +751,23 @@
     [Command.RevealRotation]: () => revealLanes(Reveal.Rotation),
     [Command.RevealOpacity]: () => revealLanes(Reveal.Opacity),
     [Command.RevealAnimated]: () => (reveal = Reveal.Animated),
-    [Command.ToggleChat]: () => relayout({ chat: flip(layout.chat) }),
+    [Command.ToggleChat]: () => CHAT_TOGGLE[chatPlace](),
     [Command.ToggleInspector]: () => relayout({ inspector: flip(layout.inspector) }),
     [Command.Help]: () => (helpOpen = !helpOpen),
     [Command.Precompose]: precomposeSelection
   };
 
+  function closeSettings(e: PointerEvent) {
+    if (settingsOpen && !(e.target as HTMLElement | null)?.closest('.popover-anchor')) {
+      settingsOpen = false;
+    }
+  }
+
   function onKey(e: KeyboardEvent) {
+    if (settingsOpen && e.key === 'Escape') {
+      settingsOpen = false;
+      return;
+    }
     if (exporting || sounding || isTyping(e.target as HTMLElement | null)) {
       return;
     }
@@ -729,59 +781,60 @@
 </script>
 
 <svelte:head><title>{data.node.name ?? 'Motion'} · Motion editor</title></svelte:head>
-<svelte:window onkeydown={onKey} />
+<svelte:window bind:innerWidth={width} onkeydown={onKey} onpointerdown={closeSettings} />
 
-<div class="editor" data-testid="motion-editor">
+<div class="editor" data-testid="motion-editor" data-viewport={viewport}>
   <header class="bar">
-    <a class="back" href={`/p/${data.projectId}/c/${data.canvas.id}`}><ArrowLeft size={14} /> {data.canvas.name}</a>
-    <span class="title">{data.node.name ?? 'Motion'}</span>
-    <label class="field">
-      Format
-      <select value={formatOf(doc)} onchange={(e) => setFormat(e.currentTarget.value as MotionFormat)}>
-        {#each MOTION_FORMATS as format (format)}<option value={format}>{FORMATS[format].label}</option>{/each}
-      </select>
-    </label>
-    <label class="field">
-      Length (s)
-      <input type="text" inputmode="decimal" title={`1–${MAX_SECONDS} s`} value={secondsLabel(doc.durationInFrames, doc.fps)} onchange={(e) => setDuration(e.currentTarget.value)} />
-    </label>
-    <label class="field">
-      Frame rate
-      <select value={doc.fps} onchange={(e) => apply(setFrameRate(doc, Number(e.currentTarget.value) as FrameRate), 'Changed frame rate')} data-testid="frame-rate">
-        {#each FRAME_RATES as rate (rate)}<option value={rate}>{rate} fps</option>{/each}
-      </select>
-    </label>
-    <label class="field">
-      Background
-      <select value={doc.background} onchange={(e) => apply(setCanvas(doc, { background: e.currentTarget.value as Background }), 'Changed background')} data-testid="background">
-        <option value={Background.Brand}>Brand</option>
-        <option value={Background.Transparent}>Transparent</option>
-      </select>
-    </label>
-    <label class="field" title="Real motion blur on server renders; the browser export takes 2 samples, the preview none">
-      <input type="checkbox" checked={doc.motionBlur.enabled} onchange={(e) => apply(setMotionBlur(doc, { enabled: e.currentTarget.checked }), 'Changed motion blur')} data-testid="motion-blur" />
-      Motion blur
-    </label>
-    {#if doc.motionBlur.enabled}
-      <label class="field">
-        Shutter °
-        <input type="number" min="1" max="360" value={doc.motionBlur.shutterAngle} onchange={(e) => apply(setMotionBlur(doc, { shutterAngle: Number(e.currentTarget.value) }), 'Changed shutter angle')} data-testid="shutter-angle" />
-      </label>
-      <label class="field">
-        Phase °
-        <input type="number" min="-360" max="360" value={doc.motionBlur.shutterPhase} onchange={(e) => apply(setMotionBlur(doc, { shutterPhase: Number(e.currentTarget.value) }), 'Changed shutter phase')} data-testid="shutter-phase" />
-      </label>
-      <label class="field">
-        Samples
-        <input type="number" min="2" max="32" value={doc.motionBlur.samples} onchange={(e) => apply(setMotionBlur(doc, { samples: Number(e.currentTarget.value) }), 'Changed blur samples')} data-testid="blur-samples" />
-      </label>
-    {/if}
-    <span class="save" data-testid="save-state">{saveState} · v{version}</span>
-    <ThemeSwitch />
-    <button type="button" class="panel-toggle" title="Properties (⌥⌘B)" aria-label="Properties panel" aria-pressed={layout.inspector === Panel.Open} data-testid="toggle-inspector" onclick={COMMANDS[Command.ToggleInspector]}><SlidersHorizontal size={14} /></button>
-    <button type="button" class="panel-toggle" title="Agent (⌘B)" aria-label="Agent panel" aria-pressed={layout.chat === Panel.Open} data-testid="toggle-chat" onclick={COMMANDS[Command.ToggleChat]}><BotMessageSquare size={14} /></button>
-    <button type="button" onclick={() => (leaveTo(0), (templating = true))} data-testid="template-open">Template</button>
-    <button type="button" class="render" onclick={() => (leaveTo(0), (exporting = true))} data-testid="export-open"><Film size={14} /> Export</button>
+    <div class="group lead">
+      <a class="icon-btn" href={`/p/${data.projectId}/c/${data.canvas.id}`} title={`Back to ${data.canvas.name}`} aria-label={`Back to ${data.canvas.name}`}><ArrowLeft size={16} /></a>
+      <nav class="crumbs" aria-label="Compositions" data-testid="comp-breadcrumb">
+        <a class="crumb" href={`/p/${data.projectId}/c/${data.canvas.id}`}>{data.canvas.name}</a>
+        <span class="slash" aria-hidden="true">/</span>
+        {#if path.length}
+          <button type="button" class="crumb" onclick={() => leaveTo(0)}>{data.node.name ?? 'Motion'}</button>
+        {:else}
+          <span class="crumb current" aria-current="page">{data.node.name ?? 'Motion'}</span>
+        {/if}
+        {#each pathNames(history.present, compPath) as name, i (i)}
+          <span class="slash" aria-hidden="true">/</span>
+          {#if i === path.length - 1}<span class="crumb current" aria-current="page">{name}</span>{:else}<button type="button" class="crumb" onclick={() => leaveTo(i + 1)}>{name}</button>{/if}
+        {/each}
+      </nav>
+    </div>
+
+    <div class="group transport" role="group" aria-label="Transport">
+      <button type="button" class="icon-btn" title="Go to start (Home)" aria-label="Go to start" onclick={COMMANDS[Command.GoStart]}><SkipBack size={16} /></button>
+      <button type="button" class="icon-btn step" title="Previous frame (←)" aria-label="Previous frame" onclick={COMMANDS[Command.StepBack]}><StepBack size={16} /></button>
+      <button type="button" class="icon-btn play" aria-label={playing ? 'Pause' : 'Play'} title={playing ? 'Pause (Space)' : 'Play (Space)'} onclick={() => (playing = !playing)}>
+        {#if playing}<Pause size={16} fill="currentColor" />{:else}<Play size={16} fill="currentColor" />{/if}
+      </button>
+      <button type="button" class="icon-btn step" title="Next frame (→)" aria-label="Next frame" onclick={COMMANDS[Command.StepForward]}><StepForward size={16} /></button>
+      <button type="button" class="icon-btn" title="Go to end (End)" aria-label="Go to end" onclick={COMMANDS[Command.GoEnd]}><SkipForward size={16} /></button>
+      <button type="button" class="clock" title={display === TimeDisplay.Timecode ? 'Show frames' : 'Show timecode'} data-testid="clock" onclick={() => (display = nextDisplay(display))}>
+        <span data-testid="timecode"><b>{clockLabel(frame, doc.fps, display)}</b> <i>/ {clockLabel(doc.durationInFrames, doc.fps, display)}</i></span>
+      </button>
+    </div>
+
+    <div class="group trail">
+      <div class="popover-anchor">
+        <button type="button" class="chip" aria-expanded={settingsOpen} title="Composition settings" data-testid="comp-settings" onclick={() => (settingsOpen = !settingsOpen)}>
+          <span class="long">{compositionLabel(doc)}</span><span class="short">{compositionShort(doc)}</span><ChevronDown size={12} />
+        </button>
+        {#if settingsOpen}
+          <div class="popover" role="dialog" aria-label="Composition settings">
+            <span class="popover-head">Composition</span>
+            <CompositionSettings {doc} onchange={apply} />
+          </div>
+        {/if}
+      </div>
+      <span class="save" data-testid="save-state" data-tone={SAVE_TONE[saveState]}><i aria-hidden="true"></i>{saveState} · v{version}</span>
+      <span class="divider" aria-hidden="true"></span>
+      <button type="button" class="icon-btn toggle" title="Properties (⌥⌘B)" aria-label="Properties panel" aria-pressed={layout.inspector === Panel.Open} data-testid="toggle-inspector" onclick={COMMANDS[Command.ToggleInspector]}><PanelRight size={16} /></button>
+      <button type="button" class="icon-btn toggle" title="Agent (⌘B)" aria-label="Agent panel" aria-pressed={chatShown} data-testid="toggle-chat" onclick={COMMANDS[Command.ToggleChat]}><BotMessageSquare size={16} /></button>
+      <span class="divider" aria-hidden="true"></span>
+      <button type="button" class="secondary" onclick={() => (leaveTo(0), (templating = true))} data-testid="template-open">Template</button>
+      <button type="button" class="render" onclick={() => (leaveTo(0), (exporting = true))} data-testid="export-open">Export</button>
+    </div>
   </header>
 
   {#if sounding}
@@ -820,33 +873,57 @@
     />
   {/if}
 
-  <div class="body" bind:this={body} class:coding={inspectorTab === InspectorTab.Code && selected?.component === 'Custom'} class:no-props={layout.inspector === Panel.Closed} class:no-chat={layout.chat === Panel.Closed}>
-    <section class="left">
-      <div class="preview">
-        <MotionPreview bind:this={preview} {html} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing>
-          {#if !playing}<SelectionOverlay {doc} {frame} {html} {selection} measure={() => preview?.measure() ?? Promise.resolve({})} onselect={(ids) => (selection = ids)} onpreview={(next) => (previewDoc = next)} onchange={edit} />{/if}
-          {#if selected?.mask && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<MaskOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
-          {#if selected?.component === 'Shape' && selected.props.shape === 'path' && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<PenOverlay {doc} clip={selected} onchange={edit} />{/if}
-          {#if selected?.path && !playing}<MotionPathOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
-        </MotionPreview>
-      </div>
+  <div class="body" bind:this={body} style={`--tl-h: ${layout.timelinePx}px;`} class:coding={inspectorTab === InspectorTab.Code && selected?.component === 'Custom'} class:no-props={layout.inspector === Panel.Closed} class:no-chat={layout.chat === Panel.Closed}>
+    <section class="stage" aria-label="Preview">
+      <MotionPreview bind:this={preview} {html} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing>
+        {#if !playing}<SelectionOverlay {doc} {frame} {html} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} />{/if}
+        {#if selected?.mask && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<MaskOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
+        {#if selected?.component === 'Shape' && selected.props.shape === 'path' && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<PenOverlay {doc} clip={selected} onchange={edit} />{/if}
+        {#if selected?.path && !playing}<MotionPathOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
+        {#if selected?.textPath && !playing}<TextPathOverlay {doc} clip={selected} {frame} />{/if}
+      </MotionPreview>
+      {#if blank}
+        <div class="empty-state" data-testid="empty-state">
+          <p>Start with a template, a clip or a prompt</p>
+          <div class="empty-actions">
+            <button type="button" class="secondary" onclick={() => (templating = true)}>Template…</button>
+            <button type="button" class="secondary" onclick={() => (adding = true)}>Add element</button>
+            <button type="button" class="secondary" onclick={askAgent}>Ask the agent</button>
+          </div>
+        </div>
+      {/if}
+    </section>
 
+    <aside class="props" class:open={sheet === Sheet.Properties} aria-label="Properties">
+      <div class="sheet-head"><span>Properties</span><button type="button" aria-label="Close" onclick={() => (sheet = Sheet.None)}><X size={16} /></button></div>
+      {#if cameraOpen && !selection.length}
+        <CameraInspector {doc} {frame} onchange={edit} />
+        <LookInspector {doc} onchange={edit} />
+      {:else if selected}
+        <MotionInspector {doc} {analyses} clip={selected} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} onopen={enterComp} />
+        {#if selected.component === 'Device3D'}<DevicePresets {doc} clip={selected} onchange={edit} />{/if}
+        {#if selected.component === 'Video'}<TimeRemap {doc} clip={selected} {frame} onchange={edit} />{/if}
+        {#if selected.component === 'Particles'}<ParticlePresets {doc} clip={selected} onchange={edit} />{/if}
+        {#if THREE_D_COMPONENTS.includes(selected.component)}<LookInspector {doc} onchange={edit} />{/if}
+      {:else}
+        <div class="composition" data-testid="composition-inspector">
+          <header class="composition-head"><span>Composition</span>{#if selection.length > 1}<em>{selection.length} clips selected</em>{/if}</header>
+          <CompositionSettings {doc} onchange={apply} />
+        </div>
+      {/if}
+    </aside>
+
+    <aside class="chat" class:open={sheet === Sheet.Agent} aria-label="Agent">
+      <div class="sheet-head"><span>Agent</span><button type="button" aria-label="Close" onclick={() => (sheet = Sheet.None)}><X size={16} /></button></div>
+      <ChatPanel projectId={data.projectId} motionNodeId={data.node.id} reload={chatReload} context={() => ({ selection })} onturnend={() => void pullAgentEdit()} ondata={onAgentData} />
+    </aside>
+
+    <section class="timeline-area" aria-label="Timeline">
       <div class="resize" role="separator" aria-orientation="horizontal" aria-label="Resize the timeline" aria-valuenow={layout.timelinePx} data-testid="timeline-resize" onpointerdown={startResize}></div>
 
-      <div class="transport">
-        <button type="button" aria-label={playing ? 'Pause' : 'Play'} onclick={() => (playing = !playing)}>
-          {#if playing}<Pause size={14} />{:else}<Play size={14} />{/if}
-        </button>
-        <span class="tc" data-testid="timecode">{timecode(frame, doc.fps)} / {timecode(doc.durationInFrames, doc.fps)}</span>
-        <span class="sep"></span>
-        {#if beats.length}
-          <button type="button" data-testid="mark-beats" onclick={markBeats}>Mark beats</button>
-        {/if}
-        {#if beats.length && selection.length}
-          <button type="button" data-testid="cut-to-beat" onclick={cutSelectionToBeat}>Cut to beat</button>
-        {/if}
+      <div class="toolbar">
         <div class="add">
-          <button type="button" onclick={() => (adding = !adding)}><Plus size={14} /> Add</button>
+          <button type="button" class="tool text" onclick={() => (adding = !adding)}><Plus size={14} /> Add</button>
           {#if adding}
             <div class="menu" role="menu">
               <div class="col">
@@ -871,67 +948,50 @@
             </div>
           {/if}
         </div>
-        <button type="button" title="Split at playhead (⇧⌘D)" disabled={!selection.length} onclick={split}><Scissors size={14} /></button>
-        <button type="button" title="Duplicate (⌘D)" disabled={!selection.length} onclick={duplicate}><Copy size={14} /></button>
-        <button type="button" title="Create null from selection" data-testid="null-from-selection" disabled={!selection.length} onclick={groupUnderNull}><Crosshair size={14} /></button>
-        <button type="button" title="Precompose (⇧⌘C)" data-testid="precompose" disabled={!selection.length} onclick={precomposeSelection}><Layers size={14} /></button>
-        <button type="button" title="Delete (Del)" disabled={!selection.length} onclick={remove}><Trash size={14} /></button>
-        <button type="button" title="Undo (⌘Z)" disabled={!canUndo(history)} onclick={undoEdit}><Undo size={14} /></button>
-        <button type="button" title="Redo (⇧⌘Z)" disabled={!canRedo(history)} onclick={redoEdit}><Redo size={14} /></button>
-        <button type="button" title="Snap" class:on={snap === Snap.On} onclick={() => (snap = snap === Snap.On ? Snap.Off : Snap.On)}><Magnet size={14} /></button>
-        <button type="button" title="Graph editor" aria-pressed={graphOpen} data-testid="graph-toggle" class:on={graphOpen} onclick={() => (graphOpen = !graphOpen)}><ChartSpline size={14} /></button>
-        <select class="arrange" aria-label="Arrange" data-testid="arrange" disabled={selection.length < 2} value="" onchange={(e) => (arrange(e.currentTarget.value), (e.currentTarget.value = ''))}>
-          <option value="" disabled>Arrange</option>
-          {#each Object.entries(ARRANGE) as [id, op] (id)}<option value={id}>{op.label}</option>{/each}
-        </select>
-        <button type="button" title="Add marker (M)" data-testid="add-marker" onclick={markHere}>M</button>
-        <button type="button" title={doc.workArea ? 'Clear work area' : 'Work area: set in/out with I and O'} class:on={!!doc.workArea} onclick={() => apply(setWorkArea(doc, null), 'Cleared the work area')} disabled={!doc.workArea}>[ ]</button>
-        <span class="sep"></span>
-        <button type="button" title="Zoom out (−)" onclick={COMMANDS[Command.ZoomOut]}><ZoomOut size={14} /></button>
-        <button type="button" title="Zoom in (+)" onclick={COMMANDS[Command.ZoomIn]}><ZoomIn size={14} /></button>
-        <button type="button" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts" data-testid="shortcut-help-open" onclick={COMMANDS[Command.Help]}><Keyboard size={14} /></button>
+        <span class="divider" aria-hidden="true"></span>
+        <button type="button" class="tool" title="Split at playhead (⇧⌘D)" aria-label="Split" disabled={!selection.length} onclick={split}><Scissors size={14} /></button>
+        <button type="button" class="tool" title="Duplicate (⌘D)" aria-label="Duplicate" disabled={!selection.length} onclick={duplicate}><Copy size={14} /></button>
+        <button type="button" class="tool" title="Create null from selection" aria-label="Create null from selection" data-testid="null-from-selection" disabled={!selection.length} onclick={groupUnderNull}><Crosshair size={14} /></button>
+        <button type="button" class="tool" title="Precompose (⇧⌘C)" aria-label="Precompose" data-testid="precompose" disabled={!selection.length} onclick={precomposeSelection}><Layers size={14} /></button>
+        <button type="button" class="tool" title="Delete (Del)" aria-label="Delete" disabled={!selection.length && !keySelection.length} onclick={remove}><Trash size={14} /></button>
+        <span class="divider" aria-hidden="true"></span>
+        <button type="button" class="tool" title="Undo (⌘Z)" aria-label="Undo" disabled={!canUndo(history)} onclick={undoEdit}><Undo size={14} /></button>
+        <button type="button" class="tool" title="Redo (⇧⌘Z)" aria-label="Redo" disabled={!canRedo(history)} onclick={redoEdit}><Redo size={14} /></button>
+        <span class="divider" aria-hidden="true"></span>
+        <div class="segmented" role="group" aria-label="Timeline mode">
+          <button type="button" aria-pressed={!graphOpen} onclick={() => (graphOpen = false)}>Clips</button>
+          <button type="button" aria-pressed={graphOpen} data-testid="graph-toggle" onclick={() => (graphOpen = !graphOpen)}>Graph</button>
+        </div>
+        <button type="button" class="tool" title="Snap" aria-label="Snap" aria-pressed={snap === Snap.On} onclick={() => (snap = snap === Snap.On ? Snap.Off : Snap.On)}><Magnet size={14} /></button>
+        <button type="button" class="tool" title="Add marker (M)" aria-label="Add marker" data-testid="add-marker" onclick={markHere}><Bookmark size={14} /></button>
+        <button type="button" class="tool" title={doc.workArea ? 'Clear work area' : 'Work area: set in/out with I and O'} aria-label="Work area" aria-pressed={!!doc.workArea} onclick={() => apply(setWorkArea(doc, null), 'Cleared the work area')} disabled={!doc.workArea}><Brackets size={14} /></button>
+        {#if selection.length > 1}
+          <select class="arrange" aria-label="Arrange" data-testid="arrange" value="" onchange={(e) => (arrange(e.currentTarget.value), (e.currentTarget.value = ''))}>
+            <option value="" disabled>Arrange</option>
+            {#each Object.entries(ARRANGE) as [id, op] (id)}<option value={id}>{op.label}</option>{/each}
+          </select>
+        {/if}
+        {#if beats.length}
+          <span class="divider" aria-hidden="true"></span>
+          <button type="button" class="tool text" data-testid="mark-beats" onclick={markBeats}>Mark beats</button>
+          {#if selection.length}<button type="button" class="tool text" data-testid="cut-to-beat" onclick={cutSelectionToBeat}>Cut to beat</button>{/if}
+        {/if}
         {#if notice}<span class="notice" role="status">{notice}</span>{/if}
+        <span class="spacer"></span>
+        <button type="button" class="tool" title="Zoom out (−)" aria-label="Zoom out" onclick={COMMANDS[Command.ZoomOut]}><ZoomOut size={14} /></button>
+        <input class="zoom" type="range" aria-label="Timeline zoom" min={Math.log2(ZOOM_MIN)} max={Math.log2(ZOOM_MAX)} step="0.05" value={Math.log2(zoom)} oninput={(e) => (zoom = clampZoom(2 ** Number(e.currentTarget.value)))} data-testid="timeline-zoom" />
+        <button type="button" class="tool" title="Zoom in (+)" aria-label="Zoom in" onclick={COMMANDS[Command.ZoomIn]}><ZoomIn size={14} /></button>
+        <button type="button" class="tool" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts" data-testid="shortcut-help-open" onclick={COMMANDS[Command.Help]}><Keyboard size={14} /></button>
       </div>
 
-      {#if path.length}
-        <nav class="crumbs" aria-label="Compositions" data-testid="comp-breadcrumb">
-          <button type="button" onclick={() => leaveTo(0)}>{data.node.name ?? 'Main'}</button>
-          {#each pathNames(history.present, compPath) as name, i (i)}
-            <ChevronRight size={12} aria-hidden="true" />
-            {#if i === path.length - 1}<span aria-current="page">{name}</span>{:else}<button type="button" onclick={() => leaveTo(i + 1)}>{name}</button>{/if}
-          {/each}
-        </nav>
-      {/if}
-
-      <div class="tl" style={`--tl-h: ${layout.timelinePx}px;`}>
+      <div class="tl">
         {#if graphOpen}
           <GraphEditor {doc} {frame} {selection} bind:keySelection camera={cameraOpen} onchange={edit} />
         {:else}
-          <MotionTimeline {doc} bind:frame bind:selection bind:keySelection bind:camera={cameraOpen} {zoom} {snap} {waveforms} {beats} {assetUrls} {reveal} onchange={edit} onopen={enterComp} />
+          <MotionTimeline {doc} bind:frame bind:selection bind:keySelection bind:camera={cameraOpen} bind:zoom {snap} {waveforms} {beats} {assetUrls} {reveal} onchange={edit} onopen={enterComp} />
         {/if}
       </div>
     </section>
-
-    <aside class="props" class:open={sheet === Sheet.Properties} aria-label="Properties">
-      <div class="sheet-head"><span>Properties</span><button type="button" aria-label="Close" onclick={() => (sheet = Sheet.None)}><X size={16} /></button></div>
-      {#if cameraOpen && !selection.length}
-        <CameraInspector {doc} {frame} onchange={edit} />
-        <LookInspector {doc} onchange={edit} />
-      {:else if selected}
-        <MotionInspector {doc} {analyses} clip={selected} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} onopen={enterComp} />
-        {#if selected.component === 'Device3D'}<DevicePresets {doc} clip={selected} onchange={edit} />{/if}
-        {#if selected.component === 'Video'}<TimeRemap {doc} clip={selected} {frame} onchange={edit} />{/if}
-        {#if selected.component === 'Particles'}<ParticlePresets {doc} clip={selected} onchange={edit} />{/if}
-        {#if THREE_D_COMPONENTS.includes(selected.component)}<LookInspector {doc} onchange={edit} />{/if}
-      {:else}
-        <p class="hint">{selection.length > 1 ? `${selection.length} clips selected.` : 'Select a clip in the timeline to edit its properties.'}</p>
-      {/if}
-    </aside>
-
-    <aside class="chat" class:open={sheet === Sheet.Agent} aria-label="Agent">
-      <div class="sheet-head"><span>Agent</span><button type="button" aria-label="Close" onclick={() => (sheet = Sheet.None)}><X size={16} /></button></div>
-      <ChatPanel projectId={data.projectId} motionNodeId={data.node.id} context={() => ({ selection })} onturnend={() => void pullAgentEdit()} ondata={onAgentData} />
-    </aside>
   </div>
 
   <nav class="tabs" aria-label="Panels">
@@ -953,78 +1013,255 @@
     z-index: 10;
   }
 
+  .editor :global(:focus-visible) {
+    outline: 1px solid var(--ui-accent);
+    outline-offset: -1px;
+  }
+
   .bar {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    height: var(--ui-bar-h);
-    padding: 0 var(--ui-space-3);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: stretch;
+    height: var(--ui-bar-h-dense);
     border-bottom: 1px solid var(--ui-line);
     background: var(--ui-bg);
-    font-size: var(--ui-text-md);
+    font-size: var(--ui-text-sm);
     flex-shrink: 0;
   }
 
-  .back {
+  .group {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    min-width: 0;
+    padding: 0 var(--ui-space-2);
+  }
+
+  .lead {
+    gap: var(--ui-space-1);
+  }
+
+  .transport {
+    justify-content: center;
+    border-left: 1px solid var(--ui-line);
+    border-right: 1px solid var(--ui-line);
+    padding: 0 var(--ui-space-3);
+  }
+
+  .trail {
+    justify-content: flex-end;
+    gap: var(--ui-space-1);
+  }
+
+  .icon-btn,
+  .tool,
+  .clock,
+  .crumb,
+  .segmented button {
+    border: 0;
+    border-radius: 0;
+    background: none;
+    cursor: pointer;
+  }
+
+  .icon-btn {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    color: var(--ui-ink-2);
-  }
-
-  .title {
-    font-weight: 600;
-    letter-spacing: -0.01em;
-  }
-
-  .field {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    color: var(--ui-ink-2);
-  }
-
-  .field select,
-  .field input {
-    width: 72px;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 28px;
     height: 28px;
-    padding: 0 6px;
-    border: 1px solid var(--ui-line);
-    background: var(--ui-bg);
+    color: var(--ui-ink-2);
+  }
+
+  .icon-btn:hover {
+    background: var(--ui-hover);
     color: var(--ui-ink);
+  }
+
+  .icon-btn.play {
+    color: var(--ui-ink);
+  }
+
+  .icon-btn.toggle[aria-pressed='true'] {
+    background: var(--ui-accent-wash);
+    color: var(--ui-accent);
+  }
+
+  .crumbs {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    min-width: 0;
+    font-size: var(--ui-text-md);
+  }
+
+  .crumb {
+    flex-shrink: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 4px 6px;
+    color: var(--ui-ink-2);
     font: inherit;
   }
 
-  .save {
-    margin-left: auto;
-    font-family: var(--ui-mono);
-    font-size: 11px;
-    color: var(--ui-ink-2);
+  a.crumb:hover,
+  button.crumb:hover {
+    background: var(--ui-hover);
+    color: var(--ui-ink);
   }
 
-  .render {
+  .crumb.current {
+    color: var(--ui-ink);
+    font-weight: 600;
+  }
+
+  .slash {
+    color: var(--ui-ink-3);
+  }
+
+  .clock {
+    margin-left: var(--ui-space-2);
+    padding: 4px 6px;
+    font-family: var(--ui-mono);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .clock:hover {
+    background: var(--ui-hover);
+  }
+
+  .clock b {
+    font-size: var(--ui-text-md);
+    font-weight: 400;
+    color: var(--ui-ink);
+  }
+
+  .clock i {
+    font-style: normal;
+    font-size: var(--ui-text-xs);
+    color: var(--ui-ink-3);
+  }
+
+  .popover-anchor {
+    position: relative;
+  }
+
+  .chip {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    height: 30px;
-    padding: 0 12px;
-    background: var(--ui-accent);
-    color: var(--ui-accent-ink);
+    height: 24px;
+    padding: 0 8px;
+    border: 1px solid var(--ui-line);
+    background: var(--ui-surface);
+    color: var(--ui-ink-2);
+    font-family: var(--ui-mono);
+    font-size: var(--ui-text-xs);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .chip:hover,
+  .chip[aria-expanded='true'] {
+    border-color: var(--ui-line-strong);
+    color: var(--ui-ink);
+  }
+
+  .popover {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    z-index: 40;
+    width: 300px;
+    padding: var(--ui-space-3);
+    border: 1px solid var(--ui-line-strong);
+    background: var(--ui-bg);
+    box-shadow: 0 12px 32px rgb(0 0 0 / 0.14);
+  }
+
+  .popover-head {
+    display: block;
+    margin-bottom: var(--ui-space-2);
     font-size: var(--ui-text-sm);
     font-weight: 600;
   }
 
-  .render:disabled {
-    opacity: 0.5;
+  .save {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 var(--ui-space-1);
+    font-family: var(--ui-mono);
+    font-size: var(--ui-text-xs);
+    color: var(--ui-ink-3);
+    white-space: nowrap;
+  }
+
+  .save i {
+    width: 6px;
+    height: 6px;
+    background: var(--ui-ok);
+  }
+
+  .save[data-tone='busy'] i {
+    background: var(--ui-warn);
+  }
+
+  .save[data-tone='error'] i {
+    background: var(--ui-danger);
+  }
+
+  .save[data-tone='error'] {
+    color: var(--ui-danger);
+  }
+
+  .divider {
+    align-self: stretch;
+    width: 1px;
+    margin: 8px var(--ui-space-1);
+    background: var(--ui-line);
+  }
+
+  .secondary,
+  .render {
+    height: 28px;
+    padding: 0 12px;
+    font-size: var(--ui-text-sm);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .secondary {
+    border: 1px solid var(--ui-line-strong);
+    background: var(--ui-bg);
+    color: var(--ui-ink);
+  }
+
+  .secondary:hover {
+    background: var(--ui-hover);
+  }
+
+  .render {
+    background: var(--ui-accent);
+    color: var(--ui-accent-ink);
+  }
+
+  .render:hover {
+    background: color-mix(in srgb, var(--ui-accent) 88%, #000);
   }
 
   .body {
-    --props-w: 280px;
-    --chat-w: 380px;
+    --props-w: 300px;
+    --chat-w: 360px;
     flex: 1;
     min-height: 0;
     display: grid;
     grid-template-columns: minmax(0, 1fr) var(--props-w) var(--chat-w);
+    grid-template-rows: minmax(0, 1fr) var(--tl-h);
   }
 
   .body.coding {
@@ -1045,30 +1282,121 @@
     display: none;
   }
 
-  .panel-toggle {
-    display: inline-flex;
+  .stage {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
     align-items: center;
     justify-content: center;
-    width: 30px;
-    height: 30px;
-    color: var(--ui-ink-2);
+    padding: var(--ui-space-6);
+    background: var(--ui-surface);
+    container-type: size;
   }
 
-  .panel-toggle:hover {
-    background: var(--ui-hover);
+  .stage :global(> *) {
+    outline: 1px solid var(--ui-line-strong);
   }
 
-  .panel-toggle[aria-pressed='true'] {
-    background: var(--ui-accent-wash);
-    color: var(--ui-accent);
+  .stage {
+    position: relative;
+  }
+
+  :global([data-theme='dark']) .stage {
+    background: var(--ui-bg);
+  }
+
+  .empty-state {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--ui-space-3);
+    padding: var(--ui-space-6);
+    max-width: calc(100% - 32px);
+    background: var(--ui-bg);
+    border: 1px solid var(--ui-line-strong);
+    outline: none !important;
+  }
+
+  .empty-state p {
+    font-size: var(--ui-text-lg);
+    font-weight: 600;
+    text-align: center;
+  }
+
+  .empty-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--ui-space-2);
+  }
+
+  .composition {
+    padding: 0 12px 12px;
+  }
+
+  .composition-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    height: 40px;
+    padding-top: 12px;
+    margin: 0 -12px 8px;
+    padding: 0 12px;
+    align-items: center;
+    border-bottom: 1px solid var(--ui-line);
+    font-size: var(--ui-text-md);
+    font-weight: 600;
+  }
+
+  .composition-head em {
+    font-style: normal;
+    font-family: var(--ui-mono);
+    font-size: 10px;
+    font-weight: 400;
+    color: var(--ui-ink-3);
+  }
+
+  .props {
+    grid-column: 2;
+    grid-row: 1;
+    border-left: 1px solid var(--ui-line);
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .chat {
+    grid-column: 3;
+    grid-row: 1 / 3;
+    border-left: 1px solid var(--ui-line);
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .timeline-area {
+    grid-column: 1 / 3;
+    grid-row: 2;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    border-top: 1px solid var(--ui-line);
   }
 
   .resize {
+    position: absolute;
+    top: -3px;
+    left: 0;
+    right: 0;
     height: 5px;
-    margin-bottom: -5px;
-    position: relative;
-    z-index: 2;
-    flex-shrink: 0;
+    z-index: 3;
     cursor: row-resize;
     touch-action: none;
   }
@@ -1077,105 +1405,130 @@
     background: var(--ui-accent);
   }
 
-  .left {
-    grid-column: 1;
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-    min-height: 0;
-  }
-
-  .preview {
-    flex: 1;
-    min-height: 0;
+  .toolbar {
     display: flex;
     align-items: center;
-    justify-content: center;
-    padding: 16px;
-    background: var(--ui-surface);
-    container-type: size;
-  }
-
-  .crumbs {
-    display: flex;
-    align-items: center;
-    gap: var(--ui-space-1);
+    gap: 2px;
+    height: 32px;
     padding: 0 var(--ui-space-2);
-    height: 28px;
-    border-top: 1px solid var(--ui-line);
-    background: var(--ui-surface);
-    color: var(--ui-ink-2);
-    font-size: var(--ui-text-sm);
-    flex-shrink: 0;
-  }
-
-  .crumbs button {
-    border: 0;
-    border-radius: 0;
-    background: none;
-    color: var(--ui-ink-2);
-    padding: 2px 4px;
-    font: inherit;
-    cursor: pointer;
-  }
-
-  .crumbs button:hover {
-    background: var(--ui-hover);
-    color: var(--ui-ink);
-  }
-
-  .crumbs [aria-current='page'] {
-    color: var(--ui-ink);
-    font-weight: 600;
-    padding: 2px 4px;
-  }
-
-  .transport {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    height: 40px;
-    padding: 0 var(--ui-space-2);
-    border-top: 1px solid var(--ui-line);
+    border-bottom: 1px solid var(--ui-line);
     background: var(--ui-bg);
     font-size: var(--ui-text-sm);
     flex-shrink: 0;
   }
 
-  .transport > button,
-  .add > button {
+  .tool {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 4px;
-    height: 26px;
-    padding: 0 7px;
+    min-width: 24px;
+    height: 24px;
+    color: var(--ui-ink-2);
+  }
+
+  .tool.text {
+    padding: 0 6px;
     color: var(--ui-ink);
   }
 
-  .transport button:hover:not(:disabled) {
+  .tool:hover:not(:disabled) {
     background: var(--ui-hover);
+    color: var(--ui-ink);
   }
 
-  .transport button:disabled {
-    opacity: 0.35;
+  .tool:disabled {
+    color: var(--ui-ink-3);
+    cursor: default;
   }
 
-  .transport button.on {
+  .tool[aria-pressed='true'] {
     background: var(--ui-accent-wash);
     color: var(--ui-accent);
   }
 
-  .tc {
-    font-family: var(--ui-mono);
-    font-size: 11px;
-    padding: 0 6px;
+  .toolbar .divider {
+    margin: 8px 6px;
   }
 
-  .sep {
-    width: 1px;
-    height: 18px;
-    background: var(--ui-line);
+  .segmented {
+    display: inline-flex;
+    height: 24px;
+    margin-right: 4px;
+    border: 1px solid var(--ui-line);
+  }
+
+  .segmented button {
+    padding: 0 10px;
+    font-size: var(--ui-text-xs);
+    color: var(--ui-ink-2);
+  }
+
+  .segmented button + button {
+    border-left: 1px solid var(--ui-line);
+  }
+
+  .segmented button:hover {
+    color: var(--ui-ink);
+  }
+
+  .segmented button[aria-pressed='true'] {
+    background: var(--ui-accent-wash);
+    color: var(--ui-accent);
+  }
+
+  .arrange {
+    height: 24px;
+    margin-left: 4px;
+    padding: 0 4px;
+    border: 1px solid var(--ui-line-strong);
+    border-radius: 0;
+    background: var(--ui-bg);
+    color: var(--ui-ink);
+    font: inherit;
+    font-size: var(--ui-text-xs);
+  }
+
+  .spacer {
+    flex: 1;
+  }
+
+  .zoom {
+    width: 120px;
+    height: 24px;
     margin: 0 4px;
+    appearance: none;
+    background: transparent;
+    cursor: pointer;
+    touch-action: none;
+  }
+
+  .zoom::-webkit-slider-runnable-track {
+    height: 2px;
+    background: var(--ui-line-strong);
+  }
+
+  .zoom::-moz-range-track {
+    height: 2px;
+    background: var(--ui-line-strong);
+  }
+
+  .zoom::-webkit-slider-thumb {
+    appearance: none;
+    width: 10px;
+    height: 10px;
+    margin-top: -4px;
+    border: 1.5px solid var(--ui-ink-2);
+    border-radius: 0;
+    background: var(--ui-bg);
+  }
+
+  .zoom::-moz-range-thumb {
+    width: 10px;
+    height: 10px;
+    border: 1.5px solid var(--ui-ink-2);
+    border-radius: 0;
+    background: var(--ui-bg);
   }
 
   .add {
@@ -1194,8 +1547,8 @@
     overflow: auto;
     padding: 4px;
     background: var(--ui-bg);
-    border: 1px solid var(--ui-line);
-    box-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
+    border: 1px solid var(--ui-line-strong);
+    box-shadow: 0 12px 32px rgb(0 0 0 / 0.14);
   }
 
   .menu .col {
@@ -1213,29 +1566,23 @@
   }
 
   .menu-head {
-    padding: 4px 8px 2px;
-    font-family: var(--ui-mono);
-    font-size: 10px;
-    text-transform: uppercase;
-    color: var(--ui-ink-2);
+    padding: 6px 8px 2px;
+    font-size: var(--ui-text-xs);
+    font-weight: 600;
+    color: var(--ui-ink-3);
   }
-
 
   .notice {
     margin-left: 8px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     color: var(--ui-ink-2);
   }
 
   .tl {
-    height: var(--tl-h);
-    flex-shrink: 0;
-  }
-
-  .props {
-    grid-column: 2;
-    border-left: 1px solid var(--ui-line);
+    flex: 1;
     min-height: 0;
-    overflow: hidden;
   }
 
   .hint {
@@ -1244,138 +1591,257 @@
     font-size: 12px;
   }
 
-  .chat {
-    grid-column: 3;
-    border-left: 1px solid var(--ui-line);
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-  }
-
   .sheet-head,
   .tabs {
     display: none;
   }
 
-  @media (max-width: 760px) {
-    .bar {
-      gap: 8px;
-      height: auto;
-      min-height: 44px;
-      flex-wrap: wrap;
-      padding: 6px 12px;
+  @media (max-width: 1280px) {
+    .save {
+      font-size: 0;
+      gap: 0;
+    }
+  }
+
+  @media (pointer: coarse) {
+    .icon-btn,
+    .tool {
+      min-width: 44px;
+      height: 44px;
     }
 
-    .bar .title {
-      flex: 1;
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .bar .save,
-    .bar .render {
-      display: none;
-    }
-
-    .body {
-      display: flex;
-      flex-direction: column;
-    }
-
-    .left {
-      flex: 1;
-    }
-
-    .preview {
-      flex: 0 0 auto;
-      height: 34vh;
-      padding: 8px;
-    }
-
-    .transport {
-      overflow-x: auto;
-      flex-wrap: nowrap;
-    }
-
-    .transport > * {
-      flex-shrink: 0;
-    }
-
-    .menu {
-      position: fixed;
-      left: 8px;
-      right: 8px;
-      grid-template-columns: 1fr 1fr;
-      bottom: 104px;
-      max-height: 50vh;
-      overflow: auto;
-    }
-
-    .tl {
-      flex: 1;
-      height: auto;
-      min-height: 160px;
-    }
-
-    .props,
-    .chat {
-      position: fixed;
-      left: 0;
-      right: 0;
-      bottom: 48px;
-      height: 70vh;
-      z-index: 30;
-      display: none;
-      flex-direction: column;
-      background: var(--ui-bg);
-      border-left: 0;
-      border-top: 1px solid var(--ui-line);
-      box-shadow: 0 -12px 32px rgb(0 0 0 / 0.16);
-    }
-
-    .props.open,
-    .chat.open {
-      display: flex;
-    }
-
-    .props.open {
-      overflow: auto;
-    }
-
-    .sheet-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 8px 12px;
-      border-bottom: 1px solid var(--ui-line);
-      font-weight: 600;
-      flex-shrink: 0;
-    }
-
-    .chat :global(> :last-child) {
-      flex: 1;
-      min-height: 0;
-    }
-
-    .tabs {
-      display: flex;
-      flex-shrink: 0;
+    .toolbar {
       height: 48px;
-      border-top: 1px solid var(--ui-line);
     }
 
-    .tabs button {
-      flex: 1;
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--ui-ink-2);
+    .segmented {
+      height: 36px;
     }
 
-    .tabs button.on {
-      color: var(--ui-ink);
-      box-shadow: inset 0 2px 0 var(--ui-ink);
+    .chip,
+    .secondary,
+    .render {
+      height: 36px;
     }
+  }
+
+  .chip .short {
+    display: none;
+  }
+
+  [data-viewport='tablet'] .chip .long,
+  [data-viewport='tablet'] .step,
+  [data-viewport='tablet'] .crumb:not(.current),
+  [data-viewport='tablet'] .slash {
+    display: none;
+  }
+
+  [data-viewport='tablet'] .chip .short {
+    display: inline;
+  }
+
+  [data-viewport='tablet'] .bar {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  [data-viewport='tablet'] .toolbar {
+    overflow-x: auto;
+  }
+
+  [data-viewport='tablet'] .toolbar > * {
+    flex-shrink: 0;
+  }
+
+  [data-viewport='tablet'] .body {
+    --props-w: 280px;
+    --chat-w: 0px;
+  }
+
+  [data-viewport='tablet'] .chat {
+    display: none;
+  }
+
+  [data-viewport='tablet'] .chat.open {
+    display: flex;
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(380px, 90vw);
+    z-index: 30;
+    background: var(--ui-bg);
+    box-shadow: -12px 0 32px rgb(0 0 0 / 0.16);
+  }
+
+  [data-viewport='tablet'] .body {
+    position: relative;
+  }
+
+  [data-viewport='tablet'] .chat .sheet-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--ui-line);
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  [data-viewport='tablet'] .chat :global(> :last-child) {
+    flex: 1;
+    min-height: 0;
+  }
+
+  [data-viewport='phone'] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
+    grid-template-areas: 'lead trail' 'body body' 'transport transport' 'tabs tabs';
+  }
+
+  [data-viewport='phone'] .bar {
+    display: contents;
+  }
+
+  [data-viewport='phone'] .lead {
+    grid-area: lead;
+    height: 48px;
+    border-bottom: 1px solid var(--ui-line);
+  }
+
+  [data-viewport='phone'] .trail {
+    grid-area: trail;
+    height: 48px;
+    border-bottom: 1px solid var(--ui-line);
+  }
+
+  [data-viewport='phone'] .transport {
+    grid-area: transport;
+    height: 56px;
+    border: 0;
+    border-top: 1px solid var(--ui-line);
+    background: var(--ui-bg);
+  }
+
+  [data-viewport='phone'] .transport .icon-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  [data-viewport='phone'] .crumb:not(.current),
+  [data-viewport='phone'] .slash,
+  [data-viewport='phone'] .save,
+  [data-viewport='phone'] .chip,
+  [data-viewport='phone'] .trail .divider,
+  [data-viewport='phone'] .trail .toggle {
+    display: none;
+  }
+
+  [data-viewport='phone'] .body {
+    grid-area: body;
+    display: flex;
+    flex-direction: column;
+  }
+
+  [data-viewport='phone'] .stage {
+    flex: 0 0 auto;
+    height: 34vh;
+    padding: 8px;
+  }
+
+  [data-viewport='phone'] .timeline-area {
+    flex: 1;
+    min-height: 160px;
+  }
+
+  [data-viewport='phone'] .resize {
+    display: none;
+  }
+
+  [data-viewport='phone'] .toolbar {
+    overflow-x: auto;
+  }
+
+  [data-viewport='phone'] .toolbar > * {
+    flex-shrink: 0;
+  }
+
+  [data-viewport='phone'] .menu {
+    position: fixed;
+    left: 8px;
+    right: 8px;
+    grid-template-columns: 1fr 1fr;
+    top: 96px;
+    bottom: auto;
+    max-height: 50vh;
+    overflow: auto;
+  }
+
+  [data-viewport='phone'] .props,
+  [data-viewport='phone'] .chat {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 104px;
+    height: 62vh;
+    z-index: 30;
+    display: none;
+    flex-direction: column;
+    background: var(--ui-bg);
+    border-left: 0;
+    border-top: 1px solid var(--ui-line-strong);
+    box-shadow: 0 -12px 32px rgb(0 0 0 / 0.16);
+  }
+
+  [data-viewport='phone'] .props.open,
+  [data-viewport='phone'] .chat.open {
+    display: flex;
+  }
+
+  [data-viewport='phone'] .props.open {
+    overflow: auto;
+  }
+
+  [data-viewport='phone'] .sheet-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 44px;
+    padding: 0 4px 0 12px;
+    border-bottom: 1px solid var(--ui-line);
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  [data-viewport='phone'] .sheet-head button {
+    width: 44px;
+    height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  [data-viewport='phone'] .chat :global(> :last-child) {
+    flex: 1;
+    min-height: 0;
+  }
+
+  [data-viewport='phone'] .tabs {
+    grid-area: tabs;
+    display: flex;
+    height: 48px;
+    border-top: 1px solid var(--ui-line);
+  }
+
+  .tabs button {
+    flex: 1;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ui-ink-2);
+  }
+
+  .tabs button.on {
+    color: var(--ui-ink);
+    box-shadow: inset 0 2px 0 var(--ui-accent);
   }
 </style>

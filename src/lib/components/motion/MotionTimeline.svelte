@@ -2,31 +2,25 @@
   import ChevronUp from '@lucide/svelte/icons/chevron-up';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
-  import Type from '@lucide/svelte/icons/type';
-  import ImageIcon from '@lucide/svelte/icons/image';
-  import Clapperboard from '@lucide/svelte/icons/clapperboard';
-  import AudioLines from '@lucide/svelte/icons/audio-lines';
-  import Square from '@lucide/svelte/icons/square';
-  import Box from '@lucide/svelte/icons/box';
-  import Code from '@lucide/svelte/icons/code';
-  import Crosshair from '@lucide/svelte/icons/crosshair';
-  import Video from '@lucide/svelte/icons/video';
-  import SquareDashed from '@lucide/svelte/icons/square-dashed';
-  import Layers from '@lucide/svelte/icons/layers';
-  import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
-  import { tick, type Component } from 'svelte';
+  import { tick } from 'svelte';
+  import Link2 from '@lucide/svelte/icons/link-2';
   import { CLIP_FAMILIES, ClipFamily, Preview, familyOf, tileFrames } from '$lib/motion/track-style';
   import { filmstrip, type Strip } from '$lib/motion/filmstrip';
-  import { COMPONENTS, TrackKind } from '$lib/motion/components';
+  import { COMPONENTS, THREE_D_COMPONENTS, TrackKind } from '$lib/motion/components';
   import { compOf, type MotionClip, type MotionDoc } from '$lib/motion/doc';
-  import { ClipEdge, moveClip, moveKeyframes, moveTrack, setKeyEase, setKeyInterp, trimClip, type KeyRef, type OpResult } from '$lib/motion/timeline';
+  import { ClipEdge, moveClip, moveKeyframes, moveTrack, removeKeyframes, setKeyEase, setKeyInterp, setKeyframe, trimClip, type KeyRef, type OpResult } from '$lib/motion/timeline';
   import { withParams } from '$lib/motion/custom/params';
-  import { Grip, KeySide, Reveal, Snap, edgeHandles, frameAt, keyLanes, pxPerFrame, rulerTicks, snapped, stackRows, type KeyLane } from '$lib/motion/timeline-view';
+  import { Grip, KeySide, Reveal, Snap, edgeHandles, frameAt, keyLanes, pxPerFrame, snapped } from '$lib/motion/timeline-view';
+  import { KeyMark, RowKind, keyGlyph, keyMark, layerName, layerRows, pinched, propValue, rulerMarks, type PropLane } from '$lib/motion/timeline-layers';
   import { MASK_KINDS, Matte } from '$lib/motion/mask';
   import type { MotionTrack } from '$lib/motion/doc';
   import { Interp, Source, type EaseSpec, type Keyframe } from '$lib/motion/keyframes';
-  import { CAMERA_LANE } from '$lib/motion/camera';
-  import { cameraLanes } from '$lib/motion/camera-ops';
+  import { CAMERA, CAMERA_LANE, type CameraKey } from '$lib/motion/camera';
+  import { cameraEditAt, cameraLanes, cameraValueAt } from '$lib/motion/camera-ops';
+  import { animProp, ValueKind } from '$lib/motion/keyframes';
+  import { editAt, parseDecimal, valueAt } from '$lib/motion/inspector';
+  import { sliderOf, toShown, toStored, type Owner } from '$lib/motion/units';
+  import { formatValue, precisionOf, scrubbed, type Range } from '$lib/motion/number-field';
   import { ancestorsOf } from '$lib/motion/parent';
   import { setParent } from '$lib/motion/parent-ops';
   import EasePicker from './EasePicker.svelte';
@@ -36,36 +30,15 @@
   import LockOpen from '@lucide/svelte/icons/lock-open';
   import Headphones from '@lucide/svelte/icons/headphones';
   import Ghost from '@lucide/svelte/icons/ghost';
-  import { allMarkers, isLocked, setTrackFlags, shownTracks } from '$lib/motion/organize';
+  import { allMarkers, isLocked, setClipFlags, setTrackFlags, shownTracks } from '$lib/motion/organize';
   import { PEAKS_PER_SECOND, clipPeaks, wavePath } from '$lib/motion/waveform';
   import { FadeEdge, dragFade, fadeHandles } from '$lib/motion/fade-handles';
 
-  const HEADER_PX = 176;
-  const COMPACT_HEADER_PX = 112;
+  const HEADER_PX = 240;
+  const COMPACT_HEADER_PX = 180;
   const COMPACT_BELOW_PX = 760;
-  const ROW_PX = 34;
-  const FOLDED_ROW_PX = 12;
-  const LANE_PAD_PX = 6;
   const TILE_PX = 64;
   const MAX_TILES = 48;
-
-  const FAMILY_ICONS: Record<ClipFamily, Component> = {
-    [ClipFamily.Text]: Type,
-    [ClipFamily.Image]: ImageIcon,
-    [ClipFamily.Video]: Clapperboard,
-    [ClipFamily.Audio]: AudioLines,
-    [ClipFamily.Shape]: Square,
-    [ClipFamily.ThreeD]: Box,
-    [ClipFamily.Custom]: Code,
-    [ClipFamily.Null]: Crosshair,
-    [ClipFamily.Camera]: Video,
-    [ClipFamily.Mask]: SquareDashed,
-    [ClipFamily.Precomp]: Layers,
-    [ClipFamily.Adjustment]: SlidersHorizontal
-  };
-
-  const KEY_ROW_PX = 20;
-  const DIAMOND_PX = 10;
   const INDENT_PX = 10;
 
   const Drag = { Move: 'move', TrimStart: 'trim-start', TrimEnd: 'trim-end', Scrub: 'scrub', Keys: 'keys', FadeIn: 'fade-in', FadeOut: 'fade-out' } as const;
@@ -81,7 +54,7 @@
     selection = $bindable<string[]>([]),
     keySelection = $bindable<KeyRef[]>([]),
     camera = $bindable(false),
-    zoom,
+    zoom = $bindable(1),
     snap,
     waveforms = {},
     beats = [],
@@ -95,7 +68,7 @@
     selection?: string[];
     keySelection?: KeyRef[];
     camera?: boolean;
-    zoom: number;
+    zoom?: number;
     snap: Snap;
     waveforms?: Record<string, number[]>;
     beats?: number[];
@@ -114,7 +87,7 @@
   const headPx = $derived(viewportWidth < COMPACT_BELOW_PX ? COMPACT_HEADER_PX : HEADER_PX);
   let strips = $state<Record<string, Strip>>({});
 
-  let collapsed = $state<string[]>([]);
+  let open = $state<string[]>([]);
   let easing = $state<{ ref: KeyRef; next: KeyRef; ease: EaseSpec; left: number; top: number } | null>(null);
   let whip = $state<{ clipId: string; x0: number; y0: number; x: number; y: number } | null>(null);
 
@@ -137,7 +110,158 @@
   }
 
   const width = $derived(Math.max(shown.durationInFrames * ppf + 120, 400));
-  const ticks = $derived(rulerTicks(shown.durationInFrames, zoom, doc.fps));
+  const marks = $derived(rulerMarks(shown.durationInFrames, zoom, doc.fps));
+  const cameraShown = $derived(!!shown.camera || shown.tracks.some((t) => t.clips.some((c) => THREE_D_COMPONENTS.includes(c.component))));
+
+  function lanesOf(clip: MotionClip): PropLane[] {
+    return keyLanes(withParams(shown, clip), reveal).map((l) => ({ prop: l.prop, label: l.source === Source.Mask ? `Mask · ${l.label}` : l.label }));
+  }
+
+  const isOpen = (clip: MotionClip) => open.includes(clip.id) || (reveal !== Reveal.Animated && selection.includes(clip.id));
+  const rows = $derived(layerRows(tracks, { folded, open: tracks.flatMap((t) => (t.clips as MotionClip[]).filter(isOpen).map((c) => c.id)), lanes: lanesOf }));
+
+  function keyFrames(clip: MotionClip): number[] {
+    return [...new Set(Object.values(clip.keyframes).flatMap((keys) => (keys ?? []).map((k) => k.frame)))];
+  }
+
+  function toggleOpen(clipId: string) {
+    open = toggled(open, clipId);
+    if (open.includes(clipId)) {
+      selection = [clipId];
+      camera = false;
+    }
+    void revealLanes(clipId);
+  }
+
+  function pickLayer(e: PointerEvent, clip: MotionClip) {
+    select(clip.id, e);
+    keySelection = [];
+  }
+
+  function clipFlag(clipId: string, flags: { hidden?: boolean; locked?: boolean }, summary: string) {
+    const result = setClipFlags(doc, clipId, flags);
+    if (result.ok) {
+      onchange(result.doc, summary);
+    }
+  }
+
+  type PropEdit = { shown: number; range: Range; unit: string; set: (shownValue: number) => void };
+
+  const sameColor = (c: string) => c;
+
+  function clipEdit(clip: MotionClip, key: string): PropEdit | null {
+    const prop = animProp(clip.component, key, withParams(doc, clip).params);
+    if (!prop || prop.kind !== ValueKind.Number) {
+      return null;
+    }
+    return unitEdit(clip.component, prop, Number(valueAt(withParams(shown, clip), key, frame, sameColor)), (stored) => editAt(doc, clip, key, stored, frame));
+  }
+
+  function cameraEdit(key: CameraKey): PropEdit {
+    return unitEdit(CAMERA_LANE, { key, ...CAMERA[key] }, cameraValueAt(shown, key, frame), (stored) => cameraEditAt(doc, key, Math.min(CAMERA[key].max, Math.max(CAMERA[key].min, stored)), frame));
+  }
+
+  function unitEdit(owner: Owner, prop: Range & { key: string }, stored: number, write: (stored: number) => OpResult): PropEdit {
+    const slider = sliderOf(owner, prop, doc);
+    return {
+      shown: toShown(owner, prop.key, stored, doc),
+      range: slider,
+      unit: slider.unit ?? '',
+      set: (v) => {
+        const result = write(toStored(owner, prop.key, v, doc));
+        if (result.ok) {
+          onchange(result.doc, `Edited ${prop.key}`);
+        }
+      }
+    };
+  }
+
+  const propEdit = (owner: KeyOwner, key: string): PropEdit | null => (owner.id === CAMERA_LANE ? cameraEdit(key as CameraKey) : clipEdit(clipById(owner.id), key));
+
+  let typing = $state<string | null>(null);
+  let valueScrub: { x: number; start: number; edit: PropEdit; moved: boolean } | null = null;
+  const TAP_SLOP_PX = 3;
+
+  function startValue(e: PointerEvent, edit: PropEdit) {
+    e.stopPropagation();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    valueScrub = { x: e.clientX, start: edit.shown, edit, moved: false };
+  }
+
+  function moveValue(e: PointerEvent) {
+    if (!valueScrub) {
+      return;
+    }
+    const dx = e.clientX - valueScrub.x;
+    valueScrub.moved ||= Math.abs(dx) > TAP_SLOP_PX;
+    if (valueScrub.moved) {
+      valueScrub.edit.set(scrubbed(valueScrub.start, dx, valueScrub.edit.range, precisionOf(e)));
+    }
+  }
+
+  function endValue(rowId: string) {
+    if (valueScrub && !valueScrub.moved) {
+      typing = rowId;
+    }
+    valueScrub = null;
+  }
+
+  function typeValue(edit: PropEdit, text: string) {
+    typing = null;
+    const parsed = parseDecimal(text);
+    if (parsed !== null) {
+      edit.set(Math.min(edit.range.max, Math.max(edit.range.min, parsed)));
+    }
+  }
+
+  function focusSelect(node: HTMLInputElement) {
+    node.focus();
+    node.select();
+  }
+
+  const fingers = new Map<number, number>();
+  let pinch: { zoom: number; distance: number } | null = null;
+
+  const spread = () => Math.abs([...fingers.values()].reduce((a, b) => a - b));
+
+  function touchDown(e: PointerEvent) {
+    if (e.pointerType !== 'touch') {
+      return;
+    }
+    fingers.set(e.pointerId, e.clientX);
+    if (fingers.size === 2) {
+      pinch = { zoom, distance: Math.max(1, spread()) };
+      gesture = null;
+      draft = null;
+    }
+  }
+
+  function touchMove(e: PointerEvent) {
+    if (!fingers.has(e.pointerId)) {
+      return;
+    }
+    fingers.set(e.pointerId, e.clientX);
+    if (pinch && fingers.size === 2) {
+      zoom = pinched(pinch.zoom, pinch.distance, Math.max(1, spread()));
+    }
+  }
+
+  function touchUp(e: PointerEvent) {
+    fingers.delete(e.pointerId);
+    if (fingers.size < 2) {
+      pinch = null;
+    }
+  }
+
+  function toggleMark(owner: KeyOwner, prop: string, mark: KeyMark) {
+    const local = frame - owner.from;
+    const keys = owner.keyframes[prop] ?? [];
+    const value = keys.every((k) => typeof k.value === 'number') ? Number(propValue(keys, local)) : (keys.findLast((k) => k.frame <= local) ?? keys[0])?.value;
+    const result = mark === KeyMark.Here ? removeKeyframes(doc, owner.id, prop, [local]) : setKeyframe(doc, owner.id, prop, local, value ?? 0);
+    if (result.ok) {
+      onchange(result.doc, 'Toggled a keyframe');
+    }
+  }
 
   function frameOfPointer(e: PointerEvent): number {
     const rect = lanes!.getBoundingClientRect();
@@ -223,26 +347,9 @@
     }
   }
 
-  function toggleLanes(e: Event, clipId: string) {
-    e.stopPropagation();
-    collapsed = collapsed.includes(clipId) ? collapsed.filter((id) => id !== clipId) : [...collapsed, clipId];
-    void revealLanes(clipId);
-  }
-
-  function showLanes(e: Event, clipId: string) {
-    e.stopPropagation();
-    selection = [clipId];
-    collapsed = collapsed.filter((id) => id !== clipId);
-    void revealLanes(clipId);
-  }
-
   async function revealLanes(clipId: string) {
     await tick();
     lanes?.querySelector(`[data-key-lane^="${clipId}:"]`)?.scrollIntoView({ block: 'nearest' });
-  }
-
-  function laneClips(track: MotionTrack): MotionClip[] {
-    return (track.clips as MotionClip[]).filter((c) => selection.includes(c.id) && !collapsed.includes(c.id) && keyLanes(withParams(shown, c), reveal).length > 0);
   }
 
   function clipById(id: string): MotionClip {
@@ -284,9 +391,9 @@
     }
   }
 
-  function parentLabel(clip: MotionClip): string {
-    const parent = clip.parent ? shown.tracks.flatMap((t) => t.clips).find((c) => c.id === clip.parent) : null;
-    return parent ? `↳ ${clipLabel(parent as MotionClip)} · ` : '';
+  function parentName(clip: MotionClip): string {
+    const parent = shown.tracks.flatMap((t) => t.clips).find((c) => c.id === clip.parent);
+    return parent ? parent.id : '';
   }
 
   function startScrub(e: PointerEvent) {
@@ -388,10 +495,6 @@
     return `--hue: ${CLIP_FAMILIES[family].hue};`;
   }
 
-  function rowPx(track: MotionTrack): number {
-    return folded.includes(track.id) ? FOLDED_ROW_PX : ROW_PX;
-  }
-
   function toggleFold(trackId: string) {
     folded = folded.includes(trackId) ? folded.filter((id) => id !== trackId) : [...folded, trackId];
   }
@@ -442,114 +545,164 @@
 
 <svelte:window bind:innerWidth={viewportWidth} onpointermove={onMove} onpointerup={onUp} />
 
-  {#snippet keyLane(clip: KeyOwner, lane: { prop: string; label: string })}
-    {@const keys = clip.keyframes[lane.prop] ?? []}
-    <div class="lane sub" data-key-lane={`${clip.id}:${lane.prop}`} style={`height: ${KEY_ROW_PX}px;`}>
-      <div class="head" style={`width: ${headPx}px;`}><span class="name prop">{lane.label}</span></div>
-      <div class="clips">
-        {#each keys.slice(0, -1) as key, i (key.frame)}
-          <button
-            type="button"
-            class="segment"
-            title="Ease"
-            aria-label={`Ease after ${lane.label} keyframe`}
-            style={`left: ${(clip.from + key.frame) * ppf}px; width: ${(keys[i + 1].frame - key.frame) * ppf}px;`}
-            onclick={(e) => openEase(e, clip, { clipId: clip.id, prop: lane.prop, frame: key.frame }, { clipId: clip.id, prop: lane.prop, frame: keys[i + 1].frame }, key.ease)}
-          ></button>
-        {/each}
-        {#each keys as key (key.frame)}
-          {@const ref = { clipId: clip.id, prop: lane.prop, frame: key.frame }}
-          <div
-            class="diamond"
-            class:picked={keySelection.some((k) => sameKey(k, ref))}
-            role="button"
-            tabindex="-1"
-            aria-label={`${lane.label} keyframe at ${clip.from + key.frame}`}
-            data-key-frame={clip.from + key.frame}
-            data-interp={key.out ?? Interp.Bezier}
-            class:roving={key.roving}
-            style={`left: ${(clip.from + key.frame) * ppf - DIAMOND_PX / 2}px; width: ${DIAMOND_PX}px; height: ${DIAMOND_PX}px; top: ${(KEY_ROW_PX - DIAMOND_PX) / 2}px;`}
-            onpointerdown={(e) => startKey(e, clip, ref)}
-          ></div>
-        {/each}
-      </div>
+{#snippet propRow(owner: KeyOwner, lane: PropLane, rowId: string)}
+  {@const keys = owner.keyframes[lane.prop] ?? []}
+  {@const mark = keyMark(keys, frame - owner.from)}
+  {@const edit = propEdit(owner, lane.prop)}
+  <div class="row prop" data-key-lane={rowId}>
+    <div class="head">
+      <span class="indent prop-indent"></span>
+      <button type="button" class="mark" data-mark={mark} aria-label={mark === KeyMark.Here ? `Remove ${lane.label} keyframe` : `Add ${lane.label} keyframe`} title={mark === KeyMark.Here ? 'Remove keyframe here' : 'Add keyframe here'} disabled={owner.id === CAMERA_LANE} onclick={() => toggleMark(owner, lane.prop, mark)}></button>
+      <span class="prop-name">{lane.label}</span>
+      {#if !edit}
+        <span class="prop-value">{propValue(keys, frame - owner.from)}</span>
+      {:else if typing === rowId}
+        <input class="prop-input" use:focusSelect aria-label={`${lane.label} value`} value={formatValue(edit.shown, edit.range.step)} onchange={(e) => typeValue(edit, e.currentTarget.value)} onblur={() => (typing = null)} onkeydown={(e) => (e.key === 'Escape' || e.key === 'Enter') && e.currentTarget.blur()} onpointerdown={(e) => e.stopPropagation()} />
+      {:else}
+        <span class="prop-value editable" role="slider" tabindex="0" aria-label={`${lane.label} value`} aria-valuenow={edit.shown} title="Drag to change (Shift ×10, Alt ×0.1), click to type" onpointerdown={(e) => startValue(e, edit)} onpointermove={moveValue} onpointerup={() => endValue(rowId)} onkeydown={(e) => e.key === 'Enter' && (typing = rowId)}>{formatValue(edit.shown, edit.range.step)}<em>{edit.unit}</em></span>
+      {/if}
     </div>
-  {/snippet}
+    <div class="lane">
+      {#each keys.slice(0, -1) as key, i (key.frame)}
+        <button
+          type="button"
+          class="segment"
+          title="Ease"
+          aria-label={`Ease after ${lane.label} keyframe`}
+          style={`left: ${(owner.from + key.frame) * ppf}px; width: ${(keys[i + 1].frame - key.frame) * ppf}px;`}
+          onclick={(e) => openEase(e, owner, { clipId: owner.id, prop: lane.prop, frame: key.frame }, { clipId: owner.id, prop: lane.prop, frame: keys[i + 1].frame }, key.ease)}
+        ></button>
+      {/each}
+      {#each keys as key (key.frame)}
+        {@const ref = { clipId: owner.id, prop: lane.prop, frame: key.frame }}
+        <div
+          class="key"
+          class:picked={keySelection.some((k) => sameKey(k, ref))}
+          class:roving={key.roving}
+          role="button"
+          tabindex="-1"
+          aria-label={`${lane.label} keyframe at ${owner.from + key.frame}`}
+          data-key-frame={owner.from + key.frame}
+          data-interp={key.out ?? Interp.Bezier}
+          data-glyph={keyGlyph(key)}
+          style={`left: ${(owner.from + key.frame) * ppf}px;`}
+          onpointerdown={(e) => startKey(e, owner, ref)}
+        ></div>
+      {/each}
+    </div>
+  </div>
+{/snippet}
 
-<div class="timeline" bind:this={lanes} data-testid="motion-timeline">
+<div class="timeline" bind:this={lanes} data-testid="motion-timeline" style={`--head: ${headPx}px;`} onpointerdowncapture={touchDown} onpointermovecapture={touchMove} onpointerupcapture={touchUp} onpointercancelcapture={touchUp}>
   <div class="inner" style={`width: ${width + headPx}px;`}>
     <div class="ruler" role="slider" tabindex="-1" aria-label="Playhead" aria-valuenow={frame} onpointerdown={startScrub}>
-      <div class="corner" style={`width: ${headPx}px;`}>
+      <div class="corner">
         <input class="search" type="search" placeholder="Search layers" aria-label="Search layers" bind:value={filter} onpointerdown={(e) => e.stopPropagation()} />
         <button type="button" class="shy-toggle" class:on={hideShy} aria-pressed={hideShy} title="Hide shy tracks" onpointerdown={(e) => e.stopPropagation()} onclick={() => (hideShy = !hideShy)}><Ghost size={12} /></button>
       </div>
+      {#each marks as mark (mark.frame)}
+        <span class="tick" class:major={mark.label} style={`left: ${headPx + mark.frame * ppf}px;`}>
+          {#if mark.label}<em>{mark.label}</em>{/if}
+        </span>
+      {/each}
       {#if shown.workArea}
         <span class="work-area" data-testid="work-area" style={`left: ${headPx + shown.workArea.from * ppf}px; width: ${(shown.workArea.to - shown.workArea.from) * ppf}px;`}></span>
       {/if}
       {#each markers as m (`${m.clipId}:${m.label}`)}
-        <span class="marker" class:clip-marker={m.clipId} data-marker={m.label} title={m.label} style={`left: ${headPx + m.frame * ppf}px;`}><em>{m.label}</em></span>
-      {/each}
-      {#each ticks as tick (tick.frame)}
-        <span class="tick" class:major={tick.label} style={`left: ${headPx + tick.frame * ppf}px;`}>
-          {#if tick.label}<em>{tick.label}</em>{/if}
-        </span>
+        <span class="marker" class:clip-marker={m.clipId} data-marker={m.label} title={m.label} style={`left: ${headPx + m.frame * ppf}px;`}></span>
       {/each}
       {#each beats as beat (beat)}<span class="beat" data-beat={beat} style={`left: ${headPx + beat * ppf}px;`}></span>{/each}
+      <span class="playhead-head" style={`left: ${headPx + frame * ppf}px;`}></span>
     </div>
 
-    <div class="lane camera-track" data-camera-track style={`height: ${ROW_PX + 2 * LANE_PAD_PX}px; ${hueOf(ClipFamily.Camera)}`}>
-      <div class="head" style={`width: ${headPx}px;`}><span class="fold-space"></span><span class="chip"><Video size={12} /></span><span class="name">Camera</span></div>
-      <div class="clips">
-        <div
-          class="bar camera-bar"
-          class:selected={camera}
-          class:ghost={!shown.camera}
-          role="button"
-          tabindex="0"
-          aria-label="Camera"
-          data-testid="camera-bar"
-          style={`left: 0; width: ${Math.max(4, shown.durationInFrames * ppf)}px; top: ${LANE_PAD_PX}px; height: ${ROW_PX - 2}px;`}
-          onpointerdown={pickCamera}
-        >
-          <span class="kind">Camera{#if shown.camera?.dof}<span class="tag"> · depth of field</span>{/if}</span>
-          <span class="label">{shown.camera ? `${cameraLanes(shown.camera).length} animated values${Object.keys(shown.camera.expressions).length ? ` · = ${Object.keys(shown.camera.expressions).join(', ')}` : ''}` : 'Add a camera for 3D moves'}</span>
+    {#if cameraShown}
+      <div class="row layer camera-row" class:selected={camera} data-camera-track style={hueOf(ClipFamily.Camera)}>
+        <div class="head" role="button" tabindex="-1" aria-label="Select the camera" onpointerdown={pickCamera}>
+          <span class="indent"></span>
+          {#if cameraOwner}
+            <button type="button" class="twirl" aria-label="Show keyframes" aria-expanded={open.includes(CAMERA_LANE)} onpointerdown={(e) => e.stopPropagation()} onclick={() => (open = toggled(open, CAMERA_LANE))}>{#if open.includes(CAMERA_LANE)}<ChevronDown size={12} />{:else}<ChevronRight size={12} />{/if}</button>
+          {:else}
+            <span class="twirl"></span>
+          {/if}
+          <span class="swatch"></span>
+          <span class="layer-name">Camera{#if shown.camera?.dof}<em> · depth of field</em>{/if}</span>
+        </div>
+        <div class="lane">
+          <div
+            class="bar camera-bar"
+            class:selected={camera}
+            class:ghost={!shown.camera}
+            role="button"
+            tabindex="0"
+            aria-label="Camera"
+            data-testid="camera-bar"
+            style={`left: 0; width: ${Math.max(4, shown.durationInFrames * ppf)}px;`}
+            onpointerdown={pickCamera}
+          >
+            <span class="kicker">Camera</span>
+            <span class="label">{shown.camera ? `${cameraLanes(shown.camera).length} animated values${Object.keys(shown.camera.expressions).length ? ` · ƒ ${Object.keys(shown.camera.expressions).join(', ')}` : ''}` : 'Add a camera for 3D moves'}</span>
+          </div>
         </div>
       </div>
-    </div>
-    {#if cameraOwner}
-      {#each cameraLanes(shown.camera) as lane (lane.prop)}{@render keyLane(cameraOwner, lane)}{/each}
+      {#if cameraOwner && open.includes(CAMERA_LANE)}
+        {#each cameraLanes(shown.camera) as lane (lane.prop)}{@render propRow(cameraOwner, lane, `${CAMERA_LANE}:${lane.prop}`)}{/each}
+      {/if}
     {/if}
 
-    {#each tracks as track, index (track.id)}
-      {@const rows = stackRows(track.clips)}
-      {@const rowCount = Math.max(1, ...Object.values(rows).map((r) => r + 1))}
-      {@const row = rowPx(track)}
-      {@const family = trackFamily(track)}
-      {@const TrackIcon = FAMILY_ICONS[family]}
-      <div class="lane track" data-track-id={track.id} class:alt={index % 2 === 1} class:folded={folded.includes(track.id)} style={`height: ${rowCount * row + 2 * LANE_PAD_PX}px; ${hueOf(family)}`}>
-        <div class="head" style={`width: ${headPx}px;`}>
-          <button type="button" class="fold" aria-label={folded.includes(track.id) ? 'Expand track' : 'Collapse track'} aria-expanded={!folded.includes(track.id)} onclick={() => toggleFold(track.id)}>
-            {#if folded.includes(track.id)}<ChevronRight size={12} />{:else}<ChevronDown size={12} />{/if}
-          </button>
-          <span class="chip" title={CLIP_FAMILIES[family].label}><TrackIcon size={12} /></span>
-          <span class="name">{track.name || track.id}</span>
-          <span class="flags">
-            <button type="button" aria-label={track.hidden ? 'Show track' : 'Hide track'} aria-pressed={!!track.hidden} data-flag="hide" class:on={track.hidden} onclick={() => flag(track.id, { hidden: !track.hidden }, track.hidden ? 'Showed a track' : 'Hid a track')}>{#if track.hidden}<EyeOff size={12} />{:else}<Eye size={12} />{/if}</button>
-            <button type="button" aria-label={track.locked ? 'Unlock track' : 'Lock track'} aria-pressed={!!track.locked} data-flag="lock" class:on={track.locked} onclick={() => flag(track.id, { locked: !track.locked }, track.locked ? 'Unlocked a track' : 'Locked a track')}>{#if track.locked}<Lock size={12} />{:else}<LockOpen size={12} />{/if}</button>
-            <button type="button" aria-label="Solo track" aria-pressed={solo.includes(track.id)} data-flag="solo" class:on={solo.includes(track.id)} onclick={() => (solo = toggled(solo, track.id))}><Headphones size={12} /></button>
-            <button type="button" aria-label="Shy track" aria-pressed={shy.includes(track.id)} data-flag="shy" class:on={shy.includes(track.id)} onclick={() => (shy = toggled(shy, track.id))}><Ghost size={12} /></button>
-          </span>
-          <span class="order">
-            <button type="button" aria-label="Move track up" disabled={index === 0} onclick={() => reorder(track.id, -1)}><ChevronUp size={12} /></button>
-            <button type="button" aria-label="Move track down" disabled={index === shown.tracks.length - 1} onclick={() => reorder(track.id, 1)}><ChevronDown size={12} /></button>
-          </span>
+    {#each rows as row (row.kind + row.id)}
+      {#if row.kind === RowKind.Group}
+        {@const track = row.track}
+        {@const family = trackFamily(track)}
+        {@const index = shown.tracks.findIndex((t) => t.id === track.id)}
+        <div class="row group" data-track-id={track.id} class:folded={folded.includes(track.id)} style={hueOf(family)}>
+          <div class="head">
+            <button type="button" class="twirl" aria-label={folded.includes(track.id) ? 'Expand track' : 'Collapse track'} aria-expanded={!folded.includes(track.id)} onclick={() => toggleFold(track.id)}>
+              {#if folded.includes(track.id)}<ChevronRight size={12} />{:else}<ChevronDown size={12} />{/if}
+            </button>
+            <span class="group-name">{track.name || track.id}</span>
+            <span class="count">{track.clips.length}</span>
+            <span class="flags">
+              <button type="button" title={track.hidden ? 'Show track' : 'Hide track'} aria-label={track.hidden ? 'Show track' : 'Hide track'} aria-pressed={!!track.hidden} data-flag="hide" class:on={track.hidden} onclick={() => flag(track.id, { hidden: !track.hidden }, track.hidden ? 'Showed a track' : 'Hid a track')}>{#if track.hidden}<EyeOff size={12} />{:else}<Eye size={12} />{/if}</button>
+              <button type="button" title={track.locked ? 'Unlock track' : 'Lock track'} aria-label={track.locked ? 'Unlock track' : 'Lock track'} aria-pressed={!!track.locked} data-flag="lock" class:on={track.locked} onclick={() => flag(track.id, { locked: !track.locked }, track.locked ? 'Unlocked a track' : 'Locked a track')}>{#if track.locked}<Lock size={12} />{:else}<LockOpen size={12} />{/if}</button>
+              <button type="button" title="Solo track" aria-label="Solo track" aria-pressed={solo.includes(track.id)} data-flag="solo" class:on={solo.includes(track.id)} onclick={() => (solo = toggled(solo, track.id))}><Headphones size={12} /></button>
+              <button type="button" title="Shy track" aria-label="Shy track" aria-pressed={shy.includes(track.id)} data-flag="shy" class:on={shy.includes(track.id)} onclick={() => (shy = toggled(shy, track.id))}><Ghost size={12} /></button>
+              <button type="button" title="Move track up" aria-label="Move track up" disabled={index <= 0} onclick={() => reorder(track.id, -1)}><ChevronUp size={12} /></button>
+              <button type="button" title="Move track down" aria-label="Move track down" disabled={index === shown.tracks.length - 1} onclick={() => reorder(track.id, 1)}><ChevronDown size={12} /></button>
+            </span>
+          </div>
+          <div class="lane" data-track-id={track.id}>
+            {#each track.clips as clip (clip.id)}
+              <span class="summary-bar" style={`left: ${clip.from * ppf}px; width: ${Math.max(2, clip.durationInFrames * ppf)}px; ${hueOf(familyOf(clip.component))}`}></span>
+            {/each}
+          </div>
         </div>
-        <div class="clips" data-track-id={track.id}>
-          {#each track.clips as clip (clip.id)}
-            {@const wave = waveOf(clip as MotionClip)}
-            {@const clipFamily = familyOf(clip.component)}
-            {@const preview = CLIP_FAMILIES[clipFamily].preview}
-            {@const url = assetOf(clip as MotionClip)}
+      {:else if row.kind === RowKind.Layer}
+        {@const track = row.track}
+        {@const clip = row.clip}
+        {@const clipFamily = familyOf(clip.component)}
+        {@const preview = CLIP_FAMILIES[clipFamily].preview}
+        {@const url = assetOf(clip)}
+        {@const wave = waveOf(clip)}
+        {@const twirlable = lanesOf(clip).length > 0}
+        <div class="row layer" data-layer={clip.id} data-track-id={track.id} class:selected={selection.includes(clip.id)} style={hueOf(clipFamily)}>
+          <div class="head" role="button" tabindex="-1" aria-label={`Select ${layerName(clip, doc.comps)}`} onpointerdown={(e) => pickLayer(e, clip)}>
+            <span class="indent" style={`width: ${12 + INDENT_PX * ancestorsOf(shown, clip.id).length}px;`}></span>
+            {#if twirlable}
+              <button type="button" class="twirl" aria-label="Show keyframes" aria-expanded={isOpen(clip)} onpointerdown={(e) => e.stopPropagation()} onclick={() => toggleOpen(clip.id)}>{#if isOpen(clip)}<ChevronDown size={12} />{:else}<ChevronRight size={12} />{/if}</button>
+            {:else}
+              <span class="twirl"></span>
+            {/if}
+            <span class="swatch"></span>
+            <span class="layer-name" title={layerName(clip, doc.comps)}>{#if clip.parent}<em class="parent">↳ {parentName(clip)}</em>{/if}{layerName(clip, doc.comps)}</span>
+            <span class="flags">
+              {#if track.kind === TrackKind.Visual}
+                <button type="button" class="whip" title="Drag onto another layer to parent this one to it" aria-label="Parent pick-whip" data-whip={clip.id} onpointerdown={(e) => startWhip(e, clip.id)}><Link2 size={12} /></button>
+              {/if}
+              <button type="button" title={clip.hidden ? 'Show layer' : 'Hide layer'} aria-label={clip.hidden ? 'Show layer' : 'Hide layer'} aria-pressed={!!clip.hidden} class:on={clip.hidden} onpointerdown={(e) => e.stopPropagation()} onclick={() => clipFlag(clip.id, { hidden: !clip.hidden }, clip.hidden ? 'Showed a layer' : 'Hid a layer')}>{#if clip.hidden}<EyeOff size={12} />{:else}<Eye size={12} />{/if}</button>
+              <button type="button" title={clip.locked ? 'Unlock layer' : 'Lock layer'} aria-label={clip.locked ? 'Unlock layer' : 'Lock layer'} aria-pressed={!!clip.locked} class:on={clip.locked} onpointerdown={(e) => e.stopPropagation()} onclick={() => clipFlag(clip.id, { locked: !clip.locked }, clip.locked ? 'Unlocked a layer' : 'Locked a layer')}>{#if clip.locked}<Lock size={12} />{:else}<LockOpen size={12} />{/if}</button>
+            </span>
+          </div>
+          <div class="lane" data-track-id={track.id}>
             <div
               class="bar"
               class:selected={selection.includes(clip.id)}
@@ -560,81 +713,69 @@
               role="button"
               tabindex="0"
               aria-label={`${COMPONENTS[clip.component].label} clip`}
-              style={`left: ${clip.from * ppf}px; width: ${Math.max(4, clip.durationInFrames * ppf)}px; top: ${LANE_PAD_PX + rows[clip.id] * row}px; height: ${row - 2}px; ${hueOf(clipFamily)}`}
-              onpointerdown={(e) => startClip(e, clip as MotionClip, track.id)}
-              ondblclick={() => openComp(clip as MotionClip)}
+              style={`left: ${clip.from * ppf}px; width: ${Math.max(4, clip.durationInFrames * ppf)}px;`}
+              onpointerdown={(e) => startClip(e, clip, track.id)}
+              ondblclick={() => openComp(clip)}
             >
               {#if url && preview === Preview.Thumb}
                 <span class="thumbs" style={`background-image: url("${url}");`} aria-hidden="true"></span>
               {:else if url && preview === Preview.Filmstrip}
                 <span class="strip" use:whenVisible={url} aria-hidden="true">
-                  {#each stripTiles(clip as MotionClip, url) as tile, i (i)}<img src={tile} alt="" />{/each}
+                  {#each stripTiles(clip, url) as tile, i (i)}<img src={tile} alt="" />{/each}
                 </span>
               {/if}
-              <span class="kind">
-                {COMPONENTS[clip.component].label}
-                {#if Object.keys(clip.keyframes).length}
-                  <button type="button" class="lanes-toggle" aria-label="Show keyframes" aria-expanded={selection.includes(clip.id) && !collapsed.includes(clip.id)} onpointerdown={(e) => e.stopPropagation()} onclick={(e) => (selection.includes(clip.id) ? toggleLanes(e, clip.id) : showLanes(e, clip.id))}>◆</button>
-                {/if}
-                {#if Object.keys(clip.expressions ?? {}).length}<span class="tag expr" data-expr-marker={clip.id} title={`Expressions: ${Object.keys(clip.expressions).join(', ')}`}>· = {Object.keys(clip.expressions).join(', ')}</span>{/if}
-                {#if clip.mask}<span class="tag" title="Masked">· mask</span>{/if}
-                {#if clip.matte !== Matte.None}<span class="tag" title="Track matte">· {clip.matte} matte</span>{/if}
-              </span>
-              <span class="label" style={`padding-left: ${INDENT_PX * ancestorsOf(shown, clip.id).length}px;`}>{#if clip.parent}<em class="parent">{parentLabel(clip as MotionClip)}</em> {/if}{clipLabel(clip as MotionClip)}</span>
-              {#if track.kind === TrackKind.Visual}
-                <button type="button" class="whip" title="Drag onto another clip to parent this one to it" aria-label="Parent pick-whip" data-whip={clip.id} onpointerdown={(e) => startWhip(e, clip.id)}>@</button>
-              {/if}
               {#if wave}<svg class="wave" viewBox={`0 0 ${wave.width} 1`} preserveAspectRatio="none" aria-hidden="true"><path d={wave.path} /></svg>{/if}
+              <span class="kicker">{COMPONENTS[clip.component].label}</span>
+              <span class="label">{clipLabel(clip)}</span>
+              {#if Object.keys(clip.expressions ?? {}).length}<span class="tag expr" data-expr-marker={clip.id} title={`Expressions: ${Object.keys(clip.expressions).join(', ')}`}>ƒ</span>{/if}
+              {#if clip.mask}<span class="tag" title="Masked">mask</span>{/if}
+              {#if clip.matte !== Matte.None}<span class="tag" title="Track matte">{clip.matte} matte</span>{/if}
+              {#if !isOpen(clip)}
+                {#each keyFrames(clip) as at (at)}<span class="key-dot" style={`left: ${at * ppf - 3}px;`}></span>{/each}
+              {/if}
             </div>
-          {/each}
-          {#each track.clips.filter((c) => selection.includes(c.id)) as clip (clip.id)}
-            {@const fades = fadeHandles(clip as MotionClip, shown.fps, ppf)}
-            {#if fades.length}
-              {@const top = LANE_PAD_PX + rows[clip.id] * row}
-              <svg class="fade-ramp" style={`left: ${clip.from * ppf}px; top: ${top}px; width: ${clip.durationInFrames * ppf}px; height: ${row - 2}px;`} viewBox={`0 0 ${clip.durationInFrames * ppf} 1`} preserveAspectRatio="none" aria-hidden="true">
-                <polyline points={`0,1 ${fades[0].x - clip.from * ppf},0 ${fades[1].x - clip.from * ppf},0 ${clip.durationInFrames * ppf},1`} />
-              </svg>
-              {#each fades as fade (fade.edge)}
-                <div
-                  class="fade"
-                  data-fade={fade.edge}
-                  data-fade-clip={clip.id}
-                  role="slider"
-                  tabindex="-1"
-                  aria-label={FADE_LABEL[fade.edge]}
-                  aria-valuenow={(clip.props as Record<string, number>)[fade.edge] ?? 0}
-                  style={`left: ${fade.x}px; top: ${top}px;`}
-                  onpointerdown={(e) => startClip(e, clip as MotionClip, track.id, FADE_DRAG[fade.edge])}
-                ></div>
-              {/each}
+            {#if selection.includes(clip.id)}
+              {@const fades = fadeHandles(clip, shown.fps, ppf)}
+              {#if fades.length}
+                <svg class="fade-ramp" style={`left: ${clip.from * ppf}px; width: ${clip.durationInFrames * ppf}px;`} viewBox={`0 0 ${clip.durationInFrames * ppf} 1`} preserveAspectRatio="none" aria-hidden="true">
+                  <polyline points={`0,1 ${fades[0].x - clip.from * ppf},0 ${fades[1].x - clip.from * ppf},0 ${clip.durationInFrames * ppf},1`} />
+                </svg>
+                {#each fades as fade (fade.edge)}
+                  <div
+                    class="fade"
+                    data-fade={fade.edge}
+                    data-fade-clip={clip.id}
+                    role="slider"
+                    tabindex="-1"
+                    aria-label={FADE_LABEL[fade.edge]}
+                    aria-valuenow={(clip.props as Record<string, number>)[fade.edge] ?? 0}
+                    style={`left: ${fade.x}px;`}
+                    onpointerdown={(e) => startClip(e, clip, track.id, FADE_DRAG[fade.edge])}
+                  ></div>
+                {/each}
+              {/if}
             {/if}
-          {/each}
-          {#each edgeHandles(track.clips, ppf, selection) as handle (`${handle.clipId}-${handle.grip}`)}
-            <div
-              class="grip"
-              data-grip={handle.grip}
-              data-grip-clip={handle.clipId}
-              role="separator"
-              aria-label={`Trim ${handle.grip}`}
-              style={`left: ${handle.left}px; width: ${handle.width}px; top: ${LANE_PAD_PX + rows[handle.clipId] * row}px; height: ${row - 2}px;`}
-              onpointerdown={(e) => startClip(e, clipById(handle.clipId), track.id, GRIP_DRAG[handle.grip])}
-            ></div>
-          {/each}
-        </div>
-      </div>
-      {#each laneClips(track) as clip (clip.id)}
-        {@const all = keyLanes(withParams(shown, clip), reveal)}
-        {@const masked = all.filter((l) => l.source === Source.Mask)}
-        {#each all.filter((l) => l.source !== Source.Mask) as lane (lane.prop)}{@render keyLane(clip, lane)}{/each}
-        {#if masked.length}
-          <div class="lane sub group" data-mask-lanes={clip.id} style={`height: ${KEY_ROW_PX}px;`}>
-            <div class="head" style={`width: ${headPx}px;`}><span class="name prop">Mask{clip.mask ? ` · ${MASK_KINDS[clip.mask.kind].label}` : ''}</span></div>
-            <div class="clips"></div>
+            {#each edgeHandles([clip], ppf, selection) as handle (handle.grip)}
+              <div
+                class="grip"
+                data-grip={handle.grip}
+                data-grip-clip={handle.clipId}
+                role="separator"
+                aria-label={`Trim ${handle.grip}`}
+                style={`left: ${handle.left}px; width: ${handle.width}px;`}
+                onpointerdown={(e) => startClip(e, clip, track.id, GRIP_DRAG[handle.grip])}
+              ></div>
+            {/each}
           </div>
-          {#each masked as lane (lane.prop)}{@render keyLane(clip, lane)}{/each}
-        {/if}
-      {/each}
+        </div>
+      {:else}
+        {@render propRow(row.clip, row.lane, row.id)}
+      {/if}
     {/each}
+
+    {#if shown.tracks.every((t) => !t.clips.length)}
+      <div class="empty-drop" data-testid="timeline-empty">Press <b>+ Add</b> to place your first element</div>
+    {/if}
 
     {#if easing}
       <div class="ease-at" style={`left: ${Math.max(headPx, easing.left - 120)}px; top: ${easing.top}px;`}>
@@ -652,14 +793,20 @@
 
 <style>
   .timeline {
+    --row: 28px;
+    --prop-row: 24px;
+    --tint: 14%;
     position: relative;
     overflow: auto;
     background: var(--ui-bg);
-    border-top: 1px solid var(--ui-line);
     user-select: none;
     font-size: var(--ui-text-xs);
     color: var(--ui-ink);
     height: 100%;
+  }
+
+  :global([data-theme='dark']) .timeline {
+    --tint: 22%;
   }
 
   .inner {
@@ -670,7 +817,7 @@
   .ruler {
     position: sticky;
     top: 0;
-    z-index: 3;
+    z-index: 7;
     height: 28px;
     background: var(--ui-bg);
     border-bottom: 1px solid var(--ui-line);
@@ -682,53 +829,153 @@
     float: left;
     left: 0;
     top: 0;
+    z-index: 6;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    width: var(--head);
     height: 100%;
+    padding: 0 6px;
     background: var(--ui-bg);
     border-right: 1px solid var(--ui-line);
-    z-index: 6;
+    cursor: default;
   }
 
-  .beat {
-    position: absolute;
-    top: 0;
-    width: 2px;
-    height: 6px;
-    margin-left: -1px;
-    background: var(--ui-accent);
-    pointer-events: none;
+  .search {
+    flex: 1;
+    min-width: 0;
+    height: 22px;
+    padding: 0 6px;
+    border: 1px solid transparent;
+    border-radius: 0;
+    background: var(--ui-surface);
+    color: var(--ui-ink);
+    font: inherit;
+  }
+
+  .search:hover {
+    border-color: var(--ui-line-strong);
+  }
+
+  .search:focus {
+    outline: none;
+    border-color: var(--ui-accent);
+  }
+
+  .shy-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    color: var(--ui-ink-3);
+  }
+
+  .shy-toggle:hover {
+    color: var(--ui-ink);
+  }
+
+  .shy-toggle.on {
+    background: var(--ui-accent-wash);
+    color: var(--ui-accent);
   }
 
   .tick {
     position: absolute;
     bottom: 0;
     width: 1px;
-    height: 4px;
+    height: 5px;
     background: var(--ui-line-strong);
+    pointer-events: none;
   }
 
   .tick.major {
-    height: 8px;
+    height: 10px;
     background: var(--ui-ink-3);
   }
 
   .tick em {
     position: absolute;
-    bottom: 10px;
+    bottom: 11px;
     left: 4px;
     font-style: normal;
     font-family: var(--ui-mono);
     font-size: 10px;
+    font-variant-numeric: tabular-nums;
     color: var(--ui-ink-3);
     white-space: nowrap;
   }
 
-  .lane {
+  .work-area {
+    position: absolute;
+    top: 0;
+    height: 4px;
+    background: color-mix(in srgb, var(--ui-accent) 50%, transparent);
+    border-left: 2px solid var(--ui-accent);
+    border-right: 2px solid var(--ui-accent);
+    pointer-events: none;
+  }
+
+  .marker {
+    position: absolute;
+    bottom: 0;
+    width: 8px;
+    height: 8px;
+    margin-left: -4px;
+    background: var(--ui-warn);
+    clip-path: polygon(0 0, 100% 0, 50% 100%);
+    pointer-events: none;
+  }
+
+  .marker.clip-marker {
+    background: #8a6cff;
+  }
+
+  .beat {
+    position: absolute;
+    top: 4px;
+    width: 2px;
+    height: 5px;
+    margin-left: -1px;
+    background: var(--ui-accent);
+    pointer-events: none;
+  }
+
+  .playhead-head {
+    position: absolute;
+    bottom: 0;
+    width: 11px;
+    height: 10px;
+    margin-left: -5px;
+    background: var(--playhead);
+    clip-path: polygon(0 0, 100% 0, 100% 60%, 50% 100%, 0 60%);
+    pointer-events: none;
+    z-index: 3;
+  }
+
+  .playhead {
+    position: absolute;
+    top: 28px;
+    bottom: 0;
+    width: 1px;
+    background: var(--playhead);
+    pointer-events: none;
+    z-index: 4;
+  }
+
+  .row {
     position: relative;
     display: flex;
+    height: var(--row);
+  }
+
+  .row > .head,
+  .row > .lane {
     border-bottom: 1px solid var(--ui-line);
   }
 
-  .lane.alt {
+  .row.prop {
+    height: var(--prop-row);
     background: var(--ui-surface);
   }
 
@@ -737,254 +984,411 @@
     left: 0;
     z-index: 5;
     display: flex;
-    align-items: flex-start;
-    gap: 6px;
-    padding: 12px 8px 0 4px;
-    margin-bottom: -1px;
+    align-items: center;
+    gap: 4px;
+    width: var(--head);
+    flex-shrink: 0;
+    padding-right: 4px;
     background: var(--ui-bg);
     border-right: 1px solid var(--ui-line);
-    border-bottom: 1px solid var(--ui-line);
-    flex-shrink: 0;
+    overflow: hidden;
   }
 
-  @media (max-width: 760px) {
-    .head .chip,
-    .head .order {
-      display: none;
-    }
+  .row.group > .head {
+    background: var(--ui-surface);
+    padding-left: 4px;
   }
 
-  .lane.sub > .head {
-    align-items: center;
-    padding-top: 0;
-  }
-
-  .lane.alt > .head {
+  .row.group {
     background: var(--ui-surface);
   }
 
-  .head .name {
+  .row.prop > .head {
+    background: var(--ui-surface);
+  }
+
+  .row.layer:hover > .head {
+    background: var(--ui-hover);
+  }
+
+  .row.layer.selected > .head {
+    background: color-mix(in srgb, var(--ui-accent) 10%, var(--ui-bg));
+  }
+
+  .head button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    color: var(--ui-ink-3);
+    cursor: pointer;
+  }
+
+  .indent {
+    flex-shrink: 0;
+    width: 12px;
+  }
+
+  .prop-indent {
+    width: 46px;
+  }
+
+  .twirl {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 14px;
+    height: 20px;
+  }
+
+  .head .twirl:hover {
+    color: var(--ui-ink);
+  }
+
+  .swatch {
+    flex-shrink: 0;
+    width: 3px;
+    height: 16px;
+    background: var(--hue);
+  }
+
+  .group-name,
+  .layer-name,
+  .prop-name {
     flex: 1;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: var(--ui-text-sm);
-    font-weight: 500;
   }
 
-  .head button {
-    display: grid;
-    place-items: center;
-    width: 18px;
-    height: 18px;
+  .group-name {
+    flex: 0 0 auto;
+    max-width: 96px;
+    font-weight: 600;
+  }
+
+  .count {
+    flex: 1;
+    font-family: var(--ui-mono);
+    font-size: 10px;
     color: var(--ui-ink-3);
   }
 
-  .head button:hover:not(:disabled) {
+  .layer-name {
+    padding-left: 4px;
+    color: var(--ui-ink);
+  }
+
+  .layer-name em,
+  .parent {
+    font-style: normal;
+    color: var(--ui-ink-3);
+    margin-right: 4px;
+  }
+
+  .prop-name {
+    color: var(--ui-ink-2);
+  }
+
+  .prop-value {
+    flex-shrink: 0;
+    font-family: var(--ui-mono);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ui-accent);
+  }
+
+  .prop-value.editable {
+    padding: 2px 4px;
+    cursor: ew-resize;
+    touch-action: none;
+  }
+
+  .prop-value.editable:hover {
+    background: var(--ui-hover);
+  }
+
+  .prop-value em {
+    margin-left: 2px;
+    font-style: normal;
+    font-size: 10px;
+    color: var(--ui-ink-3);
+  }
+
+  .prop-input {
+    width: 64px;
+    height: 20px;
+    padding: 0 4px;
+    border: 1px solid var(--ui-accent);
+    border-radius: 0;
+    background: var(--ui-bg);
+    color: var(--ui-ink);
+    font-family: var(--ui-mono);
+    font-size: 11px;
+    text-align: right;
+  }
+
+  .mark {
+    width: 14px;
+    height: 14px;
+  }
+
+  .mark::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    transform: rotate(45deg);
+    border: 1.5px solid var(--ui-ink-3);
+  }
+
+  .mark[data-mark='here']::before {
+    border-color: var(--ui-accent);
+    background: var(--ui-accent);
+  }
+
+  .mark[data-mark='animated']::before {
+    background: linear-gradient(135deg, var(--ui-ink-3) 50%, transparent 50%);
+  }
+
+  .flags {
+    display: inline-flex;
+    gap: 1px;
+    flex-shrink: 0;
+  }
+
+  .flags button {
+    width: 20px;
+    height: 20px;
+  }
+
+  .flags button:not(.on) {
+    visibility: hidden;
+  }
+
+  .row:hover .flags button,
+  .head:focus-within .flags button {
+    visibility: visible;
+  }
+
+  .flags button:hover:not(:disabled) {
     color: var(--ui-ink);
     background: var(--ui-hover);
   }
 
-  .head button:disabled {
-    opacity: 0.3;
+  .flags button:disabled {
+    opacity: 0.4;
   }
 
-  .fold-space {
-    width: 18px;
-    flex-shrink: 0;
+  .flags button.on {
+    color: var(--ui-accent);
   }
 
-  .chip {
-    display: grid;
-    place-items: center;
-    flex-shrink: 0;
-    width: 20px;
-    height: 20px;
-    background: color-mix(in srgb, var(--hue) 14%, transparent);
-    color: var(--hue);
-  }
-
-  .order {
-    display: flex;
-    opacity: 0;
-    transition: opacity 120ms;
-  }
-
-  .head:hover .order,
-  .head:focus-within .order {
-    opacity: 1;
-  }
-
-  .clips {
+  .lane {
     position: relative;
     flex: 1;
   }
 
+  .summary-bar {
+    position: absolute;
+    top: 50%;
+    height: 6px;
+    margin-top: -3px;
+    background: color-mix(in srgb, var(--hue) 45%, var(--ui-surface));
+    pointer-events: none;
+  }
+
+  .row.group:not(.folded) .summary-bar {
+    height: 2px;
+    margin-top: -1px;
+    background: color-mix(in srgb, var(--hue) 30%, var(--ui-surface));
+  }
+
   .bar {
     position: absolute;
+    top: 3px;
+    height: calc(var(--row) - 7px);
     display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: 1px;
-    padding: 0 8px 0 10px;
+    align-items: center;
+    gap: 6px;
+    padding: 0 6px 0 8px;
     overflow: hidden;
-    background: color-mix(in srgb, var(--hue) 10%, var(--ui-bg));
-    border: 1px solid color-mix(in srgb, var(--hue) 30%, transparent);
-    box-shadow: inset 3px 0 0 var(--hue);
+    background: color-mix(in srgb, var(--hue) var(--tint), var(--ui-bg));
+    border: 1px solid color-mix(in srgb, var(--hue) 35%, var(--ui-bg));
+    border-left: 3px solid var(--hue);
     cursor: grab;
     white-space: nowrap;
-    transition: background 120ms;
   }
 
   .bar:hover {
-    background: color-mix(in srgb, var(--hue) 16%, var(--ui-bg));
+    border-color: color-mix(in srgb, var(--hue) 60%, var(--ui-bg));
+    border-left-color: var(--hue);
   }
 
   .bar.selected {
-    border-color: var(--ui-accent);
-    outline: 1px solid var(--ui-accent);
-    z-index: 1;
+    outline: 2px solid var(--ui-accent);
+    outline-offset: -1px;
+    z-index: 2;
+  }
+
+  .bar.selected::before,
+  .bar.selected::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 5px;
+    background: var(--ui-accent);
+  }
+
+  .bar.selected::before {
+    left: 0;
+  }
+
+  .bar.selected::after {
+    right: 0;
+  }
+
+  .bar.muted {
+    opacity: 0.4;
+  }
+
+  .bar.locked {
+    background-image: repeating-linear-gradient(45deg, transparent 0 4px, color-mix(in srgb, var(--hue) 25%, transparent) 4px 6px);
+    cursor: not-allowed;
+  }
+
+  .kicker {
+    flex-shrink: 0;
+    position: relative;
+    font-family: var(--ui-mono);
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: color-mix(in srgb, var(--hue) 80%, var(--ui-ink));
+  }
+
+  .label {
+    position: relative;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--ui-ink);
+  }
+
+  .tag {
+    position: relative;
+    flex-shrink: 0;
+    font-family: var(--ui-mono);
+    font-size: 9px;
+    color: var(--ui-ink-3);
+  }
+
+  .tag.expr {
+    color: var(--ui-accent);
+  }
+
+  .key-dot {
+    position: absolute;
+    bottom: 1px;
+    width: 5px;
+    height: 5px;
+    margin-left: -2.5px;
+    transform: rotate(45deg);
+    background: var(--ui-ink-3);
+    pointer-events: none;
   }
 
   .thumbs,
   .strip {
     position: absolute;
-    inset: 0 0 0 3px;
+    inset: 0;
+    opacity: 0.35;
     pointer-events: none;
   }
 
   .thumbs {
-    background-repeat: repeat-x;
     background-size: auto 100%;
-    opacity: 0.9;
+    background-repeat: repeat-x;
   }
 
   .strip {
     display: flex;
-    overflow: hidden;
   }
 
   .strip img {
-    flex: 0 0 64px;
-    width: 64px;
     height: 100%;
-    object-fit: cover;
-    border-right: 1px solid color-mix(in srgb, #000 25%, transparent);
-  }
-
-  .thumbs ~ .kind,
-  .thumbs ~ .label,
-  .strip ~ .kind,
-  .strip ~ .label {
-    position: relative;
-    align-self: flex-start;
-    max-width: 100%;
-    padding: 0 4px;
-    background: color-mix(in srgb, var(--ui-bg) 88%, transparent);
-  }
-
-  .bar .kind {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-family: var(--ui-mono);
-    font-size: 9px;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: color-mix(in srgb, var(--hue) 75%, var(--ui-ink));
-  }
-
-  .bar .label {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    font-size: var(--ui-text-sm);
-    color: var(--ui-ink);
-  }
-
-  .lane.folded .bar .kind,
-  .lane.folded .bar .label,
-  .lane.folded .bar .whip,
-  .lane.folded .bar .strip,
-  .lane.folded .bar .thumbs {
-    display: none;
+    width: auto;
+    flex-shrink: 0;
   }
 
   .wave {
     position: absolute;
-    inset: 4px 0 4px 3px;
-    width: calc(100% - 3px);
-    height: calc(100% - 8px);
+    inset: 2px 0;
+    width: 100%;
+    height: calc(100% - 4px);
     pointer-events: none;
-    opacity: 0.55;
   }
 
   .wave path {
-    stroke: var(--hue);
-    stroke-width: 1.5;
-    vector-effect: non-scaling-stroke;
+    fill: color-mix(in srgb, var(--hue) 55%, transparent);
+  }
+
+  .camera-bar {
+    left: 0;
+  }
+
+  .camera-bar.ghost {
+    background: transparent;
+    border-style: dashed;
+    border-left-style: solid;
+  }
+
+  .camera-bar.ghost .label {
+    color: var(--ui-ink-3);
   }
 
   .fade-ramp {
     position: absolute;
-    z-index: 2;
+    top: 3px;
+    height: calc(var(--row) - 7px);
     pointer-events: none;
-    overflow: visible;
+    z-index: 3;
   }
 
   .fade-ramp polyline {
     fill: none;
     stroke: var(--ui-accent);
-    stroke-width: 1.5;
+    stroke-width: 1;
     vector-effect: non-scaling-stroke;
   }
 
   .fade {
     position: absolute;
-    z-index: 3;
-    width: 8px;
-    height: 8px;
-    margin-left: -4px;
-    background: var(--ui-accent);
+    top: 3px;
+    width: 7px;
+    height: 7px;
+    margin-left: -3.5px;
+    background: var(--ui-bg);
+    border: 1.5px solid var(--ui-accent);
     cursor: ew-resize;
+    z-index: 4;
   }
 
   .grip {
     position: absolute;
-    z-index: 2;
+    top: 3px;
+    height: calc(var(--row) - 7px);
     cursor: ew-resize;
-  }
-
-  .grip:hover {
-    background: color-mix(in srgb, var(--ui-accent) 45%, transparent);
+    z-index: 3;
   }
 
   .whip {
-    position: absolute;
-    z-index: 3;
-    right: 8px;
-    top: 3px;
-    width: 14px;
-    height: 14px;
-    font-size: 10px;
-    line-height: 14px;
-    color: var(--ui-ink-3);
     cursor: crosshair;
-    opacity: 0;
-  }
-
-  .bar:hover .whip,
-  .bar.selected .whip {
-    opacity: 1;
-  }
-
-  .whip:hover {
-    color: var(--ui-accent);
-  }
-
-  .parent {
-    font-style: normal;
-    color: var(--ui-ink-3);
   }
 
   .whip-line {
@@ -993,61 +1397,23 @@
     width: 100%;
     height: 100%;
     pointer-events: none;
-    z-index: 7;
+    z-index: 9;
     overflow: visible;
   }
 
   .whip-line line {
     stroke: var(--ui-accent);
     stroke-width: 1.5;
-    stroke-dasharray: 4 3;
-  }
-
-  .camera-bar {
-    cursor: pointer;
-  }
-
-  .camera-bar.ghost {
-    background: transparent;
-    border-style: dashed;
-    box-shadow: none;
-  }
-
-  .camera-bar.ghost .label {
-    color: var(--ui-ink-3);
-  }
-
-  .lane.sub {
-    background: var(--ui-surface);
-  }
-
-  .bar .tag {
-    color: var(--ui-ink-2);
-    text-transform: none;
-  }
-
-  .lane.group {
-    --hue: #978365;
-  }
-
-  .lane.group .prop {
-    font-family: var(--ui-mono);
-    font-size: 10px;
-    text-transform: uppercase;
-    color: var(--hue);
-  }
-
-  .head .prop {
-    padding-left: 28px;
-    font-weight: 400;
-    color: var(--ui-ink-2);
   }
 
   .segment {
     position: absolute;
     top: 50%;
-    height: 8px;
-    transform: translateY(-50%);
+    height: 9px;
+    margin-top: -4.5px;
+    border: 0;
+    border-radius: 0;
+    background: none;
     cursor: pointer;
   }
 
@@ -1056,174 +1422,117 @@
     position: absolute;
     left: 0;
     right: 0;
-    top: 50%;
-    border-top: 1px solid var(--ui-line-strong);
+    top: 4px;
+    height: 1px;
+    background: var(--ui-line-strong);
   }
 
   .segment:hover::after {
-    border-top-color: var(--ui-accent);
+    background: var(--ui-accent);
   }
 
-  .diamond {
+  .key {
     position: absolute;
-    z-index: 2;
+    top: 50%;
+    width: 9px;
+    height: 9px;
+    margin: -4.5px 0 0 -4.5px;
+    transform: rotate(45deg);
     background: var(--ui-bg);
     border: 1.5px solid var(--ui-ink-2);
-    transform: rotate(45deg) scale(0.75);
-    cursor: ew-resize;
+    cursor: grab;
+    z-index: 1;
   }
 
-  .diamond[data-interp='hold'] {
-    transform: scale(0.75);
+  .key[data-glyph='square'] {
+    transform: none;
   }
 
-  .diamond[data-interp='auto'],
-  .diamond[data-interp='continuous'] {
-    transform: scale(0.8);
-    clip-path: polygon(30% 0, 70% 0, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0 70%, 0 30%);
+  .key[data-glyph='circle'] {
+    transform: none;
+    clip-path: circle(50%);
   }
 
-  .diamond.roving {
+  .key.roving {
     border-style: dashed;
   }
 
-  .diamond:hover {
-    border-color: var(--ui-ink);
+  .key:hover {
+    border-color: var(--ui-accent);
   }
 
-  .diamond.picked {
+  .key.picked {
     background: var(--ui-accent);
     border-color: var(--ui-accent);
   }
 
-  .tag.expr {
-    font-family: var(--ui-mono);
-  }
-
-  .lanes-toggle {
-    font-size: 9px;
+  .empty-drop {
+    position: sticky;
+    left: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: min(480px, calc(100vw - 48px));
+    height: 56px;
+    margin: 12px;
+    border: 1px dashed var(--ui-line-strong);
+    background: var(--ui-bg);
     color: var(--ui-ink-3);
+    font-size: var(--ui-text-sm);
+    z-index: 5;
   }
 
-  .lanes-toggle[aria-expanded='true'] {
-    color: var(--ui-accent);
+  .empty-drop b {
+    margin: 0 4px;
+    color: var(--ui-ink-2);
+    font-weight: 600;
   }
 
   .ease-at {
     position: absolute;
-    z-index: 6;
+    z-index: 10;
   }
 
-  .flags {
-    display: flex;
-    flex-shrink: 0;
+  @media (hover: none) {
+    .row.group .flags button,
+    .row.layer.selected .flags button {
+      visibility: visible;
+    }
+
+    .row.layer:not(.selected) .flags {
+      display: none;
+    }
   }
 
-  .flags button:not(.on) {
-    display: none;
-  }
+  @media (pointer: coarse) {
+    .timeline {
+      --row: 44px;
+      --prop-row: 40px;
+    }
 
-  .head:hover .flags button,
-  .head:focus-within .flags button {
-    display: grid;
-  }
+    .twirl,
+    .flags button,
+    .mark {
+      width: 32px;
+      height: 40px;
+    }
 
-  .flags button.on {
-    color: var(--ui-accent);
-  }
+    .grip {
+      min-width: 16px;
+    }
 
-  .bar.muted {
-    opacity: 0.4;
-  }
+    .key {
+      width: 14px;
+      height: 14px;
+      margin: -7px 0 0 -7px;
+    }
 
-  .bar.locked {
-    cursor: not-allowed;
-    background-image: repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, var(--hue) 12%, transparent) 6px 8px);
-  }
+    .ruler {
+      height: 36px;
+    }
 
-  .corner {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 0 4px;
-  }
-
-  .search {
-    flex: 1;
-    min-width: 0;
-    height: 20px;
-    padding: 0 4px;
-    border: 1px solid var(--ui-line);
-    background: var(--ui-bg);
-    color: var(--ui-ink);
-    font: inherit;
-  }
-
-  .shy-toggle {
-    display: grid;
-    place-items: center;
-    width: 20px;
-    height: 20px;
-    color: var(--ui-ink-3);
-  }
-
-  .shy-toggle.on {
-    color: var(--ui-accent);
-  }
-
-  .work-area {
-    position: absolute;
-    top: 0;
-    height: 6px;
-    background: color-mix(in srgb, var(--ui-accent) 45%, transparent);
-    pointer-events: none;
-  }
-
-  .marker {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 2px;
-    margin-left: -1px;
-    background: #f5a524;
-    pointer-events: none;
-    z-index: 2;
-  }
-
-  .marker.clip-marker {
-    background: #8b5cf6;
-  }
-
-  .marker em {
-    position: absolute;
-    top: 6px;
-    left: 4px;
-    padding: 0 3px;
-    font-style: normal;
-    font-size: 10px;
-    color: #111;
-    background: inherit;
-    white-space: nowrap;
-  }
-
-  .playhead {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 1px;
-    background: var(--ui-ink);
-    pointer-events: none;
-    z-index: 4;
-  }
-
-  .playhead::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -5px;
-    width: 11px;
-    height: 10px;
-    background: var(--ui-ink);
-    clip-path: polygon(0 0, 100% 0, 100% 60%, 50% 100%, 0 60%);
+    .playhead {
+      top: 36px;
+    }
   }
 </style>

@@ -1,6 +1,6 @@
 import type { AudioEntry } from '$lib/motion/audio-plan';
 import { chunkPlan, type ChunkPlan } from '$lib/motion/server-render';
-import { frameCosts, type CostSpan } from '$lib/motion/render-cost';
+import { FLAT_FRAME_MS, frameCosts, type CostSpan } from '$lib/motion/render-cost';
 import { FONT_CSS_ORIGIN, FONT_FILE_ORIGIN } from '$lib/motion/hyperframes/csp';
 import { ExportFormat, FORMAT, Master, Quality } from '$lib/motion/export-formats';
 import { assembleArgs, audioMixArgs, concatList, zipArgs } from './render-commands';
@@ -48,6 +48,8 @@ const WORKER: Record<RenderRoute, { vcpus: number; timeoutMs: number }> = {
   [RenderRoute.Chunked]: { vcpus: 4, timeoutMs: 20 * MINUTE_MS },
   [RenderRoute.Whole]: { vcpus: 8, timeoutMs: 120 * MINUTE_MS }
 };
+
+const LIFETIME = { bootMs: 2 * MINUTE_MS, msPerFullHdFrame: 500, assemblyMs: 5 * MINUTE_MS };
 
 export const MAX_ATTEMPTS = 2;
 export const RENDER_DEADLINE_MS = (MAX_ATTEMPTS + 1) * WORKER[RenderRoute.Whole].timeoutMs;
@@ -135,6 +137,16 @@ export function farmProblem(job: FarmJob): string | null {
   return REFUSED.find((rule) => rule.applies(job))?.because ?? null;
 }
 
+function lifetimeMs(job: FarmJob, slice: Slice): number {
+  const route = routeOf(job);
+  const start = slice.index * slice.size;
+  const three = frameCosts(job.totalFrames, job.cost ?? []).slice(start, start + slice.size).reduce((sum, ms) => sum + ms - FLAT_FRAME_MS, 0);
+  const frames = slice.size * (job.motionBlur?.samples ?? 1);
+  const work = LIFETIME.bootMs + (frames * job.width * job.height * LIFETIME.msPerFullHdFrame) / FULL_HD_PIXELS + three * (job.motionBlur?.samples ?? 1);
+  const head = slice.index === 0 ? LIFETIME.assemblyMs : 0;
+  return Math.round(Math.min(WORKER[route].timeoutMs, work + head));
+}
+
 export function farmChunks(job: FarmJob): ChunkPlan {
   return routeOf(job) === RenderRoute.Whole ? { size: job.totalFrames, count: 1 } : chunkPlan(job.totalFrames, frameCosts(job.totalFrames, job.cost ?? []));
 }
@@ -190,19 +202,24 @@ async function startSteps(worker: FarmWorker, task: FarmTask, steps: Step[]): Pr
 export async function launchPiece(farm: RenderFarm, job: FarmJob, slice: Slice, links: PieceLinks): Promise<string> {
   const route = routeOf(job);
   const hosts = [...new Set([...job.allowHosts, links.storageHost, ...RUNTIME_HOSTS])];
-  const worker = await farm.open({ allowHosts: hosts, timeoutMs: WORKER[route].timeoutMs, vcpus: WORKER[route].vcpus });
+  const worker = await farm.open({ allowHosts: hosts, timeoutMs: lifetimeMs(job, slice), vcpus: WORKER[route].vcpus });
 
   const what = framesOf(job, slice);
   const render: Step = { what, cmd: 'node', args: [CHUNK_SCRIPT, SPEC] };
   const file = chunkPath(job, slice);
   const upload = links.upload ? [sizeStep(`${what} size check`, 'a part of this render', file, links.maxBytes), uploadStep(`${what} upload`, file, 'application/octet-stream', links.upload)] : [];
 
-  await worker.write([
-    { path: `${PROJECT_DIR}/index.html`, content: Buffer.from(job.html) },
-    { path: CHUNK_SCRIPT, content: Buffer.from(CHUNK_SOURCE) },
-    { path: SPEC, content: Buffer.from(JSON.stringify(chunkSpec(job, slice))) }
-  ]);
-  await startSteps(worker, FarmTask.Piece, [render, ...upload]);
+  try {
+    await worker.write([
+      { path: `${PROJECT_DIR}/index.html`, content: Buffer.from(job.html) },
+      { path: CHUNK_SCRIPT, content: Buffer.from(CHUNK_SOURCE) },
+      { path: SPEC, content: Buffer.from(JSON.stringify(chunkSpec(job, slice))) }
+    ]);
+    await startSteps(worker, FarmTask.Piece, [render, ...upload]);
+  } catch (e) {
+    await worker.stop().catch(() => {});
+    throw e;
+  }
   return worker.name;
 }
 

@@ -7,6 +7,7 @@ import { cameraRuntime, seekDriver } from './stage';
 import { DEVICE_SCRIPT, type DeviceRuntime } from './device-runtime';
 import { ENGINE_GLOBAL } from '../engine/engine';
 import { drawOnce, screenKey } from './three-draw';
+import { strokePolygons } from './stroke-outline';
 import { ON_DISPOSE, hotScope, hotSeek, keptGl } from './hot';
 
 export const THREE_VERSION = '0.181.2';
@@ -330,11 +331,25 @@ function loadModel(c, s) {
   });
 }
 
+const painted = (paint) => paint !== undefined && paint !== 'none' && paint !== 'transparent';
+
+function filled(path) {
+  const style = path.userData.style;
+  return painted(style.fill) ? SVGLoader.createShapes(path) : [];
+}
+
+function stroked(path) {
+  const style = path.userData.style;
+  if (!painted(style.stroke) || !(style.strokeWidth > 0)) return [];
+  return path.subPaths.flatMap((sub) => strokePolygons(sub.getPoints().map((p) => [p.x, p.y]), style.strokeWidth, style.strokeLineCap))
+    .map((poly) => new THREE.Shape(poly.map(([x, y]) => new THREE.Vector2(x, y))));
+}
+
 function loadLogo(c, s) {
   return new Promise((resolve) => {
     if (!c.url) return resolve();
     new SVGLoader().load(c.url, (data) => {
-      const shapes = data.paths.flatMap((p) => SVGLoader.createShapes(p));
+      const shapes = data.paths.flatMap((p) => [...filled(p), ...stroked(p)]);
       if (!shapes.length) return resolve();
       const root = extruded(shapes, c);
       finish(root, c);
@@ -400,15 +415,20 @@ const scenes = CLIPS.map((c) => {
   return { c, s, ready: Promise.all([LOADERS[c.kind](c, s), environment(s)]) };
 }).filter(Boolean);
 dropUnused('three-', CLIPS.map((c) => 'three-' + c.id));
+const STALE = '__feegaStaleThree';
+const replaced = window[STALE] || [];
+window[STALE] = [];
 ${ON_DISPOSE}(() => {
   live = false;
-  for (const { s } of scenes) {
-    disposeScene(s.scene);
-    if (s.bokeh) {
-      s.bokeh.target.dispose();
-      disposeScene(s.bokeh.scene);
+  window[STALE].push(() => {
+    for (const { s } of scenes) {
+      disposeScene(s.scene);
+      if (s.bokeh) {
+        s.bokeh.target.dispose();
+        disposeScene(s.bokeh.scene);
+      }
     }
-  }
+  });
 });
 
 function legacyOrbit(c, local) {
@@ -474,7 +494,10 @@ function drawAt(time) {
 
 window.__hf = window.__hf || {};
 window.__hf.buildReady = window.__hf.buildReady || {};
-window.__hf.buildReady['motion-three'] = Promise.all(scenes.map((x) => x.ready)).then(() => redraw(window.__hfThreeTime || 0));
+window.__hf.buildReady['motion-three'] = Promise.all(scenes.map((x) => x.ready)).then(() => {
+  redraw(window.__hfThreeTime || 0);
+  replaced.forEach((dispose) => dispose());
+});
 ${hotSeek('renderAt')}
 const tl = window.__timelines && window.__timelines.main;
 DRIVER
@@ -485,5 +508,5 @@ export function threeScript(clips: ThreeClip[], duration: number, stage: StageSp
   if (!clips.length) {
     return '';
   }
-  return `<script type="module">const CLIPS = ${js(clips)};const LIGHTING = ${js(LIGHTING)};const LOOK = ${js(look)};const DURATION = ${js(duration)};const FOV = ${SCENE.fov.fallback};const STAGE = ${js(stage)};${cameraRuntime()}const sampleTrack = (${sampleTrack.toString()});const onScreen = (${onScreen.toString()});const drawOnce = (${drawOnce.toString()});const screenKey = (${screenKey.toString()});${SCENE_SCRIPT.replace('DRIVER', seekDriver(THREE_TIMELINE, 'DURATION', 'renderAt'))}</script>`;
+  return `<script type="module">const CLIPS = ${js(clips)};const LIGHTING = ${js(LIGHTING)};const LOOK = ${js(look)};const DURATION = ${js(duration)};const FOV = ${SCENE.fov.fallback};const STAGE = ${js(stage)};${cameraRuntime()}const sampleTrack = (${sampleTrack.toString()});const onScreen = (${onScreen.toString()});const drawOnce = (${drawOnce.toString()});const screenKey = (${screenKey.toString()});const strokePolygons = (${strokePolygons.toString()});${SCENE_SCRIPT.replace('DRIVER', seekDriver(THREE_TIMELINE, 'DURATION', 'renderAt'))}</script>`;
 }

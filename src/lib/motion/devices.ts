@@ -1,6 +1,7 @@
 export enum Device {
   PhonePro = 'phone-pro',
   Phone = 'phone',
+  Foldable = 'foldable',
   Android = 'android',
   LaptopPro = 'laptop-pro',
   LaptopAir = 'laptop-air',
@@ -29,6 +30,7 @@ export const FINISH_COLOR: Record<Exclude<Finish, Finish.Default | Finish.Brand>
 
 export enum DeviceKind {
   Phone = 'phone',
+  Foldable = 'foldable',
   Laptop = 'laptop',
   Monitor = 'monitor',
   Tablet = 'tablet',
@@ -77,6 +79,7 @@ const screenOf = (inches: number, px: [number, number], radius: number, offsetY 
 
 const APPLE_PHONE_PRO = 'https://www.apple.com/iphone-18-pro/specs/';
 const APPLE_PHONE = 'https://www.apple.com/iphone-17/specs/';
+const APPLE_FOLDABLE = 'https://www.apple.com/iphone-duo/specs/';
 const PIXEL = 'https://store.google.com/product/pixel_11_specs';
 const LAPTOP_PRO = 'https://www.apple.com/macbook-pro/specs/';
 const LAPTOP_AIR = 'https://www.apple.com/macbook-air/specs/';
@@ -124,6 +127,19 @@ export const DEVICE: Record<Device, DeviceSpec> = {
     stand: null,
     finish: '#a9c3dc',
     sources: [APPLE_PHONE]
+  },
+  [Device.Foldable]: {
+    label: 'Foldable Phone 7.6″',
+    kind: DeviceKind.Foldable,
+    body: { width: 164.6, height: 117.8, depth: 5.2, radius: 10 },
+    screen: screenOf(7.6, [2670, 1878], 8),
+    cutout: NO_CUTOUT,
+    camera: CameraLayout.DualPill,
+    buttons: [],
+    base: null,
+    stand: null,
+    finish: '#d9d6d0',
+    sources: [APPLE_FOLDABLE]
   },
   [Device.Android]: {
     label: 'Android Phone 6.3″',

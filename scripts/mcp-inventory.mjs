@@ -45,7 +45,8 @@ const GROUPS = [
   ['Accesso diretto al database', /^(query|insert_row|update_row|delete_row|describe_node_types)$/],
   ['Post', /post/],
   ['Ads', /ad_campaign/],
-  ['Nodi e generazione', /node/]
+  ['Nodi e generazione', /node/],
+  ['Video motion', /motion/]
 ];
 const groupOf = (name) => (GROUPS.find(([, re]) => re.test(name)) ?? ['Altro'])[0];
 

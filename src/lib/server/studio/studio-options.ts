@@ -1,5 +1,6 @@
 import type { Db } from '$lib/server/db/client';
-import { listCanvases, listNodes } from '$lib/server/repos/canvas';
+import { listCanvases, listNodes, type CanvasNodeRecord } from '$lib/server/repos/canvas';
+import { signedAssets } from './studio-media';
 import { listNodeProducts, type Product } from '$lib/server/repos/products';
 import { listInfluencers, listInfluencerViewsByIds, signInfluencerViewFiles } from '$lib/server/repos/influencers';
 import { canvasModelCatalogue } from '$lib/server/canvas-catalogue';
@@ -10,6 +11,21 @@ import { castingVerdict, isKidsProduct, ModelVerdict, MODEL_VERDICT_TEXT } from 
 
 export const FIDELITY_MODEL = 'nano-banana-pro';
 
+export enum ProductOrigin {
+  Store = 'store',
+  Upload = 'upload'
+}
+
+export type ProductSource = { origin: ProductOrigin.Store; product: Product } | { origin: ProductOrigin.Upload; assetId: string };
+
+export const UPLOAD_ID_PREFIX = 'upload:';
+
+export type UploadItem = { asset_id: string; label: string };
+
+export function isUploadsList(node: CanvasNodeRecord): boolean {
+  return node.type === 'list' && node.data.studio_uploads === true;
+}
+
 export type StudioProduct = {
   id: string;
   nodeId: string;
@@ -19,7 +35,7 @@ export type StudioProduct = {
   productType: string | null;
   tags: string[];
   kids: boolean;
-  source: Product;
+  source: ProductSource;
 };
 
 export type StudioModel = { id: string; name: string; age: number | null; cover: string | null; viewCount: number; allowed: boolean; why: string };
@@ -34,13 +50,29 @@ export type StudioOptions = {
   previewModel: string;
 };
 
+async function uploadedProducts(db: Db, orgId: string, nodes: CanvasNodeRecord[]): Promise<StudioProduct[]> {
+  const items = nodes.filter(isUploadsList).flatMap((n) => (n.data.items ?? []) as UploadItem[]);
+  const { urls } = await signedAssets(db, orgId, items.map((i) => i.asset_id), 'pickerTile');
+  return items.reverse().map((item) => ({
+    id: `${UPLOAD_ID_PREFIX}${item.asset_id}`,
+    nodeId: '',
+    title: item.label,
+    image: urls[item.asset_id] ?? null,
+    imageCount: 1,
+    productType: null,
+    tags: [],
+    kids: false,
+    source: { origin: ProductOrigin.Upload, assetId: item.asset_id }
+  }));
+}
+
 async function projectProducts(db: Db, scope: { orgId: string; projectId: string }): Promise<StudioProduct[]> {
   const canvases = await listCanvases(db, { orgId: scope.orgId, projectId: scope.projectId });
   const nodes = (await Promise.all(canvases.map((c) => listNodes(db, { orgId: scope.orgId, canvasId: c.id })))).flat();
   const productNodes = nodes.filter((n) => n.type === 'products' && !n.data.studio_batch_id);
   const perNode = await Promise.all(productNodes.map((n) => listNodeProducts(db, { orgId: scope.orgId, nodeId: n.id })));
 
-  return perNode.flat().map((p) => ({
+  const stored = perNode.flat().map((p) => ({
     id: p.id,
     nodeId: p.nodeId ?? '',
     title: p.title,
@@ -49,8 +81,9 @@ async function projectProducts(db: Db, scope: { orgId: string; projectId: string
     productType: p.productType,
     tags: p.tags,
     kids: isKidsProduct(p),
-    source: p
+    source: { origin: ProductOrigin.Store as const, product: p }
   }));
+  return [...(await uploadedProducts(db, scope.orgId, nodes)), ...stored];
 }
 
 async function castableModels(db: Db): Promise<StudioModel[]> {

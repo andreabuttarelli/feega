@@ -232,6 +232,22 @@ export async function queuedAudioRuns(db: Db, input: { limit: number }): Promise
   return queuedRunsWithPrefix(db, { ...input, prefix: AUDIO_JOB_PREFIX });
 }
 
+const ACTIVE_RENDER_LIMIT = 1000;
+
+export async function activeRenderRuns(db: Db): Promise<NodeRun[]> {
+  const { data, error } = await db
+    .from('node_runs')
+    .select(RUN_COLUMNS)
+    .in('status', ['running', 'finishing'])
+    .like('external_job_id', `${RENDER_JOB_PREFIX}%`)
+    .limit(ACTIVE_RENDER_LIMIT);
+
+  if (error) {
+    throw error;
+  }
+  return (data ?? []).map(toRun);
+}
+
 export async function queuedRenderRuns(db: Db, input: { limit: number }): Promise<NodeRun[]> {
   return queuedRunsWithPrefix(db, { ...input, prefix: RENDER_JOB_PREFIX });
 }
@@ -267,6 +283,21 @@ export async function completeRun(
       cost_usd: input.costUsd ?? null,
       finished_at: new Date().toISOString()
     })
+    .eq('id', input.runId)
+    .eq('org_id', input.orgId);
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function settleRun(
+  db: Db,
+  input: { orgId: string; runId: string; params: Record<string, unknown>; costUsd: number }
+): Promise<void> {
+  const { error } = await db
+    .from('node_runs')
+    .update({ status: 'done', params: input.params as never, cost_usd: input.costUsd, finished_at: new Date().toISOString() })
     .eq('id', input.runId)
     .eq('org_id', input.orgId);
 

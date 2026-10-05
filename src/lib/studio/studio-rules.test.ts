@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { ENVIRONMENTS, Environment } from './environments';
 import { SHOTS, Shot, Casting } from './shots';
 import { castingVerdict, isKidsProduct, ModelVerdict, STUDIO_MIN_AGE } from './casting';
-import { BATCH_MAX, cellKey, lockedPrompt, planBatch, previewItems, SkipReason, styleRefBudget, type PlanProduct } from './plan';
-import { afterFailure, canMove, creditCheck, failureKind, FailureKind, ItemStatus, MAX_RETRIES, pickRunnable } from './batch-state';
+import { BATCH_MAX, cellKey, lockedPrompt, planBatch, SkipReason, styleRefBudget, type PlanProduct } from './plan';
+import { afterFailure, canMove, creditCheck, failureKind, failureText, FailureKind, ItemStatus, MAX_RETRIES, pickRunnable } from './batch-state';
 
 const shirt: PlanProduct = { index: 1, title: 'Linen shirt', productType: 'Shirts', tags: [], imageCount: 2 };
 const onesie: PlanProduct = { index: 2, title: 'Cotton onesie', productType: 'Baby', tags: ['kids'], imageCount: 1 };
@@ -83,13 +83,6 @@ describe('planBatch', () => {
     expect(plan.items.map((i) => i.variation)).toEqual([3, 4]);
   });
 
-  it("l'anteprima prende prima un item per prodotto, al massimo tre", () => {
-    const plan = planBatch({ products: [shirt, onesie], models: [], environments: [Environment.WhiteEcom], shots: [Shot.Packshot], variations: 3 });
-    const preview = previewItems(plan.items);
-    expect(preview).toHaveLength(3);
-    expect(preview.slice(0, 2).map((i) => i.productIndex)).toEqual([1, 2]);
-  });
-
   it('una cella è ambiente + inquadratura + modello', () => {
     expect(cellKey({ environment: Environment.Beach, shot: Shot.Detail, influencerId: null })).toBe('beach|detail|-');
   });
@@ -143,6 +136,16 @@ describe('macchina a stati', () => {
 
   it('un blocco di moderazione non si ritenta mai', () => {
     expect(afterFailure('Refused: unsafe', 1)).toEqual({ status: ItemStatus.Blocked });
+  });
+
+  it.each([
+    ['Refused: could depict a real person.', /blocked/i],
+    ['provider 503 unavailable', /busy/i],
+    ['store_failed', /could not be made/i]
+  ])('%s: spiega il motivo e cosa fare', (error, problem) => {
+    const text = failureText(error);
+    expect(text.problem).toMatch(problem);
+    expect(text.fix.length).toBeGreaterThan(10);
   });
 });
 

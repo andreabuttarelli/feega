@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { COMPONENT_IDS, CUSTOM_NAME, TrackKind, parseProps, type ComponentId, type PropsVerdict } from './components';
 import { withParams } from './custom/params';
 import { MAX_COMPONENTS, Strictness, customComponentSchema, customValues, type CustomComponents } from './custom/component';
+import { junctionSchema } from './junction-model';
 import { FASTEST_RATE, FPS, FRAME_RATES, MAX_SECONDS, TRANSITION_KINDS, TransitionKind, maxFrames } from './design';
 import { motionPathSchema } from './path';
 import { keyframeSchema, keyframesProblem, transformSchema } from './keyframes';
@@ -14,6 +15,7 @@ import { fontRefProblem, fontsSchema, usedFaces } from './fonts/model';
 import { effectsSchema, effectsProblem } from './effects/model';
 import { BLEND_MODES, BlendMode } from './blend';
 import { animatorsSchema } from './text-animators/model';
+import { textPathSchema } from './text-path/model';
 import { DEFAULT_MOTION_BLUR, motionBlurSchema } from './motion-blur';
 import { fieldsSchema } from './template/field-model';
 import { physicsSchema } from './physics/model';
@@ -66,6 +68,7 @@ const clipSchema = z.object({
   props: z.record(z.string(), z.unknown()).default({}),
   transitionIn: edgeSchema.default({ kind: TransitionKind.None, durationInFrames: 0 }),
   transitionOut: edgeSchema.default({ kind: TransitionKind.None, durationInFrames: 0 }),
+  junction: junctionSchema.nullable().optional(),
   transform: transformSchema.default({}),
   keyframes: z.record(z.string(), z.array(keyframeSchema).min(1)).default({}),
   mask: maskSchema.nullable().default(null),
@@ -79,6 +82,7 @@ const clipSchema = z.object({
   effects: effectsSchema,
   blend: z.enum(BLEND_MODES).default(BlendMode.Normal),
   animators: animatorsSchema,
+  textPath: textPathSchema.nullable().default(null),
   motionBlur: z.boolean().default(true),
   path: motionPathSchema.nullable().default(null),
   physics: physicsSchema.nullable().optional(),
@@ -229,13 +233,25 @@ export function compOf(clip: Pick<MotionClip, 'component' | 'props'>): string | 
   return clip.component === 'Precomp' ? String(clip.props.comp) : null;
 }
 
+type CompositionCard = { assetId: string; kind: string };
+const COMP_CARD = 'comp';
+const RING_LAYOUT = 'ring';
+
+export function compsOf(clip: Pick<MotionClip, 'component' | 'props'>): string[] {
+  if (clip.component === 'Composition') {
+    return clip.props.layout !== RING_LAYOUT ? [] : ((clip.props.media ?? []) as CompositionCard[]).filter((m) => m.kind === COMP_CARD).map((m) => m.assetId);
+  }
+  const id = compOf(clip);
+  return id === null ? [] : [id];
+}
+
 function compsUsed(tracks: readonly MotionTrack[]): string[] {
-  return tracks.flatMap((t) => (t.clips as MotionClip[]).map(compOf).filter((id): id is string => id !== null));
+  return tracks.flatMap((t) => (t.clips as MotionClip[]).flatMap(compsOf));
 }
 
 export function compRefProblem(doc: Pick<MotionDoc, 'comps'>, clip: Pick<MotionClip, 'component' | 'props'>): string | null {
-  const id = compOf(clip);
-  if (id === null || doc.comps[id]) {
+  const id = compsOf(clip).find((ref) => !doc.comps[ref]);
+  if (id === undefined) {
     return null;
   }
   const known = Object.keys(doc.comps);
@@ -333,6 +349,7 @@ export function newClip(fields: Pick<MotionClip, 'id' | 'from' | 'durationInFram
     effects: [],
     blend: BlendMode.Normal,
     animators: [],
+    textPath: null,
     motionBlur: true,
     path: null,
     ...fields
