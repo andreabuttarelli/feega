@@ -17,3 +17,9 @@ Terzo passo della spec di redesign (inspector e campi numerici, P0/P1).
   `3:06`, `45f`, `1.5`).
 - Camera e Look usano lo stesso campo. `.cell` era già una classe globale del calendario con
   `min-height: 116px`: le celle si chiamano `grid-cell`.
+- Valori nelle unità di `units.ts` (#134): il campo mostra e scrive px, %, °; `fieldLook` dà
+  solo etichetta corta e riempimento, l'unità viene da `sliderOf` quando c'è.
+- Liquid preset e «Morph to…» (#136) nella sezione Path & modifiers; Physics (#137) in Animate.
+- Touch: campi, sezioni e controlli a 44px con puntatore grossolano, una colonna sola; pressione
+  lunga sul campo al posto del tasto destro per l'espressione. E2e su viewport 390×844: apre
+  l'editor, tocca una clip, cambia l'opacità dal foglio Properties e fa play.

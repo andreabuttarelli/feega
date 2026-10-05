@@ -1294,6 +1294,33 @@
     color: var(--ui-ink-3);
   }
 
+  @media (pointer: coarse) {
+    .line,
+    .clock,
+    .check {
+      min-height: 44px;
+    }
+
+    .clock {
+      height: 44px;
+    }
+
+    input[type='text'],
+    select {
+      height: 40px;
+    }
+
+    .key,
+    .icon {
+      width: 40px;
+      height: 40px;
+    }
+
+    .grid2 {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
   .error {
     margin: 8px 12px;
     color: var(--ui-danger);

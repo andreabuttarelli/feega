@@ -34,6 +34,30 @@
   } = $props();
 
   const NUDGE_KEYS: Record<string, Nudge> = { ArrowUp: Nudge.Up, ArrowDown: Nudge.Down };
+  const LONG_PRESS_MS = 550;
+  const PRESS_SLOP_PX = 6;
+
+  let press: { timer: ReturnType<typeof setTimeout>; x: number } | null = null;
+
+  function startPress(e: PointerEvent) {
+    if (!onexpression || e.pointerType !== 'touch') {
+      return;
+    }
+    press = { x: e.clientX, timer: setTimeout(() => ((press = null), onexpression?.()), LONG_PRESS_MS) };
+  }
+
+  function movePress(e: PointerEvent) {
+    if (press && Math.abs(e.clientX - press.x) > PRESS_SLOP_PX) {
+      endPress();
+    }
+  }
+
+  function endPress() {
+    if (press) {
+      clearTimeout(press.timer);
+      press = null;
+    }
+  }
 
   let input = $state<HTMLInputElement | null>(null);
   let scrub: { x: number; start: number } | null = null;
@@ -92,7 +116,7 @@
   }
 </script>
 
-<div class="field {kind}" class:disabled class:expression data-field={name} style={fill === FieldFill.Range ? `--fill: ${fillShare(value, range) * 100}%;` : ''} oncontextmenu={onContext} role="group" aria-label={name}>
+<div class="field {kind}" class:disabled class:expression data-field={name} style={fill === FieldFill.Range ? `--fill: ${fillShare(value, range) * 100}%;` : ''} oncontextmenu={onContext} onpointerdowncapture={startPress} onpointermovecapture={movePress} onpointerupcapture={endPress} onpointercancelcapture={endPress} role="group" aria-label={name}>
   <span class="label" title={`${name} · drag to scrub (Shift ×10, Alt ×0.1)`} onpointerdown={startScrub} onpointermove={moveScrub} onpointerup={() => (scrub = null)} onlostpointercapture={() => (scrub = null)} aria-hidden="true">{label}</span>
   <input bind:this={input} class="num" type="text" inputmode="decimal" aria-label={name} {disabled} value={formatValue(value, range.step)} onchange={(e) => commit(e.currentTarget.value)} onkeydown={onKeydown} />
   {#if unit}<span class="unit" aria-hidden="true">{unit}</span>{/if}
@@ -147,6 +171,21 @@
     touch-action: none;
     white-space: nowrap;
     overflow: hidden;
+  }
+
+  @media (pointer: coarse) {
+    .field {
+      height: 44px;
+    }
+
+    .label {
+      width: 32px;
+    }
+
+    .mark {
+      width: 40px;
+      height: 42px;
+    }
   }
 
   .named .label {

@@ -41,6 +41,12 @@
     color: var(--ui-ink-3);
   }
 
+  @media (pointer: coarse) {
+    .section-head {
+      height: 44px;
+    }
+  }
+
   .section-head:hover {
     background: var(--ui-hover);
   }
