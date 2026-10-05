@@ -2,7 +2,7 @@ import type { ComponentId } from '../components';
 import { findClip, type MotionClip, type MotionDoc } from '../doc';
 import { sampleTrack } from '../keyframes';
 import { boxOf } from '../layout';
-import { transformAt } from '../parent';
+import { apply2d, composeLocal, mul2d, worldAt } from '../parent';
 import type { Size } from '../shape/geometry';
 import { charPositions } from '../text-animators/split';
 import { presetCurve, shapeCurve, type Bend } from '../text-path/curves';
@@ -104,9 +104,12 @@ export function textPathOutline(doc: MotionDoc, clip: MotionClip, frame: number)
   const local = Math.min(Math.max(frame - clip.from, 0), clip.durationInFrames - 1);
   const box = sizeOf(clip.props, doc);
   const curve = curveOf(doc, clip, path, valuesAt(clip, path, local), local, box);
-  const left = (Number(clip.props.x) + transformAt(clip, 'x', frame)) * doc.width - box.w / 2;
-  const top = (Number(clip.props.y) + transformAt(clip, 'y', frame)) * doc.height - box.h / 2;
-  return { points: curve.points.map((p) => [p[0] + left, p[1] + top]), closed: curve.closed };
+  const center: [number, number] = [Number(clip.props.x) * doc.width, Number(clip.props.y) * doc.height];
+  const own = composeLocal({ x: 0, y: 0, rotateZ: Number(clip.props.rotation ?? 0), scaleX: Number(clip.props.scale ?? 1), scaleY: Number(clip.props.scale ?? 1) }, center);
+  const toFrame = mul2d(worldAt(doc, clip.id, frame, doc), own);
+  const left = center[0] - box.w / 2;
+  const top = center[1] - box.h / 2;
+  return { points: curve.points.map((p) => apply2d(toFrame, [p[0] + left, p[1] + top])), closed: curve.closed };
 }
 
 export function glyphHtml(text: string, seed: number | null): string {

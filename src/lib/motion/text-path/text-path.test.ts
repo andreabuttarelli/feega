@@ -189,6 +189,18 @@ describe('the preview outline', () => {
     expect(textPathOutline(doc, findClip(doc, 'title')!.clip, 5)!.points[0][0]).toBeCloseTo(box.left + 108);
     expect(textPathOutline(titled(), findClip(titled(), 'title')!.clip, 0)).toBeNull();
   });
+
+  it('turns and scales with the clip around its anchor, as the text does', () => {
+    let doc = ok(setTextPath(titled(), 'title', { source: { kind: PathSourceKind.Preset, preset: PathPreset.Line } }));
+    const clip = findClip(doc, 'title')!.clip;
+    const [cx, cy] = [Number(clip.props.x) * 1080, Number(clip.props.y) * 1080];
+    const half = (Number(clip.props.width) * 1080) / 2;
+    doc = ok(setKeyframes(doc, 'title', 'rotateZ', [{ frame: 0, value: 90, ease: Ease.Linear }]));
+    doc = ok(setKeyframes(doc, 'title', 'scale', [{ frame: 0, value: 0.5, ease: Ease.Linear }]));
+    const [x, y] = textPathOutline(doc, findClip(doc, 'title')!.clip, 0)!.points[0];
+    expect(x).toBeCloseTo(cx);
+    expect(y).toBeCloseTo(cy - half / 2);
+  });
 });
 
 describe('text path compose', () => {
