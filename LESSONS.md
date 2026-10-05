@@ -80,6 +80,13 @@ pixel. Mossa: misurare sul farm un chunk solo (`launchPiece` con indice 0, log d
 `ms`), varianti dell'HTML in parallelo su sandbox diverse, e ripetere la base: tra sandbox il
 rumore arriva al 20%.
 
+### Il log del farm taglia l'errore: il motivo vero si legge in locale
+Lo step salva solo gli ultimi 600 caratteri dell'uscita, cioè la coda del dump `CaptureFailure`
+(worker, frame catturati: 0), mai il messaggio. Segnale: `failed` con un elenco di worker vuoti.
+Mossa: rifare lo stesso HTML con `executeRenderJob` del producer in locale (stessa versione):
+il messaggio esce intero, p. es. `[MotionBlur] ... cannot run with injected video frames` che
+il producer lancia per qualunque `<video>` nella pagina.
+
 ### La bolletta Sandbox sale e nessun render è stato addebitato
 Segnale: Vercel mostra Active CPU / Provisioned Memory in crescita, `ai_calls` non ha righe `motion_render`. Le sandbox del farm vivono nel progetto Vercel **anomalia**, non in feega: `GET /v1/sandboxes?project=<id>&teamId=…` (token di `vercel login`) dà `vcpus`, `timeout`, `activeCpuDurationMs`, `startedAt`/`stoppedAt` per ognuna. Il 5/10 l'87% della spesa motion veniva da bench degli agenti (timeout non usati dal codice), e una sandbox che vive `timeout` pieno con poca CPU è un worker orfano. Mossa: un bench chiama `stopWorker` in `finally`; il minimo fatturato è 1 min di memoria per sandbox, quindi un bench a molti chunk corti costa il minimo × chunk.
 
