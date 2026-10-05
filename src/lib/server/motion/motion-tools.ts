@@ -56,6 +56,7 @@ import { DEGREES, MAX_SAMPLES } from '$lib/motion/motion-blur';
 import { MODIFIERS, MODIFIER_KINDS } from '$lib/motion/shape/modifiers';
 import { addModifier, morphTo, removeModifier, setModifier, setPath } from '$lib/motion/shape/ops';
 import { SHAPE_KINDS, modifierKey } from '$lib/motion/shape/schema';
+import { PRESET as SHAPE_PRESET, SHAPE_PRESETS, applyShapePreset } from '$lib/motion/shape/presets';
 import { MAX_RATE, MIN_RATE, REMAP_KEY, clearTimeRemap, freezeFrame } from '$lib/motion/time-remap';
 import { PARTICLE_PRESETS, PRESET_PROPS as PARTICLE_PRESET, applyParticlePreset } from '$lib/motion/particles/presets';
 import { DUCK_DEFAULTS, duckUnder } from '$lib/motion/duck';
@@ -883,13 +884,19 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     add_modifier: tool({
-      description: `Add a modifier at the end of a Shape clip's stack (applied top to bottom). Kinds and params: ${MODIFIER_CATALOGUE}. trim start/end/offset draws a path on; repeater steps each copy by offset/rotation/scale around the box centre (rotation 360/copies makes a radial pattern); wiggle is seeded and moves with speed. Returns modifier_id and the keys to animate with set_keyframes / set_expression: mod.<modifier id>.<param>.`,
+      description: `Add a modifier at the end of a Shape clip's stack (applied top to bottom). Kinds and params: ${MODIFIER_CATALOGUE}. trim start/end/offset draws a path on; repeater steps each copy by offset/rotation/scale around the box centre (rotation 360/copies makes a radial pattern); wiggle is seeded and moves with speed; wave ripples the edge (waves around it, Waves/s); blob swells the outline organically (lobes, speed, seed); goo melts near outlines together (Melt is the blur, Threshold the edge), best after a repeater or on a multi-part path. Returns modifier_id and the keys to animate with set_keyframes / set_expression: mod.<modifier id>.<param>.`,
       inputSchema: z.object({ clip_id: z.string(), kind: z.enum(MODIFIER_KINDS), params: z.record(z.string(), z.number()).optional() }),
       execute: async (input) => {
         const id = deps.newId();
         const out = apply(addModifier(session.doc, input.clip_id, input.kind, id, input.params), `added ${input.kind} to ${input.clip_id}`);
         return out.ok ? { ...out, modifier_id: id, animate: MODIFIERS[input.kind].params.map((p) => modifierKey(id, p.key)) } : out;
       }
+    }),
+
+    apply_shape_preset: tool({
+      description: `Give a Shape clip a liquid look, replacing its modifiers and their keys: ${SHAPE_PRESETS.map((p) => `${p} — ${SHAPE_PRESET[p].about}`).join('; ')}. Tune it after with set_modifier.`,
+      inputSchema: z.object({ clip_id: z.string(), preset: z.enum(SHAPE_PRESETS) }),
+      execute: async (input) => apply(applyShapePreset(session.doc, input.clip_id, input.preset, deps.newId), `${input.preset} on ${input.clip_id}`)
     }),
 
     set_modifier: tool({

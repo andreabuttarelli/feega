@@ -35,6 +35,25 @@ describe('shape bake', () => {
     expect(shapeBake(wiggly, env)!.frames.length).toBeGreaterThan(1);
   });
 
+  it('a wave or a blob with speed runs by itself; a gooey filter alone is still', () => {
+    const wave = clip({ modifiers: [{ id: 'w', kind: ModifierKind.Wave, params: { speed: 1 } }] });
+    const blob = clip({ modifiers: [{ id: 'b', kind: ModifierKind.Blob, params: { speed: 1 } }] });
+    const goo = clip({ modifiers: [{ id: 'g', kind: ModifierKind.Goo, params: {} }] });
+
+    expect(shapeBake(wave, env)!.frames.length).toBeGreaterThan(1);
+    expect(shapeBake(blob, env)!.frames.length).toBeGreaterThan(1);
+    expect(shapeBake(goo, env)).toBeNull();
+  });
+
+  it('a liquid frame is the same whatever frame was drawn before it, so seek lands on it', () => {
+    const liquid = clip({ modifiers: [{ id: 'b', kind: ModifierKind.Blob, params: { speed: 1 } }, { id: 'g', kind: ModifierKind.Goo, params: {} }] });
+    const bake = shapeBake(liquid, env)!;
+    const later = shapeBake({ ...liquid, durationInFrames: 2 } as MotionClip, env)!;
+
+    expect(bake.frames[bake.index[1]]).toBe(later.frames[later.index[1]]);
+    expect(bake.frames[0]).toContain('filter="url(#sf-s1)"');
+  });
+
   it('the html holds the first frame inside an svg the runtime can find', () => {
     const html = shapeHtml('s1', clip({}).props as never, env, { w: 100, h: 50 });
     expect(html).toMatch(/^<svg id="sv-s1" width="100" height="50" viewBox="0 0 100 50"/);

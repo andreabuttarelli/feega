@@ -29,7 +29,8 @@
   import { addEffect, removeEffect, setEffect } from '$lib/motion/effects/ops';
   import { effectKey } from '$lib/motion/effects/model';
   import { MODIFIERS, MODIFIER_KINDS, type ModifierKind } from '$lib/motion/shape/modifiers';
-  import { addModifier, morphTo, removeModifier, setModifier, setPath, shapePath, type ShapeParams } from '$lib/motion/shape/ops';
+  import { addModifier, morphHere, removeModifier, setModifier, setPath, shapePath, type ShapeParams } from '$lib/motion/shape/ops';
+  import { PRESET as SHAPE_PRESET, SHAPE_PRESETS, applyShapePreset, type ShapePreset } from '$lib/motion/shape/presets';
   import { SHAPE_KINDS, ShapeKind, modifierKey, type Modifier } from '$lib/motion/shape/schema';
   import { SELECTOR_SHAPES, animatorKey, type SelectorShape } from '$lib/motion/text-animators/model';
   import { TEXT_COMPONENTS, TEXT_PRESETS, applyPreset as applyTextPreset, removeAnimator, setAnimator, type TextPreset } from '$lib/motion/text-animators/ops';
@@ -228,7 +229,15 @@
     const kind = select.value as ShapeKind;
     select.value = '';
     if (kind) {
-      commit(morphTo(doc, clip.id, { kind }), 'Added a morph target');
+      commit(morphHere(doc, clip.id, kind, frame), `Morphed to ${kind}`);
+    }
+  }
+
+  function applyShapePresetOf(select: HTMLSelectElement) {
+    const preset = select.value as ShapePreset;
+    select.value = '';
+    if (preset) {
+      commit(applyShapePreset(doc, clip.id, preset, () => crypto.randomUUID().slice(0, 8)), `Applied the ${SHAPE_PRESET[preset].label.toLowerCase()} preset`);
     }
   }
 
@@ -455,11 +464,15 @@
           <button type="button" aria-label={`Remove morph target ${i + 1}`} onclick={() => commit(setProps(doc, clip.id, { morphs: shapeMorphs.filter((_, j) => j !== i) }), 'Removed a morph target')}>×</button>
         </div>
       {/each}
-      <select aria-label="Add morph target" data-testid="add-morph" value="" onchange={(e) => addMorphOf(e.currentTarget)}>
-        <option value="">Morph into…</option>
+      <select aria-label="Morph to" data-testid="add-morph" title="Adds the shape and keys the morph from the playhead over one second" value="" onchange={(e) => addMorphOf(e.currentTarget)}>
+        <option value="">Morph to…</option>
         {#each SHAPE_KINDS.filter((k) => k !== ShapeKind.Path) as kind (kind)}<option value={kind}>{kind}</option>{/each}
       </select>
       <h4>Modifiers</h4>
+      <select aria-label="Liquid preset" data-testid="shape-preset" value="" onchange={(e) => applyShapePresetOf(e.currentTarget)}>
+        <option value="">Liquid preset…</option>
+        {#each SHAPE_PRESETS as preset (preset)}<option value={preset} title={SHAPE_PRESET[preset].about}>{SHAPE_PRESET[preset].label}</option>{/each}
+      </select>
       {#each shapeModifiers as modifier, i (modifier.id)}
         <div class="effect" class:off={!modifier.enabled} data-modifier={modifier.id}>
           <div class="effect-head">
