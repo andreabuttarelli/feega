@@ -31,6 +31,24 @@ import type { MotionNode } from '$lib/canvas/motion-node';
 
 export const MOTION_AGENT_KEY = 'motion';
 const CHECK_WAIT_MS = 90_000;
+const NEEDS_EDITOR = 'this needs the motion editor open in a browser to draw frames: nobody has it open for this turn';
+
+export enum Browser {
+  Attached = 'attached',
+  Absent = 'absent'
+}
+
+const BROWSER_VISION: Record<Browser, (visionModel: string | null) => Vision> = {
+  [Browser.Attached]: (visionModel) => (visionModel ? Vision.Available : Vision.Missing),
+  [Browser.Absent]: () => Vision.Missing
+};
+
+const BROWSER_DRAWS: Record<Browser, () => void> = {
+  [Browser.Attached]: () => {},
+  [Browser.Absent]: () => {
+    throw new Error(NEEDS_EDITOR);
+  }
+};
 
 enum Round {
   Edit = 'edit',
@@ -61,6 +79,7 @@ export type MotionTurnInput = {
   model: string;
   reasoning: string | null;
   requester: Actor;
+  browser: Browser;
 };
 
 export type TurnOutcome = { reply: string; summary: string | null; version: number | null; revision: RevisionOutcome | null; costUsd: number };
@@ -68,7 +87,7 @@ export type TurnOutcome = { reply: string; summary: string | null; version: numb
 export type MotionTurn = { stream: ReadableStream<UIMessageChunk>; done: Promise<TurnOutcome> };
 
 export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Response> {
-  const { db, userId, orgId, project, motion, message, selection, model, reasoning, requester } = input;
+  const { db, userId, orgId, project, motion, message, selection, model, reasoning, requester, browser } = input;
   const actor = agentActor(userId, MOTION_AGENT_KEY);
   const nodeScope = { orgId, nodeId: motion.record.id };
 
@@ -101,6 +120,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
     analysis: async (assetId) => (await analyzeSounds(storageAnalysis(db), { orgId, projectId: project.id }, assets, [assetId]))[assetId] ?? null,
     voiceover: (voice) => withOrgContext(orgId, () => speakVoiceover(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, actor }, voice)),
     frames: async (callId, times) => {
+      BROWSER_DRAWS[browser]();
       const review = await screenModelInput(db, { profile: ModerationProfile.Standard, texts: docTexts(session.doc), scope: moderationScope });
       if (!review.ok) {
         throw new Error(`frames withheld by the safety review: ${review.error}`);
@@ -109,6 +129,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
       return awaitFrames(bucket, framesPrefix(frameScope, callId), times.length);
     },
     check: async (callId, doc, name) => {
+      BROWSER_DRAWS[browser]();
       const review = await screenModelInput(db, { profile: ModerationProfile.Standard, texts: docTexts(doc), scope: moderationScope });
       if (!review.ok) {
         throw new Error(`the component was withheld by the safety review: ${review.error}`);
@@ -134,7 +155,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
   const opening = openingTier({ message, doc: head.doc, selection });
   await ensureGatewayModels();
   const visionModel = llmVisionModel();
-  const vision = visionModel ? Vision.Available : Vision.Missing;
+  const vision = BROWSER_VISION[browser](visionModel);
   const toolNames = Object.keys(tools).filter((name) => vision === Vision.Available || name !== VIEW_FRAMES);
   const system = motionAgentPrompt({ brandName: project.brandId ? tokens.name : null, selectionNote: selectionNote(head.doc, selection), vision, frame: head.doc });
   const t0 = Date.now();

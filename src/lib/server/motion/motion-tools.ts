@@ -94,7 +94,7 @@ export type MotionToolDeps = {
 const framesAt = (s: number, fps: number) => Math.round(s * fps);
 const secondsAt = (f: number, fps: number) => Math.round((f / fps) * 100) / 100;
 
-function summary(doc: MotionDoc, selection: string[]) {
+export function docSummary(doc: MotionDoc, selection: string[]) {
   const secs = (f: number) => secondsAt(f, doc.fps);
   const edgeSummary = (edge: { kind: string; durationInFrames: number }) => ({ kind: edge.kind, duration: secs(edge.durationInFrames) });
   const inSeconds = (keyframes: Record<string, Keyframe[] | undefined>) =>
@@ -280,7 +280,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }
     session.doc = result.doc;
     session.edits.push(what);
-    return { ok: true, doc: summary(session.doc, session.selection) };
+    return { ok: true, doc: docSummary(session.doc, session.selection) };
   };
 
   async function codeWrite(result: OpResult, name: string, what: string, callId: string) {
@@ -338,7 +338,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     get_motion_doc: tool({
       description: 'Read the video being edited: size, duration in seconds, tracks and clips (start/duration in seconds), and the clips the user has selected.',
       inputSchema: z.object({}).strict(),
-      execute: async () => summary(session.doc, session.selection)
+      execute: async () => docSummary(session.doc, session.selection)
     }),
 
     list_components: tool({
@@ -1254,10 +1254,10 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
           for (const [index, call] of input.calls.entries()) {
             const out = await nestedCall(call.tool, call.input, options);
             if (out.ok === false) {
-              return { ok: false, failed: index, error: `${call.tool}: ${out.error}`, doc: summary(session.doc, []) };
+              return { ok: false, failed: index, error: `${call.tool}: ${out.error}`, doc: docSummary(session.doc, []) };
             }
           }
-          return { ok: true, doc: summary(session.doc, []) };
+          return { ok: true, doc: docSummary(session.doc, []) };
         } finally {
           session.doc = mergeView(root, [input.comp], session.doc);
         }

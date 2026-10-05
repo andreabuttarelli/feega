@@ -7,7 +7,7 @@ import { loadTurns, openNodeThread } from '$lib/server/repos/chat';
 import { AGENT_MAX_DURATION_S } from '$lib/server/project-agent/limits';
 import { headOrNew } from '$lib/server/motion/editor';
 import { motionAgentScope } from '$lib/server/motion/agent-scope';
-import { startMotionTurn } from '$lib/server/motion/turn';
+import { Browser, startMotionTurn } from '$lib/server/motion/turn';
 import type { RequestHandler } from './$types';
 
 export const config = { maxDuration: AGENT_MAX_DURATION_S };
@@ -38,7 +38,7 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
   }
   const { model, reasoning } = resolved.choice;
 
-  const turn = await startMotionTurn({ db, userId: user.id, orgId, project, motion, message, selection, model, reasoning, requester: { kind: 'user', id: user.id } });
+  const turn = await startMotionTurn({ db, userId: user.id, orgId, project, motion, message, selection, model, reasoning, requester: { kind: 'user', id: user.id }, browser: Browser.Attached });
   if (turn instanceof Response) {
     return turn;
   }

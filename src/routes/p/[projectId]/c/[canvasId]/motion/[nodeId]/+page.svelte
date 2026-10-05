@@ -2,6 +2,7 @@
   import { onMount, untrack } from 'svelte';
   import { deserialize } from '$app/forms';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
+  import { watchMotionNode } from '$lib/realtime/motion-channel';
   import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
   import { registerUpload } from '$lib/motion/fonts/ops';
   import ArrowLeft from '@lucide/svelte/icons/arrow-left';
@@ -139,6 +140,7 @@
   let reveal = $state(Reveal.Animated);
   let helpOpen = $state(false);
   let layout = $state<EditorLayout>(DEFAULT_LAYOUT);
+  let chatReload = $state(0);
 
   function browserStore(): LayoutStore | null {
     try {
@@ -150,6 +152,7 @@
 
   onMount(() => {
     layout = readLayout(browserStore());
+    return watchMotionNode(supabase, data.node.id, () => void pullExternalEdit());
   });
   let body = $state<HTMLDivElement | null>(null);
 
@@ -326,6 +329,18 @@
     }
     edit(registered.doc, `Uploaded the font ${familyOf(file.name)}`);
     return null;
+  }
+
+  async function pullExternalEdit() {
+    const res = await fetch(agentUrl);
+    const body = (await res.json().catch(() => null)) as { head?: { version: number; doc: MotionDoc; actorKind: string } } | null;
+    if (!body?.head || body.head.version <= version || body.head.actorKind !== 'agent') {
+      return;
+    }
+    history = record(history, body.head.doc);
+    version = body.head.version;
+    selection = selection.filter((id) => findClip(body.head!.doc, id));
+    chatReload++;
   }
 
   async function pullAgentEdit() {
@@ -928,7 +943,7 @@
 
     <aside class="chat" class:open={sheet === Sheet.Agent} aria-label="Agent">
       <div class="sheet-head"><span>Agent</span><button type="button" aria-label="Close" onclick={() => (sheet = Sheet.None)}><X size={16} /></button></div>
-      <ChatPanel projectId={data.projectId} motionNodeId={data.node.id} context={() => ({ selection })} onturnend={() => void pullAgentEdit()} ondata={onAgentData} />
+      <ChatPanel projectId={data.projectId} motionNodeId={data.node.id} reload={chatReload} context={() => ({ selection })} onturnend={() => void pullAgentEdit()} ondata={onAgentData} />
     </aside>
   </div>
 

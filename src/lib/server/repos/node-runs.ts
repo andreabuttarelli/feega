@@ -275,6 +275,21 @@ export async function completeRun(
   }
 }
 
+export async function settleRun(
+  db: Db,
+  input: { orgId: string; runId: string; params: Record<string, unknown>; costUsd: number }
+): Promise<void> {
+  const { error } = await db
+    .from('node_runs')
+    .update({ status: 'done', params: input.params as never, cost_usd: input.costUsd, finished_at: new Date().toISOString() })
+    .eq('id', input.runId)
+    .eq('org_id', input.orgId);
+
+  if (error) {
+    throw error;
+  }
+}
+
 export async function setRunPrompt(
   db: Db,
   input: { orgId: string; runId: string; prompt: string }
