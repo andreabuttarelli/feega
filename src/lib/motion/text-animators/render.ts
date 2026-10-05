@@ -1,6 +1,7 @@
 import { esc } from '../hyperframes/html';
 import { COLOR_VALUE, SELECTOR_KEYS, SelectorShape, VALUE_KEYS, cssName, type TextAnimator, type ValueKey } from './model';
-import { HARD_EDGE, splitLines } from './split';
+import { HARD_EDGE, OWN_POSITION, POSITION_VAR, splitLines } from './split';
+import { AnimatorUnit } from './model';
 
 export type TextRender = { lines: (text: string) => string[]; id: string | null; vars: Record<string, string | number>; style: string; seed: number | null };
 
@@ -14,12 +15,19 @@ export function textHostId(clipId: string): string {
 
 const v = (a: TextAnimator, field: string) => `var(${cssName(a.id, field)})`;
 
-function selectionVars(a: TextAnimator, i: number): string {
+const FINEST_FIRST = [AnimatorUnit.Char, AnimatorUnit.Word, AnimatorUnit.Line];
+
+function finestUnit(animators: readonly TextAnimator[]): AnimatorUnit {
+  return FINEST_FIRST.find((unit) => animators.some((a) => a.unit === unit))!;
+}
+
+function selectionVars(a: TextAnimator, i: number, finest: AnimatorUnit): string {
+  const p = a.unit === finest ? OWN_POSITION : POSITION_VAR[a.unit];
   const soft = a.shape === SelectorShape.Square ? String(HARD_EDGE) : `max(${v(a, 'softness')}, ${HARD_EDGE})`;
   const from = `(${v(a, 'start')} + ${v(a, 'offset')}) / 100`;
   const to = `(${v(a, 'end')} + ${v(a, 'offset')}) / 100`;
-  const enter = `--in${i}:clamp(0, (var(--p) - ${from}) / ${soft}, 1)`;
-  const leave = `--out${i}:clamp(0, (${to} - var(--p)) / ${soft}, 1)`;
+  const enter = `--in${i}:clamp(0, (var(${p}) - ${from}) / ${soft}, 1)`;
+  const leave = `--out${i}:clamp(0, (${to} - var(${p})) / ${soft}, 1)`;
   const eased = (n: string) => `var(${n}) * var(${n}) * (3 - 2 * var(${n}))`;
   const amount = a.shape === SelectorShape.Smooth ? `--a${i}:calc(${eased(`--in${i}`)} * ${eased(`--out${i}`)})` : `--a${i}:calc(var(--in${i}) * var(--out${i}))`;
   return [enter, leave, amount].join(';');
@@ -53,7 +61,7 @@ function unitRule(animators: readonly TextAnimator[]): string {
   const tracking = collect(animators, TRACKING);
   const colour = collect(animators, COLOUR).at(-1);
   const declarations = [
-    ...animators.map(selectionVars),
+    ...animators.map((a, i) => selectionVars(a, i, finestUnit(animators))),
     opacity.length ? `opacity:calc(${opacity.length === 1 ? opacity[0].slice(1, -1) : opacity.join(' * ')})` : '',
     transform.length ? `transform:${transform.join(' ')}` : '',
     blur.length ? `filter:blur(calc(${blur.join(' + ')}))` : '',
@@ -77,12 +85,14 @@ export function textRender(clipId: string, animators: readonly TextAnimator[], r
   if (!animators.length) {
     return PLAIN_TEXT;
   }
-  const split = animators[0];
+  const unit = finestUnit(animators);
+  const seed = animators.find((a) => a.unit === unit)!.seed;
+  const coarser = FINEST_FIRST.filter((u) => u !== unit && animators.some((a) => a.unit === u));
   return {
-    lines: (text) => splitLines(text, { unit: split.unit, seed: split.seed }),
+    lines: (text) => splitLines(text, { unit, seed, coarser }),
     id: textHostId(clipId),
     vars: hostVars(animators, resolve),
     style: `<style>#${textHostId(clipId)} .tu{${unitRule(animators)}}</style>`,
-    seed: split.seed
+    seed
   };
 }

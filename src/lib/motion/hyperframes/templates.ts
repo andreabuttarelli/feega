@@ -300,8 +300,14 @@ const CanvasMock: Template<'CanvasMock'> = {
   ]
 };
 
-const threeStage = (ctx: { id: string; width: number; height: number }, p: { x: number; y: number; width: number; height: number }, backdrop: string | null) => {
-  const box = boxOf(p, ctx);
+export const DEVICE_OVERSCAN = 0.5;
+
+function overscanned(box: Box, overscan: number): Box {
+  return { left: box.left - box.width * overscan, top: box.top - box.height * overscan, width: box.width * (1 + 2 * overscan), height: box.height * (1 + 2 * overscan) };
+}
+
+const threeStage = (ctx: { id: string; width: number; height: number }, p: { x: number; y: number; width: number; height: number }, backdrop: string | null, overscan = 0) => {
+  const box = overscanned(boxOf(p, ctx), overscan);
   const back = backdrop ? `<div style="${css({ position: 'absolute', inset: '0', background: backdrop })}"></div>` : '';
   return `${back}<canvas id="three-${ctx.id}" width="${Math.round(box.width)}" height="${Math.round(box.height)}" style="${css(boxCss(box))}"></canvas>`;
 };
@@ -355,7 +361,7 @@ const Device3D: Template<'Device3D'> = {
     const backdrop = BACKDROP[ctx.p.backdrop];
     const video = ctx.asset(ctx.p.screenVideo);
     const source = video ? `<video id="dv-${ctx.id}" src="${esc(video)}" crossorigin="anonymous" preload="auto" muted playsinline data-start="${ctx.start}" data-duration="${ctx.length}" data-media-start="${ctx.mediaStart}" style="${DEVICE_VIDEO_STYLE}"></video>` : '';
-    return source + threeStage(ctx, ctx.p, backdrop ? ctx.color(backdrop) : null);
+    return source + threeStage(ctx, ctx.p, backdrop ? ctx.color(backdrop) : null, DEVICE_OVERSCAN);
   }
 };
 

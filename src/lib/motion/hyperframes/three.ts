@@ -50,6 +50,7 @@ export type ThreeClip = {
   bevel: number;
   device: DeviceRuntime | null;
   video: boolean;
+  overscan: number;
 };
 
 export const LIGHTING = {
@@ -91,6 +92,7 @@ const FONT_CACHE = '__feegaFontFiles';
 let live = true;
 
 const DEG = Math.PI / 180;
+const wider = (fov, overscan) => (2 * Math.atan(Math.tan((fov * DEG) / 2) * (1 + 2 * overscan))) / DEG;
 const FLOOR = -1.05;
 const FIT = 2;
 const SHADOW_MAP = 512;
@@ -268,7 +270,7 @@ function stage(c) {
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   }
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(FOV, canvas.width / canvas.height, 0.1, 100);
+  const camera = new THREE.PerspectiveCamera(wider(FOV, c.overscan), canvas.width / canvas.height, 0.1, 100);
   camera.position.set(0, 0.3, 4.6 / c.zoom);
   const lights = LOOK && LOOK.lights.length ? lookLights(scene) : presetLights(scene, c);
   ground(scene, c);
@@ -462,7 +464,7 @@ function drawAt(time) {
     s.object.rotation.set(at('objectRotateX', 0) * DEG, at('objectRotateY', 0) * DEG, at('objectRotateZ', 0) * DEG);
     const distance = 4.6 / at('dolly', c.zoom);
     s.camera.position.set(0, 0.3, distance);
-    s.camera.fov = at('fov', FOV);
+    s.camera.fov = wider(at('fov', FOV), c.overscan);
     if (STAGE && c.depth !== null) {
       const v = CAMERA_MATH.valuesAt(STAGE, time * c.fps);
       const view = CAMERA_MATH.orbitView(v, STAGE, c.depth);
