@@ -11,7 +11,7 @@
   import { ClipEdge, moveClip, moveKeyframes, moveTrack, removeKeyframes, setKeyEase, setKeyInterp, setKeyframe, trimClip, type KeyRef, type OpResult } from '$lib/motion/timeline';
   import { withParams } from '$lib/motion/custom/params';
   import { Grip, KeySide, Reveal, Snap, edgeHandles, frameAt, keyLanes, pxPerFrame, snapped } from '$lib/motion/timeline-view';
-  import { KeyMark, RowKind, keyGlyph, keyMark, layerName, layerRows, propValue, rulerMarks, type PropLane } from '$lib/motion/timeline-layers';
+  import { KeyMark, RowKind, keyGlyph, keyMark, layerName, layerRows, pinched, propValue, rulerMarks, type PropLane } from '$lib/motion/timeline-layers';
   import { MASK_KINDS, Matte } from '$lib/motion/mask';
   import type { MotionTrack } from '$lib/motion/doc';
   import { Interp, Source, type EaseSpec, type Keyframe } from '$lib/motion/keyframes';
@@ -35,7 +35,7 @@
   import { FadeEdge, dragFade, fadeHandles } from '$lib/motion/fade-handles';
 
   const HEADER_PX = 240;
-  const COMPACT_HEADER_PX = 140;
+  const COMPACT_HEADER_PX = 180;
   const COMPACT_BELOW_PX = 760;
   const TILE_PX = 64;
   const MAX_TILES = 48;
@@ -54,7 +54,7 @@
     selection = $bindable<string[]>([]),
     keySelection = $bindable<KeyRef[]>([]),
     camera = $bindable(false),
-    zoom,
+    zoom = $bindable(1),
     snap,
     waveforms = {},
     beats = [],
@@ -68,7 +68,7 @@
     selection?: string[];
     keySelection?: KeyRef[];
     camera?: boolean;
-    zoom: number;
+    zoom?: number;
     snap: Snap;
     waveforms?: Record<string, number[]>;
     beats?: number[];
@@ -217,6 +217,40 @@
   function focusSelect(node: HTMLInputElement) {
     node.focus();
     node.select();
+  }
+
+  const fingers = new Map<number, number>();
+  let pinch: { zoom: number; distance: number } | null = null;
+
+  const spread = () => Math.abs([...fingers.values()].reduce((a, b) => a - b));
+
+  function touchDown(e: PointerEvent) {
+    if (e.pointerType !== 'touch') {
+      return;
+    }
+    fingers.set(e.pointerId, e.clientX);
+    if (fingers.size === 2) {
+      pinch = { zoom, distance: Math.max(1, spread()) };
+      gesture = null;
+      draft = null;
+    }
+  }
+
+  function touchMove(e: PointerEvent) {
+    if (!fingers.has(e.pointerId)) {
+      return;
+    }
+    fingers.set(e.pointerId, e.clientX);
+    if (pinch && fingers.size === 2) {
+      zoom = pinched(pinch.zoom, pinch.distance, Math.max(1, spread()));
+    }
+  }
+
+  function touchUp(e: PointerEvent) {
+    fingers.delete(e.pointerId);
+    if (fingers.size < 2) {
+      pinch = null;
+    }
   }
 
   function toggleMark(owner: KeyOwner, prop: string, mark: KeyMark) {
@@ -559,7 +593,7 @@
   </div>
 {/snippet}
 
-<div class="timeline" bind:this={lanes} data-testid="motion-timeline" style={`--head: ${headPx}px;`}>
+<div class="timeline" bind:this={lanes} data-testid="motion-timeline" style={`--head: ${headPx}px;`} onpointerdowncapture={touchDown} onpointermovecapture={touchMove} onpointerupcapture={touchUp} onpointercancelcapture={touchUp}>
   <div class="inner" style={`width: ${width + headPx}px;`}>
     <div class="ruler" role="slider" tabindex="-1" aria-label="Playhead" aria-valuenow={frame} onpointerdown={startScrub}>
       <div class="corner">
@@ -929,6 +963,10 @@
     position: relative;
     display: flex;
     height: var(--row);
+  }
+
+  .row > .head,
+  .row > .lane {
     border-bottom: 1px solid var(--ui-line);
   }
 
@@ -970,7 +1008,7 @@
   }
 
   .row.layer.selected > .head {
-    background: var(--ui-accent-wash);
+    background: color-mix(in srgb, var(--ui-accent) 10%, var(--ui-bg));
   }
 
   .head button {
@@ -1025,7 +1063,8 @@
   }
 
   .group-name {
-    flex: 0 1 auto;
+    flex: 0 0 auto;
+    max-width: 96px;
     font-weight: 600;
   }
 
@@ -1168,7 +1207,7 @@
   .bar {
     position: absolute;
     top: 3px;
-    height: 21px;
+    height: calc(var(--row) - 7px);
     display: flex;
     align-items: center;
     gap: 6px;
@@ -1312,7 +1351,7 @@
   .fade-ramp {
     position: absolute;
     top: 3px;
-    height: 21px;
+    height: calc(var(--row) - 7px);
     pointer-events: none;
     z-index: 3;
   }
@@ -1339,7 +1378,7 @@
   .grip {
     position: absolute;
     top: 3px;
-    height: 21px;
+    height: calc(var(--row) - 7px);
     cursor: ew-resize;
     z-index: 3;
   }
@@ -1428,9 +1467,46 @@
     z-index: 10;
   }
 
-  @media (max-width: 760px) {
-    .flags {
+  @media (hover: none) {
+    .row.group .flags button,
+    .row.layer.selected .flags button {
+      visibility: visible;
+    }
+
+    .row.layer:not(.selected) .flags {
       display: none;
+    }
+  }
+
+  @media (pointer: coarse) {
+    .timeline {
+      --row: 44px;
+      --prop-row: 40px;
+    }
+
+    .twirl,
+    .flags button,
+    .mark {
+      width: 32px;
+      height: 40px;
+    }
+
+    .grip {
+      min-width: 16px;
+    }
+
+    .key {
+      width: 14px;
+      height: 14px;
+      margin: -7px 0 0 -7px;
+    }
+
+    .ruler {
+      height: 36px;
+    }
+
+    .playhead {
+      top: 36px;
     }
   }
 </style>

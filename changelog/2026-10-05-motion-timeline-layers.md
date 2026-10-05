@@ -21,5 +21,9 @@ Secondo passo della spec di redesign (timeline, P0).
   in hover sull'header. Riga camera solo se c'è una camera o una clip 3D.
 - Tinte: 14% light, 22% dark; tonalità aggiornate (video blu, non più rosso come il playhead).
 
+- Touch: con puntatore grossolano righe 44px e maniglie più larghe; pinch a due dita sulla
+  timeline per lo zoom (`pinched`); senza hover le azioni del layer restano visibili sulla riga
+  selezionata e sulle righe di gruppo.
+
 Scartato per ora: riordino a trascinamento (restano le frecce in hover), nomi layer editabili
 (il doc non ha `clip.name`: serve una migrazione dello schema).

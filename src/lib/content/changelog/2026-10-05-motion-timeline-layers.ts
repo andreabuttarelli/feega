@@ -8,6 +8,7 @@ export default {
     'Twirl a layer open to see each animated property and its keyframes.',
     'Drag a property value in the timeline to change it, or click it to type, in px, % and degrees.',
     'Hide or lock a single layer from its row.',
+    'Pinch the timeline to zoom on touch screens.',
     'The ruler counts in round steps and the playhead is red, so it never gets lost.'
   ]
 } satisfies ChangelogEntry;

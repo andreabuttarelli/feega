@@ -2,7 +2,7 @@ import { compOf, type MotionClip, type MotionTrack } from './doc';
 import { COMPONENTS } from './components';
 import { FPS } from './design';
 import { Interp, sampleTrack, type Keyframe } from './keyframes';
-import { pxPerFrame } from './timeline-view';
+import { clampZoom, pxPerFrame } from './timeline-view';
 
 export enum RowKind {
   Group = 'group',
@@ -126,3 +126,5 @@ export function rulerMarks(durationInFrames: number, zoom: number, fps: number =
   }
   return marks;
 }
+
+export const pinched = (startZoom: number, startDistance: number, distance: number): number => clampZoom((startZoom * distance) / startDistance);

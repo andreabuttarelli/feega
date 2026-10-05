@@ -3,7 +3,7 @@ import { MotionFormat, newMotionDoc, type MotionClip, type MotionTrack } from '.
 import { Interp, type Keyframe } from './keyframes';
 import { TrackKind } from './components';
 import { Ease } from './design';
-import { KeyMark, KeyGlyph, ROW_PX, RowKind, keyMark, keyGlyph, layerName, propValue, layerRows, rulerMarks } from './timeline-layers';
+import { KeyMark, KeyGlyph, ROW_PX, RowKind, keyMark, keyGlyph, layerName, layerRows, pinched, propValue, rulerMarks } from './timeline-layers';
 
 const clip = (id: string, over: Partial<MotionClip> = {}): MotionClip => ({ id, component: 'Title', from: 0, durationInFrames: 30, props: { text: 'Better marketing' }, keyframes: {}, ...over }) as MotionClip;
 const track = (id: string, clips: MotionClip[]): MotionTrack => ({ id, kind: TrackKind.Visual, name: id, clips }) as MotionTrack;
@@ -70,5 +70,11 @@ describe('timeline layers', () => {
   it('keeps the ruler on whole frames at any rate', () => {
     expect(rulerMarks(120, 1, 60).every((m) => Number.isInteger(m.frame))).toBe(true);
     expect(rulerMarks(newMotionDoc(MotionFormat.Square).durationInFrames, 4).length).toBeGreaterThan(rulerMarks(newMotionDoc(MotionFormat.Square).durationInFrames, 1).length);
+  });
+
+  it('pinches the zoom by the ratio between the two fingers, within the zoom range', () => {
+    expect(pinched(2, 100, 200)).toBe(4);
+    expect(pinched(2, 100, 50)).toBe(1);
+    expect(pinched(2, 100, 100000)).toBe(16);
   });
 });
