@@ -57,6 +57,7 @@
   import PenOverlay from '$lib/components/motion/PenOverlay.svelte';
   import SelectionOverlay from '$lib/components/motion/SelectionOverlay.svelte';
   import MotionPathOverlay from '$lib/components/motion/MotionPathOverlay.svelte';
+  import TextPathOverlay from '$lib/components/motion/TextPathOverlay.svelte';
   import { Align, addMarker, alignClips, allMarkers, clipsTo, distributeClips, trimClipsAt, loopFrame, nudgeClips, sequenceClips, setWorkArea, staggerClips } from '$lib/motion/organize';
   import ExportDialog from '$lib/components/motion/ExportDialog.svelte';
   import TemplateDialog from '$lib/components/motion/TemplateDialog.svelte';
@@ -879,6 +880,7 @@
         {#if selected?.mask && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<MaskOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected?.component === 'Shape' && selected.props.shape === 'path' && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<PenOverlay {doc} clip={selected} onchange={edit} />{/if}
         {#if selected?.path && !playing}<MotionPathOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
+        {#if selected?.textPath && !playing}<TextPathOverlay {doc} clip={selected} {frame} />{/if}
       </MotionPreview>
       {#if blank}
         <div class="empty-state" data-testid="empty-state">

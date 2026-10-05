@@ -2,9 +2,9 @@ import { esc } from '../hyperframes/html';
 import { COLOR_VALUE, SELECTOR_KEYS, SelectorShape, VALUE_KEYS, cssName, type TextAnimator, type ValueKey } from './model';
 import { HARD_EDGE, splitLines } from './split';
 
-export type TextRender = { lines: (text: string) => string[]; id: string | null; vars: Record<string, string | number>; style: string };
+export type TextRender = { lines: (text: string) => string[]; id: string | null; vars: Record<string, string | number>; style: string; seed: number | null };
 
-export const PLAIN_TEXT: TextRender = { lines: (text) => text.split('\n').map(esc), id: null, vars: {}, style: '' };
+export const PLAIN_TEXT: TextRender = { lines: (text) => text.split('\n').map(esc), id: null, vars: {}, style: '', seed: null };
 
 export const ANIMATOR_CSS = '.tu,.tw{display:inline-block}.tw{white-space:nowrap}';
 
@@ -82,6 +82,7 @@ export function textRender(clipId: string, animators: readonly TextAnimator[], r
     lines: (text) => splitLines(text, { unit: split.unit, seed: split.seed }),
     id: textHostId(clipId),
     vars: hostVars(animators, resolve),
-    style: `<style>#${textHostId(clipId)} .tu{${unitRule(animators)}}</style>`
+    style: `<style>#${textHostId(clipId)} .tu{${unitRule(animators)}}</style>`,
+    seed: split.seed
   };
 }
