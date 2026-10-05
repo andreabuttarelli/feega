@@ -27,14 +27,14 @@ export type FamilyStyle = { label: string; hue: string; preview: Preview };
 
 export const CLIP_FAMILIES: Record<ClipFamily, FamilyStyle> = {
   [ClipFamily.Text]: { label: 'Text', hue: '#7c5cff', preview: Preview.Text },
-  [ClipFamily.Image]: { label: 'Image', hue: '#12a594', preview: Preview.Thumb },
-  [ClipFamily.Video]: { label: 'Video', hue: '#e5484d', preview: Preview.Filmstrip },
-  [ClipFamily.Audio]: { label: 'Audio', hue: '#f5a524', preview: Preview.Waveform },
-  [ClipFamily.Shape]: { label: 'Shape', hue: '#d6409f', preview: Preview.Icon },
-  [ClipFamily.ThreeD]: { label: '3D', hue: '#f76b15', preview: Preview.Icon },
+  [ClipFamily.Image]: { label: 'Image', hue: '#14a38b', preview: Preview.Thumb },
+  [ClipFamily.Video]: { label: 'Video', hue: '#2f7de1', preview: Preview.Filmstrip },
+  [ClipFamily.Audio]: { label: 'Audio', hue: '#e8a33d', preview: Preview.Waveform },
+  [ClipFamily.Shape]: { label: 'Shape', hue: '#d6589c', preview: Preview.Icon },
+  [ClipFamily.ThreeD]: { label: '3D', hue: '#f06a2c', preview: Preview.Icon },
   [ClipFamily.Custom]: { label: 'Code', hue: '#46a758', preview: Preview.Icon },
-  [ClipFamily.Null]: { label: 'Null', hue: '#8b8d98', preview: Preview.Icon },
-  [ClipFamily.Camera]: { label: 'Camera', hue: '#00a2c7', preview: Preview.Icon },
+  [ClipFamily.Null]: { label: 'Null', hue: '#8a8a85', preview: Preview.Icon },
+  [ClipFamily.Camera]: { label: 'Camera', hue: '#2bb3c0', preview: Preview.Icon },
   [ClipFamily.Mask]: { label: 'Mask', hue: '#978365', preview: Preview.Icon },
   [ClipFamily.Precomp]: { label: 'Precomp', hue: '#3e63dd', preview: Preview.Icon },
   [ClipFamily.Adjustment]: { label: 'Adjustment', hue: '#6e56cf', preview: Preview.Icon }

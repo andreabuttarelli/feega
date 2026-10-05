@@ -60,9 +60,9 @@ test.describe('motion editor @real', () => {
 
     await page.getByRole('button', { name: 'Add', exact: true }).click();
     await page.getByRole('menuitem', { name: 'feega trailer v2 · 16:9' }).dispatchEvent('click');
-    const bar = page.locator('[data-clip-id="bar-0"]');
-    await bar.scrollIntoViewIfNeeded();
-    await bar.getByRole('button', { name: 'Show keyframes' }).dispatchEvent('click');
+    const layer = page.locator('[data-layer="bar-0"]');
+    await layer.scrollIntoViewIfNeeded();
+    await layer.getByRole('button', { name: 'Show keyframes' }).dispatchEvent('click');
     await expect(page.locator('[data-key-lane="bar-0:scaleY"]')).toBeInViewport();
 
     await page.getByTestId('graph-toggle').click();

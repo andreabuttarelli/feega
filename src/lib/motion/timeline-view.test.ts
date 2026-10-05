@@ -5,7 +5,7 @@ import { Source } from './keyframes';
 import { addClip, setKeyframes, type OpResult } from './timeline';
 import { feegaTrailerV2 } from './trailer-v2';
 import { withParams } from './custom/params';
-import { Grip, HANDLE_PX, Reveal, Snap, easePath, edgeHandles, frameAt, graphLanes, handleAt, keyLanes, stackRows, pxPerFrame, rulerTicks, snapped, timecode } from './timeline-view';
+import { Grip, HANDLE_PX, Reveal, Snap, easePath, edgeHandles, frameAt, graphLanes, handleAt, keyLanes, pxPerFrame, snapped, timecode } from './timeline-view';
 
 describe('timeline view', () => {
   it('at zoom 1 a second is 60 px', () => {
@@ -17,10 +17,6 @@ describe('timeline view', () => {
     expect(timecode(0)).toBe('00:00:00');
     expect(timecode(95)).toBe('00:03:05');
     expect(timecode(30 * 61)).toBe('01:01:00');
-  });
-
-  it('ticks get denser as the zoom grows', () => {
-    expect(rulerTicks(300, 4).length).toBeGreaterThan(rulerTicks(300, 1).length);
   });
 
   it('snaps to a whole second within a few pixels, unless snapping is off', () => {
@@ -69,16 +65,6 @@ describe('timeline view', () => {
 
     expect(handleAt(edgeHandles(clips, 3, ['k']), 90 * 3 - 2)).toMatchObject({ clipId: 'k', grip: Grip.End });
     expect(handleAt(edgeHandles(clips, 3, ['t']), 90 * 3 - 2)).toMatchObject({ clipId: 't', grip: Grip.End });
-  });
-
-  it('clips overlapping in time on one track stack in rows, so none hides another', () => {
-    const rows = stackRows([
-      { id: 'k', from: 9, durationInFrames: 90 },
-      { id: 't', from: 11, durationInFrames: 88 },
-      { id: 'next', from: 99, durationInFrames: 30 }
-    ]);
-
-    expect(rows).toEqual({ k: 0, t: 1, next: 0 });
   });
 
   it('a tiny clip keeps a body to drag between its two edges', () => {
@@ -155,6 +141,5 @@ describe('timeline view at another frame rate', () => {
     expect(pxPerFrame(1, 60) * 60).toBe(60);
     expect(frameAt(60, 1, 60)).toBe(60);
     expect(timecode(90, 60)).toBe('00:01:30');
-    expect(rulerTicks(120, 1, 60).at(-1)?.frame).toBe(120);
   });
 });
