@@ -1,5 +1,6 @@
 import {
   extractColorsFromImage,
+  extractFonts,
   extractSocialHandles,
   fetchShopifyProducts,
   fetchWooCommerceProducts,
@@ -25,6 +26,11 @@ const PALETTE_MAX = 8;
 const PRODUCTS_MAX = 8;
 const TAGLINE_MAX = 120;
 const HTML_TYPES = ['text/html', 'application/xhtml+xml'];
+const STYLESHEETS_READ = 3;
+const STYLESHEET_MAX_BYTES = 1_000_000;
+const INLINE_LOGO_MAX = 100_000;
+const INLINE_LOGO_CONTEXT = 300;
+const INLINE_LOGO_ANCHOR = '#inline-logo';
 
 export enum ImageRole {
   Og = 'og',
@@ -37,7 +43,7 @@ export enum LogoKind {
   Raster = 'raster'
 }
 
-export type SiteLogo = { url: string; kind: LogoKind; source: string };
+export type SiteLogo = { url: string; kind: LogoKind; source: string; markup?: string };
 export type SiteImage = { url: string; width: number; height: number; role: ImageRole };
 export type SiteFont = { family: string; google: boolean };
 export type SiteProduct = { name: string; price: string | null; url: string | null; image: string | null };
@@ -57,6 +63,10 @@ export type SiteRead = { ok: true; site: SiteBrief } | { ok: false; error: strin
 
 const HEX = /#(?:[0-9a-f]{6}|[0-9a-f]{3})\b/gi;
 const SVG_URL = /\.svg(?:[?#]|$)/i;
+const INLINE_SVG = /<svg\b[\s\S]*?<\/svg>/gi;
+const LOGO_HINT = /logo|brand|wordmark/i;
+const STYLESHEET = /<link[^>]+rel=["']stylesheet["'][^>]*>/gi;
+const SVG_NS = 'http://www.w3.org/2000/svg';
 const TITLE_SEPARATOR = /\s+[|–—:·-]\s+/;
 const GOOGLE_FAMILIES = new Map(GOOGLE_FONTS.map((f) => [f.f.toLowerCase(), f.f]));
 
@@ -90,7 +100,22 @@ function taglineOf(html: string, title: string): string | null {
   return title.split(TITLE_SEPARATOR)[1]?.trim() || null;
 }
 
+const secured = (url: string, base: string) => (new URL(base).protocol === 'https:' ? url.replace(/^http:/i, 'https:') : url);
+
+function inlineLogo(html: string): string | null {
+  for (const m of html.matchAll(INLINE_SVG)) {
+    const svg = m[0];
+    const around = html.slice(Math.max(0, m.index - INLINE_LOGO_CONTEXT), m.index) + svg.slice(0, INLINE_LOGO_CONTEXT);
+    if (svg.length <= INLINE_LOGO_MAX && /<path/i.test(svg) && LOGO_HINT.test(around)) {
+      return svg.replace(/^<svg\b(?![^>]*\bxmlns=)/i, `<svg xmlns="${SVG_NS}"`);
+    }
+  }
+  return null;
+}
+
 function logosOf(html: string, base: string, metadata: ReturnType<typeof parseHTMLMetadata>): SiteLogo[] {
+  const inline = inlineLogo(html);
+  const drawn: SiteLogo[] = inline ? [{ url: new URL(INLINE_LOGO_ANCHOR, base).href, kind: LogoKind.Svg, source: 'inline-svg', markup: inline }] : [];
   const found = [
     ...metadata.logos.filter((l) => l.type !== 'og-image').map((l) => ({ url: l.url, source: l.type })),
     { url: metadata.faviconUrl, source: 'favicon' },
@@ -98,25 +123,38 @@ function logosOf(html: string, base: string, metadata: ReturnType<typeof parseHT
     { url: metadata.ogImage ? new URL(metadata.ogImage, base).href : null, source: 'og-image' }
   ];
   const seen = new Set<string>();
-  return found
+  const linked = found
+    .map((l) => ({ ...l, url: l.url ? secured(l.url, base) : null }))
     .filter((l): l is { url: string; source: string } => Boolean(l.url) && !seen.has(l.url as string) && Boolean(seen.add(l.url as string)))
     .map((l) => ({ ...l, kind: SVG_URL.test(l.url) ? LogoKind.Svg : LogoKind.Raster }));
+  return [...drawn, ...linked];
 }
 
-const LOGO_COLOURS: Record<LogoKind, (url: string) => Promise<string[]>> = {
-  [LogoKind.Svg]: async (url) => hexesIn((await safeFetchUrl(url, { maxBytes: LOGO_SVG_MAX_BYTES, timeoutMs: IMAGE_TIMEOUT_MS })).body),
-  [LogoKind.Raster]: (url) => extractColorsFromImage(url)
+const LOGO_COLOURS: Record<LogoKind, (logo: SiteLogo) => Promise<string[]>> = {
+  [LogoKind.Svg]: async (logo) => hexesIn(logo.markup ?? (await safeFetchUrl(logo.url, { maxBytes: LOGO_SVG_MAX_BYTES, timeoutMs: IMAGE_TIMEOUT_MS })).body),
+  [LogoKind.Raster]: (logo) => extractColorsFromImage(logo.url)
 };
 
 async function logoColours(logo: SiteLogo | undefined): Promise<string[]> {
-  return logo ? LOGO_COLOURS[logo.kind](logo.url).catch(() => []) : [];
+  return logo ? LOGO_COLOURS[logo.kind](logo).catch(() => []) : [];
 }
 
-function fontsOf(metadata: ReturnType<typeof parseHTMLMetadata>): SiteFont[] {
-  return metadata.fonts.map((f) => {
+async function linkedCss(html: string, base: string): Promise<string> {
+  const hrefs = [...html.matchAll(STYLESHEET)].map((m) => m[0].match(/href=["']([^"']+)["']/i)?.[1]).filter((h): h is string => Boolean(h));
+  const sheets = hrefs.slice(0, STYLESHEETS_READ).map((href) =>
+    safeFetchUrl(new URL(href, base).href, { maxBytes: STYLESHEET_MAX_BYTES, timeoutMs: PAGE_TIMEOUT_MS })
+      .then((r) => (r.ok ? r.body : ''))
+      .catch(() => '')
+  );
+  return (await Promise.all(sheets)).join('\n');
+}
+
+function fontsOf(found: { name: string }[]): SiteFont[] {
+  const fonts = found.map((f) => {
     const google = GOOGLE_FAMILIES.get(f.name.toLowerCase());
     return google ? { family: google, google: true } : { family: f.name, google: false };
   });
+  return fonts.filter((f, i) => fonts.findIndex((o) => o.family === f.family) === i);
 }
 
 async function probe(url: string, role: ImageRole): Promise<SiteImage | null> {
@@ -160,10 +198,10 @@ async function read(input: string): Promise<SiteRead> {
   const logoLike = new Set(logos.map((l) => l.url));
   const ogImage = logos.find((l) => l.source === 'og-image')?.url;
 
-  const [products, fromLogo] = await Promise.all([productsOf(html, base), logoColours(logos.find((l) => l.source !== 'og-image'))]);
+  const [products, fromLogo, css] = await Promise.all([productsOf(html, base), logoColours(logos.find((l) => l.source !== 'og-image')), linkedCss(html, base)]);
   const candidates = [
     ...(ogImage ? [{ url: ogImage, role: ImageRole.Og }] : []),
-    ...harvestPageImages(html, base).filter((url) => !logoLike.has(url)).map((url) => ({ url, role: ImageRole.Hero })),
+    ...harvestPageImages(html, base).map((url) => secured(url, base)).filter((url) => !logoLike.has(url)).map((url) => ({ url, role: ImageRole.Hero })),
     ...products.flatMap((p) => (p.images?.[0] ? [{ url: p.images[0], role: ImageRole.Product }] : []))
   ];
   const images = await imagesOf(candidates);
@@ -180,7 +218,7 @@ async function read(input: string): Promise<SiteRead> {
       description: metadata.ogDescription || metadata.description || null,
       logos,
       palette,
-      fonts: fontsOf(metadata),
+      fonts: fontsOf([...metadata.fonts, ...extractFonts(`<style>${css}</style>`)]),
       images,
       products: products.map((p) => ({ name: p.name, price: p.pricing ?? null, url: p.url ?? null, image: p.images?.[0] ?? null })),
       socials: extractSocialHandles(html).map((s) => ({ platform: s.platform, url: s.url }))

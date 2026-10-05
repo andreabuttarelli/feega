@@ -27,7 +27,9 @@ export function pictureOf(bytes: Buffer): Picture | null {
   return SIGNATURES.find(([, matches]) => matches(head))?.[0] ?? null;
 }
 
-export async function importImageAsset(db: Db, scope: { orgId: string; projectId: string; canvasId: string }, url: string, label?: string): Promise<AssetImport> {
+type ImportScope = { orgId: string; projectId: string; canvasId: string };
+
+export async function importImageAsset(db: Db, scope: ImportScope, url: string, label?: string): Promise<AssetImport> {
   const fetched = await safeFetchBytes(url, { maxBytes: IMPORT_MAX_BYTES, timeoutMs: IMPORT_TIMEOUT_MS, scheme: 'https-only' }).catch((e: unknown) => (e instanceof Error ? e.message : String(e)));
   if (typeof fetched === 'string') {
     return { ok: false, error: `could not download ${url}: ${fetched}` };
@@ -35,20 +37,27 @@ export async function importImageAsset(db: Db, scope: { orgId: string; projectId
   if (!fetched.ok) {
     return { ok: false, error: `the server answered ${fetched.status}` };
   }
-  const picture = pictureOf(fetched.bytes);
+  return storeImage(db, scope, { bytes: fetched.bytes, url: fetched.url }, label);
+}
+
+export async function storeImage(db: Db, scope: ImportScope, file: { bytes: Buffer; url: string }, label?: string): Promise<AssetImport> {
+  const picture = pictureOf(file.bytes);
   if (!picture) {
-    return { ok: false, error: `not an image (PNG, JPEG, WebP, GIF, AVIF or SVG): ${url}` };
+    return { ok: false, error: `not an image (PNG, JPEG, WebP, GIF, AVIF or SVG): ${file.url}` };
+  }
+  if (file.bytes.length > IMPORT_MAX_BYTES) {
+    return { ok: false, error: `larger than ${IMPORT_MAX_BYTES / 1_000_000} MB` };
   }
 
   const path = `${canvasUploadPrefix(scope.orgId, scope.projectId)}imports/${crypto.randomUUID()}.${picture.ext}`;
-  await storeAssetFile(db, path, new File([new Uint8Array(fetched.bytes)], path.split('/').at(-1) as string, { type: picture.mime }));
-  const { width, height } = await probeImageDimensions(fetched.bytes);
-  const row = await insertAsset(db, { orgId: scope.orgId, projectId: scope.projectId, type: 'image', source: 'imported', url: path, mimeType: picture.mime, bytes: fetched.bytes.length, width, height });
+  await storeAssetFile(db, path, new File([new Uint8Array(file.bytes)], path.split('/').at(-1) as string, { type: picture.mime }));
+  const { width, height } = await probeImageDimensions(file.bytes);
+  const row = await insertAsset(db, { orgId: scope.orgId, projectId: scope.projectId, type: 'image', source: 'imported', url: path, mimeType: picture.mime, bytes: file.bytes.length, width, height });
 
   return {
     ok: true,
     width,
     height,
-    asset: { id: row.id, kind: AssetKind.Image, label: label ?? `image · ${new URL(fetched.url).hostname}`, previewUrl: `/p/${scope.projectId}/c/${scope.canvasId}/assets/${row.id}`, url: await signAssetFile(db, path) }
+    asset: { id: row.id, kind: AssetKind.Image, label: label ?? `image · ${new URL(file.url).hostname}`, previewUrl: `/p/${scope.projectId}/c/${scope.canvasId}/assets/${row.id}`, url: await signAssetFile(db, path) }
   };
 }

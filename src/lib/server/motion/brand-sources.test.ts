@@ -98,6 +98,19 @@ describe('brand sources wired into the real motion tools, against a served page'
     expect(session.doc.assets.map((a) => a.id)).toEqual([logo.asset_id, hero.asset_id]);
   });
 
+  it('imports a logo drawn inline in the page, which has no url of its own', async () => {
+    const { db, stored } = storageDb();
+    const sources = brandSources(db, { orgId: 'org1', projectId: 'proj1', canvasId: 'c1', brandId: null });
+    vi.stubGlobal('fetch', async () => new Response('<html><body><a class="site-logo" href="/"><svg viewBox="0 0 10 10"><path d="M0 0h10v10z"/></svg></a></body></html>', { headers: { 'content-type': 'text/html' } }));
+
+    const read = (await sources.site('https://brand.example/')) as { ok: true; site: { logos: { url: string; markup?: string }[] } };
+    vi.stubGlobal('fetch', (input: URL | string, init?: RequestInit) => realFetch(String(input).replace('https://brand.example', origin), init));
+
+    expect(read.site.logos[0]).toEqual({ url: 'https://brand.example/#inline-logo', kind: 'svg', source: 'inline-svg' });
+    expect(await sources.importAsset(read.site.logos[0].url, 'logo')).toMatchObject({ ok: true });
+    expect([...stored.values()]).toEqual(['image/svg+xml']);
+  });
+
   it('still refuses a host that resolves to this machine', async () => {
     const { db } = storageDb();
     const sources = brandSources(db, { orgId: 'org1', projectId: 'proj1', canvasId: 'c1', brandId: null });

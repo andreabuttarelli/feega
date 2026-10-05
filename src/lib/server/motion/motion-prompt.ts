@@ -60,7 +60,8 @@ export function motionAgentPrompt(input: { brandName: string | null; selectionNo
       '3. Look: set_canvas background and a BrandBackground with the brand palette (hex values in props: fill, accent, text colours), set_font with the brand fonts when google is true (otherwise the closest Google family), the real name and the real claim, word for word.',
       '4. Structure, 15–30 s: hook (2–4 s, the claim in a Title with apply_text_preset, or Text3D of the name), product and benefits (3–4 beats, Image or ProductCard per picture, Device3D for a screenshot or an app, a morph_to or a camera preset between beats), proof (a number, a review or a press line from the site, only if the site says it), CTA (Logo3D of an svg logo, or Logo, plus the website). Particles or a light leak sparingly, slide-up or fade transitions.',
       '5. Sound: when an audio asset exists, put it on an Audio clip, analyze_audio and cut_to_beat or mark_beats so the cuts land on the beat.',
-      '6. Check with view_frames on the hook, each beat and the CTA, fix what reads badly, then answer with what you made.'
+      '6. Check with view_frames on the hook, each beat and the CTA, fix what reads badly, then answer with what you made.',
+      'A turn has a cost cap and every step resends the whole conversation: call independent tools together in one step (all import_asset at once, all clips of a beat at once) and give add_clip every prop (text, colours, font, layout) instead of fixing it after with set_props.'
     ].join('\n'),
     'Timing (start, duration) is set_timing, never a prop. A tool that fails tells you why: read the error and retry with what it says.',
     componentContract(input.frame ?? { width: 1920, height: 1080 }),

@@ -58,7 +58,7 @@ const HTML = `<!doctype html><html><head>
 <title>Verde — Shoes that walk lighter</title>
 <meta name="description" content="Wool sneakers made from natural materials.">
 <meta property="og:site_name" content="Verde">
-<meta property="og:image" content="https://brand.example/og.png">
+<meta property="og:image" content="http://brand.example/og.png">
 <meta name="theme-color" content="#1A6B4F">
 <link rel="icon" type="image/png" href="/favicon.png">
 <link rel="apple-touch-icon" href="/apple-touch.png">
@@ -143,6 +143,26 @@ describe('readSite: what a trailer needs from a public page', () => {
     serves({ [SITE]: { type: 'application/pdf', body: '%PDF-1.7' } });
 
     expect(await readSite(SITE)).toMatchObject({ ok: false, error: expect.stringContaining('not a web page') });
+  });
+
+  it('finds a logo drawn inline in the header and fonts declared in a linked stylesheet', async () => {
+    const page = `<html><head><title>Verde</title><link href="/theme.css" rel="stylesheet"></head><body><header><a href="/" aria-label="Verde"><svg viewBox="0 0 74 24" fill="none"><g id="logo"><path fill="#0B3D2E" d="M0 0h74v24H0z"/></g></svg></a></header></body></html>`;
+    serves({
+      [SITE]: { type: 'text/html', body: page },
+      'https://brand.example/theme.css': { type: 'text/css', body: "@font-face { font-family: 'Geograph'; } h1 { font-family: 'Geograph', sans-serif } p { font-family: Lora, serif }" }
+    });
+
+    const read = await readSite(SITE);
+    if (!read.ok) {
+      throw new Error(read.error);
+    }
+
+    expect(read.site.logos[0]).toMatchObject({ url: 'https://brand.example/#inline-logo', kind: 'svg', source: 'inline-svg', markup: expect.stringMatching(/^<svg xmlns="http:\/\/www.w3.org\/2000\/svg"/) });
+    expect(read.site.palette).toContain('#0B3D2E');
+    expect(read.site.fonts).toEqual([
+      { family: 'Geograph', google: false },
+      { family: 'Lora', google: true }
+    ]);
   });
 
   it('keeps the page when an image is too large to probe, dropping only that image', async () => {
