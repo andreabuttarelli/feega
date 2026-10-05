@@ -87,18 +87,19 @@ function shifted(keyframes: Keyframes, by: number): Keyframes {
   return Object.fromEntries(Object.entries(keyframes).map(([key, track]) => [key, (track ?? []).map((k) => ({ ...k, frame: k.frame - by }))]));
 }
 
-type Window = { from: number; end: number; offset: number; length: number; loops: number[] };
+type Window = { from: number; end: number; offset: number; length: number; loops: number[]; held: boolean };
 
 function windowOf(clip: MotionClip, comp: MotionComp): Window {
   const length = comp.durationInFrames;
   const first = clip.props.loop ? Math.floor(clip.trimStart / length) : 0;
   const last = clip.props.loop ? Math.min(first + MAX_LOOPS, Math.ceil((clip.trimStart + clip.durationInFrames) / length)) : 1;
-  return { from: clip.from, end: clipEnd(clip), offset: clip.from - clip.trimStart, length, loops: Array.from({ length: last - first }, (_, i) => first + i) };
+  return { from: clip.from, end: clipEnd(clip), offset: clip.from - clip.trimStart, length, loops: Array.from({ length: last - first }, (_, i) => first + i), held: !clip.props.loop && Boolean(clip.props.hold) };
 }
 
 function placeOne(clip: MotionClip, w: Window, k: number, prefix: string): MotionClip | null {
   const start = w.offset + k * w.length + clip.from;
-  const stop = start + Math.min(clip.durationInFrames, w.length - clip.from);
+  const lastFrame = w.held && clipEnd(clip) >= w.length;
+  const stop = lastFrame ? Math.max(w.end, start + w.length - clip.from) : start + Math.min(clip.durationInFrames, w.length - clip.from);
   const from = Math.max(start, w.from);
   const end = Math.min(stop, w.end);
   if (end <= from) {
@@ -114,7 +115,7 @@ function placeOne(clip: MotionClip, w: Window, k: number, prefix: string): Motio
     trimStart: clip.trimStart + cut,
     keyframes: shifted(clip.keyframes, cut),
     transitionIn: cut ? STILL : clip.transitionIn,
-    transitionOut: end < stop ? STILL : clip.transitionOut
+    transitionOut: end < stop || lastFrame ? STILL : clip.transitionOut
   };
 }
 
