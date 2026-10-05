@@ -5,6 +5,7 @@ import { FONT_CSS_ORIGIN, FONT_FILE_ORIGIN } from '$lib/motion/hyperframes/csp';
 import { ExportFormat, FORMAT, Master, Quality } from '$lib/motion/export-formats';
 import { assembleArgs, audioMixArgs, concatList, zipArgs } from './render-commands';
 import { FARM_JOB_DIR, FARM_RUNTIME_DIR, type FarmWorker, type RenderFarm } from './render-farm';
+import { stripSteps, stripVideos } from './video-strips';
 
 export type FarmJob = { html: string; width: number; height: number; fps: number; totalFrames: number; audio: AudioEntry[]; allowHosts: string[]; format: ExportFormat; quality: Quality; motionBlur: Shutter | null; cost?: CostSpan[] };
 
@@ -52,8 +53,16 @@ const WORKER: Record<RenderRoute, { vcpus: number; timeoutMs: number }> = {
 export const MAX_ATTEMPTS = 2;
 export const RENDER_DEADLINE_MS = (MAX_ATTEMPTS + 1) * WORKER[RenderRoute.Whole].timeoutMs;
 
-const blurWork = (job: FarmJob) => (job.motionBlur ? (job.totalFrames * job.motionBlur.samples * job.width * job.height) / FULL_HD_PIXELS : 0);
-const blurBudget = Math.floor((WORKER[RenderRoute.Whole].timeoutMs * BLUR_SAFETY) / MS_PER_BLUR_SAMPLE);
+function blurWork(job: FarmJob): number {
+  if (!job.motionBlur) {
+    return 0;
+  }
+  const flat = (job.totalFrames * MS_PER_BLUR_SAMPLE * job.width * job.height) / FULL_HD_PIXELS;
+  const three = (job.cost ?? []).reduce((sum, span) => sum + (Math.min(span.to, job.totalFrames) - Math.max(span.from, 0)) * span.ms, 0);
+  return job.motionBlur.samples * (flat + three);
+}
+
+const blurBudget = WORKER[RenderRoute.Whole].timeoutMs * BLUR_SAFETY;
 
 type Rule = { because: string; applies: (job: FarmJob) => boolean };
 
@@ -64,7 +73,6 @@ const WHOLE_ONLY: Rule[] = [
 
 const REFUSED: Rule[] = [
   { because: 'H.265 renders at 24, 30 or 60 fps without motion blur', applies: (job) => FORMAT[job.format].master === Master.H265 && routeOf(job) === RenderRoute.Whole },
-  { because: 'motion blur cannot render Video clips: turn it off or remove the video', applies: (job) => job.motionBlur !== null && job.html.includes('<video') },
   { because: `motion blur this long cannot finish on one machine: lower the samples, the frame rate or the length`, applies: (job) => blurWork(job) > blurBudget }
 ];
 
@@ -197,12 +205,13 @@ export async function launchPiece(farm: RenderFarm, job: FarmJob, slice: Slice, 
   const file = chunkPath(job, slice);
   const upload = links.upload ? [sizeStep(`${what} size check`, 'a part of this render', file, links.maxBytes), uploadStep(`${what} upload`, file, 'application/octet-stream', links.upload)] : [];
 
+  const page = job.motionBlur ? stripVideos(job.html) : { html: job.html, strips: [] };
   await worker.write([
-    { path: `${PROJECT_DIR}/index.html`, content: Buffer.from(job.html) },
+    { path: `${PROJECT_DIR}/index.html`, content: Buffer.from(page.html) },
     { path: CHUNK_SCRIPT, content: Buffer.from(CHUNK_SOURCE) },
     { path: SPEC, content: Buffer.from(JSON.stringify(chunkSpec(job, slice))) }
   ]);
-  await startSteps(worker, FarmTask.Piece, [render, ...upload]);
+  await startSteps(worker, FarmTask.Piece, [...stripSteps(PROJECT_DIR, page.strips), render, ...upload]);
   return worker.name;
 }
 

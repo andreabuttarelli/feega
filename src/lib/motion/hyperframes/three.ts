@@ -11,6 +11,7 @@ import { ON_DISPOSE, hotScope, hotSeek, keptGl } from './hot';
 
 export const THREE_VERSION = '0.181.2';
 export const THREE_TIMELINE = 'feegaThree';
+export const THREE_REDRAW = '__feegaThreeRedraw';
 export const OPENTYPE_URL = 'https://cdn.jsdelivr.net/npm/opentype.js@1.3.4/dist/opentype.module.js';
 
 export function onScreen(clip: { start: number; length: number }, time: number): boolean {
@@ -424,6 +425,7 @@ const screens = () => scenes.map(({ c, s }) => (s.device ? screenKey(deviceSourc
 const painter = drawOnce(drawAt, screens);
 const renderAt = (time) => painter.at(time);
 const redraw = (time) => painter.again(time);
+window.${THREE_REDRAW} = renderAt;
 
 function drawAt(time) {
   if (!live) return;

@@ -105,6 +105,26 @@ describe('launchPiece', () => {
     expect(specOf(workers[0])).toMatchObject({ route: 'whole', config: { motionBlur: { shutterAngle: 180, shutterPhase: -90, samplesPerFrame: 8 } } });
   });
 
+  it('motion blur over a video renders frames extracted on the worker, not the producer\'s injected ones', async () => {
+    const { farm, workers } = fakeFarm();
+    const video = '<html><body><video id="c-v" src="https://x.supabase.co/v.mp4" data-start="0" data-duration="2" data-media-start="0"></video></body></html>';
+
+    await launchPiece(farm, { ...job, html: video, motionBlur: blur }, { index: 0, size: 840 }, { upload: null, storageHost: STORAGE, maxBytes: 1000 });
+
+    const lines = steps(workers[0], FarmTask.Piece).map(line);
+    expect(lines.findIndex((l) => l.includes('ffmpeg'))).toBeLessThan(lines.findIndex((l) => l.includes('render-chunk.mjs')));
+    expect(String(workers[0].files.get('/vercel/sandbox/job/project/index.html'))).toContain('data-strip="0"');
+  });
+
+  it('without motion blur the producer keeps injecting video frames', async () => {
+    const { farm, workers } = fakeFarm();
+    const video = '<video id="c-v" src="https://x.supabase.co/v.mp4" data-start="0" data-duration="2" data-media-start="0"></video>';
+
+    await launchPiece(farm, { ...job, html: video }, { index: 0, size: 120 }, { upload: null, storageHost: STORAGE, maxBytes: 1000 });
+
+    expect(String(workers[0].files.get('/vercel/sandbox/job/project/index.html'))).toBe(video);
+  });
+
   it('only an mp4 master names a codec, the producer refuses one on other containers', async () => {
     const { farm, workers } = fakeFarm();
 
@@ -152,9 +172,16 @@ describe('farmProblem', () => {
     expect(farmProblem({ ...job, fps: 60, totalFrames: 10_800, motionBlur: { ...blur, samples: 64 } })).toMatch(/samples/);
   });
 
-  it('a video clip cannot blur, and H.265 cannot render whole', () => {
-    expect(farmProblem({ ...job, html: '<video id="c-v" src="x">', motionBlur: blur })).toMatch(/Video/);
+  it('a video clip blurs like any other clip, and H.265 cannot render whole', () => {
+    expect(farmProblem({ ...job, html: '<video id="c-v" src="x">', motionBlur: blur })).toBeNull();
     expect(farmProblem({ ...job, fps: 25, format: ExportFormat.Mp4H265 })).toMatch(/H\.265/);
+  });
+
+  it('30 s at 1080p with a device on screen the whole time blurs with 3 samples, not with 8', () => {
+    const showcase = { ...job, totalFrames: 900, cost: [{ from: 0, to: 900, ms: 1600 }] };
+
+    expect(farmProblem({ ...showcase, motionBlur: { ...blur, samples: 3 } })).toBeNull();
+    expect(farmProblem({ ...showcase, motionBlur: { ...blur, samples: 8 } })).toMatch(/samples/);
   });
 });
 

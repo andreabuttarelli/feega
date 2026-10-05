@@ -74,6 +74,13 @@ pixel. Mossa: misurare sul farm un chunk solo (`launchPiece` con indice 0, log d
 `ms`), varianti dell'HTML in parallelo su sandbox diverse, e ripetere la base: tra sandbox il
 rumore arriva al 20%.
 
+### Il log del farm taglia l'errore: il motivo vero si legge in locale
+Lo step salva solo gli ultimi 600 caratteri dell'uscita, cioè la coda del dump `CaptureFailure`
+(worker, frame catturati: 0), mai il messaggio. Segnale: `failed` con un elenco di worker vuoti.
+Mossa: rifare lo stesso HTML con `executeRenderJob` del producer in locale (stessa versione):
+il messaggio esce intero, p. es. `[MotionBlur] ... cannot run with injected video frames` che
+il producer lancia per qualunque `<video>` nella pagina.
+
 ### In three.js `envMapIntensity` non conta se c'è `scene.environment`
 Un riflesso additivo sullo schermo dei mockup sbiancava il laptop e abbassare `envMapIntensity`
 non cambiava un pixel. Segnale: un parametro di materiale che «non ha effetto» con un ambiente
