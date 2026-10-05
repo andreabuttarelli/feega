@@ -38,6 +38,8 @@
   import CameraInspector from '$lib/components/motion/CameraInspector.svelte';
   import LookInspector from '$lib/components/motion/LookInspector.svelte';
   import DevicePresets from '$lib/components/motion/DevicePresets.svelte';
+  import ParticlePresets from '$lib/components/motion/ParticlePresets.svelte';
+  import TimeRemap from '$lib/components/motion/TimeRemap.svelte';
   import { THREE_D_COMPONENTS } from '$lib/motion/components';
   import MaskOverlay from '$lib/components/motion/MaskOverlay.svelte';
   import PenOverlay from '$lib/components/motion/PenOverlay.svelte';
@@ -808,6 +810,8 @@
       {:else if selected}
         <MotionInspector {doc} {analyses} clip={selected} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} onopen={enterComp} />
         {#if selected.component === 'Device3D'}<DevicePresets {doc} clip={selected} onchange={edit} />{/if}
+        {#if selected.component === 'Video'}<TimeRemap {doc} clip={selected} {frame} onchange={edit} />{/if}
+        {#if selected.component === 'Particles'}<ParticlePresets {doc} clip={selected} onchange={edit} />{/if}
         {#if THREE_D_COMPONENTS.includes(selected.component)}<LookInspector {doc} onchange={edit} />{/if}
       {:else}
         <p class="hint">{selection.length > 1 ? `${selection.length} clips selected.` : 'Select a clip in the timeline to edit its properties.'}</p>

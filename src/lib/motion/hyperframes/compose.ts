@@ -24,6 +24,9 @@ import { Composite, cameraMath, stageSpec } from '../camera';
 import { sampleTrack } from '../keyframes';
 import { STAGE_CSS, stageRootStyle, stageScript } from './stage';
 import { shapeBake, shapeScript, type ShapeBake } from './shapes';
+import { particleBake, particleScript } from './particles';
+import { remappedSegments } from '../time-remap';
+import type { ParticleBake } from '../particles/simulate';
 import { bakeExpressions } from '../expression/bake';
 import type { AudioAnalysis } from '../audio-analysis';
 import { FIT_TEXT, fitScript } from './fit-runtime';
@@ -127,7 +130,8 @@ function ctxOf(clip: MotionClip, input: ComposeInput): TemplateCtx<ComponentId> 
     components: doc.components,
     font: (family) => fontStack(family, doc.fonts),
     weight: (family, weight) => loadedWeight(family, weight, doc.fonts),
-    text: textRender(clip.id, clip.animators, (v) => resolveColor(v, tokens))
+    text: textRender(clip.id, clip.animators, (v) => resolveColor(v, tokens)),
+    remap: () => remappedSegments(clip, doc.fps)
   };
 }
 
@@ -375,6 +379,7 @@ export function composeHtml(raw: ComposeInput): string {
   const three: ThreeClip[] = [];
   const compositions: TimedBake[] = [];
   const shapes: ShapeBake[] = [];
+  const particles: ParticleBake[] = [];
   const clips: MotionClip[] = [];
   const runs: CustomRun[] = [];
   const effectSets: EffectSet[] = [];
@@ -412,6 +417,9 @@ export function composeHtml(raw: ComposeInput): string {
       const shape = clip.component === 'Shape' ? shapeBake({ ...clip, props: ctx.p as Record<string, unknown> }, ctx) : null;
       if (shape) {
         shapes.push(shape);
+      }
+      if (clip.component === 'Particles') {
+        particles.push(particleBake(clip, ctx));
       }
       const run = clip.component === 'Custom' ? customRun(clip, ctx, doc.components) : null;
       if (run) {
@@ -463,7 +471,8 @@ export function composeHtml(raw: ComposeInput): string {
     stage ? `<script>${stageScript(stage, doc.fps, Number(duration))}</script>` : '',
     threeScript(three, Number(duration), stage, look),
     compositionScript(compositions, Number(duration)),
-    shapeScript(shapes, doc.fps, Number(duration))
+    shapeScript(shapes, doc.fps, Number(duration)),
+    particleScript(particles, doc.fps, Number(duration))
   ].join('');
   return `${page}${captureScript(frame, contentStamp(page))}</body></html>`;
 }

@@ -176,6 +176,7 @@ const EDIT_BASE: Record<Source, (doc: MotionDoc, clip: MotionClip, key: string, 
   [Source.Transform]: (doc, clip, key, value) => setTransform(doc, clip.id, { [key]: Number(value) }),
   [Source.Prop]: (doc, clip, key, value) => setProps(doc, clip.id, { [key]: value }),
   [Source.Scene]: (doc, clip, key, value, local) => setKeyframe(doc, clip.id, key, local, value),
+  [Source.Remap]: (doc, clip, key, value, local) => setKeyframe(doc, clip.id, key, local, value),
   [Source.Param]: (doc, clip, key, value) => setProps(doc, clip.id, { [key]: value }),
   [Source.Sound]: (doc, clip, key, value) => setProps(doc, clip.id, { [key]: value }),
   [Source.Effect]: (doc, clip, key, value) => {

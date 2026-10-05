@@ -45,6 +45,8 @@ import { registerFont, removeFont, setFont } from '$lib/motion/fonts/ops';
 import { EFFECTS, EFFECT_KINDS } from '$lib/motion/effects/registry';
 import { addEffect, removeEffect, setEffect } from '$lib/motion/effects/ops';
 import { effectKey } from '$lib/motion/effects/model';
+import { EffectKind } from '$lib/motion/effects/registry';
+import { LUT_PRESETS, LUT_PRESET_IDS, applyLut, compileLut, lutFromCube } from '$lib/motion/effects/lut';
 import { BLEND_MODES } from '$lib/motion/blend';
 import { ANIMATOR_UNITS, SELECTOR_SHAPES, SELECTOR_KEYS, VALUES, VALUE_KEYS, animatorKey } from '$lib/motion/text-animators/model';
 import { PRESETS as TEXT_PRESET_SPECS, TEXT_PRESETS, addAnimator, applyPreset as applyTextPreset, removeAnimator, setAnimator } from '$lib/motion/text-animators/ops';
@@ -54,6 +56,8 @@ import { DEGREES, MAX_SAMPLES } from '$lib/motion/motion-blur';
 import { MODIFIERS, MODIFIER_KINDS } from '$lib/motion/shape/modifiers';
 import { addModifier, morphTo, removeModifier, setModifier, setPath } from '$lib/motion/shape/ops';
 import { SHAPE_KINDS, modifierKey } from '$lib/motion/shape/schema';
+import { MAX_RATE, MIN_RATE, REMAP_KEY, clearTimeRemap, freezeFrame } from '$lib/motion/time-remap';
+import { PARTICLE_PRESETS, PRESET_PROPS as PARTICLE_PRESET, applyParticlePreset } from '$lib/motion/particles/presets';
 import { DUCK_DEFAULTS, duckUnder } from '$lib/motion/duck';
 import type { AudioAnalysis } from '$lib/motion/audio-analysis';
 import { Hit, cutToBeat, hitFrames, markHits } from '$lib/motion/beats';
@@ -621,6 +625,53 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       execute: async (input) => apply(applyDevicePreset(session.doc, input.clip_id, input.preset), `${input.preset} on ${input.clip_id}`)
     }),
 
+    add_particles: tool({
+      description: `Add a Particles clip (seeded, deterministic emitter) from a preset: ${PARTICLE_PRESETS.map((p) => `${p} — ${PARTICLE_PRESET[p].about}`).join('; ')}. props override the preset (seed, emitter, shape, rate, life, speed, direction, spread, gravity, drag, wobble, spin, sizeStart/End, colorStart/End, opacityStart/End, softness, prewarm; list_components has the ranges). Every numeric and colour prop takes set_keyframes.`,
+      inputSchema: z.object({ preset: z.enum(PARTICLE_PRESETS), start: z.number().min(0), duration: z.number().positive().optional(), track_id: z.string().optional(), props: z.record(z.string(), z.unknown()).optional() }),
+      execute: async (input) => {
+        if (!assetKnown(input.props?.sprite)) {
+          return { ok: false, error: 'unknown asset id: call list_assets' };
+        }
+        const props = { ...PARTICLE_PRESET[input.preset].props, ...input.props };
+        const result = addClip(session.doc, { component: 'Particles', from: frames(input.start), durationInFrames: input.duration ? frames(input.duration) : undefined, trackId: input.track_id, props }, deps.newId());
+        return apply(registered(result, input.props?.sprite), `added ${input.preset} particles`);
+      }
+    }),
+
+    apply_particle_preset: tool({
+      description: `Restyle a Particles clip with a preset (${PARTICLE_PRESETS.join(', ')}); its seed and keyframes are kept.`,
+      inputSchema: z.object({ clip_id: z.string(), preset: z.enum(PARTICLE_PRESETS) }),
+      execute: async (input) => apply(applyParticlePreset(session.doc, input.clip_id, input.preset), `${input.preset} particles on ${input.clip_id}`)
+    }),
+
+    set_time_remap: tool({
+      description: `Retime a Video clip, in every render path. speed ${MIN_RATE}..${MAX_RATE} (1 = normal), reverse plays backwards; keyframes map clip time (seconds from the clip start) to source time (seconds into the video file) and win over speed/reverse: a ramp, a slow-mo, a jump back. clear: true returns to plain playback first. A retimed video is silent.`,
+      inputSchema: z.object({
+        clip_id: z.string(),
+        clear: z.boolean().optional(),
+        speed: z.number().min(MIN_RATE).max(MAX_RATE).optional(),
+        reverse: z.boolean().optional(),
+        keyframes: z.array(z.object({ time: z.number().min(0), source: z.number().min(0), ease: easeSchema.default(Ease.Linear), ...keyShape })).min(1).optional()
+      }),
+      execute: async (input) => {
+        let result: OpResult = input.clear ? clearTimeRemap(session.doc, input.clip_id) : { ok: true, doc: session.doc };
+        const playback = Object.fromEntries(Object.entries({ speed: input.speed, reverse: input.reverse }).filter(([, v]) => v !== undefined));
+        if (result.ok && Object.keys(playback).length) {
+          result = setProps(result.doc, input.clip_id, playback);
+        }
+        if (result.ok && input.keyframes) {
+          result = setKeyframes(result.doc, input.clip_id, REMAP_KEY, input.keyframes.map((k) => asKey({ ...k, value: k.source })));
+        }
+        return apply(result, `retimed ${input.clip_id}`);
+      }
+    }),
+
+    freeze_frame: tool({
+      description: 'Freeze a Video clip on the source frame showing at a time of the video (seconds), for the whole clip. Split the clip first to freeze only a part, or use set_time_remap with a hold keyframe.',
+      inputSchema: z.object({ clip_id: z.string(), at: z.number().min(0) }),
+      execute: async (input) => apply(freezeFrame(session.doc, input.clip_id, frames(input.at)), `froze ${input.clip_id}`)
+    }),
+
     add_device_row: tool({
       description: `Add three Device3D clips side by side that enter staggered and turn at different rates (parallax row). device: ${DEVICES.map((d) => `${d} (${DEVICE[d].label})`).join(', ')}. screens: up to three image asset ids, the first fills any missing.`,
       inputSchema: z.object({ device: z.enum(DEVICES), start: z.number().min(0), duration: z.number().positive(), screens: z.array(z.string()).max(3).default([]) }),
@@ -817,6 +868,22 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const id = deps.newId();
         const out = apply(addEffect(session.doc, input.clip_id, input.kind, id, input.params), `added ${input.kind} to ${input.clip_id}`);
         return out.ok ? { ...out, effect_id: id, animate: EFFECTS[input.kind].params.map((p) => effectKey(id, p.key)) } : out;
+      }
+    }),
+
+    set_lut: tool({
+      description: `Colour-grade a clip with a LUT: a preset (${LUT_PRESET_IDS.join(', ')}) or the text of a .cube file. Without effect_id it adds a LUT effect at the end of the stack; amount 0..1 mixes it (animate fx.<effect id>.amount). Pair with levels and lift-gamma-gain effects (add_effect).`,
+      inputSchema: z.object({ clip_id: z.string(), effect_id: z.string().optional(), preset: z.enum(LUT_PRESET_IDS).optional(), cube: z.string().max(4_000_000).optional(), name: z.string().max(80).optional(), amount: z.number().min(0).max(1).optional() }),
+      execute: async (input) => {
+        const lut = input.cube ? lutFromCube(input.cube, input.name ?? 'custom') : input.preset ? compileLut(LUT_PRESETS[input.preset].look, input.preset) : 'give a preset or a .cube';
+        if (typeof lut === 'string') {
+          return { ok: false, error: lut };
+        }
+        const id = input.effect_id ?? deps.newId();
+        const params: Record<string, number> = input.amount === undefined ? {} : { amount: input.amount };
+        const added = input.effect_id ? setEffect(session.doc, input.clip_id, id, { params }) : addEffect(session.doc, input.clip_id, EffectKind.Lut, id, params);
+        const out = apply(added.ok ? applyLut(added.doc, input.clip_id, id, lut) : added, `graded ${input.clip_id} with ${lut.name}`);
+        return out.ok ? { ...out, effect_id: id } : out;
       }
     }),
 

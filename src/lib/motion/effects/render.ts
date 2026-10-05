@@ -30,7 +30,7 @@ function valuesAt(clip: EffectClip, effect: Effect, local: number, resolve: Reso
 const active = (clip: EffectClip) => clip.effects.filter((e) => e.enabled);
 
 function renderAt(clip: EffectClip, frame: Frame, local: number, resolve: Resolve): { effect: Effect; out: Rendered }[] {
-  return active(clip).map((effect) => ({ effect, out: EFFECTS[effect.kind].render(valuesAt(clip, effect, local, resolve), { ...frame, frame: local }, filterId(clip, effect)) }));
+  return active(clip).map((effect) => ({ effect, out: EFFECTS[effect.kind].render(valuesAt(clip, effect, local, resolve), { ...frame, frame: local }, filterId(clip, effect), effect.lut ?? null) }));
 }
 
 function primitives(nodes: SvgNode[]): SvgNode[] {
