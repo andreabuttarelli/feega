@@ -136,7 +136,7 @@ function orbitPose(m: Move, e: number): Pose {
 }
 
 function cranePose(m: Move, e: number): Pose {
-  const rise = m.amount * e;
+  const rise = (m.amount / m.height) * e;
   const reach = m.rest - m.origin.z + m.target;
   return { y: m.origin.y - rise, rotateX: m.origin.rotateX + Math.atan2(rise * m.height, reach) / DEG };
 }
@@ -213,10 +213,10 @@ function rackFocus(ctx: Ctx): Lanes | string {
 export const PRESETS: Record<CameraPreset, PresetSpec> = {
   [CameraPreset.DollyIn]: { label: 'Dolly in', about: 'the camera pushes forward (amount: pixels)', amount: 600, focus: Focus.Keep, lanes: moved(Path.Straight, (m, e) => ({ z: m.origin.z + m.amount * e })) },
   [CameraPreset.DollyOut]: { label: 'Dolly out', about: 'the camera pulls back (amount: pixels)', amount: 600, focus: Focus.Keep, lanes: moved(Path.Straight, (m, e) => ({ z: m.origin.z - m.amount * e })) },
-  [CameraPreset.Truck]: { label: 'Truck', about: 'the camera slides sideways (amount: fraction of the frame width, negative goes left)', amount: 0.15, focus: Focus.Keep, lanes: moved(Path.Straight, (m, e) => ({ x: m.origin.x + m.amount * e })) },
+  [CameraPreset.Truck]: { label: 'Truck', about: 'the camera slides sideways (amount: px of the frame, negative goes left)', amount: 160, focus: Focus.Keep, lanes: moved(Path.Straight, (m, e) => ({ x: m.origin.x + (m.amount / m.width) * e })) },
   [CameraPreset.Pan]: { label: 'Pan', about: 'the camera turns on the spot (amount: degrees, negative turns left)', amount: 12, focus: Focus.Keep, lanes: moved(Path.Straight, (m, e) => ({ rotateY: m.origin.rotateY + m.amount * e })) },
   [CameraPreset.Orbit]: { label: 'Orbit', about: 'the camera circles the target depth and keeps it centred (amount: degrees)', amount: 30, focus: Focus.Keep, lanes: moved(Path.Curved, orbitPose) },
-  [CameraPreset.Crane]: { label: 'Crane', about: 'the camera rises and tilts down onto the target (amount: fraction of the frame height)', amount: 0.2, focus: Focus.Keep, lanes: moved(Path.Curved, cranePose) },
+  [CameraPreset.Crane]: { label: 'Crane', about: 'the camera rises and tilts down onto the target (amount: px of the frame)', amount: 220, focus: Focus.Keep, lanes: moved(Path.Curved, cranePose) },
   [CameraPreset.DollyZoom]: { label: 'Dolly zoom', about: 'vertigo: the camera pushes in while zooming out, the target keeps its size (amount: pixels)', amount: 700, focus: Focus.Keep, lanes: moved(Path.Curved, dollyZoomPose) },
   [CameraPreset.RackFocus]: { label: 'Rack focus', about: 'focus moves from the depth of clip `from` to clip `to`; turns depth of field on', amount: 0, focus: Focus.On, lanes: rackFocus }
 };
