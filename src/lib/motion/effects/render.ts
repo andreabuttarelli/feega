@@ -66,6 +66,30 @@ export function effectLayer(clip: EffectClip, frame: Frame, resolve: Resolve, in
   return `<div class="ef" id="${layerId(clip)}" style="filter:${esc(filter)}">${svg}${inner}</div>`;
 }
 
+type Adjusting = EffectClip & { blend: string };
+
+const UNADJUSTED = { filter: 'none', mixBlendMode: 'normal' };
+
+function adjusting(clip: Adjusting, frame: Frame, resolve: Resolve) {
+  const rendered = renderAt(clip, frame, 0, resolve);
+  return { rendered, on: { filter: rendered.map((r) => r.out.filter).join(' ') || 'none', mixBlendMode: clip.blend } };
+}
+
+export function adjustmentLayer(clip: Adjusting, frame: Frame, resolve: Resolve, inner: string, zIndex: number): string {
+  const { rendered, on } = adjusting(clip, frame, resolve);
+  const defs = rendered.map((r) => filterMarkup(clip, r.effect, r.out)).join('');
+  const svg = defs ? `<svg class="efd" aria-hidden="true"><defs>${defs}</defs></svg>` : '';
+  const shown = clip.from === 0 ? on : UNADJUSTED;
+  return `<div class="ef" id="${layerId(clip)}" data-clip="${esc(clip.id)}" data-group="${esc(clip.id)}" style="z-index:${zIndex};filter:${esc(shown.filter)};mix-blend-mode:${esc(shown.mixBlendMode)}">${svg}${inner}</div><!--/group:${esc(clip.id)}-->`;
+}
+
+export function adjustmentTimeline(clip: Adjusting, frame: Frame, resolve: Resolve): EffectSet[] {
+  const target = `#${layerId(clip)}`;
+  const { on } = adjusting(clip, frame, resolve);
+  const start = clip.from > 0 ? [{ target, vars: on, at: setTime(clip.from, frame.fps) }] : [];
+  return [...start, ...effectTimeline(clip, frame, resolve), { target, vars: UNADJUSTED, at: setTime(clip.from + clip.durationInFrames, frame.fps) }];
+}
+
 function animated(clip: EffectClip, resolve: Resolve): boolean {
   return active(clip).some((effect) => {
     const keyed = EFFECTS[effect.kind].params.some((p) => clip.keyframes[effectKey(effect.id, p.key)]?.length);

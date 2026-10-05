@@ -16,6 +16,7 @@ const DOC: Record<string, Access> = {
   height: { write: ['set_canvas'], read: 'height' },
   durationInFrames: { write: ['set_canvas'], read: 'duration' },
   tracks: { write: ['add_track', 'set_track', 'remove_track'], read: 'tracks' },
+  comps: { write: ['precompose', 'edit_comp'], read: 'comps' },
   assets: { write: ['add_asset', 'remove_asset'], read: 'assets' },
   camera: { write: ['set_camera'], read: 'camera' },
   look: { write: ['set_look', 'set_light', 'remove_light', 'set_light_keyframes'], read: 'look' },

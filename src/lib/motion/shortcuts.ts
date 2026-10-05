@@ -23,7 +23,8 @@ export enum Command {
   NudgeBack = 'nudge-back',
   NudgeForward = 'nudge-forward',
   NudgeBackMore = 'nudge-back-more',
-  NudgeForwardMore = 'nudge-forward-more'
+  NudgeForwardMore = 'nudge-forward-more',
+  Precompose = 'precompose'
 }
 
 export type KeyPress = { key: string; mod: boolean; shift: boolean };
@@ -49,6 +50,7 @@ export const SHORTCUTS: readonly Binding[] = [
   { key: 'Escape', command: Command.Deselect, label: 'Esc' },
   { key: 'j', command: Command.PrevKeyframe, label: 'J' },
   { key: 'k', command: Command.NextKeyframe, label: 'K' },
+  { key: 'c', mod: true, shift: true, command: Command.Precompose, label: '⇧⌘C' },
   { key: 'c', mod: true, command: Command.Copy, label: '⌘C' },
   { key: 'v', mod: true, command: Command.Paste, label: '⌘V' },
   { key: 'm', command: Command.AddMarker, label: 'M' },

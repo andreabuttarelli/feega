@@ -1,4 +1,5 @@
-import { tool, type Tool } from 'ai';
+import { tool, type Tool, type ToolExecutionOptions } from 'ai';
+import { addAdjustment, mergeView, precompose, viewOf } from '$lib/motion/precomp';
 import { z } from 'zod';
 import { AssetKind, COMPONENTS, COMPONENT_IDS, TrackKind } from '$lib/motion/components';
 import { fieldsOf } from '$lib/motion/inspector';
@@ -67,6 +68,7 @@ export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string
 export type CheckResult = { ok: boolean; problems: string[]; frames: Frame[] };
 
 export const MAX_CODE_WRITES_PER_TURN = 12;
+export const MAX_COMP_CALLS = 40;
 
 export type Voiceover = { ok: true; assetId: string; seconds: number; url: string | null } | { ok: false; error: string };
 
@@ -139,7 +141,8 @@ function summary(doc: MotionDoc, selection: string[]) {
     workArea: doc.workArea ? { start: secs(doc.workArea.from), end: secs(doc.workArea.to) } : null,
     camera: cameraSummary(doc.camera),
     look: lookSummary(doc.look),
-    components: Object.entries(doc.components).map(([name, c]) => customSummary(name, c))
+    components: Object.entries(doc.components).map(([name, c]) => customSummary(name, c)),
+    comps: Object.entries(doc.comps).map(([id, c]) => ({ id, name: c.name, duration: secs(c.durationInFrames), clips: c.tracks.flatMap((t) => t.clips.map((clip) => clip.id)) }))
   };
 }
 
@@ -286,7 +289,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     return { ok: true, doc: { ...result.doc, assets: [...result.doc.assets, { id: asset.id, kind: asset.kind, name: asset.label }] } };
   };
 
-  return {
+  const tools: Record<string, Tool> = {
     get_motion_doc: tool({
       description: 'Read the video being edited: size, duration in seconds, tracks and clips (start/duration in seconds), and the clips the user has selected.',
       inputSchema: z.object({}).strict(),
@@ -1117,8 +1120,66 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const result = addClip(session.doc, { component: 'Audio', from: frames(input.start), durationInFrames: Math.max(1, frames(voice.seconds)), props: { assetId: voice.assetId } }, deps.newId());
         return apply(registered(result, voice.assetId), 'added a voice-over');
       }
+    }),
+
+    precompose: tool({
+      description: 'Precompose: move clips (on video tracks) into a new nested composition and leave one Precomp clip in their place, spanning them. The composition starts at the first chosen clip. Edit what is inside with edit_comp; set_props on the Precomp sets loop (repeat to the end of the clip); trim_clip on its start shifts the composition time.',
+      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1), name: z.string().max(60).optional() }),
+      execute: async (input) => {
+        const comp = deps.newId();
+        const clip = deps.newId();
+        const out = apply(precompose(session.doc, input.clip_ids, { comp, clip }, input.name ?? `Comp ${Object.keys(session.doc.comps).length + 1}`), `precomposed ${input.clip_ids.length} clip(s)`);
+        return out.ok ? { ...out, comp, clip_id: clip } : out;
+      }
+    }),
+
+    edit_comp: tool({
+      description: `Work inside a nested composition: runs the given tool calls in order, as if the composition were the whole video (its tracks, its length; ids are those inside it). Stops at the first call that fails, keeping what came before. Any tool works, e.g. {tool:"add_clip",input:{...}}, {tool:"set_keyframes",input:{...}}, {tool:"get_motion_doc",input:{}}. At most ${MAX_COMP_CALLS} calls.`,
+      inputSchema: z.object({ comp: z.string(), calls: z.array(z.object({ tool: z.string(), input: z.record(z.string(), z.unknown()).default({}) })).max(MAX_COMP_CALLS) }),
+      execute: async (input, options) => {
+        const root = session.doc;
+        if (!root.comps[input.comp]) {
+          return { ok: false, error: `no composition ${input.comp}: compositions are ${Object.keys(root.comps).join(', ') || 'none (precompose first)'}` };
+        }
+        session.doc = viewOf(root, [input.comp]);
+        try {
+          for (const [index, call] of input.calls.entries()) {
+            const out = await nestedCall(call.tool, call.input, options);
+            if (out.ok === false) {
+              return { ok: false, failed: index, error: `${call.tool}: ${out.error}`, doc: summary(session.doc, []) };
+            }
+          }
+          return { ok: true, doc: summary(session.doc, []) };
+        } finally {
+          session.doc = mergeView(root, [input.comp], session.doc);
+        }
+      }
+    }),
+
+    add_adjustment_layer: tool({
+      description: 'Add an adjustment layer on a new top track: it draws nothing, and its effects (add_effect) and blend mode (set_blend_mode) apply to everything below it, only while it is on screen.',
+      inputSchema: z.object({ start: z.number().min(0), duration: z.number().positive().optional() }),
+      execute: async (input) => {
+        const clip = deps.newId();
+        const out = apply(addAdjustment(session.doc, { from: frames(input.start), durationInFrames: input.duration === undefined ? undefined : frames(input.duration) }, { clip, track: deps.newId() }), 'added an adjustment layer');
+        return out.ok ? { ...out, clip_id: clip } : out;
+      }
     })
   };
+
+  async function nestedCall(name: string, raw: unknown, options: ToolExecutionOptions<unknown>): Promise<{ ok?: boolean; error?: unknown }> {
+    const nested = tools[name] as (Tool & { execute?: (input: unknown, options: ToolExecutionOptions<unknown>) => Promise<unknown> }) | undefined;
+    if (!nested?.execute) {
+      return { ok: false, error: 'no such tool' };
+    }
+    const parsed = (nested.inputSchema as z.ZodType).safeParse(raw);
+    if (!parsed.success) {
+      return { ok: false, error: parsed.error.issues.map((i) => `${i.path.join('.')} ${i.message}`).join('; ') };
+    }
+    return ((await nested.execute(parsed.data, options)) ?? {}) as { ok?: boolean; error?: unknown };
+  }
+
+  return tools;
 }
 
 function parsedJson(text: string): unknown {

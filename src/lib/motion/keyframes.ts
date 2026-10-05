@@ -194,6 +194,8 @@ export const ANIMATABLE: Record<ComponentId, readonly AnimProp[]> = {
   Device3D: visual(sceneProps, deviceProps),
   Composition: visual(),
   Particles: visual(PARTICLE_PROPS),
+  Precomp: visual(),
+  Adjustment: [],
   Custom: visual()
 };
 
