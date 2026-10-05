@@ -3,7 +3,9 @@ import { MotionFormat, findClip, newMotionDoc } from './doc';
 import { Ease } from './design';
 import { Source } from './keyframes';
 import { addClip, setKeyframes, type OpResult } from './timeline';
-import { Grip, HANDLE_PX, Reveal, Snap, easePath, edgeHandles, frameAt, handleAt, keyLanes, stackRows, pxPerFrame, rulerTicks, snapped, timecode } from './timeline-view';
+import { feegaTrailerV2 } from './trailer-v2';
+import { withParams } from './custom/params';
+import { Grip, HANDLE_PX, Reveal, Snap, easePath, edgeHandles, frameAt, graphLanes, handleAt, keyLanes, stackRows, pxPerFrame, rulerTicks, snapped, timecode } from './timeline-view';
 
 describe('timeline view', () => {
   it('at zoom 1 a second is 60 px', () => {
@@ -122,6 +124,21 @@ describe('keyframe lanes', () => {
     expect(props(Reveal.Opacity)).toEqual(['opacity']);
     expect(props(Reveal.Animated)).toEqual(['rotateX', 'color']);
     expect(keyLanes(clip, Reveal.Opacity)[0]).toEqual({ prop: 'opacity', label: 'Opacity', source: Source.Transform, frames: [] });
+  });
+
+  it('the trailer bar with an animated Scale Y has a lane and a graph curve when selected', () => {
+    const trailer = feegaTrailerV2(MotionFormat.Vertical, { imageId: null, modelId: null, voiceId: null, musicId: null } as never);
+    const bar = findClip(trailer, 'bar-0')!.clip;
+
+    expect(keyLanes(withParams(trailer, bar)).map((l) => l.prop)).toContain('scaleY');
+    expect(graphLanes(trailer, ['bar-0'], [], false).map((l) => l.prop)).toContain('scaleY');
+  });
+
+  it('keyframes picked on another clip do not hide the selected clip curves', () => {
+    const trailer = feegaTrailerV2(MotionFormat.Vertical, { imageId: null, modelId: null, voiceId: null, musicId: null } as never);
+    const stale = [{ clipId: 'gone', prop: 'opacity', frame: 0 }];
+
+    expect(graphLanes(trailer, ['bar-0'], stale, false).map((l) => l.prop)).toContain('scaleY');
   });
 
   it('the ease preview is a path from the bottom-left to the top-right corner', () => {

@@ -12,7 +12,7 @@
   import Crosshair from '@lucide/svelte/icons/crosshair';
   import Video from '@lucide/svelte/icons/video';
   import SquareDashed from '@lucide/svelte/icons/square-dashed';
-  import type { Component } from 'svelte';
+  import { tick, type Component } from 'svelte';
   import { CLIP_FAMILIES, ClipFamily, Preview, familyOf, tileFrames } from '$lib/motion/track-style';
   import { filmstrip, type Strip } from '$lib/motion/filmstrip';
   import { COMPONENTS, TrackKind } from '$lib/motion/components';
@@ -207,6 +207,19 @@
   function toggleLanes(e: Event, clipId: string) {
     e.stopPropagation();
     collapsed = collapsed.includes(clipId) ? collapsed.filter((id) => id !== clipId) : [...collapsed, clipId];
+    void revealLanes(clipId);
+  }
+
+  function showLanes(e: Event, clipId: string) {
+    e.stopPropagation();
+    selection = [clipId];
+    collapsed = collapsed.filter((id) => id !== clipId);
+    void revealLanes(clipId);
+  }
+
+  async function revealLanes(clipId: string) {
+    await tick();
+    lanes?.querySelector(`[data-key-lane^="${clipId}:"]`)?.scrollIntoView({ block: 'nearest' });
   }
 
   function laneClips(track: MotionTrack): MotionClip[] {
@@ -533,7 +546,7 @@
               <span class="kind">
                 {COMPONENTS[clip.component].label}
                 {#if Object.keys(clip.keyframes).length}
-                  <button type="button" class="lanes-toggle" aria-label="Show keyframes" aria-expanded={selection.includes(clip.id) && !collapsed.includes(clip.id)} onpointerdown={(e) => e.stopPropagation()} onclick={(e) => (selection.includes(clip.id) ? toggleLanes(e, clip.id) : (selection = [clip.id]))}>◆</button>
+                  <button type="button" class="lanes-toggle" aria-label="Show keyframes" aria-expanded={selection.includes(clip.id) && !collapsed.includes(clip.id)} onpointerdown={(e) => e.stopPropagation()} onclick={(e) => (selection.includes(clip.id) ? toggleLanes(e, clip.id) : showLanes(e, clip.id))}>◆</button>
                 {/if}
                 {#if Object.keys(clip.expressions ?? {}).length}<span class="tag expr" data-expr-marker={clip.id} title={`Expressions: ${Object.keys(clip.expressions).join(', ')}`}>· = {Object.keys(clip.expressions).join(', ')}</span>{/if}
                 {#if clip.mask}<span class="tag" title="Masked">· mask</span>{/if}

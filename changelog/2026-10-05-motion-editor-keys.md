@@ -19,3 +19,9 @@ Typing in inputs/contenteditable never fires a shortcut (`isTyping`).
 **Panels.** ⌘B / ⌥⌘B and header toggles hide the agent and properties columns; the
 timeline height is draggable. Both persist in localStorage via `editor-layout.ts`
 (read on mount to avoid a hydration mismatch, every access in try/catch).
+
+**Keyframe lanes and graph.** Lane rows render below every row of their track, so on a
+stacked track (trailer bars) the ◆ added rows off-screen: it now scrolls them into view.
+`graphLanes` filtered on `keySelection` whenever it was non-empty, so keys picked on another
+clip (or a deleted one) emptied the graph for the selected clip; it now falls back to the
+selection when the picked keys match no lane.

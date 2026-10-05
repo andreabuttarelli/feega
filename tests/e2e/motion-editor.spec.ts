@@ -54,6 +54,21 @@ test.describe('motion editor @real', () => {
     await expect(page.getByLabel('Agent', { exact: true })).toBeHidden();
   });
 
+  test('un clip con keyframe mostra le sue lane con ◆ e la sua curva nel graph editor', async ({ page, session, seedNode }) => {
+    const node = await seedNode({ type: 'motion', data: MOTION_DATA });
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}/motion/${node.id}`);
+
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await page.getByRole('menuitem', { name: 'feega trailer v2 · 16:9' }).dispatchEvent('click');
+    const bar = page.locator('[data-clip-id="bar-0"]');
+    await bar.scrollIntoViewIfNeeded();
+    await bar.getByRole('button', { name: 'Show keyframes' }).dispatchEvent('click');
+    await expect(page.locator('[data-key-lane="bar-0:scaleY"]')).toBeInViewport();
+
+    await page.getByTestId('graph-toggle').click();
+    await expect(page.getByText('Select a clip with keyframes')).toHaveCount(0);
+  });
+
   test('una scorciatoia non scatta mentre si scrive in un campo', async ({ page, session, seedNode }) => {
     const node = await seedNode({ type: 'motion', data: MOTION_DATA });
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}/motion/${node.id}`);

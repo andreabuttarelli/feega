@@ -154,8 +154,9 @@ export function graphLanes(doc: MotionDoc, selection: readonly string[], keySele
   const numeric = [...cameraOwned, ...clipOwned].filter((l) => typeof l.track[0]?.value === 'number');
 
   const picked = new Set(keySelection.map((r) => `${r.clipId} ${r.prop}`));
-  if (picked.size) {
-    return numeric.filter((l) => picked.has(`${l.clipId} ${l.prop}`));
+  const chosen = numeric.filter((l) => picked.has(`${l.clipId} ${l.prop}`));
+  if (chosen.length) {
+    return chosen;
   }
   return numeric.filter((l) => selection.includes(l.clipId) || (camera && l.clipId === CAMERA_LANE));
 }
