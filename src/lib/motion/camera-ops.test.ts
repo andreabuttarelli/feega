@@ -92,11 +92,12 @@ describe('camera presets', () => {
     ]);
   });
 
-  it('truck and pan move sideways and turn', () => {
-    const trucked = must(applyPreset(layered(), CameraPreset.Truck, { ...at, amount: 0.2 }));
-    const panned = must(applyPreset(layered(), CameraPreset.Pan, { ...at, amount: 15 }));
+  it('truck slides by its amount in px of the frame, pan turns by degrees', () => {
+    const doc = layered();
+    const trucked = must(applyPreset(doc, CameraPreset.Truck, { ...at, amount: 200 }));
+    const panned = must(applyPreset(doc, CameraPreset.Pan, { ...at, amount: 15 }));
 
-    expect(trucked.camera!.keyframes.x!.at(-1)!.value).toBe(0.2);
+    expect(trucked.camera!.keyframes.x!.at(-1)!.value).toBeCloseTo(200 / doc.width, 4);
     expect(panned.camera!.keyframes.rotateY!.at(-1)!.value).toBe(15);
   });
 
@@ -112,12 +113,13 @@ describe('camera presets', () => {
     expect(math.valuesAt(spec, 120).rotateY).toBeCloseTo(40, 6);
   });
 
-  it('crane rises and tilts down onto the target', () => {
-    const doc = must(applyPreset(layered(), CameraPreset.Crane, { ...at, amount: 0.25, target: 0 }));
+  it('crane rises by its amount in px of the frame and tilts down onto the target', () => {
+    const base = layered();
+    const doc = must(applyPreset(base, CameraPreset.Crane, { ...at, amount: 270, target: 0 }));
     const spec = stageSpec(doc);
     const [x, y] = screenOf(spec, 120, [0, 0, 0]);
 
-    expect(math.valuesAt(spec, 120).y).toBeCloseTo(-0.25, 6);
+    expect(math.valuesAt(spec, 120).y).toBeCloseTo(-270 / base.height, 6);
     expect(Math.abs(x) + Math.abs(y)).toBeLessThan(1);
   });
 
