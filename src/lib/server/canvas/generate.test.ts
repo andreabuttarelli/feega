@@ -847,15 +847,15 @@ describe('un giro asincrono presso un fornitore ha il proprio tetto, non quello 
     expect(runUpdate).toBeDefined();
   });
 
-  it('un render motion fermo da 9 minuti scade: la richiesta che lo portava è morta', async () => {
-    const renderRow = { ...runRow, external_job_id: 'motion-render:7', started_at: startedAgo(9 * 60_000) };
+  it('un render motion oltre la vita di ogni suo tentativo scade', async () => {
+    const renderRow = { ...runRow, external_job_id: 'motion-render:7', started_at: startedAgo(7 * 60 * 60_000) };
     const { db } = fakeDb({ node_runs: [renderRow], nodes: [nodeRow] }, { updateRows: { node_runs: [renderRow], nodes: [nodeRow] } });
 
     expect(await expireStuckRuns(db)).toMatchObject({ expired: 1 });
   });
 
-  it('un render motion di 4 minuti sta ancora lavorando', async () => {
-    const renderRow = { ...runRow, external_job_id: 'motion-render:7', started_at: startedAgo(4 * 60_000) };
+  it('un render motion di 40 minuti sta ancora lavorando: gira fuori dalla richiesta', async () => {
+    const renderRow = { ...runRow, external_job_id: 'motion-render:7', started_at: startedAgo(40 * 60_000) };
     const { db } = fakeDb({ node_runs: [renderRow], nodes: [nodeRow] });
 
     expect(await expireStuckRuns(db)).toMatchObject({ expired: 0 });
@@ -1434,6 +1434,19 @@ describe('reconcileVideoNodeRuns chiude un video in coda quando il fornitore ha 
     expect(data.running).toBe(false);
     expect(data.error ?? null).toBeNull();
     expect(data.refId).toBe('asset-video-1');
+  });
+
+  it('un render motion in corso non è un video: il riconciliatore video non lo reclama né lo chiude', async () => {
+    const { db, currentRun } = videoReconcileDb({
+      node: { id: NODE, orgId: ORG, data: { running: true }, version: 1 },
+      run: { id: RUN, taskId: 'motion-render:12' }
+    });
+
+    const result = await reconcileVideoNodeRuns(db);
+
+    expect(result).toMatchObject({ checked: 0, failed: 0 });
+    expect(currentRun()).toMatchObject({ status: 'running', attempts: 0, error: null });
+    expect(finishVideoRender).not.toHaveBeenCalled();
   });
 
   it('pending: rilascia il claim senza consumare un tentativo', async () => {

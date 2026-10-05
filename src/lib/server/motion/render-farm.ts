@@ -6,12 +6,15 @@ export type FarmRun = { exitCode: number; output: string };
 export type WorkerSpec = { allowHosts: string[]; timeoutMs: number; vcpus: number };
 
 export type FarmWorker = {
+  name: string;
   write: (files: FarmFile[]) => Promise<void>;
   run: (cmd: string, args: string[]) => Promise<FarmRun>;
+  spawn: (cmd: string, args: string[]) => Promise<void>;
   read: (path: string) => Promise<Buffer | null>;
   stop: () => Promise<void>;
 };
 
 export type RenderFarm = {
   open: (spec: WorkerSpec) => Promise<FarmWorker>;
+  attach: (name: string) => Promise<FarmWorker | null>;
 };

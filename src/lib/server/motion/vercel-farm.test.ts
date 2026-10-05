@@ -4,16 +4,18 @@ vi.mock('$env/dynamic/private', () => ({ env: {} }));
 
 const sdk = vi.hoisted(() => ({
   getOrCreate: vi.fn(),
-  fork: vi.fn()
+  fork: vi.fn(),
+  get: vi.fn()
 }));
 
-vi.mock('@vercel/sandbox', () => ({ Sandbox: { getOrCreate: sdk.getOrCreate, fork: sdk.fork } }));
+vi.mock('@vercel/sandbox', () => ({ Sandbox: { getOrCreate: sdk.getOrCreate, fork: sdk.fork, get: sdk.get } }));
 
 import { FARM_BASE, farmAccess, vercelFarm } from './vercel-farm';
 
 function fakeSandbox(status = 'stopped') {
   return {
     status,
+    name: 'box-1',
     stop: vi.fn(async () => {}),
     writeFiles: vi.fn(async () => {}),
     readFileToBuffer: vi.fn(async () => Buffer.from('bytes')),
@@ -46,6 +48,37 @@ describe('vercelFarm', () => {
   beforeEach(() => {
     sdk.getOrCreate.mockReset();
     sdk.fork.mockReset();
+    sdk.get.mockReset();
+  });
+
+  it('a worker starts a command detached, so it keeps running after the request returns', async () => {
+    const box = fakeSandbox('running');
+    sdk.getOrCreate.mockResolvedValue(fakeSandbox());
+    sdk.fork.mockResolvedValue(box);
+    const worker = await vercelFarm({}).open({ allowHosts: [], timeoutMs: 1, vcpus: 4 });
+
+    await worker.spawn('bash', ['-c', 'node steps.mjs']);
+
+    expect(worker.name).toBe('box-1');
+    expect(box.runCommand).toHaveBeenCalledWith({ cmd: 'bash', args: ['-c', 'node steps.mjs'], detached: true });
+  });
+
+  it('attaches to a running worker by name, without preparing the base', async () => {
+    sdk.get.mockResolvedValue(fakeSandbox('running'));
+
+    const worker = await vercelFarm({ token: 't' }).attach('box-1');
+
+    expect(sdk.get).toHaveBeenCalledWith(expect.objectContaining({ name: 'box-1', token: 't' }));
+    expect(worker?.name).toBe('box-1');
+    expect(sdk.getOrCreate).not.toHaveBeenCalled();
+  });
+
+  it('a stopped or unknown worker attaches to nothing', async () => {
+    sdk.get.mockResolvedValueOnce(fakeSandbox('stopped')).mockRejectedValueOnce(new Error('not found'));
+    const farm = vercelFarm({});
+
+    expect(await farm.attach('box-1')).toBeNull();
+    expect(await farm.attach('box-2')).toBeNull();
   });
 
   it('forks the prepared base with only the allowed hosts reachable and no app env', async () => {
