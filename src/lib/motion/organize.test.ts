@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { FEEGA_TOKENS } from './brand';
 import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from './doc';
 import { composeHtml } from './hyperframes/compose';
-import { addClip, snapTargets, type OpResult } from './timeline';
+import { ClipEdge, addClip, snapTargets, type OpResult } from './timeline';
 import {
   Align,
   addMarker,
@@ -10,6 +10,7 @@ import {
   distributeClips,
   loopFrame,
   markerFrame,
+  clipsTo,
   nudgeClips,
   removeMarker,
   sequenceClips,
@@ -17,7 +18,8 @@ import {
   setTrackFlags,
   setWorkArea,
   shownTracks,
-  staggerClips
+  staggerClips,
+  trimClipsAt
 } from './organize';
 
 function must(r: OpResult): MotionDoc {
@@ -112,6 +114,26 @@ describe('arranging selected clips in time', () => {
   it('nudge moves every selected clip, never before zero', () => {
     const d = must(nudgeClips(three, ['a', 'b'], -5));
     expect([at(d, 'a'), at(d, 'b')]).toEqual([0, 5]);
+  });
+
+  it('[ moves each selected clip to start at the playhead, ] to end there', () => {
+    const started = must(clipsTo(three, ['a', 'c'], ClipEdge.Start, 12));
+    expect([at(started, 'a'), at(started, 'c'), end(started, 'c')]).toEqual([12, 12, 22]);
+
+    const ended = must(clipsTo(three, ['b'], ClipEdge.End, 50));
+    expect([at(ended, 'b'), end(ended, 'b')]).toEqual([30, 50]);
+  });
+
+  it('] never moves a clip before zero', () => {
+    expect(at(must(clipsTo(three, ['a'], ClipEdge.End, 5)), 'a')).toBe(0);
+  });
+
+  it('alt+[ and alt+] trim every selected clip to the playhead', () => {
+    const trimmed = must(trimClipsAt(three, ['a', 'b'], ClipEdge.End, 20));
+    expect([end(trimmed, 'a'), end(trimmed, 'b')]).toEqual([20, 20]);
+
+    const cut = must(trimClipsAt(three, ['b'], ClipEdge.Start, 15));
+    expect([at(cut, 'b'), end(cut, 'b')]).toEqual([15, 30]);
   });
 
   it('sequence lays them end to end in their current order, from the first start', () => {

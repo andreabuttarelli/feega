@@ -1,6 +1,6 @@
 import { COMPONENTS } from './components';
 import { findClip, type Marker, type MotionClip, type MotionDoc, type MotionTrack } from './doc';
-import { moveClip, type OpResult } from './timeline';
+import { ClipEdge, moveClip, trimClip, type OpResult } from './timeline';
 
 const fail = (error: string): OpResult => ({ ok: false, error });
 const ok = (doc: MotionDoc): OpResult => ({ ok: true, doc });
@@ -117,6 +117,23 @@ function moveAll(doc: MotionDoc, ids: readonly string[], startOf: (clip: MotionC
 
 export function nudgeClips(doc: MotionDoc, ids: readonly string[], frames: number): OpResult {
   return moveAll(doc, ids, (c) => Math.max(0, c.from + frames));
+}
+
+const STARTS_FOR_EDGE: Record<ClipEdge, (clip: MotionClip, frame: number) => number> = {
+  [ClipEdge.Start]: (_clip, frame) => frame,
+  [ClipEdge.End]: (clip, frame) => Math.max(0, frame - clip.durationInFrames)
+};
+
+export function clipsTo(doc: MotionDoc, ids: readonly string[], edge: ClipEdge, frame: number): OpResult {
+  return moveAll(doc, ids, (c) => STARTS_FOR_EDGE[edge](c, frame));
+}
+
+export function trimClipsAt(doc: MotionDoc, ids: readonly string[], edge: ClipEdge, frame: number): OpResult {
+  const locked = ids.find((id) => isLocked(doc, id));
+  if (locked) {
+    return fail(`${locked} is locked`);
+  }
+  return ids.reduce<OpResult>((r, id) => (r.ok ? trimClip(r.doc, id, edge, frame) : r), ok(doc));
 }
 
 export function sequenceClips(doc: MotionDoc, ids: readonly string[], gap: number): OpResult {

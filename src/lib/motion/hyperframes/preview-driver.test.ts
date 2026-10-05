@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CAPTURE_REPLY, FrameFormat, captureScript, type CaptureReply, type CaptureRequest } from './capture';
-import { previewDriver, type PlayerPort } from './preview-driver';
+import { Playback, previewDriver, type PlayerPort } from './preview-driver';
 
 const REQUEST = { format: FrameFormat.Jpeg, width: 64, height: 36 };
 const COMMIT_MS = 30;
@@ -23,6 +23,8 @@ function slowPlayer(first: string) {
       }, COMMIT_MS);
     },
     seek: () => {},
+    play: () => {},
+    pause: () => {},
     post: (m: CaptureRequest) => {
       const doc = committed;
       queueMicrotask(() => replies.forEach((l) => l({ type: CAPTURE_REPLY, id: m.id, url: nameOf(doc), stamp: stampOf(doc) })));
@@ -57,5 +59,54 @@ describe('the preview driver', () => {
     await Promise.all([job('export'), job('agent')]);
 
     expect(order).toEqual(['start export', 'export:export', 'start agent', 'agent:agent']);
+  });
+});
+
+function transport() {
+  const calls: string[] = [];
+  const port: PlayerPort = {
+    load: () => calls.push('load'),
+    seek: () => {},
+    post: () => true,
+    play: () => calls.push('play'),
+    pause: () => calls.push('pause'),
+    onReady: () => () => {},
+    onReply: () => () => {}
+  };
+  return { port, calls };
+}
+
+describe('the preview transport', () => {
+  it('a Play pressed before the player is ready starts it once ready', () => {
+    const { port, calls } = transport();
+    const driver = previewDriver(port);
+
+    driver.playback(Playback.Playing);
+    driver.ready();
+
+    expect(calls).toEqual(['play']);
+  });
+
+  it('Play and Pause reach the player once it is ready', () => {
+    const { port, calls } = transport();
+    const driver = previewDriver(port);
+    driver.ready();
+
+    driver.playback(Playback.Playing);
+    driver.playback(Playback.Paused);
+
+    expect(calls).toEqual(['pause', 'play', 'pause']);
+  });
+
+  it('a reload keeps playing once the new document is ready', () => {
+    const { port, calls } = transport();
+    const driver = previewDriver(port);
+    driver.ready();
+    driver.playback(Playback.Playing);
+
+    driver.load('<html></html>');
+    driver.ready();
+
+    expect(calls).toEqual(['pause', 'play', 'load', 'play']);
   });
 });

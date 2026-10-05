@@ -14,14 +14,14 @@
   import SquareDashed from '@lucide/svelte/icons/square-dashed';
   import Layers from '@lucide/svelte/icons/layers';
   import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
-  import type { Component } from 'svelte';
+  import { tick, type Component } from 'svelte';
   import { CLIP_FAMILIES, ClipFamily, Preview, familyOf, tileFrames } from '$lib/motion/track-style';
   import { filmstrip, type Strip } from '$lib/motion/filmstrip';
   import { COMPONENTS, TrackKind } from '$lib/motion/components';
   import { compOf, type MotionClip, type MotionDoc } from '$lib/motion/doc';
   import { ClipEdge, moveClip, moveKeyframes, moveTrack, setKeyEase, setKeyInterp, trimClip, type KeyRef, type OpResult } from '$lib/motion/timeline';
   import { withParams } from '$lib/motion/custom/params';
-  import { Grip, KeySide, Snap, edgeHandles, frameAt, keyLanes, pxPerFrame, rulerTicks, snapped, stackRows, type KeyLane } from '$lib/motion/timeline-view';
+  import { Grip, KeySide, Reveal, Snap, edgeHandles, frameAt, keyLanes, pxPerFrame, rulerTicks, snapped, stackRows, type KeyLane } from '$lib/motion/timeline-view';
   import { MASK_KINDS, Matte } from '$lib/motion/mask';
   import type { MotionTrack } from '$lib/motion/doc';
   import { Interp, Source, type EaseSpec, type Keyframe } from '$lib/motion/keyframes';
@@ -86,6 +86,7 @@
     waveforms = {},
     beats = [],
     assetUrls = {},
+    reveal = Reveal.Animated,
     onchange,
     onopen
   }: {
@@ -99,6 +100,7 @@
     waveforms?: Record<string, number[]>;
     beats?: number[];
     assetUrls?: Record<string, string>;
+    reveal?: Reveal;
     onchange: (doc: MotionDoc, summary: string) => void;
     onopen?: (comp: string) => void;
   } = $props();
@@ -224,10 +226,23 @@
   function toggleLanes(e: Event, clipId: string) {
     e.stopPropagation();
     collapsed = collapsed.includes(clipId) ? collapsed.filter((id) => id !== clipId) : [...collapsed, clipId];
+    void revealLanes(clipId);
+  }
+
+  function showLanes(e: Event, clipId: string) {
+    e.stopPropagation();
+    selection = [clipId];
+    collapsed = collapsed.filter((id) => id !== clipId);
+    void revealLanes(clipId);
+  }
+
+  async function revealLanes(clipId: string) {
+    await tick();
+    lanes?.querySelector(`[data-key-lane^="${clipId}:"]`)?.scrollIntoView({ block: 'nearest' });
   }
 
   function laneClips(track: MotionTrack): MotionClip[] {
-    return (track.clips as MotionClip[]).filter((c) => selection.includes(c.id) && !collapsed.includes(c.id) && Object.keys(c.keyframes).length > 0);
+    return (track.clips as MotionClip[]).filter((c) => selection.includes(c.id) && !collapsed.includes(c.id) && keyLanes(withParams(shown, c), reveal).length > 0);
   }
 
   function clipById(id: string): MotionClip {
@@ -559,7 +574,7 @@
               <span class="kind">
                 {COMPONENTS[clip.component].label}
                 {#if Object.keys(clip.keyframes).length}
-                  <button type="button" class="lanes-toggle" aria-label="Show keyframes" aria-expanded={selection.includes(clip.id) && !collapsed.includes(clip.id)} onpointerdown={(e) => e.stopPropagation()} onclick={(e) => (selection.includes(clip.id) ? toggleLanes(e, clip.id) : (selection = [clip.id]))}>◆</button>
+                  <button type="button" class="lanes-toggle" aria-label="Show keyframes" aria-expanded={selection.includes(clip.id) && !collapsed.includes(clip.id)} onpointerdown={(e) => e.stopPropagation()} onclick={(e) => (selection.includes(clip.id) ? toggleLanes(e, clip.id) : showLanes(e, clip.id))}>◆</button>
                 {/if}
                 {#if Object.keys(clip.expressions ?? {}).length}<span class="tag expr" data-expr-marker={clip.id} title={`Expressions: ${Object.keys(clip.expressions).join(', ')}`}>· = {Object.keys(clip.expressions).join(', ')}</span>{/if}
                 {#if clip.mask}<span class="tag" title="Masked">· mask</span>{/if}
@@ -608,7 +623,7 @@
         </div>
       </div>
       {#each laneClips(track) as clip (clip.id)}
-        {@const all = keyLanes(withParams(shown, clip))}
+        {@const all = keyLanes(withParams(shown, clip), reveal)}
         {@const masked = all.filter((l) => l.source === Source.Mask)}
         {#each all.filter((l) => l.source !== Source.Mask) as lane (lane.prop)}{@render keyLane(clip, lane)}{/each}
         {#if masked.length}
