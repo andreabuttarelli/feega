@@ -69,6 +69,8 @@ import { DEFAULT_NAME_PATTERN, MAX_BATCH_ROWS, outputName } from '$lib/motion/te
 import { renderQuote } from '$lib/motion/render-quote';
 import { BOUNDS, PHYSICS, PHYSICS_KEYS, PHYSICS_PRESET, PHYSICS_PRESETS } from '$lib/motion/physics/model';
 import { applyPhysicsPreset, setPhysics } from '$lib/motion/physics/ops';
+import { CARD_KINDS, CardKind, MAX_RING_CARDS } from '$lib/motion/ring/model';
+import { DASHBOARD_CARD_COUNT, dashboardCards } from '$lib/motion/ui-ring';
 import { unitOf, propsOwner, shownKeyframes, shownMask, shownOffset, shownRecord, storedMask, storedOffset, storedRecord, toShown, toStored, type Owner } from '$lib/motion/units';
 
 export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number };
@@ -691,6 +693,32 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const props = { ...PARTICLE_PRESET[input.preset].props, ...propsIn('Particles', input.props) };
         const result = addClip(session.doc, { component: 'Particles', from: frames(input.start), durationInFrames: input.duration ? frames(input.duration) : undefined, trackId: input.track_id, props }, deps.newId());
         return apply(registered(result, input.props?.sprite), `added ${input.preset} particles`);
+      }
+    }),
+
+    add_ring: tool({
+      description: `Add a Ring clip: cards curved on a turning, tilted cylinder (UI showcase, dashboard reel). Each card is an image or video asset, or a composition of this video (a precomp: build a card's UI in it with Shape and Title clips). sample: true builds ${DASHBOARD_CARD_COUNT} dashboard compositions (charts drawn with shapes, animated numbers) and uses them. props: count, ringRadius and cardHeight (px), gap, tiltX/tiltZ (°), loop (s) with turns per loop (whole turns loop perfectly), direction, spin, doubleSided, backOpacity, backBlur, shadowOpacity, cardColor, cameraDistance, cameraHeight. Every number takes set_keyframes.`,
+      inputSchema: z.object({
+        start: z.number().min(0),
+        duration: z.number().positive().optional(),
+        track_id: z.string().optional(),
+        sample: z.boolean().optional(),
+        cards: z.array(z.object({ kind: z.enum(CARD_KINDS), ref: z.string() })).max(MAX_RING_CARDS).optional(),
+        props: z.record(z.string(), z.unknown()).optional()
+      }),
+      execute: async (input) => {
+        const unknown = (input.cards ?? []).find((c) => c.kind !== CardKind.Comp && !deps.assets.some((a) => a.id === c.ref));
+        if (unknown) {
+          return { ok: false, error: `unknown asset id ${unknown.ref}: call list_assets` };
+        }
+        const sample = input.sample ? dashboardCards(`${deps.newId()}-`) : { comps: {}, cards: [] };
+        const doc = { ...session.doc, comps: { ...session.doc.comps, ...sample.comps } };
+        const cards = [...(input.cards ?? []), ...sample.cards];
+        let result = addClip(doc, { component: 'Ring', from: frames(input.start), durationInFrames: input.duration ? frames(input.duration) : undefined, trackId: input.track_id, props: { ...propsIn('Ring', input.props), cards } }, deps.newId());
+        for (const card of cards) {
+          result = registered(result, card.ref);
+        }
+        return apply(result, `added a ring of ${cards.length} cards`);
       }
     }),
 

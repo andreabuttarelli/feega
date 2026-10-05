@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { COLOR, TYPE, type ComponentId } from './components';
 import { EASE_IDS, Ease } from './design';
 import { MASK_KEYS, MASK_PROPS, maskValue, type Mask, type MaskKey } from './mask';
+import { RING_NUMBERS, RING_NUMBER_KEYS } from './ring/model';
 import { PARTICLE_COLOURS, PARTICLE_COLOUR_KEYS, PARTICLE_NUMBERS, PARTICLE_NUMBER_KEYS } from './particles/model';
 
 export type Bezier = [number, number, number, number];
@@ -173,6 +174,11 @@ const PARTICLE_PROPS: AnimProp[] = [
   ...PARTICLE_COLOUR_KEYS.map((key) => ({ key, label: PARTICLE_COLOURS[key].label, kind: ValueKind.Color, source: Source.Param, min: 0, max: 0, step: 0, fallback: 0 }))
 ];
 
+const RING_PROPS: AnimProp[] = RING_NUMBER_KEYS.map((key) => {
+  const { label, min, max, step, fallback } = RING_NUMBERS[key];
+  return { key, label, min, max, step, fallback, kind: ValueKind.Number, source: Source.Param };
+});
+
 export const ANIMATABLE: Record<ComponentId, readonly AnimProp[]> = {
   Title: visual(colours(['color', 'Colour']), typeNumbers),
   Text: visual(colours(['color', 'Colour']), typeNumbers),
@@ -194,6 +200,7 @@ export const ANIMATABLE: Record<ComponentId, readonly AnimProp[]> = {
   Logo3D: visual(sceneProps),
   Device3D: visual(sceneProps, deviceProps),
   Composition: visual(),
+  Ring: visual(RING_PROPS),
   Particles: visual(PARTICLE_PROPS),
   Precomp: visual(),
   Adjustment: [],

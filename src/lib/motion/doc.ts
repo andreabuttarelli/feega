@@ -17,6 +17,7 @@ import { animatorsSchema } from './text-animators/model';
 import { DEFAULT_MOTION_BLUR, motionBlurSchema } from './motion-blur';
 import { fieldsSchema } from './template/field-model';
 import { physicsSchema } from './physics/model';
+import { CardKind, type RingCard } from './ring/model';
 
 export enum MotionFormat {
   Landscape = '16:9',
@@ -229,13 +230,21 @@ export function compOf(clip: Pick<MotionClip, 'component' | 'props'>): string | 
   return clip.component === 'Precomp' ? String(clip.props.comp) : null;
 }
 
+export function compsOf(clip: Pick<MotionClip, 'component' | 'props'>): string[] {
+  if (clip.component === 'Ring') {
+    return ((clip.props.cards ?? []) as RingCard[]).filter((c) => c.kind === CardKind.Comp).map((c) => c.ref);
+  }
+  const id = compOf(clip);
+  return id === null ? [] : [id];
+}
+
 function compsUsed(tracks: readonly MotionTrack[]): string[] {
-  return tracks.flatMap((t) => (t.clips as MotionClip[]).map(compOf).filter((id): id is string => id !== null));
+  return tracks.flatMap((t) => (t.clips as MotionClip[]).flatMap(compsOf));
 }
 
 export function compRefProblem(doc: Pick<MotionDoc, 'comps'>, clip: Pick<MotionClip, 'component' | 'props'>): string | null {
-  const id = compOf(clip);
-  if (id === null || doc.comps[id]) {
+  const id = compsOf(clip).find((ref) => !doc.comps[ref]);
+  if (id === undefined) {
     return null;
   }
   const known = Object.keys(doc.comps);
