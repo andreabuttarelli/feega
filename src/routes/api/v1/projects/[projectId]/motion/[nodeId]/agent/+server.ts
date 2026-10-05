@@ -16,6 +16,7 @@ import { ModerationProfile } from '$lib/server/moderation/profiles';
 import { blockedPrompt } from '$lib/server/moderation/blocked-response';
 import { assetUrls, headOrNew, motionAssets, motionTokens, saveMotionDoc } from '$lib/server/motion/editor';
 import { createMotionTools, selectionNote, type MotionSession } from '$lib/server/motion/motion-tools';
+import { templateLibrary } from '$lib/server/motion/templates';
 import { analyzeSounds, storageAnalysis } from '$lib/server/motion/audio-analysis';
 import { motionAgentPrompt } from '$lib/server/motion/motion-prompt';
 import { speakVoiceover } from '$lib/server/motion/voiceover';
@@ -128,6 +129,7 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
       askCheck({ callId, name, doc });
       return awaitVerdict(bucket, framesPrefix(frameScope, callId), { timeoutMs: CHECK_WAIT_MS, pollMs: FRAME_POLL_MS });
     },
+    templates: templateLibrary(db, { orgId, actor: { kind: 'agent', id: user.id, agentKey: MOTION_AGENT_KEY } }),
     batch: async ({ rows }) => {
       if (session.edits.length) {
         return { ok: false, error: 'this turn has unsaved edits: the batch renders the saved video, so finish the turn and run render_batch in the next one' };
