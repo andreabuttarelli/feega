@@ -6,6 +6,7 @@ import { SURFACE, type Material, type Surface } from '../materials';
 import { cameraRuntime, seekDriver } from './stage';
 import { DEVICE_SCRIPT, type DeviceRuntime } from './device-runtime';
 import { ENGINE_GLOBAL } from '../engine/engine';
+import { ON_DISPOSE, hotScope, hotSeek, keptGl } from './hot';
 
 export const THREE_VERSION = '0.181.2';
 export const THREE_TIMELINE = 'feegaThree';
@@ -82,6 +83,10 @@ import { SVGLoader } from 'three/addons/loaders/SVGLoader.js';
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
+${hotScope(THREE_TIMELINE)}
+${keptGl()}
+const FONT_CACHE = '__feegaFontFiles';
+let live = true;
 
 const DEG = Math.PI / 180;
 const FLOOR = -1.05;
@@ -248,11 +253,13 @@ function ground(scene, c) {
 }
 
 function stage(c) {
-  const canvas = document.getElementById('three-' + c.id);
-  if (!canvas) return null;
-  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: true });
+  const renderer = keptRenderer('three-' + c.id, (canvas) => new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: true }));
+  if (!renderer) return null;
+  const canvas = renderer.domElement;
   renderer.setPixelRatio(1);
   renderer.setSize(canvas.width, canvas.height, false);
+  renderer.toneMapping = THREE.NoToneMapping;
+  renderer.shadowMap.enabled = false;
   if (LOOK) {
     renderer.toneMapping = THREE.NeutralToneMapping;
     renderer.shadowMap.enabled = LOOK.softShadows;
@@ -349,10 +356,16 @@ function textShapes(font, text) {
   return SVGLoader.createShapes(shapePath);
 }
 
+function fontFile(url) {
+  const files = (window[FONT_CACHE] = window[FONT_CACHE] || {});
+  if (!files[url]) files[url] = fetch(url).then((r) => r.arrayBuffer()).catch((e) => { delete files[url]; throw e; });
+  return files[url];
+}
+
 function loadText(c, s) {
   if (!c.url || !c.text.trim()) return Promise.resolve();
   return import('opentype')
-    .then((mod) => fetch(c.url).then((r) => r.arrayBuffer()).then((buf) => (mod.default || mod).parse(buf)))
+    .then((mod) => fontFile(c.url).then((buf) => (mod.default || mod).parse(buf)))
     .then((font) => {
       const shapes = textShapes(font, c.text);
       if (!shapes.length) return;
@@ -385,6 +398,17 @@ const scenes = CLIPS.map((c) => {
   if (!s) return null;
   return { c, s, ready: Promise.all([LOADERS[c.kind](c, s), environment(s)]) };
 }).filter(Boolean);
+dropUnused('three-', CLIPS.map((c) => 'three-' + c.id));
+${ON_DISPOSE}(() => {
+  live = false;
+  for (const { s } of scenes) {
+    disposeScene(s.scene);
+    if (s.bokeh) {
+      s.bokeh.target.dispose();
+      disposeScene(s.bokeh.scene);
+    }
+  }
+});
 
 function legacyOrbit(c, local) {
   const t = window.${ENGINE_GLOBAL}.parseEase(c.ease)(c.length > 0 ? local / c.length : 1);
@@ -396,6 +420,7 @@ function lightAt(spec, key, frame) {
 }
 
 function renderAt(time) {
+  if (!live) return;
   for (const { c, s } of scenes) {
     if (!onScreen(c, time)) continue;
     const local = Math.min(Math.max(time - c.start, 0), c.length);
@@ -444,7 +469,7 @@ function renderAt(time) {
 window.__hf = window.__hf || {};
 window.__hf.buildReady = window.__hf.buildReady || {};
 window.__hf.buildReady['motion-three'] = Promise.all(scenes.map((x) => x.ready)).then(() => renderAt(window.__hfThreeTime || 0));
-window.addEventListener('hf-seek', (e) => renderAt(e.detail.time));
+${hotSeek('renderAt')}
 const tl = window.__timelines && window.__timelines.main;
 DRIVER
 renderAt(window.__hfThreeTime || 0);

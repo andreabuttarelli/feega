@@ -5,6 +5,7 @@ import { ENGINE_GLOBAL } from '../engine/engine';
 
 export const REGISTRY = '__feegaComponents';
 export const ERRORS = '__feegaErrors';
+const ERROR_LISTENER = '__feegaErrorListener';
 export const THREE_GLOBAL = '__feegaThree';
 
 export const SHADOWED = [
@@ -75,10 +76,11 @@ type BootWindow = Window & Record<string, unknown>;
 type Timeline = { time: () => number; set: (t: object, v: object, at: number) => void; add: (child: object, at: number) => void; fromTo: (t: object, a: object, b: object, at: number) => void; tweenFromTo: (from: number, to: number, vars: object) => object };
 type ClipError = { clip: string; component: string; message: string };
 
-function bootCustom(cfg: { registry: string; errors: string; three: string; engine: string; shadowed: string[] }, runs: CustomRun[], env: CustomEnv, master: Timeline) {
+function bootCustom(cfg: { registry: string; errors: string; listener: string; three: string; engine: string; shadowed: string[] }, runs: CustomRun[], env: CustomEnv, master: Timeline) {
   const w = window as unknown as BootWindow;
   const engine = w[cfg.engine] as Engine;
-  const errors = ((w[cfg.errors] as ClipError[] | undefined) ??= []);
+  const errors: ClipError[] = [];
+  w[cfg.errors] = errors;
   const registry = (w[cfg.registry] ?? {}) as Record<string, (ctx: object, ...shadows: unknown[]) => void>;
   const refuse = (what: string, instead: string) => () => {
     throw new Error(`${what} is not allowed in a component: ${instead}`);
@@ -106,7 +108,10 @@ function bootCustom(cfg: { registry: string; errors: string; three: string; engi
     };
   };
 
-  addEventListener('error', (e) => errors.push({ clip: '', component: '', message: String((e as ErrorEvent).message ?? e) }));
+  const onError = (e: Event) => errors.push({ clip: '', component: '', message: String((e as ErrorEvent).message ?? e) });
+  removeEventListener('error', w[cfg.listener] as EventListener);
+  w[cfg.listener] = onError;
+  addEventListener('error', onError);
 
   for (const run of runs) {
     const root = document.getElementById(`cc-${run.id}`);
@@ -167,6 +172,6 @@ export function bootScript(runs: CustomRun[], env: CustomEnv, master: string): s
   if (!runs.length) {
     return '';
   }
-  const cfg = { registry: REGISTRY, errors: ERRORS, three: THREE_GLOBAL, engine: ENGINE_GLOBAL, shadowed: [...SHADOWED] };
+  const cfg = { registry: REGISTRY, errors: ERRORS, listener: ERROR_LISTENER, three: THREE_GLOBAL, engine: ENGINE_GLOBAL, shadowed: [...SHADOWED] };
   return `(${bootCustom.toString()})(${js(cfg)},${js(runs)},${js(env)},${master});`;
 }

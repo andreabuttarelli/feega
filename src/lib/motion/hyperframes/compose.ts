@@ -30,7 +30,7 @@ import type { ParticleBake } from '../particles/simulate';
 import { bakeExpressions } from '../expression/bake';
 import type { AudioAnalysis } from '../audio-analysis';
 import { FIT_TEXT, fitScript } from './fit-runtime';
-import { HOT_CLOSE, HOT_OPEN, HOT_SCRIPT, hotRuntime } from './hot';
+import { HOT_CLOSE, HOT_MODULE, HOT_OPEN, HOT_SCRIPT, hotRuntime } from './hot';
 import { ANIMATOR_CSS, textRender } from '../text-animators/render';
 import { declaredFamilyCss, fontStack, loadDescriptors, googleFontsUrl, loadedWeight, uploadFaceCss, usedFaces } from '../fonts/model';
 import { bakePaths } from '../path';
@@ -356,6 +356,10 @@ function withoutBackdrop(doc: MotionDoc): MotionDoc {
   return { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.filter((c) => !BACKDROPS.has(c.component as ComponentId)) })) };
 }
 
+function hotScript(script: string): string {
+  return script.replace('<script>', HOT_SCRIPT).replace('<script type="module">', HOT_MODULE);
+}
+
 function zoomed(doc: MotionDoc, scale: number): string {
   return scale === 1 ? '' : `#root{width:${doc.width}px;height:${doc.height}px;zoom:${scale}}`;
 }
@@ -433,15 +437,13 @@ export function composeHtml(raw: ComposeInput): string {
   const threeCustom = libraries.has(Library.Three);
   const env = { assets: input.assets, brand: brandEnv(tokens) };
   const boot = gated(bootScript(runs, env, `window.__timelines[${js(COMPOSITION_ID)}]`));
-  const definitions = [...used].map((name) => definitionScript(name, doc.components[name].source.js)).join('');
+  const definitions = [...used].map((name) => hotScript(definitionScript(name, doc.components[name].source.js))).join('');
   const customBoot = threeCustom
     ? `<script type="module">import * as THREE from 'three';window.${THREE_GLOBAL}=THREE;${boot}</script>`
     : boot
       ? `<script>${boot}</script>`
       : '';
   const scripts = [RUNTIME_URL, SCREENSHOT_URL, ...(three.length || compositions.length ? [THREE_BASE] : []), ...outlines, ...[...libraries].flatMap((lib) => LIBRARY_TAGS[lib].scripts)];
-  const hot = !(three.length || compositions.length || stage || runs.length || particles.length);
-  const hotScript = (script: string) => (hot ? script.replace('<script>', HOT_SCRIPT) : script);
   const assetUrls = [...Object.values(input.assets), ...(tokens.logoUrl ? [tokens.logoUrl] : []), ...threeAssetUrls(look, three)];
 
   const page = [
@@ -454,26 +456,26 @@ export function composeHtml(raw: ComposeInput): string {
     three.length || compositions.length || threeCustom ? threeImportMap() : '',
     `<link rel="stylesheet" crossorigin="anonymous" href="${FONTS_URL}" />`,
     fitScript(),
-    hot ? hotRuntime() : '',
+    hotRuntime(),
     fontLinks(doc, input.assets),
-    `<style>${BASE_CSS}#root{background:${esc(background)}}${zoomed(doc, scale)}${stage ? STAGE_CSS + stageRootStyle(stage) : ''}</style>`,
+    `<style>${BASE_CSS}#root{background:${esc(background)}}${zoomed(doc, scale)}${stage ? STAGE_CSS : ''}</style>`,
     '</head><body>',
     `<div id="root" data-composition-id="${COMPOSITION_ID}" data-start="0" data-width="${frame.width}" data-height="${frame.height}" data-duration="${duration}" data-fps="${doc.fps}">`,
-    stage ? `<div id="world" class="world">${world.join('')}</div><!--/world-->` : '',
-    hot ? HOT_OPEN : '',
+    HOT_OPEN,
+    stage ? `<style>${stageRootStyle(stage)}</style><div id="world" class="world">${world.join('')}</div><!--/world-->` : '',
     layers.join(''),
     fontProbe(doc),
-    hot ? HOT_CLOSE : '',
+    HOT_CLOSE,
     '</div>',
-    `${hot ? HOT_SCRIPT : '<script>'}${animation.setup}const tl=${ENGINE}.timeline();${holds.map(holdLine).join('')}${tweens.map(tweenLine).join('')}${animation.timeline}${effectScript(effectSets)}${held.size ? holdScript(doc.fps, doc.motionBlur) : ''}tl.set({}, {}, ${duration});window.__timelines=window.__timelines||{};window.__timelines[${js(COMPOSITION_ID)}]=tl;</script>`,
+    `${HOT_SCRIPT}${animation.setup}const tl=${ENGINE}.timeline();${holds.map(holdLine).join('')}${tweens.map(tweenLine).join('')}${animation.timeline}${effectScript(effectSets)}${held.size ? holdScript(doc.fps, doc.motionBlur) : ''}tl.set({}, {}, ${duration});window.__timelines=window.__timelines||{};window.__timelines[${js(COMPOSITION_ID)}]=tl;</script>`,
     hotScript(matteScript(pairs, Number(duration))),
     definitions,
-    customBoot,
-    stage ? `<script>${stageScript(stage, doc.fps, Number(duration))}</script>` : '',
-    threeScript(three, Number(duration), stage, look),
-    compositionScript(compositions, Number(duration)),
+    hotScript(customBoot),
+    stage ? `${HOT_SCRIPT}${stageScript(stage, doc.fps, Number(duration))}</script>` : '',
+    hotScript(threeScript(three, Number(duration), stage, look)),
+    hotScript(compositionScript(compositions, Number(duration))),
     hotScript(shapeScript(shapes, doc.fps, Number(duration))),
-    particleScript(particles, doc.fps, Number(duration))
+    hotScript(particleScript(particles, doc.fps, Number(duration)))
   ].join('');
   return `${page}${captureScript(frame, contentStamp(page))}</body></html>`;
 }
