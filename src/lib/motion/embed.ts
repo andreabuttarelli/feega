@@ -28,8 +28,9 @@ const unionBy = <T>(key: (item: T) => string, ...lists: T[][]): T[] => [...new M
 export function embedMotion(host: MotionDoc, nodeId: string, source: MotionDoc): MotionDoc {
   const id = motionCompId(nodeId);
   const rename: Rename = (inner) => `${id}${SCOPE}${inner}`;
-  const nested = Object.fromEntries(Object.entries(source.comps).map(([key, comp]): [string, MotionComp] => [rename(key), { ...comp, tracks: scopedTracks(comp.tracks, rename) }]));
-  const outer: MotionComp = { name: id, durationInFrames: source.durationInFrames, tracks: scopedTracks(source.tracks, rename) };
+  const frame = { width: source.width, height: source.height };
+  const nested = Object.fromEntries(Object.entries(source.comps).map(([key, comp]): [string, MotionComp] => [rename(key), { ...comp, frame, tracks: scopedTracks(comp.tracks, rename) }]));
+  const outer: MotionComp = { name: id, durationInFrames: source.durationInFrames, frame, tracks: scopedTracks(source.tracks, rename) };
 
   return {
     ...host,

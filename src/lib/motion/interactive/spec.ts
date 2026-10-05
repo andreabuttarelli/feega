@@ -7,7 +7,7 @@ import { liveTarget } from '../hyperframes/animate';
 import { SEPARATOR } from '../precomp';
 import { pivotOf, transformAt } from '../parent';
 import { apply2d, composeLocal, mul2d, type Affine } from '../affine';
-import { BENTO_LAYOUT, bentoCellId, type BentoCard } from '../bento/model';
+import { BENTO_LAYOUT, bentoCellId, cellFrames, type BentoCard, type CompFrame } from '../bento/model';
 import { bentoSlotAt } from '../hyperframes/bento';
 import type { HostSpec, HostStep, LiveLane, LiveSpec, Rect } from './live';
 import type { Outside } from './settings';
@@ -44,7 +44,7 @@ const DEG = Math.PI / 180;
 const PRECISION = 1000;
 
 type Size = { width: number; height: number; fps: number };
-type CellRef = { grid: MotionClip; item: number };
+type CellRef = { grid: MotionClip; item: number; content: CompFrame | null };
 type HostFrame = { m: Affine; clip: Rect | null };
 
 function projected(clip: MotionClip, frame: number, size: Size): Affine {
@@ -66,29 +66,41 @@ function boundsOf(m: Affine, [left, top, width, height]: Rect): Rect {
   return [Math.min(...xs), Math.min(...ys), Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)];
 }
 
+const toFrame = (size: Size, content: CompFrame): Affine => [content.width / size.width, 0, 0, content.height / size.height, 0, 0];
+const fromFrame = (size: Size, content: CompFrame): Affine => [size.width / content.width, 0, 0, size.height / content.height, 0, 0];
+
 function cellFrame(cell: CellRef, frame: number, size: Size): HostFrame | null {
-  const slot = bentoSlotAt(cell.grid, size, cell.item, frame);
+  const content = cell.content ?? size;
+  const slot = bentoSlotAt(cell.grid, size, cell.item, frame, content);
   if (!slot) {
     return null;
   }
   const grid = projected(cell.grid, frame, size);
   const { x, y, scale } = slot.content;
-  return { m: mul2d(grid, [scale, 0, 0, scale, x, y]), clip: boundsOf(grid, [slot.cell.left, slot.cell.top, slot.cell.width, slot.cell.height]) };
+  return { m: mul2d(mul2d(grid, [scale, 0, 0, scale, x, y]), toFrame(size, content)), clip: boundsOf(grid, [slot.cell.left, slot.cell.top, slot.cell.width, slot.cell.height]) };
 }
 
 function cellsOf(doc: MotionDoc): Map<string, CellRef> {
   const cells = new Map<string, CellRef>();
   for (const grid of clipsOf(doc).filter((c) => c.component === 'Composition' && c.props.layout === BENTO_LAYOUT)) {
-    ((grid.props.media ?? []) as BentoCard[]).forEach((_, item) => cells.set(bentoCellId(grid.id, item), { grid, item }));
+    ((grid.props.media ?? []) as BentoCard[]).forEach((card, item) => cells.set(bentoCellId(grid.id, item), { grid, item, content: card.kind === 'comp' ? (doc.comps[card.assetId]?.frame ?? null) : null }));
   }
   return cells;
 }
 
 const rounded = (frame: HostFrame) => JSON.parse(JSON.stringify(frame, (_k, v) => (typeof v === 'number' ? Math.round(v * PRECISION) / PRECISION : v))) as HostFrame;
 
+function inFrame(clip: MotionClip, frame: number, size: Size, content: CompFrame | null): Affine {
+  if (!content) {
+    return projected(clip, frame, size);
+  }
+  return mul2d(mul2d(fromFrame(size, content), projected(clip, frame, { ...size, ...content })), toFrame(size, content));
+}
+
 function hostOf(clip: MotionClip, cell: CellRef | undefined, doc: MotionDoc): HostSpec {
   const size = { width: doc.width, height: doc.height, fps: doc.fps };
-  const frameAt = (frame: number): HostFrame => (cell ? cellFrame(cell, frame, size) : null) ?? { m: projected(clip, frame, size), clip: null };
+  const content = cellFrames(doc).find((c) => clip.id.startsWith(c.prefix))?.frame ?? null;
+  const frameAt = (frame: number): HostFrame => (cell ? cellFrame(cell, frame, size) : null) ?? { m: inFrame(clip, frame, size, content), clip: null };
   const steps: HostStep[] = [];
   for (let frame = 0; frame <= doc.durationInFrames; frame++) {
     const next = rounded(frameAt(frame));

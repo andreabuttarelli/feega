@@ -12,7 +12,7 @@ import { deviceRuntime } from './device-runtime';
 import { ringBake, ringHtml, ringScript } from './ring';
 import { RING_LAYOUT } from '../ring/model';
 import { bentoBake, bentoHtml, bentoScript } from './bento';
-import { BENTO_LAYOUT } from '../bento/model';
+import { BENTO_LAYOUT, cellFrames } from '../bento/model';
 import { bakeComposition, compositionScript, type TimedBake } from './composition';
 import { ANIMATE_CSS, ENGINE, animationScript, keyedOverrides, sceneKeys, wrapAnimated, wrapParents } from './animate';
 import { ancestorsOf, parentsWithChildren } from '../parent';
@@ -159,14 +159,19 @@ function moveTweens(clip: MotionClip, fps: number): Tween[] {
   return [{ target: `#mv-${clip.id}`, from: move.from, to: move.to, at: clip.from / fps, duration: clip.durationInFrames / fps, ease: p.easing ?? Ease.Standard }];
 }
 
+function frameOf(clip: MotionClip, doc: MotionDoc): { width: number; height: number } {
+  return cellFrames(doc).find((c) => clip.id.startsWith(c.prefix))?.frame ?? doc;
+}
+
 function ctxOf(clip: MotionClip, input: ComposeInput): TemplateCtx<ComponentId> {
   const { doc, tokens, assets } = input;
+  const { width, height } = frameOf(clip, doc);
   return {
     id: clip.id,
     p: { ...clip.props, ...keyedOverrides(clip) } as never,
-    width: doc.width,
-    height: doc.height,
-    unit: Math.min(doc.width, doc.height),
+    width,
+    height,
+    unit: Math.min(width, height),
     start: Number(seconds(clip.from, doc.fps)),
     length: Number(seconds(clip.durationInFrames, doc.fps)),
     fps: doc.fps,
@@ -179,7 +184,8 @@ function ctxOf(clip: MotionClip, input: ComposeInput): TemplateCtx<ComponentId> 
     font: (family) => fontStack(family, doc.fonts),
     weight: (family, weight) => loadedWeight(family, weight, doc.fonts),
     text: textRender(clip.id, clip.animators, (v) => resolveColor(v, tokens)),
-    remap: () => remappedSegments(clip, doc.fps)
+    remap: () => remappedSegments(clip, doc.fps),
+    compFrame: (compId) => doc.comps[compId]?.frame ?? null
   };
 }
 

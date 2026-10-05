@@ -9,6 +9,7 @@ import { isAnimatable } from '../keyframes';
 import { bentoCellId } from '../bento/model';
 import { composeHtml } from './compose';
 import { bentoAt, bentoBake, bentoSlotAt, slotLocal } from './bento';
+import { embedMotion, motionCompId } from '../embed';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -70,6 +71,17 @@ describe('a composition laid out as a bento', () => {
     expect(cell(1)).toContain('background:#ff0000');
     expect(html).toContain('feegaBento');
     expect(html).not.toContain('id="comp-grid"');
+  });
+
+  it('lays a motion out in its own frame, not the host one: a landscape motion in a vertical bento keeps its proportions', () => {
+    const landscape = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Title', from: 0, durationInFrames: 60, props: { x: 0.5, width: 0.5 } }, 'wide'));
+    const host = embedMotion(newMotionDoc(MotionFormat.Vertical), 'src', { ...landscape, durationInFrames: 60 });
+    const doc = must(setProps(must(addClip(host, { component: 'Composition', from: 0, durationInFrames: 60 }, 'grid')), 'grid', { layout: 'bento', media: [{ assetId: motionCompId('src'), kind: 'comp' }], layoutParams: { columns: 1, rows: 3 } }));
+    const html = compose(doc);
+    const inner = html.slice(html.indexOf('class="btc"'));
+
+    expect(inner).toMatch(/^class="btc" style="[^"]*width:1920px;height:1080px/);
+    expect(inner).toContain('left:480px');
   });
 
   it('keyframes the corner radius', () => {
