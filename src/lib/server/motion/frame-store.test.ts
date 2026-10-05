@@ -22,6 +22,13 @@ const scope = { orgId: 'o', projectId: 'p', nodeId: 'n' };
 const fast = { timeoutMs: 200, pollMs: 10 };
 
 describe('frames travel from the preview to the agent through storage', () => {
+  it('a storage error is thrown with its cause, never mistaken for a preview that did not answer', async () => {
+    const bucket = { ...memoryBucket(), list: async () => ({ data: null, error: { message: 'invalid input syntax for type uuid: "e2e-perf"' } }) };
+
+    await expect(awaitFrames(bucket, framesPrefix(scope, 'call_x'), 1, fast)).rejects.toThrow('e2e-perf');
+    await expect(awaitVerdict(bucket, framesPrefix(scope, 'call_x'), fast)).rejects.toThrow('e2e-perf');
+  });
+
   it('frames put by the preview are read back in order, then removed', async () => {
     const bucket = memoryBucket();
     const prefix = framesPrefix(scope, 'call_1');

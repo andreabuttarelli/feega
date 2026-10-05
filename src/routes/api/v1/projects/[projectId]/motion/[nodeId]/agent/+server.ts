@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { llmCodeModel, llmLanguageModel, llmVisionModel } from '$lib/server/llm';
 import { offeredChatModels, reasoningProviderOptions, resolveChoice } from '$lib/server/chat-model/catalogue';
 import { ensureGatewayModels, gatewayRate } from '$lib/server/openrouter-models';
-import { MOTION_TURN_CAP_USD, Tier, activeTools, openingTier, spentUsd, stepTier } from '$lib/server/motion/model-route';
+import { MOTION_TURN_CAP_USD, Tier, activeTools, openingTier, selfCheckChoice, spentUsd, stepTier } from '$lib/server/motion/model-route';
 import { extractSdkUsage, logAiCall, withOrgContext } from '$lib/server/ai-log';
 import { gateOrgAiAction } from '$lib/server/cli-auth';
 import { loadTurns, openNodeThread, promptHistory, saveTurn } from '$lib/server/repos/chat';
@@ -51,7 +51,6 @@ const ROUND_STOPS: Record<Round, (t0: number, overBudget: Stop) => Stop[]> = {
   [Round.SelfCheck]: (t0, overBudget) => [agentStopWhen(t0), selfCheckSpent, overBudget]
 };
 
-const FORCES_TOOL: Record<Tier, boolean> = { [Tier.Edit]: true, [Tier.Code]: false };
 
 type TurnStep = Parameters<typeof finishedTurn>[0][number] & { usage: unknown };
 
@@ -178,7 +177,7 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
         const routed = visionModel ? visionStep({ lastCalls: steps.at(-1)?.toolCalls ?? [], messages: current, frames: session.frames, visionModel: tier === Tier.Code ? codeModel : visionModel }) : undefined;
         const stepModel = routed?.model ?? tierModel;
         stepModels.push(stepModel);
-        const forced = kind === Round.SelfCheck && stepNumber === 0 && FORCES_TOOL[tier] ? { toolChoice: { type: 'tool' as const, toolName: VIEW_FRAMES } } : {};
+        const forced = kind === Round.SelfCheck && stepNumber === 0 ? selfCheckChoice({ tier, reasoning: stepModel === model ? (reasoning ?? null) : null }) : {};
         return { model: llmLanguageModel(stepModel), providerOptions: stepModel === model ? reasoningProviderOptions(reasoning) : {}, activeTools: activeTools(tier, toolNames), ...(routed?.messages ? { messages: routed.messages } : {}), ...forced };
       }
     });

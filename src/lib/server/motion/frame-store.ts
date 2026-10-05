@@ -29,6 +29,14 @@ export async function putFrames(bucket: FrameBucket, prefix: string, frames: Fra
   return results.every((r) => !r.error);
 }
 
+async function listed(bucket: FrameBucket, prefix: string): Promise<string[]> {
+  const { data, error } = await bucket.list(prefix);
+  if (error) {
+    throw new Error(`frame storage refused the read: ${error.message}`);
+  }
+  return (data ?? []).map((f) => f.name);
+}
+
 async function readAll(bucket: FrameBucket, prefix: string, names: string[]): Promise<Frame[]> {
   const parsed = names.map((name) => ({ name, match: FRAME_NAME.exec(name) })).filter((n) => n.match);
   parsed.sort((a, b) => Number(a.match![1]) - Number(b.match![1]));
@@ -46,8 +54,7 @@ async function readAll(bucket: FrameBucket, prefix: string, names: string[]): Pr
 export async function awaitFrames(bucket: FrameBucket, prefix: string, count: number, timing = { timeoutMs: FRAME_WAIT_MS, pollMs: FRAME_POLL_MS }): Promise<Frame[] | null> {
   const deadline = Date.now() + timing.timeoutMs;
   while (Date.now() < deadline) {
-    const { data } = await bucket.list(prefix);
-    const names = (data ?? []).map((f) => f.name).filter((n) => FRAME_NAME.test(n));
+    const names = (await listed(bucket, prefix)).filter((n) => FRAME_NAME.test(n));
     if (names.length >= count) {
       return readAll(bucket, prefix, names);
     }
@@ -64,8 +71,7 @@ export async function putVerdict(bucket: FrameBucket, prefix: string, verdict: S
 export async function awaitVerdict(bucket: FrameBucket, prefix: string, timing = { timeoutMs: FRAME_WAIT_MS, pollMs: FRAME_POLL_MS }): Promise<(StoredVerdict & { frames: Frame[] }) | null> {
   const deadline = Date.now() + timing.timeoutMs;
   while (Date.now() < deadline) {
-    const { data } = await bucket.list(prefix);
-    const names = (data ?? []).map((f) => f.name);
+    const names = await listed(bucket, prefix);
     if (names.includes(VERDICT_NAME)) {
       const { data: blob } = await bucket.download(`${prefix}/${VERDICT_NAME}`);
       const verdict = JSON.parse(blob ? await blob.text() : '{}') as StoredVerdict;
