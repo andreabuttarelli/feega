@@ -84,6 +84,13 @@ ognuna un layer di compositing a piena risoluzione, centinaia per frame. JS e la
 istantaneo. Mossa: confrontare varianti dell'HTML con un CSS in più (`will-change:auto`) e
 misurare ms per screenshot; dentro le copie si spegne il `will-change`.
 
+### Una preview che resta ferma al frame 0 dopo aver caricato un doc: `structuredClone` su un proxy di `$state`
+Segnale: la preview non si aggiorna e non parte, nessun errore in `console`; con
+`page.on('pageerror')` esce `DataCloneError: … could not be cloned`. Un doc caricato in un
+`$state` profondo è un proxy, e `applyDraft`/`parseMotionDoc` lo clonano. Mossa: i doc letti dal
+server vanno in `$state.raw` (si sostituisce l'oggetto intero), e nei giri Playwright si ascolta
+`pageerror`, non solo `console`.
+
 ## Ambiente e worktree
 
 ### I tempi di idratazione misurati in dev non dicono niente

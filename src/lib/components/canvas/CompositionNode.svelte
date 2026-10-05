@@ -28,7 +28,7 @@
 
   type Loaded = { revision: number; doc: MotionDoc | null; assets: Record<string, string> };
 
-  let sources = $state<Record<string, Loaded>>({});
+  let sources = $state.raw<Record<string, Loaded>>({});
 
   async function load(card: MotionCard) {
     const shown = sources[card.sourceId];

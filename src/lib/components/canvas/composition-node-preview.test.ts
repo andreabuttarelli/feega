@@ -13,6 +13,10 @@ describe('the composition node runs on the motion engine', () => {
     expect(node).toMatch(/<CompositionPlayer[^>]*doc=\{nodeDoc\(node, cards, motions\)\}/);
   });
 
+  it('keeps loaded motion docs out of deep state: nodeDoc structured-clones them, and a state proxy cannot be cloned', () => {
+    expect(node).toMatch(/let sources = \$state\.raw</);
+  });
+
   it('opens and exports in Compositions, the motion editor with its export dialog', () => {
     expect(node).toMatch(/ondblclick=\{openInCompositions\}/);
     expect(node).toMatch(/action="\/app\/compose\?\/fromNode"/);
