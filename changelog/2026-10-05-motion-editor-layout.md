@@ -23,6 +23,7 @@ Primo passo della spec di redesign dell'editor (layout e barra superiore).
   puntatore touch bottoni e strumenti a 44px.
 - Zoom della timeline anche come slider (scala logaritmica), oltre a −/+.
 - `selection-context.ts`: la pagina espone ids e clip selezionata via context, così inspector e
-  overlay della preview leggono la stessa fonte.
+  overlay della preview leggono la stessa fonte. `SelectionOverlay` (#140) legge e scrive la
+  selezione solo da lì: niente più prop `selection`/`onselect` paralleli.
 
 Comportamento di play, scorciatoie e pannelli invariato.

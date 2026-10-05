@@ -199,6 +199,10 @@
     },
     get clip() {
       return selected;
+    },
+    select: (ids) => {
+      selection = ids;
+      cameraOpen = false;
     }
   });
   const editorUrl = $derived(`/p/${data.projectId}/c/${data.canvas.id}/motion/${data.node.id}`);
@@ -842,7 +846,7 @@
   <div class="body" bind:this={body} style={`--tl-h: ${layout.timelinePx}px;`} class:coding={inspectorTab === InspectorTab.Code && selected?.component === 'Custom'} class:no-props={layout.inspector === Panel.Closed} class:no-chat={layout.chat === Panel.Closed}>
     <section class="stage" aria-label="Preview">
       <MotionPreview bind:this={preview} {html} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing>
-        {#if !playing}<SelectionOverlay {doc} {frame} {html} {selection} measure={() => preview?.measure() ?? Promise.resolve({})} onselect={(ids) => (selection = ids)} onpreview={(next) => (previewDoc = next)} onchange={edit} />{/if}
+        {#if !playing}<SelectionOverlay {doc} {frame} {html} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} />{/if}
         {#if selected?.mask && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<MaskOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected?.component === 'Shape' && selected.props.shape === 'path' && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<PenOverlay {doc} clip={selected} onchange={edit} />{/if}
         {#if selected?.path && !playing}<MotionPathOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}

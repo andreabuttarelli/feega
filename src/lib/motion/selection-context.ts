@@ -1,7 +1,7 @@
 import { getContext, setContext } from 'svelte';
 import type { MotionClip } from './doc';
 
-export type SelectionView = { readonly ids: readonly string[]; readonly clip: MotionClip | null };
+export type SelectionView = { readonly ids: string[]; readonly clip: MotionClip | null; select: (ids: string[]) => void };
 
 const SELECTION = Symbol('motion-selection');
 
