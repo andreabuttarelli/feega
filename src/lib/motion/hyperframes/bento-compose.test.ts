@@ -84,6 +84,21 @@ describe('a composition laid out as a bento', () => {
     expect(inner).toContain('left:480px');
   });
 
+  it('a bento inside a looping precomp keeps its cells full on every loop', () => {
+    const grid = bento([{ assetId: 'dash', kind: 'comp' }]);
+    const inner = { ...grid, durationInFrames: 150 };
+    const wrapped = must(precompose(inner, ['grid'], { comp: 'wrap', clip: 'pc' }, 'Wrap'));
+    const looped = { ...wrapped, durationInFrames: 300, tracks: wrapped.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === 'pc' ? { ...c, durationInFrames: 300, props: { ...c.props, loop: true } } : c)) })) };
+    const html = compose(looped);
+    const cell = (k: number) => {
+      const start = html.indexOf(`id="bt-pc__${k}__grid-0"`);
+      return start < 0 ? '' : html.slice(start, html.indexOf('id="bt-', start + 1));
+    };
+
+    expect(cell(0)).toContain(`data-clip="pc__0__grid__b0__0__kpi"`);
+    expect(cell(1)).toContain(`data-clip="pc__1__grid__b0__0__kpi"`);
+  });
+
   it('keyframes the corner radius', () => {
     const doc = must(setKeyframes(bento([]), 'grid', 'cornerRadius', [{ frame: 0, value: 0, ease: Ease.Linear }, { frame: 30, value: 60, ease: Ease.Linear }]));
     const bake = bentoBake(gridOf(doc), ENV);
