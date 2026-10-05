@@ -10,6 +10,7 @@ import { liveScene } from './live';
 import { liveSpec } from './spec';
 import { bakeExpressions } from '../expression/bake';
 import { Outside } from './settings';
+import { embedMotion, motionCompId } from '../embed';
 
 const sceneOf = (doc: MotionDoc, outside: Outside) => liveScene(liveSpec({ live: doc, baked: bakeExpressions(doc), outside, parents: [] }));
 
@@ -155,6 +156,22 @@ describe('live inputs through nested compositions', () => {
     expect(values.get('grid__b0__0__dot.x')).toBeCloseTo(0.1);
     expect(values.get('grid__b0__0__dot.y')).toBeCloseTo(-0.25);
     expect(values.get('grid__b1__0__dot2.x')).toBeCloseTo(0);
+  });
+
+  it('a landscape motion in a vertical bento reads the cursor in its own frame', () => {
+    const source = { ...follower(newMotionDoc(MotionFormat.Landscape), 'dot'), durationInFrames: 60 };
+    let doc = embedMotion(newMotionDoc(MotionFormat.Vertical), 'src', source);
+    doc = ok(addClip(doc, { component: 'Composition', from: 0, durationInFrames: 60 }, 'grid'));
+    doc = ok(setProps(doc, 'grid', { layout: 'bento', media: [{ assetId: motionCompId('src'), kind: 'comp' }], layoutParams: { columns: 1, rows: 2, gap: 0, enter: 'none' } }));
+    const flat = flattenComps(doc);
+    const grid = clipsOf(flat).find((c) => c.id === 'grid') as MotionClip;
+    const slot = bentoSlotAt(grid, { width: doc.width, height: doc.height, fps: doc.fps }, 0, 10, { width: source.width, height: source.height })!;
+    const point = { x: (slot.content.x + slot.content.scale * source.width * 0.75) / doc.width, y: (slot.content.y + slot.content.scale * source.height * 0.25) / doc.height };
+
+    const values = sceneOf(flat, Outside.Fallback).tick(at(point.x, point.y), 10, 0);
+
+    expect(values.get('grid__b0__0__dot.x')).toBeCloseTo(0.25);
+    expect(values.get('grid__b0__0__dot.y')).toBeCloseTo(-0.25);
   });
 });
 

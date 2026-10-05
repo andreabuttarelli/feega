@@ -2,13 +2,14 @@
 import { describe, expect, it } from 'vitest';
 import { FEEGA_TOKENS } from '../brand';
 import { Ease } from '../design';
-import { MotionFormat, clipsOf, newMotionDoc, type MotionClip, type MotionDoc } from '../doc';
+import { Background, MotionFormat, clipsOf, newMotionDoc, type MotionClip, type MotionDoc } from '../doc';
 import { flattenComps, precompose } from '../precomp';
 import { addClip, setKeyframes, setProps, type OpResult } from '../timeline';
 import { isAnimatable } from '../keyframes';
 import { bentoCellId } from '../bento/model';
 import { composeHtml } from './compose';
 import { bentoAt, bentoBake, bentoSlotAt, slotLocal } from './bento';
+import { embedMotion, motionCompId } from '../embed';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -70,6 +71,45 @@ describe('a composition laid out as a bento', () => {
     expect(cell(1)).toContain('background:#ff0000');
     expect(html).toContain('feegaBento');
     expect(html).not.toContain('id="comp-grid"');
+  });
+
+  it('lays a motion out in its own frame, not the host one: a landscape motion in a vertical bento keeps its proportions', () => {
+    const landscape = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Title', from: 0, durationInFrames: 60, props: { x: 0.5, width: 0.5 } }, 'wide'));
+    const host = embedMotion(newMotionDoc(MotionFormat.Vertical), 'src', { ...landscape, durationInFrames: 60 });
+    const doc = must(setProps(must(addClip(host, { component: 'Composition', from: 0, durationInFrames: 60 }, 'grid')), 'grid', { layout: 'bento', media: [{ assetId: motionCompId('src'), kind: 'comp' }], layoutParams: { columns: 1, rows: 3 } }));
+    const html = compose(doc);
+    const inner = html.slice(html.indexOf('class="btc"'));
+
+    expect(inner).toMatch(/^class="btc" style="[^"]*width:1920px;height:1080px/);
+    expect(inner).toContain('left:480px');
+  });
+
+  it('a nested motion brings its own background into the cell, and a transparent one shows the cell colour', () => {
+    const source = { ...newMotionDoc(MotionFormat.Landscape), durationInFrames: 60 };
+    const cellOf = (background: MotionDoc['background']) => {
+      const host = embedMotion(newMotionDoc(MotionFormat.Landscape), 'src', { ...source, background });
+      const doc = must(setProps(must(addClip(host, { component: 'Composition', from: 0, durationInFrames: 60 }, 'grid')), 'grid', { layout: 'bento', media: [{ assetId: motionCompId('src'), kind: 'comp' }], layoutParams: { columns: 1, rows: 1 } }));
+      const html = compose(doc);
+      return html.slice(html.indexOf('class="btc"'), html.indexOf('>', html.indexOf('class="btc"')));
+    };
+
+    expect(cellOf(Background.Brand)).toContain(`background:${FEEGA_TOKENS.colors['brand.background']}`);
+    expect(cellOf(Background.Transparent)).not.toContain('background:');
+  });
+
+  it('a bento inside a looping precomp keeps its cells full on every loop', () => {
+    const grid = bento([{ assetId: 'dash', kind: 'comp' }]);
+    const inner = { ...grid, durationInFrames: 150 };
+    const wrapped = must(precompose(inner, ['grid'], { comp: 'wrap', clip: 'pc' }, 'Wrap'));
+    const looped = { ...wrapped, durationInFrames: 300, tracks: wrapped.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === 'pc' ? { ...c, durationInFrames: 300, props: { ...c.props, loop: true } } : c)) })) };
+    const html = compose(looped);
+    const cell = (k: number) => {
+      const start = html.indexOf(`id="bt-pc__${k}__grid-0"`);
+      return start < 0 ? '' : html.slice(start, html.indexOf('id="bt-', start + 1));
+    };
+
+    expect(cell(0)).toContain(`data-clip="pc__0__grid__b0__0__kpi"`);
+    expect(cell(1)).toContain(`data-clip="pc__1__grid__b0__0__kpi"`);
   });
 
   it('keyframes the corner radius', () => {

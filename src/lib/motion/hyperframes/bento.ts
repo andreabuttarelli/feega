@@ -10,7 +10,8 @@ import { hotScope, hotSeek } from './hot';
 
 type BentoProps = PropsOf<'Composition'>;
 type Env = { width: number; height: number; fps: number };
-type Ctx = Env & { id: string; p: BentoProps; start: number; length: number; mediaStart: number; color: (v: string) => string; asset: (id: string | null) => string | null };
+type Frame = { width: number; height: number };
+type Ctx = Env & { id: string; p: BentoProps; start: number; length: number; mediaStart: number; color: (v: string) => string; asset: (id: string | null) => string | null; compFrame: (compId: string) => Frame | null; compBackground: (compId: string) => string | null };
 
 export type BentoBake = {
   id: string;
@@ -96,13 +97,13 @@ export function bentoAt(bake: BentoBake, frame: number): BentoPose {
 export type BentoSlot = { cell: BentoRect; content: { x: number; y: number; scale: number } };
 type Point = { x: number; y: number };
 
-function contentOffset(card: BentoCard, rect: BentoRect, env: Env) {
-  const s = FRAME_SCALE[fitOf(card)](rect.width / env.width, rect.height / env.height);
+function contentOffset(card: BentoCard, rect: BentoRect, content: Frame) {
+  const s = FRAME_SCALE[fitOf(card)](rect.width / content.width, rect.height / content.height);
   const focus = focusOf(card);
-  return { x: (rect.width - env.width * s) * focus.x, y: (rect.height - env.height * s) * focus.y, scale: s };
+  return { x: (rect.width - content.width * s) * focus.x, y: (rect.height - content.height * s) * focus.y, scale: s };
 }
 
-export function bentoSlotAt(clip: MotionClip, env: Env, item: number, frame: number): BentoSlot | null {
+export function bentoSlotAt(clip: MotionClip, env: Env, item: number, frame: number, content: Frame = env): BentoSlot | null {
   const p = clip.props as BentoProps;
   const cells = cellsOf(p, env);
   const index = cells.findIndex((c) => c.item === item);
@@ -112,7 +113,7 @@ export function bentoSlotAt(clip: MotionClip, env: Env, item: number, frame: num
   }
   const { rect } = cells[index];
   const pose = bentoAt(bentoBake(clip, env), frame).cells[index];
-  const offset = contentOffset(card, rect, env);
+  const offset = contentOffset(card, rect, content);
   const centre = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
   return {
     cell: rect,
@@ -144,8 +145,9 @@ const FRAME_SCALE: Record<CellFit, (a: number, b: number) => number> = {
 };
 
 function framed(ctx: Ctx, card: BentoCard, rect: BentoRect, chunk: string): string {
-  const o = contentOffset(card, rect, ctx);
-  return `<div class="btc" style="${css({ position: 'absolute', left: '0', top: '0', width: px(ctx.width), height: px(ctx.height), transformOrigin: '0 0', transform: `translate(${px(o.x)},${px(o.y)}) scale(${Math.round(o.scale * 10000) / 10000})` })}">${chunk}</div>`;
+  const content = ctx.compFrame(card.assetId) ?? ctx;
+  const o = contentOffset(card, rect, content);
+  return `<div class="btc" style="${css({ position: 'absolute', left: '0', top: '0', width: px(content.width), height: px(content.height), background: ctx.compBackground(card.assetId) ?? undefined, transformOrigin: '0 0', transform: `translate(${px(o.x)},${px(o.y)}) scale(${Math.round(o.scale * 10000) / 10000})` })}">${chunk}</div>`;
 }
 
 const FACES: Record<BentoCard['kind'], Face> = {

@@ -123,7 +123,8 @@ function placeOne(clip: MotionClip, w: Window, k: number, prefix: string): Motio
 function placed(host: MotionClip, comp: MotionComp, tracks: MotionTrack[]): MotionTrack[] {
   const w = windowOf(host, comp);
   const prefix = `${host.id}${SEPARATOR}`;
-  const laid = tracks.map((t) => ({ ...t, id: `${prefix}${t.id}`, clips: w.loops.flatMap((k) => (t.clips as MotionClip[]).flatMap((c) => placeOne(c, w, k, prefix) ?? [])) }));
+  const loopTrack = (t: MotionTrack, k: number) => ({ ...t, id: w.loops.length > 1 ? `${prefix}${k}${SEPARATOR}${t.id}` : `${prefix}${t.id}`, clips: (t.clips as MotionClip[]).flatMap((c) => placeOne(c, w, k, prefix) ?? []) });
+  const laid = w.loops.flatMap((k) => tracks.map((t) => loopTrack(t, k)));
   const present = new Set(laid.flatMap((t) => t.clips.map((c) => c.id)));
   return laid.map((t) => ({ ...t, clips: t.clips.map((c) => (c.parent && !present.has(c.parent) ? { ...c, parent: null } : c)) }));
 }
@@ -133,8 +134,9 @@ type Expander = (doc: MotionDoc, track: MotionTrack, host: MotionClip, depth: nu
 function precompTracks(doc: MotionDoc, track: MotionTrack, host: MotionClip, depth: number): MotionTrack[] {
   const comp = doc.comps[compOf(host)!];
   const inner = expand(doc, withoutHidden({ ...doc, tracks: comp.tracks }).tracks, depth + 1);
-  const group: MotionClip = { ...host, props: { ...host.props, span: inner.length } };
-  return [{ ...track, id: `${host.id}${SEPARATOR}group`, clips: [group] }, ...placed(host, comp, inner)];
+  const laid = placed(host, comp, inner);
+  const group: MotionClip = { ...host, props: { ...host.props, span: laid.length } };
+  return [{ ...track, id: `${host.id}${SEPARATOR}group`, clips: [group] }, ...laid];
 }
 
 function cardHost(grid: MotionClip, id: string, props: { comp: string; loop: boolean; hold: boolean }): MotionClip {

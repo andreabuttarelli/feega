@@ -40,6 +40,8 @@ export type TemplateCtx<K extends ComponentId> = {
   weight: (family: string, weight: number) => number;
   text: TextRender;
   remap: () => MediaSegment[] | null;
+  compFrame: (compId: string) => { width: number; height: number } | null;
+  compBackground: (compId: string) => string | null;
 };
 
 export enum Timing {
