@@ -1,5 +1,5 @@
 import type { Db } from '$lib/server/db/client';
-import { claimRun, completeRun, createRun, failRun, listNodeRuns, queuedRenderRuns, releaseClaim, RENDER_JOB_PREFIX, setRunParams, type NodeRun } from '$lib/server/repos/node-runs';
+import { activeRenderRuns, claimRun, completeRun, createRun, failRun, listNodeRuns, queuedRenderRuns, releaseClaim, RENDER_JOB_PREFIX, setRunParams, type NodeRun } from '$lib/server/repos/node-runs';
 import { CANVAS_ASSET_BUCKET } from '$lib/server/repos/asset-storage';
 import { logAiCall } from '$lib/server/ai-log';
 import { sendPushToUser } from '$lib/server/web-push';
@@ -35,7 +35,7 @@ export type BatchRow = { req: RenderRequest; name: string };
 export type BatchStart = { ok: true; batchId: string; rows: number; credits: number } | { ok: false; error: RenderRefusal; detail?: string };
 export type BatchCell = { row: number; name: string; runId: string; status: NodeRun['status']; progress: RenderProgress | null; error: string | null; assetId: string | null };
 export type BatchView = { id: string; credits: number; rows: BatchCell[] };
-export type ReconcileOutcome = { checked: number; done: number; failed: number; pending: number };
+export type ReconcileOutcome = { checked: number; done: number; failed: number; pending: number; reaped: number };
 
 type Piece = { worker: string; attempt: number; state: TaskState };
 type Output = { width: number; height: number; seconds: number; format: ExportFormat };
@@ -56,6 +56,7 @@ const DOWNLOAD_TTL_S = 2 * 60 * 60;
 const CANCELLED = 'cancelled';
 const TOO_LARGE = /too_large: .*/;
 const JOB_FILE = 'job.json';
+const ORPHAN_GRACE_MS = 3 * 60_000;
 
 export function farmJob(input: ComposeInput, settings: RenderSettings): FarmJob {
   const { doc, tokens, assets } = input;
@@ -276,14 +277,25 @@ async function launchQueued(db: Db, farm: RenderFarm, storage: RenderStorage, ru
 
 async function retryPiece(db: Db, farm: RenderFarm, storage: RenderStorage, run: NodeRun, job: FarmJob, piece: Piece, index: number): Promise<Piece> {
   await Promise.allSettled([stopWorker(farm, piece.worker)]);
-  const worker = await launchPiece(farm, job, index, await pieceLinks(db, storage, stateOf(run).scope, run.id, job, index));
-  return { worker, attempt: piece.attempt + 1, state: TaskState.Running };
+  const attempt = piece.attempt + 1;
+  try {
+    const worker = await launchPiece(farm, job, index, await pieceLinks(db, storage, stateOf(run).scope, run.id, job, index));
+    return { worker, attempt, state: TaskState.Running };
+  } catch {
+    return { ...piece, attempt, state: TaskState.Failed };
+  }
 }
 
 async function startAssembly(db: Db, farm: RenderFarm, storage: RenderStorage, run: NodeRun, state: RenderState, job: FarmJob, attempt: number): Promise<Step> {
   const others = state.farm.pieces.slice(1).map((_, k) => signedDownload(db, workPath(state.scope, run.id, pieceFile(job, k + 1))));
   const links = { pieces: await Promise.all(others), output: await signedUpload(db, outputPath(state, run.id)), maxBytes: await storage.limit() };
-  await launchAssembly(farm, state.farm.pieces[0].worker, job, links);
+  try {
+    await launchAssembly(farm, state.farm.pieces[0].worker, job, links);
+  } catch {
+    const pieces = state.farm.pieces.map((p, i) => (i === 0 ? { ...p, state: TaskState.Failed } : p));
+    await saveState(db, run, { ...state, farm: { pieces, assembly: null } });
+    return Step.Pending;
+  }
   await saveState(db, run, { ...state, farm: { ...state.farm, assembly: { attempt } } }, { kind: 'assembling' });
   return Step.Pending;
 }
@@ -371,7 +383,7 @@ async function advanceRender(db: Db, farm: RenderFarm, storage: RenderStorage, r
 }
 
 export async function reconcileRenders(db: Db, farm: RenderFarm, storage: RenderStorage): Promise<ReconcileOutcome> {
-  const outcome: ReconcileOutcome = { checked: 0, done: 0, failed: 0, pending: 0 };
+  const outcome: ReconcileOutcome = { checked: 0, done: 0, failed: 0, pending: 0, reaped: 0 };
   for (const queued of await queuedRenderRuns(db, { limit: RECONCILE_BATCH })) {
     const claimed = await claimRun(db, { orgId: queued.orgId, runId: queued.id });
     if (!claimed) {
@@ -388,7 +400,16 @@ export async function reconcileRenders(db: Db, farm: RenderFarm, storage: Render
     }
     outcome[step] += 1;
   }
+  outcome.reaped = await reapOrphans(db, farm);
   return outcome;
+}
+
+async function reapOrphans(db: Db, farm: RenderFarm): Promise<number> {
+  const owned = new Set((await activeRenderRuns(db)).flatMap((run) => (stateOf(run).farm?.pieces ?? []).map((p) => p.worker)));
+  const settled = Date.now() - ORPHAN_GRACE_MS;
+  const orphans = (await farm.running()).filter((w) => !owned.has(w.name) && w.createdAt < settled);
+  await Promise.allSettled(orphans.map((w) => stopWorker(farm, w.name)));
+  return orphans.length;
 }
 
 export async function cancelRender(db: Db, farm: RenderFarm, scope: Pick<RenderScope, 'orgId' | 'nodeId'>): Promise<{ ok: boolean }> {
