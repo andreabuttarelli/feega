@@ -231,3 +231,13 @@ describe('motion agent tools', () => {
     expect(deps.frames).toHaveBeenCalledTimes(MAX_VIEWS_PER_TURN);
   });
 });
+
+describe('add_track', () => {
+  it('keeps the name it is given', async () => {
+    const { run, session } = setup();
+
+    await run('add_track', { kind: 'visual', name: 'Stage' });
+
+    expect(session.doc.tracks[0].name).toBe('Stage');
+  });
+});

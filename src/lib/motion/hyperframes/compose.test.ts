@@ -422,3 +422,13 @@ describe('audio-reactive composition', () => {
     expect(composeHtml({ doc: reactive, tokens: FEEGA_TOKENS, assets: { m: '/m.mp3' }, analyses })).not.toBe(composeHtml({ doc: reactive, tokens: FEEGA_TOKENS, assets: { m: '/m.mp3' } }));
   });
 });
+
+describe('device mockups are not cut by their box', () => {
+  it('the device draws on a canvas larger than its box, centred on it, with a wider lens so it keeps its size', () => {
+    const device = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Device3D', from: 0, durationInFrames: 60, props: { width: 0.5, height: 0.5 } }, 'dev'));
+    const html = compose(device);
+
+    expect(html).toContain('<canvas id="three-dev" width="1920" height="1080" style="position:absolute;left:0px;top:0px;width:1920px;height:1080px"');
+    expect(html).toContain('"overscan":0.5');
+  });
+});

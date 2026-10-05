@@ -1065,7 +1065,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     add_text_animator: tool({
-      description: `Animate a text clip (Title, Text, Kicker, Caption) per character, word or line, like an After Effects text animator. The text is split into units; a range selector (start..end %, shifted by offset %, edges softened by softness 0..1 with shape square|ramp|smooth, order shuffled by seed) picks the units, and the selected ones get values: ${ANIMATOR_VALUES} (x/y in em, scale multiplier, rotation degrees, blur px, tracking em). Animate offset (or start/end) with set_keyframes on ta.<animator id>.offset to sweep the selection; every value is keyframable and expressionable the same way. All animators of a clip share one unit.`,
+      description: `Animate a text clip (Title, Text, Kicker, Caption) per character, word or line, like an After Effects text animator. The text is split into units; a range selector (start..end %, shifted by offset %, edges softened by softness 0..1 with shape square|ramp|smooth, order shuffled by seed) picks the units, and the selected ones get values: ${ANIMATOR_VALUES} (x/y in em, scale multiplier, rotation degrees, blur px, tracking em). Animate offset (or start/end) with set_keyframes on ta.<animator id>.offset to sweep the selection; every value is keyframable and expressionable the same way. Animators of one clip may use different units: the text splits by the finest and each piece also knows its word and line.`,
       inputSchema: z.object({ clip_id: z.string(), unit: z.enum(ANIMATOR_UNITS), ...animatorFields }),
       execute: async (input) => {
         const id = deps.newId();
@@ -1102,9 +1102,9 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     add_track: tool({
-      description: 'Add a visual or audio track. A new visual track goes on top.',
-      inputSchema: z.object({ kind: z.enum([TrackKind.Visual, TrackKind.Audio]) }),
-      execute: async (input) => apply(addTrack(session.doc, input.kind, deps.newId()), `added ${input.kind} track`)
+      description: 'Add a visual or audio track, optionally named. A new visual track goes on top.',
+      inputSchema: z.object({ kind: z.enum([TrackKind.Visual, TrackKind.Audio]), name: z.string().max(60).optional() }),
+      execute: async (input) => apply(addTrack(session.doc, input.kind, deps.newId(), input.name), `added ${input.kind} track`)
     }),
 
     set_track: tool({
