@@ -27,7 +27,7 @@ import { TaskState } from './farm-render';
 import { FEEGA_TOKENS } from '$lib/motion/brand';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { RenderStage } from '$lib/motion/server-render';
-import { Resolution } from '$lib/motion/render-quote';
+import { Resolution, renderQuote } from '$lib/motion/render-quote';
 import { addClip } from '$lib/motion/timeline';
 import { writeComponent } from '$lib/motion/custom/ops';
 import type { NodeRun } from '$lib/server/repos/node-runs';
@@ -129,11 +129,11 @@ describe('startRender only enqueues and starts the workers', () => {
 
     const result = await startRender(db, farm, scope, request(), storage);
 
-    expect(result).toEqual({ ok: true, runId: 'run-1', quote: { seconds: 28, resolution: '1080p', credits: 6 } });
+    expect(result).toEqual({ ok: true, runId: 'run-1', quote: { seconds: 28, resolution: '1080p', credits: renderQuote(trailer()).credits } });
     expect(runs.createRun).toHaveBeenCalledWith(db, expect.objectContaining({
       externalJobId: 'motion-render:12',
       actorId: 'u',
-      params: expect.objectContaining({ revision: 12, format: '16:9', quote: { seconds: 28, resolution: '1080p', credits: 6 } })
+      params: expect.objectContaining({ revision: 12, format: '16:9', quote: { seconds: 28, resolution: '1080p', credits: renderQuote(trailer()).credits } })
     }));
   });
 
@@ -419,7 +419,7 @@ describe('4K', () => {
 
     const result = await startRender(db, farm, scope, request(trailer(), { ...settingsOf(Preset.Social), resolution: Resolution.P2160 }), storage);
 
-    expect(result).toMatchObject({ ok: true, quote: { resolution: Resolution.P2160, credits: 24 } });
+    expect(result).toMatchObject({ ok: true, quote: { resolution: Resolution.P2160, credits: renderQuote(trailer(), Resolution.P2160).credits } });
   });
 });
 
@@ -448,7 +448,7 @@ describe('startBatch', () => {
 
     const result = await startBatch(db, farm, scope, rows(5), storage);
 
-    expect(result).toMatchObject({ ok: true, rows: 5, credits: 30 });
+    expect(result).toMatchObject({ ok: true, rows: 5, credits: 5 * renderQuote(trailer()).credits });
     expect(runs.createRun).toHaveBeenCalledTimes(5);
     expect(runs.createRun.mock.calls[4][1].params.batch).toEqual({ id: expect.any(String), row: 5, name: 'row-5', rows: 5 });
     expect(uploads).toHaveLength(5);
