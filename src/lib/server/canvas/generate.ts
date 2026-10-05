@@ -1,5 +1,6 @@
 import type { Db } from '$lib/server/db/client';
 import { RENDER_DEADLINE_MS } from '$lib/server/motion/farm-render';
+import { releaseHold } from '$lib/server/motion/render-run';
 import { promptRequired, type GenMedium, type GenParams } from '$lib/canvas/gen-node';
 import { upscaleLimitsOf } from '$lib/video-models';
 import { findAsset, insertAsset, type Asset } from '$lib/server/repos/assets';
@@ -1027,6 +1028,10 @@ const JOB_TIMEOUTS_MS: Record<JobKind, number> = {
   motion_render: RENDER_DEADLINE_MS
 };
 
+const ON_EXPIRE: Partial<Record<JobKind, (run: NodeRun) => Promise<void>>> = {
+  motion_render: releaseHold
+};
+
 /**
  * IL GENERE DI UN GIRO SI LEGGE DALL'`external_job_id`, non da un campo dedicato: `wiro:` e
  * `elevenlabs:` sono i due fornitori con un riconciliatore proprio (`node-runs.ts`), e per Wiro
@@ -1097,6 +1102,7 @@ export async function expireStuckRuns(db: Db): Promise<ExpireOutcome> {
     if (!claimed) continue;
 
     await expireRun(db, { orgId: run.orgId, runId: run.id, error: RUN_TIMED_OUT });
+    await ON_EXPIRE[kind]?.(run);
 
     await showRunState(db, run, { running: false, runId: run.id, error: RUN_TIMED_OUT });
 

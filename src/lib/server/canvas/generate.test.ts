@@ -93,6 +93,8 @@ vi.mock('$lib/server/ai-models-sync', async (importOriginal) => ({
   modalitiesOf
 }));
 vi.mock('$lib/server/supabase-admin', () => ({ createAdminClient: () => ({}) }));
+const releaseCredits = vi.hoisted(() => vi.fn(async () => {}));
+vi.mock('$lib/server/credit-hold', () => ({ holdCredits: vi.fn(), releaseCredits }));
 
 const { offerableSpy } = vi.hoisted(() => ({ offerableSpy: vi.fn() }));
 vi.mock('$lib/server/offerable-models', async (importOriginal) => {
@@ -783,6 +785,19 @@ describe('una run rimasta running non ha altra via se non il timeout', () => {
  * per genere di lavoro, nessun `if` sparso — e ogni genere scade sul proprio tetto, non su
  * `RUN_STALE_MS`.
  */
+describe('un render scaduto restituisce i crediti riservati', () => {
+  it('la riserva torna con la sua scadenza, come se il render fosse fallito', async () => {
+    const portions = [{ amount: 12, expiresAt: '2026-10-10T00:00:00.000Z' }, { amount: 3, expiresAt: null }];
+    const renderRow = { ...runRow, external_job_id: 'motion-render:3', started_at: new Date(Date.now() - 7 * 60 * 60_000).toISOString(), params: { billing: { held: 15, portions } } };
+    const { db } = fakeDb({ node_runs: [renderRow], nodes: [nodeRow] }, { updateRows: { node_runs: [renderRow], nodes: [nodeRow] } });
+
+    const result = await expireStuckRuns(db);
+
+    expect(result).toMatchObject({ expired: 1 });
+    expect(releaseCredits).toHaveBeenCalledWith(ORG, portions, expect.any(String));
+  });
+});
+
 describe('un giro asincrono presso un fornitore ha il proprio tetto, non quello sincrono', () => {
   const startedAgo = (ms: number) => new Date(Date.now() - ms).toISOString();
 
