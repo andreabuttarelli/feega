@@ -1,18 +1,13 @@
-import { clipsOf, type MotionDoc } from '../doc';
-import type { AudioAnalysis } from '../audio-analysis';
 import type { InputValues } from '../expression/inputs';
-import { liveWrite } from '../hyperframes/animate';
+import { OUT } from '../hyperframes/channel-out';
 import { ENGINE_GLOBAL } from '../engine/engine';
-import { laneName, liveScene } from './live';
-import type { Outside } from './settings';
+import { laneName, liveScene, type LiveSpec } from './live';
 
 export const INPUT_MESSAGE = 'feega:input';
 export const LIVE_GLOBAL = '__feegaLive';
 export const COMPOSITION_TIMELINE = 'main';
 
 export type InputMessage = { type: typeof INPUT_MESSAGE; values: InputValues };
-
-export type LiveConfig = { doc: MotionDoc; analyses: Record<string, AudioAnalysis>; outside: Outside; parents: string[] };
 
 type Timeline = { time: () => number; to: (target: object, vars: Record<string, unknown>, at: number) => unknown };
 type Engine = { set: (target: string, vars: Record<string, unknown>) => void };
@@ -21,13 +16,10 @@ type LiveWindow = Window & { __timelines?: Record<string, Timeline> } & Record<s
 const MS_PER_SECOND = 1000;
 const MAX_STEP_SECONDS = 0.1;
 
-export function installLive(config: LiveConfig): void {
+export function installLive(spec: LiveSpec): void {
   const win = window as unknown as LiveWindow;
-  const { doc } = config;
-  const scene = liveScene(doc, config.analyses, config.outside);
-  const byId = new Map(clipsOf(doc).map((c) => [c.id, c]));
-  const parents = new Set(config.parents);
-  const frameSize = { width: doc.width, height: doc.height, fps: doc.fps };
+  const scene = liveScene(spec);
+  const size = { width: spec.width, height: spec.height };
   const engine = () => win[ENGINE_GLOBAL] as Engine | undefined;
   const timeline = () => win.__timelines?.[COMPOSITION_TIMELINE];
   let inputs: InputValues = {};
@@ -41,19 +33,17 @@ export function installLive(config: LiveConfig): void {
     }
     for (const lane of scene.lanes) {
       const value = latest.get(laneName(lane));
-      const clip = byId.get(lane.id);
-      if (value === undefined || !clip) {
+      if (value === undefined) {
         continue;
       }
-      const write = liveWrite(clip, lane.key, value, frameSize, parents);
-      set(write.target, write.vars);
+      set(lane.target, { [lane.prop]: OUT[lane.out](value, size) });
     }
   };
 
   const step = (now: number) => {
     const dt = Math.min(MAX_STEP_SECONDS, (now - last) / MS_PER_SECOND);
     last = now;
-    const frame = Math.round((timeline()?.time() ?? 0) * doc.fps);
+    const frame = Math.round((timeline()?.time() ?? 0) * spec.fps);
     latest = scene.tick(inputs, frame, dt);
     paint();
     requestAnimationFrame(step);
@@ -67,6 +57,6 @@ export function installLive(config: LiveConfig): void {
     inputs = m.values;
   });
 
-  timeline()?.to({}, { duration: doc.durationInFrames / doc.fps, ease: 'none', onUpdate: paint }, 0);
+  timeline()?.to({}, { duration: spec.duration, ease: 'none', onUpdate: paint }, 0);
   requestAnimationFrame(step);
 }

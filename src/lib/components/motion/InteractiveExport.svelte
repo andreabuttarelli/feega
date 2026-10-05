@@ -5,7 +5,7 @@
   import type { BrandTokens } from '$lib/motion/brand';
   import type { AudioAnalysis } from '$lib/motion/audio-analysis';
   import { BUNDLE_FILE, interactiveBundle, type InteractiveBundle } from '$lib/motion/interactive/bundle';
-  import { liveLanes } from '$lib/motion/interactive/live';
+  import { liveLanes } from '$lib/motion/interactive/spec';
   import { flattenComps } from '$lib/motion/precomp';
   import { OUTSIDES, PLAY_MODES, PLAY_MODE_LABEL, Outside, interactiveOf, type Interactive } from '$lib/motion/interactive/settings';
 

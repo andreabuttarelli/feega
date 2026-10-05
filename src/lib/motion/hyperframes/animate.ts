@@ -1,5 +1,5 @@
 import type { MotionClip } from '../doc';
-import { Source, TRANSFORM, animProp, easeName, isPlainTrack, sampleColor, sampleTrack, type EaseSpec, type Keyframe, type SceneKey, type TransformKey } from '../keyframes';
+import { Source, TRANSFORM, ValueKind, animProp, easeName, isPlainTrack, sampleColor, sampleTrack, type EaseSpec, type Keyframe, type SceneKey, type TransformKey } from '../keyframes';
 import { css, js, px } from './html';
 import { Ease } from '../design';
 import { MASK_LANES, MaskScope, maskTarget } from './masks';
@@ -39,15 +39,22 @@ const CHANNELS: Record<Exclude<TransformKey, 'anchorX' | 'anchorY'>, Channel> = 
   blur: { wrapper: Wrapper.Transform, prop: 'filter', out: Out.Blur }
 };
 
-export function isLiveKey(key: string): boolean {
-  return key in CHANNELS;
-}
+export type LiveTarget = { target: string; prop: string; out: Out };
 
-export type LiveWrite = { target: string; vars: TweenVars };
+const LIVE_TARGET: Partial<Record<Source, (clip: MotionClip, key: string, parents: Parents) => LiveTarget | null>> = {
+  [Source.Transform]: (clip, key, parents) => {
+    const channel = CHANNELS[key as keyof typeof CHANNELS];
+    return channel ? { target: target(channel.wrapper, clip, key, parents), prop: channel.prop, out: channel.out } : null;
+  },
+  [Source.Prop]: (clip, key) => ({ target: target(Wrapper.Scale, clip), prop: cssVar(key), out: Out.Same })
+};
 
-export function liveWrite(clip: MotionClip, key: string, value: number, frame: Frame, parents: Parents): LiveWrite {
-  const channel = CHANNELS[key as keyof typeof CHANNELS];
-  return { target: target(channel.wrapper, clip, key, parents), vars: { [channel.prop]: OUT[channel.out](value, frame) } };
+export function liveTarget(clip: MotionClip, key: string, parents: Parents): LiveTarget | null {
+  const prop = animProp(clip.component, key, animatorProps(clip.animators));
+  if (!prop || prop.kind !== ValueKind.Number) {
+    return null;
+  }
+  return LIVE_TARGET[prop.source]?.(clip, key, parents) ?? null;
 }
 
 export const ANIMATE_CSS = '.kp{position:absolute;inset:0}.kf,.ks{position:absolute;inset:0;transform-style:preserve-3d;backface-visibility:visible;will-change:transform,opacity,filter}';

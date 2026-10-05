@@ -1,5 +1,3 @@
-import { z } from 'zod';
-
 export enum Outside {
   Hold = 'hold',
   Fallback = 'fallback'
@@ -27,13 +25,7 @@ export const PLAY_MODE_LABEL: Record<PlayMode, string> = {
   [PlayMode.Paused]: 'Start paused'
 };
 
-export const interactiveSchema = z.object({
-  playback: z.enum(PLAY_MODES).default(PlayMode.Autoplay),
-  loop: z.boolean().default(true),
-  outside: z.enum(OUTSIDES).default(Outside.Fallback)
-});
-
-export type Interactive = z.infer<typeof interactiveSchema>;
+export type Interactive = { playback: PlayMode; loop: boolean; outside: Outside };
 
 export const DEFAULT_INTERACTIVE: Interactive = { playback: PlayMode.Autoplay, loop: true, outside: Outside.Fallback };
 

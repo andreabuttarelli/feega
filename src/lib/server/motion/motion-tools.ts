@@ -42,7 +42,7 @@ import { setCameraExpression, setExpression } from '$lib/motion/expression/ops';
 import { EXPRESSION_GUIDE } from '$lib/motion/expression/guide';
 import { INTERACTIVE_PRESETS, PRESET, applyInteractivePreset, setInteractive } from '$lib/motion/interactive/presets';
 import { OUTSIDES, PLAY_MODES, interactiveOf } from '$lib/motion/interactive/settings';
-import { liveLanes } from '$lib/motion/interactive/live';
+import { liveLanes } from '$lib/motion/interactive/spec';
 import { embedSnippet } from '$lib/motion/interactive/bundle';
 import { flattenComps } from '$lib/motion/precomp';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';

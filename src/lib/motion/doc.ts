@@ -18,7 +18,7 @@ import { BLEND_MODES, BlendMode } from './blend';
 import { animatorsSchema } from './text-animators/model';
 import { textPathSchema } from './text-path/model';
 import { DEFAULT_MOTION_BLUR, motionBlurSchema } from './motion-blur';
-import { interactiveSchema } from './interactive/settings';
+import { interactiveSchema } from './interactive/schema';
 import { fieldsSchema } from './template/field-model';
 import { physicsSchema } from './physics/model';
 

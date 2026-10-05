@@ -49,8 +49,8 @@ import { blendStyle } from '../blend';
 import { HELD, holdScript } from './blur';
 import { engineScript } from '../engine/engine';
 import liveRuntime from 'virtual:motion-live-runtime';
-import { liveLanes } from '../interactive/live';
-import { LIVE_GLOBAL, type LiveConfig } from '../interactive/runtime';
+import { liveSpec, type SpecInput } from '../interactive/spec';
+import { LIVE_GLOBAL } from '../interactive/runtime';
 import { Liveness, interactiveOf } from '../interactive/settings';
 
 export { CAPTURE_REPLY, CAPTURE_REQUEST } from './capture';
@@ -576,13 +576,16 @@ export function composeHtml(raw: ComposeInput): string {
     hotScript(particleScript(particles, doc.fps, Number(duration))),
     ...[...cardBakes].map(([layout, bakes]) => hotScript(layout.script(bakes as never[], doc.fps, Number(duration))))
   ].join('');
-  const live = LIVE_SCRIPT[raw.liveness ?? Liveness.Baked]({ doc: prepared, analyses: raw.analyses ?? {}, outside: interactiveOf(raw.doc).outside, parents: [...parentsWithChildren(doc)] });
+  const live = LIVE_SCRIPT[raw.liveness ?? Liveness.Baked]({ live: prepared, baked: doc, outside: interactiveOf(raw.doc).outside, parents: [...parentsWithChildren(doc)] });
   return `${page}${live}${captureScript(frame, contentStamp(page))}${measureScript()}</body></html>`;
 }
 
-const LIVE_SCRIPT: Record<Liveness, (config: LiveConfig) => string> = {
+const LIVE_SCRIPT: Record<Liveness, (input: SpecInput) => string> = {
   [Liveness.Baked]: () => '',
-  [Liveness.Live]: (config) => (liveLanes(config.doc).length ? `<script>${liveRuntime.replace(/<\/script/gi, '<\\/script')}</script><script>window.${LIVE_GLOBAL}(${scriptJson(config)});</script>` : '')
+  [Liveness.Live]: (input) => {
+    const spec = liveSpec(input);
+    return spec.live.length ? `<script>${liveRuntime.replace(/<\/script/gi, '<\\/script')}</script><script>window.${LIVE_GLOBAL}(${scriptJson(spec)});</script>` : '';
+  }
 };
 
 function scriptJson(value: unknown): string {

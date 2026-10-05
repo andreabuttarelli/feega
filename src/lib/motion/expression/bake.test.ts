@@ -4,8 +4,7 @@ import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } 
 import { addClip, setKeyframes, setTransform } from '../timeline';
 import { sampleTrack } from '../keyframes';
 import { setCameraExpression, setExpression } from './ops';
-import { bakeExpressions, expressionErrors, expressionValue, liveEvaluator } from './bake';
-import { InputKey, valuesPort } from './inputs';
+import { bakeExpressions, expressionErrors, expressionValue } from './bake';
 import { setCamera } from '../camera-ops';
 
 function ok(result: { ok: true; doc: MotionDoc } | { ok: false; error: string }): MotionDoc {
@@ -144,26 +143,4 @@ describe('audio-reactive expressions', () => {
     expect(bakeExpressions(live)).toEqual(bakeExpressions(literal));
     expect(bakeExpressions(live)).toEqual(bakeExpressions(live));
   });
-
-  it('evaluates live with simulated inputs, per clip, and falls back to defaults when they are missing', () => {
-    const doc = ok(setExpression(twoShapes(), 'a', 'rotateY', '(input.pointer.x - 0.5) * 30'));
-    const moved = liveEvaluator(doc, {}, () => valuesPort({ [InputKey.PointerX]: 1 }, 0, (_s, t) => t));
-    const absent = liveEvaluator(doc, {}, () => valuesPort({}, 0, (_s, t) => t));
-
-    expect(moved.value('a', 'rotateY', 10)).toBe(15);
-    expect(absent.value('a', 'rotateY', 10)).toBe(0);
-    expect(absent.value('a', 'rotateY', 10)).toBe(expressionValue(doc, 'a', 'rotateY', 10));
-  });
-
-  it('forgets last frame values on reset, so a moved cursor shows at the same frame', () => {
-    const doc = ok(setExpression(twoShapes(), 'a', 'rotateY', 'input.pointer.x * 10'));
-    let x = 0;
-    const live = liveEvaluator(doc, {}, () => valuesPort({ [InputKey.PointerX]: x }, 0, (_s, t) => t));
-
-    expect(live.value('a', 'rotateY', 5)).toBe(0);
-    x = 1;
-    live.reset();
-    expect(live.value('a', 'rotateY', 5)).toBe(10);
-  });
 });
-

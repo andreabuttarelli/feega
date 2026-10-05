@@ -1,4 +1,5 @@
 import { TrackKind } from './components';
+import { COMP_SEPARATOR } from './comp-path';
 import { compOf, compsOf, newClip, type MotionClip, type MotionComp, type MotionDoc, type MotionTrack } from './doc';
 import { TransitionKind } from './design';
 import type { Keyframes } from './keyframes';
@@ -12,7 +13,7 @@ export type GroupProps = { span?: number };
 
 export const MAX_COMP_DEPTH = 8;
 const MAX_LOOPS = 600;
-const SEPARATOR = '__';
+const SEPARATOR = COMP_SEPARATOR;
 const STILL = { kind: TransitionKind.None, durationInFrames: 0 };
 
 const fail = (error: string): OpResult => ({ ok: false, error });
@@ -202,7 +203,3 @@ export function flattenComps(doc: MotionDoc): MotionDoc {
   return { ...doc, tracks: expand(doc, doc.tracks, 0) };
 }
 
-export function hostIdsOf(clipId: string): string[] {
-  const parts = clipId.split(SEPARATOR);
-  return Array.from({ length: Math.floor((parts.length - 1) / 2) }, (_, i) => parts.slice(0, 2 * i + 1).join(SEPARATOR));
-}
