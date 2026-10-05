@@ -15,8 +15,12 @@
   import { MASK_KINDS, Matte } from '$lib/motion/mask';
   import type { MotionTrack } from '$lib/motion/doc';
   import { Interp, Source, type EaseSpec, type Keyframe } from '$lib/motion/keyframes';
-  import { CAMERA_LANE } from '$lib/motion/camera';
-  import { cameraLanes } from '$lib/motion/camera-ops';
+  import { CAMERA, CAMERA_LANE, type CameraKey } from '$lib/motion/camera';
+  import { cameraEditAt, cameraLanes, cameraValueAt } from '$lib/motion/camera-ops';
+  import { animProp, ValueKind } from '$lib/motion/keyframes';
+  import { editAt, parseDecimal, valueAt } from '$lib/motion/inspector';
+  import { sliderOf, toShown, toStored, type Owner } from '$lib/motion/units';
+  import { formatValue, precisionOf, scrubbed, type Range } from '$lib/motion/number-field';
   import { ancestorsOf } from '$lib/motion/parent';
   import { setParent } from '$lib/motion/parent-ops';
   import EasePicker from './EasePicker.svelte';
@@ -139,6 +143,80 @@
     if (result.ok) {
       onchange(result.doc, summary);
     }
+  }
+
+  type PropEdit = { shown: number; range: Range; unit: string; set: (shownValue: number) => void };
+
+  const sameColor = (c: string) => c;
+
+  function clipEdit(clip: MotionClip, key: string): PropEdit | null {
+    const prop = animProp(clip.component, key, withParams(doc, clip).params);
+    if (!prop || prop.kind !== ValueKind.Number) {
+      return null;
+    }
+    return unitEdit(clip.component, prop, Number(valueAt(withParams(shown, clip), key, frame, sameColor)), (stored) => editAt(doc, clip, key, stored, frame));
+  }
+
+  function cameraEdit(key: CameraKey): PropEdit {
+    return unitEdit(CAMERA_LANE, { key, ...CAMERA[key] }, cameraValueAt(shown, key, frame), (stored) => cameraEditAt(doc, key, Math.min(CAMERA[key].max, Math.max(CAMERA[key].min, stored)), frame));
+  }
+
+  function unitEdit(owner: Owner, prop: Range & { key: string }, stored: number, write: (stored: number) => OpResult): PropEdit {
+    const slider = sliderOf(owner, prop, doc);
+    return {
+      shown: toShown(owner, prop.key, stored, doc),
+      range: slider,
+      unit: slider.unit ?? '',
+      set: (v) => {
+        const result = write(toStored(owner, prop.key, v, doc));
+        if (result.ok) {
+          onchange(result.doc, `Edited ${prop.key}`);
+        }
+      }
+    };
+  }
+
+  const propEdit = (owner: KeyOwner, key: string): PropEdit | null => (owner.id === CAMERA_LANE ? cameraEdit(key as CameraKey) : clipEdit(clipById(owner.id), key));
+
+  let typing = $state<string | null>(null);
+  let valueScrub: { x: number; start: number; edit: PropEdit; moved: boolean } | null = null;
+  const TAP_SLOP_PX = 3;
+
+  function startValue(e: PointerEvent, edit: PropEdit) {
+    e.stopPropagation();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    valueScrub = { x: e.clientX, start: edit.shown, edit, moved: false };
+  }
+
+  function moveValue(e: PointerEvent) {
+    if (!valueScrub) {
+      return;
+    }
+    const dx = e.clientX - valueScrub.x;
+    valueScrub.moved ||= Math.abs(dx) > TAP_SLOP_PX;
+    if (valueScrub.moved) {
+      valueScrub.edit.set(scrubbed(valueScrub.start, dx, valueScrub.edit.range, precisionOf(e)));
+    }
+  }
+
+  function endValue(rowId: string) {
+    if (valueScrub && !valueScrub.moved) {
+      typing = rowId;
+    }
+    valueScrub = null;
+  }
+
+  function typeValue(edit: PropEdit, text: string) {
+    typing = null;
+    const parsed = parseDecimal(text);
+    if (parsed !== null) {
+      edit.set(Math.min(edit.range.max, Math.max(edit.range.min, parsed)));
+    }
+  }
+
+  function focusSelect(node: HTMLInputElement) {
+    node.focus();
+    node.select();
   }
 
   function toggleMark(owner: KeyOwner, prop: string, mark: KeyMark) {
@@ -436,12 +514,19 @@
 {#snippet propRow(owner: KeyOwner, lane: PropLane, rowId: string)}
   {@const keys = owner.keyframes[lane.prop] ?? []}
   {@const mark = keyMark(keys, frame - owner.from)}
+  {@const edit = propEdit(owner, lane.prop)}
   <div class="row prop" data-key-lane={rowId}>
     <div class="head">
       <span class="indent prop-indent"></span>
       <button type="button" class="mark" data-mark={mark} aria-label={mark === KeyMark.Here ? `Remove ${lane.label} keyframe` : `Add ${lane.label} keyframe`} title={mark === KeyMark.Here ? 'Remove keyframe here' : 'Add keyframe here'} disabled={owner.id === CAMERA_LANE} onclick={() => toggleMark(owner, lane.prop, mark)}></button>
       <span class="prop-name">{lane.label}</span>
-      <span class="prop-value">{propValue(keys, frame - owner.from)}</span>
+      {#if !edit}
+        <span class="prop-value">{propValue(keys, frame - owner.from)}</span>
+      {:else if typing === rowId}
+        <input class="prop-input" use:focusSelect aria-label={`${lane.label} value`} value={formatValue(edit.shown, edit.range.step)} onchange={(e) => typeValue(edit, e.currentTarget.value)} onblur={() => (typing = null)} onkeydown={(e) => (e.key === 'Escape' || e.key === 'Enter') && e.currentTarget.blur()} onpointerdown={(e) => e.stopPropagation()} />
+      {:else}
+        <span class="prop-value editable" role="slider" tabindex="0" aria-label={`${lane.label} value`} aria-valuenow={edit.shown} title="Drag to change (Shift ×10, Alt ×0.1), click to type" onpointerdown={(e) => startValue(e, edit)} onpointermove={moveValue} onpointerup={() => endValue(rowId)} onkeydown={(e) => e.key === 'Enter' && (typing = rowId)}>{formatValue(edit.shown, edit.range.step)}<em>{edit.unit}</em></span>
+      {/if}
     </div>
     <div class="lane">
       {#each keys.slice(0, -1) as key, i (key.frame)}
@@ -973,6 +1058,36 @@
     font-size: 11px;
     font-variant-numeric: tabular-nums;
     color: var(--ui-accent);
+  }
+
+  .prop-value.editable {
+    padding: 2px 4px;
+    cursor: ew-resize;
+    touch-action: none;
+  }
+
+  .prop-value.editable:hover {
+    background: var(--ui-hover);
+  }
+
+  .prop-value em {
+    margin-left: 2px;
+    font-style: normal;
+    font-size: 10px;
+    color: var(--ui-ink-3);
+  }
+
+  .prop-input {
+    width: 64px;
+    height: 20px;
+    padding: 0 4px;
+    border: 1px solid var(--ui-accent);
+    border-radius: 0;
+    background: var(--ui-bg);
+    color: var(--ui-ink);
+    font-family: var(--ui-mono);
+    font-size: 11px;
+    text-align: right;
   }
 
   .mark {

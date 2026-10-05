@@ -10,6 +10,9 @@ Secondo passo della spec di redesign (timeline, P0).
   barra tiene kicker e testo su una riga sola.
 - Twirl del layer: una riga 24px per proprietà animata con indicatore ◆ (pieno se c'è una chiave
   al frame, mezzo se animata altrove; clic aggiunge/toglie la chiave) e valore al playhead.
+  Il valore si trascina (1 step/px, Shift ×10, Alt ×0.1) o si scrive con un clic, nelle unità di
+  `units.ts` (px, %, °): scrive con `editAt`/`cameraEditAt`, quindi su una proprietà animata crea
+  o aggiorna la chiave al frame. Logica dello scrub in `number-field.ts`.
   Chiavi 9px con forma dall'interpolazione in uscita (◆ bezier, ■ hold, ● linear). Layer chiuso:
   chiavi riassunte in basso nella barra.
 - Ruler a passi tondi scelti dallo zoom (1f, 5f, 10f, 1s, 2s, 5s…), etichette solo sui maggiori.

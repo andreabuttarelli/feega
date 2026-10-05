@@ -65,6 +65,15 @@ test.describe('motion editor @real', () => {
     await layer.getByRole('button', { name: 'Show keyframes' }).dispatchEvent('click');
     await expect(page.locator('[data-key-lane="bar-0:scaleY"]')).toBeInViewport();
 
+    const value = page.locator('[data-key-lane="bar-0:scaleY"] .prop-value');
+    const before = await value.textContent();
+    const box = (await value.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 30, box.y + box.height / 2, { steps: 5 });
+    await page.mouse.up();
+    await expect(value).not.toHaveText(before ?? '');
+
     await page.getByTestId('graph-toggle').click();
     await expect(page.getByText('Select a clip with keyframes')).toHaveCount(0);
   });
