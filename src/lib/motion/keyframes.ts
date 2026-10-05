@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { COLOR, TYPE, type ComponentId } from './components';
 import { EASE_IDS, Ease } from './design';
 import { MASK_KEYS, MASK_PROPS, maskValue, type Mask, type MaskKey } from './mask';
+import { PARTICLE_COLOURS, PARTICLE_COLOUR_KEYS, PARTICLE_NUMBERS, PARTICLE_NUMBER_KEYS } from './particles/model';
 
 export type Bezier = [number, number, number, number];
 export type EaseSpec = Ease | Bezier;
@@ -62,7 +63,9 @@ export enum Source {
   Param = 'param',
   Effect = 'effect',
   Animator = 'animator',
-  Modifier = 'modifier'
+  Modifier = 'modifier',
+  Remap = 'remap',
+  Sound = 'sound'
 }
 
 type Range = { label: string; min: number; max: number; step: number; fallback: number };
@@ -106,6 +109,10 @@ export const DEVICE_SCENE = {
   screenScroll: { label: 'Screen scroll', min: 0, max: 1, step: 0.01, fallback: 0 }
 } as const satisfies Record<string, Range>;
 
+export const REMAP_KEY = 'time';
+const MAX_SOURCE_SECONDS = 3600;
+const remapProps: AnimProp[] = [{ key: REMAP_KEY, label: 'Time remap (source s)', kind: ValueKind.Number, source: Source.Remap, min: 0, max: MAX_SOURCE_SECONDS, step: 0.01, fallback: 0 }];
+
 export type SceneKey = keyof typeof SCENE | keyof typeof DEVICE_SCENE;
 export const SCENE_KEYS = Object.keys(SCENE) as SceneKey[];
 
@@ -122,6 +129,13 @@ const maskProps: AnimProp[] = MASK_KEYS.map((key) => {
 });
 const colours = (...entries: [string, string][]): AnimProp[] =>
   entries.map(([key, label]) => ({ key, label, kind: ValueKind.Color, source: Source.Prop, min: 0, max: 0, step: 0, fallback: 0 }));
+
+export const SOUND = {
+  volume: { label: 'Volume', min: 0, max: 1, step: 0.01, fallback: 1 },
+  pan: { label: 'Pan', min: -1, max: 1, step: 0.01, fallback: 0 }
+} as const satisfies Record<string, Range>;
+
+const soundProps: AnimProp[] = (Object.keys(SOUND) as (keyof typeof SOUND)[]).map((key) => ({ key, kind: ValueKind.Number, source: Source.Sound, ...SOUND[key] }));
 
 const visual = (...extra: AnimProp[][]): AnimProp[] => [...transformProps, ...extra.flat(), ...maskProps];
 
@@ -150,14 +164,22 @@ const SHAPE_NUMBERS: AnimProp[] = (
   ] as const
 ).map(([key, label, min, max, step, fallback]) => ({ key, label, min, max, step, fallback, kind: ValueKind.Number, source: Source.Param }));
 
+const PARTICLE_PROPS: AnimProp[] = [
+  ...PARTICLE_NUMBER_KEYS.map((key) => {
+    const { label, min, max, step, fallback } = PARTICLE_NUMBERS[key];
+    return { key, label, min, max, step, fallback, kind: ValueKind.Number, source: Source.Param };
+  }),
+  ...PARTICLE_COLOUR_KEYS.map((key) => ({ key, label: PARTICLE_COLOURS[key].label, kind: ValueKind.Color, source: Source.Param, min: 0, max: 0, step: 0, fallback: 0 }))
+];
+
 export const ANIMATABLE: Record<ComponentId, readonly AnimProp[]> = {
   Title: visual(colours(['color', 'Colour']), typeNumbers),
   Text: visual(colours(['color', 'Colour']), typeNumbers),
   Kicker: visual(colours(['color', 'Colour']), typeNumbers),
   Caption: visual(colours(['color', 'Colour'], ['background', 'Box']), typeNumbers),
   Image: visual(),
-  Video: visual(),
-  Audio: [],
+  Video: visual(remapProps, soundProps),
+  Audio: soundProps,
   Shape: visual(colours(['fill', 'Fill'], ['fill2', 'Gradient end'], ['stroke', 'Stroke colour']), SHAPE_NUMBERS),
   Logo: visual(),
   Null: transformProps,
@@ -171,6 +193,9 @@ export const ANIMATABLE: Record<ComponentId, readonly AnimProp[]> = {
   Logo3D: visual(sceneProps),
   Device3D: visual(sceneProps, deviceProps),
   Composition: visual(),
+  Particles: visual(PARTICLE_PROPS),
+  Precomp: visual(),
+  Adjustment: [],
   Custom: visual()
 };
 
@@ -193,7 +218,9 @@ const BASE: Record<Source, (clip: Animated, prop: AnimProp) => KeyValue> = {
   [Source.Param]: (clip, prop) => (prop.kind === ValueKind.Color ? String(clip.props[prop.key]) : Number(clip.props[prop.key])),
   [Source.Effect]: (_clip, prop) => prop.base ?? prop.fallback,
   [Source.Animator]: (_clip, prop) => prop.base ?? prop.fallback,
-  [Source.Modifier]: (_clip, prop) => prop.base ?? prop.fallback
+  [Source.Modifier]: (_clip, prop) => prop.base ?? prop.fallback,
+  [Source.Remap]: (_clip, prop) => prop.fallback,
+  [Source.Sound]: (clip, prop) => Number(clip.props[prop.key] ?? prop.fallback)
 };
 
 export function baseValue(clip: Animated, key: string): KeyValue | null {
@@ -223,7 +250,9 @@ const SOURCE_PROBLEM: Record<Source, (clip: Pick<Animated, 'mask'>, key: string)
   [Source.Param]: () => null,
   [Source.Effect]: () => null,
   [Source.Animator]: () => null,
-  [Source.Modifier]: () => null
+  [Source.Modifier]: () => null,
+  [Source.Remap]: () => null,
+  [Source.Sound]: () => null
 };
 
 export function keyframesProblem(clip: Pick<Animated, 'component' | 'keyframes' | 'mask' | 'params'>): string | null {

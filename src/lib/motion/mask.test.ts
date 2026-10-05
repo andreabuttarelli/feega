@@ -89,7 +89,7 @@ describe('animating a mask', () => {
 
   it('every visual component animates the mask, audio does not', () => {
     expect(ANIMATABLE.Image.filter((p) => p.source === Source.Mask).map((p) => p.key)).toEqual(Object.keys(MASK_PROPS));
-    expect(ANIMATABLE.Audio).toEqual([]);
+    expect(ANIMATABLE.Audio.some((p) => p.source === Source.Mask)).toBe(false);
   });
 
   it('the base value of a mask prop is the mask field', () => {

@@ -1,5 +1,8 @@
 <script lang="ts">
   import { setMotionPath } from '$lib/motion/path-ops';
+  import { duckUnder, voicesOver } from '$lib/motion/duck';
+  import { PULSE_PROPS, pulseWithMusic } from '$lib/motion/pulse';
+  import type { AudioAnalysis } from '$lib/motion/audio-analysis';
   import { BRAND_COLORS, COMPONENTS, Control, TrackKind, type AssetKind } from '$lib/motion/components';
   import { DEPTH, Space } from '$lib/motion/camera';
   import { setClipDepth } from '$lib/motion/camera-ops';
@@ -12,10 +15,11 @@
   import { InspectorTab, clipFieldGroups, editAt, keyAt, keyedField, parseDecimal, secondsLabel, toggleKey, valueAt, type Field } from '$lib/motion/inspector';
   import { setMask, setMaskStack, setProps, setTiming, setTrackMatte, setTransform, setTransition, Side, type OpResult } from '$lib/motion/timeline';
   import { MASK_KINDS, MASK_KIND_IDS, MASK_MODES, MATTES, MATTE_LABEL, MAX_MASK_STACK, MaskKind, MaskMode, Needs, newMask, type Mask, type Matte } from '$lib/motion/mask';
-  import { ANIMATABLE, Source, TRANSFORM, ValueKind, type AnimProp, type KeyValue } from '$lib/motion/keyframes';
+  import { ANIMATABLE, Source, isAnimatable, TRANSFORM, ValueKind, type AnimProp, type KeyValue } from '$lib/motion/keyframes';
   import Dial from './Dial.svelte';
   import CodeEditor from './CodeEditor.svelte';
   import FontPicker from './FontPicker.svelte';
+  import LutPicker from './LutPicker.svelte';
   import { registerFont, setFont } from '$lib/motion/fonts/ops';
   import type { CatalogueFont } from '$lib/motion/fonts/model';
   import { withParams } from '$lib/motion/custom/params';
@@ -39,6 +43,7 @@
 
   let {
     doc,
+    analyses = {},
     clip,
     tokens,
     assets,
@@ -47,9 +52,11 @@
     composeHref = null,
     tab = $bindable<InspectorTab>(InspectorTab.Properties),
     onchange,
-    onuploadfont
+    onuploadfont,
+    onopen
   }: {
     doc: MotionDoc;
+    analyses?: Record<string, AudioAnalysis>;
     clip: MotionClip;
     tokens: BrandTokens;
     assets: Asset[];
@@ -59,6 +66,7 @@
     tab?: InspectorTab;
     onchange: (doc: MotionDoc, summary: string) => void;
     onuploadfont?: (file: File) => Promise<string | null>;
+    onopen?: (comp: string) => void;
   } = $props();
 
   const DIALS = new Set(['rotateX', 'rotateY', 'rotateZ', 'objectRotateX', 'objectRotateY', 'objectRotateZ', 'orbit', 'maskRotation']);
@@ -66,6 +74,15 @@
   const KEY_STATE = { On: 'on', Lane: 'lane', None: 'none' } as const;
 
   let error = $state('');
+  const voices = $derived(voicesOver(doc, clip.id));
+  const pulsable = $derived(PULSE_PROPS.filter((p) => isAnimatable(clip.component, p)));
+  let voice = $state('');
+
+  function duck() {
+    const voiceId = voices.includes(voice) ? voice : voices[0];
+    const assetId = String(findClip(doc, voiceId)?.clip.props.assetId ?? '');
+    commit(duckUnder(doc, clip.id, voiceId, analyses[assetId]?.speech ?? null), 'Ducked the music');
+  }
 
   const groups = $derived(clipFieldGroups(doc, clip));
   const animated = $derived(withParams(doc, clip));
@@ -151,7 +168,7 @@
     }
   }
 
-  const faults = $derived(Object.fromEntries(expressionErrors(doc).filter((f) => f.clipId === clip.id).map((f) => [f.key, f.error])));
+  const faults = $derived(Object.fromEntries(expressionErrors(doc, analyses).filter((f) => f.clipId === clip.id).map((f) => [f.key, f.error])));
   const DEFAULT_EXPRESSION = 'value';
   const BLEND_LABEL = Object.fromEntries(BLEND_MODES.map((m) => [m, m.split('-').map((w) => w[0].toUpperCase() + w.slice(1)).join(' ')])) as Record<BlendMode, string>;
 
@@ -166,7 +183,7 @@
 
   function expressionNow(key: string): string {
     try {
-      return String(Math.round(expressionValue(doc, clip.id, key, clip.from + Math.max(0, frame - clip.from)) * 1000) / 1000);
+      return String(Math.round(expressionValue(doc, clip.id, key, clip.from + Math.max(0, frame - clip.from), analyses) * 1000) / 1000);
     } catch {
       return '—';
     }
@@ -308,6 +325,27 @@
     {/each}
   </section>
 
+  {#if pulsable.length && doc.tracks.some((t) => t.clips.some((c) => c.component === 'Audio'))}
+    <section data-testid="pulse-section">
+      <h4>Pulse with the music</h4>
+      <div class="row">
+        {#each pulsable as prop (prop)}<button type="button" data-pulse={prop} onclick={() => commit(pulseWithMusic(doc, clip.id, prop), `Pulsed ${prop} with the music`)}>{prop}</button>{/each}
+      </div>
+    </section>
+  {/if}
+
+  {#if voices.length}
+    <section data-testid="duck-section">
+      <h4>Ducking</h4>
+      <div class="row two">
+        <select aria-label="Voice-over" value={voice || voices[0]} onchange={(e) => (voice = e.currentTarget.value)}>
+          {#each voices as id (id)}<option value={id}>{clipName(id)}</option>{/each}
+        </select>
+        <button type="button" data-testid="duck" onclick={duck}>Duck under voice-over</button>
+      </div>
+    </section>
+  {/if}
+
   {#snippet diamond(key: string)}
     <button type="button" class="key {keyState(key)}" title="Keyframe at playhead" aria-label={`Keyframe ${key}`} aria-pressed={keyState(key) === KEY_STATE.On} onclick={() => toggle(key)}>◆</button>
   {/snippet}
@@ -444,6 +482,7 @@
             <button type="button" aria-label="Move effect down" disabled={i === clip.effects.length - 1} onclick={() => commit(setEffect(doc, clip.id, effect.id, { index: i + 1 }), 'Reordered effects')}>↓</button>
             <button type="button" aria-label={`Remove ${EFFECTS[effect.kind].label}`} onclick={() => commit(removeEffect(doc, clip.id, effect.id), 'Removed an effect')}>×</button>
           </div>
+          {#if effect.kind === 'lut'}<LutPicker {doc} clipId={clip.id} {effect} {onchange} />{/if}
           {#each effectParams(effect.id) as prop (prop.key)}
             {#if prop.kind === ValueKind.Color}
               <div class="row anim" data-prop={prop.key}>
@@ -628,6 +667,13 @@
             </div>
           {:else if field.control === Control.Font}
             <FontPicker value={String(value(field))} fonts={doc.fonts} brand={tokens.fonts ?? []} onpick={(family, catalogue) => pickFont(field, family, catalogue)} onupload={onuploadfont} />
+          {:else if field.control === Control.Comp}
+            <div class="comp">
+              <select id={`f-${field.key}`} value={String(value(field))} onchange={(e) => setProp(field, e.currentTarget.value)}>
+                {#each Object.entries(doc.comps) as [id, comp] (id)}<option value={id}>{comp.name}</option>{/each}
+              </select>
+              <button type="button" data-testid="open-comp" disabled={!doc.comps[String(value(field))]} onclick={() => onopen?.(String(value(field)))}>Open</button>
+            </div>
           {:else if field.control === Control.Managed}
             <span class="managed">{managedSummary(value(field))}{#if composeHref} · <a href={composeHref}>Edit in Compositions</a>{/if}</span>
           {/if}
@@ -643,6 +689,30 @@
 </div>
 
 <style>
+  .comp {
+    display: flex;
+    gap: var(--ui-space-1);
+  }
+
+  .comp select {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .comp button {
+    border: 1px solid var(--ui-line);
+    border-radius: 0;
+    background: var(--ui-bg);
+    color: var(--ui-ink);
+    padding: 0 var(--ui-space-2);
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .comp button:hover:not(:disabled) {
+    background: var(--ui-hover);
+  }
+
   .managed {
     color: var(--ui-ink-2);
   }

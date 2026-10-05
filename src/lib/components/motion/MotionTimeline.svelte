@@ -12,11 +12,13 @@
   import Crosshair from '@lucide/svelte/icons/crosshair';
   import Video from '@lucide/svelte/icons/video';
   import SquareDashed from '@lucide/svelte/icons/square-dashed';
+  import Layers from '@lucide/svelte/icons/layers';
+  import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
   import type { Component } from 'svelte';
   import { CLIP_FAMILIES, ClipFamily, Preview, familyOf, tileFrames } from '$lib/motion/track-style';
   import { filmstrip, type Strip } from '$lib/motion/filmstrip';
   import { COMPONENTS, TrackKind } from '$lib/motion/components';
-  import type { MotionClip, MotionDoc } from '$lib/motion/doc';
+  import { compOf, type MotionClip, type MotionDoc } from '$lib/motion/doc';
   import { ClipEdge, moveClip, moveKeyframes, moveTrack, setKeyEase, setKeyInterp, trimClip, type KeyRef, type OpResult } from '$lib/motion/timeline';
   import { withParams } from '$lib/motion/custom/params';
   import { Grip, KeySide, Snap, edgeHandles, frameAt, keyLanes, pxPerFrame, rulerTicks, snapped, stackRows, type KeyLane } from '$lib/motion/timeline-view';
@@ -36,6 +38,7 @@
   import Ghost from '@lucide/svelte/icons/ghost';
   import { allMarkers, isLocked, setTrackFlags, shownTracks } from '$lib/motion/organize';
   import { PEAKS_PER_SECOND, clipPeaks, wavePath } from '$lib/motion/waveform';
+  import { FadeEdge, dragFade, fadeHandles } from '$lib/motion/fade-handles';
 
   const HEADER_PX = 176;
   const COMPACT_HEADER_PX = 112;
@@ -56,14 +59,16 @@
     [ClipFamily.Custom]: Code,
     [ClipFamily.Null]: Crosshair,
     [ClipFamily.Camera]: Video,
-    [ClipFamily.Mask]: SquareDashed
+    [ClipFamily.Mask]: SquareDashed,
+    [ClipFamily.Precomp]: Layers,
+    [ClipFamily.Adjustment]: SlidersHorizontal
   };
 
   const KEY_ROW_PX = 20;
   const DIAMOND_PX = 10;
   const INDENT_PX = 10;
 
-  const Drag = { Move: 'move', TrimStart: 'trim-start', TrimEnd: 'trim-end', Scrub: 'scrub', Keys: 'keys' } as const;
+  const Drag = { Move: 'move', TrimStart: 'trim-start', TrimEnd: 'trim-end', Scrub: 'scrub', Keys: 'keys', FadeIn: 'fade-in', FadeOut: 'fade-out' } as const;
   type Drag = (typeof Drag)[keyof typeof Drag];
 
   type KeyOwner = { id: string; from: number; keyframes: Partial<Record<string, Keyframe[]>> };
@@ -79,9 +84,24 @@
     zoom,
     snap,
     waveforms = {},
+    beats = [],
     assetUrls = {},
-    onchange
-  }: { doc: MotionDoc; frame?: number; selection?: string[]; keySelection?: KeyRef[]; camera?: boolean; zoom: number; snap: Snap; waveforms?: Record<string, number[]>; assetUrls?: Record<string, string>; onchange: (doc: MotionDoc, summary: string) => void } = $props();
+    onchange,
+    onopen
+  }: {
+    doc: MotionDoc;
+    frame?: number;
+    selection?: string[];
+    keySelection?: KeyRef[];
+    camera?: boolean;
+    zoom: number;
+    snap: Snap;
+    waveforms?: Record<string, number[]>;
+    beats?: number[];
+    assetUrls?: Record<string, string>;
+    onchange: (doc: MotionDoc, summary: string) => void;
+    onopen?: (comp: string) => void;
+  } = $props();
 
   let folded = $state<string[]>([]);
   let solo = $state<string[]>([]);
@@ -134,6 +154,8 @@
   }
 
   const GRIP_DRAG: Record<Grip, Drag> = { [Grip.Start]: Drag.TrimStart, [Grip.End]: Drag.TrimEnd };
+  const FADE_LABEL: Record<FadeEdge, string> = { [FadeEdge.In]: 'Fade in', [FadeEdge.Out]: 'Fade out' };
+  const FADE_DRAG: Record<FadeEdge, Drag> = { [FadeEdge.In]: Drag.FadeIn, [FadeEdge.Out]: Drag.FadeOut };
 
   function startClip(e: PointerEvent, clip: MotionClip, trackId: string, kind: Drag = Drag.Move) {
     e.stopPropagation();
@@ -267,17 +289,19 @@
     [Drag.Move]: (g, at, e) => {
       const from = g.originFrom + (at - g.grabFrame);
       const clip = g.base.tracks.flatMap((t) => t.clips).find((c) => c.id === g.clipId)!;
-      const start = snapped(g.base, from, { playhead: frame, exclude: [g.clipId], zoom, snap });
-      const endSnap = snapped(g.base, from + clip.durationInFrames, { playhead: frame, exclude: [g.clipId], zoom, snap }) - clip.durationInFrames;
+      const start = snapped(g.base, from, { playhead: frame, exclude: [g.clipId], zoom, snap, beats });
+      const endSnap = snapped(g.base, from + clip.durationInFrames, { playhead: frame, exclude: [g.clipId], zoom, snap, beats }) - clip.durationInFrames;
       const target = start !== from ? start : endSnap;
       const over = trackUnder(e);
       const sameKind = g.base.tracks.find((t) => t.id === over)?.kind === g.base.tracks.find((t) => t.id === g.trackId)?.kind;
       return moveClip(g.base, g.clipId, { from: target, trackId: over && sameKind ? over : undefined });
     },
-    [Drag.TrimStart]: (g, at) => trimClip(g.base, g.clipId, ClipEdge.Start, snapped(g.base, at, { playhead: frame, exclude: [g.clipId], zoom, snap })),
-    [Drag.TrimEnd]: (g, at) => trimClip(g.base, g.clipId, ClipEdge.End, snapped(g.base, at, { playhead: frame, exclude: [g.clipId], zoom, snap })),
+    [Drag.TrimStart]: (g, at) => trimClip(g.base, g.clipId, ClipEdge.Start, snapped(g.base, at, { playhead: frame, exclude: [g.clipId], zoom, snap, beats })),
+    [Drag.TrimEnd]: (g, at) => trimClip(g.base, g.clipId, ClipEdge.End, snapped(g.base, at, { playhead: frame, exclude: [g.clipId], zoom, snap, beats })),
+    [Drag.FadeIn]: (g, at) => dragFade(g.base, g.clipId, FadeEdge.In, at),
+    [Drag.FadeOut]: (g, at) => dragFade(g.base, g.clipId, FadeEdge.Out, at),
     [Drag.Keys]: (g, at) => {
-      g.delta = snapped(g.base, g.originFrom + (at - g.grabFrame), { playhead: g.originFrom, exclude: [], zoom, snap }) - g.originFrom;
+      g.delta = snapped(g.base, g.originFrom + (at - g.grabFrame), { playhead: g.originFrom, exclude: [], zoom, snap, beats }) - g.originFrom;
       return moveKeyframes(g.base, g.refs, g.delta);
     }
   };
@@ -302,7 +326,7 @@
     }
   }
 
-  const SUMMARY: Record<Drag, string> = { [Drag.Move]: 'Moved a clip', [Drag.TrimStart]: 'Trimmed a clip', [Drag.TrimEnd]: 'Trimmed a clip', [Drag.Scrub]: '', [Drag.Keys]: 'Moved keyframes' };
+  const SUMMARY: Record<Drag, string> = { [Drag.Move]: 'Moved a clip', [Drag.TrimStart]: 'Trimmed a clip', [Drag.TrimEnd]: 'Trimmed a clip', [Drag.Scrub]: '', [Drag.Keys]: 'Moved keyframes', [Drag.FadeIn]: 'Changed a fade', [Drag.FadeOut]: 'Changed a fade' };
 
   function onUp(e: PointerEvent) {
     if (whip) {
@@ -386,9 +410,17 @@
     return { destroy: () => watcher.disconnect() };
   }
 
+  function openComp(clip: MotionClip) {
+    const comp = compOf(clip);
+    if (comp && doc.comps[comp]) {
+      onopen?.(comp);
+    }
+  }
+
   function clipLabel(clip: MotionClip): string {
     const p = clip.props as { text?: string; title?: string; name?: string };
-    const label = clip.component === 'Custom' ? p.name : undefined;
+    const comp = compOf(clip);
+    const label = clip.component === 'Custom' ? p.name : comp ? doc.comps[comp]?.name : undefined;
     return label ?? p.text?.split('\n')[0] ?? p.title ?? COMPONENTS[clip.component].label;
   }
 </script>
@@ -447,6 +479,7 @@
           {#if tick.label}<em>{tick.label}</em>{/if}
         </span>
       {/each}
+      {#each beats as beat (beat)}<span class="beat" data-beat={beat} style={`left: ${headPx + beat * ppf}px;`}></span>{/each}
     </div>
 
     <div class="lane camera-track" data-camera-track style={`height: ${ROW_PX + 2 * LANE_PAD_PX}px; ${hueOf(ClipFamily.Camera)}`}>
@@ -514,6 +547,7 @@
               aria-label={`${COMPONENTS[clip.component].label} clip`}
               style={`left: ${clip.from * ppf}px; width: ${Math.max(4, clip.durationInFrames * ppf)}px; top: ${LANE_PAD_PX + rows[clip.id] * row}px; height: ${row - 2}px; ${hueOf(clipFamily)}`}
               onpointerdown={(e) => startClip(e, clip as MotionClip, track.id)}
+              ondblclick={() => openComp(clip as MotionClip)}
             >
               {#if url && preview === Preview.Thumb}
                 <span class="thumbs" style={`background-image: url("${url}");`} aria-hidden="true"></span>
@@ -537,6 +571,28 @@
               {/if}
               {#if wave}<svg class="wave" viewBox={`0 0 ${wave.width} 1`} preserveAspectRatio="none" aria-hidden="true"><path d={wave.path} /></svg>{/if}
             </div>
+          {/each}
+          {#each track.clips.filter((c) => selection.includes(c.id)) as clip (clip.id)}
+            {@const fades = fadeHandles(clip as MotionClip, shown.fps, ppf)}
+            {#if fades.length}
+              {@const top = LANE_PAD_PX + rows[clip.id] * row}
+              <svg class="fade-ramp" style={`left: ${clip.from * ppf}px; top: ${top}px; width: ${clip.durationInFrames * ppf}px; height: ${row - 2}px;`} viewBox={`0 0 ${clip.durationInFrames * ppf} 1`} preserveAspectRatio="none" aria-hidden="true">
+                <polyline points={`0,1 ${fades[0].x - clip.from * ppf},0 ${fades[1].x - clip.from * ppf},0 ${clip.durationInFrames * ppf},1`} />
+              </svg>
+              {#each fades as fade (fade.edge)}
+                <div
+                  class="fade"
+                  data-fade={fade.edge}
+                  data-fade-clip={clip.id}
+                  role="slider"
+                  tabindex="-1"
+                  aria-label={FADE_LABEL[fade.edge]}
+                  aria-valuenow={(clip.props as Record<string, number>)[fade.edge] ?? 0}
+                  style={`left: ${fade.x}px; top: ${top}px;`}
+                  onpointerdown={(e) => startClip(e, clip as MotionClip, track.id, FADE_DRAG[fade.edge])}
+                ></div>
+              {/each}
+            {/if}
           {/each}
           {#each edgeHandles(track.clips, ppf, selection) as handle (`${handle.clipId}-${handle.grip}`)}
             <div
@@ -615,6 +671,16 @@
     background: var(--ui-bg);
     border-right: 1px solid var(--ui-line);
     z-index: 6;
+  }
+
+  .beat {
+    position: absolute;
+    top: 0;
+    width: 2px;
+    height: 6px;
+    margin-left: -1px;
+    background: var(--ui-accent);
+    pointer-events: none;
   }
 
   .tick {
@@ -842,6 +908,30 @@
     stroke: var(--hue);
     stroke-width: 1.5;
     vector-effect: non-scaling-stroke;
+  }
+
+  .fade-ramp {
+    position: absolute;
+    z-index: 2;
+    pointer-events: none;
+    overflow: visible;
+  }
+
+  .fade-ramp polyline {
+    fill: none;
+    stroke: var(--ui-accent);
+    stroke-width: 1.5;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .fade {
+    position: absolute;
+    z-index: 3;
+    width: 8px;
+    height: 8px;
+    margin-left: -4px;
+    background: var(--ui-accent);
+    cursor: ew-resize;
   }
 
   .grip {

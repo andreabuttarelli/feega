@@ -1,4 +1,5 @@
 import type { Db } from '$lib/server/db/client';
+import { RENDER_DEADLINE_MS } from '$lib/server/motion/farm-render';
 import { promptRequired, type GenMedium, type GenParams } from '$lib/canvas/gen-node';
 import { upscaleLimitsOf } from '$lib/video-models';
 import { findAsset, insertAsset, type Asset } from '$lib/server/repos/assets';
@@ -1010,7 +1011,6 @@ const VIDEO_TIMEOUT_MS = 20 * 60_000;
 const WIRO_IMAGE_TIMEOUT_MS = 10 * 60_000;
 const WIRO_VIDEO_TIMEOUT_MS = 30 * 60_000;
 const DUBBING_TIMEOUT_MS = 60 * 60_000;
-const MOTION_RENDER_TIMEOUT_MS = 8 * 60_000;
 
 type JobKind = 'sync' | 'video' | 'wiro_image' | 'wiro_video' | 'dubbing' | 'motion_render';
 
@@ -1020,7 +1020,7 @@ const JOB_TIMEOUTS_MS: Record<JobKind, number> = {
   wiro_image: WIRO_IMAGE_TIMEOUT_MS,
   wiro_video: WIRO_VIDEO_TIMEOUT_MS,
   dubbing: DUBBING_TIMEOUT_MS,
-  motion_render: MOTION_RENDER_TIMEOUT_MS
+  motion_render: RENDER_DEADLINE_MS
 };
 
 /**

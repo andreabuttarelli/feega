@@ -1,4 +1,5 @@
 import { ValueKind } from '../keyframes';
+import type { CompiledLut } from './lut-model';
 
 export enum EffectKind {
   BrightnessContrast = 'brightness-contrast',
@@ -14,7 +15,10 @@ export enum EffectKind {
   Noise = 'noise',
   ChromaticAberration = 'chromatic-aberration',
   Vignette = 'vignette',
-  Wave = 'wave'
+  Wave = 'wave',
+  Lut = 'lut',
+  Levels = 'levels',
+  LiftGammaGain = 'lift-gamma-gain'
 }
 
 export const EFFECT_KINDS = Object.values(EffectKind) as [EffectKind, ...EffectKind[]];
@@ -29,7 +33,7 @@ export type EffectFrame = { width: number; height: number; frame: number; fps: n
 
 export type Rendered = { filter: string; nodes: SvgNode[] };
 
-type Spec = { label: string; about: string; params: EffectParam[]; varies?: (v: Values) => boolean; render: (v: Values, frame: EffectFrame, filterId: string) => Rendered };
+type Spec = { label: string; about: string; params: EffectParam[]; varies?: (v: Values) => boolean; render: (v: Values, frame: EffectFrame, filterId: string, lut: CompiledLut | null) => Rendered };
 
 const num = (key: string, label: string, min: number, max: number, step: number, fallback: number): EffectParam => ({ key, label, kind: ValueKind.Number, min, max, step, fallback });
 const colour = (key: string, label: string, fallback: string): EffectParam => ({ key, label, kind: ValueKind.Color, min: 0, max: 0, step: 0, fallback });
@@ -95,6 +99,47 @@ const channel = (keep: number) =>
     .map((row) => [0, 1, 2, 3, 4].map((col) => (row === keep && col === keep ? 1 : 0)).join(' '))
     .concat(ALPHA_ROW)
     .join(' ');
+
+const TABLE_STEPS = 17;
+const MIN_GAMMA = 0.01;
+
+function levelsTable(inBlack: number, inWhite: number, gamma: number, outBlack: number, outWhite: number): string {
+  const span = Math.max(inWhite - inBlack, MIN_GAMMA);
+  return Array.from({ length: TABLE_STEPS }, (_, i) => {
+    const x = Math.min(1, Math.max(0, (i / (TABLE_STEPS - 1) - inBlack) / span));
+    return r(outBlack + (outWhite - outBlack) * x ** (1 / Math.max(gamma, MIN_GAMMA)));
+  }).join(' ');
+}
+
+function liftGammaGainTable(lift: number, gamma: number, gain: number): string {
+  return Array.from({ length: TABLE_STEPS }, (_, i) => {
+    const x = i / (TABLE_STEPS - 1);
+    const graded = (gain * x + lift * (1 - x)) ** (1 / Math.max(gamma, MIN_GAMMA));
+    return r(Math.min(1, Math.max(0, graded)));
+  }).join(' ');
+}
+
+const transfer = (tables: [string, string, string]) =>
+  node(
+    'feComponentTransfer',
+    {},
+    ['feFuncR', 'feFuncG', 'feFuncB'].map((tag, i) => node(tag, { type: 'table', tableValues: tables[i] }))
+  );
+
+const PASS_THROUGH: Rendered = { filter: '', nodes: [] };
+
+function lutMatrix(lut: CompiledLut): string {
+  const m = lut.matrix;
+  return [0, 1, 2].map((c) => [m[c * 4], m[c * 4 + 1], m[c * 4 + 2], 0, m[c * 4 + 3]].map(r).join(' ')).concat(ALPHA_ROW).join(' ');
+}
+
+const CHANNELS_RGB = ['R', 'G', 'B'] as const;
+const LIFT = { min: -0.5, max: 0.5, step: 0.01, fallback: 0 };
+const GAMMA = { min: 0.2, max: 4, step: 0.01, fallback: 1 };
+const GAIN = { min: 0, max: 3, step: 0.01, fallback: 1 };
+
+const gradeParams = (prefix: string, label: string, range: { min: number; max: number; step: number; fallback: number }) =>
+  CHANNELS_RGB.map((c) => num(`${prefix}${c}`, `${label} ${c}`, range.min, range.max, range.step, range.fallback));
 
 export const EFFECTS: Record<EffectKind, Spec> = {
   [EffectKind.BrightnessContrast]: {
@@ -220,6 +265,38 @@ export const EFFECTS: Record<EffectKind, Spec> = {
         node('feComposite', { in: 'SourceGraphic', in2: 'light', operator: 'arithmetic', k1: 1, k2: 0, k3: 0, k4: 0 })
       ]);
     }
+  },
+  [EffectKind.Lut]: {
+    label: 'LUT',
+    about: 'colour look from a .cube file or a preset (set_lut), mixed by amount 0..1',
+    params: [num('amount', 'Amount', 0, 1, 0.01, 1)],
+    render: (v, _f, id, lut) => {
+      if (!lut) {
+        return PASS_THROUGH;
+      }
+      const amount = n(v, 'amount');
+      return svg(id, [
+        node('feColorMatrix', { in: 'SourceGraphic', type: 'matrix', values: lutMatrix(lut), result: 'mixed' }),
+        node('feComponentTransfer', { in: 'mixed', result: 'graded' }, ['feFuncR', 'feFuncG', 'feFuncB'].map((tag, i) => node(tag, { type: 'table', tableValues: lut.curves[i].join(' ') }))),
+        node('feComposite', { in: 'graded', in2: 'SourceGraphic', operator: 'arithmetic', k1: 0, k2: r(amount), k3: r(1 - amount), k4: 0, result: 'blend' }),
+        node('feComposite', { in: 'blend', in2: 'SourceAlpha', operator: 'in' })
+      ]);
+    }
+  },
+  [EffectKind.Levels]: {
+    label: 'Levels',
+    about: 'input black/white point, gamma, output black/white point (0..1)',
+    params: [num('inBlack', 'Input black', 0, 1, 0.01, 0), num('inWhite', 'Input white', 0, 1, 0.01, 1), num('gamma', 'Gamma', 0.1, 10, 0.01, 1), num('outBlack', 'Output black', 0, 1, 0.01, 0), num('outWhite', 'Output white', 0, 1, 0.01, 1)],
+    render: (v, _f, id) => {
+      const table = levelsTable(n(v, 'inBlack'), n(v, 'inWhite'), n(v, 'gamma'), n(v, 'outBlack'), n(v, 'outWhite'));
+      return svg(id, [transfer([table, table, table])]);
+    }
+  },
+  [EffectKind.LiftGammaGain]: {
+    label: 'Lift / gamma / gain',
+    about: `per-channel colour wheels: lift R/G/B ${LIFT.min}..${LIFT.max} (shadows), gamma ${GAMMA.min}..${GAMMA.max} (midtones), gain ${GAIN.min}..${GAIN.max} (highlights)`,
+    params: [...gradeParams('lift', 'Lift', LIFT), ...gradeParams('gamma', 'Gamma', GAMMA), ...gradeParams('gain', 'Gain', GAIN)],
+    render: (v, _f, id) => svg(id, [transfer(CHANNELS_RGB.map((c) => liftGammaGainTable(n(v, `lift${c}`), n(v, `gamma${c}`), n(v, `gain${c}`))) as [string, string, string])])
   },
   [EffectKind.Wave]: {
     label: 'Wave distort',

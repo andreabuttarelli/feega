@@ -14,16 +14,21 @@ import { AGENT_MAX_DURATION_S, agentStopWhen } from '$lib/server/project-agent/l
 import { screenModelInput } from '$lib/server/moderation/model-input';
 import { ModerationProfile } from '$lib/server/moderation/profiles';
 import { blockedPrompt } from '$lib/server/moderation/blocked-response';
-import { headOrNew, motionAssets, motionTokens, saveMotionDoc } from '$lib/server/motion/editor';
+import { assetUrls, headOrNew, motionAssets, motionTokens, saveMotionDoc } from '$lib/server/motion/editor';
 import { createMotionTools, selectionNote, type MotionSession } from '$lib/server/motion/motion-tools';
+import { analyzeSounds, storageAnalysis } from '$lib/server/motion/audio-analysis';
 import { motionAgentPrompt } from '$lib/server/motion/motion-prompt';
 import { speakVoiceover } from '$lib/server/motion/voiceover';
 import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
 import { motionAgentScope } from '$lib/server/motion/agent-scope';
 import { SELF_CHECK_MAX_STEPS, VIEW_FRAMES, Vision, docTexts, keyFrameTimes, selfCheckDue, selfCheckPrompt, usageByModel, visionStep } from '$lib/server/motion/frames';
 import { awaitFrames, awaitVerdict, framesPrefix, FRAME_POLL_MS, type FrameBucket } from '$lib/server/motion/frame-store';
-import { CANVAS_ASSET_BUCKET } from '$lib/server/repos/asset-storage';
+import { CANVAS_ASSET_BUCKET, SIGNED_URL_TTL_S } from '$lib/server/repos/asset-storage';
 import { CHECK_REQUEST, FRAMES_REQUEST, type CheckRequest, type FramesRequest } from '$lib/motion/frames-request';
+import { rowRequests } from '$lib/server/motion/batch-input';
+import { startBatch } from '$lib/server/motion/render-run';
+import { motionRenderFarm, motionRenderStorage } from '$lib/server/motion/renderer';
+import { Preset, settingsOf } from '$lib/motion/export-formats';
 import type { RequestHandler } from './$types';
 
 export const config = { maxDuration: AGENT_MAX_DURATION_S };
@@ -105,6 +110,7 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
     session,
     assets,
     newId: () => crypto.randomUUID().slice(0, 8),
+    analysis: async (assetId) => (await analyzeSounds(storageAnalysis(db), { orgId, projectId: project.id }, assets, [assetId]))[assetId] ?? null,
     voiceover: (input) => withOrgContext(orgId, () => speakVoiceover(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId: user.id, actor }, input)),
     frames: async (callId, times) => {
       const review = await screenModelInput(db, { profile: ModerationProfile.Standard, texts: docTexts(session.doc), scope: moderationScope });
@@ -121,6 +127,18 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
       }
       askCheck({ callId, name, doc });
       return awaitVerdict(bucket, framesPrefix(frameScope, callId), { timeoutMs: CHECK_WAIT_MS, pollMs: FRAME_POLL_MS });
+    },
+    batch: async ({ rows }) => {
+      if (session.edits.length) {
+        return { ok: false, error: 'this turn has unsaved edits: the batch renders the saved video, so finish the turn and run render_batch in the next one' };
+      }
+      const renderAssets = await motionAssets({ db, orgId, projectId: project.id, canvasId: motion.record.canvasId, nodeId: motion.record.id }, SIGNED_URL_TTL_S.render);
+      const made = rowRequests(head, rows, { tokens, assets: assetUrls(renderAssets) }, settingsOf(Preset.Social));
+      if (!made.ok) {
+        return made;
+      }
+      const editorUrl = `/p/${project.id}/c/${motion.record.canvasId}/motion/${motion.record.id}`;
+      return startBatch(db, motionRenderFarm(), { ...nodeScope, projectId: project.id, userId: user.id, editorUrl }, made.rows, motionRenderStorage());
     }
   });
 

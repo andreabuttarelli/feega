@@ -102,7 +102,15 @@ describe('MotionDoc to HyperFrames composition', () => {
     const html = compose(withAudio, { v: '/v.mp4', a: '/a.mp3' });
 
     expect(html).toContain('<video id="c-vid" src="/v.mp4" crossorigin="anonymous"');
-    expect(html).toContain('<audio id="c-mus" src="/a.mp3" crossorigin="anonymous"');
+  });
+
+  it('sound stays out of the composition: one mixer plays it in preview and export alike', () => {
+    const loud = must(addClip(doc, { component: 'Video', from: 0, props: { assetId: 'v', volume: 1 } }, 'vid'));
+    const withAudio = must(addClip(loud, { component: 'Audio', from: 0, props: { assetId: 'a' } }, 'mus'));
+    const html = compose(withAudio, { v: '/v.mp4', a: '/a.mp3' });
+
+    expect(html).not.toContain('<audio');
+    expect(html).toMatch(/<video id="c-vid"[^>]* muted /);
   });
 
   it('is deterministic', () => {
@@ -397,5 +405,15 @@ describe('custom components in the composition', () => {
       tl.seek(f / 30);
       expect(target.x / baked.width).toBeCloseTo(expressionValue(shaky, 'card', 'x', f), 3);
     }
+  });
+});
+
+describe('audio-reactive composition', () => {
+  it('bakes audio expressions from the analyses it is given', () => {
+    const withMusic = must(addClip(must(addClip(doc, { component: 'Audio', from: 0, durationInFrames: 60, props: { assetId: 'm' } }, 'music')), { component: 'Shape', from: 0, durationInFrames: 60 }, 'dot'));
+    const reactive = must(setExpression(withMusic, 'dot', 'opacity', 'audio.amp()'));
+    const analyses = { m: { version: 1, fps: 30, duration: 2, amp: Array.from({ length: 60 }, () => 0.5), onsets: [], bpm: null, beats: [], speech: [] } };
+
+    expect(composeHtml({ doc: reactive, tokens: FEEGA_TOKENS, assets: { m: '/m.mp3' }, analyses })).not.toBe(composeHtml({ doc: reactive, tokens: FEEGA_TOKENS, assets: { m: '/m.mp3' } }));
   });
 });

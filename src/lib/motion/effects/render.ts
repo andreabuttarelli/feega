@@ -30,7 +30,7 @@ function valuesAt(clip: EffectClip, effect: Effect, local: number, resolve: Reso
 const active = (clip: EffectClip) => clip.effects.filter((e) => e.enabled);
 
 function renderAt(clip: EffectClip, frame: Frame, local: number, resolve: Resolve): { effect: Effect; out: Rendered }[] {
-  return active(clip).map((effect) => ({ effect, out: EFFECTS[effect.kind].render(valuesAt(clip, effect, local, resolve), { ...frame, frame: local }, filterId(clip, effect)) }));
+  return active(clip).map((effect) => ({ effect, out: EFFECTS[effect.kind].render(valuesAt(clip, effect, local, resolve), { ...frame, frame: local }, filterId(clip, effect), effect.lut ?? null) }));
 }
 
 function primitives(nodes: SvgNode[]): SvgNode[] {
@@ -64,6 +64,30 @@ export function effectLayer(clip: EffectClip, frame: Frame, resolve: Resolve, in
   const defs = rendered.map((r) => filterMarkup(clip, r.effect, r.out)).join('');
   const svg = defs ? `<svg class="efd" aria-hidden="true"><defs>${defs}</defs></svg>` : '';
   return `<div class="ef" id="${layerId(clip)}" style="filter:${esc(filter)}">${svg}${inner}</div>`;
+}
+
+type Adjusting = EffectClip & { blend: string };
+
+const UNADJUSTED = { filter: 'none', mixBlendMode: 'normal' };
+
+function adjusting(clip: Adjusting, frame: Frame, resolve: Resolve) {
+  const rendered = renderAt(clip, frame, 0, resolve);
+  return { rendered, on: { filter: rendered.map((r) => r.out.filter).join(' ') || 'none', mixBlendMode: clip.blend } };
+}
+
+export function adjustmentLayer(clip: Adjusting, frame: Frame, resolve: Resolve, inner: string, zIndex: number): string {
+  const { rendered, on } = adjusting(clip, frame, resolve);
+  const defs = rendered.map((r) => filterMarkup(clip, r.effect, r.out)).join('');
+  const svg = defs ? `<svg class="efd" aria-hidden="true"><defs>${defs}</defs></svg>` : '';
+  const shown = clip.from === 0 ? on : UNADJUSTED;
+  return `<div class="ef" id="${layerId(clip)}" data-clip="${esc(clip.id)}" data-group="${esc(clip.id)}" style="z-index:${zIndex};filter:${esc(shown.filter)};mix-blend-mode:${esc(shown.mixBlendMode)}">${svg}${inner}</div><!--/group:${esc(clip.id)}-->`;
+}
+
+export function adjustmentTimeline(clip: Adjusting, frame: Frame, resolve: Resolve): EffectSet[] {
+  const target = `#${layerId(clip)}`;
+  const { on } = adjusting(clip, frame, resolve);
+  const start = clip.from > 0 ? [{ target, vars: on, at: setTime(clip.from, frame.fps) }] : [];
+  return [...start, ...effectTimeline(clip, frame, resolve), { target, vars: UNADJUSTED, at: setTime(clip.from + clip.durationInFrames, frame.fps) }];
 }
 
 function animated(clip: EffectClip, resolve: Resolve): boolean {

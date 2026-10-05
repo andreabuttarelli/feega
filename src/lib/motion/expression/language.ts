@@ -6,6 +6,10 @@ const MAX_DEPTH = 64;
 
 export type LayerHandle = { get: (key: string) => number };
 
+export type AudioPort = { amp: (ref: string | number | null, smoothing: number) => number; beat: (ref: string | number | null) => number; onset: (ref: string | number | null) => number };
+
+export const SILENT_AUDIO: AudioPort = { amp: () => 0, beat: () => 0, onset: () => 0 };
+
 export type Scope = {
   time: number;
   frame: number;
@@ -16,6 +20,7 @@ export type Scope = {
   track: readonly Keyframe[];
   thisLayer: LayerHandle;
   layer: (ref: string | number) => LayerHandle;
+  audio: AudioPort;
 };
 
 export class ExpressionError extends Error {}
@@ -428,6 +433,28 @@ const MATH = new Namespace(
   ])
 );
 
+const DEFAULT_SMOOTHING = 1;
+
+function audioRef(name: string, ref: Value | undefined): string | number | null {
+  if (ref === undefined) {
+    return null;
+  }
+  if (typeof ref !== 'string' && typeof ref !== 'number') {
+    throw new ExpressionError(`${name}() takes a clip or track name, id or index`);
+  }
+  return ref;
+}
+
+function audioNamespace(port: AudioPort): Namespace {
+  return new Namespace(
+    new Map<string, Value>([
+      ['amp', new Builtin('audio.amp', (ref, smoothing) => port.amp(audioRef('audio.amp', ref), smoothing === undefined ? DEFAULT_SMOOTHING : num(smoothing, 'audio.amp')))],
+      ['beat', new Builtin('audio.beat', (ref) => port.beat(audioRef('audio.beat', ref)))],
+      ['onset', new Builtin('audio.onset', (ref) => port.onset(audioRef('audio.onset', ref)))]
+    ])
+  );
+}
+
 function globals(scope: Scope): Map<string, Value> {
   const fn = (name: string, call: Fn): [string, Value] => [name, new Builtin(name, call)];
   const numbers = (name: string, args: Value[]) => args.map((a) => num(a, name));
@@ -438,6 +465,7 @@ function globals(scope: Scope): Map<string, Value> {
     ['index', scope.index],
     ['thisLayer', new Handle(scope.thisLayer)],
     ['Math', MATH],
+    ['audio', audioNamespace(scope.audio)],
     fn('layer', (ref) => {
       if (typeof ref !== 'string' && typeof ref !== 'number') {
         throw new ExpressionError('layer() takes a layer name, id or index');
