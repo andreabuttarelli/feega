@@ -1,5 +1,6 @@
 import type { ComponentId } from './components';
 import { clipsOf, type MotionClip, type MotionDoc } from './doc';
+import { flattenComps } from './precomp';
 
 export type AudioEntry = { clipId: string; url: string; at: number; offset: number; duration: number; volume: number; fadeIn: number; fadeOut: number };
 export type GainPoint = { time: number; value: number };
@@ -32,7 +33,7 @@ function entryOf(clip: MotionClip, doc: MotionDoc, url: string): AudioEntry | nu
 }
 
 export function audioPlan(doc: MotionDoc, urls: Record<string, string>): AudioEntry[] {
-  return clipsOf(doc).flatMap((clip) => {
+  return clipsOf(flattenComps(doc)).flatMap((clip) => {
     const audible = AUDIBLE[clip.component];
     const p = clip.props as Sound;
     const url = p.assetId ? urls[p.assetId] : undefined;

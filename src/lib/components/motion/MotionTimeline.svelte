@@ -12,11 +12,13 @@
   import Crosshair from '@lucide/svelte/icons/crosshair';
   import Video from '@lucide/svelte/icons/video';
   import SquareDashed from '@lucide/svelte/icons/square-dashed';
+  import Layers from '@lucide/svelte/icons/layers';
+  import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
   import type { Component } from 'svelte';
   import { CLIP_FAMILIES, ClipFamily, Preview, familyOf, tileFrames } from '$lib/motion/track-style';
   import { filmstrip, type Strip } from '$lib/motion/filmstrip';
   import { COMPONENTS, TrackKind } from '$lib/motion/components';
-  import type { MotionClip, MotionDoc } from '$lib/motion/doc';
+  import { compOf, type MotionClip, type MotionDoc } from '$lib/motion/doc';
   import { ClipEdge, moveClip, moveKeyframes, moveTrack, setKeyEase, setKeyInterp, trimClip, type KeyRef, type OpResult } from '$lib/motion/timeline';
   import { withParams } from '$lib/motion/custom/params';
   import { Grip, KeySide, Snap, edgeHandles, frameAt, keyLanes, pxPerFrame, rulerTicks, snapped, stackRows, type KeyLane } from '$lib/motion/timeline-view';
@@ -56,7 +58,9 @@
     [ClipFamily.Custom]: Code,
     [ClipFamily.Null]: Crosshair,
     [ClipFamily.Camera]: Video,
-    [ClipFamily.Mask]: SquareDashed
+    [ClipFamily.Mask]: SquareDashed,
+    [ClipFamily.Precomp]: Layers,
+    [ClipFamily.Adjustment]: SlidersHorizontal
   };
 
   const KEY_ROW_PX = 20;
@@ -80,8 +84,21 @@
     snap,
     waveforms = {},
     assetUrls = {},
-    onchange
-  }: { doc: MotionDoc; frame?: number; selection?: string[]; keySelection?: KeyRef[]; camera?: boolean; zoom: number; snap: Snap; waveforms?: Record<string, number[]>; assetUrls?: Record<string, string>; onchange: (doc: MotionDoc, summary: string) => void } = $props();
+    onchange,
+    onopen
+  }: {
+    doc: MotionDoc;
+    frame?: number;
+    selection?: string[];
+    keySelection?: KeyRef[];
+    camera?: boolean;
+    zoom: number;
+    snap: Snap;
+    waveforms?: Record<string, number[]>;
+    assetUrls?: Record<string, string>;
+    onchange: (doc: MotionDoc, summary: string) => void;
+    onopen?: (comp: string) => void;
+  } = $props();
 
   let folded = $state<string[]>([]);
   let solo = $state<string[]>([]);
@@ -386,9 +403,17 @@
     return { destroy: () => watcher.disconnect() };
   }
 
+  function openComp(clip: MotionClip) {
+    const comp = compOf(clip);
+    if (comp && doc.comps[comp]) {
+      onopen?.(comp);
+    }
+  }
+
   function clipLabel(clip: MotionClip): string {
     const p = clip.props as { text?: string; title?: string; name?: string };
-    const label = clip.component === 'Custom' ? p.name : undefined;
+    const comp = compOf(clip);
+    const label = clip.component === 'Custom' ? p.name : comp ? doc.comps[comp]?.name : undefined;
     return label ?? p.text?.split('\n')[0] ?? p.title ?? COMPONENTS[clip.component].label;
   }
 </script>
@@ -514,6 +539,7 @@
               aria-label={`${COMPONENTS[clip.component].label} clip`}
               style={`left: ${clip.from * ppf}px; width: ${Math.max(4, clip.durationInFrames * ppf)}px; top: ${LANE_PAD_PX + rows[clip.id] * row}px; height: ${row - 2}px; ${hueOf(clipFamily)}`}
               onpointerdown={(e) => startClip(e, clip as MotionClip, track.id)}
+              ondblclick={() => openComp(clip as MotionClip)}
             >
               {#if url && preview === Preview.Thumb}
                 <span class="thumbs" style={`background-image: url("${url}");`} aria-hidden="true"></span>

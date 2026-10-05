@@ -18,7 +18,8 @@ export enum Control {
   Toggle = 'toggle',
   Asset = 'asset',
   Managed = 'managed',
-  Font = 'font'
+  Font = 'font',
+  Comp = 'comp'
 }
 
 export enum AssetKind {
@@ -402,6 +403,20 @@ export const COMPONENTS = {
       })
       .strict()
   },
+  Precomp: {
+    label: 'Precomp',
+    description: 'A nested composition (precompose clips to make one) played as one clip: trimStart starts it later, loop repeats it to the end of the clip.',
+    track: TrackKind.Visual,
+    durationInFrames: seconds(5),
+    schema: z.object({ comp: z.string().max(60).default('').meta({ control: Control.Comp, label: 'Composition', group: Group.Content }), loop: toggle(false, 'Loop', Group.Motion) }).strict()
+  },
+  Adjustment: {
+    label: 'Adjustment layer',
+    description: 'Draws nothing: its effects and blend mode apply to everything on the tracks below it, while it is on screen.',
+    track: TrackKind.Visual,
+    durationInFrames: seconds(5),
+    schema: z.object({}).strict()
+  },
   Custom: {
     label: 'Custom',
     description: 'A component written in code for this video (write_component); its props come from its own props schema.',
@@ -419,7 +434,9 @@ export const THREE_D_COMPONENTS: readonly ComponentId[] = ['Model3D', 'Shape3D',
 
 export const CODE_COMPONENTS: readonly ComponentId[] = ['Custom'];
 
-export const LIBRARY_IDS = COMPONENT_IDS.filter((id) => !CODE_COMPONENTS.includes(id));
+export const NESTING_COMPONENTS: readonly ComponentId[] = ['Precomp'];
+
+export const LIBRARY_IDS = COMPONENT_IDS.filter((id) => !CODE_COMPONENTS.includes(id) && !NESTING_COMPONENTS.includes(id));
 
 export function isComponentId(x: string): x is ComponentId {
   return (COMPONENT_IDS as readonly string[]).includes(x);
