@@ -3,8 +3,8 @@
 > Generato da `node scripts/mcp-inventory.mjs --write`, leggendo `tools/list` dal server vero.
 > Non si modifica a mano: il prossimo che rigenera cancella le correzioni.
 
-**19 tool** — 6 in lettura, 10 in scrittura, 3 che distruggono.
-Il payload di `tools/list` pesa **20.162 caratteri**, circa **5041 token**, ed e' il costo che ogni sessione paga prima di dire una parola.
+**22 tool** — 8 in lettura, 11 in scrittura, 3 che distruggono.
+Il payload di `tools/list` pesa **23.740 caratteri**, circa **5935 token**, ed e' il costo che ogni sessione paga prima di dire una parola.
 
 | gruppo | tool |
 |---|---:|
@@ -12,6 +12,7 @@ Il payload di `tools/list` pesa **20.162 caratteri**, circa **5041 token**, ed e
 | Ads | 4 |
 | Nodi e generazione | 4 |
 | Altro | 3 |
+| Video motion | 3 |
 | Post | 3 |
 
 Legenda: **R** legge e non cambia niente · **W** scrive · **D** distrugge, e il client puo' chiedere conferma.
@@ -34,7 +35,7 @@ Remove rows that exist, in your org. `where` is required — a delete with no fi
 
 *Node data shapes*
 
-What `data` must look like on a `nodes` row, per `type` — the JSON Schema `insert_row`/`update_row` actually enforce on `nodes`, not a guess. Omit `type` for every type at once; name one to save tokens once you know which you need — an unknown `type` comes back as an error naming the ones that exist, so this list is never hand-maintained here. `list` holds N iteration values (images or text, never mixed); `select` picks exactly one item back out of a connected `list`, `products` or `social_account_feed` by a 1-based `index` — a synced catalogue or feed is an ordered list too, so `select` can pull one product or one post out of either the same way; `effects` holds a stack of image filters over an upstream image, each with its own params — set it with `update_row`, then render it with `apply_effects`. Also returns `recommended_models` per medium (best, balanced, cheapest-good, each with price and release month) — prefer these over older models. Limits (aspect ratios, durations, prompt length) are NOT here — those come from `get_media_models`, because they are a fact of the model, not the node. Free.
+What `data` must look like on a `nodes` row, per `type` — the JSON Schema `insert_row`/`update_row` actually enforce on `nodes`, not a guess. Omit `type` for every type at once; name one to save tokens once you know which you need — an unknown `type` comes back as an error naming the ones that exist, so this list is never hand-maintained here. `list` holds N iteration values (images or text, never mixed); `select` picks exactly one item back out of a connected `list`, `products` or `social_account_feed` by a 1-based `index` — a synced catalogue or feed is an ordered list too, so `select` can pull one product or one post out of either the same way, exposing named outputs (`out:images`, `out:text`, and `out:field:<field>` for each entry of `data.outputs` — the fields per source are listed in its schema) that an edge picks with `source_handle`; `effects` holds a stack of image filters over an upstream image, each with its own params — set it with `update_row`, then render it with `apply_effects`; `audio` runs one ElevenLabs operation — `audio_operations` lists each one's inputs, default model and price. Also returns `recommended_models` per medium (best, balanced, cheapest-good, each with price and release month) — prefer these over older models. Limits (aspect ratios, durations, prompt length) are NOT here — those come from `get_media_models`, because they are a fact of the model, not the node. Free.
 
 | campo | tipo | |
 |---|---|---|
@@ -45,7 +46,7 @@ What `data` must look like on a `nodes` row, per `type` — the JSON Schema `ins
 
 *Insert a row*
 
-Add ONE row to any table in your org. `org_id` is filled in for you; naming a different one is refused, not quietly corrected. Never replaces anything — a row that already exists comes back as a collision, and changing it is `update_row`. Several jsonb columns are checked against a real shape before writing (`nodes.data` by `type` — call `describe_node_types` first; `posts.media`, `ad_campaigns.targeting`/`placements`, `canvases.viewport` too); a rejection names the exact field. Others are deliberately free-form. Free.
+Add ONE row to any table in your org. `org_id` is filled in for you; naming a different one is refused, not quietly corrected. Never replaces anything — a row that already exists comes back as a collision, and changing it is `update_row`. Several jsonb columns are checked against a real shape before writing (`nodes.data` by `type` — call `describe_node_types` first; `posts.media`, `ad_campaigns.targeting`/`placements`, `canvases.viewport` too); a rejection names the exact field. On `nodes_connections`, an edge into a node whose model is uncensored is refused — those nodes take no input of any kind. Others are deliberately free-form. Free.
 
 | campo | tipo | |
 |---|---|---|
@@ -176,13 +177,13 @@ How many combinations `run_node_loop` would queue on this node right now, and wh
 
 *Generate a node's content*
 
-Generate into an existing canvas node — text, image or video. This is the same engine the canvas Generate button calls; it never creates a node (`insert_row` does that). `medium` MUST match the node's own type, or the call is refused before anything is spent. Pass `version` as the node's current `nodes.version`: a stale value comes back `conflict` (never a silent overwrite) — re-read the node and retry with the fresh version. A `video` NEVER returns finished here: it comes back `queued` with an `external_job_id` on the run, and the render lands later, asynchronously — the node stays `running` until a later tick deposits the asset. Poll the node (`query`) rather than expecting a file now. A finished result returns `asset_ids` and `media` with `preview_url`/`full_url` (see `get_media`). Omit `model` to keep the node's own model, or the recommended balanced one for the medium when it has none (`describe_node_types` lists the recommended ones). A model the canvas does not offer is refused with the recommended alternatives; an old or weak one still runs but the result carries a `warning` naming the recommended one. Spends credits; a `credits_exhausted` failure means the org is out.
+Generate into an existing canvas node — text, image, video, audio or model3d. This is the same engine the canvas Generate button calls; it never creates a node (`insert_row` does that). `medium` MUST match the node's own type, or the call is refused before anything is spent. Pass `version` as the node's current `nodes.version`: a stale value comes back `conflict` (never a silent overwrite) — re-read the node and retry with the fresh version. A `video` NEVER returns finished here: it comes back `queued` with an `external_job_id` on the run, and the render lands later, asynchronously — the node stays `running` until a later tick deposits the asset. Poll the node (`query`) rather than expecting a file now. An `audio` node runs one ElevenLabs operation set in `params.operation` (see `audio_operations` in `describe_node_types`); `describe_node_types` with `type: audio` also lists the voices. Audio `dubbing` is queued like a video. A `model3d` node turns ONE connected image into a GLB 3D model on a `wiro/` image-to-3D model. With no image but a prompt or connected text, it first draws a white-background product shot on the cheapest image model (billed too), then models that; with neither it is refused. Settings go in `params` (Trellis/Pixal3D `pipeline_type`, Hunyuan3D `generate_texture`). A finished result returns `asset_ids` and `media` with `preview_url`/`full_url` (see `get_media`). Omit `model` to keep the node's own model, or the recommended balanced one for the medium when it has none (`describe_node_types` lists the recommended ones). A model the canvas does not offer is refused with the recommended alternatives; an old or weak one still runs but the result carries a `warning` naming the recommended one. Models whose id starts with `wiro/` run on Wiro and are always queued like a video, after a safety screen that refuses with a readable reason. Uncensored `wiro/` models run only when the org owner turned them on in Settings; minors and real, identifiable people are refused regardless. An uncensored model takes NO input of any kind — no upstream connections, no picked references, no image/mask/init params — and the call is refused before anything is spent if any are present. Spends credits; a `credits_exhausted` failure means the org is out.
 
 | campo | tipo | |
 |---|---|---|
 | `org`? | string | Which org, if you belong to more than one. |
 | `node_id` | string |  |
-| `medium` | `text` \| `image` \| `video` |  |
+| `medium` | `text` \| `image` \| `video` \| `audio` \| `model3d` |  |
 | `prompt` | string |  |
 | `model`? | string |  |
 | `version` | integer |  |
@@ -230,7 +231,7 @@ Rewrites a brief into the SHAPE the model you are about to render with wants —
 
 *See a node's media*
 
-View the image, video or text a node holds, a generation run produced, or an asset — by `node_ids`, `run_ids` and/or `asset_ids`. Per item: type, mime, width/height, duration, and two signed links: `preview_url` (images: 1024px long edge, valid 5 minutes — FETCH THIS to look at the image and judge it against the prompt) and `full_url` (the original file, valid 1 hour — give this to the user). Videos have `full_url` only. Ids your org cannot see come back in `missing`. Reads only, spends nothing.
+View the image, video, audio, 3D model or text a node holds, a generation run produced, or an asset — by `node_ids`, `run_ids` and/or `asset_ids`. Per item: type, mime, width/height, duration, and two signed links: `preview_url` (images: 1024px long edge, valid 5 minutes — FETCH THIS to look at the image and judge it against the prompt) and `full_url` (the original file, valid 1 hour — give this to the user). Videos and audio have `full_url` only. Ids your org cannot see come back in `missing`. Reads only, spends nothing.
 
 | campo | tipo | |
 |---|---|---|
@@ -238,6 +239,43 @@ View the image, video or text a node holds, a generation run produced, or an ass
 | `node_ids`? | string[] |  |
 | `run_ids`? | string[] |  |
 | `asset_ids`? | string[] |  |
+
+## Video motion
+
+### `ask_motion_agent` · W
+
+*Ask the motion editor agent*
+
+Edit a motion video (a `motion` canvas node) by asking the motion editor's own AI in plain words, e.g. "make the title red and add a bounce". It runs one turn of the same agent as the editor chat, with its own tools, writes a new revision of the video and posts the exchange in the editor chat. Read the video first with `get_motion_summary` to name clips precisely. With `wait` (default true) it returns when the turn ends, up to about 4 minutes; otherwise, or past that, it returns a `run_id` still `running` — poll `get_motion_run`. Frames cannot be inspected without the editor open in a browser. Spends credits.
+
+| campo | tipo | |
+|---|---|---|
+| `org`? | string | Which org, if you belong to more than one. |
+| `node_id` | string |  |
+| `prompt` | string |  |
+| `wait`? | boolean |  |
+
+### `get_motion_run` · R
+
+*Read a motion agent run*
+
+State of an `ask_motion_agent` run: `status` (running, done, failed, expired), the agent `reply`, the `summary` of its edits, the new revision `version` (null when nothing was saved), `cost_usd` and `editor_url`. Reads only.
+
+| campo | tipo | |
+|---|---|---|
+| `org`? | string | Which org, if you belong to more than one. |
+| `run_id` | string |  |
+
+### `get_motion_summary` · R
+
+*Read a motion video*
+
+The saved state of a motion video: revision `version`, last change and who made it, size, fps, duration and every track and clip with start/duration in seconds. Reads only, spends nothing.
+
+| campo | tipo | |
+|---|---|---|
+| `org`? | string | Which org, if you belong to more than one. |
+| `node_id` | string |  |
 
 ## Post
 
