@@ -126,6 +126,15 @@ describe('a precomp in the rendered timeline', () => {
     expect(placed(doc).filter((c) => c.id.endsWith('__title'))).toHaveLength(1);
   });
 
+  it('held, the composition plays once and its last frame stays until the clip ends', () => {
+    let doc = must(setProps(precomposed, 'pc', { hold: true }));
+    doc = { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === 'pc' ? { ...c, durationInFrames: 200 } : c)) })) };
+    const cap = byId(doc, 'pc__0__cap');
+
+    expect([cap.from, cap.durationInFrames, cap.transitionOut.durationInFrames]).toEqual([60, 170, 0]);
+    expect(byId(doc, 'pc__0__title').durationInFrames).toBe(60);
+  });
+
   it('the precomp itself becomes the group over exactly its composition tracks', () => {
     const flat = flattenComps(precomposed);
     const group = clipsOf(flat).find((c) => c.id === 'pc')!;

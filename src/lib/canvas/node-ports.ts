@@ -44,11 +44,11 @@ export const NODE_PORTS: Record<NodeType, Ports> = {
   list: { inputs: InputRule.List, output: OutputRule.Item },
   select: { inputs: ['text', 'images'], output: OutputRule.Item },
   effects: { inputs: ['images', 'videos'], output: OutputRule.Media },
-  composition: { inputs: ['images'], output: 'videos' },
+  composition: { inputs: ['images', 'videos', 'motions'], output: 'videos' },
   calendar: { inputs: ['images', 'videos', 'audios', 'text'], output: null },
   audio: { inputs: InputRule.Audio, output: OutputRule.Audio },
   model3d: { inputs: ['images', 'text'], output: null },
-  motion: { inputs: NONE, output: null },
+  motion: { inputs: NONE, output: 'motions' },
   studio_batch: { inputs: NONE, output: 'images' }
 };
 

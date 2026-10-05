@@ -5,6 +5,8 @@ import type { CompositionNode } from '$lib/canvas/composition-node';
 import { FPS } from './design';
 import { FORMATS, MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from './doc';
 import { addClip } from './timeline';
+import { CellFit, CellTiming } from './bento/model';
+import { motionCompId } from './embed';
 import {
   COMPOSITION_CLIP,
   HEADLINE_CLIP,
@@ -102,7 +104,8 @@ describe('draftFromNode: an old canvas composition node opens as the same video'
     background: { color: '#ff0000' },
     duration: 7.5,
     aspect: '16:9',
-    refId: null
+    refId: null,
+    cells: {}
   };
 
   it('carries layout, camera, background, duration, format and media over', () => {
@@ -133,15 +136,62 @@ it('composeEditorPath points at the compositions tool for that video', () => {
 });
 
 describe('a canvas composition node, read as a motion video', () => {
-  const node: CompositionNode = { id: 'n1', layout: 'ring', layoutParams: { count: 6, tiltX: -20 }, camera: { preset: 'static', params: {} }, background: { color: '#112233' }, duration: 8, aspect: '16:9', refId: null };
+  const node: CompositionNode = { id: 'n1', layout: 'ring', layoutParams: { count: 6, tiltX: -20 }, camera: { preset: 'static', params: {} }, background: { color: '#112233' }, duration: 8, aspect: '16:9', refId: null, cells: {} };
 
   it('keeps its layout, settings, length, format and media, so a stored node plays in the motion engine without losing anything', () => {
-    const doc = nodeDoc(node, [{ assetId: 'a1', kind: 'image' }]);
+    const doc = nodeDoc(node, [{ sourceId: 'img', assetId: 'a1', kind: 'image' }]);
     const clip = findClip(doc, COMPOSITION_CLIP)!.clip;
 
     expect(parseMotionDoc(doc).ok).toBe(true);
     expect([doc.width, doc.height]).toEqual([FORMATS[MotionFormat.Landscape].width, FORMATS[MotionFormat.Landscape].height]);
     expect(doc.durationInFrames).toBe(8 * FPS);
     expect(clip.props).toMatchObject({ layout: 'ring', layoutParams: { count: 6, tiltX: -20 }, camera: 'static', background: '#112233', media: [{ assetId: 'a1', kind: 'image' }] });
+  });
+});
+
+describe('a bento composition node with motion editors wired in', () => {
+  const motion = (() => {
+    const added = addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Title', from: 0, durationInFrames: 45 }, 'title');
+    if (!added.ok) {
+      throw new Error(added.error);
+    }
+    return { ...added.doc, durationInFrames: 45 };
+  })();
+  const node: CompositionNode = {
+    id: 'n1',
+    layout: 'bento',
+    layoutParams: { columns: 2, rows: 1 },
+    camera: { preset: 'static', params: {} },
+    background: { color: '#000000' },
+    duration: 6,
+    aspect: '16:9',
+    refId: null,
+    cells: { mot: { columns: 1, timing: CellTiming.Hold, fit: CellFit.Contain }, img: { background: '#ff0000' } }
+  };
+  const motionCard = { sourceId: 'mot', kind: 'motion' as const, revision: 2, posterAssetId: 'poster' };
+  const cards = [{ sourceId: 'img', assetId: 'a1', kind: 'image' as const }, motionCard];
+  const media = (doc: MotionDoc) => findClip(doc, COMPOSITION_CLIP)!.clip.props.media as Record<string, unknown>[];
+
+  it('puts the motion doc inside its cell as a live composition, with the cell settings of its source node', () => {
+    const doc = nodeDoc(node, cards, { mot: motion });
+
+    expect(parseMotionDoc(doc).ok).toBe(true);
+    expect(media(doc)).toEqual([
+      { assetId: 'a1', kind: 'image', background: '#ff0000' },
+      { assetId: motionCompId('mot'), kind: 'comp', columns: 1, timing: 'hold', fit: 'contain' }
+    ]);
+    expect(doc.comps[motionCompId('mot')].durationInFrames).toBe(45);
+  });
+
+  it('shows the poster frame when the motion could not be read', () => {
+    expect(media(nodeDoc(node, cards, { mot: null }))[1]).toMatchObject({ assetId: 'poster', kind: 'image' });
+  });
+
+  it('leaves the cell out when there is neither a doc nor a poster', () => {
+    expect(media(nodeDoc(node, [{ ...motionCard, posterAssetId: null }], {}))).toEqual([]);
+  });
+
+  it('a layout that cannot hold compositions shows the poster', () => {
+    expect(media(nodeDoc({ ...node, layout: 'helix' }, cards, { mot: motion }))[1]).toMatchObject({ assetId: 'poster', kind: 'image' });
   });
 });

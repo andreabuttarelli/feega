@@ -247,7 +247,8 @@ const CONNECTOR_FOR_MEDIUM: Record<Medium, ConnectorType> = {
   image: 'images',
   video: 'videos',
   audio: 'audios',
-  model3d: 'models3d'
+  model3d: 'models3d',
+  motion: 'motions'
 };
 
 /**

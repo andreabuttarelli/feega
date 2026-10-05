@@ -10,8 +10,9 @@ import { outlineUrl } from '../fonts/outline';
 import { Finish } from '../devices';
 import { deviceRuntime } from './device-runtime';
 import { ringBake, ringHtml, ringScript } from './ring';
-import { isRing } from '../ring/model';
-import type { RingBake } from '../ring/pose';
+import { RING_LAYOUT } from '../ring/model';
+import { bentoBake, bentoHtml, bentoScript } from './bento';
+import { BENTO_LAYOUT } from '../bento/model';
 import { bakeComposition, compositionScript, type TimedBake } from './composition';
 import { ANIMATE_CSS, ENGINE, animationScript, keyedOverrides, sceneKeys, wrapAnimated, wrapParents } from './animate';
 import { ancestorsOf, parentsWithChildren } from '../parent';
@@ -219,6 +220,21 @@ type GroupSpec = {
   effects: (clip: MotionClip, ctx: TemplateCtx<ComponentId>) => EffectSet[];
 };
 
+type CardLayout = {
+  html: (ctx: TemplateCtx<'Composition'>, content: string) => string;
+  bake: (clip: MotionClip, ctx: TemplateCtx<ComponentId>) => unknown;
+  script: (bakes: never[], fps: number, duration: number) => string;
+};
+
+const CARD_LAYOUTS: Record<string, CardLayout> = {
+  [RING_LAYOUT]: { html: ringHtml, bake: ringBake, script: ringScript },
+  [BENTO_LAYOUT]: { html: bentoHtml, bake: bentoBake, script: (bakes, _fps, duration) => bentoScript(bakes, duration) }
+};
+
+function cardLayoutOf(clip: MotionClip): CardLayout | null {
+  return clip.component === 'Composition' ? (CARD_LAYOUTS[String(clip.props.layout)] ?? null) : null;
+}
+
 const GROUPS: Partial<Record<ComponentId, GroupSpec>> = {
   Precomp: {
     firstLayer: (clip, trackIndex, starts) => starts.get(trackIndex + ((clip.props as GroupProps).span ?? 0)) ?? 0,
@@ -230,7 +246,10 @@ const GROUPS: Partial<Record<ComponentId, GroupSpec>> = {
       const span = (clip.props as GroupProps).span;
       return span ? (starts.get(trackIndex + span) ?? 0) : Number.POSITIVE_INFINITY;
     },
-    html: (clip, ctx, placed, content) => clipHtml(clip, ctx, placed, isRing(clip.props) ? ringHtml(ctx as TemplateCtx<'Composition'>, content) : TEMPLATES.Composition.html(ctx as TemplateCtx<'Composition'>)),
+    html: (clip, ctx, placed, content) => {
+      const layout = cardLayoutOf(clip);
+      return clipHtml(clip, ctx, placed, layout ? layout.html(ctx as TemplateCtx<'Composition'>, content) : TEMPLATES.Composition.html(ctx as TemplateCtx<'Composition'>));
+    },
     effects: (clip, ctx) => effectTimeline(clip, ctx, ctx.color)
   },
   Adjustment: {
@@ -442,7 +461,7 @@ export function composeHtml(raw: ComposeInput): string {
   const shapes: ShapeBake[] = [];
   const textPaths: TextPathBake[] = [];
   const particles: ParticleBake[] = [];
-  const rings: RingBake[] = [];
+  const cardBakes = new Map<CardLayout, unknown[]>(Object.values(CARD_LAYOUTS).map((l) => [l, []]));
   const clips: MotionClip[] = [];
   const runs: CustomRun[] = [];
   const pairs = mattePairs(doc);
@@ -476,7 +495,8 @@ export function composeHtml(raw: ComposeInput): string {
       if (THREE_D_COMPONENTS.includes(clip.component)) {
         three.push(threeClipOf(clip, ctx, onStage.has(clip.id), input));
       }
-      if (clip.component === 'Composition' && !isRing(clip.props)) {
+      const cards = cardLayoutOf(clip);
+      if (clip.component === 'Composition' && !cards) {
         compositions.push(compositionBake(clip, ctx));
       }
       const shape = clip.component === 'Shape' ? shapeBake({ ...clip, props: ctx.p as Record<string, unknown> }, ctx) : null;
@@ -489,8 +509,8 @@ export function composeHtml(raw: ComposeInput): string {
       if (clip.component === 'Particles') {
         particles.push(particleBake(clip, ctx));
       }
-      if (clip.component === 'Composition' && isRing(clip.props)) {
-        rings.push(ringBake(clip, ctx));
+      if (cards) {
+        cardBakes.get(cards)!.push(cards.bake(clip, ctx));
       }
       const run = clip.component === 'Custom' ? customRun(clip, ctx, doc.components) : null;
       if (run) {
@@ -549,7 +569,7 @@ export function composeHtml(raw: ComposeInput): string {
     hotScript(shapeScript(shapes, doc.fps, Number(duration))),
     hotScript(textPathScript(textPaths, doc.fps, Number(duration))),
     hotScript(particleScript(particles, doc.fps, Number(duration))),
-    hotScript(ringScript(rings, doc.fps, Number(duration)))
+    ...[...cardBakes].map(([layout, bakes]) => hotScript(layout.script(bakes as never[], doc.fps, Number(duration))))
   ].join('');
   return `${page}${captureScript(frame, contentStamp(page))}${measureScript()}</body></html>`;
 }

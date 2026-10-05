@@ -1,8 +1,10 @@
 import { CAMERA_PRESETS, type CameraPresetId } from '../canvas/composition/camera';
 import { LAYOUTS } from '../canvas/composition/index';
 import type { LayoutId, LayoutParams } from '../canvas/composition/types';
-import type { CompositionAspect, CompositionNode } from '../canvas/composition-node';
-import { TrackKind, defaultProps } from './components';
+import type { CompositionAspect, CompositionNode, UpstreamCard } from '../canvas/composition-node';
+import { COMP_CARD_LAYOUTS } from './card-layouts';
+import { embedMotion, motionCompId } from './embed';
+import { TrackKind, defaultProps, type CellSpec } from './components';
 import { FORMATS, MotionFormat, formatOf, newClip, newMotionDoc, parseMotionDoc, type DocVerdict, type MotionClip, type MotionDoc, type MotionTrack } from './doc';
 import type { PropsOf } from './hyperframes/templates';
 
@@ -178,9 +180,34 @@ export function composeEditorPath(input: { projectId: string; nodeId: string }):
   return `/app/compose/${input.nodeId}?project=${input.projectId}`;
 }
 
-export function nodeDoc(node: CompositionNode, media: ComposeMedia[]): MotionDoc {
-  const draft = draftFromNode(node, media);
-  const verdict = applyDraft(newMotionDoc(draft.format), draft);
+export type MotionSources = Record<string, MotionDoc | null>;
+type Slots = { media: ComposeMedia[]; embeds: { nodeId: string; doc: MotionDoc }[] };
+
+function slotOf(card: UpstreamCard, cell: CellSpec, takesComps: boolean, motions: MotionSources): Slots {
+  if (card.kind !== 'motion') {
+    return { media: [{ assetId: card.assetId, kind: card.kind, ...cell }], embeds: [] };
+  }
+  const doc = takesComps ? motions[card.sourceId] : null;
+  if (doc) {
+    return { media: [{ assetId: motionCompId(card.sourceId), kind: 'comp', ...cell }], embeds: [{ nodeId: card.sourceId, doc }] };
+  }
+  return card.posterAssetId ? { media: [{ assetId: card.posterAssetId, kind: 'image', ...cell }], embeds: [] } : { media: [], embeds: [] };
+}
+
+export function slotsOf(node: Pick<CompositionNode, 'layout' | 'cells'>, cards: UpstreamCard[], motions: MotionSources): Slots {
+  const takesComps = COMP_CARD_LAYOUTS.has(node.layout);
+  const slots = cards.map((card) => slotOf(card, node.cells[card.sourceId] ?? {}, takesComps, motions));
+  return { media: slots.flatMap((s) => s.media), embeds: slots.flatMap((s) => s.embeds) };
+}
+
+export function withEmbeds(base: MotionDoc, embeds: Slots['embeds']): MotionDoc {
+  return embeds.reduce((doc, e) => embedMotion(doc, e.nodeId, e.doc), base);
+}
+
+export function nodeDoc(node: CompositionNode, cards: UpstreamCard[], motions: MotionSources = {}): MotionDoc {
+  const slots = slotsOf(node, cards, motions);
+  const draft = draftFromNode(node, slots.media);
+  const verdict = applyDraft(withEmbeds(newMotionDoc(draft.format), slots.embeds), draft);
   if (!verdict.ok) {
     throw new Error(verdict.error);
   }

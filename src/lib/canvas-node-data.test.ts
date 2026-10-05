@@ -465,8 +465,15 @@ describe('un nodo composition, letto dalla riga', () => {
       background: { color: '#000000' },
       duration: 6,
       aspect: '9:16',
-      refId: null
+      refId: null,
+      cells: {}
     });
+  });
+
+  it('le impostazioni di cella valide restano, quelle sbagliate cadono', () => {
+    const node = compositionOf({ id: 'n1', type: 'composition', data: { layout: 'bento', cells: { a: { fit: 'contain', timing: 'hold' }, b: { fit: 'stretch' } } } });
+
+    expect(node?.cells).toEqual({ a: { fit: 'contain', timing: 'hold' } });
   });
 
   it('un layout o preset sconosciuto in data torna al default invece di rompere il disegno', () => {
