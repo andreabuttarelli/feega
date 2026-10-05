@@ -1,7 +1,7 @@
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 
 const MOTION_DATA = { format: 'landscape', docHeadRevision: 0, posterAssetId: null, lastRenderAssetId: null };
-const START = /^0:00\.00 \//;
+const START = /^00:00:00 \//;
 
 test.describe('motion editor @real', () => {
   test.skip(!REAL_STACK, 'richiede uno stack disposable: E2E_REAL_STACK=1');

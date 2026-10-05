@@ -12,7 +12,7 @@ export const TIMELINE_MIN_PX = 140;
 const PREVIEW_MIN_PX = 160;
 const STORAGE_KEY = 'motion-editor-layout';
 
-export const DEFAULT_LAYOUT: EditorLayout = { chat: Panel.Open, inspector: Panel.Open, timelinePx: 300 };
+export const DEFAULT_LAYOUT: EditorLayout = { chat: Panel.Open, inspector: Panel.Open, timelinePx: 360 };
 
 const layoutSchema = z.object({ chat: z.enum(Panel), inspector: z.enum(Panel), timelinePx: z.number().finite() });
 
