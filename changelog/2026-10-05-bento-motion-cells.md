@@ -39,4 +39,6 @@ vero (precomp).
 - La comp è disposta nel frame dell'ospite: un motion verticale in una composizione orizzontale
   mantiene le frazioni di posizione, non il proprio aspetto.
 - fps diversi fra sorgente e ospite non sono convertiti.
-- Le celle si configurano via dati del nodo/agente; non c'è un inspector dedicato sulla tela.
+- Pannello minimo sul nodo (`BentoPanel.svelte`): righe, colonne, gap, radius e span per cella,
+  scritti con `write(id, patch)` tramite `bentoGridPatch`/`cellSpanPatch`. Fit, crop, colore e
+  timing restano all'agente.

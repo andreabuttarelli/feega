@@ -141,3 +141,14 @@ export function staleMotions(cards: UpstreamCard[], loaded: Record<string, numbe
 export function cardAssetIds(cards: UpstreamCard[]): string[] {
   return cards.flatMap((c) => (c.kind === MOTION_TYPE ? (c.posterAssetId ? [c.posterAssetId] : []) : [c.assetId]));
 }
+
+export type BentoGridKey = 'columns' | 'rows' | 'gap' | 'cornerRadius';
+export type SpanKey = 'columns' | 'rows';
+
+export function bentoGridPatch(node: Pick<CompositionNode, 'layoutParams'>, key: BentoGridKey, value: number): Pick<CompositionNode, 'layoutParams'> {
+  return { layoutParams: { ...node.layoutParams, [key]: value } };
+}
+
+export function cellSpanPatch(node: Pick<CompositionNode, 'cells'>, sourceId: string, key: SpanKey, value: number): Pick<CompositionNode, 'cells'> {
+  return { cells: { ...node.cells, [sourceId]: { ...node.cells[sourceId], [key]: value } } };
+}

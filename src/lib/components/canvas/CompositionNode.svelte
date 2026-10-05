@@ -5,6 +5,7 @@
   import { motionSourcePath } from '$lib/canvas/motion-node';
   import CompositionPlayer from '$lib/components/motion/CompositionPlayer.svelte';
   import NodeDownload from './NodeDownload.svelte';
+  import BentoPanel from './BentoPanel.svelte';
   import { nodeDoc } from '$lib/motion/composition-draft';
   import type { MotionDoc } from '$lib/motion/doc';
 
@@ -14,7 +15,8 @@
     cards = [],
     assets = {},
     previewActive = true,
-    composeIn
+    composeIn,
+    onpatch
   }: {
     node: CompositionNode;
     posterUrl?: string | null;
@@ -22,6 +24,7 @@
     assets?: Record<string, string>;
     previewActive?: boolean;
     composeIn: { project: string; canvas: string };
+    onpatch?: (patch: Partial<CompositionNode>) => void;
   } = $props();
 
   const ASPECT_RATIO = { '9:16': 9 / 16, '1:1': 1, '16:9': 16 / 9 } as const;
@@ -66,6 +69,10 @@
       <Orbit size={22} strokeWidth={1.5} />
       <p>Connect images, videos or motions</p>
     </div>
+  {/if}
+
+  {#if node.layout === 'bento' && onpatch}
+    <BentoPanel {node} {cards} {onpatch} />
   {/if}
 
   <div class="composition-actions">

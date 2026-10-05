@@ -112,6 +112,11 @@ Segnale: la preview non si aggiorna e non parte, nessun errore in `console`; con
 server vanno in `$state.raw` (si sostituisce l'oggetto intero), e nei giri Playwright si ascolta
 `pageerror`, non solo `console`.
 
+### Uno screenshot di un frame HTML del motore senza le clip che partono dopo lo 0
+Segnale: in un harness Playwright le clip con `from` > 0 non compaiono mai, anche senza keyframe;
+sul farm e nel player sì. `__timelines.main.seek(t)` muove solo GSAP, non la visibilità delle clip
+che governa il runtime. Mossa: `window.__player.renderSeek(t)`, lo stesso seek del render.
+
 ## Ambiente e worktree
 
 ### I tempi di idratazione misurati in dev non dicono niente

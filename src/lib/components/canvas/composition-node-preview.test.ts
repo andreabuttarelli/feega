@@ -17,6 +17,12 @@ describe('the composition node runs on the motion engine', () => {
     expect(node).toMatch(/let sources = \$state\.raw</);
   });
 
+  it('a bento node shows its grid and span panel, and the canvas saves what it changes', () => {
+    expect(node).toMatch(/node\.layout === 'bento' && onpatch/);
+    expect(node).toMatch(/<BentoPanel \{node\} \{cards\} \{onpatch\}/);
+    expect(page).toMatch(/onpatch=\{\(patch\) => write\(id, patch, SaveTiming\.Now\)\}/);
+  });
+
   it('opens and exports in Compositions, the motion editor with its export dialog', () => {
     expect(node).toMatch(/ondblclick=\{openInCompositions\}/);
     expect(node).toMatch(/action="\/app\/compose\?\/fromNode"/);

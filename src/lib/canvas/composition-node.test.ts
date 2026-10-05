@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { cardAssetIds, staleMotions, upstreamCards, upstreamImageRefs, upstreamMedia } from './composition-node';
+import { bentoGridPatch, cardAssetIds, cellSpanPatch, staleMotions, upstreamCards, upstreamImageRefs, upstreamMedia } from './composition-node';
+import { CellFit } from '$lib/motion/bento/model';
 
 describe('upstreamImageRefs', () => {
   it('collects refIds from several image nodes wired in', () => {
@@ -97,4 +98,17 @@ it('cardAssetIds names every picture the preview may show: media and the posters
   ];
 
   expect(cardAssetIds(cards)).toEqual(['a1', 'p1']);
+});
+
+describe('the bento panel on the canvas writes only what it changes', () => {
+  const node = { layoutParams: { columns: 3, rows: 2, enter: 'rise' }, cells: { a: { fit: CellFit.Contain } } };
+
+  it('a grid setting lands in layoutParams, keeping the rest', () => {
+    expect(bentoGridPatch(node, 'gap', 40)).toEqual({ layoutParams: { columns: 3, rows: 2, enter: 'rise', gap: 40 } });
+  });
+
+  it('a span lands on the cell of its source node, keeping its other settings', () => {
+    expect(cellSpanPatch(node, 'a', 'columns', 2)).toEqual({ cells: { a: { fit: 'contain', columns: 2 } } });
+    expect(cellSpanPatch(node, 'b', 'rows', 2)).toEqual({ cells: { a: { fit: 'contain' }, b: { rows: 2 } } });
+  });
 });

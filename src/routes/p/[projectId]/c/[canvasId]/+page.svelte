@@ -2717,6 +2717,7 @@
             {cards}
             assets={cardAssets(cards)}
             composeIn={{ project: data.projectId, canvas: data.canvas.id }}
+            onpatch={(patch) => write(id, patch, SaveTiming.Now)}
           />
         {:else if motion}
           {@const motionAt = { projectId: data.projectId, canvasId: data.canvas.id, nodeId: id }}
