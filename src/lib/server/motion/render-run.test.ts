@@ -8,6 +8,7 @@ const runs = vi.hoisted(() => ({
   failRun: vi.fn(),
   listNodeRuns: vi.fn(),
   queuedRenderRuns: vi.fn(),
+  activeRenderRuns: vi.fn(),
   setRunParams: vi.fn()
 }));
 const saveExport = vi.hoisted(() => vi.fn());
@@ -33,7 +34,7 @@ import type { NodeRun } from '$lib/server/repos/node-runs';
 import { ExportFormat, Preset, settingsOf } from '$lib/motion/export-formats';
 import { CREDITS_PER_USD_SUBSCRIPTION_LIST } from '$lib/credit-ladder';
 
-const farm = { open: vi.fn(), attach: vi.fn() };
+const farm = { open: vi.fn(), attach: vi.fn(), running: vi.fn() };
 const scope = { orgId: 'org', projectId: 'prj', nodeId: 'node', userId: 'u', editorUrl: '/p/prj/c/c/motion/node' };
 const longScope = { ...scope, plan: 'pro' };
 const SEVEN_CHUNKS = 7 * 450;
@@ -84,6 +85,8 @@ async function started(req = request(sevenChunks())) {
 beforeEach(() => {
   vi.clearAllMocks();
   runs.listNodeRuns.mockResolvedValue([]);
+  runs.activeRenderRuns.mockResolvedValue([]);
+  farm.running.mockResolvedValue([]);
   runs.createRun.mockImplementation(async (_db, input) => runOf(input.params));
   runs.claimRun.mockImplementation(async (_db, input) => ({ ...runOf({}), id: input.runId }));
   saveExport.mockResolvedValue({ ok: true, assetId: 'asset-9' });
@@ -277,6 +280,55 @@ describe('reconcileRenders', () => {
     await reconcileRenders(db, farm, storage);
 
     expect(farmCalls.checkTask).not.toHaveBeenCalled();
+  });
+});
+
+describe('a sandbox costs only while a render needs it', () => {
+  it('a retry that cannot start spends its attempt, instead of retrying on every tick', async () => {
+    let run = await started();
+    runs.queuedRenderRuns.mockImplementation(async () => [run]);
+    farmCalls.checkTask.mockImplementation(async (_f, name: string) => (name === 'box-3' ? { state: TaskState.Failed, error: 'chunk 3 failed' } : running));
+    farmCalls.launchPiece.mockRejectedValue(new Error('quota'));
+    const { db } = fakeDb(request(sevenChunks()).job);
+
+    await reconcileRenders(db, farm, storage);
+    expect(lastParams().farm.pieces[3]).toMatchObject({ attempt: 2, state: TaskState.Failed });
+
+    run = runOf(lastParams());
+    await reconcileRenders(db, farm, storage);
+    expect(runs.failRun).toHaveBeenCalledWith(db, expect.objectContaining({ runId: 'run-1' }));
+  });
+
+  it('a first worker gone before assembly renders its chunk again, the render does not hang', async () => {
+    const run = await started();
+    runs.queuedRenderRuns.mockResolvedValue([run]);
+    farmCalls.checkTask.mockResolvedValue(done);
+    farmCalls.launchAssembly.mockRejectedValue(new Error('render worker stopped before it finished'));
+    const { db } = fakeDb(request(sevenChunks()).job);
+
+    await reconcileRenders(db, farm, storage);
+
+    expect(lastParams().farm.pieces[0]).toMatchObject({ state: TaskState.Failed });
+    expect(lastParams().farm.assembly).toBeNull();
+    expect(runs.failRun).not.toHaveBeenCalled();
+  });
+
+  it('the tick stops a running sandbox no live render owns, once it is past its start-up grace', async () => {
+    const run = await started();
+    runs.queuedRenderRuns.mockResolvedValue([]);
+    runs.activeRenderRuns.mockResolvedValue([run]);
+    const old = Date.now() - 10 * 60_000;
+    farm.running.mockResolvedValue([
+      { name: 'box-0', createdAt: old },
+      { name: 'orphan', createdAt: old },
+      { name: 'just-born', createdAt: Date.now() }
+    ]);
+    const { db } = fakeDb();
+
+    const outcome = await reconcileRenders(db, farm, storage);
+
+    expect(farmCalls.stopWorker.mock.calls.map((c) => c[1])).toEqual(['orphan']);
+    expect(outcome.reaped).toBe(1);
   });
 });
 

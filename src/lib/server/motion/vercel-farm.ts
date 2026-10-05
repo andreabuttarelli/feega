@@ -1,6 +1,6 @@
 import { Sandbox } from '@vercel/sandbox';
 import { HYPERFRAMES_VERSION } from '$lib/motion/hyperframes/compose';
-import { FARM_RUNTIME_DIR, type FarmWorker, type RenderFarm, type WorkerSpec } from './render-farm';
+import { FARM_RUNTIME_DIR, type FarmWorker, type LiveWorker, type RenderFarm, type WorkerSpec } from './render-farm';
 
 export type FarmAccess = { token?: string; teamId?: string; projectId?: string };
 
@@ -18,6 +18,8 @@ const BASE_SETUP = [
   `mkdir -p ${FARM_RUNTIME_DIR} && cd ${FARM_RUNTIME_DIR} && npm init -y && npm i --no-audit --no-fund hyperframes@${HYPERFRAMES_VERSION} @hyperframes/producer@${HYPERFRAMES_VERSION}`,
   `cd ${FARM_RUNTIME_DIR} && npx hyperframes browser ensure`
 ];
+
+export const workerPrefix = (deployment: string) => `feega-motion-w-${deployment}-`;
 
 export function farmAccess(source: Record<string, string | undefined>): FarmAccess | null {
   const token = source.SANDBOX_VERCEL_TOKEN || source.VERCEL_TOKEN;
@@ -61,7 +63,8 @@ function workerOf(sandbox: Sandbox): FarmWorker {
   };
 }
 
-export function vercelFarm(access: FarmAccess): RenderFarm {
+export function vercelFarm(access: FarmAccess, deployment = 'local'): RenderFarm {
+  const prefix = workerPrefix(deployment);
   let base: Promise<void> | null = null;
   const ready = () => {
     base ??= prepareBase(access).catch((e) => {
@@ -77,6 +80,7 @@ export function vercelFarm(access: FarmAccess): RenderFarm {
       const sandbox = await Sandbox.fork({
         ...access,
         sourceSandbox: FARM_BASE,
+        name: `${prefix}${crypto.randomUUID()}`,
         resources: { vcpus: spec.vcpus },
         timeout: spec.timeoutMs,
         networkPolicy: { allow: spec.allowHosts },
@@ -88,6 +92,10 @@ export function vercelFarm(access: FarmAccess): RenderFarm {
     attach: async (name: string) => {
       const sandbox = await Sandbox.get({ ...access, name }).catch(() => null);
       return sandbox?.status === RUNNING ? workerOf(sandbox) : null;
+    },
+    running: async (): Promise<LiveWorker[]> => {
+      const listed = await (await Sandbox.list({ ...access, namePrefix: prefix })).toArray();
+      return listed.filter((s) => s.status === RUNNING).map((s) => ({ name: s.name, createdAt: s.createdAt }));
     }
   };
 }
