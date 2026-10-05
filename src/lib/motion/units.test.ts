@@ -95,3 +95,13 @@ describe('property units', () => {
     expect(sliderOf(CAMERA_LANE, { key: 'x', ...CAMERA.x }, PORTRAIT).unit).toBe(Unit.Px);
   });
 });
+
+describe('physics units', () => {
+  it('bounce and friction are percent, speeds px/s, gravity px/s²', () => {
+    expect(toShown('Shape', 'restitution', 0.6, PORTRAIT)).toBe(60);
+    expect(toShown('Shape', 'friction', 0.2, PORTRAIT)).toBe(20);
+    expect(unitOf('Shape', 'velocityX')).toBe(Unit.PxPerSecond);
+    expect(unitOf('Shape', 'gravity')).toBe(Unit.PxPerSecondSquared);
+    expect(toShown('Shape', 'gravity', 2400, PORTRAIT)).toBe(2400);
+  });
+});

@@ -38,6 +38,8 @@
   import { setBlendMode } from '$lib/motion/blend-ops';
   import { setClipsBlur } from '$lib/motion/motion-blur-ops';
   import { expressionErrors, expressionValue } from '$lib/motion/expression/bake';
+  import { BOUNDS, PHYSICS, PHYSICS_KEYS, PHYSICS_PRESET, PHYSICS_PRESETS, type Bounds, type PhysicsKey, type PhysicsPreset } from '$lib/motion/physics/model';
+  import { applyPhysicsPreset, setPhysics } from '$lib/motion/physics/ops';
   import { propsOwner, sliderOf, toShown, toStored, type Ranged } from '$lib/motion/units';
 
 
@@ -161,6 +163,21 @@
   function clipName(id: string): string {
     const other = findClip(doc, id)?.clip;
     return other ? `${COMPONENTS[other.component].label} · ${id}` : id;
+  }
+
+  function applyPhysicsOf(select: HTMLSelectElement) {
+    const preset = select.value as PhysicsPreset;
+    select.value = '';
+    if (preset) {
+      commit(applyPhysicsPreset(doc, clip.id, preset), `Applied ${PHYSICS_PRESET[preset].label.toLowerCase()} physics`);
+    }
+  }
+
+  function setPhysicsValue(key: PhysicsKey, text: string) {
+    const value = parseDecimal(text);
+    if (value !== null) {
+      commit(setPhysics(doc, clip.id, { [key]: Math.min(PHYSICS[key].max, Math.max(PHYSICS[key].min, stored(key, value))) }), `Changed physics ${PHYSICS[key].label.toLowerCase()}`);
+    }
   }
 
   function setDepthText(text: string) {
@@ -526,6 +543,37 @@
   {/if}
 
   {#if spec.track === TrackKind.Visual}
+    <section data-testid="physics-section">
+      <h4>Physics</h4>
+      <select aria-label="Physics preset" data-testid="physics-preset" value="" onchange={(e) => applyPhysicsOf(e.currentTarget)}>
+        <option value="">Physics preset…</option>
+        {#each PHYSICS_PRESETS as preset (preset)}<option value={preset} title={PHYSICS_PRESET[preset].about}>{PHYSICS_PRESET[preset].label}</option>{/each}
+      </select>
+      {#if clip.physics}
+        {@const physics = clip.physics}
+        {#each PHYSICS_KEYS as key (key)}
+          {@const range = slider({ key, ...PHYSICS[key] })}
+          {@const value = toShown(clip.component, key, physics[key], doc)}
+          <div class="row anim" data-physics={key}>
+            <span class="name">{PHYSICS[key].label}</span>
+            <div class="range">
+              <input type="range" min={range.min} max={range.max} step={range.step} {value} onchange={(e) => setPhysicsValue(key, e.currentTarget.value)} />
+              <input class="num" type="text" inputmode="decimal" aria-label={PHYSICS[key].label} value={String(value)} onchange={(e) => setPhysicsValue(key, e.currentTarget.value)} />
+              {#if range.unit}<span class="unit">{range.unit}</span>{/if}
+            </div>
+          </div>
+        {/each}
+        <div class="row">
+          <label for="physics-bounds">Bounces on</label>
+          <select id="physics-bounds" value={physics.bounds} onchange={(e) => commit(setPhysics(doc, clip.id, { bounds: e.currentTarget.value as Bounds }), 'Changed physics bounds')}>
+            {#each BOUNDS as bounds (bounds)}<option value={bounds}>{bounds}</option>{/each}
+          </select>
+        </div>
+        <label class="check"><input type="checkbox" checked={physics.collide} onchange={(e) => commit(setPhysics(doc, clip.id, { collide: e.currentTarget.checked }), 'Toggled physics collisions')} />Collide with other clips</label>
+        <button type="button" data-testid="physics-off" onclick={() => commit(setPhysics(doc, clip.id, null), 'Removed physics')}>Remove physics</button>
+      {/if}
+    </section>
+
     <section data-testid="blend-section">
       <h4>Blend mode</h4>
       <div class="row">

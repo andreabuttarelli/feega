@@ -60,6 +60,7 @@ const CLIP: Record<string, Access> = {
   animators: { write: ['add_text_animator', 'set_text_animator', 'remove_text_animator', 'apply_text_preset'], read: 'animators' },
   motionBlur: { write: ['set_motion_blur'], read: 'motionBlur' },
   path: { write: ['set_motion_path', 'set_path_tangent'], read: 'path' },
+  physics: { write: ['set_physics', 'apply_physics_preset'], read: 'physics' },
   hidden: { write: ['set_visibility'], read: 'hidden' },
   locked: { write: ['set_visibility'], read: 'locked' },
   markers: { write: ['set_marker', 'remove_marker'], read: 'markers' }

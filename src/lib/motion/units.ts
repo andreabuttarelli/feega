@@ -7,7 +7,9 @@ export type Owner = ComponentId | typeof CAMERA_LANE | null;
 export enum Unit {
   Px = 'px',
   Percent = '%',
-  Degrees = '°'
+  Degrees = '°',
+  PxPerSecond = 'px/s',
+  PxPerSecondSquared = 'px/s²'
 }
 
 enum Basis {
@@ -96,7 +98,12 @@ export const PROPERTY_UNITS: Readonly<Record<string, Rule>> = {
   objectRotateY: degrees(),
   objectRotateZ: degrees(),
   orbit: degrees(),
-  gradientAngle: degrees()
+  gradientAngle: degrees(),
+  gravity: { unit: Unit.PxPerSecondSquared, basis: Basis.Same },
+  velocityX: { unit: Unit.PxPerSecond, basis: Basis.Same },
+  velocityY: { unit: Unit.PxPerSecond, basis: Basis.Same },
+  restitution: percent(),
+  friction: percent()
 };
 
 const FACTOR: Record<Basis, (frame: Frame) => number> = {
