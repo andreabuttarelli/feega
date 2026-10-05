@@ -185,7 +185,8 @@ function ctxOf(clip: MotionClip, input: ComposeInput): TemplateCtx<ComponentId> 
     weight: (family, weight) => loadedWeight(family, weight, doc.fonts),
     text: textRender(clip.id, clip.animators, (v) => resolveColor(v, tokens)),
     remap: () => remappedSegments(clip, doc.fps),
-    compFrame: (compId) => doc.comps[compId]?.frame ?? null
+    compFrame: (compId) => doc.comps[compId]?.frame ?? null,
+    compBackground: (compId) => COMP_BACKGROUND[doc.comps[compId]?.background ?? Background.Transparent](tokens)
   };
 }
 
@@ -432,6 +433,11 @@ function gated(script: string): string {
   const rerender = `var m=window.__timelines&&window.__timelines[${js(COMPOSITION_ID)}];if(m){m.render(m.totalTime(),false,true);}`;
   return script ? `(window.${FONTS_READY}||Promise.resolve()).then(function(){${script}${rerender}});` : '';
 }
+
+const COMP_BACKGROUND: Record<Background, (tokens: BrandTokens) => string | null> = {
+  [Background.Brand]: (tokens) => tokens.colors['brand.background'],
+  [Background.Transparent]: () => null
+};
 
 const ROOT_BACKGROUND: Record<Background, (tokens: BrandTokens) => string> = {
   [Background.Brand]: (tokens) => tokens.colors['brand.background'],

@@ -30,7 +30,7 @@ export function embedMotion(host: MotionDoc, nodeId: string, source: MotionDoc):
   const rename: Rename = (inner) => `${id}${SCOPE}${inner}`;
   const frame = { width: source.width, height: source.height };
   const nested = Object.fromEntries(Object.entries(source.comps).map(([key, comp]): [string, MotionComp] => [rename(key), { ...comp, frame, tracks: scopedTracks(comp.tracks, rename) }]));
-  const outer: MotionComp = { name: id, durationInFrames: source.durationInFrames, frame, tracks: scopedTracks(source.tracks, rename) };
+  const outer: MotionComp = { name: id, durationInFrames: source.durationInFrames, frame, background: source.background, tracks: scopedTracks(source.tracks, rename) };
 
   return {
     ...host,

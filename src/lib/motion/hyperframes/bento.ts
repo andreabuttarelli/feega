@@ -11,7 +11,7 @@ import { hotScope, hotSeek } from './hot';
 type BentoProps = PropsOf<'Composition'>;
 type Env = { width: number; height: number; fps: number };
 type Frame = { width: number; height: number };
-type Ctx = Env & { id: string; p: BentoProps; start: number; length: number; mediaStart: number; color: (v: string) => string; asset: (id: string | null) => string | null; compFrame: (compId: string) => Frame | null };
+type Ctx = Env & { id: string; p: BentoProps; start: number; length: number; mediaStart: number; color: (v: string) => string; asset: (id: string | null) => string | null; compFrame: (compId: string) => Frame | null; compBackground: (compId: string) => string | null };
 
 export type BentoBake = {
   id: string;
@@ -147,7 +147,7 @@ const FRAME_SCALE: Record<CellFit, (a: number, b: number) => number> = {
 function framed(ctx: Ctx, card: BentoCard, rect: BentoRect, chunk: string): string {
   const content = ctx.compFrame(card.assetId) ?? ctx;
   const o = contentOffset(card, rect, content);
-  return `<div class="btc" style="${css({ position: 'absolute', left: '0', top: '0', width: px(content.width), height: px(content.height), transformOrigin: '0 0', transform: `translate(${px(o.x)},${px(o.y)}) scale(${Math.round(o.scale * 10000) / 10000})` })}">${chunk}</div>`;
+  return `<div class="btc" style="${css({ position: 'absolute', left: '0', top: '0', width: px(content.width), height: px(content.height), background: ctx.compBackground(card.assetId) ?? undefined, transformOrigin: '0 0', transform: `translate(${px(o.x)},${px(o.y)}) scale(${Math.round(o.scale * 10000) / 10000})` })}">${chunk}</div>`;
 }
 
 const FACES: Record<BentoCard['kind'], Face> = {

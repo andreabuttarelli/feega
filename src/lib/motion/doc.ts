@@ -115,6 +115,7 @@ const compSchema = z.object({
   name: z.string().min(1).max(60),
   durationInFrames: z.number().int().min(1).max(FRAMES_CEILING),
   frame: z.object({ width: z.number().int().min(16).max(MAX_SIDE), height: z.number().int().min(16).max(MAX_SIDE) }).optional(),
+  background: z.enum([Background.Brand, Background.Transparent]).optional(),
   tracks: z
     .array(trackSchema)
     .max(MAX_TRACKS)
