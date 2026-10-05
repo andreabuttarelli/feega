@@ -17,7 +17,8 @@ export type LayoutId =
 	| 'staggered-grid'
 	| 'vertical-flow'
 	| 'coverflow'
-	| 'ring';
+	| 'ring'
+	| 'bento';
 
 export type LayoutParam =
 	| { name: string; label: string; kind: 'range'; min: number; max: number; step: number; default: number }

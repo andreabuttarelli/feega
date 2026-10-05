@@ -97,6 +97,9 @@ il producer lancia per qualunque `<video>` nella pagina.
 ### La bolletta Sandbox sale e nessun render è stato addebitato
 Segnale: Vercel mostra Active CPU / Provisioned Memory in crescita, `ai_calls` non ha righe `motion_render`. Le sandbox del farm vivono nel progetto Vercel **anomalia**, non in feega: `GET /v1/sandboxes?project=<id>&teamId=…` (token di `vercel login`) dà `vcpus`, `timeout`, `activeCpuDurationMs`, `startedAt`/`stoppedAt` per ognuna. Il 5/10 l'87% della spesa motion veniva da bench degli agenti (timeout non usati dal codice), e una sandbox che vive `timeout` pieno con poca CPU è un worker orfano. Mossa: un bench chiama `stopWorker` in `finally`; il minimo fatturato è 1 min di memoria per sandbox, quindi un bench a molti chunk corti costa il minimo × chunk.
 
+### Un timeout calcolato su contenuti piatti uccide i render 3D
+Segnale: un render con Device3D/Text3D fallisce a metà con `render worker stopped`, quelli 2D no. Un frame 3D sul farm (SwiftShader) costa 10–30 volte uno piatto: Device3D laptop 1,2 s/frame contro 0,04. Mossa: ogni stima per frame (timeout, chunk, prezzo) parte dai costi per componente (`render-cost.ts`, `renderClass` in `render-quote.ts`), mai da una costante "per frame 1080p".
+
 ### In three.js `envMapIntensity` non conta se c'è `scene.environment`
 Un riflesso additivo sullo schermo dei mockup sbiancava il laptop e abbassare `envMapIntensity`
 non cambiava un pixel. Segnale: un parametro di materiale che «non ha effetto» con un ambiente
@@ -111,6 +114,18 @@ ognuna un layer di compositing a piena risoluzione, centinaia per frame. JS e la
 4 ms, il frame a 1 s. Segnale: tempo per frame che cresce col numero di copie mentre il seek è
 istantaneo. Mossa: confrontare varianti dell'HTML con un CSS in più (`will-change:auto`) e
 misurare ms per screenshot; dentro le copie si spegne il `will-change`.
+
+### Una preview che resta ferma al frame 0 dopo aver caricato un doc: `structuredClone` su un proxy di `$state`
+Segnale: la preview non si aggiorna e non parte, nessun errore in `console`; con
+`page.on('pageerror')` esce `DataCloneError: … could not be cloned`. Un doc caricato in un
+`$state` profondo è un proxy, e `applyDraft`/`parseMotionDoc` lo clonano. Mossa: i doc letti dal
+server vanno in `$state.raw` (si sostituisce l'oggetto intero), e nei giri Playwright si ascolta
+`pageerror`, non solo `console`.
+
+### Uno screenshot di un frame HTML del motore senza le clip che partono dopo lo 0
+Segnale: in un harness Playwright le clip con `from` > 0 non compaiono mai, anche senza keyframe;
+sul farm e nel player sì. `__timelines.main.seek(t)` muove solo GSAP, non la visibilità delle clip
+che governa il runtime. Mossa: `window.__player.renderSeek(t)`, lo stesso seek del render.
 
 ## Ambiente e worktree
 

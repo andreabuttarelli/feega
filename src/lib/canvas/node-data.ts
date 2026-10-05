@@ -27,6 +27,7 @@ import { EFFECTS } from './effects';
 import { nodeReferenceSchema } from './node-references';
 import type { EffectId, EffectParam } from './effects';
 import { LAYOUTS } from './composition/index';
+import { cellSchema } from '$lib/motion/components';
 import { CAMERA_PRESETS } from './composition/camera';
 import type { LayoutId } from './composition/types';
 import type { CameraPresetId } from './composition/camera';
@@ -423,7 +424,8 @@ const compositionSchema = z.object({
   background: z.object({ color: z.string().regex(HEX_COLOR, 'invalid colour, expected #rrggbb') }),
   duration: z.number().positive(),
   aspect: z.enum(COMPOSITION_ASPECTS),
-  refId: z.string().nullish()
+  refId: z.string().nullish(),
+  cells: z.record(z.string(), cellSchema).optional()
 });
 
 /**

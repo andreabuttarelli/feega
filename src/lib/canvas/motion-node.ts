@@ -49,6 +49,10 @@ export function motionEditorPath(input: { projectId: string; canvasId: string; n
   return `/p/${input.projectId}/c/${input.canvasId}/motion/${input.nodeId}`;
 }
 
+export function motionSourcePath(input: { projectId: string; canvasId: string; nodeId: string; revision: number }): string {
+  return `${motionEditorPath(input)}/source?rev=${input.revision}`;
+}
+
 export function motionPreviewPath(input: { projectId: string; canvasId: string; nodeId: string }): string {
   return `${motionEditorPath(input)}/preview`;
 }

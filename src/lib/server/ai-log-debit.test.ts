@@ -40,6 +40,8 @@ vi.mock('./supabase-admin', () => ({
 }));
 
 import { logAiCall, withBrandContext } from './ai-log';
+import { CHAT_MULTIPLIER, CREDITS_PER_USD_GRANT, MULTIPLIER_FLOOR } from '$lib/credit-ladder';
+import { RENDER_CALL_LABEL, RENDER_MULTIPLIER } from '$lib/motion/render-quote';
 import { GEMINI_FLASH } from './google-models';
 
 async function settled(): Promise<void> {
@@ -107,3 +109,30 @@ describe('logAiCall debita credit_ledger per una chiamata prezzata', () => {
 	});
 });
 
+describe('what a credit costs the user against what the call cost us', () => {
+	it('a chat turn of an agent bills its cost at least four times over', async () => {
+		logAiCall({ label: 'project-agent', provider: 'llm', ms: 900, ok: true, flatCostUsd: 0.05, orgId: 'org-1', actorKind: 'agent', threadId: 't1', agentKey: 'sidebar' });
+
+		await settled();
+
+		expect(CHAT_MULTIPLIER).toBeGreaterThanOrEqual(MULTIPLIER_FLOOR);
+		expect(ledgerRows[0].amount).toBe(Math.round(0.05 * CHAT_MULTIPLIER * CREDITS_PER_USD_GRANT));
+	});
+
+	it('a render bills its measured sandbox cost times the render multiplier', async () => {
+		logAiCall({ label: RENDER_CALL_LABEL, provider: 'vercel-sandbox', ms: 900, ok: true, flatCostUsd: 0.02, orgId: 'org-1', creditCap: 1000 });
+
+		await settled();
+
+		expect(ledgerRows[0].amount).toBe(Math.round(0.02 * RENDER_MULTIPLIER * CREDITS_PER_USD_GRANT));
+	});
+
+	it('a render never bills past the credits held for it', async () => {
+		logAiCall({ label: RENDER_CALL_LABEL, provider: 'vercel-sandbox', ms: 900, ok: true, flatCostUsd: 1, orgId: 'org-1', creditCap: 9 });
+
+		await settled();
+
+		expect(ledgerRows[0].amount).toBe(9);
+		expect(aiCallsRows[0].billed_credits).toBe(9);
+	});
+});

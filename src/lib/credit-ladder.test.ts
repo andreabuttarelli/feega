@@ -130,3 +130,15 @@ describe('nessun secondo cambio credito/dollaro fuori da credit-ladder.ts', () =
     ).toBe(false);
   });
 });
+
+describe('multipliers on our cost', () => {
+	it('no multiplier billed to users drops under the floor of four', async () => {
+		const { RENDER_MULTIPLIER } = await import('$lib/motion/render-quote');
+		const { CHAT_MULTIPLIER, MULTIPLIER_FLOOR } = await import('./credit-ladder');
+
+		expect(MULTIPLIER_FLOOR).toBe(4);
+		expect(RENDER_MULTIPLIER).toBeGreaterThanOrEqual(MULTIPLIER_FLOOR);
+		expect(CHAT_MULTIPLIER).toBeGreaterThanOrEqual(MULTIPLIER_FLOOR);
+	});
+});
+

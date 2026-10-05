@@ -111,6 +111,31 @@ describe('motion agent template library tools', () => {
     expect(ring?.props.layoutParams).toMatchObject({ tiltX: -30, cornerRadius: 24, turns: 2 });
   });
 
+  it('the bento is a template too: grid, gap and corner radius are its fields', async () => {
+    const { run, session } = withLibrary();
+
+    const placed = await run('insert_template', { template_id: 'builtin:composition-bento', start: 0 });
+    const clip = String(placed.clip_id);
+
+    expect((await run('set_template_fields', { clip_id: clip, values: { columns: 2, rows: 2, gap: 40, corner_radius: 48, enter: 'scale' } })).ok).toBe(true);
+    const grid = Object.values(session.doc.comps).flatMap((c) => c.tracks.flatMap((t) => t.clips)).find((c) => c.component === 'Composition');
+    expect(grid?.props.layoutParams).toMatchObject({ columns: 2, rows: 2, gap: 40, cornerRadius: 48, enter: 'scale' });
+  });
+
+  it('the agent fills bento cells with set_props and keyframes their corner radius', async () => {
+    const { run, session } = setup();
+    await run('add_clip', { component: 'Title', start: 0, duration: 2 });
+    await run('precompose', { clip_ids: ['id1'], name: 'Intro' });
+    const comp = Object.keys(session.doc.comps)[0];
+    await run('add_clip', { component: 'Composition', start: 0, duration: 6, props: { layout: 'bento' } });
+    const grid = session.doc.tracks.flatMap((t) => t.clips).find((c) => c.component === 'Composition')!;
+
+    const cells = await run('set_props', { clip_id: grid.id, props: { media: [{ assetId: comp, kind: 'comp', columns: 2, timing: 'hold', fit: 'contain', background: '#101010' }] } });
+    const keyed = await run('set_keyframes', { clip_id: grid.id, prop: 'cornerRadius', keyframes: [{ time: 0, value: 0 }, { time: 1, value: 40 }] });
+
+    expect([cells.ok, keyed.ok]).toEqual([true, true]);
+  });
+
   it('edit_comp refuses a template until detach_template unlocks it', async () => {
     const { run, session } = withLibrary();
     const clip = String((await run('insert_template', { template_id: 'builtin:quote', start: 0 })).clip_id);

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { COMP_CARD, COMP_CARD_LAYOUTS } from './card-layouts';
 import { COMPONENT_IDS, CUSTOM_NAME, TrackKind, parseProps, type ComponentId, type PropsVerdict } from './components';
 import { withParams } from './custom/params';
 import { MAX_COMPONENTS, Strictness, customComponentSchema, customValues, type CustomComponents } from './custom/component';
@@ -244,12 +245,10 @@ export function compOf(clip: Pick<MotionClip, 'component' | 'props'>): string | 
 }
 
 type CompositionCard = { assetId: string; kind: string };
-const COMP_CARD = 'comp';
-const RING_LAYOUT = 'ring';
 
 export function compsOf(clip: Pick<MotionClip, 'component' | 'props'>): string[] {
   if (clip.component === 'Composition') {
-    return clip.props.layout !== RING_LAYOUT ? [] : ((clip.props.media ?? []) as CompositionCard[]).filter((m) => m.kind === COMP_CARD).map((m) => m.assetId);
+    return !COMP_CARD_LAYOUTS.has(clip.props.layout) ? [] : ((clip.props.media ?? []) as CompositionCard[]).filter((m) => m.kind === COMP_CARD).map((m) => m.assetId);
   }
   const id = compOf(clip);
   return id === null ? [] : [id];

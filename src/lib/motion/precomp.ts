@@ -4,7 +4,8 @@ import { TransitionKind } from './design';
 import type { Keyframes } from './keyframes';
 import { withoutHidden } from './organize';
 import { addClip, type OpResult } from './timeline';
-import { ringCards, ringRadiusPx, ringSliceId, slicesFor } from './ring/model';
+import { RING_LAYOUT, ringCards, ringRadiusPx, ringSliceId, slicesFor } from './ring/model';
+import { BENTO_LAYOUT, bentoCellId, heldCell, type BentoCard } from './bento/model';
 
 export type CompPath = readonly string[];
 export type GroupProps = { span?: number };
@@ -87,18 +88,19 @@ function shifted(keyframes: Keyframes, by: number): Keyframes {
   return Object.fromEntries(Object.entries(keyframes).map(([key, track]) => [key, (track ?? []).map((k) => ({ ...k, frame: k.frame - by }))]));
 }
 
-type Window = { from: number; end: number; offset: number; length: number; loops: number[] };
+type Window = { from: number; end: number; offset: number; length: number; loops: number[]; held: boolean };
 
 function windowOf(clip: MotionClip, comp: MotionComp): Window {
   const length = comp.durationInFrames;
   const first = clip.props.loop ? Math.floor(clip.trimStart / length) : 0;
   const last = clip.props.loop ? Math.min(first + MAX_LOOPS, Math.ceil((clip.trimStart + clip.durationInFrames) / length)) : 1;
-  return { from: clip.from, end: clipEnd(clip), offset: clip.from - clip.trimStart, length, loops: Array.from({ length: last - first }, (_, i) => first + i) };
+  return { from: clip.from, end: clipEnd(clip), offset: clip.from - clip.trimStart, length, loops: Array.from({ length: last - first }, (_, i) => first + i), held: !clip.props.loop && Boolean(clip.props.hold) };
 }
 
 function placeOne(clip: MotionClip, w: Window, k: number, prefix: string): MotionClip | null {
   const start = w.offset + k * w.length + clip.from;
-  const stop = start + Math.min(clip.durationInFrames, w.length - clip.from);
+  const lastFrame = w.held && clipEnd(clip) >= w.length;
+  const stop = lastFrame ? Math.max(w.end, start + w.length - clip.from) : start + Math.min(clip.durationInFrames, w.length - clip.from);
   const from = Math.max(start, w.from);
   const end = Math.min(stop, w.end);
   if (end <= from) {
@@ -114,7 +116,7 @@ function placeOne(clip: MotionClip, w: Window, k: number, prefix: string): Motio
     trimStart: clip.trimStart + cut,
     keyframes: shifted(clip.keyframes, cut),
     transitionIn: cut ? STILL : clip.transitionIn,
-    transitionOut: end < stop ? STILL : clip.transitionOut
+    transitionOut: end < stop || lastFrame ? STILL : clip.transitionOut
   };
 }
 
@@ -135,28 +137,47 @@ function precompTracks(doc: MotionDoc, track: MotionTrack, host: MotionClip, dep
   return [{ ...track, id: `${host.id}${SEPARATOR}group`, clips: [group] }, ...placed(host, comp, inner)];
 }
 
-function sliceHost(ring: MotionClip, card: number, slice: number, comp: string): MotionClip {
-  return newClip({ id: ringSliceId(ring.id, card, slice), from: ring.from, durationInFrames: ring.durationInFrames, trimStart: ring.trimStart, component: 'Precomp', props: { comp, loop: true } });
+function cardHost(grid: MotionClip, id: string, props: { comp: string; loop: boolean; hold: boolean }): MotionClip {
+  return newClip({ id, from: grid.from, durationInFrames: grid.durationInFrames, trimStart: grid.trimStart, component: 'Precomp', props });
 }
+
+function grouped(doc: MotionDoc, track: MotionTrack, grid: MotionClip, hosts: MotionTrack[], depth: number): MotionTrack[] {
+  const inner = expand(doc, hosts, depth);
+  const group: MotionClip = { ...grid, props: { ...grid.props, span: inner.length } };
+  return [{ ...track, id: `${grid.id}${SEPARATOR}group`, clips: [group] }, ...inner];
+}
+
+const hostTrack = (track: MotionTrack, host: MotionClip): MotionTrack => ({ ...track, id: `${host.id}${SEPARATOR}host`, clips: [host] });
 
 function ringTracks(doc: MotionDoc, track: MotionTrack, ring: MotionClip, depth: number): MotionTrack[] {
   const cards = ringCards(ring.props as never);
   const slices = slicesFor(cards.length, ringRadiusPx(ring.props as never, Math.min(doc.width, doc.height)));
   const hosts = cards.flatMap((shown, card) =>
     shown?.kind === COMP_CARD && doc.comps[shown.assetId]
-      ? Array.from({ length: slices }, (_, slice) => ({ ...track, id: `${ringSliceId(ring.id, card, slice)}${SEPARATOR}host`, clips: [sliceHost(ring, card, slice, shown.assetId)] }))
+      ? Array.from({ length: slices }, (_, slice) => hostTrack(track, cardHost(ring, ringSliceId(ring.id, card, slice), { comp: shown.assetId, loop: true, hold: false })))
       : []
   );
-  const inner = expand(doc, hosts, depth);
-  const group: MotionClip = { ...ring, props: { ...ring.props, span: inner.length } };
-  return [{ ...track, id: `${ring.id}${SEPARATOR}group`, clips: [group] }, ...inner];
+  return grouped(doc, track, ring, hosts, depth);
+}
+
+function bentoTracks(doc: MotionDoc, track: MotionTrack, grid: MotionClip, depth: number): MotionTrack[] {
+  const cards = (grid.props.media ?? []) as BentoCard[];
+  const hosts = cards.flatMap((card, item) =>
+    card.kind === COMP_CARD && doc.comps[card.assetId] ? [hostTrack(track, cardHost(grid, bentoCellId(grid.id, item), { comp: card.assetId, loop: !heldCell(card), hold: heldCell(card) }))] : []
+  );
+  return grouped(doc, track, grid, hosts, depth);
 }
 
 const COMP_CARD = 'comp';
 
+const CARD_EXPANDERS: Record<string, Expander> = {
+  [RING_LAYOUT]: ringTracks,
+  [BENTO_LAYOUT]: bentoTracks
+};
+
 const EXPANDERS: Partial<Record<MotionClip['component'], Expander>> = {
   Precomp: precompTracks,
-  Composition: ringTracks
+  Composition: (doc, track, host, depth) => CARD_EXPANDERS[String(host.props.layout)](doc, track, host, depth)
 };
 
 const isHost = (doc: MotionDoc, clip: MotionClip, depth: number) =>

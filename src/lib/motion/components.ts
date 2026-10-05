@@ -8,6 +8,8 @@ import { CAMERA_PRESETS } from '../canvas/composition/camera';
 import type { CameraPresetId } from '../canvas/composition/camera';
 import type { LayoutId } from '../canvas/composition/types';
 import { EMITTERS, Emitter, PARTICLE_COLOURS, PARTICLE_COLOUR_KEYS, PARTICLE_NUMBERS, PARTICLE_NUMBER_KEYS, PARTICLE_SHAPES, ParticleSection, ParticleShape, SEED } from './particles/model';
+import { CELL_FITS, CELL_TIMINGS } from './bento/model';
+import { BENTO_GRID } from '../canvas/composition/bento';
 import { CAPS, FILL_KINDS, FILL_RULES, FillKind, JOINS, MAX_MODIFIERS, MAX_MORPHS, SHAPE_KINDS, STROKE_KINDS, ShapeKind, StrokeKind, modifierSchema, pathString } from './shape/schema';
 
 export enum Control {
@@ -154,6 +156,23 @@ export const MAX_COMPOSITION_MEDIA = 40;
 
 const managed = (label: string) => ({ control: Control.Managed, label, group: Group.Content });
 const compositionParams = (label: string) => z.record(z.string(), z.union([z.number(), z.string()])).default({}).meta(managed(label));
+
+const unitRange = z.number().min(0).max(1);
+
+const cellFields = {
+  fit: z.enum(CELL_FITS).optional(),
+  focusX: unitRange.optional(),
+  focusY: unitRange.optional(),
+  background: z.string().regex(COLOR).optional(),
+  columns: z.number().int().min(BENTO_GRID.min).max(BENTO_GRID.max).optional(),
+  rows: z.number().int().min(BENTO_GRID.min).max(BENTO_GRID.max).optional(),
+  timing: z.enum(CELL_TIMINGS).optional()
+};
+
+export const cellSchema = z.object(cellFields).strict();
+export type CellSpec = z.output<typeof cellSchema>;
+
+const compositionCard = z.object({ assetId: z.string().min(1), kind: z.enum(COMPOSITION_CARD_KINDS), ...cellFields }).strict();
 
 export enum TrackKind {
   Visual = 'visual',
@@ -408,14 +427,14 @@ export const COMPONENTS = {
   },
   Composition: {
     label: 'Composition',
-    description: 'Many images or videos arranged in 3D (grid, carousel, helix, coverflow, ring…) and looping every `loop` seconds. The ring layout curves cards on a tilted, turning cylinder (UI showcase): its media can also be compositions of this video (kind comp, assetId = comp id), so UI built with Shape and Title clips goes on the cards; whole turns per loop loop exactly, and its numbers (ringRadius, cardHeight, gap as fractions of the short side; tiltX/tiltZ/spin in degrees; backOpacity, backBlur, shadowOpacity; cameraDistance px, cameraHeight) take set_keyframes.',
+    description: 'Many images or videos arranged in 3D (grid, carousel, helix, coverflow, ring…) and looping every `loop` seconds. The bento layout is a flat grid (layoutParams columns, rows, gap and cornerRadius in px at 1080p, cellColor, enter none/rise/fade/scale with stagger seconds): each media item is a cell with optional fit cover/contain, focusX/focusY, background, columns/rows span and, for a comp, timing loop or hold; cornerRadius takes set_keyframes. The ring layout curves cards on a tilted, turning cylinder (UI showcase): its media can also be compositions of this video (kind comp, assetId = comp id), so UI built with Shape and Title clips goes on the cards; whole turns per loop loop exactly, and its numbers (ringRadius, cardHeight, gap as fractions of the short side; tiltX/tiltZ/spin in degrees; backOpacity, backBlur, shadowOpacity; cameraDistance px, cameraHeight) take set_keyframes.',
     track: TrackKind.Visual,
     durationInFrames: seconds(6),
     schema: z
       .object({
         layout: choice(COMPOSITION_LAYOUTS, 'tilted-grid', 'Template', Group.Content),
         media: z
-          .array(z.object({ assetId: z.string().min(1), kind: z.enum(COMPOSITION_CARD_KINDS) }).strict())
+          .array(compositionCard)
           .max(MAX_COMPOSITION_MEDIA)
           .default([])
           .meta(managed('Media')),
@@ -449,7 +468,7 @@ export const COMPONENTS = {
     description: 'A nested composition (precompose clips to make one) played as one clip: trimStart starts it later, loop repeats it to the end of the clip.',
     track: TrackKind.Visual,
     durationInFrames: seconds(5),
-    schema: z.object({ comp: z.string().max(60).default('').meta({ control: Control.Comp, label: 'Composition', group: Group.Content }), loop: toggle(false, 'Loop', Group.Motion) }).strict()
+    schema: z.object({ comp: z.string().max(60).default('').meta({ control: Control.Comp, label: 'Composition', group: Group.Content }), loop: toggle(false, 'Loop', Group.Motion), hold: toggle(false, 'Hold last frame', Group.Motion) }).strict()
   },
   Adjustment: {
     label: 'Adjustment layer',
