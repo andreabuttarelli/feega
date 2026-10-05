@@ -61,6 +61,7 @@ const asset = (kind: AssetKind, label: string) =>
   z.string().nullable().default(null).meta({ control: Control.Asset, assetKind: kind, label, group: Group.Content });
 
 const fade = (label: string) => range(0, 5, 0.1, 0, label, Group.Style);
+const pan = () => range(-1, 1, 0.01, 0, 'Pan', Group.Style);
 
 const toggle = (fallback: boolean, label: string, group: Group) =>
   z.boolean().default(fallback).meta({ control: Control.Toggle, label, group });
@@ -213,6 +214,7 @@ export const COMPONENTS = {
         assetId: asset(AssetKind.Video, 'Video'),
         fit: choice(['cover', 'contain'] as const, 'cover', 'Fit', Group.Style),
         volume: range(0, 1, 0.01, 0, 'Volume', Group.Style),
+        pan: pan(),
         fadeIn: fade('Fade in (s)'),
         fadeOut: fade('Fade out (s)'),
         ...layout({ width: 1, height: 1 })
@@ -224,7 +226,7 @@ export const COMPONENTS = {
     description: 'Music or voice-over from the canvas assets.',
     track: TrackKind.Audio,
     durationInFrames: seconds(5),
-    schema: z.object({ assetId: asset(AssetKind.Audio, 'Audio'), volume: range(0, 1, 0.01, 1, 'Volume', Group.Style), fadeIn: fade('Fade in (s)'), fadeOut: fade('Fade out (s)') }).strict()
+    schema: z.object({ assetId: asset(AssetKind.Audio, 'Audio'), volume: range(0, 1, 0.01, 1, 'Volume', Group.Style), pan: pan(), fadeIn: fade('Fade in (s)'), fadeOut: fade('Fade out (s)') }).strict()
   },
   Shape: {
     label: 'Shape',

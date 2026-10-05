@@ -28,6 +28,13 @@ describe('timeline view', () => {
     expect(snapped(doc, 32, { ...input, snap: Snap.Off })).toBe(32);
   });
 
+  it('snaps to a beat when beats are given', () => {
+    const doc = newMotionDoc(MotionFormat.Square);
+    const input = { playhead: 0, exclude: [], zoom: 1, snap: Snap.On };
+
+    expect(snapped(doc, 46, { ...input, beats: [45] })).toBe(45);
+  });
+
   it('the end edge of a clip under a later overlapping clip can still be grabbed', () => {
     const kicker = { id: 'k', from: 0, durationInFrames: 90 };
     const title = { id: 't', from: 24, durationInFrames: 90 };

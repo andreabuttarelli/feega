@@ -1,5 +1,8 @@
 <script lang="ts">
   import { setMotionPath } from '$lib/motion/path-ops';
+  import { duckUnder, voicesOver } from '$lib/motion/duck';
+  import { PULSE_PROPS, pulseWithMusic } from '$lib/motion/pulse';
+  import type { AudioAnalysis } from '$lib/motion/audio-analysis';
   import { BRAND_COLORS, COMPONENTS, Control, TrackKind, type AssetKind } from '$lib/motion/components';
   import { DEPTH, Space } from '$lib/motion/camera';
   import { setClipDepth } from '$lib/motion/camera-ops';
@@ -12,7 +15,7 @@
   import { InspectorTab, clipFieldGroups, editAt, keyAt, keyedField, parseDecimal, secondsLabel, toggleKey, valueAt, type Field } from '$lib/motion/inspector';
   import { setMask, setProps, setTiming, setTrackMatte, setTransform, setTransition, Side, type OpResult } from '$lib/motion/timeline';
   import { MASK_KINDS, MASK_KIND_IDS, MATTES, MaskKind, Matte, Needs, newMask, type Mask } from '$lib/motion/mask';
-  import { ANIMATABLE, Source, TRANSFORM, ValueKind, type AnimProp, type KeyValue } from '$lib/motion/keyframes';
+  import { ANIMATABLE, Source, isAnimatable, TRANSFORM, ValueKind, type AnimProp, type KeyValue } from '$lib/motion/keyframes';
   import Dial from './Dial.svelte';
   import CodeEditor from './CodeEditor.svelte';
   import FontPicker from './FontPicker.svelte';
@@ -39,6 +42,7 @@
 
   let {
     doc,
+    analyses = {},
     clip,
     tokens,
     assets,
@@ -51,6 +55,7 @@
     onopen
   }: {
     doc: MotionDoc;
+    analyses?: Record<string, AudioAnalysis>;
     clip: MotionClip;
     tokens: BrandTokens;
     assets: Asset[];
@@ -68,6 +73,15 @@
   const KEY_STATE = { On: 'on', Lane: 'lane', None: 'none' } as const;
 
   let error = $state('');
+  const voices = $derived(voicesOver(doc, clip.id));
+  const pulsable = $derived(PULSE_PROPS.filter((p) => isAnimatable(clip.component, p)));
+  let voice = $state('');
+
+  function duck() {
+    const voiceId = voices.includes(voice) ? voice : voices[0];
+    const assetId = String(findClip(doc, voiceId)?.clip.props.assetId ?? '');
+    commit(duckUnder(doc, clip.id, voiceId, analyses[assetId]?.speech ?? null), 'Ducked the music');
+  }
 
   const groups = $derived(clipFieldGroups(doc, clip));
   const animated = $derived(withParams(doc, clip));
@@ -153,7 +167,7 @@
     }
   }
 
-  const faults = $derived(Object.fromEntries(expressionErrors(doc).filter((f) => f.clipId === clip.id).map((f) => [f.key, f.error])));
+  const faults = $derived(Object.fromEntries(expressionErrors(doc, analyses).filter((f) => f.clipId === clip.id).map((f) => [f.key, f.error])));
   const DEFAULT_EXPRESSION = 'value';
   const BLEND_LABEL = Object.fromEntries(BLEND_MODES.map((m) => [m, m.split('-').map((w) => w[0].toUpperCase() + w.slice(1)).join(' ')])) as Record<BlendMode, string>;
 
@@ -168,7 +182,7 @@
 
   function expressionNow(key: string): string {
     try {
-      return String(Math.round(expressionValue(doc, clip.id, key, clip.from + Math.max(0, frame - clip.from)) * 1000) / 1000);
+      return String(Math.round(expressionValue(doc, clip.id, key, clip.from + Math.max(0, frame - clip.from), analyses) * 1000) / 1000);
     } catch {
       return '—';
     }
@@ -294,6 +308,27 @@
       </div>
     {/each}
   </section>
+
+  {#if pulsable.length && doc.tracks.some((t) => t.clips.some((c) => c.component === 'Audio'))}
+    <section data-testid="pulse-section">
+      <h4>Pulse with the music</h4>
+      <div class="row">
+        {#each pulsable as prop (prop)}<button type="button" data-pulse={prop} onclick={() => commit(pulseWithMusic(doc, clip.id, prop), `Pulsed ${prop} with the music`)}>{prop}</button>{/each}
+      </div>
+    </section>
+  {/if}
+
+  {#if voices.length}
+    <section data-testid="duck-section">
+      <h4>Ducking</h4>
+      <div class="row two">
+        <select aria-label="Voice-over" value={voice || voices[0]} onchange={(e) => (voice = e.currentTarget.value)}>
+          {#each voices as id (id)}<option value={id}>{clipName(id)}</option>{/each}
+        </select>
+        <button type="button" data-testid="duck" onclick={duck}>Duck under voice-over</button>
+      </div>
+    </section>
+  {/if}
 
   {#snippet diamond(key: string)}
     <button type="button" class="key {keyState(key)}" title="Keyframe at playhead" aria-label={`Keyframe ${key}`} aria-pressed={keyState(key) === KEY_STATE.On} onclick={() => toggle(key)}>◆</button>

@@ -1,5 +1,6 @@
 import { AudioBufferSource, BufferTarget, CanvasSource, Mp4OutputFormat, Output, QUALITY_HIGH, canEncodeAudio, canEncodeVideo } from 'mediabunny';
-import { gainCurve, type AudioEntry } from '../audio-plan';
+import type { AudioEntry } from '../audio-plan';
+import { scheduleEntry } from '../audio-graph';
 import { exportSize, type Capabilities, type Size } from '../export-plan';
 import { Resolution } from '../render-quote';
 import type { MotionDoc } from '../doc';
@@ -42,16 +43,7 @@ export async function mixAudio(entries: AudioEntry[], seconds: number): Promise<
   const buffers = await Promise.all(entries.map((e) => decoded(context, e.url)));
 
   for (const [i, entry] of entries.entries()) {
-    const source = context.createBufferSource();
-    source.buffer = buffers[i];
-    const gain = context.createGain();
-    const [first, ...rest] = gainCurve(entry);
-    gain.gain.setValueAtTime(first.value, first.time);
-    for (const point of rest) {
-      gain.gain.linearRampToValueAtTime(point.value, point.time);
-    }
-    source.connect(gain).connect(context.destination);
-    source.start(entry.at, entry.offset, entry.duration);
+    scheduleEntry(context, buffers[i], entry, { origin: 0, from: 0 }, context.destination);
   }
   return context.startRendering();
 }

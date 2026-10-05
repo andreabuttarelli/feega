@@ -1,43 +1,45 @@
 import { describe, expect, it } from 'vitest';
-import { renderOnFarm, RenderFailure, type FarmJob } from './farm-render';
-import type { FarmFile, FarmRun, FarmWorker, RenderFarm, WorkerSpec } from './render-farm';
-import type { RenderEvent } from '$lib/motion/server-render';
+import { checkTask, FarmTask, farmChunks, farmProblem, launchAssembly, launchPiece, TaskState, type FarmJob, type Step } from './farm-render';
+import type { FarmFile, FarmWorker, RenderFarm, WorkerSpec } from './render-farm';
 import { ExportFormat, Quality } from '$lib/motion/export-formats';
 
-type FakeWorker = FarmWorker & { id: number; files: FarmFile[]; runs: string[]; stopped: boolean };
+type FakeWorker = FarmWorker & { files: Map<string, Buffer>; spawned: string[]; stopped: boolean };
 
-function fakeFarm(fail: (w: number, cmd: string) => boolean = () => false) {
+function fakeFarm() {
   const workers: FakeWorker[] = [];
   const specs: WorkerSpec[] = [];
   const farm: RenderFarm = {
     open: async (spec) => {
       specs.push(spec);
       const w: FakeWorker = {
-        id: workers.length,
-        files: [],
-        runs: [],
+        name: `w${workers.length}`,
+        files: new Map(),
+        spawned: [],
         stopped: false,
-        write: async (files) => {
-          w.files.push(...files);
+        write: async (files: FarmFile[]) => {
+          files.forEach((f) => w.files.set(f.path, f.content));
         },
-        run: async (cmd, args): Promise<FarmRun> => {
-          const line = [cmd, ...args].join(' ');
-          w.runs.push(line);
-          return fail(w.id, line) ? { exitCode: 1, output: 'chrome crashed\n' } : { exitCode: 0, output: '' };
+        run: async () => ({ exitCode: 0, output: '' }),
+        spawn: async (cmd, args) => {
+          w.spawned.push([cmd, ...args].join(' '));
         },
-        read: async (path) => Buffer.from(`w${w.id}:${path}`),
+        read: async (path) => w.files.get(path) ?? null,
         stop: async () => {
           w.stopped = true;
         }
       };
       workers.push(w);
       return w;
-    }
+    },
+    attach: async (name) => workers.find((w) => w.name === name && !w.stopped) ?? null
   };
   return { farm, workers, specs };
 }
 
-const specOf = (w: FakeWorker) => JSON.parse(w.files.find((f) => f.path.endsWith('spec.json'))?.content.toString() ?? 'null');
+const json = (w: FakeWorker, suffix: string) => JSON.parse(String([...w.files.entries()].find(([p]) => p.endsWith(suffix))?.[1] ?? 'null'));
+const steps = (w: FakeWorker, task: FarmTask): Step[] => json(w, `steps-${task}.json`);
+const specOf = (w: FakeWorker) => json(w, 'spec.json');
+const line = (s: Step) => [s.cmd, ...s.args].join(' ');
 
 const job: FarmJob = {
   html: '<html></html>',
@@ -45,173 +47,149 @@ const job: FarmJob = {
   height: 1080,
   fps: 30,
   totalFrames: 840,
-  audio: [{ clipId: 'm', url: 'https://x.supabase.co/m.mp3', at: 0, offset: 0, duration: 28, volume: 1, fadeIn: 1, fadeOut: 2 }],
+  audio: [{ clipId: 'm', url: 'https://x.supabase.co/m.mp3', at: 0, offset: 0, duration: 28, left: [{ time: 0, value: 1 }, { time: 28, value: 1 }], right: [{ time: 0, value: 1 }, { time: 28, value: 1 }] }],
   allowHosts: ['x.supabase.co'],
   format: ExportFormat.Mp4H264,
   quality: Quality.High,
   motionBlur: null
 };
 
-describe('renderOnFarm', () => {
-  it('opens one worker per chunk, each rendering its own index of the same plan', async () => {
+const STORAGE = 's.supabase.co';
+const blur = { shutterAngle: 180, shutterPhase: -90, samples: 8 };
+
+describe('launchPiece', () => {
+  it('starts the chunk detached on its own worker and returns the worker name the tick finds it by', async () => {
     const { farm, workers } = fakeFarm();
 
-    await renderOnFarm(farm, job, () => {});
+    const name = await launchPiece(farm, job, 3, { upload: 'https://s.supabase.co/up/c3', storageHost: STORAGE, maxBytes: 1000 });
 
-    expect(workers).toHaveLength(7);
-    workers.forEach((w, i) => expect(specOf(w)).toMatchObject({ route: 'chunked', index: i, config: { fps: 30, width: 1920, height: 1080, chunkSize: 120 } }));
+    expect(name).toBe('w0');
+    expect(specOf(workers[0])).toMatchObject({ route: 'chunked', index: 3, config: { fps: 30, width: 1920, height: 1080, chunkSize: 120 } });
+    expect(workers[0].spawned).toEqual([expect.stringContaining('steps-piece.json')]);
   });
 
-  it.each([25, 50])('a %i fps video renders whole on one worker, since chunked renders take 24, 30 or 60', async (fps) => {
-    const { farm, workers, specs } = fakeFarm();
+  it('a chunk other than the first uploads itself to its signed URL, the first stays on the worker that assembles', async () => {
+    const { farm, workers } = fakeFarm();
 
-    await renderOnFarm(farm, { ...job, fps }, () => {});
+    await launchPiece(farm, job, 0, { upload: null, storageHost: STORAGE, maxBytes: 1000 });
+    await launchPiece(farm, job, 2, { upload: 'https://s.supabase.co/up/c2', storageHost: STORAGE, maxBytes: 1000 });
 
-    expect(workers).toHaveLength(1);
-    expect(specOf(workers[0])).toMatchObject({ route: 'whole', config: { fps } });
-    expect(specs[0].vcpus).toBe(8);
+    expect(steps(workers[0], FarmTask.Piece).map(line)).toEqual([expect.stringContaining('render-chunk.mjs')]);
+    expect(line(steps(workers[1], FarmTask.Piece).at(-2)!)).toContain('-le 1000');
+    expect(steps(workers[1], FarmTask.Piece).at(-1)!.args).toEqual(expect.arrayContaining(['-T', '/vercel/sandbox/job/c2.mp4', 'https://s.supabase.co/up/c2']));
   });
 
-  it('only the asset origin and the runtime CDNs are reachable', async () => {
+  it('only the asset origin, storage and the runtime CDNs are reachable', async () => {
     const { farm, specs } = fakeFarm();
 
-    await renderOnFarm(farm, job, () => {});
+    await launchPiece(farm, job, 0, { upload: null, storageHost: STORAGE, maxBytes: 1000 });
 
-    expect(specs[0].allowHosts).toEqual(['x.supabase.co', 'cdn.jsdelivr.net', 'fonts.googleapis.com', 'fonts.gstatic.com']);
+    expect(specs[0].allowHosts).toEqual(['x.supabase.co', STORAGE, 'cdn.jsdelivr.net', 'fonts.googleapis.com', 'fonts.gstatic.com']);
   });
 
-  it('the first worker mixes the audio, collects every chunk in order and returns the joined file', async () => {
+  it.each([25, 50])('a %i fps video renders whole on 8 vCPUs, since chunked renders take 24, 30 or 60', async (fps) => {
+    const { farm, workers, specs } = fakeFarm();
+
+    await launchPiece(farm, { ...job, fps }, 0, { upload: null, storageHost: STORAGE, maxBytes: 1000 });
+
+    expect(specOf(workers[0])).toMatchObject({ route: 'whole', config: { fps } });
+    expect(specs[0].vcpus).toBe(8);
+    expect(farmChunks({ ...job, fps })).toEqual({ size: 840, count: 1 });
+  });
+
+  it('motion blur renders whole and passes the shutter to the engine', async () => {
     const { farm, workers } = fakeFarm();
 
-    const bytes = await renderOnFarm(farm, job, () => {});
+    await launchPiece(farm, { ...job, motionBlur: blur }, 0, { upload: null, storageHost: STORAGE, maxBytes: 1000 });
 
-    const head = workers[0];
-    expect(head.runs.some((r) => r.startsWith('ffmpeg') && r.includes('amix'))).toBe(true);
-    expect(head.files.filter((f) => f.path.endsWith('.mp4')).map((f) => f.content.toString())).toEqual(workers.slice(1).map((w) => `w${w.id}:/vercel/sandbox/job/c${w.id}.mp4`));
-    expect(head.files.find((f) => f.path.endsWith('chunks.txt'))?.content.toString().split('\n')[0]).toBe("file '/vercel/sandbox/job/c0.mp4'");
-    expect(head.runs.at(-1)).toContain('-map 1:a');
-    expect(bytes.toString()).toBe('w0:/vercel/sandbox/job/out.mp4');
-  });
-
-  it('a silent doc skips the mix', async () => {
-    const { farm, workers } = fakeFarm();
-
-    await renderOnFarm(farm, { ...job, audio: [] }, () => {});
-
-    expect(workers[0].runs.some((r) => r.includes('amix'))).toBe(false);
-    expect(workers[0].runs.at(-1)).not.toContain('-map 1:a');
-  });
-
-  it('reports a chunk as it lands, then assembling', async () => {
-    const { farm } = fakeFarm();
-    const events: RenderEvent['kind'][] = [];
-
-    await renderOnFarm(farm, job, (e) => events.push(e.kind));
-
-    expect(events).toEqual([...Array(7).fill('chunk'), 'assembling']);
-  });
-
-  it('a chunk that fails fails the render with its output, and every worker is stopped', async () => {
-    const { farm, workers } = fakeFarm((w, cmd) => w === 3 && cmd.includes('render-chunk.mjs'));
-
-    await expect(renderOnFarm(farm, job, () => {})).rejects.toThrow(new RenderFailure('chunk 3 failed: chrome crashed'));
-    expect(workers.every((w) => w.stopped)).toBe(true);
-  });
-
-  it('every worker is stopped after success too', async () => {
-    const { farm, workers } = fakeFarm();
-
-    await renderOnFarm(farm, job, () => {});
-
-    expect(workers.every((w) => w.stopped)).toBe(true);
-  });
-});
-
-describe('renderOnFarm with motion blur', () => {
-  const blur = { shutterAngle: 180, shutterPhase: -90, samples: 8 };
-
-  it('renders whole on one worker, since the distributed producer has no motion blur, and passes the shutter to the engine', async () => {
-    const { farm, workers } = fakeFarm();
-
-    await renderOnFarm(farm, { ...job, totalFrames: 120, motionBlur: blur }, () => {});
-
-    expect(workers).toHaveLength(1);
     expect(specOf(workers[0])).toMatchObject({ route: 'whole', config: { motionBlur: { shutterAngle: 180, shutterPhase: -90, samplesPerFrame: 8 } } });
-  });
-
-  it('a video clip cannot blur, the engine extracts its frames once per output frame', async () => {
-    const { farm, workers } = fakeFarm();
-
-    await expect(renderOnFarm(farm, { ...job, html: '<video id="c-v" src="x">', motionBlur: blur }, () => {})).rejects.toThrow(/Video/);
-    expect(workers).toHaveLength(0);
-  });
-
-  it('more blurred samples than one machine renders in time are refused, with what to lower', async () => {
-    const { farm, workers } = fakeFarm();
-
-    await expect(renderOnFarm(farm, { ...job, fps: 60, totalFrames: 600, motionBlur: blur }, () => {})).rejects.toThrow(/samples/);
-    expect(workers).toHaveLength(0);
-    await expect(renderOnFarm(farm, { ...job, fps: 60, totalFrames: 480, motionBlur: blur }, () => {})).resolves.toBeDefined();
-  });
-
-  it('without blur the config carries none', async () => {
-    const { farm, workers } = fakeFarm();
-
-    await renderOnFarm(farm, job, () => {});
-
-    expect(specOf(workers[0]).config).not.toHaveProperty('motionBlur');
-  });
-});
-
-describe('renderOnFarm by export format', () => {
-  it.each([
-    [ExportFormat.Mp4H265, { format: 'mp4', codec: 'h265' }, 'mp4', 'mp4'],
-    [ExportFormat.ProRes4444, { format: 'mov' }, 'mov', 'mov'],
-    [ExportFormat.ProRes422, { format: 'mov' }, 'mov', 'mov'],
-    [ExportFormat.WebmAlpha, { format: 'webm' }, 'webm', 'webm'],
-    [ExportFormat.Gif, { format: 'webm' }, 'webm', 'gif']
-  ])('%s chunks render a %o master and the head writes the .%s → .%s file', async (format, master, chunkExt, outExt) => {
-    const { farm, workers } = fakeFarm();
-
-    const bytes = await renderOnFarm(farm, { ...job, format }, () => {});
-
-    expect(specOf(workers[1]).config).toMatchObject(master);
-    expect(specOf(workers[1]).out).toBe(`/vercel/sandbox/job/c1.${chunkExt}`);
-    expect(bytes.toString()).toBe(`w0:/vercel/sandbox/job/out.${outExt}`);
   });
 
   it('only an mp4 master names a codec, the producer refuses one on other containers', async () => {
     const { farm, workers } = fakeFarm();
 
-    await renderOnFarm(farm, { ...job, format: ExportFormat.WebmAlpha }, () => {});
+    await launchPiece(farm, { ...job, format: ExportFormat.WebmAlpha }, 1, { upload: 'u', storageHost: STORAGE, maxBytes: 1000 });
 
     expect(specOf(workers[0]).config).not.toHaveProperty('codec');
+    expect(specOf(workers[0]).out).toBe('/vercel/sandbox/job/c1.webm');
+  });
+});
+
+describe('farmProblem', () => {
+  it('a 60 s 1080p60 video with motion blur is no longer refused for its samples', () => {
+    expect(farmProblem({ ...job, fps: 60, totalFrames: 3600, motionBlur: blur })).toBeNull();
   });
 
-  it('a GIF and a PNG sequence carry no audio, so nothing is mixed', async () => {
-    for (const format of [ExportFormat.Gif, ExportFormat.PngSequence]) {
-      const { farm, workers } = fakeFarm();
+  it('blur that cannot finish inside one worker lifetime is refused, with what to lower', () => {
+    expect(farmProblem({ ...job, fps: 60, totalFrames: 10_800, motionBlur: { ...blur, samples: 64 } })).toMatch(/samples/);
+  });
 
-      await renderOnFarm(farm, { ...job, format }, () => {});
+  it('a video clip cannot blur, and H.265 cannot render whole', () => {
+    expect(farmProblem({ ...job, html: '<video id="c-v" src="x">', motionBlur: blur })).toMatch(/Video/);
+    expect(farmProblem({ ...job, fps: 25, format: ExportFormat.Mp4H265 })).toMatch(/H\.265/);
+  });
+});
 
-      expect(workers[0].runs.some((r) => r.includes('amix'))).toBe(false);
-    }
+describe('launchAssembly', () => {
+  const links = { pieces: ['https://s/d1', 'https://s/d2'], output: 'https://s/up/out', maxBytes: 50 * 1024 * 1024 };
+
+  async function assembled(j: FarmJob = job) {
+    const { farm, workers } = fakeFarm();
+    await launchPiece(farm, j, 0, { upload: null, storageHost: STORAGE, maxBytes: 1000 });
+    await launchAssembly(farm, workers[0].name, j, links);
+    return { worker: workers[0], lines: steps(workers[0], FarmTask.Assembly).map(line) };
+  }
+
+  it('downloads the other chunks, mixes the audio, joins in order, checks the size and uploads the file', async () => {
+    const { worker, lines } = await assembled();
+
+    expect(lines[0]).toContain('https://s/d1 -o /vercel/sandbox/job/c1.mp4');
+    expect(lines[1]).toContain('https://s/d2 -o /vercel/sandbox/job/c2.mp4');
+    expect(lines.some((l) => l.includes('amix'))).toBe(true);
+    expect(lines.find((l) => l.includes('concat'))).toContain('-map 1:a');
+    expect(String(worker.files.get('/vercel/sandbox/job/chunks.txt')).split('\n').slice(0, 3)).toEqual(["file '/vercel/sandbox/job/c0.mp4'", "file '/vercel/sandbox/job/c1.mp4'", "file '/vercel/sandbox/job/c2.mp4'"]);
+    expect(lines.at(-2)).toContain('52428800');
+    expect(lines.at(-1)).toMatch(/-T \/vercel\/sandbox\/job\/out\.mp4 .*https:\/\/s\/up\/out$/);
+    expect(worker.spawned.at(-1)).toContain('steps-assembly.json');
+  });
+
+  it('a silent doc skips the mix', async () => {
+    const { lines } = await assembled({ ...job, audio: [] });
+
+    expect(lines.some((l) => l.includes('amix'))).toBe(false);
   });
 
   it('a PNG sequence writes frames into a folder and zips it', async () => {
-    const { farm, workers } = fakeFarm();
+    const { lines } = await assembled({ ...job, format: ExportFormat.PngSequence });
 
-    const bytes = await renderOnFarm(farm, { ...job, format: ExportFormat.PngSequence }, () => {});
+    expect(lines.some((l) => l.includes('/vercel/sandbox/job/frames/frame_%05d.png'))).toBe(true);
+    expect(lines.some((l) => l.includes('zip -q'))).toBe(true);
+    expect(lines.at(-1)).toContain('out.zip');
+  });
+});
 
-    expect(workers[0].runs.some((r) => r.includes('/vercel/sandbox/job/frames/frame_%05d.png'))).toBe(true);
-    expect(workers[0].runs.at(-1)).toContain('zip -q');
-    expect(bytes.toString()).toBe('w0:/vercel/sandbox/job/out.zip');
+describe('checkTask', () => {
+  it('a worker without a result is still working', async () => {
+    const { farm } = fakeFarm();
+    const name = await launchPiece(farm, job, 0, { upload: null, storageHost: STORAGE, maxBytes: 1000 });
+
+    expect(await checkTask(farm, name, FarmTask.Piece)).toEqual({ state: TaskState.Running, error: null });
   });
 
-  it('H.265 is refused before any worker opens when the video must render whole', async () => {
+  it('reads the result the worker wrote, success or the failing step with its output', async () => {
     const { farm, workers } = fakeFarm();
+    const name = await launchPiece(farm, job, 0, { upload: null, storageHost: STORAGE, maxBytes: 1000 });
 
-    await expect(renderOnFarm(farm, { ...job, fps: 25, format: ExportFormat.Mp4H265 }, () => {})).rejects.toThrow(/H\.265/);
-    expect(workers).toHaveLength(0);
+    workers[0].files.set('/vercel/sandbox/job/result-piece.json', Buffer.from(JSON.stringify({ ok: false, error: 'render failed: chrome crashed' })));
+    expect(await checkTask(farm, name, FarmTask.Piece)).toEqual({ state: TaskState.Failed, error: 'render failed: chrome crashed' });
+
+    workers[0].files.set('/vercel/sandbox/job/result-piece.json', Buffer.from(JSON.stringify({ ok: true, error: null })));
+    expect(await checkTask(farm, name, FarmTask.Piece)).toEqual({ state: TaskState.Done, error: null });
+  });
+
+  it('a worker that is gone before writing a result failed: it timed out or crashed', async () => {
+    const { farm } = fakeFarm();
+
+    expect(await checkTask(farm, 'gone', FarmTask.Piece)).toEqual({ state: TaskState.Failed, error: expect.stringMatching(/stopped/) });
   });
 });

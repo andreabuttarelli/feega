@@ -5,7 +5,7 @@ import { AssetKind, COMPONENTS, COMPONENT_IDS, TrackKind } from '$lib/motion/com
 import { fieldsOf } from '$lib/motion/inspector';
 import { Ease, FRAME_RATES, MAX_SECONDS, TRANSITION_KINDS } from '$lib/motion/design';
 import { setFrameRate } from '$lib/motion/frame-rate';
-import { Background, MOTION_FORMATS, findClip, type MotionDoc } from '$lib/motion/doc';
+import { Background, MOTION_FORMATS, clipsOf, findClip, type MotionDoc } from '$lib/motion/doc';
 import { ClipEdge, Side, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyInterp, setKeyframes, setMask, shaped, setProps, setTiming, setTrackMatte, setTransform, setTransition, trimClip, applyEasePreset, setKeyEase, type OpResult } from '$lib/motion/timeline';
 import { MASK_KEYS, MASK_KIND_IDS, MATTES } from '$lib/motion/mask';
 import { pathProblem } from '$lib/motion/path';
@@ -54,6 +54,10 @@ import { DEGREES, MAX_SAMPLES } from '$lib/motion/motion-blur';
 import { MODIFIERS, MODIFIER_KINDS } from '$lib/motion/shape/modifiers';
 import { addModifier, morphTo, removeModifier, setModifier, setPath } from '$lib/motion/shape/ops';
 import { SHAPE_KINDS, modifierKey } from '$lib/motion/shape/schema';
+import { DUCK_DEFAULTS, duckUnder } from '$lib/motion/duck';
+import type { AudioAnalysis } from '$lib/motion/audio-analysis';
+import { Hit, cutToBeat, hitFrames, markHits } from '$lib/motion/beats';
+import { PULSE_PROPS, pulseWithMusic } from '$lib/motion/pulse';
 
 export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number };
 
@@ -71,6 +75,7 @@ export type MotionToolDeps = {
   voiceover: (input: { text: string; voiceId?: string }) => Promise<Voiceover>;
   frames: (callId: string, times: number[]) => Promise<Frame[] | null>;
   check: (callId: string, doc: MotionDoc, name: string) => Promise<CheckResult | null>;
+  analysis?: (assetId: string) => Promise<AudioAnalysis | null>;
 };
 
 const framesAt = (s: number, fps: number) => Math.round(s * fps);
@@ -254,6 +259,20 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     session.frames.set(callId, check.frames);
     const shown = check.frames.length ? ' The two frames that should be identical follow as images.' : '';
     return { ok: false, error: `${name} v${version} is saved but failed the seek-determinism check, so it cannot be exported:\n- ${check.problems.join('\n- ')}\nFix it with patch_component: build every change on tl from props and time only.${shown}` };
+  }
+
+  const analysisOf = (assetId: string) => (deps.analysis ? deps.analysis(assetId) : Promise.resolve(null));
+
+  async function docBeats(hit: Hit) {
+    const ids = [...new Set(clipsOf(session.doc).flatMap((c) => (c.component === 'Audio' && typeof c.props.assetId === 'string' ? [c.props.assetId] : [])))];
+    const found = await Promise.all(ids.map(async (id) => [id, await analysisOf(id)] as const));
+    const analyses = Object.fromEntries(found.flatMap(([id, a]) => (a ? [[id, a]] : [])));
+    return hitFrames(session.doc, analyses, hit);
+  }
+
+  async function speechOf(clipId: string) {
+    const assetId = findClip(session.doc, clipId)?.clip.props.assetId;
+    return typeof assetId === 'string' ? ((await analysisOf(assetId))?.speech ?? null) : null;
   }
 
   const assetKnown = (id: unknown) => typeof id !== 'string' || deps.assets.some((a) => a.id === id);
@@ -479,6 +498,57 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         'Bend the motion path at the position keyframe at time (seconds from the clip start): in and out are the bezier handles as [dx, dy] offsets from the key point, in fractions of the frame (like x/y). Omitted handles are flat ([0,0]).',
       inputSchema: z.object({ clip_id: z.string(), time: z.number().min(0), in: z.tuple([z.number(), z.number()]).optional(), out: z.tuple([z.number(), z.number()]).optional() }),
       execute: async (input) => apply(setPathTangent(session.doc, input.clip_id, { frame: frames(input.time), in: input.in ?? [0, 0], out: input.out ?? [0, 0] }), `bent the path of ${input.clip_id}`)
+    }),
+
+    analyze_audio: tool({
+      description:
+        'Analyse an audio or video asset (from list_assets): tempo in BPM, beat grid and onsets (seconds in the file), speech regions (seconds in the file). Map file seconds to the timeline through the clip: timeline = clip start + (file time - clip trimStart). Expressions read it per frame with audio.amp/beat/onset.',
+      inputSchema: z.object({ asset_id: z.string() }),
+      execute: async (input) => {
+        const analysis = await analysisOf(input.asset_id);
+        if (!analysis) {
+          return { ok: false, error: `no analysis for ${input.asset_id}: it must be an audio or video asset with a file` };
+        }
+        const { duration, bpm, beats, onsets, speech } = analysis;
+        return { ok: true, duration, bpm, beats, onsets, speech };
+      }
+    }),
+
+    pulse_with_music: tool({
+      description: `Make a clip pulse with the music: sets an audio-reactive expression on ${PULSE_PROPS.join(', ')} (scale and opacity follow the loudness, blur flashes on each beat). source is the audio clip to follow (default: the longest audio clip); strength 0..1 (default per prop). Edit it afterwards with set_expression.`,
+      inputSchema: z.object({ clip_id: z.string(), prop: z.enum(PULSE_PROPS), source: z.string().optional(), strength: z.number().min(0).max(1).optional() }),
+      execute: async (input) => apply(pulseWithMusic(session.doc, input.clip_id, input.prop, { source: input.source, strength: input.strength }), `pulsed ${input.prop} of ${input.clip_id} with the music`)
+    }),
+
+    beat_times: tool({
+      description: 'Where the music hits, on the timeline: the beat grid (hit: beats) or every detected onset (hit: onsets) of the Audio clips, in seconds from the start of the video. Use them to place cuts, keyframes and markers on the music.',
+      inputSchema: z.object({ hit: z.enum([Hit.Beats, Hit.Onsets]).default(Hit.Beats) }),
+      execute: async (input) => ({ ok: true, times: (await docBeats(input.hit)).map((f) => Math.round((f / session.doc.fps) * 1000) / 1000) })
+    }),
+
+    mark_beats: tool({
+      description: 'Add a timeline marker on every beat (hit: beats, labelled "beat N") or every onset of the music (hit: onsets, "hit N"). Marking again replaces those markers; other markers stay. move_clip can then snap a clip to a marker by label.',
+      inputSchema: z.object({ hit: z.enum([Hit.Beats, Hit.Onsets]).default(Hit.Beats) }),
+      execute: async (input) => apply(markHits(session.doc, await docBeats(input.hit), input.hit), `marked the ${input.hit}`)
+    }),
+
+    cut_to_beat: tool({
+      description: 'Re-time clips to the beat: in time order, the first starts on the nearest beat and each one ends on the beat nearest its length, the next starting there, so every cut lands on a beat.',
+      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1) }),
+      execute: async (input) => apply(cutToBeat(session.doc, input.clip_ids, await docBeats(Hit.Beats)), `cut ${input.clip_ids.length} clips to the beat`)
+    }),
+
+    duck_audio: tool({
+      description: `Duck music under a voice-over: writes volume keyframes on the music clip so it drops while the voice speaks (its analysed speech regions, or the whole clip) and comes back after. depth is the music level under the voice as a fraction of its volume (default ${DUCK_DEFAULTS.depth}); attack/release in seconds (default ${DUCK_DEFAULTS.attack}/${DUCK_DEFAULTS.release}). Replaces the music's volume keyframes. Volume and pan of Audio/Video clips animate with set_keyframes too.`,
+      inputSchema: z.object({
+        music_clip_id: z.string(),
+        voice_clip_id: z.string(),
+        depth: z.number().min(0).max(1).optional(),
+        attack: z.number().min(0).max(2).optional(),
+        release: z.number().min(0).max(4).optional()
+      }),
+      execute: async (input) =>
+        apply(duckUnder(session.doc, input.music_clip_id, input.voice_clip_id, await speechOf(input.voice_clip_id), { depth: input.depth, attack: input.attack, release: input.release }), `ducked ${input.music_clip_id} under ${input.voice_clip_id}`)
     }),
 
     remove_keyframes: tool({

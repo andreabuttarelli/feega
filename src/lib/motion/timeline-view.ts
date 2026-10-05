@@ -52,11 +52,11 @@ export enum Snap {
   Off = 'off'
 }
 
-export function snapped(doc: MotionDoc, frame: number, input: { playhead: number; exclude: readonly string[]; zoom: number; snap: Snap }): number {
+export function snapped(doc: MotionDoc, frame: number, input: { playhead: number; exclude: readonly string[]; zoom: number; snap: Snap; beats?: readonly number[] }): number {
   if (input.snap === Snap.Off) {
     return frame;
   }
-  return snapFrame(frame, snapTargets(doc, input), Math.max(1, Math.round(SNAP_PX / pxPerFrame(input.zoom))));
+  return snapFrame(frame, [...snapTargets(doc, input), ...(input.beats ?? [])], Math.max(1, Math.round(SNAP_PX / pxPerFrame(input.zoom))));
 }
 
 export const HANDLE_PX = 8;

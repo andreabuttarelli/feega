@@ -22,7 +22,7 @@ const DOC: Record<string, Access> = {
   look: { write: ['set_look', 'set_light', 'remove_light', 'set_light_keyframes'], read: 'look' },
   fonts: { write: ['set_font', 'register_font', 'remove_font'], read: 'fonts' },
   components: { write: ['write_component', 'patch_component', 'remove_component'], read: 'components' },
-  markers: { write: ['set_marker', 'remove_marker'], read: 'markers' },
+  markers: { write: ['set_marker', 'remove_marker', 'mark_beats'], read: 'markers' },
   workArea: { write: ['set_work_area'], read: 'workArea' }
 };
 
@@ -45,14 +45,14 @@ const CLIP: Record<string, Access> = {
   transitionIn: { write: ['set_transition'], read: 'in' },
   transitionOut: { write: ['set_transition'], read: 'out' },
   transform: { write: ['set_transform'], read: 'transform' },
-  keyframes: { write: ['set_keyframes', 'remove_keyframes'], read: 'keyframes' },
+  keyframes: { write: ['set_keyframes', 'remove_keyframes', 'duck_audio'], read: 'keyframes' },
   mask: { write: ['set_mask', 'remove_mask'], read: 'mask' },
   matte: { write: ['set_track_matte'], read: 'matte' },
   depth: { write: ['set_clip_depth'], read: 'depth' },
   space: { write: ['set_clip_depth'], read: 'space' },
   parent: { write: ['set_parent', 'parent_clips'], read: 'parent' },
   parentOpacity: { write: ['set_parent'], read: 'parentOpacity' },
-  expressions: { write: ['set_expression'], read: 'expressions' },
+  expressions: { write: ['set_expression', 'pulse_with_music'], read: 'expressions' },
   effects: { write: ['add_effect', 'set_effect', 'remove_effect'], read: 'effects' },
   blend: { write: ['set_blend_mode'], read: 'blend' },
   animators: { write: ['add_text_animator', 'set_text_animator', 'remove_text_animator', 'apply_text_preset'], read: 'animators' },

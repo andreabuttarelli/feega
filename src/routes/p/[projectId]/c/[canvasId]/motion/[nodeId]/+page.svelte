@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { deserialize } from '$app/forms';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
@@ -73,7 +74,10 @@
   import { Command, commandFor } from '$lib/motion/shortcuts';
   import { composeHtml } from '$lib/motion/hyperframes/compose';
   import { feegaTrailer } from '$lib/motion/trailer';
-  import { loadPeaks } from '$lib/motion/waveform';
+  import type { AudioAnalysis } from '$lib/motion/audio-analysis';
+  import { Hit, cutToBeat, hitFrames, markHits } from '$lib/motion/beats';
+  import { audioPlan } from '$lib/motion/audio-plan';
+  import { previewAudio } from '$lib/motion/preview-audio';
   import { AD_TEMPLATES, AD_TEMPLATE_IDS, templateAssets, type AdTemplate } from '$lib/motion/ad-templates';
   import { composeEditorPath } from '$lib/motion/composition-draft';
   import type { PageData } from './$types';
@@ -114,8 +118,9 @@
   let exporting = $state(false);
   let sounding = $state<SoundKind | null>(null);
   let madeAssets = $state<PageData['assets']>([]);
-  let waveforms = $state<Record<string, number[]>>({});
-  const loadingWaves = new Set<string>();
+  let analyses = $state<Record<string, AudioAnalysis>>({});
+  const waveforms = $derived(Object.fromEntries(Object.entries(analyses).map(([id, a]) => [id, a.amp])));
+  const analysing = new Set<string>();
   let sheet = $state<Sheet>(Sheet.None);
   let inspectorTab = $state<InspectorTab>(InspectorTab.Properties);
   let preview = $state<MotionPreview | null>(null);
@@ -126,9 +131,10 @@
 
   const compPath = $derived(path.map((p) => p.comp));
   const doc = $derived(viewOf(history.present, compPath));
+  const beats = $derived(hitFrames(doc, analyses, Hit.Beats));
   const assets = $derived([...madeAssets, ...data.assets]);
   const assetUrls = $derived(Object.fromEntries(assets.filter((a) => a.url).map((a) => [a.id, a.url as string])));
-  const html = $derived(composeHtml({ doc, tokens: data.tokens, assets: assetUrls }));
+  const html = $derived(composeHtml({ doc, tokens: data.tokens, assets: assetUrls, analyses }));
   const selected = $derived(selection.length === 1 ? (findClip(doc, selection[0])?.clip ?? null) : null);
   const editorUrl = $derived(`/p/${data.projectId}/c/${data.canvas.id}/motion/${data.node.id}`);
   const agentUrl = $derived(`/api/v1/projects/${data.projectId}/motion/${data.node.id}/agent`);
@@ -140,16 +146,54 @@
     return [...ids].filter((id) => assetUrls[id] && assets.some((a) => a.id === id && (a.kind === AssetKind.Audio || a.kind === AssetKind.Video))).map((id) => [id, assetUrls[id]]);
   }
 
+  const speaker = previewAudio();
+
   $effect(() => {
-    for (const [id, url] of soundAssets) {
-      if (loadingWaves.has(id)) {
-        continue;
-      }
-      loadingWaves.add(id);
-      loadPeaks(url)
-        .then((peaks) => (waveforms = { ...waveforms, [id]: peaks }))
-        .catch(() => {});
+    if (!playing) {
+      speaker.stop();
+      return;
     }
+    void speaker.play(audioPlan(doc, assetUrls), untrack(() => frame) / doc.fps);
+    return () => speaker.stop();
+  });
+
+  function markBeats() {
+    const result = markHits(doc, beats, Hit.Beats);
+    if (result.ok) {
+      edit(result.doc, 'Marked the beats');
+    }
+  }
+
+  function cutSelectionToBeat() {
+    const result = cutToBeat(doc, selection, beats);
+    if (!result.ok) {
+      notice = result.error;
+      return;
+    }
+    edit(result.doc, 'Cut to the beat');
+  }
+
+  async function analyse(ids: string[]) {
+    const form = new FormData();
+    for (const id of ids) {
+      form.append('assetId', id);
+    }
+    const res = await fetch(`${editorUrl}?/analyze`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
+    const result = deserialize(await res.text());
+    if (result.type === 'success') {
+      analyses = { ...analyses, ...((result.data as { analyses: Record<string, AudioAnalysis> }).analyses ?? {}) };
+    }
+  }
+
+  $effect(() => {
+    const fresh = soundAssets.map(([id]) => id).filter((id) => !analysing.has(id));
+    if (!fresh.length) {
+      return;
+    }
+    for (const id of fresh) {
+      analysing.add(id);
+    }
+    void analyse(fresh).catch(() => {});
   });
 
   function edit(next: MotionDoc, summary: string) {
@@ -248,7 +292,7 @@
   }
 
   const checkPorts: CheckPorts = {
-    compose: (d) => composeHtml({ doc: d, tokens: data.tokens, assets: assetUrls }),
+    compose: (d) => composeHtml({ doc: d, tokens: data.tokens, assets: assetUrls, analyses }),
     capture: (times, source) => (preview ? preview.capture(times, source, CHECK_WIDTH) : Promise.reject(new Error('the preview is still loading')))
   };
 
@@ -313,7 +357,7 @@
     if (!preview) {
       return;
     }
-    const agentHtml = composeHtml({ doc: request.doc, tokens: data.tokens, assets: assetUrls });
+    const agentHtml = composeHtml({ doc: request.doc, tokens: data.tokens, assets: assetUrls, analyses });
     const times = request.times.map((t) => Math.min(t, (request.doc.durationInFrames - 1) / request.doc.fps));
     const frames = await preview.capture(times, agentHtml).catch((e) => {
       console.error('[motion] frames not captured', e);
@@ -684,6 +728,12 @@
         </button>
         <span class="tc" data-testid="timecode">{timecode(frame, doc.fps)} / {timecode(doc.durationInFrames, doc.fps)}</span>
         <span class="sep"></span>
+        {#if beats.length}
+          <button type="button" data-testid="mark-beats" onclick={markBeats}>Mark beats</button>
+        {/if}
+        {#if beats.length && selection.length}
+          <button type="button" data-testid="cut-to-beat" onclick={cutSelectionToBeat}>Cut to beat</button>
+        {/if}
         <div class="add">
           <button type="button" onclick={() => (adding = !adding)}><Plus size={14} /> Add</button>
           {#if adding}
@@ -745,7 +795,7 @@
         {#if graphOpen}
           <GraphEditor {doc} {frame} {selection} bind:keySelection camera={cameraOpen} onchange={edit} />
         {:else}
-          <MotionTimeline {doc} bind:frame bind:selection bind:keySelection bind:camera={cameraOpen} {zoom} {snap} {waveforms} {assetUrls} onchange={edit} onopen={enterComp} />
+          <MotionTimeline {doc} bind:frame bind:selection bind:keySelection bind:camera={cameraOpen} {zoom} {snap} {waveforms} {beats} {assetUrls} onchange={edit} onopen={enterComp} />
         {/if}
       </div>
     </section>
@@ -756,7 +806,7 @@
         <CameraInspector {doc} {frame} onchange={edit} />
         <LookInspector {doc} onchange={edit} />
       {:else if selected}
-        <MotionInspector {doc} clip={selected} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} onopen={enterComp} />
+        <MotionInspector {doc} {analyses} clip={selected} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} onopen={enterComp} />
         {#if selected.component === 'Device3D'}<DevicePresets {doc} clip={selected} onchange={edit} />{/if}
         {#if THREE_D_COMPONENTS.includes(selected.component)}<LookInspector {doc} onchange={edit} />{/if}
       {:else}

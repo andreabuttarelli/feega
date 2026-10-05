@@ -114,3 +114,25 @@ describe('expressions on a doc', () => {
     expect(baked.camera!.expressions).toEqual({});
   });
 });
+
+describe('audio-reactive expressions', () => {
+  const pulse = { version: 1, fps: 30, duration: 2, amp: Array.from({ length: 60 }, (_, i) => (i < 30 ? 0 : 1)), onsets: [], bpm: null, beats: [], speech: [] };
+
+  function reactive(): MotionDoc {
+    const withMusic = ok(addClip(twoShapes(), { component: 'Audio', from: 0, durationInFrames: 60, props: { assetId: 'm' } }, 'music'));
+    return ok(setExpression(withMusic, 'a', 'scale', 'value * (1 + audio.amp())'));
+  }
+
+  it('bake reads the stored analysis at each frame', () => {
+    const baked = bakeExpressions(reactive(), { m: pulse });
+    const track = findClip(baked, 'a')!.clip.keyframes.scale;
+
+    expect([sampleTrack(track, 10), sampleTrack(track, 40)]).toEqual([1, 2]);
+    expect(expressionValue(reactive(), 'a', 'scale', 40, { m: pulse })).toBe(2);
+  });
+
+  it('without the analysis the music is silent, not an error', () => {
+    expect(expressionErrors(reactive())).toEqual([]);
+    expect(expressionValue(reactive(), 'a', 'scale', 40)).toBe(1);
+  });
+});
