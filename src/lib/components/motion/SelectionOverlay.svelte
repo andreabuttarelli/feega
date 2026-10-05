@@ -1,6 +1,7 @@
 <script lang="ts">
   import { findClip, type MotionClip, type MotionDoc } from '$lib/motion/doc';
   import type { MeasuredBox } from '$lib/motion/hyperframes/measure';
+  import { selectionView } from '$lib/motion/selection-context';
   import type { ComponentId } from '$lib/motion/components';
   import type { Transform } from '$lib/motion/keyframes';
   import { Grip, PickMode, aabb, anchorOf, dragPatch, handlesOf, pick, quadOf, readout, stackAt, writePatch, type Boxes, type Guide, type Pt, type Quad } from '$lib/motion/scene-select';
@@ -9,21 +10,21 @@
     doc,
     frame,
     html,
-    selection,
     measure,
-    onselect,
     onpreview,
     onchange
   }: {
     doc: MotionDoc;
     frame: number;
     html: string;
-    selection: string[];
     measure: () => Promise<Record<string, MeasuredBox>>;
-    onselect: (ids: string[]) => void;
     onpreview: (doc: MotionDoc | null) => void;
     onchange: (doc: MotionDoc, summary: string) => void;
   } = $props();
+
+  const shared = selectionView()!;
+  const selection = $derived(shared.ids);
+  const onselect = (ids: string[]) => shared.select(ids);
 
   const SNAP_SCREEN_PX = 8;
   const SETTLE_MS = 300;

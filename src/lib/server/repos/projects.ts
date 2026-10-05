@@ -92,6 +92,23 @@ export async function findProjectBySlug(
   return data ? toProject(data) : null;
 }
 
+export async function findProjectById(
+  db: Db,
+  input: { orgId: string; projectId: string }
+): Promise<Project | null> {
+  const { data, error } = await db
+    .from('projects')
+    .select(PROJECT_COLUMNS)
+    .eq('org_id', input.orgId)
+    .eq('id', input.projectId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+  return data ? toProject(data) : null;
+}
+
 export async function createProject(
   db: Db,
   input: { orgId: string; name: string; slug: string; brandId?: string | null; mode?: ProjectMode }

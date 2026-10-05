@@ -23,6 +23,7 @@ describe('layoutAt', () => {
 			'helix',
 			'media-cloud',
 			'media-ring',
+			'ring',
 			'staggered-grid',
 			'tilted-grid',
 			'vertical-flow'

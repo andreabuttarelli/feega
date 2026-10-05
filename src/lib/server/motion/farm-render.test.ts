@@ -31,7 +31,8 @@ function fakeFarm() {
       workers.push(w);
       return w;
     },
-    attach: async (name) => workers.find((w) => w.name === name && !w.stopped) ?? null
+    attach: async (name) => workers.find((w) => w.name === name && !w.stopped) ?? null,
+    running: async () => []
   };
   return { farm, workers, specs };
 }
@@ -61,10 +62,10 @@ describe('launchPiece', () => {
   it('starts the chunk detached on its own worker and returns the worker name the tick finds it by', async () => {
     const { farm, workers } = fakeFarm();
 
-    const name = await launchPiece(farm, job, { index: 3, size: 120 }, { upload: 'https://s.supabase.co/up/c3', storageHost: STORAGE, maxBytes: 1000 });
+    const name = await launchPiece(farm, job, { index: 3, size: 420 }, { upload: 'https://s.supabase.co/up/c3', storageHost: STORAGE, maxBytes: 1000 });
 
     expect(name).toBe('w0');
-    expect(specOf(workers[0])).toMatchObject({ route: 'chunked', index: 3, config: { fps: 30, width: 1920, height: 1080, chunkSize: 120 } });
+    expect(specOf(workers[0])).toMatchObject({ route: 'chunked', index: 3, config: { fps: 30, width: 1920, height: 1080, chunkSize: 420 } });
     expect(workers[0].spawned).toEqual([expect.stringContaining('steps-piece.json')]);
   });
 
@@ -160,6 +161,47 @@ describe('halves', () => {
 
   it('a chunk names its frames, which is what a failure reports', () => {
     expect(framesOf(job, { index: 2, size: 120 })).toBe('frames 240–359');
+  });
+});
+
+describe('a worker costs only while it works', () => {
+  it('a worker whose job cannot be written is stopped at once, not left to its timeout', async () => {
+    const { farm, workers } = fakeFarm();
+    const open = farm.open;
+    farm.open = async (spec) => {
+      const w = await open(spec);
+      w.write = async () => {
+        throw new Error('write refused');
+      };
+      return w;
+    };
+
+    await expect(launchPiece(farm, job, { index: 1, size: 420 }, { upload: 'u', storageHost: STORAGE, maxBytes: 1000 })).rejects.toThrow('write refused');
+    expect(workers[0].stopped).toBe(true);
+  });
+
+  it('a chunk lives minutes, sized by its frames and pixels, not a flat 20', async () => {
+    const { farm, specs } = fakeFarm();
+
+    await launchPiece(farm, job, { index: 1, size: 420 }, { upload: 'u', storageHost: STORAGE, maxBytes: 1000 });
+    await launchPiece(farm, { ...job, width: 3840, height: 2160 }, { index: 1, size: 420 }, { upload: 'u', storageHost: STORAGE, maxBytes: 1000 });
+
+    expect(specs[0].timeoutMs).toBeLessThanOrEqual(10 * 60_000);
+    expect(specs[1].timeoutMs).toBeGreaterThan(specs[0].timeoutMs);
+    expect(specs[1].timeoutMs).toBeLessThanOrEqual(20 * 60_000);
+  });
+
+  it('the first worker lives long enough to wait for the others and assemble', async () => {
+    const { farm, specs } = fakeFarm();
+
+    await launchPiece(farm, job, { index: 0, size: 420 }, { upload: null, storageHost: STORAGE, maxBytes: 1000 });
+    await launchPiece(farm, job, { index: 1, size: 420 }, { upload: 'u', storageHost: STORAGE, maxBytes: 1000 });
+
+    expect(specs[0].timeoutMs).toBeGreaterThan(specs[1].timeoutMs);
+  });
+
+  it('a 30 s video renders in two chunks of 15 s: a shorter chunk would pay a minute of memory for seconds of work', () => {
+    expect(farmChunks({ ...job, totalFrames: 900 })).toEqual({ size: 450, count: 2 });
   });
 });
 

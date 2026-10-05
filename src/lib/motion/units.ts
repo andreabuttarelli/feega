@@ -102,6 +102,17 @@ export const PROPERTY_UNITS: Readonly<Record<string, Rule>> = {
   gravity: { unit: Unit.PxPerSecondSquared, basis: Basis.Same },
   velocityX: { unit: Unit.PxPerSecond, basis: Basis.Same },
   velocityY: { unit: Unit.PxPerSecond, basis: Basis.Same },
+  ringRadius: px(Basis.Short),
+  cardHeight: px(Basis.Short),
+  tiltX: degrees(),
+  tiltZ: degrees(),
+  spin: degrees(),
+  backOpacity: percent(),
+  backBlur: px(Basis.Same),
+  shadowOpacity: percent(),
+  cornerRadius: px(Basis.Same),
+  cameraDistance: px(Basis.Same),
+  cameraHeight: px(Basis.Height, ONE_FRAME),
   restitution: percent(),
   friction: percent()
 };

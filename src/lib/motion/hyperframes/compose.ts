@@ -9,6 +9,9 @@ import { LIGHTING, OPENTYPE_URL, ThreeKind, lookRuntime, surfaceOf, threeAssetUr
 import { outlineUrl } from '../fonts/outline';
 import { Finish } from '../devices';
 import { deviceRuntime } from './device-runtime';
+import { ringBake, ringHtml, ringScript } from './ring';
+import { isRing } from '../ring/model';
+import type { RingBake } from '../ring/pose';
 import { bakeComposition, compositionScript, type TimedBake } from './composition';
 import { ANIMATE_CSS, ENGINE, animationScript, keyedOverrides, sceneKeys, wrapAnimated, wrapParents } from './animate';
 import { ancestorsOf, parentsWithChildren } from '../parent';
@@ -25,6 +28,7 @@ import { Composite, cameraMath, stageSpec } from '../camera';
 import { sampleTrack } from '../keyframes';
 import { STAGE_CSS, stageRootStyle, stageScript } from './stage';
 import { shapeBake, shapeScript, type ShapeBake } from './shapes';
+import { TEXT_PATH_CSS, textPathBake, textPathScript, textPathTemplate, type TextPathBake } from './text-path';
 import { particleBake, particleScript } from './particles';
 import { remappedSegments } from '../time-remap';
 import type { ParticleBake } from '../particles/simulate';
@@ -37,6 +41,7 @@ import { declaredFamilyCss, fontStack, loadDescriptors, googleFontsUrl, loadedWe
 import { bakePaths } from '../path';
 import { bakePhysics } from '../physics/simulate';
 import { withoutHidden } from '../organize';
+import { JUNCTION, Span, junctionHalves, junctionPairs, withJunctions, type JunctionPair, type Move } from '../junctions';
 import { EFFECT_CSS, adjustmentLayer, adjustmentTimeline, effectLayer, effectScript, effectTimeline, type EffectSet } from '../effects/render';
 import { flattenComps, type GroupProps } from '../precomp';
 import { blendStyle } from '../blend';
@@ -103,6 +108,41 @@ function edgeTweens(clip: MotionClip, fps: number): Tween[] {
   }
 
   return tweens;
+}
+
+const SPAN: Record<Span, (d: number) => { offset: number; length: number }> = {
+  [Span.Whole]: (d) => ({ offset: 0, length: d }),
+  [Span.FirstHalf]: (d) => ({ offset: 0, length: d / 2 }),
+  [Span.SecondHalf]: (d) => ({ offset: d / 2, length: d / 2 })
+};
+
+function incomingOnTop(doc: MotionDoc, pair: JunctionPair): boolean {
+  const rank = (id: string) => {
+    const track = doc.tracks.findIndex((t) => t.clips.some((c) => c.id === id));
+    return [-track, doc.tracks[track].clips.findIndex((c) => c.id === id)];
+  };
+  const [inTrack, inIndex] = rank(pair.incoming);
+  const [outTrack, outIndex] = rank(pair.outgoing);
+  return inTrack !== outTrack ? inTrack > outTrack : inIndex > outIndex;
+}
+
+function junctionTweens(doc: MotionDoc, pairs: JunctionPair[]): Tween[] {
+  return pairs.flatMap((pair) => {
+    const spec = JUNCTION[pair.kind];
+    const incoming = byIdIn(doc, pair.incoming);
+    const at = (incoming.from - junctionHalves(pair.durationInFrames).before) / doc.fps;
+    const duration = pair.durationInFrames / doc.fps;
+    const below = spec.incomingBelow && !incomingOnTop(doc, pair);
+    const tween = (target: string) => (move: Move): Tween => {
+      const { offset, length } = SPAN[move.span](duration);
+      return { target: `#fx-${target}`, from: move.from, to: move.to, at: at + offset, duration: length, ease: spec.ease };
+    };
+    return [...(below ? spec.incomingBelow! : spec.outgoing).map(tween(pair.outgoing)), ...(below ? [] : spec.incoming).map(tween(pair.incoming))];
+  });
+}
+
+function byIdIn(doc: MotionDoc, id: string): MotionClip {
+  return clipsOf(doc).find((c) => c.id === id)!;
 }
 
 function moveTweens(clip: MotionClip, fps: number): Tween[] {
@@ -185,6 +225,14 @@ const GROUPS: Partial<Record<ComponentId, GroupSpec>> = {
     html: (clip, ctx, placed, content) => `${clipHtml(clip, ctx, { ...placed, group: clip.id }, content)}<!--/group:${esc(clip.id)}-->`,
     effects: (clip, ctx) => effectTimeline(clip, ctx, ctx.color)
   },
+  Composition: {
+    firstLayer: (clip, trackIndex, starts) => {
+      const span = (clip.props as GroupProps).span;
+      return span ? (starts.get(trackIndex + span) ?? 0) : Number.POSITIVE_INFINITY;
+    },
+    html: (clip, ctx, placed, content) => clipHtml(clip, ctx, placed, isRing(clip.props) ? ringHtml(ctx as TemplateCtx<'Composition'>, content) : TEMPLATES.Composition.html(ctx as TemplateCtx<'Composition'>)),
+    effects: (clip, ctx) => effectTimeline(clip, ctx, ctx.color)
+  },
   Adjustment: {
     firstLayer: () => 0,
     html: (clip, ctx, placed, content) => adjustmentLayer(clip, ctx, ctx.color, content, placed.layer),
@@ -197,6 +245,17 @@ function tweenLine(t: Tween): string {
 }
 
 type Hold = { target: string; vars: Vars; at: number };
+
+function untrimmed(tweens: Tween[], clipStart: number, trimmed: number): Tween[] {
+  return tweens.flatMap((t) => {
+    const at = t.at - trimmed;
+    const end = at + t.duration;
+    if (end <= clipStart) {
+      return [];
+    }
+    return at >= clipStart ? [{ ...t, at }] : [{ ...t, at: clipStart, duration: end - clipStart }];
+  });
+}
 
 function heldUntilStart(tweens: Tween[], clipStart: number): Hold[] {
   return tweens.filter((t) => t.at > clipStart).map((t) => ({ target: t.target, vars: t.from, at: clipStart }));
@@ -277,6 +336,7 @@ const BASE_CSS = [
   MASK_CSS,
   EFFECT_CSS,
   ANIMATOR_CSS,
+  TEXT_PATH_CSS,
   '.font-probe{position:absolute;left:0;top:0;opacity:0;pointer-events:none}'
 ].join('');
 
@@ -366,18 +426,22 @@ function zoomed(doc: MotionDoc, scale: number): string {
 }
 
 export function composeHtml(raw: ComposeInput): string {
-  const input = { ...raw, doc: bakePhysics(bakeExpressions(bakePaths(withoutBackdrop(flattenComps(withoutHidden(raw.doc)))), raw.analyses)) };
+  const shown = withoutHidden(raw.doc);
+  const junctions = junctionTweens(shown, junctionPairs(shown));
+  const input = { ...raw, doc: bakePhysics(bakeExpressions(bakePaths(withoutBackdrop(flattenComps(withJunctions(shown)))), raw.analyses)) };
   const { doc, tokens } = input;
   const scale = raw.scale ?? 1;
   const frame = { width: Math.round(doc.width * scale), height: Math.round(doc.height * scale) };
   const bottomFirst = doc.tracks.map((track, index) => ({ track, index })).reverse();
   const layers: string[] = [];
-  const tweens: Tween[] = [];
+  const tweens: Tween[] = [...junctions];
   const holds: Hold[] = [];
   const three: ThreeClip[] = [];
   const compositions: TimedBake[] = [];
   const shapes: ShapeBake[] = [];
+  const textPaths: TextPathBake[] = [];
   const particles: ParticleBake[] = [];
+  const rings: RingBake[] = [];
   const clips: MotionClip[] = [];
   const runs: CustomRun[] = [];
   const pairs = mattePairs(doc);
@@ -398,28 +462,34 @@ export function composeHtml(raw: ComposeInput): string {
     for (const clip of track.clips as MotionClip[]) {
       const ctx = ctxOf(clip, input);
       clips.push(clip);
-      const template = TEMPLATES[clip.component] as (typeof TEMPLATES)[ComponentId];
+      const template = (clip.textPath ? textPathTemplate(clip.component) : TEMPLATES[clip.component]) as (typeof TEMPLATES)[ComponentId];
       const group = GROUPS[clip.component];
       layer += 1;
       const placed: Placed = { layer, trackIndex: index, matte: matteOf.get(clip.id) ?? null, visibility: hidden.has(clip.id) ? Visibility.MatteSource : Visibility.Shown, transform: startPose.get(clip.id), chain: ancestorsOf(doc, clip.id).map((id) => byId.get(id)!), held: held.has(clip.id) };
       const html = group ? group.html(clip, ctx, placed, layers.splice(group.firstLayer(clip, index, starts)).join('')) : clipHtml(clip, ctx, placed, template.html(ctx as never));
       (onStage.has(clip.id) && !group && !hidden.has(clip.id) ? world : layers).push(html);
       effectSets.push(...(group ? group.effects(clip, ctx) : effectTimeline(clip, ctx, ctx.color)));
-      const own = template.tweens?.(ctx as never) ?? [];
+      const own = untrimmed(template.tweens?.(ctx as never) ?? [], ctx.start, ctx.mediaStart);
       tweens.push(...edgeTweens(clip, doc.fps), ...moveTweens(clip, doc.fps), ...own);
       holds.push(...heldUntilStart(own, ctx.start));
       if (THREE_D_COMPONENTS.includes(clip.component)) {
         three.push(threeClipOf(clip, ctx, onStage.has(clip.id), input));
       }
-      if (clip.component === 'Composition') {
+      if (clip.component === 'Composition' && !isRing(clip.props)) {
         compositions.push(compositionBake(clip, ctx));
       }
       const shape = clip.component === 'Shape' ? shapeBake({ ...clip, props: ctx.p as Record<string, unknown> }, ctx) : null;
       if (shape) {
         shapes.push(shape);
       }
+      if (clip.textPath) {
+        textPaths.push(textPathBake(clip, doc));
+      }
       if (clip.component === 'Particles') {
         particles.push(particleBake(clip, ctx));
+      }
+      if (clip.component === 'Composition' && isRing(clip.props)) {
+        rings.push(ringBake(clip, ctx));
       }
       const run = clip.component === 'Custom' ? customRun(clip, ctx, doc.components) : null;
       if (run) {
@@ -476,7 +546,9 @@ export function composeHtml(raw: ComposeInput): string {
     hotScript(threeScript(three, Number(duration), stage, look)),
     hotScript(compositionScript(compositions, Number(duration))),
     hotScript(shapeScript(shapes, doc.fps, Number(duration))),
-    hotScript(particleScript(particles, doc.fps, Number(duration)))
+    hotScript(textPathScript(textPaths, doc.fps, Number(duration))),
+    hotScript(particleScript(particles, doc.fps, Number(duration))),
+    hotScript(ringScript(rings, doc.fps, Number(duration)))
   ].join('');
   return `${page}${captureScript(frame, contentStamp(page))}${measureScript()}</body></html>`;
 }

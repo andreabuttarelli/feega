@@ -8,6 +8,7 @@ export enum DevicePreset {
   SpinIn = 'spin-in',
   HeroTurn = 'hero-turn',
   LidOpen = 'lid-open',
+  FoldOpen = 'fold-open',
   ScreenScroll = 'screen-scroll'
 }
 
@@ -20,6 +21,7 @@ const SETTLE_X = 6;
 const SPIN_FRAMES = Math.round(1.6 * FPS);
 const LID_FRAMES = Math.round(1.5 * FPS);
 const LID_OPEN = 110;
+const FOLD_FLAT = 180;
 const SCROLL_LEAD = Math.round(0.8 * FPS);
 const SCROLL_TAIL = Math.round(0.5 * FPS);
 
@@ -49,6 +51,14 @@ export const PRESET: Record<DevicePreset, { about: string; lanes: (length: numbe
     lanes: () => ({
       lid: [key(0, 0), key(LID_FRAMES, LID_OPEN)],
       objectRotateX: [key(0, 24), key(LID_FRAMES, 12)]
+    })
+  },
+  [DevicePreset.FoldOpen]: {
+    about: 'a foldable phone unfolds from closed to flat',
+    fits: (kind) => kind === DeviceKind.Foldable,
+    lanes: () => ({
+      fold: [key(0, 0), key(LID_FRAMES, FOLD_FLAT)],
+      objectRotateX: [key(0, 18), key(LID_FRAMES, SETTLE_X)]
     })
   },
   [DevicePreset.ScreenScroll]: {

@@ -188,6 +188,23 @@ count is not already known, rather than guessing at whether `confirm` will be ne
 a tick has already claimed finish regardless, and anything already produced stays in the output
 list. Returns how many combinations it actually stopped.
 
+## Motion videos
+
+| MCP | CLI |
+|-----|-----|
+| `ask_motion_agent` | `feega motion ask <nodeId> "<prompt>" [--no-wait]` |
+| `get_motion_run` | `feega motion run <runId>` |
+| `get_motion_summary` | (MCP only) |
+
+`ask_motion_agent({ org, node_id, prompt, wait? })` runs one turn of the motion editor's agent on
+a `motion` node, with the editor's own tools, and saves a new revision. `wait` defaults to true and
+returns the finished run (`reply`, `summary`, `version`, `cost_usd`); past about 4 minutes, or with
+`wait: false`, the run comes back `running` — poll `get_motion_run({ org, run_id })`. The agent
+cannot look at rendered frames: that needs the editor open in a browser. Spends credits.
+
+`get_motion_summary({ org, node_id })` reads the saved video: revision, last change, size, fps,
+duration, tracks and clips in seconds. Spends nothing.
+
 ## Posts
 
 | MCP | CLI |

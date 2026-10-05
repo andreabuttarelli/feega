@@ -81,6 +81,9 @@ Mossa: rifare lo stesso HTML con `executeRenderJob` del producer in locale (stes
 il messaggio esce intero, p. es. `[MotionBlur] ... cannot run with injected video frames` che
 il producer lancia per qualunque `<video>` nella pagina.
 
+### La bolletta Sandbox sale e nessun render è stato addebitato
+Segnale: Vercel mostra Active CPU / Provisioned Memory in crescita, `ai_calls` non ha righe `motion_render`. Le sandbox del farm vivono nel progetto Vercel **anomalia**, non in feega: `GET /v1/sandboxes?project=<id>&teamId=…` (token di `vercel login`) dà `vcpus`, `timeout`, `activeCpuDurationMs`, `startedAt`/`stoppedAt` per ognuna. Il 5/10 l'87% della spesa motion veniva da bench degli agenti (timeout non usati dal codice), e una sandbox che vive `timeout` pieno con poca CPU è un worker orfano. Mossa: un bench chiama `stopWorker` in `finally`; il minimo fatturato è 1 min di memoria per sandbox, quindi un bench a molti chunk corti costa il minimo × chunk.
+
 ### In three.js `envMapIntensity` non conta se c'è `scene.environment`
 Un riflesso additivo sullo schermo dei mockup sbiancava il laptop e abbassare `envMapIntensity`
 non cambiava un pixel. Segnale: un parametro di materiale che «non ha effetto» con un ambiente
@@ -88,6 +91,13 @@ di scena acceso. Mossa: la forza la dà `scene.environmentIntensity` (per tutta 
 un solo materiale, `specularIntensity` di `MeshPhysicalMaterial`. E prima di toccare i
 materiali, togli lo strato sospetto dall'HTML generato e rifai lo snapshot: dice in un minuto
 quale strato è.
+
+### Copie di DOM dentro elementi 3D: `will-change` le fa costare un secondo a frame
+Il ring copia ogni clip di una composizione in ogni fetta: `.fx{will-change:transform}` dava a
+ognuna un layer di compositing a piena risoluzione, centinaia per frame. JS e layout restano a
+4 ms, il frame a 1 s. Segnale: tempo per frame che cresce col numero di copie mentre il seek è
+istantaneo. Mossa: confrontare varianti dell'HTML con un CSS in più (`will-change:auto`) e
+misurare ms per screenshot; dentro le copie si spegne il `will-change`.
 
 ## Ambiente e worktree
 
@@ -187,6 +197,12 @@ patch-package non aggiorna uno stato già patchato: dopo un merge/rebase che toc
 
 ### Una sessione precedente uccisa lascia una `vite build` orfana che scrive nella STESSA `build/`
 Una sessione (agente o terminale) chiusa a metà `npm run build` non porta via il processo: il trap del genitore non lo tocca, e `vite build` resta parente di `init`, vivo per decine di minuti, a scrivere in `build/`. Rilanciare il build nello stesso worktree fa gareggiare due `vite build` sulla stessa cartella d'output — corruzione silenziosa, non un errore chiaro. Segnale: `ps -ef | grep "vite build"` mostra più di un processo con lo stesso `cwd`, uno con `PPID 1` e un'ora di avvio molto più vecchia. Mossa: prima di rilanciare un build lungo in un worktree, cerca ed elimina (`kill -9`) ogni `vite build`/`npm run build` orfano di QUEL worktree — non toccare processi di altri worktree che condividono la macchina.
+
+### `gh pr merge --delete-branch` sulla base di una pila chiude la PR figlia
+Mergiando #133 con `--delete-branch`, GitHub ha cancellato `feat/editor-layout` e ha CHIUSO #135
+(base `feat/editor-layout`) invece di ri-puntarla su `main`: va riaperta come PR nuova. Segnale:
+la PR figlia passa a `CLOSED` senza merge appena la base viene mergiata. Mossa: merge della base
+SENZA `--delete-branch`, poi `gh pr edit <figlia> --base main`, e cancella il branch solo dopo.
 
 ### Una PR «Merged» su GitHub può non essere MAI arrivata su `dev`
 La #52 («Run custom-agent turns on the Agent Kit») risulta `MERGED` su GitHub, con tanto di merge commit, e il task su Notion diceva «In production». In produzione non c'è mai stata: era aperta **contro `feat/kit-private-threads`**, non contro `dev`, e quel branch intermedio in `dev` non è mai entrato. Il merge commit è reale e irraggiungibile — un ramo staccato che nessuno ha più tirato. Il codice su `dev` continuava a portare il gate vecchio (`!personaId`) mentre tutti lo davano per migrato.
@@ -435,7 +451,13 @@ Era descritto come irrisolvibile: `.checked` cambia, l'handler (`onchange`, `onc
 ### Un bottone cliccato subito dopo `page.goto`/`waitForURL` non ha ancora il suo `onclick`
 Su una pagina SvelteKit renderizzata server-side, il DOM del bottone esiste — Playwright lo vede `visible`, lo clicca, nessun errore — ma se il click arriva prima che l'hydration client-side abbia agganciato gli handler, il click cade su un nodo ancora "morto": nessuna eccezione, nessun log in console, nessun `pageerror`, e la funzione che quel bottone dovrebbe chiamare (qui: `openSheet` dietro un bottone della rail) semplicemente non parte — l'URL non cambia, niente si apre. Uno script standalone con `page.on('console')`/`page.on('pageerror')` attivi, ripetuto con e senza un `await page.waitForLoadState('networkidle')` dopo la navigazione, ha isolato la causa in due minuti — senza quell'attesa il click non fa niente in ogni run, con quell'attesa funziona in ogni run. Segnale: un click che Playwright riporta come riuscito (nessuna eccezione dal `.click()` stesso) ma il cui effetto atteso (URL, DOM, stato) non arriva mai, e zero rumore in console o server. Mossa: `waitForLoadState('networkidle')` (o l'equivalente `gotoHydrated` già in `fixtures/session.ts`) dopo OGNI navigazione che precede un click, non solo dopo il login — la stessa corsa esiste su qualunque pagina, non solo sul form che l'ha fatta scoprire per primo.
 
+### Un utente usa-e-getta `e2e-*` sparisce a metà sessione
+Login che funzionava dieci minuti prima risponde «Wrong email or password»; `auth.admin.getUserById` dà niente e anche l'org è sparita. Qualcosa ripulisce gli utenti `e2e-…@feega.app` sul progetto condiviso mentre la tua sessione manuale è ancora aperta. Mossa: per una sessione di lavoro lunga (screenshot, giri a mano) crea l'utente con un prefisso tuo, non `e2e-`, e smontalo tu alla fine; le spec Playwright restano su `fixtures/session.ts`, che dura quanto il test.
+
 ## Codice
+
+### Un valore nuovo per una colonna «libera» muore su un CHECK che le migration non hanno
+`platform = 'upload'` su `products`: i test con repo finti verdi, in produzione `23514 products_platform_check`. Lo stesso per `nodes.data.type` di un nodo `products` (`nodes_data_shape_check`). Quei CHECK vivono sul database e non in `supabase/migrations`: la lista vera è `src/lib/server/org-data/checks.ts` e le `canvas-migrations`. Segnale: `23514` al primo giro reale di un valore che nessun test ha mai scritto su Postgres. Mossa: prima di inventare un valore di enum, `grep` del nome della colonna in `org-data/checks.ts` e nelle `canvas-migrations`; se serve davvero, è una migration da applicare, non un cast.
 
 ### Un claim atomico su UNA tabella non protegge un job che vive su DUE
 `reconcileVideoRenders` (`video-render-queue.ts`, cron `videos/render/work`) claima

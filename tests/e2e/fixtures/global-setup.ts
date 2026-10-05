@@ -1,4 +1,5 @@
 import { startMockZernio, type MockZernio } from './mock-zernio';
+import { startMockImages } from './mock-images';
 
 /**
  * Il webServer di Playwright parte UNA volta, prima di ogni spec: il mock Zernio deve già
@@ -11,6 +12,7 @@ import { startMockZernio, type MockZernio } from './mock-zernio';
  * richiusa, e non c'è un canale per farlo fra due processi Node separati.
  */
 const MOCK_ZERNIO_PORT = 4499;
+const MOCK_IMAGES_PORT = 4498;
 
 /** Il valore di ritorno è la funzione di teardown: Playwright la chiama da sola a fine corsa —
  *  un file solo, un'esportazione sola, niente da tenere sincronizzato con globalTeardown. */
@@ -20,5 +22,13 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
   // precisa, e il mock risponde direttamente su /posts, /posts/:id.
   process.env.ZERNIO_BASE_URL = mock.url;
 
-  return () => mock.close();
+  const images = process.env.E2E_FAKE_IMAGES ? await startMockImages(MOCK_IMAGES_PORT) : null;
+  if (images) {
+    process.env.LLM_BASE_URL = images.url;
+  }
+
+  return async () => {
+    await mock.close();
+    await images?.close();
+  };
 }

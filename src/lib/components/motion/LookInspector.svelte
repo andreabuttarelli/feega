@@ -2,6 +2,8 @@
   import type { DocVerdict, MotionDoc } from '$lib/motion/doc';
   import { ENVIRONMENT, ENV_PRESETS, LIGHT, LIGHT_KINDS, LightKind, MAX_LIGHTS, type Light } from '$lib/motion/look';
   import { removeLight, removeLook, setLight, setLook } from '$lib/motion/look-ops';
+  import NumberField from './NumberField.svelte';
+  import { FieldFill, FieldKind } from '$lib/motion/number-field';
 
   let { doc, onchange }: { doc: MotionDoc; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 
@@ -52,14 +54,12 @@
           {#each ENV_PRESETS as preset (preset)}<option value={preset}>{preset}</option>{/each}
         </select>
       </label>
-      <label class="row">
-        Intensity
-        <input type="range" min={ENVIRONMENT.intensity.min} max={ENVIRONMENT.intensity.max} step="0.05" value={look.environment.intensity} oninput={(e) => commit(setLook(doc, { environment: { intensity: Number(e.currentTarget.value) } }), 'Environment intensity')} />
-      </label>
-      <label class="row">
-        Rotation
-        <input type="range" min={ENVIRONMENT.rotation.min} max={ENVIRONMENT.rotation.max} step="1" value={look.environment.rotation} oninput={(e) => commit(setLook(doc, { environment: { rotation: Number(e.currentTarget.value) } }), 'Environment rotation')} />
-      </label>
+      <div class="row">
+        <NumberField label="Intensity" kind={FieldKind.Named} name="Environment intensity" value={look.environment.intensity} range={{ ...ENVIRONMENT.intensity, step: 0.05 }} fill={FieldFill.Range} onchange={(v) => commit(setLook(doc, { environment: { intensity: v } }), 'Environment intensity')} />
+      </div>
+      <div class="row">
+        <NumberField label="Rotation" kind={FieldKind.Named} name="Environment rotation" value={look.environment.rotation} range={{ ...ENVIRONMENT.rotation, step: 1 }} unit="°" onchange={(v) => commit(setLook(doc, { environment: { rotation: v } }), 'Environment rotation')} />
+      </div>
       <label class="check"><input type="checkbox" checked={look.softShadows} onchange={(e) => commit(setLook(doc, { softShadows: e.currentTarget.checked }), 'Soft shadows')} /> Soft shadows</label>
       <label class="check"><input type="checkbox" checked={look.contactShadow} onchange={(e) => commit(setLook(doc, { contactShadow: e.currentTarget.checked }), 'Contact shadow')} /> Contact shadow</label>
     </section>
@@ -75,16 +75,14 @@
             <input type="color" value={light.color} aria-label={`Colour of ${light.id}`} onchange={(e) => editLight(light, { color: e.currentTarget.value })} />
             <button type="button" class="link" onclick={() => commit(removeLight(doc, light.id), `Removed light ${light.id}`)}>Remove</button>
           </div>
-          <label class="row">
-            Intensity
-            <input type="range" min={LIGHT.intensity.min} max={LIGHT.intensity.max} step="0.1" value={light.intensity} oninput={(e) => editLight(light, { intensity: Number(e.currentTarget.value) })} />
-          </label>
-          {#each POSITION as axis (axis)}
-            <label class="row">
-              {axis.toUpperCase()}
-              <input type="range" min={LIGHT[axis].min} max={LIGHT[axis].max} step="0.1" value={light[axis]} oninput={(e) => editLight(light, { [axis]: Number(e.currentTarget.value) })} />
-            </label>
-          {/each}
+          <div class="row">
+            <NumberField label="Intensity" kind={FieldKind.Named} name="Light intensity" value={light.intensity} range={{ ...LIGHT.intensity, step: 0.1 }} fill={FieldFill.Range} onchange={(v) => editLight(light, { intensity: v })} />
+          </div>
+          <div class="axes">
+            {#each POSITION as axis (axis)}
+              <NumberField label={axis.toUpperCase()} name={`Light ${axis}`} value={light[axis]} range={{ ...LIGHT[axis], step: 0.1 }} onchange={(v) => editLight(light, { [axis]: v })} />
+            {/each}
+          </div>
         </div>
       {/each}
       <button type="button" data-testid="look-add-light" onclick={() => commit(setLight(doc, nextId(), { kind: LightKind.Directional }), 'Added a light')} disabled={look.lights.length >= MAX_LIGHTS}>Add a light</button>
@@ -202,5 +200,11 @@
   .error {
     color: #c62828;
     padding: 8px 12px;
+  }
+
+  .axes {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
   }
 </style>
