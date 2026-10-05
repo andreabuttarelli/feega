@@ -47,6 +47,10 @@ import { flattenComps, type GroupProps } from '../precomp';
 import { blendStyle } from '../blend';
 import { HELD, holdScript } from './blur';
 import { engineScript } from '../engine/engine';
+import liveRuntime from 'virtual:motion-live-runtime';
+import { liveLanes } from '../interactive/live';
+import { LIVE_GLOBAL, type LiveConfig } from '../interactive/runtime';
+import { Liveness, interactiveOf } from '../interactive/settings';
 
 export { CAPTURE_REPLY, CAPTURE_REQUEST } from './capture';
 
@@ -82,7 +86,7 @@ const MOVE: Record<PropsOf<'Image'>['move'], { from: Vars; to: Vars }> = {
   'pan-right': { from: { scale: 1.12, xPercent: -3 }, to: { scale: 1.12, xPercent: 3 } }
 };
 
-export type ComposeInput = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; scale?: number; analyses?: Record<string, AudioAnalysis> };
+export type ComposeInput = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; scale?: number; analyses?: Record<string, AudioAnalysis>; liveness?: Liveness };
 
 function pick(vars: Vars, keys: string[]): Vars {
   return Object.fromEntries(keys.map((k) => [k, vars[k]]));
@@ -417,7 +421,8 @@ function zoomed(doc: MotionDoc, scale: number): string {
 export function composeHtml(raw: ComposeInput): string {
   const shown = withoutHidden(raw.doc);
   const junctions = junctionTweens(shown, junctionPairs(shown));
-  const input = { ...raw, doc: bakePhysics(bakeExpressions(bakePaths(withoutBackdrop(flattenComps(withJunctions(shown)))), raw.analyses)) };
+  const prepared = bakePaths(withoutBackdrop(flattenComps(withJunctions(shown))));
+  const input = { ...raw, doc: bakePhysics(bakeExpressions(prepared, raw.analyses)) };
   const { doc, tokens } = input;
   const scale = raw.scale ?? 1;
   const frame = { width: Math.round(doc.width * scale), height: Math.round(doc.height * scale) };
@@ -539,5 +544,15 @@ export function composeHtml(raw: ComposeInput): string {
     hotScript(particleScript(particles, doc.fps, Number(duration))),
     hotScript(ringScript(rings, doc.fps, Number(duration)))
   ].join('');
-  return `${page}${captureScript(frame, contentStamp(page))}${measureScript()}</body></html>`;
+  const live = LIVE_SCRIPT[raw.liveness ?? Liveness.Baked]({ doc: prepared, analyses: raw.analyses ?? {}, outside: interactiveOf(raw.doc).outside, parents: [...parentsWithChildren(doc)] });
+  return `${page}${live}${captureScript(frame, contentStamp(page))}${measureScript()}</body></html>`;
+}
+
+const LIVE_SCRIPT: Record<Liveness, (config: LiveConfig) => string> = {
+  [Liveness.Baked]: () => '',
+  [Liveness.Live]: (config) => (liveLanes(config.doc).length ? `<script>${liveRuntime.replace(/<\/script/gi, '<\\/script')}</script><script>window.${LIVE_GLOBAL}(${scriptJson(config)});</script>` : '')
+};
+
+function scriptJson(value: unknown): string {
+  return JSON.stringify(value).replace(/</g, '\\u003c');
 }

@@ -1,4 +1,5 @@
 import { sampleTrack, type Keyframe } from '../keyframes';
+import { INPUT_KEYS, type InputPort } from './inputs';
 
 export const MAX_SOURCE = 2000;
 export const MAX_STEPS = 4000;
@@ -21,6 +22,7 @@ export type Scope = {
   thisLayer: LayerHandle;
   layer: (ref: string | number) => LayerHandle;
   audio: AudioPort;
+  input: InputPort;
 };
 
 export class ExpressionError extends Error {}
@@ -455,6 +457,22 @@ function audioNamespace(port: AudioPort): Namespace {
   );
 }
 
+function inputNamespace(port: InputPort): Namespace {
+  const groups = new Map<string, Map<string, Value>>();
+  const top = new Map<string, Value>();
+  for (const key of INPUT_KEYS) {
+    const [group, name] = key.split('.');
+    if (name === undefined) {
+      top.set(group, port.read(key));
+      continue;
+    }
+    groups.set(group, (groups.get(group) ?? new Map()).set(name, port.read(key)));
+  }
+  let slot = 0;
+  const smooth = new Builtin('input.smooth', (v, seconds) => port.smooth(slot++, num(v, 'input.smooth'), seconds === undefined ? 0 : num(seconds, 'input.smooth')));
+  return new Namespace(new Map<string, Value>([...top, ...[...groups].map(([g, members]): [string, Value] => [g, new Namespace(members)]), ['smooth', smooth]]));
+}
+
 function globals(scope: Scope): Map<string, Value> {
   const fn = (name: string, call: Fn): [string, Value] => [name, new Builtin(name, call)];
   const numbers = (name: string, args: Value[]) => args.map((a) => num(a, name));
@@ -466,6 +484,7 @@ function globals(scope: Scope): Map<string, Value> {
     ['thisLayer', new Handle(scope.thisLayer)],
     ['Math', MATH],
     ['audio', audioNamespace(scope.audio)],
+    ['input', inputNamespace(scope.input)],
     fn('layer', (ref) => {
       if (typeof ref !== 'string' && typeof ref !== 'number') {
         throw new ExpressionError('layer() takes a layer name, id or index');

@@ -180,3 +180,8 @@ export function flattenComps(doc: MotionDoc): MotionDoc {
   }
   return { ...doc, tracks: expand(doc, doc.tracks, 0) };
 }
+
+export function hostIdsOf(clipId: string): string[] {
+  const parts = clipId.split(SEPARATOR);
+  return Array.from({ length: Math.floor((parts.length - 1) / 2) }, (_, i) => parts.slice(0, 2 * i + 1).join(SEPARATOR));
+}

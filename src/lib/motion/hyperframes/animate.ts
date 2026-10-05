@@ -40,6 +40,17 @@ const CHANNELS: Record<Exclude<TransformKey, 'anchorX' | 'anchorY'>, Channel> = 
   blur: { wrapper: Wrapper.Transform, prop: 'filter', out: (v) => `blur(${px(v)})` }
 };
 
+export function isLiveKey(key: string): boolean {
+  return key in CHANNELS;
+}
+
+export type LiveWrite = { target: string; vars: TweenVars };
+
+export function liveWrite(clip: MotionClip, key: string, value: number, frame: Frame, parents: Parents): LiveWrite {
+  const channel = CHANNELS[key as keyof typeof CHANNELS];
+  return { target: target(channel.wrapper, clip, key, parents), vars: { [channel.prop]: channel.out(value, frame) } };
+}
+
 export const ANIMATE_CSS = '.kp{position:absolute;inset:0}.kf,.ks{position:absolute;inset:0;transform-style:preserve-3d;backface-visibility:visible;will-change:transform,opacity,filter}';
 
 type TweenVars = Record<string, unknown>;

@@ -6,6 +6,9 @@ import { ValueKind, animProp, baseValue, sampleTrack, type AnimProp, type Keyfra
 import { ExpressionError, compileExpression, runExpression, type LayerHandle, type Program } from './language';
 import type { AudioAnalysis } from '../audio-analysis';
 import { audioPort } from './audio-port';
+import { fallbackPort, type InputPort } from './inputs';
+
+export type InputSource = (clipId: string, key: string, frame: number) => InputPort;
 
 export type ExpressionFault = { clipId: string; key: string; error: string };
 
@@ -33,7 +36,8 @@ class Evaluator {
 
   constructor(
     private readonly doc: MotionDoc,
-    private readonly analyses: Record<string, AudioAnalysis> = {}
+    private readonly analyses: Record<string, AudioAnalysis> = {},
+    private readonly inputs: InputSource = (_id, _key, frame) => fallbackPort(frame / doc.fps)
   ) {
     this.order = clipsOf(doc);
     this.byId = new Map(this.order.map((c) => [c.id, c]));
@@ -70,7 +74,8 @@ class Evaluator {
         track: lane.track,
         thisLayer: this.handle(id, frame),
         layer: (ref) => this.handle(this.resolve(ref), frame),
-        audio: audioPort(this.doc, this.analyses, frame)
+        audio: audioPort(this.doc, this.analyses, frame),
+        input: this.inputs(id, key, frame)
       });
       const clamped = clamp(result, lane.range);
       this.memo.set(memoKey, clamped);
@@ -154,6 +159,10 @@ class Evaluator {
       source: camera.expressions[cameraKey],
       index: 0
     };
+  }
+
+  reset(): void {
+    this.memo.clear();
   }
 
   tolerance(id: string, key: string): number {
@@ -246,4 +255,10 @@ export function expressionErrors(doc: MotionDoc, analyses: Record<string, AudioA
 
 export function expressionValue(doc: MotionDoc, clipId: string, key: string, frame: number, analyses: Record<string, AudioAnalysis> = {}): number {
   return new Evaluator(doc, analyses).value(clipId, key, frame);
+}
+
+export type LiveEvaluator = Pick<Evaluator, 'value' | 'reset'>;
+
+export function liveEvaluator(doc: MotionDoc, analyses: Record<string, AudioAnalysis>, inputs: InputSource): LiveEvaluator {
+  return new Evaluator(doc, analyses, inputs);
 }

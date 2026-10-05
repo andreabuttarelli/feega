@@ -40,6 +40,11 @@ import { ParentOpacity } from '$lib/motion/parent';
 import { addNull, nullFromSelection, setParent, setParentOpacity } from '$lib/motion/parent-ops';
 import { setCameraExpression, setExpression } from '$lib/motion/expression/ops';
 import { EXPRESSION_GUIDE } from '$lib/motion/expression/guide';
+import { INTERACTIVE_PRESETS, PRESET, applyInteractivePreset, setInteractive } from '$lib/motion/interactive/presets';
+import { OUTSIDES, PLAY_MODES, interactiveOf } from '$lib/motion/interactive/settings';
+import { liveLanes } from '$lib/motion/interactive/live';
+import { embedSnippet } from '$lib/motion/interactive/bundle';
+import { flattenComps } from '$lib/motion/precomp';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
 import { BuiltinFont, FONT_WEIGHTS, searchFonts } from '$lib/motion/fonts/model';
 import { registerFont, removeFont, setFont } from '$lib/motion/fonts/ops';
@@ -166,6 +171,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
     fonts: doc.fonts,
     markers: (doc.markers ?? []).map((m) => ({ label: m.label, time: secs(m.frame) })),
     workArea: doc.workArea ? { start: secs(doc.workArea.from), end: secs(doc.workArea.to) } : null,
+    interactive: interactiveOf(doc),
     camera: cameraSummary(doc.camera),
     look: lookSummary(doc.look),
     components: Object.entries(doc.components).map(([name, c]) => customSummary(name, c)),
@@ -884,6 +890,27 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
           return apply(setCameraExpression(session.doc, input.prop as (typeof CAMERA_KEYS)[number], input.expression), `camera ${input.prop} expression`);
         }
         return apply(setExpression(session.doc, input.clip_id ?? '', input.prop, input.expression), `${input.prop} expression on ${input.clip_id}`);
+      }
+    }),
+
+    apply_interactive_preset: tool({
+      description: `Make the interactive web export react: ${INTERACTIVE_PRESETS.map((p) => `${p} — ${PRESET[p].about}`).join('; ')}. Clip presets write expressions (edit them with set_expression); videos keep the default pose.`,
+      inputSchema: z.object({ preset: z.enum(INTERACTIVE_PRESETS), clip_id: z.string().optional() }),
+      execute: async (input) => apply(applyInteractivePreset(session.doc, input.preset, input.clip_id ?? null), `${input.preset} interactive preset`)
+    }),
+
+    set_interactive: tool({
+      description: `How the interactive web export plays: playback ${PLAY_MODES.join('|')} (in-view plays while on screen, scrub ties the playhead to the host page scroll), loop, and outside ${OUTSIDES.join('|')}: what a precomp reads when the cursor leaves its box (fallback = default pose, hold = last value).`,
+      inputSchema: z.object({ playback: z.enum(PLAY_MODES).optional(), loop: z.boolean().optional(), outside: z.enum(OUTSIDES).optional() }),
+      execute: async (input) => apply(setInteractive(session.doc, Object.fromEntries(Object.entries(input).filter(([, v]) => v !== undefined))), 'changed interactive playback')
+    }),
+
+    export_interactive: tool({
+      description: 'Check the interactive web export: lists the clip properties that react to live input, the playback settings and the embed snippet. The self-contained HTML file is downloaded by the user from Export → Interactive (web).',
+      inputSchema: z.object({}),
+      execute: async () => {
+        const live = liveLanes(flattenComps(session.doc)).map((l) => ({ clip_id: l.id, prop: l.key }));
+        return { ok: true, live, settings: interactiveOf(session.doc), snippet: embedSnippet(session.doc), note: live.length ? 'Ready: Export → Interactive (web) downloads the file.' : 'Nothing reads input yet: apply_interactive_preset or set_expression with input.*.' };
       }
     }),
 
