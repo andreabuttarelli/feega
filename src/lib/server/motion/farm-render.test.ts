@@ -32,7 +32,8 @@ function fakeFarm() {
       return w;
     },
     attach: async (name) => workers.find((w) => w.name === name && !w.stopped) ?? null,
-    running: async () => []
+    running: async () => [],
+    usage: async () => null
   };
   return { farm, workers, specs };
 }
@@ -141,6 +142,14 @@ describe('a worker costs only while it works', () => {
     expect(specs[0].timeoutMs).toBeLessThanOrEqual(10 * 60_000);
     expect(specs[1].timeoutMs).toBeGreaterThan(specs[0].timeoutMs);
     expect(specs[1].timeoutMs).toBeLessThanOrEqual(20 * 60_000);
+  });
+
+  it('a 3D chunk lives as long as 3D frames take, not as long as flat ones: 450 Device3D frames take ~9 min', async () => {
+    const { farm, specs } = fakeFarm();
+
+    await launchPiece(farm, { ...job, totalFrames: 900, frameSeconds: 1.2 }, 1, { upload: 'u', storageHost: STORAGE, maxBytes: 1000 });
+
+    expect(specs[0].timeoutMs).toBeGreaterThan(450 * 1.2 * 1000 * 1.5);
   });
 
   it('the first worker lives long enough to wait for the others and assemble', async () => {

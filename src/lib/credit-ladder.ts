@@ -34,6 +34,9 @@ export const CREDITS_PER_USD_SUBSCRIPTION_LIST = 100 * (1 + AI_MARKUP); // 200
 // strategia, chat) oltre alla produzione dei post.
 export const CREDITS_PER_USD_GRANT = 100;
 
+export const MULTIPLIER_FLOOR = 4;
+export const CHAT_MULTIPLIER = 4;
+
 export const PLAN_CURRENCY = 'eur';
 
 export type CreditRung = {
@@ -62,8 +65,8 @@ export const rungForLookupKey = (lookupKey: string | null | undefined): CreditRu
  * markup deve valere solo per le chiamate future, mai riscrivere silenziosamente lo storico di un
  * cliente sotto di lui.
  */
-export function billedCreditsFor(costUsd: number): number {
-  return Math.round(costUsd * CREDITS_PER_USD_SUBSCRIPTION_LIST);
+export function billedCreditsFor(costUsd: number, multiplier = 1 + AI_MARKUP): number {
+  return Math.round(costUsd * multiplier * CREDITS_PER_USD_GRANT);
 }
 
 /**

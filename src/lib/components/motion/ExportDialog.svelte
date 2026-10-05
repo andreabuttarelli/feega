@@ -13,7 +13,7 @@
   import { unverified } from '$lib/motion/custom/determinism';
   import { CheckState } from '$lib/motion/custom/component';
   import { deserialize } from '$app/forms';
-  import { renderQuote } from '$lib/motion/render-quote';
+  import { HOLD_BUFFER, renderQuote } from '$lib/motion/render-quote';
   import { EXPORT_FORMATS, FORMAT, PRESETS, Preset, Quality, estimateBytes, exportProblem, settingsOf, type RenderSettings } from '$lib/motion/export-formats';
   import { FRAME_RATES } from '$lib/motion/design';
   import { setFrameRate } from '$lib/motion/frame-rate';
@@ -286,7 +286,7 @@
         {#if spec.alpha && doc.background !== Background.Transparent}<br /><span class="muted">Keeps alpha only where nothing is painted: set the background to Transparent for a see-through file.</span>{/if}
       </dd>
       <dt>Cost</dt>
-      <dd data-testid="export-quote">{quote.credits} credits, charged only when the video is ready.</dd>
+      <dd data-testid="export-quote">About {quote.credits} credits. {Math.ceil(quote.credits * HOLD_BUFFER)} are held while it renders; you pay the time it really takes, never more than held, nothing if it fails.</dd>
     </dl>
 
     {#if job && jobRunning}
@@ -310,7 +310,7 @@
         </p>
       {:else}
         {#if problem}<p class="warn" role="alert" data-testid="export-problem">{problem}</p>{/if}
-        <button type="button" class="primary" onclick={startServer} disabled={!server.saved || problem !== null} data-testid="export-start-server">{server.saved ? `Render · ${quote.credits} credits` : 'Saving your changes…'}</button>
+        <button type="button" class="primary" onclick={startServer} disabled={!server.saved || problem !== null} data-testid="export-start-server">{server.saved ? `Render · ~${quote.credits} credits` : 'Saving your changes…'}</button>
       {/if}
     {/if}
   {:else if phase === Phase.Checking}

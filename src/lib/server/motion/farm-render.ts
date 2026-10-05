@@ -5,7 +5,7 @@ import { ExportFormat, FORMAT, Master, Quality } from '$lib/motion/export-format
 import { assembleArgs, audioMixArgs, concatList, zipArgs } from './render-commands';
 import { FARM_JOB_DIR, FARM_RUNTIME_DIR, type FarmWorker, type RenderFarm } from './render-farm';
 
-export type FarmJob = { html: string; width: number; height: number; fps: number; totalFrames: number; audio: AudioEntry[]; allowHosts: string[]; format: ExportFormat; quality: Quality; motionBlur: Shutter | null };
+export type FarmJob = { html: string; width: number; height: number; fps: number; totalFrames: number; audio: AudioEntry[]; allowHosts: string[]; format: ExportFormat; quality: Quality; motionBlur: Shutter | null; frameSeconds?: number };
 
 export type Shutter = { shutterAngle: number; shutterPhase: number; samples: number };
 
@@ -45,7 +45,7 @@ const WORKER: Record<RenderRoute, { vcpus: number; timeoutMs: number }> = {
   [RenderRoute.Whole]: { vcpus: 8, timeoutMs: 120 * MINUTE_MS }
 };
 
-const LIFETIME = { bootMs: 2 * MINUTE_MS, msPerFullHdFrame: 500, assemblyMs: 5 * MINUTE_MS };
+const LIFETIME = { bootMs: 2 * MINUTE_MS, msPerFullHdFrame: 500, assemblyMs: 5 * MINUTE_MS, safety: 2 };
 
 export const MAX_ATTEMPTS = 2;
 export const RENDER_DEADLINE_MS = (MAX_ATTEMPTS + 1) * WORKER[RenderRoute.Whole].timeoutMs;
@@ -133,7 +133,9 @@ export function farmProblem(job: FarmJob): string | null {
 function lifetimeMs(job: FarmJob, index: number): number {
   const route = routeOf(job);
   const frames = farmChunks(job).size * (job.motionBlur?.samples ?? 1);
-  const work = LIFETIME.bootMs + (frames * job.width * job.height * LIFETIME.msPerFullHdFrame) / FULL_HD_PIXELS;
+  const flatMs = (job.width * job.height * LIFETIME.msPerFullHdFrame) / FULL_HD_PIXELS;
+  const frameMs = Math.max(flatMs, (job.frameSeconds ?? 0) * 1000 * LIFETIME.safety);
+  const work = LIFETIME.bootMs + frames * frameMs;
   const head = index === 0 ? LIFETIME.assemblyMs : 0;
   return Math.round(Math.min(WORKER[route].timeoutMs, work + head));
 }

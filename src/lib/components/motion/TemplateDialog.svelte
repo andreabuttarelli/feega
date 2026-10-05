@@ -214,7 +214,7 @@
           <dt>Preview</dt>
           <dd><input type="number" min="1" max={rows.length} bind:value={previewRow} /> <button type="button" onclick={preview} data-testid="batch-preview">Preview row</button> <button type="button" onclick={() => onpreview(null)}>Template</button></dd>
           <dt>Cost</dt>
-          <dd data-testid="batch-quote">{rows.length} videos × {perVideo} = {rows.length * perVideo} credits, charged per video when it is ready.</dd>
+          <dd data-testid="batch-quote">{rows.length} videos × ~{perVideo} = about {rows.length * perVideo} credits, each paid by the time it really takes when it is ready.</dd>
         </dl>
         {#if rows.length > MAX_BATCH_ROWS}<p class="warn">At most {MAX_BATCH_ROWS} rows per batch.</p>{/if}
         <button type="button" class="primary" onclick={render} disabled={!saved || running || !rows.length || rows.length > MAX_BATCH_ROWS} data-testid="batch-render">{saved ? `Render ${rows.length} videos · ${rows.length * perVideo} credits` : 'Saving your changes…'}</button>

@@ -14,12 +14,14 @@ const runs = vi.hoisted(() => ({
 const saveExport = vi.hoisted(() => vi.fn());
 const logAiCall = vi.hoisted(() => vi.fn());
 const sendPushToUser = vi.hoisted(() => vi.fn());
+const hold = vi.hoisted(() => ({ holdCredits: vi.fn(), releaseCredits: vi.fn() }));
 const farmCalls = vi.hoisted(() => ({ launchPiece: vi.fn(), launchAssembly: vi.fn(), checkTask: vi.fn(), stopWorker: vi.fn() }));
 
 vi.mock('$lib/server/repos/node-runs', () => ({ ...runs, RENDER_JOB_PREFIX: 'motion-render:' }));
 vi.mock('./export', () => ({ saveExport }));
 vi.mock('$lib/server/ai-log', () => ({ logAiCall }));
 vi.mock('$lib/server/web-push', () => ({ sendPushToUser }));
+vi.mock('$lib/server/credit-hold', () => hold);
 vi.mock('./farm-render', async (original) => ({ ...(await original<typeof import('./farm-render')>()), ...farmCalls }));
 
 import { BATCH_CONCURRENCY, batchView, cancelRender, farmJob, reconcileRenders, RenderRefusal, renderRequest, renderView, startBatch, startRender, type RenderRequest } from './render-run';
@@ -27,14 +29,14 @@ import { TaskState } from './farm-render';
 import { FEEGA_TOKENS } from '$lib/motion/brand';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { RenderStage } from '$lib/motion/server-render';
-import { Resolution, renderQuote } from '$lib/motion/render-quote';
+import { HOLD_BUFFER, Resolution, renderQuote, sandboxCostUsd } from '$lib/motion/render-quote';
 import { addClip } from '$lib/motion/timeline';
 import { writeComponent } from '$lib/motion/custom/ops';
 import type { NodeRun } from '$lib/server/repos/node-runs';
 import { ExportFormat, Preset, settingsOf } from '$lib/motion/export-formats';
-import { CREDITS_PER_USD_SUBSCRIPTION_LIST } from '$lib/credit-ladder';
 
-const farm = { open: vi.fn(), attach: vi.fn(), running: vi.fn() };
+const farm = { open: vi.fn(), attach: vi.fn(), running: vi.fn(), usage: vi.fn() };
+const MINUTE_OF_8GB = { cpuMs: 30_000, memoryMb: 8192, wallMs: 60_000 };
 const scope = { orgId: 'org', projectId: 'prj', nodeId: 'node', userId: 'u', editorUrl: '/p/prj/c/c/motion/node' };
 const longScope = { ...scope, plan: 'pro' };
 const SEVEN_CHUNKS = 7 * 450;
@@ -87,6 +89,9 @@ beforeEach(() => {
   runs.listNodeRuns.mockResolvedValue([]);
   runs.activeRenderRuns.mockResolvedValue([]);
   farm.running.mockResolvedValue([]);
+  farm.usage.mockResolvedValue(MINUTE_OF_8GB);
+  hold.holdCredits.mockResolvedValue(true);
+  hold.releaseCredits.mockResolvedValue(undefined);
   runs.createRun.mockImplementation(async (_db, input) => runOf(input.params));
   runs.claimRun.mockImplementation(async (_db, input) => ({ ...runOf({}), id: input.runId }));
   saveExport.mockResolvedValue({ ok: true, assetId: 'asset-9' });
@@ -235,7 +240,7 @@ describe('reconcileRenders', () => {
 
     expect(saveExport).toHaveBeenCalledWith(db, expect.objectContaining({ path: 'org/prj/motion/node/run-1.mp4', width: 1920, height: 1080, seconds: SEVEN_CHUNKS / 30, nodeId: 'node', format: ExportFormat.Mp4H264 }));
     expect(logAiCall).toHaveBeenCalledTimes(1);
-    expect(logAiCall.mock.calls[0][0]).toMatchObject({ label: 'motion_render', ok: true, flatCostUsd: (run.params.quote as { credits: number }).credits / CREDITS_PER_USD_SUBSCRIPTION_LIST, orgId: 'org', actorId: 'u' });
+    expect(logAiCall.mock.calls[0][0]).toMatchObject({ label: 'motion_render', ok: true, orgId: 'org', actorId: 'u' });
     expect(runs.completeRun).toHaveBeenCalledWith(db, expect.objectContaining({ runId: 'run-1', assetId: 'asset-9' }));
     expect(lastParams().progress.stage).toBe(RenderStage.Done);
     expect(sendPushToUser).toHaveBeenCalledWith(db, 'u', expect.objectContaining({ url: scope.editorUrl }));
@@ -280,6 +285,79 @@ describe('reconcileRenders', () => {
     await reconcileRenders(db, farm, storage);
 
     expect(farmCalls.checkTask).not.toHaveBeenCalled();
+  });
+});
+
+describe('a render is paid by the sandbox time it really used', () => {
+  const heldFor = (run: NodeRun) => Math.ceil((run.params.quote as { credits: number }).credits * HOLD_BUFFER);
+
+  it('starting holds the quote plus a buffer, and refuses when the balance cannot cover it', async () => {
+    const run = await started();
+    expect(hold.holdCredits).toHaveBeenCalledWith('org', heldFor(run), expect.any(String));
+
+    hold.holdCredits.mockResolvedValue(false);
+    const { db } = fakeDb();
+    const refused = await startRender(db, farm, longScope, request(sevenChunks()), storage);
+
+    expect(refused).toMatchObject({ ok: false, error: RenderRefusal.NoCredits });
+    expect(farmCalls.launchPiece).toHaveBeenCalledTimes(7);
+  });
+
+  it('a finished render stops every worker before measuring, charges the measured cost, and releases the hold', async () => {
+    let run = await started();
+    runs.queuedRenderRuns.mockImplementation(async () => [run]);
+    farmCalls.checkTask.mockResolvedValue(done);
+    const order: string[] = [];
+    farmCalls.stopWorker.mockImplementation(async () => order.push('stop'));
+    farm.usage.mockImplementation(async () => (order.push('usage'), MINUTE_OF_8GB));
+    const { db } = fakeDb(request(sevenChunks()).job);
+    await reconcileRenders(db, farm, storage);
+    run = runOf(lastParams());
+
+    await reconcileRenders(db, farm, storage);
+
+    const cost = sandboxCostUsd(Array(7).fill(MINUTE_OF_8GB));
+    expect(order.indexOf('usage')).toBeGreaterThan(order.lastIndexOf('stop'));
+    expect(logAiCall.mock.calls[0][0]).toMatchObject({ flatCostUsd: cost, creditCap: heldFor(run) });
+    expect(hold.releaseCredits).toHaveBeenCalledWith('org', heldFor(run), expect.any(String));
+    expect(runs.completeRun).toHaveBeenCalledWith(db, expect.objectContaining({ costUsd: cost }));
+  });
+
+  it('a worker replaced by a retry is paid too: it ran', async () => {
+    let run = await started();
+    runs.queuedRenderRuns.mockImplementation(async () => [run]);
+    farmCalls.checkTask.mockImplementation(async (_f, name: string) => (name === 'box-3' ? { state: TaskState.Failed, error: 'chrome crashed' } : done));
+    const { db } = fakeDb(request(sevenChunks()).job);
+    await reconcileRenders(db, farm, storage);
+    run = runOf(lastParams());
+    farmCalls.checkTask.mockResolvedValue(done);
+    await reconcileRenders(db, farm, storage);
+    run = runOf(lastParams());
+
+    await reconcileRenders(db, farm, storage);
+
+    expect(farm.usage.mock.calls.map((c) => c[0])).toContain('box-3');
+    expect(farm.usage).toHaveBeenCalledTimes(8);
+  });
+
+  it.each([
+    ['our failure', 'chunk 3 failed: chrome crashed'],
+    ['a cancel', 'cancelled']
+  ])('%s charges nothing and gives the hold back', async (_, error) => {
+    let run = await started();
+    runs.queuedRenderRuns.mockImplementation(async () => [run]);
+    const { db } = fakeDb(request(sevenChunks()).job);
+    if (error === 'cancelled') {
+      runs.listNodeRuns.mockResolvedValue([run]);
+      await cancelRender(db, farm, scope);
+    } else {
+      run = { ...run, params: { ...run.params, farm: { ...(run.params.farm as object), pieces: (run.params.farm as { pieces: object[] }).pieces.map((p) => ({ ...p, attempt: 2 })) } } };
+      farmCalls.checkTask.mockResolvedValue({ state: TaskState.Failed, error });
+      await reconcileRenders(db, farm, storage);
+    }
+
+    expect(logAiCall).not.toHaveBeenCalled();
+    expect(hold.releaseCredits).toHaveBeenCalledWith('org', heldFor(run), expect.any(String));
   });
 });
 

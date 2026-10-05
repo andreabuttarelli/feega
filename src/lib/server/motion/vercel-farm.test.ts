@@ -173,3 +173,18 @@ describe('the farm knows its own workers', () => {
     expect(running).toEqual([{ name: `${workerPrefix('production')}a`, createdAt: 5 }]);
   });
 });
+
+describe('what a worker cost', () => {
+  it('reads CPU, memory and the time from start to stop, after the worker stopped', async () => {
+    sdk.get.mockResolvedValue({ ...fakeSandbox('stopped'), activeCpuUsageMs: 35_000, memory: 8192, createdAt: new Date(1_000), statusUpdatedAt: new Date(17_000) });
+
+    expect(await vercelFarm({}).usage('box-1')).toEqual({ cpuMs: 35_000, memoryMb: 8192, wallMs: 16_000 });
+  });
+
+  it('an unknown worker cost nothing we can read', async () => {
+    sdk.get.mockRejectedValue(new Error('not found'));
+
+    expect(await vercelFarm({}).usage('gone')).toBeNull();
+  });
+});
+

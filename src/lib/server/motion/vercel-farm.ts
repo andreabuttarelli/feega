@@ -1,6 +1,6 @@
 import { Sandbox } from '@vercel/sandbox';
 import { HYPERFRAMES_VERSION } from '$lib/motion/hyperframes/compose';
-import { FARM_RUNTIME_DIR, type FarmWorker, type LiveWorker, type RenderFarm, type WorkerSpec } from './render-farm';
+import { FARM_RUNTIME_DIR, type FarmWorker, type LiveWorker, type RenderFarm, type WorkerUsage, type WorkerSpec } from './render-farm';
 
 export type FarmAccess = { token?: string; teamId?: string; projectId?: string };
 
@@ -96,6 +96,14 @@ export function vercelFarm(access: FarmAccess, deployment = 'local'): RenderFarm
     running: async (): Promise<LiveWorker[]> => {
       const listed = await (await Sandbox.list({ ...access, namePrefix: prefix })).toArray();
       return listed.filter((s) => s.status === RUNNING).map((s) => ({ name: s.name, createdAt: s.createdAt }));
+    },
+    usage: async (name: string): Promise<WorkerUsage | null> => {
+      const sandbox = await Sandbox.get({ ...access, name }).catch(() => null);
+      if (!sandbox) {
+        return null;
+      }
+      const end = sandbox.status === RUNNING ? Date.now() : (sandbox.statusUpdatedAt?.getTime() ?? Date.now());
+      return { cpuMs: sandbox.activeCpuUsageMs ?? 0, memoryMb: sandbox.memory ?? 0, wallMs: end - sandbox.createdAt.getTime() };
     }
   };
 }

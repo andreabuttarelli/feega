@@ -4,14 +4,14 @@ import { CANVAS_ASSET_BUCKET } from '$lib/server/repos/asset-storage';
 import { logAiCall } from '$lib/server/ai-log';
 import { sendPushToUser } from '$lib/server/web-push';
 import { formatOf, type MotionDoc } from '$lib/motion/doc';
-import { renderQuote, type RenderQuote } from '$lib/motion/render-quote';
+import { creditsOfCost, frameWallSeconds, HOLD_BUFFER, RENDER_CALL_LABEL, renderQuote, sandboxCostUsd, type RenderQuote } from '$lib/motion/render-quote';
 import { advance, startProgress, progressOf, type RenderEvent, type RenderProgress, type RenderView } from '$lib/motion/server-render';
 import { unverified } from '$lib/motion/custom/determinism';
 import { exportFolder, exportPath, outputSize } from '$lib/motion/export-plan';
 import { composeHtml, HYPERFRAMES_VERSION, type ComposeInput } from '$lib/motion/hyperframes/compose';
 import { assetOrigins } from '$lib/motion/hyperframes/csp';
 import { audioPlan } from '$lib/motion/audio-plan';
-import { CREDITS_PER_USD_SUBSCRIPTION_LIST } from '$lib/credit-ladder';
+import { holdCredits, releaseCredits } from '$lib/server/credit-hold';
 import { checkTask, FarmTask, farmChunks, farmProblem, launchAssembly, launchPiece, MAX_ATTEMPTS, pieceFile, stopWorker, TaskState, type FarmJob, type TaskCheck } from './farm-render';
 import { FORMAT, exportProblem, type ExportFormat, type RenderSettings } from '$lib/motion/export-formats';
 import { setFrameRate } from '$lib/motion/frame-rate';
@@ -24,7 +24,8 @@ export enum RenderRefusal {
   Unverified = 'components_unverified',
   Busy = 'render_in_progress',
   Unsupported = 'render_unsupported',
-  Unavailable = 'render_unavailable'
+  Unavailable = 'render_unavailable',
+  NoCredits = 'credits_exhausted'
 }
 
 export type RenderScope = { orgId: string; projectId: string; nodeId: string; userId: string; editorUrl: string; plan?: string | null };
@@ -37,11 +38,12 @@ export type BatchCell = { row: number; name: string; runId: string; status: Node
 export type BatchView = { id: string; credits: number; rows: BatchCell[] };
 export type ReconcileOutcome = { checked: number; done: number; failed: number; pending: number; reaped: number };
 
-type Piece = { worker: string; attempt: number; state: TaskState };
+type Piece = { worker: string; attempt: number; state: TaskState; spent?: string[] };
+type Billing = { held: number };
 type Output = { width: number; height: number; seconds: number; format: ExportFormat };
 type FarmProgress = { pieces: Piece[]; assembly: { attempt: number } | null };
 type BatchTag = { id: string; row: number; name: string; rows: number };
-type RenderState = { scope: RenderScope; output: Output; quote: RenderQuote; farm: FarmProgress; progress: RenderProgress; batch?: BatchTag };
+type RenderState = { scope: RenderScope; output: Output; quote: RenderQuote; farm: FarmProgress; progress: RenderProgress; batch?: BatchTag; billing?: Billing };
 
 enum Step {
   Pending = 'pending',
@@ -72,6 +74,7 @@ export function farmJob(input: ComposeInput, settings: RenderSettings): FarmJob 
     allowHosts: reachable.map((origin) => new URL(origin).host),
     format: settings.format,
     quality: settings.quality,
+    frameSeconds: frameWallSeconds(doc, settings.resolution),
     motionBlur: doc.motionBlur.enabled ? { shutterAngle: doc.motionBlur.shutterAngle, shutterPhase: doc.motionBlur.shutterPhase, samples: doc.motionBlur.samples } : null
   };
 }
@@ -152,8 +155,16 @@ async function cleanUp(db: Db, farm: RenderFarm, run: NodeRun, state: RenderStat
   await db.storage.from(CANVAS_ASSET_BUCKET).remove([workPath(state.scope, run.id, JOB_FILE), ...pieces]).catch(() => {});
 }
 
+const heldOf = (quote: RenderQuote) => Math.ceil(quote.credits * HOLD_BUFFER);
+const holdNote = (what: string) => `motion render hold ${what}`;
+
+async function release(run: NodeRun, state: RenderState): Promise<void> {
+  await releaseCredits(run.orgId, state.billing?.held ?? 0, holdNote(run.id)).catch((e) => console.error('[motion render] hold not released', run.id, e));
+}
+
 async function fail(db: Db, farm: RenderFarm, run: NodeRun, state: RenderState, error: string, job: FarmJob | null): Promise<Step> {
   await failRun(db, { orgId: run.orgId, runId: run.id, error });
+  await release(run, state);
   await saveState(db, run, state, { kind: 'failed' });
   await cleanUp(db, farm, run, state, job);
   return Step.Failed;
@@ -177,6 +188,7 @@ function refusal(farm: RenderFarm | null, runs: NodeRun[], plan: string | null, 
 
 async function enqueue(db: Db, scope: RenderScope, req: RenderRequest, extra: Record<string, unknown> = {}): Promise<NodeRun> {
   const quote = renderQuote(req.doc, req.settings.resolution);
+  const billing: Billing = { held: heldOf(quote) };
   const count = farmChunks(req.job).count;
   const output: Output = { width: req.job.width, height: req.job.height, seconds: req.doc.durationInFrames / req.doc.fps, format: req.settings.format };
   const run = await createRun(db, {
@@ -184,7 +196,7 @@ async function enqueue(db: Db, scope: RenderScope, req: RenderRequest, extra: Re
     nodeId: scope.nodeId,
     prompt: `render v${req.version}`,
     model: RENDER_MODEL,
-    params: { revision: req.version, format: formatOf(req.doc), settings: req.settings, quote, scope, output, farm: { pieces: [], assembly: null }, progress: startProgress(req.doc.durationInFrames, count), ...extra },
+    params: { revision: req.version, format: formatOf(req.doc), settings: req.settings, quote, scope, output, farm: { pieces: [], assembly: null }, progress: startProgress(req.doc.durationInFrames, count), billing, ...extra },
     actorKind: 'user',
     actorId: scope.userId,
     externalJobId: `${RENDER_JOB_PREFIX}${req.version}`
@@ -217,6 +229,9 @@ export async function startRender(db: Db, farm: RenderFarm | null, scope: Render
     return { ok: false, ...(refused ?? { error: RenderRefusal.NotConfigured }) };
   }
 
+  if (!(await holdCredits(scope.orgId, heldOf(renderQuote(req.doc, req.settings.resolution)), holdNote(scope.nodeId)))) {
+    return { ok: false, error: RenderRefusal.NoCredits };
+  }
   const run = await enqueue(db, scope, req);
   const detail = await launch(db, farm, storage, run, req.job);
   if (detail) {
@@ -235,6 +250,11 @@ export async function startBatch(db: Db, farm: RenderFarm | null, scope: RenderS
   }
   if (!farm) {
     return { ok: false, error: RenderRefusal.NotConfigured };
+  }
+
+  const held = rows.reduce((sum, row) => sum + heldOf(renderQuote(row.req.doc, row.req.settings.resolution)), 0);
+  if (!(await holdCredits(scope.orgId, held, holdNote(scope.nodeId)))) {
+    return { ok: false, error: RenderRefusal.NoCredits };
   }
 
   const id = crypto.randomUUID();
@@ -280,7 +300,7 @@ async function retryPiece(db: Db, farm: RenderFarm, storage: RenderStorage, run:
   const attempt = piece.attempt + 1;
   try {
     const worker = await launchPiece(farm, job, index, await pieceLinks(db, storage, stateOf(run).scope, run.id, job, index));
-    return { worker, attempt, state: TaskState.Running };
+    return { worker, attempt, state: TaskState.Running, spent: [...(piece.spent ?? []), piece.worker] };
   } catch {
     return { ...piece, attempt, state: TaskState.Failed };
   }
@@ -327,9 +347,18 @@ async function advancePieces(db: Db, farm: RenderFarm, storage: RenderStorage, r
   return Step.Pending;
 }
 
-function charge(scope: RenderScope, quote: RenderQuote, ms: number): number {
-  const usd = quote.credits / CREDITS_PER_USD_SUBSCRIPTION_LIST;
-  logAiCall({ label: 'motion_render', provider: 'vercel-sandbox', model: RENDER_MODEL, flatCostUsd: usd, ms, ok: true, orgId: scope.orgId, projectId: scope.projectId, userId: scope.userId, actorKind: 'user', actorId: scope.userId });
+const workersOf = (state: RenderState) => state.farm.pieces.flatMap((p) => [p.worker, ...(p.spent ?? [])]);
+
+async function charge(farm: RenderFarm, run: NodeRun, state: RenderState): Promise<number> {
+  const { scope } = state;
+  const usages = await Promise.all(workersOf(state).map((name) => farm.usage(name).catch(() => null)));
+  const usd = sandboxCostUsd(usages.filter((u) => u !== null));
+  await release(run, state);
+  if (creditsOfCost(usd) > (state.billing?.held ?? Infinity)) {
+    console.warn('[motion render] measured cost over the hold, charged the hold', { runId: run.id, usd, held: state.billing?.held });
+  }
+  const ms = Date.now() - new Date(run.startedAt).getTime();
+  logAiCall({ label: RENDER_CALL_LABEL, provider: 'vercel-sandbox', model: RENDER_MODEL, flatCostUsd: usd, creditCap: state.billing?.held, ms, ok: true, orgId: scope.orgId, projectId: scope.projectId, userId: scope.userId, actorKind: 'user', actorId: scope.userId });
   return usd;
 }
 
@@ -341,10 +370,10 @@ async function finish(db: Db, farm: RenderFarm, run: NodeRun, state: RenderState
     return fail(db, farm, run, saving, saved.error, job);
   }
 
-  const costUsd = charge(scope, state.quote, Date.now() - new Date(run.startedAt).getTime());
+  await cleanUp(db, farm, run, saving, job);
+  const costUsd = await charge(farm, run, saving);
   await completeRun(db, { orgId: run.orgId, runId: run.id, assetId: saved.assetId, costUsd });
   await saveState(db, run, saving, { kind: 'done' });
-  await cleanUp(db, farm, run, saving, job);
   await sendPushToUser(db as never, scope.userId, { title: 'feega', body: 'Your video is ready', url: scope.editorUrl, tag: `motion-render-${run.id}`, skipIfFocused: true }).catch(() => {});
   return Step.Done;
 }

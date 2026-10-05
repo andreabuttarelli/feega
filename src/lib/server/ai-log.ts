@@ -3,7 +3,8 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { gatewayRate } from '$lib/server/openrouter-models';
 import { createAdminClient } from '$lib/server/supabase-admin';
 import { GEMINI_FLASH, geminiFlash, isGeminiFlashId, NANO_BANANA_PRO, isNanoBananaProId, geminiVisualCreditShare } from '$lib/server/google-models';
-import { billedCreditsFor } from '$lib/credit-ladder';
+import { AI_MARKUP, billedCreditsFor, CHAT_MULTIPLIER } from '$lib/credit-ladder';
+import { RENDER_CALL_LABEL, RENDER_MULTIPLIER } from '$lib/motion/render-quote';
 import type { Database } from '$lib/database.types';
 
 type AiCallInsert = Database['public']['Tables']['ai_calls']['Insert'];
@@ -233,6 +234,7 @@ export type AiCallLog = {
   model?: string;
   // Flat per-request price for non-token providers; when set it wins over the token rates.
   flatCostUsd?: number;
+  creditCap?: number;
   // Provider-reported credits, observability only — brand billing still sums cost_usd.
   providerCredits?: number;
   prompt?: string; // hashed + measured, never stored
@@ -404,6 +406,18 @@ export function promptHash(prompt: string | undefined): string | null {
  */
 const HOUSE_PAID_LABEL_PREFIXES: readonly string[] = ['moderation.'];
 
+type MultiplierRule = { applies: (entry: AiCallLog) => boolean; multiplier: number };
+
+const MULTIPLIERS: MultiplierRule[] = [
+  { applies: (e) => e.label === RENDER_CALL_LABEL, multiplier: RENDER_MULTIPLIER },
+  { applies: (e) => e.provider === 'llm' && e.actorKind === 'agent' && Boolean(e.threadId), multiplier: CHAT_MULTIPLIER }
+];
+
+function creditsOf(entry: AiCallLog, costUsd: number): number {
+  const multiplier = MULTIPLIERS.find((rule) => rule.applies(entry))?.multiplier ?? 1 + AI_MARKUP;
+  return Math.min(entry.creditCap ?? Infinity, billedCreditsFor(costUsd, multiplier));
+}
+
 function billedToUser(entry: AiCallLog): boolean {
   return !HOUSE_PAID_LABEL_PREFIXES.some((prefix) => entry.label.startsWith(prefix));
 }
@@ -481,7 +495,7 @@ export function logAiCall(entry: AiCallLog): void {
         await ensureGatewayModels();
       }
       const costUsd = computeCostUsd(entry, plan);
-      const billedCredits = billedToUser(entry) && costUsd != null && costUsd > 0 ? billedCreditsFor(costUsd) : null;
+      const billedCredits = billedToUser(entry) && costUsd != null && costUsd > 0 ? creditsOf(entry, costUsd) : null;
       const row: AiCallInsert = {
         org_id: orgId,
         brand_id: brandId,
