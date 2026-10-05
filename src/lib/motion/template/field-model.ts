@@ -5,12 +5,14 @@ export enum FieldType {
   Number = 'number',
   Color = 'color',
   Asset = 'asset',
-  Boolean = 'boolean'
+  Boolean = 'boolean',
+  Select = 'select'
 }
 
 export const FIELD_TYPES = Object.values(FieldType) as [FieldType, ...FieldType[]];
 export const FIELD_KEY = /^[a-z][a-z0-9_]{0,39}$/;
 export const MAX_FIELDS = 50;
+export const MAX_OPTIONS = 20;
 
 export const fieldSchema = z.object({
   key: z.string().regex(FIELD_KEY, 'field keys are snake_case, e.g. headline'),
@@ -18,7 +20,12 @@ export const fieldSchema = z.object({
   type: z.enum(FIELD_TYPES),
   clipId: z.string().min(1),
   prop: z.string().min(1).max(60),
-  default: z.unknown()
+  default: z.unknown(),
+  min: z.number().optional(),
+  max: z.number().optional(),
+  unit: z.string().max(12).optional(),
+  options: z.array(z.string().min(1).max(60)).min(1).max(MAX_OPTIONS).optional(),
+  aspect: z.number().positive().max(10).optional()
 });
 
 export const fieldsSchema = z.array(fieldSchema).max(MAX_FIELDS).default([]);
