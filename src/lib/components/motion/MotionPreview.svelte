@@ -2,14 +2,13 @@
   import { onMount, type Snippet } from 'svelte';
   import { FPS } from '$lib/motion/design';
   import { CAPTURE_REPLY, FrameFormat, type CaptureReply, type ClipError } from '$lib/motion/hyperframes/capture';
-  import { previewDriver, type ShotRequest } from '$lib/motion/hyperframes/preview-driver';
+  import { Playback, previewDriver, type ShotRequest } from '$lib/motion/hyperframes/preview-driver';
 
   type Player = HTMLElement & { seek: (t: number) => void; play: () => void; pause: () => void; currentTime: number; iframeElement: HTMLIFrameElement };
 
   export type CapturedFrame = { time: number; data: string; layout: string; errors: ClipError[] };
   export type FrameSize = { width: number; height: number };
 
-  const RELOAD_DEBOUNCE_MS = 250;
   const CAPTURE_WIDTH = 640;
   const CAPTURE_QUALITY = 0.72;
 
@@ -27,7 +26,7 @@
   let player: Player | null = null;
   let reported = -1;
   let ready = false;
-  let pending: ReturnType<typeof setTimeout> | null = null;
+  let pending: number | null = null;
   let capturing = false;
 
   function setSource(next: string) {
@@ -53,6 +52,7 @@
       el.addEventListener('ready', () => {
         ready = true;
         el.seek(frame / fps);
+        driver.ready();
       });
       el.addEventListener('timeupdate', (e) => {
         if (!playing) {
@@ -79,6 +79,8 @@
   const driver = previewDriver({
     load: setSource,
     seek: (t) => player?.seek(t),
+    play: () => player?.play(),
+    pause: () => player?.pause(),
     post: (message) => {
       const target = player?.iframeElement?.contentWindow;
       if (!target) {
@@ -154,13 +156,13 @@
   $effect(() => {
     const next = html;
     if (pending) {
-      clearTimeout(pending);
+      cancelAnimationFrame(pending);
     }
-    pending = setTimeout(() => {
+    pending = requestAnimationFrame(() => {
       if (!capturing) {
-        driver.load(next);
+        driver.update(next);
       }
-    }, RELOAD_DEBOUNCE_MS);
+    });
   });
 
   $effect(() => {
@@ -173,14 +175,7 @@
   });
 
   $effect(() => {
-    if (!player || !ready) {
-      return;
-    }
-    if (playing) {
-      player.play();
-    } else {
-      player.pause();
-    }
+    driver.playback(playing ? Playback.Playing : Playback.Paused);
   });
 </script>
 

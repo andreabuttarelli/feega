@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { untrack } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { deserialize } from '$app/forms';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
@@ -19,6 +19,11 @@
   import Film from '@lucide/svelte/icons/film';
   import X from '@lucide/svelte/icons/x';
   import Crosshair from '@lucide/svelte/icons/crosshair';
+  import Keyboard from '@lucide/svelte/icons/keyboard';
+  import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
+  import BotMessageSquare from '@lucide/svelte/icons/bot-message-square';
+  import ShortcutHelp from '$lib/components/motion/ShortcutHelp.svelte';
+  import { DEFAULT_LAYOUT, Panel, flip, readLayout, timelineHeight, writeLayout, type EditorLayout, type LayoutStore } from '$lib/motion/editor-layout';
   import Layers from '@lucide/svelte/icons/layers';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import { addAdjustment, mergeView, pathNames, precompose, viewOf } from '$lib/motion/precomp';
@@ -44,7 +49,7 @@
   import MaskOverlay from '$lib/components/motion/MaskOverlay.svelte';
   import PenOverlay from '$lib/components/motion/PenOverlay.svelte';
   import MotionPathOverlay from '$lib/components/motion/MotionPathOverlay.svelte';
-  import { Align, addMarker, alignClips, allMarkers, distributeClips, loopFrame, nudgeClips, sequenceClips, setWorkArea, staggerClips } from '$lib/motion/organize';
+  import { Align, addMarker, alignClips, allMarkers, clipsTo, distributeClips, trimClipsAt, loopFrame, nudgeClips, sequenceClips, setWorkArea, staggerClips } from '$lib/motion/organize';
   import ExportDialog from '$lib/components/motion/ExportDialog.svelte';
   import TemplateDialog from '$lib/components/motion/TemplateDialog.svelte';
   import SoundDialog, { type Made, type SoundKind } from '$lib/components/motion/SoundDialog.svelte';
@@ -55,6 +60,7 @@
   import { setMotionBlur } from '$lib/motion/motion-blur-ops';
   import { Background, FORMATS, MOTION_FORMATS, MAX_SECONDS, findClip, formatOf, type MotionDoc, type MotionFormat } from '$lib/motion/doc';
   import {
+    ClipEdge,
     Direction,
     addClip,
     addTrack,
@@ -72,9 +78,9 @@
     type OpResult
   } from '$lib/motion/timeline';
   import { amend, canRedo, canUndo, previousSource, record, redo, startHistory, undo, type History } from '$lib/motion/history';
-  import { Snap, clampZoom, timecode } from '$lib/motion/timeline-view';
+  import { Reveal, Snap, clampZoom, timecode } from '$lib/motion/timeline-view';
   import { InspectorTab, parseDecimal, secondsLabel } from '$lib/motion/inspector';
-  import { Command, commandFor } from '$lib/motion/shortcuts';
+  import { Command, commandFor, isTyping } from '$lib/motion/shortcuts';
   import { composeHtml } from '$lib/motion/hyperframes/compose';
   import { feegaTrailer } from '$lib/motion/trailer';
   import type { AudioAnalysis } from '$lib/motion/audio-analysis';
@@ -92,6 +98,7 @@
   const HEAD_POLL_TRIES = 6;
   const HEAD_POLL_MS = 500;
   const ZOOM_STEP = 1.25;
+  const STEP_MORE = 10;
 
   const SaveState = { Saved: 'Saved', Saving: 'Saving…', Pending: 'Unsaved', Conflict: 'Reloaded the latest version', Failed: 'Not saved' } as const;
   type SaveState = (typeof SaveState)[keyof typeof SaveState];
@@ -129,6 +136,45 @@
   let sheet = $state<Sheet>(Sheet.None);
   let inspectorTab = $state<InspectorTab>(InspectorTab.Properties);
   let preview = $state<MotionPreview | null>(null);
+  let reveal = $state(Reveal.Animated);
+  let helpOpen = $state(false);
+  let layout = $state<EditorLayout>(DEFAULT_LAYOUT);
+
+  function browserStore(): LayoutStore | null {
+    try {
+      return localStorage;
+    } catch {
+      return null;
+    }
+  }
+
+  onMount(() => {
+    layout = readLayout(browserStore());
+  });
+  let body = $state<HTMLDivElement | null>(null);
+
+  function relayout(next: Partial<EditorLayout>) {
+    layout = { ...layout, ...next };
+    writeLayout(browserStore(), layout);
+  }
+
+  function startResize(e: PointerEvent) {
+    const handle = e.currentTarget as HTMLElement;
+    handle.setPointerCapture(e.pointerId);
+    const origin = { y: e.clientY, px: layout.timelinePx };
+    const room = body?.getBoundingClientRect().height ?? window.innerHeight;
+    const move = (m: PointerEvent) => (layout = { ...layout, timelinePx: timelineHeight(origin.px + origin.y - m.clientY, room) });
+    const end = () => {
+      handle.removeEventListener('pointermove', move);
+      relayout({});
+    };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('lostpointercapture', end, { once: true });
+  }
+
+  function revealLanes(next: Reveal) {
+    reveal = reveal === next ? Reveal.Animated : next;
+  }
 
   let lastEdit = { summary: '', at: 0 };
   let saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -552,6 +598,23 @@
   }
 
   const NUDGE_MORE = 10;
+
+  function toPlayhead(edge: ClipEdge) {
+    if (selection.length) {
+      apply(clipsTo(doc, selection, edge, edge === ClipEdge.End ? frame + 1 : frame), 'Moved to the playhead');
+    }
+  }
+
+  function trimHere(edge: ClipEdge) {
+    if (selection.length) {
+      apply(trimClipsAt(doc, selection, edge, edge === ClipEdge.End ? frame + 1 : frame), 'Trimmed');
+    }
+  }
+
+  function seekTo(target: number) {
+    playing = false;
+    frame = target;
+  }
   const STAGGER_FRAMES = 3;
 
   function nudge(frames: number) {
@@ -608,14 +671,20 @@
     [Command.Duplicate]: duplicate,
     [Command.Undo]: undoEdit,
     [Command.Redo]: redoEdit,
+    [Command.Play]: () => (playing = true),
+    [Command.Pause]: () => (playing = false),
+    [Command.Rewind]: () => step(-doc.fps),
+    [Command.GoStart]: () => seekTo(0),
+    [Command.GoEnd]: () => seekTo(doc.durationInFrames - 1),
     [Command.StepBack]: () => step(-1),
     [Command.StepForward]: () => step(1),
-    [Command.SecondBack]: () => step(-doc.fps),
-    [Command.SecondForward]: () => step(doc.fps),
+    [Command.StepBackMore]: () => step(-STEP_MORE),
+    [Command.StepForwardMore]: () => step(STEP_MORE),
     [Command.ZoomIn]: () => (zoom = clampZoom(zoom * ZOOM_STEP)),
     [Command.ZoomOut]: () => (zoom = clampZoom(zoom / ZOOM_STEP)),
     [Command.SelectAll]: () => (selection = doc.tracks.flatMap((t) => t.clips.map((c) => c.id))),
     [Command.Deselect]: () => {
+      helpOpen = false;
       selection = [];
       keySelection = [];
     },
@@ -630,15 +699,26 @@
     [Command.NudgeForward]: () => nudge(1),
     [Command.NudgeBackMore]: () => nudge(-NUDGE_MORE),
     [Command.NudgeForwardMore]: () => nudge(NUDGE_MORE),
+    [Command.StartHere]: () => toPlayhead(ClipEdge.Start),
+    [Command.EndHere]: () => toPlayhead(ClipEdge.End),
+    [Command.TrimIn]: () => trimHere(ClipEdge.Start),
+    [Command.TrimOut]: () => trimHere(ClipEdge.End),
+    [Command.RevealPosition]: () => revealLanes(Reveal.Position),
+    [Command.RevealScale]: () => revealLanes(Reveal.Scale),
+    [Command.RevealRotation]: () => revealLanes(Reveal.Rotation),
+    [Command.RevealOpacity]: () => revealLanes(Reveal.Opacity),
+    [Command.RevealAnimated]: () => (reveal = Reveal.Animated),
+    [Command.ToggleChat]: () => relayout({ chat: flip(layout.chat) }),
+    [Command.ToggleInspector]: () => relayout({ inspector: flip(layout.inspector) }),
+    [Command.Help]: () => (helpOpen = !helpOpen),
     [Command.Precompose]: precomposeSelection
   };
 
   function onKey(e: KeyboardEvent) {
-    const target = e.target as HTMLElement | null;
-    if (exporting || sounding || target?.closest('input, textarea, select, [contenteditable="true"]')) {
+    if (exporting || sounding || isTyping(e.target as HTMLElement | null)) {
       return;
     }
-    const command = commandFor({ key: e.key, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey });
+    const command = commandFor({ key: e.key, code: e.code, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey, alt: e.altKey });
     if (!command) {
       return;
     }
@@ -695,14 +775,20 @@
         <input type="number" min="2" max="32" value={doc.motionBlur.samples} onchange={(e) => apply(setMotionBlur(doc, { samples: Number(e.currentTarget.value) }), 'Changed blur samples')} data-testid="blur-samples" />
       </label>
     {/if}
-    <ThemeSwitch />
     <span class="save" data-testid="save-state">{saveState} · v{version}</span>
+    <ThemeSwitch />
+    <button type="button" class="panel-toggle" title="Properties (⌥⌘B)" aria-label="Properties panel" aria-pressed={layout.inspector === Panel.Open} data-testid="toggle-inspector" onclick={COMMANDS[Command.ToggleInspector]}><SlidersHorizontal size={14} /></button>
+    <button type="button" class="panel-toggle" title="Agent (⌘B)" aria-label="Agent panel" aria-pressed={layout.chat === Panel.Open} data-testid="toggle-chat" onclick={COMMANDS[Command.ToggleChat]}><BotMessageSquare size={14} /></button>
     <button type="button" onclick={() => (leaveTo(0), (templating = true))} data-testid="template-open">Template</button>
     <button type="button" class="render" onclick={() => (leaveTo(0), (exporting = true))} data-testid="export-open"><Film size={14} /> Export</button>
   </header>
 
   {#if sounding}
     <SoundDialog kind={sounding} {editorUrl} seconds={doc.durationInFrames / doc.fps} onclose={() => (sounding = null)} onmade={(made) => placeSound(sounding ?? 'voice', made)} />
+  {/if}
+
+  {#if helpOpen}
+    <ShortcutHelp onclose={() => (helpOpen = false)} />
   {/if}
 
   {#if exporting}
@@ -733,7 +819,7 @@
     />
   {/if}
 
-  <div class="body" class:coding={inspectorTab === InspectorTab.Code && selected?.component === 'Custom'}>
+  <div class="body" bind:this={body} class:coding={inspectorTab === InspectorTab.Code && selected?.component === 'Custom'} class:no-props={layout.inspector === Panel.Closed} class:no-chat={layout.chat === Panel.Closed}>
     <section class="left">
       <div class="preview">
         <MotionPreview bind:this={preview} {html} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing>
@@ -742,6 +828,8 @@
           {#if selected?.path && !playing}<MotionPathOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         </MotionPreview>
       </div>
+
+      <div class="resize" role="separator" aria-orientation="horizontal" aria-label="Resize the timeline" aria-valuenow={layout.timelinePx} data-testid="timeline-resize" onpointerdown={startResize}></div>
 
       <div class="transport">
         <button type="button" aria-label={playing ? 'Pause' : 'Play'} onclick={() => (playing = !playing)}>
@@ -781,7 +869,7 @@
             </div>
           {/if}
         </div>
-        <button type="button" title="Split at playhead (S)" disabled={!selection.length} onclick={split}><Scissors size={14} /></button>
+        <button type="button" title="Split at playhead (⇧⌘D)" disabled={!selection.length} onclick={split}><Scissors size={14} /></button>
         <button type="button" title="Duplicate (⌘D)" disabled={!selection.length} onclick={duplicate}><Copy size={14} /></button>
         <button type="button" title="Create null from selection" data-testid="null-from-selection" disabled={!selection.length} onclick={groupUnderNull}><Crosshair size={14} /></button>
         <button type="button" title="Precompose (⇧⌘C)" data-testid="precompose" disabled={!selection.length} onclick={precomposeSelection}><Layers size={14} /></button>
@@ -795,10 +883,11 @@
           {#each Object.entries(ARRANGE) as [id, op] (id)}<option value={id}>{op.label}</option>{/each}
         </select>
         <button type="button" title="Add marker (M)" data-testid="add-marker" onclick={markHere}>M</button>
-        <button type="button" title={doc.workArea ? 'Clear work area' : 'Work area: set in/out with B and N'} class:on={!!doc.workArea} onclick={() => apply(setWorkArea(doc, null), 'Cleared the work area')} disabled={!doc.workArea}>[ ]</button>
+        <button type="button" title={doc.workArea ? 'Clear work area' : 'Work area: set in/out with I and O'} class:on={!!doc.workArea} onclick={() => apply(setWorkArea(doc, null), 'Cleared the work area')} disabled={!doc.workArea}>[ ]</button>
         <span class="sep"></span>
         <button type="button" title="Zoom out (−)" onclick={COMMANDS[Command.ZoomOut]}><ZoomOut size={14} /></button>
         <button type="button" title="Zoom in (+)" onclick={COMMANDS[Command.ZoomIn]}><ZoomIn size={14} /></button>
+        <button type="button" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts" data-testid="shortcut-help-open" onclick={COMMANDS[Command.Help]}><Keyboard size={14} /></button>
         {#if notice}<span class="notice" role="status">{notice}</span>{/if}
       </div>
 
@@ -812,11 +901,11 @@
         </nav>
       {/if}
 
-      <div class="tl">
+      <div class="tl" style={`--tl-h: ${layout.timelinePx}px;`}>
         {#if graphOpen}
           <GraphEditor {doc} {frame} {selection} bind:keySelection camera={cameraOpen} onchange={edit} />
         {:else}
-          <MotionTimeline {doc} bind:frame bind:selection bind:keySelection bind:camera={cameraOpen} {zoom} {snap} {waveforms} {beats} {assetUrls} onchange={edit} onopen={enterComp} />
+          <MotionTimeline {doc} bind:frame bind:selection bind:keySelection bind:camera={cameraOpen} {zoom} {snap} {waveforms} {beats} {assetUrls} {reveal} onchange={edit} onopen={enterComp} />
         {/if}
       </div>
     </section>
@@ -928,17 +1017,66 @@
   }
 
   .body {
+    --props-w: 280px;
+    --chat-w: 380px;
     flex: 1;
     min-height: 0;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 280px 380px;
+    grid-template-columns: minmax(0, 1fr) var(--props-w) var(--chat-w);
   }
 
   .body.coding {
-    grid-template-columns: minmax(0, 1fr) 560px 340px;
+    --props-w: 560px;
+    --chat-w: 340px;
+  }
+
+  .body.no-props {
+    --props-w: 0px;
+  }
+
+  .body.no-chat {
+    --chat-w: 0px;
+  }
+
+  .body.no-props .props,
+  .body.no-chat .chat {
+    display: none;
+  }
+
+  .panel-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    color: var(--ui-ink-2);
+  }
+
+  .panel-toggle:hover {
+    background: var(--ui-hover);
+  }
+
+  .panel-toggle[aria-pressed='true'] {
+    background: var(--ui-accent-wash);
+    color: var(--ui-accent);
+  }
+
+  .resize {
+    height: 5px;
+    margin-bottom: -5px;
+    position: relative;
+    z-index: 2;
+    flex-shrink: 0;
+    cursor: row-resize;
+    touch-action: none;
+  }
+
+  .resize:hover {
+    background: var(--ui-accent);
   }
 
   .left {
+    grid-column: 1;
     display: flex;
     flex-direction: column;
     min-width: 0;
@@ -1087,11 +1225,12 @@
   }
 
   .tl {
-    height: 300px;
+    height: var(--tl-h);
     flex-shrink: 0;
   }
 
   .props {
+    grid-column: 2;
     border-left: 1px solid var(--ui-line);
     min-height: 0;
     overflow: hidden;
@@ -1104,6 +1243,7 @@
   }
 
   .chat {
+    grid-column: 3;
     border-left: 1px solid var(--ui-line);
     min-height: 0;
     display: flex;

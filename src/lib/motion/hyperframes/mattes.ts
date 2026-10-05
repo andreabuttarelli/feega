@@ -120,8 +120,11 @@ function matteRuntime(cfg: RuntimeConfig, alphaOf: typeof matteAlpha, tl: { to: 
     return running;
   };
 
-  win[cfg.global] = refresh;
-  addEventListener('hf-seek', (e) => (e as CustomEvent<SeekDetail>).detail?.waitUntil?.(refresh()));
+  const onSeek = (e: Event) => (e as CustomEvent<SeekDetail>).detail?.waitUntil?.(refresh());
+  const previous = win[cfg.global] as { stop?: () => void } | undefined;
+  previous?.stop?.();
+  win[cfg.global] = Object.assign(refresh, { stop: () => removeEventListener('hf-seek', onSeek) });
+  addEventListener('hf-seek', onSeek);
   tl?.to({}, { duration, ease: 'none', onUpdate: () => void refresh() }, 0);
   void refresh();
 }

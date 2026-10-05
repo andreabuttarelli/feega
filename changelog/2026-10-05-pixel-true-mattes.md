@@ -26,3 +26,10 @@ anteprima vs export browser 56–66 dB PSNR, anteprima vs riseek in ordine inver
 anteprima vs render sul farm 37–43 dB (H.264).
 
 **Scartato.** SVG `<mask>` con `<foreignObject>`: Chrome non lo disegna. `element()`: solo Firefox.
+
+**Patch a caldo.** Lo script delle matte è uno script `data-hot`: la patch della preview lo
+riesegue, e il runtime nuovo ferma il vecchio (`stop` sul listener `hf-seek`) invece di
+sommarsi; il tween di refresh rinasce sulla timeline svuotata. Verificato: la preview dopo la
+patch è identica a un caricamento da zero dello stesso doc. Costo misurato: una matte 1080p
+costa ~82 ms per aggiornamento (Chrome headless, M-series), quindi in riproduzione la matte si
+aggiorna a ~12 fps mentre il resto va a 60; seek, export e render aspettano e restano esatti.
