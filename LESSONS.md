@@ -4,6 +4,13 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 ## Motion editor
 
+### Un modulo virtuale Vite che fa fallire suite intere senza un errore leggibile
+`this.addWatchFile` con un percorso relativo (`node_modules/zod/...`, come lo restituisce il
+metafile di esbuild) fa trattare a vitest quel file come import del modulo virtuale: ogni test che
+lo raggiunge muore con `(0 test)` e nessun messaggio a schermo. Segnale: suite rosse senza stack,
+`--reporter=json --outputFile` mostra `Failed to resolve import "node_modules/..."`. Mossa:
+passare percorsi assoluti (`path.resolve`).
+
 ### `mix-blend-mode` dentro `preserve-3d` appiattisce il mondo, e solo il render lo mostra
 Un clip con fusione dentro `#world` (camera accesa) fa appiattire a Chrome tutto il contesto 3D:
 la preview sembra giusta, ma render su server ed export dal browser divergono (PSNR 10 dB invece
