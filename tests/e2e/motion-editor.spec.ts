@@ -89,12 +89,12 @@ test.describe('motion editor @real', () => {
       () =>
         new Promise<string>((resolve) => {
           const player = document.querySelector('hyperframes-player')!;
-          const slider = document.querySelector('input.num[aria-label="Opacity"]')!.previousElementSibling as HTMLInputElement;
+          const field = document.querySelector('input.num[aria-label="Opacity"]') as HTMLInputElement;
           window.addEventListener('message', (e) => e.data?.type === 'feega:hot-done' && resolve('patch'));
           player.addEventListener('ready', () => resolve('reload'), { once: true });
           setTimeout(() => resolve('nothing'), 3000);
-          slider.value = '40';
-          slider.dispatchEvent(new Event('input', { bubbles: true }));
+          field.value = '40';
+          field.dispatchEvent(new Event('change', { bubbles: true }));
         })
     );
 
