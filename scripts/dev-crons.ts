@@ -10,10 +10,21 @@ export function everyMinutePaths(crons: Cron[]): string[] {
   return crons.filter((c) => EVERY_MINUTE.has(c.schedule.trim())).map((c) => c.path);
 }
 
-export function devCrons(): Plugin {
+export enum CronMode {
+  On = 'on',
+  Off = 'off'
+}
+
+const ENABLED = new Set(['1', 'true']);
+
+export function cronMode(env: Record<string, string | undefined>): CronMode {
+  return ENABLED.has(env.DEV_CRONS ?? '') ? CronMode.On : CronMode.Off;
+}
+
+export function devCrons(mode: CronMode = cronMode(process.env)): Plugin {
   return {
     name: 'dev-crons',
-    apply: 'serve',
+    apply: () => mode === CronMode.On,
     configureServer(server) {
       const vercel = JSON.parse(readFileSync('vercel.json', 'utf8')) as { crons?: Cron[] };
       const paths = everyMinutePaths(vercel.crons ?? []);

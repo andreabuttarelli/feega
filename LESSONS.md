@@ -4,6 +4,14 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 ## Motion editor
 
+### Un dev server qualunque chiude i render degli altri
+`npm run dev` faceva partire `devCrons`, che chiama ogni minuto le cron di `vercel.json`
+(`/api/v1/canvas/runs/tick` compreso) con il codice del checkout locale e il `.env` puntato sul DB
+remoto; in dev `cronAuthorized` dice sempre sì. Ogni agente o utente con un dev server acceso
+riconciliava i run di produzione. Segnale: render chiusi per errore, nel log del dev server
+`render reconcile failed` o `[canvas runs]`. Mossa: le cron in dev sono opt-in, `DEV_CRONS=1`, e
+solo contro un DB locale o usa e getta.
+
 ### Un modulo virtuale Vite che fa fallire suite intere senza un errore leggibile
 `this.addWatchFile` con un percorso relativo (`node_modules/zod/...`, come lo restituisce il
 metafile di esbuild) fa trattare a vitest quel file come import del modulo virtuale: ogni test che
