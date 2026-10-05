@@ -52,7 +52,7 @@ describe('the ring pose', () => {
     expect(pose.slices).toHaveLength(8 * 6);
     expect(new Set(steps.map((d) => d.toFixed(2))).size).toBe(1);
     expect(steps[0]).toBeGreaterThan(0);
-    expect(pose.slices[0].transform).toContain(`translateZ(${0.6 * 1080}px)`);
+    expect(pose.slices[0].transform).toContain(`translateZ(${RING_NUMBERS.ringRadius.fallback * 1080}px)`);
   });
 
   it('reads slice offsets left to right across the card', () => {

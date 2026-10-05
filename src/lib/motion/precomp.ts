@@ -32,7 +32,7 @@ export function mergeView(root: MotionDoc, path: CompPath, view: MotionDoc): Mot
     return view;
   }
   const comp: MotionComp = { ...(view.comps[id] ?? root.comps[id]), tracks: view.tracks, durationInFrames: view.durationInFrames };
-  return { ...root, assets: view.assets, fonts: view.fonts, components: view.components, comps: { ...view.comps, [id]: comp } };
+  return { ...root, assets: view.assets, fonts: view.fonts, components: view.components, fields: view.fields, comps: { ...view.comps, [id]: comp } };
 }
 
 export function pathNames(root: MotionDoc, path: CompPath): string[] {

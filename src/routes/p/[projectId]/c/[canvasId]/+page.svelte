@@ -78,8 +78,7 @@
   import { inputChanged } from '$lib/canvas/effects/editor';
   import { upstreamMedia } from '$lib/canvas/effects-node';
   import type { EffectStep } from '$lib/canvas/effects';
-  import { upstreamImageRefs } from '$lib/canvas/composition-node';
-  import type { CompositionNode as CompositionNodeState } from '$lib/canvas/composition-node';
+  import { upstreamMedia as compositionMedia } from '$lib/canvas/composition-node';
   import { listFeedingSelect } from '$lib/canvas/select-node';
   import { fieldValue, productItem, socialPostItem } from '$lib/canvas/select-sources';
   import { isOutputHandle, outputValues, portOfOutputHandle, selectOutputs, type OutputValue, type SelectOutput } from '$lib/canvas/select-outputs';
@@ -144,7 +143,6 @@
     effectsOf,
     effectsData,
     compositionOf,
-    compositionData,
     socialFeedOf
   } from '$lib/canvas-node-data';
   import {
@@ -755,10 +753,6 @@
     return upstreamMedia(effectsId, edges, nodes);
   }
 
-  function upstreamCompositionRefsOf(compositionId: string): string[] {
-    return upstreamImageRefs(compositionId, edges, nodes);
-  }
-
   function assetUrl(refId: string | null): string | null {
     return refId ? `/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}` : null;
   }
@@ -1275,62 +1269,6 @@
     const row = effectsEditorId ? nodes.find((n) => n.id === effectsEditorId) : null;
     return row ? effectsOf(row) : null;
   });
-
-  let compositionEditorId = $state<string | null>(null);
-  let CompositionEditorComponent = $state<typeof import('$lib/components/canvas/CompositionEditor.svelte').default | null>(null);
-  const compositionEditing = $derived.by(() => {
-    const row = compositionEditorId ? nodes.find((n) => n.id === compositionEditorId) : null;
-    return row ? compositionOf(row) : null;
-  });
-
-  async function openCompositionEditor(id: string) {
-    compositionEditorId = id;
-    if (!CompositionEditorComponent) {
-      const module = await import('$lib/components/canvas/CompositionEditor.svelte');
-      CompositionEditorComponent = module.default;
-    }
-  }
-
-  async function saveComposition(id: string, next: CompositionNodeState): Promise<boolean> {
-    const current = nodes.find((node) => node.id === id);
-    if (!current) { return false; }
-    const wanted = compositionData(next) as Record<string, unknown>;
-    const patch = diffNodeData(current.data, wanted, Object.keys(wanted));
-    const out = await saveNode(id, patch, baseOf(current.saved, patch));
-    if (!out.ok) {
-      return false;
-    }
-    const written = out.node;
-    nodes = nodes.map((node) => (node.id === id ? { ...node, data: written.data, saved: written.data, version: written.version } : node));
-    return true;
-  }
-
-  /**
-   * L'esportazione della composizione (video o immagine) segue lo stesso schema di `upload()`:
-   * il file va dritto in `canvas-assets` dal browser, e solo il percorso arriva al server perché
-   * un MP4 supera facilmente il corpo che un'azione SvelteKit regge su Vercel. `into: 'library'`
-   * registra l'asset senza creare un nodo — la riga che riceve il `refId` è già quella del nodo
-   * `composition` che sta esportando.
-   */
-  async function uploadCompositionExport(file: Blob, extension: 'mp4' | 'webm' | 'png'): Promise<string | null> {
-    const mimeType = extension === 'png' ? 'image/png' : extension === 'webm' ? 'video/webm' : 'video/mp4';
-    const path = `${canvasUploadPrefix(data.orgId, data.projectId)}${crypto.randomUUID()}-export.${extension}`;
-    const up = await supabase.storage.from('canvas-assets').upload(path, file, { contentType: mimeType, upsert: false });
-    if (up.error) {
-      failed = up.error.message;
-      return null;
-    }
-
-    const result = await post('upload', {
-      path, file_name: `export.${extension}`, mime_type: mimeType, bytes: file.size, into: 'library'
-    });
-    const asset = result?.asset as { id?: string } | undefined;
-    return asset?.id ?? null;
-  }
-
-  async function saveCompositionExportRefId(id: string, refId: string): Promise<boolean> {
-    return write(id, { refId }, SaveTiming.Now);
-  }
 
   async function applyEffects(id: string, steps: EffectStep[], _output: Blob | null = null): Promise<boolean> {
     const source = upstreamEffectsMediaOf(id);
@@ -2768,14 +2706,13 @@
             onopeneditor={() => (effectsEditorId = id)}
           />
         {:else if composition}
+          {@const media = compositionMedia(id, edges, nodes)}
           <CompositionNode
             node={composition}
             posterUrl={assetUrl(composition.refId)}
-            mediaUrls={upstreamCompositionRefsOf(id).map((refId) => assetUrl(refId)).filter((url): url is string => url !== null).map((url) => sized(url, AssetSize.Px1024))}
-            previewActive={compositionEditorId !== id}
-            imageCount={upstreamCompositionRefsOf(id).length}
+            {media}
+            assets={Object.fromEntries(media.map((m) => [m.assetId, sized(assetUrl(m.assetId)!, AssetSize.Px1024)]))}
             composeIn={{ project: data.projectId, canvas: data.canvas.id }}
-            onopeneditor={() => openCompositionEditor(id)}
           />
         {:else if motion}
           <MotionNode node={motion} href={motionEditorPath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId: id })} />
@@ -2821,19 +2758,6 @@
     {/key}
   {/if}
 
-  {#if compositionEditing && CompositionEditorComponent}
-    {@const editingId = compositionEditing.id}
-    {#key editingId}
-      <CompositionEditorComponent
-        initial={compositionEditing}
-        mediaUrls={upstreamCompositionRefsOf(editingId).map((refId) => assetUrl(refId)).filter((url) => url !== null)}
-        onsave={(next) => saveComposition(editingId, next)}
-        onupload={uploadCompositionExport}
-        onwriterefid={(refId) => saveCompositionExportRefId(editingId, refId)}
-        onclose={() => (compositionEditorId = null)}
-      />
-    {/key}
-  {/if}
 
   {#if coachOpen}
     <OnboardingCoach

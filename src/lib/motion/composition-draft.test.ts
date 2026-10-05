@@ -14,6 +14,7 @@ import {
   draftFromDoc,
   draftFromNode,
   newDraft,
+  nodeDoc,
   withLayout,
   type ComposeDraft
 } from './composition-draft';
@@ -129,4 +130,18 @@ describe('draftFromNode: an old canvas composition node opens as the same video'
 
 it('composeEditorPath points at the compositions tool for that video', () => {
   expect(composeEditorPath({ projectId: 'p', nodeId: 'n' })).toBe('/app/compose/n?project=p');
+});
+
+describe('a canvas composition node, read as a motion video', () => {
+  const node: CompositionNode = { id: 'n1', layout: 'ring', layoutParams: { count: 6, tiltX: -20 }, camera: { preset: 'static', params: {} }, background: { color: '#112233' }, duration: 8, aspect: '16:9', refId: null };
+
+  it('keeps its layout, settings, length, format and media, so a stored node plays in the motion engine without losing anything', () => {
+    const doc = nodeDoc(node, [{ assetId: 'a1', kind: 'image' }]);
+    const clip = findClip(doc, COMPOSITION_CLIP)!.clip;
+
+    expect(parseMotionDoc(doc).ok).toBe(true);
+    expect([doc.width, doc.height]).toEqual([FORMATS[MotionFormat.Landscape].width, FORMATS[MotionFormat.Landscape].height]);
+    expect(doc.durationInFrames).toBe(8 * FPS);
+    expect(clip.props).toMatchObject({ layout: 'ring', layoutParams: { count: 6, tiltX: -20 }, camera: 'static', background: '#112233', media: [{ assetId: 'a1', kind: 'image' }] });
+  });
 });

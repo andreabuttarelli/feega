@@ -5,9 +5,6 @@ export type Transform = {
 	rotation: Vec3;
 	scale: Vec3;
 	opacity?: number;
-	bend?: number;
-	width?: number;
-	corner?: number;
 };
 
 export type LayoutId =

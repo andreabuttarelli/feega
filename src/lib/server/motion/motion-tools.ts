@@ -67,7 +67,9 @@ import type { AudioAnalysis } from '$lib/motion/audio-analysis';
 import { Hit, cutToBeat, hitFrames, markHits } from '$lib/motion/beats';
 import { PULSE_PROPS, pulseWithMusic } from '$lib/motion/pulse';
 import { applyValues, exposeField, fieldValues, removeField } from '$lib/motion/template/fields';
-import { FIELD_TYPES } from '$lib/motion/template/field-model';
+import { FIELD_TYPES, type ExposedField } from '$lib/motion/template/field-model';
+import { detachTemplate, insertTemplate, isLockedComp, setTemplateValues, templateFields } from '$lib/motion/template/library';
+import type { TemplateLibrary } from './templates';
 import { DEFAULT_NAME_PATTERN, MAX_BATCH_ROWS, outputName } from '$lib/motion/template/batch';
 import { renderQuote } from '$lib/motion/render-quote';
 import { BOUNDS, PHYSICS, PHYSICS_KEYS, PHYSICS_PRESET, PHYSICS_PRESETS } from '$lib/motion/physics/model';
@@ -92,6 +94,7 @@ export type MotionToolDeps = {
   check: (callId: string, doc: MotionDoc, name: string) => Promise<CheckResult | null>;
   analysis?: (assetId: string) => Promise<AudioAnalysis | null>;
   batch?: (input: { doc: MotionDoc; rows: { name: string; values: Record<string, string> }[] }) => Promise<Record<string, unknown>>;
+  templates?: TemplateLibrary;
   site?: (url: string) => Promise<SourceRead>;
   brand?: (name?: string) => Promise<SourceRead>;
   importAsset?: (url: string, label?: string) => Promise<AssetImport>;
@@ -102,6 +105,8 @@ export type SourceRead = { ok: true } & Record<string, unknown> | { ok: false; e
 export type AssetImport = { ok: true; asset: MotionAsset; width: number | null; height: number | null } | { ok: false; error: string };
 
 const UNREADABLE = (what: string) => ({ ok: false as const, error: `${what} is not available in this workspace` });
+
+const fieldSpec = (f: ExposedField) => ({ key: f.key, label: f.label, type: f.type, min: f.min, max: f.max, unit: f.unit, options: f.options, aspect: f.aspect });
 
 const framesAt = (s: number, fps: number) => Math.round(s * fps);
 const secondsAt = (f: number, fps: number) => Math.round((f / fps) * 100) / 100;
@@ -169,7 +174,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
     camera: cameraSummary(doc.camera),
     look: lookSummary(doc.look),
     components: Object.entries(doc.components).map(([name, c]) => customSummary(name, c)),
-    comps: Object.entries(doc.comps).map(([id, c]) => ({ id, name: c.name, duration: secs(c.durationInFrames), clips: c.tracks.flatMap((t) => t.clips.map((clip) => clip.id)) }))
+    comps: Object.entries(doc.comps).map(([id, c]) => ({ id, name: c.name, ...(c.template ? { template: c.template.id } : {}), duration: secs(c.durationInFrames), clips: c.tracks.flatMap((t) => t.clips.map((clip) => clip.id)) }))
   };
 }
 
@@ -1326,6 +1331,9 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         if (!root.comps[input.comp]) {
           return { ok: false, error: `no composition ${input.comp}: compositions are ${Object.keys(root.comps).join(', ') || 'none (precompose first)'}` };
         }
+        if (isLockedComp(root, input.comp)) {
+          return { ok: false, error: `${input.comp} is a template: change it with set_template_fields, or detach_template first to edit its structure` };
+        }
         session.doc = viewOf(root, [input.comp]);
         try {
           for (const [index, call] of input.calls.entries()) {
@@ -1338,6 +1346,59 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         } finally {
           session.doc = mergeView(root, [input.comp], session.doc);
         }
+      }
+    }),
+
+    list_templates: tool({
+      description: 'List the motion templates (built-in and saved by the team): fixed designs customised only through their fields — text, colours, media slots (aspect = width/height of the crop), numbers (min..max, unit), choices (options).',
+      inputSchema: z.object({}).strict(),
+      execute: async () => {
+        const entries = (await deps.templates?.list()) ?? [];
+        return { templates: entries.map((e) => ({ id: e.id, name: e.template.name, description: e.template.description, seconds: secondsAt(e.template.doc.durationInFrames, e.template.doc.fps), fields: e.template.doc.fields.map(fieldSpec) })) };
+      }
+    }),
+
+    insert_template: tool({
+      description: 'Insert a template (id from list_templates) as one locked Precomp clip on a new top track at start seconds. Fill it with set_template_fields; its structure stays fixed unless detach_template.',
+      inputSchema: z.object({ template_id: z.string(), start: z.number().min(0).default(0) }),
+      execute: async (input) => {
+        const entry = ((await deps.templates?.list()) ?? []).find((e) => e.id === input.template_id);
+        if (!entry) {
+          return { ok: false, error: `no template ${input.template_id}: call list_templates` };
+        }
+        const placed = insertTemplate(session.doc, entry, { from: frames(input.start), newId: deps.newId });
+        if (!placed.ok) {
+          return placed;
+        }
+        const out = apply(placed, `inserted template ${entry.template.name}`);
+        return out.ok ? { ...out, clip_id: placed.clipId, fields: templateFields(session.doc, placed.clipId).map((f) => ({ ...fieldSpec(f), value: f.value })) } : out;
+      }
+    }),
+
+    set_template_fields: tool({
+      description: 'Set fields of an inserted template (clip_id of its Precomp clip; keys as in list_templates). Each value is checked against the field type: text, #rrggbb colour, asset id, number in range, one of the options, comma-separated asset ids for a media list.',
+      inputSchema: z.object({ clip_id: z.string(), values: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])) }),
+      execute: async (input) => {
+        const values = Object.fromEntries(Object.entries(input.values).map(([k, v]) => [k, String(v)]));
+        return apply(setTemplateValues(session.doc, input.clip_id, values), `set template fields ${Object.keys(values).join(', ')}`);
+      }
+    }),
+
+    detach_template: tool({
+      description: 'Detach an inserted template so its composition can be edited freely with edit_comp. Only when the user asks to change the structure.',
+      inputSchema: z.object({ clip_id: z.string() }),
+      execute: async (input) => apply(detachTemplate(session.doc, input.clip_id), `detached template ${input.clip_id}`)
+    }),
+
+    save_template: tool({
+      description: 'Save a precomp (comp id) or, without comp, the whole video as a reusable team template. Its exposed fields (expose_field) become the template fields; at least one is required.',
+      inputSchema: z.object({ name: z.string().min(1).max(60), description: z.string().max(200).default(''), comp: z.string().nullable().optional() }),
+      execute: async (input) => {
+        if (!deps.templates) {
+          return { ok: false, error: 'the template library is not available here' };
+        }
+        const saved = await deps.templates.save({ doc: session.doc, compId: input.comp ?? null, meta: { name: input.name, description: input.description ?? '' }, posterFrame: 0 });
+        return saved.ok ? { ok: true, template_id: saved.entry.id } : saved;
       }
     }),
 

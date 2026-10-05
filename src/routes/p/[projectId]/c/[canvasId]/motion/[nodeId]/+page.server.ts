@@ -17,7 +17,17 @@ import { Sound, generateSound } from '$lib/server/motion/voiceover';
 import { withOrgContext } from '$lib/server/ai-log';
 import { saveFontUpload } from '$lib/server/motion/font-upload';
 import { analyzeSounds, storageAnalysis } from '$lib/server/motion/audio-analysis';
-import { clipsOf } from '$lib/motion/doc';
+import { clipsOf, parseMotionDoc } from '$lib/motion/doc';
+import { templateLibrary } from '$lib/server/motion/templates';
+import type { Db } from '$lib/server/db/client';
+
+function parsedJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
 
 const HTTP_CONFLICT = 409;
 const HTTP_BAD_REQUEST = 400;
@@ -50,12 +60,13 @@ export const load: PageServerLoad = async ({ locals, params }) => {
   const scope = await scopeFor(locals, params);
   const nodeScope = { orgId: scope.orgId, nodeId: scope.motion.record.id };
   const farm = motionRenderFarm();
-  const [head, tokens, assets, runs, uploadLimit] = await Promise.all([
+  const [head, tokens, assets, runs, uploadLimit, templates] = await Promise.all([
     headOrNew(scope.db, nodeScope, scope.motion.node),
     motionTokens(scope.db, { orgId: scope.orgId, brandId: scope.projectBrandId }),
     motionAssets({ db: scope.db, orgId: scope.orgId, projectId: params.projectId, canvasId: scope.canvas.id, nodeId: scope.motion.record.id }),
     listNodeRuns(scope.db, nodeScope),
-    farm ? motionRenderStorage().limit().catch(() => null) : null
+    farm ? motionRenderStorage().limit().catch(() => null) : null,
+    libraryOf(scope).list()
   ]);
 
   return {
@@ -67,9 +78,12 @@ export const load: PageServerLoad = async ({ locals, params }) => {
     tokens,
     assets,
     serverRender: { configured: farm !== null, latest: renderView(runs), uploadLimit },
-    batch: batchView(runs)
+    batch: batchView(runs),
+    templates
   };
 };
+
+const libraryOf = (scope: { db: Db; orgId: string; userId: string }) => templateLibrary(scope.db, { orgId: scope.orgId, actor: { kind: 'user', id: scope.userId } });
 
 export const actions: Actions = {
   save: async ({ locals, params, request }) => {
@@ -225,6 +239,29 @@ export const actions: Actions = {
     const renderScope = { ...nodeScope, projectId: params.projectId, userId: scope.userId, editorUrl };
     const started = await startBatch(scope.db, motionRenderFarm(), renderScope, rows.rows, motionRenderStorage());
     return started.ok ? started : fail(HTTP_UNAVAILABLE, { error: started.error, detail: started.detail });
+  },
+
+  saveTemplate: async ({ locals, params, request }) => {
+    const scope = await scopeFor(locals, params);
+    const form = await request.formData();
+    const parsed = parseMotionDoc(parsedJson(String(form.get('doc') ?? '')));
+    if (!parsed.ok) {
+      return fail(HTTP_BAD_REQUEST, { error: parsed.error });
+    }
+    const saved = await libraryOf(scope).save({
+      doc: parsed.doc,
+      compId: String(form.get('compId') ?? '') || null,
+      meta: { name: String(form.get('name') ?? ''), description: String(form.get('description') ?? '') },
+      posterFrame: Number(form.get('posterFrame')) || 0
+    });
+    return saved.ok ? { entry: saved.entry } : fail(HTTP_BAD_REQUEST, { error: saved.error });
+  },
+
+  deleteTemplate: async ({ locals, params, request }) => {
+    const scope = await scopeFor(locals, params);
+    const form = await request.formData();
+    const removed = await libraryOf(scope).remove(String(form.get('id') ?? ''));
+    return removed ? { removed: true } : fail(HTTP_BAD_REQUEST, { error: 'not_removable' });
   },
 
   batchStatus: async ({ locals, params }) => {

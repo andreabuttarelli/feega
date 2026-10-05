@@ -1643,6 +1643,48 @@ export type Database = {
         }
         Relationships: []
       }
+      motion_templates: {
+        Row: {
+          actor_id: string | null
+          actor_kind: string
+          agent_key: string | null
+          created_at: string
+          description: string
+          doc: Json
+          id: string
+          name: string
+          org_id: string
+          poster_frame: number
+          updated_at: string
+        }
+        Insert: {
+          actor_id?: string | null
+          actor_kind: string
+          agent_key?: string | null
+          created_at?: string
+          description?: string
+          doc: Json
+          id?: string
+          name: string
+          org_id: string
+          poster_frame?: number
+          updated_at?: string
+        }
+        Update: {
+          actor_id?: string | null
+          actor_kind?: string
+          agent_key?: string | null
+          created_at?: string
+          description?: string
+          doc?: Json
+          id?: string
+          name?: string
+          org_id?: string
+          poster_frame?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       node_runs: {
         Row: {
           actor_id: string | null

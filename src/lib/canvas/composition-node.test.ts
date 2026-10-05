@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { upstreamImageRefs } from './composition-node';
+import { upstreamImageRefs, upstreamMedia } from './composition-node';
 
 describe('upstreamImageRefs', () => {
   it('collects refIds from several image nodes wired in', () => {
@@ -28,5 +28,23 @@ describe('upstreamImageRefs', () => {
   it('is empty when nothing feeds the node', () => {
     expect(upstreamImageRefs('comp', [], [{ id: 'img1', data: { refId: 'a1' } }])).toEqual([]);
     expect(upstreamImageRefs('comp', [{ source: 'img1', target: 'comp' }], [{ id: 'img1', data: {} }])).toEqual([]);
+  });
+});
+
+describe('upstreamMedia', () => {
+  it('names each wired picture or clip with its kind, so the motion engine plays videos as videos', () => {
+    const edges = [
+      { source: 'img', target: 'comp' },
+      { source: 'vid', target: 'comp' }
+    ];
+    const nodes = [
+      { id: 'img', type: 'image', data: { refId: 'a1' } },
+      { id: 'vid', type: 'video', data: { refId: 'v1' } }
+    ];
+
+    expect(upstreamMedia('comp', edges, nodes)).toEqual([
+      { assetId: 'a1', kind: 'image' },
+      { assetId: 'v1', kind: 'video' }
+    ]);
   });
 });

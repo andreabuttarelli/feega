@@ -64,6 +64,8 @@ const asset = (kind: AssetKind, label: string) =>
 const fade = (label: string) => range(0, 5, 0.1, 0, label, Group.Style);
 const pan = () => range(-1, 1, 0.01, 0, 'Pan', Group.Style);
 
+const crop = () => ({ focusX: range(0, 1, 0.01, 0.5, 'Crop X', Group.Style), focusY: range(0, 1, 0.01, 0.5, 'Crop Y', Group.Style) });
+
 const toggle = (fallback: boolean, label: string, group: Group) =>
   z.boolean().default(fallback).meta({ control: Control.Toggle, label, group });
 
@@ -219,7 +221,7 @@ export const COMPONENTS = {
     description: 'A picture from the canvas assets.',
     track: TrackKind.Visual,
     durationInFrames: seconds(3),
-    schema: z.object({ assetId: asset(AssetKind.Image, 'Image'), fit: choice(['cover', 'contain'] as const, 'cover', 'Fit', Group.Style), ...layout({ width: 1, height: 1 }) }).strict()
+    schema: z.object({ assetId: asset(AssetKind.Image, 'Image'), fit: choice(['cover', 'contain'] as const, 'cover', 'Fit', Group.Style), ...crop(), ...layout({ width: 1, height: 1 }) }).strict()
   },
   Video: {
     label: 'Video',
@@ -230,6 +232,7 @@ export const COMPONENTS = {
       .object({
         assetId: asset(AssetKind.Video, 'Video'),
         fit: choice(['cover', 'contain'] as const, 'cover', 'Fit', Group.Style),
+        ...crop(),
         volume: range(0, 1, 0.01, 0, 'Volume', Group.Style),
         pan: pan(),
         fadeIn: fade('Fade in (s)'),

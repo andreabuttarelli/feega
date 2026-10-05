@@ -1,47 +1,44 @@
 <script lang="ts">
   import TieredImage from './TieredImage.svelte';
   import Orbit from '@lucide/svelte/icons/orbit';
-  import type { CompositionNode } from '$lib/canvas/composition-node';
-  import CompositionPreview from './CompositionPreview.svelte';
+  import type { CompositionNode, UpstreamMedia } from '$lib/canvas/composition-node';
+  import CompositionPlayer from '$lib/components/motion/CompositionPlayer.svelte';
   import NodeDownload from './NodeDownload.svelte';
+  import { nodeDoc } from '$lib/motion/composition-draft';
 
   let {
     node,
     posterUrl = null,
-    mediaUrls = [],
+    media = [],
+    assets = {},
     previewActive = true,
-    imageCount = 0,
-    composeIn = null,
-    onopeneditor
+    composeIn
   }: {
     node: CompositionNode;
     posterUrl?: string | null;
-    mediaUrls?: string[];
+    media?: UpstreamMedia[];
+    assets?: Record<string, string>;
     previewActive?: boolean;
-    imageCount?: number;
-    composeIn?: { project: string; canvas: string } | null;
-    onopeneditor: () => void;
+    composeIn: { project: string; canvas: string };
   } = $props();
 
   const ASPECT_RATIO = { '9:16': 9 / 16, '1:1': 1, '16:9': 16 / 9 } as const;
+
+  let form = $state<HTMLFormElement | null>(null);
+  const openInCompositions = () => form?.requestSubmit();
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="composition" ondblclick={onopeneditor}>
-  {#if mediaUrls.length > 0 && previewActive}
+<div class="composition" ondblclick={openInCompositions}>
+  {#if media.length > 0}
     <div
       class="composition-preview"
       style={`--preview-ratio: ${ASPECT_RATIO[node.aspect]}; aspect-ratio: ${ASPECT_RATIO[node.aspect]}`}
     >
-      <CompositionPreview {node} {mediaUrls} />
+      <CompositionPlayer doc={nodeDoc(node, media)} {assets} active={previewActive} />
     </div>
   {:else if node.refId && posterUrl}
     <TieredImage src={posterUrl} nodeId={node.id} alt="Composition" />
-  {:else if imageCount > 0}
-    <div class="composition-ready">
-      <Orbit size={22} strokeWidth={1.5} />
-      <p>{imageCount} images connected</p>
-    </div>
   {:else}
     <div class="composition-empty">
       <Orbit size={22} strokeWidth={1.5} />
@@ -53,15 +50,12 @@
     {#if node.refId && posterUrl}
       <NodeDownload kind="video" sourceUrl={posterUrl} nodeId={node.id} nodeType="composizione" />
     {/if}
-    <button type="button" class="composition-action nodrag" onclick={onopeneditor}>Open editor</button>
-    {#if composeIn}
-      <form method="POST" action="/app/compose?/fromNode" class="nodrag">
-        <input type="hidden" name="project" value={composeIn.project} />
-        <input type="hidden" name="canvas" value={composeIn.canvas} />
-        <input type="hidden" name="node" value={node.id} />
-        <button type="submit" class="composition-action" title="Turn this into a video in Compositions: server export, timeline and motion editor">Open in Compositions</button>
-      </form>
-    {/if}
+    <form bind:this={form} method="POST" action="/app/compose?/fromNode" class="nodrag">
+      <input type="hidden" name="project" value={composeIn.project} />
+      <input type="hidden" name="canvas" value={composeIn.canvas} />
+      <input type="hidden" name="node" value={node.id} />
+      <button type="submit" class="composition-action" title="Edit and export in Compositions">Open editor</button>
+    </form>
   </div>
 </div>
 
@@ -119,7 +113,7 @@
     cursor: pointer;
   }
 
-  .composition-ready,
+
   .composition-empty {
     display: flex;
     flex-direction: column;
@@ -129,7 +123,7 @@
     color: var(--ink-soft, #6e6e73);
     text-align: center;
   }
-  .composition-ready p,
+
   .composition-empty p {
     margin: 0;
     font-size: 11.5px;
