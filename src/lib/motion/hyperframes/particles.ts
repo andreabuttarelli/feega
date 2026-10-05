@@ -4,6 +4,7 @@ import { PARTICLE_COLOUR_KEYS, PARTICLE_NUMBER_KEYS, type Emitter, type Particle
 import { drawParticles, particlesAt, type ParticleBake, type ParticleRow, type Rgb } from '../particles/simulate';
 import { css, esc, js } from './html';
 import { seekDriver } from './stage';
+import { ON_DISPOSE, hotScope, hotSeek } from './hot';
 
 type Env = { width: number; height: number; unit: number; fps: number; color: (value: string) => string };
 
@@ -56,7 +57,7 @@ export function particleScript(bakes: readonly ParticleBake[], fps: number, dura
   if (!bakes.length) {
     return '';
   }
-  return `<script>(function(){const PT_AT=(${particlesAt.toString()});const PT_DRAW=(${drawParticles.toString()});
+  return `<script>(function(){${hotScope(PARTICLE_TIMELINE)}const PT_AT=(${particlesAt.toString()});const PT_DRAW=(${drawParticles.toString()});
 const B=${js(bakes)};
 const items=B.map(function(b){const el=document.getElementById(${js(canvasId(''))}+b.id);return {b:b,paint:el&&el.getContext('2d'),sprite:document.getElementById(${js(spriteId(''))}+b.id)};});
 let shown=0;
@@ -71,7 +72,8 @@ function particlesNow(time){
 items.forEach(function(it){if(it.sprite){it.sprite.addEventListener('load',function(){particlesNow(shown);});}});
 const tl=window.__timelines&&window.__timelines.main;
 ${seekDriver(PARTICLE_TIMELINE, duration, 'particlesNow')}
-window.addEventListener('hf-seek',function(e){particlesNow(e.detail.time);});
+${hotSeek('particlesNow')}
+${ON_DISPOSE}(function(){items.forEach(function(it){if(it.paint){it.paint.clearRect(0,0,it.paint.canvas.width,it.paint.canvas.height);}});});
 particlesNow(0);
 })();</script>`;
 }

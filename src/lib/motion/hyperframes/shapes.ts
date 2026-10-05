@@ -6,6 +6,7 @@ import { shapeMarkup, type ShapeLook } from '../shape/render';
 import { modifierOfKey, modifierValues, type Modifier } from '../shape/schema';
 import { js } from './html';
 import { seekDriver } from './stage';
+import { hotScope, hotSeek } from './hot';
 
 export type ShapeBake = { id: string; from: number; index: number[]; frames: string[] };
 type Env = { width: number; height: number; unit: number; fps: number; color: (value: string) => string };
@@ -75,7 +76,7 @@ export function shapeScript(bakes: readonly ShapeBake[], fps: number, duration: 
   if (!bakes.length) {
     return '';
   }
-  return `<script>(function(){const S=${js(bakes)};
+  return `<script>(function(){${hotScope(SHAPE_TIMELINE)}const S=${js(bakes)};
 const els=S.map(function(s){return document.getElementById('${svgId('')}'+s.id);});
 function shapesAt(time){
   S.forEach(function(s,i){
@@ -88,7 +89,7 @@ function shapesAt(time){
 }
 const tl=window.__timelines&&window.__timelines.main;
 ${seekDriver(SHAPE_TIMELINE, duration, 'shapesAt')}
-window.addEventListener('hf-seek',function(e){shapesAt(e.detail.time);});
+${hotSeek('shapesAt')}
 shapesAt(0);
 })();</script>`;
 }

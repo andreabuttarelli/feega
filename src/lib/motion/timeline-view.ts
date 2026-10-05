@@ -44,7 +44,7 @@ export function rulerTicks(durationInFrames: number, zoom: number, fps: number =
 export function timecode(frame: number, fps: number = FPS): string {
   const seconds = Math.floor(frame / fps);
   const rest = frame % fps;
-  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}.${String(rest).padStart(2, '0')}`;
+  return [Math.floor(seconds / 60), seconds % 60, rest].map((n) => String(n).padStart(2, '0')).join(':');
 }
 
 export enum Snap {

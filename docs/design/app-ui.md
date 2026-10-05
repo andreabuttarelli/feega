@@ -14,13 +14,16 @@ defined in `src/app.css` (`--ui-*`). Square corners everywhere (`--radius: 0`).
 | `--ui-ink` / `-2` / `-3` | `#111` / `#5c5c58` / `#93938e` | text, secondary, labels |
 | `--ui-accent` | `#0099ff` | primary action, selection, focus, active state |
 | `--ui-accent-wash` | accent 10% | selected chip/segment background |
+| `--ui-ok` / `--ui-warn` / `--ui-danger` | green / amber / red | status squares (saved, saving, error) |
+| `--playhead` | `#ff3b30` in both themes | the timeline playhead, the only red in the editor |
 
 Dark mode redefines the same names under `[data-theme='dark']`. `.ui-app` (on the `/app` and
 `/p` shells) maps the legacy `--accent` to the blue, so shared components follow.
 
 ## Rules
 
-- **Top bars**: white, 48px (`--ui-bar-h`), hairline bottom border. No black bars.
+- **Top bars**: white, 48px (`--ui-bar-h`), hairline bottom border. No black bars. The motion
+  editor uses 44px (`--ui-bar-h-dense`): breadcrumb, centred transport, composition chip.
 - **Buttons**: primary = solid accent; secondary = white with `--ui-line-strong` border.
   Selected chip/segment = accent wash + accent text/border, never solid ink.
 - **Type**: DM Sans for UI; Fragment Mono (`--ui-mono`, self-hosted) for section labels,

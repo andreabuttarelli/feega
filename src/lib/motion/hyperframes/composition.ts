@@ -2,6 +2,7 @@ import { instancesOf, poseAt, type PoseInput } from '../../canvas/composition/po
 import { MEDIA_FRAGMENT_SHADER, MEDIA_UNIFORMS, MEDIA_VERTEX_SHADER } from '../../canvas/composition/shader';
 import { js } from './html';
 import type { PropsOf } from './templates';
+import { ON_DISPOSE, hotScope, hotSeek, keptGl } from './hot';
 
 export type CompositionProps = PropsOf<'Composition'>;
 export type BakedMedia = { url: string; kind: CompositionProps['media'][number]['kind'] };
@@ -69,6 +70,9 @@ export function bakeComposition(id: string, p: CompositionProps, size: { width: 
 
 const STAGE_SCRIPT = `
 import * as THREE from 'three';
+${hotScope(COMPOSITION_READY)}
+${keptGl()}
+let live = true;
 
 function texture(b, m, i, loads) {
   if (m.kind === 'video') {
@@ -89,9 +93,9 @@ function texture(b, m, i, loads) {
 }
 
 function stage(b) {
-  const canvas = document.getElementById('comp-' + b.id);
-  if (!canvas) return null;
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
+  const renderer = keptRenderer('comp-' + b.id, (canvas) => new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true }));
+  if (!renderer) return null;
+  const canvas = renderer.domElement;
   renderer.setPixelRatio(1);
   renderer.setSize(canvas.width, canvas.height, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -115,8 +119,14 @@ function stage(b) {
 }
 
 const stages = BAKES.map(stage).filter(Boolean);
+dropUnused('comp-', BAKES.map((b) => 'comp-' + b.id));
+${ON_DISPOSE}(() => {
+  live = false;
+  stages.forEach((s) => disposeScene(s.scene));
+});
 
 function renderAt(time) {
+  if (!live) return;
   for (const s of stages) {
     const local = Math.min(Math.max(time - s.b.start, 0), s.b.length);
     const stride = CAMERA_FIELDS + s.meshes.length * INSTANCE_FIELDS;
@@ -148,7 +158,7 @@ function renderAt(time) {
 window.__hf = window.__hf || {};
 window.__hf.buildReady = window.__hf.buildReady || {};
 window.__hf.buildReady[READY] = Promise.all(stages.map((s) => s.ready)).then(() => renderAt(window.__hfThreeTime || 0));
-window.addEventListener('hf-seek', (e) => renderAt(e.detail.time));
+${hotSeek('renderAt')}
 const tl = window.__timelines && window.__timelines.main;
 if (tl) {
   tl.to({}, { duration: DURATION, onUpdate: () => renderAt(tl.time()) }, 0);

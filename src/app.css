@@ -149,7 +149,12 @@
   --ui-accent: #0099ff;
   --ui-accent-ink: #ffffff;
   --ui-accent-wash: color-mix(in srgb, var(--ui-accent) 10%, transparent);
+  --ui-ok: #1f9d55;
+  --ui-warn: #d98e04;
+  --ui-danger: #e5484d;
+  --playhead: #ff3b30;
   --ui-bar-h: 48px;
+  --ui-bar-h-dense: 44px;
   --ui-mono: "Fragment Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --ui-text-xs: 11px;
   --ui-text-sm: 12px;
@@ -202,6 +207,9 @@
   --ui-ink: #ededed;
   --ui-ink-2: #a3a3a0;
   --ui-ink-3: #6b6b68;
+  --ui-ok: #30a46c;
+  --ui-warn: #f0a83a;
+  --ui-danger: #ff5a5f;
 }
 
 @layer base {
