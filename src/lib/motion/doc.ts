@@ -15,6 +15,7 @@ import { effectsSchema, effectsProblem } from './effects/model';
 import { BLEND_MODES, BlendMode } from './blend';
 import { animatorsSchema } from './text-animators/model';
 import { DEFAULT_MOTION_BLUR, motionBlurSchema } from './motion-blur';
+import { fieldsSchema } from './template/field-model';
 
 export enum MotionFormat {
   Landscape = '16:9',
@@ -124,6 +125,7 @@ export const motionDocSchema = z
     fonts: fontsSchema,
     background: z.enum([Background.Brand, Background.Transparent]).default(Background.Brand),
     motionBlur: motionBlurSchema,
+    fields: fieldsSchema,
     components: z
       .record(z.string().regex(CUSTOM_NAME, 'component names are PascalCase, e.g. NodeGraph'), customComponentSchema)
       .refine((c) => Object.keys(c).length <= MAX_COMPONENTS, `at most ${MAX_COMPONENTS} custom components`)
@@ -303,6 +305,7 @@ export function newMotionDoc(format: MotionFormat): MotionDoc {
     fonts: [],
     background: Background.Brand,
     motionBlur: DEFAULT_MOTION_BLUR,
+    fields: [],
     components: {}
   };
 }

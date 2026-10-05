@@ -46,6 +46,7 @@
   import MotionPathOverlay from '$lib/components/motion/MotionPathOverlay.svelte';
   import { Align, addMarker, alignClips, allMarkers, distributeClips, loopFrame, nudgeClips, sequenceClips, setWorkArea, staggerClips } from '$lib/motion/organize';
   import ExportDialog from '$lib/components/motion/ExportDialog.svelte';
+  import TemplateDialog from '$lib/components/motion/TemplateDialog.svelte';
   import SoundDialog, { type Made, type SoundKind } from '$lib/components/motion/SoundDialog.svelte';
   import ChatPanel from '$lib/components/brand-agent/ChatPanel.svelte';
   import { AssetKind, COMPONENTS, LIBRARY_IDS, TrackKind, type ComponentId } from '$lib/motion/components';
@@ -118,6 +119,8 @@
   const UPLOAD_WEIGHT = 400;
   let adding = $state(false);
   let exporting = $state(false);
+  let templating = $state(false);
+  let previewDoc = $state<MotionDoc | null>(null);
   let sounding = $state<SoundKind | null>(null);
   let madeAssets = $state<PageData['assets']>([]);
   let analyses = $state<Record<string, AudioAnalysis>>({});
@@ -136,7 +139,7 @@
   const beats = $derived(hitFrames(doc, analyses, Hit.Beats));
   const assets = $derived([...madeAssets, ...data.assets]);
   const assetUrls = $derived(Object.fromEntries(assets.filter((a) => a.url).map((a) => [a.id, a.url as string])));
-  const html = $derived(composeHtml({ doc, tokens: data.tokens, assets: assetUrls, analyses }));
+  const html = $derived(composeHtml({ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls, analyses }));
   const selected = $derived(selection.length === 1 ? (findClip(doc, selection[0])?.clip ?? null) : null);
   const editorUrl = $derived(`/p/${data.projectId}/c/${data.canvas.id}/motion/${data.node.id}`);
   const agentUrl = $derived(`/api/v1/projects/${data.projectId}/motion/${data.node.id}/agent`);
@@ -694,6 +697,7 @@
     {/if}
     <ThemeSwitch />
     <span class="save" data-testid="save-state">{saveState} · v{version}</span>
+    <button type="button" onclick={() => (leaveTo(0), (templating = true))} data-testid="template-open">Template</button>
     <button type="button" class="render" onclick={() => (leaveTo(0), (exporting = true))} data-testid="export-open"><Film size={14} /> Export</button>
   </header>
 
@@ -711,6 +715,21 @@
       render={exportFrames}
       server={{ ...data.serverRender, version, saved: saveState === SaveState.Saved, assetHref: (id: string) => `/p/${data.projectId}/c/${data.canvas.id}/assets/${id}` }}
       onclose={() => (exporting = false)}
+    />
+  {/if}
+
+  {#if templating}
+    <TemplateDialog
+      {doc}
+      clip={selected}
+      {editorUrl}
+      {version}
+      saved={saveState === SaveState.Saved}
+      batch={data.batch}
+      assetHref={(id: string) => `/p/${data.projectId}/c/${data.canvas.id}/assets/${id}`}
+      onchange={apply}
+      onpreview={(next) => (previewDoc = next)}
+      onclose={() => (templating = false)}
     />
   {/if}
 

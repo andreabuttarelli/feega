@@ -6,7 +6,8 @@ import { canvasReachable } from '$lib/server/uncensored-workspace/workspace-serv
 import { assetUrls, findMotionNode, headOrNew, motionAssets, motionTokens, saveMotionDoc } from '$lib/server/motion/editor';
 import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
 import { motionRenderFarm, motionRenderStorage } from '$lib/server/motion/renderer';
-import { cancelRender, renderRequest, renderView, startRender } from '$lib/server/motion/render-run';
+import { batchView, cancelRender, renderRequest, renderView, startBatch, startRender } from '$lib/server/motion/render-run';
+import { batchInput, rowRequests } from '$lib/server/motion/batch-input';
 import { parseSettings } from '$lib/motion/export-formats';
 import { listNodeRuns } from '$lib/server/repos/node-runs';
 import { SIGNED_URL_TTL_S } from '$lib/server/repos/asset-storage';
@@ -65,7 +66,8 @@ export const load: PageServerLoad = async ({ locals, params }) => {
     head: { version: head.version, doc: head.doc },
     tokens,
     assets,
-    serverRender: { configured: farm !== null, latest: renderView(runs), uploadLimit }
+    serverRender: { configured: farm !== null, latest: renderView(runs), uploadLimit },
+    batch: batchView(runs)
   };
 };
 
@@ -186,6 +188,49 @@ export const actions: Actions = {
     const renderScope = { ...nodeScope, projectId: params.projectId, userId: scope.userId, editorUrl };
     const started = await startRender(scope.db, motionRenderFarm(), renderScope, req, motionRenderStorage());
     return started.ok ? { runId: started.runId, quote: started.quote } : fail(HTTP_UNAVAILABLE, { error: started.error, detail: started.detail });
+  },
+
+  renderBatch: async ({ locals, params, request }) => {
+    const scope = await scopeFor(locals, params);
+    const form = await request.formData();
+    const settings = parseSettings(form.get('settings') as string | null);
+    const input = batchInput(form.get('rows') as string | null);
+    if (!settings.ok) {
+      return fail(HTTP_BAD_REQUEST, { error: settings.error });
+    }
+    if (!input.ok) {
+      return fail(HTTP_BAD_REQUEST, { error: input.error });
+    }
+    const nodeScope = { orgId: scope.orgId, nodeId: scope.motion.record.id };
+    const head = await headOrNew(scope.db, nodeScope, scope.motion.node);
+    if (head.version !== Number(form.get('version'))) {
+      return fail(HTTP_CONFLICT, { error: 'save_first' });
+    }
+
+    const denied = await gateOrgAiActionForForm(scope.orgId);
+    if (denied) {
+      return fail(denied.status, denied.data);
+    }
+
+    const [assets, tokens] = await Promise.all([
+      motionAssets({ db: scope.db, orgId: scope.orgId, projectId: params.projectId, canvasId: scope.canvas.id, nodeId: scope.motion.record.id }, SIGNED_URL_TTL_S.render),
+      motionTokens(scope.db, { orgId: scope.orgId, brandId: scope.projectBrandId })
+    ]);
+    const rows = rowRequests(head, input.rows, { tokens, assets: assetUrls(assets) }, settings.settings);
+    if (!rows.ok) {
+      return fail(HTTP_BAD_REQUEST, { error: 'invalid_row', detail: rows.error });
+    }
+
+    const editorUrl = `/p/${params.projectId}/c/${params.canvasId}/motion/${params.nodeId}`;
+    const renderScope = { ...nodeScope, projectId: params.projectId, userId: scope.userId, editorUrl };
+    const started = await startBatch(scope.db, motionRenderFarm(), renderScope, rows.rows, motionRenderStorage());
+    return started.ok ? started : fail(HTTP_UNAVAILABLE, { error: started.error, detail: started.detail });
+  },
+
+  batchStatus: async ({ locals, params }) => {
+    const scope = await scopeFor(locals, params);
+    const runs = await listNodeRuns(scope.db, { orgId: scope.orgId, nodeId: scope.motion.record.id });
+    return { batch: batchView(runs) };
   },
 
   cancelRender: async ({ locals, params }) => {
