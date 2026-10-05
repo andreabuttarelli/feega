@@ -6,7 +6,7 @@ vi.mock('node:dns/promises', () => ({ lookup: vi.fn(async () => [{ address: '93.
 
 import sharp from 'sharp';
 import type { Db } from '$lib/server/db/client';
-import { importImageAsset, IMPORT_MAX_BYTES } from './asset-import';
+import { importImageAsset, IMPORT_MAX_BYTES, IMPORT_MAX_EDGE } from './asset-import';
 
 const SCOPE = { orgId: 'org1', projectId: 'proj1', canvasId: 'canvas1' };
 
@@ -60,6 +60,16 @@ describe('importImageAsset: a picture from the web becomes a project asset', () 
     expect(uploads[0]).toMatchObject({ bucket: 'canvas-assets', type: 'image/png' });
     expect(uploads[0].path).toMatch(/^org1\/proj1\/imports\/.+\.png$/);
     expect(rows[0]).toMatchObject({ org_id: 'org1', project_id: 'proj1', type: 'image', source: 'imported', url: uploads[0].path });
+  });
+
+  it('scales a huge photo down to what a video frame can show, so the preview loads it in time', async () => {
+    serves('image/jpeg', await sharp({ create: { width: 4000, height: 3000, channels: 3, background: '#888' } }).jpeg().toBuffer());
+    const { db, uploads } = fakeDb();
+
+    const out = await importImageAsset(db, SCOPE, 'https://brand.example/huge.jpg');
+
+    expect(out).toMatchObject({ ok: true, width: IMPORT_MAX_EDGE, height: IMPORT_MAX_EDGE * 0.75 });
+    expect(uploads[0]).toMatchObject({ type: 'image/jpeg' });
   });
 
   it('keeps an SVG logo as SVG, even when the server calls it text/plain', async () => {
