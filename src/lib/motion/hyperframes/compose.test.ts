@@ -4,7 +4,8 @@ import { TransitionKind } from '../design';
 import { Background, MotionFormat, newMotionDoc, type MotionDoc } from '../doc';
 import { installEngine, testTimeline } from '../engine/testing';
 import { engineScript } from '../engine/engine';
-import { addClip, setKeyframes, setTransform, setTransition, Side, type OpResult } from '../timeline';
+import { addClip, setJunction, setKeyframes, setTransform, setTransition, Side, type OpResult } from '../timeline';
+import { JunctionKind } from '../junctions';
 import { LIBRARY_IDS } from '../components';
 import { Ease } from '../design';
 import { findClip } from '../doc';
@@ -422,3 +423,22 @@ describe('audio-reactive composition', () => {
     expect(composeHtml({ doc: reactive, tokens: FEEGA_TOKENS, assets: { m: '/m.mp3' }, analyses })).not.toBe(composeHtml({ doc: reactive, tokens: FEEGA_TOKENS, assets: { m: '/m.mp3' } }));
   });
 });
+
+describe('transitions between clips', () => {
+  const cut = must(addClip(must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Shape', from: 0, durationInFrames: 90 }, 'a')), { component: 'Shape', from: 90, durationInFrames: 90 }, 'b'));
+
+  it('a cross dissolve overlaps the two clips across the cut and fades the arriving one in', () => {
+    const html = compose(must(setJunction(cut, 'b', { kind: JunctionKind.Crossfade, durationInFrames: 12 })));
+
+    expect(html).toContain('data-clip="b" data-start="2.8"');
+    expect(html).toContain('tl.fromTo("#fx-b",{"opacity":0},{"opacity":1,"duration":0.4,"ease":"none","immediateRender":false},2.8);');
+  });
+
+  it('a dip to black darkens the first clip, then lights the second', () => {
+    const html = compose(must(setJunction(cut, 'b', { kind: JunctionKind.DipToBlack, durationInFrames: 12 })));
+
+    expect(html).toContain('tl.fromTo("#fx-a",{"filter":"brightness(1)"},{"filter":"brightness(0)","duration":0.2');
+    expect(html).toContain('{"opacity":1,"filter":"brightness(1)","duration":0.2');
+  });
+});
+

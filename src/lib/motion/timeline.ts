@@ -2,7 +2,8 @@ import { COMPONENTS, TrackKind, defaultProps, type ComponentId } from './compone
 import { Strictness } from './custom/component';
 import { withParams } from './custom/params';
 import { FPS, MAX_SECONDS, TransitionKind, maxFrames, type Edge } from './design';
-import { FORMATS, byFrame, clipProps, compRefProblem, findClip, fontsOfClip, newClip, type Background, type MotionClip, type MotionDoc, type MotionFormat, type MotionTrack } from './doc';
+import { MAX_JUNCTION_FRAMES, junctionProblem, type Junction } from './junctions';
+import { FORMATS, byFrame, clipsOf, clipProps, compRefProblem, findClip, fontsOfClip, newClip, type Background, type MotionClip, type MotionDoc, type MotionFormat, type MotionTrack } from './doc';
 import { Ease } from './design';
 import { Matte, isMaskKey, maskSchema, maskStackSchema, type MaskInput } from './mask';
 import { matteSource } from './matte';
@@ -212,6 +213,21 @@ export function setTransition(doc: MotionDoc, clipId: string, side: Side, edge: 
     const durationInFrames = Math.min(Math.max(0, Math.round(edge.durationInFrames)), clip.durationInFrames);
     const next = { kind: edge.kind, durationInFrames };
     return side === Side.In ? { ...clip, transitionIn: next } : { ...clip, transitionOut: next };
+  });
+}
+
+export function setJunction(doc: MotionDoc, clipId: string, junction: Junction | null): OpResult {
+  const problem = junction ? junctionProblem(doc, clipId) : null;
+  if (problem) {
+    return fail(problem);
+  }
+  const partner = junction ? clipsOf(doc).find((c) => c.from + c.durationInFrames === findClip(doc, clipId)?.clip.from) : null;
+  return editClip(doc, clipId, (clip) => {
+    if (!junction) {
+      return { ...clip, junction: null };
+    }
+    const longest = Math.min(MAX_JUNCTION_FRAMES, 2 * Math.min(clip.durationInFrames, partner?.durationInFrames ?? clip.durationInFrames));
+    return { ...clip, junction: { kind: junction.kind, durationInFrames: Math.max(2, Math.min(longest, Math.round(junction.durationInFrames))) } };
   });
 }
 
