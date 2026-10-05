@@ -1,6 +1,5 @@
 import { loadSession } from '../lib/auth.ts';
 import { awaitRun, motionApi, type MotionRun } from '../lib/motion.ts';
-import { info, section, warn } from '../lib/display.ts';
 
 type AskOpts = { org?: string; wait?: boolean };
 
@@ -27,7 +26,7 @@ export async function cmdMotionRun(runId: string, opts: { org?: string }) {
 }
 
 function printRun(run: MotionRun) {
-  section(`run ${run.run_id}: ${run.status}`);
+  console.log(`run ${run.run_id}: ${run.status}`);
   if (run.reply) {
     console.log(run.reply);
   }
@@ -38,9 +37,9 @@ function printRun(run: MotionRun) {
     console.log(`  cost     $${run.cost_usd.toFixed(4)}`);
   }
   if (run.error) {
-    warn(run.error);
+    console.error(run.error);
   }
   if (run.status === 'running') {
-    info(`Still running. Check later: feega motion run ${run.run_id}`);
+    console.log(`Still running. Check later: feega motion run ${run.run_id}`);
   }
 }
