@@ -73,6 +73,38 @@ describe('motion agent mask tools', () => {
     expect(findClip(session.doc, 'id1')!.clip.matte).toBe('alpha');
   });
 
+  it('set_track_matte takes any clip above, a video too, and the inverted mattes', async () => {
+    const { session, run } = setup();
+    await run('add_clip', { component: 'Image', start: 0, props: { assetId: 'pic' } });
+    await run('add_track', { kind: 'visual' });
+    await run('add_clip', { component: 'Video', start: 0, track_id: 'id2', props: { assetId: 'pic' } });
+
+    for (const matte of ['alpha-inverted', 'luma', 'luma-inverted']) {
+      const out = await run('set_track_matte', { clip_id: 'id1', matte });
+      expect(out.ok).toBe(true);
+      expect(findClip(session.doc, 'id1')!.clip.matte).toBe(matte);
+    }
+  });
+
+  it('set_mask_stack folds more masks into the first one, each by its mode', async () => {
+    const { session, run } = setup();
+    await run('add_clip', { component: 'Image', start: 0, props: { assetId: 'pic' } });
+
+    const lonely = await run('set_mask_stack', { clip_id: 'id1', masks: [{ kind: 'rect', mode: 'subtract' }] });
+    expect(lonely.ok).toBe(false);
+
+    await run('set_mask', { clip_id: 'id1', mask: { kind: 'ellipse', mode: 'add' } });
+    expect((await run('set_mask_stack', { clip_id: 'id1', masks: [{ kind: 'luma', assetId: 'nope' }] })).ok).toBe(false);
+    const out = await run('set_mask_stack', { clip_id: 'id1', masks: [{ kind: 'rect', mode: 'subtract', width: 0.2 }, { kind: 'ellipse', mode: 'difference' }] });
+
+    expect(out.ok).toBe(true);
+    expect(findClip(session.doc, 'id1')!.clip.maskStack.map((m) => m.mode)).toEqual(['subtract', 'difference']);
+    expect(JSON.stringify(out.doc)).toContain('"maskStack":[{"kind":"rect"');
+
+    await run('remove_mask', { clip_id: 'id1' });
+    expect(findClip(session.doc, 'id1')!.clip.maskStack).toEqual([]);
+  });
+
   it('the prompt teaches masks and mattes', () => {
     const prompt = motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Available });
 

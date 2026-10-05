@@ -18,8 +18,8 @@ import { cspMeta } from './csp';
 import { THREE_VERSION } from './three';
 import { Library, THREE_GLOBAL, bootScript, definitionScript, librariesOf, seedOf, type CustomRun } from '../custom/runtime';
 import { PropFormat, type CustomComponents } from '../custom/component';
-import { hiddenMattes, matteMask, matteSource } from '../matte';
-import { Matte, type Mask } from '../mask';
+import { mattePairs, type MattePair } from '../matte';
+import { matteScript, matteWrapper } from './mattes';
 import { Composite, cameraMath, stageSpec } from '../camera';
 import { sampleTrack } from '../keyframes';
 import { STAGE_CSS, stageRootStyle, stageScript } from './stage';
@@ -133,22 +133,13 @@ function ownMask(clip: MotionClip, ctx: TemplateCtx<ComponentId>, inner: string)
   if (!clip.mask) {
     return inner;
   }
-  return maskLayer({ scope: MaskScope.Own, clipId: clip.id, mask: clip.mask, values: startValues(clip.mask, clip.keyframes), frame: ctx, url: ctx.asset(clip.mask.assetId) }, inner);
+  const primary = { mask: clip.mask, values: startValues(clip.mask, clip.keyframes), url: ctx.asset(clip.mask.assetId) };
+  const stacked = clip.maskStack.map((mask) => ({ mask, values: startValues(mask, {}), url: ctx.asset(mask.assetId) }));
+  return maskLayer({ scope: MaskScope.Own, clipId: clip.id, masks: [primary, ...stacked], frame: ctx }, inner);
 }
 
-function matteOf(doc: MotionDoc, clip: MotionClip): Mask | null {
-  if (clip.matte === Matte.None) {
-    return null;
-  }
-  const source = matteSource(doc, clip.id);
-  return source ? matteMask(source, clip.matte) : null;
-}
-
-function matted(clip: MotionClip, ctx: TemplateCtx<ComponentId>, matte: Mask | null, inner: string): string {
-  if (!matte) {
-    return inner;
-  }
-  return maskLayer({ scope: MaskScope.Matte, clipId: clip.id, mask: matte, values: startValues(matte, {}), frame: ctx, url: ctx.asset(matte.assetId) }, inner);
+function matted(matte: MattePair | null, inner: string): string {
+  return matte ? matteWrapper(matte, inner) : inner;
 }
 
 enum Visibility {
@@ -156,11 +147,11 @@ enum Visibility {
   MatteSource = 'matte-source'
 }
 
-type Placed = { layer: number; trackIndex: number; matte: Mask | null; visibility: Visibility; transform?: string; chain: MotionClip[]; held: boolean };
+type Placed = { layer: number; trackIndex: number; matte: MattePair | null; visibility: Visibility; transform?: string; chain: MotionClip[]; held: boolean };
 
 function clipHtml(clip: MotionClip, ctx: TemplateCtx<ComponentId>, placed: Placed): string {
   const template = TEMPLATES[clip.component] as (typeof TEMPLATES)[ComponentId];
-  const inner = matted(clip, ctx, placed.matte, wrapParents(placed.chain, clip, ctx, wrapAnimated(clip, ctx, effectLayer(clip, ctx, ctx.color, ownMask(clip, ctx, template.html(ctx as never))))));
+  const inner = matted(placed.matte, wrapParents(placed.chain, clip, ctx, wrapAnimated(clip, ctx, effectLayer(clip, ctx, ctx.color, ownMask(clip, ctx, template.html(ctx as never))))));
   const fx = `<div class="fx" id="fx-${clip.id}">${inner}</div>`;
   const style = css({ zIndex: placed.layer, transform: placed.transform, mixBlendMode: blendStyle(clip.blend) });
   const blur = placed.held ? ` ${HELD}` : '';
@@ -169,7 +160,7 @@ function clipHtml(clip: MotionClip, ctx: TemplateCtx<ComponentId>, placed: Place
       ? `<div class="layer" data-clip="${esc(clip.id)}"${blur} style="${style}">${fx}</div>`
       : `<div id="c-${clip.id}" class="clip layer" data-clip="${esc(clip.id)}" data-start="${ctx.start}" data-duration="${ctx.length}" data-track-index="${placed.trackIndex}"${blur} style="${style}">${fx}</div>`;
 
-  return placed.visibility === Visibility.MatteSource ? `<div class="matte-src" style="display:none">${layer}</div>` : layer;
+  return placed.visibility === Visibility.MatteSource ? `<div class="matte-src" style="${css({ opacity: 0, pointerEvents: 'none' })}">${layer}</div>` : layer;
 }
 
 function tweenLine(t: Tween): string {
@@ -355,7 +346,9 @@ export function composeHtml(raw: ComposeInput): string {
   const shapes: ShapeBake[] = [];
   const clips: MotionClip[] = [];
   const runs: CustomRun[] = [];
-  const hidden = hiddenMattes(doc);
+  const pairs = mattePairs(doc);
+  const matteOf = new Map(pairs.map((p) => [p.target, p]));
+  const hidden = new Set(pairs.map((p) => p.source));
   const stage = doc.camera ? stageSpec(doc) : null;
   const onStage = new Set(stage?.layers.filter((l) => l.composite === Composite.World).map((l) => l.id));
   const startPose = new Map(stage ? cameraMath(sampleTrack).frameAt(stage, 0).layers.map((l) => [l.id, l.transform]) : []);
@@ -370,8 +363,8 @@ export function composeHtml(raw: ComposeInput): string {
       clips.push(clip);
       const template = TEMPLATES[clip.component] as (typeof TEMPLATES)[ComponentId];
       layer += 1;
-      const html = clipHtml(clip, ctx, { layer, trackIndex: index, matte: matteOf(doc, clip), visibility: hidden.has(clip.id) ? Visibility.MatteSource : Visibility.Shown, transform: startPose.get(clip.id), chain: ancestorsOf(doc, clip.id).map((id) => byId.get(id)!), held: held.has(clip.id) });
-      (onStage.has(clip.id) ? world : layers).push(html);
+      const html = clipHtml(clip, ctx, { layer, trackIndex: index, matte: matteOf.get(clip.id) ?? null, visibility: hidden.has(clip.id) ? Visibility.MatteSource : Visibility.Shown, transform: startPose.get(clip.id), chain: ancestorsOf(doc, clip.id).map((id) => byId.get(id)!), held: held.has(clip.id) });
+      (onStage.has(clip.id) && !hidden.has(clip.id) ? world : layers).push(html);
       const own = template.tweens?.(ctx as never) ?? [];
       tweens.push(...edgeTweens(clip, doc.fps), ...moveTweens(clip, doc.fps), ...own);
       holds.push(...heldUntilStart(own, ctx.start));
@@ -430,6 +423,7 @@ export function composeHtml(raw: ComposeInput): string {
     fontProbe(doc),
     '</div>',
     `<script>${animation.setup}const tl=${ENGINE}.timeline();${holds.map(holdLine).join('')}${tweens.map(tweenLine).join('')}${animation.timeline}${effectScript(clips.flatMap((c) => effectTimeline(c, doc, (v) => resolveColor(v, tokens))))}${held.size ? holdScript(doc.fps, doc.motionBlur) : ''}tl.set({}, {}, ${duration});window.__timelines=window.__timelines||{};window.__timelines[${js(COMPOSITION_ID)}]=tl;</script>`,
+    matteScript(pairs, Number(duration)),
     definitions,
     customBoot,
     stage ? `<script>${stageScript(stage, doc.fps, Number(duration))}</script>` : '',

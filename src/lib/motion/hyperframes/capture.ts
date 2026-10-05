@@ -101,6 +101,7 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
       .then(painted)
       .then(mediaReady)
       .then(painted)
+      .then(() => (window as unknown as { __hfWaitForSeekCompletion?: () => Promise<void> }).__hfWaitForSeekCompletion?.())
       .then(() => inline(root, shrink, shrunk))
       .then(() => (fonts ??= tool().getFontEmbedCSS(root)))
       .then((embed) => freeze().then((thaw) => output[m.format](root, m, embed).finally(thaw)))

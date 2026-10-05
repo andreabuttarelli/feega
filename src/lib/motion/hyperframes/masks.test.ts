@@ -5,8 +5,10 @@ import { TrackKind } from '../components';
 import { Ease } from '../design';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '../doc';
 import { sampleTrack } from '../keyframes';
-import { MaskKind, Matte, type MaskInput } from '../mask';
-import { addClip, addTrack, setKeyframes, setMask, setTrackMatte, type OpResult } from '../timeline';
+import { MaskKind, MaskMode, Matte, combineMasks, type MaskInput } from '../mask';
+import { addClip, addTrack, setKeyframes, setMask, setMaskStack, setTrackMatte, type OpResult } from '../timeline';
+import { CssComposite, stackLayers } from './masks';
+import { MATTE_RUNTIME } from './mattes';
 import { keyframeTweens } from './animate';
 import { composeHtml } from './compose';
 
@@ -185,6 +187,13 @@ describe('frames the agent sees', () => {
     expect(capture.indexOf('freeze().then')).toBeLessThan(capture.indexOf('output[m.format]'));
     expect(capture.indexOf('freeze().then')).toBeGreaterThan(-1);
   });
+
+  it('a capture waits for every seek to settle, mattes included, before it freezes', () => {
+    const capture = [...masked({ kind: MaskKind.Ellipse }).matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]).find((s) => s.includes('feega:capture'))!;
+
+    expect(capture.indexOf('__hfWaitForSeekCompletion')).toBeGreaterThan(-1);
+    expect(capture.indexOf('__hfWaitForSeekCompletion')).toBeLessThan(capture.indexOf('freeze().then'));
+  });
 });
 
 describe('track matte composition', () => {
@@ -193,17 +202,37 @@ describe('track matte composition', () => {
   );
   const matted = must(setTrackMatte(stacked, 'img', Matte.Alpha));
 
-  it('the matte source is hidden, still timed', () => {
-    expect(compose(matted)).toMatch(/<div class="matte-src" style="display:none"><div id="c-title" class="clip layer"/);
+  it('the matte source stays laid out and timed, drawn nowhere, so the page can render it', () => {
+    expect(compose(matted)).toMatch(/<div class="matte-src" style="opacity:0;pointer-events:none"><div id="c-title" class="clip layer"/);
     expect(compose(stacked)).not.toContain('matte-src');
   });
 
-  it('the matted clip is cut by the source shape, in frame space', () => {
+  it('the matted clip waits for the rendered source: hidden until the first matte lands', () => {
     const html = compose(matted);
 
-    expect(html).toMatch(/<div class="fx" id="fx-img"><svg class="kd"[^>]*><defs>.*<mask id="tk-img"/);
-    expect(html).toContain('<div class="kt" id="kt-img" style="mask:url(#tk-img);-webkit-mask:url(#tk-img)">');
-    expect(html).toMatch(/<text [^>]*>GO<\/text>/);
+    expect(html).toContain('<div class="kt" id="kt-img" style="mask:linear-gradient(#0000,#0000);-webkit-mask:linear-gradient(#0000,#0000)">');
+    expect(html).not.toMatch(/<mask id="tk-img"/);
+    expect(html).toContain(JSON.stringify([{ target: 'img', source: 'title', matte: Matte.Alpha }]));
+  });
+
+  it('an inverted matte shows the clip until the source is drawn', () => {
+    expect(compose(must(setTrackMatte(stacked, 'img', Matte.AlphaInverted)))).toContain('<div class="kt" id="kt-img">');
+  });
+
+  it('a video above is a matte too', () => {
+    const video = must(addClip(must(addTrack(base, TrackKind.Visual, 'top')), { component: 'Video', from: 30, durationInFrames: 120, trackId: 'top', props: { assetId: 'pic' } }, 'vid'));
+    const html = compose(must(setTrackMatte(video, 'img', Matte.Luma)));
+
+    expect(html).toContain(JSON.stringify([{ target: 'img', source: 'vid', matte: Matte.Luma }]));
+    expect(html).toMatch(/<div class="matte-src" style="opacity:0;pointer-events:none"><div class="layer" data-clip="vid"/);
+  });
+
+  it('the matte renders on real frames, since the server render freezes the page clock', () => {
+    expect(compose(matted)).toContain('originalRequestAnimationFrame');
+  });
+
+  it('a page without mattes carries no matte runtime', () => {
+    expect(compose(stacked)).not.toContain(MATTE_RUNTIME);
   });
 
   it('a matte and a mask combine on the same clip', () => {
@@ -211,5 +240,39 @@ describe('track matte composition', () => {
 
     expect(html).toContain('id="kt-img"');
     expect(html).toContain('id="km-img"');
+  });
+});
+
+describe('several masks on one clip', () => {
+  type Css = (top: number, below: number) => number;
+  const CSS: Record<CssComposite, Css> = {
+    [CssComposite.Add]: (s, d) => s + d * (1 - s),
+    [CssComposite.Subtract]: (s, d) => s * (1 - d),
+    [CssComposite.Intersect]: (s, d) => s * d,
+    [CssComposite.Exclude]: (s, d) => s * (1 - d) + d * (1 - s)
+  };
+  const css = (modes: MaskMode[], levels: number[]) => {
+    const layers = stackLayers(modes);
+    return layers.map((layer, i) => (layer.flip ? 1 - levels[i] : levels[i])).reduce((below, level, i) => (i === 0 ? level : CSS[layers[i].composite](level, below)), 0);
+  };
+
+  it.each([
+    [[MaskMode.Add, MaskMode.Add, MaskMode.Subtract]],
+    [[MaskMode.Subtract, MaskMode.Intersect]],
+    [[MaskMode.Add, MaskMode.Difference, MaskMode.Intersect]],
+    [[MaskMode.Intersect, MaskMode.Subtract, MaskMode.Difference, MaskMode.Add]]
+  ])('the CSS mask layers of %j give what the modes promise', (modes) => {
+    const levels = [0.7, 0.4, 0.55, 0.2].slice(0, modes.length);
+
+    expect(css(modes, levels)).toBeCloseTo(combineMasks(modes.map((mode, i) => ({ mode, level: levels[i] }))), 10);
+  });
+
+  it('a stacked clip lists one SVG mask per layer, last mask on top, with its composite', () => {
+    const doc = must(setMaskStack(must(setMask(base, 'img', { kind: MaskKind.Ellipse })), 'img', [{ kind: MaskKind.Rect, mode: MaskMode.Subtract }]));
+    const html = compose(doc);
+
+    expect(html).toContain('<mask id="mk-img"');
+    expect(html).toContain('<mask id="m1k-img"');
+    expect(html).toContain('style="mask:url(#m1k-img),url(#mk-img);-webkit-mask:url(#m1k-img),url(#mk-img);mask-composite:intersect,add"');
   });
 });

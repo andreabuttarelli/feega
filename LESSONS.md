@@ -40,6 +40,13 @@ frame × 8 campioni a 1080p, uguale a 4 vCPU). Segnale: tempo identico cambiando
 `workers` esplicito nella config intera (6 su 8 vCPU: 99 s, ~51 ms per campione) e un tetto di
 campioni (`BLUR_BUDGET` in `farm-render.ts`) che stia nei 300 s della funzione.
 
+### Un render sul farm che muore con `stream_ended_early` e zero frame catturati
+Il producer gira in screenshot mode con tempo virtuale: `requestAnimationFrame` è finto e non
+scatta mai durante un `waitUntil` di `hf-seek`. Una promessa che lo aspetta (html-to-image lo
+usa per caricare l'immagine) blocca il seek per sempre. Segnale: `framesCompleted: 0` per minuti
+nel log del producer. Mossa: riprodurre in locale con `@hyperframes/producer` (`executeRenderJob`)
+e, nel lavoro asincrono di un seek, usare `__HF_VIRTUAL_TIME__.originalRequestAnimationFrame`.
+
 ### Un render che fallisce dopo minuti senza log: guarda prima la durata del doc di prova
 Un doc costruito a mano con `addClip` si allunga da solo quando una clip arrotondata finisce oltre
 la fine: 51 frame invece di 50 sembrano un errore del producer. Mossa: stampa `job.totalFrames`

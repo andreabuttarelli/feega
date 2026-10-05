@@ -14,7 +14,43 @@ export enum MaskKind {
 export enum Matte {
   None = 'none',
   Alpha = 'alpha',
-  Luma = 'luma'
+  AlphaInverted = 'alpha-inverted',
+  Luma = 'luma',
+  LumaInverted = 'luma-inverted'
+}
+
+export const MATTE_LABEL: Record<Matte, string> = {
+  [Matte.None]: 'None',
+  [Matte.Alpha]: 'Alpha of the clip above',
+  [Matte.AlphaInverted]: 'Inverted alpha of the clip above',
+  [Matte.Luma]: 'Luma of the clip above',
+  [Matte.LumaInverted]: 'Inverted luma of the clip above'
+};
+
+export enum MaskMode {
+  Add = 'add',
+  Subtract = 'subtract',
+  Intersect = 'intersect',
+  Difference = 'difference'
+}
+
+type Fold = { seed: number; fold: (kept: number, level: number) => number };
+
+const FOLD: Record<MaskMode, Fold> = {
+  [MaskMode.Add]: { seed: 0, fold: (kept, level) => kept + level - kept * level },
+  [MaskMode.Subtract]: { seed: 1, fold: (kept, level) => kept * (1 - level) },
+  [MaskMode.Intersect]: { seed: 1, fold: (kept, level) => kept * level },
+  [MaskMode.Difference]: { seed: 0, fold: (kept, level) => kept + level - 2 * kept * level }
+};
+
+export const MASK_MODES = Object.values(MaskMode) as [MaskMode, ...MaskMode[]];
+export const MAX_MASK_STACK = 7;
+
+export type MaskLevel = { mode: MaskMode; level: number };
+
+export function combineMasks(levels: MaskLevel[]): number {
+  const seed = levels.length ? FOLD[levels[0].mode].seed : 0;
+  return levels.reduce((kept, { mode, level }) => FOLD[mode].fold(kept, level), seed);
 }
 
 export enum Needs {
@@ -83,6 +119,7 @@ const NEEDS_MET: Record<Needs, (mask: { assetId: string | null; text: string }) 
 export const maskSchema = z
   .object({
     kind: z.enum(MASK_KIND_IDS),
+    mode: z.enum(MASK_MODES).default(MaskMode.Add),
     x: numeric('maskX'),
     y: numeric('maskY'),
     width: numeric('maskWidth'),
@@ -97,6 +134,8 @@ export const maskSchema = z
     text: z.string().max(120).default('TEXT')
   })
   .refine((m) => NEEDS_MET[MASK_KINDS[m.kind].needs](m), { message: 'this mask kind needs an asset (image, luma) or text (text)' });
+
+export const maskStackSchema = z.array(maskSchema).max(MAX_MASK_STACK);
 
 export type Mask = z.output<typeof maskSchema>;
 export type MaskInput = z.input<typeof maskSchema>;

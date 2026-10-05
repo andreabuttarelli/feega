@@ -5,7 +5,7 @@ import { MAX_COMPONENTS, Strictness, customComponentSchema, customValues, type C
 import { FASTEST_RATE, FPS, FRAME_RATES, MAX_SECONDS, TRANSITION_KINDS, TransitionKind, maxFrames } from './design';
 import { motionPathSchema } from './path';
 import { keyframeSchema, keyframesProblem, transformSchema } from './keyframes';
-import { MATTES, Matte, maskSchema } from './mask';
+import { MATTES, Matte, maskSchema, maskStackSchema } from './mask';
 import { lookSchema } from './look';
 import { DEPTH, SPACES, Space, cameraSchema, depthSchema } from './camera';
 import { PARENT_OPACITIES, ParentOpacity, parentProblem } from './parent';
@@ -67,6 +67,7 @@ const clipSchema = z.object({
   transform: transformSchema.default({}),
   keyframes: z.record(z.string(), z.array(keyframeSchema).min(1)).default({}),
   mask: maskSchema.nullable().default(null),
+  maskStack: maskStackSchema.default([]),
   matte: z.enum(MATTES).default(Matte.None),
   depth: depthSchema.default(DEPTH.fallback),
   space: z.enum(SPACES).default(Space.World),
@@ -257,6 +258,7 @@ export function newClip(fields: Pick<MotionClip, 'id' | 'from' | 'durationInFram
     transform: {},
     keyframes: {},
     mask: null,
+    maskStack: [],
     matte: Matte.None,
     depth: DEPTH.fallback,
     space: Space.World,
