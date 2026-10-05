@@ -4,6 +4,15 @@ import { SCREENSHOT_URL } from './capture';
 import { MaskScope } from './masks';
 
 export const MATTE_RUNTIME = '__feegaMattes';
+export const MATTE_DRAFT_SCALE = 0.25;
+export const MATTE_SETTLE_MS = 150;
+
+enum Pass {
+  Draft = 0,
+  Exact = 1
+}
+
+const PASS_SCALE: Record<Pass, number> = { [Pass.Draft]: MATTE_DRAFT_SCALE, [Pass.Exact]: 1 };
 
 const WRAPPER = `k${MaskScope.Matte}`;
 const EMPTY = 'linear-gradient(#0000,#0000)';
@@ -14,7 +23,7 @@ export function matteWrapper(pair: MattePair, inner: string): string {
   return `<div class="${WRAPPER}" id="${WRAPPER}-${pair.target}"${style}>${inner}</div>`;
 }
 
-type RuntimeConfig = { pairs: MattePair[]; reads: typeof MATTE_READ; lib: string; wrapper: string; global: string };
+type RuntimeConfig = { pairs: MattePair[]; reads: typeof MATTE_READ; lib: string; wrapper: string; global: string; scales: Record<Pass, number>; settleMs: number; exact: Pass; draft: Pass };
 type HtmlToImage = {
   toCanvas: (node: HTMLElement, options: Record<string, unknown>) => Promise<HTMLCanvasElement>;
   getFontEmbedCSS: (node: HTMLElement) => Promise<string>;
@@ -50,27 +59,27 @@ function matteRuntime(cfg: RuntimeConfig, alphaOf: typeof matteAlpha, tl: { to: 
   };
   const blank = (width: number, height: number) => Object.assign(document.createElement('canvas'), { width, height });
 
-  const render = async (source: HTMLElement, id: string, width: number, height: number) => {
+  const render = async (source: HTMLElement, id: string, width: number, height: number, scale: number) => {
+    const canvasWidth = Math.round(width * scale);
+    const canvasHeight = Math.round(height * scale);
     if (!drawn(source)) {
-      return blank(width, height);
+      return blank(canvasWidth, canvasHeight);
     }
-    const options = { width, height, canvasWidth: width, canvasHeight: height, pixelRatio: 1, fontEmbedCSS: await embed(id, source), filter: drawable, style: { opacity: '1' } };
+    const options = { width, height, canvasWidth, canvasHeight, pixelRatio: 1, fontEmbedCSS: await embed(id, source), filter: drawable, style: { opacity: '1' } };
     return tool().toCanvas(source, options);
   };
 
-  const paint = async (pair: MattePair) => {
+  const paint = async (pair: MattePair, scale: number) => {
     const target = document.getElementById(`${cfg.wrapper}-${pair.target}`);
     const source = document.querySelector<HTMLElement>(`[data-clip="${pair.source}"]`);
     if (!target || !source) {
       return;
     }
 
-    const width = source.offsetWidth;
-    const height = source.offsetHeight;
-    const canvas = await render(source, pair.source, width, height);
+    const canvas = await render(source, pair.source, source.offsetWidth, source.offsetHeight, scale);
     const read = cfg.reads[pair.matte];
     const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
-    const pixels = ctx.getImageData(0, 0, width, height);
+    const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const d = pixels.data;
     for (let i = 0; i < d.length; i += 4) {
       const alpha = alphaOf(read, d[i], d[i + 1], d[i + 2], d[i + 3]);
@@ -91,10 +100,11 @@ function matteRuntime(cfg: RuntimeConfig, alphaOf: typeof matteAlpha, tl: { to: 
   };
 
   let running: Promise<void> | null = null;
-  let again = false;
-  const refresh = (): Promise<void> => {
+  let wanted: Pass | null = null;
+  let settle: ReturnType<typeof setTimeout> | null = null;
+  const refresh = (pass: Pass): Promise<void> => {
+    wanted = Math.max(wanted ?? pass, pass);
     if (running) {
-      again = true;
       return running;
     }
     running = (async () => {
@@ -104,13 +114,14 @@ function matteRuntime(cfg: RuntimeConfig, alphaOf: typeof matteAlpha, tl: { to: 
       const paced = window.requestAnimationFrame;
       window.requestAnimationFrame = virtual?.originalRequestAnimationFrame ?? paced;
       try {
-        do {
-          again = false;
+        while (wanted !== null) {
           await Promise.resolve();
+          const scale = cfg.scales[wanted];
+          wanted = null;
           for (const pair of cfg.pairs) {
-            await paint(pair);
+            await paint(pair, scale);
           }
-        } while (again);
+        }
       } finally {
         window.requestAnimationFrame = paced;
       }
@@ -120,19 +131,39 @@ function matteRuntime(cfg: RuntimeConfig, alphaOf: typeof matteAlpha, tl: { to: 
     return running;
   };
 
-  const onSeek = (e: Event) => (e as CustomEvent<SeekDetail>).detail?.waitUntil?.(refresh());
+  const player = () => win.__player as { isPlaying?: () => boolean } | undefined;
+  const settleLater = () => {
+    if (settle) {
+      clearTimeout(settle);
+    }
+    settle = setTimeout(() => void refresh(cfg.exact), cfg.settleMs);
+  };
+  const onSeek = (e: Event) => {
+    if (!player()?.isPlaying?.()) {
+      (e as CustomEvent<SeekDetail>).detail?.waitUntil?.(refresh(cfg.exact));
+      return;
+    }
+    void refresh(cfg.draft);
+    settleLater();
+  };
+  const onPlay = () => {
+    if (player()?.isPlaying?.()) {
+      void refresh(cfg.draft);
+      settleLater();
+    }
+  };
   const previous = win[cfg.global] as { stop?: () => void } | undefined;
   previous?.stop?.();
-  win[cfg.global] = Object.assign(refresh, { stop: () => removeEventListener('hf-seek', onSeek) });
+  win[cfg.global] = Object.assign(() => refresh(cfg.exact), { stop: () => removeEventListener('hf-seek', onSeek) });
   addEventListener('hf-seek', onSeek);
-  tl?.to({}, { duration, ease: 'none', onUpdate: () => void refresh() }, 0);
-  void refresh();
+  tl?.to({}, { duration, ease: 'none', onUpdate: onPlay }, 0);
+  void refresh(cfg.exact);
 }
 
 export function matteScript(pairs: MattePair[], duration: number): string {
   if (!pairs.length) {
     return '';
   }
-  const cfg: RuntimeConfig = { pairs, reads: MATTE_READ, lib: SCREENSHOT_URL, wrapper: WRAPPER, global: MATTE_RUNTIME };
+  const cfg: RuntimeConfig = { pairs, reads: MATTE_READ, lib: SCREENSHOT_URL, wrapper: WRAPPER, global: MATTE_RUNTIME, scales: PASS_SCALE, settleMs: MATTE_SETTLE_MS, exact: Pass.Exact, draft: Pass.Draft };
   return `<script>(${matteRuntime.toString()})(${js(cfg)},(${matteAlpha.toString()}),window.__timelines&&window.__timelines.main,${duration});</script>`;
 }

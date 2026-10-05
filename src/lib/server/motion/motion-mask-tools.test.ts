@@ -20,7 +20,7 @@ describe('motion agent mask tools', () => {
   it('set_mask stores the mask and the doc summary shows it', async () => {
     const { session, run } = setup();
     await run('add_clip', { component: 'Image', start: 0, props: { assetId: 'pic' } });
-    const out = await run('set_mask', { clip_id: 'id1', mask: { kind: 'ellipse', width: 0.3, feather: 20 } });
+    const out = await run('set_mask', { clip_id: 'id1', mask: { kind: 'ellipse', width: 324, feather: 20 } });
 
     expect(out.ok).toBe(true);
     expect(findClip(session.doc, 'id1')!.clip.mask).toMatchObject({ kind: 'ellipse', width: 0.3, feather: 20 });

@@ -21,13 +21,13 @@ function setup() {
 describe('motion agent physics tools', () => {
   it('set_physics gives a clip gravity and bounce, reads back, and turns off', async () => {
     const { session, run } = setup();
-    await run('add_shape', { kind: 'circle', start: 0, duration: 3, props: { width: 0.1, height: 0.1 } });
-    const on = await run('set_physics', { clip_id: 'id1', physics: { gravity: 3000, restitution: 0.7, velocityX: 400, bounds: 'box', collide: true } });
+    await run('add_shape', { kind: 'circle', start: 0, duration: 3, props: { width: 108, height: 108 } });
+    const on = await run('set_physics', { clip_id: 'id1', physics: { gravity: 3000, restitution: 70, velocityX: 400, bounds: 'box', collide: true } });
     const read = (await run('get_motion_doc', {})) as { tracks: { clips: { physics: unknown }[] }[] };
 
     expect(on.ok).toBe(true);
     expect(findClip(session.doc, 'id1')!.clip.physics).toMatchObject({ gravity: 3000, restitution: 0.7, velocityX: 400, bounds: 'box', collide: true });
-    expect(read.tracks.flatMap((t) => t.clips)[0].physics).toMatchObject({ gravity: 3000 });
+    expect(read.tracks.flatMap((t) => t.clips)[0].physics).toMatchObject({ gravity: 3000, restitution: 70 });
 
     expect((await run('set_physics', { clip_id: 'id1', physics: null })).ok).toBe(true);
     expect(findClip(session.doc, 'id1')!.clip.physics).toBeNull();
@@ -36,7 +36,7 @@ describe('motion agent physics tools', () => {
   it('every physics preset is one call, and the composed video moves the clip', async () => {
     for (const preset of PHYSICS_PRESETS) {
       const { session, run } = setup();
-      await run('add_shape', { kind: 'circle', start: 0, duration: 2, props: { width: 0.1, height: 0.1 } });
+      await run('add_shape', { kind: 'circle', start: 0, duration: 2, props: { width: 108, height: 108 } });
       const out = await run('apply_physics_preset', { clip_id: 'id1', preset });
 
       expect({ preset, ok: out.ok }).toEqual({ preset, ok: true });

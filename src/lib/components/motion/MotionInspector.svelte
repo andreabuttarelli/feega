@@ -29,7 +29,8 @@
   import { addEffect, removeEffect, setEffect } from '$lib/motion/effects/ops';
   import { effectKey } from '$lib/motion/effects/model';
   import { MODIFIERS, MODIFIER_KINDS, type ModifierKind } from '$lib/motion/shape/modifiers';
-  import { addModifier, morphTo, removeModifier, setModifier, setPath, shapePath, type ShapeParams } from '$lib/motion/shape/ops';
+  import { addModifier, morphHere, removeModifier, setModifier, setPath, shapePath, type ShapeParams } from '$lib/motion/shape/ops';
+  import { PRESET as SHAPE_PRESET, SHAPE_PRESETS, applyShapePreset, type ShapePreset } from '$lib/motion/shape/presets';
   import { SHAPE_KINDS, ShapeKind, modifierKey, type Modifier } from '$lib/motion/shape/schema';
   import { SELECTOR_SHAPES, animatorKey, type SelectorShape } from '$lib/motion/text-animators/model';
   import { TEXT_COMPONENTS, TEXT_PRESETS, applyPreset as applyTextPreset, removeAnimator, setAnimator, type TextPreset } from '$lib/motion/text-animators/ops';
@@ -39,6 +40,7 @@
   import { expressionErrors, expressionValue } from '$lib/motion/expression/bake';
   import { BOUNDS, PHYSICS, PHYSICS_KEYS, PHYSICS_PRESET, PHYSICS_PRESETS, type Bounds, type PhysicsKey, type PhysicsPreset } from '$lib/motion/physics/model';
   import { applyPhysicsPreset, setPhysics } from '$lib/motion/physics/ops';
+  import { propsOwner, sliderOf, toShown, toStored, type Ranged } from '$lib/motion/units';
 
 
   type Asset = { id: string; kind: AssetKind; label: string; previewUrl: string };
@@ -152,7 +154,7 @@
   function animateText(prop: AnimProp, text: string) {
     const parsed = parseDecimal(text);
     if (parsed !== null) {
-      animate(prop.key, Math.min(prop.max, Math.max(prop.min, parsed)));
+      animate(prop.key, Math.min(prop.max, Math.max(prop.min, stored(prop.key, parsed))));
     }
   }
 
@@ -174,7 +176,7 @@
   function setPhysicsValue(key: PhysicsKey, text: string) {
     const value = parseDecimal(text);
     if (value !== null) {
-      commit(setPhysics(doc, clip.id, { [key]: Math.min(PHYSICS[key].max, Math.max(PHYSICS[key].min, value)) }), `Changed physics ${PHYSICS[key].label.toLowerCase()}`);
+      commit(setPhysics(doc, clip.id, { [key]: Math.min(PHYSICS[key].max, Math.max(PHYSICS[key].min, stored(key, value))) }), `Changed physics ${PHYSICS[key].label.toLowerCase()}`);
     }
   }
 
@@ -244,7 +246,15 @@
     const kind = select.value as ShapeKind;
     select.value = '';
     if (kind) {
-      commit(morphTo(doc, clip.id, { kind }), 'Added a morph target');
+      commit(morphHere(doc, clip.id, kind, frame), `Morphed to ${kind}`);
+    }
+  }
+
+  function applyShapePresetOf(select: HTMLSelectElement) {
+    const preset = select.value as ShapePreset;
+    select.value = '';
+    if (preset) {
+      commit(applyShapePreset(doc, clip.id, preset, () => crypto.randomUUID().slice(0, 8)), `Applied the ${SHAPE_PRESET[preset].label.toLowerCase()} preset`);
     }
   }
 
@@ -300,7 +310,14 @@
   }
 
   const shown = (key: string) => valueAt(animated, key, frame, resolve);
-  const numberShown = (prop: AnimProp) => Math.round(Number(shown(prop.key)) * 1000) / 1000;
+  const numberShown = (prop: AnimProp) => toShown(clip.component, prop.key, Math.round(Number(shown(prop.key)) * 1000) / 1000, doc);
+  const stored = (key: string, v: number) => toStored(clip.component, key, v, doc);
+  const slider = (p: Ranged) => sliderOf(clip.component, p, doc);
+  const depthRange = $derived(slider({ key: 'depth', ...DEPTH }));
+  const fieldRange = (field: Field): Ranged => ({ key: field.key, min: field.min ?? 0, max: field.max ?? 0, step: field.step ?? 1 });
+  const fieldShown = (field: Field) => toShown(propsOwner(clip.component), field.key, Number(value(field)), doc);
+  const fieldStored = (field: Field, v: number) => toStored(propsOwner(clip.component), field.key, v, doc);
+  const fieldSlider = (field: Field) => sliderOf(propsOwner(clip.component), fieldRange(field), doc);
   const value = (field: Field) => (keyedField(clip.component, field.key, animated.params) ? shown(field.key) : (clip.props as Record<string, unknown>)[field.key]);
   const isHex = (v: unknown) => typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v);
 </script>
@@ -381,12 +398,14 @@
   {/snippet}
 
   {#snippet animRow(prop: AnimProp)}
+    {@const range = slider(prop)}
     <div class="row anim" data-prop={prop.key}>
       <span class="name">{@render diamond(prop.key)}{@render exprToggle(prop.key)}{prop.label}</span>
       <div class="range">
-        {#if DIALS.has(prop.key)}<Dial value={numberShown(prop)} label={prop.label} onchange={(v) => animate(prop.key, v)} />{/if}
-        <input type="range" min={prop.min} max={prop.max} step={prop.step} value={numberShown(prop)} oninput={(e) => animate(prop.key, Number(e.currentTarget.value))} />
+        {#if DIALS.has(prop.key)}<Dial value={numberShown(prop)} label={prop.label} onchange={(v) => animate(prop.key, stored(prop.key, v))} />{/if}
+        <input type="range" min={range.min} max={range.max} step={range.step} value={numberShown(prop)} oninput={(e) => animate(prop.key, stored(prop.key, Number(e.currentTarget.value)))} />
         <input class="num" type="text" inputmode="decimal" aria-label={prop.label} value={String(numberShown(prop))} onchange={(e) => animateText(prop, e.currentTarget.value)} />
+        {#if range.unit}<span class="unit" data-unit={range.unit}>{range.unit}</span>{/if}
       </div>
     </div>
     {@render exprEditor(prop.key)}
@@ -462,11 +481,15 @@
           <button type="button" aria-label={`Remove morph target ${i + 1}`} onclick={() => commit(setProps(doc, clip.id, { morphs: shapeMorphs.filter((_, j) => j !== i) }), 'Removed a morph target')}>×</button>
         </div>
       {/each}
-      <select aria-label="Add morph target" data-testid="add-morph" value="" onchange={(e) => addMorphOf(e.currentTarget)}>
-        <option value="">Morph into…</option>
+      <select aria-label="Morph to" data-testid="add-morph" title="Adds the shape and keys the morph from the playhead over one second" value="" onchange={(e) => addMorphOf(e.currentTarget)}>
+        <option value="">Morph to…</option>
         {#each SHAPE_KINDS.filter((k) => k !== ShapeKind.Path) as kind (kind)}<option value={kind}>{kind}</option>{/each}
       </select>
       <h4>Modifiers</h4>
+      <select aria-label="Liquid preset" data-testid="shape-preset" value="" onchange={(e) => applyShapePresetOf(e.currentTarget)}>
+        <option value="">Liquid preset…</option>
+        {#each SHAPE_PRESETS as preset (preset)}<option value={preset} title={SHAPE_PRESET[preset].about}>{SHAPE_PRESET[preset].label}</option>{/each}
+      </select>
       {#each shapeModifiers as modifier, i (modifier.id)}
         <div class="effect" class:off={!modifier.enabled} data-modifier={modifier.id}>
           <div class="effect-head">
@@ -529,11 +552,14 @@
       {#if clip.physics}
         {@const physics = clip.physics}
         {#each PHYSICS_KEYS as key (key)}
+          {@const range = slider({ key, ...PHYSICS[key] })}
+          {@const value = toShown(clip.component, key, physics[key], doc)}
           <div class="row anim" data-physics={key}>
             <span class="name">{PHYSICS[key].label}</span>
             <div class="range">
-              <input type="range" min={PHYSICS[key].min} max={PHYSICS[key].max} step={PHYSICS[key].step} value={physics[key]} onchange={(e) => setPhysicsValue(key, e.currentTarget.value)} />
-              <input class="num" type="text" inputmode="decimal" aria-label={PHYSICS[key].label} value={String(physics[key])} onchange={(e) => setPhysicsValue(key, e.currentTarget.value)} />
+              <input type="range" min={range.min} max={range.max} step={range.step} {value} onchange={(e) => setPhysicsValue(key, e.currentTarget.value)} />
+              <input class="num" type="text" inputmode="decimal" aria-label={PHYSICS[key].label} value={String(value)} onchange={(e) => setPhysicsValue(key, e.currentTarget.value)} />
+              {#if range.unit}<span class="unit">{range.unit}</span>{/if}
             </div>
           </div>
         {/each}
@@ -582,8 +608,9 @@
       <div class="row anim">
         <span class="name">{DEPTH.label}</span>
         <div class="range">
-          <input type="range" min={DEPTH.min} max={DEPTH.max} step={DEPTH.step} value={clip.depth} disabled={clip.space === Space.Screen} oninput={(e) => commit(setClipDepth(doc, clip.id, { depth: Number(e.currentTarget.value) }), 'Changed depth')} />
+          <input type="range" min={depthRange.min} max={depthRange.max} step={depthRange.step} value={clip.depth} disabled={clip.space === Space.Screen} oninput={(e) => commit(setClipDepth(doc, clip.id, { depth: Number(e.currentTarget.value) }), 'Changed depth')} />
           <input class="num" type="text" inputmode="decimal" aria-label="Depth" value={String(clip.depth)} disabled={clip.space === Space.Screen} onchange={(e) => setDepthText(e.currentTarget.value)} />
+          <span class="unit">{depthRange.unit}</span>
         </div>
       </div>
       <label class="check"><input type="checkbox" data-testid="screen-space" checked={clip.space === Space.Screen} onchange={(e) => commit(setClipDepth(doc, clip.id, { space: e.currentTarget.checked ? Space.Screen : Space.World }), 'Changed space')} />Screen space: ignores the camera</label>
@@ -682,9 +709,10 @@
           {:else if field.control === Control.Textarea}
             <textarea id={`f-${field.key}`} rows="3" value={String(value(field) ?? '')} onchange={(e) => setProp(field, e.currentTarget.value)}></textarea>
           {:else if field.control === Control.Range}
+            {@const range = fieldSlider(field)}
             <div class="range">
-              <input id={`f-${field.key}`} type="range" min={field.min} max={field.max} step={field.step} value={Number(value(field))} oninput={(e) => setProp(field, Number(e.currentTarget.value))} />
-              <output>{Number(value(field)).toFixed(field.step && field.step < 1 ? 2 : 0)}</output>
+              <input id={`f-${field.key}`} type="range" min={range.min} max={range.max} step={range.step} value={fieldShown(field)} oninput={(e) => setProp(field, fieldStored(field, Number(e.currentTarget.value)))} />
+              <output>{fieldShown(field).toFixed(range.step < 1 ? 2 : 0)}{range.unit ?? ''}</output>
             </div>
           {:else if field.control === Control.Select}
             <select id={`f-${field.key}`} value={String(value(field))} onchange={(e) => setProp(field, e.currentTarget.value)}>
@@ -946,6 +974,12 @@
   .num {
     width: 56px !important;
     flex: none;
+  }
+
+  .unit {
+    flex: none;
+    min-width: 1.2em;
+    color: var(--ui-ink-3);
   }
 
   .effect {

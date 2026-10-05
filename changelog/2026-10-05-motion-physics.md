@@ -25,3 +25,6 @@ dal browser 35–60 dB, dove la differenza è solo l'antialias del testo, le pos
 **Scartato.** Simulare nel runtime della pagina: il seek all'indietro avrebbe richiesto di
 rigiocare la simulazione dal frame 0 in ogni renderer. Rotazione e urti tra forme non
 rettangolari: fuori dal primo taglio.
+
+**Unità.** Dopo #134 la sezione Physics e i tool passano da `PROPERTY_UNITS`: rimbalzo e attrito
+in %, velocità in px/s, gravità in px/s²; nel doc restano 0..1 e px.

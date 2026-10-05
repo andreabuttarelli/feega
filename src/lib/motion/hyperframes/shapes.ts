@@ -1,7 +1,7 @@
 import type { MotionClip } from '../doc';
 import { Source, animProp, sampleTrack } from '../keyframes';
 import type { Size } from '../shape/geometry';
-import { ModifierKind } from '../shape/modifiers';
+import { movesOverTime } from '../shape/modifiers';
 import { shapeMarkup, type ShapeLook } from '../shape/render';
 import { modifierOfKey, modifierValues, type Modifier } from '../shape/schema';
 import { js } from './html';
@@ -15,10 +15,7 @@ const svgId = (id: string) => `sv-${id}`;
 
 const isGeometric = (key: string) => modifierOfKey(key) !== null || animProp('Shape', key)?.source === Source.Param;
 
-const wiggles = (m: Modifier) => {
-  const v = modifierValues(m);
-  return m.enabled && m.kind === ModifierKind.Wiggle && v.speed > 0 && v.size > 0;
-};
+const runsByItself = (m: Modifier) => m.enabled && movesOverTime({ kind: m.kind, values: modifierValues(m) });
 
 function lookAt(clip: MotionClip, frame: number): ShapeLook {
   const look = { ...(clip.props as unknown as ShapeLook) };
@@ -56,7 +53,7 @@ export function shapeHtml(id: string, look: ShapeLook, env: Env, size: Size): st
 
 export function shapeBake(clip: MotionClip, env: Env): ShapeBake | null {
   const modifiers = (clip.props.modifiers as Modifier[] | undefined) ?? [];
-  const moving = Object.keys(clip.keyframes).some(isGeometric) || modifiers.some(wiggles);
+  const moving = Object.keys(clip.keyframes).some(isGeometric) || modifiers.some(runsByItself);
   if (!moving) {
     return null;
   }

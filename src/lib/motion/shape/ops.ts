@@ -51,6 +51,18 @@ export function morphTo(doc: MotionDoc, clipId: string, target: MorphTarget): Op
   return setKeyframes(added.doc, clipId, 'morph', [...kept, ...start, { frame: Math.round(target.to), value: morphs.length + 1, ease: Ease.Standard }]);
 }
 
+const MORPH_SECONDS = 1;
+
+export function morphHere(doc: MotionDoc, clipId: string, kind: ShapeKind, frame: number): OpResult {
+  const clip = findClip(doc, clipId)?.clip;
+  if (!clip) {
+    return fail(`no clip ${clipId}`);
+  }
+  const last = clip.durationInFrames - 1;
+  const from = Math.min(Math.max(frame - clip.from, 0), Math.max(last - 1, 0));
+  return morphTo(doc, clipId, { kind, from, to: Math.min(from + MORPH_SECONDS * doc.fps, last) });
+}
+
 function modifiersOf(doc: MotionDoc, clipId: string): Modifier[] | string {
   const props = shapeProps(doc, clipId);
   return typeof props === 'string' ? props : ((props.modifiers as Modifier[]) ?? []);

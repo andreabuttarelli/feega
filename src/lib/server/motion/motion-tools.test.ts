@@ -139,7 +139,7 @@ describe('motion agent tools', () => {
     const { session, run } = setup();
     await run('add_clip', { component: 'Title', start: 0 });
     const before = session.doc;
-    const out = await run('set_props', { clip_id: 'id1', props: { opacity: 7 } });
+    const out = await run('set_props', { clip_id: 'id1', props: { opacity: 700 } });
 
     expect(out.ok).toBe(false);
     expect(session.doc).toBe(before);

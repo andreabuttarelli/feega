@@ -172,11 +172,11 @@ describe('motion agent paths', () => {
   it('set_motion_path turns x/y keys into a curved path, and set_path_tangent bends it', async () => {
     const { session, run } = setup();
     await run('add_clip', { component: 'Shape', start: 0, duration: 3 });
-    await run('set_keyframes', { clip_id: 'id1', prop: 'x', keyframes: [{ time: 0, value: -0.3, ease: 'linear' }, { time: 2, value: 0.3, ease: 'linear' }] });
+    await run('set_keyframes', { clip_id: 'id1', prop: 'x', keyframes: [{ time: 0, value: -324, ease: 'linear' }, { time: 2, value: 324, ease: 'linear' }] });
     await run('set_keyframes', { clip_id: 'id1', prop: 'y', keyframes: [{ time: 0, value: 0, ease: 'linear' }, { time: 2, value: 0, ease: 'linear' }] });
 
     expect((await run('set_motion_path', { clip_id: 'id1', enabled: true, auto_orient: true })).ok).toBe(true);
-    expect((await run('set_path_tangent', { clip_id: 'id1', time: 0, out: [0.2, -0.3] })).ok).toBe(true);
+    expect((await run('set_path_tangent', { clip_id: 'id1', time: 0, out: [216, -324] })).ok).toBe(true);
     expect(findClip(session.doc, 'id1')!.clip.path).toEqual({ autoOrient: true, tangents: [{ frame: 0, in: [0, 0], out: [0.2, -0.3] }] });
   });
 });
@@ -211,5 +211,32 @@ describe('motion agent timeline organisation', () => {
     expect(findClip(session.doc, 'id1')!.clip.hidden).toBe(true);
     const doc = (await run('get_motion_doc', {})) as Record<string, unknown>;
     expect(doc.workArea).toEqual({ start: 0.5, end: 2 });
+  });
+});
+
+describe('motion agent units', () => {
+  it('writes and reads px, percent and degrees, the units the editor shows', async () => {
+    const { session, run } = setup();
+    await run('add_clip', { component: 'Shape', start: 0, duration: 3, props: { width: 540, opacity: 50 } });
+    await run('set_transform', { clip_id: 'id1', transform: { x: 108, scale: 150, rotateZ: 45 } });
+    await run('set_keyframes', { clip_id: 'id1', prop: 'y', keyframes: [{ time: 0, value: -540 }, { time: 1, value: 0 }] });
+    const read = (await run('get_motion_doc', {})) as { tracks: { clips: { props: Record<string, unknown>; transform: Record<string, number>; keyframes: Record<string, { value: number }[]> }[] }[] };
+    const shown = read.tracks.flatMap((t) => t.clips)[0];
+    const clip = findClip(session.doc, 'id1')!.clip;
+
+    expect(clip.props).toMatchObject({ width: 0.5, opacity: 0.5 });
+    expect(clip.transform).toEqual({ x: 0.1, scale: 1.5, rotateZ: 45 });
+    expect(clip.keyframes.y.map((k) => k.value)).toEqual([-0.5, 0]);
+    expect(shown.props).toMatchObject({ width: 540, opacity: 50 });
+    expect(shown.transform).toEqual({ x: 108, scale: 150, rotateZ: 45 });
+    expect(shown.keyframes.y.map((k) => k.value)).toEqual([-540, 0]);
+  });
+
+  it('the prompt says which unit every value takes', () => {
+    const prompt = motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Missing });
+
+    expect(prompt).toContain('in px of the composition');
+    expect(prompt).toContain('in % (100 = as is)');
+    expect(prompt).not.toContain('fractions of the frame (0..1)');
   });
 });

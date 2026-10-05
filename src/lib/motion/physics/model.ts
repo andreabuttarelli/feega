@@ -11,11 +11,11 @@ export const BOUNDS = Object.values(Bounds) as [Bounds, ...Bounds[]];
 type Range = { label: string; min: number; max: number; step: number; fallback: number };
 
 export const PHYSICS = {
-  gravity: { label: 'Gravity (px/s²)', min: -10000, max: 10000, step: 10, fallback: 2400 },
+  gravity: { label: 'Gravity', min: -10000, max: 10000, step: 10, fallback: 2400 },
   restitution: { label: 'Bounce', min: 0, max: 1, step: 0.01, fallback: 0.6 },
   friction: { label: 'Friction', min: 0, max: 1, step: 0.01, fallback: 0.2 },
-  velocityX: { label: 'Start speed X (px/s)', min: -20000, max: 20000, step: 10, fallback: 0 },
-  velocityY: { label: 'Start speed Y (px/s)', min: -20000, max: 20000, step: 10, fallback: 0 },
+  velocityX: { label: 'Start speed X', min: -20000, max: 20000, step: 10, fallback: 0 },
+  velocityY: { label: 'Start speed Y', min: -20000, max: 20000, step: 10, fallback: 0 },
   mass: { label: 'Mass', min: 0.1, max: 100, step: 0.1, fallback: 1 }
 } as const satisfies Record<string, Range>;
 

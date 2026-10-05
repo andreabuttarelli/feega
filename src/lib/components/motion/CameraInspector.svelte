@@ -5,6 +5,7 @@
   import { CAMERA, CAMERA_LANE, Space, type CameraKey } from '$lib/motion/camera';
   import { CAMERA_PRESETS, CameraPreset, PRESETS, applyPreset, cameraEditAt, cameraKeyToggle, cameraValueAt, focusOn, removeCamera, setCamera } from '$lib/motion/camera-ops';
   import { parseDecimal } from '$lib/motion/inspector';
+  import { sliderOf, toShown, toStored } from '$lib/motion/units';
   import Dial from './Dial.svelte';
   import SceneMap from './SceneMap.svelte';
   import { setCameraExpression } from '$lib/motion/expression/ops';
@@ -40,10 +41,11 @@
     onchange(result.doc, summary);
   }
 
-  const shown = (key: CameraKey) => Math.round(cameraValueAt(doc, key, frame) * 1000) / 1000;
+  const shown = (key: CameraKey) => toShown(CAMERA_LANE, key, Math.round(cameraValueAt(doc, key, frame) * 1000) / 1000, doc);
 
   function edit(key: CameraKey, value: number) {
-    commit(cameraEditAt(doc, key, Math.min(CAMERA[key].max, Math.max(CAMERA[key].min, value)), frame), `Edited the camera ${CAMERA[key].label.toLowerCase()}`);
+    const stored = toStored(CAMERA_LANE, key, value, doc);
+    commit(cameraEditAt(doc, key, Math.min(CAMERA[key].max, Math.max(CAMERA[key].min, stored)), frame), `Edited the camera ${CAMERA[key].label.toLowerCase()}`);
   }
 
   function editText(key: CameraKey, text: string) {
@@ -120,6 +122,7 @@
 
     {#snippet valueRow(key: CameraKey)}
       {@const spec = CAMERA[key]}
+      {@const range = sliderOf(CAMERA_LANE, { key, ...spec }, doc)}
       <div class="row anim" data-camera-prop={key}>
         <span class="name">
           <button type="button" class="key {keyState(key)}" title="Keyframe at playhead" aria-label={`Keyframe camera ${key}`} aria-pressed={keyState(key) === KEY_STATE.On} onclick={() => commit(cameraKeyToggle(doc, key, frame), 'Toggled a camera keyframe')}>◆</button>
@@ -128,8 +131,9 @@
         </span>
         <div class="range">
           {#if DIALS.has(key)}<Dial value={shown(key)} label={spec.label} onchange={(v) => edit(key, v)} />{/if}
-          <input type="range" min={spec.min} max={spec.max} step={spec.step} value={shown(key)} oninput={(e) => edit(key, Number(e.currentTarget.value))} />
+          <input type="range" min={range.min} max={range.max} step={range.step} value={shown(key)} oninput={(e) => edit(key, Number(e.currentTarget.value))} />
           <input class="num" type="text" inputmode="decimal" aria-label={`Camera ${spec.label}`} value={String(shown(key))} onchange={(e) => editText(key, e.currentTarget.value)} />
+          {#if range.unit}<span class="unit">{range.unit}</span>{/if}
         </div>
       </div>
       {#if expressionOf(key) !== undefined}
@@ -274,6 +278,12 @@
     display: flex;
     align-items: center;
     gap: 4px;
+  }
+
+  .unit {
+    flex: none;
+    min-width: 1.2em;
+    color: var(--ui-ink-3);
   }
 
   .num {

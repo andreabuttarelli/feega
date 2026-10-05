@@ -1,7 +1,7 @@
 import { tool, type Tool, type ToolExecutionOptions } from 'ai';
 import { addAdjustment, mergeView, precompose, viewOf } from '$lib/motion/precomp';
 import { z } from 'zod';
-import { AssetKind, COMPONENTS, COMPONENT_IDS, TrackKind } from '$lib/motion/components';
+import { AssetKind, COMPONENTS, COMPONENT_IDS, TrackKind, type ComponentId } from '$lib/motion/components';
 import { fieldsOf } from '$lib/motion/inspector';
 import { Ease, FRAME_RATES, MAX_SECONDS, TRANSITION_KINDS } from '$lib/motion/design';
 import { setFrameRate } from '$lib/motion/frame-rate';
@@ -23,13 +23,13 @@ const ARRANGE: Record<(typeof ARRANGE_OPS)[number], (doc: MotionDoc, ids: string
 };
 import { setMotionPath, setPathTangent } from '$lib/motion/path-ops';
 import { EASE_PRESETS, EASE_PRESET_IDS, easeHandles, withHandles } from '$lib/motion/graph';
-import { ANIMATABLE, INTERPS, Interp, SPATIAL_KEYS, TRANSFORM_KEYS, ValueKind, easeSchema, transformSchema, type Keyframe } from '$lib/motion/keyframes';
+import { ANIMATABLE, INTERPS, Interp, SPATIAL_KEYS, TRANSFORM_KEYS, ValueKind, easeSchema, type Keyframe } from '$lib/motion/keyframes';
 import type { MotionAsset } from './editor';
 import { MAX_FRAMES_PER_VIEW, MAX_VIEWS_PER_TURN, VIEW_FRAMES, type Frame } from './frames';
 import { CheckState, MAX_CSS, MAX_HTML, MAX_JS, SOURCE_FILES, checkState, propsSchemaSchema, sourceHash, type CustomComponent } from '$lib/motion/custom/component';
 import { patchComponent, recordCheck, removeComponent, writeComponent } from '$lib/motion/custom/ops';
 import { PATCH_COMPONENT, READ_COMPONENT, WRITE_COMPONENT } from './model-route';
-import { CAMERA, CAMERA_KEYS, SPACES, type Camera } from '$lib/motion/camera';
+import { CAMERA, CAMERA_KEYS, CAMERA_LANE, SPACES, type Camera } from '$lib/motion/camera';
 import { ENV_PRESETS, HDRI, LIGHT, LIGHT_KEYS, LIGHT_KINDS, type Look } from '$lib/motion/look';
 import { removeLight, removeLook, setLight, setLightKeyframes, setLook } from '$lib/motion/look-ops';
 import { DEVICE, DEVICES } from '$lib/motion/devices';
@@ -56,6 +56,7 @@ import { DEGREES, MAX_SAMPLES } from '$lib/motion/motion-blur';
 import { MODIFIERS, MODIFIER_KINDS } from '$lib/motion/shape/modifiers';
 import { addModifier, morphTo, removeModifier, setModifier, setPath } from '$lib/motion/shape/ops';
 import { SHAPE_KINDS, modifierKey } from '$lib/motion/shape/schema';
+import { PRESET as SHAPE_PRESET, SHAPE_PRESETS, applyShapePreset } from '$lib/motion/shape/presets';
 import { MAX_RATE, MIN_RATE, REMAP_KEY, clearTimeRemap, freezeFrame } from '$lib/motion/time-remap';
 import { PARTICLE_PRESETS, PRESET_PROPS as PARTICLE_PRESET, applyParticlePreset } from '$lib/motion/particles/presets';
 import { DUCK_DEFAULTS, duckUnder } from '$lib/motion/duck';
@@ -68,6 +69,7 @@ import { DEFAULT_NAME_PATTERN, MAX_BATCH_ROWS, outputName } from '$lib/motion/te
 import { renderQuote } from '$lib/motion/render-quote';
 import { BOUNDS, PHYSICS, PHYSICS_KEYS, PHYSICS_PRESET, PHYSICS_PRESETS } from '$lib/motion/physics/model';
 import { applyPhysicsPreset, setPhysics } from '$lib/motion/physics/ops';
+import { unitOf, propsOwner, shownKeyframes, shownMask, shownOffset, shownRecord, storedMask, storedOffset, storedRecord, toShown, toStored, type Owner } from '$lib/motion/units';
 
 export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number };
 
@@ -97,7 +99,8 @@ function summary(doc: MotionDoc, selection: string[]) {
   const edgeSummary = (edge: { kind: string; durationInFrames: number }) => ({ kind: edge.kind, duration: secs(edge.durationInFrames) });
   const inSeconds = (keyframes: Record<string, Keyframe[] | undefined>) =>
     Object.fromEntries(Object.entries(keyframes).map(([prop, track]) => [prop, (track ?? []).map(({ frame, ...rest }) => ({ time: secs(frame), ...rest }))]));
-  const cameraSummary = (camera: Camera | null) => (camera ? { values: camera.base, dof: camera.dof, keyframes: inSeconds(camera.keyframes), expressions: camera.expressions } : null);
+  const cameraSummary = (camera: Camera | null) =>
+    camera ? { values: shownRecord(CAMERA_LANE, camera.base, doc), dof: camera.dof, keyframes: inSeconds(shownKeyframes(CAMERA_LANE, camera.keyframes, doc)), expressions: camera.expressions } : null;
   const lookSummary = (look: Look | null) => (look ? { ...look, lights: look.lights.map((l) => ({ ...l, keyframes: inSeconds(l.keyframes) })) } : null);
 
   return {
@@ -120,14 +123,14 @@ function summary(doc: MotionDoc, selection: string[]) {
         start: secs(c.from),
         duration: secs(c.durationInFrames),
         trimStart: secs(c.trimStart),
-        props: c.props,
+        props: shownRecord(propsOwner(c.component), c.props, doc),
         in: edgeSummary(c.transitionIn),
         out: edgeSummary(c.transitionOut),
-        transform: c.transform,
-        mask: c.mask,
-        maskStack: c.maskStack,
+        transform: shownRecord(c.component, c.transform, doc),
+        mask: c.mask && shownMask(c.component, c.mask, doc),
+        maskStack: c.maskStack.map((m) => shownMask(c.component, m, doc)),
         matte: c.matte,
-        keyframes: inSeconds(c.keyframes),
+        keyframes: inSeconds(shownKeyframes(c.component, c.keyframes, doc)),
         depth: c.depth,
         space: c.space,
         parent: c.parent,
@@ -140,8 +143,8 @@ function summary(doc: MotionDoc, selection: string[]) {
         hidden: c.hidden ?? false,
         locked: c.locked ?? false,
         markers: (c.markers ?? []).map((m) => ({ label: m.label, time: secs(m.frame) })),
-        physics: c.physics ?? null,
-        path: c.path ? { autoOrient: c.path.autoOrient, tangents: c.path.tangents.map(({ frame, ...rest }) => ({ time: secs(frame), ...rest })), problem: pathProblem(c) } : null
+        physics: c.physics ? shownRecord(c.component, c.physics, doc) : null,
+        path: c.path ? { autoOrient: c.path.autoOrient, tangents: c.path.tangents.map((t) => ({ time: secs(t.frame), in: shownOffset(c.component, t.in, doc), out: shownOffset(c.component, t.out, doc) })), problem: pathProblem(c) } : null
       }))
     })),
     assets: doc.assets,
@@ -155,6 +158,8 @@ function summary(doc: MotionDoc, selection: string[]) {
     comps: Object.entries(doc.comps).map(([id, c]) => ({ id, name: c.name, duration: secs(c.durationInFrames), clips: c.tracks.flatMap((t) => t.clips.map((clip) => clip.id)) }))
   };
 }
+
+const transformInput = z.object(Object.fromEntries(TRANSFORM_KEYS.map((k) => [k, z.number().optional()]))).partial();
 
 const keyShape = { in: z.enum(INTERPS).optional(), out: z.enum(INTERPS).optional(), roving: z.boolean().optional() };
 
@@ -202,7 +207,7 @@ const animatorFields = {
   values: animatorValues.optional()
 };
 
-const CAMERA_UNITS = `${CAMERA_KEYS.map((k) => `${k} ${CAMERA[k].min}..${CAMERA[k].max}`).join(', ')}. x/y are fractions of the frame, z is the dolly in pixels (positive moves forward), rotations and fov in degrees, focusDistance is the depth in focus (same units as clip depth), aperture the blur strength (px of blur per 100 px out of focus)`;
+const CAMERA_UNITS = `${CAMERA_KEYS.map((k) => `${k} ${CAMERA[k].min}..${CAMERA[k].max}`).join(', ')}. x/y are in px of the frame (the ranges above are in frame widths/heights), z is the dolly in pixels (positive moves forward), rotations and fov in degrees, focusDistance is the depth in focus (same units as clip depth), aperture the blur strength (px of blur per 100 px out of focus)`;
 
 function customSummary(name: string, c: CustomComponent) {
   return {
@@ -215,19 +220,20 @@ function customSummary(name: string, c: CustomComponent) {
 
 function componentCatalogue(doc: MotionDoc) {
   return {
-    library: libraryCatalogue(),
+    library: libraryCatalogue(doc),
     custom: Object.entries(doc.components).map(([name, c]) => customSummary(name, c)),
     note: 'A custom component is used with add_clip component "Custom" and props { name, ...its props }.'
   };
 }
 
-function libraryCatalogue() {
+function libraryCatalogue(doc: MotionDoc) {
+  const range = (id: ComponentId, key: string, min: number, max: number) => `${toShown(propsOwner(id), key, min, doc)}..${toShown(propsOwner(id), key, max, doc)}`;
   return COMPONENT_IDS.map((id) => ({
     id,
     track: COMPONENTS[id].track,
     about: COMPONENTS[id].description,
     animates: ANIMATABLE[id].map((p) => p.key),
-    props: Object.fromEntries(fieldsOf(id).map((f) => [f.key, f.options ? f.options.join('|') : f.min !== undefined ? `${f.min}..${f.max}` : f.control]))
+    props: Object.fromEntries(fieldsOf(id).map((f) => [f.key, f.options ? f.options.join('|') : f.min !== undefined ? range(id, f.key, f.min, f.max ?? f.min) : f.control]))
   }));
 }
 
@@ -257,6 +263,16 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
   const { session } = deps;
   const frames = (s: number) => framesAt(s, session.doc.fps);
   const asKey = (k: KeyInput): Keyframe => shaped({ frame: frames(k.time), value: k.value, ease: k.ease }, { in: k.in, out: k.out, roving: k.roving });
+  const ownerOf = (clipId: string): Owner => findClip(session.doc, clipId)?.clip.component ?? null;
+  const propsOf = (clipId: string): Owner => {
+    const owner = ownerOf(clipId);
+    return owner && owner !== CAMERA_LANE ? propsOwner(owner) : null;
+  };
+  const propsIn = (component: ComponentId, props: Record<string, unknown> = {}) => storedRecord(propsOwner(component), props, session.doc);
+  const keyIn =
+    (owner: Owner, prop: string) =>
+    (k: KeyInput): Keyframe =>
+      asKey(typeof k.value === 'number' ? { ...k, value: toStored(owner, prop, k.value, session.doc) } : k);
 
   const apply = (result: OpResult, what: string) => {
     if (!result.ok) {
@@ -326,7 +342,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     list_components: tool({
-      description: 'Every component a clip can use: the library (its track and props; x/y/width/height go 0..1) and the custom components written in code for this video.',
+      description: 'Every component a clip can use: the library (its track and props, ranges in the units of the prompt for this video size) and the custom components written in code for this video.',
       inputSchema: z.object({}).strict(),
       execute: async () => componentCatalogue(session.doc)
     }),
@@ -352,7 +368,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         }
         const result = addClip(
           session.doc,
-          { component: input.component, from: frames(input.start), durationInFrames: input.duration ? frames(input.duration) : undefined, trackId: input.track_id, props: input.props },
+          { component: input.component, from: frames(input.start), durationInFrames: input.duration ? frames(input.duration) : undefined, trackId: input.track_id, props: propsIn(input.component, input.props) },
           deps.newId()
         );
         return apply(registered(result, input.props?.assetId), `added ${input.component}`);
@@ -373,7 +389,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         if (!assetKnown(input.props.assetId)) {
           return { ok: false, error: 'unknown asset id: call list_assets' };
         }
-        const result = setProps(session.doc, input.clip_id, input.props);
+        const result = setProps(session.doc, input.clip_id, storedRecord(propsOf(input.clip_id), input.props, session.doc));
         if (!result.ok) {
           return { ok: false, error: propsError(session.doc, input.clip_id, input.props, result.error) };
         }
@@ -446,9 +462,9 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_transform: tool({
-      description: `Set base transform values of a clip; the rest are kept. Keys: ${TRANSFORM_KEYS.join(', ')}. x/y are offsets in fractions of the frame, rotations and skews in degrees, z and perspective in pixels, anchorX/anchorY the pivot inside the clip box (0..1), blur in pixels.`,
-      inputSchema: z.object({ clip_id: z.string(), transform: transformSchema }),
-      execute: async (input) => apply(setTransform(session.doc, input.clip_id, input.transform), `transformed ${input.clip_id}`)
+      description: `Set base transform values of a clip; the rest are kept. Keys: ${TRANSFORM_KEYS.join(', ')}. x/y are offsets in px of the frame, scale/scaleX/scaleY and opacity in % (100 = as is), rotations and skews in degrees, z and perspective in px, anchorX/anchorY the pivot inside the clip box (0..1), blur in px.`,
+      inputSchema: z.object({ clip_id: z.string(), transform: transformInput }),
+      execute: async (input) => apply(setTransform(session.doc, input.clip_id, storedRecord(ownerOf(input.clip_id), input.transform, session.doc)), `transformed ${input.clip_id}`)
     }),
 
     set_keyframes: tool({
@@ -459,7 +475,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         prop: z.string(),
         keyframes: z.array(z.object({ time: z.number().min(0), value: z.union([z.number(), z.string()]), ease: easeSchema.default(Ease.Standard), ...keyShape })).min(1)
       }),
-      execute: async (input) => apply(setKeyframes(session.doc, input.clip_id, input.prop, input.keyframes.map(asKey)), `animated ${input.prop} of ${input.clip_id}`)
+      execute: async (input) => apply(setKeyframes(session.doc, input.clip_id, input.prop, input.keyframes.map(keyIn(ownerOf(input.clip_id), input.prop))), `animated ${input.prop} of ${input.clip_id}`)
     }),
 
     set_key_interpolation: tool({
@@ -486,7 +502,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
 
     set_ease_handles: tool({
       description:
-        'Shape the segment leaving the keyframe at time (seconds from the clip start), like dragging the bezier handles in a graph editor: influence 0..100 (% of the segment the handle reaches), speed in prop units per second (0 = eased to a stop). Values not given are kept.',
+        'Shape the segment leaving the keyframe at time (seconds from the clip start), like dragging the bezier handles in a graph editor: influence 0..100 (% of the segment the handle reaches), speed in the units of the prop per second (px/s for x/y, %/s for scale; 0 = eased to a stop). Values not given are kept.',
       inputSchema: z.object({
         clip_id: z.string(),
         prop: z.string(),
@@ -505,8 +521,9 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const [a, b] = [track[at], track[at + 1]];
         const h = easeHandles(a, b, session.doc.fps);
         const percent = (n: number | undefined, fallback: number) => (n === undefined ? fallback : n / 100);
+        const speed = (n: number | undefined, fallback: number) => (n === undefined ? fallback : toStored(ownerOf(input.clip_id), input.prop, n, session.doc));
         const ease = withHandles(
-          { outInfluence: percent(input.out_influence, h.outInfluence), outSpeed: input.out_speed ?? h.outSpeed, inInfluence: percent(input.in_influence, h.inInfluence), inSpeed: input.in_speed ?? h.inSpeed },
+          { outInfluence: percent(input.out_influence, h.outInfluence), outSpeed: speed(input.out_speed, h.outSpeed), inInfluence: percent(input.in_influence, h.inInfluence), inSpeed: speed(input.in_speed, h.inSpeed) },
           a,
           b,
           session.doc.fps
@@ -528,9 +545,13 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
 
     set_path_tangent: tool({
       description:
-        'Bend the motion path at the position keyframe at time (seconds from the clip start): in and out are the bezier handles as [dx, dy] offsets from the key point, in fractions of the frame (like x/y). Omitted handles are flat ([0,0]).',
+        'Bend the motion path at the position keyframe at time (seconds from the clip start): in and out are the bezier handles as [dx, dy] offsets from the key point, in px of the frame (like x/y). Omitted handles are flat ([0,0]).',
       inputSchema: z.object({ clip_id: z.string(), time: z.number().min(0), in: z.tuple([z.number(), z.number()]).optional(), out: z.tuple([z.number(), z.number()]).optional() }),
-      execute: async (input) => apply(setPathTangent(session.doc, input.clip_id, { frame: frames(input.time), in: input.in ?? [0, 0], out: input.out ?? [0, 0] }), `bent the path of ${input.clip_id}`)
+      execute: async (input) => {
+        const owner = ownerOf(input.clip_id);
+        const offset = (o: [number, number] = [0, 0]) => storedOffset(owner, o, session.doc);
+        return apply(setPathTangent(session.doc, input.clip_id, { frame: frames(input.time), in: offset(input.in), out: offset(input.out) }), `bent the path of ${input.clip_id}`);
+      }
     }),
 
     analyze_audio: tool({
@@ -591,7 +612,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_mask: tool({
-      description: `Mask a clip: only the inside of the mask shows (invert shows the outside). mode (${MASK_MODES.join(', ')}, default add) says how it folds into the masks stacked after it: a first mask that subtracts keeps the outside. kind: ${MASK_KIND_IDS.join(', ')}. x/y are the mask centre and width/height its size, in fractions of the frame; rotation in degrees; feather (blur) and expansion (grow, negative shrinks) in pixels; opacity 0..1. polygon takes points [[x,y],...] inside the mask box (0..1); image (alpha) and luma (brightness) take an assetId from list_assets; text takes text. Replaces the whole mask. Animate it with set_keyframes on ${MASK_KEYS.join(', ')}.`,
+      description: `Mask a clip: only the inside of the mask shows (invert shows the outside). mode (${MASK_MODES.join(', ')}, default add) says how it folds into the masks stacked after it: a first mask that subtracts keeps the outside. kind: ${MASK_KIND_IDS.join(', ')}. x/y are the mask centre and width/height its size, in px of the frame; rotation in degrees; feather (blur) and expansion (grow, negative shrinks) in px; opacity in % (0..100). polygon takes points [[x,y],...] inside the mask box (0..1); image (alpha) and luma (brightness) take an assetId from list_assets; text takes text. Replaces the whole mask. Animate it with set_keyframes on ${MASK_KEYS.join(', ')}.`,
       inputSchema: z.object({
         clip_id: z.string(),
         mask: maskInput
@@ -600,7 +621,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         if (!assetKnown(input.mask.assetId)) {
           return { ok: false, error: 'unknown asset id: call list_assets' };
         }
-        return apply(registered(setMask(session.doc, input.clip_id, input.mask), input.mask.assetId), `masked ${input.clip_id}`);
+        return apply(registered(setMask(session.doc, input.clip_id, storedMask(ownerOf(input.clip_id), input.mask, session.doc)), input.mask.assetId), `masked ${input.clip_id}`);
       }
     }),
 
@@ -612,7 +633,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         if (!ids.every(assetKnown)) {
           return { ok: false, error: 'unknown asset id: call list_assets' };
         }
-        return apply(ids.reduce((r, id) => registered(r, id), setMaskStack(session.doc, input.clip_id, input.masks)), `stacked ${input.masks.length} masks on ${input.clip_id}`);
+        return apply(ids.reduce((r, id) => registered(r, id), setMaskStack(session.doc, input.clip_id, input.masks.map((m) => storedMask(ownerOf(input.clip_id), m, session.doc)))), `stacked ${input.masks.length} masks on ${input.clip_id}`);
       }
     }),
 
@@ -640,7 +661,8 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         if (input.enabled === false) {
           return apply(removeCamera(session.doc), 'removed the camera');
         }
-        return apply(setCamera(session.doc, { base: input.values as Partial<Record<(typeof CAMERA_KEYS)[number], number>>, dof: input.dof }), 'set the camera');
+        const base = input.values && storedRecord(CAMERA_LANE, input.values, session.doc);
+        return apply(setCamera(session.doc, { base: base as Partial<Record<(typeof CAMERA_KEYS)[number], number>>, dof: input.dof }), 'set the camera');
       }
     }),
 
@@ -657,7 +679,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         if (!assetKnown(input.props?.sprite)) {
           return { ok: false, error: 'unknown asset id: call list_assets' };
         }
-        const props = { ...PARTICLE_PRESET[input.preset].props, ...input.props };
+        const props = { ...PARTICLE_PRESET[input.preset].props, ...propsIn('Particles', input.props) };
         const result = addClip(session.doc, { component: 'Particles', from: frames(input.start), durationInFrames: input.duration ? frames(input.duration) : undefined, trackId: input.track_id, props }, deps.newId());
         return apply(registered(result, input.props?.sprite), `added ${input.preset} particles`);
       }
@@ -757,7 +779,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         prop: z.enum(CAMERA_KEYS),
         keyframes: z.array(z.object({ time: z.number().min(0), value: z.number(), ease: easeSchema.default(Ease.Standard), in: keyShape.in, out: keyShape.out }))
       }),
-      execute: async (input) => apply(setCameraKeyframes(session.doc, input.prop, input.keyframes.map(asKey)), `animated the camera ${input.prop}`)
+      execute: async (input) => apply(setCameraKeyframes(session.doc, input.prop, input.keyframes.map(keyIn(CAMERA_LANE, input.prop))), `animated the camera ${input.prop}`)
     }),
 
     apply_camera_preset: tool({
@@ -780,7 +802,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_physics: tool({
-      description: `Give a visual clip physics: it falls with gravity and bounces, simulated at a fixed step and baked per frame, so every seek and render shows the same motion. ${PHYSICS_KEYS.map((k) => `${k} ${PHYSICS[k].min}..${PHYSICS[k].max} (${PHYSICS[k].label})`).join('; ')}. bounds: ${BOUNDS.join(', ')} (floor bounces on the bottom of the frame, box on all four edges). collide true makes it bump into the other clips with collide on (AABB, mass decides who moves). The motion starts from where the clip is at its start and adds to its x/y. Values not given are kept; physics null turns it off.`,
+      description: `Give a visual clip physics: it falls with gravity and bounces, simulated at a fixed step and baked per frame, so every seek and render shows the same motion. ${PHYSICS_KEYS.map((k) => `${k} ${toShown('Shape', k, PHYSICS[k].min, session.doc)}..${toShown('Shape', k, PHYSICS[k].max, session.doc)} ${unitOf('Shape', k) ?? ''}`.trim()).join('; ')} (restitution is the bounce, 100% keeps all the speed). bounds: ${BOUNDS.join(', ')} (floor bounces on the bottom of the frame, box on all four edges). collide true makes it bump into the other clips with collide on (AABB, mass decides who moves). The motion starts from where the clip is at its start and adds to its x/y. Values not given are kept; physics null turns it off.`,
       inputSchema: z.object({
         clip_id: z.string(),
         physics: z
@@ -788,7 +810,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
           .partial()
           .nullable()
       }),
-      execute: async (input) => apply(setPhysics(session.doc, input.clip_id, input.physics), input.physics ? `physics on ${input.clip_id}` : `physics off on ${input.clip_id}`)
+      execute: async (input) => apply(setPhysics(session.doc, input.clip_id, input.physics && storedRecord(ownerOf(input.clip_id), input.physics, session.doc)), input.physics ? `physics on ${input.clip_id}` : `physics off on ${input.clip_id}`)
     }),
 
     apply_physics_preset: tool({
@@ -804,9 +826,9 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     add_null: tool({
-      description: 'Add a Null: an invisible handle that draws nothing. Parent clips to it (set_parent / parent_clips) and animate its transform (set_transform, set_keyframes on x, y, z, rotateX/Y/Z, scale, opacity) to move, turn or scale them together. x/y is its pivot in fractions of the frame.',
-      inputSchema: z.object({ start: z.number().min(0), duration: z.number().positive().optional(), x: z.number().min(0).max(1).optional(), y: z.number().min(0).max(1).optional(), track_id: z.string().optional() }),
-      execute: async (input) => apply(addNull(session.doc, { from: frames(input.start), durationInFrames: input.duration === undefined ? undefined : frames(input.duration), x: input.x, y: input.y, trackId: input.track_id }, deps.newId()), 'added a null')
+      description: 'Add a Null: an invisible handle that draws nothing. Parent clips to it (set_parent / parent_clips) and animate its transform (set_transform, set_keyframes on x, y, z, rotateX/Y/Z, scale, opacity) to move, turn or scale them together. x/y is its pivot in px of the frame.',
+      inputSchema: z.object({ start: z.number().min(0), duration: z.number().positive().optional(), x: z.number().optional(), y: z.number().optional(), track_id: z.string().optional() }),
+      execute: async (input) => apply(addNull(session.doc, { from: frames(input.start), durationInFrames: input.duration === undefined ? undefined : frames(input.duration), x: input.x === undefined ? undefined : toStored('Null', 'x', input.x, session.doc), y: input.y === undefined ? undefined : toStored('Null', 'y', input.y, session.doc), trackId: input.track_id }, deps.newId()), 'added a null')
     }),
 
     set_parent: tool({
@@ -846,11 +868,11 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     add_shape: tool({
-      description: `Add a vector Shape clip. kind: ${SHAPE_KINDS.join(', ')}; path takes ${PATH_GUIDE}. Fill: fill_kind solid/linear/radial/none with fill, fill2 (gradient end) and gradientAngle; stroke: strokeKind none/solid/gradient, stroke, strokeWidth/dash/gap in fractions of the short side of the frame, cap, join. Other props as add_clip. Returns the clip id.`,
+      description: `Add a vector Shape clip. kind: ${SHAPE_KINDS.join(', ')}; path takes ${PATH_GUIDE}. Fill: fill_kind solid/linear/radial/none with fill, fill2 (gradient end) and gradientAngle; stroke: strokeKind none/solid/gradient, stroke, strokeWidth/dash/gap in px, cap, join. Other props as add_clip. Returns the clip id.`,
       inputSchema: z.object({ kind: z.enum(SHAPE_KINDS), start: z.number().min(0), duration: z.number().positive().optional(), path: z.string().optional(), props: z.record(z.string(), z.unknown()).optional() }),
       execute: async (input) => {
         const id = deps.newId();
-        const props = { ...input.props, shape: input.kind, ...(input.path ? { path: input.path } : {}) };
+        const props = { ...propsIn('Shape', input.props), shape: input.kind, ...(input.path ? { path: input.path } : {}) };
         const out = apply(addClip(session.doc, { component: 'Shape', from: frames(input.start), durationInFrames: input.duration ? frames(input.duration) : undefined, props }, id), `added ${input.kind} shape`);
         return out.ok ? { ...out, clip_id: id } : out;
       }
@@ -883,13 +905,19 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     add_modifier: tool({
-      description: `Add a modifier at the end of a Shape clip's stack (applied top to bottom). Kinds and params: ${MODIFIER_CATALOGUE}. trim start/end/offset draws a path on; repeater steps each copy by offset/rotation/scale around the box centre (rotation 360/copies makes a radial pattern); wiggle is seeded and moves with speed. Returns modifier_id and the keys to animate with set_keyframes / set_expression: mod.<modifier id>.<param>.`,
+      description: `Add a modifier at the end of a Shape clip's stack (applied top to bottom). Kinds and params: ${MODIFIER_CATALOGUE}. trim start/end/offset draws a path on; repeater steps each copy by offset/rotation/scale around the box centre (rotation 360/copies makes a radial pattern); wiggle is seeded and moves with speed; wave ripples the edge (waves around it, Waves/s); blob swells the outline organically (lobes, speed, seed); goo melts near outlines together (Melt is the blur, Threshold the edge), best after a repeater or on a multi-part path. Returns modifier_id and the keys to animate with set_keyframes / set_expression: mod.<modifier id>.<param>.`,
       inputSchema: z.object({ clip_id: z.string(), kind: z.enum(MODIFIER_KINDS), params: z.record(z.string(), z.number()).optional() }),
       execute: async (input) => {
         const id = deps.newId();
         const out = apply(addModifier(session.doc, input.clip_id, input.kind, id, input.params), `added ${input.kind} to ${input.clip_id}`);
         return out.ok ? { ...out, modifier_id: id, animate: MODIFIERS[input.kind].params.map((p) => modifierKey(id, p.key)) } : out;
       }
+    }),
+
+    apply_shape_preset: tool({
+      description: `Give a Shape clip a liquid look, replacing its modifiers and their keys: ${SHAPE_PRESETS.map((p) => `${p} — ${SHAPE_PRESET[p].about}`).join('; ')}. Tune it after with set_modifier.`,
+      inputSchema: z.object({ clip_id: z.string(), preset: z.enum(SHAPE_PRESETS) }),
+      execute: async (input) => apply(applyShapePreset(session.doc, input.clip_id, input.preset, deps.newId), `${input.preset} on ${input.clip_id}`)
     }),
 
     set_modifier: tool({
