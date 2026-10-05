@@ -13,9 +13,10 @@ describe('timeline view', () => {
     expect(frameAt(60, 1)).toBe(30);
   });
 
-  it('labels the ruler in minutes, seconds and frames', () => {
-    expect(timecode(0)).toBe('0:00.00');
-    expect(timecode(95)).toBe('0:03.05');
+  it('reads time as minutes, seconds and frames, separated by colons', () => {
+    expect(timecode(0)).toBe('00:00:00');
+    expect(timecode(95)).toBe('00:03:05');
+    expect(timecode(30 * 61)).toBe('01:01:00');
   });
 
   it('ticks get denser as the zoom grows', () => {
@@ -153,7 +154,7 @@ describe('timeline view at another frame rate', () => {
   it('a second keeps its width and its timecode at 60 fps', () => {
     expect(pxPerFrame(1, 60) * 60).toBe(60);
     expect(frameAt(60, 1, 60)).toBe(60);
-    expect(timecode(90, 60)).toBe('0:01.30');
+    expect(timecode(90, 60)).toBe('00:01:30');
     expect(rulerTicks(120, 1, 60).at(-1)?.frame).toBe(120);
   });
 });
