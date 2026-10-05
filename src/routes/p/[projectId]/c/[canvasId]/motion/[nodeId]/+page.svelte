@@ -1354,9 +1354,12 @@
 
   .live-bar {
     position: absolute;
-    top: var(--ui-space-1, 4px);
-    left: var(--ui-space-2, 8px);
-    right: var(--ui-space-2, 8px);
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 0 var(--ui-space-2, 8px);
+    background: var(--ui-surface);
+    border-top: 1px solid var(--ui-line);
     outline: none;
   }
 
