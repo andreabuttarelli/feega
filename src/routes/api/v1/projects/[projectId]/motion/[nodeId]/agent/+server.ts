@@ -21,6 +21,7 @@ import { motionAgentPrompt } from '$lib/server/motion/motion-prompt';
 import { speakVoiceover } from '$lib/server/motion/voiceover';
 import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
 import { motionAgentScope } from '$lib/server/motion/agent-scope';
+import { brandSources } from '$lib/server/motion/brand-sources';
 import { SELF_CHECK_MAX_STEPS, VIEW_FRAMES, Vision, docTexts, keyFrameTimes, selfCheckDue, selfCheckPrompt, usageByModel, visionStep } from '$lib/server/motion/frames';
 import { awaitFrames, awaitVerdict, framesPrefix, FRAME_POLL_MS, type FrameBucket } from '$lib/server/motion/frame-store';
 import { CANVAS_ASSET_BUCKET, SIGNED_URL_TTL_S } from '$lib/server/repos/asset-storage';
@@ -110,6 +111,7 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
     session,
     assets,
     newId: () => crypto.randomUUID().slice(0, 8),
+    ...brandSources(db, { orgId, projectId: project.id, canvasId: motion.record.canvasId, brandId: project.brandId }),
     analysis: async (assetId) => (await analyzeSounds(storageAnalysis(db), { orgId, projectId: project.id }, assets, [assetId]))[assetId] ?? null,
     voiceover: (input) => withOrgContext(orgId, () => speakVoiceover(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId: user.id, actor }, input)),
     frames: async (callId, times) => {
