@@ -94,6 +94,7 @@ const missing = (label: string) =>
 type Framing = { fit: string; focusX: number; focusY: number };
 
 const PERCENT = 100;
+const CENTRED: Framing = { fit: 'cover', focusX: 0.5, focusY: 0.5 };
 const focus = (f: Framing) => `${Math.round(f.focusX * PERCENT)}% ${Math.round(f.focusY * PERCENT)}%`;
 const cover = (url: string, f: Framing) => `<img src="${esc(url)}" alt="" style="${css({ width: '100%', height: '100%', objectFit: f.fit, objectPosition: focus(f), display: 'block' })}" />`;
 
@@ -251,7 +252,7 @@ const ProductCard: Template<'ProductCard'> = {
     return placed(
       ctx,
       ctx.p,
-      `<div style="${card}"><div style="${css({ flex: 1, position: 'relative', background: INK.paper2, overflow: 'hidden' })}">${url ? cover(url, 'cover') : ''}</div><div style="${row}"><span style="font-weight:500;letter-spacing:-0.02em">${esc(ctx.p.title)}</span><span style="font-family:${MONO}">${esc(ctx.p.price)}</span></div></div>`,
+      `<div style="${card}"><div style="${css({ flex: 1, position: 'relative', background: INK.paper2, overflow: 'hidden' })}">${url ? cover(url, CENTRED) : ''}</div><div style="${row}"><span style="font-weight:500;letter-spacing:-0.02em">${esc(ctx.p.title)}</span><span style="font-family:${MONO}">${esc(ctx.p.price)}</span></div></div>`,
       true
     );
   }
@@ -265,7 +266,7 @@ const SocialMockup: Template<'SocialMockup'> = {
     const dark = ctx.p.platform === 'tiktok';
     const frame = css({ width: '100%', height: '100%', background: dark ? '#000' : INK.paper, color: dark ? '#fff' : INK.ink, border: `1px solid ${INK.line}`, display: 'flex', flexDirection: 'column', fontFamily: SANS, fontSize: px(unit) });
     const head = `<div style="${css({ display: 'flex', alignItems: 'center', gap: px(unit * 0.6), padding: px(unit * 0.7), fontWeight: 600 })}"><span style="${css({ width: px(unit * 1.6), height: px(unit * 1.6), background: INK.select, display: 'inline-block' })}"></span>${esc(ctx.p.handle)}</div>`;
-    const body = `<div style="${css({ flex: 1, position: 'relative', background: INK.paper2, overflow: 'hidden' })}">${url ? cover(url, 'cover') : ''}</div>`;
+    const body = `<div style="${css({ flex: 1, position: 'relative', background: INK.paper2, overflow: 'hidden' })}">${url ? cover(url, CENTRED) : ''}</div>`;
     const foot = `<div style="${css({ padding: px(unit * 0.7), lineHeight: 1.35 })}"><b>${esc(ctx.p.handle)}</b> ${esc(ctx.p.caption)}</div>`;
     return placed(ctx, ctx.p, `<div style="${frame}">${head}${body}${foot}</div>`, true);
   }
@@ -284,7 +285,7 @@ const CanvasMock: Template<'CanvasMock'> = {
     const label = (left: string, top: string, text: string) => `<div style="${css({ position: 'absolute', left, top, fontSize: px(u * 1.8), color: INK.inkSoft })}">${text}</div>`;
     const prompt = `<div id="pr-${ctx.id}" style="${css({ padding: px(u * 2), fontSize: px(u * 2.6), lineHeight: 1.35 })}">${esc(ctx.p.prompt)}</div>`;
     const wire = `<svg style="position:absolute;inset:0;width:100%;height:100%;overflow:visible" viewBox="0 0 100 100" preserveAspectRatio="none"><path id="wr-${ctx.id}" d="M36,48 C46,48 46,40 56,40" fill="none" stroke="#2563eb" stroke-width="0.4" pathLength="1" stroke-dasharray="1 1" stroke-dashoffset="1"></path></svg>`;
-    const result = `<div id="rs-${ctx.id}" style="${css({ position: 'absolute', inset: '0' })}">${url ? cover(url, 'cover') : ''}</div><div style="${css({ position: 'absolute', left: '8px', bottom: '8px', background: 'rgba(17,17,17,0.78)', color: '#fff', fontSize: px(u * 1.8), padding: '3px 6px' })}">AI-generated</div>`;
+    const result = `<div id="rs-${ctx.id}" style="${css({ position: 'absolute', inset: '0' })}">${url ? cover(url, CENTRED) : ''}</div><div style="${css({ position: 'absolute', left: '8px', bottom: '8px', background: 'rgba(17,17,17,0.78)', color: '#fff', fontSize: px(u * 1.8), padding: '3px 6px' })}">AI-generated</div>`;
     return placed(
       ctx,
       ctx.p,
