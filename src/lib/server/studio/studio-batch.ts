@@ -8,7 +8,7 @@ import { nodeReferenceSchema } from '$lib/canvas/node-references';
 import { newStudioBatchData } from '$lib/canvas/studio-batch-node';
 import { Environment, ENVIRONMENTS } from '$lib/studio/environments';
 import { Shot, SHOTS } from '$lib/studio/shots';
-import { BATCH_MAX, cellKey, lockedPrompt, MAX_VARIATIONS, planBatch, previewItems, styleRefBudget, type BatchPlan, type PlannedItem } from '$lib/studio/plan';
+import { BATCH_MAX, cellKey, lockedPrompt, MAX_VARIATIONS, planBatch, styleRefBudget, type BatchPlan, type PlannedItem } from '$lib/studio/plan';
 import { Approval, creditCheck, ItemStatus, type CreditCheck } from '$lib/studio/batch-state';
 import {
   BatchStatus,
@@ -23,7 +23,7 @@ import {
   type BatchItem,
   type BatchSpec
 } from '$lib/server/repos/product-batches';
-import type { StudioImageModel, StudioModel, StudioOptions, StudioProduct } from './studio-options';
+import { ProductOrigin, type StudioImageModel, type StudioModel, type StudioOptions, type StudioProduct } from './studio-options';
 
 export const STUDIO_AGENT_KEY = 'studio';
 const ASPECT_RATIO = '3:4';
@@ -57,7 +57,9 @@ export type Quote = {
   keptRefs: number;
 };
 
-export type StudioRefusal = { error: string };
+export type Shortfall = { needed: number; balance: number };
+
+export type StudioRefusal = { error: string; shortfall?: Shortfall };
 
 function actorOf(ctx: StudioCtx): Actor {
   return { kind: 'agent', id: ctx.userId, agentKey: STUDIO_AGENT_KEY };
@@ -107,7 +109,7 @@ export async function creditsFor(db: Db, orgId: string, perImage: number, count:
   return creditCheck(perImage, count, await orgCreditBalance(db, orgId));
 }
 
-async function copyProducts(db: Db, ctx: StudioCtx, canvasId: string, products: StudioProduct[], batchId: string): Promise<string> {
+async function copyProducts(db: Db, ctx: StudioCtx, canvasId: string, products: StoreProduct[], batchId: string): Promise<string> {
   const node = await createNode(db, {
     orgId: ctx.orgId,
     projectId: ctx.projectId,
@@ -116,21 +118,49 @@ async function copyProducts(db: Db, ctx: StudioCtx, canvasId: string, products: 
     x: 0,
     y: 0,
     displayName: 'Studio products',
-    data: { type: products[0].source.platform, url: '', studio_batch_id: batchId },
+    data: { type: products[0].source.product.platform, url: '', studio_batch_id: batchId },
     actor: actorOf(ctx)
   });
 
-  for (const product of products) {
-    const { source } = product;
+  for (const { source } of products) {
     await upsertNodeProducts(db, {
       orgId: ctx.orgId,
       projectId: ctx.projectId,
       nodeId: node.id,
-      platform: source.platform,
-      products: [{ ...source }]
+      platform: source.product.platform,
+      products: [{ ...source.product }]
     });
   }
   return node.id;
+}
+
+function listItemOf(product: StudioProduct): { label: string; asset_id?: string; url?: string } {
+  return product.source.origin === ProductOrigin.Upload ? { label: product.title, asset_id: product.source.assetId } : { label: product.title, url: product.image ?? '' };
+}
+
+async function listProducts(db: Db, ctx: StudioCtx, canvasId: string, products: StudioProduct[], batchId: string): Promise<string> {
+  const node = await createNode(db, {
+    orgId: ctx.orgId,
+    projectId: ctx.projectId,
+    canvasId,
+    type: 'list',
+    x: 0,
+    y: 0,
+    displayName: 'Studio products',
+    data: { item_kind: 'image', items: products.map(listItemOf), studio_batch_id: batchId },
+    actor: actorOf(ctx)
+  });
+  return node.id;
+}
+
+type StoreProduct = StudioProduct & { source: { origin: ProductOrigin.Store } };
+
+function allFromStore(products: StudioProduct[]): products is StoreProduct[] {
+  return products.every((p) => p.source.origin === ProductOrigin.Store);
+}
+
+async function placeProducts(db: Db, ctx: StudioCtx, canvasId: string, products: StudioProduct[], batchId: string): Promise<string> {
+  return allFromStore(products) ? copyProducts(db, ctx, canvasId, products, batchId) : listProducts(db, ctx, canvasId, products, batchId);
 }
 
 async function placeModels(db: Db, ctx: StudioCtx, canvasId: string, models: StudioModel[]): Promise<Record<string, string>> {
@@ -167,9 +197,12 @@ async function placeSummary(db: Db, ctx: StudioCtx, canvasId: string, batch: { i
 }
 
 async function productIndexes(db: Db, orgId: string, productsNodeId: string, products: StudioProduct[]): Promise<Map<string, number>> {
+  if (!allFromStore(products)) {
+    return new Map(products.map((p, i) => [p.id, i + 1]));
+  }
   const copied = await listNodeProducts(db, { orgId, nodeId: productsNodeId });
   const byExternal = new Map(copied.map((p, i) => [`${p.platform}:${p.externalId}`, i + 1]));
-  return new Map(products.map((p) => [p.id, byExternal.get(`${p.source.platform}:${p.source.externalId}`) ?? 0]));
+  return new Map(products.map((p) => [p.id, byExternal.get(`${p.source.product.platform}:${p.source.product.externalId}`) ?? 0]));
 }
 
 async function ensureCells(db: Db, ctx: StudioCtx, batch: Batch, items: PlannedItem[], keptRefs: number): Promise<BatchSpec> {
@@ -242,24 +275,7 @@ async function enqueue(
 
 export type StartOutcome = { batchId: string } | StudioRefusal;
 
-export async function startPreview(db: Db, ctx: StudioCtx, selection: Selection, options: StudioOptions): Promise<StartOutcome> {
-  const quote = quoteSelection(selection, options);
-  if ('error' in quote) {
-    return quote;
-  }
-  if (!quote.plan.items.length) {
-    return { error: 'Nothing to generate with this selection.' };
-  }
-  if (quote.plan.overLimit) {
-    return { error: `At most ${BATCH_MAX} images per batch: this one has ${quote.plan.items.length}.` };
-  }
-
-  const preview = previewItems(quote.plan.items);
-  const credits = await creditsFor(db, ctx.orgId, quote.previewModel.credits, preview.length);
-  if (!credits.enough) {
-    return { error: `Not enough credits: the preview costs ${credits.total}, you have ${credits.balance}.` };
-  }
-
+async function materialise(db: Db, ctx: StudioCtx, selection: Selection, quote: Quote): Promise<Batch> {
   const spec: BatchSpec & { selection: Selection } = { styleRefs: selection.styleRefs, cells: {}, modelNodes: {}, droppedRefs: quote.droppedRefs, selection };
   const batch = await insertBatch(db, {
     orgId: ctx.orgId,
@@ -272,14 +288,35 @@ export async function startPreview(db: Db, ctx: StudioCtx, selection: Selection,
   });
 
   const canvas = await createCanvas(db, { orgId: ctx.orgId, projectId: ctx.projectId, name: `Studio · ${selection.name}` });
-  const productsNodeId = await copyProducts(db, ctx, canvas.id, quote.products, batch.id);
+  const productsNodeId = await placeProducts(db, ctx, canvas.id, quote.products, batch.id);
   const modelNodes = await placeModels(db, ctx, canvas.id, quote.models);
   await placeSummary(db, ctx, canvas.id, { id: batch.id, name: selection.name });
   const materialised: Batch = { ...batch, canvasId: canvas.id, productsNodeId, spec: { ...spec, modelNodes } };
   await updateBatch(db, { orgId: ctx.orgId, batchId: batch.id, patch: { canvas_id: canvas.id, products_node_id: productsNodeId, spec: materialised.spec } });
+  return materialised;
+}
 
-  await enqueue(db, ctx, materialised, quote, preview, { preview: true, model: quote.previewModel.id });
-  return { batchId: batch.id };
+export async function startBatch(db: Db, ctx: StudioCtx, selection: Selection, options: StudioOptions): Promise<StartOutcome> {
+  const quote = quoteSelection(selection, options);
+  if ('error' in quote) {
+    return quote;
+  }
+  if (!quote.plan.items.length) {
+    return { error: 'Nothing to generate with this selection.' };
+  }
+  if (quote.plan.overLimit) {
+    return { error: `At most ${BATCH_MAX} images per batch: this one has ${quote.plan.items.length}.` };
+  }
+
+  const credits = await creditsFor(db, ctx.orgId, quote.model.credits, quote.plan.items.length);
+  if (!credits.enough) {
+    return { error: `Not enough credits: these photos cost ${credits.total}, you have ${credits.balance}.`, shortfall: { needed: credits.total, balance: credits.balance } };
+  }
+
+  const materialised = await materialise(db, ctx, selection, quote);
+  await enqueue(db, ctx, materialised, quote, quote.plan.items, { preview: false, model: quote.model.id });
+  await updateBatch(db, { orgId: ctx.orgId, batchId: materialised.id, patch: { status: BatchStatus.Running } });
+  return { batchId: materialised.id };
 }
 
 function selectionOf(batch: Batch): Selection | null {
@@ -310,7 +347,7 @@ export async function runBatch(db: Db, ctx: StudioCtx, batchId: string, options:
 
   const credits = await creditsFor(db, ctx.orgId, quote.model.credits, quote.plan.items.length);
   if (!credits.enough) {
-    return { error: `Not enough credits: this batch costs ${credits.total}, you have ${credits.balance}.` };
+    return { error: `Not enough credits: this batch costs ${credits.total}, you have ${credits.balance}.`, shortfall: { needed: credits.total, balance: credits.balance } };
   }
 
   await enqueue(db, ctx, batch, quote, quote.plan.items, { preview: false, model: quote.model.id });
@@ -340,7 +377,7 @@ export async function moreVariations(db: Db, ctx: StudioCtx, batchId: string, op
 
   const credits = await creditsFor(db, ctx.orgId, quote.model.credits, plan.items.length);
   if (!credits.enough) {
-    return { error: `Not enough credits: ${credits.total} needed, you have ${credits.balance}.` };
+    return { error: `Not enough credits: ${credits.total} needed, you have ${credits.balance}.`, shortfall: { needed: credits.total, balance: credits.balance } };
   }
 
   await enqueue(db, ctx, batch, quote, plan.items, { preview: false, model: quote.model.id });

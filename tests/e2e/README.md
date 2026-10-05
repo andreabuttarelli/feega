@@ -22,6 +22,11 @@ che "crea un brand" arrivi davvero a mostrare il form del brand appena creato. U
 larga (drag & drop, upload, angoli squadrati…) è stata scritta e tolta di nuovo: costa tempo reale
 a ogni run e qui la CLAUDE.md chiede una funzione provata end-to-end, non ogni superficie coperta.
 
+`photo-studio.spec.ts` è `@real` con un provider immagini finto: carica una foto, sceglie due
+stili, genera, sceglie una foto e scarica lo zip Amazon. Gira solo con `E2E_FAKE_IMAGES=1`:
+`fixtures/global-setup.ts` avvia `fixtures/mock-images.ts` sulla porta 4498 e il dev server di
+Playwright riceve `LLM_BASE_URL` puntato lì, quindi nessun render va al fornitore vero.
+
 Tutti girano SOLO con `E2E_REAL_STACK=1`; senza, si saltano. Non si proteggono con
 `PUBLIC_SUPABASE_URL`: quella la mette `playwright.config.ts` come segnaposto, c'è sempre, e una
 guardia che non può scattare è una guardia che non esiste.

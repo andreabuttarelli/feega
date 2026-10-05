@@ -187,7 +187,8 @@ export async function listItems(db: Db, scope: { orgId: string; batchId: string 
     .select('*')
     .eq('org_id', scope.orgId)
     .eq('batch_id', scope.batchId)
-    .order('created_at', { ascending: true });
+    .order('created_at', { ascending: true })
+    .order('id', { ascending: true });
   return rows(result).map(toItem);
 }
 
