@@ -239,6 +239,9 @@ describe('add_track', () => {
     await run('add_track', { kind: 'visual', name: 'Stage' });
 
     expect(session.doc.tracks[0].name).toBe('Stage');
+  });
+});
+
 describe('set_clip_transition', () => {
   it('dissolves between two adjacent clips and get_motion_doc names the clip it comes from', async () => {
     const { run } = setup();
