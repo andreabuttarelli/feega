@@ -1,3 +1,4 @@
+import * as bento from './bento';
 import * as carousel3d from './carousel-3d';
 import * as coverflow from './coverflow';
 import * as explorerGrid from './explorer-grid';
@@ -112,6 +113,15 @@ export const LAYOUTS: Record<LayoutId, LayoutDefinition> = {
 		params: ring.params,
 		instances: (mediaCount, values) => filledCount(mediaCount, valueOf(values, 'count', ring.RING_COUNT.fallback)),
 		transforms: ring.transforms
+	},
+	bento: {
+		label: 'Bento',
+		description: 'A grid of rounded cells, some spanning rows or columns, each holding a picture, a video or a motion.',
+		motion: 'cycle',
+		camera: 'fixed',
+		params: bento.params,
+		instances: (mediaCount) => mediaCount,
+		transforms: (count, values) => bento.transforms(count, values)
 	}
 };
 
