@@ -5,7 +5,7 @@
   import { Playback, previewDriver, type ShotRequest } from '$lib/motion/hyperframes/preview-driver';
   import { MEASURE_REPLY, MEASURE_REQUEST, type MeasureReply, type MeasuredBox } from '$lib/motion/hyperframes/measure';
 
-  type Player = HTMLElement & { seek: (t: number) => void; play: () => void; pause: () => void; currentTime: number; iframeElement: HTMLIFrameElement };
+  type Player = HTMLElement & { seek: (t: number) => void; play: () => void; pause: () => void; currentTime: number; muted: boolean; loop: boolean; iframeElement: HTMLIFrameElement };
 
   export type CapturedFrame = { time: number; data: string; layout: string; errors: ClipError[] };
   export type FrameSize = { width: number; height: number };
@@ -21,8 +21,10 @@
     fps = FPS,
     frame = $bindable(0),
     playing = $bindable(false),
+    muted = false,
+    loop = false,
     children
-  }: { html: string; width: number; height: number; fps?: number; frame?: number; playing?: boolean; children?: Snippet } = $props();
+  }: { html: string; width: number; height: number; fps?: number; frame?: number; playing?: boolean; muted?: boolean; loop?: boolean; children?: Snippet } = $props();
 
   let host = $state<HTMLDivElement | null>(null);
   let player: Player | null = null;
@@ -51,6 +53,8 @@
       el.setAttribute('disable-click-to-play', '');
       el.style.width = '100%';
       el.style.height = '100%';
+      el.muted = muted;
+      el.loop = loop;
       el.addEventListener('ready', () => {
         ready = true;
         el.seek(frame / fps);
@@ -142,6 +146,11 @@
     });
   }
 
+  export function still(time: number, captureWidth = CAPTURE_WIDTH): Promise<string> {
+    const request = { format: FrameFormat.Jpeg, width: captureWidth, height: Math.round((captureWidth * height) / width), quality: CAPTURE_QUALITY };
+    return driver.exclusive(async () => (await shoot(time, request)).url ?? '');
+  }
+
   export function measure(): Promise<Record<string, MeasuredBox>> {
     const target = player?.iframeElement?.contentWindow;
     if (!target || capturing) {
@@ -199,6 +208,15 @@
     }
     reported = target;
     player.seek(target / fps);
+  });
+
+  $effect(() => {
+    const sound = muted;
+    const again = loop;
+    if (player) {
+      player.muted = sound;
+      player.loop = again;
+    }
   });
 
   $effect(() => {
