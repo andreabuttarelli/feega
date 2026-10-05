@@ -7,11 +7,29 @@ describe('chunkPlan', () => {
   });
 
   it('never asks for more than eight sandboxes: a long video gets bigger chunks', () => {
-    expect(chunkPlan(3000)).toEqual({ size: 375, count: 8 });
+    expect(chunkPlan(3000)).toEqual({ size: 376, count: 8 });
   });
 
   it('a clip shorter than one chunk is one chunk', () => {
     expect(chunkPlan(45)).toEqual({ size: 45, count: 1 });
+  });
+
+  it('heavy frames make the chunks smaller, up to sixteen workers', () => {
+    const heavy = Array.from({ length: 900 }, () => 2500);
+
+    expect(chunkPlan(900, heavy).count).toBe(16);
+    expect(chunkPlan(900, heavy).size * 2500).toBeLessThan(chunkPlan(900).size * 2500);
+  });
+
+  it('a chunk is sized by its heaviest stretch, not by the average', () => {
+    const costs = Array.from({ length: 840 }, (_, f) => (f < 120 ? 2500 : 40));
+
+    expect(chunkPlan(840, costs).count).toBeGreaterThan(chunkPlan(840).count);
+  });
+
+  it('chunk sizes are even, so a chunk that times out splits in two halves on the same grid', () => {
+    expect(chunkPlan(901).size % 2).toBe(0);
+    expect(chunkPlan(900, Array.from({ length: 900 }, () => 2500)).size % 2).toBe(0);
   });
 
   it('the last chunk is allowed to be short, but no chunk is empty', () => {
