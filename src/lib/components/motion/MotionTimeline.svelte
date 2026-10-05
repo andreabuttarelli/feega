@@ -19,7 +19,7 @@
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
   import { ClipEdge, moveClip, moveKeyframes, moveTrack, setKeyEase, setKeyInterp, trimClip, type KeyRef, type OpResult } from '$lib/motion/timeline';
   import { withParams } from '$lib/motion/custom/params';
-  import { Grip, KeySide, Snap, edgeHandles, frameAt, keyLanes, pxPerFrame, rulerTicks, snapped, stackRows, type KeyLane } from '$lib/motion/timeline-view';
+  import { Grip, KeySide, Reveal, Snap, edgeHandles, frameAt, keyLanes, pxPerFrame, rulerTicks, snapped, stackRows, type KeyLane } from '$lib/motion/timeline-view';
   import { MASK_KINDS, Matte } from '$lib/motion/mask';
   import type { MotionTrack } from '$lib/motion/doc';
   import { Interp, Source, type EaseSpec, type Keyframe } from '$lib/motion/keyframes';
@@ -82,8 +82,9 @@
     waveforms = {},
     beats = [],
     assetUrls = {},
+    reveal = Reveal.Animated,
     onchange
-  }: { doc: MotionDoc; frame?: number; selection?: string[]; keySelection?: KeyRef[]; camera?: boolean; zoom: number; snap: Snap; waveforms?: Record<string, number[]>; beats?: number[]; assetUrls?: Record<string, string>; onchange: (doc: MotionDoc, summary: string) => void } = $props();
+  }: { doc: MotionDoc; frame?: number; selection?: string[]; keySelection?: KeyRef[]; camera?: boolean; zoom: number; snap: Snap; waveforms?: Record<string, number[]>; beats?: number[]; assetUrls?: Record<string, string>; reveal?: Reveal; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 
   let folded = $state<string[]>([]);
   let solo = $state<string[]>([]);
@@ -209,7 +210,7 @@
   }
 
   function laneClips(track: MotionTrack): MotionClip[] {
-    return (track.clips as MotionClip[]).filter((c) => selection.includes(c.id) && !collapsed.includes(c.id) && Object.keys(c.keyframes).length > 0);
+    return (track.clips as MotionClip[]).filter((c) => selection.includes(c.id) && !collapsed.includes(c.id) && keyLanes(withParams(shown, c), reveal).length > 0);
   }
 
   function clipById(id: string): MotionClip {
@@ -581,7 +582,7 @@
         </div>
       </div>
       {#each laneClips(track) as clip (clip.id)}
-        {@const all = keyLanes(withParams(shown, clip))}
+        {@const all = keyLanes(withParams(shown, clip), reveal)}
         {@const masked = all.filter((l) => l.source === Source.Mask)}
         {#each all.filter((l) => l.source !== Source.Mask) as lane (lane.prop)}{@render keyLane(clip, lane)}{/each}
         {#if masked.length}

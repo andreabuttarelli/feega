@@ -107,10 +107,26 @@ export enum KeySide {
 
 export type KeyLane = { prop: string; label: string; source: Source; frames: number[] };
 
-export function keyLanes(clip: MotionClip & { params?: readonly AnimProp[] }): KeyLane[] {
+export enum Reveal {
+  Animated = 'animated',
+  Position = 'position',
+  Scale = 'scale',
+  Rotation = 'rotation',
+  Opacity = 'opacity'
+}
+
+const REVEALED: Record<Reveal, (prop: AnimProp, clip: MotionClip) => boolean> = {
+  [Reveal.Animated]: (p, clip) => Boolean(clip.keyframes[p.key]?.length),
+  [Reveal.Position]: (p) => p.key === 'x' || p.key === 'y',
+  [Reveal.Scale]: (p) => p.key === 'scale',
+  [Reveal.Rotation]: (p) => p.key === 'rotateZ',
+  [Reveal.Opacity]: (p) => p.key === 'opacity'
+};
+
+export function keyLanes(clip: MotionClip & { params?: readonly AnimProp[] }, reveal: Reveal = Reveal.Animated): KeyLane[] {
   return [...ANIMATABLE[clip.component], ...(clip.params ?? [])]
-    .filter((p) => clip.keyframes[p.key]?.length)
-    .map((p) => ({ prop: p.key, label: p.label, source: p.source, frames: clip.keyframes[p.key].map((k) => k.frame) }));
+    .filter((p) => REVEALED[reveal](p, clip))
+    .map((p) => ({ prop: p.key, label: p.label, source: p.source, frames: (clip.keyframes[p.key] ?? []).map((k) => k.frame) }));
 }
 
 const CURVE_STEPS = 24;

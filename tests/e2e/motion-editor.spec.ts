@@ -33,4 +33,36 @@ test.describe('motion editor @real', () => {
 
     expect(errors, errors.join('\n')).toEqual([]);
   });
+
+  test('? apre le scorciatoie, ⌘B e ⌥⌘B chiudono i pannelli e restano chiusi dopo un reload', async ({ page, session, seedNode }) => {
+    const node = await seedNode({ type: 'motion', data: MOTION_DATA });
+    const url = `/p/${session.projectId}/c/${session.canvasId}/motion/${node.id}`;
+    await gotoHydrated(page, url);
+
+    await page.keyboard.press('Shift+?');
+    await expect(page.getByTestId('shortcut-help')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('shortcut-help')).toHaveCount(0);
+
+    await page.keyboard.press('ControlOrMeta+b');
+    await page.keyboard.press('ControlOrMeta+Alt+b');
+    await expect(page.getByLabel('Agent', { exact: true })).toBeHidden();
+    await expect(page.getByLabel('Properties', { exact: true })).toBeHidden();
+
+    await gotoHydrated(page, url);
+    await expect(page.getByTestId('toggle-chat')).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.getByLabel('Agent', { exact: true })).toBeHidden();
+  });
+
+  test('una scorciatoia non scatta mentre si scrive in un campo', async ({ page, session, seedNode }) => {
+    const node = await seedNode({ type: 'motion', data: MOTION_DATA });
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}/motion/${node.id}`);
+
+    await page.getByPlaceholder('Search layers').fill('l ');
+    await page.keyboard.press('Home');
+    await page.waitForTimeout(500);
+
+    await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeVisible();
+    await expect(page.getByTestId('timecode')).toHaveText(START);
+  });
 });

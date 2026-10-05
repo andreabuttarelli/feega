@@ -3,7 +3,7 @@ import { MotionFormat, findClip, newMotionDoc } from './doc';
 import { Ease } from './design';
 import { Source } from './keyframes';
 import { addClip, setKeyframes, type OpResult } from './timeline';
-import { Grip, HANDLE_PX, Snap, easePath, edgeHandles, frameAt, handleAt, keyLanes, stackRows, pxPerFrame, rulerTicks, snapped, timecode } from './timeline-view';
+import { Grip, HANDLE_PX, Reveal, Snap, easePath, edgeHandles, frameAt, handleAt, keyLanes, stackRows, pxPerFrame, rulerTicks, snapped, timecode } from './timeline-view';
 
 describe('timeline view', () => {
   it('at zoom 1 a second is 60 px', () => {
@@ -110,6 +110,18 @@ describe('keyframe lanes', () => {
 
   it('a clip without keyframes has no lanes', () => {
     expect(keyLanes(findClip(doc, 't')!.clip)).toEqual([]);
+  });
+
+  it('P S R T show their property lane even with no keyframes, U the animated ones', () => {
+    const clip = findClip(keyed, 't')!.clip;
+    const props = (reveal: Reveal) => keyLanes(clip, reveal).map((l) => l.prop);
+
+    expect(props(Reveal.Position)).toEqual(['x', 'y']);
+    expect(props(Reveal.Scale)).toEqual(['scale']);
+    expect(props(Reveal.Rotation)).toEqual(['rotateZ']);
+    expect(props(Reveal.Opacity)).toEqual(['opacity']);
+    expect(props(Reveal.Animated)).toEqual(['rotateX', 'color']);
+    expect(keyLanes(clip, Reveal.Opacity)[0]).toEqual({ prop: 'opacity', label: 'Opacity', source: Source.Transform, frames: [] });
   });
 
   it('the ease preview is a path from the bottom-left to the top-right corner', () => {

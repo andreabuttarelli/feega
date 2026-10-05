@@ -23,6 +23,8 @@ function slowPlayer(first: string) {
       }, COMMIT_MS);
     },
     seek: () => {},
+    play: () => {},
+    pause: () => {},
     post: (m: CaptureRequest) => {
       const doc = committed;
       queueMicrotask(() => replies.forEach((l) => l({ type: CAPTURE_REPLY, id: m.id, url: nameOf(doc), stamp: stampOf(doc) })));
