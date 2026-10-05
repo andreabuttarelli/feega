@@ -3,6 +3,7 @@
   import { FPS } from '$lib/motion/design';
   import { CAPTURE_REPLY, FrameFormat, type CaptureReply, type ClipError } from '$lib/motion/hyperframes/capture';
   import { Playback, previewDriver, type ShotRequest } from '$lib/motion/hyperframes/preview-driver';
+  import { MEASURE_REPLY, MEASURE_REQUEST, type MeasureReply, type MeasuredBox } from '$lib/motion/hyperframes/measure';
 
   type Player = HTMLElement & { seek: (t: number) => void; play: () => void; pause: () => void; currentTime: number; iframeElement: HTMLIFrameElement };
 
@@ -11,6 +12,7 @@
 
   const CAPTURE_WIDTH = 640;
   const CAPTURE_QUALITY = 0.72;
+  const MEASURE_TIMEOUT_MS = 1000;
 
   let {
     html,
@@ -137,6 +139,31 @@
         frames.push({ time, data: reply.url ?? '', layout: reply.layout ?? '', errors: reply.errors ?? [] });
       }
       return frames;
+    });
+  }
+
+  export function measure(): Promise<Record<string, MeasuredBox>> {
+    const target = player?.iframeElement?.contentWindow;
+    if (!target || capturing) {
+      return Promise.resolve({});
+    }
+    const id = crypto.randomUUID();
+    return new Promise((resolve) => {
+      const settle = (boxes: Record<string, MeasuredBox>) => {
+        clearTimeout(timer);
+        window.removeEventListener('message', onMessage);
+        resolve(boxes);
+      };
+      const onMessage = (e: MessageEvent) => {
+        const m = e.data as MeasureReply;
+        if (e.source !== target || m?.type !== MEASURE_REPLY || m.id !== id) {
+          return;
+        }
+        settle(m.boxes);
+      };
+      const timer = setTimeout(() => settle({}), MEASURE_TIMEOUT_MS);
+      window.addEventListener('message', onMessage);
+      target.postMessage({ type: MEASURE_REQUEST, id }, '*');
     });
   }
 

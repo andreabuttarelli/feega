@@ -48,6 +48,7 @@
   import { THREE_D_COMPONENTS } from '$lib/motion/components';
   import MaskOverlay from '$lib/components/motion/MaskOverlay.svelte';
   import PenOverlay from '$lib/components/motion/PenOverlay.svelte';
+  import SelectionOverlay from '$lib/components/motion/SelectionOverlay.svelte';
   import MotionPathOverlay from '$lib/components/motion/MotionPathOverlay.svelte';
   import { Align, addMarker, alignClips, allMarkers, clipsTo, distributeClips, trimClipsAt, loopFrame, nudgeClips, sequenceClips, setWorkArea, staggerClips } from '$lib/motion/organize';
   import ExportDialog from '$lib/components/motion/ExportDialog.svelte';
@@ -823,6 +824,7 @@
     <section class="left">
       <div class="preview">
         <MotionPreview bind:this={preview} {html} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing>
+          {#if !playing}<SelectionOverlay {doc} {frame} {html} {selection} measure={() => preview?.measure() ?? Promise.resolve({})} onselect={(ids) => (selection = ids)} onpreview={(next) => (previewDoc = next)} onchange={edit} />{/if}
           {#if selected?.mask && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<MaskOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
           {#if selected?.component === 'Shape' && selected.props.shape === 'path' && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<PenOverlay {doc} clip={selected} onchange={edit} />{/if}
           {#if selected?.path && !playing}<MotionPathOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
