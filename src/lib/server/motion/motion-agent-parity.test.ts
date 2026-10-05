@@ -45,6 +45,7 @@ const CLIP: Record<string, Access> = {
   props: { write: ['set_props', 'add_particles', 'apply_particle_preset', 'set_time_remap'], read: 'props' },
   transitionIn: { write: ['set_transition'], read: 'in' },
   transitionOut: { write: ['set_transition'], read: 'out' },
+  junction: { write: ['set_clip_transition'], read: 'junction' },
   transform: { write: ['set_transform'], read: 'transform' },
   keyframes: { write: ['set_keyframes', 'remove_keyframes', 'duck_audio', 'set_time_remap', 'freeze_frame'], read: 'keyframes' },
   mask: { write: ['set_mask', 'remove_mask'], read: 'mask' },

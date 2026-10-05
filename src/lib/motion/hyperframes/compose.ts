@@ -37,6 +37,7 @@ import { declaredFamilyCss, fontStack, loadDescriptors, googleFontsUrl, loadedWe
 import { bakePaths } from '../path';
 import { bakePhysics } from '../physics/simulate';
 import { withoutHidden } from '../organize';
+import { JUNCTION, Span, junctionHalves, junctionPairs, withJunctions, type JunctionPair, type Move } from '../junctions';
 import { EFFECT_CSS, adjustmentLayer, adjustmentTimeline, effectLayer, effectScript, effectTimeline, type EffectSet } from '../effects/render';
 import { flattenComps, type GroupProps } from '../precomp';
 import { blendStyle } from '../blend';
@@ -103,6 +104,41 @@ function edgeTweens(clip: MotionClip, fps: number): Tween[] {
   }
 
   return tweens;
+}
+
+const SPAN: Record<Span, (d: number) => { offset: number; length: number }> = {
+  [Span.Whole]: (d) => ({ offset: 0, length: d }),
+  [Span.FirstHalf]: (d) => ({ offset: 0, length: d / 2 }),
+  [Span.SecondHalf]: (d) => ({ offset: d / 2, length: d / 2 })
+};
+
+function incomingOnTop(doc: MotionDoc, pair: JunctionPair): boolean {
+  const rank = (id: string) => {
+    const track = doc.tracks.findIndex((t) => t.clips.some((c) => c.id === id));
+    return [-track, doc.tracks[track].clips.findIndex((c) => c.id === id)];
+  };
+  const [inTrack, inIndex] = rank(pair.incoming);
+  const [outTrack, outIndex] = rank(pair.outgoing);
+  return inTrack !== outTrack ? inTrack > outTrack : inIndex > outIndex;
+}
+
+function junctionTweens(doc: MotionDoc, pairs: JunctionPair[]): Tween[] {
+  return pairs.flatMap((pair) => {
+    const spec = JUNCTION[pair.kind];
+    const incoming = byIdIn(doc, pair.incoming);
+    const at = (incoming.from - junctionHalves(pair.durationInFrames).before) / doc.fps;
+    const duration = pair.durationInFrames / doc.fps;
+    const below = spec.incomingBelow && !incomingOnTop(doc, pair);
+    const tween = (target: string) => (move: Move): Tween => {
+      const { offset, length } = SPAN[move.span](duration);
+      return { target: `#fx-${target}`, from: move.from, to: move.to, at: at + offset, duration: length, ease: spec.ease };
+    };
+    return [...(below ? spec.incomingBelow! : spec.outgoing).map(tween(pair.outgoing)), ...(below ? [] : spec.incoming).map(tween(pair.incoming))];
+  });
+}
+
+function byIdIn(doc: MotionDoc, id: string): MotionClip {
+  return clipsOf(doc).find((c) => c.id === id)!;
 }
 
 function moveTweens(clip: MotionClip, fps: number): Tween[] {
@@ -366,13 +402,15 @@ function zoomed(doc: MotionDoc, scale: number): string {
 }
 
 export function composeHtml(raw: ComposeInput): string {
-  const input = { ...raw, doc: bakePhysics(bakeExpressions(bakePaths(withoutBackdrop(flattenComps(withoutHidden(raw.doc)))), raw.analyses)) };
+  const shown = withoutHidden(raw.doc);
+  const junctions = junctionTweens(shown, junctionPairs(shown));
+  const input = { ...raw, doc: bakePhysics(bakeExpressions(bakePaths(withoutBackdrop(flattenComps(withJunctions(shown)))), raw.analyses)) };
   const { doc, tokens } = input;
   const scale = raw.scale ?? 1;
   const frame = { width: Math.round(doc.width * scale), height: Math.round(doc.height * scale) };
   const bottomFirst = doc.tracks.map((track, index) => ({ track, index })).reverse();
   const layers: string[] = [];
-  const tweens: Tween[] = [];
+  const tweens: Tween[] = [...junctions];
   const holds: Hold[] = [];
   const three: ThreeClip[] = [];
   const compositions: TimedBake[] = [];
