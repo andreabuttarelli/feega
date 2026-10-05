@@ -18,8 +18,8 @@ export type RingNumber = { label: string; min: number; max: number; step: number
 const n = (label: string, min: number, max: number, step: number, fallback: number, section: RingSection): RingNumber => ({ label, min, max, step, fallback, section });
 
 export const RING_NUMBERS = {
-	ringRadius: n('Radius', 0.1, 2, 0.01, 0.6, RingSection.Shape),
-	cardHeight: n('Card height', 0.05, 1.5, 0.01, 0.34, RingSection.Shape),
+	ringRadius: n('Radius', 0.1, 2, 0.01, 0.45, RingSection.Shape),
+	cardHeight: n('Card height', 0.05, 1.5, 0.01, 0.26, RingSection.Shape),
 	gap: n('Gap', 0, 0.2, 0.001, 0.025, RingSection.Shape),
 	tiltX: n('Tilt X', -90, 90, 1, -14, RingSection.Shape),
 	tiltZ: n('Tilt Z', -90, 90, 1, -12, RingSection.Shape),
@@ -52,9 +52,7 @@ export const params: LayoutParam[] = [
 export const SPIN_SIGN: Record<Spin, 1 | -1> = { [Spin.Left]: 1, [Spin.Right]: -1 };
 
 const WORLD_PER_SHORT_SIDE = 7.6;
-const REFERENCE_SHORT_SIDE_PX = 1080;
 const DEGREE = Math.PI / 180;
-const MAX_GAP_SHARE = 0.9;
 
 type Matrix = [number, number, number, number, number, number, number, number, number];
 
@@ -78,8 +76,6 @@ export function transforms(count: number, raw: LayoutParams, t: number): Transfo
 	const radius = num('ringRadius') * WORLD_PER_SHORT_SIDE;
 	const height = num('cardHeight') * WORLD_PER_SHORT_SIDE;
 	const angle = SPIN_SIGN[v.direction as Spin] * Math.PI * 2 * Math.round(num('turns')) * t + num('spin') * DEGREE;
-	const pitch = (Math.PI * 2) / Math.max(1, count);
-	const arc = pitch - Math.min(num('gap') * WORLD_PER_SHORT_SIDE / radius, pitch * MAX_GAP_SHARE);
 	const tilt = multiply(rotZ(num('tiltZ') * DEGREE), rotX(num('tiltX') * DEGREE));
 
 	return Array.from({ length: count }, (_, i) => {
@@ -91,9 +87,6 @@ export function transforms(count: number, raw: LayoutParams, t: number): Transfo
 			rotation: eulerXYZ(m),
 			scale: { x: height, y: height, z: height },
 			opacity: facing >= 0 ? 1 : num('backOpacity'),
-			bend: radius,
-			corner: num('cornerRadius') / REFERENCE_SHORT_SIDE_PX / num('cardHeight'),
-			width: arc * radius
 		};
 	});
 }

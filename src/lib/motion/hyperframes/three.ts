@@ -6,11 +6,13 @@ import { SURFACE, type Material, type Surface } from '../materials';
 import { cameraRuntime, seekDriver } from './stage';
 import { DEVICE_SCRIPT, type DeviceRuntime } from './device-runtime';
 import { ENGINE_GLOBAL } from '../engine/engine';
+import { drawOnce, screenKey } from './three-draw';
 import { strokePolygons } from './stroke-outline';
 import { ON_DISPOSE, hotScope, hotSeek, keptGl } from './hot';
 
 export const THREE_VERSION = '0.181.2';
 export const THREE_TIMELINE = 'feegaThree';
+export const THREE_REDRAW = '__feegaThreeRedraw';
 export const OPENTYPE_URL = 'https://cdn.jsdelivr.net/npm/opentype.js@1.3.4/dist/opentype.module.js';
 
 export function onScreen(clip: { start: number; length: number }, time: number): boolean {
@@ -49,6 +51,7 @@ export type ThreeClip = {
   bevel: number;
   device: DeviceRuntime | null;
   video: boolean;
+  overscan: number;
 };
 
 export const LIGHTING = {
@@ -90,6 +93,7 @@ const FONT_CACHE = '__feegaFontFiles';
 let live = true;
 
 const DEG = Math.PI / 180;
+const wider = (fov, overscan) => (2 * Math.atan(Math.tan((fov * DEG) / 2) * (1 + 2 * overscan))) / DEG;
 const FLOOR = -1.05;
 const FIT = 2;
 const SHADOW_MAP = 512;
@@ -267,7 +271,7 @@ function stage(c) {
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   }
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(FOV, canvas.width / canvas.height, 0.1, 100);
+  const camera = new THREE.PerspectiveCamera(wider(FOV, c.overscan), canvas.width / canvas.height, 0.1, 100);
   camera.position.set(0, 0.3, 4.6 / c.zoom);
   const lights = LOOK && LOOK.lights.length ? lookLights(scene) : presetLights(scene, c);
   ground(scene, c);
@@ -439,7 +443,13 @@ function lightAt(spec, key, frame) {
   return spec.keyframes[key] ? sampleTrack(spec.keyframes[key], frame) : spec[key];
 }
 
-function renderAt(time) {
+const screens = () => scenes.map(({ c, s }) => (s.device ? screenKey(deviceSource(c, s), 0) : '')).join(',');
+const painter = drawOnce(drawAt, screens);
+const renderAt = (time) => painter.at(time);
+const redraw = (time) => painter.again(time);
+window.${THREE_REDRAW} = renderAt;
+
+function drawAt(time) {
   if (!live) return;
   for (const { c, s } of scenes) {
     if (!onScreen(c, time)) continue;
@@ -456,7 +466,7 @@ function renderAt(time) {
     s.object.rotation.set(at('objectRotateX', 0) * DEG, at('objectRotateY', 0) * DEG, at('objectRotateZ', 0) * DEG);
     const distance = 4.6 / at('dolly', c.zoom);
     s.camera.position.set(0, 0.3, distance);
-    s.camera.fov = at('fov', FOV);
+    s.camera.fov = wider(at('fov', FOV), c.overscan);
     if (STAGE && c.depth !== null) {
       const v = CAMERA_MATH.valuesAt(STAGE, time * c.fps);
       const view = CAMERA_MATH.orbitView(v, STAGE, c.depth);
@@ -489,7 +499,7 @@ function renderAt(time) {
 window.__hf = window.__hf || {};
 window.__hf.buildReady = window.__hf.buildReady || {};
 window.__hf.buildReady['motion-three'] = Promise.all(scenes.map((x) => x.ready)).then(() => {
-  renderAt(window.__hfThreeTime || 0);
+  redraw(window.__hfThreeTime || 0);
   replaced.forEach((dispose) => dispose());
 });
 ${hotSeek('renderAt')}
@@ -502,5 +512,5 @@ export function threeScript(clips: ThreeClip[], duration: number, stage: StageSp
   if (!clips.length) {
     return '';
   }
-  return `<script type="module">const CLIPS = ${js(clips)};const LIGHTING = ${js(LIGHTING)};const LOOK = ${js(look)};const DURATION = ${js(duration)};const FOV = ${SCENE.fov.fallback};const STAGE = ${js(stage)};${cameraRuntime()}const sampleTrack = (${sampleTrack.toString()});const onScreen = (${onScreen.toString()});const strokePolygons = (${strokePolygons.toString()});${SCENE_SCRIPT.replace('DRIVER', seekDriver(THREE_TIMELINE, 'DURATION', 'renderAt'))}</script>`;
+  return `<script type="module">const CLIPS = ${js(clips)};const LIGHTING = ${js(LIGHTING)};const LOOK = ${js(look)};const DURATION = ${js(duration)};const FOV = ${SCENE.fov.fallback};const STAGE = ${js(stage)};${cameraRuntime()}const sampleTrack = (${sampleTrack.toString()});const onScreen = (${onScreen.toString()});const drawOnce = (${drawOnce.toString()});const screenKey = (${screenKey.toString()});const strokePolygons = (${strokePolygons.toString()});${SCENE_SCRIPT.replace('DRIVER', seekDriver(THREE_TIMELINE, 'DURATION', 'renderAt'))}</script>`;
 }

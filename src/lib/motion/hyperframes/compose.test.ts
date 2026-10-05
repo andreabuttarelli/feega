@@ -53,6 +53,17 @@ describe('MotionDoc to HyperFrames composition', () => {
     expect(html.indexOf('c-bg')).toBeLessThan(html.indexOf('c-title'));
   });
 
+  it('a picture or video is cropped around its focus point', () => {
+    const base = newMotionDoc(MotionFormat.Landscape);
+    const pic = must(addClip(base, { component: 'Image', from: 0, durationInFrames: 30, props: { assetId: 'a', focusX: 0.2, focusY: 0.9 } }, 'pic'));
+    const vid = must(addClip(pic, { component: 'Video', from: 0, durationInFrames: 30, props: { assetId: 'v', focusX: 1, focusY: 0 } }, 'vid'));
+
+    const html = compose(vid, { a: 'https://x/a.png', v: 'https://x/v.mp4' });
+
+    expect(html).toContain('object-position:20% 90%');
+    expect(html).toContain('object-position:100% 0%');
+  });
+
   it('registers one paused timeline under the composition id', () => {
     expect(compose(doc)).toContain('window.__timelines["main"]=tl');
   });
@@ -70,6 +81,22 @@ describe('MotionDoc to HyperFrames composition', () => {
 
     expect(html).toContain('tl.fromTo("#li-title-0"');
     expect(html).toContain('tl.fromTo("#li-title-1"');
+  });
+
+  it('a title trimmed past its reveal starts with the lines already shown', () => {
+    const trimmed = { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === 'title' ? { ...c, trimStart: 30 } : c)) })) };
+    const html = compose(trimmed);
+
+    expect(html).not.toContain('tl.fromTo("#li-title-0"');
+    expect(html).not.toContain('tl.set("#li-title-1"');
+  });
+
+  it('a title trimmed inside its reveal finishes it from the clip start', () => {
+    const trimmed = { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === 'title' ? { ...c, trimStart: 10 } : c)) })) };
+    const html = compose(trimmed);
+
+    expect(html).toContain('"duration":0.2,"ease":"power3.out","immediateRender":false},0.5);');
+    expect(html).toContain('"duration":0.3667,"ease":"power3.out","immediateRender":false},0.5);');
   });
 
   it('a transition becomes a tween on the clip at its edge', () => {
@@ -424,6 +451,15 @@ describe('audio-reactive composition', () => {
   });
 });
 
+describe('device mockups are not cut by their box', () => {
+  it('the device draws on a canvas larger than its box, centred on it, with a wider lens so it keeps its size', () => {
+    const device = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Device3D', from: 0, durationInFrames: 60, props: { width: 0.5, height: 0.5 } }, 'dev'));
+    const html = compose(device);
+
+    expect(html).toContain('<canvas id="three-dev" width="1920" height="1080" style="position:absolute;left:0px;top:0px;width:1920px;height:1080px"');
+    expect(html).toContain('"overscan":0.5');
+  });
+});
 describe('transitions between clips', () => {
   const cut = must(addClip(must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Shape', from: 0, durationInFrames: 90 }, 'a')), { component: 'Shape', from: 90, durationInFrames: 90 }, 'b'));
 

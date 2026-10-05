@@ -103,7 +103,14 @@ const trackSchema = z.object({
 
 export const MAX_TRACKS = 20;
 
+const templateMarkSchema = z.object({
+  id: z.string().min(1).max(80),
+  name: z.string().min(1).max(60),
+  keys: z.record(z.string(), z.string()).default({})
+});
+
 const compSchema = z.object({
+  template: templateMarkSchema.optional(),
   name: z.string().min(1).max(60),
   durationInFrames: z.number().int().min(1).max(FRAMES_CEILING),
   tracks: z
@@ -150,6 +157,7 @@ export type MotionTrack = MotionDoc['tracks'][number];
 export type MotionClip = Omit<MotionTrack['clips'][number], 'component'> & { component: ComponentId };
 export type AssetRef = MotionDoc['assets'][number];
 export type MotionComp = MotionDoc['comps'][string];
+export type TemplateMark = NonNullable<MotionComp['template']>;
 
 export type DocVerdict = { ok: true; doc: MotionDoc } | { ok: false; error: string };
 

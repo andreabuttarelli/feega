@@ -4,6 +4,8 @@ import type { z } from 'zod';
 import { MotionFormat, motionDocSchema, newMotionDoc } from '$lib/motion/doc';
 import { cameraSchema } from '$lib/motion/camera';
 import { createMotionTools, type MotionSession } from './motion-tools';
+import { LAYOUTS } from '$lib/canvas/composition/index';
+import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
 
 type Access = { write: string[]; read: string } | { fixed: string };
 
@@ -12,12 +14,12 @@ const DOC: Record<string, Access> = {
   fps: { write: ['set_canvas'], read: 'fps' },
   background: { write: ['set_canvas'], read: 'background' },
   motionBlur: { write: ['set_motion_blur'], read: 'motionBlur' },
-  fields: { write: ['expose_field', 'unexpose_field'], read: 'fields' },
+  fields: { write: ['expose_field', 'unexpose_field', 'insert_template', 'set_template_fields'], read: 'fields' },
   width: { write: ['set_canvas'], read: 'width' },
   height: { write: ['set_canvas'], read: 'height' },
   durationInFrames: { write: ['set_canvas'], read: 'duration' },
   tracks: { write: ['add_track', 'set_track', 'remove_track'], read: 'tracks' },
-  comps: { write: ['precompose', 'edit_comp'], read: 'comps' },
+  comps: { write: ['precompose', 'edit_comp', 'insert_template', 'detach_template'], read: 'comps' },
   assets: { write: ['add_asset', 'remove_asset'], read: 'assets' },
   camera: { write: ['set_camera'], read: 'camera' },
   look: { write: ['set_look', 'set_light', 'remove_light', 'set_light_keyframes'], read: 'look' },
@@ -116,6 +118,15 @@ describe('every editable part of a motion video has an agent path', () => {
     for (const [field, access] of Object.entries(table)) {
       const missing = 'write' in access ? access.write.filter((t) => !tools[t]) : [];
       expect({ field, missing }).toEqual({ field, missing: [] });
+    }
+  });
+
+  it('every composition layout is a template the agent inserts and fills with its template tools, every setting a field', () => {
+    for (const [layout, def] of Object.entries(LAYOUTS)) {
+      const entry = BUILTIN_TEMPLATES.find((e) => e.id === `builtin:composition-${layout}`);
+      const props = entry?.template.doc.fields.map((f) => f.prop) ?? [];
+
+      expect({ layout, missing: def.params.map((p) => `layoutParams.${p.name}`).filter((p) => !props.includes(p)) }).toEqual({ layout, missing: [] });
     }
   });
 

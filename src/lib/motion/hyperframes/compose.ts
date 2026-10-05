@@ -4,7 +4,7 @@ import { EASE_NAME, easeName } from '../keyframes';
 import { Background, clipsOf, type MotionClip, type MotionDoc } from '../doc';
 import { resolveColor, type BrandTokens } from '../brand';
 import { css, esc, js, seconds } from './html';
-import { TEMPLATES, Timing, type PropsOf, type TemplateCtx, type Tween, type Vars } from './templates';
+import { DEVICE_OVERSCAN, TEMPLATES, Timing, type PropsOf, type TemplateCtx, type Tween, type Vars } from './templates';
 import { LIGHTING, OPENTYPE_URL, ThreeKind, lookRuntime, surfaceOf, threeAssetUrls, threeImportMap, threeScript, type ThreeClip } from './three';
 import { outlineUrl } from '../fonts/outline';
 import { Finish } from '../devices';
@@ -250,6 +250,17 @@ function tweenLine(t: Tween): string {
 
 type Hold = { target: string; vars: Vars; at: number };
 
+function untrimmed(tweens: Tween[], clipStart: number, trimmed: number): Tween[] {
+  return tweens.flatMap((t) => {
+    const at = t.at - trimmed;
+    const end = at + t.duration;
+    if (end <= clipStart) {
+      return [];
+    }
+    return at >= clipStart ? [{ ...t, at }] : [{ ...t, at: clipStart, duration: end - clipStart }];
+  });
+}
+
 function heldUntilStart(tweens: Tween[], clipStart: number): Hold[] {
   return tweens.filter((t) => t.at > clipStart).map((t) => ({ target: t.target, vars: t.from, at: clipStart }));
 }
@@ -309,7 +320,8 @@ function threeClipOf(clip: MotionClip, ctx: TemplateCtx<ComponentId>, staged: bo
     extrude: p.extrude ?? 0,
     bevel: p.bevel ?? 0,
     device: p.device ? deviceRuntime(p.device, p.finish ?? Finish.Default, ctx) : null,
-    video: Boolean(ctx.asset(p.screenVideo ?? null))
+    video: Boolean(ctx.asset(p.screenVideo ?? null)),
+    overscan: clip.component === 'Device3D' ? DEVICE_OVERSCAN : 0
   };
 }
 
@@ -463,7 +475,7 @@ export function composeHtml(raw: ComposeInput): string {
       const html = group ? group.html(clip, ctx, placed, layers.splice(group.firstLayer(clip, index, starts)).join('')) : clipHtml(clip, ctx, placed, template.html(ctx as never));
       (onStage.has(clip.id) && !group && !hidden.has(clip.id) ? world : layers).push(html);
       effectSets.push(...(group ? group.effects(clip, ctx) : effectTimeline(clip, ctx, ctx.color)));
-      const own = template.tweens?.(ctx as never) ?? [];
+      const own = untrimmed(template.tweens?.(ctx as never) ?? [], ctx.start, ctx.mediaStart);
       tweens.push(...edgeTweens(clip, doc.fps), ...moveTweens(clip, doc.fps), ...own);
       holds.push(...heldUntilStart(own, ctx.start));
       if (THREE_D_COMPONENTS.includes(clip.component)) {

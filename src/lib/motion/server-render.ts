@@ -16,6 +16,8 @@ export type RenderEvent = { kind: 'started' | 'chunk' | 'assembling' | 'saving' 
 
 const CHUNK_TARGET_FRAMES = 450;
 const MAX_CHUNKS = 8;
+const MAX_HEAVY_CHUNKS = 16;
+const CHUNK_BUDGET_MS = 2 * 60_000;
 
 const FINAL: ReadonlySet<RenderStage> = new Set([RenderStage.Done, RenderStage.Failed]);
 
@@ -28,10 +30,27 @@ const STAGE_AFTER: Record<RenderEvent['kind'], RenderStage> = {
   failed: RenderStage.Failed
 };
 
-export function chunkPlan(totalFrames: number): ChunkPlan {
-  const count = Math.min(MAX_CHUNKS, Math.max(1, Math.ceil(totalFrames / CHUNK_TARGET_FRAMES)));
-  const size = Math.ceil(totalFrames / count);
+const even = (n: number) => n + (n % 2);
+
+function heaviestChunk(costs: readonly number[], size: number): number {
+  let heaviest = 0;
+  for (let start = 0; start < costs.length; start += size) {
+    heaviest = Math.max(heaviest, costs.slice(start, start + size).reduce((sum, ms) => sum + ms, 0));
+  }
+  return heaviest;
+}
+
+function planOf(totalFrames: number, count: number): ChunkPlan {
+  const size = count > 1 ? even(Math.ceil(totalFrames / count)) : totalFrames;
   return { size, count: Math.ceil(totalFrames / size) };
+}
+
+export function chunkPlan(totalFrames: number, costs: readonly number[] = []): ChunkPlan {
+  let count = Math.min(MAX_CHUNKS, Math.max(1, Math.ceil(totalFrames / CHUNK_TARGET_FRAMES)));
+  while (count < MAX_HEAVY_CHUNKS && heaviestChunk(costs, planOf(totalFrames, count).size) > CHUNK_BUDGET_MS) {
+    count += 1;
+  }
+  return planOf(totalFrames, count);
 }
 
 export function startProgress(totalFrames: number, chunks: number = chunkPlan(totalFrames).count): RenderProgress {

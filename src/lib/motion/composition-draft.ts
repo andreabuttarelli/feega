@@ -3,7 +3,7 @@ import { LAYOUTS } from '../canvas/composition/index';
 import type { LayoutId, LayoutParams } from '../canvas/composition/types';
 import type { CompositionAspect, CompositionNode } from '../canvas/composition-node';
 import { TrackKind, defaultProps } from './components';
-import { FORMATS, MotionFormat, formatOf, newClip, parseMotionDoc, type DocVerdict, type MotionClip, type MotionDoc, type MotionTrack } from './doc';
+import { FORMATS, MotionFormat, formatOf, newClip, newMotionDoc, parseMotionDoc, type DocVerdict, type MotionClip, type MotionDoc, type MotionTrack } from './doc';
 import type { PropsOf } from './hyperframes/templates';
 
 export type ComposeMedia = PropsOf<'Composition'>['media'][number];
@@ -176,4 +176,13 @@ export function draftFromDoc(doc: MotionDoc): ComposeDraft | null {
 
 export function composeEditorPath(input: { projectId: string; nodeId: string }): string {
   return `/app/compose/${input.nodeId}?project=${input.projectId}`;
+}
+
+export function nodeDoc(node: CompositionNode, media: ComposeMedia[]): MotionDoc {
+  const draft = draftFromNode(node, media);
+  const verdict = applyDraft(newMotionDoc(draft.format), draft);
+  if (!verdict.ok) {
+    throw new Error(verdict.error);
+  }
+  return verdict.doc;
 }

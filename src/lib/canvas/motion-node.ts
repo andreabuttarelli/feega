@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
+import { FORMATS, MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
 
 export type MotionNode = {
   id: string;
@@ -16,10 +16,19 @@ export const motionNodeSchema = z.object({
   lastRenderAssetId: z.string().nullable()
 });
 
-const MOTION_NODE_SIZE = { w: 420, h: 320 };
+export const MOTION_NODE_BAR_H = 44;
 
-export function motionNodeSize(): { w: number; h: number } {
-  return MOTION_NODE_SIZE;
+const MOTION_STAGE_WIDTH: Record<MotionFormat, number> = {
+  [MotionFormat.Landscape]: 420,
+  [MotionFormat.Vertical]: 288,
+  [MotionFormat.Square]: 320,
+  [MotionFormat.Portrait]: 300
+};
+
+export function motionNodeSize(format: MotionFormat = MotionFormat.Vertical): { w: number; h: number } {
+  const { width, height } = FORMATS[format];
+  const w = MOTION_STAGE_WIDTH[format];
+  return { w, h: Math.round((w * height) / width) + MOTION_NODE_BAR_H };
 }
 
 export function newMotionData(format: MotionFormat = MotionFormat.Vertical): Record<string, unknown> {
@@ -38,4 +47,8 @@ export function motionOf(row: { id: string; type: string; data: Record<string, u
 
 export function motionEditorPath(input: { projectId: string; canvasId: string; nodeId: string }): string {
   return `/p/${input.projectId}/c/${input.canvasId}/motion/${input.nodeId}`;
+}
+
+export function motionPreviewPath(input: { projectId: string; canvasId: string; nodeId: string }): string {
+  return `${motionEditorPath(input)}/preview`;
 }

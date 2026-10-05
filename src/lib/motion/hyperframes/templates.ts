@@ -91,7 +91,12 @@ const frames = (ctx: { fps: number }, n: number) => n / ctx.fps;
 const missing = (label: string) =>
   `<div style="${css({ width: '100%', height: '100%', background: INK.paper2, color: INK.inkSoft, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: MONO, fontSize: '24px' })}">${esc(label)}</div>`;
 
-const cover = (url: string, fit: string) => `<img src="${esc(url)}" alt="" style="${css({ width: '100%', height: '100%', objectFit: fit, display: 'block' })}" />`;
+type Framing = { fit: string; focusX: number; focusY: number };
+
+const PERCENT = 100;
+const CENTRED: Framing = { fit: 'cover', focusX: 0.5, focusY: 0.5 };
+const focus = (f: Framing) => `${Math.round(f.focusX * PERCENT)}% ${Math.round(f.focusY * PERCENT)}%`;
+const cover = (url: string, f: Framing) => `<img src="${esc(url)}" alt="" style="${css({ width: '100%', height: '100%', objectFit: f.fit, objectPosition: focus(f), display: 'block' })}" />`;
 
 const Title: Template<'Title'> = {
   timing: Timing.Wrapper,
@@ -155,15 +160,15 @@ const Image: Template<'Image'> = {
   timing: Timing.Wrapper,
   html: (ctx) => {
     const url = ctx.asset(ctx.p.assetId);
-    return placed(ctx, ctx.p, url ? cover(url, ctx.p.fit) : missing('Pick an image'), true);
+    return placed(ctx, ctx.p, url ? cover(url, ctx.p) : missing('Pick an image'), true);
   }
 };
 
 const SECONDS = 10000;
 const exact = (n: number) => Math.round(n * SECONDS) / SECONDS;
 
-function segmentVideo(clipId: string, index: number, url: string, s: MediaSegment, fit: string): string {
-  const style = css({ position: 'absolute', left: '0', top: '0', width: '100%', height: '100%', objectFit: fit, display: 'block' });
+function segmentVideo(clipId: string, index: number, url: string, s: MediaSegment, f: Framing): string {
+  const style = css({ position: 'absolute', left: '0', top: '0', width: '100%', height: '100%', objectFit: f.fit, objectPosition: focus(f), display: 'block' });
   const preload = index === 0 ? 'auto' : 'metadata';
   return `<video id="c-${clipId}-s${index}" src="${esc(url)}" crossorigin="anonymous" preload="${preload}" muted playsinline data-start="${exact(s.at)}" data-duration="${exact(s.duration)}" data-media-start="${exact(s.mediaStart)}" data-playback-rate="${exact(s.rate)}" style="${style}"></video>`;
 }
@@ -177,9 +182,9 @@ const Video: Template<'Video'> = {
     }
     const segments = ctx.remap();
     if (segments) {
-      return placed(ctx, ctx.p, segments.map((s, i) => segmentVideo(ctx.id, i, url, s, ctx.p.fit)).join(''), true);
+      return placed(ctx, ctx.p, segments.map((s, i) => segmentVideo(ctx.id, i, url, s, ctx.p)).join(''), true);
     }
-    const video = `<video id="c-${ctx.id}" src="${esc(url)}" crossorigin="anonymous" preload="auto" muted playsinline data-start="${ctx.start}" data-duration="${ctx.length}" data-media-start="${ctx.mediaStart}" style="${css({ width: '100%', height: '100%', objectFit: ctx.p.fit, display: 'block' })}"></video>`;
+    const video = `<video id="c-${ctx.id}" src="${esc(url)}" crossorigin="anonymous" preload="auto" muted playsinline data-start="${ctx.start}" data-duration="${ctx.length}" data-media-start="${ctx.mediaStart}" style="${css({ width: '100%', height: '100%', objectFit: ctx.p.fit, objectPosition: focus(ctx.p), display: 'block' })}"></video>`;
     return placed(ctx, ctx.p, video, true);
   }
 };
@@ -247,7 +252,7 @@ const ProductCard: Template<'ProductCard'> = {
     return placed(
       ctx,
       ctx.p,
-      `<div style="${card}"><div style="${css({ flex: 1, position: 'relative', background: INK.paper2, overflow: 'hidden' })}">${url ? cover(url, 'cover') : ''}</div><div style="${row}"><span style="font-weight:500;letter-spacing:-0.02em">${esc(ctx.p.title)}</span><span style="font-family:${MONO}">${esc(ctx.p.price)}</span></div></div>`,
+      `<div style="${card}"><div style="${css({ flex: 1, position: 'relative', background: INK.paper2, overflow: 'hidden' })}">${url ? cover(url, CENTRED) : ''}</div><div style="${row}"><span style="font-weight:500;letter-spacing:-0.02em">${esc(ctx.p.title)}</span><span style="font-family:${MONO}">${esc(ctx.p.price)}</span></div></div>`,
       true
     );
   }
@@ -261,7 +266,7 @@ const SocialMockup: Template<'SocialMockup'> = {
     const dark = ctx.p.platform === 'tiktok';
     const frame = css({ width: '100%', height: '100%', background: dark ? '#000' : INK.paper, color: dark ? '#fff' : INK.ink, border: `1px solid ${INK.line}`, display: 'flex', flexDirection: 'column', fontFamily: SANS, fontSize: px(unit) });
     const head = `<div style="${css({ display: 'flex', alignItems: 'center', gap: px(unit * 0.6), padding: px(unit * 0.7), fontWeight: 600 })}"><span style="${css({ width: px(unit * 1.6), height: px(unit * 1.6), background: INK.select, display: 'inline-block' })}"></span>${esc(ctx.p.handle)}</div>`;
-    const body = `<div style="${css({ flex: 1, position: 'relative', background: INK.paper2, overflow: 'hidden' })}">${url ? cover(url, 'cover') : ''}</div>`;
+    const body = `<div style="${css({ flex: 1, position: 'relative', background: INK.paper2, overflow: 'hidden' })}">${url ? cover(url, CENTRED) : ''}</div>`;
     const foot = `<div style="${css({ padding: px(unit * 0.7), lineHeight: 1.35 })}"><b>${esc(ctx.p.handle)}</b> ${esc(ctx.p.caption)}</div>`;
     return placed(ctx, ctx.p, `<div style="${frame}">${head}${body}${foot}</div>`, true);
   }
@@ -280,7 +285,7 @@ const CanvasMock: Template<'CanvasMock'> = {
     const label = (left: string, top: string, text: string) => `<div style="${css({ position: 'absolute', left, top, fontSize: px(u * 1.8), color: INK.inkSoft })}">${text}</div>`;
     const prompt = `<div id="pr-${ctx.id}" style="${css({ padding: px(u * 2), fontSize: px(u * 2.6), lineHeight: 1.35 })}">${esc(ctx.p.prompt)}</div>`;
     const wire = `<svg style="position:absolute;inset:0;width:100%;height:100%;overflow:visible" viewBox="0 0 100 100" preserveAspectRatio="none"><path id="wr-${ctx.id}" d="M36,48 C46,48 46,40 56,40" fill="none" stroke="#2563eb" stroke-width="0.4" pathLength="1" stroke-dasharray="1 1" stroke-dashoffset="1"></path></svg>`;
-    const result = `<div id="rs-${ctx.id}" style="${css({ position: 'absolute', inset: '0' })}">${url ? cover(url, 'cover') : ''}</div><div style="${css({ position: 'absolute', left: '8px', bottom: '8px', background: 'rgba(17,17,17,0.78)', color: '#fff', fontSize: px(u * 1.8), padding: '3px 6px' })}">AI-generated</div>`;
+    const result = `<div id="rs-${ctx.id}" style="${css({ position: 'absolute', inset: '0' })}">${url ? cover(url, CENTRED) : ''}</div><div style="${css({ position: 'absolute', left: '8px', bottom: '8px', background: 'rgba(17,17,17,0.78)', color: '#fff', fontSize: px(u * 1.8), padding: '3px 6px' })}">AI-generated</div>`;
     return placed(
       ctx,
       ctx.p,
@@ -295,8 +300,14 @@ const CanvasMock: Template<'CanvasMock'> = {
   ]
 };
 
-const threeStage = (ctx: { id: string; width: number; height: number }, p: { x: number; y: number; width: number; height: number }, backdrop: string | null) => {
-  const box = boxOf(p, ctx);
+export const DEVICE_OVERSCAN = 0.5;
+
+function overscanned(box: Box, overscan: number): Box {
+  return { left: box.left - box.width * overscan, top: box.top - box.height * overscan, width: box.width * (1 + 2 * overscan), height: box.height * (1 + 2 * overscan) };
+}
+
+const threeStage = (ctx: { id: string; width: number; height: number }, p: { x: number; y: number; width: number; height: number }, backdrop: string | null, overscan = 0) => {
+  const box = overscanned(boxOf(p, ctx), overscan);
   const back = backdrop ? `<div style="${css({ position: 'absolute', inset: '0', background: backdrop })}"></div>` : '';
   return `${back}<canvas id="three-${ctx.id}" width="${Math.round(box.width)}" height="${Math.round(box.height)}" style="${css(boxCss(box))}"></canvas>`;
 };
@@ -350,7 +361,7 @@ const Device3D: Template<'Device3D'> = {
     const backdrop = BACKDROP[ctx.p.backdrop];
     const video = ctx.asset(ctx.p.screenVideo);
     const source = video ? `<video id="dv-${ctx.id}" src="${esc(video)}" crossorigin="anonymous" preload="auto" muted playsinline data-start="${ctx.start}" data-duration="${ctx.length}" data-media-start="${ctx.mediaStart}" style="${DEVICE_VIDEO_STYLE}"></video>` : '';
-    return source + threeStage(ctx, ctx.p, backdrop ? ctx.color(backdrop) : null);
+    return source + threeStage(ctx, ctx.p, backdrop ? ctx.color(backdrop) : null, DEVICE_OVERSCAN);
   }
 };
 

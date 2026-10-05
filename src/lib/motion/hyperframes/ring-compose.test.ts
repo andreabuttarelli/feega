@@ -4,7 +4,7 @@ import { FEEGA_TOKENS } from '../brand';
 import { MotionFormat, newMotionDoc, parseMotionDoc, type MotionDoc } from '../doc';
 import { flattenComps, precompose } from '../precomp';
 import { addClip, setProps, type OpResult } from '../timeline';
-import { ringSliceId, slicesFor } from '../ring/model';
+import { RING_NUMBERS, ringSliceId, slicesFor } from '../ring/model';
 import { baseValue, isAnimatable } from '../keyframes';
 import { Unit, unitOf } from '../units';
 import { composeHtml } from './compose';
@@ -36,7 +36,7 @@ describe('a composition laid out as a ring', () => {
     const clip = doc.tracks.flatMap((t) => t.clips).find((c) => c.id === 'ring')!;
 
     expect(isAnimatable('Composition', 'tiltX')).toBe(true);
-    expect(baseValue({ ...clip, params: [] } as never, 'ringRadius')).toBe(0.6);
+    expect(baseValue({ ...clip, params: [] } as never, 'ringRadius')).toBe(RING_NUMBERS.ringRadius.fallback);
     expect(unitOf('Composition', 'ringRadius')).toBe(Unit.Px);
     expect(unitOf('Composition', 'backOpacity')).toBe(Unit.Percent);
   });
@@ -66,7 +66,7 @@ describe('a composition laid out as a ring', () => {
     const ids = flat.tracks.flatMap((t) => t.clips.map((c) => c.id));
 
     expect(ids).toContain(`${ringSliceId('ring', 0, 0)}__0__kpi`);
-    expect(ids).toContain(`${ringSliceId('ring', 2, slicesFor(3, 0.6 * 1080) - 1)}__0__kpi`);
+    expect(ids).toContain(`${ringSliceId('ring', 2, slicesFor(3, RING_NUMBERS.ringRadius.fallback * 1080) - 1)}__0__kpi`);
     expect(new Set(ids).size).toBe(ids.length);
   });
 

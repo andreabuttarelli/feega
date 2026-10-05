@@ -232,6 +232,16 @@ describe('motion agent tools', () => {
   });
 });
 
+describe('add_track', () => {
+  it('keeps the name it is given', async () => {
+    const { run, session } = setup();
+
+    await run('add_track', { kind: 'visual', name: 'Stage' });
+
+    expect(session.doc.tracks[0].name).toBe('Stage');
+  });
+});
+
 describe('set_clip_transition', () => {
   it('dissolves between two adjacent clips and get_motion_doc names the clip it comes from', async () => {
     const { run } = setup();
