@@ -16,6 +16,7 @@ import { BLEND_MODES, BlendMode } from './blend';
 import { animatorsSchema } from './text-animators/model';
 import { DEFAULT_MOTION_BLUR, motionBlurSchema } from './motion-blur';
 import { fieldsSchema } from './template/field-model';
+import { physicsSchema } from './physics/model';
 
 export enum MotionFormat {
   Landscape = '16:9',
@@ -80,6 +81,7 @@ const clipSchema = z.object({
   animators: animatorsSchema,
   motionBlur: z.boolean().default(true),
   path: motionPathSchema.nullable().default(null),
+  physics: physicsSchema.nullable().optional(),
   hidden: z.boolean().optional(),
   locked: z.boolean().optional(),
   markers: z.array(markerSchema).max(MAX_MARKERS).optional()

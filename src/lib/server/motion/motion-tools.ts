@@ -66,6 +66,8 @@ import { applyValues, exposeField, fieldValues, removeField } from '$lib/motion/
 import { FIELD_TYPES } from '$lib/motion/template/field-model';
 import { DEFAULT_NAME_PATTERN, MAX_BATCH_ROWS, outputName } from '$lib/motion/template/batch';
 import { renderQuote } from '$lib/motion/render-quote';
+import { BOUNDS, PHYSICS, PHYSICS_KEYS, PHYSICS_PRESET, PHYSICS_PRESETS } from '$lib/motion/physics/model';
+import { applyPhysicsPreset, setPhysics } from '$lib/motion/physics/ops';
 
 export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number };
 
@@ -138,6 +140,7 @@ function summary(doc: MotionDoc, selection: string[]) {
         hidden: c.hidden ?? false,
         locked: c.locked ?? false,
         markers: (c.markers ?? []).map((m) => ({ label: m.label, time: secs(m.frame) })),
+        physics: c.physics ?? null,
         path: c.path ? { autoOrient: c.path.autoOrient, tangents: c.path.tangents.map(({ frame, ...rest }) => ({ time: secs(frame), ...rest })), problem: pathProblem(c) } : null
       }))
     })),
@@ -774,6 +777,24 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
           applyPreset(session.doc, input.preset, { start: frames(input.start), duration: frames(input.duration), amount: input.amount, target: input.target, from: input.from_clip, to: input.to_clip, ease: input.ease }),
           `camera ${input.preset}`
         )
+    }),
+
+    set_physics: tool({
+      description: `Give a visual clip physics: it falls with gravity and bounces, simulated at a fixed step and baked per frame, so every seek and render shows the same motion. ${PHYSICS_KEYS.map((k) => `${k} ${PHYSICS[k].min}..${PHYSICS[k].max} (${PHYSICS[k].label})`).join('; ')}. bounds: ${BOUNDS.join(', ')} (floor bounces on the bottom of the frame, box on all four edges). collide true makes it bump into the other clips with collide on (AABB, mass decides who moves). The motion starts from where the clip is at its start and adds to its x/y. Values not given are kept; physics null turns it off.`,
+      inputSchema: z.object({
+        clip_id: z.string(),
+        physics: z
+          .object({ ...Object.fromEntries(PHYSICS_KEYS.map((k) => [k, z.number().optional()])), bounds: z.enum(BOUNDS).optional(), collide: z.boolean().optional() })
+          .partial()
+          .nullable()
+      }),
+      execute: async (input) => apply(setPhysics(session.doc, input.clip_id, input.physics), input.physics ? `physics on ${input.clip_id}` : `physics off on ${input.clip_id}`)
+    }),
+
+    apply_physics_preset: tool({
+      description: `Give a visual clip a ready physics move: ${PHYSICS_PRESETS.map((p) => `${p} — ${PHYSICS_PRESET[p].about}`).join('; ')}. Tune it after with set_physics.`,
+      inputSchema: z.object({ clip_id: z.string(), preset: z.enum(PHYSICS_PRESETS) }),
+      execute: async (input) => apply(applyPhysicsPreset(session.doc, input.clip_id, input.preset), `${input.preset} physics on ${input.clip_id}`)
     }),
 
     set_clip_depth: tool({
