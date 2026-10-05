@@ -84,6 +84,7 @@ const LANE: Record<Source, (input: LaneInput) => Lane[]> = {
   [Source.Param]: () => [],
   [Source.Effect]: () => [],
   [Source.Modifier]: () => [],
+  [Source.Remap]: () => [],
   [Source.Animator]: ({ clip, key, track, resolve }) => {
     const ref = animatorOfKey(key);
     return ref ? [{ target: `#${textHostId(clip.id)}`, source: Source.Animator, track, vars: (v) => ({ [cssName(ref.id, ref.field)]: typeof v === 'string' ? resolve(v) : v }) }] : [];

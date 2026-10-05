@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { COLOR } from '../components';
 import { Source, ValueKind, type AnimProp } from '../keyframes';
+import { lutSchema } from './lut-model';
 import { EFFECTS, EFFECT_KINDS, type EffectKind, type EffectParam, type Values } from './registry';
 
 export const MAX_EFFECTS = 12;
@@ -10,7 +11,8 @@ export const effectSchema = z.object({
   id: z.string().min(1),
   kind: z.enum(EFFECT_KINDS),
   enabled: z.boolean().default(true),
-  params: z.record(z.string(), z.union([z.number(), z.string()])).default({})
+  params: z.record(z.string(), z.union([z.number(), z.string()])).default({}),
+  lut: lutSchema.nullable().optional()
 });
 
 export const effectsSchema = z.array(effectSchema).max(MAX_EFFECTS).default([]);
@@ -62,6 +64,9 @@ export function effectsProblem(effects: readonly Effect[]): string | null {
     return 'two effects share an id';
   }
   for (const effect of effects) {
+    if (effect.lut && !lutSchema.safeParse(effect.lut).success) {
+      return `${effect.id}: the LUT is malformed, load it again`;
+    }
     const problem = effectProblem(effect);
     if (problem) {
       return problem;

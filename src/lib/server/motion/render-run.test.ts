@@ -21,7 +21,7 @@ vi.mock('$lib/server/ai-log', () => ({ logAiCall }));
 vi.mock('$lib/server/web-push', () => ({ sendPushToUser }));
 vi.mock('./farm-render', async (original) => ({ ...(await original<typeof import('./farm-render')>()), ...farmCalls }));
 
-import { cancelRender, farmJob, reconcileRenders, RenderRefusal, renderRequest, renderView, startRender, type RenderRequest } from './render-run';
+import { BATCH_CONCURRENCY, batchView, cancelRender, farmJob, reconcileRenders, RenderRefusal, renderRequest, renderView, startBatch, startRender, type RenderRequest } from './render-run';
 import { TaskState } from './farm-render';
 import { FEEGA_TOKENS } from '$lib/motion/brand';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
@@ -376,5 +376,68 @@ describe('what the export dialog sees of a render', () => {
 
   it('no render yet is nothing to show', () => {
     expect(renderView([])).toBeNull();
+  });
+});
+
+describe('startBatch', () => {
+  const rows = (n: number) => Array.from({ length: n }, (_, i) => ({ req: request(), name: `row-${i + 1}` }));
+
+  it('enqueues every row as its own run, starts only the first few, and quotes the total', async () => {
+    let id = 0;
+    runs.createRun.mockImplementation(async (_db, input) => ({ ...runOf(input.params), id: `run-${++id}` }));
+    const { db, uploads } = fakeDb();
+
+    const result = await startBatch(db, farm, scope, rows(5), storage);
+
+    expect(result).toMatchObject({ ok: true, rows: 5, credits: 30 });
+    expect(runs.createRun).toHaveBeenCalledTimes(5);
+    expect(runs.createRun.mock.calls[4][1].params.batch).toEqual({ id: expect.any(String), row: 5, name: 'row-5', rows: 5 });
+    expect(uploads).toHaveLength(5);
+    expect(farmCalls.launchPiece.mock.calls.filter((c) => c[2] === 0)).toHaveLength(BATCH_CONCURRENCY);
+  });
+
+  it('a row the farm cannot render refuses the whole batch before anything is spent, naming the row', async () => {
+    const { db } = fakeDb();
+    const bad = { req: request(trailer(), settingsOf(Preset.Gif)), name: 'gif' };
+
+    expect(await startBatch(db, farm, scope, [...rows(2), bad], storage)).toMatchObject({ ok: false, error: RenderRefusal.Unsupported, detail: expect.stringMatching(/^row 3: .*GIF/) });
+    expect(runs.createRun).not.toHaveBeenCalled();
+  });
+
+  it('a queued row starts when the tick finds a free slot in its batch', async () => {
+    const batch = { id: 'b1', row: 4, name: 'row-4', rows: 4 };
+    const queued = runOf({ ...(await started()).params, farm: { pieces: [], assembly: null }, batch });
+    vi.clearAllMocks();
+    farmCalls.launchPiece.mockResolvedValue('box-q');
+    runs.claimRun.mockImplementation(async (_db, input) => ({ ...runOf({}), id: input.runId }));
+    runs.queuedRenderRuns.mockResolvedValue([queued]);
+    const busy = (n: number) => Array.from({ length: n }, (_, i) => ({ ...runOf({ batch: { ...batch, row: i + 1 }, farm: { pieces: [{ worker: 'w', attempt: 1, state: 'running' }], assembly: null } }), id: `r${i}` }));
+
+    runs.listNodeRuns.mockResolvedValue(busy(BATCH_CONCURRENCY));
+    await reconcileRenders(fakeDb().db, farm, storage);
+    expect(farmCalls.launchPiece).not.toHaveBeenCalled();
+
+    runs.listNodeRuns.mockResolvedValue(busy(BATCH_CONCURRENCY - 1));
+    await reconcileRenders(fakeDb().db, farm, storage);
+    expect(farmCalls.launchPiece).toHaveBeenCalled();
+  });
+});
+
+describe('batchView', () => {
+  it('the newest batch of the node, one cell per row with its state and asset', () => {
+    const cell = (row: number, status: NodeRun['status'], assetId: string | null) => ({ ...runOf({ batch: { id: 'b1', row, name: `n${row}`, rows: 2 }, quote: { credits: 6 } }), id: `r${row}`, status, outputAssetId: assetId });
+
+    expect(batchView([cell(2, 'running', null), cell(1, 'done', 'a1')])).toEqual({
+      id: 'b1',
+      credits: 12,
+      rows: [
+        { row: 1, name: 'n1', runId: 'r1', status: 'done', progress: null, error: null, assetId: 'a1' },
+        { row: 2, name: 'n2', runId: 'r2', status: 'running', progress: null, error: null, assetId: null }
+      ]
+    });
+  });
+
+  it('no batch is nothing to show', () => {
+    expect(batchView([runOf({})])).toBeNull();
   });
 });
