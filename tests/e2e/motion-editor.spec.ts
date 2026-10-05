@@ -69,6 +69,29 @@ test.describe('motion editor @real', () => {
     await expect(page.getByText('Select a clip with keyframes')).toHaveCount(0);
   });
 
+  test('cambiare l’opacità non ricompone: la preview si aggiorna senza ricaricare', async ({ page, session, seedNode }) => {
+    const node = await seedNode({ type: 'motion', data: MOTION_DATA });
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}/motion/${node.id}`);
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await page.getByRole('menuitem', { name: 'Title', exact: true }).dispatchEvent('click');
+    await page.waitForTimeout(3000);
+
+    const how = await page.evaluate(
+      () =>
+        new Promise<string>((resolve) => {
+          const player = document.querySelector('hyperframes-player')!;
+          const slider = document.querySelector('input.num[aria-label="Opacity"]')!.previousElementSibling as HTMLInputElement;
+          window.addEventListener('message', (e) => e.data?.type === 'feega:hot-done' && resolve('patch'));
+          player.addEventListener('ready', () => resolve('reload'), { once: true });
+          setTimeout(() => resolve('nothing'), 3000);
+          slider.value = '0.4';
+          slider.dispatchEvent(new Event('input', { bubbles: true }));
+        })
+    );
+
+    expect(how).toBe('patch');
+  });
+
   test('una scorciatoia non scatta mentre si scrive in un campo', async ({ page, session, seedNode }) => {
     const node = await seedNode({ type: 'motion', data: MOTION_DATA });
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}/motion/${node.id}`);
