@@ -184,6 +184,21 @@ export async function deleteNodeProducts(db: Db, scope: { orgId: string; nodeId:
   }
 }
 
+export async function listBrandProducts(db: Db, scope: { orgId: string; brandId: string; limit: number }): Promise<Product[]> {
+  const { data, error } = await db
+    .from('products')
+    .select(PRODUCT_COLUMNS)
+    .eq('org_id', scope.orgId)
+    .eq('brand_id', scope.brandId)
+    .order('created_at', { ascending: true })
+    .limit(scope.limit);
+
+  if (error) {
+    throw error;
+  }
+  return (data ?? []).map(toProduct);
+}
+
 /**
  * IL CATALOGO DI UN BRAND APPENA CREATO — non di un nodo. `NEW_DATABASE_STRUCTURE.md` lo dice
  * esplicito: «la sincronizzazione è una sola, per brand» (`unique (brand_id, platform,

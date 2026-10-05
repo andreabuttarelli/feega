@@ -116,6 +116,12 @@ describe('every editable part of a motion video has an agent path', () => {
     }
   });
 
+  it('the agent can bring a brand in from outside the doc: a site, an org brand, a picture', () => {
+    const { tools } = setup();
+
+    expect(['analyze_site', 'use_brand', 'import_asset'].filter((t) => !tools[t])).toEqual([]);
+  });
+
   it('get_motion_doc shows every writable field of the doc, its tracks, clips and camera', async () => {
     const { run } = setup();
     await run('add_clip', { component: 'Shape', start: 0, duration: 2 });

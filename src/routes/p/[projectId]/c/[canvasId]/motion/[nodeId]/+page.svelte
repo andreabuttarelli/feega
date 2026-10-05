@@ -39,7 +39,7 @@
   import { nullFromSelection } from '$lib/motion/parent-ops';
   import MotionPreview from '$lib/components/motion/MotionPreview.svelte';
   import type { StreamData } from '$lib/components/brand-agent/chat-session.svelte';
-  import { CHECK_REQUEST, FRAMES_REQUEST, type CheckRequest, type FramesRequest } from '$lib/motion/frames-request';
+  import { CHECK_REQUEST, FRAMES_REQUEST, adoptAgentAssets, type CheckRequest, type FramesRequest } from '$lib/motion/frames-request';
   import { runCheck, type CheckPorts } from '$lib/motion/custom/run-check';
   import { recordCheck } from '$lib/motion/custom/ops';
   import { unverified } from '$lib/motion/custom/determinism';
@@ -417,6 +417,7 @@
 
   function onAgentData(part: StreamData) {
     const handle = AGENT_DATA[part.type];
+    madeAssets = adoptAgentAssets(madeAssets, (part.data as { assets?: PageData['assets'] } | null)?.assets);
     if (handle && preview) {
       void handle(part.data).catch((e) => console.error('[motion] agent request not answered', part.type, e));
     }
