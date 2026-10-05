@@ -44,6 +44,8 @@ import { registerFont, removeFont, setFont } from '$lib/motion/fonts/ops';
 import { EFFECTS, EFFECT_KINDS } from '$lib/motion/effects/registry';
 import { addEffect, removeEffect, setEffect } from '$lib/motion/effects/ops';
 import { effectKey } from '$lib/motion/effects/model';
+import { EffectKind } from '$lib/motion/effects/registry';
+import { LUT_PRESETS, LUT_PRESET_IDS, applyLut, compileLut, lutFromCube } from '$lib/motion/effects/lut';
 import { BLEND_MODES } from '$lib/motion/blend';
 import { ANIMATOR_UNITS, SELECTOR_SHAPES, SELECTOR_KEYS, VALUES, VALUE_KEYS, animatorKey } from '$lib/motion/text-animators/model';
 import { PRESETS as TEXT_PRESET_SPECS, TEXT_PRESETS, addAnimator, applyPreset as applyTextPreset, removeAnimator, setAnimator } from '$lib/motion/text-animators/ops';
@@ -793,6 +795,22 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const id = deps.newId();
         const out = apply(addEffect(session.doc, input.clip_id, input.kind, id, input.params), `added ${input.kind} to ${input.clip_id}`);
         return out.ok ? { ...out, effect_id: id, animate: EFFECTS[input.kind].params.map((p) => effectKey(id, p.key)) } : out;
+      }
+    }),
+
+    set_lut: tool({
+      description: `Colour-grade a clip with a LUT: a preset (${LUT_PRESET_IDS.join(', ')}) or the text of a .cube file. Without effect_id it adds a LUT effect at the end of the stack; amount 0..1 mixes it (animate fx.<effect id>.amount). Pair with levels and lift-gamma-gain effects (add_effect).`,
+      inputSchema: z.object({ clip_id: z.string(), effect_id: z.string().optional(), preset: z.enum(LUT_PRESET_IDS).optional(), cube: z.string().max(4_000_000).optional(), name: z.string().max(80).optional(), amount: z.number().min(0).max(1).optional() }),
+      execute: async (input) => {
+        const lut = input.cube ? lutFromCube(input.cube, input.name ?? 'custom') : input.preset ? compileLut(LUT_PRESETS[input.preset].look, input.preset) : 'give a preset or a .cube';
+        if (typeof lut === 'string') {
+          return { ok: false, error: lut };
+        }
+        const id = input.effect_id ?? deps.newId();
+        const params: Record<string, number> = input.amount === undefined ? {} : { amount: input.amount };
+        const added = input.effect_id ? setEffect(session.doc, input.clip_id, id, { params }) : addEffect(session.doc, input.clip_id, EffectKind.Lut, id, params);
+        const out = apply(added.ok ? applyLut(added.doc, input.clip_id, id, lut) : added, `graded ${input.clip_id} with ${lut.name}`);
+        return out.ok ? { ...out, effect_id: id } : out;
       }
     }),
 

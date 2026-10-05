@@ -30,7 +30,7 @@ export function addEffect(doc: MotionDoc, clipId: string, kind: EffectKind, id: 
   });
 }
 
-export type EffectPatch = { params?: Values; enabled?: boolean; index?: number };
+export type EffectPatch = { params?: Values; enabled?: boolean; index?: number; lut?: Effect['lut'] };
 
 export function setEffect(doc: MotionDoc, clipId: string, effectId: string, patch: EffectPatch): OpResult {
   return editEffects(doc, clipId, (clip) => {
@@ -38,7 +38,7 @@ export function setEffect(doc: MotionDoc, clipId: string, effectId: string, patc
     if (!current) {
       return `no effect ${effectId} on ${clipId}; it has ${clip.effects.map((e) => `${e.id} (${EFFECTS[e.kind].label})`).join(', ') || 'none'}`;
     }
-    const next: Effect = { ...current, enabled: patch.enabled ?? current.enabled, params: { ...current.params, ...patch.params } };
+    const next: Effect = { ...current, enabled: patch.enabled ?? current.enabled, params: { ...current.params, ...patch.params }, ...(patch.lut === undefined ? {} : { lut: patch.lut }) };
     const problem = effectProblem(next);
     if (problem) {
       return problem;

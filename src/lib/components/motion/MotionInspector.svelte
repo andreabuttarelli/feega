@@ -16,6 +16,7 @@
   import Dial from './Dial.svelte';
   import CodeEditor from './CodeEditor.svelte';
   import FontPicker from './FontPicker.svelte';
+  import LutPicker from './LutPicker.svelte';
   import { registerFont, setFont } from '$lib/motion/fonts/ops';
   import type { CatalogueFont } from '$lib/motion/fonts/model';
   import { withParams } from '$lib/motion/custom/params';
@@ -429,6 +430,7 @@
             <button type="button" aria-label="Move effect down" disabled={i === clip.effects.length - 1} onclick={() => commit(setEffect(doc, clip.id, effect.id, { index: i + 1 }), 'Reordered effects')}>↓</button>
             <button type="button" aria-label={`Remove ${EFFECTS[effect.kind].label}`} onclick={() => commit(removeEffect(doc, clip.id, effect.id), 'Removed an effect')}>×</button>
           </div>
+          {#if effect.kind === 'lut'}<LutPicker {doc} clipId={clip.id} {effect} {onchange} />{/if}
           {#each effectParams(effect.id) as prop (prop.key)}
             {#if prop.kind === ValueKind.Color}
               <div class="row anim" data-prop={prop.key}>
