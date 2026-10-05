@@ -31,9 +31,12 @@ import { addClip } from '$lib/motion/timeline';
 import { writeComponent } from '$lib/motion/custom/ops';
 import type { NodeRun } from '$lib/server/repos/node-runs';
 import { ExportFormat, Preset, settingsOf } from '$lib/motion/export-formats';
+import { CREDITS_PER_USD_SUBSCRIPTION_LIST } from '$lib/credit-ladder';
 
 const farm = { open: vi.fn(), attach: vi.fn() };
 const scope = { orgId: 'org', projectId: 'prj', nodeId: 'node', userId: 'u', editorUrl: '/p/prj/c/c/motion/node' };
+const longScope = { ...scope, plan: 'pro' };
+const SEVEN_CHUNKS = 7 * 450;
 const LIMIT = 50 * 1024 * 1024;
 const storage = { host: 's.supabase.co', limit: vi.fn(async () => LIMIT) };
 const done = { state: TaskState.Done, error: null };
@@ -41,6 +44,10 @@ const running = { state: TaskState.Running, error: null };
 
 function trailer(): MotionDoc {
   return { ...newMotionDoc(MotionFormat.Landscape), durationInFrames: 840 };
+}
+
+function sevenChunks(): MotionDoc {
+  return { ...trailer(), durationInFrames: SEVEN_CHUNKS };
 }
 
 function request(doc = trailer(), settings = settingsOf(Preset.Social)): RenderRequest {
@@ -67,9 +74,9 @@ function fakeDb(job = request().job) {
 
 const lastParams = () => runs.setRunParams.mock.calls.at(-1)?.[1].params;
 
-async function started(req = request()) {
+async function started(req = request(sevenChunks())) {
   const { db } = fakeDb(req.job);
-  await startRender(db, farm, scope, req, storage);
+  await startRender(db, farm, longScope, req, storage);
   const params = lastParams();
   return runOf(params);
 }
@@ -88,7 +95,7 @@ beforeEach(() => {
 
 describe('startRender refuses before spending anything', () => {
   it('without a render farm', async () => {
-    const { db } = fakeDb();
+    const { db } = fakeDb(request(sevenChunks()).job);
 
     expect(await startRender(db, null, scope, request(), storage)).toEqual({ ok: false, error: RenderRefusal.NotConfigured });
     expect(runs.createRun).not.toHaveBeenCalled();
@@ -99,7 +106,7 @@ describe('startRender refuses before spending anything', () => {
     const written = writeComponent(trailer(), 'Glow', draft);
     const used = written.ok ? addClip(written.doc, { component: 'Custom', from: 0, durationInFrames: 30, props: { name: 'Glow' } }, 'g1') : written;
     const doc = (used as { doc: MotionDoc }).doc;
-    const { db } = fakeDb();
+    const { db } = fakeDb(request(sevenChunks()).job);
 
     expect(await startRender(db, farm, scope, request(doc), storage)).toEqual({ ok: false, error: RenderRefusal.Unverified });
     expect(runs.createRun).not.toHaveBeenCalled();
@@ -107,7 +114,7 @@ describe('startRender refuses before spending anything', () => {
 
   it('a second render while one is running on the same node', async () => {
     runs.listNodeRuns.mockResolvedValue([runOf({}), { ...runOf({}), id: 'old', status: 'done' }]);
-    const { db } = fakeDb();
+    const { db } = fakeDb(request(sevenChunks()).job);
 
     expect(await startRender(db, farm, scope, request(), storage)).toEqual({ ok: false, error: RenderRefusal.Busy });
   });
@@ -115,7 +122,7 @@ describe('startRender refuses before spending anything', () => {
 
 describe('startRender only enqueues and starts the workers', () => {
   it('records the revision, the format and the quote on a run the tick can find', async () => {
-    const { db } = fakeDb();
+    const { db } = fakeDb(request(sevenChunks()).job);
 
     const result = await startRender(db, farm, scope, request(), storage);
 
@@ -128,9 +135,9 @@ describe('startRender only enqueues and starts the workers', () => {
   });
 
   it('stores the job for retries and starts one detached worker per chunk, each but the first with its own upload URL', async () => {
-    const { db, uploads } = fakeDb();
+    const { db, uploads } = fakeDb(request(sevenChunks()).job);
 
-    await startRender(db, farm, scope, request(), storage);
+    await startRender(db, farm, longScope, request(sevenChunks()), storage);
 
     expect(uploads).toEqual(['org/prj/motion/node/work/run-1/job.json']);
     expect(farmCalls.launchPiece).toHaveBeenCalledTimes(7);
@@ -143,7 +150,7 @@ describe('startRender only enqueues and starts the workers', () => {
 
   it('a worker that cannot start fails the run, stops the ones that did and charges nothing', async () => {
     farmCalls.launchPiece.mockResolvedValueOnce('box-0').mockRejectedValueOnce(new Error('quota'));
-    const { db } = fakeDb();
+    const { db } = fakeDb(request(sevenChunks()).job);
 
     const result = await startRender(db, farm, scope, request(), storage);
 
@@ -158,7 +165,7 @@ describe('reconcileRenders', () => {
   it('a render still working is left running, and the tick releases its claim', async () => {
     const run = await started();
     runs.queuedRenderRuns.mockResolvedValue([run]);
-    const { db } = fakeDb();
+    const { db } = fakeDb(request(sevenChunks()).job);
 
     await reconcileRenders(db, farm, storage);
 
@@ -170,7 +177,7 @@ describe('reconcileRenders', () => {
     const run = await started();
     runs.queuedRenderRuns.mockResolvedValue([run]);
     farmCalls.checkTask.mockImplementation(async (_f, name: string) => (['box-0', 'box-1'].includes(name) ? done : running));
-    const { db } = fakeDb();
+    const { db } = fakeDb(request(sevenChunks()).job);
 
     await reconcileRenders(db, farm, storage);
 
@@ -182,7 +189,7 @@ describe('reconcileRenders', () => {
     const run = await started();
     runs.queuedRenderRuns.mockResolvedValue([run]);
     farmCalls.checkTask.mockResolvedValue(done);
-    const { db } = fakeDb();
+    const { db } = fakeDb(request(sevenChunks()).job);
 
     await reconcileRenders(db, farm, storage);
 
@@ -199,7 +206,7 @@ describe('reconcileRenders', () => {
     let run = await started();
     runs.queuedRenderRuns.mockImplementation(async () => [run]);
     farmCalls.checkTask.mockImplementation(async (_f, name: string) => (name === 'box-3' || name === 'box-7' ? { state: TaskState.Failed, error: 'chunk 3 failed: chrome crashed' } : running));
-    const { db } = fakeDb();
+    const { db } = fakeDb(request(sevenChunks()).job);
 
     await reconcileRenders(db, farm, storage);
     expect(farmCalls.launchPiece).toHaveBeenLastCalledWith(farm, expect.anything(), 3, expect.objectContaining({ upload: expect.stringContaining('c3.mp4') }));
@@ -217,15 +224,15 @@ describe('reconcileRenders', () => {
     let run = await started();
     runs.queuedRenderRuns.mockImplementation(async () => [run]);
     farmCalls.checkTask.mockResolvedValue(done);
-    const { db, removed } = fakeDb();
+    const { db, removed } = fakeDb(request(sevenChunks()).job);
     await reconcileRenders(db, farm, storage);
     run = runOf(lastParams());
 
     await reconcileRenders(db, farm, storage);
 
-    expect(saveExport).toHaveBeenCalledWith(db, expect.objectContaining({ path: 'org/prj/motion/node/run-1.mp4', width: 1920, height: 1080, seconds: 28, nodeId: 'node', format: ExportFormat.Mp4H264 }));
+    expect(saveExport).toHaveBeenCalledWith(db, expect.objectContaining({ path: 'org/prj/motion/node/run-1.mp4', width: 1920, height: 1080, seconds: SEVEN_CHUNKS / 30, nodeId: 'node', format: ExportFormat.Mp4H264 }));
     expect(logAiCall).toHaveBeenCalledTimes(1);
-    expect(logAiCall.mock.calls[0][0]).toMatchObject({ label: 'motion_render', ok: true, flatCostUsd: 0.03, orgId: 'org', actorId: 'u' });
+    expect(logAiCall.mock.calls[0][0]).toMatchObject({ label: 'motion_render', ok: true, flatCostUsd: (run.params.quote as { credits: number }).credits / CREDITS_PER_USD_SUBSCRIPTION_LIST, orgId: 'org', actorId: 'u' });
     expect(runs.completeRun).toHaveBeenCalledWith(db, expect.objectContaining({ runId: 'run-1', assetId: 'asset-9' }));
     expect(lastParams().progress.stage).toBe(RenderStage.Done);
     expect(sendPushToUser).toHaveBeenCalledWith(db, 'u', expect.objectContaining({ url: scope.editorUrl }));
@@ -237,7 +244,7 @@ describe('reconcileRenders', () => {
     let run = await started(request(trailer(), settingsOf(Preset.Master)));
     runs.queuedRenderRuns.mockImplementation(async () => [run]);
     farmCalls.checkTask.mockResolvedValue(done);
-    const { db } = fakeDb();
+    const { db } = fakeDb(request(sevenChunks()).job);
     await reconcileRenders(db, farm, storage);
     run = runOf(lastParams());
     farmCalls.checkTask.mockResolvedValue({ state: TaskState.Failed, error: 'size check failed: too_large: the file is 812 MB, over the 50 MB this project\'s storage accepts per file. Nothing was charged.' });
@@ -250,10 +257,10 @@ describe('reconcileRenders', () => {
   });
 
   it('a piece over the storage limit fails the render at once: a retry would be just as large', async () => {
-    const run = await started(request(trailer(), settingsOf(Preset.Master)));
+    const run = await started(request(sevenChunks(), settingsOf(Preset.Master)));
     runs.queuedRenderRuns.mockResolvedValue([run]);
     farmCalls.checkTask.mockImplementation(async (_f, name: string) => (name === 'box-2' ? { state: TaskState.Failed, error: 'chunk 2 size check failed: too_large: a part of this render is 70 MB, over the 50 MB this project\'s storage accepts per file. Nothing was charged.' } : running));
-    const { db } = fakeDb();
+    const { db } = fakeDb(request(sevenChunks()).job);
 
     await reconcileRenders(db, farm, storage);
 
@@ -265,7 +272,7 @@ describe('reconcileRenders', () => {
     const run = await started();
     runs.queuedRenderRuns.mockResolvedValue([run]);
     runs.claimRun.mockResolvedValue(null);
-    const { db } = fakeDb();
+    const { db } = fakeDb(request(sevenChunks()).job);
 
     await reconcileRenders(db, farm, storage);
 
@@ -277,7 +284,7 @@ describe('cancelRender', () => {
   it('closes the running render as cancelled, stops its workers and charges nothing', async () => {
     const run = await started();
     runs.listNodeRuns.mockResolvedValue([run]);
-    const { db } = fakeDb();
+    const { db } = fakeDb(request(sevenChunks()).job);
 
     expect(await cancelRender(db, farm, scope)).toEqual({ ok: true });
 
@@ -287,7 +294,7 @@ describe('cancelRender', () => {
   });
 
   it('nothing running is nothing to cancel', async () => {
-    const { db } = fakeDb();
+    const { db } = fakeDb(request(sevenChunks()).job);
 
     expect(await cancelRender(db, farm, scope)).toEqual({ ok: false });
   });
@@ -306,7 +313,7 @@ describe('farmJob', () => {
 
 describe('render settings', () => {
   it('a GIF over its length cap is refused before a run is created, with the reason', async () => {
-    const { db } = fakeDb();
+    const { db } = fakeDb(request(sevenChunks()).job);
 
     const result = await startRender(db, farm, scope, request(trailer(), settingsOf(Preset.Gif)), storage);
 
@@ -315,7 +322,7 @@ describe('render settings', () => {
   });
 
   it('the run records the settings it renders with', async () => {
-    const { db } = fakeDb();
+    const { db } = fakeDb(request(sevenChunks()).job);
     const web = settingsOf(Preset.Web);
 
     await startRender(db, farm, scope, request(trailer(), web), storage);
@@ -334,14 +341,14 @@ describe('length by plan', () => {
   const long = () => ({ ...trailer(), durationInFrames: 90 * 30 });
 
   it('a video longer than the plan renders is refused before a run, with the limit', async () => {
-    const { db } = fakeDb();
+    const { db } = fakeDb(request(sevenChunks()).job);
 
     expect(await startRender(db, farm, scope, request(long()), storage)).toMatchObject({ ok: false, error: RenderRefusal.Unsupported, detail: expect.stringMatching(/60 s/) });
     expect(runs.createRun).not.toHaveBeenCalled();
   });
 
   it('a plan with a longer limit renders it', async () => {
-    const { db } = fakeDb();
+    const { db } = fakeDb(request(sevenChunks()).job);
 
     expect(await startRender(db, farm, { ...scope, plan: 'starter' }, request(long()), storage)).toMatchObject({ ok: true });
   });
@@ -356,7 +363,7 @@ describe('4K', () => {
   });
 
   it('the quote follows the output resolution', async () => {
-    const { db } = fakeDb();
+    const { db } = fakeDb(request(sevenChunks()).job);
 
     const result = await startRender(db, farm, scope, request(trailer(), { ...settingsOf(Preset.Social), resolution: Resolution.P2160 }), storage);
 
@@ -397,7 +404,7 @@ describe('startBatch', () => {
   });
 
   it('a row the farm cannot render refuses the whole batch before anything is spent, naming the row', async () => {
-    const { db } = fakeDb();
+    const { db } = fakeDb(request(sevenChunks()).job);
     const bad = { req: request(trailer(), settingsOf(Preset.Gif)), name: 'gif' };
 
     expect(await startBatch(db, farm, scope, [...rows(2), bad], storage)).toMatchObject({ ok: false, error: RenderRefusal.Unsupported, detail: expect.stringMatching(/^row 3: .*GIF/) });
