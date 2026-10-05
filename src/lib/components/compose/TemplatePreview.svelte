@@ -1,17 +1,19 @@
 <script lang="ts">
-  import type { CompositionScene } from '$lib/canvas/composition/scene';
   import type { LayoutId } from '$lib/canvas/composition/types';
-  import { createSceneWhenMounted } from '$lib/canvas/composition-editor';
-  import { newDraft } from '$lib/motion/composition-draft';
+  import CompositionPlayer from '$lib/components/motion/CompositionPlayer.svelte';
+  import { applyDraft, newDraft } from '$lib/motion/composition-draft';
+  import { newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 
   let { layout, pictures }: { layout: LayoutId; pictures: string[] } = $props();
 
   const TILE_SIDE = 256;
   const TILE_COUNT = 6;
   const TILE_HUES = [18, 42, 200, 160, 280, 340];
+  const SAMPLE = 'sample';
 
-  let canvas = $state<HTMLCanvasElement | null>(null);
+  let host = $state<HTMLDivElement | null>(null);
   let visible = $state(false);
+  let urls = $state<string[]>([]);
 
   function tiles(): string[] {
     return Array.from({ length: TILE_COUNT }, (_, i) => {
@@ -33,68 +35,37 @@
   }
 
   $effect(() => {
-    if (!canvas) {
+    if (!host) {
       return;
     }
     const observer = new IntersectionObserver(([entry]) => (visible = entry.isIntersecting));
-    observer.observe(canvas);
+    observer.observe(host);
     return () => observer.disconnect();
   });
 
   $effect(() => {
-    if (!canvas || !visible) {
-      return;
+    if (visible && !urls.length) {
+      urls = pictures.length ? pictures : tiles();
     }
-    const target = canvas;
+  });
+
+  const assets = $derived(Object.fromEntries(urls.map((url, i) => [`${SAMPLE}${i}`, url])));
+
+  const doc = $derived.by((): MotionDoc | null => {
     const draft = newDraft(layout);
-    const media = (pictures.length ? pictures : tiles()).map((url) => ({ url, kind: 'image' as const, aspect: 1 }));
-    let scene: CompositionScene | null = null;
-    let frame = 0;
-    let stopped = false;
-
-    void createSceneWhenMounted(
-      target,
-      () => !stopped && canvas === target,
-      async () => {
-        const { createCompositionScene } = await import('$lib/canvas/composition/scene');
-        return (el) =>
-          createCompositionScene(el, {
-            media,
-            layout,
-            layoutParams: draft.layoutParams,
-            camera: draft.camera,
-            cameraParams: draft.cameraParams,
-            background: draft.background,
-            duration: draft.seconds
-          });
-      }
-    ).then((made) => {
-      if (!made) {
-        return;
-      }
-      scene = made;
-      scene.resize(target.clientWidth, target.clientHeight);
-      const startedAt = performance.now();
-      const render = (now: number) => {
-        scene?.renderAt(((now - startedAt) / 1000) % draft.seconds);
-        frame = requestAnimationFrame(render);
-      };
-      frame = requestAnimationFrame(render);
-    });
-
-    return () => {
-      stopped = true;
-      cancelAnimationFrame(frame);
-      scene?.dispose();
-      scene = null;
-    };
+    const verdict = applyDraft(newMotionDoc(draft.format), { ...draft, media: urls.map((_, i) => ({ assetId: `${SAMPLE}${i}`, kind: 'image' as const })) });
+    return verdict.ok ? verdict.doc : null;
   });
 </script>
 
-<canvas bind:this={canvas} aria-hidden="true"></canvas>
+<div bind:this={host} class="template-preview" aria-hidden="true">
+  {#if visible && doc && urls.length}
+    <CompositionPlayer {doc} {assets} active={visible} />
+  {/if}
+</div>
 
 <style>
-  canvas {
+  .template-preview {
     display: block;
     width: 100%;
     height: 100%;

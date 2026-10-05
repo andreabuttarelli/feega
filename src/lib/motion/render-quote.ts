@@ -1,6 +1,7 @@
 import type { MotionDoc, MotionTrack } from './doc';
 import { CREDITS_PER_USD_GRANT } from '$lib/credit-ladder';
 import { chunkPlan } from './server-render';
+import { costSpans, frameCosts } from './render-cost';
 
 export enum Resolution {
   P720 = '720p',
@@ -39,6 +40,8 @@ const PER_1080P_FRAME: Record<RenderClass, { cpuS: number; wallS: number }> = {
   [RenderClass.Device3D]: { cpuS: 4.6, wallS: 1.2 }
 };
 
+const SHORT_SIDE: Record<Resolution, number> = { [Resolution.P720]: 720, [Resolution.P1080]: 1080, [Resolution.P1440]: 1440, [Resolution.P2160]: 2160 };
+
 const RESOLUTION_WORK: Record<Resolution, number> = { [Resolution.P720]: 0.6, [Resolution.P1080]: 1, [Resolution.P1440]: 1.6, [Resolution.P2160]: 2.5 };
 
 const CLASS_OF_COMPONENT: Record<string, RenderClass> = {
@@ -63,10 +66,6 @@ export function renderClass(doc: Partial<Pick<MotionDoc, 'tracks' | 'comps'>>): 
   return HEAVIEST.find((c) => present.has(c)) ?? RenderClass.Flat;
 }
 
-export function frameWallSeconds(doc: Quoted, resolution: Resolution = resolutionOf(doc)): number {
-  return PER_1080P_FRAME[renderClass(doc)].wallS * RESOLUTION_WORK[resolution];
-}
-
 export function sandboxCostUsd(usages: WorkerUsage[]): number {
   return usages.reduce((sum, u) => {
     const cpu = (u.cpuMs / MS_PER_HOUR) * SANDBOX_USD.activeCpuHour;
@@ -75,10 +74,18 @@ export function sandboxCostUsd(usages: WorkerUsage[]): number {
   }, 0);
 }
 
+function costsOf(doc: Quoted, resolution: Resolution): number[] {
+  if (!doc.tracks) {
+    return [];
+  }
+  const scale = SHORT_SIDE[resolution] / Math.min(doc.width, doc.height);
+  return frameCosts(doc.durationInFrames, costSpans(doc as MotionDoc, doc.width * doc.height * scale * scale));
+}
+
 export function estimatedUsage(doc: Quoted, resolution: Resolution = resolutionOf(doc)): WorkerUsage[] {
   const samples = doc.motionBlur?.enabled ? doc.motionBlur.samples : 1;
   const whole = samples > 1 || !CHUNKED_FPS.includes(doc.fps);
-  const plan = whole ? { size: doc.durationInFrames, count: 1 } : chunkPlan(doc.durationInFrames);
+  const plan = whole ? { size: doc.durationInFrames, count: 1 } : chunkPlan(doc.durationInFrames, costsOf(doc, resolution));
   const per = PER_1080P_FRAME[renderClass(doc)];
   const work = plan.size * samples * RESOLUTION_WORK[resolution];
   const piece = { cpuMs: (BOOT.cpuS + work * per.cpuS) * S_TO_MS, memoryMb: whole ? MEMORY_MB.whole : MEMORY_MB.chunked, wallMs: (BOOT.wallS + work * per.wallS) * S_TO_MS + IDLE.pieceMs };

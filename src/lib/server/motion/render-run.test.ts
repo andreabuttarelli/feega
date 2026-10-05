@@ -25,7 +25,7 @@ vi.mock('$lib/server/credit-hold', () => hold);
 vi.mock('./farm-render', async (original) => ({ ...(await original<typeof import('./farm-render')>()), ...farmCalls }));
 
 import { BATCH_CONCURRENCY, batchView, cancelRender, farmJob, reconcileRenders, RenderRefusal, renderRequest, renderView, startBatch, startRender, type RenderRequest } from './render-run';
-import { TaskState } from './farm-render';
+import { TaskState, WORKER_GONE } from './farm-render';
 import { FEEGA_TOKENS } from '$lib/motion/brand';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { RenderStage } from '$lib/motion/server-render';
@@ -150,7 +150,7 @@ describe('startRender only enqueues and starts the workers', () => {
     expect(uploads).toEqual(['org/prj/motion/node/work/run-1/job.json']);
     expect(farmCalls.launchPiece).toHaveBeenCalledTimes(7);
     expect(farmCalls.launchPiece.mock.calls[0][3]).toEqual({ upload: null, storageHost: 's.supabase.co', maxBytes: LIMIT });
-    expect(farmCalls.launchPiece.mock.calls[2][3]).toEqual({ upload: 'https://s.supabase.co/up/org/prj/motion/node/work/run-1/c2.mp4', storageHost: 's.supabase.co', maxBytes: LIMIT });
+    expect(farmCalls.launchPiece.mock.calls[2][3]).toEqual({ upload: 'https://s.supabase.co/up/org/prj/motion/node/work/run-1/c900.mp4', storageHost: 's.supabase.co', maxBytes: LIMIT });
     expect(lastParams().farm.pieces.map((p: { worker: string }) => p.worker)).toEqual(['box-0', 'box-1', 'box-2', 'box-3', 'box-4', 'box-5', 'box-6']);
     expect(lastParams().progress).toMatchObject({ stage: RenderStage.Rendering, chunksDone: 0, chunks: 7 });
     expect(saveExport).not.toHaveBeenCalled();
@@ -201,10 +201,10 @@ describe('reconcileRenders', () => {
 
     await reconcileRenders(db, farm, storage);
 
-    const [, head, , links] = farmCalls.launchAssembly.mock.calls[0];
+    const [, head, , , links] = farmCalls.launchAssembly.mock.calls[0];
     expect(head).toBe('box-0');
     expect(links.pieces).toHaveLength(6);
-    expect(links.pieces[0]).toBe('https://s.supabase.co/get/org/prj/motion/node/work/run-1/c1.mp4');
+    expect(links.pieces[0]).toBe('https://s.supabase.co/get/org/prj/motion/node/work/run-1/c450.mp4');
     expect(links.output).toBe('https://s.supabase.co/up/org/prj/motion/node/run-1.mp4');
     expect(links.maxBytes).toBe(LIMIT);
     expect(lastParams().progress.stage).toBe(RenderStage.Assembling);
@@ -217,15 +217,48 @@ describe('reconcileRenders', () => {
     const { db } = fakeDb(request(sevenChunks()).job);
 
     await reconcileRenders(db, farm, storage);
-    expect(farmCalls.launchPiece).toHaveBeenLastCalledWith(farm, expect.anything(), 3, expect.objectContaining({ upload: expect.stringContaining('c3.mp4') }));
+    expect(farmCalls.launchPiece).toHaveBeenLastCalledWith(farm, expect.anything(), { index: 3, size: 450 }, expect.objectContaining({ upload: expect.stringContaining('c1350.mp4') }));
     expect(lastParams().farm.pieces[3]).toMatchObject({ worker: 'box-7', attempt: 2 });
     expect(runs.failRun).not.toHaveBeenCalled();
 
     run = runOf(lastParams());
     await reconcileRenders(db, farm, storage);
-    expect(runs.failRun).toHaveBeenCalledWith(db, { orgId: 'org', runId: 'run-1', error: 'chunk 3 failed: chrome crashed' });
+    expect(runs.failRun).toHaveBeenCalledWith(db, { orgId: 'org', runId: 'run-1', error: 'frames 1350–1799 failed after 2 attempts: chunk 3 failed: chrome crashed' });
     expect(lastParams().progress.stage).toBe(RenderStage.Failed);
     expect(logAiCall).not.toHaveBeenCalled();
+  });
+
+  it('a chunk whose worker timed out is split in two halves on new workers, and the halves are assembled in order', async () => {
+    let run = await started();
+    runs.queuedRenderRuns.mockImplementation(async () => [run]);
+    farmCalls.checkTask.mockImplementation(async (_f, name: string) => (name === 'box-3' ? { state: TaskState.Failed, error: WORKER_GONE } : done));
+    const { db } = fakeDb(request(sevenChunks()).job);
+
+    await reconcileRenders(db, farm, storage);
+
+    const pieces = lastParams().farm.pieces;
+    expect(pieces.map((p: { slice: { index: number; size: number } }) => p.slice)).toEqual([0, 1, 2, { index: 6, size: 225 }, { index: 7, size: 225 }, 4, 5, 6].map((s) => (typeof s === 'number' ? { index: s, size: 450 } : s)));
+    expect(lastParams().progress).toMatchObject({ chunks: 8, chunksDone: 6 });
+    expect(runs.failRun).not.toHaveBeenCalled();
+
+    run = runOf(lastParams());
+    await reconcileRenders(db, farm, storage);
+    const [, , , slices, links] = farmCalls.launchAssembly.mock.calls[0];
+    expect(slices).toHaveLength(8);
+    expect(links.pieces[2]).toContain('c1350.mp4');
+    expect(links.pieces[3]).toContain('c1575.mp4');
+  });
+
+  it('a chunk that times out even at its smallest size fails with what to change, not a silent stop', async () => {
+    await started();
+    const tiny = { ...lastParams(), farm: { ...lastParams().farm, pieces: lastParams().farm.pieces.map((p: object, i: number) => ({ ...p, attempt: 2, slice: { index: i, size: 18 } })) } };
+    runs.queuedRenderRuns.mockResolvedValue([runOf(tiny)]);
+    farmCalls.checkTask.mockImplementation(async (_f, name: string) => (name === 'box-1' ? { state: TaskState.Failed, error: WORKER_GONE } : running));
+    const { db } = fakeDb();
+
+    await reconcileRenders(db, farm, storage);
+
+    expect(runs.failRun.mock.calls[0][1].error).toMatch(/frames 18–35 did not finish .* too heavy/);
   });
 
   it('an assembled file is saved, attached, charged once, announced, and the work is cleaned up', async () => {
@@ -244,7 +277,7 @@ describe('reconcileRenders', () => {
     expect(runs.completeRun).toHaveBeenCalledWith(db, expect.objectContaining({ runId: 'run-1', assetId: 'asset-9' }));
     expect(lastParams().progress.stage).toBe(RenderStage.Done);
     expect(sendPushToUser).toHaveBeenCalledWith(db, 'u', expect.objectContaining({ url: scope.editorUrl }));
-    expect(removed).toEqual(expect.arrayContaining(['org/prj/motion/node/work/run-1/job.json', 'org/prj/motion/node/work/run-1/c1.mp4']));
+    expect(removed).toEqual(expect.arrayContaining(['org/prj/motion/node/work/run-1/job.json', 'org/prj/motion/node/work/run-1/c450.mp4']));
     expect(farmCalls.stopWorker).toHaveBeenCalledWith(farm, 'box-0');
   });
 
@@ -530,7 +563,7 @@ describe('startBatch', () => {
     expect(runs.createRun).toHaveBeenCalledTimes(5);
     expect(runs.createRun.mock.calls[4][1].params.batch).toEqual({ id: expect.any(String), row: 5, name: 'row-5', rows: 5 });
     expect(uploads).toHaveLength(5);
-    expect(farmCalls.launchPiece.mock.calls.filter((c) => c[2] === 0)).toHaveLength(BATCH_CONCURRENCY);
+    expect(farmCalls.launchPiece.mock.calls.filter((c) => c[2].index === 0)).toHaveLength(BATCH_CONCURRENCY);
   });
 
   it('a row the farm cannot render refuses the whole batch before anything is spent, naming the row', async () => {

@@ -107,3 +107,23 @@ describe('text animators', () => {
     expect(compose(lines)).toContain('tl');
   });
 });
+
+describe('animators with different units on one clip', () => {
+  it('a char preset and a per-word colour live together: the text splits by char and each char also knows its word', () => {
+    let doc = ok(addAnimator(titled(), 'title', 'a1', { unit: AnimatorUnit.Char, values: { opacity: 0, blur: 8 } }));
+    doc = ok(addAnimator(doc, 'title', 'a2', { unit: AnimatorUnit.Word, shape: SelectorShape.Square, values: { color: '#0099ff' } }));
+    const html = compose(doc);
+
+    expect(html).toMatch(/class="tu" style="--p:[0-9.]+;--pw:[0-9.]+"/);
+    expect(html).toMatch(/--in1:clamp\(0, \(var\(--pw\)/);
+    expect(html).toMatch(/--in0:clamp\(0, \(var\(--p\)/);
+  });
+
+  it('every char of a word shares that word\'s position', () => {
+    const html = splitText('ab cd', { unit: AnimatorUnit.Char, seed: null, coarser: [AnimatorUnit.Word] });
+
+    expect(html).toContain('style="--p:0.125;--pw:0.25">a<');
+    expect(html).toContain('style="--p:0.375;--pw:0.25">b<');
+    expect(html).toContain('style="--p:0.625;--pw:0.75">c<');
+  });
+});

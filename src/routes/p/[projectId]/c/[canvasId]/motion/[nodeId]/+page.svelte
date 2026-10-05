@@ -61,6 +61,9 @@
   import { Align, addMarker, alignClips, allMarkers, clipsTo, distributeClips, trimClipsAt, loopFrame, nudgeClips, sequenceClips, setWorkArea, staggerClips } from '$lib/motion/organize';
   import ExportDialog from '$lib/components/motion/ExportDialog.svelte';
   import TemplateDialog from '$lib/components/motion/TemplateDialog.svelte';
+  import TemplateLibrary from '$lib/components/motion/TemplateLibrary.svelte';
+  import TemplateInspector from '$lib/components/motion/TemplateInspector.svelte';
+  import { insertTemplate, isLockedComp, type TemplateEntry } from '$lib/motion/template/library';
   import SoundDialog, { type Made, type SoundKind } from '$lib/components/motion/SoundDialog.svelte';
   import ChatPanel from '$lib/components/brand-agent/ChatPanel.svelte';
   import { AssetKind, COMPONENTS, LIBRARY_IDS, TrackKind, type ComponentId } from '$lib/motion/components';
@@ -129,6 +132,8 @@
   let adding = $state(false);
   let exporting = $state(false);
   let templating = $state(false);
+  let browsing = $state(false);
+  let templates = $state<TemplateEntry[]>(data.templates);
   let previewDoc = $state<MotionDoc | null>(null);
   let sounding = $state<SoundKind | null>(null);
   let madeAssets = $state<PageData['assets']>([]);
@@ -491,7 +496,20 @@
     selection = [id];
   }
 
+  function insertEntry(entry: TemplateEntry) {
+    browsing = false;
+    const placed = insertTemplate(doc, entry, { from: frame, newId });
+    apply(placed, `Inserted ${entry.template.name}`);
+    if (placed.ok) {
+      selection = [placed.clipId];
+    }
+  }
+
   function enterComp(comp: string) {
+    if (isLockedComp(doc, comp)) {
+      notice = 'This is a template: change its fields in Properties, or Detach it to edit its structure.';
+      return;
+    }
     path = [...path, { comp, frame }];
     selection = [];
     keySelection = [];
@@ -858,6 +876,21 @@
     />
   {/if}
 
+  {#if browsing}
+    <TemplateLibrary
+      {templates}
+      {doc}
+      selectedComp={selected?.component === 'Precomp' ? String(selected.props.comp) : null}
+      {frame}
+      {editorUrl}
+      compose={(d) => composeHtml({ doc: d, tokens: data.tokens, assets: assetUrls, analyses })}
+      oninsert={insertEntry}
+      onsaved={(entry) => ((templates = [...templates, entry]), (notice = `Saved ${entry.template.name} to the templates.`))}
+      onremoved={(id) => (templates = templates.filter((t) => t.id !== id))}
+      onclose={() => (browsing = false)}
+    />
+  {/if}
+
   {#if templating}
     <TemplateDialog
       {doc}
@@ -899,6 +932,8 @@
       {#if cameraOpen && !selection.length}
         <CameraInspector {doc} {frame} onchange={edit} />
         <LookInspector {doc} onchange={edit} />
+      {:else if selected?.component === 'Precomp' && isLockedComp(doc, String(selected.props.comp))}
+        <TemplateInspector {doc} clip={selected} {assets} onchange={edit} />
       {:else if selected}
         <MotionInspector {doc} {analyses} clip={selected} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} onopen={enterComp} />
         {#if selected.component === 'Device3D'}<DevicePresets {doc} clip={selected} onchange={edit} />{/if}
@@ -938,6 +973,8 @@
                   <button type="button" role="menuitem" onclick={() => startTemplate(id)}>{AD_TEMPLATES[id].label}</button>
                 {/each}
                 <button type="button" role="menuitem" onclick={startTrailer}>feega trailer template</button>
+                <span class="menu-head">Templates</span>
+                <button type="button" role="menuitem" data-testid="open-templates" onclick={() => ((adding = false), (browsing = true))}>Browse templates…</button>
                 <span class="menu-head">Audio</span>
                 <button type="button" role="menuitem" onclick={() => ((adding = false), (sounding = 'voice'))}>Generate voice-over…</button>
                 <button type="button" role="menuitem" onclick={() => ((adding = false), (sounding = 'music'))}>Generate music…</button>

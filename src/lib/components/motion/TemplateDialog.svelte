@@ -6,7 +6,7 @@
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
   import type { OpResult } from '$lib/motion/timeline';
   import { applyValues, exposeField, FieldType, fieldValues, removeField } from '$lib/motion/template/fields';
-  import { FIELD_TYPES } from '$lib/motion/template/field-model';
+  import { FIELD_TYPE_LABEL, FIELD_TYPES } from '$lib/motion/template/field-model';
   import { batchRows, DEFAULT_NAME_PATTERN, MAX_BATCH_ROWS, outputName, parseCsv, sheetCsvUrl, type ColumnMap, type CsvTable } from '$lib/motion/template/batch';
   import { renderQuote } from '$lib/motion/render-quote';
   import { EXPORT_FORMATS, FORMAT, Preset, settingsOf, type RenderSettings } from '$lib/motion/export-formats';
@@ -40,7 +40,7 @@
 
   const POLL_MS = 3000;
   const SETTLED = new Set(['done', 'failed', 'expired']);
-  const TYPE_LABEL: Record<FieldType, string> = { [FieldType.Text]: 'Text', [FieldType.Number]: 'Number', [FieldType.Color]: 'Colour', [FieldType.Asset]: 'Asset', [FieldType.Boolean]: 'Yes / no' };
+  const TYPE_LABEL = FIELD_TYPE_LABEL;
 
   let prop = $state('');
   let key = $state('');

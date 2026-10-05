@@ -23,9 +23,9 @@ La chat addebitava il costo dei token ×2 (200 crediti per $1, crediti venduti a
 - Preventivo per classe (`renderClass`: piatto, 3D, Device3D) dai bench del 5/10 sul farm, per
   frame 1080p: piatto 0,08 s CPU / 0,04 s, Text3D 1,8 / 0,46, Device3D laptop 4,6 / 1,2; 4K ×2,5;
   blur × campioni su 16 GB; attesa del tick 30 s per worker + 90 s sul primo. Ogni classe sta
-  entro il 4% del bench (test con le misure come fixture).
-- Il timeout dei worker usa lo stesso costo per frame (`FarmJob.frameSeconds`, ×2): con #152 un
-  chunk 3D da 450 frame aveva 5,75 min per ~9 min di lavoro.
+  entro il 6% del bench (test con le misure come fixture).
+- Il numero di worker del preventivo segue `chunkPlan` con i costi di `render-cost.ts` (#150),
+  come il farm.
 - Chat: una regola in `ai-log.ts` (`MULTIPLIERS`) prezza le chiamate LLM di un agente in un
   thread a `CHAT_MULTIPLIER` (4) invece di 2. Le altre chiamate restano ×2.
 
