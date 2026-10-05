@@ -1,6 +1,6 @@
 import { ellipseOutline, parsePath, pathData, polygonOutline, rectOutline, scaled, starOutline, type Outline, type Size } from './geometry';
 import { morphOutline } from './morph';
-import { IDENTITY, applyModifiers, type Layer } from './modifiers';
+import { IDENTITY, applyModifiers, modifierFilter, type AppliedModifier, type Layer } from './modifiers';
 import { FillKind, ShapeKind, StrokeKind, modifierValues, type Modifier } from './schema';
 
 export type ShapeLook = {
@@ -52,14 +52,26 @@ export function baseOutline(p: ShapeLook, size: Size): Outline {
   return OUTLINE[p.shape](p, size);
 }
 
+const stackOf = (p: ShapeLook): AppliedModifier[] => p.modifiers.filter((m) => m.enabled).map((m) => ({ kind: m.kind, values: modifierValues(m) }));
+
 export function shapeLayers(p: ShapeLook, size: Size, time: number): Layer[] {
   const base = baseOutline(p, size);
   const outline = p.morphs.length ? morphOutline([base, ...p.morphs.map((d) => pathOutline(d, size))], p.morph, p.morphStart) : base;
-  const stack = p.modifiers.filter((m) => m.enabled).map((m) => ({ kind: m.kind, values: modifierValues(m) }));
-  return applyModifiers([{ outline, opacity: 1, matrix: IDENTITY }], stack, { size, time });
+  return applyModifiers([{ outline, opacity: 1, matrix: IDENTITY }], stackOf(p), { size, time });
 }
 
 const gradientId = (id: string) => `sg-${id}`;
+const filterId = (id: string) => `sf-${id}`;
+const FILTER_REACH = 3;
+
+function filterOf(p: ShapeLook, paint: Paint): string {
+  const primitives = modifierFilter(stackOf(p), paint.unit);
+  if (!primitives) {
+    return '';
+  }
+  const { w, h } = paint.size;
+  return `<filter id="${filterId(paint.id)}" filterUnits="userSpaceOnUse" x="${round(-w * FILTER_REACH)}" y="${round(-h * FILTER_REACH)}" width="${round(w * (FILTER_REACH * 2 + 1))}" height="${round(h * (FILTER_REACH * 2 + 1))}" color-interpolation-filters="sRGB">${primitives}</filter>`;
+}
 
 function gradient(p: ShapeLook, paint: Paint): string {
   const { w, h } = paint.size;
@@ -103,6 +115,8 @@ export function shapeMarkup(p: ShapeLook, paint: Paint): string {
     .filter((l) => l.outline.length)
     .map((l) => `<path d="${pathData(l.outline)}"${matrixAttr(l.matrix)}${opacityAttr(l.opacity)}/>`)
     .join('');
-  const defs = usesGradient(p) ? `<defs>${gradient(p, paint)}</defs>` : '';
-  return `${defs}<g style="${paintStyle(p, paint)}">${paths}</g>`;
+  const filter = filterOf(p, paint);
+  const defs = usesGradient(p) || filter ? `<defs>${usesGradient(p) ? gradient(p, paint) : ''}${filter}</defs>` : '';
+  const filtered = filter ? ` filter="url(#${filterId(paint.id)})"` : '';
+  return `${defs}<g style="${paintStyle(p, paint)}"${filtered}>${paths}</g>`;
 }

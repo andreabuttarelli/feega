@@ -15,7 +15,10 @@ export enum ModifierKind {
   Wiggle = 'wiggle',
   ZigZag = 'zigzag',
   RoundCorners = 'round',
-  Merge = 'merge'
+  Merge = 'merge',
+  Wave = 'wave',
+  Blob = 'blob',
+  Goo = 'goo'
 }
 
 export const MODIFIER_KINDS = Object.values(ModifierKind) as [ModifierKind, ...ModifierKind[]];
@@ -25,6 +28,18 @@ export const MERGE_OPS = ['union', 'subtract', 'intersect', 'exclude'] as const;
 const KAPPA = 0.5522847498;
 const MITER_LIMIT = 4;
 const DEGREES = Math.PI / 180;
+const TURN = Math.PI * 2;
+const CATMULL = 6;
+const BLOB_POINTS = 32;
+const MIN_LOBES = 2;
+const BLOB_HARMONICS = [
+  { lobes: 0, weight: 0.5, rate: 1 },
+  { lobes: -1, weight: 0.3, rate: -0.7 },
+  { lobes: 1, weight: 0.2, rate: 1.3 }
+] as const;
+const GOO_CONTRAST = 30;
+const HALF = 0.5;
+const FILTER_DIGITS = 1000;
 
 const param = (key: string, label: string, min: number, max: number, step: number, fallback: number, options?: readonly string[]): ModParam => ({ key, label, min, max, step, fallback, options });
 
@@ -117,6 +132,42 @@ function roundContour(contour: Contour, radius: number): Contour {
   return { vertices, closed: contour.closed };
 }
 
+function smooth(points: readonly Pt[], closed: boolean): Contour {
+  const n = points.length;
+  const at = (i: number) => (closed ? points[(i + n) % n] : points[Math.min(Math.max(i, 0), n - 1)]);
+  const vertices = points.map((p, i): Vertex => {
+    const prev = at(i - 1);
+    const next = at(i + 1);
+    const t: Pt = [(next[0] - prev[0]) / CATMULL, (next[1] - prev[1]) / CATMULL];
+    return { p, in: [p[0] - t[0], p[1] - t[1]], out: [p[0] + t[0], p[1] + t[1]] };
+  });
+  return { vertices, closed };
+}
+
+const along = (i: number, n: number, closed: boolean) => (closed ? i / n : i / Math.max(n - 1, 1));
+
+function wave(c: Contour, v: Values, ctx: ModContext): Contour {
+  const points = resample(c, Math.max(8, Math.round(v.detail)));
+  const waves = c.closed ? Math.round(v.waves) : v.waves;
+  const amp = v.amplitude * unitOf(ctx.size);
+  return smooth(displaced(points, c.closed, (i) => amp * Math.sin(TURN * (waves * along(i, points.length, c.closed) - v.speed * ctx.time))), c.closed);
+}
+
+function blob(c: Contour, v: Values, ctx: ModContext): Contour {
+  const points = resample(c, BLOB_POINTS);
+  const lobes = Math.max(MIN_LOBES, Math.round(v.lobes));
+  const amp = v.amount * unitOf(ctx.size);
+  const swell = (u: number) =>
+    BLOB_HARMONICS.reduce((sum, h, j) => sum + h.weight * Math.sin(TURN * ((lobes + h.lobes) * u + hash(v.seed, j, 0, 0) + v.speed * h.rate * ctx.time)), 0);
+  return smooth(displaced(points, c.closed, (i) => amp * swell(along(i, points.length, c.closed))), c.closed);
+}
+
+const filterNumber = (n: number) => Math.round(n * FILTER_DIGITS) / FILTER_DIGITS;
+
+const gooFilter = (v: Values, unit: number) =>
+  `<feGaussianBlur in="SourceGraphic" stdDeviation="${filterNumber(v.blur * unit)}" result="gooBlur"/>` +
+  `<feColorMatrix in="gooBlur" type="matrix" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 ${GOO_CONTRAST} -${filterNumber(GOO_CONTRAST * v.threshold - HALF)}"/>`;
+
 const ringOf = (c: Contour): [number, number][] => flatten(c).map((p) => [p[0], p[1]]);
 
 const MERGE: Record<(typeof MERGE_OPS)[number], (first: Polygon, rest: Polygon[]) => MultiPolygon> = {
@@ -136,7 +187,13 @@ function merged(outline: Outline, op: number): Outline {
   return MERGE[name](first, rest).flatMap((polygon) => polygon.map((ring) => polyline(ring.slice(0, -1), true)));
 }
 
-type Spec = { label: string; params: readonly ModParam[]; apply: (layers: Layer[], v: Values, ctx: ModContext) => Layer[] };
+type Spec = {
+  label: string;
+  params: readonly ModParam[];
+  apply: (layers: Layer[], v: Values, ctx: ModContext) => Layer[];
+  moves?: (v: Values) => boolean;
+  filter?: (v: Values, unit: number) => string;
+};
 
 export const MODIFIERS: Record<ModifierKind, Spec> = {
   [ModifierKind.Trim]: {
@@ -173,6 +230,7 @@ export const MODIFIERS: Record<ModifierKind, Spec> = {
   [ModifierKind.Wiggle]: {
     label: 'Wiggle paths',
     params: [param('size', 'Size', 0, 0.5, 0.005, 0.03), param('detail', 'Points', 4, 300, 1, 48), param('speed', 'Wiggles/s', 0, 30, 0.1, 2), param('seed', 'Seed', 0, 9999, 1, 1)],
+    moves: (v) => v.speed > 0 && v.size > 0,
     apply: (layers, v, { size, time }) =>
       each(layers, (c) => {
         const points = resample(c, Math.max(4, Math.round(v.detail)));
@@ -199,10 +257,36 @@ export const MODIFIERS: Record<ModifierKind, Spec> = {
     label: 'Merge paths',
     params: [param('op', 'Mode', 0, MERGE_OPS.length - 1, 1, 0, MERGE_OPS)],
     apply: (layers, v) => layers.map((l) => ({ ...l, outline: merged(l.outline, v.op) }))
+  },
+  [ModifierKind.Wave]: {
+    label: 'Wave / ripple',
+    params: [param('amplitude', 'Amplitude', 0, 0.2, 0.001, 0.015), param('waves', 'Waves', 1, 64, 1, 8), param('speed', 'Waves/s', -10, 10, 0.05, 1), param('detail', 'Points', 8, 400, 1, 160)],
+    moves: (v) => v.speed !== 0 && v.amplitude > 0,
+    apply: (layers, v, ctx) => each(layers, (c) => [wave(c, v, ctx)])
+  },
+  [ModifierKind.Blob]: {
+    label: 'Blob',
+    params: [param('amount', 'Amount', 0, 0.3, 0.001, 0.06), param('lobes', 'Lobes', MIN_LOBES, 12, 1, 4), param('speed', 'Speed', 0, 5, 0.05, 0.4), param('seed', 'Seed', 0, 9999, 1, 1)],
+    moves: (v) => v.speed > 0 && v.amount > 0,
+    apply: (layers, v, ctx) => each(layers, (c) => [blob(c, v, ctx)])
+  },
+  [ModifierKind.Goo]: {
+    label: 'Liquid / gooey',
+    params: [param('blur', 'Melt', 0, 0.2, 0.001, 0.03), param('threshold', 'Threshold', 0.05, 0.95, 0.01, HALF)],
+    apply: (layers) => layers,
+    filter: gooFilter
   }
 };
 
 export type AppliedModifier = { kind: ModifierKind; values: Values };
+
+export function movesOverTime(m: AppliedModifier): boolean {
+  return MODIFIERS[m.kind].moves?.(m.values) ?? false;
+}
+
+export function modifierFilter(stack: readonly AppliedModifier[], unit: number): string {
+  return stack.map((m) => MODIFIERS[m.kind].filter?.(m.values, unit) ?? '').join('');
+}
 
 export function applyModifiers(layers: Layer[], stack: readonly AppliedModifier[], ctx: ModContext): Layer[] {
   return stack.reduce((current, m) => MODIFIERS[m.kind].apply(current, m.values, ctx), layers);
