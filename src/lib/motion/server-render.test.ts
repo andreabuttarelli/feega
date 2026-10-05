@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { RenderStage, chunkPlan, progressOf, advance, framesDone, type RenderProgress } from './server-render';
 
 describe('chunkPlan', () => {
-  it('splits a 28 s trailer into seven 120-frame chunks', () => {
-    expect(chunkPlan(840)).toEqual({ size: 120, count: 7 });
+  it('splits a 28 s trailer into two chunks of 15 s at most', () => {
+    expect(chunkPlan(840)).toEqual({ size: 420, count: 2 });
   });
 
   it('never asks for more than eight sandboxes: a long video gets bigger chunks', () => {
-    expect(chunkPlan(3000)).toEqual({ size: 375, count: 8 });
+    expect(chunkPlan(6000)).toEqual({ size: 750, count: 8 });
   });
 
   it('a clip shorter than one chunk is one chunk', () => {

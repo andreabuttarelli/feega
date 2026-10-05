@@ -8,7 +8,7 @@ import type { RenderStorage } from './render-run';
 
 export function motionRenderFarm(source: Record<string, string | undefined> = env): RenderFarm | null {
   const access = farmAccess(source);
-  return access ? vercelFarm(access) : null;
+  return access ? vercelFarm(access, source.VERCEL_ENV ?? 'local') : null;
 }
 
 export function motionRenderStorage(): RenderStorage {

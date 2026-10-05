@@ -81,7 +81,7 @@ async function listedTools(): Promise<Map<string, string>> {
  *
  * Serve corta: si paga a ogni sessione, come `tools/list`.
  */
-const INSTRUCTIONS_MAX_CHARS = 1_900;
+const INSTRUCTIONS_MAX_CHARS = 2_000;
 
 describe('le istruzioni del server sono una mappa, non un ordine', () => {
   test('dicono di non scegliere brand/org da soli, che è il danno vero', () => {

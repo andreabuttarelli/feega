@@ -25,22 +25,6 @@ export function clampZoom(zoom: number): number {
   return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom));
 }
 
-export type Tick = { frame: number; label: string | null };
-
-const TICK_STEPS_S = [0.1, 0.25, 0.5, 1, 2, 5, 10] as const;
-const MIN_TICK_PX = 14;
-const LABEL_EVERY = 5;
-
-export function rulerTicks(durationInFrames: number, zoom: number, fps: number = FPS): Tick[] {
-  const step = TICK_STEPS_S.find((s) => s * fps * pxPerFrame(zoom, fps) >= MIN_TICK_PX) ?? TICK_STEPS_S.at(-1)!;
-  const stepFrames = Math.max(1, Math.round(step * fps));
-  const ticks: Tick[] = [];
-  for (let frame = 0, i = 0; frame <= durationInFrames; frame += stepFrames, i++) {
-    ticks.push({ frame, label: i % LABEL_EVERY === 0 ? timecode(frame, fps) : null });
-  }
-  return ticks;
-}
-
 export function timecode(frame: number, fps: number = FPS): string {
   const seconds = Math.floor(frame / fps);
   const rest = frame % fps;
@@ -82,18 +66,6 @@ export function edgeHandles(clips: readonly Span[], ppf: number, selected: reado
       { clipId: clip.id, grip: Grip.End, left: right - width, width }
     ];
   });
-}
-
-export function stackRows(clips: readonly Span[]): Record<string, number> {
-  const rowEnds: number[] = [];
-  const rows: Record<string, number> = {};
-  for (const clip of [...clips].sort((a, b) => a.from - b.from)) {
-    const free = rowEnds.findIndex((end) => end <= clip.from);
-    const row = free < 0 ? rowEnds.length : free;
-    rowEnds[row] = clip.from + clip.durationInFrames;
-    rows[clip.id] = row;
-  }
-  return rows;
 }
 
 export function handleAt(handles: readonly Handle[], x: number): Handle | null {

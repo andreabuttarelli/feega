@@ -60,10 +60,19 @@ test.describe('motion editor @real', () => {
 
     await page.getByRole('button', { name: 'Add', exact: true }).click();
     await page.getByRole('menuitem', { name: 'feega trailer v2 · 16:9' }).dispatchEvent('click');
-    const bar = page.locator('[data-clip-id="bar-0"]');
-    await bar.scrollIntoViewIfNeeded();
-    await bar.getByRole('button', { name: 'Show keyframes' }).dispatchEvent('click');
+    const layer = page.locator('[data-layer="bar-0"]');
+    await layer.scrollIntoViewIfNeeded();
+    await layer.getByRole('button', { name: 'Show keyframes' }).dispatchEvent('click');
     await expect(page.locator('[data-key-lane="bar-0:scaleY"]')).toBeInViewport();
+
+    const value = page.locator('[data-key-lane="bar-0:scaleY"] .prop-value');
+    const before = await value.textContent();
+    const box = (await value.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 30, box.y + box.height / 2, { steps: 5 });
+    await page.mouse.up();
+    await expect(value).not.toHaveText(before ?? '');
 
     await page.getByTestId('graph-toggle').click();
     await expect(page.getByText('Select a clip with keyframes')).toHaveCount(0);
@@ -80,12 +89,12 @@ test.describe('motion editor @real', () => {
       () =>
         new Promise<string>((resolve) => {
           const player = document.querySelector('hyperframes-player')!;
-          const slider = document.querySelector('input.num[aria-label="Opacity"]')!.previousElementSibling as HTMLInputElement;
+          const field = document.querySelector('input.num[aria-label="Opacity"]') as HTMLInputElement;
           window.addEventListener('message', (e) => e.data?.type === 'feega:hot-done' && resolve('patch'));
           player.addEventListener('ready', () => resolve('reload'), { once: true });
           setTimeout(() => resolve('nothing'), 3000);
-          slider.value = '40';
-          slider.dispatchEvent(new Event('input', { bubbles: true }));
+          field.value = '40';
+          field.dispatchEvent(new Event('change', { bubbles: true }));
         })
     );
 
@@ -102,5 +111,32 @@ test.describe('motion editor @real', () => {
 
     await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeVisible();
     await expect(page.getByTestId('timecode')).toHaveText(START);
+  });
+});
+
+test.describe('motion editor on a phone @real', () => {
+  test.skip(!REAL_STACK, 'richiede uno stack disposable: E2E_REAL_STACK=1');
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  test('si apre, si tocca una clip, si cambia una proprietà e parte il play', async ({ page, session, seedNode }) => {
+    const node = await seedNode({ type: 'motion', data: MOTION_DATA });
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}/motion/${node.id}`);
+
+    await page.getByRole('button', { name: 'Add', exact: true }).tap();
+    await page.getByRole('menuitem', { name: 'Title', exact: true }).tap();
+    const clip = page.locator('[data-clip-id]').last();
+    await clip.scrollIntoViewIfNeeded();
+    await clip.tap();
+
+    await page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Properties' }).tap();
+    const opacity = page.getByRole('textbox', { name: 'Opacity', exact: true }).first();
+    await opacity.fill('50');
+    await opacity.press('Enter');
+    await expect(opacity).toHaveValue(/^50/);
+    await page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Properties' }).tap();
+
+    const timecode = page.getByTestId('timecode');
+    await page.getByRole('button', { name: 'Play', exact: true }).tap();
+    await expect(timecode).not.toHaveText(START, { timeout: 5000 });
   });
 });
