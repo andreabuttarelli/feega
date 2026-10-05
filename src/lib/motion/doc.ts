@@ -300,13 +300,17 @@ export function fontsOfClip(doc: MotionDoc, clip: Pick<MotionClip, 'component' |
   return fontsProblem({ ...doc, tracks: [{ id: '', kind: TrackKind.Visual, name: '', clips: [clip as MotionClip] }] });
 }
 
+export function cloneDoc<T>(doc: T): T {
+  return JSON.parse(JSON.stringify(doc)) as T;
+}
+
 export function parseMotionDoc(input: unknown): DocVerdict {
   const parsed = motionDocSchema.safeParse(upgradeDoc(input));
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ') };
   }
 
-  const doc = structuredClone(parsed.data);
+  const doc = cloneDoc(parsed.data);
   const problem = parentProblem(doc) ?? compsProblem(doc) ?? propsProblem(doc) ?? fontsProblem(doc);
   if (problem) {
     return { ok: false, error: problem };

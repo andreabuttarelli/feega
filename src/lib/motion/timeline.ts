@@ -3,7 +3,7 @@ import { Strictness } from './custom/component';
 import { withParams } from './custom/params';
 import { FPS, MAX_SECONDS, TransitionKind, maxFrames, type Edge } from './design';
 import { MAX_JUNCTION_FRAMES, junctionProblem, type Junction } from './junctions';
-import { FORMATS, byFrame, clipsOf, clipProps, compRefProblem, findClip, fontsOfClip, newClip, type Background, type MotionClip, type MotionDoc, type MotionFormat, type MotionTrack } from './doc';
+import { FORMATS, byFrame, cloneDoc, clipsOf, clipProps, compRefProblem, findClip, fontsOfClip, newClip, type Background, type MotionClip, type MotionDoc, type MotionFormat, type MotionTrack } from './doc';
 import { Ease } from './design';
 import { Matte, isMaskKey, maskSchema, maskStackSchema, type MaskInput } from './mask';
 import { matteSource } from './matte';
@@ -184,7 +184,7 @@ export function duplicateClip(doc: MotionDoc, clipId: string, newId: string): Op
     return fail(`no clip ${clipId}`);
   }
 
-  const copy: MotionClip = { ...structuredClone(found.clip), id: newId, from: clipEnd(found.clip) };
+  const copy: MotionClip = { ...cloneDoc(found.clip), id: newId, from: clipEnd(found.clip) };
   return fitted({ ...doc, tracks: doc.tracks.map((t) => (t.id === found.track.id ? { ...t, clips: [...t.clips, copy] } : t)) });
 }
 
