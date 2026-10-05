@@ -4,9 +4,9 @@ import { DOC_VERSION, MotionFormat, findClip, newMotionDoc, parseMotionDoc, upgr
 import { editAt, valueAt } from './inspector';
 import { keyLanes } from './timeline-view';
 import { ANIMATABLE, Source, baseValue } from './keyframes';
-import { MASK_PROPS, MaskKind, Matte, newMask } from './mask';
-import { matteMask, matteSource, hiddenMattes } from './matte';
-import { addClip, addTrack, setKeyframes, setMask, setTrackMatte, type OpResult } from './timeline';
+import { MASK_PROPS, MaskKind, MaskMode, Matte, combineMasks, newMask } from './mask';
+import { matteSource, hiddenMattes } from './matte';
+import { addClip, addTrack, setKeyframes, setMask, setMaskStack, setTrackMatte, type OpResult } from './timeline';
 import { TrackKind } from './components';
 
 function must(r: OpResult): MotionDoc {
@@ -130,18 +130,8 @@ describe('track matte', () => {
     expect(setTrackMatte(stacked, 'img', Matte.Alpha).ok).toBe(true);
   });
 
-  it('a text clip used as matte becomes a text mask in its own box', () => {
-    const doc = must(setTrackMatte(stacked, 'img', Matte.Alpha));
-
-    expect(matteMask(clipOf(doc, 'title'), Matte.Alpha)).toMatchObject({ kind: 'text', text: 'GO', x: 0.5, y: 0.5, width: 0.6, height: 0.4, rotation: 5 });
-    expect(hiddenMattes(doc)).toEqual(new Set(['title']));
-  });
-
-  it('a picture used as luma matte becomes a luminance mask', () => {
-    const pic = must(addClip(must(addTrack(base, TrackKind.Visual, 'top')), { component: 'Image', from: 0, trackId: 'top', props: { assetId: 'lum' } }, 'lumpic'));
-
-    expect(matteMask(clipOf(pic, 'lumpic'), Matte.Luma)).toMatchObject({ kind: 'luma', assetId: 'lum' });
-    expect(matteMask(clipOf(pic, 'lumpic'), Matte.Alpha)).toMatchObject({ kind: 'image', assetId: 'lum' });
+  it('the source of a matte is hidden from the frame', () => {
+    expect(hiddenMattes(must(setTrackMatte(stacked, 'img', Matte.Alpha)))).toEqual(new Set(['title']));
   });
 
   it('turning the matte off shows the source again', () => {
@@ -168,5 +158,33 @@ describe('editing a mask from the panels', () => {
       ['rotateZ', Source.Transform],
       ['maskX', Source.Mask]
     ]);
+  });
+});
+
+describe('several masks on one clip', () => {
+  it('each mask folds into what the masks before it left, by its own mode', () => {
+    expect(combineMasks([{ mode: MaskMode.Add, level: 0.6 }, { mode: MaskMode.Add, level: 0.5 }])).toBeCloseTo(0.8);
+    expect(combineMasks([{ mode: MaskMode.Add, level: 1 }, { mode: MaskMode.Subtract, level: 0.25 }])).toBeCloseTo(0.75);
+    expect(combineMasks([{ mode: MaskMode.Add, level: 0.6 }, { mode: MaskMode.Intersect, level: 0.5 }])).toBeCloseTo(0.3);
+    expect(combineMasks([{ mode: MaskMode.Add, level: 0.6 }, { mode: MaskMode.Difference, level: 0.5 }])).toBeCloseTo(0.5);
+  });
+
+  it('a first mask that subtracts keeps everything outside it, one that intersects keeps its inside', () => {
+    expect(combineMasks([{ mode: MaskMode.Subtract, level: 0.25 }])).toBeCloseTo(0.75);
+    expect(combineMasks([{ mode: MaskMode.Intersect, level: 0.25 }])).toBeCloseTo(0.25);
+  });
+
+  it('a mask adds by default, and the stack after the first mask is stored on the clip', () => {
+    const doc = must(setMaskStack(must(setMask(base, 'img', { kind: MaskKind.Ellipse })), 'img', [{ kind: MaskKind.Rect, mode: MaskMode.Subtract, width: 0.2 }]));
+
+    expect(clipOf(doc).mask?.mode).toBe(MaskMode.Add);
+    expect(clipOf(doc).maskStack).toMatchObject([{ kind: MaskKind.Rect, mode: MaskMode.Subtract, width: 0.2 }]);
+  });
+
+  it('a stack needs a first mask, and removing the mask takes the stack too', () => {
+    expect(setMaskStack(base, 'img', [{ kind: MaskKind.Rect }]).ok).toBe(false);
+
+    const stacked = must(setMaskStack(must(setMask(base, 'img', { kind: MaskKind.Ellipse })), 'img', [{ kind: MaskKind.Rect }]));
+    expect(clipOf(must(setMask(stacked, 'img', null))).maskStack).toEqual([]);
   });
 });

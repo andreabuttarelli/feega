@@ -1,66 +1,28 @@
-import { COMPONENTS, TrackKind, type ComponentId } from './components';
-import { flatten } from './shape/geometry';
-import { resample } from './shape/morph';
-import { baseOutline, type ShapeLook } from './shape/render';
-import { ShapeKind } from './shape/schema';
+import { TrackKind } from './components';
 import { findClip, type MotionClip, type MotionDoc } from './doc';
-import { MaskKind, Matte, maskSchema, type Mask, type MaskInput } from './mask';
+import { Matte } from './mask';
 
-type Box = { x: number; y: number; width: number; height: number; rotation?: number; opacity?: number };
-type Props = Box & { text?: string; shape?: string; assetId?: string | null };
+export const MATTE_OPAQUE = 255;
 
-const boxOf = (p: Props): Omit<MaskInput, 'kind'> => ({ x: p.x, y: p.y, width: p.width, height: p.height, rotation: p.rotation ?? 0, opacity: p.opacity ?? 1 });
+const REC_709: [number, number, number] = [0.2125, 0.7154, 0.0721];
 
-const textMatte = (p: Props): MaskInput => ({ ...boxOf(p), kind: MaskKind.Text, text: (p.text ?? '').replace(/\s*\n\s*/g, ' ') });
+export type MatteRead = { weights: [number, number, number] | null; invert: boolean };
 
-const PICTURE: Record<Exclude<Matte, Matte.None>, MaskKind> = { [Matte.Alpha]: MaskKind.Image, [Matte.Luma]: MaskKind.Luma };
-
-const pictureMatte = (p: Props, matte: Exclude<Matte, Matte.None>): MaskInput | null => (p.assetId ? { ...boxOf(p), kind: PICTURE[matte], assetId: p.assetId } : null);
-
-const MAX_MASK_POINTS = 64;
-const clampUnit = (n: number) => Math.min(1, Math.max(0, Math.round(n * 10000) / 10000));
-
-function outlinePoints(p: Props): [number, number][] {
-  const [contour] = baseOutline(COMPONENTS.Shape.schema.parse(p) as unknown as ShapeLook, { w: 1, h: 1 });
-  if (!contour) {
-    return [];
-  }
-  const flat = flatten(contour);
-  const points = flat.length > MAX_MASK_POINTS ? resample(contour, MAX_MASK_POINTS) : flat;
-  return points.map(([x, y]) => [clampUnit(x), clampUnit(y)]);
-}
-
-const box = (kind: MaskKind) => (p: Props): MaskInput => ({ ...boxOf(p), kind });
-
-const SHAPE: Record<ShapeKind, (p: Props) => MaskInput> = {
-  [ShapeKind.Rect]: box(MaskKind.Rect),
-  [ShapeKind.Line]: box(MaskKind.Rect),
-  [ShapeKind.Circle]: box(MaskKind.Ellipse),
-  [ShapeKind.Ellipse]: box(MaskKind.Ellipse),
-  [ShapeKind.Polygon]: (p) => ({ ...boxOf(p), kind: MaskKind.Polygon, points: outlinePoints(p) }),
-  [ShapeKind.Star]: (p) => ({ ...boxOf(p), kind: MaskKind.Polygon, points: outlinePoints(p) }),
-  [ShapeKind.Path]: (p) => ({ ...boxOf(p), kind: MaskKind.Polygon, points: outlinePoints(p) })
+export const MATTE_READ: Record<Exclude<Matte, Matte.None>, MatteRead> = {
+  [Matte.Alpha]: { weights: null, invert: false },
+  [Matte.AlphaInverted]: { weights: null, invert: true },
+  [Matte.Luma]: { weights: REC_709, invert: false },
+  [Matte.LumaInverted]: { weights: REC_709, invert: true }
 };
 
-const MATTE: Partial<Record<ComponentId, (p: Props, matte: Exclude<Matte, Matte.None>) => MaskInput | null>> = {
-  Title: textMatte,
-  Text: textMatte,
-  Kicker: textMatte,
-  Caption: textMatte,
-  Shape: (p) => SHAPE[(p.shape as ShapeKind) ?? ShapeKind.Rect](p),
-  Image: pictureMatte,
-  Logo: pictureMatte
-};
-
-export function matteMask(source: MotionClip, matte: Matte): Mask | null {
-  const build = MATTE[source.component];
-  if (matte === Matte.None || !build) {
-    return null;
-  }
-  const input = build(source.props as Props, matte);
-  const parsed = input ? maskSchema.safeParse(input) : null;
-  return parsed?.success ? parsed.data : null;
+export function matteAlpha(read: MatteRead, r: number, g: number, b: number, a: number): number {
+  const opaque = 255;
+  const w = read.weights;
+  const level = w ? Math.round(((w[0] * r + w[1] * g + w[2] * b) * a) / opaque) : a;
+  return read.invert ? opaque - level : level;
 }
+
+export type MattePair = { target: string; source: string; matte: Exclude<Matte, Matte.None> };
 
 const overlap = (a: MotionClip, b: MotionClip) => Math.min(a.from + a.durationInFrames, b.from + b.durationInFrames) - Math.max(a.from, b.from);
 
@@ -76,7 +38,14 @@ export function matteSource(doc: MotionDoc, clipId: string): MotionClip | null {
   return candidates.sort((a, b) => overlap(b, found.clip) - overlap(a, found.clip))[0] ?? null;
 }
 
-export function hiddenMattes(doc: MotionDoc): Set<string> {
+export function mattePairs(doc: MotionDoc): MattePair[] {
   const matted = doc.tracks.flatMap((t) => (t.clips as MotionClip[]).filter((c) => c.matte !== Matte.None));
-  return new Set(matted.flatMap((c) => matteSource(doc, c.id)?.id ?? []));
+  return matted.flatMap((c) => {
+    const source = matteSource(doc, c.id);
+    return source ? [{ target: c.id, source: source.id, matte: c.matte as MattePair['matte'] }] : [];
+  });
+}
+
+export function hiddenMattes(doc: MotionDoc): Set<string> {
+  return new Set(mattePairs(doc).map((p) => p.source));
 }

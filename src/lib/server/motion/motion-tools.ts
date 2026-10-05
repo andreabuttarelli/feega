@@ -6,8 +6,8 @@ import { fieldsOf } from '$lib/motion/inspector';
 import { Ease, FRAME_RATES, MAX_SECONDS, TRANSITION_KINDS } from '$lib/motion/design';
 import { setFrameRate } from '$lib/motion/frame-rate';
 import { Background, MOTION_FORMATS, clipsOf, findClip, type MotionDoc } from '$lib/motion/doc';
-import { ClipEdge, Side, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyInterp, setKeyframes, setMask, shaped, setProps, setTiming, setTrackMatte, setTransform, setTransition, trimClip, applyEasePreset, setKeyEase, type OpResult } from '$lib/motion/timeline';
-import { MASK_KEYS, MASK_KIND_IDS, MATTES } from '$lib/motion/mask';
+import { ClipEdge, Side, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyInterp, setKeyframes, setMask, setMaskStack, shaped, setProps, setTiming, setTrackMatte, setTransform, setTransition, trimClip, applyEasePreset, setKeyEase, type OpResult } from '$lib/motion/timeline';
+import { MASK_KEYS, MASK_KIND_IDS, MASK_MODES, MATTES, MAX_MASK_STACK } from '$lib/motion/mask';
 import { pathProblem } from '$lib/motion/path';
 import { Align, addMarker, alignClips, allMarkers, distributeClips, markerFrame, nudgeClips, removeMarker, sequenceClips, setClipFlags, setTrackFlags, setWorkArea, staggerClips } from '$lib/motion/organize';
 
@@ -123,6 +123,7 @@ function summary(doc: MotionDoc, selection: string[]) {
         out: edgeSummary(c.transitionOut),
         transform: c.transform,
         mask: c.mask,
+        maskStack: c.maskStack,
         matte: c.matte,
         keyframes: inSeconds(c.keyframes),
         depth: c.depth,
@@ -153,6 +154,25 @@ function summary(doc: MotionDoc, selection: string[]) {
 }
 
 const keyShape = { in: z.enum(INTERPS).optional(), out: z.enum(INTERPS).optional(), roving: z.boolean().optional() };
+
+const maskInput = z
+  .object({
+    kind: z.enum(MASK_KIND_IDS),
+    mode: z.enum(MASK_MODES).optional(),
+    x: z.number().optional(),
+    y: z.number().optional(),
+    width: z.number().optional(),
+    height: z.number().optional(),
+    rotation: z.number().optional(),
+    feather: z.number().optional(),
+    expansion: z.number().optional(),
+    opacity: z.number().optional(),
+    invert: z.boolean().optional(),
+    points: z.array(z.tuple([z.number(), z.number()])).optional(),
+    assetId: z.string().optional(),
+    text: z.string().optional()
+  })
+  .strict();
 
 const INTERP_HELP = `in/out set how the value enters and leaves a keyframe: bezier (default, uses ease), linear, hold (no change until the next keyframe), auto (smooth, never overshoots), continuous (smooth, keeps speed through). roving true (${SPATIAL_KEYS.join(', ')} only) retimes a middle keyframe so the speed is even.`;
 
@@ -568,26 +588,10 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_mask: tool({
-      description: `Mask a clip: only the inside of the mask shows (invert shows the outside). kind: ${MASK_KIND_IDS.join(', ')}. x/y are the mask centre and width/height its size, in fractions of the frame; rotation in degrees; feather (blur) and expansion (grow, negative shrinks) in pixels; opacity 0..1. polygon takes points [[x,y],...] inside the mask box (0..1); image (alpha) and luma (brightness) take an assetId from list_assets; text takes text. Replaces the whole mask. Animate it with set_keyframes on ${MASK_KEYS.join(', ')}.`,
+      description: `Mask a clip: only the inside of the mask shows (invert shows the outside). mode (${MASK_MODES.join(', ')}, default add) says how it folds into the masks stacked after it: a first mask that subtracts keeps the outside. kind: ${MASK_KIND_IDS.join(', ')}. x/y are the mask centre and width/height its size, in fractions of the frame; rotation in degrees; feather (blur) and expansion (grow, negative shrinks) in pixels; opacity 0..1. polygon takes points [[x,y],...] inside the mask box (0..1); image (alpha) and luma (brightness) take an assetId from list_assets; text takes text. Replaces the whole mask. Animate it with set_keyframes on ${MASK_KEYS.join(', ')}.`,
       inputSchema: z.object({
         clip_id: z.string(),
-        mask: z
-          .object({
-            kind: z.enum(MASK_KIND_IDS),
-            x: z.number().optional(),
-            y: z.number().optional(),
-            width: z.number().optional(),
-            height: z.number().optional(),
-            rotation: z.number().optional(),
-            feather: z.number().optional(),
-            expansion: z.number().optional(),
-            opacity: z.number().optional(),
-            invert: z.boolean().optional(),
-            points: z.array(z.tuple([z.number(), z.number()])).optional(),
-            assetId: z.string().optional(),
-            text: z.string().optional()
-          })
-          .strict()
+        mask: maskInput
       }),
       execute: async (input) => {
         if (!assetKnown(input.mask.assetId)) {
@@ -597,15 +601,27 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       }
     }),
 
+    set_mask_stack: tool({
+      description: `Stack up to ${MAX_MASK_STACK} more masks after the clip's first mask (set_mask first), in order. Each folds into what the masks before it left, by its mode: add (union), subtract (cut it out), intersect (keep only the overlap), difference (keep where exactly one covers). Same fields as set_mask; stacked masks do not animate. Replaces the whole stack; [] clears it.`,
+      inputSchema: z.object({ clip_id: z.string(), masks: z.array(maskInput).max(MAX_MASK_STACK) }),
+      execute: async (input) => {
+        const ids = input.masks.map((m) => m.assetId);
+        if (!ids.every(assetKnown)) {
+          return { ok: false, error: 'unknown asset id: call list_assets' };
+        }
+        return apply(ids.reduce((r, id) => registered(r, id), setMaskStack(session.doc, input.clip_id, input.masks)), `stacked ${input.masks.length} masks on ${input.clip_id}`);
+      }
+    }),
+
     remove_mask: tool({
-      description: 'Remove the mask of a clip and its mask keyframes.',
+      description: 'Remove the mask of a clip, its stacked masks and its mask keyframes.',
       inputSchema: z.object({ clip_id: z.string() }),
       execute: async (input) => apply(setMask(session.doc, input.clip_id, null), `unmasked ${input.clip_id}`)
     }),
 
     set_track_matte: tool({
       description:
-        'Use the clip directly above (on the track above, overlapping in time) as a matte for this clip: alpha shows this clip only where that clip is drawn (text, shape, picture), luma where it is bright. The matte clip is hidden. none turns it off.',
+        'Use the clip directly above (on the track above, overlapping in time) as a matte for this clip. The matte is that clip as rendered, frame by frame: any kind (text, shape, picture, video, 3D, custom) with its keyframes and animation. alpha shows this clip where the matte is drawn, luma where it is bright; alpha-inverted and luma-inverted the opposite. The matte clip itself is hidden. none turns it off. Animated text over a video: Title on the upper track, Video below with matte alpha.',
       inputSchema: z.object({ clip_id: z.string(), matte: z.enum(MATTES) }),
       execute: async (input) => apply(setTrackMatte(session.doc, input.clip_id, input.matte), `matte ${input.matte} on ${input.clip_id}`)
     }),

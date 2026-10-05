@@ -4,8 +4,8 @@ import { withParams } from './custom/params';
 import { FPS, MAX_SECONDS, TransitionKind, maxFrames, type Edge } from './design';
 import { FORMATS, byFrame, clipProps, compRefProblem, findClip, fontsOfClip, newClip, type Background, type MotionClip, type MotionDoc, type MotionFormat, type MotionTrack } from './doc';
 import { Ease } from './design';
-import { Matte, isMaskKey, maskSchema, type MaskInput } from './mask';
-import { matteMask, matteSource } from './matte';
+import { Matte, isMaskKey, maskSchema, maskStackSchema, type MaskInput } from './mask';
+import { matteSource } from './matte';
 import { CAMERA_LANE, type CameraKey } from './camera';
 import { editCameraLane } from './camera-ops';
 import { Around, EASE_PRESETS, Half, presetEase, withHalf, type EasePreset } from './graph';
@@ -241,7 +241,7 @@ export function removeAsset(doc: MotionDoc, assetId: string): OpResult {
   if (!doc.assets.some((a) => a.id === assetId)) {
     return fail(`no asset ${assetId} in this video`);
   }
-  const users = doc.tracks.flatMap((t) => t.clips).filter((c) => JSON.stringify([c.props, c.mask]).includes(JSON.stringify(assetId)));
+  const users = doc.tracks.flatMap((t) => t.clips).filter((c) => JSON.stringify([c.props, c.mask, c.maskStack]).includes(JSON.stringify(assetId)));
   if (users.length) {
     return fail(`asset ${assetId} is used by ${users.map((c) => c.id).join(', ')}: remove or change those first`);
   }
@@ -473,10 +473,20 @@ const issues = (error: { issues: { path: PropertyKey[]; message: string }[] }) =
 export function setMask(doc: MotionDoc, clipId: string, input: MaskInput | null): OpResult {
   return editClip(doc, clipId, (clip) => {
     if (input === null) {
-      return { ...clip, mask: null, keyframes: Object.fromEntries(Object.entries(clip.keyframes).filter(([key]) => !isMaskKey(key))) };
+      return { ...clip, mask: null, maskStack: [], keyframes: Object.fromEntries(Object.entries(clip.keyframes).filter(([key]) => !isMaskKey(key))) };
     }
     const parsed = maskSchema.safeParse(input);
     return parsed.success ? { ...clip, mask: parsed.data } : issues(parsed.error);
+  });
+}
+
+export function setMaskStack(doc: MotionDoc, clipId: string, inputs: MaskInput[]): OpResult {
+  return editClip(doc, clipId, (clip) => {
+    if (!clip.mask) {
+      return 'add a first mask (set_mask) before stacking more on it';
+    }
+    const parsed = maskStackSchema.safeParse(inputs);
+    return parsed.success ? { ...clip, maskStack: parsed.data } : issues(parsed.error);
   });
 }
 
@@ -485,9 +495,6 @@ export function setTrackMatte(doc: MotionDoc, clipId: string, matte: Matte): OpR
     const source = matteSource(doc, clipId);
     if (!source) {
       return fail('no clip above this one, on the track above and overlapping it in time, to use as matte');
-    }
-    if (!matteMask(source, matte)) {
-      return fail(`${source.component} ${source.id} cannot be a matte: use a Title, Text, Kicker, Caption, Shape, Image or Logo with a picture`);
     }
   }
   return editClip(doc, clipId, (clip) => ({ ...clip, matte }));

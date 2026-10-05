@@ -1,5 +1,5 @@
 import type { Keyframes } from '../keyframes';
-import { MASK_KEYS, MaskKind, maskValue, type Mask, type MaskKey } from '../mask';
+import { MASK_KEYS, MaskKind, MaskMode, maskValue, type Mask, type MaskKey } from '../mask';
 import { esc } from './html';
 import { SANS } from './templates';
 
@@ -47,7 +47,7 @@ export const MASK_LANES: Record<MaskKey, MaskAttr[]> = {
   ]
 };
 
-export function maskTarget(scope: MaskScope, part: Part | string, clipId: string): string {
+export function maskTarget(scope: MaskScope | string, part: Part | string, clipId: string): string {
   return `${scope}${part}-${clipId}`;
 }
 
@@ -104,28 +104,62 @@ const LANE_OF_PART = new Map(
   (Object.entries(MASK_LANES) as [MaskKey, MaskAttr[]][]).flatMap(([key, attrs]) => attrs.map((a) => [a.part, { key, attr: a }] as const))
 );
 
-export type MaskLayer = { scope: MaskScope; clipId: string; mask: Mask; values: MaskValues; frame: Frame; url: string | null };
+export enum CssComposite {
+  Add = 'add',
+  Subtract = 'subtract',
+  Intersect = 'intersect',
+  Exclude = 'exclude'
+}
 
-export function maskLayer(layer: MaskLayer, inner: string): string {
-  const { scope, clipId, mask, values, frame } = layer;
+type StackLayer = { composite: CssComposite; flip: boolean };
+
+const AS_CSS: Record<MaskMode, StackLayer> = {
+  [MaskMode.Add]: { composite: CssComposite.Add, flip: false },
+  [MaskMode.Subtract]: { composite: CssComposite.Intersect, flip: true },
+  [MaskMode.Intersect]: { composite: CssComposite.Intersect, flip: false },
+  [MaskMode.Difference]: { composite: CssComposite.Exclude, flip: false }
+};
+
+export function stackLayers(modes: MaskMode[]): StackLayer[] {
+  return modes.map((mode) => AS_CSS[mode]);
+}
+
+export type MaskShape = { mask: Mask; values: MaskValues; url: string | null };
+
+export type MaskLayer = { scope: MaskScope; clipId: string; masks: MaskShape[]; frame: Frame };
+
+const stackScope = (scope: MaskScope, index: number) => (index === 0 ? scope : `${scope}${index}`);
+
+function maskDefs(scope: string, clipId: string, shape: MaskShape, flip: boolean, frame: Frame): string {
+  const { mask, values } = shape;
   const id = (part: string) => maskTarget(scope, part, clipId);
   const value = (part: Part) => {
     const lane = LANE_OF_PART.get(part)!;
     return `${lane.attr.attr}="${lane.attr.out(values[lane.key], frame)}"`;
   };
   const set = (part: Part) => `id="${id(part)}" ${value(part)}`;
-  const paint: Paint = { id, ...(mask.invert ? CUT : SHOWN), mask, url: layer.url };
+  const inverted = mask.invert !== flip;
+  const paint: Paint = { id, ...(inverted ? CUT : SHOWN), mask, url: shape.url };
   const region = `x="${-frame.width}" y="${-frame.height}" width="${frame.width * 3}" height="${frame.height * 3}"`;
 
   const kind = KIND[mask.kind];
   const nested = NESTING.reduceRight((body, part) => `<g ${set(part)}>${body}</g>`, kind.shape(paint));
   const filter = `<filter id="${id('f')}" filterUnits="userSpaceOnUse" ${region}><feMorphology id="${id(Part.Dilate)}" operator="dilate" ${value(Part.Dilate)}/><feMorphology id="${id(Part.Erode)}" operator="erode" ${value(Part.Erode)}/><feGaussianBlur ${set(Part.Blur)}/></filter>`;
-  const backdrop = mask.invert ? `<rect ${region} fill="#fff"/>` : '';
-  const svg = `<svg class="kd" aria-hidden="true"><defs>${filter}${kind.defs(paint)}<mask id="${id('k')}" maskUnits="userSpaceOnUse" ${region}>${backdrop}<g filter="url(#${id('f')})"><g ${set(Part.Opacity)}>${nested}</g></g></mask></defs></svg>`;
-  const url = `url(#${id('k')})`;
+  const backdrop = inverted ? `<rect ${region} fill="#fff"/>` : '';
+  return `${filter}${kind.defs(paint)}<mask id="${id('k')}" maskUnits="userSpaceOnUse" ${region}>${backdrop}<g filter="url(#${id('f')})"><g ${set(Part.Opacity)}>${nested}</g></g></mask>`;
+}
+
+export function maskLayer(layer: MaskLayer, inner: string): string {
+  const { scope, clipId, masks, frame } = layer;
+  const layers = stackLayers(masks.map((m) => m.mask.mode));
+  const topFirst = masks.map((shape, i) => ({ shape, scope: stackScope(scope, i), layer: layers[i] })).reverse();
+
+  const defs = topFirst.map((m) => maskDefs(m.scope, clipId, m.shape, m.layer.flip, frame)).join('');
+  const url = topFirst.map((m) => `url(#${maskTarget(m.scope, 'k', clipId)})`).join(',');
+  const composite = masks.length > 1 ? `;mask-composite:${topFirst.map((m) => m.layer.composite).join(',')}` : '';
   const wrapper = WRAPPER[scope];
 
-  return `${svg}<div class="${wrapper}" id="${wrapper}-${clipId}" style="mask:${url};-webkit-mask:${url}">${inner}</div>`;
+  return `<svg class="kd" aria-hidden="true"><defs>${defs}</defs></svg><div class="${wrapper}" id="${wrapper}-${clipId}" style="mask:${url};-webkit-mask:${url}${composite}">${inner}</div>`;
 }
 
 export const MASK_CSS = '.km,.kt{position:absolute;inset:0}.kd{position:absolute;width:0;height:0;overflow:hidden}';
@@ -138,15 +172,7 @@ export async function freezeMasks(): Promise<() => void> {
       .then((blob) => new Promise<string>((resolve) => Object.assign(new FileReader(), { onload: (e: ProgressEvent<FileReader>) => resolve(String(e.target?.result)) }).readAsDataURL(blob)));
   const undo: (() => void)[] = [];
 
-  for (const el of Array.from(document.querySelectorAll<HTMLElement>('.km,.kt'))) {
-    const defs = el.previousElementSibling?.querySelector('defs');
-    const mask = defs?.querySelector('mask');
-    if (!defs || !mask) {
-      continue;
-    }
-
-    const width = el.offsetWidth;
-    const height = el.offsetHeight;
+  const freezeOne = async (defs: Element, mask: Element, width: number, height: number) => {
     const svg = document.createElementNS(SVG_NS, 'svg');
     svg.setAttribute('width', String(width));
     svg.setAttribute('height', String(height));
@@ -154,7 +180,7 @@ export async function freezeMasks(): Promise<() => void> {
     svg.innerHTML = `<filter id="kl" filterUnits="userSpaceOnUse" x="0" y="0" width="${width}" height="${height}" color-interpolation-filters="sRGB"><feColorMatrix type="luminanceToAlpha" result="l"/><feComposite in="l" in2="SourceGraphic" operator="in"/></filter>`;
 
     const copy = defs.cloneNode(true) as Element;
-    copy.querySelector('mask')?.remove();
+    copy.querySelectorAll('mask').forEach((m) => m.remove());
     const body = document.createElementNS(SVG_NS, 'g');
     body.setAttribute('filter', 'url(#kl)');
     body.append(...Array.from(mask.cloneNode(true).childNodes));
@@ -166,11 +192,22 @@ export async function freezeMasks(): Promise<() => void> {
         image.setAttribute('href', await asData(href).catch(() => href));
       }
     }
+    return `url("data:image/svg+xml;charset=utf-8,${encodeURIComponent(new XMLSerializer().serializeToString(svg))}") 0 0 / 100% 100% no-repeat`;
+  };
+
+  for (const el of Array.from(document.querySelectorAll<HTMLElement>('.km,.kt'))) {
+    const defs = el.previousElementSibling?.querySelector('defs');
+    const masks = Array.from(defs?.querySelectorAll('mask') ?? []);
+    if (!defs || !masks.length) {
+      continue;
+    }
 
     const before = el.getAttribute('style') ?? '';
-    const frozen = `url("data:image/svg+xml;charset=utf-8,${encodeURIComponent(new XMLSerializer().serializeToString(svg))}") 0 0 / 100% 100% no-repeat`;
+    const composite = getComputedStyle(el).getPropertyValue('mask-composite');
+    const frozen = (await Promise.all(masks.map((mask) => freezeOne(defs, mask, el.offsetWidth, el.offsetHeight)))).join(',');
     el.style.setProperty('mask', frozen);
     el.style.setProperty('-webkit-mask', frozen);
+    el.style.setProperty('mask-composite', composite);
     undo.push(() => el.setAttribute('style', before));
   }
 

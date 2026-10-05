@@ -13,8 +13,8 @@
   import { resolveColor, type BrandTokens } from '$lib/motion/brand';
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
   import { InspectorTab, clipFieldGroups, editAt, keyAt, keyedField, parseDecimal, secondsLabel, toggleKey, valueAt, type Field } from '$lib/motion/inspector';
-  import { setMask, setProps, setTiming, setTrackMatte, setTransform, setTransition, Side, type OpResult } from '$lib/motion/timeline';
-  import { MASK_KINDS, MASK_KIND_IDS, MATTES, MaskKind, Matte, Needs, newMask, type Mask } from '$lib/motion/mask';
+  import { setMask, setMaskStack, setProps, setTiming, setTrackMatte, setTransform, setTransition, Side, type OpResult } from '$lib/motion/timeline';
+  import { MASK_KINDS, MASK_KIND_IDS, MASK_MODES, MATTES, MATTE_LABEL, MAX_MASK_STACK, MaskKind, MaskMode, Needs, newMask, type Mask, type Matte } from '$lib/motion/mask';
   import { ANIMATABLE, Source, isAnimatable, TRANSFORM, ValueKind, type AnimProp, type KeyValue } from '$lib/motion/keyframes';
   import Dial from './Dial.svelte';
   import CodeEditor from './CodeEditor.svelte';
@@ -265,6 +265,21 @@
 
   function editMask(mask: Mask, patch: Partial<Mask>) {
     commit(setMask(doc, clip.id, { ...mask, ...patch }), 'Edited the mask');
+  }
+
+  const STACK_FIELDS = ['x', 'y', 'width', 'height', 'feather'] as const;
+
+  function editStack(index: number, patch: Partial<Mask>) {
+    commit(setMaskStack(doc, clip.id, clip.maskStack.map((m, i) => (i === index ? { ...m, ...patch } : m))), 'Edited a stacked mask');
+  }
+
+  function addStacked(kind: MaskKind) {
+    const asset = pictures[0]?.id ?? null;
+    commit(setMaskStack(doc, clip.id, [...clip.maskStack, { ...newMask(kind, asset), mode: MaskMode.Subtract }]), 'Stacked a mask');
+  }
+
+  function removeStacked(index: number) {
+    commit(setMaskStack(doc, clip.id, clip.maskStack.filter((_, i) => i !== index)), 'Removed a stacked mask');
   }
 
   const shown = (key: string) => valueAt(animated, key, frame, resolve);
@@ -552,13 +567,21 @@
         <label>
           Track matte
           <select data-testid="track-matte" value={clip.matte} onchange={(e) => commit(setTrackMatte(doc, clip.id, e.currentTarget.value as Matte), 'Changed the track matte')}>
-            {#each MATTES as matte (matte)}<option value={matte}>{matte === Matte.None ? 'None' : `${matte} of the clip above`}</option>{/each}
+            {#each MATTES as matte (matte)}<option value={matte}>{MATTE_LABEL[matte]}</option>{/each}
           </select>
         </label>
       </div>
       {#if clip.mask}
         {@const mask = clip.mask}
-        <label class="check"><input type="checkbox" checked={mask.invert} onchange={(e) => editMask(mask, { invert: e.currentTarget.checked })} />Invert</label>
+        <div class="row two">
+          <label class="check"><input type="checkbox" checked={mask.invert} onchange={(e) => editMask(mask, { invert: e.currentTarget.checked })} />Invert</label>
+          <label>
+            Mode
+            <select data-testid="mask-mode" value={mask.mode} onchange={(e) => editMask(mask, { mode: e.currentTarget.value as MaskMode })}>
+              {#each MASK_MODES as mode (mode)}<option value={mode}>{mode}</option>{/each}
+            </select>
+          </label>
+        </div>
         {#if MASK_KINDS[mask.kind].needs === Needs.Text}
           <div class="row"><label for="mask-text">Text</label><input id="mask-text" type="text" value={mask.text} onchange={(e) => editMask(mask, { text: e.currentTarget.value })} /></div>
         {:else if MASK_KINDS[mask.kind].needs === Needs.Asset}
@@ -573,6 +596,32 @@
           <p class="hint">Drag the points on the preview.</p>
         {/if}
         {#each maskProps as prop (prop.key)}{@render animRow(prop)}{/each}
+        {#each clip.maskStack as stacked, i (i)}
+          <div class="row two" data-testid="stacked-mask">
+            <label>
+              {MASK_KINDS[stacked.kind].label}
+              <select value={stacked.mode} onchange={(e) => editStack(i, { mode: e.currentTarget.value as MaskMode })}>
+                {#each MASK_MODES as mode (mode)}<option value={mode}>{mode}</option>{/each}
+              </select>
+            </label>
+            <label class="check"><input type="checkbox" checked={stacked.invert} onchange={(e) => editStack(i, { invert: e.currentTarget.checked })} />Invert</label>
+          </div>
+          <div class="row two">
+            {#each STACK_FIELDS as field (field)}
+              <label>{field}<input type="number" step="0.01" value={stacked[field]} onchange={(e) => editStack(i, { [field]: Number(e.currentTarget.value) })} /></label>
+            {/each}
+            <button type="button" onclick={() => removeStacked(i)}>Remove</button>
+          </div>
+        {/each}
+        {#if clip.maskStack.length < MAX_MASK_STACK}
+          <label>
+            Add a mask
+            <select data-testid="mask-stack-add" value="" onchange={(e) => addStacked(e.currentTarget.value as MaskKind)}>
+              <option value="">…</option>
+              {#each MASK_KIND_IDS.filter((k) => MASK_KINDS[k].needs !== Needs.Text) as kind (kind)}<option value={kind}>{MASK_KINDS[kind].label}</option>{/each}
+            </select>
+          </label>
+        {/if}
       {/if}
     </section>
   {/if}

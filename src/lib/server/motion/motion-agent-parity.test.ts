@@ -48,6 +48,7 @@ const CLIP: Record<string, Access> = {
   transform: { write: ['set_transform'], read: 'transform' },
   keyframes: { write: ['set_keyframes', 'remove_keyframes', 'duck_audio', 'set_time_remap', 'freeze_frame'], read: 'keyframes' },
   mask: { write: ['set_mask', 'remove_mask'], read: 'mask' },
+  maskStack: { write: ['set_mask_stack', 'remove_mask'], read: 'maskStack' },
   matte: { write: ['set_track_matte'], read: 'matte' },
   depth: { write: ['set_clip_depth'], read: 'depth' },
   space: { write: ['set_clip_depth'], read: 'space' },
