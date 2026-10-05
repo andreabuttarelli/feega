@@ -1,5 +1,3 @@
-const SRC_TAIL = 64;
-
 type ScreenSource = { src?: string; currentSrc?: string; currentTime?: number; naturalWidth?: number; videoWidth?: number } | null;
 
 export function drawOnce(draw: (time: number) => void, sources: () => string = () => ''): { at: (time: number) => void; again: (time?: number) => void } {
@@ -24,6 +22,7 @@ export function screenKey(source: ScreenSource, scroll: number): string {
   if (!source) {
     return 'none';
   }
+  const SRC_TAIL = 64;
   const time = source.currentTime === undefined ? '' : source.currentTime;
   const url = source.currentSrc || source.src || '';
   return `${url.length}:${url.slice(-SRC_TAIL)}|${time}|${source.videoWidth || source.naturalWidth || 0}|${scroll}`;
