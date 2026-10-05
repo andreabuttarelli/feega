@@ -19,6 +19,9 @@
   import Film from '@lucide/svelte/icons/film';
   import X from '@lucide/svelte/icons/x';
   import Crosshair from '@lucide/svelte/icons/crosshair';
+  import Layers from '@lucide/svelte/icons/layers';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
+  import { addAdjustment, mergeView, pathNames, precompose, viewOf } from '$lib/motion/precomp';
   import ThemeSwitch from '$lib/components/ThemeSwitch.svelte';
   import ChartSpline from '@lucide/svelte/icons/chart-spline';
   import GraphEditor from '$lib/components/motion/GraphEditor.svelte';
@@ -98,6 +101,7 @@
   let history = $state<History>(startHistory(data.head.doc as MotionDoc));
   let version = $state(data.head.version);
   let selection = $state<string[]>([]);
+  let path = $state<{ comp: string; frame: number }[]>([]);
   let cameraOpen = $state(false);
   let keySelection = $state<KeyRef[]>([]);
   let keyBoard: KeyBoard = [];
@@ -125,7 +129,8 @@
   let saveTimer: ReturnType<typeof setTimeout> | null = null;
   let unsavedSummary = '';
 
-  const doc = $derived(history.present);
+  const compPath = $derived(path.map((p) => p.comp));
+  const doc = $derived(viewOf(history.present, compPath));
   const beats = $derived(hitFrames(doc, analyses, Hit.Beats));
   const assets = $derived([...madeAssets, ...data.assets]);
   const assetUrls = $derived(Object.fromEntries(assets.filter((a) => a.url).map((a) => [a.id, a.url as string])));
@@ -193,7 +198,8 @@
 
   function edit(next: MotionDoc, summary: string) {
     const now = Date.now();
-    history = summary === lastEdit.summary && now - lastEdit.at < COALESCE_MS ? amend(history, next) : record(history, next);
+    const root = mergeView(history.present, compPath, next);
+    history = summary === lastEdit.summary && now - lastEdit.at < COALESCE_MS ? amend(history, root) : record(history, root);
     lastEdit = { summary, at: now };
     scheduleSave(summary);
   }
@@ -263,7 +269,7 @@
     }
     const asset = result.data.asset as PageData['assets'][number];
     madeAssets = [asset, ...madeAssets];
-    const registered = registerUpload(history.present, { assetId: asset.id, family: familyOf(file.name), weights: [UPLOAD_WEIGHT], italic: false });
+    const registered = registerUpload(doc, { assetId: asset.id, family: familyOf(file.name), weights: [UPLOAD_WEIGHT], italic: false });
     if (!registered.ok) {
       return registered.error;
     }
@@ -365,11 +371,45 @@
 
   const newId = () => crypto.randomUUID().slice(0, 8);
 
+  const ADD: Partial<Record<ComponentId, (id: string) => OpResult>> = {
+    Adjustment: (id) => addAdjustment(doc, { from: frame }, { clip: id, track: newId() })
+  };
+
   function add(component: ComponentId) {
     adding = false;
     const id = newId();
-    apply(addClip(doc, { component, from: frame }, id), `Added ${COMPONENTS[component].label}`);
+    apply(ADD[component]?.(id) ?? addClip(doc, { component, from: frame }, id), `Added ${COMPONENTS[component].label}`);
     selection = [id];
+  }
+
+  function precomposeSelection() {
+    if (!selection.length) {
+      return;
+    }
+    const id = newId();
+    const count = Object.keys(history.present.comps).length + 1;
+    apply(precompose(doc, selection, { comp: newId(), clip: id }, `Comp ${count}`), 'Precomposed');
+    selection = [id];
+  }
+
+  function enterComp(comp: string) {
+    path = [...path, { comp, frame }];
+    selection = [];
+    keySelection = [];
+    playing = false;
+    frame = 0;
+  }
+
+  function leaveTo(depth: number) {
+    const back = path[depth];
+    if (!back) {
+      return;
+    }
+    path = path.slice(0, depth);
+    selection = [];
+    keySelection = [];
+    playing = false;
+    frame = back.frame;
   }
 
   const firstOf = (kind: AssetKind) => assets.find((a) => a.kind === kind)?.id ?? null;
@@ -405,7 +445,7 @@
 
   function split() {
     for (const id of selection) {
-      const result = splitClip(history.present, id, frame, newId());
+      const result = splitClip(doc, id, frame, newId());
       if (result.ok) {
         edit(result.doc, 'Split');
       }
@@ -414,7 +454,7 @@
 
   function groupUnderNull() {
     const id = newId();
-    const result = nullFromSelection(history.present, selection, frame, id);
+    const result = nullFromSelection(doc, selection, frame, id);
     if (!result.ok) {
       notice = result.error;
       return;
@@ -427,7 +467,7 @@
     const copies: string[] = [];
     for (const id of selection) {
       const copy = newId();
-      const result = duplicateClip(history.present, id, copy);
+      const result = duplicateClip(doc, id, copy);
       if (result.ok) {
         edit(result.doc, 'Duplicated');
         copies.push(copy);
@@ -584,7 +624,8 @@
     [Command.NudgeBack]: () => nudge(-1),
     [Command.NudgeForward]: () => nudge(1),
     [Command.NudgeBackMore]: () => nudge(-NUDGE_MORE),
-    [Command.NudgeForwardMore]: () => nudge(NUDGE_MORE)
+    [Command.NudgeForwardMore]: () => nudge(NUDGE_MORE),
+    [Command.Precompose]: precomposeSelection
   };
 
   function onKey(e: KeyboardEvent) {
@@ -651,7 +692,7 @@
     {/if}
     <ThemeSwitch />
     <span class="save" data-testid="save-state">{saveState} · v{version}</span>
-    <button type="button" class="render" onclick={() => (exporting = true)} data-testid="export-open"><Film size={14} /> Export</button>
+    <button type="button" class="render" onclick={() => (leaveTo(0), (exporting = true))} data-testid="export-open"><Film size={14} /> Export</button>
   </header>
 
   {#if sounding}
@@ -722,6 +763,7 @@
         <button type="button" title="Split at playhead (S)" disabled={!selection.length} onclick={split}><Scissors size={14} /></button>
         <button type="button" title="Duplicate (⌘D)" disabled={!selection.length} onclick={duplicate}><Copy size={14} /></button>
         <button type="button" title="Create null from selection" data-testid="null-from-selection" disabled={!selection.length} onclick={groupUnderNull}><Crosshair size={14} /></button>
+        <button type="button" title="Precompose (⇧⌘C)" data-testid="precompose" disabled={!selection.length} onclick={precomposeSelection}><Layers size={14} /></button>
         <button type="button" title="Delete (Del)" disabled={!selection.length} onclick={remove}><Trash size={14} /></button>
         <button type="button" title="Undo (⌘Z)" disabled={!canUndo(history)} onclick={undoEdit}><Undo size={14} /></button>
         <button type="button" title="Redo (⇧⌘Z)" disabled={!canRedo(history)} onclick={redoEdit}><Redo size={14} /></button>
@@ -739,11 +781,21 @@
         {#if notice}<span class="notice" role="status">{notice}</span>{/if}
       </div>
 
+      {#if path.length}
+        <nav class="crumbs" aria-label="Compositions" data-testid="comp-breadcrumb">
+          <button type="button" onclick={() => leaveTo(0)}>{data.node.name ?? 'Main'}</button>
+          {#each pathNames(history.present, compPath) as name, i (i)}
+            <ChevronRight size={12} aria-hidden="true" />
+            {#if i === path.length - 1}<span aria-current="page">{name}</span>{:else}<button type="button" onclick={() => leaveTo(i + 1)}>{name}</button>{/if}
+          {/each}
+        </nav>
+      {/if}
+
       <div class="tl">
         {#if graphOpen}
           <GraphEditor {doc} {frame} {selection} bind:keySelection camera={cameraOpen} onchange={edit} />
         {:else}
-          <MotionTimeline {doc} bind:frame bind:selection bind:keySelection bind:camera={cameraOpen} {zoom} {snap} {waveforms} {beats} {assetUrls} onchange={edit} />
+          <MotionTimeline {doc} bind:frame bind:selection bind:keySelection bind:camera={cameraOpen} {zoom} {snap} {waveforms} {beats} {assetUrls} onchange={edit} onopen={enterComp} />
         {/if}
       </div>
     </section>
@@ -754,7 +806,7 @@
         <CameraInspector {doc} {frame} onchange={edit} />
         <LookInspector {doc} onchange={edit} />
       {:else if selected}
-        <MotionInspector {doc} {analyses} clip={selected} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} />
+        <MotionInspector {doc} {analyses} clip={selected} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} onopen={enterComp} />
         {#if selected.component === 'Device3D'}<DevicePresets {doc} clip={selected} onchange={edit} />{/if}
         {#if THREE_D_COMPONENTS.includes(selected.component)}<LookInspector {doc} onchange={edit} />{/if}
       {:else}
@@ -879,6 +931,40 @@
     padding: 16px;
     background: var(--ui-surface);
     container-type: size;
+  }
+
+  .crumbs {
+    display: flex;
+    align-items: center;
+    gap: var(--ui-space-1);
+    padding: 0 var(--ui-space-2);
+    height: 28px;
+    border-top: 1px solid var(--ui-line);
+    background: var(--ui-surface);
+    color: var(--ui-ink-2);
+    font-size: var(--ui-text-sm);
+    flex-shrink: 0;
+  }
+
+  .crumbs button {
+    border: 0;
+    border-radius: 0;
+    background: none;
+    color: var(--ui-ink-2);
+    padding: 2px 4px;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .crumbs button:hover {
+    background: var(--ui-hover);
+    color: var(--ui-ink);
+  }
+
+  .crumbs [aria-current='page'] {
+    color: var(--ui-ink);
+    font-weight: 600;
+    padding: 2px 4px;
   }
 
   .transport {

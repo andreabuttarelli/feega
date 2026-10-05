@@ -43,4 +43,9 @@ describe('timeline organisation keys', () => {
     expect(commandFor({ key: '{', mod: false, shift: true })).toBe(Command.NudgeBackMore);
     expect(commandFor({ key: '}', mod: false, shift: true })).toBe(Command.NudgeForwardMore);
   });
+
+  it('shift+cmd+c precomposes the selection, cmd+c still copies', () => {
+    expect(press('c', true, true)).toBe(Command.Precompose);
+    expect(press('c', true)).toBe(Command.Copy);
+  });
 });
