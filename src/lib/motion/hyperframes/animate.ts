@@ -8,6 +8,7 @@ import { ParentOpacity, pivotOf } from '../parent';
 import { animatorOfKey, animatorProps, cssName } from '../text-animators/model';
 import { textHostId } from '../text-animators/render';
 import { ENGINE_GLOBAL } from '../engine/engine';
+import { OUT, Out } from './channel-out';
 
 export const ENGINE = `window.${ENGINE_GLOBAL}`;
 
@@ -19,25 +20,23 @@ enum Wrapper {
   Scale = 'ks'
 }
 
-type Channel = { wrapper: Wrapper; prop: string; out: (value: number, frame: Frame) => number | string };
-
-const same = (v: number) => v;
+type Channel = { wrapper: Wrapper; prop: string; out: Out };
 
 const CHANNELS: Record<Exclude<TransformKey, 'anchorX' | 'anchorY'>, Channel> = {
-  x: { wrapper: Wrapper.Transform, prop: 'x', out: (v, f) => round(v * f.width) },
-  y: { wrapper: Wrapper.Transform, prop: 'y', out: (v, f) => round(v * f.height) },
-  z: { wrapper: Wrapper.Transform, prop: 'z', out: same },
-  scale: { wrapper: Wrapper.Scale, prop: 'scale', out: same },
-  scaleX: { wrapper: Wrapper.Transform, prop: 'scaleX', out: same },
-  scaleY: { wrapper: Wrapper.Transform, prop: 'scaleY', out: same },
-  rotateX: { wrapper: Wrapper.Transform, prop: 'rotationX', out: same },
-  rotateY: { wrapper: Wrapper.Transform, prop: 'rotationY', out: same },
-  rotateZ: { wrapper: Wrapper.Transform, prop: 'rotation', out: same },
-  skewX: { wrapper: Wrapper.Transform, prop: 'skewX', out: same },
-  skewY: { wrapper: Wrapper.Transform, prop: 'skewY', out: same },
-  perspective: { wrapper: Wrapper.Perspective, prop: 'perspective', out: (v) => px(v) },
-  opacity: { wrapper: Wrapper.Transform, prop: 'opacity', out: same },
-  blur: { wrapper: Wrapper.Transform, prop: 'filter', out: (v) => `blur(${px(v)})` }
+  x: { wrapper: Wrapper.Transform, prop: 'x', out: Out.Width },
+  y: { wrapper: Wrapper.Transform, prop: 'y', out: Out.Height },
+  z: { wrapper: Wrapper.Transform, prop: 'z', out: Out.Same },
+  scale: { wrapper: Wrapper.Scale, prop: 'scale', out: Out.Same },
+  scaleX: { wrapper: Wrapper.Transform, prop: 'scaleX', out: Out.Same },
+  scaleY: { wrapper: Wrapper.Transform, prop: 'scaleY', out: Out.Same },
+  rotateX: { wrapper: Wrapper.Transform, prop: 'rotationX', out: Out.Same },
+  rotateY: { wrapper: Wrapper.Transform, prop: 'rotationY', out: Out.Same },
+  rotateZ: { wrapper: Wrapper.Transform, prop: 'rotation', out: Out.Same },
+  skewX: { wrapper: Wrapper.Transform, prop: 'skewX', out: Out.Same },
+  skewY: { wrapper: Wrapper.Transform, prop: 'skewY', out: Out.Same },
+  perspective: { wrapper: Wrapper.Perspective, prop: 'perspective', out: Out.Px },
+  opacity: { wrapper: Wrapper.Transform, prop: 'opacity', out: Out.Same },
+  blur: { wrapper: Wrapper.Transform, prop: 'filter', out: Out.Blur }
 };
 
 export function isLiveKey(key: string): boolean {
@@ -48,7 +47,7 @@ export type LiveWrite = { target: string; vars: TweenVars };
 
 export function liveWrite(clip: MotionClip, key: string, value: number, frame: Frame, parents: Parents): LiveWrite {
   const channel = CHANNELS[key as keyof typeof CHANNELS];
-  return { target: target(channel.wrapper, clip, key, parents), vars: { [channel.prop]: channel.out(value, frame) } };
+  return { target: target(channel.wrapper, clip, key, parents), vars: { [channel.prop]: OUT[channel.out](value, frame) } };
 }
 
 export const ANIMATE_CSS = '.kp{position:absolute;inset:0}.kf,.ks{position:absolute;inset:0;transform-style:preserve-3d;backface-visibility:visible;will-change:transform,opacity,filter}';
@@ -88,7 +87,7 @@ type LaneInput = { clip: MotionClip; key: string; track: Keyframe[]; frame: Fram
 const LANE: Record<Source, (input: LaneInput) => Lane[]> = {
   [Source.Transform]: ({ clip, key, track, frame, parents }) => {
     const channel = CHANNELS[key as keyof typeof CHANNELS];
-    return [{ target: target(channel.wrapper, clip, key, parents), source: Source.Transform, track, vars: (v) => ({ [channel.prop]: channel.out(Number(v), frame) }) }];
+    return [{ target: target(channel.wrapper, clip, key, parents), source: Source.Transform, track, vars: (v) => ({ [channel.prop]: OUT[channel.out](Number(v), frame) }) }];
   },
   [Source.Prop]: ({ clip, key, track, resolve }) => [{ target: target(Wrapper.Scale, clip), source: Source.Prop, track, vars: (v) => ({ [cssVar(key)]: resolve(String(v)) }) }],
   [Source.Scene]: () => [],
@@ -162,7 +161,7 @@ function initial(clip: MotionClip, frame: Frame, resolve: (color: string) => str
     if (value === undefined || channel.wrapper === Wrapper.Perspective) {
       continue;
     }
-    put(target(channel.wrapper, clip, key, parents), channel.prop, channel.out(value, frame));
+    put(target(channel.wrapper, clip, key, parents), channel.prop, OUT[channel.out](value, frame));
   }
   for (const lane of lanes(clip, frame, resolve, parents).filter((l) => l.source === Source.Prop)) {
     vars.set(lane.target, { ...vars.get(lane.target), ...lane.vars(lane.track[0].value) });
