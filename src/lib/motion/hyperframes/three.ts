@@ -6,6 +6,7 @@ import { SURFACE, type Material, type Surface } from '../materials';
 import { cameraRuntime, seekDriver } from './stage';
 import { DEVICE_SCRIPT, type DeviceRuntime } from './device-runtime';
 import { ENGINE_GLOBAL } from '../engine/engine';
+import { strokePolygons } from './stroke-outline';
 import { ON_DISPOSE, hotScope, hotSeek, keptGl } from './hot';
 
 export const THREE_VERSION = '0.181.2';
@@ -329,11 +330,25 @@ function loadModel(c, s) {
   });
 }
 
+const painted = (paint) => paint !== undefined && paint !== 'none' && paint !== 'transparent';
+
+function filled(path) {
+  const style = path.userData.style;
+  return painted(style.fill) ? SVGLoader.createShapes(path) : [];
+}
+
+function stroked(path) {
+  const style = path.userData.style;
+  if (!painted(style.stroke) || !(style.strokeWidth > 0)) return [];
+  return path.subPaths.flatMap((sub) => strokePolygons(sub.getPoints().map((p) => [p.x, p.y]), style.strokeWidth, style.strokeLineCap))
+    .map((poly) => new THREE.Shape(poly.map(([x, y]) => new THREE.Vector2(x, y))));
+}
+
 function loadLogo(c, s) {
   return new Promise((resolve) => {
     if (!c.url) return resolve();
     new SVGLoader().load(c.url, (data) => {
-      const shapes = data.paths.flatMap((p) => SVGLoader.createShapes(p));
+      const shapes = data.paths.flatMap((p) => [...filled(p), ...stroked(p)]);
       if (!shapes.length) return resolve();
       const root = extruded(shapes, c);
       finish(root, c);
@@ -487,5 +502,5 @@ export function threeScript(clips: ThreeClip[], duration: number, stage: StageSp
   if (!clips.length) {
     return '';
   }
-  return `<script type="module">const CLIPS = ${js(clips)};const LIGHTING = ${js(LIGHTING)};const LOOK = ${js(look)};const DURATION = ${js(duration)};const FOV = ${SCENE.fov.fallback};const STAGE = ${js(stage)};${cameraRuntime()}const sampleTrack = (${sampleTrack.toString()});const onScreen = (${onScreen.toString()});${SCENE_SCRIPT.replace('DRIVER', seekDriver(THREE_TIMELINE, 'DURATION', 'renderAt'))}</script>`;
+  return `<script type="module">const CLIPS = ${js(clips)};const LIGHTING = ${js(LIGHTING)};const LOOK = ${js(look)};const DURATION = ${js(duration)};const FOV = ${SCENE.fov.fallback};const STAGE = ${js(stage)};${cameraRuntime()}const sampleTrack = (${sampleTrack.toString()});const onScreen = (${onScreen.toString()});const strokePolygons = (${strokePolygons.toString()});${SCENE_SCRIPT.replace('DRIVER', seekDriver(THREE_TIMELINE, 'DURATION', 'renderAt'))}</script>`;
 }
