@@ -20,7 +20,7 @@ function setup() {
 describe('motion agent shape tools', () => {
   it('draws a star, morphs it into a path, draws it on with trim paths and repeats it, all in the render', async () => {
     const { session, run } = setup();
-    expect(await run('add_shape', { kind: 'star', start: 0, duration: 4, props: { fillKind: 'linear', fill: '#ff0000', fill2: '#0000ff', width: 0.3, height: 0.3 } })).toMatchObject({ ok: true, clip_id: 'id1' });
+    expect(await run('add_shape', { kind: 'star', start: 0, duration: 4, props: { fillKind: 'linear', fill: '#ff0000', fill2: '#0000ff', width: 576, height: 324 } })).toMatchObject({ ok: true, clip_id: 'id1' });
     expect((await run('morph_to', { clip_id: 'id1', path: 'M0 0L1 0L1 1L0 1Z', start: 0, end: 2 })).ok).toBe(true);
     const trim = await run('add_modifier', { clip_id: 'id1', kind: 'trim' });
     expect(trim).toMatchObject({ ok: true, modifier_id: 'id2', animate: ['mod.id2.start', 'mod.id2.end', 'mod.id2.offset'] });

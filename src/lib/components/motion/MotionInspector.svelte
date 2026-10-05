@@ -37,6 +37,7 @@
   import { setBlendMode } from '$lib/motion/blend-ops';
   import { setClipsBlur } from '$lib/motion/motion-blur-ops';
   import { expressionErrors, expressionValue } from '$lib/motion/expression/bake';
+  import { propsOwner, sliderOf, toShown, toStored, type Ranged } from '$lib/motion/units';
 
 
   type Asset = { id: string; kind: AssetKind; label: string; previewUrl: string };
@@ -150,7 +151,7 @@
   function animateText(prop: AnimProp, text: string) {
     const parsed = parseDecimal(text);
     if (parsed !== null) {
-      animate(prop.key, Math.min(prop.max, Math.max(prop.min, parsed)));
+      animate(prop.key, Math.min(prop.max, Math.max(prop.min, stored(prop.key, parsed))));
     }
   }
 
@@ -283,7 +284,14 @@
   }
 
   const shown = (key: string) => valueAt(animated, key, frame, resolve);
-  const numberShown = (prop: AnimProp) => Math.round(Number(shown(prop.key)) * 1000) / 1000;
+  const numberShown = (prop: AnimProp) => toShown(clip.component, prop.key, Math.round(Number(shown(prop.key)) * 1000) / 1000, doc);
+  const stored = (key: string, v: number) => toStored(clip.component, key, v, doc);
+  const slider = (p: Ranged) => sliderOf(clip.component, p, doc);
+  const depthRange = $derived(slider({ key: 'depth', ...DEPTH }));
+  const fieldRange = (field: Field): Ranged => ({ key: field.key, min: field.min ?? 0, max: field.max ?? 0, step: field.step ?? 1 });
+  const fieldShown = (field: Field) => toShown(propsOwner(clip.component), field.key, Number(value(field)), doc);
+  const fieldStored = (field: Field, v: number) => toStored(propsOwner(clip.component), field.key, v, doc);
+  const fieldSlider = (field: Field) => sliderOf(propsOwner(clip.component), fieldRange(field), doc);
   const value = (field: Field) => (keyedField(clip.component, field.key, animated.params) ? shown(field.key) : (clip.props as Record<string, unknown>)[field.key]);
   const isHex = (v: unknown) => typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v);
 </script>
@@ -364,12 +372,14 @@
   {/snippet}
 
   {#snippet animRow(prop: AnimProp)}
+    {@const range = slider(prop)}
     <div class="row anim" data-prop={prop.key}>
       <span class="name">{@render diamond(prop.key)}{@render exprToggle(prop.key)}{prop.label}</span>
       <div class="range">
-        {#if DIALS.has(prop.key)}<Dial value={numberShown(prop)} label={prop.label} onchange={(v) => animate(prop.key, v)} />{/if}
-        <input type="range" min={prop.min} max={prop.max} step={prop.step} value={numberShown(prop)} oninput={(e) => animate(prop.key, Number(e.currentTarget.value))} />
+        {#if DIALS.has(prop.key)}<Dial value={numberShown(prop)} label={prop.label} onchange={(v) => animate(prop.key, stored(prop.key, v))} />{/if}
+        <input type="range" min={range.min} max={range.max} step={range.step} value={numberShown(prop)} oninput={(e) => animate(prop.key, stored(prop.key, Number(e.currentTarget.value)))} />
         <input class="num" type="text" inputmode="decimal" aria-label={prop.label} value={String(numberShown(prop))} onchange={(e) => animateText(prop, e.currentTarget.value)} />
+        {#if range.unit}<span class="unit" data-unit={range.unit}>{range.unit}</span>{/if}
       </div>
     </div>
     {@render exprEditor(prop.key)}
@@ -537,8 +547,9 @@
       <div class="row anim">
         <span class="name">{DEPTH.label}</span>
         <div class="range">
-          <input type="range" min={DEPTH.min} max={DEPTH.max} step={DEPTH.step} value={clip.depth} disabled={clip.space === Space.Screen} oninput={(e) => commit(setClipDepth(doc, clip.id, { depth: Number(e.currentTarget.value) }), 'Changed depth')} />
+          <input type="range" min={depthRange.min} max={depthRange.max} step={depthRange.step} value={clip.depth} disabled={clip.space === Space.Screen} oninput={(e) => commit(setClipDepth(doc, clip.id, { depth: Number(e.currentTarget.value) }), 'Changed depth')} />
           <input class="num" type="text" inputmode="decimal" aria-label="Depth" value={String(clip.depth)} disabled={clip.space === Space.Screen} onchange={(e) => setDepthText(e.currentTarget.value)} />
+          <span class="unit">{depthRange.unit}</span>
         </div>
       </div>
       <label class="check"><input type="checkbox" data-testid="screen-space" checked={clip.space === Space.Screen} onchange={(e) => commit(setClipDepth(doc, clip.id, { space: e.currentTarget.checked ? Space.Screen : Space.World }), 'Changed space')} />Screen space: ignores the camera</label>
@@ -637,9 +648,10 @@
           {:else if field.control === Control.Textarea}
             <textarea id={`f-${field.key}`} rows="3" value={String(value(field) ?? '')} onchange={(e) => setProp(field, e.currentTarget.value)}></textarea>
           {:else if field.control === Control.Range}
+            {@const range = fieldSlider(field)}
             <div class="range">
-              <input id={`f-${field.key}`} type="range" min={field.min} max={field.max} step={field.step} value={Number(value(field))} oninput={(e) => setProp(field, Number(e.currentTarget.value))} />
-              <output>{Number(value(field)).toFixed(field.step && field.step < 1 ? 2 : 0)}</output>
+              <input id={`f-${field.key}`} type="range" min={range.min} max={range.max} step={range.step} value={fieldShown(field)} oninput={(e) => setProp(field, fieldStored(field, Number(e.currentTarget.value)))} />
+              <output>{fieldShown(field).toFixed(range.step < 1 ? 2 : 0)}{range.unit ?? ''}</output>
             </div>
           {:else if field.control === Control.Select}
             <select id={`f-${field.key}`} value={String(value(field))} onchange={(e) => setProp(field, e.currentTarget.value)}>
@@ -901,6 +913,12 @@
   .num {
     width: 56px !important;
     flex: none;
+  }
+
+  .unit {
+    flex: none;
+    min-width: 1.2em;
+    color: var(--ui-ink-3);
   }
 
   .effect {

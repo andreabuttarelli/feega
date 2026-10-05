@@ -84,7 +84,7 @@ test.describe('motion editor @real', () => {
           window.addEventListener('message', (e) => e.data?.type === 'feega:hot-done' && resolve('patch'));
           player.addEventListener('ready', () => resolve('reload'), { once: true });
           setTimeout(() => resolve('nothing'), 3000);
-          slider.value = '0.4';
+          slider.value = '40';
           slider.dispatchEvent(new Event('input', { bubbles: true }));
         })
     );

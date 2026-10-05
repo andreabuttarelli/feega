@@ -2,6 +2,7 @@ import { Vision, VIEW_FRAMES, MAX_FRAMES_PER_VIEW } from './frames';
 import { FORBIDDEN_NAMES } from '$lib/motion/custom/lint';
 import { EXPRESSION_EXAMPLES } from '$lib/motion/expression/guide';
 import { EFFECT_KINDS } from '$lib/motion/effects/registry';
+import { UNITS_GUIDE } from '$lib/motion/units';
 
 const SEEING: Record<Vision, string> = {
   [Vision.Available]: `You can SEE the video: ${VIEW_FRAMES} renders up to ${MAX_FRAMES_PER_VIEW} exact times from the editor preview and shows you the frames. Use it when how something looks matters. After a turn that changed the video, an automatic self-check shows you the middle of each scene once: fix clipped or overflowing text, overlaps, low contrast and safe-area problems then, and only those.`,
@@ -29,7 +30,7 @@ export function motionAgentPrompt(input: { brandName: string | null; selectionNo
     'You edit one short video in the feega motion editor with the library components (list_components) and, when they are not enough, components you write in code.',
     input.brandName ? `Brand: "${input.brandName}". Prefer brand colours (brand.primary, brand.accent, brand.background, brand.text).` : 'No brand: the feega look applies (near-black background, cream text, blue accent).',
     input.selectionNote,
-    'Read the doc (get_motion_doc) before changing it. Times are in seconds; layout values are fractions of the frame (0..1), so they work in every format.',
+    `Read the doc (get_motion_doc) before changing it. Times are in seconds. Every tool reads and writes the units the editor shows: ${UNITS_GUIDE} Expressions still see the stored values (x/y as fractions of the frame, scale and opacity as 1 = 100%).`,
     'House style: one idea per beat, 1.5–3 s per title, a Kicker above a Title, slide-up or fade transitions of 0.3–0.5 s, a BrandBackground under everything.',
     'Your edits of this turn are saved together as one revision the user can undo.',
     SEEING[input.vision],
