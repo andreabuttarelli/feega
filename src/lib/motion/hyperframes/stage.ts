@@ -1,6 +1,7 @@
 import { cameraMath, type StageSpec } from '../camera';
 import { sampleTrack } from '../keyframes';
 import { js, px } from './html';
+import { hotScope, hotSeek } from './hot';
 
 export const STAGE_TIMELINE = 'feegaStage';
 
@@ -11,7 +12,7 @@ export function cameraRuntime(): string {
 }
 
 export function stageScript(spec: StageSpec, fps: number, duration: number): string {
-  return `(function(){${cameraRuntime()}
+  return `(function(){${hotScope(STAGE_TIMELINE)}${cameraRuntime()}
 const SPEC=${js(spec)};
 const root=document.getElementById('root');
 const world=document.getElementById('world');
@@ -29,7 +30,7 @@ function stageAt(time){
 }
 const tl=window.__timelines&&window.__timelines.main;
 ${seekDriver(STAGE_TIMELINE, duration, 'stageAt')}
-window.addEventListener('hf-seek',function(e){stageAt(e.detail.time);});
+${hotSeek('stageAt')}
 stageAt(0);
 })();`;
 }

@@ -54,6 +54,14 @@ describe('a custom component at runtime', () => {
     expect(run('Math', 'root.dataset.v = String(Math.max(1, 2));').root.dataset.v).toBe('2');
   });
 
+  it('a boot run again by a preview patch reports only its own errors', () => {
+    run('Broken', 'throw new Error("boom");');
+    const { errors } = run('Broken', 'throw new Error("boom");');
+    window.dispatchEvent(new ErrorEvent('error', { message: 'late' }));
+
+    expect(errors.map((e) => e.message)).toEqual(['boom', 'late']);
+  });
+
   it('records a component that throws instead of breaking the video', () => {
     const { errors, master } = run('Broken', 'throw new Error("boom");');
 
