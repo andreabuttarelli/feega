@@ -66,7 +66,8 @@ const SVG_URL = /\.svg(?:[?#]|$)/i;
 const INLINE_SVG = /<svg\b[\s\S]*?<\/svg>/gi;
 const LOGO_HINT = /logo|brand|wordmark/i;
 const STYLESHEET = /<link[^>]+rel=["']stylesheet["'][^>]*>/gi;
-const SVG_NS = 'http://www.w3.org/2000/svg';
+const FAMILY_NAME = /^[\w][\w .-]*$/;
+const SVG_NS ='http://www.w3.org/2000/svg';
 const TITLE_SEPARATOR = /\s+[|–—:·-]\s+/;
 const GOOGLE_FAMILIES = new Map(GOOGLE_FONTS.map((f) => [f.f.toLowerCase(), f.f]));
 
@@ -150,7 +151,7 @@ async function linkedCss(html: string, base: string): Promise<string> {
 }
 
 function fontsOf(found: { name: string }[]): SiteFont[] {
-  const fonts = found.map((f) => {
+  const fonts = found.filter((f) => FAMILY_NAME.test(f.name)).map((f) => {
     const google = GOOGLE_FAMILIES.get(f.name.toLowerCase());
     return google ? { family: google, google: true } : { family: f.name, google: false };
   });

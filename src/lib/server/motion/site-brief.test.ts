@@ -149,7 +149,7 @@ describe('readSite: what a trailer needs from a public page', () => {
     const page = `<html><head><title>Verde</title><link href="/theme.css" rel="stylesheet"></head><body><header><a href="/" aria-label="Verde"><svg viewBox="0 0 74 24" fill="none"><g id="logo"><path fill="#0B3D2E" d="M0 0h74v24H0z"/></g></svg></a></header></body></html>`;
     serves({
       [SITE]: { type: 'text/html', body: page },
-      'https://brand.example/theme.css': { type: 'text/css', body: "@font-face { font-family: 'Geograph'; } h1 { font-family: 'Geograph', sans-serif } p { font-family: Lora, serif }" }
+      'https://brand.example/theme.css': { type: 'text/css', body: "html { font-family: var(--font-sans) } @font-face { font-family: 'Geograph'; } h1 { font-family: 'Geograph', sans-serif } p { font-family: Lora, serif }" }
     });
 
     const read = await readSite(SITE);

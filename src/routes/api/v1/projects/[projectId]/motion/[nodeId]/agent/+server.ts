@@ -25,7 +25,7 @@ import { brandSources } from '$lib/server/motion/brand-sources';
 import { SELF_CHECK_MAX_STEPS, VIEW_FRAMES, Vision, docTexts, keyFrameTimes, selfCheckDue, selfCheckPrompt, usageByModel, visionStep } from '$lib/server/motion/frames';
 import { awaitFrames, awaitVerdict, framesPrefix, FRAME_POLL_MS, type FrameBucket } from '$lib/server/motion/frame-store';
 import { CANVAS_ASSET_BUCKET, SIGNED_URL_TTL_S } from '$lib/server/repos/asset-storage';
-import { CHECK_REQUEST, FRAMES_REQUEST, type CheckRequest, type FramesRequest } from '$lib/motion/frames-request';
+import { ASSETS_ADDED, CHECK_REQUEST, FRAMES_REQUEST, type CheckRequest, type FramesRequest } from '$lib/motion/frames-request';
 import { rowRequests } from '$lib/server/motion/batch-input';
 import { startBatch } from '$lib/server/motion/render-run';
 import { motionRenderFarm, motionRenderStorage } from '$lib/server/motion/renderer';
@@ -100,6 +100,7 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
   const history = promptHistory(await loadTurns(db, { orgId, threadId }));
   await saveTurn(db, { orgId, threadId, role: 'user', content: message, actor: userActor });
 
+  const knownAssets = assets.length;
   const session: MotionSession = { doc: head.doc, baseVersion: head.version, edits: [], selection, frames: new Map(), views: 0, checkedAt: 0, codeWrites: 0 };
   const moderationScope = { orgId, userId: user.id, projectId: project.id, nodeId: motion.record.id, actor };
   const bucket = db.storage.from(CANVAS_ASSET_BUCKET) as unknown as FrameBucket;
@@ -119,7 +120,7 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
       if (!review.ok) {
         throw new Error(`frames withheld by the safety review: ${review.error}`);
       }
-      askPreview({ callId, times, doc: session.doc });
+      askPreview({ callId, times, doc: session.doc, assets: assets.slice(knownAssets) });
       return awaitFrames(bucket, framesPrefix(frameScope, callId), times.length);
     },
     check: async (callId, doc, name) => {
@@ -127,7 +128,7 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
       if (!review.ok) {
         throw new Error(`the component was withheld by the safety review: ${review.error}`);
       }
-      askCheck({ callId, name, doc });
+      askCheck({ callId, name, doc, assets: assets.slice(knownAssets) });
       return awaitVerdict(bucket, framesPrefix(frameScope, callId), { timeoutMs: CHECK_WAIT_MS, pollMs: FRAME_POLL_MS });
     },
     batch: async ({ rows }) => {
@@ -206,6 +207,9 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
         })));
       }
 
+      if (assets.length > knownAssets) {
+        writer.write({ type: ASSETS_ADDED, data: { assets: assets.slice(knownAssets) } });
+      }
       await finishTurn(steps);
     },
     onError: (e) => {
