@@ -54,19 +54,21 @@ const CROSS: Record<Crossing, (key: InputKey, outer: InputValues, local: InputVa
 
 const within = (n: number) => n >= 0 && n <= 1;
 
-function localPointer(outer: InputValues, toLocal: (p: Point) => Point): Crossed {
+export type Level = { toLocal: (p: Point) => Point; contains?: (p: Point) => boolean };
+
+function localPointer(outer: InputValues, level: Level): Crossed {
   const x = outer[InputKey.PointerX];
   const y = outer[InputKey.PointerY];
   if (x === undefined || y === undefined) {
     return { values: {}, inside: false };
   }
-  const [lx, ly] = toLocal([x, y]);
-  const inside = within(lx) && within(ly);
+  const [lx, ly] = level.toLocal([x, y]);
+  const inside = within(lx) && within(ly) && (level.contains?.([x, y]) ?? true);
   return { values: { [InputKey.PointerX]: lx, [InputKey.PointerY]: ly, [InputKey.Hover]: inside ? (outer[InputKey.Hover] ?? 0) : 0 }, inside };
 }
 
-export function crossLevel(outer: InputValues, toLocal: (p: Point) => Point): Crossed {
-  const local = localPointer(outer, toLocal);
+export function crossLevel(outer: InputValues, level: Level): Crossed {
+  const local = localPointer(outer, level);
   const values: InputValues = {};
   for (const key of INPUT_KEYS) {
     const value = CROSS[INPUTS[key].crossing](key, outer, local.values);

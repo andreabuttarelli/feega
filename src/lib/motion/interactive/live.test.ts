@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '../doc';
-import { addClip, setTransform, type OpResult } from '../timeline';
+import { addClip, setProps, setTransform, type OpResult } from '../timeline';
+import { bentoSlotAt } from '../hyperframes/bento';
+import { clipsOf, type MotionClip } from '../doc';
 import { precompose, flattenComps } from '../precomp';
 import { setExpression } from '../expression/ops';
 import { InputKey } from '../expression/inputs';
@@ -132,6 +134,27 @@ describe('live inputs through nested compositions', () => {
     const scene = sceneOf(doc, Outside.Fallback);
 
     expect(scene.tick(at(1, 0.5), 30, 0).get('b.rotateZ')).toBeCloseTo(40);
+  });
+
+  it('a follower in a bento cell reads the cursor in its cell, and the other cell does not move', () => {
+    let doc = follower(newMotionDoc(MotionFormat.Landscape), 'dot');
+    doc = ok(precompose(doc, ['dot'], { comp: 'one', clip: 'p1' }, 'One'));
+    doc = follower(doc, 'dot2');
+    doc = ok(precompose(doc, ['dot2'], { comp: 'two', clip: 'p2' }, 'Two'));
+    doc = { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.filter((c) => c.id !== 'p1' && c.id !== 'p2') })) };
+    doc = ok(addClip(doc, { component: 'Composition', from: 0, durationInFrames: 60 }, 'grid'));
+    doc = ok(setProps(doc, 'grid', { layout: 'bento', media: [{ assetId: 'one', kind: 'comp' }, { assetId: 'two', kind: 'comp' }], layoutParams: { columns: 2, rows: 1, gap: 0, enter: 'none' } }));
+    const flat = flattenComps(doc);
+    const grid = clipsOf(flat).find((c) => c.id === 'grid') as MotionClip;
+    const slot = bentoSlotAt(grid, { width: doc.width, height: doc.height, fps: doc.fps }, 0, 10)!;
+    const corner = { x: (slot.content.x + slot.content.scale * doc.width * 0.6) / doc.width, y: (slot.content.y + slot.content.scale * doc.height * 0.25) / doc.height };
+    const scene = sceneOf(flat, Outside.Fallback);
+
+    const values = scene.tick(at(corner.x, corner.y), 10, 0);
+
+    expect(values.get('grid__b0__0__dot.x')).toBeCloseTo(0.1);
+    expect(values.get('grid__b0__0__dot.y')).toBeCloseTo(-0.25);
+    expect(values.get('grid__b1__0__dot2.x')).toBeCloseTo(0);
   });
 });
 

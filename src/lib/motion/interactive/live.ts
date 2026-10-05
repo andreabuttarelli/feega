@@ -1,20 +1,17 @@
-import { sampleTrack } from '../sample-track';
-import type { Keyframe } from '../keyframes';
 import { Evaluator, type LaneBook, type LaneData } from '../expression/evaluator';
 import { ExpressionError, SILENT_AUDIO } from '../expression/language';
-import { InputKey, crossLevel, valuesPort, type Crossed, type InputValues, type Point } from '../expression/inputs';
+import { InputKey, crossLevel, valuesPort, type Crossed, type InputValues, type Level } from '../expression/inputs';
 import type { Out } from '../hyperframes/channel-out';
-import { apply2d, composeLocal, type Affine } from '../affine';
+import { apply2d, type Affine } from '../affine';
 import { Outside } from './settings';
-import { hostIdsOf } from '../comp-path';
 
 export type LiveLane = { id: string; key: string; target: string; prop: string; out: Out };
 
-export const HOST_KEYS = ['x', 'y', 'rotateZ', 'scale', 'scaleX', 'scaleY', 'rotateX', 'rotateY'] as const;
+export type Rect = [number, number, number, number];
 
-type HostKey = (typeof HOST_KEYS)[number];
+export type HostStep = { from: number; m: Affine; clip: Rect | null };
 
-export type HostSpec = { pivot: [number, number]; tracks: Record<HostKey, { track: Keyframe[]; base: number }> };
+export type HostSpec = { steps: HostStep[] };
 
 export type LiveSpec = {
   fps: number;
@@ -27,11 +24,11 @@ export type LiveSpec = {
   order: string[];
   names: Record<string, string>;
   hosts: Record<string, HostSpec>;
+  chains: Record<string, string[]>;
 };
 
 export type LiveScene = { lanes: LiveLane[]; tick: (global: InputValues, frame: number, dtSeconds: number) => Map<string, number> };
 
-const DEG = Math.PI / 180;
 
 export function laneName(lane: Pick<LiveLane, 'id' | 'key'>): string {
   return `${lane.id}.${lane.key}`;
@@ -57,19 +54,15 @@ function specBook(spec: LiveSpec): LaneBook {
   };
 }
 
-function projected(host: HostSpec, frame: number, size: { width: number; height: number }): Affine {
-  const at = (key: HostKey) => {
-    const { track, base } = host.tracks[key];
-    return track.length ? sampleTrack(track, frame) : base;
-  };
-  const pose = {
-    x: at('x') * size.width,
-    y: at('y') * size.height,
-    rotateZ: at('rotateZ'),
-    scaleX: at('scale') * at('scaleX') * Math.cos(at('rotateY') * DEG),
-    scaleY: at('scale') * at('scaleY') * Math.cos(at('rotateX') * DEG)
-  };
-  return composeLocal(pose, host.pivot);
+function stepAt(host: HostSpec, frame: number): HostStep {
+  let step = host.steps[0];
+  for (const next of host.steps) {
+    if (next.from > frame) {
+      break;
+    }
+    step = next;
+  }
+  return step;
 }
 
 function invert([a, b, c, d, e, f]: Affine): Affine {
@@ -93,19 +86,22 @@ export function liveScene(spec: LiveSpec): LiveScene {
   let global: InputValues = {};
   let dt = 0;
 
-  const toLocal = (host: HostSpec, frame: number) => {
-    const inverse = invert(projected(host, frame, size));
-    return ([x, y]: Point): Point => {
-      const [lx, ly] = apply2d(inverse, [x * size.width, y * size.height]);
-      return [lx / size.width, ly / size.height];
+  const levelOf = (host: HostSpec, frame: number): Level => {
+    const step = stepAt(host, frame);
+    const inverse = invert(step.m);
+    const clip = step.clip;
+    return {
+      toLocal: ([x, y]) => {
+        const [lx, ly] = apply2d(inverse, [x * size.width, y * size.height]);
+        return [lx / size.width, ly / size.height];
+      },
+      contains: clip ? ([x, y]) => x * size.width >= clip[0] && x * size.width <= clip[0] + clip[2] && y * size.height >= clip[1] && y * size.height <= clip[1] + clip[3] : undefined
     };
   };
 
   const localInputs = (id: string, frame: number): InputValues =>
-    hostIdsOf(id)
-      .filter((hostId) => spec.hosts[hostId])
-      .reduce((outer, hostId) => {
-        const crossed = crossLevel(outer, toLocal(spec.hosts[hostId], frame));
+    (spec.chains[id] ?? []).reduce((outer, hostId) => {
+        const crossed = crossLevel(outer, levelOf(spec.hosts[hostId], frame));
         if (crossed.inside) {
           memory.set(hostId, crossed.values);
           return crossed.values;
