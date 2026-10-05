@@ -77,6 +77,7 @@ const DESIGNS: Design[] = [
       { key: 'fit', label: 'Photo fit', type: FieldType.Select, clipId: 'photo', prop: 'fit', options: ['cover', 'contain'] },
       text('name', 'Product name', 'name'),
       text('price', 'Price', 'price'),
+      colour('text_color', 'Name colour', 'name', 'color'),
       colour('accent', 'Price colour', 'price', 'color'),
       colour('background', 'Background', 'bg', 'fill')
     ]
