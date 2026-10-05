@@ -12,11 +12,19 @@
   import { TRANSITION_KINDS, type Edge } from '$lib/motion/design';
   import { resolveColor, type BrandTokens } from '$lib/motion/brand';
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
-  import { InspectorTab, clipFieldGroups, editAt, keyAt, keyedField, parseDecimal, secondsLabel, toggleKey, valueAt, type Field } from '$lib/motion/inspector';
-  import { setMask, setMaskStack, setProps, setTiming, setTrackMatte, setTransform, setTransition, Side, type OpResult } from '$lib/motion/timeline';
-  import { MASK_KINDS, MASK_KIND_IDS, MASK_MODES, MATTES, MATTE_LABEL, MAX_MASK_STACK, MaskKind, MaskMode, Needs, newMask, type Mask, type Matte } from '$lib/motion/mask';
+  import { InspectorTab, clipFieldGroups, editAt, keyAt, keyedField, toggleKey, valueAt, type Field } from '$lib/motion/inspector';
+  import { setMask, setProps, setTiming, setTrackMatte, setTransform, setTransition, Side, type OpResult } from '$lib/motion/timeline';
+  import { MASK_KINDS, MASK_KIND_IDS, MATTES, MaskKind, Matte, Needs, newMask, type Mask } from '$lib/motion/mask';
   import { ANIMATABLE, Source, isAnimatable, TRANSFORM, ValueKind, type AnimProp, type KeyValue } from '$lib/motion/keyframes';
+  import NumberField from './NumberField.svelte';
   import Dial from './Dial.svelte';
+  import InspectorSection from './InspectorSection.svelte';
+  import { onMount, type Snippet } from 'svelte';
+  import { FieldKind, clockText, parseClock } from '$lib/motion/number-field';
+  import { DIAL_KEYS, GROUP_SECTION, Part, SECTION_ORDER, SECTION_TITLE, Section, fieldLook, flipSection, isOpen as sectionOpen, readSections, shows, transformSection, type SectionState } from '$lib/motion/inspector-sections';
+  import { CLIP_FAMILIES, familyOf } from '$lib/motion/track-style';
+  import { KeyMark } from '$lib/motion/timeline-layers';
+  import type { LayoutStore } from '$lib/motion/editor-layout';
   import CodeEditor from './CodeEditor.svelte';
   import FontPicker from './FontPicker.svelte';
   import LutPicker from './LutPicker.svelte';
@@ -38,9 +46,9 @@
   import { setBlendMode } from '$lib/motion/blend-ops';
   import { setClipsBlur } from '$lib/motion/motion-blur-ops';
   import { expressionErrors, expressionValue } from '$lib/motion/expression/bake';
+  import { propsOwner, sliderOf, toShown, toStored, type Ranged } from '$lib/motion/units';
   import { BOUNDS, PHYSICS, PHYSICS_KEYS, PHYSICS_PRESET, PHYSICS_PRESETS, type Bounds, type PhysicsKey, type PhysicsPreset } from '$lib/motion/physics/model';
   import { applyPhysicsPreset, setPhysics } from '$lib/motion/physics/ops';
-  import { propsOwner, sliderOf, toShown, toStored, type Ranged } from '$lib/motion/units';
 
 
   type Asset = { id: string; kind: AssetKind; label: string; previewUrl: string };
@@ -73,9 +81,35 @@
     onopen?: (comp: string) => void;
   } = $props();
 
-  const DIALS = new Set(['rotateX', 'rotateY', 'rotateZ', 'objectRotateX', 'objectRotateY', 'objectRotateZ', 'orbit', 'maskRotation']);
   const ANCHOR_STOPS = [0, 0.5, 1] as const;
   const KEY_STATE = { On: 'on', Lane: 'lane', None: 'none' } as const;
+  const MARK: Record<(typeof KEY_STATE)[keyof typeof KEY_STATE], KeyMark> = { [KEY_STATE.On]: KeyMark.Here, [KEY_STATE.Lane]: KeyMark.Animated, [KEY_STATE.None]: KeyMark.None };
+  const EDGE_GLYPH: Record<Side, string> = { [Side.In]: '↗', [Side.Out]: '↘' };
+  const DEFAULT_EDGE_FRAMES = 12;
+
+  const family = $derived(familyOf(clip.component));
+  let sections = $state<SectionState>({});
+
+  function sectionStore(): LayoutStore | null {
+    try {
+      return localStorage;
+    } catch {
+      return null;
+    }
+  }
+
+  onMount(() => {
+    sections = readSections(sectionStore());
+  });
+
+  const toggleSection = (section: Section) => (sections = flipSection(sections, family, section, sectionStore()));
+  const inGrid = (field: Field) => field.control === Control.Range && fieldLook(field.key).glyph !== null;
+  const afterDot = (prop: AnimProp) => prop.label.split(' · ')[1] ?? prop.label;
+
+  function grow(area: HTMLTextAreaElement) {
+    area.style.height = 'auto';
+    area.style.height = `${area.scrollHeight}px`;
+  }
 
   let error = $state('');
   const voices = $derived(voicesOver(doc, clip.id));
@@ -92,7 +126,11 @@
   const animated = $derived(withParams(doc, clip));
   const customName = $derived(clip.component === 'Custom' ? String(clip.props.name) : null);
   const spec = $derived(COMPONENTS[clip.component]);
-  const transformProps = $derived(ANIMATABLE[clip.component].filter((p) => p.source === Source.Transform));
+  const transformProps = $derived(ANIMATABLE[clip.component].filter((p) => p.source === Source.Transform && p.key !== 'anchorX' && p.key !== 'anchorY'));
+  const layoutProps = $derived(transformProps.filter((p) => transformSection(p.key) === Section.Layout));
+  const threeDProps = $derived(transformProps.filter((p) => transformSection(p.key) === Section.ThreeD));
+  const dialProps = $derived(transformProps.filter((p) => DIAL_KEYS.has(p.key)));
+  const groupsIn = (section: Section) => groups.filter((g) => GROUP_SECTION[g.group] === section);
   const sceneProps = $derived(ANIMATABLE[clip.component].filter((p) => p.source === Source.Scene));
   const maskProps = $derived(ANIMATABLE[clip.component].filter((p) => p.source === Source.Mask));
   const NO_MASK = 'none';
@@ -126,12 +164,12 @@
     commit(registered.ok ? setProps(registered.doc, clip.id, { [field.key]: family }) : registered, `Set ${field.label.toLowerCase()} to ${family}`);
   }
 
-  function setSeconds(key: 'from' | 'durationInFrames', text: string) {
-    const seconds = parseDecimal(text);
-    if (seconds === null) {
+  function setClock(key: 'from' | 'durationInFrames', text: string) {
+    const frames = parseClock(text, doc.fps);
+    if (frames === null) {
       return;
     }
-    commit(setTiming(doc, clip.id, { [key]: Math.round(seconds * doc.fps) }), 'Changed timing');
+    commit(setTiming(doc, clip.id, { [key]: frames }), 'Changed timing');
   }
 
   function setEdge(side: Side, edge: Partial<Edge>) {
@@ -139,30 +177,15 @@
     commit(setTransition(doc, clip.id, side, { ...current, ...edge }), 'Changed transition');
   }
 
-  function setEdgeSeconds(side: Side, text: string) {
-    const seconds = parseDecimal(text);
-    if (seconds === null) {
-      return;
+  function setEdgeClock(side: Side, text: string) {
+    const frames = parseClock(text, doc.fps);
+    if (frames !== null) {
+      setEdge(side, { durationInFrames: frames });
     }
-    setEdge(side, { durationInFrames: Math.round(seconds * doc.fps) });
   }
 
   function animate(key: string, value: KeyValue) {
     commit(editAt(doc, clip, key, value, frame), `Edited ${key}`);
-  }
-
-  function animateText(prop: AnimProp, text: string) {
-    const parsed = parseDecimal(text);
-    if (parsed !== null) {
-      animate(prop.key, Math.min(prop.max, Math.max(prop.min, stored(prop.key, parsed))));
-    }
-  }
-
-  const NO_PARENT = '';
-
-  function clipName(id: string): string {
-    const other = findClip(doc, id)?.clip;
-    return other ? `${COMPONENTS[other.component].label} · ${id}` : id;
   }
 
   function applyPhysicsOf(select: HTMLSelectElement) {
@@ -173,18 +196,15 @@
     }
   }
 
-  function setPhysicsValue(key: PhysicsKey, text: string) {
-    const value = parseDecimal(text);
-    if (value !== null) {
-      commit(setPhysics(doc, clip.id, { [key]: Math.min(PHYSICS[key].max, Math.max(PHYSICS[key].min, stored(key, value))) }), `Changed physics ${PHYSICS[key].label.toLowerCase()}`);
-    }
+  function setPhysicsValue(key: PhysicsKey, value: number) {
+    commit(setPhysics(doc, clip.id, { [key]: Math.min(PHYSICS[key].max, Math.max(PHYSICS[key].min, value)) }), `Changed physics ${PHYSICS[key].label.toLowerCase()}`);
   }
 
-  function setDepthText(text: string) {
-    const depth = parseDecimal(text);
-    if (depth !== null) {
-      commit(setClipDepth(doc, clip.id, { depth }), 'Changed depth');
-    }
+  const NO_PARENT = '';
+
+  function clipName(id: string): string {
+    const other = findClip(doc, id)?.clip;
+    return other ? `${COMPONENTS[other.component].label} · ${id}` : id;
   }
 
   const faults = $derived(Object.fromEntries(expressionErrors(doc, analyses).filter((f) => f.clipId === clip.id).map((f) => [f.key, f.error])));
@@ -294,21 +314,6 @@
     commit(setMask(doc, clip.id, { ...mask, ...patch }), 'Edited the mask');
   }
 
-  const STACK_FIELDS = ['x', 'y', 'width', 'height', 'feather'] as const;
-
-  function editStack(index: number, patch: Partial<Mask>) {
-    commit(setMaskStack(doc, clip.id, clip.maskStack.map((m, i) => (i === index ? { ...m, ...patch } : m))), 'Edited a stacked mask');
-  }
-
-  function addStacked(kind: MaskKind) {
-    const asset = pictures[0]?.id ?? null;
-    commit(setMaskStack(doc, clip.id, [...clip.maskStack, { ...newMask(kind, asset), mode: MaskMode.Subtract }]), 'Stacked a mask');
-  }
-
-  function removeStacked(index: number) {
-    commit(setMaskStack(doc, clip.id, clip.maskStack.filter((_, i) => i !== index)), 'Removed a stacked mask');
-  }
-
   const shown = (key: string) => valueAt(animated, key, frame, resolve);
   const numberShown = (prop: AnimProp) => toShown(clip.component, prop.key, Math.round(Number(shown(prop.key)) * 1000) / 1000, doc);
   const stored = (key: string, v: number) => toStored(clip.component, key, v, doc);
@@ -320,10 +325,38 @@
   const fieldSlider = (field: Field) => sliderOf(propsOwner(clip.component), fieldRange(field), doc);
   const value = (field: Field) => (keyedField(clip.component, field.key, animated.params) ? shown(field.key) : (clip.props as Record<string, unknown>)[field.key]);
   const isHex = (v: unknown) => typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v);
+
+  const pulseShown = $derived(pulsable.length > 0 && shows(Part.Pulse, family) && doc.tracks.some((t) => t.clips.some((c) => c.component === 'Audio')));
+  const visual = $derived(spec.track === TrackKind.Visual);
+
+  const has: Record<Section, boolean> = $derived({
+    [Section.Content]: groupsIn(Section.Content).length > 0,
+    [Section.Style]: groupsIn(Section.Style).length > 0,
+    [Section.Layout]: layoutProps.length > 0 || groupsIn(Section.Layout).length > 0,
+    [Section.Timing]: true,
+    [Section.Shape]: clip.component === 'Shape',
+    [Section.Animate]: visual || TEXT_COMPONENTS.has(clip.component) || pulseShown || (voices.length > 0 && shows(Part.Ducking, family)) || groupsIn(Section.Animate).length > 0 || !!(clip.keyframes.x?.length && clip.keyframes.y?.length),
+    [Section.Effects]: visual && clip.component !== 'Null',
+    [Section.ThreeD]: threeDProps.length > 0 || sceneProps.length > 0 || groupsIn(Section.ThreeD).length > 0 || visual,
+    [Section.Parent]: visual || maskProps.length > 0
+  });
+
+  const BODIES: Record<Section, Snippet> = $derived({
+    [Section.Content]: contentBody,
+    [Section.Style]: styleBody,
+    [Section.Layout]: layoutBody,
+    [Section.Timing]: timingBody,
+    [Section.Shape]: shapeBody,
+    [Section.Animate]: animateBody,
+    [Section.Effects]: effectsBody,
+    [Section.ThreeD]: threeDBody,
+    [Section.Parent]: parentBody
+  });
 </script>
 
-<div class="inspector" data-testid="motion-inspector">
+<div class="inspector" data-testid="motion-inspector" style={`--hue: ${CLIP_FAMILIES[family].hue};`}>
   <header>
+    <span class="swatch-bar" aria-hidden="true"></span>
     <span class="kind">{customName ?? spec.label}</span>
     <span class="id">{clip.id}</span>
   </header>
@@ -338,85 +371,170 @@
   {#if customName && tab === InspectorTab.Code}
     <CodeEditor {doc} name={customName} previous={previousSource(customName)} {onchange} />
   {:else}
-
-  <section>
-    <h4>Timing</h4>
-    <div class="row two">
-      <label>Start (s)<input type="text" inputmode="decimal" value={secondsLabel(clip.from, doc.fps)} onchange={(e) => setSeconds('from', e.currentTarget.value)} /></label>
-      <label>Length (s)<input type="text" inputmode="decimal" value={secondsLabel(clip.durationInFrames, doc.fps)} onchange={(e) => setSeconds('durationInFrames', e.currentTarget.value)} /></label>
-    </div>
-    {#each [Side.In, Side.Out] as side (side)}
-      {@const edge = side === Side.In ? clip.transitionIn : clip.transitionOut}
-      <div class="row two">
-        <label>
-          Transition {side}
-          <select value={edge.kind} onchange={(e) => setEdge(side, { kind: e.currentTarget.value as Edge['kind'], durationInFrames: edge.durationInFrames || 12 })}>
-            {#each TRANSITION_KINDS as kind (kind)}<option value={kind}>{kind}</option>{/each}
-          </select>
-        </label>
-        <label>Duration (s)<input type="text" inputmode="decimal" value={secondsLabel(edge.durationInFrames, doc.fps)} onchange={(e) => setEdgeSeconds(side, e.currentTarget.value)} /></label>
-      </div>
+    {#each SECTION_ORDER.filter((s) => has[s]) as section (section)}
+      <InspectorSection title={SECTION_TITLE[section]} {section} open={sectionOpen(sections, family, section)} ontoggle={() => toggleSection(section)}>
+        {@render BODIES[section]()}
+      </InspectorSection>
     {/each}
-  </section>
-
-  {#if pulsable.length && doc.tracks.some((t) => t.clips.some((c) => c.component === 'Audio'))}
-    <section data-testid="pulse-section">
-      <h4>Pulse with the music</h4>
-      <div class="row">
-        {#each pulsable as prop (prop)}<button type="button" data-pulse={prop} onclick={() => commit(pulseWithMusic(doc, clip.id, prop), `Pulsed ${prop} with the music`)}>{prop}</button>{/each}
-      </div>
-    </section>
   {/if}
 
-  {#if voices.length}
-    <section data-testid="duck-section">
-      <h4>Ducking</h4>
-      <div class="row two">
-        <select aria-label="Voice-over" value={voice || voices[0]} onchange={(e) => (voice = e.currentTarget.value)}>
-          {#each voices as id (id)}<option value={id}>{clipName(id)}</option>{/each}
-        </select>
-        <button type="button" data-testid="duck" onclick={duck}>Duck under voice-over</button>
-      </div>
-    </section>
-  {/if}
+  {#if error}<p class="error" role="alert">{error}</p>{/if}
+</div>
 
-  {#snippet diamond(key: string)}
-    <button type="button" class="key {keyState(key)}" title="Keyframe at playhead" aria-label={`Keyframe ${key}`} aria-pressed={keyState(key) === KEY_STATE.On} onclick={() => toggle(key)}>◆</button>
-  {/snippet}
+{#snippet diamond(key: string)}
+  <button type="button" class="key" data-mark={MARK[keyState(key)]} title="Keyframe at playhead" aria-label={`Keyframe ${key}`} aria-pressed={keyState(key) === KEY_STATE.On} onclick={() => toggle(key)}></button>
+{/snippet}
 
-  {#snippet exprToggle(key: string)}
-    <button type="button" class="expr-toggle" class:on={clip.expressions[key] !== undefined} title="Expression" aria-label={`Expression ${key}`} aria-pressed={clip.expressions[key] !== undefined} onclick={() => toggleExpression(key)}>=</button>
-  {/snippet}
-
-  {#snippet exprEditor(key: string)}
-    {#if clip.expressions[key] !== undefined}
-      <div class="expr" data-expression={key}>
-        <textarea class="code" rows="2" spellcheck="false" aria-label={`${key} expression`} value={clip.expressions[key]} onchange={(e) => editExpression(key, e.currentTarget.value)}></textarea>
-        {#if faults[key]}<p class="expr-error" role="alert">{faults[key]}</p>{:else}<output class="expr-now">= {expressionNow(key)}</output>{/if}
-      </div>
-    {/if}
-  {/snippet}
-
-  {#snippet animRow(prop: AnimProp)}
-    {@const range = slider(prop)}
-    <div class="row anim" data-prop={prop.key}>
-      <span class="name">{@render diamond(prop.key)}{@render exprToggle(prop.key)}{prop.label}</span>
-      <div class="range">
-        {#if DIALS.has(prop.key)}<Dial value={numberShown(prop)} label={prop.label} onchange={(v) => animate(prop.key, stored(prop.key, v))} />{/if}
-        <input type="range" min={range.min} max={range.max} step={range.step} value={numberShown(prop)} oninput={(e) => animate(prop.key, stored(prop.key, Number(e.currentTarget.value)))} />
-        <input class="num" type="text" inputmode="decimal" aria-label={prop.label} value={String(numberShown(prop))} onchange={(e) => animateText(prop, e.currentTarget.value)} />
-        {#if range.unit}<span class="unit" data-unit={range.unit}>{range.unit}</span>{/if}
-      </div>
+{#snippet exprEditor(key: string)}
+  {#if clip.expressions[key] !== undefined}
+    <div class="expr" data-expression={key}>
+      <div class="expr-head"><span>ƒ {key}</span><button type="button" aria-label={`Remove the ${key} expression`} onclick={() => toggleExpression(key)}>×</button></div>
+      <textarea class="code" rows="2" spellcheck="false" aria-label={`${key} expression`} value={clip.expressions[key]} onchange={(e) => editExpression(key, e.currentTarget.value)}></textarea>
+      {#if faults[key]}<p class="expr-error" role="alert">{faults[key]}</p>{:else}<output class="expr-now">= {expressionNow(key)}</output>{/if}
     </div>
-    {@render exprEditor(prop.key)}
-  {/snippet}
+  {/if}
+{/snippet}
 
-  {#if transformProps.length}
-    <section data-testid="transform-section">
-      <h4>3D transform</h4>
-      {#each transformProps as prop (prop.key)}{@render animRow(prop)}{/each}
-      <div class="row anim">
-        <span class="name">Anchor</span>
+{#snippet animField(prop: AnimProp)}
+  {@const look = fieldLook(prop.key, prop.source)}
+  {@const range = slider(prop)}
+  <NumberField
+    label={look.glyph ?? prop.label}
+    kind={look.glyph ? FieldKind.Glyph : FieldKind.Named}
+    name={prop.label}
+    value={numberShown(prop)}
+    {range}
+    unit={range.unit ?? look.unit}
+    fill={look.fill}
+    mark={MARK[keyState(prop.key)]}
+    expression={clip.expressions[prop.key] !== undefined}
+    onchange={(v) => animate(prop.key, stored(prop.key, v))}
+    onkey={() => toggle(prop.key)}
+    onexpression={() => toggleExpression(prop.key)}
+  />
+{/snippet}
+
+{#snippet animGrid(props: AnimProp[])}
+  <div class="grid2">
+    {#each props as prop (prop.key)}
+      {@const look = fieldLook(prop.key, prop.source)}
+      <div class="grid-cell" class:wide={!look.glyph} data-prop={prop.key}>{@render animField(prop)}</div>
+    {/each}
+  </div>
+  {#each props as prop (prop.key)}{@render exprEditor(prop.key)}{/each}
+{/snippet}
+
+{#snippet animList(props: AnimProp[], labelOf: (prop: AnimProp) => string)}
+  {#each props as prop (prop.key)}
+    <div class="stack" data-prop={prop.key}>{@render animField({ ...prop, label: labelOf(prop) })}</div>
+    {@render exprEditor(prop.key)}
+  {/each}
+{/snippet}
+
+{#snippet rangeField(field: Field)}
+  {@const keyed = keyedField(clip.component, field.key, animated.params)}
+  {@const look = fieldLook(field.key)}
+  {@const range = fieldSlider(field)}
+  <NumberField
+    label={look.glyph ?? field.label}
+    kind={look.glyph ? FieldKind.Glyph : FieldKind.Named}
+    name={field.label}
+    value={fieldShown(field)}
+    {range}
+    unit={range.unit ?? look.unit}
+    fill={look.fill}
+    mark={keyed ? MARK[keyState(field.key)] : null}
+    expression={clip.expressions[field.key] !== undefined}
+    onchange={(v) => setProp(field, fieldStored(field, v))}
+    onkey={() => toggle(field.key)}
+    onexpression={keyed ? () => toggleExpression(field.key) : undefined}
+  />
+{/snippet}
+
+{#snippet fieldRow(field: Field)}
+  {@const keyed = keyedField(clip.component, field.key, animated.params)}
+  {#if field.control === Control.Range}
+    <div class="stack" data-prop={field.key}>{@render rangeField(field)}</div>
+    {#if keyed}{@render exprEditor(field.key)}{/if}
+  {:else if field.control === Control.Textarea}
+    <div class="stack">
+      <textarea id={`f-${field.key}`} class="content" aria-label={field.label} rows="3" value={String(value(field) ?? '')} onchange={(e) => setProp(field, e.currentTarget.value)} oninput={(e) => grow(e.currentTarget)}></textarea>
+    </div>
+  {:else}
+    <div class="line">
+      <label for={`f-${field.key}`}>{field.label}</label>
+      <div class="control">
+        {#if field.control === Control.Text}
+          <input id={`f-${field.key}`} type="text" value={String(value(field) ?? '')} onchange={(e) => setProp(field, e.currentTarget.value)} />
+        {:else if field.control === Control.Select}
+          <select id={`f-${field.key}`} value={String(value(field))} onchange={(e) => setProp(field, e.currentTarget.value)}>
+            {#each field.options ?? [] as option (option)}<option value={option}>{option}</option>{/each}
+          </select>
+        {:else if field.control === Control.Toggle}
+          <input id={`f-${field.key}`} class="toggle" type="checkbox" checked={value(field) === true} onchange={(e) => setProp(field, e.currentTarget.checked)} />
+        {:else if field.control === Control.Color}
+          <div class="swatches">
+            {#each BRAND_COLORS as token (token)}
+              <button type="button" class="swatch" class:on={value(field) === token} title={token} aria-label={token} style={`background: ${resolveColor(token, tokens)};`} onclick={() => setProp(field, token)}></button>
+            {/each}
+            <input id={`f-${field.key}`} type="color" value={isHex(value(field)) ? String(value(field)) : resolveColor(value(field), tokens)} onchange={(e) => setProp(field, e.currentTarget.value)} />
+          </div>
+        {:else if field.control === Control.Asset}
+          <div class="assets">
+            <button type="button" class="asset none" class:on={!value(field)} onclick={() => setProp(field, null)}>None</button>
+            {#each assets.filter((a) => a.kind === field.assetKind) as asset (asset.id)}
+              <button type="button" class="asset" class:on={value(field) === asset.id} title={asset.label} onclick={() => setProp(field, asset.id)}>
+                {#if asset.kind === 'image'}<img src={asset.previewUrl} alt="" />{:else}<span>{asset.label}</span>{/if}
+              </button>
+            {:else}
+              <span class="empty">No {field.assetKind} assets on this canvas yet.</span>
+            {/each}
+          </div>
+        {:else if field.control === Control.Font}
+          <FontPicker value={String(value(field))} fonts={doc.fonts} brand={tokens.fonts ?? []} onpick={(family, catalogue) => pickFont(field, family, catalogue)} onupload={onuploadfont} />
+        {:else if field.control === Control.Comp}
+          <div class="comp">
+            <select id={`f-${field.key}`} value={String(value(field))} onchange={(e) => setProp(field, e.currentTarget.value)}>
+              {#each Object.entries(doc.comps) as [id, comp] (id)}<option value={id}>{comp.name}</option>{/each}
+            </select>
+            <button type="button" data-testid="open-comp" disabled={!doc.comps[String(value(field))]} onclick={() => onopen?.(String(value(field)))}>Open</button>
+          </div>
+        {:else if field.control === Control.Managed}
+          <span class="managed">{managedSummary(value(field))}{#if composeHref} · <a href={composeHref}>Edit in Compositions</a>{/if}</span>
+        {/if}
+      </div>
+      {#if keyed}{@render diamond(field.key)}{/if}
+    </div>
+  {/if}
+{/snippet}
+
+{#snippet groupFields(section: Section)}
+  {#each groupsIn(section) as { group, fields } (group)}
+    {@const gridded = fields.filter(inGrid)}
+    {#each fields.filter((f) => !inGrid(f)) as field (field.key)}{@render fieldRow(field)}{/each}
+    {#if gridded.length}
+      <div class="grid2">
+        {#each gridded as field (field.key)}<div class="grid-cell" data-prop={field.key}>{@render rangeField(field)}</div>{/each}
+      </div>
+      {#each gridded as field (field.key)}{@render exprEditor(field.key)}{/each}
+    {/if}
+  {/each}
+{/snippet}
+
+{#snippet contentBody()}
+  {@render groupFields(Section.Content)}
+{/snippet}
+
+{#snippet styleBody()}
+  {@render groupFields(Section.Style)}
+{/snippet}
+
+{#snippet layoutBody()}
+  {#if layoutProps.length}
+    <div data-testid="transform-section">
+      {@render animGrid(layoutProps)}
+      <div class="line">
+        <span class="label">Anchor</span>
         <div class="anchor" role="group" aria-label="Anchor">
           {#each ANCHOR_STOPS as ay (ay)}
             {#each ANCHOR_STOPS as ax (ax)}
@@ -426,20 +544,77 @@
           {/each}
         </div>
       </div>
-      {#if clip.keyframes.x?.length && clip.keyframes.y?.length}
-        <div class="row" data-testid="path-row">
-          <label><input type="checkbox" checked={!!clip.path} onchange={(e) => commit(setMotionPath(doc, clip.id, { enabled: e.currentTarget.checked }), 'Toggled the motion path')} /> Motion path</label>
-          {#if clip.path}
-            <label><input type="checkbox" checked={clip.path.autoOrient} onchange={(e) => commit(setMotionPath(doc, clip.id, { autoOrient: e.currentTarget.checked }), 'Toggled auto-orient')} /> Auto-orient</label>
-          {/if}
-        </div>
-      {/if}
-    </section>
+    </div>
   {/if}
+  {@render groupFields(Section.Layout)}
+{/snippet}
 
+{#snippet timingBody()}
+  <div class="grid2">
+    <label class="clock"><span>In</span><input type="text" aria-label="Start" value={clockText(clip.from, doc.fps)} onchange={(e) => setClock('from', e.currentTarget.value)} /></label>
+    <label class="clock"><span>Dur</span><input type="text" aria-label="Length" value={clockText(clip.durationInFrames, doc.fps)} onchange={(e) => setClock('durationInFrames', e.currentTarget.value)} /></label>
+  </div>
+  {#if shows(Part.Transitions, family)}
+    {#each [Side.In, Side.Out] as side (side)}
+      {@const edge = side === Side.In ? clip.transitionIn : clip.transitionOut}
+      <div class="grid2 transition">
+        <label class="clock">
+          <span>{EDGE_GLYPH[side]}</span>
+          <select aria-label={`Transition ${side}`} value={edge.kind} onchange={(e) => setEdge(side, { kind: e.currentTarget.value as Edge['kind'], durationInFrames: edge.durationInFrames || DEFAULT_EDGE_FRAMES })}>
+            {#each TRANSITION_KINDS as kind (kind)}<option value={kind}>{kind}</option>{/each}
+          </select>
+        </label>
+        <label class="clock"><span>Dur</span><input type="text" aria-label={`Transition ${side} duration`} value={clockText(edge.durationInFrames, doc.fps)} onchange={(e) => setEdgeClock(side, e.currentTarget.value)} /></label>
+      </div>
+    {/each}
+  {/if}
+{/snippet}
+
+{#snippet shapeBody()}
+  <div data-testid="shape-section">
+    <div class="line">
+      <span class="label">Path</span>
+      {#if clip.props.shape !== ShapeKind.Path}
+        <button type="button" class="link" data-testid="convert-to-path" onclick={convertToPath}>Convert to editable path</button>
+      {:else}
+        <span class="managed">Edit points on the preview with the pen tool.</span>
+      {/if}
+    </div>
+    {#each shapeMorphs as _target, i (i)}
+      <div class="line">
+        <span class="label">Morph {i + 1}</span>
+        <button type="button" class="icon" aria-label={`Remove morph target ${i + 1}`} onclick={() => commit(setProps(doc, clip.id, { morphs: shapeMorphs.filter((_, j) => j !== i) }), 'Removed a morph target')}>×</button>
+      </div>
+    {/each}
+    <select class="add" aria-label="Morph to" data-testid="add-morph" title="Adds the shape and keys the morph from the playhead over one second" value="" onchange={(e) => addMorphOf(e.currentTarget)}>
+      <option value="">Morph to…</option>
+      {#each SHAPE_KINDS.filter((k) => k !== ShapeKind.Path) as kind (kind)}<option value={kind}>{kind}</option>{/each}
+    </select>
+    <select class="add" aria-label="Liquid preset" data-testid="shape-preset" value="" onchange={(e) => applyShapePresetOf(e.currentTarget)}>
+      <option value="">Liquid preset…</option>
+      {#each SHAPE_PRESETS as preset (preset)}<option value={preset} title={SHAPE_PRESET[preset].about}>{SHAPE_PRESET[preset].label}</option>{/each}
+    </select>
+    {#each shapeModifiers as modifier, i (modifier.id)}
+      <div class="effect" class:off={!modifier.enabled} data-modifier={modifier.id}>
+        <div class="effect-head">
+          <label class="effect-name"><input type="checkbox" checked={modifier.enabled} aria-label={`Enable ${MODIFIERS[modifier.kind].label}`} onchange={(e) => commit(setModifier(doc, clip.id, modifier.id, { enabled: e.currentTarget.checked }), 'Toggled a modifier')} />{MODIFIERS[modifier.kind].label}</label>
+          <button type="button" class="icon" aria-label="Move modifier up" disabled={i === 0} onclick={() => commit(setModifier(doc, clip.id, modifier.id, { index: i - 1 }), 'Reordered modifiers')}>↑</button>
+          <button type="button" class="icon" aria-label="Move modifier down" disabled={i === shapeModifiers.length - 1} onclick={() => commit(setModifier(doc, clip.id, modifier.id, { index: i + 1 }), 'Reordered modifiers')}>↓</button>
+          <button type="button" class="icon" aria-label={`Remove ${MODIFIERS[modifier.kind].label}`} onclick={() => commit(removeModifier(doc, clip.id, modifier.id), 'Removed a modifier')}>×</button>
+        </div>
+        {@render animList(modifierParams(modifier.id), afterDot)}
+      </div>
+    {/each}
+    <select class="add" aria-label="Add modifier" data-testid="add-modifier" value="" onchange={(e) => addModifierOf(e.currentTarget)}>
+      <option value="">Add modifier…</option>
+      {#each MODIFIER_KINDS as kind (kind)}<option value={kind}>{MODIFIERS[kind].label}</option>{/each}
+    </select>
+  </div>
+{/snippet}
+
+{#snippet animateBody()}
   {#if TEXT_COMPONENTS.has(clip.component)}
-    <section data-testid="text-animators-section">
-      <h4>Text animators</h4>
+    <div data-testid="text-animators-section">
       {#each clip.animators as animator, i (animator.id)}
         <div class="effect" data-animator={animator.id}>
           <div class="effect-head">
@@ -447,153 +622,144 @@
             <select aria-label="Selector shape" value={animator.shape} onchange={(e) => commit(setAnimator(doc, clip.id, animator.id, { shape: e.currentTarget.value as SelectorShape }), 'Changed a text animator')}>
               {#each SELECTOR_SHAPES as shape (shape)}<option value={shape}>{shape}</option>{/each}
             </select>
-            <button type="button" aria-label="Shuffle order" title="Randomise the order (seeded)" onclick={() => commit(setAnimator(doc, clip.id, animator.id, { seed: animator.seed === null ? 1 : null }), 'Changed a text animator')}>{animator.seed === null ? '↯' : '→'}</button>
-            <button type="button" aria-label={`Remove animator ${i + 1}`} onclick={() => commit(removeAnimator(doc, clip.id, animator.id), 'Removed a text animator')}>×</button>
+            <button type="button" class="icon" aria-label="Shuffle order" title="Randomise the order (seeded)" onclick={() => commit(setAnimator(doc, clip.id, animator.id, { seed: animator.seed === null ? 1 : null }), 'Changed a text animator')}>{animator.seed === null ? '↯' : '→'}</button>
+            <button type="button" class="icon" aria-label={`Remove animator ${i + 1}`} onclick={() => commit(removeAnimator(doc, clip.id, animator.id), 'Removed a text animator')}>×</button>
           </div>
-          {#each animatorRows(animator.id) as prop (prop.key)}
-            {#if prop.kind === ValueKind.Number}{@render animRow({ ...prop, label: prop.label.split(' · ')[1] })}{/if}
-          {/each}
+          {@render animList(animatorRows(animator.id).filter((p) => p.kind === ValueKind.Number), afterDot)}
         </div>
       {/each}
-      <div class="row">
-        <select aria-label="Add text preset" data-testid="add-text-preset" value="" onchange={(e) => addTextPreset(e.currentTarget)}>
-          <option value="">Add text animation…</option>
-          {#each TEXT_PRESETS as preset (preset)}<option value={preset}>{preset}</option>{/each}
+      <select class="add" aria-label="Add text preset" data-testid="add-text-preset" value="" onchange={(e) => addTextPreset(e.currentTarget)}>
+        <option value="">Add text animation…</option>
+        {#each TEXT_PRESETS as preset (preset)}<option value={preset}>{preset}</option>{/each}
+      </select>
+    </div>
+  {/if}
+  {#if pulseShown}
+    <div class="line" data-testid="pulse-section">
+      <span class="label">Pulse with music</span>
+      <div class="chips">
+        {#each pulsable as prop (prop)}<button type="button" class="chip" data-pulse={prop} onclick={() => commit(pulseWithMusic(doc, clip.id, prop), `Pulsed ${prop} with the music`)}>{prop}</button>{/each}
+      </div>
+    </div>
+  {/if}
+  {#if voices.length && shows(Part.Ducking, family)}
+    <div class="line" data-testid="duck-section">
+      <span class="label">Ducking</span>
+      <div class="control duck">
+        <select aria-label="Voice-over" value={voice || voices[0]} onchange={(e) => (voice = e.currentTarget.value)}>
+          {#each voices as id (id)}<option value={id}>{clipName(id)}</option>{/each}
+        </select>
+        <button type="button" class="secondary" data-testid="duck" onclick={duck}>Duck</button>
+      </div>
+    </div>
+  {/if}
+  {#if clip.keyframes.x?.length && clip.keyframes.y?.length}
+    <div class="checks" data-testid="path-row">
+      <label class="check"><input type="checkbox" checked={!!clip.path} onchange={(e) => commit(setMotionPath(doc, clip.id, { enabled: e.currentTarget.checked }), 'Toggled the motion path')} /> Motion path</label>
+      {#if clip.path}
+        <label class="check"><input type="checkbox" checked={clip.path.autoOrient} onchange={(e) => commit(setMotionPath(doc, clip.id, { autoOrient: e.currentTarget.checked }), 'Toggled auto-orient')} /> Auto-orient</label>
+      {/if}
+    </div>
+  {/if}
+  {#if visual}
+    <div data-testid="physics-section">
+      <div class="line">
+        <label class="label" for="physics-preset">Physics</label>
+        <select id="physics-preset" aria-label="Physics preset" data-testid="physics-preset" value="" onchange={(e) => applyPhysicsOf(e.currentTarget)}>
+          <option value="">Physics preset…</option>
+          {#each PHYSICS_PRESETS as preset (preset)}<option value={preset} title={PHYSICS_PRESET[preset].about}>{PHYSICS_PRESET[preset].label}</option>{/each}
         </select>
       </div>
-    </section>
-  {/if}
-
-  {#if clip.component === 'Shape'}
-    <section data-testid="shape-section">
-      <h4>Path</h4>
-      <div class="row">
-        {#if clip.props.shape !== ShapeKind.Path}
-          <button type="button" data-testid="convert-to-path" onclick={convertToPath}>Convert to editable path</button>
-        {:else}
-          <span class="managed">Edit points on the preview with the pen tool.</span>
-        {/if}
-      </div>
-      <h4>Morph</h4>
-      {#each shapeMorphs as _target, i (i)}
-        <div class="row">
-          <span class="managed">Target {i + 1}</span>
-          <button type="button" aria-label={`Remove morph target ${i + 1}`} onclick={() => commit(setProps(doc, clip.id, { morphs: shapeMorphs.filter((_, j) => j !== i) }), 'Removed a morph target')}>×</button>
-        </div>
-      {/each}
-      <select aria-label="Morph to" data-testid="add-morph" title="Adds the shape and keys the morph from the playhead over one second" value="" onchange={(e) => addMorphOf(e.currentTarget)}>
-        <option value="">Morph to…</option>
-        {#each SHAPE_KINDS.filter((k) => k !== ShapeKind.Path) as kind (kind)}<option value={kind}>{kind}</option>{/each}
-      </select>
-      <h4>Modifiers</h4>
-      <select aria-label="Liquid preset" data-testid="shape-preset" value="" onchange={(e) => applyShapePresetOf(e.currentTarget)}>
-        <option value="">Liquid preset…</option>
-        {#each SHAPE_PRESETS as preset (preset)}<option value={preset} title={SHAPE_PRESET[preset].about}>{SHAPE_PRESET[preset].label}</option>{/each}
-      </select>
-      {#each shapeModifiers as modifier, i (modifier.id)}
-        <div class="effect" class:off={!modifier.enabled} data-modifier={modifier.id}>
-          <div class="effect-head">
-            <label class="effect-name"><input type="checkbox" checked={modifier.enabled} aria-label={`Enable ${MODIFIERS[modifier.kind].label}`} onchange={(e) => commit(setModifier(doc, clip.id, modifier.id, { enabled: e.currentTarget.checked }), 'Toggled a modifier')} />{MODIFIERS[modifier.kind].label}</label>
-            <button type="button" aria-label="Move modifier up" disabled={i === 0} onclick={() => commit(setModifier(doc, clip.id, modifier.id, { index: i - 1 }), 'Reordered modifiers')}>↑</button>
-            <button type="button" aria-label="Move modifier down" disabled={i === shapeModifiers.length - 1} onclick={() => commit(setModifier(doc, clip.id, modifier.id, { index: i + 1 }), 'Reordered modifiers')}>↓</button>
-            <button type="button" aria-label={`Remove ${MODIFIERS[modifier.kind].label}`} onclick={() => commit(removeModifier(doc, clip.id, modifier.id), 'Removed a modifier')}>×</button>
-          </div>
-          {#each modifierParams(modifier.id) as prop (prop.key)}
-            {@render animRow({ ...prop, label: prop.label.split(' · ')[1] })}
-          {/each}
-        </div>
-      {/each}
-      <select aria-label="Add modifier" data-testid="add-modifier" value="" onchange={(e) => addModifierOf(e.currentTarget)}>
-        <option value="">Add modifier…</option>
-        {#each MODIFIER_KINDS as kind (kind)}<option value={kind}>{MODIFIERS[kind].label}</option>{/each}
-      </select>
-    </section>
-  {/if}
-
-  {#if spec.track === TrackKind.Visual && clip.component !== 'Null'}
-    <section data-testid="effects-section">
-      <h4>Effects</h4>
-      {#each clip.effects as effect, i (effect.id)}
-        <div class="effect" class:off={!effect.enabled} role="listitem" draggable="true" data-effect={effect.id} ondragstart={() => (draggedEffect = effect.id)} ondragover={(e) => e.preventDefault()} ondrop={() => dropEffect(i)}>
-          <div class="effect-head">
-            <span class="grip" aria-hidden="true">⋮⋮</span>
-            <label class="effect-name"><input type="checkbox" checked={effect.enabled} aria-label={`Enable ${EFFECTS[effect.kind].label}`} onchange={(e) => commit(setEffect(doc, clip.id, effect.id, { enabled: e.currentTarget.checked }), 'Toggled an effect')} />{EFFECTS[effect.kind].label}</label>
-            <button type="button" aria-label="Move effect up" disabled={i === 0} onclick={() => commit(setEffect(doc, clip.id, effect.id, { index: i - 1 }), 'Reordered effects')}>↑</button>
-            <button type="button" aria-label="Move effect down" disabled={i === clip.effects.length - 1} onclick={() => commit(setEffect(doc, clip.id, effect.id, { index: i + 1 }), 'Reordered effects')}>↓</button>
-            <button type="button" aria-label={`Remove ${EFFECTS[effect.kind].label}`} onclick={() => commit(removeEffect(doc, clip.id, effect.id), 'Removed an effect')}>×</button>
-          </div>
-          {#if effect.kind === 'lut'}<LutPicker {doc} clipId={clip.id} {effect} {onchange} />{/if}
-          {#each effectParams(effect.id) as prop (prop.key)}
-            {#if prop.kind === ValueKind.Color}
-              <div class="row anim" data-prop={prop.key}>
-                <span class="name">{@render diamond(prop.key)}{prop.label.split(' · ')[1]}</span>
-                <input type="color" aria-label={prop.label} value={resolve(String(shown(prop.key)))} onchange={(e) => animate(prop.key, e.currentTarget.value)} />
-              </div>
-            {:else}
-              {@render animRow({ ...prop, label: prop.label.split(' · ')[1] })}
-            {/if}
-          {/each}
-        </div>
-      {/each}
-      <select aria-label="Add effect" data-testid="add-effect" value="" onchange={(e) => addEffectOf(e.currentTarget)}>
-        <option value="">Add effect…</option>
-        {#each EFFECT_KINDS as kind (kind)}<option value={kind}>{EFFECTS[kind].label}</option>{/each}
-      </select>
-    </section>
-  {/if}
-
-  {#if spec.track === TrackKind.Visual}
-    <section data-testid="physics-section">
-      <h4>Physics</h4>
-      <select aria-label="Physics preset" data-testid="physics-preset" value="" onchange={(e) => applyPhysicsOf(e.currentTarget)}>
-        <option value="">Physics preset…</option>
-        {#each PHYSICS_PRESETS as preset (preset)}<option value={preset} title={PHYSICS_PRESET[preset].about}>{PHYSICS_PRESET[preset].label}</option>{/each}
-      </select>
       {#if clip.physics}
         {@const physics = clip.physics}
         {#each PHYSICS_KEYS as key (key)}
-          {@const range = slider({ key, ...PHYSICS[key] })}
-          {@const value = toShown(clip.component, key, physics[key], doc)}
-          <div class="row anim" data-physics={key}>
-            <span class="name">{PHYSICS[key].label}</span>
-            <div class="range">
-              <input type="range" min={range.min} max={range.max} step={range.step} {value} onchange={(e) => setPhysicsValue(key, e.currentTarget.value)} />
-              <input class="num" type="text" inputmode="decimal" aria-label={PHYSICS[key].label} value={String(value)} onchange={(e) => setPhysicsValue(key, e.currentTarget.value)} />
-              {#if range.unit}<span class="unit">{range.unit}</span>{/if}
-            </div>
+          <div class="stack" data-physics={key}>
+            <NumberField label={PHYSICS[key].label} kind={FieldKind.Named} name={PHYSICS[key].label} value={physics[key]} range={PHYSICS[key]} onchange={(v) => setPhysicsValue(key, v)} />
           </div>
         {/each}
-        <div class="row">
-          <label for="physics-bounds">Bounces on</label>
+        <div class="line">
+          <label class="label" for="physics-bounds">Bounces on</label>
           <select id="physics-bounds" value={physics.bounds} onchange={(e) => commit(setPhysics(doc, clip.id, { bounds: e.currentTarget.value as Bounds }), 'Changed physics bounds')}>
             {#each BOUNDS as bounds (bounds)}<option value={bounds}>{bounds}</option>{/each}
           </select>
         </div>
         <label class="check"><input type="checkbox" checked={physics.collide} onchange={(e) => commit(setPhysics(doc, clip.id, { collide: e.currentTarget.checked }), 'Toggled physics collisions')} />Collide with other clips</label>
-        <button type="button" data-testid="physics-off" onclick={() => commit(setPhysics(doc, clip.id, null), 'Removed physics')}>Remove physics</button>
+        <button type="button" class="link" data-testid="physics-off" onclick={() => commit(setPhysics(doc, clip.id, null), 'Removed physics')}>Remove physics</button>
       {/if}
-    </section>
+    </div>
+  {/if}
+  {@render groupFields(Section.Animate)}
+{/snippet}
 
-    <section data-testid="blend-section">
-      <h4>Blend mode</h4>
-      <div class="row">
-        <select aria-label="Blend mode" data-testid="blend-select" value={clip.blend} onchange={(e) => commit(setBlendMode(doc, clip.id, e.currentTarget.value as BlendMode), 'Changed the blend mode')}>
-          {#each BLEND_MODES as mode (mode)}<option value={mode}>{BLEND_LABEL[mode]}</option>{/each}
-        </select>
+{#snippet effectsBody()}
+  <div data-testid="effects-section">
+    {#each clip.effects as effect, i (effect.id)}
+      <div class="effect" class:off={!effect.enabled} role="listitem" draggable="true" data-effect={effect.id} ondragstart={() => (draggedEffect = effect.id)} ondragover={(e) => e.preventDefault()} ondrop={() => dropEffect(i)}>
+        <div class="effect-head">
+          <span class="grip" aria-hidden="true">⋮⋮</span>
+          <label class="effect-name"><input type="checkbox" checked={effect.enabled} aria-label={`Enable ${EFFECTS[effect.kind].label}`} onchange={(e) => commit(setEffect(doc, clip.id, effect.id, { enabled: e.currentTarget.checked }), 'Toggled an effect')} />{EFFECTS[effect.kind].label}</label>
+          <button type="button" class="icon" aria-label="Move effect up" disabled={i === 0} onclick={() => commit(setEffect(doc, clip.id, effect.id, { index: i - 1 }), 'Reordered effects')}>↑</button>
+          <button type="button" class="icon" aria-label="Move effect down" disabled={i === clip.effects.length - 1} onclick={() => commit(setEffect(doc, clip.id, effect.id, { index: i + 1 }), 'Reordered effects')}>↓</button>
+          <button type="button" class="icon" aria-label={`Remove ${EFFECTS[effect.kind].label}`} onclick={() => commit(removeEffect(doc, clip.id, effect.id), 'Removed an effect')}>×</button>
+        </div>
+        {#if effect.kind === 'lut'}<LutPicker {doc} clipId={clip.id} {effect} {onchange} />{/if}
+        {#each effectParams(effect.id) as prop (prop.key)}
+          {#if prop.kind === ValueKind.Color}
+            <div class="line" data-prop={prop.key}>
+              <span class="label">{afterDot(prop)}</span>
+              <input type="color" aria-label={prop.label} value={resolve(String(shown(prop.key)))} onchange={(e) => animate(prop.key, e.currentTarget.value)} />
+              {@render diamond(prop.key)}
+            </div>
+          {:else}
+            {@render animList([prop], afterDot)}
+          {/if}
+        {/each}
       </div>
-    </section>
+    {/each}
+    <select class="add" aria-label="Add effect" data-testid="add-effect" value="" onchange={(e) => addEffectOf(e.currentTarget)}>
+      <option value="">Add effect…</option>
+      {#each EFFECT_KINDS as kind (kind)}<option value={kind}>{EFFECTS[kind].label}</option>{/each}
+    </select>
+  </div>
+  <div class="line" data-testid="blend-section">
+    <label class="label" for="blend-mode">Blend</label>
+    <select id="blend-mode" aria-label="Blend mode" data-testid="blend-select" value={clip.blend} onchange={(e) => commit(setBlendMode(doc, clip.id, e.currentTarget.value as BlendMode), 'Changed the blend mode')}>
+      {#each BLEND_MODES as mode (mode)}<option value={mode}>{BLEND_LABEL[mode]}</option>{/each}
+    </select>
+  </div>
+  {#if doc.motionBlur.enabled}
+    <label class="check" data-testid="clip-blur-section"><input type="checkbox" data-testid="clip-blur" checked={clip.motionBlur} onchange={(e) => commit(setClipsBlur(doc, [clip.id], e.currentTarget.checked), 'Changed motion blur')} /> Motion blur on this clip</label>
+  {/if}
+{/snippet}
 
-    {#if doc.motionBlur.enabled}
-      <section data-testid="clip-blur-section">
-        <h4>Motion blur</h4>
-        <label class="row"><input type="checkbox" data-testid="clip-blur" checked={clip.motionBlur} onchange={(e) => commit(setClipsBlur(doc, [clip.id], e.currentTarget.checked), 'Changed motion blur')} /> Blur this clip</label>
-      </section>
-    {/if}
+{#snippet threeDBody()}
+  {#if dialProps.length}
+    <div class="dials">
+      {#each dialProps as prop (prop.key)}
+        <div class="dial-cell"><Dial value={numberShown(prop)} label={prop.label} onchange={(v) => animate(prop.key, stored(prop.key, v))} /><span>{fieldLook(prop.key).glyph}</span></div>
+      {/each}
+    </div>
+  {/if}
+  {#if threeDProps.length}{@render animGrid(threeDProps)}{/if}
+  {#if sceneProps.length}{@render animGrid(sceneProps)}{/if}
+  {@render groupFields(Section.ThreeD)}
+  {#if spec.track === TrackKind.Visual}
+    <div data-testid="depth-section">
+      <div class="stack">
+        <NumberField label={DEPTH.label} kind={FieldKind.Named} name="Depth" value={clip.depth} range={depthRange} unit={depthRange.unit ?? ''} disabled={clip.space === Space.Screen} onchange={(v) => commit(setClipDepth(doc, clip.id, { depth: v }), 'Changed depth')} />
+      </div>
+      <label class="check"><input type="checkbox" data-testid="screen-space" checked={clip.space === Space.Screen} onchange={(e) => commit(setClipDepth(doc, clip.id, { space: e.currentTarget.checked ? Space.Screen : Space.World }), 'Changed space')} />Screen space: ignores the camera</label>
+      {#if !doc.camera}<p class="hint">Depth shows once the video has a camera.</p>{/if}
+    </div>
+  {/if}
+{/snippet}
 
-    <section data-testid="parent-section">
-      <h4>Parent</h4>
-      <div class="row">
-        <select aria-label="Parent" data-testid="parent-select" value={clip.parent ?? NO_PARENT} onchange={(e) => commit(setParent(doc, clip.id, e.currentTarget.value === NO_PARENT ? null : e.currentTarget.value, { at: frame }), 'Changed the parent')}>
+{#snippet parentBody()}
+  {#if spec.track === TrackKind.Visual}
+    <div data-testid="parent-section">
+      <div class="line">
+        <label class="label" for="parent-select">Parent</label>
+        <select id="parent-select" aria-label="Parent" data-testid="parent-select" value={clip.parent ?? NO_PARENT} onchange={(e) => commit(setParent(doc, clip.id, e.currentTarget.value === NO_PARENT ? null : e.currentTarget.value, { at: frame }), 'Changed the parent')}>
           <option value={NO_PARENT}>None</option>
           {#each parentChoices(doc, clip.id) as id (id)}<option value={id}>{clipName(id)}</option>{/each}
         </select>
@@ -601,61 +767,28 @@
       {#if clip.parent}
         <label class="check"><input type="checkbox" data-testid="parent-opacity" checked={clip.parentOpacity === ParentOpacity.Inherit} onchange={(e) => commit(setParentOpacity(doc, clip.id, e.currentTarget.checked ? ParentOpacity.Inherit : ParentOpacity.Ignore), 'Changed opacity inheritance')} />Inherit the parent opacity</label>
       {/if}
-    </section>
-
-    <section data-testid="depth-section">
-      <h4>Camera depth</h4>
-      <div class="row anim">
-        <span class="name">{DEPTH.label}</span>
-        <div class="range">
-          <input type="range" min={depthRange.min} max={depthRange.max} step={depthRange.step} value={clip.depth} disabled={clip.space === Space.Screen} oninput={(e) => commit(setClipDepth(doc, clip.id, { depth: Number(e.currentTarget.value) }), 'Changed depth')} />
-          <input class="num" type="text" inputmode="decimal" aria-label="Depth" value={String(clip.depth)} disabled={clip.space === Space.Screen} onchange={(e) => setDepthText(e.currentTarget.value)} />
-          <span class="unit">{depthRange.unit}</span>
-        </div>
-      </div>
-      <label class="check"><input type="checkbox" data-testid="screen-space" checked={clip.space === Space.Screen} onchange={(e) => commit(setClipDepth(doc, clip.id, { space: e.currentTarget.checked ? Space.Screen : Space.World }), 'Changed space')} />Screen space: ignores the camera</label>
-      {#if !doc.camera}<p class="hint">Depth shows once the video has a camera (Camera track).</p>{/if}
-    </section>
+    </div>
   {/if}
-
-  {#if sceneProps.length}
-    <section>
-      <h4>3D scene</h4>
-      {#each sceneProps as prop (prop.key)}{@render animRow(prop)}{/each}
-    </section>
-  {/if}
-
   {#if maskProps.length}
-    <section data-testid="mask-section">
-      <h4>Mask</h4>
-      <div class="row two">
-        <label>
-          Shape
-          <select data-testid="mask-kind" value={clip.mask?.kind ?? NO_MASK} onchange={(e) => pickMask(e.currentTarget.value)}>
-            <option value={NO_MASK}>None</option>
-            {#each MASK_KIND_IDS as kind (kind)}<option value={kind}>{MASK_KINDS[kind].label}</option>{/each}
-          </select>
-        </label>
-        <label>
-          Track matte
-          <select data-testid="track-matte" value={clip.matte} onchange={(e) => commit(setTrackMatte(doc, clip.id, e.currentTarget.value as Matte), 'Changed the track matte')}>
-            {#each MATTES as matte (matte)}<option value={matte}>{MATTE_LABEL[matte]}</option>{/each}
-          </select>
-        </label>
+    <div data-testid="mask-section">
+      <div class="line">
+        <label class="label" for="mask-kind">Mask</label>
+        <select id="mask-kind" data-testid="mask-kind" value={clip.mask?.kind ?? NO_MASK} onchange={(e) => pickMask(e.currentTarget.value)}>
+          <option value={NO_MASK}>None</option>
+          {#each MASK_KIND_IDS as kind (kind)}<option value={kind}>{MASK_KINDS[kind].label}</option>{/each}
+        </select>
+      </div>
+      <div class="line">
+        <label class="label" for="track-matte">Matte</label>
+        <select id="track-matte" data-testid="track-matte" value={clip.matte} onchange={(e) => commit(setTrackMatte(doc, clip.id, e.currentTarget.value as Matte), 'Changed the track matte')}>
+          {#each MATTES as matte (matte)}<option value={matte}>{matte === Matte.None ? 'None' : `${matte} of the clip above`}</option>{/each}
+        </select>
       </div>
       {#if clip.mask}
         {@const mask = clip.mask}
-        <div class="row two">
-          <label class="check"><input type="checkbox" checked={mask.invert} onchange={(e) => editMask(mask, { invert: e.currentTarget.checked })} />Invert</label>
-          <label>
-            Mode
-            <select data-testid="mask-mode" value={mask.mode} onchange={(e) => editMask(mask, { mode: e.currentTarget.value as MaskMode })}>
-              {#each MASK_MODES as mode (mode)}<option value={mode}>{mode}</option>{/each}
-            </select>
-          </label>
-        </div>
+        <label class="check"><input type="checkbox" checked={mask.invert} onchange={(e) => editMask(mask, { invert: e.currentTarget.checked })} />Invert</label>
         {#if MASK_KINDS[mask.kind].needs === Needs.Text}
-          <div class="row"><label for="mask-text">Text</label><input id="mask-text" type="text" value={mask.text} onchange={(e) => editMask(mask, { text: e.currentTarget.value })} /></div>
+          <div class="line"><label class="label" for="mask-text">Text</label><input id="mask-text" type="text" value={mask.text} onchange={(e) => editMask(mask, { text: e.currentTarget.value })} /></div>
         {:else if MASK_KINDS[mask.kind].needs === Needs.Asset}
           <div class="assets">
             {#each pictures as asset (asset.id)}
@@ -667,148 +800,47 @@
         {:else if MASK_KINDS[mask.kind].needs === Needs.Points}
           <p class="hint">Drag the points on the preview.</p>
         {/if}
-        {#each maskProps as prop (prop.key)}{@render animRow(prop)}{/each}
-        {#each clip.maskStack as stacked, i (i)}
-          <div class="row two" data-testid="stacked-mask">
-            <label>
-              {MASK_KINDS[stacked.kind].label}
-              <select value={stacked.mode} onchange={(e) => editStack(i, { mode: e.currentTarget.value as MaskMode })}>
-                {#each MASK_MODES as mode (mode)}<option value={mode}>{mode}</option>{/each}
-              </select>
-            </label>
-            <label class="check"><input type="checkbox" checked={stacked.invert} onchange={(e) => editStack(i, { invert: e.currentTarget.checked })} />Invert</label>
-          </div>
-          <div class="row two">
-            {#each STACK_FIELDS as field (field)}
-              <label>{field}<input type="number" step="0.01" value={stacked[field]} onchange={(e) => editStack(i, { [field]: Number(e.currentTarget.value) })} /></label>
-            {/each}
-            <button type="button" onclick={() => removeStacked(i)}>Remove</button>
-          </div>
-        {/each}
-        {#if clip.maskStack.length < MAX_MASK_STACK}
-          <label>
-            Add a mask
-            <select data-testid="mask-stack-add" value="" onchange={(e) => addStacked(e.currentTarget.value as MaskKind)}>
-              <option value="">…</option>
-              {#each MASK_KIND_IDS.filter((k) => MASK_KINDS[k].needs !== Needs.Text) as kind (kind)}<option value={kind}>{MASK_KINDS[kind].label}</option>{/each}
-            </select>
-          </label>
-        {/if}
+        {@render animList(maskProps, (p) => p.label)}
       {/if}
-    </section>
+    </div>
   {/if}
-
-  {#each groups as { group, fields } (group)}
-    <section>
-      <h4>{group}</h4>
-      {#each fields as field (field.key)}
-        <div class="row">
-          <label for={`f-${field.key}`}>{#if keyedField(clip.component, field.key, animated.params)}{@render diamond(field.key)}{#if field.control === Control.Range}{@render exprToggle(field.key)}{/if}{/if}{field.label}</label>
-          {#if field.control === Control.Text}
-            <input id={`f-${field.key}`} type="text" value={String(value(field) ?? '')} onchange={(e) => setProp(field, e.currentTarget.value)} />
-          {:else if field.control === Control.Textarea}
-            <textarea id={`f-${field.key}`} rows="3" value={String(value(field) ?? '')} onchange={(e) => setProp(field, e.currentTarget.value)}></textarea>
-          {:else if field.control === Control.Range}
-            {@const range = fieldSlider(field)}
-            <div class="range">
-              <input id={`f-${field.key}`} type="range" min={range.min} max={range.max} step={range.step} value={fieldShown(field)} oninput={(e) => setProp(field, fieldStored(field, Number(e.currentTarget.value)))} />
-              <output>{fieldShown(field).toFixed(range.step < 1 ? 2 : 0)}{range.unit ?? ''}</output>
-            </div>
-          {:else if field.control === Control.Select}
-            <select id={`f-${field.key}`} value={String(value(field))} onchange={(e) => setProp(field, e.currentTarget.value)}>
-              {#each field.options ?? [] as option (option)}<option value={option}>{option}</option>{/each}
-            </select>
-          {:else if field.control === Control.Toggle}
-            <input id={`f-${field.key}`} type="checkbox" checked={value(field) === true} onchange={(e) => setProp(field, e.currentTarget.checked)} />
-          {:else if field.control === Control.Color}
-            <div class="swatches">
-              {#each BRAND_COLORS as token (token)}
-                <button type="button" class="swatch" class:on={value(field) === token} title={token} aria-label={token} style={`background: ${resolveColor(token, tokens)};`} onclick={() => setProp(field, token)}></button>
-              {/each}
-              <input id={`f-${field.key}`} type="color" value={isHex(value(field)) ? String(value(field)) : resolveColor(value(field), tokens)} onchange={(e) => setProp(field, e.currentTarget.value)} />
-            </div>
-          {:else if field.control === Control.Asset}
-            <div class="assets">
-              <button type="button" class="asset none" class:on={!value(field)} onclick={() => setProp(field, null)}>None</button>
-              {#each assets.filter((a) => a.kind === field.assetKind) as asset (asset.id)}
-                <button type="button" class="asset" class:on={value(field) === asset.id} title={asset.label} onclick={() => setProp(field, asset.id)}>
-                  {#if asset.kind === 'image'}<img src={asset.previewUrl} alt="" />{:else}<span>{asset.label}</span>{/if}
-                </button>
-              {:else}
-                <span class="empty">No {field.assetKind} assets on this canvas yet.</span>
-              {/each}
-            </div>
-          {:else if field.control === Control.Font}
-            <FontPicker value={String(value(field))} fonts={doc.fonts} brand={tokens.fonts ?? []} onpick={(family, catalogue) => pickFont(field, family, catalogue)} onupload={onuploadfont} />
-          {:else if field.control === Control.Comp}
-            <div class="comp">
-              <select id={`f-${field.key}`} value={String(value(field))} onchange={(e) => setProp(field, e.currentTarget.value)}>
-                {#each Object.entries(doc.comps) as [id, comp] (id)}<option value={id}>{comp.name}</option>{/each}
-              </select>
-              <button type="button" data-testid="open-comp" disabled={!doc.comps[String(value(field))]} onclick={() => onopen?.(String(value(field)))}>Open</button>
-            </div>
-          {:else if field.control === Control.Managed}
-            <span class="managed">{managedSummary(value(field))}{#if composeHref} · <a href={composeHref}>Edit in Compositions</a>{/if}</span>
-          {/if}
-        </div>
-        {#if keyedField(clip.component, field.key, animated.params) && field.control === Control.Range}{@render exprEditor(field.key)}{/if}
-      {/each}
-    </section>
-  {/each}
-
-  {/if}
-
-  {#if error}<p class="error" role="alert">{error}</p>{/if}
-</div>
+{/snippet}
 
 <style>
-  .comp {
-    display: flex;
-    gap: var(--ui-space-1);
-  }
-
-  .comp select {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .comp button {
-    border: 1px solid var(--ui-line);
-    border-radius: 0;
-    background: var(--ui-bg);
-    color: var(--ui-ink);
-    padding: 0 var(--ui-space-2);
-    font: inherit;
-    cursor: pointer;
-  }
-
-  .comp button:hover:not(:disabled) {
-    background: var(--ui-hover);
-  }
-
-  .managed {
-    color: var(--ui-ink-2);
-  }
-
-  .managed a {
-    color: var(--ui-ink);
-    text-decoration: underline;
-  }
-
   .inspector {
     display: flex;
     flex-direction: column;
-    font-size: 12px;
+    font-size: var(--ui-text-xs);
     overflow: auto;
     height: 100%;
   }
 
   header {
     display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    padding: 10px 12px;
+    align-items: center;
+    gap: 8px;
+    height: 40px;
+    flex-shrink: 0;
+    padding: 0 12px;
     border-bottom: 1px solid var(--ui-line);
+  }
+
+  .swatch-bar {
+    width: 3px;
+    height: 16px;
+    background: var(--hue);
+  }
+
+  .kind {
+    flex: 1;
+    font-weight: 600;
+    font-size: var(--ui-text-md);
+  }
+
+  .id {
+    font-family: var(--ui-mono);
+    font-size: 10px;
+    color: var(--ui-ink-3);
   }
 
   .tabs {
@@ -819,7 +851,7 @@
   .tabs button {
     flex: 1;
     padding: 6px 0;
-    font-size: 12px;
+    font-size: var(--ui-text-xs);
     color: var(--ui-ink-2);
   }
 
@@ -828,84 +860,146 @@
     box-shadow: inset 0 -2px 0 var(--ui-accent);
   }
 
-  .kind {
-    font-weight: 600;
-    font-size: 13px;
+  .grid2 {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 4px 6px;
+    margin-bottom: 6px;
   }
 
-  .id {
-    font-family: var(--ui-mono);
-    color: var(--ui-ink-2);
-  }
-
-  section {
-    padding: 12px 12px 14px;
-    border-bottom: 1px solid var(--ui-line);
-  }
-
-  h4 {
-    margin: 0 0 6px;
-    font-family: var(--ui-mono);
-    font-size: 10px;
-    font-weight: 400;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--ui-ink-3);
-  }
-
-  .row {
+  .dials {
     display: flex;
-    flex-direction: column;
-    gap: 3px;
+    gap: 12px;
     margin-bottom: 8px;
   }
 
-  .row.two {
-    flex-direction: row;
-    gap: 8px;
+  .dial-cell {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-family: var(--ui-mono);
+    font-size: 10px;
+    color: var(--ui-ink-3);
   }
 
-  .row.two label {
-    flex: 1;
+  .grid2 .grid-cell.wide {
+    grid-column: 1 / -1;
+  }
+
+  .stack {
+    margin-bottom: 4px;
+  }
+
+  .line {
     display: flex;
-    flex-direction: column;
-    gap: 3px;
+    align-items: center;
+    gap: 6px;
+    min-height: 24px;
+    margin-bottom: 4px;
+  }
+
+  .line > label,
+  .line > .label {
+    flex-shrink: 0;
+    width: 84px;
+    padding-left: 6px;
+    color: var(--ui-ink-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .line .control,
+  .line > select,
+  .line > input[type='text'] {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .clock {
+    display: flex;
+    align-items: center;
+    height: 24px;
+    background: var(--ui-surface);
+    border: 1px solid transparent;
+  }
+
+  .clock:hover {
+    border-color: var(--ui-line-strong);
+  }
+
+  .clock:focus-within {
+    border-color: var(--ui-accent);
+  }
+
+  .clock span {
+    flex-shrink: 0;
+    width: 28px;
+    text-align: center;
+    font-family: var(--ui-mono);
+    font-size: 10px;
+    color: var(--ui-ink-3);
+  }
+
+  .clock input,
+  .clock select {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    padding: 0 2px;
+    border: 0;
+    background: transparent;
+    font-family: var(--ui-mono);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .clock input:focus,
+  .clock select:focus {
+    border: 0;
   }
 
   input[type='text'],
-  input[type='number'],
   textarea,
   select {
     width: 100%;
-    padding: 4px 6px;
-    border: 1px solid var(--ui-line);
+    height: 24px;
+    padding: 0 6px;
+    border: 1px solid var(--ui-line-strong);
+    border-radius: 0;
     background: var(--ui-bg);
     color: var(--ui-ink);
     font: inherit;
   }
 
+  textarea {
+    height: auto;
+    padding: 6px;
+  }
+
+  textarea.content {
+    min-height: 56px;
+    font-size: var(--ui-text-md);
+    line-height: 1.35;
+    resize: none;
+    overflow: hidden;
+  }
+
   input[type='text']:focus,
-  input[type='number']:focus,
   textarea:focus,
   select:focus {
     outline: none;
     border-color: var(--ui-accent);
   }
 
-  .range {
-    display: flex;
-    align-items: center;
-    gap: 6px;
+  select.add {
+    margin-top: 2px;
+    border-style: dashed;
+    color: var(--ui-ink-2);
   }
 
-  .range input {
-    flex: 1;
-  }
-
-  output {
-    width: 40px;
-    text-align: right;
-    font-family: var(--ui-mono);
+  .toggle {
+    margin: 0;
   }
 
   .swatches {
@@ -917,7 +1011,7 @@
   .swatch {
     width: 20px;
     height: 20px;
-    border: 1px solid var(--ui-line);
+    border: 1px solid var(--ui-line-strong);
   }
 
   .swatch.on {
@@ -926,10 +1020,10 @@
   }
 
   input[type='color'] {
-    width: 28px;
+    width: 24px;
     height: 22px;
     padding: 0;
-    border: 1px solid var(--ui-line);
+    border: 1px solid var(--ui-line-strong);
     background: none;
   }
 
@@ -937,6 +1031,7 @@
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 4px;
+    margin-bottom: 4px;
   }
 
   .asset {
@@ -962,24 +1057,80 @@
 
   .empty {
     grid-column: 1 / -1;
-    color: var(--ui-ink-2);
+    color: var(--ui-ink-3);
   }
 
-  .anim .name {
+  .comp {
     display: flex;
-    align-items: center;
+    gap: var(--ui-space-1);
+  }
+
+  .comp select {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .comp button,
+  .secondary {
+    height: 24px;
+    border: 1px solid var(--ui-line-strong);
+    border-radius: 0;
+    background: var(--ui-bg);
+    color: var(--ui-ink);
+    padding: 0 var(--ui-space-2);
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .comp button:hover:not(:disabled),
+  .secondary:hover {
+    background: var(--ui-hover);
+  }
+
+  .duck {
+    display: flex;
     gap: 4px;
   }
 
-  .num {
-    width: 56px !important;
-    flex: none;
+  .managed {
+    color: var(--ui-ink-2);
   }
 
-  .unit {
-    flex: none;
-    min-width: 1.2em;
-    color: var(--ui-ink-3);
+  .managed a,
+  .link {
+    color: var(--ui-accent);
+    text-decoration: none;
+    background: none;
+    border: 0;
+    padding: 0;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .link:hover,
+  .managed a:hover {
+    text-decoration: underline;
+  }
+
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .chip {
+    height: 22px;
+    padding: 0 8px;
+    border: 1px solid var(--ui-line-strong);
+    background: var(--ui-bg);
+    font-family: var(--ui-mono);
+    font-size: 10px;
+    color: var(--ui-ink-2);
+  }
+
+  .chip:hover {
+    color: var(--ui-ink);
+    background: var(--ui-hover);
   }
 
   .effect {
@@ -989,14 +1140,18 @@
   }
 
   .effect.off {
-    opacity: 0.5;
+    opacity: 0.55;
   }
 
   .effect-head {
     display: flex;
     align-items: center;
     gap: 4px;
-    margin-bottom: 4px;
+    margin-bottom: 6px;
+  }
+
+  .effect-head select {
+    width: auto;
   }
 
   .effect-name {
@@ -1004,6 +1159,25 @@
     display: flex;
     gap: 6px;
     align-items: center;
+    font-weight: 600;
+  }
+
+  .icon {
+    width: 20px;
+    height: 20px;
+    border: 0;
+    background: none;
+    color: var(--ui-ink-3);
+    cursor: pointer;
+  }
+
+  .icon:hover:not(:disabled) {
+    color: var(--ui-ink);
+    background: var(--ui-hover);
+  }
+
+  .icon:disabled {
+    opacity: 0.4;
   }
 
   .grip {
@@ -1011,22 +1185,28 @@
     color: var(--ui-ink-3);
   }
 
-  .expr-toggle {
-    width: 16px;
-    margin-right: 4px;
-    font-family: var(--ui-mono);
-    font-size: 11px;
-    color: var(--ui-ink-3);
-  }
-
-  .expr-toggle.on {
-    color: var(--ui-accent);
-  }
-
   .expr {
     display: grid;
     gap: 4px;
     margin: 0 0 8px;
+    padding: 6px;
+    border-left: 2px solid var(--ui-accent);
+    background: var(--ui-surface);
+  }
+
+  .expr-head {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--ui-mono);
+    font-size: 10px;
+    color: var(--ui-accent);
+  }
+
+  .expr-head button {
+    border: 0;
+    background: none;
+    color: var(--ui-ink-3);
+    cursor: pointer;
   }
 
   .expr .code {
@@ -1037,7 +1217,7 @@
   }
 
   .expr-error {
-    color: #e11d48;
+    color: var(--ui-danger);
     font-size: 11px;
     margin: 0;
   }
@@ -1049,30 +1229,45 @@
   }
 
   .key {
-    font-size: 10px;
-    line-height: 1;
-    width: 14px;
-    color: var(--ui-line);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 18px;
+    height: 22px;
+    border: 0;
+    background: none;
+    cursor: pointer;
   }
 
-  .key.lane {
-    color: var(--ui-ink-2);
+  .key::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    transform: rotate(45deg);
+    border: 1.5px solid var(--ui-ink-3);
   }
 
-  .key.on {
-    color: var(--ui-accent);
+  .key[data-mark='here']::before {
+    border-color: var(--ui-accent);
+    background: var(--ui-accent);
+  }
+
+  .key[data-mark='animated']::before {
+    border-color: var(--ui-accent);
+    background: linear-gradient(135deg, var(--ui-accent) 50%, transparent 50%);
   }
 
   .anchor {
     display: grid;
-    grid-template-columns: repeat(3, 14px);
+    grid-template-columns: repeat(3, 12px);
     gap: 3px;
   }
 
   .anchor button {
-    width: 14px;
-    height: 14px;
-    border: 1px solid var(--ui-line);
+    width: 12px;
+    height: 12px;
+    border: 1px solid var(--ui-line-strong);
     background: var(--ui-bg);
   }
 
@@ -1081,20 +1276,53 @@
     border-color: var(--ui-accent);
   }
 
+  .checks {
+    display: flex;
+    gap: 12px;
+  }
+
   .check {
     display: flex;
     align-items: center;
     gap: 6px;
-    margin-bottom: 8px;
+    min-height: 24px;
+    color: var(--ui-ink-2);
   }
 
   .hint {
     margin: 0 0 8px;
-    color: var(--ui-ink-2);
+    color: var(--ui-ink-3);
+  }
+
+  @media (pointer: coarse) {
+    .line,
+    .clock,
+    .check {
+      min-height: 44px;
+    }
+
+    .clock {
+      height: 44px;
+    }
+
+    input[type='text'],
+    select {
+      height: 40px;
+    }
+
+    .key,
+    .icon {
+      width: 40px;
+      height: 40px;
+    }
+
+    .grid2 {
+      grid-template-columns: minmax(0, 1fr);
+    }
   }
 
   .error {
     margin: 8px 12px;
-    color: var(--sh-destructive);
+    color: var(--ui-danger);
   }
 </style>
