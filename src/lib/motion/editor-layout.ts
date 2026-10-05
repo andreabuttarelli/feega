@@ -38,3 +38,29 @@ export const flip = (panel: Panel): Panel => (panel === Panel.Open ? Panel.Close
 export function timelineHeight(px: number, room: number): number {
   return Math.max(TIMELINE_MIN_PX, Math.min(Math.round(px), room - PREVIEW_MIN_PX));
 }
+
+export enum Viewport {
+  Phone = 'phone',
+  Tablet = 'tablet',
+  Desktop = 'desktop'
+}
+
+const VIEWPORT_FROM_PX: readonly (readonly [Viewport, number])[] = [
+  [Viewport.Desktop, 1100],
+  [Viewport.Tablet, 760],
+  [Viewport.Phone, 0]
+];
+
+export const viewportOf = (width: number): Viewport => VIEWPORT_FROM_PX.find(([, from]) => width >= from)![0];
+
+export enum ChatPlace {
+  Column = 'column',
+  Drawer = 'drawer',
+  Sheet = 'sheet'
+}
+
+export const CHAT_PLACE: Record<Viewport, ChatPlace> = {
+  [Viewport.Desktop]: ChatPlace.Column,
+  [Viewport.Tablet]: ChatPlace.Drawer,
+  [Viewport.Phone]: ChatPlace.Sheet
+};

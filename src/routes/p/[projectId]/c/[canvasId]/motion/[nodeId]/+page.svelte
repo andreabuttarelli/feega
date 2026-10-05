@@ -25,13 +25,14 @@
   import Brackets from '@lucide/svelte/icons/brackets';
   import PanelRight from '@lucide/svelte/icons/panel-right';
   import CompositionSettings from '$lib/components/motion/CompositionSettings.svelte';
-  import { SAVE_TONE, SaveState, TimeDisplay, clockLabel, compositionLabel, nextDisplay } from '$lib/motion/editor-bar';
+  import { SAVE_TONE, SaveState, TimeDisplay, clockLabel, compositionLabel, compositionShort, nextDisplay } from '$lib/motion/editor-bar';
   import X from '@lucide/svelte/icons/x';
   import Crosshair from '@lucide/svelte/icons/crosshair';
   import Keyboard from '@lucide/svelte/icons/keyboard';
   import BotMessageSquare from '@lucide/svelte/icons/bot-message-square';
   import ShortcutHelp from '$lib/components/motion/ShortcutHelp.svelte';
-  import { DEFAULT_LAYOUT, Panel, flip, readLayout, timelineHeight, writeLayout, type EditorLayout, type LayoutStore } from '$lib/motion/editor-layout';
+  import { CHAT_PLACE, ChatPlace, DEFAULT_LAYOUT, Panel, flip, readLayout, timelineHeight, viewportOf, writeLayout, type EditorLayout, type LayoutStore } from '$lib/motion/editor-layout';
+  import { provideSelection } from '$lib/motion/selection-context';
   import Layers from '@lucide/svelte/icons/layers';
   import { addAdjustment, mergeView, pathNames, precompose, viewOf } from '$lib/motion/precomp';
   import GraphEditor from '$lib/components/motion/GraphEditor.svelte';
@@ -80,7 +81,7 @@
     type OpResult
   } from '$lib/motion/timeline';
   import { amend, canRedo, canUndo, previousSource, record, redo, startHistory, undo, type History } from '$lib/motion/history';
-  import { Reveal, Snap, clampZoom } from '$lib/motion/timeline-view';
+  import { Reveal, Snap, ZOOM_MAX, ZOOM_MIN, clampZoom } from '$lib/motion/timeline-view';
   import { InspectorTab } from '$lib/motion/inspector';
   import { Command, commandFor, isTyping } from '$lib/motion/shortcuts';
   import { composeHtml } from '$lib/motion/hyperframes/compose';
@@ -139,6 +140,9 @@
   let helpOpen = $state(false);
   let layout = $state<EditorLayout>(DEFAULT_LAYOUT);
   let display = $state(TimeDisplay.Timecode);
+  let width = $state(1440);
+  const viewport = $derived(viewportOf(width));
+  const chatPlace = $derived(CHAT_PLACE[viewport]);
   let settingsOpen = $state(false);
 
   function browserStore(): LayoutStore | null {
@@ -188,6 +192,15 @@
   const assetUrls = $derived(Object.fromEntries(assets.filter((a) => a.url).map((a) => [a.id, a.url as string])));
   const html = $derived(composeHtml({ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls, analyses }));
   const selected = $derived(selection.length === 1 ? (findClip(doc, selection[0])?.clip ?? null) : null);
+
+  provideSelection({
+    get ids() {
+      return selection;
+    },
+    get clip() {
+      return selected;
+    }
+  });
   const editorUrl = $derived(`/p/${data.projectId}/c/${data.canvas.id}/motion/${data.node.id}`);
   const agentUrl = $derived(`/api/v1/projects/${data.projectId}/motion/${data.node.id}/agent`);
 
@@ -653,6 +666,13 @@
     }
   });
 
+  const CHAT_TOGGLE: Record<ChatPlace, () => void> = {
+    [ChatPlace.Column]: () => relayout({ chat: flip(layout.chat) }),
+    [ChatPlace.Drawer]: () => (sheet = sheet === Sheet.Agent ? Sheet.None : Sheet.Agent),
+    [ChatPlace.Sheet]: () => (sheet = sheet === Sheet.Agent ? Sheet.None : Sheet.Agent)
+  };
+  const chatShown = $derived(chatPlace === ChatPlace.Column ? layout.chat === Panel.Open : sheet === Sheet.Agent);
+
   const COMMANDS: Record<Command, () => void> = {
     [Command.TogglePlay]: () => (playing = !playing),
     [Command.Delete]: remove,
@@ -697,7 +717,7 @@
     [Command.RevealRotation]: () => revealLanes(Reveal.Rotation),
     [Command.RevealOpacity]: () => revealLanes(Reveal.Opacity),
     [Command.RevealAnimated]: () => (reveal = Reveal.Animated),
-    [Command.ToggleChat]: () => relayout({ chat: flip(layout.chat) }),
+    [Command.ToggleChat]: () => CHAT_TOGGLE[chatPlace](),
     [Command.ToggleInspector]: () => relayout({ inspector: flip(layout.inspector) }),
     [Command.Help]: () => (helpOpen = !helpOpen),
     [Command.Precompose]: precomposeSelection
@@ -727,9 +747,9 @@
 </script>
 
 <svelte:head><title>{data.node.name ?? 'Motion'} · Motion editor</title></svelte:head>
-<svelte:window onkeydown={onKey} onpointerdown={closeSettings} />
+<svelte:window bind:innerWidth={width} onkeydown={onKey} onpointerdown={closeSettings} />
 
-<div class="editor" data-testid="motion-editor">
+<div class="editor" data-testid="motion-editor" data-viewport={viewport}>
   <header class="bar">
     <div class="group lead">
       <a class="icon-btn" href={`/p/${data.projectId}/c/${data.canvas.id}`} title={`Back to ${data.canvas.name}`} aria-label={`Back to ${data.canvas.name}`}><ArrowLeft size={16} /></a>
@@ -750,11 +770,11 @@
 
     <div class="group transport" role="group" aria-label="Transport">
       <button type="button" class="icon-btn" title="Go to start (Home)" aria-label="Go to start" onclick={COMMANDS[Command.GoStart]}><SkipBack size={16} /></button>
-      <button type="button" class="icon-btn" title="Previous frame (←)" aria-label="Previous frame" onclick={COMMANDS[Command.StepBack]}><StepBack size={16} /></button>
+      <button type="button" class="icon-btn step" title="Previous frame (←)" aria-label="Previous frame" onclick={COMMANDS[Command.StepBack]}><StepBack size={16} /></button>
       <button type="button" class="icon-btn play" aria-label={playing ? 'Pause' : 'Play'} title={playing ? 'Pause (Space)' : 'Play (Space)'} onclick={() => (playing = !playing)}>
         {#if playing}<Pause size={16} fill="currentColor" />{:else}<Play size={16} fill="currentColor" />{/if}
       </button>
-      <button type="button" class="icon-btn" title="Next frame (→)" aria-label="Next frame" onclick={COMMANDS[Command.StepForward]}><StepForward size={16} /></button>
+      <button type="button" class="icon-btn step" title="Next frame (→)" aria-label="Next frame" onclick={COMMANDS[Command.StepForward]}><StepForward size={16} /></button>
       <button type="button" class="icon-btn" title="Go to end (End)" aria-label="Go to end" onclick={COMMANDS[Command.GoEnd]}><SkipForward size={16} /></button>
       <button type="button" class="clock" title={display === TimeDisplay.Timecode ? 'Show frames' : 'Show timecode'} data-testid="clock" onclick={() => (display = nextDisplay(display))}>
         <span data-testid="timecode"><b>{clockLabel(frame, doc.fps, display)}</b> <i>/ {clockLabel(doc.durationInFrames, doc.fps, display)}</i></span>
@@ -764,7 +784,7 @@
     <div class="group trail">
       <div class="popover-anchor">
         <button type="button" class="chip" aria-expanded={settingsOpen} title="Composition settings" data-testid="comp-settings" onclick={() => (settingsOpen = !settingsOpen)}>
-          {compositionLabel(doc)}<ChevronDown size={12} />
+          <span class="long">{compositionLabel(doc)}</span><span class="short">{compositionShort(doc)}</span><ChevronDown size={12} />
         </button>
         {#if settingsOpen}
           <div class="popover" role="dialog" aria-label="Composition settings">
@@ -776,7 +796,7 @@
       <span class="save" data-testid="save-state" data-tone={SAVE_TONE[saveState]}><i aria-hidden="true"></i>{saveState} · v{version}</span>
       <span class="divider" aria-hidden="true"></span>
       <button type="button" class="icon-btn toggle" title="Properties (⌥⌘B)" aria-label="Properties panel" aria-pressed={layout.inspector === Panel.Open} data-testid="toggle-inspector" onclick={COMMANDS[Command.ToggleInspector]}><PanelRight size={16} /></button>
-      <button type="button" class="icon-btn toggle" title="Agent (⌘B)" aria-label="Agent panel" aria-pressed={layout.chat === Panel.Open} data-testid="toggle-chat" onclick={COMMANDS[Command.ToggleChat]}><BotMessageSquare size={16} /></button>
+      <button type="button" class="icon-btn toggle" title="Agent (⌘B)" aria-label="Agent panel" aria-pressed={chatShown} data-testid="toggle-chat" onclick={COMMANDS[Command.ToggleChat]}><BotMessageSquare size={16} /></button>
       <span class="divider" aria-hidden="true"></span>
       <button type="button" class="secondary" onclick={() => (leaveTo(0), (templating = true))} data-testid="template-open">Template</button>
       <button type="button" class="render" onclick={() => (leaveTo(0), (exporting = true))} data-testid="export-open">Export</button>
@@ -911,6 +931,7 @@
         {#if notice}<span class="notice" role="status">{notice}</span>{/if}
         <span class="spacer"></span>
         <button type="button" class="tool" title="Zoom out (−)" aria-label="Zoom out" onclick={COMMANDS[Command.ZoomOut]}><ZoomOut size={14} /></button>
+        <input class="zoom" type="range" aria-label="Timeline zoom" min={Math.log2(ZOOM_MIN)} max={Math.log2(ZOOM_MAX)} step="0.05" value={Math.log2(zoom)} oninput={(e) => (zoom = clampZoom(2 ** Number(e.currentTarget.value)))} data-testid="timeline-zoom" />
         <button type="button" class="tool" title="Zoom in (+)" aria-label="Zoom in" onclick={COMMANDS[Command.ZoomIn]}><ZoomIn size={14} /></button>
         <button type="button" class="tool" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts" data-testid="shortcut-help-open" onclick={COMMANDS[Command.Help]}><Keyboard size={14} /></button>
       </div>
@@ -1361,6 +1382,44 @@
     flex: 1;
   }
 
+  .zoom {
+    width: 120px;
+    height: 24px;
+    margin: 0 4px;
+    appearance: none;
+    background: transparent;
+    cursor: pointer;
+    touch-action: none;
+  }
+
+  .zoom::-webkit-slider-runnable-track {
+    height: 2px;
+    background: var(--ui-line-strong);
+  }
+
+  .zoom::-moz-range-track {
+    height: 2px;
+    background: var(--ui-line-strong);
+  }
+
+  .zoom::-webkit-slider-thumb {
+    appearance: none;
+    width: 10px;
+    height: 10px;
+    margin-top: -4px;
+    border: 1.5px solid var(--ui-ink-2);
+    border-radius: 0;
+    background: var(--ui-bg);
+  }
+
+  .zoom::-moz-range-thumb {
+    width: 10px;
+    height: 10px;
+    border: 1.5px solid var(--ui-ink-2);
+    border-radius: 0;
+    background: var(--ui-bg);
+  }
+
   .add {
     position: relative;
   }
@@ -1433,127 +1492,245 @@
     }
   }
 
-  @media (max-width: 760px) {
-    .bar {
-      display: flex;
-      flex-wrap: wrap;
-      height: auto;
-    }
-
-    .lead {
-      flex: 1;
-    }
-
-    .transport {
-      order: 3;
-      flex-basis: 100%;
-      border: 0;
-      border-top: 1px solid var(--ui-line);
-      height: 40px;
-    }
-
-    .bar .save,
-    .bar .render,
-    .bar .chip,
-    .bar .divider {
-      display: none;
-    }
-
-    .body {
-      display: flex;
-      flex-direction: column;
-    }
-
-    .stage {
-      flex: 0 0 auto;
-      height: 34vh;
-      padding: 8px;
-    }
-
-    .timeline-area {
-      flex: 1;
-      min-height: 160px;
-    }
-
-    .resize {
-      display: none;
+  @media (pointer: coarse) {
+    .icon-btn,
+    .tool {
+      min-width: 44px;
+      height: 44px;
     }
 
     .toolbar {
-      overflow-x: auto;
-    }
-
-    .toolbar > * {
-      flex-shrink: 0;
-    }
-
-    .menu {
-      position: fixed;
-      left: 8px;
-      right: 8px;
-      grid-template-columns: 1fr 1fr;
-      bottom: 104px;
-      max-height: 50vh;
-      overflow: auto;
-    }
-
-    .props,
-    .chat {
-      position: fixed;
-      left: 0;
-      right: 0;
-      bottom: 48px;
-      height: 70vh;
-      z-index: 30;
-      display: none;
-      flex-direction: column;
-      background: var(--ui-bg);
-      border-left: 0;
-      border-top: 1px solid var(--ui-line);
-      box-shadow: 0 -12px 32px rgb(0 0 0 / 0.16);
-    }
-
-    .props.open,
-    .chat.open {
-      display: flex;
-    }
-
-    .props.open {
-      overflow: auto;
-    }
-
-    .sheet-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 8px 12px;
-      border-bottom: 1px solid var(--ui-line);
-      font-weight: 600;
-      flex-shrink: 0;
-    }
-
-    .chat :global(> :last-child) {
-      flex: 1;
-      min-height: 0;
-    }
-
-    .tabs {
-      display: flex;
-      flex-shrink: 0;
       height: 48px;
-      border-top: 1px solid var(--ui-line);
     }
 
-    .tabs button {
-      flex: 1;
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--ui-ink-2);
+    .segmented {
+      height: 36px;
     }
 
-    .tabs button.on {
-      color: var(--ui-ink);
-      box-shadow: inset 0 2px 0 var(--ui-ink);
+    .chip,
+    .secondary,
+    .render {
+      height: 36px;
     }
+  }
+
+  .chip .short {
+    display: none;
+  }
+
+  [data-viewport='tablet'] .chip .long,
+  [data-viewport='tablet'] .step,
+  [data-viewport='tablet'] .crumb:not(.current),
+  [data-viewport='tablet'] .slash {
+    display: none;
+  }
+
+  [data-viewport='tablet'] .chip .short {
+    display: inline;
+  }
+
+  [data-viewport='tablet'] .bar {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  [data-viewport='tablet'] .toolbar {
+    overflow-x: auto;
+  }
+
+  [data-viewport='tablet'] .toolbar > * {
+    flex-shrink: 0;
+  }
+
+  [data-viewport='tablet'] .body {
+    --props-w: 280px;
+    --chat-w: 0px;
+  }
+
+  [data-viewport='tablet'] .chat {
+    display: none;
+  }
+
+  [data-viewport='tablet'] .chat.open {
+    display: flex;
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(380px, 90vw);
+    z-index: 30;
+    background: var(--ui-bg);
+    box-shadow: -12px 0 32px rgb(0 0 0 / 0.16);
+  }
+
+  [data-viewport='tablet'] .body {
+    position: relative;
+  }
+
+  [data-viewport='tablet'] .chat .sheet-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--ui-line);
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  [data-viewport='tablet'] .chat :global(> :last-child) {
+    flex: 1;
+    min-height: 0;
+  }
+
+  [data-viewport='phone'] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
+    grid-template-areas: 'lead trail' 'body body' 'transport transport' 'tabs tabs';
+  }
+
+  [data-viewport='phone'] .bar {
+    display: contents;
+  }
+
+  [data-viewport='phone'] .lead {
+    grid-area: lead;
+    height: 48px;
+    border-bottom: 1px solid var(--ui-line);
+  }
+
+  [data-viewport='phone'] .trail {
+    grid-area: trail;
+    height: 48px;
+    border-bottom: 1px solid var(--ui-line);
+  }
+
+  [data-viewport='phone'] .transport {
+    grid-area: transport;
+    height: 56px;
+    border: 0;
+    border-top: 1px solid var(--ui-line);
+    background: var(--ui-bg);
+  }
+
+  [data-viewport='phone'] .transport .icon-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  [data-viewport='phone'] .crumb:not(.current),
+  [data-viewport='phone'] .slash,
+  [data-viewport='phone'] .save,
+  [data-viewport='phone'] .chip,
+  [data-viewport='phone'] .trail .divider,
+  [data-viewport='phone'] .trail .toggle {
+    display: none;
+  }
+
+  [data-viewport='phone'] .body {
+    grid-area: body;
+    display: flex;
+    flex-direction: column;
+  }
+
+  [data-viewport='phone'] .stage {
+    flex: 0 0 auto;
+    height: 34vh;
+    padding: 8px;
+  }
+
+  [data-viewport='phone'] .timeline-area {
+    flex: 1;
+    min-height: 160px;
+  }
+
+  [data-viewport='phone'] .resize {
+    display: none;
+  }
+
+  [data-viewport='phone'] .toolbar {
+    overflow-x: auto;
+  }
+
+  [data-viewport='phone'] .toolbar > * {
+    flex-shrink: 0;
+  }
+
+  [data-viewport='phone'] .menu {
+    position: fixed;
+    left: 8px;
+    right: 8px;
+    grid-template-columns: 1fr 1fr;
+    top: 96px;
+    bottom: auto;
+    max-height: 50vh;
+    overflow: auto;
+  }
+
+  [data-viewport='phone'] .props,
+  [data-viewport='phone'] .chat {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 104px;
+    height: 62vh;
+    z-index: 30;
+    display: none;
+    flex-direction: column;
+    background: var(--ui-bg);
+    border-left: 0;
+    border-top: 1px solid var(--ui-line-strong);
+    box-shadow: 0 -12px 32px rgb(0 0 0 / 0.16);
+  }
+
+  [data-viewport='phone'] .props.open,
+  [data-viewport='phone'] .chat.open {
+    display: flex;
+  }
+
+  [data-viewport='phone'] .props.open {
+    overflow: auto;
+  }
+
+  [data-viewport='phone'] .sheet-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 44px;
+    padding: 0 4px 0 12px;
+    border-bottom: 1px solid var(--ui-line);
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  [data-viewport='phone'] .sheet-head button {
+    width: 44px;
+    height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  [data-viewport='phone'] .chat :global(> :last-child) {
+    flex: 1;
+    min-height: 0;
+  }
+
+  [data-viewport='phone'] .tabs {
+    grid-area: tabs;
+    display: flex;
+    height: 48px;
+    border-top: 1px solid var(--ui-line);
+  }
+
+  .tabs button {
+    flex: 1;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ui-ink-2);
+  }
+
+  .tabs button.on {
+    color: var(--ui-ink);
+    box-shadow: inset 0 2px 0 var(--ui-accent);
   }
 </style>

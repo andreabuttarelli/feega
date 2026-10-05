@@ -41,3 +41,7 @@ export const nextDisplay = (display: TimeDisplay): TimeDisplay => (display === T
 export function compositionLabel(doc: Pick<MotionDoc, 'width' | 'height' | 'fps' | 'durationInFrames'>): string {
   return `${FORMATS[formatOf(doc)].label} · ${doc.width}×${doc.height} · ${doc.fps}fps · ${secondsLabel(doc.durationInFrames, doc.fps)}s`;
 }
+
+export function compositionShort(doc: Pick<MotionDoc, 'width' | 'height' | 'fps' | 'durationInFrames'>): string {
+  return `${FORMATS[formatOf(doc)].label} · ${secondsLabel(doc.durationInFrames, doc.fps)}s`;
+}

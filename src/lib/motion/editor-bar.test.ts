@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, newMotionDoc } from './doc';
-import { SAVE_TONE, SaveState, SaveTone, TimeDisplay, clockLabel, compositionLabel, nextDisplay } from './editor-bar';
+import { SAVE_TONE, SaveState, SaveTone, TimeDisplay, clockLabel, compositionLabel, compositionShort, nextDisplay } from './editor-bar';
 
 describe('editor bar', () => {
   it('sums the composition up in one chip', () => {
     const doc = { ...newMotionDoc(MotionFormat.Landscape), durationInFrames: 28 * 30 };
 
     expect(compositionLabel(doc)).toBe('16:9 · 1920×1080 · 30fps · 28s');
+    expect(compositionShort(doc)).toBe('16:9 · 28s');
   });
 
   it('shows the clock as timecode, or as a frame count after a click', () => {

@@ -17,4 +17,12 @@ Primo passo della spec di redesign dell'editor (layout e barra superiore).
   icona invece di «M» e «[ ]», Arrange solo con due o più clip selezionate.
 - ThemeSwitch tolto dall'editor. Nuovi token `--ui-ok/warn/danger`, `--playhead`.
 
+- Telefono e tablet da una tabella (`viewportOf`, `CHAT_PLACE` in `editor-layout.ts`): sotto
+  760px preview in alto, timeline sotto, trasporto in fondo vicino al pollice, inspector e chat
+  come bottom sheet; 760–1099px inspector a colonna e chat come drawer; da 1100px colonne. Su
+  puntatore touch bottoni e strumenti a 44px.
+- Zoom della timeline anche come slider (scala logaritmica), oltre a −/+.
+- `selection-context.ts`: la pagina espone ids e clip selezionata via context, così inspector e
+  overlay della preview leggono la stessa fonte.
+
 Comportamento di play, scorciatoie e pannelli invariato.
