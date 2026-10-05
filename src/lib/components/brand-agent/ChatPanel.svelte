@@ -15,10 +15,11 @@
   let {
     projectId = '',
     motionNodeId = '',
+    reload = 0,
     context,
     onturnend,
     ondata
-  }: { projectId?: string; motionNodeId?: string; context?: () => Record<string, unknown>; onturnend?: () => void; ondata?: (part: StreamData) => void } = $props();
+  }: { projectId?: string; motionNodeId?: string; reload?: number; context?: () => Record<string, unknown>; onturnend?: () => void; ondata?: (part: StreamData) => void } = $props();
 
   let draft = $state('');
   let follow = $state<Follow>('following');
@@ -73,6 +74,7 @@
   }
 
   $effect(() => {
+    void reload;
     if (!session) {
       return;
     }

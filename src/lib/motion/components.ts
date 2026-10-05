@@ -147,6 +147,7 @@ const position3d = {
 export const COMPOSITION_LAYOUTS = Object.keys(LAYOUTS) as [LayoutId, ...LayoutId[]];
 export const COMPOSITION_CAMERAS = Object.keys(CAMERA_PRESETS) as [CameraPresetId, ...CameraPresetId[]];
 export const COMPOSITION_MEDIA_KINDS = ['image', 'video'] as const;
+export const COMPOSITION_CARD_KINDS = [...COMPOSITION_MEDIA_KINDS, 'comp'] as const;
 export const MAX_COMPOSITION_MEDIA = 40;
 
 const managed = (label: string) => ({ control: Control.Managed, label, group: Group.Content });
@@ -404,14 +405,14 @@ export const COMPONENTS = {
   },
   Composition: {
     label: 'Composition',
-    description: 'Many images or videos arranged in 3D (grid, carousel, helix, coverflow…) and looping every `loop` seconds.',
+    description: 'Many images or videos arranged in 3D (grid, carousel, helix, coverflow, ring…) and looping every `loop` seconds. The ring layout curves cards on a tilted, turning cylinder (UI showcase): its media can also be compositions of this video (kind comp, assetId = comp id), so UI built with Shape and Title clips goes on the cards; whole turns per loop loop exactly, and its numbers (ringRadius, cardHeight, gap as fractions of the short side; tiltX/tiltZ/spin in degrees; backOpacity, backBlur, shadowOpacity; cameraDistance px, cameraHeight) take set_keyframes.',
     track: TrackKind.Visual,
     durationInFrames: seconds(6),
     schema: z
       .object({
         layout: choice(COMPOSITION_LAYOUTS, 'tilted-grid', 'Template', Group.Content),
         media: z
-          .array(z.object({ assetId: z.string().min(1), kind: z.enum(COMPOSITION_MEDIA_KINDS) }).strict())
+          .array(z.object({ assetId: z.string().min(1), kind: z.enum(COMPOSITION_CARD_KINDS) }).strict())
           .max(MAX_COMPOSITION_MEDIA)
           .default([])
           .meta(managed('Media')),

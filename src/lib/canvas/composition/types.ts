@@ -5,6 +5,9 @@ export type Transform = {
 	rotation: Vec3;
 	scale: Vec3;
 	opacity?: number;
+	bend?: number;
+	width?: number;
+	corner?: number;
 };
 
 export type LayoutId =
@@ -16,7 +19,8 @@ export type LayoutId =
 	| 'explorer-grid'
 	| 'staggered-grid'
 	| 'vertical-flow'
-	| 'coverflow';
+	| 'coverflow'
+	| 'ring';
 
 export type LayoutParam =
 	| { name: string; label: string; kind: 'range'; min: number; max: number; step: number; default: number }

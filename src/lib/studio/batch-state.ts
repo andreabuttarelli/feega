@@ -41,6 +41,27 @@ export function failureKind(error: string): FailureKind {
   return FAILURE_PATTERNS.find((row) => row.pattern.test(error))?.kind ?? FailureKind.Permanent;
 }
 
+export type FailureText = { problem: string; fix: string };
+
+export const FAILURE_TEXT: Readonly<Record<FailureKind, FailureText>> = {
+  [FailureKind.Moderation]: {
+    problem: 'Blocked by the safety filter.',
+    fix: 'Try another style, or a photo with only the product in it.'
+  },
+  [FailureKind.Transient]: {
+    problem: 'The image service was busy.',
+    fix: 'Wait a minute, then press Try again.'
+  },
+  [FailureKind.Permanent]: {
+    problem: 'This photo could not be made.',
+    fix: 'Press Try again. If it fails again, use a clearer photo of the product.'
+  }
+};
+
+export function failureText(error: string): FailureText {
+  return FAILURE_TEXT[failureKind(error)];
+}
+
 export const MAX_RETRIES = 2;
 const BACKOFF_BASE_MS = 30_000;
 

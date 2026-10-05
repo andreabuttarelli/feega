@@ -1,9 +1,10 @@
 import { TrackKind } from './components';
-import { compOf, newClip, type MotionClip, type MotionComp, type MotionDoc, type MotionTrack } from './doc';
+import { compOf, compsOf, newClip, type MotionClip, type MotionComp, type MotionDoc, type MotionTrack } from './doc';
 import { TransitionKind } from './design';
 import type { Keyframes } from './keyframes';
 import { withoutHidden } from './organize';
 import { addClip, type OpResult } from './timeline';
+import { ringCards, ringRadiusPx, ringSliceId, slicesFor } from './ring/model';
 
 export type CompPath = readonly string[];
 export type GroupProps = { span?: number };
@@ -125,19 +126,50 @@ function placed(host: MotionClip, comp: MotionComp, tracks: MotionTrack[]): Moti
   return laid.map((t) => ({ ...t, clips: t.clips.map((c) => (c.parent && !present.has(c.parent) ? { ...c, parent: null } : c)) }));
 }
 
+type Expander = (doc: MotionDoc, track: MotionTrack, host: MotionClip, depth: number) => MotionTrack[];
+
+function precompTracks(doc: MotionDoc, track: MotionTrack, host: MotionClip, depth: number): MotionTrack[] {
+  const comp = doc.comps[compOf(host)!];
+  const inner = expand(doc, withoutHidden({ ...doc, tracks: comp.tracks }).tracks, depth + 1);
+  const group: MotionClip = { ...host, props: { ...host.props, span: inner.length } };
+  return [{ ...track, id: `${host.id}${SEPARATOR}group`, clips: [group] }, ...placed(host, comp, inner)];
+}
+
+function sliceHost(ring: MotionClip, card: number, slice: number, comp: string): MotionClip {
+  return newClip({ id: ringSliceId(ring.id, card, slice), from: ring.from, durationInFrames: ring.durationInFrames, trimStart: ring.trimStart, component: 'Precomp', props: { comp, loop: true } });
+}
+
+function ringTracks(doc: MotionDoc, track: MotionTrack, ring: MotionClip, depth: number): MotionTrack[] {
+  const cards = ringCards(ring.props as never);
+  const slices = slicesFor(cards.length, ringRadiusPx(ring.props as never, Math.min(doc.width, doc.height)));
+  const hosts = cards.flatMap((shown, card) =>
+    shown?.kind === COMP_CARD && doc.comps[shown.assetId]
+      ? Array.from({ length: slices }, (_, slice) => ({ ...track, id: `${ringSliceId(ring.id, card, slice)}${SEPARATOR}host`, clips: [sliceHost(ring, card, slice, shown.assetId)] }))
+      : []
+  );
+  const inner = expand(doc, hosts, depth);
+  const group: MotionClip = { ...ring, props: { ...ring.props, span: inner.length } };
+  return [{ ...track, id: `${ring.id}${SEPARATOR}group`, clips: [group] }, ...inner];
+}
+
+const COMP_CARD = 'comp';
+
+const EXPANDERS: Partial<Record<MotionClip['component'], Expander>> = {
+  Precomp: precompTracks,
+  Composition: ringTracks
+};
+
+const isHost = (doc: MotionDoc, clip: MotionClip, depth: number) =>
+  depth < MAX_COMP_DEPTH && EXPANDERS[clip.component] !== undefined && compsOf(clip).some((id) => doc.comps[id]);
+
 function expand(doc: MotionDoc, tracks: readonly MotionTrack[], depth: number): MotionTrack[] {
   return tracks.flatMap((track) => {
-    const hosts = (track.clips as MotionClip[]).filter((c) => compOf(c) !== null && doc.comps[compOf(c)!] && depth < MAX_COMP_DEPTH);
+    const hosts = (track.clips as MotionClip[]).filter((c) => isHost(doc, c, depth));
     if (!hosts.length) {
       return [track];
     }
     const rest = { ...track, clips: track.clips.filter((c) => !hosts.includes(c as MotionClip)) };
-    const groups = hosts.flatMap((host) => {
-      const comp = doc.comps[compOf(host)!];
-      const inner = expand(doc, withoutHidden({ ...doc, tracks: comp.tracks }).tracks, depth + 1);
-      const group: MotionClip = { ...host, props: { ...host.props, span: inner.length } };
-      return [{ ...track, id: `${host.id}${SEPARATOR}group`, clips: [group] }, ...placed(host, comp, inner)];
-    });
+    const groups = hosts.flatMap((host) => EXPANDERS[host.component]!(doc, track, host, depth));
     return [...groups, rest];
   });
 }
