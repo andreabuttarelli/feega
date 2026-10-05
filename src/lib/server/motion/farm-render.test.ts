@@ -31,7 +31,8 @@ function fakeFarm() {
       workers.push(w);
       return w;
     },
-    attach: async (name) => workers.find((w) => w.name === name && !w.stopped) ?? null
+    attach: async (name) => workers.find((w) => w.name === name && !w.stopped) ?? null,
+    running: async () => []
   };
   return { farm, workers, specs };
 }
