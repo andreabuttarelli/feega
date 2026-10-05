@@ -151,6 +151,15 @@ queue and what they would cost, without spending anything — call it first when
 already known. `cancel_node_loop` stops what is still queued; anything a tick already claimed
 finishes regardless, and what it already produced stays in the output list.
 
+## Edit a motion video
+
+A `motion` node is a video built in the motion editor. `get_motion_summary` reads it — revision,
+duration, every track and clip in seconds. `ask_motion_agent` asks the editor's own AI to change
+it in plain words ("make the title red and add a bounce"): one turn of the same agent the editor
+chat runs, a new revision, the exchange visible in the editor chat. By default it waits for the
+turn; with `wait: false`, or past about 4 minutes, it returns a running `run_id` — read it with
+`get_motion_run`. Spends credits. CLI: `feega motion ask <nodeId> "<prompt>"`.
+
 ## Promote to a post
 
 A canvas node is not a post. `create_post` is what makes something publishable: give it a
