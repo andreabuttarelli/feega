@@ -77,6 +77,12 @@ export function splitLines(text: string, options: SplitOptions): string[] {
   });
 }
 
+export function charPositions(text: string, seed: number | null): number[] {
+  const units = unitsOf(text.split('\n'), AnimatorUnit.Char);
+  const rank = ranks(units.length, seed);
+  return units.map((_, i) => round((rank[i] + 0.5) / units.length));
+}
+
 export function splitText(text: string, options: SplitOptions): string {
   return splitLines(text, options).join('\n');
 }

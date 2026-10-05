@@ -49,6 +49,8 @@ import { EffectKind } from '$lib/motion/effects/registry';
 import { LUT_PRESETS, LUT_PRESET_IDS, applyLut, compileLut, lutFromCube } from '$lib/motion/effects/lut';
 import { BLEND_MODES } from '$lib/motion/blend';
 import { ANIMATOR_UNITS, SELECTOR_SHAPES, SELECTOR_KEYS, VALUES, VALUE_KEYS, animatorKey } from '$lib/motion/text-animators/model';
+import { PATH_ALIGNS, PATH_PRESETS, PathSourceKind, TEXT_PATH, TEXT_PATH_KEYS, textPathKey, type PathSource } from '$lib/motion/text-path/model';
+import { removeTextPath, setTextPath } from '$lib/motion/text-path/ops';
 import { PRESETS as TEXT_PRESET_SPECS, TEXT_PRESETS, addAnimator, applyPreset as applyTextPreset, removeAnimator, setAnimator } from '$lib/motion/text-animators/ops';
 import { setBlendMode } from '$lib/motion/blend-ops';
 import { setClipsBlur, setMotionBlur } from '$lib/motion/motion-blur-ops';
@@ -139,6 +141,7 @@ function summary(doc: MotionDoc, selection: string[]) {
         effects: c.effects,
         blend: c.blend,
         animators: c.animators,
+        textPath: c.textPath,
         motionBlur: c.motionBlur,
         hidden: c.hidden ?? false,
         locked: c.locked ?? false,
@@ -1090,6 +1093,38 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const out = apply(applyTextPreset(session.doc, input.clip_id, input.preset, { start: frames(input.start), duration: frames(input.duration) }, id), `${input.preset} on ${input.clip_id}`);
         return out.ok ? { ...out, animator_id: id } : out;
       }
+    }),
+
+    set_text_path: tool({
+      description: `Put a text clip (Title, Text, Kicker, Caption) on a path, like After Effects Path Options. The path is a preset (${PATH_PRESETS.join(', ')}; radius px and arc degrees bend it: arc is the sweep of an arc and the phase sweep of a wave) or shape_clip_id, a Shape clip whose outline (pen paths, morphs and modifiers included) the text follows frame by frame, centred on the text box. align ${PATH_ALIGNS.join('|')}; firstMargin/lastMargin are % of the path length (animate firstMargin to slide the text along it, 100 = one turn of a closed path); reverse runs the text the other way (inside a circle); perpendicular false keeps glyphs upright; forceAlignment spreads the text from margin to margin. Every value animates with set_keyframes or set_expression on ${TEXT_PATH_KEYS.map((k) => textPathKey(k)).join(', ')} (booleans: 0/1, align: 0 start, 0.5 center, 1 end). Text animators keep working per character. Omitted fields keep their value.`,
+      inputSchema: z.object({
+        clip_id: z.string(),
+        preset: z.enum(PATH_PRESETS).optional(),
+        shape_clip_id: z.string().optional(),
+        align: z.enum(PATH_ALIGNS).optional(),
+        reverse: z.boolean().optional(),
+        perpendicular: z.boolean().optional(),
+        forceAlignment: z.boolean().optional(),
+        firstMargin: z.number().min(TEXT_PATH.firstMargin.min).max(TEXT_PATH.firstMargin.max).optional(),
+        lastMargin: z.number().min(TEXT_PATH.lastMargin.min).max(TEXT_PATH.lastMargin.max).optional(),
+        radius: z.number().min(TEXT_PATH.radius.min).max(TEXT_PATH.radius.max).optional(),
+        arc: z.number().min(TEXT_PATH.arc.min).max(TEXT_PATH.arc.max).optional()
+      }),
+      execute: async (input) => {
+        const { clip_id, preset, shape_clip_id, forceAlignment, ...rest } = input;
+        if (preset && shape_clip_id) {
+          return { ok: false, error: 'pick one path: preset or shape_clip_id' };
+        }
+        const source: PathSource | undefined = preset ? { kind: PathSourceKind.Preset, preset } : shape_clip_id ? { kind: PathSourceKind.Clip, clip: shape_clip_id } : undefined;
+        const out = apply(setTextPath(session.doc, clip_id, { ...rest, forceAlign: forceAlignment, source }), `text path on ${clip_id}`);
+        return out.ok ? { ...out, animate: TEXT_PATH_KEYS.map((k) => textPathKey(k)) } : out;
+      }
+    }),
+
+    remove_text_path: tool({
+      description: 'Take a text clip off its path, with the path keyframes and expressions.',
+      inputSchema: z.object({ clip_id: z.string() }),
+      execute: async (input) => apply(removeTextPath(session.doc, input.clip_id), `removed text path from ${input.clip_id}`)
     }),
 
     add_track: tool({

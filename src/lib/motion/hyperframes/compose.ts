@@ -25,6 +25,7 @@ import { Composite, cameraMath, stageSpec } from '../camera';
 import { sampleTrack } from '../keyframes';
 import { STAGE_CSS, stageRootStyle, stageScript } from './stage';
 import { shapeBake, shapeScript, type ShapeBake } from './shapes';
+import { TEXT_PATH_CSS, textPathBake, textPathScript, textPathTemplate, type TextPathBake } from './text-path';
 import { particleBake, particleScript } from './particles';
 import { remappedSegments } from '../time-remap';
 import type { ParticleBake } from '../particles/simulate';
@@ -277,6 +278,7 @@ const BASE_CSS = [
   MASK_CSS,
   EFFECT_CSS,
   ANIMATOR_CSS,
+  TEXT_PATH_CSS,
   '.font-probe{position:absolute;left:0;top:0;opacity:0;pointer-events:none}'
 ].join('');
 
@@ -377,6 +379,7 @@ export function composeHtml(raw: ComposeInput): string {
   const three: ThreeClip[] = [];
   const compositions: TimedBake[] = [];
   const shapes: ShapeBake[] = [];
+  const textPaths: TextPathBake[] = [];
   const particles: ParticleBake[] = [];
   const clips: MotionClip[] = [];
   const runs: CustomRun[] = [];
@@ -398,7 +401,7 @@ export function composeHtml(raw: ComposeInput): string {
     for (const clip of track.clips as MotionClip[]) {
       const ctx = ctxOf(clip, input);
       clips.push(clip);
-      const template = TEMPLATES[clip.component] as (typeof TEMPLATES)[ComponentId];
+      const template = (clip.textPath ? textPathTemplate(clip.component) : TEMPLATES[clip.component]) as (typeof TEMPLATES)[ComponentId];
       const group = GROUPS[clip.component];
       layer += 1;
       const placed: Placed = { layer, trackIndex: index, matte: matteOf.get(clip.id) ?? null, visibility: hidden.has(clip.id) ? Visibility.MatteSource : Visibility.Shown, transform: startPose.get(clip.id), chain: ancestorsOf(doc, clip.id).map((id) => byId.get(id)!), held: held.has(clip.id) };
@@ -417,6 +420,9 @@ export function composeHtml(raw: ComposeInput): string {
       const shape = clip.component === 'Shape' ? shapeBake({ ...clip, props: ctx.p as Record<string, unknown> }, ctx) : null;
       if (shape) {
         shapes.push(shape);
+      }
+      if (clip.textPath) {
+        textPaths.push(textPathBake(clip, doc));
       }
       if (clip.component === 'Particles') {
         particles.push(particleBake(clip, ctx));
@@ -476,6 +482,7 @@ export function composeHtml(raw: ComposeInput): string {
     hotScript(threeScript(three, Number(duration), stage, look)),
     hotScript(compositionScript(compositions, Number(duration))),
     hotScript(shapeScript(shapes, doc.fps, Number(duration))),
+    hotScript(textPathScript(textPaths, doc.fps, Number(duration))),
     hotScript(particleScript(particles, doc.fps, Number(duration)))
   ].join('');
   return `${page}${captureScript(frame, contentStamp(page))}${measureScript()}</body></html>`;

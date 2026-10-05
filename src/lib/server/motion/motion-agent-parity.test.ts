@@ -59,6 +59,7 @@ const CLIP: Record<string, Access> = {
   blend: { write: ['set_blend_mode'], read: 'blend' },
   animators: { write: ['add_text_animator', 'set_text_animator', 'remove_text_animator', 'apply_text_preset'], read: 'animators' },
   motionBlur: { write: ['set_motion_blur'], read: 'motionBlur' },
+  textPath: { write: ['set_text_path', 'remove_text_path'], read: 'textPath' },
   path: { write: ['set_motion_path', 'set_path_tangent'], read: 'path' },
   physics: { write: ['set_physics', 'apply_physics_preset'], read: 'physics' },
   hidden: { write: ['set_visibility'], read: 'hidden' },

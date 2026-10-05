@@ -65,7 +65,8 @@ export enum Source {
   Animator = 'animator',
   Modifier = 'modifier',
   Remap = 'remap',
-  Sound = 'sound'
+  Sound = 'sound',
+  TextPath = 'textPath'
 }
 
 type Range = { label: string; min: number; max: number; step: number; fallback: number };
@@ -220,7 +221,8 @@ const BASE: Record<Source, (clip: Animated, prop: AnimProp) => KeyValue> = {
   [Source.Animator]: (_clip, prop) => prop.base ?? prop.fallback,
   [Source.Modifier]: (_clip, prop) => prop.base ?? prop.fallback,
   [Source.Remap]: (_clip, prop) => prop.fallback,
-  [Source.Sound]: (clip, prop) => Number(clip.props[prop.key] ?? prop.fallback)
+  [Source.Sound]: (clip, prop) => Number(clip.props[prop.key] ?? prop.fallback),
+  [Source.TextPath]: (_clip, prop) => prop.base ?? prop.fallback
 };
 
 export function baseValue(clip: Animated, key: string): KeyValue | null {
@@ -252,7 +254,8 @@ const SOURCE_PROBLEM: Record<Source, (clip: Pick<Animated, 'mask'>, key: string)
   [Source.Animator]: () => null,
   [Source.Modifier]: () => null,
   [Source.Remap]: () => null,
-  [Source.Sound]: () => null
+  [Source.Sound]: () => null,
+  [Source.TextPath]: () => null
 };
 
 export function keyframesProblem(clip: Pick<Animated, 'component' | 'keyframes' | 'mask' | 'params'>): string | null {

@@ -20,6 +20,7 @@
   import CodeEditor from './CodeEditor.svelte';
   import FontPicker from './FontPicker.svelte';
   import LutPicker from './LutPicker.svelte';
+  import TextPathSection from './TextPathSection.svelte';
   import { registerFont, setFont } from '$lib/motion/fonts/ops';
   import type { CatalogueFont } from '$lib/motion/fonts/model';
   import { withParams } from '$lib/motion/custom/params';
@@ -463,6 +464,8 @@
       </div>
     </section>
   {/if}
+
+  {#if TEXT_COMPONENTS.has(clip.component)}<TextPathSection {doc} {clip} params={animated.params} row={animRow} {commit} />{/if}
 
   {#if clip.component === 'Shape'}
     <section data-testid="shape-section">

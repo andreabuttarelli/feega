@@ -14,6 +14,7 @@ import { fontRefProblem, fontsSchema, usedFaces } from './fonts/model';
 import { effectsSchema, effectsProblem } from './effects/model';
 import { BLEND_MODES, BlendMode } from './blend';
 import { animatorsSchema } from './text-animators/model';
+import { textPathSchema } from './text-path/model';
 import { DEFAULT_MOTION_BLUR, motionBlurSchema } from './motion-blur';
 import { fieldsSchema } from './template/field-model';
 import { physicsSchema } from './physics/model';
@@ -79,6 +80,7 @@ const clipSchema = z.object({
   effects: effectsSchema,
   blend: z.enum(BLEND_MODES).default(BlendMode.Normal),
   animators: animatorsSchema,
+  textPath: textPathSchema.nullable().default(null),
   motionBlur: z.boolean().default(true),
   path: motionPathSchema.nullable().default(null),
   physics: physicsSchema.nullable().optional(),
@@ -333,6 +335,7 @@ export function newClip(fields: Pick<MotionClip, 'id' | 'from' | 'durationInFram
     effects: [],
     blend: BlendMode.Normal,
     animators: [],
+    textPath: null,
     motionBlur: true,
     path: null,
     ...fields
