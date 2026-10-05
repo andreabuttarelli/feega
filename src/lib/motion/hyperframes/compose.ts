@@ -198,6 +198,17 @@ function tweenLine(t: Tween): string {
 
 type Hold = { target: string; vars: Vars; at: number };
 
+function untrimmed(tweens: Tween[], clipStart: number, trimmed: number): Tween[] {
+  return tweens.flatMap((t) => {
+    const at = t.at - trimmed;
+    const end = at + t.duration;
+    if (end <= clipStart) {
+      return [];
+    }
+    return at >= clipStart ? [{ ...t, at }] : [{ ...t, at: clipStart, duration: end - clipStart }];
+  });
+}
+
 function heldUntilStart(tweens: Tween[], clipStart: number): Hold[] {
   return tweens.filter((t) => t.at > clipStart).map((t) => ({ target: t.target, vars: t.from, at: clipStart }));
 }
@@ -405,7 +416,7 @@ export function composeHtml(raw: ComposeInput): string {
       const html = group ? group.html(clip, ctx, placed, layers.splice(group.firstLayer(clip, index, starts)).join('')) : clipHtml(clip, ctx, placed, template.html(ctx as never));
       (onStage.has(clip.id) && !group && !hidden.has(clip.id) ? world : layers).push(html);
       effectSets.push(...(group ? group.effects(clip, ctx) : effectTimeline(clip, ctx, ctx.color)));
-      const own = template.tweens?.(ctx as never) ?? [];
+      const own = untrimmed(template.tweens?.(ctx as never) ?? [], ctx.start, ctx.mediaStart);
       tweens.push(...edgeTweens(clip, doc.fps), ...moveTweens(clip, doc.fps), ...own);
       holds.push(...heldUntilStart(own, ctx.start));
       if (THREE_D_COMPONENTS.includes(clip.component)) {

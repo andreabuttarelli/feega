@@ -71,6 +71,22 @@ describe('MotionDoc to HyperFrames composition', () => {
     expect(html).toContain('tl.fromTo("#li-title-1"');
   });
 
+  it('a title trimmed past its reveal starts with the lines already shown', () => {
+    const trimmed = { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === 'title' ? { ...c, trimStart: 30 } : c)) })) };
+    const html = compose(trimmed);
+
+    expect(html).not.toContain('tl.fromTo("#li-title-0"');
+    expect(html).not.toContain('tl.set("#li-title-1"');
+  });
+
+  it('a title trimmed inside its reveal finishes it from the clip start', () => {
+    const trimmed = { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === 'title' ? { ...c, trimStart: 10 } : c)) })) };
+    const html = compose(trimmed);
+
+    expect(html).toContain('"duration":0.2,"ease":"power3.out","immediateRender":false},0.5);');
+    expect(html).toContain('"duration":0.3667,"ease":"power3.out","immediateRender":false},0.5);');
+  });
+
   it('a transition becomes a tween on the clip at its edge', () => {
     const faded = must(setTransition(doc, 'title', Side.Out, { kind: TransitionKind.Fade, durationInFrames: 15 }));
 
