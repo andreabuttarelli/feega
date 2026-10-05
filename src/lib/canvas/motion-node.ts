@@ -39,3 +39,7 @@ export function motionOf(row: { id: string; type: string; data: Record<string, u
 export function motionEditorPath(input: { projectId: string; canvasId: string; nodeId: string }): string {
   return `/p/${input.projectId}/c/${input.canvasId}/motion/${input.nodeId}`;
 }
+
+export function motionSourcePath(input: { projectId: string; canvasId: string; nodeId: string; revision: number }): string {
+  return `${motionEditorPath(input)}/source?rev=${input.revision}`;
+}

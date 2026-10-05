@@ -10,7 +10,7 @@ const lib = join(dir, '../../canvas/composition');
 
 describe('the composition node runs on the motion engine', () => {
   it('previews with the motion player, from the node read as a motion video', () => {
-    expect(node).toMatch(/<CompositionPlayer[^>]*doc=\{nodeDoc\(node, media\)\}/);
+    expect(node).toMatch(/<CompositionPlayer[^>]*doc=\{nodeDoc\(node, cards, motions\)\}/);
   });
 
   it('opens and exports in Compositions, the motion editor with its export dialog', () => {

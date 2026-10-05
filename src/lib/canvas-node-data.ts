@@ -19,6 +19,7 @@ import type { EffectsNode } from '$lib/canvas/effects-node';
 import { LAYOUTS } from '$lib/canvas/composition/index';
 import { CAMERA_PRESETS } from '$lib/canvas/composition/camera';
 import type { CompositionNode } from '$lib/canvas/composition-node';
+import { cellSchema, type CellSpec } from '$lib/motion/components';
 import { newCalendarData } from '$lib/canvas/calendar-node';
 import { newMotionData } from '$lib/canvas/motion-node';
 import { newStudioBatchData } from '$lib/canvas/studio-batch-node';
@@ -270,6 +271,15 @@ const DEFAULT_COMPOSITION_DURATION = 6;
 const DEFAULT_COMPOSITION_ASPECT: CompositionNode['aspect'] = '9:16';
 
 /** Il nodo `composition` dietro una riga, o null quando quella riga è un'altra cosa. */
+function cellsOf(raw: unknown): Record<string, CellSpec> {
+  return Object.fromEntries(
+    Object.entries(record(raw)).flatMap(([id, cell]) => {
+      const parsed = cellSchema.safeParse(cell);
+      return parsed.success ? [[id, parsed.data]] : [];
+    })
+  );
+}
+
 export function compositionOf(row: NodeRow): CompositionNode | null {
   if (row.type !== 'composition') {
     return null;
@@ -296,7 +306,8 @@ export function compositionOf(row: NodeRow): CompositionNode | null {
     aspect: (['9:16', '1:1', '16:9'] as const).includes(row.data.aspect as never)
       ? (row.data.aspect as CompositionNode['aspect'])
       : DEFAULT_COMPOSITION_ASPECT,
-    refId: nullableStr(row.data.refId)
+    refId: nullableStr(row.data.refId),
+    cells: cellsOf(row.data.cells)
   };
 }
 
@@ -308,7 +319,8 @@ export function compositionData(node: CompositionNode): Record<string, unknown> 
     background: node.background,
     duration: node.duration,
     aspect: node.aspect,
-    refId: node.refId
+    refId: node.refId,
+    cells: node.cells
   };
 }
 

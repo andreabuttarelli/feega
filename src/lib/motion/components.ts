@@ -159,19 +159,20 @@ const compositionParams = (label: string) => z.record(z.string(), z.union([z.num
 
 const unitRange = z.number().min(0).max(1);
 
-const compositionCard = z
-  .object({
-    assetId: z.string().min(1),
-    kind: z.enum(COMPOSITION_CARD_KINDS),
-    fit: z.enum(CELL_FITS).optional(),
-    focusX: unitRange.optional(),
-    focusY: unitRange.optional(),
-    background: z.string().regex(COLOR).optional(),
-    columns: z.number().int().min(BENTO_GRID.min).max(BENTO_GRID.max).optional(),
-    rows: z.number().int().min(BENTO_GRID.min).max(BENTO_GRID.max).optional(),
-    timing: z.enum(CELL_TIMINGS).optional()
-  })
-  .strict();
+const cellFields = {
+  fit: z.enum(CELL_FITS).optional(),
+  focusX: unitRange.optional(),
+  focusY: unitRange.optional(),
+  background: z.string().regex(COLOR).optional(),
+  columns: z.number().int().min(BENTO_GRID.min).max(BENTO_GRID.max).optional(),
+  rows: z.number().int().min(BENTO_GRID.min).max(BENTO_GRID.max).optional(),
+  timing: z.enum(CELL_TIMINGS).optional()
+};
+
+export const cellSchema = z.object(cellFields).strict();
+export type CellSpec = z.output<typeof cellSchema>;
+
+const compositionCard = z.object({ assetId: z.string().min(1), kind: z.enum(COMPOSITION_CARD_KINDS), ...cellFields }).strict();
 
 export enum TrackKind {
   Visual = 'visual',

@@ -28,11 +28,13 @@
 
 /** Cosa una cosa È. I tre primitivi, e nient'altro. */
 import { videoRefCapacity } from '$lib/video-models';
+import { MAX_COMPOSITION_MEDIA } from '$lib/motion/components';
 import { imageModelSpec } from '$lib/image-models';
 import { SELECTABLE_SOURCE_TYPES } from './select-node';
 import { audioInputMediums, audioOperationOf, type AudioOperationId } from './audio-operations';
 
-export const MEDIUMS = ['text', 'image', 'video', 'audio', 'model3d'] as const;
+export const GENERATED_MEDIUMS = ['text', 'image', 'video', 'audio', 'model3d'] as const;
+export const MEDIUMS = [...GENERATED_MEDIUMS, 'motion'] as const;
 export type Medium = (typeof MEDIUMS)[number];
 
 /**
@@ -139,11 +141,11 @@ export const CANVAS_NODE_SPECS: Record<NodeKind, NodeSpec> = {
   effects: { medium: null, generated: true, accepts: ['image', 'video'], requires: [], requiresOneOf: ['image', 'video'] },
   // Un nodo `composition` compone più immagini in una scena 3D animata: produce un video (fase 3),
   // richiede almeno un'immagine collegata — senza materiale la scena non ha cosa mostrare.
-  composition: { medium: 'video', generated: true, accepts: ['image'], requires: ['image'] },
+  composition: { medium: 'video', generated: true, accepts: ['image', 'video', 'motion'], requires: [], requiresOneOf: ['image', 'video', 'motion'] },
   audio: { medium: 'audio', generated: true, accepts: ['text', 'audio', 'video'], requires: [] },
   model3d: { medium: 'model3d', generated: true, accepts: ['image', 'text'], requires: [], requiresOneOf: ['image', 'text'] },
   calendar: { medium: null, generated: true, accepts: ['text', 'image', 'video', 'audio'], requires: [] },
-  motion: { medium: null, generated: false, accepts: [], requires: [] },
+  motion: { medium: 'motion', generated: false, accepts: [], requires: [] },
   studio_batch: { medium: 'image', generated: false, accepts: [], requires: [] }
 };
 
@@ -196,7 +198,7 @@ export function canConnect(from: CanvasNode, to: CanvasNode, fromMedium: Medium 
   return { ok: true };
 }
 
-const MEDIUM_NAME: Record<Medium, string> = { text: 'text', image: 'image', video: 'video', audio: 'audio', model3d: '3D model' };
+const MEDIUM_NAME: Record<Medium, string> = { text: 'text', image: 'image', video: 'video', audio: 'audio', model3d: '3D model', motion: 'motion' };
 
 function operationOf(node: CanvasNode): AudioOperationId {
   return audioOperationOf({ operation: node.operation });
@@ -252,7 +254,7 @@ export function acceptedInputs(node: CanvasNode, incoming: CanvasNode[]): InputV
   const caps = capacityOf(node);
   const accepted: CanvasNode[] = [];
   const rejected: CanvasNode[] = [];
-  const used: Record<Medium, number> = { text: 0, image: 0, video: 0, audio: 0, model3d: 0 };
+  const used: Record<Medium, number> = { text: 0, image: 0, video: 0, audio: 0, model3d: 0, motion: 0 };
   let why: string | null = null;
 
   for (const source of incoming) {
@@ -304,5 +306,6 @@ function capacityOf(node: CanvasNode): Partial<Record<Medium, number>> {
   // 16): un tetto uguale per tutti mentirebbe agli stessi due versi di `video`. Senza un modello
   // noto resta 1 — il caso oggi eseguito (`baseMediaId`), mai un numero inventato.
   if (node.kind === 'image') return { text: 1, image: imageModelSpec(node.model)?.maxRefs ?? 1, video: 0, audio: 0 };
+  if (node.kind === 'composition') return { image: MAX_COMPOSITION_MEDIA, video: MAX_COMPOSITION_MEDIA, motion: MAX_COMPOSITION_MEDIA };
   return { text: 1, image: 1, video: 0, audio: 1 };
 }

@@ -1,22 +1,24 @@
 <script lang="ts">
   import TieredImage from './TieredImage.svelte';
   import Orbit from '@lucide/svelte/icons/orbit';
-  import type { CompositionNode, UpstreamMedia } from '$lib/canvas/composition-node';
+  import { staleMotions, type CompositionNode, type MotionCard, type UpstreamCard } from '$lib/canvas/composition-node';
+  import { motionSourcePath } from '$lib/canvas/motion-node';
   import CompositionPlayer from '$lib/components/motion/CompositionPlayer.svelte';
   import NodeDownload from './NodeDownload.svelte';
   import { nodeDoc } from '$lib/motion/composition-draft';
+  import type { MotionDoc } from '$lib/motion/doc';
 
   let {
     node,
     posterUrl = null,
-    media = [],
+    cards = [],
     assets = {},
     previewActive = true,
     composeIn
   }: {
     node: CompositionNode;
     posterUrl?: string | null;
-    media?: UpstreamMedia[];
+    cards?: UpstreamCard[];
     assets?: Record<string, string>;
     previewActive?: boolean;
     composeIn: { project: string; canvas: string };
@@ -24,25 +26,45 @@
 
   const ASPECT_RATIO = { '9:16': 9 / 16, '1:1': 1, '16:9': 16 / 9 } as const;
 
+  type Loaded = { revision: number; doc: MotionDoc | null; assets: Record<string, string> };
+
+  let sources = $state<Record<string, Loaded>>({});
+
+  async function load(card: MotionCard) {
+    const shown = sources[card.sourceId];
+    sources = { ...sources, [card.sourceId]: { revision: card.revision, doc: shown?.doc ?? null, assets: shown?.assets ?? {} } };
+    const res = await fetch(motionSourcePath({ projectId: composeIn.project, canvasId: composeIn.canvas, nodeId: card.sourceId, revision: card.revision })).catch(() => null);
+    const body = res?.ok ? ((await res.json()) as { doc: MotionDoc; assets: Record<string, string> }) : null;
+    sources = { ...sources, [card.sourceId]: { revision: card.revision, doc: body?.doc ?? null, assets: body?.assets ?? {} } };
+  }
+
+  $effect(() => {
+    const revisions = Object.fromEntries(Object.entries(sources).map(([id, s]) => [id, s.revision]));
+    staleMotions(cards, revisions).forEach(load);
+  });
+
+  const motions = $derived(Object.fromEntries(Object.entries(sources).map(([id, s]) => [id, s.doc])));
+  const allAssets = $derived(Object.assign({}, assets, ...Object.values(sources).map((s) => s.assets)));
+
   let form = $state<HTMLFormElement | null>(null);
   const openInCompositions = () => form?.requestSubmit();
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="composition" ondblclick={openInCompositions}>
-  {#if media.length > 0}
+  {#if cards.length > 0}
     <div
       class="composition-preview"
       style={`--preview-ratio: ${ASPECT_RATIO[node.aspect]}; aspect-ratio: ${ASPECT_RATIO[node.aspect]}`}
     >
-      <CompositionPlayer doc={nodeDoc(node, media)} {assets} active={previewActive} />
+      <CompositionPlayer doc={nodeDoc(node, cards, motions)} assets={allAssets} active={previewActive} />
     </div>
   {:else if node.refId && posterUrl}
     <TieredImage src={posterUrl} nodeId={node.id} alt="Composition" />
   {:else}
     <div class="composition-empty">
       <Orbit size={22} strokeWidth={1.5} />
-      <p>Connect images</p>
+      <p>Connect images, videos or motions</p>
     </div>
   {/if}
 

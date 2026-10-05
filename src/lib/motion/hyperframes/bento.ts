@@ -25,7 +25,7 @@ export type BentoBake = {
   radius: number[];
 };
 
-export type BentoPose = { radius: number; cells: { opacity: number; transform: string }[] };
+export type BentoPose = { radius: number; cells: { opacity: number; transform: string; lift: number; zoom: number }[] };
 
 const BENTO_TIMELINE = 'feegaBento';
 const RADIUS_KEY = 'cornerRadius';
@@ -77,21 +77,57 @@ export function bentoAt(bake: BentoBake, frame: number): BentoPose {
   const clipFrame = Math.max(0, Math.floor(frame - bake.from));
   const radius = round(bake.radius[Math.min(clipFrame, bake.radius.length - 1)] * bake.scale);
   const eased = (t: number) => 1 - (1 - t) ** 3;
-  const moves: Record<string, (p: number) => string> = {
-    none: () => 'none',
-    fade: () => 'none',
-    rise: (p) => `translateY(${round((1 - p) * bake.lift)}px)`,
-    scale: (p) => `scale(${round(0.9 + 0.1 * p)})`
+  const moves: Record<string, (p: number) => { lift: number; zoom: number }> = {
+    none: () => ({ lift: 0, zoom: 1 }),
+    fade: () => ({ lift: 0, zoom: 1 }),
+    rise: (p) => ({ lift: round((1 - p) * bake.lift), zoom: 1 }),
+    scale: (p) => ({ lift: 0, zoom: round(0.9 + 0.1 * p) })
   };
+  const css = (m: { lift: number; zoom: number }) => (m.lift ? `translateY(${m.lift}px)` : m.zoom !== 1 ? `scale(${m.zoom})` : 'none');
 
   const cells = Array.from({ length: bake.cells }, (_, i) => {
-    if (bake.enter === 'none') {
-      return { opacity: 1, transform: 'none' };
-    }
-    const progress = eased(Math.min(1, Math.max(0, (clipFrame - i * bake.stagger) / bake.enterFrames)));
-    return { opacity: round(progress), transform: progress >= 1 ? 'none' : moves[bake.enter](progress) };
+    const progress = bake.enter === 'none' ? 1 : eased(Math.min(1, Math.max(0, (clipFrame - i * bake.stagger) / bake.enterFrames)));
+    const move = progress >= 1 ? moves.none(1) : moves[bake.enter](progress);
+    return { opacity: round(progress), transform: css(move), ...move };
   });
   return { radius, cells };
+}
+
+export type BentoSlot = { cell: BentoRect; content: { x: number; y: number; scale: number } };
+type Point = { x: number; y: number };
+
+function contentOffset(card: BentoCard, rect: BentoRect, env: Env) {
+  const s = FRAME_SCALE[fitOf(card)](rect.width / env.width, rect.height / env.height);
+  const focus = focusOf(card);
+  return { x: (rect.width - env.width * s) * focus.x, y: (rect.height - env.height * s) * focus.y, scale: s };
+}
+
+export function bentoSlotAt(clip: MotionClip, env: Env, item: number, frame: number): BentoSlot | null {
+  const p = clip.props as BentoProps;
+  const cells = cellsOf(p, env);
+  const index = cells.findIndex((c) => c.item === item);
+  const card = cells[index]?.card;
+  if (!card) {
+    return null;
+  }
+  const { rect } = cells[index];
+  const pose = bentoAt(bentoBake(clip, env), frame).cells[index];
+  const offset = contentOffset(card, rect, env);
+  const centre = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+  return {
+    cell: rect,
+    content: {
+      x: centre.x + pose.zoom * (rect.left + offset.x - centre.x),
+      y: centre.y + pose.zoom * (rect.top + offset.y - centre.y) + pose.lift,
+      scale: pose.zoom * offset.scale
+    }
+  };
+}
+
+export function slotLocal(slot: BentoSlot, point: Point): Point {
+  const PRECISION = 1000;
+  const round = (n: number) => Math.round(n * PRECISION) / PRECISION;
+  return { x: round((point.x - slot.content.x) / slot.content.scale), y: round((point.y - slot.content.y) / slot.content.scale) };
 }
 
 const fill = (fit: CellFit, focus: { x: number; y: number }) =>
@@ -108,11 +144,8 @@ const FRAME_SCALE: Record<CellFit, (a: number, b: number) => number> = {
 };
 
 function framed(ctx: Ctx, card: BentoCard, rect: BentoRect, chunk: string): string {
-  const s = FRAME_SCALE[fitOf(card)](rect.width / ctx.width, rect.height / ctx.height);
-  const focus = focusOf(card);
-  const x = (rect.width - ctx.width * s) * focus.x;
-  const y = (rect.height - ctx.height * s) * focus.y;
-  return `<div class="btc" style="${css({ position: 'absolute', left: '0', top: '0', width: px(ctx.width), height: px(ctx.height), transformOrigin: '0 0', transform: `translate(${px(x)},${px(y)}) scale(${Math.round(s * 10000) / 10000})` })}">${chunk}</div>`;
+  const o = contentOffset(card, rect, ctx);
+  return `<div class="btc" style="${css({ position: 'absolute', left: '0', top: '0', width: px(ctx.width), height: px(ctx.height), transformOrigin: '0 0', transform: `translate(${px(o.x)},${px(o.y)}) scale(${Math.round(o.scale * 10000) / 10000})` })}">${chunk}</div>`;
 }
 
 const FACES: Record<BentoCard['kind'], Face> = {

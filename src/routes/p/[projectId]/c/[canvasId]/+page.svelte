@@ -78,7 +78,7 @@
   import { inputChanged } from '$lib/canvas/effects/editor';
   import { upstreamMedia } from '$lib/canvas/effects-node';
   import type { EffectStep } from '$lib/canvas/effects';
-  import { upstreamMedia as compositionMedia } from '$lib/canvas/composition-node';
+  import { upstreamCards as compositionCards, cardAssetIds } from '$lib/canvas/composition-node';
   import { listFeedingSelect } from '$lib/canvas/select-node';
   import { fieldValue, productItem, socialPostItem } from '$lib/canvas/select-sources';
   import { isOutputHandle, outputValues, portOfOutputHandle, selectOutputs, type OutputValue, type SelectOutput } from '$lib/canvas/select-outputs';
@@ -755,6 +755,10 @@
 
   function assetUrl(refId: string | null): string | null {
     return refId ? `/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}` : null;
+  }
+
+  function cardAssets(cards: ReturnType<typeof compositionCards>): Record<string, string> {
+    return Object.fromEntries(cardAssetIds(cards).map((id) => [id, sized(assetUrl(id)!, AssetSize.Px1024)]));
   }
 
   /** Da un nodo `list` al nodo che GENERA che lo tiene come proprio output di loop
@@ -2706,12 +2710,12 @@
             onopeneditor={() => (effectsEditorId = id)}
           />
         {:else if composition}
-          {@const media = compositionMedia(id, edges, nodes)}
+          {@const cards = compositionCards(id, edges, nodes)}
           <CompositionNode
             node={composition}
             posterUrl={assetUrl(composition.refId)}
-            {media}
-            assets={Object.fromEntries(media.map((m) => [m.assetId, sized(assetUrl(m.assetId)!, AssetSize.Px1024)]))}
+            {cards}
+            assets={cardAssets(cards)}
             composeIn={{ project: data.projectId, canvas: data.canvas.id }}
           />
         {:else if motion}

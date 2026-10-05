@@ -8,7 +8,7 @@ import { addClip, setKeyframes, setProps, type OpResult } from '../timeline';
 import { isAnimatable } from '../keyframes';
 import { bentoCellId } from '../bento/model';
 import { composeHtml } from './compose';
-import { bentoAt, bentoBake } from './bento';
+import { bentoAt, bentoBake, bentoSlotAt, slotLocal } from './bento';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -103,5 +103,24 @@ describe('a composition laid out as a bento', () => {
     [40, 3, 99, 0].forEach((f) => bentoAt(bake, f));
 
     expect(bentoAt(bake, 17)).toEqual(direct);
+  });
+
+  it('maps a point of the frame into the local space of the motion in a cell, at any frame', () => {
+    const doc = bento([{ assetId: 'dash', kind: 'comp' }], { columns: 2, rows: 2, gap: 20, enter: 'none' });
+    const slot = bentoSlotAt(gridOf(doc), ENV, 0, 30)!;
+    const centre = { x: slot.cell.left + slot.cell.width / 2, y: slot.cell.top + slot.cell.height / 2 };
+
+    expect(slot.cell).toMatchObject({ left: 20, top: 20 });
+    expect(slotLocal(slot, centre)).toEqual({ x: 960, y: 540 });
+    expect(slotLocal(slot, { x: slot.cell.left, y: slot.cell.top }).x).toBe(0);
+  });
+
+  it('follows the cell while it rises in', () => {
+    const doc = bento([{ assetId: 'dash', kind: 'comp' }], { enter: 'rise', stagger: 0, enterSeconds: 1 });
+    const early = bentoSlotAt(gridOf(doc), ENV, 0, 5)!;
+    const settled = bentoSlotAt(gridOf(doc), ENV, 0, 60)!;
+
+    expect(early.content.y).toBeGreaterThan(settled.content.y);
+    expect(bentoSlotAt(gridOf(doc), ENV, 7, 0)).toBeNull();
   });
 });
