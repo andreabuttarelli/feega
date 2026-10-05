@@ -11,6 +11,7 @@ import { findClip } from '../doc';
 import { Interp, easeName, sampleTrack } from '../keyframes';
 import { keyframeTweens } from './animate';
 import { CAPTURE_REPLY, CAPTURE_REQUEST, composeHtml } from './compose';
+import { MEASURE_REQUEST } from './measure';
 import { writeComponent } from '../custom/ops';
 import { PropFormat } from '../custom/component';
 import { setExpression } from '../expression/ops';
@@ -30,6 +31,10 @@ function compose(d: MotionDoc, assets: Record<string, string> = {}): string {
 }
 
 describe('MotionDoc to HyperFrames composition', () => {
+  it('the page answers the editor when it asks where the clips are', () => {
+    expect(compose(doc)).toContain(MEASURE_REQUEST);
+  });
+
   it('the root carries the canvas size and duration in seconds', () => {
     expect(compose(doc)).toContain('data-composition-id="main" data-start="0" data-width="1920" data-height="1080" data-duration="15" data-fps="30"');
   });

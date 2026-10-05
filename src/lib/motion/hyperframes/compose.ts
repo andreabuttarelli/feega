@@ -15,6 +15,7 @@ import { ancestorsOf, parentsWithChildren } from '../parent';
 import { MASK_CSS, MaskScope, maskLayer, startValues } from './masks';
 import { SCREENSHOT_URL, captureScript, contentStamp } from './capture';
 import { cspMeta } from './csp';
+import { measureScript } from './measure';
 import { THREE_VERSION } from './three';
 import { Library, THREE_GLOBAL, bootScript, definitionScript, librariesOf, seedOf, type CustomRun } from '../custom/runtime';
 import { PropFormat, type CustomComponents } from '../custom/component';
@@ -477,5 +478,5 @@ export function composeHtml(raw: ComposeInput): string {
     hotScript(shapeScript(shapes, doc.fps, Number(duration))),
     hotScript(particleScript(particles, doc.fps, Number(duration)))
   ].join('');
-  return `${page}${captureScript(frame, contentStamp(page))}</body></html>`;
+  return `${page}${captureScript(frame, contentStamp(page))}${measureScript()}</body></html>`;
 }
