@@ -10,14 +10,14 @@ import { selectNodeSize } from './select-node';
 import { effectsNodeSize } from './effects-node';
 import { compositionNodeSize } from './composition-node';
 import { calendarNodeSize } from './calendar-node';
-import { motionNodeSize } from './motion-node';
+import { motionNodeSize, motionOf } from './motion-node';
 import { studioBatchNodeSize } from './studio-batch-node';
 
 type Size = { w: number; h: number };
 
 const FALLBACK_SIZE: Size = { w: 320, h: 240 };
 
-const NODE_SIZE: Record<NodeType, () => Size> = {
+const NODE_SIZE: Record<NodeType, (data: Record<string, unknown>) => Size> = {
   text: () => genNodeSize('text'),
   image: () => genNodeSize('image'),
   video: () => genNodeSize('video'),
@@ -35,10 +35,10 @@ const NODE_SIZE: Record<NodeType, () => Size> = {
   calendar: calendarNodeSize,
   audio: () => genNodeSize('audio'),
   model3d: () => genNodeSize('model3d'),
-  motion: motionNodeSize,
+  motion: (data) => motionNodeSize(motionOf({ id: '', type: 'motion', data })?.format),
   studio_batch: studioBatchNodeSize
 };
 
-export function nodeSize(type: string): Size {
-  return isNodeType(type) ? NODE_SIZE[type]() : FALLBACK_SIZE;
+export function nodeSize(type: string, data: Record<string, unknown> = {}): Size {
+  return isNodeType(type) ? NODE_SIZE[type](data) : FALLBACK_SIZE;
 }

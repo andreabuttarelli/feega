@@ -6,7 +6,8 @@ import { fieldsOf } from '$lib/motion/inspector';
 import { Ease, FRAME_RATES, MAX_SECONDS, TRANSITION_KINDS } from '$lib/motion/design';
 import { setFrameRate } from '$lib/motion/frame-rate';
 import { Background, MOTION_FORMATS, clipsOf, findClip, type MotionDoc } from '$lib/motion/doc';
-import { ClipEdge, Side, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyInterp, setKeyframes, setMask, setMaskStack, shaped, setProps, setTiming, setTrackMatte, setTransform, setTransition, trimClip, applyEasePreset, setKeyEase, type OpResult } from '$lib/motion/timeline';
+import { JUNCTION, JUNCTION_KINDS, junctionPairs } from '$lib/motion/junctions';
+import { ClipEdge, Side, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyInterp, setKeyframes, setMask, setMaskStack, shaped, setProps, setTiming, setTrackMatte, setTransform, setTransition, setJunction, trimClip, applyEasePreset, setKeyEase, type OpResult } from '$lib/motion/timeline';
 import { MASK_KEYS, MASK_KIND_IDS, MASK_MODES, MATTES, MAX_MASK_STACK } from '$lib/motion/mask';
 import { pathProblem } from '$lib/motion/path';
 import { Align, addMarker, alignClips, allMarkers, distributeClips, markerFrame, nudgeClips, removeMarker, sequenceClips, setClipFlags, setTrackFlags, setWorkArea, staggerClips } from '$lib/motion/organize';
@@ -142,6 +143,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
         props: shownRecord(propsOwner(c.component), c.props, doc),
         in: edgeSummary(c.transitionIn),
         out: edgeSummary(c.transitionOut),
+        junction: c.junction ? { kind: c.junction.kind, duration: secs(c.junction.durationInFrames), from: junctionPairs(doc).find((p) => p.incoming === c.id)?.outgoing ?? null } : null,
         transform: shownRecord(c.component, c.transform, doc),
         mask: c.mask && shownMask(c.component, c.mask, doc),
         maskStack: c.maskStack.map((m) => shownMask(c.component, m, doc)),
@@ -418,6 +420,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: 'Set the transition at the start (in) or end (out) of a clip.',
       inputSchema: z.object({ clip_id: z.string(), side: z.enum([Side.In, Side.Out]), kind: z.enum(TRANSITION_KINDS), duration: z.number().min(0).max(2) }),
       execute: async (input) => apply(setTransition(session.doc, input.clip_id, input.side, { kind: input.kind, durationInFrames: frames(input.duration) }), `transition on ${input.clip_id}`)
+    }),
+
+    set_clip_transition: tool({
+      description: `Transition between two clips at a cut, like a dissolve in an editor: put it on the clip that arrives (clip_id); the clip that ends exactly where it starts (same track first, else any video track) is the one that leaves. Kinds: ${JUNCTION_KINDS.map((k) => `${k} (${JUNCTION[k].label})`).join(', ')}; none removes it. duration in seconds, centred on the cut: both clips stay on screen half of it longer. It replaces the out transition of the leaving clip and the in transition of the arriving one.`,
+      inputSchema: z.object({ clip_id: z.string(), kind: z.enum([...JUNCTION_KINDS, 'none']), duration: z.number().min(0.05).max(2).default(0.5) }),
+      execute: async (input) => apply(setJunction(session.doc, input.clip_id, input.kind === 'none' ? null : { kind: input.kind, durationInFrames: frames(input.duration) }), `transition into ${input.clip_id}`)
     }),
 
     trim_clip: tool({
@@ -1031,7 +1039,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_motion_blur: tool({
-      description: `Real motion blur, like After Effects: each frame averages sub-frame samples across the shutter, so fast moves smear. Video-wide: enabled, shutter_angle (degrees open, 180 is film), shutter_phase (degrees, -90 centres the shutter on the frame), samples (2..${MAX_SAMPLES}, 8 is enough for most moves; more costs more render time). Per clip: clip_ids with clips_blur false keeps those clips sharp. Renders on our servers in one pass; videos with Video clips cannot blur.`,
+      description: `Real motion blur, like After Effects: each frame averages sub-frame samples across the shutter, so fast moves smear. Video-wide: enabled, shutter_angle (degrees open, 180 is film), shutter_phase (degrees, -90 centres the shutter on the frame), samples (2..${MAX_SAMPLES}, 8 is enough for most moves; more costs more render time). Per clip: clip_ids with clips_blur false keeps those clips sharp. Renders on our servers in one pass, Video clips and device screens included; 3D clips make each sample slower, so long 3D shots allow fewer samples.`,
       inputSchema: z.object({
         enabled: z.boolean().optional(),
         shutter_angle: z.number().min(1).max(DEGREES).optional(),
@@ -1073,7 +1081,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     add_text_animator: tool({
-      description: `Animate a text clip (Title, Text, Kicker, Caption) per character, word or line, like an After Effects text animator. The text is split into units; a range selector (start..end %, shifted by offset %, edges softened by softness 0..1 with shape square|ramp|smooth, order shuffled by seed) picks the units, and the selected ones get values: ${ANIMATOR_VALUES} (x/y in em, scale multiplier, rotation degrees, blur px, tracking em). Animate offset (or start/end) with set_keyframes on ta.<animator id>.offset to sweep the selection; every value is keyframable and expressionable the same way. All animators of a clip share one unit.`,
+      description: `Animate a text clip (Title, Text, Kicker, Caption) per character, word or line, like an After Effects text animator. The text is split into units; a range selector (start..end %, shifted by offset %, edges softened by softness 0..1 with shape square|ramp|smooth, order shuffled by seed) picks the units, and the selected ones get values: ${ANIMATOR_VALUES} (x/y in em, scale multiplier, rotation degrees, blur px, tracking em). Animate offset (or start/end) with set_keyframes on ta.<animator id>.offset to sweep the selection; every value is keyframable and expressionable the same way. Animators of one clip may use different units: the text splits by the finest and each piece also knows its word and line.`,
       inputSchema: z.object({ clip_id: z.string(), unit: z.enum(ANIMATOR_UNITS), ...animatorFields }),
       execute: async (input) => {
         const id = deps.newId();
@@ -1142,9 +1150,9 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     add_track: tool({
-      description: 'Add a visual or audio track. A new visual track goes on top.',
-      inputSchema: z.object({ kind: z.enum([TrackKind.Visual, TrackKind.Audio]) }),
-      execute: async (input) => apply(addTrack(session.doc, input.kind, deps.newId()), `added ${input.kind} track`)
+      description: 'Add a visual or audio track, optionally named. A new visual track goes on top.',
+      inputSchema: z.object({ kind: z.enum([TrackKind.Visual, TrackKind.Audio]), name: z.string().max(60).optional() }),
+      execute: async (input) => apply(addTrack(session.doc, input.kind, deps.newId(), input.name), `added ${input.kind} track`)
     }),
 
     set_track: tool({

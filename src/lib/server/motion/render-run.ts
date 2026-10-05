@@ -12,7 +12,8 @@ import { composeHtml, HYPERFRAMES_VERSION, type ComposeInput } from '$lib/motion
 import { assetOrigins } from '$lib/motion/hyperframes/csp';
 import { audioPlan } from '$lib/motion/audio-plan';
 import { CREDITS_PER_USD_SUBSCRIPTION_LIST } from '$lib/credit-ladder';
-import { checkTask, FarmTask, farmChunks, farmProblem, launchAssembly, launchPiece, MAX_ATTEMPTS, pieceFile, stopWorker, TaskState, type FarmJob, type TaskCheck } from './farm-render';
+import { checkTask, FarmTask, farmChunks, farmProblem, firstSlices, framesOf, halves, launchAssembly, launchPiece, MAX_ATTEMPTS, pieceFile, stopWorker, TaskState, WORKER_GONE, type FarmJob, type Slice, type TaskCheck } from './farm-render';
+import { costSpans } from '$lib/motion/render-cost';
 import { FORMAT, exportProblem, type ExportFormat, type RenderSettings } from '$lib/motion/export-formats';
 import { setFrameRate } from '$lib/motion/frame-rate';
 import { lengthProblem } from '$lib/motion/render-length';
@@ -37,7 +38,7 @@ export type BatchCell = { row: number; name: string; runId: string; status: Node
 export type BatchView = { id: string; credits: number; rows: BatchCell[] };
 export type ReconcileOutcome = { checked: number; done: number; failed: number; pending: number; reaped: number };
 
-type Piece = { worker: string; attempt: number; state: TaskState };
+type Piece = { worker: string; attempt: number; state: TaskState; slice: Slice };
 type Output = { width: number; height: number; seconds: number; format: ExportFormat };
 type FarmProgress = { pieces: Piece[]; assembly: { attempt: number } | null };
 type BatchTag = { id: string; row: number; name: string; rows: number };
@@ -72,7 +73,8 @@ export function farmJob(input: ComposeInput, settings: RenderSettings): FarmJob 
     allowHosts: reachable.map((origin) => new URL(origin).host),
     format: settings.format,
     quality: settings.quality,
-    motionBlur: doc.motionBlur.enabled ? { shutterAngle: doc.motionBlur.shutterAngle, shutterPhase: doc.motionBlur.shutterPhase, samples: doc.motionBlur.samples } : null
+    motionBlur: doc.motionBlur.enabled ? { shutterAngle: doc.motionBlur.shutterAngle, shutterPhase: doc.motionBlur.shutterPhase, samples: doc.motionBlur.samples } : null,
+    cost: costSpans(doc, out.width * out.height)
   };
 }
 
@@ -131,8 +133,8 @@ async function loadJob(db: Db, path: string): Promise<FarmJob> {
   return JSON.parse(await data.text()) as FarmJob;
 }
 
-async function pieceLinks(db: Db, storage: RenderStorage, scope: RenderScope, runId: string, job: FarmJob, index: number) {
-  const upload = index === 0 ? null : await signedUpload(db, workPath(scope, runId, pieceFile(job, index)));
+async function pieceLinks(db: Db, storage: RenderStorage, scope: RenderScope, runId: string, job: FarmJob, slice: Slice) {
+  const upload = slice.index === 0 ? null : await signedUpload(db, workPath(scope, runId, pieceFile(job, slice)));
   return { upload, storageHost: storage.host, maxBytes: await storage.limit() };
 }
 
@@ -148,7 +150,7 @@ async function saveState(db: Db, run: NodeRun, state: RenderState, event?: Rende
 
 async function cleanUp(db: Db, farm: RenderFarm, run: NodeRun, state: RenderState, job: FarmJob | null): Promise<void> {
   await Promise.allSettled(state.farm.pieces.map((p) => stopWorker(farm, p.worker)));
-  const pieces = job ? state.farm.pieces.map((_, i) => workPath(state.scope, run.id, pieceFile(job, i))).slice(1) : [];
+  const pieces = job ? state.farm.pieces.filter((p) => p.slice.index > 0).map((p) => workPath(state.scope, run.id, pieceFile(job, p.slice))) : [];
   await db.storage.from(CANVAS_ASSET_BUCKET).remove([workPath(state.scope, run.id, JOB_FILE), ...pieces]).catch(() => {});
 }
 
@@ -195,9 +197,9 @@ async function enqueue(db: Db, scope: RenderScope, req: RenderRequest, extra: Re
 
 async function launch(db: Db, farm: RenderFarm, storage: RenderStorage, run: NodeRun, job: FarmJob): Promise<string | null> {
   const state = stateOf(run);
-  const count = farmChunks(job).count;
-  const launched = await Promise.allSettled(Array.from({ length: count }, async (_, i) => launchPiece(farm, job, i, await pieceLinks(db, storage, state.scope, run.id, job, i))));
-  const pieces = launched.flatMap((l) => (l.status === 'fulfilled' ? [{ worker: l.value, attempt: 1, state: TaskState.Running }] : []));
+  const slices = firstSlices(job);
+  const launched = await Promise.allSettled(slices.map(async (slice) => launchPiece(farm, job, slice, await pieceLinks(db, storage, state.scope, run.id, job, slice))));
+  const pieces = launched.flatMap((l, i) => (l.status === 'fulfilled' ? [{ worker: l.value, attempt: 1, state: TaskState.Running, slice: slices[i] }] : []));
   const refused = launched.find((l): l is PromiseRejectedResult => l.status === 'rejected');
 
   if (refused) {
@@ -275,22 +277,54 @@ async function launchQueued(db: Db, farm: RenderFarm, storage: RenderStorage, ru
   return detail ? Step.Failed : Step.Pending;
 }
 
-async function retryPiece(db: Db, farm: RenderFarm, storage: RenderStorage, run: NodeRun, job: FarmJob, piece: Piece, index: number): Promise<Piece> {
+async function relaunch(db: Db, farm: RenderFarm, storage: RenderStorage, run: NodeRun, job: FarmJob, slice: Slice, attempt: number): Promise<Piece> {
+  const worker = await launchPiece(farm, job, slice, await pieceLinks(db, storage, stateOf(run).scope, run.id, job, slice));
+  return { worker, attempt, state: TaskState.Running, slice };
+}
+
+async function retryPiece(db: Db, farm: RenderFarm, storage: RenderStorage, run: NodeRun, job: FarmJob, piece: Piece, check: TaskCheck): Promise<Piece[]> {
   await Promise.allSettled([stopWorker(farm, piece.worker)]);
-  const attempt = piece.attempt + 1;
+  const split = check.error === WORKER_GONE ? halves(job, piece.slice) : null;
   try {
-    const worker = await launchPiece(farm, job, index, await pieceLinks(db, storage, stateOf(run).scope, run.id, job, index));
-    return { worker, attempt, state: TaskState.Running };
+    if (split) {
+      return await Promise.all(split.map((slice) => relaunch(db, farm, storage, run, job, slice, 1)));
+    }
+    return [await relaunch(db, farm, storage, run, job, piece.slice, piece.attempt + 1)];
   } catch {
-    return { ...piece, attempt, state: TaskState.Failed };
+    return [{ ...piece, attempt: piece.attempt + 1, state: TaskState.Failed }];
   }
 }
 
+function failure(job: FarmJob, piece: Piece, error: string): string {
+  const tooLarge = error.match(TOO_LARGE)?.[0];
+  if (tooLarge) {
+    return tooLarge;
+  }
+  if (error === WORKER_GONE) {
+    return `${framesOf(job, piece.slice)} did not finish on a render worker even split down to ${piece.slice.size} frames: the scene is too heavy for the farm. Shorten the 3D shots, lower the motion blur samples or the resolution.`;
+  }
+  return `${framesOf(job, piece.slice)} failed after ${piece.attempt} attempts: ${error}`;
+}
+
+function hopeless(job: FarmJob, piece: Piece, check: TaskCheck): boolean {
+  if (check.state !== TaskState.Failed) {
+    return false;
+  }
+  if (TOO_LARGE.test(check.error ?? '')) {
+    return true;
+  }
+  if (check.error === WORKER_GONE && halves(job, piece.slice)) {
+    return false;
+  }
+  return piece.attempt >= MAX_ATTEMPTS;
+}
+
 async function startAssembly(db: Db, farm: RenderFarm, storage: RenderStorage, run: NodeRun, state: RenderState, job: FarmJob, attempt: number): Promise<Step> {
-  const others = state.farm.pieces.slice(1).map((_, k) => signedDownload(db, workPath(state.scope, run.id, pieceFile(job, k + 1))));
+  const slices = state.farm.pieces.map((p) => p.slice);
+  const others = slices.filter((slice) => slice.index > 0).map((slice) => signedDownload(db, workPath(state.scope, run.id, pieceFile(job, slice))));
   const links = { pieces: await Promise.all(others), output: await signedUpload(db, outputPath(state, run.id)), maxBytes: await storage.limit() };
   try {
-    await launchAssembly(farm, state.farm.pieces[0].worker, job, links);
+    await launchAssembly(farm, state.farm.pieces[0].worker, job, slices, links);
   } catch {
     const pieces = state.farm.pieces.map((p, i) => (i === 0 ? { ...p, state: TaskState.Failed } : p));
     await saveState(db, run, { ...state, farm: { pieces, assembly: null } });
@@ -304,25 +338,23 @@ async function advancePieces(db: Db, farm: RenderFarm, storage: RenderStorage, r
   const pending = (p: Piece): Promise<TaskCheck> => (p.state === TaskState.Done ? Promise.resolve({ state: TaskState.Done, error: null }) : checkTask(farm, p.worker, FarmTask.Piece));
   const checks = await Promise.all(state.farm.pieces.map(pending));
 
-  const hopeless = (c: TaskCheck, i: number) => c.state === TaskState.Failed && (state.farm.pieces[i].attempt >= MAX_ATTEMPTS || TOO_LARGE.test(c.error ?? ''));
-  const spent = checks.findIndex(hopeless);
+  const spent = state.farm.pieces.findIndex((p, i) => hopeless(job, p, checks[i]));
   if (spent >= 0) {
-    const error = checks[spent].error ?? 'render failed';
-    return fail(db, farm, run, state, error.match(TOO_LARGE)?.[0] ?? error, job);
+    return fail(db, farm, run, state, failure(job, state.farm.pieces[spent], checks[spent].error ?? 'render failed'), job);
   }
 
-  const landed = state.farm.pieces.filter((p, i) => i > 0 && p.state !== TaskState.Done && checks[i].state === TaskState.Done);
+  const landed = state.farm.pieces.filter((p, i) => p.slice.index > 0 && p.state !== TaskState.Done && checks[i].state === TaskState.Done);
   await Promise.allSettled(landed.map((p) => stopWorker(farm, p.worker)));
 
-  const pieces = await Promise.all(
-    state.farm.pieces.map((p, i) => (checks[i].state === TaskState.Failed ? retryPiece(db, farm, storage, run, job, p, i) : Promise.resolve({ ...p, state: checks[i].state })))
+  const next = await Promise.all(
+    state.farm.pieces.map((p, i) => (checks[i].state === TaskState.Failed ? retryPiece(db, farm, storage, run, job, p, checks[i]) : Promise.resolve([{ ...p, state: checks[i].state }])))
   );
-  const fresh = state.farm.pieces.filter((p, i) => p.state !== TaskState.Done && pieces[i].state === TaskState.Done).length;
-  const progress = { ...state.progress, chunksDone: Math.min(state.progress.chunks, state.progress.chunksDone + fresh) };
-  const next = await saveState(db, run, { ...state, progress, farm: { ...state.farm, pieces } });
+  const pieces = next.flat();
+  const progress = { ...state.progress, chunks: pieces.length, chunksDone: pieces.filter((p) => p.state === TaskState.Done).length };
+  const saved = await saveState(db, run, { ...state, progress, farm: { ...state.farm, pieces } });
 
   if (pieces.every((p) => p.state === TaskState.Done)) {
-    return startAssembly(db, farm, storage, run, next, job, 1);
+    return startAssembly(db, farm, storage, run, saved, job, 1);
   }
   return Step.Pending;
 }

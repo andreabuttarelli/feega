@@ -3,6 +3,7 @@ import { COMP_CARD, COMP_CARD_LAYOUTS } from './card-layouts';
 import { COMPONENT_IDS, CUSTOM_NAME, TrackKind, parseProps, type ComponentId, type PropsVerdict } from './components';
 import { withParams } from './custom/params';
 import { MAX_COMPONENTS, Strictness, customComponentSchema, customValues, type CustomComponents } from './custom/component';
+import { junctionSchema } from './junction-model';
 import { FASTEST_RATE, FPS, FRAME_RATES, MAX_SECONDS, TRANSITION_KINDS, TransitionKind, maxFrames } from './design';
 import { motionPathSchema } from './path';
 import { keyframeSchema, keyframesProblem, transformSchema } from './keyframes';
@@ -68,6 +69,7 @@ const clipSchema = z.object({
   props: z.record(z.string(), z.unknown()).default({}),
   transitionIn: edgeSchema.default({ kind: TransitionKind.None, durationInFrames: 0 }),
   transitionOut: edgeSchema.default({ kind: TransitionKind.None, durationInFrames: 0 }),
+  junction: junctionSchema.nullable().optional(),
   transform: transformSchema.default({}),
   keyframes: z.record(z.string(), z.array(keyframeSchema).min(1)).default({}),
   mask: maskSchema.nullable().default(null),

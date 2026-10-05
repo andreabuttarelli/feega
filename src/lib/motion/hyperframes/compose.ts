@@ -4,7 +4,7 @@ import { EASE_NAME, easeName } from '../keyframes';
 import { Background, clipsOf, type MotionClip, type MotionDoc } from '../doc';
 import { resolveColor, type BrandTokens } from '../brand';
 import { css, esc, js, seconds } from './html';
-import { TEMPLATES, Timing, type PropsOf, type TemplateCtx, type Tween, type Vars } from './templates';
+import { DEVICE_OVERSCAN, TEMPLATES, Timing, type PropsOf, type TemplateCtx, type Tween, type Vars } from './templates';
 import { LIGHTING, OPENTYPE_URL, ThreeKind, lookRuntime, surfaceOf, threeAssetUrls, threeImportMap, threeScript, type ThreeClip } from './three';
 import { outlineUrl } from '../fonts/outline';
 import { Finish } from '../devices';
@@ -42,6 +42,7 @@ import { declaredFamilyCss, fontStack, loadDescriptors, googleFontsUrl, loadedWe
 import { bakePaths } from '../path';
 import { bakePhysics } from '../physics/simulate';
 import { withoutHidden } from '../organize';
+import { JUNCTION, Span, junctionHalves, junctionPairs, withJunctions, type JunctionPair, type Move } from '../junctions';
 import { EFFECT_CSS, adjustmentLayer, adjustmentTimeline, effectLayer, effectScript, effectTimeline, type EffectSet } from '../effects/render';
 import { flattenComps, type GroupProps } from '../precomp';
 import { blendStyle } from '../blend';
@@ -108,6 +109,41 @@ function edgeTweens(clip: MotionClip, fps: number): Tween[] {
   }
 
   return tweens;
+}
+
+const SPAN: Record<Span, (d: number) => { offset: number; length: number }> = {
+  [Span.Whole]: (d) => ({ offset: 0, length: d }),
+  [Span.FirstHalf]: (d) => ({ offset: 0, length: d / 2 }),
+  [Span.SecondHalf]: (d) => ({ offset: d / 2, length: d / 2 })
+};
+
+function incomingOnTop(doc: MotionDoc, pair: JunctionPair): boolean {
+  const rank = (id: string) => {
+    const track = doc.tracks.findIndex((t) => t.clips.some((c) => c.id === id));
+    return [-track, doc.tracks[track].clips.findIndex((c) => c.id === id)];
+  };
+  const [inTrack, inIndex] = rank(pair.incoming);
+  const [outTrack, outIndex] = rank(pair.outgoing);
+  return inTrack !== outTrack ? inTrack > outTrack : inIndex > outIndex;
+}
+
+function junctionTweens(doc: MotionDoc, pairs: JunctionPair[]): Tween[] {
+  return pairs.flatMap((pair) => {
+    const spec = JUNCTION[pair.kind];
+    const incoming = byIdIn(doc, pair.incoming);
+    const at = (incoming.from - junctionHalves(pair.durationInFrames).before) / doc.fps;
+    const duration = pair.durationInFrames / doc.fps;
+    const below = spec.incomingBelow && !incomingOnTop(doc, pair);
+    const tween = (target: string) => (move: Move): Tween => {
+      const { offset, length } = SPAN[move.span](duration);
+      return { target: `#fx-${target}`, from: move.from, to: move.to, at: at + offset, duration: length, ease: spec.ease };
+    };
+    return [...(below ? spec.incomingBelow! : spec.outgoing).map(tween(pair.outgoing)), ...(below ? [] : spec.incoming).map(tween(pair.incoming))];
+  });
+}
+
+function byIdIn(doc: MotionDoc, id: string): MotionClip {
+  return clipsOf(doc).find((c) => c.id === id)!;
 }
 
 function moveTweens(clip: MotionClip, fps: number): Tween[] {
@@ -229,6 +265,17 @@ function tweenLine(t: Tween): string {
 
 type Hold = { target: string; vars: Vars; at: number };
 
+function untrimmed(tweens: Tween[], clipStart: number, trimmed: number): Tween[] {
+  return tweens.flatMap((t) => {
+    const at = t.at - trimmed;
+    const end = at + t.duration;
+    if (end <= clipStart) {
+      return [];
+    }
+    return at >= clipStart ? [{ ...t, at }] : [{ ...t, at: clipStart, duration: end - clipStart }];
+  });
+}
+
 function heldUntilStart(tweens: Tween[], clipStart: number): Hold[] {
   return tweens.filter((t) => t.at > clipStart).map((t) => ({ target: t.target, vars: t.from, at: clipStart }));
 }
@@ -288,7 +335,8 @@ function threeClipOf(clip: MotionClip, ctx: TemplateCtx<ComponentId>, staged: bo
     extrude: p.extrude ?? 0,
     bevel: p.bevel ?? 0,
     device: p.device ? deviceRuntime(p.device, p.finish ?? Finish.Default, ctx) : null,
-    video: Boolean(ctx.asset(p.screenVideo ?? null))
+    video: Boolean(ctx.asset(p.screenVideo ?? null)),
+    overscan: clip.component === 'Device3D' ? DEVICE_OVERSCAN : 0
   };
 }
 
@@ -398,13 +446,15 @@ function zoomed(doc: MotionDoc, scale: number): string {
 }
 
 export function composeHtml(raw: ComposeInput): string {
-  const input = { ...raw, doc: bakePhysics(bakeExpressions(bakePaths(withoutBackdrop(flattenComps(withoutHidden(raw.doc)))), raw.analyses)) };
+  const shown = withoutHidden(raw.doc);
+  const junctions = junctionTweens(shown, junctionPairs(shown));
+  const input = { ...raw, doc: bakePhysics(bakeExpressions(bakePaths(withoutBackdrop(flattenComps(withJunctions(shown)))), raw.analyses)) };
   const { doc, tokens } = input;
   const scale = raw.scale ?? 1;
   const frame = { width: Math.round(doc.width * scale), height: Math.round(doc.height * scale) };
   const bottomFirst = doc.tracks.map((track, index) => ({ track, index })).reverse();
   const layers: string[] = [];
-  const tweens: Tween[] = [];
+  const tweens: Tween[] = [...junctions];
   const holds: Hold[] = [];
   const three: ThreeClip[] = [];
   const compositions: TimedBake[] = [];
@@ -439,7 +489,7 @@ export function composeHtml(raw: ComposeInput): string {
       const html = group ? group.html(clip, ctx, placed, layers.splice(group.firstLayer(clip, index, starts)).join('')) : clipHtml(clip, ctx, placed, template.html(ctx as never));
       (onStage.has(clip.id) && !group && !hidden.has(clip.id) ? world : layers).push(html);
       effectSets.push(...(group ? group.effects(clip, ctx) : effectTimeline(clip, ctx, ctx.color)));
-      const own = template.tweens?.(ctx as never) ?? [];
+      const own = untrimmed(template.tweens?.(ctx as never) ?? [], ctx.start, ctx.mediaStart);
       tweens.push(...edgeTweens(clip, doc.fps), ...moveTweens(clip, doc.fps), ...own);
       holds.push(...heldUntilStart(own, ctx.start));
       if (THREE_D_COMPONENTS.includes(clip.component)) {

@@ -68,7 +68,7 @@
   import CompositionNode from '$lib/components/canvas/CompositionNode.svelte';
   import CalendarNode from '$lib/components/canvas/CalendarNode.svelte';
   import MotionNode from '$lib/components/canvas/MotionNode.svelte';
-  import { motionEditorPath, motionOf } from '$lib/canvas/motion-node';
+  import { motionEditorPath, motionOf, motionPreviewPath } from '$lib/canvas/motion-node';
   import { newStudioBatchData, studioBatchOf } from '$lib/canvas/studio-batch-node';
   import StudioBatchNode from '$lib/components/canvas/StudioBatchNode.svelte';
   import { calendarBrand, calendarData, calendarOf, CalendarScope, type CalendarNode as CalendarNodeState } from '$lib/canvas/calendar-node';
@@ -363,7 +363,7 @@
   };
 
   function sizeOf(node: CanvasNodeRecord): { w: number; h: number } {
-    const { w, h } = nodeSize(node.type);
+    const { w, h } = nodeSize(node.type, node.data);
     return { w: node.size.width ?? w, h: node.size.height ?? h };
   }
 
@@ -880,8 +880,8 @@
       inPost: data.nodeIdsInPost.includes(n.id),
       select: n.select,
       settings: hasInspector(n.type),
-      minW: nodeSize(n.type).w,
-      minH: nodeSize(n.type).h,
+      minW: nodeSize(n.type, n.data).w,
+      minH: nodeSize(n.type, n.data).h,
       node: n.type === 'effects'
         ? { id: n.id, kind: 'effects' as const, mediaKind: n.data.mediaKind === 'video' ? 'video' as const : 'image' as const }
         : tileNode({
@@ -2719,7 +2719,8 @@
             composeIn={{ project: data.projectId, canvas: data.canvas.id }}
           />
         {:else if motion}
-          <MotionNode node={motion} href={motionEditorPath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId: id })} />
+          {@const motionAt = { projectId: data.projectId, canvasId: data.canvas.id, nodeId: id }}
+          <MotionNode node={motion} href={motionEditorPath(motionAt)} previewUrl={motionPreviewPath(motionAt)} posterUrl={assetUrl(motion.posterAssetId)} />
         {:else if studioBatch}
           <StudioBatchNode node={studioBatch} projectId={data.projectId} onpick={(batchId) => write(id, newStudioBatchData(batchId), SaveTiming.Now)} />
         {:else if calendar}
