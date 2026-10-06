@@ -2,7 +2,7 @@ import { createUIMessageStream, streamText, type ModelMessage, type UIMessageChu
 import type { Db } from '$lib/server/db/client';
 import { llmCodeModel, llmLanguageModel, llmVisionModel } from '$lib/server/llm';
 import { reasoningProviderOptions } from '$lib/server/chat-model/catalogue';
-import { ensureGatewayModels, gatewayRate } from '$lib/server/openrouter-models';
+import { ensureGatewayModels, gatewayModel, gatewayRate } from '$lib/server/openrouter-models';
 import { MOTION_TURN_CAP_USD, Tier, activeTools, openingTier, selfCheckChoice, spentUsd, stepTier, type ForcedTool } from '$lib/server/motion/model-route';
 import { extractSdkUsage, logAiCall, withOrgContext } from '$lib/server/ai-log';
 import { loadTurns, openNodeThread, promptHistory, saveTurn } from '$lib/server/repos/chat';
@@ -178,7 +178,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
   const codeModel = llmCodeModel();
   const opening = openingTier({ message, doc: head.doc, selection });
   await ensureGatewayModels();
-  const visionModel = llmVisionModel();
+  const visionModel = gatewayModel(model)?.usable ? model : llmVisionModel();
   const vision = BROWSER_VISION[browser](visionModel);
   const toolNames = Object.keys(tools).filter((name) => vision === Vision.Available || name !== VIEW_FRAMES);
   const system = motionAgentPrompt({ brandName: project.brandId ? tokens.name : null, selectionNote: selectionNote(head.doc, selection), vision, frame: head.doc });
@@ -190,7 +190,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
   const overBudget: Stop = () => spent > MOTION_TURN_CAP_USD;
   const TIER_MODEL: Record<Tier, string> = { [Tier.Edit]: model, [Tier.Code]: codeModel };
 
-  const round = (messages: ModelMessage[], kind: Round) =>
+  const round = (messages: ModelMessage[], kind: Round, onStep: (step: TurnStep & { response: { messages: unknown[] } }) => void) =>
     streamText({
       model: llmLanguageModel(model),
       system,
@@ -200,6 +200,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
       stopWhen: ROUND_STOPS[kind](t0, overBudget),
       onStepFinish: (step) => {
         spent += spentUsd([extractSdkUsage(step.usage)], [stepModels.at(-1) ?? model], gatewayRate);
+        onStep(step);
       },
       prepareStep: ({ steps, messages: current, stepNumber }) => {
         const tier = stepTier(stepTiers.at(-1) ?? opening, steps.map((s) => s.toolCalls));
@@ -229,23 +230,23 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
       let conversation = openingMessages;
 
       const play = async (messages: ModelMessage[], kind: Round) => {
-        const played = round(messages, kind);
-        writer.merge(played.toUIMessageStream({ sendStart: kind === Round.Edit, sendFinish: false, sendReasoning: true }));
-        const taken = await Promise.resolve(played.steps).catch((e: unknown) => {
-          console.error(`[motion-agent] ${kind} round failed, keeping the edits made so far`, e);
-          return [];
+        const answered: ModelMessage[] = [];
+        const played = round(messages, kind, (step) => {
+          steps.push(step);
+          answered.push(...(step.response.messages as ModelMessage[]));
         });
-        steps.push(...taken);
-        const answered = taken.length ? ((await played.response).messages as ModelMessage[]) : [];
+        writer.merge(played.toUIMessageStream({ sendStart: kind === Round.Edit, sendFinish: false, sendReasoning: true }));
+        await Promise.resolve(played.steps).catch((e: unknown) => {
+          console.error(`[motion-agent] ${kind} round failed, keeping the steps it finished`, e);
+        });
         conversation = [...messages, ...answered];
       };
 
       await play(openingMessages, Round.Edit);
-      const edited = steps.length;
       for (let nudge = 0; nudge < MAX_SELF_CHECK_NUDGES && steps.length && selfCheckDue(session, vision); nudge++) {
         await play([...conversation, { role: 'user', content: selfCheckPrompt(keyFrameTimes(session.doc)) }], Round.SelfCheck);
       }
-      if (steps.length && (steps.length > edited || !closedByModel(steps.at(-1)))) {
+      if (steps.length && !closedByModel(steps.at(-1))) {
         await play([...conversation, { role: 'user', content: SUMMARY_PROMPT }], Round.Summary);
       }
       writer.write({ type: 'finish' });
@@ -262,7 +263,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
     }
   });
 
-  const labelOf = (modelId: string) => (modelId === codeModel ? 'motion-agent-code' : modelId === visionModel ? 'motion-agent-vision' : 'motion-agent');
+  const labelOf = (modelId: string) => (modelId === model ? 'motion-agent' : modelId === codeModel ? 'motion-agent-code' : 'motion-agent-vision');
 
   async function finishTurn(steps: TurnStep[]): Promise<TurnOutcome> {
     const write = session.edits.length

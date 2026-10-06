@@ -2529,3 +2529,10 @@ only while the turn was under budget, and the reply was whatever the last step s
 closing rounds (`Round.SelfCheck`, `Round.Summary` in `turn.ts`) ignore the edit budget, the edit
 round stops `CLOSING_RESERVE_MS` early to leave them time, and the summary round runs with
 `toolChoice: 'none'`, which thinking models accept.
+
+## A motion turn forgets its own edits after view_frames
+Signal: the summary says nothing was built while the timeline is full; the dev log shows
+`GenerateContentRequest.tools[0].function_declarations[...]: missing field` from Google. Cause: the
+step after `view_frames` went to the Gemini vision model, which rejects the tool schemas; the round
+rejected and its messages were read from the failed result. Move: keep each finished step from
+`onStepFinish`, and let a model that reads images (`gatewayModel(id).usable`) see its own frames.
