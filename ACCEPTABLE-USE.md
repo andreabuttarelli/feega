@@ -8,7 +8,10 @@ This policy says what you may not do with feega. It is part of the [Terms of Ser
 ## 1. Always prohibited, in every mode
 
 - Sexual, suggestive or nude content involving minors or people who appear to be minors, including fictional, drawn or virtual depictions.
-- Sexual or nude content depicting a real, identifiable person; deepfakes of real people made to deceive, defame or harass.
+- Pornographic and sexually explicit content is prohibited in every mode.
+- Non-consensual intimate imagery (NCII), including real or synthetic intimate images of a person shared or created without their consent.
+- Sexual deepfakes: any sexualised or nude depiction of a real, identifiable person, whether generated, edited or composited.
+- Deepfakes of real people made to deceive, defame or harass.
 - Non-consensual sexual content, sexual violence, voyeurism or "revenge" content.
 - Graphic violence, gore, torture or realistic depictions of killing.
 - Sexual content involving animals.
@@ -20,11 +23,12 @@ This policy says what you may not do with feega. It is part of the [Terms of Ser
 
 ## 2. Modes
 
-| | Standard mode | Uncensored mode (not yet available) |
+| | Standard projects | Projects with age-restricted features |
 |---|---|---|
 | Who | every workspace, by default | paid plan, owner opt-in, each user age-verified 18+ |
-| Sexual or nude content | prohibited | allowed for **fictional adults** only |
-| Real, identifiable people in sexual content | prohibited | prohibited, with an extra check on prompts and references |
+| Non-sexual artistic nudity of fictional adults, fictional violence, horror, satire, strong themes | prohibited | allowed |
+| Sexually explicit content | prohibited | prohibited |
+| Real, identifiable people | ordinary rules | prohibited, including any reference image showing a person |
 | Sharing, publishing, scheduling, ads | allowed | not possible |
 | Everything in §1 | prohibited | prohibited |
 
@@ -42,9 +46,9 @@ This policy says what you may not do with feega. It is part of the [Terms of Ser
 
 1. **Refusal.** Prompts in a prohibited category are refused before they reach a model, and the decision is logged.
 2. **Removal.** We may remove content or disable share links that breach this policy.
-3. **Restriction.** We may withdraw uncensored mode, pause connected accounts or limit features.
+3. **Restriction.** We may withdraw age-restricted features, pause connected accounts or limit features.
 4. **Suspension or termination** of the account or workspace.
-5. **Report to authorities.** Content involving child sexual abuse is always reported.
+5. **Report to authorities.** Unlawful use may be reported to the competent authorities. Content involving child sexual abuse is always reported.
 
 Where reasonable we give notice and reasons first and let you respond. For serious breaches of §1 we may act immediately. You can contest a decision by writing to [LEGAL NOTICE EMAIL].
 

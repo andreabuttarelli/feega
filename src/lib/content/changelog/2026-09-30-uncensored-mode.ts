@@ -2,8 +2,8 @@ import type { ChangelogEntry } from './index';
 
 export default {
   date: '2026-09-30',
-  title: 'Uncensored mode',
+  title: 'Age-restricted features',
   items: [
-    'The separate workspace is now called uncensored mode: models without built-in content filters, for adults (18+). Our safety rules still apply.'
+    'Age-restricted features are for adults (18+). Our safety rules still apply, and sexually explicit content is prohibited in every mode.'
   ]
 } satisfies ChangelogEntry;
