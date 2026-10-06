@@ -44,7 +44,7 @@ describe('fonts', () => {
   });
 
   it('a clip cannot point at a family the video has not registered', () => {
-    expect(setProps(titled(), 'title', { font: 'Inter' })).toMatchObject({ ok: false, error: expect.stringContaining('set_font') });
+    expect(setProps(titled(), 'title', { font: 'Inter' })).toMatchObject({ ok: false, error: expect.stringContaining('register_font') });
     const doc = ok(setFont(titled(), 'title', { family: 'Inter' }, CATALOGUE));
     expect(parseMotionDoc(JSON.parse(JSON.stringify(doc))).ok).toBe(true);
   });
