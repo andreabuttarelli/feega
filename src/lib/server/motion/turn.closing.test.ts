@@ -13,7 +13,11 @@ const world = vi.hoisted(() => ({
   toolCalls: [] as string[],
   saved: [] as { role: string; content?: string }[],
   nudgesToIgnore: 0,
-  rate: 1
+  rate: 1,
+  models: [] as string[],
+  visionFails: false,
+  seesImages: false,
+  viewsWhileEditing: false
 }));
 
 const SUMMARY = 'Made a bold title card that pops in.';
@@ -58,6 +62,9 @@ function reply(call: Call): unknown[] {
   if (nudged) {
     return tool('view_frames', { times: [1] });
   }
+  if (world.viewsWhileEditing && last.role === 'tool' && JSON.stringify(last.content).includes('add_clip')) {
+    return tool('view_frames', { times: [1] });
+  }
   if (last.role === 'user') {
     return tool('add_clip', { component: 'Title', start: 0, duration: 2, props: { text: 'Pop' } });
   }
@@ -83,8 +90,27 @@ function scripted() {
   });
 }
 
-vi.mock('$lib/server/llm', () => ({ llmLanguageModel: () => scripted(), llmCodeModel: () => 'code/model', llmVisionModel: () => 'vision/model' }));
-vi.mock('$lib/server/openrouter-models', () => ({ ensureGatewayModels: async () => undefined, gatewayRate: () => ({ input: world.rate, cachedInput: world.rate, output: world.rate }) }));
+function failing() {
+  return new MockLanguageModelV4({
+    doStream: async () => {
+      throw new Error('tools[0].function_declarations[17]: missing field');
+    }
+  });
+}
+
+vi.mock('$lib/server/llm', () => ({
+  llmLanguageModel: (id: string) => {
+    world.models.push(id);
+    return id === 'vision/model' && world.visionFails ? failing() : scripted();
+  },
+  llmCodeModel: () => 'code/model',
+  llmVisionModel: () => 'vision/model'
+}));
+vi.mock('$lib/server/openrouter-models', () => ({
+  ensureGatewayModels: async () => undefined,
+  gatewayRate: () => ({ input: world.rate, cachedInput: world.rate, output: world.rate }),
+  gatewayModel: () => (world.seesImages ? { usable: true } : null)
+}));
 vi.mock('$lib/server/ai-log', () => ({ extractSdkUsage: () => ({ inputTokens: 10, outputTokens: 5 }), logAiCall: vi.fn(), withOrgContext: (_id: string, fn: () => unknown) => fn() }));
 vi.mock('$lib/server/moderation/model-input', () => ({ screenModelInput: async () => ({ ok: true }) }));
 vi.mock('$lib/server/repos/chat', () => ({
@@ -134,6 +160,10 @@ describe('a motion turn closes on a look and a summary', () => {
     world.saved = [];
     world.nudgesToIgnore = 0;
     world.rate = 1;
+    world.models = [];
+    world.visionFails = false;
+    world.seesImages = false;
+    world.viewsWhileEditing = false;
   });
 
   it('looks at its frames after the last edit even when the edits spent the whole budget', async () => {
@@ -149,6 +179,25 @@ describe('a motion turn closes on a look and a summary', () => {
 
     await turn();
 
+    expect(viewedAfterLastEdit()).toBe(true);
+  });
+
+  it('a step that fails after the edits keeps them in the conversation: the summary sees the work', async () => {
+    world.visionFails = true;
+    world.viewsWhileEditing = true;
+
+    await turn();
+    const summary = world.calls.find((c) => c.toolChoice?.type === 'none')!;
+
+    expect(JSON.stringify(summary.prompt.filter((m) => m.role !== 'system'))).toContain('add_clip');
+  });
+
+  it('a turn on a model that reads images looks at its frames with that same model', async () => {
+    world.seesImages = true;
+
+    await turn();
+
+    expect(world.models).not.toContain('vision/model');
     expect(viewedAfterLastEdit()).toBe(true);
   });
 

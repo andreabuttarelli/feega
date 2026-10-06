@@ -60,7 +60,7 @@ vi.mock('$lib/server/llm', () => ({
   llmCodeModel: () => 'code/model',
   llmVisionModel: () => 'vision/model'
 }));
-vi.mock('$lib/server/openrouter-models', () => ({ ensureGatewayModels: async () => undefined, gatewayRate: () => ({ input: 1, cachedInput: 0, output: 1 }) }));
+vi.mock('$lib/server/openrouter-models', () => ({ ensureGatewayModels: async () => undefined, gatewayRate: () => ({ input: 1, cachedInput: 0, output: 1 }), gatewayModel: () => null }));
 vi.mock('$lib/server/chat-model/catalogue', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$lib/server/chat-model/catalogue')>()),
   offeredChatModels: async () => [{ id: 'anthropic/claude-sonnet-5.5', label: 'S', provider: 'anthropic', costTier: '$$$', inputUsdPerM: 2, outputUsdPerM: 10, efforts: ['medium'], defaultEffort: 'medium' }]
