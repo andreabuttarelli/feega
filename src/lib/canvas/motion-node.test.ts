@@ -22,6 +22,18 @@ describe('motion node', () => {
     expect(motionOf({ id: 'n', type: 'motion', data: { format: 'cinema' } })?.format).toBe(MotionFormat.Vertical);
   });
 
+  it.each([
+    ['landscape', MotionFormat.Landscape],
+    ['vertical', MotionFormat.Vertical],
+    ['square', MotionFormat.Square],
+    ['portrait', MotionFormat.Portrait]
+  ])('a node written with the format name %s opens in that format, not as 9:16', (name, format) => {
+    const node = motionOf({ id: 'n', type: 'motion', data: { format: name, docHeadRevision: 3, posterAssetId: null, lastRenderAssetId: null } });
+
+    expect(node?.format).toBe(format);
+    expect(node?.docHeadRevision).toBe(3);
+  });
+
   it('the editor lives under the canvas', () => {
     expect(motionEditorPath({ projectId: 'p', canvasId: 'c', nodeId: 'n' })).toBe('/p/p/c/c/motion/n');
   });

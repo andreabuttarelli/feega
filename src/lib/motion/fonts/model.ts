@@ -76,7 +76,7 @@ export function fontRefProblem(family: unknown, registry: readonly FontFace[]): 
   if (typeof family !== 'string' || isBuiltin(family) || registry.some((f) => f.family === family)) {
     return null;
   }
-  return `font ${family} is not in this video: call set_font with the family (it registers it), or pick a built-in (${Object.values(BuiltinFont).join(', ')})`;
+  return `font ${family} is not in this video: call register_font with the family before adding the clip, or pick a built-in (${Object.values(BuiltinFont).join(', ')})`;
 }
 
 export function nearestWeight(weight: number, available: readonly number[]): number {

@@ -1,6 +1,7 @@
 import { createUIMessageStream, streamText, type ModelMessage, type UIMessageChunk } from 'ai';
 import type { Db } from '$lib/server/db/client';
 import { llmCodeModel, llmLanguageModel, llmVisionModel } from '$lib/server/llm';
+import { PromptCache } from '$lib/server/prompt-cache';
 import { reasoningProviderOptions } from '$lib/server/chat-model/catalogue';
 import { ensureGatewayModels, gatewayModel, gatewayRate } from '$lib/server/openrouter-models';
 import { MOTION_TURN_CAP_USD, Tier, activeTools, openingTier, selfCheckChoice, spentUsd, stepTier, type ForcedTool } from '$lib/server/motion/model-route';
@@ -190,7 +191,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
 
   const round = (messages: ModelMessage[], kind: Round, onStep: (step: TurnStep & { response: { messages: unknown[] } }) => void) =>
     streamText({
-      model: llmLanguageModel(model),
+      model: llmLanguageModel(model, PromptCache.On),
       system,
       messages,
       tools,
@@ -208,7 +209,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
         const stepModel = routed?.model ?? tierModel;
         stepModels.push(stepModel);
         const forced = ROUND_CHOICE[kind]({ tier, reasoning: stepModel === model ? reasoning : null, stepNumber });
-        return { model: llmLanguageModel(stepModel), providerOptions: stepModel === model ? reasoningProviderOptions(reasoning) : {}, activeTools: activeTools(tier, toolNames), ...(routed?.messages ? { messages: routed.messages } : {}), ...forced };
+        return { model: llmLanguageModel(stepModel, PromptCache.On), providerOptions: stepModel === model ? reasoningProviderOptions(reasoning) : {}, activeTools: activeTools(tier, toolNames), ...(routed?.messages ? { messages: routed.messages } : {}), ...forced };
       }
     });
 
