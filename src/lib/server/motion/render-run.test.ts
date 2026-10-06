@@ -29,7 +29,7 @@ import { TaskState, WORKER_GONE } from './farm-render';
 import { FEEGA_TOKENS } from '$lib/motion/brand';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { RenderStage } from '$lib/motion/server-render';
-import { HOLD_BUFFER, Resolution, renderQuote, sandboxCostUsd } from '$lib/motion/render-quote';
+import { HOLD_BUFFER, Resolution, renderClass, renderQuote, sandboxCostUsd } from '$lib/motion/render-quote';
 import { addClip } from '$lib/motion/timeline';
 import { writeComponent } from '$lib/motion/custom/ops';
 import type { NodeRun } from '$lib/server/repos/node-runs';
@@ -512,6 +512,10 @@ describe('farmJob', () => {
     expect(job.allowHosts).toEqual(['media.example.com', 'x.supabase.co']);
     expect([job.width, job.height, job.fps, job.totalFrames]).toEqual([1920, 1080, 30, 840]);
     expect(job.html).toContain('<html');
+  });
+
+  it('carries the render class of the doc, which sizes the worker', () => {
+    expect(farmJob({ doc: trailer(), tokens: FEEGA_TOKENS, assets: {} }, settingsOf(Preset.Social)).renderClass).toBe(renderClass(trailer()));
   });
 });
 

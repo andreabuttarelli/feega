@@ -125,8 +125,23 @@ limitata a dove la clip disegna (`paintArea`), non tolto il filtro.
 
 ### Blur a chunk: i worker in parallelo vanno più lenti che da soli
 Segnale: un chunk isolato fa 8,7 s/frame, lo stesso chunk fra 27 in parallelo 32 s/frame.
-Mossa: misurare sempre un render intero a N worker (`e2e` con `firstSlices`), mai stimare il
-totale da un worker solo.
+Causa misurata (6/10): non il numero di worker ma la sandbox. Due sandbox identiche aperte
+insieme fanno lo stesso chunk a 7,9 e 17,2 s/frame, e la CPU fatturata segue il tempo; un loop
+di CPU puro fra 27 sandbox rallenta al massimo 1,45×. Mossa: misurare sempre un render intero a
+N worker (`e2e` con `firstSlices`), mai stimare il totale da un worker solo; e un A/B si fa
+DENTRO la stessa sandbox, varianti in sequenza e base ripetuta in coda (`taskset -c 0` simula
+meno vCPU), mai fra sandbox diverse.
+
+### Un chunk 2D usa un core solo: i vCPU in più si pagano in memoria
+Segnale: CPU fatturata ≈ tempo di parete su un worker da 4 vCPU. Il frame 2D (seek, raster,
+PNG) è seriale: con `taskset -c 0` va 1,26× più lento e fattura meno CPU, mentre i 4 vCPU portano
+8 GB di memoria fatturata. Il 3D no: SwiftShader su 4 core è 2,4× più veloce. Mossa: la taglia
+del worker sta in `CHUNK_VCPUS` per classe di render; prima di cambiarla, misura la classe.
+
+### Una matte raster costa un PNG per campione
+Segnale: `before` alto (0,8 s per campione di blur con 3 matte). html-to-image → canvas →
+`toDataURL` PNG → decode, a ogni seek. Mossa: per il passo esatto la maschera è l'SVG di
+`toSvg`, che Chrome rasterizza una volta mentre dipinge (56,8 dB contro le maschere PNG).
 
 ### Copie di DOM dentro elementi 3D: `will-change` le fa costare un secondo a frame
 Il ring copia ogni clip di una composizione in ogni fetta: `.fx{will-change:transform}` dava a

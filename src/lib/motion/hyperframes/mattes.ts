@@ -27,6 +27,7 @@ export function matteWrapper(pair: MattePair, inner: string): string {
 type RuntimeConfig = { pairs: MattePair[]; reads: typeof MATTE_READ; whole: string; lib: string; wrapper: string; global: string; scales: Record<Pass, number>; settleMs: number; exact: Pass; draft: Pass };
 type HtmlToImage = {
   toCanvas: (node: HTMLElement, options: Record<string, unknown>) => Promise<HTMLCanvasElement>;
+  toSvg: (node: HTMLElement, options: Record<string, unknown>) => Promise<string>;
   getFontEmbedCSS: (node: HTMLElement) => Promise<string>;
 };
 type SeekDetail = { waitUntil?: (work: Promise<unknown>) => void };
@@ -60,25 +61,30 @@ function matteRuntime(cfg: RuntimeConfig, tl: { to: (target: object, vars: Recor
   };
   const blank = (width: number, height: number) => Object.assign(document.createElement('canvas'), { width, height });
 
-  const render = async (source: HTMLElement, id: string, width: number, height: number, scale: number) => {
+  const snapshot = async (source: HTMLElement, id: string, pass: Pass) => {
+    const width = source.offsetWidth;
+    const height = source.offsetHeight;
+    const scale = cfg.scales[pass];
     const canvasWidth = Math.round(width * scale);
     const canvasHeight = Math.round(height * scale);
     if (!drawn(source)) {
-      return blank(canvasWidth, canvasHeight);
+      return blank(canvasWidth, canvasHeight).toDataURL('image/png');
     }
-    const options = { width, height, canvasWidth, canvasHeight, pixelRatio: 1, fontEmbedCSS: await embed(id, source), filter: drawable, style: { opacity: '1' } };
-    return tool().toCanvas(source, options);
+    const options = { width, height, pixelRatio: 1, fontEmbedCSS: await embed(id, source), filter: drawable, style: { opacity: '1' } };
+    if (pass === cfg.exact) {
+      return tool().toSvg(source, options);
+    }
+    return (await tool().toCanvas(source, { ...options, canvasWidth, canvasHeight })).toDataURL('image/png');
   };
 
-  const paint = async (pair: MattePair, scale: number) => {
+  const paint = async (pair: MattePair, pass: Pass) => {
     const target = document.getElementById(`${cfg.wrapper}-${pair.target}`);
     const source = document.querySelector<HTMLElement>(`[data-clip="${pair.source}"]`);
     if (!target || !source) {
       return;
     }
 
-    const canvas = await render(source, pair.source, source.offsetWidth, source.offsetHeight, scale);
-    const url = canvas.toDataURL('image/png');
+    const url = await snapshot(source, pair.source, pass);
     const picture = new Image();
     picture.src = url;
     await picture.decode().catch(() => undefined);
@@ -105,10 +111,10 @@ function matteRuntime(cfg: RuntimeConfig, tl: { to: (target: object, vars: Recor
       try {
         while (wanted !== null) {
           await Promise.resolve();
-          const scale = cfg.scales[wanted];
+          const pass = wanted;
           wanted = null;
           for (const pair of cfg.pairs) {
-            await paint(pair, scale);
+            await paint(pair, pass);
           }
         }
       } finally {

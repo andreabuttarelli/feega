@@ -4,7 +4,7 @@ import { CANVAS_ASSET_BUCKET } from '$lib/server/repos/asset-storage';
 import { logAiCall } from '$lib/server/ai-log';
 import { sendPushToUser } from '$lib/server/web-push';
 import { formatOf, type MotionDoc } from '$lib/motion/doc';
-import { creditsOfCost, HOLD_BUFFER, RENDER_CALL_LABEL, renderQuote, sandboxCostUsd, type RenderQuote } from '$lib/motion/render-quote';
+import { creditsOfCost, HOLD_BUFFER, RENDER_CALL_LABEL, renderClass, renderQuote, sandboxCostUsd, type RenderQuote } from '$lib/motion/render-quote';
 import { advance, startProgress, progressOf, type RenderEvent, type RenderProgress, type RenderView } from '$lib/motion/server-render';
 import { unverified } from '$lib/motion/custom/determinism';
 import { exportFolder, exportPath, outputSize } from '$lib/motion/export-plan';
@@ -77,7 +77,8 @@ export function farmJob(input: ComposeInput, settings: RenderSettings): FarmJob 
     format: settings.format,
     quality: settings.quality,
     motionBlur: doc.motionBlur.enabled ? { shutterAngle: doc.motionBlur.shutterAngle, shutterPhase: doc.motionBlur.shutterPhase, samples: doc.motionBlur.samples } : null,
-    cost: costSpans(doc, out.width * out.height)
+    cost: costSpans(doc, out.width * out.height),
+    renderClass: renderClass(doc)
   };
 }
 

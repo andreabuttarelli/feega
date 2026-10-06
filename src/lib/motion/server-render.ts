@@ -16,8 +16,16 @@ export type RenderEvent = { kind: 'started' | 'chunk' | 'assembling' | 'saving' 
 
 const CHUNK_TARGET_FRAMES = 450;
 const MAX_CHUNKS = 8;
-const MAX_HEAVY_CHUNKS = 64;
-const CHUNK_BUDGET_MS = 90_000;
+
+enum SplitFor {
+  Speed = 'speed',
+  Lifetime = 'lifetime'
+}
+
+const SPLIT: { for: SplitFor; upTo: number; whileHeaviestOverMs: number }[] = [
+  { for: SplitFor.Speed, upTo: 32, whileHeaviestOverMs: 90_000 },
+  { for: SplitFor.Lifetime, upTo: 64, whileHeaviestOverMs: 240_000 }
+];
 
 const FINAL: ReadonlySet<RenderStage> = new Set([RenderStage.Done, RenderStage.Failed]);
 
@@ -47,8 +55,10 @@ function planOf(totalFrames: number, count: number): ChunkPlan {
 
 export function chunkPlan(totalFrames: number, costs: readonly number[] = []): ChunkPlan {
   let count = Math.min(MAX_CHUNKS, Math.max(1, Math.ceil(totalFrames / CHUNK_TARGET_FRAMES)));
-  while (count < MAX_HEAVY_CHUNKS && heaviestChunk(costs, planOf(totalFrames, count).size) > CHUNK_BUDGET_MS) {
-    count += 1;
+  for (const rule of SPLIT) {
+    while (count < rule.upTo && heaviestChunk(costs, planOf(totalFrames, count).size) > rule.whileHeaviestOverMs) {
+      count += 1;
+    }
   }
   return planOf(totalFrames, count);
 }
