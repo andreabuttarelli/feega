@@ -2521,3 +2521,11 @@ outside every child are captured once and reused). Signal: a render with frames 
 moving element, or `static-frame dedup` reasons like `no GSAP tweens` in the log and a slower
 render. Move: any timeline handed to `window.__timelines` keeps that surface, with a child's
 `startTime` relative to its parent; compare `static-frame dedup` lines of two renders.
+
+## A motion turn ends on a working note and never looks at its frames
+Signal: the reply reads "Registering Inter, then adding text.The glow went…", `view_frames` was
+never called, and `ai_calls` shows a cost above `MOTION_TURN_CAP_USD`. Cause: the self-check ran
+only while the turn was under budget, and the reply was whatever the last step said. Move: the
+closing rounds (`Round.SelfCheck`, `Round.Summary` in `turn.ts`) ignore the edit budget, the edit
+round stops `CLOSING_RESERVE_MS` early to leave them time, and the summary round runs with
+`toolChoice: 'none'`, which thinking models accept.

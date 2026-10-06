@@ -92,7 +92,7 @@ export enum Vision {
 export type CheckState = { edits: readonly string[]; checkedAt: number; views: number };
 
 export function selfCheckDue(state: CheckState, vision: Vision): boolean {
-  return vision === Vision.Available && state.edits.length > state.checkedAt && state.views < MAX_VIEWS_PER_TURN;
+  return vision === Vision.Available && state.edits.length > state.checkedAt;
 }
 
 const TEXT_CONTROLS = new Set([Control.Text, Control.Textarea]);
@@ -127,8 +127,10 @@ function libraryTexts(doc: MotionDoc): string[] {
 }
 
 export function selfCheckPrompt(times: number[]): string {
-  return `Self-check: call ${VIEW_FRAMES} with times [${times.join(', ')}] and look at the result. If text is clipped or overflows, overlaps another element, has poor contrast or leaves the safe area, or the result lists quality problems, fix them with the editing tools; otherwise change nothing. Then say in one line what you checked.`;
+  return `Self-check: call ${VIEW_FRAMES} with times [${times.join(', ')}] and look at the result. If text is clipped or overflows, overlaps another element, has poor contrast or leaves the safe area, or the result lists quality problems, fix them with the editing tools; otherwise change nothing.`;
 }
+
+export const SUMMARY_PROMPT = 'The turn is over. Write the user a short summary of the video as it now stands: what you made or changed, what you checked in the frames, and anything left to decide. Plain sentences, no tool names, no working notes.';
 
 export type TokenUsage = Partial<Record<'inputTokens' | 'outputTokens' | 'cachedTokens' | 'thinkingTokens', number>>;
 

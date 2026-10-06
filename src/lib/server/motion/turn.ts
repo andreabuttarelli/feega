@@ -3,7 +3,7 @@ import type { Db } from '$lib/server/db/client';
 import { llmCodeModel, llmLanguageModel, llmVisionModel } from '$lib/server/llm';
 import { reasoningProviderOptions } from '$lib/server/chat-model/catalogue';
 import { ensureGatewayModels, gatewayRate } from '$lib/server/openrouter-models';
-import { MOTION_TURN_CAP_USD, Tier, activeTools, openingTier, spentUsd, stepTier } from '$lib/server/motion/model-route';
+import { MOTION_TURN_CAP_USD, Tier, activeTools, openingTier, selfCheckChoice, spentUsd, stepTier, type ForcedTool } from '$lib/server/motion/model-route';
 import { extractSdkUsage, logAiCall, withOrgContext } from '$lib/server/ai-log';
 import { loadTurns, openNodeThread, promptHistory, saveTurn } from '$lib/server/repos/chat';
 import { finishedTurn } from '$lib/server/project-agent/finished-turn';
@@ -20,7 +20,7 @@ import { motionAgentPrompt } from '$lib/server/motion/motion-prompt';
 import { speakVoiceover } from '$lib/server/motion/voiceover';
 import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
 import { brandSources } from '$lib/server/motion/brand-sources';
-import { SELF_CHECK_MAX_STEPS, VIEW_FRAMES, Vision, docTexts, keyFrameTimes, selfCheckDue, selfCheckPrompt, usageByModel, visionStep } from '$lib/server/motion/frames';
+import { SELF_CHECK_MAX_STEPS, SUMMARY_PROMPT, VIEW_FRAMES, Vision, docTexts, keyFrameTimes, selfCheckDue, selfCheckPrompt, usageByModel, visionStep } from '$lib/server/motion/frames';
 import { frameStats } from '$lib/server/motion/frame-stats';
 import { awaitFrames, awaitVerdict, framesPrefix, FRAME_POLL_MS, type FrameBucket } from '$lib/server/motion/frame-store';
 import { CANVAS_ASSET_BUCKET, SIGNED_URL_TTL_S } from '$lib/server/repos/asset-storage';
@@ -55,21 +55,38 @@ const BROWSER_DRAWS: Record<Browser, () => void> = {
 
 enum Round {
   Edit = 'edit',
-  SelfCheck = 'self-check'
+  SelfCheck = 'self-check',
+  Summary = 'summary'
 }
 
 type Stop = ReturnType<typeof agentStopWhen>;
 
+const CLOSING_RESERVE_MS = 60_000;
+const MAX_SELF_CHECK_NUDGES = 2;
+
+const oneStep: Stop = ({ steps }) => steps.length >= 1;
+
 const selfCheckSpent: Stop = ({ steps }) => steps.length >= SELF_CHECK_MAX_STEPS;
 
 const ROUND_STOPS: Record<Round, (t0: number, overBudget: Stop) => Stop[]> = {
-  [Round.Edit]: (t0, overBudget) => [agentStopWhen(t0), overBudget],
-  [Round.SelfCheck]: (t0, overBudget) => [agentStopWhen(t0), selfCheckSpent, overBudget]
+  [Round.Edit]: (t0, overBudget) => [agentStopWhen(t0 - CLOSING_RESERVE_MS), overBudget],
+  [Round.SelfCheck]: (t0) => [agentStopWhen(t0), selfCheckSpent],
+  [Round.Summary]: () => [oneStep]
 };
 
-const FORCES_TOOL: Record<Tier, boolean> = { [Tier.Edit]: true, [Tier.Code]: false };
+type Choice = ForcedTool | { toolChoice: 'none' };
 
-type TurnStep = Parameters<typeof finishedTurn>[0][number] & { usage: unknown };
+type ChoiceInput = { tier: Tier; reasoning: string | null; stepNumber: number };
+
+const ROUND_CHOICE: Record<Round, (input: ChoiceInput) => Choice> = {
+  [Round.Edit]: () => ({}),
+  [Round.SelfCheck]: (input) => (input.stepNumber === 0 ? selfCheckChoice(input) : {}),
+  [Round.Summary]: () => ({ toolChoice: 'none' })
+};
+
+type TurnStep = Parameters<typeof finishedTurn>[0][number] & { usage: unknown; finishReason: string };
+
+const closedByModel = (last: TurnStep | undefined) => last?.finishReason === 'stop' && last.text.trim().length > 0;
 
 export type MotionTurnInput = {
   db: Db;
@@ -191,7 +208,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
         const routed = visionModel ? visionStep({ lastCalls: steps.at(-1)?.toolCalls ?? [], messages: current, frames: session.frames, visionModel: tier === Tier.Code ? codeModel : visionModel }) : undefined;
         const stepModel = routed?.model ?? tierModel;
         stepModels.push(stepModel);
-        const forced = kind === Round.SelfCheck && stepNumber === 0 && FORCES_TOOL[tier] ? { toolChoice: { type: 'tool' as const, toolName: VIEW_FRAMES } } : {};
+        const forced = ROUND_CHOICE[kind]({ tier, reasoning: stepModel === model ? reasoning : null, stepNumber });
         return { model: llmLanguageModel(stepModel), providerOptions: stepModel === model ? reasoningProviderOptions(reasoning) : {}, activeTools: activeTools(tier, toolNames), ...(routed?.messages ? { messages: routed.messages } : {}), ...forced };
       }
     });
@@ -208,25 +225,30 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
     execute: async ({ writer }) => {
       askPreview = (request) => writer.write({ type: FRAMES_REQUEST, data: request });
       askCheck = (request) => writer.write({ type: CHECK_REQUEST, data: request });
-      const first = round(openingMessages, Round.Edit);
-      writer.merge(first.toUIMessageStream({ sendFinish: false, sendReasoning: true }));
-      const steps: TurnStep[] = [
-        ...(await Promise.resolve(first.steps).catch((e: unknown) => {
-          console.error('[motion-agent] round failed, keeping the edits made so far', e);
-          return [];
-        }))
-      ];
+      const steps: TurnStep[] = [];
+      let conversation = openingMessages;
 
-      if (steps.length && selfCheckDue(session, vision) && spent <= MOTION_TURN_CAP_USD) {
-        const times = keyFrameTimes(session.doc);
-        const answered = (await first.response).messages as ModelMessage[];
-        const check = round([...openingMessages, ...answered, { role: 'user', content: selfCheckPrompt(times) }], Round.SelfCheck);
-        writer.merge(check.toUIMessageStream({ sendStart: false, sendReasoning: true }));
-        steps.push(...(await Promise.resolve(check.steps).catch((e: unknown) => {
-          console.error('[motion-agent] self-check failed, keeping the edits', e);
+      const play = async (messages: ModelMessage[], kind: Round) => {
+        const played = round(messages, kind);
+        writer.merge(played.toUIMessageStream({ sendStart: kind === Round.Edit, sendFinish: false, sendReasoning: true }));
+        const taken = await Promise.resolve(played.steps).catch((e: unknown) => {
+          console.error(`[motion-agent] ${kind} round failed, keeping the edits made so far`, e);
           return [];
-        })));
+        });
+        steps.push(...taken);
+        const answered = taken.length ? ((await played.response).messages as ModelMessage[]) : [];
+        conversation = [...messages, ...answered];
+      };
+
+      await play(openingMessages, Round.Edit);
+      const edited = steps.length;
+      for (let nudge = 0; nudge < MAX_SELF_CHECK_NUDGES && steps.length && selfCheckDue(session, vision); nudge++) {
+        await play([...conversation, { role: 'user', content: selfCheckPrompt(keyFrameTimes(session.doc)) }], Round.SelfCheck);
       }
+      if (steps.length && (steps.length > edited || !closedByModel(steps.at(-1)))) {
+        await play([...conversation, { role: 'user', content: SUMMARY_PROMPT }], Round.Summary);
+      }
+      writer.write({ type: 'finish' });
 
       if (assets.length > knownAssets) {
         writer.write({ type: ASSETS_ADDED, data: { assets: assets.slice(knownAssets) } });
