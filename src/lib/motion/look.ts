@@ -34,11 +34,15 @@ export enum EnvPreset {
 
 export const ENV_PRESETS = Object.values(EnvPreset) as [EnvPreset, ...EnvPreset[]];
 
+const ENV_ALIASES: Record<string, EnvPreset> = { studio: EnvPreset.Room };
+
+export const envPresetInput = z.preprocess((value) => (typeof value === 'string' ? (ENV_ALIASES[value] ?? value) : value), z.enum(ENV_PRESETS));
+
 const HDRI_BASE = 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r181/examples/textures/equirectangular/';
 
 export const HDRI: Record<EnvPreset, { file: string | null; about: string }> = {
   [EnvPreset.None]: { file: null, about: 'no image-based light' },
-  [EnvPreset.Room]: { file: null, about: 'neutral procedural room, soft and even' },
+  [EnvPreset.Room]: { file: null, about: 'neutral procedural studio room, soft and even (the studio look)' },
   [EnvPreset.Overpass]: { file: 'pedestrian_overpass_1k.hdr', about: 'soft overcast city light' },
   [EnvPreset.Sunset]: { file: 'venice_sunset_1k.hdr', about: 'warm low sun over a city' },
   [EnvPreset.Sunrise]: { file: 'spruit_sunrise_1k.hdr', about: 'cool morning sky, open field' },

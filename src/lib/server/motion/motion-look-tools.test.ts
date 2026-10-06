@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Tool } from 'ai';
 import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
+import { z } from 'zod';
+import { ENV_PRESETS, EnvPreset } from '$lib/motion/look';
 import { createMotionTools, type MotionSession } from './motion-tools';
 
 function setup() {
@@ -29,5 +31,17 @@ describe('look tools', () => {
     expect(session.doc.look?.lights).toEqual([]);
     await run('set_look', { enabled: false });
     expect(session.doc.look).toBeNull();
+  });
+});
+
+describe('set_look environment presets', () => {
+  const schema = () => createMotionTools({ session: { doc: newMotionDoc(MotionFormat.Square), baseVersion: 1, edits: [], selection: [], frames: new Map(), views: 0, checkedAt: 0, codeWrites: 0 }, assets: [], newId: () => 'id', voiceover: vi.fn(), frames: vi.fn(), check: vi.fn() }).set_look.inputSchema as z.ZodType;
+
+  it('the model sees every preset in the schema', () => {
+    expect(JSON.stringify(z.toJSONSchema(schema(), { io: 'input' }))).toContain(JSON.stringify(ENV_PRESETS));
+  });
+
+  it('studio, the name a model reaches for first, is the neutral room', () => {
+    expect(schema().parse({ environment: { preset: 'studio' } })).toMatchObject({ environment: { preset: EnvPreset.Room } });
   });
 });
