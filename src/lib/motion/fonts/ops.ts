@@ -37,7 +37,7 @@ export function setFont(doc: MotionDoc, clipId: string, choice: FontChoice, cata
     return fail(`no clip ${clipId}`);
   }
   if (!('font' in found.clip.props)) {
-    return fail(`${found.clip.component} has no text font; custom components take a font param through set_props after set_font registers it on a text clip, or register_font`);
+    return fail(`${found.clip.component} has no text font; custom components take a font param through set_props after register_font`);
   }
   const verdict = registered(doc, choice.family, catalogue);
   if (typeof verdict === 'string') {

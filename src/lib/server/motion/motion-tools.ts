@@ -1096,7 +1096,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     register_font: tool({
-      description: 'Add a Google Fonts family to the video without using it yet, e.g. for a custom component font param (then set_props with that family).',
+      description: 'Add a Google Fonts family to the video. Call it before add_clip names the family in props.font, and for a custom component font param (then set_props with that family).',
       inputSchema: z.object({ family: z.string().max(64) }),
       execute: async (input) => apply(registerFont(session.doc, input.family, GOOGLE_FONTS), `registered font ${input.family}`)
     }),
@@ -1213,7 +1213,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     analyze_site: tool({
-      description: 'Read a public website for a brand: name, tagline, description, logos (svg first, then favicon, apple-touch-icon, og:image), palette (theme, logo, CSS), fonts (google true = usable by name with set_font), images with width and height (og, hero, product), products and social links. Nothing is stored: import_asset the logo and the pictures you will use.',
+      description: 'Read a public website for a brand: name, tagline, description, logos (svg first, then favicon, apple-touch-icon, og:image), palette (theme, logo, CSS), fonts (google true = usable by name after register_font), images with width and height (og, hero, product), products and social links. Nothing is stored: import_asset the logo and the pictures you will use.',
       inputSchema: z.object({ url: z.string().min(4).max(2000).describe('the site, e.g. https://www.allbirds.com or allbirds.com') }),
       execute: async (input) => (deps.site ? deps.site(input.url) : UNREADABLE('reading sites'))
     }),
