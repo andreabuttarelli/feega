@@ -6,7 +6,7 @@
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
   import type { OpResult } from '$lib/motion/timeline';
   import { applyValues, exposeField, FieldType, fieldValues, removeField } from '$lib/motion/template/fields';
-  import { FIELD_TYPES } from '$lib/motion/template/field-model';
+  import { FIELD_TYPE_LABEL, FIELD_TYPES } from '$lib/motion/template/field-model';
   import { batchRows, DEFAULT_NAME_PATTERN, MAX_BATCH_ROWS, outputName, parseCsv, sheetCsvUrl, type ColumnMap, type CsvTable } from '$lib/motion/template/batch';
   import { renderQuote } from '$lib/motion/render-quote';
   import { EXPORT_FORMATS, FORMAT, Preset, settingsOf, type RenderSettings } from '$lib/motion/export-formats';
@@ -40,7 +40,7 @@
 
   const POLL_MS = 3000;
   const SETTLED = new Set(['done', 'failed', 'expired']);
-  const TYPE_LABEL: Record<FieldType, string> = { [FieldType.Text]: 'Text', [FieldType.Number]: 'Number', [FieldType.Color]: 'Colour', [FieldType.Asset]: 'Asset', [FieldType.Boolean]: 'Yes / no' };
+  const TYPE_LABEL = FIELD_TYPE_LABEL;
 
   let prop = $state('');
   let key = $state('');
@@ -214,7 +214,7 @@
           <dt>Preview</dt>
           <dd><input type="number" min="1" max={rows.length} bind:value={previewRow} /> <button type="button" onclick={preview} data-testid="batch-preview">Preview row</button> <button type="button" onclick={() => onpreview(null)}>Template</button></dd>
           <dt>Cost</dt>
-          <dd data-testid="batch-quote">{rows.length} videos × {perVideo} = {rows.length * perVideo} credits, charged per video when it is ready.</dd>
+          <dd data-testid="batch-quote">{rows.length} videos × ~{perVideo} = about {rows.length * perVideo} credits, each paid by the time it really takes when it is ready.</dd>
         </dl>
         {#if rows.length > MAX_BATCH_ROWS}<p class="warn">At most {MAX_BATCH_ROWS} rows per batch.</p>{/if}
         <button type="button" class="primary" onclick={render} disabled={!saved || running || !rows.length || rows.length > MAX_BATCH_ROWS} data-testid="batch-render">{saved ? `Render ${rows.length} videos · ${rows.length * perVideo} credits` : 'Saving your changes…'}</button>

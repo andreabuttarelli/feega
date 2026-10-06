@@ -1,3 +1,4 @@
+import * as bento from './bento';
 import * as carousel3d from './carousel-3d';
 import * as coverflow from './coverflow';
 import * as explorerGrid from './explorer-grid';
@@ -5,6 +6,7 @@ import * as helix from './helix';
 import * as staggeredGrid from './staggered-grid';
 import * as mediaCloud from './media-cloud';
 import * as mediaRing from './media-ring';
+import * as ring from './ring';
 import * as tiltedGrid from './tilted-grid';
 import * as verticalFlow from './vertical-flow';
 import type { LayoutId, LayoutParam, LayoutParams, Transform } from './types';
@@ -102,6 +104,24 @@ export const LAYOUTS: Record<LayoutId, LayoutDefinition> = {
 		params: coverflow.params,
 		instances: (mediaCount, values) => filledCount(mediaCount, valueOf(values, 'items', 5)),
 		transforms: coverflow.transforms
+	},
+	ring: {
+		label: 'UI ring',
+		description: 'Cards curved on a tilted, turning cylinder; the ones behind show through.',
+		motion: 'cycle',
+		camera: 'fixed',
+		params: ring.params,
+		instances: (mediaCount, values) => filledCount(mediaCount, valueOf(values, 'count', ring.RING_COUNT.fallback)),
+		transforms: ring.transforms
+	},
+	bento: {
+		label: 'Bento',
+		description: 'A grid of rounded cells, some spanning rows or columns, each holding a picture, a video or a motion.',
+		motion: 'cycle',
+		camera: 'fixed',
+		params: bento.params,
+		instances: (mediaCount) => mediaCount,
+		transforms: (count, values) => bento.transforms(count, values)
 	}
 };
 

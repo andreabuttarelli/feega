@@ -1,16 +1,18 @@
 import { TrackKind } from './components';
-import { compOf, newClip, type MotionClip, type MotionComp, type MotionDoc, type MotionTrack } from './doc';
+import { compOf, compsOf, newClip, type MotionClip, type MotionComp, type MotionDoc, type MotionTrack } from './doc';
 import { TransitionKind } from './design';
 import type { Keyframes } from './keyframes';
 import { withoutHidden } from './organize';
 import { addClip, type OpResult } from './timeline';
+import { RING_LAYOUT, ringCards, ringRadiusPx, ringSliceId, slicesFor } from './ring/model';
+import { BENTO_LAYOUT, bentoCellId, heldCell, type BentoCard } from './bento/model';
 
 export type CompPath = readonly string[];
 export type GroupProps = { span?: number };
 
 export const MAX_COMP_DEPTH = 8;
 const MAX_LOOPS = 600;
-const SEPARATOR = '__';
+export const SEPARATOR = '__';
 const STILL = { kind: TransitionKind.None, durationInFrames: 0 };
 
 const fail = (error: string): OpResult => ({ ok: false, error });
@@ -31,7 +33,7 @@ export function mergeView(root: MotionDoc, path: CompPath, view: MotionDoc): Mot
     return view;
   }
   const comp: MotionComp = { ...(view.comps[id] ?? root.comps[id]), tracks: view.tracks, durationInFrames: view.durationInFrames };
-  return { ...root, assets: view.assets, fonts: view.fonts, components: view.components, comps: { ...view.comps, [id]: comp } };
+  return { ...root, assets: view.assets, fonts: view.fonts, components: view.components, fields: view.fields, comps: { ...view.comps, [id]: comp } };
 }
 
 export function pathNames(root: MotionDoc, path: CompPath): string[] {
@@ -86,18 +88,19 @@ function shifted(keyframes: Keyframes, by: number): Keyframes {
   return Object.fromEntries(Object.entries(keyframes).map(([key, track]) => [key, (track ?? []).map((k) => ({ ...k, frame: k.frame - by }))]));
 }
 
-type Window = { from: number; end: number; offset: number; length: number; loops: number[] };
+type Window = { from: number; end: number; offset: number; length: number; loops: number[]; held: boolean };
 
 function windowOf(clip: MotionClip, comp: MotionComp): Window {
   const length = comp.durationInFrames;
   const first = clip.props.loop ? Math.floor(clip.trimStart / length) : 0;
   const last = clip.props.loop ? Math.min(first + MAX_LOOPS, Math.ceil((clip.trimStart + clip.durationInFrames) / length)) : 1;
-  return { from: clip.from, end: clipEnd(clip), offset: clip.from - clip.trimStart, length, loops: Array.from({ length: last - first }, (_, i) => first + i) };
+  return { from: clip.from, end: clipEnd(clip), offset: clip.from - clip.trimStart, length, loops: Array.from({ length: last - first }, (_, i) => first + i), held: !clip.props.loop && Boolean(clip.props.hold) };
 }
 
 function placeOne(clip: MotionClip, w: Window, k: number, prefix: string): MotionClip | null {
   const start = w.offset + k * w.length + clip.from;
-  const stop = start + Math.min(clip.durationInFrames, w.length - clip.from);
+  const lastFrame = w.held && clipEnd(clip) >= w.length;
+  const stop = lastFrame ? Math.max(w.end, start + w.length - clip.from) : start + Math.min(clip.durationInFrames, w.length - clip.from);
   const from = Math.max(start, w.from);
   const end = Math.min(stop, w.end);
   if (end <= from) {
@@ -113,31 +116,83 @@ function placeOne(clip: MotionClip, w: Window, k: number, prefix: string): Motio
     trimStart: clip.trimStart + cut,
     keyframes: shifted(clip.keyframes, cut),
     transitionIn: cut ? STILL : clip.transitionIn,
-    transitionOut: end < stop ? STILL : clip.transitionOut
+    transitionOut: end < stop || lastFrame ? STILL : clip.transitionOut
   };
 }
 
 function placed(host: MotionClip, comp: MotionComp, tracks: MotionTrack[]): MotionTrack[] {
   const w = windowOf(host, comp);
   const prefix = `${host.id}${SEPARATOR}`;
-  const laid = tracks.map((t) => ({ ...t, id: `${prefix}${t.id}`, clips: w.loops.flatMap((k) => (t.clips as MotionClip[]).flatMap((c) => placeOne(c, w, k, prefix) ?? [])) }));
+  const loopTrack = (t: MotionTrack, k: number) => ({ ...t, id: w.loops.length > 1 ? `${prefix}${k}${SEPARATOR}${t.id}` : `${prefix}${t.id}`, clips: (t.clips as MotionClip[]).flatMap((c) => placeOne(c, w, k, prefix) ?? []) });
+  const laid = w.loops.flatMap((k) => tracks.map((t) => loopTrack(t, k)));
   const present = new Set(laid.flatMap((t) => t.clips.map((c) => c.id)));
   return laid.map((t) => ({ ...t, clips: t.clips.map((c) => (c.parent && !present.has(c.parent) ? { ...c, parent: null } : c)) }));
 }
 
+type Expander = (doc: MotionDoc, track: MotionTrack, host: MotionClip, depth: number) => MotionTrack[];
+
+function precompTracks(doc: MotionDoc, track: MotionTrack, host: MotionClip, depth: number): MotionTrack[] {
+  const comp = doc.comps[compOf(host)!];
+  const inner = expand(doc, withoutHidden({ ...doc, tracks: comp.tracks }).tracks, depth + 1);
+  const laid = placed(host, comp, inner);
+  const group: MotionClip = { ...host, props: { ...host.props, span: laid.length } };
+  return [{ ...track, id: `${host.id}${SEPARATOR}group`, clips: [group] }, ...laid];
+}
+
+function cardHost(grid: MotionClip, id: string, props: { comp: string; loop: boolean; hold: boolean }): MotionClip {
+  return newClip({ id, from: grid.from, durationInFrames: grid.durationInFrames, trimStart: grid.trimStart, component: 'Precomp', props });
+}
+
+function grouped(doc: MotionDoc, track: MotionTrack, grid: MotionClip, hosts: MotionTrack[], depth: number): MotionTrack[] {
+  const inner = expand(doc, hosts, depth);
+  const group: MotionClip = { ...grid, props: { ...grid.props, span: inner.length } };
+  return [{ ...track, id: `${grid.id}${SEPARATOR}group`, clips: [group] }, ...inner];
+}
+
+const hostTrack = (track: MotionTrack, host: MotionClip): MotionTrack => ({ ...track, id: `${host.id}${SEPARATOR}host`, clips: [host] });
+
+function ringTracks(doc: MotionDoc, track: MotionTrack, ring: MotionClip, depth: number): MotionTrack[] {
+  const cards = ringCards(ring.props as never);
+  const slices = slicesFor(cards.length, ringRadiusPx(ring.props as never, Math.min(doc.width, doc.height)));
+  const hosts = cards.flatMap((shown, card) =>
+    shown?.kind === COMP_CARD && doc.comps[shown.assetId]
+      ? Array.from({ length: slices }, (_, slice) => hostTrack(track, cardHost(ring, ringSliceId(ring.id, card, slice), { comp: shown.assetId, loop: true, hold: false })))
+      : []
+  );
+  return grouped(doc, track, ring, hosts, depth);
+}
+
+function bentoTracks(doc: MotionDoc, track: MotionTrack, grid: MotionClip, depth: number): MotionTrack[] {
+  const cards = (grid.props.media ?? []) as BentoCard[];
+  const hosts = cards.flatMap((card, item) =>
+    card.kind === COMP_CARD && doc.comps[card.assetId] ? [hostTrack(track, cardHost(grid, bentoCellId(grid.id, item), { comp: card.assetId, loop: !heldCell(card), hold: heldCell(card) }))] : []
+  );
+  return grouped(doc, track, grid, hosts, depth);
+}
+
+const COMP_CARD = 'comp';
+
+const CARD_EXPANDERS: Record<string, Expander> = {
+  [RING_LAYOUT]: ringTracks,
+  [BENTO_LAYOUT]: bentoTracks
+};
+
+const EXPANDERS: Partial<Record<MotionClip['component'], Expander>> = {
+  Precomp: precompTracks,
+  Composition: (doc, track, host, depth) => CARD_EXPANDERS[String(host.props.layout)](doc, track, host, depth)
+};
+
+const isHost = (doc: MotionDoc, clip: MotionClip, depth: number) =>
+  depth < MAX_COMP_DEPTH && EXPANDERS[clip.component] !== undefined && compsOf(clip).some((id) => doc.comps[id]);
+
 function expand(doc: MotionDoc, tracks: readonly MotionTrack[], depth: number): MotionTrack[] {
   return tracks.flatMap((track) => {
-    const hosts = (track.clips as MotionClip[]).filter((c) => compOf(c) !== null && doc.comps[compOf(c)!] && depth < MAX_COMP_DEPTH);
+    const hosts = (track.clips as MotionClip[]).filter((c) => isHost(doc, c, depth));
     if (!hosts.length) {
       return [track];
     }
     const rest = { ...track, clips: track.clips.filter((c) => !hosts.includes(c as MotionClip)) };
-    const groups = hosts.flatMap((host) => {
-      const comp = doc.comps[compOf(host)!];
-      const inner = expand(doc, withoutHidden({ ...doc, tracks: comp.tracks }).tracks, depth + 1);
-      const group: MotionClip = { ...host, props: { ...host.props, span: inner.length } };
-      return [{ ...track, id: `${host.id}${SEPARATOR}group`, clips: [group] }, ...placed(host, comp, inner)];
-    });
+    const groups = hosts.flatMap((host) => EXPANDERS[host.component]!(doc, track, host, depth));
     return [...groups, rest];
   });
 }

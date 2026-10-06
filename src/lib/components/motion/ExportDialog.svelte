@@ -13,18 +13,21 @@
   import { unverified } from '$lib/motion/custom/determinism';
   import { CheckState } from '$lib/motion/custom/component';
   import { deserialize } from '$app/forms';
-  import { renderQuote } from '$lib/motion/render-quote';
+  import { HOLD_BUFFER, renderQuote } from '$lib/motion/render-quote';
   import { EXPORT_FORMATS, FORMAT, PRESETS, Preset, Quality, estimateBytes, exportProblem, settingsOf, type RenderSettings } from '$lib/motion/export-formats';
   import { FRAME_RATES } from '$lib/motion/design';
   import { setFrameRate } from '$lib/motion/frame-rate';
   import { RenderStage, framesDone, type RenderView, type ServerRender } from '$lib/motion/server-render';
+  import type { BrandTokens } from '$lib/motion/brand';
+  import type { AudioAnalysis } from '$lib/motion/audio-analysis';
+  import InteractiveExport from './InteractiveExport.svelte';
 
   type Renderer = (times: number[], size: FrameSize, onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>, signal: AbortSignal) => Promise<void>;
 
   const Phase = { Checking: 'checking', Ready: 'ready', Mixing: 'mixing', Rendering: 'rendering', Saving: 'saving', Done: 'done', Failed: 'failed' } as const;
   type Phase = (typeof Phase)[keyof typeof Phase];
 
-  const Mode = { Server: 'server', Browser: 'browser' } as const;
+  const Mode = { Server: 'server', Browser: 'browser', Interactive: 'interactive' } as const;
   type Mode = (typeof Mode)[keyof typeof Mode];
 
   const STAGE_LABEL: Record<RenderStage, string> = {
@@ -61,6 +64,8 @@
     fileName,
     render,
     server,
+    tokens,
+    analyses = {},
     onclose
   }: {
     doc: MotionDoc;
@@ -70,6 +75,8 @@
     fileName: string;
     render: Renderer;
     server: ServerRender;
+    tokens: BrandTokens;
+    analyses?: Record<string, AudioAnalysis>;
     onclose: () => void;
   } = $props();
 
@@ -79,6 +86,8 @@
   let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
   let settings = $state<RenderSettings>({ ...settingsOf(Preset.Social), fps: doc.fps });
+  const SETTING_KEYS = ['format', 'fps', 'quality', 'resolution'] as const;
+  const isPreset = (preset: Preset) => SETTING_KEYS.every((k) => settingsOf(preset)[k] === settings[k]);
   const target = $derived.by(() => {
     const paced = setFrameRate(doc, settings.fps);
     return paced.ok ? paced.doc : doc;
@@ -239,19 +248,21 @@
     <button type="button" aria-label="Close" disabled={busy} onclick={onclose}><X size={16} /></button>
   </header>
 
-  {#if server.configured}
-    <div class="choice modes" role="radiogroup" aria-label="Where to render">
-      <label><input type="radio" name="mode" value={Mode.Server} bind:group={mode} disabled={busy} data-testid="export-mode-server" /> On our servers (fast)</label>
-      <label><input type="radio" name="mode" value={Mode.Browser} bind:group={mode} disabled={busy || jobRunning} data-testid="export-mode-browser" /> In this browser</label>
-    </div>
-  {/if}
+  <div class="choice modes" role="radiogroup" aria-label="Where to render">
+    {#if server.configured}<label><input type="radio" name="mode" value={Mode.Server} bind:group={mode} disabled={busy} data-testid="export-mode-server" /> On our servers (fast)</label>{/if}
+    <label><input type="radio" name="mode" value={Mode.Browser} bind:group={mode} disabled={busy || jobRunning} data-testid="export-mode-browser" /> In this browser</label>
+    <label><input type="radio" name="mode" value={Mode.Interactive} bind:group={mode} disabled={busy} data-testid="export-mode-interactive" /> Interactive (web)</label>
+  </div>
 
-  {#if mode === Mode.Server}
+  {#if mode === Mode.Interactive}
+    <InteractiveExport {doc} {tokens} {assetUrls} {analyses} {fileName} />
+  {:else if mode === Mode.Server}
     <dl>
       <dt>Preset</dt>
-      <dd class="choice" data-testid="export-presets">
+      <dd class="presets" data-testid="export-presets">
         {#each Object.values(Preset) as preset (preset)}
-          <button type="button" class="secondary" disabled={jobRunning} onclick={() => (settings = settingsOf(preset))}>{PRESETS[preset].label}</button>
+          {@const [name, detail] = PRESETS[preset].label.split(' · ')}
+          <button type="button" class="preset" aria-pressed={isPreset(preset)} disabled={jobRunning} onclick={() => (settings = settingsOf(preset))}><b>{name}</b><span>{detail}</span></button>
         {/each}
       </dd>
       <dt>File</dt>
@@ -283,7 +294,7 @@
         {#if spec.alpha && doc.background !== Background.Transparent}<br /><span class="muted">Keeps alpha only where nothing is painted: set the background to Transparent for a see-through file.</span>{/if}
       </dd>
       <dt>Cost</dt>
-      <dd data-testid="export-quote">{quote.credits} credits, charged only when the video is ready.</dd>
+      <dd data-testid="export-quote">About {quote.credits} credits. {Math.ceil(quote.credits * HOLD_BUFFER)} are held while it renders; you pay the time it really takes, never more than held, nothing if it fails.</dd>
     </dl>
 
     {#if job && jobRunning}
@@ -307,7 +318,7 @@
         </p>
       {:else}
         {#if problem}<p class="warn" role="alert" data-testid="export-problem">{problem}</p>{/if}
-        <button type="button" class="primary" onclick={startServer} disabled={!server.saved || problem !== null} data-testid="export-start-server">{server.saved ? `Render · ${quote.credits} credits` : 'Saving your changes…'}</button>
+        <button type="button" class="primary" onclick={startServer} disabled={!server.saved || problem !== null} data-testid="export-start-server">{server.saved ? `Render · ~${quote.credits} credits` : 'Saving your changes…'}</button>
       {/if}
     {/if}
   {:else if phase === Phase.Checking}
@@ -365,7 +376,7 @@
   .scrim {
     position: fixed;
     inset: 0;
-    background: rgb(0 0 0 / 0.35);
+    background: rgb(0 0 0 / 0.4);
     z-index: 40;
   }
 
@@ -374,39 +385,79 @@
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: min(440px, calc(100vw - 32px));
+    width: min(520px, calc(100vw - 32px));
+    max-height: calc(100vh - 48px);
+    overflow: auto;
     z-index: 41;
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    padding: 16px;
+    gap: 14px;
+    padding: 0 16px 16px;
     background: var(--ui-bg);
     color: var(--ui-ink);
-    border: 1px solid var(--ui-line);
-    box-shadow: 0 16px 48px rgb(0 0 0 / 0.2);
-    font-size: 13px;
+    border: 1px solid var(--ui-line-strong);
+    box-shadow: 0 24px 64px rgb(0 0 0 / 0.24);
+    font-size: var(--ui-text-sm);
   }
 
   header {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    height: 44px;
+    margin: 0 -16px;
+    padding: 0 8px 0 16px;
+    border-bottom: 1px solid var(--ui-line);
+    font-size: var(--ui-text-md);
     font-weight: 600;
+  }
+
+  header button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    color: var(--ui-ink-2);
+  }
+
+  header button:hover {
+    background: var(--ui-hover);
   }
 
   dl {
     display: grid;
-    grid-template-columns: 70px 1fr;
+    grid-template-columns: 96px minmax(0, 1fr);
+    align-items: center;
     gap: 8px 12px;
     margin: 0;
   }
 
   dt {
     color: var(--ui-ink-2);
+    align-self: start;
+    padding-top: 4px;
   }
 
   dd {
     margin: 0;
+    min-width: 0;
+  }
+
+  select {
+    width: 100%;
+    height: 26px;
+    padding: 0 6px;
+    border: 1px solid var(--ui-line-strong);
+    border-radius: 0;
+    background: var(--ui-bg);
+    color: var(--ui-ink);
+    font: inherit;
+  }
+
+  select:focus-visible {
+    outline: none;
+    border-color: var(--ui-accent);
   }
 
   .choice {
@@ -421,8 +472,79 @@
   }
 
   .modes {
-    padding-bottom: 4px;
-    border-bottom: 1px solid var(--ui-line);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    margin-top: 2px;
+    border: 1px solid var(--ui-line-strong);
+  }
+
+  .modes label {
+    justify-content: center;
+    height: 30px;
+    color: var(--ui-ink-2);
+    cursor: pointer;
+  }
+
+  .modes label + label {
+    border-left: 1px solid var(--ui-line-strong);
+  }
+
+  .modes input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .modes label:has(input:checked) {
+    background: var(--ui-accent-wash);
+    color: var(--ui-accent);
+    font-weight: 600;
+  }
+
+  .modes label:has(input:focus-visible) {
+    outline: 1px solid var(--ui-accent);
+    outline-offset: -1px;
+  }
+
+  .presets {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--ui-line);
+  }
+
+  .preset {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 40px;
+    padding: 0 12px;
+    border-left: 2px solid transparent;
+    text-align: left;
+  }
+
+  .preset + .preset {
+    border-top: 1px solid var(--ui-line);
+  }
+
+  .preset:hover:not(:disabled) {
+    background: var(--ui-hover);
+  }
+
+  .preset[aria-pressed='true'] {
+    background: var(--ui-accent-wash);
+    border-left-color: var(--ui-accent);
+  }
+
+  .preset b {
+    font-size: var(--ui-text-sm);
+    font-weight: 600;
+  }
+
+  .preset span {
+    font-family: var(--ui-mono);
+    font-size: 10px;
+    color: var(--ui-ink-3);
   }
 
   .muted {
@@ -431,7 +553,7 @@
   }
 
   .warn {
-    color: #b45309;
+    color: var(--ui-warn);
     margin: 0;
   }
 
@@ -460,8 +582,11 @@
     align-items: center;
     justify-content: center;
     gap: 6px;
-    padding: 8px 12px;
-    font-size: 12px;
+    align-self: flex-end;
+    height: 30px;
+    padding: 0 14px;
+    font-size: var(--ui-text-sm);
+    font-weight: 600;
   }
 
   .primary {
@@ -469,7 +594,12 @@
     color: var(--ui-accent-ink);
   }
 
+  .primary:disabled {
+    background: var(--ui-hover);
+    color: var(--ui-ink-3);
+  }
+
   .secondary {
-    border: 1px solid var(--ui-line);
+    border: 1px solid var(--ui-line-strong);
   }
 </style>

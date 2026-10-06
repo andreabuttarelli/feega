@@ -2,7 +2,7 @@ import type { MotionClip } from '../doc';
 import { Source, animProp, sampleTrack } from '../keyframes';
 import type { Size } from '../shape/geometry';
 import { movesOverTime } from '../shape/modifiers';
-import { shapeMarkup, type ShapeLook } from '../shape/render';
+import { shapeDrawing, unionExtent, type Extent, type ShapeLook } from '../shape/render';
 import { modifierOfKey, modifierValues, type Modifier } from '../shape/schema';
 import { js } from './html';
 import { seekDriver } from './stage';
@@ -18,7 +18,7 @@ const isGeometric = (key: string) => modifierOfKey(key) !== null || animProp('Sh
 
 const runsByItself = (m: Modifier) => m.enabled && movesOverTime({ kind: m.kind, values: modifierValues(m) });
 
-function lookAt(clip: MotionClip, frame: number): ShapeLook {
+export function lookAt(clip: MotionClip, frame: number): ShapeLook {
   const look = { ...(clip.props as unknown as ShapeLook) };
   const params = new Map<string, Record<string, number>>();
   for (const [key, track] of Object.entries(clip.keyframes)) {
@@ -42,9 +42,11 @@ function sizeOf(clip: MotionClip, env: Env): Size {
   return { w: p.width * env.width, h: p.height * env.height };
 }
 
-function markupAt(id: string, env: Env, frame: number, size: Size, look: ShapeLook): string {
-  return shapeMarkup(look, { id, size, unit: env.unit, time: frame / env.fps, color: env.color });
+function drawingAt(id: string, env: Env, frame: number, size: Size, look: ShapeLook) {
+  return shapeDrawing(look, { id, size, unit: env.unit, time: frame / env.fps, color: env.color });
 }
+
+const markupAt = (id: string, env: Env, frame: number, size: Size, look: ShapeLook) => drawingAt(id, env, frame, size, look).markup;
 
 export function shapeHtml(id: string, look: ShapeLook, env: Env, size: Size): string {
   const w = Math.round(size.w * 100) / 100;
@@ -52,24 +54,32 @@ export function shapeHtml(id: string, look: ShapeLook, env: Env, size: Size): st
   return `<svg id="${svgId(id)}" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="display:block;overflow:visible">${markupAt(id, env, 0, size, look)}</svg>`;
 }
 
-export function shapeBake(clip: MotionClip, env: Env): ShapeBake | null {
+export type ShapeStudy = { bake: ShapeBake | null; extent: Extent | null };
+
+export function shapeStudy(clip: MotionClip, env: Env): ShapeStudy {
   const modifiers = (clip.props.modifiers as Modifier[] | undefined) ?? [];
   const moving = Object.keys(clip.keyframes).some(isGeometric) || modifiers.some(runsByItself);
-  if (!moving) {
-    return null;
-  }
   const size = sizeOf(clip, env);
+  if (!moving) {
+    return { bake: null, extent: drawingAt(clip.id, env, 0, size, lookAt(clip, 0)).extent };
+  }
   const frames: string[] = [];
   const seen = new Map<string, number>();
+  let extent: Extent | null = null;
   const index = Array.from({ length: clip.durationInFrames }, (_, f) => {
-    const markup = markupAt(clip.id, env, f, size, lookAt(clip, f));
-    if (!seen.has(markup)) {
-      seen.set(markup, frames.length);
-      frames.push(markup);
+    const drawing = drawingAt(clip.id, env, f, size, lookAt(clip, f));
+    extent = unionExtent(extent, drawing.extent);
+    if (!seen.has(drawing.markup)) {
+      seen.set(drawing.markup, frames.length);
+      frames.push(drawing.markup);
     }
-    return seen.get(markup)!;
+    return seen.get(drawing.markup)!;
   });
-  return { id: clip.id, from: clip.from, index, frames };
+  return { bake: { id: clip.id, from: clip.from, index, frames }, extent };
+}
+
+export function shapeBake(clip: MotionClip, env: Env): ShapeBake | null {
+  return shapeStudy(clip, env).bake;
 }
 
 export function shapeScript(bakes: readonly ShapeBake[], fps: number, duration: number): string {

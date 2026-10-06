@@ -6,7 +6,10 @@
   import { CAMERA_PRESETS, CameraPreset, PRESETS, applyPreset, cameraEditAt, cameraKeyToggle, cameraValueAt, focusOn, removeCamera, setCamera } from '$lib/motion/camera-ops';
   import { parseDecimal } from '$lib/motion/inspector';
   import { sliderOf, toShown, toStored } from '$lib/motion/units';
-  import Dial from './Dial.svelte';
+  import NumberField from './NumberField.svelte';
+  import { FieldKind } from '$lib/motion/number-field';
+  import { fieldLook } from '$lib/motion/inspector-sections';
+  import { KeyMark } from '$lib/motion/timeline-layers';
   import SceneMap from './SceneMap.svelte';
   import { setCameraExpression } from '$lib/motion/expression/ops';
   import { expressionErrors } from '$lib/motion/expression/bake';
@@ -18,8 +21,8 @@
     { title: 'Rotation', keys: ['rotateX', 'rotateY', 'rotateZ'] },
     { title: 'Lens', keys: ['fov'] }
   ];
-  const DIALS = new Set<CameraKey>(['rotateX', 'rotateY', 'rotateZ']);
   const KEY_STATE = { On: 'on', Lane: 'lane', None: 'none' } as const;
+  const MARK: Record<(typeof KEY_STATE)[keyof typeof KEY_STATE], KeyMark> = { [KEY_STATE.On]: KeyMark.Here, [KEY_STATE.Lane]: KeyMark.Animated, [KEY_STATE.None]: KeyMark.None };
   const DEFAULT_MOVE_SECONDS = 2;
 
   let error = $state('');
@@ -122,19 +125,23 @@
 
     {#snippet valueRow(key: CameraKey)}
       {@const spec = CAMERA[key]}
+      {@const look = fieldLook(key)}
       {@const range = sliderOf(CAMERA_LANE, { key, ...spec }, doc)}
       <div class="row anim" data-camera-prop={key}>
-        <span class="name">
-          <button type="button" class="key {keyState(key)}" title="Keyframe at playhead" aria-label={`Keyframe camera ${key}`} aria-pressed={keyState(key) === KEY_STATE.On} onclick={() => commit(cameraKeyToggle(doc, key, frame), 'Toggled a camera keyframe')}>◆</button>
-          <button type="button" class="expr-toggle" class:on={expressionOf(key) !== undefined} title="Expression" aria-label={`Expression camera ${key}`} aria-pressed={expressionOf(key) !== undefined} onclick={() => toggleExpression(key)}>=</button>
-          {spec.label}
-        </span>
-        <div class="range">
-          {#if DIALS.has(key)}<Dial value={shown(key)} label={spec.label} onchange={(v) => edit(key, v)} />{/if}
-          <input type="range" min={range.min} max={range.max} step={range.step} value={shown(key)} oninput={(e) => edit(key, Number(e.currentTarget.value))} />
-          <input class="num" type="text" inputmode="decimal" aria-label={`Camera ${spec.label}`} value={String(shown(key))} onchange={(e) => editText(key, e.currentTarget.value)} />
-          {#if range.unit}<span class="unit">{range.unit}</span>{/if}
-        </div>
+        <NumberField
+          label={spec.label}
+          kind={FieldKind.Named}
+          name={`Camera ${spec.label}`}
+          value={shown(key)}
+          {range}
+          unit={range.unit ?? look.unit}
+          fill={look.fill}
+          mark={MARK[keyState(key)]}
+          expression={expressionOf(key) !== undefined}
+          onchange={(v) => edit(key, v)}
+          onkey={() => commit(cameraKeyToggle(doc, key, frame), 'Toggled a camera keyframe')}
+          onexpression={() => toggleExpression(key)}
+        />
       </div>
       {#if expressionOf(key) !== undefined}
         <div class="expr" data-expression={key}>
@@ -264,45 +271,6 @@
     font: inherit;
   }
 
-  .range {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .range input {
-    flex: 1;
-  }
-
-  .anim .name {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
-
-  .unit {
-    flex: none;
-    min-width: 1.2em;
-    color: var(--ui-ink-3);
-  }
-
-  .num {
-    width: 56px !important;
-    flex: none;
-  }
-
-  .expr-toggle {
-    width: 16px;
-    margin-right: 4px;
-    font-family: var(--ui-mono);
-    font-size: 11px;
-    color: var(--ui-ink-3);
-  }
-
-  .expr-toggle.on {
-    color: var(--ui-accent);
-  }
-
   .expr {
     display: grid;
     gap: 4px;
@@ -320,21 +288,6 @@
     color: #e11d48;
     font-size: 11px;
     margin: 0;
-  }
-
-  .key {
-    font-size: 10px;
-    line-height: 1;
-    width: 14px;
-    color: var(--ui-line);
-  }
-
-  .key.lane {
-    color: var(--ui-ink-2);
-  }
-
-  .key.on {
-    color: var(--ui-accent);
   }
 
   .check {

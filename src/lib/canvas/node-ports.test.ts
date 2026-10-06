@@ -29,7 +29,7 @@ const EXPECTED: Record<(typeof NODE_TYPES)[number], { inputs: boolean; output: b
   calendar: { inputs: true, output: false },
   audio: { inputs: true, output: true },
   model3d: { inputs: true, output: false },
-  motion: { inputs: false, output: false },
+  motion: { inputs: false, output: true },
   studio_batch: { inputs: false, output: true }
 };
 

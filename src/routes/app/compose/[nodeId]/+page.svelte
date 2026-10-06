@@ -191,6 +191,7 @@
     editorUrl={data.editorUrl}
     fileName={data.node.name ?? 'composition'}
     render={exportFrames}
+    tokens={data.tokens}
     server={{ ...data.serverRender, version, saved: saveState === SaveState.Saved, assetHref: (id: string) => `${data.canvasHref}/assets/${id}` }}
     onclose={() => (exporting = false)}
   />

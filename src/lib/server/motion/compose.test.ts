@@ -3,6 +3,8 @@ import type { Db } from '$lib/server/db/client';
 import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
 import { COMPOSITION_CLIP, applyDraft, newDraft } from '$lib/motion/composition-draft';
 import { findClip, newMotionDoc, MotionFormat, type MotionDoc } from '$lib/motion/doc';
+import { addClip } from '$lib/motion/timeline';
+import { motionCompId } from '$lib/motion/embed';
 import { COMPOSE_DEPS, mediaOfRefs, openCanvasComposition, recentCompositions, startComposition, type ComposeDeps } from './compose';
 
 const db = {} as Db;
@@ -117,6 +119,35 @@ describe('openCanvasComposition: an existing canvas composition node becomes the
       loop: 9,
       media: [{ assetId: 'a1', kind: 'image' }, { assetId: 'v1', kind: 'video' }]
     });
+  });
+
+  it('a bento with a motion editor wired in opens with that motion inside its cell, at its head revision, for export', async () => {
+    const bento = record('comp-node', 'composition', { layout: 'bento', layoutParams: { columns: 2, rows: 1 }, camera: { preset: 'static', params: {} }, background: { color: '#000000' }, duration: 6, aspect: '16:9', refId: null, cells: { 'mot-1': { timing: 'hold' } } });
+    const motionDoc = (() => {
+      const added = addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Title', from: 0, durationInFrames: 40 }, 'hello');
+      if (!added.ok) {
+        throw new Error(added.error);
+      }
+      return { ...added.doc, durationInFrames: 40 };
+    })();
+    const d = migrating({
+      findNode: vi.fn(async () => bento),
+      listNodes: vi.fn(async () => [bento, record('img-1', 'image', { assetId: 'a1' }), record('mot-1', 'motion', { format: 'landscape', docHeadRevision: 5, posterAssetId: null, lastRenderAssetId: null })]),
+      listConnections: vi.fn(async () => [
+        { id: 'e1', canvasId: 'c1', sourceNodeId: 'img-1', targetNodeId: 'comp-node', sourceHandle: null, targetHandle: null, mode: 'fixed' },
+        { id: 'e2', canvasId: 'c1', sourceNodeId: 'mot-1', targetNodeId: 'comp-node', sourceHandle: null, targetHandle: null, mode: 'fixed' }
+      ]) as never,
+      readHead: vi.fn(async (_db: Db, input: { nodeId: string }) => (input.nodeId === 'mot-1' ? { version: 5, doc: motionDoc, summary: null, actorKind: 'user' } : null))
+    });
+
+    await openCanvasComposition(db, d, { orgId: 'org', projectId: 'p1', canvasId: 'c1', nodeId: 'comp-node', userId: 'u1' });
+
+    const doc = vi.mocked(d.saveMotionDoc).mock.calls[0][1].doc as MotionDoc;
+    expect(findClip(doc, COMPOSITION_CLIP)?.clip.props.media).toEqual([
+      { assetId: 'a1', kind: 'image' },
+      { assetId: motionCompId('mot-1'), kind: 'comp', timing: 'hold' }
+    ]);
+    expect(doc.comps[motionCompId('mot-1')].tracks.flatMap((t) => t.clips.map((c) => c.id))).toEqual(['hello']);
   });
 
   it('leaves the canvas node untouched', async () => {

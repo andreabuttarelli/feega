@@ -93,6 +93,8 @@ vi.mock('$lib/server/ai-models-sync', async (importOriginal) => ({
   modalitiesOf
 }));
 vi.mock('$lib/server/supabase-admin', () => ({ createAdminClient: () => ({}) }));
+const releaseCredits = vi.hoisted(() => vi.fn(async () => {}));
+vi.mock('$lib/server/credit-hold', () => ({ holdCredits: vi.fn(), releaseCredits }));
 
 const { offerableSpy } = vi.hoisted(() => ({ offerableSpy: vi.fn() }));
 vi.mock('$lib/server/offerable-models', async (importOriginal) => {
@@ -783,6 +785,19 @@ describe('una run rimasta running non ha altra via se non il timeout', () => {
  * per genere di lavoro, nessun `if` sparso — e ogni genere scade sul proprio tetto, non su
  * `RUN_STALE_MS`.
  */
+describe('un render scaduto restituisce i crediti riservati', () => {
+  it('la riserva torna con la sua scadenza, come se il render fosse fallito', async () => {
+    const portions = [{ amount: 12, expiresAt: '2026-10-10T00:00:00.000Z' }, { amount: 3, expiresAt: null }];
+    const renderRow = { ...runRow, external_job_id: 'motion-render:3', started_at: new Date(Date.now() - 7 * 60 * 60_000).toISOString(), params: { billing: { held: 15, portions } } };
+    const { db } = fakeDb({ node_runs: [renderRow], nodes: [nodeRow] }, { updateRows: { node_runs: [renderRow], nodes: [nodeRow] } });
+
+    const result = await expireStuckRuns(db);
+
+    expect(result).toMatchObject({ expired: 1 });
+    expect(releaseCredits).toHaveBeenCalledWith(ORG, portions, expect.any(String));
+  });
+});
+
 describe('un giro asincrono presso un fornitore ha il proprio tetto, non quello sincrono', () => {
   const startedAgo = (ms: number) => new Date(Date.now() - ms).toISOString();
 
@@ -1648,6 +1663,43 @@ describe('la foto di un prodotto del negozio arriva al render immagine', () => {
       expect.objectContaining({
         baseMediaId: undefined,
         referenceImageUrls: expect.arrayContaining([SHOP_PHOTO])
+      })
+    );
+  });
+
+  it('una foto caricata, in canvas-assets della org, va firmata come riferimento: come base cadeva in source_not_found', async () => {
+    const LIST = 'list-node';
+    const UPLOAD_PATH = `${ORG}/${PROJECT}/abc-mug.jpg`;
+    const imageNode = { ...freshNodeRow, data: { prompt: 'packshot' } };
+    const { db } = fakeDb(
+      {
+        nodes: [imageNode, { ...freshNodeRow, id: LIST, type: 'list', data: { item_kind: 'image', items: [{ asset_id: 'up-1', label: 'Mug' }] } }],
+        nodes_connections: [{ id: 'e1', canvas_id: CANVAS, source_node_id: LIST, target_node_id: NODE, source_handle: null, target_handle: null, mode: 'iterate' }],
+        assets: [{ id: 'up-1', org_id: ORG, project_id: PROJECT, type: 'image', source: 'upload', url: UPLOAD_PATH, mime_type: 'image/jpeg' }]
+      },
+      { updateRows: { nodes: [{ ...imageNode, version: 2 }] } }
+    );
+
+    const result = await runGenNode(db, {
+      orgId: ORG,
+      projectId: PROJECT,
+      canvasId: CANVAS,
+      nodeId: NODE,
+      userId: USER,
+      medium: 'image',
+      prompt: 'packshot',
+      model: 'qwen3-pro',
+      params: {},
+      expectedVersion: 1,
+      iterateSelection: { [LIST]: 1 }
+    });
+
+    expect(result.kind).toBe('done');
+    expect(generateImagesWithoutBrand).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        baseMediaId: undefined,
+        referenceImageUrls: [expect.stringMatching(new RegExp(`^https://signed\\.example/.+/${UPLOAD_PATH}$`))]
       })
     );
   });

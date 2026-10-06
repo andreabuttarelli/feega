@@ -4,11 +4,15 @@ import { EASE_NAME, easeName } from '../keyframes';
 import { Background, clipsOf, type MotionClip, type MotionDoc } from '../doc';
 import { resolveColor, type BrandTokens } from '../brand';
 import { css, esc, js, seconds } from './html';
-import { TEMPLATES, Timing, type PropsOf, type TemplateCtx, type Tween, type Vars } from './templates';
+import { DEVICE_OVERSCAN, TEMPLATES, Timing, type PropsOf, type TemplateCtx, type Tween, type Vars } from './templates';
 import { LIGHTING, OPENTYPE_URL, ThreeKind, lookRuntime, surfaceOf, threeAssetUrls, threeImportMap, threeScript, type ThreeClip } from './three';
 import { outlineUrl } from '../fonts/outline';
 import { Finish } from '../devices';
 import { deviceRuntime } from './device-runtime';
+import { ringBake, ringHtml, ringScript } from './ring';
+import { RING_LAYOUT } from '../ring/model';
+import { bentoBake, bentoHtml, bentoScript } from './bento';
+import { BENTO_LAYOUT, cellFrames } from '../bento/model';
 import { bakeComposition, compositionScript, type TimedBake } from './composition';
 import { ANIMATE_CSS, ENGINE, animationScript, keyedOverrides, sceneKeys, wrapAnimated, wrapParents } from './animate';
 import { ancestorsOf, parentsWithChildren } from '../parent';
@@ -24,7 +28,9 @@ import { matteScript, matteWrapper } from './mattes';
 import { Composite, cameraMath, stageSpec } from '../camera';
 import { sampleTrack } from '../keyframes';
 import { STAGE_CSS, stageRootStyle, stageScript } from './stage';
-import { shapeBake, shapeScript, type ShapeBake } from './shapes';
+import { shapeScript, shapeStudy, type ShapeBake } from './shapes';
+import type { Extent } from '../shape/render';
+import { TEXT_PATH_CSS, textPathBake, textPathScript, textPathTemplate, type TextPathBake } from './text-path';
 import { particleBake, particleScript } from './particles';
 import { remappedSegments } from '../time-remap';
 import type { ParticleBake } from '../particles/simulate';
@@ -37,11 +43,17 @@ import { declaredFamilyCss, fontStack, loadDescriptors, googleFontsUrl, loadedWe
 import { bakePaths } from '../path';
 import { bakePhysics } from '../physics/simulate';
 import { withoutHidden } from '../organize';
+import { JUNCTION, Span, junctionHalves, junctionPairs, withJunctions, type JunctionPair, type Move } from '../junctions';
+import { paintArea } from '../effects/paint-area';
 import { EFFECT_CSS, adjustmentLayer, adjustmentTimeline, effectLayer, effectScript, effectTimeline, type EffectSet } from '../effects/render';
 import { flattenComps, type GroupProps } from '../precomp';
 import { blendStyle } from '../blend';
 import { HELD, holdScript } from './blur';
 import { engineScript } from '../engine/engine';
+import liveRuntime from 'virtual:motion-live-runtime';
+import { liveSpec, type SpecInput } from '../interactive/spec';
+import { LIVE_GLOBAL } from '../interactive/runtime';
+import { Liveness, interactiveOf } from '../interactive/settings';
 
 export { CAPTURE_REPLY, CAPTURE_REQUEST } from './capture';
 
@@ -77,7 +89,7 @@ const MOVE: Record<PropsOf<'Image'>['move'], { from: Vars; to: Vars }> = {
   'pan-right': { from: { scale: 1.12, xPercent: -3 }, to: { scale: 1.12, xPercent: 3 } }
 };
 
-export type ComposeInput = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; scale?: number; analyses?: Record<string, AudioAnalysis> };
+export type ComposeInput = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; scale?: number; analyses?: Record<string, AudioAnalysis>; liveness?: Liveness };
 
 function pick(vars: Vars, keys: string[]): Vars {
   return Object.fromEntries(keys.map((k) => [k, vars[k]]));
@@ -105,6 +117,41 @@ function edgeTweens(clip: MotionClip, fps: number): Tween[] {
   return tweens;
 }
 
+const SPAN: Record<Span, (d: number) => { offset: number; length: number }> = {
+  [Span.Whole]: (d) => ({ offset: 0, length: d }),
+  [Span.FirstHalf]: (d) => ({ offset: 0, length: d / 2 }),
+  [Span.SecondHalf]: (d) => ({ offset: d / 2, length: d / 2 })
+};
+
+function incomingOnTop(doc: MotionDoc, pair: JunctionPair): boolean {
+  const rank = (id: string) => {
+    const track = doc.tracks.findIndex((t) => t.clips.some((c) => c.id === id));
+    return [-track, doc.tracks[track].clips.findIndex((c) => c.id === id)];
+  };
+  const [inTrack, inIndex] = rank(pair.incoming);
+  const [outTrack, outIndex] = rank(pair.outgoing);
+  return inTrack !== outTrack ? inTrack > outTrack : inIndex > outIndex;
+}
+
+function junctionTweens(doc: MotionDoc, pairs: JunctionPair[]): Tween[] {
+  return pairs.flatMap((pair) => {
+    const spec = JUNCTION[pair.kind];
+    const incoming = byIdIn(doc, pair.incoming);
+    const at = (incoming.from - junctionHalves(pair.durationInFrames).before) / doc.fps;
+    const duration = pair.durationInFrames / doc.fps;
+    const below = spec.incomingBelow && !incomingOnTop(doc, pair);
+    const tween = (target: string) => (move: Move): Tween => {
+      const { offset, length } = SPAN[move.span](duration);
+      return { target: `#fx-${target}`, from: move.from, to: move.to, at: at + offset, duration: length, ease: spec.ease };
+    };
+    return [...(below ? spec.incomingBelow! : spec.outgoing).map(tween(pair.outgoing)), ...(below ? [] : spec.incoming).map(tween(pair.incoming))];
+  });
+}
+
+function byIdIn(doc: MotionDoc, id: string): MotionClip {
+  return clipsOf(doc).find((c) => c.id === id)!;
+}
+
 function moveTweens(clip: MotionClip, fps: number): Tween[] {
   const p = clip.props as { move?: PropsOf<'Image'>['move']; easing?: Ease };
   if (!p.move || p.move === 'none') {
@@ -114,14 +161,19 @@ function moveTweens(clip: MotionClip, fps: number): Tween[] {
   return [{ target: `#mv-${clip.id}`, from: move.from, to: move.to, at: clip.from / fps, duration: clip.durationInFrames / fps, ease: p.easing ?? Ease.Standard }];
 }
 
+function frameOf(clip: MotionClip, doc: MotionDoc): { width: number; height: number } {
+  return cellFrames(doc).find((c) => clip.id.startsWith(c.prefix))?.frame ?? doc;
+}
+
 function ctxOf(clip: MotionClip, input: ComposeInput): TemplateCtx<ComponentId> {
   const { doc, tokens, assets } = input;
+  const { width, height } = frameOf(clip, doc);
   return {
     id: clip.id,
     p: { ...clip.props, ...keyedOverrides(clip) } as never,
-    width: doc.width,
-    height: doc.height,
-    unit: Math.min(doc.width, doc.height),
+    width,
+    height,
+    unit: Math.min(width, height),
     start: Number(seconds(clip.from, doc.fps)),
     length: Number(seconds(clip.durationInFrames, doc.fps)),
     fps: doc.fps,
@@ -134,7 +186,9 @@ function ctxOf(clip: MotionClip, input: ComposeInput): TemplateCtx<ComponentId> 
     font: (family) => fontStack(family, doc.fonts),
     weight: (family, weight) => loadedWeight(family, weight, doc.fonts),
     text: textRender(clip.id, clip.animators, (v) => resolveColor(v, tokens)),
-    remap: () => remappedSegments(clip, doc.fps)
+    remap: () => remappedSegments(clip, doc.fps),
+    compFrame: (compId) => doc.comps[compId]?.frame ?? null,
+    compBackground: (compId) => COMP_BACKGROUND[doc.comps[compId]?.background ?? Background.Transparent](tokens)
   };
 }
 
@@ -156,11 +210,11 @@ enum Visibility {
   MatteSource = 'matte-source'
 }
 
-type Placed = { layer: number; trackIndex: number; matte: MattePair | null; visibility: Visibility; transform?: string; chain: MotionClip[]; held: boolean; group?: string };
+type Placed = { layer: number; trackIndex: number; matte: MattePair | null; visibility: Visibility; transform?: string; chain: MotionClip[]; held: boolean; group?: string; extent?: Extent | null };
 
 function clipHtml(clip: MotionClip, ctx: TemplateCtx<ComponentId>, placed: Placed, content: string): string {
   const template = TEMPLATES[clip.component] as (typeof TEMPLATES)[ComponentId];
-  const inner = matted(placed.matte, wrapParents(placed.chain, clip, ctx, wrapAnimated(clip, ctx, effectLayer(clip, ctx, ctx.color, ownMask(clip, ctx, content)))));
+  const inner = matted(placed.matte, wrapParents(placed.chain, clip, ctx, wrapAnimated(clip, ctx, effectLayer(clip, ctx, ctx.color, ownMask(clip, ctx, content), paintArea(clip.component, ctx.p as never, ctx, placed.extent ?? null)))));
   const fx = `<div class="fx" id="fx-${clip.id}">${inner}</div>`;
   const style = css({ zIndex: placed.layer, transform: placed.transform, mixBlendMode: blendStyle(clip.blend) });
   const blur = (placed.held ? ` ${HELD}` : '') + (placed.group ? ` data-group="${esc(placed.group)}"` : '');
@@ -179,10 +233,36 @@ type GroupSpec = {
   effects: (clip: MotionClip, ctx: TemplateCtx<ComponentId>) => EffectSet[];
 };
 
+type CardLayout = {
+  html: (ctx: TemplateCtx<'Composition'>, content: string) => string;
+  bake: (clip: MotionClip, ctx: TemplateCtx<ComponentId>) => unknown;
+  script: (bakes: never[], fps: number, duration: number) => string;
+};
+
+const CARD_LAYOUTS: Record<string, CardLayout> = {
+  [RING_LAYOUT]: { html: ringHtml, bake: ringBake, script: ringScript },
+  [BENTO_LAYOUT]: { html: bentoHtml, bake: bentoBake, script: (bakes, _fps, duration) => bentoScript(bakes, duration) }
+};
+
+function cardLayoutOf(clip: MotionClip): CardLayout | null {
+  return clip.component === 'Composition' ? (CARD_LAYOUTS[String(clip.props.layout)] ?? null) : null;
+}
+
 const GROUPS: Partial<Record<ComponentId, GroupSpec>> = {
   Precomp: {
     firstLayer: (clip, trackIndex, starts) => starts.get(trackIndex + ((clip.props as GroupProps).span ?? 0)) ?? 0,
     html: (clip, ctx, placed, content) => `${clipHtml(clip, ctx, { ...placed, group: clip.id }, content)}<!--/group:${esc(clip.id)}-->`,
+    effects: (clip, ctx) => effectTimeline(clip, ctx, ctx.color)
+  },
+  Composition: {
+    firstLayer: (clip, trackIndex, starts) => {
+      const span = (clip.props as GroupProps).span;
+      return span ? (starts.get(trackIndex + span) ?? 0) : Number.POSITIVE_INFINITY;
+    },
+    html: (clip, ctx, placed, content) => {
+      const layout = cardLayoutOf(clip);
+      return clipHtml(clip, ctx, placed, layout ? layout.html(ctx as TemplateCtx<'Composition'>, content) : TEMPLATES.Composition.html(ctx as TemplateCtx<'Composition'>));
+    },
     effects: (clip, ctx) => effectTimeline(clip, ctx, ctx.color)
   },
   Adjustment: {
@@ -197,6 +277,17 @@ function tweenLine(t: Tween): string {
 }
 
 type Hold = { target: string; vars: Vars; at: number };
+
+function untrimmed(tweens: Tween[], clipStart: number, trimmed: number): Tween[] {
+  return tweens.flatMap((t) => {
+    const at = t.at - trimmed;
+    const end = at + t.duration;
+    if (end <= clipStart) {
+      return [];
+    }
+    return at >= clipStart ? [{ ...t, at }] : [{ ...t, at: clipStart, duration: end - clipStart }];
+  });
+}
 
 function heldUntilStart(tweens: Tween[], clipStart: number): Hold[] {
   return tweens.filter((t) => t.at > clipStart).map((t) => ({ target: t.target, vars: t.from, at: clipStart }));
@@ -257,7 +348,8 @@ function threeClipOf(clip: MotionClip, ctx: TemplateCtx<ComponentId>, staged: bo
     extrude: p.extrude ?? 0,
     bevel: p.bevel ?? 0,
     device: p.device ? deviceRuntime(p.device, p.finish ?? Finish.Default, ctx) : null,
-    video: Boolean(ctx.asset(p.screenVideo ?? null))
+    video: Boolean(ctx.asset(p.screenVideo ?? null)),
+    overscan: clip.component === 'Device3D' ? DEVICE_OVERSCAN : 0
   };
 }
 
@@ -277,6 +369,7 @@ const BASE_CSS = [
   MASK_CSS,
   EFFECT_CSS,
   ANIMATOR_CSS,
+  TEXT_PATH_CSS,
   '.font-probe{position:absolute;left:0;top:0;opacity:0;pointer-events:none}'
 ].join('');
 
@@ -343,6 +436,11 @@ function gated(script: string): string {
   return script ? `(window.${FONTS_READY}||Promise.resolve()).then(function(){${script}${rerender}});` : '';
 }
 
+const COMP_BACKGROUND: Record<Background, (tokens: BrandTokens) => string | null> = {
+  [Background.Brand]: (tokens) => tokens.colors['brand.background'],
+  [Background.Transparent]: () => null
+};
+
 const ROOT_BACKGROUND: Record<Background, (tokens: BrandTokens) => string> = {
   [Background.Brand]: (tokens) => tokens.colors['brand.background'],
   [Background.Transparent]: () => 'transparent'
@@ -366,18 +464,23 @@ function zoomed(doc: MotionDoc, scale: number): string {
 }
 
 export function composeHtml(raw: ComposeInput): string {
-  const input = { ...raw, doc: bakePhysics(bakeExpressions(bakePaths(withoutBackdrop(flattenComps(withoutHidden(raw.doc)))), raw.analyses)) };
+  const shown = withoutHidden(raw.doc);
+  const junctions = junctionTweens(shown, junctionPairs(shown));
+  const prepared = bakePaths(withoutBackdrop(flattenComps(withJunctions(shown))));
+  const input = { ...raw, doc: bakePhysics(bakeExpressions(prepared, raw.analyses)) };
   const { doc, tokens } = input;
   const scale = raw.scale ?? 1;
   const frame = { width: Math.round(doc.width * scale), height: Math.round(doc.height * scale) };
   const bottomFirst = doc.tracks.map((track, index) => ({ track, index })).reverse();
   const layers: string[] = [];
-  const tweens: Tween[] = [];
+  const tweens: Tween[] = [...junctions];
   const holds: Hold[] = [];
   const three: ThreeClip[] = [];
   const compositions: TimedBake[] = [];
   const shapes: ShapeBake[] = [];
+  const textPaths: TextPathBake[] = [];
   const particles: ParticleBake[] = [];
+  const cardBakes = new Map<CardLayout, unknown[]>(Object.values(CARD_LAYOUTS).map((l) => [l, []]));
   const clips: MotionClip[] = [];
   const runs: CustomRun[] = [];
   const pairs = mattePairs(doc);
@@ -398,28 +501,35 @@ export function composeHtml(raw: ComposeInput): string {
     for (const clip of track.clips as MotionClip[]) {
       const ctx = ctxOf(clip, input);
       clips.push(clip);
-      const template = TEMPLATES[clip.component] as (typeof TEMPLATES)[ComponentId];
+      const template = (clip.textPath ? textPathTemplate(clip.component) : TEMPLATES[clip.component]) as (typeof TEMPLATES)[ComponentId];
       const group = GROUPS[clip.component];
       layer += 1;
-      const placed: Placed = { layer, trackIndex: index, matte: matteOf.get(clip.id) ?? null, visibility: hidden.has(clip.id) ? Visibility.MatteSource : Visibility.Shown, transform: startPose.get(clip.id), chain: ancestorsOf(doc, clip.id).map((id) => byId.get(id)!), held: held.has(clip.id) };
+      const study = clip.component === 'Shape' ? shapeStudy({ ...clip, props: ctx.p as Record<string, unknown> }, ctx) : null;
+      const placed: Placed = { layer, trackIndex: index, matte: matteOf.get(clip.id) ?? null, visibility: hidden.has(clip.id) ? Visibility.MatteSource : Visibility.Shown, transform: startPose.get(clip.id), chain: ancestorsOf(doc, clip.id).map((id) => byId.get(id)!), held: held.has(clip.id), extent: study?.extent ?? null };
       const html = group ? group.html(clip, ctx, placed, layers.splice(group.firstLayer(clip, index, starts)).join('')) : clipHtml(clip, ctx, placed, template.html(ctx as never));
       (onStage.has(clip.id) && !group && !hidden.has(clip.id) ? world : layers).push(html);
-      effectSets.push(...(group ? group.effects(clip, ctx) : effectTimeline(clip, ctx, ctx.color)));
-      const own = template.tweens?.(ctx as never) ?? [];
+      effectSets.push(...(group ? group.effects(clip, ctx) : effectTimeline(clip, ctx, ctx.color, paintArea(clip.component, ctx.p as never, ctx, placed.extent ?? null))));
+      const own = untrimmed(template.tweens?.(ctx as never) ?? [], ctx.start, ctx.mediaStart);
       tweens.push(...edgeTweens(clip, doc.fps), ...moveTweens(clip, doc.fps), ...own);
       holds.push(...heldUntilStart(own, ctx.start));
       if (THREE_D_COMPONENTS.includes(clip.component)) {
         three.push(threeClipOf(clip, ctx, onStage.has(clip.id), input));
       }
-      if (clip.component === 'Composition') {
+      const cards = cardLayoutOf(clip);
+      if (clip.component === 'Composition' && !cards) {
         compositions.push(compositionBake(clip, ctx));
       }
-      const shape = clip.component === 'Shape' ? shapeBake({ ...clip, props: ctx.p as Record<string, unknown> }, ctx) : null;
-      if (shape) {
-        shapes.push(shape);
+      if (study?.bake) {
+        shapes.push(study.bake);
+      }
+      if (clip.textPath) {
+        textPaths.push(textPathBake(clip, doc));
       }
       if (clip.component === 'Particles') {
         particles.push(particleBake(clip, ctx));
+      }
+      if (cards) {
+        cardBakes.get(cards)!.push(cards.bake(clip, ctx));
       }
       const run = clip.component === 'Custom' ? customRun(clip, ctx, doc.components) : null;
       if (run) {
@@ -476,7 +586,22 @@ export function composeHtml(raw: ComposeInput): string {
     hotScript(threeScript(three, Number(duration), stage, look)),
     hotScript(compositionScript(compositions, Number(duration))),
     hotScript(shapeScript(shapes, doc.fps, Number(duration))),
-    hotScript(particleScript(particles, doc.fps, Number(duration)))
+    hotScript(textPathScript(textPaths, doc.fps, Number(duration))),
+    hotScript(particleScript(particles, doc.fps, Number(duration))),
+    ...[...cardBakes].map(([layout, bakes]) => hotScript(layout.script(bakes as never[], doc.fps, Number(duration))))
   ].join('');
-  return `${page}${captureScript(frame, contentStamp(page))}${measureScript()}</body></html>`;
+  const live = LIVE_SCRIPT[raw.liveness ?? Liveness.Baked]({ live: prepared, baked: doc, outside: interactiveOf(raw.doc).outside, parents: [...parentsWithChildren(doc)] });
+  return `${page}${live}${captureScript(frame, contentStamp(page))}${measureScript()}</body></html>`;
+}
+
+const LIVE_SCRIPT: Record<Liveness, (input: SpecInput) => string> = {
+  [Liveness.Baked]: () => '',
+  [Liveness.Live]: (input) => {
+    const spec = liveSpec(input);
+    return spec.live.length ? `<script>${liveRuntime.replace(/<\/script/gi, '<\\/script')}</script><script>window.${LIVE_GLOBAL}(${scriptJson(spec)});</script>` : '';
+  }
+};
+
+function scriptJson(value: unknown): string {
+  return JSON.stringify(value).replace(/</g, '\\u003c');
 }

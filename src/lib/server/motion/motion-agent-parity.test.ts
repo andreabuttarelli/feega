@@ -4,6 +4,8 @@ import type { z } from 'zod';
 import { MotionFormat, motionDocSchema, newMotionDoc } from '$lib/motion/doc';
 import { cameraSchema } from '$lib/motion/camera';
 import { createMotionTools, type MotionSession } from './motion-tools';
+import { LAYOUTS } from '$lib/canvas/composition/index';
+import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
 
 type Access = { write: string[]; read: string } | { fixed: string };
 
@@ -12,19 +14,20 @@ const DOC: Record<string, Access> = {
   fps: { write: ['set_canvas'], read: 'fps' },
   background: { write: ['set_canvas'], read: 'background' },
   motionBlur: { write: ['set_motion_blur'], read: 'motionBlur' },
-  fields: { write: ['expose_field', 'unexpose_field'], read: 'fields' },
+  fields: { write: ['expose_field', 'unexpose_field', 'insert_template', 'set_template_fields'], read: 'fields' },
   width: { write: ['set_canvas'], read: 'width' },
   height: { write: ['set_canvas'], read: 'height' },
   durationInFrames: { write: ['set_canvas'], read: 'duration' },
   tracks: { write: ['add_track', 'set_track', 'remove_track'], read: 'tracks' },
-  comps: { write: ['precompose', 'edit_comp'], read: 'comps' },
+  comps: { write: ['precompose', 'edit_comp', 'insert_template', 'detach_template'], read: 'comps' },
   assets: { write: ['add_asset', 'remove_asset'], read: 'assets' },
   camera: { write: ['set_camera'], read: 'camera' },
   look: { write: ['set_look', 'set_light', 'remove_light', 'set_light_keyframes'], read: 'look' },
   fonts: { write: ['set_font', 'register_font', 'remove_font'], read: 'fonts' },
   components: { write: ['write_component', 'patch_component', 'remove_component'], read: 'components' },
   markers: { write: ['set_marker', 'remove_marker', 'mark_beats'], read: 'markers' },
-  workArea: { write: ['set_work_area'], read: 'workArea' }
+  workArea: { write: ['set_work_area'], read: 'workArea' },
+  interactive: { write: ['set_interactive', 'apply_interactive_preset'], read: 'interactive' }
 };
 
 const TRACK: Record<string, Access> = {
@@ -45,6 +48,7 @@ const CLIP: Record<string, Access> = {
   props: { write: ['set_props', 'add_particles', 'apply_particle_preset', 'set_time_remap'], read: 'props' },
   transitionIn: { write: ['set_transition'], read: 'in' },
   transitionOut: { write: ['set_transition'], read: 'out' },
+  junction: { write: ['set_clip_transition'], read: 'junction' },
   transform: { write: ['set_transform'], read: 'transform' },
   keyframes: { write: ['set_keyframes', 'remove_keyframes', 'duck_audio', 'set_time_remap', 'freeze_frame'], read: 'keyframes' },
   mask: { write: ['set_mask', 'remove_mask'], read: 'mask' },
@@ -59,6 +63,7 @@ const CLIP: Record<string, Access> = {
   blend: { write: ['set_blend_mode'], read: 'blend' },
   animators: { write: ['add_text_animator', 'set_text_animator', 'remove_text_animator', 'apply_text_preset'], read: 'animators' },
   motionBlur: { write: ['set_motion_blur'], read: 'motionBlur' },
+  textPath: { write: ['set_text_path', 'remove_text_path'], read: 'textPath' },
   path: { write: ['set_motion_path', 'set_path_tangent'], read: 'path' },
   physics: { write: ['set_physics', 'apply_physics_preset'], read: 'physics' },
   hidden: { write: ['set_visibility'], read: 'hidden' },
@@ -113,6 +118,15 @@ describe('every editable part of a motion video has an agent path', () => {
     for (const [field, access] of Object.entries(table)) {
       const missing = 'write' in access ? access.write.filter((t) => !tools[t]) : [];
       expect({ field, missing }).toEqual({ field, missing: [] });
+    }
+  });
+
+  it('every composition layout is a template the agent inserts and fills with its template tools, every setting a field', () => {
+    for (const [layout, def] of Object.entries(LAYOUTS)) {
+      const entry = BUILTIN_TEMPLATES.find((e) => e.id === `builtin:composition-${layout}`);
+      const props = entry?.template.doc.fields.map((f) => f.prop) ?? [];
+
+      expect({ layout, missing: def.params.map((p) => `layoutParams.${p.name}`).filter((p) => !props.includes(p)) }).toEqual({ layout, missing: [] });
     }
   });
 

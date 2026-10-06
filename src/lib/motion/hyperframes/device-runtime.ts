@@ -94,6 +94,9 @@ function screenCanvas(spec) {
 
 function drawScreen(slot, source, scroll) {
   const { canvas, ctx, texture } = slot;
+  const key = screenKey(source, scroll);
+  if (slot.key === key) return;
+  slot.key = key;
   ctx.fillStyle = '#0b0b0c';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   const sw = source && (source.videoWidth || source.naturalWidth || source.width);
@@ -373,12 +376,12 @@ function loadDevice(c, s) {
   s.object.add(fitted(built.root));
   if (c.video) {
     const video = document.getElementById('dv-' + c.id);
-    const redraw = () => renderAt(window.__hfThreeTime || 0);
-    video.addEventListener('seeked', redraw);
-    video.addEventListener('loadeddata', redraw);
+    const again = () => redraw();
+    video.addEventListener('seeked', again);
+    video.addEventListener('loadeddata', again);
     new MutationObserver(() => {
       const frame = video.nextElementSibling;
-      if (frame && frame.classList.contains('__render_frame__')) frame.decode().then(redraw, () => {});
+      if (frame && frame.classList.contains('__render_frame__')) frame.decode().then(again, () => {});
     }).observe(video.parentNode, { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] });
     return Promise.resolve();
   }

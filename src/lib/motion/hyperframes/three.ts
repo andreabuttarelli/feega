@@ -6,10 +6,13 @@ import { SURFACE, type Material, type Surface } from '../materials';
 import { cameraRuntime, seekDriver } from './stage';
 import { DEVICE_SCRIPT, type DeviceRuntime } from './device-runtime';
 import { ENGINE_GLOBAL } from '../engine/engine';
+import { drawOnce, screenKey } from './three-draw';
+import { strokePolygons } from './stroke-outline';
 import { ON_DISPOSE, hotScope, hotSeek, keptGl } from './hot';
 
 export const THREE_VERSION = '0.181.2';
 export const THREE_TIMELINE = 'feegaThree';
+export const THREE_REDRAW = '__feegaThreeRedraw';
 export const OPENTYPE_URL = 'https://cdn.jsdelivr.net/npm/opentype.js@1.3.4/dist/opentype.module.js';
 
 export function onScreen(clip: { start: number; length: number }, time: number): boolean {
@@ -48,6 +51,7 @@ export type ThreeClip = {
   bevel: number;
   device: DeviceRuntime | null;
   video: boolean;
+  overscan: number;
 };
 
 export const LIGHTING = {
@@ -89,6 +93,7 @@ const FONT_CACHE = '__feegaFontFiles';
 let live = true;
 
 const DEG = Math.PI / 180;
+const wider = (fov, overscan) => (2 * Math.atan(Math.tan((fov * DEG) / 2) * (1 + 2 * overscan))) / DEG;
 const FLOOR = -1.05;
 const FIT = 2;
 const SHADOW_MAP = 512;
@@ -266,7 +271,7 @@ function stage(c) {
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   }
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(FOV, canvas.width / canvas.height, 0.1, 100);
+  const camera = new THREE.PerspectiveCamera(wider(FOV, c.overscan), canvas.width / canvas.height, 0.1, 100);
   camera.position.set(0, 0.3, 4.6 / c.zoom);
   const lights = LOOK && LOOK.lights.length ? lookLights(scene) : presetLights(scene, c);
   ground(scene, c);
@@ -329,11 +334,25 @@ function loadModel(c, s) {
   });
 }
 
+const painted = (paint) => paint !== undefined && paint !== 'none' && paint !== 'transparent';
+
+function filled(path) {
+  const style = path.userData.style;
+  return painted(style.fill) ? SVGLoader.createShapes(path) : [];
+}
+
+function stroked(path) {
+  const style = path.userData.style;
+  if (!painted(style.stroke) || !(style.strokeWidth > 0)) return [];
+  return path.subPaths.flatMap((sub) => strokePolygons(sub.getPoints().map((p) => [p.x, p.y]), style.strokeWidth, style.strokeLineCap))
+    .map((poly) => new THREE.Shape(poly.map(([x, y]) => new THREE.Vector2(x, y))));
+}
+
 function loadLogo(c, s) {
   return new Promise((resolve) => {
     if (!c.url) return resolve();
     new SVGLoader().load(c.url, (data) => {
-      const shapes = data.paths.flatMap((p) => SVGLoader.createShapes(p));
+      const shapes = data.paths.flatMap((p) => [...filled(p), ...stroked(p)]);
       if (!shapes.length) return resolve();
       const root = extruded(shapes, c);
       finish(root, c);
@@ -399,15 +418,20 @@ const scenes = CLIPS.map((c) => {
   return { c, s, ready: Promise.all([LOADERS[c.kind](c, s), environment(s)]) };
 }).filter(Boolean);
 dropUnused('three-', CLIPS.map((c) => 'three-' + c.id));
+const STALE = '__feegaStaleThree';
+const replaced = window[STALE] || [];
+window[STALE] = [];
 ${ON_DISPOSE}(() => {
   live = false;
-  for (const { s } of scenes) {
-    disposeScene(s.scene);
-    if (s.bokeh) {
-      s.bokeh.target.dispose();
-      disposeScene(s.bokeh.scene);
+  window[STALE].push(() => {
+    for (const { s } of scenes) {
+      disposeScene(s.scene);
+      if (s.bokeh) {
+        s.bokeh.target.dispose();
+        disposeScene(s.bokeh.scene);
+      }
     }
-  }
+  });
 });
 
 function legacyOrbit(c, local) {
@@ -419,7 +443,13 @@ function lightAt(spec, key, frame) {
   return spec.keyframes[key] ? sampleTrack(spec.keyframes[key], frame) : spec[key];
 }
 
-function renderAt(time) {
+const screens = () => scenes.map(({ c, s }) => (s.device ? screenKey(deviceSource(c, s), 0) : '')).join(',');
+const painter = drawOnce(drawAt, screens);
+const renderAt = (time) => painter.at(time);
+const redraw = (time) => painter.again(time);
+window.${THREE_REDRAW} = renderAt;
+
+function drawAt(time) {
   if (!live) return;
   for (const { c, s } of scenes) {
     if (!onScreen(c, time)) continue;
@@ -436,7 +466,7 @@ function renderAt(time) {
     s.object.rotation.set(at('objectRotateX', 0) * DEG, at('objectRotateY', 0) * DEG, at('objectRotateZ', 0) * DEG);
     const distance = 4.6 / at('dolly', c.zoom);
     s.camera.position.set(0, 0.3, distance);
-    s.camera.fov = at('fov', FOV);
+    s.camera.fov = wider(at('fov', FOV), c.overscan);
     if (STAGE && c.depth !== null) {
       const v = CAMERA_MATH.valuesAt(STAGE, time * c.fps);
       const view = CAMERA_MATH.orbitView(v, STAGE, c.depth);
@@ -468,7 +498,10 @@ function renderAt(time) {
 
 window.__hf = window.__hf || {};
 window.__hf.buildReady = window.__hf.buildReady || {};
-window.__hf.buildReady['motion-three'] = Promise.all(scenes.map((x) => x.ready)).then(() => renderAt(window.__hfThreeTime || 0));
+window.__hf.buildReady['motion-three'] = Promise.all(scenes.map((x) => x.ready)).then(() => {
+  redraw(window.__hfThreeTime || 0);
+  replaced.forEach((dispose) => dispose());
+});
 ${hotSeek('renderAt')}
 const tl = window.__timelines && window.__timelines.main;
 DRIVER
@@ -479,5 +512,5 @@ export function threeScript(clips: ThreeClip[], duration: number, stage: StageSp
   if (!clips.length) {
     return '';
   }
-  return `<script type="module">const CLIPS = ${js(clips)};const LIGHTING = ${js(LIGHTING)};const LOOK = ${js(look)};const DURATION = ${js(duration)};const FOV = ${SCENE.fov.fallback};const STAGE = ${js(stage)};${cameraRuntime()}const sampleTrack = (${sampleTrack.toString()});const onScreen = (${onScreen.toString()});${SCENE_SCRIPT.replace('DRIVER', seekDriver(THREE_TIMELINE, 'DURATION', 'renderAt'))}</script>`;
+  return `<script type="module">const CLIPS = ${js(clips)};const LIGHTING = ${js(LIGHTING)};const LOOK = ${js(look)};const DURATION = ${js(duration)};const FOV = ${SCENE.fov.fallback};const STAGE = ${js(stage)};${cameraRuntime()}const sampleTrack = (${sampleTrack.toString()});const onScreen = (${onScreen.toString()});const drawOnce = (${drawOnce.toString()});const screenKey = (${screenKey.toString()});const strokePolygons = (${strokePolygons.toString()});${SCENE_SCRIPT.replace('DRIVER', seekDriver(THREE_TIMELINE, 'DURATION', 'renderAt'))}</script>`;
 }

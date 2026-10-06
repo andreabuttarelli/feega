@@ -1,7 +1,9 @@
 import { z } from 'zod';
+import { COMP_CARD, COMP_CARD_LAYOUTS } from './card-layouts';
 import { COMPONENT_IDS, CUSTOM_NAME, TrackKind, parseProps, type ComponentId, type PropsVerdict } from './components';
 import { withParams } from './custom/params';
 import { MAX_COMPONENTS, Strictness, customComponentSchema, customValues, type CustomComponents } from './custom/component';
+import { junctionSchema } from './junction-model';
 import { FASTEST_RATE, FPS, FRAME_RATES, MAX_SECONDS, TRANSITION_KINDS, TransitionKind, maxFrames } from './design';
 import { motionPathSchema } from './path';
 import { keyframeSchema, keyframesProblem, transformSchema } from './keyframes';
@@ -14,7 +16,9 @@ import { fontRefProblem, fontsSchema, usedFaces } from './fonts/model';
 import { effectsSchema, effectsProblem } from './effects/model';
 import { BLEND_MODES, BlendMode } from './blend';
 import { animatorsSchema } from './text-animators/model';
+import { textPathSchema } from './text-path/model';
 import { DEFAULT_MOTION_BLUR, motionBlurSchema } from './motion-blur';
+import { interactiveSchema } from './interactive/schema';
 import { fieldsSchema } from './template/field-model';
 import { physicsSchema } from './physics/model';
 
@@ -66,6 +70,7 @@ const clipSchema = z.object({
   props: z.record(z.string(), z.unknown()).default({}),
   transitionIn: edgeSchema.default({ kind: TransitionKind.None, durationInFrames: 0 }),
   transitionOut: edgeSchema.default({ kind: TransitionKind.None, durationInFrames: 0 }),
+  junction: junctionSchema.nullable().optional(),
   transform: transformSchema.default({}),
   keyframes: z.record(z.string(), z.array(keyframeSchema).min(1)).default({}),
   mask: maskSchema.nullable().default(null),
@@ -79,6 +84,7 @@ const clipSchema = z.object({
   effects: effectsSchema,
   blend: z.enum(BLEND_MODES).default(BlendMode.Normal),
   animators: animatorsSchema,
+  textPath: textPathSchema.nullable().default(null),
   motionBlur: z.boolean().default(true),
   path: motionPathSchema.nullable().default(null),
   physics: physicsSchema.nullable().optional(),
@@ -98,9 +104,18 @@ const trackSchema = z.object({
 
 export const MAX_TRACKS = 20;
 
+const templateMarkSchema = z.object({
+  id: z.string().min(1).max(80),
+  name: z.string().min(1).max(60),
+  keys: z.record(z.string(), z.string()).default({})
+});
+
 const compSchema = z.object({
+  template: templateMarkSchema.optional(),
   name: z.string().min(1).max(60),
   durationInFrames: z.number().int().min(1).max(FRAMES_CEILING),
+  frame: z.object({ width: z.number().int().min(16).max(MAX_SIDE), height: z.number().int().min(16).max(MAX_SIDE) }).optional(),
+  background: z.enum([Background.Brand, Background.Transparent]).optional(),
   tracks: z
     .array(trackSchema)
     .max(MAX_TRACKS)
@@ -134,7 +149,8 @@ export const motionDocSchema = z
       .refine((c) => Object.keys(c).length <= MAX_COMPONENTS, `at most ${MAX_COMPONENTS} custom components`)
       .default({}),
     markers: z.array(markerSchema).max(MAX_MARKERS).optional(),
-    workArea: z.object({ from: z.number().int().min(0), to: z.number().int().min(1) }).nullable().optional()
+    workArea: z.object({ from: z.number().int().min(0), to: z.number().int().min(1) }).nullable().optional(),
+    interactive: interactiveSchema.optional()
   })
   .refine((d) => Math.min(d.width, d.height) <= MAX_SHORT_SIDE, 'resolution above 1080p')
   .refine((d) => d.durationInFrames <= maxFrames(d.fps), { message: `the video can be at most ${MAX_SECONDS} seconds`, path: ['durationInFrames'] });
@@ -144,6 +160,7 @@ export type MotionTrack = MotionDoc['tracks'][number];
 export type MotionClip = Omit<MotionTrack['clips'][number], 'component'> & { component: ComponentId };
 export type AssetRef = MotionDoc['assets'][number];
 export type MotionComp = MotionDoc['comps'][string];
+export type TemplateMark = NonNullable<MotionComp['template']>;
 
 export type DocVerdict = { ok: true; doc: MotionDoc } | { ok: false; error: string };
 
@@ -229,13 +246,23 @@ export function compOf(clip: Pick<MotionClip, 'component' | 'props'>): string | 
   return clip.component === 'Precomp' ? String(clip.props.comp) : null;
 }
 
+type CompositionCard = { assetId: string; kind: string };
+
+export function compsOf(clip: Pick<MotionClip, 'component' | 'props'>): string[] {
+  if (clip.component === 'Composition') {
+    return !COMP_CARD_LAYOUTS.has(clip.props.layout) ? [] : ((clip.props.media ?? []) as CompositionCard[]).filter((m) => m.kind === COMP_CARD).map((m) => m.assetId);
+  }
+  const id = compOf(clip);
+  return id === null ? [] : [id];
+}
+
 function compsUsed(tracks: readonly MotionTrack[]): string[] {
-  return tracks.flatMap((t) => (t.clips as MotionClip[]).map(compOf).filter((id): id is string => id !== null));
+  return tracks.flatMap((t) => (t.clips as MotionClip[]).flatMap(compsOf));
 }
 
 export function compRefProblem(doc: Pick<MotionDoc, 'comps'>, clip: Pick<MotionClip, 'component' | 'props'>): string | null {
-  const id = compOf(clip);
-  if (id === null || doc.comps[id]) {
+  const id = compsOf(clip).find((ref) => !doc.comps[ref]);
+  if (id === undefined) {
     return null;
   }
   const known = Object.keys(doc.comps);
@@ -275,13 +302,17 @@ export function fontsOfClip(doc: MotionDoc, clip: Pick<MotionClip, 'component' |
   return fontsProblem({ ...doc, tracks: [{ id: '', kind: TrackKind.Visual, name: '', clips: [clip as MotionClip] }] });
 }
 
+export function cloneDoc<T>(doc: T): T {
+  return JSON.parse(JSON.stringify(doc)) as T;
+}
+
 export function parseMotionDoc(input: unknown): DocVerdict {
   const parsed = motionDocSchema.safeParse(upgradeDoc(input));
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ') };
   }
 
-  const doc = structuredClone(parsed.data);
+  const doc = cloneDoc(parsed.data);
   const problem = parentProblem(doc) ?? compsProblem(doc) ?? propsProblem(doc) ?? fontsProblem(doc);
   if (problem) {
     return { ok: false, error: problem };
@@ -333,6 +364,7 @@ export function newClip(fields: Pick<MotionClip, 'id' | 'from' | 'durationInFram
     effects: [],
     blend: BlendMode.Normal,
     animators: [],
+    textPath: null,
     motionBlur: true,
     path: null,
     ...fields

@@ -5,12 +5,13 @@ vi.mock('$env/dynamic/private', () => ({ env: {} }));
 const sdk = vi.hoisted(() => ({
   getOrCreate: vi.fn(),
   fork: vi.fn(),
-  get: vi.fn()
+  get: vi.fn(),
+  list: vi.fn()
 }));
 
-vi.mock('@vercel/sandbox', () => ({ Sandbox: { getOrCreate: sdk.getOrCreate, fork: sdk.fork, get: sdk.get } }));
+vi.mock('@vercel/sandbox', () => ({ Sandbox: { getOrCreate: sdk.getOrCreate, fork: sdk.fork, get: sdk.get, list: sdk.list } }));
 
-import { FARM_BASE, farmAccess, vercelFarm } from './vercel-farm';
+import { FARM_BASE, farmAccess, vercelFarm, workerPrefix } from './vercel-farm';
 
 function fakeSandbox(status = 'stopped') {
   return {
@@ -140,3 +141,50 @@ describe('vercelFarm', () => {
     expect(sdk.getOrCreate).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('the farm knows its own workers', () => {
+  beforeEach(() => {
+    sdk.getOrCreate.mockReset();
+    sdk.fork.mockReset();
+    sdk.list.mockReset();
+  });
+
+  it('a worker is named after the farm and its deployment, so a reaper finds only its own', async () => {
+    sdk.getOrCreate.mockResolvedValue(fakeSandbox());
+    sdk.fork.mockResolvedValue(fakeSandbox('running'));
+
+    await vercelFarm({}, 'production').open({ allowHosts: [], timeoutMs: 1, vcpus: 4 });
+
+    expect(sdk.fork).toHaveBeenCalledWith(expect.objectContaining({ name: expect.stringMatching(new RegExp(`^${workerPrefix('production')}`)) }));
+    expect(workerPrefix('production')).not.toBe(workerPrefix('preview'));
+  });
+
+  it('lists only its running workers, with when they started', async () => {
+    sdk.list.mockResolvedValue({
+      toArray: async () => [
+        { name: `${workerPrefix('production')}a`, status: 'running', createdAt: 5 },
+        { name: `${workerPrefix('production')}b`, status: 'stopped', createdAt: 6 }
+      ]
+    });
+
+    const running = await vercelFarm({ token: 't' }, 'production').running();
+
+    expect(sdk.list).toHaveBeenCalledWith(expect.objectContaining({ namePrefix: workerPrefix('production'), token: 't' }));
+    expect(running).toEqual([{ name: `${workerPrefix('production')}a`, createdAt: 5 }]);
+  });
+});
+
+describe('what a worker cost', () => {
+  it('reads CPU, memory and the time from start to stop, after the worker stopped', async () => {
+    sdk.get.mockResolvedValue({ ...fakeSandbox('stopped'), activeCpuUsageMs: 35_000, memory: 8192, createdAt: new Date(1_000), statusUpdatedAt: new Date(17_000) });
+
+    expect(await vercelFarm({}).usage('box-1')).toEqual({ cpuMs: 35_000, memoryMb: 8192, wallMs: 16_000 });
+  });
+
+  it('an unknown worker cost nothing we can read', async () => {
+    sdk.get.mockRejectedValue(new Error('not found'));
+
+    expect(await vercelFarm({}).usage('gone')).toBeNull();
+  });
+});
+

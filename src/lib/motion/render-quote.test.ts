@@ -1,31 +1,89 @@
 import { describe, expect, it } from 'vitest';
-import { Resolution, renderQuote } from './render-quote';
+import { creditsOfCost, HOLD_BUFFER, IDLE, RenderClass, renderClass, renderCostUsd, renderQuote, Resolution, RENDER_MULTIPLIER, sandboxCostUsd, type WorkerUsage } from './render-quote';
+import { MULTIPLIER_FLOOR } from '$lib/credit-ladder';
+import { MotionFormat, newMotionDoc, type MotionDoc } from './doc';
+import { addClip } from './timeline';
+
+function doc(frames: number, component?: string, props: Record<string, unknown> = {}): MotionDoc {
+  const base = { ...newMotionDoc(MotionFormat.Landscape), durationInFrames: frames };
+  if (!component) {
+    return base;
+  }
+  const added = addClip(base, { component: component as never, from: 0, durationInFrames: frames, props }, 'x');
+  if (!added.ok) {
+    throw new Error(added.error);
+  }
+  return { ...added.doc, durationInFrames: frames };
+}
+
+const blurred = (d: MotionDoc, samples: number): MotionDoc => ({ ...d, motionBlur: { enabled: true, shutterAngle: 180, shutterPhase: -90, samples } });
+
+function masking(): MotionDoc {
+  let d = doc(270);
+  for (const id of ['a', 'b', 'c']) {
+    const added = addClip(d, { component: 'Shape', from: 0, durationInFrames: 270 }, id);
+    if (!added.ok) {
+      throw new Error(added.error);
+    }
+    d = { ...added.doc, durationInFrames: 270 };
+  }
+  const heavy = { effects: ['stroke', 'drop-shadow'].map((kind, i) => ({ id: `e${i}`, kind, enabled: true, params: {} })), matte: 'alpha' };
+  return blurred({ ...d, tracks: d.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => ({ ...c, ...heavy })) })) } as MotionDoc, 6);
+}
+
+const asRunInProduction = (bench: WorkerUsage): WorkerUsage => ({ ...bench, wallMs: bench.wallMs + IDLE.pieceMs + IDLE.headMs });
+
+const BENCH_2026_10_05: { name: string; doc: MotionDoc; resolution: Resolution; usage: WorkerUsage }[] = [
+  { name: '2D, 350 frames 1080p', doc: doc(350), resolution: Resolution.P1080, usage: { cpuMs: 35_327, memoryMb: 8192, wallMs: 16_297 } },
+  { name: '4K, 350 frames', doc: doc(350), resolution: Resolution.P2160, usage: { cpuMs: 88_145, memoryMb: 8192, wallMs: 36_878 } },
+  { name: 'motion blur ×4, 350 frames 1080p', doc: blurred(doc(350), 4), resolution: Resolution.P1080, usage: { cpuMs: 151_889, memoryMb: 16384, wallMs: 54_529 } },
+  { name: 'masking loop: mattes, strokes, shadows, liquid shapes, blur ×6, 270 frames 1080p on 27 workers', doc: masking(), resolution: Resolution.P1080, usage: { cpuMs: 6_845_811, memoryMb: 8192 * 27, wallMs: 8_695_158 / 27 } },
+  { name: '3D text, 120 frames 1080p', doc: doc(120, 'Text3D'), resolution: Resolution.P1080, usage: { cpuMs: 217_071, memoryMb: 8192, wallMs: 58_405 } },
+  { name: 'Device3D laptop, 120 frames 1080p', doc: doc(120, 'Device3D', { device: 'laptop-pro' }), resolution: Resolution.P1080, usage: { cpuMs: 552_320, memoryMb: 8192, wallMs: 146_712 } }
+];
+
+describe('the render estimate', () => {
+  it.each(BENCH_2026_10_05)('$name: within ±50% of what the sandbox measured', ({ doc, resolution, usage }) => {
+    const measured = sandboxCostUsd([asRunInProduction(usage)]);
+
+    expect(renderCostUsd(doc, resolution) / measured).toBeGreaterThan(0.5);
+    expect(renderCostUsd(doc, resolution) / measured).toBeLessThan(1.5);
+  });
+
+  it('a doc is as heavy as its heaviest layer', () => {
+    expect(renderClass(doc(30))).toBe(RenderClass.Flat);
+    expect(renderClass(doc(30, 'Shape3D'))).toBe(RenderClass.Scene3D);
+    expect(renderClass(doc(30, 'Device3D'))).toBe(RenderClass.Device3D);
+  });
+});
+
+describe('the sandbox bill', () => {
+  it('memory is billed at least a minute per sandbox, CPU only while it works', () => {
+    const second = sandboxCostUsd([{ cpuMs: 0, memoryMb: 8192, wallMs: 1000 }]);
+
+    expect(second).toBeCloseTo(sandboxCostUsd([{ cpuMs: 0, memoryMb: 8192, wallMs: 60_000 }]));
+    expect(sandboxCostUsd([{ cpuMs: 3_600_000, memoryMb: 0, wallMs: 0 }])).toBeCloseTo(0.128);
+  });
+});
 
 describe('render quote', () => {
-  it('15 seconds at 1080p cost two units of ten seconds, doubled', () => {
-    expect(renderQuote({ width: 1080, height: 1920, durationInFrames: 450, fps: 30 })).toEqual({ seconds: 15, resolution: Resolution.P1080, credits: 4 });
+  it('the multiplier on our cost never drops under the floor', () => {
+    expect(RENDER_MULTIPLIER).toBeGreaterThanOrEqual(MULTIPLIER_FLOOR);
   });
 
-  it('motion blur costs one render per sample', () => {
-    const blur = { enabled: true, shutterAngle: 180, shutterPhase: -90, samples: 8 };
+  it('the price is the estimated cost times the multiplier, in credits, rounded up', () => {
+    const d = doc(900);
 
-    expect(renderQuote({ width: 1080, height: 1920, durationInFrames: 450, fps: 30, motionBlur: blur }).credits).toBe(32);
-    expect(renderQuote({ width: 1080, height: 1920, durationInFrames: 450, fps: 30, motionBlur: { ...blur, enabled: false } }).credits).toBe(4);
+    expect(renderQuote(d).credits).toBe(creditsOfCost(renderCostUsd(d)));
+    expect(HOLD_BUFFER).toBeGreaterThan(1);
   });
 
-  it('a bigger output costs by its pixels: 1440p twice 1080p, 4K four times', () => {
-    const doc = { width: 1920, height: 1080, durationInFrames: 450, fps: 30 as const };
+  it('heavier content costs more: 3D over 2D, Device3D over 3D, 4K over 1080p, blur over none', () => {
+    const flat = renderCostUsd(doc(300));
 
-    expect(renderQuote(doc, Resolution.P1440).credits).toBe(8);
-    expect(renderQuote(doc, Resolution.P2160)).toMatchObject({ resolution: Resolution.P2160, credits: 16 });
-  });
-
-  it('50 and 60 fps cost twice, they render twice the frames', () => {
-    expect(renderQuote({ width: 1920, height: 1080, durationInFrames: 900, fps: 60 as const }).credits).toBe(8);
-  });
-
-  it('720p costs one credit per started ten seconds', () => {
-    expect(renderQuote({ width: 1280, height: 720, durationInFrames: 301, fps: 30 }).credits).toBe(2);
-    expect(renderQuote({ width: 1280, height: 720, durationInFrames: 300, fps: 30 }).credits).toBe(1);
+    expect(renderCostUsd(doc(300, 'Text3D'))).toBeGreaterThan(flat);
+    expect(renderCostUsd(doc(300, 'Device3D'))).toBeGreaterThan(renderCostUsd(doc(300, 'Text3D')));
+    expect(renderCostUsd(doc(300), Resolution.P2160)).toBeGreaterThan(flat);
+    expect(renderCostUsd(blurred(doc(300), 4))).toBeGreaterThan(flat);
   });
 });

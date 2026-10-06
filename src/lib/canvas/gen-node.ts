@@ -13,15 +13,15 @@
  * nodo nasce senza formato — il vuoto è onesto, un «1:1» inventato no.
  */
 import { upscaleLimitsOf } from '$lib/video-models';
-import { MEDIUMS, type Medium } from './graph';
+import { GENERATED_MEDIUMS } from './graph';
 import type { ModelParam } from './model-params';
 import type { RecommendationTier } from './recommended-models';
 import type { AudioParams } from './audio-operations';
 
 /** I tre medium che un nodo può produrre: gli stessi della tela, non un secondo elenco. */
-export const GEN_MEDIUMS = MEDIUMS;
+export const GEN_MEDIUMS = GENERATED_MEDIUMS;
 
-export type GenMedium = Medium;
+export type GenMedium = (typeof GENERATED_MEDIUMS)[number];
 
 export function isGenMedium(x: string): x is GenMedium {
   return (GEN_MEDIUMS as readonly string[]).includes(x);

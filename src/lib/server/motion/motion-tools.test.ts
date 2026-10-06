@@ -231,3 +231,32 @@ describe('motion agent tools', () => {
     expect(deps.frames).toHaveBeenCalledTimes(MAX_VIEWS_PER_TURN);
   });
 });
+
+describe('add_track', () => {
+  it('keeps the name it is given', async () => {
+    const { run, session } = setup();
+
+    await run('add_track', { kind: 'visual', name: 'Stage' });
+
+    expect(session.doc.tracks[0].name).toBe('Stage');
+  });
+});
+
+describe('set_clip_transition', () => {
+  it('dissolves between two adjacent clips and get_motion_doc names the clip it comes from', async () => {
+    const { run } = setup();
+    await run('add_clip', { component: 'Shape', start: 0, duration: 2 });
+    await run('add_clip', { component: 'Shape', start: 2, duration: 2 });
+
+    expect(await run('set_clip_transition', { clip_id: 'id2', kind: 'crossfade', duration: 0.5 })).toMatchObject({ ok: true });
+    const doc = (await run('get_motion_doc', {})) as { tracks: { clips: { id: string; junction: unknown }[] }[] };
+    expect(doc.tracks.flatMap((t) => t.clips).find((c) => c.id === 'id2')!.junction).toEqual({ kind: 'crossfade', duration: 0.5, from: 'id1' });
+  });
+
+  it('a clip with nothing ending at its start says so', async () => {
+    const { run } = setup();
+    await run('add_clip', { component: 'Shape', start: 1, duration: 2 });
+
+    expect(await run('set_clip_transition', { clip_id: 'id1', kind: 'push-left' })).toMatchObject({ ok: false, error: expect.stringMatching(/nothing ends/) });
+  });
+});

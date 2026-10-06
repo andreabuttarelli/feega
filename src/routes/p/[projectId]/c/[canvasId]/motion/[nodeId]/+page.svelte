@@ -1,7 +1,8 @@
 <script lang="ts">
-  import { onMount, untrack } from 'svelte';
+  import { onMount, tick, untrack } from 'svelte';
   import { deserialize } from '$app/forms';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
+  import { watchMotionNode } from '$lib/realtime/motion-channel';
   import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
   import { registerUpload } from '$lib/motion/fonts/ops';
   import ArrowLeft from '@lucide/svelte/icons/arrow-left';
@@ -56,9 +57,17 @@
   import PenOverlay from '$lib/components/motion/PenOverlay.svelte';
   import SelectionOverlay from '$lib/components/motion/SelectionOverlay.svelte';
   import MotionPathOverlay from '$lib/components/motion/MotionPathOverlay.svelte';
+  import TextPathOverlay from '$lib/components/motion/TextPathOverlay.svelte';
   import { Align, addMarker, alignClips, allMarkers, clipsTo, distributeClips, trimClipsAt, loopFrame, nudgeClips, sequenceClips, setWorkArea, staggerClips } from '$lib/motion/organize';
   import ExportDialog from '$lib/components/motion/ExportDialog.svelte';
+  import InteractivePanel from '$lib/components/motion/InteractivePanel.svelte';
+  import { Liveness } from '$lib/motion/interactive/settings';
+  import { applyInteractivePreset } from '$lib/motion/interactive/presets';
+  import { InputKey } from '$lib/motion/expression/inputs';
   import TemplateDialog from '$lib/components/motion/TemplateDialog.svelte';
+  import TemplateLibrary from '$lib/components/motion/TemplateLibrary.svelte';
+  import TemplateInspector from '$lib/components/motion/TemplateInspector.svelte';
+  import { insertTemplate, isLockedComp, type TemplateEntry } from '$lib/motion/template/library';
   import SoundDialog, { type Made, type SoundKind } from '$lib/components/motion/SoundDialog.svelte';
   import ChatPanel from '$lib/components/brand-agent/ChatPanel.svelte';
   import { AssetKind, COMPONENTS, LIBRARY_IDS, TrackKind, type ComponentId } from '$lib/motion/components';
@@ -127,6 +136,8 @@
   let adding = $state(false);
   let exporting = $state(false);
   let templating = $state(false);
+  let browsing = $state(false);
+  let templates = $state<TemplateEntry[]>(data.templates);
   let previewDoc = $state<MotionDoc | null>(null);
   let sounding = $state<SoundKind | null>(null);
   let madeAssets = $state<PageData['assets']>([]);
@@ -139,6 +150,7 @@
   let reveal = $state(Reveal.Animated);
   let helpOpen = $state(false);
   let layout = $state<EditorLayout>(DEFAULT_LAYOUT);
+  let chatReload = $state(0);
   let display = $state(TimeDisplay.Timecode);
   let width = $state(1440);
   const viewport = $derived(viewportOf(width));
@@ -155,6 +167,7 @@
 
   onMount(() => {
     layout = readLayout(browserStore());
+    return watchMotionNode(supabase, data.node.id, () => void pullExternalEdit());
   });
   let body = $state<HTMLDivElement | null>(null);
 
@@ -190,8 +203,24 @@
   const beats = $derived(hitFrames(doc, analyses, Hit.Beats));
   const assets = $derived([...madeAssets, ...data.assets]);
   const assetUrls = $derived(Object.fromEntries(assets.filter((a) => a.url).map((a) => [a.id, a.url as string])));
-  const html = $derived(composeHtml({ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls, analyses }));
+  let interactive = $state(false);
+  let tiltX = $state(0);
+  let tiltY = $state(0);
+  const html = $derived(composeHtml({ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls, analyses, liveness: interactive ? Liveness.Live : Liveness.Baked }));
   const selected = $derived(selection.length === 1 ? (findClip(doc, selection[0])?.clip ?? null) : null);
+  const blank = $derived(!path.length && doc.tracks.every((t) => !t.clips.length));
+
+  const OPEN_CHAT: Record<ChatPlace, () => void> = {
+    [ChatPlace.Column]: () => relayout({ chat: Panel.Open }),
+    [ChatPlace.Drawer]: () => (sheet = Sheet.Agent),
+    [ChatPlace.Sheet]: () => (sheet = Sheet.Agent)
+  };
+
+  async function askAgent() {
+    OPEN_CHAT[chatPlace]();
+    await tick();
+    document.querySelector<HTMLTextAreaElement>('aside.chat textarea')?.focus();
+  }
 
   provideSelection({
     get ids() {
@@ -346,6 +375,18 @@
     return null;
   }
 
+  async function pullExternalEdit() {
+    const res = await fetch(agentUrl);
+    const body = (await res.json().catch(() => null)) as { head?: { version: number; doc: MotionDoc; actorKind: string } } | null;
+    if (!body?.head || body.head.version <= version || body.head.actorKind !== 'agent') {
+      return;
+    }
+    history = record(history, body.head.doc);
+    version = body.head.version;
+    selection = selection.filter((id) => findClip(body.head!.doc, id));
+    chatReload++;
+  }
+
   async function pullAgentEdit() {
     for (let i = 0; i < HEAD_POLL_TRIES; i++) {
       const res = await fetch(agentUrl);
@@ -462,7 +503,20 @@
     selection = [id];
   }
 
+  function insertEntry(entry: TemplateEntry) {
+    browsing = false;
+    const placed = insertTemplate(doc, entry, { from: frame, newId });
+    apply(placed, `Inserted ${entry.template.name}`);
+    if (placed.ok) {
+      selection = [placed.clipId];
+    }
+  }
+
   function enterComp(comp: string) {
+    if (isLockedComp(doc, comp)) {
+      notice = 'This is a template: change its fields in Properties, or Detach it to edit its structure.';
+      return;
+    }
     path = [...path, { comp, frame }];
     selection = [];
     keySelection = [];
@@ -824,8 +878,25 @@
       {editorUrl}
       fileName={data.node.name ?? 'motion'}
       render={exportFrames}
+      tokens={data.tokens}
+      {analyses}
       server={{ ...data.serverRender, version, saved: saveState === SaveState.Saved, assetHref: (id: string) => `/p/${data.projectId}/c/${data.canvas.id}/assets/${id}` }}
       onclose={() => (exporting = false)}
+    />
+  {/if}
+
+  {#if browsing}
+    <TemplateLibrary
+      {templates}
+      {doc}
+      selectedComp={selected?.component === 'Precomp' ? String(selected.props.comp) : null}
+      {frame}
+      {editorUrl}
+      compose={(d) => composeHtml({ doc: d, tokens: data.tokens, assets: assetUrls, analyses })}
+      oninsert={insertEntry}
+      onsaved={(entry) => ((templates = [...templates, entry]), (notice = `Saved ${entry.template.name} to the templates.`))}
+      onremoved={(id) => (templates = templates.filter((t) => t.id !== id))}
+      onclose={() => (browsing = false)}
     />
   {/if}
 
@@ -846,12 +917,26 @@
 
   <div class="body" bind:this={body} style={`--tl-h: ${layout.timelinePx}px;`} class:coding={inspectorTab === InspectorTab.Code && selected?.component === 'Custom'} class:no-props={layout.inspector === Panel.Closed} class:no-chat={layout.chat === Panel.Closed}>
     <section class="stage" aria-label="Preview">
-      <MotionPreview bind:this={preview} {html} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing>
+      <MotionPreview bind:this={preview} {html} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null}>
         {#if !playing}<SelectionOverlay {doc} {frame} {html} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} />{/if}
         {#if selected?.mask && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<MaskOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected?.component === 'Shape' && selected.props.shape === 'path' && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<PenOverlay {doc} clip={selected} onchange={edit} />{/if}
         {#if selected?.path && !playing}<MotionPathOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
+        {#if selected?.textPath && !playing}<TextPathOverlay {doc} clip={selected} {frame} />{/if}
       </MotionPreview>
+      <div class="live-bar">
+        <InteractivePanel bind:active={interactive} bind:tiltX bind:tiltY clipId={selected?.id ?? null} onpreset={(preset) => apply(applyInteractivePreset(doc, preset, selected?.id ?? null), preset)} />
+      </div>
+      {#if blank}
+        <div class="empty-state" data-testid="empty-state">
+          <p>Start with a template, a clip or a prompt</p>
+          <div class="empty-actions">
+            <button type="button" class="secondary" onclick={() => (templating = true)}>Template…</button>
+            <button type="button" class="secondary" onclick={() => (adding = true)}>Add element</button>
+            <button type="button" class="secondary" onclick={askAgent}>Ask the agent</button>
+          </div>
+        </div>
+      {/if}
     </section>
 
     <aside class="props" class:open={sheet === Sheet.Properties} aria-label="Properties">
@@ -859,6 +944,8 @@
       {#if cameraOpen && !selection.length}
         <CameraInspector {doc} {frame} onchange={edit} />
         <LookInspector {doc} onchange={edit} />
+      {:else if selected?.component === 'Precomp' && isLockedComp(doc, String(selected.props.comp))}
+        <TemplateInspector {doc} clip={selected} {assets} onchange={edit} />
       {:else if selected}
         <MotionInspector {doc} {analyses} clip={selected} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} onopen={enterComp} />
         {#if selected.component === 'Device3D'}<DevicePresets {doc} clip={selected} onchange={edit} />{/if}
@@ -866,13 +953,16 @@
         {#if selected.component === 'Particles'}<ParticlePresets {doc} clip={selected} onchange={edit} />{/if}
         {#if THREE_D_COMPONENTS.includes(selected.component)}<LookInspector {doc} onchange={edit} />{/if}
       {:else}
-        <p class="hint">{selection.length > 1 ? `${selection.length} clips selected.` : 'Select a clip in the timeline to edit its properties.'}</p>
+        <div class="composition" data-testid="composition-inspector">
+          <header class="composition-head"><span>Composition</span>{#if selection.length > 1}<em>{selection.length} clips selected</em>{/if}</header>
+          <CompositionSettings {doc} onchange={apply} />
+        </div>
       {/if}
     </aside>
 
     <aside class="chat" class:open={sheet === Sheet.Agent} aria-label="Agent">
       <div class="sheet-head"><span>Agent</span><button type="button" aria-label="Close" onclick={() => (sheet = Sheet.None)}><X size={16} /></button></div>
-      <ChatPanel projectId={data.projectId} motionNodeId={data.node.id} context={() => ({ selection })} onturnend={() => void pullAgentEdit()} ondata={onAgentData} />
+      <ChatPanel projectId={data.projectId} motionNodeId={data.node.id} reload={chatReload} context={() => ({ selection })} onturnend={() => void pullAgentEdit()} ondata={onAgentData} />
     </aside>
 
     <section class="timeline-area" aria-label="Timeline">
@@ -895,6 +985,8 @@
                   <button type="button" role="menuitem" onclick={() => startTemplate(id)}>{AD_TEMPLATES[id].label}</button>
                 {/each}
                 <button type="button" role="menuitem" onclick={startTrailer}>feega trailer template</button>
+                <span class="menu-head">Templates</span>
+                <button type="button" role="menuitem" data-testid="open-templates" onclick={() => ((adding = false), (browsing = true))}>Browse templates…</button>
                 <span class="menu-head">Audio</span>
                 <button type="button" role="menuitem" onclick={() => ((adding = false), (sounding = 'voice'))}>Generate voice-over…</button>
                 <button type="button" role="menuitem" onclick={() => ((adding = false), (sounding = 'music'))}>Generate music…</button>
@@ -945,7 +1037,7 @@
         {#if graphOpen}
           <GraphEditor {doc} {frame} {selection} bind:keySelection camera={cameraOpen} onchange={edit} />
         {:else}
-          <MotionTimeline {doc} bind:frame bind:selection bind:keySelection bind:camera={cameraOpen} {zoom} {snap} {waveforms} {beats} {assetUrls} {reveal} onchange={edit} onopen={enterComp} />
+          <MotionTimeline {doc} bind:frame bind:selection bind:keySelection bind:camera={cameraOpen} bind:zoom {snap} {waveforms} {beats} {assetUrls} {reveal} onchange={edit} onopen={enterComp} />
         {/if}
       </div>
     </section>
@@ -1256,6 +1348,80 @@
     outline: 1px solid var(--ui-line-strong);
   }
 
+  .stage {
+    position: relative;
+  }
+
+  .live-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 0 var(--ui-space-2, 8px);
+    background: var(--ui-surface);
+    border-top: 1px solid var(--ui-line);
+    outline: none;
+  }
+
+  :global([data-theme='dark']) .stage {
+    background: var(--ui-bg);
+  }
+
+  .empty-state {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--ui-space-3);
+    padding: var(--ui-space-6);
+    max-width: calc(100% - 32px);
+    background: var(--ui-bg);
+    border: 1px solid var(--ui-line-strong);
+    outline: none !important;
+  }
+
+  .empty-state p {
+    font-size: var(--ui-text-lg);
+    font-weight: 600;
+    text-align: center;
+  }
+
+  .empty-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--ui-space-2);
+  }
+
+  .composition {
+    padding: 0 12px 12px;
+  }
+
+  .composition-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    height: 40px;
+    padding-top: 12px;
+    margin: 0 -12px 8px;
+    padding: 0 12px;
+    align-items: center;
+    border-bottom: 1px solid var(--ui-line);
+    font-size: var(--ui-text-md);
+    font-weight: 600;
+  }
+
+  .composition-head em {
+    font-style: normal;
+    font-family: var(--ui-mono);
+    font-size: 10px;
+    font-weight: 400;
+    color: var(--ui-ink-3);
+  }
+
   .props {
     grid-column: 2;
     grid-row: 1;
@@ -1333,7 +1499,7 @@
 
   .tool:disabled {
     color: var(--ui-ink-3);
-    opacity: 0.6;
+    cursor: default;
   }
 
   .tool[aria-pressed='true'] {

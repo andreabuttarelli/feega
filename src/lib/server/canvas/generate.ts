@@ -1,5 +1,6 @@
 import type { Db } from '$lib/server/db/client';
 import { RENDER_DEADLINE_MS } from '$lib/server/motion/farm-render';
+import { releaseHold } from '$lib/server/motion/render-run';
 import { promptRequired, type GenMedium, type GenParams } from '$lib/canvas/gen-node';
 import { upscaleLimitsOf } from '$lib/video-models';
 import { findAsset, insertAsset, type Asset } from '$lib/server/repos/assets';
@@ -78,9 +79,13 @@ export type RunOutcome =
 
 const EXTERNAL_URL = /^https?:\/\//;
 
-async function imageInputs(db: Db, upstream: UpstreamInputs): Promise<{ baseMediaId: string | undefined; referenceImageUrls: string[] }> {
+function signableAsReference(base: string, orgId: string): boolean {
+  return EXTERNAL_URL.test(base) || base.startsWith(`${orgId}/`);
+}
+
+async function imageInputs(db: Db, orgId: string, upstream: UpstreamInputs): Promise<{ baseMediaId: string | undefined; referenceImageUrls: string[] }> {
   const base = upstream.referenceImageUrl;
-  if (base && EXTERNAL_URL.test(base)) {
+  if (base && signableAsReference(base, orgId)) {
     return { baseMediaId: undefined, referenceImageUrls: await signMediaPaths(db, upstream.referenceImageUrls) };
   }
   return { baseMediaId: base ?? undefined, referenceImageUrls: await signMediaPaths(db, upstream.pickedImageUrls) };
@@ -543,7 +548,7 @@ export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcom
         // Un solo riferimento: `ImageJob.baseMediaId` è un campo, non una lista — anche quando il
         // modello ne accetterebbe di più (`upstream.referenceImageUrls`, dal catalogo in
         // `graph.ts`). Il tetto vero sta lì; qui si spedisce solo quel che il trasporto sa portare.
-        ...(await imageInputs(db, upstream)),
+        ...(await imageInputs(db, input.orgId, upstream)),
         params: extraParamsOf(input.params as unknown as Record<string, unknown>, declared)
       });
       if (!out.ok) {
@@ -1023,6 +1028,10 @@ const JOB_TIMEOUTS_MS: Record<JobKind, number> = {
   motion_render: RENDER_DEADLINE_MS
 };
 
+const ON_EXPIRE: Partial<Record<JobKind, (run: NodeRun) => Promise<void>>> = {
+  motion_render: releaseHold
+};
+
 /**
  * IL GENERE DI UN GIRO SI LEGGE DALL'`external_job_id`, non da un campo dedicato: `wiro:` e
  * `elevenlabs:` sono i due fornitori con un riconciliatore proprio (`node-runs.ts`), e per Wiro
@@ -1093,6 +1102,7 @@ export async function expireStuckRuns(db: Db): Promise<ExpireOutcome> {
     if (!claimed) continue;
 
     await expireRun(db, { orgId: run.orgId, runId: run.id, error: RUN_TIMED_OUT });
+    await ON_EXPIRE[kind]?.(run);
 
     await showRunState(db, run, { running: false, runId: run.id, error: RUN_TIMED_OUT });
 

@@ -17,12 +17,14 @@ describe('layoutAt', () => {
 
 	it('covers every declared layout id', () => {
 		expect(Object.keys(LAYOUTS).sort()).toEqual([
+			'bento',
 			'carousel-3d',
 			'coverflow',
 			'explorer-grid',
 			'helix',
 			'media-cloud',
 			'media-ring',
+			'ring',
 			'staggered-grid',
 			'tilted-grid',
 			'vertical-flow'

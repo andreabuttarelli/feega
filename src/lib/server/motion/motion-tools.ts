@@ -6,7 +6,8 @@ import { fieldsOf } from '$lib/motion/inspector';
 import { Ease, FRAME_RATES, MAX_SECONDS, TRANSITION_KINDS } from '$lib/motion/design';
 import { setFrameRate } from '$lib/motion/frame-rate';
 import { Background, MOTION_FORMATS, clipsOf, findClip, type MotionDoc } from '$lib/motion/doc';
-import { ClipEdge, Side, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyInterp, setKeyframes, setMask, setMaskStack, shaped, setProps, setTiming, setTrackMatte, setTransform, setTransition, trimClip, applyEasePreset, setKeyEase, type OpResult } from '$lib/motion/timeline';
+import { JUNCTION, JUNCTION_KINDS, junctionPairs } from '$lib/motion/junctions';
+import { ClipEdge, Side, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyInterp, setKeyframes, setMask, setMaskStack, shaped, setProps, setTiming, setTrackMatte, setTransform, setTransition, setJunction, trimClip, applyEasePreset, setKeyEase, type OpResult } from '$lib/motion/timeline';
 import { MASK_KEYS, MASK_KIND_IDS, MASK_MODES, MATTES, MAX_MASK_STACK } from '$lib/motion/mask';
 import { pathProblem } from '$lib/motion/path';
 import { Align, addMarker, alignClips, allMarkers, distributeClips, markerFrame, nudgeClips, removeMarker, sequenceClips, setClipFlags, setTrackFlags, setWorkArea, staggerClips } from '$lib/motion/organize';
@@ -39,6 +40,11 @@ import { ParentOpacity } from '$lib/motion/parent';
 import { addNull, nullFromSelection, setParent, setParentOpacity } from '$lib/motion/parent-ops';
 import { setCameraExpression, setExpression } from '$lib/motion/expression/ops';
 import { EXPRESSION_GUIDE } from '$lib/motion/expression/guide';
+import { INTERACTIVE_PRESETS, PRESET, applyInteractivePreset, setInteractive } from '$lib/motion/interactive/presets';
+import { OUTSIDES, PLAY_MODES, interactiveOf } from '$lib/motion/interactive/settings';
+import { liveLanes } from '$lib/motion/interactive/spec';
+import { embedSnippet } from '$lib/motion/interactive/bundle';
+import { flattenComps } from '$lib/motion/precomp';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
 import { BuiltinFont, FONT_WEIGHTS, searchFonts } from '$lib/motion/fonts/model';
 import { registerFont, removeFont, setFont } from '$lib/motion/fonts/ops';
@@ -49,6 +55,8 @@ import { EffectKind } from '$lib/motion/effects/registry';
 import { LUT_PRESETS, LUT_PRESET_IDS, applyLut, compileLut, lutFromCube } from '$lib/motion/effects/lut';
 import { BLEND_MODES } from '$lib/motion/blend';
 import { ANIMATOR_UNITS, SELECTOR_SHAPES, SELECTOR_KEYS, VALUES, VALUE_KEYS, animatorKey } from '$lib/motion/text-animators/model';
+import { PATH_ALIGNS, PATH_PRESETS, PathSourceKind, TEXT_PATH, TEXT_PATH_KEYS, textPathKey, type PathSource } from '$lib/motion/text-path/model';
+import { removeTextPath, setTextPath } from '$lib/motion/text-path/ops';
 import { PRESETS as TEXT_PRESET_SPECS, TEXT_PRESETS, addAnimator, applyPreset as applyTextPreset, removeAnimator, setAnimator } from '$lib/motion/text-animators/ops';
 import { setBlendMode } from '$lib/motion/blend-ops';
 import { setClipsBlur, setMotionBlur } from '$lib/motion/motion-blur-ops';
@@ -64,7 +72,9 @@ import type { AudioAnalysis } from '$lib/motion/audio-analysis';
 import { Hit, cutToBeat, hitFrames, markHits } from '$lib/motion/beats';
 import { PULSE_PROPS, pulseWithMusic } from '$lib/motion/pulse';
 import { applyValues, exposeField, fieldValues, removeField } from '$lib/motion/template/fields';
-import { FIELD_TYPES } from '$lib/motion/template/field-model';
+import { FIELD_TYPES, type ExposedField } from '$lib/motion/template/field-model';
+import { detachTemplate, insertTemplate, isLockedComp, setTemplateValues, templateFields } from '$lib/motion/template/library';
+import type { TemplateLibrary } from './templates';
 import { DEFAULT_NAME_PATTERN, MAX_BATCH_ROWS, outputName } from '$lib/motion/template/batch';
 import { renderQuote } from '$lib/motion/render-quote';
 import { BOUNDS, PHYSICS, PHYSICS_KEYS, PHYSICS_PRESET, PHYSICS_PRESETS } from '$lib/motion/physics/model';
@@ -89,6 +99,7 @@ export type MotionToolDeps = {
   check: (callId: string, doc: MotionDoc, name: string) => Promise<CheckResult | null>;
   analysis?: (assetId: string) => Promise<AudioAnalysis | null>;
   batch?: (input: { doc: MotionDoc; rows: { name: string; values: Record<string, string> }[] }) => Promise<Record<string, unknown>>;
+  templates?: TemplateLibrary;
   site?: (url: string) => Promise<SourceRead>;
   brand?: (name?: string) => Promise<SourceRead>;
   importAsset?: (url: string, label?: string) => Promise<AssetImport>;
@@ -100,10 +111,12 @@ export type AssetImport = { ok: true; asset: MotionAsset; width: number | null; 
 
 const UNREADABLE = (what: string) => ({ ok: false as const, error: `${what} is not available in this workspace` });
 
+const fieldSpec = (f: ExposedField) => ({ key: f.key, label: f.label, type: f.type, min: f.min, max: f.max, unit: f.unit, options: f.options, aspect: f.aspect });
+
 const framesAt = (s: number, fps: number) => Math.round(s * fps);
 const secondsAt = (f: number, fps: number) => Math.round((f / fps) * 100) / 100;
 
-function summary(doc: MotionDoc, selection: string[]) {
+export function docSummary(doc: MotionDoc, selection: string[]) {
   const secs = (f: number) => secondsAt(f, doc.fps);
   const edgeSummary = (edge: { kind: string; durationInFrames: number }) => ({ kind: edge.kind, duration: secs(edge.durationInFrames) });
   const inSeconds = (keyframes: Record<string, Keyframe[] | undefined>) =>
@@ -135,6 +148,7 @@ function summary(doc: MotionDoc, selection: string[]) {
         props: shownRecord(propsOwner(c.component), c.props, doc),
         in: edgeSummary(c.transitionIn),
         out: edgeSummary(c.transitionOut),
+        junction: c.junction ? { kind: c.junction.kind, duration: secs(c.junction.durationInFrames), from: junctionPairs(doc).find((p) => p.incoming === c.id)?.outgoing ?? null } : null,
         transform: shownRecord(c.component, c.transform, doc),
         mask: c.mask && shownMask(c.component, c.mask, doc),
         maskStack: c.maskStack.map((m) => shownMask(c.component, m, doc)),
@@ -148,6 +162,7 @@ function summary(doc: MotionDoc, selection: string[]) {
         effects: c.effects,
         blend: c.blend,
         animators: c.animators,
+        textPath: c.textPath,
         motionBlur: c.motionBlur,
         hidden: c.hidden ?? false,
         locked: c.locked ?? false,
@@ -161,10 +176,11 @@ function summary(doc: MotionDoc, selection: string[]) {
     fonts: doc.fonts,
     markers: (doc.markers ?? []).map((m) => ({ label: m.label, time: secs(m.frame) })),
     workArea: doc.workArea ? { start: secs(doc.workArea.from), end: secs(doc.workArea.to) } : null,
+    interactive: interactiveOf(doc),
     camera: cameraSummary(doc.camera),
     look: lookSummary(doc.look),
     components: Object.entries(doc.components).map(([name, c]) => customSummary(name, c)),
-    comps: Object.entries(doc.comps).map(([id, c]) => ({ id, name: c.name, duration: secs(c.durationInFrames), clips: c.tracks.flatMap((t) => t.clips.map((clip) => clip.id)) }))
+    comps: Object.entries(doc.comps).map(([id, c]) => ({ id, name: c.name, ...(c.template ? { template: c.template.id } : {}), duration: secs(c.durationInFrames), clips: c.tracks.flatMap((t) => t.clips.map((clip) => clip.id)) }))
   };
 }
 
@@ -289,7 +305,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }
     session.doc = result.doc;
     session.edits.push(what);
-    return { ok: true, doc: summary(session.doc, session.selection) };
+    return { ok: true, doc: docSummary(session.doc, session.selection) };
   };
 
   async function codeWrite(result: OpResult, name: string, what: string, callId: string) {
@@ -347,7 +363,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     get_motion_doc: tool({
       description: 'Read the video being edited: size, duration in seconds, tracks and clips (start/duration in seconds), and the clips the user has selected.',
       inputSchema: z.object({}).strict(),
-      execute: async () => summary(session.doc, session.selection)
+      execute: async () => docSummary(session.doc, session.selection)
     }),
 
     list_components: tool({
@@ -410,6 +426,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: 'Set the transition at the start (in) or end (out) of a clip.',
       inputSchema: z.object({ clip_id: z.string(), side: z.enum([Side.In, Side.Out]), kind: z.enum(TRANSITION_KINDS), duration: z.number().min(0).max(2) }),
       execute: async (input) => apply(setTransition(session.doc, input.clip_id, input.side, { kind: input.kind, durationInFrames: frames(input.duration) }), `transition on ${input.clip_id}`)
+    }),
+
+    set_clip_transition: tool({
+      description: `Transition between two clips at a cut, like a dissolve in an editor: put it on the clip that arrives (clip_id); the clip that ends exactly where it starts (same track first, else any video track) is the one that leaves. Kinds: ${JUNCTION_KINDS.map((k) => `${k} (${JUNCTION[k].label})`).join(', ')}; none removes it. duration in seconds, centred on the cut: both clips stay on screen half of it longer. It replaces the out transition of the leaving clip and the in transition of the arriving one.`,
+      inputSchema: z.object({ clip_id: z.string(), kind: z.enum([...JUNCTION_KINDS, 'none']), duration: z.number().min(0.05).max(2).default(0.5) }),
+      execute: async (input) => apply(setJunction(session.doc, input.clip_id, input.kind === 'none' ? null : { kind: input.kind, durationInFrames: frames(input.duration) }), `transition into ${input.clip_id}`)
     }),
 
     trim_clip: tool({
@@ -876,6 +898,27 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       }
     }),
 
+    apply_interactive_preset: tool({
+      description: `Make the interactive web export react: ${INTERACTIVE_PRESETS.map((p) => `${p} — ${PRESET[p].about}`).join('; ')}. Clip presets write expressions (edit them with set_expression); videos keep the default pose.`,
+      inputSchema: z.object({ preset: z.enum(INTERACTIVE_PRESETS), clip_id: z.string().optional() }),
+      execute: async (input) => apply(applyInteractivePreset(session.doc, input.preset, input.clip_id ?? null), `${input.preset} interactive preset`)
+    }),
+
+    set_interactive: tool({
+      description: `How the interactive web export plays: playback ${PLAY_MODES.join('|')} (in-view plays while on screen, scrub ties the playhead to the host page scroll), loop, and outside ${OUTSIDES.join('|')}: what a precomp reads when the cursor leaves its box (fallback = default pose, hold = last value).`,
+      inputSchema: z.object({ playback: z.enum(PLAY_MODES).optional(), loop: z.boolean().optional(), outside: z.enum(OUTSIDES).optional() }),
+      execute: async (input) => apply(setInteractive(session.doc, Object.fromEntries(Object.entries(input).filter(([, v]) => v !== undefined))), 'changed interactive playback')
+    }),
+
+    export_interactive: tool({
+      description: 'Check the interactive web export: lists the clip properties that react to live input, the playback settings and the embed snippet. The self-contained HTML file is downloaded by the user from Export → Interactive (web).',
+      inputSchema: z.object({}),
+      execute: async () => {
+        const live = liveLanes(flattenComps(session.doc)).map((l) => ({ clip_id: l.id, prop: l.key }));
+        return { ok: true, live, settings: interactiveOf(session.doc), snippet: embedSnippet(session.doc), note: live.length ? 'Ready: Export → Interactive (web) downloads the file.' : 'Nothing reads input yet: apply_interactive_preset or set_expression with input.*.' };
+      }
+    }),
+
     add_shape: tool({
       description: `Add a vector Shape clip. kind: ${SHAPE_KINDS.join(', ')}; path takes ${PATH_GUIDE}. Fill: fill_kind solid/linear/radial/none with fill, fill2 (gradient end) and gradientAngle; stroke: strokeKind none/solid/gradient, stroke, strokeWidth/dash/gap in px, cap, join. Other props as add_clip. Returns the clip id.`,
       inputSchema: z.object({ kind: z.enum(SHAPE_KINDS), start: z.number().min(0), duration: z.number().positive().optional(), path: z.string().optional(), props: z.record(z.string(), z.unknown()).optional() }),
@@ -1023,7 +1066,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_motion_blur: tool({
-      description: `Real motion blur, like After Effects: each frame averages sub-frame samples across the shutter, so fast moves smear. Video-wide: enabled, shutter_angle (degrees open, 180 is film), shutter_phase (degrees, -90 centres the shutter on the frame), samples (2..${MAX_SAMPLES}, 8 is enough for most moves; more costs more render time). Per clip: clip_ids with clips_blur false keeps those clips sharp. Renders on our servers in one pass; videos with Video clips cannot blur.`,
+      description: `Real motion blur, like After Effects: each frame averages sub-frame samples across the shutter, so fast moves smear. Video-wide: enabled, shutter_angle (degrees open, 180 is film), shutter_phase (degrees, -90 centres the shutter on the frame), samples (2..${MAX_SAMPLES}, 8 is enough for most moves; more costs more render time). Per clip: clip_ids with clips_blur false keeps those clips sharp. Renders on our servers in one pass, Video clips and device screens included; 3D clips make each sample slower, so long 3D shots allow fewer samples.`,
       inputSchema: z.object({
         enabled: z.boolean().optional(),
         shutter_angle: z.number().min(1).max(DEGREES).optional(),
@@ -1065,7 +1108,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     add_text_animator: tool({
-      description: `Animate a text clip (Title, Text, Kicker, Caption) per character, word or line, like an After Effects text animator. The text is split into units; a range selector (start..end %, shifted by offset %, edges softened by softness 0..1 with shape square|ramp|smooth, order shuffled by seed) picks the units, and the selected ones get values: ${ANIMATOR_VALUES} (x/y in em, scale multiplier, rotation degrees, blur px, tracking em). Animate offset (or start/end) with set_keyframes on ta.<animator id>.offset to sweep the selection; every value is keyframable and expressionable the same way. All animators of a clip share one unit.`,
+      description: `Animate a text clip (Title, Text, Kicker, Caption) per character, word or line, like an After Effects text animator. The text is split into units; a range selector (start..end %, shifted by offset %, edges softened by softness 0..1 with shape square|ramp|smooth, order shuffled by seed) picks the units, and the selected ones get values: ${ANIMATOR_VALUES} (x/y in em, scale multiplier, rotation degrees, blur px, tracking em). Animate offset (or start/end) with set_keyframes on ta.<animator id>.offset to sweep the selection; every value is keyframable and expressionable the same way. Animators of one clip may use different units: the text splits by the finest and each piece also knows its word and line.`,
       inputSchema: z.object({ clip_id: z.string(), unit: z.enum(ANIMATOR_UNITS), ...animatorFields }),
       execute: async (input) => {
         const id = deps.newId();
@@ -1101,10 +1144,42 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       }
     }),
 
+    set_text_path: tool({
+      description: `Put a text clip (Title, Text, Kicker, Caption) on a path, like After Effects Path Options. The path is a preset (${PATH_PRESETS.join(', ')}; radius px and arc degrees bend it: arc is the sweep of an arc and the phase sweep of a wave) or shape_clip_id, a Shape clip whose outline (pen paths, morphs and modifiers included) the text follows frame by frame, centred on the text box. align ${PATH_ALIGNS.join('|')}; firstMargin/lastMargin are % of the path length (animate firstMargin to slide the text along it, 100 = one turn of a closed path); reverse runs the text the other way (inside a circle); perpendicular false keeps glyphs upright; forceAlignment spreads the text from margin to margin. Every value animates with set_keyframes or set_expression on ${TEXT_PATH_KEYS.map((k) => textPathKey(k)).join(', ')} (booleans: 0/1, align: 0 start, 0.5 center, 1 end). Text animators keep working per character. Omitted fields keep their value.`,
+      inputSchema: z.object({
+        clip_id: z.string(),
+        preset: z.enum(PATH_PRESETS).optional(),
+        shape_clip_id: z.string().optional(),
+        align: z.enum(PATH_ALIGNS).optional(),
+        reverse: z.boolean().optional(),
+        perpendicular: z.boolean().optional(),
+        forceAlignment: z.boolean().optional(),
+        firstMargin: z.number().min(TEXT_PATH.firstMargin.min).max(TEXT_PATH.firstMargin.max).optional(),
+        lastMargin: z.number().min(TEXT_PATH.lastMargin.min).max(TEXT_PATH.lastMargin.max).optional(),
+        radius: z.number().min(TEXT_PATH.radius.min).max(TEXT_PATH.radius.max).optional(),
+        arc: z.number().min(TEXT_PATH.arc.min).max(TEXT_PATH.arc.max).optional()
+      }),
+      execute: async (input) => {
+        const { clip_id, preset, shape_clip_id, forceAlignment, ...rest } = input;
+        if (preset && shape_clip_id) {
+          return { ok: false, error: 'pick one path: preset or shape_clip_id' };
+        }
+        const source: PathSource | undefined = preset ? { kind: PathSourceKind.Preset, preset } : shape_clip_id ? { kind: PathSourceKind.Clip, clip: shape_clip_id } : undefined;
+        const out = apply(setTextPath(session.doc, clip_id, { ...rest, forceAlign: forceAlignment, source }), `text path on ${clip_id}`);
+        return out.ok ? { ...out, animate: TEXT_PATH_KEYS.map((k) => textPathKey(k)) } : out;
+      }
+    }),
+
+    remove_text_path: tool({
+      description: 'Take a text clip off its path, with the path keyframes and expressions.',
+      inputSchema: z.object({ clip_id: z.string() }),
+      execute: async (input) => apply(removeTextPath(session.doc, input.clip_id), `removed text path from ${input.clip_id}`)
+    }),
+
     add_track: tool({
-      description: 'Add a visual or audio track. A new visual track goes on top.',
-      inputSchema: z.object({ kind: z.enum([TrackKind.Visual, TrackKind.Audio]) }),
-      execute: async (input) => apply(addTrack(session.doc, input.kind, deps.newId()), `added ${input.kind} track`)
+      description: 'Add a visual or audio track, optionally named. A new visual track goes on top.',
+      inputSchema: z.object({ kind: z.enum([TrackKind.Visual, TrackKind.Audio]), name: z.string().max(60).optional() }),
+      execute: async (input) => apply(addTrack(session.doc, input.kind, deps.newId(), input.name), `added ${input.kind} track`)
     }),
 
     set_track: tool({
@@ -1283,18 +1358,74 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         if (!root.comps[input.comp]) {
           return { ok: false, error: `no composition ${input.comp}: compositions are ${Object.keys(root.comps).join(', ') || 'none (precompose first)'}` };
         }
+        if (isLockedComp(root, input.comp)) {
+          return { ok: false, error: `${input.comp} is a template: change it with set_template_fields, or detach_template first to edit its structure` };
+        }
         session.doc = viewOf(root, [input.comp]);
         try {
           for (const [index, call] of input.calls.entries()) {
             const out = await nestedCall(call.tool, call.input, options);
             if (out.ok === false) {
-              return { ok: false, failed: index, error: `${call.tool}: ${out.error}`, doc: summary(session.doc, []) };
+              return { ok: false, failed: index, error: `${call.tool}: ${out.error}`, doc: docSummary(session.doc, []) };
             }
           }
-          return { ok: true, doc: summary(session.doc, []) };
+          return { ok: true, doc: docSummary(session.doc, []) };
         } finally {
           session.doc = mergeView(root, [input.comp], session.doc);
         }
+      }
+    }),
+
+    list_templates: tool({
+      description: 'List the motion templates (built-in and saved by the team): fixed designs customised only through their fields — text, colours, media slots (aspect = width/height of the crop), numbers (min..max, unit), choices (options).',
+      inputSchema: z.object({}).strict(),
+      execute: async () => {
+        const entries = (await deps.templates?.list()) ?? [];
+        return { templates: entries.map((e) => ({ id: e.id, name: e.template.name, description: e.template.description, seconds: secondsAt(e.template.doc.durationInFrames, e.template.doc.fps), fields: e.template.doc.fields.map(fieldSpec) })) };
+      }
+    }),
+
+    insert_template: tool({
+      description: 'Insert a template (id from list_templates) as one locked Precomp clip on a new top track at start seconds. Fill it with set_template_fields; its structure stays fixed unless detach_template.',
+      inputSchema: z.object({ template_id: z.string(), start: z.number().min(0).default(0) }),
+      execute: async (input) => {
+        const entry = ((await deps.templates?.list()) ?? []).find((e) => e.id === input.template_id);
+        if (!entry) {
+          return { ok: false, error: `no template ${input.template_id}: call list_templates` };
+        }
+        const placed = insertTemplate(session.doc, entry, { from: frames(input.start), newId: deps.newId });
+        if (!placed.ok) {
+          return placed;
+        }
+        const out = apply(placed, `inserted template ${entry.template.name}`);
+        return out.ok ? { ...out, clip_id: placed.clipId, fields: templateFields(session.doc, placed.clipId).map((f) => ({ ...fieldSpec(f), value: f.value })) } : out;
+      }
+    }),
+
+    set_template_fields: tool({
+      description: 'Set fields of an inserted template (clip_id of its Precomp clip; keys as in list_templates). Each value is checked against the field type: text, #rrggbb colour, asset id, number in range, one of the options, comma-separated asset ids for a media list.',
+      inputSchema: z.object({ clip_id: z.string(), values: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])) }),
+      execute: async (input) => {
+        const values = Object.fromEntries(Object.entries(input.values).map(([k, v]) => [k, String(v)]));
+        return apply(setTemplateValues(session.doc, input.clip_id, values), `set template fields ${Object.keys(values).join(', ')}`);
+      }
+    }),
+
+    detach_template: tool({
+      description: 'Detach an inserted template so its composition can be edited freely with edit_comp. Only when the user asks to change the structure.',
+      inputSchema: z.object({ clip_id: z.string() }),
+      execute: async (input) => apply(detachTemplate(session.doc, input.clip_id), `detached template ${input.clip_id}`)
+    }),
+
+    save_template: tool({
+      description: 'Save a precomp (comp id) or, without comp, the whole video as a reusable team template. Its exposed fields (expose_field) become the template fields; at least one is required.',
+      inputSchema: z.object({ name: z.string().min(1).max(60), description: z.string().max(200).default(''), comp: z.string().nullable().optional() }),
+      execute: async (input) => {
+        if (!deps.templates) {
+          return { ok: false, error: 'the template library is not available here' };
+        }
+        const saved = await deps.templates.save({ doc: session.doc, compId: input.comp ?? null, meta: { name: input.name, description: input.description ?? '' }, posterFrame: 0 });
+        return saved.ok ? { ok: true, template_id: saved.entry.id } : saved;
       }
     }),
 

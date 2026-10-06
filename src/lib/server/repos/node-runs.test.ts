@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fakeDb, filtersOf } from '$lib/server/db/fake-db';
-import { claimRun, completeRun, createRun, failRun, listNodeRuns, queuedVideoRuns, RENDER_JOB_PREFIX, runningRuns, setRunParams } from './node-runs';
+import { activeRenderRuns, claimRun, completeRun, createRun, failRun, listNodeRuns, queuedVideoRuns, RENDER_JOB_PREFIX, runningRuns, setRunParams } from './node-runs';
 
 const ORG = '11111111-1111-1111-1111-111111111111';
 const NODE = '22222222-2222-2222-2222-222222222222';
@@ -137,5 +137,15 @@ describe('un render motion non è un video in coda presso un fornitore', () => {
     const call = calls.find((c) => c.op === 'update')!;
     expect(call.payload).toEqual({ params: { progress: { stage: 'rendering' } } });
     expect(filtersOf(calls, 'update')).toEqual({ id: RUN, org_id: ORG });
+  });
+});
+
+describe('activeRenderRuns — i render che hanno ancora macchine accese', () => {
+  it('legge anche quelli reclamati da un altro tick, non solo quelli in coda', async () => {
+    const { db, calls } = fakeDb({ node_runs: [] });
+
+    await activeRenderRuns(db);
+
+    expect(filtersOf(calls, 'select')).toEqual({ status: ['running', 'finishing'] });
   });
 });

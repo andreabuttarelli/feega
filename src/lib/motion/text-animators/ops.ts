@@ -30,8 +30,12 @@ function validated(input: unknown): TextAnimator | string {
   return parsed.success ? parsed.data : parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
 }
 
-function sameUnit(animators: TextAnimator[]): string | null {
-  return new Set(animators.map((a) => a.unit)).size > 1 ? 'every animator of a clip splits the text the same way (char, word or line)' : null;
+export function onPathProblem(animators: readonly TextAnimator[]): string | null {
+  return animators.some((a) => a.unit !== AnimatorUnit.Char) ? 'text on a path is laid out per character: its text animators must use unit char' : null;
+}
+
+function unitProblem(clip: MotionClip, animators: TextAnimator[]): string | null {
+  return clip.textPath ? onPathProblem(animators) : null;
 }
 
 export function addAnimator(doc: MotionDoc, clipId: string, id: string, input: AnimatorInput): OpResult {
@@ -44,7 +48,7 @@ export function addAnimator(doc: MotionDoc, clipId: string, id: string, input: A
       return animator;
     }
     const animators = [...clip.animators, animator];
-    return sameUnit(animators) ?? { ...clip, animators };
+    return unitProblem(clip, animators) ?? { ...clip, animators };
   });
 }
 
@@ -62,7 +66,7 @@ export function setAnimator(doc: MotionDoc, clipId: string, id: string, patch: A
     const others = clip.animators.filter((a) => a.id !== id);
     const at = Math.min(Math.max(0, index ?? clip.animators.indexOf(current)), others.length);
     const animators = [...others.slice(0, at), animator, ...others.slice(at)];
-    return sameUnit(animators) ?? { ...clip, animators };
+    return unitProblem(clip, animators) ?? { ...clip, animators };
   });
 }
 

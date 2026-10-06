@@ -2,13 +2,14 @@ import type { Db } from '$lib/server/db/client';
 import { listProjectAssets, type Asset } from '$lib/server/repos/assets';
 import { findNode, listConnections } from '$lib/server/repos/canvas';
 import { compositionOf } from '$lib/canvas-node-data';
-import { upstreamImageRefs } from '$lib/canvas/composition-node';
+import { upstreamCards, type UpstreamCard } from '$lib/canvas/composition-node';
 import { listRecentNodes } from '$lib/server/repos/dashboard';
 import { readHead } from '$lib/server/repos/motion-revisions';
 import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
 import { MOTION_START_DEPS, startMotion, type MotionStart, type MotionStartDeps } from './start';
 import { saveMotionDoc } from './editor';
-import { applyDraft, composeEditorPath, draftFromDoc, draftFromNode, type ComposeDraft, type ComposeMedia } from '$lib/motion/composition-draft';
+import { applyDraft, composeEditorPath, draftFromDoc, draftFromNode, slotsOf, withEmbeds, type ComposeDraft, type ComposeMedia, type MotionSources } from '$lib/motion/composition-draft';
+import type { MotionDoc } from '$lib/motion/doc';
 import { COMPOSITION_MEDIA_KINDS } from '$lib/motion/components';
 import { newMotionDoc } from '$lib/motion/doc';
 import type { LayoutId } from '$lib/canvas/composition/types';
@@ -26,10 +27,10 @@ export const COMPOSE_DEPS: ComposeDeps = { ...MOTION_START_DEPS, saveMotionDoc, 
 
 export type ComposeStart = { ok: true; start: MotionStart } | { ok: false; error: string };
 
-type StartInput = { orgId: string; projectId: string; canvasId: string | null; userId: string; name: string; draft: ComposeDraft };
+type StartInput = { orgId: string; projectId: string; canvasId: string | null; userId: string; name: string; draft: ComposeDraft; base?: MotionDoc };
 
 export async function startComposition(db: Db, deps: ComposeDeps, input: StartInput): Promise<ComposeStart> {
-  const doc = applyDraft(newMotionDoc(input.draft.format), input.draft);
+  const doc = applyDraft(input.base ?? newMotionDoc(input.draft.format), input.draft);
   if (!doc.ok) {
     return { ok: false, error: doc.error };
   }
@@ -76,6 +77,17 @@ export async function recentCompositions(db: Db, deps: ComposeDeps, scope: { org
     .slice(0, RECENT_LIMIT);
 }
 
+function knownCards(assets: Pick<Asset, 'id' | 'type'>[], cards: UpstreamCard[]): UpstreamCard[] {
+  const known = new Set(mediaOfRefs(assets, cards.flatMap((c) => (c.kind === 'motion' ? [] : [c.assetId]))).map((m) => m.assetId));
+  return cards.filter((c) => c.kind === 'motion' || known.has(c.assetId));
+}
+
+async function headsOf(db: Db, deps: ComposeDeps, orgId: string, cards: UpstreamCard[]): Promise<MotionSources> {
+  const motions = cards.filter((c) => c.kind === 'motion');
+  const heads = await Promise.all(motions.map((c) => deps.readHead(db, { orgId, nodeId: c.sourceId }).catch(() => null)));
+  return Object.fromEntries(motions.map((c, i) => [c.sourceId, heads[i]?.doc ?? null]));
+}
+
 type CanvasNodeInput = { orgId: string; projectId: string; canvasId: string; nodeId: string; userId: string };
 
 const MIGRATED_NAME = 'Composition';
@@ -95,7 +107,9 @@ export async function openCanvasComposition(db: Db, deps: ComposeDeps, input: Ca
     deps.listProjectAssets(db, { orgId: input.orgId, projectId: input.projectId })
   ]);
   const edges = connections.map((c) => ({ source: c.sourceNodeId, target: c.targetNodeId }));
-  const media = mediaOfRefs(assets, upstreamImageRefs(node.id, edges, nodes));
+  const cards = knownCards(assets, upstreamCards(node.id, edges, nodes));
+  const slots = slotsOf(node, cards, await headsOf(db, deps, input.orgId, cards));
+  const draft = draftFromNode(node, slots.media);
 
-  return startComposition(db, deps, { ...input, name: record.displayName ?? MIGRATED_NAME, draft: draftFromNode(node, media) });
+  return startComposition(db, deps, { ...input, name: record.displayName ?? MIGRATED_NAME, draft, base: withEmbeds(newMotionDoc(draft.format), slots.embeds) });
 }

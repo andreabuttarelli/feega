@@ -2,102 +2,26 @@ import { CAMERA, CAMERA_LANE, baseValues, type CameraKey } from '../camera';
 import { withParams } from '../custom/params';
 import { Ease } from '../design';
 import { clipsOf, type MotionClip, type MotionDoc } from '../doc';
-import { ValueKind, animProp, baseValue, sampleTrack, type AnimProp, type Keyframe } from '../keyframes';
-import { ExpressionError, compileExpression, runExpression, type LayerHandle, type Program } from './language';
+import { ValueKind, animProp, baseValue, type Keyframe } from '../keyframes';
+import { ExpressionError } from './language';
 import type { AudioAnalysis } from '../audio-analysis';
 import { audioPort } from './audio-port';
+import { Evaluator, type InputSource, type LaneBook, type LaneData } from './evaluator';
+
+export type { InputSource };
 
 export type ExpressionFault = { clipId: string; key: string; error: string };
 
-type Lane = { id: string; key: string; range: Pick<AnimProp, 'min' | 'max' | 'step'>; from: number; track: readonly Keyframe[]; keyed: (local: number) => number; source: string | undefined; index: number };
-
-const MIN_TOLERANCE = 1e-4;
-const TOLERANCE_PER_STEP = 0.01;
-
-function seedOf(text: string): number {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < text.length; i++) {
-    h = Math.imul(h ^ text.charCodeAt(i), 0x01000193);
-  }
-  return h | 0;
-}
-
-const clamp = (v: number, range: Lane['range']) => Math.min(range.max, Math.max(range.min, v));
-
-class Evaluator {
+class DocBook implements LaneBook {
   private readonly byId: Map<string, MotionClip>;
   private readonly order: MotionClip[];
-  private readonly programs = new Map<string, Program>();
-  private readonly memo = new Map<string, number>();
-  private readonly visiting: string[] = [];
 
-  constructor(
-    private readonly doc: MotionDoc,
-    private readonly analyses: Record<string, AudioAnalysis> = {}
-  ) {
+  constructor(private readonly doc: MotionDoc) {
     this.order = clipsOf(doc);
     this.byId = new Map(this.order.map((c) => [c.id, c]));
   }
 
-  value(id: string, key: string, frame: number): number {
-    const lane = this.lane(id, key);
-    const local = frame - lane.from;
-    const keyed = lane.keyed(local);
-    if (!lane.source) {
-      return keyed;
-    }
-
-    const name = `${id}.${key}`;
-    const memoKey = `${name}@${frame}`;
-    const known = this.memo.get(memoKey);
-    if (known !== undefined) {
-      return known;
-    }
-    const loop = this.visiting.indexOf(name);
-    if (loop >= 0) {
-      throw new ExpressionError(`expression cycle: ${[...this.visiting.slice(loop), name].join(' → ')}`);
-    }
-
-    this.visiting.push(name);
-    try {
-      const result = runExpression(this.program(name, lane.source), {
-        time: local / this.doc.fps,
-        frame: local,
-        fps: this.doc.fps,
-        value: keyed,
-        index: lane.index,
-        seed: seedOf(name),
-        track: lane.track,
-        thisLayer: this.handle(id, frame),
-        layer: (ref) => this.handle(this.resolve(ref), frame),
-        audio: audioPort(this.doc, this.analyses, frame)
-      });
-      const clamped = clamp(result, lane.range);
-      this.memo.set(memoKey, clamped);
-      return clamped;
-    } finally {
-      this.visiting.pop();
-    }
-  }
-
-  private program(name: string, source: string): Program {
-    const cached = this.programs.get(name);
-    if (cached) {
-      return cached;
-    }
-    const compiled = compileExpression(source);
-    if (!compiled.ok) {
-      throw new ExpressionError(compiled.error);
-    }
-    this.programs.set(name, compiled.program);
-    return compiled.program;
-  }
-
-  private handle(id: string, frame: number): LayerHandle {
-    return { get: (key) => this.value(id, key, frame) };
-  }
-
-  private resolve(ref: string | number): string {
+  resolve(ref: string | number): string {
     const clip =
       typeof ref === 'number'
         ? this.order[ref - 1]
@@ -108,11 +32,11 @@ class Evaluator {
     return clip.id;
   }
 
-  private lane(id: string, key: string): Lane {
+  lane(id: string, key: string): LaneData {
     return id === CAMERA_LANE ? this.cameraLane(key) : this.clipLane(id, key);
   }
 
-  private clipLane(id: string, key: string): Lane {
+  private clipLane(id: string, key: string): LaneData {
     const clip = this.byId.get(id);
     if (!clip) {
       throw new ExpressionError(`no layer "${id}"`);
@@ -122,44 +46,43 @@ class Evaluator {
     if (!prop || prop.kind !== ValueKind.Number) {
       throw new ExpressionError(`${id} has no number property "${key}"`);
     }
-    const track = clip.keyframes[key] ?? [];
-    const base = Number(baseValue(animated, key));
     return {
       id,
       key,
-      range: prop,
+      range: { min: prop.min, max: prop.max, step: prop.step },
       from: clip.from,
-      track,
-      keyed: (local) => (track.length ? sampleTrack(track, local) : base),
+      track: clip.keyframes[key] ?? [],
+      base: Number(baseValue(animated, key)),
       source: clip.expressions[key],
       index: this.order.indexOf(clip) + 1
     };
   }
 
-  private cameraLane(key: string): Lane {
+  private cameraLane(key: string): LaneData {
     const camera = this.doc.camera;
     if (!camera || !(key in CAMERA)) {
       throw new ExpressionError(`the camera has no "${key}"`);
     }
     const cameraKey = key as CameraKey;
-    const track = camera.keyframes[cameraKey] ?? [];
-    const base = baseValues(camera)[cameraKey];
+    const range = CAMERA[cameraKey];
     return {
       id: CAMERA_LANE,
       key,
-      range: CAMERA[cameraKey],
+      range: { min: range.min, max: range.max, step: range.step },
       from: 0,
-      track,
-      keyed: (frame) => (track.length ? sampleTrack(track, frame) : base),
+      track: camera.keyframes[cameraKey] ?? [],
+      base: baseValues(camera)[cameraKey],
       source: camera.expressions[cameraKey],
       index: 0
     };
   }
-
-  tolerance(id: string, key: string): number {
-    return Math.max(MIN_TOLERANCE, this.lane(id, key).range.step * TOLERANCE_PER_STEP);
-  }
 }
+
+export function docBook(doc: MotionDoc): LaneBook {
+  return new DocBook(doc);
+}
+
+const docEvaluator = (doc: MotionDoc, analyses: Record<string, AudioAnalysis>, inputs?: InputSource) => new Evaluator(docBook(doc), doc.fps, (frame) => audioPort(doc, analyses, frame), inputs);
 
 function deviates(samples: number[], from: number, to: number, tolerance: number): boolean {
   for (let i = from + 1; i < to; i++) {
@@ -214,7 +137,7 @@ function bake(doc: MotionDoc, analyses: Record<string, AudioAnalysis>): Baked {
   if (!hasExpressions(doc)) {
     return { doc, faults: [] };
   }
-  const evaluator = new Evaluator(doc, analyses);
+  const evaluator = docEvaluator(doc, analyses);
   const faults: ExpressionFault[] = [];
 
   const tracks = doc.tracks.map((t) => ({
@@ -245,5 +168,11 @@ export function expressionErrors(doc: MotionDoc, analyses: Record<string, AudioA
 }
 
 export function expressionValue(doc: MotionDoc, clipId: string, key: string, frame: number, analyses: Record<string, AudioAnalysis> = {}): number {
-  return new Evaluator(doc, analyses).value(clipId, key, frame);
+  return docEvaluator(doc, analyses).value(clipId, key, frame);
+}
+
+export type LiveEvaluator = Pick<Evaluator, 'value' | 'reset'>;
+
+export function liveEvaluator(doc: MotionDoc, analyses: Record<string, AudioAnalysis>, inputs: InputSource): LiveEvaluator {
+  return docEvaluator(doc, analyses, inputs);
 }

@@ -35,9 +35,11 @@ Dark mode redefines the same names under `[data-theme='dark']`. `.ui-app` (on th
 ## Timeline
 
 One table, `src/lib/motion/track-style.ts`: each component maps to a family (text, image,
-video, audio, shape, 3D, code, null, camera, mask) with a hue and a preview kind. Bars are a
-10% tint of the hue with a 3px hue left edge; the track header shows a hue chip with the
-family icon. Selection is always the accent outline, so no family uses `#0099ff`.
+video, audio, shape, 3D, code, null, camera, mask) with a hue and a preview kind. The timeline is
+a layer list (`src/lib/motion/timeline-layers.ts`): a 28px group row per track, a 28px row per
+clip, and a 24px row per animated property when the layer is twirled open. Bars are a tint of
+the hue (14% light, 22% dark) with a 35% hue border and a 3px hue left edge; selection is the
+accent outline with 5px trim handles, so no family uses `#0099ff`. The playhead is `--playhead`.
 
 Previews: image clips tile the asset; video clips show a filmstrip captured once per asset
 (`src/lib/motion/filmstrip.ts`, ≤24 frames, queued, cached, only when the clip scrolls into

@@ -4,6 +4,7 @@ import { MotionFormat, type MotionDoc } from './doc';
 import { MaskKind } from './mask';
 import { FADE_OUT, RISE, assemble, edge, type Beat, type TrackSpec } from './template-kit';
 import { TRAILER_V2_SECONDS, feegaTrailerV2 } from './trailer-v2';
+import { UI_RING_SECONDS, uiRing } from './ui-ring';
 
 export enum AdTemplate {
   ProductHero = 'product-hero',
@@ -12,7 +13,8 @@ export enum AdTemplate {
   Launch3D = 'launch-3d',
   Offer = 'before-after-offer',
   TrailerV2 = 'feega-trailer-v2',
-  TrailerV2Vertical = 'feega-trailer-v2-vertical'
+  TrailerV2Vertical = 'feega-trailer-v2-vertical',
+  UiRing = 'ui-ring'
 }
 
 export type TemplateAssets = {
@@ -254,7 +256,8 @@ export const AD_TEMPLATES: Record<AdTemplate, AdSpec> = {
   [AdTemplate.Launch3D]: { label: '3D product launch · 16:9', format: MotionFormat.Landscape, seconds: 20, build: launch3d },
   [AdTemplate.Offer]: { label: 'Before / after offer · 9:16', format: MotionFormat.Vertical, seconds: 15, build: beforeAfterOffer },
   [AdTemplate.TrailerV2]: { label: 'feega trailer v2 · 16:9', format: MotionFormat.Landscape, seconds: TRAILER_V2_SECONDS, build: (a) => feegaTrailerV2(MotionFormat.Landscape, a) },
-  [AdTemplate.TrailerV2Vertical]: { label: 'feega trailer v2 · 9:16', format: MotionFormat.Vertical, seconds: TRAILER_V2_SECONDS, build: (a) => feegaTrailerV2(MotionFormat.Vertical, a) }
+  [AdTemplate.TrailerV2Vertical]: { label: 'feega trailer v2 · 9:16', format: MotionFormat.Vertical, seconds: TRAILER_V2_SECONDS, build: (a) => feegaTrailerV2(MotionFormat.Vertical, a) },
+  [AdTemplate.UiRing]: { label: 'UI ring · 16:9', format: MotionFormat.Landscape, seconds: UI_RING_SECONDS, build: uiRing }
 };
 
 export const AD_TEMPLATE_IDS = Object.values(AdTemplate);

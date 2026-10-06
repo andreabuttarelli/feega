@@ -1,7 +1,10 @@
 import { esc } from '../hyperframes/html';
 import { AnimatorUnit, SelectorShape } from './model';
 
-export type SplitOptions = { unit: AnimatorUnit; seed: number | null };
+export type SplitOptions = { unit: AnimatorUnit; seed: number | null; coarser?: AnimatorUnit[] };
+
+export const POSITION_VAR: Record<AnimatorUnit, string> = { [AnimatorUnit.Char]: '--pc', [AnimatorUnit.Word]: '--pw', [AnimatorUnit.Line]: '--pl' };
+export const OWN_POSITION = '--p';
 
 const PRECISION = 10000;
 const round = (n: number) => Math.round(n * PRECISION) / PRECISION;
@@ -46,9 +49,9 @@ function unitsOf(lines: string[], unit: AnimatorUnit): Unit[] {
   return units;
 }
 
-const span = (classes: string, p: number, text: string) => `<span class="${classes}" style="--p:${round(p)}">${esc(text)}</span>`;
+const span = (classes: string, p: string, text: string) => `<span class="${classes}" style="${p}">${esc(text)}</span>`;
 
-const RENDER: Record<AnimatorUnit, (line: string, own: Unit[], p: (u: Unit) => number) => string> = {
+const RENDER: Record<AnimatorUnit, (line: string, own: Unit[], p: (u: Unit) => string) => string> = {
   [AnimatorUnit.Line]: (_line, own, p) => own.map((u) => span('tu tl', p(u), u.text)).join(''),
   [AnimatorUnit.Word]: (line, own, p) => {
     let w = 0;
@@ -66,15 +69,35 @@ const RENDER: Record<AnimatorUnit, (line: string, own: Unit[], p: (u: Unit) => n
   }
 };
 
+const LEVEL_KEY: Record<AnimatorUnit, (u: Unit) => string> = {
+  [AnimatorUnit.Char]: (u) => `${u.line}:${u.word}:${u.text}`,
+  [AnimatorUnit.Word]: (u) => `${u.line}:${u.word}`,
+  [AnimatorUnit.Line]: (u) => `${u.line}`
+};
+
+function positions(lines: string[], unit: AnimatorUnit, seed: number | null): Map<string, number> {
+  const units = unitsOf(lines, unit);
+  const rank = ranks(units.length, seed);
+  return new Map(units.map((u, i) => [LEVEL_KEY[unit](u), (rank[i] + 0.5) / units.length]));
+}
+
 export function splitLines(text: string, options: SplitOptions): string[] {
   const lines = text.split('\n');
   const units = unitsOf(lines, options.unit);
   const rank = ranks(units.length, options.seed);
   const position = new Map(units.map((u, i) => [u, (rank[i] + 0.5) / units.length]));
+  const coarser = (options.coarser ?? []).map((level) => ({ level, at: positions(lines, level, null) }));
+  const style = (u: Unit) => [`${OWN_POSITION}:${round(position.get(u)!)}`, ...coarser.map(({ level, at }) => `${POSITION_VAR[level]}:${round(at.get(LEVEL_KEY[level](u))!)}`)].join(';');
   return lines.map((line, l) => {
     const own = units.filter((u) => u.line === l);
-    return own.length ? RENDER[options.unit](line, own, (u) => position.get(u)!) : esc(line);
+    return own.length ? RENDER[options.unit](line, own, style) : esc(line);
   });
+}
+
+export function charPositions(text: string, seed: number | null): number[] {
+  const units = unitsOf(text.split('\n'), AnimatorUnit.Char);
+  const rank = ranks(units.length, seed);
+  return units.map((_, i) => round((rank[i] + 0.5) / units.length));
 }
 
 export function splitText(text: string, options: SplitOptions): string {

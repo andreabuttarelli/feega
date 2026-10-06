@@ -1,11 +1,15 @@
 import type { AudioEntry } from '$lib/motion/audio-plan';
 import { chunkPlan, type ChunkPlan } from '$lib/motion/server-render';
+import { FLAT_FRAME_MS, frameCosts, type CostSpan } from '$lib/motion/render-cost';
 import { FONT_CSS_ORIGIN, FONT_FILE_ORIGIN } from '$lib/motion/hyperframes/csp';
 import { ExportFormat, FORMAT, Master, Quality } from '$lib/motion/export-formats';
 import { assembleArgs, audioMixArgs, concatList, zipArgs } from './render-commands';
 import { FARM_JOB_DIR, FARM_RUNTIME_DIR, type FarmWorker, type RenderFarm } from './render-farm';
+import { stripSteps, stripVideos } from './video-strips';
 
-export type FarmJob = { html: string; width: number; height: number; fps: number; totalFrames: number; audio: AudioEntry[]; allowHosts: string[]; format: ExportFormat; quality: Quality; motionBlur: Shutter | null };
+export type FarmJob = { html: string; width: number; height: number; fps: number; totalFrames: number; audio: AudioEntry[]; allowHosts: string[]; format: ExportFormat; quality: Quality; motionBlur: Shutter | null; cost?: CostSpan[] };
+
+export type Slice = { index: number; size: number };
 
 export type Shutter = { shutterAngle: number; shutterPhase: number; samples: number };
 
@@ -26,42 +30,47 @@ export enum TaskState {
 }
 
 export type Step = { what: string; cmd: string; args: string[] };
-export type TaskCheck = { state: TaskState; error: string | null };
+export type TaskCheck = { state: TaskState; error: string | null; log?: string };
 export type PieceLinks = { upload: string | null; storageHost: string; maxBytes: number };
 export type AssemblyLinks = { pieces: string[]; output: string; maxBytes: number };
 
 const RUNTIME_HOSTS = ['cdn.jsdelivr.net', new URL(FONT_CSS_ORIGIN).host, new URL(FONT_FILE_ORIGIN).host];
-const MAX_PARALLEL_CHUNKS = 16;
+const MAX_PARALLEL_CHUNKS_CEILING = 256;
 const WHOLE_CAPTURE_WORKERS = 6;
 const FULL_HD_PIXELS = 1920 * 1080;
-const MS_PER_BLUR_SAMPLE = 51;
-const BLUR_SAFETY = 0.8;
+const LIFETIME_SAFETY = 0.8;
+const HEAVY_MARGIN = 3;
+const LOG_TAIL_CHARS = 600;
+const PROGRESS_EVERY_MS = 20_000;
+const CAPTURED_FRAME = 'frame_';
 const BYTES_PER_MB = 1024 * 1024;
 const MINUTE_MS = 60_000;
-const WORKER_GONE = 'render worker stopped before it finished: it timed out or crashed';
+export const WORKER_GONE = 'render worker stopped before it finished: it timed out or crashed';
+const MIN_SPLIT_FRAMES = 20;
 
 const WORKER: Record<RenderRoute, { vcpus: number; timeoutMs: number }> = {
   [RenderRoute.Chunked]: { vcpus: 4, timeoutMs: 20 * MINUTE_MS },
   [RenderRoute.Whole]: { vcpus: 8, timeoutMs: 120 * MINUTE_MS }
 };
 
+const LIFETIME = { bootMs: 2 * MINUTE_MS, msPerFullHdFrame: 500, assemblyMs: 5 * MINUTE_MS };
+
 export const MAX_ATTEMPTS = 2;
 export const RENDER_DEADLINE_MS = (MAX_ATTEMPTS + 1) * WORKER[RenderRoute.Whole].timeoutMs;
 
-const blurWork = (job: FarmJob) => (job.motionBlur ? (job.totalFrames * job.motionBlur.samples * job.width * job.height) / FULL_HD_PIXELS : 0);
-const blurBudget = Math.floor((WORKER[RenderRoute.Whole].timeoutMs * BLUR_SAFETY) / MS_PER_BLUR_SAMPLE);
-
 type Rule = { because: string; applies: (job: FarmJob) => boolean };
 
-const WHOLE_ONLY: Rule[] = [
-  { because: 'chunked renders run at 24, 30 or 60 fps only', applies: (job) => ![24, 30, 60].includes(job.fps) },
-  { because: 'the distributed producer has no motion blur', applies: (job) => job.motionBlur !== null }
-];
+const WHOLE_ONLY: Rule[] = [{ because: 'chunked renders run at 24, 30 or 60 fps only', applies: (job) => ![24, 30, 60].includes(job.fps) }];
 
 const REFUSED: Rule[] = [
   { because: 'H.265 renders at 24, 30 or 60 fps without motion blur', applies: (job) => FORMAT[job.format].master === Master.H265 && routeOf(job) === RenderRoute.Whole },
-  { because: 'motion blur cannot render Video clips: turn it off or remove the video', applies: (job) => job.motionBlur !== null && job.html.includes('<video') },
-  { because: `motion blur this long cannot finish on one machine: lower the samples, the frame rate or the length`, applies: (job) => blurWork(job) > blurBudget }
+  { because: `motion blur this long cannot finish even split over every render machine: lower the samples, the frame rate or the length`, applies: (job) => heaviestWork(job) > WORKER[routeOf(job)].timeoutMs * LIFETIME_SAFETY }
+];
+
+export const PRODUCER_BLUR_PATCHES: [string, string][] = [
+  ['format: plan2.dimensions.format === "mp4" ? "jpeg" : "png",', 'format: "png",'],
+  ['lockWarmupTicks: true,', 'lockWarmupTicks: true, motionBlur: JSON.parse(process.env.FEEGA_BLUR),'],
+  ['let forceScreenshotForChunk = encoder2.forceScreenshot;', 'let forceScreenshotForChunk = true;']
 ];
 
 const MASTER: Record<Master, { format: string; codec?: string; ext: string }> = {
@@ -84,10 +93,27 @@ const stepsPath = (task: FarmTask) => `${FARM_JOB_DIR}/steps-${task}.json`;
 const resultPath = (task: FarmTask) => `${FARM_JOB_DIR}/result-${task}.json`;
 const logPath = (task: FarmTask) => `${FARM_JOB_DIR}/log-${task}.txt`;
 
-const CHUNK_SOURCE = `import { readFileSync } from 'node:fs';
+const PRODUCER_DIST = `${FARM_RUNTIME_DIR}/node_modules/@hyperframes/producer/dist`;
+
+const CHUNK_SOURCE = `import { readFileSync, writeFileSync } from 'node:fs';
 const spec = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+async function distributed() {
+  if (!spec.blur) {
+    return import('@hyperframes/producer/distributed');
+  }
+  let source = readFileSync('${PRODUCER_DIST}/distributed.js', 'utf8');
+  for (const [from, to] of ${JSON.stringify(PRODUCER_BLUR_PATCHES)}) {
+    if (!source.includes(from)) {
+      throw new Error('producer patch anchor missing: ' + from);
+    }
+    source = source.replace(from, to);
+  }
+  writeFileSync('${PRODUCER_DIST}/distributed-blur.js', source);
+  process.env.FEEGA_BLUR = JSON.stringify(spec.blur);
+  return import('${PRODUCER_DIST}/distributed-blur.js');
+}
 if (spec.route === 'chunked') {
-  const { plan, renderChunk } = await import('@hyperframes/producer/distributed');
+  const { plan, renderChunk } = await distributed();
   await plan(spec.project, spec.config, spec.planDir);
   const r = await renderChunk(spec.planDir, spec.index, spec.out);
   console.log(JSON.stringify({ frames: r.framesEncoded, captureMs: r.captureStageMs, encodeMs: r.encodeStageMs }));
@@ -97,27 +123,58 @@ if (spec.route === 'chunked') {
 }
 `;
 
-const STEPS_SOURCE = `import { readFileSync, writeFileSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
-const [stepsFile, resultFile] = process.argv.slice(2);
+const STEPS_SOURCE = `import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+const [stepsFile, resultFile, logFile] = process.argv.slice(2);
+const tail = () => {
+  try {
+    return readFileSync(logFile, 'utf8').trim().slice(-${LOG_TAIL_CHARS});
+  } catch {
+    return '';
+  }
+};
+const captured = () => {
+  try {
+    return readdirSync('${FARM_JOB_DIR}', { recursive: true }).filter((f) => String(f).includes('${CAPTURED_FRAME}')).length;
+  } catch {
+    return 0;
+  }
+};
+let reported = 0;
+const progress = setInterval(() => {
+  const now = captured();
+  if (now !== reported) {
+    reported = now;
+    console.log(JSON.stringify({ progress: now + ' frames captured' }));
+  }
+}, ${PROGRESS_EVERY_MS});
+const run = (step) => new Promise((done) => {
+  const child = spawn(step.cmd, step.args, { cwd: '${FARM_RUNTIME_DIR}', stdio: ['ignore', 'inherit', 'inherit'] });
+  child.on('error', (e) => done({ status: 1, message: e.message }));
+  child.on('close', (status) => done({ status, message: null }));
+});
 let error = null;
 try {
   for (const step of JSON.parse(readFileSync(stepsFile, 'utf8'))) {
-    const r = spawnSync(step.cmd, step.args, { cwd: '${FARM_RUNTIME_DIR}', encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
+    const started = Date.now();
+    const r = await run(step);
+    console.log(JSON.stringify({ step: step.what, status: r.status, ms: Date.now() - started }));
     if (r.status !== 0) {
-      error = step.what + ' failed: ' + ((r.stdout ?? '') + (r.stderr ?? '') + (r.error?.message ?? '')).trim().slice(-600);
+      error = step.what + ' failed: ' + (r.message ?? tail());
       break;
     }
   }
 } catch (e) {
   error = 'steps failed: ' + (e?.message ?? String(e));
 }
+clearInterval(progress);
 writeFileSync(resultFile, JSON.stringify({ ok: error === null, error }));
 `;
 
 const masterOf = (job: FarmJob) => MASTER[FORMAT[job.format].master];
-export const pieceFile = (job: FarmJob, i: number) => `c${i}.${masterOf(job).ext}`;
-const chunkPath = (job: FarmJob, i: number) => `${FARM_JOB_DIR}/${pieceFile(job, i)}`;
+export const pieceFile = (job: FarmJob, slice: Slice) => `c${slice.index * slice.size}.${masterOf(job).ext}`;
+const chunkPath = (job: FarmJob, slice: Slice) => `${FARM_JOB_DIR}/${pieceFile(job, slice)}`;
+const isHead = (slice: Slice) => slice.index === 0;
 const outPath = (job: FarmJob) => `${FARM_JOB_DIR}/out.${FORMAT[job.format].ext}`;
 
 export function routeOf(job: FarmJob): RenderRoute {
@@ -128,20 +185,63 @@ export function farmProblem(job: FarmJob): string | null {
   return REFUSED.find((rule) => rule.applies(job))?.because ?? null;
 }
 
-export function farmChunks(job: FarmJob): ChunkPlan {
-  return routeOf(job) === RenderRoute.Whole ? { size: job.totalFrames, count: 1 } : chunkPlan(job.totalFrames);
+const samplesOf = (job: FarmJob) => job.motionBlur?.samples ?? 1;
+
+function pieceWork(job: FarmJob, slice: Slice): number {
+  const start = slice.index * slice.size;
+  const frames = Math.max(0, Math.min(job.totalFrames, start + slice.size) - start);
+  const heavy = frameCosts(job.totalFrames, job.cost ?? []).slice(start, start + slice.size).reduce((sum, ms) => sum + ms - FLAT_FRAME_MS, 0);
+  const flat = (frames * job.width * job.height * LIFETIME.msPerFullHdFrame) / FULL_HD_PIXELS;
+  return LIFETIME.bootMs + samplesOf(job) * (flat + heavy * HEAVY_MARGIN);
 }
 
-type ChunkSpec = { route: RenderRoute; project: string; planDir: string; index: number; out: string; config: Record<string, unknown> };
+function lifetimeMs(job: FarmJob, slice: Slice): number {
+  const head = slice.index === 0 ? LIFETIME.assemblyMs : 0;
+  return Math.round(Math.min(WORKER[routeOf(job)].timeoutMs, pieceWork(job, slice) + head));
+}
 
-function chunkSpec(job: FarmJob, index: number): ChunkSpec {
+function heaviestWork(job: FarmJob): number {
+  return Math.max(...firstSlices(job).map((slice) => pieceWork(job, slice)));
+}
+
+export function farmChunks(job: FarmJob): ChunkPlan {
+  if (routeOf(job) === RenderRoute.Whole) {
+    return { size: job.totalFrames, count: 1 };
+  }
+  return chunkPlan(job.totalFrames, frameCosts(job.totalFrames, job.cost ?? []).map((ms) => ms * samplesOf(job)));
+}
+
+export function firstSlices(job: FarmJob): Slice[] {
+  const { size, count } = farmChunks(job);
+  return Array.from({ length: count }, (_, index) => ({ index, size }));
+}
+
+export function halves(job: FarmJob, slice: Slice): Slice[] | null {
+  const last = (slice.index + 1) * slice.size >= job.totalFrames;
+  if (routeOf(job) === RenderRoute.Whole || slice.size < MIN_SPLIT_FRAMES || (slice.size % 2 !== 0 && !last)) {
+    return null;
+  }
+  const size = Math.ceil(slice.size / 2);
+  return [0, 1].map((k) => ({ index: slice.index * 2 + k, size })).filter((half) => half.index * half.size < job.totalFrames);
+}
+
+export function framesOf(job: FarmJob, slice: Slice): string {
+  const start = slice.index * slice.size;
+  return `frames ${start}–${Math.min(job.totalFrames, start + slice.size) - 1}`;
+}
+
+type ProducerShutter = { shutterAngle: number; shutterPhase: number; samplesPerFrame: number };
+type ChunkSpec = { route: RenderRoute; project: string; planDir: string; index: number; out: string; blur: ProducerShutter | null; config: Record<string, unknown> };
+
+const producerShutter = (s: Shutter): ProducerShutter => ({ shutterAngle: s.shutterAngle, shutterPhase: s.shutterPhase, samplesPerFrame: s.samples });
+
+function chunkSpec(job: FarmJob, slice: Slice): ChunkSpec {
   const { format, codec } = masterOf(job);
-  const blur = job.motionBlur ? { motionBlur: { shutterAngle: job.motionBlur.shutterAngle, shutterPhase: job.motionBlur.shutterPhase, samplesPerFrame: job.motionBlur.samples } } : {};
-  const base = { fps: job.fps, quality: job.quality, format, ...blur };
+  const blur = job.motionBlur ? producerShutter(job.motionBlur) : null;
+  const base = { fps: job.fps, quality: job.quality, format };
   const route = routeOf(job);
-  const chunkSize = farmChunks(job).size;
-  const config = route === RenderRoute.Chunked ? { ...base, ...(codec ? { codec } : {}), width: job.width, height: job.height, chunkSize, maxParallelChunks: MAX_PARALLEL_CHUNKS, runtimeCap: 'none' } : { ...base, workers: WHOLE_CAPTURE_WORKERS };
-  return { route, project: PROJECT_DIR, planDir: PLAN_DIR, index, out: chunkPath(job, index), config };
+  const config = route === RenderRoute.Chunked ? { ...base, ...(codec ? { codec } : {}), width: job.width, height: job.height, chunkSize: slice.size, maxParallelChunks: MAX_PARALLEL_CHUNKS_CEILING, runtimeCap: 'none' } : { ...base, ...(blur ? { motionBlur: blur } : {}), workers: WHOLE_CAPTURE_WORKERS };
+  return { route, project: PROJECT_DIR, planDir: PLAN_DIR, index: slice.index, out: chunkPath(job, slice), blur: route === RenderRoute.Chunked ? blur : null, config };
 }
 
 const curl = (args: string[]) => ['-sS', '--fail-with-body', '--retry', '3', ...args];
@@ -159,24 +259,31 @@ async function startSteps(worker: FarmWorker, task: FarmTask, steps: Step[]): Pr
     { path: STEPS_SCRIPT, content: Buffer.from(STEPS_SOURCE) },
     { path: stepsPath(task), content: Buffer.from(JSON.stringify(steps)) }
   ]);
-  await worker.spawn('bash', ['-c', `node ${STEPS_SCRIPT} ${stepsPath(task)} ${resultPath(task)} > ${logPath(task)} 2>&1`]);
+  await worker.spawn('bash', ['-c', `node ${STEPS_SCRIPT} ${stepsPath(task)} ${resultPath(task)} ${logPath(task)} > ${logPath(task)} 2>&1`]);
 }
 
-export async function launchPiece(farm: RenderFarm, job: FarmJob, index: number, links: PieceLinks): Promise<string> {
+export async function launchPiece(farm: RenderFarm, job: FarmJob, slice: Slice, links: PieceLinks): Promise<string> {
   const route = routeOf(job);
   const hosts = [...new Set([...job.allowHosts, links.storageHost, ...RUNTIME_HOSTS])];
-  const worker = await farm.open({ allowHosts: hosts, timeoutMs: WORKER[route].timeoutMs, vcpus: WORKER[route].vcpus });
+  const worker = await farm.open({ allowHosts: hosts, timeoutMs: lifetimeMs(job, slice), vcpus: WORKER[route].vcpus });
 
-  const render: Step = { what: `chunk ${index}`, cmd: 'node', args: [CHUNK_SCRIPT, SPEC] };
-  const file = chunkPath(job, index);
-  const upload = links.upload ? [sizeStep(`chunk ${index} size check`, 'a part of this render', file, links.maxBytes), uploadStep(`chunk ${index} upload`, file, 'application/octet-stream', links.upload)] : [];
+  const what = framesOf(job, slice);
+  const render: Step = { what, cmd: 'node', args: [CHUNK_SCRIPT, SPEC] };
+  const file = chunkPath(job, slice);
+  const upload = links.upload ? [sizeStep(`${what} size check`, 'a part of this render', file, links.maxBytes), uploadStep(`${what} upload`, file, 'application/octet-stream', links.upload)] : [];
 
-  await worker.write([
-    { path: `${PROJECT_DIR}/index.html`, content: Buffer.from(job.html) },
-    { path: CHUNK_SCRIPT, content: Buffer.from(CHUNK_SOURCE) },
-    { path: SPEC, content: Buffer.from(JSON.stringify(chunkSpec(job, index))) }
-  ]);
-  await startSteps(worker, FarmTask.Piece, [render, ...upload]);
+  const page = job.motionBlur ? stripVideos(job.html) : { html: job.html, strips: [] };
+  try {
+    await worker.write([
+      { path: `${PROJECT_DIR}/index.html`, content: Buffer.from(page.html) },
+      { path: CHUNK_SCRIPT, content: Buffer.from(CHUNK_SOURCE) },
+      { path: SPEC, content: Buffer.from(JSON.stringify(chunkSpec(job, slice))) }
+    ]);
+    await startSteps(worker, FarmTask.Piece, [...stripSteps(PROJECT_DIR, page.strips), render, ...upload]);
+  } catch (e) {
+    await worker.stop().catch(() => {});
+    throw e;
+  }
   return worker.name;
 }
 
@@ -191,16 +298,16 @@ function joinSteps(job: FarmJob, audio: string | null): Step[] {
   ];
 }
 
-export async function launchAssembly(farm: RenderFarm, name: string, job: FarmJob, links: AssemblyLinks): Promise<void> {
+export async function launchAssembly(farm: RenderFarm, name: string, job: FarmJob, slices: Slice[], links: AssemblyLinks): Promise<void> {
   const head = await farm.attach(name);
   if (!head) {
     throw new Error(WORKER_GONE);
   }
-  const count = links.pieces.length + 1;
-  const downloads = links.pieces.map((url, k) => downloadStep(`chunk ${k + 1} download`, url, chunkPath(job, k + 1)));
+  const others = slices.filter((slice) => !isHead(slice));
+  const downloads = links.pieces.map((url, k) => downloadStep(`${framesOf(job, others[k])} download`, url, chunkPath(job, others[k])));
   const mixArgs = FORMAT[job.format].audio ? audioMixArgs(job.audio, job.totalFrames / job.fps, MIX) : null;
   const mix = mixArgs ? [{ what: 'audio mix', cmd: 'ffmpeg', args: mixArgs }] : [];
-  const list = concatList(Array.from({ length: count }, (_, i) => chunkPath(job, i)));
+  const list = concatList(slices.map((slice) => chunkPath(job, slice)));
 
   await head.write([{ path: LIST, content: Buffer.from(list) }]);
   await startSteps(head, FarmTask.Assembly, [
@@ -219,7 +326,8 @@ export async function checkTask(farm: RenderFarm, name: string, task: FarmTask):
   }
   const written = await worker.read(resultPath(task));
   if (!written) {
-    return { state: TaskState.Running, error: null };
+    const log = await worker.read(logPath(task)).catch(() => null);
+    return { state: TaskState.Running, error: null, ...(log ? { log: log.toString().trim().slice(-LOG_TAIL_CHARS) } : {}) };
   }
   const result = JSON.parse(written.toString()) as { ok: boolean; error: string | null };
   return result.ok ? { state: TaskState.Done, error: null } : { state: TaskState.Failed, error: result.error };

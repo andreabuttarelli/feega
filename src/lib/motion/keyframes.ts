@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { COLOR, TYPE, type ComponentId } from './components';
 import { EASE_IDS, Ease } from './design';
 import { MASK_KEYS, MASK_PROPS, maskValue, type Mask, type MaskKey } from './mask';
+import { RING_NUMBERS, RING_NUMBER_KEYS } from '../canvas/composition/ring';
 import { PARTICLE_COLOURS, PARTICLE_COLOUR_KEYS, PARTICLE_NUMBERS, PARTICLE_NUMBER_KEYS } from './particles/model';
 
 export type Bezier = [number, number, number, number];
@@ -65,7 +66,9 @@ export enum Source {
   Animator = 'animator',
   Modifier = 'modifier',
   Remap = 'remap',
-  Sound = 'sound'
+  Sound = 'sound',
+  Layout = 'layout',
+  TextPath = 'textPath'
 }
 
 type Range = { label: string; min: number; max: number; step: number; fallback: number };
@@ -173,6 +176,11 @@ const PARTICLE_PROPS: AnimProp[] = [
   ...PARTICLE_COLOUR_KEYS.map((key) => ({ key, label: PARTICLE_COLOURS[key].label, kind: ValueKind.Color, source: Source.Param, min: 0, max: 0, step: 0, fallback: 0 }))
 ];
 
+const RING_PROPS: AnimProp[] = RING_NUMBER_KEYS.map((key) => {
+  const { label, min, max, step, fallback } = RING_NUMBERS[key];
+  return { key, label, min, max, step, fallback, kind: ValueKind.Number, source: Source.Layout };
+});
+
 export const ANIMATABLE: Record<ComponentId, readonly AnimProp[]> = {
   Title: visual(colours(['color', 'Colour']), typeNumbers),
   Text: visual(colours(['color', 'Colour']), typeNumbers),
@@ -193,7 +201,7 @@ export const ANIMATABLE: Record<ComponentId, readonly AnimProp[]> = {
   Text3D: visual(sceneProps),
   Logo3D: visual(sceneProps),
   Device3D: visual(sceneProps, deviceProps),
-  Composition: visual(),
+  Composition: visual(RING_PROPS),
   Particles: visual(PARTICLE_PROPS),
   Precomp: visual(),
   Adjustment: [],
@@ -221,7 +229,9 @@ const BASE: Record<Source, (clip: Animated, prop: AnimProp) => KeyValue> = {
   [Source.Animator]: (_clip, prop) => prop.base ?? prop.fallback,
   [Source.Modifier]: (_clip, prop) => prop.base ?? prop.fallback,
   [Source.Remap]: (_clip, prop) => prop.fallback,
-  [Source.Sound]: (clip, prop) => Number(clip.props[prop.key] ?? prop.fallback)
+  [Source.Sound]: (clip, prop) => Number(clip.props[prop.key] ?? prop.fallback),
+  [Source.Layout]: (clip, prop) => Number((clip.props.layoutParams as Record<string, unknown> | undefined)?.[prop.key] ?? prop.fallback),
+  [Source.TextPath]: (_clip, prop) => prop.base ?? prop.fallback
 };
 
 export function baseValue(clip: Animated, key: string): KeyValue | null {
@@ -253,7 +263,9 @@ const SOURCE_PROBLEM: Record<Source, (clip: Pick<Animated, 'mask'>, key: string)
   [Source.Animator]: () => null,
   [Source.Modifier]: () => null,
   [Source.Remap]: () => null,
-  [Source.Sound]: () => null
+  [Source.Sound]: () => null,
+  [Source.Layout]: () => null,
+  [Source.TextPath]: () => null
 };
 
 export function keyframesProblem(clip: Pick<Animated, 'component' | 'keyframes' | 'mask' | 'params'>): string | null {
@@ -310,123 +322,9 @@ export function easeName(ease: EaseSpec): string {
   return typeof ease === 'string' ? EASE_NAME[ease] : `kf-bz-${ease.map((n) => String(n).replace('.', '_').replace('-', 'm')).join('-')}`;
 }
 
-export type SampledKey = { frame: number; value: number | string; ease: string | number[]; in?: string; out?: string; roving?: boolean };
+import { sampleTrack, type SampledKey } from './sample-track';
 
-export function sampleTrack(track: SampledKey[], frame: number): number {
-  const curves: Record<string, (p: number) => number> = {
-    standard: (p) => 1 - (1 - p) ** 4,
-    enter: (p) => 1 - (1 - p) ** 3,
-    exit: (p) => p ** 3,
-    linear: (p) => p,
-    overshoot: (p) => {
-      const q = p - 1;
-      return p ? q * q * (2.7 * q + 1.7) + 1 : 0;
-    }
-  };
-  const handles: Record<string, number[]> = {
-    standard: [0.165, 0.84, 0.44, 1],
-    enter: [0.215, 0.61, 0.355, 1],
-    exit: [0.55, 0.055, 0.675, 0.19],
-    linear: [1 / 3, 1 / 3, 2 / 3, 2 / 3],
-    overshoot: [0.175, 0.885, 0.32, 1.275]
-  };
-  const cubic = (a: number, b: number, c: number, d: number, t: number) => {
-    const u = 1 - t;
-    return u * u * u * a + 3 * u * u * t * b + 3 * u * t * t * c + t * t * t * d;
-  };
-  const along = (x1: number, x2: number, p: number) => {
-    let lo = 0;
-    let hi = 1;
-    let t = p;
-    for (let i = 0; i < 48; i++) {
-      if (cubic(0, x1, x2, 1, t) < p) {
-        lo = t;
-      } else {
-        hi = t;
-      }
-      t = (lo + hi) / 2;
-    }
-    return t;
-  };
-  const bezier = (b: number[], p: number) => {
-    if (p <= 0 || p >= 1) {
-      return p <= 0 ? 0 : 1;
-    }
-    return cubic(0, b[1], b[3], 1, along(b[0], b[2], p));
-  };
-
-  const keys = track.map((k) => ({ ...k, frame: k.frame }));
-  let fixed = 0;
-  for (let i = 1; i < keys.length; i++) {
-    if (keys[i].roving && i < keys.length - 1) {
-      continue;
-    }
-    let total = 0;
-    const walked = [0];
-    for (let j = fixed + 1; j <= i; j++) {
-      total += Math.abs(Number(keys[j].value) - Number(keys[j - 1].value));
-      walked.push(total);
-    }
-    for (let j = fixed + 1; j < i && total > 0; j++) {
-      keys[j].frame = keys[fixed].frame + ((keys[i].frame - keys[fixed].frame) * walked[j - fixed]) / total;
-    }
-    fixed = i;
-  }
-
-  const first = keys[0];
-  const last = keys[keys.length - 1];
-  if (frame <= first.frame) {
-    return Number(first.value);
-  }
-  if (frame >= last.frame) {
-    return Number(last.value);
-  }
-
-  let i = 0;
-  while (keys[i + 1].frame <= frame) {
-    i++;
-  }
-  const a = keys[i];
-  const b = keys[i + 1];
-  const va = Number(a.value);
-  const vb = Number(b.value);
-  const dt = b.frame - a.frame;
-  const dv = vb - va;
-  const p = (frame - a.frame) / dt;
-  const out = a.out ?? 'bezier';
-  const into = b.in ?? 'bezier';
-
-  if (out === 'hold' || into === 'hold') {
-    return va;
-  }
-  if (out === 'bezier' && into === 'bezier') {
-    const eased = typeof a.ease === 'string' ? curves[a.ease](p) : bezier(a.ease, p);
-    return va + dv * eased;
-  }
-
-  const through = (k: number, clamp: boolean) => {
-    if (k === 0 || k === keys.length - 1) {
-      return 0;
-    }
-    const before = Number(keys[k].value) - Number(keys[k - 1].value);
-    const after = Number(keys[k + 1].value) - Number(keys[k].value);
-    if (clamp && before * after <= 0) {
-      return 0;
-    }
-    return (Number(keys[k + 1].value) - Number(keys[k - 1].value)) / (keys[k + 1].frame - keys[k - 1].frame);
-  };
-  const slopeOf: Record<string, (k: number) => number> = {
-    linear: () => dv / dt,
-    auto: (k) => through(k, true),
-    continuous: (k) => through(k, false)
-  };
-  const ease = typeof a.ease === 'string' ? handles[a.ease] : a.ease;
-  const x1 = out === 'bezier' ? ease[0] : 1 / 3;
-  const y1 = out === 'bezier' ? va + ease[1] * dv : va + (slopeOf[out](i) * dt) / 3;
-  const x2 = into === 'bezier' ? ease[2] : 2 / 3;
-  const y2 = into === 'bezier' ? va + ease[3] * dv : vb - (slopeOf[into](i + 1) * dt) / 3;
-  return cubic(va, y1, y2, vb, along(x1, x2, p));
-}
+export { sampleTrack, type SampledKey };
 
 const HEX = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i;
 

@@ -38,6 +38,7 @@ const BLOB_HARMONICS = [
   { lobes: 1, weight: 0.2, rate: 1.3 }
 ] as const;
 const GOO_CONTRAST = 30;
+const GOO_TAIL = 3;
 const HALF = 0.5;
 const FILTER_DIGITS = 1000;
 
@@ -193,6 +194,7 @@ type Spec = {
   apply: (layers: Layer[], v: Values, ctx: ModContext) => Layer[];
   moves?: (v: Values) => boolean;
   filter?: (v: Values, unit: number) => string;
+  reach?: (v: Values, unit: number) => number;
 };
 
 export const MODIFIERS: Record<ModifierKind, Spec> = {
@@ -274,6 +276,7 @@ export const MODIFIERS: Record<ModifierKind, Spec> = {
     label: 'Liquid / gooey',
     params: [param('blur', 'Melt', 0, 0.2, 0.001, 0.03), param('threshold', 'Threshold', 0.05, 0.95, 0.01, HALF)],
     apply: (layers) => layers,
+    reach: (v, unit) => v.blur * unit * GOO_TAIL,
     filter: gooFilter
   }
 };
@@ -282,6 +285,10 @@ export type AppliedModifier = { kind: ModifierKind; values: Values };
 
 export function movesOverTime(m: AppliedModifier): boolean {
   return MODIFIERS[m.kind].moves?.(m.values) ?? false;
+}
+
+export function modifierReach(stack: readonly AppliedModifier[], unit: number): number {
+  return stack.reduce((sum, m) => sum + (MODIFIERS[m.kind].reach?.(m.values, unit) ?? 0), 0);
 }
 
 export function modifierFilter(stack: readonly AppliedModifier[], unit: number): string {
