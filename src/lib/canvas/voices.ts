@@ -18,7 +18,7 @@ export const VOICE_SLOTS_BY_PLAN: Readonly<Record<PlanKey | 'none', number>> = {
 };
 
 export const VOICE_CREATION_USD: Readonly<Record<VoiceMethod, number>> = {
-  design: 0.05,
+  design: 0.08,
   instant_clone: 0.1
 };
 

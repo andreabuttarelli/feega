@@ -203,3 +203,9 @@ export async function voiceRefusalFor(
   const own = (await store.list(input.orgId)).find((v) => v.providerVoiceId === input.voiceId);
   return own?.method === 'instant_clone' ? 'cloned_voice_not_in_this_project' : null;
 }
+
+export async function sweepVoices(deps: VoiceDeps, now: Date): Promise<{ samples: { purged: number; failed: number }; orphans: { removed: number } }> {
+  const samples = await purgeVoiceSamples(deps);
+  const orphans = now.getUTCMinutes() === 0 ? await sweepOrphanVoices(deps) : { removed: 0 };
+  return { samples, orphans };
+}

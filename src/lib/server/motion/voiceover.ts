@@ -1,15 +1,14 @@
 import type { Db } from '$lib/server/db/client';
 import type { Actor } from '$lib/server/repos/actor';
 import { runAudio } from '$lib/server/canvas/audio-run';
-import { cachedVoices } from '$lib/server/canvas/audio-voices';
+import { voiceUseRefusal } from '$lib/server/voices/voice-guard';
 import { createAssetSigningDb, signAssetPaths } from '$lib/server/canvas/sign-media';
-import { defaultAudioModel } from '$lib/canvas/audio-operations';
+import { defaultAudioModel, voiceIdOf } from '$lib/canvas/audio-operations';
 import { screenModelInput } from '$lib/server/moderation/model-input';
 import { ModerationProfile } from '$lib/server/moderation/profiles';
 import type { Voiceover } from './motion-tools';
 
 const AUDIO_NOT_CONFIGURED = 'elevenlabs_not_configured';
-const NO_VOICE = 'no_voice_available';
 const OPERATION = 'text_to_speech';
 
 export type VoiceoverScope = { orgId: string; projectId: string; nodeId: string; userId: string; actor: Actor };
@@ -26,9 +25,10 @@ export async function speakVoiceover(db: Db, scope: VoiceoverScope, input: { tex
     return { ok: false, error: AUDIO_NOT_CONFIGURED };
   }
 
-  const voiceId = input.voiceId ?? (await cachedVoices(provider))[0]?.id;
-  if (!voiceId) {
-    return { ok: false, error: NO_VOICE };
+  const voiceId = voiceIdOf({ voiceId: input.voiceId });
+  const refusal = await voiceUseRefusal(db, { orgId: scope.orgId, projectId: scope.projectId, voiceId });
+  if (refusal) {
+    return { ok: false, error: refusal };
   }
 
   const out = await runAudio(db, provider, {

@@ -50,6 +50,9 @@ vi.mock('$lib/server/supabase-admin', () => ({ createAdminClient: () => ({}) }))
 const { screenModelInput } = vi.hoisted(() => ({ screenModelInput: vi.fn() }));
 vi.mock('$lib/server/moderation/model-input', () => ({ screenModelInput }));
 
+const { voiceUseRefusal } = vi.hoisted(() => ({ voiceUseRefusal: vi.fn() }));
+vi.mock('$lib/server/voices/voice-guard', () => ({ voiceUseRefusal }));
+
 const audioNode = (data: Record<string, unknown> = {}) => ({
   id: NODE,
   org_id: ORG,
@@ -108,12 +111,32 @@ beforeEach(() => {
   logAiCall.mockReset();
   screenModelInput.mockReset();
   screenModelInput.mockResolvedValue({ ok: true });
+  voiceUseRefusal.mockReset();
+  voiceUseRefusal.mockResolvedValue(null);
   configuredProvider.mockReset();
   configuredProvider.mockReturnValue(provider);
   vi.stubGlobal('fetch', vi.fn(async () => new Response(new Uint8Array([1, 2, 3]), { headers: { 'content-type': 'video/mp4' } })));
 });
 
 describe('an audio node speaks the text connected to it', () => {
+  it('refuses a voice another workspace owns, before calling ElevenLabs', async () => {
+    voiceUseRefusal.mockResolvedValue('voice_not_yours');
+    const { db } = fakeDb(
+      {
+        nodes: [audioNode(), textNode],
+        nodes_connections: [edge(TEXT)],
+        assets: [{ id: 'text-asset', org_id: ORG, project_id: PROJECT, type: 'text', content: 'Buongiorno' }]
+      },
+      { updateRows: { nodes: [{ ...audioNode(), version: 2 }] } }
+    );
+
+    const out = await runGenNode(db, start({ operation: 'text_to_speech', voiceId: 'theirs' }, 'a tutti'));
+
+    expect(out).toMatchObject({ kind: 'refused', error: 'voice_not_yours' });
+    expect(voiceUseRefusal).toHaveBeenCalledWith(db, { orgId: ORG, projectId: PROJECT, voiceId: 'theirs' });
+    expect(provider.speak).not.toHaveBeenCalled();
+  });
+
   it('sends the connected text plus its own to ElevenLabs, stores the mp3 path where generated media is signed, bills the characters', async () => {
     provider.speak.mockResolvedValue(oneSecondMp3());
     const { db, calls } = fakeDb(

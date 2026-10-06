@@ -6,6 +6,7 @@ import {
   purgeVoiceSamples,
   saveDesignedVoice,
   sweepOrphanVoices,
+  sweepVoices,
   voiceRefusalFor,
   voiceSlots,
   VOICE_ORG_LABEL,
@@ -166,5 +167,15 @@ describe('using a voice', () => {
     expect(await voiceRefusalFor(store, { orgId: 'org-1', voiceId: 'el-1', mode: ProjectMode.Uncensored })).toBe('cloned_voice_not_in_this_project');
     expect(await voiceRefusalFor(store, { orgId: 'org-1', voiceId: 'el-2', mode: ProjectMode.Uncensored })).toBeNull();
     expect(await voiceRefusalFor(store, { orgId: 'org-1', voiceId: 'premade', mode: ProjectMode.Standard })).toBeNull();
+  });
+});
+
+describe('the voice sweep on the tick', () => {
+  it('purges samples every tick and looks for orphans only on the hour', async () => {
+    const { deps, provider } = fakes([voice({ method: 'instant_clone' })]);
+    expect(await sweepVoices(deps, new Date('2026-10-06T10:07:00Z'))).toEqual({ samples: { purged: 1, failed: 0 }, orphans: { removed: 0 } });
+    expect(provider.labelled).not.toHaveBeenCalled();
+    await sweepVoices(deps, new Date('2026-10-06T11:00:00Z'));
+    expect(provider.labelled).toHaveBeenCalledTimes(1);
   });
 });
