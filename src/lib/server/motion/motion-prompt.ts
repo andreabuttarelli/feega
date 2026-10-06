@@ -5,7 +5,7 @@ import { EFFECT_KINDS } from '$lib/motion/effects/registry';
 import { UNITS_GUIDE } from '$lib/motion/units';
 
 const SEEING: Record<Vision, string> = {
-  [Vision.Available]: `You can SEE the video: ${VIEW_FRAMES} renders up to ${MAX_FRAMES_PER_VIEW} exact times from the editor preview and shows you the frames. Use it when how something looks matters. After a turn that changed the video, an automatic self-check shows you the middle of each scene once: fix clipped or overflowing text, overlaps, low contrast and safe-area problems then, and only those.`,
+  [Vision.Available]: `You can SEE the video: ${VIEW_FRAMES} renders up to ${MAX_FRAMES_PER_VIEW} exact times from the editor preview and shows you the frames. Use it when how something looks matters. After a turn that changed the video, an automatic self-check shows you the middle of each scene once: fix clipped or overflowing text, overlaps, low contrast and safe-area problems then, and only those. Write your summary for the user after that check, not before: until then keep any note to one line.`,
   [Vision.Missing]: 'You cannot see frames in this workspace: reason from the doc.'
 };
 

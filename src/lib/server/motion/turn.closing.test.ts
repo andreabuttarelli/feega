@@ -137,10 +137,10 @@ vi.mock('$lib/server/motion/brand-sources', () => ({ brandSources: () => ({}) })
 
 const { startMotionTurn, Browser } = await import('./turn');
 
-async function turn(reasoning: string | null = 'low') {
+async function turn(reasoning: string | null = 'low', browser = Browser.Attached) {
   const db = { storage: { from: () => ({}) } } as never;
   const motion = { record: { id: 'n-1', canvasId: 'c-1' }, node: { id: 'n-1', format: MotionFormat.Landscape, docHeadRevision: 0, posterAssetId: null, lastRenderAssetId: null } } as never;
-  const started = await startMotionTurn({ db, userId: 'u-1', orgId: 'o-1', project: { id: 'p-1', brandId: null }, motion, message: 'make it pop', selection: [], model: 'anthropic/claude-opus-5.5', reasoning, requester: { kind: 'user', id: 'u-1' }, browser: Browser.Attached });
+  const started = await startMotionTurn({ db, userId: 'u-1', orgId: 'o-1', project: { id: 'p-1', brandId: null }, motion, message: 'make it pop', selection: [], model: 'anthropic/claude-opus-5.5', reasoning, requester: { kind: 'user', id: 'u-1' }, browser });
   if (started instanceof Response) {
     throw new Error('turn refused');
   }
@@ -207,12 +207,21 @@ describe('a motion turn closes on a look and a summary', () => {
     expect(world.calls.some((c) => c.toolChoice?.type === 'tool')).toBe(false);
   });
 
-  it('ends on a summary for the user, and the working notes keep their spacing', async () => {
-    const outcome = await turn();
+  it('a turn cut by its budget in the middle of the work still ends on a summary, and the notes keep their spacing', async () => {
+    world.rate = 1_000_000;
+
+    const outcome = await turn('low', Browser.Absent);
     const saved = world.saved.find((t) => t.role === 'assistant')!.content!;
 
     expect(outcome.reply.trim().endsWith(SUMMARY)).toBe(true);
     expect(saved.trim().endsWith(SUMMARY)).toBe(true);
     expect(saved).not.toMatch(/\.[A-Z]/);
+  });
+
+  it('a check that ends on its own words is the summary: no extra step resends the turn', async () => {
+    await turn();
+
+    expect(world.calls.some((c) => c.toolChoice?.type === 'none')).toBe(false);
+    expect(world.calls.at(-1)!.prompt.some((m) => m.role === 'user' && /summary/i.test(textOf(m)))).toBe(true);
   });
 });

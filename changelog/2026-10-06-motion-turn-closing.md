@@ -25,5 +25,10 @@ diceva "non ho cambiato nulla". Ora i passi finiti si raccolgono in `onStepFinis
 fallisce tiene ciò che ha fatto), e un modello del picker, che per definizione legge immagini
 (`usable`), guarda i frame da sé senza passare a un altro modello.
 
+Il secondo rilancio ha mostrato tre riepiloghi uno dopo l'altro e un passo in più per ogni round:
+il round di riepilogo ora parte solo se l'ultimo passo non ha chiuso con un testo (budget, tempo,
+errore); il self-check chiede di chiudere con il riepilogo, e il prompt di dire il riepilogo solo
+dopo il controllo.
+
 Scartato: forzare `view_frames` con `tool_choice: required` (stesso rifiuto con il thinking), e un
 riepilogo generato da un secondo modello (perde il contesto del turno, che è già in cache).

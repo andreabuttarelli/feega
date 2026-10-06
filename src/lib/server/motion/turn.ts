@@ -241,11 +241,10 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
       };
 
       await play(openingMessages, Round.Edit);
-      const edited = steps.length;
       for (let nudge = 0; nudge < MAX_SELF_CHECK_NUDGES && steps.length && selfCheckDue(session, vision); nudge++) {
         await play([...conversation, { role: 'user', content: selfCheckPrompt(keyFrameTimes(session.doc)) }], Round.SelfCheck);
       }
-      if (steps.length && (steps.length > edited || !closedByModel(steps.at(-1)))) {
+      if (steps.length && !closedByModel(steps.at(-1))) {
         await play([...conversation, { role: 'user', content: SUMMARY_PROMPT }], Round.Summary);
       }
       writer.write({ type: 'finish' });
