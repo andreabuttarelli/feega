@@ -93,7 +93,7 @@ const ROW_WIDTH = 0.34;
 const ROW_STAGGER = Math.round(0.25 * FPS);
 const ROW_TURN = 14;
 
-export type DeviceRow = { device: Device; screens: (string | null)[]; from: number; durationInFrames: number; ids: string[] };
+export type DeviceRow = { device: Device; screens: (string | null)[]; from: number; durationInFrames: number; ids: string[]; trackId?: string };
 
 export function addDeviceRow(doc: MotionDoc, row: DeviceRow): OpResult {
   let next: OpResult = { ok: true, doc };
@@ -103,7 +103,7 @@ export function addDeviceRow(doc: MotionDoc, row: DeviceRow): OpResult {
     }
     const id = row.ids[i];
     const props = { device: row.device, screen: row.screens[i] ?? row.screens[0] ?? null, x, width: ROW_WIDTH };
-    next = addClip(next.doc, { component: 'Device3D', from: row.from + i * ROW_STAGGER, durationInFrames: row.durationInFrames - i * ROW_STAGGER, props }, id);
+    next = addClip(next.doc, { component: 'Device3D', from: row.from + i * ROW_STAGGER, durationInFrames: row.durationInFrames - i * ROW_STAGGER, trackId: row.trackId, props }, id);
     if (next.ok) {
       const turn = (i - 1) * ROW_TURN;
       next = setKeyframes(next.doc, id, 'objectRotateY', [key(0, turn - 40), key(row.durationInFrames, turn + 10 * (i + 1))]);
