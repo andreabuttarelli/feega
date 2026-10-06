@@ -3,10 +3,12 @@ import { Matte } from '../mask';
 import { MATTE_DRAFT_SCALE, MATTE_SETTLE_MS, matteScript } from './mattes';
 
 const FRAME = { width: 1920, height: 1080 };
+const VECTOR = 'data:image/svg+xml;charset=utf-8,matte';
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
 function page(matte: Exclude<Matte, Matte.None> = Matte.Alpha) {
   const widths: number[] = [];
+  const vectors: number[] = [];
   const styles = new Map<string, string>();
   let pixelReads = 0;
   const listeners = new Map<string, (e: unknown) => void>();
@@ -30,6 +32,10 @@ function page(matte: Exclude<Matte, Matte.None> = Matte.Alpha) {
     __timelines: { main: { to: (_t: object, vars: { onUpdate: () => void }) => updates.push(vars.onUpdate) } },
     htmlToImage: {
       getFontEmbedCSS: async () => '',
+      toSvg: async (_node: unknown, o: { width: number }) => {
+        vectors.push(o.width);
+        return VECTOR;
+      },
       toCanvas: async (_node: unknown, o: { canvasWidth: number; canvasHeight: number }) => {
         widths.push(o.canvasWidth);
         return canvas(o.canvasWidth, o.canvasHeight);
@@ -72,15 +78,17 @@ function page(matte: Exclude<Matte, Matte.None> = Matte.Alpha) {
     await tick();
     await tick();
   };
-  return { widths, seek, play, pause, settle, styles, reads: () => pixelReads };
+  return { widths, vectors, seek, play, pause, settle, styles, reads: () => pixelReads };
 }
 
 describe('matte quality while the preview plays', () => {
-  it('a seek while paused renders the matte at full size: export and render wait for it', async () => {
+  it('a seek while paused masks with the vector picture at full size, never a raster to encode', async () => {
     const p = page();
     await p.seek();
 
-    expect(p.widths.at(-1)).toBe(FRAME.width);
+    expect(p.vectors).toEqual([FRAME.width]);
+    expect(p.widths).toEqual([]);
+    expect(p.styles.get('mask')).toContain(VECTOR);
   });
 
   it('the player seeking while it plays gets a draft at reduced size, so the matte keeps up', async () => {
@@ -97,7 +105,7 @@ describe('matte quality while the preview plays', () => {
     p.pause();
     await p.settle();
 
-    expect(p.widths.at(-1)).toBe(FRAME.width);
+    expect(p.vectors.at(-1)).toBe(FRAME.width);
     expect(MATTE_SETTLE_MS).toBeGreaterThan(0);
   });
 });
