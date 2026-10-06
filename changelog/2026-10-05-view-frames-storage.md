@@ -10,6 +10,4 @@ e ogni `list` di un client utente torna `invalid input syntax for type uuid: "e2
 `20261005120000_canvas_assets_text_org.sql` (confronto come testo) e un errore di `list` ora
 arriva all'agente con la causa.
 
-**Causa 2, self-check.** Il secondo giro forzava `tool_choice: view_frames`; con il reasoning acceso
-i provider lo rifiutano (`tool_choice ... not supported`) e il self-check moriva. Ora si forza solo
-senza reasoning (`selfCheckChoice`).
+**Causa 2, self-check.** Il secondo giro forzava `tool_choice: view_frames`, rifiutato dai provider con il reasoning acceso: la correzione sta nella PR #177 (`selfCheckChoice` e i round di chiusura in `turn.ts`). La migration risulta già applicata in produzione.

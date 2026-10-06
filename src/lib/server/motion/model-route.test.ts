@@ -1,20 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
-import { Tier, activeTools, openingTier, selfCheckChoice, spentUsd, stepTier, toolsWritingCode } from './model-route';
-
-describe('the self-check opens on view_frames', () => {
-  it('forces view_frames on the edit model without reasoning', () => {
-    expect(selfCheckChoice({ tier: Tier.Edit, reasoning: null })).toEqual({ toolChoice: { type: 'tool', toolName: 'view_frames' } });
-  });
-
-  it('never forces a tool while reasoning is on: providers refuse tool_choice with thinking and the whole self-check dies', () => {
-    expect(selfCheckChoice({ tier: Tier.Edit, reasoning: 'medium' })).toEqual({});
-  });
-
-  it('never forces a tool on the code model', () => {
-    expect(selfCheckChoice({ tier: Tier.Code, reasoning: null })).toEqual({});
-  });
-});
+import { Tier, activeTools, openingTier, spentUsd, stepTier, toolsWritingCode } from './model-route';
 
 const doc = newMotionDoc(MotionFormat.Landscape);
 

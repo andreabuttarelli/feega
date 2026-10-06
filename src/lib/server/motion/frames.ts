@@ -127,7 +127,7 @@ function libraryTexts(doc: MotionDoc): string[] {
 }
 
 export function selfCheckPrompt(times: number[]): string {
-  return `Self-check: call ${VIEW_FRAMES} with times [${times.join(', ')}] and look at the result. If text is clipped or overflows, overlaps another element, has poor contrast or leaves the safe area, fix it once with the editing tools; otherwise change nothing. Then say in one line what you checked.`;
+  return `Self-check: call ${VIEW_FRAMES} with times [${times.join(', ')}] and look at the result. If text is clipped or overflows, overlaps another element, has poor contrast or leaves the safe area, or the result lists quality problems, fix them with the editing tools; otherwise change nothing. Then say in one line what you checked.`;
 }
 
 export type TokenUsage = Partial<Record<'inputTokens' | 'outputTokens' | 'cachedTokens' | 'thinkingTokens', number>>;

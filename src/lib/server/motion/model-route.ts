@@ -11,12 +11,6 @@ export const PATCH_COMPONENT = 'patch_component';
 export const READ_COMPONENT = 'read_component';
 
 export const toolsWritingCode: ReadonlySet<string> = new Set([WRITE_COMPONENT, PATCH_COMPONENT]);
-
-const FORCES_VIEW: Record<Tier, boolean> = { [Tier.Edit]: true, [Tier.Code]: false };
-
-export function selfCheckChoice(input: { tier: Tier; reasoning: string | null }): { toolChoice?: { type: 'tool'; toolName: string } } {
-  return FORCES_VIEW[input.tier] && !input.reasoning ? { toolChoice: { type: 'tool', toolName: 'view_frames' } } : {};
-}
 const CODE_TOOLS: ReadonlySet<string> = new Set([...toolsWritingCode, READ_COMPONENT]);
 
 const CODE_INTENT = /\b(code|components?|custom|animated|animation|ui|interface|scenes?|mock-?ups?|trailer|promo|chat panel|calendar|cursors?|node graph|typing)\b/i;
