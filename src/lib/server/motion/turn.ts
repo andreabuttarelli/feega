@@ -22,6 +22,7 @@ import { speakVoiceover } from '$lib/server/motion/voiceover';
 import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
 import { brandSources } from '$lib/server/motion/brand-sources';
 import { SELF_CHECK_MAX_STEPS, SUMMARY_PROMPT, VIEW_FRAMES, Vision, docTexts, keyFrameTimes, selfCheckDue, selfCheckPrompt, usageByModel, visionStep } from '$lib/server/motion/frames';
+import { frameStats } from '$lib/server/motion/frame-stats';
 import { awaitFrames, awaitVerdict, framesPrefix, FRAME_POLL_MS, type FrameBucket } from '$lib/server/motion/frame-store';
 import { CANVAS_ASSET_BUCKET, SIGNED_URL_TTL_S } from '$lib/server/repos/asset-storage';
 import { ASSETS_ADDED, CHECK_REQUEST, FRAMES_REQUEST, type CheckRequest, type FramesRequest } from '$lib/motion/frames-request';
@@ -151,6 +152,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
       askPreview({ callId, times, doc: session.doc, assets: assets.slice(knownAssets) });
       return awaitFrames(bucket, framesPrefix(frameScope, callId), times.length);
     },
+    inspect: frameStats,
     check: async (callId, doc, name) => {
       BROWSER_DRAWS[browser]();
       const review = await screenModelInput(db, { profile: ModerationProfile.Standard, texts: docTexts(doc), scope: moderationScope });
