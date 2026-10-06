@@ -21,7 +21,8 @@
   const numberOf = (e: Event) => Number((e.currentTarget as HTMLInputElement).value);
 </script>
 
-<div class="bento-panel nodrag" data-testid="bento-panel">
+<details class="bento-panel nodrag" data-testid="bento-panel">
+  <summary>Grid</summary>
   <div class="row">
     {#each GRID as g (g.key)}
       <label>
@@ -41,17 +42,14 @@
       {/each}
     </div>
   {/each}
-</div>
+</details>
 
 <style>
   .bento-panel {
     position: absolute;
     left: 8px;
     bottom: 8px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    padding: 6px;
+    padding: 4px 6px;
     max-height: 60%;
     overflow: auto;
     background: var(--paper, #fff);
@@ -59,8 +57,16 @@
     font-size: 11px;
     color: var(--ink, #1d1d1f);
   }
+  summary {
+    cursor: pointer;
+    color: var(--ink-soft, #6e6e73);
+  }
+  .bento-panel[open] summary {
+    margin-bottom: 4px;
+  }
   .row {
     display: flex;
+    margin-top: 4px;
     gap: 6px;
     align-items: center;
   }
