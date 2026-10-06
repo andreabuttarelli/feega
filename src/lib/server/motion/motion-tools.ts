@@ -31,7 +31,7 @@ import { CheckState, MAX_CSS, MAX_HTML, MAX_JS, SOURCE_FILES, checkState, propsS
 import { patchComponent, recordCheck, removeComponent, writeComponent } from '$lib/motion/custom/ops';
 import { PATCH_COMPONENT, READ_COMPONENT, WRITE_COMPONENT } from './model-route';
 import { CAMERA, CAMERA_KEYS, CAMERA_LANE, SPACES, type Camera } from '$lib/motion/camera';
-import { ENV_PRESETS, HDRI, LIGHT, LIGHT_KEYS, LIGHT_KINDS, type Look } from '$lib/motion/look';
+import { ENV_PRESETS, HDRI, LIGHT, envPresetInput, LIGHT_KEYS, LIGHT_KINDS, type Look } from '$lib/motion/look';
 import { removeLight, removeLook, setLight, setLightKeyframes, setLook } from '$lib/motion/look-ops';
 import { DEVICE, DEVICES } from '$lib/motion/devices';
 import { DEVICE_PRESETS, PRESET as DEVICE_PRESET, addDeviceRow, applyDevicePreset } from '$lib/motion/device-presets';
@@ -50,7 +50,7 @@ import { BuiltinFont, FONT_WEIGHTS, searchFonts } from '$lib/motion/fonts/model'
 import { registerFont, removeFont, setFont } from '$lib/motion/fonts/ops';
 import { EFFECTS, EFFECT_KINDS } from '$lib/motion/effects/registry';
 import { addEffect, removeEffect, setEffect } from '$lib/motion/effects/ops';
-import { effectKey } from '$lib/motion/effects/model';
+import { MAX_EFFECTS, effectKey } from '$lib/motion/effects/model';
 import { EffectKind } from '$lib/motion/effects/registry';
 import { LUT_PRESETS, LUT_PRESET_IDS, applyLut, compileLut, lutFromCube } from '$lib/motion/effects/lut';
 import { BLEND_MODES } from '$lib/motion/blend';
@@ -215,6 +215,16 @@ const MODIFIER_CATALOGUE = MODIFIER_KINDS.map((k) => `${k} (${MODIFIERS[k].param
 const PATH_GUIDE = 'SVG path data (M L H V C S Q T Z, absolute or relative) in the shape box: 0,0 is its top-left and 1,1 its bottom-right';
 const EFFECT_CATALOGUE = EFFECT_KINDS.map((k) => `${k} (${EFFECTS[k].about}; ${EFFECTS[k].params.map((p) => `${p.key} ${p.kind === ValueKind.Color ? 'colour' : `${p.min}..${p.max}`}`).join(', ')})`).join('; ');
 
+const effectSpec = z.object({ kind: z.enum(EFFECT_KINDS), params: z.record(z.string(), z.union([z.number(), z.string()])).optional() });
+
+type EffectSpec = z.infer<typeof effectSpec>;
+
+const PLACED = { track_id: z.string().optional() };
+
+const PLACED_PICTURE = { ...PLACED, effects: z.array(effectSpec).max(MAX_EFFECTS).optional() };
+
+const PLACEMENT_HELP = 'track_id puts it on that track (else the first that fits); effects is its effect stack, same kinds and params as add_effect.';
+
 const MAX_FONT_RESULTS = 50;
 const DEFAULT_FONT_RESULTS = 12;
 
@@ -359,6 +369,11 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     return { ok: true, doc: { ...result.doc, assets: [...result.doc.assets, { id: asset.id, kind: asset.kind, name: asset.label }] } };
   };
 
+  const withEffects = (result: OpResult, clipIds: string[], effects: EffectSpec[] = []): OpResult =>
+    clipIds.flatMap((id) => effects.map((e) => ({ id, e }))).reduce<OpResult>((r, { id, e }) => (r.ok ? addEffect(r.doc, id, e.kind, deps.newId(), e.params) : r), result);
+
+  const created = (out: ReturnType<typeof apply>, clipId: string) => (out.ok ? { ...out, clip_id: clipId } : out);
+
   const tools: Record<string, Tool> = {
     get_motion_doc: tool({
       description: 'Read the video being edited: size, duration in seconds, tracks and clips (start/duration in seconds), and the clips the user has selected.',
@@ -379,24 +394,25 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     add_clip: tool({
-      description: 'Add a clip of a library component at a time in seconds. Props not given take the component defaults. Colours may be brand.primary/secondary/accent/background/text or #rrggbb.',
+      description: `Add a clip of a library component at a time in seconds. Props not given take the component defaults. Colours may be brand.primary/secondary/accent/background/text or #rrggbb. ${PLACEMENT_HELP} Returns the clip id.`,
       inputSchema: z.object({
         component: z.enum(COMPONENT_IDS),
         start: z.number().min(0),
         duration: z.number().positive().optional(),
-        track_id: z.string().optional(),
-        props: z.record(z.string(), z.unknown()).optional()
+        props: z.record(z.string(), z.unknown()).optional(),
+        ...PLACED_PICTURE
       }),
       execute: async (input) => {
         if (!assetKnown(input.props?.assetId)) {
           return { ok: false, error: 'unknown asset id: call list_assets' };
         }
+        const id = deps.newId();
         const result = addClip(
           session.doc,
           { component: input.component, from: frames(input.start), durationInFrames: input.duration ? frames(input.duration) : undefined, trackId: input.track_id, props: propsIn(input.component, input.props) },
-          deps.newId()
+          id
         );
-        return apply(registered(result, input.props?.assetId), `added ${input.component}`);
+        return created(apply(withEffects(registered(result, input.props?.assetId), [id], input.effects), `added ${input.component}`), id);
       }
     }),
 
@@ -704,15 +720,16 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     add_particles: tool({
-      description: `Add a Particles clip (seeded, deterministic emitter) from a preset: ${PARTICLE_PRESETS.map((p) => `${p} — ${PARTICLE_PRESET[p].about}`).join('; ')}. props override the preset (seed, emitter, shape, rate, life, speed, direction, spread, gravity, drag, wobble, spin, sizeStart/End, colorStart/End, opacityStart/End, softness, prewarm; list_components has the ranges). Every numeric and colour prop takes set_keyframes.`,
-      inputSchema: z.object({ preset: z.enum(PARTICLE_PRESETS), start: z.number().min(0), duration: z.number().positive().optional(), track_id: z.string().optional(), props: z.record(z.string(), z.unknown()).optional() }),
+      description: `Add a Particles clip (seeded, deterministic emitter) from a preset: ${PARTICLE_PRESETS.map((p) => `${p} — ${PARTICLE_PRESET[p].about}`).join('; ')}. props override the preset (seed, emitter, shape, rate, life, speed, direction, spread, gravity, drag, wobble, spin, sizeStart/End, colorStart/End, opacityStart/End, softness, prewarm; list_components has the ranges). Every numeric and colour prop takes set_keyframes. ${PLACEMENT_HELP} Returns the clip id.`,
+      inputSchema: z.object({ preset: z.enum(PARTICLE_PRESETS), start: z.number().min(0), duration: z.number().positive().optional(), props: z.record(z.string(), z.unknown()).optional(), ...PLACED_PICTURE }),
       execute: async (input) => {
         if (!assetKnown(input.props?.sprite)) {
           return { ok: false, error: 'unknown asset id: call list_assets' };
         }
+        const id = deps.newId();
         const props = { ...PARTICLE_PRESET[input.preset].props, ...propsIn('Particles', input.props) };
-        const result = addClip(session.doc, { component: 'Particles', from: frames(input.start), durationInFrames: input.duration ? frames(input.duration) : undefined, trackId: input.track_id, props }, deps.newId());
-        return apply(registered(result, input.props?.sprite), `added ${input.preset} particles`);
+        const result = addClip(session.doc, { component: 'Particles', from: frames(input.start), durationInFrames: input.duration ? frames(input.duration) : undefined, trackId: input.track_id, props }, id);
+        return created(apply(withEffects(registered(result, input.props?.sprite), [id], input.effects), `added ${input.preset} particles`), id);
       }
     }),
 
@@ -751,17 +768,21 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     add_device_row: tool({
-      description: `Add three Device3D clips side by side that enter staggered and turn at different rates (parallax row). device: ${DEVICES.map((d) => `${d} (${DEVICE[d].label})`).join(', ')}. screens: up to three image asset ids, the first fills any missing.`,
-      inputSchema: z.object({ device: z.enum(DEVICES), start: z.number().min(0), duration: z.number().positive(), screens: z.array(z.string()).max(3).default([]) }),
-      execute: async (input) =>
-        apply(addDeviceRow(session.doc, { device: input.device, screens: input.screens ?? [], from: frames(input.start), durationInFrames: frames(input.duration), ids: [deps.newId(), deps.newId(), deps.newId()] }), `a row of ${input.device}`)
+      description: `Add three Device3D clips side by side that enter staggered and turn at different rates (parallax row). device: ${DEVICES.map((d) => `${d} (${DEVICE[d].label})`).join(', ')}. screens: up to three image asset ids, the first fills any missing. ${PLACEMENT_HELP} Returns the three clip ids.`,
+      inputSchema: z.object({ device: z.enum(DEVICES), start: z.number().min(0), duration: z.number().positive(), screens: z.array(z.string()).max(3).default([]), ...PLACED_PICTURE }),
+      execute: async (input) => {
+        const ids = [deps.newId(), deps.newId(), deps.newId()];
+        const row = addDeviceRow(session.doc, { device: input.device, screens: input.screens ?? [], from: frames(input.start), durationInFrames: frames(input.duration), ids, trackId: input.track_id });
+        const out = apply(withEffects(row, ids, input.effects), `a row of ${input.device}`);
+        return out.ok ? { ...out, clip_ids: ids } : out;
+      }
     }),
 
     set_look: tool({
       description: `Set how 3D clips (3D model, 3D shape, 3D text, 3D logo) are lit: image-based environment (presets: ${ENV_PRESETS.map((p) => `${p} — ${HDRI[p].about}`).join('; ')}), its intensity (0–5) and rotation (degrees), soft shadow maps and a contact shadow under the object. enabled false removes the look (each clip falls back to its own lighting preset). Lights are added with set_light.`,
       inputSchema: z.object({
         enabled: z.boolean().optional(),
-        environment: z.object({ preset: z.enum(ENV_PRESETS).optional(), intensity: z.number().optional(), rotation: z.number().optional() }).optional(),
+        environment: z.object({ preset: envPresetInput.optional(), intensity: z.number().optional(), rotation: z.number().optional() }).optional(),
         soft_shadows: z.boolean().optional(),
         contact_shadow: z.boolean().optional()
       }),
@@ -857,9 +878,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     add_null: tool({
-      description: 'Add a Null: an invisible handle that draws nothing. Parent clips to it (set_parent / parent_clips) and animate its transform (set_transform, set_keyframes on x, y, z, rotateX/Y/Z, scale, opacity) to move, turn or scale them together. x/y is its pivot in px of the frame.',
-      inputSchema: z.object({ start: z.number().min(0), duration: z.number().positive().optional(), x: z.number().optional(), y: z.number().optional(), track_id: z.string().optional() }),
-      execute: async (input) => apply(addNull(session.doc, { from: frames(input.start), durationInFrames: input.duration === undefined ? undefined : frames(input.duration), x: input.x === undefined ? undefined : toStored('Null', 'x', input.x, session.doc), y: input.y === undefined ? undefined : toStored('Null', 'y', input.y, session.doc), trackId: input.track_id }, deps.newId()), 'added a null')
+      description: 'Add a Null: an invisible handle that draws nothing. Parent clips to it (set_parent / parent_clips) and animate its transform (set_transform, set_keyframes on x, y, z, rotateX/Y/Z, scale, opacity) to move, turn or scale them together. x/y is its pivot in px of the frame. Returns the clip id.',
+      inputSchema: z.object({ start: z.number().min(0), duration: z.number().positive().optional(), x: z.number().optional(), y: z.number().optional(), ...PLACED }),
+      execute: async (input) => {
+        const id = deps.newId();
+        return created(apply(addNull(session.doc, { from: frames(input.start), durationInFrames: input.duration === undefined ? undefined : frames(input.duration), x: input.x === undefined ? undefined : toStored('Null', 'x', input.x, session.doc), y: input.y === undefined ? undefined : toStored('Null', 'y', input.y, session.doc), trackId: input.track_id }, id), 'added a null'), id);
+      }
     }),
 
     set_parent: tool({
@@ -920,13 +944,13 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     add_shape: tool({
-      description: `Add a vector Shape clip. kind: ${SHAPE_KINDS.join(', ')}; path takes ${PATH_GUIDE}. Fill: fill_kind solid/linear/radial/none with fill, fill2 (gradient end) and gradientAngle; stroke: strokeKind none/solid/gradient, stroke, strokeWidth/dash/gap in px, cap, join. Other props as add_clip. Returns the clip id.`,
-      inputSchema: z.object({ kind: z.enum(SHAPE_KINDS), start: z.number().min(0), duration: z.number().positive().optional(), path: z.string().optional(), props: z.record(z.string(), z.unknown()).optional() }),
+      description: `Add a vector Shape clip. kind: ${SHAPE_KINDS.join(', ')}; path takes ${PATH_GUIDE}. Fill: fillKind solid/linear/radial/none with fill, fill2 (gradient end) and gradientAngle; stroke: strokeKind none/solid/gradient, stroke, strokeWidth/dash/gap in px, cap, join. Other props as add_clip; a soft glow is effects [{kind: gaussian-blur}]. ${PLACEMENT_HELP} Returns the clip id.`,
+      inputSchema: z.object({ kind: z.enum(SHAPE_KINDS), start: z.number().min(0), duration: z.number().positive().optional(), path: z.string().optional(), props: z.record(z.string(), z.unknown()).optional(), ...PLACED_PICTURE }),
       execute: async (input) => {
         const id = deps.newId();
         const props = { ...propsIn('Shape', input.props), shape: input.kind, ...(input.path ? { path: input.path } : {}) };
-        const out = apply(addClip(session.doc, { component: 'Shape', from: frames(input.start), durationInFrames: input.duration ? frames(input.duration) : undefined, props }, id), `added ${input.kind} shape`);
-        return out.ok ? { ...out, clip_id: id } : out;
+        const shape = addClip(session.doc, { component: 'Shape', from: frames(input.start), durationInFrames: input.duration ? frames(input.duration) : undefined, trackId: input.track_id, props }, id);
+        return created(apply(withEffects(shape, [id], input.effects), `added ${input.kind} shape`), id);
       }
     }),
 
@@ -1327,15 +1351,16 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
 
     generate_voiceover: tool({
       description: 'Spends credits. Turn a script into speech and place it as an Audio clip at a time in seconds. Only when the user asked for a voice-over.',
-      inputSchema: z.object({ text: z.string().min(1).max(2000), start: z.number().min(0).default(0), voice_id: z.string().optional() }),
+      inputSchema: z.object({ text: z.string().min(1).max(2000), start: z.number().min(0).default(0), voice_id: z.string().optional(), ...PLACED }),
       execute: async (input) => {
         const voice = await deps.voiceover({ text: input.text, voiceId: input.voice_id });
         if (!voice.ok) {
           return { ok: false, error: voice.error };
         }
         deps.assets.push({ id: voice.assetId, kind: AssetKind.Audio, label: 'voice-over', previewUrl: '', url: voice.url });
-        const result = addClip(session.doc, { component: 'Audio', from: frames(input.start), durationInFrames: Math.max(1, frames(voice.seconds)), props: { assetId: voice.assetId } }, deps.newId());
-        return apply(registered(result, voice.assetId), 'added a voice-over');
+        const id = deps.newId();
+        const result = addClip(session.doc, { component: 'Audio', from: frames(input.start), durationInFrames: Math.max(1, frames(voice.seconds)), trackId: input.track_id, props: { assetId: voice.assetId } }, id);
+        return created(apply(registered(result, voice.assetId), 'added a voice-over'), id);
       }
     }),
 
