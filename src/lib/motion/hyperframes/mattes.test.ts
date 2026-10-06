@@ -5,15 +5,23 @@ import { MATTE_DRAFT_SCALE, MATTE_SETTLE_MS, matteScript } from './mattes';
 const FRAME = { width: 1920, height: 1080 };
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
-function page() {
+function page(matte: Exclude<Matte, Matte.None> = Matte.Alpha) {
   const widths: number[] = [];
+  const styles = new Map<string, string>();
+  let pixelReads = 0;
   const listeners = new Map<string, (e: unknown) => void>();
   const timers: (() => void)[] = [];
   const updates: (() => void)[] = [];
   const canvas = (w: number, h: number) => ({
     width: w,
     height: h,
-    getContext: () => ({ getImageData: () => ({ data: new Uint8ClampedArray(w * h * 4) }), putImageData: () => undefined }),
+    getContext: () => ({
+      getImageData: () => {
+        pixelReads += 1;
+        return { data: new Uint8ClampedArray(w * h * 4) };
+      },
+      putImageData: () => undefined
+    }),
     toDataURL: () => 'data:,'
   });
   let playing = false;
@@ -28,12 +36,12 @@ function page() {
       }
     }
   };
-  const document = { getElementById: () => ({ style: { setProperty: () => undefined } }), querySelector: () => ({ offsetWidth: FRAME.width, offsetHeight: FRAME.height }) };
+  const document = { getElementById: () => ({ style: { setProperty: (k: string, v: string) => styles.set(k, v) } }), querySelector: () => ({ offsetWidth: FRAME.width, offsetHeight: FRAME.height }) };
   class Image {
     src = '';
     decode = async () => undefined;
   }
-  const script = matteScript([{ target: 't', source: 's', matte: Matte.Alpha }], 4).replace(/^<script>|<\/script>$/g, '');
+  const script = matteScript([{ target: 't', source: 's', matte }], 4).replace(/^<script>|<\/script>$/g, '');
   new Function('window', 'document', 'addEventListener', 'removeEventListener', 'getComputedStyle', 'Image', 'setTimeout', 'clearTimeout', script)(
     win,
     document,
@@ -64,7 +72,7 @@ function page() {
     await tick();
     await tick();
   };
-  return { widths, seek, play, pause, settle };
+  return { widths, seek, play, pause, settle, styles, reads: () => pixelReads };
 }
 
 describe('matte quality while the preview plays', () => {
@@ -91,5 +99,22 @@ describe('matte quality while the preview plays', () => {
 
     expect(p.widths.at(-1)).toBe(FRAME.width);
     expect(MATTE_SETTLE_MS).toBeGreaterThan(0);
+  });
+});
+
+describe('a matte is a mask of the raster as drawn', () => {
+  it.each([
+    [Matte.Alpha, 'alpha', false],
+    [Matte.AlphaInverted, 'alpha', true],
+    [Matte.Luma, 'luminance', false],
+    [Matte.LumaInverted, 'luminance', true]
+  ] as const)('%s reads the raster by its %s, inverted=%s, without a pass over its pixels', async (matte, mode, inverted) => {
+    const p = page(matte);
+    await p.seek();
+
+    expect(p.styles.get('mask')).toContain(` ${mode}`);
+    expect(p.styles.get('mask')!.includes('linear-gradient')).toBe(inverted);
+    expect(p.styles.get('mask-composite')).toBe(inverted ? 'exclude' : 'add');
+    expect(p.reads()).toBe(0);
   });
 });

@@ -101,6 +101,18 @@ un solo materiale, `specularIntensity` di `MeshPhysicalMaterial`. E prima di toc
 materiali, togli lo strato sospetto dall'HTML generato e rifai lo snapshot: dice in un minuto
 quale strato è.
 
+### Un 2D lento sul farm: guarda la regione dei filtri SVG, non html-to-image
+Segnale: frame 2D da secondi, `before` (refresh matte) e screenshot alti, forme con Stroke/goo.
+`.ef` è `inset:0`, quindi una regione `-25%/150%` è 2880×1620 px anche per una forma piccola, e
+`feMorphology` costa regione × raggio in software. Mossa: varianti dell'HTML senza un filtro
+alla volta (`filter:url(...)` tolto) e ms per frame con un chunk del producer; la regione va
+limitata a dove la clip disegna (`paintArea`), non tolto il filtro.
+
+### Blur a chunk: i worker in parallelo vanno più lenti che da soli
+Segnale: un chunk isolato fa 8,7 s/frame, lo stesso chunk fra 27 in parallelo 32 s/frame.
+Mossa: misurare sempre un render intero a N worker (`e2e` con `firstSlices`), mai stimare il
+totale da un worker solo.
+
 ### Copie di DOM dentro elementi 3D: `will-change` le fa costare un secondo a frame
 Il ring copia ogni clip di una composizione in ogni fetta: `.fx{will-change:transform}` dava a
 ognuna un layer di compositing a piena risoluzione, centinaia per frame. JS e layout restano a

@@ -261,6 +261,47 @@ describe('reconcileRenders', () => {
     expect(runs.failRun.mock.calls[0][1].error).toMatch(/frames 18–35 did not finish .* too heavy/);
   });
 
+  it('a worker whose log stops moving is stalled: it is stopped and its frames split, not left hanging', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      let run = await started();
+      runs.queuedRenderRuns.mockImplementation(async () => [run]);
+      farmCalls.checkTask.mockImplementation(async (_f, name: string) => (name === 'box-3' ? { ...running, log: 'frame 12/450' } : done));
+      const { db } = fakeDb(request(sevenChunks()).job);
+
+      await reconcileRenders(db, farm, storage);
+      run = runOf(lastParams());
+      vi.setSystemTime(Date.now() + 4 * 60_000);
+      await reconcileRenders(db, farm, storage);
+      run = runOf(lastParams());
+      expect(lastParams().farm.pieces).toHaveLength(7);
+
+      vi.setSystemTime(Date.now() + 5 * 60_000);
+      await reconcileRenders(db, farm, storage);
+
+      expect(farmCalls.stopWorker).toHaveBeenCalledWith(farm, 'box-3');
+      expect(lastParams().farm.pieces.map((p: { slice: { size: number } }) => p.slice.size)).toEqual([450, 450, 450, 225, 225, 450, 450, 450]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a worker that dies leaves the last log it wrote, kept from the ticks before', async () => {
+    await started();
+    const tiny = { ...lastParams(), farm: { ...lastParams().farm, pieces: lastParams().farm.pieces.map((p: object, i: number) => ({ ...p, attempt: 2, slice: { index: i, size: 18 } })) } };
+    let run = runOf(tiny);
+    runs.queuedRenderRuns.mockImplementation(async () => [run]);
+    farmCalls.checkTask.mockImplementation(async () => ({ ...running, log: '[capture] frame 7/18 seek 900ms' }));
+    const { db } = fakeDb();
+
+    await reconcileRenders(db, farm, storage);
+    run = runOf(lastParams());
+    farmCalls.checkTask.mockImplementation(async (_f, name: string) => (name === 'box-1' ? { state: TaskState.Failed, error: WORKER_GONE } : running));
+    await reconcileRenders(db, farm, storage);
+
+    expect(runs.failRun.mock.calls[0][1].error).toMatch(/Last output: \[capture\] frame 7\/18 seek 900ms/);
+  });
+
   it('an assembled file is saved, attached, charged once, announced, and the work is cleaned up', async () => {
     let run = await started();
     runs.queuedRenderRuns.mockImplementation(async () => [run]);

@@ -33,7 +33,7 @@ export type EffectFrame = { width: number; height: number; frame: number; fps: n
 
 export type Rendered = { filter: string; nodes: SvgNode[] };
 
-type Spec = { label: string; about: string; params: EffectParam[]; varies?: (v: Values) => boolean; render: (v: Values, frame: EffectFrame, filterId: string, lut: CompiledLut | null) => Rendered };
+type Spec = { label: string; about: string; params: EffectParam[]; varies?: (v: Values) => boolean; reach?: (v: Values) => number; boxed?: (v: Values, filterId: string) => Rendered; render: (v: Values, frame: EffectFrame, filterId: string, lut: CompiledLut | null) => Rendered };
 
 const num = (key: string, label: string, min: number, max: number, step: number, fallback: number): EffectParam => ({ key, label, kind: ValueKind.Number, min, max, step, fallback });
 const colour = (key: string, label: string, fallback: string): EffectParam => ({ key, label, kind: ValueKind.Color, min: 0, max: 0, step: 0, fallback });
@@ -64,6 +64,10 @@ const svg = (filterId: string, children: SvgNode[]): Rendered => ({
 const node = (tag: string, attrs: SvgNode['attrs'], children?: SvgNode[]): SvgNode => (children ? { tag, attrs, children } : { tag, attrs });
 
 const LUMA = [0.2126, 0.7152, 0.0722];
+const GAUSS_TAIL = 4;
+
+const shadowNode = (dx: number, dy: number, blur: number, colour: string, opacity: number, link: SvgNode['attrs'] = {}): SvgNode =>
+  node('feDropShadow', { ...link, dx, dy, stdDeviation: r(blur / 2), 'flood-color': colour, 'flood-opacity': r(opacity) });
 
 function tintMatrix(black: string, white: string, amount: number): string {
   const lo = rgb(black);
@@ -179,18 +183,26 @@ export const EFFECTS: Record<EffectKind, Spec> = {
     label: 'Gaussian blur',
     about: 'blur radius in px',
     params: [num('radius', 'Radius', 0, 200, 0.5, 8)],
+    reach: (v) => n(v, 'radius') * GAUSS_TAIL,
+    boxed: (v, id) => svg(id, [node('feGaussianBlur', { in: 'SourceGraphic', stdDeviation: r(n(v, 'radius')) })]),
     render: (v) => css(`blur(${r(n(v, 'radius'))}px)`)
   },
   [EffectKind.DirectionalBlur]: {
     label: 'Directional blur',
     about: 'motion blur of length px along angle degrees',
     params: [num('length', 'Length', 0, 400, 1, 40), num('angle', 'Angle', -180, 180, 1, 0)],
+    reach: (v) => n(v, 'length') / 2,
     render: (v, _f, id) => svg(id, directionalTaps(n(v, 'length'), n(v, 'angle')))
   },
   [EffectKind.DropShadow]: {
     label: 'Drop shadow',
     about: 'shadow at distance px and angle degrees, blur px, colour and opacity',
     params: [num('distance', 'Distance', 0, 300, 1, 16), num('angle', 'Angle', -180, 180, 1, 135), num('blur', 'Softness', 0, 200, 0.5, 24), colour('color', 'Colour', '#000000'), num('opacity', 'Opacity', 0, 1, 0.01, 0.5)],
+    reach: (v) => n(v, 'distance') + (n(v, 'blur') / 2) * GAUSS_TAIL,
+    boxed: (v, id) => {
+      const a = rad(n(v, 'angle'));
+      return svg(id, [shadowNode(r(Math.cos(a) * n(v, 'distance')), r(Math.sin(a) * n(v, 'distance')), n(v, 'blur'), String(v.color), n(v, 'opacity'))]);
+    },
     render: (v) => {
       const d = n(v, 'distance');
       const a = rad(n(v, 'angle'));
@@ -201,6 +213,11 @@ export const EFFECTS: Record<EffectKind, Spec> = {
     label: 'Glow',
     about: 'soft light around the layer: radius px, colour, intensity 0..1',
     params: [num('radius', 'Radius', 0, 200, 0.5, 24), colour('color', 'Colour', '#ffffff'), num('intensity', 'Intensity', 0, 1, 0.01, 0.8)],
+    reach: (v) => (n(v, 'radius') / 2) * GAUSS_TAIL,
+    boxed: (v, id) => {
+      const c = String(v.color);
+      return svg(id, [shadowNode(0, 0, n(v, 'radius') / 3, c, n(v, 'intensity'), { result: 'near' }), shadowNode(0, 0, n(v, 'radius'), c, n(v, 'intensity'), { in: 'near' })]);
+    },
     render: (v) => {
       const c = rgba(String(v.color), n(v, 'intensity'));
       return css(`drop-shadow(0px 0px ${r(n(v, 'radius') / 3)}px ${c}) drop-shadow(0px 0px ${r(n(v, 'radius'))}px ${c})`);
@@ -210,6 +227,7 @@ export const EFFECTS: Record<EffectKind, Spec> = {
     label: 'Stroke',
     about: 'outline around the layer alpha: width px and colour',
     params: [num('width', 'Width', 0, 60, 0.5, 4), colour('color', 'Colour', '#ffffff')],
+    reach: (v) => n(v, 'width'),
     render: (v, _f, id) =>
       svg(id, [
         node('feMorphology', { in: 'SourceAlpha', operator: 'dilate', radius: r(n(v, 'width')), result: 'grown' }),
@@ -237,6 +255,7 @@ export const EFFECTS: Record<EffectKind, Spec> = {
     label: 'Chromatic aberration',
     about: 'splits red and blue by offset px along angle degrees',
     params: [num('offset', 'Offset', 0, 60, 0.5, 6), num('angle', 'Angle', -180, 180, 1, 0)],
+    reach: (v) => n(v, 'offset'),
     render: (v, _f, id) => {
       const d = n(v, 'offset');
       const a = rad(n(v, 'angle'));
@@ -303,6 +322,7 @@ export const EFFECTS: Record<EffectKind, Spec> = {
     about: 'displaces the layer with a flowing noise: amount px, scale px, speed px/s',
     params: [num('amount', 'Amount', 0, 200, 1, 24), num('scale', 'Scale', 10, 1000, 1, 160), num('speed', 'Speed', 0, 1000, 1, 120)],
     varies: (v) => n(v, 'speed') > 0,
+    reach: (v) => n(v, 'amount'),
     render: (v, f, id) => {
       const shift = r((n(v, 'speed') * f.frame) / f.fps);
       return svg(id, [

@@ -14,11 +14,13 @@ describe('chunkPlan', () => {
     expect(chunkPlan(45)).toEqual({ size: 45, count: 1 });
   });
 
-  it('heavy frames make the chunks smaller, up to sixteen workers', () => {
+  it('heavy frames make the chunks smaller, each a minute and a half of work, up to sixty-four workers', () => {
     const heavy = Array.from({ length: 900 }, () => 2500);
+    const heavier = Array.from({ length: 900 }, () => 25_000);
 
-    expect(chunkPlan(900, heavy).count).toBe(16);
-    expect(chunkPlan(900, heavy).size * 2500).toBeLessThan(chunkPlan(900).size * 2500);
+    expect(chunkPlan(900, heavy).size * 2500).toBeLessThanOrEqual(90_000);
+    expect(chunkPlan(900, heavy).size).toBeLessThan(chunkPlan(900).size);
+    expect(chunkPlan(900, heavier).count).toBeLessThanOrEqual(64);
   });
 
   it('a chunk is sized by its heaviest stretch, not by the average', () => {
