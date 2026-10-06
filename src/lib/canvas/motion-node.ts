@@ -9,8 +9,17 @@ export type MotionNode = {
   lastRenderAssetId: string | null;
 };
 
+const FORMAT_NAMES: Record<string, MotionFormat> = {
+  landscape: MotionFormat.Landscape,
+  vertical: MotionFormat.Vertical,
+  square: MotionFormat.Square,
+  portrait: MotionFormat.Portrait
+};
+
+const formatOf = (value: unknown) => (typeof value === 'string' ? (FORMAT_NAMES[value.trim().toLowerCase()] ?? value) : value);
+
 export const motionNodeSchema = z.object({
-  format: z.enum(MOTION_FORMATS),
+  format: z.preprocess(formatOf, z.enum(MOTION_FORMATS)),
   docHeadRevision: z.number().int().min(0),
   posterAssetId: z.string().nullable(),
   lastRenderAssetId: z.string().nullable()
