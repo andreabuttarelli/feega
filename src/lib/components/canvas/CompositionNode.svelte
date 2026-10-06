@@ -1,7 +1,7 @@
 <script lang="ts">
   import TieredImage from './TieredImage.svelte';
   import Orbit from '@lucide/svelte/icons/orbit';
-  import { staleMotions, type CompositionNode, type MotionCard, type UpstreamCard } from '$lib/canvas/composition-node';
+  import { assetUrlsPath, staleMotions, type CompositionNode, type MotionCard, type UpstreamCard } from '$lib/canvas/composition-node';
   import { motionSourcePath } from '$lib/canvas/motion-node';
   import CompositionPlayer from '$lib/components/motion/CompositionPlayer.svelte';
   import NodeDownload from './NodeDownload.svelte';
@@ -47,7 +47,25 @@
   });
 
   const motions = $derived(Object.fromEntries(Object.entries(sources).map(([id, s]) => [id, s.doc])));
-  const allAssets = $derived(Object.assign({}, assets, ...Object.values(sources).map((s) => s.assets)));
+  let signed = $state.raw<Record<string, string>>({});
+  const cardIds = $derived(Object.keys(assets).sort().join(','));
+
+  $effect(() => {
+    const ids = cardIds;
+    if (!ids) {
+      return;
+    }
+    fetch(assetUrlsPath({ projectId: composeIn.project, canvasId: composeIn.canvas, ids: ids.split(',') }))
+      .then((res) => (res.ok ? (res.json() as Promise<Record<string, string>>) : {}))
+      .then((urls) => {
+        if (ids === cardIds) {
+          signed = urls;
+        }
+      })
+      .catch(() => {});
+  });
+
+  const allAssets = $derived(Object.assign({}, assets, signed, ...Object.values(sources).map((s) => s.assets)));
 
   let form = $state<HTMLFormElement | null>(null);
   const openInCompositions = () => form?.requestSubmit();

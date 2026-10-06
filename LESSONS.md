@@ -152,6 +152,13 @@ render che lancia resta dentro il suo nodo. Un test con proxy veri vuole
 `// @vitest-environment jsdom` in un `.svelte.test.ts`: in ambiente node `$state` compila lato
 server e non crea proxy, e il test passa senza provare niente.
 
+### Un'immagine rotta solo dentro l'anteprima motion
+Segnale: lo stesso asset si vede sul nodo e non nel player; nella rete, `/assets/<id>` risponde
+303 → `/login`. L'iframe `srcdoc` del player ha origine opaca e non manda i cookie. Mossa: dentro
+il player solo URL firmati di Storage (`assetsById`, `motionSource`), mai le route di sessione. In
+Playwright si controllano le immagini del frame `about:srcdoc`, non di tutti i frame: quella del
+nodo nella pagina carica e fa passare il test.
+
 ### Uno screenshot di un frame HTML del motore senza le clip che partono dopo lo 0
 Segnale: in un harness Playwright le clip con `from` > 0 non compaiono mai, anche senza keyframe;
 sul farm e nel player sì. `__timelines.main.seek(t)` muove solo GSAP, non la visibilità delle clip

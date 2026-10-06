@@ -152,3 +152,9 @@ export function bentoGridPatch(node: Pick<CompositionNode, 'layoutParams'>, key:
 export function cellSpanPatch(node: Pick<CompositionNode, 'cells'>, sourceId: string, key: SpanKey, value: number): Pick<CompositionNode, 'cells'> {
   return { cells: { ...node.cells, [sourceId]: { ...node.cells[sourceId], [key]: value } } };
 }
+
+export const ASSET_IDS_PARAM = 'ids';
+
+export function assetUrlsPath(input: { projectId: string; canvasId: string; ids: string[] }): string {
+  return `/p/${input.projectId}/c/${input.canvasId}/asset-urls?${ASSET_IDS_PARAM}=${input.ids.join(',')}`;
+}
