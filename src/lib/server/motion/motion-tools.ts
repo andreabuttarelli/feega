@@ -315,7 +315,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }
     session.doc = result.doc;
     session.edits.push(what);
-    return { ok: true, doc: docSummary(session.doc, session.selection) };
+    return { ok: true, edit: what };
   };
 
   async function codeWrite(result: OpResult, name: string, what: string, callId: string) {

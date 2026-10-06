@@ -111,6 +111,18 @@ describe('motion agent tools', () => {
     expect(session.doc.assets).toEqual([]);
   });
 
+  it('an edit answers in a line, not with the whole doc: every later step re-sends what a tool returned', async () => {
+    const { run } = setup();
+    for (let i = 0; i < 12; i++) {
+      await run('add_clip', { component: 'Title', start: i, duration: 1, props: { text: `Beat ${i}` } });
+    }
+
+    const out = await run('set_props', { clip_id: 'id1', props: { text: 'Hello' } });
+
+    expect(out.ok).toBe(true);
+    expect(JSON.stringify(out).length).toBeLessThan(200);
+  });
+
   it('add_clip places a library component at a time in seconds', async () => {
     const { session, run } = setup();
     const out = await run('add_clip', { component: 'Title', start: 1, duration: 2, props: { text: 'Hi' } });

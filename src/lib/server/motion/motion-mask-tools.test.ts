@@ -24,7 +24,7 @@ describe('motion agent mask tools', () => {
 
     expect(out.ok).toBe(true);
     expect(findClip(session.doc, 'id1')!.clip.mask).toMatchObject({ kind: 'ellipse', width: 0.3, feather: 20 });
-    expect(JSON.stringify(out.doc)).toContain('"mask":{"kind":"ellipse"');
+    expect(JSON.stringify(await run('get_motion_doc', {}))).toContain('"mask":{"kind":"ellipse"');
   });
 
   it('a mask asset must be one of the project assets', async () => {
@@ -99,7 +99,7 @@ describe('motion agent mask tools', () => {
 
     expect(out.ok).toBe(true);
     expect(findClip(session.doc, 'id1')!.clip.maskStack.map((m) => m.mode)).toEqual(['subtract', 'difference']);
-    expect(JSON.stringify(out.doc)).toContain('"maskStack":[{"kind":"rect"');
+    expect(JSON.stringify(await run('get_motion_doc', {}))).toContain('"maskStack":[{"kind":"rect"');
 
     await run('remove_mask', { clip_id: 'id1' });
     expect(findClip(session.doc, 'id1')!.clip.maskStack).toEqual([]);
