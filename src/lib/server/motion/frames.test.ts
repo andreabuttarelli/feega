@@ -93,10 +93,13 @@ describe('the automatic self-check after an edit', () => {
     expect(selfCheckDue({ ...edited, checkedAt: 1 }, Vision.Available)).toBe(false);
   });
 
-  it('never on a turn that only read, without a vision model, or with the frame budget spent', () => {
+  it('never on a turn that only read, or without a vision model', () => {
     expect(selfCheckDue({ ...edited, edits: [] }, Vision.Available)).toBe(false);
     expect(selfCheckDue(edited, Vision.Missing)).toBe(false);
-    expect(selfCheckDue({ ...edited, views: MAX_VIEWS_PER_TURN }, Vision.Available)).toBe(false);
+  });
+
+  it('still due after the frame budget is spent, when an edit came after the last look', () => {
+    expect(selfCheckDue({ ...edited, views: MAX_VIEWS_PER_TURN }, Vision.Available)).toBe(true);
   });
 });
 
