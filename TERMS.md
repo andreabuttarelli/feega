@@ -119,6 +119,7 @@ Consistent with Article 50 of the EU AI Act (details in [AI Transparency](./AI-T
 
 ## 11. Third parties: people, brands and platforms
 
+- **Custom voices.** You may clone only your own voice, or the voice of a person who gave you explicit, informed consent; you confirm this each time you clone, and we record that confirmation. You may not use any voice to impersonate a real person. Recordings you upload are deleted, from us and from our voice provider, once the voice is created. Deleting a voice, your workspace or your account deletes the voice at the provider too.
 - Using a real person's likeness or voice requires their consent. Using third-party trademarks, logos or copyrighted works requires the right to do so.
 - **Connected accounts.** Publishing and ads run through official APIs (social publishing via Zernio, ads via Meta). By connecting an account you authorise us to act on it as you instruct, and you remain bound by each platform's terms. Platforms may change or restrict access at any time; we are not responsible for that.
 - **Imported data.** Brand analysis, product import and social feeds read publicly available pages and endpoints. You must use that data lawfully and only for sources you are entitled to use.
