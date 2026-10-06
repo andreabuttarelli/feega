@@ -90,6 +90,11 @@ export function elevenLabsVoices(config: Config): VoiceProvider {
       return { voices: (body.voices ?? []).map(libraryVoice), hasMore: Boolean(body.has_more) };
     },
 
+    async addShared({ ownerId, voiceId, name }) {
+      const body = await sendJson<{ voice_id: string }>(`/v1/voices/add/${encodeURIComponent(ownerId)}/${encodeURIComponent(voiceId)}`, { new_name: name });
+      return body.voice_id;
+    },
+
     async design({ description }) {
       const body = await sendJson<{ previews?: { generated_voice_id: string; audio_base_64: string; media_type?: string }[] }>(
         '/v1/text-to-voice/design',

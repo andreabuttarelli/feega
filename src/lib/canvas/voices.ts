@@ -22,6 +22,7 @@ export const VOICE_CREATION_USD: Readonly<Record<VoiceMethod, number>> = {
   instant_clone: 0.1
 };
 
+export const MIN_VOICE_DESCRIPTION = 20;
 export const CLONE_MIN_SECONDS = 60;
 export const CLONE_MAX_SECONDS = 180;
 

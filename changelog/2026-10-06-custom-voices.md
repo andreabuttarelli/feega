@@ -19,4 +19,18 @@
 account owner's ElevenLabs session, hours of training, and a per-account PVC limit shared by every
 org. Not deliverable per end user.
 
-**Not done in this PR.** See PR body.
+**Wiring.** "More voices" in `AudioControls.svelte` opens `VoiceStudio.svelte` (library, design,
+clone with `VoiceRecorder.svelte`, my voices) → `voiceAction` in the canvas `+page.svelte` →
+`voice_library` / `voice_use_library` / `voice_design` / `voice_save` / `voice_clone` /
+`voice_delete` actions in `+page.server.ts` (credit gate on design and clone) → use cases in
+`voices/custom-voices.ts` → `voice-store.ts` (`custom_voices`) and `elevenlabs-voices.ts`.
+Runs: `runAudioNode` and `speakVoiceover` call `voiceUseRefusal`. Tick: `sweepVoices`.
+
+**Prices.** ElevenLabs bills Voice Design previews as TTS characters of the preview text, so design
+is priced at $0.08 (1k characters at the multilingual rate, upper bound). Instant cloning costs no
+ElevenLabs credits; $0.10 is our charge for the slot. Library voices added to the account do not use
+custom slots (ElevenLabs docs). Slot ceilings per ElevenLabs tier: Starter 10, Creator 30, Pro 160,
+Scale/Business 660 — our account's real `voice_limit` is read at runtime from `/v1/user/subscription`.
+
+**Recording.** MediaRecorder with webm/opus, mp4 fallback for Safari (iOS 14.3+). Denied permission,
+missing microphone and unsupported browser each have their own message (`voice-recording.ts`).

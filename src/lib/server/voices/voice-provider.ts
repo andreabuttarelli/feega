@@ -9,6 +9,7 @@ export type DesignedPreview = { generatedVoiceId: string; audioBase64: string; m
 
 export type VoiceProvider = {
   library(filters: LibraryFilters): Promise<{ voices: LibraryVoice[]; hasMore: boolean }>;
+  addShared(input: { ownerId: string; voiceId: string; name: string }): Promise<string>;
   design(input: { description: string }): Promise<DesignedPreview[]>;
   saveDesign(input: { generatedVoiceId: string; name: string; description: string; labels: Record<string, string> }): Promise<string>;
   clone(input: { name: string; samples: AudioFile[]; labels: Record<string, string> }): Promise<string>;

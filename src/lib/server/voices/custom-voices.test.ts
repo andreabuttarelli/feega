@@ -37,6 +37,7 @@ function fakes(rows: CustomVoice[] = [], account = { used: 0, limit: 30 }) {
   };
   const provider: VoiceProvider = {
     library: vi.fn(),
+    addShared: vi.fn(),
     design: vi.fn(async () => [{ generatedVoiceId: 'g1', audioBase64: 'QQ==', mime: 'audio/mpeg' }]),
     saveDesign: vi.fn(async () => 'el-new'),
     clone: vi.fn(async () => 'el-clone'),

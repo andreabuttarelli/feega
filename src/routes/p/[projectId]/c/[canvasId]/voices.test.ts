@@ -9,6 +9,7 @@ const designPreviews = vi.fn();
 const deleteVoice = vi.fn();
 const voiceSlots = vi.fn();
 const list = vi.fn();
+const addShared = vi.fn();
 const canvasReachable = vi.fn();
 
 vi.mock('$lib/server/cli-auth', () => ({
@@ -41,13 +42,12 @@ vi.mock('$lib/server/repos/influencers', () => ({
 	signInfluencerViewFiles: vi.fn()
 }));
 
-import { actions } from './+page.server';
 vi.mock('$lib/server/uncensored-workspace/workspace-server', async (importOriginal) => ({
 	...(await importOriginal<object>()),
 	canvasReachable: (...a: unknown[]) => canvasReachable(...a)
 }));
 vi.mock('$lib/server/voices/voices-config', () => ({
-	configuredVoiceDeps: () => ({ store: { list }, provider: {}, bill: vi.fn(), plan: null })
+	configuredVoiceDeps: () => ({ store: { list }, provider: { addShared }, bill: vi.fn(), plan: null })
 }));
 vi.mock('$lib/server/voices/custom-voices', async (importOriginal) => ({
 	...(await importOriginal<object>()),
@@ -123,6 +123,16 @@ describe('voice actions', () => {
 		fd.set('description', 'a warm older narrator, slow and calm');
 		const out = (await actions.voice_design(fakeEvent(fd))) as { status: number };
 		expect(out.status).toBe(409);
+	});
+
+	it('adds a library voice to the account and hands back its id', async () => {
+		addShared.mockResolvedValue('v1');
+		const fd = new FormData();
+		fd.set('owner_id', 'o1');
+		fd.set('voice_id', 'v1');
+		fd.set('name', 'Aria');
+		expect(await actions.voice_use_library(fakeEvent(fd))).toEqual({ voiceId: 'v1', name: 'Aria' });
+		expect(addShared).toHaveBeenCalledWith({ ownerId: 'o1', voiceId: 'v1', name: 'Aria' });
 	});
 
 	it('delete only within the org', async () => {

@@ -27,6 +27,13 @@ describe('elevenLabs voices adapter', () => {
     expect(out.voices[0]).toMatchObject({ id: 'v1', ownerId: 'o1', name: 'Aria', previewUrl: 'https://p', gender: 'female', useCase: 'narrative_story' });
   });
 
+  it('adds a library voice to the account so text to speech can use it', async () => {
+    const { calls, voices } = recorder(() => Response.json({ voice_id: 'v1' }));
+    expect(await voices.addShared({ ownerId: 'o1', voiceId: 'v1', name: 'Aria' })).toBe('v1');
+    expect(calls[0].url).toBe('https://api.test/v1/voices/add/o1/v1');
+    expect(JSON.parse(String(calls[0].init.body))).toEqual({ new_name: 'Aria' });
+  });
+
   it('designs previews from a description', async () => {
     const { calls, voices } = recorder(() =>
       Response.json({ previews: [{ generated_voice_id: 'g1', audio_base_64: 'QUJD', media_type: 'audio/mpeg' }] })

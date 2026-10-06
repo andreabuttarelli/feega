@@ -33,11 +33,10 @@ import { isCanvasEdgeKind, isWireMode } from '$lib/canvas-edges';
 import { canvasModelCatalogue } from '$lib/server/canvas-catalogue';
 import { Capability, catalogueIn, MODE_REFUSAL, modeAllows, modeOf, type ProjectMode } from '$lib/project-mode';
 import { canvasReachable } from '$lib/server/uncensored-workspace/workspace-server';
-import { VOICE_REFUSAL_MESSAGE, type VoiceRefusal } from '$lib/canvas/voices';
+import { MIN_VOICE_DESCRIPTION, VOICE_REFUSAL_MESSAGE, type VoiceRefusal } from '$lib/canvas/voices';
 import type { VoiceDeps } from '$lib/server/voices/custom-voices';
 
 const HTTP_UNAVAILABLE = 503;
-const MIN_VOICE_DESCRIPTION = 20;
 const MAX_VOICE_NAME = 100;
 const VOICE_FAIL_STATUS: Partial<Record<VoiceRefusal | 'voice_not_found', number>> = {
   voice_slots_full: 409,
@@ -534,6 +533,24 @@ export const actions: Actions = {
     }
     const { libraryFiltersOf } = await import('$lib/server/voices/voice-forms');
     return deps.provider.library(libraryFiltersOf(await request.formData()));
+  },
+
+  voice_use_library: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const input = {
+      ownerId: String(fd.get('owner_id') ?? ''),
+      voiceId: String(fd.get('voice_id') ?? ''),
+      name: String(fd.get('name') ?? '').trim().slice(0, MAX_VOICE_NAME)
+    };
+    if (!input.ownerId || !input.voiceId || !input.name) {
+      return fail(400, { error: 'voice_not_found', message: 'This voice does not exist.' });
+    }
+    const deps = await voiceDepsOf(scope);
+    if (!deps) {
+      return fail(HTTP_UNAVAILABLE, { error: 'elevenlabs_not_configured' });
+    }
+    return { voiceId: await deps.provider.addShared(input), name: input.name };
   },
 
   voice_design: async ({ request, params, locals }) => {
