@@ -14,7 +14,7 @@ export const FLAT_FRAME_MS = 60;
 const FULL_HD_PIXELS = 1920 * 1080;
 const EFFECT_MS = 100;
 const MATTE_MS = 150;
-const CARD_COPY_MS = 70;
+const CARD_COPY_MS = 5;
 const MAX_NESTING = 8;
 
 const FRAME_MS: Partial<Record<ComponentId, number>> = {

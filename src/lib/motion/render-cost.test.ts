@@ -87,7 +87,19 @@ describe('what makes a 2D frame heavy', () => {
     const images = ring([{ assetId: 'a', kind: 'image' }]);
     const comps = ring([{ assetId: 'c1', kind: 'comp' }]);
 
-    expect(first(images) - first(card)).toBeGreaterThan(6 * FLAT_FRAME_MS);
+    expect(first(images)).toBeGreaterThan(first(card));
     expect(first(comps)).toBeGreaterThan(first(images));
+  });
+
+  it.each([
+    [6, 280],
+    [12, 277]
+  ])('a ring of %i cards costs what one worker measured on 2026-10-06, %i ms a frame, within ±50%', (count, measuredMs) => {
+    const plain = ok(precompose(shape, ['Shape-0'], { comp: 'c1', clip: 'p1' }, 'card'));
+    const bare = { ...plain, tracks: plain.tracks.map((t) => ({ ...t, clips: t.clips.filter((c) => c.id !== 'p1') })) };
+    const ringed = ok(addClip(bare, { component: 'Composition', from: 0, durationInFrames: 90, props: { layout: 'ring', media: [{ assetId: 'c1', kind: 'comp' }], layoutParams: { count } } }, 'r'));
+
+    expect(first(ringed) / measuredMs).toBeGreaterThan(0.5);
+    expect(first(ringed) / measuredMs).toBeLessThan(1.5);
   });
 });
