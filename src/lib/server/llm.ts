@@ -9,6 +9,7 @@ import { env } from '$env/dynamic/private';
 import { extractSdkUsage, logAiCall, noteLlmCost } from '$lib/server/ai-log';
 import { costFromJson, costFromStreamText, OPENROUTER_DATA_POLICY, withOpenrouterDefaults } from '$lib/server/llm-usage-cost';
 import { gatewayModel } from '$lib/server/openrouter-models';
+import { PromptCache, withPromptCache } from '$lib/server/prompt-cache';
 
 export const LLM_UNCONFIGURED = 'llm_unconfigured';
 export const LLM_VIDEO_UNCONFIGURED = 'llm_video_unconfigured';
@@ -105,8 +106,7 @@ export function llmModelForPicker(choice: string | null | undefined): string {
 	return llmDefaultModel();
 }
 
-let cached: ReturnType<typeof createOpenAI> | null = null;
-let cachedSig = '';
+const clients = new Map<string, ReturnType<typeof createOpenAI>>();
 
 /**
  * Chiede il conto al gateway e lo mette nella cassetta dello scope, senza rallentare la risposta.
@@ -133,23 +133,31 @@ const billedFetch: typeof fetch = async (input, init) => {
 	return res;
 };
 
-export function llmClient(): ReturnType<typeof createOpenAI> {
+const CACHE_FETCH: Record<PromptCache, typeof fetch> = {
+	[PromptCache.Off]: billedFetch,
+	[PromptCache.On]: (input, init) => billedFetch(input, typeof init?.body === 'string' ? { ...init, body: withPromptCache(init.body) } : init)
+};
+
+export function llmClient(cache: PromptCache = PromptCache.Off): ReturnType<typeof createOpenAI> {
 	const key = llmApiKey();
 	if (!key) throw new Error('LLM_API_KEY is not configured');
-	const sig = `${llmBaseUrl()}|${key}`;
-	if (cached && cachedSig === sig) return cached;
-	cached = createOpenAI({
+	const sig = `${llmBaseUrl()}|${key}|${cache}`;
+	const known = clients.get(sig);
+	if (known) {
+		return known;
+	}
+	const client = createOpenAI({
 		baseURL: llmBaseUrl(),
 		apiKey: key,
 		name: 'llm',
-		fetch: billedFetch
+		fetch: CACHE_FETCH[cache]
 	});
-	cachedSig = sig;
-	return cached;
+	clients.set(sig, client);
+	return client;
 }
 
-export function llmLanguageModel(modelId?: string) {
-	return llmClient()(modelId ?? llmDefaultModel());
+export function llmLanguageModel(modelId?: string, cache: PromptCache = PromptCache.Off) {
+	return llmClient(cache)(modelId ?? llmDefaultModel());
 }
 
 export type LlmMediaPart = { mediaType: string; data: string };
