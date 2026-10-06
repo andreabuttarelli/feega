@@ -6,6 +6,7 @@ import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
 import { motionRenderFarm, motionRenderStorage } from '$lib/server/motion/renderer';
 import { batchView, cancelRender, renderRequest, renderView, startBatch, startRender } from '$lib/server/motion/render-run';
 import { batchInput, rowRequests } from '$lib/server/motion/batch-input';
+import { renderQueue } from '$lib/server/motion/render-queue';
 import { parseSettings } from '$lib/motion/export-formats';
 import { listNodeRuns } from '$lib/server/repos/node-runs';
 import { SIGNED_URL_TTL_S } from '$lib/server/repos/asset-storage';
@@ -52,7 +53,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
     head: { version: head.version, doc: head.doc },
     tokens,
     assets,
-    serverRender: { configured: farm !== null, latest: renderView(runs), uploadLimit },
+    serverRender: { configured: farm !== null, latest: renderView(runs), queue: renderQueue(), uploadLimit },
     batch: batchView(runs),
     templates
   };
