@@ -1309,7 +1309,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: `See the video: the editor preview renders these exact times (seconds, up to ${MAX_FRAMES_PER_VIEW}) and you get the frames as images. Use it to check text that is clipped or overflows, overlaps, contrast and the safe area before and after edits.`,
       inputSchema: z.object({ times: z.array(z.number().min(0)).min(1).max(MAX_FRAMES_PER_VIEW) }),
       execute: async (input, { toolCallId }) => {
-        if (session.views >= MAX_VIEWS_PER_TURN) {
+        if (session.views >= MAX_VIEWS_PER_TURN && session.checkedAt === session.edits.length) {
           return { ok: false, error: `frame budget for this turn is spent (${MAX_VIEWS_PER_TURN} views): finish with what you saw` };
         }
         session.views += 1;

@@ -18,9 +18,17 @@ function savedTool(part: StepPart): SavedTool | null {
   return null;
 }
 
+const STEP_BREAK = '\n\n';
+const EDGE_SPACE = /\s/;
+
+function joined(sofar: string, next: string): string {
+  const glued = !sofar || !next || EDGE_SPACE.test(sofar.at(-1)!) || EDGE_SPACE.test(next[0]);
+  return glued ? sofar + next : sofar + STEP_BREAK + next;
+}
+
 export function finishedTurn(steps: ReadonlyArray<FinishedStep>): { content: string; tools: SavedTool[] } {
   return {
-    content: steps.map((s) => s.text).join(''),
+    content: steps.map((s) => s.text).reduce(joined, ''),
     tools: steps.flatMap((s) => s.content.map(savedTool).filter((t): t is SavedTool => t !== null))
   };
 }

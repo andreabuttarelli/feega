@@ -230,6 +230,18 @@ describe('motion agent tools', () => {
     expect(out.ok).toBe(false);
     expect(deps.frames).toHaveBeenCalledTimes(MAX_VIEWS_PER_TURN);
   });
+
+  it('an edit after the budget is spent can still be looked at once: a turn never closes on an unseen change', async () => {
+    const { run, deps } = setup();
+    for (let i = 0; i < MAX_VIEWS_PER_TURN; i++) {
+      await run('view_frames', { times: [1] });
+    }
+    await run('add_clip', { component: 'Title', start: 0, duration: 1, props: { text: 'Late' } });
+
+    expect((await run('view_frames', { times: [1] })).ok).toBe(true);
+    expect((await run('view_frames', { times: [1] })).ok).toBe(false);
+    expect(deps.frames).toHaveBeenCalledTimes(MAX_VIEWS_PER_TURN + 1);
+  });
 });
 
 describe('add_track', () => {
