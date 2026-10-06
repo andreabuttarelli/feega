@@ -58,10 +58,20 @@ function assetLabel(asset: Asset, kind: AssetKind): string {
   return `${kind} · ${asset.createdAt.slice(0, 10)} · ${asset.id.slice(0, 6)}`;
 }
 
-export async function motionAssets(scope: MotionScope, ttlSeconds?: number): Promise<MotionAsset[]> {
-  const all = await listProjectAssets(scope.db, { orgId: scope.orgId, projectId: scope.projectId });
-  const usable = all.filter((a) => kindOf(a) && a.url).slice(0, ASSET_LIMIT);
+type AssetScope = Pick<MotionScope, 'db' | 'orgId' | 'projectId' | 'canvasId'>;
 
+export async function motionAssets(scope: AssetScope, ttlSeconds?: number): Promise<MotionAsset[]> {
+  const all = await listProjectAssets(scope.db, { orgId: scope.orgId, projectId: scope.projectId });
+  return signAssets(scope, all.filter((a) => kindOf(a) && a.url).slice(0, ASSET_LIMIT), ttlSeconds);
+}
+
+export async function assetsById(scope: AssetScope, ids: string[]): Promise<Record<string, string>> {
+  const wanted = new Set(ids);
+  const all = await listProjectAssets(scope.db, { orgId: scope.orgId, projectId: scope.projectId });
+  return assetUrls(await signAssets(scope, all.filter((a) => wanted.has(a.id) && kindOf(a) && a.url)));
+}
+
+async function signAssets(scope: AssetScope, usable: Asset[], ttlSeconds?: number): Promise<MotionAsset[]> {
   const signed = await signAssetPaths(scope.db, createAssetSigningDb(), {
     generated: usable.filter((a) => a.source === 'generated').map((a) => a.url ?? ''),
     uploaded: usable.filter((a) => a.source !== 'generated' && !/^https?:\/\//.test(a.url ?? '')).map((a) => a.url ?? '')
