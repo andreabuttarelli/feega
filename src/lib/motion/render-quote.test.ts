@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { creditsOfCost, HOLD_BUFFER, IDLE, RenderClass, renderClass, renderCostUsd, renderQuote, Resolution, RENDER_MULTIPLIER, sandboxCostUsd, type WorkerUsage } from './render-quote';
+import { creditsOfCost, estimatedUsage, HOLD_BUFFER, IDLE, RenderClass, renderClass, renderCostUsd, renderQuote, Resolution, RENDER_MULTIPLIER, sandboxCostUsd, type WorkerUsage } from './render-quote';
 import { MULTIPLIER_FLOOR } from '$lib/credit-ladder';
 import { MotionFormat, newMotionDoc, type MotionDoc } from './doc';
 import { addClip } from './timeline';
@@ -33,21 +33,31 @@ function masking(): MotionDoc {
 
 const asRunInProduction = (bench: WorkerUsage): WorkerUsage => ({ ...bench, wallMs: bench.wallMs + IDLE.pieceMs + IDLE.headMs });
 
-const BENCH_2026_10_05: { name: string; doc: MotionDoc; resolution: Resolution; usage: WorkerUsage }[] = [
-  { name: '2D, 350 frames 1080p', doc: doc(350), resolution: Resolution.P1080, usage: { cpuMs: 35_327, memoryMb: 8192, wallMs: 16_297 } },
-  { name: '4K, 350 frames', doc: doc(350), resolution: Resolution.P2160, usage: { cpuMs: 88_145, memoryMb: 8192, wallMs: 36_878 } },
-  { name: 'motion blur ×4, 350 frames 1080p', doc: blurred(doc(350), 4), resolution: Resolution.P1080, usage: { cpuMs: 151_889, memoryMb: 16384, wallMs: 54_529 } },
-  { name: 'masking loop: mattes, strokes, shadows, liquid shapes, blur ×6, 270 frames 1080p on 27 workers', doc: masking(), resolution: Resolution.P1080, usage: { cpuMs: 6_845_811, memoryMb: 8192 * 27, wallMs: 8_695_158 / 27 } },
+type Bench = { name: string; doc: MotionDoc; resolution: Resolution; usage: WorkerUsage };
+
+const BENCH_2026_10_06_ONE_VCPU: Bench[] = [
+  { name: '2D, 350 frames 1080p', doc: doc(350), resolution: Resolution.P1080, usage: { cpuMs: 23_064, memoryMb: 2048, wallMs: 18_917 } },
+  { name: '4K, 350 frames', doc: doc(350), resolution: Resolution.P2160, usage: { cpuMs: 42_672, memoryMb: 2048, wallMs: 48_273 } },
+  { name: 'motion blur ×4, 350 frames 1080p', doc: blurred(doc(350), 4), resolution: Resolution.P1080, usage: { cpuMs: 51_587, memoryMb: 2048, wallMs: 43_578 } },
+  { name: 'masking loop: vector mattes, strokes, shadows, liquid shapes, blur ×6, 270 frames 1080p on 27 workers, mean of two runs', doc: masking(), resolution: Resolution.P1080, usage: { cpuMs: 4_651_000, memoryMb: 2048 * 27, wallMs: 172_340 } }
+];
+
+const BENCH_2026_10_05: Bench[] = [
   { name: '3D text, 120 frames 1080p', doc: doc(120, 'Text3D'), resolution: Resolution.P1080, usage: { cpuMs: 217_071, memoryMb: 8192, wallMs: 58_405 } },
   { name: 'Device3D laptop, 120 frames 1080p', doc: doc(120, 'Device3D', { device: 'laptop-pro' }), resolution: Resolution.P1080, usage: { cpuMs: 552_320, memoryMb: 8192, wallMs: 146_712 } }
 ];
 
 describe('the render estimate', () => {
-  it.each(BENCH_2026_10_05)('$name: within ±50% of what the sandbox measured', ({ doc, resolution, usage }) => {
+  it.each([...BENCH_2026_10_06_ONE_VCPU, ...BENCH_2026_10_05])('$name: within ±50% of what the sandbox measured', ({ doc, resolution, usage }) => {
     const measured = sandboxCostUsd([asRunInProduction(usage)]);
 
     expect(renderCostUsd(doc, resolution) / measured).toBeGreaterThan(0.5);
     expect(renderCostUsd(doc, resolution) / measured).toBeLessThan(1.5);
+  });
+
+  it('a chunk is billed for the memory of the worker its class opens: 2 GB per vCPU', () => {
+    expect(estimatedUsage(doc(30)).map((u) => u.memoryMb)).toEqual([2048]);
+    expect(estimatedUsage(doc(30, 'Text3D')).map((u) => u.memoryMb)).toEqual([8192]);
   });
 
   it('a doc is as heavy as its heaviest layer', () => {

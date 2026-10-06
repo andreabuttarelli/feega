@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { checkTask, FarmTask, farmChunks, farmProblem, framesOf, halves, launchAssembly, launchPiece, TaskState, type FarmJob, type Step } from './farm-render';
 import type { FarmFile, FarmWorker, RenderFarm, WorkerSpec } from './render-farm';
 import { ExportFormat, Quality } from '$lib/motion/export-formats';
+import { RenderClass } from '$lib/motion/render-quote';
 
 type FakeWorker = FarmWorker & { files: Map<string, Buffer>; spawned: string[]; stopped: boolean };
 
@@ -97,6 +98,18 @@ describe('launchPiece', () => {
     expect(specOf(workers[0])).toMatchObject({ route: 'whole', config: { fps } });
     expect(specs[0].vcpus).toBe(8);
     expect(farmChunks({ ...job, fps })).toEqual({ size: 840, count: 1 });
+  });
+
+  it.each([
+    [RenderClass.Flat, 1],
+    [RenderClass.Scene3D, 4],
+    [RenderClass.Device3D, 4]
+  ])('a %s chunk opens a worker with %i vCPUs: 2D frames run serially, SwiftShader spreads 3D over cores', async (renderClass, vcpus) => {
+    const { farm, specs } = fakeFarm();
+
+    await launchPiece(farm, { ...job, renderClass }, { index: 0, size: 120 }, { upload: null, storageHost: STORAGE, maxBytes: 1000 });
+
+    expect(specs[0].vcpus).toBe(vcpus);
   });
 
   it('motion blur renders in chunks, each worker taking every sample of its own frames', async () => {

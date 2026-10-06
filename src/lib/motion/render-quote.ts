@@ -28,18 +28,25 @@ const SANDBOX_USD = { activeCpuHour: 0.128, memoryGbHour: 0.0212 };
 const BILLED_MINIMUM_MS = 60_000;
 const MS_PER_HOUR = 3_600_000;
 const MB_PER_GB = 1024;
-const MEMORY_MB = { chunked: 8192, whole: 16384 };
+const MB_PER_VCPU = 2048;
+export const WHOLE_VCPUS = 8;
 const BOOT = { wallS: 3.4, cpuS: 3 };
 const CHUNKED_FPS: readonly number[] = [24, 30, 60];
 const FULL_HD_SHORT_SIDE = 1080;
 const S_TO_MS = 1000;
-const EFFECT_WALL_PER_MS = 4.5;
-const CPU_PER_WALL = 0.8;
+const EFFECT_WALL_PER_MS = 1.75;
+const CPU_PER_WALL = 1.2;
 
 const PER_1080P_FRAME: Record<RenderClass, { cpuS: number; wallS: number }> = {
-  [RenderClass.Flat]: { cpuS: 0.08, wallS: 0.04 },
+  [RenderClass.Flat]: { cpuS: 0.04, wallS: 0.035 },
   [RenderClass.Scene3D]: { cpuS: 1.8, wallS: 0.46 },
   [RenderClass.Device3D]: { cpuS: 4.6, wallS: 1.2 }
+};
+
+export const CHUNK_VCPUS: Record<RenderClass, number> = {
+  [RenderClass.Flat]: 1,
+  [RenderClass.Scene3D]: 4,
+  [RenderClass.Device3D]: 4
 };
 
 const SHORT_SIDE: Record<Resolution, number> = { [Resolution.P720]: 720, [Resolution.P1080]: 1080, [Resolution.P1440]: 1440, [Resolution.P2160]: 2160 };
@@ -88,7 +95,9 @@ export function estimatedUsage(doc: Quoted, resolution: Resolution = resolutionO
   const samples = doc.motionBlur?.enabled ? doc.motionBlur.samples : 1;
   const whole = !CHUNKED_FPS.includes(doc.fps);
   const plan = whole ? { size: doc.durationInFrames, count: 1 } : chunkPlan(doc.durationInFrames, scaled(doc, resolution, Weigh.Everything).map((ms) => ms * samples));
-  const per = PER_1080P_FRAME[renderClass(doc)];
+  const kind = renderClass(doc);
+  const per = PER_1080P_FRAME[kind];
+  const memoryMb = (whole ? WHOLE_VCPUS : CHUNK_VCPUS[kind]) * MB_PER_VCPU;
   const effects = scaled(doc, resolution, Weigh.EffectsOnly);
   return Array.from({ length: plan.count }, (_, i) => {
     const frames = effects.slice(i * plan.size, (i + 1) * plan.size);
@@ -97,7 +106,7 @@ export function estimatedUsage(doc: Quoted, resolution: Resolution = resolutionO
     const wallS = BOOT.wallS + work * per.wallS + extraS;
     const cpuS = BOOT.cpuS + work * per.cpuS + extraS * CPU_PER_WALL;
     const idle = IDLE.pieceMs + (i === 0 ? IDLE.headMs : 0);
-    return { cpuMs: cpuS * S_TO_MS, memoryMb: whole ? MEMORY_MB.whole : MEMORY_MB.chunked, wallMs: wallS * S_TO_MS + idle };
+    return { cpuMs: cpuS * S_TO_MS, memoryMb, wallMs: wallS * S_TO_MS + idle };
   });
 }
 

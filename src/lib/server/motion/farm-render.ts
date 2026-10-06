@@ -1,13 +1,14 @@
 import type { AudioEntry } from '$lib/motion/audio-plan';
 import { chunkPlan, type ChunkPlan } from '$lib/motion/server-render';
 import { FLAT_FRAME_MS, frameCosts, type CostSpan } from '$lib/motion/render-cost';
+import { CHUNK_VCPUS, RenderClass, WHOLE_VCPUS } from '$lib/motion/render-quote';
 import { FONT_CSS_ORIGIN, FONT_FILE_ORIGIN } from '$lib/motion/hyperframes/csp';
 import { ExportFormat, FORMAT, Master, Quality } from '$lib/motion/export-formats';
 import { assembleArgs, audioMixArgs, concatList, zipArgs } from './render-commands';
 import { FARM_JOB_DIR, FARM_RUNTIME_DIR, type FarmWorker, type RenderFarm } from './render-farm';
 import { stripSteps, stripVideos } from './video-strips';
 
-export type FarmJob = { html: string; width: number; height: number; fps: number; totalFrames: number; audio: AudioEntry[]; allowHosts: string[]; format: ExportFormat; quality: Quality; motionBlur: Shutter | null; cost?: CostSpan[] };
+export type FarmJob = { html: string; width: number; height: number; fps: number; totalFrames: number; audio: AudioEntry[]; allowHosts: string[]; format: ExportFormat; quality: Quality; motionBlur: Shutter | null; cost?: CostSpan[]; renderClass?: RenderClass };
 
 export type Slice = { index: number; size: number };
 
@@ -48,9 +49,9 @@ const MINUTE_MS = 60_000;
 export const WORKER_GONE = 'render worker stopped before it finished: it timed out or crashed';
 const MIN_SPLIT_FRAMES = 20;
 
-const WORKER: Record<RenderRoute, { vcpus: number; timeoutMs: number }> = {
-  [RenderRoute.Chunked]: { vcpus: 4, timeoutMs: 20 * MINUTE_MS },
-  [RenderRoute.Whole]: { vcpus: 8, timeoutMs: 120 * MINUTE_MS }
+const WORKER: Record<RenderRoute, { vcpus: (job: FarmJob) => number; timeoutMs: number }> = {
+  [RenderRoute.Chunked]: { vcpus: (job) => CHUNK_VCPUS[job.renderClass ?? RenderClass.Flat], timeoutMs: 20 * MINUTE_MS },
+  [RenderRoute.Whole]: { vcpus: () => WHOLE_VCPUS, timeoutMs: 120 * MINUTE_MS }
 };
 
 const LIFETIME = { bootMs: 2 * MINUTE_MS, msPerFullHdFrame: 500, assemblyMs: 5 * MINUTE_MS };
@@ -265,7 +266,7 @@ async function startSteps(worker: FarmWorker, task: FarmTask, steps: Step[]): Pr
 export async function launchPiece(farm: RenderFarm, job: FarmJob, slice: Slice, links: PieceLinks): Promise<string> {
   const route = routeOf(job);
   const hosts = [...new Set([...job.allowHosts, links.storageHost, ...RUNTIME_HOSTS])];
-  const worker = await farm.open({ allowHosts: hosts, timeoutMs: lifetimeMs(job, slice), vcpus: WORKER[route].vcpus });
+  const worker = await farm.open({ allowHosts: hosts, timeoutMs: lifetimeMs(job, slice), vcpus: WORKER[route].vcpus(job) });
 
   const what = framesOf(job, slice);
   const render: Step = { what, cmd: 'node', args: [CHUNK_SCRIPT, SPEC] };
