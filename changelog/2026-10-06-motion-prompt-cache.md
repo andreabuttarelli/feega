@@ -15,3 +15,8 @@ Scartato: `cache_control` dentro le parti del messaggio di sistema (sulla Respon
 OpenRouter non scrive nulla), e il caching per ogni chiamata del prodotto (una chiamata singola
 paga la scrittura 1,25× senza mai rileggerla). Gli altri provider cachano da soli e ricevono la
 richiesta intatta.
+
+Rilanciando il prompt Dub con la cache: $0,99 e poi $1,41, con 1,6M token di prompt. Il costo
+cresceva con il quadrato dei passi perché ogni tool di modifica restituiva l'intero `docSummary`
+(qualche migliaio di token), riletto da ogni passo successivo. Ora una modifica risponde
+`{ ok, edit }` (i tool che creano aggiungono `clip_id`); il doc si legge con `get_motion_doc`.
