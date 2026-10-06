@@ -39,7 +39,7 @@ export type BatchCell = { row: number; name: string; runId: string; status: Node
 export type BatchView = { id: string; credits: number; rows: BatchCell[] };
 export type ReconcileOutcome = { checked: number; done: number; failed: number; pending: number; reaped: number };
 
-type Piece = { worker: string; attempt: number; state: TaskState; slice: Slice; spent?: string[] };
+type Piece = { worker: string; attempt: number; state: TaskState; slice: Slice; spent?: string[]; log?: string; logAt?: number };
 type Billing = { held: number; portions?: Portion[] };
 type Output = { width: number; height: number; seconds: number; format: ExportFormat };
 type FarmProgress = { pieces: Piece[]; assembly: { attempt: number } | null };
@@ -52,6 +52,7 @@ enum Step {
   Failed = 'failed'
 }
 
+const STALL_MS = 6 * 60_000;
 const RENDER_MODEL = `hyperframes@${HYPERFRAMES_VERSION}`;
 const RECONCILE_BATCH = 50;
 export const BATCH_CONCURRENCY = 3;
@@ -310,6 +311,7 @@ async function relaunch(db: Db, farm: RenderFarm, storage: RenderStorage, run: N
 
 async function retryPiece(db: Db, farm: RenderFarm, storage: RenderStorage, run: NodeRun, job: FarmJob, piece: Piece, check: TaskCheck): Promise<Piece[]> {
   await Promise.allSettled([stopWorker(farm, piece.worker)]);
+  console.warn('[motion render] piece failed', { runId: run.id, worker: piece.worker, frames: framesOf(job, piece.slice), error: check.error, lastOutput: piece.log ?? null });
   const split = check.error === WORKER_GONE ? halves(job, piece.slice) : null;
   try {
     const spent = [...(piece.spent ?? []), piece.worker];
@@ -329,7 +331,8 @@ function failure(job: FarmJob, piece: Piece, error: string): string {
     return tooLarge;
   }
   if (error === WORKER_GONE) {
-    return `${framesOf(job, piece.slice)} did not finish on a render worker even split down to ${piece.slice.size} frames: the scene is too heavy for the farm. Shorten the 3D shots, lower the motion blur samples or the resolution.`;
+    const last = piece.log ? ` Last output: ${piece.log}` : '';
+    return `${framesOf(job, piece.slice)} did not finish on a render worker even split down to ${piece.slice.size} frames: the scene is too heavy for the farm. Shorten the 3D shots, lower the motion blur samples or the resolution.${last}`;
   }
   return `${framesOf(job, piece.slice)} failed after ${piece.attempt} attempts: ${error}`;
 }
@@ -362,9 +365,20 @@ async function startAssembly(db: Db, farm: RenderFarm, storage: RenderStorage, r
   return Step.Pending;
 }
 
+function watch(piece: Piece, check: TaskCheck, now: number): { piece: Piece; check: TaskCheck } {
+  if (check.state !== TaskState.Running) {
+    return { piece, check };
+  }
+  const moved = check.log !== undefined && check.log !== piece.log;
+  const seen = { ...piece, log: check.log ?? piece.log, logAt: moved || piece.logAt === undefined ? now : piece.logAt };
+  const stalled = now - seen.logAt > STALL_MS;
+  return { piece: seen, check: stalled ? { state: TaskState.Failed, error: WORKER_GONE } : check };
+}
+
 async function advancePieces(db: Db, farm: RenderFarm, storage: RenderStorage, run: NodeRun, state: RenderState, job: FarmJob): Promise<Step> {
   const pending = (p: Piece): Promise<TaskCheck> => (p.state === TaskState.Done ? Promise.resolve({ state: TaskState.Done, error: null }) : checkTask(farm, p.worker, FarmTask.Piece));
-  const checks = await Promise.all(state.farm.pieces.map(pending));
+  const watched = (await Promise.all(state.farm.pieces.map(pending))).map((check, i) => watch(state.farm.pieces[i], check, Date.now()));
+  const checks = watched.map((w) => w.check);
 
   const spent = state.farm.pieces.findIndex((p, i) => hopeless(job, p, checks[i]));
   if (spent >= 0) {
@@ -375,7 +389,7 @@ async function advancePieces(db: Db, farm: RenderFarm, storage: RenderStorage, r
   await Promise.allSettled(landed.map((p) => stopWorker(farm, p.worker)));
 
   const next = await Promise.all(
-    state.farm.pieces.map((p, i) => (checks[i].state === TaskState.Failed ? retryPiece(db, farm, storage, run, job, p, checks[i]) : Promise.resolve([{ ...p, state: checks[i].state }])))
+    state.farm.pieces.map((p, i) => (checks[i].state === TaskState.Failed ? retryPiece(db, farm, storage, run, job, p, checks[i]) : Promise.resolve([{ ...watched[i].piece, state: checks[i].state }])))
   );
   const pieces = next.flat();
   const progress = { ...state.progress, chunks: pieces.length, chunksDone: pieces.filter((p) => p.state === TaskState.Done).length };

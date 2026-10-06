@@ -1,6 +1,6 @@
 import { ellipseOutline, parsePath, pathData, polygonOutline, rectOutline, scaled, starOutline, type Outline, type Size } from './geometry';
 import { morphOutline } from './morph';
-import { IDENTITY, applyModifiers, modifierFilter, type AppliedModifier, type Layer } from './modifiers';
+import { IDENTITY, applyModifiers, modifierFilter, modifierReach, type AppliedModifier, type Layer } from './modifiers';
 import { FillKind, ShapeKind, StrokeKind, modifierValues, type Modifier } from './schema';
 
 export type ShapeLook = {
@@ -62,15 +62,42 @@ export function shapeLayers(p: ShapeLook, size: Size, time: number): Layer[] {
 
 const gradientId = (id: string) => `sg-${id}`;
 const filterId = (id: string) => `sf-${id}`;
-const FILTER_REACH = 3;
+const MITER_REACH = 4;
 
-function filterOf(p: ShapeLook, paint: Paint): string {
+export type Extent = { left: number; top: number; right: number; bottom: number };
+
+function drawnBounds(layers: Layer[]): Extent | null {
+  const points = layers.flatMap((l) => l.outline.flatMap((c) => c.vertices.flatMap((v) => [v.p, v.in, v.out])).map(([x, y]) => [l.matrix[0] * x + l.matrix[2] * y + l.matrix[4], l.matrix[1] * x + l.matrix[3] * y + l.matrix[5]]));
+  if (!points.length) {
+    return null;
+  }
+  const xs = points.map((pt) => pt[0]);
+  const ys = points.map((pt) => pt[1]);
+  return { left: Math.min(...xs), top: Math.min(...ys), right: Math.max(...xs), bottom: Math.max(...ys) };
+}
+
+function paintedExtent(p: ShapeLook, paint: Paint, layers: Layer[]): Extent | null {
+  const drawn = drawnBounds(layers);
+  if (!drawn) {
+    return null;
+  }
+  const reach = modifierReach(stackOf(p), paint.unit) + (p.strokeKind === StrokeKind.None ? 0 : (p.strokeWidth * paint.unit * MITER_REACH) / 2);
+  return { left: drawn.left - reach, top: drawn.top - reach, right: drawn.right + reach, bottom: drawn.bottom + reach };
+}
+
+export function unionExtent(a: Extent | null, b: Extent | null): Extent | null {
+  if (!a || !b) {
+    return a ?? b;
+  }
+  return { left: Math.min(a.left, b.left), top: Math.min(a.top, b.top), right: Math.max(a.right, b.right), bottom: Math.max(a.bottom, b.bottom) };
+}
+
+function filterOf(p: ShapeLook, paint: Paint, extent: Extent | null): string {
   const primitives = modifierFilter(stackOf(p), paint.unit);
-  if (!primitives) {
+  if (!primitives || !extent) {
     return '';
   }
-  const { w, h } = paint.size;
-  return `<filter id="${filterId(paint.id)}" filterUnits="userSpaceOnUse" x="${round(-w * FILTER_REACH)}" y="${round(-h * FILTER_REACH)}" width="${round(w * (FILTER_REACH * 2 + 1))}" height="${round(h * (FILTER_REACH * 2 + 1))}" color-interpolation-filters="sRGB">${primitives}</filter>`;
+  return `<filter id="${filterId(paint.id)}" filterUnits="userSpaceOnUse" x="${round(extent.left)}" y="${round(extent.top)}" width="${round(extent.right - extent.left)}" height="${round(extent.bottom - extent.top)}" color-interpolation-filters="sRGB">${primitives}</filter>`;
 }
 
 function gradient(p: ShapeLook, paint: Paint): string {
@@ -111,12 +138,15 @@ const matrixAttr = (m: Layer['matrix']) => (m.every((n, i) => n === IDENTITY[i])
 const opacityAttr = (o: number) => (o === 1 ? '' : ` opacity="${round(o)}"`);
 
 export function shapeMarkup(p: ShapeLook, paint: Paint): string {
-  const paths = shapeLayers(p, paint.size, paint.time)
-    .filter((l) => l.outline.length)
-    .map((l) => `<path d="${pathData(l.outline)}"${matrixAttr(l.matrix)}${opacityAttr(l.opacity)}/>`)
-    .join('');
-  const filter = filterOf(p, paint);
+  return shapeDrawing(p, paint).markup;
+}
+
+export function shapeDrawing(p: ShapeLook, paint: Paint): { markup: string; extent: Extent | null } {
+  const layers = shapeLayers(p, paint.size, paint.time).filter((l) => l.outline.length);
+  const paths = layers.map((l) => `<path d="${pathData(l.outline)}"${matrixAttr(l.matrix)}${opacityAttr(l.opacity)}/>`).join('');
+  const extent = paintedExtent(p, paint, layers);
+  const filter = filterOf(p, paint, extent);
   const defs = usesGradient(p) || filter ? `<defs>${usesGradient(p) ? gradient(p, paint) : ''}${filter}</defs>` : '';
   const filtered = filter ? ` filter="url(#${filterId(paint.id)})"` : '';
-  return `${defs}<g style="${paintStyle(p, paint)}"${filtered}>${paths}</g>`;
+  return { markup: `${defs}<g style="${paintStyle(p, paint)}"${filtered}>${paths}</g>`, extent };
 }

@@ -99,12 +99,29 @@ describe('launchPiece', () => {
     expect(farmChunks({ ...job, fps })).toEqual({ size: 840, count: 1 });
   });
 
-  it('motion blur renders whole and passes the shutter to the engine', async () => {
+  it('motion blur renders in chunks, each worker taking every sample of its own frames', async () => {
+    const { farm, workers } = fakeFarm();
+
+    await launchPiece(farm, { ...job, motionBlur: blur }, { index: 2, size: 120 }, { upload: 'u', storageHost: STORAGE, maxBytes: 1000 });
+
+    expect(specOf(workers[0])).toMatchObject({ route: 'chunked', index: 2, blur: { shutterAngle: 180, shutterPhase: -90, samplesPerFrame: 8 } });
+    expect(specOf(workers[0]).config).not.toHaveProperty('motionBlur');
+  });
+
+  it('a chunk without blur leaves the shutter out', async () => {
+    const { farm, workers } = fakeFarm();
+
+    await launchPiece(farm, job, { index: 0, size: 120 }, { upload: null, storageHost: STORAGE, maxBytes: 1000 });
+
+    expect(specOf(workers[0]).blur).toBeNull();
+  });
+
+  it('the chunk script fails loudly when the producer it patches for blur has changed', async () => {
     const { farm, workers } = fakeFarm();
 
     await launchPiece(farm, { ...job, motionBlur: blur }, { index: 0, size: 120 }, { upload: null, storageHost: STORAGE, maxBytes: 1000 });
 
-    expect(specOf(workers[0])).toMatchObject({ route: 'whole', config: { motionBlur: { shutterAngle: 180, shutterPhase: -90, samplesPerFrame: 8 } } });
+    expect(String([...workers[0].files.entries()].find(([p]) => p.endsWith('render-chunk.mjs'))?.[1])).toContain('producer patch anchor missing');
   });
 
   it('motion blur over a video renders frames extracted on the worker, not the producer\'s injected ones', async () => {
@@ -151,7 +168,19 @@ describe('halves', () => {
 
   it('a chunk too small to split, or a whole render, cannot be split', () => {
     expect(halves(job, { index: 0, size: 18 })).toBeNull();
-    expect(halves({ ...job, motionBlur: blur }, { index: 0, size: 840 })).toBeNull();
+    expect(halves({ ...job, fps: 25 }, { index: 0, size: 840 })).toBeNull();
+  });
+
+  it('a blurred chunk that timed out splits like any other', () => {
+    expect(halves({ ...job, motionBlur: blur }, { index: 1, size: 60 })).toEqual([
+      { index: 2, size: 30 },
+      { index: 3, size: 30 }
+    ]);
+  });
+
+  it('every blur sample weighs on the chunk size, so a blurred job runs on more workers', () => {
+    expect(farmChunks({ ...job, motionBlur: blur }).count).toBeGreaterThan(farmChunks(job).count);
+    expect(farmChunks({ ...job, motionBlur: { ...blur, samples: 16 } }).count).toBeGreaterThan(farmChunks({ ...job, motionBlur: blur }).count);
   });
 
   it('the chunks of a 3D-heavy job are smaller than those of a flat one', () => {
@@ -211,8 +240,8 @@ describe('farmProblem', () => {
     expect(farmProblem({ ...job, fps: 60, totalFrames: 3600, motionBlur: blur })).toBeNull();
   });
 
-  it('blur that cannot finish inside one worker lifetime is refused, with what to lower', () => {
-    expect(farmProblem({ ...job, fps: 60, totalFrames: 10_800, motionBlur: { ...blur, samples: 64 } })).toMatch(/samples/);
+  it('blur that cannot finish even split over every worker is refused, with what to lower', () => {
+    expect(farmProblem({ ...job, fps: 60, totalFrames: 21_600, motionBlur: { ...blur, samples: 64 } })).toMatch(/samples/);
   });
 
   it('a video clip blurs like any other clip, and H.265 cannot render whole', () => {
@@ -220,11 +249,11 @@ describe('farmProblem', () => {
     expect(farmProblem({ ...job, fps: 25, format: ExportFormat.Mp4H265 })).toMatch(/H\.265/);
   });
 
-  it('30 s at 1080p with a device on screen the whole time blurs with 3 samples, not with 8', () => {
+  it('30 s at 1080p with a device on screen the whole time blurs with 8 samples, spread over more workers', () => {
     const showcase = { ...job, totalFrames: 900, cost: [{ from: 0, to: 900, ms: 1600 }] };
 
-    expect(farmProblem({ ...showcase, motionBlur: { ...blur, samples: 3 } })).toBeNull();
-    expect(farmProblem({ ...showcase, motionBlur: { ...blur, samples: 8 } })).toMatch(/samples/);
+    expect(farmProblem({ ...showcase, motionBlur: { ...blur, samples: 8 } })).toBeNull();
+    expect(farmChunks({ ...showcase, motionBlur: { ...blur, samples: 8 } }).count).toBeGreaterThan(farmChunks({ ...showcase, motionBlur: { ...blur, samples: 3 } }).count);
   });
 });
 
@@ -283,6 +312,28 @@ describe('checkTask', () => {
 
     workers[0].files.set('/vercel/sandbox/job/result-piece.json', Buffer.from(JSON.stringify({ ok: true, error: null })));
     expect(await checkTask(farm, name, FarmTask.Piece)).toEqual({ state: TaskState.Done, error: null });
+  });
+
+  it('a running worker reports the tail of its log, which is what is left of it if it dies', async () => {
+    const { farm, workers } = fakeFarm();
+    const name = await launchPiece(farm, job, { index: 0, size: 120 }, { upload: null, storageHost: STORAGE, maxBytes: 1000 });
+
+    workers[0].files.set('/vercel/sandbox/job/log-piece.txt', Buffer.from(`${'x'.repeat(5000)}\n[renderChunk] frame 41/120`));
+
+    const check = await checkTask(farm, name, FarmTask.Piece);
+    expect(check.state).toBe(TaskState.Running);
+    expect(check.log).toMatch(/frame 41\/120$/);
+    expect(check.log!.length).toBeLessThanOrEqual(600);
+  });
+
+  it('the producer writes into the log while it renders, not only when it ends', async () => {
+    const { farm, workers } = fakeFarm();
+
+    await launchPiece(farm, job, { index: 0, size: 120 }, { upload: null, storageHost: STORAGE, maxBytes: 1000 });
+
+    const script = String([...workers[0].files.entries()].find(([p]) => p.endsWith('steps.mjs'))?.[1]);
+    expect(script).toContain("stdio: ['ignore', 'inherit', 'inherit']");
+    expect(script).toContain('frames captured');
   });
 
   it('a worker that is gone before writing a result failed: it timed out or crashed', async () => {

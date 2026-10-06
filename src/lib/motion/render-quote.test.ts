@@ -18,12 +18,26 @@ function doc(frames: number, component?: string, props: Record<string, unknown> 
 
 const blurred = (d: MotionDoc, samples: number): MotionDoc => ({ ...d, motionBlur: { enabled: true, shutterAngle: 180, shutterPhase: -90, samples } });
 
+function masking(): MotionDoc {
+  let d = doc(270);
+  for (const id of ['a', 'b', 'c']) {
+    const added = addClip(d, { component: 'Shape', from: 0, durationInFrames: 270 }, id);
+    if (!added.ok) {
+      throw new Error(added.error);
+    }
+    d = { ...added.doc, durationInFrames: 270 };
+  }
+  const heavy = { effects: ['stroke', 'drop-shadow'].map((kind, i) => ({ id: `e${i}`, kind, enabled: true, params: {} })), matte: 'alpha' };
+  return blurred({ ...d, tracks: d.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => ({ ...c, ...heavy })) })) } as MotionDoc, 6);
+}
+
 const asRunInProduction = (bench: WorkerUsage): WorkerUsage => ({ ...bench, wallMs: bench.wallMs + IDLE.pieceMs + IDLE.headMs });
 
 const BENCH_2026_10_05: { name: string; doc: MotionDoc; resolution: Resolution; usage: WorkerUsage }[] = [
   { name: '2D, 350 frames 1080p', doc: doc(350), resolution: Resolution.P1080, usage: { cpuMs: 35_327, memoryMb: 8192, wallMs: 16_297 } },
   { name: '4K, 350 frames', doc: doc(350), resolution: Resolution.P2160, usage: { cpuMs: 88_145, memoryMb: 8192, wallMs: 36_878 } },
   { name: 'motion blur ×4, 350 frames 1080p', doc: blurred(doc(350), 4), resolution: Resolution.P1080, usage: { cpuMs: 151_889, memoryMb: 16384, wallMs: 54_529 } },
+  { name: 'masking loop: mattes, strokes, shadows, liquid shapes, blur ×6, 270 frames 1080p on 27 workers', doc: masking(), resolution: Resolution.P1080, usage: { cpuMs: 6_845_811, memoryMb: 8192 * 27, wallMs: 8_695_158 / 27 } },
   { name: '3D text, 120 frames 1080p', doc: doc(120, 'Text3D'), resolution: Resolution.P1080, usage: { cpuMs: 217_071, memoryMb: 8192, wallMs: 58_405 } },
   { name: 'Device3D laptop, 120 frames 1080p', doc: doc(120, 'Device3D', { device: 'laptop-pro' }), resolution: Resolution.P1080, usage: { cpuMs: 552_320, memoryMb: 8192, wallMs: 146_712 } }
 ];

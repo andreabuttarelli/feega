@@ -1,7 +1,7 @@
 import type { MotionDoc, MotionTrack } from './doc';
 import { CREDITS_PER_USD_GRANT } from '$lib/credit-ladder';
 import { chunkPlan } from './server-render';
-import { costSpans, frameCosts } from './render-cost';
+import { FLAT_FRAME_MS, Weigh, costSpans, frameCosts } from './render-cost';
 
 export enum Resolution {
   P720 = '720p',
@@ -33,6 +33,8 @@ const BOOT = { wallS: 3.4, cpuS: 3 };
 const CHUNKED_FPS: readonly number[] = [24, 30, 60];
 const FULL_HD_SHORT_SIDE = 1080;
 const S_TO_MS = 1000;
+const EFFECT_WALL_PER_MS = 4.5;
+const CPU_PER_WALL = 0.8;
 
 const PER_1080P_FRAME: Record<RenderClass, { cpuS: number; wallS: number }> = {
   [RenderClass.Flat]: { cpuS: 0.08, wallS: 0.04 },
@@ -74,22 +76,29 @@ export function sandboxCostUsd(usages: WorkerUsage[]): number {
   }, 0);
 }
 
-function costsOf(doc: Quoted, resolution: Resolution): number[] {
+function scaled(doc: Quoted, resolution: Resolution, weigh: Weigh): number[] {
   if (!doc.tracks) {
-    return [];
+    return Array.from({ length: doc.durationInFrames }, () => FLAT_FRAME_MS);
   }
   const scale = SHORT_SIDE[resolution] / Math.min(doc.width, doc.height);
-  return frameCosts(doc.durationInFrames, costSpans(doc as MotionDoc, doc.width * doc.height * scale * scale));
+  return frameCosts(doc.durationInFrames, costSpans(doc as MotionDoc, doc.width * doc.height * scale * scale, weigh));
 }
 
 export function estimatedUsage(doc: Quoted, resolution: Resolution = resolutionOf(doc)): WorkerUsage[] {
   const samples = doc.motionBlur?.enabled ? doc.motionBlur.samples : 1;
-  const whole = samples > 1 || !CHUNKED_FPS.includes(doc.fps);
-  const plan = whole ? { size: doc.durationInFrames, count: 1 } : chunkPlan(doc.durationInFrames, costsOf(doc, resolution));
+  const whole = !CHUNKED_FPS.includes(doc.fps);
+  const plan = whole ? { size: doc.durationInFrames, count: 1 } : chunkPlan(doc.durationInFrames, scaled(doc, resolution, Weigh.Everything).map((ms) => ms * samples));
   const per = PER_1080P_FRAME[renderClass(doc)];
-  const work = plan.size * samples * RESOLUTION_WORK[resolution];
-  const piece = { cpuMs: (BOOT.cpuS + work * per.cpuS) * S_TO_MS, memoryMb: whole ? MEMORY_MB.whole : MEMORY_MB.chunked, wallMs: (BOOT.wallS + work * per.wallS) * S_TO_MS + IDLE.pieceMs };
-  return Array.from({ length: plan.count }, (_, i) => (i === 0 ? { ...piece, wallMs: piece.wallMs + IDLE.headMs } : piece));
+  const effects = scaled(doc, resolution, Weigh.EffectsOnly);
+  return Array.from({ length: plan.count }, (_, i) => {
+    const frames = effects.slice(i * plan.size, (i + 1) * plan.size);
+    const extraS = (frames.reduce((sum, ms) => sum + ms - FLAT_FRAME_MS, 0) * samples * EFFECT_WALL_PER_MS) / S_TO_MS;
+    const work = frames.length * samples * RESOLUTION_WORK[resolution];
+    const wallS = BOOT.wallS + work * per.wallS + extraS;
+    const cpuS = BOOT.cpuS + work * per.cpuS + extraS * CPU_PER_WALL;
+    const idle = IDLE.pieceMs + (i === 0 ? IDLE.headMs : 0);
+    return { cpuMs: cpuS * S_TO_MS, memoryMb: whole ? MEMORY_MB.whole : MEMORY_MB.chunked, wallMs: wallS * S_TO_MS + idle };
+  });
 }
 
 export function renderCostUsd(doc: Quoted, resolution: Resolution = resolutionOf(doc)): number {

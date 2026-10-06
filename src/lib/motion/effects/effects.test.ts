@@ -10,6 +10,8 @@ import { EFFECTS, EFFECT_KINDS, EffectKind } from './registry';
 import { addEffect, removeEffect, setEffect } from './ops';
 import { effectKey } from './model';
 import { effectLayer, effectTimeline } from './render';
+import { addModifier } from '../shape/ops';
+import { ModifierKind } from '../shape/modifiers';
 
 function ok(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -68,6 +70,25 @@ describe('layer effects', () => {
     expect(html).toContain('<i></i>');
   });
 
+  it('an svg filter over a known paint area covers that area and the reach of the effect, not the whole frame; an animated one its widest reach', () => {
+    const doc = ok(addEffect(base(), 'card', EffectKind.Stroke, 'b', { width: 12 }));
+    const keyed = ok(setKeyframes(doc, 'card', effectKey('b', 'width'), [{ frame: 0, value: 0, ease: Ease.Linear }, { frame: 10, value: 30, ease: Ease.Linear }]));
+    const area = { left: 100, top: 200, width: 300, height: 100 };
+
+    expect(effectLayer(clipOf(doc), frame, plain, '', area)).toContain('<filter id="ef-card-b" filterUnits="userSpaceOnUse" x="88" y="188" width="324" height="124"');
+    expect(effectLayer(clipOf(keyed), frame, plain, '', area)).toContain('<filter id="ef-card-b" filterUnits="userSpaceOnUse" x="40" y="140" width="420" height="220"');
+    expect(effectLayer(clipOf(doc), frame, plain, '')).toContain('x="-25%" y="-25%" width="150%" height="150%"');
+  });
+
+  it.each([EffectKind.DropShadow, EffectKind.Glow, EffectKind.GaussianBlur])('over a known paint area %s becomes an svg filter bounded to it, not a css filter over the whole layer', (kind) => {
+    const doc = ok(addEffect(base(), 'card', kind, 'd'));
+    const html = effectLayer(clipOf(doc), frame, plain, '', { left: 100, top: 200, width: 300, height: 100 });
+
+    expect(html).toContain('style="filter:url(#ef-card-d)"');
+    expect(html).toMatch(/<filter id="ef-card-d" filterUnits="userSpaceOnUse"/);
+    expect(effectLayer(clipOf(doc), frame, plain, '')).not.toContain('<filter');
+  });
+
   it('a clip without effects keeps its markup', () => {
     expect(effectLayer(clipOf(base()), frame, plain, '<i></i>')).toBe('<i></i>');
   });
@@ -117,6 +138,19 @@ describe('layer effects', () => {
     const html = composeHtml({ doc, tokens: FEEGA_TOKENS, assets: {} });
 
     expect(html).toContain('id="ef-card"');
-    expect(html).toMatch(/tl\.set\("#ef-card",\{"filter":"drop-shadow\(/);
+    expect(html).toMatch(/tl\.set\("#ef-card-d-0",\{"attr":\{"dx"/);
+  });
+
+  it('a shape filters only where it draws over its clip, repeated copies included; other clips keep the whole frame', () => {
+    const stroked = ok(addEffect(base(), 'card', EffectKind.Stroke, 's'));
+    const repeated = ok(addModifier(stroked, 'card', ModifierKind.Repeater, 'm'));
+    const title = ok(addEffect(ok(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Title', from: 0, durationInFrames: 30 }, 'card')), 'card', EffectKind.Stroke, 's'));
+    const region = (doc: MotionDoc) => /<filter id="ef-card-s"[^>]*>/.exec(composeHtml({ doc, tokens: FEEGA_TOKENS, assets: {} }))?.[0] ?? '';
+    const width = (doc: MotionDoc) => Number(/ width="([\d.]+)"/.exec(region(doc))?.[1]);
+
+    expect(region(stroked)).toContain('filterUnits="userSpaceOnUse"');
+    expect(width(stroked)).toBeLessThan(1920);
+    expect(width(repeated)).toBeGreaterThan(width(stroked));
+    expect(region(title)).toContain('x="-25%"');
   });
 });

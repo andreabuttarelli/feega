@@ -70,6 +70,17 @@ describe('gooey modifier', () => {
     expect(svg).toContain('filter="url(#sf-a)"');
   });
 
+  it('filters only the drawing and its melt this frame, not seven times the box around it', () => {
+    const svg = shapeMarkup(look({ modifiers: [{ id: 'g', kind: ModifierKind.Goo, params: { blur: 0.02, threshold: 0.5 } }] }), paint);
+    const [x, y, w, h] = ['x', 'y', 'width', 'height'].map((k) => Number(new RegExp(`<filter id="sf-a"[^>]* ${k}="(-?[\\d.]+)"`).exec(svg)![1]));
+
+    expect(x).toBeLessThanOrEqual(-60);
+    expect(x).toBeGreaterThan(-paint.size.w);
+    expect(x + w).toBeGreaterThanOrEqual(paint.size.w + 60);
+    expect(w * h).toBeLessThan(4 * paint.size.w * paint.size.h);
+    expect(y).toBeLessThanOrEqual(-60);
+  });
+
   it('a shape without it has no filter, and a disabled one draws the same as none', () => {
     expect(shapeMarkup(look(), paint)).not.toContain('<filter');
     expect(shapeMarkup(look({ modifiers: [{ id: 'g', kind: ModifierKind.Goo, enabled: false, params: {} }] }), paint)).toBe(shapeMarkup(look(), paint));

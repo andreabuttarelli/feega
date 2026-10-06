@@ -16,8 +16,8 @@ export type RenderEvent = { kind: 'started' | 'chunk' | 'assembling' | 'saving' 
 
 const CHUNK_TARGET_FRAMES = 450;
 const MAX_CHUNKS = 8;
-const MAX_HEAVY_CHUNKS = 16;
-const CHUNK_BUDGET_MS = 2 * 60_000;
+const MAX_HEAVY_CHUNKS = 64;
+const CHUNK_BUDGET_MS = 90_000;
 
 const FINAL: ReadonlySet<RenderStage> = new Set([RenderStage.Done, RenderStage.Failed]);
 
