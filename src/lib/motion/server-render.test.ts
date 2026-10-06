@@ -23,6 +23,34 @@ describe('chunkPlan', () => {
     expect(chunkPlan(900, heavier).count).toBeLessThanOrEqual(64);
   });
 
+  const MASKING_LOOP_FRAME_MS = 8460;
+  const FARM_SWEEP_2026_10_06 = [
+    { workers: 8, seconds: 724, usd: 0.234 },
+    { workers: 16, seconds: 559, usd: 0.244 },
+    { workers: 27, seconds: 249, usd: 0.23 },
+    { workers: 54, seconds: 203, usd: 0.321 }
+  ];
+
+  it('the masking loop gets the worker count that cost the least seconds × dollars on the farm', () => {
+    const best = FARM_SWEEP_2026_10_06.reduce((a, b) => (a.seconds * a.usd <= b.seconds * b.usd ? a : b));
+
+    expect(chunkPlan(270, Array.from({ length: 270 }, () => MASKING_LOOP_FRAME_MS)).count).toBe(best.workers);
+  });
+
+  it('speed alone stops at 32 workers: past it the sandboxes contend and each frame bills more CPU', () => {
+    const plan = chunkPlan(900, Array.from({ length: 900 }, () => 7000));
+
+    expect(plan.count).toBeLessThanOrEqual(32);
+    expect(plan.size * 7000).toBeGreaterThan(90_000);
+  });
+
+  it('a chunk that would outlive its worker splits further, up to sixty-four', () => {
+    const plan = chunkPlan(900, Array.from({ length: 900 }, () => 25_000));
+
+    expect(plan.count).toBeGreaterThan(32);
+    expect(plan.count).toBeLessThanOrEqual(64);
+  });
+
   it('a chunk is sized by its heaviest stretch, not by the average', () => {
     const costs = Array.from({ length: 840 }, (_, f) => (f < 120 ? 2500 : 40));
 
