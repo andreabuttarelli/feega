@@ -13,6 +13,31 @@ function setup() {
   return { session, run };
 }
 
+describe('a composition holds video tracks only', () => {
+  it('edit_comp refuses an audio track inside a composition and points to the root', async () => {
+    const { session, run } = setup();
+    await run('add_clip', { component: 'Title', start: 0, duration: 2 });
+    await run('precompose', { clip_ids: ['id1'] });
+    const before = JSON.stringify(session.doc);
+
+    const out = await run('edit_comp', { comp: 'id2', calls: [{ tool: 'add_track', input: { kind: 'audio' } }] });
+
+    expect(out.ok).toBe(false);
+    expect(String(out.error)).toMatch(/root|whole video/);
+    expect(JSON.stringify(session.doc)).toBe(before);
+  });
+
+  it('a nested edit that leaves an invalid doc comes back as an error and changes nothing', async () => {
+    const { session, run } = setup();
+    await run('add_clip', { component: 'Title', start: 0, duration: 2 });
+    await run('precompose', { clip_ids: ['id1'] });
+
+    await run('edit_comp', { comp: 'id2', calls: [{ tool: 'add_clip', input: { component: 'Kicker', start: 0, duration: 1 } }] });
+
+    expect(parseMotionDoc(session.doc).ok).toBe(true);
+  });
+});
+
 describe('motion agent precomp tools', () => {
   it('precompose moves clips into a named composition and leaves a precomp clip', async () => {
     const { session, run } = setup();

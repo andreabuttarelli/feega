@@ -39,6 +39,7 @@ export type DeepState = {
   iteration: number;
   storyboard: string | null;
   verdict: DeepVerdict | null;
+  best?: { verdict: DeepVerdict; version: number } | null;
   notes: DeepNote[];
   summary: string | null;
 };

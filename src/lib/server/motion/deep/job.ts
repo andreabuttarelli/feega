@@ -86,7 +86,7 @@ export async function runDeepJob(db: Db, runId: string, clock: JobClock): Promis
   const heartbeat = setInterval(() => void beatDeep(db, { orgId: run.orgId, runId }).catch((e) => console.error('[motion-deep] heartbeat failed', e)), HEARTBEAT_MS);
   try {
     const ports = await deepPorts(
-      { db, orgId: run.orgId, userId: params.userId, threadId: params.threadId, project: { id: project.id, brandId: project.brandId }, motion: { record, node }, model: params.model, brief: params.message, startedAt: clock.startedAt, maxMs: clock.maxMs, capUsd: params.quote.capUsd, spentBefore: params.spentUsd, assetsNote: params.assets },
+      { db, orgId: run.orgId, userId: params.userId, threadId: params.threadId, project: { id: project.id, brandId: project.brandId }, motion: { record, node }, model: params.model, brief: params.message, startedAt: clock.startedAt, maxMs: clock.maxMs, capUsd: params.quote.capUsd, capCredits: params.quote.capCredits, spentBefore: params.spentUsd, assetsNote: params.assets },
       {
         checkpoint: async (state, extra) => {
           params = { ...params, state, spentUsd: extra.spentUsd, assets: extra.assets };

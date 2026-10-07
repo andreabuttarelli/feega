@@ -5,7 +5,7 @@ import { AssetKind, COMPONENTS, COMPONENT_IDS, TrackKind, type ComponentId } fro
 import { fieldsOf } from '$lib/motion/inspector';
 import { Ease, FRAME_RATES, MAX_SECONDS, TRANSITION_KINDS } from '$lib/motion/design';
 import { setFrameRate } from '$lib/motion/frame-rate';
-import { Background, MOTION_FORMATS, clipsOf, findClip, type MotionDoc } from '$lib/motion/doc';
+import { Background, MOTION_FORMATS, clipsOf, findClip, parseMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { JUNCTION, JUNCTION_KINDS, junctionPairs } from '$lib/motion/junctions';
 import { ClipEdge, Side, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyInterp, setKeyframes, setMask, setMaskStack, shaped, setProps, setTiming, setTrackMatte, setTransform, setTransition, setJunction, trimClip, applyEasePreset, setKeyEase, type OpResult } from '$lib/motion/timeline';
 import { MASK_KEYS, MASK_KIND_IDS, MASK_MODES, MATTES, MAX_MASK_STACK } from '$lib/motion/mask';
@@ -1437,17 +1437,22 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
           return { ok: false, error: `${input.comp} is a template: change it with set_template_fields, or detach_template first to edit its structure` };
         }
         session.doc = viewOf(root, [input.comp]);
-        try {
-          for (const [index, call] of input.calls.entries()) {
-            const out = await nestedCall(call.tool, call.input, options);
-            if (out.ok === false) {
-              return { ok: false, failed: index, error: `${call.tool}: ${out.error}`, doc: docSummary(session.doc, []) };
-            }
+        let outcome: Record<string, unknown> = { ok: true };
+        for (const [index, call] of input.calls.entries()) {
+          const out = await nestedCall(call.tool, call.input, options);
+          if (out.ok === false) {
+            outcome = { ok: false, failed: index, error: `${call.tool}: ${out.error}` };
+            break;
           }
-          return { ok: true, doc: docSummary(session.doc, []) };
-        } finally {
-          session.doc = mergeView(root, [input.comp], session.doc);
         }
+        const merged = mergeView(root, [input.comp], session.doc);
+        const valid = parseMotionDoc(merged);
+        if (!valid.ok) {
+          session.doc = root;
+          return { ok: false, error: `nothing was changed inside ${input.comp}: ${valid.error}. Audio tracks and music belong to the root of the video: call add_track and add_clip outside edit_comp.` };
+        }
+        session.doc = merged;
+        return { ...outcome, doc: docSummary(viewOf(merged, [input.comp]), []) };
       }
     }),
 

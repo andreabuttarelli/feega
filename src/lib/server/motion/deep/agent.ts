@@ -11,12 +11,12 @@ import { motionAgentPrompt } from '$lib/server/motion/motion-prompt';
 import { selectionNote, type MotionSession } from '$lib/server/motion/motion-tools';
 import { workspaceTools } from '$lib/server/motion/workspace';
 import { agentActor } from '$lib/server/repos/actor';
-import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
+import { RevisionOutcome, readRevision } from '$lib/server/repos/motion-revisions';
 import { SIGNED_URL_TTL_S } from '$lib/server/repos/asset-storage';
 import { analyzeSounds, storageAnalysis } from '$lib/server/motion/audio-analysis';
 import { frameStats } from '$lib/server/motion/frame-stats';
 import { spentUsd } from '$lib/server/motion/model-route';
-import { Vision, VIEW_FRAMES, type Frame } from '$lib/server/motion/frames';
+import { Vision, visionStep, type Frame } from '$lib/server/motion/frames';
 import { awaitTask, FarmTask, launchStills, readStills, TaskState } from '$lib/server/motion/farm-render';
 import { farmJob } from '$lib/server/motion/render-run';
 import { motionRenderFarm } from '$lib/server/motion/renderer';
@@ -31,7 +31,8 @@ import type { CanvasNodeRecord } from '$lib/server/repos/canvas';
 import type { MotionNode } from '$lib/canvas/motion-node';
 import type { DeepPorts, DeepState } from './loop';
 import { critiquePrompt, critiqueTimes, parseVerdict, sampleTimes, stillSpans } from './critic';
-import { ASSET_TOOLS, BUILD_NOTE, DIRECTOR_TOOLS, assetsPrompt, buildPrompt, directorSystem, summaryPrompt } from './prompts';
+import { ASSET_TOOLS, BUILD_NOTE, refusedPrompt, DIRECTOR_TOOLS, assetsPrompt, buildPrompt, directorSystem, summaryPrompt } from './prompts';
+import { creditsLeft, creditsOfUsd, shouldStop } from './budget';
 import { DEEP_BUILD_STEPS, DEEP_RESERVE_MS, Runtime, StillsEngine, stillsEngine } from './limits';
 
 export const DEEP_AGENT_KEY = 'motion-deep';
@@ -60,6 +61,7 @@ export type DeepContext = {
   startedAt: number;
   maxMs: number;
   capUsd: number;
+  capCredits: number;
   spentBefore: number;
   assetsNote: string;
 };
@@ -92,14 +94,20 @@ export async function deepPorts(ctx: DeepContext, hooks: DeepHooks): Promise<Dee
   const session: MotionSession = { doc: head.doc, baseVersion: head.version, edits: [], selection: [], frames: new Map(), views: 0, checkedAt: 0, codeWrites: 0 };
   const tools = workspaceTools(
     { db, userId, orgId, project, record: motion.record, actor, agentKey: DEEP_AGENT_KEY },
-    { head, tokens, assets, session, frames: async () => null, check: async () => null }
+    { head, tokens, assets, session, frames: async (_callId, times) => framesAt(times), check: async () => null }
   );
-  const buildTools = Object.fromEntries(Object.entries(tools).filter(([name]) => name !== VIEW_FRAMES)) as ToolSet;
+  const buildTools = tools as ToolSet;
   const style = STYLES[styleOf(session.doc)];
   const frame = { width: session.doc.width, height: session.doc.height };
-  const buildSystem = [motionAgentPrompt({ brandName: project.brandId ? tokens.name : null, selectionNote: selectionNote(session.doc, []), vision: Vision.Missing, frame, style: styleOf(session.doc) }), BUILD_NOTE].join('\n');
+  const buildSystem = [motionAgentPrompt({ brandName: project.brandId ? tokens.name : null, selectionNote: selectionNote(session.doc, []), vision: Vision.Available, frame, style: styleOf(session.doc) }), BUILD_NOTE].join('\n');
 
   let spent = ctx.spentBefore;
+  let billedCredits = creditsOfUsd(ctx.spentBefore);
+  let lastStepUsd = 0;
+  const capLeft = () => creditsLeft(ctx.capCredits, billedCredits);
+  const bill = (usd: number) => {
+    billedCredits += creditsOfUsd(usd);
+  };
   let assetsNote = ctx.assetsNote;
   const remainingMs = () => ctx.maxMs - (Date.now() - ctx.startedAt) - DEEP_RESERVE_MS;
   const rate = gatewayRate(model);
@@ -136,7 +144,7 @@ export async function deepPorts(ctx: DeepContext, hooks: DeepHooks): Promise<Dee
     withOrgContext(orgId, async () => {
       const t0 = Date.now();
       const deadline = input.deadline ?? Number.POSITIVE_INFINITY;
-      const stops: StopCondition<ToolSet>[] = [stepCountIs(input.steps), () => Date.now() >= deadline, () => spent > ctx.capUsd, () => hooks.stopped()];
+      const stops: StopCondition<ToolSet>[] = [stepCountIs(input.steps), () => Date.now() >= deadline, () => shouldStop({ spentUsd: spent, capUsd: ctx.capUsd, stepUsd: lastStepUsd }), () => hooks.stopped()];
       let estimate = 0;
       const result = await generateText({
         model: llmLanguageModel(model, PromptCache.On),
@@ -145,16 +153,19 @@ export async function deepPorts(ctx: DeepContext, hooks: DeepHooks): Promise<Dee
         tools: input.tools,
         stopWhen: stops,
         providerOptions: reasoningProviderOptions(input.effort),
+        prepareStep: ({ steps, messages: current }) => visionStep({ lastCalls: steps.at(-1)?.toolCalls ?? [], messages: current, frames: session.frames, visionModel: model }),
         onStepFinish: async (step) => {
           const stepUsd = spentUsd([extractSdkUsage(step.usage)], [model], () => rate);
           estimate += stepUsd;
           spent += stepUsd;
+          lastStepUsd = stepUsd;
           await input.afterStep?.();
         }
       });
-      logAiCall({ label: DEEP_AGENT_KEY, context: input.label, provider: 'llm', model, ms: Date.now() - t0, ok: true, orgId, userId, threadId: ctx.threadId, projectId: project.id, actorKind: 'agent', actorId: userId, agentKey: DEEP_AGENT_KEY, ...extractSdkUsage(result.totalUsage) });
+      logAiCall({ label: DEEP_AGENT_KEY, context: input.label, provider: 'llm', model, ms: Date.now() - t0, ok: true, orgId, userId, threadId: ctx.threadId, projectId: project.id, actorKind: 'agent', actorId: userId, agentKey: DEEP_AGENT_KEY, creditCap: capLeft(), ...extractSdkUsage(result.totalUsage) });
       const billed = billedUsdInScope();
       spent += (billed ?? estimate) - estimate;
+      bill(billed ?? estimate);
       return result.text;
     });
 
@@ -165,12 +176,11 @@ export async function deepPorts(ctx: DeepContext, hooks: DeepHooks): Promise<Dee
     return farmJob({ doc: session.doc, tokens, assets: assetUrls(signed), analyses }, { format: ExportFormat.Mp4H264, fps: session.doc.fps, quality: Quality.Standard, resolution: UNSCALED });
   };
 
-  const farmFrames = async (): Promise<Frame[]> => {
+  const farmFrames = async (times: number[]): Promise<Frame[]> => {
     const farm = motionRenderFarm();
     if (!farm) {
       throw new Error('rendering is not configured here');
     }
-    const times = sampleTimes(session.doc);
     const name = await launchStills(farm, await stillsJob(), times);
     const check = await awaitTask(farm, name, FarmTask.Stills, STILLS_WAIT);
     const frames = check.state === TaskState.Done ? await readStills(farm, name, times) : null;
@@ -178,17 +188,19 @@ export async function deepPorts(ctx: DeepContext, hooks: DeepHooks): Promise<Dee
     await (await farm.attach(name))?.stop().catch(() => {});
     const usd = usage ? sandboxCostUsd([usage]) : 0;
     spent += usd;
-    logAiCall({ label: RENDER_CALL_LABEL, context: 'deep-stills', provider: 'vercel-sandbox', model: 'hyperframes-stills', flatCostUsd: usd, ms: usage?.wallMs ?? 0, ok: Boolean(frames), orgId, projectId: project.id, userId, actorKind: 'agent', actorId: userId });
+    bill(usd);
+    logAiCall({ label: RENDER_CALL_LABEL, context: 'deep-stills', provider: 'vercel-sandbox', model: 'hyperframes-stills', flatCostUsd: usd, creditCap: capLeft(), ms: usage?.wallMs ?? 0, ok: Boolean(frames), orgId, projectId: project.id, userId, actorKind: 'agent', actorId: userId });
     if (!frames) {
       throw new Error(check.error ?? 'the stills could not be read');
     }
     return frames;
   };
 
-  const machineFrames = async (): Promise<Frame[]> => localStills(machinePorts)(await stillsJob(), sampleTimes(session.doc));
+  const machineFrames = async (times: number[]): Promise<Frame[]> => localStills(machinePorts)(await stillsJob(), times);
 
-  const STILLS: Record<StillsEngine, () => Promise<Frame[]>> = { [StillsEngine.Farm]: farmFrames, [StillsEngine.Machine]: machineFrames };
-  const renderFrames = STILLS[stillsEngine(dev ? Runtime.Dev : Runtime.Deployed)];
+  const STILLS: Record<StillsEngine, (times: number[]) => Promise<Frame[]>> = { [StillsEngine.Farm]: farmFrames, [StillsEngine.Machine]: machineFrames };
+  const framesAt = STILLS[stillsEngine(dev ? Runtime.Dev : Runtime.Deployed)];
+  const renderFrames = () => framesAt(sampleTimes(session.doc));
 
   const critique = async (input: { storyboard: string; frames: Frame[] }) => {
     const seconds = session.doc.durationInFrames / session.doc.fps;
@@ -221,8 +233,15 @@ export async function deepPorts(ctx: DeepContext, hooks: DeepHooks): Promise<Dee
       return `${short(text)} (${savedNote()})`;
     },
     build: async (input) => {
-      const text = await call({ system: buildSystem, messages: [{ role: 'user', content: buildPrompt({ brief: ctx.brief, storyboard: input.storyboard, assets: assetsNote, fixes: input.fixes, iteration: input.iteration }) }], tools: buildTools, effort: Effort.Medium, steps: DEEP_BUILD_STEPS, label: 'build', deadline: Date.now() + remainingMs(), afterStep: saveDoc });
-      return `${short(text)} (${savedNote()})`;
+      session.views = 0;
+      const ask = buildPrompt({ brief: ctx.brief, storyboard: input.storyboard, assets: assetsNote, fixes: input.fixes, iteration: input.iteration });
+      const first = await call({ system: buildSystem, messages: [{ role: 'user', content: ask }], tools: buildTools, effort: Effort.Medium, steps: DEEP_BUILD_STEPS, label: 'build', deadline: Date.now() + remainingMs(), afterStep: saveDoc });
+      if (!saved.lost.length) {
+        return `${short(first)} (${savedNote()})`;
+      }
+      const refused = refusedPrompt(saved.lost);
+      const again = await call({ system: buildSystem, messages: [{ role: 'user', content: ask }, { role: 'assistant', content: first }, { role: 'user', content: refused }], tools: buildTools, effort: Effort.Medium, steps: DEEP_BUILD_STEPS, label: 'build', deadline: Date.now() + remainingMs(), afterStep: saveDoc });
+      return `${short(again)} (${savedNote()})`;
     },
     render: renderFrames,
     critique,
@@ -232,6 +251,17 @@ export async function deepPorts(ctx: DeepContext, hooks: DeepHooks): Promise<Dee
     },
     stopRequested: hooks.stopped,
     spentUsd: () => spent,
+    version: () => session.baseVersion,
+    restore: async (version) => {
+      const best = await readRevision(db, { ...nodeScope, version });
+      if (!best) {
+        return;
+      }
+      session.doc = best.doc;
+      session.edits = [`back to the best version v${version}`];
+      await saveDoc();
+      savedNote();
+    },
     remainingMs
   };
 }

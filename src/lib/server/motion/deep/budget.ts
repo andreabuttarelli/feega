@@ -47,3 +47,11 @@ export function deepQuote(rate: Rate | null): DeepPrice {
   const credits = creditsOfUsd(llmUsd) + renderCredits;
   return { usd, llmUsd, credits, renderCredits, capUsd: usd * DEEP_CAP_FACTOR, capCredits: Math.ceil(credits * DEEP_CAP_FACTOR), minutes: MINUTES_FIXED + iterations * MINUTES_PER_ROUND, iterations };
 }
+
+export function creditsLeft(capCredits: number, billedCredits: number): number {
+  return Math.max(0, capCredits - billedCredits);
+}
+
+export function shouldStop(input: { spentUsd: number; capUsd: number; stepUsd: number }): boolean {
+  return input.spentUsd + input.stepUsd > input.capUsd;
+}

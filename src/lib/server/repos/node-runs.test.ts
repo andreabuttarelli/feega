@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fakeDb, filtersOf } from '$lib/server/db/fake-db';
-import { activeRenderRuns, claimRun, completeRun, createRun, failRun, listNodeRuns, queuedVideoRuns, RENDER_JOB_PREFIX, runningRuns, setRunParams } from './node-runs';
+import { activeRenderRuns, claimRun, completeRun, createRun, failRun, listNodeRuns, queuedVideoRuns, RENDER_JOB_PREFIX, DEEP_JOB_PREFIX, runningRuns, setRunParams } from './node-runs';
 
 const ORG = '11111111-1111-1111-1111-111111111111';
 const NODE = '22222222-2222-2222-2222-222222222222';
@@ -137,6 +137,16 @@ describe('un render motion non è un video in coda presso un fornitore', () => {
     const call = calls.find((c) => c.op === 'update')!;
     expect(call.payload).toEqual({ params: { progress: { stage: 'rendering' } } });
     expect(filtersOf(calls, 'update')).toEqual({ id: RUN, org_id: ORG });
+  });
+});
+
+describe('un job Deep motion', () => {
+  it('il riconciliatore video non lo vede, quindi non lo chiude con video_reconcile_failed', async () => {
+    const { db } = fakeDb({ node_runs: [{ ...row, external_job_id: `${DEEP_JOB_PREFIX}7` }, { ...row, id: 'v', external_job_id: 'kling:1' }] });
+
+    const runs = await queuedVideoRuns(db, { limit: 10 });
+
+    expect(runs.map((r) => r.id)).toEqual(['v']);
   });
 });
 

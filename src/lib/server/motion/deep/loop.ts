@@ -13,6 +13,8 @@ export type DeepPorts = {
   checkpoint: (state: DeepState) => Promise<void>;
   stopRequested: () => Promise<boolean>;
   spentUsd: () => number;
+  version: () => number;
+  restore: (version: number) => Promise<void>;
   remainingMs: () => number;
 };
 
@@ -31,7 +33,7 @@ type Step = { next: DeepPhase; note: string };
 type Run = { state: DeepState; frames: Frame[] | null; ports: DeepPorts; limits: DeepLimits };
 
 export function freshState(): DeepState {
-  return { phase: DeepPhase.Storyboard, iteration: 0, storyboard: null, verdict: null, notes: [], summary: null };
+  return { phase: DeepPhase.Storyboard, iteration: 0, storyboard: null, verdict: null, best: null, notes: [], summary: null };
 }
 
 type Closing = { because: string; applies: (run: Run, verdict: DeepVerdict) => boolean };
@@ -41,6 +43,25 @@ const CLOSINGS: Closing[] = [
   { because: 'the rubric passes', applies: (run, verdict) => verdict.pass && run.state.iteration >= run.limits.minIterations },
   { because: 'the budget cannot pay for another round', applies: (run) => run.ports.spentUsd() + run.limits.roundUsd > run.limits.capUsd }
 ];
+
+enum Trend {
+  Better = 'better',
+  Worse = 'worse'
+}
+
+const trendOf = (best: DeepState['best'], verdict: DeepVerdict) => (best && verdict.score < best.verdict.score ? Trend.Worse : Trend.Better);
+
+const KEEP: Record<Trend, (run: Run, verdict: DeepVerdict) => Promise<{ verdict: DeepVerdict; note: string }>> = {
+  [Trend.Better]: async (run, verdict) => {
+    run.state.best = { verdict, version: run.ports.version() };
+    return { verdict, note: '' };
+  },
+  [Trend.Worse]: async (run, verdict) => {
+    const best = run.state.best!;
+    await run.ports.restore(best.version);
+    return { verdict: best.verdict, note: `; scored ${verdict.score}, worse than ${best.verdict.score}: back to the best version (v${best.version})` };
+  }
+};
 
 const verdictLine = (verdict: DeepVerdict) => `score ${verdict.score}/10, ${verdict.pass ? 'passes' : 'fails'} the rubric${verdict.fixes.length ? `: ${verdict.fixes.length} fixes` : ''}`;
 
@@ -65,11 +86,13 @@ const PHASES: Record<DeepPhase, (run: Run) => Promise<Step>> = {
     }
   },
   [DeepPhase.Critique]: async (run) => {
-    const verdict = await run.ports.critique({ storyboard: run.state.storyboard ?? '', frames: run.frames ?? [] });
-    run.state.verdict = verdict;
+    const seen = await run.ports.critique({ storyboard: run.state.storyboard ?? '', frames: run.frames ?? [] });
     run.frames = null;
+    const kept = await KEEP[trendOf(run.state.best, seen)](run, seen);
+    const verdict = kept.verdict;
+    run.state.verdict = verdict;
     const closing = CLOSINGS.find((c) => c.applies(run, verdict));
-    return { next: closing ? DeepPhase.Summary : DeepPhase.Build, note: `${verdictLine(verdict)}${closing ? `; closing: ${closing.because}` : ''}` };
+    return { next: closing ? DeepPhase.Summary : DeepPhase.Build, note: `${verdictLine(seen)}${kept.note}${closing ? `; closing: ${closing.because}` : ''}` };
   },
   [DeepPhase.Summary]: async (run) => {
     run.state.summary = await run.ports.summarize(run.state);

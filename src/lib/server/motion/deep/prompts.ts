@@ -50,4 +50,8 @@ export function summaryPrompt(state: DeepState, brief: string): string {
     .join('\n\n');
 }
 
-export const BUILD_NOTE = 'This is a Deep job: you have time. Build carefully, scene by scene, and finish the whole video in this round. You cannot see frames here: a critic renders the video after you and sends the fixes.';
+export const BUILD_NOTE = 'This is a Deep job: you have time. Build carefully, scene by scene, and finish the whole video in this round. After each block of edits (a scene or two) call view_frames on the times you changed and fix what reads badly before moving on. A critic renders the whole video after you and sends the fixes.';
+
+export function refusedPrompt(lost: string[]): string {
+  return `Some of your edits were refused when the video was saved, and the video was reloaded from the last saved version:\n- ${lost.join('\n- ')}\nRead the doc, then redo those edits in a valid way.`;
+}

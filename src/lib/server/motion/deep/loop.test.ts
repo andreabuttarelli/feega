@@ -25,10 +25,12 @@ type World = {
   timeLeftAfter: Record<string, number>;
   renderFails: boolean;
   critiqueFrames: number[];
+  version: number;
+  restored: number[];
 };
 
 function world(overrides: Partial<World> = {}): World {
-  return { verdicts: [], calls: [], builds: [], checkpoints: [], spent: 0, costPerBuild: 0, stopAfter: null, remainingMs: 1_000_000, timeLeftAfter: {}, renderFails: false, critiqueFrames: [], ...overrides };
+  return { verdicts: [], calls: [], builds: [], checkpoints: [], spent: 0, costPerBuild: 0, stopAfter: null, remainingMs: 1_000_000, timeLeftAfter: {}, renderFails: false, critiqueFrames: [], version: 0, restored: [], ...overrides };
 }
 
 function portsOf(w: World): DeepPorts {
@@ -51,6 +53,7 @@ function portsOf(w: World): DeepPorts {
       did('build');
       w.builds.push({ fixes: input.fixes, iteration: input.iteration });
       w.spent += w.costPerBuild;
+      w.version += 1;
       return 'placed five scenes';
     },
     render: async () => {
@@ -74,6 +77,11 @@ function portsOf(w: World): DeepPorts {
     },
     stopRequested: async () => w.stopAfter !== null && w.calls.includes(w.stopAfter),
     spentUsd: () => w.spent,
+    version: () => w.version,
+    restore: async (version) => {
+      w.restored.push(version);
+      w.version = version;
+    },
     remainingMs: () => w.remainingMs
   };
 }
@@ -171,6 +179,29 @@ describe('the Deep agent loop', () => {
     expect(outcome.end).toBe(DeepEnd.Finished);
     expect(w.critiqueFrames).toEqual([0, 0]);
     expect(outcome.state.notes.some((n) => n.phase === DeepPhase.Render && /render worker stopped/.test(n.text))).toBe(true);
+  });
+
+  it('goes back to the best checkpoint when a round makes the video worse', async () => {
+    const good: DeepVerdict = { pass: false, score: 6, fixes: ['tighten the hook'] };
+    const worse: DeepVerdict = { pass: false, score: 3, fixes: ['everything broke'] };
+    const w = world({ verdicts: [good, worse, PASS] });
+
+    const outcome = await runDeep(portsOf(w), freshState(), LIMITS);
+
+    expect(w.restored).toEqual([1]);
+    expect(w.builds[2].fixes).toEqual(good.fixes);
+    expect(outcome.state.notes.some((n) => /back to the best version/.test(n.text))).toBe(true);
+  });
+
+  it('keeps the best version at the end even when the last round is worse', async () => {
+    const good: DeepVerdict = { pass: false, score: 6, fixes: ['a'] };
+    const worse: DeepVerdict = { pass: false, score: 2, fixes: ['b'] };
+    const w = world({ verdicts: [good, worse, worse, worse] });
+
+    const outcome = await runDeep(portsOf(w), freshState(), LIMITS);
+
+    expect(w.restored.at(-1)).toBe(1);
+    expect(outcome.state.verdict?.score).toBe(6);
   });
 
   it('writes a note for every phase it runs', async () => {

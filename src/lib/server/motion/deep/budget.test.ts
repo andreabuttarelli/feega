@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CHAT_MULTIPLIER, billedCreditsFor } from '$lib/credit-ladder';
-import { DEEP_CAP_FACTOR, DEEP_ITERATIONS, creditsOfUsd, deepQuote, roundUsd } from './budget';
+import { DEEP_CAP_FACTOR, DEEP_ITERATIONS, creditsLeft, creditsOfUsd, deepQuote, roundUsd, shouldStop } from './budget';
 
 const OPUS = { input: 5, cachedInput: 0.5, output: 25 };
 const FLASH = { input: 0.075, cachedInput: 0.015, output: 0.25 };
@@ -38,5 +38,24 @@ describe('what a Deep job costs before it starts', () => {
 
   it('turns dollars spent into the credits the user sees', () => {
     expect(creditsOfUsd(1)).toBe(billedCreditsFor(1, CHAT_MULTIPLIER));
+  });
+});
+
+describe('the credit cap is never passed', () => {
+  it('quotes the credits the user will be charged, multiplier included', () => {
+    const quote = deepQuote(OPUS);
+
+    expect(quote.credits).toBeGreaterThanOrEqual(creditsOfUsd(quote.llmUsd));
+    expect(creditsOfUsd(quote.capUsd)).toBeLessThanOrEqual(quote.capCredits);
+  });
+
+  it('caps every billed call at what is left of the cap', () => {
+    expect(creditsLeft(3000, 2900)).toBe(100);
+    expect(creditsLeft(3000, 3200)).toBe(0);
+  });
+
+  it('stops a round before the next step could pass the cap, not after', () => {
+    expect(shouldStop({ spentUsd: 6, capUsd: 7.5, stepUsd: 1.6 })).toBe(true);
+    expect(shouldStop({ spentUsd: 5, capUsd: 7.5, stepUsd: 1 })).toBe(false);
   });
 });

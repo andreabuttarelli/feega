@@ -28,6 +28,21 @@ function headOf(row: RevisionRow): MotionHead | null {
   return { version: Number(row.version), doc: parsed.doc, summary: row.summary, actorKind: row.actor_kind };
 }
 
+export async function readRevision(db: Db, input: { orgId: string; nodeId: string; version: number }): Promise<MotionHead | null> {
+  const { data, error } = await db
+    .from('motion_revisions')
+    .select('version, doc, summary, actor_kind')
+    .eq('org_id', input.orgId)
+    .eq('node_id', input.nodeId)
+    .eq('version', input.version)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+  return data ? headOf(data as RevisionRow) : null;
+}
+
 export async function readHead(db: Db, input: { orgId: string; nodeId: string }): Promise<MotionHead | null> {
   const { data, error } = await db
     .from('motion_revisions')
