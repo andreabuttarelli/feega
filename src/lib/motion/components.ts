@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { BuiltinFont, FONT_NAME } from './fonts/model';
 import { DURATION, EASE_IDS, Ease, FPS } from './design';
 import { MATERIALS, Material } from './materials';
-import { DEVICES, Device, FINISHES, Finish } from './devices';
+import { DEVICES, Device, FINISHES, Finish, SCREEN_FITS, ScreenFit, screenGuide } from './devices';
 import { LAYOUTS } from '../canvas/composition/index';
 import { CARD_ASPECTS, RATIO_RANGE } from '../canvas/composition/card-look';
 import { CAMERA_PRESETS } from '../canvas/composition/camera';
@@ -416,7 +416,7 @@ export const COMPONENTS = {
   },
   Device3D: {
     label: 'Device mockup',
-    description: 'A 3D phone, foldable phone, laptop, monitor, tablet or browser window with an image or video mapped on its screen, lit by the look of the video. Animate lid (laptops, degrees open), fold (foldable, 0 closed..180 flat) and screenScroll (0..1, scrolls a tall screenshot); apply_device_preset adds spin-in, hero turn, lid opening, fold opening or screen scroll.',
+    description: 'A 3D phone, foldable phone, laptop, monitor, tablet or browser window with an image or video mapped on its screen, lit by the look of the video. Animate lid (laptops, degrees open), fold (foldable, 0 closed..180 flat) and screenScroll (0..1, scrolls a tall screenshot); apply_device_preset adds spin-in, hero turn, lid opening, fold opening or screen scroll. Screens in px (aspect): ' + DEVICES.map(screenGuide).join(', ') + '. screenComp puts a composition of this video on the screen instead (UI built from Shape, Title and Text clips, a Custom or kit component, precomposed): it plays live and stays vector-sharp at any size; give that composition the frame of the screen aspect (e.g. 390×848 for a phone). screenFit: cover fills the screen and crops what does not match its aspect (a taller screenshot scrolls), contain shows the whole source with bars, safe shows it whole below the island, notch or camera hole.',
     track: TrackKind.Visual,
     durationInFrames: seconds(4),
     schema: z
@@ -424,6 +424,8 @@ export const COMPONENTS = {
         device: choice(DEVICES, Device.PhonePro, 'Device', Group.Content),
         screen: asset(AssetKind.Image, 'Screen image'),
         screenVideo: asset(AssetKind.Video, 'Screen video'),
+        screenComp: z.string().max(60).default('').meta({ control: Control.Comp, label: 'Screen composition', group: Group.Content }),
+        screenFit: choice(SCREEN_FITS, ScreenFit.Cover, 'Screen fit', Group.Style),
         finish: choice(FINISHES, Finish.Default, 'Finish', Group.Style),
         ...camera,
         ...position3d

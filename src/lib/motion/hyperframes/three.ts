@@ -5,8 +5,9 @@ import { hdriUrl, type Look } from '../look';
 import { SURFACE, type Material, type Surface } from '../materials';
 import { cameraRuntime, seekDriver } from './stage';
 import { DEVICE_SCRIPT, type DeviceRuntime } from './device-runtime';
+import type { ScreenBake } from './device-screen';
 import { ENGINE_GLOBAL } from '../engine/engine';
-import { drawOnce, screenKey } from './three-draw';
+import { drawOnce, faceShown, quadMatrix, screenKey, screenPlacement } from './three-draw';
 import { strokePolygons } from './stroke-outline';
 import { ON_DISPOSE, hotScope, hotSeek, keptGl } from './hot';
 
@@ -50,6 +51,8 @@ export type ThreeClip = {
   extrude: number;
   bevel: number;
   device: DeviceRuntime | null;
+  screenFit: string;
+  screen: ScreenBake | null;
   video: boolean;
   overscan: number;
 };
@@ -483,6 +486,7 @@ function drawAt(time) {
       }
     }
     s.camera.updateProjectionMatrix();
+    placeFaces(c, s);
     if (!s.bokeh) {
       s.renderer.render(s.scene, s.camera);
       continue;
@@ -512,5 +516,5 @@ export function threeScript(clips: ThreeClip[], duration: number, stage: StageSp
   if (!clips.length) {
     return '';
   }
-  return `<script type="module">const CLIPS = ${js(clips)};const LIGHTING = ${js(LIGHTING)};const LOOK = ${js(look)};const DURATION = ${js(duration)};const FOV = ${SCENE.fov.fallback};const STAGE = ${js(stage)};${cameraRuntime()}const sampleTrack = (${sampleTrack.toString()});const onScreen = (${onScreen.toString()});const drawOnce = (${drawOnce.toString()});const screenKey = (${screenKey.toString()});const strokePolygons = (${strokePolygons.toString()});${SCENE_SCRIPT.replace('DRIVER', seekDriver(THREE_TIMELINE, 'DURATION', 'renderAt'))}</script>`;
+  return `<script type="module">const CLIPS = ${js(clips)};const LIGHTING = ${js(LIGHTING)};const LOOK = ${js(look)};const DURATION = ${js(duration)};const FOV = ${SCENE.fov.fallback};const STAGE = ${js(stage)};${cameraRuntime()}const sampleTrack = (${sampleTrack.toString()});const onScreen = (${onScreen.toString()});const drawOnce = (${drawOnce.toString()});const screenKey = (${screenKey.toString()});const screenPlacement = (${screenPlacement.toString()});const quadMatrix = (${quadMatrix.toString()});const faceShown = (${faceShown.toString()});const strokePolygons = (${strokePolygons.toString()});${SCENE_SCRIPT.replace('DRIVER', seekDriver(THREE_TIMELINE, 'DURATION', 'renderAt'))}</script>`;
 }

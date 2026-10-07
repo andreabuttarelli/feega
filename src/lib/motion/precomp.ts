@@ -6,6 +6,8 @@ import { withoutHidden } from './organize';
 import { addClip, type OpResult } from './timeline';
 import { RING_LAYOUT, ringCards, ringRadiusPx, ringSliceId, slicesFor } from './ring/model';
 import { BENTO_LAYOUT, bentoCellId, heldCell, type BentoCard } from './bento/model';
+import { facesOf, screenCompOf, screenHostId } from './device-screen';
+import type { Device } from './devices';
 
 export type CompPath = readonly string[];
 export type GroupProps = { span?: number };
@@ -24,7 +26,7 @@ export function viewOf(root: MotionDoc, path: CompPath): MotionDoc {
   if (!comp) {
     return root;
   }
-  return { ...root, durationInFrames: comp.durationInFrames, tracks: comp.tracks, camera: null, markers: undefined, workArea: null };
+  return { ...root, ...comp.frame, durationInFrames: comp.durationInFrames, tracks: comp.tracks, camera: null, markers: undefined, workArea: null };
 }
 
 export function mergeView(root: MotionDoc, path: CompPath, view: MotionDoc): MotionDoc {
@@ -48,6 +50,14 @@ function chosenTracks(doc: MotionDoc, ids: ReadonlySet<string>): MotionTrack[] {
 }
 
 const freed = (clip: MotionClip, inside: ReadonlySet<string>): MotionClip => (clip.parent && inside.has(clip.parent) ? clip : { ...clip, parent: null });
+
+export function createComp(doc: MotionDoc, id: string, input: { name: string; durationInFrames: number; frame: { width: number; height: number } }): OpResult {
+  if (doc.comps[id]) {
+    return fail(`a composition ${id} already exists`);
+  }
+  const comp: MotionComp = { name: input.name.trim().slice(0, 60) || 'Comp', durationInFrames: Math.max(1, Math.round(input.durationInFrames)), frame: input.frame, tracks: [{ id: 'v1', kind: TrackKind.Visual, name: 'Video 1', clips: [] }] };
+  return { ok: true, doc: { ...doc, comps: { ...doc.comps, [id]: comp } } };
+}
 
 export function precompose(doc: MotionDoc, clipIds: readonly string[], ids: { comp: string; clip: string }, name: string): OpResult {
   const chosen = new Set(clipIds);
@@ -170,6 +180,13 @@ function bentoTracks(doc: MotionDoc, track: MotionTrack, grid: MotionClip, depth
   return grouped(doc, track, grid, hosts, depth);
 }
 
+function deviceTracks(doc: MotionDoc, track: MotionTrack, device: MotionClip, depth: number): MotionTrack[] {
+  const comp = screenCompOf(device)!;
+  const faces = facesOf(device.props.device as Device);
+  const hosts = Array.from({ length: faces }, (_, face) => hostTrack(track, cardHost(device, screenHostId(device.id, face), { comp, loop: true, hold: false })));
+  return grouped(doc, track, device, hosts, depth);
+}
+
 const COMP_CARD = 'comp';
 
 const CARD_EXPANDERS: Record<string, Expander> = {
@@ -179,6 +196,7 @@ const CARD_EXPANDERS: Record<string, Expander> = {
 
 const EXPANDERS: Partial<Record<MotionClip['component'], Expander>> = {
   Precomp: precompTracks,
+  Device3D: deviceTracks,
   Composition: (doc, track, host, depth) => CARD_EXPANDERS[String(host.props.layout)](doc, track, host, depth)
 };
 

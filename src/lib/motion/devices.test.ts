@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEVICE, DEVICES, DeviceKind, GLASS_RIM, bevelOf } from './devices';
+import { DEVICE, DEVICES, Device, DeviceKind, GLASS_RIM, SCREEN, bevelOf } from './devices';
 
 const TRADEMARKS = /iphone|ipad|imac|macbook|apple|pixel|google|galaxy|samsung/i;
 const ASPECT_TOLERANCE = 0.005;
@@ -44,5 +44,17 @@ describe('device table', () => {
     const { screen, kind } = DEVICE['foldable'];
     expect(kind).toBe(DeviceKind.Foldable);
     expect(screen.width).toBeGreaterThan(screen.height);
+  });
+});
+
+describe('screen table', () => {
+  it('names the real screen of every device: pixels, aspect and the band the cutout covers', () => {
+    expect(SCREEN[Device.PhonePro]).toEqual({ px: [1206, 2622], aspect: '9:19.6', safeTop: expect.closeTo(0.055, 2) });
+    expect(SCREEN[Device.Monitor]).toEqual({ px: [5120, 2880], aspect: '16:9', safeTop: 0 });
+  });
+
+  it.each(DEVICES)('%s keeps its safe band inside the screen', (id) => {
+    expect(SCREEN[id].safeTop).toBeGreaterThanOrEqual(0);
+    expect(SCREEN[id].safeTop).toBeLessThan(0.2);
   });
 });

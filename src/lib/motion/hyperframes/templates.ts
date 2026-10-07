@@ -312,7 +312,7 @@ const CanvasMock: Template<'CanvasMock'> = {
 
 export const DEVICE_OVERSCAN = 0.5;
 
-function overscanned(box: Box, overscan: number): Box {
+export function overscanned(box: Box, overscan: number): Box {
   return { left: box.left - box.width * overscan, top: box.top - box.height * overscan, width: box.width * (1 + 2 * overscan), height: box.height * (1 + 2 * overscan) };
 }
 

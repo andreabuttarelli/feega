@@ -1,7 +1,7 @@
-import { DEVICE, FINISH_COLOR, Finish, BEVEL, GLASS_RIM, type Device, type DeviceSpec } from '../devices';
+import { DEVICE, FINISH_COLOR, Finish, BEVEL, GLASS_RIM, SCREEN, type Device, type DeviceSpec } from '../devices';
 import { DEVICE_SCENE } from '../keyframes';
 
-export type DeviceRuntime = DeviceSpec & { color: string };
+export type DeviceRuntime = DeviceSpec & { color: string; safeTop: number };
 
 export function deviceRuntime(device: Device, finish: Finish, ctx: { color: (v: string) => string }): DeviceRuntime {
   const spec = DEVICE[device];
@@ -12,7 +12,7 @@ export function deviceRuntime(device: Device, finish: Finish, ctx: { color: (v: 
     [Finish.Silver]: () => FINISH_COLOR[Finish.Silver],
     [Finish.White]: () => FINISH_COLOR[Finish.White]
   };
-  return { ...spec, color: FINISH_OF[finish]() };
+  return { ...spec, color: FINISH_OF[finish](), safeTop: SCREEN[device].safeTop };
 }
 
 export const DEVICE_SCRIPT = `
@@ -54,6 +54,10 @@ function halfRect(w, h, r, side) {
   return shape;
 }
 
+function rectCorners(left, right, h) {
+  return [[left, h / 2], [right, h / 2], [right, -h / 2], [left, -h / 2]].map(([x, y]) => new THREE.Vector3(x, y, 0));
+}
+
 function flat(shape, w, h) {
   const geo = new THREE.ShapeGeometry(shape, 24);
   const pos = geo.attributes.position, uv = geo.attributes.uv;
@@ -92,23 +96,18 @@ function screenCanvas(spec) {
   return { canvas, texture, ctx: canvas.getContext('2d') };
 }
 
-function drawScreen(slot, source, scroll) {
+function drawScreen(slot, source, scroll, fit, safeTop) {
   const { canvas, ctx, texture } = slot;
   const key = screenKey(source, scroll);
   if (slot.key === key) return;
   slot.key = key;
   ctx.fillStyle = '#0b0b0c';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  const sw = source && (source.videoWidth || source.naturalWidth || source.width);
-  const sh = source && (source.videoHeight || source.naturalHeight || source.height);
-  if (sw && sh) {
-    const tall = sh / sw > canvas.height / canvas.width;
-    const scale = tall ? canvas.width / sw : Math.max(canvas.width / sw, canvas.height / sh);
-    const visibleH = canvas.height / scale;
-    const visibleW = canvas.width / scale;
-    const sy = tall ? scroll * (sh - visibleH) : (sh - visibleH) / 2;
-    const sx = (sw - visibleW) / 2;
-    ctx.drawImage(source, sx, sy, visibleW, visibleH, 0, 0, canvas.width, canvas.height);
+  const width = source && (source.videoWidth || source.naturalWidth || source.width);
+  const height = source && (source.videoHeight || source.naturalHeight || source.height);
+  if (width && height) {
+    const p = screenPlacement({ width, height }, canvas, fit, scroll, safeTop);
+    ctx.drawImage(source, p.sx, p.sy, p.sw, p.sh, p.dx, p.dy, p.dw, p.dh);
   }
   texture.needsUpdate = true;
 }
@@ -123,6 +122,7 @@ function frontFace(spec, group, front) {
   const display = plate(screenShape, screen.width, screen.height, front + step * 2, new THREE.MeshBasicMaterial({ map: slot.texture, toneMapped: false, ...LIFT }));
   display.position.y = screen.offsetY;
   group.add(display);
+  slot.faces = [{ mesh: display, corners: rectCorners(-screen.width / 2, screen.width / 2, screen.height) }];
   const reflection = plate(screenShape, screen.width, screen.height, front + step * 3, new THREE.MeshPhysicalMaterial({ color: 0x000000, roughness: 0.06, metalness: 0, specularIntensity: SCREEN_REFLECTION, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, ...LIFT }));
   reflection.position.y = screen.offsetY;
   group.add(reflection);
@@ -307,6 +307,7 @@ function browser(spec) {
   const display = plate(roundedRect(spec.screen.width, spec.screen.height, 0.01), spec.screen.width, spec.screen.height, spec.body.depth / 2 + 0.05, new THREE.MeshBasicMaterial({ map: slot.texture, toneMapped: false }));
   display.position.y = spec.screen.offsetY;
   group.add(display);
+  slot.faces = [{ mesh: display, corners: rectCorners(-spec.screen.width / 2, spec.screen.width / 2, spec.screen.height) }];
   return { root: group, slot, lid: null };
 }
 
@@ -321,6 +322,8 @@ function leaf(spec, side, material, slot) {
   half.add(plate(halfRect(w - 0.7, body.height - 1.4, body.radius - 0.7, side), body.width, body.height, step, new THREE.MeshPhysicalMaterial(GLASS)));
   const display = plate(halfRect(screen.width / 2, screen.height, screen.radius, side), screen.width, screen.height, step * 2, new THREE.MeshBasicMaterial({ map: slot.texture, toneMapped: false, ...LIFT }));
   half.add(display);
+  slot.faces = slot.faces || [];
+  slot.faces[side < 0 ? 0 : 1] = { mesh: display, corners: side < 0 ? rectCorners(-screen.width / 2, 0, screen.height) : rectCorners(0, screen.width / 2, screen.height) };
   const back = plate(halfRect(w - 0.7, body.height - 1.4, body.radius - 0.7, -side), body.width, body.height, -body.depth - 0.02, side < 0 ? new THREE.MeshPhysicalMaterial({ color: new THREE.Color(spec.color), roughness: 0.45, metalness: 0.1, clearcoat: 0.6 }) : new THREE.MeshPhysicalMaterial(GLASS));
   back.rotation.y = Math.PI;
   half.add(back);
@@ -395,10 +398,29 @@ function loadDevice(c, s) {
   });
 }
 
+function placeFaces(c, s) {
+  if (!c.screen || !s.device) return;
+  s.scene.updateMatrixWorld();
+  s.camera.updateMatrixWorld();
+  const stage = c.screen.stage;
+  c.screen.faces.forEach((f, k) => {
+    const el = document.getElementById('dsf-' + c.id + '-' + k);
+    const face = s.device.slot.faces && s.device.slot.faces[k];
+    if (!el || !face) return;
+    const quad = face.corners.map((v) => {
+      const p = v.clone().applyMatrix4(face.mesh.matrixWorld).project(s.camera);
+      return [stage.left + ((p.x + 1) / 2) * stage.width, stage.top + ((1 - p.y) / 2) * stage.height, p.z];
+    });
+    const shown = faceShown(quad);
+    el.style.visibility = shown ? 'visible' : 'hidden';
+    if (shown) el.style.transform = quadMatrix(f.w, f.h, quad);
+  });
+}
+
 function updateDevice(c, s, at) {
   if (!s.device) return;
   setLid(s, at('lid', DEVICE_LID));
   setFold(s, at('fold', DEVICE_FOLD));
-  drawScreen(s.device.slot, deviceSource(c, s), at('screenScroll', 0));
+  drawScreen(s.device.slot, deviceSource(c, s), at('screenScroll', 0), c.screenFit, c.device.safeTop);
 }
 `;
