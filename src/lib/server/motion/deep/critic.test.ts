@@ -73,7 +73,14 @@ describe('the critic verdict', () => {
     const verdict = parseVerdict(text, ['the frame at 3s is a flat colour: nothing is on screen']);
 
     expect(verdict.pass).toBe(false);
-    expect(verdict.fixes).toEqual(['the frame at 3s is a flat colour: nothing is on screen']);
+    expect(verdict.fixes).toContain('the frame at 3s is a flat colour: nothing is on screen');
+  });
+
+  it("puts the critic's own fixes first and keeps at most three measured ones", () => {
+    const measured = ['m1', 'm2', 'm3', 'm4', 'm5'];
+    const text = JSON.stringify({ score: 4, pass: false, fixes: ['add a wow peak at 10 s', 'cut on the beat at 2 s'] });
+
+    expect(parseVerdict(text, measured).fixes).toEqual(['add a wow peak at 10 s', 'cut on the beat at 2 s', 'm1', 'm2', 'm3']);
   });
 
   it('fails a score under the bar even when the critic says pass', () => {

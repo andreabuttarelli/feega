@@ -26,8 +26,13 @@ job su `node_runs` (`external_job_id` `motion-deep:`):
   `threadId` e `agentKey`, quindi l'addebito reale passa dal moltiplicatore esistente.
 - Stop: `POST .../agent/deep/stop` mette `stop` nei params; il loop lo legge fra le fasi e il
   costruttore fra i passi.
-- Tool nuovi, anche per la chat veloce: `capture_site` (hyperframes capture su una sandbox del farm
-  a rete aperta, screenshot 1920×1080 importati come asset) e `generate_music`.
+- Asset: la cattura delle pagine è quella di main (`import_asset` con `capture`, 2×); un primo
+  `capture_site` con hyperframes capture è stato tolto nel merge per non avere due catture.
+- Il critico mette prima le proprie correzioni e al massimo tre problemi misurati (prima i dieci
+  posti si riempivano di "repeated layout" e "plain white" su screenshot bianchi veri, e il
+  costruttore smontava le scene per inseguirli); `WhiteArea` non entra nel verdetto Deep.
+- Costo misurato sulla prova dub.co con Opus 5.5: build 0,4–3,4 $ a giro (fino a 6 M token in
+  cache), critica ~0,2 $, render stills ~0,01–0,02 $; il preventivo usa questi valori.
 
 Scartato: frame dal browser quando la tab è aperta (il job non ha un canale verso la pagina; il
 render sul farm costa ~45 s e vale sempre); clip video AI dalle foto prodotto con conferma a metà

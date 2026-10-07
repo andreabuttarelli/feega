@@ -8,8 +8,10 @@ Ora la stessa riga (sempre l'unico posto) chiede il look di un film di lancio Ap
 con energia alta: scene 1–2,5 s tagliate sul beat, musica sempre presente, tipografia cinetica
 (ingressi 0,3–0,8 s), ogni scena in movimento (push-in 12%, device 3D che girano fino a 30°,
 camera), speed ramp, match cut, un picco wow a due terzi; vietati restano particelle, glow, testo
-che ruota, bounce, wipe e push, più di tre cose in movimento. Le scene della libreria entrano in
-0,45 s (0,7 s le grandi). La giunzione `zoom` è ammessa come punch sul beat.
+che ruota, bounce, wipe e push, più di tre cose in movimento. Le scene della libreria restano quelle di main
+(testo che scatta in 0,3–0,5 s, immagini sempre in deriva). La giunzione `zoom` è ammessa come
+punch sul beat. Il logo del brand resta l'asset originale, piatto e intatto (regola anche nel
+critico Deep).
 
 Il critico Deep giudica con una domanda sola, "un cliente lo pagherebbe?": un video pulito ma
 statico vale al massimo 5/10.

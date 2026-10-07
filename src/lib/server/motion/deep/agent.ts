@@ -22,7 +22,7 @@ import { farmJob } from '$lib/server/motion/render-run';
 import { motionRenderFarm } from '$lib/server/motion/renderer';
 import { RENDER_CALL_LABEL, Resolution, sandboxCostUsd } from '$lib/motion/render-quote';
 import { ExportFormat, Quality } from '$lib/motion/export-formats';
-import { docProblems, frameProblems } from '$lib/motion/direction';
+import { Quality, docProblems, frameProblems } from '$lib/motion/direction';
 import { STYLES, styleOf } from '$lib/motion/style';
 import { AssetKind } from '$lib/motion/components';
 import type { CanvasNodeRecord } from '$lib/server/repos/canvas';
@@ -187,7 +187,7 @@ export async function deepPorts(ctx: DeepContext, hooks: DeepHooks): Promise<Dee
     const signed = await Promise.all(input.frames.map(async (f) => ({ time: f.time, signature: await signature(f.bytes) })));
     const stills = stillSpans(signed, seconds).map((s) => `nothing moves from ${s.from}s to ${s.to}s: give the picture a slow push-in or pan, or cut sooner`);
     const audioAssets = assets.filter((a) => a.kind === AssetKind.Audio).length;
-    const objective = [...docProblems(session.doc, { audioAssets }), ...frameProblems(await frameStats(shown))].map((p) => p.detail).concat(stills);
+    const objective = [...docProblems(session.doc, { audioAssets }), ...frameProblems(await frameStats(shown)).filter((p) => p.kind !== Quality.WhiteArea)].map((p) => p.detail).concat(stills);
     const text = critiquePrompt({ storyboard: input.storyboard, times: shown.map((f) => f.time), objective, styleRules: style.rules });
     const content = [{ type: 'text' as const, text }, ...shown.map((f) => ({ type: 'file' as const, mediaType: 'image/jpeg', data: f.bytes }))];
     const answer = await call({ messages: [{ role: 'user', content }], effort: Effort.High, steps: 1, label: 'critique' });

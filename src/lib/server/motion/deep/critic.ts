@@ -7,6 +7,7 @@ export const SAMPLE_STEP_S = 0.25;
 export const CRITIC_SHOWN_MAX = 24;
 export const PASS_SCORE = 8;
 const MAX_FIXES = 10;
+const MEASURED_MAX = 3;
 const EDGE_S = 0.1;
 const CUT_SIDE_S = 0.25;
 const STILL_DIFF = 1.5;
@@ -93,12 +94,12 @@ export function parseVerdict(text: string, objective: string[]): DeepVerdict {
     parsed = null;
   }
   if (!parsed) {
-    return { pass: false, score: 0, fixes: [...objective, UNREADABLE].slice(0, MAX_FIXES) };
+    return { pass: false, score: 0, fixes: [UNREADABLE, ...objective.slice(0, MEASURED_MAX)] };
   }
   return {
     pass: parsed.pass && parsed.score >= PASS_SCORE && objective.length === 0,
     score: parsed.score,
-    fixes: [...objective, ...parsed.fixes].slice(0, MAX_FIXES)
+    fixes: [...parsed.fixes.slice(0, MAX_FIXES - Math.min(objective.length, MEASURED_MAX)), ...objective.slice(0, MEASURED_MAX)]
   };
 }
 
@@ -111,7 +112,8 @@ export const RUBRIC = [
   'Hierarchy: one focal point per frame; headline over subline over detail; the eye knows where to go.',
   'No blank, half-loaded, blurry or pixelated frame; screenshots and logos crisp, never upscaled mush. No overflow: text inside the frame and its box, a 5% safe area.',
   `Nothing holds still for more than ${STILL_MAX_S} s.`,
-  'Story: a hook in the first second, the real product shown big, the real name and claim. Style: the style rules below are respected.'
+  'Story: a hook in the first second, the real product shown big, the real name and claim. Style: the style rules below are respected.',
+  'The brand logo is the original asset, flat and intact: no 3D, no recolouring, no effects, no distortion. A logo turned into Logo3D, tinted, glowing or stretched is a blocking problem.'
 ];
 
 export function critiquePrompt(input: { storyboard: string; times: number[]; objective: string[]; styleRules: readonly string[] }): string {

@@ -7,21 +7,21 @@ type Usage = { fresh: number; cached: number; output: number };
 
 export const DEEP_ITERATIONS = { min: 2, max: 4, quoted: 3 };
 export const DEEP_CAP_FACTOR = 1.5;
-export const RENDER_USD = 0.06;
-const MINUTES_PER_ROUND = 6;
-const MINUTES_FIXED = 4;
+export const RENDER_USD = 0.03;
+const MINUTES_PER_ROUND = 9;
+const MINUTES_FIXED = 8;
 const MILLION = 1_000_000;
 
 const PRICIEST_RATE: Rate = { input: 15, cachedInput: 1.5, output: 75 };
 
 const ONCE: Usage[] = [
   { fresh: 30_000, cached: 0, output: 8_000 },
-  { fresh: 60_000, cached: 140_000, output: 5_000 },
+  { fresh: 20_000, cached: 60_000, output: 3_000 },
   { fresh: 10_000, cached: 0, output: 1_500 }
 ];
 
 const ROUND: Usage[] = [
-  { fresh: 120_000, cached: 480_000, output: 25_000 },
+  { fresh: 120_000, cached: 1_600_000, output: 30_000 },
   { fresh: 25_000, cached: 0, output: 6_000 }
 ];
 
