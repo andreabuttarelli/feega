@@ -78,7 +78,8 @@ export function styleOf(doc: Pick<MotionDoc, 'style'>): MotionStyle {
 
 type Clip = MotionDoc['tracks'][number]['clips'][number];
 type Found = { clip: Clip; at: number; detail: string };
-type Check = (clips: readonly Clip[], spec: StyleSpec, fps: number) => Found[];
+type ClipCheck = (clips: readonly Clip[], spec: StyleSpec, fps: number) => Found[];
+type Check = (doc: MotionDoc, spec: StyleSpec) => Found[];
 
 const timelines = (doc: MotionDoc): Clip[][] => [doc.tracks, ...Object.values(doc.comps).map((c) => c.tracks)].map((tracks) => tracks.flatMap((t) => t.clips as Clip[]));
 
@@ -138,7 +139,12 @@ function longestStill(clip: Clip): { at: number; frames: number } {
   return longest;
 }
 
-const CHECKS: Record<Forbidden, Check> = {
+const perTimeline =
+  (check: ClipCheck): Check =>
+  (doc, spec) =>
+    timelines(doc).flatMap((clips) => check(clips, spec, doc.fps));
+
+const CLIP_CHECKS: Record<Forbidden, ClipCheck> = {
   [Forbidden.Particles]: (clips) => clips.filter((c) => c.component === 'Particles').map((clip) => ({ clip, at: clip.from, detail: `${clip.id} is a particle emitter: decorative particles are off-style` })),
   [Forbidden.Glow]: (clips) => clips.filter((c) => c.effects.some((e) => e.enabled && e.kind === EffectKind.Glow)).map((clip) => ({ clip, at: clip.from, detail: `${clip.id} glows: remove the glow effect` })),
   [Forbidden.Rotation]: (clips) =>
@@ -165,9 +171,11 @@ const CHECKS: Record<Forbidden, Check> = {
       .map((clip) => ({ clip, at: clip.from, detail: `${clip.id} enters or leaves with ${clip.junction?.kind ?? clip.transitionIn.kind}: use a cut, a dissolve (${spec.junctions.join(', ')}) or a match cut` }))
 };
 
+const CHECKS = Object.fromEntries(Object.entries(CLIP_CHECKS).map(([effect, check]) => [effect, perTimeline(check)])) as Record<Forbidden, Check>;
+
 export type StyleProblem = { effect: Forbidden; at: number; detail: string };
 
 export function styleProblems(doc: MotionDoc): StyleProblem[] {
   const spec = STYLES[styleOf(doc)];
-  return spec.forbidden.flatMap((effect) => timelines(doc).flatMap((clips) => CHECKS[effect](clips, spec, doc.fps)).map((f) => ({ effect, at: Math.round((f.at / doc.fps) * 100) / 100, detail: f.detail })));
+  return spec.forbidden.flatMap((effect) => CHECKS[effect](doc, spec).map((f) => ({ effect, at: Math.round((f.at / doc.fps) * 100) / 100, detail: f.detail })));
 }
