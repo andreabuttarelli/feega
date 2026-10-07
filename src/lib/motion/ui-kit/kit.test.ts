@@ -54,4 +54,8 @@ describe('every UI kit piece', () => {
 
     expect(js).not.toMatch(/span\(t, CLICK, 0\.08\)|inOut\(span\(t, HOVER|const on = inOut|lift = i === top \? out|const press = \(t, at\) => span/);
   });
+
+  it.each(UI_KINDS.map((k) => [k]))('%s never redeclares a name the runtime passes in, such as brand', (kind) => {
+    expect(UI_KIT[kind].js).not.toMatch(/^(const|let) (root|props|tl|param|duration|fps|assets|brand|rand|motion|gsap|lottie|THREE)\b/m);
+  });
 });

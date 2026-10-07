@@ -497,13 +497,13 @@ const SIDEBAR = generic(
 .stroke { height: 14px; border-radius: 7px; background: var(--line); }
 `,
   `
-const brand = param('brand', 'Acme', { type: 'text', group: 'Content' });
+const brandName = param('brand', 'Acme', { type: 'text', group: 'Content' });
 const items = param('items', 'Home\\nProjects\\nAnalytics\\nTeam\\nSettings', { type: 'textarea', group: 'Content' });
 const active = param('active', 2, { type: 'number', min: 0, max: 12, group: 'Content' });
 const title = param('title', 'Analytics', { type: 'text', group: 'Content' });
 const shell = make('div', 'card shell');
 const side = make('div', 'side', shell);
-make('div', 'brand', side, brand);
+make('div', 'brand', side, brandName);
 const glow = make('div', 'glow', side);
 const navs = rows(items).map((r, i) => anchor(make('div', 'nav', side, r[0]), 'nav-' + i));
 const main = make('div', 'main', shell);
