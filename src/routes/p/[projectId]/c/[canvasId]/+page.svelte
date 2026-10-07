@@ -77,7 +77,7 @@
   import { plannedInstant } from '$lib/calendar/period-grid';
   import { DropVerdict, dayUnderPointer, type PointerPoint } from '$lib/canvas/canvas-drop';
   import { inputChanged } from '$lib/canvas/effects/editor';
-  import { upstreamMedia } from '$lib/canvas/effects-node';
+  import { cutoutTwin, upstreamMedia } from '$lib/canvas/effects-node';
   import type { EffectStep } from '$lib/canvas/effects';
   import { hasCutout } from '$lib/canvas/effects/shape-cutout';
   import { upstreamCards as compositionCards, cardAssetIds } from '$lib/canvas/composition-node';
@@ -2742,7 +2742,7 @@
             sourceImageUrl={assetUrl(effectsInput?.refId ?? effects.sourceRefId)}
             inputChanged={inputChanged(effects.sourceRefId, effectsInput?.refId ?? null)}
             onopeneditor={() => (effectsEditorId = id)}
-            onpair={hasCutout(effects.effects) && effectsInput ? () => makePair(id) : undefined}
+            onpair={hasCutout(effects.effects) && effectsInput && !cutoutTwin(id, edges, nodes) ? () => makePair(id) : undefined}
           />
         {:else if composition}
           {@const cards = compositionCards(id, edges, nodes)}
