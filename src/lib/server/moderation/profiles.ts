@@ -1,5 +1,5 @@
 import { ProjectMode } from '$lib/project-mode';
-import { DOUBT, MODERATION_CATEGORIES, SAFE, type ModerationCategories } from './policy';
+import { DOUBT, EXPLICIT_SEXUAL, MODERATION_CATEGORIES, REAL_PERSON, SAFE, type ModerationCategories } from './policy';
 
 export enum ModerationProfile {
   Standard = 'standard',
@@ -30,7 +30,8 @@ const blocked = (what: string) => `This prompt was blocked: ${what} in feega's s
 const STANDARD_REFUSALS: Readonly<Record<string, string>> = {
   [SAFE]: '',
   minors: blocked("content sexualising minors isn't allowed"),
-  real_person_sexual: blocked("sexual content isn't allowed"),
+  [REAL_PERSON]: blocked("sexual content isn't allowed"),
+  [EXPLICIT_SEXUAL]: blocked("sexual content isn't allowed"),
   non_consensual_sexual: blocked("sexual content isn't allowed"),
   violence_gore: blocked("violence and gore aren't allowed"),
   animals_sexual: blocked("sexual content isn't allowed"),

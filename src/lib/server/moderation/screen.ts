@@ -4,6 +4,7 @@ import {
   judgeDecision,
   mentionsMinor,
   MINORS,
+  REAL_PERSON,
   MODERATION_CATEGORIES,
   type JevDecision,
   type JudgeVerdict
@@ -159,13 +160,20 @@ const SCREEN_OF: Readonly<Record<ScreenStage, (ports: ScreenPorts, state: string
   identifiability: screenIdentifiability
 };
 
+const UNCENSORED_RULES: ReadonlyArray<readonly [string, (request: ScreenRequest) => boolean, string]> = [
+  [MINORS, (r) => mentionsMinor(`${r.text} ${r.references.join(' ')}`), 'minor keyword'],
+  [REAL_PERSON, (r) => r.references.length > 0, 'reference attached']
+];
+
 export async function screenGeneration(ports: ScreenPorts, request: ScreenRequest): Promise<ScreenOutcome> {
   const state = stateOf(request);
   const policy = MODERATION_PROFILES[carriedProfile(request)];
 
-  if (request.uncensored && mentionsMinor(`${request.text} ${request.references.join(' ')}`)) {
-    ports.record({ stage: 'rules', verdict: 'refuse', category: MINORS, probabilities: {}, reason: 'minor keyword' });
-    return { ok: false, error: MODERATION_CATEGORIES[MINORS].refusal };
+  const refused = UNCENSORED_RULES.find(([, applies]) => request.uncensored && applies(request));
+  if (refused) {
+    const [category, , reason] = refused;
+    ports.record({ stage: 'rules', verdict: 'refuse', category, probabilities: {}, reason });
+    return { ok: false, error: MODERATION_CATEGORIES[category].refusal };
   }
 
   const rule = ruleFor(request);

@@ -21,7 +21,7 @@ feega (**[LEGAL ENTITY]**, VAT no. **[VAT]**, **[ADDRESS]**) uses the providers 
 | Provider | Purpose | Personal data | Location | Transfer mechanism |
 |---|---|---|---|---|
 | OpenRouter, and the model providers it routes each request to | text, chat, image and video generation; the second-stage moderation review | prompts, attachments, brand context, generated outputs | US / other, per model | SCCs [to confirm per provider] |
-| Wiro | image and video generation with the uncensored model catalogue (uncensored mode, not yet available); 3D models from an image (every project) | prompts, reference media, generated outputs | [LOCATION] | [SCCs — to confirm] |
+| Wiro | image and video generation for age-restricted features; 3D models from an image (every project) | prompts, reference media, generated outputs | [LOCATION] | [SCCs — to confirm] |
 | ElevenLabs | voice-over, music and sound generation | script text, chosen voice, generated audio | US / EU | DPF / SCCs |
 | TypeSafe (Jev classifier) | first-stage prompt moderation | prompt text, reference descriptions | [LOCATION] | [SCCs — to confirm] |
 
@@ -29,7 +29,7 @@ feega (**[LEGAL ENTITY]**, VAT no. **[VAT]**, **[ADDRESS]**) uses the providers 
 
 | Provider | Purpose | Personal data | Location | Transfer mechanism |
 |---|---|---|---|---|
-| Didit (Didit Identity Spain, S.L., Barcelona) | one-time 18+ check for uncensored mode: age estimation from a selfie, ID document only when the estimate is not conclusive | selfie and liveness capture; ID document only on fallback; our user ID as session reference | EU — AWS Ireland (eu-west-1) | none needed (EEA); Didit's DPA is Annex 2 of its Business Terms |
+| Didit (Didit Identity Spain, S.L., Barcelona) | one-time 18+ check for age-restricted features: age estimation from a selfie, ID document only when the estimate is not conclusive | selfie and liveness capture; ID document only on fallback; our user ID as session reference | EU — AWS Ireland (eu-west-1) | none needed (EEA); Didit's DPA is Annex 2 of its Business Terms |
 
 Didit sends us only the outcome (over 18 or not) and a session ID. Once the outcome is final we ask Didit to erase the session, without keeping face templates.
 
@@ -66,7 +66,7 @@ Google Gemini models are reached through OpenRouter; the current code does not c
 
 | Provider | Purpose | Status |
 |---|---|---|
-| [AGE VERIFICATION PROVIDER] | age verification for uncensored mode; we keep only the result | not chosen; uncensored mode is not available |
+| [AGE VERIFICATION PROVIDER] | age verification for age-restricted features; we keep only the result | not chosen; age-restricted features are not available |
 
 Platforms you publish to (Instagram, Facebook, TikTok and others) receive your content as independent controllers, not as our sub-processors.
 

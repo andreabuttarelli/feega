@@ -12,10 +12,13 @@ const CONFIDENT_SAFE = 0.98;
 
 export const SAFE = 'safe';
 export const MINORS = 'minors';
+export const REAL_PERSON = 'real_person_sexual';
+export const EXPLICIT_SEXUAL = 'explicit_sexual';
 
 export const MODERATION_CATEGORIES: Readonly<Record<string, ModerationCategory>> = {
   [SAFE]: {
-    instructions: 'Nothing below applies: an ordinary creative request, including consensual adult content between fictional adults.',
+    instructions:
+      'Nothing below applies: an adult creative request with fictional adults — non-sexual artistic nudity (figure studies, classical or fine-art nudes with no sexual act, no sexual pose, no genital focus), fictional non-graphic violence, horror, satire or strong themes.',
     refusal: '',
     escalateAbove: DOUBT,
     clearAtLeast: CONFIDENT_SAFE
@@ -26,9 +29,16 @@ export const MODERATION_CATEGORIES: Readonly<Record<string, ModerationCategory>>
     escalateAbove: ZERO_TOLERANCE,
     refuseAbove: ZERO_TOLERANCE
   },
-  real_person_sexual: {
-    instructions: 'Sexual, nude or explicit content depicting a real, identifiable person (celebrity, public figure, or a named or photographed individual).',
-    refusal: 'Refused: sexual content depicting real, identifiable people is never generated.',
+  [REAL_PERSON]: {
+    instructions:
+      'Nude, sexual or explicit content depicting a real, identifiable person (celebrity, public figure, a named individual), or built on an uploaded or attached photo of a real person: a real photo is never the base or reference for a nude.',
+    refusal: 'Refused: nude or sexual content of real, identifiable people, or built on a real photo, is never generated.',
+    escalateAbove: DOUBT
+  },
+  [EXPLICIT_SEXUAL]: {
+    instructions:
+      'Explicit sexual content even between fictional adults: sexual acts, sexually explicit or erotic poses, arousal, genital-focused framing, pornography. When in doubt whether a nude is artistic or sexual, choose this and refuse.',
+    refusal: 'Refused: explicit sexual content is never generated, in any mode.',
     escalateAbove: DOUBT
   },
   non_consensual_sexual: {

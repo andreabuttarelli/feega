@@ -24,11 +24,11 @@ const LOCKS_IN_ORDER: ReadonlyArray<[UncensoredLock, (facts: UncensoredFacts) =>
 const HIDDEN_LOCKS: ReadonlySet<UncensoredLock> = new Set([UncensoredLock.PlanNotEntitled, UncensoredLock.OrgNotOptedIn]);
 
 export const UNCENSORED_LOCK_TEXT: Readonly<Record<UncensoredLock, string>> = {
-  [UncensoredLock.Open]: 'Uncensored workspace',
+  [UncensoredLock.Open]: 'Uncensored mode',
   [UncensoredLock.PlanNotEntitled]: 'Uncensored mode needs a paid plan.',
   [UncensoredLock.OrgNotOptedIn]: 'The workspace owner has not enabled uncensored mode.',
   [UncensoredLock.ComingSoon]: 'Age verification coming soon',
-  [UncensoredLock.AgeUnverified]: 'Verify your age to open the uncensored workspace.'
+  [UncensoredLock.AgeUnverified]: 'Verify your age to turn on uncensored mode.'
 };
 
 export function uncensoredLock(facts: UncensoredFacts): UncensoredLock {
@@ -38,3 +38,6 @@ export function uncensoredLock(facts: UncensoredFacts): UncensoredLock {
 export function uncensoredSectionVisible(lock: UncensoredLock): boolean {
   return !HIDDEN_LOCKS.has(lock);
 }
+
+export const UNCENSORED_NOTICE =
+  'Uncensored does not mean pornographic or illegal content. We screen prompts, references and outputs, keep logs, and may report unlawful use to the competent authorities. Child sexual abuse material is always reported.';

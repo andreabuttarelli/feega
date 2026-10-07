@@ -1,7 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { isRedirect } from '@sveltejs/kit';
 import { fakeDb } from '$lib/server/db/fake-db';
 import { actions } from './+page.server';
+import { OUTPUTS_PRESENT, SWITCH_REFUSAL_TEXT } from '$lib/server/uncensored-workspace/mode-switch';
+import { UNCENSORED_LOCK_TEXT, UncensoredLock } from '$lib/uncensored-lock';
+
+vi.mock('$app/environment', () => ({ dev: true, browser: false, building: false }));
+vi.mock('$env/dynamic/private', () => ({ env: { UNCENSORED_DEV_MANUAL_VERIFICATION: 'true' } }));
 
 const ORG = 'org-1';
 const PROJECT = 'proj-1';
@@ -152,3 +157,68 @@ function entryDb(others: Record<string, unknown>[]) {
   };
   return fake;
 }
+
+function gatedSeed(extra: Record<string, unknown[]> = {}) {
+  return {
+    projects: [{ id: PROJECT, org_id: ORG, name: NAME, mode: 'standard' }],
+    orgs: [{ id: ORG, stripe_subscription_id: 'sub_1' }],
+    org_uncensored_optins: [{ org_id: ORG, enabled_by: USER.id, enabled_at: '2026-09-29T10:00:00Z', disabled_at: null }],
+    user_age_verifications: [{ id: 'v1', user_id: USER.id, provider: 'manual_admin', method: 'manual_admin', result: 'adult' }],
+    assets: [],
+    ai_calls: [],
+    ...extra
+  };
+}
+
+describe('settings/project setMode: uncensored is a switch on the project', () => {
+  it('turns uncensored on when every gate passes and the notice is acknowledged', async () => {
+    const { db, calls } = fakeDb(gatedSeed(), { filter: true });
+
+    const result = await run('setMode', { mode: 'uncensored', acknowledge: 'on' }, db);
+
+    expect(result).toMatchObject({ switched: true });
+    expect(projectUpdate(calls)?.payload).toMatchObject({ mode: 'uncensored' });
+  });
+
+  it('refuses without the acknowledgment', async () => {
+    const { db, calls } = fakeDb(gatedSeed(), { filter: true });
+
+    const result = (await run('setMode', { mode: 'uncensored' }, db)) as { status: number };
+
+    expect(result.status).toBe(400);
+    expect(projectUpdate(calls)).toBeUndefined();
+  });
+
+  it('refuses an unverified user with the age step message', async () => {
+    const { db, calls } = fakeDb(gatedSeed({ user_age_verifications: [] }), { filter: true });
+
+    const result = (await run('setMode', { mode: 'uncensored', acknowledge: 'on' }, db)) as { status: number; data: { error: string } };
+
+    expect(result.status).toBe(403);
+    expect(result.data.error).toBe(UNCENSORED_LOCK_TEXT[UncensoredLock.AgeUnverified]);
+    expect(projectUpdate(calls)).toBeUndefined();
+  });
+
+  it('switches back to standard when nothing was produced under uncensored', async () => {
+    const { db, calls } = fakeDb(gatedSeed({ projects: [{ id: PROJECT, org_id: ORG, name: NAME, mode: 'uncensored' }] }), { filter: true });
+
+    expect(await run('setMode', { mode: 'standard' }, db)).toMatchObject({ switched: true });
+    expect(projectUpdate(calls)?.payload).toMatchObject({ mode: 'standard' });
+  });
+
+  it('refuses to switch back once uncensored outputs exist, with a clear message', async () => {
+    const { db, calls } = fakeDb(
+      gatedSeed({
+        projects: [{ id: PROJECT, org_id: ORG, name: NAME, mode: 'uncensored' }],
+        assets: [{ id: 'a1', org_id: ORG, project_id: PROJECT, uncensored_project: true }]
+      }),
+      { filter: true }
+    );
+
+    const result = (await run('setMode', { mode: 'standard' }, db)) as { status: number; data: { error: string } };
+
+    expect(result.status).toBe(403);
+    expect(result.data.error).toBe(SWITCH_REFUSAL_TEXT[OUTPUTS_PRESENT]);
+    expect(projectUpdate(calls)).toBeUndefined();
+  });
+});

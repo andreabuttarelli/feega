@@ -65,7 +65,7 @@ export const actions: Actions = {
         orgId,
         userId,
         attestedAdult: fd.get('attestAdult') === CHECKED,
-        acceptedPolicy: fd.get('acceptPolicy') === CHECKED
+        acceptedPolicy: fd.get('acceptPolicy') === CHECKED && fd.get('acknowledgeScreening') === CHECKED
       })
     );
   },

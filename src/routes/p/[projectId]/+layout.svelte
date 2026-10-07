@@ -188,7 +188,6 @@
             mode: p.mode
           }))}
           projectMode={data.project.mode}
-          uncensored={data.uncensored}
           brandName={data.brand?.name ?? null}
           canvasName={currentCanvas?.name ?? ''}
           canvasHref={currentCanvas?.href ?? ''}
