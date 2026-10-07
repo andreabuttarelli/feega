@@ -1,5 +1,4 @@
 <script lang="ts">
-  import BrandMark from '$lib/components/BrandMark.svelte';
   import CreditAmount from '$lib/components/CreditAmount.svelte';
   import CanvasMenu from '$lib/components/canvas/CanvasMenu.svelte';
   import { pageMeta } from '$lib/stores/page-meta';
@@ -24,7 +23,6 @@
 <header class="app-header" data-testid="app-header">
   <CanvasMenu projectId={menuProjectId} {profile} {org} {creditBalance} navigation="page" />
   <a class="home" href="/app" aria-label="Dashboard">
-    <BrandMark size={22} />
     <span class="word">feega</span>
   </a>
   {#if title}
