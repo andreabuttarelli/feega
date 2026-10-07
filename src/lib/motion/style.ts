@@ -5,6 +5,7 @@ import type { MotionDoc } from './doc';
 import { EffectKind } from './effects/registry';
 import { JunctionKind } from './junction-model';
 import { EASE_BEZIER, type Bezier, type Keyframe } from './keyframes';
+import { loopSeam, tooDense } from './ui-morph/ops';
 import { DEFAULT_STYLE, MotionStyle, STYLE_EASES, type StyleEases } from './style-model';
 
 export enum Forbidden {
@@ -21,7 +22,10 @@ export enum Forbidden {
   RoughCut = 'rough-cut',
   UnreadableText = 'unreadable-text',
   Screenshots = 'screenshots',
-  MissingStoryBeat = 'missing-story-beat'
+  MissingStoryBeat = 'missing-story-beat',
+  Rushed = 'rushed',
+  LoopSeam = 'loop-seam',
+  TooDense = 'too-dense'
 }
 
 export type StyleSpec = {
@@ -33,8 +37,9 @@ export type StyleSpec = {
   palette: { ink: string; paper: string; muted: string; accents: number };
   junctions: readonly JunctionKind[];
   entrances: readonly TransitionKind[];
-  reading: { perWord: number; base: number; phrase: number };
+  reading: { perWord: number; base: number; phrase: number; pause: number };
   forbidden: readonly Forbidden[];
+  pace: { minGap: number; hold: number };
   maxMoving: number;
   rules: readonly string[];
 };
@@ -54,32 +59,37 @@ const PEAK_FROM_S = 6;
 const PEAK_TRAVEL: Record<string, number> = { scale: 0.6, zoom: 0.8, dolly: 0.5, objectRotateX: 90, objectRotateY: 90, objectRotateZ: 90 };
 const HARD_CUT_SHARE = 0.25;
 const ENTRY_FRAMES = 2;
-const READING = { perWord: 0.4, base: 0.6, phrase: 1.2 };
-const SCREENSHOT_SHARE = 0.3;
+const READING = { perWord: 0.4, base: 0.6, phrase: 1.2, pause: 0.5 };
 const MAIN_PICTURE_AREA = 0.25;
 const BACKDROP_BLUR = 8;
+const BACKDROP_OPACITY = 0.35;
+const SHOWN_PICTURE: readonly [component: string, prop: string][] = [
+  ['Image', 'assetId'],
+  ['Device3D', 'screen']
+];
 const CALM: readonly Forbidden[] = [Forbidden.Particles, Forbidden.Glow, Forbidden.Rotation, Forbidden.Bounce, Forbidden.FlyingText, Forbidden.Crowded, Forbidden.Transition, Forbidden.Still];
 
 export const STYLES: Record<MotionStyle, StyleSpec> = {
   [MotionStyle.LaunchFilm]: {
     label: 'Launch film',
     eases: STYLE_EASES[MotionStyle.LaunchFilm],
-    seconds: { enter: [0.2, 0.35], stagger: 0.06, exit: 0.2, still: 0.5, scene: [0.8, 2.5] },
+    seconds: { enter: [0.2, 0.35], stagger: 0.06, exit: 0.2, still: 0.5, scene: [2, 4] },
     movement: { rise: 0.12, settle: 0.7, blur: 18, pushIn: 1.25, turn: 100 },
     type: { family: 'Inter', weights: { display: 800, text: 500 }, sizes: { hero: 0.26, line: 0.12, small: 0.026 } },
     palette: { ink: '#050505', paper: '#ffffff', muted: '#8b8b8b', accents: 1 },
     junctions: [JunctionKind.Crossfade, JunctionKind.DipToBlack, JunctionKind.Blur, JunctionKind.Zoom, JunctionKind.PushLeft, JunctionKind.PushRight, JunctionKind.Wipe],
     entrances: [TransitionKind.None, TransitionKind.Fade, TransitionKind.Blur, TransitionKind.Scale, TransitionKind.SlideLeft, TransitionKind.SlideRight, TransitionKind.SlideUp],
     reading: READING,
-    forbidden: [Forbidden.Particles, Forbidden.Glow, Forbidden.Bounce, Forbidden.Crowded, Forbidden.Transition, Forbidden.Still, Forbidden.OffBeat, Forbidden.NoPeak, Forbidden.RoughCut, Forbidden.UnreadableText, Forbidden.Screenshots, Forbidden.MissingStoryBeat],
+    forbidden: [Forbidden.Particles, Forbidden.Glow, Forbidden.Bounce, Forbidden.Crowded, Forbidden.Transition, Forbidden.Still, Forbidden.OffBeat, Forbidden.NoPeak, Forbidden.RoughCut, Forbidden.UnreadableText, Forbidden.Screenshots, Forbidden.MissingStoryBeat, Forbidden.Rushed],
+    pace: { minGap: 0.25, hold: 0.5 },
     maxMoving: 4,
     rules: [
       'Launch film is the house style: the LOOK of an Apple keynote film, Linear, Vercel Ship or Stripe Sessions (few elements, very large type, the real product, a sober palette) with HIGH ENERGY. Minimal never means slow: the bar is "would a client pay for this?". Never a slideshow, a still picture, a slow fade, the same layout twice or a PowerPoint effect.',
       'Story first: four acts, problem (the user\'s pain in the brand\'s own words), solution (the product enters), proof (features shown live, numbers, results), claim (promise, original logo, address), about 20/15/45/20% of the length, each marked with mark_story; the gate names a missing act.',
       'Storyboard first: before the first edit write a table, one row per scene, grouped by act: time, beat, scene template, the line it says, the move (kinetic type, speed ramp, device fly, match cut, montage, peak, logo build).',
-      'Music is always there and drives the cut: put it on an Audio clip, analyze_audio, mark_beats, then cut on every beat or every second beat (cut_to_beat). Scenes last 0.8–2.5 s; a montage before the peak cuts on half beats.',
+      'Music is always there and drives the cut: with no audio in the project call add_music first (mood and bpm that fit the brand; it lays the track and marks its beats), otherwise put the project music on an Audio clip, analyze_audio, mark_beats; then cut on the beat, never on a half beat (cut_to_beat). A scene lasts until every animation in it has finished, plus a 1–1.5 s hold; never cut while something is still moving. Longer beats compressed: fewer ideas, never faster cuts (3 to 5 scenes in 15 s). Backgrounds never show a cut-off or banded gradient.',
       'Build from the launch scenes: list_templates, insert_template builtin:launch-* (word-burst, ui-speed-ramp, device-fly, number-match-cut, ui-tilt-zoom, beat-montage, ui-explode, device-orbit, logo-build) and fill them with set_template_fields; push them further with keyframes. builtin:scene-* are the calm variants, for a beat of rest.',
-      'Kinetic type that can be read: words land on the beat, very large, each punching in from 130–140% and an 18 px blur in 0.2–0.3 s on cubic-bezier(0.16,1,0.3,1), then STAY: every text is on screen at least 0.4 s per word plus 0.6 s, 1.2 s at least for a phrase (the gate names unreadable text). Build a line word by word and hold it; energy comes from movement and transitions, never from text that disappears. One accent colour on the key word.',
+      'Kinetic type that can be read: words land on the beat, very large, each punching in from 130–140% and an 18 px blur in 0.2–0.3 s on cubic-bezier(0.16,1,0.3,1), then STAY: every text is on screen at least 0.4 s per word plus 0.6 s, 1.2 s at least for a phrase, plus a 1 s pause once read (the gate names unreadable text). Build a line word by word and hold it; energy comes from movement and transitions, never from text that disappears. One accent colour on the key word.',
       'Camera never rests: every picture pushes, zooms inside its box (Image zoom with focus_x/focus_y) or pans; devices fly in turning 90° or more and keep drifting; nothing holds still for more than half a second (the quality gate names it).',
       'Speed ramps: a zoom into the real UI runs slow-fast-slow on cubic-bezier(0.83,0,0.17,1): hold a beat, whip to the detail on the next beat, keep creeping. Motion blur on (set_motion_blur, 180°, 6 samples) so the whip smears.',
       'Match cuts: carry a word, a number or the product across the cut in the same place (the hook word becomes the headline on the real page; three numbers swap in one spot).',
@@ -87,8 +97,10 @@ export const STYLES: Record<MotionStyle, StyleSpec> = {
       'Every junction flows: a match cut (an element carries on into the next scene), camera continuity (a zoom that goes through and becomes the next scene: set_clip_transition zoom), a whip pan with motion blur (push-left/push-right), a soft wipe, a dissolve with movement, a shape or UI morphing into the next. A hard cut is the exception, a deliberate hit on a strong beat, and rare: the gate names a film cut together hard.',
       'A memorable close built by its context, never by the logo: light, a shockwave, the address and the claim around the logo (launch-logo-build).',
       'A real brand logo is always the original asset (the SVG or PNG from the site or the brand kit), flat and intact, on a Logo or Image clip: never Logo3D, extrusion, chrome, recolouring, deformation, filters, blends, masks or reveals that cut it. It may only fade in or scale in a little, whole.',
-      'Recreate the product, never as screenshots: for a SaaS or an app, add_ui rebuilds its UI live in the brand style (font, colours and corner radius from analyze_site): a link typed and shortened, a list filling, numbers counting, a chart drawing, a funnel filling, a table updating, a QR building, inside vector browser or phone chrome. The camera follows the action by moving the clip position onto the part that moves, with scale changes within about 10% on a smooth ease: never pump the scale, never push UI or text out of the frame (the gate names anything outside the safe area). A screenshot is at most a blurred background; the gate names a film whose main picture is a screenshot for more than 30% of its length.',
-      'Palette: near-black background, white type, one accent from the brand. Forbidden: decorative particles, glows, bounce or overshoot, more than four things moving at once.'
+      'Recreate the product, never as screenshots: for a SaaS or an app, add_ui rebuilds its UI live in the brand style (font, colours and corner radius from analyze_site): a link typed and shortened, a list filling, numbers counting, a chart drawing, a funnel filling, a table updating, a QR building, inside vector browser or phone chrome. In the storyboard, every act names the UI it recreates: a kit piece (add_ui) when one fits the product, otherwise recreate_ui on the site capture (or a region of it) to rebuild that screen as vector UI with its real texts; captures are raw material for recreate_ui, not footage. The camera follows the action by moving the clip position onto the part that moves, with scale changes within about 10% on a smooth ease: never pump the scale, never push UI or text out of the frame (the gate names anything outside the safe area). Screenshots are raw material, never content: not even for a moment may a sharp screenshot fill the frame or a device screen. At most a background (blur 8 or more, or opacity 0.35 or less); the gate names every sharp one and blocks delivery.',
+      'Palette: near-black background, white type, one accent from the brand. Forbidden: decorative particles, glows, bounce or overshoot, more than four things moving at once.',
+      'Meaning before motion: the film tells the saved script (write_script). The problem is a recognisable moment of the user\'s day shown on a "before" screen with real-looking data; the solution is the product doing its real flow with specific content; the proof is a number or result the site states; the claim is the site\'s promise. Never an empty or generic UI (the empty-ui gate blocks it).',
+      'UI morph language in every product scene: springs for every reaction (press, hover, toggle, tab), one UI morphing into the next instead of exit and entrance, content swapping with a short blur and stagger, the camera framing the active state, cursor clicks and drags only on anchors through click_ui, clean flat graphics. ui_morph_reel when the beat is a sequence of interface states.'
     ]
   },
   [MotionStyle.AppleMinimal]: {
@@ -102,6 +114,7 @@ export const STYLES: Record<MotionStyle, StyleSpec> = {
     entrances: [TransitionKind.None, TransitionKind.Fade, TransitionKind.Blur],
     reading: READING,
     forbidden: [...CALM, Forbidden.UnreadableText],
+    pace: { minGap: 1, hold: 1 },
     maxMoving: 2,
     rules: [
       'Apple minimal is the house style: every frame should look like a frame of an Apple keynote or product film. Confident and calm: type snaps in and holds, the camera drifts slowly, one idea at a time.',
@@ -121,6 +134,28 @@ export const STYLES: Record<MotionStyle, StyleSpec> = {
       'Sound: when the project has music, put it on an Audio clip and cut the scenes on its beats (analyze_audio, cut_to_beat).',
       'Every text stays on screen long enough to be read: 0.4 s per word plus 0.6 s, 1.2 s at least for a phrase.',
       'A real brand logo is always the original asset, flat and intact (Logo or Image clip): never extruded, recoloured, filtered or deformed; a fade or a small scale only.'
+    ]
+  },
+  [MotionStyle.UiMorph]: {
+    label: 'UI morph reel',
+    eases: STYLE_EASES[MotionStyle.UiMorph],
+    seconds: { enter: [0.2, 0.35], stagger: 0.05, exit: 0.15, still: 0.5, scene: [0.5, 2] },
+    movement: { rise: 0, settle: 1, blur: 12, pushIn: 1, turn: 0 },
+    type: { family: 'Geist', weights: { display: 600, text: 500 }, sizes: { hero: 0.05, line: 0.03, small: 0.02 } },
+    palette: { ink: '#0a0a0a', paper: '#ffffff', muted: '#e7e4de', accents: 1 },
+    junctions: [],
+    entrances: [TransitionKind.None],
+    reading: READING,
+    forbidden: [Forbidden.Particles, Forbidden.Glow, Forbidden.Bounce, Forbidden.LoopSeam, Forbidden.TooDense],
+    pace: { minGap: 0.9, hold: 0.6 },
+    maxMoving: 2,
+    rules: [
+      'One shape, never a cut: every UI state is the same element morphing size, radius and colour on springs while its content swaps with a short blur (ui_morph_reel builds it).',
+      'A cursor drives every change with real clicks and drags; while a knob is held its value comes from the pointer, on release it springs from where it is.',
+      'Warm light grey canvas, black and white components and at most one accent; a clean UI font (Geist); no gradients, glows, particles or bouncy eases.',
+      'Calm, never dense: one change every two beats or every bar from a downbeat, then a hold (at least 0.6 s) in which the state reads; energy comes from the quality of the movement, not from the number of events. 8 states over a longer loop beat 11 rushed ones. The cursor moves slowly on curves. The too-dense gate names events closer than 0.9 s.',
+      'Analyze the music with mark_beats and set the reel offset to the first beat.',
+      'The last frame flows into the first, cursor included: the reel spans the whole video and the loop-seam gate names anything that breaks the loop.'
     ]
   }
 };
@@ -227,16 +262,14 @@ const CLIP_CHECKS: Partial<Record<Forbidden, ClipCheck>> = {
 
 const beatFrames = (doc: MotionDoc) => (doc.markers ?? []).filter((m) => BEAT_LABEL.test(m.label)).map((m) => m.frame);
 
-const halfBeats = (beats: readonly number[]) => beats.flatMap((b, i) => (i + 1 < beats.length ? [b, (b + beats[i + 1]) / 2] : [b]));
-
 function offBeat(doc: MotionDoc): Found[] {
-  const beats = halfBeats(beatFrames(doc));
+  const beats = beatFrames(doc);
   if (beats.length < 2) {
     return [];
   }
   const cuts = timelines(doc)[0].filter((c) => c.from > 0 && COMPONENTS[c.component].track === TrackKind.Visual);
   const missed = cuts.find((c) => Math.min(...beats.map((b) => Math.abs(b - c.from))) > BEAT_TOLERANCE_FRAMES);
-  return missed ? [{ clip: missed, at: missed.from, detail: `${missed.id} cuts in off the beat: move it onto a beat or half beat (cut_to_beat or move_clip to "beat N")` }] : [];
+  return missed ? [{ clip: missed, at: missed.from, detail: `${missed.id} cuts in off the beat: move it onto a beat (cut_to_beat or move_clip to "beat N")` }] : [];
 }
 
 const peakOf = (clip: Clip) => Object.entries(PEAK_TRAVEL).some(([prop, size]) => travel(clip.keyframes[prop] ?? []) >= size);
@@ -272,7 +305,7 @@ function roughCut(doc: MotionDoc): Found[] {
 
 const words = (clip: Clip) => String(clip.props.text ?? '').split(/\s+/).filter(Boolean).length;
 
-const readingTime = (n: number, spec: StyleSpec) => Math.max(spec.reading.perWord * n + spec.reading.base, n > 1 ? spec.reading.phrase : 0);
+const readingTime = (n: number, spec: StyleSpec) => Math.max(spec.reading.perWord * n + spec.reading.base, n > 1 ? spec.reading.phrase : 0) + spec.reading.pause;
 
 function unreadable(clips: readonly Clip[], spec: StyleSpec, fps: number): Found[] {
   return clips
@@ -282,15 +315,34 @@ function unreadable(clips: readonly Clip[], spec: StyleSpec, fps: number): Found
 
 const area = (clip: Clip) => Number(clip.props.width ?? 1) * Number(clip.props.height ?? 1);
 
-const isScreenshot = (clip: Clip) => (clip.component === 'Image' || (clip.component === 'Device3D' && Boolean(clip.props.screen))) && area(clip) >= MAIN_PICTURE_AREA && Number(clip.transform?.blur ?? 0) < BACKDROP_BLUR;
+type Placed = { clip: Clip; from: number };
+
+function placed(doc: MotionDoc, tracks: MotionDoc['tracks'], offset: number, seen: ReadonlySet<string>): Placed[] {
+  return tracks.flatMap((t) => t.clips as Clip[]).flatMap((clip) => {
+    const comp = clip.component === 'Precomp' ? String(clip.props.comp) : '';
+    const inner = doc.comps[comp];
+    if (!inner || seen.has(comp)) {
+      return [{ clip, from: offset + clip.from }];
+    }
+    return placed(doc, inner.tracks, offset + clip.from, new Set([...seen, comp]));
+  });
+}
+
+const veiled = (clip: Clip) => Number(clip.transform?.blur ?? 0) >= BACKDROP_BLUR || Number(clip.transform?.opacity ?? 1) <= BACKDROP_OPACITY;
+
+const isScreenshot = (clip: Clip) => SHOWN_PICTURE.some(([component, prop]) => clip.component === component && Boolean(clip.props[prop])) && area(clip) >= MAIN_PICTURE_AREA && !veiled(clip);
 
 function screenshots(doc: MotionDoc): Found[] {
-  const shots = timelines(doc)[0].filter(isScreenshot);
-  const covered = new Set(shots.flatMap((c) => Array.from({ length: c.durationInFrames }, (_, i) => c.from + i))).size;
-  if (doc.durationInFrames < PEAK_FROM_S * doc.fps || !shots.length || covered / doc.durationInFrames <= SCREENSHOT_SHARE) {
-    return [];
-  }
-  return [{ clip: shots[0], at: shots[0].from, detail: `screenshots are the main picture for ${Math.round((covered / doc.durationInFrames) * 100)}% of the film (at most ${SCREENSHOT_SHARE * 100}%): recreate the product UI live with add_ui (inputs typing, lists filling, numbers counting, charts drawing) and keep screenshots as a blurred background at most` }];
+  return placed(doc, doc.tracks, 0, new Set())
+    .filter((p) => isScreenshot(p.clip))
+    .map(({ clip, from }) => ({ clip, at: from, detail: `${clip.id} shows a sharp screenshot in the foreground at ${Math.round((from / doc.fps) * 100) / 100}s: a product film never shows screenshots as content, not even for a moment. Recreate that UI live with add_ui, or keep the screenshot as a background only (blur ${BACKDROP_BLUR} or more, or opacity ${BACKDROP_OPACITY} or less)` }));
+}
+
+function rushed(doc: MotionDoc, spec: StyleSpec): Found[] {
+  const [shortest] = spec.seconds.scene;
+  return timelines(doc)[0]
+    .filter((c) => c.component === 'Precomp' && c.durationInFrames < shortest * doc.fps - 1)
+    .map((clip) => ({ clip, at: clip.from, detail: `${clip.id} lasts ${Math.round((clip.durationInFrames / doc.fps) * 10) / 10} s: every scene holds ${shortest}–${spec.seconds.scene[1]} s so it can be read. Hold it longer and cut a scene instead: fewer ideas, never faster cuts` }));
 }
 
 function missingStory(doc: MotionDoc): Found[] {
@@ -309,7 +361,10 @@ const CHECKS: Record<Forbidden, Check> = {
   [Forbidden.NoPeak]: noPeak,
   [Forbidden.RoughCut]: roughCut,
   [Forbidden.Screenshots]: screenshots,
-  [Forbidden.MissingStoryBeat]: missingStory
+  [Forbidden.MissingStoryBeat]: missingStory,
+  [Forbidden.Rushed]: rushed,
+  [Forbidden.TooDense]: (doc, spec) => tooDense(doc, spec.pace.minGap).map((p) => ({ clip: p.clip, at: 0, detail: p.detail })),
+  [Forbidden.LoopSeam]: (doc) => loopSeam(doc).map((p) => ({ clip: p.clip, at: doc.durationInFrames - 1, detail: p.detail }))
 };
 
 export type StyleProblem = { effect: Forbidden; at: number; detail: string };

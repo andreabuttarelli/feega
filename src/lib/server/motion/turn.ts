@@ -1,7 +1,8 @@
 import { styleOf } from '$lib/motion/style';
 import { createUIMessageStream, streamText, type ModelMessage, type UIMessageChunk } from 'ai';
 import type { Db } from '$lib/server/db/client';
-import { llmCodeModel, llmLanguageModel, llmVisionModel } from '$lib/server/llm';
+import { llmCodeModel, llmLanguageModel, llmStructured, llmVisionModel } from '$lib/server/llm';
+import { fetchImageBytes, uiReader } from '$lib/server/motion/ui-read';
 import { PromptCache } from '$lib/server/prompt-cache';
 import { reasoningProviderOptions } from '$lib/server/chat-model/catalogue';
 import { ensureGatewayModels, gatewayModel, gatewayRate } from '$lib/server/openrouter-models';
@@ -20,9 +21,10 @@ import { templateLibrary } from '$lib/server/motion/templates';
 import { analyzeSounds, storageAnalysis } from '$lib/server/motion/audio-analysis';
 import { motionAgentPrompt } from '$lib/server/motion/motion-prompt';
 import { speakVoiceover } from '$lib/server/motion/voiceover';
+import { layMusic } from '$lib/server/motion/music';
 import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
 import { brandSources } from '$lib/server/motion/brand-sources';
-import { SELF_CHECK_MAX_STEPS, SUMMARY_PROMPT, VIEW_FRAMES, Vision, docTexts, keyFrameTimes, selfCheckDue, selfCheckPrompt, usageByModel, visionStep } from '$lib/server/motion/frames';
+import { SELF_CHECK_MAX_STEPS, SUMMARY_PROMPT, VIEW_FRAMES, Vision, deliveryBlocked, docTexts, fixPrompt, keyFrameTimes, openErrors, selfCheckPrompt, stillOpenNote, usageByModel, visionStep } from '$lib/server/motion/frames';
 import { frameStats } from '$lib/server/motion/frame-stats';
 import { awaitFrames, awaitVerdict, framesPrefix, FRAME_POLL_MS, type FrameBucket } from '$lib/server/motion/frame-store';
 import { CANVAS_ASSET_BUCKET, SIGNED_URL_TTL_S } from '$lib/server/repos/asset-storage';
@@ -67,7 +69,8 @@ enum Round {
 type Stop = ReturnType<typeof agentStopWhen>;
 
 const CLOSING_RESERVE_MS = 60_000;
-const MAX_SELF_CHECK_NUDGES = 2;
+export const MAX_DELIVERY_ATTEMPTS = 3;
+const STILL_OPEN_ID = 'still-open';
 
 const oneStep: Stop = ({ steps }) => steps.length >= 1;
 
@@ -147,6 +150,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
     ...brandSources(db, { orgId, projectId: project.id, canvasId: motion.record.canvasId, brandId: project.brandId }),
     analysis: async (assetId) => (await analyzeSounds(storageAnalysis(db), { orgId, projectId: project.id }, assets, [assetId]))[assetId] ?? null,
     voiceover: (voice) => withOrgContext(orgId, () => speakVoiceover(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, actor }, voice)),
+    music: (ask) => withOrgContext(orgId, () => layMusic(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, actor }, ask)),
     frames: async (callId, times) => {
       BROWSER_DRAWS[browser]();
       const review = await screenModelInput(db, { profile: ModerationProfile.Standard, texts: docTexts(session.doc), scope: moderationScope });
@@ -157,6 +161,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
       return awaitFrames(bucket, framesPrefix(frameScope, callId), times.length);
     },
     inspect: frameStats,
+    readUi: uiReader({ ask: (q) => withOrgContext(orgId, () => llmStructured({ ...q, model: llmVisionModel() ?? model, label: 'motion-recreate-ui' })), fetchBytes: fetchImageBytes }),
     check: async (callId, doc, name) => {
       BROWSER_DRAWS[browser]();
       const review = await screenModelInput(db, { profile: ModerationProfile.Standard, texts: docTexts(doc), scope: moderationScope });
@@ -255,11 +260,19 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
       };
 
       await play(openingMessages, Round.Edit);
-      for (let nudge = 0; nudge < MAX_SELF_CHECK_NUDGES && steps.length && selfCheckDue(session, vision); nudge++) {
-        await play([...conversation, { role: 'user', content: selfCheckPrompt(keyFrameTimes(session.doc)) }], Round.SelfCheck);
+      for (let attempt = 0; attempt < MAX_DELIVERY_ATTEMPTS && steps.length && deliveryBlocked(session, vision); attempt++) {
+        const errors = openErrors(session);
+        const times = keyFrameTimes(session.doc);
+        await play([...conversation, { role: 'user', content: errors.length ? fixPrompt(errors, times) : selfCheckPrompt(times) }], Round.SelfCheck);
       }
       if (steps.length && !closedByModel(steps.at(-1))) {
         await play([...conversation, { role: 'user', content: SUMMARY_PROMPT }], Round.Summary);
+      }
+      const open = stillOpenNote(openErrors(session));
+      if (open) {
+        writer.write({ type: 'text-start', id: STILL_OPEN_ID });
+        writer.write({ type: 'text-delta', id: STILL_OPEN_ID, delta: open });
+        writer.write({ type: 'text-end', id: STILL_OPEN_ID });
       }
       writer.write({ type: 'finish' });
 
@@ -285,7 +298,8 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
       console.warn('[motion-agent] revision not saved', { nodeId: motion.record.id, outcome: write.outcome });
     }
 
-    const turn = finishedTurn(steps);
+    const finished = finishedTurn(steps);
+    const turn = { ...finished, content: finished.content + stillOpenNote(openErrors(session)) };
     await saveTurn(db, { orgId, threadId, role: 'assistant', ...turn, actor }).catch((e) => console.error('[motion-agent] assistant turn not saved', { threadId }, e));
 
     for (const [modelId, usage] of usageByModel(steps.map((s) => extractSdkUsage(s.usage)), stepModels)) {

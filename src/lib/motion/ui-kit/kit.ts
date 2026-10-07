@@ -1,3 +1,7 @@
+import { z } from 'zod';
+import { cursorPlan } from './cursor-plan';
+import { springSource } from '../spring';
+
 export enum UiKind {
   LinkShortener = 'link-shortener',
   LinkList = 'link-list',
@@ -5,7 +9,19 @@ export enum UiKind {
   Funnel = 'funnel',
   Payouts = 'payouts',
   Qr = 'qr',
-  Window = 'window'
+  Window = 'window',
+  Sidebar = 'sidebar',
+  Hero = 'hero',
+  PromptBox = 'prompt-box',
+  EditorCanvas = 'editor-canvas',
+  CardGrid = 'card-grid',
+  Pricing = 'pricing',
+  Chat = 'chat',
+  Modal = 'modal',
+  Toggle = 'toggle',
+  Upload = 'upload',
+  GeneratedResult = 'generated-result',
+  Cursor = 'cursor'
 }
 
 export const UI_KINDS = Object.values(UiKind) as [UiKind, ...UiKind[]];
@@ -78,6 +94,25 @@ stage.style.fontFamily = family;
 root.appendChild(stage);
 const fit = Math.min(1, ((root.clientWidth || DESIGN_W) * SAFE) / DESIGN_W, ((root.clientHeight || DESIGN_H) * SAFE) / DESIGN_H);
 stage.style.transform = 'translate(-50%, -50%) scale(' + zoom * fit + ')';
+const SPRING = SPRING_MATH;
+const PRESS = { stiffness: 1400, damping: 75 };
+const UI = { stiffness: 320, damping: 30 };
+const springTo = (t, at, spring) => SPRING.step(spring || UI, t - at / speed);
+const tap = (t, at) => SPRING.sumSteps(0, [{ at: at / speed, delta: 1, spring: PRESS }, { at: (at + 0.09) / speed, delta: -1, spring: PRESS }], t);
+const TIP = [40 * 4 / 24, 40 * 2 / 24];
+const aim = (el, host) => {
+  let x = el.offsetWidth / 2;
+  let y = el.offsetHeight / 2;
+  for (let n = el; n && n !== host; n = n.offsetParent) {
+    x += n.offsetLeft;
+    y += n.offsetTop;
+  }
+  return [x - TIP[0], y - TIP[1]];
+};
+const anchor = (el, name) => {
+  el.setAttribute('data-anchor', name);
+  return el;
+};
 const drive = (render) => {
   render(0);
   tl.to({}, { duration, ease: 'none', onUpdate() { render(this.time()); } }, 0);
@@ -92,7 +127,7 @@ const BASE_CSS = `
 .muted { color: var(--muted); }
 `;
 
-const piece = (name: string, about: string, size: UiSize, css: string, js: string): UiPiece => ({ name, about, size, html: '', css: BASE_CSS + css, js: `const DESIGN_W = ${size.width};\nconst DESIGN_H = ${size.height};\nconst SAFE = ${UI_SAFE};\n` + STYLE_PARAMS + js });
+const piece = (name: string, about: string, size: UiSize, css: string, js: string): UiPiece => ({ name, about, size, html: '', css: BASE_CSS + css, js: `const DESIGN_W = ${size.width};\nconst DESIGN_H = ${size.height};\nconst SAFE = ${UI_SAFE};\n` + STYLE_PARAMS.replace('SPRING_MATH', () => springSource()) + js });
 
 const SHORTENER = piece(
   'UiLinkShortener',
@@ -121,10 +156,10 @@ box.style.transform = 'translate(-50%, -50%)';
 box.style.position = 'absolute';
 make('div', 'label', box, label);
 const row = make('div', 'row', box);
-const field = make('div', 'field', row);
+const field = anchor(make('div', 'field', row), 'field');
 const typed = make('span', '', field);
 const caret = make('span', 'caret', field);
-const btn = make('div', 'button', row, button);
+const btn = anchor(make('div', 'button', row, button), 'button');
 const result = make('div', 'result', box);
 make('div', 'dot', result, '✓');
 make('div', '', result, short);
@@ -136,19 +171,18 @@ const TYPE_LEN = Math.min(1.6, duration * 0.35);
 const CLICK = TYPE_AT + TYPE_LEN + 0.45;
 const CURSOR_TRAVEL = 0.6;
 const CURSOR_FROM = { x: 170, y: 230 };
-const CURSOR_TIP = { x: 40 * 4 / 24, y: 40 * 2 / 24 };
 const CURSOR_STIFFNESS = 13;
 const settle = (s) => 1 - (1 + CURSOR_STIFFNESS * s) * Math.exp(-CURSOR_STIFFNESS * s);
-cursor.style.transformOrigin = CURSOR_TIP.x + 'px ' + CURSOR_TIP.y + 'px';
+cursor.style.transformOrigin = TIP[0] + 'px ' + TIP[1] + 'px';
 drive((t) => {
   const typing = span(t, TYPE_AT, TYPE_LEN);
   typed.textContent = url.slice(0, Math.round(url.length * typing));
   caret.style.opacity = typing < 1 || Math.floor(t * 2.5) % 2 === 0 ? '1' : '0';
-  const aim = { x: btn.offsetLeft + btn.offsetWidth * 0.5, y: btn.offsetTop + btn.offsetHeight * 0.55 };
+  const [ax, ay] = aim(btn, box);
   const travel = settle(Math.max(0, t - (CLICK - CURSOR_TRAVEL) / speed) * speed);
-  const press = span(t, CLICK, 0.08) - span(t, CLICK + 0.08, 0.12);
-  cursor.style.left = (aim.x - CURSOR_TIP.x + CURSOR_FROM.x * (1 - travel)) + 'px';
-  cursor.style.top = (aim.y - CURSOR_TIP.y + CURSOR_FROM.y * (1 - travel)) + 'px';
+  const press = tap(t, CLICK);
+  cursor.style.left = (ax + CURSOR_FROM.x * (1 - travel)) + 'px';
+  cursor.style.top = (ay + CURSOR_FROM.y * (1 - travel)) + 'px';
   cursor.style.opacity = String(span(t, CLICK - CURSOR_TRAVEL - 0.1, 0.15));
   cursor.style.transform = 'scale(' + (1 - 0.14 * press) + ')';
   btn.style.transform = 'scale(' + (1 - 0.06 * press) + ')';
@@ -427,6 +461,546 @@ drive((t) => {
 `
 );
 
+const POINTER = `
+const pointer = (host) => {
+  const n = make('div', 'pointer', host);
+  n.innerHTML = '<svg viewBox="0 0 24 24" width="40" height="40"><path d="M4 2l16 9-7 2-3 7z" fill="#111" stroke="#fff" stroke-width="1.5"/></svg>';
+  return n;
+};
+const glide = (n, from, to, at, len, t) => {
+  const p = inOut(span(t, at, len));
+  n.style.left = (from[0] + (to[0] - from[0]) * p) + 'px';
+  n.style.top = (from[1] + (to[1] - from[1]) * p) + 'px';
+  n.style.opacity = String(span(t, at - 0.2, 0.15));
+};
+const press = (t, at) => tap(t, at);
+const rise = (n, p, dy) => {
+  n.style.opacity = String(p);
+  n.style.transform = 'translateY(' + (dy * (1 - p)) + 'px)';
+};
+`;
+
+const POINTER_CSS = `
+.pointer { position: absolute; width: 40px; height: 40px; opacity: 0; z-index: 5; }
+`;
+
+const generic = (name: string, about: string, size: UiSize, css: string, js: string) => piece(name, about, size, POINTER_CSS + css, POINTER + js);
+
+const SIDEBAR = generic(
+  'UiSidebar',
+  'An app shell: the sidebar nav slides in item by item, the active highlight walks down to the chosen item, the content rows fill in. Params brand, items (one per line), active (index from 0), title.',
+  { width: 1400, height: 800 },
+  `
+.shell { position: absolute; width: 1400px; height: 800px; transform: translate(-50%, -50%); display: flex; overflow: hidden; }
+.side { width: 300px; border-right: 1px solid var(--line); padding: 30px 20px; position: relative; }
+.brand { font-size: 28px; font-weight: 800; margin: 0 14px 30px; }
+.nav { position: relative; height: 58px; display: flex; align-items: center; padding: 0 18px; font-size: 23px; font-weight: 500; z-index: 1; }
+.glow { position: absolute; left: 20px; right: 20px; height: 58px; border-radius: calc(var(--r) * 0.7); background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.main { flex: 1; padding: 44px 52px; }
+.title { font-size: 40px; font-weight: 700; margin-bottom: 30px; }
+.bar { height: 64px; border: 1px solid var(--line); border-radius: calc(var(--r) * 0.7); margin-bottom: 16px; display: flex; align-items: center; gap: 18px; padding: 0 22px; }
+.chip { width: 30px; height: 30px; border-radius: 50%; background: var(--accent); }
+.stroke { height: 14px; border-radius: 7px; background: var(--line); }
+`,
+  `
+const brandName = param('brand', 'Acme', { type: 'text', group: 'Content' });
+const items = param('items', 'Home\\nProjects\\nAnalytics\\nTeam\\nSettings', { type: 'textarea', group: 'Content' });
+const active = param('active', 2, { type: 'number', min: 0, max: 12, group: 'Content' });
+const title = param('title', 'Analytics', { type: 'text', group: 'Content' });
+const shell = make('div', 'card shell');
+const side = make('div', 'side', shell);
+make('div', 'brand', side, brandName);
+const glow = make('div', 'glow', side);
+const navs = rows(items).map((r, i) => anchor(make('div', 'nav', side, r[0]), 'nav-' + i));
+const main = make('div', 'main', shell);
+const head = make('div', 'title', main, title);
+const bars = [0.62, 0.48, 0.71, 0.4, 0.55].map((w) => {
+  const b = make('div', 'bar', main);
+  make('div', 'chip', b);
+  make('div', 'stroke', b).style.width = Math.round(w * 100) + '%';
+  return b;
+});
+const target = Math.min(navs.length - 1, Math.max(0, Math.round(active)));
+drive((t) => {
+  navs.forEach((n, i) => {
+    const p = out(span(t, 0.1 + i * 0.08, 0.4));
+    n.style.opacity = String(p);
+    n.style.transform = 'translateX(' + (-30 * (1 - p)) + 'px)';
+    n.style.color = i === target && t > 1.2 / speed ? accent : ink;
+  });
+  const walk = inOut(span(t, 0.6, 0.6));
+  glow.style.top = (86 + 58 * target * walk) + 'px';
+  glow.style.opacity = String(span(t, 0.5, 0.2));
+  rise(head, out(span(t, 1.1, 0.4)), 20);
+  bars.forEach((b, i) => rise(b, out(span(t, 1.3 + i * 0.1, 0.4)), 24));
+});
+`
+);
+
+const HERO = generic(
+  'UiHero',
+  'A landing page hero: the kicker fades in, the headline lands word by word, the subline follows, the call-to-action button pops and a cursor clicks it. Params kicker, headline, sub, cta.',
+  { width: 1400, height: 680 },
+  `
+.hero { position: absolute; width: 1400px; height: 680px; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0 90px; }
+.kicker { font-size: 22px; font-weight: 600; color: var(--accent); padding: 8px 18px; border: 1px solid var(--line); border-radius: 999px; margin-bottom: 30px; }
+.headline { font-size: 82px; font-weight: 800; letter-spacing: -0.035em; line-height: 1.05; }
+.word { display: inline-block; margin: 0 0.12em; }
+.sub { font-size: 28px; margin-top: 26px; max-width: 900px; }
+.cta { margin-top: 40px; padding: 22px 40px; font-size: 26px; font-weight: 700; background: var(--accent); color: #fff; border-radius: calc(var(--r) * 0.7); position: relative; }
+`,
+  `
+const kicker = param('kicker', 'New', { type: 'text', group: 'Content' });
+const headline = param('headline', 'Ship your site in minutes', { type: 'text', group: 'Content' });
+const sub = param('sub', 'Describe it, see it, publish it.', { type: 'text', group: 'Content' });
+const cta = param('cta', 'Get started', { type: 'text', group: 'Content' });
+const hero = make('div', 'card hero');
+const kick = make('div', 'kicker', hero, kicker);
+const h = make('div', 'headline', hero);
+const words = String(headline).split(' ').map((w) => make('span', 'word', h, w));
+const s = make('div', 'sub muted', hero, sub);
+const button = anchor(make('div', 'cta', hero, cta), 'cta');
+const cursor = pointer(hero);
+const CLICK = 1.3 + words.length * 0.12;
+drive((t) => {
+  rise(kick, out(span(t, 0.1, 0.4)), 16);
+  words.forEach((w, i) => {
+    const p = out(span(t, 0.3 + i * 0.12, 0.4));
+    w.style.opacity = String(p);
+    w.style.transform = 'translateY(' + (40 * (1 - p)) + 'px) scale(' + (1.25 - 0.25 * p) + ')';
+  });
+  rise(s, out(span(t, 0.5 + words.length * 0.12, 0.4)), 16);
+  const pop = out(span(t, 0.8 + words.length * 0.12, 0.35));
+  button.style.opacity = String(pop);
+  button.style.transform = 'scale(' + ((0.8 + 0.2 * pop) * (1 - 0.06 * press(t, CLICK))) + ')';
+  glide(cursor, [1100, 640], aim(button, hero), CLICK - 0.5, 0.45, t);
+});
+`
+);
+
+const PROMPT_BOX = generic(
+  'UiPromptBox',
+  'A form or prompt box: the request types itself into the field, a cursor presses send, a progress line runs and a done state appears. Params label, prompt, button, done.',
+  { width: 1240, height: 400 },
+  `
+.box { position: absolute; width: 1240px; transform: translate(-50%, -50%); padding: 36px 40px; }
+.label { font-size: 22px; font-weight: 600; margin-bottom: 16px; }
+.field { min-height: 130px; border: 1.5px solid var(--line); border-radius: calc(var(--r) * 0.8); padding: 22px 24px; font-size: 30px; line-height: 1.35; position: relative; }
+.caret { display: inline-block; width: 2px; height: 34px; background: var(--accent); vertical-align: middle; margin-left: 2px; }
+.send { position: absolute; right: 18px; bottom: 18px; width: 64px; height: 64px; border-radius: calc(var(--r) * 0.7); background: var(--accent); display: flex; align-items: center; justify-content: center; }
+.track { height: 6px; border-radius: 3px; background: var(--line); margin-top: 22px; overflow: hidden; }
+.run { height: 100%; background: var(--accent); }
+.done { margin-top: 16px; font-size: 24px; font-weight: 600; display: flex; align-items: center; gap: 12px; }
+.tick { width: 34px; height: 34px; border-radius: 50%; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+`,
+  `
+const label = param('label', 'What do you want to change?', { type: 'text', group: 'Content' });
+const prompt = param('prompt', 'Make the pricing page dark and add a yearly plan', { type: 'textarea', group: 'Content' });
+const doneText = param('done', 'Done in 4 seconds', { type: 'text', group: 'Content' });
+const box = make('div', 'card box');
+make('div', 'label', box, label);
+const field = anchor(make('div', 'field', box), 'field');
+const typed = make('span', '', field);
+const caret = make('span', 'caret', field);
+const send = anchor(make('div', 'send', field), 'send');
+send.innerHTML = '<svg viewBox="0 0 24 24" width="30" height="30"><path d="M5 12h12M12 6l6 6-6 6" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round"/></svg>';
+const run = make('div', 'run', make('div', 'track', box));
+const done = make('div', 'done', box);
+make('div', 'tick', done, '✓');
+make('div', '', done, doneText);
+const cursor = pointer(box);
+const TYPE_LEN = Math.min(1.8, duration * 0.4);
+const CLICK = 0.2 + TYPE_LEN + 0.45;
+drive((t) => {
+  const typing = span(t, 0.2, TYPE_LEN);
+  typed.textContent = String(prompt).slice(0, Math.round(String(prompt).length * typing));
+  caret.style.opacity = typing < 1 || Math.floor(t * 2.5) % 2 === 0 ? '1' : '0';
+  glide(cursor, [900, 380], aim(send, box), CLICK - 0.5, 0.45, t);
+  send.style.transform = 'scale(' + (1 - 0.1 * press(t, CLICK)) + ')';
+  run.style.width = (100 * inOut(span(t, CLICK + 0.1, 0.8))) + '%';
+  rise(done, out(span(t, CLICK + 0.9, 0.35)), 14);
+});
+`
+);
+
+const EDITOR_CANVAS = generic(
+  'UiEditorCanvas',
+  'A design or page editor: toolbar on top, blocks drop onto the canvas one by one, a selection box wraps one block and the cursor drags it into place. Params title, blocks (one label per line).',
+  { width: 1440, height: 840 },
+  `
+.editor { position: absolute; width: 1440px; height: 840px; transform: translate(-50%, -50%); overflow: hidden; }
+.tools { height: 70px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 14px; padding: 0 24px; font-size: 22px; font-weight: 600; }
+.tool { width: 40px; height: 40px; border-radius: calc(var(--r) * 0.5); border: 1px solid var(--line); }
+.tool.on { background: var(--accent); border-color: var(--accent); }
+.board { position: absolute; left: 40px; right: 40px; top: 110px; bottom: 40px; background-image: radial-gradient(var(--line) 1.5px, transparent 1.5px); background-size: 28px 28px; }
+.block { position: absolute; border-radius: calc(var(--r) * 0.6); background: var(--paper); border: 1px solid var(--line); box-shadow: 0 10px 30px rgba(0,0,0,0.08); font-size: 24px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
+.block.hot { background: color-mix(in srgb, var(--accent) 14%, var(--paper)); }
+.select { position: absolute; border: 2.5px solid var(--accent); }
+`,
+  `
+const title = param('title', 'Landing page', { type: 'text', group: 'Content' });
+const blocks = param('blocks', 'Header\\nHero\\nFeatures\\nPricing\\nFooter', { type: 'textarea', group: 'Content' });
+const editor = make('div', 'card editor');
+const bar = make('div', 'tools', editor);
+['on', '', '', ''].forEach((c) => make('div', 'tool ' + c, bar));
+make('div', 'muted', bar, title).style.marginLeft = '18px';
+const board = make('div', 'board', editor);
+const SLOTS = [[30, 30, 1300, 80], [30, 140, 760, 300], [820, 140, 510, 300], [30, 470, 640, 170], [700, 470, 630, 170]];
+const placed = rows(blocks).slice(0, SLOTS.length).map((r, i) => {
+  const b = anchor(make('div', 'block' + (i === 1 ? ' hot' : ''), board, r[0]), 'block-' + i);
+  const [x, y, w, h] = SLOTS[i];
+  Object.assign(b.style, { left: x + 'px', top: y + 'px', width: w + 'px', height: h + 'px' });
+  return b;
+});
+const sel = make('div', 'select', board);
+const cursor = pointer(board);
+const GRAB = 0.4 + placed.length * 0.15 + 0.3;
+drive((t) => {
+  placed.forEach((b, i) => {
+    const p = out(span(t, 0.2 + i * 0.15, 0.4));
+    b.style.opacity = String(p);
+    b.style.transform = 'scale(' + (0.9 + 0.1 * p) + ')';
+  });
+  const drag = inOut(span(t, GRAB + 0.3, 0.7));
+  const hot = placed[1];
+  if (hot) {
+    hot.style.transform = 'translate(' + (40 * drag) + 'px, ' + (-20 * drag) + 'px)';
+    sel.style.left = (26 + 40 * drag) + 'px';
+    sel.style.top = (136 - 20 * drag) + 'px';
+    sel.style.width = '768px';
+    sel.style.height = '308px';
+  }
+  sel.style.opacity = String(span(t, GRAB, 0.15));
+  const [hx, hy] = hot ? aim(hot, board) : [420, 290];
+  glide(cursor, [1000, 600], [hx + 40 * drag, hy - 20 * drag], GRAB - 0.5, 0.5, t);
+});
+`
+);
+
+const CARD_GRID = generic(
+  'UiCardGrid',
+  'A grid of cards (projects, templates, products) arriving in a stagger, each with an accent thumbnail, title and subtitle; one card lifts as the cursor hovers it. Params cards: one per line "title|subtitle".',
+  { width: 1440, height: 800 },
+  `
+.grid { position: absolute; width: 1440px; transform: translate(-50%, -50%); display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
+.tile { overflow: hidden; }
+.thumb { height: 190px; }
+.meta { padding: 20px 24px; }
+.name { font-size: 26px; font-weight: 700; }
+.note { font-size: 20px; margin-top: 4px; }
+`,
+  `
+const cards = param('cards', 'Portfolio|Updated 2 min ago\\nShop|12 pages\\nBlog|Draft\\nDocs|Published\\nLanding|A/B test\\nEvents|Scheduled', { type: 'textarea', group: 'Content' });
+const grid = make('div', 'grid');
+const tiles = rows(cards).slice(0, 6).map((r, i) => {
+  const tile = anchor(make('div', 'card tile', grid), 'card-' + i);
+  const thumb = make('div', 'thumb', tile);
+  thumb.style.background = 'linear-gradient(135deg, ' + accent + ', color-mix(in srgb, ' + accent + ' ' + (30 + i * 10) + '%, ' + paper + '))';
+  const meta = make('div', 'meta', tile);
+  make('div', 'name', meta, r[0]);
+  make('div', 'note muted', meta, r[1] || '');
+  return tile;
+});
+const cursor = pointer(grid);
+const HOVER = 0.3 + tiles.length * 0.1 + 0.4;
+drive((t) => {
+  tiles.forEach((tile, i) => {
+    const p = out(span(t, 0.2 + i * 0.1, 0.45));
+    const lift = i === 1 ? springTo(t, HOVER) : 0;
+    tile.style.opacity = String(p);
+    tile.style.transform = 'translateY(' + (40 * (1 - p) - 12 * lift) + 'px) scale(' + (1 + 0.03 * lift) + ')';
+  });
+  glide(cursor, [1300, 760], tiles.length ? aim(tiles[Math.min(1, tiles.length - 1)], grid) : [720, 200], HOVER - 0.5, 0.5, t);
+});
+`
+);
+
+const PRICING = generic(
+  'UiPricing',
+  'A pricing table: plan cards rise in, prices count up, the featured plan lifts with an accent border and the cursor clicks its button. Params plans: one per line "name|price|feature; feature; feature", featured (index from 0), cta.',
+  { width: 1440, height: 760 },
+  `
+.plans { position: absolute; width: 1440px; transform: translate(-50%, -50%); display: flex; gap: 28px; align-items: stretch; }
+.plan { flex: 1; padding: 36px 34px; display: flex; flex-direction: column; gap: 14px; position: relative; }
+.plan.top { border: 2.5px solid var(--accent); }
+.pname { font-size: 26px; font-weight: 700; }
+.price { font-size: 68px; font-weight: 800; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.feat { font-size: 21px; display: flex; gap: 10px; }
+.feat b { color: var(--accent); }
+.buy { margin-top: auto; text-align: center; padding: 18px; font-size: 22px; font-weight: 700; border-radius: calc(var(--r) * 0.7); border: 1.5px solid var(--line); }
+.plan.top .buy { background: var(--accent); color: #fff; border-color: var(--accent); }
+`,
+  `
+const plans = param('plans', 'Free|$0|1 site; Subdomain; Community support\\nPro|$12|Unlimited sites; Custom domain; AI edits\\nTeam|$39|Everything in Pro; Roles; Priority support', { type: 'textarea', group: 'Content' });
+const featured = param('featured', 1, { type: 'number', min: 0, max: 3, group: 'Content' });
+const cta = param('cta', 'Choose plan', { type: 'text', group: 'Content' });
+const wrap = make('div', 'plans');
+const featuredAt = Math.round(featured);
+const cards = rows(plans).slice(0, 4).map((r, i) => {
+  const plan = make('div', 'card plan' + (i === featuredAt ? ' top' : ''), wrap);
+  make('div', 'pname', plan, r[0]);
+  const price = make('div', 'price', plan);
+  String(r[2] || '').split(';').filter((f) => f.trim()).forEach((f) => {
+    const row = make('div', 'feat', plan);
+    make('b', '', row, '✓');
+    make('span', 'muted', row, f.trim());
+  });
+  const buy = anchor(make('div', 'buy', plan, cta), 'buy-' + i);
+  return { plan, price, buy, n: number(r[1] || '0') };
+});
+const cursor = pointer(wrap);
+const CLICK = 0.4 + cards.length * 0.15 + 1;
+drive((t) => {
+  cards.forEach((c, i) => {
+    const p = out(span(t, 0.2 + i * 0.15, 0.45));
+    const lift = i === featuredAt ? springTo(t, 1) : 0;
+    c.plan.style.opacity = String(p);
+    c.plan.style.transform = 'translateY(' + (50 * (1 - p) - 18 * lift) + 'px) scale(' + (1 + 0.04 * lift) + ')';
+    c.price.textContent = counted(c.n, out(span(t, 0.3 + i * 0.15, 1)));
+    c.buy.style.transform = i === featuredAt ? 'scale(' + (1 - 0.06 * press(t, CLICK)) + ')' : '';
+  });
+  glide(cursor, [1300, 760], cards[featuredAt] ? aim(cards[featuredAt].buy, wrap) : [720, 660], CLICK - 0.5, 0.45, t);
+});
+`
+);
+
+const CHAT = generic(
+  'UiChat',
+  'A chat with an assistant: messages arrive in turn, the user bubble on the right, the assistant reply showing typing dots then writing itself. Params title, messages: one per line "user|text" or "bot|text".',
+  { width: 1000, height: 800 },
+  `
+.chat { position: absolute; width: 1000px; height: 800px; transform: translate(-50%, -50%); display: flex; flex-direction: column; overflow: hidden; }
+.top { padding: 24px 30px; border-bottom: 1px solid var(--line); font-size: 24px; font-weight: 700; display: flex; align-items: center; gap: 14px; }
+.avatar { width: 38px; height: 38px; border-radius: 50%; background: var(--accent); }
+.feed { flex: 1; padding: 30px; display: flex; flex-direction: column; gap: 18px; }
+.msg { max-width: 72%; padding: 18px 22px; font-size: 25px; line-height: 1.35; border-radius: calc(var(--r) * 0.9); }
+.msg.user { align-self: flex-end; background: var(--accent); color: #fff; }
+.msg.bot { align-self: flex-start; background: color-mix(in srgb, var(--line) 60%, var(--paper)); }
+`,
+  `
+const title = param('title', 'Assistant', { type: 'text', group: 'Content' });
+const messages = param('messages', 'user|Add a contact form to my homepage\\nbot|Done. The form is live under the hero, and replies go to your inbox.\\nuser|Make the button orange', { type: 'textarea', group: 'Content' });
+const chat = make('div', 'card chat');
+const header = make('div', 'top', chat);
+make('div', 'avatar', header);
+make('div', '', header, title);
+const feed = make('div', 'feed', chat);
+let at = 0.2;
+const turns = rows(messages).slice(0, 6).map((r) => {
+  const bot = r[0] === 'bot';
+  const text = r[1] || '';
+  const msg = make('div', 'msg ' + (bot ? 'bot' : 'user'), feed);
+  const turn = { msg, text, bot, at: at + (bot ? 0.5 : 0) };
+  at = turn.at + (bot ? Math.min(1.2, text.length * 0.02) : 0.3) + 0.35;
+  return turn;
+});
+drive((t) => {
+  turns.forEach((m) => {
+    const shownAt = m.bot ? m.at - 0.5 : m.at;
+    rise(m.msg, out(span(t, shownAt, 0.3)), 18);
+    const typing = m.bot ? span(t, m.at, Math.min(1.2, m.text.length * 0.02)) : 1;
+    m.msg.textContent = typing > 0 ? m.text.slice(0, Math.round(m.text.length * typing)) : '•••';
+  });
+});
+`
+);
+
+const MODAL = generic(
+  'UiModal',
+  'A modal dialog: the page dims, the dialog scales in with its title and body, the cursor clicks confirm and it turns into a success state. Params title, body, confirm, cancel, success.',
+  { width: 1300, height: 760 },
+  `
+.page { position: absolute; width: 1300px; height: 760px; transform: translate(-50%, -50%); overflow: hidden; }
+.ghost { margin: 40px; height: 120px; border-radius: var(--r); background: color-mix(in srgb, var(--line) 50%, transparent); }
+.dim { position: absolute; inset: 0; background: rgba(0,0,0,0.45); }
+.dialog { position: absolute; left: 50%; top: 50%; width: 700px; padding: 40px; margin-left: -350px; margin-top: -190px; }
+.dtitle { font-size: 34px; font-weight: 700; }
+.dbody { font-size: 23px; margin-top: 14px; line-height: 1.4; }
+.actions { display: flex; justify-content: flex-end; gap: 14px; margin-top: 34px; }
+.btn { padding: 16px 28px; font-size: 22px; font-weight: 600; border-radius: calc(var(--r) * 0.7); border: 1.5px solid var(--line); }
+.btn.go { background: var(--accent); color: #fff; border-color: var(--accent); }
+`,
+  `
+const title = param('title', 'Publish your site?', { type: 'text', group: 'Content' });
+const body = param('body', 'Your changes go live on your domain right away.', { type: 'textarea', group: 'Content' });
+const confirm = param('confirm', 'Publish', { type: 'text', group: 'Content' });
+const cancel = param('cancel', 'Cancel', { type: 'text', group: 'Content' });
+const success = param('success', 'Published ✓', { type: 'text', group: 'Content' });
+const page = make('div', 'card page');
+[0, 1, 2, 3].forEach(() => make('div', 'ghost', page));
+const dim = make('div', 'dim', page);
+const dialog = make('div', 'card dialog', page);
+make('div', 'dtitle', dialog, title);
+make('div', 'dbody muted', dialog, body);
+const actions = make('div', 'actions', dialog);
+anchor(make('div', 'btn', actions, cancel), 'cancel');
+const go = anchor(make('div', 'btn go', actions, confirm), 'confirm');
+const cursor = pointer(page);
+const CLICK = 1.5;
+drive((t) => {
+  dim.style.opacity = String(out(span(t, 0.1, 0.3)));
+  const p = out(span(t, 0.2, 0.4));
+  dialog.style.opacity = String(p);
+  dialog.style.transform = 'scale(' + (0.88 + 0.12 * p) + ')';
+  glide(cursor, [1200, 720], aim(go, page), CLICK - 0.5, 0.45, t);
+  go.style.transform = 'scale(' + (1 - 0.06 * press(t, CLICK)) + ')';
+  go.textContent = t >= (CLICK + 0.15) / speed ? success : confirm;
+});
+`
+);
+
+const TOGGLE = generic(
+  'UiToggle',
+  'A settings panel: rows appear and their switches flip on one after another, the knob sliding and the track filling with the accent. Params title, settings (one label per line).',
+  { width: 1000, height: 560 },
+  `
+.panel { position: absolute; width: 1000px; transform: translate(-50%, -50%); padding: 34px 40px; }
+.ptitle { font-size: 30px; font-weight: 700; margin-bottom: 14px; }
+.set { display: flex; align-items: center; justify-content: space-between; padding: 20px 0; border-bottom: 1px solid var(--line); font-size: 25px; }
+.set:last-child { border-bottom: 0; }
+.track { width: 80px; height: 44px; border-radius: 22px; position: relative; }
+.knob { position: absolute; top: 4px; width: 36px; height: 36px; border-radius: 50%; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.25); }
+`,
+  `
+const title = param('title', 'Settings', { type: 'text', group: 'Content' });
+const settings = param('settings', 'Auto-publish\\nDark mode\\nAnalytics\\nCustom domain', { type: 'textarea', group: 'Content' });
+const panel = make('div', 'card panel');
+make('div', 'ptitle', panel, title);
+const switches = rows(settings).slice(0, 6).map((r, i) => {
+  const set = make('div', 'set', panel);
+  make('div', '', set, r[0]);
+  const track = anchor(make('div', 'track', set), 'toggle-' + i);
+  return { set, track, knob: make('div', 'knob', track) };
+});
+drive((t) => {
+  switches.forEach((s, i) => {
+    rise(s.set, out(span(t, 0.1 + i * 0.1, 0.4)), 16);
+    const on = springTo(t, 0.8 + i * 0.3);
+    s.knob.style.left = (4 + 36 * on) + 'px';
+    s.track.style.background = 'color-mix(in srgb, ' + accent + ' ' + Math.round(on * 100) + '%, ' + line + ')';
+  });
+});
+`
+);
+
+const UPLOAD = generic(
+  'UiUpload',
+  'An upload: a file card drops into the dashed zone, its progress bar fills while the percentage counts, then it turns to a check. Params label, file, size, done.',
+  { width: 1100, height: 600 },
+  `
+.zone { position: absolute; width: 1100px; transform: translate(-50%, -50%); padding: 36px; }
+.drop { height: 220px; border: 2.5px dashed var(--line); border-radius: var(--r); display: flex; align-items: center; justify-content: center; font-size: 25px; }
+.file { margin-top: 24px; display: flex; align-items: center; gap: 20px; padding: 20px 24px; border: 1px solid var(--line); border-radius: calc(var(--r) * 0.8); }
+.icon { width: 56px; height: 66px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 18%, var(--paper)); border: 2px solid var(--accent); }
+.info { flex: 1; }
+.fname { font-size: 24px; font-weight: 700; }
+.bar { height: 10px; border-radius: 5px; background: var(--line); margin-top: 12px; overflow: hidden; }
+.fill { height: 100%; background: var(--accent); }
+.pct { width: 110px; text-align: right; font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+`,
+  `
+const label = param('label', 'Drop your files here', { type: 'text', group: 'Content' });
+const file = param('file', 'brand-assets.zip', { type: 'text', group: 'Content' });
+const size = param('size', '24 MB', { type: 'text', group: 'Content' });
+const doneText = param('done', 'Uploaded', { type: 'text', group: 'Content' });
+const zone = make('div', 'card zone');
+const drop = anchor(make('div', 'drop muted', zone, label), 'drop');
+const card = make('div', 'file', zone);
+make('div', 'icon', card);
+const info = make('div', 'info', card);
+make('div', 'fname', info, file);
+const status = make('div', 'muted', info, size);
+const fill = make('div', 'fill', make('div', 'bar', info));
+const pct = make('div', 'pct', card);
+const total = number('100%');
+drive((t) => {
+  const land = out(span(t, 0.2, 0.5));
+  card.style.opacity = String(land);
+  card.style.transform = 'translateY(' + (-160 * (1 - land)) + 'px) rotate(' + (-4 * (1 - land)) + 'deg)';
+  drop.style.borderColor = land > 0 && land < 1 ? accent : line;
+  const p = inOut(span(t, 0.7, 1.6));
+  fill.style.width = (100 * p) + '%';
+  pct.textContent = p < 1 ? counted(total, p) : '✓';
+  pct.style.color = p < 1 ? ink : accent;
+  status.textContent = p < 1 ? size : doneText;
+});
+`
+);
+
+const GENERATED_RESULT = generic(
+  'UiGeneratedResult',
+  'An AI result appearing: a skeleton card shimmers, then the picture block fills with the accent, the title and lines write themselves and a "Generated" badge pops. Params badge, title, lines (one per line).',
+  { width: 1200, height: 720 },
+  `
+.result { position: absolute; width: 1200px; transform: translate(-50%, -50%); padding: 34px; display: grid; grid-template-columns: 460px 1fr; gap: 34px; overflow: hidden; }
+.pic { height: 460px; border-radius: calc(var(--r) * 0.8); background: color-mix(in srgb, var(--line) 60%, var(--paper)); position: relative; overflow: hidden; }
+.paint { position: absolute; inset: 0; }
+.sheen { position: absolute; top: 0; bottom: 0; width: 40%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent); }
+.badge { justify-self: start; font-size: 19px; font-weight: 700; color: var(--accent); padding: 6px 14px; border: 1.5px solid var(--accent); border-radius: 999px; }
+.rtitle { font-size: 44px; font-weight: 800; letter-spacing: -0.02em; margin: 18px 0 14px; min-height: 54px; }
+.rline { font-size: 24px; line-height: 1.5; min-height: 36px; }
+`,
+  `
+const badge = param('badge', 'Generated', { type: 'text', group: 'Content' });
+const title = param('title', 'Your new homepage', { type: 'text', group: 'Content' });
+const lines = param('lines', 'Hero with your headline and photo\\nThree features in your words\\nContact form wired to your inbox', { type: 'textarea', group: 'Content' });
+const result = make('div', 'card result');
+const pic = make('div', 'pic', result);
+const paint = make('div', 'paint', pic);
+paint.style.background = 'linear-gradient(160deg, ' + accent + ', color-mix(in srgb, ' + accent + ' 35%, ' + paper + '))';
+const sheen = make('div', 'sheen', pic);
+const copy = make('div', '', result);
+const tag = make('div', 'badge', copy, badge);
+const head = make('div', 'rtitle', copy);
+const body = rows(lines).slice(0, 5).map((r) => ({ node: make('div', 'rline muted', copy), text: r[0] }));
+drive((t) => {
+  sheen.style.left = (-40 + 180 * ((t * speed * 0.9) % 1)) + '%';
+  sheen.style.opacity = String(1 - span(t, 1, 0.3));
+  const fillIn = inOut(span(t, 0.8, 0.6));
+  paint.style.clipPath = 'inset(' + (100 * (1 - fillIn)) + '% 0 0 0)';
+  head.textContent = String(title).slice(0, Math.round(String(title).length * span(t, 1, 0.6)));
+  body.forEach((b, i) => {
+    b.node.textContent = b.text.slice(0, Math.round(b.text.length * span(t, 1.5 + i * 0.35, 0.4)));
+  });
+  const pop = out(span(t, 1.4, 0.3));
+  tag.style.opacity = String(pop);
+  tag.style.transform = 'scale(' + (0.7 + 0.3 * pop) + ')';
+});
+`
+);
+
+const CURSOR = generic(
+  'UiCursor',
+  'A lone cursor to lay over any UI clip: it glides to each point and clicks it with a ripple in the accent. Param path: one click per line "x|y|t", x and y shares of the clip box (0..1), t the second of the click inside the clip. Never guess the points: click_ui writes them from the anchors of the UI it clicks.',
+  { width: 1600, height: 900 },
+  `
+.layer { position: absolute; inset: 0; }
+.ripple { position: absolute; width: 80px; height: 80px; margin: -40px 0 0 -40px; border-radius: 50%; border: 3px solid var(--accent); opacity: 0; }
+`,
+  `
+const path = param('path', '0.7|0.8\\n0.45|0.4\\n0.6|0.55', { type: 'textarea', group: 'Content' });
+const plan = (CURSOR_PLAN)(path, duration);
+const layer = document.createElement('div');
+layer.className = 'layer';
+root.appendChild(layer);
+const ripple = make('div', 'ripple', layer);
+const cursor = pointer(layer);
+const W = root.clientWidth || 1920;
+const H = root.clientHeight || 1080;
+drive((t) => {
+  const pose = plan.at(t);
+  cursor.style.left = (pose.x * W - TIP[0]) + 'px';
+  cursor.style.top = (pose.y * H - TIP[1]) + 'px';
+  cursor.style.opacity = '1';
+  const r = clamp((t - pose.click.at) / 0.4);
+  ripple.style.left = pose.click.x * W + 'px';
+  ripple.style.top = pose.click.y * H + 'px';
+  ripple.style.opacity = String(t >= pose.click.at && r < 1 ? 1 - r : 0);
+  ripple.style.transform = 'scale(' + (0.3 + r) + ')';
+});
+`.replace('CURSOR_PLAN', cursorPlan.toString())
+);
+
 export const UI_KIT: Record<UiKind, UiPiece> = {
   [UiKind.LinkShortener]: SHORTENER,
   [UiKind.LinkList]: LINK_LIST,
@@ -434,5 +1008,166 @@ export const UI_KIT: Record<UiKind, UiPiece> = {
   [UiKind.Funnel]: FUNNEL,
   [UiKind.Payouts]: PAYOUTS,
   [UiKind.Qr]: QR,
-  [UiKind.Window]: WINDOW
+  [UiKind.Window]: WINDOW,
+  [UiKind.Sidebar]: SIDEBAR,
+  [UiKind.Hero]: HERO,
+  [UiKind.PromptBox]: PROMPT_BOX,
+  [UiKind.EditorCanvas]: EDITOR_CANVAS,
+  [UiKind.CardGrid]: CARD_GRID,
+  [UiKind.Pricing]: PRICING,
+  [UiKind.Chat]: CHAT,
+  [UiKind.Modal]: MODAL,
+  [UiKind.Toggle]: TOGGLE,
+  [UiKind.Upload]: UPLOAD,
+  [UiKind.GeneratedResult]: GENERATED_RESULT,
+  [UiKind.Cursor]: CURSOR
 };
+
+export enum UiBlock {
+  Nav = 'nav',
+  Heading = 'heading',
+  Text = 'text',
+  Input = 'input',
+  Button = 'button',
+  Stat = 'stat',
+  Card = 'card',
+  List = 'list',
+  Picture = 'picture'
+}
+
+const HEX = /^#[0-9a-fA-F]{6}$/;
+const MAX_BLOCKS = 12;
+const MAX_ITEMS = 6;
+
+export const UI_STRUCTURE = z.object({
+  layout: z.enum(['landing', 'app', 'dashboard', 'form', 'chat']),
+  colors: z.object({ ink: z.string().regex(HEX), muted: z.string().regex(HEX), paper: z.string().regex(HEX), line: z.string().regex(HEX), accent: z.string().regex(HEX) }),
+  font: z.string().max(60),
+  radius: z.number().min(0).max(40),
+  blocks: z.array(z.object({ kind: z.enum(UiBlock), text: z.string().max(140), items: z.array(z.string().max(60)).max(MAX_ITEMS).optional() })).min(1).max(MAX_BLOCKS)
+});
+
+export type UiStructure = z.infer<typeof UI_STRUCTURE>;
+
+export const RECREATE_STATES = [
+  'enter: the blocks rise in one after another',
+  'type: the input types its text with a caret',
+  'count: numbers count up',
+  'click: a cursor travels to the button and presses it'
+] as const;
+
+const RECREATED_SIZE: UiSize = { width: 1400, height: 860 };
+
+const RECREATED_CSS = `
+.screen { position: absolute; width: 1400px; height: 860px; transform: translate(-50%, -50%); overflow: hidden; display: flex; flex-direction: column; }
+.nav { height: 76px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 34px; padding: 0 40px; font-size: 22px; }
+.brand { font-weight: 800; font-size: 26px; margin-right: auto; }
+.body { flex: 1; padding: 44px 64px; display: flex; flex-direction: column; gap: 26px; }
+.heading { font-size: 62px; font-weight: 800; line-height: 1.05; letter-spacing: -0.02em; }
+.text { font-size: 26px; line-height: 1.4; }
+.input { height: 80px; border: 1.5px solid var(--line); border-radius: calc(var(--r) * 0.8); display: flex; align-items: center; padding: 0 26px; font-size: 28px; white-space: nowrap; overflow: hidden; }
+.caret { display: inline-block; width: 2px; height: 34px; background: var(--ink); margin-left: 2px; }
+.button { align-self: flex-start; height: 72px; padding: 0 40px; border-radius: calc(var(--r) * 0.8); background: var(--accent); color: var(--paper); font-size: 26px; font-weight: 700; display: flex; align-items: center; }
+.stat { font-size: 54px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.box { border: 1px solid var(--line); border-radius: var(--r); padding: 24px 28px; }
+.box-title { font-size: 24px; font-weight: 700; margin-bottom: 14px; }
+.chips { display: flex; gap: 14px; flex-wrap: wrap; }
+.chip { font-size: 20px; padding: 10px 18px; border-radius: 999px; border: 1px solid var(--line); }
+.row { font-size: 24px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.picture { height: 200px; border-radius: var(--r); overflow: hidden; }
+.cursor { position: absolute; width: 40px; height: 40px; left: 0; top: 0; }
+`;
+
+const RECREATED_JS = `
+const S = STRUCTURE;
+const screen = make('div', 'card screen');
+const body = make('div', 'body', screen);
+const parts = [];
+const typers = [];
+const counters = [];
+let button = null;
+S.blocks.forEach((b) => {
+  if (b.kind === 'nav') {
+    const nav = make('div', 'nav', screen);
+    screen.insertBefore(nav, body);
+    make('div', 'brand', nav, b.text);
+    (b.items || []).forEach((i) => make('div', 'muted', nav, i));
+    parts.push(nav);
+    return;
+  }
+  if (b.kind === 'input') {
+    const field = anchor(make('div', 'input', body), 'input-' + typers.length);
+    typers.push({ text: make('span', '', field), caret: make('span', 'caret', field), full: b.text });
+    parts.push(field);
+    return;
+  }
+  if (b.kind === 'button') {
+    button = anchor(make('div', 'button', body, b.text), 'button');
+    parts.push(button);
+    return;
+  }
+  if (b.kind === 'stat') {
+    const n = make('div', 'stat', body);
+    counters.push({ node: n, n: number(b.text) });
+    parts.push(n);
+    return;
+  }
+  if (b.kind === 'card' || b.kind === 'list') {
+    const box = make('div', 'box', body);
+    make('div', 'box-title', box, b.text);
+    const host = b.kind === 'card' ? make('div', 'chips', box) : box;
+    (b.items || []).forEach((i) => make('div', b.kind === 'card' ? 'chip' : 'row', host, i));
+    parts.push(box);
+    return;
+  }
+  if (b.kind === 'picture') {
+    const pic = make('div', 'picture', body);
+    const art = svg('svg', { viewBox: '0 0 1200 200', width: '100%', height: '100%', preserveAspectRatio: 'none' }, pic);
+    svg('rect', { x: 0, y: 0, width: 1200, height: 200, fill: accent, opacity: 0.12 }, art);
+    svg('circle', { cx: 980, cy: 100, r: 70, fill: accent, opacity: 0.5 }, art);
+    svg('rect', { x: 60, y: 60, width: 420, height: 24, fill: ink, opacity: 0.2 }, art);
+    svg('rect', { x: 60, y: 110, width: 300, height: 24, fill: ink, opacity: 0.12 }, art);
+    parts.push(pic);
+    return;
+  }
+  parts.push(make('div', b.kind === 'heading' ? 'heading' : 'text muted', body, b.text));
+});
+const cursor = make('div', 'cursor', screen);
+cursor.innerHTML = '<svg viewBox="0 0 24 24" width="40" height="40"><path d="M4 2l16 9-7 2-3 7z" fill="#111" stroke="#fff" stroke-width="1.5"/></svg>';
+const STAGGER = 0.12;
+const TYPE_AT = 0.3 + parts.length * STAGGER;
+const TYPE_LEN = Math.min(1.4, duration * 0.3);
+const CLICK = TYPE_AT + TYPE_LEN + 0.5;
+drive((t) => {
+  parts.forEach((p, i) => {
+    const s = out(span(t, 0.1 + i * STAGGER, 0.45));
+    p.style.opacity = String(s);
+    p.style.transform = 'translateY(' + (28 * (1 - s)) + 'px)';
+  });
+  typers.forEach((ty) => {
+    const k = span(t, TYPE_AT, TYPE_LEN);
+    ty.text.textContent = ty.full.slice(0, Math.round(ty.full.length * k));
+    ty.caret.style.opacity = k < 1 || Math.floor(t * 2.5) % 2 === 0 ? '1' : '0';
+  });
+  counters.forEach((c, i) => {
+    c.node.textContent = counted(c.n, out(span(t, 0.4 + i * STAGGER, 1.4)));
+  });
+  if (!button) {
+    cursor.style.opacity = '0';
+    return;
+  }
+  const travel = inOut(span(t, CLICK - 0.6, 0.55));
+  const [bx, by] = aim(button, screen);
+  cursor.style.transform = 'translate(' + (1300 + (bx - 1300) * travel) + 'px, ' + (800 + (by - 800) * travel) + 'px)';
+  cursor.style.opacity = String(span(t, CLICK - 0.75, 0.15));
+  const press = tap(t, CLICK);
+  button.style.transform = 'scale(' + (1 - 0.06 * press) + ')';
+});
+`;
+
+export function recreatedUi(name: string, structure: UiStructure): UiPiece {
+  const about = `${structure.layout} UI recreated from a capture: ${structure.blocks.map((b) => b.kind).join(', ')}`;
+  return piece(name, about, RECREATED_SIZE, RECREATED_CSS, RECREATED_JS.replace('STRUCTURE', () => JSON.stringify(structure)));
+}
+
+export const recreatedStyle = (structure: UiStructure, fontUsable: boolean) => ({ ...structure.colors, radius: structure.radius, ...(fontUsable ? { font: structure.font } : {}) });

@@ -27,11 +27,17 @@ import { EASE_PRESETS, EASE_PRESET_IDS, easeHandles, withHandles } from '$lib/mo
 import { ANIMATABLE, INTERPS, Interp, SPATIAL_KEYS, TRANSFORM_KEYS, ValueKind, easeSchema, type Keyframe } from '$lib/motion/keyframes';
 import type { MotionAsset } from './editor';
 import { MAX_FRAMES_PER_VIEW, MAX_VIEWS_PER_TURN, VIEW_FRAMES, type Frame } from './frames';
-import { docProblems, frameProblems, type FrameStat } from '$lib/motion/direction';
+import { blocking, docProblems, frameProblems, softPictures, type FrameStat, type Pixels, type QualityProblem } from '$lib/motion/direction';
 import { CheckState, MAX_CSS, MAX_HTML, MAX_JS, SOURCE_FILES, checkState, propsSchemaSchema, sourceHash, type CustomComponent } from '$lib/motion/custom/component';
 import { patchComponent, recordCheck, removeComponent, writeComponent } from '$lib/motion/custom/ops';
-import { UI_KINDS, UI_KIT } from '$lib/motion/ui-kit/kit';
+import { RECREATE_STATES, UI_KINDS, UI_KIT, recreatedStyle, recreatedUi, type UiStructure } from '$lib/motion/ui-kit/kit';
+import { MORPH_KINDS, DEFAULT_REEL } from '$lib/motion/ui-morph/reel';
+import { addMorphReel } from '$lib/motion/ui-morph/ops';
 import { STORY_BEATS, STORY_SHARE, markStory } from '$lib/motion/story';
+import { anchorsOf } from '$lib/motion/clicks';
+import { clickUi } from '$lib/motion/cursor-ops';
+import { ACTS, briefOf, scriptProblems, scriptSchema, sourcesOf } from '$lib/motion/script';
+import { quoted, type SitePage } from './site-copy';
 import { PATCH_COMPONENT, READ_COMPONENT, WRITE_COMPONENT } from './model-route';
 import { CAMERA, CAMERA_KEYS, CAMERA_LANE, SPACES, type Camera } from '$lib/motion/camera';
 import { ENV_PRESETS, HDRI, LIGHT, envPresetInput, LIGHT_KEYS, LIGHT_KINDS, type Look } from '$lib/motion/look';
@@ -49,7 +55,7 @@ import { liveLanes } from '$lib/motion/interactive/spec';
 import { embedSnippet } from '$lib/motion/interactive/bundle';
 import { flattenComps } from '$lib/motion/precomp';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
-import { BuiltinFont, FONT_WEIGHTS, searchFonts } from '$lib/motion/fonts/model';
+import { BuiltinFont, FONT_WEIGHTS, fontRefProblem, searchFonts } from '$lib/motion/fonts/model';
 import { registerFont, removeFont, setFont } from '$lib/motion/fonts/ops';
 import { EFFECTS, EFFECT_KINDS } from '$lib/motion/effects/registry';
 import { addEffect, removeEffect, setEffect } from '$lib/motion/effects/ops';
@@ -73,6 +79,7 @@ import { PARTICLE_PRESETS, PRESET_PROPS as PARTICLE_PRESET, applyParticlePreset 
 import { DUCK_DEFAULTS, duckUnder } from '$lib/motion/duck';
 import type { AudioAnalysis } from '$lib/motion/audio-analysis';
 import { Division, Hit, cutToBeat, hitFrames, markHits } from '$lib/motion/beats';
+import { Mood } from '$lib/motion/music-library';
 import { PULSE_PROPS, pulseWithMusic } from '$lib/motion/pulse';
 import { applyValues, exposeField, fieldValues, removeField } from '$lib/motion/template/fields';
 import { FIELD_TYPES, type ExposedField } from '$lib/motion/template/field-model';
@@ -86,7 +93,7 @@ import { STYLES, styleOf } from '$lib/motion/style';
 import { MOTION_STYLES } from '$lib/motion/style-model';
 import { unitOf, propsOwner, shownKeyframes, shownMask, shownOffset, shownRecord, storedMask, storedOffset, storedRecord, toShown, toStored, type Owner } from '$lib/motion/units';
 
-export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number };
+export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number; gate?: QualityProblem[] };
 
 export type CheckResult = { ok: boolean; problems: string[]; frames: Frame[] };
 
@@ -95,11 +102,14 @@ export const MAX_COMP_CALLS = 40;
 
 export type Voiceover = { ok: true; assetId: string; seconds: number; url: string | null } | { ok: false; error: string };
 
+export type Music = { ok: true; assetId: string; seconds: number; url: string | null; source: string; track: string } | { ok: false; error: string };
+
 export type MotionToolDeps = {
   session: MotionSession;
   assets: MotionAsset[];
   newId: () => string;
   voiceover: (input: { text: string; voiceId?: string }) => Promise<Voiceover>;
+  music?: (input: { mood: Mood; bpm?: number; seconds: number }) => Promise<Music>;
   frames: (callId: string, times: number[]) => Promise<Frame[] | null>;
   inspect?: (frames: Frame[]) => Promise<FrameStat[]>;
   check: (callId: string, doc: MotionDoc, name: string) => Promise<CheckResult | null>;
@@ -111,7 +121,12 @@ export type MotionToolDeps = {
   brand?: (name?: string) => Promise<SourceRead>;
   importAsset?: (url: string, label?: string) => Promise<AssetImport>;
   capture?: (url: string, view: CaptureView) => Promise<SiteCapture>;
+  readUi?: (asset: MotionAsset, region?: UiRegion) => Promise<UiRead>;
 };
+
+export type UiRegion = { x: number; y: number; width: number; height: number };
+
+export type UiRead = { ok: true; structure: UiStructure } | { ok: false; error: string };
 
 export enum CaptureView {
   Desktop = 'desktop',
@@ -195,6 +210,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
     workArea: doc.workArea ? { start: secs(doc.workArea.from), end: secs(doc.workArea.to) } : null,
     interactive: interactiveOf(doc),
     style: styleOf(doc),
+    script: doc.script ?? null,
     camera: cameraSummary(doc.camera),
     look: lookSummary(doc.look),
     components: Object.entries(doc.components).map(([name, c]) => customSummary(name, c)),
@@ -329,6 +345,13 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
 
   const logoUrls = new Set<string>();
   const brandLogos = new Set<string>();
+  const sitePages: SitePage[] = [];
+  const readPages = (read: SourceRead) => {
+    const pages = (read as { site?: { pages?: SitePage[] } }).site?.pages ?? [];
+    sitePages.push(...pages);
+    return read;
+  };
+
   const readLogos = (read: SourceRead) => {
     const found = read as { site?: { logos?: { url?: string }[] }; brand?: { logoUrl?: string | null } };
     for (const url of [...(found.site?.logos ?? []).map((l) => l.url), found.brand?.logoUrl]) {
@@ -339,9 +362,21 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     return read;
   };
 
+  const assetPixels = (): Pixels => Object.fromEntries(deps.assets.flatMap((a) => (a.width && a.height ? [[a.id, { width: a.width, height: a.height }]] : [])));
+
+  const newlySoft = (doc: MotionDoc) => {
+    const pixels = assetPixels();
+    const already = new Set(softPictures(session.doc, pixels).map((p) => p.detail));
+    return softPictures(doc, pixels).filter((p) => !already.has(p.detail));
+  };
+
   const apply = (result: OpResult, what: string) => {
     if (!result.ok) {
       return { ok: false, error: explained(session.doc, result.error) };
+    }
+    const blownUp = newlySoft(result.doc);
+    if (blownUp.length) {
+      return { ok: false, error: blownUp.map((p) => p.detail).join('; ') };
     }
     session.doc = result.doc;
     session.edits.push(what);
@@ -1281,9 +1316,31 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     analyze_site: tool({
-      description: 'Read a public website for a brand: name, tagline, description, logos (svg first, then favicon, apple-touch-icon, og:image), palette (theme, logo, CSS), fonts (google true = usable by name after register_font), images with width and height (og, hero, product), products and social links. Nothing is stored: import_asset the logo and the pictures you will use.',
+      description: 'Read a public website for a brand: name, tagline, description, logos (svg first, then favicon, apple-touch-icon, og:image), palette (theme, logo, CSS), accent (hex and where it was found; hex null with a neutral palette when the brand has none), fonts (google true = usable by name after register_font), images with width and height (og, hero, product), products and social links. Nothing is stored: import_asset the logo and the pictures you will use.',
       inputSchema: z.object({ url: z.string().min(4).max(2000).describe('the site, e.g. https://www.allbirds.com or allbirds.com') }),
-      execute: async (input) => (deps.site ? readLogos(await deps.site(input.url)) : UNREADABLE('reading sites'))
+      execute: async (input) => (deps.site ? readPages(readLogos(await deps.site(input.url))) : UNREADABLE('reading sites'))
+    }),
+
+    write_script: tool({
+      description: `Save the research and the four-act script of a launch film before building it; the video is not built until this passes. Research: who it serves, the concrete problem, the struggle as an everyday scene, how the product works step by step (input → what happens → result), 1–3 benefits and up to 4 numbers or results, the tone, the promise. Every benefit, number, promise and proof cites its source: the url of a page analyze_site read and a quote copied from that page; a claim without a source on the site is refused, so never invent one. Acts ${ACTS.join(', ')} in order: problem shows the "before" UI, cluttered or slow, with realistic data; solution shows the product's real flow with specific content; proof shows a number or result from the site; claim puts the site's own promise on screen. Returns the brief to show the user word for word.`,
+      inputSchema: scriptSchema,
+      execute: async (raw) => {
+        const parsed = scriptSchema.safeParse(raw);
+        if (!parsed.success) {
+          return { ok: false, error: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ') };
+        }
+        const input = parsed.data;
+        if (!sitePages.length) {
+          return { ok: false, error: 'read the site first: analyze_site gives the pages and quotes every claim must come from' };
+        }
+        const unsourced = sourcesOf(input).filter((s) => !quoted(sitePages, s));
+        const problems = [...scriptProblems(input), ...unsourced.map((s) => `"${s.quote}" is not on ${s.url}: quote the page word for word or drop the claim`)];
+        if (problems.length) {
+          return { ok: false, error: problems.join('; ') };
+        }
+        const saved = apply({ ok: true, doc: { ...session.doc, script: input } }, 'saved the research and the script');
+        return saved.ok ? { ok: true, brief: briefOf(input) } : saved;
+      }
     }),
 
     use_brand: tool({
@@ -1368,7 +1425,66 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         }
         const id = deps.newId();
         const placed = addClip(written.doc, { component: 'Custom', from: frames(input.start), durationInFrames: frames(input.duration), trackId: input.track_id, props: { name: piece.name, ...input.props } }, id);
-        return created(apply(placed, `added ${piece.name}`), id);
+        const shown = created(apply(placed, `added ${piece.name}`), id);
+        return shown.ok ? { ...shown, anchors: Object.keys(anchorsOf(session.doc, id)?.anchors ?? {}) } : shown;
+      }
+    }),
+
+    recreate_ui: tool({
+      description: `Rebuild a product UI from a site capture as a sharp, vector, animatable component in the brand style, for any product the kit does not cover: a vision model reads the capture (or a region of it, fractions of the picture) into layout, blocks, real texts, colours, font and corners, and the component replays it: ${RECREATE_STATES.join('; ')}. With start and duration it also places the clip. Spends one code write.`,
+      inputSchema: z.object({
+        asset_id: z.string(),
+        name: z.string().regex(/^[A-Z][A-Za-z0-9]*$/).describe('PascalCase, e.g. UiEditor'),
+        region: z.object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1), width: z.number().positive().max(1), height: z.number().positive().max(1) }).optional(),
+        start: z.number().min(0).optional(),
+        duration: z.number().positive().default(3),
+        track_id: z.string().optional()
+      }),
+      execute: async (input, { toolCallId }) => {
+        const asset = deps.assets.find((a) => a.id === input.asset_id && a.kind === AssetKind.Image);
+        if (!asset) {
+          return { ok: false, error: `no picture ${input.asset_id} in this project: capture the site first (import_asset with capture)` };
+        }
+        if (!deps.readUi) {
+          return UNREADABLE('a vision model to read the capture');
+        }
+        const read = await deps.readUi(asset, input.region);
+        if (!read.ok) {
+          return read;
+        }
+        const piece = recreatedUi(input.name, read.structure);
+        const written = await codeWrite(writeComponent(session.doc, piece.name, { source: { html: piece.html, css: piece.css, js: piece.js }, propsSchema: { type: 'object', properties: {} } }), piece.name, `recreated ${piece.name}`, toolCallId);
+        if (!written.ok) {
+          return written;
+        }
+        const made = { ok: true, name: piece.name, structure: read.structure, params: Object.keys(session.doc.components[piece.name].propsSchema.properties), states: RECREATE_STATES };
+        if (input.start === undefined) {
+          return made;
+        }
+        const id = deps.newId();
+        const placed = addClip(session.doc, { component: 'Custom', from: frames(input.start), durationInFrames: frames(input.duration), trackId: input.track_id, props: { name: piece.name, ...recreatedStyle(read.structure, fontRefProblem(read.structure.font, session.doc.fonts) === null) } }, id);
+        const shown = apply(placed, `placed ${piece.name}`);
+        return shown.ok ? { ...made, clip_id: id, anchors: Object.keys(anchorsOf(session.doc, id)?.anchors ?? {}) } : shown;
+      }
+    }),
+
+    click_ui: tool({
+      description: 'Lay a cursor that clicks named parts of UI clips (anchors such as send, cta, button, buy-1, toggle-0, card-2, input-0: add_ui and recreate_ui return them). Give each click the clip, the anchor and the second of the click on the video timeline; the cursor travels there and clicks exactly inside the part, following the clip scale, keyframes, parents, precomps and camera at that frame. Never place a cursor by guessed coordinates: the click-miss gate blocks a click outside the part it presses.',
+      inputSchema: z.object({ clicks: z.array(z.object({ clip_id: z.string(), anchor: z.string(), at: z.number().min(0) })).min(1).max(12) }),
+      execute: async (input) => {
+        const id = deps.newId();
+        const made = clickUi(session.doc, input.clicks.map((c) => ({ clipId: c.clip_id, anchor: c.anchor, at: c.at })), { clip: id, track: deps.newId() });
+        return created(apply(made, `cursor clicks ${input.clicks.map((c) => `${c.clip_id}#${c.anchor}`).join(', ')}`), id);
+      }
+    }),
+
+    ui_morph_reel: tool({
+      description: `Build a looping UI morph reel: ONE shape morphing on springs through UI states (${MORPH_KINDS.join(', ')}; default order ${DEFAULT_REEL.join(', ')}), its content swapping with a short blur, a cursor clicking and dragging through every change, the camera zooming so each state fills the frame, one change every beats_per_change beats (2 by default: each state holds long enough to be read; the too-dense gate names events closer than a second). It sets the video length to the loop (e.g. 28 changes × 2 beats at 120 BPM = 28 s), the style ui-morph and the Geist font; the last frame flows into the first (the loop-seam gate checks it). offset is the time of the first beat (mark_beats on the music). props: ink, paper, accent, mute, canvas (colours), font, button, toast, track, artist (texts).`,
+      inputSchema: z.object({ states: z.array(z.enum(MORPH_KINDS)).min(2).max(20).optional(), bpm: z.number().min(60).max(200).default(120), offset: z.number().min(0).max(4).default(0), beats_per_change: z.number().int().min(1).max(8).default(2), accent: z.string().optional(), props: z.record(z.string(), z.union([z.string(), z.number()])).optional() }),
+      execute: async (input) => {
+        const id = deps.newId();
+        const props = { ...input.props, ...(input.accent ? { accent: input.accent } : {}) };
+        return created(apply(addMorphReel(session.doc, { states: input.states ?? DEFAULT_REEL, bpm: input.bpm, offset: input.offset, pace: input.beats_per_change, props }, GOOGLE_FONTS, id), 'added a UI morph reel'), id);
       }
     }),
 
@@ -1428,9 +1544,34 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         session.checkedAt = session.edits.length;
         const stats = deps.inspect ? await deps.inspect(frames) : [];
         const audioAssets = deps.assets.filter((a) => a.kind === AssetKind.Audio).length;
-        const pixels = Object.fromEntries(deps.assets.flatMap((a) => (a.width && a.height ? [[a.id, { width: a.width, height: a.height }]] : [])));
-        const quality = [...docProblems(session.doc, { audioAssets, pixels, logos: [...brandLogos] }), ...frameProblems(stats)].map((p) => p.detail);
-        return { ok: true, times: frames.map((f) => f.time), quality, note: quality.length ? 'The quality gate found the problems in quality: fix each one, then look again. The frames follow as images in the next message.' : 'The frames follow as images in the next message.' };
+        const pixels = assetPixels();
+        session.gate = [...docProblems(session.doc, { audioAssets, pixels, logos: [...brandLogos] }), ...frameProblems(stats)];
+        const quality = session.gate.map((p) => p.detail);
+        const open = blocking(session.gate).map((p) => p.detail);
+        return { ok: true, times: frames.map((f) => f.time), quality, blocking: open, note: open.length ? 'blocking lists what must be fixed before the video can be delivered: fix each one, then look again. The frames follow as images in the next message.' : quality.length ? 'The quality gate found the problems in quality: fix each one, then look again. The frames follow as images in the next message.' : 'The frames follow as images in the next message.' };
+      }
+    }),
+
+    add_music: tool({
+      description: 'Music under the whole video: a generated track when the workspace has a music generator, otherwise a CC0 track from the built-in library, chosen by mood and bpm. It lands on an Audio clip from 0 to the end and its beats are marked ("beat N"), ready for cut_to_beat. A launch film always has music.',
+      inputSchema: z.object({ mood: z.enum(Mood), bpm: z.number().min(60).max(180).optional(), ...PLACED }),
+      execute: async (input) => {
+        if (!deps.music) {
+          return UNREADABLE('music');
+        }
+        const seconds = session.doc.durationInFrames / session.doc.fps;
+        const track = await deps.music({ mood: input.mood, bpm: input.bpm, seconds });
+        if (!track.ok) {
+          return { ok: false, error: track.error };
+        }
+        deps.assets.push({ id: track.assetId, kind: AssetKind.Audio, label: `music ${track.track}`, previewUrl: '', url: track.url });
+        const id = deps.newId();
+        const placed = apply(registered(addClip(session.doc, { component: 'Audio', from: 0, durationInFrames: session.doc.durationInFrames, trackId: input.track_id, props: { assetId: track.assetId } }, id), track.assetId), `added ${track.source} music ${track.track}`);
+        if (!placed.ok) {
+          return placed;
+        }
+        const marked = apply(markHits(session.doc, await docBeats(Hit.Beats), Hit.Beats), 'marked the beats');
+        return { ...marked, clip_id: id, source: track.source, track: track.track };
       }
     }),
 

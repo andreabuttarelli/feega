@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, newMotionDoc, type MotionDoc } from './doc';
 import { Side, addClip, setTransition } from './timeline';
-import { Quality, docProblems, frameProblems } from './direction';
+import { Quality, SEVERITY, Severity, blocking, docProblems, frameProblems } from './direction';
+import { Forbidden } from './style';
+import supasitoV1 from './fixtures/supasito-v1.json';
 import { Ease, TransitionKind } from './design';
 import { builtinTemplate } from './template/builtins';
 import { insertTemplate } from './template/library';
@@ -38,6 +40,8 @@ function dubLike(): MotionDoc {
 
 const kinds = (doc: MotionDoc) => docProblems(doc, { audioAssets: 0 }).map((p) => p.kind);
 
+const fitted = (doc: MotionDoc): MotionDoc => ({ ...doc, durationInFrames: Math.max(...doc.tracks.flatMap((t) => t.clips.map((c) => c.from + c.durationInFrames))) });
+
 describe('the quality gate reads the direction of the video', () => {
   it('the Dub run: one layout four times and small titles are named', () => {
     expect(kinds(dubLike())).toEqual(expect.arrayContaining([Quality.RepeatedLayout, Quality.SmallTitle]));
@@ -55,7 +59,7 @@ describe('the quality gate reads the direction of the video', () => {
       doc = must(setTransition(doc, `t${i}`, Side.In, { kind: TransitionKind.Fade, durationInFrames: 12 }));
     });
 
-    expect(kinds(doc)).toEqual([]);
+    expect(kinds(fitted(doc))).toEqual([]);
   });
 
   it('scenes from the library are told apart by their template: two different scenes pass, the same one twice repeats', () => {
@@ -64,7 +68,7 @@ describe('the quality gate reads the direction of the video', () => {
     const varied = place(place(place(calm(), 'scene-hero-title', 0), 'scene-big-number', 90), 'scene-hero-title', 195);
     const twice = place(place(newMotionDoc(MotionFormat.Landscape), 'scene-hero-title', 0), 'scene-hero-title', 90);
 
-    expect(kinds(varied)).toEqual([]);
+    expect(kinds(fitted(varied))).toEqual([]);
     expect(kinds(twice)).toContain(Quality.RepeatedLayout);
   });
 
@@ -72,6 +76,14 @@ describe('the quality gate reads the direction of the video', () => {
     const sparkling = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Particles', from: 0, durationInFrames: 60 }, 'p'));
 
     expect(kinds(sparkling)).toContain(Quality.OffStyle);
+  });
+
+  it('a launch film with no music at all is named silent, even with no audio in the project', () => {
+    const launch = { ...newMotionDoc(MotionFormat.Landscape), style: MotionStyle.LaunchFilm };
+    const calmFilm = { ...newMotionDoc(MotionFormat.Landscape), style: MotionStyle.AppleMinimal };
+
+    expect(docProblems(launch, { audioAssets: 0 }).map((p) => p.kind)).toContain(Quality.Silent);
+    expect(docProblems(calmFilm, { audioAssets: 0 }).map((p) => p.kind)).not.toContain(Quality.Silent);
   });
 
   it('music in the project that the video never plays is named', () => {
@@ -100,9 +112,9 @@ describe('the quality gate reads the direction of the video', () => {
 
   it('a flat frame and a frame half white are named with their time', () => {
     const problems = frameProblems([
-      { time: 0.5, lumaStd: 1, whiteShare: 0 },
-      { time: 3, lumaStd: 40, whiteShare: 0.3 },
-      { time: 6, lumaStd: 40, whiteShare: 0.02 }
+      { time: 0.5, luma: 120, lumaStd: 1, whiteShare: 0 },
+      { time: 3, luma: 160, lumaStd: 40, whiteShare: 0.3 },
+      { time: 6, luma: 120, lumaStd: 40, whiteShare: 0.02 }
     ]);
 
     expect(problems.map((p) => [p.kind, p.at])).toEqual([
@@ -172,5 +184,108 @@ describe('nothing important leaves the frame', () => {
     const exit = { scale: [{ frame: 0, value: 1, ease: Ease.Linear }, { frame: 82, value: 1, ease: Ease.Linear }, { frame: 90, value: 2.5, ease: Ease.Linear }] };
 
     expect(out(placed('Custom', ui, exit))).toEqual([]);
+  });
+});
+
+describe('text that cannot be read: tilted or cut, inside a scene too', () => {
+  const tilted = (doc: MotionDoc) => docProblems(doc, { audioAssets: 0 }).filter((p) => p.kind === Quality.TiltedText);
+  const out = (doc: MotionDoc) => docProblems(doc, { audioAssets: 0 }).filter((p) => p.kind === Quality.OutOfFrame);
+  const tilt = (doc: MotionDoc, rotateX: number): MotionDoc => ({ ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => ({ ...c, transform: { ...c.transform, rotateX, perspective: 1600 } })) })) });
+  const inScene = (doc: MotionDoc, change: (c: MotionDoc['tracks'][number]['clips'][number]) => MotionDoc['tracks'][number]['clips'][number]): MotionDoc => ({ ...doc, comps: Object.fromEntries(Object.entries(doc.comps).map(([id, comp]) => [id, { ...comp, tracks: comp.tracks.map((t) => ({ ...t, clips: t.clips.map(change) })) }])) });
+  const tiltZoom = () => must(insertTemplate(calm(), builtinTemplate('builtin:launch-ui-tilt-zoom')!, { from: 180, newId: () => 'tz' }));
+
+  it('a title held tilted back 18° in 3D is named, a 6° lean is not', () => {
+    const doc = must(addClip(calm(), { component: 'Title', from: 0, durationInFrames: 60, props: { text: 'All by design', size: 0.12, x: 0.5, y: 0.5, width: 0.8, height: 0.3 } }, 'c'));
+
+    expect(tilted(tilt(doc, 18))).toHaveLength(1);
+    expect(tilted(tilt(doc, 6))).toEqual([]);
+  });
+
+  it('the UI tilt zoom scene straightens the capture once it has landed', () => {
+    expect(tilted(tiltZoom())).toEqual([]);
+  });
+
+  it('a capture held tilted inside a scene is named at the time it plays in the film', () => {
+    const held = inScene(tiltZoom(), (c) => (c.component === 'Image' ? { ...c, keyframes: { ...c.keyframes, rotateX: [] }, transform: { rotateX: 18, perspective: 1600 } } : c));
+
+    expect(tilted(held)).toHaveLength(1);
+    expect(tilted(held)[0].at).toBeGreaterThanOrEqual(6);
+    expect(tilted(held)[0].at).toBeLessThan(7);
+  });
+
+  it('a line cut by the edge inside a scene is named like one on the main timeline', () => {
+    const doc = must(insertTemplate(calm(), builtinTemplate('builtin:launch-device-fly')!, { from: 120, newId: () => 'df' }));
+    const wide = inScene(doc, (c) => (c.component === 'Title' ? { ...c, keyframes: {}, props: { ...c.props, text: 'Every site you run, up to date', x: 0.2 } } : c));
+
+    expect(out(wide)).toHaveLength(1);
+    expect(out(wide)[0].at).toBeGreaterThanOrEqual(4);
+  });
+});
+
+describe('empty frames', () => {
+  const supasito = supasitoV1 as unknown as MotionDoc;
+  const empty = (problems: { kind: Quality; at?: number }[]) => problems.filter((p) => p.kind === Quality.EmptyFrames).map((p) => p.at);
+
+  it('the supasito v1 hole before the logo is named at 11.5 s', () => {
+    expect(empty(docProblems(supasito, { audioAssets: 0 }))).toEqual([11.5]);
+  });
+
+  it('a film covered from start to end has no hole', () => {
+    const blank = newMotionDoc(MotionFormat.Landscape);
+    const doc = must(addClip(blank, { component: 'Title', from: 0, durationInFrames: blank.durationInFrames, props: { text: 'Hi' } }, 'a'));
+
+    expect(empty(docProblems(doc, { audioAssets: 0 }))).toEqual([]);
+  });
+
+  it('a hard jump from a white frame to a black one is a flash', () => {
+    const flat = { lumaStd: 1, whiteShare: 0 };
+
+    expect(empty(frameProblems([{ time: 2, luma: 250, lumaStd: 30, whiteShare: 0.1 }, { time: 2.1, luma: 4, lumaStd: 3, whiteShare: 0 }]))).toEqual([2.1]);
+    expect(empty(frameProblems([{ time: 1, luma: 120, ...flat }, { time: 1.1, luma: 125, ...flat }]))).toEqual([]);
+  });
+
+  it('an empty frame blocks delivery', () => {
+    expect(SEVERITY[Quality.EmptyFrames]).toBe(Severity.Blocking);
+  });
+});
+
+describe('severity', () => {
+  it('blocks delivery on the errors and lets warnings through', () => {
+    const open = blocking([
+      { kind: Quality.BlankFrame, detail: 'blank' },
+      { kind: Quality.RepeatedLayout, detail: 'repeat' },
+      { kind: Quality.OffStyle, detail: 'unreadable', effect: Forbidden.UnreadableText },
+      { kind: Quality.OffStyle, detail: 'glow', effect: Forbidden.Glow }
+    ]);
+
+    expect(open.map((p) => p.detail)).toEqual(['blank', 'unreadable']);
+    expect(SEVERITY[Forbidden.MissingStoryBeat]).toBe(Severity.Blocking);
+  });
+});
+
+describe('the logo in the closing claim', () => {
+  const supasito = (): MotionDoc => structuredClone(supasitoV1) as unknown as MotionDoc;
+  const clipIn = (doc: MotionDoc, id: string) => doc.comps['347aa400'].tracks.flatMap((t) => t.clips).find((c) => c.id === id)!;
+  const smallLogos = (doc: MotionDoc, pixels = {}) => docProblems(doc, { audioAssets: 0, pixels }).filter((p) => p.kind === Quality.SmallLogo);
+
+  it('supasito closed on a logo far smaller than its address: the gate names it', () => {
+    expect(smallLogos(supasito())).toHaveLength(1);
+  });
+
+  it('a tall mark squeezed into the box reads as narrow as it draws, not as its box', () => {
+    const doc = supasito();
+    const url = clipIn(doc, '8d3dc9f8-url');
+    url.props = { ...url.props, size: 0.03 };
+    const asset = String(clipIn(doc, '8d3dc9f8-logo').props.assetId);
+
+    expect(smallLogos(doc, { [asset]: { width: 1200, height: 1200 } })).toEqual([]);
+    expect(smallLogos(doc, { [asset]: { width: 100, height: 1200 } })).toHaveLength(1);
+  });
+
+  it('the launch logo build ships a logo larger than its address', () => {
+    let n = 0;
+    const built = must(insertTemplate(newMotionDoc(MotionFormat.Landscape), builtinTemplate('builtin:launch-logo-build')!, { from: 0, newId: () => `k${++n}` }));
+
+    expect(smallLogos(built)).toEqual([]);
   });
 });

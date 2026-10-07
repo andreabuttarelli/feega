@@ -234,12 +234,12 @@ const SCENE_DESIGNS: Omit<Design, 'fonts'>[] = [
     id: 'scene-match-cut',
     name: 'Scene · Match cut',
     description: 'Apple minimal. Three words cut on the beat in the same place, the last in the accent colour.',
-    seconds: 3,
+    seconds: 4.5,
     beats: [
-      fill(INK, 3),
-      { id: 'word_1', track: 'front', component: 'Text', at: 0, len: 1, props: { text: 'Fast.', ...display(HERO), y: 0.5, width: 0.9, height: 0.3 }, keys: snapUp(0.3) },
-      { id: 'word_2', track: 'front', component: 'Text', at: 1, len: 1, props: { text: 'Simple.', ...display(HERO), y: 0.5, width: 0.9, height: 0.3 } },
-      { id: 'word_3', track: 'front', component: 'Text', at: 2, len: 1, props: { text: 'Yours.', ...display(HERO, ACCENT), y: 0.5, width: 0.9, height: 0.3 }, exit: OUT }
+      fill(INK, 4.5),
+      { id: 'word_1', track: 'front', component: 'Text', at: 0, len: 1.5, props: { text: 'Fast.', ...display(HERO), y: 0.5, width: 0.9, height: 0.3 }, keys: snapUp(0.3) },
+      { id: 'word_2', track: 'front', component: 'Text', at: 1.5, len: 1.5, props: { text: 'Simple.', ...display(HERO), y: 0.5, width: 0.9, height: 0.3 } },
+      { id: 'word_3', track: 'front', component: 'Text', at: 3, len: 1.5, props: { text: 'Yours.', ...display(HERO, ACCENT), y: 0.5, width: 0.9, height: 0.3 }, exit: OUT }
     ],
     fields: [text('word_1', 'First word', 'word_1'), text('word_2', 'Second word', 'word_2'), text('word_3', 'Third word', 'word_3'), colour('accent', 'Last word colour', 'word_3', 'color'), colour('background', 'Background', 'bg', 'fill')]
   },

@@ -8,6 +8,7 @@ import { createMotionTools, type MotionSession } from './motion-tools';
 type Exec = (input: unknown, options: { toolCallId: string }) => Promise<Record<string, unknown>>;
 
 const voice: AudioAnalysis = { version: ANALYSIS_VERSION, fps: 30, duration: 4, amp: [], onsets: [0.5], bpm: null, beats: [], speech: [{ start: 1, end: 2 }] };
+const musicAnalysis: AudioAnalysis = { version: ANALYSIS_VERSION, fps: 30, duration: 32, amp: [], onsets: [0, 0.47], bpm: 128, beats: [0, 0.47, 0.94], speech: [] };
 const music: AudioAnalysis = { version: ANALYSIS_VERSION, fps: 30, duration: 10, amp: [], onsets: [0, 0.5], bpm: 120, beats: [0, 0.5, 1], speech: [] };
 
 function setup() {
@@ -21,6 +22,21 @@ function setup() {
 }
 
 describe('motion agent audio tools', () => {
+  it('add_music lays a track under the whole video and marks its beats', async () => {
+    let n = 0;
+    const session: MotionSession = { doc: newMotionDoc(MotionFormat.Square), baseVersion: 1, edits: [], selection: [], frames: new Map(), views: 0, checkedAt: 0, codeWrites: 0 };
+    const assets: { id: string; kind: AssetKind; label: string; previewUrl: string; url: string }[] = [];
+    const music = vi.fn(async () => ({ ok: true as const, assetId: 'music', seconds: 32, url: 'https://x/music', source: 'library', track: 'drive-128' }));
+    const tools = createMotionTools({ session, assets, newId: () => `id${++n}`, voiceover: vi.fn(), frames: vi.fn(), check: vi.fn(), analysis: async () => musicAnalysis, music });
+    const out = await (tools.add_music as Tool & { execute: Exec }).execute({ mood: 'energetic', bpm: 128 }, { toolCallId: 'c' });
+
+    const clip = session.doc.tracks.flatMap((t) => t.clips).find((c) => c.component === 'Audio');
+    expect(out.ok).toBe(true);
+    expect(music).toHaveBeenCalledWith({ mood: 'energetic', bpm: 128, seconds: session.doc.durationInFrames / session.doc.fps });
+    expect(clip).toMatchObject({ from: 0, durationInFrames: session.doc.durationInFrames, props: { assetId: 'music' } });
+    expect(session.doc.markers?.some((m) => m.label === 'beat 1')).toBe(true);
+  });
+
   it('analyze_audio reports tempo, beats, onsets and speech of an asset', async () => {
     const { run } = setup();
     const out = await run('analyze_audio', { asset_id: 'music' });

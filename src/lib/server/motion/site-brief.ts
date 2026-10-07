@@ -12,10 +12,12 @@ import {
 import { safeFetchBytes, safeFetchUrl } from '$lib/server/tool-guard';
 import { probeImageDimensions } from '$lib/server/brand-media';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
+import { AccentSource, pickAccent, type Accent } from '$lib/motion/accent';
+import { PageRole, linksWorthReading, pageOf, type SitePage } from './site-copy';
 
 export const PAGE_MAX_BYTES = 2_000_000;
 const PAGE_TIMEOUT_MS = 10_000;
-const SITE_DEADLINE_MS = 30_000;
+const SITE_DEADLINE_MS = 40_000;
 const LOGO_SVG_MAX_BYTES = 500_000;
 const IMAGE_MAX_BYTES = 8_000_000;
 const IMAGE_TIMEOUT_MS = 6_000;
@@ -54,10 +56,12 @@ export type SiteBrief = {
   description: string | null;
   logos: SiteLogo[];
   palette: string[];
+  accent: Accent;
   fonts: SiteFont[];
   images: SiteImage[];
   products: SiteProduct[];
   socials: { platform: string; url: string }[];
+  pages: SitePage[];
 };
 export type SiteRead = { ok: true; site: SiteBrief } | { ok: false; error: string };
 
@@ -69,6 +73,8 @@ const STYLESHEET = /<link[^>]+rel=["']stylesheet["'][^>]*>/gi;
 const FAMILY_NAME = /^[\w][\w .-]*$/;
 const SVG_NS ='http://www.w3.org/2000/svg';
 const TITLE_SEPARATOR = /\s+[|–—:·-]\s+/;
+const CSS_RULE = /([^{}]+)\{([^{}]*)\}/g;
+const ACTION_SELECTOR = /button|btn|cta|primary|\ba\b|link/i;
 const GOOGLE_FAMILIES = new Map(GOOGLE_FONTS.map((f) => [f.f.toLowerCase(), f.f]));
 
 const errorOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -140,6 +146,10 @@ async function logoColours(logo: SiteLogo | undefined): Promise<string[]> {
   return logo ? LOGO_COLOURS[logo.kind](logo).catch(() => []) : [];
 }
 
+function actionColours(css: string): string[] {
+  return [...css.matchAll(CSS_RULE)].filter((m) => ACTION_SELECTOR.test(m[1])).flatMap((m) => hexesIn(m[2]));
+}
+
 async function linkedCss(html: string, base: string): Promise<string> {
   const hrefs = [...html.matchAll(STYLESHEET)].map((m) => m[0].match(/href=["']([^"']+)["']/i)?.[1]).filter((h): h is string => Boolean(h));
   const sheets = hrefs.slice(0, STYLESHEETS_READ).map((href) =>
@@ -182,6 +192,14 @@ async function productsOf(html: string, base: string): Promise<StoreProduct[]> {
   return (await products.catch(() => [])).slice(0, PRODUCTS_MAX);
 }
 
+async function morePages(html: string, base: string): Promise<SitePage[]> {
+  const pages = linksWorthReading(html, base).map(async (url) => {
+    const page = await safeFetchUrl(url, { maxBytes: PAGE_MAX_BYTES, timeoutMs: PAGE_TIMEOUT_MS }).catch(() => null);
+    return page?.ok ? [pageOf(page.url, page.body, PageRole.Inner)] : [];
+  });
+  return (await Promise.all(pages)).flat();
+}
+
 async function read(input: string): Promise<SiteRead> {
   const page = await safeFetchUrl(input, { maxBytes: PAGE_MAX_BYTES, timeoutMs: PAGE_TIMEOUT_MS });
   if (!page.ok) {
@@ -199,7 +217,13 @@ async function read(input: string): Promise<SiteRead> {
   const logoLike = new Set(logos.map((l) => l.url));
   const ogImage = logos.find((l) => l.source === 'og-image')?.url;
 
-  const [products, fromLogo, css] = await Promise.all([productsOf(html, base), logoColours(logos.find((l) => l.source !== 'og-image')), linkedCss(html, base)]);
+  const [products, fromLogo, fromFavicon, css, pages] = await Promise.all([
+    productsOf(html, base),
+    logoColours(logos.find((l) => l.source !== 'og-image')),
+    logoColours(logos.find((l) => l.source === 'favicon' || l.source === 'apple-touch-icon')),
+    linkedCss(html, base),
+    morePages(html, base)
+  ]);
   const candidates = [
     ...(ogImage ? [{ url: ogImage, role: ImageRole.Og }] : []),
     ...harvestPageImages(html, base).map((url) => secured(url, base)).filter((url) => !logoLike.has(url)).map((url) => ({ url, role: ImageRole.Hero })),
@@ -210,6 +234,15 @@ async function read(input: string): Promise<SiteRead> {
   const cssVars = Object.values(metadata.cssCustomProperties).flatMap(hexesIn);
   const palette = [...new Set([...(metadata.themeColor ? hexesIn(metadata.themeColor) : []), ...fromLogo.map((c) => c.toUpperCase()), ...cssVars, ...metadata.cssColors])].slice(0, PALETTE_MAX);
 
+  const theme = metadata.themeColor ? hexesIn(metadata.themeColor) : [];
+  const accent = pickAccent({
+    [AccentSource.Logo]: fromLogo.map((c) => c.toUpperCase()),
+    [AccentSource.Favicon]: fromFavicon.map((c) => c.toUpperCase()),
+    [AccentSource.Theme]: theme,
+    [AccentSource.Buttons]: actionColours(`${html}\n${css}`),
+    [AccentSource.Css]: [...cssVars, ...metadata.cssColors]
+  });
+
   return {
     ok: true,
     site: {
@@ -219,10 +252,12 @@ async function read(input: string): Promise<SiteRead> {
       description: metadata.ogDescription || metadata.description || null,
       logos,
       palette,
+      accent,
       fonts: fontsOf([...metadata.fonts, ...extractFonts(`<style>${css}</style>`)]),
       images,
       products: products.map((p) => ({ name: p.name, price: p.pricing ?? null, url: p.url ?? null, image: p.images?.[0] ?? null })),
-      socials: extractSocialHandles(html).map((s) => ({ platform: s.platform, url: s.url }))
+      socials: extractSocialHandles(html).map((s) => ({ platform: s.platform, url: s.url })),
+      pages: [pageOf(base, html), ...pages]
     }
   };
 }

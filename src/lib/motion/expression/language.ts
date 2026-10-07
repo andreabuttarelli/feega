@@ -1,6 +1,7 @@
 import { sampleTrack } from '../sample-track';
 import type { Keyframe } from '../keyframes';
 import { INPUT_KEYS, type InputPort } from './inputs';
+import { SPRINGS, springTrack, type SpringKey } from '../spring';
 
 export const MAX_SOURCE = 2000;
 export const MAX_STEPS = 4000;
@@ -426,6 +427,18 @@ function loop(scope: Scope, type: Value | undefined, direction: 1 | -1): number 
   return LOOPS[kind as LoopType]({ track, frame: scope.frame, first, last }, direction);
 }
 
+const SPRING_COST = 16;
+
+function springKeys(keys: Value): SpringKey[] {
+  const pairs = Array.isArray(keys) ? keys : [];
+  if (!pairs.length || !pairs.every((k) => Array.isArray(k) && k.length === 2 && k.every((n) => typeof n === 'number'))) {
+    throw new ExpressionError('spring() takes a list of [time, value] pairs, e.g. spring([[0, 0], [0.5, 100]], time)');
+  }
+  return (pairs as [number, number][]).slice().sort((a, b) => a[0] - b[0]);
+}
+
+const CALL_COST: Record<string, number> = { wiggle: WIGGLE_COST, spring: SPRING_COST };
+
 const MATH_FUNCTIONS = ['sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'atan2', 'abs', 'floor', 'ceil', 'round', 'min', 'max', 'pow', 'sqrt', 'exp', 'log', 'sign', 'hypot', 'trunc'] as const;
 
 const MATH = new Namespace(
@@ -510,6 +523,10 @@ function globals(scope: Scope): Map<string, Value> {
     }),
     fn('degreesToRadians', (d) => (num(d, 'degreesToRadians') * Math.PI) / 180),
     fn('radiansToDegrees', (r) => (num(r, 'radiansToDegrees') * 180) / Math.PI),
+    fn('spring', (keys, t, stiffness, damping) => {
+      const spring = { stiffness: stiffness === undefined ? SPRINGS.ui.stiffness : num(stiffness, 'spring'), damping: damping === undefined ? SPRINGS.ui.damping : num(damping, 'spring') };
+      return springTrack(springKeys(keys), num(t, 'spring'), spring);
+    }),
     fn('loopOut', (type) => loop(scope, type, 1)),
     fn('loopIn', (type) => loop(scope, type, -1)),
     ...(Object.keys(CURVES) as (keyof typeof CURVES)[]).map((name) => fn(name, (...args) => interpolate(CURVES[name], numbers(name, args))))
@@ -617,7 +634,7 @@ class Machine {
           throw new ExpressionError('that is not a function');
         }
         const args = node.args.map((a) => this.eval(a));
-        this.steps += callee.name === 'wiggle' ? WIGGLE_COST : 1;
+        this.steps += CALL_COST[callee.name] ?? 1;
         return callee.call(...args);
       }
       case 'unary':

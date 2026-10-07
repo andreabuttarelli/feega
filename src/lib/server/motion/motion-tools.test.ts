@@ -225,13 +225,22 @@ describe('motion agent tools', () => {
   });
 
   it('view_frames comes back with the quality gate: a blank frame and a small title are named', async () => {
-    const { run } = setup({ inspect: async (frames) => frames.map((f) => ({ time: f.time, lumaStd: 0, whiteShare: 0 })) });
+    const { run } = setup({ inspect: async (frames) => frames.map((f) => ({ time: f.time, luma: 0, lumaStd: 0, whiteShare: 0 })) });
     await run('add_clip', { component: 'Title', start: 0, duration: 2, props: { text: 'Tiny', width: 300, height: 100 } });
 
     const out = (await run('view_frames', { times: [1] })) as { quality: string[] };
 
     expect(out.quality.some((q) => q.includes('flat colour'))).toBe(true);
     expect(out.quality.some((q) => q.includes('small box'))).toBe(true);
+  });
+
+  it('view_frames names an empty hole in the film as blocking', async () => {
+    const { run } = setup({ inspect: async (frames) => frames.map((f) => ({ time: f.time, luma: 120, lumaStd: 40, whiteShare: 0 })) });
+    await run('add_clip', { component: 'Title', start: 0, duration: 1, props: { text: 'Then nothing' } });
+
+    const out = (await run('view_frames', { times: [1] })) as { blocking: string[] };
+
+    expect(out.blocking.some((q) => q.includes('only the background'))).toBe(true);
   });
 
   it('with no preview open the agent is told so instead of waiting forever', async () => {

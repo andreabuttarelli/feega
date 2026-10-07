@@ -5,7 +5,11 @@ import { Ease } from './design';
 import { JunctionKind } from './junction-model';
 import { EffectKind } from './effects/registry';
 import { Forbidden, STYLES, styleOf, styleProblems } from './style';
+import { SEVERITY, Severity } from './direction';
 import { DEFAULT_STYLE, MotionStyle } from './style-model';
+import supasito from './fixtures/supasito-v1.json';
+import { builtinTemplate } from './template/builtins';
+import { insertTemplate } from './template/library';
 
 const SECOND = 30;
 
@@ -130,7 +134,6 @@ describe('the launch film style', () => {
 
     expect(seconds.enter[1]).toBeLessThanOrEqual(0.35);
     expect(eases.enter[0]).toBeLessThanOrEqual(0.2);
-    expect(seconds.scene[1]).toBeLessThanOrEqual(2.5);
   });
 
   it('lets a device fly in turning and a word punch in from the side: energy is not off-style', () => {
@@ -155,10 +158,24 @@ describe('the launch film style', () => {
     expect(effects(onBeat)).not.toContain(Forbidden.OffBeat);
   });
 
-  it('a cut on a half beat is on the music too', () => {
+  it('cuts on the beat, never on a half beat', () => {
     const half = withClip(withClip(beatMarkers(film(), 0.5), 'a', 'Title', { keyframes: rise }), 'b', 'Title', { keyframes: rise }, at(3.25));
 
-    expect(effects(half)).not.toContain(Forbidden.OffBeat);
+    expect(effects(half)).toContain(Forbidden.OffBeat);
+  });
+
+  it('holds every scene 2 to 4 s: fewer ideas, never faster cuts', () => {
+    expect(STYLES[MotionStyle.LaunchFilm].seconds.scene).toEqual([2, 4]);
+  });
+
+  it('names a scene cut shorter than two seconds, not one that holds', () => {
+    const scene = (seconds: number) => {
+      const doc = must(insertTemplate(film(), builtinTemplate('builtin:launch-word-burst')!, { from: 0, newId: () => 'ws' }));
+      return { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.component === 'Precomp' ? { ...c, durationInFrames: at(seconds) } : c)) })) };
+    };
+
+    expect(effects(scene(1))).toContain(Forbidden.Rushed);
+    expect(effects(scene(2.5))).not.toContain(Forbidden.Rushed);
   });
 
   it('names a video of six seconds or more with no peak, and finds the peak in a big 3D move', () => {
@@ -185,14 +202,14 @@ describe('the launch film style', () => {
     expect(effects(withClip(film(), 'w', 'Title', { junction: { kind: JunctionKind.PushLeft, durationInFrames: 8 }, keyframes: rise }))).not.toContain(Forbidden.Transition);
   });
 
-  it('names text gone before it can be read: 0.4 s a word plus 0.6 s, 1.2 s at least for a phrase', () => {
+  it('names text gone before it can be read and given a pause: 0.4 s a word plus 0.6 s, 1.2 s at least for a phrase, then 0.5 s', () => {
     const shown = (text: string, seconds: number) => withClip(film(), 't', 'Title', { props: { text }, durationInFrames: at(seconds), keyframes: rise });
 
-    expect(effects(shown('Turn clicks into revenue.', 1.5))).toContain(Forbidden.UnreadableText);
-    expect(effects(shown('Turn clicks into revenue.', 2.2))).not.toContain(Forbidden.UnreadableText);
-    expect(effects(shown('Links.', 0.5))).toContain(Forbidden.UnreadableText);
-    expect(effects(shown('Links.', 1))).not.toContain(Forbidden.UnreadableText);
-    expect(effects(shown('Two words', 1.4))).not.toContain(Forbidden.UnreadableText);
+    expect(effects(shown('Turn clicks into revenue.', 2.2))).toContain(Forbidden.UnreadableText);
+    expect(effects(shown('Turn clicks into revenue.', 2.7))).not.toContain(Forbidden.UnreadableText);
+    expect(effects(shown('Links.', 1))).toContain(Forbidden.UnreadableText);
+    expect(effects(shown('Links.', 1.5))).not.toContain(Forbidden.UnreadableText);
+    expect(effects(shown('Two words', 1.9))).not.toContain(Forbidden.UnreadableText);
   });
 
   it('names a film made mostly of screenshots, not one with a blurred one behind live UI', () => {
@@ -200,6 +217,21 @@ describe('the launch film style', () => {
 
     expect(effects(shot(0))).toContain(Forbidden.Screenshots);
     expect(effects(shot(20))).not.toContain(Forbidden.Screenshots);
+  });
+
+  it('names one sharp screenshot in the foreground, however short', () => {
+    const shot = (transform: Patch['transform']) => withClip({ ...film(), durationInFrames: at(8) }, 'i', 'Image', { props: { assetId: 'shot', width: 1, height: 1 }, durationInFrames: at(0.5), keyframes: track('zoom', 1, 1.1, at(0.5)), transform });
+
+    expect(effects(shot(undefined))).toContain(Forbidden.Screenshots);
+    expect(effects(shot({ blur: 5 }))).toContain(Forbidden.Screenshots);
+    expect(effects(shot({ opacity: 0.2 }))).not.toContain(Forbidden.Screenshots);
+  });
+
+  it('names the supasito v1 screenshots hidden inside its scenes', () => {
+    const problems = styleProblems(supasito as unknown as MotionDoc).filter((p) => p.effect === Forbidden.Screenshots);
+
+    expect(problems.map((p) => p.at)).toEqual(expect.arrayContaining([2, 4, 6, 7]));
+    expect(SEVERITY[Forbidden.Screenshots]).toBe(Severity.Blocking);
   });
 
   it('names a film without its story: problem, solution, product and proof, claim', () => {

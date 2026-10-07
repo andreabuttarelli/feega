@@ -1,91 +1,61 @@
-// @vitest-environment jsdom
-import { afterEach, describe, expect, it } from 'vitest';
-import { UI_KIT, UiKind } from './kit';
+import { describe, expect, it } from 'vitest';
+import { UI_KINDS, UI_KIT, type UiPiece } from './kit';
 
-const FPS = 30;
 const DURATION = 4;
-const CURSOR_PX = 40;
-const VIEWBOX = 24;
-const TIP = { x: (4 / VIEWBOX) * CURSOR_PX, y: (2 / VIEWBOX) * CURSOR_PX };
-const BUTTON = { left: 905, top: 82, width: 231, height: 76 };
+const TIMES = [0, 1.2, 3.9, 0.5, 2.4];
 
-type Box = typeof BUTTON;
+type Node = { tag: string; className: string; textContent: string; innerHTML: string; style: Record<string, unknown>; attrs: Record<string, string>; children: Node[] };
 
-function layOut(boxes: Record<string, Box>) {
-  const read = (key: keyof Box) =>
-    function (this: HTMLElement) {
-      const box = boxes[this.className];
-      return box ? box[key] : 0;
-    };
-  for (const [prop, key] of [['offsetLeft', 'left'], ['offsetTop', 'top'], ['offsetWidth', 'width'], ['offsetHeight', 'height']] as const) {
-    Object.defineProperty(HTMLElement.prototype, prop, { configurable: true, get: read(key) });
-  }
+function node(tag: string): Node & Record<string, unknown> {
+  const style: Record<string, unknown> = {};
+  style.setProperty = (k: string, v: string) => (style[k] = v);
+  const n = { tag, className: '', textContent: '', innerHTML: '', style, attrs: {} as Record<string, string>, children: [] as Node[], clientWidth: 1920, clientHeight: 1080 };
+  return Object.assign(n, { appendChild: (c: Node) => n.children.push(c), setAttribute: (k: string, v: string) => (n.attrs[k] = v) });
 }
 
-function mount(kind: UiKind) {
-  const root = document.createElement('div');
-  document.body.appendChild(root);
-  let update: (() => void) | null = null;
+const fakeDocument = { createElement: node, createElementNS: (_: string, tag: string) => node(tag) };
+
+function mount(piece: UiPiece) {
+  const root = node('root');
+  const updates: (() => void)[] = [];
   let now = 0;
-  const tl = { to: (_: unknown, o: { onUpdate: () => void }) => (update = o.onUpdate) };
-  const param = (_: string, fallback: unknown) => fallback;
-  new Function('root', 'param', 'tl', 'duration', 'rand', UI_KIT[kind].js)(root, param, tl, DURATION, () => 0.5);
-  const seek = (t: number) => {
-    now = t;
-    update!.call({ time: () => now });
+  let seed = 42;
+  const rand = () => {
+    seed = (seed * 16807) % 2147483647;
+    return seed / 2147483647;
   };
-  return { root, seek };
+  const param = (_: string, fallback: unknown) => fallback;
+  const tl = { to: (_: unknown, o: { onUpdate: (this: { time: () => number }) => void }) => updates.push(() => o.onUpdate.call({ time: () => now })) };
+  new Function('root', 'param', 'tl', 'duration', 'rand', 'document', piece.js)(root, param, tl, DURATION, rand, fakeDocument);
+  return (t: number) => {
+    now = t;
+    updates.forEach((u) => u());
+    return JSON.stringify(root, (k, v) => (typeof v === 'function' ? undefined : v));
+  };
 }
 
-function tipAt(root: HTMLElement) {
-  const cursor = root.querySelector('.cursor') as HTMLElement;
-  return { x: parseFloat(cursor.style.left) + TIP.x, y: parseFloat(cursor.style.top) + TIP.y };
-}
+describe('every UI kit piece', () => {
+  it.each(UI_KINDS.map((k) => [k]))('%s draws the same frame for a time whatever time came before', (kind) => {
+    const seek = mount(UI_KIT[kind]);
+    const first = TIMES.map(seek);
+    const again = [...TIMES].reverse().map(seek).reverse();
 
-function pressed(root: HTMLElement) {
-  const scale = /scale\(([\d.]+)\)/.exec((root.querySelector('.button') as HTMLElement).style.transform);
-  return scale ? Number(scale[1]) < 1 : false;
-}
-
-const inside = (p: { x: number; y: number }, b: Box) => p.x >= b.left && p.x <= b.left + b.width && p.y >= b.top && p.y <= b.top + b.height;
-
-afterEach(() => {
-  document.body.innerHTML = '';
-});
-
-describe('the link shortener cursor', () => {
-  it('clicks inside the button wherever the layout puts it, on every pressed frame', () => {
-    for (const button of [BUTTON, { left: 700, top: 120, width: 180, height: 60 }]) {
-      layOut({ button });
-      const { root, seek } = mount(UiKind.LinkShortener);
-      const frames = Array.from({ length: DURATION * FPS }, (_, i) => i / FPS);
-      const presses = frames.filter((t) => {
-        seek(t);
-        return pressed(root);
-      });
-
-      expect(presses.length).toBeGreaterThan(0);
-      for (const t of presses) {
-        seek(t);
-        expect(inside(tipAt(root), button), `t=${t}`).toBe(true);
-      }
-    }
+    expect(again).toEqual(first);
   });
 
-  it('arrives slowing down: still over the button the frame before the press', () => {
-    layOut({ button: BUTTON });
-    const { root, seek } = mount(UiKind.LinkShortener);
-    const frames = Array.from({ length: DURATION * FPS }, (_, i) => i / FPS);
-    const first = frames.find((t) => {
-      seek(t);
-      return pressed(root);
-    })!;
-    seek(first - 2 / FPS);
-    const before = tipAt(root);
-    seek(first - 1 / FPS);
-    const last = tipAt(root);
+  it.each(UI_KINDS.map((k) => [k]))('%s moves: its first and last frames differ', (kind) => {
+    const seek = mount(UI_KIT[kind]);
 
-    expect(Math.hypot(last.x - before.x, last.y - before.y)).toBeLessThan(4);
-    expect(inside(last, BUTTON)).toBe(true);
+    expect(seek(0)).not.toEqual(seek(DURATION - 0.1));
+  });
+
+  it.each(UI_KINDS.map((k) => [k]))('%s reacts on springs: presses, hovers and switches never ride an eased ramp', (kind) => {
+    const js = UI_KIT[kind].js;
+
+    expect(js).not.toMatch(/span\(t, CLICK, 0\.08\)|inOut\(span\(t, HOVER|const on = inOut|lift = i === top \? out|const press = \(t, at\) => span/);
+  });
+
+  it.each(UI_KINDS.map((k) => [k]))('%s never redeclares a name the runtime passes in, such as brand, or a browser global that cannot be shadowed, such as top', (kind) => {
+    expect(UI_KIT[kind].js).not.toMatch(/^(const|let) (root|props|tl|param|duration|fps|assets|brand|rand|motion|gsap|lottie|THREE|top|window|document|location)\b/m);
   });
 });

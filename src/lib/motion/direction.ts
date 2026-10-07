@@ -1,9 +1,12 @@
 import { COMPONENTS, TrackKind, type ComponentId } from './components';
 import type { MotionDoc } from './doc';
 import { DEVICE, Device } from './devices';
-import { styleProblems } from './style';
+import { Forbidden, styleOf, styleProblems } from './style';
+import { MotionStyle } from './style-model';
 import { UI_KIT, UI_SAFE, uiScale } from './ui-kit/kit';
 import { sampleTrack } from './sample-track';
+import { cursorClicks, cursorMisses, reelMisses, TARGET_SEPARATOR } from './clicks';
+import { emptyContent, interactionOf, isUiPiece, Interaction } from './ui-kit/content';
 
 export enum Quality {
   RepeatedLayout = 'repeated-layout',
@@ -15,14 +18,69 @@ export enum Quality {
   SoftPicture = 'soft-picture',
   CroppedScreen = 'cropped-screen',
   BrandLogoAltered = 'brand-logo-altered',
-  OutOfFrame = 'out-of-frame'
+  OutOfFrame = 'out-of-frame',
+  TiltedText = 'tilted-text',
+  EmptyFrames = 'empty-frames',
+  SmallLogo = 'small-logo',
+  ClickMiss = 'click-miss',
+  EmptyUi = 'empty-ui',
+  NoMicroMotion = 'no-micro-motion',
+  NoScript = 'no-script'
 }
+
+export enum Severity {
+  Warning = 'warning',
+  Blocking = 'blocking'
+}
+
+export type Check = Quality | Forbidden;
+
+export const SEVERITY: Record<Check, Severity> = {
+  [Quality.RepeatedLayout]: Severity.Warning,
+  [Quality.SmallTitle]: Severity.Warning,
+  [Quality.Silent]: Severity.Blocking,
+  [Quality.BlankFrame]: Severity.Blocking,
+  [Quality.WhiteArea]: Severity.Blocking,
+  [Quality.OffStyle]: Severity.Warning,
+  [Quality.SoftPicture]: Severity.Blocking,
+  [Quality.CroppedScreen]: Severity.Warning,
+  [Quality.BrandLogoAltered]: Severity.Blocking,
+  [Quality.OutOfFrame]: Severity.Blocking,
+  [Quality.TiltedText]: Severity.Warning,
+  [Quality.EmptyFrames]: Severity.Blocking,
+  [Quality.SmallLogo]: Severity.Warning,
+  [Quality.ClickMiss]: Severity.Blocking,
+  [Quality.EmptyUi]: Severity.Blocking,
+  [Quality.NoMicroMotion]: Severity.Warning,
+  [Quality.NoScript]: Severity.Warning,
+  [Forbidden.Particles]: Severity.Warning,
+  [Forbidden.Glow]: Severity.Warning,
+  [Forbidden.Rotation]: Severity.Warning,
+  [Forbidden.Bounce]: Severity.Warning,
+  [Forbidden.FlyingText]: Severity.Warning,
+  [Forbidden.Crowded]: Severity.Warning,
+  [Forbidden.Transition]: Severity.Warning,
+  [Forbidden.Still]: Severity.Warning,
+  [Forbidden.OffBeat]: Severity.Warning,
+  [Forbidden.NoPeak]: Severity.Warning,
+  [Forbidden.RoughCut]: Severity.Warning,
+  [Forbidden.UnreadableText]: Severity.Blocking,
+  [Forbidden.Screenshots]: Severity.Blocking,
+  [Forbidden.MissingStoryBeat]: Severity.Blocking,
+  [Forbidden.Rushed]: Severity.Warning,
+  [Forbidden.LoopSeam]: Severity.Blocking,
+  [Forbidden.TooDense]: Severity.Warning
+};
 
 export type Pixels = Record<string, { width: number; height: number }>;
 
-export type QualityProblem = { kind: Quality; at?: number; detail: string };
+export type QualityProblem = { kind: Quality; effect?: Forbidden; at?: number; detail: string };
 
-export type FrameStat = { time: number; lumaStd: number; whiteShare: number };
+export const severityOf = (p: QualityProblem) => SEVERITY[p.effect ?? p.kind];
+
+export const blocking = (problems: readonly QualityProblem[]) => problems.filter((p) => severityOf(p) === Severity.Blocking);
+
+export type FrameStat = { time: number; luma: number; lumaStd: number; whiteShare: number };
 
 const SCENE_JOIN_S = 0.5;
 const SCENE_SHARE = 0.9;
@@ -92,9 +150,17 @@ function smallTitles(doc: MotionDoc): QualityProblem[] {
     .map((c) => ({ kind: Quality.SmallTitle, at: seconds(doc, c.from), detail: `title ${c.id} at ${seconds(doc, c.from)}s sits in a small box (${Math.round(num(c, 'width', 0.8) * 100)}% × ${Math.round(num(c, 'height', 0.4) * 100)}% of the frame): it reads small` }));
 }
 
+const SCORED: Record<MotionStyle, boolean> = { [MotionStyle.LaunchFilm]: true, [MotionStyle.AppleMinimal]: false, [MotionStyle.UiMorph]: true };
+
 function silent(doc: MotionDoc, audioAssets: number): QualityProblem[] {
   const plays = doc.tracks.some((t) => t.kind === TrackKind.Audio && t.clips.length > 0);
-  return audioAssets > 0 && !plays ? [{ kind: Quality.Silent, detail: 'the project has music the video never plays' }] : [];
+  if (plays) {
+    return [];
+  }
+  if (audioAssets > 0) {
+    return [{ kind: Quality.Silent, detail: 'the project has music the video never plays' }];
+  }
+  return SCORED[styleOf(doc)] ? [{ kind: Quality.Silent, detail: 'the launch film has no music: add_music lays a track under it (pick mood and bpm), then cut on its beats' }] : [];
 }
 
 const everyClip = (doc: MotionDoc) => [doc.tracks, ...Object.values(doc.comps).map((c) => c.tracks)].flatMap((tracks) => tracks.flatMap((t) => t.clips as Clip[]));
@@ -106,7 +172,7 @@ function largestZoom(clip: Clip): number {
   return num(clip, 'scale', 1) * peak('scale', clip.transform?.scale ?? 1) * peak('zoom', num(clip, 'zoom', 1));
 }
 
-function softPictures(doc: MotionDoc, pixels: Pixels): QualityProblem[] {
+export function softPictures(doc: MotionDoc, pixels: Pixels): QualityProblem[] {
   return everyClip(doc).flatMap((clip) => {
     const source = clip.component === 'Image' ? pixels[String(clip.props.assetId)] : undefined;
     if (!source) {
@@ -196,16 +262,46 @@ function outside(clip: Clip, size: Size, frame: Size, f: number): boolean {
   return cx - halfW < frame.width * margin - 1 || cx + halfW > frame.width * (1 - margin) + 1 || cy - halfH < frame.height * margin - 1 || cy + halfH > frame.height * (1 - margin) + 1;
 }
 
+function placedClips(doc: MotionDoc): Clip[] {
+  const top = doc.tracks.flatMap((t) => t.clips as Clip[]);
+  const nested = top.flatMap((scene) => {
+    const comp = scene.component === 'Precomp' ? doc.comps[String(scene.props.comp)] : undefined;
+    const shift = scene.from - scene.trimStart;
+    return comp ? comp.tracks.flatMap((t) => (t.clips as Clip[]).map((c) => ({ ...c, from: c.from + shift }))) : [];
+  });
+  return [...top, ...nested];
+}
+
+const heldFrames = (clip: Clip, edge: number) => Array.from({ length: Math.max(0, clip.durationInFrames - 2 * edge) }, (_, i) => i + edge);
+
+const MAX_READABLE_TILT = 12;
+const TILTS = ['rotateX', 'rotateY'];
+const READ_MATTER: ReadonlySet<ComponentId> = new Set([...TEXTS, 'Custom', 'Image'] as ComponentId[]);
+
+function tiltedText(doc: MotionDoc): QualityProblem[] {
+  const edge = Math.round(EDGE_SECONDS * doc.fps);
+  return placedClips(doc).flatMap((clip) => {
+    if (!READ_MATTER.has(clip.component)) {
+      return [];
+    }
+    const tilt = (f: number) => Math.max(...TILTS.map((key) => Math.abs(at(clip, key, f, 0))));
+    const leaning = heldFrames(clip, edge).filter((f) => tilt(f) > MAX_READABLE_TILT);
+    if (leaning.length <= OUT_FRAMES_ALLOWED) {
+      return [];
+    }
+    return [{ kind: Quality.TiltedText, at: seconds(doc, clip.from + leaning[0]), detail: `${clip.id} holds text or UI tilted ${Math.round(tilt(leaning[0]))}° in 3D from ${seconds(doc, clip.from + leaning[0])}s: it reads distorted. Tilt only on the entrance and straighten it (rotateX and rotateY within ${MAX_READABLE_TILT}°) once it has landed` }];
+  });
+}
+
 function outOfFrame(doc: MotionDoc): QualityProblem[] {
   const frame = { width: doc.width, height: doc.height };
   const edge = Math.round(EDGE_SECONDS * doc.fps);
-  return doc.tracks.flatMap((t) => t.clips as Clip[]).flatMap((clip) => {
+  return placedClips(doc).flatMap((clip) => {
     const size = contentSize(clip, frame);
     if (!size) {
       return [];
     }
-    const frames = Array.from({ length: Math.max(0, clip.durationInFrames - 2 * edge) }, (_, i) => i + edge);
-    const out = frames.filter((f) => outside(clip, size, frame, f));
+    const out = heldFrames(clip, edge).filter((f) => outside(clip, size, frame, f));
     if (out.length <= OUT_FRAMES_ALLOWED) {
       return [];
     }
@@ -213,13 +309,131 @@ function outOfFrame(doc: MotionDoc): QualityProblem[] {
   });
 }
 
+const EMPTY_SECONDS = 0.3;
+const FLASH_LUMA_JUMP = 200;
+const SCENERY: ReadonlySet<ComponentId> = new Set([...BACKDROPS, 'Shape'] as ComponentId[]);
+
+type Span = { from: number; to: number };
+
+function shownSpans(doc: MotionDoc, tracks: MotionDoc['tracks'], offset: number, end: number): Span[] {
+  return tracks
+    .filter((t) => t.kind === TrackKind.Visual)
+    .flatMap((t) => t.clips as Clip[])
+    .flatMap((clip): Span[] => {
+      const from = offset + clip.from;
+      const to = Math.min(end, from + clip.durationInFrames);
+      const nested = clip.component === 'Precomp' ? doc.comps[String(clip.props.comp)] : undefined;
+      if (nested) {
+        return shownSpans(doc, nested.tracks, from - clip.trimStart, to).filter((s) => s.to > from).map((s) => ({ from: Math.max(from, s.from), to: s.to }));
+      }
+      return SCENERY.has(clip.component) ? [] : [{ from, to }];
+    });
+}
+
+function holes(shown: readonly boolean[]): Span[] {
+  const found: Span[] = [];
+  shown.forEach((on, f) => {
+    const open = found.at(-1);
+    if (on) {
+      return;
+    }
+    if (open && open.to === f) {
+      open.to = f + 1;
+      return;
+    }
+    found.push({ from: f, to: f + 1 });
+  });
+  return found;
+}
+
+function emptyFrames(doc: MotionDoc): QualityProblem[] {
+  const shown = new Array<boolean>(doc.durationInFrames).fill(false);
+  for (const span of shownSpans(doc, doc.tracks, 0, doc.durationInFrames)) {
+    shown.fill(true, Math.max(0, span.from), Math.max(0, span.to));
+  }
+
+  return holes(shown)
+    .filter((h) => h.to - h.from > EMPTY_SECONDS * doc.fps)
+    .map((h) => ({ kind: Quality.EmptyFrames, at: seconds(doc, h.from), detail: `from ${seconds(doc, h.from)}s to ${seconds(doc, h.to)}s only the background is on screen: an empty hole the viewer reads as a mistake. Close the gap (start the next scene or its content sooner) or fill it` }));
+}
+
+function flashes(stats: readonly FrameStat[]): QualityProblem[] {
+  return stats.slice(1).flatMap((s, i) =>
+    Math.abs(s.luma - stats[i].luma) >= FLASH_LUMA_JUMP
+      ? [{ kind: Quality.EmptyFrames, at: s.time, detail: `the picture jumps from ${stats[i].luma > s.luma ? 'white to black' : 'black to white'} between ${stats[i].time}s and ${s.time}s: an unintended flash. Carry the move across (a dissolve, a matching background) unless it is a deliberate hit` }]
+      : []
+  );
+}
+
+const MIN_LOGO_WIDTH = 0.18;
+const PIXEL = 1;
+const ADDRESS = /\b[a-z0-9-]+\.[a-z]{2,}\b/i;
+
+const overlaps = (a: Clip, b: Clip) => a.from < b.from + b.durationInFrames && b.from < a.from + a.durationInFrames;
+
+function drawnWidth(clip: Clip, frame: Size, pixels: Pixels): number {
+  const box = { width: num(clip, 'width', 0.2) * frame.width, height: num(clip, 'height', 0.2) * frame.height };
+  const source = pixels[String(clip.props.assetId ?? '')] ?? { width: 1, height: 1 };
+  const fit = Math.min(box.width / source.width, box.height / source.height);
+  return source.width * fit * num(clip, 'scale', 1) * (clip.transform?.scale ?? 1);
+}
+
+function smallLogos(doc: MotionDoc, pixels: Pixels): QualityProblem[] {
+  const frame = { width: doc.width, height: doc.height };
+  const groups = [doc.tracks, ...Object.values(doc.comps).map((c) => c.tracks)].map((tracks) => tracks.flatMap((t) => t.clips as Clip[]));
+  return groups.flatMap((clips) => {
+    const addresses = clips.filter((c) => TEXTS.has(c.component) && ADDRESS.test(String(c.props.text ?? '')));
+    return clips.flatMap((logo) => {
+      const address = logo.component === 'Logo' ? addresses.find((a) => overlaps(a, logo)) : undefined;
+      if (!address) {
+        return [];
+      }
+      const width = drawnWidth(logo, frame, pixels);
+      const floor = Math.max(MIN_LOGO_WIDTH * frame.width, textSize(address, frame).width);
+      if (width + PIXEL >= floor) {
+        return [];
+      }
+      return [{ kind: Quality.SmallLogo, at: seconds(doc, logo.from), detail: `${logo.id} draws the logo ${Math.round(width)} px wide next to the address ${address.id} (${Math.round(textSize(address, frame).width)} px): in the claim the logo is at least ${Math.round(MIN_LOGO_WIDTH * 100)}% of the frame width and never smaller than the address. Widen the logo box or shrink the address` }];
+    });
+  });
+}
+
+function clickMisses(doc: MotionDoc): QualityProblem[] {
+  return [...cursorMisses(doc), ...reelMisses(doc)].map((m) => ({ kind: Quality.ClickMiss, at: seconds(doc, m.frame), detail: `${m.detail}. Every click lands inside the element it presses` }));
+}
+
+const uiClips = (doc: MotionDoc) => everyClip(doc).filter((c) => c.component === 'Custom' && isUiPiece(String(c.props.name ?? ''), doc.components[String(c.props.name ?? '')]?.source.js));
+
+function emptyUis(doc: MotionDoc): QualityProblem[] {
+  return uiClips(doc).flatMap((clip) => {
+    const name = String(clip.props.name);
+    const found = emptyContent(name, clip.props, doc.components[name]?.source.js);
+    return found.length ? [{ kind: Quality.EmptyUi, at: seconds(doc, clip.from), detail: `${clip.id} (${name}) shows no real content: ${found.join('; ')}. Fill it with the product's own data from the research: names, numbers and states a user of the product would recognise` }] : [];
+  });
+}
+
+function stillUis(doc: MotionDoc): QualityProblem[] {
+  const clicked = new Set(cursorClicks(doc).flatMap((c) => (c.target ? [c.target.split(TARGET_SEPARATOR)[0]] : [])));
+  return uiClips(doc)
+    .filter((clip) => interactionOf(String(clip.props.name), doc.components[String(clip.props.name)]?.source.js) === Interaction.Still && !clicked.has(clip.id))
+    .map((clip) => ({ kind: Quality.NoMicroMotion, at: seconds(doc, clip.from), detail: `${clip.id} (${String(clip.props.name)}) only moves as a whole: nothing in it reacts. Press, hover or change a state on it (click_ui on an anchor), or morph it into the next UI` }));
+}
+
+function unscripted(doc: MotionDoc): QualityProblem[] {
+  return SCORED[styleOf(doc)] && !doc.script && everyClip(doc).length ? [{ kind: Quality.NoScript, detail: 'no research and script saved: for a launch film or trailer, write_script first (problem, struggle, flow, sourced proof, promise) and build that' }] : [];
+}
+
 export function docProblems(doc: MotionDoc, input: { audioAssets: number; pixels?: Pixels; logos?: readonly string[] }): QualityProblem[] {
   const list = scenes(doc);
   const pixels = input.pixels ?? {};
-  return [...repeated(doc, list), ...smallTitles(doc), ...silent(doc, input.audioAssets), ...softPictures(doc, pixels), ...croppedScreens(doc, pixels), ...alteredLogos(doc, new Set(input.logos ?? [])), ...outOfFrame(doc), ...styleProblems(doc).map((p) => ({ kind: Quality.OffStyle, at: p.at, detail: p.detail }))];
+  return [...unscripted(doc), ...clickMisses(doc), ...emptyUis(doc), ...stillUis(doc), ...repeated(doc, list), ...smallTitles(doc), ...silent(doc, input.audioAssets), ...softPictures(doc, pixels), ...croppedScreens(doc, pixels), ...alteredLogos(doc, new Set(input.logos ?? [])), ...outOfFrame(doc), ...tiltedText(doc), ...emptyFrames(doc), ...smallLogos(doc, pixels), ...styleProblems(doc).map((p) => ({ kind: Quality.OffStyle, at: p.at, effect: p.effect, detail: p.detail }))];
 }
 
 export function frameProblems(stats: readonly FrameStat[]): QualityProblem[] {
+  return [...flatFrames(stats), ...flashes(stats)];
+}
+
+function flatFrames(stats: readonly FrameStat[]): QualityProblem[] {
   return stats.flatMap((s): QualityProblem[] => {
     if (s.lumaStd < BLANK_STD) {
       return [{ kind: Quality.BlankFrame, at: s.time, detail: `the frame at ${s.time}s is a flat colour: nothing is on screen` }];
