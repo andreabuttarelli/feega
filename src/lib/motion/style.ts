@@ -3,7 +3,7 @@ import type { MotionDoc } from './doc';
 import { EffectKind } from './effects/registry';
 import { JunctionKind } from './junction-model';
 import { EASE_BEZIER, type Bezier, type Keyframe } from './keyframes';
-import { DEFAULT_STYLE, MotionStyle } from './style-model';
+import { DEFAULT_STYLE, MotionStyle, STYLE_EASES, type StyleEases } from './style-model';
 
 export enum Forbidden {
   Particles = 'particles',
@@ -17,7 +17,7 @@ export enum Forbidden {
 
 export type StyleSpec = {
   label: string;
-  eases: { enter: Bezier; move: Bezier };
+  eases: StyleEases;
   seconds: { enter: [min: number, max: number]; exit: number; scene: [min: number, max: number] };
   movement: { rise: number; settle: number; blur: number; pushIn: number; turn: number };
   type: { family: string; weights: { display: number; text: number }; sizes: { hero: number; line: number; small: number } };
@@ -38,7 +38,7 @@ const OVERSHOOT_Y = 1;
 export const STYLES: Record<MotionStyle, StyleSpec> = {
   [MotionStyle.AppleMinimal]: {
     label: 'Apple minimal',
-    eases: { enter: [0.22, 1, 0.36, 1], move: [0.65, 0, 0.35, 1] },
+    eases: STYLE_EASES[MotionStyle.AppleMinimal],
     seconds: { enter: [0.6, 1.2], exit: 0.5, scene: [2, 4] },
     movement: { rise: 0.03, settle: 0.97, blur: 12, pushIn: 1.04, turn: 14 },
     type: { family: 'Inter', weights: { display: 600, text: 400 }, sizes: { hero: 0.15, line: 0.075, small: 0.026 } },
