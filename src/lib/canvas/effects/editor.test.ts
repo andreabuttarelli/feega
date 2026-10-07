@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyStack } from './index';
-import { addStep, controlFor, fitWithin, inputChanged, moveStep, removeStep, setParam, toggleStep } from './editor';
+import { addStep, controlFor, fitWithin, inputChanged, moveStep, removeStep, setParam, svgExport, toggleStep } from './editor';
 import { makePixels } from './test-helpers';
 import type { EffectStep } from './types';
 
@@ -105,5 +105,20 @@ describe('fitWithin', () => {
 	it('scales the longer side down to the bound, keeping the ratio', () => {
 		expect(fitWithin(1800, 1200, 900)).toEqual({ width: 900, height: 600 });
 		expect(fitWithin(1000, 2000, 900)).toEqual({ width: 450, height: 900 });
+	});
+});
+
+describe('svgExport', () => {
+	const pixels = { width: 8, height: 8, data: new Uint8ClampedArray(8 * 8 * 4).fill(200) };
+	const mosaic = { id: 'shape-mosaic' as const, params: { minSize: 4, maxSize: 8, seed: 1 }, enabled: true };
+
+	it('exports a vector when the mosaic is the last active step', () => {
+		expect(svgExport(pixels, [{ id: 'posterize', params: { levels: 2 }, enabled: true }, mosaic])).toMatch(/^<svg/);
+		expect(svgExport(pixels, [mosaic, { id: 'posterize', params: { levels: 2 }, enabled: false }])).toMatch(/^<svg/);
+	});
+
+	it('refuses when a raster step follows the mosaic, or there is none', () => {
+		expect(svgExport(pixels, [mosaic, { id: 'posterize', params: { levels: 2 }, enabled: true }])).toBeNull();
+		expect(svgExport(pixels, [])).toBeNull();
 	});
 });

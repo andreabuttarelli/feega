@@ -119,9 +119,12 @@ enforce on `nodes.data`, per `type` (`text`, `image`, `video`, `doc`, `iframe`,
 a fact of the model, not the node.
 
 `effects` holds a stack of image filters (pixelate, posterize, duotone, dither, halftone, noise,
-rgb-shift, glitch, wave, swirl, pinch, ascii, random-colors) over an upstream image — the schema
-returned for it lists every effect's params with their ranges/options/defaults. Set the stack with
-`update_row`, then call `apply_effects` to render it.
+rgb-shift, glitch, wave, swirl, pinch, ascii, random-colors, shape-mosaic, shape-cutout) over an
+upstream image — the schema returned for it lists every effect's params with their
+ranges/options/defaults. Set the stack with `update_row`, then call `apply_effects` to render it.
+`shape-cutout` yields one side of an A/B pair (`side: shapes` = shapes over the image, `side: holes`
+= solid fill with windows): for the pair, use two `effects` nodes on the same image with the same
+params and seed, differing only in `side`.
 
 ## Generation
 
