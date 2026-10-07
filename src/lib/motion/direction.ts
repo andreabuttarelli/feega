@@ -18,7 +18,8 @@ export enum Quality {
   BrandLogoAltered = 'brand-logo-altered',
   OutOfFrame = 'out-of-frame',
   TiltedText = 'tilted-text',
-  EmptyFrames = 'empty-frames'
+  EmptyFrames = 'empty-frames',
+  SmallLogo = 'small-logo'
 }
 
 export enum Severity {
@@ -41,6 +42,7 @@ export const SEVERITY: Record<Check, Severity> = {
   [Quality.OutOfFrame]: Severity.Blocking,
   [Quality.TiltedText]: Severity.Warning,
   [Quality.EmptyFrames]: Severity.Blocking,
+  [Quality.SmallLogo]: Severity.Warning,
   [Forbidden.Particles]: Severity.Warning,
   [Forbidden.Glow]: Severity.Warning,
   [Forbidden.Rotation]: Severity.Warning,
@@ -350,10 +352,43 @@ function flashes(stats: readonly FrameStat[]): QualityProblem[] {
   );
 }
 
+const MIN_LOGO_WIDTH = 0.18;
+const PIXEL = 1;
+const ADDRESS = /\b[a-z0-9-]+\.[a-z]{2,}\b/i;
+
+const overlaps = (a: Clip, b: Clip) => a.from < b.from + b.durationInFrames && b.from < a.from + a.durationInFrames;
+
+function drawnWidth(clip: Clip, frame: Size, pixels: Pixels): number {
+  const box = { width: num(clip, 'width', 0.2) * frame.width, height: num(clip, 'height', 0.2) * frame.height };
+  const source = pixels[String(clip.props.assetId ?? '')] ?? { width: 1, height: 1 };
+  const fit = Math.min(box.width / source.width, box.height / source.height);
+  return source.width * fit * num(clip, 'scale', 1) * (clip.transform?.scale ?? 1);
+}
+
+function smallLogos(doc: MotionDoc, pixels: Pixels): QualityProblem[] {
+  const frame = { width: doc.width, height: doc.height };
+  const groups = [doc.tracks, ...Object.values(doc.comps).map((c) => c.tracks)].map((tracks) => tracks.flatMap((t) => t.clips as Clip[]));
+  return groups.flatMap((clips) => {
+    const addresses = clips.filter((c) => TEXTS.has(c.component) && ADDRESS.test(String(c.props.text ?? '')));
+    return clips.flatMap((logo) => {
+      const address = logo.component === 'Logo' ? addresses.find((a) => overlaps(a, logo)) : undefined;
+      if (!address) {
+        return [];
+      }
+      const width = drawnWidth(logo, frame, pixels);
+      const floor = Math.max(MIN_LOGO_WIDTH * frame.width, textSize(address, frame).width);
+      if (width + PIXEL >= floor) {
+        return [];
+      }
+      return [{ kind: Quality.SmallLogo, at: seconds(doc, logo.from), detail: `${logo.id} draws the logo ${Math.round(width)} px wide next to the address ${address.id} (${Math.round(textSize(address, frame).width)} px): in the claim the logo is at least ${Math.round(MIN_LOGO_WIDTH * 100)}% of the frame width and never smaller than the address. Widen the logo box or shrink the address` }];
+    });
+  });
+}
+
 export function docProblems(doc: MotionDoc, input: { audioAssets: number; pixels?: Pixels; logos?: readonly string[] }): QualityProblem[] {
   const list = scenes(doc);
   const pixels = input.pixels ?? {};
-  return [...repeated(doc, list), ...smallTitles(doc), ...silent(doc, input.audioAssets), ...softPictures(doc, pixels), ...croppedScreens(doc, pixels), ...alteredLogos(doc, new Set(input.logos ?? [])), ...outOfFrame(doc), ...tiltedText(doc), ...emptyFrames(doc), ...styleProblems(doc).map((p) => ({ kind: Quality.OffStyle, at: p.at, effect: p.effect, detail: p.detail }))];
+  return [...repeated(doc, list), ...smallTitles(doc), ...silent(doc, input.audioAssets), ...softPictures(doc, pixels), ...croppedScreens(doc, pixels), ...alteredLogos(doc, new Set(input.logos ?? [])), ...outOfFrame(doc), ...tiltedText(doc), ...emptyFrames(doc), ...smallLogos(doc, pixels), ...styleProblems(doc).map((p) => ({ kind: Quality.OffStyle, at: p.at, effect: p.effect, detail: p.detail }))];
 }
 
 export function frameProblems(stats: readonly FrameStat[]): QualityProblem[] {
