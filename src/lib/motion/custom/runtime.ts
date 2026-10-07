@@ -2,6 +2,7 @@ import { contentStamp } from '../stamp';
 import { js } from '../hyperframes/html';
 import type { CustomComponents } from './component';
 import { ENGINE_GLOBAL } from '../engine/engine';
+import { fixedFormat } from './format';
 
 export const REGISTRY = '__feegaComponents';
 export const ERRORS = '__feegaErrors';
@@ -68,7 +69,7 @@ export function seedOf(clipId: string): number {
 
 export function definitionScript(name: string, code: string): string {
   const body = code.replace(/<\/(script)/gi, '<\\/$1');
-  return `<script>(window.${REGISTRY}=window.${REGISTRY}||{})[${js(name)}]=function(ctx,${SHADOWED.join(',')}){"use strict";const {root,props,tl,duration,fps,assets,brand,rand,param,motion,gsap,SplitText,lottie,THREE}=ctx;\n${body}\n};</script>`;
+  return `<script>(window.${REGISTRY}=window.${REGISTRY}||{})[${js(name)}]=function(ctx,${SHADOWED.join(',')}){"use strict";const {root,props,tl,duration,fps,assets,brand,rand,param,format,motion,gsap,SplitText,lottie,THREE}=ctx;{\n${body}\n}};</script>`;
 }
 
 type Engine = { timeline: () => Timeline; parseEase: (ease: string) => (p: number) => number; utils: { interpolate: (a: unknown, b: unknown, p: number) => unknown }; split: unknown; SplitText: unknown };
@@ -76,7 +77,7 @@ type BootWindow = Window & Record<string, unknown>;
 type Timeline = { time: () => number; set: (t: object, v: object, at: number) => void; add: (child: object, at: number) => void; fromTo: (t: object, a: object, b: object, at: number) => void; tweenFromTo: (from: number, to: number, vars: object) => object };
 type ClipError = { clip: string; component: string; message: string };
 
-function bootCustom(cfg: { registry: string; errors: string; listener: string; three: string; engine: string; shadowed: string[] }, runs: CustomRun[], env: CustomEnv, master: Timeline) {
+function bootCustom(cfg: { registry: string; errors: string; listener: string; three: string; engine: string; shadowed: string[] }, runs: CustomRun[], env: CustomEnv, master: Timeline, format: ReturnType<typeof fixedFormat>) {
   const w = window as unknown as BootWindow;
   const engine = w[cfg.engine] as Engine;
   const errors: ClipError[] = [];
@@ -152,7 +153,7 @@ function bootCustom(cfg: { registry: string; errors: string; listener: string; t
     const param = (name: string, fallback: unknown) => (name in values ? values[name] : fallback);
     try {
       make(
-        { root, props: values, tl: child, param, duration: run.length, fps: run.fps, assets: env.assets, brand: env.brand, rand: seeded(run.seed), motion: engine, gsap: engine, SplitText: engine.SplitText, lottie: w.lottie ?? null, THREE: w[cfg.three] ?? null },
+        { root, props: values, tl: child, param, duration: run.length, fps: run.fps, assets: env.assets, brand: env.brand, rand: seeded(run.seed), format, motion: engine, gsap: engine, SplitText: engine.SplitText, lottie: w.lottie ?? null, THREE: w[cfg.three] ?? null },
         ...shadows
       );
     } catch (e) {
@@ -173,5 +174,5 @@ export function bootScript(runs: CustomRun[], env: CustomEnv, master: string): s
     return '';
   }
   const cfg = { registry: REGISTRY, errors: ERRORS, listener: ERROR_LISTENER, three: THREE_GLOBAL, engine: ENGINE_GLOBAL, shadowed: [...SHADOWED] };
-  return `(${bootCustom.toString()})(${js(cfg)},${js(runs)},${js(env)},${master});`;
+  return `(${bootCustom.toString()})(${js(cfg)},${js(runs)},${js(env)},${master},(${fixedFormat.toString()})());`;
 }

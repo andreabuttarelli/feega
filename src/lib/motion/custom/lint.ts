@@ -6,6 +6,8 @@ export type LintProblem = { file: SourceFile; message: string };
 
 const ECMA_VERSION = 2022;
 
+const LOCALE = 'the locale differs between preview and render: use format.number, format.compact or format.percent';
+
 const FORBIDDEN_GLOBALS: Record<string, string> = {
   setTimeout: 'animate on tl, not with timers',
   setInterval: 'animate on tl, not with timers',
@@ -37,7 +39,8 @@ const FORBIDDEN_GLOBALS: Record<string, string> = {
   navigator: 'no device access',
   location: 'no navigation',
   performance: 'time comes from tl, not the clock',
-  postMessage: 'no messaging'
+  postMessage: 'no messaging',
+  Intl: LOCALE
 };
 
 export const FORBIDDEN_NAMES = Object.keys(FORBIDDEN_GLOBALS);
@@ -50,7 +53,10 @@ const FORBIDDEN_MEMBERS: Record<string, Record<string, string>> = {
 
 const FORBIDDEN_PROPERTIES: Record<string, string> = {
   constructor: 'no constructor access',
-  __proto__: 'no prototype access'
+  __proto__: 'no prototype access',
+  toLocaleString: LOCALE,
+  toLocaleDateString: LOCALE,
+  toLocaleTimeString: LOCALE
 };
 
 type AnyNode = Node & Record<string, unknown>;

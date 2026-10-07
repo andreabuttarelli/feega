@@ -34,6 +34,10 @@ describe('the authoring contract', () => {
     expect(problemsOf({ js }).join(' ')).toContain(name);
   });
 
+  it.each(['n.toLocaleString();', 'd.toLocaleDateString("it");', 'new Intl.NumberFormat("en").format(1);'])('refuses %s and points at format', (js) => {
+    expect(problemsOf({ js }).join(' ')).toContain('format.');
+  });
+
   it('allows a fixed date and the seeded rand', () => {
     expect(problemsOf({ js: 'const d = new Date(2026, 9, 3); const r = rand();' })).toEqual([]);
   });
