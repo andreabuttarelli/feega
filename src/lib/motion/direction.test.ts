@@ -174,3 +174,38 @@ describe('nothing important leaves the frame', () => {
     expect(out(placed('Custom', ui, exit))).toEqual([]);
   });
 });
+
+describe('text that cannot be read: tilted or cut, inside a scene too', () => {
+  const tilted = (doc: MotionDoc) => docProblems(doc, { audioAssets: 0 }).filter((p) => p.kind === Quality.TiltedText);
+  const out = (doc: MotionDoc) => docProblems(doc, { audioAssets: 0 }).filter((p) => p.kind === Quality.OutOfFrame);
+  const tilt = (doc: MotionDoc, rotateX: number): MotionDoc => ({ ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => ({ ...c, transform: { ...c.transform, rotateX, perspective: 1600 } })) })) });
+  const inScene = (doc: MotionDoc, change: (c: MotionDoc['tracks'][number]['clips'][number]) => MotionDoc['tracks'][number]['clips'][number]): MotionDoc => ({ ...doc, comps: Object.fromEntries(Object.entries(doc.comps).map(([id, comp]) => [id, { ...comp, tracks: comp.tracks.map((t) => ({ ...t, clips: t.clips.map(change) })) }])) });
+  const tiltZoom = () => must(insertTemplate(calm(), builtinTemplate('builtin:launch-ui-tilt-zoom')!, { from: 180, newId: () => 'tz' }));
+
+  it('a title held tilted back 18° in 3D is named, a 6° lean is not', () => {
+    const doc = must(addClip(calm(), { component: 'Title', from: 0, durationInFrames: 60, props: { text: 'All by design', size: 0.12, x: 0.5, y: 0.5, width: 0.8, height: 0.3 } }, 'c'));
+
+    expect(tilted(tilt(doc, 18))).toHaveLength(1);
+    expect(tilted(tilt(doc, 6))).toEqual([]);
+  });
+
+  it('the UI tilt zoom scene straightens the capture once it has landed', () => {
+    expect(tilted(tiltZoom())).toEqual([]);
+  });
+
+  it('a capture held tilted inside a scene is named at the time it plays in the film', () => {
+    const held = inScene(tiltZoom(), (c) => (c.component === 'Image' ? { ...c, keyframes: { ...c.keyframes, rotateX: [] }, transform: { rotateX: 18, perspective: 1600 } } : c));
+
+    expect(tilted(held)).toHaveLength(1);
+    expect(tilted(held)[0].at).toBeGreaterThanOrEqual(6);
+    expect(tilted(held)[0].at).toBeLessThan(7);
+  });
+
+  it('a line cut by the edge inside a scene is named like one on the main timeline', () => {
+    const doc = must(insertTemplate(calm(), builtinTemplate('builtin:launch-device-fly')!, { from: 120, newId: () => 'df' }));
+    const wide = inScene(doc, (c) => (c.component === 'Title' ? { ...c, keyframes: {}, props: { ...c.props, text: 'Every site you run, up to date', x: 0.2 } } : c));
+
+    expect(out(wide)).toHaveLength(1);
+    expect(out(wide)[0].at).toBeGreaterThanOrEqual(4);
+  });
+});
