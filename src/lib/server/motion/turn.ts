@@ -1,4 +1,5 @@
 import { styleOf } from '$lib/motion/style';
+import { briefAwaits, promptTexts } from '$lib/motion/script-brief';
 import { createUIMessageStream, streamText, type ModelMessage, type UIMessageChunk } from 'ai';
 import type { Db } from '$lib/server/db/client';
 import { llmCodeModel, llmLanguageModel, llmStructured, llmVisionModel } from '$lib/server/llm';
@@ -76,8 +77,10 @@ const oneStep: Stop = ({ steps }) => steps.length >= 1;
 
 const selfCheckSpent: Stop = ({ steps }) => steps.length >= SELF_CHECK_MAX_STEPS;
 
+const briefShown: Stop = ({ steps }) => briefAwaits(steps as TurnStep[]);
+
 const ROUND_STOPS: Record<Round, (t0: number, overBudget: Stop) => Stop[]> = {
-  [Round.Edit]: (t0, overBudget) => [agentStopWhen(t0 - CLOSING_RESERVE_MS), overBudget],
+  [Round.Edit]: (t0, overBudget) => [agentStopWhen(t0 - CLOSING_RESERVE_MS), overBudget, briefShown],
   [Round.SelfCheck]: (t0) => [agentStopWhen(t0), selfCheckSpent],
   [Round.Summary]: () => [oneStep]
 };
@@ -119,13 +122,12 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
   const actor = agentActor(userId, MOTION_AGENT_KEY);
   const nodeScope = { orgId, nodeId: motion.record.id };
 
-  const screening = screenModelInput(db, { profile: ModerationProfile.Standard, texts: [message], scope: { orgId, userId, projectId: project.id, nodeId: motion.record.id, actor: requester } });
   const [head, tokens, threadId] = await Promise.all([
     headOrNew(db, nodeScope, motion.node),
     motionTokens(db, { orgId, brandId: project.brandId }),
     openNodeThread(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, brandId: project.brandId })
   ]);
-  const screened = await screening;
+  const screened = await screenModelInput(db, { profile: ModerationProfile.Standard, texts: promptTexts(message, head.doc), scope: { orgId, userId, projectId: project.id, nodeId: motion.record.id, actor: requester } });
   if (!screened.ok) {
     return blockedPrompt(screened.error);
   }
@@ -260,15 +262,16 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
       };
 
       await play(openingMessages, Round.Edit);
-      for (let attempt = 0; attempt < MAX_DELIVERY_ATTEMPTS && steps.length && deliveryBlocked(session, vision); attempt++) {
+      const awaitsGo = briefAwaits(steps);
+      for (let attempt = 0; attempt < MAX_DELIVERY_ATTEMPTS && !awaitsGo && steps.length && deliveryBlocked(session, vision); attempt++) {
         const errors = openErrors(session);
         const times = keyFrameTimes(session.doc);
         await play([...conversation, { role: 'user', content: errors.length ? fixPrompt(errors, times) : selfCheckPrompt(times) }], Round.SelfCheck);
       }
-      if (steps.length && !closedByModel(steps.at(-1))) {
+      if (steps.length && !awaitsGo && !closedByModel(steps.at(-1))) {
         await play([...conversation, { role: 'user', content: SUMMARY_PROMPT }], Round.Summary);
       }
-      const open = stillOpenNote(openErrors(session));
+      const open = awaitsGo ? '' : stillOpenNote(openErrors(session));
       if (open) {
         writer.write({ type: 'text-start', id: STILL_OPEN_ID });
         writer.write({ type: 'text-delta', id: STILL_OPEN_ID, delta: open });
@@ -299,7 +302,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
     }
 
     const finished = finishedTurn(steps);
-    const turn = { ...finished, content: finished.content + stillOpenNote(openErrors(session)) };
+    const turn = { ...finished, content: finished.content + (briefAwaits(steps) ? '' : stillOpenNote(openErrors(session))) };
     await saveTurn(db, { orgId, threadId, role: 'assistant', ...turn, actor }).catch((e) => console.error('[motion-agent] assistant turn not saved', { threadId }, e));
 
     for (const [modelId, usage] of usageByModel(steps.map((s) => extractSdkUsage(s.usage)), stepModels)) {

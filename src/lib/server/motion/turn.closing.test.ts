@@ -20,8 +20,22 @@ const world = vi.hoisted(() => ({
   seesImages: false,
   viewsWhileEditing: false,
   blankViews: 0,
-  views: 0
+  views: 0,
+  scripting: false
 }));
+
+const SITE = 'https://supasito.com/';
+const PROMISE = 'Every site you run. Up to date. In one place.';
+const source = { url: SITE, quote: PROMISE };
+const SCRIPT = {
+  research: { audience: 'People who run several websites', problem: 'Changes scatter across chats', struggle: 'A client sends a new price for three sites', flow: ['Pick the site', 'Say what should change'], benefits: [{ claim: 'One place', source }], numbers: [], tone: 'calm', promise: { text: PROMISE, source } },
+  acts: [
+    { act: 'problem', start: 0, end: 3, scene: 'Scattered folders', on_screen: ['The price changed.'], ui: 'Finder: marta-bakery, cardstack-launch, supasito.com, each edited 9 days ago' },
+    { act: 'solution', start: 3, end: 7, scene: 'One prompt', on_screen: ['Say what should change.'], ui: 'Sidebar Supasito, Cardstack, Marta Bakery; prompt Set the price to 12; preview' },
+    { act: 'proof', start: 7, end: 11, scene: 'Preview', on_screen: ['In one place.'], sources: [source] },
+    { act: 'claim', start: 11, end: 14, scene: 'Logo', on_screen: [PROMISE] }
+  ]
+};
 
 const SUMMARY = 'Made a bold title card that pops in.';
 const NOTE = 'Adding the title now.';
@@ -68,7 +82,14 @@ function reply(call: Call): unknown[] {
   if (world.viewsWhileEditing && last.role === 'tool' && JSON.stringify(last.content).includes('add_clip')) {
     return tool('view_frames', { times: [1] });
   }
-  if (last.role === 'user') {
+  const answered = JSON.stringify(last.content);
+  if (world.scripting && last.role === 'user') {
+    return tool('analyze_site', { url: SITE });
+  }
+  if (world.scripting && last.role === 'tool' && answered.includes('analyze_site')) {
+    return tool('write_script', SCRIPT);
+  }
+  if (last.role === 'user' || (world.scripting && last.role === 'tool' && answered.includes('write_script'))) {
     return tool('add_clip', { component: 'Title', start: 0, duration: DEFAULT_SECONDS, props: { text: 'Pop' } });
   }
   return text(NOTE);
@@ -143,7 +164,10 @@ vi.mock('$lib/server/motion/frame-stats', () => ({
   }
 }));
 vi.mock('$lib/server/motion/templates', () => ({ templateLibrary: () => ({ list: async () => [] }) }));
-vi.mock('$lib/server/motion/brand-sources', () => ({ brandSources: () => ({}) }));
+vi.mock('$lib/server/motion/brand-sources', async () => {
+  const { pageOf } = await import('./site-copy');
+  return { brandSources: () => (world.scripting ? { site: async () => ({ ok: true, site: { url: SITE, logos: [], pages: [pageOf(SITE, `<h1>${PROMISE}</h1>`)] } }) } : {}) };
+});
 
 const { startMotionTurn, Browser, MAX_DELIVERY_ATTEMPTS } = await import('./turn');
 
@@ -176,6 +200,7 @@ describe('a motion turn closes on a look and a summary', () => {
     world.viewsWhileEditing = false;
     world.blankViews = 0;
     world.views = 0;
+    world.scripting = false;
   });
 
   it('looks at its frames after the last edit even when the edits spent the whole budget', async () => {
@@ -255,5 +280,15 @@ describe('a motion turn closes on a look and a summary', () => {
     expect(world.toolCalls.filter((t) => t === 'view_frames')).toHaveLength(MAX_DELIVERY_ATTEMPTS);
     expect(outcome.reply).toMatch(/still open/i);
     expect(outcome.reply).toMatch(/flat colour/);
+  });
+
+  it('stops after the script is saved: the user reads the brief before anything is built', async () => {
+    world.scripting = true;
+
+    const outcome = await turn();
+
+    expect(world.toolCalls).toEqual(['analyze_site', 'write_script']);
+    expect(world.calls.some((c) => c.toolChoice?.type === 'none')).toBe(false);
+    expect(outcome.reply).not.toMatch(/still open/i);
   });
 });

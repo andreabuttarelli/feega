@@ -604,6 +604,13 @@
       "stop": "Stop generating",
       "jump": "Jump to latest",
       "thinking": "Working…",
+      "brief": {
+        "title": "Research and script",
+        "go": "Build it",
+        "edit": "Change it",
+        "countdown": "Building in {seconds} s",
+        "held": "Waiting for your changes"
+      },
       "model": "Model",
       "reasoning": "Reasoning",
       "reasoningTrace": "Thinking",
