@@ -55,7 +55,7 @@ const amount = (key: string, label: string, clipId: string, prop: string): Field
 
 const FULL = { width: 1, height: 1 };
 const BAND = { width: 1, height: 0.8 };
-const PRODUCT = { width: 0.5, height: 0.62 };
+const PRODUCT = { width: 0.66, height: 0.7 };
 const WINDOW = { width: 0.74, height: 0.66 };
 const LOGO = { width: 0.14, height: 0.2 };
 

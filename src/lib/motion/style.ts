@@ -3,7 +3,6 @@ import type { MotionDoc } from './doc';
 import { EffectKind } from './effects/registry';
 import { JunctionKind } from './junction-model';
 import { EASE_BEZIER, type Bezier, type Keyframe } from './keyframes';
-
 import { DEFAULT_STYLE, MotionStyle } from './style-model';
 
 export enum Forbidden {
@@ -25,7 +24,6 @@ export type StyleSpec = {
   palette: { ink: string; paper: string; muted: string; accents: number };
   junctions: readonly JunctionKind[];
   entrances: readonly TransitionKind[];
-  cuts: boolean;
   forbidden: readonly Forbidden[];
   maxMoving: number;
   rules: readonly string[];
@@ -47,7 +45,6 @@ export const STYLES: Record<MotionStyle, StyleSpec> = {
     palette: { ink: '#000000', paper: '#ffffff', muted: '#86868b', accents: 1 },
     junctions: [JunctionKind.Crossfade, JunctionKind.DipToBlack, JunctionKind.Blur],
     entrances: [TransitionKind.None, TransitionKind.Fade, TransitionKind.Blur],
-    cuts: true,
     forbidden: Object.values(Forbidden),
     maxMoving: 2,
     rules: [
@@ -59,7 +56,8 @@ export const STYLES: Record<MotionStyle, StyleSpec> = {
       'Movement is small and slow: fades with a 2–4% rise or scale, a light blur-in, a slow push-in on pictures. Entrances 0.6–1.2 s on the eases cubic-bezier(0.22,1,0.36,1) and cubic-bezier(0.65,0,0.35,1).',
       'Between scenes: a cut on the beat, a dissolve (set_clip_transition crossfade or dip-to-black) or a match cut (the next scene keeps the word or object in the same place). Never wipes, pushes, zooms or spins.',
       'Forbidden by default: decorative particles, glows, gratuitous rotation, bounce or overshoot, text that flies across the frame, physics, more than two things moving at once. The quality gate in view_frames names each one.',
-      'Screenshots must be readable: the ui-closeup scene crops on the part that matters; never a whole page shrunk small.',
+      'Show the product, big: at least half the scenes carry a picture of it (scene-ui-closeup on a detail, scene-device-hero, scene-product-reveal, scene-media-caption). Never the same scene or the same crop twice; with a single picture, vary it: a close-up on one detail, the whole on a device, then a scene with a line under it.',
+      'Screenshots must be readable: the ui-closeup scene crops on the part that matters (focus_x, focus_y); never a whole page shrunk small.',
       'Sound: when the project has music, put it on an Audio clip and cut the scenes on its beats (analyze_audio, cut_to_beat).'
     ]
   }
