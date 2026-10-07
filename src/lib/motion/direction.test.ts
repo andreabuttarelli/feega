@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, newMotionDoc, type MotionDoc } from './doc';
 import { Side, addClip, setTransition } from './timeline';
-import { Quality, docProblems, frameProblems } from './direction';
+import { Quality, STYLE_SEVERITY, Severity, blocking, docProblems, frameProblems } from './direction';
+import { Forbidden } from './style';
 import { Ease, TransitionKind } from './design';
 import { builtinTemplate } from './template/builtins';
 import { insertTemplate } from './template/library';
@@ -172,5 +173,19 @@ describe('nothing important leaves the frame', () => {
     const exit = { scale: [{ frame: 0, value: 1, ease: Ease.Linear }, { frame: 82, value: 1, ease: Ease.Linear }, { frame: 90, value: 2.5, ease: Ease.Linear }] };
 
     expect(out(placed('Custom', ui, exit))).toEqual([]);
+  });
+});
+
+describe('severity', () => {
+  it('blocks delivery on the errors and lets warnings through', () => {
+    const open = blocking([
+      { kind: Quality.BlankFrame, detail: 'blank' },
+      { kind: Quality.RepeatedLayout, detail: 'repeat' },
+      { kind: Quality.OffStyle, detail: 'unreadable', severity: STYLE_SEVERITY[Forbidden.UnreadableText] },
+      { kind: Quality.OffStyle, detail: 'glow', severity: STYLE_SEVERITY[Forbidden.Glow] }
+    ]);
+
+    expect(open.map((p) => p.detail)).toEqual(['blank', 'unreadable']);
+    expect(STYLE_SEVERITY[Forbidden.MissingStoryBeat]).toBe(Severity.Error);
   });
 });

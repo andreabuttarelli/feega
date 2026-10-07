@@ -17,7 +17,9 @@ const world = vi.hoisted(() => ({
   models: [] as string[],
   visionFails: false,
   seesImages: false,
-  viewsWhileEditing: false
+  viewsWhileEditing: false,
+  blankViews: 0,
+  views: 0
 }));
 
 const SUMMARY = 'Made a bold title card that pops in.';
@@ -132,10 +134,17 @@ vi.mock('$lib/server/motion/frame-store', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$lib/server/motion/frame-store')>()),
   awaitFrames: async (_bucket: unknown, _prefix: string, count: number) => Array.from({ length: count }, (_, i) => ({ time: i, bytes: Buffer.from([0xff, 0xd8]) }))
 }));
+vi.mock('$lib/server/motion/frame-stats', () => ({
+  frameStats: async (frames: { time: number }[]) => {
+    world.views++;
+    const blank = world.views <= world.blankViews;
+    return frames.map((f) => ({ time: f.time, lumaStd: blank ? 0 : 40, whiteShare: 0 }));
+  }
+}));
 vi.mock('$lib/server/motion/templates', () => ({ templateLibrary: () => ({ list: async () => [] }) }));
 vi.mock('$lib/server/motion/brand-sources', () => ({ brandSources: () => ({}) }));
 
-const { startMotionTurn, Browser } = await import('./turn');
+const { startMotionTurn, Browser, MAX_DELIVERY_ATTEMPTS } = await import('./turn');
 
 async function turn(reasoning: string | null = 'low', browser = Browser.Attached) {
   const db = { storage: { from: () => ({}) } } as never;
@@ -164,6 +173,8 @@ describe('a motion turn closes on a look and a summary', () => {
     world.visionFails = false;
     world.seesImages = false;
     world.viewsWhileEditing = false;
+    world.blankViews = 0;
+    world.views = 0;
   });
 
   it('looks at its frames after the last edit even when the edits spent the whole budget', async () => {
@@ -223,5 +234,25 @@ describe('a motion turn closes on a look and a summary', () => {
 
     expect(world.calls.some((c) => c.toolChoice?.type === 'none')).toBe(false);
     expect(world.calls.at(-1)!.prompt.some((m) => m.role === 'user' && /summary/i.test(textOf(m)))).toBe(true);
+  });
+
+  it('a gate error seen in the last look keeps the turn open: it asks for a fix and another look', async () => {
+    world.blankViews = 1;
+
+    await turn();
+    const asked = world.calls.flatMap((c) => c.prompt).filter((m) => m.role === 'user').map(textOf);
+
+    expect(world.toolCalls.filter((t) => t === 'view_frames')).toHaveLength(2);
+    expect(asked.some((t) => /flat colour/.test(t))).toBe(true);
+  });
+
+  it('gate errors that survive every attempt are delivered, and the reply says what stays open', async () => {
+    world.blankViews = 1_000;
+
+    const outcome = await turn();
+
+    expect(world.toolCalls.filter((t) => t === 'view_frames')).toHaveLength(MAX_DELIVERY_ATTEMPTS);
+    expect(outcome.reply).toMatch(/still open/i);
+    expect(outcome.reply).toMatch(/flat colour/);
   });
 });

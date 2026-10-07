@@ -3,6 +3,7 @@ import type { ModelMessage } from 'ai';
 import { COMPONENTS, Control, TrackKind } from '$lib/motion/components';
 import { fieldsOf } from '$lib/motion/inspector';
 import type { MotionDoc } from '$lib/motion/doc';
+import { blocking, type QualityProblem } from '$lib/motion/direction';
 
 export const VIEW_FRAMES = 'view_frames';
 const FRAME_TOOLS: ReadonlySet<string> = new Set([VIEW_FRAMES, 'write_component', 'patch_component']);
@@ -95,6 +96,14 @@ export function selfCheckDue(state: CheckState, vision: Vision): boolean {
   return vision === Vision.Available && state.edits.length > state.checkedAt;
 }
 
+export type DeliveryState = CheckState & { gate?: readonly QualityProblem[] };
+
+export const openErrors = (state: DeliveryState) => blocking(state.gate ?? []);
+
+export function deliveryBlocked(state: DeliveryState, vision: Vision): boolean {
+  return selfCheckDue(state, vision) || (vision === Vision.Available && openErrors(state).length > 0);
+}
+
 const TEXT_CONTROLS = new Set([Control.Text, Control.Textarea]);
 
 const TAG = /<[^>]*>/g;
@@ -130,6 +139,14 @@ const SUMMARY_ASK = 'write the user a short summary of the video as it now stand
 
 export function selfCheckPrompt(times: number[]): string {
   return `Self-check: call ${VIEW_FRAMES} with times [${times.join(', ')}] and look at the result. If text is clipped or overflows, overlaps another element, has poor contrast or leaves the safe area, or the result lists quality problems, fix them with the editing tools; otherwise change nothing. Then, as your last message, ${SUMMARY_ASK}`;
+}
+
+export function fixPrompt(errors: readonly QualityProblem[], times: number[]): string {
+  return `Not deliverable yet: the quality gate still finds these errors in the video:\n${errors.map((e) => `- ${e.detail}`).join('\n')}\nFix each one with the editing tools, then call ${VIEW_FRAMES} with times [${times.join(', ')}] to check again. Then, as your last message, ${SUMMARY_ASK}`;
+}
+
+export function stillOpenNote(errors: readonly QualityProblem[]): string {
+  return errors.length ? `\n\nStill open after the last check, not fixed:\n${errors.map((e) => `- ${e.detail}`).join('\n')}` : '';
 }
 
 export const SUMMARY_PROMPT = `The turn is over: ${SUMMARY_ASK}`;

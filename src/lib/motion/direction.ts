@@ -1,7 +1,7 @@
 import { COMPONENTS, TrackKind, type ComponentId } from './components';
 import type { MotionDoc } from './doc';
 import { DEVICE, Device } from './devices';
-import { styleProblems } from './style';
+import { Forbidden, styleProblems } from './style';
 import { UI_KIT, UI_SAFE, uiScale } from './ui-kit/kit';
 import { sampleTrack } from './sample-track';
 
@@ -18,9 +18,48 @@ export enum Quality {
   OutOfFrame = 'out-of-frame'
 }
 
+export enum Severity {
+  Error = 'error',
+  Warning = 'warning'
+}
+
+export const QUALITY_SEVERITY: Record<Quality, Severity> = {
+  [Quality.RepeatedLayout]: Severity.Warning,
+  [Quality.SmallTitle]: Severity.Warning,
+  [Quality.Silent]: Severity.Error,
+  [Quality.BlankFrame]: Severity.Error,
+  [Quality.WhiteArea]: Severity.Error,
+  [Quality.OffStyle]: Severity.Warning,
+  [Quality.SoftPicture]: Severity.Error,
+  [Quality.CroppedScreen]: Severity.Warning,
+  [Quality.BrandLogoAltered]: Severity.Error,
+  [Quality.OutOfFrame]: Severity.Error
+};
+
+export const STYLE_SEVERITY: Record<Forbidden, Severity> = {
+  [Forbidden.Particles]: Severity.Warning,
+  [Forbidden.Glow]: Severity.Warning,
+  [Forbidden.Rotation]: Severity.Warning,
+  [Forbidden.Bounce]: Severity.Warning,
+  [Forbidden.FlyingText]: Severity.Warning,
+  [Forbidden.Crowded]: Severity.Warning,
+  [Forbidden.Transition]: Severity.Warning,
+  [Forbidden.Still]: Severity.Warning,
+  [Forbidden.OffBeat]: Severity.Warning,
+  [Forbidden.NoPeak]: Severity.Warning,
+  [Forbidden.RoughCut]: Severity.Warning,
+  [Forbidden.UnreadableText]: Severity.Error,
+  [Forbidden.Screenshots]: Severity.Warning,
+  [Forbidden.MissingStoryBeat]: Severity.Error
+};
+
 export type Pixels = Record<string, { width: number; height: number }>;
 
-export type QualityProblem = { kind: Quality; at?: number; detail: string };
+export type QualityProblem = { kind: Quality; at?: number; detail: string; severity?: Severity };
+
+export const severityOf = (p: QualityProblem) => p.severity ?? QUALITY_SEVERITY[p.kind];
+
+export const blocking = (problems: readonly QualityProblem[]) => problems.filter((p) => severityOf(p) === Severity.Error);
 
 export type FrameStat = { time: number; lumaStd: number; whiteShare: number };
 
@@ -216,7 +255,7 @@ function outOfFrame(doc: MotionDoc): QualityProblem[] {
 export function docProblems(doc: MotionDoc, input: { audioAssets: number; pixels?: Pixels; logos?: readonly string[] }): QualityProblem[] {
   const list = scenes(doc);
   const pixels = input.pixels ?? {};
-  return [...repeated(doc, list), ...smallTitles(doc), ...silent(doc, input.audioAssets), ...softPictures(doc, pixels), ...croppedScreens(doc, pixels), ...alteredLogos(doc, new Set(input.logos ?? [])), ...outOfFrame(doc), ...styleProblems(doc).map((p) => ({ kind: Quality.OffStyle, at: p.at, detail: p.detail }))];
+  return [...repeated(doc, list), ...smallTitles(doc), ...silent(doc, input.audioAssets), ...softPictures(doc, pixels), ...croppedScreens(doc, pixels), ...alteredLogos(doc, new Set(input.logos ?? [])), ...outOfFrame(doc), ...styleProblems(doc).map((p) => ({ kind: Quality.OffStyle, at: p.at, detail: p.detail, severity: STYLE_SEVERITY[p.effect] }))];
 }
 
 export function frameProblems(stats: readonly FrameStat[]): QualityProblem[] {
