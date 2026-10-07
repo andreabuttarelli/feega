@@ -1105,7 +1105,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_style: tool({
-      description: `The motion style the video is directed in: ${MOTION_STYLES.map((m) => `${m} (${STYLES[m].label})`).join(', ')}. Apple minimal is the default; change it only when the user explicitly asks for another style. The quality gate in view_frames checks the effects the style forbids.`,
+      description: `The motion style the video is directed in: ${MOTION_STYLES.map((m) => `${m} (${STYLES[m].label})`).join(', ')}. Launch film (minimal look, high energy) is the default; change it only when the user explicitly asks for another style. The quality gate in view_frames checks the effects the style forbids.`,
       inputSchema: z.object({ style: z.enum(MOTION_STYLES) }),
       execute: async (input) => apply({ ok: true, doc: { ...session.doc, style: input.style } }, `style ${input.style}`)
     }),

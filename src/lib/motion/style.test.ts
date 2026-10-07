@@ -25,14 +25,9 @@ function withClip(doc: MotionDoc, id: string, component: 'Title' | 'Image' | 'Pa
 
 const rise = { opacity: [{ frame: 0, value: 0, ease: STYLES[MotionStyle.AppleMinimal].eases.enter }, { frame: 12, value: 1, ease: STYLES[MotionStyle.AppleMinimal].eases.enter }] };
 const effects = (doc: MotionDoc) => styleProblems(doc).map((p) => p.effect);
-const blank = () => newMotionDoc(MotionFormat.Landscape);
+const blank = (style = MotionStyle.AppleMinimal): MotionDoc => ({ ...newMotionDoc(MotionFormat.Landscape), style });
 
 describe('the Apple minimal style', () => {
-  it('is the default style of every video', () => {
-    expect(styleOf(blank())).toBe(DEFAULT_STYLE);
-    expect(DEFAULT_STYLE).toBe(MotionStyle.AppleMinimal);
-  });
-
   it('signs its eases: an expo-out entrance that never overshoots, an in-out move', () => {
     const { enter, move } = STYLES[MotionStyle.AppleMinimal].eases;
 
@@ -116,5 +111,59 @@ describe('the Apple minimal style', () => {
 
     expect(effects(two)).toEqual([]);
     expect(effects(withClip(two, 'c', 'Title', { keyframes: rise }))).toContain(Forbidden.Crowded);
+  });
+});
+
+const at = (seconds: number) => Math.round(seconds * SECOND);
+const track = (prop: string, from: number, to: number, frames = 3 * SECOND) => ({ [prop]: [{ frame: 0, value: from, ease: Ease.Linear }, { frame: frames, value: to, ease: Ease.Linear }] });
+const film = () => blank(MotionStyle.LaunchFilm);
+const beatMarkers = (doc: MotionDoc, every: number) => ({ ...doc, markers: Array.from({ length: 20 }, (_, i) => ({ frame: at(i * every), label: `beat ${i + 1}` })) });
+
+describe('the launch film style', () => {
+  it('is the default style of every new video', () => {
+    expect(DEFAULT_STYLE).toBe(MotionStyle.LaunchFilm);
+    expect(styleOf(newMotionDoc(MotionFormat.Landscape))).toBe(MotionStyle.LaunchFilm);
+  });
+
+  it('enters text in a third of a second or less, on an ease that snaps', () => {
+    const { seconds, eases } = STYLES[MotionStyle.LaunchFilm];
+
+    expect(seconds.enter[1]).toBeLessThanOrEqual(0.35);
+    expect(eases.enter[0]).toBeLessThanOrEqual(0.2);
+    expect(seconds.scene[1]).toBeLessThanOrEqual(2.5);
+  });
+
+  it('lets a device fly in turning and a word punch in from the side: energy is not off-style', () => {
+    const doc = withClip(withClip(film(), 'd', 'Device3D', { keyframes: track('objectRotateY', -95, 8) }), 'w', 'Title', { keyframes: track('x', 0.2, -0.2, 12) });
+
+    expect(effects(doc)).not.toContain(Forbidden.Rotation);
+    expect(effects(doc)).not.toContain(Forbidden.FlyingText);
+  });
+
+  it('names a picture that holds still for more than half a second', () => {
+    const late = { scale: [{ frame: at(1), value: 1, ease: Ease.Linear }, { frame: at(3), value: 1.2, ease: Ease.Linear }] };
+
+    expect(effects(withClip(film(), 'i', 'Image', { keyframes: late }))).toContain(Forbidden.Still);
+    expect(effects(withClip(film(), 'i', 'Image', { keyframes: track('zoom', 1, 1.6) }))).not.toContain(Forbidden.Still);
+  });
+
+  it('names a cut that misses the beat once the beats are marked, not one that lands on it', () => {
+    const offBeat = withClip(withClip(beatMarkers(film(), 0.5), 'a', 'Title', { keyframes: rise }), 'b', 'Title', { keyframes: rise }, at(3.2));
+    const onBeat = withClip(withClip(beatMarkers(film(), 0.5), 'a', 'Title', { keyframes: rise }), 'b', 'Title', { keyframes: rise }, at(3));
+
+    expect(effects(offBeat)).toContain(Forbidden.OffBeat);
+    expect(effects(onBeat)).not.toContain(Forbidden.OffBeat);
+  });
+
+  it('names a video of six seconds or more with no peak, and finds the peak in a big 3D move', () => {
+    const flat = [0, 3, 6].reduce((doc, s, i) => withClip(doc, `t${i}`, 'Title', { keyframes: rise }, at(s)), film());
+    const peak = withClip(flat, 'd', 'Device3D', { keyframes: track('objectRotateY', -200, 0, 20) }, at(6));
+
+    expect(effects(flat)).toContain(Forbidden.NoPeak);
+    expect(effects(peak)).not.toContain(Forbidden.NoPeak);
+  });
+
+  it('a short clip has no peak to find', () => {
+    expect(effects(withClip(film(), 't', 'Title', { keyframes: rise }))).not.toContain(Forbidden.NoPeak);
   });
 });

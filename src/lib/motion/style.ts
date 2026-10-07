@@ -1,4 +1,5 @@
 import { TransitionKind } from './design';
+import { COMPONENTS, TrackKind } from './components';
 import type { MotionDoc } from './doc';
 import { EffectKind } from './effects/registry';
 import { JunctionKind } from './junction-model';
@@ -13,7 +14,9 @@ export enum Forbidden {
   FlyingText = 'flying-text',
   Crowded = 'crowded',
   Transition = 'transition',
-  Still = 'still'
+  Still = 'still',
+  OffBeat = 'off-beat',
+  NoPeak = 'no-peak'
 }
 
 export type StyleSpec = {
@@ -36,11 +39,42 @@ const POSITIONS = ['x', 'y'];
 const SPIN_LIMIT = 60;
 const OVERSHOOT_Y = 1;
 const PICTURES = new Set(['Image', 'Device3D']);
-const DRIFTS = ['scale', 'scaleX', 'scaleY', 'x', 'y', 'z', 'focusX', 'focusY', 'objectRotateX', 'objectRotateY', 'screenScroll'];
+const DRIFTS = ['scale', 'scaleX', 'scaleY', 'x', 'y', 'z', 'zoom', 'dolly', 'orbit', 'focusX', 'focusY', 'objectRotateX', 'objectRotateY', 'objectRotateZ', 'screenScroll'];
 const DRIFT_STEP = 0.004;
 const DEVICE_TURN = { start: -20, end: 40 };
+const BEAT_LABEL = /^beat \d+$/;
+const BEAT_TOLERANCE_FRAMES = 2;
+const PEAK_FROM_S = 6;
+const PEAK_TRAVEL: Record<string, number> = { scale: 0.6, zoom: 0.8, dolly: 0.5, objectRotateX: 90, objectRotateY: 90, objectRotateZ: 90 };
+const CALM: readonly Forbidden[] = [Forbidden.Particles, Forbidden.Glow, Forbidden.Rotation, Forbidden.Bounce, Forbidden.FlyingText, Forbidden.Crowded, Forbidden.Transition, Forbidden.Still];
 
 export const STYLES: Record<MotionStyle, StyleSpec> = {
+  [MotionStyle.LaunchFilm]: {
+    label: 'Launch film',
+    eases: { enter: [0.16, 1, 0.3, 1], move: [0.83, 0, 0.17, 1] },
+    seconds: { enter: [0.2, 0.35], stagger: 0.06, exit: 0.2, still: 0.5, scene: [0.8, 2.5] },
+    movement: { rise: 0.12, settle: 0.7, blur: 18, pushIn: 1.25, turn: 100 },
+    type: { family: 'Inter', weights: { display: 800, text: 500 }, sizes: { hero: 0.26, line: 0.12, small: 0.026 } },
+    palette: { ink: '#050505', paper: '#ffffff', muted: '#8b8b8b', accents: 1 },
+    junctions: [JunctionKind.Crossfade, JunctionKind.DipToBlack, JunctionKind.Blur, JunctionKind.Zoom],
+    entrances: [TransitionKind.None, TransitionKind.Fade, TransitionKind.Blur, TransitionKind.Scale],
+    forbidden: [Forbidden.Particles, Forbidden.Glow, Forbidden.Bounce, Forbidden.Crowded, Forbidden.Transition, Forbidden.Still, Forbidden.OffBeat, Forbidden.NoPeak],
+    maxMoving: 4,
+    rules: [
+      'Launch film is the house style: the LOOK of an Apple keynote film, Linear, Vercel Ship or Stripe Sessions (few elements, very large type, the real product, a sober palette) with HIGH ENERGY. Minimal never means slow: the bar is "would a client pay for this?". Never a slideshow, a still picture, a slow fade, the same layout twice or a PowerPoint effect.',
+      'Storyboard first: before the first edit write a table, one row per scene: time, beat, scene template, the line it says, the move (kinetic type, speed ramp, device fly, match cut, montage, peak, logo build).',
+      'Music is always there and drives the cut: put it on an Audio clip, analyze_audio, mark_beats, then cut on every beat or every second beat (cut_to_beat). Scenes last 0.8–2.5 s; a montage before the peak cuts on half beats.',
+      'Build from the launch scenes: list_templates, insert_template builtin:launch-* (word-burst, ui-speed-ramp, device-fly, number-match-cut, ui-tilt-zoom, beat-montage, ui-explode, device-orbit, logo-build) and fill them with set_template_fields; push them further with keyframes. builtin:scene-* are the calm variants, for a beat of rest.',
+      'Kinetic type: one to three words per beat, very large (a fifth of the frame or more), each word punching in from a 130–140% scale and an 18 px blur in 0.2–0.3 s on cubic-bezier(0.16,1,0.3,1), then holding. Numbers rise out of their own box (a fast mask reveal). One accent colour on the key word.',
+      'Camera never rests: every picture pushes, zooms inside its box (Image zoom with focus_x/focus_y) or pans; devices fly in turning 90° or more and keep drifting; nothing holds still for more than half a second (the quality gate names it).',
+      'Speed ramps: a zoom into the real UI runs slow-fast-slow on cubic-bezier(0.83,0,0.17,1): hold a beat, whip to the detail on the next beat, keep creeping. Motion blur on (set_motion_blur, 180°, 6 samples) so the whip smears.',
+      'Match cuts: carry a word, a number or the product across the cut in the same place (the hook word becomes the headline on the real page; three numbers swap in one spot).',
+      'One clear wow peak on the strongest beat, about two thirds in: the UI exploding into 3D (launch-ui-explode), a white flash on the drop, the biggest move of the film. The gate names a film with no peak.',
+      'A memorable close: the logo builds in 3D (Logo3D chrome or metal spinning in and landing on a beat with a shockwave), then the address and the claim.',
+      'Show the real product, big and readable: captures from import_asset capture desktop/mobile, cropped on the part that matters; a phone wants a mobile capture, a laptop a desktop one; never zoom past the source pixels.',
+      'Palette: near-black background, white type, one accent from the brand. Forbidden: decorative particles, glows, bounce or overshoot, wipes and pushes, more than four things moving at once.'
+    ]
+  },
   [MotionStyle.AppleMinimal]: {
     label: 'Apple minimal',
     eases: { enter: [0.16, 1, 0.3, 1], move: [0.65, 0, 0.35, 1] },
@@ -50,7 +84,7 @@ export const STYLES: Record<MotionStyle, StyleSpec> = {
     palette: { ink: '#000000', paper: '#ffffff', muted: '#86868b', accents: 1 },
     junctions: [JunctionKind.Crossfade, JunctionKind.DipToBlack, JunctionKind.Blur],
     entrances: [TransitionKind.None, TransitionKind.Fade, TransitionKind.Blur],
-    forbidden: Object.values(Forbidden),
+    forbidden: CALM,
     maxMoving: 2,
     rules: [
       'Apple minimal is the house style: every frame should look like a frame of an Apple keynote or product film. Confident and calm: type snaps in and holds, the camera drifts slowly, one idea at a time.',
@@ -144,7 +178,7 @@ const perTimeline =
   (doc, spec) =>
     timelines(doc).flatMap((clips) => check(clips, spec, doc.fps));
 
-const CLIP_CHECKS: Record<Forbidden, ClipCheck> = {
+const CLIP_CHECKS: Partial<Record<Forbidden, ClipCheck>> = {
   [Forbidden.Particles]: (clips) => clips.filter((c) => c.component === 'Particles').map((clip) => ({ clip, at: clip.from, detail: `${clip.id} is a particle emitter: decorative particles are off-style` })),
   [Forbidden.Glow]: (clips) => clips.filter((c) => c.effects.some((e) => e.enabled && e.kind === EffectKind.Glow)).map((clip) => ({ clip, at: clip.from, detail: `${clip.id} glows: remove the glow effect` })),
   [Forbidden.Rotation]: (clips) =>
@@ -171,7 +205,34 @@ const CLIP_CHECKS: Record<Forbidden, ClipCheck> = {
       .map((clip) => ({ clip, at: clip.from, detail: `${clip.id} enters or leaves with ${clip.junction?.kind ?? clip.transitionIn.kind}: use a cut, a dissolve (${spec.junctions.join(', ')}) or a match cut` }))
 };
 
-const CHECKS = Object.fromEntries(Object.entries(CLIP_CHECKS).map(([effect, check]) => [effect, perTimeline(check)])) as Record<Forbidden, Check>;
+const beatFrames = (doc: MotionDoc) => (doc.markers ?? []).filter((m) => BEAT_LABEL.test(m.label)).map((m) => m.frame);
+
+function offBeat(doc: MotionDoc): Found[] {
+  const beats = beatFrames(doc);
+  if (beats.length < 2) {
+    return [];
+  }
+  const cuts = timelines(doc)[0].filter((c) => c.from > 0 && COMPONENTS[c.component].track === TrackKind.Visual);
+  const missed = cuts.find((c) => Math.min(...beats.map((b) => Math.abs(b - c.from))) > BEAT_TOLERANCE_FRAMES);
+  return missed ? [{ clip: missed, at: missed.from, detail: `${missed.id} cuts in off the beat: move it onto a beat marker (cut_to_beat or move_clip to "beat N")` }] : [];
+}
+
+const peakOf = (clip: Clip) => Object.entries(PEAK_TRAVEL).some(([prop, size]) => travel(clip.keyframes[prop] ?? []) >= size);
+
+function noPeak(doc: MotionDoc): Found[] {
+  const clips = timelines(doc).flat();
+  const end = Math.max(0, ...timelines(doc)[0].map((c) => c.from + c.durationInFrames));
+  if (end < PEAK_FROM_S * doc.fps || clips.some(peakOf)) {
+    return [];
+  }
+  return [{ clip: clips[0], at: 0, detail: 'the film has no peak: give its strongest beat one big move (launch-ui-explode, a device flying in turning 90° or more, a 60% scale punch or a whip zoom into the UI)' }];
+}
+
+const CHECKS: Record<Forbidden, Check> = {
+  ...(Object.fromEntries(Object.entries(CLIP_CHECKS).map(([effect, check]) => [effect, perTimeline(check)])) as Record<Forbidden, Check>),
+  [Forbidden.OffBeat]: offBeat,
+  [Forbidden.NoPeak]: noPeak
+};
 
 export type StyleProblem = { effect: Forbidden; at: number; detail: string };
 
