@@ -36,7 +36,7 @@ describe('the launch film scene library', () => {
   it.each(launchDocs().map((e) => [e.id, e] as const))('%s breaks none of the launch film rules, alone and inside a video', (_id, entry) => {
     const placed = insertTemplate(newMotionDoc(MotionFormat.Landscape), entry, { from: 0, newId: ids() });
 
-    expect(styleProblems(entry.template.doc)).toEqual([]);
+    expect(styleProblems(entry.template.doc).map((p) => p.detail)).toEqual([]);
     expect(placed.ok && styleProblems(placed.doc)).toEqual([]);
   });
 

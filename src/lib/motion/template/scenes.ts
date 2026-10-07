@@ -144,7 +144,7 @@ const SCENE_DESIGNS: Omit<Design, 'fonts'>[] = [
     beats: [
       fill(INK, 3.5),
       { id: 'statement', track: 'front', component: 'Text', at: 0.1, len: 3.4, props: { text: 'Fast.\nBy design.', ...display(HERO), x: 0.3, y: 0.5, width: 0.46, height: 0.5, align: 'left' }, keys: snapUp(), exit: OUT },
-      { id: 'detail', track: 'middle', component: 'Text', at: 0.1 + STAGGER * 4, len: 3.4 - STAGGER * 4, props: { text: 'One small paragraph that explains the statement on the left.', ...body(SMALL, MUTED), x: 0.74, y: 0.56, width: 0.3, height: 0.2, align: 'left' }, keys: snapUp(), exit: OUT }
+      { id: 'detail', track: 'middle', component: 'Text', at: 0.1 + STAGGER * 4, len: 3.4 - STAGGER * 4, props: { text: 'It explains the line.', ...body(SMALL, MUTED), x: 0.74, y: 0.56, width: 0.3, height: 0.2, align: 'left' }, keys: snapUp(), exit: OUT }
     ],
     fields: [text('statement', 'Statement', 'statement'), text('detail', 'Detail', 'detail'), colour('background', 'Background', 'bg', 'fill'), colour('text_color', 'Statement colour', 'statement', 'color')]
   },

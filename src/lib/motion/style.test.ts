@@ -184,4 +184,21 @@ describe('the launch film style', () => {
   it('allows a whip pan between scenes', () => {
     expect(effects(withClip(film(), 'w', 'Title', { junction: { kind: JunctionKind.PushLeft, durationInFrames: 8 }, keyframes: rise }))).not.toContain(Forbidden.Transition);
   });
+
+  it('names text gone before it can be read: 0.4 s a word plus 0.6 s, 1.2 s at least for a phrase', () => {
+    const shown = (text: string, seconds: number) => withClip(film(), 't', 'Title', { props: { text }, durationInFrames: at(seconds), keyframes: rise });
+
+    expect(effects(shown('Turn clicks into revenue.', 1.5))).toContain(Forbidden.UnreadableText);
+    expect(effects(shown('Turn clicks into revenue.', 2.2))).not.toContain(Forbidden.UnreadableText);
+    expect(effects(shown('Links.', 0.5))).toContain(Forbidden.UnreadableText);
+    expect(effects(shown('Links.', 1))).not.toContain(Forbidden.UnreadableText);
+    expect(effects(shown('Two words', 1.4))).not.toContain(Forbidden.UnreadableText);
+  });
+
+  it('names a film made mostly of screenshots, not one with a blurred one behind live UI', () => {
+    const shot = (blur: number) => withClip({ ...film(), durationInFrames: at(8) }, 'i', 'Image', { props: { assetId: 'shot', width: 1, height: 1 }, durationInFrames: at(8), keyframes: track('zoom', 1, 1.4), transform: { blur } });
+
+    expect(effects(shot(0))).toContain(Forbidden.Screenshots);
+    expect(effects(shot(20))).not.toContain(Forbidden.Screenshots);
+  });
 });
