@@ -80,6 +80,8 @@ import { DEFAULT_NAME_PATTERN, MAX_BATCH_ROWS, outputName } from '$lib/motion/te
 import { renderQuote } from '$lib/motion/render-quote';
 import { BOUNDS, PHYSICS, PHYSICS_KEYS, PHYSICS_PRESET, PHYSICS_PRESETS } from '$lib/motion/physics/model';
 import { applyPhysicsPreset, setPhysics } from '$lib/motion/physics/ops';
+import { STYLES, styleOf } from '$lib/motion/style';
+import { MOTION_STYLES } from '$lib/motion/style-model';
 import { unitOf, propsOwner, shownKeyframes, shownMask, shownOffset, shownRecord, storedMask, storedOffset, storedRecord, toShown, toStored, type Owner } from '$lib/motion/units';
 
 export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number };
@@ -179,6 +181,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
     markers: (doc.markers ?? []).map((m) => ({ label: m.label, time: secs(m.frame) })),
     workArea: doc.workArea ? { start: secs(doc.workArea.from), end: secs(doc.workArea.to) } : null,
     interactive: interactiveOf(doc),
+    style: styleOf(doc),
     camera: cameraSummary(doc.camera),
     look: lookSummary(doc.look),
     components: Object.entries(doc.components).map(([name, c]) => customSummary(name, c)),
@@ -1089,6 +1092,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         }
         return deps.batch({ doc: session.doc, rows });
       }
+    }),
+
+    set_style: tool({
+      description: `The motion style the video is directed in: ${MOTION_STYLES.map((m) => `${m} (${STYLES[m].label})`).join(', ')}. Apple minimal is the default; change it only when the user explicitly asks for another style. The quality gate in view_frames checks the effects the style forbids.`,
+      inputSchema: z.object({ style: z.enum(MOTION_STYLES) }),
+      execute: async (input) => apply({ ok: true, doc: { ...session.doc, style: input.style } }, `style ${input.style}`)
     }),
 
     set_motion_blur: tool({
