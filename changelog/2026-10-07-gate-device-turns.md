@@ -7,4 +7,7 @@
   tagliata a metà senza che il gate lo dicesse. Ora `NESTED` dice, per componente, quale
   composizione annidata leggere: Precomp → `comp`, Device3D → `screenComp`.
 
+- Anche il controllo del copione (`scriptDrift`) legge il testo sullo schermo di un device, con la
+  stessa tabella (`nested.ts`): una riga del copione mostrata su un telefono contava come assente.
+
 Trovati costruendo il video demo Ondrafo.

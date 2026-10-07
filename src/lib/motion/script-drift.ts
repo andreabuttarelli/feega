@@ -4,6 +4,7 @@ import { storyLabel, StoryBeat } from './story';
 import { UI_KIT } from './ui-kit/kit';
 import { contentParams, kitKind } from './ui-kit/content';
 import { defaultsOf } from './ui-kit/anchors';
+import { nestedComp } from './nested';
 
 export type DriftProblem = { frame: number; detail: string };
 
@@ -61,8 +62,8 @@ function shown(doc: MotionDoc, tracks: MotionDoc['tracks'], offset: number, end:
       if (to <= from) {
         return [];
       }
-      const comp = String(clip.props.comp ?? '');
-      if (clip.component === 'Precomp' && doc.comps[comp] && !seen.has(comp)) {
+      const comp = nestedComp(clip) ?? '';
+      if (doc.comps[comp] && !seen.has(comp)) {
         return shown(doc, doc.comps[comp].tracks, from, to, new Set([...seen, comp]));
       }
       return [{ from, to, text: TEXT_OF[clip.component]?.(clip) ?? '', logo: LOGOS.has(clip.component) }];
