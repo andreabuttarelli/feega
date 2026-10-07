@@ -70,6 +70,24 @@ describe('a custom component at runtime', () => {
   });
 });
 
+describe('a component scope of its own', () => {
+  it('declares top and brand without colliding with the injected names', () => {
+    const js = 'const top = 12; let brand = "Tappory"; function rand() { return 0.5; } root.dataset.v = brand + top + rand();';
+    const { errors, root } = run('Leaderboard', js);
+
+    expect(errors).toEqual([]);
+    expect(root.dataset.v).toBe('Tappory120.5');
+  });
+});
+
+describe('format', () => {
+  it('formats numbers the same on every machine, whatever its locale', () => {
+    const js = 'root.dataset.v = [format.number(1234567.891, { decimals: 2 }), format.number(-9876), format.compact(12400), format.compact(3_250_000), format.percent(0.4567), format.number(1234.5, { decimals: 1, group: ".", point: "," })].join("|");';
+
+    expect(run('Stats', js).root.dataset.v).toBe('1,234,567.89|-9,876|12.4K|3.3M|46%|1.234,5');
+  });
+});
+
 describe('callbacks under the HyperFrames seek', () => {
   it('an onUpdate on tl still runs when the runtime seeks with events suppressed', () => {
     const { master, root } = run('Typer', 'tl.to({}, { duration: 1, ease: "none", onUpdate() { root.dataset.p = String(Math.round(this.progress() * 10)); } });', 0);

@@ -6,7 +6,7 @@ import { FONT_CSS_ORIGIN, FONT_FILE_ORIGIN } from '$lib/motion/hyperframes/csp';
 import { ExportFormat, FORMAT, Master, Quality } from '$lib/motion/export-formats';
 import { assembleArgs, audioMixArgs, concatList, zipArgs } from './render-commands';
 import { FARM_JOB_DIR, FARM_RUNTIME_DIR, type FarmWorker, type RenderFarm } from './render-farm';
-import { stripSteps, stripVideos } from './video-strips';
+import { privateVideos, stripSteps, stripVideos } from './video-strips';
 
 export type FarmJob = { html: string; width: number; height: number; fps: number; totalFrames: number; audio: AudioEntry[]; allowHosts: string[]; format: ExportFormat; quality: Quality; motionBlur: Shutter | null; cost?: CostSpan[]; renderClass?: RenderClass };
 
@@ -182,8 +182,13 @@ export function routeOf(job: FarmJob): RenderRoute {
   return WHOLE_ONLY.some((rule) => rule.applies(job)) ? RenderRoute.Whole : RenderRoute.Chunked;
 }
 
+function unreachable(job: FarmJob): string | null {
+  const urls = privateVideos(job.html);
+  return urls.length ? `the renderer downloads videos only from public hosts, and ${urls.join(', ')} is on a private address: import it as an asset (or serve it from a public https url) and use the asset` : null;
+}
+
 export function farmProblem(job: FarmJob): string | null {
-  return REFUSED.find((rule) => rule.applies(job))?.because ?? null;
+  return REFUSED.find((rule) => rule.applies(job))?.because ?? unreachable(job);
 }
 
 const samplesOf = (job: FarmJob) => job.motionBlur?.samples ?? 1;

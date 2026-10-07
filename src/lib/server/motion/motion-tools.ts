@@ -1516,7 +1516,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         name: z.string().describe('PascalCase, e.g. NodeGraph'),
         html: z.string().max(MAX_HTML).describe('markup inside the component root; no script, style, iframe, media or external urls'),
         css: z.string().max(MAX_CSS).describe('scoped to the component root (:scope is the root); no animation, transition, @keyframes, @import or external url()'),
-        js: z.string().max(MAX_JS).describe('body of a function receiving root, props, tl, duration, fps, assets, brand, rand, motion, lottie, THREE; build every animation on tl'),
+        js: z.string().max(MAX_JS).describe('body of a function receiving root, props, tl, duration, fps, assets, brand, rand, format, motion, lottie, THREE; build every animation on tl. Its own names never clash with these or with other components. Numbers on screen go through format.number(n, { decimals, group, point }), format.compact(n) (12.4K) or format.percent(ratio): toLocaleString and Intl differ between preview and render'),
         props_schema: z.union([propsSchemaSchema, z.string()]).optional().describe('optional: param() calls in js build it. ' + 'what a person may edit: { type: "object", properties: { key: { type: string|number|boolean, title, default, minimum, maximum, enum, format: color|textarea|asset } } }')
       }),
       execute: async (input, { toolCallId }) => {

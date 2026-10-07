@@ -7,11 +7,26 @@ export type StripTiming = { start: number; duration: number; mediaStart: number;
 export type Strip = StripTiming & { url: string };
 
 const VIDEO_TAG = /<video\b[^>]*><\/video>/g;
+const VIDEO_OPEN = /<video\b[^>]*>/g;
 const TIMING_ATTR = /\sdata-(start|duration|media-start|playback-rate)="/g;
 const STRIP_DIR = 'strips';
 
 const attr = (tag: string, name: string) => tag.match(new RegExp(`\\s${name}="([^"]*)"`))?.[1] ?? null;
 const unescape = (url: string) => url.replace(/&amp;/g, '&').replace(/&quot;/g, '"');
+
+const PRIVATE_HOST = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|0\.0\.0\.0$|\[?::1\]?$)|\.(local|localhost|internal)$/;
+
+function privateUrl(url: string): boolean {
+  try {
+    return PRIVATE_HOST.test(new URL(url).hostname);
+  } catch {
+    return false;
+  }
+}
+
+export function privateVideos(html: string): string[] {
+  return [...html.matchAll(VIDEO_OPEN)].map(([tag]) => unescape(attr(tag, 'src') ?? '')).filter(privateUrl);
+}
 
 export function stripFrame(strip: StripTiming, time: number, fps: number): number | null {
   const EPSILON = 1e-6;

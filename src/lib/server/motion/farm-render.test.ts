@@ -257,6 +257,17 @@ describe('farmProblem', () => {
     expect(farmProblem({ ...job, fps: 60, totalFrames: 21_600, motionBlur: { ...blur, samples: 64 } })).toMatch(/samples/);
   });
 
+  it.each(['http://localhost:8792/screen.mp4', 'http://127.0.0.1/a.mp4', 'http://192.168.1.4/a.mp4', 'https://studio.local/a.mp4'])('a video the renderer cannot download (%s) is refused, naming it and the fix', (url) => {
+    const problem = farmProblem({ ...job, html: `<video id="dv-c" src="${url}" muted></video>` });
+
+    expect(problem).toContain(url);
+    expect(problem).toMatch(/asset/);
+  });
+
+  it('a video on a public host is not refused', () => {
+    expect(farmProblem({ ...job, html: '<video id="c-v" src="https://cdn.example.com/a.mp4"></video>' })).toBeNull();
+  });
+
   it('a video clip blurs like any other clip, and H.265 cannot render whole', () => {
     expect(farmProblem({ ...job, html: '<video id="c-v" src="x">', motionBlur: blur })).toBeNull();
     expect(farmProblem({ ...job, fps: 25, format: ExportFormat.Mp4H265 })).toMatch(/H\.265/);
