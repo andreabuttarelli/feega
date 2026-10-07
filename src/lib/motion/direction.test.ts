@@ -174,3 +174,64 @@ describe('nothing important leaves the frame', () => {
     expect(out(placed('Custom', ui, exit))).toEqual([]);
   });
 });
+
+describe('a cut waits for the scene to finish', () => {
+  const FPS = 30;
+  const withPiece = (kind: UiKind, seconds: number, props: Record<string, unknown> = {}) => {
+    const piece = UI_KIT[kind];
+    const base = must(writeComponent(calm(), piece.name, { source: { html: piece.html, css: piece.css, js: piece.js }, propsSchema: { type: 'object', properties: {} } }));
+    return must(addClip(base, { component: 'Custom', from: 0, durationInFrames: Math.round(seconds * FPS), props: { name: piece.name, ...props } }, 'c'));
+  };
+  const keyed = (keyframes: Record<string, { frame: number; value: number; ease: Ease }[]>) => {
+    const doc = must(addClip(calm(), { component: 'Title', from: 0, durationInFrames: 90, props: { text: 'Hi', x: 0.5, y: 0.5, width: 0.4, height: 0.3 } }, 'c'));
+    return { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === 'c' ? { ...c, keyframes } : c)) })) };
+  };
+  const cuts = (doc: MotionDoc) => docProblems(doc, { audioAssets: 0 }).filter((p) => p.kind === Quality.CutMidAnimation);
+
+  it('a funnel cut before its last stage fills is named, one held a second after it settles is not', () => {
+    expect(cuts(withPiece(UiKind.Funnel, 2))).toHaveLength(1);
+    expect(cuts(withPiece(UiKind.Funnel, 3.5))).toEqual([]);
+  });
+
+  it('the shortener is held until its toast has landed', () => {
+    expect(cuts(withPiece(UiKind.LinkShortener, 2.5))).toHaveLength(1);
+    expect(cuts(withPiece(UiKind.LinkShortener, 4.5))).toEqual([]);
+  });
+
+  it('a slower piece needs a longer scene', () => {
+    expect(cuts(withPiece(UiKind.StatCards, 3.4))).toEqual([]);
+    expect(cuts(withPiece(UiKind.StatCards, 3.4, { speed: 0.6 }))).toHaveLength(1);
+  });
+
+  it('a keyframed move still running a second before the cut is named; a long drift and a quick exit are not', () => {
+    const late = { scale: [{ frame: 0, value: 1, ease: Ease.Linear }, { frame: 50, value: 1, ease: Ease.Linear }, { frame: 75, value: 1.3, ease: Ease.Linear }] };
+    const drift = { scale: [{ frame: 0, value: 1, ease: Ease.Linear }, { frame: 90, value: 1.04, ease: Ease.Linear }] };
+    const exit = { scale: [{ frame: 0, value: 1, ease: Ease.Linear }, { frame: 82, value: 1, ease: Ease.Linear }, { frame: 90, value: 2.5, ease: Ease.Linear }] };
+
+    expect(cuts(keyed(late))).toHaveLength(1);
+    expect(cuts(keyed(drift))).toEqual([]);
+    expect(cuts(keyed(exit))).toEqual([]);
+  });
+});
+
+describe('a background has no seams', () => {
+  const backdrop = (props: Record<string, unknown>, scale = 1) => {
+    const doc = must(addClip(calm(), { component: 'Shape', from: 0, durationInFrames: 90, props: { fillKind: 'radial', fill: '#16233a', fill2: '#050505', ...props } }, 'bg'));
+    return { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === 'bg' ? { ...c, transform: { ...c.transform, scale } } : c)) })) } as MotionDoc;
+  };
+  const seams = (doc: MotionDoc) => docProblems(doc, { audioAssets: 0 }).filter((p) => p.kind === Quality.BackgroundSeam);
+
+  it('the Dub v4 halo, an ellipse smaller than the frame, is named', () => {
+    expect(seams(backdrop({ shape: 'ellipse', x: 0.5, y: 0.55, width: 0.99, height: 0.98 }))).toHaveLength(1);
+  });
+
+  it('a gradient that covers the whole frame passes, an ellipse only when its curve clears the corners', () => {
+    expect(seams(backdrop({ shape: 'rect', x: 0.5, y: 0.5, width: 1, height: 1 }))).toEqual([]);
+    expect(seams(backdrop({ shape: 'ellipse', x: 0.5, y: 0.5, width: 1, height: 1 }, 1.2))).toHaveLength(1);
+    expect(seams(backdrop({ shape: 'ellipse', x: 0.5, y: 0.5, width: 1, height: 1 }, 1.5))).toEqual([]);
+  });
+
+  it('a small gradient accent is not a background', () => {
+    expect(seams(backdrop({ shape: 'ellipse', x: 0.5, y: 0.4, width: 0.3, height: 0.3 }))).toEqual([]);
+  });
+});
