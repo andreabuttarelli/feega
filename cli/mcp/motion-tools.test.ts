@@ -42,6 +42,15 @@ const fake: Server = createServer((req, res) => {
       send(200, polls < 1 ? { run_id: RUN, status: 'running' } : { run_id: RUN, status: 'done', summary: 'added Title', version: 3, cost_usd: 0.01 });
       return;
     }
+    if (route === `/api/v1/motion/${NODE}/render`) {
+      const server = (raw ? JSON.parse(raw) : {}).mode === 'server';
+      send(server ? 202 : 201, server ? { mode: 'server', run_id: 'farm-1', credits: 12 } : { mode: 'browser', run_id: 'render-1', render_url: `https://feega.app/render/render-1.s`, credits: 0 });
+      return;
+    }
+    if (route === '/api/v1/motion/renders/render-1') {
+      send(200, { run_id: 'render-1', mode: 'browser', status: 'done', asset_id: 'a1', file_url: 'https://files/a1.mp4' });
+      return;
+    }
     if (route === `/api/v1/motion/${NODE}`) {
       send(200, { node_id: NODE, version: 3, doc: { duration: 6, tracks: [] } });
       return;
@@ -115,11 +124,30 @@ describe('the motion agent over MCP', () => {
     expect(result?.structuredContent).toMatchObject({ node_id: NODE, version: 3 });
   });
 
-  test('only the three motion tools are exposed, not the editor ones', async () => {
+  test('render_video returns a render link by default, a farm run only on request', async () => {
+    const link = await callTool('render_video', { node_id: NODE });
+    expect(calls[0]).toEqual({ method: 'POST', path: `/api/v1/motion/${NODE}/render`, body: { mode: 'browser' } });
+    expect(JSON.stringify(link)).toContain('render-1.s');
+
+    calls.length = 0;
+    const farm = await callTool('render_video', { node_id: NODE, mode: 'server', resolution: '720p' });
+    expect(calls[0].body).toEqual({ mode: 'server', settings: { resolution: '720p' } });
+    expect(JSON.stringify(farm)).toContain('farm-1');
+  });
+
+  test('get_render reads a render and its file', async () => {
+    const result = await callTool('get_render', { run_id: 'render-1' });
+    expect(calls[0].path).toBe('/api/v1/motion/renders/render-1');
+    expect(JSON.stringify(result)).toContain('https://files/a1.mp4');
+  });
+
+  test('only the motion tools are exposed, not the editor ones', async () => {
     await rpc('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'motion', version: '0.0.1' } });
     const names = ((await rpc('tools/list', {})).result?.tools ?? []).map((t) => t.name);
 
     expect(names.filter((n) => n.includes('motion')).sort()).toEqual(['ask_motion_agent', 'get_motion_run', 'get_motion_summary']);
+    expect(names).toContain('render_video');
+    expect(names).toContain('get_render');
     expect(names).not.toContain('add_clip');
   });
 });
@@ -140,5 +168,35 @@ describe('feega motion ask', () => {
     expect(calls[0]).toEqual({ method: 'POST', path: `/api/v1/motion/${NODE}/ask`, body: { prompt: 'make the title red' } });
     expect(lines.join('\n')).toContain('revision 3');
     expect(lines.join('\n')).toContain('added Title');
+  });
+});
+
+describe('feega motion render', () => {
+  async function printed(work: () => Promise<void>): Promise<string> {
+    const lines: string[] = [];
+    const log = console.log;
+    console.log = (...args: unknown[]) => {
+      lines.push(args.join(' '));
+    };
+    await work().finally(() => {
+      console.log = log;
+    });
+    return lines.join('\n');
+  }
+
+  test('prints the render link to open on a device', async () => {
+    const { renderAndReport } = await import('../commands/motion.ts');
+    const out = await printed(() => renderAndReport('token', NODE, {}));
+
+    expect(calls[0]).toEqual({ method: 'POST', path: `/api/v1/motion/${NODE}/render`, body: { mode: 'browser' } });
+    expect(out).toContain('https://feega.app/render/render-1.s');
+  });
+
+  test('--server asks the farm and says what it costs', async () => {
+    const { renderAndReport } = await import('../commands/motion.ts');
+    const out = await printed(() => renderAndReport('token', NODE, { server: true }));
+
+    expect(calls[0].body).toEqual({ mode: 'server' });
+    expect(out).toContain('12 credits');
   });
 });

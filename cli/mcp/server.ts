@@ -27,7 +27,7 @@ export const MCP_INSTRUCTIONS = [
   'A canvas node is raw material; a post (`list_posts`/`create_post`/`set_post_status`) is the promoted artifact ready to schedule. An ad campaign (`list_ad_campaigns`/`create_ad_campaign`/`approve_ad_campaign`/`set_ad_campaign_status`) always drafts unapproved; only a signed-in person approves it.',
   'A project has no brand until one is attached (`projects.brand_id` is nullable, and that is the normal case): open a canvas to explore, choose a brand only once something is ready to publish.',
   '`get_media` shows what a node, run or asset holds: fetch `preview_url` to look, give `full_url` to the user.',
-  '`ask_motion_agent` edits a `motion` video via the editor AI (`get_motion_run`, `get_motion_summary`).',
+  '`ask_motion_agent` edits a `motion` video via the editor AI (`get_motion_run`, `get_motion_summary`). `render_video` (free browser link by default), `get_render`.',
   'Signing in is not a tool: over HTTP the host sends the Bearer; locally run `feega login` once (shared session file).'
 ].join(' ');
 

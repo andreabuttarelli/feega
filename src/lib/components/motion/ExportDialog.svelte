@@ -5,9 +5,11 @@
   import type { MotionDoc } from '$lib/motion/doc';
   import { Background, FORMATS, formatOf } from '$lib/motion/doc';
   import { Resolution } from '$lib/motion/render-quote';
-  import { AudioMode, Support, eta, exportSize, exportSupport, frameTimes, outputSize, samplesPerFrame, type ExportScope, type ExportSupport, type Size } from '$lib/motion/export-plan';
+  import { eta, exportSize, outputSize, type Capabilities, type ExportScope, type Size } from '$lib/motion/export-plan';
   import { audioPlan } from '$lib/motion/audio-plan';
-  import { capabilities, encodeMp4, mixAudio } from '$lib/motion/export/encode';
+  import { capabilities } from '$lib/motion/export/encode';
+  import { BrowserStage, renderInBrowser } from '$lib/motion/export/browser-render';
+  import { RenderPlace, renderPlace, thisDevice, type Device } from '$lib/motion/render-place';
   import { saveExport } from '$lib/motion/export/save';
   import type { FrameSize } from './MotionPreview.svelte';
   import { unverified } from '$lib/motion/custom/determinism';
@@ -27,7 +29,7 @@
   const Phase = { Checking: 'checking', Ready: 'ready', Mixing: 'mixing', Rendering: 'rendering', Saving: 'saving', Done: 'done', Failed: 'failed' } as const;
   type Phase = (typeof Phase)[keyof typeof Phase];
 
-  const Mode = { Server: 'server', Browser: 'browser', Interactive: 'interactive' } as const;
+  const Mode = { Video: 'video', Interactive: 'interactive' } as const;
   type Mode = (typeof Mode)[keyof typeof Mode];
 
   const STAGE_LABEL: Record<RenderStage, string> = {
@@ -80,7 +82,8 @@
     onclose: () => void;
   } = $props();
 
-  let mode = $state<Mode>(server.configured ? Mode.Server : Mode.Browser);
+  let mode = $state<Mode>(Mode.Video);
+  let background = $state(false);
   let job = $state<RenderView | null>(server.latest && !SETTLED.has(server.latest.status) ? server.latest : null);
   let serverError = $state('');
   let pollTimer: ReturnType<typeof setTimeout> | null = null;
@@ -102,25 +105,29 @@
   const jobTotal = $derived(job?.progress?.totalFrames ?? target.durationInFrames);
 
   let phase = $state<Phase>(Phase.Checking);
-  let support = $state<ExportSupport>({ support: Support.None, audio: AudioMode.Off });
-  let resolution = $state(Resolution.P1080);
+  let caps = $state<Capabilities | null>(null);
+  let device = $state<Device | null>(null);
   let withAudio = $state(true);
   let done = $state(0);
   let startedAt = $state(0);
   let now = $state(0);
+  let paused = $state(false);
   let error = $state('');
   let downloadUrl = $state('');
   let savedNote = $state('');
   let controller: AbortController | null = null;
 
-  const total = $derived(doc.durationInFrames);
+  const total = $derived(target.durationInFrames);
   const sounds = $derived(audioPlan(doc, assetUrls));
-  const size = $derived<Size>(exportSize(doc, resolution));
+  const size = $derived<Size>(exportSize(doc, settings.resolution));
   const remaining = $derived(eta({ done, total, elapsedMs: now - startedAt }));
   const busy = $derived(phase === Phase.Mixing || phase === Phase.Rendering || phase === Phase.Saving);
   const blockers = $derived(unverified(doc));
   const BLOCKER_LABEL: Record<CheckState, string> = { [CheckState.Unchecked]: 'is still being checked', [CheckState.Failed]: 'failed the seek check', [CheckState.Passed]: '' };
-  const audioOn = $derived(withAudio && support.audio === AudioMode.On && sounds.length > 0);
+  const hasAudio = $derived(withAudio && sounds.length > 0);
+  const place = $derived(caps && device ? renderPlace({ doc: target, settings, capabilities: caps, device, background, hasAudio }) : null);
+  const onFarm = $derived(place?.place === RenderPlace.Farm || jobRunning);
+  const STAGE_PHASE: Record<BrowserStage, Phase> = { [BrowserStage.Mixing]: Phase.Mixing, [BrowserStage.Rendering]: Phase.Rendering };
 
   async function postAction(name: string, form: FormData): Promise<{ ok: boolean; data: Record<string, unknown> }> {
     const res = await fetch(`${editorUrl}?/${name}`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
@@ -172,9 +179,9 @@
     if (jobRunning) {
       pollTimer = setTimeout(poll, POLL_MS);
     }
+    device = thisDevice(navigator);
     void capabilities(doc).then((c) => {
-      support = exportSupport(c);
-      resolution = support.support === Support.Only720 ? Resolution.P720 : Resolution.P1080;
+      caps = c;
       phase = Phase.Ready;
     });
     return () => {
@@ -201,29 +208,27 @@
     error = '';
     done = 0;
     try {
-      phase = Phase.Mixing;
-      const audio = audioOn ? await mixAudio(sounds, doc.durationInFrames / doc.fps) : null;
-
-      phase = Phase.Rendering;
-      startedAt = performance.now();
-      const times = frameTimes(doc);
-      const blob = await encodeMp4({
+      const blob = await renderInBrowser({
+        doc: target,
+        assetUrls,
         size,
-        fps: doc.fps,
-        frames: doc.durationInFrames,
-        samples: samplesPerFrame(doc),
-        audio,
+        withAudio: hasAudio && Boolean(caps?.aac),
+        frames: render,
         signal,
-        render: (onFrame) => render(times, size, onFrame, signal),
+        onStage: (stage) => {
+          phase = STAGE_PHASE[stage];
+          startedAt = performance.now();
+        },
         onFrame: (n) => {
           done = n;
           now = performance.now();
-        }
+        },
+        onPause: (p) => (paused = p)
       });
       downloadUrl = URL.createObjectURL(blob);
 
       phase = Phase.Saving;
-      const saved = await saveExport(blob, { scope, editorUrl, size, seconds: doc.durationInFrames / doc.fps });
+      const saved = await saveExport(blob, { scope, editorUrl, size, seconds: target.durationInFrames / target.fps });
       savedNote = saved.ok ? 'Saved to the canvas assets and attached to this video.' : `Not saved to your assets (${saved.error}). The download below still works.`;
       phase = Phase.Done;
     } catch (e) {
@@ -248,53 +253,75 @@
     <button type="button" aria-label="Close" disabled={busy} onclick={onclose}><X size={16} /></button>
   </header>
 
-  <div class="choice modes" role="radiogroup" aria-label="Where to render">
-    {#if server.configured}<label><input type="radio" name="mode" value={Mode.Server} bind:group={mode} disabled={busy} data-testid="export-mode-server" /> On our servers (fast)</label>{/if}
-    <label><input type="radio" name="mode" value={Mode.Browser} bind:group={mode} disabled={busy || jobRunning} data-testid="export-mode-browser" /> In this browser</label>
+  <div class="choice modes" role="radiogroup" aria-label="What to export">
+    <label><input type="radio" name="mode" value={Mode.Video} bind:group={mode} disabled={busy} data-testid="export-mode-video" /> Video</label>
     <label><input type="radio" name="mode" value={Mode.Interactive} bind:group={mode} disabled={busy} data-testid="export-mode-interactive" /> Interactive (web)</label>
   </div>
 
   {#if mode === Mode.Interactive}
     <InteractiveExport {doc} {tokens} {assetUrls} {analyses} {fileName} />
-  {:else if mode === Mode.Server}
+  {:else}
     <dl>
       <dt>Preset</dt>
       <dd class="presets" data-testid="export-presets">
         {#each Object.values(Preset) as preset (preset)}
           {@const [name, detail] = PRESETS[preset].label.split(' · ')}
-          <button type="button" class="preset" aria-pressed={isPreset(preset)} disabled={jobRunning} onclick={() => (settings = settingsOf(preset))}><b>{name}</b><span>{detail}</span></button>
+          <button type="button" class="preset" aria-pressed={isPreset(preset)} disabled={jobRunning || busy} onclick={() => (settings = settingsOf(preset))}><b>{name}</b><span>{detail}</span></button>
         {/each}
       </dd>
       <dt>File</dt>
       <dd>
-        <select bind:value={settings.format} disabled={jobRunning} data-testid="export-format">
+        <select bind:value={settings.format} disabled={jobRunning || busy} data-testid="export-format">
           {#each EXPORT_FORMATS as format (format)}<option value={format}>{FORMAT[format].label}</option>{/each}
         </select>
       </dd>
       <dt>Frame rate</dt>
       <dd>
-        <select bind:value={settings.fps} disabled={jobRunning} data-testid="export-fps">
+        <select bind:value={settings.fps} disabled={jobRunning || busy} data-testid="export-fps">
           {#each FRAME_RATES as rate (rate)}<option value={rate}>{rate} fps</option>{/each}
         </select>
       </dd>
       <dt>Resolution</dt>
       <dd>
-        <select bind:value={settings.resolution} disabled={jobRunning} data-testid="export-resolution">
+        <select bind:value={settings.resolution} disabled={jobRunning || busy} data-testid="export-resolution">
           {#each Object.values(Resolution) as r (r)}<option value={r}>{r === Resolution.P2160 ? '4K (2160p)' : r}</option>{/each}
         </select>
       </dd>
       <dt>Quality</dt>
       <dd class="choice">
-        <label><input type="radio" name="quality" value={Quality.High} bind:group={settings.quality} disabled={jobRunning} /> High</label>
-        <label><input type="radio" name="quality" value={Quality.Standard} bind:group={settings.quality} disabled={jobRunning} /> Standard</label>
+        <label><input type="radio" name="quality" value={Quality.High} bind:group={settings.quality} disabled={jobRunning || busy} /> High</label>
+        <label><input type="radio" name="quality" value={Quality.Standard} bind:group={settings.quality} disabled={jobRunning || busy} /> Standard</label>
+      </dd>
+      <dt>Audio</dt>
+      <dd>
+        {#if !sounds.length}
+          <span class="muted">No audio clips</span>
+        {:else}
+          <label><input type="checkbox" bind:checked={withAudio} disabled={busy || jobRunning} /> {sounds.length} {sounds.length === 1 ? 'track' : 'tracks'} mixed in</label>
+        {/if}
       </dd>
       <dt>Output</dt>
       <dd>
-        {FORMATS[formatOf(doc)].label} · {output.width}×{output.height} · {settings.fps} fps · {Math.round(quote.seconds)} s · {spec.audio ? 'audio mixed in' : 'no audio'} · up to ~{megabytes} MB{#if server.uploadLimit} (a saved file can be {Math.round(server.uploadLimit / BYTES_PER_MB)} MB){/if}
+        {FORMATS[formatOf(doc)].label} · {output.width}×{output.height} · {settings.fps} fps · {Math.round(quote.seconds)} s · up to ~{megabytes} MB{#if onFarm && server.uploadLimit} (a saved file can be {Math.round(server.uploadLimit / BYTES_PER_MB)} MB){/if}
         {#if spec.alpha && doc.background !== Background.Transparent}<br /><span class="muted">Keeps alpha only where nothing is painted: set the background to Transparent for a see-through file.</span>{/if}
       </dd>
+      {#if server.configured}
+        <dt>Where</dt>
+        <dd>
+          <label><input type="checkbox" bind:checked={background} disabled={busy || jobRunning} data-testid="export-background" /> Render in the background: you can close this tab (~{quote.credits} credits)</label>
+        </dd>
+      {/if}
       <dt>Cost</dt>
-      <dd data-testid="export-quote">About {quote.credits} credits. {Math.ceil(quote.credits * HOLD_BUFFER)} are held while it renders; you pay the time it really takes, never more than held, nothing if it fails.</dd>
+      <dd data-testid="export-quote">
+        {#if !place}
+          <span class="muted">Checking what this browser can encode…</span>
+        {:else if onFarm}
+          {#if place.place === RenderPlace.Farm}<span data-testid="export-farm-reason">{place.message}</span><br />{/if}
+          About {quote.credits} credits. {Math.ceil(quote.credits * HOLD_BUFFER)} are held while it renders; you pay the time it really takes, never more than held, nothing if it fails.
+        {:else}
+          Free: it renders in this tab. Keep it open and the screen on until it finishes.
+        {/if}
+      </dd>
     </dl>
 
     {#if job && jobRunning}
@@ -304,70 +331,44 @@
       </div>
       <p class="muted">You can close this tab: the video lands in your assets when it is ready.</p>
       <button type="button" onclick={cancelServer} data-testid="export-cancel">Cancel render</button>
-    {:else if job?.status === 'done' && job.assetId}
+    {:else if job?.status === 'done' && job.assetId && phase !== Phase.Done}
       <p class="muted" data-testid="export-saved">Saved to the canvas assets and attached to this video.</p>
       <a class="primary" href={server.assetHref(job.assetId)} download={`${fileName}.${spec.ext}`} data-testid="export-download"><Download size={14} /> Download {spec.ext.toUpperCase()}</a>
     {:else}
       {#if job && (job.status === 'failed' || job.status === 'expired')}
-        <p class="warn" role="alert" data-testid="export-failed">Server render failed: {job.error ?? job.status}. Nothing was charged. Try again, or render in this browser.</p>
+        <p class="warn" role="alert" data-testid="export-failed">Server render failed: {job.error ?? job.status}. Nothing was charged.</p>
       {/if}
       {#if serverError}<p class="warn" role="alert">{serverError}</p>{/if}
-      {#if blockers.length}
+
+      {#if PROGRESS_LABEL[phase]}
+        <div class="progress" data-testid="export-progress">
+          <div class="track"><div class="fill" style={`width: ${(done / total) * 100}%`}></div></div>
+          <span>{PROGRESS_LABEL[phase]} {#if phase === Phase.Rendering}{done}/{total} · {etaLabel(remaining)}{/if}</span>
+        </div>
+        {#if paused}<p class="warn" role="alert" data-testid="export-paused">Paused: this tab is in the background. Come back to resume.</p>{/if}
+      {/if}
+      {#if phase === Phase.Failed}<p class="warn" role="alert">Export failed: {error}</p>{/if}
+
+      {#if phase === Phase.Done}
+        <p class="muted" data-testid="export-saved">{savedNote}</p>
+        <a class="primary" href={downloadUrl} download={`${fileName}.mp4`} data-testid="export-download"><Download size={14} /> Download MP4</a>
+      {:else if busy}
+        <button type="button" class="secondary" disabled={phase === Phase.Saving} onclick={cancel}>Cancel</button>
+      {:else if blockers.length}
         <p class="warn" role="alert" data-testid="export-blocked">
           Export waits for custom components: {blockers.map((b) => `${b.name} ${BLOCKER_LABEL[b.state]}`).join(', ')}. Fix them in the Code tab or ask the agent.
         </p>
+      {:else if problem}
+        <p class="warn" role="alert" data-testid="export-problem">{problem}</p>
+      {:else if !place}
+        <button type="button" class="primary" disabled>Export</button>
+      {:else if place.place === RenderPlace.Browser}
+        <button type="button" class="primary" onclick={start} data-testid="export-start">Export {settings.resolution} · free</button>
+      {:else if server.configured}
+        <button type="button" class="primary" onclick={startServer} disabled={!server.saved} data-testid="export-start-server">{server.saved ? `Render on our servers · ~${quote.credits} credits` : 'Saving your changes…'}</button>
       {:else}
-        {#if problem}<p class="warn" role="alert" data-testid="export-problem">{problem}</p>{/if}
-        <button type="button" class="primary" onclick={startServer} disabled={!server.saved || problem !== null} data-testid="export-start-server">{server.saved ? `Render · ~${quote.credits} credits` : 'Saving your changes…'}</button>
+        <p class="warn" role="alert">Server rendering is not available right now: pick MP4 H.264 up to 1080p to render it here.</p>
       {/if}
-    {/if}
-  {:else if phase === Phase.Checking}
-    <p class="muted">Checking what this browser can encode…</p>
-  {:else if support.support === Support.None}
-    <p class="warn">This browser cannot encode video. Use a recent Chrome or Edge, or Safari 16.4 or later.</p>
-  {:else}
-    <dl>
-      <dt>Format</dt>
-      <dd>{FORMATS[formatOf(doc)].label} · {size.width}×{size.height} · {doc.fps} fps · {Math.round(doc.durationInFrames / doc.fps)} s<br /><span class="muted">MP4 H.264 up to 1080p only. 4K, ProRes, HEVC, transparent WebM, GIF and PNG render on our servers.</span></dd>
-      <dt>Quality</dt>
-      <dd class="choice">
-        <label><input type="radio" name="res" value={Resolution.P1080} bind:group={resolution} disabled={busy || support.support === Support.Only720} /> 1080p</label>
-        <label><input type="radio" name="res" value={Resolution.P720} bind:group={resolution} disabled={busy} /> 720p</label>
-      </dd>
-      <dt>Audio</dt>
-      <dd>
-        {#if !sounds.length}
-          <span class="muted">No audio clips</span>
-        {:else if support.audio === AudioMode.Unavailable}
-          <span class="warn">This browser cannot encode AAC audio: the video exports silent. Chrome or Edge on macOS/Windows can.</span>
-        {:else}
-          <label><input type="checkbox" bind:checked={withAudio} disabled={busy} /> {sounds.length} {sounds.length === 1 ? 'track' : 'tracks'} mixed in</label>
-        {/if}
-      </dd>
-      <dt>Cost</dt>
-      <dd>Free — it renders in this tab. Keep it open until it finishes.</dd>
-    </dl>
-
-    {#if PROGRESS_LABEL[phase]}
-      <div class="progress" data-testid="export-progress">
-        <div class="track"><div class="fill" style={`width: ${(done / total) * 100}%`}></div></div>
-        <span>{PROGRESS_LABEL[phase]} {#if phase === Phase.Rendering}{done}/{total} · {etaLabel(remaining)}{/if}</span>
-      </div>
-    {/if}
-
-    {#if phase === Phase.Failed}<p class="warn" role="alert">Export failed: {error}</p>{/if}
-
-    {#if phase === Phase.Done}
-      <p class="muted" data-testid="export-saved">{savedNote}</p>
-      <a class="primary" href={downloadUrl} download={`${fileName}.mp4`} data-testid="export-download"><Download size={14} /> Download MP4</a>
-    {:else if busy}
-      <button type="button" class="secondary" disabled={phase === Phase.Saving} onclick={cancel}>Cancel</button>
-    {:else if blockers.length}
-      <p class="warn" role="alert" data-testid="export-blocked">
-        Export waits for custom components: {blockers.map((b) => `${b.name} ${BLOCKER_LABEL[b.state]}`).join(', ')}. Fix them in the Code tab or ask the agent.
-      </p>
-    {:else}
-      <button type="button" class="primary" onclick={start} data-testid="export-start">Export {resolution}</button>
     {/if}
   {/if}
 </div>
