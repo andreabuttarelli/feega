@@ -36,6 +36,8 @@
   import { provideSelection } from '$lib/motion/selection-context';
   import Layers from '@lucide/svelte/icons/layers';
   import { addAdjustment, mergeView, pathNames, precompose, viewOf } from '$lib/motion/precomp';
+  import { addLiquidGlass } from '$lib/motion/glass/ops';
+  import { SPRINGS } from '$lib/motion/spring';
   import GraphEditor from '$lib/components/motion/GraphEditor.svelte';
   import { nullFromSelection } from '$lib/motion/parent-ops';
   import MotionPreview from '$lib/components/motion/MotionPreview.svelte';
@@ -484,7 +486,8 @@
   const newId = () => crypto.randomUUID().slice(0, 8);
 
   const ADD: Partial<Record<ComponentId, (id: string) => OpResult>> = {
-    Adjustment: (id) => addAdjustment(doc, { from: frame }, { clip: id, track: newId() })
+    Adjustment: (id) => addAdjustment(doc, { from: frame }, { clip: id, track: newId() }),
+    LiquidGlass: (id) => addLiquidGlass(doc, { from: frame, durationInFrames: COMPONENTS.LiquidGlass.durationInFrames, props: {}, path: [], spring: SPRINGS.soft, fadeIn: 0, fadeOut: 0 }, { clip: id, track: newId() })
   };
 
   function add(component: ComponentId) {

@@ -4,6 +4,7 @@ import { EASE_IDS, Ease } from './design';
 import { MASK_KEYS, MASK_PROPS, maskValue, type Mask, type MaskKey } from './mask';
 import { RING_NUMBERS, RING_NUMBER_KEYS } from '../canvas/composition/ring';
 import { PARTICLE_COLOURS, PARTICLE_COLOUR_KEYS, PARTICLE_NUMBERS, PARTICLE_NUMBER_KEYS } from './particles/model';
+import { GLASS_NUMBERS, GLASS_NUMBER_KEYS, GLASS_TINT } from './glass/model';
 
 export type Bezier = [number, number, number, number];
 export type EaseSpec = Ease | Bezier;
@@ -182,6 +183,14 @@ const PARTICLE_PROPS: AnimProp[] = [
   ...PARTICLE_COLOUR_KEYS.map((key) => ({ key, label: PARTICLE_COLOURS[key].label, kind: ValueKind.Color, source: Source.Param, min: 0, max: 0, step: 0, fallback: 0 }))
 ];
 
+const GLASS_PROPS: AnimProp[] = [
+  ...GLASS_NUMBER_KEYS.map((key) => {
+    const { label, min, max, step, fallback } = GLASS_NUMBERS[key];
+    return { key, label, min, max, step, fallback, kind: ValueKind.Number, source: Source.Param };
+  }),
+  { key: GLASS_TINT.key, label: GLASS_TINT.label, kind: ValueKind.Color, source: Source.Param, min: 0, max: 0, step: 0, fallback: 0 }
+];
+
 const RING_PROPS: AnimProp[] = RING_NUMBER_KEYS.map((key) => {
   const { label, min, max, step, fallback } = RING_NUMBERS[key];
   return { key, label, min, max, step, fallback, kind: ValueKind.Number, source: Source.Layout };
@@ -209,6 +218,7 @@ export const ANIMATABLE: Record<ComponentId, readonly AnimProp[]> = {
   Device3D: visual(sceneProps, deviceProps),
   Composition: visual(RING_PROPS),
   Particles: visual(PARTICLE_PROPS),
+  LiquidGlass: GLASS_PROPS,
   Precomp: visual(),
   Adjustment: [],
   Custom: visual()
