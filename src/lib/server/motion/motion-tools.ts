@@ -108,7 +108,7 @@ export type MotionToolDeps = {
   brand?: (name?: string) => Promise<SourceRead>;
   importAsset?: (url: string, label?: string) => Promise<AssetImport>;
   capture?: (url: string) => Promise<SiteCapture>;
-  music?: (input: { text: string; seconds: number }) => Promise<Voiceover>;
+  music?: (input: { text: string; seconds: number }) => Promise<Voiceover & { license?: string }>;
 };
 
 export type SiteCapture = { ok: true; shots: Extract<AssetImport, { ok: true }>[] } | { ok: false; error: string };
@@ -1381,7 +1381,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     generate_music: tool({
-      description: 'Spends credits. Generate an instrumental music bed from a prompt (genre, mood, tempo, no vocals) and place it on an Audio clip at a time in seconds. Then analyze_audio and cut_to_beat so the scenes land on its beats.',
+      description: 'Generate an instrumental music bed from a prompt (genre, mood, tempo in bpm, no vocals) and place it on an Audio clip at a time in seconds; when the music provider is unavailable it places a CC0 beat at the tempo asked and returns its license. Then analyze_audio and cut_to_beat so the scenes land on its beats.',
       inputSchema: z.object({ prompt: z.string().min(1).max(1000), seconds: z.number().min(3).max(120), start: z.number().min(0).default(0), ...PLACED }),
       execute: async (input) => {
         const made = deps.music ? await deps.music({ text: input.prompt, seconds: input.seconds }) : UNREADABLE('making music');
@@ -1391,7 +1391,8 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         deps.assets.push({ id: made.assetId, kind: AssetKind.Audio, label: 'music', previewUrl: '', url: made.url });
         const id = deps.newId();
         const result = addClip(session.doc, { component: 'Audio', from: frames(input.start), durationInFrames: Math.max(1, frames(made.seconds)), trackId: input.track_id, props: { assetId: made.assetId } }, id);
-        return created(apply(registered(result, made.assetId), 'added music'), id);
+        const out = created(apply(registered(result, made.assetId), 'added music'), id);
+        return made.license ? { ...out, asset_id: made.assetId, license: made.license } : { ...out, asset_id: made.assetId };
       }
     }),
 

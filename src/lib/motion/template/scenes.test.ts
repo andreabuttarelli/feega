@@ -63,7 +63,7 @@ describe('the Apple minimal scene library', () => {
     expect(colours.every((c) => NEUTRALS.has(c))).toBe(true);
   });
 
-  it.each(sceneDocs().map((e) => [e.id, e] as const))('%s enters slowly', (_id, entry) => {
+  it.each(sceneDocs().map((e) => [e.id, e] as const))('%s enters quickly', (_id, entry) => {
     const doc = entry.template.doc;
     const entrances = clipsOf(doc).flatMap((c) => {
       const fade = c.keyframes.opacity;

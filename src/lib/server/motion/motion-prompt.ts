@@ -72,7 +72,7 @@ export function motionAgentPrompt(input: { brandName: string | null; selectionNo
     ].join('\n'),
     'Timing (start, duration) is set_timing, never a prop. A tool that fails tells you why: read the error and retry with what it says.',
     componentContract(input.frame ?? { width: 1920, height: 1080 }),
-    'generate_voiceover and generate_music spend credits: only when the user asked for a voice-over or music. capture_site takes 2–3 minutes and spends credits: use it when screenshots of the product site matter more than its og:image.',
+    'generate_voiceover spends credits: only when the user asked for a voice-over. A new video always gets music: generate_music (a CC0 beat when the music provider is unavailable). capture_site takes 2–3 minutes and spends credits: use it when screenshots of the product site matter more than its og:image.',
     'Answer in the language the user writes in. Be brief: say what changed.'
   ].join('\n');
 }

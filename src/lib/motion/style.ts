@@ -39,26 +39,26 @@ export const STYLES: Record<MotionStyle, StyleSpec> = {
   [MotionStyle.AppleMinimal]: {
     label: 'Apple minimal',
     eases: { enter: [0.22, 1, 0.36, 1], move: [0.65, 0, 0.35, 1] },
-    seconds: { enter: [0.6, 1.2], exit: 0.5, scene: [2, 4] },
-    movement: { rise: 0.03, settle: 0.97, blur: 12, pushIn: 1.04, turn: 14 },
+    seconds: { enter: [0.3, 0.8], exit: 0.3, scene: [1, 2.5] },
+    movement: { rise: 0.05, settle: 0.94, blur: 16, pushIn: 1.12, turn: 30 },
     type: { family: 'Inter', weights: { display: 600, text: 400 }, sizes: { hero: 0.15, line: 0.075, small: 0.026 } },
     palette: { ink: '#000000', paper: '#ffffff', muted: '#86868b', accents: 1 },
-    junctions: [JunctionKind.Crossfade, JunctionKind.DipToBlack, JunctionKind.Blur],
-    entrances: [TransitionKind.None, TransitionKind.Fade, TransitionKind.Blur],
+    junctions: [JunctionKind.Crossfade, JunctionKind.DipToBlack, JunctionKind.Blur, JunctionKind.Zoom],
+    entrances: [TransitionKind.None, TransitionKind.Fade, TransitionKind.Blur, TransitionKind.Scale],
     forbidden: Object.values(Forbidden),
-    maxMoving: 2,
+    maxMoving: 3,
     rules: [
-      'Apple minimal is the house style: every frame should look like a frame of an Apple keynote or product film. Calm, slow, confident, one idea at a time.',
-      'Build the video from the scene library: list_templates, then insert_template the builtin:scene-* scenes one after another and fill them with set_template_fields (real text, brand pictures, the one accent colour). Build primitives by hand only for something no scene can show.',
-      'Storyboard first: before the first edit, write the plan as a short table, one row per scene: time, scene template, the line it says, the beat it lands on.',
-      'One idea per scene, 2–4 s each. Type is either very large (one line that fills the frame) or very small; nothing in between. Lots of empty space.',
-      'Palette: black or white background, the text white or near-black, one accent from the brand used on one word or one number at a time. Never more than one accent colour.',
-      'Movement is small and slow: fades with a 2–4% rise or scale, a light blur-in, a slow push-in on pictures. Entrances 0.6–1.2 s on the eases cubic-bezier(0.22,1,0.36,1) and cubic-bezier(0.65,0,0.35,1).',
-      'Between scenes: a cut on the beat, a dissolve (set_clip_transition crossfade or dip-to-black) or a match cut (the next scene keeps the word or object in the same place). Never wipes, pushes, zooms or spins.',
-      'Forbidden by default: decorative particles, glows, gratuitous rotation, bounce or overshoot, text that flies across the frame, physics, more than two things moving at once. The quality gate in view_frames names each one.',
-      'Show the product, big: at least half the scenes carry a picture of it (scene-ui-closeup on a detail, scene-device-hero, scene-product-reveal, scene-media-caption). Never the same scene or the same crop twice; with a single picture, vary it: a close-up on one detail, the whole on a device, then a scene with a line under it.',
-      'Screenshots must be readable: the ui-closeup scene crops on the part that matters (focus_x, focus_y); never a whole page shrunk small.',
-      'Sound: when the project has music, put it on an Audio clip and cut the scenes on its beats (analyze_audio, cut_to_beat).'
+      'Apple minimal is the house style: the LOOK of an Apple, Linear or Vercel launch film (few elements, very large type, the real product, a sober palette) with HIGH ENERGY. Minimal never means slow or static: the bar is "would a client pay for this?".',
+      'Build the video from the scene library: list_templates, then insert_template the builtin:scene-* scenes and fill them with set_template_fields (real text, brand pictures, the one accent colour), then push them harder with keyframes, camera and timing. Build primitives by hand only for something no scene can show.',
+      'Storyboard first: before the first edit, write the plan as a short table, one row per scene: time, scene template, the line it says, the beat it lands on, the move.',
+      'Rhythm: scenes of 1–2.5 s, a cut on every beat or every second beat of the music. Music is always there: generate_music or the project track, analyze_audio, cut_to_beat.',
+      'Kinetic typography: words land one by one on the beat (apply_text_preset word-stagger or blur-up, short 0.3–0.6 s entrances), big type punches in with a scale or a snap; one idea per scene, nothing in between very large and very small.',
+      'Camera and depth: every scene moves. Pictures push in or pan, devices fly in and turn in 3D (Device3D with apply_device_preset, apply_camera_preset dolly-in, truck, orbit), set_clip_depth for parallax. No picture holds still for more than a second: no slideshow.',
+      'Speed ramps and match cuts: ramp a camera move fast-slow-fast into the cut (set_keyframes, eases cubic-bezier(0.22,1,0.36,1) in and cubic-bezier(0.65,0,0.35,1) on moves), carry a word or the product across a cut in the same place (scene-match-cut), punch in with a zoom junction on a downbeat.',
+      'A clear wow peak around two thirds in: the product big in 3D, the biggest move and the strongest beat, then a clean end card with the real website.',
+      'Palette: black or white background, the text white or near-black, one accent from the brand on one word or one number at a time. Never more than one accent colour.',
+      'Forbidden: decorative particles, glows, spinning text, bounce or overshoot, wipes and pushes, more than three things moving at once. The quality gate in view_frames names each one.',
+      'Show the product, big and readable: at least half the scenes carry a real screenshot or picture of it (scene-ui-closeup on a detail, scene-device-hero, scene-product-reveal). Crop screenshots on the part that matters (focus_x, focus_y); never a whole page shrunk small, never the same crop twice.'
     ]
   }
 };

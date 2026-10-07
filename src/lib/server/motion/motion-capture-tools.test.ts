@@ -55,6 +55,13 @@ describe('generate_music', () => {
     expect(clipsOf(session.doc).find((c) => c.component === 'Audio')?.props.assetId).toBe('bed');
   });
 
+  it('says which license the music carries when it is the CC0 bed', async () => {
+    const music = vi.fn(async () => ({ ok: true as const, assetId: 'bed', seconds: 15, url: 'https://x/bed', license: 'CC0 1.0' }));
+    const { run } = setup({ music });
+
+    expect(await run('generate_music', { prompt: 'beat', seconds: 15 })).toMatchObject({ ok: true, license: 'CC0 1.0', asset_id: 'bed' });
+  });
+
   it('says so when this workspace cannot make music', async () => {
     const { run } = setup();
 

@@ -81,10 +81,30 @@ describe('the Apple minimal style', () => {
     expect(effects(withClip(blank(), 'i', 'Image', { junction: { kind: JunctionKind.Crossfade, durationInFrames: 24 } }))).toEqual([]);
   });
 
-  it('names three things moving at once, not two', () => {
-    const two = withClip(withClip(blank(), 'a', 'Title', { keyframes: rise }), 'b', 'Image', { keyframes: rise });
+  it('names four things moving at once, not three: kinetic, never a mess', () => {
+    const three = withClip(withClip(withClip(blank(), 'a', 'Title', { keyframes: rise }), 'b', 'Image', { keyframes: rise }), 'c', 'Title', { keyframes: rise });
 
-    expect(effects(two)).toEqual([]);
-    expect(effects(withClip(two, 'c', 'Title', { keyframes: rise }))).toContain(Forbidden.Crowded);
+    expect(effects(three)).toEqual([]);
+    expect(effects(withClip(three, 'd', 'Image', { keyframes: rise }))).toContain(Forbidden.Crowded);
+  });
+
+  it('lets a zoom punch carry the cut between two scenes', () => {
+    expect(effects(withClip(blank(), 'i', 'Image', { junction: { kind: JunctionKind.Zoom, durationInFrames: 8 } }))).toEqual([]);
+  });
+
+  it('keeps scenes short and entrances quick: minimal look, launch-film energy', () => {
+    const { seconds } = STYLES[MotionStyle.AppleMinimal];
+
+    expect(seconds.scene[1]).toBeLessThanOrEqual(2.5);
+    expect(seconds.enter[1]).toBeLessThanOrEqual(0.8);
+  });
+
+  it('asks for beat cuts, kinetic type, camera and a wow peak, never a slideshow', () => {
+    const rules = STYLES[MotionStyle.AppleMinimal].rules.join(' ');
+
+    for (const word of ['beat', 'kinetic', 'camera', 'speed ramp', 'match cut', 'wow', 'slideshow']) {
+      expect(rules.toLowerCase()).toContain(word);
+    }
+    expect(rules).not.toMatch(/calm, slow/i);
   });
 });
