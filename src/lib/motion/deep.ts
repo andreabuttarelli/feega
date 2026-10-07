@@ -34,6 +34,15 @@ export type DeepNote = { phase: DeepPhase; iteration: number; text: string; at: 
 
 export type DeepVerdict = { pass: boolean; score: number; fixes: string[] };
 
+export type DeepState = {
+  phase: DeepPhase;
+  iteration: number;
+  storyboard: string | null;
+  verdict: DeepVerdict | null;
+  notes: DeepNote[];
+  summary: string | null;
+};
+
 export const DEEP_QUOTE = 'data-motion-deep-quote';
 
 export type DeepQuote = { message: string; model: string; reasoning: string | null; credits: number; capCredits: number; minutes: number; iterations: number };

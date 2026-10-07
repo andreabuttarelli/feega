@@ -1,14 +1,7 @@
-import { DeepEnd, DeepPhase, type DeepNote, type DeepVerdict } from '$lib/motion/deep';
+import { DeepEnd, DeepPhase, type DeepState, type DeepVerdict } from '$lib/motion/deep';
 import type { Frame } from '$lib/server/motion/frames';
 
-export type DeepState = {
-  phase: DeepPhase;
-  iteration: number;
-  storyboard: string | null;
-  verdict: DeepVerdict | null;
-  notes: DeepNote[];
-  summary: string | null;
-};
+export type { DeepState };
 
 export type DeepPorts = {
   direct: () => Promise<string>;

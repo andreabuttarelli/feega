@@ -68,6 +68,21 @@ sessione. Segnale: render fermo in `rendering` con la sandbox viva e l'uscita gi
 Mossa: il processo scrive `result-<task>.json` alla fine e il tick legge quello; sandbox non più
 `running` senza risultato = morta.
 
+### Un `external_job_id` con un prefisso nuovo viene chiuso dalla produzione
+`reconcileVideoNodeRuns` prende ogni run `running` con un `external_job_id` che non sta in
+`OWN_RECONCILER_PREFIXES`: il tick di produzione, che gira il codice di main sullo stesso DB, segna
+`video_reconcile_failed` su una riga col prefisso nuovo (`motion-deep:`) prima del deploy. Segnale:
+run fallito dopo ~1 minuto con quell'errore, mentre il job locale continua a scrivere params.
+Mossa: il prefisso entra in `OWN_RECONCILER_PREFIXES` nello stesso commit; per una prova prima del
+merge, seguire il job dai params (`end`), non da `status`.
+
+### Il render `whole` del farm ignora la risoluzione scelta
+`chunkSpec` per la rotta whole non passa `width`/`height` al producer: un html composto con
+`scale < 1` (720p su un doc 1080) viene catturato a viewport piena e il contenuto occupa solo
+l'angolo in alto a sinistra. Segnale: frame con 2/3 di nero/bianco a destra e in basso. Mossa:
+per gli stills Deep si compone a scala 1 (`UNSCALED`); un export whole a risoluzione ridotta va
+verificato prima di fidarsi.
+
 ### Un render con motion blur non diventa più veloce con più vCPU
 Il producer distribuito non ha `motionBlur`: il blur gira intero su una sandbox, e
 `createRenderJob` senza `workers` resta su un solo browser anche con 8 vCPU (186 s per 240

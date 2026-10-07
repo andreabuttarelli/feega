@@ -70,6 +70,8 @@
   import { insertTemplate, isLockedComp, type TemplateEntry } from '$lib/motion/template/library';
   import SoundDialog, { type Made, type SoundKind } from '$lib/components/motion/SoundDialog.svelte';
   import ChatPanel from '$lib/components/brand-agent/ChatPanel.svelte';
+  import DeepPanel from '$lib/components/motion/DeepPanel.svelte';
+  import { DEEP_QUOTE, type DeepQuote } from '$lib/motion/deep';
   import { AssetKind, COMPONENTS, LIBRARY_IDS, TrackKind, type ComponentId } from '$lib/motion/components';
   import { findClip, type MotionDoc } from '$lib/motion/doc';
   import {
@@ -151,6 +153,7 @@
   let helpOpen = $state(false);
   let layout = $state<EditorLayout>(DEFAULT_LAYOUT);
   let chatReload = $state(0);
+  let deepQuote = $state<DeepQuote | null>(null);
   let display = $state(TimeDisplay.Timecode);
   let width = $state(1440);
   const viewport = $derived(viewportOf(width));
@@ -457,6 +460,10 @@
   };
 
   function onAgentData(part: StreamData) {
+    if (part.type === DEEP_QUOTE) {
+      deepQuote = part.data as DeepQuote;
+      return;
+    }
     const handle = AGENT_DATA[part.type];
     madeAssets = adoptAgentAssets(madeAssets, (part.data as { assets?: PageData['assets'] } | null)?.assets);
     if (handle && preview) {
@@ -962,6 +969,7 @@
 
     <aside class="chat" class:open={sheet === Sheet.Agent} aria-label="Agent">
       <div class="sheet-head"><span>Agent</span><button type="button" aria-label="Close" onclick={() => (sheet = Sheet.None)}><X size={16} /></button></div>
+      <DeepPanel url={`${agentUrl}/deep`} bind:quote={deepQuote} onchange={() => void pullExternalEdit().then(() => chatReload++)} />
       <ChatPanel projectId={data.projectId} motionNodeId={data.node.id} reload={chatReload} context={() => ({ selection })} onturnend={() => void pullAgentEdit()} ondata={onAgentData} />
     </aside>
 

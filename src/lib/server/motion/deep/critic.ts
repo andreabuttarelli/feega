@@ -103,25 +103,26 @@ export function parseVerdict(text: string, objective: string[]): DeepVerdict {
 }
 
 export const RUBRIC = [
-  `Rhythm: a cut or a clear change every 1–2.5 s; scenes 2–4 s; the cuts land on the music beats when there is music; nothing drags, nothing flashes by unread.`,
+  'Would a client pay for it? Judge it against the launch films of Apple, Linear and Vercel: minimal look, high energy, a wow moment. A tidy slideshow fails, however clean.',
+  'Energy: kinetic typography that lands on the beat, every scene moving (push-ins, pans, devices flying and turning in 3D, camera moves), speed ramps into cuts, at least one match cut.',
+  'The peak: one clear wow moment around two thirds in (the product big, the biggest move, the strongest beat), then a clean end card with the real website.',
+  'Rhythm: a cut every 1–2.5 s, on the beat of the music; music is always there; nothing drags, nothing flashes by unread.',
   'Legibility: every line can be read on a phone in the time it is on screen; no text smaller than about 3% of the frame height; strong contrast.',
   'Hierarchy: one focal point per frame; headline over subline over detail; the eye knows where to go.',
-  'No blank, half-loaded, blurry or pixelated frame; screenshots and logos crisp, never upscaled mush.',
-  'No overflow: text stays inside the frame and its box, nothing clipped at an edge, everything inside a 5% safe area.',
-  `Nothing holds still for more than ${STILL_MAX_S} s: every picture moves (slow push-in, pan, parallax, mask reveal) or is cut away.`,
-  'Story: a hook in the first 2 s, the real product shown big, the real name and claim, an end card with the real website.',
-  'Style: the style rules below are respected.'
+  'No blank, half-loaded, blurry or pixelated frame; screenshots and logos crisp, never upscaled mush. No overflow: text inside the frame and its box, a 5% safe area.',
+  `Nothing holds still for more than ${STILL_MAX_S} s.`,
+  'Story: a hook in the first second, the real product shown big, the real name and claim. Style: the style rules below are respected.'
 ];
 
 export function critiquePrompt(input: { storyboard: string; times: number[]; objective: string[]; styleRules: readonly string[] }): string {
   return [
-    'You are the critic of a short motion video, a senior motion director with a hard eye. You get the storyboard, the frames rendered from the real video at the times listed, and the problems the automatic checks measured.',
+    'You are the critic of a short motion video, a senior motion director at a top launch-film studio, with a hard eye. You get the storyboard, the frames rendered from the real video at the times listed, and the problems the automatic checks measured. The question is one: would a client pay for this?',
     `Frames, in order, at: ${input.times.map((t) => `${t}s`).join(', ')}.`,
     `Storyboard:\n${input.storyboard}`,
     input.objective.length ? `Measured problems (each one must be fixed):\n- ${input.objective.join('\n- ')}` : 'The automatic checks found nothing.',
     `Rubric:\n${RUBRIC.map((r, i) => `${i + 1}. ${r}`).join('\n')}`,
     `Style rules:\n${input.styleRules.map((r) => `- ${r}`).join('\n')}`,
-    `Score the video 0–10. It passes only at ${PASS_SCORE} or more with no blocking problem left.`,
+    `Score the video 0–10, where ${PASS_SCORE} means a client would pay for it as it is. A clean but static or slow video scores 5 at most. It passes only at ${PASS_SCORE} or more with no blocking problem left.`,
     `List at most ${MAX_FIXES} fixes, most important first, each concrete and actionable for the editor: the time, the scene or clip, what is wrong, and exactly what to change (e.g. "2.5–4.5 s, ui-closeup: the screenshot holds still and its text is unreadable: crop on the chart with focus_x 0.7, focus_y 0.4 and add a 1.04 push-in").`,
     'Answer with your reasoning, then the verdict as one JSON object: {"score": number, "pass": boolean, "fixes": string[]}.'
   ].join('\n\n');

@@ -869,6 +869,20 @@ describe('un giro asincrono presso un fornitore ha il proprio tetto, non quello 
     expect(await expireStuckRuns(db)).toMatchObject({ expired: 1 });
   });
 
+  it('il reaper non uccide un job Deep che lavora da 40 minuti', async () => {
+    const deepRow = { ...runRow, external_job_id: 'motion-deep:7', started_at: startedAgo(40 * 60_000) };
+    const { db } = fakeDb({ node_runs: [deepRow], nodes: [nodeRow] });
+
+    expect(await expireStuckRuns(db)).toMatchObject({ expired: 0 });
+  });
+
+  it('un job Deep oltre il proprio tetto scade', async () => {
+    const deepRow = { ...runRow, external_job_id: 'motion-deep:7', started_at: startedAgo(4 * 60 * 60_000) };
+    const { db } = fakeDb({ node_runs: [deepRow], nodes: [nodeRow] }, { updateRows: { node_runs: [deepRow], nodes: [nodeRow] } });
+
+    expect(await expireStuckRuns(db)).toMatchObject({ expired: 1 });
+  });
+
   it('un render motion di 40 minuti sta ancora lavorando: gira fuori dalla richiesta', async () => {
     const renderRow = { ...runRow, external_job_id: 'motion-render:7', started_at: startedAgo(40 * 60_000) };
     const { db } = fakeDb({ node_runs: [renderRow], nodes: [nodeRow] });
