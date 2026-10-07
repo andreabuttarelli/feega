@@ -2,6 +2,8 @@ import { COMPONENTS, TrackKind, type ComponentId } from './components';
 import type { MotionDoc } from './doc';
 import { DEVICE, Device } from './devices';
 import { styleProblems } from './style';
+import { UI_KIT, UI_SAFE, uiScale } from './ui-kit/kit';
+import { sampleTrack } from './sample-track';
 
 export enum Quality {
   RepeatedLayout = 'repeated-layout',
@@ -12,7 +14,8 @@ export enum Quality {
   OffStyle = 'off-style',
   SoftPicture = 'soft-picture',
   CroppedScreen = 'cropped-screen',
-  BrandLogoAltered = 'brand-logo-altered'
+  BrandLogoAltered = 'brand-logo-altered',
+  OutOfFrame = 'out-of-frame'
 }
 
 export type Pixels = Record<string, { width: number; height: number }>;
@@ -153,10 +156,67 @@ function alteredLogos(doc: MotionDoc, logos: ReadonlySet<string>): QualityProble
   });
 }
 
+const OUT_FRAMES_ALLOWED = 6;
+const EDGE_SECONDS = 0.35;
+const GLYPH_WIDTH = 0.55;
+const LINE_HEIGHT = 1.1;
+const TEXTS: ReadonlySet<ComponentId> = new Set(['Title', 'Text', 'Kicker', 'Caption'] as ComponentId[]);
+const PIECES = new Map(Object.values(UI_KIT).map((p) => [p.name, p]));
+
+type Size = { width: number; height: number };
+
+function textSize(clip: Clip, frame: Size): Size {
+  const lines = String(clip.props.text ?? '').split('\n');
+  const px = num(clip, 'size', 0.1) * frame.height;
+  const longest = Math.max(...lines.map((l) => l.length));
+  return { width: Math.min(num(clip, 'width', 0.8) * frame.width, longest * px * GLYPH_WIDTH), height: Math.min(num(clip, 'height', 0.4) * frame.height, lines.length * px * LINE_HEIGHT) };
+}
+
+function contentSize(clip: Clip, frame: Size): Size | null {
+  const piece = clip.component === 'Custom' ? PIECES.get(String(clip.props.name)) : undefined;
+  if (piece) {
+    const scale = uiScale(piece, frame, num(clip, 'zoom', 1));
+    return { width: piece.size.width * scale, height: piece.size.height * scale };
+  }
+  return TEXTS.has(clip.component) ? textSize(clip, frame) : null;
+}
+
+const at = (clip: Clip, key: string, frame: number, fallback: number) => {
+  const track = clip.keyframes[key];
+  return track?.length ? Number(sampleTrack(track as never, frame)) : ((clip.transform as Record<string, number> | undefined)?.[key] ?? fallback);
+};
+
+function outside(clip: Clip, size: Size, frame: Size, f: number): boolean {
+  const scale = at(clip, 'scale', f, 1);
+  const cx = (num(clip, 'x', 0.5) + at(clip, 'x', f, 0)) * frame.width;
+  const cy = (num(clip, 'y', 0.5) + at(clip, 'y', f, 0)) * frame.height;
+  const halfW = (size.width * scale) / 2;
+  const halfH = (size.height * scale) / 2;
+  const margin = (1 - UI_SAFE) / 2;
+  return cx - halfW < frame.width * margin - 1 || cx + halfW > frame.width * (1 - margin) + 1 || cy - halfH < frame.height * margin - 1 || cy + halfH > frame.height * (1 - margin) + 1;
+}
+
+function outOfFrame(doc: MotionDoc): QualityProblem[] {
+  const frame = { width: doc.width, height: doc.height };
+  const edge = Math.round(EDGE_SECONDS * doc.fps);
+  return doc.tracks.flatMap((t) => t.clips as Clip[]).flatMap((clip) => {
+    const size = contentSize(clip, frame);
+    if (!size) {
+      return [];
+    }
+    const frames = Array.from({ length: Math.max(0, clip.durationInFrames - 2 * edge) }, (_, i) => i + edge);
+    const out = frames.filter((f) => outside(clip, size, frame, f));
+    if (out.length <= OUT_FRAMES_ALLOWED) {
+      return [];
+    }
+    return [{ kind: Quality.OutOfFrame, at: seconds(doc, clip.from + out[0]), detail: `${clip.id} leaves the safe area (5% from each edge) for ${out.length} frames from ${seconds(doc, clip.from + out[0])}s: keep scale moves small and slow, move the camera or the position instead, or shrink it (zoom, width)` }];
+  });
+}
+
 export function docProblems(doc: MotionDoc, input: { audioAssets: number; pixels?: Pixels; logos?: readonly string[] }): QualityProblem[] {
   const list = scenes(doc);
   const pixels = input.pixels ?? {};
-  return [...repeated(doc, list), ...smallTitles(doc), ...silent(doc, input.audioAssets), ...softPictures(doc, pixels), ...croppedScreens(doc, pixels), ...alteredLogos(doc, new Set(input.logos ?? [])), ...styleProblems(doc).map((p) => ({ kind: Quality.OffStyle, at: p.at, detail: p.detail }))];
+  return [...repeated(doc, list), ...smallTitles(doc), ...silent(doc, input.audioAssets), ...softPictures(doc, pixels), ...croppedScreens(doc, pixels), ...alteredLogos(doc, new Set(input.logos ?? [])), ...outOfFrame(doc), ...styleProblems(doc).map((p) => ({ kind: Quality.OffStyle, at: p.at, detail: p.detail }))];
 }
 
 export function frameProblems(stats: readonly FrameStat[]): QualityProblem[] {

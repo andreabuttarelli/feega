@@ -109,29 +109,31 @@ const NUMBERS = [
   ['$506', 'SALES']
 ];
 const CLAIMS = ['Links.', 'Analytics.', 'Affiliates.', 'One place.'];
-const MONTAGE_CUTS = 8;
-const HALF = BEAT / 2;
+const HOLD = 2 * BEAT;
+const CLAIM_HOLD = 3 * BEAT;
+const CLAIM_SECONDS = (CLAIMS.length - 1) * HOLD + CLAIM_HOLD;
+const BURST_SECONDS = BEAT * 4 + 1;
 
 const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
   {
     id: 'launch-word-burst',
     name: 'Launch · Word burst',
-    description: 'Launch film. The claim one word per beat, each punching in from 135% out of a blur in the same spot, the last word in the accent. The hook.',
-    seconds: BEAT * BURST.length,
+    description: 'Launch film. The claim builds one word per beat, each punching in from 135% out of a blur on its own line and staying until the line is read, the last word in the accent. The hook.',
+    seconds: BURST_SECONDS,
     beats: [
-      fill(BEAT * BURST.length),
+      fill(BURST_SECONDS),
       ...BURST.map((w, i): Beat => ({
         id: `word_${i + 1}`,
         track: 'front',
         component: 'Title',
         at: i * BEAT,
-        len: BEAT,
+        len: BURST_SECONDS - i * BEAT,
         props: {
           text: w,
-          ...word(HERO, i === BURST.length - 1 ? ACCENT : PAPER),
-          y: 0.5,
+          ...word(LINE * 1.5, i === BURST.length - 1 ? ACCENT : PAPER),
+          y: 0.5 + (i - (BURST.length - 1) / 2) * 0.2,
           width: 0.92,
-          height: 0.34
+          height: 0.2
         },
         keys: punch(i === BURST.length - 1 ? 0.6 : PUNCH)
       }))
@@ -273,17 +275,17 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
   {
     id: 'launch-number-match-cut',
     name: 'Launch · Number match cut',
-    description: 'Launch film. Three numbers swap on the beat in one spot, each rising out of its own box (a fast mask reveal), its label small under it; the last in the accent.',
-    seconds: NUMBERS.length * BEAT,
+    description: 'Launch film. Three numbers swap every two beats in one spot, each rising out of its own box (a fast mask reveal), its label small under it; the last in the accent.',
+    seconds: NUMBERS.length * HOLD,
     beats: [
-      fill(NUMBERS.length * BEAT),
+      fill(NUMBERS.length * HOLD),
       ...NUMBERS.flatMap(([n, what], i): Beat[] => [
         {
           id: `number_${i + 1}`,
           track: 'front',
           component: 'Title',
-          at: i * BEAT,
-          len: BEAT,
+          at: i * HOLD,
+          len: HOLD,
           props: {
             text: n,
             ...word(0.35, i === NUMBERS.length - 1 ? ACCENT : PAPER),
@@ -297,8 +299,8 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
           id: `label_${i + 1}`,
           track: 'middle',
           component: 'Kicker',
-          at: i * BEAT,
-          len: BEAT,
+          at: i * HOLD,
+          len: HOLD,
           props: { text: what, ...label(), y: 0.76, width: 0.6, height: 0.06 }
         }
       ])
@@ -338,46 +340,17 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
   },
   {
     id: 'launch-beat-montage',
-    name: 'Launch · Beat montage',
-    description: 'Launch film. The build-up before the drop: eight UI crops cut on half beats under a dark scrim, each punching in, and one claim per beat on top, the last in the accent.',
-    seconds: CLAIMS.length * BEAT,
+    name: 'Launch · Claim run',
+    description: 'Launch film. The build-up before the drop: one claim every two beats in the same spot on black, each punching in and held long enough to read, the last in the accent. Put live UI (add_ui) between claims, never screenshots behind them.',
+    seconds: CLAIM_SECONDS,
     beats: [
-      fill(CLAIMS.length * BEAT),
-      ...Array.from({ length: MONTAGE_CUTS }, (_, i): Beat => ({
-        id: `shot_${i + 1}`,
-        track: 'back',
-        component: 'Image',
-        at: i * HALF,
-        len: HALF,
-        props: {
-          ...FULL,
-          fit: 'cover',
-          zoom: 1.9,
-          focusX: i % 2 ? 0.3 : 0.7,
-          focusY: 0.75
-        },
-        keys: {
-          scale: [
-            [0, 1.18, SNAP],
-            [HALF, 1, LINEAR]
-          ]
-        },
-        transform: { blur: 5 }
-      })),
-      {
-        id: 'scrim',
-        track: 'middle',
-        component: 'Shape',
-        at: 0,
-        len: CLAIMS.length * BEAT,
-        props: { shape: 'rect', fill: INK, opacity: 0.72, ...FULL }
-      },
+      fill(CLAIM_SECONDS),
       ...CLAIMS.map((c, i): Beat => ({
         id: `claim_${i + 1}`,
         track: 'front',
         component: 'Title',
-        at: i * BEAT,
-        len: BEAT,
+        at: i * HOLD,
+        len: i === CLAIMS.length - 1 ? CLAIM_HOLD : HOLD,
         props: {
           text: c,
           ...word(LINE * 1.8, i === CLAIMS.length - 1 ? ACCENT : PAPER),
@@ -388,20 +361,20 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
         keys: punch(1.25)
       }))
     ],
-    fields: [...Array.from({ length: MONTAGE_CUTS }, (_, i) => picture(`shot_${i + 1}`, `Shot ${i + 1}`, `shot_${i + 1}`)), ...CLAIMS.map((_, i) => text(`claim_${i + 1}`, `Claim ${i + 1}`, `claim_${i + 1}`)), colour('accent', 'Last claim colour', `claim_${CLAIMS.length}`, 'color')]
+    fields: [...CLAIMS.map((_, i) => text(`claim_${i + 1}`, `Claim ${i + 1}`, `claim_${i + 1}`)), colour('accent', 'Last claim colour', `claim_${CLAIMS.length}`, 'color')]
   },
   {
     id: 'launch-ui-explode',
     name: 'Launch · UI explosion (peak)',
     description: 'Launch film. The wow peak, on the drop: a white flash, then every capture bursts into a tilted 3D grid that rushes at the camera and settles, the grid dims and the claim lands on top. Fill it with 8–12 captures.',
-    seconds: 5 * BEAT,
+    seconds: 6 * BEAT,
     beats: [
       {
         id: 'grid',
         track: 'back',
         component: 'Composition',
         at: 0,
-        len: 5 * BEAT,
+        len: 6 * BEAT,
         props: {
           layout: 'tilted-grid',
           camera: 'push-in',
@@ -423,7 +396,7 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
           scale: [
             [0, 4.2, SNAP],
             [0.8, 2.4, LINEAR],
-            [5 * BEAT, 2.15, LINEAR]
+            [6 * BEAT, 2.1, LINEAR]
           ],
           rotateZ: [
             [0, 14, SNAP],
@@ -455,7 +428,7 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
         track: 'front',
         component: 'Title',
         at: BEAT,
-        len: 4 * BEAT,
+        len: 5 * BEAT,
         props: {
           text: 'Turn clicks\ninto revenue.',
           ...word(LINE * 1.3),
@@ -467,7 +440,7 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
           ...riseOut,
           scale: [
             [0, 0.96, LINEAR],
-            [4 * BEAT, 1.04, LINEAR]
+            [5 * BEAT, 1.04, LINEAR]
           ]
         }
       }
@@ -560,21 +533,21 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
     id: 'launch-logo-build',
     name: 'Launch · Logo build',
     description: 'Launch film. The close: the light opens, the original logo lands flat and intact on a beat (fade and a small scale only) with an accent shockwave around it, then the address and the claim. The logo is never altered: the build is the context.',
-    seconds: 6 * BEAT,
+    seconds: 8 * BEAT,
     beats: [
-      fill(6 * BEAT),
+      fill(8 * BEAT),
       {
         id: 'light',
         track: 'back',
         component: 'Shape',
         at: 0,
-        len: 6 * BEAT,
+        len: 8 * BEAT,
         props: { shape: 'rect', fillKind: FillKind.Radial, fill: PAPER, fill2: INK, ...FULL, opacity: 0.16 },
         keys: {
           scale: [
             [0, 0.4, SNAP],
             [2 * BEAT, 1, LINEAR],
-            [6 * BEAT, 1.1, LINEAR]
+            [8 * BEAT, 1.1, LINEAR]
           ]
         }
       },
@@ -583,7 +556,7 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
         track: 'middle',
         component: 'Logo',
         at: 2 * BEAT,
-        len: 4 * BEAT,
+        len: 6 * BEAT,
         props: { x: 0.5, y: 0.42, width: 0.18, height: 0.32 },
         keys: {
           opacity: [
@@ -593,7 +566,7 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
           scale: [
             [0, 0.92, SNAP],
             [HIT, 1, LINEAR],
-            [4 * BEAT, 1.03, LINEAR]
+            [6 * BEAT, 1.03, LINEAR]
           ]
         }
       },
@@ -630,7 +603,7 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
         track: 'front',
         component: 'Title',
         at: 2.5 * BEAT,
-        len: 3.5 * BEAT,
+        len: 5.5 * BEAT,
         props: {
           text: 'example.com',
           ...word(0.11),
@@ -645,10 +618,10 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
         id: 'claim',
         track: 'front',
         component: 'Kicker',
-        at: 4 * BEAT,
-        len: 2 * BEAT,
+        at: 3.5 * BEAT,
+        len: 4.5 * BEAT,
         props: {
-          text: 'THE CLAIM IN SMALL CAPS',
+          text: 'YOUR CLAIM IN CAPS',
           ...label(),
           y: 0.89,
           width: 0.6,

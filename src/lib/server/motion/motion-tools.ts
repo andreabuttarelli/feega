@@ -30,6 +30,8 @@ import { MAX_FRAMES_PER_VIEW, MAX_VIEWS_PER_TURN, VIEW_FRAMES, type Frame } from
 import { docProblems, frameProblems, type FrameStat } from '$lib/motion/direction';
 import { CheckState, MAX_CSS, MAX_HTML, MAX_JS, SOURCE_FILES, checkState, propsSchemaSchema, sourceHash, type CustomComponent } from '$lib/motion/custom/component';
 import { patchComponent, recordCheck, removeComponent, writeComponent } from '$lib/motion/custom/ops';
+import { UI_KINDS, UI_KIT } from '$lib/motion/ui-kit/kit';
+import { STORY_BEATS, STORY_SHARE, markStory } from '$lib/motion/story';
 import { PATCH_COMPONENT, READ_COMPONENT, WRITE_COMPONENT } from './model-route';
 import { CAMERA, CAMERA_KEYS, CAMERA_LANE, SPACES, type Camera } from '$lib/motion/camera';
 import { ENV_PRESETS, HDRI, LIGHT, envPresetInput, LIGHT_KEYS, LIGHT_KINDS, type Look } from '$lib/motion/look';
@@ -1341,6 +1343,32 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
           return { ok: false, error: `no custom component ${input.name}; this video has ${Object.keys(session.doc.components).join(', ') || 'none'}` };
         }
         return { ok: true, name: input.name, ...component.source, props_schema: component.propsSchema, version: component.version, check: checkState(component), problems: component.check?.problems ?? [] };
+      }
+    }),
+
+    mark_story: tool({
+      description: `Mark where an act of the story starts (a timeline marker "story: <act>"). Every brand or product film tells four acts: problem (the user's pain, in the words of the site), solution (the product enters), proof (key features shown with live UI, numbers, results), claim (promise, original logo, address), about ${STORY_BEATS.map((b) => `${b} ${Math.round(STORY_SHARE[b] * 100)}%`).join(', ')} of the length. Marking an act again moves it.`,
+      inputSchema: z.object({ beat: z.enum(STORY_BEATS), start: z.number().min(0) }),
+      execute: async (input) => apply({ ok: true, doc: markStory(session.doc, input.beat, frames(input.start)) }, `marked the ${input.beat}`)
+    }),
+
+    add_ui: tool({
+      description: `Recreate a piece of product UI live, as vector UI in the brand style, instead of a screenshot: ${UI_KINDS.map((k) => `${k} (${UI_KIT[k].about})`).join(' ')} Every piece also takes font, ink, muted, paper, line, accent (colours from analyze_site or use_brand), radius (px, the site's corners), zoom (size) and speed (1 = default timing). It animates itself across its duration; give it at least 2.5 s. Move, scale and keyframe the clip like any other (camera following the action).`,
+      inputSchema: z.object({ kind: z.enum(UI_KINDS), start: z.number().min(0), duration: z.number().positive(), props: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(), track_id: z.string().optional() }),
+      execute: async (input) => {
+        const piece = UI_KIT[input.kind];
+        const written = session.doc.components[piece.name] ? { ok: true as const, doc: session.doc } : writeComponent(session.doc, piece.name, { source: { html: piece.html, css: piece.css, js: piece.js }, propsSchema: { type: 'object', properties: {} } });
+        if (!written.ok) {
+          return written;
+        }
+        const known = Object.keys(written.doc.components[piece.name].propsSchema.properties);
+        const unknown = Object.keys(input.props ?? {}).filter((k) => !known.includes(k));
+        if (unknown.length) {
+          return { ok: false, error: `${piece.name} has no ${unknown.join(', ')}: its props are ${known.join(', ')}` };
+        }
+        const id = deps.newId();
+        const placed = addClip(written.doc, { component: 'Custom', from: frames(input.start), durationInFrames: frames(input.duration), trackId: input.track_id, props: { name: piece.name, ...input.props } }, id);
+        return created(apply(placed, `added ${piece.name}`), id);
       }
     }),
 
