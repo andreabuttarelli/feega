@@ -9,6 +9,8 @@
   import { FAILURES, keyboardInset, speakerStarts } from './chat-view';
   import ChatComposer from './ChatComposer.svelte';
   import ChatMessage from './ChatMessage.svelte';
+  import ScriptBrief from './ScriptBrief.svelte';
+  import { BRIEF_AUTO_GO_S, GO_MESSAGE, pendingBrief } from '$lib/motion/script-brief';
   import ChatModelPicker from './ChatModelPicker.svelte';
   import { chatModelPrefs } from './chat-model-prefs.svelte';
 
@@ -54,6 +56,8 @@
   const failure = $derived(failed ? FAILURES[failed] : null);
   const copyKey = $derived(motionNodeId ? 'chat.panel.motion' : 'chat.panel');
   const suggestions = $derived(($json(`${copyKey}.suggestions`) as string[] | undefined) ?? []);
+  const brief = $derived(motionNodeId && !sending ? pendingBrief(messages) : null);
+  let editingBrief = $state(false);
   const showEmpty = $derived(!loading && failed !== 'load' && !messages.length);
 
   function on(event: FollowEvent) {
@@ -115,7 +119,13 @@
     }
     draft = '';
     on({ kind: 'sent' });
+    editingBrief = false;
     void session.send(text, 'append-user');
+  }
+
+  function editBrief() {
+    editingBrief = true;
+    root?.querySelector('textarea')?.focus();
   }
 
   function retry() {
@@ -185,6 +195,12 @@
             first={starts[i]}
           />
         {/each}
+
+        {#if brief}
+          {#key brief}
+            <ScriptBrief {brief} seconds={BRIEF_AUTO_GO_S} held={editingBrief || !!draft.trim()} ongo={() => send(GO_MESSAGE)} onedit={editBrief} />
+          {/key}
+        {/if}
       </div>
     </div>
 
