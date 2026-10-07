@@ -55,9 +55,13 @@ const PEAK_TRAVEL: Record<string, number> = { scale: 0.6, zoom: 0.8, dolly: 0.5,
 const HARD_CUT_SHARE = 0.25;
 const ENTRY_FRAMES = 2;
 const READING = { perWord: 0.4, base: 0.6, phrase: 1.2 };
-const SCREENSHOT_SHARE = 0.3;
 const MAIN_PICTURE_AREA = 0.25;
 const BACKDROP_BLUR = 8;
+const BACKDROP_OPACITY = 0.35;
+const SHOWN_PICTURE: readonly [component: string, prop: string][] = [
+  ['Image', 'assetId'],
+  ['Device3D', 'screen']
+];
 const CALM: readonly Forbidden[] = [Forbidden.Particles, Forbidden.Glow, Forbidden.Rotation, Forbidden.Bounce, Forbidden.FlyingText, Forbidden.Crowded, Forbidden.Transition, Forbidden.Still];
 
 export const STYLES: Record<MotionStyle, StyleSpec> = {
@@ -87,7 +91,7 @@ export const STYLES: Record<MotionStyle, StyleSpec> = {
       'Every junction flows: a match cut (an element carries on into the next scene), camera continuity (a zoom that goes through and becomes the next scene: set_clip_transition zoom), a whip pan with motion blur (push-left/push-right), a soft wipe, a dissolve with movement, a shape or UI morphing into the next. A hard cut is the exception, a deliberate hit on a strong beat, and rare: the gate names a film cut together hard.',
       'A memorable close built by its context, never by the logo: light, a shockwave, the address and the claim around the logo (launch-logo-build).',
       'A real brand logo is always the original asset (the SVG or PNG from the site or the brand kit), flat and intact, on a Logo or Image clip: never Logo3D, extrusion, chrome, recolouring, deformation, filters, blends, masks or reveals that cut it. It may only fade in or scale in a little, whole.',
-      'Recreate the product, never as screenshots: for a SaaS or an app, add_ui rebuilds its UI live in the brand style (font, colours and corner radius from analyze_site): a link typed and shortened, a list filling, numbers counting, a chart drawing, a funnel filling, a table updating, a QR building, inside vector browser or phone chrome. The camera follows the action by moving the clip position onto the part that moves, with scale changes within about 10% on a smooth ease: never pump the scale, never push UI or text out of the frame (the gate names anything outside the safe area). A screenshot is at most a blurred background; the gate names a film whose main picture is a screenshot for more than 30% of its length.',
+      'Recreate the product, never as screenshots: for a SaaS or an app, add_ui rebuilds its UI live in the brand style (font, colours and corner radius from analyze_site): a link typed and shortened, a list filling, numbers counting, a chart drawing, a funnel filling, a table updating, a QR building, inside vector browser or phone chrome. The camera follows the action by moving the clip position onto the part that moves, with scale changes within about 10% on a smooth ease: never pump the scale, never push UI or text out of the frame (the gate names anything outside the safe area). Screenshots are raw material, never content: not even for a moment may a sharp screenshot fill the frame or a device screen. At most a background (blur 8 or more, or opacity 0.35 or less); the gate names every sharp one and blocks delivery.',
       'Palette: near-black background, white type, one accent from the brand. Forbidden: decorative particles, glows, bounce or overshoot, more than four things moving at once.'
     ]
   },
@@ -282,15 +286,27 @@ function unreadable(clips: readonly Clip[], spec: StyleSpec, fps: number): Found
 
 const area = (clip: Clip) => Number(clip.props.width ?? 1) * Number(clip.props.height ?? 1);
 
-const isScreenshot = (clip: Clip) => (clip.component === 'Image' || (clip.component === 'Device3D' && Boolean(clip.props.screen))) && area(clip) >= MAIN_PICTURE_AREA && Number(clip.transform?.blur ?? 0) < BACKDROP_BLUR;
+type Placed = { clip: Clip; from: number };
+
+function placed(doc: MotionDoc, tracks: MotionDoc['tracks'], offset: number, seen: ReadonlySet<string>): Placed[] {
+  return tracks.flatMap((t) => t.clips as Clip[]).flatMap((clip) => {
+    const comp = clip.component === 'Precomp' ? String(clip.props.comp) : '';
+    const inner = doc.comps[comp];
+    if (!inner || seen.has(comp)) {
+      return [{ clip, from: offset + clip.from }];
+    }
+    return placed(doc, inner.tracks, offset + clip.from, new Set([...seen, comp]));
+  });
+}
+
+const veiled = (clip: Clip) => Number(clip.transform?.blur ?? 0) >= BACKDROP_BLUR || Number(clip.transform?.opacity ?? 1) <= BACKDROP_OPACITY;
+
+const isScreenshot = (clip: Clip) => SHOWN_PICTURE.some(([component, prop]) => clip.component === component && Boolean(clip.props[prop])) && area(clip) >= MAIN_PICTURE_AREA && !veiled(clip);
 
 function screenshots(doc: MotionDoc): Found[] {
-  const shots = timelines(doc)[0].filter(isScreenshot);
-  const covered = new Set(shots.flatMap((c) => Array.from({ length: c.durationInFrames }, (_, i) => c.from + i))).size;
-  if (doc.durationInFrames < PEAK_FROM_S * doc.fps || !shots.length || covered / doc.durationInFrames <= SCREENSHOT_SHARE) {
-    return [];
-  }
-  return [{ clip: shots[0], at: shots[0].from, detail: `screenshots are the main picture for ${Math.round((covered / doc.durationInFrames) * 100)}% of the film (at most ${SCREENSHOT_SHARE * 100}%): recreate the product UI live with add_ui (inputs typing, lists filling, numbers counting, charts drawing) and keep screenshots as a blurred background at most` }];
+  return placed(doc, doc.tracks, 0, new Set())
+    .filter((p) => isScreenshot(p.clip))
+    .map(({ clip, from }) => ({ clip, at: from, detail: `${clip.id} shows a sharp screenshot in the foreground at ${Math.round((from / doc.fps) * 100) / 100}s: a product film never shows screenshots as content, not even for a moment. Recreate that UI live with add_ui, or keep the screenshot as a background only (blur ${BACKDROP_BLUR} or more, or opacity ${BACKDROP_OPACITY} or less)` }));
 }
 
 function missingStory(doc: MotionDoc): Found[] {
@@ -312,9 +328,18 @@ const CHECKS: Record<Forbidden, Check> = {
   [Forbidden.MissingStoryBeat]: missingStory
 };
 
-export type StyleProblem = { effect: Forbidden; at: number; detail: string };
+export enum Severity {
+  Error = 'error',
+  Warning = 'warning'
+}
+
+const SEVERITY: Partial<Record<Forbidden, Severity>> = {
+  [Forbidden.Screenshots]: Severity.Error
+};
+
+export type StyleProblem = { effect: Forbidden; severity: Severity; at: number; detail: string };
 
 export function styleProblems(doc: MotionDoc): StyleProblem[] {
   const spec = STYLES[styleOf(doc)];
-  return spec.forbidden.flatMap((effect) => CHECKS[effect](doc, spec).map((f) => ({ effect, at: Math.round((f.at / doc.fps) * 100) / 100, detail: f.detail })));
+  return spec.forbidden.flatMap((effect) => CHECKS[effect](doc, spec).map((f) => ({ effect, severity: SEVERITY[effect] ?? Severity.Warning, at: Math.round((f.at / doc.fps) * 100) / 100, detail: f.detail })));
 }
