@@ -23,7 +23,7 @@ function withClip(doc: MotionDoc, id: string, component: 'Title' | 'Image' | 'Pa
   return { ...added, tracks: added.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === id ? { ...c, ...patch } : c)) })) };
 }
 
-const rise = { opacity: [{ frame: 0, value: 0, ease: STYLES[MotionStyle.AppleMinimal].eases.enter }, { frame: 27, value: 1, ease: STYLES[MotionStyle.AppleMinimal].eases.enter }] };
+const rise = { opacity: [{ frame: 0, value: 0, ease: STYLES[MotionStyle.AppleMinimal].eases.enter }, { frame: 12, value: 1, ease: STYLES[MotionStyle.AppleMinimal].eases.enter }] };
 const effects = (doc: MotionDoc) => styleProblems(doc).map((p) => p.effect);
 const blank = () => newMotionDoc(MotionFormat.Landscape);
 
@@ -33,14 +33,22 @@ describe('the Apple minimal style', () => {
     expect(DEFAULT_STYLE).toBe(MotionStyle.AppleMinimal);
   });
 
-  it('signs its eases: decelerating curves that never overshoot', () => {
+  it('signs its eases: an expo-out entrance that never overshoots, an in-out move', () => {
     const { enter, move } = STYLES[MotionStyle.AppleMinimal].eases;
 
-    expect(enter).toEqual([0.22, 1, 0.36, 1]);
+    expect(enter).toEqual([0.16, 1, 0.3, 1]);
     expect(move).toEqual([0.65, 0, 0.35, 1]);
   });
 
-  it('a slow fade-up title passes', () => {
+  it('text enters in 0.3 to 0.5 s with a short stagger, then holds', () => {
+    const { seconds } = STYLES[MotionStyle.AppleMinimal];
+
+    expect(seconds.enter).toEqual([0.3, 0.5]);
+    expect(seconds.stagger).toBeGreaterThanOrEqual(0.05);
+    expect(seconds.stagger).toBeLessThanOrEqual(0.15);
+  });
+
+  it('a fast fade-up title passes', () => {
     expect(effects(withClip(blank(), 't', 'Title', { keyframes: rise }))).toEqual([]);
   });
 
@@ -77,12 +85,34 @@ describe('the Apple minimal style', () => {
   });
 
   it('names a wipe between scenes, not a dissolve', () => {
-    expect(effects(withClip(blank(), 'i', 'Image', { junction: { kind: JunctionKind.Wipe, durationInFrames: 12 } }))).toContain(Forbidden.Transition);
-    expect(effects(withClip(blank(), 'i', 'Image', { junction: { kind: JunctionKind.Crossfade, durationInFrames: 24 } }))).toEqual([]);
+    expect(effects(withClip(blank(), 't', 'Title', { junction: { kind: JunctionKind.Wipe, durationInFrames: 12 } }))).toContain(Forbidden.Transition);
+    expect(effects(withClip(blank(), 't', 'Title', { junction: { kind: JunctionKind.Crossfade, durationInFrames: 24 } }))).toEqual([]);
+  });
+
+  it('names a picture that stands still for more than a second, not one that keeps drifting', () => {
+    const push = { scale: [{ frame: 0, value: 1, ease: Ease.Linear }, { frame: 3 * SECOND, value: 1.04, ease: Ease.Linear }] };
+    const stops = { scale: [{ frame: 0, value: 1, ease: Ease.Linear }, { frame: SECOND, value: 1.04, ease: Ease.Linear }] };
+
+    expect(effects(withClip(blank(), 'i', 'Image'))).toContain(Forbidden.Still);
+    expect(effects(withClip(blank(), 'i', 'Image', { keyframes: stops }))).toContain(Forbidden.Still);
+    expect(effects(withClip(blank(), 'i', 'Image', { keyframes: push }))).toEqual([]);
+  });
+
+  it('a device that turns is moving, one parked at an angle stands still', () => {
+    const angled = (start: number, end: number) => {
+      const doc = withClip(blank(), 'd', 'Device3D');
+      return { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => ({ ...c, props: { ...c.props, startAngle: start, endAngle: end } })) })) };
+    };
+    const parked = angled(10, 10);
+    const turning = angled(-14, 14);
+
+    expect(effects(parked)).toContain(Forbidden.Still);
+    expect(effects(turning)).toEqual([]);
   });
 
   it('names three things moving at once, not two', () => {
-    const two = withClip(withClip(blank(), 'a', 'Title', { keyframes: rise }), 'b', 'Image', { keyframes: rise });
+    const drift = { ...rise, scale: [{ frame: 0, value: 1, ease: Ease.Linear }, { frame: 3 * SECOND, value: 1.04, ease: Ease.Linear }] };
+    const two = withClip(withClip(blank(), 'a', 'Title', { keyframes: rise }), 'b', 'Image', { keyframes: drift });
 
     expect(effects(two)).toEqual([]);
     expect(effects(withClip(two, 'c', 'Title', { keyframes: rise }))).toContain(Forbidden.Crowded);

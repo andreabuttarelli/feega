@@ -48,6 +48,30 @@ describe('motion agent brand tools', () => {
     expect(session.doc.assets.map((a) => a.id)).toContain('logo1');
   });
 
+  it('import_asset with capture photographs the page at 2x and registers every shot', async () => {
+    const shot = (id: string): MotionAsset => ({ id, kind: AssetKind.Image, label: id, previewUrl: '', url: `https://signed/${id}.png`, width: 780, height: 1688 });
+    const capture = vi.fn(async () => ({ ok: true as const, shots: [{ part: 'top', asset: shot('top'), width: 780, height: 1688 }, { part: 'section 2', asset: shot('s2'), width: 780, height: 1688 }] }));
+    const { assets, run } = setup({ capture });
+
+    const out = await run('import_asset', { url: 'https://dub.co', capture: 'mobile' });
+
+    expect(capture).toHaveBeenCalledWith('https://dub.co', 'mobile');
+    expect(out).toEqual({ ok: true, captures: [{ asset_id: 'top', part: 'top', width: 780, height: 1688 }, { asset_id: 's2', part: 'section 2', width: 780, height: 1688 }] });
+    expect(assets.map((a) => a.id)).toEqual(['top', 's2']);
+  });
+
+  it('view_frames names a picture blown up past its pixels', async () => {
+    const small: MotionAsset = { id: 'og', kind: AssetKind.Image, label: 'og', previewUrl: '', url: 'https://signed/og.jpg', width: 640, height: 488 };
+    const frames = vi.fn(async (_id: string, times: number[]) => times.map((time) => ({ time, bytes: Buffer.from('x') })));
+    const { assets, run } = setup({ frames });
+    assets.push(small);
+    await run('add_clip', { component: 'Image', start: 0, duration: 3, props: { assetId: 'og', fit: 'cover', width: 1920, height: 1080 } });
+
+    const out = (await run('view_frames', { times: [1] })) as { quality: string[] };
+
+    expect(out.quality.some((q) => q.includes('640×488'))).toBe(true);
+  });
+
   it('import_asset passes a refusal through without touching the assets', async () => {
     const { assets, run } = setup({ importAsset: vi.fn(async () => ({ ok: false as const, error: 'not an image' })) });
 

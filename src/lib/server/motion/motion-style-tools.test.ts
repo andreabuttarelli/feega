@@ -41,7 +41,7 @@ describe('the motion style', () => {
 
     expect(text).toContain('Apple');
     expect(text).toContain('builtin:scene-');
-    expect(text).toContain('cubic-bezier(0.22,1,0.36,1)');
+    expect(text).toContain('cubic-bezier(0.16,1,0.3,1)');
     expect(text).toContain('particles');
     expect(text).not.toContain('push, wipe, zoom, whip');
   });
