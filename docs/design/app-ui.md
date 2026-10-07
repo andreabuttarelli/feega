@@ -32,6 +32,13 @@ Dark mode redefines the same names under `[data-theme='dark']`. `.ui-app` (on th
 - **Icons**: 16px (`--ui-icon`), 14px in dense toolbars, 12px in timeline chips.
 - **Focus**: accent border or `--ui-focus` ring.
 
+## /app shell
+
+A 220px sidebar, always open from 1024px (`AppSidebar.svelte`); below, the same sidebar in a
+left drawer behind a hamburger. Its entries are one table, `src/lib/app-nav.ts`; tools come from
+`src/lib/tools.ts`. Active row = `--ui-hover` wash. The dashboard separates with space and
+`--ui-surface`, not borders. Dark `--ui-bg` is pure `#000`.
+
 ## Timeline
 
 One table, `src/lib/motion/track-style.ts`: each component maps to a family (text, image,
