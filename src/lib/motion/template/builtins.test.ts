@@ -14,7 +14,7 @@ const ids = () => {
 
 describe('built-in motion templates', () => {
   it('every composition node layout is a template, so motion uses the same compositions as the canvas', () => {
-    const layouts = BUILTIN_TEMPLATES.filter((e) => e.template.doc.tracks.some((t) => t.clips.some((c) => c.component === 'Composition'))).map((e) => e.template.doc.tracks[0].clips[0].props.layout);
+    const layouts = BUILTIN_TEMPLATES.filter((e) => e.id.startsWith('builtin:composition-')).map((e) => e.template.doc.tracks[0].clips[0].props.layout);
 
     expect(layouts.sort()).toEqual(Object.keys(LAYOUTS).sort());
   });

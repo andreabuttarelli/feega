@@ -20,3 +20,5 @@ Musica: `generate_music` usa ElevenLabs quando c'è; altrimenti `music-bed.ts` s
 una base CC0 (kick sul beat, rullante su 2 e 4, build fino al picco a due terzi, tempo letto dal
 prompt), salvata come asset audio con la licenza in `assets.content`. Scartato: tracce CC0 da siti
 terzi (link instabili, licenze da verificare una per una).
+
+Aggiornamento: nel merge con main (#193) l'energia vive nello stile `LaunchFilm`, ora default; `AppleMinimal` torna quello di main. Da questo branch restano la musica sempre presente e il critico Deep.

@@ -64,13 +64,13 @@ import { setClipsBlur, setMotionBlur } from '$lib/motion/motion-blur-ops';
 import { DEGREES, MAX_SAMPLES } from '$lib/motion/motion-blur';
 import { MODIFIERS, MODIFIER_KINDS } from '$lib/motion/shape/modifiers';
 import { addModifier, morphTo, removeModifier, setModifier, setPath } from '$lib/motion/shape/ops';
-import { SHAPE_KINDS, modifierKey } from '$lib/motion/shape/schema';
+import { SHAPE_KINDS, StrokeKind, modifierKey } from '$lib/motion/shape/schema';
 import { PRESET as SHAPE_PRESET, SHAPE_PRESETS, applyShapePreset } from '$lib/motion/shape/presets';
 import { MAX_RATE, MIN_RATE, REMAP_KEY, clearTimeRemap, freezeFrame } from '$lib/motion/time-remap';
 import { PARTICLE_PRESETS, PRESET_PROPS as PARTICLE_PRESET, applyParticlePreset } from '$lib/motion/particles/presets';
 import { DUCK_DEFAULTS, duckUnder } from '$lib/motion/duck';
 import type { AudioAnalysis } from '$lib/motion/audio-analysis';
-import { Hit, cutToBeat, hitFrames, markHits } from '$lib/motion/beats';
+import { Division, Hit, cutToBeat, hitFrames, markHits } from '$lib/motion/beats';
 import { PULSE_PROPS, pulseWithMusic } from '$lib/motion/pulse';
 import { applyValues, exposeField, fieldValues, removeField } from '$lib/motion/template/fields';
 import { FIELD_TYPES, type ExposedField } from '$lib/motion/template/field-model';
@@ -324,6 +324,18 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     (owner: Owner, prop: string) =>
     (k: KeyInput): Keyframe =>
       asKey(typeof k.value === 'number' ? { ...k, value: toStored(owner, prop, k.value, session.doc) } : k);
+
+  const logoUrls = new Set<string>();
+  const brandLogos = new Set<string>();
+  const readLogos = (read: SourceRead) => {
+    const found = read as { site?: { logos?: { url?: string }[] }; brand?: { logoUrl?: string | null } };
+    for (const url of [...(found.site?.logos ?? []).map((l) => l.url), found.brand?.logoUrl]) {
+      if (url) {
+        logoUrls.add(url);
+      }
+    }
+    return read;
+  };
 
   const apply = (result: OpResult, what: string) => {
     if (!result.ok) {
@@ -650,9 +662,9 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     cut_to_beat: tool({
-      description: 'Re-time clips to the beat: in time order, the first starts on the nearest beat and each one ends on the beat nearest its length, the next starting there, so every cut lands on a beat.',
-      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1) }),
-      execute: async (input) => apply(cutToBeat(session.doc, input.clip_ids, await docBeats(Hit.Beats)), `cut ${input.clip_ids.length} clips to the beat`)
+      description: 'Re-time clips to the beat: in time order, the first starts on the nearest beat and each one ends on the beat nearest its length, the next starting there, so every cut lands on a beat. division half cuts on half beats too (a fast montage before the drop).',
+      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1), division: z.enum(Division).optional() }),
+      execute: async (input) => apply(cutToBeat(session.doc, input.clip_ids, await docBeats(Hit.Beats), input.division), `cut ${input.clip_ids.length} clips to the beat`)
     }),
 
     duck_audio: tool({
@@ -964,7 +976,8 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       inputSchema: z.object({ kind: z.enum(SHAPE_KINDS), start: z.number().min(0), duration: z.number().positive().optional(), path: z.string().optional(), props: z.record(z.string(), z.unknown()).optional(), ...PLACED_PICTURE }),
       execute: async (input) => {
         const id = deps.newId();
-        const props = { ...propsIn('Shape', input.props), shape: input.kind, ...(input.path ? { path: input.path } : {}) };
+        const outlined = input.props?.stroke !== undefined && input.props?.strokeKind === undefined ? { strokeKind: StrokeKind.Solid } : {};
+        const props = { ...propsIn('Shape', { ...outlined, ...input.props }), shape: input.kind, ...(input.path ? { path: input.path } : {}) };
         const shape = addClip(session.doc, { component: 'Shape', from: frames(input.start), durationInFrames: input.duration ? frames(input.duration) : undefined, trackId: input.track_id, props }, id);
         return created(apply(withEffects(shape, [id], input.effects), `added ${input.kind} shape`), id);
       }
@@ -1106,7 +1119,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_style: tool({
-      description: `The motion style the video is directed in: ${MOTION_STYLES.map((m) => `${m} (${STYLES[m].label})`).join(', ')}. Apple minimal is the default; change it only when the user explicitly asks for another style. The quality gate in view_frames checks the effects the style forbids.`,
+      description: `The motion style the video is directed in: ${MOTION_STYLES.map((m) => `${m} (${STYLES[m].label})`).join(', ')}. Launch film (minimal look, high energy) is the default; change it only when the user explicitly asks for another style. The quality gate in view_frames checks the effects the style forbids.`,
       inputSchema: z.object({ style: z.enum(MOTION_STYLES) }),
       execute: async (input) => apply({ ok: true, doc: { ...session.doc, style: input.style } }, `style ${input.style}`)
     }),
@@ -1261,13 +1274,13 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     analyze_site: tool({
       description: 'Read a public website for a brand: name, tagline, description, logos (svg first, then favicon, apple-touch-icon, og:image), palette (theme, logo, CSS), fonts (google true = usable by name after register_font), images with width and height (og, hero, product), products and social links. Nothing is stored: import_asset the logo and the pictures you will use.',
       inputSchema: z.object({ url: z.string().min(4).max(2000).describe('the site, e.g. https://www.allbirds.com or allbirds.com') }),
-      execute: async (input) => (deps.site ? deps.site(input.url) : UNREADABLE('reading sites'))
+      execute: async (input) => (deps.site ? readLogos(await deps.site(input.url)) : UNREADABLE('reading sites'))
     }),
 
     use_brand: tool({
       description: "Read a brand of this workspace: the project brand without a name, or the brand the user names. Returns name, website, logo url, palette, fonts, voice notes and products. import_asset its logo and product pictures to use them in clips.",
       inputSchema: z.object({ name: z.string().max(120).optional().describe('brand name or slug; omit for the project brand') }),
-      execute: async (input) => (deps.brand ? deps.brand(input.name) : UNREADABLE('reading brands'))
+      execute: async (input) => (deps.brand ? readLogos(await deps.brand(input.name)) : UNREADABLE('reading brands'))
     }),
 
     import_asset: tool({
@@ -1287,6 +1300,9 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
           return imported;
         }
         deps.assets.push(imported.asset);
+        if (logoUrls.has(input.url)) {
+          brandLogos.add(imported.asset.id);
+        }
         return { ok: true, asset_id: imported.asset.id, kind: imported.asset.kind, width: imported.width, height: imported.height };
       }
     }),
@@ -1378,7 +1394,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const stats = deps.inspect ? await deps.inspect(frames) : [];
         const audioAssets = deps.assets.filter((a) => a.kind === AssetKind.Audio).length;
         const pixels = Object.fromEntries(deps.assets.flatMap((a) => (a.width && a.height ? [[a.id, { width: a.width, height: a.height }]] : [])));
-        const quality = [...docProblems(session.doc, { audioAssets, pixels }), ...frameProblems(stats)].map((p) => p.detail);
+        const quality = [...docProblems(session.doc, { audioAssets, pixels, logos: [...brandLogos] }), ...frameProblems(stats)].map((p) => p.detail);
         return { ok: true, times: frames.map((f) => f.time), quality, note: quality.length ? 'The quality gate found the problems in quality: fix each one, then look again. The frames follow as images in the next message.' : 'The frames follow as images in the next message.' };
       }
     }),
