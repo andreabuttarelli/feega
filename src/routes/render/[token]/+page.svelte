@@ -13,6 +13,7 @@
   import { RenderPlace, renderPlace, thisDevice, type Device, type PlaceVerdict } from '$lib/motion/render-place';
   import { Preset, settingsOf } from '$lib/motion/export-formats';
   import { REFUSAL_TEXT } from '$lib/motion/render-link';
+  import { profileOf } from '$lib/motion/export/capture-profile';
   import type { Resolution } from '$lib/motion/render-quote';
 
   let { data } = $props();
@@ -27,6 +28,7 @@
   };
   const STAGE_PHASE: Record<BrowserStage, Phase> = { [BrowserStage.Mixing]: Phase.Mixing, [BrowserStage.Rendering]: Phase.Rendering };
   const MIME = 'video/mp4';
+  const CAPTURE_PARAM = 'capture';
 
   const render = data.render;
   const html = render ? composeHtml({ doc: render.doc, tokens: render.tokens, assets: render.assetUrls, analyses: render.analyses }) : '';
@@ -105,7 +107,7 @@
         assetUrls: render.assetUrls,
         size,
         withAudio: Boolean(caps?.aac),
-        frames: (times, s, onFrame, signal) => preview!.render(times, s, onFrame, signal),
+        frames: (times, s, onFrame, signal) => preview!.render(times, s, onFrame, signal, html, profileOf(page.url.searchParams.get(CAPTURE_PARAM))),
         signal: controller.signal,
         onStage: (stage) => {
           phase = STAGE_PHASE[stage];
