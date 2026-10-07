@@ -5,6 +5,8 @@ import { Forbidden, styleOf, styleProblems } from './style';
 import { MotionStyle } from './style-model';
 import { UI_KIT, UI_SAFE, uiScale } from './ui-kit/kit';
 import { sampleTrack } from './sample-track';
+import { cursorClicks, cursorMisses, reelMisses, TARGET_SEPARATOR } from './clicks';
+import { emptyContent, interactionOf, isUiPiece, Interaction } from './ui-kit/content';
 
 export enum Quality {
   RepeatedLayout = 'repeated-layout',
@@ -19,7 +21,11 @@ export enum Quality {
   OutOfFrame = 'out-of-frame',
   TiltedText = 'tilted-text',
   EmptyFrames = 'empty-frames',
-  SmallLogo = 'small-logo'
+  SmallLogo = 'small-logo',
+  ClickMiss = 'click-miss',
+  EmptyUi = 'empty-ui',
+  NoMicroMotion = 'no-micro-motion',
+  NoScript = 'no-script'
 }
 
 export enum Severity {
@@ -43,6 +49,10 @@ export const SEVERITY: Record<Check, Severity> = {
   [Quality.TiltedText]: Severity.Warning,
   [Quality.EmptyFrames]: Severity.Blocking,
   [Quality.SmallLogo]: Severity.Warning,
+  [Quality.ClickMiss]: Severity.Blocking,
+  [Quality.EmptyUi]: Severity.Blocking,
+  [Quality.NoMicroMotion]: Severity.Warning,
+  [Quality.NoScript]: Severity.Warning,
   [Forbidden.Particles]: Severity.Warning,
   [Forbidden.Glow]: Severity.Warning,
   [Forbidden.Rotation]: Severity.Warning,
@@ -57,7 +67,9 @@ export const SEVERITY: Record<Check, Severity> = {
   [Forbidden.UnreadableText]: Severity.Blocking,
   [Forbidden.Screenshots]: Severity.Blocking,
   [Forbidden.MissingStoryBeat]: Severity.Blocking,
-  [Forbidden.Rushed]: Severity.Warning
+  [Forbidden.Rushed]: Severity.Warning,
+  [Forbidden.LoopSeam]: Severity.Blocking,
+  [Forbidden.TooDense]: Severity.Warning
 };
 
 export type Pixels = Record<string, { width: number; height: number }>;
@@ -138,7 +150,7 @@ function smallTitles(doc: MotionDoc): QualityProblem[] {
     .map((c) => ({ kind: Quality.SmallTitle, at: seconds(doc, c.from), detail: `title ${c.id} at ${seconds(doc, c.from)}s sits in a small box (${Math.round(num(c, 'width', 0.8) * 100)}% × ${Math.round(num(c, 'height', 0.4) * 100)}% of the frame): it reads small` }));
 }
 
-const SCORED: Record<MotionStyle, boolean> = { [MotionStyle.LaunchFilm]: true, [MotionStyle.AppleMinimal]: false };
+const SCORED: Record<MotionStyle, boolean> = { [MotionStyle.LaunchFilm]: true, [MotionStyle.AppleMinimal]: false, [MotionStyle.UiMorph]: true };
 
 function silent(doc: MotionDoc, audioAssets: number): QualityProblem[] {
   const plays = doc.tracks.some((t) => t.kind === TrackKind.Audio && t.clips.length > 0);
@@ -386,10 +398,35 @@ function smallLogos(doc: MotionDoc, pixels: Pixels): QualityProblem[] {
   });
 }
 
+function clickMisses(doc: MotionDoc): QualityProblem[] {
+  return [...cursorMisses(doc), ...reelMisses(doc)].map((m) => ({ kind: Quality.ClickMiss, at: seconds(doc, m.frame), detail: `${m.detail}. Every click lands inside the element it presses` }));
+}
+
+const uiClips = (doc: MotionDoc) => everyClip(doc).filter((c) => c.component === 'Custom' && isUiPiece(String(c.props.name ?? ''), doc.components[String(c.props.name ?? '')]?.source.js));
+
+function emptyUis(doc: MotionDoc): QualityProblem[] {
+  return uiClips(doc).flatMap((clip) => {
+    const name = String(clip.props.name);
+    const found = emptyContent(name, clip.props, doc.components[name]?.source.js);
+    return found.length ? [{ kind: Quality.EmptyUi, at: seconds(doc, clip.from), detail: `${clip.id} (${name}) shows no real content: ${found.join('; ')}. Fill it with the product's own data from the research: names, numbers and states a user of the product would recognise` }] : [];
+  });
+}
+
+function stillUis(doc: MotionDoc): QualityProblem[] {
+  const clicked = new Set(cursorClicks(doc).flatMap((c) => (c.target ? [c.target.split(TARGET_SEPARATOR)[0]] : [])));
+  return uiClips(doc)
+    .filter((clip) => interactionOf(String(clip.props.name), doc.components[String(clip.props.name)]?.source.js) === Interaction.Still && !clicked.has(clip.id))
+    .map((clip) => ({ kind: Quality.NoMicroMotion, at: seconds(doc, clip.from), detail: `${clip.id} (${String(clip.props.name)}) only moves as a whole: nothing in it reacts. Press, hover or change a state on it (click_ui on an anchor), or morph it into the next UI` }));
+}
+
+function unscripted(doc: MotionDoc): QualityProblem[] {
+  return SCORED[styleOf(doc)] && !doc.script && everyClip(doc).length ? [{ kind: Quality.NoScript, detail: 'no research and script saved: for a launch film or trailer, write_script first (problem, struggle, flow, sourced proof, promise) and build that' }] : [];
+}
+
 export function docProblems(doc: MotionDoc, input: { audioAssets: number; pixels?: Pixels; logos?: readonly string[] }): QualityProblem[] {
   const list = scenes(doc);
   const pixels = input.pixels ?? {};
-  return [...repeated(doc, list), ...smallTitles(doc), ...silent(doc, input.audioAssets), ...softPictures(doc, pixels), ...croppedScreens(doc, pixels), ...alteredLogos(doc, new Set(input.logos ?? [])), ...outOfFrame(doc), ...tiltedText(doc), ...emptyFrames(doc), ...smallLogos(doc, pixels), ...styleProblems(doc).map((p) => ({ kind: Quality.OffStyle, at: p.at, effect: p.effect, detail: p.detail }))];
+  return [...unscripted(doc), ...clickMisses(doc), ...emptyUis(doc), ...stillUis(doc), ...repeated(doc, list), ...smallTitles(doc), ...silent(doc, input.audioAssets), ...softPictures(doc, pixels), ...croppedScreens(doc, pixels), ...alteredLogos(doc, new Set(input.logos ?? [])), ...outOfFrame(doc), ...tiltedText(doc), ...emptyFrames(doc), ...smallLogos(doc, pixels), ...styleProblems(doc).map((p) => ({ kind: Quality.OffStyle, at: p.at, effect: p.effect, detail: p.detail }))];
 }
 
 export function frameProblems(stats: readonly FrameStat[]): QualityProblem[] {

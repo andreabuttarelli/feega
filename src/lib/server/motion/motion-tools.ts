@@ -34,6 +34,10 @@ import { RECREATE_STATES, UI_KINDS, UI_KIT, recreatedStyle, recreatedUi, type Ui
 import { MORPH_KINDS, DEFAULT_REEL } from '$lib/motion/ui-morph/reel';
 import { addMorphReel } from '$lib/motion/ui-morph/ops';
 import { STORY_BEATS, STORY_SHARE, markStory } from '$lib/motion/story';
+import { anchorsOf } from '$lib/motion/clicks';
+import { clickUi } from '$lib/motion/cursor-ops';
+import { ACTS, briefOf, scriptProblems, scriptSchema, sourcesOf } from '$lib/motion/script';
+import { quoted, type SitePage } from './site-copy';
 import { PATCH_COMPONENT, READ_COMPONENT, WRITE_COMPONENT } from './model-route';
 import { CAMERA, CAMERA_KEYS, CAMERA_LANE, SPACES, type Camera } from '$lib/motion/camera';
 import { ENV_PRESETS, HDRI, LIGHT, envPresetInput, LIGHT_KEYS, LIGHT_KINDS, type Look } from '$lib/motion/look';
@@ -206,6 +210,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
     workArea: doc.workArea ? { start: secs(doc.workArea.from), end: secs(doc.workArea.to) } : null,
     interactive: interactiveOf(doc),
     style: styleOf(doc),
+    script: doc.script ?? null,
     camera: cameraSummary(doc.camera),
     look: lookSummary(doc.look),
     components: Object.entries(doc.components).map(([name, c]) => customSummary(name, c)),
@@ -340,6 +345,13 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
 
   const logoUrls = new Set<string>();
   const brandLogos = new Set<string>();
+  const sitePages: SitePage[] = [];
+  const readPages = (read: SourceRead) => {
+    const pages = (read as { site?: { pages?: SitePage[] } }).site?.pages ?? [];
+    sitePages.push(...pages);
+    return read;
+  };
+
   const readLogos = (read: SourceRead) => {
     const found = read as { site?: { logos?: { url?: string }[] }; brand?: { logoUrl?: string | null } };
     for (const url of [...(found.site?.logos ?? []).map((l) => l.url), found.brand?.logoUrl]) {
@@ -1306,7 +1318,29 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     analyze_site: tool({
       description: 'Read a public website for a brand: name, tagline, description, logos (svg first, then favicon, apple-touch-icon, og:image), palette (theme, logo, CSS), accent (hex and where it was found; hex null with a neutral palette when the brand has none), fonts (google true = usable by name after register_font), images with width and height (og, hero, product), products and social links. Nothing is stored: import_asset the logo and the pictures you will use.',
       inputSchema: z.object({ url: z.string().min(4).max(2000).describe('the site, e.g. https://www.allbirds.com or allbirds.com') }),
-      execute: async (input) => (deps.site ? readLogos(await deps.site(input.url)) : UNREADABLE('reading sites'))
+      execute: async (input) => (deps.site ? readPages(readLogos(await deps.site(input.url))) : UNREADABLE('reading sites'))
+    }),
+
+    write_script: tool({
+      description: `Save the research and the four-act script of a launch film before building it; the video is not built until this passes. Research: who it serves, the concrete problem, the struggle as an everyday scene, how the product works step by step (input → what happens → result), 1–3 benefits and up to 4 numbers or results, the tone, the promise. Every benefit, number, promise and proof cites its source: the url of a page analyze_site read and a quote copied from that page; a claim without a source on the site is refused, so never invent one. Acts ${ACTS.join(', ')} in order: problem shows the "before" UI, cluttered or slow, with realistic data; solution shows the product's real flow with specific content; proof shows a number or result from the site; claim puts the site's own promise on screen. Returns the brief to show the user word for word.`,
+      inputSchema: scriptSchema,
+      execute: async (raw) => {
+        const parsed = scriptSchema.safeParse(raw);
+        if (!parsed.success) {
+          return { ok: false, error: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ') };
+        }
+        const input = parsed.data;
+        if (!sitePages.length) {
+          return { ok: false, error: 'read the site first: analyze_site gives the pages and quotes every claim must come from' };
+        }
+        const unsourced = sourcesOf(input).filter((s) => !quoted(sitePages, s));
+        const problems = [...scriptProblems(input), ...unsourced.map((s) => `"${s.quote}" is not on ${s.url}: quote the page word for word or drop the claim`)];
+        if (problems.length) {
+          return { ok: false, error: problems.join('; ') };
+        }
+        const saved = apply({ ok: true, doc: { ...session.doc, script: input } }, 'saved the research and the script');
+        return saved.ok ? { ok: true, brief: briefOf(input) } : saved;
+      }
     }),
 
     use_brand: tool({
@@ -1391,7 +1425,8 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         }
         const id = deps.newId();
         const placed = addClip(written.doc, { component: 'Custom', from: frames(input.start), durationInFrames: frames(input.duration), trackId: input.track_id, props: { name: piece.name, ...input.props } }, id);
-        return created(apply(placed, `added ${piece.name}`), id);
+        const shown = created(apply(placed, `added ${piece.name}`), id);
+        return shown.ok ? { ...shown, anchors: Object.keys(anchorsOf(session.doc, id)?.anchors ?? {}) } : shown;
       }
     }),
 
@@ -1429,7 +1464,17 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const id = deps.newId();
         const placed = addClip(session.doc, { component: 'Custom', from: frames(input.start), durationInFrames: frames(input.duration), trackId: input.track_id, props: { name: piece.name, ...recreatedStyle(read.structure, fontRefProblem(read.structure.font, session.doc.fonts) === null) } }, id);
         const shown = apply(placed, `placed ${piece.name}`);
-        return shown.ok ? { ...made, clip_id: id } : shown;
+        return shown.ok ? { ...made, clip_id: id, anchors: Object.keys(anchorsOf(session.doc, id)?.anchors ?? {}) } : shown;
+      }
+    }),
+
+    click_ui: tool({
+      description: 'Lay a cursor that clicks named parts of UI clips (anchors such as send, cta, button, buy-1, toggle-0, card-2, input-0: add_ui and recreate_ui return them). Give each click the clip, the anchor and the second of the click on the video timeline; the cursor travels there and clicks exactly inside the part, following the clip scale, keyframes, parents, precomps and camera at that frame. Never place a cursor by guessed coordinates: the click-miss gate blocks a click outside the part it presses.',
+      inputSchema: z.object({ clicks: z.array(z.object({ clip_id: z.string(), anchor: z.string(), at: z.number().min(0) })).min(1).max(12) }),
+      execute: async (input) => {
+        const id = deps.newId();
+        const made = clickUi(session.doc, input.clicks.map((c) => ({ clipId: c.clip_id, anchor: c.anchor, at: c.at })), { clip: id, track: deps.newId() });
+        return created(apply(made, `cursor clicks ${input.clicks.map((c) => `${c.clip_id}#${c.anchor}`).join(', ')}`), id);
       }
     }),
 
