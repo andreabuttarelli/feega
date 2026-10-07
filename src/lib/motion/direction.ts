@@ -1,7 +1,8 @@
 import { COMPONENTS, TrackKind, type ComponentId } from './components';
 import type { MotionDoc } from './doc';
 import { DEVICE, Device } from './devices';
-import { styleProblems } from './style';
+import { styleOf, styleProblems } from './style';
+import { MotionStyle } from './style-model';
 import { UI_KIT, UI_SAFE, uiScale } from './ui-kit/kit';
 import { sampleTrack } from './sample-track';
 
@@ -92,9 +93,17 @@ function smallTitles(doc: MotionDoc): QualityProblem[] {
     .map((c) => ({ kind: Quality.SmallTitle, at: seconds(doc, c.from), detail: `title ${c.id} at ${seconds(doc, c.from)}s sits in a small box (${Math.round(num(c, 'width', 0.8) * 100)}% × ${Math.round(num(c, 'height', 0.4) * 100)}% of the frame): it reads small` }));
 }
 
+const SCORED: Record<MotionStyle, boolean> = { [MotionStyle.LaunchFilm]: true, [MotionStyle.AppleMinimal]: false };
+
 function silent(doc: MotionDoc, audioAssets: number): QualityProblem[] {
   const plays = doc.tracks.some((t) => t.kind === TrackKind.Audio && t.clips.length > 0);
-  return audioAssets > 0 && !plays ? [{ kind: Quality.Silent, detail: 'the project has music the video never plays' }] : [];
+  if (plays) {
+    return [];
+  }
+  if (audioAssets > 0) {
+    return [{ kind: Quality.Silent, detail: 'the project has music the video never plays' }];
+  }
+  return SCORED[styleOf(doc)] ? [{ kind: Quality.Silent, detail: 'the launch film has no music: add_music lays a track under it (pick mood and bpm), then cut on its beats' }] : [];
 }
 
 const everyClip = (doc: MotionDoc) => [doc.tracks, ...Object.values(doc.comps).map((c) => c.tracks)].flatMap((tracks) => tracks.flatMap((t) => t.clips as Clip[]));

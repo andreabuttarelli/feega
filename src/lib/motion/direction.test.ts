@@ -74,6 +74,14 @@ describe('the quality gate reads the direction of the video', () => {
     expect(kinds(sparkling)).toContain(Quality.OffStyle);
   });
 
+  it('a launch film with no music at all is named silent, even with no audio in the project', () => {
+    const launch = { ...newMotionDoc(MotionFormat.Landscape), style: MotionStyle.LaunchFilm };
+    const calmFilm = { ...newMotionDoc(MotionFormat.Landscape), style: MotionStyle.AppleMinimal };
+
+    expect(docProblems(launch, { audioAssets: 0 }).map((p) => p.kind)).toContain(Quality.Silent);
+    expect(docProblems(calmFilm, { audioAssets: 0 }).map((p) => p.kind)).not.toContain(Quality.Silent);
+  });
+
   it('music in the project that the video never plays is named', () => {
     expect(docProblems(dubLike(), { audioAssets: 1 }).map((p) => p.kind)).toContain(Quality.Silent);
   });

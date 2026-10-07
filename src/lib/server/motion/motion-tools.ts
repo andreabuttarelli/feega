@@ -73,6 +73,7 @@ import { PARTICLE_PRESETS, PRESET_PROPS as PARTICLE_PRESET, applyParticlePreset 
 import { DUCK_DEFAULTS, duckUnder } from '$lib/motion/duck';
 import type { AudioAnalysis } from '$lib/motion/audio-analysis';
 import { Division, Hit, cutToBeat, hitFrames, markHits } from '$lib/motion/beats';
+import { Mood } from '$lib/motion/music-library';
 import { PULSE_PROPS, pulseWithMusic } from '$lib/motion/pulse';
 import { applyValues, exposeField, fieldValues, removeField } from '$lib/motion/template/fields';
 import { FIELD_TYPES, type ExposedField } from '$lib/motion/template/field-model';
@@ -95,11 +96,14 @@ export const MAX_COMP_CALLS = 40;
 
 export type Voiceover = { ok: true; assetId: string; seconds: number; url: string | null } | { ok: false; error: string };
 
+export type Music = { ok: true; assetId: string; seconds: number; url: string | null; source: string; track: string } | { ok: false; error: string };
+
 export type MotionToolDeps = {
   session: MotionSession;
   assets: MotionAsset[];
   newId: () => string;
   voiceover: (input: { text: string; voiceId?: string }) => Promise<Voiceover>;
+  music?: (input: { mood: Mood; bpm?: number; seconds: number }) => Promise<Music>;
   frames: (callId: string, times: number[]) => Promise<Frame[] | null>;
   inspect?: (frames: Frame[]) => Promise<FrameStat[]>;
   check: (callId: string, doc: MotionDoc, name: string) => Promise<CheckResult | null>;
@@ -1431,6 +1435,29 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const pixels = Object.fromEntries(deps.assets.flatMap((a) => (a.width && a.height ? [[a.id, { width: a.width, height: a.height }]] : [])));
         const quality = [...docProblems(session.doc, { audioAssets, pixels, logos: [...brandLogos] }), ...frameProblems(stats)].map((p) => p.detail);
         return { ok: true, times: frames.map((f) => f.time), quality, note: quality.length ? 'The quality gate found the problems in quality: fix each one, then look again. The frames follow as images in the next message.' : 'The frames follow as images in the next message.' };
+      }
+    }),
+
+    add_music: tool({
+      description: 'Music under the whole video: a generated track when the workspace has a music generator, otherwise a CC0 track from the built-in library, chosen by mood and bpm. It lands on an Audio clip from 0 to the end and its beats are marked ("beat N"), ready for cut_to_beat. A launch film always has music.',
+      inputSchema: z.object({ mood: z.enum(Mood), bpm: z.number().min(60).max(180).optional(), ...PLACED }),
+      execute: async (input) => {
+        if (!deps.music) {
+          return UNREADABLE('music');
+        }
+        const seconds = session.doc.durationInFrames / session.doc.fps;
+        const track = await deps.music({ mood: input.mood, bpm: input.bpm, seconds });
+        if (!track.ok) {
+          return { ok: false, error: track.error };
+        }
+        deps.assets.push({ id: track.assetId, kind: AssetKind.Audio, label: `music ${track.track}`, previewUrl: '', url: track.url });
+        const id = deps.newId();
+        const placed = apply(registered(addClip(session.doc, { component: 'Audio', from: 0, durationInFrames: session.doc.durationInFrames, trackId: input.track_id, props: { assetId: track.assetId } }, id), track.assetId), `added ${track.source} music ${track.track}`);
+        if (!placed.ok) {
+          return placed;
+        }
+        const marked = apply(markHits(session.doc, await docBeats(Hit.Beats), Hit.Beats), 'marked the beats');
+        return { ...marked, clip_id: id, source: track.source, track: track.track };
       }
     }),
 
