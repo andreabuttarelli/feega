@@ -99,8 +99,6 @@
      bottom padding pushes the wordmark to the top of the bar. Specific enough to win the cascade. */
   header.nav .brand { padding: 0; }
   /* Logo mark larger than the 19px "feega" wordmark so the symbol leads (nav + footer). */
-  .brand .brandmark { width: 30px; height: 30px; }
-  header.nav .brand .brandmark { width: 44px; height: 44px; }
   .brand .dot {
     width: 7px; height: 7px;
     background: linear-gradient(135deg, var(--accent-2), var(--accent));
