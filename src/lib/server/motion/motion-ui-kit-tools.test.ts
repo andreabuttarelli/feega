@@ -69,6 +69,21 @@ describe('the UI recreation kit', () => {
     expect(text).toContain('never as screenshots');
   });
 
+  it('the kit carries generic primitives for any product, not only a link shortener', () => {
+    const generic = [UiKind.Sidebar, UiKind.Hero, UiKind.PromptBox, UiKind.EditorCanvas, UiKind.CardGrid, UiKind.Pricing, UiKind.Chat, UiKind.Modal, UiKind.Toggle, UiKind.Upload, UiKind.GeneratedResult, UiKind.Cursor];
+
+    expect(generic.every((k) => UI_KINDS.includes(k))).toBe(true);
+  });
+
+  it('add_ui and the prompt offer the generic primitives to the agent', () => {
+    const { run } = setup();
+    const text = motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Available });
+
+    expect(text).toContain('prompt box');
+    expect(text).toContain('pricing');
+    return expect(run('add_ui', { kind: UiKind.Chat, start: 0, duration: 3, props: { accent: '#ff5500' } })).resolves.toMatchObject({ ok: true });
+  });
+
   it('mark_story marks each act of the story once, moving it when marked again', async () => {
     const { session, run } = setup();
     await run('mark_story', { beat: 'problem', start: 0 });
