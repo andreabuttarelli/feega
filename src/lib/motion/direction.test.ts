@@ -73,6 +73,26 @@ describe('the quality gate reads the direction of the video', () => {
     expect(docProblems(dubLike(), { audioAssets: 1 }).map((p) => p.kind)).toContain(Quality.Silent);
   });
 
+  it('the Dub v3 funnel: a 640 px picture pushed in full frame is named soft, with the largest scale it takes', () => {
+    const placed = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Image', from: 0, durationInFrames: 90, props: { assetId: 'funnel', fit: 'cover', width: 1, height: 1 } }, 'i'));
+    const pushed = { ...placed, tracks: placed.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => ({ ...c, keyframes: { scale: [{ frame: 0, value: 1.12, ease: Ease.Linear }, { frame: 90, value: 1.18, ease: Ease.Linear }] } })) })) };
+    const soft = docProblems(pushed, { audioAssets: 0, pixels: { funnel: { width: 640, height: 488 } } }).filter((p) => p.kind === Quality.SoftPicture);
+    const sharp = docProblems(pushed, { audioAssets: 0, pixels: { funnel: { width: 3840, height: 2400 } } }).filter((p) => p.kind === Quality.SoftPicture);
+
+    expect(soft).toHaveLength(1);
+    expect(soft[0].detail).toContain('0.33');
+    expect(sharp).toEqual([]);
+  });
+
+  it('a desktop screenshot on a phone screen is named, a mobile one is not', () => {
+    const phone = (asset: string) => must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Device3D', from: 0, durationInFrames: 90, props: { device: 'phone-pro', screen: asset } }, 'd'));
+    const pixels = { desk: { width: 2880, height: 1800 }, mobile: { width: 780, height: 1688 } };
+    const cropped = (asset: string) => docProblems(phone(asset), { audioAssets: 0, pixels }).filter((p) => p.kind === Quality.CroppedScreen);
+
+    expect(cropped('desk')).toHaveLength(1);
+    expect(cropped('mobile')).toEqual([]);
+  });
+
   it('a flat frame and a frame half white are named with their time', () => {
     const problems = frameProblems([
       { time: 0.5, lumaStd: 1, whiteShare: 0 },
