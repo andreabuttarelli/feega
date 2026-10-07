@@ -1,11 +1,11 @@
 import { tool, type Tool, type ToolExecutionOptions } from 'ai';
-import { addAdjustment, mergeView, precompose, viewOf } from '$lib/motion/precomp';
+import { addAdjustment, createComp, mergeView, precompose, viewOf } from '$lib/motion/precomp';
 import { z } from 'zod';
 import { AssetKind, COMPONENTS, COMPONENT_IDS, TrackKind, type ComponentId } from '$lib/motion/components';
 import { fieldsOf } from '$lib/motion/inspector';
 import { Ease, FRAME_RATES, MAX_SECONDS, TRANSITION_KINDS } from '$lib/motion/design';
 import { setFrameRate } from '$lib/motion/frame-rate';
-import { Background, MOTION_FORMATS, clipsOf, findClip, type MotionDoc } from '$lib/motion/doc';
+import { Background, MAX_SIDE, MOTION_FORMATS, clipsOf, findClip, type MotionDoc } from '$lib/motion/doc';
 import { JUNCTION, JUNCTION_KINDS, junctionPairs } from '$lib/motion/junctions';
 import { ClipEdge, Side, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyInterp, setKeyframes, setMask, setMaskStack, shaped, setProps, setTiming, setTrackMatte, setTransform, setTransition, setJunction, trimClip, applyEasePreset, setKeyEase, type OpResult } from '$lib/motion/timeline';
 import { MASK_KEYS, MASK_KIND_IDS, MASK_MODES, MATTES, MAX_MASK_STACK } from '$lib/motion/mask';
@@ -1598,6 +1598,16 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const clip = deps.newId();
         const out = apply(precompose(session.doc, input.clip_ids, { comp, clip }, input.name ?? `Comp ${Object.keys(session.doc.comps).length + 1}`), `precomposed ${input.clip_ids.length} clip(s)`);
         return out.ok ? { ...out, comp, clip_id: clip } : out;
+      }
+    }),
+
+    create_comp: tool({
+      description: 'Create an empty nested composition with its own frame size in px, e.g. a phone screen (390×848) for UI that a Device3D shows live with screenComp. Fill it with edit_comp: px inside it are px of this frame.',
+      inputSchema: z.object({ name: z.string().max(60), width: z.number().int().min(16).max(MAX_SIDE), height: z.number().int().min(16).max(MAX_SIDE), duration: z.number().positive() }),
+      execute: async (input) => {
+        const comp = deps.newId();
+        const out = apply(createComp(session.doc, comp, { name: input.name, durationInFrames: frames(input.duration), frame: { width: input.width, height: input.height } }), `created ${input.name}`);
+        return out.ok ? { ...out, comp } : out;
       }
     }),
 

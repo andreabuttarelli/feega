@@ -36,4 +36,18 @@ describe('device tools', () => {
     expect(device.about).toContain('monitor 5120×2880 (16:9)');
     expect(device.props.screenFit).toBe('cover|contain|safe');
   });
+
+  it('builds UI on its own screen frame and puts it live on a phone', async () => {
+    const { session, run } = setup();
+    const comp = await run('create_comp', { name: 'App', width: 390, height: 848, duration: 4 });
+    expect(comp.ok, String(comp.error)).toBe(true);
+    const inside = await run('edit_comp', { comp: comp.comp, calls: [{ tool: 'add_clip', input: { component: 'Title', start: 0, props: { text: 'Daily Loop', x: 195, width: 390 } } }] });
+    expect(inside.ok, JSON.stringify(inside)).toBe(true);
+    const phone = await run('add_clip', { component: 'Device3D', start: 0, duration: 4, props: { screenComp: comp.comp } });
+    expect(phone.ok, String(phone.error)).toBe(true);
+
+    const title = session.doc.comps[String(comp.comp)].tracks.flatMap((t) => t.clips)[0];
+    expect(session.doc.comps[String(comp.comp)].frame).toEqual({ width: 390, height: 848 });
+    expect([title.props.x, title.props.width]).toEqual([0.5, 1]);
+  });
 });

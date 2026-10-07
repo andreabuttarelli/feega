@@ -9,6 +9,8 @@ import { LIGHTING, OPENTYPE_URL, ThreeKind, lookRuntime, surfaceOf, threeAssetUr
 import { outlineUrl } from '../fonts/outline';
 import { Finish, ScreenFit } from '../devices';
 import { deviceRuntime } from './device-runtime';
+import { screenBake, screenHtml, type ScreenBake, type ScreenInput } from './device-screen';
+import { screenCompOf, screenFrames } from '../device-screen';
 import { ringBake, ringHtml, ringScript } from './ring';
 import { RING_LAYOUT } from '../ring/model';
 import { bentoBake, bentoHtml, bentoScript } from './bento';
@@ -162,7 +164,17 @@ function moveTweens(clip: MotionClip, fps: number): Tween[] {
 }
 
 function frameOf(clip: MotionClip, doc: MotionDoc): { width: number; height: number } {
-  return cellFrames(doc).find((c) => clip.id.startsWith(c.prefix))?.frame ?? doc;
+  return [...cellFrames(doc), ...screenFrames(doc)].find((c) => clip.id.startsWith(c.prefix))?.frame ?? doc;
+}
+
+function screenInput(clip: MotionClip, ctx: TemplateCtx<ComponentId>): ScreenInput | null {
+  const p = clip.props as PropsOf<'Device3D'>;
+  const comp = screenCompOf(clip);
+  if (!comp) {
+    return null;
+  }
+  const dolly = (clip.keyframes.dolly ?? []).map((k) => Number(k.value));
+  return { id: clip.id, frame: ctx, place: ctx.p as PropsOf<'Device3D'>, device: p.device, fit: p.screenFit, zoomMax: Math.max(p.zoom, ...dolly), compFrame: ctx.compFrame(comp) ?? { width: ctx.width, height: ctx.height } };
 }
 
 function ctxOf(clip: MotionClip, input: ComposeInput): TemplateCtx<ComponentId> {
@@ -265,6 +277,17 @@ const GROUPS: Partial<Record<ComponentId, GroupSpec>> = {
     },
     effects: (clip, ctx) => effectTimeline(clip, ctx, ctx.color)
   },
+  Device3D: {
+    firstLayer: (clip, trackIndex, starts) => {
+      const span = (clip.props as GroupProps).span;
+      return span ? (starts.get(trackIndex + span) ?? 0) : Number.POSITIVE_INFINITY;
+    },
+    html: (clip, ctx, placed, content) => {
+      const screen = screenInput(clip, ctx);
+      return clipHtml(clip, ctx, placed, TEMPLATES.Device3D.html(ctx as TemplateCtx<'Device3D'>) + (screen ? screenHtml(screen, content) : ''));
+    },
+    effects: (clip, ctx) => effectTimeline(clip, ctx, ctx.color, paintArea(clip.component, ctx.p as never, ctx, null))
+  },
   Adjustment: {
     firstLayer: () => 0,
     html: (clip, ctx, placed, content) => adjustmentLayer(clip, ctx, ctx.color, content, placed.layer),
@@ -349,9 +372,15 @@ function threeClipOf(clip: MotionClip, ctx: TemplateCtx<ComponentId>, staged: bo
     bevel: p.bevel ?? 0,
     device: p.device ? deviceRuntime(p.device, p.finish ?? Finish.Default, ctx) : null,
     screenFit: p.screenFit ?? ScreenFit.Cover,
+    screen: screenOf(clip, ctx),
     video: Boolean(ctx.asset(p.screenVideo ?? null)),
     overscan: clip.component === 'Device3D' ? DEVICE_OVERSCAN : 0
   };
+}
+
+function screenOf(clip: MotionClip, ctx: TemplateCtx<ComponentId>): ScreenBake | null {
+  const input = clip.component === 'Device3D' ? screenInput(clip, ctx) : null;
+  return input ? screenBake(input) : null;
 }
 
 function compositionBake(clip: MotionClip, ctx: TemplateCtx<ComponentId>): TimedBake {

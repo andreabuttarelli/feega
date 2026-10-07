@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { drawOnce, screenKey, screenPlacement } from './three-draw';
+import { drawOnce, faceShown, quadMatrix, screenKey, screenPlacement } from './three-draw';
 
 describe('drawOnce', () => {
   it('a seek repeated at the same time draws once: the producer seeks a frame several times', () => {
@@ -101,5 +101,39 @@ describe('screenPlacement', () => {
 
     expect(screenPlacement(tall, PHONE, 'cover', 0, 0).sy).toBe(0);
     expect(screenPlacement(tall, PHONE, 'cover', 1, 0).sy).toBeCloseTo(6000 - 2622, 6);
+  });
+});
+
+describe('quadMatrix', () => {
+  const apply = (m: number[], x: number, y: number) => {
+    const w = m[3] * x + m[7] * y + m[15];
+    return [(m[0] * x + m[4] * y + m[12]) / w, (m[1] * x + m[5] * y + m[13]) / w];
+  };
+  const values = (css: string) => css.slice('matrix3d('.length, -1).split(',').map(Number);
+
+  it('maps the corners of the screen box onto the projected corners of the screen', () => {
+    const quad: [number, number][] = [
+      [100, 80],
+      [420, 120],
+      [400, 700],
+      [90, 650]
+    ];
+    const m = values(quadMatrix(1206, 2622, quad));
+
+    [[0, 0], [1206, 0], [1206, 2622], [0, 2622]].forEach(([x, y], k) => {
+      const [qx, qy] = apply(m, x, y);
+      expect(qx).toBeCloseTo(quad[k][0], 6);
+      expect(qy).toBeCloseTo(quad[k][1], 6);
+    });
+  });
+
+  it('a screen turned away or behind the camera is hidden', () => {
+    const front: [number, number, number][] = [[0, 0, 0.5], [10, 0, 0.5], [10, 10, 0.5], [0, 10, 0.5]];
+    const back = [front[1], front[0], front[3], front[2]];
+    const behind = front.map(([x, y]) => [x, y, 1.2] as [number, number, number]);
+
+    expect(faceShown(front)).toBe(true);
+    expect(faceShown(back)).toBe(false);
+    expect(faceShown(behind)).toBe(false);
   });
 });
