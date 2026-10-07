@@ -52,6 +52,11 @@ export enum CameraLayout {
   Single = 'single'
 }
 
+export const GLASS_RIM = 0.7;
+export const BEVEL = { share: 0.45, max: GLASS_RIM / 0.8 };
+
+export const bevelOf = (depth: number) => Math.min(depth * BEVEL.share, BEVEL.max);
+
 export type Rect = { width: number; height: number; radius: number };
 
 export type DeviceSpec = {

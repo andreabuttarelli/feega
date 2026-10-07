@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { MotionFormat, newMotionDoc, type MotionDoc } from './doc';
 import { Side, addClip, setTransition } from './timeline';
 import { Quality, docProblems, frameProblems } from './direction';
-import { TransitionKind } from './design';
+import { Ease, TransitionKind } from './design';
 import { builtinTemplate } from './template/builtins';
 import { insertTemplate } from './template/library';
 
@@ -18,7 +18,9 @@ const SCENE = 90;
 function scene(doc: MotionDoc, i: number, look: { titleX: number; media: 'Image' | 'Device3D'; mediaX: number; titleBox?: { width: number; height: number } }): MotionDoc {
   const box = look.titleBox ?? { width: 0.4, height: 0.24 };
   const titled = must(addClip(doc, { component: 'Title', from: i * SCENE, durationInFrames: SCENE, props: { text: `Beat ${i}`, x: look.titleX, ...box } }, `t${i}`));
-  return must(addClip(titled, { component: look.media, from: i * SCENE, durationInFrames: SCENE, props: { x: look.mediaX } }, `m${i}`));
+  const placed = must(addClip(titled, { component: look.media, from: i * SCENE, durationInFrames: SCENE, props: { x: look.mediaX } }, `m${i}`));
+  const drift = { scale: [{ frame: 0, value: 1, ease: Ease.Linear }, { frame: SCENE, value: 1.05, ease: Ease.Linear }] };
+  return { ...placed, tracks: placed.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === `m${i}` ? { ...c, keyframes: drift } : c)) })) };
 }
 
 function dubLike(): MotionDoc {
@@ -69,6 +71,26 @@ describe('the quality gate reads the direction of the video', () => {
 
   it('music in the project that the video never plays is named', () => {
     expect(docProblems(dubLike(), { audioAssets: 1 }).map((p) => p.kind)).toContain(Quality.Silent);
+  });
+
+  it('the Dub v3 funnel: a 640 px picture pushed in full frame is named soft, with the largest scale it takes', () => {
+    const placed = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Image', from: 0, durationInFrames: 90, props: { assetId: 'funnel', fit: 'cover', width: 1, height: 1 } }, 'i'));
+    const pushed = { ...placed, tracks: placed.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => ({ ...c, keyframes: { scale: [{ frame: 0, value: 1.12, ease: Ease.Linear }, { frame: 90, value: 1.18, ease: Ease.Linear }] } })) })) };
+    const soft = docProblems(pushed, { audioAssets: 0, pixels: { funnel: { width: 640, height: 488 } } }).filter((p) => p.kind === Quality.SoftPicture);
+    const sharp = docProblems(pushed, { audioAssets: 0, pixels: { funnel: { width: 3840, height: 2400 } } }).filter((p) => p.kind === Quality.SoftPicture);
+
+    expect(soft).toHaveLength(1);
+    expect(soft[0].detail).toContain('0.33');
+    expect(sharp).toEqual([]);
+  });
+
+  it('a desktop screenshot on a phone screen is named, a mobile one is not', () => {
+    const phone = (asset: string) => must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Device3D', from: 0, durationInFrames: 90, props: { device: 'phone-pro', screen: asset } }, 'd'));
+    const pixels = { desk: { width: 2880, height: 1800 }, mobile: { width: 780, height: 1688 } };
+    const cropped = (asset: string) => docProblems(phone(asset), { audioAssets: 0, pixels }).filter((p) => p.kind === Quality.CroppedScreen);
+
+    expect(cropped('desk')).toHaveLength(1);
+    expect(cropped('mobile')).toEqual([]);
   });
 
   it('a flat frame and a frame half white are named with their time', () => {

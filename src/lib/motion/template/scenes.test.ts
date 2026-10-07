@@ -7,6 +7,7 @@ import { Ease } from '$lib/motion/design';
 import { BUILTIN_TEMPLATES } from './builtins';
 import { insertTemplate } from './library';
 import { SCENES } from './scenes';
+import { TEMPLATES } from '$lib/motion/hyperframes/templates';
 
 const APPLE = STYLES[MotionStyle.AppleMinimal];
 const TEXT = new Set(['Title', 'Text', 'Kicker', 'Caption']);
@@ -63,14 +64,54 @@ describe('the Apple minimal scene library', () => {
     expect(colours.every((c) => NEUTRALS.has(c))).toBe(true);
   });
 
-  it.each(sceneDocs().map((e) => [e.id, e] as const))('%s enters quickly', (_id, entry) => {
+  it.each(sceneDocs().map((e) => [e.id, e] as const))('%s sets its text in fast, 0.3 to 0.5 s, and then holds', (_id, entry) => {
     const doc = entry.template.doc;
-    const entrances = clipsOf(doc).flatMap((c) => {
-      const fade = c.keyframes.opacity;
-      return fade && fade.length > 1 ? [(fade[1].frame - fade[0].frame) / doc.fps] : [];
+    const entrances = clipsOf(doc)
+      .filter((c) => TEXT.has(c.component))
+      .flatMap((c) => {
+        const frames = Object.values(c.keyframes).flatMap((track) => (track.length > 1 ? track.map((k) => k.frame) : []));
+        return frames.length ? [(Math.max(...frames) - Math.min(...frames)) / doc.fps] : [];
+      });
+
+    expect(entrances.every((s) => s >= APPLE.seconds.enter[0] && s <= APPLE.seconds.enter[1])).toBe(true);
+  });
+
+  it.each(sceneDocs().map((e) => [e.id, e] as const))('%s staggers its lines briefly', (_id, entry) => {
+    const doc = entry.template.doc;
+    const starts = clipsOf(doc)
+      .filter((c) => TEXT.has(c.component) && Object.keys(c.keyframes).length)
+      .map((c) => c.from)
+      .sort((a, b) => a - b);
+    const gaps = starts.slice(1).map((f, i) => (f - starts[i]) / doc.fps);
+
+    expect(gaps.every((g) => g <= APPLE.seconds.enter[1])).toBe(true);
+  });
+
+  it.each(sceneDocs().map((e) => [e.id, e] as const))('%s never shows pieces of letters: no text enters through a line mask', (_id, entry) => {
+    const doc = entry.template.doc;
+    const masked = clipsOf(doc).filter((c) => {
+      if (!TEXT.has(c.component)) {
+        return false;
+      }
+      const tweens = (TEMPLATES[c.component] as { tweens?: (ctx: unknown) => { from: Record<string, unknown> }[] }).tweens;
+      return (tweens?.({ id: c.id, p: c.props, start: 0, fps: doc.fps }) ?? []).some((t) => 'yPercent' in t.from);
     });
 
-    expect(entrances.length).toBeGreaterThan(0);
-    expect(entrances.every((s) => s >= APPLE.seconds.enter[0] && s <= APPLE.seconds.enter[1])).toBe(true);
+    expect(masked.map((c) => c.id)).toEqual([]);
+  });
+
+  it('the product reveal crops a capture on one section instead of shrinking the whole page', () => {
+    const reveal = SCENES.find((s) => s.id === 'scene-product-reveal')!;
+    const photo = reveal.beats.find((b) => b.id === 'photo')!;
+
+    expect(photo.props?.fit).toBe('cover');
+    expect(reveal.fields.map((f) => f.key)).toEqual(expect.arrayContaining(['focus_x', 'focus_y', 'zoom']));
+  });
+
+  it('every scene has its text on screen within the first second', () => {
+    const settled = (c: ReturnType<typeof clipsOf>[number]) => c.from + Math.max(0, ...Object.values(c.keyframes).flatMap((track) => track.map((k) => k.frame)));
+    const late = sceneDocs().filter((e) => clipsOf(e.template.doc).some((c) => TEXT.has(c.component) && Object.keys(c.keyframes).length && settled(c) > e.template.doc.fps));
+
+    expect(late.map((e) => e.id)).toEqual([]);
   });
 });

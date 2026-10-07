@@ -107,11 +107,18 @@ export type MotionToolDeps = {
   site?: (url: string) => Promise<SourceRead>;
   brand?: (name?: string) => Promise<SourceRead>;
   importAsset?: (url: string, label?: string) => Promise<AssetImport>;
-  capture?: (url: string) => Promise<SiteCapture>;
+  capture?: (url: string, view: CaptureView) => Promise<SiteCapture>;
   music?: (input: { text: string; seconds: number }) => Promise<Voiceover & { license?: string }>;
 };
 
-export type SiteCapture = { ok: true; shots: Extract<AssetImport, { ok: true }>[] } | { ok: false; error: string };
+export enum CaptureView {
+  Desktop = 'desktop',
+  Mobile = 'mobile'
+}
+
+export type CaptureShot = { part: string; asset: MotionAsset; width: number; height: number };
+
+export type SiteCapture = { ok: true; shots: CaptureShot[] } | { ok: false; error: string };
 
 export type SourceRead = { ok: true } & Record<string, unknown> | { ok: false; error: string };
 
@@ -1264,9 +1271,17 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     import_asset: tool({
-      description: 'Download a picture or logo from a public https url (PNG, JPEG, WebP, GIF, AVIF or SVG, max 12MB) into the project assets and return its asset_id for Image, Logo, Logo3D (SVG), ProductCard or Device3D screen.',
-      inputSchema: z.object({ url: z.string().url().max(2000), label: z.string().max(60).optional() }),
+      description: 'Download a picture or logo from a public https url (PNG, JPEG, WebP, GIF, AVIF or SVG, max 12MB) into the project assets and return its asset_id for Image, Logo, Logo3D (SVG), ProductCard or Device3D screen. With capture desktop or mobile the url is a web page instead: it is photographed in a real browser at 2× (desktop 1440 px wide, mobile 390 px) and you get the top of the page and its key sections as sharp screenshots, one asset each. Use captures for UI and screens, never og:image or a small thumbnail.',
+      inputSchema: z.object({ url: z.string().url().max(2000), label: z.string().max(60).optional(), capture: z.enum(CaptureView).optional() }),
       execute: async (input) => {
+        if (input.capture) {
+          const captured = deps.capture ? await deps.capture(input.url, input.capture) : UNREADABLE('capturing pages');
+          if (!captured.ok) {
+            return captured;
+          }
+          deps.assets.push(...captured.shots.map((s) => s.asset));
+          return { ok: true, captures: captured.shots.map((s) => ({ asset_id: s.asset.id, part: s.part, width: s.width, height: s.height })) };
+        }
         const imported = deps.importAsset ? await deps.importAsset(input.url, input.label) : UNREADABLE('importing pictures');
         if (!imported.ok) {
           return imported;
@@ -1362,21 +1377,9 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         session.checkedAt = session.edits.length;
         const stats = deps.inspect ? await deps.inspect(frames) : [];
         const audioAssets = deps.assets.filter((a) => a.kind === AssetKind.Audio).length;
-        const quality = [...docProblems(session.doc, { audioAssets }), ...frameProblems(stats)].map((p) => p.detail);
+        const pixels = Object.fromEntries(deps.assets.flatMap((a) => (a.width && a.height ? [[a.id, { width: a.width, height: a.height }]] : [])));
+        const quality = [...docProblems(session.doc, { audioAssets, pixels }), ...frameProblems(stats)].map((p) => p.detail);
         return { ok: true, times: frames.map((f) => f.time), quality, note: quality.length ? 'The quality gate found the problems in quality: fix each one, then look again. The frames follow as images in the next message.' : 'The frames follow as images in the next message.' };
-      }
-    }),
-
-    capture_site: tool({
-      description: 'Spends credits and takes about 2–3 minutes. Opens a public website in a real browser at 1920×1080 and imports crisp screenshots of it (the top of the page first, then each scrolled section) as project pictures: use them for ui-closeup, ui-window and device scenes instead of small og:images.',
-      inputSchema: z.object({ url: z.string().url().max(2000).describe('the page, e.g. https://dub.co') }),
-      execute: async (input) => {
-        const captured = deps.capture ? await deps.capture(input.url) : UNREADABLE('capturing sites');
-        if (!captured.ok) {
-          return captured;
-        }
-        deps.assets.push(...captured.shots.map((s) => s.asset));
-        return { ok: true, screenshots: captured.shots.map((s) => ({ asset_id: s.asset.id, width: s.width, height: s.height })) };
       }
     }),
 

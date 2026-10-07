@@ -15,33 +15,6 @@ function setup(deps: Partial<MotionToolDeps> = {}) {
   return { session, assets, run };
 }
 
-const shot = (id: string) => ({ ok: true as const, width: 1920, height: 1080, asset: { id, kind: AssetKind.Image, label: id, previewUrl: '', url: `https://x/${id}` } });
-
-describe('capture_site', () => {
-  it('imports the screenshots of a real browser as project pictures, top of the page first', async () => {
-    const capture = vi.fn(async () => ({ ok: true as const, shots: [shot('top'), shot('features')] }));
-    const { assets, run } = setup({ capture });
-
-    const out = await run('capture_site', { url: 'https://dub.co' });
-
-    expect(capture).toHaveBeenCalledWith('https://dub.co');
-    expect(out).toMatchObject({ ok: true, screenshots: [{ asset_id: 'top', width: 1920, height: 1080 }, { asset_id: 'features' }] });
-    expect(assets.map((a) => a.id)).toEqual(['top', 'features']);
-  });
-
-  it('says so when this workspace cannot capture sites', async () => {
-    const { run } = setup();
-
-    expect((await run('capture_site', { url: 'https://dub.co' })).ok).toBe(false);
-  });
-
-  it('passes a failed capture on as an error', async () => {
-    const { run } = setup({ capture: vi.fn(async () => ({ ok: false as const, error: 'capture did not finish in 360 s' })) });
-
-    expect(await run('capture_site', { url: 'https://dub.co' })).toEqual({ ok: false, error: 'capture did not finish in 360 s' });
-  });
-});
-
 describe('generate_music', () => {
   it('generates a music bed and places it on an Audio clip', async () => {
     const music = vi.fn(async () => ({ ok: true as const, assetId: 'bed', seconds: 15, url: 'https://x/bed' }));

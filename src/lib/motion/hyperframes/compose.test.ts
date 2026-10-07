@@ -60,7 +60,7 @@ describe('MotionDoc to HyperFrames composition', () => {
 
     const html = compose(vid, { a: 'https://x/a.png', v: 'https://x/v.mp4' });
 
-    expect(html).toContain('object-position:20% 90%');
+    expect(html).toContain('object-position:calc(var(--kc-focusX, 0.2) * 100%) calc(var(--kc-focusY, 0.9) * 100%)');
     expect(html).toContain('object-position:100% 0%');
   });
 

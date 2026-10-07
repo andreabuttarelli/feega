@@ -1,7 +1,7 @@
 import type { DeepState } from './loop';
 
 export const DIRECTOR_TOOLS = ['analyze_site', 'use_brand', 'list_templates'];
-export const ASSET_TOOLS = ['analyze_site', 'use_brand', 'capture_site', 'import_asset', 'generate_music', 'list_assets', 'analyze_audio', 'get_motion_doc'];
+export const ASSET_TOOLS = ['analyze_site', 'use_brand', 'import_asset', 'generate_music', 'list_assets', 'analyze_audio', 'get_motion_doc'];
 
 export function directorSystem(input: { styleLabel: string; styleRules: readonly string[]; frame: { width: number; height: number }; seconds: number }): string {
   return [
@@ -18,7 +18,7 @@ export function assetsPrompt(input: { brief: string; storyboard: string }): stri
   return [
     `Brief:\n${input.brief}`,
     `Storyboard:\n${input.storyboard}`,
-    'Prepare every asset this storyboard lists, and nothing else yet: capture_site for product screenshots, import_asset for the logo (svg first) and the pictures, generate_music for the music bed (always: instrumental, the length of the video, the tempo in bpm in the prompt), then analyze_audio on it. Call independent tools together. Skip what fails, never invent a url. Then answer with the asset ids, what each one shows, the music tempo and beats, and the music license when the tool returns one, one line each.'
+    'Prepare every asset this storyboard lists, and nothing else yet: import_asset with capture desktop (and mobile when the product is an app) for crisp product screenshots, import_asset for the logo (svg first) and the pictures, generate_music for the music bed (always: instrumental, the length of the video, the tempo in bpm in the prompt), then analyze_audio on it. Call independent tools together. Skip what fails, never invent a url. Then answer with the asset ids, what each one shows, the music tempo and beats, and the music license when the tool returns one, one line each.'
   ].join('\n\n');
 }
 

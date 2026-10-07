@@ -119,9 +119,11 @@ enforce on `nodes.data`, per `type` (`text`, `image`, `video`, `doc`, `iframe`,
 a fact of the model, not the node.
 
 `effects` holds a stack of image filters (pixelate, posterize, duotone, dither, halftone, noise,
-rgb-shift, glitch, wave, swirl, pinch, ascii, random-colors) over an upstream image — the schema
-returned for it lists every effect's params with their ranges/options/defaults. Set the stack with
-`update_row`, then call `apply_effects` to render it.
+rgb-shift, glitch, wave, swirl, pinch, ascii, random-colors, shape-mosaic, shape-cutout) over an
+upstream image — the schema returned for it lists every effect's params with their
+ranges/options/defaults (`list_effects` gives the same list). `apply_effects` sets and renders it.
+`shape-cutout` yields one side of an A/B pair (`side: shapes` = shapes over the image, `side: holes`
+= solid fill with windows): `make_effects_pair` creates the other side.
 
 ## Generation
 
@@ -156,10 +158,11 @@ deposits the asset. Poll the node (`query`) rather than expecting a file now. Sp
 and `full_url` (the original, for the user, valid 1 hour). Ids outside your org come back in `missing`; nothing
 visible at all is a 404. Reads only.
 
-`apply_effects({ org, node_id })` renders an `effects` node's stack onto its upstream image and
-writes the result as the node's `refId` — the same render `EffectsEditor` does in the browser, for
-when there is no browser. Set the stack first with `update_row` on `nodes.data.effects`, then call
-this. Spends no credits.
+`list_effects({ org })` lists every effect and its params. `apply_effects({ org, node_id, effects? })`
+on an image node creates a wired `effects` node and renders `effects` into it; on an `effects` node
+it replaces the stack when `effects` is given, then renders. `make_effects_pair({ org, node_id })`
+creates and renders the A/B twin of a `shape-cutout` node. All return `{ node_id, asset_id }` and
+spend no credits.
 
 ## Node loops
 

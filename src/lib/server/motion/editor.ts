@@ -13,7 +13,7 @@ import { FEEGA_TOKENS, brandTokens, paletteFrom, type BrandTokens } from '$lib/m
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
 import { fontsFrom } from '$lib/motion/fonts/model';
 
-export type MotionAsset = { id: string; kind: AssetKind; label: string; previewUrl: string; url: string | null; seconds?: number | null };
+export type MotionAsset = { id: string; kind: AssetKind; label: string; previewUrl: string; url: string | null; seconds?: number | null; width?: number | null; height?: number | null };
 
 export type MotionScope = { db: Db; orgId: string; projectId: string; canvasId: string; nodeId: string };
 
@@ -88,6 +88,8 @@ async function signAssets(scope: AssetScope, usable: Asset[], ttlSeconds?: numbe
       label: assetLabel(asset, kind),
       previewUrl: `/p/${scope.projectId}/c/${scope.canvasId}/assets/${asset.id}`,
       seconds: asset.durationS,
+      width: asset.width,
+      height: asset.height,
       url: /^https?:\/\//.test(path) ? path : (signed.get(path) ?? null)
     };
   });

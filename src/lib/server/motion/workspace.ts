@@ -8,7 +8,6 @@ import { createMotionTools, type MotionSession, type MotionToolDeps } from '$lib
 import { templateLibrary } from '$lib/server/motion/templates';
 import { analyzeSounds, storageAnalysis } from '$lib/server/motion/audio-analysis';
 import { generateSound, Sound, speakVoiceover } from '$lib/server/motion/voiceover';
-import { farmCapture } from '$lib/server/motion/site-capture';
 import { musicOrBed, storeBed } from '$lib/server/motion/music-source';
 import { brandSources } from '$lib/server/motion/brand-sources';
 import { frameStats } from '$lib/server/motion/frame-stats';
@@ -53,7 +52,6 @@ export function workspaceTools(scope: WorkspaceScope, input: WorkspaceInput): Re
     analysis: async (assetId) => (await analyzeSounds(storageAnalysis(db), { orgId, projectId: project.id }, assets, [assetId]))[assetId] ?? null,
     voiceover: (voice) => withOrgContext(orgId, () => speakVoiceover(db, { orgId, projectId: project.id, nodeId: record.id, userId, actor }, voice)),
     music: (input) => musicOrBed({ generate: () => withOrgContext(orgId, () => generateSound(db, { orgId, projectId: project.id, nodeId: record.id, userId, actor }, Sound.Music, input)), store: (wav, spec) => storeBed(db, { orgId, projectId: project.id }, wav, spec) }, input),
-    capture: farmCapture(db, motionRenderFarm(), { orgId, projectId: project.id, canvasId: record.canvasId, userId }),
     frames: input.frames,
     inspect: frameStats,
     check: input.check,

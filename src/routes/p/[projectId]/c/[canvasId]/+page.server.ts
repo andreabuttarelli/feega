@@ -82,6 +82,7 @@ import { decideWithJev } from '$lib/server/jev';
 import { upstreamInputsFor } from '$lib/server/canvas/upstream';
 import { estimateCanvasTextCost } from '$lib/server/canvas/text-cost-estimate';
 import { applyEffectsNode } from '$lib/server/canvas/apply-effects';
+import { makeEffectsPair } from '$lib/server/canvas/effects-actions';
 import { nodeAcceptsConnection } from '$lib/canvas/connector-ports';
 import { connectVerdict } from '$lib/server/canvas/node-model';
 import { ShareState, readCanvasShare, setCanvasShare } from '$lib/server/canvas/canvas-share';
@@ -1197,6 +1198,27 @@ export const actions: Actions = {
 
     const node = await findNode(scope.db, { orgId: scope.orgId, nodeId });
     return { asset: outcome.asset, node };
+  },
+
+  effects_pair: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const nodeId = String(fd.get('node_id') ?? '');
+    if (!nodeId) {
+      return fail(400, { error: 'nodo mancante' });
+    }
+
+    const outcome = await makeEffectsPair(scope.db, { orgId: scope.orgId, nodeId, actor: userActor(scope) });
+    if (outcome.outcome === 'refused') {
+      return fail(400, { error: outcome.error });
+    }
+    if (outcome.outcome === 'conflict') {
+      return fail(409, { conflict: true });
+    }
+
+    const node = await findNode(scope.db, { orgId: scope.orgId, nodeId: outcome.nodeId });
+    const connection = (await listConnections(scope.db, { orgId: scope.orgId, canvasId: params.canvasId })).find((edge) => edge.targetNodeId === outcome.nodeId);
+    return { node, connection };
   },
 
   /**

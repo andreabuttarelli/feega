@@ -2566,3 +2566,6 @@ Signal: the summary says nothing was built while the timeline is full; the dev l
 step after `view_frames` went to the Gemini vision model, which rejects the tool schemas; the round
 rejected and its messages were read from the failed result. Move: keep each finished step from
 `onStepFinish`, and let a model that reads images (`gatewayModel(id).usable`) see its own frames.
+
+### Il dev server del checkout principale si ricarica da solo e crasha l'SSR
+Segnale: `changed tsconfig file detected: .../.claude/worktrees/agent-*/.svelte-kit/tsconfig.json` a raffica, poi `The dependency module is not yet fully initialized due to circular dependency` in `@sveltejs/kit/src/runtime/server`. I worktree degli agenti stanno dentro la repo, e Vite li osserva: ogni `svelte-kit sync` di un agente forza un full reload a metà caricamento. Mossa: `server.watch.ignored` esclude `**/.claude/worktrees/**` in `vite.config.ts`.

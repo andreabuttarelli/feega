@@ -1,4 +1,4 @@
-import { DEVICE, FINISH_COLOR, Finish, type Device, type DeviceSpec } from '../devices';
+import { DEVICE, FINISH_COLOR, Finish, BEVEL, GLASS_RIM, type Device, type DeviceSpec } from '../devices';
 import { DEVICE_SCENE } from '../keyframes';
 
 export type DeviceRuntime = DeviceSpec & { color: string };
@@ -61,7 +61,7 @@ function flat(shape, w, h) {
   return geo;
 }
 
-const bevelOf = (d) => Math.min(d * 0.45, 2.2);
+const bevelOf = (d) => Math.min(d * ${BEVEL.share}, ${BEVEL.max});
 
 function slab(w, h, d, r, material, outline = roundedRect) {
   const bevel = bevelOf(d);
@@ -115,7 +115,7 @@ function drawScreen(slot, source, scroll) {
 
 function frontFace(spec, group, front) {
   const { body, screen } = spec;
-  const rim = 0.7;
+  const rim = ${GLASS_RIM};
   const step = Math.max(body.width, body.height) * LAYER_GAP;
   group.add(plate(roundedRect(body.width - rim * 2, body.height - rim * 2, body.radius - rim), body.width, body.height, front + step, new THREE.MeshPhysicalMaterial(GLASS)));
   const slot = screenCanvas(spec);

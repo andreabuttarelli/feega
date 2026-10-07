@@ -10,6 +10,9 @@ import { apply as applyPixelate } from './pixelate';
 import { apply as applyPosterize } from './posterize';
 import { apply as applyRandomColors } from './random-colors';
 import { apply as applyRgbShift } from './rgb-shift';
+import { apply as applyShapeCutout, CUTOUT_SIDE_OPTIONS, CUTOUT_STYLE_OPTIONS, CutoutSide, CutoutStyle } from './shape-cutout';
+import { apply as applyShapeMosaic, MOSAIC_BACKGROUND_OPTIONS, MosaicBackground } from './shape-mosaic';
+import { SHAPE_SET_OPTIONS } from './shapes';
 import { apply as applySwirl } from './swirl';
 import type { EffectId, EffectParam, EffectStep, Pixels } from './types';
 import { apply as applyWave } from './wave';
@@ -163,6 +166,39 @@ export const EFFECTS: Record<EffectId, EffectDefinition> = {
 			}
 		],
 		apply: applyAscii
+	},
+	'shape-mosaic': {
+		label: 'Mosaico di forme',
+		params: [
+			{ name: 'shapes', label: 'Forme', kind: 'select', options: SHAPE_SET_OPTIONS, default: 'mix' },
+			{ name: 'minSize', label: 'Dimensione minima', kind: 'range', min: 2, max: 128, step: 1, default: 10 },
+			{ name: 'maxSize', label: 'Dimensione massima', kind: 'range', min: 4, max: 256, step: 1, default: 64 },
+			{ name: 'detail', label: 'Dettaglio adattivo', kind: 'range', min: 0, max: 100, step: 1, default: 70 },
+			{ name: 'gap', label: 'Spazio', kind: 'range', min: 0, max: 32, step: 1, default: 3 },
+			{ name: 'radius', label: 'Raggio arrotondati', kind: 'range', min: 0, max: 100, step: 1, default: 40 },
+			{ name: 'jitter', label: 'Jitter', kind: 'range', min: 0, max: 100, step: 1, default: 0 },
+			{ name: 'background', label: 'Sfondo', kind: 'select', options: MOSAIC_BACKGROUND_OPTIONS, default: MosaicBackground.Average },
+			{ name: 'backgroundColor', label: 'Colore sfondo', kind: 'color', default: '#ffffff' },
+			{ name: 'seed', label: 'Seed', kind: 'seed', default: 1 }
+		],
+		apply: applyShapeMosaic
+	},
+	'shape-cutout': {
+		label: 'Ritaglio di forme (A/B)',
+		params: [
+			{ name: 'side', label: 'Uscita', kind: 'select', options: CUTOUT_SIDE_OPTIONS, default: CutoutSide.Shapes },
+			{ name: 'shapes', label: 'Forme', kind: 'select', options: SHAPE_SET_OPTIONS, default: 'mix' },
+			{ name: 'count', label: 'Numero', kind: 'range', min: 1, max: 40, step: 1, default: 6 },
+			{ name: 'size', label: 'Dimensione (%)', kind: 'range', min: 4, max: 60, step: 1, default: 18 },
+			{ name: 'sizeSpread', label: 'Variazione dimensione', kind: 'range', min: 0, max: 100, step: 1, default: 40 },
+			{ name: 'radius', label: 'Raggio arrotondati', kind: 'range', min: 0, max: 100, step: 1, default: 40 },
+			{ name: 'style', label: 'Stile forme', kind: 'select', options: CUTOUT_STYLE_OPTIONS, default: CutoutStyle.Fill },
+			{ name: 'strokeWidth', label: 'Spessore contorno', kind: 'range', min: 1, max: 32, step: 1, default: 4 },
+			{ name: 'shapeColor', label: 'Colore forme', kind: 'color', default: '#f4f1ea' },
+			{ name: 'fillColor', label: 'Colore riempimento', kind: 'color', default: '#f4f1ea' },
+			{ name: 'seed', label: 'Seed', kind: 'seed', default: 1 }
+		],
+		apply: applyShapeCutout
 	}
 };
 

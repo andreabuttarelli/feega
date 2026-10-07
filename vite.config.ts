@@ -42,8 +42,14 @@ const hmr = process.env.NO_HMR === '1' || process.env.NO_HMR === 'true' ? false 
  */
 const TEST_TIMEOUT_MS = 120_000;
 
+const AGENT_WORKTREES = '**/.claude/worktrees/**';
+
 export default defineConfig({
-  server: { hmr, fs: { allow: ['..', ...(nodeModulesReal ? [nodeModulesReal] : [])] } },
+  server: {
+    hmr,
+    fs: { allow: ['..', ...(nodeModulesReal ? [nodeModulesReal] : [])] },
+    watch: { ignored: [AGENT_WORKTREES] }
+  },
   define: vercelAnalyticsDefine(process.env),
   plugins: [sentrySvelteKit({
     org: "021-6z",

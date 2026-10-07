@@ -5,7 +5,7 @@ import { CHUNK_VCPUS, RenderClass, WHOLE_VCPUS } from '$lib/motion/render-quote'
 import { FONT_CSS_ORIGIN, FONT_FILE_ORIGIN } from '$lib/motion/hyperframes/csp';
 import { ExportFormat, FORMAT, Master, Quality } from '$lib/motion/export-formats';
 import { assembleArgs, audioMixArgs, concatList, zipArgs } from './render-commands';
-import { FARM_JOB_DIR, FARM_RUNTIME_DIR, Network, type FarmWorker, type RenderFarm } from './render-farm';
+import { FARM_JOB_DIR, FARM_RUNTIME_DIR, type FarmWorker, type RenderFarm } from './render-farm';
 import { stripSteps, stripVideos } from './video-strips';
 import type { Frame } from './frames';
 
@@ -23,8 +23,7 @@ export enum RenderRoute {
 export enum FarmTask {
   Piece = 'piece',
   Assembly = 'assembly',
-  Stills = 'stills',
-  Capture = 'capture'
+  Stills = 'stills'
 }
 
 export enum TaskState {
@@ -97,12 +96,7 @@ const STILL_WIDTH = 960;
 const STILL_QUALITY = 4;
 const STILLS_TIMEOUT_MS = 12 * MINUTE_MS;
 const stillPath = (i: number) => `${FARM_JOB_DIR}/still-${i}.jpg`;
-const CAPTURE_DIR = `${FARM_JOB_DIR}/capture`;
-const CAPTURED = `${FARM_JOB_DIR}/capture.json`;
-const CAPTURE_SHOTS = 6;
-const CAPTURE_VCPUS = 2;
-const CAPTURE_TIMEOUT_MS = 6 * MINUTE_MS;
-const HTTPS = 'https:';
+
 
 const stepsPath = (task: FarmTask) => `${FARM_JOB_DIR}/steps-${task}.json`;
 const resultPath = (task: FarmTask) => `${FARM_JOB_DIR}/result-${task}.json`;
@@ -389,38 +383,6 @@ export async function readStills(farm: RenderFarm, name: string, times: number[]
   }
   const images = JSON.parse(packed.toString()) as string[];
   return times.map((time, i) => ({ time, bytes: Buffer.from(images[i], 'base64') }));
-}
-
-const CAPTURE_JPEGS = `cd ${CAPTURE_DIR}/screenshots && ls scroll-*.png | sort | head -${CAPTURE_SHOTS} | while read f; do ffmpeg -y -loglevel error -i "$f" -q:v 2 "\${f%.png}.jpg"; done`;
-const CAPTURE_PACK = `const fs = require('node:fs'); const dir = '${CAPTURE_DIR}/screenshots'; const shots = fs.readdirSync(dir).filter((f) => /^scroll-\\d+\\.jpg$/.test(f)).sort(); fs.writeFileSync('${CAPTURED}', JSON.stringify(shots.map((name) => ({ name, data: fs.readFileSync(dir + '/' + name).toString('base64') }))));`;
-
-export type CaptureShot = { name: string; bytes: Buffer };
-
-export async function launchCapture(farm: RenderFarm, url: string): Promise<string> {
-  if (new URL(url).protocol !== HTTPS) {
-    throw new Error(`only a public https page can be captured: ${url}`);
-  }
-  const worker = await farm.open({ allowHosts: [], network: Network.Open, timeoutMs: CAPTURE_TIMEOUT_MS, vcpus: CAPTURE_VCPUS });
-  try {
-    await startSteps(worker, FarmTask.Capture, [
-      { what: 'capture', cmd: 'npx', args: ['hyperframes', 'capture', url, '-o', CAPTURE_DIR, '--json', '--skip-vision', '--skip-assets', '--max-screenshots', String(CAPTURE_SHOTS + 2)] },
-      { what: 'jpeg', cmd: 'bash', args: ['-c', CAPTURE_JPEGS] },
-      { what: 'pack capture', cmd: 'node', args: ['-e', CAPTURE_PACK] }
-    ]);
-  } catch (e) {
-    await worker.stop().catch(() => {});
-    throw e;
-  }
-  return worker.name;
-}
-
-export async function readCapture(farm: RenderFarm, name: string): Promise<CaptureShot[] | null> {
-  const worker = await farm.attach(name);
-  const packed = worker ? await worker.read(CAPTURED) : null;
-  if (!packed) {
-    return null;
-  }
-  return (JSON.parse(packed.toString()) as { name: string; data: string }[]).map((shot) => ({ name: shot.name, bytes: Buffer.from(shot.data, 'base64') }));
 }
 
 export async function awaitTask(farm: RenderFarm, name: string, task: FarmTask, timing: { timeoutMs: number; pollMs: number }): Promise<TaskCheck> {

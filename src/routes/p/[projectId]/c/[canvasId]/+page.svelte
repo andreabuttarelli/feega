@@ -77,8 +77,9 @@
   import { plannedInstant } from '$lib/calendar/period-grid';
   import { DropVerdict, dayUnderPointer, type PointerPoint } from '$lib/canvas/canvas-drop';
   import { inputChanged } from '$lib/canvas/effects/editor';
-  import { upstreamMedia } from '$lib/canvas/effects-node';
+  import { cutoutTwin, upstreamMedia } from '$lib/canvas/effects-node';
   import type { EffectStep } from '$lib/canvas/effects';
+  import { hasCutout } from '$lib/canvas/effects/shape-cutout';
   import { upstreamCards as compositionCards, cardAssetIds } from '$lib/canvas/composition-node';
   import { listFeedingSelect } from '$lib/canvas/select-node';
   import { fieldValue, productItem, socialPostItem } from '$lib/canvas/select-sources';
@@ -1311,6 +1312,19 @@
     }
     nodes = nodes.map((node) => node.id === id ? toTile(written) : node);
     return true;
+  }
+
+  async function makePair(id: string) {
+    const res = await post('effects_pair', { node_id: id });
+    const created = (res?.node ?? null) as CanvasNodeRecord | null;
+    const wire = (res?.connection ?? null) as Connection | null;
+    if (!created) {
+      return;
+    }
+
+    nodes = [...nodes.filter((node) => node.id !== created.id), toTile(created, { select: true })];
+    edges = wire ? [...edges.filter((edge) => edge.id !== wire.id), toEdge(wire)] : edges;
+    pushGesture(createManyGesture([created], wire ? [wire] : []));
   }
 
   function sizeForAddable(what: Addable): { w: number; h: number } {
@@ -2728,6 +2742,7 @@
             sourceImageUrl={assetUrl(effectsInput?.refId ?? effects.sourceRefId)}
             inputChanged={inputChanged(effects.sourceRefId, effectsInput?.refId ?? null)}
             onopeneditor={() => (effectsEditorId = id)}
+            onpair={hasCutout(effects.effects) && effectsInput && !cutoutTwin(id, edges, nodes) ? () => makePair(id) : undefined}
           />
         {:else if composition}
           {@const cards = compositionCards(id, edges, nodes)}

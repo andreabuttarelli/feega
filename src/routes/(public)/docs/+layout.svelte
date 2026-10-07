@@ -6,7 +6,6 @@
   import { toc } from '$lib/stores/toc';
   import { onMount } from 'svelte';
   import { siShopify, siWebflow, siWix, type SimpleIcon } from 'simple-icons';
-  import BrandMark from '$lib/components/BrandMark.svelte';
   import DocsSearch, { type DocsSearchItem } from '$lib/components/docs/DocsSearch.svelte';
   import DocsPager from '$lib/components/docs/DocsPager.svelte';
   import '$lib/styles/tailwind.css';
@@ -182,7 +181,6 @@
       class="docs-brand flex items-center gap-2.5 no-underline text-foreground shrink-0"
       aria-label={$_('landing.nav.brandAria')}
     >
-      <BrandMark size={40} />
       <span class="docs-brand-wordmark text-[15px] font-medium tracking-[-0.035em]">{$_('docs.layout.s42')}</span>
       <span class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground bg-muted border border-border px-1.5 py-0.5">{$_('docs.layout.s43')}</span>
     </a>
@@ -358,15 +356,3 @@
   </nav>
 </div>
 
-<style>
-  /* BrandMark is a wide mark (viewBox ~2:1). Keep width dominant so it reads like the homepage nav. */
-  .docs-brand :global(.brandmark) {
-    width: 40px;
-    height: 20px;
-  }
-  @media (max-width: 480px) {
-    .docs-brand-wordmark {
-      display: none;
-    }
-  }
-</style>

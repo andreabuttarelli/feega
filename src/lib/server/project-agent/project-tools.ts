@@ -20,6 +20,8 @@ import { withBrandContext, withOrgContext } from '$lib/server/ai-log';
 import { GEN_MEDIUMS, isGenMedium, type GenParams } from '$lib/canvas/gen-node';
 import { audioDescription } from '$lib/server/canvas/audio-description';
 import { connectRefusal, nodeModelError, targetTakesNoInputs, UNCENSORED_NO_INPUTS_ERROR } from '$lib/server/canvas/node-model';
+import { applyEffectsTo, makeEffectsPair } from '$lib/server/canvas/effects-actions';
+import { effectsCatalogue } from '$lib/canvas/effects/catalogue';
 import { describeNodeType, describeNodeTypes, isNodeType, unknownFieldsError, validateNewNodeData } from '$lib/canvas/node-data';
 
 /**
@@ -306,6 +308,36 @@ export function createProjectTools(deps: ProjectToolDeps): Record<string, Tool> 
 
         return outcomeOf(out);
       }
+    }),
+
+    list_effects: tool({
+      description: 'Every image effect apply_effects accepts, with its params (range, options, default). Free, reads only.',
+      inputSchema: z.object({}).strict(),
+      execute: async () => ({ effects: effectsCatalogue() })
+    }),
+
+    apply_effects: tool({
+      description: [
+        'Apply one effect or a chain of effects (list_effects) to an image, free: no credits.',
+        'On an image node: creates an effects node beside it, wired to it, and renders the chain into a new asset.',
+        'On an effects node: replaces its stack with effects when given, otherwise re-renders the stack it has.',
+        'effects: [{ id, params?, enabled? }] in order; params omitted take their defaults.'
+      ].join(' '),
+      inputSchema: z
+        .object({
+          nodeId: z.string(),
+          effects: z.array(z.record(z.string(), z.unknown())).optional()
+        })
+        .strict(),
+      execute: async (input: { nodeId: string; effects?: Record<string, unknown>[] }) =>
+        applyEffectsTo(deps.db, { orgId: deps.orgId, nodeId: input.nodeId, effects: input.effects, actor })
+    }),
+
+    make_effects_pair: tool({
+      description:
+        'For an effects node with a shape-cutout step: creates its A/B twin (same shapes and seed, other side), wired to the same image, and renders it. Free.',
+      inputSchema: z.object({ nodeId: z.string() }).strict(),
+      execute: async (input: { nodeId: string }) => makeEffectsPair(deps.db, { orgId: deps.orgId, nodeId: input.nodeId, actor })
     }),
 
     list_runs: tool({

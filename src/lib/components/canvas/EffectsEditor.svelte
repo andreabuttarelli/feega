@@ -8,7 +8,7 @@
   import X from '@lucide/svelte/icons/x';
   import Plus from '@lucide/svelte/icons/plus';
   import { applyStack, EFFECTS, type EffectId, type EffectStep, type Pixels } from '$lib/canvas/effects';
-  import { addStep, controlFor, fitWithin, moveStep, removeStep, setParam, toggleStep } from '$lib/canvas/effects/editor';
+  import { addStep, controlFor, fitWithin, moveStep, removeStep, setParam, exportsSvg, svgExport, toggleStep } from '$lib/canvas/effects/editor';
   import StudioParamControl from './StudioParamControl.svelte';
   import { ListMenu } from '$lib/components/ui/control/index.js';
 
@@ -198,6 +198,23 @@
     }
   }
 
+  const svgReady = $derived(Boolean(bitmap) && exportsSvg(steps));
+
+  function downloadSvg() {
+    if (!bitmap) {
+      return;
+    }
+    const svg = svgExport(pixelsOf(bitmap, bitmap), $state.snapshot(steps) as EffectStep[]);
+    if (!svg) {
+      return;
+    }
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+    link.download = 'shape-mosaic.svg';
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }
+
   const effectItems = $derived([{ id: 'effects', label: '', items: effectIds.map((id) => ({ value: id, label: EFFECTS[id].label })) }]);
 
   function add(id: string) {
@@ -268,6 +285,9 @@
       </ol>
 
       <footer class="fx-foot">
+        {#if svgReady}
+          <button type="button" class="fx-button" onclick={downloadSvg} disabled={busy}>Download SVG</button>
+        {/if}
         <button type="button" class="fx-button" onclick={close} disabled={busy}>Cancel</button>
         <button type="button" class="fx-button is-primary" onclick={apply} disabled={busy || (!bitmap && !video)}>
           {#if busy}<LoaderCircle size={14} class="fx-spin" />{/if}

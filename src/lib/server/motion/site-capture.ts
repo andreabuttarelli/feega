@@ -1,75 +1,97 @@
-import type { Db } from '$lib/server/db/client';
-import { logAiCall } from '$lib/server/ai-log';
-import { sandboxCostUsd } from '$lib/motion/render-quote';
-import { awaitTask, FarmTask, launchCapture, readCapture, TaskState, type CaptureShot, type TaskCheck } from './farm-render';
-import { storeImage } from './asset-import';
-import type { RenderFarm } from './render-farm';
-import type { AssetImport, SiteCapture } from './motion-tools';
+import { FARM_JOB_DIR, FARM_RUNTIME_DIR, type FarmWorker, type RenderFarm } from './render-farm';
+import { CaptureView, type CaptureShot, type SiteCapture } from './motion-tools';
 
-export const CAPTURE_LABEL = 'motion_capture';
-const CAPTURE_WAIT = { timeoutMs: 6 * 60_000, pollMs: 4_000 };
-const PERCENT = /scroll-(\d+)\./;
+export const CAPTURE_SCALE = 2;
+export const MAX_SECTIONS = 4;
 
-export type CapturePorts = {
-  launch: (url: string) => Promise<string>;
-  wait: (name: string, task: FarmTask) => Promise<TaskCheck>;
-  read: (name: string) => Promise<CaptureShot[] | null>;
-  stop: (name: string) => Promise<void>;
-  cost: (name: string) => Promise<number>;
-  log: (usd: number) => void;
-  store: (bytes: Buffer, label: string) => Promise<AssetImport>;
+export const VIEWPORTS: Record<CaptureView, { width: number; height: number; mobile: boolean }> = {
+  [CaptureView.Desktop]: { width: 1440, height: 900, mobile: false },
+  [CaptureView.Mobile]: { width: 390, height: 844, mobile: true }
 };
 
-function shotLabel(host: string, name: string): string {
-  const percent = Number(PERCENT.exec(name)?.[1] ?? 0);
-  return percent ? `${host} · ${percent}% down the page` : `${host} · top of the page`;
+const CAPTURE_DIR = `${FARM_JOB_DIR}/capture`;
+const SCRIPT = `${FARM_RUNTIME_DIR}/capture.cjs`;
+const MANIFEST = `${CAPTURE_DIR}/manifest.json`;
+const WORKER = { allowHosts: ['*'], timeoutMs: 3 * 60_000, vcpus: 2 };
+const OUTPUT_TAIL = 400;
+
+export type Shot = { part: string; bytes: Buffer };
+export type StoreShot = (shot: Shot, page: { url: string; label: string }) => Promise<CaptureShot | { error: string }>;
+
+type Page = {
+  setViewport: (v: Record<string, unknown>) => Promise<void>;
+  goto: (url: string, o: Record<string, unknown>) => Promise<unknown>;
+  evaluate: <T, A>(fn: (arg: A) => T, arg?: A) => Promise<T>;
+  screenshot: (o: { path: string }) => Promise<unknown>;
+};
+type Browser = { newPage: () => Promise<Page>; close: () => Promise<void> };
+type Puppeteer = { launch: (o: Record<string, unknown>) => Promise<Browser> };
+type Files = { writeFileSync: (path: string, data: string) => void };
+type Viewport = { width: number; height: number; mobile: boolean };
+
+function captureRuntime(puppeteer: Puppeteer, fs: Files, url: string, view: Viewport, scale: number, sections: number, dir: string) {
+  const settle = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+  return (async () => {
+    const browser = await puppeteer.launch({ args: ['--no-sandbox', '--hide-scrollbars'] });
+    try {
+      const page = await browser.newPage();
+      await page.setViewport({ width: view.width, height: view.height, deviceScaleFactor: scale, isMobile: view.mobile, hasTouch: view.mobile });
+      await page.goto(url, { waitUntil: 'networkidle2', timeout: 45000 });
+      await settle(1500);
+      const height = await page.evaluate(() => document.documentElement.scrollHeight, undefined);
+      const stops = [0];
+      for (let i = 1; i <= sections && i * view.height < height - view.height / 2; i++) {
+        stops.push(i * view.height);
+      }
+      const shots = [];
+      for (const [i, top] of stops.entries()) {
+        await page.evaluate((y: number) => window.scrollTo(0, y), top);
+        await settle(700);
+        const file = `${dir}/shot-${i}.png`;
+        await page.screenshot({ path: file });
+        shots.push({ part: i ? `section ${i + 1}` : 'top', file });
+      }
+      fs.writeFileSync(`${dir}/manifest.json`, JSON.stringify(shots));
+    } finally {
+      await browser.close();
+    }
+  })();
 }
 
-export async function captureSite(ports: CapturePorts, url: string): Promise<SiteCapture> {
-  const name = await ports.launch(url).catch((e: unknown) => (e instanceof Error ? new Error(e.message) : new Error(String(e))));
-  if (name instanceof Error) {
-    return { ok: false, error: name.message };
-  }
-
-  const check = await ports.wait(name, FarmTask.Capture);
-  const shots = check.state === TaskState.Done ? await ports.read(name) : null;
-  ports.log(await ports.cost(name));
-  await ports.stop(name);
-
-  if (check.state !== TaskState.Done) {
-    return { ok: false, error: check.error ?? 'the capture failed' };
-  }
-  if (!shots?.length) {
-    return { ok: false, error: 'the page gave no screenshots' };
-  }
-
-  const host = new URL(url).hostname;
-  const stored = await Promise.all(shots.map((shot) => ports.store(shot.bytes, shotLabel(host, shot.name))));
-  return { ok: true, shots: stored.filter((s): s is Extract<AssetImport, { ok: true }> => s.ok) };
+export function captureProgram(url: string, view: CaptureView): string {
+  return `(${captureRuntime.toString()})(require('puppeteer'), require('node:fs'), ${JSON.stringify(url)}, ${JSON.stringify(VIEWPORTS[view])}, ${CAPTURE_SCALE}, ${MAX_SECTIONS}, ${JSON.stringify(CAPTURE_DIR)}).catch((e) => { console.error(String(e && e.stack || e)); process.exit(1); });`;
 }
 
-export type CaptureScope = { orgId: string; projectId: string; canvasId: string; userId: string };
-
-export function farmCapture(db: Db, farm: RenderFarm | null, scope: CaptureScope): ((url: string) => Promise<SiteCapture>) | undefined {
-  if (!farm) {
-    return undefined;
+async function shotsOf(worker: FarmWorker, url: string, view: CaptureView): Promise<Shot[] | string> {
+  await worker.run('mkdir', ['-p', CAPTURE_DIR]);
+  await worker.write([{ path: SCRIPT, content: Buffer.from(captureProgram(url, view)) }]);
+  const done = await worker.run('bash', ['-lc', `cd ${FARM_RUNTIME_DIR} && node ${SCRIPT}`]);
+  if (done.exitCode !== 0) {
+    return `the page could not be captured: ${done.output.slice(-OUTPUT_TAIL)}`;
   }
-  return (url) =>
-    captureSite(
-      {
-        launch: (target) => launchCapture(farm, target),
-        wait: (name, task) => awaitTask(farm, name, task, CAPTURE_WAIT),
-        read: (name) => readCapture(farm, name),
-        stop: async (name) => {
-          await (await farm.attach(name))?.stop();
-        },
-        cost: async (name) => {
-          const usage = await farm.usage(name);
-          return usage ? sandboxCostUsd([usage]) : 0;
-        },
-        log: (usd) => logAiCall({ label: CAPTURE_LABEL, provider: 'vercel-sandbox', model: 'hyperframes-capture', flatCostUsd: usd, ms: 0, ok: true, orgId: scope.orgId, projectId: scope.projectId, userId: scope.userId, actorKind: 'agent', actorId: scope.userId }),
-        store: (bytes, label) => storeImage(db, scope, { bytes, url }, label)
-      },
-      url
-    );
+  const manifest = await worker.read(MANIFEST);
+  const listed: { part: string; file: string }[] = manifest ? JSON.parse(manifest.toString()) : [];
+  const shots = await Promise.all(listed.map(async (s) => ({ part: s.part, bytes: await worker.read(s.file) })));
+  return shots.flatMap((s) => (s.bytes ? [{ part: s.part, bytes: s.bytes }] : []));
+}
+
+export function farmCapture(farm: RenderFarm, store: StoreShot) {
+  return async (url: string, view: CaptureView): Promise<SiteCapture> => {
+    if (!/^https:\/\//.test(url)) {
+      return { ok: false, error: 'capture takes a public https page' };
+    }
+    const worker = await farm.open(WORKER);
+    try {
+      const shots = await shotsOf(worker, url, view);
+      if (typeof shots === 'string') {
+        return { ok: false, error: shots };
+      }
+      const host = new URL(url).hostname;
+      const stored = await Promise.all(shots.map((s) => store(s, { url, label: `${view} ${s.part} · ${host}` })));
+      const kept = stored.filter((s): s is CaptureShot => !('error' in s));
+      return kept.length ? { ok: true, shots: kept } : { ok: false, error: 'the page gave no screenshot' };
+    } finally {
+      await worker.stop();
+    }
+  };
 }

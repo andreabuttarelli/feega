@@ -1,5 +1,6 @@
 import { COMPONENTS, TrackKind, type ComponentId } from './components';
 import type { MotionDoc } from './doc';
+import { DEVICE, Device } from './devices';
 import { styleProblems } from './style';
 
 export enum Quality {
@@ -8,8 +9,12 @@ export enum Quality {
   Silent = 'silent',
   BlankFrame = 'blank-frame',
   WhiteArea = 'white-area',
-  OffStyle = 'off-style'
+  OffStyle = 'off-style',
+  SoftPicture = 'soft-picture',
+  CroppedScreen = 'cropped-screen'
 }
+
+export type Pixels = Record<string, { width: number; height: number }>;
 
 export type QualityProblem = { kind: Quality; at?: number; detail: string };
 
@@ -20,6 +25,8 @@ const SCENE_SHARE = 0.9;
 const MIN_TITLE_AREA = 0.12;
 const BLANK_STD = 4;
 const WHITE_SHARE = 0.15;
+const SOFT_UPSCALE = 1.25;
+const SIDES_KEPT = 0.75;
 const LEFT = 0.4;
 const RIGHT = 0.6;
 
@@ -82,9 +89,52 @@ function silent(doc: MotionDoc, audioAssets: number): QualityProblem[] {
   return audioAssets > 0 && !plays ? [{ kind: Quality.Silent, detail: 'the project has music the video never plays' }] : [];
 }
 
-export function docProblems(doc: MotionDoc, input: { audioAssets: number }): QualityProblem[] {
+const everyClip = (doc: MotionDoc) => [doc.tracks, ...Object.values(doc.comps).map((c) => c.tracks)].flatMap((tracks) => tracks.flatMap((t) => t.clips as Clip[]));
+
+const round = (n: number) => Math.round(n * 100) / 100;
+
+function largestZoom(clip: Clip): number {
+  const peak = (key: string, base: number) => Math.max(base, ...(clip.keyframes[key] ?? []).map((k) => Number(k.value)).filter(Number.isFinite));
+  return num(clip, 'scale', 1) * peak('scale', clip.transform?.scale ?? 1) * peak('zoom', num(clip, 'zoom', 1));
+}
+
+function softPictures(doc: MotionDoc, pixels: Pixels): QualityProblem[] {
+  return everyClip(doc).flatMap((clip) => {
+    const source = clip.component === 'Image' ? pixels[String(clip.props.assetId)] : undefined;
+    if (!source) {
+      return [];
+    }
+    const box = { width: num(clip, 'width', 1) * doc.width, height: num(clip, 'height', 1) * doc.height };
+    const fits = [box.width / source.width, box.height / source.height];
+    const fitted = clip.props.fit === 'contain' ? Math.min(...fits) : Math.max(...fits);
+    const shown = fitted * largestZoom(clip);
+    if (shown <= SOFT_UPSCALE) {
+      return [];
+    }
+    return [{ kind: Quality.SoftPicture, at: seconds(doc, clip.from), detail: `${clip.id} blows a ${source.width}×${source.height} picture up ${round(shown)}×: it reads soft. Its largest sharp scale is ${round(1 / fitted)} (source pixels / pixels on screen): use a sharper picture (import_asset with capture) or show it smaller` }];
+  });
+}
+
+function croppedScreens(doc: MotionDoc, pixels: Pixels): QualityProblem[] {
+  return everyClip(doc).flatMap((clip) => {
+    const source = clip.component === 'Device3D' ? pixels[String(clip.props.screen)] : undefined;
+    const device = DEVICE[(clip.props.device as Device) ?? Device.PhonePro];
+    if (!source || !device) {
+      return [];
+    }
+    const [w, h] = device.screen.px;
+    const kept = w / h / (source.width / source.height);
+    if (kept >= SIDES_KEPT) {
+      return [];
+    }
+    return [{ kind: Quality.CroppedScreen, at: seconds(doc, clip.from), detail: `${clip.id} shows a ${source.width}×${source.height} picture on a ${w}×${h} screen: ${Math.round((1 - kept) * 100)}% of its width is cut off. Use a capture that matches the screen (mobile for a phone, desktop for a laptop)` }];
+  });
+}
+
+export function docProblems(doc: MotionDoc, input: { audioAssets: number; pixels?: Pixels }): QualityProblem[] {
   const list = scenes(doc);
-  return [...repeated(doc, list), ...smallTitles(doc), ...silent(doc, input.audioAssets), ...styleProblems(doc).map((p) => ({ kind: Quality.OffStyle, at: p.at, detail: p.detail }))];
+  const pixels = input.pixels ?? {};
+  return [...repeated(doc, list), ...smallTitles(doc), ...silent(doc, input.audioAssets), ...softPictures(doc, pixels), ...croppedScreens(doc, pixels), ...styleProblems(doc).map((p) => ({ kind: Quality.OffStyle, at: p.at, detail: p.detail }))];
 }
 
 export function frameProblems(stats: readonly FrameStat[]): QualityProblem[] {

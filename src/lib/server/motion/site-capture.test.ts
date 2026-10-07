@@ -1,63 +1,49 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AssetKind } from '$lib/motion/components';
-import { FarmTask, TaskState } from './farm-render';
-import { captureSite, type CapturePorts } from './site-capture';
+import type { FarmWorker, RenderFarm } from './render-farm';
+import { CaptureView } from './motion-tools';
+import { CAPTURE_SCALE, VIEWPORTS, captureProgram, farmCapture } from './site-capture';
 
-function ports(overrides: Partial<CapturePorts> = {}): CapturePorts & { stored: string[]; logged: number[] } {
-  const stored: string[] = [];
-  const logged: number[] = [];
-  return {
-    stored,
-    logged,
-    launch: vi.fn(async () => 'w1'),
-    wait: vi.fn(async () => ({ state: TaskState.Done, error: null })),
-    read: vi.fn(async () => [
-      { name: 'scroll-000.jpg', bytes: Buffer.from('a') },
-      { name: 'scroll-020.jpg', bytes: Buffer.from('b') }
-    ]),
-    stop: vi.fn(async () => {}),
-    cost: vi.fn(async () => 0.02),
-    log: (usd) => logged.push(usd),
-    store: async (bytes, label) => {
-      stored.push(label);
-      return { ok: true, width: 1920, height: 1080, asset: { id: `a${stored.length}`, kind: AssetKind.Image, label, previewUrl: '', url: null } };
-    },
-    ...overrides
-  };
+function fakeFarm(run: FarmWorker['run'], files: Record<string, string>) {
+  const worker: FarmWorker = { name: 'w', write: vi.fn(async () => {}), run, spawn: vi.fn(), read: vi.fn(async (path: string) => (path in files ? Buffer.from(files[path]) : null)), stop: vi.fn(async () => {}) };
+  const farm: RenderFarm = { open: vi.fn(async () => worker), attach: vi.fn(), running: vi.fn(), usage: vi.fn() };
+  return { farm, worker };
 }
 
-describe('capturing a site for a video', () => {
-  it('stores every screenshot as a picture and bills the browser time', async () => {
-    const p = ports();
+const stored = vi.fn(async (shot: { part: string }, page: { label: string }) => ({ part: shot.part, asset: { id: shot.part, kind: AssetKind.Image, label: page.label, previewUrl: '', url: null }, width: 780, height: 1688 }));
 
-    const out = await captureSite(p, 'https://dub.co');
+describe('capturing a site on the render farm', () => {
+  it('photographs the page at 2x in the asked viewport and stores the top and each section', async () => {
+    const manifest = JSON.stringify([{ part: 'top', file: '/a.png' }, { part: 'section 2', file: '/b.png' }]);
+    const { farm, worker } = fakeFarm(vi.fn(async () => ({ exitCode: 0, output: '' })), { '/vercel/sandbox/job/capture/manifest.json': manifest, '/a.png': 'A', '/b.png': 'B' });
 
-    expect(out.ok && out.shots.map((s) => s.asset.id)).toEqual(['a1', 'a2']);
-    expect(p.stored).toEqual(['dub.co · top of the page', 'dub.co · 20% down the page']);
-    expect(p.wait).toHaveBeenCalledWith('w1', FarmTask.Capture);
-    expect(p.logged).toEqual([0.02]);
-    expect(p.stop).toHaveBeenCalledWith('w1');
+    const out = await farmCapture(farm, stored)('https://dub.co', CaptureView.Mobile);
+
+    expect(out).toMatchObject({ ok: true, shots: [{ part: 'top' }, { part: 'section 2' }] });
+    expect(stored).toHaveBeenCalledWith({ part: 'top', bytes: Buffer.from('A') }, { url: 'https://dub.co', label: 'mobile top · dub.co' });
+    expect(worker.stop).toHaveBeenCalled();
   });
 
-  it('stops the worker and reports the farm error when the capture fails', async () => {
-    const p = ports({ wait: vi.fn(async () => ({ state: TaskState.Failed, error: 'capture failed: timeout' })) });
+  it('a page that fails to load comes back as an error and the sandbox still stops', async () => {
+    const { farm, worker } = fakeFarm(vi.fn(async () => ({ exitCode: 1, output: 'TimeoutError: Navigation timeout' })), {});
 
-    const out = await captureSite(p, 'https://dub.co');
+    const out = await farmCapture(farm, stored)('https://slow.example', CaptureView.Desktop);
 
-    expect(out).toEqual({ ok: false, error: 'capture failed: timeout' });
-    expect(p.stop).toHaveBeenCalledWith('w1');
-    expect(p.logged).toEqual([0.02]);
+    expect(out).toEqual({ ok: false, error: expect.stringContaining('Navigation timeout') });
+    expect(worker.stop).toHaveBeenCalled();
   });
 
-  it('reports a page that gave no screenshots', async () => {
-    const p = ports({ read: vi.fn(async () => []) });
+  it('refuses anything that is not a public https page before opening a sandbox', async () => {
+    const { farm } = fakeFarm(vi.fn(), {});
 
-    expect((await captureSite(p, 'https://dub.co')).ok).toBe(false);
+    expect(await farmCapture(farm, stored)('file:///etc/passwd', CaptureView.Desktop)).toMatchObject({ ok: false });
+    expect(farm.open).not.toHaveBeenCalled();
   });
 
-  it('turns a launch refusal into an error, not a crash', async () => {
-    const p = ports({ launch: vi.fn(async () => Promise.reject(new Error('only a public https page can be captured'))) });
+  it('the program asks the browser for the viewport at device scale 2', () => {
+    const program = captureProgram('https://dub.co', CaptureView.Desktop);
 
-    expect(await captureSite(p, 'http://dub.co')).toEqual({ ok: false, error: 'only a public https page can be captured' });
+    expect(program).toContain(JSON.stringify(VIEWPORTS[CaptureView.Desktop]));
+    expect(program).toContain(`, ${CAPTURE_SCALE}, `);
   });
 });
