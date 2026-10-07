@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, newMotionDoc, type MotionDoc } from './doc';
 import { Side, addClip, setTransition } from './timeline';
-import { Quality, docProblems, frameProblems } from './direction';
+import { Quality, QUALITY_SEVERITY, Severity, docProblems, frameProblems } from './direction';
+import supasitoV1 from './supasito-v1.fixture.json';
 import { Ease, TransitionKind } from './design';
 import { builtinTemplate } from './template/builtins';
 import { insertTemplate } from './template/library';
@@ -38,6 +39,8 @@ function dubLike(): MotionDoc {
 
 const kinds = (doc: MotionDoc) => docProblems(doc, { audioAssets: 0 }).map((p) => p.kind);
 
+const fitted = (doc: MotionDoc): MotionDoc => ({ ...doc, durationInFrames: Math.max(...doc.tracks.flatMap((t) => t.clips.map((c) => c.from + c.durationInFrames))) });
+
 describe('the quality gate reads the direction of the video', () => {
   it('the Dub run: one layout four times and small titles are named', () => {
     expect(kinds(dubLike())).toEqual(expect.arrayContaining([Quality.RepeatedLayout, Quality.SmallTitle]));
@@ -55,7 +58,7 @@ describe('the quality gate reads the direction of the video', () => {
       doc = must(setTransition(doc, `t${i}`, Side.In, { kind: TransitionKind.Fade, durationInFrames: 12 }));
     });
 
-    expect(kinds(doc)).toEqual([]);
+    expect(kinds(fitted(doc))).toEqual([]);
   });
 
   it('scenes from the library are told apart by their template: two different scenes pass, the same one twice repeats', () => {
@@ -64,7 +67,7 @@ describe('the quality gate reads the direction of the video', () => {
     const varied = place(place(place(calm(), 'scene-hero-title', 0), 'scene-big-number', 90), 'scene-hero-title', 195);
     const twice = place(place(newMotionDoc(MotionFormat.Landscape), 'scene-hero-title', 0), 'scene-hero-title', 90);
 
-    expect(kinds(varied)).toEqual([]);
+    expect(kinds(fitted(varied))).toEqual([]);
     expect(kinds(twice)).toContain(Quality.RepeatedLayout);
   });
 
@@ -100,9 +103,9 @@ describe('the quality gate reads the direction of the video', () => {
 
   it('a flat frame and a frame half white are named with their time', () => {
     const problems = frameProblems([
-      { time: 0.5, lumaStd: 1, whiteShare: 0 },
-      { time: 3, lumaStd: 40, whiteShare: 0.3 },
-      { time: 6, lumaStd: 40, whiteShare: 0.02 }
+      { time: 0.5, luma: 120, lumaStd: 1, whiteShare: 0 },
+      { time: 3, luma: 160, lumaStd: 40, whiteShare: 0.3 },
+      { time: 6, luma: 120, lumaStd: 40, whiteShare: 0.02 }
     ]);
 
     expect(problems.map((p) => [p.kind, p.at])).toEqual([
@@ -172,5 +175,32 @@ describe('nothing important leaves the frame', () => {
     const exit = { scale: [{ frame: 0, value: 1, ease: Ease.Linear }, { frame: 82, value: 1, ease: Ease.Linear }, { frame: 90, value: 2.5, ease: Ease.Linear }] };
 
     expect(out(placed('Custom', ui, exit))).toEqual([]);
+  });
+});
+
+describe('empty frames', () => {
+  const supasito = supasitoV1 as unknown as MotionDoc;
+  const empty = (problems: { kind: Quality; at?: number }[]) => problems.filter((p) => p.kind === Quality.EmptyFrames).map((p) => p.at);
+
+  it('the supasito v1 hole before the logo is named at 11.5 s', () => {
+    expect(empty(docProblems(supasito, { audioAssets: 0 }))).toEqual([11.5]);
+  });
+
+  it('a film covered from start to end has no hole', () => {
+    const blank = newMotionDoc(MotionFormat.Landscape);
+    const doc = must(addClip(blank, { component: 'Title', from: 0, durationInFrames: blank.durationInFrames, props: { text: 'Hi' } }, 'a'));
+
+    expect(empty(docProblems(doc, { audioAssets: 0 }))).toEqual([]);
+  });
+
+  it('a hard jump from a white frame to a black one is a flash', () => {
+    const flat = { lumaStd: 1, whiteShare: 0 };
+
+    expect(empty(frameProblems([{ time: 2, luma: 250, lumaStd: 30, whiteShare: 0.1 }, { time: 2.1, luma: 4, lumaStd: 3, whiteShare: 0 }]))).toEqual([2.1]);
+    expect(empty(frameProblems([{ time: 1, luma: 120, ...flat }, { time: 1.1, luma: 125, ...flat }]))).toEqual([]);
+  });
+
+  it('an empty frame blocks delivery', () => {
+    expect(QUALITY_SEVERITY[Quality.EmptyFrames]).toBe(Severity.Blocking);
   });
 });

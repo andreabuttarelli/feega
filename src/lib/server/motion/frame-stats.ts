@@ -15,7 +15,7 @@ async function statOf(frame: Frame): Promise<FrameStat> {
     white += luma >= WHITE_LUMA ? 1 : 0;
   }
   const mean = sum / data.length;
-  return { time: frame.time, lumaStd: Math.sqrt(Math.max(0, squares / data.length - mean * mean)), whiteShare: white / data.length };
+  return { time: frame.time, luma: mean, lumaStd: Math.sqrt(Math.max(0, squares / data.length - mean * mean)), whiteShare: white / data.length };
 }
 
 export function frameStats(frames: readonly Frame[]): Promise<FrameStat[]> {

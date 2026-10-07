@@ -1,0 +1,4107 @@
+{
+ "fps": 30,
+ "look": null,
+ "comps": {
+  "36309012": {
+   "name": "Launch · Word burst",
+   "tracks": [
+    {
+     "id": "c583eb1e-front",
+     "kind": "visual",
+     "name": "Front",
+     "clips": [
+      {
+       "id": "c583eb1e-word_1",
+       "from": 0,
+       "mask": null,
+       "path": null,
+       "blend": "normal",
+       "depth": 0,
+       "matte": "none",
+       "props": {
+        "x": 0.5,
+        "y": 0.5,
+        "axes": "",
+        "font": "Inter",
+        "move": "none",
+        "size": 0.26,
+        "text": "Every site",
+        "align": "center",
+        "color": "#ffffff",
+        "scale": 1,
+        "slant": 0,
+        "width": 0.92,
+        "easing": "standard",
+        "height": 0.34,
+        "italic": false,
+        "weight": 800,
+        "leading": 1,
+        "opacity": 1,
+        "stretch": 100,
+        "rotation": 0,
+        "tracking": -0.05
+       },
+       "space": "world",
+       "parent": null,
+       "effects": [],
+       "textPath": null,
+       "animators": [],
+       "component": "Title",
+       "keyframes": {
+        "blur": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 18
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 6,
+          "value": 0
+         }
+        ],
+        "scale": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 1.35
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 8,
+          "value": 1
+         }
+        ]
+       },
+       "maskStack": [],
+       "transform": {},
+       "trimStart": 0,
+       "motionBlur": true,
+       "expressions": {},
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "parentOpacity": "inherit",
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "durationInFrames": 15
+      },
+      {
+       "id": "c583eb1e-word_2",
+       "from": 15,
+       "mask": null,
+       "path": null,
+       "blend": "normal",
+       "depth": 0,
+       "matte": "none",
+       "props": {
+        "x": 0.5,
+        "y": 0.5,
+        "axes": "",
+        "font": "Inter",
+        "move": "none",
+        "size": 0.26,
+        "text": "you run.",
+        "align": "center",
+        "color": "#ffffff",
+        "scale": 1,
+        "slant": 0,
+        "width": 0.92,
+        "easing": "standard",
+        "height": 0.34,
+        "italic": false,
+        "weight": 800,
+        "leading": 1,
+        "opacity": 1,
+        "stretch": 100,
+        "rotation": 0,
+        "tracking": -0.05
+       },
+       "space": "world",
+       "parent": null,
+       "effects": [],
+       "textPath": null,
+       "animators": [],
+       "component": "Title",
+       "keyframes": {
+        "blur": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 18
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 6,
+          "value": 0
+         }
+        ],
+        "scale": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 1.35
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 8,
+          "value": 1
+         }
+        ]
+       },
+       "maskStack": [],
+       "transform": {},
+       "trimStart": 0,
+       "motionBlur": true,
+       "expressions": {},
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "parentOpacity": "inherit",
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "durationInFrames": 15
+      },
+      {
+       "id": "c583eb1e-word_3",
+       "from": 30,
+       "mask": null,
+       "path": null,
+       "blend": "normal",
+       "depth": 0,
+       "matte": "none",
+       "props": {
+        "x": 0.5,
+        "y": 0.5,
+        "axes": "",
+        "font": "Inter",
+        "move": "none",
+        "size": 0.26,
+        "text": "Up to date.",
+        "align": "center",
+        "color": "#ffffff",
+        "scale": 1,
+        "slant": 0,
+        "width": 0.92,
+        "easing": "standard",
+        "height": 0.34,
+        "italic": false,
+        "weight": 800,
+        "leading": 1,
+        "opacity": 1,
+        "stretch": 100,
+        "rotation": 0,
+        "tracking": -0.05
+       },
+       "space": "world",
+       "parent": null,
+       "effects": [],
+       "textPath": null,
+       "animators": [],
+       "component": "Title",
+       "keyframes": {
+        "blur": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 18
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 6,
+          "value": 0
+         }
+        ],
+        "scale": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 1.35
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 8,
+          "value": 1
+         }
+        ]
+       },
+       "maskStack": [],
+       "transform": {},
+       "trimStart": 0,
+       "motionBlur": true,
+       "expressions": {},
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "parentOpacity": "inherit",
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "durationInFrames": 15
+      },
+      {
+       "id": "c583eb1e-word_4",
+       "from": 45,
+       "mask": null,
+       "path": null,
+       "blend": "normal",
+       "depth": 0,
+       "matte": "none",
+       "props": {
+        "x": 0.5,
+        "y": 0.5,
+        "axes": "",
+        "font": "Inter",
+        "move": "none",
+        "size": 0.26,
+        "text": "One place.",
+        "align": "center",
+        "color": "#f2552f",
+        "scale": 1,
+        "slant": 0,
+        "width": 0.92,
+        "easing": "standard",
+        "height": 0.34,
+        "italic": false,
+        "weight": 800,
+        "leading": 1,
+        "opacity": 1,
+        "stretch": 100,
+        "rotation": 0,
+        "tracking": -0.05
+       },
+       "space": "world",
+       "parent": null,
+       "effects": [],
+       "textPath": null,
+       "animators": [],
+       "component": "Title",
+       "keyframes": {
+        "blur": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 18
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 6,
+          "value": 0
+         }
+        ],
+        "scale": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 0.6
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 8,
+          "value": 1
+         }
+        ]
+       },
+       "maskStack": [],
+       "transform": {},
+       "trimStart": 0,
+       "motionBlur": true,
+       "expressions": {},
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "parentOpacity": "inherit",
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "durationInFrames": 15
+      }
+     ]
+    },
+    {
+     "id": "c583eb1e-back",
+     "kind": "visual",
+     "name": "Back",
+     "clips": [
+      {
+       "id": "c583eb1e-bg",
+       "from": 0,
+       "mask": null,
+       "path": null,
+       "blend": "normal",
+       "depth": 0,
+       "matte": "none",
+       "props": {
+        "x": 0.5,
+        "y": 0.5,
+        "cap": "butt",
+        "gap": 0,
+        "dash": 0,
+        "fill": "#050505",
+        "join": "miter",
+        "move": "none",
+        "path": "",
+        "align": "center",
+        "fill2": "brand.primary",
+        "morph": 0,
+        "scale": 1,
+        "shape": "rect",
+        "sides": 6,
+        "width": 1,
+        "easing": "standard",
+        "height": 1,
+        "morphs": [],
+        "points": 5,
+        "stroke": "brand.text",
+        "opacity": 1,
+        "fillKind": "solid",
+        "fillRule": "nonzero",
+        "rotation": 0,
+        "modifiers": [],
+        "roundness": 0,
+        "morphStart": 0,
+        "strokeKind": "none",
+        "innerRadius": 0.5,
+        "strokeWidth": 0.01,
+        "gradientAngle": 90
+       },
+       "space": "world",
+       "parent": null,
+       "effects": [],
+       "textPath": null,
+       "animators": [],
+       "component": "Shape",
+       "keyframes": {},
+       "maskStack": [],
+       "transform": {},
+       "trimStart": 0,
+       "motionBlur": true,
+       "expressions": {},
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "parentOpacity": "inherit",
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "durationInFrames": 60
+      }
+     ]
+    }
+   ],
+   "template": {
+    "id": "builtin:launch-word-burst",
+    "keys": {
+     "accent": "accent",
+     "word_1": "word_1",
+     "word_2": "word_2",
+     "word_3": "word_3",
+     "word_4": "word_4"
+    },
+    "name": "Launch · Word burst"
+   },
+   "durationInFrames": 60
+  },
+  "1a6309e9": {
+   "name": "Launch · Device fly-in",
+   "tracks": [
+    {
+     "id": "e99b442d-front",
+     "kind": "visual",
+     "name": "Front",
+     "clips": [
+      {
+       "id": "e99b442d-device",
+       "from": 0,
+       "mask": null,
+       "path": null,
+       "blend": "normal",
+       "depth": 0,
+       "matte": "none",
+       "props": {
+        "x": 0.5,
+        "y": 0.6,
+        "zoom": 1,
+        "width": 1,
+        "device": "laptop-pro",
+        "easing": "standard",
+        "finish": "black",
+        "height": 0.9,
+        "screen": "b8fb51cf-496e-4339-8a09-3c68120b9b49",
+        "shadow": false,
+        "backdrop": "transparent",
+        "endAngle": 40,
+        "lighting": "studio",
+        "orbitSpeed": 0,
+        "startAngle": -20,
+        "screenVideo": null
+       },
+       "space": "world",
+       "parent": null,
+       "effects": [],
+       "textPath": null,
+       "animators": [],
+       "component": "Device3D",
+       "keyframes": {
+        "dolly": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 0.5
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 27,
+          "value": 1.2
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 60,
+          "value": 1.5
+         }
+        ],
+        "objectRotateX": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 38
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 27,
+          "value": 8
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 60,
+          "value": 6
+         }
+        ],
+        "objectRotateY": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": -95
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 27,
+          "value": -20
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 60,
+          "value": 8
+         }
+        ]
+       },
+       "maskStack": [],
+       "transform": {},
+       "trimStart": 0,
+       "motionBlur": true,
+       "expressions": {},
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "parentOpacity": "inherit",
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "durationInFrames": 60
+      }
+     ]
+    },
+    {
+     "id": "e99b442d-back",
+     "kind": "visual",
+     "name": "Back",
+     "clips": [
+      {
+       "id": "e99b442d-bg",
+       "from": 0,
+       "mask": null,
+       "path": null,
+       "blend": "normal",
+       "depth": 0,
+       "matte": "none",
+       "props": {
+        "x": 0.5,
+        "y": 0.5,
+        "cap": "butt",
+        "gap": 0,
+        "dash": 0,
+        "fill": "#050505",
+        "join": "miter",
+        "move": "none",
+        "path": "",
+        "align": "center",
+        "fill2": "brand.primary",
+        "morph": 0,
+        "scale": 1,
+        "shape": "rect",
+        "sides": 6,
+        "width": 1,
+        "easing": "standard",
+        "height": 1,
+        "morphs": [],
+        "points": 5,
+        "stroke": "brand.text",
+        "opacity": 1,
+        "fillKind": "solid",
+        "fillRule": "nonzero",
+        "rotation": 0,
+        "modifiers": [],
+        "roundness": 0,
+        "morphStart": 0,
+        "strokeKind": "none",
+        "innerRadius": 0.5,
+        "strokeWidth": 0.01,
+        "gradientAngle": 90
+       },
+       "space": "world",
+       "parent": null,
+       "effects": [],
+       "textPath": null,
+       "animators": [],
+       "component": "Shape",
+       "keyframes": {},
+       "maskStack": [],
+       "transform": {},
+       "trimStart": 0,
+       "motionBlur": true,
+       "expressions": {},
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "parentOpacity": "inherit",
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "durationInFrames": 60
+      },
+      {
+       "id": "e99b442d-line",
+       "from": 0,
+       "mask": null,
+       "path": null,
+       "blend": "normal",
+       "depth": 0,
+       "matte": "none",
+       "props": {
+        "x": 0.5,
+        "y": 0.2,
+        "axes": "",
+        "font": "Inter",
+        "move": "none",
+        "size": 0.24,
+        "text": "Say it.",
+        "align": "center",
+        "color": "#ffffff",
+        "scale": 1,
+        "slant": 0,
+        "width": 0.92,
+        "easing": "standard",
+        "height": 0.28,
+        "italic": false,
+        "weight": 800,
+        "leading": 1,
+        "opacity": 1,
+        "stretch": 100,
+        "rotation": 0,
+        "tracking": -0.05
+       },
+       "space": "world",
+       "parent": null,
+       "effects": [],
+       "textPath": null,
+       "animators": [],
+       "component": "Title",
+       "keyframes": {
+        "blur": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 18
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 8,
+          "value": 0
+         }
+        ],
+        "scale": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 1.2
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 8,
+          "value": 1
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 60,
+          "value": 0.94
+         }
+        ]
+       },
+       "maskStack": [],
+       "transform": {},
+       "trimStart": 0,
+       "motionBlur": true,
+       "expressions": {},
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "parentOpacity": "inherit",
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "durationInFrames": 60
+      }
+     ]
+    }
+   ],
+   "template": {
+    "id": "builtin:launch-device-fly",
+    "keys": {
+     "line": "line",
+     "device": "device",
+     "screen": "screen"
+    },
+    "name": "Launch · Device fly-in"
+   },
+   "durationInFrames": 60
+  },
+  "347aa400": {
+   "name": "Launch · Logo build",
+   "tracks": [
+    {
+     "id": "8d3dc9f8-front",
+     "kind": "visual",
+     "name": "Front",
+     "clips": [
+      {
+       "id": "8d3dc9f8-ring",
+       "from": 30,
+       "mask": null,
+       "path": null,
+       "blend": "normal",
+       "depth": 0,
+       "matte": "none",
+       "props": {
+        "x": 0.5,
+        "y": 0.42,
+        "cap": "butt",
+        "gap": 0,
+        "dash": 0,
+        "fill": "transparent",
+        "join": "miter",
+        "move": "none",
+        "path": "",
+        "align": "center",
+        "fill2": "brand.primary",
+        "morph": 0,
+        "scale": 1,
+        "shape": "ellipse",
+        "sides": 6,
+        "width": 0.22,
+        "easing": "standard",
+        "height": 0.39,
+        "morphs": [],
+        "points": 5,
+        "stroke": "#f2552f",
+        "opacity": 1,
+        "fillKind": "solid",
+        "fillRule": "nonzero",
+        "rotation": 0,
+        "modifiers": [],
+        "roundness": 0,
+        "morphStart": 0,
+        "strokeKind": "solid",
+        "innerRadius": 0.5,
+        "strokeWidth": 0.009,
+        "gradientAngle": 90
+       },
+       "space": "world",
+       "parent": null,
+       "effects": [],
+       "textPath": null,
+       "animators": [],
+       "component": "Shape",
+       "keyframes": {
+        "scale": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 0.6
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 24,
+          "value": 4.2
+         }
+        ],
+        "opacity": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 1
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 24,
+          "value": 0
+         }
+        ]
+       },
+       "maskStack": [],
+       "transform": {},
+       "trimStart": 0,
+       "motionBlur": true,
+       "expressions": {},
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "parentOpacity": "inherit",
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "durationInFrames": 24
+      },
+      {
+       "id": "8d3dc9f8-url",
+       "from": 38,
+       "mask": null,
+       "path": null,
+       "blend": "normal",
+       "depth": 0,
+       "matte": "none",
+       "props": {
+        "x": 0.5,
+        "y": 0.8,
+        "axes": "",
+        "font": "Inter",
+        "move": "none",
+        "size": 0.11,
+        "text": "supasito.com",
+        "align": "center",
+        "color": "#ffffff",
+        "scale": 1,
+        "slant": 0,
+        "width": 0.8,
+        "easing": "standard",
+        "height": 0.15,
+        "italic": false,
+        "weight": 700,
+        "leading": 1,
+        "opacity": 1,
+        "stretch": 100,
+        "rotation": 0,
+        "tracking": -0.05
+       },
+       "space": "world",
+       "parent": null,
+       "effects": [],
+       "textPath": null,
+       "animators": [],
+       "component": "Title",
+       "keyframes": {
+        "y": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 0.12
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 8,
+          "value": 0
+         }
+        ],
+        "blur": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 18
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 6,
+          "value": 0
+         }
+        ]
+       },
+       "maskStack": [],
+       "transform": {},
+       "trimStart": 0,
+       "motionBlur": true,
+       "expressions": {},
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "parentOpacity": "inherit",
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "durationInFrames": 52
+      },
+      {
+       "id": "8d3dc9f8-claim",
+       "from": 60,
+       "mask": null,
+       "path": null,
+       "blend": "normal",
+       "depth": 0,
+       "matte": "none",
+       "props": {
+        "x": 0.5,
+        "y": 0.89,
+        "axes": "",
+        "font": "Inter",
+        "move": "none",
+        "size": 0.026,
+        "text": "FREE FOR PERSONAL USE",
+        "align": "center",
+        "color": "#8b8b8b",
+        "scale": 1,
+        "slant": 0,
+        "width": 0.6,
+        "easing": "standard",
+        "height": 0.05,
+        "italic": false,
+        "weight": 500,
+        "leading": 1,
+        "opacity": 1,
+        "stretch": 100,
+        "rotation": 0,
+        "tracking": 0.3
+       },
+       "space": "world",
+       "parent": null,
+       "effects": [],
+       "textPath": null,
+       "animators": [],
+       "component": "Kicker",
+       "keyframes": {
+        "opacity": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 0
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 8,
+          "value": 1
+         }
+        ]
+       },
+       "maskStack": [],
+       "transform": {},
+       "trimStart": 0,
+       "motionBlur": true,
+       "expressions": {},
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "parentOpacity": "inherit",
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "durationInFrames": 30
+      }
+     ]
+    },
+    {
+     "id": "8d3dc9f8-middle",
+     "kind": "visual",
+     "name": "Middle",
+     "clips": [
+      {
+       "id": "8d3dc9f8-logo",
+       "from": 30,
+       "mask": null,
+       "path": null,
+       "blend": "normal",
+       "depth": 0,
+       "matte": "none",
+       "props": {
+        "x": 0.5,
+        "y": 0.42,
+        "move": "none",
+        "align": "center",
+        "scale": 1,
+        "width": 0.18,
+        "easing": "standard",
+        "height": 0.32,
+        "assetId": "df255e47-5696-4c00-ace6-46159e8c33c5",
+        "opacity": 1,
+        "rotation": 0
+       },
+       "space": "world",
+       "parent": null,
+       "effects": [],
+       "textPath": null,
+       "animators": [],
+       "component": "Logo",
+       "keyframes": {
+        "scale": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 0.92
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 8,
+          "value": 1
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 60,
+          "value": 1.03
+         }
+        ],
+        "opacity": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 0
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 8,
+          "value": 1
+         }
+        ]
+       },
+       "maskStack": [],
+       "transform": {},
+       "trimStart": 0,
+       "motionBlur": true,
+       "expressions": {},
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "parentOpacity": "inherit",
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "durationInFrames": 60
+      }
+     ]
+    },
+    {
+     "id": "8d3dc9f8-back",
+     "kind": "visual",
+     "name": "Back",
+     "clips": [
+      {
+       "id": "8d3dc9f8-bg",
+       "from": 0,
+       "mask": null,
+       "path": null,
+       "blend": "normal",
+       "depth": 0,
+       "matte": "none",
+       "props": {
+        "x": 0.5,
+        "y": 0.5,
+        "cap": "butt",
+        "gap": 0,
+        "dash": 0,
+        "fill": "#050505",
+        "join": "miter",
+        "move": "none",
+        "path": "",
+        "align": "center",
+        "fill2": "brand.primary",
+        "morph": 0,
+        "scale": 1,
+        "shape": "rect",
+        "sides": 6,
+        "width": 1,
+        "easing": "standard",
+        "height": 1,
+        "morphs": [],
+        "points": 5,
+        "stroke": "brand.text",
+        "opacity": 1,
+        "fillKind": "solid",
+        "fillRule": "nonzero",
+        "rotation": 0,
+        "modifiers": [],
+        "roundness": 0,
+        "morphStart": 0,
+        "strokeKind": "none",
+        "innerRadius": 0.5,
+        "strokeWidth": 0.01,
+        "gradientAngle": 90
+       },
+       "space": "world",
+       "parent": null,
+       "effects": [],
+       "textPath": null,
+       "animators": [],
+       "component": "Shape",
+       "keyframes": {},
+       "maskStack": [],
+       "transform": {},
+       "trimStart": 0,
+       "motionBlur": true,
+       "expressions": {},
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "parentOpacity": "inherit",
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "durationInFrames": 90
+      },
+      {
+       "id": "8d3dc9f8-light",
+       "from": 0,
+       "mask": null,
+       "path": null,
+       "blend": "normal",
+       "depth": 0,
+       "matte": "none",
+       "props": {
+        "x": 0.5,
+        "y": 0.5,
+        "cap": "butt",
+        "gap": 0,
+        "dash": 0,
+        "fill": "#ffffff",
+        "join": "miter",
+        "move": "none",
+        "path": "",
+        "align": "center",
+        "fill2": "#050505",
+        "morph": 0,
+        "scale": 1,
+        "shape": "rect",
+        "sides": 6,
+        "width": 1,
+        "easing": "standard",
+        "height": 1,
+        "morphs": [],
+        "points": 5,
+        "stroke": "brand.text",
+        "opacity": 0.16,
+        "fillKind": "radial",
+        "fillRule": "nonzero",
+        "rotation": 0,
+        "modifiers": [],
+        "roundness": 0,
+        "morphStart": 0,
+        "strokeKind": "none",
+        "innerRadius": 0.5,
+        "strokeWidth": 0.01,
+        "gradientAngle": 90
+       },
+       "space": "world",
+       "parent": null,
+       "effects": [],
+       "textPath": null,
+       "animators": [],
+       "component": "Shape",
+       "keyframes": {
+        "scale": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 0.4
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 30,
+          "value": 1
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 90,
+          "value": 1.1
+         }
+        ]
+       },
+       "maskStack": [],
+       "transform": {},
+       "trimStart": 0,
+       "motionBlur": true,
+       "expressions": {},
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "parentOpacity": "inherit",
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "durationInFrames": 90
+      }
+     ]
+    }
+   ],
+   "template": {
+    "id": "builtin:launch-logo-build",
+    "keys": {
+     "url": "url",
+     "logo": "logo",
+     "claim": "claim",
+     "accent": "accent_2"
+    },
+    "name": "Launch · Logo build"
+   },
+   "durationInFrames": 90
+  },
+  "719c079e": {
+   "name": "Launch · Beat montage",
+   "tracks": [
+    {
+     "id": "45f4e576-front",
+     "kind": "visual",
+     "name": "Front",
+     "clips": [
+      {
+       "id": "45f4e576-claim_1",
+       "from": 0,
+       "mask": null,
+       "path": null,
+       "blend": "normal",
+       "depth": 0,
+       "matte": "none",
+       "props": {
+        "x": 0.5,
+        "y": 0.5,
+        "axes": "",
+        "font": "Inter",
+        "move": "none",
+        "size": 0.216,
+        "text": "Say it.",
+        "align": "center",
+        "color": "#ffffff",
+        "scale": 1,
+        "slant": 0,
+        "width": 0.92,
+        "easing": "standard",
+        "height": 0.3,
+        "italic": false,
+        "weight": 800,
+        "leading": 1,
+        "opacity": 1,
+        "stretch": 100,
+        "rotation": 0,
+        "tracking": -0.05
+       },
+       "space": "world",
+       "parent": null,
+       "effects": [],
+       "textPath": null,
+       "animators": [],
+       "component": "Title",
+       "keyframes": {
+        "blur": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 18
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 6,
+          "value": 0
+         }
+        ],
+        "scale": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 1.25
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 8,
+          "value": 1
+         }
+        ]
+       },
+       "maskStack": [],
+       "transform": {},
+       "trimStart": 0,
+       "motionBlur": true,
+       "expressions": {},
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "parentOpacity": "inherit",
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "durationInFrames": 15
+      },
+      {
+       "id": "45f4e576-claim_2",
+       "from": 15,
+       "mask": null,
+       "path": null,
+       "blend": "normal",
+       "depth": 0,
+       "matte": "none",
+       "props": {
+        "x": 0.5,
+        "y": 0.5,
+        "axes": "",
+        "font": "Inter",
+        "move": "none",
+        "size": 0.216,
+        "text": "See it.",
+        "align": "center",
+        "color": "#ffffff",
+        "scale": 1,
+        "slant": 0,
+        "width": 0.92,
+        "easing": "standard",
+        "height": 0.3,
+        "italic": false,
+        "weight": 800,
+        "leading": 1,
+        "opacity": 1,
+        "stretch": 100,
+        "rotation": 0,
+        "tracking": -0.05
+       },
+       "space": "world",
+       "parent": null,
+       "effects": [],
+       "textPath": null,
+       "animators": [],
+       "component": "Title",
+       "keyframes": {
+        "blur": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 18
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 6,
+          "value": 0
+         }
+        ],
+        "scale": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 1.25
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 8,
+          "value": 1
+         }
+        ]
+       },
+       "maskStack": [],
+       "transform": {},
+       "trimStart": 0,
+       "motionBlur": true,
+       "expressions": {},
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "parentOpacity": "inherit",
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "durationInFrames": 15
+      },
+      {
+       "id": "45f4e576-claim_3",
+       "from": 30,
+       "mask": null,
+       "path": null,
+       "blend": "normal",
+       "depth": 0,
+       "matte": "none",
+       "props": {
+        "x": 0.5,
+        "y": 0.5,
+        "axes": "",
+        "font": "Inter",
+        "move": "none",
+        "size": 0.216,
+        "text": "Publish.",
+        "align": "center",
+        "color": "#ffffff",
+        "scale": 1,
+        "slant": 0,
+        "width": 0.92,
+        "easing": "standard",
+        "height": 0.3,
+        "italic": false,
+        "weight": 800,
+        "leading": 1,
+        "opacity": 1,
+        "stretch": 100,
+        "rotation": 0,
+        "tracking": -0.05
+       },
+       "space": "world",
+       "parent": null,
+       "effects": [],
+       "textPath": null,
+       "animators": [],
+       "component": "Title",
+       "keyframes": {
+        "blur": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 18
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 6,
+          "value": 0
+         }
+        ],
+        "scale": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 1.25
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 8,
+          "value": 1
+         }
+        ]
+       },
+       "maskStack": [],
+       "transform": {},
+       "trimStart": 0,
+       "motionBlur": true,
+       "expressions": {},
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "parentOpacity": "inherit",
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "durationInFrames": 15
+      },
+      {
+       "id": "45f4e576-claim_4",
+       "from": 45,
+       "mask": null,
+       "path": null,
+       "blend": "normal",
+       "depth": 0,
+       "matte": "none",
+       "props": {
+        "x": 0.5,
+        "y": 0.5,
+        "axes": "",
+        "font": "Inter",
+        "move": "none",
+        "size": 0.216,
+        "text": "Free.",
+        "align": "center",
+        "color": "#f2552f",
+        "scale": 1,
+        "slant": 0,
+        "width": 0.92,
+        "easing": "standard",
+        "height": 0.3,
+        "italic": false,
+        "weight": 800,
+        "leading": 1,
+        "opacity": 1,
+        "stretch": 100,
+        "rotation": 0,
+        "tracking": -0.05
+       },
+       "space": "world",
+       "parent": null,
+       "effects": [],
+       "textPath": null,
+       "animators": [],
+       "component": "Title",
+       "keyframes": {
+        "blur": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 18
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 6,
+          "value": 0
+         }
+        ],
+        "scale": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 1.25
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 8,
+          "value": 1
+         }
+        ]
+       },
+       "maskStack": [],
+       "transform": {},
+       "trimStart": 0,
+       "motionBlur": true,
+       "expressions": {},
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "parentOpacity": "inherit",
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "durationInFrames": 15
+      }
+     ]
+    },
+    {
+     "id": "45f4e576-middle",
+     "kind": "visual",
+     "name": "Middle",
+     "clips": [
+      {
+       "id": "45f4e576-scrim",
+       "from": 0,
+       "mask": null,
+       "path": null,
+       "blend": "normal",
+       "depth": 0,
+       "matte": "none",
+       "props": {
+        "x": 0.5,
+        "y": 0.5,
+        "cap": "butt",
+        "gap": 0,
+        "dash": 0,
+        "fill": "#050505",
+        "join": "miter",
+        "move": "none",
+        "path": "",
+        "align": "center",
+        "fill2": "brand.primary",
+        "morph": 0,
+        "scale": 1,
+        "shape": "rect",
+        "sides": 6,
+        "width": 1,
+        "easing": "standard",
+        "height": 1,
+        "morphs": [],
+        "points": 5,
+        "stroke": "brand.text",
+        "opacity": 0.72,
+        "fillKind": "solid",
+        "fillRule": "nonzero",
+        "rotation": 0,
+        "modifiers": [],
+        "roundness": 0,
+        "morphStart": 0,
+        "strokeKind": "none",
+        "innerRadius": 0.5,
+        "strokeWidth": 0.01,
+        "gradientAngle": 90
+       },
+       "space": "world",
+       "parent": null,
+       "effects": [],
+       "textPath": null,
+       "animators": [],
+       "component": "Shape",
+       "keyframes": {},
+       "maskStack": [],
+       "transform": {},
+       "trimStart": 0,
+       "motionBlur": true,
+       "expressions": {},
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "parentOpacity": "inherit",
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "durationInFrames": 60
+      }
+     ]
+    },
+    {
+     "id": "45f4e576-back",
+     "kind": "visual",
+     "name": "Back",
+     "clips": [
+      {
+       "id": "45f4e576-bg",
+       "from": 0,
+       "mask": null,
+       "path": null,
+       "blend": "normal",
+       "depth": 0,
+       "matte": "none",
+       "props": {
+        "x": 0.5,
+        "y": 0.5,
+        "cap": "butt",
+        "gap": 0,
+        "dash": 0,
+        "fill": "#050505",
+        "join": "miter",
+        "move": "none",
+        "path": "",
+        "align": "center",
+        "fill2": "brand.primary",
+        "morph": 0,
+        "scale": 1,
+        "shape": "rect",
+        "sides": 6,
+        "width": 1,
+        "easing": "standard",
+        "height": 1,
+        "morphs": [],
+        "points": 5,
+        "stroke": "brand.text",
+        "opacity": 1,
+        "fillKind": "solid",
+        "fillRule": "nonzero",
+        "rotation": 0,
+        "modifiers": [],
+        "roundness": 0,
+        "morphStart": 0,
+        "strokeKind": "none",
+        "innerRadius": 0.5,
+        "strokeWidth": 0.01,
+        "gradientAngle": 90
+       },
+       "space": "world",
+       "parent": null,
+       "effects": [],
+       "textPath": null,
+       "animators": [],
+       "component": "Shape",
+       "keyframes": {},
+       "maskStack": [],
+       "transform": {},
+       "trimStart": 0,
+       "motionBlur": true,
+       "expressions": {},
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "parentOpacity": "inherit",
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "durationInFrames": 60
+      },
+      {
+       "id": "45f4e576-shot_1",
+       "from": 0,
+       "mask": null,
+       "path": null,
+       "blend": "normal",
+       "depth": 0,
+       "matte": "none",
+       "props": {
+        "x": 0.5,
+        "y": 0.5,
+        "fit": "cover",
+        "move": "none",
+        "zoom": 1.9,
+        "align": "center",
+        "scale": 1,
+        "width": 1,
+        "easing": "standard",
+        "focusX": 0.7,
+        "focusY": 0.75,
+        "height": 1,
+        "assetId": "56d20a39-8fee-49ca-a754-3e4c2a37291b",
+        "opacity": 1,
+        "rotation": 0
+       },
+       "space": "world",
+       "parent": null,
+       "effects": [],
+       "textPath": null,
+       "animators": [],
+       "component": "Image",
+       "keyframes": {
+        "scale": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 1.18
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 8,
+          "value": 1
+         }
+        ]
+       },
+       "maskStack": [],
+       "transform": {
+        "blur": 5
+       },
+       "trimStart": 0,
+       "motionBlur": true,
+       "expressions": {},
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "parentOpacity": "inherit",
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "durationInFrames": 8
+      },
+      {
+       "id": "45f4e576-shot_2",
+       "from": 8,
+       "mask": null,
+       "path": null,
+       "blend": "normal",
+       "depth": 0,
+       "matte": "none",
+       "props": {
+        "x": 0.5,
+        "y": 0.5,
+        "fit": "cover",
+        "move": "none",
+        "zoom": 1.9,
+        "align": "center",
+        "scale": 1,
+        "width": 1,
+        "easing": "standard",
+        "focusX": 0.3,
+        "focusY": 0.75,
+        "height": 1,
+        "assetId": "b8fb51cf-496e-4339-8a09-3c68120b9b49",
+        "opacity": 1,
+        "rotation": 0
+       },
+       "space": "world",
+       "parent": null,
+       "effects": [],
+       "textPath": null,
+       "animators": [],
+       "component": "Image",
+       "keyframes": {
+        "scale": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 1.18
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 8,
+          "value": 1
+         }
+        ]
+       },
+       "maskStack": [],
+       "transform": {
+        "blur": 5
+       },
+       "trimStart": 0,
+       "motionBlur": true,
+       "expressions": {},
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "parentOpacity": "inherit",
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "durationInFrames": 7
+      },
+      {
+       "id": "45f4e576-shot_3",
+       "from": 15,
+       "mask": null,
+       "path": null,
+       "blend": "normal",
+       "depth": 0,
+       "matte": "none",
+       "props": {
+        "x": 0.5,
+        "y": 0.5,
+        "fit": "cover",
+        "move": "none",
+        "zoom": 1.9,
+        "align": "center",
+        "scale": 1,
+        "width": 1,
+        "easing": "standard",
+        "focusX": 0.7,
+        "focusY": 0.75,
+        "height": 1,
+        "assetId": "849a4ce3-3f5c-48ff-9f8e-07293961dfdc",
+        "opacity": 1,
+        "rotation": 0
+       },
+       "space": "world",
+       "parent": null,
+       "effects": [],
+       "textPath": null,
+       "animators": [],
+       "component": "Image",
+       "keyframes": {
+        "scale": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 1.18
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 8,
+          "value": 1
+         }
+        ]
+       },
+       "maskStack": [],
+       "transform": {
+        "blur": 5
+       },
+       "trimStart": 0,
+       "motionBlur": true,
+       "expressions": {},
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "parentOpacity": "inherit",
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "durationInFrames": 8
+      },
+      {
+       "id": "45f4e576-shot_4",
+       "from": 23,
+       "mask": null,
+       "path": null,
+       "blend": "normal",
+       "depth": 0,
+       "matte": "none",
+       "props": {
+        "x": 0.5,
+        "y": 0.5,
+        "fit": "cover",
+        "move": "none",
+        "zoom": 1.9,
+        "align": "center",
+        "scale": 1,
+        "width": 1,
+        "easing": "standard",
+        "focusX": 0.3,
+        "focusY": 0.75,
+        "height": 1,
+        "assetId": "d8f41a56-0282-416c-a84e-281f3d28833d",
+        "opacity": 1,
+        "rotation": 0
+       },
+       "space": "world",
+       "parent": null,
+       "effects": [],
+       "textPath": null,
+       "animators": [],
+       "component": "Image",
+       "keyframes": {
+        "scale": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 1.18
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 8,
+          "value": 1
+         }
+        ]
+       },
+       "maskStack": [],
+       "transform": {
+        "blur": 5
+       },
+       "trimStart": 0,
+       "motionBlur": true,
+       "expressions": {},
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "parentOpacity": "inherit",
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "durationInFrames": 7
+      },
+      {
+       "id": "45f4e576-shot_5",
+       "from": 30,
+       "mask": null,
+       "path": null,
+       "blend": "normal",
+       "depth": 0,
+       "matte": "none",
+       "props": {
+        "x": 0.5,
+        "y": 0.5,
+        "fit": "cover",
+        "move": "none",
+        "zoom": 1.9,
+        "align": "center",
+        "scale": 1,
+        "width": 1,
+        "easing": "standard",
+        "focusX": 0.7,
+        "focusY": 0.75,
+        "height": 1,
+        "assetId": "8627fc02-af6d-40e4-8121-4cc4d54536ac",
+        "opacity": 1,
+        "rotation": 0
+       },
+       "space": "world",
+       "parent": null,
+       "effects": [],
+       "textPath": null,
+       "animators": [],
+       "component": "Image",
+       "keyframes": {
+        "scale": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 1.18
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 8,
+          "value": 1
+         }
+        ]
+       },
+       "maskStack": [],
+       "transform": {
+        "blur": 5
+       },
+       "trimStart": 0,
+       "motionBlur": true,
+       "expressions": {},
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "parentOpacity": "inherit",
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "durationInFrames": 8
+      },
+      {
+       "id": "45f4e576-shot_6",
+       "from": 38,
+       "mask": null,
+       "path": null,
+       "blend": "normal",
+       "depth": 0,
+       "matte": "none",
+       "props": {
+        "x": 0.5,
+        "y": 0.5,
+        "fit": "cover",
+        "move": "none",
+        "zoom": 1.9,
+        "align": "center",
+        "scale": 1,
+        "width": 1,
+        "easing": "standard",
+        "focusX": 0.3,
+        "focusY": 0.75,
+        "height": 1,
+        "assetId": "56d20a39-8fee-49ca-a754-3e4c2a37291b",
+        "opacity": 1,
+        "rotation": 0
+       },
+       "space": "world",
+       "parent": null,
+       "effects": [],
+       "textPath": null,
+       "animators": [],
+       "component": "Image",
+       "keyframes": {
+        "scale": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 1.18
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 8,
+          "value": 1
+         }
+        ]
+       },
+       "maskStack": [],
+       "transform": {
+        "blur": 5
+       },
+       "trimStart": 0,
+       "motionBlur": true,
+       "expressions": {},
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "parentOpacity": "inherit",
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "durationInFrames": 7
+      },
+      {
+       "id": "45f4e576-shot_7",
+       "from": 45,
+       "mask": null,
+       "path": null,
+       "blend": "normal",
+       "depth": 0,
+       "matte": "none",
+       "props": {
+        "x": 0.5,
+        "y": 0.5,
+        "fit": "cover",
+        "move": "none",
+        "zoom": 1.9,
+        "align": "center",
+        "scale": 1,
+        "width": 1,
+        "easing": "standard",
+        "focusX": 0.7,
+        "focusY": 0.75,
+        "height": 1,
+        "assetId": "d8f41a56-0282-416c-a84e-281f3d28833d",
+        "opacity": 1,
+        "rotation": 0
+       },
+       "space": "world",
+       "parent": null,
+       "effects": [],
+       "textPath": null,
+       "animators": [],
+       "component": "Image",
+       "keyframes": {
+        "scale": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 1.18
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 8,
+          "value": 1
+         }
+        ]
+       },
+       "maskStack": [],
+       "transform": {
+        "blur": 5
+       },
+       "trimStart": 0,
+       "motionBlur": true,
+       "expressions": {},
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "parentOpacity": "inherit",
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "durationInFrames": 8
+      },
+      {
+       "id": "45f4e576-shot_8",
+       "from": 53,
+       "mask": null,
+       "path": null,
+       "blend": "normal",
+       "depth": 0,
+       "matte": "none",
+       "props": {
+        "x": 0.5,
+        "y": 0.5,
+        "fit": "cover",
+        "move": "none",
+        "zoom": 1.9,
+        "align": "center",
+        "scale": 1,
+        "width": 1,
+        "easing": "standard",
+        "focusX": 0.3,
+        "focusY": 0.75,
+        "height": 1,
+        "assetId": "849a4ce3-3f5c-48ff-9f8e-07293961dfdc",
+        "opacity": 1,
+        "rotation": 0
+       },
+       "space": "world",
+       "parent": null,
+       "effects": [],
+       "textPath": null,
+       "animators": [],
+       "component": "Image",
+       "keyframes": {
+        "scale": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 1.18
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 8,
+          "value": 1
+         }
+        ]
+       },
+       "maskStack": [],
+       "transform": {
+        "blur": 5
+       },
+       "trimStart": 0,
+       "motionBlur": true,
+       "expressions": {},
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "parentOpacity": "inherit",
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "durationInFrames": 7
+      }
+     ]
+    }
+   ],
+   "template": {
+    "id": "builtin:launch-beat-montage",
+    "keys": {
+     "accent": "accent_3",
+     "shot_1": "shot_1",
+     "shot_2": "shot_2",
+     "shot_3": "shot_3",
+     "shot_4": "shot_4",
+     "shot_5": "shot_5",
+     "shot_6": "shot_6",
+     "shot_7": "shot_7",
+     "shot_8": "shot_8",
+     "claim_1": "claim_1",
+     "claim_2": "claim_2",
+     "claim_3": "claim_3",
+     "claim_4": "claim_4"
+    },
+    "name": "Launch · Beat montage"
+   },
+   "durationInFrames": 60
+  },
+  "7323dc2e": {
+   "name": "Launch · UI tilt zoom",
+   "tracks": [
+    {
+     "id": "4c0e8b28-middle",
+     "kind": "visual",
+     "name": "Middle",
+     "clips": [
+      {
+       "id": "4c0e8b28-screen",
+       "from": 0,
+       "mask": null,
+       "path": null,
+       "blend": "normal",
+       "depth": 0,
+       "matte": "none",
+       "props": {
+        "x": 0.5,
+        "y": 0.5,
+        "fit": "cover",
+        "move": "none",
+        "zoom": 1,
+        "align": "center",
+        "scale": 1,
+        "width": 1,
+        "easing": "standard",
+        "focusX": 0.5,
+        "focusY": 0.55,
+        "height": 1,
+        "assetId": "849a4ce3-3f5c-48ff-9f8e-07293961dfdc",
+        "opacity": 1,
+        "rotation": 0
+       },
+       "space": "world",
+       "parent": null,
+       "effects": [],
+       "textPath": null,
+       "animators": [],
+       "component": "Image",
+       "keyframes": {
+        "zoom": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 1
+         },
+         {
+          "ease": [
+           0.83,
+           0,
+           0.17,
+           1
+          ],
+          "frame": 11,
+          "value": 1.5
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 30,
+          "value": 1.95
+         }
+        ],
+        "focusY": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 0.5
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 11,
+          "value": 0.58
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 30,
+          "value": 0.6
+         }
+        ]
+       },
+       "maskStack": [],
+       "transform": {
+        "rotateX": 18,
+        "perspective": 1600
+       },
+       "trimStart": 0,
+       "motionBlur": true,
+       "expressions": {},
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "parentOpacity": "inherit",
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "durationInFrames": 30
+      }
+     ]
+    },
+    {
+     "id": "4c0e8b28-back",
+     "kind": "visual",
+     "name": "Back",
+     "clips": [
+      {
+       "id": "4c0e8b28-bg",
+       "from": 0,
+       "mask": null,
+       "path": null,
+       "blend": "normal",
+       "depth": 0,
+       "matte": "none",
+       "props": {
+        "x": 0.5,
+        "y": 0.5,
+        "cap": "butt",
+        "gap": 0,
+        "dash": 0,
+        "fill": "#050505",
+        "join": "miter",
+        "move": "none",
+        "path": "",
+        "align": "center",
+        "fill2": "brand.primary",
+        "morph": 0,
+        "scale": 1,
+        "shape": "rect",
+        "sides": 6,
+        "width": 1,
+        "easing": "standard",
+        "height": 1,
+        "morphs": [],
+        "points": 5,
+        "stroke": "brand.text",
+        "opacity": 1,
+        "fillKind": "solid",
+        "fillRule": "nonzero",
+        "rotation": 0,
+        "modifiers": [],
+        "roundness": 0,
+        "morphStart": 0,
+        "strokeKind": "none",
+        "innerRadius": 0.5,
+        "strokeWidth": 0.01,
+        "gradientAngle": 90
+       },
+       "space": "world",
+       "parent": null,
+       "effects": [],
+       "textPath": null,
+       "animators": [],
+       "component": "Shape",
+       "keyframes": {},
+       "maskStack": [],
+       "transform": {},
+       "trimStart": 0,
+       "motionBlur": true,
+       "expressions": {},
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "parentOpacity": "inherit",
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "durationInFrames": 30
+      }
+     ]
+    }
+   ],
+   "template": {
+    "id": "builtin:launch-ui-tilt-zoom",
+    "keys": {
+     "screen": "screen_3",
+     "focus_x": "focus_x",
+     "focus_y": "focus_y"
+    },
+    "name": "Launch · UI tilt zoom"
+   },
+   "durationInFrames": 30
+  },
+  "7857479d": {
+   "name": "Launch · Speed-ramp zoom into the UI",
+   "tracks": [
+    {
+     "id": "1313fa13-middle",
+     "kind": "visual",
+     "name": "Middle",
+     "clips": [
+      {
+       "id": "1313fa13-page",
+       "from": 0,
+       "mask": null,
+       "path": null,
+       "blend": "normal",
+       "depth": 0,
+       "matte": "none",
+       "props": {
+        "x": 0.5,
+        "y": 0.5,
+        "fit": "cover",
+        "move": "none",
+        "zoom": 2.4,
+        "align": "center",
+        "scale": 1,
+        "width": 1,
+        "easing": "standard",
+        "focusX": 0.5,
+        "focusY": 0.22,
+        "height": 1,
+        "assetId": "56d20a39-8fee-49ca-a754-3e4c2a37291b",
+        "opacity": 1,
+        "rotation": 0
+       },
+       "space": "world",
+       "parent": null,
+       "effects": [],
+       "textPath": null,
+       "animators": [],
+       "component": "Image",
+       "keyframes": {
+        "zoom": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 2.4
+         },
+         {
+          "ease": [
+           0.83,
+           0,
+           0.17,
+           1
+          ],
+          "frame": 15,
+          "value": 1.02
+         },
+         {
+          "ease": [
+           0.83,
+           0,
+           0.17,
+           1
+          ],
+          "frame": 23,
+          "value": 1.04
+         },
+         {
+          "ease": [
+           0.83,
+           0,
+           0.17,
+           1
+          ],
+          "frame": 47,
+          "value": 2.2
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 60,
+          "value": 2.35
+         }
+        ],
+        "focusX": [
+         {
+          "ease": [
+           0.83,
+           0,
+           0.17,
+           1
+          ],
+          "frame": 0,
+          "value": 0.5
+         },
+         {
+          "ease": [
+           0.83,
+           0,
+           0.17,
+           1
+          ],
+          "frame": 23,
+          "value": 0.5
+         },
+         {
+          "ease": [
+           0.83,
+           0,
+           0.17,
+           1
+          ],
+          "frame": 47,
+          "value": 0.36
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 60,
+          "value": 0.34
+         }
+        ],
+        "focusY": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 0.22
+         },
+         {
+          "ease": [
+           0.83,
+           0,
+           0.17,
+           1
+          ],
+          "frame": 15,
+          "value": 0.45
+         },
+         {
+          "ease": [
+           0.83,
+           0,
+           0.17,
+           1
+          ],
+          "frame": 23,
+          "value": 0.45
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 47,
+          "value": 0.86
+         }
+        ]
+       },
+       "maskStack": [],
+       "transform": {},
+       "trimStart": 0,
+       "motionBlur": true,
+       "expressions": {},
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "parentOpacity": "inherit",
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "durationInFrames": 60
+      }
+     ]
+    },
+    {
+     "id": "1313fa13-back",
+     "kind": "visual",
+     "name": "Back",
+     "clips": [
+      {
+       "id": "1313fa13-bg",
+       "from": 0,
+       "mask": null,
+       "path": null,
+       "blend": "normal",
+       "depth": 0,
+       "matte": "none",
+       "props": {
+        "x": 0.5,
+        "y": 0.5,
+        "cap": "butt",
+        "gap": 0,
+        "dash": 0,
+        "fill": "#050505",
+        "join": "miter",
+        "move": "none",
+        "path": "",
+        "align": "center",
+        "fill2": "brand.primary",
+        "morph": 0,
+        "scale": 1,
+        "shape": "rect",
+        "sides": 6,
+        "width": 1,
+        "easing": "standard",
+        "height": 1,
+        "morphs": [],
+        "points": 5,
+        "stroke": "brand.text",
+        "opacity": 1,
+        "fillKind": "solid",
+        "fillRule": "nonzero",
+        "rotation": 0,
+        "modifiers": [],
+        "roundness": 0,
+        "morphStart": 0,
+        "strokeKind": "none",
+        "innerRadius": 0.5,
+        "strokeWidth": 0.01,
+        "gradientAngle": 90
+       },
+       "space": "world",
+       "parent": null,
+       "effects": [],
+       "textPath": null,
+       "animators": [],
+       "component": "Shape",
+       "keyframes": {},
+       "maskStack": [],
+       "transform": {},
+       "trimStart": 0,
+       "motionBlur": true,
+       "expressions": {},
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "parentOpacity": "inherit",
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "durationInFrames": 60
+      }
+     ]
+    }
+   ],
+   "template": {
+    "id": "builtin:launch-ui-speed-ramp",
+    "keys": {
+     "zoom": "zoom",
+     "screen": "screen_2"
+    },
+    "name": "Launch · Speed-ramp zoom into the UI"
+   },
+   "durationInFrames": 60
+  },
+  "7fa506e5": {
+   "name": "Launch · UI explosion (peak)",
+   "tracks": [
+    {
+     "id": "7f6f8e8b-front",
+     "kind": "visual",
+     "name": "Front",
+     "clips": [
+      {
+       "id": "7f6f8e8b-flash",
+       "from": 0,
+       "mask": null,
+       "path": null,
+       "blend": "normal",
+       "depth": 0,
+       "matte": "none",
+       "props": {
+        "x": 0.5,
+        "y": 0.5,
+        "cap": "butt",
+        "gap": 0,
+        "dash": 0,
+        "fill": "#ffffff",
+        "join": "miter",
+        "move": "none",
+        "path": "",
+        "align": "center",
+        "fill2": "brand.primary",
+        "morph": 0,
+        "scale": 1,
+        "shape": "rect",
+        "sides": 6,
+        "width": 1,
+        "easing": "standard",
+        "height": 1,
+        "morphs": [],
+        "points": 5,
+        "stroke": "brand.text",
+        "opacity": 1,
+        "fillKind": "solid",
+        "fillRule": "nonzero",
+        "rotation": 0,
+        "modifiers": [],
+        "roundness": 0,
+        "morphStart": 0,
+        "strokeKind": "none",
+        "innerRadius": 0.5,
+        "strokeWidth": 0.01,
+        "gradientAngle": 90
+       },
+       "space": "world",
+       "parent": null,
+       "effects": [],
+       "textPath": null,
+       "animators": [],
+       "component": "Shape",
+       "keyframes": {
+        "opacity": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 0.9
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 6,
+          "value": 0
+         }
+        ]
+       },
+       "maskStack": [],
+       "transform": {},
+       "trimStart": 0,
+       "motionBlur": true,
+       "expressions": {},
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "parentOpacity": "inherit",
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "durationInFrames": 6
+      },
+      {
+       "id": "7f6f8e8b-title",
+       "from": 15,
+       "mask": null,
+       "path": null,
+       "blend": "normal",
+       "depth": 0,
+       "matte": "none",
+       "props": {
+        "x": 0.5,
+        "y": 0.5,
+        "axes": "",
+        "font": "Inter",
+        "move": "none",
+        "size": 0.156,
+        "text": "Every site.\nUp to date.",
+        "align": "center",
+        "color": "#ffffff",
+        "scale": 1,
+        "slant": 0,
+        "width": 0.92,
+        "easing": "standard",
+        "height": 0.4,
+        "italic": false,
+        "weight": 800,
+        "leading": 1,
+        "opacity": 1,
+        "stretch": 100,
+        "rotation": 0,
+        "tracking": -0.05
+       },
+       "space": "world",
+       "parent": null,
+       "effects": [],
+       "textPath": null,
+       "animators": [],
+       "component": "Title",
+       "keyframes": {
+        "y": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 0.12
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 8,
+          "value": 0
+         }
+        ],
+        "blur": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 18
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 6,
+          "value": 0
+         }
+        ],
+        "scale": [
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 0,
+          "value": 0.96
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 60,
+          "value": 1.04
+         }
+        ]
+       },
+       "maskStack": [],
+       "transform": {},
+       "trimStart": 0,
+       "motionBlur": true,
+       "expressions": {},
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "parentOpacity": "inherit",
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "durationInFrames": 60
+      }
+     ]
+    },
+    {
+     "id": "7f6f8e8b-back",
+     "kind": "visual",
+     "name": "Back",
+     "clips": [
+      {
+       "id": "7f6f8e8b-grid",
+       "from": 0,
+       "mask": null,
+       "path": null,
+       "blend": "normal",
+       "depth": 0,
+       "matte": "none",
+       "props": {
+        "loop": 6,
+        "media": [
+         {
+          "kind": "image",
+          "assetId": "56d20a39-8fee-49ca-a754-3e4c2a37291b"
+         },
+         {
+          "kind": "image",
+          "assetId": "b8fb51cf-496e-4339-8a09-3c68120b9b49"
+         },
+         {
+          "kind": "image",
+          "assetId": "849a4ce3-3f5c-48ff-9f8e-07293961dfdc"
+         },
+         {
+          "kind": "image",
+          "assetId": "d8f41a56-0282-416c-a84e-281f3d28833d"
+         },
+         {
+          "kind": "image",
+          "assetId": "8627fc02-af6d-40e4-8121-4cc4d54536ac"
+         },
+         {
+          "kind": "image",
+          "assetId": "56d20a39-8fee-49ca-a754-3e4c2a37291b"
+         },
+         {
+          "kind": "image",
+          "assetId": "b8fb51cf-496e-4339-8a09-3c68120b9b49"
+         },
+         {
+          "kind": "image",
+          "assetId": "849a4ce3-3f5c-48ff-9f8e-07293961dfdc"
+         }
+        ],
+        "camera": "push-in",
+        "layout": "tilted-grid",
+        "background": "#050505",
+        "cameraParams": {},
+        "layoutParams": {
+         "rows": 3,
+         "tiltX": 28,
+         "tiltY": 8,
+         "tiltZ": -18,
+         "columns": 4,
+         "cardScale": 2.2,
+         "waveDepth": 2.6,
+         "waveSpeed": 1.4,
+         "scrollSpeed": 1.6
+        }
+       },
+       "space": "world",
+       "parent": null,
+       "effects": [],
+       "textPath": null,
+       "animators": [],
+       "component": "Composition",
+       "keyframes": {
+        "scale": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 4.2
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 24,
+          "value": 2.4
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 75,
+          "value": 2.15
+         }
+        ],
+        "opacity": [
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 0,
+          "value": 1
+         },
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 15,
+          "value": 1
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 24,
+          "value": 0.45
+         }
+        ],
+        "rotateZ": [
+         {
+          "ease": [
+           0.16,
+           1,
+           0.3,
+           1
+          ],
+          "frame": 0,
+          "value": 14
+         },
+         {
+          "ease": [
+           0.3333333333333333,
+           0.3333333333333333,
+           0.6666666666666666,
+           0.6666666666666666
+          ],
+          "frame": 24,
+          "value": 0
+         }
+        ]
+       },
+       "maskStack": [],
+       "transform": {},
+       "trimStart": 0,
+       "motionBlur": true,
+       "expressions": {},
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "parentOpacity": "inherit",
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "durationInFrames": 75
+      }
+     ]
+    }
+   ],
+   "template": {
+    "id": "builtin:launch-ui-explode",
+    "keys": {
+     "media": "media",
+     "title": "title"
+    },
+    "name": "Launch · UI explosion (peak)"
+   },
+   "durationInFrames": 75
+  }
+ },
+ "fonts": [
+  {
+   "axes": [],
+   "family": "Inter",
+   "italic": false,
+   "source": "google",
+   "weights": [
+    500,
+    800
+   ],
+   "category": "sans"
+  }
+ ],
+ "width": 1920,
+ "assets": [],
+ "camera": null,
+ "fields": [
+  {
+   "key": "media",
+   "prop": "media",
+   "type": "media_list",
+   "label": "Captures",
+   "clipId": "7f6f8e8b-grid",
+   "default": []
+  },
+  {
+   "key": "title",
+   "prop": "text",
+   "type": "text",
+   "label": "Claim",
+   "clipId": "7f6f8e8b-title",
+   "default": "Turn clicks\ninto revenue."
+  },
+  {
+   "key": "word_1",
+   "prop": "text",
+   "type": "text",
+   "label": "Word 1",
+   "clipId": "c583eb1e-word_1",
+   "default": "Turn"
+  },
+  {
+   "key": "word_2",
+   "prop": "text",
+   "type": "text",
+   "label": "Word 2",
+   "clipId": "c583eb1e-word_2",
+   "default": "clicks"
+  },
+  {
+   "key": "word_3",
+   "prop": "text",
+   "type": "text",
+   "label": "Word 3",
+   "clipId": "c583eb1e-word_3",
+   "default": "into"
+  },
+  {
+   "key": "word_4",
+   "prop": "text",
+   "type": "text",
+   "label": "Word 4",
+   "clipId": "c583eb1e-word_4",
+   "default": "revenue."
+  },
+  {
+   "key": "accent",
+   "prop": "color",
+   "type": "color",
+   "label": "Last word colour",
+   "clipId": "c583eb1e-word_4",
+   "default": "brand.accent"
+  },
+  {
+   "key": "logo",
+   "prop": "assetId",
+   "type": "asset",
+   "label": "Original logo (SVG or PNG)",
+   "aspect": 1,
+   "clipId": "8d3dc9f8-logo",
+   "default": null
+  },
+  {
+   "key": "url",
+   "prop": "text",
+   "type": "text",
+   "label": "Address",
+   "clipId": "8d3dc9f8-url",
+   "default": "example.com"
+  },
+  {
+   "key": "claim",
+   "prop": "text",
+   "type": "text",
+   "label": "Claim",
+   "clipId": "8d3dc9f8-claim",
+   "default": "THE CLAIM IN SMALL CAPS"
+  },
+  {
+   "key": "accent_2",
+   "prop": "stroke",
+   "type": "color",
+   "label": "Shockwave colour",
+   "clipId": "8d3dc9f8-ring",
+   "default": "brand.accent"
+  },
+  {
+   "key": "shot_1",
+   "prop": "assetId",
+   "type": "asset",
+   "label": "Shot 1",
+   "aspect": 1.78,
+   "clipId": "45f4e576-shot_1",
+   "default": null
+  },
+  {
+   "key": "shot_2",
+   "prop": "assetId",
+   "type": "asset",
+   "label": "Shot 2",
+   "aspect": 1.78,
+   "clipId": "45f4e576-shot_2",
+   "default": null
+  },
+  {
+   "key": "shot_3",
+   "prop": "assetId",
+   "type": "asset",
+   "label": "Shot 3",
+   "aspect": 1.78,
+   "clipId": "45f4e576-shot_3",
+   "default": null
+  },
+  {
+   "key": "shot_4",
+   "prop": "assetId",
+   "type": "asset",
+   "label": "Shot 4",
+   "aspect": 1.78,
+   "clipId": "45f4e576-shot_4",
+   "default": null
+  },
+  {
+   "key": "shot_5",
+   "prop": "assetId",
+   "type": "asset",
+   "label": "Shot 5",
+   "aspect": 1.78,
+   "clipId": "45f4e576-shot_5",
+   "default": null
+  },
+  {
+   "key": "shot_6",
+   "prop": "assetId",
+   "type": "asset",
+   "label": "Shot 6",
+   "aspect": 1.78,
+   "clipId": "45f4e576-shot_6",
+   "default": null
+  },
+  {
+   "key": "shot_7",
+   "prop": "assetId",
+   "type": "asset",
+   "label": "Shot 7",
+   "aspect": 1.78,
+   "clipId": "45f4e576-shot_7",
+   "default": null
+  },
+  {
+   "key": "shot_8",
+   "prop": "assetId",
+   "type": "asset",
+   "label": "Shot 8",
+   "aspect": 1.78,
+   "clipId": "45f4e576-shot_8",
+   "default": null
+  },
+  {
+   "key": "claim_1",
+   "prop": "text",
+   "type": "text",
+   "label": "Claim 1",
+   "clipId": "45f4e576-claim_1",
+   "default": "Links."
+  },
+  {
+   "key": "claim_2",
+   "prop": "text",
+   "type": "text",
+   "label": "Claim 2",
+   "clipId": "45f4e576-claim_2",
+   "default": "Analytics."
+  },
+  {
+   "key": "claim_3",
+   "prop": "text",
+   "type": "text",
+   "label": "Claim 3",
+   "clipId": "45f4e576-claim_3",
+   "default": "Affiliates."
+  },
+  {
+   "key": "claim_4",
+   "prop": "text",
+   "type": "text",
+   "label": "Claim 4",
+   "clipId": "45f4e576-claim_4",
+   "default": "One place."
+  },
+  {
+   "key": "accent_3",
+   "prop": "color",
+   "type": "color",
+   "label": "Last claim colour",
+   "clipId": "45f4e576-claim_4",
+   "default": "brand.accent"
+  },
+  {
+   "key": "screen",
+   "prop": "screen",
+   "type": "asset",
+   "label": "Screen (desktop capture)",
+   "aspect": 2.84,
+   "clipId": "e99b442d-device",
+   "default": null
+  },
+  {
+   "key": "line",
+   "prop": "text",
+   "type": "text",
+   "label": "Line behind",
+   "clipId": "e99b442d-line",
+   "default": "Every click."
+  },
+  {
+   "key": "device",
+   "prop": "device",
+   "type": "select",
+   "label": "Device",
+   "clipId": "e99b442d-device",
+   "default": "laptop-pro",
+   "options": [
+    "laptop-pro",
+    "laptop-air",
+    "monitor",
+    "browser"
+   ]
+  },
+  {
+   "key": "screen_2",
+   "prop": "assetId",
+   "type": "asset",
+   "label": "Desktop capture",
+   "aspect": 1.78,
+   "clipId": "1313fa13-page",
+   "default": null
+  },
+  {
+   "key": "zoom",
+   "max": 4,
+   "min": 1,
+   "prop": "zoom",
+   "type": "number",
+   "label": "Start zoom",
+   "clipId": "1313fa13-page",
+   "default": 2.4
+  },
+  {
+   "key": "screen_3",
+   "prop": "assetId",
+   "type": "asset",
+   "label": "Capture of the feature",
+   "aspect": 1.78,
+   "clipId": "4c0e8b28-screen",
+   "default": null
+  },
+  {
+   "key": "focus_x",
+   "max": 1,
+   "min": 0,
+   "prop": "focusX",
+   "type": "number",
+   "label": "Focus X",
+   "clipId": "4c0e8b28-screen",
+   "default": 0.5
+  },
+  {
+   "key": "focus_y",
+   "max": 1,
+   "min": 0,
+   "prop": "focusY",
+   "type": "number",
+   "label": "Focus Y",
+   "clipId": "4c0e8b28-screen",
+   "default": 0.55
+  }
+ ],
+ "height": 1080,
+ "tracks": [
+  {
+   "id": "ad5a9abb",
+   "kind": "visual",
+   "name": "Launch · UI tilt zoom",
+   "clips": [
+    {
+     "id": "14724f4c",
+     "from": 180,
+     "mask": null,
+     "path": null,
+     "blend": "normal",
+     "depth": 0,
+     "matte": "none",
+     "props": {
+      "comp": "7323dc2e",
+      "hold": false,
+      "loop": false
+     },
+     "space": "world",
+     "parent": null,
+     "effects": [],
+     "textPath": null,
+     "animators": [],
+     "component": "Precomp",
+     "keyframes": {},
+     "maskStack": [],
+     "transform": {},
+     "trimStart": 0,
+     "motionBlur": true,
+     "expressions": {},
+     "transitionIn": {
+      "kind": "none",
+      "durationInFrames": 0
+     },
+     "parentOpacity": "inherit",
+     "transitionOut": {
+      "kind": "none",
+      "durationInFrames": 0
+     },
+     "durationInFrames": 30
+    }
+   ]
+  },
+  {
+   "id": "c85c3a91",
+   "kind": "visual",
+   "name": "Launch · Speed-ramp zoom into the UI",
+   "clips": [
+    {
+     "id": "0b8fb7d9",
+     "from": 60,
+     "mask": null,
+     "path": null,
+     "blend": "normal",
+     "depth": 0,
+     "matte": "none",
+     "props": {
+      "comp": "7857479d",
+      "hold": false,
+      "loop": false
+     },
+     "space": "world",
+     "parent": null,
+     "effects": [],
+     "textPath": null,
+     "animators": [],
+     "component": "Precomp",
+     "keyframes": {},
+     "maskStack": [],
+     "transform": {},
+     "trimStart": 0,
+     "motionBlur": true,
+     "expressions": {},
+     "transitionIn": {
+      "kind": "none",
+      "durationInFrames": 0
+     },
+     "parentOpacity": "inherit",
+     "transitionOut": {
+      "kind": "none",
+      "durationInFrames": 0
+     },
+     "durationInFrames": 60
+    }
+   ]
+  },
+  {
+   "id": "99c581ad",
+   "kind": "visual",
+   "name": "Launch · Device fly-in",
+   "clips": [
+    {
+     "id": "f4a927e5",
+     "from": 120,
+     "mask": null,
+     "path": null,
+     "blend": "normal",
+     "depth": 0,
+     "matte": "none",
+     "props": {
+      "comp": "1a6309e9",
+      "hold": false,
+      "loop": false
+     },
+     "space": "world",
+     "parent": null,
+     "effects": [],
+     "textPath": null,
+     "animators": [],
+     "component": "Precomp",
+     "keyframes": {},
+     "maskStack": [],
+     "transform": {},
+     "trimStart": 0,
+     "motionBlur": true,
+     "expressions": {},
+     "transitionIn": {
+      "kind": "none",
+      "durationInFrames": 0
+     },
+     "parentOpacity": "inherit",
+     "transitionOut": {
+      "kind": "none",
+      "durationInFrames": 0
+     },
+     "durationInFrames": 60
+    }
+   ]
+  },
+  {
+   "id": "17c5230c",
+   "kind": "visual",
+   "name": "Launch · Beat montage",
+   "clips": [
+    {
+     "id": "468b9007",
+     "from": 210,
+     "mask": null,
+     "path": null,
+     "blend": "normal",
+     "depth": 0,
+     "matte": "none",
+     "props": {
+      "comp": "719c079e",
+      "hold": false,
+      "loop": false
+     },
+     "space": "world",
+     "parent": null,
+     "effects": [],
+     "textPath": null,
+     "animators": [],
+     "component": "Precomp",
+     "keyframes": {},
+     "maskStack": [],
+     "transform": {},
+     "trimStart": 0,
+     "motionBlur": true,
+     "expressions": {},
+     "transitionIn": {
+      "kind": "none",
+      "durationInFrames": 0
+     },
+     "parentOpacity": "inherit",
+     "transitionOut": {
+      "kind": "none",
+      "durationInFrames": 0
+     },
+     "durationInFrames": 60
+    }
+   ]
+  },
+  {
+   "id": "80a153bd",
+   "kind": "visual",
+   "name": "Launch · Logo build",
+   "clips": [
+    {
+     "id": "3481293a",
+     "from": 345,
+     "mask": null,
+     "path": null,
+     "blend": "normal",
+     "depth": 0,
+     "matte": "none",
+     "props": {
+      "comp": "347aa400",
+      "hold": false,
+      "loop": false
+     },
+     "space": "world",
+     "parent": null,
+     "effects": [],
+     "textPath": null,
+     "animators": [],
+     "component": "Precomp",
+     "keyframes": {},
+     "maskStack": [],
+     "transform": {},
+     "trimStart": 0,
+     "motionBlur": true,
+     "expressions": {},
+     "transitionIn": {
+      "kind": "none",
+      "durationInFrames": 0
+     },
+     "parentOpacity": "inherit",
+     "transitionOut": {
+      "kind": "none",
+      "durationInFrames": 0
+     },
+     "durationInFrames": 90
+    }
+   ]
+  },
+  {
+   "id": "36852671",
+   "kind": "visual",
+   "name": "Launch · Word burst",
+   "clips": [
+    {
+     "id": "6e818b43",
+     "from": 0,
+     "mask": null,
+     "path": null,
+     "blend": "normal",
+     "depth": 0,
+     "matte": "none",
+     "props": {
+      "comp": "36309012",
+      "hold": false,
+      "loop": false
+     },
+     "space": "world",
+     "parent": null,
+     "effects": [],
+     "textPath": null,
+     "animators": [],
+     "component": "Precomp",
+     "keyframes": {},
+     "maskStack": [],
+     "transform": {},
+     "trimStart": 0,
+     "motionBlur": true,
+     "expressions": {},
+     "transitionIn": {
+      "kind": "none",
+      "durationInFrames": 0
+     },
+     "parentOpacity": "inherit",
+     "transitionOut": {
+      "kind": "none",
+      "durationInFrames": 0
+     },
+     "durationInFrames": 60
+    }
+   ]
+  },
+  {
+   "id": "f8fa9ea2",
+   "kind": "visual",
+   "name": "Launch · UI explosion (peak)",
+   "clips": [
+    {
+     "id": "16759881",
+     "from": 270,
+     "mask": null,
+     "path": null,
+     "blend": "normal",
+     "depth": 0,
+     "matte": "none",
+     "props": {
+      "comp": "7fa506e5",
+      "hold": false,
+      "loop": false
+     },
+     "space": "world",
+     "parent": null,
+     "effects": [],
+     "textPath": null,
+     "animators": [],
+     "component": "Precomp",
+     "keyframes": {},
+     "maskStack": [],
+     "transform": {},
+     "trimStart": 0,
+     "motionBlur": true,
+     "expressions": {},
+     "transitionIn": {
+      "kind": "none",
+      "durationInFrames": 0
+     },
+     "parentOpacity": "inherit",
+     "transitionOut": {
+      "kind": "none",
+      "durationInFrames": 0
+     },
+     "durationInFrames": 75
+    }
+   ]
+  },
+  {
+   "id": "v1",
+   "kind": "visual",
+   "name": "Video 1",
+   "clips": []
+  },
+  {
+   "id": "a1",
+   "kind": "audio",
+   "name": "Audio 1",
+   "clips": []
+  }
+ ],
+ "version": 5,
+ "background": "brand",
+ "components": {},
+ "motionBlur": {
+  "enabled": true,
+  "samples": 6,
+  "shutterAngle": 180,
+  "shutterPhase": -90
+ },
+ "durationInFrames": 435
+}
