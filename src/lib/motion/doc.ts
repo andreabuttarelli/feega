@@ -20,6 +20,7 @@ import { textPathSchema } from './text-path/model';
 import { DEFAULT_MOTION_BLUR, motionBlurSchema } from './motion-blur';
 import { interactiveSchema } from './interactive/schema';
 import { fieldsSchema } from './template/field-model';
+import { scriptSchema } from './script';
 import { physicsSchema } from './physics/model';
 import { MOTION_STYLES } from './style-model';
 
@@ -155,7 +156,8 @@ export const motionDocSchema = z
     markers: z.array(markerSchema).max(MAX_MARKERS).optional(),
     workArea: z.object({ from: z.number().int().min(0), to: z.number().int().min(1) }).nullable().optional(),
     interactive: interactiveSchema.optional(),
-    style: z.enum(MOTION_STYLES).optional()
+    style: z.enum(MOTION_STYLES).optional(),
+    script: scriptSchema.optional()
   })
   .refine((d) => Math.min(d.width, d.height) <= MAX_SHORT_SIDE || (d.width === d.height && d.width <= LARGE_SQUARE), 'resolution above 1080p (a 1440 square is the one exception)')
   .refine((d) => d.durationInFrames <= maxFrames(d.fps), { message: `the video can be at most ${MAX_SECONDS} seconds`, path: ['durationInFrames'] });

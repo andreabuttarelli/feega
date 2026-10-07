@@ -13,10 +13,11 @@ import { safeFetchBytes, safeFetchUrl } from '$lib/server/tool-guard';
 import { probeImageDimensions } from '$lib/server/brand-media';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
 import { AccentSource, pickAccent, type Accent } from '$lib/motion/accent';
+import { PageRole, linksWorthReading, pageOf, type SitePage } from './site-copy';
 
 export const PAGE_MAX_BYTES = 2_000_000;
 const PAGE_TIMEOUT_MS = 10_000;
-const SITE_DEADLINE_MS = 30_000;
+const SITE_DEADLINE_MS = 40_000;
 const LOGO_SVG_MAX_BYTES = 500_000;
 const IMAGE_MAX_BYTES = 8_000_000;
 const IMAGE_TIMEOUT_MS = 6_000;
@@ -60,6 +61,7 @@ export type SiteBrief = {
   images: SiteImage[];
   products: SiteProduct[];
   socials: { platform: string; url: string }[];
+  pages: SitePage[];
 };
 export type SiteRead = { ok: true; site: SiteBrief } | { ok: false; error: string };
 
@@ -190,6 +192,14 @@ async function productsOf(html: string, base: string): Promise<StoreProduct[]> {
   return (await products.catch(() => [])).slice(0, PRODUCTS_MAX);
 }
 
+async function morePages(html: string, base: string): Promise<SitePage[]> {
+  const pages = linksWorthReading(html, base).map(async (url) => {
+    const page = await safeFetchUrl(url, { maxBytes: PAGE_MAX_BYTES, timeoutMs: PAGE_TIMEOUT_MS }).catch(() => null);
+    return page?.ok ? [pageOf(page.url, page.body, PageRole.Inner)] : [];
+  });
+  return (await Promise.all(pages)).flat();
+}
+
 async function read(input: string): Promise<SiteRead> {
   const page = await safeFetchUrl(input, { maxBytes: PAGE_MAX_BYTES, timeoutMs: PAGE_TIMEOUT_MS });
   if (!page.ok) {
@@ -207,11 +217,12 @@ async function read(input: string): Promise<SiteRead> {
   const logoLike = new Set(logos.map((l) => l.url));
   const ogImage = logos.find((l) => l.source === 'og-image')?.url;
 
-  const [products, fromLogo, fromFavicon, css] = await Promise.all([
+  const [products, fromLogo, fromFavicon, css, pages] = await Promise.all([
     productsOf(html, base),
     logoColours(logos.find((l) => l.source !== 'og-image')),
     logoColours(logos.find((l) => l.source === 'favicon' || l.source === 'apple-touch-icon')),
-    linkedCss(html, base)
+    linkedCss(html, base),
+    morePages(html, base)
   ]);
   const candidates = [
     ...(ogImage ? [{ url: ogImage, role: ImageRole.Og }] : []),
@@ -245,7 +256,8 @@ async function read(input: string): Promise<SiteRead> {
       fonts: fontsOf([...metadata.fonts, ...extractFonts(`<style>${css}</style>`)]),
       images,
       products: products.map((p) => ({ name: p.name, price: p.pricing ?? null, url: p.url ?? null, image: p.images?.[0] ?? null })),
-      socials: extractSocialHandles(html).map((s) => ({ platform: s.platform, url: s.url }))
+      socials: extractSocialHandles(html).map((s) => ({ platform: s.platform, url: s.url })),
+      pages: [pageOf(base, html), ...pages]
     }
   };
 }

@@ -114,6 +114,23 @@ describe('readSite: what a trailer needs from a public page', () => {
     expect(site.socials).toEqual([{ platform: 'instagram', url: 'https://www.instagram.com/verde' }]);
   });
 
+  it('reads the pages a story needs beyond the home: pricing and how it works, with their sections', async () => {
+    serves({
+      [SITE]: { type: 'text/html', body: '<html><title>Verde</title><h1>Shoes that walk lighter</h1><p>Wool sneakers.</p><a href="/pricing">Pricing</a><a href="/how-it-works">How it works</a><a href="/login">Log in</a></html>' },
+      'https://brand.example/pricing': { type: 'text/html', body: '<h2>Plans</h2><p>Classic pair $98, free returns for 30 days.</p>' },
+      'https://brand.example/how-it-works': { type: 'text/html', body: '<h2>How it works</h2><li>Pick your size.</li><li>Walk 30 days.</li>' }
+    });
+
+    const read = await readSite('brand.example');
+    if (!read.ok) {
+      throw new Error(read.error);
+    }
+
+    expect(read.site.pages.map((p) => p.url)).toEqual([SITE, 'https://brand.example/pricing', 'https://brand.example/how-it-works']);
+    expect(read.site.pages[1].sections[0]).toMatchObject({ kind: 'pricing', lines: ['Classic pair $98, free returns for 30 days.'] });
+    expect(read.site.pages[2].sections[0]).toMatchObject({ kind: 'steps', lines: ['Pick your size.', 'Walk 30 days.'] });
+  });
+
   it('refuses a host that resolves into a private network before any request', async () => {
     resolvesTo({ 'evil.example': '10.0.0.5' });
     const requested = serves({});
