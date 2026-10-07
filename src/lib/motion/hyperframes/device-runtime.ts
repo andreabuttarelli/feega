@@ -412,7 +412,7 @@ function placeFaces(c, s) {
       return [stage.left + ((p.x + 1) / 2) * stage.width, stage.top + ((1 - p.y) / 2) * stage.height, p.z];
     });
     const shown = faceShown(quad);
-    el.style.visibility = shown ? 'visible' : 'hidden';
+    el.style.visibility = shown ? '' : 'hidden';
     if (shown) el.style.transform = quadMatrix(f.w, f.h, quad);
   });
 }
