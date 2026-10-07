@@ -29,11 +29,22 @@ export function hitFrames(doc: MotionDoc, analyses: Record<string, AudioAnalysis
     .filter((f) => f >= clip.from && f < end);
 }
 
+export enum Division {
+  Beat = 'beat',
+  Half = 'half'
+}
+
+const GRID: Record<Division, (beats: readonly number[]) => number[]> = {
+  [Division.Beat]: (beats) => [...beats],
+  [Division.Half]: (beats) => beats.flatMap((b, i) => (i + 1 < beats.length ? [b, Math.round((b + beats[i + 1]) / 2)] : [b]))
+};
+
 function nearest(beats: readonly number[], frame: number): number {
   return beats.reduce((best, b) => (Math.abs(b - frame) < Math.abs(best - frame) ? b : best), beats[0]);
 }
 
-export function cutToBeat(doc: MotionDoc, clipIds: readonly string[], beats: readonly number[]): OpResult {
+export function cutToBeat(doc: MotionDoc, clipIds: readonly string[], hits: readonly number[], division = Division.Beat): OpResult {
+  const beats = GRID[division](hits);
   if (!beats.length) {
     return { ok: false, error: 'no beats to cut to: add a music clip with an analysed beat' };
   }

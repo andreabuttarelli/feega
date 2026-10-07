@@ -20,6 +20,13 @@ function setup() {
 }
 
 describe('motion agent shape tools', () => {
+  it('a stroke colour without a stroke kind draws a solid outline', async () => {
+    const { session, run } = setup();
+    await run('add_shape', { kind: 'ellipse', start: 0, props: { fill: 'transparent', stroke: '#3b82f6', strokeWidth: 10 } });
+
+    expect(findClip(session.doc, 'id1')!.clip.props.strokeKind).toBe('solid');
+  });
+
   it('draws a star, morphs it into a path, draws it on with trim paths and repeats it, all in the render', async () => {
     const { session, run } = setup();
     expect(await run('add_shape', { kind: 'star', start: 0, duration: 4, props: { fillKind: 'linear', fill: '#ff0000', fill2: '#0000ff', width: 576, height: 324 } })).toMatchObject({ ok: true, clip_id: 'id1' });

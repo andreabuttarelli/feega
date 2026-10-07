@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
 import { addClip, trimClip, ClipEdge, type OpResult } from './timeline';
 import { ANALYSIS_VERSION, type AudioAnalysis } from './audio-analysis';
-import { Hit, cutToBeat, hitFrames, markHits } from './beats';
+import { Division, Hit, cutToBeat, hitFrames, markHits } from './beats';
 import { MAX_MARKERS } from './doc';
 
 function must(r: OpResult): MotionDoc {
@@ -88,6 +88,20 @@ describe('cutToBeat', () => {
     const doc = must(cutToBeat(tiny, ['t'], hitFrames(tiny, analyses, Hit.Beats)));
 
     expect(span(doc, 't')).toEqual([60, 75]);
+  });
+
+  it('cuts on half beats when asked: a montage of short clips lands on every half beat', () => {
+    let doc = scene();
+    for (const [i, id] of ['h1', 'h2', 'h3'].entries()) {
+      doc = must(addClip(doc, { component: 'Shape', from: 60 + i * 8, durationInFrames: 8 }, id));
+    }
+    const halved = must(cutToBeat(doc, ['h1', 'h2', 'h3'], hitFrames(doc, analyses, Hit.Beats), Division.Half));
+
+    expect([span(halved, 'h1'), span(halved, 'h2'), span(halved, 'h3')]).toEqual([
+      [60, 68],
+      [68, 75],
+      [75, 83]
+    ]);
   });
 
   it('needs beats and clips', () => {
