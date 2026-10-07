@@ -136,7 +136,8 @@ credits.
 `apply_effects` renders an `effects` node's stack (pixelate, duotone, glitch, …) onto its upstream
 image, the same render `EffectsEditor` does in the browser. Set the stack with `update_row` on
 `nodes.data.effects` first — `describe_node_types({ type: 'effects' })` lists every effect and its
-params — then call `apply_effects`. Spends no credits.
+params — then call `apply_effects`. Spends no credits. A `shape-cutout` A/B pair is two `effects`
+nodes on the same image, same params and seed, `side: shapes` on one and `side: holes` on the other.
 
 ## Loop a node over many combinations
 
