@@ -99,7 +99,7 @@ const PRESS = { stiffness: 1400, damping: 75 };
 const UI = { stiffness: 320, damping: 30 };
 const springTo = (t, at, spring) => SPRING.step(spring || UI, t - at / speed);
 const tap = (t, at) => SPRING.sumSteps(0, [{ at: at / speed, delta: 1, spring: PRESS }, { at: (at + 0.09) / speed, delta: -1, spring: PRESS }], t);
-const TIP = [7, 3];
+const TIP = [40 * 4 / 24, 40 * 2 / 24];
 const aim = (el, host) => {
   let x = el.offsetWidth / 2;
   let y = el.offsetHeight / 2;
@@ -169,16 +169,22 @@ cursor.innerHTML = '<svg viewBox="0 0 24 24" width="40" height="40"><path d="M4 
 const TYPE_AT = 0.2;
 const TYPE_LEN = Math.min(1.6, duration * 0.35);
 const CLICK = TYPE_AT + TYPE_LEN + 0.45;
+const CURSOR_TRAVEL = 0.6;
+const CURSOR_FROM = { x: 170, y: 230 };
+const CURSOR_STIFFNESS = 13;
+const settle = (s) => 1 - (1 + CURSOR_STIFFNESS * s) * Math.exp(-CURSOR_STIFFNESS * s);
+cursor.style.transformOrigin = TIP[0] + 'px ' + TIP[1] + 'px';
 drive((t) => {
   const typing = span(t, TYPE_AT, TYPE_LEN);
   typed.textContent = url.slice(0, Math.round(url.length * typing));
   caret.style.opacity = typing < 1 || Math.floor(t * 2.5) % 2 === 0 ? '1' : '0';
-  const travel = inOut(span(t, CLICK - 0.55, 0.5));
-  const [bx, by] = aim(btn, box);
-  cursor.style.left = (1080 + (bx - 1080) * travel) + 'px';
-  cursor.style.top = (314 + (by - 314) * travel) + 'px';
-  cursor.style.opacity = String(span(t, CLICK - 0.7, 0.15));
+  const [ax, ay] = aim(btn, box);
+  const travel = settle(Math.max(0, t - (CLICK - CURSOR_TRAVEL) / speed) * speed);
   const press = tap(t, CLICK);
+  cursor.style.left = (ax + CURSOR_FROM.x * (1 - travel)) + 'px';
+  cursor.style.top = (ay + CURSOR_FROM.y * (1 - travel)) + 'px';
+  cursor.style.opacity = String(span(t, CLICK - CURSOR_TRAVEL - 0.1, 0.15));
+  cursor.style.transform = 'scale(' + (1 - 0.14 * press) + ')';
   btn.style.transform = 'scale(' + (1 - 0.06 * press) + ')';
   const shown = out(span(t, CLICK + 0.1, 0.4));
   result.style.opacity = String(shown);
