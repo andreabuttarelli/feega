@@ -3,7 +3,12 @@ export const FARM_JOB_DIR = '/vercel/sandbox/job';
 
 export type FarmFile = { path: string; content: Buffer };
 export type FarmRun = { exitCode: number; output: string };
-export type WorkerSpec = { allowHosts: string[]; timeoutMs: number; vcpus: number };
+export enum Network {
+  Listed = 'listed',
+  Open = 'open'
+}
+
+export type WorkerSpec = { allowHosts: string[]; timeoutMs: number; vcpus: number; network?: Network };
 export type LiveWorker = { name: string; createdAt: number };
 import type { WorkerUsage } from '$lib/motion/render-quote';
 export type { WorkerUsage };

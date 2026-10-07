@@ -1,6 +1,6 @@
 import { Sandbox } from '@vercel/sandbox';
 import { HYPERFRAMES_VERSION } from '$lib/motion/hyperframes/compose';
-import { FARM_RUNTIME_DIR, type FarmWorker, type LiveWorker, type RenderFarm, type WorkerUsage, type WorkerSpec } from './render-farm';
+import { FARM_RUNTIME_DIR, Network, type FarmWorker, type LiveWorker, type RenderFarm, type WorkerUsage, type WorkerSpec } from './render-farm';
 
 export type FarmAccess = { token?: string; teamId?: string; projectId?: string };
 
@@ -83,7 +83,7 @@ export function vercelFarm(access: FarmAccess, deployment = 'local'): RenderFarm
         name: `${prefix}${crypto.randomUUID()}`,
         resources: { vcpus: spec.vcpus },
         timeout: spec.timeoutMs,
-        networkPolicy: { allow: spec.allowHosts },
+        networkPolicy: spec.network === Network.Open ? 'allow-all' : { allow: spec.allowHosts },
         persistent: false,
         env: {}
       });

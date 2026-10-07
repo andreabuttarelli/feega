@@ -107,7 +107,11 @@ export type MotionToolDeps = {
   site?: (url: string) => Promise<SourceRead>;
   brand?: (name?: string) => Promise<SourceRead>;
   importAsset?: (url: string, label?: string) => Promise<AssetImport>;
+  capture?: (url: string) => Promise<SiteCapture>;
+  music?: (input: { text: string; seconds: number }) => Promise<Voiceover>;
 };
+
+export type SiteCapture = { ok: true; shots: Extract<AssetImport, { ok: true }>[] } | { ok: false; error: string };
 
 export type SourceRead = { ok: true } & Record<string, unknown> | { ok: false; error: string };
 
@@ -1360,6 +1364,34 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const audioAssets = deps.assets.filter((a) => a.kind === AssetKind.Audio).length;
         const quality = [...docProblems(session.doc, { audioAssets }), ...frameProblems(stats)].map((p) => p.detail);
         return { ok: true, times: frames.map((f) => f.time), quality, note: quality.length ? 'The quality gate found the problems in quality: fix each one, then look again. The frames follow as images in the next message.' : 'The frames follow as images in the next message.' };
+      }
+    }),
+
+    capture_site: tool({
+      description: 'Spends credits and takes about 2–3 minutes. Opens a public website in a real browser at 1920×1080 and imports crisp screenshots of it (the top of the page first, then each scrolled section) as project pictures: use them for ui-closeup, ui-window and device scenes instead of small og:images.',
+      inputSchema: z.object({ url: z.string().url().max(2000).describe('the page, e.g. https://dub.co') }),
+      execute: async (input) => {
+        const captured = deps.capture ? await deps.capture(input.url) : UNREADABLE('capturing sites');
+        if (!captured.ok) {
+          return captured;
+        }
+        deps.assets.push(...captured.shots.map((s) => s.asset));
+        return { ok: true, screenshots: captured.shots.map((s) => ({ asset_id: s.asset.id, width: s.width, height: s.height })) };
+      }
+    }),
+
+    generate_music: tool({
+      description: 'Spends credits. Generate an instrumental music bed from a prompt (genre, mood, tempo, no vocals) and place it on an Audio clip at a time in seconds. Then analyze_audio and cut_to_beat so the scenes land on its beats.',
+      inputSchema: z.object({ prompt: z.string().min(1).max(1000), seconds: z.number().min(3).max(120), start: z.number().min(0).default(0), ...PLACED }),
+      execute: async (input) => {
+        const made = deps.music ? await deps.music({ text: input.prompt, seconds: input.seconds }) : UNREADABLE('making music');
+        if (!made.ok) {
+          return made;
+        }
+        deps.assets.push({ id: made.assetId, kind: AssetKind.Audio, label: 'music', previewUrl: '', url: made.url });
+        const id = deps.newId();
+        const result = addClip(session.doc, { component: 'Audio', from: frames(input.start), durationInFrames: Math.max(1, frames(made.seconds)), trackId: input.track_id, props: { assetId: made.assetId } }, id);
+        return created(apply(registered(result, made.assetId), 'added music'), id);
       }
     }),
 

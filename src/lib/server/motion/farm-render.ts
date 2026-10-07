@@ -5,8 +5,9 @@ import { CHUNK_VCPUS, RenderClass, WHOLE_VCPUS } from '$lib/motion/render-quote'
 import { FONT_CSS_ORIGIN, FONT_FILE_ORIGIN } from '$lib/motion/hyperframes/csp';
 import { ExportFormat, FORMAT, Master, Quality } from '$lib/motion/export-formats';
 import { assembleArgs, audioMixArgs, concatList, zipArgs } from './render-commands';
-import { FARM_JOB_DIR, FARM_RUNTIME_DIR, type FarmWorker, type RenderFarm } from './render-farm';
+import { FARM_JOB_DIR, FARM_RUNTIME_DIR, Network, type FarmWorker, type RenderFarm } from './render-farm';
 import { stripSteps, stripVideos } from './video-strips';
+import type { Frame } from './frames';
 
 export type FarmJob = { html: string; width: number; height: number; fps: number; totalFrames: number; audio: AudioEntry[]; allowHosts: string[]; format: ExportFormat; quality: Quality; motionBlur: Shutter | null; cost?: CostSpan[]; renderClass?: RenderClass };
 
@@ -21,7 +22,9 @@ export enum RenderRoute {
 
 export enum FarmTask {
   Piece = 'piece',
-  Assembly = 'assembly'
+  Assembly = 'assembly',
+  Stills = 'stills',
+  Capture = 'capture'
 }
 
 export enum TaskState {
@@ -89,6 +92,17 @@ const STEPS_SCRIPT = `${FARM_RUNTIME_DIR}/steps.mjs`;
 const MIX = `${FARM_JOB_DIR}/mix.m4a`;
 const LIST = `${FARM_JOB_DIR}/chunks.txt`;
 const FRAMES_DIR = `${FARM_JOB_DIR}/frames`;
+const STILLS = `${FARM_JOB_DIR}/stills.json`;
+const STILL_WIDTH = 960;
+const STILL_QUALITY = 4;
+const STILLS_TIMEOUT_MS = 12 * MINUTE_MS;
+const stillPath = (i: number) => `${FARM_JOB_DIR}/still-${i}.jpg`;
+const CAPTURE_DIR = `${FARM_JOB_DIR}/capture`;
+const CAPTURED = `${FARM_JOB_DIR}/capture.json`;
+const CAPTURE_SHOTS = 6;
+const CAPTURE_VCPUS = 2;
+const CAPTURE_TIMEOUT_MS = 6 * MINUTE_MS;
+const HTTPS = 'https:';
 
 const stepsPath = (task: FarmTask) => `${FARM_JOB_DIR}/steps-${task}.json`;
 const resultPath = (task: FarmTask) => `${FARM_JOB_DIR}/result-${task}.json`;
@@ -337,4 +351,86 @@ export async function checkTask(farm: RenderFarm, name: string, task: FarmTask):
 export async function stopWorker(farm: RenderFarm, name: string): Promise<void> {
   const worker = await farm.attach(name);
   await worker?.stop();
+}
+
+function stillSteps(job: FarmJob, times: number[]): Step[] {
+  const video = chunkPath(job, { index: 0, size: job.totalFrames });
+  const cuts = times.map((t, i): Step => ({ what: `still ${t}s`, cmd: 'ffmpeg', args: ['-y', '-loglevel', 'error', '-ss', String(t), '-i', video, '-frames:v', '1', '-vf', `scale=${STILL_WIDTH}:-2`, '-q:v', String(STILL_QUALITY), stillPath(i)] }));
+  const pack = `const fs = require('node:fs'); fs.writeFileSync('${STILLS}', JSON.stringify(${JSON.stringify(times.map((_, i) => stillPath(i)))}.map((p) => fs.readFileSync(p).toString('base64'))));`;
+  return [...cuts, { what: 'pack stills', cmd: 'node', args: ['-e', pack] }];
+}
+
+export async function launchStills(farm: RenderFarm, job: FarmJob, times: number[]): Promise<string> {
+  const plain: FarmJob = { ...job, motionBlur: null };
+  const hosts = [...new Set([...plain.allowHosts, ...RUNTIME_HOSTS])];
+  const worker = await farm.open({ allowHosts: hosts, timeoutMs: STILLS_TIMEOUT_MS, vcpus: WHOLE_VCPUS });
+  const whole = { index: 0, size: plain.totalFrames };
+  const spec = { ...chunkSpec(plain, whole), route: RenderRoute.Whole, config: { fps: plain.fps, quality: plain.quality, format: masterOf(plain).format, workers: WHOLE_CAPTURE_WORKERS } };
+
+  try {
+    await worker.write([
+      { path: `${PROJECT_DIR}/index.html`, content: Buffer.from(plain.html) },
+      { path: CHUNK_SCRIPT, content: Buffer.from(CHUNK_SOURCE) },
+      { path: SPEC, content: Buffer.from(JSON.stringify(spec)) }
+    ]);
+    await startSteps(worker, FarmTask.Stills, [{ what: 'render', cmd: 'node', args: [CHUNK_SCRIPT, SPEC] }, ...stillSteps(plain, times)]);
+  } catch (e) {
+    await worker.stop().catch(() => {});
+    throw e;
+  }
+  return worker.name;
+}
+
+export async function readStills(farm: RenderFarm, name: string, times: number[]): Promise<Frame[] | null> {
+  const worker = await farm.attach(name);
+  const packed = worker ? await worker.read(STILLS) : null;
+  if (!packed) {
+    return null;
+  }
+  const images = JSON.parse(packed.toString()) as string[];
+  return times.map((time, i) => ({ time, bytes: Buffer.from(images[i], 'base64') }));
+}
+
+const CAPTURE_JPEGS = `cd ${CAPTURE_DIR}/screenshots && ls scroll-*.png | sort | head -${CAPTURE_SHOTS} | while read f; do ffmpeg -y -loglevel error -i "$f" -q:v 2 "\${f%.png}.jpg"; done`;
+const CAPTURE_PACK = `const fs = require('node:fs'); const dir = '${CAPTURE_DIR}/screenshots'; const shots = fs.readdirSync(dir).filter((f) => /^scroll-\\d+\\.jpg$/.test(f)).sort(); fs.writeFileSync('${CAPTURED}', JSON.stringify(shots.map((name) => ({ name, data: fs.readFileSync(dir + '/' + name).toString('base64') }))));`;
+
+export type CaptureShot = { name: string; bytes: Buffer };
+
+export async function launchCapture(farm: RenderFarm, url: string): Promise<string> {
+  if (new URL(url).protocol !== HTTPS) {
+    throw new Error(`only a public https page can be captured: ${url}`);
+  }
+  const worker = await farm.open({ allowHosts: [], network: Network.Open, timeoutMs: CAPTURE_TIMEOUT_MS, vcpus: CAPTURE_VCPUS });
+  try {
+    await startSteps(worker, FarmTask.Capture, [
+      { what: 'capture', cmd: 'npx', args: ['hyperframes', 'capture', url, '-o', CAPTURE_DIR, '--json', '--skip-vision', '--skip-assets', '--max-screenshots', String(CAPTURE_SHOTS + 2)] },
+      { what: 'jpeg', cmd: 'bash', args: ['-c', CAPTURE_JPEGS] },
+      { what: 'pack capture', cmd: 'node', args: ['-e', CAPTURE_PACK] }
+    ]);
+  } catch (e) {
+    await worker.stop().catch(() => {});
+    throw e;
+  }
+  return worker.name;
+}
+
+export async function readCapture(farm: RenderFarm, name: string): Promise<CaptureShot[] | null> {
+  const worker = await farm.attach(name);
+  const packed = worker ? await worker.read(CAPTURED) : null;
+  if (!packed) {
+    return null;
+  }
+  return (JSON.parse(packed.toString()) as { name: string; data: string }[]).map((shot) => ({ name: shot.name, bytes: Buffer.from(shot.data, 'base64') }));
+}
+
+export async function awaitTask(farm: RenderFarm, name: string, task: FarmTask, timing: { timeoutMs: number; pollMs: number }): Promise<TaskCheck> {
+  const deadline = Date.now() + timing.timeoutMs;
+  while (Date.now() < deadline) {
+    const check = await checkTask(farm, name, task);
+    if (check.state !== TaskState.Running) {
+      return check;
+    }
+    await new Promise((resolve) => setTimeout(resolve, timing.pollMs));
+  }
+  return { state: TaskState.Failed, error: `${task} did not finish in ${Math.round(timing.timeoutMs / 1000)} s` };
 }

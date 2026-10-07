@@ -7,7 +7,8 @@ import { withOrgContext } from '$lib/server/ai-log';
 import { createMotionTools, type MotionSession, type MotionToolDeps } from '$lib/server/motion/motion-tools';
 import { templateLibrary } from '$lib/server/motion/templates';
 import { analyzeSounds, storageAnalysis } from '$lib/server/motion/audio-analysis';
-import { speakVoiceover } from '$lib/server/motion/voiceover';
+import { generateSound, Sound, speakVoiceover } from '$lib/server/motion/voiceover';
+import { farmCapture } from '$lib/server/motion/site-capture';
 import { brandSources } from '$lib/server/motion/brand-sources';
 import { frameStats } from '$lib/server/motion/frame-stats';
 import { SIGNED_URL_TTL_S } from '$lib/server/repos/asset-storage';
@@ -50,6 +51,8 @@ export function workspaceTools(scope: WorkspaceScope, input: WorkspaceInput): Re
     ...brandSources(db, { orgId, projectId: project.id, canvasId: record.canvasId, brandId: project.brandId }),
     analysis: async (assetId) => (await analyzeSounds(storageAnalysis(db), { orgId, projectId: project.id }, assets, [assetId]))[assetId] ?? null,
     voiceover: (voice) => withOrgContext(orgId, () => speakVoiceover(db, { orgId, projectId: project.id, nodeId: record.id, userId, actor }, voice)),
+    music: (input) => withOrgContext(orgId, () => generateSound(db, { orgId, projectId: project.id, nodeId: record.id, userId, actor }, Sound.Music, input)),
+    capture: farmCapture(db, motionRenderFarm(), { orgId, projectId: project.id, canvasId: record.canvasId, userId }),
     frames: input.frames,
     inspect: frameStats,
     check: input.check,
