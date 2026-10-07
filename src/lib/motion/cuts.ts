@@ -2,7 +2,7 @@ import { COMPONENTS, TrackKind } from './components';
 import type { MotionDoc } from './doc';
 import { UI_KIT } from './ui-kit/kit';
 import { settleTime } from './ui-kit/render';
-import { screenCompOf } from './device-screen';
+import { nestedComp } from './nested';
 
 export enum CutFault {
   MidAnimation = 'mid-animation',
@@ -42,13 +42,6 @@ function keyMoves(doc: MotionDoc, clip: Clip, cut: number): Moves {
 }
 
 type Reading = { settle: number; problems: CutProblem[] };
-
-const NESTED: Record<string, (clip: Clip) => string | null> = {
-  Precomp: (clip) => String(clip.props.comp ?? '') || null,
-  Device3D: (clip) => screenCompOf(clip)
-};
-
-const nestedComp = (clip: Clip) => NESTED[clip.component]?.(clip) ?? null;
 
 function readClip(doc: MotionDoc, clip: Clip, offset: number, seen: ReadonlySet<string>): Reading {
   if (!visual(clip)) {
