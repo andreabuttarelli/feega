@@ -50,6 +50,7 @@ export default defineConfig({
     fs: { allow: ['..', ...(nodeModulesReal ? [nodeModulesReal] : [])] },
     watch: { ignored: [AGENT_WORKTREES] }
   },
+  optimizeDeps: { include: ['@sentry/sveltekit'] },
   define: vercelAnalyticsDefine(process.env),
   plugins: [sentrySvelteKit({
     org: "021-6z",
