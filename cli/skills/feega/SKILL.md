@@ -134,7 +134,7 @@ credits.
 ## Apply image effects
 
 `list_effects` lists every effect (pixelate, duotone, glitch, shape-mosaic, shape-cutout, …) with
-its params. `apply_effects({ node_id, effects })` on an image node creates an `effects` node beside
+its params. `apply_effects` with `node_id` and `effects` on an image node creates an `effects` node beside
 it, wired to it, and renders the chain; on an `effects` node it replaces the stack (or re-renders
 it when `effects` is omitted). `make_effects_pair` turns a `shape-cutout` node into an A/B pair:
 the twin has the same shapes and seed, the other side. All free.
