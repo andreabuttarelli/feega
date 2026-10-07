@@ -306,6 +306,19 @@ function libraryCatalogue(doc: MotionDoc) {
   }));
 }
 
+function shownProblem(doc: MotionDoc, component: ComponentId, props: Record<string, unknown> = {}): string | null {
+  const owner = propsOwner(component);
+  const out = fieldsOf(component).flatMap((f) => {
+    const value = props[f.key];
+    if (typeof value !== 'number' || f.min === undefined || f.max === undefined || !unitOf(owner, f.key)) {
+      return [];
+    }
+    const [min, max] = [toShown(owner, f.key, f.min, doc), toShown(owner, f.key, f.max, doc)];
+    return value < min || value > max ? [`${f.key} ${value} is outside ${min}..${max} ${unitOf(owner, f.key)}`] : [];
+  });
+  return out.length ? `${component}: ${out.join('; ')}` : null;
+}
+
 const TIMING_KEYS = new Set(['start', 'from', 'duration', 'durationInFrames', 'end', 'length']);
 
 function explained(doc: MotionDoc, error: string): string {
@@ -471,6 +484,10 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         if (!assetKnown(input.props?.assetId)) {
           return { ok: false, error: 'unknown asset id: call list_assets' };
         }
+        const outside = shownProblem(session.doc, input.component, input.props);
+        if (outside) {
+          return { ok: false, error: outside };
+        }
         const id = deps.newId();
         const result = addClip(
           session.doc,
@@ -494,6 +511,11 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       execute: async (input) => {
         if (!assetKnown(input.props.assetId)) {
           return { ok: false, error: 'unknown asset id: call list_assets' };
+        }
+        const component = findClip(session.doc, input.clip_id)?.clip.component;
+        const outside = component ? shownProblem(session.doc, component, input.props) : null;
+        if (outside) {
+          return { ok: false, error: outside };
         }
         const result = setProps(session.doc, input.clip_id, storedRecord(propsOf(input.clip_id), input.props, session.doc));
         if (!result.ok) {
