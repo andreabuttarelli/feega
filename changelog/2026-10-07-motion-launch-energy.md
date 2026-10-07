@@ -6,7 +6,7 @@ dub.co v3 e v4 uscivano puliti e statici: l'utente non li comprerebbe.
 
 Ora la stessa riga (sempre l'unico posto) chiede il look di un film di lancio Apple/Linear/Vercel
 con energia alta: scene 1–2,5 s tagliate sul beat, musica sempre presente, tipografia cinetica
-(ingressi 0,3–0,8 s), ogni scena in movimento (push-in 12%, device 3D che girano fino a 30°,
+(ingressi 0,3–0,8 s), ogni scena in movimento (push-in fino a 8%, device 3D che volano e girano,
 camera), speed ramp, match cut, un picco wow a due terzi; vietati restano particelle, glow, testo
 che ruota, bounce, wipe e push, più di tre cose in movimento. Le scene della libreria restano quelle di main
 (testo che scatta in 0,3–0,5 s, immagini sempre in deriva). La giunzione `zoom` è ammessa come
