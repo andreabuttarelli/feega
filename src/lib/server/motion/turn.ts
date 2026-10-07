@@ -1,7 +1,8 @@
 import { styleOf } from '$lib/motion/style';
 import { createUIMessageStream, streamText, type ModelMessage, type UIMessageChunk } from 'ai';
 import type { Db } from '$lib/server/db/client';
-import { llmCodeModel, llmLanguageModel, llmVisionModel } from '$lib/server/llm';
+import { llmCodeModel, llmLanguageModel, llmStructured, llmVisionModel } from '$lib/server/llm';
+import { fetchImageBytes, uiReader } from '$lib/server/motion/ui-read';
 import { PromptCache } from '$lib/server/prompt-cache';
 import { reasoningProviderOptions } from '$lib/server/chat-model/catalogue';
 import { ensureGatewayModels, gatewayModel, gatewayRate } from '$lib/server/openrouter-models';
@@ -160,6 +161,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
       return awaitFrames(bucket, framesPrefix(frameScope, callId), times.length);
     },
     inspect: frameStats,
+    readUi: uiReader({ ask: (q) => withOrgContext(orgId, () => llmStructured({ ...q, model: llmVisionModel() ?? model, label: 'motion-recreate-ui' })), fetchBytes: fetchImageBytes }),
     check: async (callId, doc, name) => {
       BROWSER_DRAWS[browser]();
       const review = await screenModelInput(db, { profile: ModerationProfile.Standard, texts: docTexts(doc), scope: moderationScope });

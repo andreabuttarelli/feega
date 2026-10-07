@@ -30,7 +30,7 @@ import { MAX_FRAMES_PER_VIEW, MAX_VIEWS_PER_TURN, VIEW_FRAMES, type Frame } from
 import { blocking, docProblems, frameProblems, softPictures, type FrameStat, type Pixels, type QualityProblem } from '$lib/motion/direction';
 import { CheckState, MAX_CSS, MAX_HTML, MAX_JS, SOURCE_FILES, checkState, propsSchemaSchema, sourceHash, type CustomComponent } from '$lib/motion/custom/component';
 import { patchComponent, recordCheck, removeComponent, writeComponent } from '$lib/motion/custom/ops';
-import { UI_KINDS, UI_KIT } from '$lib/motion/ui-kit/kit';
+import { RECREATE_STATES, UI_KINDS, UI_KIT, recreatedStyle, recreatedUi, type UiStructure } from '$lib/motion/ui-kit/kit';
 import { STORY_BEATS, STORY_SHARE, markStory } from '$lib/motion/story';
 import { PATCH_COMPONENT, READ_COMPONENT, WRITE_COMPONENT } from './model-route';
 import { CAMERA, CAMERA_KEYS, CAMERA_LANE, SPACES, type Camera } from '$lib/motion/camera';
@@ -49,7 +49,7 @@ import { liveLanes } from '$lib/motion/interactive/spec';
 import { embedSnippet } from '$lib/motion/interactive/bundle';
 import { flattenComps } from '$lib/motion/precomp';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
-import { BuiltinFont, FONT_WEIGHTS, searchFonts } from '$lib/motion/fonts/model';
+import { BuiltinFont, FONT_WEIGHTS, fontRefProblem, searchFonts } from '$lib/motion/fonts/model';
 import { registerFont, removeFont, setFont } from '$lib/motion/fonts/ops';
 import { EFFECTS, EFFECT_KINDS } from '$lib/motion/effects/registry';
 import { addEffect, removeEffect, setEffect } from '$lib/motion/effects/ops';
@@ -115,7 +115,12 @@ export type MotionToolDeps = {
   brand?: (name?: string) => Promise<SourceRead>;
   importAsset?: (url: string, label?: string) => Promise<AssetImport>;
   capture?: (url: string, view: CaptureView) => Promise<SiteCapture>;
+  readUi?: (asset: MotionAsset, region?: UiRegion) => Promise<UiRead>;
 };
+
+export type UiRegion = { x: number; y: number; width: number; height: number };
+
+export type UiRead = { ok: true; structure: UiStructure } | { ok: false; error: string };
 
 export enum CaptureView {
   Desktop = 'desktop',
@@ -1385,6 +1390,44 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const id = deps.newId();
         const placed = addClip(written.doc, { component: 'Custom', from: frames(input.start), durationInFrames: frames(input.duration), trackId: input.track_id, props: { name: piece.name, ...input.props } }, id);
         return created(apply(placed, `added ${piece.name}`), id);
+      }
+    }),
+
+    recreate_ui: tool({
+      description: `Rebuild a product UI from a site capture as a sharp, vector, animatable component in the brand style, for any product the kit does not cover: a vision model reads the capture (or a region of it, fractions of the picture) into layout, blocks, real texts, colours, font and corners, and the component replays it: ${RECREATE_STATES.join('; ')}. With start and duration it also places the clip. Spends one code write.`,
+      inputSchema: z.object({
+        asset_id: z.string(),
+        name: z.string().regex(/^[A-Z][A-Za-z0-9]*$/).describe('PascalCase, e.g. UiEditor'),
+        region: z.object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1), width: z.number().positive().max(1), height: z.number().positive().max(1) }).optional(),
+        start: z.number().min(0).optional(),
+        duration: z.number().positive().default(3),
+        track_id: z.string().optional()
+      }),
+      execute: async (input, { toolCallId }) => {
+        const asset = deps.assets.find((a) => a.id === input.asset_id && a.kind === AssetKind.Image);
+        if (!asset) {
+          return { ok: false, error: `no picture ${input.asset_id} in this project: capture the site first (import_asset with capture)` };
+        }
+        if (!deps.readUi) {
+          return UNREADABLE('a vision model to read the capture');
+        }
+        const read = await deps.readUi(asset, input.region);
+        if (!read.ok) {
+          return read;
+        }
+        const piece = recreatedUi(input.name, read.structure);
+        const written = await codeWrite(writeComponent(session.doc, piece.name, { source: { html: piece.html, css: piece.css, js: piece.js }, propsSchema: { type: 'object', properties: {} } }), piece.name, `recreated ${piece.name}`, toolCallId);
+        if (!written.ok) {
+          return written;
+        }
+        const made = { ok: true, name: piece.name, structure: read.structure, params: Object.keys(session.doc.components[piece.name].propsSchema.properties), states: RECREATE_STATES };
+        if (input.start === undefined) {
+          return made;
+        }
+        const id = deps.newId();
+        const placed = addClip(session.doc, { component: 'Custom', from: frames(input.start), durationInFrames: frames(input.duration), trackId: input.track_id, props: { name: piece.name, ...recreatedStyle(read.structure, fontRefProblem(read.structure.font, session.doc.fonts) === null) } }, id);
+        const shown = apply(placed, `placed ${piece.name}`);
+        return shown.ok ? { ...made, clip_id: id } : shown;
       }
     }),
 

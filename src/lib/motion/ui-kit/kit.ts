@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 export enum UiKind {
   LinkShortener = 'link-shortener',
   LinkList = 'link-list',
@@ -994,3 +996,153 @@ export const UI_KIT: Record<UiKind, UiPiece> = {
   [UiKind.GeneratedResult]: GENERATED_RESULT,
   [UiKind.Cursor]: CURSOR
 };
+
+export enum UiBlock {
+  Nav = 'nav',
+  Heading = 'heading',
+  Text = 'text',
+  Input = 'input',
+  Button = 'button',
+  Stat = 'stat',
+  Card = 'card',
+  List = 'list',
+  Picture = 'picture'
+}
+
+const HEX = /^#[0-9a-fA-F]{6}$/;
+const MAX_BLOCKS = 12;
+const MAX_ITEMS = 6;
+
+export const UI_STRUCTURE = z.object({
+  layout: z.enum(['landing', 'app', 'dashboard', 'form', 'chat']),
+  colors: z.object({ ink: z.string().regex(HEX), muted: z.string().regex(HEX), paper: z.string().regex(HEX), line: z.string().regex(HEX), accent: z.string().regex(HEX) }),
+  font: z.string().max(60),
+  radius: z.number().min(0).max(40),
+  blocks: z.array(z.object({ kind: z.enum(UiBlock), text: z.string().max(140), items: z.array(z.string().max(60)).max(MAX_ITEMS).optional() })).min(1).max(MAX_BLOCKS)
+});
+
+export type UiStructure = z.infer<typeof UI_STRUCTURE>;
+
+export const RECREATE_STATES = [
+  'enter: the blocks rise in one after another',
+  'type: the input types its text with a caret',
+  'count: numbers count up',
+  'click: a cursor travels to the button and presses it'
+] as const;
+
+const RECREATED_SIZE: UiSize = { width: 1400, height: 860 };
+
+const RECREATED_CSS = `
+.screen { position: absolute; width: 1400px; height: 860px; transform: translate(-50%, -50%); overflow: hidden; display: flex; flex-direction: column; }
+.nav { height: 76px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 34px; padding: 0 40px; font-size: 22px; }
+.brand { font-weight: 800; font-size: 26px; margin-right: auto; }
+.body { flex: 1; padding: 44px 64px; display: flex; flex-direction: column; gap: 26px; }
+.heading { font-size: 62px; font-weight: 800; line-height: 1.05; letter-spacing: -0.02em; }
+.text { font-size: 26px; line-height: 1.4; }
+.input { height: 80px; border: 1.5px solid var(--line); border-radius: calc(var(--r) * 0.8); display: flex; align-items: center; padding: 0 26px; font-size: 28px; white-space: nowrap; overflow: hidden; }
+.caret { display: inline-block; width: 2px; height: 34px; background: var(--ink); margin-left: 2px; }
+.button { align-self: flex-start; height: 72px; padding: 0 40px; border-radius: calc(var(--r) * 0.8); background: var(--accent); color: var(--paper); font-size: 26px; font-weight: 700; display: flex; align-items: center; }
+.stat { font-size: 54px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.box { border: 1px solid var(--line); border-radius: var(--r); padding: 24px 28px; }
+.box-title { font-size: 24px; font-weight: 700; margin-bottom: 14px; }
+.chips { display: flex; gap: 14px; flex-wrap: wrap; }
+.chip { font-size: 20px; padding: 10px 18px; border-radius: 999px; border: 1px solid var(--line); }
+.row { font-size: 24px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.picture { height: 200px; border-radius: var(--r); overflow: hidden; }
+.cursor { position: absolute; width: 40px; height: 40px; left: 0; top: 0; }
+`;
+
+const RECREATED_JS = `
+const S = STRUCTURE;
+const screen = make('div', 'card screen');
+const body = make('div', 'body', screen);
+const parts = [];
+const typers = [];
+const counters = [];
+let button = null;
+S.blocks.forEach((b) => {
+  if (b.kind === 'nav') {
+    const nav = make('div', 'nav', screen);
+    screen.insertBefore(nav, body);
+    make('div', 'brand', nav, b.text);
+    (b.items || []).forEach((i) => make('div', 'muted', nav, i));
+    parts.push(nav);
+    return;
+  }
+  if (b.kind === 'input') {
+    const field = make('div', 'input', body);
+    typers.push({ text: make('span', '', field), caret: make('span', 'caret', field), full: b.text });
+    parts.push(field);
+    return;
+  }
+  if (b.kind === 'button') {
+    button = make('div', 'button', body, b.text);
+    parts.push(button);
+    return;
+  }
+  if (b.kind === 'stat') {
+    const n = make('div', 'stat', body);
+    counters.push({ node: n, n: number(b.text) });
+    parts.push(n);
+    return;
+  }
+  if (b.kind === 'card' || b.kind === 'list') {
+    const box = make('div', 'box', body);
+    make('div', 'box-title', box, b.text);
+    const host = b.kind === 'card' ? make('div', 'chips', box) : box;
+    (b.items || []).forEach((i) => make('div', b.kind === 'card' ? 'chip' : 'row', host, i));
+    parts.push(box);
+    return;
+  }
+  if (b.kind === 'picture') {
+    const pic = make('div', 'picture', body);
+    const art = svg('svg', { viewBox: '0 0 1200 200', width: '100%', height: '100%', preserveAspectRatio: 'none' }, pic);
+    svg('rect', { x: 0, y: 0, width: 1200, height: 200, fill: accent, opacity: 0.12 }, art);
+    svg('circle', { cx: 980, cy: 100, r: 70, fill: accent, opacity: 0.5 }, art);
+    svg('rect', { x: 60, y: 60, width: 420, height: 24, fill: ink, opacity: 0.2 }, art);
+    svg('rect', { x: 60, y: 110, width: 300, height: 24, fill: ink, opacity: 0.12 }, art);
+    parts.push(pic);
+    return;
+  }
+  parts.push(make('div', b.kind === 'heading' ? 'heading' : 'text muted', body, b.text));
+});
+const cursor = make('div', 'cursor', screen);
+cursor.innerHTML = '<svg viewBox="0 0 24 24" width="40" height="40"><path d="M4 2l16 9-7 2-3 7z" fill="#111" stroke="#fff" stroke-width="1.5"/></svg>';
+const STAGGER = 0.12;
+const TYPE_AT = 0.3 + parts.length * STAGGER;
+const TYPE_LEN = Math.min(1.4, duration * 0.3);
+const CLICK = TYPE_AT + TYPE_LEN + 0.5;
+drive((t) => {
+  parts.forEach((p, i) => {
+    const s = out(span(t, 0.1 + i * STAGGER, 0.45));
+    p.style.opacity = String(s);
+    p.style.transform = 'translateY(' + (28 * (1 - s)) + 'px)';
+  });
+  typers.forEach((ty) => {
+    const k = span(t, TYPE_AT, TYPE_LEN);
+    ty.text.textContent = ty.full.slice(0, Math.round(ty.full.length * k));
+    ty.caret.style.opacity = k < 1 || Math.floor(t * 2.5) % 2 === 0 ? '1' : '0';
+  });
+  counters.forEach((c, i) => {
+    c.node.textContent = counted(c.n, out(span(t, 0.4 + i * STAGGER, 1.4)));
+  });
+  if (!button) {
+    cursor.style.opacity = '0';
+    return;
+  }
+  const travel = inOut(span(t, CLICK - 0.6, 0.55));
+  const bx = button.offsetLeft + button.offsetWidth * 0.6;
+  const by = button.offsetTop + (screen.offsetHeight - body.offsetHeight) + button.offsetHeight * 0.6;
+  cursor.style.transform = 'translate(' + (1300 + (bx - 1300) * travel) + 'px, ' + (800 + (by - 800) * travel) + 'px)';
+  cursor.style.opacity = String(span(t, CLICK - 0.75, 0.15));
+  const press = span(t, CLICK, 0.08) - span(t, CLICK + 0.08, 0.12);
+  button.style.transform = 'scale(' + (1 - 0.06 * press) + ')';
+});
+`;
+
+export function recreatedUi(name: string, structure: UiStructure): UiPiece {
+  const about = `${structure.layout} UI recreated from a capture: ${structure.blocks.map((b) => b.kind).join(', ')}`;
+  return piece(name, about, RECREATED_SIZE, RECREATED_CSS, RECREATED_JS.replace('STRUCTURE', () => JSON.stringify(structure)));
+}
+
+export const recreatedStyle = (structure: UiStructure, fontUsable: boolean) => ({ ...structure.colors, radius: structure.radius, ...(fontUsable ? { font: structure.font } : {}) });
