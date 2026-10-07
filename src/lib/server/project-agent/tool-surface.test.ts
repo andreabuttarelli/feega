@@ -51,10 +51,13 @@ describe('la superficie del modello mostra solo ciò che può usare', () => {
         'list_assets',
         'run_node',
         'list_runs',
-        'describe_node_types'
+        'describe_node_types',
+        'list_effects',
+        'apply_effects',
+        'make_effects_pair'
       ])
     );
-    expect(names).toHaveLength(11);
+    expect(names).toHaveLength(14);
   });
 
   it('col brand i tool di brand ci sono, accanto a quelli di progetto', () => {

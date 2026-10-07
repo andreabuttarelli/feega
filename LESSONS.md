@@ -2554,3 +2554,9 @@ rejected and its messages were read from the failed result. Move: keep each fini
 
 ### Il dev server del checkout principale si ricarica da solo e crasha l'SSR
 Segnale: `changed tsconfig file detected: .../.claude/worktrees/agent-*/.svelte-kit/tsconfig.json` a raffica, poi `The dependency module is not yet fully initialized due to circular dependency` in `@sveltejs/kit/src/runtime/server`. I worktree degli agenti stanno dentro la repo, e Vite li osserva: ogni `svelte-kit sync` di un agente forza un full reload a metà caricamento. Mossa: `server.watch.ignored` esclude `**/.claude/worktrees/**` in `vite.config.ts`.
+
+## Uno script vite-node che importa il compositor motion non parte
+Segnale: `Failed to load url virtual:motion-live-runtime ... in src/lib/motion/hyperframes/compose.ts`. Causa: `scripts/vite-node.config.ts` non registra il plugin che fornisce quel modulo virtuale. Mossa: config locale che estende `scripts/vite-node.config.ts` e aggiunge `motionLiveRuntime()` da `scripts/motion-live-runtime.ts`; prima, in un worktree nuovo, `npx svelte-kit sync`.
+
+## Un keyframe x/y su un testo lo spedisce fuori campo
+Segnale: un numero o una parola keyframati su `y`/`x` spariscono o finiscono al bordo, mentre le props x/y degli stessi clip sono giuste. Causa: nelle props x/y sono posizioni, nei keyframe sono offset dal posto del clip (entrambi "px" per i tool). Mossa: keyframe da offset a 0 (es. y 140 → 0), mai la posizione assoluta.

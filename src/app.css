@@ -199,14 +199,14 @@
   /* Inverse of light: deep gray with a hint of violet */
   --sidebar-bg: var(--paper);
   --sidebar-line: var(--line);
-  --ui-bg: #0b0b0b;
-  --ui-surface: #121212;
-  --ui-hover: #1b1b1b;
-  --ui-line: #222222;
-  --ui-line-strong: #333333;
+  --ui-bg: #000000;
+  --ui-surface: #0a0a0a;
+  --ui-hover: #161616;
+  --ui-line: #1a1a1a;
+  --ui-line-strong: #2a2a2a;
   --ui-ink: #ededed;
   --ui-ink-2: #a3a3a0;
-  --ui-ink-3: #6b6b68;
+  --ui-ink-3: #77776f;
   --ui-ok: #30a46c;
   --ui-warn: #f0a83a;
   --ui-danger: #ff5a5f;

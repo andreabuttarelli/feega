@@ -11,7 +11,8 @@ export enum Quality {
   WhiteArea = 'white-area',
   OffStyle = 'off-style',
   SoftPicture = 'soft-picture',
-  CroppedScreen = 'cropped-screen'
+  CroppedScreen = 'cropped-screen',
+  BrandLogoAltered = 'brand-logo-altered'
 }
 
 export type Pixels = Record<string, { width: number; height: number }>;
@@ -29,6 +30,10 @@ const SOFT_UPSCALE = 1.25;
 const SIDES_KEPT = 0.75;
 const LEFT = 0.4;
 const RIGHT = 0.6;
+
+const LOGO_ENTRANCE: ReadonlySet<string> = new Set(['opacity', 'scale', 'x', 'y']);
+const EXTRUDED: ReadonlySet<ComponentId> = new Set(['Logo3D'] as ComponentId[]);
+const FLAT_LOGO: ReadonlySet<ComponentId> = new Set(['Logo', 'Image'] as ComponentId[]);
 
 const BACKDROPS: ReadonlySet<ComponentId> = new Set(['BrandBackground', 'Adjustment', 'Particles', 'Null'] as ComponentId[]);
 const MEDIA: ReadonlySet<ComponentId> = new Set(['Image', 'Video', 'Device3D', 'Model3D'] as ComponentId[]);
@@ -94,8 +99,8 @@ const everyClip = (doc: MotionDoc) => [doc.tracks, ...Object.values(doc.comps).m
 const round = (n: number) => Math.round(n * 100) / 100;
 
 function largestZoom(clip: Clip): number {
-  const keyed = (clip.keyframes.scale ?? []).map((k) => Number(k.value)).filter(Number.isFinite);
-  return Math.max(clip.transform?.scale ?? 1, ...keyed);
+  const peak = (key: string, base: number) => Math.max(base, ...(clip.keyframes[key] ?? []).map((k) => Number(k.value)).filter(Number.isFinite));
+  return num(clip, 'scale', 1) * peak('scale', clip.transform?.scale ?? 1) * peak('zoom', num(clip, 'zoom', 1));
 }
 
 function softPictures(doc: MotionDoc, pixels: Pixels): QualityProblem[] {
@@ -131,10 +136,27 @@ function croppedScreens(doc: MotionDoc, pixels: Pixels): QualityProblem[] {
   });
 }
 
-export function docProblems(doc: MotionDoc, input: { audioAssets: number; pixels?: Pixels }): QualityProblem[] {
+const ALTERATIONS: { name: string; applies: (clip: Clip) => boolean }[] = [
+  { name: 'extruded in 3D', applies: (clip) => EXTRUDED.has(clip.component) },
+  { name: 'filtered', applies: (clip) => clip.effects.some((e) => e.enabled) },
+  { name: 'blended', applies: (clip) => clip.blend !== 'normal' },
+  { name: 'masked', applies: (clip) => Boolean(clip.mask) || clip.maskStack.length > 0 || clip.matte !== 'none' },
+  { name: 'deformed or turned', applies: (clip) => Object.keys(clip.keyframes).some((k) => !LOGO_ENTRANCE.has(k)) || Object.keys(clip.transform ?? {}).some((k) => !LOGO_ENTRANCE.has(k) && k !== 'anchorX' && k !== 'anchorY') }
+];
+
+const showsLogo = (clip: Clip, logos: ReadonlySet<string>) => (FLAT_LOGO.has(clip.component) || EXTRUDED.has(clip.component)) && logos.has(String(clip.props.assetId ?? ''));
+
+function alteredLogos(doc: MotionDoc, logos: ReadonlySet<string>): QualityProblem[] {
+  return everyClip(doc).flatMap((clip) => {
+    const found = showsLogo(clip, logos) ? ALTERATIONS.filter((a) => a.applies(clip)).map((a) => a.name) : [];
+    return found.length ? [{ kind: Quality.BrandLogoAltered, at: seconds(doc, clip.from), detail: `${clip.id} shows the real brand logo ${found.join(', ')}: a brand logo stays the original asset, flat and intact (Logo or Image), entering with a fade or a small scale only` }] : [];
+  });
+}
+
+export function docProblems(doc: MotionDoc, input: { audioAssets: number; pixels?: Pixels; logos?: readonly string[] }): QualityProblem[] {
   const list = scenes(doc);
   const pixels = input.pixels ?? {};
-  return [...repeated(doc, list), ...smallTitles(doc), ...silent(doc, input.audioAssets), ...softPictures(doc, pixels), ...croppedScreens(doc, pixels), ...styleProblems(doc).map((p) => ({ kind: Quality.OffStyle, at: p.at, detail: p.detail }))];
+  return [...repeated(doc, list), ...smallTitles(doc), ...silent(doc, input.audioAssets), ...softPictures(doc, pixels), ...croppedScreens(doc, pixels), ...alteredLogos(doc, new Set(input.logos ?? [])), ...styleProblems(doc).map((p) => ({ kind: Quality.OffStyle, at: p.at, detail: p.detail }))];
 }
 
 export function frameProblems(stats: readonly FrameStat[]): QualityProblem[] {

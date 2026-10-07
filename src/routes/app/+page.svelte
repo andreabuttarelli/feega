@@ -1,6 +1,5 @@
 <script lang="ts">
   import Plus from '@lucide/svelte/icons/plus';
-  import ArrowRight from '@lucide/svelte/icons/arrow-right';
   import Film from '@lucide/svelte/icons/film';
   import Images from '@lucide/svelte/icons/images';
   import { formatLastEdited } from '$lib/canvas/format-last-edited';
@@ -16,6 +15,8 @@
 <svelte:head><title>Dashboard · feega</title></svelte:head>
 
 <div class="dashboard">
+  <h1>Home</h1>
+
   <section aria-labelledby="projects-heading">
     <div class="section-head">
       <h2 id="projects-heading">Projects</h2>
@@ -66,12 +67,9 @@
         {@const badge = TOOL_STATUS_LABEL[tool.status]}
         <li>
           <svelte:element this={href ? 'a' : 'div'} class="tool" class:is-disabled={!href} {href}>
-            <span class="tool-icon"><Icon size={20} strokeWidth={1.6} /></span>
-            <span class="tool-text">
-              <span class="tool-name">{tool.name}{#if badge}<span class="badge">{badge}</span>{/if}</span>
-              <span class="muted">{tool.description}</span>
-            </span>
-            {#if href}<ArrowRight size={16} class="tool-arrow" />{/if}
+            <span class="tool-preview"><Icon size={28} strokeWidth={1.4} /></span>
+            <span class="tool-name">{tool.name}{#if badge}<span class="badge">{badge}</span>{/if}</span>
+            <span class="muted">{tool.description}</span>
           </svelte:element>
         </li>
       {/each}
@@ -121,8 +119,15 @@
     margin: 0 auto;
     display: flex;
     flex-direction: column;
-    gap: var(--ui-space-8);
+    gap: 48px;
     color: var(--ui-ink);
+  }
+
+  h1 {
+    margin: 0;
+    font-size: var(--ui-text-xl);
+    font-weight: 600;
+    letter-spacing: -0.02em;
   }
 
   .section-head {
@@ -132,17 +137,14 @@
     justify-content: space-between;
     gap: var(--ui-space-3);
     min-height: 32px;
-    margin-bottom: var(--ui-space-3);
+    margin-bottom: var(--ui-space-4);
   }
 
   h2 {
     margin: 0;
-    font-family: var(--ui-mono);
-    font-size: var(--ui-text-xs);
-    font-weight: 400;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--ui-ink-3);
+    font-size: var(--ui-text-md);
+    font-weight: 600;
+    color: var(--ui-ink);
   }
 
   h3 {
@@ -175,16 +177,15 @@
     height: 32px;
     width: 200px;
     padding: 0 var(--ui-space-3);
-    border: 1px solid var(--ui-line-strong);
-    background: var(--ui-bg);
+    border: 0;
+    background: var(--ui-surface);
     color: var(--ui-ink);
     font-size: var(--ui-text-md);
   }
 
   .new-project input:focus {
     outline: none;
-    border-color: var(--ui-accent);
-    box-shadow: 0 0 0 3px var(--ui-accent-wash);
+    box-shadow: var(--ui-focus);
   }
 
   .primary {
@@ -205,30 +206,31 @@
     background: color-mix(in srgb, var(--ui-accent) 88%, #000);
   }
 
-  .projects {
+  .projects,
+  .tools {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    gap: var(--ui-space-4);
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: var(--ui-space-6) var(--ui-space-4);
   }
 
   .project {
     display: flex;
     flex-direction: column;
-    border: 1px solid var(--ui-line);
-    background: var(--ui-bg);
-    transition: border-color 120ms;
+    gap: var(--ui-space-2);
   }
 
-  .project:hover {
-    border-color: var(--ui-line-strong);
-  }
-
-  .cover {
+  .cover,
+  .tool-preview {
     display: block;
     aspect-ratio: 16 / 10;
     background: var(--ui-surface);
-    border-bottom: 1px solid var(--ui-line);
     overflow: hidden;
+    transition: background 120ms;
+  }
+
+  .cover:hover,
+  a.tool:hover .tool-preview {
+    background: var(--ui-hover);
   }
 
   .mosaic {
@@ -253,6 +255,11 @@
     width: 100%;
     height: 100%;
     object-fit: cover;
+    transition: opacity 120ms;
+  }
+
+  .cover:hover img {
+    opacity: 0.9;
   }
 
   .empty-cover {
@@ -268,96 +275,58 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
-    padding: var(--ui-space-3);
   }
 
   .project-name {
     font-size: var(--ui-text-md);
-    font-weight: 600;
+    font-weight: 500;
     color: var(--ui-ink);
     text-decoration: none;
-  }
-
-  .canvases {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--ui-space-1);
-    margin-top: var(--ui-space-2);
-  }
-
-  .canvases a {
-    padding: 2px 6px;
-    background: var(--ui-surface);
-    border: 1px solid var(--ui-line);
-    font-size: var(--ui-text-xs);
-    color: var(--ui-ink-2);
-    text-decoration: none;
-  }
-
-  .canvases a:hover {
-    border-color: var(--ui-accent);
-    color: var(--ui-accent);
   }
 
   .project-name:hover {
     color: var(--ui-accent);
   }
 
-  .tools {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-    border-top: 1px solid var(--ui-line);
-    border-left: 1px solid var(--ui-line);
+  .canvases {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--ui-space-1) var(--ui-space-3);
+    margin-top: var(--ui-space-1);
   }
 
-  .tools li {
-    border-right: 1px solid var(--ui-line);
-    border-bottom: 1px solid var(--ui-line);
+  .canvases a {
+    font-size: var(--ui-text-sm);
+    color: var(--ui-ink-2);
+    text-decoration: none;
+  }
+
+  .canvases a:hover {
+    color: var(--ui-accent);
   }
 
   .tool {
     display: flex;
-    align-items: flex-start;
-    gap: var(--ui-space-3);
-    height: 100%;
-    padding: var(--ui-space-4);
-    background: var(--ui-bg);
+    flex-direction: column;
+    gap: 2px;
     color: var(--ui-ink);
     text-decoration: none;
-    transition: background 120ms;
-  }
-
-  a.tool:hover {
-    background: var(--ui-surface);
-  }
-
-  a.tool:hover .tool-icon {
-    color: var(--ui-accent);
-    border-color: var(--ui-accent);
   }
 
   .tool.is-disabled {
     opacity: 0.5;
   }
 
-  .tool-icon {
+  .tool-preview {
     display: flex;
     align-items: center;
     justify-content: center;
-    flex: 0 0 auto;
-    width: 36px;
-    height: 36px;
-    border: 1px solid var(--ui-line);
+    margin-bottom: var(--ui-space-2);
     color: var(--ui-ink-2);
-    transition: color 120ms, border-color 120ms;
   }
 
-  .tool-text {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    flex: 1 1 auto;
-    min-width: 0;
+  a.tool:hover .tool-preview {
+    color: var(--ui-ink);
   }
 
   .tool-name {
@@ -365,20 +334,16 @@
     align-items: center;
     gap: var(--ui-space-2);
     font-size: var(--ui-text-md);
-    font-weight: 600;
-  }
-
-  .tool :global(.tool-arrow) {
-    align-self: center;
-    color: var(--ui-ink-3);
+    font-weight: 500;
   }
 
   .badge {
-    padding: 1px 5px;
+    padding: 0 4px;
     background: var(--ui-accent-wash);
     color: var(--ui-accent);
     font-family: var(--ui-mono);
-    font-size: 10px;
+    font-size: 9px;
+    line-height: 14px;
     font-weight: 400;
     text-transform: uppercase;
     letter-spacing: 0.04em;
@@ -391,9 +356,8 @@
   }
 
   .output-list {
-    padding: var(--ui-space-3) var(--ui-space-4);
-    border: 1px solid var(--ui-line);
-    background: var(--ui-bg);
+    padding: var(--ui-space-4);
+    background: var(--ui-surface);
   }
 
   .output-list li {
@@ -401,11 +365,6 @@
     flex-direction: column;
     gap: 2px;
     padding: var(--ui-space-2) 0;
-    border-top: 1px solid var(--ui-line);
-  }
-
-  .output-list li:first-child {
-    border-top: 0;
   }
 
   .output-list a {
@@ -433,12 +392,15 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: var(--ui-surface);
-    border: 1px solid var(--ui-line);
+    background: var(--ui-hover);
     color: var(--ui-ink-3);
   }
 
   @media (max-width: 640px) {
+    .dashboard {
+      gap: var(--ui-space-8);
+    }
+
     .new-project {
       width: 100%;
     }
@@ -448,9 +410,10 @@
       width: auto;
     }
 
-    .projects {
+    .projects,
+    .tools {
       grid-template-columns: repeat(2, 1fr);
-      gap: var(--ui-space-2);
+      gap: var(--ui-space-4) var(--ui-space-2);
     }
   }
 </style>

@@ -1,5 +1,6 @@
 import { Ease, TransitionKind } from '$lib/motion/design';
 import { DEVICES, Device } from '$lib/motion/devices';
+import { IMAGE_ZOOM } from '$lib/motion/components';
 import { FontCategory, FontSource, type FontFace } from '$lib/motion/fonts/model';
 import { EASE_BEZIER } from '$lib/motion/keyframes';
 import { STYLES } from '$lib/motion/style';
@@ -68,7 +69,7 @@ const SCENE_DESIGNS: Omit<Design, 'fonts'>[] = [
     name: 'Scene · Hero title',
     description: 'Apple minimal. One giant line on black, its words snapping up one after another. The hook.',
     seconds: 3,
-    beats: [fill(INK, 3), { id: 'title', track: 'front', component: 'Title', at: 0.1, len: 2.9, props: { text: 'Think different.', ...display(HERO), y: 0.5, width: 0.9, height: 0.34 }, keys: snapUp(), exit: OUT }],
+    beats: [fill(INK, 3), { id: 'title', track: 'front', component: 'Text', at: 0.1, len: 2.9, props: { text: 'Think different.', ...display(HERO), y: 0.5, width: 0.9, height: 0.34 }, keys: snapUp(), exit: OUT }],
     fields: [text('title', 'Title', 'title'), colour('background', 'Background', 'bg', 'fill'), colour('text_color', 'Title colour', 'title', 'color')]
   },
   {
@@ -79,7 +80,7 @@ const SCENE_DESIGNS: Omit<Design, 'fonts'>[] = [
     beats: [
       fill(INK, 3),
       { id: 'eyebrow', track: 'middle', component: 'Text', at: 0.1, len: 2.9, props: { text: 'Introducing', ...body(SMALL, ACCENT), y: 0.33, width: 0.6, height: 0.06 }, keys: snapUp(), exit: OUT },
-      { id: 'title', track: 'front', component: 'Title', at: 0.1 + STAGGER * 1.5, len: 2.9 - STAGGER * 1.5, props: { text: 'The new thing.', ...display(HERO), y: 0.52, width: 0.9, height: 0.3 }, keys: snapUp(), exit: OUT }
+      { id: 'title', track: 'front', component: 'Text', at: 0.1 + STAGGER * 1.5, len: 2.9 - STAGGER * 1.5, props: { text: 'The new thing.', ...display(HERO), y: 0.52, width: 0.9, height: 0.3 }, keys: snapUp(), exit: OUT }
     ],
     fields: [text('eyebrow', 'Eyebrow', 'eyebrow'), text('title', 'Title', 'title'), colour('accent', 'Eyebrow colour', 'eyebrow', 'color'), colour('background', 'Background', 'bg', 'fill'), colour('text_color', 'Title colour', 'title', 'color')]
   },
@@ -118,7 +119,7 @@ const SCENE_DESIGNS: Omit<Design, 'fonts'>[] = [
     seconds: 3.5,
     beats: [
       fill(INK, 3.5),
-      { id: 'number', track: 'front', component: 'Title', at: 0.1, len: 3.4, props: { text: '10×', ...display(0.3, ACCENT), y: 0.45, width: 0.9, height: 0.42 }, keys: settle(), exit: OUT },
+      { id: 'number', track: 'front', component: 'Text', at: 0.1, len: 3.4, props: { text: '10×', ...display(0.3, ACCENT), y: 0.45, width: 0.9, height: 0.42 }, keys: settle(), exit: OUT },
       { id: 'label', track: 'middle', component: 'Text', at: 0.1 + STAGGER * 2, len: 3.4 - STAGGER * 2, props: { text: 'faster than before', ...body(SMALL, MUTED), y: 0.74, width: 0.6, height: 0.06 }, keys: snapUp(), exit: OUT }
     ],
     fields: [text('number', 'Number', 'number'), text('label', 'What it measures', 'label'), colour('accent', 'Number colour', 'number', 'color'), colour('background', 'Background', 'bg', 'fill')]
@@ -142,7 +143,7 @@ const SCENE_DESIGNS: Omit<Design, 'fonts'>[] = [
     seconds: 3.5,
     beats: [
       fill(INK, 3.5),
-      { id: 'statement', track: 'front', component: 'Title', at: 0.1, len: 3.4, props: { text: 'Fast.\nBy design.', ...display(HERO), x: 0.3, y: 0.5, width: 0.46, height: 0.5, align: 'left' }, keys: snapUp(), exit: OUT },
+      { id: 'statement', track: 'front', component: 'Text', at: 0.1, len: 3.4, props: { text: 'Fast.\nBy design.', ...display(HERO), x: 0.3, y: 0.5, width: 0.46, height: 0.5, align: 'left' }, keys: snapUp(), exit: OUT },
       { id: 'detail', track: 'middle', component: 'Text', at: 0.1 + STAGGER * 4, len: 3.4 - STAGGER * 4, props: { text: 'One small paragraph that explains the statement on the left.', ...body(SMALL, MUTED), x: 0.74, y: 0.56, width: 0.3, height: 0.2, align: 'left' }, keys: snapUp(), exit: OUT }
     ],
     fields: [text('statement', 'Statement', 'statement'), text('detail', 'Detail', 'detail'), colour('background', 'Background', 'bg', 'fill'), colour('text_color', 'Statement colour', 'statement', 'color')]
@@ -150,15 +151,15 @@ const SCENE_DESIGNS: Omit<Design, 'fonts'>[] = [
   {
     id: 'scene-product-reveal',
     name: 'Scene · Product reveal',
-    description: 'Apple minimal. The product or a screenshot under a soft light, drifting with a slow push-in and pan the whole time; a small caption under it.',
+    description: 'Apple minimal. The product, or one readable section of a screenshot (zoom inside the box on focus x/y), under a soft light, drifting with a slow push-in and pan the whole time; a small caption under it.',
     seconds: 4,
     beats: [
       fill(INK, 4),
       { id: 'light', track: 'back', component: 'Shape', at: 0, len: 4, props: { shape: 'rect', fillKind: FillKind.Radial, fill: PAPER, fill2: INK, x: 0.5, y: 0.5, width: 1, height: 1, opacity: 0.14 } },
-      { id: 'photo', track: 'middle', component: 'Image', at: 0, len: 4, props: { x: 0.5, y: 0.44, ...PRODUCT, fit: 'contain' }, keys: drift(4, 0.97), exit: OUT },
+      { id: 'photo', track: 'middle', component: 'Image', at: 0, len: 4, props: { x: 0.5, y: 0.44, ...PRODUCT, fit: 'cover', focusX: 0.5, focusY: 0.2 }, keys: drift(4, 0.97), exit: OUT },
       { id: 'caption', track: 'front', component: 'Text', at: 0.5, len: 3.5, props: { text: 'Product name', ...body(SMALL, MUTED), y: 0.86, width: 0.6, height: 0.06 }, keys: snapUp(), exit: OUT }
     ],
-    fields: [picture('photo', 'Product or screenshot', 'photo', PRODUCT), { key: 'fit', label: 'Photo fit', type: FieldType.Select, clipId: 'photo', prop: 'fit', options: ['contain', 'cover'] }, text('caption', 'Caption', 'caption'), colour('background', 'Background', 'bg', 'fill')]
+    fields: [picture('photo', 'Product or screenshot', 'photo', PRODUCT), { key: 'fit', label: 'Photo fit', type: FieldType.Select, clipId: 'photo', prop: 'fit', options: ['contain', 'cover'] }, amount('focus_x', 'Focus X', 'photo', 'focusX'), amount('focus_y', 'Focus Y', 'photo', 'focusY'), { key: 'zoom', label: 'Zoom on the section', type: FieldType.Number, clipId: 'photo', prop: 'zoom', min: IMAGE_ZOOM.min, max: IMAGE_ZOOM.max }, text('caption', 'Caption', 'caption'), colour('background', 'Background', 'bg', 'fill')]
   },
   {
     id: 'scene-ui-closeup',
@@ -236,9 +237,9 @@ const SCENE_DESIGNS: Omit<Design, 'fonts'>[] = [
     seconds: 3,
     beats: [
       fill(INK, 3),
-      { id: 'word_1', track: 'front', component: 'Title', at: 0, len: 1, props: { text: 'Fast.', ...display(HERO), y: 0.5, width: 0.9, height: 0.3 }, keys: snapUp(0.3) },
-      { id: 'word_2', track: 'front', component: 'Title', at: 1, len: 1, props: { text: 'Simple.', ...display(HERO), y: 0.5, width: 0.9, height: 0.3 } },
-      { id: 'word_3', track: 'front', component: 'Title', at: 2, len: 1, props: { text: 'Yours.', ...display(HERO, ACCENT), y: 0.5, width: 0.9, height: 0.3 }, exit: OUT }
+      { id: 'word_1', track: 'front', component: 'Text', at: 0, len: 1, props: { text: 'Fast.', ...display(HERO), y: 0.5, width: 0.9, height: 0.3 }, keys: snapUp(0.3) },
+      { id: 'word_2', track: 'front', component: 'Text', at: 1, len: 1, props: { text: 'Simple.', ...display(HERO), y: 0.5, width: 0.9, height: 0.3 } },
+      { id: 'word_3', track: 'front', component: 'Text', at: 2, len: 1, props: { text: 'Yours.', ...display(HERO, ACCENT), y: 0.5, width: 0.9, height: 0.3 }, exit: OUT }
     ],
     fields: [text('word_1', 'First word', 'word_1'), text('word_2', 'Second word', 'word_2'), text('word_3', 'Third word', 'word_3'), colour('accent', 'Last word colour', 'word_3', 'color'), colour('background', 'Background', 'bg', 'fill')]
   },

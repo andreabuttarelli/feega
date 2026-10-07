@@ -103,22 +103,56 @@ export function registerNodeTools(server: McpServer) {
   );
 
   server.registerTool(
+    'list_effects',
+    {
+      title: 'List image effects',
+      description:
+        'Every image effect `apply_effects` accepts, with its params (range, options, default). ' +
+        'Reads only, spends nothing.',
+      inputSchema: z.object({ org }),
+      annotations: { readOnlyHint: true }
+    },
+    async ({ org }) => withAuth((token) => call(token, 'GET', '/api/v1/org/effects', org))
+  );
+
+  server.registerTool(
     'apply_effects',
     {
-      title: 'Render an effects node',
+      title: 'Apply image effects',
       description:
-        'Renders an `effects` node\'s stack onto its upstream image and lands the result as the ' +
-        'node\'s `refId` — the same render `EffectsEditor` does in the browser, run server-side so ' +
-        'an agent without a browser can do it. Set the stack first with `update_row` on `nodes.data.' +
-        'effects` (see `describe_node_types` for the effect list and their params), then call this. ' +
-        'Refused before anything runs if `data.sourceRefId` is empty (nothing upstream to render) — ' +
-        'wire an image into the node first. Spends no credits: no AI provider is called.',
+        'Applies one effect or a chain (`list_effects`) and lands the result as a new asset — the ' +
+        'same render the canvas Effects editor does. On an image node it creates an `effects` node ' +
+        'beside it, wired to it; on an `effects` node it replaces the stack with `effects` when ' +
+        'given, otherwise re-renders the stack it has. `effects`: `[{ id, params?, enabled? }]` in ' +
+        'order, missing params take their defaults. Returns `{ node_id, asset_id }`. Spends no ' +
+        'credits: no AI provider is called.',
+      inputSchema: z.object({
+        org,
+        node_id: z.string(),
+        effects: z.array(z.record(z.string(), z.unknown())).optional()
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false }
+    },
+    async ({ org, node_id, effects }) =>
+      withAuth((token) =>
+        call(token, 'POST', `/api/v1/org/nodes/${encodeURIComponent(node_id)}/apply-effects`, org, effects ? { effects } : undefined)
+      )
+  );
+
+  server.registerTool(
+    'make_effects_pair',
+    {
+      title: 'Make a shape cutout A/B pair',
+      description:
+        'For an `effects` node with a `shape-cutout` step: creates its twin (same shapes and seed, ' +
+        'other side — shapes over the image vs fill with holes), wired to the same image, and ' +
+        'renders it. Returns `{ node_id, asset_id }`. Free.',
       inputSchema: z.object({ org, node_id: z.string() }),
       annotations: { readOnlyHint: false, destructiveHint: false }
     },
     async ({ org, node_id }) =>
       withAuth((token) =>
-        call(token, 'POST', `/api/v1/org/nodes/${encodeURIComponent(node_id)}/apply-effects`, org)
+        call(token, 'POST', `/api/v1/org/nodes/${encodeURIComponent(node_id)}/effects-pair`, org)
       )
   );
 
