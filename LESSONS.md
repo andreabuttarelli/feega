@@ -4,6 +4,14 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 ## Motion editor
 
+### Un render locale con `npx hyperframes render` non ha motion blur
+Il motion blur non sta nell'html di `farmJob`: è un'opzione del producer (`motionBlur:
+{ shutterAngle, shutterPhase, samplesPerFrame }`) che il farm passa a `createRenderJob`, e la CLI
+`hyperframes render` non ha un flag per darla. Anche l'audio resta fuori: il farm lo mixa a parte
+con `audioMixArgs(job.audio, …)`. Segnale: render locale nitido sulle whip pan e muto. Mossa:
+installare `@hyperframes/producer` alla stessa versione e chiamare `executeRenderJob` con
+`motionBlur`, poi mixare con `audioMixArgs` come il farm.
+
 ### `visibility: hidden` su un contenitore non nasconde i clip che il runtime accende
 Il runtime hyperframes scrive `visibility: visible` su ogni clip nel suo range, e un figlio
 `visible` vince su un padre `hidden`. Uno schermo `screenComp` nascosto così mostrava la sua UI
