@@ -14,11 +14,16 @@ export enum FrameFormat {
   Bitmap = 'bitmap'
 }
 
-export type CaptureRequest = { type: typeof CAPTURE_REQUEST; id: string; format: FrameFormat; width: number; height: number; quality?: number };
+export enum Settle {
+  Paint = 'paint',
+  Seek = 'seek'
+}
+
+export type CaptureRequest = { type: typeof CAPTURE_REQUEST; id: string; format: FrameFormat; width: number; height: number; quality?: number; settle?: Settle };
 export type ClipError = { clip: string; component: string; message: string };
 export type CaptureReply = { type: typeof CAPTURE_REPLY; id: string; stamp?: string; url?: string; bitmap?: ImageBitmap; error?: string; layout?: string; errors?: ClipError[] };
 
-type RuntimeConfig = { request: string; reply: string; lib: string; width: number; height: number; mediaTimeoutMs: number; stamp: string; errorsKey: string };
+type RuntimeConfig = { request: string; reply: string; lib: string; width: number; height: number; mediaTimeoutMs: number; stamp: string; errorsKey: string; settle: Settle };
 type Shot = { body: Record<string, unknown>; transfer: Transferable[] };
 type HtmlToImage = {
   toJpeg: (node: HTMLElement, options: Record<string, unknown>) => Promise<string>;
@@ -61,6 +66,10 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
     return err instanceof Event ? `a picture or video in this frame could not be drawn${src ? ` (${src})` : ''}` : String(err);
   };
   const mediaReady = () => Promise.all([...document.querySelectorAll('video')].map(settled));
+  const settleBy: Record<`${Settle}`, () => Promise<unknown>> = {
+    paint: () => painted().then(mediaReady).then(painted),
+    seek: () => mediaReady().then((videos) => (videos.length ? frame() : undefined))
+  };
 
   const size = (m: CaptureRequest, embed: string) => ({ width: cfg.width, height: cfg.height, canvasWidth: m.width, canvasHeight: m.height, pixelRatio: 1, fontEmbedCSS: embed, filter: drawable });
   const output: Record<string, (root: HTMLElement, m: CaptureRequest, embed: string) => Promise<Shot>> = {
@@ -98,9 +107,7 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
     load()
       .then(() => (window as unknown as { __fontsReady?: Promise<unknown> }).__fontsReady ?? document.fonts.ready)
       .then(() => document.fonts.ready)
-      .then(painted)
-      .then(mediaReady)
-      .then(painted)
+      .then(settleBy[m.settle ?? cfg.settle])
       .then(() => (window as unknown as { __hfWaitForSeekCompletion?: () => Promise<void> }).__hfWaitForSeekCompletion?.())
       .then(() => inline(root, shrink, shrunk))
       .then(() => (fonts ??= tool().getFontEmbedCSS(root)))
@@ -119,6 +126,6 @@ export function stampOf(html: string): string | null {
 }
 
 export function captureScript(doc: { width: number; height: number }, stamp: string): string {
-  const cfg: RuntimeConfig = { request: CAPTURE_REQUEST, reply: CAPTURE_REPLY, lib: SCREENSHOT_URL, width: doc.width, height: doc.height, mediaTimeoutMs: MEDIA_TIMEOUT_MS, stamp, errorsKey: ERRORS };
+  const cfg: RuntimeConfig = { request: CAPTURE_REQUEST, reply: CAPTURE_REPLY, lib: SCREENSHOT_URL, width: doc.width, height: doc.height, mediaTimeoutMs: MEDIA_TIMEOUT_MS, stamp, errorsKey: ERRORS, settle: Settle.Paint };
   return `<script>(${captureRuntime.toString()})(${js(cfg)},(${freezeMasks.toString()}),(${inlineMedia.toString()}),(${shrinkImage.toString()}));</script>`;
 }

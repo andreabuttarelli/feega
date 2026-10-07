@@ -3,6 +3,9 @@
   import { FPS } from '$lib/motion/design';
   import { CAPTURE_REPLY, FrameFormat, type CaptureReply, type ClipError } from '$lib/motion/hyperframes/capture';
   import { Playback, previewDriver, type ShotRequest } from '$lib/motion/hyperframes/preview-driver';
+  import { mountCapturePlayer } from '$lib/motion/hyperframes/capture-player';
+  import { shootInLanes } from '$lib/motion/export/lanes';
+  import { CAPTURE_PROFILES, CaptureProfile } from '$lib/motion/export/capture-profile';
   import { MEASURE_REPLY, MEASURE_REQUEST, type MeasureReply, type MeasuredBox } from '$lib/motion/hyperframes/measure';
   import { InputKey, type InputValues } from '$lib/motion/expression/inputs';
   import { INPUT_MESSAGE } from '$lib/motion/interactive/runtime';
@@ -196,15 +199,22 @@
     });
   }
 
-  export function render(times: number[], size: FrameSize, onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>, signal: AbortSignal, source: string = html): Promise<void> {
+  export function render(times: number[], size: FrameSize, onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>, signal: AbortSignal, source: string = html, profile: CaptureProfile = CaptureProfile.Fast): Promise<void> {
+    const { settle, lanes } = CAPTURE_PROFILES[profile];
+    const request = { format: FrameFormat.Bitmap, settle, ...size };
+    const bitmapOf = (reply: CaptureReply) => {
+      if (!reply.bitmap) {
+        throw new Error('frame not rendered');
+      }
+      return reply.bitmap;
+    };
     return borrowed(source, async () => {
-      for (const [index, time] of times.entries()) {
-        signal.throwIfAborted();
-        const reply = await shoot(time, { format: FrameFormat.Bitmap, ...size });
-        if (!reply.bitmap) {
-          throw new Error('frame not rendered');
-        }
-        await onFrame(reply.bitmap, index);
+      const extra = host ? await Promise.all(Array.from({ length: lanes() - 1 }, () => mountCapturePlayer(host!, source))) : [];
+      try {
+        const shooters = [(time: number) => shoot(time, request).then(bitmapOf), ...extra.map((p) => (time: number) => p.shoot(time, request).then(bitmapOf))];
+        await shootInLanes(times, shooters, onFrame, signal);
+      } finally {
+        extra.forEach((p) => p.dispose());
       }
     });
   }

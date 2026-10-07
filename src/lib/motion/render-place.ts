@@ -102,9 +102,13 @@ export function deviceOf(info: DeviceInfo): Device {
 
 const MOBILE_UA = /iPhone|iPad|iPod|Android|Mobile/i;
 
-export function thisDevice(nav: Navigator): Device {
+export function deviceInfo(nav: Navigator): DeviceInfo {
   const hints = (nav as Navigator & { userAgentData?: { mobile?: boolean }; deviceMemory?: number }).userAgentData;
   const memory = (nav as Navigator & { deviceMemory?: number }).deviceMemory;
   const touchMac = nav.maxTouchPoints > 1 && /Macintosh/.test(nav.userAgent);
-  return deviceOf({ mobile: hints?.mobile ?? (MOBILE_UA.test(nav.userAgent) || touchMac), memoryGb: memory ?? null, cores: nav.hardwareConcurrency ?? null });
+  return { mobile: hints?.mobile ?? (MOBILE_UA.test(nav.userAgent) || touchMac), memoryGb: memory ?? null, cores: nav.hardwareConcurrency ?? null };
+}
+
+export function thisDevice(nav: Navigator): Device {
+  return deviceOf(deviceInfo(nav));
 }
