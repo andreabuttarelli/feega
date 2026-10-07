@@ -557,7 +557,7 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
         component: 'Logo',
         at: 2 * BEAT,
         len: 6 * BEAT,
-        props: { x: 0.5, y: 0.42, width: 0.18, height: 0.32 },
+        props: { x: 0.5, y: 0.42, width: 0.36, height: 0.4 },
         keys: {
           opacity: [
             [0, 0, SNAP],
@@ -584,8 +584,8 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
           strokeWidth: 0.009,
           x: 0.5,
           y: 0.42,
-          width: 0.22,
-          height: 0.39
+          width: 0.4,
+          height: 0.71
         },
         keys: {
           scale: [
@@ -606,7 +606,7 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
         len: 5.5 * BEAT,
         props: {
           text: 'example.com',
-          ...word(0.11),
+          ...word(0.06),
           weight: 700,
           y: 0.8,
           width: 0.8,
@@ -637,8 +637,8 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
     ],
     fields: [
       picture('logo', 'Original logo (SVG or PNG)', 'logo', 'assetId', {
-        width: 0.18,
-        height: 0.32
+        width: 0.36,
+        height: 0.4
       }),
       text('url', 'Address', 'url'),
       text('claim', 'Claim', 'claim'),

@@ -8,6 +8,7 @@ import { insertTemplate } from './template/library';
 import { MotionStyle } from './style-model';
 import { UI_KIT, UiKind } from './ui-kit/kit';
 import { writeComponent } from './custom/ops';
+import supasitoClaim from './supasito-claim.fixture.json';
 
 function must(r: { ok: true; doc: MotionDoc } | { ok: false; error: string }): MotionDoc {
   if (!r.ok) {
@@ -172,5 +173,32 @@ describe('nothing important leaves the frame', () => {
     const exit = { scale: [{ frame: 0, value: 1, ease: Ease.Linear }, { frame: 82, value: 1, ease: Ease.Linear }, { frame: 90, value: 2.5, ease: Ease.Linear }] };
 
     expect(out(placed('Custom', ui, exit))).toEqual([]);
+  });
+});
+
+describe('the logo in the closing claim', () => {
+  const supasito = (): MotionDoc => structuredClone(supasitoClaim) as unknown as MotionDoc;
+  const clipIn = (doc: MotionDoc, id: string) => doc.comps['347aa400'].tracks.flatMap((t) => t.clips).find((c) => c.id === id)!;
+  const smallLogos = (doc: MotionDoc, pixels = {}) => docProblems(doc, { audioAssets: 0, pixels }).filter((p) => p.kind === Quality.SmallLogo);
+
+  it('supasito closed on a logo far smaller than its address: the gate names it', () => {
+    expect(smallLogos(supasito())).toHaveLength(1);
+  });
+
+  it('a tall mark squeezed into the box reads as narrow as it draws, not as its box', () => {
+    const doc = supasito();
+    const url = clipIn(doc, '8d3dc9f8-url');
+    url.props = { ...url.props, size: 0.03 };
+    const asset = String(clipIn(doc, '8d3dc9f8-logo').props.assetId);
+
+    expect(smallLogos(doc, { [asset]: { width: 1200, height: 1200 } })).toEqual([]);
+    expect(smallLogos(doc, { [asset]: { width: 100, height: 1200 } })).toHaveLength(1);
+  });
+
+  it('the launch logo build ships a logo larger than its address', () => {
+    let n = 0;
+    const built = must(insertTemplate(newMotionDoc(MotionFormat.Landscape), builtinTemplate('builtin:launch-logo-build')!, { from: 0, newId: () => `k${++n}` }));
+
+    expect(smallLogos(built)).toEqual([]);
   });
 });
