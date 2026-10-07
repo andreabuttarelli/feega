@@ -191,5 +191,20 @@ describe('audio', () => {
   it('refuses an input that does not exist', () => {
     expect(error('input.mouse')).toContain('unknown member "mouse"');
   });
+
+  it('spring(keys, t) settles on each retarget in closed form, and a retarget keeps the motion continuous', () => {
+    const at = (time: number) => run('spring([[0, 0], [0.5, 100], [0.8, 40]], time)', { time });
+
+    expect(at(0.5)).toBe(0);
+    expect(at(0.7)).toBeGreaterThan(50);
+    expect(at(4)).toBeCloseTo(40, 3);
+    expect(Math.abs(at(0.8 + 1e-6) - at(0.8 - 1e-6))).toBeLessThan(1e-3);
+    expect(at(0.9)).toBe(at(0.9));
+  });
+
+  it('spring takes stiffness and damping, and refuses keys that are not [time, value] pairs', () => {
+    expect(run('spring([[0, 0], [0, 1]], 0.05, 900, 60)')).toBeGreaterThan(run('spring([[0, 0], [0, 1]], 0.05, 100, 20)'));
+    expect(error('spring([1, 2], time)')).toContain('[time, value]');
+  });
 });
 

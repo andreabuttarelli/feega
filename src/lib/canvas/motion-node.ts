@@ -31,7 +31,8 @@ const MOTION_STAGE_WIDTH: Record<MotionFormat, number> = {
   [MotionFormat.Landscape]: 420,
   [MotionFormat.Vertical]: 288,
   [MotionFormat.Square]: 320,
-  [MotionFormat.Portrait]: 300
+  [MotionFormat.Portrait]: 300,
+  [MotionFormat.SquareLarge]: 320
 };
 
 export function motionNodeSize(format: MotionFormat = MotionFormat.Vertical): { w: number; h: number } {

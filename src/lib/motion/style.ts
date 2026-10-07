@@ -5,6 +5,7 @@ import type { MotionDoc } from './doc';
 import { EffectKind } from './effects/registry';
 import { JunctionKind } from './junction-model';
 import { EASE_BEZIER, type Bezier, type Keyframe } from './keyframes';
+import { loopSeam, tooDense } from './ui-morph/ops';
 import { DEFAULT_STYLE, MotionStyle, STYLE_EASES, type StyleEases } from './style-model';
 
 export enum Forbidden {
@@ -22,7 +23,9 @@ export enum Forbidden {
   UnreadableText = 'unreadable-text',
   Screenshots = 'screenshots',
   MissingStoryBeat = 'missing-story-beat',
-  Rushed = 'rushed'
+  Rushed = 'rushed',
+  LoopSeam = 'loop-seam',
+  TooDense = 'too-dense'
 }
 
 export type StyleSpec = {
@@ -36,6 +39,7 @@ export type StyleSpec = {
   entrances: readonly TransitionKind[];
   reading: { perWord: number; base: number; phrase: number; pause: number };
   forbidden: readonly Forbidden[];
+  pace: { minGap: number; hold: number };
   maxMoving: number;
   rules: readonly string[];
 };
@@ -77,6 +81,7 @@ export const STYLES: Record<MotionStyle, StyleSpec> = {
     entrances: [TransitionKind.None, TransitionKind.Fade, TransitionKind.Blur, TransitionKind.Scale, TransitionKind.SlideLeft, TransitionKind.SlideRight, TransitionKind.SlideUp],
     reading: READING,
     forbidden: [Forbidden.Particles, Forbidden.Glow, Forbidden.Bounce, Forbidden.Crowded, Forbidden.Transition, Forbidden.Still, Forbidden.OffBeat, Forbidden.NoPeak, Forbidden.RoughCut, Forbidden.UnreadableText, Forbidden.Screenshots, Forbidden.MissingStoryBeat, Forbidden.Rushed],
+    pace: { minGap: 0.25, hold: 0.5 },
     maxMoving: 4,
     rules: [
       'Launch film is the house style: the LOOK of an Apple keynote film, Linear, Vercel Ship or Stripe Sessions (few elements, very large type, the real product, a sober palette) with HIGH ENERGY. Minimal never means slow: the bar is "would a client pay for this?". Never a slideshow, a still picture, a slow fade, the same layout twice or a PowerPoint effect.',
@@ -107,6 +112,7 @@ export const STYLES: Record<MotionStyle, StyleSpec> = {
     entrances: [TransitionKind.None, TransitionKind.Fade, TransitionKind.Blur],
     reading: READING,
     forbidden: [...CALM, Forbidden.UnreadableText],
+    pace: { minGap: 1, hold: 1 },
     maxMoving: 2,
     rules: [
       'Apple minimal is the house style: every frame should look like a frame of an Apple keynote or product film. Confident and calm: type snaps in and holds, the camera drifts slowly, one idea at a time.',
@@ -126,6 +132,28 @@ export const STYLES: Record<MotionStyle, StyleSpec> = {
       'Sound: when the project has music, put it on an Audio clip and cut the scenes on its beats (analyze_audio, cut_to_beat).',
       'Every text stays on screen long enough to be read: 0.4 s per word plus 0.6 s, 1.2 s at least for a phrase.',
       'A real brand logo is always the original asset, flat and intact (Logo or Image clip): never extruded, recoloured, filtered or deformed; a fade or a small scale only.'
+    ]
+  },
+  [MotionStyle.UiMorph]: {
+    label: 'UI morph reel',
+    eases: STYLE_EASES[MotionStyle.UiMorph],
+    seconds: { enter: [0.2, 0.35], stagger: 0.05, exit: 0.15, still: 0.5, scene: [0.5, 2] },
+    movement: { rise: 0, settle: 1, blur: 12, pushIn: 1, turn: 0 },
+    type: { family: 'Geist', weights: { display: 600, text: 500 }, sizes: { hero: 0.05, line: 0.03, small: 0.02 } },
+    palette: { ink: '#0a0a0a', paper: '#ffffff', muted: '#e7e4de', accents: 1 },
+    junctions: [],
+    entrances: [TransitionKind.None],
+    reading: READING,
+    forbidden: [Forbidden.Particles, Forbidden.Glow, Forbidden.Bounce, Forbidden.LoopSeam, Forbidden.TooDense],
+    pace: { minGap: 0.9, hold: 0.6 },
+    maxMoving: 2,
+    rules: [
+      'One shape, never a cut: every UI state is the same element morphing size, radius and colour on springs while its content swaps with a short blur (ui_morph_reel builds it).',
+      'A cursor drives every change with real clicks and drags; while a knob is held its value comes from the pointer, on release it springs from where it is.',
+      'Warm light grey canvas, black and white components and at most one accent; a clean UI font (Geist); no gradients, glows, particles or bouncy eases.',
+      'Calm, never dense: one change every two beats or every bar from a downbeat, then a hold (at least 0.6 s) in which the state reads; energy comes from the quality of the movement, not from the number of events. 8 states over a longer loop beat 11 rushed ones. The cursor moves slowly on curves. The too-dense gate names events closer than 0.9 s.',
+      'Analyze the music with mark_beats and set the reel offset to the first beat.',
+      'The last frame flows into the first, cursor included: the reel spans the whole video and the loop-seam gate names anything that breaks the loop.'
     ]
   }
 };
@@ -332,7 +360,9 @@ const CHECKS: Record<Forbidden, Check> = {
   [Forbidden.RoughCut]: roughCut,
   [Forbidden.Screenshots]: screenshots,
   [Forbidden.MissingStoryBeat]: missingStory,
-  [Forbidden.Rushed]: rushed
+  [Forbidden.Rushed]: rushed,
+  [Forbidden.TooDense]: (doc, spec) => tooDense(doc, spec.pace.minGap).map((p) => ({ clip: p.clip, at: 0, detail: p.detail })),
+  [Forbidden.LoopSeam]: (doc) => loopSeam(doc).map((p) => ({ clip: p.clip, at: doc.durationInFrames - 1, detail: p.detail }))
 };
 
 export type StyleProblem = { effect: Forbidden; at: number; detail: string };
