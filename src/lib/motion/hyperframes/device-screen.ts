@@ -78,7 +78,7 @@ export function screenHtml(input: ScreenInput, content: string): string {
   const chunks = sliceChunks(content, ids);
 
   const face = (id: string, index: number) => {
-    const box = css({ position: 'absolute', left: '0', top: '0', width: pxOf(faceWidth), height: pxOf(size.height), transformOrigin: '0 0', overflow: 'hidden', background: '#000', borderRadius: corners(spec.screen.radius * k.kx, index, faces), visibility: 'hidden' });
+    const box = css({ position: 'absolute', left: '0', top: '0', width: pxOf(faceWidth), height: pxOf(size.height), transformOrigin: '0 0', overflow: 'hidden', background: '#000', borderRadius: corners(spec.screen.radius * k.kx, index, faces), opacity: '0' });
     const offset = { x: fit.dx - fit.sx * scale - index * faceWidth, y: fit.dy - fit.sy * scale };
     const inner = css({ position: 'absolute', left: '0', top: '0', width: pxOf(input.compFrame.width), height: pxOf(input.compFrame.height), transformOrigin: '0 0', transform: `translate(${pxOf(offset.x)},${pxOf(offset.y)}) scale(${round(scale * 10000) / 10000})` });
     const cutout = faces === 1 ? CUTOUT_HTML[spec.cutout.kind](spec, k) : '';

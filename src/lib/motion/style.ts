@@ -90,7 +90,7 @@ export const STYLES: Record<MotionStyle, StyleSpec> = {
       'Music is always there and drives the cut: with no audio in the project call add_music first (mood and bpm that fit the brand; it lays the track and marks its beats), otherwise put the project music on an Audio clip, analyze_audio, mark_beats; then cut on the beat, never on a half beat (cut_to_beat). A scene lasts until every animation in it has finished, plus a 1–1.5 s hold; never cut while something is still moving. Longer beats compressed: fewer ideas, never faster cuts (3 to 5 scenes in 15 s). Backgrounds never show a cut-off or banded gradient.',
       'Build from the launch scenes: list_templates, insert_template builtin:launch-* (word-burst, ui-speed-ramp, device-fly, number-match-cut, ui-tilt-zoom, beat-montage, ui-explode, device-orbit, logo-build) and fill them with set_template_fields; push them further with keyframes. builtin:scene-* are the calm variants, for a beat of rest.',
       'Kinetic type that can be read: words land on the beat, very large, each punching in from 130–140% and an 18 px blur in 0.2–0.3 s on cubic-bezier(0.16,1,0.3,1), then STAY: every text is on screen at least 0.4 s per word plus 0.6 s, 1.2 s at least for a phrase, plus a 1 s pause once read (the gate names unreadable text). Build a line word by word and hold it; energy comes from movement and transitions, never from text that disappears. One accent colour on the key word.',
-      'Camera never rests: every picture pushes, zooms inside its box (Image zoom with focus_x/focus_y) or pans; devices fly in turning 90° or more and keep drifting; nothing holds still for more than half a second (the quality gate names it).',
+      'Camera never rests: every picture pushes, zooms inside its box (Image zoom with focus_x/focus_y) or pans; devices fly in turning 90° or more and keep drifting; nothing holds still for more than half a second (the quality gate names it). A drift is slow (a few % of scale, a few % of the frame or about 10° per second) or longer than 2 s: it is camera, it never needs a hold and never blocks a cut; anything faster is an animation that must finish and hold.',
       'Speed ramps: a zoom into the real UI runs slow-fast-slow on cubic-bezier(0.83,0,0.17,1): hold a beat, whip to the detail on the next beat, keep creeping. Motion blur on (set_motion_blur, 180°, 6 samples) so the whip smears.',
       'Match cuts: carry a word, a number or the product across the cut in the same place (the hook word becomes the headline on the real page; three numbers swap in one spot).',
       'One clear wow peak on the strongest beat, about two thirds in: the UI exploding into 3D (launch-ui-explode), a white flash on the drop, the biggest move of the film. The gate names a film with no peak.',
@@ -272,7 +272,11 @@ function offBeat(doc: MotionDoc): Found[] {
   return missed ? [{ clip: missed, at: missed.from, detail: `${missed.id} cuts in off the beat: move it onto a beat (cut_to_beat or move_clip to "beat N")` }] : [];
 }
 
-const peakOf = (clip: Clip) => Object.entries(PEAK_TRAVEL).some(([prop, size]) => travel(clip.keyframes[prop] ?? []) >= size);
+const PEAK_SPANS: readonly { from: string; to: string; size: number }[] = [{ from: 'startAngle', to: 'endAngle', size: 90 }];
+
+const spanned = (clip: Clip) => PEAK_SPANS.some(({ from, to, size }) => Math.abs(Number(clip.props[to] ?? 0) - Number(clip.props[from] ?? 0)) >= size);
+
+const peakOf = (clip: Clip) => spanned(clip) || Object.entries(PEAK_TRAVEL).some(([prop, size]) => travel(clip.keyframes[prop] ?? []) >= size);
 
 function noPeak(doc: MotionDoc): Found[] {
   const clips = timelines(doc).flat();

@@ -77,3 +77,11 @@ describe('a composition on a device screen', () => {
     expect(result.ok ? '' : result.error).toContain('ui');
   });
 });
+
+describe('a device screen before its first placement', () => {
+  it('starts transparent, so its live clips never show unprojected', () => {
+    const html = compose(device(withUi, 'ph', { device: 'phone-pro' }));
+
+    expect(face(html, 'dsf-ph-0').slice(0, 400)).toMatch(/^id="dsf-ph-0" class="dsf" style="[^"]*opacity:0/);
+  });
+});
