@@ -6,6 +6,7 @@ const repo = vi.hoisted(() => ({
   createNode: vi.fn(),
   createConnection: vi.fn(),
   listConnections: vi.fn(),
+  listNodes: vi.fn(),
   patchNodeData: vi.fn()
 }));
 const applyEffectsNode = vi.hoisted(() => vi.fn());
@@ -37,6 +38,7 @@ const image = node('image-1', 'image', { refId: 'asset-in' });
 beforeEach(() => {
   vi.clearAllMocks();
   repo.createNode.mockImplementation(async (_db, input) => node('fx-new', input.type, input.data));
+  repo.listNodes.mockResolvedValue([]);
   repo.createConnection.mockImplementation(async (_db, input) => ({ id: 'edge-new', ...input }));
   applyEffectsNode.mockResolvedValue({ outcome: 'applied', asset: { id: 'asset-out' } });
 });
@@ -111,6 +113,23 @@ describe('makeEffectsPair', () => {
     expect(twin.effects[0].params).toEqual({ side: 'holes', seed: 3 });
     expect(twin.refId).toBeNull();
     expect(repo.createConnection.mock.calls[0][1]).toMatchObject({ sourceNodeId: 'image-1', targetNodeId: 'fx-new', targetHandle: 'images' });
+  });
+
+  it('on a node that already has its twin: returns the twin, creates nothing', async () => {
+    const a = node('fx-1', 'effects', { effects: [cutout], sourceRefId: 'asset-in', refId: 'asset-a' });
+    const b = node('fx-2', 'effects', { effects: [{ ...cutout, params: { seed: 3, side: 'holes' } }], sourceRefId: 'asset-in', refId: 'asset-b' });
+    repo.findNode.mockResolvedValue(b);
+    repo.listNodes.mockResolvedValue([a, b]);
+    repo.listConnections.mockResolvedValue([
+      { id: 'e1', sourceNodeId: 'image-1', targetNodeId: 'fx-1', sourceHandle: null, targetHandle: 'images' },
+      { id: 'e2', sourceNodeId: 'image-1', targetNodeId: 'fx-2', sourceHandle: null, targetHandle: 'images' }
+    ]);
+
+    const out = await makeEffectsPair(db, { orgId, nodeId: 'fx-2', actor });
+
+    expect(out).toEqual({ outcome: 'applied', nodeId: 'fx-1', assetId: 'asset-a' });
+    expect(repo.createNode).not.toHaveBeenCalled();
+    expect(applyEffectsNode).not.toHaveBeenCalled();
   });
 
   it('refuses a stack without a shape cutout', async () => {

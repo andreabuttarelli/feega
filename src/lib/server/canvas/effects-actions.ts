@@ -5,12 +5,13 @@ import {
   DataCheck,
   findNode,
   listConnections,
+  listNodes,
   patchNodeData,
   type CanvasNodeRecord
 } from '$lib/server/repos/canvas';
 import type { Actor } from '$lib/server/repos/actor';
 import { validateNodeData } from '$lib/canvas/node-data';
-import { upstreamMedia, type EffectsMedia } from '$lib/canvas/effects-node';
+import { cutoutTwin, upstreamMedia, type EffectsMedia } from '$lib/canvas/effects-node';
 import { counterpart, hasCutout } from '$lib/canvas/effects/shape-cutout';
 import type { EffectStep } from '$lib/canvas/effects';
 import { applyEffectsNode } from './apply-effects';
@@ -65,13 +66,36 @@ export async function makeEffectsPair(db: Db, input: Scope): Promise<EffectsOutc
     return { outcome: 'refused', error: 'no_shape_cutout: la pila non contiene un ritaglio di forme attivo' };
   }
 
-  const feed = (await listConnections(db, { orgId: input.orgId, canvasId: node.canvasId })).find((edge) => edge.targetNodeId === node.id);
+  const connections = await listConnections(db, { orgId: input.orgId, canvasId: node.canvasId });
+  const feed = connections.find((edge) => edge.targetNodeId === node.id);
   if (!feed) {
     return { outcome: 'refused', error: 'nessuna immagine collegata al nodo' };
   }
 
+  const existing = await existingTwin(db, input, node, connections);
+  if (existing) {
+    return existing;
+  }
+
   const twin = { ...node.data, effects: counterpart(steps), refId: null };
   return spawnBeside(db, input, node, twin, feed.sourceNodeId, feed.sourceHandle, feed.targetHandle);
+}
+
+async function existingTwin(
+  db: Db,
+  input: Scope,
+  node: CanvasNodeRecord,
+  connections: { sourceNodeId: string; targetNodeId: string }[]
+): Promise<EffectsOutcome | null> {
+  const nodes = await listNodes(db, { orgId: input.orgId, canvasId: node.canvasId });
+  const wires = connections.map((edge) => ({ source: edge.sourceNodeId, target: edge.targetNodeId }));
+  const twin = nodes.find((other) => other.id === cutoutTwin(node.id, wires, nodes));
+  if (!twin) {
+    return null;
+  }
+
+  const refId = twin.data.refId;
+  return typeof refId === 'string' ? { outcome: 'applied', nodeId: twin.id, assetId: refId } : render(db, input, twin.id);
 }
 
 async function restack(db: Db, node: CanvasNodeRecord, input: Scope & { effects?: unknown }): Promise<EffectsOutcome> {

@@ -1,4 +1,5 @@
 import type { EffectStep } from './effects';
+import { counterpart } from './effects/shape-cutout';
 
 /**
  * IL NODO `effects`: una pila di effetti sopra un'immagine a monte. `sourceRefId` è l'asset che
@@ -91,4 +92,24 @@ export function upstreamImageRef(
     }
   }
   return null;
+}
+
+type EffectsRow = { id: string; type: string; data: Record<string, unknown> };
+
+function stackKey(steps: unknown): string {
+  const list = Array.isArray(steps) ? (steps as EffectStep[]) : [];
+  return JSON.stringify(list.map((step) => [step.id, Object.entries(step.params ?? {}).sort(([a], [b]) => a.localeCompare(b)), step.enabled !== false]));
+}
+
+export function cutoutTwin(id: string, edges: { source: string; target: string }[], nodes: EffectsRow[]): string | null {
+  const self = nodes.find((node) => node.id === id);
+  const feed = edges.find((edge) => edge.target === id)?.source;
+  if (!self || !feed || !Array.isArray(self.data.effects)) {
+    return null;
+  }
+
+  const wanted = stackKey(counterpart(self.data.effects as EffectStep[]));
+  const siblings = new Set(edges.filter((edge) => edge.source === feed && edge.target !== id).map((edge) => edge.target));
+  const twin = nodes.find((node) => siblings.has(node.id) && node.type === 'effects' && stackKey(node.data.effects) === wanted);
+  return twin?.id ?? null;
 }
