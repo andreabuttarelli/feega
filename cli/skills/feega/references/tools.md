@@ -205,7 +205,9 @@ list. Returns how many combinations it actually stopped.
 a `motion` node, with the editor's own tools, and saves a new revision. `wait` defaults to true and
 returns the finished run (`reply`, `summary`, `version`, `cost_usd`); past about 4 minutes, or with
 `wait: false`, the run comes back `running` — poll `get_motion_run({ org, run_id })`. The agent
-cannot look at rendered frames: that needs the editor open in a browser. Spends credits.
+cannot look at rendered frames: that needs the editor open in a browser. Spends credits. For a launch film it
+rebuilds the product UI as vector components (UI kit or `recreate_ui` from a site capture),
+never as screenshots: asking "recreate the dashboard from the capture" works.
 
 `get_motion_summary({ org, node_id })` reads the saved video: revision, last change, size, fps,
 duration, tracks and clips in seconds. Spends nothing.
