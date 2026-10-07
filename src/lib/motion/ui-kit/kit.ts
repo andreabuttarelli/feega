@@ -729,9 +729,9 @@ const plans = param('plans', 'Free|$0|1 site; Subdomain; Community support\\nPro
 const featured = param('featured', 1, { type: 'number', min: 0, max: 3, group: 'Content' });
 const cta = param('cta', 'Choose plan', { type: 'text', group: 'Content' });
 const wrap = make('div', 'plans');
-const top = Math.round(featured);
+const featuredAt = Math.round(featured);
 const cards = rows(plans).slice(0, 4).map((r, i) => {
-  const plan = make('div', 'card plan' + (i === top ? ' top' : ''), wrap);
+  const plan = make('div', 'card plan' + (i === featuredAt ? ' top' : ''), wrap);
   make('div', 'pname', plan, r[0]);
   const price = make('div', 'price', plan);
   String(r[2] || '').split(';').filter((f) => f.trim()).forEach((f) => {
@@ -747,13 +747,13 @@ const CLICK = 0.4 + cards.length * 0.15 + 1;
 drive((t) => {
   cards.forEach((c, i) => {
     const p = out(span(t, 0.2 + i * 0.15, 0.45));
-    const lift = i === top ? springTo(t, 1) : 0;
+    const lift = i === featuredAt ? springTo(t, 1) : 0;
     c.plan.style.opacity = String(p);
     c.plan.style.transform = 'translateY(' + (50 * (1 - p) - 18 * lift) + 'px) scale(' + (1 + 0.04 * lift) + ')';
     c.price.textContent = counted(c.n, out(span(t, 0.3 + i * 0.15, 1)));
-    c.buy.style.transform = i === top ? 'scale(' + (1 - 0.06 * press(t, CLICK)) + ')' : '';
+    c.buy.style.transform = i === featuredAt ? 'scale(' + (1 - 0.06 * press(t, CLICK)) + ')' : '';
   });
-  glide(cursor, [1300, 760], cards[top] ? aim(cards[top].buy, wrap) : [720, 660], CLICK - 0.5, 0.45, t);
+  glide(cursor, [1300, 760], cards[featuredAt] ? aim(cards[featuredAt].buy, wrap) : [720, 660], CLICK - 0.5, 0.45, t);
 });
 `
 );
@@ -775,9 +775,9 @@ const CHAT = generic(
 const title = param('title', 'Assistant', { type: 'text', group: 'Content' });
 const messages = param('messages', 'user|Add a contact form to my homepage\\nbot|Done. The form is live under the hero, and replies go to your inbox.\\nuser|Make the button orange', { type: 'textarea', group: 'Content' });
 const chat = make('div', 'card chat');
-const top = make('div', 'top', chat);
-make('div', 'avatar', top);
-make('div', '', top, title);
+const header = make('div', 'top', chat);
+make('div', 'avatar', header);
+make('div', '', header, title);
 const feed = make('div', 'feed', chat);
 let at = 0.2;
 const turns = rows(messages).slice(0, 6).map((r) => {
