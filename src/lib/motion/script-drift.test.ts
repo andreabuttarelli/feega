@@ -80,6 +80,15 @@ describe('the video keeps to its script', () => {
     expect(drift(film(FAITHFUL, { [StoryBeat.Problem]: 0, [StoryBeat.Proof]: 6, [StoryBeat.Claim]: 10 })).map((p) => p.detail).join(' ')).toContain('mark_story');
   });
 
+  it('a line shown on a device screen counts for its act', () => {
+    const onScreen = text('pr', 'See it before it goes live.', 0, 4);
+    const device = newClip({ id: 'dev', from: 6 * FPS, durationInFrames: 4 * FPS, component: 'Device3D', props: { screenComp: 'phone' } });
+    const base = film([...FAITHFUL.filter((c) => c.id !== 'pr'), device]);
+    const doc = { ...base, comps: { phone: { name: 'Phone', durationInFrames: 4 * FPS, frame: { width: 390, height: 848 }, tracks: [{ id: 'pt', kind: 'visual', name: 'V', clips: [onScreen] }] } } } as unknown as MotionDoc;
+
+    expect(drift(doc)).toEqual([]);
+  });
+
   it('a film without a saved script is not checked against one', () => {
     expect(drift({ ...film([]), script: undefined })).toEqual([]);
   });

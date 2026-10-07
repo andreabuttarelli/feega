@@ -2,6 +2,7 @@ import { COMPONENTS, TrackKind } from './components';
 import type { MotionDoc } from './doc';
 import { UI_KIT } from './ui-kit/kit';
 import { settleTime } from './ui-kit/render';
+import { nestedComp } from './nested';
 
 export enum CutFault {
   MidAnimation = 'mid-animation',
@@ -48,9 +49,9 @@ function readClip(doc: MotionDoc, clip: Clip, offset: number, seen: ReadonlySet<
   }
   const cut = cutOf(clip);
   const moves = keyMoves(doc, clip, cut);
-  const comp = String(clip.props.comp ?? '');
-  const inner = clip.component === 'Precomp' && !seen.has(comp) ? doc.comps[comp] : undefined;
-  const nested = new Set([...seen, comp]);
+  const comp = nestedComp(clip);
+  const inner = comp && !seen.has(comp) ? doc.comps[comp] : undefined;
+  const nested = new Set([...seen, comp ?? '']);
   const children = (inner?.tracks.flatMap((t) => t.clips as Clip[]) ?? [])
     .filter((c) => c.from < cut)
     .map((c) => ({ from: c.from, read: readClip(doc, { ...c, durationInFrames: Math.min(c.durationInFrames, cut - c.from) }, offset + clip.from, nested) }));

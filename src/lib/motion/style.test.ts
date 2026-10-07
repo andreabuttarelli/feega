@@ -188,6 +188,17 @@ describe('the launch film style', () => {
     expect(effects(peak)).not.toContain(Forbidden.NoPeak);
   });
 
+  it('finds the peak in a device turning 90° or more between its start and end angles', () => {
+    const flat = [0, 3, 6].reduce((doc, s, i) => withClip(doc, `t${i}`, 'Title', { keyframes: rise }, at(s)), film());
+    const turned = (start: number, end: number) => {
+      const doc = withClip(flat, 'd', 'Device3D', {}, at(6));
+      return { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === 'd' ? { ...c, props: { ...c.props, startAngle: start, endAngle: end } } : c)) })) };
+    };
+
+    expect(effects(turned(-100, 0))).not.toContain(Forbidden.NoPeak);
+    expect(effects(turned(-20, 40))).toContain(Forbidden.NoPeak);
+  });
+
   it('a short clip has no peak to find', () => {
     expect(effects(withClip(film(), 't', 'Title', { keyframes: rise }))).not.toContain(Forbidden.NoPeak);
   });

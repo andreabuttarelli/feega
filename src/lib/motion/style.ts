@@ -272,7 +272,11 @@ function offBeat(doc: MotionDoc): Found[] {
   return missed ? [{ clip: missed, at: missed.from, detail: `${missed.id} cuts in off the beat: move it onto a beat (cut_to_beat or move_clip to "beat N")` }] : [];
 }
 
-const peakOf = (clip: Clip) => Object.entries(PEAK_TRAVEL).some(([prop, size]) => travel(clip.keyframes[prop] ?? []) >= size);
+const PEAK_SPANS: readonly { from: string; to: string; size: number }[] = [{ from: 'startAngle', to: 'endAngle', size: 90 }];
+
+const spanned = (clip: Clip) => PEAK_SPANS.some(({ from, to, size }) => Math.abs(Number(clip.props[to] ?? 0) - Number(clip.props[from] ?? 0)) >= size);
+
+const peakOf = (clip: Clip) => spanned(clip) || Object.entries(PEAK_TRAVEL).some(([prop, size]) => travel(clip.keyframes[prop] ?? []) >= size);
 
 function noPeak(doc: MotionDoc): Found[] {
   const clips = timelines(doc).flat();
