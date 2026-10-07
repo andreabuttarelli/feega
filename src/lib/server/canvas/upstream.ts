@@ -341,8 +341,8 @@ async function toUpstreamNode(
     return audioUpstreamNode(db, orgId, node);
   }
 
-  const refId = typeof node.data.refId === 'string' ? node.data.refId : null;
-  const asset = refId ? await findAsset(db, { orgId, assetId: refId }) : null;
+  const shownId = typeof node.data.refId === 'string' ? node.data.refId : uploadedAssetIdOf(node.data);
+  const asset = shownId ? await findAsset(db, { orgId, assetId: shownId }) : null;
 
   return {
     id: node.id,
@@ -351,6 +351,10 @@ async function toUpstreamNode(
     text: sourceText(node, asset),
     mediaUrl: sourceMediaUrl(asset)
   };
+}
+
+function uploadedAssetIdOf(data: Record<string, unknown>): string | null {
+  return typeof data.assetId === 'string' ? data.assetId : null;
 }
 
 const MEDIUM_OF_ASSET: Partial<Record<string, Medium>> = { audio: 'audio', video: 'video' };

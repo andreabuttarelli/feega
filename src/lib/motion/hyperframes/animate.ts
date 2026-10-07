@@ -1,8 +1,16 @@
-import { boxOf, type Box, type Placement } from '../layout';
 import type { MotionClip } from '../doc';
-import { Source, TRANSFORM, ValueKind, animProp, easeName, sampleTrack, type EaseSpec, type Keyframe, type SceneKey, type TransformKey } from '../keyframes';
+import { Source, TRANSFORM, ValueKind, animProp, easeName, isPlainTrack, sampleColor, sampleTrack, type EaseSpec, type Keyframe, type SceneKey, type TransformKey } from '../keyframes';
 import { css, js, px } from './html';
-import type { Vars } from './templates';
+import { Ease } from '../design';
+import { MASK_LANES, MaskScope, maskTarget } from './masks';
+import type { MaskKey } from '../mask';
+import { ParentOpacity, pivotOf } from '../parent';
+import { animatorOfKey, animatorProps, cssName } from '../text-animators/model';
+import { textHostId } from '../text-animators/render';
+import { ENGINE_GLOBAL } from '../engine/engine';
+import { OUT, Out } from './channel-out';
+
+export const ENGINE = `window.${ENGINE_GLOBAL}`;
 
 type Frame = { width: number; height: number; fps: number };
 
@@ -12,38 +20,64 @@ enum Wrapper {
   Scale = 'ks'
 }
 
-type Channel = { wrapper: Wrapper; gsap: string; out: (value: number, frame: Frame) => number | string };
-
-const same = (v: number) => v;
+type Channel = { wrapper: Wrapper; prop: string; out: Out };
 
 const CHANNELS: Record<Exclude<TransformKey, 'anchorX' | 'anchorY'>, Channel> = {
-  x: { wrapper: Wrapper.Transform, gsap: 'x', out: (v, f) => round(v * f.width) },
-  y: { wrapper: Wrapper.Transform, gsap: 'y', out: (v, f) => round(v * f.height) },
-  z: { wrapper: Wrapper.Transform, gsap: 'z', out: same },
-  scale: { wrapper: Wrapper.Scale, gsap: 'scale', out: same },
-  scaleX: { wrapper: Wrapper.Transform, gsap: 'scaleX', out: same },
-  scaleY: { wrapper: Wrapper.Transform, gsap: 'scaleY', out: same },
-  rotateX: { wrapper: Wrapper.Transform, gsap: 'rotationX', out: same },
-  rotateY: { wrapper: Wrapper.Transform, gsap: 'rotationY', out: same },
-  rotateZ: { wrapper: Wrapper.Transform, gsap: 'rotation', out: same },
-  skewX: { wrapper: Wrapper.Transform, gsap: 'skewX', out: same },
-  skewY: { wrapper: Wrapper.Transform, gsap: 'skewY', out: same },
-  perspective: { wrapper: Wrapper.Perspective, gsap: 'perspective', out: (v) => px(v) },
-  opacity: { wrapper: Wrapper.Transform, gsap: 'opacity', out: same },
-  blur: { wrapper: Wrapper.Transform, gsap: 'filter', out: (v) => `blur(${px(v)})` }
+  x: { wrapper: Wrapper.Transform, prop: 'x', out: Out.Width },
+  y: { wrapper: Wrapper.Transform, prop: 'y', out: Out.Height },
+  z: { wrapper: Wrapper.Transform, prop: 'z', out: Out.Same },
+  scale: { wrapper: Wrapper.Scale, prop: 'scale', out: Out.Same },
+  scaleX: { wrapper: Wrapper.Transform, prop: 'scaleX', out: Out.Same },
+  scaleY: { wrapper: Wrapper.Transform, prop: 'scaleY', out: Out.Same },
+  rotateX: { wrapper: Wrapper.Transform, prop: 'rotationX', out: Out.Same },
+  rotateY: { wrapper: Wrapper.Transform, prop: 'rotationY', out: Out.Same },
+  rotateZ: { wrapper: Wrapper.Transform, prop: 'rotation', out: Out.Same },
+  skewX: { wrapper: Wrapper.Transform, prop: 'skewX', out: Out.Same },
+  skewY: { wrapper: Wrapper.Transform, prop: 'skewY', out: Out.Same },
+  perspective: { wrapper: Wrapper.Perspective, prop: 'perspective', out: Out.Px },
+  opacity: { wrapper: Wrapper.Transform, prop: 'opacity', out: Out.Same },
+  blur: { wrapper: Wrapper.Transform, prop: 'filter', out: Out.Blur }
 };
+
+export type LiveTarget = { target: string; prop: string; out: Out };
+
+const LIVE_TARGET: Partial<Record<Source, (clip: MotionClip, key: string, parents: Parents) => LiveTarget | null>> = {
+  [Source.Transform]: (clip, key, parents) => {
+    const channel = CHANNELS[key as keyof typeof CHANNELS];
+    return channel ? { target: target(channel.wrapper, clip, key, parents), prop: channel.prop, out: channel.out } : null;
+  },
+  [Source.Prop]: (clip, key) => ({ target: target(Wrapper.Scale, clip), prop: cssVar(key), out: Out.Same })
+};
+
+export function liveTarget(clip: MotionClip, key: string, parents: Parents): LiveTarget | null {
+  const prop = animProp(clip.component, key, animatorProps(clip.animators));
+  if (!prop || prop.kind !== ValueKind.Number) {
+    return null;
+  }
+  return LIVE_TARGET[prop.source]?.(clip, key, parents) ?? null;
+}
 
 export const ANIMATE_CSS = '.kp{position:absolute;inset:0}.kf,.ks{position:absolute;inset:0;transform-style:preserve-3d;backface-visibility:visible;will-change:transform,opacity,filter}';
 
-export type KfTween = { target: string; from: Vars; to: Vars; at: number; duration: number; ease: string };
+type TweenVars = Record<string, unknown>;
 
-type Lane = { target: string; prop: string; track: Keyframe[]; out: (value: Keyframe['value']) => number | string };
+export type KfTween = { target: string; from: TweenVars; to: TweenVars; at: number; duration: number; ease: string };
+
+type Lane = { target: string; source: Source; track: Keyframe[]; vars: (value: Keyframe['value']) => TweenVars };
 
 function round(n: number): number {
   return Math.round(n * 10000) / 10000;
 }
 
-const target = (wrapper: Wrapper, clip: MotionClip) => `#${wrapper}-${clip.id}`;
+const COPY_CLASS: Record<Wrapper, (key: string) => string> = {
+  [Wrapper.Perspective]: () => 'kpc',
+  [Wrapper.Transform]: (key) => (key === 'opacity' ? 'ko' : 'kc'),
+  [Wrapper.Scale]: () => 'ksc'
+};
+
+export type Parents = ReadonlySet<string>;
+
+const target = (wrapper: Wrapper, clip: MotionClip, key = '', parents: Parents = new Set()) => `#${wrapper}-${clip.id}${parents.has(clip.id) ? `,.${COPY_CLASS[wrapper](key)}-${clip.id}` : ''}`;
 
 const CSS_VAR_PREFIX = '--kc-';
 
@@ -55,32 +89,62 @@ export function isAnimated(clip: MotionClip): boolean {
   return Object.keys(clip.transform).length > 0 || Object.keys(clip.keyframes).length > 0;
 }
 
-type LaneInput = { clip: MotionClip; key: string; track: Keyframe[]; frame: Frame; resolve: (color: string) => string };
+type LaneInput = { clip: MotionClip; key: string; track: Keyframe[]; frame: Frame; resolve: (color: string) => string; parents: Parents };
 
 const LANE: Record<Source, (input: LaneInput) => Lane[]> = {
-  [Source.Transform]: ({ clip, key, track, frame }) => {
+  [Source.Transform]: ({ clip, key, track, frame, parents }) => {
     const channel = CHANNELS[key as keyof typeof CHANNELS];
-    return [{ target: target(channel.wrapper, clip), prop: channel.gsap, track, out: (v) => channel.out(Number(v), frame) }];
+    return [{ target: target(channel.wrapper, clip, key, parents), source: Source.Transform, track, vars: (v) => ({ [channel.prop]: OUT[channel.out](Number(v), frame) }) }];
   },
-  [Source.Prop]: ({ clip, key, track, resolve }) => [{ target: target(Wrapper.Scale, clip), prop: cssVar(key), track, out: (v) => resolve(String(v)) }],
-  [Source.Scene]: () => []
+  [Source.Prop]: ({ clip, key, track, resolve }) => [{ target: target(Wrapper.Scale, clip), source: Source.Prop, track, vars: (v) => ({ [cssVar(key)]: resolve(String(v)) }) }],
+  [Source.Scene]: () => [],
+  [Source.Param]: () => [],
+  [Source.Effect]: () => [],
+  [Source.Modifier]: () => [],
+  [Source.Remap]: () => [],
+  [Source.Animator]: ({ clip, key, track, resolve }) => {
+    const ref = animatorOfKey(key);
+    return ref ? [{ target: `#${textHostId(clip.id)}`, source: Source.Animator, track, vars: (v) => ({ [cssName(ref.id, ref.field)]: typeof v === 'string' ? resolve(v) : v }) }] : [];
+  },
+  [Source.Sound]: () => [],
+  [Source.Layout]: () => [],
+  [Source.TextPath]: () => [],
+  [Source.Mask]: ({ clip, key, track, frame }) =>
+    clip.mask
+      ? MASK_LANES[key as MaskKey].map((a) => ({ target: `#${maskTarget(MaskScope.Own, a.part, clip.id)}`, source: Source.Mask, track, vars: (v) => ({ attr: { [a.attr]: a.out(Number(v), frame) } }) }))
+      : []
 };
 
-function lanes(clip: MotionClip, frame: Frame, resolve: (color: string) => string): Lane[] {
+function lanes(clip: MotionClip, frame: Frame, resolve: (color: string) => string, parents: Parents): Lane[] {
   return Object.entries(clip.keyframes).flatMap(([key, track]) => {
-    const prop = animProp(clip.component, key);
-    return prop ? LANE[prop.source]({ clip, key, track, frame, resolve }) : [];
+    const prop = animProp(clip.component, key, animatorProps(clip.animators));
+    return prop ? LANE[prop.source]({ clip, key, track, frame, resolve, parents }) : [];
   });
 }
 
-export function keyframeTweens(clip: MotionClip, frame: Frame, resolve: (color: string) => string): KfTween[] {
-  return lanes(clip, frame, resolve).flatMap((lane) =>
+function frameByFrame(track: Keyframe[], resolve: (color: string) => string): Keyframe[] {
+  const first = track[0].frame;
+  const last = track[track.length - 1].frame;
+  const colour = typeof track[0].value === 'string';
+  return Array.from({ length: last - first + 1 }, (_, i) => ({
+    frame: first + i,
+    value: colour ? sampleColor(track, first + i, resolve) : sampleTrack(track, first + i),
+    ease: Ease.Linear
+  }));
+}
+
+function bakedLane(lane: Lane, resolve: (color: string) => string): Lane {
+  return isPlainTrack(lane.track) ? lane : { ...lane, track: frameByFrame(lane.track, resolve) };
+}
+
+export function keyframeTweens(clip: MotionClip, frame: Frame, resolve: (color: string) => string, parents: Parents = new Set()): KfTween[] {
+  return lanes(clip, frame, resolve, parents).map((lane) => bakedLane(lane, resolve)).flatMap((lane) =>
     lane.track.slice(0, -1).map((k, i) => {
       const next = lane.track[i + 1];
       return {
         target: lane.target,
-        from: { [lane.prop]: lane.out(k.value) },
-        to: { [lane.prop]: lane.out(next.value) },
+        from: lane.vars(k.value),
+        to: lane.vars(next.value),
         at: (clip.from + k.frame) / frame.fps,
         duration: (next.frame - k.frame) / frame.fps,
         ease: easeName(k.ease)
@@ -89,13 +153,13 @@ export function keyframeTweens(clip: MotionClip, frame: Frame, resolve: (color: 
   );
 }
 
-function holds(clip: MotionClip, frame: Frame, resolve: (color: string) => string): string[] {
+function holds(clip: MotionClip, frame: Frame, resolve: (color: string) => string, parents: Parents): string[] {
   const start = clip.from / frame.fps;
-  return lanes(clip, frame, resolve).map((lane) => `tl.set(${js(lane.target)},${js({ [lane.prop]: lane.out(lane.track[0].value) })},${start});`);
+  return lanes(clip, frame, resolve, parents).map((lane) => `tl.set(${js(lane.target)},${js(lane.vars(lane.track[0].value))},${start});`);
 }
 
-function initial(clip: MotionClip, frame: Frame, resolve: (color: string) => string): string[] {
-  const vars = new Map<string, Vars>();
+function initial(clip: MotionClip, frame: Frame, resolve: (color: string) => string, parents: Parents): string[] {
+  const vars = new Map<string, TweenVars>();
   const put = (t: string, prop: string, value: number | string) => vars.set(t, { ...vars.get(t), [prop]: value });
 
   for (const [key, channel] of Object.entries(CHANNELS) as [keyof typeof CHANNELS, Channel][]) {
@@ -104,12 +168,12 @@ function initial(clip: MotionClip, frame: Frame, resolve: (color: string) => str
     if (value === undefined || channel.wrapper === Wrapper.Perspective) {
       continue;
     }
-    put(target(channel.wrapper, clip), channel.gsap, channel.out(value, frame));
+    put(target(channel.wrapper, clip, key, parents), channel.prop, OUT[channel.out](value, frame));
   }
-  for (const lane of lanes(clip, frame, resolve).filter((l) => l.prop.startsWith(CSS_VAR_PREFIX))) {
-    put(lane.target, lane.prop, lane.out(lane.track[0].value));
+  for (const lane of lanes(clip, frame, resolve, parents).filter((l) => l.source === Source.Prop)) {
+    vars.set(lane.target, { ...vars.get(lane.target), ...lane.vars(lane.track[0].value) });
   }
-  return [...vars].map(([t, v]) => `gsap.set(${js(t)},${js(v)});`);
+  return [...vars].map(([t, v]) => `${ENGINE}.set(${js(t)},${js(v)});`);
 }
 
 function bezierEases(clips: MotionClip[]): string[] {
@@ -119,16 +183,16 @@ function bezierEases(clips: MotionClip[]): string[] {
       curves.set(easeName(k.ease), k.ease);
     }
   }
-  return [...curves].map(([name, ease]) => `gsap.registerEase(${js(name)},function(p){return KF_SAMPLE([{frame:0,value:0,ease:${js(ease)}},{frame:1,value:1,ease:"linear"}],p);});`);
+  return [...curves].map(([name, ease]) => `${ENGINE}.registerEase(${js(name)},function(p){return KF_SAMPLE([{frame:0,value:0,ease:${js(ease)}},{frame:1,value:1,ease:"linear"}],p);});`);
 }
 
-export function animationScript(clips: MotionClip[], frame: Frame, resolve: (color: string) => string): { setup: string; timeline: string } {
+export function animationScript(clips: MotionClip[], frame: Frame, resolve: (color: string) => string, parents: Parents = new Set()): { setup: string; timeline: string } {
   const animated = clips.filter(isAnimated);
   const eases = bezierEases(animated);
   const sampler = eases.length ? `const KF_SAMPLE=(${sampleTrack.toString()});` : '';
-  const setup = [sampler, ...eases, ...animated.flatMap((c) => initial(c, frame, resolve))].join('');
+  const setup = [sampler, ...eases, ...animated.flatMap((c) => initial(c, frame, resolve, parents))].join('');
   const timeline = animated
-    .flatMap((c) => [...holds(c, frame, resolve), ...keyframeTweens(c, frame, resolve).map(tweenLine)])
+    .flatMap((c) => [...holds(c, frame, resolve, parents), ...keyframeTweens(c, frame, resolve, parents).map(tweenLine)])
     .join('');
   return { setup, timeline };
 }
@@ -137,29 +201,51 @@ function tweenLine(t: KfTween): string {
   return `tl.fromTo(${js(t.target)},${js(t.from)},${js({ ...t.to, duration: t.duration, ease: t.ease, immediateRender: false })},${t.at});`;
 }
 
-function placement(props: Record<string, unknown>): Placement | null {
-  const { x, y, width, height } = props as Partial<Placement>;
-  return [x, y, width, height].every((n) => typeof n === 'number') ? ({ x, y, width, height } as Placement) : null;
+type WrapperNames = Record<Wrapper, string>;
+
+function wrapped(clip: MotionClip, frame: Frame, names: WrapperNames, inner: string): string {
+  const [x, y] = pivotOf(clip, frame);
+  const origin = `${px(x)} ${px(y)}`;
+  const perspective = clip.keyframes.perspective?.[0]?.value ?? clip.transform.perspective ?? TRANSFORM.perspective.fallback;
+
+  return `<div ${names[Wrapper.Perspective]} style="${css({ perspective: px(Number(perspective)), perspectiveOrigin: origin })}"><div ${names[Wrapper.Transform]} style="${css({ transformOrigin: origin })}"><div ${names[Wrapper.Scale]} style="${css({ transformOrigin: origin })}">${inner}</div></div></div>`;
 }
 
 export function wrapAnimated(clip: MotionClip, frame: Frame, inner: string): string {
   if (!isAnimated(clip)) {
     return inner;
   }
-  const p = placement(clip.props);
-  const box: Box = p ? boxOf(p, frame) : { left: 0, top: 0, width: frame.width, height: frame.height };
-  const ax = clip.transform.anchorX ?? TRANSFORM.anchorX.fallback;
-  const ay = clip.transform.anchorY ?? TRANSFORM.anchorY.fallback;
-  const origin = `${px(box.left + ax * box.width)} ${px(box.top + ay * box.height)}`;
-  const perspective = clip.keyframes.perspective?.[0]?.value ?? clip.transform.perspective ?? TRANSFORM.perspective.fallback;
-
-  return `<div class="kp" id="kp-${clip.id}" style="${css({ perspective: px(Number(perspective)), perspectiveOrigin: origin })}"><div class="kf" id="kf-${clip.id}" style="${css({ transformOrigin: origin })}"><div class="ks" id="ks-${clip.id}" style="${css({ transformOrigin: origin })}">${inner}</div></div></div>`;
+  return wrapped(clip, frame, { [Wrapper.Perspective]: `class="kp" id="kp-${clip.id}"`, [Wrapper.Transform]: `class="kf" id="kf-${clip.id}"`, [Wrapper.Scale]: `class="ks" id="ks-${clip.id}"` }, inner);
 }
 
-export function colourOverrides(clip: MotionClip): Record<string, string> {
+const OPACITY_CLASS: Record<ParentOpacity, (id: string) => string> = {
+  [ParentOpacity.Inherit]: (id) => ` ${COPY_CLASS[Wrapper.Transform]('opacity')}-${id}`,
+  [ParentOpacity.Ignore]: () => ''
+};
+
+export function wrapParents(chain: readonly MotionClip[], child: MotionClip, frame: Frame, inner: string): string {
+  return chain
+    .filter(isAnimated)
+    .reduceRight(
+      (acc, parent) =>
+        wrapped(
+          parent,
+          frame,
+          {
+            [Wrapper.Perspective]: `class="kp ${COPY_CLASS[Wrapper.Perspective]('')}-${parent.id}"`,
+            [Wrapper.Transform]: `class="kf ${COPY_CLASS[Wrapper.Transform]('')}-${parent.id}${OPACITY_CLASS[child.parentOpacity](parent.id)}"`,
+            [Wrapper.Scale]: `class="ks ${COPY_CLASS[Wrapper.Scale]('')}-${parent.id}"`
+          },
+          acc
+        ),
+      inner
+    );
+}
+
+export function keyedOverrides(clip: MotionClip): Record<string, string> {
   return Object.fromEntries(
     Object.keys(clip.keyframes)
-      .filter((key) => animProp(clip.component, key)?.kind === ValueKind.Color)
+      .filter((key) => animProp(clip.component, key)?.source === Source.Prop)
       .map((key) => [key, `var(${cssVar(key)})`])
   );
 }

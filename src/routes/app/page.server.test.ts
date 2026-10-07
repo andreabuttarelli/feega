@@ -63,7 +63,7 @@ describe('/app is the dashboard for a returning user', () => {
     expect(data.dashboard.projects.map((p) => p.id)).toEqual(['p1']);
     expect(data.dashboard.projects[0].canvases).toEqual([{ id: 'c1', name: 'Board', href: '/p/p1/c/c1' }]);
     expect(data.dashboard.batches[0].href).toBe('/app/studio/b1');
-    expect(data.tools.map((t) => t.id)).toEqual(['studio', 'motion']);
+    expect(data.tools.map((t) => t.id)).toEqual(['studio', 'motion', 'compose', 'upscale']);
   });
 
   it('a first-run or campaign arrival is sent on to its canvas', async () => {

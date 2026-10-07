@@ -84,7 +84,10 @@ Every generation prompt is screened automatically before it reaches a model, by 
 **Always prohibited, in every mode:**
 
 - any sexual, suggestive or nude content involving minors or persons who appear to be minors, including fictional, drawn or virtual depictions;
-- sexual or nude content depicting a real, identifiable person, and deepfakes of real people made to deceive, defame or harass;
+- pornographic and sexually explicit content, which is prohibited in every mode;
+- non-consensual intimate imagery (NCII), real or synthetic;
+- sexual deepfakes: any sexualised or nude depiction of a real, identifiable person;
+- deepfakes of real people made to deceive, defame or harass;
 - non-consensual sexual content, sexual violence, voyeurism or "revenge" content;
 - graphic violence, gore, torture or realistic depictions of killing;
 - sexual content involving animals;
@@ -98,16 +101,19 @@ Every generation prompt is screened automatically before it reaches a model, by 
 
 You also must not: probe, bypass or overload the moderation or rate limits; reverse-engineer, decompile or scrape the Service or any model; disrupt, overload or attack the Service or the systems connected to it, or introduce malware; gain or attempt unauthorised access; use the Service or any output to develop a competing product or to train a competing model; generate or distribute disinformation or misleading political content; carry out biometric processing, surveillance or monitoring of people without their explicit consent; share API keys outside your organisation; resell the Service without our written consent; use the Service for high-risk purposes listed in Annex III of the AI Act; or breach the terms of any connected platform.
 
-## 9. Uncensored mode
+## 9. Age-restricted features
 
 > **Not yet available.** The rules below will apply once age verification is live.
 
-- Uncensored mode offers models without built-in content filters, for adults (18+). Our safety rules still apply.
-- Uncensored mode is a **separate workspace area, off by default**. It requires a paid plan, the workspace owner's explicit opt-in and attestation, and each user's **age verification (18+) through a certified third-party provider**. We keep only the result, not identity documents.
-- Content created there stays isolated: uncensored projects are badged, listed apart, and **cannot be shared, published, scheduled or used in ads**.
+- Age-restricted features are a **project setting, off by default**, for adults (18+). They allow non-sexual artistic nudity of fictional adults, fictional violence, horror, satire and strong themes. Our safety rules still apply.
+- Pornographic and sexually explicit content is prohibited in every mode. With these features, real or identifiable people and anything appearing to involve a minor are refused.
+- Turning them on requires a paid plan, the workspace owner's explicit opt-in and attestation, and each user's **age verification (18+) through a certified third-party provider**. We keep only the result, not identity documents.
+- Projects using them are badged, cannot use reference images showing people, and **cannot be shared, published, scheduled or used in ads**.
 - Every result is labelled as AI-generated, including in the downloaded file name.
 - All "always prohibited" rules in §8 continue to apply. Only fictional adults may be depicted.
-- We may withdraw uncensored mode, or access to it, at any time.
+- Prompts, references and outputs are screened and logs are kept. Unlawful use may be reported to the competent authorities; child sexual abuse material is always reported.
+- A project can go back to standard only if nothing was produced with these features.
+- We may withdraw age-restricted features, or access to them, at any time.
 
 ## 10. Labelling of AI-generated content
 

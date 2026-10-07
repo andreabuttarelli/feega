@@ -19,7 +19,7 @@
   import Trash from '@lucide/svelte/icons/trash-2';
   import Search from '@lucide/svelte/icons/search';
   import Ellipsis from '@lucide/svelte/icons/ellipsis';
-  import ShieldAlert from '@lucide/svelte/icons/shield-alert';
+  import { UNCENSORED_NOTICE } from '$lib/uncensored-lock';
   import { DropdownMenu as MenuPrimitive } from 'bits-ui';
   import { Badge } from '$lib/components/ui/badge/index.js';
   import { matching, needsSearch, recentFirst } from '$lib/canvas/switcher-list';
@@ -53,7 +53,6 @@
     profile,
     org,
     projectMode = ProjectMode.Standard,
-    uncensored = null,
     brandName = null
   }: {
     projectId: string;
@@ -70,21 +69,17 @@
     profile: { name: string | null; email: string; avatarUrl: string | null };
     org: { name: string } | null;
     projectMode?: string;
-    uncensored?: { visible: boolean; text: string } | null;
     brandName?: string | null;
   } = $props();
 
   const ICON = 16;
   const EDGE = 8;
 
-  const standardProjects = $derived(projects.filter((p) => p.mode !== ProjectMode.Uncensored));
-  const uncensoredProjects = $derived(projects.filter((p) => p.mode === ProjectMode.Uncensored));
 
   let projectQuery = $state('');
   let searchInput = $state<HTMLInputElement | null>(null);
   const projectSearch = $derived(needsSearch(projects.length));
-  const shownProjects = $derived(matching(recentFirst(standardProjects), projectQuery));
-  const shownUncensoredProjects = $derived(matching(recentFirst(uncensoredProjects), projectQuery));
+  const shownProjects = $derived(matching(recentFirst(projects), projectQuery));
 
   function focusSearch(event: Event) {
     if (!searchInput) {
@@ -183,7 +178,7 @@
     <DropdownMenu.Root onOpenChange={() => (projectQuery = '')}>
       <DropdownMenu.Trigger class="switcher-btn" data-testid="project-switcher" title={projectName}>
         {#if inUncensored}
-          <span class="uncensored-badge" data-testid="uncensored-project-badge">Uncensored</span>
+          <span class="uncensored-badge" data-testid="uncensored-project-badge" title={UNCENSORED_NOTICE}>Uncensored</span>
         {/if}
         <span class="truncate">{projectName}</span>
         <ChevronDown size={ICON} />
@@ -207,23 +202,6 @@
         {:else}
           <div class="sw-empty">{$_('app.shell.canvasActions.noMatch')}</div>
         {/each}
-        {#if uncensored?.visible}
-          <DropdownMenu.Separator />
-          <div class="sw-label sw-uncensored" data-testid="uncensored-section">
-            <span class="uncensored-badge">Uncensored</span>18+
-          </div>
-          {#each shownUncensoredProjects as project (project.id)}
-            {@render projectRow(project)}
-          {/each}
-          <DropdownMenu.Item class="sw-row">
-            {#snippet child({ props })}
-              <a {...props} href={`/p/${projectId}/uncensored`} data-testid="uncensored-workspace-link">
-                <span class="sw-lead"><ShieldAlert size={ICON} /></span>
-                <span class="sw-name">{uncensored.text}</span>
-              </a>
-            {/snippet}
-          </DropdownMenu.Item>
-        {/if}
       </DropdownMenu.Content>
     </DropdownMenu.Root>
     {/if}
@@ -324,6 +302,7 @@
           <a {...props} href={project.href} title={project.name} data-sw-link>
             <span class="sw-lead">{#if current}<Check size={ICON} />{/if}</span>
             <span class="sw-name">{project.name}</span>
+            {#if project.mode === ProjectMode.Uncensored}<span class="uncensored-badge" title={UNCENSORED_NOTICE}>Uncensored</span>{/if}
             <span class="sw-meta">{formatLastEdited(project.updatedAt)}</span>
           </a>
         {/snippet}
@@ -458,9 +437,9 @@
   }
 
   .rename-save {
-    border: 1px solid var(--ink, #1d1d1f);
-    background: var(--ink, #1d1d1f);
-    color: var(--paper, #fff);
+    border: 1px solid var(--ui-accent);
+    background: var(--ui-accent);
+    color: var(--ui-accent-ink);
     padding: 4px 8px;
     font: inherit;
     font-size: 12px;
@@ -495,9 +474,9 @@
     height: 30px;
     padding: 0 10px;
     flex-shrink: 0;
-    border: 1px solid var(--ink, #1d1d1f);
-    background: var(--ink, #1d1d1f);
-    color: var(--paper, #fff);
+    border: 1px solid var(--ui-line-strong);
+    background: var(--ui-bg);
+    color: var(--ui-ink);
     font: inherit;
     font-size: 12.5px;
     font-weight: 600;
@@ -569,10 +548,6 @@
     text-transform: uppercase;
     color: var(--ink-faint, #9a9a9e);
   }
-  :global(.sw-uncensored) {
-    color: var(--color-destructive);
-  }
-
   :global(.sw-search) {
     position: sticky;
     top: -4px;

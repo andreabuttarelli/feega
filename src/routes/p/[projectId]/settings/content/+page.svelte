@@ -7,6 +7,7 @@
   import { Field, FieldLayout } from '$lib/components/ui/field';
   import { Button } from '$lib/components/ui/button';
   import { Notice } from '$lib/components/ui/notice';
+  import { UNCENSORED_NOTICE } from '$lib/uncensored-lock';
 
   let { data, form } = $props();
   const SHEET_PATH = '/settings/content';
@@ -57,6 +58,10 @@
           <input type="checkbox" name="acceptPolicy" required />
           I accept the uncensored mode policy (version {data.policyVersion}): no minors, no real people, no non-consensual
           content, and I am responsible for where outputs are used.
+        </label>
+        <label class="flex items-start gap-2">
+          <input type="checkbox" name="acknowledgeScreening" required />
+          I understand: {UNCENSORED_NOTICE}
         </label>
         <div><Button type="submit">Allow uncensored models</Button></div>
       </form>

@@ -1133,7 +1133,7 @@ export const actions: Actions = {
       return fail(404, { error: 'nodo non trovato' });
     }
 
-    const min = nodeSize(existing.type);
+    const min = nodeSize(existing.type, existing.data);
     await resizeNode(scope.db, {
       orgId: scope.orgId,
       nodeId,

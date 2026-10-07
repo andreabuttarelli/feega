@@ -16,7 +16,7 @@ const { GET } = await import('./+server');
 
 const USER = { id: 'user-1' };
 const PROJECT = 'proj-1';
-const BACK = `/p/${PROJECT}/uncensored`;
+const BACK = `/p/${PROJECT}/settings/project`;
 const ERASE_URL = 'https://verification.didit.me/v3/session/s-1/delete/';
 
 function event(sessionId: string) {

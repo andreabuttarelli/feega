@@ -19,7 +19,7 @@ import { PLACEMENT_GAP } from './placement';
 import { NODE_PORTS } from './node-ports';
 import { portAccepts, type ConnectorType } from './connectors';
 import { IMAGE_MODEL_CHOICES, imageModelSpec } from '$lib/image-models';
-import { VIDEO_MODEL_CHOICES, videoModelSpec } from '$lib/video-models';
+import { OPENROUTER_UPSCALE_MODEL, VIDEO_MODEL_CHOICES, videoModelSpec, videoRefCapacity } from '$lib/video-models';
 import { audioInputPorts, audioModelsOf, audioOperationOf } from './audio-operations';
 import { DEFAULT_MODEL } from './default-models';
 import { MODEL3D_MODELS } from '$lib/model3d-models';
@@ -37,7 +37,7 @@ const audioOperation = (node: TemplateNode) => audioOperationOf((node.data.param
 const KNOWN_MODELS: Record<string, (node: TemplateNode) => readonly string[]> = {
   text: () => [DEFAULT_MODEL.text],
   image: () => IMAGE_MODEL_CHOICES.map((c) => c.id),
-  video: () => VIDEO_MODEL_CHOICES.map((c) => c.id),
+  video: () => [...VIDEO_MODEL_CHOICES.map((c) => c.id), OPENROUTER_UPSCALE_MODEL],
   audio: (node) => audioModelsOf(audioOperation(node)),
   model3d: () => Object.values(MODEL3D_MODELS)
 };
@@ -45,7 +45,10 @@ const KNOWN_MODELS: Record<string, (node: TemplateNode) => readonly string[]> = 
 const ACCEPTED_HANDLES: Record<string, (node: TemplateNode) => ConnectorType[]> = {
   text: () => ['text'],
   image: (node) => ((imageModelSpec(modelOf(node))?.maxRefs ?? 0) > 0 ? ['text', 'images'] : ['text']),
-  video: (node) => (videoModelSpec(modelOf(node))?.roles.includes('image') ? ['text', 'images', 'first_frame', 'last_frame'] : ['text']),
+  video: (node) => [
+    ...(videoModelSpec(modelOf(node))?.roles.includes('image') ? (['text', 'images', 'first_frame', 'last_frame'] as const) : (['text'] as const)),
+    ...(videoRefCapacity(modelOf(node)).videos > 0 ? (['videos'] as const) : [])
+  ],
   audio: (node) => audioInputPorts(audioOperation(node)),
   model3d: () => ['images', 'text']
 };

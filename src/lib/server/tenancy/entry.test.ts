@@ -243,6 +243,15 @@ describe('a landing campaign lands with its template', () => {
     expect(d.seedWelcome).not.toHaveBeenCalled();
   });
 
+  it('a campaign a tool serves lands on that tool, in the same project, after seeding its canvas', async () => {
+    const d = deps({});
+
+    const path = await homePathFor(db, d, user, null, null, 'ai-video-upscaler');
+
+    expect(d.seedWelcome).toHaveBeenCalled();
+    expect(path).toBe(`/app/upscale?project=${PROJECT}`);
+  });
+
   it('a campaign already spent lands on the plain canvas', async () => {
     const d = deps({ seedWelcome: vi.fn(async () => false) });
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { ThemePref, applyTheme, parseThemePref, resolvedTheme } from '$lib/theme';
   import '../app.css';
   import { page } from '$app/stores';
   import { navigating } from '$app/state';
@@ -101,22 +102,24 @@
     }
   });
 
-  // Resolve the colour theme for EVERY page (not just ones with the marketing nav): read the
-  // saved choice or fall back to the OS preference, set data-theme, and keep it synced across
-  // tabs via the `storage` event. The SiteNav toggle just writes localStorage; this applies it.
   $effect(() => {
     if (typeof window === 'undefined') return;
+    const root = document.documentElement;
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
     const resolve = () => {
+      const pref = parseThemePref(root.getAttribute('data-theme-pref'));
+      if (pref !== ThemePref.System) return applyTheme(pref);
       const saved = localStorage.getItem('theme');
-      const t = saved === 'light' || saved === 'dark'
-        ? saved
-        : window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-      document.documentElement.setAttribute('data-theme', t);
+      root.setAttribute('data-theme', saved === 'light' || saved === 'dark' ? saved : resolvedTheme(ThemePref.System, media.matches));
     };
     resolve();
     function onStorage(e: StorageEvent) { if (e.key === 'theme') resolve(); }
     window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
+    media.addEventListener('change', resolve);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      media.removeEventListener('change', resolve);
+    };
   });
 
   // Web MCP: espone al browser gli stessi strumenti che il server MCP espone a un client esterno,

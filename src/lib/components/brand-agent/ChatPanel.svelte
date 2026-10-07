@@ -9,14 +9,17 @@
   import { FAILURES, keyboardInset, speakerStarts } from './chat-view';
   import ChatComposer from './ChatComposer.svelte';
   import ChatMessage from './ChatMessage.svelte';
+  import ChatModelPicker from './ChatModelPicker.svelte';
+  import { chatModelPrefs } from './chat-model-prefs.svelte';
 
   let {
     projectId = '',
     motionNodeId = '',
+    reload = 0,
     context,
     onturnend,
     ondata
-  }: { projectId?: string; motionNodeId?: string; context?: () => Record<string, unknown>; onturnend?: () => void; ondata?: (part: StreamData) => void } = $props();
+  }: { projectId?: string; motionNodeId?: string; reload?: number; context?: () => Record<string, unknown>; onturnend?: () => void; ondata?: (part: StreamData) => void } = $props();
 
   let draft = $state('');
   let follow = $state<Follow>('following');
@@ -28,12 +31,17 @@
   const scopeProjectId = $derived(projectId || routeProjectId);
   const endpoint = $derived(chatEndpoint({ projectId: scopeProjectId, motionNodeId }));
   const session = $derived<ChatSession | null>(endpoint ? chatSession(endpoint) : null);
+  const models = chatModelPrefs();
+
+  $effect(() => {
+    void models.load();
+  });
 
   $effect(() => {
     if (!session) {
       return;
     }
-    session.context = context ?? (() => ({}));
+    session.context = () => ({ ...(context?.() ?? {}), ...models.turnFields() });
     session.onTurnEnd = onturnend ?? null;
     session.onData = ondata ?? null;
   });
@@ -44,7 +52,8 @@
   const failedDetail = $derived(session?.failedDetail ?? '');
   const starts = $derived(speakerStarts(messages));
   const failure = $derived(failed ? FAILURES[failed] : null);
-  const suggestions = $derived(($json('chat.panel.suggestions') as string[] | undefined) ?? []);
+  const copyKey = $derived(motionNodeId ? 'chat.panel.motion' : 'chat.panel');
+  const suggestions = $derived(($json(`${copyKey}.suggestions`) as string[] | undefined) ?? []);
   const showEmpty = $derived(!loading && failed !== 'load' && !messages.length);
 
   function on(event: FollowEvent) {
@@ -65,6 +74,7 @@
   }
 
   $effect(() => {
+    void reload;
     if (!session) {
       return;
     }
@@ -147,8 +157,8 @@
         {:else if showEmpty}
           <section class="empty">
             <span class="empty-mark" aria-hidden="true"></span>
-            <h2>{$_('chat.panel.emptyTitle')}</h2>
-            <p>{$_('chat.panel.emptyBody')}</p>
+            <h2>{$_(`${copyKey}.emptyTitle`)}</h2>
+            <p>{$_(`${copyKey}.emptyBody`)}</p>
             <ul class="suggestions">
               {#each suggestions as text (text)}
                 <li>
@@ -170,6 +180,7 @@
             pending={message.pending}
             at={message.at}
             tools={message.tools}
+            reasoning={message.reasoning}
             live={message.live}
             first={starts[i]}
           />
@@ -203,7 +214,13 @@
         enabled={!loading}
         onsend={() => send(draft.trim())}
         onstop={stop}
-      />
+      >
+        {#snippet controls()}
+          {#if models.choice && models.groups.length}
+            <ChatModelPicker groups={models.groups} choice={models.choice} onchoose={(next) => void models.choose(next)} />
+          {/if}
+        {/snippet}
+      </ChatComposer>
       <span class="sr-only" aria-live="polite">{sending ? $_('chat.panel.responding') : ''}</span>
     </div>
   {/if}

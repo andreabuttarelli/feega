@@ -105,6 +105,32 @@ export type VideoModelCaps = {
    * arbitrario, che avrebbe nascosto durate che il provider accetta davvero.
    */
   durations?: readonly number[];
+  refs?: VideoRefCapacity;
+  upscale?: UpscaleLimits;
+};
+
+export type UpscaleLimits = {
+  minFactor: number;
+  maxFactor: number;
+  maxInputSeconds: number;
+  maxInputBytes: number;
+  maxInputLongEdge: number;
+  maxInputShortEdge: number;
+  maxOutputMegapixels: number;
+  inputMimeTypes: readonly string[];
+};
+
+const MB = 1024 * 1024;
+
+export const FLUX_UPSCALE_LIMITS: UpscaleLimits = {
+  minFactor: 1.5,
+  maxFactor: 3,
+  maxInputSeconds: 20,
+  maxInputBytes: 50 * MB,
+  maxInputLongEdge: 2560,
+  maxInputShortEdge: 1440,
+  maxOutputMegapixels: 14.4,
+  inputMimeTypes: ['video/mp4']
 };
 
 export type VideoModelSpec = VideoModelCaps & {
@@ -271,11 +297,13 @@ const SPECS: VideoModelSpec[] = [
     roles: ['refine'],
     family: 'unknown',
     minDuration: 1,
-    maxDuration: 30,
+    maxDuration: FLUX_UPSCALE_LIMITS.maxInputSeconds,
     maxPromptChars: KLING_PROMPT_LIMIT,
     ratios: SEEDANCE_RATIOS,
     supportsUpscale: false,
-    generateAudio: false
+    generateAudio: false,
+    refs: { images: 0, videos: 1, audios: 0 },
+    upscale: FLUX_UPSCALE_LIMITS
   }
 
 ];
@@ -407,9 +435,17 @@ export function nearestVideoDuration(options: readonly number[], wanted: number)
 export type VideoRefCapacity = { images: number; videos: number; audios: number };
 
 export function videoRefCapacity(model: string | null | undefined): VideoRefCapacity {
+  const declared = videoModelSpec(model)?.refs;
+  if (declared) {
+    return declared;
+  }
   return isSeedanceFamily(model)
     ? { images: 30, videos: 10, audios: 10 }
     : { images: 0, videos: 0, audios: 0 };
+}
+
+export function upscaleLimitsOf(model: string | null | undefined): UpscaleLimits | null {
+  return videoModelSpec(model)?.upscale ?? null;
 }
 
 export function isSeedance25Model(model: string | null | undefined): boolean {

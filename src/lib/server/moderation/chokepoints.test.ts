@@ -72,7 +72,7 @@ const MODEL_CALLERS: Readonly<Record<string, string>> = {
   'src/routes/api/v1/prompts/enhance/+server.ts': SCREENED,
   'src/routes/api/v1/brands/[slug]/prompts/enhance/+server.ts': SCREENED,
   'src/routes/api/v1/projects/[projectId]/agent/+server.ts': SCREENED,
-  'src/routes/api/v1/projects/[projectId]/motion/[nodeId]/agent/+server.ts': SCREENED,
+  'src/lib/server/motion/turn.ts': SCREENED,
   'src/lib/server/motion/voiceover.ts': SCREENED,
   'src/lib/server/moderation/moderation-config.ts': 'the moderator itself: Jev and the LLM judge',
   'src/lib/server/provider-purgers.ts': 'deletes stored provider copies, sends no prompt',

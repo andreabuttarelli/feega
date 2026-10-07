@@ -77,18 +77,18 @@
     margin: 0 0 12px;
     font-size: 15px;
     font-weight: 600;
-    color: var(--ink);
+    color: var(--ui-ink);
   }
 
   .muted {
     font-size: 12px;
-    color: var(--ink-soft);
+    color: var(--ui-ink-2);
   }
 
   .new {
     padding: 16px;
-    border: 1px solid var(--line);
-    background: var(--paper);
+    border: 1px solid var(--ui-line);
+    background: var(--ui-bg);
   }
 
   .new-form {
@@ -103,7 +103,7 @@
     flex-direction: column;
     gap: 4px;
     font-size: 12px;
-    color: var(--ink-soft);
+    color: var(--ui-ink-2);
   }
 
   .new-form .grow {
@@ -114,9 +114,9 @@
   .new-form input {
     height: 32px;
     padding: 0 8px;
-    border: 1px solid var(--line-2);
-    background: var(--paper);
-    color: var(--ink);
+    border: 1px solid var(--ui-line-strong);
+    background: var(--ui-bg);
+    color: var(--ui-ink);
     font-size: 13px;
   }
 
@@ -126,9 +126,9 @@
     gap: 6px;
     height: 32px;
     padding: 0 12px;
-    border: 1px solid var(--ink);
-    background: var(--ink);
-    color: var(--paper);
+    border: 1px solid var(--ui-ink);
+    background: var(--ui-accent);
+    color: var(--ui-accent-ink);
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
@@ -154,14 +154,14 @@
     flex-direction: column;
     gap: 4px;
     padding-bottom: 10px;
-    border: 1px solid var(--line);
-    background: var(--paper);
-    color: var(--ink);
+    border: 1px solid var(--ui-line);
+    background: var(--ui-bg);
+    color: var(--ui-ink);
     text-decoration: none;
   }
 
   .video:hover {
-    border-color: var(--ink);
+    border-color: var(--ui-ink);
   }
 
   .poster {
@@ -169,8 +169,8 @@
     align-items: center;
     justify-content: center;
     aspect-ratio: 9 / 12;
-    background: var(--paper-3);
-    color: var(--ink-faint);
+    background: var(--ui-hover);
+    color: var(--ui-ink-3);
     overflow: hidden;
   }
 

@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { motionAgentScope } from '$lib/server/motion/agent-scope';
 import { FrameUpload, decodeFrame } from '$lib/server/motion/frames';
-import { framesPrefix, putFrames, type FrameBucket } from '$lib/server/motion/frame-store';
+import { framesPrefix, putFrames, putVerdict, type FrameBucket } from '$lib/server/motion/frame-store';
 import { CANVAS_ASSET_BUCKET } from '$lib/server/repos/asset-storage';
 import type { RequestHandler } from './$types';
 
@@ -26,6 +26,6 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
 
   const bucket = scope.db.storage.from(CANVAS_ASSET_BUCKET) as unknown as FrameBucket;
   const prefix = framesPrefix({ orgId: scope.orgId, projectId: scope.project.id, nodeId: scope.motion.record.id }, body.data.callId);
-  const stored = await putFrames(bucket, prefix, frames.map((f) => ({ time: f.time, bytes: f.bytes! })));
+  const stored = (await putFrames(bucket, prefix, frames.map((f) => ({ time: f.time, bytes: f.bytes! })))) && (!body.data.verdict || (await putVerdict(bucket, prefix, body.data.verdict)));
   return stored ? json({ ok: true }) : json({ error: 'store_failed' }, { status: HTTP_STORE_FAILED });
 };

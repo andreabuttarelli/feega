@@ -27,6 +27,7 @@
   import { getTileResize } from '$lib/canvas/tile-resize-context';
   import { growthOf } from '$lib/canvas/settings-column';
   import { portOfHandle, type SelectOutput } from '$lib/canvas/select-outputs';
+  import NodeBoundary from './NodeBoundary.svelte';
 
   type TileData = {
     id: string;
@@ -131,7 +132,9 @@
   />
 {/if}
 
-{@render render()({ id: tile.id, selected })}
+<NodeBoundary>
+  {@render render()({ id: tile.id, selected })}
+</NodeBoundary>
 
 {#if tile.connectable}
   {#if tile.output}

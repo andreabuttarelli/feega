@@ -25,7 +25,7 @@ When you upload data about other people (for example customers, models or influe
 | Billing | plan, credit balance and ledger, Stripe customer and invoice IDs, billing address/VAT if given | you, Stripe (we never see full card numbers) |
 | Usage logs | log of each AI action: action, model, provider, credits, time, acting user or agent | the Service |
 | Moderation | for each screened prompt: verdict, category, scores, reason, acting user | the Service |
-| Age verification (uncensored mode) | only the result: verified 18+, provider (Didit), check session ID, date — **no selfie, no identity document** | Didit, after a selfie age estimate (ID document only if the estimate is not conclusive); Didit erases the check once decided |
+| Age verification (age-restricted features) | only the result: verified 18+, provider (Didit), check session ID, date — **no selfie, no identity document** | Didit, after a selfie age estimate (ID document only if the estimate is not conclusive); Didit erases the check once decided |
 | Technical | IP address, browser, device, pages, errors | your device |
 
 We do not ask for special categories of data (Art. 9 GDPR). Do not include them in prompts unless necessary.
@@ -37,7 +37,7 @@ We do not ask for special categories of data (Art. 9 GDPR). Do not include them 
 | Provide the Service: accounts, workspaces, canvas, generation, publishing, ads, sharing, API/CLI/MCP | Contract — Art. 6(1)(b) |
 | Billing, credits, invoicing, tax records | Contract; legal obligation — Art. 6(1)(b), (c) |
 | Content moderation, abuse and fraud prevention, security | Legitimate interest — Art. 6(1)(f); legal obligation where applicable |
-| Age verification for uncensored mode | Legal obligation / legitimate interest — Art. 6(1)(c)/(f) [to confirm] |
+| Age verification for age-restricted features | Legal obligation / legitimate interest — Art. 6(1)(c)/(f) [to confirm] |
 | Handling DSA notices and authority requests | Legal obligation — Art. 6(1)(c) |
 | Error monitoring and debugging | Legitimate interest — Art. 6(1)(f) |
 | Cookieless aggregate page statistics (Vercel Web Analytics) | Legitimate interest — Art. 6(1)(f) |
@@ -63,7 +63,7 @@ We share personal data with these categories of recipients, each acting as our p
 | Error monitoring | detecting and fixing errors (may include user ID, email, IP) |
 | Product analytics | understanding how the Service is used (consent) |
 | Advertising measurement | measuring which ads lead to sign-ups (consent) |
-| Age verification | one-time 18+ check for uncensored mode (Didit, EU) |
+| Age verification | one-time 18+ check for age-restricted features (Didit, EU) |
 
 The current list of sub-processors is available at [https://feega.app/subprocessors](./SUBPROCESSORS.md).
 
@@ -104,7 +104,7 @@ You can request access, rectification, erasure, restriction, portability, and ob
 
 ## 9. Minors
 
-The Service is for people aged **18 or over**. We do not knowingly collect data of minors; if we learn of it, we delete the account. Uncensored mode is strictly 18+ and requires verified age.
+The Service is for people aged **18 or over**. We do not knowingly collect data of minors; if we learn of it, we delete the account. Age-restricted features are strictly 18+ and requires verified age.
 
 ## 10. Security
 

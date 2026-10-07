@@ -140,7 +140,7 @@
 
 <ChatLeaveGuard {projectId} />
 
-<div class="project-shell" class:is-sheet-pending={sheetPending} class:is-uncensored={data.project.mode === ProjectMode.Uncensored} data-viewport={viewport} data-mode={data.project.mode}>
+<div class="project-shell ui-app" class:is-sheet-pending={sheetPending} class:is-uncensored={data.project.mode === ProjectMode.Uncensored} data-viewport={viewport} data-mode={data.project.mode}>
   {#if isMobile}
     <MobileTopBar
       {projectId}
@@ -188,7 +188,6 @@
             mode: p.mode
           }))}
           projectMode={data.project.mode}
-          uncensored={data.uncensored}
           brandName={data.brand?.name ?? null}
           canvasName={currentCanvas?.name ?? ''}
           canvasHref={currentCanvas?.href ?? ''}
@@ -247,7 +246,7 @@
     height: 100dvh;
     display: flex;
     flex-direction: column;
-    background: var(--paper-2, #f9f9f9);
+    background: var(--ui-bg);
   }
 
   .canvas-row {

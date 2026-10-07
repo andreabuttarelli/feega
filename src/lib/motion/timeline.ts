@@ -1,8 +1,16 @@
-import { COMPONENTS, TrackKind, defaultProps, parseProps, type ComponentId } from './components';
-import { FPS, TransitionKind, type Edge } from './design';
-import { FORMATS, MAX_FRAMES, byFrame, findClip, type MotionClip, type MotionDoc, type MotionFormat, type MotionTrack } from './doc';
+import { COMPONENTS, TrackKind, defaultProps, type ComponentId } from './components';
+import { Strictness } from './custom/component';
+import { withParams } from './custom/params';
+import { FPS, MAX_SECONDS, TransitionKind, maxFrames, type Edge } from './design';
+import { MAX_JUNCTION_FRAMES, junctionProblem, type Junction } from './junctions';
+import { FORMATS, byFrame, cloneDoc, clipsOf, clipProps, compRefProblem, findClip, fontsOfClip, newClip, type Background, type MotionClip, type MotionDoc, type MotionFormat, type MotionTrack } from './doc';
 import { Ease } from './design';
-import { keyframesProblem, transformSchema, type EaseSpec, type KeyValue, type Keyframe, type Keyframes, type Transform } from './keyframes';
+import { Matte, isMaskKey, maskSchema, maskStackSchema, type MaskInput } from './mask';
+import { matteSource } from './matte';
+import { CAMERA_LANE, type CameraKey } from './camera';
+import { editCameraLane } from './camera-ops';
+import { Around, EASE_PRESETS, Half, presetEase, withHalf, type EasePreset } from './graph';
+import { Interp, keyframesProblem, transformSchema, type EaseSpec, type KeyValue, type Keyframe, type Keyframes, type Transform } from './keyframes';
 
 export type OpResult = { ok: true; doc: MotionDoc } | { ok: false; error: string };
 
@@ -27,8 +35,8 @@ function clipEnd(clip: Pick<MotionClip, 'from' | 'durationInFrames'>): number {
 
 function fitted(doc: MotionDoc): OpResult {
   const end = Math.max(0, ...doc.tracks.flatMap((t) => t.clips.map(clipEnd)));
-  if (end > MAX_FRAMES) {
-    return fail(`the video can be at most ${MAX_FRAMES / FPS} seconds`);
+  if (end > maxFrames(doc.fps)) {
+    return fail(`the video can be at most ${MAX_SECONDS} seconds`);
   }
   return { ok: true, doc: { ...doc, durationInFrames: Math.max(doc.durationInFrames, end) } };
 }
@@ -82,23 +90,24 @@ export function addClip(doc: MotionDoc, input: NewClip, id: string): OpResult {
     return fail(track);
   }
 
-  const props = parseProps(input.component, { ...defaultProps(input.component), ...input.props });
+  const props = clipProps(doc.components, input.component, { ...defaultProps(input.component), ...input.props }, Strictness.Strict);
   if (!props.ok) {
     return fail(props.error);
   }
+  const missing = fontsOfClip(doc, { component: input.component, props: props.props }) ?? compRefProblem(doc, { component: input.component, props: props.props });
+  if (missing) {
+    return fail(missing);
+  }
 
-  const clip: MotionClip = {
+  const clip = newClip({
     id,
     from: Math.max(0, Math.round(input.from)),
-    durationInFrames: Math.max(MIN_FRAMES, Math.round(input.durationInFrames ?? spec.durationInFrames)),
-    trimStart: 0,
+    durationInFrames: Math.max(MIN_FRAMES, Math.round(input.durationInFrames ?? (spec.durationInFrames * doc.fps) / FPS)),
     component: input.component,
     props: props.props,
     transitionIn: input.transitionIn ?? NO_EDGE,
-    transitionOut: input.transitionOut ?? NO_EDGE,
-    transform: {},
-    keyframes: {}
-  };
+    transitionOut: input.transitionOut ?? NO_EDGE
+  });
 
   return fitted({ ...doc, tracks: doc.tracks.map((t) => (t.id === track.id ? { ...t, clips: [...t.clips, clip] } : t)) });
 }
@@ -175,7 +184,7 @@ export function duplicateClip(doc: MotionDoc, clipId: string, newId: string): Op
     return fail(`no clip ${clipId}`);
   }
 
-  const copy: MotionClip = { ...structuredClone(found.clip), id: newId, from: clipEnd(found.clip) };
+  const copy: MotionClip = { ...cloneDoc(found.clip), id: newId, from: clipEnd(found.clip) };
   return fitted({ ...doc, tracks: doc.tracks.map((t) => (t.id === found.track.id ? { ...t, clips: [...t.clips, copy] } : t)) });
 }
 
@@ -184,13 +193,18 @@ export function removeClips(doc: MotionDoc, ids: readonly string[]): OpResult {
   if (missing) {
     return fail(`no clip ${missing}`);
   }
-  return { ok: true, doc: { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.filter((c) => !ids.includes(c.id)) })) } };
+  const orphan = (c: MotionTrack['clips'][number]) => (c.parent && ids.includes(c.parent) ? { ...c, parent: null } : c);
+  return { ok: true, doc: { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.filter((c) => !ids.includes(c.id)).map(orphan) })) } };
 }
 
 export function setProps(doc: MotionDoc, clipId: string, patch: Record<string, unknown>): OpResult {
   return editClip(doc, clipId, (clip) => {
-    const verdict = parseProps(clip.component, { ...clip.props, ...patch });
-    return verdict.ok ? { ...clip, props: verdict.props } : verdict.error;
+    const verdict = clipProps(doc.components, clip.component, { ...clip.props, ...patch }, Strictness.Strict);
+    if (!verdict.ok) {
+      return verdict.error;
+    }
+    const next = { component: clip.component, props: verdict.props };
+    return fontsOfClip(doc, next) ?? compRefProblem(doc, next) ?? { ...clip, props: verdict.props };
   });
 }
 
@@ -199,6 +213,21 @@ export function setTransition(doc: MotionDoc, clipId: string, side: Side, edge: 
     const durationInFrames = Math.min(Math.max(0, Math.round(edge.durationInFrames)), clip.durationInFrames);
     const next = { kind: edge.kind, durationInFrames };
     return side === Side.In ? { ...clip, transitionIn: next } : { ...clip, transitionOut: next };
+  });
+}
+
+export function setJunction(doc: MotionDoc, clipId: string, junction: Junction | null): OpResult {
+  const problem = junction ? junctionProblem(doc, clipId) : null;
+  if (problem) {
+    return fail(problem);
+  }
+  const partner = junction ? clipsOf(doc).find((c) => c.from + c.durationInFrames === findClip(doc, clipId)?.clip.from) : null;
+  return editClip(doc, clipId, (clip) => {
+    if (!junction) {
+      return { ...clip, junction: null };
+    }
+    const longest = Math.min(MAX_JUNCTION_FRAMES, 2 * Math.min(clip.durationInFrames, partner?.durationInFrames ?? clip.durationInFrames));
+    return { ...clip, junction: { kind: junction.kind, durationInFrames: Math.max(2, Math.min(longest, Math.round(junction.durationInFrames))) } };
   });
 }
 
@@ -217,6 +246,24 @@ export function removeTrack(doc: MotionDoc, trackId: string): OpResult {
   return { ok: true, doc: { ...doc, tracks: doc.tracks.filter((t) => t.id !== trackId) } };
 }
 
+export function renameTrack(doc: MotionDoc, trackId: string, name: string): OpResult {
+  if (!doc.tracks.some((t) => t.id === trackId)) {
+    return fail(`no track ${trackId}`);
+  }
+  return { ok: true, doc: { ...doc, tracks: doc.tracks.map((t) => (t.id === trackId ? { ...t, name } : t)) } };
+}
+
+export function removeAsset(doc: MotionDoc, assetId: string): OpResult {
+  if (!doc.assets.some((a) => a.id === assetId)) {
+    return fail(`no asset ${assetId} in this video`);
+  }
+  const users = doc.tracks.flatMap((t) => t.clips).filter((c) => JSON.stringify([c.props, c.mask, c.maskStack]).includes(JSON.stringify(assetId)));
+  if (users.length) {
+    return fail(`asset ${assetId} is used by ${users.map((c) => c.id).join(', ')}: remove or change those first`);
+  }
+  return { ok: true, doc: { ...doc, assets: doc.assets.filter((a) => a.id !== assetId) } };
+}
+
 export function moveTrack(doc: MotionDoc, trackId: string, toIndex: number): OpResult {
   const track = doc.tracks.find((t) => t.id === trackId);
   if (!track) {
@@ -228,7 +275,7 @@ export function moveTrack(doc: MotionDoc, trackId: string, toIndex: number): OpR
   return { ok: true, doc: { ...doc, tracks: [...rest.slice(0, at), track, ...rest.slice(at)] } };
 }
 
-export function setCanvas(doc: MotionDoc, input: { format?: MotionFormat; durationInFrames?: number }): OpResult {
+export function setCanvas(doc: MotionDoc, input: { format?: MotionFormat; durationInFrames?: number; background?: Background }): OpResult {
   const size = input.format ? FORMATS[input.format] : { width: doc.width, height: doc.height };
   const durationInFrames = Math.round(input.durationInFrames ?? doc.durationInFrames);
   const end = Math.max(0, ...doc.tracks.flatMap((t) => t.clips.map(clipEnd)));
@@ -236,10 +283,10 @@ export function setCanvas(doc: MotionDoc, input: { format?: MotionFormat; durati
   if (durationInFrames < Math.max(1, end)) {
     return fail(`a clip ends at frame ${end}: move or trim it before shortening the video`);
   }
-  if (durationInFrames > MAX_FRAMES) {
-    return fail(`the video can be at most ${MAX_FRAMES / FPS} seconds`);
+  if (durationInFrames > maxFrames(doc.fps)) {
+    return fail(`the video can be at most ${MAX_SECONDS} seconds`);
   }
-  return { ok: true, doc: { ...doc, width: size.width, height: size.height, durationInFrames } };
+  return { ok: true, doc: { ...doc, width: size.width, height: size.height, durationInFrames, background: input.background ?? doc.background } };
 }
 
 export function snapFrame(frame: number, targets: readonly number[], threshold: number): number {
@@ -261,24 +308,25 @@ export function snapTargets(doc: MotionDoc, input: { playhead: number; exclude: 
   const edges = kept.flatMap((c) => [c.from, clipEnd(c)]);
   const keys = keyframeFrames(doc, kept.map((c) => c.id));
   const seconds = Array.from({ length: Math.floor(doc.durationInFrames / doc.fps) + 1 }, (_, i) => i * doc.fps);
-  return [...new Set([...edges, ...keys, input.playhead, ...seconds])];
+  const markers = [...(doc.markers ?? []).map((m) => m.frame), ...kept.flatMap((c) => (c.markers ?? []).map((m) => c.from + m.frame))];
+  return [...new Set([...edges, ...keys, ...markers, input.playhead, ...seconds])];
 }
 
 export type KeyRef = { clipId: string; prop: string; frame: number };
-export type KeyBoard = { prop: string; offset: number; value: KeyValue; ease: EaseSpec }[];
+export type KeyBoard = ({ prop: string; offset: number; value: KeyValue; ease: EaseSpec } & KeyShape)[];
 
 export enum Direction {
   Back = 'back',
   Forward = 'forward'
 }
 
-function withKeyframes(clip: MotionClip, keyframes: Keyframes): MotionClip | string {
+function withKeyframes(doc: MotionDoc, clip: MotionClip, keyframes: Keyframes): MotionClip | string {
   const kept = Object.fromEntries(
     Object.entries(keyframes)
       .filter(([, track]) => track.length > 0)
       .map(([prop, track]) => [prop, byFrame(track)])
   );
-  return keyframesProblem(clip.component, kept) ?? { ...clip, keyframes: kept };
+  return keyframesProblem({ ...withParams(doc, clip), keyframes: kept }) ?? { ...clip, keyframes: kept };
 }
 
 export function setTransform(doc: MotionDoc, clipId: string, patch: Transform): OpResult {
@@ -289,7 +337,7 @@ export function setTransform(doc: MotionDoc, clipId: string, patch: Transform): 
 }
 
 export function setKeyframes(doc: MotionDoc, clipId: string, prop: string, track: Keyframe[]): OpResult {
-  return editClip(doc, clipId, (clip) => withKeyframes(clip, { ...clip.keyframes, [prop]: track.map((k) => ({ ...k, frame: Math.max(0, Math.round(k.frame)) })) }));
+  return editClip(doc, clipId, (clip) => withKeyframes(doc, clip, { ...clip.keyframes, [prop]: track.map((k) => ({ ...k, frame: Math.max(0, Math.round(k.frame)) })) }));
 }
 
 export function setKeyframe(doc: MotionDoc, clipId: string, prop: string, frame: number, value: KeyValue): OpResult {
@@ -297,14 +345,14 @@ export function setKeyframe(doc: MotionDoc, clipId: string, prop: string, frame:
     const track = clip.keyframes[prop] ?? [];
     const at = Math.max(0, Math.round(frame));
     const ease = track.find((k) => k.frame === at)?.ease ?? Ease.Standard;
-    return withKeyframes(clip, { ...clip.keyframes, [prop]: [...track.filter((k) => k.frame !== at), { frame: at, value, ease }] });
+    return withKeyframes(doc, clip, { ...clip.keyframes, [prop]: [...track.filter((k) => k.frame !== at), { frame: at, value, ease }] });
   });
 }
 
 export function removeKeyframes(doc: MotionDoc, clipId: string, prop: string, frames?: readonly number[]): OpResult {
   return editClip(doc, clipId, (clip) => {
     const track = frames ? (clip.keyframes[prop] ?? []).filter((k) => !frames.includes(k.frame)) : [];
-    return withKeyframes(clip, { ...clip.keyframes, [prop]: track });
+    return withKeyframes(doc, clip, { ...clip.keyframes, [prop]: track });
   });
 }
 
@@ -322,7 +370,12 @@ function editRefs(doc: MotionDoc, refs: readonly KeyRef[], edit: (track: Keyfram
     }
     const { clipId, prop } = group[0];
     const frames = group.map((r) => r.frame);
-    result = editClip(result.doc, clipId, (clip) => withKeyframes(clip, { ...clip.keyframes, [prop]: edit(clip.keyframes[prop] ?? [], frames) }));
+    const current = result.doc;
+    if (clipId === CAMERA_LANE) {
+      result = editCameraLane(current, prop as CameraKey, (track) => edit(track, frames));
+      continue;
+    }
+    result = editClip(current, clipId, (clip) => withKeyframes(current, clip, { ...clip.keyframes, [prop]: edit(clip.keyframes[prop] ?? [], frames) }));
   }
   return result;
 }
@@ -344,13 +397,65 @@ export function setKeyEase(doc: MotionDoc, ref: KeyRef, ease: EaseSpec): OpResul
   return editRefs(doc, [ref], (track) => track.map((k) => (k.frame === ref.frame ? { ...k, ease } : k)));
 }
 
+export type KeyShape = { in?: Interp; out?: Interp; roving?: boolean };
+
+export function shaped(key: Keyframe, shape: KeyShape): Keyframe {
+  const next = { ...key, ...shape };
+  const { in: inKind, out, roving, ...rest } = next;
+  return {
+    ...rest,
+    ...(inKind && inKind !== Interp.Bezier ? { in: inKind } : {}),
+    ...(out && out !== Interp.Bezier ? { out } : {}),
+    ...(roving ? { roving } : {})
+  };
+}
+
+export function setKeyInterp(doc: MotionDoc, refs: readonly KeyRef[], shape: KeyShape): OpResult {
+  return editRefs(doc, refs, (track, frames) => track.map((k) => (frames.includes(k.frame) ? shaped(k, shape) : k)));
+}
+
+export type EaseBoard = { ease: EaseSpec } & KeyShape;
+
+function keyOf(doc: MotionDoc, ref: KeyRef): Keyframe | undefined {
+  const lanes: Partial<Record<string, Keyframe[]>> | undefined = ref.clipId === CAMERA_LANE ? doc.camera?.keyframes : findClip(doc, ref.clipId)?.clip.keyframes;
+  return lanes?.[ref.prop]?.find((k) => k.frame === ref.frame);
+}
+
+export function copyEase(doc: MotionDoc, ref: KeyRef): EaseBoard | null {
+  const key = keyOf(doc, ref);
+  return key ? { ease: key.ease, in: key.in, out: key.out } : null;
+}
+
+export function pasteEase(doc: MotionDoc, refs: readonly KeyRef[], board: EaseBoard): OpResult {
+  return editRefs(doc, refs, (track, frames) => track.map((k) => (frames.includes(k.frame) ? shaped({ ...k, ease: board.ease }, { in: board.in, out: board.out }) : k)));
+}
+
+const PRESET_AROUND: Record<Around, (track: Keyframe[], picked: (i: number) => boolean, preset: EasePreset) => Keyframe[]> = {
+  [Around.Segment]: (track, picked, preset) => track.map((k, i) => (picked(i) ? shaped({ ...k, ease: presetEase(preset, k.ease) }, { out: Interp.Bezier }) : k)),
+  [Around.Keyframe]: (track, picked, preset) => {
+    const { halves, bezier } = EASE_PRESETS[preset];
+    const leaving = halves.includes(Half.Leaving);
+    const entering = halves.includes(Half.Entering);
+    return track.map((k, i) => {
+      const own = leaving && picked(i);
+      const before = entering && picked(i + 1);
+      const ease = [own ? Half.Leaving : null, before ? Half.Entering : null].reduce<EaseSpec>((e, half) => (half ? withHalf(half, e, bezier) : e), k.ease);
+      return shaped({ ...k, ease }, { ...(own ? { out: Interp.Bezier } : {}), ...(entering && picked(i) ? { in: Interp.Bezier } : {}) });
+    });
+  }
+};
+
+export function applyEasePreset(doc: MotionDoc, refs: readonly KeyRef[], preset: EasePreset): OpResult {
+  return editRefs(doc, refs, (track, frames) => PRESET_AROUND[EASE_PRESETS[preset].around](track, (i) => i < track.length && frames.includes(track[i]?.frame), preset));
+}
+
 export function copyKeyframes(doc: MotionDoc, refs: readonly KeyRef[]): KeyBoard {
   const picked = refs.flatMap((ref) => {
     const key = findClip(doc, ref.clipId)?.clip.keyframes[ref.prop]?.find((k) => k.frame === ref.frame);
     return key ? [{ prop: ref.prop, key }] : [];
   });
   const earliest = Math.min(...picked.map((p) => p.key.frame));
-  return picked.map(({ prop, key }) => ({ prop, offset: key.frame - earliest, value: key.value, ease: key.ease }));
+  return picked.map(({ prop, key }) => ({ prop, offset: key.frame - earliest, value: key.value, ease: key.ease, in: key.in, out: key.out, roving: key.roving }));
 }
 
 export function pasteKeyframes(doc: MotionDoc, clipId: string, board: KeyBoard, at: number): OpResult {
@@ -358,9 +463,9 @@ export function pasteKeyframes(doc: MotionDoc, clipId: string, board: KeyBoard, 
     const next: Keyframes = { ...clip.keyframes };
     for (const item of board) {
       const frame = Math.max(0, Math.round(at + item.offset));
-      next[item.prop] = [...(next[item.prop] ?? []).filter((k) => k.frame !== frame), { frame, value: item.value, ease: item.ease }];
+      next[item.prop] = [...(next[item.prop] ?? []).filter((k) => k.frame !== frame), shaped({ frame, value: item.value, ease: item.ease }, { in: item.in, out: item.out, roving: item.roving })];
     }
-    return withKeyframes(clip, next);
+    return withKeyframes(doc, clip, next);
   });
 }
 
@@ -377,4 +482,36 @@ export function adjacentKeyframe(frames: readonly number[], frame: number, direc
     return frames.find((f) => f > frame) ?? null;
   }
   return frames.findLast((f) => f < frame) ?? null;
+}
+
+const issues = (error: { issues: { path: PropertyKey[]; message: string }[] }) => error.issues.map((i) => `${i.path.join('.') || 'mask'}: ${i.message}`).join('; ');
+
+export function setMask(doc: MotionDoc, clipId: string, input: MaskInput | null): OpResult {
+  return editClip(doc, clipId, (clip) => {
+    if (input === null) {
+      return { ...clip, mask: null, maskStack: [], keyframes: Object.fromEntries(Object.entries(clip.keyframes).filter(([key]) => !isMaskKey(key))) };
+    }
+    const parsed = maskSchema.safeParse(input);
+    return parsed.success ? { ...clip, mask: parsed.data } : issues(parsed.error);
+  });
+}
+
+export function setMaskStack(doc: MotionDoc, clipId: string, inputs: MaskInput[]): OpResult {
+  return editClip(doc, clipId, (clip) => {
+    if (!clip.mask) {
+      return 'add a first mask (set_mask) before stacking more on it';
+    }
+    const parsed = maskStackSchema.safeParse(inputs);
+    return parsed.success ? { ...clip, maskStack: parsed.data } : issues(parsed.error);
+  });
+}
+
+export function setTrackMatte(doc: MotionDoc, clipId: string, matte: Matte): OpResult {
+  if (matte !== Matte.None) {
+    const source = matteSource(doc, clipId);
+    if (!source) {
+      return fail('no clip above this one, on the track above and overlapping it in time, to use as matte');
+    }
+  }
+  return editClip(doc, clipId, (clip) => ({ ...clip, matte }));
 }

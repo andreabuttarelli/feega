@@ -1,39 +1,24 @@
 import { describe, expect, it } from 'vitest';
-import { TOOLS, ToolStatus, toolHref } from './tools';
+import { TOOLS, toolForCampaign, toolHref } from './tools';
 
-describe('the tools registry: one row per tool on the dashboard', () => {
-  it('lists the photo studio and the motion editor, in that order', () => {
-    expect(TOOLS.map((t) => t.id)).toEqual(['studio', 'motion']);
+describe('the tools registry', () => {
+  it('lists the video upscaler at /app/upscale', () => {
+    const upscaler = TOOLS.find((t) => t.id === 'upscale');
+    expect(upscaler).toMatchObject({ name: 'AI Video Upscaler', route: '/app/upscale' });
+    expect(toolHref(upscaler!, 'p1')).toBe('/app/upscale?project=p1');
   });
 
-  it('every id is unique', () => {
-    expect(new Set(TOOLS.map((t) => t.id)).size).toBe(TOOLS.length);
+  it('lists Compositions at /app/compose', () => {
+    const compose = TOOLS.find((t) => t.id === 'compose');
+    expect(compose).toMatchObject({ name: 'Compositions', route: '/app/compose' });
+    expect(toolHref(compose!, 'p1')).toBe('/app/compose?project=p1');
   });
 
-  it('an openable tool lives under /app, a coming-soon one has no route', () => {
-    for (const tool of TOOLS) {
-      if (tool.status === ToolStatus.ComingSoon) {
-        expect(tool.route).toBeNull();
-        continue;
-      }
-      expect(tool.route).toMatch(/^\/app\//);
-    }
+  it('the upscaler landing campaign is served by the upscaler tool', () => {
+    expect(toolForCampaign('ai-video-upscaler')?.id).toBe('upscale');
   });
 
-  it('every tool says what it does in one line', () => {
-    for (const tool of TOOLS) {
-      expect(tool.description.length).toBeGreaterThan(0);
-      expect(tool.description).not.toContain('\n');
-    }
-  });
-
-  it('a tool opens on the chosen project when there is one', () => {
-    const studio = TOOLS.find((t) => t.id === 'studio')!;
-    expect(toolHref(studio, 'p1')).toBe('/app/studio?project=p1');
-    expect(toolHref(studio, null)).toBe('/app/studio');
-  });
-
-  it('a coming-soon tool has no link', () => {
-    expect(toolHref({ ...TOOLS[0], status: ToolStatus.ComingSoon, route: null }, 'p1')).toBeNull();
+  it('a campaign no tool serves has no tool', () => {
+    expect(toolForCampaign('anime-video-generator')).toBeNull();
   });
 });

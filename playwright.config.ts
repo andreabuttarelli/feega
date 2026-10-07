@@ -39,6 +39,7 @@ export default defineConfig({
       // programmare/pubblicare puntano qui invece che a https://zernio.com — vedi
       // calendar.spec.ts per il server che risponde su questa porta.
       ...(process.env.ZERNIO_BASE_URL ? { ZERNIO_BASE_URL: process.env.ZERNIO_BASE_URL } : {}),
+      ...(process.env.E2E_FAKE_IMAGES && process.env.LLM_BASE_URL ? { LLM_BASE_URL: process.env.LLM_BASE_URL } : {}),
       ZERNIO_API_KEY: process.env.ZERNIO_API_KEY ?? 'e2e-placeholder-zernio-key'
     }
   }

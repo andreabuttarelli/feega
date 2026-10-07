@@ -2,6 +2,183 @@
 
 Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa riconoscere, e la mossa che li risolve. Una sezione per tema. Una lezione nova entra qui nel commit che l'ha pagata.
 
+## Motion editor
+
+### Un dev server qualunque chiude i render degli altri
+`npm run dev` faceva partire `devCrons`, che chiama ogni minuto le cron di `vercel.json`
+(`/api/v1/canvas/runs/tick` compreso) con il codice del checkout locale e il `.env` puntato sul DB
+remoto; in dev `cronAuthorized` dice sempre sì. Ogni agente o utente con un dev server acceso
+riconciliava i run di produzione. Segnale: render chiusi per errore, nel log del dev server
+`render reconcile failed` o `[canvas runs]`. Mossa: le cron in dev sono opt-in, `DEV_CRONS=1`, e
+solo contro un DB locale o usa e getta.
+
+### Un modulo virtuale Vite che fa fallire suite intere senza un errore leggibile
+`this.addWatchFile` con un percorso relativo (`node_modules/zod/...`, come lo restituisce il
+metafile di esbuild) fa trattare a vitest quel file come import del modulo virtuale: ogni test che
+lo raggiunge muore con `(0 test)` e nessun messaggio a schermo. Segnale: suite rosse senza stack,
+`--reporter=json --outputFile` mostra `Failed to resolve import "node_modules/..."`. Mossa:
+passare percorsi assoluti (`path.resolve`).
+
+### `MotionPreview.capture()` con lo stesso html che sta già suonando non torna mai
+`capture(times, source)` ricarica `srcdoc` e aspetta `ready`; se `source` è identico all'html
+corrente il player non ricarica, `ready` non arriva e la promessa resta appesa senza timeout.
+Segnale: il poster del nodo motion non nasce e il player non si smonta mai. Mossa: per un
+fotogramma del documento corrente usa `still(time)`, che scatta senza ricaricare.
+
+### `mix-blend-mode` dentro `preserve-3d` appiattisce il mondo, e solo il render lo mostra
+Un clip con fusione dentro `#world` (camera accesa) fa appiattire a Chrome tutto il contesto 3D:
+la preview sembra giusta, ma render su server ed export dal browser divergono (PSNR 10 dB invece
+di ~26) e il render dura il doppio. Segnale: due export dello stesso doc che non si somigliano,
+solo quando la camera è accesa. Mossa: confrontare un frame dei due export (`ffmpeg -lavfi psnr`)
+con e senza la proprietà sospetta; ogni proprietà di raggruppamento (`mix-blend-mode`,
+`isolation`, `filter`, `opacity<1` sul contenitore) va tenuta fuori da `#world`.
+
+### Un overlay SVG scalato ×1000 sopra la preview la ridisegna spostata e ingrandita
+Disegnare un tracciato in coordinate 0..1 dentro un `<g transform="scale(larghezza altezza)">`
+nell'overlay dell'editor fa dipingere a Chrome un fantasma dell'iframe della preview, più grande
+e fuori posto, sopra la barra in alto. Nessun errore, `elementFromPoint` non lo vede: è solo
+composizione. Segnale: uno screenshot con un rettangolo scuro che sborda dalla preview appena
+compare l'overlay. Mossa: portare i punti in pixel del frame prima di scrivere `d` (come fa
+`MaskOverlay`), mai una scala enorme su un gruppo.
+
+### Un file toccato nel worktree durante un giro Playwright ricarica la pagina
+Vite osserva anche `changelog/*.md`: scriverne uno mentre l'harness naviga l'editor fa
+`page reload` e il `goto` muore con `net::ERR_ABORTED`. Segnale: nel log del dev server
+`page reload <file>` all'ora del fallimento. Mossa: niente edit nel worktree servito finché il
+giro non è finito, o un dev server da un checkout separato.
+
+### Un render server riesce e il salvataggio fallisce con `EntityTooLarge`
+Storage del progetto accetta al massimo 50 MB per file (limite globale, non del bucket): un
+ProRes, un 4K o un PNG lungo esce dal farm e muore all'upload con `413`. La dimensione dipende
+dal contenuto (ProRes di grafica piatta: 17 Mbit/s, non i 330 nominali), quindi una stima non
+basta per rifiutare prima. Mossa: la sandbox confronta il peso vero con il limite misurato da
+`storage-limit.ts` (POST TUS a zero byte: 413 = oltre) e fallisce senza addebito; per file più
+grandi si alza il limite globale di Storage, non il codice.
+
+### Un run render prende `video_reconcile_failed` e `attempts` che salgono
+Solo `reconcileVideoNodeRuns` scrive quell'errore, e su main esclude `motion-render:`. Se succede
+lo stesso, un checkout locale vecchio (dev server sul DB di produzione) sta girando il tick con
+`OWN_RECONCILER_PREFIXES` senza `RENDER_JOB_PREFIX`. Segnale: production ed eventuali altri
+progetti Vercel sono su main, eppure le righe cambiano. Mossa: `grep OWN_RECONCILER_PREFIXES`
+nei checkout con un dev server acceso, aggiornarli o spegnerli.
+
+### Un comando staccato della sandbox non dice mai di aver finito
+`sandbox.getCommand(id).exitCode` resta `null` anche a comando concluso, letto da un'altra
+sessione. Segnale: render fermo in `rendering` con la sandbox viva e l'uscita già scritta.
+Mossa: il processo scrive `result-<task>.json` alla fine e il tick legge quello; sandbox non più
+`running` senza risultato = morta.
+
+### Un render con motion blur non diventa più veloce con più vCPU
+Il producer distribuito non ha `motionBlur`: il blur gira intero su una sandbox, e
+`createRenderJob` senza `workers` resta su un solo browser anche con 8 vCPU (186 s per 240
+frame × 8 campioni a 1080p, uguale a 4 vCPU). Segnale: tempo identico cambiando le vCPU. Mossa:
+`workers` esplicito nella config intera (6 su 8 vCPU: 99 s, ~51 ms per campione). Il render gira
+staccato dalla richiesta: il tetto è la vita della sandbox (`WORKER` in `farm-render.ts`).
+
+### Un render sul farm che muore con `stream_ended_early` e zero frame catturati
+Il producer gira in screenshot mode con tempo virtuale: `requestAnimationFrame` è finto e non
+scatta mai durante un `waitUntil` di `hf-seek`. Una promessa che lo aspetta (html-to-image lo
+usa per caricare l'immagine) blocca il seek per sempre. Segnale: `framesCompleted: 0` per minuti
+nel log del producer. Mossa: riprodurre in locale con `@hyperframes/producer` (`executeRenderJob`)
+e, nel lavoro asincrono di un seek, usare `__HF_VIRTUAL_TIME__.originalRequestAnimationFrame`.
+
+### Un render che fallisce dopo minuti senza log: guarda prima la durata del doc di prova
+Un doc costruito a mano con `addClip` si allunga da solo quando una clip arrotondata finisce oltre
+la fine: 51 frame invece di 50 sembrano un errore del producer. Mossa: stampa `job.totalFrames`
+prima di accusare il render.
+
+### Un frame 3D che in locale costa 70 ms sul farm ne costa 1.600
+Il WebGL della sandbox è SwiftShader con JIT Subzero (`UNMASKED_RENDERER_WEBGL` lo dice), quello
+del Mac SwiftShader LLVM: profilare in locale con `--use-angle=swiftshader` dà l'ordine delle
+voci, non i numeri. E il tempo JS di `renderAt` è ~0: il lavoro GPU si paga alla lettura dei
+pixel. Mossa: misurare sul farm un chunk solo (`launchPiece` con indice 0, log degli step con
+`ms`), varianti dell'HTML in parallelo su sandbox diverse, e ripetere la base: tra sandbox il
+rumore arriva al 20%.
+
+### Il log del farm taglia l'errore: il motivo vero si legge in locale
+Lo step salva solo gli ultimi 600 caratteri dell'uscita, cioè la coda del dump `CaptureFailure`
+(worker, frame catturati: 0), mai il messaggio. Segnale: `failed` con un elenco di worker vuoti.
+Mossa: rifare lo stesso HTML con `executeRenderJob` del producer in locale (stessa versione):
+il messaggio esce intero, p. es. `[MotionBlur] ... cannot run with injected video frames` che
+il producer lancia per qualunque `<video>` nella pagina.
+
+### La bolletta Sandbox sale e nessun render è stato addebitato
+Segnale: Vercel mostra Active CPU / Provisioned Memory in crescita, `ai_calls` non ha righe `motion_render`. Le sandbox del farm vivono nel progetto Vercel **anomalia**, non in feega: `GET /v1/sandboxes?project=<id>&teamId=…` (token di `vercel login`) dà `vcpus`, `timeout`, `activeCpuDurationMs`, `startedAt`/`stoppedAt` per ognuna. Il 5/10 l'87% della spesa motion veniva da bench degli agenti (timeout non usati dal codice), e una sandbox che vive `timeout` pieno con poca CPU è un worker orfano. Mossa: un bench chiama `stopWorker` in `finally`; il minimo fatturato è 1 min di memoria per sandbox, quindi un bench a molti chunk corti costa il minimo × chunk.
+
+### Un timeout calcolato su contenuti piatti uccide i render 3D
+Segnale: un render con Device3D/Text3D fallisce a metà con `render worker stopped`, quelli 2D no. Un frame 3D sul farm (SwiftShader) costa 10–30 volte uno piatto: Device3D laptop 1,2 s/frame contro 0,04. Mossa: ogni stima per frame (timeout, chunk, prezzo) parte dai costi per componente (`render-cost.ts`, `renderClass` in `render-quote.ts`), mai da una costante "per frame 1080p".
+
+### In three.js `envMapIntensity` non conta se c'è `scene.environment`
+Un riflesso additivo sullo schermo dei mockup sbiancava il laptop e abbassare `envMapIntensity`
+non cambiava un pixel. Segnale: un parametro di materiale che «non ha effetto» con un ambiente
+di scena acceso. Mossa: la forza la dà `scene.environmentIntensity` (per tutta la scena) o, per
+un solo materiale, `specularIntensity` di `MeshPhysicalMaterial`. E prima di toccare i
+materiali, togli lo strato sospetto dall'HTML generato e rifai lo snapshot: dice in un minuto
+quale strato è.
+
+### Un 2D lento sul farm: guarda la regione dei filtri SVG, non html-to-image
+Segnale: frame 2D da secondi, `before` (refresh matte) e screenshot alti, forme con Stroke/goo.
+`.ef` è `inset:0`, quindi una regione `-25%/150%` è 2880×1620 px anche per una forma piccola, e
+`feMorphology` costa regione × raggio in software. Mossa: varianti dell'HTML senza un filtro
+alla volta (`filter:url(...)` tolto) e ms per frame con un chunk del producer; la regione va
+limitata a dove la clip disegna (`paintArea`), non tolto il filtro.
+
+### Blur a chunk: i worker in parallelo vanno più lenti che da soli
+Segnale: un chunk isolato fa 8,7 s/frame, lo stesso chunk fra 27 in parallelo 32 s/frame.
+Causa misurata (6/10): non il numero di worker ma la sandbox. Due sandbox identiche aperte
+insieme fanno lo stesso chunk a 7,9 e 17,2 s/frame, e la CPU fatturata segue il tempo; un loop
+di CPU puro fra 27 sandbox rallenta al massimo 1,45×. Mossa: misurare sempre un render intero a
+N worker (`e2e` con `firstSlices`), mai stimare il totale da un worker solo; e un A/B si fa
+DENTRO la stessa sandbox, varianti in sequenza e base ripetuta in coda (`taskset -c 0` simula
+meno vCPU), mai fra sandbox diverse.
+
+### Un chunk 2D usa un core solo: i vCPU in più si pagano in memoria
+Segnale: CPU fatturata ≈ tempo di parete su un worker da 4 vCPU. Il frame 2D (seek, raster,
+PNG) è seriale: con `taskset -c 0` va 1,26× più lento e fattura meno CPU, mentre i 4 vCPU portano
+8 GB di memoria fatturata. Il 3D no: SwiftShader su 4 core è 2,4× più veloce. Mossa: la taglia
+del worker sta in `CHUNK_VCPUS` per classe di render; prima di cambiarla, misura la classe.
+
+### Una matte raster costa un PNG per campione
+Segnale: `before` alto (0,8 s per campione di blur con 3 matte). html-to-image → canvas →
+`toDataURL` PNG → decode, a ogni seek. Mossa: per il passo esatto la maschera è l'SVG di
+`toSvg`, che Chrome rasterizza una volta mentre dipinge (56,8 dB contro le maschere PNG).
+
+### Copie di DOM dentro elementi 3D: `will-change` le fa costare un secondo a frame
+Il ring copia ogni clip di una composizione in ogni fetta: `.fx{will-change:transform}` dava a
+ognuna un layer di compositing a piena risoluzione, centinaia per frame. JS e layout restano a
+4 ms, il frame a 1 s. Segnale: tempo per frame che cresce col numero di copie mentre il seek è
+istantaneo. Mossa: confrontare varianti dell'HTML con un CSS in più (`will-change:auto`) e
+misurare ms per screenshot; dentro le copie si spegne il `will-change`.
+
+### Una preview che resta ferma al frame 0 dopo aver caricato un doc: `structuredClone` su un proxy di `$state`
+Segnale: la preview non si aggiorna e non parte, nessun errore in `console`; con
+`page.on('pageerror')` esce `DataCloneError: … could not be cloned`. Un doc caricato in un
+`$state` profondo è un proxy, e `applyDraft`/`parseMotionDoc` lo clonano. Mossa: i doc letti dal
+server vanno in `$state.raw` (si sostituisce l'oggetto intero), e nei giri Playwright si ascolta
+`pageerror`, non solo `console`.
+
+### Una tela vuota per un solo nodo: `structuredClone` su un proxy, di nuovo
+Segnale: la tela intera resta bianca, `DataCloneError: … could not be cloned` con
+`parseMotionDoc`/`applyDraft` nello stack. Il `$state.raw` sopra copriva i doc caricati, non il
+nodo e le card che il componente passa a `nodeDoc` dritti dallo stato della tela. Mossa: una
+funzione pura che copia un doc usa `cloneDoc` (JSON), mai `structuredClone` — tollera i proxy, e
+la regola sta in un posto invece che in ogni chiamante. Ogni nodo sta in `NodeBoundary`, così un
+render che lancia resta dentro il suo nodo. Un test con proxy veri vuole
+`// @vitest-environment jsdom` in un `.svelte.test.ts`: in ambiente node `$state` compila lato
+server e non crea proxy, e il test passa senza provare niente.
+
+### Un'immagine rotta solo dentro l'anteprima motion
+Segnale: lo stesso asset si vede sul nodo e non nel player; nella rete, `/assets/<id>` risponde
+303 → `/login`. L'iframe `srcdoc` del player ha origine opaca e non manda i cookie. Mossa: dentro
+il player solo URL firmati di Storage (`assetsById`, `motionSource`), mai le route di sessione. In
+Playwright si controllano le immagini del frame `about:srcdoc`, non di tutti i frame: quella del
+nodo nella pagina carica e fa passare il test.
+
+### Uno screenshot di un frame HTML del motore senza le clip che partono dopo lo 0
+Segnale: in un harness Playwright le clip con `from` > 0 non compaiono mai, anche senza keyframe;
+sul farm e nel player sì. `__timelines.main.seek(t)` muove solo GSAP, non la visibilità delle clip
+che governa il runtime. Mossa: `window.__player.renderSeek(t)`, lo stesso seek del render.
+
 ## Ambiente e worktree
 
 ### I tempi di idratazione misurati in dev non dicono niente
@@ -100,6 +277,12 @@ patch-package non aggiorna uno stato già patchato: dopo un merge/rebase che toc
 
 ### Una sessione precedente uccisa lascia una `vite build` orfana che scrive nella STESSA `build/`
 Una sessione (agente o terminale) chiusa a metà `npm run build` non porta via il processo: il trap del genitore non lo tocca, e `vite build` resta parente di `init`, vivo per decine di minuti, a scrivere in `build/`. Rilanciare il build nello stesso worktree fa gareggiare due `vite build` sulla stessa cartella d'output — corruzione silenziosa, non un errore chiaro. Segnale: `ps -ef | grep "vite build"` mostra più di un processo con lo stesso `cwd`, uno con `PPID 1` e un'ora di avvio molto più vecchia. Mossa: prima di rilanciare un build lungo in un worktree, cerca ed elimina (`kill -9`) ogni `vite build`/`npm run build` orfano di QUEL worktree — non toccare processi di altri worktree che condividono la macchina.
+
+### `gh pr merge --delete-branch` sulla base di una pila chiude la PR figlia
+Mergiando #133 con `--delete-branch`, GitHub ha cancellato `feat/editor-layout` e ha CHIUSO #135
+(base `feat/editor-layout`) invece di ri-puntarla su `main`: va riaperta come PR nuova. Segnale:
+la PR figlia passa a `CLOSED` senza merge appena la base viene mergiata. Mossa: merge della base
+SENZA `--delete-branch`, poi `gh pr edit <figlia> --base main`, e cancella il branch solo dopo.
 
 ### Una PR «Merged» su GitHub può non essere MAI arrivata su `dev`
 La #52 («Run custom-agent turns on the Agent Kit») risulta `MERGED` su GitHub, con tanto di merge commit, e il task su Notion diceva «In production». In produzione non c'è mai stata: era aperta **contro `feat/kit-private-threads`**, non contro `dev`, e quel branch intermedio in `dev` non è mai entrato. Il merge commit è reale e irraggiungibile — un ramo staccato che nessuno ha più tirato. Il codice su `dev` continuava a portare il gate vecchio (`!personaId`) mentre tutti lo davano per migrato.
@@ -348,7 +531,13 @@ Era descritto come irrisolvibile: `.checked` cambia, l'handler (`onchange`, `onc
 ### Un bottone cliccato subito dopo `page.goto`/`waitForURL` non ha ancora il suo `onclick`
 Su una pagina SvelteKit renderizzata server-side, il DOM del bottone esiste — Playwright lo vede `visible`, lo clicca, nessun errore — ma se il click arriva prima che l'hydration client-side abbia agganciato gli handler, il click cade su un nodo ancora "morto": nessuna eccezione, nessun log in console, nessun `pageerror`, e la funzione che quel bottone dovrebbe chiamare (qui: `openSheet` dietro un bottone della rail) semplicemente non parte — l'URL non cambia, niente si apre. Uno script standalone con `page.on('console')`/`page.on('pageerror')` attivi, ripetuto con e senza un `await page.waitForLoadState('networkidle')` dopo la navigazione, ha isolato la causa in due minuti — senza quell'attesa il click non fa niente in ogni run, con quell'attesa funziona in ogni run. Segnale: un click che Playwright riporta come riuscito (nessuna eccezione dal `.click()` stesso) ma il cui effetto atteso (URL, DOM, stato) non arriva mai, e zero rumore in console o server. Mossa: `waitForLoadState('networkidle')` (o l'equivalente `gotoHydrated` già in `fixtures/session.ts`) dopo OGNI navigazione che precede un click, non solo dopo il login — la stessa corsa esiste su qualunque pagina, non solo sul form che l'ha fatta scoprire per primo.
 
+### Un utente usa-e-getta `e2e-*` sparisce a metà sessione
+Login che funzionava dieci minuti prima risponde «Wrong email or password»; `auth.admin.getUserById` dà niente e anche l'org è sparita. Qualcosa ripulisce gli utenti `e2e-…@feega.app` sul progetto condiviso mentre la tua sessione manuale è ancora aperta. Mossa: per una sessione di lavoro lunga (screenshot, giri a mano) crea l'utente con un prefisso tuo, non `e2e-`, e smontalo tu alla fine; le spec Playwright restano su `fixtures/session.ts`, che dura quanto il test.
+
 ## Codice
+
+### Un valore nuovo per una colonna «libera» muore su un CHECK che le migration non hanno
+`platform = 'upload'` su `products`: i test con repo finti verdi, in produzione `23514 products_platform_check`. Lo stesso per `nodes.data.type` di un nodo `products` (`nodes_data_shape_check`). Quei CHECK vivono sul database e non in `supabase/migrations`: la lista vera è `src/lib/server/org-data/checks.ts` e le `canvas-migrations`. Segnale: `23514` al primo giro reale di un valore che nessun test ha mai scritto su Postgres. Mossa: prima di inventare un valore di enum, `grep` del nome della colonna in `org-data/checks.ts` e nelle `canvas-migrations`; se serve davvero, è una migration da applicare, non un cast.
 
 ### Un claim atomico su UNA tabella non protegge un job che vive su DUE
 `reconcileVideoRenders` (`video-render-queue.ts`, cron `videos/render/work`) claima
@@ -2241,3 +2430,124 @@ Signal: an inspector edit or keyframe lands at frame 0 or an older frame, not at
 Cause: the HyperFrames player emits `timeupdate` (often at 0) when the composition reloads, and
 the editor took it as the new frame. Move: while paused the editor owns the frame; follow
 `timeupdate` only while playing (`MotionPreview.svelte`).
+
+## Captured motion frames ignore SVG masks
+Signal: `view_frames` / html-to-image JPEGs show clips unmasked while the preview masks them.
+Cause: html-to-image inlines computed styles, and a computed `url(#id)` resolves against the
+srcdoc URL, which the cloned SVG image cannot reach. Move: before capture, freeze each mask into
+a data-URL image (`freezeMasks` in `hyperframes/masks.ts`), restore after. Same signal on a doc
+with a Video clip is a different cause: `<video>` without `crossorigin` taints the canvas.
+
+## An exported motion video goes silent halfway
+Signal: the MP4 has an AAC track for the full length but `ebur128` shows digital silence after a
+few seconds. Cause: not the encoder — the template picked a 4 s voice-over as the music bed
+(assets come newest first). Move: check the mix before the muxer (`mixAudio` RMS per second in
+the page); the music is the longest audio (`templateAssets`), so seed fixtures with `duration_s`.
+
+## `page.evaluate` breaks under vite-node
+Signal: `__vite_ssr_dynamic_import__ is not defined` from a Playwright script run with
+`vite-node`. Cause: vite-node rewrites `import()` inside the function shipped to the browser.
+Move: run browser-side probes with plain `node` (`.mjs`), or pass the function as a string.
+
+## A motion export contains frames of another video
+Signal: an MP4 (or `view_frames`) shows clips of the doc loaded before, usually at the start.
+Cause: `ready` from the previous `srcdoc` load resolved the wait for the new one; until the
+navigation commits, `contentWindow` is the old document and answers the capture. Move: trust a
+frame only if its reply carries the stamp of the composition you loaded (`preview-driver.ts`),
+and serialize every borrowed capture.
+
+## A motion agent tool fails twenty times on one argument
+Signal: every `write_component` fails with "expected object, received string" and the turn burns
+a dollar retrying. Cause: a `z.unknown()` tool input becomes a JSON schema with no type, and the
+model sends a string. Move: give every tool argument a concrete schema (accept the JSON string
+too), and count refused calls against the per-turn cap.
+
+## A motion turn on Claude dies and saves nothing
+Signal: `tool_choice: type "tool" ... not supported for this model` in the log, revision stays
+at the old version, no `ai_calls` row. Cause: the self-check round forces `view_frames`, which
+Anthropic models on OpenRouter refuse; the error escaped before `finishTurn`. Move: force a tool
+only on models that accept it (`FORCES_TOOL`), and a failed round must still save the edits.
+
+## A motion component types nothing in preview but passes every check
+Signal: text that should type, bars that should fill stay at their first state in the preview
+and the MP4; the determinism check passes. Cause: the HyperFrames runtime seeks with
+`totalTime(t, true)`, which suppressed GSAP callbacks, so `onUpdate` never ran. Move: the motion
+engine (`motion/engine/engine.ts`) calls every `onUpdate` on every render and never runs `call()`,
+`onStart`, `onComplete`; test with `totalTime(t, true)`, never `seek(t)`.
+
+## A Vercel Sandbox snapshot is "not found" from the deployment
+Signal: `Snapshot not found` (404) creating a sandbox from a snapshot id that works locally.
+Cause: snapshots belong to the project of the credentials that made them; the local
+`VERCEL_PROJECT_ID` is not the app project the deployment's OIDC speaks for. Move: no snapshot
+ids in env — keep a named persistent base sandbox per version and `Sandbox.fork` it
+(`vercel-farm.ts`); it is rebuilt where it is first used.
+
+## Headless Chrome will not start in a Vercel Sandbox
+Signal: HyperFrames says `Chrome cannot launch (missing system libraries)`: libnss3, libnspr4.
+Cause: the sandbox image is a bare Ubuntu 26.04. Move: apt-install the Chrome libraries
+(`libasound2t64`, not `libasound2`) in the base setup, next to ffmpeg.
+
+## A model in the catalogue still cannot run on the canvas
+Signal: a node on a synced model refuses (`source_video_required`, `prompt_required`) or its
+input edge is dropped, while unit tests on the model spec are green.
+Cause: four gates decide it, not one: `videoRefCapacity`, `ai_models.input_modalities` (video rows
+have no `architecture`: the sync derives them), `promptRequired`, the transport payload. Uploaded
+nodes carry `data.assetId`, generated ones `data.refId`. Move: write a `runGenNode` test with a
+real upstream node and the synced modalities before claiming a model works, then one real run.
+
+## A 3D model stays frozen in renders and `view_frames`
+Signal: a Model3D / Shape3D (or anything a page script draws per frame) shows its frame-0 pose at
+every time in an MP4 or a captured frame, while the editor's playing preview animates it.
+Cause: same root as the typing component above — the runtime seeks with callbacks suppressed, and
+the three.js scene redrew from a `tl.to({}, { onUpdate })`. Move: drive any per-frame page
+renderer through `seekDriver` (`hyperframes/stage.ts`, an `onUpdate` the engine runs on every seek); to probe a
+standalone composition, seek with `window.__player.renderSeek(t)`, not `tl.totalTime`, or clips
+past their start never become visible.
+
+## A picture is a broken icon only in the server-rendered MP4
+Signal: the preview and the browser export show an Image clip; the Vercel Sandbox MP4 shows a
+broken-image box, while a GLB from the same signed host loads. Cause: the HyperFrames producer
+downloads every remote `<img>`/`<video>`/`<audio>` src and rewrites it to `_remote_media/…` on its
+own file server; the composition CSP allowed images only from the asset origin. Move: `img-src`
+and `media-src` carry `'self'` (`hyperframes/csp.ts`); anything the producer localizes must be
+allowed from the page origin.
+
+### A clip written as a literal misses the next field, and only the browser notices
+`checkDoc` built its clip by hand; when `expressions` joined the schema, the literal did not get
+it and `bakeExpressions` threw on `Object.keys(undefined)` — every custom component failed its
+seek check (`the preview could not render it: Cannot convert undefined or null to object`) and
+export stayed blocked. Unit tests were green: none composed the check doc. Signal: a check or
+export refused with a TypeError that names no field. Move: every clip comes from `newClip` in
+`doc.ts` (one place for defaults), and a test composes the derived doc, not just its shape.
+
+### The server renderer swaps some fonts for bundled look-alikes
+The HyperFrames producer injects its own `@font-face` for every family the page does not declare
+itself, and for an alias list it uses bundled fonts (`Bebas Neue` → League Gothic). A `<link>` to
+Google Fonts does not count as declared. Signal: one font looks right in preview and browser
+export but narrower or different on the server. Move: declare every family in the page
+(`declaredFamilyCss`: a `@font-face` that matches nothing), and compare a server frame with a
+browser-export frame for each new font path.
+
+### The HyperFrames producer reads the timeline, not just the frames
+Replacing GSAP, the producer kept working only because the new timeline answers what it asks:
+`totalTime(t, true)`/`seek` to draw, `play`/`pause`/`time` for the preview transport, and
+`getChildren()` with `startTime`/`duration`/`totalDuration`/`vars` for static-frame dedup (frames
+outside every child are captured once and reused). Signal: a render with frames frozen on a
+moving element, or `static-frame dedup` reasons like `no GSAP tweens` in the log and a slower
+render. Move: any timeline handed to `window.__timelines` keeps that surface, with a child's
+`startTime` relative to its parent; compare `static-frame dedup` lines of two renders.
+
+## A motion turn ends on a working note and never looks at its frames
+Signal: the reply reads "Registering Inter, then adding text.The glow went…", `view_frames` was
+never called, and `ai_calls` shows a cost above `MOTION_TURN_CAP_USD`. Cause: the self-check ran
+only while the turn was under budget, and the reply was whatever the last step said. Move: the
+closing rounds (`Round.SelfCheck`, `Round.Summary` in `turn.ts`) ignore the edit budget, the edit
+round stops `CLOSING_RESERVE_MS` early to leave them time, and the summary round runs with
+`toolChoice: 'none'`, which thinking models accept.
+
+## A motion turn forgets its own edits after view_frames
+Signal: the summary says nothing was built while the timeline is full; the dev log shows
+`GenerateContentRequest.tools[0].function_declarations[...]: missing field` from Google. Cause: the
+step after `view_frames` went to the Gemini vision model, which rejects the tool schemas; the round
+rejected and its messages were read from the failed result. Move: keep each finished step from
+`onStepFinish`, and let a model that reads images (`gatewayModel(id).usable`) see its own frames.

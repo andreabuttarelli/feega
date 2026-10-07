@@ -25,8 +25,11 @@ function costOf(usage: unknown): number | null {
   return Number.isFinite(cost) ? cost : null;
 }
 
+type BilledBody = { usage?: unknown; response?: { usage?: unknown } } | null | undefined;
+
 export function costFromJson(body: unknown): number | null {
-  return costOf((body as { usage?: unknown } | null | undefined)?.usage);
+  const billed = body as BilledBody;
+  return costOf(billed?.usage) ?? costOf(billed?.response?.usage);
 }
 
 /** L'ultimo chunk che porta un costo vince: i precedenti sono parziali o assenti. */

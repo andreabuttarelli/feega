@@ -4,6 +4,7 @@ export type BrandTokens = {
   name: string;
   colors: Record<BrandColor, string>;
   logoUrl: string | null;
+  fonts?: string[];
 };
 
 export const FEEGA_TOKENS: BrandTokens = {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat } from '$lib/motion/doc';
-import { motionEditorPath, motionOf, newMotionData } from './motion-node';
+import { FORMATS, MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
+import { MOTION_NODE_BAR_H, motionEditorPath, motionNodeSize, motionOf, motionPreviewPath, newMotionData } from './motion-node';
+import { nodeSize } from './node-size';
 
 describe('motion node', () => {
   it('a new motion node is vertical with no revision yet', () => {
@@ -21,7 +22,39 @@ describe('motion node', () => {
     expect(motionOf({ id: 'n', type: 'motion', data: { format: 'cinema' } })?.format).toBe(MotionFormat.Vertical);
   });
 
+  it.each([
+    ['landscape', MotionFormat.Landscape],
+    ['vertical', MotionFormat.Vertical],
+    ['square', MotionFormat.Square],
+    ['portrait', MotionFormat.Portrait]
+  ])('a node written with the format name %s opens in that format, not as 9:16', (name, format) => {
+    const node = motionOf({ id: 'n', type: 'motion', data: { format: name, docHeadRevision: 3, posterAssetId: null, lastRenderAssetId: null } });
+
+    expect(node?.format).toBe(format);
+    expect(node?.docHeadRevision).toBe(3);
+  });
+
   it('the editor lives under the canvas', () => {
     expect(motionEditorPath({ projectId: 'p', canvasId: 'c', nodeId: 'n' })).toBe('/p/p/c/c/motion/n');
+  });
+
+  it.each(MOTION_FORMATS)('a %s node is its picture plus the bar, so the selection frames what is visible', (format) => {
+    const { w, h } = motionNodeSize(format);
+    const { width, height } = FORMATS[format];
+
+    expect((h - MOTION_NODE_BAR_H) / w).toBeCloseTo(height / width, 2);
+  });
+
+  it('the canvas sizes a motion node by the format it carries', () => {
+    const wide = nodeSize('motion', newMotionData(MotionFormat.Landscape));
+    const tall = nodeSize('motion', newMotionData(MotionFormat.Vertical));
+
+    expect(wide.w).toBeGreaterThan(wide.h);
+    expect(tall.h).toBeGreaterThan(tall.w);
+    expect(nodeSize('motion')).toEqual(motionNodeSize(MotionFormat.Vertical));
+  });
+
+  it('the preview is read next to the editor', () => {
+    expect(motionPreviewPath({ projectId: 'p', canvasId: 'c', nodeId: 'n' })).toBe('/p/p/c/c/motion/n/preview');
   });
 });

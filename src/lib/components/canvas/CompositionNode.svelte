@@ -1,57 +1,108 @@
 <script lang="ts">
   import TieredImage from './TieredImage.svelte';
   import Orbit from '@lucide/svelte/icons/orbit';
-  import type { CompositionNode } from '$lib/canvas/composition-node';
-  import CompositionPreview from './CompositionPreview.svelte';
+  import { assetUrlsPath, staleMotions, type CompositionNode, type MotionCard, type UpstreamCard } from '$lib/canvas/composition-node';
+  import { motionSourcePath } from '$lib/canvas/motion-node';
+  import CompositionPlayer from '$lib/components/motion/CompositionPlayer.svelte';
   import NodeDownload from './NodeDownload.svelte';
+  import BentoPanel from './BentoPanel.svelte';
+  import { nodeDoc } from '$lib/motion/composition-draft';
+  import type { MotionDoc } from '$lib/motion/doc';
 
   let {
     node,
     posterUrl = null,
-    mediaUrls = [],
+    cards = [],
+    assets = {},
     previewActive = true,
-    imageCount = 0,
-    onopeneditor
+    composeIn,
+    onpatch
   }: {
     node: CompositionNode;
     posterUrl?: string | null;
-    mediaUrls?: string[];
+    cards?: UpstreamCard[];
+    assets?: Record<string, string>;
     previewActive?: boolean;
-    imageCount?: number;
-    onopeneditor: () => void;
+    composeIn: { project: string; canvas: string };
+    onpatch?: (patch: Partial<CompositionNode>) => void;
   } = $props();
 
   const ASPECT_RATIO = { '9:16': 9 / 16, '1:1': 1, '16:9': 16 / 9 } as const;
+
+  type Loaded = { revision: number; doc: MotionDoc | null; assets: Record<string, string> };
+
+  let sources = $state.raw<Record<string, Loaded>>({});
+
+  async function load(card: MotionCard) {
+    const shown = sources[card.sourceId];
+    sources = { ...sources, [card.sourceId]: { revision: card.revision, doc: shown?.doc ?? null, assets: shown?.assets ?? {} } };
+    const res = await fetch(motionSourcePath({ projectId: composeIn.project, canvasId: composeIn.canvas, nodeId: card.sourceId, revision: card.revision })).catch(() => null);
+    const body = res?.ok ? ((await res.json()) as { doc: MotionDoc; assets: Record<string, string> }) : null;
+    sources = { ...sources, [card.sourceId]: { revision: card.revision, doc: body?.doc ?? null, assets: body?.assets ?? {} } };
+  }
+
+  $effect(() => {
+    const revisions = Object.fromEntries(Object.entries(sources).map(([id, s]) => [id, s.revision]));
+    staleMotions(cards, revisions).forEach(load);
+  });
+
+  const motions = $derived(Object.fromEntries(Object.entries(sources).map(([id, s]) => [id, s.doc])));
+  let signed = $state.raw<Record<string, string>>({});
+  const cardIds = $derived(Object.keys(assets).sort().join(','));
+
+  $effect(() => {
+    const ids = cardIds;
+    if (!ids) {
+      return;
+    }
+    fetch(assetUrlsPath({ projectId: composeIn.project, canvasId: composeIn.canvas, ids: ids.split(',') }))
+      .then((res) => (res.ok ? (res.json() as Promise<Record<string, string>>) : {}))
+      .then((urls) => {
+        if (ids === cardIds) {
+          signed = urls;
+        }
+      })
+      .catch(() => {});
+  });
+
+  const allAssets = $derived(Object.assign({}, assets, signed, ...Object.values(sources).map((s) => s.assets)));
+
+  let form = $state<HTMLFormElement | null>(null);
+  const openInCompositions = () => form?.requestSubmit();
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="composition" ondblclick={onopeneditor}>
-  {#if mediaUrls.length > 0 && previewActive}
+<div class="composition" ondblclick={openInCompositions}>
+  {#if cards.length > 0}
     <div
       class="composition-preview"
       style={`--preview-ratio: ${ASPECT_RATIO[node.aspect]}; aspect-ratio: ${ASPECT_RATIO[node.aspect]}`}
     >
-      <CompositionPreview {node} {mediaUrls} />
+      <CompositionPlayer doc={nodeDoc(node, cards, motions)} assets={allAssets} active={previewActive} />
     </div>
   {:else if node.refId && posterUrl}
     <TieredImage src={posterUrl} nodeId={node.id} alt="Composition" />
-  {:else if imageCount > 0}
-    <div class="composition-ready">
-      <Orbit size={22} strokeWidth={1.5} />
-      <p>{imageCount} immagini collegate</p>
-    </div>
   {:else}
     <div class="composition-empty">
       <Orbit size={22} strokeWidth={1.5} />
-      <p>Connect images</p>
+      <p>Connect images, videos or motions</p>
     </div>
+  {/if}
+
+  {#if node.layout === 'bento' && onpatch}
+    <BentoPanel {node} {cards} {onpatch} />
   {/if}
 
   <div class="composition-actions">
     {#if node.refId && posterUrl}
       <NodeDownload kind="video" sourceUrl={posterUrl} nodeId={node.id} nodeType="composizione" />
     {/if}
-    <button type="button" class="composition-action nodrag" onclick={onopeneditor}>Open editor</button>
+    <form bind:this={form} method="POST" action="/app/compose?/fromNode" class="nodrag">
+      <input type="hidden" name="project" value={composeIn.project} />
+      <input type="hidden" name="canvas" value={composeIn.canvas} />
+      <input type="hidden" name="node" value={node.id} />
+      <button type="submit" class="composition-action" title="Edit and export in Compositions">Open editor</button>
+    </form>
   </div>
 </div>
 
@@ -109,7 +160,7 @@
     cursor: pointer;
   }
 
-  .composition-ready,
+
   .composition-empty {
     display: flex;
     flex-direction: column;
@@ -119,7 +170,7 @@
     color: var(--ink-soft, #6e6e73);
     text-align: center;
   }
-  .composition-ready p,
+
   .composition-empty p {
     margin: 0;
     font-size: 11.5px;

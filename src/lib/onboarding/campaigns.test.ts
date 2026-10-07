@@ -38,4 +38,9 @@ describe('campaign → template', () => {
   it('anime landing gets the anime template', () => {
     expect(templateIdForCampaign(campaignOf('anime-video-generator')!)).toBe('anime-video');
   });
+
+  it('the upscaler landing opens an upscale-ready canvas, not a generation template', () => {
+    const template = templateById(templateIdForCampaign(campaignOf('ai-video-upscaler')!))!;
+    expect(template.nodes.some((n) => n.data.model === 'black-forest-labs/flux-video-upscale')).toBe(true);
+  });
 });

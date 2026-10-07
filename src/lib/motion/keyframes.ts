@@ -1,11 +1,32 @@
 import { z } from 'zod';
-import { COLOR, type ComponentId } from './components';
+import { COLOR, TYPE, type ComponentId } from './components';
 import { EASE_IDS, Ease } from './design';
+import { MASK_KEYS, MASK_PROPS, maskValue, type Mask, type MaskKey } from './mask';
+import { RING_NUMBERS, RING_NUMBER_KEYS } from '../canvas/composition/ring';
+import { PARTICLE_COLOURS, PARTICLE_COLOUR_KEYS, PARTICLE_NUMBERS, PARTICLE_NUMBER_KEYS } from './particles/model';
 
 export type Bezier = [number, number, number, number];
 export type EaseSpec = Ease | Bezier;
 export type KeyValue = number | string;
-export type Keyframe = { frame: number; value: KeyValue; ease: EaseSpec };
+export enum Interp {
+  Bezier = 'bezier',
+  Linear = 'linear',
+  Hold = 'hold',
+  Auto = 'auto',
+  Continuous = 'continuous'
+}
+
+export const INTERPS = Object.values(Interp) as [Interp, ...Interp[]];
+
+export const INTERP_LABEL: Record<Interp, string> = {
+  [Interp.Bezier]: 'Bezier',
+  [Interp.Linear]: 'Linear',
+  [Interp.Hold]: 'Hold',
+  [Interp.Auto]: 'Auto-bezier',
+  [Interp.Continuous]: 'Continuous'
+};
+
+export type Keyframe = { frame: number; value: KeyValue; ease: EaseSpec; in?: Interp; out?: Interp; roving?: boolean };
 export type Keyframes = Record<string, Keyframe[]>;
 
 const unit = z.number().min(0).max(1);
@@ -16,8 +37,19 @@ export const easeSchema = z.union([z.enum(EASE_IDS), z.tuple([unit, ordinate, un
 export const keyframeSchema = z.object({
   frame: z.number().int().min(0),
   value: z.union([z.number(), z.string()]),
-  ease: easeSchema.default(Ease.Standard)
+  ease: easeSchema.default(Ease.Standard),
+  in: z.enum(INTERPS).optional(),
+  out: z.enum(INTERPS).optional(),
+  roving: z.boolean().optional()
 });
+
+export const SPATIAL_KEYS: readonly string[] = ['x', 'y', 'z'];
+
+const COLOUR_INTERPS: readonly Interp[] = [Interp.Bezier, Interp.Linear, Interp.Hold];
+
+export function isPlainTrack(track: readonly Keyframe[]): boolean {
+  return track.every((k) => !k.roving && (k.in ?? Interp.Bezier) === Interp.Bezier && (k.out ?? Interp.Bezier) === Interp.Bezier);
+}
 
 export enum ValueKind {
   Number = 'number',
@@ -27,7 +59,16 @@ export enum ValueKind {
 export enum Source {
   Transform = 'transform',
   Prop = 'prop',
-  Scene = 'scene'
+  Scene = 'scene',
+  Mask = 'mask',
+  Param = 'param',
+  Effect = 'effect',
+  Animator = 'animator',
+  Modifier = 'modifier',
+  Remap = 'remap',
+  Sound = 'sound',
+  Layout = 'layout',
+  TextPath = 'textPath'
 }
 
 type Range = { label: string; min: number; max: number; step: number; fallback: number };
@@ -66,55 +107,135 @@ export const SCENE = {
   fov: { label: 'Camera FOV', min: 10, max: 120, step: 1, fallback: 35 }
 } as const satisfies Record<string, Range>;
 
-export type SceneKey = keyof typeof SCENE;
+export const DEVICE_SCENE = {
+  lid: { label: 'Lid open', min: 0, max: 135, step: 1, fallback: 110 },
+  fold: { label: 'Fold open', min: 0, max: 180, step: 1, fallback: 180 },
+  screenScroll: { label: 'Screen scroll', min: 0, max: 1, step: 0.01, fallback: 0 }
+} as const satisfies Record<string, Range>;
+
+export const REMAP_KEY = 'time';
+const MAX_SOURCE_SECONDS = 3600;
+const remapProps: AnimProp[] = [{ key: REMAP_KEY, label: 'Time remap (source s)', kind: ValueKind.Number, source: Source.Remap, min: 0, max: MAX_SOURCE_SECONDS, step: 0.01, fallback: 0 }];
+
+export type SceneKey = keyof typeof SCENE | keyof typeof DEVICE_SCENE;
 export const SCENE_KEYS = Object.keys(SCENE) as SceneKey[];
 
-export type AnimProp = { key: string; label: string; kind: ValueKind; source: Source; min: number; max: number; step: number; fallback: number };
+export type AnimProp = { key: string; label: string; kind: ValueKind; source: Source; min: number; max: number; step: number; fallback: number; base?: KeyValue };
 
 const ANCHORS: readonly TransformKey[] = ['anchorX', 'anchorY'];
 
 const transformProps: AnimProp[] = TRANSFORM_KEYS.filter((k) => !ANCHORS.includes(k)).map((key) => ({ key, kind: ValueKind.Number, source: Source.Transform, ...TRANSFORM[key] }));
-const sceneProps: AnimProp[] = SCENE_KEYS.map((key) => ({ key, kind: ValueKind.Number, source: Source.Scene, ...SCENE[key] }));
+const sceneProps: AnimProp[] = SCENE_KEYS.map((key) => ({ key, kind: ValueKind.Number, source: Source.Scene, ...SCENE[key as keyof typeof SCENE] }));
+const deviceProps: AnimProp[] = (Object.keys(DEVICE_SCENE) as (keyof typeof DEVICE_SCENE)[]).map((key) => ({ key, kind: ValueKind.Number, source: Source.Scene, ...DEVICE_SCENE[key] }));
+const maskProps: AnimProp[] = MASK_KEYS.map((key) => {
+  const { label, min, max, step, fallback } = MASK_PROPS[key];
+  return { key, label, min, max, step, fallback, kind: ValueKind.Number, source: Source.Mask };
+});
 const colours = (...entries: [string, string][]): AnimProp[] =>
   entries.map(([key, label]) => ({ key, label, kind: ValueKind.Color, source: Source.Prop, min: 0, max: 0, step: 0, fallback: 0 }));
 
+export const SOUND = {
+  volume: { label: 'Volume', min: 0, max: 1, step: 0.01, fallback: 1 },
+  pan: { label: 'Pan', min: -1, max: 1, step: 0.01, fallback: 0 }
+} as const satisfies Record<string, Range>;
+
+const soundProps: AnimProp[] = (Object.keys(SOUND) as (keyof typeof SOUND)[]).map((key) => ({ key, kind: ValueKind.Number, source: Source.Sound, ...SOUND[key] }));
+
+const visual = (...extra: AnimProp[][]): AnimProp[] => [...transformProps, ...extra.flat(), ...maskProps];
+
+const typeNumbers: AnimProp[] = (
+  [
+    ['weight', 'Weight', 400],
+    ['tracking', 'Tracking', 0],
+    ['leading', 'Leading', 1.2],
+    ['stretch', 'Width axis', TYPE.stretch.fallback],
+    ['slant', 'Slant axis', TYPE.slant.fallback]
+  ] as const
+).map(([key, label, fallback]) => ({ key, label, kind: ValueKind.Number, source: Source.Prop, min: TYPE[key].min, max: TYPE[key].max, step: TYPE[key].step, fallback }));
+
+const SHAPE_NUMBERS: AnimProp[] = (
+  [
+    ['roundness', 'Roundness', 0, 0.5, 0.01, 0],
+    ['sides', 'Sides', 3, 64, 1, 6],
+    ['points', 'Points', 3, 64, 1, 5],
+    ['innerRadius', 'Inner radius', 0.05, 1, 0.01, 0.5],
+    ['morph', 'Morph', 0, 16, 0.01, 0],
+    ['morphStart', 'Morph start point', 0, 1, 0.01, 0],
+    ['gradientAngle', 'Gradient angle', -360, 360, 1, 90],
+    ['strokeWidth', 'Stroke width', 0, 0.2, 0.001, 0.01],
+    ['dash', 'Dash', 0, 0.5, 0.001, 0],
+    ['gap', 'Gap', 0, 0.5, 0.001, 0]
+  ] as const
+).map(([key, label, min, max, step, fallback]) => ({ key, label, min, max, step, fallback, kind: ValueKind.Number, source: Source.Param }));
+
+const PARTICLE_PROPS: AnimProp[] = [
+  ...PARTICLE_NUMBER_KEYS.map((key) => {
+    const { label, min, max, step, fallback } = PARTICLE_NUMBERS[key];
+    return { key, label, min, max, step, fallback, kind: ValueKind.Number, source: Source.Param };
+  }),
+  ...PARTICLE_COLOUR_KEYS.map((key) => ({ key, label: PARTICLE_COLOURS[key].label, kind: ValueKind.Color, source: Source.Param, min: 0, max: 0, step: 0, fallback: 0 }))
+];
+
+const RING_PROPS: AnimProp[] = RING_NUMBER_KEYS.map((key) => {
+  const { label, min, max, step, fallback } = RING_NUMBERS[key];
+  return { key, label, min, max, step, fallback, kind: ValueKind.Number, source: Source.Layout };
+});
+
 export const ANIMATABLE: Record<ComponentId, readonly AnimProp[]> = {
-  Title: [...transformProps, ...colours(['color', 'Colour'])],
-  Text: [...transformProps, ...colours(['color', 'Colour'])],
-  Kicker: [...transformProps, ...colours(['color', 'Colour'])],
-  Caption: [...transformProps, ...colours(['color', 'Colour'], ['background', 'Box'])],
-  Image: transformProps,
-  Video: transformProps,
-  Audio: [],
-  Shape: [...transformProps, ...colours(['fill', 'Fill'])],
-  Logo: transformProps,
-  BrandBackground: [...transformProps, ...colours(['fill', 'Fill'])],
-  ProductCard: [...transformProps, ...colours(['color', 'Colour'], ['card', 'Card'])],
-  SocialMockup: transformProps,
-  CanvasMock: transformProps,
-  Model3D: [...transformProps, ...sceneProps],
-  Shape3D: [...transformProps, ...sceneProps]
+  Title: visual(colours(['color', 'Colour']), typeNumbers),
+  Text: visual(colours(['color', 'Colour']), typeNumbers),
+  Kicker: visual(colours(['color', 'Colour']), typeNumbers),
+  Caption: visual(colours(['color', 'Colour'], ['background', 'Box']), typeNumbers),
+  Image: visual(),
+  Video: visual(remapProps, soundProps),
+  Audio: soundProps,
+  Shape: visual(colours(['fill', 'Fill'], ['fill2', 'Gradient end'], ['stroke', 'Stroke colour']), SHAPE_NUMBERS),
+  Logo: visual(),
+  Null: transformProps,
+  BrandBackground: visual(colours(['fill', 'Fill'])),
+  ProductCard: visual(colours(['color', 'Colour'], ['card', 'Card'])),
+  SocialMockup: visual(),
+  CanvasMock: visual(),
+  Model3D: visual(sceneProps),
+  Shape3D: visual(sceneProps),
+  Text3D: visual(sceneProps),
+  Logo3D: visual(sceneProps),
+  Device3D: visual(sceneProps, deviceProps),
+  Composition: visual(RING_PROPS),
+  Particles: visual(PARTICLE_PROPS),
+  Precomp: visual(),
+  Adjustment: [],
+  Custom: visual()
 };
 
-export function animProp(component: ComponentId, key: string): AnimProp | null {
-  return ANIMATABLE[component].find((p) => p.key === key) ?? null;
+export function animProp(component: ComponentId, key: string, params: readonly AnimProp[] = []): AnimProp | null {
+  return ANIMATABLE[component].find((p) => p.key === key) ?? params.find((p) => p.key === key) ?? null;
 }
 
-export type Animated = { component: ComponentId; props: Record<string, unknown>; transform: Transform; keyframes: Keyframes };
+export type Animated = { component: ComponentId; props: Record<string, unknown>; transform: Transform; keyframes: Keyframes; mask: Mask | null; params?: readonly AnimProp[] };
 
 const SCENE_FROM_PROPS: Partial<Record<SceneKey, string>> = { orbit: 'startAngle', dolly: 'zoom' };
 
 const BASE: Record<Source, (clip: Animated, prop: AnimProp) => KeyValue> = {
   [Source.Transform]: (clip, prop) => clip.transform[prop.key as TransformKey] ?? prop.fallback,
-  [Source.Prop]: (clip, prop) => String(clip.props[prop.key]),
+  [Source.Prop]: (clip, prop) => (prop.kind === ValueKind.Color ? String(clip.props[prop.key]) : Number(clip.props[prop.key] ?? prop.fallback)),
   [Source.Scene]: (clip, prop) => {
     const from = SCENE_FROM_PROPS[prop.key as SceneKey];
     return from ? Number(clip.props[from]) : prop.fallback;
-  }
+  },
+  [Source.Mask]: (clip, prop) => (clip.mask ? maskValue(clip.mask, prop.key as MaskKey) : prop.fallback),
+  [Source.Param]: (clip, prop) => (prop.kind === ValueKind.Color ? String(clip.props[prop.key]) : Number(clip.props[prop.key])),
+  [Source.Effect]: (_clip, prop) => prop.base ?? prop.fallback,
+  [Source.Animator]: (_clip, prop) => prop.base ?? prop.fallback,
+  [Source.Modifier]: (_clip, prop) => prop.base ?? prop.fallback,
+  [Source.Remap]: (_clip, prop) => prop.fallback,
+  [Source.Sound]: (clip, prop) => Number(clip.props[prop.key] ?? prop.fallback),
+  [Source.Layout]: (clip, prop) => Number((clip.props.layoutParams as Record<string, unknown> | undefined)?.[prop.key] ?? prop.fallback),
+  [Source.TextPath]: (_clip, prop) => prop.base ?? prop.fallback
 };
 
 export function baseValue(clip: Animated, key: string): KeyValue | null {
-  const prop = animProp(clip.component, key);
+  const prop = animProp(clip.component, key, clip.params);
   return prop ? BASE[prop.source](clip, prop) : null;
 }
 
@@ -132,12 +253,36 @@ function valueProblem(prop: AnimProp, value: KeyValue): string | null {
   return value < prop.min || value > prop.max ? `${prop.key}: ${value} is outside ${prop.min}..${prop.max}` : null;
 }
 
-export function keyframesProblem(component: ComponentId, keyframes: Keyframes): string | null {
-  for (const [key, track] of Object.entries(keyframes)) {
-    const prop = animProp(component, key);
+const SOURCE_PROBLEM: Record<Source, (clip: Pick<Animated, 'mask'>, key: string) => string | null> = {
+  [Source.Transform]: () => null,
+  [Source.Prop]: () => null,
+  [Source.Scene]: () => null,
+  [Source.Mask]: (clip, key) => (clip.mask ? null : `${key}: the clip has no mask, add one first (set_mask)`),
+  [Source.Param]: () => null,
+  [Source.Effect]: () => null,
+  [Source.Animator]: () => null,
+  [Source.Modifier]: () => null,
+  [Source.Remap]: () => null,
+  [Source.Sound]: () => null,
+  [Source.Layout]: () => null,
+  [Source.TextPath]: () => null
+};
+
+export function keyframesProblem(clip: Pick<Animated, 'component' | 'keyframes' | 'mask' | 'params'>): string | null {
+  const { component } = clip;
+  for (const [key, track] of Object.entries(clip.keyframes)) {
+    const prop = animProp(component, key, clip.params);
     if (!prop) {
-      const allowed = ANIMATABLE[component].map((p) => p.key).join(', ') || 'nothing';
+      const allowed = [...ANIMATABLE[component], ...(clip.params ?? [])].map((p) => p.key).join(', ') || 'nothing';
       return `${component} cannot animate ${key}; it animates: ${allowed}`;
+    }
+    const missing = SOURCE_PROBLEM[prop.source](clip, key);
+    if (missing) {
+      return missing;
+    }
+    const shapeProblem = interpProblem(prop, track);
+    if (shapeProblem) {
+      return shapeProblem;
     }
     for (const k of track) {
       const problem = valueProblem(prop, k.value);
@@ -149,7 +294,23 @@ export function keyframesProblem(component: ComponentId, keyframes: Keyframes): 
   return null;
 }
 
-export const GSAP_EASE: Record<Ease, string> = {
+function interpProblem(prop: AnimProp, track: readonly Keyframe[]): string | null {
+  if (track.some((k) => k.roving) && !SPATIAL_KEYS.includes(prop.key)) {
+    return `${prop.key}: roving keyframes are only for position (${SPATIAL_KEYS.join(', ')})`;
+  }
+  const smooth = track.some((k) => ![k.in, k.out].every((i) => !i || COLOUR_INTERPS.includes(i)));
+  return prop.kind === ValueKind.Color && smooth ? `${prop.key}: a colour keyframe takes ${COLOUR_INTERPS.join(', ')} interpolation` : null;
+}
+
+export const EASE_BEZIER: Record<Ease, Bezier> = {
+  [Ease.Standard]: [0.165, 0.84, 0.44, 1],
+  [Ease.Enter]: [0.215, 0.61, 0.355, 1],
+  [Ease.Exit]: [0.55, 0.055, 0.675, 0.19],
+  [Ease.Linear]: [1 / 3, 1 / 3, 2 / 3, 2 / 3],
+  [Ease.Overshoot]: [0.175, 0.885, 0.32, 1.275]
+};
+
+export const EASE_NAME: Record<Ease, string> = {
   [Ease.Standard]: 'power3.out',
   [Ease.Enter]: 'power2.out',
   [Ease.Exit]: 'power2.in',
@@ -158,64 +319,12 @@ export const GSAP_EASE: Record<Ease, string> = {
 };
 
 export function easeName(ease: EaseSpec): string {
-  return typeof ease === 'string' ? GSAP_EASE[ease] : `kf-bz-${ease.map((n) => String(n).replace('.', '_').replace('-', 'm')).join('-')}`;
+  return typeof ease === 'string' ? EASE_NAME[ease] : `kf-bz-${ease.map((n) => String(n).replace('.', '_').replace('-', 'm')).join('-')}`;
 }
 
-export function sampleTrack(track: { frame: number; value: number | string; ease: string | number[] }[], frame: number): number {
-  const curves: Record<string, (p: number) => number> = {
-    standard: (p) => 1 - (1 - p) ** 4,
-    enter: (p) => 1 - (1 - p) ** 3,
-    exit: (p) => p ** 3,
-    linear: (p) => p,
-    overshoot: (p) => {
-      const q = p - 1;
-      return p ? q * q * (2.7 * q + 1.7) + 1 : 0;
-    }
-  };
-  const bezier = (b: number[], p: number) => {
-    if (p <= 0 || p >= 1) {
-      return p <= 0 ? 0 : 1;
-    }
-    const cx = 3 * b[0];
-    const bx = 3 * (b[2] - b[0]) - cx;
-    const ax = 1 - cx - bx;
-    const cy = 3 * b[1];
-    const by = 3 * (b[3] - b[1]) - cy;
-    const ay = 1 - cy - by;
-    const xAt = (t: number) => ((ax * t + bx) * t + cx) * t;
-    let lo = 0;
-    let hi = 1;
-    let t = p;
-    for (let i = 0; i < 48; i++) {
-      if (xAt(t) < p) {
-        lo = t;
-      } else {
-        hi = t;
-      }
-      t = (lo + hi) / 2;
-    }
-    return ((ay * t + by) * t + cy) * t;
-  };
+import { sampleTrack, type SampledKey } from './sample-track';
 
-  const first = track[0];
-  const last = track[track.length - 1];
-  if (frame <= first.frame) {
-    return Number(first.value);
-  }
-  if (frame >= last.frame) {
-    return Number(last.value);
-  }
-
-  let i = 0;
-  while (track[i + 1].frame <= frame) {
-    i++;
-  }
-  const a = track[i];
-  const b = track[i + 1];
-  const p = (frame - a.frame) / (b.frame - a.frame);
-  const eased = typeof a.ease === 'string' ? curves[a.ease](p) : bezier(a.ease, p);
-  return Number(a.value) + (Number(b.value) - Number(a.value)) * eased;
-}
+export { sampleTrack, type SampledKey };
 
 const HEX = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i;
 

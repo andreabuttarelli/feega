@@ -1,3 +1,4 @@
+import * as bento from './bento';
 import * as carousel3d from './carousel-3d';
 import * as coverflow from './coverflow';
 import * as explorerGrid from './explorer-grid';
@@ -5,12 +6,14 @@ import * as helix from './helix';
 import * as staggeredGrid from './staggered-grid';
 import * as mediaCloud from './media-cloud';
 import * as mediaRing from './media-ring';
+import * as ring from './ring';
 import * as tiltedGrid from './tilted-grid';
 import * as verticalFlow from './vertical-flow';
 import type { LayoutId, LayoutParam, LayoutParams, Transform } from './types';
 
 type LayoutDefinition = {
 	label: string;
+	description: string;
 	motion: 'cycle' | 'ping-pong';
 	camera: 'fixed' | 'selected';
 	params: LayoutParam[];
@@ -20,7 +23,8 @@ type LayoutDefinition = {
 
 export const LAYOUTS: Record<LayoutId, LayoutDefinition> = {
 	'tilted-grid': {
-		label: 'Griglia cinetica',
+		label: 'Kinetic grid',
+		description: 'A tilted wall of cards that sways back and forth.',
 		motion: 'ping-pong',
 		camera: 'selected',
 		params: tiltedGrid.params,
@@ -28,7 +32,8 @@ export const LAYOUTS: Record<LayoutId, LayoutDefinition> = {
 		transforms: tiltedGrid.transforms
 	},
 	'carousel-3d': {
-		label: 'Carosello orbitale',
+		label: 'Orbital carousel',
+		description: 'Cards orbit a centre like a 3D carousel.',
 		motion: 'cycle',
 		camera: 'fixed',
 		params: carousel3d.params,
@@ -36,7 +41,8 @@ export const LAYOUTS: Record<LayoutId, LayoutDefinition> = {
 		transforms: carousel3d.transforms
 	},
 	'media-cloud': {
-		label: 'Nube cinematica',
+		label: 'Cinematic cloud',
+		description: 'Cards drift through depth in a loose cloud.',
 		motion: 'cycle',
 		camera: 'fixed',
 		params: mediaCloud.params,
@@ -44,7 +50,8 @@ export const LAYOUTS: Record<LayoutId, LayoutDefinition> = {
 		transforms: mediaCloud.transforms
 	},
 	'media-ring': {
-		label: 'Anelli sincronizzati',
+		label: 'Synced rings',
+		description: 'Rings of cards turning in step.',
 		motion: 'ping-pong',
 		camera: 'selected',
 		params: mediaRing.params,
@@ -53,7 +60,8 @@ export const LAYOUTS: Record<LayoutId, LayoutDefinition> = {
 		transforms: mediaRing.transforms
 	},
 	helix: {
-		label: 'Flusso elicoidale',
+		label: 'Helix',
+		description: 'A spiral of cards turning around its axis.',
 		motion: 'ping-pong',
 		camera: 'selected',
 		params: helix.params,
@@ -61,7 +69,8 @@ export const LAYOUTS: Record<LayoutId, LayoutDefinition> = {
 		transforms: helix.transforms
 	},
 	'explorer-grid': {
-		label: 'Griglia esplorativa',
+		label: 'Explorer grid',
+		description: 'An endless grid that glides from card to card.',
 		motion: 'cycle',
 		camera: 'fixed',
 		params: explorerGrid.params,
@@ -69,7 +78,8 @@ export const LAYOUTS: Record<LayoutId, LayoutDefinition> = {
 		transforms: explorerGrid.transforms
 	},
 	'staggered-grid': {
-		label: 'Colonne oblique',
+		label: 'Staggered columns',
+		description: 'Columns scrolling at offset heights.',
 		motion: 'cycle',
 		camera: 'fixed',
 		params: staggeredGrid.params,
@@ -78,7 +88,8 @@ export const LAYOUTS: Record<LayoutId, LayoutDefinition> = {
 		transforms: staggeredGrid.transforms
 	},
 	'vertical-flow': {
-		label: 'Flusso verticale',
+		label: 'Vertical flow',
+		description: 'A stream of cards rising through the frame.',
 		motion: 'cycle',
 		camera: 'fixed',
 		params: verticalFlow.params,
@@ -86,12 +97,31 @@ export const LAYOUTS: Record<LayoutId, LayoutDefinition> = {
 		transforms: verticalFlow.transforms
 	},
 	coverflow: {
-		label: 'Coverflow editoriale',
+		label: 'Editorial coverflow',
+		description: 'A front card with its neighbours angled away.',
 		motion: 'cycle',
 		camera: 'fixed',
 		params: coverflow.params,
 		instances: (mediaCount, values) => filledCount(mediaCount, valueOf(values, 'items', 5)),
 		transforms: coverflow.transforms
+	},
+	ring: {
+		label: 'UI ring',
+		description: 'Cards curved on a tilted, turning cylinder; the ones behind show through.',
+		motion: 'cycle',
+		camera: 'fixed',
+		params: ring.params,
+		instances: (mediaCount, values) => filledCount(mediaCount, valueOf(values, 'count', ring.RING_COUNT.fallback)),
+		transforms: ring.transforms
+	},
+	bento: {
+		label: 'Bento',
+		description: 'A grid of rounded cells, some spanning rows or columns, each holding a picture, a video or a motion.',
+		motion: 'cycle',
+		camera: 'fixed',
+		params: bento.params,
+		instances: (mediaCount) => mediaCount,
+		transforms: (count, values) => bento.transforms(count, values)
 	}
 };
 

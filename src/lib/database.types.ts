@@ -1056,6 +1056,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "chat_threads_node_id_fkey"
+            columns: ["node_id"]
+            isOneToOne: false
+            referencedRelation: "nodes"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "chat_threads_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
@@ -1067,6 +1074,103 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      competitor_ads: {
+        Row: {
+          brand_id: string | null
+          country: string
+          created_at: string
+          creative_body: string | null
+          creative_title: string | null
+          cta: string | null
+          external_ad_id: string
+          fetched_at: string
+          first_seen_at: string | null
+          found_via: string | null
+          id: string
+          is_active: boolean | null
+          landing_url: string | null
+          last_seen_at: string | null
+          matched_terms: string | null
+          media: Json | null
+          node_id: string | null
+          org_id: string
+          page_id: string | null
+          page_name: string | null
+          platform: string
+          raw: Json | null
+        }
+        Insert: {
+          brand_id?: string | null
+          country: string
+          created_at?: string
+          creative_body?: string | null
+          creative_title?: string | null
+          cta?: string | null
+          external_ad_id: string
+          fetched_at?: string
+          first_seen_at?: string | null
+          found_via?: string | null
+          id?: string
+          is_active?: boolean | null
+          landing_url?: string | null
+          last_seen_at?: string | null
+          matched_terms?: string | null
+          media?: Json | null
+          node_id?: string | null
+          org_id: string
+          page_id?: string | null
+          page_name?: string | null
+          platform?: string
+          raw?: Json | null
+        }
+        Update: {
+          brand_id?: string | null
+          country?: string
+          created_at?: string
+          creative_body?: string | null
+          creative_title?: string | null
+          cta?: string | null
+          external_ad_id?: string
+          fetched_at?: string
+          first_seen_at?: string | null
+          found_via?: string | null
+          id?: string
+          is_active?: boolean | null
+          landing_url?: string | null
+          last_seen_at?: string | null
+          matched_terms?: string | null
+          media?: Json | null
+          node_id?: string | null
+          org_id?: string
+          page_id?: string | null
+          page_name?: string | null
+          platform?: string
+          raw?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "competitor_ads_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "competitor_ads_node_id_fkey"
+            columns: ["node_id"]
+            isOneToOne: false
+            referencedRelation: "nodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "competitor_ads_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
             referencedColumns: ["id"]
           },
         ]
@@ -1192,103 +1296,6 @@ export type Database = {
           },
         ]
       }
-      competitor_ads: {
-        Row: {
-          brand_id: string | null
-          country: string
-          created_at: string
-          creative_body: string | null
-          creative_title: string | null
-          cta: string | null
-          external_ad_id: string
-          fetched_at: string
-          first_seen_at: string | null
-          found_via: string | null
-          id: string
-          is_active: boolean | null
-          landing_url: string | null
-          last_seen_at: string | null
-          matched_terms: string | null
-          media: Json | null
-          node_id: string | null
-          org_id: string
-          page_id: string | null
-          page_name: string | null
-          platform: string
-          raw: Json | null
-        }
-        Insert: {
-          brand_id?: string | null
-          country: string
-          created_at?: string
-          creative_body?: string | null
-          creative_title?: string | null
-          cta?: string | null
-          external_ad_id: string
-          fetched_at?: string
-          first_seen_at?: string | null
-          found_via?: string | null
-          id?: string
-          is_active?: boolean | null
-          landing_url?: string | null
-          last_seen_at?: string | null
-          matched_terms?: string | null
-          media?: Json | null
-          node_id?: string | null
-          org_id: string
-          page_id?: string | null
-          page_name?: string | null
-          platform?: string
-          raw?: Json | null
-        }
-        Update: {
-          brand_id?: string | null
-          country?: string
-          created_at?: string
-          creative_body?: string | null
-          creative_title?: string | null
-          cta?: string | null
-          external_ad_id?: string
-          fetched_at?: string
-          first_seen_at?: string | null
-          found_via?: string | null
-          id?: string
-          is_active?: boolean | null
-          landing_url?: string | null
-          last_seen_at?: string | null
-          matched_terms?: string | null
-          media?: Json | null
-          node_id?: string | null
-          org_id?: string
-          page_id?: string | null
-          page_name?: string | null
-          platform?: string
-          raw?: Json | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "competitor_ads_brand_id_fkey"
-            columns: ["brand_id"]
-            isOneToOne: false
-            referencedRelation: "brands"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "competitor_ads_node_id_fkey"
-            columns: ["node_id"]
-            isOneToOne: false
-            referencedRelation: "nodes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "competitor_ads_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "orgs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       credit_ledger: {
         Row: {
           ai_call_id: string | null
@@ -1375,6 +1382,75 @@ export type Database = {
             columns: ["social_account_id"]
             isOneToOne: false
             referencedRelation: "social_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      custom_voices: {
+        Row: {
+          actor_id: string | null
+          actor_kind: string
+          agent_key: string | null
+          consent_attested_at: string | null
+          consent_basis: string | null
+          consent_speaker: string | null
+          created_at: string
+          description: string | null
+          id: string
+          method: string
+          name: string
+          org_id: string
+          preview_url: string | null
+          provider_voice_id: string
+          samples_purged_at: string | null
+        }
+        Insert: {
+          actor_id?: string | null
+          actor_kind?: string
+          agent_key?: string | null
+          consent_attested_at?: string | null
+          consent_basis?: string | null
+          consent_speaker?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          method: string
+          name: string
+          org_id: string
+          preview_url?: string | null
+          provider_voice_id: string
+          samples_purged_at?: string | null
+        }
+        Update: {
+          actor_id?: string | null
+          actor_kind?: string
+          agent_key?: string | null
+          consent_attested_at?: string | null
+          consent_basis?: string | null
+          consent_speaker?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          method?: string
+          name?: string
+          org_id?: string
+          preview_url?: string | null
+          provider_voice_id?: string
+          samples_purged_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_voices_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "custom_voices_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
             referencedColumns: ["id"]
           },
         ]
@@ -1641,7 +1717,72 @@ export type Database = {
           summary?: string | null
           version?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "motion_revisions_node_id_fkey"
+            columns: ["node_id"]
+            isOneToOne: false
+            referencedRelation: "nodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "motion_revisions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      motion_templates: {
+        Row: {
+          actor_id: string | null
+          actor_kind: string
+          agent_key: string | null
+          created_at: string
+          description: string
+          doc: Json
+          id: string
+          name: string
+          org_id: string
+          poster_frame: number
+          updated_at: string
+        }
+        Insert: {
+          actor_id?: string | null
+          actor_kind: string
+          agent_key?: string | null
+          created_at?: string
+          description?: string
+          doc: Json
+          id?: string
+          name: string
+          org_id: string
+          poster_frame?: number
+          updated_at?: string
+        }
+        Update: {
+          actor_id?: string | null
+          actor_kind?: string
+          agent_key?: string | null
+          created_at?: string
+          description?: string
+          doc?: Json
+          id?: string
+          name?: string
+          org_id?: string
+          poster_frame?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "motion_templates_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       node_runs: {
         Row: {
@@ -2226,6 +2367,201 @@ export type Database = {
           },
         ]
       }
+      product_batch_items: {
+        Row: {
+          approval: string
+          asset_id: string | null
+          attempts: number
+          batch_id: string
+          created_at: string
+          environment: string
+          error: string | null
+          gen_node_id: string | null
+          id: string
+          influencer_id: string | null
+          model: string
+          next_attempt_at: string
+          node_run_id: string | null
+          org_id: string
+          preview: boolean
+          product_index: number
+          product_title: string
+          shot: string
+          status: string
+          updated_at: string
+          variation: number
+        }
+        Insert: {
+          approval?: string
+          asset_id?: string | null
+          attempts?: number
+          batch_id: string
+          created_at?: string
+          environment: string
+          error?: string | null
+          gen_node_id?: string | null
+          id?: string
+          influencer_id?: string | null
+          model: string
+          next_attempt_at?: string
+          node_run_id?: string | null
+          org_id: string
+          preview?: boolean
+          product_index: number
+          product_title: string
+          shot: string
+          status?: string
+          updated_at?: string
+          variation: number
+        }
+        Update: {
+          approval?: string
+          asset_id?: string | null
+          attempts?: number
+          batch_id?: string
+          created_at?: string
+          environment?: string
+          error?: string | null
+          gen_node_id?: string | null
+          id?: string
+          influencer_id?: string | null
+          model?: string
+          next_attempt_at?: string
+          node_run_id?: string | null
+          org_id?: string
+          preview?: boolean
+          product_index?: number
+          product_title?: string
+          shot?: string
+          status?: string
+          updated_at?: string
+          variation?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_batch_items_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_batch_items_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "product_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_batch_items_gen_node_id_fkey"
+            columns: ["gen_node_id"]
+            isOneToOne: false
+            referencedRelation: "nodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_batch_items_influencer_id_fkey"
+            columns: ["influencer_id"]
+            isOneToOne: false
+            referencedRelation: "influencers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_batch_items_node_run_id_fkey"
+            columns: ["node_run_id"]
+            isOneToOne: false
+            referencedRelation: "node_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_batch_items_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_batches: {
+        Row: {
+          actor_id: string | null
+          actor_kind: string
+          canvas_id: string | null
+          created_at: string
+          id: string
+          model: string
+          name: string
+          org_id: string
+          preview_model: string
+          products_node_id: string | null
+          project_id: string
+          spec: Json
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          actor_id?: string | null
+          actor_kind?: string
+          canvas_id?: string | null
+          created_at?: string
+          id?: string
+          model: string
+          name: string
+          org_id: string
+          preview_model: string
+          products_node_id?: string | null
+          project_id: string
+          spec?: Json
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          actor_id?: string | null
+          actor_kind?: string
+          canvas_id?: string | null
+          created_at?: string
+          id?: string
+          model?: string
+          name?: string
+          org_id?: string
+          preview_model?: string
+          products_node_id?: string | null
+          project_id?: string
+          spec?: Json
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_batches_canvas_id_fkey"
+            columns: ["canvas_id"]
+            isOneToOne: false
+            referencedRelation: "canvases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_batches_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_batches_products_node_id_fkey"
+            columns: ["products_node_id"]
+            isOneToOne: false
+            referencedRelation: "nodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_batches_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           available: boolean | null
@@ -2784,8 +3120,21 @@ export type Database = {
       feega_credits: { Args: { _value: string }; Returns: number }
       feega_org_from_metadata: { Args: { _metadata: Json }; Returns: string }
       org_credit_balance: { Args: { _org_id: string }; Returns: number }
+      project_has_shares: { Args: { p_project_id: string }; Returns: boolean }
+      project_has_uncensored_outputs: {
+        Args: { p_project_id: string }
+        Returns: boolean
+      }
       project_is_uncensored: {
         Args: { p_project_id: string }
+        Returns: boolean
+      }
+      uncensored_switch_refusal: {
+        Args: { p_org_id: string; p_user_id: string }
+        Returns: string
+      }
+      voice_owned_elsewhere: {
+        Args: { p_org: string; p_voice: string }
         Returns: boolean
       }
     }

@@ -31,6 +31,7 @@
       });
     </script>
     <script>document.documentElement.setAttribute('data-hydrating', '');</script>
+    <script>(function(r){if(r.getAttribute('data-theme'))return;var s=null;try{s=localStorage.getItem('theme')}catch(e){}r.setAttribute('data-theme',s==='light'||s==='dark'?s:matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')})(document.documentElement);</script>
     %sveltekit.head%
   </head>
   <body data-sveltekit-preload-data="hover">

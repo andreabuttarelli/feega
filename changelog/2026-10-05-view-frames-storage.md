@@ -1,0 +1,13 @@
+# view_frames e autocontrollo: due guasti veri
+
+**Perché.** Nei giri reali del trailer `view_frames` rispondeva sempre «no editor preview answered»,
+anche con l'editor aperto e il POST dei frame a 200.
+
+**Causa 1, Storage.** Le policy di `canvas-assets` facevano `(storage.foldername(name))[1]::uuid`.
+Dal 05/10 09:15 nel bucket ci sono 15 oggetti sotto `e2e-perf/...`: il cast fallisce su quelle righe
+e ogni `list` di un client utente torna `invalid input syntax for type uuid: "e2e-perf"`.
+`awaitFrames`/`awaitVerdict` ignoravano l'errore e aspettavano fino al timeout. Fix: migration
+`20261005120000_canvas_assets_text_org.sql` (confronto come testo) e un errore di `list` ora
+arriva all'agente con la causa.
+
+**Causa 2, self-check.** Il secondo giro forzava `tool_choice: view_frames`, rifiutato dai provider con il reasoning acceso: la correzione sta nella PR #177 (`selfCheckChoice` e i round di chiusura in `turn.ts`). La migration risulta già applicata in produzione.

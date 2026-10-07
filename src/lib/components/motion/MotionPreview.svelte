@@ -1,33 +1,59 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, type Snippet } from 'svelte';
   import { FPS } from '$lib/motion/design';
-  import { CAPTURE_REPLY, CAPTURE_REQUEST } from '$lib/motion/hyperframes/compose';
+  import { CAPTURE_REPLY, FrameFormat, type CaptureReply, type ClipError } from '$lib/motion/hyperframes/capture';
+  import { Playback, previewDriver, type ShotRequest } from '$lib/motion/hyperframes/preview-driver';
+  import { MEASURE_REPLY, MEASURE_REQUEST, type MeasureReply, type MeasuredBox } from '$lib/motion/hyperframes/measure';
+  import { InputKey, type InputValues } from '$lib/motion/expression/inputs';
+  import { INPUT_MESSAGE } from '$lib/motion/interactive/runtime';
 
-  type Player = HTMLElement & { seek: (t: number) => void; play: () => void; pause: () => void; currentTime: number; iframeElement: HTMLIFrameElement };
+  type Player = HTMLElement & { seek: (t: number) => void; play: () => void; pause: () => void; currentTime: number; muted: boolean; loop: boolean; iframeElement: HTMLIFrameElement };
 
-  export type CapturedFrame = { time: number; data: string };
+  export type CapturedFrame = { time: number; data: string; layout: string; errors: ClipError[] };
+  export type FrameSize = { width: number; height: number };
 
-  const RELOAD_DEBOUNCE_MS = 250;
   const CAPTURE_WIDTH = 640;
   const CAPTURE_QUALITY = 0.72;
-  const CAPTURE_TIMEOUT_MS = 15_000;
+  const MEASURE_TIMEOUT_MS = 1000;
 
   let {
     html,
     width,
     height,
+    fps = FPS,
     frame = $bindable(0),
-    playing = $bindable(false)
-  }: { html: string; width: number; height: number; frame?: number; playing?: boolean } = $props();
+    playing = $bindable(false),
+    muted = false,
+    loop = false,
+    live = null,
+    children
+  }: { html: string; width: number; height: number; fps?: number; frame?: number; playing?: boolean; muted?: boolean; loop?: boolean; live?: InputValues | null; children?: Snippet } = $props();
+
+  let pointer = $state<InputValues>({});
+
+  function sendInputs(values: InputValues) {
+    player?.iframeElement?.contentWindow?.postMessage({ type: INPUT_MESSAGE, values }, '*');
+  }
+
+  function track(e: PointerEvent) {
+    const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    pointer = { ...pointer, [InputKey.PointerX]: (e.clientX - box.left) / box.width, [InputKey.PointerY]: (e.clientY - box.top) / box.height, [InputKey.Hover]: 1 };
+  }
+
+  $effect(() => {
+    if (live) {
+      sendInputs({ ...live, ...pointer });
+    }
+  });
 
   let host = $state<HTMLDivElement | null>(null);
   let player: Player | null = null;
   let reported = -1;
   let ready = false;
-  let pending: ReturnType<typeof setTimeout> | null = null;
+  let pending: number | null = null;
   let capturing = false;
 
-  function load(next: string) {
+  function setSource(next: string) {
     if (!player) {
       return;
     }
@@ -47,15 +73,18 @@
       el.setAttribute('disable-click-to-play', '');
       el.style.width = '100%';
       el.style.height = '100%';
+      el.muted = muted;
+      el.loop = loop;
       el.addEventListener('ready', () => {
         ready = true;
-        el.seek(frame / FPS);
+        el.seek(frame / fps);
+        driver.ready();
       });
       el.addEventListener('timeupdate', (e) => {
         if (!playing) {
           return;
         }
-        const next = Math.round(((e as CustomEvent<{ currentTime: number }>).detail.currentTime ?? 0) * FPS);
+        const next = Math.round(((e as CustomEvent<{ currentTime: number }>).detail.currentTime ?? 0) * fps);
         reported = next;
         frame = next;
       });
@@ -64,7 +93,7 @@
       el.addEventListener('ended', () => (playing = false));
       host.appendChild(el);
       player = el;
-      load(html);
+      driver.load(html);
     });
     return () => {
       disposed = true;
@@ -73,67 +102,123 @@
     };
   });
 
-  function captureOne(time: number): Promise<string> {
-    const target = player?.iframeElement?.contentWindow;
-    if (!player || !target) {
-      return Promise.reject(new Error('preview not ready'));
-    }
-    const id = crypto.randomUUID();
-    player.seek(time);
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => done(() => reject(new Error('capture timed out'))), CAPTURE_TIMEOUT_MS);
+  const driver = previewDriver({
+    load: setSource,
+    seek: (t) => player?.seek(t),
+    play: () => player?.play(),
+    pause: () => player?.pause(),
+    post: (message) => {
+      const target = player?.iframeElement?.contentWindow;
+      if (!target) {
+        return false;
+      }
+      target.postMessage(message, '*');
+      return true;
+    },
+    onReady: (listener) => {
+      const el = player;
+      el?.addEventListener('ready', listener);
+      return () => el?.removeEventListener('ready', listener);
+    },
+    onReply: (listener) => {
       const onMessage = (e: MessageEvent) => {
-        const m = e.data as { type?: string; id?: string; url?: string; error?: string };
-        if (e.source !== target || m?.type !== CAPTURE_REPLY || m.id !== id) {
+        const m = e.data as CaptureReply;
+        if (e.source !== player?.iframeElement?.contentWindow || m?.type !== CAPTURE_REPLY) {
           return;
         }
-        done(() => (m.url ? resolve(m.url) : reject(new Error(m.error ?? 'capture failed'))));
-      };
-      const done = (settle: () => void) => {
-        clearTimeout(timer);
-        window.removeEventListener('message', onMessage);
-        settle();
+        listener(m);
       };
       window.addEventListener('message', onMessage);
-      target.postMessage({ type: CAPTURE_REQUEST, id, width: CAPTURE_WIDTH, quality: CAPTURE_QUALITY }, '*');
-    });
+      return () => window.removeEventListener('message', onMessage);
+    }
+  });
+
+  const shoot = (time: number, request: ShotRequest) => driver.shoot(time, request);
+  const loaded = (next: string) => driver.loaded(next);
+
+  function borrowed<T>(source: string, work: () => Promise<T>): Promise<T> {
+    return driver.exclusive(() => swapped(source, work));
   }
 
-  function loaded(next: string): Promise<void> {
-    return new Promise((resolve) => {
-      player?.addEventListener('ready', () => resolve(), { once: true });
-      load(next);
-    });
-  }
-
-  export async function capture(times: number[], source: string): Promise<CapturedFrame[]> {
+  async function swapped<T>(source: string, work: () => Promise<T>): Promise<T> {
     playing = false;
     const back = frame;
     capturing = true;
     try {
       await loaded(source);
-      const frames: CapturedFrame[] = [];
-      for (const time of times) {
-        frames.push({ time, data: await captureOne(time) });
-      }
-      return frames;
+      return await work();
     } finally {
       capturing = false;
       await loaded(html);
-      player?.seek(back / FPS);
+      player?.seek(back / fps);
     }
+  }
+
+  export function capture(times: number[], source: string, captureWidth = CAPTURE_WIDTH): Promise<CapturedFrame[]> {
+    const request = { format: FrameFormat.Jpeg, width: captureWidth, height: Math.round((captureWidth * height) / width), quality: CAPTURE_QUALITY };
+    return borrowed(source, async () => {
+      const frames: CapturedFrame[] = [];
+      for (const time of times) {
+        const reply = await shoot(time, request);
+        frames.push({ time, data: reply.url ?? '', layout: reply.layout ?? '', errors: reply.errors ?? [] });
+      }
+      return frames;
+    });
+  }
+
+  export function still(time: number, captureWidth = CAPTURE_WIDTH): Promise<string> {
+    const request = { format: FrameFormat.Jpeg, width: captureWidth, height: Math.round((captureWidth * height) / width), quality: CAPTURE_QUALITY };
+    return driver.exclusive(async () => (await shoot(time, request)).url ?? '');
+  }
+
+  export function measure(): Promise<Record<string, MeasuredBox>> {
+    const target = player?.iframeElement?.contentWindow;
+    if (!target || capturing) {
+      return Promise.resolve({});
+    }
+    const id = crypto.randomUUID();
+    return new Promise((resolve) => {
+      const settle = (boxes: Record<string, MeasuredBox>) => {
+        clearTimeout(timer);
+        window.removeEventListener('message', onMessage);
+        resolve(boxes);
+      };
+      const onMessage = (e: MessageEvent) => {
+        const m = e.data as MeasureReply;
+        if (e.source !== target || m?.type !== MEASURE_REPLY || m.id !== id) {
+          return;
+        }
+        settle(m.boxes);
+      };
+      const timer = setTimeout(() => settle({}), MEASURE_TIMEOUT_MS);
+      window.addEventListener('message', onMessage);
+      target.postMessage({ type: MEASURE_REQUEST, id }, '*');
+    });
+  }
+
+  export function render(times: number[], size: FrameSize, onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>, signal: AbortSignal): Promise<void> {
+    return borrowed(html, async () => {
+      for (const [index, time] of times.entries()) {
+        signal.throwIfAborted();
+        const reply = await shoot(time, { format: FrameFormat.Bitmap, ...size });
+        if (!reply.bitmap) {
+          throw new Error('frame not rendered');
+        }
+        await onFrame(reply.bitmap, index);
+      }
+    });
   }
 
   $effect(() => {
     const next = html;
     if (pending) {
-      clearTimeout(pending);
+      cancelAnimationFrame(pending);
     }
-    pending = setTimeout(() => {
+    pending = requestAnimationFrame(() => {
       if (!capturing) {
-        load(next);
+        driver.update(next);
       }
-    }, RELOAD_DEBOUNCE_MS);
+    });
   });
 
   $effect(() => {
@@ -142,34 +227,58 @@
       return;
     }
     reported = target;
-    player.seek(target / FPS);
+    player.seek(target / fps);
   });
 
   $effect(() => {
-    if (!player || !ready) {
-      return;
+    const sound = muted;
+    const again = loop;
+    if (player) {
+      player.muted = sound;
+      player.loop = again;
     }
-    if (playing) {
-      player.play();
-    } else {
-      player.pause();
-    }
+  });
+
+  $effect(() => {
+    driver.playback(playing ? Playback.Playing : Playback.Paused);
   });
 </script>
 
 <div class="stage" style={`aspect-ratio: ${width} / ${height}; width: min(100cqw, calc(100cqh * ${width / height}));`} data-testid="motion-preview">
   <div class="host" bind:this={host}></div>
+  {@render children?.()}
+  {#if live}
+    <div
+      class="live-pad"
+      role="presentation"
+      data-testid="interactive-pad"
+      onpointermove={track}
+      onpointerdown={(e) => {
+        track(e);
+        pointer = { ...pointer, [InputKey.PointerDown]: 1 };
+      }}
+      onpointerup={() => (pointer = { ...pointer, [InputKey.PointerDown]: 0 })}
+      onpointerleave={() => (pointer = {})}
+    ></div>
+  {/if}
 </div>
 
 <style>
   .stage {
     position: relative;
     background: #000;
-    outline: 1px solid var(--line);
+    outline: 1px solid var(--ui-line);
   }
 
   .host {
     position: absolute;
     inset: 0;
+  }
+
+  .live-pad {
+    position: absolute;
+    inset: 0;
+    cursor: crosshair;
+    touch-action: none;
   }
 </style>

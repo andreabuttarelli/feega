@@ -1,5 +1,8 @@
 import type { Db } from '$lib/server/db/client';
-import type { GenMedium, GenParams } from '$lib/canvas/gen-node';
+import { RENDER_DEADLINE_MS } from '$lib/server/motion/farm-render';
+import { releaseHold } from '$lib/server/motion/render-run';
+import { promptRequired, type GenMedium, type GenParams } from '$lib/canvas/gen-node';
+import { upscaleLimitsOf } from '$lib/video-models';
 import { findAsset, insertAsset, type Asset } from '$lib/server/repos/assets';
 import {
   AUDIO_JOB_PREFIX,
@@ -12,6 +15,7 @@ import {
   queuedAudioRuns,
   queuedVideoRuns,
   queuedWiroRuns,
+  RENDER_JOB_PREFIX,
   releaseClaim,
   retryClaim,
   runningRuns,
@@ -23,6 +27,7 @@ import {
 import { DataCheck, findNode, patchNodeData, writeNodeData } from '$lib/server/repos/canvas';
 import type { Actor } from '$lib/server/repos/actor';
 import { signMediaPaths } from './sign-media';
+import { peopleScreened, ReferenceMedium } from '$lib/server/moderation/people';
 import { composePrompt } from '$lib/canvas/compose-prompt';
 import { textRequest } from '$lib/canvas/text-request';
 import { resolveNodeModel } from './node-model';
@@ -75,9 +80,13 @@ export type RunOutcome =
 
 const EXTERNAL_URL = /^https?:\/\//;
 
-async function imageInputs(db: Db, upstream: UpstreamInputs): Promise<{ baseMediaId: string | undefined; referenceImageUrls: string[] }> {
+function signableAsReference(base: string, orgId: string): boolean {
+  return EXTERNAL_URL.test(base) || base.startsWith(`${orgId}/`);
+}
+
+async function imageInputs(db: Db, orgId: string, upstream: UpstreamInputs): Promise<{ baseMediaId: string | undefined; referenceImageUrls: string[] }> {
   const base = upstream.referenceImageUrl;
-  if (base && EXTERNAL_URL.test(base)) {
+  if (base && signableAsReference(base, orgId)) {
     return { baseMediaId: undefined, referenceImageUrls: await signMediaPaths(db, upstream.referenceImageUrls) };
   }
   return { baseMediaId: base ?? undefined, referenceImageUrls: await signMediaPaths(db, upstream.pickedImageUrls) };
@@ -391,6 +400,13 @@ function providerRunOf(medium: GenMedium, model: string | null): ProviderRun | n
   return GENERATION_PROVIDERS.find((p) => model.startsWith(p.prefix))?.run ?? null;
 }
 
+function missingInputOf(input: StartRun, upstream: UpstreamInputs, prompt: string): string | null {
+  if (upscaleLimitsOf(input.model)) {
+    return upstream.referenceVideoUrls.length ? null : 'source_video_required';
+  }
+  return promptRequired(input.medium, input.model) && !prompt.trim() ? 'prompt_required' : null;
+}
+
 async function screenStandardRun(db: Db, input: StartRun, texts: Array<string | null | undefined>) {
   const { screenModelInput } = await import('$lib/server/moderation/model-input');
   const { ModerationProfile } = await import('$lib/server/moderation/profiles');
@@ -399,6 +415,27 @@ async function screenStandardRun(db: Db, input: StartRun, texts: Array<string | 
     texts,
     scope: { orgId: input.orgId, userId: input.userId, projectId: input.projectId, nodeId: input.nodeId, model: input.model, actor: input.actor }
   });
+}
+
+const RUN_REFERENCES: Readonly<Record<ReferenceMedium, (upstream: UpstreamInputs) => string[]>> = {
+  [ReferenceMedium.Image]: (u) =>
+    [...new Set([u.referenceImageUrl, ...u.referenceImageUrls, ...u.pickedImageUrls, u.startFrameUrl, u.endFrameUrl])].filter((p): p is string => Boolean(p)),
+  [ReferenceMedium.Video]: (u) => u.referenceVideoUrls
+};
+
+async function screenRunReferences(db: Db, input: StartRun, upstream: UpstreamInputs) {
+  const { projectModeOf } = await import('$lib/server/uncensored-workspace/workspace-server');
+  const mode = await projectModeOf(db, input);
+  if (!peopleScreened(mode)) {
+    return { ok: true as const };
+  }
+
+  const { screenModelReferences } = await import('$lib/server/moderation/model-input');
+
+  const signed = await Promise.all(
+    Object.values(ReferenceMedium).map(async (medium) => (await signMediaPaths(db, RUN_REFERENCES[medium](upstream))).map((url) => ({ medium, url })))
+  );
+  return screenModelReferences({ orgId: input.orgId, mode, references: signed.flat() });
 }
 
 export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcome> {
@@ -471,6 +508,12 @@ export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcom
     return { kind: 'refused', error: upstream.blocked };
   }
 
+  const people = await screenRunReferences(db, input, upstream);
+  if (!people.ok) {
+    await giveUp(db, input, run, people.error);
+    return { kind: 'refused', error: people.error };
+  }
+
   const textInput = input.medium === 'text' ? textRequest(upstream.text, input.prompt) : null;
   const prompt = textInput?.user ?? composePrompt(input.medium, upstream.text, input.prompt);
   const providerRun = providerRunOf(input.medium, input.model);
@@ -492,9 +535,10 @@ export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcom
   // modello — prima di questa riga `upstream.text` non era ancora stato letto. Il messaggio è
   // lo stesso che il client mostra (`gen-history.ts::BLOCKED`, "Scrivi cosa vuoi"), la stessa
   // regola in un posto solo, non due verità che possono divergere.
-  if (!prompt.trim()) {
-    await giveUp(db, input, run, 'prompt_required');
-    return { kind: 'refused', error: 'prompt_required' };
+  const missing = missingInputOf(input, upstream, prompt);
+  if (missing) {
+    await giveUp(db, input, run, missing);
+    return { kind: 'refused', error: missing };
   }
 
   const sentPrompt = await enhancedPromptFor(input, prompt);
@@ -547,7 +591,7 @@ export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcom
         // Un solo riferimento: `ImageJob.baseMediaId` è un campo, non una lista — anche quando il
         // modello ne accetterebbe di più (`upstream.referenceImageUrls`, dal catalogo in
         // `graph.ts`). Il tetto vero sta lì; qui si spedisce solo quel che il trasporto sa portare.
-        ...(await imageInputs(db, upstream)),
+        ...(await imageInputs(db, input.orgId, upstream)),
         params: extraParamsOf(input.params as unknown as Record<string, unknown>, declared)
       });
       if (!out.ok) {
@@ -1016,14 +1060,19 @@ const WIRO_IMAGE_TIMEOUT_MS = 10 * 60_000;
 const WIRO_VIDEO_TIMEOUT_MS = 30 * 60_000;
 const DUBBING_TIMEOUT_MS = 60 * 60_000;
 
-type JobKind = 'sync' | 'video' | 'wiro_image' | 'wiro_video' | 'dubbing';
+type JobKind = 'sync' | 'video' | 'wiro_image' | 'wiro_video' | 'dubbing' | 'motion_render';
 
 const JOB_TIMEOUTS_MS: Record<JobKind, number> = {
   sync: RUN_STALE_MS,
   video: VIDEO_TIMEOUT_MS,
   wiro_image: WIRO_IMAGE_TIMEOUT_MS,
   wiro_video: WIRO_VIDEO_TIMEOUT_MS,
-  dubbing: DUBBING_TIMEOUT_MS
+  dubbing: DUBBING_TIMEOUT_MS,
+  motion_render: RENDER_DEADLINE_MS
+};
+
+const ON_EXPIRE: Partial<Record<JobKind, (run: NodeRun) => Promise<void>>> = {
+  motion_render: releaseHold
 };
 
 /**
@@ -1040,6 +1089,9 @@ function jobKindOf(run: { externalJobId: string | null }, nodeType: string | nul
   }
   if (run.externalJobId.startsWith(WIRO_JOB_PREFIX)) {
     return nodeType === 'video' ? 'wiro_video' : 'wiro_image';
+  }
+  if (run.externalJobId.startsWith(RENDER_JOB_PREFIX)) {
+    return 'motion_render';
   }
   return 'video';
 }
@@ -1093,6 +1145,7 @@ export async function expireStuckRuns(db: Db): Promise<ExpireOutcome> {
     if (!claimed) continue;
 
     await expireRun(db, { orgId: run.orgId, runId: run.id, error: RUN_TIMED_OUT });
+    await ON_EXPIRE[kind]?.(run);
 
     await showRunState(db, run, { running: false, runId: run.id, error: RUN_TIMED_OUT });
 

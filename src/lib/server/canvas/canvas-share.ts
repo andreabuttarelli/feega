@@ -318,7 +318,7 @@ export async function readSharedCanvas(db: Db, token: string, sign: SignPaths): 
   return {
     name: canvas.name,
     nodes: await Promise.all(nodes.map(async (node) => {
-      const fallback = nodeSize(node.type);
+      const fallback = nodeSize(node.type, node.data);
       return {
         id: node.id,
         type: node.type,

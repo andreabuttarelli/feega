@@ -3,7 +3,6 @@ import { Casting, SHOTS, type Shot } from './shots';
 import { isKidsProduct, type ProductFacts } from './casting';
 
 export const BATCH_MAX = 200;
-export const PREVIEW_SIZE = 3;
 export const MAX_VARIATIONS = 8;
 
 export type PlanProduct = ProductFacts & { index: number; imageCount: number };
@@ -79,12 +78,6 @@ export function planBatch(input: PlanInput): BatchPlan {
   }
 
   return { items, skipped, overLimit: items.length > BATCH_MAX };
-}
-
-export function previewItems(items: PlannedItem[]): PlannedItem[] {
-  const onePerProduct = items.filter((item, i) => items.findIndex((other) => other.productIndex === item.productIndex) === i);
-  const rest = items.filter((item) => !onePerProduct.includes(item));
-  return [...onePerProduct, ...rest].slice(0, PREVIEW_SIZE);
 }
 
 export function cellKey(item: Pick<PlannedItem, 'environment' | 'shot' | 'influencerId'>): string {

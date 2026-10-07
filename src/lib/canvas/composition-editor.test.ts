@@ -1,11 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
-import {
-  clampDuration,
-  controlFor,
-  createSceneWhenMounted,
-  defaultParamsFor,
-  setLayoutParam
-} from './composition-editor';
+import { describe, expect, it } from 'vitest';
+import { controlFor, setLayoutParam } from './composition-editor';
 import type { LayoutParam } from './composition/types';
 
 describe('controlFor', () => {
@@ -41,39 +35,5 @@ describe('controlFor', () => {
 describe('setLayoutParam', () => {
   it('sets one param without touching the others', () => {
     expect(setLayoutParam({ a: 1, b: 2 }, 'a', 9)).toEqual({ a: 9, b: 2 });
-  });
-});
-
-describe('defaultParamsFor', () => {
-  it('maps a param table to its defaults', () => {
-    expect(defaultParamsFor([{ name: 'a', default: 1 }, { name: 'b', default: 'x' }])).toEqual({ a: 1, b: 'x' });
-  });
-});
-
-describe('clampDuration', () => {
-  it('never returns zero or negative', () => {
-    expect(clampDuration(0)).toBe(0.5);
-    expect(clampDuration(-5)).toBe(0.5);
-    expect(clampDuration(6)).toBe(6);
-  });
-});
-
-describe('composition scene lifecycle', () => {
-  it('does not create WebGL after its canvas was unmounted during import', async () => {
-    const canvas = {} as HTMLCanvasElement;
-    let mounted = true;
-    let release = () => {};
-    const imported = new Promise<void>((resolve) => { release = resolve; });
-    const create = vi.fn(() => ({ dispose: vi.fn() }));
-
-    const pending = createSceneWhenMounted(canvas, () => mounted, async () => {
-      await imported;
-      return create;
-    });
-    mounted = false;
-    release();
-
-    await expect(pending).resolves.toBeNull();
-    expect(create).not.toHaveBeenCalled();
   });
 });

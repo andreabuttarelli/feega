@@ -9,13 +9,14 @@ type Exec = (input: unknown, options: { toolCallId: string }) => Promise<Record<
 
 function setup(overrides: Partial<MotionToolDeps> = {}) {
   let n = 0;
-  const session: MotionSession = { doc: newMotionDoc(MotionFormat.Vertical), baseVersion: 3, edits: [], selection: [], frames: new Map(), views: 0, checkedAt: 0 };
+  const session: MotionSession = { doc: newMotionDoc(MotionFormat.Vertical), baseVersion: 3, edits: [], selection: [], frames: new Map(), views: 0, checkedAt: 0, codeWrites: 0 };
   const deps: MotionToolDeps = {
     session,
     assets: [{ id: 'glb-1', kind: AssetKind.Model3d, label: 'shoe', previewUrl: '/x', url: 'https://cdn/x.glb' }],
     newId: () => `id${++n}`,
     voiceover: vi.fn(async () => ({ ok: true as const, assetId: 'vo-1', seconds: 4, url: 'https://cdn/vo.mp3' })),
     frames: vi.fn(async (_callId: string, times: number[]) => times.map((time) => ({ time, bytes: Buffer.from([1]) }))),
+    check: vi.fn(async () => null),
     ...overrides
   };
   const tools = createMotionTools(deps);
@@ -25,7 +26,103 @@ function setup(overrides: Partial<MotionToolDeps> = {}) {
   return { session, deps, run, schema };
 }
 
+describe('motion agent tools at another frame rate', () => {
+  it('set_canvas changes the frame rate and every time the agent reads or writes stays in seconds', async () => {
+    const { session, run } = setup();
+    await run('add_clip', { component: 'Title', start: 1, duration: 2 });
+
+    expect((await run('set_canvas', { fps: 60 })).ok).toBe(true);
+    expect(session.doc.fps).toBe(60);
+    expect(session.doc.tracks[0].clips[0]).toMatchObject({ from: 60, durationInFrames: 120 });
+
+    await run('add_clip', { component: 'Title', start: 4, duration: 1 });
+    const doc = (await run('get_motion_doc', {})) as { fps: number; tracks: { clips: { start: number; duration: number }[] }[] };
+
+    expect(doc.fps).toBe(60);
+    expect(doc.tracks[0].clips.map((c) => [c.start, c.duration])).toEqual([
+      [1, 2],
+      [4, 1]
+    ]);
+  });
+
+  it('set_canvas makes the background transparent for alpha exports', async () => {
+    const { session, run } = setup();
+
+    expect((await run('set_canvas', { background: 'transparent' })).ok).toBe(true);
+    expect(session.doc.background).toBe('transparent');
+    expect(((await run('get_motion_doc', {})) as { background: string }).background).toBe('transparent');
+  });
+
+  it('set_canvas refuses a rate the renderer does not make', async () => {
+    const { schema } = setup();
+
+    expect(schema('set_canvas').safeParse({ fps: 29 }).success).toBe(false);
+  });
+});
+
+describe('motion blur through the agent', () => {
+  it('set_motion_blur turns the shutter on for the video and keeps the rest as it was', async () => {
+    const { session, run } = setup();
+
+    expect((await run('set_motion_blur', { enabled: true, shutter_angle: 270 })).ok).toBe(true);
+    expect(session.doc.motionBlur).toEqual({ enabled: true, shutterAngle: 270, shutterPhase: -90, samples: 8 });
+    expect(((await run('get_motion_doc', {})) as { motionBlur: { enabled: boolean } }).motionBlur.enabled).toBe(true);
+  });
+
+  it('set_motion_blur leaves chosen clips sharp and the agent reads it back per clip', async () => {
+    const { session, run } = setup();
+    await run('add_clip', { component: 'Title', start: 0 });
+
+    expect((await run('set_motion_blur', { clip_ids: ['id1'], clips_blur: false })).ok).toBe(true);
+    expect(findClip(session.doc, 'id1')?.clip.motionBlur).toBe(false);
+    const doc = (await run('get_motion_doc', {})) as { tracks: { clips: { motionBlur: boolean }[] }[] };
+    expect(doc.tracks[0].clips[0].motionBlur).toBe(false);
+  });
+
+  it('an unknown clip is refused and nothing changes', async () => {
+    const { session, run } = setup();
+    const before = session.doc;
+
+    expect((await run('set_motion_blur', { clip_ids: ['nope'], clips_blur: false })).ok).toBe(false);
+    expect(session.doc).toBe(before);
+  });
+});
+
 describe('motion agent tools', () => {
+  it('set_track renames and reorders a track; remove_track drops it with its clips', async () => {
+    const { session, run } = setup();
+    await run('add_track', { kind: 'visual' });
+    await run('add_clip', { component: 'Title', start: 0, track_id: 'v1' });
+
+    expect((await run('set_track', { track_id: 'v1', name: 'Titles', index: 0 })).ok).toBe(true);
+    expect(session.doc.tracks[0]).toMatchObject({ id: 'v1', name: 'Titles' });
+    expect((await run('remove_track', { track_id: 'v1' })).ok).toBe(true);
+    expect(session.doc.tracks.some((t) => t.id === 'v1')).toBe(false);
+    expect(findClip(session.doc, 'id2')).toBeNull();
+  });
+
+  it('remove_asset unregisters an asset only when nothing uses it', async () => {
+    const { session, run } = setup();
+    await run('add_clip', { component: 'Model3D', start: 0, props: { assetId: 'glb-1' } });
+
+    expect(String((await run('remove_asset', { asset_id: 'glb-1' })).error)).toContain('id1');
+    await run('remove_clip', { clip_ids: ['id1'] });
+    expect((await run('remove_asset', { asset_id: 'glb-1' })).ok).toBe(true);
+    expect(session.doc.assets).toEqual([]);
+  });
+
+  it('an edit answers in a line, not with the whole doc: every later step re-sends what a tool returned', async () => {
+    const { run } = setup();
+    for (let i = 0; i < 12; i++) {
+      await run('add_clip', { component: 'Title', start: i, duration: 1, props: { text: `Beat ${i}` } });
+    }
+
+    const out = await run('set_props', { clip_id: 'id1', props: { text: 'Hello' } });
+
+    expect(out.ok).toBe(true);
+    expect(JSON.stringify(out).length).toBeLessThan(200);
+  });
+
   it('add_clip places a library component at a time in seconds', async () => {
     const { session, run } = setup();
     const out = await run('add_clip', { component: 'Title', start: 1, duration: 2, props: { text: 'Hi' } });
@@ -54,7 +151,7 @@ describe('motion agent tools', () => {
     const { session, run } = setup();
     await run('add_clip', { component: 'Title', start: 0 });
     const before = session.doc;
-    const out = await run('set_props', { clip_id: 'id1', props: { opacity: 7 } });
+    const out = await run('set_props', { clip_id: 'id1', props: { opacity: 700 } });
 
     expect(out.ok).toBe(false);
     expect(session.doc).toBe(before);
@@ -127,6 +224,16 @@ describe('motion agent tools', () => {
     expect(schema('view_frames').safeParse({ times: [] }).success).toBe(false);
   });
 
+  it('view_frames comes back with the quality gate: a blank frame and a small title are named', async () => {
+    const { run } = setup({ inspect: async (frames) => frames.map((f) => ({ time: f.time, lumaStd: 0, whiteShare: 0 })) });
+    await run('add_clip', { component: 'Title', start: 0, duration: 2, props: { text: 'Tiny', width: 300, height: 100 } });
+
+    const out = (await run('view_frames', { times: [1] })) as { quality: string[] };
+
+    expect(out.quality.some((q) => q.includes('flat colour'))).toBe(true);
+    expect(out.quality.some((q) => q.includes('small box'))).toBe(true);
+  });
+
   it('with no preview open the agent is told so instead of waiting forever', async () => {
     const { run } = setup({ frames: async () => null });
     const out = await run('view_frames', { times: [1] });
@@ -144,5 +251,46 @@ describe('motion agent tools', () => {
 
     expect(out.ok).toBe(false);
     expect(deps.frames).toHaveBeenCalledTimes(MAX_VIEWS_PER_TURN);
+  });
+
+  it('an edit after the budget is spent can still be looked at once: a turn never closes on an unseen change', async () => {
+    const { run, deps } = setup();
+    for (let i = 0; i < MAX_VIEWS_PER_TURN; i++) {
+      await run('view_frames', { times: [1] });
+    }
+    await run('add_clip', { component: 'Title', start: 0, duration: 1, props: { text: 'Late' } });
+
+    expect((await run('view_frames', { times: [1] })).ok).toBe(true);
+    expect((await run('view_frames', { times: [1] })).ok).toBe(false);
+    expect(deps.frames).toHaveBeenCalledTimes(MAX_VIEWS_PER_TURN + 1);
+  });
+});
+
+describe('add_track', () => {
+  it('keeps the name it is given', async () => {
+    const { run, session } = setup();
+
+    await run('add_track', { kind: 'visual', name: 'Stage' });
+
+    expect(session.doc.tracks[0].name).toBe('Stage');
+  });
+});
+
+describe('set_clip_transition', () => {
+  it('dissolves between two adjacent clips and get_motion_doc names the clip it comes from', async () => {
+    const { run } = setup();
+    await run('add_clip', { component: 'Shape', start: 0, duration: 2 });
+    await run('add_clip', { component: 'Shape', start: 2, duration: 2 });
+
+    expect(await run('set_clip_transition', { clip_id: 'id2', kind: 'crossfade', duration: 0.5 })).toMatchObject({ ok: true });
+    const doc = (await run('get_motion_doc', {})) as { tracks: { clips: { id: string; junction: unknown }[] }[] };
+    expect(doc.tracks.flatMap((t) => t.clips).find((c) => c.id === 'id2')!.junction).toEqual({ kind: 'crossfade', duration: 0.5, from: 'id1' });
+  });
+
+  it('a clip with nothing ending at its start says so', async () => {
+    const { run } = setup();
+    await run('add_clip', { component: 'Shape', start: 1, duration: 2 });
+
+    expect(await run('set_clip_transition', { clip_id: 'id1', kind: 'push-left' })).toMatchObject({ ok: false, error: expect.stringMatching(/nothing ends/) });
   });
 });

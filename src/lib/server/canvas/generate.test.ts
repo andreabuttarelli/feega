@@ -93,6 +93,15 @@ vi.mock('$lib/server/ai-models-sync', async (importOriginal) => ({
   modalitiesOf
 }));
 vi.mock('$lib/server/supabase-admin', () => ({ createAdminClient: () => ({}) }));
+const releaseCredits = vi.hoisted(() => vi.fn(async () => {}));
+vi.mock('$lib/server/credit-hold', () => ({ holdCredits: vi.fn(), releaseCredits }));
+
+const { offerableSpy } = vi.hoisted(() => ({ offerableSpy: vi.fn() }));
+vi.mock('$lib/server/offerable-models', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('$lib/server/offerable-models')>();
+  offerableSpy.mockImplementation(actual.offerableModels);
+  return { ...actual, offerableModels: offerableSpy };
+});
 
 const EMPTY_OFFER = { choices: [], recommended: [] };
 const { canvasModelCatalogue } = vi.hoisted(() => ({ canvasModelCatalogue: vi.fn() }));
@@ -776,6 +785,19 @@ describe('una run rimasta running non ha altra via se non il timeout', () => {
  * per genere di lavoro, nessun `if` sparso — e ogni genere scade sul proprio tetto, non su
  * `RUN_STALE_MS`.
  */
+describe('un render scaduto restituisce i crediti riservati', () => {
+  it('la riserva torna con la sua scadenza, come se il render fosse fallito', async () => {
+    const portions = [{ amount: 12, expiresAt: '2026-10-10T00:00:00.000Z' }, { amount: 3, expiresAt: null }];
+    const renderRow = { ...runRow, external_job_id: 'motion-render:3', started_at: new Date(Date.now() - 7 * 60 * 60_000).toISOString(), params: { billing: { held: 15, portions } } };
+    const { db } = fakeDb({ node_runs: [renderRow], nodes: [nodeRow] }, { updateRows: { node_runs: [renderRow], nodes: [nodeRow] } });
+
+    const result = await expireStuckRuns(db);
+
+    expect(result).toMatchObject({ expired: 1 });
+    expect(releaseCredits).toHaveBeenCalledWith(ORG, portions, expect.any(String));
+  });
+});
+
 describe('un giro asincrono presso un fornitore ha il proprio tetto, non quello sincrono', () => {
   const startedAgo = (ms: number) => new Date(Date.now() - ms).toISOString();
 
@@ -838,6 +860,20 @@ describe('un giro asincrono presso un fornitore ha il proprio tetto, non quello 
     expect(result).toMatchObject({ expired: 1 });
     const runUpdate = calls.find((c) => c.table === 'node_runs' && c.op === 'update' && (c.payload as { status?: string })?.status === 'expired');
     expect(runUpdate).toBeDefined();
+  });
+
+  it('un render motion oltre la vita di ogni suo tentativo scade', async () => {
+    const renderRow = { ...runRow, external_job_id: 'motion-render:7', started_at: startedAgo(7 * 60 * 60_000) };
+    const { db } = fakeDb({ node_runs: [renderRow], nodes: [nodeRow] }, { updateRows: { node_runs: [renderRow], nodes: [nodeRow] } });
+
+    expect(await expireStuckRuns(db)).toMatchObject({ expired: 1 });
+  });
+
+  it('un render motion di 40 minuti sta ancora lavorando: gira fuori dalla richiesta', async () => {
+    const renderRow = { ...runRow, external_job_id: 'motion-render:7', started_at: startedAgo(40 * 60_000) };
+    const { db } = fakeDb({ node_runs: [renderRow], nodes: [nodeRow] });
+
+    expect(await expireStuckRuns(db)).toMatchObject({ expired: 0 });
   });
 
   it('un video generico in coda (non wiro/elevenlabs) sopravvive sotto i 20 minuti', async () => {
@@ -1415,6 +1451,19 @@ describe('reconcileVideoNodeRuns chiude un video in coda quando il fornitore ha 
     expect(data.refId).toBe('asset-video-1');
   });
 
+  it('un render motion in corso non è un video: il riconciliatore video non lo reclama né lo chiude', async () => {
+    const { db, currentRun } = videoReconcileDb({
+      node: { id: NODE, orgId: ORG, data: { running: true }, version: 1 },
+      run: { id: RUN, taskId: 'motion-render:12' }
+    });
+
+    const result = await reconcileVideoNodeRuns(db);
+
+    expect(result).toMatchObject({ checked: 0, failed: 0 });
+    expect(currentRun()).toMatchObject({ status: 'running', attempts: 0, error: null });
+    expect(finishVideoRender).not.toHaveBeenCalled();
+  });
+
   it('pending: rilascia il claim senza consumare un tentativo', async () => {
     finishVideoRender.mockResolvedValue({ status: 'pending' });
 
@@ -1617,6 +1666,43 @@ describe('la foto di un prodotto del negozio arriva al render immagine', () => {
       })
     );
   });
+
+  it('una foto caricata, in canvas-assets della org, va firmata come riferimento: come base cadeva in source_not_found', async () => {
+    const LIST = 'list-node';
+    const UPLOAD_PATH = `${ORG}/${PROJECT}/abc-mug.jpg`;
+    const imageNode = { ...freshNodeRow, data: { prompt: 'packshot' } };
+    const { db } = fakeDb(
+      {
+        nodes: [imageNode, { ...freshNodeRow, id: LIST, type: 'list', data: { item_kind: 'image', items: [{ asset_id: 'up-1', label: 'Mug' }] } }],
+        nodes_connections: [{ id: 'e1', canvas_id: CANVAS, source_node_id: LIST, target_node_id: NODE, source_handle: null, target_handle: null, mode: 'iterate' }],
+        assets: [{ id: 'up-1', org_id: ORG, project_id: PROJECT, type: 'image', source: 'upload', url: UPLOAD_PATH, mime_type: 'image/jpeg' }]
+      },
+      { updateRows: { nodes: [{ ...imageNode, version: 2 }] } }
+    );
+
+    const result = await runGenNode(db, {
+      orgId: ORG,
+      projectId: PROJECT,
+      canvasId: CANVAS,
+      nodeId: NODE,
+      userId: USER,
+      medium: 'image',
+      prompt: 'packshot',
+      model: 'qwen3-pro',
+      params: {},
+      expectedVersion: 1,
+      iterateSelection: { [LIST]: 1 }
+    });
+
+    expect(result.kind).toBe('done');
+    expect(generateImagesWithoutBrand).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        baseMediaId: undefined,
+        referenceImageUrls: [expect.stringMatching(new RegExp(`^https://signed\\.example/.+/${UPLOAD_PATH}$`))]
+      })
+    );
+  });
 });
 
 describe('a standard generation is screened before anything reaches the provider', () => {
@@ -1682,5 +1768,72 @@ describe('a standard generation is screened before anything reaches the provider
 
     expect((await runGenNode(db, start('text', 'a haiku about the sea'))).kind).toBe('done');
     expect(llmText).toHaveBeenCalledOnce();
+  });
+});
+
+describe('a video node on the upscale model upscales the clip wired into it', () => {
+  const SOURCE = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
+  const UPSCALER = 'black-forest-labs/flux-video-upscale';
+  const upscaleNode = { ...freshNodeRow, type: 'video', data: { model: UPSCALER } };
+
+  beforeEach(() => {
+    offerableSpy.mockResolvedValueOnce({
+      choices: [{ id: UPSCALER, params: [{ name: 'upscale_factor', label: 'Upscale factor', kind: 'number', min: 1.5, max: 3 }, { name: 'creativity', label: 'Creativity', kind: 'number', min: 0, max: 1 }] }],
+      recommended: []
+    });
+    generateVideoWithoutBrand.mockReset();
+    generateVideoWithoutBrand.mockResolvedValue({ ok: true, jobId: 'job-up' });
+    modalitiesOf.mockResolvedValue({ input: ['text', 'video'], output: ['video'], synced_at: 'now' });
+    canvasModelCatalogue.mockResolvedValue({
+      text: EMPTY_OFFER,
+      image: EMPTY_OFFER,
+      video: {
+        choices: [{ id: UPSCALER, params: [{ name: 'upscale_factor', label: 'Upscale factor', kind: 'number', min: 1.5, max: 3 }, { name: 'creativity', label: 'Creativity', kind: 'number', min: 0, max: 1 }] }],
+        recommended: []
+      }
+    });
+  });
+
+  const run = (db: Db) =>
+    runGenNode(db, {
+      orgId: ORG,
+      projectId: PROJECT,
+      canvasId: CANVAS,
+      nodeId: NODE,
+      userId: USER,
+      medium: 'video',
+      prompt: '',
+      model: UPSCALER,
+      params: { upscale_factor: 2, creativity: 0 } as never,
+      expectedVersion: 1
+    });
+
+  it('runs without a prompt and sends the source clip with the factor', async () => {
+    const { db } = fakeDb(
+      {
+        nodes: [upscaleNode, { ...freshNodeRow, id: SOURCE, type: 'video', data: { assetId: 'asset-v' } }],
+        nodes_connections: [{ id: 'e1', canvas_id: CANVAS, source_node_id: SOURCE, target_node_id: NODE, source_handle: null, target_handle: null }],
+        assets: [{ id: 'asset-v', org_id: ORG, project_id: PROJECT, type: 'video', url: 'https://cdn.example/source.mp4', mime_type: 'video/mp4' }]
+      },
+      { updateRows: { nodes: [{ ...upscaleNode, version: 2 }] } }
+    );
+
+    const result = await run(db);
+
+    expect(result).toMatchObject({ kind: 'queued' });
+    expect(generateVideoWithoutBrand).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: UPSCALER,
+        referenceVideoUrls: ['https://cdn.example/source.mp4'],
+        params: expect.objectContaining({ upscale_factor: 2, creativity: 0 })
+      })
+    );
+  });
+
+  it('without a source clip it refuses before spending', async () => {
+    const { db } = fakeDb({ nodes: [upscaleNode], nodes_connections: [], assets: [] }, { updateRows: { nodes: [{ ...upscaleNode, version: 2 }] } });
+
+    expect(await run(db)).toMatchObject({ kind: 'refused', error: 'source_video_required' });
+    expect(generateVideoWithoutBrand).not.toHaveBeenCalled();
   });
 });

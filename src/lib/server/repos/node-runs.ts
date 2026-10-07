@@ -207,10 +207,11 @@ export async function retryClaim(
 export const AUDIO_JOB_PREFIX = 'elevenlabs:';
 export const WIRO_JOB_PREFIX = 'wiro:';
 export const AUDIO_HISTORY_PREFIX = 'elevenlabs-history:';
+export const RENDER_JOB_PREFIX = 'motion-render:';
 
 const SETTLED_STATUSES: NodeRunStatus[] = ['done', 'failed', 'expired'];
 
-const OWN_RECONCILER_PREFIXES = [AUDIO_JOB_PREFIX, WIRO_JOB_PREFIX];
+const OWN_RECONCILER_PREFIXES = [AUDIO_JOB_PREFIX, WIRO_JOB_PREFIX, RENDER_JOB_PREFIX];
 
 async function queuedRunsWithPrefix(db: Db, input: { limit: number; prefix: string }): Promise<NodeRun[]> {
   const { data, error } = await db
@@ -229,6 +230,26 @@ async function queuedRunsWithPrefix(db: Db, input: { limit: number; prefix: stri
 
 export async function queuedAudioRuns(db: Db, input: { limit: number }): Promise<NodeRun[]> {
   return queuedRunsWithPrefix(db, { ...input, prefix: AUDIO_JOB_PREFIX });
+}
+
+const ACTIVE_RENDER_LIMIT = 1000;
+
+export async function activeRenderRuns(db: Db): Promise<NodeRun[]> {
+  const { data, error } = await db
+    .from('node_runs')
+    .select(RUN_COLUMNS)
+    .in('status', ['running', 'finishing'])
+    .like('external_job_id', `${RENDER_JOB_PREFIX}%`)
+    .limit(ACTIVE_RENDER_LIMIT);
+
+  if (error) {
+    throw error;
+  }
+  return (data ?? []).map(toRun);
+}
+
+export async function queuedRenderRuns(db: Db, input: { limit: number }): Promise<NodeRun[]> {
+  return queuedRunsWithPrefix(db, { ...input, prefix: RENDER_JOB_PREFIX });
 }
 
 export async function queuedWiroRuns(db: Db, input: { limit: number }): Promise<NodeRun[]> {
@@ -262,6 +283,21 @@ export async function completeRun(
       cost_usd: input.costUsd ?? null,
       finished_at: new Date().toISOString()
     })
+    .eq('id', input.runId)
+    .eq('org_id', input.orgId);
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function settleRun(
+  db: Db,
+  input: { orgId: string; runId: string; params: Record<string, unknown>; costUsd: number }
+): Promise<void> {
+  const { error } = await db
+    .from('node_runs')
+    .update({ status: 'done', params: input.params as never, cost_usd: input.costUsd, finished_at: new Date().toISOString() })
     .eq('id', input.runId)
     .eq('org_id', input.orgId);
 
@@ -320,6 +356,21 @@ export async function expireRun(
       error: input.error,
       finished_at: new Date().toISOString()
     })
+    .eq('id', input.runId)
+    .eq('org_id', input.orgId);
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function setRunParams(
+  db: Db,
+  input: { orgId: string; runId: string; params: Record<string, unknown> }
+): Promise<void> {
+  const { error } = await db
+    .from('node_runs')
+    .update({ params: input.params as never })
     .eq('id', input.runId)
     .eq('org_id', input.orgId);
 

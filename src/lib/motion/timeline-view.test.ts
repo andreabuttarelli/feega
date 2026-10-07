@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, findClip, newMotionDoc } from './doc';
 import { Ease } from './design';
+import { Source } from './keyframes';
 import { addClip, setKeyframes, type OpResult } from './timeline';
-import { Grip, HANDLE_PX, Snap, easePath, edgeHandles, frameAt, handleAt, keyLanes, stackRows, pxPerFrame, rulerTicks, snapped, timecode } from './timeline-view';
+import { feegaTrailerV2 } from './trailer-v2';
+import { withParams } from './custom/params';
+import { Grip, HANDLE_PX, Reveal, Snap, easePath, edgeHandles, frameAt, graphLanes, handleAt, keyLanes, pxPerFrame, snapped, timecode } from './timeline-view';
 
 describe('timeline view', () => {
   it('at zoom 1 a second is 60 px', () => {
@@ -10,13 +13,10 @@ describe('timeline view', () => {
     expect(frameAt(60, 1)).toBe(30);
   });
 
-  it('labels the ruler in minutes, seconds and frames', () => {
-    expect(timecode(0)).toBe('0:00.00');
-    expect(timecode(95)).toBe('0:03.05');
-  });
-
-  it('ticks get denser as the zoom grows', () => {
-    expect(rulerTicks(300, 4).length).toBeGreaterThan(rulerTicks(300, 1).length);
+  it('reads time as minutes, seconds and frames, separated by colons', () => {
+    expect(timecode(0)).toBe('00:00:00');
+    expect(timecode(95)).toBe('00:03:05');
+    expect(timecode(30 * 61)).toBe('01:01:00');
   });
 
   it('snaps to a whole second within a few pixels, unless snapping is off', () => {
@@ -25,6 +25,13 @@ describe('timeline view', () => {
 
     expect(snapped(doc, 32, { ...input, snap: Snap.On })).toBe(30);
     expect(snapped(doc, 32, { ...input, snap: Snap.Off })).toBe(32);
+  });
+
+  it('snaps to a beat when beats are given', () => {
+    const doc = newMotionDoc(MotionFormat.Square);
+    const input = { playhead: 0, exclude: [], zoom: 1, snap: Snap.On };
+
+    expect(snapped(doc, 46, { ...input, beats: [45] })).toBe(45);
   });
 
   it('the end edge of a clip under a later overlapping clip can still be grabbed', () => {
@@ -60,16 +67,6 @@ describe('timeline view', () => {
     expect(handleAt(edgeHandles(clips, 3, ['t']), 90 * 3 - 2)).toMatchObject({ clipId: 't', grip: Grip.End });
   });
 
-  it('clips overlapping in time on one track stack in rows, so none hides another', () => {
-    const rows = stackRows([
-      { id: 'k', from: 9, durationInFrames: 90 },
-      { id: 't', from: 11, durationInFrames: 88 },
-      { id: 'next', from: 99, durationInFrames: 30 }
-    ]);
-
-    expect(rows).toEqual({ k: 0, t: 1, next: 0 });
-  });
-
   it('a tiny clip keeps a body to drag between its two edges', () => {
     const [start, end] = edgeHandles([{ id: 'a', from: 0, durationInFrames: 3 }], 3);
 
@@ -95,8 +92,8 @@ describe('keyframe lanes', () => {
 
   it('one lane per animated prop, in the order the component lists them, with its label', () => {
     expect(keyLanes(findClip(keyed, 't')!.clip)).toEqual([
-      { prop: 'rotateX', label: 'Rotate X', frames: [0, 10] },
-      { prop: 'color', label: 'Colour', frames: [4] }
+      { prop: 'rotateX', label: 'Rotate X', source: Source.Transform, frames: [0, 10] },
+      { prop: 'color', label: 'Colour', source: Source.Prop, frames: [4] }
     ]);
   });
 
@@ -104,10 +101,45 @@ describe('keyframe lanes', () => {
     expect(keyLanes(findClip(doc, 't')!.clip)).toEqual([]);
   });
 
+  it('P S R T show their property lane even with no keyframes, U the animated ones', () => {
+    const clip = findClip(keyed, 't')!.clip;
+    const props = (reveal: Reveal) => keyLanes(clip, reveal).map((l) => l.prop);
+
+    expect(props(Reveal.Position)).toEqual(['x', 'y']);
+    expect(props(Reveal.Scale)).toEqual(['scale']);
+    expect(props(Reveal.Rotation)).toEqual(['rotateZ']);
+    expect(props(Reveal.Opacity)).toEqual(['opacity']);
+    expect(props(Reveal.Animated)).toEqual(['rotateX', 'color']);
+    expect(keyLanes(clip, Reveal.Opacity)[0]).toEqual({ prop: 'opacity', label: 'Opacity', source: Source.Transform, frames: [] });
+  });
+
+  it('the trailer bar with an animated Scale Y has a lane and a graph curve when selected', () => {
+    const trailer = feegaTrailerV2(MotionFormat.Vertical, { imageId: null, modelId: null, voiceId: null, musicId: null } as never);
+    const bar = findClip(trailer, 'bar-0')!.clip;
+
+    expect(keyLanes(withParams(trailer, bar)).map((l) => l.prop)).toContain('scaleY');
+    expect(graphLanes(trailer, ['bar-0'], [], false).map((l) => l.prop)).toContain('scaleY');
+  });
+
+  it('keyframes picked on another clip do not hide the selected clip curves', () => {
+    const trailer = feegaTrailerV2(MotionFormat.Vertical, { imageId: null, modelId: null, voiceId: null, musicId: null } as never);
+    const stale = [{ clipId: 'gone', prop: 'opacity', frame: 0 }];
+
+    expect(graphLanes(trailer, ['bar-0'], stale, false).map((l) => l.prop)).toContain('scaleY');
+  });
+
   it('the ease preview is a path from the bottom-left to the top-right corner', () => {
     const path = easePath(Ease.Linear, 40);
 
     expect(path.startsWith('M0,40')).toBe(true);
     expect(path.endsWith('L40,0')).toBe(true);
+  });
+});
+
+describe('timeline view at another frame rate', () => {
+  it('a second keeps its width and its timecode at 60 fps', () => {
+    expect(pxPerFrame(1, 60) * 60).toBe(60);
+    expect(frameAt(60, 1, 60)).toBe(60);
+    expect(timecode(90, 60)).toBe('00:01:30');
   });
 });

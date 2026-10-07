@@ -11,6 +11,15 @@ describe('finishedTurn — il turno salvato è quello che l utente ha visto', ()
     expect(turn.content).toBe('Guardo la tela. Ci sono 3 nodi.');
   });
 
+  it('separa due step che non portano spazio fra loro: la frase non si incolla alla successiva', () => {
+    const turn = finishedTurn([
+      { text: 'Registering Inter, then adding text.', content: [] },
+      { text: 'The glow went on the top track.', content: [] }
+    ]);
+
+    expect(turn.content).toBe('Registering Inter, then adding text.\n\nThe glow went on the top track.');
+  });
+
   it('tiene i tool riusciti e quelli falliti, con il loro esito', () => {
     const turn = finishedTurn([
       {

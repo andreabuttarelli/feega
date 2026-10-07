@@ -1,7 +1,7 @@
 export const WELCOME_PARAM = 'welcome';
 
 export const CAMPAIGN_TEMPLATES = {
-  'ai-video-upscaler': 'hd-clip',
+  'ai-video-upscaler': 'video-upscale',
   '3d-animation-maker': '3d-animation',
   'ai-commercial-maker': 'ai-commercial',
   'paper-cutout-animation': 'paper-cutout',
