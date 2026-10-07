@@ -488,7 +488,7 @@ const generic = (name: string, about: string, size: UiSize, css: string, js: str
 
 const SIDEBAR = generic(
   'UiSidebar',
-  'An app shell: the sidebar nav slides in item by item, the active highlight walks down to the chosen item, the content rows fill in. Params brand, items (one per line), active (index from 0), title.',
+  'An app shell: the sidebar nav slides in item by item, the active highlight walks down to the chosen item, the content rows fill in with their text. Params brand, items (one per line), active (index from 0), title, rows (one per line, "name|status").',
   { width: 1400, height: 800 },
   `
 .shell { position: absolute; width: 1400px; height: 800px; transform: translate(-50%, -50%); display: flex; overflow: hidden; }
@@ -500,7 +500,8 @@ const SIDEBAR = generic(
 .title { font-size: 40px; font-weight: 700; margin-bottom: 30px; }
 .bar { height: 64px; border: 1px solid var(--line); border-radius: calc(var(--r) * 0.7); margin-bottom: 16px; display: flex; align-items: center; gap: 18px; padding: 0 22px; }
 .chip { width: 30px; height: 30px; border-radius: 50%; background: var(--accent); }
-.stroke { height: 14px; border-radius: 7px; background: var(--line); }
+.row-name { font-size: 24px; font-weight: 600; flex: 1; }
+.row-meta { font-size: 20px; }
 `,
   `
 const brandName = param('brand', 'Acme', { type: 'text', group: 'Content' });
@@ -514,10 +515,12 @@ const glow = make('div', 'glow', side);
 const navs = rows(items).map((r, i) => anchor(make('div', 'nav', side, r[0]), 'nav-' + i));
 const main = make('div', 'main', shell);
 const head = make('div', 'title', main, title);
-const bars = [0.62, 0.48, 0.71, 0.4, 0.55].map((w) => {
+const list = param('rows', 'Overview|Updated today\\nVisitors|12,480 this week\\nSignups|318 this week\\nTop page|/pricing\\nConversion|4.2%', { type: 'textarea', group: 'Content' });
+const bars = rows(list).slice(0, 5).map((r) => {
   const b = make('div', 'bar', main);
   make('div', 'chip', b);
-  make('div', 'stroke', b).style.width = Math.round(w * 100) + '%';
+  make('div', 'row-name', b, r[0]);
+  make('div', 'row-meta muted', b, r[1] || '');
   return b;
 });
 const target = Math.min(navs.length - 1, Math.max(0, Math.round(active)));

@@ -1,37 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { UI_KINDS, UI_KIT, type UiPiece } from './kit';
+import { drawPiece, placeholders } from './render';
+import { skeletons } from './content';
 
 const DURATION = 4;
 const TIMES = [0, 1.2, 3.9, 0.5, 2.4];
 
-type Node = { tag: string; className: string; textContent: string; innerHTML: string; style: Record<string, unknown>; attrs: Record<string, string>; children: Node[] };
-
-function node(tag: string): Node & Record<string, unknown> {
-  const style: Record<string, unknown> = {};
-  style.setProperty = (k: string, v: string) => (style[k] = v);
-  const n = { tag, className: '', textContent: '', innerHTML: '', style, attrs: {} as Record<string, string>, children: [] as Node[], clientWidth: 1920, clientHeight: 1080 };
-  return Object.assign(n, { appendChild: (c: Node) => n.children.push(c), setAttribute: (k: string, v: string) => (n.attrs[k] = v) });
-}
-
-const fakeDocument = { createElement: node, createElementNS: (_: string, tag: string) => node(tag) };
-
 function mount(piece: UiPiece) {
-  const root = node('root');
-  const updates: (() => void)[] = [];
-  let now = 0;
-  let seed = 42;
-  const rand = () => {
-    seed = (seed * 16807) % 2147483647;
-    return seed / 2147483647;
-  };
-  const param = (_: string, fallback: unknown) => fallback;
-  const tl = { to: (_: unknown, o: { onUpdate: (this: { time: () => number }) => void }) => updates.push(() => o.onUpdate.call({ time: () => now })) };
-  new Function('root', 'param', 'tl', 'duration', 'rand', 'document', piece.js)(root, param, tl, DURATION, rand, fakeDocument);
-  return (t: number) => {
-    now = t;
-    updates.forEach((u) => u());
-    return JSON.stringify(root, (k, v) => (typeof v === 'function' ? undefined : v));
-  };
+  const draw = drawPiece(piece.js, {}, DURATION);
+  return (t: number) => JSON.stringify(draw(t), (k, v) => (typeof v === 'function' ? undefined : v));
 }
 
 describe('every UI kit piece', () => {
@@ -58,4 +35,24 @@ describe('every UI kit piece', () => {
   it.each(UI_KINDS.map((k) => [k]))('%s never redeclares a name the runtime passes in, such as brand, or a browser global that cannot be shadowed, such as top', (kind) => {
     expect(UI_KIT[kind].js).not.toMatch(/^(const|let) (root|props|tl|param|duration|fps|assets|brand|rand|motion|gsap|lottie|THREE|top|window|document|location)\b/m);
   });
+
+  it.each(UI_KINDS.map((k) => [k]))('%s never leaves grey placeholder rows or shape-only cards on screen once it has loaded', (kind) => {
+    expect(skeletons(UI_KIT[kind].name, {}, DURATION)).toEqual([]);
+  });
 });
+
+describe('placeholders', () => {
+  const box = (className: string, text = '', children: ReturnType<typeof row>[] = []) => ({ tag: 'div', className, textContent: text, innerHTML: '', style: {}, attrs: {}, children });
+  const row = (text = '') => box('bar', '', [box('chip'), box('stroke', text)]);
+
+  it('names three or more rows with no text, and a card with only shapes', () => {
+    expect(placeholders(box('main', '', [row(), row(), row()]))).toEqual(['3 rows "bar" with no text']);
+    expect(placeholders(box('card pic', '', [box('shape')]))).toEqual(['a card "card pic" with only shapes']);
+  });
+
+  it('lets rows with text and short lists through', () => {
+    expect(placeholders(box('main', '', [row('Home'), row('Pricing'), row('Blog')]))).toEqual([]);
+    expect(placeholders(box('main', '', [row(), row()]))).toEqual([]);
+  });
+});
+

@@ -20,7 +20,7 @@ export enum Forbidden {
   OffBeat = 'off-beat',
   NoPeak = 'no-peak',
   RoughCut = 'rough-cut',
-  UnreadableText = 'unreadable-text',
+  ReadingTime = 'reading-time',
   Screenshots = 'screenshots',
   MissingStoryBeat = 'missing-story-beat',
   Rushed = 'rushed',
@@ -59,7 +59,7 @@ const PEAK_FROM_S = 6;
 const PEAK_TRAVEL: Record<string, number> = { scale: 0.6, zoom: 0.8, dolly: 0.5, objectRotateX: 90, objectRotateY: 90, objectRotateZ: 90 };
 const HARD_CUT_SHARE = 0.25;
 const ENTRY_FRAMES = 2;
-const READING = { perWord: 0.4, base: 0.6, phrase: 1.2, pause: 0.5 };
+const READING = { perWord: 0.4, base: 0.6, phrase: 1.2, pause: 1 };
 const MAIN_PICTURE_AREA = 0.25;
 const BACKDROP_BLUR = 8;
 const BACKDROP_OPACITY = 0.35;
@@ -73,14 +73,14 @@ export const STYLES: Record<MotionStyle, StyleSpec> = {
   [MotionStyle.LaunchFilm]: {
     label: 'Launch film',
     eases: STYLE_EASES[MotionStyle.LaunchFilm],
-    seconds: { enter: [0.2, 0.35], stagger: 0.06, exit: 0.2, still: 0.5, scene: [2, 4] },
+    seconds: { enter: [0.2, 0.35], stagger: 0.06, exit: 0.2, still: 0.5, scene: [2, 5] },
     movement: { rise: 0.12, settle: 0.7, blur: 18, pushIn: 1.25, turn: 100 },
     type: { family: 'Inter', weights: { display: 800, text: 500 }, sizes: { hero: 0.26, line: 0.12, small: 0.026 } },
     palette: { ink: '#050505', paper: '#ffffff', muted: '#8b8b8b', accents: 1 },
     junctions: [JunctionKind.Crossfade, JunctionKind.DipToBlack, JunctionKind.Blur, JunctionKind.Zoom, JunctionKind.PushLeft, JunctionKind.PushRight, JunctionKind.Wipe],
     entrances: [TransitionKind.None, TransitionKind.Fade, TransitionKind.Blur, TransitionKind.Scale, TransitionKind.SlideLeft, TransitionKind.SlideRight, TransitionKind.SlideUp],
     reading: READING,
-    forbidden: [Forbidden.Particles, Forbidden.Glow, Forbidden.Bounce, Forbidden.Crowded, Forbidden.Transition, Forbidden.Still, Forbidden.OffBeat, Forbidden.NoPeak, Forbidden.RoughCut, Forbidden.UnreadableText, Forbidden.Screenshots, Forbidden.MissingStoryBeat, Forbidden.Rushed],
+    forbidden: [Forbidden.Particles, Forbidden.Glow, Forbidden.Bounce, Forbidden.Crowded, Forbidden.Transition, Forbidden.Still, Forbidden.OffBeat, Forbidden.NoPeak, Forbidden.RoughCut, Forbidden.ReadingTime, Forbidden.Screenshots, Forbidden.MissingStoryBeat, Forbidden.Rushed],
     pace: { minGap: 0.25, hold: 0.5 },
     maxMoving: 4,
     rules: [
@@ -113,7 +113,7 @@ export const STYLES: Record<MotionStyle, StyleSpec> = {
     junctions: [JunctionKind.Crossfade, JunctionKind.DipToBlack, JunctionKind.Blur],
     entrances: [TransitionKind.None, TransitionKind.Fade, TransitionKind.Blur],
     reading: READING,
-    forbidden: [...CALM, Forbidden.UnreadableText],
+    forbidden: [...CALM, Forbidden.ReadingTime],
     pace: { minGap: 1, hold: 1 },
     maxMoving: 2,
     rules: [
@@ -233,7 +233,7 @@ const perTimeline =
     timelines(doc).flatMap((clips) => check(clips, spec, doc.fps));
 
 const CLIP_CHECKS: Partial<Record<Forbidden, ClipCheck>> = {
-  [Forbidden.UnreadableText]: unreadable,
+  [Forbidden.ReadingTime]: unreadable,
   [Forbidden.Particles]: (clips) => clips.filter((c) => c.component === 'Particles').map((clip) => ({ clip, at: clip.from, detail: `${clip.id} is a particle emitter: decorative particles are off-style` })),
   [Forbidden.Glow]: (clips) => clips.filter((c) => c.effects.some((e) => e.enabled && e.kind === EffectKind.Glow)).map((clip) => ({ clip, at: clip.from, detail: `${clip.id} glows: remove the glow effect` })),
   [Forbidden.Rotation]: (clips) =>

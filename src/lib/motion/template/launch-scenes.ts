@@ -108,10 +108,10 @@ const NUMBERS = [
   ['$506', 'SALES']
 ];
 const CLAIMS = ['Analytics.', 'One place.'];
-const HOLD = 3 * BEAT;
-const CLAIM_HOLD = 4 * BEAT;
+const HOLD = 4 * BEAT;
+const CLAIM_HOLD = 5 * BEAT;
 const CLAIM_SECONDS = (CLAIMS.length - 1) * HOLD + CLAIM_HOLD;
-const BURST_SECONDS = BEAT * 4 + 1;
+const BURST_SECONDS = BEAT * 4 + 1.5;
 
 const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
   {
@@ -143,35 +143,35 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
     id: 'launch-ui-speed-ramp',
     name: 'Launch · Speed-ramp zoom into the UI',
     description: 'Launch film. Background only: a sharp capture in the foreground blocks delivery, so blur it (8 or more) behind live UI. A capture full frame: starts close on the headline (a match cut from the hook), pulls back to the whole page, holds a beat, then whips into one detail (focus) and keeps creeping. Slow-fast-slow.',
-    seconds: 4 * BEAT,
+    seconds: 7 * BEAT,
     beats: [
-      fill(4 * BEAT),
+      fill(7 * BEAT),
       {
         id: 'page',
         track: 'middle',
         component: 'Image',
         at: 0,
-        len: 4 * BEAT,
+        len: 7 * BEAT,
         props: { ...FULL, fit: 'cover', zoom: 2.4, focusX: 0.5, focusY: 0.22 },
         keys: {
           zoom: [
             [0, 2.4, SNAP],
             [0.5, 1.02, WHIP],
             [0.75, 1.04, WHIP],
-            [1.55, 2.2, WHIP],
-            [4 * BEAT, 2.35, LINEAR]
+            [1.25, 2.2, WHIP],
+            [7 * BEAT, 2.35, LINEAR]
           ],
           focusY: [
             [0, 0.22, SNAP],
             [0.5, 0.45, WHIP],
             [0.75, 0.45, WHIP],
-            [1.55, 0.86, LINEAR]
+            [1.25, 0.86, LINEAR]
           ],
           focusX: [
             [0, 0.5, WHIP],
             [0.75, 0.5, WHIP],
-            [1.55, 0.36, WHIP],
-            [4 * BEAT, 0.34, LINEAR]
+            [1.25, 0.36, WHIP],
+            [7 * BEAT, 0.34, LINEAR]
           ]
         }
       }
@@ -193,15 +193,15 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
     id: 'launch-device-fly',
     name: 'Launch · Device fly-in',
     description: 'Launch film. A laptop flies in from a 95° turn and keeps drifting closer while a huge line sits behind it. The product on a device.',
-    seconds: 4 * BEAT,
+    seconds: 6 * BEAT,
     beats: [
-      fill(4 * BEAT),
+      fill(6 * BEAT),
       {
         id: 'line',
         track: 'back',
         component: 'Title',
         at: 0,
-        len: 4 * BEAT,
+        len: 6 * BEAT,
         props: {
           text: 'Every click.',
           ...word(LINE * 2),
@@ -213,7 +213,7 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
           scale: [
             [0, 1.2, SNAP],
             [HIT, 1, LINEAR],
-            [4 * BEAT, 0.94, LINEAR]
+            [6 * BEAT, 0.94, LINEAR]
           ],
           blur: [
             [0, BLUR, SNAP],
@@ -226,7 +226,7 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
         track: 'front',
         component: 'Device3D',
         at: 0,
-        len: 4 * BEAT,
+        len: 6 * BEAT,
         props: {
           device: Device.LaptopPro,
           finish: 'black',
@@ -240,17 +240,17 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
           objectRotateY: [
             [0, -95, SNAP],
             [0.9, -20, LINEAR],
-            [4 * BEAT, 8, LINEAR]
+            [6 * BEAT, 8, LINEAR]
           ],
           objectRotateX: [
             [0, 38, SNAP],
             [0.9, 8, LINEAR],
-            [4 * BEAT, 6, LINEAR]
+            [6 * BEAT, 6, LINEAR]
           ],
           dolly: [
             [0, 0.5, SNAP],
             [0.9, 1.2, LINEAR],
-            [4 * BEAT, 1.5, LINEAR]
+            [6 * BEAT, 1.5, LINEAR]
           ]
         }
       }
@@ -310,26 +310,26 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
     id: 'launch-ui-tilt-zoom',
     name: 'Launch · UI tilt zoom',
     description: 'Launch film. Background only: a sharp capture in the foreground blocks delivery, so blur it (8 or more) behind live UI. One feature of the real UI lands tilted back 18° and straightens while it whips in on the detail and keeps pushing.',
-    seconds: 4 * BEAT,
+    seconds: 5 * BEAT,
     beats: [
-      fill(4 * BEAT),
+      fill(5 * BEAT),
       {
         id: 'screen',
         track: 'middle',
         component: 'Image',
         at: 0,
-        len: 4 * BEAT,
+        len: 5 * BEAT,
         props: { ...FULL, fit: 'cover', zoom: 1, focusX: 0.5, focusY: 0.55 },
         keys: {
           zoom: [
             [0, 1, SNAP],
             [0.35, 1.5, WHIP],
-            [4 * BEAT, 1.95, LINEAR]
+            [5 * BEAT, 1.95, LINEAR]
           ],
           focusY: [
             [0, 0.5, SNAP],
             [0.35, 0.58, LINEAR],
-            [4 * BEAT, 0.6, LINEAR]
+            [5 * BEAT, 0.6, LINEAR]
           ],
           rotateX: [
             [0, 18, SNAP],
@@ -430,8 +430,8 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
         id: 'title',
         track: 'front',
         component: 'Title',
-        at: BEAT,
-        len: 6 * BEAT,
+        at: 0.5 * BEAT,
+        len: 6.5 * BEAT,
         props: {
           text: 'Turn clicks\ninto revenue.',
           ...word(LINE * 1.3),
@@ -443,7 +443,7 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
           ...riseOut,
           scale: [
             [0, 0.96, LINEAR],
-            [6 * BEAT, 1.04, LINEAR]
+            [6.5 * BEAT, 1.04, LINEAR]
           ]
         }
       }
@@ -463,15 +463,15 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
     id: 'launch-device-orbit',
     name: 'Launch · Device orbit',
     description: 'Launch film. A phone spins in 200° and keeps turning while one huge word slides behind it. Wants a mobile capture.',
-    seconds: 5 * BEAT,
+    seconds: 6 * BEAT,
     beats: [
-      fill(5 * BEAT),
+      fill(6 * BEAT),
       {
         id: 'word',
         track: 'back',
         component: 'Title',
         at: 0,
-        len: 5 * BEAT,
+        len: 6 * BEAT,
         props: {
           text: 'Real-time.',
           ...word(HERO),
@@ -482,7 +482,7 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
         keys: {
           x: [
             [0, 0.09, LINEAR],
-            [5 * BEAT, -0.09, LINEAR]
+            [6 * BEAT, -0.09, LINEAR]
           ],
           blur: [
             [0, BLUR, SNAP],
@@ -495,7 +495,7 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
         track: 'front',
         component: 'Device3D',
         at: 0,
-        len: 5 * BEAT,
+        len: 6 * BEAT,
         props: {
           device: Device.PhonePro,
           finish: 'black',
@@ -509,17 +509,17 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
           objectRotateY: [
             [0, 200, SNAP],
             [0.7, 25, LINEAR],
-            [5 * BEAT, -20, LINEAR]
+            [6 * BEAT, -20, LINEAR]
           ],
           objectRotateZ: [
             [0, -25, SNAP],
             [0.7, -4, LINEAR],
-            [5 * BEAT, 0, LINEAR]
+            [6 * BEAT, 0, LINEAR]
           ],
           dolly: [
             [0, 0.5, SNAP],
             [0.7, 1.05, LINEAR],
-            [5 * BEAT, 1.15, LINEAR]
+            [6 * BEAT, 1.15, LINEAR]
           ]
         }
       }
@@ -536,21 +536,21 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
     id: 'launch-logo-build',
     name: 'Launch · Logo build',
     description: 'Launch film. The close: the light opens, the original logo lands flat and intact on a beat (fade and a small scale only) with an accent shockwave around it, then the address and the claim. The logo is never altered: the build is the context.',
-    seconds: 8 * BEAT,
+    seconds: 9 * BEAT,
     beats: [
-      fill(8 * BEAT),
+      fill(9 * BEAT),
       {
         id: 'light',
         track: 'back',
         component: 'Shape',
         at: 0,
-        len: 8 * BEAT,
+        len: 9 * BEAT,
         props: { shape: 'rect', fillKind: FillKind.Radial, fill: PAPER, fill2: INK, ...FULL, opacity: 0.16 },
         keys: {
           scale: [
             [0, 0.4, SNAP],
             [2 * BEAT, 1, LINEAR],
-            [8 * BEAT, 1.1, LINEAR]
+            [9 * BEAT, 1.1, LINEAR]
           ]
         }
       },
@@ -559,7 +559,7 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
         track: 'middle',
         component: 'Logo',
         at: 2 * BEAT,
-        len: 6 * BEAT,
+        len: 7 * BEAT,
         props: { x: 0.5, y: 0.42, width: 0.36, height: 0.4 },
         keys: {
           opacity: [
@@ -569,7 +569,7 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
           scale: [
             [0, 0.92, SNAP],
             [HIT, 1, LINEAR],
-            [6 * BEAT, 1.03, LINEAR]
+            [7 * BEAT, 1.03, LINEAR]
           ]
         }
       },
@@ -606,7 +606,7 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
         track: 'front',
         component: 'Title',
         at: 2.5 * BEAT,
-        len: 5.5 * BEAT,
+        len: 6.5 * BEAT,
         props: {
           text: 'example.com',
           ...word(0.06),
@@ -622,7 +622,7 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
         track: 'front',
         component: 'Kicker',
         at: 4 * BEAT,
-        len: 4 * BEAT,
+        len: 5 * BEAT,
         props: {
           text: 'YOUR CLAIM',
           ...label(),

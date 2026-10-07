@@ -43,4 +43,20 @@ describe('the gate on product UI', () => {
     expect(problems.find((p) => p.kind === Quality.NoMicroMotion)).toBeDefined();
     expect(blocking(problems).map((p) => p.kind)).not.toContain(Quality.NoMicroMotion);
   });
+
+  const SIDEBAR = { name: 'UiSidebar', brand: 'Supasito', items: 'Sites\nPages\nForms\nDomains', active: 1, title: 'Pages' };
+  const skeleton = (doc: MotionDoc) => docProblems(doc, { audioAssets: 0 }).filter((p) => p.kind === Quality.EmptyUi && /no text|only shapes/.test(p.detail));
+
+  it('blocks the supasito v3 sidebar: its content rows are sample text', () => {
+    expect(blocking(docProblems(film([ui('side', SIDEBAR)]), { audioAssets: 0 })).map((p) => p.kind)).toContain(Quality.EmptyUi);
+  });
+
+  it('lets the sidebar through once its rows say something', () => {
+    expect(skeleton(film([ui('side', { ...SIDEBAR, rows: 'Home|Published 2 min ago\nPricing|Draft\nAbout us|Published\nContact|Form live\nBlog|3 posts scheduled' })]))).toEqual([]);
+  });
+
+  it('lets a short skeleton through when it turns into content', () => {
+    expect(skeleton(film([ui('gen', { name: 'UiGeneratedResult', badge: 'Built by Supasito', title: 'Bakery Rossi', lines: 'Menu with prices\nOpening hours\nBook a table' })]))).toEqual([]);
+  });
 });
+

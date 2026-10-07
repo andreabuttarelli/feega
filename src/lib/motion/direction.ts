@@ -6,7 +6,10 @@ import { MotionStyle } from './style-model';
 import { UI_KIT, UI_SAFE, uiScale } from './ui-kit/kit';
 import { sampleTrack } from './sample-track';
 import { cursorClicks, cursorMisses, reelMisses, TARGET_SEPARATOR } from './clicks';
-import { emptyContent, interactionOf, isUiPiece, Interaction } from './ui-kit/content';
+import { emptyContent, interactionOf, isUiPiece, Interaction, skeletons } from './ui-kit/content';
+import { FillKind, ShapeKind } from './shape/schema';
+import { CutFault, cutProblems } from './cuts';
+import { scriptDrift } from './script-drift';
 
 export enum Quality {
   RepeatedLayout = 'repeated-layout',
@@ -25,7 +28,11 @@ export enum Quality {
   ClickMiss = 'click-miss',
   EmptyUi = 'empty-ui',
   NoMicroMotion = 'no-micro-motion',
-  NoScript = 'no-script'
+  NoScript = 'no-script',
+  CutMidAnimation = 'cut-mid-animation',
+  NoHold = 'no-hold',
+  ScriptDrift = 'script-drift',
+  BackgroundSeam = 'background-seam'
 }
 
 export enum Severity {
@@ -53,6 +60,10 @@ export const SEVERITY: Record<Check, Severity> = {
   [Quality.EmptyUi]: Severity.Blocking,
   [Quality.NoMicroMotion]: Severity.Warning,
   [Quality.NoScript]: Severity.Warning,
+  [Quality.CutMidAnimation]: Severity.Blocking,
+  [Quality.NoHold]: Severity.Blocking,
+  [Quality.ScriptDrift]: Severity.Blocking,
+  [Quality.BackgroundSeam]: Severity.Warning,
   [Forbidden.Particles]: Severity.Warning,
   [Forbidden.Glow]: Severity.Warning,
   [Forbidden.Rotation]: Severity.Warning,
@@ -64,7 +75,7 @@ export const SEVERITY: Record<Check, Severity> = {
   [Forbidden.OffBeat]: Severity.Warning,
   [Forbidden.NoPeak]: Severity.Warning,
   [Forbidden.RoughCut]: Severity.Warning,
-  [Forbidden.UnreadableText]: Severity.Blocking,
+  [Forbidden.ReadingTime]: Severity.Blocking,
   [Forbidden.Screenshots]: Severity.Blocking,
   [Forbidden.MissingStoryBeat]: Severity.Blocking,
   [Forbidden.Rushed]: Severity.Warning,
@@ -407,7 +418,7 @@ const uiClips = (doc: MotionDoc) => everyClip(doc).filter((c) => c.component ===
 function emptyUis(doc: MotionDoc): QualityProblem[] {
   return uiClips(doc).flatMap((clip) => {
     const name = String(clip.props.name);
-    const found = emptyContent(name, clip.props, doc.components[name]?.source.js);
+    const found = [...emptyContent(name, clip.props, doc.components[name]?.source.js), ...skeletons(name, clip.props, clip.durationInFrames / doc.fps)];
     return found.length ? [{ kind: Quality.EmptyUi, at: seconds(doc, clip.from), detail: `${clip.id} (${name}) shows no real content: ${found.join('; ')}. Fill it with the product's own data from the research: names, numbers and states a user of the product would recognise` }] : [];
   });
 }
@@ -423,10 +434,54 @@ function unscripted(doc: MotionDoc): QualityProblem[] {
   return SCORED[styleOf(doc)] && !doc.script && everyClip(doc).length ? [{ kind: Quality.NoScript, detail: 'no research and script saved: for a launch film or trailer, write_script first (problem, struggle, flow, sourced proof, promise) and build that' }] : [];
 }
 
+const CUT_QUALITY: Record<CutFault, Quality> = {
+  [CutFault.MidAnimation]: Quality.CutMidAnimation,
+  [CutFault.NoHold]: Quality.NoHold
+};
+
+function drifted(doc: MotionDoc): QualityProblem[] {
+  return scriptDrift(doc).map((p) => ({ kind: Quality.ScriptDrift, at: seconds(doc, p.frame), detail: p.detail }));
+}
+
+function cutsMidAnimation(doc: MotionDoc): QualityProblem[] {
+  return cutProblems(doc).map((p) => ({ kind: CUT_QUALITY[p.fault], at: seconds(doc, p.frame), detail: p.detail }));
+}
+
+const BACKDROP_AREA = 0.5;
+const GRADIENTS: ReadonlySet<string> = new Set([FillKind.Linear, FillKind.Radial]);
+const CORNERS = [[0, 0], [1, 0], [0, 1], [1, 1]];
+
+type Box = { x: number; y: number; w: number; h: number };
+
+const COVERS: Partial<Record<ShapeKind, (b: Box) => boolean>> = {
+  [ShapeKind.Ellipse]: (b) => CORNERS.every(([cx, cy]) => ((cx - b.x) / (b.w / 2)) ** 2 + ((cy - b.y) / (b.h / 2)) ** 2 <= 1),
+  [ShapeKind.Circle]: (b) => CORNERS.every(([cx, cy]) => ((cx - b.x) / (b.w / 2)) ** 2 + ((cy - b.y) / (b.h / 2)) ** 2 <= 1)
+};
+
+const boxCovers = (b: Box) => b.x - b.w / 2 <= 0 && b.x + b.w / 2 >= 1 && b.y - b.h / 2 <= 0 && b.y + b.h / 2 >= 1;
+
+function backgroundSeams(doc: MotionDoc): QualityProblem[] {
+  return doc.tracks.flatMap((t) => t.clips as Clip[]).flatMap((clip) => {
+    if (clip.component !== 'Shape' || !GRADIENTS.has(String(clip.props.fillKind))) {
+      return [];
+    }
+    const scale = at(clip, 'scale', clip.durationInFrames - 1, 1);
+    const box = { x: num(clip, 'x', 0.5), y: num(clip, 'y', 0.5), w: num(clip, 'width', 0) * scale, h: num(clip, 'height', 0) * scale };
+    if (box.w * box.h < BACKDROP_AREA) {
+      return [];
+    }
+    const covers = COVERS[clip.props.shape as ShapeKind] ?? boxCovers;
+    if (covers(box)) {
+      return [];
+    }
+    return [{ kind: Quality.BackgroundSeam, at: seconds(doc, clip.from), detail: `${clip.id} is a background gradient that stops inside the frame: its edge shows as a seam. Make it cover the whole frame (a rect at least as large as the frame, an ellipse large enough to clear the corners) or use a flat colour` }];
+  });
+}
+
 export function docProblems(doc: MotionDoc, input: { audioAssets: number; pixels?: Pixels; logos?: readonly string[] }): QualityProblem[] {
   const list = scenes(doc);
   const pixels = input.pixels ?? {};
-  return [...unscripted(doc), ...clickMisses(doc), ...emptyUis(doc), ...stillUis(doc), ...repeated(doc, list), ...smallTitles(doc), ...silent(doc, input.audioAssets), ...softPictures(doc, pixels), ...croppedScreens(doc, pixels), ...alteredLogos(doc, new Set(input.logos ?? [])), ...outOfFrame(doc), ...tiltedText(doc), ...emptyFrames(doc), ...smallLogos(doc, pixels), ...styleProblems(doc).map((p) => ({ kind: Quality.OffStyle, at: p.at, effect: p.effect, detail: p.detail }))];
+  return [...unscripted(doc), ...drifted(doc), ...clickMisses(doc), ...emptyUis(doc), ...stillUis(doc), ...repeated(doc, list), ...smallTitles(doc), ...silent(doc, input.audioAssets), ...softPictures(doc, pixels), ...croppedScreens(doc, pixels), ...alteredLogos(doc, new Set(input.logos ?? [])), ...outOfFrame(doc), ...tiltedText(doc), ...emptyFrames(doc), ...smallLogos(doc, pixels), ...cutsMidAnimation(doc), ...backgroundSeams(doc), ...styleProblems(doc).map((p) => ({ kind: Quality.OffStyle, at: p.at, effect: p.effect, detail: p.detail }))];
 }
 
 export function frameProblems(stats: readonly FrameStat[]): QualityProblem[] {
