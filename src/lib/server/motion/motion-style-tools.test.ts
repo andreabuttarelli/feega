@@ -46,6 +46,9 @@ describe('the motion style', () => {
     expect(text).toContain('cubic-bezier(0.16,1,0.3,1)');
     expect(text).toContain('particles');
     expect(text).not.toContain('mean more care, not more effects');
+    expect(text).toContain('A real brand logo is always the original asset');
+    expect(text).toContain('hard cut is the exception');
+    expect(text).not.toContain('Logo3D extrudes an SVG logo (the brand logo by default)');
   });
 
   it('the Apple minimal prompt stays calm when the user asks for it', () => {

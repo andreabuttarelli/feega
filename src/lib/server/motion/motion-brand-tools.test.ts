@@ -95,4 +95,16 @@ describe('motion agent brand tools', () => {
     }
     expect(prompt).toMatch(/trailer/i);
   });
+
+  it('the logo imported from the site read is the brand logo: view_frames names it extruded in 3D', async () => {
+    const site = vi.fn(async () => ({ ok: true as const, site: { name: 'Dub', logos: [{ url: 'https://dub.example/logo.svg' }] } }));
+    const importAsset = vi.fn(async () => ({ ok: true as const, asset: LOGO, width: 64, height: 64 }));
+    const frames = vi.fn(async (_id: string, times: number[]) => times.map((time) => ({ time, bytes: Buffer.from('x') })));
+    const { run } = setup({ site, importAsset, frames } as never);
+    await run('analyze_site', { url: 'dub.example' });
+    await run('import_asset', { url: 'https://dub.example/logo.svg' });
+    await run('add_clip', { component: 'Logo3D', start: 0, duration: 2, props: { assetId: LOGO.id } });
+
+    expect(JSON.stringify((await run('view_frames', { times: [1] })).quality)).toContain('brand logo');
+  });
 });

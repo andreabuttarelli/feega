@@ -5,6 +5,7 @@ import { MotionStyle } from '$lib/motion/style-model';
 import { BUILTIN_TEMPLATES } from './builtins';
 import { insertTemplate } from './library';
 import { LAUNCH_SCENES } from './launch-scenes';
+import { Quality, docProblems } from '$lib/motion/direction';
 
 const FILM = STYLES[MotionStyle.LaunchFilm];
 const TEXT = new Set(['Title', 'Text', 'Kicker', 'Caption']);
@@ -78,5 +79,16 @@ describe('the launch film scene library', () => {
 
     expect(styleProblems(flat).map((p) => p.effect)).toContain('no-peak');
     expect(peaked.ok && styleProblems(peaked.doc).map((p) => p.effect)).not.toContain('no-peak');
+  });
+
+  it('the logo build shows the original logo flat and intact: the build is the light, the shockwave and the address around it', () => {
+    const build = launchDocs().find((e) => e.id === 'builtin:launch-logo-build')!;
+    const doc = build.template.doc;
+    const logo = clipsOf(doc).find((c) => c.id === 'logo')!;
+    const withAsset = { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === 'logo' ? { ...c, props: { ...c.props, assetId: 'brand' } } : c)) })) };
+
+    expect(clipsOf(doc).some((c) => c.component === 'Logo3D')).toBe(false);
+    expect(logo.component).toBe('Logo');
+    expect(docProblems(withAsset, { audioAssets: 0, logos: ['brand'] }).filter((p) => p.kind === Quality.BrandLogoAltered)).toEqual([]);
   });
 });

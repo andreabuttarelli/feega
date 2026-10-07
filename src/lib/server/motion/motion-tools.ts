@@ -324,6 +324,18 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     (k: KeyInput): Keyframe =>
       asKey(typeof k.value === 'number' ? { ...k, value: toStored(owner, prop, k.value, session.doc) } : k);
 
+  const logoUrls = new Set<string>();
+  const brandLogos = new Set<string>();
+  const readLogos = (read: SourceRead) => {
+    const found = read as { site?: { logos?: { url?: string }[] }; brand?: { logoUrl?: string | null } };
+    for (const url of [...(found.site?.logos ?? []).map((l) => l.url), found.brand?.logoUrl]) {
+      if (url) {
+        logoUrls.add(url);
+      }
+    }
+    return read;
+  };
+
   const apply = (result: OpResult, what: string) => {
     if (!result.ok) {
       return { ok: false, error: explained(session.doc, result.error) };
@@ -1260,13 +1272,13 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     analyze_site: tool({
       description: 'Read a public website for a brand: name, tagline, description, logos (svg first, then favicon, apple-touch-icon, og:image), palette (theme, logo, CSS), fonts (google true = usable by name after register_font), images with width and height (og, hero, product), products and social links. Nothing is stored: import_asset the logo and the pictures you will use.',
       inputSchema: z.object({ url: z.string().min(4).max(2000).describe('the site, e.g. https://www.allbirds.com or allbirds.com') }),
-      execute: async (input) => (deps.site ? deps.site(input.url) : UNREADABLE('reading sites'))
+      execute: async (input) => (deps.site ? readLogos(await deps.site(input.url)) : UNREADABLE('reading sites'))
     }),
 
     use_brand: tool({
       description: "Read a brand of this workspace: the project brand without a name, or the brand the user names. Returns name, website, logo url, palette, fonts, voice notes and products. import_asset its logo and product pictures to use them in clips.",
       inputSchema: z.object({ name: z.string().max(120).optional().describe('brand name or slug; omit for the project brand') }),
-      execute: async (input) => (deps.brand ? deps.brand(input.name) : UNREADABLE('reading brands'))
+      execute: async (input) => (deps.brand ? readLogos(await deps.brand(input.name)) : UNREADABLE('reading brands'))
     }),
 
     import_asset: tool({
@@ -1286,6 +1298,9 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
           return imported;
         }
         deps.assets.push(imported.asset);
+        if (logoUrls.has(input.url)) {
+          brandLogos.add(imported.asset.id);
+        }
         return { ok: true, asset_id: imported.asset.id, kind: imported.asset.kind, width: imported.width, height: imported.height };
       }
     }),
@@ -1377,7 +1392,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const stats = deps.inspect ? await deps.inspect(frames) : [];
         const audioAssets = deps.assets.filter((a) => a.kind === AssetKind.Audio).length;
         const pixels = Object.fromEntries(deps.assets.flatMap((a) => (a.width && a.height ? [[a.id, { width: a.width, height: a.height }]] : [])));
-        const quality = [...docProblems(session.doc, { audioAssets, pixels }), ...frameProblems(stats)].map((p) => p.detail);
+        const quality = [...docProblems(session.doc, { audioAssets, pixels, logos: [...brandLogos] }), ...frameProblems(stats)].map((p) => p.detail);
         return { ok: true, times: frames.map((f) => f.time), quality, note: quality.length ? 'The quality gate found the problems in quality: fix each one, then look again. The frames follow as images in the next message.' : 'The frames follow as images in the next message.' };
       }
     }),

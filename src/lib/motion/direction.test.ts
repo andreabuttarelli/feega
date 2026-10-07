@@ -109,3 +109,32 @@ describe('the quality gate reads the direction of the video', () => {
     ]);
   });
 });
+
+describe('the real brand logo stays as it is', () => {
+  const logoClip = (component: 'Image' | 'Logo' | 'Logo3D', patch: Partial<MotionDoc['tracks'][number]['clips'][number]> = {}) => {
+    const placed = must(addClip(calm(), { component, from: 0, durationInFrames: 60, props: { assetId: 'brandlogo' } }, 'l'));
+    return { ...placed, tracks: placed.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === 'l' ? { ...c, ...patch } : c)) })) };
+  };
+  const altered = (doc: MotionDoc) => docProblems(doc, { audioAssets: 0, logos: ['brandlogo'] }).filter((p) => p.kind === Quality.BrandLogoAltered);
+
+  it('a flat logo that fades and scales in a little passes', () => {
+    const entrance = { opacity: [{ frame: 0, value: 0, ease: Ease.Linear }, { frame: 10, value: 1, ease: Ease.Linear }], scale: [{ frame: 0, value: 0.94, ease: Ease.Linear }, { frame: 10, value: 1, ease: Ease.Linear }] };
+
+    expect(altered(logoClip('Logo', { keyframes: entrance }))).toEqual([]);
+    expect(altered(logoClip('Image'))).toEqual([]);
+  });
+
+  it('names the brand logo extruded in 3D, filtered, blended, masked or turned', () => {
+    const turned = { rotateY: [{ frame: 0, value: -90, ease: Ease.Linear }, { frame: 10, value: 0, ease: Ease.Linear }] };
+
+    expect(altered(logoClip('Logo3D'))).toHaveLength(1);
+    expect(altered(logoClip('Logo', { effects: [{ id: 'g', kind: 'glow' as never, enabled: true, params: {} }] }))).toHaveLength(1);
+    expect(altered(logoClip('Logo', { blend: 'screen' as never }))).toHaveLength(1);
+    expect(altered(logoClip('Logo', { mask: { kind: 'ellipse' } as never }))).toHaveLength(1);
+    expect(altered(logoClip('Logo', { keyframes: turned }))).toHaveLength(1);
+  });
+
+  it('another picture may be treated freely', () => {
+    expect(docProblems(logoClip('Logo3D'), { audioAssets: 0, logos: ['other'] }).map((p) => p.kind)).not.toContain(Quality.BrandLogoAltered);
+  });
+});

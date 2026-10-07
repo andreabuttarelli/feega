@@ -5,7 +5,7 @@ import { EASE_BEZIER } from '$lib/motion/keyframes';
 import { Ease } from '$lib/motion/design';
 import { STYLES } from '$lib/motion/style';
 import { MotionStyle } from '$lib/motion/style-model';
-import { StrokeKind } from '$lib/motion/shape/schema';
+import { FillKind, StrokeKind } from '$lib/motion/shape/schema';
 import type { Beat, Key } from '$lib/motion/template-kit';
 import { FieldType } from './fields';
 import { boxAspect, colour, text, type Design, type Field } from './design-kit';
@@ -559,41 +559,41 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
   {
     id: 'launch-logo-build',
     name: 'Launch · Logo build',
-    description: 'Launch film. The close: the SVG logo spins in from -540° in chrome and lands on a beat with an accent shockwave, then the address and the claim.',
+    description: 'Launch film. The close: the light opens, the original logo lands flat and intact on a beat (fade and a small scale only) with an accent shockwave around it, then the address and the claim. The logo is never altered: the build is the context.',
     seconds: 6 * BEAT,
     beats: [
       fill(6 * BEAT),
       {
-        id: 'logo',
-        track: 'middle',
-        component: 'Logo3D',
+        id: 'light',
+        track: 'back',
+        component: 'Shape',
         at: 0,
         len: 6 * BEAT,
-        props: {
-          fill: PAPER,
-          material: 'chrome',
-          extrude: 0.35,
-          bevel: 0.05,
-          shadow: false,
-          x: 0.5,
-          y: 0.42,
-          width: 0.5,
-          height: 0.62
-        },
+        props: { shape: 'rect', fillKind: FillKind.Radial, fill: PAPER, fill2: INK, ...FULL, opacity: 0.16 },
         keys: {
-          objectRotateY: [
-            [0, -540, SNAP],
-            [2 * BEAT, 0, LINEAR],
-            [6 * BEAT, 10, LINEAR]
-          ],
-          objectRotateX: [
-            [0, 50, SNAP],
-            [2 * BEAT, 0, LINEAR]
-          ],
-          dolly: [
-            [0, 0.3, SNAP],
+          scale: [
+            [0, 0.4, SNAP],
             [2 * BEAT, 1, LINEAR],
-            [6 * BEAT, 1.08, LINEAR]
+            [6 * BEAT, 1.1, LINEAR]
+          ]
+        }
+      },
+      {
+        id: 'logo',
+        track: 'middle',
+        component: 'Logo',
+        at: 2 * BEAT,
+        len: 4 * BEAT,
+        props: { x: 0.5, y: 0.42, width: 0.18, height: 0.32 },
+        keys: {
+          opacity: [
+            [0, 0, SNAP],
+            [HIT, 1, LINEAR]
+          ],
+          scale: [
+            [0, 0.92, SNAP],
+            [HIT, 1, LINEAR],
+            [4 * BEAT, 1.03, LINEAR]
           ]
         }
       },
@@ -663,14 +663,13 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
       }
     ],
     fields: [
-      picture('logo', 'Logo (SVG)', 'logo', 'assetId', {
-        width: 0.5,
-        height: 0.62
+      picture('logo', 'Original logo (SVG or PNG)', 'logo', 'assetId', {
+        width: 0.18,
+        height: 0.32
       }),
       text('url', 'Address', 'url'),
       text('claim', 'Claim', 'claim'),
-      colour('accent', 'Shockwave colour', 'ring', 'stroke'),
-      colour('logo_color', 'Logo colour', 'logo', 'fill')
+      colour('accent', 'Shockwave colour', 'ring', 'stroke')
     ]
   }
 ];

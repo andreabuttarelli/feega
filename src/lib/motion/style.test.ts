@@ -166,4 +166,16 @@ describe('the launch film style', () => {
   it('a short clip has no peak to find', () => {
     expect(effects(withClip(film(), 't', 'Title', { keyframes: rise }))).not.toContain(Forbidden.NoPeak);
   });
+
+  it('names a film cut together hard, not one whose junctions move or dissolve', () => {
+    const still = [0, 1, 2, 3].reduce((doc, s, i) => withClip(doc, `s${i}`, 'Title', {}, at(s)), film());
+    const flowing = [0, 1, 2, 3].reduce((doc, s, i) => withClip(doc, `s${i}`, 'Title', i % 2 ? { junction: { kind: JunctionKind.Crossfade, durationInFrames: 10 } } : { keyframes: track('scale', 1.3, 1, 8) }, at(s)), film());
+
+    expect(effects(still)).toContain(Forbidden.RoughCut);
+    expect(effects(flowing)).not.toContain(Forbidden.RoughCut);
+  });
+
+  it('allows a whip pan between scenes', () => {
+    expect(effects(withClip(film(), 'w', 'Title', { junction: { kind: JunctionKind.PushLeft, durationInFrames: 8 }, keyframes: rise }))).not.toContain(Forbidden.Transition);
+  });
 });
