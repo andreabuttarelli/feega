@@ -60,12 +60,13 @@ describe('motion agent brand tools', () => {
     expect(assets.map((a) => a.id)).toEqual(['top', 's2']);
   });
 
-  it('view_frames names a picture blown up past its pixels', async () => {
-    const small: MotionAsset = { id: 'og', kind: AssetKind.Image, label: 'og', previewUrl: '', url: 'https://signed/og.jpg', width: 640, height: 488 };
+  it('view_frames names a picture placed before its pixels were known and blown up past them', async () => {
+    const small: MotionAsset = { id: 'og', kind: AssetKind.Image, label: 'og', previewUrl: '', url: 'https://signed/og.jpg' };
     const frames = vi.fn(async (_id: string, times: number[]) => times.map((time) => ({ time, bytes: Buffer.from('x') })));
     const { assets, run } = setup({ frames });
     assets.push(small);
     await run('add_clip', { component: 'Image', start: 0, duration: 3, props: { assetId: 'og', fit: 'cover', width: 1920, height: 1080 } });
+    Object.assign(small, { width: 640, height: 488 });
 
     const out = (await run('view_frames', { times: [1] })) as { quality: string[] };
 
