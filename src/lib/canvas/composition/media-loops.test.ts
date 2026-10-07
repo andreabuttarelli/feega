@@ -8,13 +8,10 @@ import type { LayoutId, Transform } from './types';
 const MEDIA_LOOPS: LayoutId[] = [
 	'marquee',
 	'stack',
-	'parallax',
 	'perspective-wall',
 	'film-strip',
 	'split-reveal',
-	'zoom-tunnel',
 	'polaroid',
-	'globe',
 	'masonry',
 	'slider'
 ];

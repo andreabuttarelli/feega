@@ -109,7 +109,7 @@ describe('composition layouts', () => {
     const base = { ...newMotionDoc(MotionFormat.Vertical), durationInFrames: 30 };
     const cost = (layout: string) => frameCosts(30, costSpans(ok(addClip(base, { component: 'Composition', from: 0, durationInFrames: 30, props: { layout, media: [] } }, 'c'))))[0];
 
-    expect(cost('globe')).toBeGreaterThan(FLAT_FRAME_MS);
-    expect(cost('masonry')).toBeGreaterThan(cost('globe'));
+    expect(cost('stack')).toBeGreaterThan(FLAT_FRAME_MS);
+    expect(cost('masonry')).toBeGreaterThan(cost('stack'));
   });
 });

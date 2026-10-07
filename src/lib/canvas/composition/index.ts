@@ -2,18 +2,15 @@ import * as bento from './bento';
 import type { CameraState } from './camera';
 import { cardParams, type CardAspect } from './card-look';
 import * as filmStrip from './film-strip';
-import * as globe from './globe';
 import { withFrame } from './loop';
 import * as marquee from './marquee';
 import * as masonry from './masonry';
 import type { Motion } from './motion';
-import * as parallax from './parallax';
 import * as perspectiveWall from './perspective-wall';
 import * as polaroid from './polaroid';
 import * as slider from './slider';
 import * as splitReveal from './split-reveal';
 import * as stack from './stack';
-import * as zoomTunnel from './zoom-tunnel';
 import * as carousel3d from './carousel-3d';
 import * as coverflow from './coverflow';
 import * as explorerGrid from './explorer-grid';
@@ -172,17 +169,6 @@ const DEFINED: Record<LayoutId, LayoutDefinition> = {
 		instances: stack.instances,
 		transforms: stack.transforms
 	},
-	parallax: {
-		cards: '1:1',
-		label: 'Parallax layers',
-		description: 'Media on planes at different depths, with a slow camera drift.',
-		motion: 'linear',
-		camera: 'fixed',
-		params: parallax.params,
-		fit: withFrame,
-		instances: parallax.instances,
-		transforms: parallax.transforms
-	},
 	'perspective-wall': {
 		cards: '1:1',
 		label: 'Perspective wall',
@@ -214,16 +200,6 @@ const DEFINED: Record<LayoutId, LayoutDefinition> = {
 		instances: splitReveal.instances,
 		transforms: splitReveal.transforms
 	},
-	'zoom-tunnel': {
-		cards: '1:1',
-		label: 'Zoom tunnel',
-		description: 'A continuous fly-through: each card grows past the frame and the next takes its place.',
-		motion: 'linear',
-		camera: 'fixed',
-		params: zoomTunnel.params,
-		instances: zoomTunnel.instances,
-		transforms: zoomTunnel.transforms
-	},
 	polaroid: {
 		cards: 'original',
 		label: 'Polaroid pile',
@@ -233,16 +209,6 @@ const DEFINED: Record<LayoutId, LayoutDefinition> = {
 		params: polaroid.params,
 		instances: polaroid.instances,
 		transforms: polaroid.transforms
-	},
-	globe: {
-		cards: '1:1',
-		label: 'Globe',
-		description: 'Media on the surface of a sphere that turns slowly.',
-		motion: 'linear',
-		camera: 'fixed',
-		params: globe.params,
-		instances: globe.instances,
-		transforms: globe.transforms
 	},
 	masonry: {
 		cards: '1:1',

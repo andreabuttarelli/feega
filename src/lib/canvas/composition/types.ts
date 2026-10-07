@@ -21,13 +21,10 @@ export type LayoutId =
 	| 'bento'
 	| 'marquee'
 	| 'stack'
-	| 'parallax'
 	| 'perspective-wall'
 	| 'film-strip'
 	| 'split-reveal'
-	| 'zoom-tunnel'
 	| 'polaroid'
-	| 'globe'
 	| 'masonry'
 	| 'slider';
 

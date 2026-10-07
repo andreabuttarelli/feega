@@ -22,13 +22,11 @@ describe('layoutAt', () => {
 			'coverflow',
 			'explorer-grid',
 			'film-strip',
-			'globe',
 			'helix',
 			'marquee',
 			'masonry',
 			'media-cloud',
 			'media-ring',
-			'parallax',
 			'perspective-wall',
 			'polaroid',
 			'ring',
@@ -37,8 +35,7 @@ describe('layoutAt', () => {
 			'stack',
 			'staggered-grid',
 			'tilted-grid',
-			'vertical-flow',
-			'zoom-tunnel'
+			'vertical-flow'
 		]);
 	});
 });

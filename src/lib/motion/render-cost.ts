@@ -42,13 +42,10 @@ export const LAYOUT_FRAME_MS: Record<LayoutId, number> = {
   bento: 0,
   marquee: 1300,
   stack: 750,
-  parallax: 900,
   'perspective-wall': 1400,
   'film-strip': 770,
   'split-reveal': 800,
-  'zoom-tunnel': 1080,
   polaroid: 750,
-  globe: 500,
   masonry: 1750,
   slider: 600
 };
