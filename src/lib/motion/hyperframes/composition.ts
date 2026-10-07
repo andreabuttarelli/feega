@@ -1,3 +1,5 @@
+import { LOOK_FIELDS, SOLID_LOOK, cardBox, lookOf, type CardLook } from '../../canvas/composition/card-look';
+import { LAYOUTS } from '../../canvas/composition/index';
 import { instancesOf, poseAt, type PoseInput } from '../../canvas/composition/pose';
 import { MEDIA_FRAGMENT_SHADER, MEDIA_UNIFORMS, MEDIA_VERTEX_SHADER } from '../../canvas/composition/shader';
 import { js } from './html';
@@ -14,12 +16,14 @@ export type CompositionBake = {
   loopFrames: number;
   fps: number;
   frames: number[];
+  looks: number[];
 };
 
 export type TimedBake = CompositionBake & { start: number; length: number };
 
 export const CAMERA_FIELDS = 7;
 export const INSTANCE_FIELDS = 10;
+export { LOOK_FIELDS };
 export const COMPOSITION_READY = 'motion-composition';
 
 const PRECISION = 10000;
@@ -65,7 +69,16 @@ export function bakeComposition(id: string, p: CompositionProps, size: { width: 
     }
   }
 
-  return { id, media, instances, loopFrames, fps: size.fps, frames: frames.map(round) };
+  const cards = p.media.filter((m) => asset(m.assetId));
+  const defaults = Object.fromEntries(LAYOUTS[p.layout].params.map((param) => [param.name, param.default]));
+  const params = { ...defaults, ...p.layoutParams };
+  const marks = LAYOUTS[p.layout].solids?.(instances.length, input.layoutParams) ?? 0;
+  const looks = instances.flatMap((mediaIndex, i): number[] => {
+    const look: CardLook = i >= instances.length - marks ? SOLID_LOOK : lookOf(cards[mediaIndex] ?? {}, params);
+    return [look.aspect, look.fit, look.focusX, look.focusY, look.solid];
+  });
+
+  return { id, media, instances, loopFrames, fps: size.fps, frames: frames.map(round), looks: looks.map(round) };
 }
 
 const STAGE_SCRIPT = `
@@ -83,13 +96,19 @@ function texture(b, m, i, loads) {
     }
     const t = new THREE.Texture();
     t.minFilter = THREE.LinearFilter; t.generateMipmaps = false;
-    return { t, video, frameId: '__render_frame_' + id + '__' };
+    const source = { t, video, frameId: '__render_frame_' + id + '__', aspect: 1 };
+    if (video) {
+      const measure = () => { source.aspect = video.videoWidth / video.videoHeight || 1; };
+      if (video.readyState >= 1) measure(); else video.addEventListener('loadedmetadata', measure, { once: true });
+    }
+    return source;
   }
   const t = new THREE.Texture();
   loads.push(new Promise((resolve) => {
-    new THREE.ImageLoader().setCrossOrigin('anonymous').load(m.url, (image) => { t.image = image; t.needsUpdate = true; resolve(); }, undefined, resolve);
+    new THREE.ImageLoader().setCrossOrigin('anonymous').load(m.url, (image) => { t.image = image; t.needsUpdate = true; source.aspect = image.naturalWidth / image.naturalHeight || 1; resolve(); }, undefined, resolve);
   }));
-  return { t, video: null };
+  const source = { t, video: null, aspect: 1 };
+  return source;
 }
 
 function stage(b) {
@@ -104,17 +123,27 @@ function stage(b) {
   const loads = [];
   const sources = b.media.map((m, i) => texture(b, m, i, loads));
   for (const { t } of sources) { t.colorSpace = THREE.SRGBColorSpace; t.flipY = false; t.premultiplyAlpha = false; }
-  const meshes = b.instances.map((index) => {
+  const meshes = b.instances.map((index, i) => {
+    const look = b.looks.slice(i * LOOK_FIELDS, (i + 1) * LOOK_FIELDS);
     const material = new THREE.ShaderMaterial({
       transparent: true, side: THREE.DoubleSide, depthWrite: true,
-      uniforms: { mediaTexture: { value: sources[index].t }, hasTexture: { value: 0 }, radius: { value: RADIUS }, opacity: { value: 1 } },
+      uniforms: { mediaTexture: { value: sources[index].t }, hasTexture: { value: 0 }, radius: { value: RADIUS }, opacity: { value: 1 }, cardAspect: { value: 1 }, mediaAspect: { value: 1 }, fit: { value: look[1] }, focus: { value: new THREE.Vector2(look[2], look[3]) }, solid: { value: look[4] } },
       vertexShader: VERTEX, fragmentShader: FRAGMENT
     });
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material);
+    mesh.userData = { aspect: look[0], source: sources[index], box: [1, 1] };
     scene.add(mesh);
     return mesh;
   });
-  const ready = Promise.all(loads).then(() => meshes.forEach((mesh) => { mesh.material.uniforms.hasTexture.value = 1; }));
+  const shape = () => meshes.forEach((mesh) => {
+    const media = mesh.userData.source.aspect;
+    const aspect = mesh.userData.aspect > 0 ? mesh.userData.aspect : media;
+    mesh.material.uniforms.mediaAspect.value = media;
+    mesh.material.uniforms.cardAspect.value = mesh.material.uniforms.solid.value > 0.5 ? 1 : aspect;
+    mesh.userData.box = mesh.material.uniforms.solid.value > 0.5 ? [1, 1] : cardBox(aspect);
+  });
+  shape();
+  const ready = Promise.all(loads).then(() => { shape(); meshes.forEach((mesh) => { mesh.material.uniforms.hasTexture.value = 1; }); });
   return { b, renderer, scene, camera, meshes, sources, ready };
 }
 
@@ -143,7 +172,7 @@ function renderAt(time) {
       const k = o + CAMERA_FIELDS + i * INSTANCE_FIELDS;
       mesh.position.set(f[k], f[k + 1], f[k + 2]);
       mesh.rotation.set(f[k + 3], f[k + 4], f[k + 5]);
-      mesh.scale.set(f[k + 6], f[k + 7], f[k + 8]);
+      mesh.scale.set(f[k + 6] * mesh.userData.box[0], f[k + 7] * mesh.userData.box[1], f[k + 8]);
       mesh.material.uniforms.opacity.value = f[k + 9];
     });
     for (const { t, video, frameId } of s.sources) {
@@ -181,6 +210,7 @@ export function compositionScript(bakes: TimedBake[], duration: number): string 
     DURATION: duration,
     CAMERA_FIELDS,
     INSTANCE_FIELDS,
+    LOOK_FIELDS,
     RADIUS: MEDIA_UNIFORMS.radius,
     VERTEX: MEDIA_VERTEX_SHADER,
     FRAGMENT: MEDIA_FRAGMENT_SHADER,
@@ -188,5 +218,5 @@ export function compositionScript(bakes: TimedBake[], duration: number): string 
     VIDEO_READY_MS: VIDEO_READY_TIMEOUT_MS
   };
   const declarations = Object.entries(constants).map(([name, value]) => `const ${name} = ${js(value)};`).join('');
-  return `<script type="module">${declarations}${STAGE_SCRIPT}</script>`;
+  return `<script type="module">${declarations}${cardBox.toString()}${STAGE_SCRIPT}</script>`;
 }

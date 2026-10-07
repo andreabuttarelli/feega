@@ -10,9 +10,16 @@
   import { batchRows, DEFAULT_NAME_PATTERN, MAX_BATCH_ROWS, outputName, parseCsv, sheetCsvUrl, type ColumnMap, type CsvTable } from '$lib/motion/template/batch';
   import { renderQuote } from '$lib/motion/render-quote';
   import { EXPORT_FORMATS, FORMAT, Preset, settingsOf, type RenderSettings } from '$lib/motion/export-formats';
+  import { exportSize, type Capabilities, type ExportScope } from '$lib/motion/export-plan';
+  import { audioPlan } from '$lib/motion/audio-plan';
+  import { capabilities } from '$lib/motion/export/encode';
+  import { renderInBrowser, type FrameSource } from '$lib/motion/export/browser-render';
+  import { saveExport } from '$lib/motion/export/save';
+  import { RenderPlace, renderPlace, thisDevice, type Device } from '$lib/motion/render-place';
 
   type Cell = { row: number; name: string; runId: string; status: string; error: string | null; assetId: string | null };
   type Batch = { id: string; credits: number; rows: Cell[] };
+  type LocalCell = { row: number; name: string; status: string; url: string | null; error: string | null };
 
   let {
     doc,
@@ -22,6 +29,9 @@
     saved,
     batch: initial,
     assetHref,
+    assetUrls,
+    scope,
+    framesFor,
     onchange,
     onpreview,
     onclose
@@ -33,6 +43,9 @@
     saved: boolean;
     batch: Batch | null;
     assetHref: (id: string) => string;
+    assetUrls: Record<string, string>;
+    scope: ExportScope;
+    framesFor: (doc: MotionDoc) => FrameSource;
     onchange: (result: OpResult, summary: string) => void;
     onpreview: (doc: MotionDoc | null) => void;
     onclose: () => void;
@@ -63,6 +76,16 @@
   const rows = $derived(batchRows(table, map));
   const perVideo = $derived(renderQuote(doc, settings.resolution).credits);
   const running = $derived(job !== null && job.rows.some((r) => !SETTLED.has(r.status)));
+
+  let background = $state(false);
+  let caps = $state<Capabilities | null>(null);
+  let device = $state<Device | null>(null);
+  let local = $state<LocalCell[]>([]);
+  let controller: AbortController | null = null;
+  const hasAudio = $derived(audioPlan(doc, assetUrls).length > 0);
+  const place = $derived(caps && device ? renderPlace({ doc, settings, capabilities: caps, device, background, hasAudio }) : null);
+  const inBrowser = $derived(place?.place === RenderPlace.Browser);
+  const localRunning = $derived(local.some((c) => c.status === 'rendering' || c.status === 'waiting'));
 
   function expose() {
     if (!clip) {
@@ -123,7 +146,36 @@
     }
   }
 
+  async function renderHere() {
+    error = '';
+    controller = new AbortController();
+    local = rows.map((values, i) => ({ row: i + 1, name: outputName(pattern, values, i + 1), status: 'waiting', url: null, error: null }));
+    for (const [i, values] of rows.entries()) {
+      const filled = applyValues(doc, values);
+      if (!filled.ok) {
+        local[i] = { ...local[i], status: 'failed', error: filled.error };
+        continue;
+      }
+      local[i] = { ...local[i], status: 'rendering' };
+      const size = exportSize(filled.doc, settings.resolution);
+      try {
+        const blob = await renderInBrowser({ doc: filled.doc, assetUrls, size, withAudio: Boolean(caps?.aac), frames: framesFor(filled.doc), signal: controller.signal, onStage: () => {}, onFrame: () => {}, onPause: () => {} });
+        await saveExport(blob, { scope, editorUrl, size, seconds: filled.doc.durationInFrames / filled.doc.fps });
+        local[i] = { ...local[i], status: 'done', url: URL.createObjectURL(blob) };
+      } catch (e) {
+        if (controller.signal.aborted) {
+          return;
+        }
+        local[i] = { ...local[i], status: 'failed', error: e instanceof Error ? e.message : String(e) };
+      }
+    }
+  }
+
   async function render() {
+    if (inBrowser) {
+      await renderHere();
+      return;
+    }
     error = '';
     const form = new FormData();
     form.set('version', String(version));
@@ -141,7 +193,11 @@
     if (running) {
       timer = setTimeout(poll, POLL_MS);
     }
+    device = thisDevice(navigator);
+    void capabilities(doc).then((c) => (caps = c));
     return () => {
+      controller?.abort();
+      local.forEach((c) => c.url && URL.revokeObjectURL(c.url));
       if (timer) {
         clearTimeout(timer);
       }
@@ -213,16 +269,36 @@
           <dd><select bind:value={settings.format}>{#each EXPORT_FORMATS as f (f)}<option value={f}>{FORMAT[f].label}</option>{/each}</select></dd>
           <dt>Preview</dt>
           <dd><input type="number" min="1" max={rows.length} bind:value={previewRow} /> <button type="button" onclick={preview} data-testid="batch-preview">Preview row</button> <button type="button" onclick={() => onpreview(null)}>Template</button></dd>
+          <dt>Where</dt>
+          <dd><label><input type="checkbox" bind:checked={background} data-testid="batch-background" /> Render in the background: you can close this tab</label></dd>
           <dt>Cost</dt>
-          <dd data-testid="batch-quote">{rows.length} videos × ~{perVideo} = about {rows.length * perVideo} credits, each paid by the time it really takes when it is ready.</dd>
+          {#if inBrowser}
+            <dd data-testid="batch-quote">Free: {rows.length} videos render one after another in this tab. Keep it open.</dd>
+          {:else}
+            <dd data-testid="batch-quote">{#if place?.place === RenderPlace.Farm}{place.message} {/if}{rows.length} videos × ~{perVideo} = about {rows.length * perVideo} credits, each paid by the time it really takes when it is ready.</dd>
+          {/if}
         </dl>
         {#if rows.length > MAX_BATCH_ROWS}<p class="warn">At most {MAX_BATCH_ROWS} rows per batch.</p>{/if}
-        <button type="button" class="primary" onclick={render} disabled={!saved || running || !rows.length || rows.length > MAX_BATCH_ROWS} data-testid="batch-render">{saved ? `Render ${rows.length} videos · ${rows.length * perVideo} credits` : 'Saving your changes…'}</button>
+        <button type="button" class="primary" onclick={render} disabled={!saved || !place || running || localRunning || !rows.length || rows.length > MAX_BATCH_ROWS} data-testid="batch-render">{!saved ? 'Saving your changes…' : inBrowser ? `Render ${rows.length} videos here · free` : `Render ${rows.length} videos · ${rows.length * perVideo} credits`}</button>
       {/if}
     </section>
   {/if}
 
   {#if error}<p class="warn" role="alert">{error}</p>{/if}
+
+  {#if local.length}
+    <section data-testid="batch-local">
+      <h3>In this tab · {local.filter((c) => c.status === 'done').length}/{local.length} done</h3>
+      <div class="grid">
+        {#each local as c (c.row)}
+          <div class={`cell ${c.status}`} title={c.error ?? c.status}>
+            <span>{c.row}. {c.name}</span>
+            {#if c.url}<a href={c.url} download={`${c.name}.mp4`}><Download size={12} /></a>{:else}<span class="muted">{c.error ? 'failed' : c.status}</span>{/if}
+          </div>
+        {/each}
+      </div>
+    </section>
+  {/if}
 
   {#if job}
     <section data-testid="batch-grid">

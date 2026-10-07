@@ -5,7 +5,7 @@ import type { MotionDoc } from './doc';
 import { EffectKind } from './effects/registry';
 import { JunctionKind } from './junction-model';
 import { EASE_BEZIER, type Bezier, type Keyframe } from './keyframes';
-import { DEFAULT_STYLE, MotionStyle } from './style-model';
+import { DEFAULT_STYLE, MotionStyle, STYLE_EASES, type StyleEases } from './style-model';
 
 export enum Forbidden {
   Particles = 'particles',
@@ -26,7 +26,7 @@ export enum Forbidden {
 
 export type StyleSpec = {
   label: string;
-  eases: { enter: Bezier; move: Bezier };
+  eases: StyleEases;
   seconds: { enter: [min: number, max: number]; stagger: number; exit: number; still: number; scene: [min: number, max: number] };
   movement: { rise: number; settle: number; blur: number; pushIn: number; turn: number };
   type: { family: string; weights: { display: number; text: number }; sizes: { hero: number; line: number; small: number } };
@@ -63,7 +63,7 @@ const CALM: readonly Forbidden[] = [Forbidden.Particles, Forbidden.Glow, Forbidd
 export const STYLES: Record<MotionStyle, StyleSpec> = {
   [MotionStyle.LaunchFilm]: {
     label: 'Launch film',
-    eases: { enter: [0.16, 1, 0.3, 1], move: [0.83, 0, 0.17, 1] },
+    eases: STYLE_EASES[MotionStyle.LaunchFilm],
     seconds: { enter: [0.2, 0.35], stagger: 0.06, exit: 0.2, still: 0.5, scene: [0.8, 2.5] },
     movement: { rise: 0.12, settle: 0.7, blur: 18, pushIn: 1.25, turn: 100 },
     type: { family: 'Inter', weights: { display: 800, text: 500 }, sizes: { hero: 0.26, line: 0.12, small: 0.026 } },
@@ -93,7 +93,7 @@ export const STYLES: Record<MotionStyle, StyleSpec> = {
   },
   [MotionStyle.AppleMinimal]: {
     label: 'Apple minimal',
-    eases: { enter: [0.16, 1, 0.3, 1], move: [0.65, 0, 0.35, 1] },
+    eases: STYLE_EASES[MotionStyle.AppleMinimal],
     seconds: { enter: [0.3, 0.5], stagger: 0.1, exit: 0.4, still: 1, scene: [2, 4] },
     movement: { rise: 0.02, settle: 0.97, blur: 6, pushIn: 1.05, turn: 14 },
     type: { family: 'Inter', weights: { display: 600, text: 400 }, sizes: { hero: 0.15, line: 0.075, small: 0.026 } },

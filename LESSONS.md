@@ -4,6 +4,18 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 ## Motion editor
 
+### `hardwareAcceleration: 'prefer-hardware'` rompe l'export dove l'encoder è software
+Chromium headless (e i dispositivi senza encoder H.264 in hardware) rifiuta la configurazione
+con `This specific encoder configuration (avc1…, hardware acceleration: prefer-hardware) is not
+supported`, mentre `canEncodeVideo` senza preferenza diceva sì. Segnale: export nel browser
+fallito al primo frame. Mossa: nessuna preferenza; il browser sceglie già l'hardware quando c'è.
+
+### Una rotta pubblica a token non ha un client utente: `motionAssets` esplode
+`signAssetPaths` esige un client marcato RLS come prova di appartenenza: col client service role
+di una rotta `/render/[token]` lancia, e i test della rotta, che mockano `motionAssets`, restano
+verdi. Segnale: 500 sulla pagina, nel log `signAssetPaths richiede un client utente scoped RLS`.
+Mossa: il token è la prova; passa un `sign` dedicato (`AssetSigner`) come fa `signSharedMedia`.
+
 ### Un dev server qualunque chiude i render degli altri
 `npm run dev` faceva partire `devCrons`, che chiama ogni minuto le cron di `vercel.json`
 (`/api/v1/canvas/runs/tick` compreso) con il codice del checkout locale e il `.env` puntato sul DB
@@ -2563,3 +2575,6 @@ Segnale: un numero o una parola keyframati su `y`/`x` spariscono o finiscono al 
 
 ## Un titolo in un video lascia un frame vuoto o lettere a metà
 Segnale: contact sheet con un frame nero o parole tagliate a metà altezza all'ingresso di un Title. Causa: Title ha un suo ingresso a maschera di riga (yPercent), che si somma ai keyframe. Mossa: per testo con keyframe propri usare Text, che entra senza maschera.
+
+## Build CPU alto con poche build di produzione
+Segnale: `Build CPU Minutes` per progetto (`/v1/billing/charges`, tag `ProjectName`) sproporzionato rispetto ai deploy di produzione; `/v6/deployments?target=preview` pieno di `READY`. Ogni build si paga a minuto intero per vCPU (`standard` = 4). Un ignore command scritto in dashboard non sta nel repo e un secondo progetto non lo eredita. Mossa: `ignoreCommand` in `vercel.json` (`scripts/vercel-ignore.sh`, exit 0 = salta), preview solo con `[preview]` nel messaggio dell'ultimo commit.

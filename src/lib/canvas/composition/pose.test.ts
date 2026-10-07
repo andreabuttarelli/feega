@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { cameraAt } from './camera';
-import { fitViewport } from './explorer-grid';
 import { LAYOUTS, instanceCountFor, mediaIndexFor } from './index';
-import { closedExpoPhase, closedExpoProgress } from './motion';
+import { MOTION_TIME } from './motion';
 import { instancesOf, poseAt, type PoseInput } from './pose';
 import type { LayoutId } from './types';
 
@@ -18,8 +17,8 @@ describe('poseAt', () => {
 		it(`${layout} poses media the way the canvas scene always did`, () => {
 			const input = inputFor(layout);
 			for (const t of SAMPLES) {
-				const motionTime = LAYOUTS[layout].motion === 'cycle' ? closedExpoPhase(t, 6) : closedExpoProgress(t, 6);
-				const params = layout === 'explorer-grid' ? fitViewport({}, cameraAt('slow-orbit', {}, 0), PORTRAIT).params : {};
+				const motionTime = MOTION_TIME[LAYOUTS[layout].motion](t, 6);
+				const params = LAYOUTS[layout].fit?.({}, cameraAt('slow-orbit', {}, 0), PORTRAIT) ?? {};
 				const count = instanceCountFor(layout, 3, params);
 				const expected = LAYOUTS[layout].transforms(count, params, motionTime);
 				const camera = cameraAt('slow-orbit', {}, LAYOUTS[layout].camera === 'fixed' ? 0 : motionTime);

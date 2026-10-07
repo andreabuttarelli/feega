@@ -1,7 +1,6 @@
 import { cameraAt, type CameraPresetId, type CameraState } from './camera';
-import { fitViewport } from './explorer-grid';
 import { instanceCountFor, LAYOUTS, mediaIndexFor } from './index';
-import { closedExpoPhase, closedExpoProgress } from './motion';
+import { MOTION_TIME } from './motion';
 import type { LayoutId, LayoutParams, Transform } from './types';
 
 export type PoseInput = {
@@ -19,10 +18,8 @@ export type Pose = { transforms: Transform[]; camera: CameraState };
 type FitInput = Pick<PoseInput, 'layout' | 'layoutParams' | 'camera' | 'cameraParams' | 'aspect'>;
 
 export function activeParams(input: FitInput): LayoutParams {
-	if (input.layout !== 'explorer-grid') {
-		return input.layoutParams;
-	}
-	return fitViewport(input.layoutParams, cameraAt(input.camera, input.cameraParams, 0), input.aspect).params;
+	const fit = LAYOUTS[input.layout].fit;
+	return fit ? fit(input.layoutParams, cameraAt(input.camera, input.cameraParams, 0), input.aspect) : input.layoutParams;
 }
 
 export function instancesOf(input: PoseInput): number[] {
@@ -33,7 +30,7 @@ export function instancesOf(input: PoseInput): number[] {
 
 export function poseAt(input: PoseInput, t: number, count = instancesOf(input).length): Pose {
 	const layout = LAYOUTS[input.layout];
-	const motionTime = layout.motion === 'cycle' ? closedExpoPhase(t, input.duration) : closedExpoProgress(t, input.duration);
+	const motionTime = MOTION_TIME[layout.motion](t, input.duration);
 	const cameraTime = layout.camera === 'fixed' ? 0 : motionTime;
 
 	return {

@@ -105,6 +105,7 @@ export type MotionToolDeps = {
   check: (callId: string, doc: MotionDoc, name: string) => Promise<CheckResult | null>;
   analysis?: (assetId: string) => Promise<AudioAnalysis | null>;
   batch?: (input: { doc: MotionDoc; rows: { name: string; values: Record<string, string> }[] }) => Promise<Record<string, unknown>>;
+  renderLink?: () => Promise<Record<string, unknown>>;
   templates?: TemplateLibrary;
   site?: (url: string) => Promise<SourceRead>;
   brand?: (name?: string) => Promise<SourceRead>;
@@ -1117,6 +1118,13 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         }
         return deps.batch({ doc: session.doc, rows });
       }
+    }),
+
+    render_video: tool({
+      description:
+        'Render the saved video to an MP4 for free on the user\'s own device. Returns render_url: give it to the user as a markdown link titled "Render on this device"; they open it (on this or another device), it renders there and lands in the project assets. The link works once and expires in 30 minutes. The saved video is rendered, so edits of this turn must be saved first.',
+      inputSchema: z.object({}).strict(),
+      execute: async () => (deps.renderLink ? deps.renderLink() : { ok: false, error: 'rendering is not available here' })
     }),
 
     set_style: tool({

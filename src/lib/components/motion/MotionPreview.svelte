@@ -196,8 +196,8 @@
     });
   }
 
-  export function render(times: number[], size: FrameSize, onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>, signal: AbortSignal): Promise<void> {
-    return borrowed(html, async () => {
+  export function render(times: number[], size: FrameSize, onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>, signal: AbortSignal, source: string = html): Promise<void> {
+    return borrowed(source, async () => {
       for (const [index, time] of times.entries()) {
         signal.throwIfAborted();
         const reply = await shoot(time, { format: FrameFormat.Bitmap, ...size });

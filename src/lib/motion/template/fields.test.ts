@@ -122,6 +122,20 @@ describe('typed fields', () => {
     ]);
   });
 
+  it('a media list item can carry its own card ratio and fit after @', () => {
+    const added = addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Composition', from: 0, durationInFrames: 60 }, 'grid');
+    const exposed = added.ok ? exposeField(added.doc, { key: 'media', label: 'Media', type: FieldType.MediaList, clipId: 'grid', prop: 'media' }) : added;
+    const filled = exposed.ok ? applyValues(exposed.doc, { media: 'a1@4:5, video:v1@16:9/contain, a2@1.3, a3@original' }) : exposed;
+
+    expect(filled.ok && fieldValues(filled.doc)[0].value).toEqual([
+      { assetId: 'a1', kind: 'image', aspect: '4:5' },
+      { assetId: 'v1', kind: 'video', aspect: '16:9', fit: 'contain' },
+      { assetId: 'a2', kind: 'image', aspect: 'free', ratio: 1.3 },
+      { assetId: 'a3', kind: 'image', aspect: 'original' }
+    ]);
+    expect(exposed.ok && applyValues(exposed.doc, { media: 'a1@7:2' }).ok).toBe(false);
+  });
+
   it('a number field refuses a value outside its range', () => {
     const exposed = exposeField(withTitle(), { ...headline, key: 'size', type: FieldType.Number, prop: 'size', min: 0.02, max: 0.2 });
 

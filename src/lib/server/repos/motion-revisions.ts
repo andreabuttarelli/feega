@@ -44,6 +44,21 @@ export async function readHead(db: Db, input: { orgId: string; nodeId: string })
   return data ? headOf(data as RevisionRow) : null;
 }
 
+export async function readRevision(db: Db, input: { orgId: string; nodeId: string; version: number }): Promise<MotionHead | null> {
+  const { data, error } = await db
+    .from('motion_revisions')
+    .select('version, doc, summary, actor_kind')
+    .eq('org_id', input.orgId)
+    .eq('node_id', input.nodeId)
+    .eq('version', input.version)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+  return data ? headOf(data as RevisionRow) : null;
+}
+
 export async function appendRevision(
   db: Db,
   input: { orgId: string; nodeId: string; expectedVersion: number; doc: unknown; actor: Actor; summary?: string | null }

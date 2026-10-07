@@ -11,6 +11,22 @@ export function closedExpoProgress(t: number, duration: number): number {
 	return easeInOutExpo(leg);
 }
 
+export function loopPhase(t: number, duration: number): number {
+	if (duration <= 0) {
+		return 0;
+	}
+
+	return ((t % duration) + duration) % duration / duration;
+}
+
+export type Motion = 'cycle' | 'ping-pong' | 'linear';
+
+export const MOTION_TIME: Record<Motion, (t: number, duration: number) => number> = {
+	cycle: (t, duration) => closedExpoPhase(t, duration),
+	'ping-pong': (t, duration) => closedExpoProgress(t, duration),
+	linear: (t, duration) => loopPhase(t, duration)
+};
+
 export function closedExpoPhase(t: number, duration: number): number {
 	if (duration <= 0) {
 		return 0;
@@ -20,7 +36,7 @@ export function closedExpoPhase(t: number, duration: number): number {
 	return easeInOutExpo(phase);
 }
 
-function easeInOutExpo(value: number): number {
+export function easeInOutExpo(value: number): number {
 	if (value <= 0 || value >= 1) {
 		return value;
 	}

@@ -103,7 +103,7 @@ program
     await cmdMedia(opts);
   });
 
-const motion = program.command('motion').description('Motion videos: ask the editor agent to change one');
+const motion = program.command('motion').description('Motion videos: ask the editor agent to change one, render one');
 
 motion
   .command('ask <nodeId> <prompt>')
@@ -122,6 +122,27 @@ motion
   .action(async (runId: string, opts) => {
     const { cmdMotionRun } = await import('./commands/motion.ts');
     await cmdMotionRun(runId, opts);
+  });
+
+motion
+  .command('render <nodeId>')
+  .description('Render a video: a free link that renders in your browser, or --server (spends credits)')
+  .option('--server', 'Render on our servers instead (spends credits)')
+  .option('--resolution <r>', '720p, 1080p, 1440p or 2160p')
+  .option('--format <f>', 'With --server: mp4-h264, mp4-h265, prores-422hq, prores-4444, webm-alpha, png-sequence, gif')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (nodeId: string, opts) => {
+    const { cmdMotionRender } = await import('./commands/motion.ts');
+    await cmdMotionRender(nodeId, opts);
+  });
+
+motion
+  .command('render-status <runId>')
+  .description('State of a render and the link to its file')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (runId: string, opts) => {
+    const { cmdMotionRenderState } = await import('./commands/motion.ts');
+    await cmdMotionRenderState(runId, opts);
   });
 
 program

@@ -42,6 +42,38 @@ export function registerMotionTools(server: McpServer) {
   );
 
   server.registerTool(
+    'render_video',
+    {
+      title: 'Render a motion video',
+      description:
+        'Render the saved revision of a motion video to MP4. Default `mode: "browser"`: free, returns a `render_url` — a one-time link ' +
+        '(expires in 30 minutes, bound to this revision) the user opens on any device; it renders in their browser and saves the file ' +
+        'to the project. Show the link to the user. `mode: "server"` renders on our machines instead: spends credits, use it only when ' +
+        'the user cannot open a browser or needs ProRes, HEVC, WebM, GIF, PNG or 4K. Poll `get_render` with the `run_id` for the file.',
+      inputSchema: z.object({
+        org,
+        node_id: z.string(),
+        mode: z.enum(['browser', 'server']).optional(),
+        resolution: z.enum(['720p', '1080p', '1440p', '2160p']).optional(),
+        format: z.string().optional().describe('server only: mp4-h264, mp4-h265, prores-422hq, prores-4444, webm-alpha, png-sequence, gif')
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false }
+    },
+    async ({ org, node_id, mode, resolution, format }) => withAuth((token) => motionApi.render(token, node_id, { mode, resolution, format }, org))
+  );
+
+  server.registerTool(
+    'get_render',
+    {
+      title: 'Read a render',
+      description: 'State of a `render_video` run: `status` (running, done, failed, expired), `mode`, and when done `asset_id` and a signed `file_url` valid one hour. Reads only.',
+      inputSchema: z.object({ org, run_id: z.string() }),
+      annotations: { readOnlyHint: true }
+    },
+    async ({ org, run_id }) => withAuth((token) => motionApi.renderState(token, run_id, org))
+  );
+
+  server.registerTool(
     'get_motion_summary',
     {
       title: 'Read a motion video',
