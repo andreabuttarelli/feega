@@ -28,6 +28,7 @@ type Rule = { unit: Unit; basis: Basis; reach?: Reach; transform?: true };
 
 const ONE_FRAME: Reach = [-1, 1];
 const UP_TO_FRAME: Reach = [0, 1];
+const PAST_EDGES: Reach = [-0.5, 1.5];
 const UP_TO_TWO_FRAMES: Reach = [0, 2];
 const SCALE_REACH: Reach = [0, 4];
 const MIRROR_SCALE_REACH: Reach = [-4, 4];
@@ -113,6 +114,11 @@ export const PROPERTY_UNITS: Readonly<Record<string, Rule>> = {
   cornerRadius: px(Basis.Same),
   cameraDistance: px(Basis.Same),
   cameraHeight: px(Basis.Height, ONE_FRAME),
+  centerX: px(Basis.Width, PAST_EDGES),
+  centerY: px(Basis.Height, PAST_EDGES),
+  diameter: px(Basis.Short),
+  frost: px(Basis.Same),
+  rim: px(Basis.Same),
   restitution: percent(),
   friction: percent()
 };

@@ -11,6 +11,7 @@ import type { LayoutId } from '../canvas/composition/types';
 import { EMITTERS, Emitter, PARTICLE_COLOURS, PARTICLE_COLOUR_KEYS, PARTICLE_NUMBERS, PARTICLE_NUMBER_KEYS, PARTICLE_SHAPES, ParticleSection, ParticleShape, SEED } from './particles/model';
 import { CELL_FITS, CELL_TIMINGS } from './bento/model';
 import { BENTO_GRID } from '../canvas/composition/bento';
+import { GLASS_NUMBERS, GLASS_NUMBER_KEYS, GLASS_TINT, GlassSection } from './glass/model';
 import { CAPS, FILL_KINDS, FILL_RULES, FillKind, JOINS, MAX_MODIFIERS, MAX_MORPHS, SHAPE_KINDS, STROKE_KINDS, ShapeKind, StrokeKind, modifierSchema, pathString } from './shape/schema';
 
 export enum Control {
@@ -204,6 +205,19 @@ const particleNumbers = Object.fromEntries(
   PARTICLE_NUMBER_KEYS.map((key) => {
     const p = PARTICLE_NUMBERS[key];
     return [key, range(p.min, p.max, p.step, p.fallback, p.label, PARTICLE_GROUP[p.section])];
+  })
+);
+
+const GLASS_GROUP: Record<GlassSection, Group> = {
+  [GlassSection.Layout]: Group.Layout,
+  [GlassSection.Look]: Group.Style,
+  [GlassSection.Motion]: Group.Motion
+};
+
+const glassNumbers = Object.fromEntries(
+  GLASS_NUMBER_KEYS.map((key) => {
+    const g = GLASS_NUMBERS[key];
+    return [key, range(g.min, g.max, g.step, g.fallback, g.label, GLASS_GROUP[g.section])];
   })
 );
 
@@ -469,6 +483,13 @@ export const COMPONENTS = {
         ...particleColours
       })
       .strict()
+  },
+  LiquidGlass: {
+    label: 'Liquid glass',
+    description: 'A drop of liquid glass over everything on the tracks below it: it magnifies and bends what it covers like a lens (strongest at its rim), frosts it with a blur, and draws a lit rim and a specular highlight. centerX/centerY/diameter place it, refraction 0..1 sets the lens strength, frost the blur, presence 0..1 fades the whole effect in or out, wobble and wobbleSpeed make the outline breathe. Every number and the tint take set_keyframes and set_expression (spring() for a soft move).',
+    track: TrackKind.Visual,
+    durationInFrames: seconds(4),
+    schema: z.object({ ...glassNumbers, [GLASS_TINT.key]: color(GLASS_TINT.fallback, GLASS_TINT.label) }).strict()
   },
   Precomp: {
     label: 'Precomp',

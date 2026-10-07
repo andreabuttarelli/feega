@@ -76,6 +76,8 @@ import { SHAPE_KINDS, StrokeKind, modifierKey } from '$lib/motion/shape/schema';
 import { PRESET as SHAPE_PRESET, SHAPE_PRESETS, applyShapePreset } from '$lib/motion/shape/presets';
 import { MAX_RATE, MIN_RATE, REMAP_KEY, clearTimeRemap, freezeFrame } from '$lib/motion/time-remap';
 import { PARTICLE_PRESETS, PRESET_PROPS as PARTICLE_PRESET, applyParticlePreset } from '$lib/motion/particles/presets';
+import { addLiquidGlass } from '$lib/motion/glass/ops';
+import { SPRINGS } from '$lib/motion/spring';
 import { DUCK_DEFAULTS, duckUnder } from '$lib/motion/duck';
 import type { AudioAnalysis } from '$lib/motion/audio-analysis';
 import { Division, Hit, cutToBeat, hitFrames, markHits } from '$lib/motion/beats';
@@ -824,6 +826,42 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: `Restyle a Particles clip with a preset (${PARTICLE_PRESETS.join(', ')}); its seed and keyframes are kept.`,
       inputSchema: z.object({ clip_id: z.string(), preset: z.enum(PARTICLE_PRESETS) }),
       execute: async (input) => apply(applyParticlePreset(session.doc, input.clip_id, input.preset), `${input.preset} particles on ${input.clip_id}`)
+    }),
+
+    add_liquid_glass: tool({
+      description: `Add a drop of liquid glass on a new top track: a lens over everything below it that magnifies and bends what it covers (strongest at its rim), frosts it with a blur, and draws a lit rim and a specular highlight. All in px of the frame: x/y place its centre, diameter its size. path glides it on a spring through stops ({time in seconds from the clip start, x, y}; it holds each stop until the next one's time), spring ${Object.keys(SPRINGS).join('|')} (soft by default; stiffness and damping override it: lower damping overshoots like a liquid). refraction 0..1 is the lens strength, frost the blur in px, rim the lit edge in px, tint and tint_amount colour it, wobble 0..0.2 and wobble_speed (Hz) make the outline breathe, fade_in/fade_out seconds fade the whole effect. Everything takes set_keyframes and set_expression afterwards (centerX, centerY, diameter, presence, refraction, frost, rim, tint, tintAmount, wobble, wobbleSpeed). Returns the clip id.`,
+      inputSchema: z.object({
+        start: z.number().min(0),
+        duration: z.number().positive(),
+        x: z.number().optional(),
+        y: z.number().optional(),
+        diameter: z.number().positive().optional(),
+        path: z.array(z.object({ time: z.number().min(0), x: z.number(), y: z.number() })).max(12).optional(),
+        spring: z.enum(Object.keys(SPRINGS) as [keyof typeof SPRINGS, ...(keyof typeof SPRINGS)[]]).optional(),
+        stiffness: z.number().positive().max(2000).optional(),
+        damping: z.number().positive().max(200).optional(),
+        refraction: z.number().min(0).max(1).optional(),
+        frost: z.number().min(0).max(40).optional(),
+        rim: z.number().min(0).max(12).optional(),
+        tint: z.string().optional(),
+        tint_amount: z.number().min(0).max(1).optional(),
+        wobble: z.number().min(0).max(0.2).optional(),
+        wobble_speed: z.number().min(0).max(4).optional(),
+        fade_in: z.number().min(0).optional(),
+        fade_out: z.number().min(0).optional()
+      }),
+      execute: async (input) => {
+        const late = (input.path ?? []).find((s) => s.time > input.duration);
+        if (late) {
+          return { ok: false, error: `path stop at time ${late.time} is after the clip ends (${input.duration} s): times are seconds from the clip start` };
+        }
+        const given = { centerX: input.x, centerY: input.y, diameter: input.diameter, refraction: input.refraction, frost: input.frost, rim: input.rim, tint: input.tint, tintAmount: input.tint_amount, wobble: input.wobble, wobbleSpeed: input.wobble_speed };
+        const props = propsIn('LiquidGlass', Object.fromEntries(Object.entries(given).filter(([, v]) => v !== undefined)));
+        const path = (input.path ?? []).map((s) => ({ time: s.time, x: s.x / session.doc.width, y: s.y / session.doc.height }));
+        const id = deps.newId();
+        const glass = { from: frames(input.start), durationInFrames: frames(input.duration), props, path, spring: { ...SPRINGS[input.spring ?? 'soft'], ...(input.stiffness ? { stiffness: input.stiffness } : {}), ...(input.damping ? { damping: input.damping } : {}) }, fadeIn: frames(input.fade_in ?? 0), fadeOut: frames(input.fade_out ?? 0) };
+        return created(apply(addLiquidGlass(session.doc, glass, { clip: id, track: deps.newId() }), 'added liquid glass'), id);
+      }
     }),
 
     set_time_remap: tool({

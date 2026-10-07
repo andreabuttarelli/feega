@@ -12,6 +12,7 @@ import { deviceRuntime } from './device-runtime';
 import { screenBake, screenHtml, type ScreenBake, type ScreenInput } from './device-screen';
 import { screenCompOf, screenFrames } from '../device-screen';
 import { ringBake, ringHtml, ringScript } from './ring';
+import { glassLayer, glassTimeline } from './glass';
 import { RING_LAYOUT } from '../ring/model';
 import { bentoBake, bentoHtml, bentoScript } from './bento';
 import { BENTO_LAYOUT, cellFrames } from '../bento/model';
@@ -287,6 +288,11 @@ const GROUPS: Partial<Record<ComponentId, GroupSpec>> = {
       return clipHtml(clip, ctx, placed, TEMPLATES.Device3D.html(ctx as TemplateCtx<'Device3D'>) + (screen ? screenHtml(screen, content) : ''));
     },
     effects: (clip, ctx) => effectTimeline(clip, ctx, ctx.color, paintArea(clip.component, ctx.p as never, ctx, null))
+  },
+  LiquidGlass: {
+    firstLayer: () => 0,
+    html: (clip, ctx, placed, content) => glassLayer(clip, ctx, content, placed.layer),
+    effects: (clip, ctx) => glassTimeline(clip, ctx)
   },
   Adjustment: {
     firstLayer: () => 0,

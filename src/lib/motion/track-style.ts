@@ -63,6 +63,7 @@ const COMPONENT_FAMILY: Record<ComponentId, ClipFamily> = {
   Null: ClipFamily.Null,
   Particles: ClipFamily.Shape,
   Precomp: ClipFamily.Precomp,
+  LiquidGlass: ClipFamily.Adjustment,
   Adjustment: ClipFamily.Adjustment,
   Custom: ClipFamily.Custom
 };
