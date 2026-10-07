@@ -3,9 +3,12 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { AGENT_MAX_DURATION_S } from '../src/lib/server/brand-agent/limits';
 
+const DEEP_MAX_DURATION_S = 1800;
+
 const ROUTES_DIR = 'src/routes';
 const ROUTE_CONFIG = /export const config = \{ maxDuration: ([A-Z_0-9]+) \}/;
-const NAMED_DURATIONS: Record<string, number> = { AGENT_MAX_DURATION_S };
+const NAMED_DURATIONS: Record<string, number> = { AGENT_MAX_DURATION_S, DEEP_MAX_DURATION_S };
+const LONG_JOB_ROUTES = ['src/routes/api/v1/projects/[projectId]/motion/[nodeId]/agent/deep/+server.ts', 'src/routes/api/v1/motion/deep/resume/+server.ts'];
 
 function routeFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -40,7 +43,12 @@ describe('one Vercel function for the whole app', () => {
 
   it('keeps every route config equal to the adapter default: each distinct value emits another full function', () => {
     const fallback = adapterMaxDuration();
-    const outliers = declaredDurations().filter((route) => route.seconds !== fallback);
+    const outliers = declaredDurations().filter((route) => route.seconds !== fallback && !LONG_JOB_ROUTES.includes(route.path));
     expect(outliers).toEqual([]);
+  });
+
+  it('gives the Deep motion routes one shared 30-minute function, and nothing else', () => {
+    const long = declaredDurations().filter((route) => route.seconds === DEEP_MAX_DURATION_S);
+    expect(long.map((route) => route.path).sort()).toEqual([...LONG_JOB_ROUTES].sort());
   });
 });

@@ -17,6 +17,7 @@ import { configuredVoiceDeps } from '$lib/server/voices/voices-config';
 import { sweepVoices } from '$lib/server/voices/custom-voices';
 import { reconcileRenders } from '$lib/server/motion/render-run';
 import { motionRenderFarm, motionRenderStorage } from '$lib/server/motion/renderer';
+import { resumeStaleDeep } from '$lib/server/motion/deep/resume';
 
 const USE = SERVICE_ROLE_USES.find((u) => u.path.startsWith('src/routes/api/v1/canvas/runs/tick'))!;
 
@@ -75,6 +76,11 @@ export const GET: RequestHandler = async ({ request }) => {
       })
     : { checked: 0, done: 0, failed: 0, pending: 0, reaped: 0 };
 
+  const deep = await resumeStaleDeep(db, new URL(request.url).origin).catch((e) => {
+    console.error('[canvas runs] deep resume failed', e);
+    return 0;
+  });
+
   const purge = await purgeProviderCopies(db, configuredPurgers()).catch((e) => {
     console.error('[canvas runs] provider purge failed', e);
     return { purged: 0, waiting: 0, failed: 0 };
@@ -129,7 +135,7 @@ export const GET: RequestHandler = async ({ request }) => {
       })
     : null;
 
-  return json({ ...runs, videos, audios, wiro, renders, purge, loops, workflows, studio, events, seats, reports, voices });
+  return json({ ...runs, videos, audios, wiro, renders, deep, purge, loops, workflows, studio, events, seats, reports, voices });
 };
 
 export const POST = GET;

@@ -53,6 +53,10 @@ export async function signAssetPaths(
     throw new Error('signAssetPaths richiede un client utente scoped RLS come prova di appartenenza');
   }
 
+  return signJobAssetPaths(serviceDb, paths, ttlSeconds, preset);
+}
+
+export async function signJobAssetPaths(serviceDb: Db, paths: { generated: string[]; uploaded: string[] }, ttlSeconds?: number, preset?: ThumbnailPreset): Promise<Map<string, string>> {
   const [rendered, uploaded] = await Promise.all([
     signKnowledgePaths(serviceDb as never, paths.generated, ttlSeconds ?? SIGNED_URL_TTL_S.canvas, preset),
     signAssetFiles(serviceDb, paths.uploaded, ttlSeconds ?? SIGNED_URL_TTL_S.canvas, preset)

@@ -14,23 +14,15 @@ import { agentStopWhen } from '$lib/server/project-agent/limits';
 import { screenModelInput } from '$lib/server/moderation/model-input';
 import { ModerationProfile } from '$lib/server/moderation/profiles';
 import { blockedPrompt } from '$lib/server/moderation/blocked-response';
-import { assetUrls, headOrNew, motionAssets, motionTokens, saveMotionDoc } from '$lib/server/motion/editor';
-import { createMotionTools, selectionNote, type MotionSession } from '$lib/server/motion/motion-tools';
-import { templateLibrary } from '$lib/server/motion/templates';
-import { analyzeSounds, storageAnalysis } from '$lib/server/motion/audio-analysis';
+import { headOrNew, motionAssets, motionTokens, saveMotionDoc } from '$lib/server/motion/editor';
+import { selectionNote, type MotionSession } from '$lib/server/motion/motion-tools';
+import { workspaceTools } from '$lib/server/motion/workspace';
 import { motionAgentPrompt } from '$lib/server/motion/motion-prompt';
-import { speakVoiceover } from '$lib/server/motion/voiceover';
 import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
-import { brandSources } from '$lib/server/motion/brand-sources';
 import { SELF_CHECK_MAX_STEPS, SUMMARY_PROMPT, VIEW_FRAMES, Vision, docTexts, keyFrameTimes, selfCheckDue, selfCheckPrompt, usageByModel, visionStep } from '$lib/server/motion/frames';
-import { frameStats } from '$lib/server/motion/frame-stats';
 import { awaitFrames, awaitVerdict, framesPrefix, FRAME_POLL_MS, type FrameBucket } from '$lib/server/motion/frame-store';
-import { CANVAS_ASSET_BUCKET, SIGNED_URL_TTL_S } from '$lib/server/repos/asset-storage';
+import { CANVAS_ASSET_BUCKET } from '$lib/server/repos/asset-storage';
 import { ASSETS_ADDED, CHECK_REQUEST, FRAMES_REQUEST, type CheckRequest, type FramesRequest } from '$lib/motion/frames-request';
-import { rowRequests } from '$lib/server/motion/batch-input';
-import { startBatch } from '$lib/server/motion/render-run';
-import { motionRenderFarm, motionRenderStorage } from '$lib/server/motion/renderer';
-import { Preset, settingsOf } from '$lib/motion/export-formats';
 import type { CanvasNodeRecord } from '$lib/server/repos/canvas';
 import type { MotionNode } from '$lib/canvas/motion-node';
 
@@ -136,46 +128,33 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
   let askPreview: (request: FramesRequest) => void = () => {};
   let askCheck: (request: CheckRequest) => void = () => {};
 
-  const tools = createMotionTools({
-    session,
-    assets,
-    newId: () => crypto.randomUUID().slice(0, 8),
-    templates: templateLibrary(db, { orgId, actor: { kind: 'agent', id: userId, agentKey: MOTION_AGENT_KEY } }),
-    ...brandSources(db, { orgId, projectId: project.id, canvasId: motion.record.canvasId, brandId: project.brandId }),
-    analysis: async (assetId) => (await analyzeSounds(storageAnalysis(db), { orgId, projectId: project.id }, assets, [assetId]))[assetId] ?? null,
-    voiceover: (voice) => withOrgContext(orgId, () => speakVoiceover(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, actor }, voice)),
-    frames: async (callId, times) => {
-      BROWSER_DRAWS[browser]();
-      const review = await screenModelInput(db, { profile: ModerationProfile.Standard, texts: docTexts(session.doc), scope: moderationScope });
-      if (!review.ok) {
-        throw new Error(`frames withheld by the safety review: ${review.error}`);
+  const tools = workspaceTools(
+    { db, userId, orgId, project, record: motion.record, actor, agentKey: MOTION_AGENT_KEY },
+    {
+      head,
+      tokens,
+      assets,
+      session,
+      frames: async (callId, times) => {
+        BROWSER_DRAWS[browser]();
+        const review = await screenModelInput(db, { profile: ModerationProfile.Standard, texts: docTexts(session.doc), scope: moderationScope });
+        if (!review.ok) {
+          throw new Error(`frames withheld by the safety review: ${review.error}`);
+        }
+        askPreview({ callId, times, doc: session.doc, assets: assets.slice(knownAssets) });
+        return awaitFrames(bucket, framesPrefix(frameScope, callId), times.length);
+      },
+      check: async (callId, doc, name) => {
+        BROWSER_DRAWS[browser]();
+        const review = await screenModelInput(db, { profile: ModerationProfile.Standard, texts: docTexts(doc), scope: moderationScope });
+        if (!review.ok) {
+          throw new Error(`the component was withheld by the safety review: ${review.error}`);
+        }
+        askCheck({ callId, name, doc, assets: assets.slice(knownAssets) });
+        return awaitVerdict(bucket, framesPrefix(frameScope, callId), { timeoutMs: CHECK_WAIT_MS, pollMs: FRAME_POLL_MS });
       }
-      askPreview({ callId, times, doc: session.doc, assets: assets.slice(knownAssets) });
-      return awaitFrames(bucket, framesPrefix(frameScope, callId), times.length);
-    },
-    inspect: frameStats,
-    check: async (callId, doc, name) => {
-      BROWSER_DRAWS[browser]();
-      const review = await screenModelInput(db, { profile: ModerationProfile.Standard, texts: docTexts(doc), scope: moderationScope });
-      if (!review.ok) {
-        throw new Error(`the component was withheld by the safety review: ${review.error}`);
-      }
-      askCheck({ callId, name, doc, assets: assets.slice(knownAssets) });
-      return awaitVerdict(bucket, framesPrefix(frameScope, callId), { timeoutMs: CHECK_WAIT_MS, pollMs: FRAME_POLL_MS });
-    },
-    batch: async ({ rows }) => {
-      if (session.edits.length) {
-        return { ok: false, error: 'this turn has unsaved edits: the batch renders the saved video, so finish the turn and run render_batch in the next one' };
-      }
-      const renderAssets = await motionAssets({ db, orgId, projectId: project.id, canvasId: motion.record.canvasId, nodeId: motion.record.id }, SIGNED_URL_TTL_S.render);
-      const made = rowRequests(head, rows, { tokens, assets: assetUrls(renderAssets) }, settingsOf(Preset.Social));
-      if (!made.ok) {
-        return made;
-      }
-      const editorUrl = `/p/${project.id}/c/${motion.record.canvasId}/motion/${motion.record.id}`;
-      return startBatch(db, motionRenderFarm(), { ...nodeScope, projectId: project.id, userId, editorUrl }, made.rows, motionRenderStorage());
     }
-  });
+  );
 
   const codeModel = llmCodeModel();
   const opening = openingTier({ message, doc: head.doc, selection });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkTask, FarmTask, farmChunks, farmProblem, framesOf, halves, launchAssembly, launchPiece, TaskState, type FarmJob, type Step } from './farm-render';
+import { checkTask, FarmTask, farmChunks, farmProblem, framesOf, halves, launchAssembly, launchPiece, launchStills, readStills, awaitTask, TaskState, type FarmJob, type Step } from './farm-render';
 import type { FarmFile, FarmWorker, RenderFarm, WorkerSpec } from './render-farm';
 import { ExportFormat, Quality } from '$lib/motion/export-formats';
 import { RenderClass } from '$lib/motion/render-quote';
@@ -353,5 +353,63 @@ describe('checkTask', () => {
     const { farm } = fakeFarm();
 
     expect(await checkTask(farm, 'gone', FarmTask.Piece)).toEqual({ state: TaskState.Failed, error: expect.stringMatching(/stopped/) });
+  });
+});
+
+describe('stills for the Deep critic', () => {
+  it('renders the whole video once on one worker, then cuts a JPEG at every time asked', async () => {
+    const { farm, workers, specs } = fakeFarm();
+
+    const name = await launchStills(farm, { ...job, motionBlur: { shutterAngle: 180, shutterPhase: -90, samples: 8 } }, [0.25, 7.5]);
+
+    expect(name).toBe('w0');
+    expect(specs[0].vcpus).toBeGreaterThan(1);
+    expect(specOf(workers[0]).route).toBe('whole');
+    expect(specOf(workers[0]).config.motionBlur).toBeUndefined();
+    const lines = steps(workers[0], FarmTask.Stills).map(line);
+    expect(lines.some((l) => l.includes('-ss 0.25') && l.includes('still-0.jpg'))).toBe(true);
+    expect(lines.some((l) => l.includes('-ss 7.5') && l.includes('still-1.jpg'))).toBe(true);
+    expect(workers[0].spawned).toHaveLength(1);
+  });
+
+  it('reads the stills back in the order asked, with their times', async () => {
+    const { farm, workers } = fakeFarm();
+    const name = await launchStills(farm, job, [1, 2]);
+    workers[0].files.set('/vercel/sandbox/job/stills.json', Buffer.from(JSON.stringify([Buffer.from('a').toString('base64'), Buffer.from('b').toString('base64')])));
+
+    const frames = await readStills(farm, name, [1, 2]);
+
+    expect(frames).toEqual([
+      { time: 1, bytes: Buffer.from('a') },
+      { time: 2, bytes: Buffer.from('b') }
+    ]);
+  });
+
+  it('reads nothing from a worker that is gone', async () => {
+    const { farm } = fakeFarm();
+
+    expect(await readStills(farm, 'missing', [1])).toBeNull();
+  });
+});
+
+describe('waiting for a farm task', () => {
+  it('waits for a farm task to write its result', async () => {
+    const { farm, workers } = fakeFarm();
+    const name = await launchStills(farm, job, [1]);
+    setTimeout(() => workers[0].files.set('/vercel/sandbox/job/result-stills.json', Buffer.from('{"ok":true,"error":null}')), 20);
+
+    const check = await awaitTask(farm, name, FarmTask.Stills, { timeoutMs: 1000, pollMs: 5 });
+
+    expect(check.state).toBe(TaskState.Done);
+  });
+
+  it('gives up on a task that never ends', async () => {
+    const { farm } = fakeFarm();
+    const name = await launchStills(farm, job, [1]);
+
+    const check = await awaitTask(farm, name, FarmTask.Stills, { timeoutMs: 30, pollMs: 5 });
+
+    expect(check.state).toBe(TaskState.Failed);
+    expect(check.error).toMatch(/did not finish/);
   });
 });

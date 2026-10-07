@@ -188,3 +188,14 @@ describe('what a worker cost', () => {
   });
 });
 
+
+describe('listing the live render workers', () => {
+  it('asks the API to sort by name, the only order a name prefix is accepted with', async () => {
+    sdk.list.mockResolvedValue({ toArray: async () => [{ name: `${workerPrefix('d')}x`, status: 'running', createdAt: 1 }] });
+
+    const live = await vercelFarm(TOKEN as never, 'd').running();
+
+    expect(sdk.list).toHaveBeenCalledWith(expect.objectContaining({ namePrefix: workerPrefix('d'), sortBy: 'name' }));
+    expect(live).toEqual([{ name: `${workerPrefix('d')}x`, createdAt: 1 }]);
+  });
+});

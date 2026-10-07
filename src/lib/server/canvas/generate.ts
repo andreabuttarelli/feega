@@ -1,5 +1,6 @@
 import type { Db } from '$lib/server/db/client';
 import { RENDER_DEADLINE_MS } from '$lib/server/motion/farm-render';
+import { DEEP_DEADLINE_MS } from '$lib/server/motion/deep/limits';
 import { releaseHold } from '$lib/server/motion/render-run';
 import { promptRequired, type GenMedium, type GenParams } from '$lib/canvas/gen-node';
 import { upscaleLimitsOf } from '$lib/video-models';
@@ -16,6 +17,7 @@ import {
   queuedVideoRuns,
   queuedWiroRuns,
   RENDER_JOB_PREFIX,
+  DEEP_JOB_PREFIX,
   releaseClaim,
   retryClaim,
   runningRuns,
@@ -1060,7 +1062,7 @@ const WIRO_IMAGE_TIMEOUT_MS = 10 * 60_000;
 const WIRO_VIDEO_TIMEOUT_MS = 30 * 60_000;
 const DUBBING_TIMEOUT_MS = 60 * 60_000;
 
-type JobKind = 'sync' | 'video' | 'wiro_image' | 'wiro_video' | 'dubbing' | 'motion_render';
+type JobKind = 'sync' | 'video' | 'wiro_image' | 'wiro_video' | 'dubbing' | 'motion_render' | 'motion_deep';
 
 const JOB_TIMEOUTS_MS: Record<JobKind, number> = {
   sync: RUN_STALE_MS,
@@ -1068,7 +1070,8 @@ const JOB_TIMEOUTS_MS: Record<JobKind, number> = {
   wiro_image: WIRO_IMAGE_TIMEOUT_MS,
   wiro_video: WIRO_VIDEO_TIMEOUT_MS,
   dubbing: DUBBING_TIMEOUT_MS,
-  motion_render: RENDER_DEADLINE_MS
+  motion_render: RENDER_DEADLINE_MS,
+  motion_deep: DEEP_DEADLINE_MS
 };
 
 const ON_EXPIRE: Partial<Record<JobKind, (run: NodeRun) => Promise<void>>> = {
@@ -1092,6 +1095,9 @@ function jobKindOf(run: { externalJobId: string | null }, nodeType: string | nul
   }
   if (run.externalJobId.startsWith(RENDER_JOB_PREFIX)) {
     return 'motion_render';
+  }
+  if (run.externalJobId.startsWith(DEEP_JOB_PREFIX)) {
+    return 'motion_deep';
   }
   return 'video';
 }

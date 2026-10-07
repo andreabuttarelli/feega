@@ -39,6 +39,11 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
     tables: ['node_runs', 'nodes', 'canvas_events', 'assets', 'ai_calls', 'social_accounts', 'credit_ledger', 'orgs', 'org_uncensored_optins', 'influencers', 'moderation_checks', 'product_batches', 'product_batch_items']
   },
   {
+    path: 'src/routes/api/v1/motion/deep/resume/+server.ts — runDeepJob ripreso dal tick',
+    why: "Un job Deep la cui funzione è scaduta o morta viene ripreso dal tick, che non ha una sessione: nessun utente ha cliccato, e la tab può essere chiusa. La rotta riceve solo il runId (autenticata dal CRON_SECRET) e legge org, nodo, progetto e utente dalla riga node_runs; scrive le revisioni del doc, gli asset importati, il turno in chat e ai_calls di quella sola org, come farebbe il job partito dalla richiesta dell'utente.",
+    tables: ['node_runs', 'nodes', 'projects', 'motion_revisions', 'assets', 'ai_calls', 'chat_threads', 'chat_messages', 'moderation_checks', 'motion_templates', 'brands']
+  },
+  {
     path: 'le callback dei provider, src/routes/api/v1/webhooks/** (non ancora scritte: fase 3 e 5)',
     why: 'Zernio e i provider di generazione chiamano senza una sessione utente. La riga da aggiornare si trova dal loro id esterno, che è già legato a una org; la firma della richiesta è ciò che autentica, non un JWT. Programmazione e stato di pubblicazione si leggono da Zernio, non da una tabella nostra (scheduled_posts è stata rimossa, 2026-09-22): un eventuale webhook scriverebbe solo posts.zernio_post_ids.',
     tables: ['posts', 'node_runs', 'ai_calls']

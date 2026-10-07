@@ -5,7 +5,7 @@ import { AssetKind, COMPONENTS, COMPONENT_IDS, TrackKind, type ComponentId } fro
 import { fieldsOf } from '$lib/motion/inspector';
 import { Ease, FRAME_RATES, MAX_SECONDS, TRANSITION_KINDS } from '$lib/motion/design';
 import { setFrameRate } from '$lib/motion/frame-rate';
-import { Background, MOTION_FORMATS, clipsOf, findClip, type MotionDoc } from '$lib/motion/doc';
+import { Background, MOTION_FORMATS, clipsOf, findClip, parseMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { JUNCTION, JUNCTION_KINDS, junctionPairs } from '$lib/motion/junctions';
 import { ClipEdge, Side, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyInterp, setKeyframes, setMask, setMaskStack, shaped, setProps, setTiming, setTrackMatte, setTransform, setTransition, setJunction, trimClip, applyEasePreset, setKeyEase, type OpResult } from '$lib/motion/timeline';
 import { MASK_KEYS, MASK_KIND_IDS, MASK_MODES, MATTES, MAX_MASK_STACK } from '$lib/motion/mask';
@@ -108,6 +108,7 @@ export type MotionToolDeps = {
   brand?: (name?: string) => Promise<SourceRead>;
   importAsset?: (url: string, label?: string) => Promise<AssetImport>;
   capture?: (url: string, view: CaptureView) => Promise<SiteCapture>;
+  music?: (input: { text: string; seconds: number }) => Promise<Voiceover & { license?: string }>;
 };
 
 export enum CaptureView {
@@ -1398,6 +1399,22 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       }
     }),
 
+    generate_music: tool({
+      description: 'Generate an instrumental music bed from a prompt (genre, mood, tempo in bpm, no vocals) and place it on an Audio clip at a time in seconds; when the music provider is unavailable it places a CC0 beat at the tempo asked and returns its license. Then analyze_audio and cut_to_beat so the scenes land on its beats.',
+      inputSchema: z.object({ prompt: z.string().min(1).max(1000), seconds: z.number().min(3).max(120), start: z.number().min(0).default(0), ...PLACED }),
+      execute: async (input) => {
+        const made = deps.music ? await deps.music({ text: input.prompt, seconds: input.seconds }) : UNREADABLE('making music');
+        if (!made.ok) {
+          return made;
+        }
+        deps.assets.push({ id: made.assetId, kind: AssetKind.Audio, label: 'music', previewUrl: '', url: made.url });
+        const id = deps.newId();
+        const result = addClip(session.doc, { component: 'Audio', from: frames(input.start), durationInFrames: Math.max(1, frames(made.seconds)), trackId: input.track_id, props: { assetId: made.assetId } }, id);
+        const out = created(apply(registered(result, made.assetId), 'added music'), id);
+        return made.license ? { ...out, asset_id: made.assetId, license: made.license } : { ...out, asset_id: made.assetId };
+      }
+    }),
+
     generate_voiceover: tool({
       description: 'Spends credits. Turn a script into speech and place it as an Audio clip at a time in seconds. Only when the user asked for a voice-over.',
       inputSchema: z.object({ text: z.string().min(1).max(2000), start: z.number().min(0).default(0), voice_id: z.string().optional(), ...PLACED }),
@@ -1436,17 +1453,22 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
           return { ok: false, error: `${input.comp} is a template: change it with set_template_fields, or detach_template first to edit its structure` };
         }
         session.doc = viewOf(root, [input.comp]);
-        try {
-          for (const [index, call] of input.calls.entries()) {
-            const out = await nestedCall(call.tool, call.input, options);
-            if (out.ok === false) {
-              return { ok: false, failed: index, error: `${call.tool}: ${out.error}`, doc: docSummary(session.doc, []) };
-            }
+        let outcome: Record<string, unknown> = { ok: true };
+        for (const [index, call] of input.calls.entries()) {
+          const out = await nestedCall(call.tool, call.input, options);
+          if (out.ok === false) {
+            outcome = { ok: false, failed: index, error: `${call.tool}: ${out.error}` };
+            break;
           }
-          return { ok: true, doc: docSummary(session.doc, []) };
-        } finally {
-          session.doc = mergeView(root, [input.comp], session.doc);
         }
+        const merged = mergeView(root, [input.comp], session.doc);
+        const valid = parseMotionDoc(merged);
+        if (!valid.ok) {
+          session.doc = root;
+          return { ok: false, error: `nothing was changed inside ${input.comp}: ${valid.error}. Audio tracks and music belong to the root of the video: call add_track and add_clip outside edit_comp.` };
+        }
+        session.doc = merged;
+        return { ...outcome, doc: docSummary(viewOf(merged, [input.comp]), []) };
       }
     }),
 

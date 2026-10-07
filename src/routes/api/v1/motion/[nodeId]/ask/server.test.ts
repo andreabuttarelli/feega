@@ -76,7 +76,7 @@ vi.mock('$lib/server/repos/canvas', async (importOriginal) => ({
 }));
 vi.mock('$lib/server/repos/projects', () => ({ findProjectById: async (_db: unknown, input: { orgId: string }) => (input.orgId === ORG ? { id: PROJECT, brandId: null } : null) }));
 vi.mock('$lib/server/repos/assets', () => ({ listProjectAssets: async () => [] }));
-vi.mock('$lib/server/canvas/sign-media', () => ({ createAssetSigningDb: () => ({}), signAssetPaths: async () => new Map() }));
+vi.mock('$lib/server/canvas/sign-media', () => ({ createAssetSigningDb: () => ({}), signAssetPaths: async () => new Map(), signJobAssetPaths: async () => new Map() }));
 vi.mock('$lib/server/repos/chat', () => ({
   openNodeThread: async () => 'thread-1',
   loadTurns: async () => [],

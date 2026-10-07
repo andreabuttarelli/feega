@@ -208,10 +208,11 @@ export const AUDIO_JOB_PREFIX = 'elevenlabs:';
 export const WIRO_JOB_PREFIX = 'wiro:';
 export const AUDIO_HISTORY_PREFIX = 'elevenlabs-history:';
 export const RENDER_JOB_PREFIX = 'motion-render:';
+export const DEEP_JOB_PREFIX = 'motion-deep:';
 
 const SETTLED_STATUSES: NodeRunStatus[] = ['done', 'failed', 'expired'];
 
-const OWN_RECONCILER_PREFIXES = [AUDIO_JOB_PREFIX, WIRO_JOB_PREFIX, RENDER_JOB_PREFIX];
+const OWN_RECONCILER_PREFIXES = [AUDIO_JOB_PREFIX, WIRO_JOB_PREFIX, RENDER_JOB_PREFIX, DEEP_JOB_PREFIX];
 
 async function queuedRunsWithPrefix(db: Db, input: { limit: number; prefix: string }): Promise<NodeRun[]> {
   const { data, error } = await db

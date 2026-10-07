@@ -74,6 +74,7 @@ const MODEL_CALLERS: Readonly<Record<string, string>> = {
   'src/routes/api/v1/projects/[projectId]/agent/+server.ts': SCREENED,
   'src/lib/server/motion/turn.ts': SCREENED,
   'src/lib/server/motion/voiceover.ts': SCREENED,
+  'src/lib/server/motion/deep/agent.ts': 'the brief is screened by startDeep before the job exists; the critic frames come from the doc the builder made',
   'src/lib/server/moderation/moderation-config.ts': 'the moderator itself: Jev and the LLM judge',
   'src/lib/server/provider-purgers.ts': 'deletes stored provider copies, sends no prompt',
   'src/lib/server/brand-analysis.ts': 'brand wizard: reads a third-party website, the user types only its URL',
