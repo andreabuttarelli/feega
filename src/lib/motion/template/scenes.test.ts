@@ -6,6 +6,7 @@ import { EASE_BEZIER } from '$lib/motion/keyframes';
 import { Ease } from '$lib/motion/design';
 import { BUILTIN_TEMPLATES } from './builtins';
 import { insertTemplate } from './library';
+import { Quality, docProblems } from '$lib/motion/direction';
 import { SCENES } from './scenes';
 import { TEMPLATES } from '$lib/motion/hyperframes/templates';
 
@@ -34,6 +35,13 @@ describe('the Apple minimal scene library', () => {
 
   it('every scene is a built-in template', () => {
     expect(sceneDocs().map((e) => e.id)).toEqual(SCENES.map((s) => `builtin:${s.id}`));
+  });
+
+  it.each(sceneDocs().map((e) => [e.id, e] as const))('%s lets every animation finish and holds a second before its cut', (_id, entry) => {
+    const placed = insertTemplate(newMotionDoc(MotionFormat.Landscape), entry, { from: 0, newId: ids() });
+    const rhythm = placed.ok ? docProblems(placed.doc, { audioAssets: 0 }).filter((p) => p.kind === Quality.CutMidAnimation || p.kind === Quality.NoHold) : [];
+
+    expect(rhythm.map((p) => p.detail)).toEqual([]);
   });
 
   it.each(sceneDocs().map((e) => [e.id, e] as const))('%s breaks none of the style rules, alone and inside a video', (_id, entry) => {

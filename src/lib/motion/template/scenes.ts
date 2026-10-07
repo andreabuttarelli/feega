@@ -23,6 +23,7 @@ const STAGGER = APPLE.seconds.stagger;
 const SHOW = 0.5;
 const OUT = edge(TransitionKind.Fade, APPLE.seconds.exit);
 const DRIFT = 0.012;
+const WORD_BEAT = 1.97;
 
 const FONTS: FontFace[] = [{ family: FAMILY, source: FontSource.Google, category: FontCategory.Sans, weights: [BODY, DISPLAY], italic: false, axes: [] }];
 
@@ -76,11 +77,11 @@ const SCENE_DESIGNS: Omit<Design, 'fonts'>[] = [
     id: 'scene-eyebrow-title',
     name: 'Scene · Eyebrow and title',
     description: 'Apple minimal. A small accent eyebrow, then a giant title under it a beat later.',
-    seconds: 3,
+    seconds: 3.5,
     beats: [
-      fill(INK, 3),
-      { id: 'eyebrow', track: 'middle', component: 'Text', at: 0.1, len: 2.9, props: { text: 'Introducing', ...body(SMALL, ACCENT), y: 0.33, width: 0.6, height: 0.06 }, keys: snapUp(), exit: OUT },
-      { id: 'title', track: 'front', component: 'Text', at: 0.1 + STAGGER * 1.5, len: 2.9 - STAGGER * 1.5, props: { text: 'The new thing.', ...display(HERO), y: 0.52, width: 0.9, height: 0.3 }, keys: snapUp(), exit: OUT }
+      fill(INK, 3.5),
+      { id: 'eyebrow', track: 'middle', component: 'Text', at: 0.1, len: 3.4, props: { text: 'Introducing', ...body(SMALL, ACCENT), y: 0.33, width: 0.6, height: 0.06 }, keys: snapUp(), exit: OUT },
+      { id: 'title', track: 'front', component: 'Text', at: 0.1 + STAGGER * 1.5, len: 3.4 - STAGGER * 1.5, props: { text: 'The new thing.', ...display(HERO), y: 0.52, width: 0.9, height: 0.3 }, keys: snapUp(), exit: OUT }
     ],
     fields: [text('eyebrow', 'Eyebrow', 'eyebrow'), text('title', 'Title', 'title'), colour('accent', 'Eyebrow colour', 'eyebrow', 'color'), colour('background', 'Background', 'bg', 'fill'), colour('text_color', 'Title colour', 'title', 'color')]
   },
@@ -88,8 +89,8 @@ const SCENE_DESIGNS: Omit<Design, 'fonts'>[] = [
     id: 'scene-feature-line',
     name: 'Scene · Feature line',
     description: 'Apple minimal. One sentence, large, centred on black: one feature per scene.',
-    seconds: 3,
-    beats: [fill(INK, 3), { id: 'line', track: 'front', component: 'Text', at: 0.1, len: 2.9, props: { text: 'One idea, said simply.', ...body(LINE), weight: DISPLAY, y: 0.5, width: 0.74, height: 0.36 }, keys: snapUp(), exit: OUT }],
+    seconds: 3.5,
+    beats: [fill(INK, 3.5), { id: 'line', track: 'front', component: 'Text', at: 0.1, len: 3.4, props: { text: 'One idea, said simply.', ...body(LINE), weight: DISPLAY, y: 0.5, width: 0.74, height: 0.36 }, keys: snapUp(), exit: OUT }],
     fields: [text('line', 'Line', 'line'), colour('background', 'Background', 'bg', 'fill'), colour('text_color', 'Text colour', 'line', 'color')]
   },
   {
@@ -128,11 +129,11 @@ const SCENE_DESIGNS: Omit<Design, 'fonts'>[] = [
     id: 'scene-quote',
     name: 'Scene · Quote',
     description: 'Apple minimal. A large quote and its author in small grey type.',
-    seconds: 4,
+    seconds: 4.5,
     beats: [
-      fill(INK, 4),
-      { id: 'quote', track: 'front', component: 'Text', at: 0.1, len: 3.9, props: { text: '“The best tool we added this year.”', ...body(LINE), y: 0.45, width: 0.76, height: 0.4 }, keys: snapUp(), exit: OUT },
-      { id: 'author', track: 'middle', component: 'Text', at: 0.1 + STAGGER * 4, len: 3.9 - STAGGER * 4, props: { text: 'Ada Lovelace, Analytical Engines', ...body(SMALL, MUTED), y: 0.72, width: 0.6, height: 0.06 }, keys: snapUp(), exit: OUT }
+      fill(INK, 4.5),
+      { id: 'quote', track: 'front', component: 'Text', at: 0.1, len: 4.4, props: { text: '“The best tool we added this year.”', ...body(LINE), y: 0.45, width: 0.76, height: 0.4 }, keys: snapUp(), exit: OUT },
+      { id: 'author', track: 'middle', component: 'Text', at: 0.1 + STAGGER * 4, len: 4.4 - STAGGER * 4, props: { text: 'Ada Lovelace, Analytical Engines', ...body(SMALL, MUTED), y: 0.72, width: 0.6, height: 0.06 }, keys: snapUp(), exit: OUT }
     ],
     fields: [text('quote', 'Quote', 'quote'), text('author', 'Author', 'author'), colour('background', 'Background', 'bg', 'fill'), colour('text_color', 'Quote colour', 'quote', 'color')]
   },
@@ -140,11 +141,11 @@ const SCENE_DESIGNS: Omit<Design, 'fonts'>[] = [
     id: 'scene-split-statement',
     name: 'Scene · Split statement',
     description: 'Apple minimal. A big statement on the left, one small explaining paragraph on the right.',
-    seconds: 3.5,
+    seconds: 4,
     beats: [
-      fill(INK, 3.5),
-      { id: 'statement', track: 'front', component: 'Text', at: 0.1, len: 3.4, props: { text: 'Fast.\nBy design.', ...display(HERO), x: 0.3, y: 0.5, width: 0.46, height: 0.5, align: 'left' }, keys: snapUp(), exit: OUT },
-      { id: 'detail', track: 'middle', component: 'Text', at: 0.1 + STAGGER * 4, len: 3.4 - STAGGER * 4, props: { text: 'It explains the line.', ...body(SMALL, MUTED), x: 0.74, y: 0.56, width: 0.3, height: 0.2, align: 'left' }, keys: snapUp(), exit: OUT }
+      fill(INK, 4),
+      { id: 'statement', track: 'front', component: 'Text', at: 0.1, len: 3.9, props: { text: 'Fast.\nBy design.', ...display(HERO), x: 0.3, y: 0.5, width: 0.46, height: 0.5, align: 'left' }, keys: snapUp(), exit: OUT },
+      { id: 'detail', track: 'middle', component: 'Text', at: 0.1 + STAGGER * 4, len: 3.9 - STAGGER * 4, props: { text: 'It explains the line.', ...body(SMALL, MUTED), x: 0.74, y: 0.56, width: 0.3, height: 0.2, align: 'left' }, keys: snapUp(), exit: OUT }
     ],
     fields: [text('statement', 'Statement', 'statement'), text('detail', 'Detail', 'detail'), colour('background', 'Background', 'bg', 'fill'), colour('text_color', 'Statement colour', 'statement', 'color')]
   },
@@ -176,11 +177,11 @@ const SCENE_DESIGNS: Omit<Design, 'fonts'>[] = [
     id: 'scene-ui-window',
     name: 'Scene · UI window',
     description: 'Apple minimal. A screenshot as a large window under one small line, drifting in slowly.',
-    seconds: 4,
+    seconds: 4.5,
     beats: [
-      fill(INK, 4),
-      { id: 'caption', track: 'front', component: 'Text', at: 0.1, len: 3.9, props: { text: 'One small line about the screen.', ...body(SMALL), y: 0.12, width: 0.6, height: 0.06 }, keys: snapUp(), exit: OUT },
-      { id: 'screen', track: 'middle', component: 'Image', at: 0.1 + STAGGER, len: 3.9 - STAGGER, props: { x: 0.5, y: 0.58, ...WINDOW, fit: 'cover', focusX: 0.5, focusY: 0 }, keys: drift(3.9 - STAGGER, 0.98, DRIFT / 2), exit: OUT }
+      fill(INK, 4.5),
+      { id: 'caption', track: 'front', component: 'Text', at: 0.1, len: 4.4, props: { text: 'One small line about the screen.', ...body(SMALL), y: 0.12, width: 0.6, height: 0.06 }, keys: snapUp(), exit: OUT },
+      { id: 'screen', track: 'middle', component: 'Image', at: 0.1 + STAGGER, len: 4.4 - STAGGER, props: { x: 0.5, y: 0.58, ...WINDOW, fit: 'cover', focusX: 0.5, focusY: 0 }, keys: drift(4.4 - STAGGER, 0.98, DRIFT / 2), exit: OUT }
     ],
     fields: [picture('screen', 'Screenshot', 'screen', WINDOW), text('caption', 'Caption', 'caption'), amount('focus_y', 'Focus Y', 'screen', 'focusY'), colour('background', 'Background', 'bg', 'fill')]
   },
@@ -234,12 +235,12 @@ const SCENE_DESIGNS: Omit<Design, 'fonts'>[] = [
     id: 'scene-match-cut',
     name: 'Scene · Match cut',
     description: 'Apple minimal. Three words cut on the beat in the same place, the last in the accent colour.',
-    seconds: 4.5,
+    seconds: 3 * WORD_BEAT,
     beats: [
-      fill(INK, 4.5),
-      { id: 'word_1', track: 'front', component: 'Text', at: 0, len: 1.5, props: { text: 'Fast.', ...display(HERO), y: 0.5, width: 0.9, height: 0.3 }, keys: snapUp(0.3) },
-      { id: 'word_2', track: 'front', component: 'Text', at: 1.5, len: 1.5, props: { text: 'Simple.', ...display(HERO), y: 0.5, width: 0.9, height: 0.3 } },
-      { id: 'word_3', track: 'front', component: 'Text', at: 3, len: 1.5, props: { text: 'Yours.', ...display(HERO, ACCENT), y: 0.5, width: 0.9, height: 0.3 }, exit: OUT }
+      fill(INK, 3 * WORD_BEAT),
+      { id: 'word_1', track: 'front', component: 'Text', at: 0, len: WORD_BEAT, props: { text: 'Fast.', ...display(HERO), y: 0.5, width: 0.9, height: 0.3 }, keys: snapUp(0.3) },
+      { id: 'word_2', track: 'front', component: 'Text', at: WORD_BEAT, len: WORD_BEAT, props: { text: 'Simple.', ...display(HERO), y: 0.5, width: 0.9, height: 0.3 } },
+      { id: 'word_3', track: 'front', component: 'Text', at: 2 * WORD_BEAT, len: WORD_BEAT, props: { text: 'Yours.', ...display(HERO, ACCENT), y: 0.5, width: 0.9, height: 0.3 }, exit: OUT }
     ],
     fields: [text('word_1', 'First word', 'word_1'), text('word_2', 'Second word', 'word_2'), text('word_3', 'Third word', 'word_3'), colour('accent', 'Last word colour', 'word_3', 'color'), colour('background', 'Background', 'bg', 'fill')]
   },

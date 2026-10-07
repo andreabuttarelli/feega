@@ -8,6 +8,7 @@ import { sampleTrack } from './sample-track';
 import { cursorClicks, cursorMisses, reelMisses, TARGET_SEPARATOR } from './clicks';
 import { emptyContent, interactionOf, isUiPiece, Interaction, skeletons } from './ui-kit/content';
 import { FillKind, ShapeKind } from './shape/schema';
+import { CutFault, cutProblems } from './cuts';
 
 export enum Quality {
   RepeatedLayout = 'repeated-layout',
@@ -28,6 +29,7 @@ export enum Quality {
   NoMicroMotion = 'no-micro-motion',
   NoScript = 'no-script',
   CutMidAnimation = 'cut-mid-animation',
+  NoHold = 'no-hold',
   BackgroundSeam = 'background-seam'
 }
 
@@ -56,6 +58,9 @@ export const SEVERITY: Record<Check, Severity> = {
   [Quality.EmptyUi]: Severity.Blocking,
   [Quality.NoMicroMotion]: Severity.Warning,
   [Quality.NoScript]: Severity.Warning,
+  [Quality.CutMidAnimation]: Severity.Blocking,
+  [Quality.NoHold]: Severity.Blocking,
+  [Quality.BackgroundSeam]: Severity.Warning,
   [Forbidden.Particles]: Severity.Warning,
   [Forbidden.Glow]: Severity.Warning,
   [Forbidden.Rotation]: Severity.Warning,
@@ -67,7 +72,7 @@ export const SEVERITY: Record<Check, Severity> = {
   [Forbidden.OffBeat]: Severity.Warning,
   [Forbidden.NoPeak]: Severity.Warning,
   [Forbidden.RoughCut]: Severity.Warning,
-  [Forbidden.UnreadableText]: Severity.Blocking,
+  [Forbidden.ReadingTime]: Severity.Blocking,
   [Forbidden.Screenshots]: Severity.Blocking,
   [Forbidden.MissingStoryBeat]: Severity.Blocking,
   [Forbidden.Rushed]: Severity.Warning,
@@ -426,41 +431,13 @@ function unscripted(doc: MotionDoc): QualityProblem[] {
   return SCORED[styleOf(doc)] && !doc.script && everyClip(doc).length ? [{ kind: Quality.NoScript, detail: 'no research and script saved: for a launch film or trailer, write_script first (problem, struggle, flow, sourced proof, promise) and build that' }] : [];
 }
 
-const HOLD_S = 1;
-const DRIFT_S = 2;
-
-function unsettledPiece(doc: MotionDoc, clip: Clip): number | null {
-  const piece = clip.component === 'Custom' ? PIECES.get(String(clip.props.name)) : undefined;
-  if (!piece) {
-    return null;
-  }
-  const length = clip.durationInFrames / doc.fps;
-  const settled = piece.settles(clip.props, length);
-  return settled + HOLD_S > length ? settled : null;
-}
-
-function unsettledKeys(doc: MotionDoc, clip: Clip): number | null {
-  const cutoff = clip.durationInFrames - HOLD_S * doc.fps;
-  const ends = Object.values(clip.keyframes).flatMap((track) =>
-    (track ?? []).slice(1).flatMap((k, i) => {
-      const prev = track[i];
-      const moving = Number(k.value) !== Number(prev.value);
-      const drift = k.frame - prev.frame >= DRIFT_S * doc.fps;
-      return moving && !drift && prev.frame < cutoff && k.frame > cutoff ? [k.frame / doc.fps] : [];
-    })
-  );
-  return ends.length ? Math.max(...ends) : null;
-}
+const CUT_QUALITY: Record<CutFault, Quality> = {
+  [CutFault.MidAnimation]: Quality.CutMidAnimation,
+  [CutFault.NoHold]: Quality.NoHold
+};
 
 function cutsMidAnimation(doc: MotionDoc): QualityProblem[] {
-  return doc.tracks.flatMap((t) => t.clips as Clip[]).flatMap((clip) => {
-    const settled = unsettledPiece(doc, clip) ?? unsettledKeys(doc, clip);
-    if (settled === null) {
-      return [];
-    }
-    const need = round(settled + HOLD_S);
-    return [{ kind: Quality.CutMidAnimation, at: seconds(doc, clip.from + clip.durationInFrames), detail: `${clip.id} is cut at ${seconds(doc, clip.from + clip.durationInFrames)}s while it still animates (it settles ${round(settled)}s in): give it at least ${need}s so the last state holds ${HOLD_S}s before the cut` }];
-  });
+  return cutProblems(doc).map((p) => ({ kind: CUT_QUALITY[p.fault], at: seconds(doc, p.frame), detail: p.detail }));
 }
 
 const BACKDROP_AREA = 0.5;

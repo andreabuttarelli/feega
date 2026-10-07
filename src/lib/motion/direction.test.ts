@@ -254,7 +254,7 @@ describe('severity', () => {
     const open = blocking([
       { kind: Quality.BlankFrame, detail: 'blank' },
       { kind: Quality.RepeatedLayout, detail: 'repeat' },
-      { kind: Quality.OffStyle, detail: 'unreadable', effect: Forbidden.UnreadableText },
+      { kind: Quality.OffStyle, detail: 'unreadable', effect: Forbidden.ReadingTime },
       { kind: Quality.OffStyle, detail: 'glow', effect: Forbidden.Glow }
     ]);
 
@@ -303,14 +303,13 @@ describe('a cut waits for the scene to finish', () => {
   };
   const cuts = (doc: MotionDoc) => docProblems(doc, { audioAssets: 0 }).filter((p) => p.kind === Quality.CutMidAnimation);
 
-  it('a funnel cut before its last stage fills is named, one held a second after it settles is not', () => {
-    expect(cuts(withPiece(UiKind.Funnel, 2))).toHaveLength(1);
-    expect(cuts(withPiece(UiKind.Funnel, 3.5))).toEqual([]);
-  });
+  const held = (doc: MotionDoc) => docProblems(doc, { audioAssets: 0 }).filter((p) => p.kind === Quality.NoHold);
 
-  it('the shortener is held until its toast has landed', () => {
-    expect(cuts(withPiece(UiKind.LinkShortener, 2.5))).toHaveLength(1);
-    expect(cuts(withPiece(UiKind.LinkShortener, 4.5))).toEqual([]);
+  it('a funnel cut while its last stage fills is cut mid-animation; one cut just after is not held; one held a second is clean', () => {
+    expect(cuts(withPiece(UiKind.Funnel, 1.5))).toHaveLength(1);
+    expect(cuts(withPiece(UiKind.Funnel, 2.4))).toEqual([]);
+    expect(held(withPiece(UiKind.Funnel, 2.4))).toHaveLength(1);
+    expect([...cuts(withPiece(UiKind.Funnel, 3)), ...held(withPiece(UiKind.Funnel, 3))]).toEqual([]);
   });
 
   it('a slower piece needs a longer scene', () => {
@@ -318,14 +317,35 @@ describe('a cut waits for the scene to finish', () => {
     expect(cuts(withPiece(UiKind.StatCards, 3.4, { speed: 0.6 }))).toHaveLength(1);
   });
 
-  it('a keyframed move still running a second before the cut is named; a long drift and a quick exit are not', () => {
+  it('a move running past the cut is cut mid-animation; one ending half a second before is not held; a long drift and a quick exit are neither', () => {
+    const past = { scale: [{ frame: 0, value: 1, ease: Ease.Linear }, { frame: 50, value: 1, ease: Ease.Linear }, { frame: 100, value: 1.3, ease: Ease.Linear }] };
     const late = { scale: [{ frame: 0, value: 1, ease: Ease.Linear }, { frame: 50, value: 1, ease: Ease.Linear }, { frame: 75, value: 1.3, ease: Ease.Linear }] };
     const drift = { scale: [{ frame: 0, value: 1, ease: Ease.Linear }, { frame: 90, value: 1.04, ease: Ease.Linear }] };
     const exit = { scale: [{ frame: 0, value: 1, ease: Ease.Linear }, { frame: 82, value: 1, ease: Ease.Linear }, { frame: 90, value: 2.5, ease: Ease.Linear }] };
 
-    expect(cuts(keyed(late))).toHaveLength(1);
-    expect(cuts(keyed(drift))).toEqual([]);
-    expect(cuts(keyed(exit))).toEqual([]);
+    expect(cuts(keyed(past))).toHaveLength(1);
+    expect(cuts(keyed(late))).toEqual([]);
+    expect(held(keyed(late))).toHaveLength(1);
+    expect([...cuts(keyed(drift)), ...held(keyed(drift)), ...cuts(keyed(exit)), ...held(keyed(exit))]).toEqual([]);
+  });
+
+  it('a transition out starts the cut: a move still running when it begins is cut mid-animation', () => {
+    const early = { scale: [{ frame: 0, value: 1, ease: Ease.Linear }, { frame: 10, value: 1, ease: Ease.Linear }, { frame: 60, value: 1.3, ease: Ease.Linear }] };
+    const doc = must(setTransition(keyed(early), 'c', Side.Out, { kind: TransitionKind.Fade, durationInFrames: 40 }));
+
+    expect(cuts(keyed(early))).toEqual([]);
+    expect(cuts(doc)).toHaveLength(1);
+  });
+
+  it('a scene shortened under its own animation is cut mid-animation at the time it plays', () => {
+    const placed = must(insertTemplate(calm(), builtinTemplate('builtin:launch-word-burst')!, { from: 0, newId: (() => { let n = 0; return () => `w${++n}`; })() }));
+    const short = { ...placed, tracks: placed.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.component === 'Precomp' ? { ...c, durationInFrames: 35 } : c)) })) };
+
+    expect(cuts(short).length).toBeGreaterThan(0);
+  });
+
+  it('cuts mid-animation, scenes without a hold and text too short to read block delivery', () => {
+    expect([SEVERITY[Quality.CutMidAnimation], SEVERITY[Quality.NoHold], SEVERITY[Forbidden.ReadingTime]]).toEqual([Severity.Blocking, Severity.Blocking, Severity.Blocking]);
   });
 });
 

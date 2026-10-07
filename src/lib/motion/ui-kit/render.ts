@@ -55,3 +55,27 @@ const emptyCard = (n: DrawnNode) => (CARD.test(n.className) && shapeOnly(n) && n
 export function placeholders(tree: DrawnNode): string[] {
   return [...emptyRows(tree), ...emptyCard(tree), ...tree.children.flatMap(placeholders)];
 }
+
+const IDLE_LOOPS: ReadonlySet<string> = new Set(['caret', 'sheen']);
+
+function still(n: DrawnNode): unknown {
+  if (IDLE_LOOPS.has(n.className) || hidden(n)) {
+    return null;
+  }
+  const style = Object.fromEntries(Object.entries(n.style).filter(([, v]) => typeof v !== 'function'));
+  return [n.className, n.textContent, n.innerHTML, style, n.attrs, n.children.map(still)];
+}
+
+export function settleTime(js: string, props: Record<string, unknown>, duration: number, step: number, lookahead: number): number {
+  const draw = drawPiece(js, props, duration);
+  let last = 0;
+  let before = JSON.stringify(still(draw(0)));
+  for (let t = step; t <= duration + lookahead; t += step) {
+    const now = JSON.stringify(still(draw(t)));
+    if (now !== before) {
+      last = t;
+    }
+    before = now;
+  }
+  return last;
+}

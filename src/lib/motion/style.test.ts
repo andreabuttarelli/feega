@@ -20,10 +20,12 @@ function must(r: { ok: true; doc: MotionDoc } | { ok: false; error: string }): M
   return r.doc;
 }
 
+const SHORT_TEXT: Partial<Record<string, { text: string }>> = { Title: { text: 'Launch' } };
+
 type Patch = Partial<MotionDoc['tracks'][number]['clips'][number]>;
 
 function withClip(doc: MotionDoc, id: string, component: 'Title' | 'Image' | 'Particles' | 'Device3D', patch: Patch = {}, from = 0): MotionDoc {
-  const added = must(addClip(doc, { component, from, durationInFrames: 3 * SECOND, props: {} }, id));
+  const added = must(addClip(doc, { component, from, durationInFrames: 3 * SECOND, props: { ...SHORT_TEXT[component] } }, id));
   return { ...added, tracks: added.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === id ? { ...c, ...patch } : c)) })) };
 }
 
@@ -165,7 +167,7 @@ describe('the launch film style', () => {
   });
 
   it('holds every scene 2 to 4 s: fewer ideas, never faster cuts', () => {
-    expect(STYLES[MotionStyle.LaunchFilm].seconds.scene).toEqual([2, 4]);
+    expect(STYLES[MotionStyle.LaunchFilm].seconds.scene).toEqual([2, 5]);
   });
 
   it('names a scene cut shorter than two seconds, not one that holds', () => {
@@ -202,14 +204,14 @@ describe('the launch film style', () => {
     expect(effects(withClip(film(), 'w', 'Title', { junction: { kind: JunctionKind.PushLeft, durationInFrames: 8 }, keyframes: rise }))).not.toContain(Forbidden.Transition);
   });
 
-  it('names text gone before it can be read and given a pause: 0.4 s a word plus 0.6 s, 1.2 s at least for a phrase, then 0.5 s', () => {
+  it('names text gone before it can be read plus a second: 0.4 s a word plus 0.6 s, 1.2 s at least for a phrase, then 1 s', () => {
     const shown = (text: string, seconds: number) => withClip(film(), 't', 'Title', { props: { text }, durationInFrames: at(seconds), keyframes: rise });
 
-    expect(effects(shown('Turn clicks into revenue.', 2.2))).toContain(Forbidden.UnreadableText);
-    expect(effects(shown('Turn clicks into revenue.', 2.7))).not.toContain(Forbidden.UnreadableText);
-    expect(effects(shown('Links.', 1))).toContain(Forbidden.UnreadableText);
-    expect(effects(shown('Links.', 1.5))).not.toContain(Forbidden.UnreadableText);
-    expect(effects(shown('Two words', 1.9))).not.toContain(Forbidden.UnreadableText);
+    expect(effects(shown('Turn clicks into revenue.', 3.1))).toContain(Forbidden.ReadingTime);
+    expect(effects(shown('Turn clicks into revenue.', 3.3))).not.toContain(Forbidden.ReadingTime);
+    expect(effects(shown('Links.', 1.9))).toContain(Forbidden.ReadingTime);
+    expect(effects(shown('Links.', 2.1))).not.toContain(Forbidden.ReadingTime);
+    expect(effects(shown('Two words', 2.5))).not.toContain(Forbidden.ReadingTime);
   });
 
   it('names a film made mostly of screenshots, not one with a blurred one behind live UI', () => {
