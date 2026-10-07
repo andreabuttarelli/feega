@@ -17,14 +17,35 @@ export enum Quality {
   CroppedScreen = 'cropped-screen',
   BrandLogoAltered = 'brand-logo-altered',
   OutOfFrame = 'out-of-frame',
-  TiltedText = 'tilted-text'
+  TiltedText = 'tilted-text',
+  EmptyFrames = 'empty-frames'
 }
+
+export enum Severity {
+  Warning = 'warning',
+  Blocking = 'blocking'
+}
+
+export const QUALITY_SEVERITY: Record<Quality, Severity> = {
+  [Quality.RepeatedLayout]: Severity.Warning,
+  [Quality.SmallTitle]: Severity.Warning,
+  [Quality.Silent]: Severity.Warning,
+  [Quality.BlankFrame]: Severity.Blocking,
+  [Quality.WhiteArea]: Severity.Warning,
+  [Quality.OffStyle]: Severity.Warning,
+  [Quality.SoftPicture]: Severity.Warning,
+  [Quality.CroppedScreen]: Severity.Warning,
+  [Quality.BrandLogoAltered]: Severity.Warning,
+  [Quality.OutOfFrame]: Severity.Warning,
+  [Quality.TiltedText]: Severity.Warning,
+  [Quality.EmptyFrames]: Severity.Blocking
+};
 
 export type Pixels = Record<string, { width: number; height: number }>;
 
 export type QualityProblem = { kind: Quality; at?: number; detail: string };
 
-export type FrameStat = { time: number; lumaStd: number; whiteShare: number };
+export type FrameStat = { time: number; luma: number; lumaStd: number; whiteShare: number };
 
 const SCENE_JOIN_S = 0.5;
 const SCENE_SHARE = 0.9;
@@ -253,13 +274,73 @@ function outOfFrame(doc: MotionDoc): QualityProblem[] {
   });
 }
 
+const EMPTY_SECONDS = 0.3;
+const FLASH_LUMA_JUMP = 200;
+const SCENERY: ReadonlySet<ComponentId> = new Set([...BACKDROPS, 'Shape'] as ComponentId[]);
+
+type Span = { from: number; to: number };
+
+function shownSpans(doc: MotionDoc, tracks: MotionDoc['tracks'], offset: number, end: number): Span[] {
+  return tracks
+    .filter((t) => t.kind === TrackKind.Visual)
+    .flatMap((t) => t.clips as Clip[])
+    .flatMap((clip): Span[] => {
+      const from = offset + clip.from;
+      const to = Math.min(end, from + clip.durationInFrames);
+      const nested = clip.component === 'Precomp' ? doc.comps[String(clip.props.comp)] : undefined;
+      if (nested) {
+        return shownSpans(doc, nested.tracks, from - clip.trimStart, to).filter((s) => s.to > from).map((s) => ({ from: Math.max(from, s.from), to: s.to }));
+      }
+      return SCENERY.has(clip.component) ? [] : [{ from, to }];
+    });
+}
+
+function holes(shown: readonly boolean[]): Span[] {
+  const found: Span[] = [];
+  shown.forEach((on, f) => {
+    const open = found.at(-1);
+    if (on) {
+      return;
+    }
+    if (open && open.to === f) {
+      open.to = f + 1;
+      return;
+    }
+    found.push({ from: f, to: f + 1 });
+  });
+  return found;
+}
+
+function emptyFrames(doc: MotionDoc): QualityProblem[] {
+  const shown = new Array<boolean>(doc.durationInFrames).fill(false);
+  for (const span of shownSpans(doc, doc.tracks, 0, doc.durationInFrames)) {
+    shown.fill(true, Math.max(0, span.from), Math.max(0, span.to));
+  }
+
+  return holes(shown)
+    .filter((h) => h.to - h.from > EMPTY_SECONDS * doc.fps)
+    .map((h) => ({ kind: Quality.EmptyFrames, at: seconds(doc, h.from), detail: `from ${seconds(doc, h.from)}s to ${seconds(doc, h.to)}s only the background is on screen: an empty hole the viewer reads as a mistake. Close the gap (start the next scene or its content sooner) or fill it` }));
+}
+
+function flashes(stats: readonly FrameStat[]): QualityProblem[] {
+  return stats.slice(1).flatMap((s, i) =>
+    Math.abs(s.luma - stats[i].luma) >= FLASH_LUMA_JUMP
+      ? [{ kind: Quality.EmptyFrames, at: s.time, detail: `the picture jumps from ${stats[i].luma > s.luma ? 'white to black' : 'black to white'} between ${stats[i].time}s and ${s.time}s: an unintended flash. Carry the move across (a dissolve, a matching background) unless it is a deliberate hit` }]
+      : []
+  );
+}
+
 export function docProblems(doc: MotionDoc, input: { audioAssets: number; pixels?: Pixels; logos?: readonly string[] }): QualityProblem[] {
   const list = scenes(doc);
   const pixels = input.pixels ?? {};
-  return [...repeated(doc, list), ...smallTitles(doc), ...silent(doc, input.audioAssets), ...softPictures(doc, pixels), ...croppedScreens(doc, pixels), ...alteredLogos(doc, new Set(input.logos ?? [])), ...outOfFrame(doc), ...tiltedText(doc), ...styleProblems(doc).map((p) => ({ kind: Quality.OffStyle, at: p.at, detail: p.detail }))];
+  return [...repeated(doc, list), ...smallTitles(doc), ...silent(doc, input.audioAssets), ...softPictures(doc, pixels), ...croppedScreens(doc, pixels), ...alteredLogos(doc, new Set(input.logos ?? [])), ...outOfFrame(doc), ...tiltedText(doc), ...emptyFrames(doc), ...styleProblems(doc).map((p) => ({ kind: Quality.OffStyle, at: p.at, detail: p.detail }))];
 }
 
 export function frameProblems(stats: readonly FrameStat[]): QualityProblem[] {
+  return [...flatFrames(stats), ...flashes(stats)];
+}
+
+function flatFrames(stats: readonly FrameStat[]): QualityProblem[] {
   return stats.flatMap((s): QualityProblem[] => {
     if (s.lumaStd < BLANK_STD) {
       return [{ kind: Quality.BlankFrame, at: s.time, detail: `the frame at ${s.time}s is a flat colour: nothing is on screen` }];
