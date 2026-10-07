@@ -6,6 +6,7 @@ import { safeBox } from '../fit';
 import { typeStyle } from './type-style';
 import type { TextRender } from '../text-animators/render';
 import { css, esc, px } from './html';
+import { cssVar } from './animate';
 import type { CustomComponents } from '../custom/component';
 import { compositionVideoId, resolvedMedia } from './composition';
 import { shapeHtml } from './shapes';
@@ -100,6 +101,13 @@ const CENTRED: Framing = { fit: 'cover', focusX: 0.5, focusY: 0.5 };
 const focus = (f: Framing) => `${Math.round(f.focusX * PERCENT)}% ${Math.round(f.focusY * PERCENT)}%`;
 const cover = (url: string, f: Framing) => `<img src="${esc(url)}" alt="" style="${css({ width: '100%', height: '100%', objectFit: f.fit, objectPosition: focus(f), display: 'block' })}" />`;
 
+const framingVar = (key: string, base: number) => `var(${cssVar(key)}, ${base})`;
+
+const zoomed = (url: string, p: Framing & { zoom: number }) => {
+  const point = `calc(${framingVar('focusX', p.focusX)} * 100%) calc(${framingVar('focusY', p.focusY)} * 100%)`;
+  return `<img src="${esc(url)}" alt="" style="${css({ width: '100%', height: '100%', objectFit: p.fit, objectPosition: point, transformOrigin: point, transform: `scale(${framingVar('zoom', p.zoom)})`, display: 'block' })}" />`;
+};
+
 const Title: Template<'Title'> = {
   timing: Timing.Wrapper,
   html: (ctx) => {
@@ -162,7 +170,7 @@ const Image: Template<'Image'> = {
   timing: Timing.Wrapper,
   html: (ctx) => {
     const url = ctx.asset(ctx.p.assetId);
-    return placed(ctx, ctx.p, url ? cover(url, ctx.p) : missing('Pick an image'), true);
+    return placed(ctx, ctx.p, url ? zoomed(url, ctx.p) : missing('Pick an image'), true);
   }
 };
 

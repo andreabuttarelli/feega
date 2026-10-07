@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { COLOR, TYPE, type ComponentId } from './components';
+import { COLOR, IMAGE_ZOOM, TYPE, type ComponentId } from './components';
 import { EASE_IDS, Ease } from './design';
 import { MASK_KEYS, MASK_PROPS, maskValue, type Mask, type MaskKey } from './mask';
 import { RING_NUMBERS, RING_NUMBER_KEYS } from '../canvas/composition/ring';
@@ -153,6 +153,12 @@ const typeNumbers: AnimProp[] = (
   ] as const
 ).map(([key, label, fallback]) => ({ key, label, kind: ValueKind.Number, source: Source.Prop, min: TYPE[key].min, max: TYPE[key].max, step: TYPE[key].step, fallback }));
 
+const IMAGE_FRAMING: AnimProp[] = [
+  { key: 'zoom', kind: ValueKind.Number, source: Source.Prop, ...IMAGE_ZOOM },
+  { key: 'focusX', label: 'Pan X', kind: ValueKind.Number, source: Source.Prop, min: 0, max: 1, step: 0.01, fallback: 0.5 },
+  { key: 'focusY', label: 'Pan Y', kind: ValueKind.Number, source: Source.Prop, min: 0, max: 1, step: 0.01, fallback: 0.5 }
+];
+
 const SHAPE_NUMBERS: AnimProp[] = (
   [
     ['roundness', 'Roundness', 0, 0.5, 0.01, 0],
@@ -186,7 +192,7 @@ export const ANIMATABLE: Record<ComponentId, readonly AnimProp[]> = {
   Text: visual(colours(['color', 'Colour']), typeNumbers),
   Kicker: visual(colours(['color', 'Colour']), typeNumbers),
   Caption: visual(colours(['color', 'Colour'], ['background', 'Box']), typeNumbers),
-  Image: visual(),
+  Image: visual(IMAGE_FRAMING),
   Video: visual(remapProps, soundProps),
   Audio: soundProps,
   Shape: visual(colours(['fill', 'Fill'], ['fill2', 'Gradient end'], ['stroke', 'Stroke colour']), SHAPE_NUMBERS),

@@ -105,7 +105,7 @@ describe('the Apple minimal scene library', () => {
     const photo = reveal.beats.find((b) => b.id === 'photo')!;
 
     expect(photo.props?.fit).toBe('cover');
-    expect(reveal.fields.map((f) => f.key)).toEqual(expect.arrayContaining(['focus_x', 'focus_y']));
+    expect(reveal.fields.map((f) => f.key)).toEqual(expect.arrayContaining(['focus_x', 'focus_y', 'zoom']));
   });
 
   it('every scene has its text on screen within the first second', () => {

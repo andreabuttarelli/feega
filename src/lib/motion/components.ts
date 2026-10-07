@@ -66,6 +66,8 @@ const asset = (kind: AssetKind, label: string) =>
 const fade = (label: string) => range(0, 5, 0.1, 0, label, Group.Style);
 const pan = () => range(-1, 1, 0.01, 0, 'Pan', Group.Style);
 
+export const IMAGE_ZOOM = { label: 'Zoom inside the box', min: 1, max: 4, step: 0.01, fallback: 1 };
+
 const crop = () => ({ focusX: range(0, 1, 0.01, 0.5, 'Crop X', Group.Style), focusY: range(0, 1, 0.01, 0.5, 'Crop Y', Group.Style) });
 
 const toggle = (fallback: boolean, label: string, group: Group) =>
@@ -237,10 +239,10 @@ export const COMPONENTS = {
   },
   Image: {
     label: 'Image',
-    description: 'A picture from the canvas assets.',
+    description: 'A picture from the canvas assets. zoom (1..4) scales it inside its box around focusX/focusY, which also pan; all three take set_keyframes. Never zoom past the picture\'s pixels.',
     track: TrackKind.Visual,
     durationInFrames: seconds(3),
-    schema: z.object({ assetId: asset(AssetKind.Image, 'Image'), fit: choice(['cover', 'contain'] as const, 'cover', 'Fit', Group.Style), ...crop(), ...layout({ width: 1, height: 1 }) }).strict()
+    schema: z.object({ assetId: asset(AssetKind.Image, 'Image'), fit: choice(['cover', 'contain'] as const, 'cover', 'Fit', Group.Style), ...crop(), zoom: range(IMAGE_ZOOM.min, IMAGE_ZOOM.max, IMAGE_ZOOM.step, IMAGE_ZOOM.fallback, IMAGE_ZOOM.label, Group.Style), ...layout({ width: 1, height: 1 }) }).strict()
   },
   Video: {
     label: 'Video',

@@ -1,5 +1,6 @@
 import { Ease, TransitionKind } from '$lib/motion/design';
 import { DEVICES, Device } from '$lib/motion/devices';
+import { IMAGE_ZOOM } from '$lib/motion/components';
 import { FontCategory, FontSource, type FontFace } from '$lib/motion/fonts/model';
 import { EASE_BEZIER } from '$lib/motion/keyframes';
 import { STYLES } from '$lib/motion/style';
@@ -150,7 +151,7 @@ const SCENE_DESIGNS: Omit<Design, 'fonts'>[] = [
   {
     id: 'scene-product-reveal',
     name: 'Scene · Product reveal',
-    description: 'Apple minimal. The product, or one section of a screenshot (a capture section, cropped with focus x/y) so its text reads, under a soft light, drifting with a slow push-in and pan the whole time; a small caption under it.',
+    description: 'Apple minimal. The product, or one readable section of a screenshot (zoom inside the box on focus x/y), under a soft light, drifting with a slow push-in and pan the whole time; a small caption under it.',
     seconds: 4,
     beats: [
       fill(INK, 4),
@@ -158,7 +159,7 @@ const SCENE_DESIGNS: Omit<Design, 'fonts'>[] = [
       { id: 'photo', track: 'middle', component: 'Image', at: 0, len: 4, props: { x: 0.5, y: 0.44, ...PRODUCT, fit: 'cover', focusX: 0.5, focusY: 0.2 }, keys: drift(4, 0.97), exit: OUT },
       { id: 'caption', track: 'front', component: 'Text', at: 0.5, len: 3.5, props: { text: 'Product name', ...body(SMALL, MUTED), y: 0.86, width: 0.6, height: 0.06 }, keys: snapUp(), exit: OUT }
     ],
-    fields: [picture('photo', 'Product or screenshot', 'photo', PRODUCT), { key: 'fit', label: 'Photo fit', type: FieldType.Select, clipId: 'photo', prop: 'fit', options: ['contain', 'cover'] }, amount('focus_x', 'Focus X', 'photo', 'focusX'), amount('focus_y', 'Focus Y', 'photo', 'focusY'), text('caption', 'Caption', 'caption'), colour('background', 'Background', 'bg', 'fill')]
+    fields: [picture('photo', 'Product or screenshot', 'photo', PRODUCT), { key: 'fit', label: 'Photo fit', type: FieldType.Select, clipId: 'photo', prop: 'fit', options: ['contain', 'cover'] }, amount('focus_x', 'Focus X', 'photo', 'focusX'), amount('focus_y', 'Focus Y', 'photo', 'focusY'), { key: 'zoom', label: 'Zoom on the section', type: FieldType.Number, clipId: 'photo', prop: 'zoom', min: IMAGE_ZOOM.min, max: IMAGE_ZOOM.max }, text('caption', 'Caption', 'caption'), colour('background', 'Background', 'bg', 'fill')]
   },
   {
     id: 'scene-ui-closeup',

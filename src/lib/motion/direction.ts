@@ -94,8 +94,8 @@ const everyClip = (doc: MotionDoc) => [doc.tracks, ...Object.values(doc.comps).m
 const round = (n: number) => Math.round(n * 100) / 100;
 
 function largestZoom(clip: Clip): number {
-  const keyed = (clip.keyframes.scale ?? []).map((k) => Number(k.value)).filter(Number.isFinite);
-  return num(clip, 'scale', 1) * Math.max(clip.transform?.scale ?? 1, ...keyed);
+  const peak = (key: string, base: number) => Math.max(base, ...(clip.keyframes[key] ?? []).map((k) => Number(k.value)).filter(Number.isFinite));
+  return num(clip, 'scale', 1) * peak('scale', clip.transform?.scale ?? 1) * peak('zoom', num(clip, 'zoom', 1));
 }
 
 function softPictures(doc: MotionDoc, pixels: Pixels): QualityProblem[] {
