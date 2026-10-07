@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, newMotionDoc, type MotionDoc } from './doc';
-import { Side, addClip, setTransition } from './timeline';
+import { Side, addClip, removeClips, setTransition } from './timeline';
+import { precompose } from './precomp';
 import { Quality, SEVERITY, Severity, blocking, docProblems, frameProblems } from './direction';
 import { Forbidden } from './style';
 import supasitoV1 from './fixtures/supasito-v1.json';
@@ -342,6 +343,14 @@ describe('a cut waits for the scene to finish', () => {
     const short = { ...placed, tracks: placed.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.component === 'Precomp' ? { ...c, durationInFrames: 35 } : c)) })) };
 
     expect(cuts(short).length).toBeGreaterThan(0);
+  });
+
+  it('a device cut while the UI on its screen still animates is cut mid-animation', () => {
+    const screen = must(precompose(withPiece(UiKind.Funnel, 3), ['c'], { comp: 'ui', clip: 'pc' }, 'UI'));
+    const device = (seconds: number) => must(addClip(must(removeClips(screen, ['pc'])), { component: 'Device3D', from: 0, durationInFrames: Math.round(seconds * FPS), props: { screenComp: 'ui' } }, 'd'));
+
+    expect(cuts(device(1.5)).length).toBeGreaterThan(0);
+    expect(cuts(device(3))).toEqual([]);
   });
 
   it('cuts mid-animation, scenes without a hold and text too short to read block delivery', () => {

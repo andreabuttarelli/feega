@@ -2,6 +2,7 @@ import { COMPONENTS, TrackKind } from './components';
 import type { MotionDoc } from './doc';
 import { UI_KIT } from './ui-kit/kit';
 import { settleTime } from './ui-kit/render';
+import { screenCompOf } from './device-screen';
 
 export enum CutFault {
   MidAnimation = 'mid-animation',
@@ -42,15 +43,22 @@ function keyMoves(doc: MotionDoc, clip: Clip, cut: number): Moves {
 
 type Reading = { settle: number; problems: CutProblem[] };
 
+const NESTED: Record<string, (clip: Clip) => string | null> = {
+  Precomp: (clip) => String(clip.props.comp ?? '') || null,
+  Device3D: (clip) => screenCompOf(clip)
+};
+
+const nestedComp = (clip: Clip) => NESTED[clip.component]?.(clip) ?? null;
+
 function readClip(doc: MotionDoc, clip: Clip, offset: number, seen: ReadonlySet<string>): Reading {
   if (!visual(clip)) {
     return { settle: 0, problems: [] };
   }
   const cut = cutOf(clip);
   const moves = keyMoves(doc, clip, cut);
-  const comp = String(clip.props.comp ?? '');
-  const inner = clip.component === 'Precomp' && !seen.has(comp) ? doc.comps[comp] : undefined;
-  const nested = new Set([...seen, comp]);
+  const comp = nestedComp(clip);
+  const inner = comp && !seen.has(comp) ? doc.comps[comp] : undefined;
+  const nested = new Set([...seen, comp ?? '']);
   const children = (inner?.tracks.flatMap((t) => t.clips as Clip[]) ?? [])
     .filter((c) => c.from < cut)
     .map((c) => ({ from: c.from, read: readClip(doc, { ...c, durationInFrames: Math.min(c.durationInFrames, cut - c.from) }, offset + clip.from, nested) }));
