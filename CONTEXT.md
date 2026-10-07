@@ -67,3 +67,17 @@ _Avoid_: fan-out, broadcast.
 **Brand memory**:
 The shared memory of a brand: facts, skills and notes any main agent can read and write. The place a notion lives when it must outlive the turn that produced it.
 _Avoid_: context, knowledge base.
+
+**Brand accent**:
+The one colour a motion film adds to ink and paper. Read from the brand, never chosen: the first saturated colour (chroma ≥ 0.18) in this order, held by `ACCENT_ORDER` in `src/lib/motion/accent.ts`.
+
+| Order | Source | Where |
+|---|---|---|
+| 1 | logo | svg fills or raster colours of the logo |
+| 2 | favicon | favicon or apple-touch-icon |
+| 3 | theme-color | `<meta name="theme-color">` |
+| 4 | buttons | CSS rules on buttons, links, `.btn`, `.cta`, `primary` |
+| 5 | css | custom properties and every other CSS colour |
+| — | none | only neutrals: no accent, the neutral palette (ink, paper, muted, line) |
+
+_Avoid_: an invented accent, a colour the agent picks because it suits the sector.

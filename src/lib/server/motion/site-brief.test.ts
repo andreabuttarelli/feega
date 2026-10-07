@@ -165,6 +165,34 @@ describe('readSite: what a trailer needs from a public page', () => {
     ]);
   });
 
+  it('finds the accent in the buttons when the tokens are only neutrals', async () => {
+    const page = `<html><head><title>Supa</title><link href="/app.css" rel="stylesheet"><style>:root { --background: #FAFAF9; --foreground: #1C1917 }</style></head><body><h1>Sites</h1></body></html>`;
+    serves({
+      [SITE]: { type: 'text/html', body: page },
+      'https://brand.example/app.css': { type: 'text/css', body: 'body { color: #1C1917 } .btn-primary { background: #F2552F; color: #FFFFFF } a:hover { color: #D9431F }' }
+    });
+
+    const read = await readSite(SITE);
+    if (!read.ok) {
+      throw new Error(read.error);
+    }
+
+    expect(read.site.accent).toMatchObject({ hex: '#F2552F', source: 'buttons' });
+  });
+
+  it('gives no accent, not an invented one, when the site has only neutrals', async () => {
+    const page = `<html><head><title>Grey</title><style>:root { --background: #FAFAF9; --foreground: #1C1917 } button { background: #111111 }</style></head><body></body></html>`;
+    serves({ [SITE]: { type: 'text/html', body: page } });
+
+    const read = await readSite(SITE);
+    if (!read.ok) {
+      throw new Error(read.error);
+    }
+
+    expect(read.site.accent.hex).toBeNull();
+    expect(read.site.accent.neutral).not.toBeNull();
+  });
+
   it('keeps the page when an image is too large to probe, dropping only that image', async () => {
     serves({
       [SITE]: { type: 'text/html', body: HTML },

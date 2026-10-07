@@ -96,6 +96,13 @@ describe('motion agent brand tools', () => {
     expect(prompt).toMatch(/trailer/i);
   });
 
+  it('the prompt takes the accent the site read found and never invents one', () => {
+    const prompt = motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Available });
+
+    expect(prompt).toContain('accent.hex');
+    expect(prompt).toMatch(/never invent/i);
+  });
+
   it('the logo imported from the site read is the brand logo: view_frames names it extruded in 3D', async () => {
     const site = vi.fn(async () => ({ ok: true as const, site: { name: 'Dub', logos: [{ url: 'https://dub.example/logo.svg' }] } }));
     const importAsset = vi.fn(async () => ({ ok: true as const, asset: LOGO, width: 64, height: 64 }));
