@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEVICE, DEVICES, DeviceKind } from './devices';
+import { DEVICE, DEVICES, DeviceKind, GLASS_RIM, bevelOf } from './devices';
 
 const TRADEMARKS = /iphone|ipad|imac|macbook|apple|pixel|google|galaxy|samsung/i;
 const ASPECT_TOLERANCE = 0.005;
@@ -19,6 +19,14 @@ describe('device table', () => {
   it.each(DEVICES)('%s screen has the aspect of its pixel resolution', (id) => {
     const { screen } = DEVICE[id];
     expect(Math.abs(screen.height / screen.width - screen.px[1] / screen.px[0])).toBeLessThan(ASPECT_TOLERANCE);
+  });
+
+  it.each(DEVICES.filter((id) => DEVICE[id].kind !== DeviceKind.Browser))('%s curves its edge outside the glass, so the black bezel stays flat and visible at an angle', (id) => {
+    const { body, screen } = DEVICE[id];
+    const curve = bevelOf(body.depth) * 0.8;
+
+    expect(curve).toBeLessThanOrEqual(GLASS_RIM);
+    expect((body.width - screen.width) / 2).toBeGreaterThan(GLASS_RIM);
   });
 
   it.each(DEVICES)('%s has a generic name, no trademark', (id) => {
