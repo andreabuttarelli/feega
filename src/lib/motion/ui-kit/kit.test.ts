@@ -48,4 +48,10 @@ describe('every UI kit piece', () => {
 
     expect(seek(0)).not.toEqual(seek(DURATION - 0.1));
   });
+
+  it.each(UI_KINDS.map((k) => [k]))('%s reacts on springs: presses, hovers and switches never ride an eased ramp', (kind) => {
+    const js = UI_KIT[kind].js;
+
+    expect(js).not.toMatch(/span\(t, CLICK, 0\.08\)|inOut\(span\(t, HOVER|const on = inOut|lift = i === top \? out|const press = \(t, at\) => span/);
+  });
 });

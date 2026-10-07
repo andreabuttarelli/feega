@@ -72,6 +72,13 @@ export function reelMath(S: SpringMath) {
   type Cue = { beat: number; cursor?: Point; click?: boolean; knob?: Edges; drag?: { to: Point; channel: string; x0: number; x1: number; rubber: number; settle: number }; set?: Record<string, number>; type?: string; key?: boolean };
   type Kind = { box: Box; beats: number; leave: { click?: Point; key?: boolean }; enter: Record<string, number>; knob?: Edges; cues: Cue[] };
 
+  const REST_INSET = 0.3;
+  const inBox = (p: Point, box: Pick<Box, 'w' | 'h'>): Point => {
+    const hw = (box.w / 2) * (1 - REST_INSET);
+    const hh = (box.h / 2) * (1 - REST_INSET);
+    return Math.abs(p[0]) <= box.w / 2 && Math.abs(p[1]) <= box.h / 2 ? p : [Math.max(-hw, Math.min(hw, p[0])), Math.max(-hh, Math.min(hh, p[1]))];
+  };
+
   const tabEdges = (tabs: typeof TABS, i: number): Edges => [tabs.centers[i] - tabs.half, tabs.centers[i] + tabs.half, tabs.y, tabs.h];
 
   const pointOf = (i: number, series: number[]): Point => [CHART.x0 + (i / (series.length - 1)) * (CHART.x1 - CHART.x0), CHART.y0 + series[i] * (CHART.y1 - CHART.y0)];
@@ -152,7 +159,9 @@ export function reelMath(S: SpringMath) {
     const time = (b: number) => wrap(input.offset + b * step);
     const put = (channel: string, at: number, value: number, spring?: Spring) => (keys[channel] = keys[channel] || []).push({ at: wrap(at), value, spring: spring ?? CHANNEL_SPRING[channel] ?? (channel.startsWith('in:') ? SPRING.soft : SPRING.ui) });
     const putAll = (values: Record<string, number>, at: number) => Object.entries(values).forEach(([k, v]) => put(k, at, v));
+    let cursorAt: Point = IDLE;
     const moveCursor = (to: Point, at: number) => {
+      cursorAt = to;
       put('curX', at - CURSOR_LEAD, to[0]);
       put('curY', at - CURSOR_LEAD + CURVE_LAG, to[1]);
     };
@@ -192,6 +201,10 @@ export function reelMath(S: SpringMath) {
       if (previous.leave.click) {
         moveCursor(previous.leave.click, at);
         click(at);
+      }
+      const inside = inBox(cursorAt, kind.box);
+      if (inside !== cursorAt) {
+        moveCursor(inside, at + CURSOR_LEAD);
       }
       if (previous.leave.key) {
         put('flash', at - PRESS_LEAD, 1);

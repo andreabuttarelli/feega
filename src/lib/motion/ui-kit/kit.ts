@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { cursorPlan } from './cursor-plan';
+import { springSource } from '../spring';
 
 export enum UiKind {
   LinkShortener = 'link-shortener',
@@ -92,6 +94,25 @@ stage.style.fontFamily = family;
 root.appendChild(stage);
 const fit = Math.min(1, ((root.clientWidth || DESIGN_W) * SAFE) / DESIGN_W, ((root.clientHeight || DESIGN_H) * SAFE) / DESIGN_H);
 stage.style.transform = 'translate(-50%, -50%) scale(' + zoom * fit + ')';
+const SPRING = SPRING_MATH;
+const PRESS = { stiffness: 1400, damping: 75 };
+const UI = { stiffness: 320, damping: 30 };
+const springTo = (t, at, spring) => SPRING.step(spring || UI, t - at / speed);
+const tap = (t, at) => SPRING.sumSteps(0, [{ at: at / speed, delta: 1, spring: PRESS }, { at: (at + 0.09) / speed, delta: -1, spring: PRESS }], t);
+const TIP = [7, 3];
+const aim = (el, host) => {
+  let x = el.offsetWidth / 2;
+  let y = el.offsetHeight / 2;
+  for (let n = el; n && n !== host; n = n.offsetParent) {
+    x += n.offsetLeft;
+    y += n.offsetTop;
+  }
+  return [x - TIP[0], y - TIP[1]];
+};
+const anchor = (el, name) => {
+  el.setAttribute('data-anchor', name);
+  return el;
+};
 const drive = (render) => {
   render(0);
   tl.to({}, { duration, ease: 'none', onUpdate() { render(this.time()); } }, 0);
@@ -106,7 +127,7 @@ const BASE_CSS = `
 .muted { color: var(--muted); }
 `;
 
-const piece = (name: string, about: string, size: UiSize, css: string, js: string): UiPiece => ({ name, about, size, html: '', css: BASE_CSS + css, js: `const DESIGN_W = ${size.width};\nconst DESIGN_H = ${size.height};\nconst SAFE = ${UI_SAFE};\n` + STYLE_PARAMS + js });
+const piece = (name: string, about: string, size: UiSize, css: string, js: string): UiPiece => ({ name, about, size, html: '', css: BASE_CSS + css, js: `const DESIGN_W = ${size.width};\nconst DESIGN_H = ${size.height};\nconst SAFE = ${UI_SAFE};\n` + STYLE_PARAMS.replace('SPRING_MATH', () => springSource()) + js });
 
 const SHORTENER = piece(
   'UiLinkShortener',
@@ -135,10 +156,10 @@ box.style.transform = 'translate(-50%, -50%)';
 box.style.position = 'absolute';
 make('div', 'label', box, label);
 const row = make('div', 'row', box);
-const field = make('div', 'field', row);
+const field = anchor(make('div', 'field', row), 'field');
 const typed = make('span', '', field);
 const caret = make('span', 'caret', field);
-const btn = make('div', 'button', row, button);
+const btn = anchor(make('div', 'button', row, button), 'button');
 const result = make('div', 'result', box);
 make('div', 'dot', result, '✓');
 make('div', '', result, short);
@@ -153,10 +174,11 @@ drive((t) => {
   typed.textContent = url.slice(0, Math.round(url.length * typing));
   caret.style.opacity = typing < 1 || Math.floor(t * 2.5) % 2 === 0 ? '1' : '0';
   const travel = inOut(span(t, CLICK - 0.55, 0.5));
-  cursor.style.left = (1080 - 140 * travel) + 'px';
-  cursor.style.top = (300 - 240 * travel + 14) + 'px';
+  const [bx, by] = aim(btn, box);
+  cursor.style.left = (1080 + (bx - 1080) * travel) + 'px';
+  cursor.style.top = (314 + (by - 314) * travel) + 'px';
   cursor.style.opacity = String(span(t, CLICK - 0.7, 0.15));
-  const press = span(t, CLICK, 0.08) - span(t, CLICK + 0.08, 0.12);
+  const press = tap(t, CLICK);
   btn.style.transform = 'scale(' + (1 - 0.06 * press) + ')';
   const shown = out(span(t, CLICK + 0.1, 0.4));
   result.style.opacity = String(shown);
@@ -445,7 +467,7 @@ const glide = (n, from, to, at, len, t) => {
   n.style.top = (from[1] + (to[1] - from[1]) * p) + 'px';
   n.style.opacity = String(span(t, at - 0.2, 0.15));
 };
-const press = (t, at) => span(t, at, 0.08) - span(t, at + 0.08, 0.12);
+const press = (t, at) => tap(t, at);
 const rise = (n, p, dy) => {
   n.style.opacity = String(p);
   n.style.transform = 'translateY(' + (dy * (1 - p)) + 'px)';
@@ -483,7 +505,7 @@ const shell = make('div', 'card shell');
 const side = make('div', 'side', shell);
 make('div', 'brand', side, brand);
 const glow = make('div', 'glow', side);
-const navs = rows(items).map((r) => make('div', 'nav', side, r[0]));
+const navs = rows(items).map((r, i) => anchor(make('div', 'nav', side, r[0]), 'nav-' + i));
 const main = make('div', 'main', shell);
 const head = make('div', 'title', main, title);
 const bars = [0.62, 0.48, 0.71, 0.4, 0.55].map((w) => {
@@ -531,7 +553,7 @@ const kick = make('div', 'kicker', hero, kicker);
 const h = make('div', 'headline', hero);
 const words = String(headline).split(' ').map((w) => make('span', 'word', h, w));
 const s = make('div', 'sub muted', hero, sub);
-const button = make('div', 'cta', hero, cta);
+const button = anchor(make('div', 'cta', hero, cta), 'cta');
 const cursor = pointer(hero);
 const CLICK = 1.3 + words.length * 0.12;
 drive((t) => {
@@ -545,7 +567,7 @@ drive((t) => {
   const pop = out(span(t, 0.8 + words.length * 0.12, 0.35));
   button.style.opacity = String(pop);
   button.style.transform = 'scale(' + ((0.8 + 0.2 * pop) * (1 - 0.06 * press(t, CLICK))) + ')';
-  glide(cursor, [1100, 640], [760, 590], CLICK - 0.5, 0.45, t);
+  glide(cursor, [1100, 640], aim(button, hero), CLICK - 0.5, 0.45, t);
 });
 `
 );
@@ -571,10 +593,10 @@ const prompt = param('prompt', 'Make the pricing page dark and add a yearly plan
 const doneText = param('done', 'Done in 4 seconds', { type: 'text', group: 'Content' });
 const box = make('div', 'card box');
 make('div', 'label', box, label);
-const field = make('div', 'field', box);
+const field = anchor(make('div', 'field', box), 'field');
 const typed = make('span', '', field);
 const caret = make('span', 'caret', field);
-const send = make('div', 'send', field);
+const send = anchor(make('div', 'send', field), 'send');
 send.innerHTML = '<svg viewBox="0 0 24 24" width="30" height="30"><path d="M5 12h12M12 6l6 6-6 6" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round"/></svg>';
 const run = make('div', 'run', make('div', 'track', box));
 const done = make('div', 'done', box);
@@ -587,7 +609,7 @@ drive((t) => {
   const typing = span(t, 0.2, TYPE_LEN);
   typed.textContent = String(prompt).slice(0, Math.round(String(prompt).length * typing));
   caret.style.opacity = typing < 1 || Math.floor(t * 2.5) % 2 === 0 ? '1' : '0';
-  glide(cursor, [900, 380], [1150, 200], CLICK - 0.5, 0.45, t);
+  glide(cursor, [900, 380], aim(send, box), CLICK - 0.5, 0.45, t);
   send.style.transform = 'scale(' + (1 - 0.1 * press(t, CLICK)) + ')';
   run.style.width = (100 * inOut(span(t, CLICK + 0.1, 0.8))) + '%';
   rise(done, out(span(t, CLICK + 0.9, 0.35)), 14);
@@ -619,7 +641,7 @@ make('div', 'muted', bar, title).style.marginLeft = '18px';
 const board = make('div', 'board', editor);
 const SLOTS = [[30, 30, 1300, 80], [30, 140, 760, 300], [820, 140, 510, 300], [30, 470, 640, 170], [700, 470, 630, 170]];
 const placed = rows(blocks).slice(0, SLOTS.length).map((r, i) => {
-  const b = make('div', 'block' + (i === 1 ? ' hot' : ''), board, r[0]);
+  const b = anchor(make('div', 'block' + (i === 1 ? ' hot' : ''), board, r[0]), 'block-' + i);
   const [x, y, w, h] = SLOTS[i];
   Object.assign(b.style, { left: x + 'px', top: y + 'px', width: w + 'px', height: h + 'px' });
   return b;
@@ -643,7 +665,8 @@ drive((t) => {
     sel.style.height = '308px';
   }
   sel.style.opacity = String(span(t, GRAB, 0.15));
-  glide(cursor, [1000, 600], [420 + 40 * drag, 290 - 20 * drag], GRAB - 0.5, 0.5, t);
+  const [hx, hy] = hot ? aim(hot, board) : [420, 290];
+  glide(cursor, [1000, 600], [hx + 40 * drag, hy - 20 * drag], GRAB - 0.5, 0.5, t);
 });
 `
 );
@@ -664,7 +687,7 @@ const CARD_GRID = generic(
 const cards = param('cards', 'Portfolio|Updated 2 min ago\\nShop|12 pages\\nBlog|Draft\\nDocs|Published\\nLanding|A/B test\\nEvents|Scheduled', { type: 'textarea', group: 'Content' });
 const grid = make('div', 'grid');
 const tiles = rows(cards).slice(0, 6).map((r, i) => {
-  const tile = make('div', 'card tile', grid);
+  const tile = anchor(make('div', 'card tile', grid), 'card-' + i);
   const thumb = make('div', 'thumb', tile);
   thumb.style.background = 'linear-gradient(135deg, ' + accent + ', color-mix(in srgb, ' + accent + ' ' + (30 + i * 10) + '%, ' + paper + '))';
   const meta = make('div', 'meta', tile);
@@ -677,11 +700,11 @@ const HOVER = 0.3 + tiles.length * 0.1 + 0.4;
 drive((t) => {
   tiles.forEach((tile, i) => {
     const p = out(span(t, 0.2 + i * 0.1, 0.45));
-    const lift = i === 1 ? inOut(span(t, HOVER, 0.3)) : 0;
+    const lift = i === 1 ? springTo(t, HOVER) : 0;
     tile.style.opacity = String(p);
     tile.style.transform = 'translateY(' + (40 * (1 - p) - 12 * lift) + 'px) scale(' + (1 + 0.03 * lift) + ')';
   });
-  glide(cursor, [1300, 760], [720, 200], HOVER - 0.5, 0.5, t);
+  glide(cursor, [1300, 760], tiles.length ? aim(tiles[Math.min(1, tiles.length - 1)], grid) : [720, 200], HOVER - 0.5, 0.5, t);
 });
 `
 );
@@ -716,7 +739,7 @@ const cards = rows(plans).slice(0, 4).map((r, i) => {
     make('b', '', row, '✓');
     make('span', 'muted', row, f.trim());
   });
-  const buy = make('div', 'buy', plan, cta);
+  const buy = anchor(make('div', 'buy', plan, cta), 'buy-' + i);
   return { plan, price, buy, n: number(r[1] || '0') };
 });
 const cursor = pointer(wrap);
@@ -724,13 +747,13 @@ const CLICK = 0.4 + cards.length * 0.15 + 1;
 drive((t) => {
   cards.forEach((c, i) => {
     const p = out(span(t, 0.2 + i * 0.15, 0.45));
-    const lift = i === top ? out(span(t, 1, 0.4)) : 0;
+    const lift = i === top ? springTo(t, 1) : 0;
     c.plan.style.opacity = String(p);
     c.plan.style.transform = 'translateY(' + (50 * (1 - p) - 18 * lift) + 'px) scale(' + (1 + 0.04 * lift) + ')';
     c.price.textContent = counted(c.n, out(span(t, 0.3 + i * 0.15, 1)));
     c.buy.style.transform = i === top ? 'scale(' + (1 - 0.06 * press(t, CLICK)) + ')' : '';
   });
-  glide(cursor, [1300, 760], [720, 660], CLICK - 0.5, 0.45, t);
+  glide(cursor, [1300, 760], cards[top] ? aim(cards[top].buy, wrap) : [720, 660], CLICK - 0.5, 0.45, t);
 });
 `
 );
@@ -804,8 +827,8 @@ const dialog = make('div', 'card dialog', page);
 make('div', 'dtitle', dialog, title);
 make('div', 'dbody muted', dialog, body);
 const actions = make('div', 'actions', dialog);
-make('div', 'btn', actions, cancel);
-const go = make('div', 'btn go', actions, confirm);
+anchor(make('div', 'btn', actions, cancel), 'cancel');
+const go = anchor(make('div', 'btn go', actions, confirm), 'confirm');
 const cursor = pointer(page);
 const CLICK = 1.5;
 drive((t) => {
@@ -813,7 +836,7 @@ drive((t) => {
   const p = out(span(t, 0.2, 0.4));
   dialog.style.opacity = String(p);
   dialog.style.transform = 'scale(' + (0.88 + 0.12 * p) + ')';
-  glide(cursor, [1200, 720], [905, 520], CLICK - 0.5, 0.45, t);
+  glide(cursor, [1200, 720], aim(go, page), CLICK - 0.5, 0.45, t);
   go.style.transform = 'scale(' + (1 - 0.06 * press(t, CLICK)) + ')';
   go.textContent = t >= (CLICK + 0.15) / speed ? success : confirm;
 });
@@ -837,16 +860,16 @@ const title = param('title', 'Settings', { type: 'text', group: 'Content' });
 const settings = param('settings', 'Auto-publish\\nDark mode\\nAnalytics\\nCustom domain', { type: 'textarea', group: 'Content' });
 const panel = make('div', 'card panel');
 make('div', 'ptitle', panel, title);
-const switches = rows(settings).slice(0, 6).map((r) => {
+const switches = rows(settings).slice(0, 6).map((r, i) => {
   const set = make('div', 'set', panel);
   make('div', '', set, r[0]);
-  const track = make('div', 'track', set);
+  const track = anchor(make('div', 'track', set), 'toggle-' + i);
   return { set, track, knob: make('div', 'knob', track) };
 });
 drive((t) => {
   switches.forEach((s, i) => {
     rise(s.set, out(span(t, 0.1 + i * 0.1, 0.4)), 16);
-    const on = inOut(span(t, 0.8 + i * 0.3, 0.25));
+    const on = springTo(t, 0.8 + i * 0.3);
     s.knob.style.left = (4 + 36 * on) + 'px';
     s.track.style.background = 'color-mix(in srgb, ' + accent + ' ' + Math.round(on * 100) + '%, ' + line + ')';
   });
@@ -875,7 +898,7 @@ const file = param('file', 'brand-assets.zip', { type: 'text', group: 'Content' 
 const size = param('size', '24 MB', { type: 'text', group: 'Content' });
 const doneText = param('done', 'Uploaded', { type: 'text', group: 'Content' });
 const zone = make('div', 'card zone');
-const drop = make('div', 'drop muted', zone, label);
+const drop = anchor(make('div', 'drop muted', zone, label), 'drop');
 const card = make('div', 'file', zone);
 make('div', 'icon', card);
 const info = make('div', 'info', card);
@@ -942,37 +965,34 @@ drive((t) => {
 
 const CURSOR = generic(
   'UiCursor',
-  'A lone cursor to lay over any UI clip: it glides through the points on a smooth ease and clicks at each with a ripple in the accent. Param path: one point per line "x|y" as shares of the frame (0..1).',
+  'A lone cursor to lay over any UI clip: it glides to each point and clicks it with a ripple in the accent. Param path: one click per line "x|y|t", x and y shares of the clip box (0..1), t the second of the click inside the clip. Never guess the points: click_ui writes them from the anchors of the UI it clicks.',
   { width: 1600, height: 900 },
   `
-.layer { position: absolute; width: 1600px; height: 900px; transform: translate(-50%, -50%); }
+.layer { position: absolute; inset: 0; }
 .ripple { position: absolute; width: 80px; height: 80px; margin: -40px 0 0 -40px; border-radius: 50%; border: 3px solid var(--accent); opacity: 0; }
 `,
   `
 const path = param('path', '0.7|0.8\\n0.45|0.4\\n0.6|0.55', { type: 'textarea', group: 'Content' });
-const layer = make('div', 'layer');
-const points = rows(path).map((r) => [Number(r[0]) * 1600, Number(r[1] || 0) * 900]);
+const plan = (CURSOR_PLAN)(path, duration);
+const layer = document.createElement('div');
+layer.className = 'layer';
+root.appendChild(layer);
 const ripple = make('div', 'ripple', layer);
 const cursor = pointer(layer);
-const LEG = Math.max(0.4, (duration * speed - 0.4) / Math.max(1, points.length));
+const W = root.clientWidth || 1920;
+const H = root.clientHeight || 1080;
 drive((t) => {
-  const leg = Math.min(points.length - 1, Math.floor((t * speed) / LEG));
-  const from = points[Math.max(0, leg - 1)] || [800, 450];
-  const to = points[Math.max(0, leg)] || [800, 450];
-  glide(cursor, from, to, Math.max(0, leg - 1) * LEG + 0.2, LEG * 0.6, t);
-  if (leg === 0) {
-    cursor.style.left = to[0] + 'px';
-    cursor.style.top = to[1] + 'px';
-  }
+  const pose = plan.at(t);
+  cursor.style.left = (pose.x * W - TIP[0]) + 'px';
+  cursor.style.top = (pose.y * H - TIP[1]) + 'px';
   cursor.style.opacity = '1';
-  const click = (Math.max(0, leg - 1) * LEG + 0.2 + LEG * 0.6);
-  const r = span(t, click, 0.4);
-  ripple.style.left = to[0] + 'px';
-  ripple.style.top = to[1] + 'px';
-  ripple.style.opacity = String(r > 0 && r < 1 ? 1 - r : 0);
+  const r = clamp((t - pose.click.at) / 0.4);
+  ripple.style.left = pose.click.x * W + 'px';
+  ripple.style.top = pose.click.y * H + 'px';
+  ripple.style.opacity = String(t >= pose.click.at && r < 1 ? 1 - r : 0);
   ripple.style.transform = 'scale(' + (0.3 + r) + ')';
 });
-`
+`.replace('CURSOR_PLAN', cursorPlan.toString())
 );
 
 export const UI_KIT: Record<UiKind, UiPiece> = {
@@ -1070,13 +1090,13 @@ S.blocks.forEach((b) => {
     return;
   }
   if (b.kind === 'input') {
-    const field = make('div', 'input', body);
+    const field = anchor(make('div', 'input', body), 'input-' + typers.length);
     typers.push({ text: make('span', '', field), caret: make('span', 'caret', field), full: b.text });
     parts.push(field);
     return;
   }
   if (b.kind === 'button') {
-    button = make('div', 'button', body, b.text);
+    button = anchor(make('div', 'button', body, b.text), 'button');
     parts.push(button);
     return;
   }
@@ -1131,11 +1151,10 @@ drive((t) => {
     return;
   }
   const travel = inOut(span(t, CLICK - 0.6, 0.55));
-  const bx = button.offsetLeft + button.offsetWidth * 0.6;
-  const by = button.offsetTop + (screen.offsetHeight - body.offsetHeight) + button.offsetHeight * 0.6;
+  const [bx, by] = aim(button, screen);
   cursor.style.transform = 'translate(' + (1300 + (bx - 1300) * travel) + 'px, ' + (800 + (by - 800) * travel) + 'px)';
   cursor.style.opacity = String(span(t, CLICK - 0.75, 0.15));
-  const press = span(t, CLICK, 0.08) - span(t, CLICK + 0.08, 0.12);
+  const press = tap(t, CLICK);
   button.style.transform = 'scale(' + (1 - 0.06 * press) + ')';
 });
 `;
