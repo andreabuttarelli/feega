@@ -76,7 +76,7 @@ import { SHAPE_KINDS, StrokeKind, modifierKey } from '$lib/motion/shape/schema';
 import { PRESET as SHAPE_PRESET, SHAPE_PRESETS, applyShapePreset } from '$lib/motion/shape/presets';
 import { MAX_RATE, MIN_RATE, REMAP_KEY, clearTimeRemap, freezeFrame } from '$lib/motion/time-remap';
 import { PARTICLE_PRESETS, PRESET_PROPS as PARTICLE_PRESET, applyParticlePreset } from '$lib/motion/particles/presets';
-import { addLiquidGlass } from '$lib/motion/glass/ops';
+import { Lens, addLens } from '$lib/motion/glass/ops';
 import { SPRINGS } from '$lib/motion/spring';
 import { DUCK_DEFAULTS, duckUnder } from '$lib/motion/duck';
 import type { AudioAnalysis } from '$lib/motion/audio-analysis';
@@ -870,7 +870,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const path = (input.path ?? []).map((s) => ({ time: s.time, x: s.x / session.doc.width, y: s.y / session.doc.height }));
         const id = deps.newId();
         const glass = { from: frames(input.start), durationInFrames: frames(input.duration), props, path, spring: { ...SPRINGS[input.spring ?? 'soft'], ...(input.stiffness ? { stiffness: input.stiffness } : {}), ...(input.damping ? { damping: input.damping } : {}) }, fadeIn: frames(input.fade_in ?? 0), fadeOut: frames(input.fade_out ?? 0) };
-        return created(apply(addLiquidGlass(session.doc, glass, { clip: id, track: deps.newId() }), 'added liquid glass'), id);
+        return created(apply(addLens(session.doc, Lens.Glass, glass, { clip: id, track: deps.newId() }), 'added liquid glass'), id);
       }
     }),
 

@@ -3,7 +3,7 @@ import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '../doc';
 import { addClip, type OpResult } from '../timeline';
 import { expressionValue } from '../expression/bake';
 import { SPRINGS } from '../spring';
-import { addLiquidGlass } from './ops';
+import { Lens, addLens } from './ops';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -17,7 +17,7 @@ const ids = { clip: 'drop', track: 'glass' };
 
 describe('adding a liquid glass drop', () => {
   it('goes on a new top track, so everything already in the video is under the lens', () => {
-    const doc = must(addLiquidGlass(titled, { from: 0, durationInFrames: 120, props: {}, path: [], spring: SPRINGS.soft, fadeIn: 0, fadeOut: 0 }, ids));
+    const doc = must(addLens(titled, Lens.Glass, { from: 0, durationInFrames: 120, props: {}, path: [], spring: SPRINGS.soft, fadeIn: 0, fadeOut: 0 }, ids));
 
     expect(doc.tracks[0].id).toBe('glass');
     expect(findClip(doc, 'drop')!.clip.component).toBe('LiquidGlass');
@@ -29,7 +29,7 @@ describe('adding a liquid glass drop', () => {
       { time: 1, x: 0.45, y: 0.48 },
       { time: 3, x: 0.5, y: 0.8 }
     ];
-    const doc = must(addLiquidGlass(titled, { from: 30, durationInFrames: 150, props: {}, path, spring: SPRINGS.soft, fadeIn: 0, fadeOut: 0 }, ids));
+    const doc = must(addLens(titled, Lens.Glass, { from: 30, durationInFrames: 150, props: {}, path, spring: SPRINGS.soft, fadeIn: 0, fadeOut: 0 }, ids));
     const x = (frame: number) => expressionValue(doc, 'drop', 'centerX', frame);
 
     expect(findClip(doc, 'drop')!.clip.props.centerX).toBe(0.1);
@@ -40,7 +40,7 @@ describe('adding a liquid glass drop', () => {
   });
 
   it('fades its presence in and out over the asked seconds', () => {
-    const doc = must(addLiquidGlass(titled, { from: 0, durationInFrames: 120, props: {}, path: [], spring: SPRINGS.soft, fadeIn: 15, fadeOut: 20 }, ids));
+    const doc = must(addLens(titled, Lens.Glass, { from: 0, durationInFrames: 120, props: {}, path: [], spring: SPRINGS.soft, fadeIn: 15, fadeOut: 20 }, ids));
 
     expect(findClip(doc, 'drop')!.clip.keyframes.presence?.map((k) => [k.frame, k.value])).toEqual([
       [0, 0],
