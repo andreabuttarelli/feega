@@ -12,7 +12,9 @@ export type EffectId =
 	| 'wave'
 	| 'swirl'
 	| 'pinch'
-	| 'ascii';
+	| 'ascii'
+	| 'shape-mosaic'
+	| 'shape-cutout';
 
 export type EffectParam =
 	| { name: string; label: string; kind: 'range'; min: number; max: number; step: number; default: number }
