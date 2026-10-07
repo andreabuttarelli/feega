@@ -4,7 +4,8 @@ import { motionScope as scopeFor } from '$lib/server/motion/editor-scope';
 import { assetUrls, headOrNew, motionAssets, motionTokens, saveMotionDoc } from '$lib/server/motion/editor';
 import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
 import { motionRenderFarm, motionRenderStorage } from '$lib/server/motion/renderer';
-import { batchView, cancelRender, renderRequest, renderView, startBatch, startRender } from '$lib/server/motion/render-run';
+import { batchView, cancelRender, renderView, startBatch } from '$lib/server/motion/render-run';
+import { startFarmRender } from '$lib/server/motion/render-start';
 import { batchInput, rowRequests } from '$lib/server/motion/batch-input';
 import { parseSettings } from '$lib/motion/export-formats';
 import { listNodeRuns } from '$lib/server/repos/node-runs';
@@ -165,17 +166,8 @@ export const actions: Actions = {
       return fail(denied.status, denied.data);
     }
 
-    const [assets, tokens] = await Promise.all([
-      motionAssets({ db: scope.db, orgId: scope.orgId, projectId: params.projectId, canvasId: scope.canvas.id, nodeId: scope.motion.record.id }, SIGNED_URL_TTL_S.render),
-      motionTokens(scope.db, { orgId: scope.orgId, brandId: scope.projectBrandId })
-    ]);
-    const soundIds = clipsOf(head.doc).map((c) => String(c.props.assetId ?? ''));
-    const analyses = await analyzeSounds(storageAnalysis(scope.db), { orgId: scope.orgId, projectId: params.projectId }, assets, soundIds);
-    const req = renderRequest(version, { doc: head.doc, tokens, assets: assetUrls(assets), analyses }, settings.settings);
-
     const editorUrl = `/p/${params.projectId}/c/${params.canvasId}/motion/${params.nodeId}`;
-    const renderScope = { ...nodeScope, projectId: params.projectId, userId: scope.userId, editorUrl };
-    const started = await startRender(scope.db, motionRenderFarm(), renderScope, req, motionRenderStorage());
+    const started = await startFarmRender(scope.db, { ...nodeScope, projectId: params.projectId, canvasId: scope.canvas.id, userId: scope.userId, brandId: scope.projectBrandId, editorUrl, head, settings: settings.settings });
     return started.ok ? { runId: started.runId, quote: started.quote } : fail(HTTP_UNAVAILABLE, { error: started.error, detail: started.detail });
   },
 
