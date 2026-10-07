@@ -3,11 +3,12 @@ import { LAYOUTS } from '$lib/canvas/composition/index';
 import { instancesOf, poseAt } from '$lib/canvas/composition/pose';
 import type { LayoutId } from '$lib/canvas/composition/types';
 import { FEEGA_TOKENS } from '../brand';
+import { CellFit } from '../bento/model';
 import { FPS } from '../design';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '../doc';
 import { addClip, type OpResult } from '../timeline';
 import { composeHtml } from './compose';
-import { CAMERA_FIELDS, INSTANCE_FIELDS, bakeComposition, type CompositionProps } from './composition';
+import { CAMERA_FIELDS, INSTANCE_FIELDS, LOOK_FIELDS, bakeComposition, type CompositionProps } from './composition';
 
 const TOLERANCE = 1e-3;
 const SAMPLED_FRAMES = [0, 7, 45, 90, 133, 179];
@@ -59,6 +60,27 @@ describe('bakeComposition', () => {
       }
     });
   }
+
+  it('bakes each card its ratio, crop and fit, falling back to the layout ratio', () => {
+    const props = { ...propsFor('film-strip'), layoutParams: { cardAspect: '4:5' }, media: [{ assetId: 'a', kind: 'image' as const, aspect: '16:9' as const, fit: CellFit.Contain, focusX: 0.2 }, { assetId: 'b', kind: 'image' as const }] };
+    const bake = bakeComposition('c1', props, PORTRAIT, (id) => ASSETS[id as keyof typeof ASSETS] ?? null);
+    const first = bake.looks.slice(0, LOOK_FIELDS);
+    const second = bake.looks.slice(LOOK_FIELDS, 2 * LOOK_FIELDS);
+
+    expect(first[0]).toBeCloseTo(16 / 9);
+    expect(first.slice(1, 3)).toEqual([1, 0.2]);
+    expect(second[0]).toBeCloseTo(0.8);
+    expect(bake.looks).toHaveLength(bake.instances.length * LOOK_FIELDS);
+  });
+
+  it('bakes slider indicators as solid marks, not media', () => {
+    const props = { ...propsFor('slider'), layoutParams: { indicators: 'dots' } };
+    const bake = bakeComposition('c1', props, PORTRAIT, (id) => ASSETS[id as keyof typeof ASSETS] ?? null);
+    const solid = (i: number) => bake.looks[i * LOOK_FIELDS + LOOK_FIELDS - 1];
+
+    expect(solid(0)).toBe(0);
+    expect(solid(bake.instances.length - 1)).toBe(1);
+  });
 
   it('bakes exactly one loop, so the clip repeats it for as long as it lasts', () => {
     const bake = bakeComposition('c1', { ...propsFor('helix'), loop: 2 }, PORTRAIT, (id) => ASSETS[id as keyof typeof ASSETS] ?? null);

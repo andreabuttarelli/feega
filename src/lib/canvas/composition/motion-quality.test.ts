@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { CAMERA_PRESETS, cameraAt } from './camera';
 import { LAYOUTS, instanceCountFor, layoutAt } from './index';
-import { closedExpoPhase, closedExpoProgress } from './motion';
+import { MOTION_TIME, closedExpoProgress } from './motion';
 import type { LayoutId, LayoutParams, Transform } from './types';
 
 const DURATION_SECONDS = 8;
@@ -64,9 +64,7 @@ function sample(id: LayoutId, count: number, params: LayoutParams): Transform[][
 
 	return Array.from({ length: frameCount + 1 }, (_, frame) => {
 		const seconds = frame / FRAMES_PER_SECOND;
-		const motion = LAYOUTS[id].motion === 'cycle'
-			? closedExpoPhase(seconds, DURATION_SECONDS)
-			: closedExpoProgress(seconds, DURATION_SECONDS);
+		const motion = MOTION_TIME[LAYOUTS[id].motion](seconds, DURATION_SECONDS);
 		return layoutAt(id, count, params, motion);
 	});
 }

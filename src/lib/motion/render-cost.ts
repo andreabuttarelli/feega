@@ -1,6 +1,7 @@
 import type { ComponentId } from './components';
 import { clipsOf, type MotionClip, type MotionDoc } from './doc';
 import { Matte } from './mask';
+import type { LayoutId } from '../canvas/composition/types';
 import { ringCards, ringRadiusPx, slicesFor, RING_LAYOUT, type RingCard } from './ring/model';
 
 export type CostSpan = { from: number; to: number; ms: number };
@@ -23,6 +24,30 @@ const FRAME_MS: Partial<Record<ComponentId, number>> = {
   Text3D: 400,
   Model3D: 600,
   Shape3D: 300
+};
+
+const WEBGL_FRAME_MS = 700;
+
+export const LAYOUT_FRAME_MS: Record<LayoutId, number> = {
+  'tilted-grid': WEBGL_FRAME_MS,
+  'carousel-3d': WEBGL_FRAME_MS,
+  'media-cloud': WEBGL_FRAME_MS,
+  'media-ring': WEBGL_FRAME_MS,
+  helix: WEBGL_FRAME_MS,
+  'explorer-grid': WEBGL_FRAME_MS,
+  'staggered-grid': WEBGL_FRAME_MS,
+  'vertical-flow': WEBGL_FRAME_MS,
+  coverflow: WEBGL_FRAME_MS,
+  ring: 0,
+  bento: 0,
+  marquee: 1300,
+  stack: 750,
+  'perspective-wall': 1400,
+  'film-strip': 770,
+  'split-reveal': 800,
+  polaroid: 750,
+  masonry: 1750,
+  slider: 600
 };
 
 type Scope = { doc: MotionDoc; depth: number; weigh: Weigh };
@@ -52,7 +77,7 @@ function cardsMs(clip: MotionClip, scope: Scope): number {
 
 const NESTED: Partial<Record<ComponentId, (clip: MotionClip, scope: Scope) => number>> = {
   Precomp: (clip, scope) => compMs(String(clip.props.comp ?? ''), scope),
-  Composition: cardsMs
+  Composition: (clip, scope) => cardsMs(clip, scope) + (LAYOUT_FRAME_MS[clip.props.layout as LayoutId] ?? 0)
 };
 
 function clipMs(clip: MotionClip, scope: Scope): number {
