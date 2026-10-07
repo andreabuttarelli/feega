@@ -228,3 +228,35 @@ export const DEVICE: Record<Device, DeviceSpec> = {
     sources: []
   }
 };
+
+export type ScreenFacts = { px: [number, number]; aspect: string; safeTop: number };
+
+const SIMPLE_RATIO = 32;
+const SHORT_SIDE = 9;
+
+const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a);
+
+function aspectOf([w, h]: [number, number]): string {
+  const k = gcd(w, h);
+  if (Math.max(w, h) / k <= SIMPLE_RATIO) {
+    return `${w / k}:${h / k}`;
+  }
+  const long = Math.round((Math.max(w, h) / Math.min(w, h)) * SHORT_SIDE * 10) / 10;
+  return w < h ? `${SHORT_SIDE}:${long}` : `${long}:${SHORT_SIDE}`;
+}
+
+const safeTopOf = (spec: DeviceSpec) => (spec.cutout.kind === Cutout.None ? 0 : (spec.cutout.top + spec.cutout.height) / spec.screen.height);
+
+export const SCREEN: Record<Device, ScreenFacts> = Object.fromEntries(
+  DEVICES.map((d) => [d, { px: DEVICE[d].screen.px, aspect: aspectOf(DEVICE[d].screen.px), safeTop: safeTopOf(DEVICE[d]) }])
+) as Record<Device, ScreenFacts>;
+
+export enum ScreenFit {
+  Cover = 'cover',
+  Contain = 'contain',
+  Safe = 'safe'
+}
+
+export const SCREEN_FITS = Object.values(ScreenFit) as [ScreenFit, ...ScreenFit[]];
+
+export const screenGuide = (d: Device) => `${d} ${SCREEN[d].px.join('×')} (${SCREEN[d].aspect})`;

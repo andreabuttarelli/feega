@@ -1,7 +1,7 @@
-import { DEVICE, FINISH_COLOR, Finish, BEVEL, GLASS_RIM, type Device, type DeviceSpec } from '../devices';
+import { DEVICE, FINISH_COLOR, Finish, BEVEL, GLASS_RIM, SCREEN, type Device, type DeviceSpec } from '../devices';
 import { DEVICE_SCENE } from '../keyframes';
 
-export type DeviceRuntime = DeviceSpec & { color: string };
+export type DeviceRuntime = DeviceSpec & { color: string; safeTop: number };
 
 export function deviceRuntime(device: Device, finish: Finish, ctx: { color: (v: string) => string }): DeviceRuntime {
   const spec = DEVICE[device];
@@ -12,7 +12,7 @@ export function deviceRuntime(device: Device, finish: Finish, ctx: { color: (v: 
     [Finish.Silver]: () => FINISH_COLOR[Finish.Silver],
     [Finish.White]: () => FINISH_COLOR[Finish.White]
   };
-  return { ...spec, color: FINISH_OF[finish]() };
+  return { ...spec, color: FINISH_OF[finish](), safeTop: SCREEN[device].safeTop };
 }
 
 export const DEVICE_SCRIPT = `
@@ -92,23 +92,18 @@ function screenCanvas(spec) {
   return { canvas, texture, ctx: canvas.getContext('2d') };
 }
 
-function drawScreen(slot, source, scroll) {
+function drawScreen(slot, source, scroll, fit, safeTop) {
   const { canvas, ctx, texture } = slot;
   const key = screenKey(source, scroll);
   if (slot.key === key) return;
   slot.key = key;
   ctx.fillStyle = '#0b0b0c';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  const sw = source && (source.videoWidth || source.naturalWidth || source.width);
-  const sh = source && (source.videoHeight || source.naturalHeight || source.height);
-  if (sw && sh) {
-    const tall = sh / sw > canvas.height / canvas.width;
-    const scale = tall ? canvas.width / sw : Math.max(canvas.width / sw, canvas.height / sh);
-    const visibleH = canvas.height / scale;
-    const visibleW = canvas.width / scale;
-    const sy = tall ? scroll * (sh - visibleH) : (sh - visibleH) / 2;
-    const sx = (sw - visibleW) / 2;
-    ctx.drawImage(source, sx, sy, visibleW, visibleH, 0, 0, canvas.width, canvas.height);
+  const width = source && (source.videoWidth || source.naturalWidth || source.width);
+  const height = source && (source.videoHeight || source.naturalHeight || source.height);
+  if (width && height) {
+    const p = screenPlacement({ width, height }, canvas, fit, scroll, safeTop);
+    ctx.drawImage(source, p.sx, p.sy, p.sw, p.sh, p.dx, p.dy, p.dw, p.dh);
   }
   texture.needsUpdate = true;
 }
@@ -399,6 +394,6 @@ function updateDevice(c, s, at) {
   if (!s.device) return;
   setLid(s, at('lid', DEVICE_LID));
   setFold(s, at('fold', DEVICE_FOLD));
-  drawScreen(s.device.slot, deviceSource(c, s), at('screenScroll', 0));
+  drawScreen(s.device.slot, deviceSource(c, s), at('screenScroll', 0), c.screenFit, c.device.safeTop);
 }
 `;

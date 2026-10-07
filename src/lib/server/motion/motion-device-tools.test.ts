@@ -26,4 +26,14 @@ describe('device tools', () => {
     expect(result).not.toHaveProperty('error');
     expect(session.doc.tracks.flatMap((t) => t.clips).filter((c) => c.component === 'Device3D')).toHaveLength(3);
   });
+
+  it('the agent knows each screen aspect and how a source fits it', async () => {
+    const { run } = setup();
+    const catalogue = (await run('list_components', {})) as unknown as { library: { id: string; about: string; props: Record<string, string> }[] };
+    const device = catalogue.library.find((c) => c.id === 'Device3D')!;
+
+    expect(device.about).toContain('phone-pro 1206×2622 (9:19.6)');
+    expect(device.about).toContain('monitor 5120×2880 (16:9)');
+    expect(device.props.screenFit).toBe('cover|contain|safe');
+  });
 });

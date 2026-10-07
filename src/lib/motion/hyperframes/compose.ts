@@ -7,7 +7,7 @@ import { css, esc, js, seconds } from './html';
 import { DEVICE_OVERSCAN, TEMPLATES, Timing, type PropsOf, type TemplateCtx, type Tween, type Vars } from './templates';
 import { LIGHTING, OPENTYPE_URL, ThreeKind, lookRuntime, surfaceOf, threeAssetUrls, threeImportMap, threeScript, type ThreeClip } from './three';
 import { outlineUrl } from '../fonts/outline';
-import { Finish } from '../devices';
+import { Finish, ScreenFit } from '../devices';
 import { deviceRuntime } from './device-runtime';
 import { ringBake, ringHtml, ringScript } from './ring';
 import { RING_LAYOUT } from '../ring/model';
@@ -348,6 +348,7 @@ function threeClipOf(clip: MotionClip, ctx: TemplateCtx<ComponentId>, staged: bo
     extrude: p.extrude ?? 0,
     bevel: p.bevel ?? 0,
     device: p.device ? deviceRuntime(p.device, p.finish ?? Finish.Default, ctx) : null,
+    screenFit: p.screenFit ?? ScreenFit.Cover,
     video: Boolean(ctx.asset(p.screenVideo ?? null)),
     overscan: clip.component === 'Device3D' ? DEVICE_OVERSCAN : 0
   };
