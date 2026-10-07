@@ -20,10 +20,10 @@ function setup() {
 const prompt = (style?: MotionStyle) => motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Available, style });
 
 describe('the motion style', () => {
-  it('the doc shows Apple minimal until the user asks for another style, and set_style keeps it', async () => {
+  it('the doc shows the launch film until the user asks for another style, and set_style changes it', async () => {
     const { session, run } = setup();
 
-    expect((await run('get_motion_doc', {})).style).toBe(MotionStyle.AppleMinimal);
+    expect((await run('get_motion_doc', {})).style).toBe(MotionStyle.LaunchFilm);
     expect((await run('set_style', { style: MotionStyle.AppleMinimal })).ok).toBe(true);
     expect(session.doc.style).toBe(MotionStyle.AppleMinimal);
   });
@@ -36,13 +36,25 @@ describe('the motion style', () => {
     expect(JSON.stringify(out.quality)).toContain('particle');
   });
 
-  it('the prompt directs in Apple minimal by default: scene library, signed eases, the forbidden list', () => {
+  it('the prompt directs a launch film by default: launch scenes, the beat, a peak, the forbidden list', () => {
     const text = prompt();
 
-    expect(text).toContain('Apple');
-    expect(text).toContain('builtin:scene-');
+    expect(text).toContain('Launch film');
+    expect(text).toContain('builtin:launch-');
+    expect(text).toContain('cut_to_beat');
+    expect(text).toContain('peak');
     expect(text).toContain('cubic-bezier(0.16,1,0.3,1)');
     expect(text).toContain('particles');
-    expect(text).not.toContain('push, wipe, zoom, whip');
+    expect(text).not.toContain('mean more care, not more effects');
+    expect(text).toContain('A real brand logo is always the original asset');
+    expect(text).toContain('hard cut is the exception');
+    expect(text).not.toContain('Logo3D extrudes an SVG logo (the brand logo by default)');
+  });
+
+  it('the Apple minimal prompt stays calm when the user asks for it', () => {
+    const text = prompt(MotionStyle.AppleMinimal);
+
+    expect(text).toContain('Apple minimal');
+    expect(text).toContain('builtin:scene-');
   });
 });

@@ -7,6 +7,7 @@ import { FieldType } from './fields';
 import type { TemplateEntry } from './library';
 import { backdrop, boxAspect, build, colour, text, type Design, type Field } from './design-kit';
 import { SCENES } from './scenes';
+import { LAUNCH_SCENES } from './launch-scenes';
 
 export { BUILTIN_PREFIX } from './design-kit';
 
@@ -149,7 +150,7 @@ function compositionDesign(layout: LayoutId): Design {
   };
 }
 
-export const BUILTIN_TEMPLATES: TemplateEntry[] = [...SCENES, ...DESIGNS, ...(Object.keys(LAYOUTS) as LayoutId[]).map(compositionDesign)].map(build);
+export const BUILTIN_TEMPLATES: TemplateEntry[] = [...LAUNCH_SCENES, ...SCENES, ...DESIGNS, ...(Object.keys(LAYOUTS) as LayoutId[]).map(compositionDesign)].map(build);
 
 export function builtinTemplate(id: string): TemplateEntry | null {
   return BUILTIN_TEMPLATES.find((e) => e.id === id) ?? null;
