@@ -131,13 +131,13 @@ pass `model`, use the `prompt` it returns. It rewrites, never invents: a rewrite
 subject or states an aspect ratio is thrown away, `changed: false`, reason in `notes`. Spends
 credits.
 
-## Render an effects node
+## Apply image effects
 
-`apply_effects` renders an `effects` node's stack (pixelate, duotone, glitch, …) onto its upstream
-image, the same render `EffectsEditor` does in the browser. Set the stack with `update_row` on
-`nodes.data.effects` first — `describe_node_types({ type: 'effects' })` lists every effect and its
-params — then call `apply_effects`. Spends no credits. A `shape-cutout` A/B pair is two `effects`
-nodes on the same image, same params and seed, `side: shapes` on one and `side: holes` on the other.
+`list_effects` lists every effect (pixelate, duotone, glitch, shape-mosaic, shape-cutout, …) with
+its params. `apply_effects({ node_id, effects })` on an image node creates an `effects` node beside
+it, wired to it, and renders the chain; on an `effects` node it replaces the stack (or re-renders
+it when `effects` is omitted). `make_effects_pair` turns a `shape-cutout` node into an A/B pair:
+the twin has the same shapes and seed, the other side. All free.
 
 ## Loop a node over many combinations
 
