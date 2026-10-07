@@ -3,7 +3,8 @@ import { FORBIDDEN_NAMES } from '$lib/motion/custom/lint';
 import { EXPRESSION_EXAMPLES } from '$lib/motion/expression/guide';
 import { EFFECT_KINDS } from '$lib/motion/effects/registry';
 import { UNITS_GUIDE } from '$lib/motion/units';
-import { DIRECTION_RULES } from '$lib/motion/direction';
+import { STYLES } from '$lib/motion/style';
+import { DEFAULT_STYLE, type MotionStyle } from '$lib/motion/style-model';
 
 const SEEING: Record<Vision, string> = {
   [Vision.Available]: `You can SEE the video: ${VIEW_FRAMES} renders up to ${MAX_FRAMES_PER_VIEW} exact times from the editor preview and shows you the frames. Use it when how something looks matters. After a turn that changed the video, an automatic self-check shows you the middle of each scene once: fix clipped or overflowing text, overlaps, low contrast and safe-area problems then, and only those. Write your summary for the user after that check, not before: until then keep any note to one line.`,
@@ -26,14 +27,14 @@ export function componentContract(frame: { width: number; height: number }): str
   ].join('\n');
 }
 
-export function motionAgentPrompt(input: { brandName: string | null; selectionNote: string; vision: Vision; frame?: { width: number; height: number } }): string {
+export function motionAgentPrompt(input: { brandName: string | null; selectionNote: string; vision: Vision; frame?: { width: number; height: number }; style?: MotionStyle }): string {
+  const style = STYLES[input.style ?? DEFAULT_STYLE];
   return [
     'You edit one short video in the feega motion editor with the library components (list_components) and, when they are not enough, components you write in code.',
     input.brandName ? `Brand: "${input.brandName}". Prefer brand colours (brand.primary, brand.accent, brand.background, brand.text).` : 'No brand: the feega look applies (near-black background, cream text, blue accent).',
     input.selectionNote,
     `Read the doc (get_motion_doc) before changing it. Times are in seconds. Every tool reads and writes the units the editor shows: ${UNITS_GUIDE} Expressions still see the stored values (x/y as fractions of the frame, scale and opacity as 1 = 100%).`,
-    ['Direction. For anything longer than a single title (a showreel, a launch, a trailer, "go all out"), direct before you edit. Rules, each one checked by the quality gate in view_frames where it can be:', ...DIRECTION_RULES.map((rule, i) => `${i + 1}. ${rule}`)].join('\n'),
-    'House style: one idea per beat, 1.5–3 s per title, a Kicker above a Title, slide-up or fade transitions of 0.3–0.5 s, a BrandBackground under everything.',
+    [`Direction, style ${style.label} (set_style changes it only when the user explicitly asks for another style; "go all out" or "dynamic" mean more care, not more effects). Rules, each one checked by the quality gate in view_frames where it can be:`, ...style.rules.map((rule, i) => `${i + 1}. ${rule}`)].join('\n'),
     'Your edits of this turn are saved together as one revision the user can undo.',
     SEEING[input.vision],
     'Motion: set_transform for a static 3D pose (rotateX/Y/Z, perspective, anchor), set_keyframes to animate a prop over time (seconds from the clip start), remove_keyframes to undo it. Keyframes and transitions combine: a fade-in plus a keyframed rotation is fine. Check a 3D move with view_frames at its start, middle and end.',
@@ -63,8 +64,8 @@ export function motionAgentPrompt(input: { brandName: string | null; selectionNo
       'Brand trailer ("make a trailer of {brand or url}"): build it from the real brand, never from placeholders.',
       '1. Read: analyze_site(url) for a site; use_brand() for the project brand or use_brand(name) for a brand the user names (if it has a website, analyze_site it too for pictures).',
       '2. Import: import_asset the logo (prefer an svg logo, then the apple-touch-icon or favicon, og:image last) and 3–6 pictures, largest first (hero and product images, at least 1000 px wide when there is a choice). Use only what really loaded; a failed import is skipped, never invented.',
-      '3. Look: set_canvas background and a BrandBackground with the brand palette (hex values in props: fill, accent, text colours), a font prop on every text clip: the brand family when google is true, otherwise the closest Google family by look (geometric sans → Manrope, grotesk → Inter Tight, serif → Playfair Display), never the default. The real name and the real claim, word for word.',
-      '4. Structure, 15–30 s: hook (2–4 s, the claim in a Title with apply_text_preset, or Text3D of the name), product and benefits (3–4 beats, Image or ProductCard per picture, Device3D for a screenshot or an app, a morph_to or a camera preset between beats), proof (a number, a review or a press line from the site, only if the site says it), CTA with the imported logo (Logo3D for an svg logo, Logo for a raster one, never the name typed as a Title in its place) plus the website. Particles or a light leak sparingly, slide-up or fade transitions.',
+      '3. Look: the scenes carry the style: black or white backgrounds, one type family. Take ONE accent colour from the brand palette and pass it as the accent field (#rrggbb) of the scenes that have one. The real name and the real claim, word for word.',
+      '4. Structure, 15–30 s, scene by scene with insert_template at the start of each beat: hook (scene-hero-title or scene-eyebrow-title with the claim), product and benefits (3–4 scenes: scene-feature-line or scene-feature-accent for a sentence, scene-ui-closeup or scene-ui-window for a screenshot, scene-device-hero or scene-device-split for an app, scene-product-reveal for a product picture, scene-match-cut for three words on the beat), proof (scene-big-number or scene-quote, only if the site says it), end card (scene-logo-end-card with the imported logo and the website). Alternate dark and light scenes now and then (scene-feature-line-light).',
       '5. Sound: when an audio asset exists, put it on an Audio clip, analyze_audio and cut_to_beat or mark_beats so the cuts land on the beat.',
       '6. Check with view_frames on the hook, each beat and the CTA, fix what reads badly, then answer with what you made.',
       'A turn has a cost cap and every step resends the whole conversation: call independent tools together in one step (all import_asset at once, all clips of a beat at once) and give add_clip every prop (text, colours, font, layout) instead of fixing it after with set_props. x and y are the centre of the clip box, not its corner: a full-frame picture is x = width/2, y = height/2 with the frame width and height.'

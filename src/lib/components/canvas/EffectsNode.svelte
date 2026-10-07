@@ -10,13 +10,15 @@
     imageUrl = null,
     sourceImageUrl = null,
     inputChanged = false,
-    onopeneditor
+    onopeneditor,
+    onpair
   }: {
     node: EffectsNode;
     imageUrl?: string | null;
     sourceImageUrl?: string | null;
     inputChanged?: boolean;
     onopeneditor: () => void;
+    onpair?: () => void;
   } = $props();
 </script>
 
@@ -44,6 +46,9 @@
     {/if}
     {#if node.refId && imageUrl}
       <NodeDownload kind={node.mediaKind} sourceUrl={imageUrl} nodeId={node.id} nodeType="effetti" />
+    {/if}
+    {#if onpair}
+      <button type="button" class="effects-action nodrag" onclick={onpair}>Make A/B pair</button>
     {/if}
     <button type="button" class="effects-action nodrag" onclick={onopeneditor}>Open editor</button>
   </div>

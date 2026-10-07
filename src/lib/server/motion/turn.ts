@@ -1,3 +1,4 @@
+import { styleOf } from '$lib/motion/style';
 import { createUIMessageStream, streamText, type ModelMessage, type UIMessageChunk } from 'ai';
 import type { Db } from '$lib/server/db/client';
 import { llmCodeModel, llmLanguageModel, llmVisionModel } from '$lib/server/llm';
@@ -182,7 +183,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
   const visionModel = gatewayModel(model)?.usable ? model : llmVisionModel();
   const vision = BROWSER_VISION[browser](visionModel);
   const toolNames = Object.keys(tools).filter((name) => vision === Vision.Available || name !== VIEW_FRAMES);
-  const system = motionAgentPrompt({ brandName: project.brandId ? tokens.name : null, selectionNote: selectionNote(head.doc, selection), vision, frame: head.doc });
+  const system = motionAgentPrompt({ brandName: project.brandId ? tokens.name : null, selectionNote: selectionNote(head.doc, selection), vision, frame: head.doc, style: styleOf(head.doc) });
   const t0 = Date.now();
   const stepModels: string[] = [];
   const openingMessages = [...history, { role: 'user', content: message }] as ModelMessage[];

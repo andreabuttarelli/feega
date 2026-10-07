@@ -1,34 +1,23 @@
 import { COMPONENTS, TrackKind, type ComponentId } from './components';
-import { TransitionKind } from './design';
 import type { MotionDoc } from './doc';
+import { styleProblems } from './style';
 
 export enum Quality {
   RepeatedLayout = 'repeated-layout',
-  HardCuts = 'hard-cuts',
   SmallTitle = 'small-title',
   Silent = 'silent',
   BlankFrame = 'blank-frame',
-  WhiteArea = 'white-area'
+  WhiteArea = 'white-area',
+  OffStyle = 'off-style'
 }
 
 export type QualityProblem = { kind: Quality; at?: number; detail: string };
 
 export type FrameStat = { time: number; lumaStd: number; whiteShare: number };
 
-export const DIRECTION_RULES: readonly string[] = [
-  'Storyboard first: before the first edit, write the plan as a short table, one row per scene: time, layout, what moves, the transition into it, the beat it lands on.',
-  'Never the same layout twice in a row: alternate full-bleed title, split (text one side, media the other, swap sides), centred hero media, grid or row of devices, big number, end card.',
-  'Every scene change is a real transition: set_clip_transition (push, wipe, zoom, whip…) or a camera move across the cut, never a bare cut between every scene.',
-  'Type hierarchy: one hero line per scene, its box at least half the frame wide; kicker and captions small. The hook title fills the frame.',
-  'Screenshots must be readable: crop or zoom on the part that matters (set_transform scale, a mask, or a camera dolly-in), never a whole page shrunk into a device.',
-  'No empty frames: a device or image is on screen with its picture from its first frame; never let a screen enter white or blank.',
-  'Sound: when the project has music, put it on an Audio clip and cut to its beats (analyze_audio, cut_to_beat).'
-];
-
 const SCENE_JOIN_S = 0.5;
 const SCENE_SHARE = 0.9;
 const MIN_TITLE_AREA = 0.12;
-const HARD_CUT_SHARE = 0.5;
 const BLANK_STD = 4;
 const WHITE_SHARE = 0.15;
 const LEFT = 0.4;
@@ -46,7 +35,9 @@ const num = (clip: Clip, key: string, fallback: number) => {
 
 const side = (x: number) => (x < LEFT ? 'L' : x > RIGHT ? 'R' : 'C');
 
-const role = (clip: Clip) => (MEDIA.has(clip.component) ? 'media' : clip.component);
+const templateOf = (doc: MotionDoc, clip: Clip) => doc.comps[String(clip.props.comp)]?.template?.id;
+
+const role = (doc: MotionDoc, clip: Clip) => (MEDIA.has(clip.component) ? 'media' : (templateOf(doc, clip) ?? clip.component));
 
 function scenes(doc: MotionDoc): Clip[][] {
   const join = SCENE_JOIN_S * doc.fps;
@@ -68,22 +59,15 @@ function scenes(doc: MotionDoc): Clip[][] {
   return grouped;
 }
 
-const layoutOf = (scene: Clip[]) => scene.map((c) => `${role(c)}@${side(num(c, 'x', 0.5))}`).sort().join(' ');
+const layoutOf = (doc: MotionDoc, scene: Clip[]) => scene.map((c) => `${role(doc, c)}@${side(num(c, 'x', 0.5))}`).sort().join(' ');
 
-const enters = (scene: Clip[]) => scene.some((c) => c.transitionIn.kind !== TransitionKind.None || c.junction);
 
 const seconds = (doc: MotionDoc, frame: number) => Math.round((frame / doc.fps) * 100) / 100;
 
 function repeated(doc: MotionDoc, list: Clip[][]): QualityProblem[] {
   return list.slice(1).flatMap((scene, i) =>
-    layoutOf(scene) === layoutOf(list[i]) ? [{ kind: Quality.RepeatedLayout, at: seconds(doc, scene[0].from), detail: `the scene at ${seconds(doc, scene[0].from)}s repeats the layout of the one before (${layoutOf(scene)})` }] : []
+    layoutOf(doc, scene) === layoutOf(doc, list[i]) ? [{ kind: Quality.RepeatedLayout, at: seconds(doc, scene[0].from), detail: `the scene at ${seconds(doc, scene[0].from)}s repeats the layout of the one before (${layoutOf(doc, scene)})` }] : []
   );
-}
-
-function hardCuts(list: Clip[][]): QualityProblem[] {
-  const cuts = list.slice(1);
-  const bare = cuts.filter((scene) => !enters(scene)).length;
-  return cuts.length && bare / cuts.length > HARD_CUT_SHARE ? [{ kind: Quality.HardCuts, detail: `${bare} of ${cuts.length} scene changes are bare cuts: give them set_clip_transition or a camera move` }] : [];
 }
 
 function smallTitles(doc: MotionDoc): QualityProblem[] {
@@ -100,11 +84,11 @@ function silent(doc: MotionDoc, audioAssets: number): QualityProblem[] {
 
 export function docProblems(doc: MotionDoc, input: { audioAssets: number }): QualityProblem[] {
   const list = scenes(doc);
-  return [...repeated(doc, list), ...hardCuts(list), ...smallTitles(doc), ...silent(doc, input.audioAssets)];
+  return [...repeated(doc, list), ...smallTitles(doc), ...silent(doc, input.audioAssets), ...styleProblems(doc).map((p) => ({ kind: Quality.OffStyle, at: p.at, detail: p.detail }))];
 }
 
 export function frameProblems(stats: readonly FrameStat[]): QualityProblem[] {
-  return stats.flatMap((s) => {
+  return stats.flatMap((s): QualityProblem[] => {
     if (s.lumaStd < BLANK_STD) {
       return [{ kind: Quality.BlankFrame, at: s.time, detail: `the frame at ${s.time}s is a flat colour: nothing is on screen` }];
     }

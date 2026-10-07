@@ -203,6 +203,34 @@ describe('applyEffectsNode', () => {
     }
   });
 
+  it('il ritaglio A/B salva due asset con la stessa geometria: forme sopra in A, fori in B', async () => {
+    const cutout = { side: 'shapes', shapes: 'square', count: 1, size: 50, sizeSpread: 0, radius: 0, style: 'fill', strokeWidth: 2, shapeColor: '#ff00ff', fillColor: '#ff00ff', seed: 5 };
+    const render = async (side: string) => {
+      const node = { ...baseNode, data: { ...baseNode.data, effects: [{ id: 'shape-cutout', params: { ...cutout, side }, enabled: true }] } };
+      const { db } = fakeDb({ node, sourceAsset: sourceAssetRow, inputBytes: await tinyPng() });
+      const result = await applyEffectsNode(db, { orgId, nodeId, actor });
+      if (result.outcome !== 'applied') throw new Error(result.outcome);
+      return sharp(result.pngBytes).ensureAlpha().raw().toBuffer();
+    };
+    const isMagenta = (raw: Buffer, i: number) => raw[i * 4] === 255 && raw[i * 4 + 1] === 0 && raw[i * 4 + 2] === 255;
+
+    const a = await render('shapes');
+    const b = await render('holes');
+
+    const source = await sharp(await tinyPng()).ensureAlpha().raw().toBuffer();
+    const same = (raw: Buffer, i: number) => raw.subarray(i * 4, i * 4 + 4).equals(source.subarray(i * 4, i * 4 + 4));
+    const covered = Array.from({ length: 64 }, (_, i) => i).filter((i) => isMagenta(a, i));
+    const open = Array.from({ length: 64 }, (_, i) => i).filter((i) => isMagenta(b, i));
+
+    expect(covered.length).toBeGreaterThan(0);
+    for (const i of covered) {
+      expect(same(b, i)).toBe(true);
+    }
+    for (const i of open) {
+      expect(same(a, i)).toBe(true);
+    }
+  });
+
   it('nodo inesistente: errore chiaro', async () => {
     const { db } = fakeDb({ node: null, sourceAsset: null, inputBytes: null });
     const result = await applyEffectsNode(db, { orgId, nodeId, actor });

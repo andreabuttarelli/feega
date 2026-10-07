@@ -1,37 +1,22 @@
 import { LAYOUTS } from '$lib/canvas/composition/index';
 import type { LayoutId, LayoutParam } from '$lib/canvas/composition/types';
-import { COMPOSITION_CAMERAS, TrackKind } from '$lib/motion/components';
+import { COMPOSITION_CAMERAS } from '$lib/motion/components';
 import { Ease, TransitionKind } from '$lib/motion/design';
-import { MotionFormat, type MotionDoc } from '$lib/motion/doc';
-import { FADE_OUT, RISE, assemble, edge, type Beat, type TrackSpec } from '$lib/motion/template-kit';
-import { exposeField, FieldType, type FieldInput } from './fields';
+import { FADE_OUT, RISE, edge, type Beat } from '$lib/motion/template-kit';
+import { FieldType } from './fields';
 import type { TemplateEntry } from './library';
+import { backdrop, boxAspect, build, colour, text, type Design, type Field } from './design-kit';
+import { SCENES } from './scenes';
 
-export const BUILTIN_PREFIX = 'builtin:';
+export { BUILTIN_PREFIX } from './design-kit';
 
-type Field = Omit<FieldInput, 'type'> & { type: FieldType };
-type Design = { id: string; name: string; description: string; seconds: number; beats: Beat[]; fields: Field[] };
-
-const FORMAT = MotionFormat.Landscape;
-const FRAME = { width: 1920, height: 1080 };
 const INK = '#0a0a0a';
 const PAPER = '#f4f1ea';
 const WHITE = '#ffffff';
 const ORANGE = '#ff5a1f';
 
-const TRACKS: TrackSpec[] = [
-  { id: 'front', kind: TrackKind.Visual, name: 'Front' },
-  { id: 'middle', kind: TrackKind.Visual, name: 'Middle' },
-  { id: 'back', kind: TrackKind.Visual, name: 'Back' }
-];
-
 const WIPE = edge(TransitionKind.Wipe, 0.4);
 const POP: Beat['keys'] = { scale: [[0, 0.9], [0.6, 1, Ease.Overshoot]] };
-const boxAspect = (width: number, height: number) => Math.round(((width * FRAME.width) / (height * FRAME.height)) * 100) / 100;
-
-const text = (key: string, label: string, clipId: string): Field => ({ key, label, type: FieldType.Text, clipId, prop: 'text' });
-const colour = (key: string, label: string, clipId: string, prop: string): Field => ({ key, label, type: FieldType.Color, clipId, prop });
-const backdrop = (fill: string, seconds: number): Beat => ({ id: 'bg', track: 'back', component: 'Shape', at: 0, len: seconds, props: { shape: 'rect', fill, x: 0.5, y: 0.5, width: 1, height: 1 } });
 
 const PHOTO = { width: 0.36, height: 0.5 };
 const LOGO = { width: 0.12, height: 0.2 };
@@ -164,20 +149,7 @@ function compositionDesign(layout: LayoutId): Design {
   };
 }
 
-function build(design: Design): TemplateEntry {
-  let doc: MotionDoc = assemble({ format: FORMAT, seconds: design.seconds, tracks: TRACKS, beats: design.beats });
-  doc = { ...doc, tracks: doc.tracks.filter((t) => t.clips.length) };
-  for (const field of design.fields) {
-    const exposed = exposeField(doc, field);
-    if (!exposed.ok) {
-      throw new Error(`${design.id}: ${exposed.error}`);
-    }
-    doc = exposed.doc;
-  }
-  return { id: `${BUILTIN_PREFIX}${design.id}`, template: { name: design.name, description: design.description, doc } };
-}
-
-export const BUILTIN_TEMPLATES: TemplateEntry[] = [...DESIGNS, ...(Object.keys(LAYOUTS) as LayoutId[]).map(compositionDesign)].map(build);
+export const BUILTIN_TEMPLATES: TemplateEntry[] = [...SCENES, ...DESIGNS, ...(Object.keys(LAYOUTS) as LayoutId[]).map(compositionDesign)].map(build);
 
 export function builtinTemplate(id: string): TemplateEntry | null {
   return BUILTIN_TEMPLATES.find((e) => e.id === id) ?? null;

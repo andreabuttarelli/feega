@@ -27,7 +27,8 @@ const DOC: Record<string, Access> = {
   components: { write: ['write_component', 'patch_component', 'remove_component'], read: 'components' },
   markers: { write: ['set_marker', 'remove_marker', 'mark_beats'], read: 'markers' },
   workArea: { write: ['set_work_area'], read: 'workArea' },
-  interactive: { write: ['set_interactive', 'apply_interactive_preset'], read: 'interactive' }
+  interactive: { write: ['set_interactive', 'apply_interactive_preset'], read: 'interactive' },
+  style: { write: ['set_style'], read: 'style' }
 };
 
 const TRACK: Record<string, Access> = {

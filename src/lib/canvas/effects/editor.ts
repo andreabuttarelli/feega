@@ -1,5 +1,6 @@
-import { EFFECTS } from './index';
-import type { EffectId, EffectParam, EffectStep } from './types';
+import { applyStack, EFFECTS } from './index';
+import { mosaicSvg } from './shape-mosaic';
+import type { EffectId, EffectParam, EffectStep, Pixels } from './types';
 
 type ParamValue = number | string;
 
@@ -72,4 +73,24 @@ export function inputChanged(appliedSourceId: string | null, upstreamId: string 
 export function fitWithin(width: number, height: number, max: number): { width: number; height: number } {
 	const scale = Math.min(1, max / Math.max(width, height));
 	return { width: Math.round(width * scale), height: Math.round(height * scale) };
+}
+
+const MOSAIC_ID: EffectId = 'shape-mosaic';
+
+export function exportsSvg(steps: EffectStep[]): boolean {
+	return lastMosaic(steps) >= 0;
+}
+
+function lastMosaic(steps: EffectStep[]): number {
+	const last = steps.findLastIndex((step) => step.enabled && step.id === MOSAIC_ID);
+	return steps.slice(last + 1).some((step) => step.enabled) ? -1 : last;
+}
+
+export function svgExport(pixels: Pixels, steps: EffectStep[]): string | null {
+	const last = lastMosaic(steps);
+	if (last < 0) {
+		return null;
+	}
+
+	return mosaicSvg(applyStack(pixels, steps.slice(0, last)), steps[last].params);
 }

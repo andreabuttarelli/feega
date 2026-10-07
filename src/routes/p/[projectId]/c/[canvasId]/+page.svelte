@@ -79,6 +79,7 @@
   import { inputChanged } from '$lib/canvas/effects/editor';
   import { upstreamMedia } from '$lib/canvas/effects-node';
   import type { EffectStep } from '$lib/canvas/effects';
+  import { counterpart, hasCutout } from '$lib/canvas/effects/shape-cutout';
   import { upstreamCards as compositionCards, cardAssetIds } from '$lib/canvas/composition-node';
   import { listFeedingSelect } from '$lib/canvas/select-node';
   import { fieldValue, productItem, socialPostItem } from '$lib/canvas/select-sources';
@@ -1311,6 +1312,35 @@
     }
     nodes = nodes.map((node) => node.id === id ? toTile(written) : node);
     return true;
+  }
+
+  const PAIR_GAP = 40;
+
+  async function makePair(id: string) {
+    const row = nodes.find((node) => node.id === id);
+    const effects = row ? effectsOf(row) : null;
+    const source = upstreamEffectsMediaOf(id);
+    const edge = edges.find((e) => e.target === id);
+    if (!row || !effects || !source || !edge) {
+      return;
+    }
+
+    const twin = { ...effects, effects: counterpart(effects.effects), refId: null, sourceRefId: source.refId, mediaKind: source.kind };
+    const res = await post('create', { type: 'effects', x: row.x + row.w + PAIR_GAP, y: row.y, data: JSON.stringify(effectsData(twin)) });
+    const created = (res?.node ?? null) as CanvasNodeRecord | null;
+    if (!created) {
+      return;
+    }
+
+    nodes = [...nodes, toTile(created, { select: true })];
+    pushGesture(createGesture(created));
+    await connect(edge.source, created.id, edge.kind, (edge.targetHandle ?? null) as ConnectorType | null, edge.sourceHandle ?? null);
+
+    const applied = await post('apply_effects', { node_id: created.id });
+    const written = applied?.node as CanvasNodeRecord | undefined;
+    if (written) {
+      nodes = nodes.map((node) => node.id === created.id ? toTile(written) : node);
+    }
   }
 
   function sizeForAddable(what: Addable): { w: number; h: number } {
@@ -2728,6 +2758,7 @@
             sourceImageUrl={assetUrl(effectsInput?.refId ?? effects.sourceRefId)}
             inputChanged={inputChanged(effects.sourceRefId, effectsInput?.refId ?? null)}
             onopeneditor={() => (effectsEditorId = id)}
+            onpair={hasCutout(effects.effects) && effectsInput ? () => makePair(id) : undefined}
           />
         {:else if composition}
           {@const cards = compositionCards(id, edges, nodes)}

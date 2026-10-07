@@ -3,6 +3,8 @@ import { MotionFormat, newMotionDoc, type MotionDoc } from './doc';
 import { Side, addClip, setTransition } from './timeline';
 import { Quality, docProblems, frameProblems } from './direction';
 import { TransitionKind } from './design';
+import { builtinTemplate } from './template/builtins';
+import { insertTemplate } from './template/library';
 
 function must(r: { ok: true; doc: MotionDoc } | { ok: false; error: string }): MotionDoc {
   if (!r.ok) {
@@ -30,8 +32,8 @@ function dubLike(): MotionDoc {
 const kinds = (doc: MotionDoc) => docProblems(doc, { audioAssets: 0 }).map((p) => p.kind);
 
 describe('the quality gate reads the direction of the video', () => {
-  it('the Dub run: one layout four times, hard cuts and small titles are all named', () => {
-    expect(kinds(dubLike())).toEqual(expect.arrayContaining([Quality.RepeatedLayout, Quality.HardCuts, Quality.SmallTitle]));
+  it('the Dub run: one layout four times and small titles are named', () => {
+    expect(kinds(dubLike())).toEqual(expect.arrayContaining([Quality.RepeatedLayout, Quality.SmallTitle]));
   });
 
   it('scenes that alternate their layout, enter with a transition and carry a big title pass', () => {
@@ -47,6 +49,22 @@ describe('the quality gate reads the direction of the video', () => {
     });
 
     expect(kinds(doc)).toEqual([]);
+  });
+
+  it('scenes from the library are told apart by their template: two different scenes pass, the same one twice repeats', () => {
+    let n = 0;
+    const place = (doc: MotionDoc, id: string, at: number) => must(insertTemplate(doc, builtinTemplate(`builtin:${id}`)!, { from: at, newId: () => `x${++n}` }));
+    const varied = place(place(place(newMotionDoc(MotionFormat.Landscape), 'scene-hero-title', 0), 'scene-big-number', 90), 'scene-hero-title', 195);
+    const twice = place(place(newMotionDoc(MotionFormat.Landscape), 'scene-hero-title', 0), 'scene-hero-title', 90);
+
+    expect(kinds(varied)).toEqual([]);
+    expect(kinds(twice)).toContain(Quality.RepeatedLayout);
+  });
+
+  it('an effect the style forbids is named by the gate', () => {
+    const sparkling = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Particles', from: 0, durationInFrames: 60 }, 'p'));
+
+    expect(kinds(sparkling)).toContain(Quality.OffStyle);
   });
 
   it('music in the project that the video never plays is named', () => {
