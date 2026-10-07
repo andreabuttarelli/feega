@@ -64,13 +64,13 @@ import { setClipsBlur, setMotionBlur } from '$lib/motion/motion-blur-ops';
 import { DEGREES, MAX_SAMPLES } from '$lib/motion/motion-blur';
 import { MODIFIERS, MODIFIER_KINDS } from '$lib/motion/shape/modifiers';
 import { addModifier, morphTo, removeModifier, setModifier, setPath } from '$lib/motion/shape/ops';
-import { SHAPE_KINDS, modifierKey } from '$lib/motion/shape/schema';
+import { SHAPE_KINDS, StrokeKind, modifierKey } from '$lib/motion/shape/schema';
 import { PRESET as SHAPE_PRESET, SHAPE_PRESETS, applyShapePreset } from '$lib/motion/shape/presets';
 import { MAX_RATE, MIN_RATE, REMAP_KEY, clearTimeRemap, freezeFrame } from '$lib/motion/time-remap';
 import { PARTICLE_PRESETS, PRESET_PROPS as PARTICLE_PRESET, applyParticlePreset } from '$lib/motion/particles/presets';
 import { DUCK_DEFAULTS, duckUnder } from '$lib/motion/duck';
 import type { AudioAnalysis } from '$lib/motion/audio-analysis';
-import { Hit, cutToBeat, hitFrames, markHits } from '$lib/motion/beats';
+import { Division, Hit, cutToBeat, hitFrames, markHits } from '$lib/motion/beats';
 import { PULSE_PROPS, pulseWithMusic } from '$lib/motion/pulse';
 import { applyValues, exposeField, fieldValues, removeField } from '$lib/motion/template/fields';
 import { FIELD_TYPES, type ExposedField } from '$lib/motion/template/field-model';
@@ -649,9 +649,9 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     cut_to_beat: tool({
-      description: 'Re-time clips to the beat: in time order, the first starts on the nearest beat and each one ends on the beat nearest its length, the next starting there, so every cut lands on a beat.',
-      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1) }),
-      execute: async (input) => apply(cutToBeat(session.doc, input.clip_ids, await docBeats(Hit.Beats)), `cut ${input.clip_ids.length} clips to the beat`)
+      description: 'Re-time clips to the beat: in time order, the first starts on the nearest beat and each one ends on the beat nearest its length, the next starting there, so every cut lands on a beat. division half cuts on half beats too (a fast montage before the drop).',
+      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1), division: z.enum(Division).optional() }),
+      execute: async (input) => apply(cutToBeat(session.doc, input.clip_ids, await docBeats(Hit.Beats), input.division), `cut ${input.clip_ids.length} clips to the beat`)
     }),
 
     duck_audio: tool({
@@ -963,7 +963,8 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       inputSchema: z.object({ kind: z.enum(SHAPE_KINDS), start: z.number().min(0), duration: z.number().positive().optional(), path: z.string().optional(), props: z.record(z.string(), z.unknown()).optional(), ...PLACED_PICTURE }),
       execute: async (input) => {
         const id = deps.newId();
-        const props = { ...propsIn('Shape', input.props), shape: input.kind, ...(input.path ? { path: input.path } : {}) };
+        const outlined = input.props?.stroke !== undefined && input.props?.strokeKind === undefined ? { strokeKind: StrokeKind.Solid } : {};
+        const props = { ...propsIn('Shape', { ...outlined, ...input.props }), shape: input.kind, ...(input.path ? { path: input.path } : {}) };
         const shape = addClip(session.doc, { component: 'Shape', from: frames(input.start), durationInFrames: input.duration ? frames(input.duration) : undefined, trackId: input.track_id, props }, id);
         return created(apply(withEffects(shape, [id], input.effects), `added ${input.kind} shape`), id);
       }
