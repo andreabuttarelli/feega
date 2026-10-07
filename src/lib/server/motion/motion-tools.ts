@@ -31,6 +31,7 @@ import { docProblems, frameProblems, type FrameStat } from '$lib/motion/directio
 import { CheckState, MAX_CSS, MAX_HTML, MAX_JS, SOURCE_FILES, checkState, propsSchemaSchema, sourceHash, type CustomComponent } from '$lib/motion/custom/component';
 import { patchComponent, recordCheck, removeComponent, writeComponent } from '$lib/motion/custom/ops';
 import { UI_KINDS, UI_KIT } from '$lib/motion/ui-kit/kit';
+import { STORY_BEATS, STORY_SHARE, markStory } from '$lib/motion/story';
 import { PATCH_COMPONENT, READ_COMPONENT, WRITE_COMPONENT } from './model-route';
 import { CAMERA, CAMERA_KEYS, CAMERA_LANE, SPACES, type Camera } from '$lib/motion/camera';
 import { ENV_PRESETS, HDRI, LIGHT, envPresetInput, LIGHT_KEYS, LIGHT_KINDS, type Look } from '$lib/motion/look';
@@ -1335,6 +1336,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         }
         return { ok: true, name: input.name, ...component.source, props_schema: component.propsSchema, version: component.version, check: checkState(component), problems: component.check?.problems ?? [] };
       }
+    }),
+
+    mark_story: tool({
+      description: `Mark where an act of the story starts (a timeline marker "story: <act>"). Every brand or product film tells four acts: problem (the user's pain, in the words of the site), solution (the product enters), proof (key features shown with live UI, numbers, results), claim (promise, original logo, address), about ${STORY_BEATS.map((b) => `${b} ${Math.round(STORY_SHARE[b] * 100)}%`).join(', ')} of the length. Marking an act again moves it.`,
+      inputSchema: z.object({ beat: z.enum(STORY_BEATS), start: z.number().min(0) }),
+      execute: async (input) => apply({ ok: true, doc: markStory(session.doc, input.beat, frames(input.start)) }, `marked the ${input.beat}`)
     }),
 
     add_ui: tool({

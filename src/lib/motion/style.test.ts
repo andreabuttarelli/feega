@@ -201,4 +201,14 @@ describe('the launch film style', () => {
     expect(effects(shot(0))).toContain(Forbidden.Screenshots);
     expect(effects(shot(20))).not.toContain(Forbidden.Screenshots);
   });
+
+  it('names a film without its story: problem, solution, product and proof, claim', () => {
+    const long = [0, 5, 10].reduce((doc, s, i) => withClip(doc, `t${i}`, 'Title', { keyframes: rise, props: { text: 'Go.' } }, at(s)), { ...film(), durationInFrames: at(15) });
+    const told = { ...long, markers: ['problem', 'solution', 'proof', 'claim'].map((beat, i) => ({ frame: at(i * 3), label: `story: ${beat}` })) };
+    const half = { ...long, markers: told.markers.slice(0, 2) };
+
+    expect(effects(long)).toContain(Forbidden.MissingStoryBeat);
+    expect(effects(half)).toContain(Forbidden.MissingStoryBeat);
+    expect(effects(told)).not.toContain(Forbidden.MissingStoryBeat);
+  });
 });

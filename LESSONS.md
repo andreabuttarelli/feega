@@ -2560,3 +2560,6 @@ Segnale: `Failed to load url virtual:motion-live-runtime ... in src/lib/motion/h
 
 ## Un keyframe x/y su un testo lo spedisce fuori campo
 Segnale: un numero o una parola keyframati su `y`/`x` spariscono o finiscono al bordo, mentre le props x/y degli stessi clip sono giuste. Causa: nelle props x/y sono posizioni, nei keyframe sono offset dal posto del clip (entrambi "px" per i tool). Mossa: keyframe da offset a 0 (es. y 140 → 0), mai la posizione assoluta.
+
+## Un titolo in un video lascia un frame vuoto o lettere a metà
+Segnale: contact sheet con un frame nero o parole tagliate a metà altezza all'ingresso di un Title. Causa: Title ha un suo ingresso a maschera di riga (yPercent), che si somma ai keyframe. Mossa: per testo con keyframe propri usare Text, che entra senza maschera.

@@ -10,7 +10,15 @@ export enum UiKind {
 
 export const UI_KINDS = Object.values(UiKind) as [UiKind, ...UiKind[]];
 
-export type UiPiece = { name: string; about: string; html: string; css: string; js: string };
+export type UiSize = { width: number; height: number };
+
+export type UiPiece = { name: string; about: string; size: UiSize; html: string; css: string; js: string };
+
+export const UI_SAFE = 0.9;
+
+export function uiScale(piece: Pick<UiPiece, 'size'>, frame: UiSize, zoom: number): number {
+  return zoom * Math.min(1, (frame.width * UI_SAFE) / piece.size.width, (frame.height * UI_SAFE) / piece.size.height);
+}
 
 const STYLE_PARAMS = `
 const font = param('font', 'sans', { type: 'font', group: 'Style' });
@@ -68,7 +76,8 @@ const stage = document.createElement('div');
 stage.className = 'stage';
 stage.style.fontFamily = family;
 root.appendChild(stage);
-stage.style.transform = 'translate(-50%, -50%) scale(' + zoom + ')';
+const fit = Math.min(1, ((root.clientWidth || DESIGN_W) * SAFE) / DESIGN_W, ((root.clientHeight || DESIGN_H) * SAFE) / DESIGN_H);
+stage.style.transform = 'translate(-50%, -50%) scale(' + zoom * fit + ')';
 const drive = (render) => {
   render(0);
   tl.to({}, { duration, ease: 'none', onUpdate() { render(this.time()); } }, 0);
@@ -83,11 +92,12 @@ const BASE_CSS = `
 .muted { color: var(--muted); }
 `;
 
-const piece = (name: string, about: string, css: string, js: string): UiPiece => ({ name, about, html: '', css: BASE_CSS + css, js: STYLE_PARAMS + js });
+const piece = (name: string, about: string, size: UiSize, css: string, js: string): UiPiece => ({ name, about, size, html: '', css: BASE_CSS + css, js: `const DESIGN_W = ${size.width};\nconst DESIGN_H = ${size.height};\nconst SAFE = ${UI_SAFE};\n` + STYLE_PARAMS + js });
 
 const SHORTENER = piece(
   'UiLinkShortener',
   'A link shortener: the long url types itself into the field, a cursor clicks the button, the short link appears with a "Copied" toast. Params url, short, button, label.',
+  { width: 1180, height: 420 },
   `
 .box { width: 1180px; padding: 40px 44px; }
 .label { font-size: 22px; font-weight: 600; margin-bottom: 14px; }
@@ -147,6 +157,7 @@ drive((t) => {
 const LINK_LIST = piece(
   'UiLinkList',
   'A list of short links filling in one row after another, each with its destination and a click count that counts up. Param links: one row per line "short|destination|clicks".',
+  { width: 1180, height: 420 },
   `
 .list { position: absolute; width: 1180px; transform: translate(-50%, -50%); padding: 14px; }
 .item { display: flex; align-items: center; gap: 20px; padding: 22px 26px; border-bottom: 1px solid var(--line); }
@@ -184,6 +195,7 @@ drive((t) => {
 const STAT_CARDS = piece(
   'UiStatCards',
   'Analytics: stat cards whose numbers count up, over a line chart that draws itself (or bars that grow). Params stats (one per line "label|value", e.g. "Sales|$506"), chart line|bar.',
+  { width: 1300, height: 520 },
   `
 .board { position: absolute; width: 1300px; transform: translate(-50%, -50%); padding: 34px; }
 .stats { display: flex; gap: 0; border-bottom: 1px solid var(--line); }
@@ -243,6 +255,7 @@ drive((t) => {
 const FUNNEL = piece(
   'UiFunnel',
   'A conversion funnel filling stage by stage (clicks to leads to sales), each bar growing to its share while its number and percentage count up. Param stages: one per line "label|value|percent".',
+  { width: 1300, height: 380 },
   `
 .funnel { position: absolute; width: 1300px; transform: translate(-50%, -50%); padding: 40px 44px; }
 .stage-row { display: grid; grid-template-columns: 200px 1fr 170px; align-items: center; gap: 24px; margin: 16px 0; }
@@ -280,6 +293,7 @@ drive((t) => {
 const PAYOUTS = piece(
   'UiPayouts',
   'A payouts table: rows slide in one after another and each status turns from Pending to Paid. Param rows: one per line "period|partner|amount".',
+  { width: 1320, height: 400 },
   `
 .table { position: absolute; width: 1320px; transform: translate(-50%, -50%); padding: 22px 0; }
 .head, .tr { display: grid; grid-template-columns: 1.3fr 1.3fr 1fr 0.8fr; padding: 18px 36px; align-items: center; }
@@ -327,6 +341,7 @@ drive((t) => {
 const QR = piece(
   'UiQr',
   'A QR code building itself: the three corner squares land first, then the modules pop in, the short link under it. Params text (encoded look), caption.',
+  { width: 640, height: 720 },
   `
 .qr { position: absolute; transform: translate(-50%, -50%); padding: 44px; display: flex; flex-direction: column; align-items: center; gap: 26px; }
 .caption { font-size: 30px; font-weight: 700; }
@@ -377,6 +392,7 @@ drive((t) => {
 const WINDOW = piece(
   'UiWindow',
   'Vector device chrome to put other clips in: a browser window with a url bar, or a phone frame. Params kind browser|phone, address. Put UI clips on a track above it.',
+  { width: 1500, height: 960 },
   `
 .browser { position: absolute; width: 1500px; height: 900px; transform: translate(-50%, -50%); overflow: hidden; }
 .bar { height: 64px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 12px; padding: 0 22px; }

@@ -6,6 +6,8 @@ import { Ease, TransitionKind } from './design';
 import { builtinTemplate } from './template/builtins';
 import { insertTemplate } from './template/library';
 import { MotionStyle } from './style-model';
+import { UI_KIT, UiKind } from './ui-kit/kit';
+import { writeComponent } from './custom/ops';
 
 function must(r: { ok: true; doc: MotionDoc } | { ok: false; error: string }): MotionDoc {
   if (!r.ok) {
@@ -136,5 +138,39 @@ describe('the real brand logo stays as it is', () => {
 
   it('another picture may be treated freely', () => {
     expect(docProblems(logoClip('Logo3D'), { audioAssets: 0, logos: ['other'] }).map((p) => p.kind)).not.toContain(Quality.BrandLogoAltered);
+  });
+});
+
+describe('nothing important leaves the frame', () => {
+  const placed = (component: 'Title' | 'Custom', props: Record<string, unknown>, keyframes: Record<string, { frame: number; value: number; ease: Ease }[]> = {}) => {
+    const piece = UI_KIT[UiKind.StatCards];
+    const base = component === 'Custom' ? must(writeComponent(calm(), piece.name, { source: { html: piece.html, css: piece.css, js: piece.js }, propsSchema: { type: 'object', properties: {} } })) : calm();
+    const doc = must(addClip(base, { component, from: 0, durationInFrames: 90, props }, 'c'));
+    return { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === 'c' ? { ...c, keyframes } : c)) })) };
+  };
+  const out = (doc: MotionDoc) => docProblems(doc, { audioAssets: 0 }).filter((p) => p.kind === Quality.OutOfFrame);
+  const pump = (to: number) => ({ scale: [{ frame: 0, value: 1, ease: Ease.Linear }, { frame: 30, value: to, ease: Ease.Linear }, { frame: 90, value: to, ease: Ease.Linear }] });
+  const ui = { name: 'UiStatCards' };
+
+  it('a UI piece pumped past the safe area is named, a gentle push is not', () => {
+    expect(out(placed('Custom', ui, pump(1.6)))).toHaveLength(1);
+    expect(out(placed('Custom', ui, pump(1.05)))).toEqual([]);
+  });
+
+  it('a UI piece slid off the side is named', () => {
+    const slid = { x: [{ frame: 0, value: 0, ease: Ease.Linear }, { frame: 20, value: 0.4, ease: Ease.Linear }, { frame: 90, value: 0.4, ease: Ease.Linear }] };
+
+    expect(out(placed('Custom', ui, slid))).toHaveLength(1);
+  });
+
+  it('a long line of large type that overflows the frame is named, a short word is not', () => {
+    expect(out(placed('Title', { text: 'Turn every click into revenue today', size: 0.3, x: 0.5, y: 0.5, width: 1, height: 0.4 }))).toHaveLength(1);
+    expect(out(placed('Title', { text: 'Links.', size: 0.2, x: 0.5, y: 0.5, width: 0.9, height: 0.3 }))).toEqual([]);
+  });
+
+  it('a move out of frame in the last moments of a clip is a transition, not a fault', () => {
+    const exit = { scale: [{ frame: 0, value: 1, ease: Ease.Linear }, { frame: 82, value: 1, ease: Ease.Linear }, { frame: 90, value: 2.5, ease: Ease.Linear }] };
+
+    expect(out(placed('Custom', ui, exit))).toEqual([]);
   });
 });

@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Tool } from 'ai';
 import { MotionFormat, findClip, newMotionDoc } from '$lib/motion/doc';
 import { writeComponent } from '$lib/motion/custom/ops';
-import { UI_KINDS, UI_KIT, UiKind } from '$lib/motion/ui-kit/kit';
+import { UI_KINDS, UI_KIT, UI_SAFE, UiKind, uiScale } from '$lib/motion/ui-kit/kit';
+import { FORMATS } from '$lib/motion/doc';
 import { motionAgentPrompt } from './motion-prompt';
 import { Vision } from './frames';
 import { createMotionTools, type MotionSession } from './motion-tools';
@@ -24,6 +25,15 @@ describe('the UI recreation kit', () => {
     const written = writeComponent(newMotionDoc(MotionFormat.Landscape), piece.name, { source: { html: piece.html, css: piece.css, js: piece.js }, propsSchema: { type: 'object', properties: {} } });
 
     expect(written.ok ? Object.keys(written.doc.components[piece.name].propsSchema.properties) : written.error).toEqual(expect.arrayContaining(['font', 'ink', 'accent', 'radius', 'zoom']));
+  });
+
+  it.each(UI_KINDS.flatMap((k) => Object.values(MotionFormat).map((f) => [k, f] as const)))('%s fits the safe area of a %s frame by default', (kind, format) => {
+    const piece = UI_KIT[kind];
+    const frame = FORMATS[format];
+    const scale = uiScale(piece, frame, 1);
+
+    expect(piece.size.width * scale).toBeLessThanOrEqual(frame.width * UI_SAFE + 0.5);
+    expect(piece.size.height * scale).toBeLessThanOrEqual(frame.height * UI_SAFE + 0.5);
   });
 
   it('add_ui puts a live piece of product UI on the timeline with its content and brand style, without spending the code budget', async () => {
@@ -57,5 +67,23 @@ describe('the UI recreation kit', () => {
 
     expect(text).toContain('add_ui');
     expect(text).toContain('never as screenshots');
+  });
+
+  it('mark_story marks each act of the story once, moving it when marked again', async () => {
+    const { session, run } = setup();
+    await run('mark_story', { beat: 'problem', start: 0 });
+    await run('mark_story', { beat: 'solution', start: 3 });
+    await run('mark_story', { beat: 'problem', start: 0.5 });
+
+    expect(session.doc.markers).toEqual([{ frame: 15, label: 'story: problem' }, { frame: 90, label: 'story: solution' }]);
+  });
+
+  it('the trailer recipe tells the four acts with brand-specific pain, and keeps UI inside the frame', () => {
+    const text = motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Available });
+
+    expect(text).toContain('Problem');
+    expect(text).toContain('mark_story');
+    expect(text).toContain('in the words of the site');
+    expect(text).toContain('inside the safe area');
   });
 });

@@ -23,3 +23,18 @@ di continuo come contenuto. I film di lancio SaaS ricostruiscono la UI in vettor
 
 Scartato: componenti Svelte o un renderer UI separato. I Custom esistono già, passano dal check di
 determinismo e dall'export: un kit di sorgenti è il pezzo più piccolo che serve.
+
+## Dopo il golden v3 ("meglio"): inquadratura e storia
+
+- **`out-of-frame`** (`direction.ts`, ogni stile): stima il riquadro reale di testi (glifi, non il
+  box) e pezzi del kit (dimensione di progetto × fit × zoom) frame per frame, con scala e offset
+  dei keyframe; nominato se esce dalla safe area (5 % per lato) per più di 6 frame fuori dai primi
+  e ultimi 0,35 s del clip (uscite di transizione ammesse). È una misura geometrica sul doc, non
+  sui pixel resi: i pixel non dicono quale elemento è importante.
+- **Kit**: ogni pezzo dichiara la sua `size`; il componente si adatta da solo al 90 % del frame
+  (`uiScale`, stessa formula nel JS) a qualunque formato. `zoom` resta un moltiplicatore.
+- **Storia in 4 atti**: `story.ts` (problem/solution/proof/claim, quote 20/15/45/20 %), tool
+  `mark_story` (marker `story: <atto>`), gate `missing-story-beat` nel launch film per film di
+  almeno 6 s. Prompt: atti obbligatori, copy del problema con le parole del sito, regola di
+  inquadratura (scala entro ~10 %, muovere posizione e camera). Lo storyboard Deep non è su main:
+  dovrà usare `mark_story` quando arriva.
