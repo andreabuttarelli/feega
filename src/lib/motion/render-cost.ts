@@ -49,7 +49,8 @@ export const LAYOUT_FRAME_MS: Record<LayoutId, number> = {
   'zoom-tunnel': 1080,
   polaroid: 750,
   globe: 500,
-  masonry: 1750
+  masonry: 1750,
+  slider: 600
 };
 
 type Scope = { doc: MotionDoc; depth: number; weigh: Weigh };

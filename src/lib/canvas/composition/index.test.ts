@@ -32,6 +32,7 @@ describe('layoutAt', () => {
 			'perspective-wall',
 			'polaroid',
 			'ring',
+			'slider',
 			'split-reveal',
 			'stack',
 			'staggered-grid',

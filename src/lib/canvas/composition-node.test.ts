@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bentoGridPatch, cardAssetIds, cellSpanPatch, staleMotions, upstreamCards, upstreamImageRefs, upstreamMedia } from './composition-node';
+import { bentoGridPatch, cardAssetIds, cardShapePatch, cellSpanPatch, staleMotions, upstreamCards, upstreamImageRefs, upstreamMedia } from './composition-node';
 import { CellFit } from '$lib/motion/bento/model';
 
 describe('upstreamImageRefs', () => {
@@ -110,5 +110,15 @@ describe('the bento panel on the canvas writes only what it changes', () => {
   it('a span lands on the cell of its source node, keeping its other settings', () => {
     expect(cellSpanPatch(node, 'a', 'columns', 2)).toEqual({ cells: { a: { fit: 'contain', columns: 2 } } });
     expect(cellSpanPatch(node, 'b', 'rows', 2)).toEqual({ cells: { a: { fit: 'contain' }, b: { rows: 2 } } });
+  });
+});
+
+describe('cardShapePatch', () => {
+  it('sets one card ratio and fit, and clears the ratio back to the layout default', () => {
+    const node = { cells: { a: { columns: 2 } } };
+    const shaped = cardShapePatch(node, 'a', { aspect: '4:5', fit: CellFit.Contain });
+
+    expect(shaped).toEqual({ cells: { a: { columns: 2, aspect: '4:5', fit: 'contain' } } });
+    expect(cardShapePatch(shaped, 'a', { aspect: undefined })).toEqual({ cells: { a: { columns: 2, fit: 'contain' } } });
   });
 });

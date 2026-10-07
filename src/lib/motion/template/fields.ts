@@ -1,6 +1,8 @@
 import { findClip, type MotionClip, type MotionDoc } from '$lib/motion/doc';
 import { mergeView, viewOf, type CompPath } from '$lib/motion/precomp';
 import { setProps, type OpResult } from '$lib/motion/timeline';
+import { CARD_ASPECTS, RATIO_RANGE, type CardAspect } from '$lib/canvas/composition/card-look';
+import { CELL_FITS, type CellFit } from '$lib/motion/bento/model';
 import { FIELD_KEY, FieldType, type ExposedField } from './field-model';
 
 export { FieldType, type ExposedField } from './field-model';
@@ -25,18 +27,47 @@ const COERCE: Record<FieldType, Coerce> = {
   [FieldType.Asset]: { expects: () => 'an asset id', parse: (raw) => raw },
   [FieldType.Boolean]: { expects: () => 'yes or no', parse: (raw) => (TRUE.has(raw.toLowerCase()) ? true : FALSE.has(raw.toLowerCase()) ? false : undefined) },
   [FieldType.Select]: { expects: (f) => `one of ${(f.options ?? []).join(', ')}`, parse: (raw, f) => (f.options?.includes(raw) ? raw : undefined) },
-  [FieldType.MediaList]: { expects: () => 'asset ids separated by commas (video:id for a video)', parse: (raw) => mediaList(raw) }
+  [FieldType.MediaList]: { expects: () => 'asset ids separated by commas (video:id for a video; id@4:5 or id@1.3/contain for the card ratio and fit)', parse: (raw) => mediaList(raw) }
 };
 
 const VIDEO_PREFIX = 'video:';
 
-function mediaList(raw: string): { assetId: string; kind: 'image' | 'video' }[] | undefined {
+const SHAPE_MARK = '@';
+const FIT_MARK = '/';
+
+type ListedCard = { assetId: string; kind: 'image' | 'video'; aspect?: CardAspect; ratio?: number; fit?: CellFit };
+
+function shapeOf(raw: string | undefined): Partial<ListedCard> | null {
+  if (raw === undefined) {
+    return {};
+  }
+  const [aspect, fit] = raw.split(FIT_MARK).map((s) => s.trim());
+  if (fit !== undefined && !CELL_FITS.includes(fit as CellFit)) {
+    return null;
+  }
+  const fitted = fit ? { fit: fit as CellFit } : {};
+  if (CARD_ASPECTS.includes(aspect as CardAspect)) {
+    return { aspect: aspect as CardAspect, ...fitted };
+  }
+  const ratio = Number(aspect);
+  return aspect && ratio >= RATIO_RANGE.min && ratio <= RATIO_RANGE.max ? { aspect: 'free', ratio, ...fitted } : null;
+}
+
+function listed(item: string): ListedCard | null {
+  const [id, shape] = item.split(SHAPE_MARK);
+  const video = id.startsWith(VIDEO_PREFIX);
+  const assetId = (video ? id.slice(VIDEO_PREFIX.length) : id).trim();
+  const extra = shapeOf(shape);
+  return assetId && extra ? { assetId, kind: video ? 'video' : 'image', ...extra } : null;
+}
+
+function mediaList(raw: string): ListedCard[] | undefined {
   const items = raw
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean)
-    .map((s) => (s.startsWith(VIDEO_PREFIX) ? { assetId: s.slice(VIDEO_PREFIX.length).trim(), kind: 'video' as const } : { assetId: s, kind: 'image' as const }));
-  return items.length && items.every((i) => i.assetId) ? items : undefined;
+    .map(listed);
+  return items.length && items.every((i) => i) ? (items as ListedCard[]) : undefined;
 }
 
 export function locateClip(doc: MotionDoc, clipId: string): Located | null {

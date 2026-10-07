@@ -24,14 +24,41 @@ export function smoothstep(from: number, to: number, value: number): number {
 	return x * x * (3 - 2 * x);
 }
 
-export type Step = { index: number; glide: number };
+export type Step = { index: number; glide: number; within: number };
 
-export function stepAt(t: number, steps: number, hold: number): Step {
+export type Bezier = readonly [number, number, number, number];
+
+const BEZIER_STEPS = 40;
+
+function cubic(a: number, b: number, t: number): number {
+	const u = 1 - t;
+	return 3 * u * u * t * a + 3 * u * t * t * b + t * t * t;
+}
+
+export function bezierAt(curve: Bezier, x: number): number {
+	if (x <= 0 || x >= 1) {
+		return x <= 0 ? 0 : 1;
+	}
+
+	let low = 0;
+	let high = 1;
+	for (let i = 0; i < BEZIER_STEPS; i++) {
+		const mid = (low + high) / 2;
+		if (cubic(curve[0], curve[2], mid) < x) {
+			low = mid;
+		} else {
+			high = mid;
+		}
+	}
+	return cubic(curve[1], curve[3], (low + high) / 2);
+}
+
+export function stepAt(t: number, steps: number, hold: number, ease: (x: number) => number = easeInOutExpo): Step {
 	const position = modulo(t, 1) * steps;
 	const index = Math.floor(position);
 	const within = position - index;
-	const glide = within <= hold ? 0 : easeInOutExpo((within - hold) / (1 - hold));
-	return { index, glide };
+	const glide = within <= hold ? 0 : ease((within - hold) / (1 - hold));
+	return { index, glide, within };
 }
 
 export function hashed(seed: number, index: number, salt: number): number {

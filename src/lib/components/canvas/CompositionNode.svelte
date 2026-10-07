@@ -6,6 +6,8 @@
   import CompositionPlayer from '$lib/components/motion/CompositionPlayer.svelte';
   import NodeDownload from './NodeDownload.svelte';
   import BentoPanel from './BentoPanel.svelte';
+  import CardsPanel from './CardsPanel.svelte';
+  import { LAYOUTS } from '$lib/canvas/composition/index';
   import { nodeDoc } from '$lib/motion/composition-draft';
   import type { MotionDoc } from '$lib/motion/doc';
 
@@ -91,6 +93,8 @@
 
   {#if node.layout === 'bento' && onpatch}
     <BentoPanel {node} {cards} {onpatch} />
+  {:else if LAYOUTS[node.layout].cards && onpatch}
+    <CardsPanel {node} {cards} {onpatch} />
   {/if}
 
   <div class="composition-actions">

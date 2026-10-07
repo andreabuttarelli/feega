@@ -15,7 +15,8 @@ const MEDIA_LOOPS: LayoutId[] = [
 	'zoom-tunnel',
 	'polaroid',
 	'globe',
-	'masonry'
+	'masonry',
+	'slider'
 ];
 const ASPECTS = { portrait: 9 / 16, square: 1, landscape: 16 / 9 };
 const LOOP_SECONDS = 8;

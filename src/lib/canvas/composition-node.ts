@@ -153,6 +153,14 @@ export function cellSpanPatch(node: Pick<CompositionNode, 'cells'>, sourceId: st
   return { cells: { ...node.cells, [sourceId]: { ...node.cells[sourceId], [key]: value } } };
 }
 
+export type CardShapeKey = 'aspect' | 'ratio' | 'fit' | 'focusX' | 'focusY';
+
+export function cardShapePatch(node: Pick<CompositionNode, 'cells'>, sourceId: string, shape: Partial<Pick<CellSpec, CardShapeKey>>): Pick<CompositionNode, 'cells'> {
+  const merged: Record<string, unknown> = { ...node.cells[sourceId], ...shape };
+  const kept = Object.fromEntries(Object.entries(merged).filter(([, value]) => value !== undefined)) as CellSpec;
+  return { cells: { ...node.cells, [sourceId]: kept } };
+}
+
 export const ASSET_IDS_PARAM = 'ids';
 
 export function assetUrlsPath(input: { projectId: string; canvasId: string; ids: string[] }): string {

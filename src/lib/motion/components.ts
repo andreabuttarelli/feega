@@ -4,6 +4,7 @@ import { DURATION, EASE_IDS, Ease, FPS } from './design';
 import { MATERIALS, Material } from './materials';
 import { DEVICES, Device, FINISHES, Finish } from './devices';
 import { LAYOUTS } from '../canvas/composition/index';
+import { CARD_ASPECTS, RATIO_RANGE } from '../canvas/composition/card-look';
 import { CAMERA_PRESETS } from '../canvas/composition/camera';
 import type { CameraPresetId } from '../canvas/composition/camera';
 import type { LayoutId } from '../canvas/composition/types';
@@ -161,6 +162,8 @@ const unitRange = z.number().min(0).max(1);
 
 const cellFields = {
   fit: z.enum(CELL_FITS).optional(),
+  aspect: z.enum(CARD_ASPECTS).optional(),
+  ratio: z.number().min(RATIO_RANGE.min).max(RATIO_RANGE.max).optional(),
   focusX: unitRange.optional(),
   focusY: unitRange.optional(),
   background: z.string().regex(COLOR).optional(),
@@ -427,7 +430,7 @@ export const COMPONENTS = {
   },
   Composition: {
     label: 'Composition',
-    description: 'Many images or videos arranged in 3D (grid, carousel, helix, coverflow, ring…) and looping every `loop` seconds. The bento layout is a flat grid (layoutParams columns, rows, gap and cornerRadius in px at 1080p, cellColor, enter none/rise/fade/scale with stagger seconds): each media item is a cell with optional fit cover/contain, focusX/focusY, background, columns/rows span and, for a comp, timing loop or hold; cornerRadius takes set_keyframes. The ring layout curves cards on a tilted, turning cylinder (UI showcase): its media can also be compositions of this video (kind comp, assetId = comp id), so UI built with Shape and Title clips goes on the cards; whole turns per loop loop exactly, and its numbers (ringRadius, cardHeight, gap as fractions of the short side; tiltX/tiltZ/spin in degrees; backOpacity, backBlur, shadowOpacity; cameraDistance px, cameraHeight) take set_keyframes.',
+    description: 'Many images or videos arranged in 3D (grid, carousel, helix, coverflow, ring…) and looping every `loop` seconds. Every layout except ring and bento takes layoutParams cardAspect (original, 1:1, 4:5, 9:16, 16:9, 3:4, free with cardRatio) as the default card ratio, and each media item can override it with aspect (and ratio when free), fit cover/contain and focusX/focusY. The slider layout shows one media at a time: layoutParams variant slide-x, slide-y, crossfade, push or peek, hold, fill, indicators none/dots/bar. The bento layout is a flat grid (layoutParams columns, rows, gap and cornerRadius in px at 1080p, cellColor, enter none/rise/fade/scale with stagger seconds): each media item is a cell with optional fit cover/contain, focusX/focusY, background, columns/rows span and, for a comp, timing loop or hold; cornerRadius takes set_keyframes. The ring layout curves cards on a tilted, turning cylinder (UI showcase): its media can also be compositions of this video (kind comp, assetId = comp id), so UI built with Shape and Title clips goes on the cards; whole turns per loop loop exactly, and its numbers (ringRadius, cardHeight, gap as fractions of the short side; tiltX/tiltZ/spin in degrees; backOpacity, backBlur, shadowOpacity; cameraDistance px, cameraHeight) take set_keyframes.',
     track: TrackKind.Visual,
     durationInFrames: seconds(6),
     schema: z
