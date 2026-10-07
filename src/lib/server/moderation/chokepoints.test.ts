@@ -74,6 +74,7 @@ const MODEL_CALLERS: Readonly<Record<string, string>> = {
   'src/routes/api/v1/projects/[projectId]/agent/+server.ts': SCREENED,
   'src/lib/server/motion/turn.ts': SCREENED,
   'src/lib/server/motion/voiceover.ts': SCREENED,
+  'src/lib/server/motion/music.ts': 'asks the configured provider only to pick the source; composing goes through generateSound, which screens',
   'src/lib/server/moderation/moderation-config.ts': 'the moderator itself: Jev and the LLM judge',
   'src/lib/server/provider-purgers.ts': 'deletes stored provider copies, sends no prompt',
   'src/lib/server/brand-analysis.ts': 'brand wizard: reads a third-party website, the user types only its URL',
