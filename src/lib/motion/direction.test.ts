@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { MotionFormat, newMotionDoc, type MotionDoc } from './doc';
 import { Side, addClip, setTransition } from './timeline';
 import { Quality, docProblems, frameProblems } from './direction';
-import { TransitionKind } from './design';
+import { Ease, TransitionKind } from './design';
 import { builtinTemplate } from './template/builtins';
 import { insertTemplate } from './template/library';
 
@@ -18,7 +18,9 @@ const SCENE = 90;
 function scene(doc: MotionDoc, i: number, look: { titleX: number; media: 'Image' | 'Device3D'; mediaX: number; titleBox?: { width: number; height: number } }): MotionDoc {
   const box = look.titleBox ?? { width: 0.4, height: 0.24 };
   const titled = must(addClip(doc, { component: 'Title', from: i * SCENE, durationInFrames: SCENE, props: { text: `Beat ${i}`, x: look.titleX, ...box } }, `t${i}`));
-  return must(addClip(titled, { component: look.media, from: i * SCENE, durationInFrames: SCENE, props: { x: look.mediaX } }, `m${i}`));
+  const placed = must(addClip(titled, { component: look.media, from: i * SCENE, durationInFrames: SCENE, props: { x: look.mediaX } }, `m${i}`));
+  const drift = { scale: [{ frame: 0, value: 1, ease: Ease.Linear }, { frame: SCENE, value: 1.05, ease: Ease.Linear }] };
+  return { ...placed, tracks: placed.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === `m${i}` ? { ...c, keyframes: drift } : c)) })) };
 }
 
 function dubLike(): MotionDoc {
