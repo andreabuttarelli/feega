@@ -5,6 +5,7 @@ import type { MotionDoc } from './doc';
 import { EffectKind } from './effects/registry';
 import { JunctionKind } from './junction-model';
 import { EASE_BEZIER, type Bezier, type Keyframe } from './keyframes';
+import { loopSeam } from './ui-morph/ops';
 import { DEFAULT_STYLE, MotionStyle, STYLE_EASES, type StyleEases } from './style-model';
 
 export enum Forbidden {
@@ -21,7 +22,8 @@ export enum Forbidden {
   RoughCut = 'rough-cut',
   UnreadableText = 'unreadable-text',
   Screenshots = 'screenshots',
-  MissingStoryBeat = 'missing-story-beat'
+  MissingStoryBeat = 'missing-story-beat',
+  LoopSeam = 'loop-seam'
 }
 
 export type StyleSpec = {
@@ -121,6 +123,26 @@ export const STYLES: Record<MotionStyle, StyleSpec> = {
       'Sound: when the project has music, put it on an Audio clip and cut the scenes on its beats (analyze_audio, cut_to_beat).',
       'Every text stays on screen long enough to be read: 0.4 s per word plus 0.6 s, 1.2 s at least for a phrase.',
       'A real brand logo is always the original asset, flat and intact (Logo or Image clip): never extruded, recoloured, filtered or deformed; a fade or a small scale only.'
+    ]
+  },
+  [MotionStyle.UiMorph]: {
+    label: 'UI morph reel',
+    eases: STYLE_EASES[MotionStyle.UiMorph],
+    seconds: { enter: [0.2, 0.35], stagger: 0.05, exit: 0.15, still: 0.5, scene: [0.5, 2] },
+    movement: { rise: 0, settle: 1, blur: 12, pushIn: 1, turn: 0 },
+    type: { family: 'Geist', weights: { display: 600, text: 500 }, sizes: { hero: 0.05, line: 0.03, small: 0.02 } },
+    palette: { ink: '#0a0a0a', paper: '#ffffff', muted: '#e7e4de', accents: 1 },
+    junctions: [],
+    entrances: [TransitionKind.None],
+    reading: READING,
+    forbidden: [Forbidden.Particles, Forbidden.Glow, Forbidden.Bounce, Forbidden.LoopSeam],
+    maxMoving: 2,
+    rules: [
+      'One shape, never a cut: every UI state is the same element morphing size, radius and colour on springs while its content swaps with a short blur (ui_morph_reel builds it).',
+      'A cursor drives every change with real clicks and drags; while a knob is held its value comes from the pointer, on release it springs from where it is.',
+      'Warm light grey canvas, black and white components and at most one accent; a clean UI font (Geist); no gradients, glows, particles or bouncy eases.',
+      'One event on every beat from a downbeat; analyze the music with mark_beats and set the reel offset to the first beat.',
+      'The last frame flows into the first, cursor included: the reel spans the whole video and the loop-seam gate names anything that breaks the loop.'
     ]
   }
 };
@@ -309,7 +331,8 @@ const CHECKS: Record<Forbidden, Check> = {
   [Forbidden.NoPeak]: noPeak,
   [Forbidden.RoughCut]: roughCut,
   [Forbidden.Screenshots]: screenshots,
-  [Forbidden.MissingStoryBeat]: missingStory
+  [Forbidden.MissingStoryBeat]: missingStory,
+  [Forbidden.LoopSeam]: (doc) => loopSeam(doc).map((p) => ({ clip: p.clip, at: doc.durationInFrames - 1, detail: p.detail }))
 };
 
 export type StyleProblem = { effect: Forbidden; at: number; detail: string };
