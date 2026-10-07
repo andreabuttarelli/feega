@@ -1,15 +1,14 @@
 import type { Db } from '$lib/server/db/client';
 import type { Actor } from '$lib/server/repos/actor';
 import { runAudio } from '$lib/server/canvas/audio-run';
-import { cachedVoices } from '$lib/server/canvas/audio-voices';
+import { voiceUseRefusal } from '$lib/server/voices/voice-guard';
 import { createAssetSigningDb, signAssetPaths } from '$lib/server/canvas/sign-media';
-import { defaultAudioModel, type AudioOperationId, type AudioParams } from '$lib/canvas/audio-operations';
+import { defaultAudioModel, voiceIdOf, type AudioOperationId, type AudioParams } from '$lib/canvas/audio-operations';
 import { screenModelInput } from '$lib/server/moderation/model-input';
 import { ModerationProfile } from '$lib/server/moderation/profiles';
 import type { Voiceover } from './motion-tools';
 
 const AUDIO_NOT_CONFIGURED = 'elevenlabs_not_configured';
-const NO_VOICE = 'no_voice_available';
 
 export type VoiceoverScope = { orgId: string; projectId: string; nodeId: string; userId: string; actor: Actor };
 
@@ -18,21 +17,17 @@ export enum Sound {
   Music = 'music'
 }
 
-type Provider = NonNullable<ReturnType<(typeof import('$lib/server/elevenlabs-config'))['configuredAudioProvider']>>;
-type SoundSpec = { operation: AudioOperationId; params: (provider: Provider, input: SoundInput) => Promise<AudioParams | null> };
+type SoundSpec = { operation: AudioOperationId; params: (input: SoundInput) => AudioParams };
 export type SoundInput = { text: string; voiceId?: string; seconds?: number };
 
 const SOUNDS: Record<Sound, SoundSpec> = {
   [Sound.Voice]: {
     operation: 'text_to_speech',
-    params: async (provider, input) => {
-      const voiceId = input.voiceId ?? (await cachedVoices(provider))[0]?.id;
-      return voiceId ? { operation: 'text_to_speech', voiceId } : null;
-    }
+    params: (input) => ({ operation: 'text_to_speech', voiceId: voiceIdOf({ voiceId: input.voiceId }) })
   },
   [Sound.Music]: {
     operation: 'music',
-    params: async (_provider, input) => ({ operation: 'music', duration: input.seconds })
+    params: (input) => ({ operation: 'music', duration: input.seconds })
   }
 };
 
@@ -49,9 +44,10 @@ export async function generateSound(db: Db, scope: VoiceoverScope, sound: Sound,
   }
 
   const spec = SOUNDS[sound];
-  const params = await spec.params(provider, input);
-  if (!params) {
-    return { ok: false, error: NO_VOICE };
+  const params = spec.params(input);
+  const refusal = params.voiceId ? await voiceUseRefusal(db, { orgId: scope.orgId, projectId: scope.projectId, voiceId: params.voiceId }) : null;
+  if (refusal) {
+    return { ok: false, error: refusal };
   }
 
   const out = await runAudio(db, provider, {

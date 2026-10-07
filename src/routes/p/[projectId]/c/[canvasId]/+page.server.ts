@@ -33,6 +33,17 @@ import { isCanvasEdgeKind, isWireMode } from '$lib/canvas-edges';
 import { canvasModelCatalogue } from '$lib/server/canvas-catalogue';
 import { Capability, catalogueIn, MODE_REFUSAL, modeAllows, modeOf, type ProjectMode } from '$lib/project-mode';
 import { canvasReachable } from '$lib/server/uncensored-workspace/workspace-server';
+import { MIN_VOICE_DESCRIPTION, VOICE_REFUSAL_MESSAGE, type VoiceRefusal } from '$lib/canvas/voices';
+import type { VoiceDeps } from '$lib/server/voices/custom-voices';
+
+const HTTP_UNAVAILABLE = 503;
+const MAX_VOICE_NAME = 100;
+const VOICE_FAIL_STATUS: Partial<Record<VoiceRefusal | 'voice_not_found', number>> = {
+  voice_slots_full: 409,
+  voice_not_found: 404,
+  voice_not_yours: 403,
+  cloning_not_in_this_project: 403
+};
 import { NO_UNCENSORED_ACCESS, uncensoredAccess, visibleCatalogue } from '$lib/server/uncensored-access';
 import { runGenNode, runsOf } from '$lib/server/canvas/generate';
 import { planLoop, enqueueLoop, cancelLoop, retryLoopCombination } from '$lib/server/canvas/loop';
@@ -135,6 +146,35 @@ async function scopeAllowing(locals: App.Locals, canvasId: string, capability: C
     throw error(403, MODE_REFUSAL[capability]);
   }
   return scope;
+}
+
+async function voiceDepsOf(scope: Scope) {
+  const { configuredVoiceDeps } = await import('$lib/server/voices/voices-config');
+  return configuredVoiceDeps(scope.db);
+}
+
+function voiceScopeOf(scope: Scope) {
+  return { orgId: scope.orgId, userId: scope.userId, actor: userActor(scope) };
+}
+
+function voiceFail(error: VoiceRefusal | 'voice_not_found') {
+  const message = error === 'voice_not_found' ? 'This voice does not exist.' : VOICE_REFUSAL_MESSAGE[error];
+  return fail(VOICE_FAIL_STATUS[error] ?? 400, { error, message });
+}
+
+async function spendOnVoice<T>(
+  scope: Scope,
+  work: (deps: VoiceDeps, useCases: typeof import('$lib/server/voices/custom-voices')) => Promise<T>
+) {
+  const deps = await voiceDepsOf(scope);
+  if (!deps) {
+    return fail(HTTP_UNAVAILABLE, { error: 'elevenlabs_not_configured' });
+  }
+  const denied = await gateOrgAiActionForForm(scope.orgId);
+  if (denied) {
+    return fail(denied.status, denied.data);
+  }
+  return work(deps, await import('$lib/server/voices/custom-voices'));
 }
 
 /** La storia dei giri, per nodo: quello che la striscia sotto il risultato deve poter mostrare. */
@@ -469,14 +509,105 @@ export const actions: Actions = {
   },
 
   audio_voices: async ({ params, locals }) => {
-    await scopeFor(locals, params.canvasId);
-    const { configuredAudioProvider } = await import('$lib/server/elevenlabs-config');
-    const { cachedVoices } = await import('$lib/server/canvas/audio-voices');
+    const scope = await scopeFor(locals, params.canvasId);
+    const [{ configuredAudioProvider }, { cachedVoices }, { configuredVoiceDeps }, { voiceSlots }] = await Promise.all([
+      import('$lib/server/elevenlabs-config'),
+      import('$lib/server/canvas/audio-voices'),
+      import('$lib/server/voices/voices-config'),
+      import('$lib/server/voices/custom-voices')
+    ]);
     const provider = configuredAudioProvider();
-    if (!provider) {
-      return fail(503, { error: 'elevenlabs_not_configured' });
+    const deps = configuredVoiceDeps(scope.db);
+    if (!provider || !deps) {
+      return fail(HTTP_UNAVAILABLE, { error: 'elevenlabs_not_configured' });
     }
-    return { voices: await cachedVoices(provider) };
+    const [voices, custom, slots] = await Promise.all([cachedVoices(provider), deps.store.list(scope.orgId), voiceSlots(deps, scope.orgId)]);
+    return { voices, custom, slots };
+  },
+
+  voice_library: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const deps = await voiceDepsOf(scope);
+    if (!deps) {
+      return fail(HTTP_UNAVAILABLE, { error: 'elevenlabs_not_configured' });
+    }
+    const { libraryFiltersOf } = await import('$lib/server/voices/voice-forms');
+    return deps.provider.library(libraryFiltersOf(await request.formData()));
+  },
+
+  voice_use_library: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const input = {
+      ownerId: String(fd.get('owner_id') ?? ''),
+      voiceId: String(fd.get('voice_id') ?? ''),
+      name: String(fd.get('name') ?? '').trim().slice(0, MAX_VOICE_NAME)
+    };
+    if (!input.ownerId || !input.voiceId || !input.name) {
+      return fail(400, { error: 'voice_not_found', message: 'This voice does not exist.' });
+    }
+    const deps = await voiceDepsOf(scope);
+    if (!deps) {
+      return fail(HTTP_UNAVAILABLE, { error: 'elevenlabs_not_configured' });
+    }
+    return { voiceId: await deps.provider.addShared(input), name: input.name };
+  },
+
+  voice_design: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const description = String((await request.formData()).get('description') ?? '').trim();
+    if (description.length < MIN_VOICE_DESCRIPTION) {
+      return fail(400, { error: 'description_too_short', message: `Describe the voice in at least ${MIN_VOICE_DESCRIPTION} characters.` });
+    }
+    return spendOnVoice(scope, async (deps, { designPreviews }) => {
+      const out = await designPreviews(deps, voiceScopeOf(scope), { description });
+      return out.ok ? { previews: out.previews } : voiceFail(out.error);
+    });
+  },
+
+  voice_save: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const input = {
+      generatedVoiceId: String(fd.get('generated_voice_id') ?? ''),
+      name: String(fd.get('name') ?? '').trim().slice(0, MAX_VOICE_NAME),
+      description: String(fd.get('description') ?? '').trim()
+    };
+    if (!input.generatedVoiceId || !input.name) {
+      return fail(400, { error: 'name_required', message: 'Give the voice a name.' });
+    }
+    const deps = await voiceDepsOf(scope);
+    if (!deps) {
+      return fail(HTTP_UNAVAILABLE, { error: 'elevenlabs_not_configured' });
+    }
+    const { saveDesignedVoice } = await import('$lib/server/voices/custom-voices');
+    const out = await saveDesignedVoice(deps, voiceScopeOf(scope), input);
+    return out.ok ? { voice: out.voice } : voiceFail(out.error);
+  },
+
+  voice_clone: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const { cloneFormOf } = await import('$lib/server/voices/voice-forms');
+    const form = await cloneFormOf(await request.formData());
+    if ('error' in form) {
+      return fail(400, { error: form.error, message: 'Record your voice and give it a name.' });
+    }
+    return spendOnVoice(scope, async (deps, { cloneVoice }) => {
+      const out = await cloneVoice(deps, voiceScopeOf(scope), { ...form, mode: scope.mode });
+      return out.ok ? { voice: out.voice } : voiceFail(out.error);
+    });
+  },
+
+  voice_delete: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const id = String((await request.formData()).get('id') ?? '');
+    const deps = await voiceDepsOf(scope);
+    if (!deps) {
+      return fail(HTTP_UNAVAILABLE, { error: 'elevenlabs_not_configured' });
+    }
+    const { deleteVoice } = await import('$lib/server/voices/custom-voices');
+    const out = await deleteVoice(deps, scope.orgId, id);
+    return out.ok ? { deleted: true } : voiceFail(out.error);
   },
 
   estimate_text_cost: async ({ request, params, locals }) => {

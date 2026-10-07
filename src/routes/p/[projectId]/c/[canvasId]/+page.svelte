@@ -61,6 +61,7 @@
   import { audioOutputIds } from '$lib/canvas/node-media';
   import NodeReferences from '$lib/components/canvas/NodeReferences.svelte';
   import AudioControls, { type VoiceChoice } from '$lib/components/canvas/AudioControls.svelte';
+  import type { CustomVoiceChoice, VoiceAnswer, VoiceSlots } from '$lib/components/canvas/VoiceStudio.svelte';
   import { audioInputKindOf, audioInputPorts, audioNamedOutputs, audioOperationOf, operationSpec, type AudioInputKind, type AudioOperationId } from '$lib/canvas/audio-operations';
   import { referencesOf } from '$lib/canvas/node-references';
   import EffectsNode from '$lib/components/canvas/EffectsNode.svelte';
@@ -200,6 +201,8 @@
   let voices = $state<VoiceChoice[]>([]);
   let voicesError = $state<string | null>(null);
   let voicesLoading = false;
+  let customVoices = $state<CustomVoiceChoice[]>([]);
+  let voiceSlots = $state<VoiceSlots | null>(null);
 
   async function loadVoices() {
     if (voicesLoading) {
@@ -207,9 +210,21 @@
     }
     voicesLoading = true;
     const result = await post('audio_voices', {});
+    voicesLoading = false;
     const found = (result?.voices as VoiceChoice[] | undefined) ?? [];
     voices = found;
+    customVoices = (result?.custom as CustomVoiceChoice[] | undefined) ?? [];
+    voiceSlots = (result?.slots as VoiceSlots | undefined) ?? null;
     voicesError = found.length ? null : 'No voices available';
+  }
+
+  async function voiceAction(action: string, fields: Record<string, string | File>): Promise<VoiceAnswer> {
+    const result = await send(action, fields);
+    if (result.type === 'success') {
+      return { ok: true, data: (result.data ?? {}) as Record<string, unknown> };
+    }
+    const detail = (result.data ?? {}) as { message?: string };
+    return { ok: false, message: detail.message ?? saveMessage(failureOf(result), detail) };
   }
 
   function handlePromote(ids: string[]) {
@@ -2634,6 +2649,11 @@
                   node={gen}
                   {voices}
                   {voicesError}
+                  custom={customVoices}
+                  slots={voiceSlots}
+                  cloningAllowed={data.mode !== 'uncensored'}
+                  onvoiceaction={voiceAction}
+                  onvoiceschanged={() => void loadVoices()}
                   onparams={(params) => changeGen(id, gen, { params })}
                   onmodel={(model) => changeGen(id, gen, { model })}
                   onoperation={(next) => void changeAudioOperation(id, gen, next)}

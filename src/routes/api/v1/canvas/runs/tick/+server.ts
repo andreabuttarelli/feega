@@ -13,6 +13,8 @@ import { purgeProviderCopies } from '$lib/server/canvas/provider-purge';
 import { configuredPurgers } from '$lib/server/provider-purgers';
 import { restoreDueReports } from '$lib/server/reports/reports';
 import { reportDeps } from '$lib/server/reports/report-deps';
+import { configuredVoiceDeps } from '$lib/server/voices/voices-config';
+import { sweepVoices } from '$lib/server/voices/custom-voices';
 import { reconcileRenders } from '$lib/server/motion/render-run';
 import { motionRenderFarm, motionRenderStorage } from '$lib/server/motion/renderer';
 
@@ -119,7 +121,15 @@ export const GET: RequestHandler = async ({ request }) => {
     return { restored: 0 };
   });
 
-  return json({ ...runs, videos, audios, wiro, renders, purge, loops, workflows, studio, events, seats, reports });
+  const voiceDeps = configuredVoiceDeps(db);
+  const voices = voiceDeps
+    ? await sweepVoices(voiceDeps, new Date()).catch((e) => {
+        console.error('[voices] sweep failed', e);
+        return null;
+      })
+    : null;
+
+  return json({ ...runs, videos, audios, wiro, renders, purge, loops, workflows, studio, events, seats, reports, voices });
 };
 
 export const POST = GET;

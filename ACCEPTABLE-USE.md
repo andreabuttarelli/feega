@@ -35,6 +35,7 @@ This policy says what you may not do with feega. It is part of the [Terms of Ser
 ## 3. Also prohibited
 
 - Presenting synthetic people, voices or reviews as real customers, employees or testimonials.
+- Cloning a voice that is not your own without the speaker's explicit, informed consent, or using any voice (cloned, designed or from the library) to impersonate a real person.
 - Using a person's likeness or voice without consent, or third-party trademarks and works without the right to do so.
 - Publishing a deepfake of real people, places or events, or AI text on matters of public interest without human review, without disclosing it is AI-generated.
 - Probing, bypassing or overloading moderation or rate limits, including by splitting or encoding prompts.

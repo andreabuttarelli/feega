@@ -10,6 +10,8 @@
     type AudioOperationId
   } from '$lib/canvas/audio-operations';
   import type { GenNode, GenParams } from '$lib/canvas/gen-node';
+  import { DEFAULT_VOICE } from '$lib/canvas/audio-operations';
+  import VoiceStudio, { type CustomVoiceChoice, type VoiceAction, type VoiceSlots } from './VoiceStudio.svelte';
 
   export type VoiceChoice = { id: string; name: string; previewUrl: string | null };
 
@@ -17,6 +19,11 @@
     node,
     voices = [],
     voicesError = null,
+    custom = [],
+    slots = null,
+    cloningAllowed = false,
+    onvoiceaction,
+    onvoiceschanged,
     onparams,
     onmodel,
     onoperation,
@@ -25,6 +32,11 @@
     node: GenNode;
     voices?: VoiceChoice[];
     voicesError?: string | null;
+    custom?: CustomVoiceChoice[];
+    slots?: VoiceSlots | null;
+    cloningAllowed?: boolean;
+    onvoiceaction: VoiceAction;
+    onvoiceschanged: () => void;
     onparams: (params: GenParams) => void;
     onmodel: (model: string) => void;
     onoperation: (next: AudioOperationId) => void;
@@ -58,8 +70,19 @@
     onoperation(next);
   }
 
+  let studioOpen = $state(false);
+
+  const known = $derived([...voices.map((v) => v.id), ...custom.map((v) => v.providerVoiceId)]);
+  const pickedElsewhere = $derived(Boolean(node.params.voiceId) && !known.includes(node.params.voiceId as string));
+
   function pickVoice(id: string) {
-    set({ voiceId: id, voiceName: voices.find((v) => v.id === id)?.name });
+    const name = voices.find((v) => v.id === id)?.name ?? custom.find((v) => v.providerVoiceId === id)?.name;
+    set({ voiceId: id, voiceName: name });
+  }
+
+  function pickFromStudio(voice: { id: string; name: string }) {
+    set({ voiceId: voice.id, voiceName: voice.name });
+    studioOpen = false;
   }
 
   function preview() {
@@ -95,17 +118,34 @@
     <label>
       <span>Voice</span>
       <span class="row">
-        <select value={node.params.voiceId ?? ''} onchange={(e) => pickVoice(e.currentTarget.value)} aria-label="Voice">
-          <option value="" disabled>{voicesError ?? (voices.length ? 'Pick a voice' : 'Loading voices…')}</option>
-          {#each voices as voice (voice.id)}
-            <option value={voice.id}>{voice.name}</option>
-          {/each}
+        <select value={node.params.voiceId ?? DEFAULT_VOICE.id} onchange={(e) => pickVoice(e.currentTarget.value)} aria-label="Voice">
+          {#if voicesError || !voices.length}
+            <option value={DEFAULT_VOICE.id}>{voicesError ?? DEFAULT_VOICE.name}</option>
+          {/if}
+          {#if pickedElsewhere}
+            <option value={node.params.voiceId}>{node.params.voiceName ?? node.params.voiceId}</option>
+          {/if}
+          {#if custom.length}
+            <optgroup label="My voices">
+              {#each custom as voice (voice.id)}
+                <option value={voice.providerVoiceId}>{voice.name}</option>
+              {/each}
+            </optgroup>
+          {/if}
+          <optgroup label="Standard voices">
+            {#each voices as voice (voice.id)}
+              <option value={voice.id}>{voice.name}</option>
+            {/each}
+          </optgroup>
         </select>
         <button type="button" class="icon" aria-label="Preview voice" disabled={!node.params.voiceId} onclick={preview}>
           <Play size={ICON_SIZE} />
         </button>
       </span>
     </label>
+    <button type="button" class="more" onclick={() => (studioOpen = true)}>
+      More voices{slots ? ` · ${slots.left} slots left` : ''}
+    </button>
     {#each VOICE_SETTINGS as setting (setting.key)}
       <label class="slider">
         <span>{setting.label}</span>
@@ -149,6 +189,18 @@
   {/if}
 </div>
 
+{#if studioOpen}
+  <VoiceStudio
+    {slots}
+    {custom}
+    {cloningAllowed}
+    onaction={onvoiceaction}
+    onpick={pickFromStudio}
+    onchanged={onvoiceschanged}
+    onclose={() => (studioOpen = false)}
+  />
+{/if}
+
 <style>
   .audio-controls {
     display: grid;
@@ -191,6 +243,15 @@
     flex: none;
     width: 24px;
     padding: 0;
+    border: 1px solid var(--line-2, #d2d2d7);
+    background: var(--paper, #fff);
+    color: var(--ink, #1d1d1f);
+    cursor: pointer;
+  }
+  .more {
+    align-self: end;
+    padding: 3px 4px;
+    font: inherit;
     border: 1px solid var(--line-2, #d2d2d7);
     background: var(--paper, #fff);
     color: var(--ink, #1d1d1f);

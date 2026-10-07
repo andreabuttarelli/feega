@@ -23,6 +23,8 @@ vi.mock('$lib/server/reports/report-deps', () => ({ reportDeps: () => ({}) }));
 vi.mock('$lib/server/reports/reports', () => ({ restoreDueReports: step('reports', { restored: 1 }) }));
 vi.mock('$lib/server/motion/renderer', () => ({ motionRenderFarm: () => ({}), motionRenderStorage: () => ({}) }));
 vi.mock('$lib/server/motion/render-run', () => ({ reconcileRenders: step('renders', { checked: 1, done: 1, failed: 0, pending: 0 }) }));
+vi.mock('$lib/server/voices/voices-config', () => ({ configuredVoiceDeps: () => ({}) }));
+vi.mock('$lib/server/voices/custom-voices', () => ({ sweepVoices: step('voices', { samples: { purged: 1, failed: 0 }, orphans: { removed: 0 } }) }));
 vi.mock('$lib/server/canvas/provider-purge', () => ({ purgeProviderCopies: step('purge', { purged: 2, waiting: 0, failed: 0 }) }));
 
 describe('the canvas run tick', () => {
@@ -51,5 +53,13 @@ describe('the canvas run tick', () => {
     const res = await GET({ request: new Request('https://x.test') } as Parameters<typeof GET>[0]);
 
     expect((await res.json()).reports).toEqual({ restored: 1 });
+  });
+
+  it('sweeps clone samples and orphan voices at ElevenLabs', async () => {
+    const { GET } = await import('./+server');
+
+    const res = await GET({ request: new Request('https://x.test') } as Parameters<typeof GET>[0]);
+
+    expect((await res.json()).voices).toEqual({ samples: { purged: 1, failed: 0 }, orphans: { removed: 0 } });
   });
 });

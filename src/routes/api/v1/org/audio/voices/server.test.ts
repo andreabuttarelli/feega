@@ -10,6 +10,9 @@ vi.mock('$lib/server/elevenlabs-config', () => ({
   configuredAudioProvider: () => configuredAudioProvider()
 }));
 
+const list = vi.fn();
+vi.mock('$lib/server/voices/voice-store', () => ({ supabaseVoiceStore: () => ({ list }) }));
+
 import { GET } from './+server';
 
 const RACHEL = { id: 'v1', name: 'Rachel', previewUrl: 'https://p/1.mp3', category: 'premade', labels: {} };
@@ -24,7 +27,8 @@ function call() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  resolveOrgCaller.mockResolvedValue({ caller: { orgId: 'org-1' } });
+  resolveOrgCaller.mockResolvedValue({ caller: { orgId: 'org-1', db: {} } });
+  list.mockResolvedValue([]);
 });
 
 describe('GET /api/v1/org/audio/voices', () => {
@@ -35,6 +39,16 @@ describe('GET /api/v1/org/audio/voices', () => {
 
     expect(res.status).toBe(200);
     expect(body.voices).toEqual([RACHEL]);
+  });
+
+  it('adds the workspace own custom voices', async () => {
+    configuredAudioProvider.mockReturnValue({ voices: async () => [RACHEL] });
+    list.mockResolvedValue([{ id: 'r', providerVoiceId: 'el-9', name: 'Mine', method: 'design' }]);
+
+    const { body } = await call();
+
+    expect(list).toHaveBeenCalledWith('org-1');
+    expect(body.custom).toEqual([{ id: 'el-9', name: 'Mine', method: 'design' }]);
   });
 
   it('says the provider is not configured instead of an empty list', async () => {

@@ -14,6 +14,7 @@ import {
   dubbedInputKind,
   audioUsdFor,
   operationSpec,
+  voiceIdOf,
   type AudioMeasure,
   type AudioOperationId,
   type AudioParams
@@ -82,10 +83,10 @@ function secondsOf(req: AudioRequest): number {
 
 const PERFORM: Record<AudioOperationId, Perform> = {
   text_to_speech: async (provider, req) => ({
-    file: await provider.speak({ text: req.text, voiceId: req.params.voiceId ?? '', model: req.model, settings: settingsOf(req.params) })
+    file: await provider.speak({ text: req.text, voiceId: voiceIdOf(req.params), model: req.model, settings: settingsOf(req.params) })
   }),
   voice_changer: async (provider, req, media) => ({
-    file: await provider.changeVoice({ media: await media(), voiceId: req.params.voiceId ?? '', model: req.model, settings: settingsOf(req.params) })
+    file: await provider.changeVoice({ media: await media(), voiceId: voiceIdOf(req.params), model: req.model, settings: settingsOf(req.params) })
   }),
   voice_isolation: async (provider, _req, media) => ({ file: await provider.isolate({ media: await media() }) }),
   music: async (provider, req) => ({ file: await provider.compose({ prompt: req.text, seconds: secondsOf(req), model: req.model }) }),

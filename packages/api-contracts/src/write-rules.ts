@@ -70,6 +70,7 @@ export const TABLE_CHECKS: Record<string, string> = {
   "custom_agents_avatar_face_chk": "avatar_face is null or avatar_face in ('wide', 'dot', 'wink', 'sleepy', 'smile', 'happy', 'visor', 'surprise')",
   "custom_agents_name_len": "char_length(btrim(name)) between 1 and 80",
   "custom_agents_prompt_len": "char_length(btrim(prompt)) between 1 and 8000",
+  "custom_voices_clone_needs_consent": "method <> 'instant_clone' or (consent_basis is not null and consent_attested_at is not null and (consent_basis = 'own_voice' or length(trim(coalesce(consent_speaker, ''))) > 0))",
   "editorial_plans_source_check": "source = any (array['onboarding','revision','rollover','manual','analytics_review','autopilot'])",
   "gtm_plans_horizon_check": "horizon in ('90d', '6m')",
   "gtm_plans_source_check": "source = any (array['manual','revision','phase_review','onboarding','analytics_review','autopilot'])",

@@ -32,7 +32,7 @@ import { composePrompt } from '$lib/canvas/compose-prompt';
 import { textRequest } from '$lib/canvas/text-request';
 import { resolveNodeModel } from './node-model';
 import { finishAudioJob, outputRefsOf, runAudio, type AudioScope } from './audio-run';
-import { audioOperationOf, defaultAudioModel } from '$lib/canvas/audio-operations';
+import { audioOperationOf, defaultAudioModel, operationSpec, voiceIdOf } from '$lib/canvas/audio-operations';
 import type { UpstreamInputs } from '$lib/canvas/upstream-inputs';
 import { WIRO_ID_PREFIX } from '$lib/server/wiro-catalogue';
 import { model3dParamsOf } from '$lib/model3d-models';
@@ -227,12 +227,27 @@ function audioScopeOf(input: StartRun): AudioScope {
   return { orgId: input.orgId, projectId: input.projectId, nodeId: input.nodeId, userId: input.userId, actor: input.actor };
 }
 
+async function refusedVoice(db: Db, input: StartRun): Promise<string | null> {
+  const operation = audioOperationOf(input.params);
+  if (!operationSpec(operation).needsVoice) {
+    return null;
+  }
+  const { voiceUseRefusal } = await import('$lib/server/voices/voice-guard');
+  return voiceUseRefusal(db, { orgId: input.orgId, projectId: input.projectId, voiceId: voiceIdOf(input.params) });
+}
+
 async function runAudioNode(db: Db, input: StartRun, run: NodeRun, upstream: UpstreamInputs, text: string): Promise<RunOutcome> {
   const { configuredAudioProvider } = await import('$lib/server/elevenlabs-config');
   const provider = configuredAudioProvider();
   if (!provider) {
     await giveUp(db, input, run, AUDIO_NOT_CONFIGURED);
     return { kind: 'refused', error: AUDIO_NOT_CONFIGURED };
+  }
+
+  const voiceRefusal = await refusedVoice(db, input);
+  if (voiceRefusal) {
+    await giveUp(db, input, run, voiceRefusal);
+    return { kind: 'refused', error: voiceRefusal };
   }
 
   try {

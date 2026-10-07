@@ -3,6 +3,7 @@ import type { RequestHandler } from './$types';
 import { resolveOrgCaller } from '$lib/server/org-data/auth';
 import { configuredAudioProvider } from '$lib/server/elevenlabs-config';
 import { cachedVoices } from '$lib/server/canvas/audio-voices';
+import { supabaseVoiceStore } from '$lib/server/voices/voice-store';
 
 const SERVICE_UNAVAILABLE = 503;
 
@@ -17,5 +18,6 @@ export const GET: RequestHandler = async ({ request, url }) => {
   if (!provider) {
     return json({ error: 'elevenlabs_not_configured' }, { status: SERVICE_UNAVAILABLE });
   }
-  return json({ voices: await cachedVoices(provider) });
+  const [voices, custom] = await Promise.all([cachedVoices(provider), supabaseVoiceStore(resolved.caller.db).list(resolved.caller.orgId)]);
+  return json({ voices, custom: custom.map((v) => ({ id: v.providerVoiceId, name: v.name, method: v.method })) });
 };
