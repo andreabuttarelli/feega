@@ -3,19 +3,105 @@
 > Generato da `node scripts/mcp-inventory.mjs --write`, leggendo `tools/list` dal server vero.
 > Non si modifica a mano: il prossimo che rigenera cancella le correzioni.
 
-**22 tool** — 8 in lettura, 11 in scrittura, 3 che distruggono.
-Il payload di `tools/list` pesa **23.740 caratteri**, circa **5935 token**, ed e' il costo che ogni sessione paga prima di dire una parola.
+**26 tool** — 10 in lettura, 13 in scrittura, 3 che distruggono.
+Il payload di `tools/list` pesa **26.215 caratteri**, circa **6554 token**, ed e' il costo che ogni sessione paga prima di dire una parola.
 
 | gruppo | tool |
 |---|---:|
+| Altro | 7 |
 | Accesso diretto al database | 5 |
 | Ads | 4 |
 | Nodi e generazione | 4 |
-| Altro | 3 |
 | Video motion | 3 |
 | Post | 3 |
 
 Legenda: **R** legge e non cambia niente · **W** scrive · **D** distrugge, e il client puo' chiedere conferma.
+
+## Altro
+
+### `apply_effects` · W
+
+*Apply image effects*
+
+Applies one effect or a chain (`list_effects`) and lands the result as a new asset — the same render the canvas Effects editor does. On an image node it creates an `effects` node beside it, wired to it; on an `effects` node it replaces the stack with `effects` when given, otherwise re-renders the stack it has. `effects`: `[{ id, params?, enabled? }]` in order, missing params take their defaults. Returns `{ node_id, asset_id }`. Spends no credits: no AI provider is called.
+
+| campo | tipo | |
+|---|---|---|
+| `org`? | string | Which org, if you belong to more than one. |
+| `node_id` | string |  |
+| `effects`? | object[] |  |
+
+### `enhance_prompt` · W
+
+*Rewrite a prompt for the model that will render it*
+
+Rewrites a brief into the SHAPE the model you are about to render with wants — one reads labelled sections, another one flowing paragraph, another a command when it edits. Pass the `model` (`get_media_models` lists them) and use the `prompt` that comes back to render. It rewrites, it never invents: a rewrite that adds a subject, asks for readable text or states an aspect ratio is thrown away and the original returns with `changed: false` and the reason in `notes`, as does a model we have no guide for. Draws nothing, files nothing. Spends credits.
+
+| campo | tipo | |
+|---|---|---|
+| `org`? | string | Which org, if you belong to more than one. |
+| `prompt` | string |  |
+| `model` | string |  |
+| `shot_mode`? | `hero` \| `flat-lay` \| `on-model` \| `close-up` \| `lifestyle` \| `studio` |  |
+
+### `get_media` · R
+
+*See a node's media*
+
+View the image, video, audio, 3D model or text a node holds, a generation run produced, or an asset — by `node_ids`, `run_ids` and/or `asset_ids`. Per item: type, mime, width/height, duration, and two signed links: `preview_url` (images: 1024px long edge, valid 5 minutes — FETCH THIS to look at the image and judge it against the prompt) and `full_url` (the original file, valid 1 hour — give this to the user). Videos and audio have `full_url` only. Ids your org cannot see come back in `missing`. Reads only, spends nothing.
+
+| campo | tipo | |
+|---|---|---|
+| `org`? | string | Which org, if you belong to more than one. |
+| `node_ids`? | string[] |  |
+| `run_ids`? | string[] |  |
+| `asset_ids`? | string[] |  |
+
+### `get_render` · R
+
+*Read a render*
+
+State of a `render_video` run: `status` (running, done, failed, expired), `mode`, and when done `asset_id` and a signed `file_url` valid one hour. Reads only.
+
+| campo | tipo | |
+|---|---|---|
+| `org`? | string | Which org, if you belong to more than one. |
+| `run_id` | string |  |
+
+### `list_effects` · R
+
+*List image effects*
+
+Every image effect `apply_effects` accepts, with its params (range, options, default). Reads only, spends nothing.
+
+| campo | tipo | |
+|---|---|---|
+| `org`? | string | Which org, if you belong to more than one. |
+
+### `make_effects_pair` · W
+
+*Make a shape cutout A/B pair*
+
+For an `effects` node with a `shape-cutout` step: creates its twin (same shapes and seed, other side — shapes over the image vs fill with holes), wired to the same image, and renders it. Returns `{ node_id, asset_id }`. Free.
+
+| campo | tipo | |
+|---|---|---|
+| `org`? | string | Which org, if you belong to more than one. |
+| `node_id` | string |  |
+
+### `render_video` · W
+
+*Render a motion video*
+
+Render the saved revision of a motion video to MP4. Default `mode: "browser"`: free, returns a `render_url` — a one-time link (expires in 30 minutes, bound to this revision) the user opens on any device; it renders in their browser and saves the file to the project. Show the link to the user. `mode: "server"` renders on our machines instead: spends credits, use it only when the user cannot open a browser or needs ProRes, HEVC, WebM, GIF, PNG or 4K. Poll `get_render` with the `run_id` for the file.
+
+| campo | tipo | |
+|---|---|---|
+| `org`? | string | Which org, if you belong to more than one. |
+| `node_id` | string |  |
+| `mode`? | `browser` \| `server` |  |
+| `resolution`? | `720p` \| `1080p` \| `1440p` \| `2160p` |  |
+| `format`? | string | server only: mp4-h264, mp4-h265, prores-422hq, prores-4444, webm-alpha, png-sequence, gif |
 
 ## Accesso diretto al database
 
@@ -200,45 +286,6 @@ QUEUES many combinations from a node's `iterate` wires (or plain "repeat N" vari
 | `org`? | string | Which org, if you belong to more than one. |
 | `node_id` | string |  |
 | `confirm`? | boolean | Required (true) to queue above 50 combinations. |
-
-## Altro
-
-### `apply_effects` · W
-
-*Render an effects node*
-
-Renders an `effects` node's stack onto its upstream image and lands the result as the node's `refId` — the same render `EffectsEditor` does in the browser, run server-side so an agent without a browser can do it. Set the stack first with `update_row` on `nodes.data.effects` (see `describe_node_types` for the effect list and their params), then call this. Refused before anything runs if `data.sourceRefId` is empty (nothing upstream to render) — wire an image into the node first. Spends no credits: no AI provider is called.
-
-| campo | tipo | |
-|---|---|---|
-| `org`? | string | Which org, if you belong to more than one. |
-| `node_id` | string |  |
-
-### `enhance_prompt` · W
-
-*Rewrite a prompt for the model that will render it*
-
-Rewrites a brief into the SHAPE the model you are about to render with wants — one reads labelled sections, another one flowing paragraph, another a command when it edits. Pass the `model` (`get_media_models` lists them) and use the `prompt` that comes back to render. It rewrites, it never invents: a rewrite that adds a subject, asks for readable text or states an aspect ratio is thrown away and the original returns with `changed: false` and the reason in `notes`, as does a model we have no guide for. Draws nothing, files nothing. Spends credits.
-
-| campo | tipo | |
-|---|---|---|
-| `org`? | string | Which org, if you belong to more than one. |
-| `prompt` | string |  |
-| `model` | string |  |
-| `shot_mode`? | `hero` \| `flat-lay` \| `on-model` \| `close-up` \| `lifestyle` \| `studio` |  |
-
-### `get_media` · R
-
-*See a node's media*
-
-View the image, video, audio, 3D model or text a node holds, a generation run produced, or an asset — by `node_ids`, `run_ids` and/or `asset_ids`. Per item: type, mime, width/height, duration, and two signed links: `preview_url` (images: 1024px long edge, valid 5 minutes — FETCH THIS to look at the image and judge it against the prompt) and `full_url` (the original file, valid 1 hour — give this to the user). Videos and audio have `full_url` only. Ids your org cannot see come back in `missing`. Reads only, spends nothing.
-
-| campo | tipo | |
-|---|---|---|
-| `org`? | string | Which org, if you belong to more than one. |
-| `node_ids`? | string[] |  |
-| `run_ids`? | string[] |  |
-| `asset_ids`? | string[] |  |
 
 ## Video motion
 

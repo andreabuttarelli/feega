@@ -876,6 +876,20 @@ describe('un giro asincrono presso un fornitore ha il proprio tetto, non quello 
     expect(await expireStuckRuns(db)).toMatchObject({ expired: 0 });
   });
 
+  it('un render nel browser di 40 minuti sta ancora girando sul telefono di qualcuno', async () => {
+    const renderRow = { ...runRow, external_job_id: 'browser-render:7', started_at: startedAgo(40 * 60_000) };
+    const { db } = fakeDb({ node_runs: [renderRow], nodes: [nodeRow] });
+
+    expect(await expireStuckRuns(db)).toMatchObject({ expired: 0 });
+  });
+
+  it('un render nel browser abbandonato scade', async () => {
+    const renderRow = { ...runRow, external_job_id: 'browser-render:7', started_at: startedAgo(3 * 60 * 60_000) };
+    const { db } = fakeDb({ node_runs: [renderRow], nodes: [nodeRow] }, { updateRows: { node_runs: [renderRow], nodes: [nodeRow] } });
+
+    expect(await expireStuckRuns(db)).toMatchObject({ expired: 1 });
+  });
+
   it('un video generico in coda (non wiro/elevenlabs) sopravvive sotto i 20 minuti', async () => {
     const videoRow = { ...runRow, external_job_id: 'kling:job-1', started_at: startedAgo(15 * 60_000) };
     const { db, calls } = fakeDb({ node_runs: [videoRow], nodes: [nodeRow] });

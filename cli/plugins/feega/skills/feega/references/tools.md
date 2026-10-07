@@ -198,6 +198,8 @@ list. Returns how many combinations it actually stopped.
 | `ask_motion_agent` | `feega motion ask <nodeId> "<prompt>" [--no-wait]` |
 | `get_motion_run` | `feega motion run <runId>` |
 | `get_motion_summary` | (MCP only) |
+| `render_video` | `feega motion render <nodeId> [--server] [--resolution 720p]` |
+| `get_render` | `feega motion render-status <runId>` |
 
 `ask_motion_agent({ org, node_id, prompt, wait? })` runs one turn of the motion editor's agent on
 a `motion` node, with the editor's own tools, and saves a new revision. `wait` defaults to true and
@@ -207,6 +209,13 @@ cannot look at rendered frames: that needs the editor open in a browser. Spends 
 
 `get_motion_summary({ org, node_id })` reads the saved video: revision, last change, size, fps,
 duration, tracks and clips in seconds. Spends nothing.
+
+`render_video({ org, node_id, mode?, resolution?, format? })` renders the saved revision. Default
+`mode: "browser"`: free, returns `{ render_url, run_id, expires_at, credits: 0 }`. The link works
+once, expires in 30 minutes if nobody opens it, and is claimed by the first device that opens it;
+that device renders, saves the MP4 to the project and closes the run. `mode: "server"` renders on
+the farm, spends credits and accepts every format and 4K. `get_render({ org, run_id })` returns
+`status`, `mode`, `asset_id` and a signed `file_url` (one hour) once `done`.
 
 ## Posts
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fakeDb, filtersOf } from '$lib/server/db/fake-db';
-import { activeRenderRuns, claimRun, completeRun, createRun, failRun, listNodeRuns, queuedVideoRuns, RENDER_JOB_PREFIX, runningRuns, setRunParams } from './node-runs';
+import { activeRenderRuns, claimRun, completeRun, createRun, failRun, listNodeRuns, queuedVideoRuns, RENDER_JOB_PREFIX, BROWSER_RENDER_PREFIX, runningRuns, setRunParams } from './node-runs';
 
 const ORG = '11111111-1111-1111-1111-111111111111';
 const NODE = '22222222-2222-2222-2222-222222222222';
@@ -123,6 +123,14 @@ describe('runningRuns — ogni run ancora in corsa, per un tick da drenare', () 
 describe('un render motion non è un video in coda presso un fornitore', () => {
   it('il riconciliatore video non lo vede', async () => {
     const { db } = fakeDb({ node_runs: [{ ...row, external_job_id: `${RENDER_JOB_PREFIX}7` }, { ...row, id: 'v', external_job_id: 'kling:1' }] });
+
+    const runs = await queuedVideoRuns(db, { limit: 10 });
+
+    expect(runs.map((r) => r.id)).toEqual(['v']);
+  });
+
+  it('nemmeno un render nel browser: lo chiude la pagina di render, non un fornitore', async () => {
+    const { db } = fakeDb({ node_runs: [{ ...row, external_job_id: `${BROWSER_RENDER_PREFIX}7` }, { ...row, id: 'v', external_job_id: 'kling:1' }] });
 
     const runs = await queuedVideoRuns(db, { limit: 10 });
 

@@ -88,14 +88,14 @@ export function renderRequest(version: number, input: ComposeInput, settings: Re
   return { version, doc, settings, job: farmJob({ ...input, doc }, settings) };
 }
 
-function isRender(run: NodeRun): boolean {
+export function isRenderRun(run: NodeRun): boolean {
   return Boolean(run.externalJobId?.startsWith(RENDER_JOB_PREFIX));
 }
 
-const isActive = (run: NodeRun) => isRender(run) && (run.status === 'running' || run.status === 'finishing');
+const isActive = (run: NodeRun) => isRenderRun(run) && (run.status === 'running' || run.status === 'finishing');
 
 export function renderView(runs: NodeRun[]): RenderView | null {
-  const run = runs.filter((r) => isRender(r) && !r.params.batch).at(-1);
+  const run = runs.filter((r) => isRenderRun(r) && !r.params.batch).at(-1);
   if (!run) {
     return null;
   }
@@ -282,7 +282,7 @@ const batchOf = (run: NodeRun) => stateOf(run).batch;
 const launched = (run: NodeRun) => (stateOf(run).farm?.pieces.length ?? 0) > 0;
 
 export function batchView(runs: NodeRun[]): BatchView | null {
-  const id = runs.filter((r) => isRender(r) && batchOf(r)).at(-1)?.params.batch as BatchTag | undefined;
+  const id = runs.filter((r) => isRenderRun(r) && batchOf(r)).at(-1)?.params.batch as BatchTag | undefined;
   if (!id) {
     return null;
   }
@@ -498,7 +498,7 @@ async function reapOrphans(db: Db, farm: RenderFarm): Promise<number> {
 
 export async function cancelRender(db: Db, farm: RenderFarm, scope: Pick<RenderScope, 'orgId' | 'nodeId'>): Promise<{ ok: boolean }> {
   const runs = await listNodeRuns(db, { orgId: scope.orgId, nodeId: scope.nodeId });
-  const active = runs.filter((r) => isRender(r) && r.status === 'running').at(-1);
+  const active = runs.filter((r) => isRenderRun(r) && r.status === 'running').at(-1);
   if (!active || !(await claimRun(db, { orgId: active.orgId, runId: active.id }))) {
     return { ok: false };
   }

@@ -29,6 +29,11 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
     tables: ['canvases', 'projects', 'nodes', 'nodes_connections', 'assets', 'products', 'social_posts', 'influencers', 'influencer_views']
   },
   {
+    path: 'src/lib/server/motion/render-link.ts — openRenderLink + linkPayload + uploadSlot + finishRenderLink (rotta pubblica /render/[token])',
+    why: "Chi apre un link di render può non avere una sessione su quel dispositivo (il telefono a cui un agente MCP ha mandato il link): il token È l'autorizzazione, monouso e a scadenza breve. La riga si trova per id del run e passa solo se l'impronta del segreto coincide, il run è un `browser-render:` ancora in corso e, dopo la prima apertura, il cookie del dispositivo che l'ha reclamato coincide. org, nodo e revisione si LEGGONO da quella riga: si legge solo quella revisione del doc, il brand del suo progetto e gli asset firmati di quel progetto; si scrive solo il file al percorso fisso del run (`exportPath`), l'asset che lo registra, `lastRenderAssetId` del nodo e lo stato del run.",
+    tables: ['node_runs', 'nodes', 'motion_revisions', 'projects', 'brands', 'assets']
+  },
+  {
     path: 'src/lib/server/cli-auth.ts — authenticateApiKey',
     why: "La chiave API va risolta in un utente PRIMA di sapere chi è: non esiste ancora un JWT su cui far girare la RLS. La lettura è su key_hash e non accetta nulla da chi chiama oltre la chiave stessa; dopo la risoluzione il lavoro continua con il client dell'utente.",
     tables: ['api_keys']

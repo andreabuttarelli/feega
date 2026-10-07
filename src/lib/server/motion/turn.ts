@@ -33,6 +33,9 @@ import { motionRenderFarm, motionRenderStorage } from '$lib/server/motion/render
 import { Preset, settingsOf } from '$lib/motion/export-formats';
 import type { CanvasNodeRecord } from '$lib/server/repos/canvas';
 import type { MotionNode } from '$lib/canvas/motion-node';
+import { createRenderLink } from './render-link';
+import { renderPagePath } from '$lib/motion/render-link';
+import { BROWSER_RENDER_CREDITS } from '$lib/motion/render-place';
 
 export const MOTION_AGENT_KEY = 'motion';
 const CHECK_WAIT_MS = 90_000;
@@ -162,6 +165,13 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
       }
       askCheck({ callId, name, doc, assets: assets.slice(knownAssets) });
       return awaitVerdict(bucket, framesPrefix(frameScope, callId), { timeoutMs: CHECK_WAIT_MS, pollMs: FRAME_POLL_MS });
+    },
+    renderLink: async () => {
+      if (session.edits.length) {
+        return { ok: false, error: 'this turn has unsaved edits: the link renders the saved video, so finish the turn and run render_video in the next one' };
+      }
+      const link = await createRenderLink(db, { orgId, nodeId: motion.record.id, version: head.version, actor });
+      return { ok: true, render_url: renderPagePath(link.token), expires_at: link.expiresAt, credits: BROWSER_RENDER_CREDITS };
     },
     batch: async ({ rows }) => {
       if (session.edits.length) {

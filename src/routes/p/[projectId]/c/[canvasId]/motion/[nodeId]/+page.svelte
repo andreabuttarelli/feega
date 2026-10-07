@@ -65,6 +65,7 @@
   import { applyInteractivePreset } from '$lib/motion/interactive/presets';
   import { InputKey } from '$lib/motion/expression/inputs';
   import TemplateDialog from '$lib/components/motion/TemplateDialog.svelte';
+  import type { FrameSource } from '$lib/motion/export/browser-render';
   import TemplateLibrary from '$lib/components/motion/TemplateLibrary.svelte';
   import TemplateInspector from '$lib/components/motion/TemplateInspector.svelte';
   import { insertTemplate, isLockedComp, type TemplateEntry } from '$lib/motion/template/library';
@@ -651,6 +652,11 @@
     apply(pasteKeyframes(doc, target.id, keyBoard, frame - target.from), 'Pasted keyframes');
   }
 
+  function docFrames(d: MotionDoc): FrameSource {
+    const source = composeHtml({ doc: d, tokens: data.tokens, assets: assetUrls, analyses });
+    return (times, size, onFrame, signal) => (preview ? preview.render(times, size, onFrame, signal, source) : Promise.reject(new Error('the preview is still loading')));
+  }
+
   function exportFrames(...args: Parameters<MotionPreview['render']>) {
     if (!preview) {
       return Promise.reject(new Error('the preview is still loading'));
@@ -909,6 +915,9 @@
       saved={saveState === SaveState.Saved}
       batch={data.batch}
       assetHref={(id: string) => `/p/${data.projectId}/c/${data.canvas.id}/assets/${id}`}
+      {assetUrls}
+      scope={{ orgId: data.orgId, projectId: data.projectId, nodeId: data.node.id }}
+      framesFor={docFrames}
       onchange={apply}
       onpreview={(next) => (previewDoc = next)}
       onclose={() => (templating = false)}

@@ -13,7 +13,7 @@ const KEYFRAME_SECONDS = 2;
 
 export type FrameRenderer = (onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>) => Promise<void>;
 
-export type EncodeJob = { size: Size; fps: number; frames: number; samples: number; render: FrameRenderer; audio: AudioBuffer | null; onFrame: (done: number) => void; signal: AbortSignal };
+export type EncodeJob = { size: Size; fps: number; frames: number; samples: number; render: FrameRenderer; audio: AudioBuffer | null; onFrame: (done: number) => void; signal: AbortSignal; gate?: () => Promise<void> };
 
 export async function capabilities(doc: Pick<MotionDoc, 'width' | 'height'>): Promise<Capabilities> {
   if (typeof VideoEncoder === 'undefined') {
@@ -73,6 +73,7 @@ export async function encodeMp4(job: EncodeJob): Promise<Blob> {
       audio.close();
     }
     await job.render(async (bitmap, sample) => {
+      await job.gate?.();
       const frame = Math.floor(sample / job.samples);
       const k = sample % job.samples;
       if (k === 0) {
