@@ -143,7 +143,7 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
   {
     id: 'launch-ui-speed-ramp',
     name: 'Launch · Speed-ramp zoom into the UI',
-    description: 'Launch film. A sharp capture full frame: starts close on the headline (a match cut from the hook), pulls back to the whole page, holds a beat, then whips into one detail (focus) and keeps creeping. Slow-fast-slow.',
+    description: 'Launch film. Background only: a sharp capture in the foreground blocks delivery, so blur it (8 or more) behind live UI. A capture full frame: starts close on the headline (a match cut from the hook), pulls back to the whole page, holds a beat, then whips into one detail (focus) and keeps creeping. Slow-fast-slow.',
     seconds: 4 * BEAT,
     beats: [
       fill(4 * BEAT),
@@ -310,7 +310,7 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
   {
     id: 'launch-ui-tilt-zoom',
     name: 'Launch · UI tilt zoom',
-    description: 'Launch film. One feature of the real UI lands tilted back 18° and straightens while it whips in on the detail and keeps pushing.',
+    description: 'Launch film. Background only: a sharp capture in the foreground blocks delivery, so blur it (8 or more) behind live UI. One feature of the real UI lands tilted back 18° and straightens while it whips in on the detail and keeps pushing.',
     seconds: 2 * BEAT,
     beats: [
       fill(2 * BEAT),

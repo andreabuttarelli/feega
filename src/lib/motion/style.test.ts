@@ -4,8 +4,9 @@ import { addClip } from './timeline';
 import { Ease } from './design';
 import { JunctionKind } from './junction-model';
 import { EffectKind } from './effects/registry';
-import { Forbidden, STYLES, styleOf, styleProblems } from './style';
+import { Forbidden, Severity, STYLES, styleOf, styleProblems } from './style';
 import { DEFAULT_STYLE, MotionStyle } from './style-model';
+import supasito from './fixtures/supasito-v1.json';
 
 const SECOND = 30;
 
@@ -200,6 +201,21 @@ describe('the launch film style', () => {
 
     expect(effects(shot(0))).toContain(Forbidden.Screenshots);
     expect(effects(shot(20))).not.toContain(Forbidden.Screenshots);
+  });
+
+  it('names one sharp screenshot in the foreground, however short', () => {
+    const shot = (transform: Patch['transform']) => withClip({ ...film(), durationInFrames: at(8) }, 'i', 'Image', { props: { assetId: 'shot', width: 1, height: 1 }, durationInFrames: at(0.5), keyframes: track('zoom', 1, 1.1, at(0.5)), transform });
+
+    expect(effects(shot(undefined))).toContain(Forbidden.Screenshots);
+    expect(effects(shot({ blur: 5 }))).toContain(Forbidden.Screenshots);
+    expect(effects(shot({ opacity: 0.2 }))).not.toContain(Forbidden.Screenshots);
+  });
+
+  it('names the supasito v1 screenshots hidden inside its scenes', () => {
+    const problems = styleProblems(supasito as unknown as MotionDoc).filter((p) => p.effect === Forbidden.Screenshots);
+
+    expect(problems.map((p) => p.at)).toEqual(expect.arrayContaining([2, 4, 6, 7]));
+    expect(new Set(problems.map((p) => p.severity))).toEqual(new Set([Severity.Error]));
   });
 
   it('names a film without its story: problem, solution, product and proof, claim', () => {
