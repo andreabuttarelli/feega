@@ -4,7 +4,8 @@ import { findBrandLook } from '$lib/server/repos/brands';
 import { DataCheck, findNode, patchNodeData, type CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { appendRevision, readHead, RevisionOutcome, type MotionHead, type RevisionWrite } from '$lib/server/repos/motion-revisions';
 import type { Actor } from '$lib/server/repos/actor';
-import { createAssetSigningDb, signAssetPaths } from '$lib/server/canvas/sign-media';
+import { createAssetSigningDb, signAssetPaths, signJobAssetPaths } from '$lib/server/canvas/sign-media';
+import { isRlsScoped } from '$lib/server/rls-client';
 import { motionOf, type MotionNode } from '$lib/canvas/motion-node';
 import { formatOf, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { AssetKind } from '$lib/motion/components';
@@ -72,10 +73,11 @@ export async function assetsById(scope: AssetScope, ids: string[]): Promise<Reco
 }
 
 async function signAssets(scope: AssetScope, usable: Asset[], ttlSeconds?: number): Promise<MotionAsset[]> {
-  const signed = await signAssetPaths(scope.db, createAssetSigningDb(), {
+  const paths = {
     generated: usable.filter((a) => a.source === 'generated').map((a) => a.url ?? ''),
     uploaded: usable.filter((a) => a.source !== 'generated' && !/^https?:\/\//.test(a.url ?? '')).map((a) => a.url ?? '')
-  }, ttlSeconds);
+  };
+  const signed = isRlsScoped(scope.db) ? await signAssetPaths(scope.db, createAssetSigningDb(), paths, ttlSeconds) : await signJobAssetPaths(scope.db, paths, ttlSeconds);
 
   return usable.map((asset) => {
     const kind = kindOf(asset) as AssetKind;

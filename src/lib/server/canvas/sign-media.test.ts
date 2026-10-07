@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Db } from '$lib/server/db/client';
 import { markRlsScoped } from '$lib/server/rls-client';
-import { signAssetPaths, signMediaPaths } from './sign-media';
+import { signAssetPaths, signJobAssetPaths, signMediaPaths } from './sign-media';
 
 function storageWith(buckets: Record<string, string[]>): Db {
   return {
@@ -84,5 +84,16 @@ describe('un asset è visibile a chiunque legga la sua riga, non solo a chi lo h
     await expect(
       signAssetPaths(notRlsScoped, serviceDb, { generated: ['x/media/y.png'], uploaded: [] })
     ).rejects.toThrow();
+  });
+});
+
+describe('un job senza sessione firma gli asset della propria org', () => {
+  it('firma render e upload con il client di servizio del job ripreso dal tick', async () => {
+    const serviceDb = storageWith({ 'brand-knowledge': ['u/media/generated.png'], 'canvas-assets': ['o/p/upload.png'] });
+
+    const urls = await signJobAssetPaths(serviceDb, { generated: ['u/media/generated.png'], uploaded: ['o/p/upload.png'] });
+
+    expect(urls.get('u/media/generated.png')).toBe('https://signed/brand-knowledge/u/media/generated.png');
+    expect(urls.get('o/p/upload.png')).toBe('https://signed/canvas-assets/o/p/upload.png');
   });
 });
