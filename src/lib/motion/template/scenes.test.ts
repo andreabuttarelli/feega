@@ -7,6 +7,7 @@ import { Ease } from '$lib/motion/design';
 import { BUILTIN_TEMPLATES } from './builtins';
 import { insertTemplate } from './library';
 import { SCENES } from './scenes';
+import { TEMPLATES } from '$lib/motion/hyperframes/templates';
 
 const APPLE = STYLES[MotionStyle.AppleMinimal];
 const TEXT = new Set(['Title', 'Text', 'Kicker', 'Caption']);
@@ -84,6 +85,27 @@ describe('the Apple minimal scene library', () => {
     const gaps = starts.slice(1).map((f, i) => (f - starts[i]) / doc.fps);
 
     expect(gaps.every((g) => g <= APPLE.seconds.enter[1])).toBe(true);
+  });
+
+  it.each(sceneDocs().map((e) => [e.id, e] as const))('%s never shows pieces of letters: no text enters through a line mask', (_id, entry) => {
+    const doc = entry.template.doc;
+    const masked = clipsOf(doc).filter((c) => {
+      if (!TEXT.has(c.component)) {
+        return false;
+      }
+      const tweens = (TEMPLATES[c.component] as { tweens?: (ctx: unknown) => { from: Record<string, unknown> }[] }).tweens;
+      return (tweens?.({ id: c.id, p: c.props, start: 0, fps: doc.fps }) ?? []).some((t) => 'yPercent' in t.from);
+    });
+
+    expect(masked.map((c) => c.id)).toEqual([]);
+  });
+
+  it('the product reveal crops a capture on one section instead of shrinking the whole page', () => {
+    const reveal = SCENES.find((s) => s.id === 'scene-product-reveal')!;
+    const photo = reveal.beats.find((b) => b.id === 'photo')!;
+
+    expect(photo.props?.fit).toBe('cover');
+    expect(reveal.fields.map((f) => f.key)).toEqual(expect.arrayContaining(['focus_x', 'focus_y']));
   });
 
   it('every scene has its text on screen within the first second', () => {

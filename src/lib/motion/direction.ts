@@ -95,7 +95,7 @@ const round = (n: number) => Math.round(n * 100) / 100;
 
 function largestZoom(clip: Clip): number {
   const keyed = (clip.keyframes.scale ?? []).map((k) => Number(k.value)).filter(Number.isFinite);
-  return Math.max(clip.transform?.scale ?? 1, ...keyed);
+  return num(clip, 'scale', 1) * Math.max(clip.transform?.scale ?? 1, ...keyed);
 }
 
 function softPictures(doc: MotionDoc, pixels: Pixels): QualityProblem[] {
