@@ -4,6 +4,14 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 ## Motion editor
 
+### Un render locale con `npx hyperframes render` non ha motion blur
+Il motion blur non sta nell'html di `farmJob`: è un'opzione del producer (`motionBlur:
+{ shutterAngle, shutterPhase, samplesPerFrame }`) che il farm passa a `createRenderJob`, e la CLI
+`hyperframes render` non ha un flag per darla. Anche l'audio resta fuori: il farm lo mixa a parte
+con `audioMixArgs(job.audio, …)`. Segnale: render locale nitido sulle whip pan e muto. Mossa:
+installare `@hyperframes/producer` alla stessa versione e chiamare `executeRenderJob` con
+`motionBlur`, poi mixare con `audioMixArgs` come il farm.
+
 ### `hardwareAcceleration: 'prefer-hardware'` rompe l'export dove l'encoder è software
 Chromium headless (e i dispositivi senza encoder H.264 in hardware) rifiuta la configurazione
 con `This specific encoder configuration (avc1…, hardware acceleration: prefer-hardware) is not
