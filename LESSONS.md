@@ -2560,3 +2560,6 @@ Segnale: `Failed to load url virtual:motion-live-runtime ... in src/lib/motion/h
 
 ## Un keyframe x/y su un testo lo spedisce fuori campo
 Segnale: un numero o una parola keyframati su `y`/`x` spariscono o finiscono al bordo, mentre le props x/y degli stessi clip sono giuste. Causa: nelle props x/y sono posizioni, nei keyframe sono offset dal posto del clip (entrambi "px" per i tool). Mossa: keyframe da offset a 0 (es. y 140 → 0), mai la posizione assoluta.
+
+## Build CPU alto con poche build di produzione
+Segnale: `Build CPU Minutes` per progetto (`/v1/billing/charges`, tag `ProjectName`) sproporzionato rispetto ai deploy di produzione; `/v6/deployments?target=preview` pieno di `READY`. Ogni build si paga a minuto intero per vCPU (`standard` = 4). Un ignore command scritto in dashboard non sta nel repo e un secondo progetto non lo eredita. Mossa: `ignoreCommand` in `vercel.json` (`scripts/vercel-ignore.sh`, exit 0 = salta), preview solo con `[preview]` nel messaggio dell'ultimo commit.

@@ -1,5 +1,6 @@
 {
   "installCommand": "npm ci",
+  "ignoreCommand": "bash scripts/vercel-ignore.sh",
   "headers": [
     {
       "source": "/fonts/(.*)",
