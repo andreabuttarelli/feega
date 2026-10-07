@@ -16,7 +16,7 @@ const FIELDS = [
 ];
 
 function reelDoc(): MotionDoc {
-  const made = addMorphReel({ ...newMotionDoc(MotionFormat.Square), fps: REEL_FPS }, { states: DEFAULT_REEL, bpm: 120, offset: 0, props: {} }, GOOGLE_FONTS, CLIP);
+  const made = addMorphReel({ ...newMotionDoc(MotionFormat.Square), fps: REEL_FPS }, { states: DEFAULT_REEL, bpm: 120, offset: 0, pace: 2, props: {} }, GOOGLE_FONTS, CLIP);
   if (!made.ok) {
     throw new Error(`ui-morph-reel: ${made.error}`);
   }

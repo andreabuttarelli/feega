@@ -9,7 +9,7 @@ import { seamProblems } from './seam';
 import { MotionStyle } from '../style-model';
 import { REEL_COMPONENT, REEL_FONT, REEL_PIECE } from './piece';
 
-export type ReelRequest = { states: readonly MorphKind[]; bpm: number; offset: number; props: Record<string, string | number> };
+export type ReelRequest = { states: readonly MorphKind[]; bpm: number; offset: number; pace: number; props: Record<string, string | number> };
 
 const reel = reelMath(springMath());
 
@@ -17,8 +17,8 @@ export const isReel = (clip: Pick<MotionClip, 'component' | 'props'>) => clip.co
 
 function planOf(doc: Pick<MotionDoc, 'width' | 'height'>, props: Record<string, unknown>): ReelPlan {
   const states = String(props.states).split(',').map((s) => s.trim()).filter(Boolean) as MorphKind[];
-  const palette = { ink: String(props.ink), paper: String(props.paper), accent: String(props.accent), mute: String(props.mute) };
-  return reel.plan({ states, bpm: Number(props.bpm), offset: Number(props.offset), frame: Number(props.frame), palette });
+  const palette = { ink: String(props.ink), paper: String(props.paper), accent: String(props.accent), mute: String(props.line) };
+  return reel.plan({ states, bpm: Number(props.bpm), offset: Number(props.offset), frame: Number(props.frame), palette, beatsPerStep: Number(props.pace) });
 }
 
 function withReelComponent(doc: MotionDoc, catalogue: readonly CatalogueFont[]): OpResult {
@@ -38,12 +38,24 @@ export function addMorphReel(doc: MotionDoc, request: ReelRequest, catalogue: re
   if (!written.ok) {
     return written;
   }
-  const props = { name: REEL_COMPONENT, frame: Math.min(doc.width, doc.height), ...request.props, states: request.states.join(','), bpm: request.bpm, offset: request.offset };
+  const given = { ...request.props, states: request.states.join(','), bpm: request.bpm, offset: request.offset, pace: request.pace };
+  const props = { name: REEL_COMPONENT, frame: Math.min(doc.width, doc.height), ...Object.fromEntries(Object.entries(given).filter(([, v]) => v !== undefined)) };
   const defaults = Object.fromEntries(Object.entries(written.doc.components[REEL_COMPONENT].propsSchema.properties).map(([k, s]) => [k, s.default]));
   const period = planOf(doc, { ...defaults, ...props }).period;
   const frames = Math.round(period * doc.fps);
   const lengthened = { ...written.doc, durationInFrames: frames, style: MotionStyle.UiMorph };
   return addClip(lengthened, { component: 'Custom', from: 0, durationInFrames: frames, props }, id);
+}
+
+export function tooDense(doc: MotionDoc, minGap: number): { clip: MotionClip; detail: string }[] {
+  return clipsOf(doc)
+    .filter(isReel)
+    .flatMap((clip) => {
+      const { cues, period } = planOf(doc, clip.props);
+      const gaps = cues.map((t, i) => (cues[(i + 1) % cues.length] - t + period) % period || period);
+      const tightest = Math.min(...gaps);
+      return tightest + 1e-6 < minGap ? [{ clip, detail: `events ${tightest.toFixed(2)} s apart (at least ${minGap} s): give each state a hold to be read, one change every two beats or every bar` }] : [];
+    });
 }
 
 export function loopSeam(doc: MotionDoc): { clip: MotionClip; detail: string }[] {

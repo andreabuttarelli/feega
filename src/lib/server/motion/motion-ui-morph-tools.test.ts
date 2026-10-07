@@ -22,7 +22,7 @@ describe('ui_morph_reel', () => {
     const added = await run('ui_morph_reel', { bpm: 120, accent: '#ff4f00' });
 
     expect(added.ok).toBe(true);
-    expect(session.doc.durationInFrames).toBe(840);
+    expect(session.doc.durationInFrames).toBe(1680);
     expect(session.doc.style).toBe(MotionStyle.UiMorph);
     expect(findClip(session.doc, 'id1')?.clip.props).toMatchObject({ name: REEL_COMPONENT, accent: '#ff4f00', bpm: 120 });
     expect(styleProblems(session.doc)).toEqual([]);
@@ -34,6 +34,13 @@ describe('ui_morph_reel', () => {
     session.doc = { ...session.doc, durationInFrames: session.doc.durationInFrames + 30 };
 
     expect(styleProblems(session.doc).map((p) => p.effect)).toContain('loop-seam');
+  });
+
+  it('the too-dense gate names a reel that changes on every beat: the state needs a hold to be read', async () => {
+    const { session, run } = setup();
+    await run('ui_morph_reel', { beats_per_change: 1 });
+
+    expect(styleProblems(session.doc).map((p) => p.effect)).toContain('too-dense');
   });
 
   it('refuses a state it does not know', async () => {

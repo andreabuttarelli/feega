@@ -62,6 +62,12 @@ describe('MotionDoc', () => {
     expect(parseMotionDoc(doc).ok).toBe(false);
   });
 
+  it('takes a 1440 square for UI reels, and nothing else above 1080p', () => {
+    expect(parseMotionDoc(newMotionDoc(MotionFormat.SquareLarge)).ok).toBe(true);
+    expect(FORMATS[MotionFormat.SquareLarge]).toMatchObject({ width: 1440, height: 1440 });
+    expect(parseMotionDoc({ ...newMotionDoc(MotionFormat.Landscape), width: 1920, height: 1440 }).ok).toBe(false);
+  });
+
   it('a new doc carries the current schema version', () => {
     expect(newMotionDoc(MotionFormat.Square).version).toBe(DOC_VERSION);
   });

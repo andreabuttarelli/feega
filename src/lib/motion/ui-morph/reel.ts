@@ -7,7 +7,7 @@ export const DEFAULT_REEL: readonly MorphKind[] = ['loader', 'check', 'island', 
 
 export type Role = 'ink' | 'paper' | 'accent' | 'mute';
 export type Point = readonly [x: number, y: number];
-export type ReelInput = { states: readonly MorphKind[]; bpm: number; offset: number; frame: number; palette: Record<Role, string> };
+export type ReelInput = { states: readonly MorphKind[]; bpm: number; offset: number; frame: number; palette: Record<Role, string>; beatsPerStep?: number };
 export type Sound = { at: number; kind: 'press' | 'release' | 'key' | 'morph' | 'tick' };
 export type ReelFrame = { values: Record<string, number>; typed: string; velocity: Record<string, number> };
 
@@ -16,8 +16,8 @@ export function reelMath(S: SpringMath) {
     ui: { stiffness: 320, damping: 30 },
     soft: { stiffness: 150, damping: 25 },
     camera: { stiffness: 150, damping: 25 },
-    cursorX: { stiffness: 230, damping: 30 },
-    cursorY: { stiffness: 200, damping: 29 },
+    cursorX: { stiffness: 90, damping: 19 },
+    cursorY: { stiffness: 70, damping: 17 },
     drag: { stiffness: 60, damping: 15 },
     press: { stiffness: 1400, damping: 75 },
     draw: { stiffness: 45, damping: 14 },
@@ -42,12 +42,15 @@ export function reelMath(S: SpringMath) {
   const ENTER_DELAY = 0.1;
   const PRESS_LEAD = 0.05;
   const PRESS_HOLD = 0.09;
-  const CURSOR_LEAD = 0.38;
+  const BEATS_PER_STEP = 2;
+  const CURSOR_LEAD = 0.62;
+  const CURVE_LAG = 0.07;
   const TYPE_GAP = 0.09;
   const RUBBER = 0.32;
   const FILL_W = 0.74;
   const FILL_H = 0.56;
   const MAX_ZOOM = 3.4;
+  const REFERENCE_FRAME = 1080;
   const ITEMS = ['Export chart', 'Export as CSV', 'Expand view', 'Share link', 'Settings'];
   const SERIES = [
     [0.22, 0.3, 0.26, 0.42, 0.38, 0.55, 0.5, 0.64, 0.6, 0.78, 0.72, 0.9],
@@ -60,7 +63,7 @@ export function reelMath(S: SpringMath) {
   const CHART_TABS = { centers: [-236, -120, -4], half: 56, y: -186, h: 52 };
   const PROGRESS = { x0: -252, x1: 252, y: 62 };
   const VOLUME = { x0: -170, x1: 226, y: 0 };
-  const IDLE: Point = [330, 250];
+  const IDLE: Point = [236, 150];
 
   type Key = { at: number; value: number; spring: Spring };
   type Drag = { channel: string; press: number; release: number; x0: number; x1: number; rubber: number; settle: number };
@@ -110,7 +113,7 @@ export function reelMath(S: SpringMath) {
       ]
     },
     palette: {
-      box: { w: 640, h: 420, r: 32, bg: 'paper' },
+      box: { w: 660, h: 480, r: 32, bg: 'paper' },
       beats: 4,
       leave: { key: true },
       enter: { draw: 0, sel: 0, flash: 0 },
@@ -132,24 +135,26 @@ export function reelMath(S: SpringMath) {
     return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)) as [number, number, number];
   };
 
-  const fit = (box: Pick<Box, 'w' | 'h'>, frame: number): number => Math.min((FILL_W * frame) / box.w, (FILL_H * frame) / box.h, MAX_ZOOM);
+  const fit = (box: Pick<Box, 'w' | 'h'>, frame: number): number => Math.min((FILL_W * frame) / box.w, (FILL_H * frame) / box.h, (MAX_ZOOM * frame) / REFERENCE_FRAME);
 
   const plan = (input: ReelInput) => {
     const beat = 60 / input.bpm;
+    const step = beat * (input.beatsPerStep ?? BEATS_PER_STEP);
     const kinds = input.states.map(kindOf);
-    const period = kinds.reduce((sum, k) => sum + k.beats, 0) * beat;
+    const period = kinds.reduce((sum, k) => sum + k.beats, 0) * step;
+    const cues: number[] = [];
     const keys: Record<string, Key[]> = {};
     const edges: { at: number; lo: number; hi: number }[] = [];
     const drags: Drag[] = [];
     const typing: { at: number; text: string }[] = [];
     const sounds: Sound[] = [];
     const wrap = (t: number) => ((t % period) + period) % period;
-    const time = (b: number) => wrap(input.offset + b * beat);
+    const time = (b: number) => wrap(input.offset + b * step);
     const put = (channel: string, at: number, value: number, spring?: Spring) => (keys[channel] = keys[channel] || []).push({ at: wrap(at), value, spring: spring ?? CHANNEL_SPRING[channel] ?? (channel.startsWith('in:') ? SPRING.soft : SPRING.ui) });
     const putAll = (values: Record<string, number>, at: number) => Object.entries(values).forEach(([k, v]) => put(k, at, v));
     const moveCursor = (to: Point, at: number) => {
       put('curX', at - CURSOR_LEAD, to[0]);
-      put('curY', at - CURSOR_LEAD, to[1]);
+      put('curY', at - CURSOR_LEAD + CURVE_LAG, to[1]);
     };
     const click = (at: number) => {
       put('press', at - PRESS_LEAD, 1);
@@ -182,6 +187,7 @@ export function reelMath(S: SpringMath) {
       }
       putAll(kind.enter, at);
       sounds.push({ at, kind: 'morph' });
+      cues.push(at);
 
       if (previous.leave.click) {
         moveCursor(previous.leave.click, at);
@@ -199,6 +205,7 @@ export function reelMath(S: SpringMath) {
 
       for (const cue of kind.cues) {
         const c = time(b + cue.beat);
+        cues.push(c);
         if (cue.cursor) {
           moveCursor(cue.cursor, c);
         }
@@ -231,6 +238,7 @@ export function reelMath(S: SpringMath) {
         }
         if (cue.drag) {
           const release = time(b + cue.beat + 1);
+          cues.push(release);
           put('press', c, 1);
           put('press', release, 0);
           put('curX', c, cue.drag.to[0], SPRING.drag);
@@ -267,7 +275,8 @@ export function reelMath(S: SpringMath) {
 
     typing.sort((x, y) => x.at - y.at);
     sounds.sort((x, y) => x.at - y.at);
-    return { period, beat, frame: input.frame, steps, drags, typing, sounds, palette: input.palette, states: input.states.slice() };
+    cues.sort((x, y) => x - y);
+    return { period, beat, step, cues, frame: input.frame, steps, drags, typing, sounds, palette: input.palette, states: input.states.slice() };
   };
 
   type Plan = ReturnType<typeof plan>;
@@ -319,7 +328,9 @@ export function reelMath(S: SpringMath) {
     return { values, velocity, typed: typed ? typed.text : '' };
   };
 
-  return { plan, frameAt, fit, library: LIBRARY, items: ITEMS, series: SERIES, chart: CHART, progress: PROGRESS, volume: VOLUME, toggle: { off: TOGGLE_OFF, on: TOGGLE_ON } };
+  const channel = (p: Plan, name: string, time: number): number => (p.steps[name] ? valueAt(p, name, ((time % p.period) + p.period) % p.period)[0] : 0);
+
+  return { plan, frameAt, channel, fit, library: LIBRARY, items: ITEMS, series: SERIES, chart: CHART, progress: PROGRESS, volume: VOLUME, toggle: { off: TOGGLE_OFF, on: TOGGLE_ON } };
 }
 
 export type ReelMath = ReturnType<typeof reelMath>;

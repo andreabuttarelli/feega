@@ -1375,12 +1375,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     ui_morph_reel: tool({
-      description: `Build a looping UI morph reel: ONE shape morphing on springs through UI states (${MORPH_KINDS.join(', ')}; default order ${DEFAULT_REEL.join(', ')}), its content swapping with a short blur, a cursor clicking and dragging through every change, the camera zooming so each state fills the frame, one event on every beat. It sets the video length to the loop (e.g. 28 beats at 120 BPM = 14 s), the style ui-morph and the Geist font; the last frame flows into the first (the loop-seam gate checks it). offset is the time of the first beat (mark_beats on the music). props: ink, paper, accent, mute, canvas (colours), font, button, toast, track, artist (texts).`,
-      inputSchema: z.object({ states: z.array(z.enum(MORPH_KINDS)).min(2).max(20).optional(), bpm: z.number().min(60).max(200).default(120), offset: z.number().min(0).max(4).default(0), accent: z.string().optional(), props: z.record(z.string(), z.union([z.string(), z.number()])).optional() }),
+      description: `Build a looping UI morph reel: ONE shape morphing on springs through UI states (${MORPH_KINDS.join(', ')}; default order ${DEFAULT_REEL.join(', ')}), its content swapping with a short blur, a cursor clicking and dragging through every change, the camera zooming so each state fills the frame, one change every beats_per_change beats (2 by default: each state holds long enough to be read; the too-dense gate names events closer than a second). It sets the video length to the loop (e.g. 28 changes × 2 beats at 120 BPM = 28 s), the style ui-morph and the Geist font; the last frame flows into the first (the loop-seam gate checks it). offset is the time of the first beat (mark_beats on the music). props: ink, paper, accent, mute, canvas (colours), font, button, toast, track, artist (texts).`,
+      inputSchema: z.object({ states: z.array(z.enum(MORPH_KINDS)).min(2).max(20).optional(), bpm: z.number().min(60).max(200).default(120), offset: z.number().min(0).max(4).default(0), beats_per_change: z.number().int().min(1).max(8).default(2), accent: z.string().optional(), props: z.record(z.string(), z.union([z.string(), z.number()])).optional() }),
       execute: async (input) => {
         const id = deps.newId();
         const props = { ...input.props, ...(input.accent ? { accent: input.accent } : {}) };
-        return created(apply(addMorphReel(session.doc, { states: input.states ?? DEFAULT_REEL, bpm: input.bpm, offset: input.offset, props }, GOOGLE_FONTS, id), 'added a UI morph reel'), id);
+        return created(apply(addMorphReel(session.doc, { states: input.states ?? DEFAULT_REEL, bpm: input.bpm, offset: input.offset, pace: input.beats_per_change, props }, GOOGLE_FONTS, id), 'added a UI morph reel'), id);
       }
     }),
 

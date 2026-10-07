@@ -21,12 +21,13 @@ svg { overflow: visible; }
 const JS = `
 const statesText = param('states', '${DEFAULT_REEL.join(',')}', { type: 'text', group: 'Content', label: 'States in order' });
 const bpm = param('bpm', 120, { type: 'number', min: 60, max: 200, step: 0.1, group: 'Motion', label: 'Tempo (BPM)' });
+const pace = param('pace', 2, { type: 'number', min: 1, max: 8, step: 1, group: 'Motion', label: 'Beats per change' });
 const offset = param('offset', 0, { type: 'number', min: 0, max: 4, step: 0.001, group: 'Motion', label: 'First beat (s)' });
 const font = param('font', 'Geist', { type: 'font', group: 'Style' });
 const ink = param('ink', '#0a0a0a', { type: 'color', group: 'Style', label: 'Ink' });
 const paper = param('paper', '#ffffff', { type: 'color', group: 'Style', label: 'Paper' });
 const accent = param('accent', '#ff5a1f', { type: 'color', group: 'Style' });
-const mute = param('mute', '#dcd8d0', { type: 'color', group: 'Style', label: 'Muted surface' });
+const mute = param('line', '#c9c3b9', { type: 'color', group: 'Style', label: 'Borders and resting surfaces' });
 const canvas = param('canvas', '#efece7', { type: 'color', group: 'Style', label: 'Background' });
 const buttonText = param('button', 'Export report', { type: 'text', group: 'Content' });
 const toastText = param('toast', 'Report exported', { type: 'text', group: 'Content' });
@@ -35,7 +36,7 @@ const artist = param('artist', 'Feega Radio', { type: 'text', group: 'Content' }
 const reel = ${'${REEL}'};
 const side = param('frame', 1080, { type: 'number', min: 16, max: 1920, group: 'Layout', label: 'Frame side (px)' });
 const states = String(statesText).split(',').map((s) => s.trim()).filter(Boolean);
-const plan = reel.plan({ states, bpm, offset, frame: side, palette: { ink, paper, accent, mute } });
+const plan = reel.plan({ states, bpm, offset, frame: side, palette: { ink, paper, accent, mute }, beatsPerStep: pace });
 const SVG = 'http://www.w3.org/2000/svg';
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const hex = (c) => [1, 3, 5].map((i) => parseInt(String(c).slice(i, i + 2), 16));
@@ -220,15 +221,15 @@ const BUILD = {
   },
   chart: (layer) => {
     const C = reel.chart;
-    const labels = ['Day', 'Week', 'Month'].map((name, i) => at(text(layer, name, 21, 500, INK), [-236, -120, -4][i], -186));
-    at(text(layer, 'Revenue', 21, 500, mix(INK, PAPER, 0.55)), 296, -186, 'right');
+    const labels = ['Day', 'Week', 'Month'].map((name, i) => at(text(layer, name, 26, 500, INK), [-236, -120, -4][i], -186));
+    at(text(layer, 'Revenue', 26, 500, mix(INK, PAPER, 0.55)), 296, -186, 'right');
     const plot = at(svg('svg', { width: 680, height: 480, viewBox: '-340 -240 680 480' }, layer), 0, 0);
     [0, 1, 2, 3].forEach((i) => svg('line', { x1: C.x0, x2: C.x1, y1: C.y0 + (i / 3) * (C.y1 - C.y0), y2: C.y0 + (i / 3) * (C.y1 - C.y0), stroke: mute, 'stroke-width': 1.5 }, plot));
     const line = svg('path', { fill: 'none', stroke: ink, 'stroke-width': 4.5, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, plot);
     const dot = svg('circle', { r: 9, fill: ink, stroke: paper, 'stroke-width': 4 }, plot);
     const tip = svg('g', {}, plot);
-    svg('rect', { x: -58, y: -62, width: 116, height: 44, rx: 12, fill: ink }, tip);
-    const value = svg('text', { x: 0, y: -33, 'text-anchor': 'middle', fill: paper, 'font-size': 21, 'font-weight': 600 }, tip);
+    svg('rect', { x: -72, y: -72, width: 144, height: 54, rx: 14, fill: ink }, tip);
+    const value = svg('text', { x: 0, y: -36, 'text-anchor': 'middle', fill: paper, 'font-size': 27, 'font-weight': 600 }, tip);
     const S = reel.series;
     const point = (i, d) => {
       const y = S[0][i] + (S[1][i] - S[0][i]) * d;
@@ -255,50 +256,50 @@ const BUILD = {
     };
   },
   palette: (layer) => {
-    const glass = at(svg('svg', { width: 32, height: 32, viewBox: '-16 -16 32 32' }, layer), -276, -158);
+    const glass = at(svg('svg', { width: 32, height: 32, viewBox: '-16 -16 32 32' }, layer), -286, -184);
     svg('circle', { cx: -2, cy: -2, r: 9, fill: 'none', stroke: ink, 'stroke-width': 2.6 }, glass);
     svg('path', { d: 'M5 5 L11 11', stroke: ink, 'stroke-width': 2.6, 'stroke-linecap': 'round' }, glass);
-    const typed = at(text(layer, '', 30, 500, INK), -244, -158, 'left');
-    const hint = at(text(layer, 'Search commands', 30, 400, mix(INK, PAPER, 0.6)), -244, -158, 'left');
+    const typed = at(text(layer, '', 36, 500, INK), -252, -184, 'left');
+    const hint = at(text(layer, 'Search commands', 36, 400, mix(INK, PAPER, 0.6)), -252, -184, 'left');
     const caret = make('div', '', layer);
     caret.style.width = '2.5px';
-    caret.style.height = '34px';
+    caret.style.height = '40px';
     caret.style.background = accent;
-    const chip = at(text(layer, '⌘K', 20, 500, mix(INK, PAPER, 0.5)), 282, -158, 'right');
+    const chip = at(text(layer, '⌘K', 24, 500, mix(INK, PAPER, 0.5)), 296, -184, 'right');
     chip.style.padding = '8px 10px';
     chip.style.borderRadius = '9px';
     chip.style.background = mute;
     const rule = make('div', '', layer);
-    rule.style.width = '640px';
+    rule.style.width = '660px';
     rule.style.height = '1.5px';
     rule.style.background = mute;
-    at(rule, 0, -112);
-    const ROW = 62;
-    const TOP = -74;
+    at(rule, 0, -136);
+    const ROW = 70;
+    const TOP = -100;
     const highlight = make('div', '', layer);
-    highlight.style.width = '600px';
-    highlight.style.height = '54px';
+    highlight.style.width = '620px';
+    highlight.style.height = '60px';
     highlight.style.borderRadius = '14px';
     const rows = reel.items.map((item) => {
       const row = make('div', '', layer);
       const box = make('div', '', row);
       box.style.cssText = 'position:absolute;left:0;top:-14px;width:28px;height:28px;border-radius:8px;border:2.5px solid currentColor;box-sizing:border-box;opacity:0.5';
       const label = make('div', 'um-label', row, item);
-      label.style.cssText += ';position:absolute;left:46px;top:0;transform:translateY(-50%);font-size:25px;font-weight:500';
+      label.style.cssText += ';position:absolute;left:50px;top:0;transform:translateY(-50%);font-size:31px;font-weight:500';
       return row;
     });
     return (v) => {
       hint.style.opacity = v.typed ? '0' : '1';
       typed.textContent = v.typed;
-      const end = -244 + (v.typed ? typed.offsetWidth + 3 : 0);
-      at(caret, end, -158);
+      const end = -252 + (v.typed ? typed.offsetWidth + 3 : 0);
+      at(caret, end, -184);
       caret.style.opacity = Math.floor(v.t * 2.4) % 2 === 0 ? '1' : '0';
       let y = TOP;
       const ys = rows.map((row, i) => {
         const p = clamp(v['row' + i], 0, 1);
         const here = y + (ROW / 2) * p;
         y += ROW * p;
-        row.style.left = '-282px';
+        row.style.left = '-292px';
         row.style.top = here + 'px';
         row.style.opacity = String(p);
         row.style.transform = 'scale(' + (0.96 + 0.04 * p) + ')';
@@ -333,13 +334,15 @@ const layers = Object.keys(BUILD).map((kind) => {
   layer.style.marginLeft = -box.w / 2 + 'px';
   layer.style.marginTop = -box.h / 2 + 'px';
   const host = make('div', 'um-host', layer);
-  return { kind, layer, update: BUILD[kind](host) };
+  return { kind, layer, host, update: BUILD[kind](host) };
 });
 
 const pointer = make('div', 'um-cursor', make('div', 'um-centre', root));
 const arrow = svg('svg', { width: 34, height: 34, viewBox: '0 0 34 34' }, pointer);
 svg('path', { d: 'M4 3 L4 27 L10.5 21 L15 30.5 L19.5 28.5 L15 19.5 L23.5 19.5 Z', fill: ink, stroke: paper, 'stroke-width': 2, 'stroke-linejoin': 'round' }, arrow);
 
+const STAGGER = 0.035;
+const CURSOR_SCALE = side / 1080;
 const coverOf = (lo, hi, centers, half) => centers.map((c) => clamp((Math.min(hi, c + half) - Math.max(lo, c - half)) / (2 * half), 0, 1));
 
 const paint = (time) => {
@@ -372,7 +375,7 @@ const paint = (time) => {
   knob.style.borderRadius = v.knobH / 2 + 'px';
   knob.style.background = rgb(mix(PAPER, INK, clamp(inTabs + inChart, 0, 1)));
   knob.style.opacity = String(clamp(v.knob, 0, 1));
-  knob.style.boxShadow = '0 2px 6px rgba(0,0,0,' + (0.18 * clamp(v['in:toggle'] || 0, 0, 1)) + ')';
+  knob.style.boxShadow = '0 3px 10px rgba(0,0,0,' + (0.28 * clamp(v['in:toggle'] || 0, 0, 1)) + ')';
 
   for (const l of layers) {
     const p = clamp(v['in:' + l.kind] || 0, 0, 1);
@@ -380,13 +383,17 @@ const paint = (time) => {
     if (p < 0.003) {
       continue;
     }
-    l.layer.style.opacity = String(p);
-    l.layer.style.filter = p > 0.995 ? 'none' : 'blur(' + (1 - p) * 12 + 'px)';
-    l.layer.style.transform = 'scale(' + (0.9 + 0.1 * p) + ')';
+    l.layer.style.transform = 'scale(' + (0.94 + 0.06 * p) + ')';
+    Array.from(l.host.children).forEach((child, i) => {
+      const q = clamp(reel.channel(plan, 'in:' + l.kind, time - i * STAGGER), 0, 1);
+      child.style.opacity = String(q);
+      child.style.filter = q > 0.995 ? 'none' : 'blur(' + (1 - q) * 10 + 'px)';
+      child.style.translate = '0 ' + (1 - q) * 10 + 'px';
+    });
     l.update(v);
   }
 
-  pointer.style.transform = 'translate(' + (cam * v.curX - 4) + 'px,' + (cam * v.curY - 3) + 'px) scale(' + (1 - 0.16 * clamp(v.press, 0, 1)) + ')';
+  pointer.style.transform = 'translate(' + (cam * v.curX - 4) + 'px,' + (cam * v.curY - 3) + 'px) scale(' + (CURSOR_SCALE * (1 - 0.16 * clamp(v.press, 0, 1))) + ')';
 };
 
 paint(0);
