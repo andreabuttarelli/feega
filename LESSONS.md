@@ -4,6 +4,13 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 ## Motion editor
 
+### `visibility: hidden` su un contenitore non nasconde i clip che il runtime accende
+Il runtime hyperframes scrive `visibility: visible` su ogni clip nel suo range, e un figlio
+`visible` vince su un padre `hidden`. Uno schermo `screenComp` nascosto così mostrava la sua UI
+piatta e gigante nei frame in cui il device era di spalle. Segnale: per pochi frame un riquadro
+enorme con la UI del device, solo nel render. Mossa: nascondere un contenitore di clip con
+`opacity: 0`, che i figli non possono scavalcare.
+
 ### `hardwareAcceleration: 'prefer-hardware'` rompe l'export dove l'encoder è software
 Chromium headless (e i dispositivi senza encoder H.264 in hardware) rifiuta la configurazione
 con `This specific encoder configuration (avc1…, hardware acceleration: prefer-hardware) is not
