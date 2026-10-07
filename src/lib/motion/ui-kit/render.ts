@@ -31,3 +31,27 @@ export function drawPiece(js: string, props: Record<string, unknown>, duration: 
     return root;
   };
 }
+
+const BLOCK_TAG = 'div';
+const MIN_EMPTY_ROWS = 3;
+const CARD = /\bcard\b/;
+
+const hidden = (n: DrawnNode) => n.style.opacity === '0' || n.style.display === 'none';
+
+const textOf = (n: DrawnNode): string => (hidden(n) ? '' : `${n.textContent}${n.children.map(textOf).join('')}`).trim();
+
+const drawsIcon = (n: DrawnNode): boolean => n.innerHTML.length > 0 || n.children.some(drawsIcon);
+
+const shapeOnly = (n: DrawnNode) => n.tag === BLOCK_TAG && !hidden(n) && !textOf(n) && !drawsIcon(n);
+
+function emptyRows(n: DrawnNode): string[] {
+  const groups = new Map<string, number>();
+  n.children.filter((c) => shapeOnly(c) && c.children.length > 0).forEach((c) => groups.set(c.className, (groups.get(c.className) ?? 0) + 1));
+  return [...groups].filter(([, count]) => count >= MIN_EMPTY_ROWS).map(([cls, count]) => `${count} rows "${cls}" with no text`);
+}
+
+const emptyCard = (n: DrawnNode) => (CARD.test(n.className) && shapeOnly(n) && n.children.length > 0 ? [`a card "${n.className}" with only shapes`] : []);
+
+export function placeholders(tree: DrawnNode): string[] {
+  return [...emptyRows(tree), ...emptyCard(tree), ...tree.children.flatMap(placeholders)];
+}

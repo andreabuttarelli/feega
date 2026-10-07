@@ -6,7 +6,7 @@ import { MotionStyle } from './style-model';
 import { UI_KIT, UI_SAFE, uiScale } from './ui-kit/kit';
 import { sampleTrack } from './sample-track';
 import { cursorClicks, cursorMisses, reelMisses, TARGET_SEPARATOR } from './clicks';
-import { emptyContent, interactionOf, isUiPiece, Interaction } from './ui-kit/content';
+import { emptyContent, interactionOf, isUiPiece, Interaction, skeletons } from './ui-kit/content';
 import { FillKind, ShapeKind } from './shape/schema';
 
 export enum Quality {
@@ -410,7 +410,7 @@ const uiClips = (doc: MotionDoc) => everyClip(doc).filter((c) => c.component ===
 function emptyUis(doc: MotionDoc): QualityProblem[] {
   return uiClips(doc).flatMap((clip) => {
     const name = String(clip.props.name);
-    const found = emptyContent(name, clip.props, doc.components[name]?.source.js);
+    const found = [...emptyContent(name, clip.props, doc.components[name]?.source.js), ...skeletons(name, clip.props, clip.durationInFrames / doc.fps)];
     return found.length ? [{ kind: Quality.EmptyUi, at: seconds(doc, clip.from), detail: `${clip.id} (${name}) shows no real content: ${found.join('; ')}. Fill it with the product's own data from the research: names, numbers and states a user of the product would recognise` }] : [];
   });
 }

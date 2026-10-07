@@ -1,5 +1,6 @@
 import { UI_KIT, UiKind, type UiPiece } from './kit';
 import { defaultsOf, structureOf } from './anchors';
+import { drawPiece, placeholders } from './render';
 
 export enum Interaction {
   Presses = 'presses',
@@ -90,4 +91,18 @@ export function emptyContent(name: string, props: Record<string, unknown>, js?: 
   }
   const texts = structure.blocks.filter((b) => b.kind !== 'picture').flatMap((b) => [b.text, ...(b.items ?? [])]);
   return texts.filter(genericText).map((t) => `"${t.slice(0, 40)}" is empty or generic`);
+}
+
+const SKELETON_GRACE_S = 2.5;
+const LAST_FRAME_S = 0.05;
+
+export function skeletons(name: string, props: Record<string, unknown>, duration: number): string[] {
+  const kind = kitKind(name);
+  if (!kind || kind === UiKind.Cursor) {
+    return [];
+  }
+  const speed = typeof props.speed === 'number' && props.speed > 0 ? props.speed : 1;
+  const draw = drawPiece(UI_KIT[kind].js, props, duration);
+  const times = [Math.min(SKELETON_GRACE_S / speed, duration), duration - LAST_FRAME_S];
+  return [...new Set(times.flatMap((t) => placeholders(draw(t))))];
 }
