@@ -23,7 +23,7 @@ import { speakVoiceover } from '$lib/server/motion/voiceover';
 import { layMusic } from '$lib/server/motion/music';
 import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
 import { brandSources } from '$lib/server/motion/brand-sources';
-import { SELF_CHECK_MAX_STEPS, SUMMARY_PROMPT, VIEW_FRAMES, Vision, docTexts, keyFrameTimes, selfCheckDue, selfCheckPrompt, usageByModel, visionStep } from '$lib/server/motion/frames';
+import { SELF_CHECK_MAX_STEPS, SUMMARY_PROMPT, VIEW_FRAMES, Vision, deliveryBlocked, docTexts, fixPrompt, keyFrameTimes, openErrors, selfCheckPrompt, stillOpenNote, usageByModel, visionStep } from '$lib/server/motion/frames';
 import { frameStats } from '$lib/server/motion/frame-stats';
 import { awaitFrames, awaitVerdict, framesPrefix, FRAME_POLL_MS, type FrameBucket } from '$lib/server/motion/frame-store';
 import { CANVAS_ASSET_BUCKET, SIGNED_URL_TTL_S } from '$lib/server/repos/asset-storage';
@@ -68,7 +68,8 @@ enum Round {
 type Stop = ReturnType<typeof agentStopWhen>;
 
 const CLOSING_RESERVE_MS = 60_000;
-const MAX_SELF_CHECK_NUDGES = 2;
+export const MAX_DELIVERY_ATTEMPTS = 3;
+const STILL_OPEN_ID = 'still-open';
 
 const oneStep: Stop = ({ steps }) => steps.length >= 1;
 
@@ -257,11 +258,19 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
       };
 
       await play(openingMessages, Round.Edit);
-      for (let nudge = 0; nudge < MAX_SELF_CHECK_NUDGES && steps.length && selfCheckDue(session, vision); nudge++) {
-        await play([...conversation, { role: 'user', content: selfCheckPrompt(keyFrameTimes(session.doc)) }], Round.SelfCheck);
+      for (let attempt = 0; attempt < MAX_DELIVERY_ATTEMPTS && steps.length && deliveryBlocked(session, vision); attempt++) {
+        const errors = openErrors(session);
+        const times = keyFrameTimes(session.doc);
+        await play([...conversation, { role: 'user', content: errors.length ? fixPrompt(errors, times) : selfCheckPrompt(times) }], Round.SelfCheck);
       }
       if (steps.length && !closedByModel(steps.at(-1))) {
         await play([...conversation, { role: 'user', content: SUMMARY_PROMPT }], Round.Summary);
+      }
+      const open = stillOpenNote(openErrors(session));
+      if (open) {
+        writer.write({ type: 'text-start', id: STILL_OPEN_ID });
+        writer.write({ type: 'text-delta', id: STILL_OPEN_ID, delta: open });
+        writer.write({ type: 'text-end', id: STILL_OPEN_ID });
       }
       writer.write({ type: 'finish' });
 
@@ -287,7 +296,8 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
       console.warn('[motion-agent] revision not saved', { nodeId: motion.record.id, outcome: write.outcome });
     }
 
-    const turn = finishedTurn(steps);
+    const finished = finishedTurn(steps);
+    const turn = { ...finished, content: finished.content + stillOpenNote(openErrors(session)) };
     await saveTurn(db, { orgId, threadId, role: 'assistant', ...turn, actor }).catch((e) => console.error('[motion-agent] assistant turn not saved', { threadId }, e));
 
     for (const [modelId, usage] of usageByModel(steps.map((s) => extractSdkUsage(s.usage)), stepModels)) {

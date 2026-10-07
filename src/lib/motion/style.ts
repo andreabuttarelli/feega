@@ -328,18 +328,9 @@ const CHECKS: Record<Forbidden, Check> = {
   [Forbidden.MissingStoryBeat]: missingStory
 };
 
-export enum Severity {
-  Error = 'error',
-  Warning = 'warning'
-}
-
-const SEVERITY: Partial<Record<Forbidden, Severity>> = {
-  [Forbidden.Screenshots]: Severity.Error
-};
-
-export type StyleProblem = { effect: Forbidden; severity: Severity; at: number; detail: string };
+export type StyleProblem = { effect: Forbidden; at: number; detail: string };
 
 export function styleProblems(doc: MotionDoc): StyleProblem[] {
   const spec = STYLES[styleOf(doc)];
-  return spec.forbidden.flatMap((effect) => CHECKS[effect](doc, spec).map((f) => ({ effect, severity: SEVERITY[effect] ?? Severity.Warning, at: Math.round((f.at / doc.fps) * 100) / 100, detail: f.detail })));
+  return spec.forbidden.flatMap((effect) => CHECKS[effect](doc, spec).map((f) => ({ effect, at: Math.round((f.at / doc.fps) * 100) / 100, detail: f.detail })));
 }

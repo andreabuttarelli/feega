@@ -4,7 +4,8 @@ import { addClip } from './timeline';
 import { Ease } from './design';
 import { JunctionKind } from './junction-model';
 import { EffectKind } from './effects/registry';
-import { Forbidden, Severity, STYLES, styleOf, styleProblems } from './style';
+import { Forbidden, STYLES, styleOf, styleProblems } from './style';
+import { SEVERITY, Severity } from './direction';
 import { DEFAULT_STYLE, MotionStyle } from './style-model';
 import supasito from './fixtures/supasito-v1.json';
 
@@ -215,7 +216,7 @@ describe('the launch film style', () => {
     const problems = styleProblems(supasito as unknown as MotionDoc).filter((p) => p.effect === Forbidden.Screenshots);
 
     expect(problems.map((p) => p.at)).toEqual(expect.arrayContaining([2, 4, 6, 7]));
-    expect(new Set(problems.map((p) => p.severity))).toEqual(new Set([Severity.Error]));
+    expect(SEVERITY[Forbidden.Screenshots]).toBe(Severity.Blocking);
   });
 
   it('names a film without its story: problem, solution, product and proof, claim', () => {

@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, newMotionDoc, type MotionDoc } from './doc';
 import { Side, addClip, setTransition } from './timeline';
-import { Quality, QUALITY_SEVERITY, Severity, docProblems, frameProblems } from './direction';
-import supasitoV1 from './supasito-v1.fixture.json';
+import { Quality, SEVERITY, Severity, blocking, docProblems, frameProblems } from './direction';
+import { Forbidden } from './style';
+import supasitoV1 from './fixtures/supasito-v1.json';
 import { Ease, TransitionKind } from './design';
 import { builtinTemplate } from './template/builtins';
 import { insertTemplate } from './template/library';
@@ -244,6 +245,20 @@ describe('empty frames', () => {
   });
 
   it('an empty frame blocks delivery', () => {
-    expect(QUALITY_SEVERITY[Quality.EmptyFrames]).toBe(Severity.Blocking);
+    expect(SEVERITY[Quality.EmptyFrames]).toBe(Severity.Blocking);
+  });
+});
+
+describe('severity', () => {
+  it('blocks delivery on the errors and lets warnings through', () => {
+    const open = blocking([
+      { kind: Quality.BlankFrame, detail: 'blank' },
+      { kind: Quality.RepeatedLayout, detail: 'repeat' },
+      { kind: Quality.OffStyle, detail: 'unreadable', effect: Forbidden.UnreadableText },
+      { kind: Quality.OffStyle, detail: 'glow', effect: Forbidden.Glow }
+    ]);
+
+    expect(open.map((p) => p.detail)).toEqual(['blank', 'unreadable']);
+    expect(SEVERITY[Forbidden.MissingStoryBeat]).toBe(Severity.Blocking);
   });
 });
