@@ -16,7 +16,8 @@ export enum Quality {
   SoftPicture = 'soft-picture',
   CroppedScreen = 'cropped-screen',
   BrandLogoAltered = 'brand-logo-altered',
-  OutOfFrame = 'out-of-frame'
+  OutOfFrame = 'out-of-frame',
+  TiltedText = 'tilted-text'
 }
 
 export type Pixels = Record<string, { width: number; height: number }>;
@@ -205,16 +206,46 @@ function outside(clip: Clip, size: Size, frame: Size, f: number): boolean {
   return cx - halfW < frame.width * margin - 1 || cx + halfW > frame.width * (1 - margin) + 1 || cy - halfH < frame.height * margin - 1 || cy + halfH > frame.height * (1 - margin) + 1;
 }
 
+function placedClips(doc: MotionDoc): Clip[] {
+  const top = doc.tracks.flatMap((t) => t.clips as Clip[]);
+  const nested = top.flatMap((scene) => {
+    const comp = scene.component === 'Precomp' ? doc.comps[String(scene.props.comp)] : undefined;
+    const shift = scene.from - scene.trimStart;
+    return comp ? comp.tracks.flatMap((t) => (t.clips as Clip[]).map((c) => ({ ...c, from: c.from + shift }))) : [];
+  });
+  return [...top, ...nested];
+}
+
+const heldFrames = (clip: Clip, edge: number) => Array.from({ length: Math.max(0, clip.durationInFrames - 2 * edge) }, (_, i) => i + edge);
+
+const MAX_READABLE_TILT = 12;
+const TILTS = ['rotateX', 'rotateY'];
+const READ_MATTER: ReadonlySet<ComponentId> = new Set([...TEXTS, 'Custom', 'Image'] as ComponentId[]);
+
+function tiltedText(doc: MotionDoc): QualityProblem[] {
+  const edge = Math.round(EDGE_SECONDS * doc.fps);
+  return placedClips(doc).flatMap((clip) => {
+    if (!READ_MATTER.has(clip.component)) {
+      return [];
+    }
+    const tilt = (f: number) => Math.max(...TILTS.map((key) => Math.abs(at(clip, key, f, 0))));
+    const leaning = heldFrames(clip, edge).filter((f) => tilt(f) > MAX_READABLE_TILT);
+    if (leaning.length <= OUT_FRAMES_ALLOWED) {
+      return [];
+    }
+    return [{ kind: Quality.TiltedText, at: seconds(doc, clip.from + leaning[0]), detail: `${clip.id} holds text or UI tilted ${Math.round(tilt(leaning[0]))}° in 3D from ${seconds(doc, clip.from + leaning[0])}s: it reads distorted. Tilt only on the entrance and straighten it (rotateX and rotateY within ${MAX_READABLE_TILT}°) once it has landed` }];
+  });
+}
+
 function outOfFrame(doc: MotionDoc): QualityProblem[] {
   const frame = { width: doc.width, height: doc.height };
   const edge = Math.round(EDGE_SECONDS * doc.fps);
-  return doc.tracks.flatMap((t) => t.clips as Clip[]).flatMap((clip) => {
+  return placedClips(doc).flatMap((clip) => {
     const size = contentSize(clip, frame);
     if (!size) {
       return [];
     }
-    const frames = Array.from({ length: Math.max(0, clip.durationInFrames - 2 * edge) }, (_, i) => i + edge);
-    const out = frames.filter((f) => outside(clip, size, frame, f));
+    const out = heldFrames(clip, edge).filter((f) => outside(clip, size, frame, f));
     if (out.length <= OUT_FRAMES_ALLOWED) {
       return [];
     }
@@ -225,7 +256,7 @@ function outOfFrame(doc: MotionDoc): QualityProblem[] {
 export function docProblems(doc: MotionDoc, input: { audioAssets: number; pixels?: Pixels; logos?: readonly string[] }): QualityProblem[] {
   const list = scenes(doc);
   const pixels = input.pixels ?? {};
-  return [...repeated(doc, list), ...smallTitles(doc), ...silent(doc, input.audioAssets), ...softPictures(doc, pixels), ...croppedScreens(doc, pixels), ...alteredLogos(doc, new Set(input.logos ?? [])), ...outOfFrame(doc), ...styleProblems(doc).map((p) => ({ kind: Quality.OffStyle, at: p.at, detail: p.detail }))];
+  return [...repeated(doc, list), ...smallTitles(doc), ...silent(doc, input.audioAssets), ...softPictures(doc, pixels), ...croppedScreens(doc, pixels), ...alteredLogos(doc, new Set(input.logos ?? [])), ...outOfFrame(doc), ...tiltedText(doc), ...styleProblems(doc).map((p) => ({ kind: Quality.OffStyle, at: p.at, detail: p.detail }))];
 }
 
 export function frameProblems(stats: readonly FrameStat[]): QualityProblem[] {

@@ -331,9 +331,13 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
             [0, 0.5, SNAP],
             [0.35, 0.58, LINEAR],
             [2 * BEAT, 0.6, LINEAR]
+          ],
+          rotateX: [
+            [0, 18, SNAP],
+            [0.35, 0, WHIP]
           ]
         },
-        transform: { rotateX: 18, perspective: 1600 }
+        transform: { perspective: 1600 }
       }
     ],
     fields: [picture('screen', 'Capture of the feature', 'screen'), amount('focus_x', 'Focus X', 'screen', 'focusX'), amount('focus_y', 'Focus Y', 'screen', 'focusY')]
