@@ -54,6 +54,16 @@ describe('write_script', () => {
     expect(String(out.error)).toContain('Ship 10x faster');
   });
 
+  it('saves the script of a fictional brand declared as such, with no site to read, and says so in the brief', async () => {
+    const { run, session } = setup();
+
+    const out = await run('write_script', { ...script('Edits go live after a preview'), brand: 'fictional' });
+
+    expect(out).toMatchObject({ ok: true });
+    expect(String(out.brief)).toContain('Fictional brand');
+    expect(session.doc.script?.brand).toBe('fictional');
+  });
+
   it('saves a sourced script on the video and returns the brief to show', async () => {
     const { run, session } = setup();
     await run('analyze_site', { url: 'supasito.com' });

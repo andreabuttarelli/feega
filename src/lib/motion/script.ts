@@ -7,6 +7,11 @@ export enum Act {
   Claim = 'claim'
 }
 
+export enum BrandKind {
+  Real = 'real',
+  Fictional = 'fictional'
+}
+
 export const ACTS = [Act.Problem, Act.Solution, Act.Proof, Act.Claim] as const;
 
 const TEXT = 400;
@@ -34,7 +39,7 @@ export const actSchema = z.object({
   sources: z.array(sourceSchema).max(4).default([])
 });
 
-export const scriptSchema = z.object({ research: researchSchema, acts: z.array(actSchema).length(ACTS.length) });
+export const scriptSchema = z.object({ brand: z.enum(BrandKind).default(BrandKind.Real), research: researchSchema, acts: z.array(actSchema).length(ACTS.length) });
 
 export type Research = z.infer<typeof researchSchema>;
 export type ScriptAct = z.infer<typeof actSchema>;
@@ -64,10 +69,16 @@ export function sourcesOf(script: LaunchScript): Source[] {
   return [...r.benefits.map((b) => b.source), ...r.numbers.map((n) => n.source), r.promise.source, ...script.acts.flatMap((a) => a.sources)];
 }
 
+const BRAND_NOTE: Record<BrandKind, string[]> = {
+  [BrandKind.Real]: [],
+  [BrandKind.Fictional]: ['**Fictional brand**: invented name, logo and domain; its claims are the brand\'s own copy, not quotes from a site.', '']
+};
+
 export function briefOf(script: LaunchScript): string {
   const r = script.research;
   const cite = (s: Source) => `"${s.quote}" (${s.url})`;
   return [
+    ...BRAND_NOTE[script.brand],
     '**Research**',
     `- For: ${r.audience}`,
     `- Problem: ${r.problem}`,
