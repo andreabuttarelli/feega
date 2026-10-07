@@ -40,6 +40,13 @@ describe('the launch film scene library', () => {
     expect(placed.ok && styleProblems(placed.doc)).toEqual([]);
   });
 
+  it.each(launchDocs().map((e) => [e.id, e] as const))('%s lasts 2 to 4 s, long enough to be read', (_id, entry) => {
+    const seconds = entry.template.doc.durationInFrames / entry.template.doc.fps;
+
+    expect(seconds).toBeGreaterThanOrEqual(FILM.seconds.scene[0]);
+    expect(seconds).toBeLessThanOrEqual(FILM.seconds.scene[1]);
+  });
+
   it.each(launchDocs().map((e) => [e.id, e] as const))('%s is already moving in its first quarter second', (_id, entry) => {
     const doc = entry.template.doc;
     const early = clipsOf(doc).some((c) => c.from <= FIRST_MOVE_S * doc.fps && Object.values(c.keyframes).some((track) => track.length > 1 && track[0].frame <= FIRST_MOVE_S * doc.fps && travel(track.map((k) => Number(k.value))) > 0));

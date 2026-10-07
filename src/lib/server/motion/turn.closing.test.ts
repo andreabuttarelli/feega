@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MockLanguageModelV4 } from 'ai/test';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
+import { DEFAULT_SECONDS, MotionFormat, newMotionDoc } from '$lib/motion/doc';
+import { MotionStyle } from '$lib/motion/style-model';
 
 const usage = { inputTokens: { total: 10, noCache: 10, cacheRead: 0, cacheWrite: 0 }, outputTokens: { total: 5, text: 5, reasoning: 0 } };
 
@@ -68,7 +69,7 @@ function reply(call: Call): unknown[] {
     return tool('view_frames', { times: [1] });
   }
   if (last.role === 'user') {
-    return tool('add_clip', { component: 'Title', start: 0, duration: 2, props: { text: 'Pop' } });
+    return tool('add_clip', { component: 'Title', start: 0, duration: DEFAULT_SECONDS, props: { text: 'Pop' } });
   }
   return text(NOTE);
 }
@@ -124,7 +125,7 @@ vi.mock('$lib/server/repos/chat', () => ({
   }
 }));
 vi.mock('$lib/server/motion/editor', () => ({
-  headOrNew: async () => ({ version: 0, doc: newMotionDoc(MotionFormat.Landscape), summary: null, actorKind: 'system' }),
+  headOrNew: async () => ({ version: 0, doc: { ...newMotionDoc(MotionFormat.Landscape), style: MotionStyle.AppleMinimal }, summary: null, actorKind: 'system' }),
   motionTokens: async () => ({ name: 'Brand' }),
   motionAssets: async () => [],
   assetUrls: () => ({}),

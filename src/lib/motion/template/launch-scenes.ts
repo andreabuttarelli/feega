@@ -105,12 +105,11 @@ const amount = (key: string, label: string, clipId: string, prop: string): Field
 const BURST = ['Turn', 'clicks', 'into', 'revenue.'];
 const NUMBERS = [
   ['7.2K', 'CLICKS'],
-  ['165', 'LEADS'],
   ['$506', 'SALES']
 ];
-const CLAIMS = ['Links.', 'Analytics.', 'Affiliates.', 'One place.'];
-const HOLD = 2 * BEAT;
-const CLAIM_HOLD = 3 * BEAT;
+const CLAIMS = ['Analytics.', 'One place.'];
+const HOLD = 3 * BEAT;
+const CLAIM_HOLD = 4 * BEAT;
 const CLAIM_SECONDS = (CLAIMS.length - 1) * HOLD + CLAIM_HOLD;
 const BURST_SECONDS = BEAT * 4 + 1;
 
@@ -275,7 +274,7 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
   {
     id: 'launch-number-match-cut',
     name: 'Launch · Number match cut',
-    description: 'Launch film. Three numbers swap every two beats in one spot, each rising out of its own box (a fast mask reveal), its label small under it; the last in the accent.',
+    description: 'Launch film. Two numbers swap every three beats in one spot, each rising out of its own box (a fast mask reveal), its label small under it; the last in the accent.',
     seconds: NUMBERS.length * HOLD,
     beats: [
       fill(NUMBERS.length * HOLD),
@@ -311,26 +310,26 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
     id: 'launch-ui-tilt-zoom',
     name: 'Launch · UI tilt zoom',
     description: 'Launch film. Background only: a sharp capture in the foreground blocks delivery, so blur it (8 or more) behind live UI. One feature of the real UI lands tilted back 18° and straightens while it whips in on the detail and keeps pushing.',
-    seconds: 2 * BEAT,
+    seconds: 4 * BEAT,
     beats: [
-      fill(2 * BEAT),
+      fill(4 * BEAT),
       {
         id: 'screen',
         track: 'middle',
         component: 'Image',
         at: 0,
-        len: 2 * BEAT,
+        len: 4 * BEAT,
         props: { ...FULL, fit: 'cover', zoom: 1, focusX: 0.5, focusY: 0.55 },
         keys: {
           zoom: [
             [0, 1, SNAP],
             [0.35, 1.5, WHIP],
-            [2 * BEAT, 1.95, LINEAR]
+            [4 * BEAT, 1.95, LINEAR]
           ],
           focusY: [
             [0, 0.5, SNAP],
             [0.35, 0.58, LINEAR],
-            [2 * BEAT, 0.6, LINEAR]
+            [4 * BEAT, 0.6, LINEAR]
           ],
           rotateX: [
             [0, 18, SNAP],
@@ -371,14 +370,14 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
     id: 'launch-ui-explode',
     name: 'Launch · UI explosion (peak)',
     description: 'Launch film. The wow peak, on the drop: a white flash, then every capture bursts into a tilted 3D grid that rushes at the camera and settles, the grid dims and the claim lands on top. Fill it with 8–12 captures.',
-    seconds: 6 * BEAT,
+    seconds: 7 * BEAT,
     beats: [
       {
         id: 'grid',
         track: 'back',
         component: 'Composition',
         at: 0,
-        len: 6 * BEAT,
+        len: 7 * BEAT,
         props: {
           layout: 'tilted-grid',
           camera: 'push-in',
@@ -400,7 +399,7 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
           scale: [
             [0, 4.2, SNAP],
             [0.8, 2.4, LINEAR],
-            [6 * BEAT, 2.1, LINEAR]
+            [7 * BEAT, 2.1, LINEAR]
           ],
           rotateZ: [
             [0, 14, SNAP],
@@ -432,7 +431,7 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
         track: 'front',
         component: 'Title',
         at: BEAT,
-        len: 5 * BEAT,
+        len: 6 * BEAT,
         props: {
           text: 'Turn clicks\ninto revenue.',
           ...word(LINE * 1.3),
@@ -444,7 +443,7 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
           ...riseOut,
           scale: [
             [0, 0.96, LINEAR],
-            [5 * BEAT, 1.04, LINEAR]
+            [6 * BEAT, 1.04, LINEAR]
           ]
         }
       }
@@ -464,15 +463,15 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
     id: 'launch-device-orbit',
     name: 'Launch · Device orbit',
     description: 'Launch film. A phone spins in 200° and keeps turning while one huge word slides behind it. Wants a mobile capture.',
-    seconds: 3 * BEAT,
+    seconds: 5 * BEAT,
     beats: [
-      fill(3 * BEAT),
+      fill(5 * BEAT),
       {
         id: 'word',
         track: 'back',
         component: 'Title',
         at: 0,
-        len: 3 * BEAT,
+        len: 5 * BEAT,
         props: {
           text: 'Real-time.',
           ...word(HERO),
@@ -483,7 +482,7 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
         keys: {
           x: [
             [0, 0.09, LINEAR],
-            [3 * BEAT, -0.09, LINEAR]
+            [5 * BEAT, -0.09, LINEAR]
           ],
           blur: [
             [0, BLUR, SNAP],
@@ -496,7 +495,7 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
         track: 'front',
         component: 'Device3D',
         at: 0,
-        len: 3 * BEAT,
+        len: 5 * BEAT,
         props: {
           device: Device.PhonePro,
           finish: 'black',
@@ -510,17 +509,17 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
           objectRotateY: [
             [0, 200, SNAP],
             [0.7, 25, LINEAR],
-            [3 * BEAT, -20, LINEAR]
+            [5 * BEAT, -20, LINEAR]
           ],
           objectRotateZ: [
             [0, -25, SNAP],
             [0.7, -4, LINEAR],
-            [3 * BEAT, 0, LINEAR]
+            [5 * BEAT, 0, LINEAR]
           ],
           dolly: [
             [0, 0.5, SNAP],
             [0.7, 1.05, LINEAR],
-            [3 * BEAT, 1.15, LINEAR]
+            [5 * BEAT, 1.15, LINEAR]
           ]
         }
       }
@@ -622,10 +621,10 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
         id: 'claim',
         track: 'front',
         component: 'Kicker',
-        at: 3.5 * BEAT,
-        len: 4.5 * BEAT,
+        at: 4 * BEAT,
+        len: 4 * BEAT,
         props: {
-          text: 'YOUR CLAIM IN CAPS',
+          text: 'YOUR CLAIM',
           ...label(),
           y: 0.89,
           width: 0.6,

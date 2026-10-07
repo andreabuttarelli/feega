@@ -21,7 +21,8 @@ export enum Forbidden {
   RoughCut = 'rough-cut',
   UnreadableText = 'unreadable-text',
   Screenshots = 'screenshots',
-  MissingStoryBeat = 'missing-story-beat'
+  MissingStoryBeat = 'missing-story-beat',
+  Rushed = 'rushed'
 }
 
 export type StyleSpec = {
@@ -33,7 +34,7 @@ export type StyleSpec = {
   palette: { ink: string; paper: string; muted: string; accents: number };
   junctions: readonly JunctionKind[];
   entrances: readonly TransitionKind[];
-  reading: { perWord: number; base: number; phrase: number };
+  reading: { perWord: number; base: number; phrase: number; pause: number };
   forbidden: readonly Forbidden[];
   maxMoving: number;
   rules: readonly string[];
@@ -54,7 +55,7 @@ const PEAK_FROM_S = 6;
 const PEAK_TRAVEL: Record<string, number> = { scale: 0.6, zoom: 0.8, dolly: 0.5, objectRotateX: 90, objectRotateY: 90, objectRotateZ: 90 };
 const HARD_CUT_SHARE = 0.25;
 const ENTRY_FRAMES = 2;
-const READING = { perWord: 0.4, base: 0.6, phrase: 1.2 };
+const READING = { perWord: 0.4, base: 0.6, phrase: 1.2, pause: 0.5 };
 const MAIN_PICTURE_AREA = 0.25;
 const BACKDROP_BLUR = 8;
 const BACKDROP_OPACITY = 0.35;
@@ -68,22 +69,22 @@ export const STYLES: Record<MotionStyle, StyleSpec> = {
   [MotionStyle.LaunchFilm]: {
     label: 'Launch film',
     eases: STYLE_EASES[MotionStyle.LaunchFilm],
-    seconds: { enter: [0.2, 0.35], stagger: 0.06, exit: 0.2, still: 0.5, scene: [0.8, 2.5] },
+    seconds: { enter: [0.2, 0.35], stagger: 0.06, exit: 0.2, still: 0.5, scene: [2, 4] },
     movement: { rise: 0.12, settle: 0.7, blur: 18, pushIn: 1.25, turn: 100 },
     type: { family: 'Inter', weights: { display: 800, text: 500 }, sizes: { hero: 0.26, line: 0.12, small: 0.026 } },
     palette: { ink: '#050505', paper: '#ffffff', muted: '#8b8b8b', accents: 1 },
     junctions: [JunctionKind.Crossfade, JunctionKind.DipToBlack, JunctionKind.Blur, JunctionKind.Zoom, JunctionKind.PushLeft, JunctionKind.PushRight, JunctionKind.Wipe],
     entrances: [TransitionKind.None, TransitionKind.Fade, TransitionKind.Blur, TransitionKind.Scale, TransitionKind.SlideLeft, TransitionKind.SlideRight, TransitionKind.SlideUp],
     reading: READING,
-    forbidden: [Forbidden.Particles, Forbidden.Glow, Forbidden.Bounce, Forbidden.Crowded, Forbidden.Transition, Forbidden.Still, Forbidden.OffBeat, Forbidden.NoPeak, Forbidden.RoughCut, Forbidden.UnreadableText, Forbidden.Screenshots, Forbidden.MissingStoryBeat],
+    forbidden: [Forbidden.Particles, Forbidden.Glow, Forbidden.Bounce, Forbidden.Crowded, Forbidden.Transition, Forbidden.Still, Forbidden.OffBeat, Forbidden.NoPeak, Forbidden.RoughCut, Forbidden.UnreadableText, Forbidden.Screenshots, Forbidden.MissingStoryBeat, Forbidden.Rushed],
     maxMoving: 4,
     rules: [
       'Launch film is the house style: the LOOK of an Apple keynote film, Linear, Vercel Ship or Stripe Sessions (few elements, very large type, the real product, a sober palette) with HIGH ENERGY. Minimal never means slow: the bar is "would a client pay for this?". Never a slideshow, a still picture, a slow fade, the same layout twice or a PowerPoint effect.',
       'Story first: four acts, problem (the user\'s pain in the brand\'s own words), solution (the product enters), proof (features shown live, numbers, results), claim (promise, original logo, address), about 20/15/45/20% of the length, each marked with mark_story; the gate names a missing act.',
       'Storyboard first: before the first edit write a table, one row per scene, grouped by act: time, beat, scene template, the line it says, the move (kinetic type, speed ramp, device fly, match cut, montage, peak, logo build).',
-      'Music is always there and drives the cut: with no audio in the project call add_music first (mood and bpm that fit the brand; it lays the track and marks its beats), otherwise put the project music on an Audio clip, analyze_audio, mark_beats; then cut on every beat or every second beat (cut_to_beat). Scenes last 0.8–2.5 s; a montage before the peak cuts on half beats.',
+      'Music is always there and drives the cut: with no audio in the project call add_music first (mood and bpm that fit the brand; it lays the track and marks its beats), otherwise put the project music on an Audio clip, analyze_audio, mark_beats; then cut on the beat, never on a half beat (cut_to_beat). Every scene lasts 2–4 s and holds after each change: the move lands, then the picture breathes. Fewer ideas, never faster cuts: 4 to 6 scenes in 15 s.',
       'Build from the launch scenes: list_templates, insert_template builtin:launch-* (word-burst, ui-speed-ramp, device-fly, number-match-cut, ui-tilt-zoom, beat-montage, ui-explode, device-orbit, logo-build) and fill them with set_template_fields; push them further with keyframes. builtin:scene-* are the calm variants, for a beat of rest.',
-      'Kinetic type that can be read: words land on the beat, very large, each punching in from 130–140% and an 18 px blur in 0.2–0.3 s on cubic-bezier(0.16,1,0.3,1), then STAY: every text is on screen at least 0.4 s per word plus 0.6 s, 1.2 s at least for a phrase (the gate names unreadable text). Build a line word by word and hold it; energy comes from movement and transitions, never from text that disappears. One accent colour on the key word.',
+      'Kinetic type that can be read: words land on the beat, very large, each punching in from 130–140% and an 18 px blur in 0.2–0.3 s on cubic-bezier(0.16,1,0.3,1), then STAY: every text is on screen at least 0.4 s per word plus 0.6 s, 1.2 s at least for a phrase, plus a 0.5 s pause once read (the gate names unreadable text). Build a line word by word and hold it; energy comes from movement and transitions, never from text that disappears. One accent colour on the key word.',
       'Camera never rests: every picture pushes, zooms inside its box (Image zoom with focus_x/focus_y) or pans; devices fly in turning 90° or more and keep drifting; nothing holds still for more than half a second (the quality gate names it).',
       'Speed ramps: a zoom into the real UI runs slow-fast-slow on cubic-bezier(0.83,0,0.17,1): hold a beat, whip to the detail on the next beat, keep creeping. Motion blur on (set_motion_blur, 180°, 6 samples) so the whip smears.',
       'Match cuts: carry a word, a number or the product across the cut in the same place (the hook word becomes the headline on the real page; three numbers swap in one spot).',
@@ -231,16 +232,14 @@ const CLIP_CHECKS: Partial<Record<Forbidden, ClipCheck>> = {
 
 const beatFrames = (doc: MotionDoc) => (doc.markers ?? []).filter((m) => BEAT_LABEL.test(m.label)).map((m) => m.frame);
 
-const halfBeats = (beats: readonly number[]) => beats.flatMap((b, i) => (i + 1 < beats.length ? [b, (b + beats[i + 1]) / 2] : [b]));
-
 function offBeat(doc: MotionDoc): Found[] {
-  const beats = halfBeats(beatFrames(doc));
+  const beats = beatFrames(doc);
   if (beats.length < 2) {
     return [];
   }
   const cuts = timelines(doc)[0].filter((c) => c.from > 0 && COMPONENTS[c.component].track === TrackKind.Visual);
   const missed = cuts.find((c) => Math.min(...beats.map((b) => Math.abs(b - c.from))) > BEAT_TOLERANCE_FRAMES);
-  return missed ? [{ clip: missed, at: missed.from, detail: `${missed.id} cuts in off the beat: move it onto a beat or half beat (cut_to_beat or move_clip to "beat N")` }] : [];
+  return missed ? [{ clip: missed, at: missed.from, detail: `${missed.id} cuts in off the beat: move it onto a beat (cut_to_beat or move_clip to "beat N")` }] : [];
 }
 
 const peakOf = (clip: Clip) => Object.entries(PEAK_TRAVEL).some(([prop, size]) => travel(clip.keyframes[prop] ?? []) >= size);
@@ -276,7 +275,7 @@ function roughCut(doc: MotionDoc): Found[] {
 
 const words = (clip: Clip) => String(clip.props.text ?? '').split(/\s+/).filter(Boolean).length;
 
-const readingTime = (n: number, spec: StyleSpec) => Math.max(spec.reading.perWord * n + spec.reading.base, n > 1 ? spec.reading.phrase : 0);
+const readingTime = (n: number, spec: StyleSpec) => Math.max(spec.reading.perWord * n + spec.reading.base, n > 1 ? spec.reading.phrase : 0) + spec.reading.pause;
 
 function unreadable(clips: readonly Clip[], spec: StyleSpec, fps: number): Found[] {
   return clips
@@ -309,6 +308,13 @@ function screenshots(doc: MotionDoc): Found[] {
     .map(({ clip, from }) => ({ clip, at: from, detail: `${clip.id} shows a sharp screenshot in the foreground at ${Math.round((from / doc.fps) * 100) / 100}s: a product film never shows screenshots as content, not even for a moment. Recreate that UI live with add_ui, or keep the screenshot as a background only (blur ${BACKDROP_BLUR} or more, or opacity ${BACKDROP_OPACITY} or less)` }));
 }
 
+function rushed(doc: MotionDoc, spec: StyleSpec): Found[] {
+  const [shortest] = spec.seconds.scene;
+  return timelines(doc)[0]
+    .filter((c) => c.component === 'Precomp' && c.durationInFrames < shortest * doc.fps - 1)
+    .map((clip) => ({ clip, at: clip.from, detail: `${clip.id} lasts ${Math.round((clip.durationInFrames / doc.fps) * 10) / 10} s: every scene holds ${shortest}–${spec.seconds.scene[1]} s so it can be read. Hold it longer and cut a scene instead: fewer ideas, never faster cuts` }));
+}
+
 function missingStory(doc: MotionDoc): Found[] {
   const told = storyBeats(doc);
   const missing = STORY_BEATS.filter((b) => !told.has(b));
@@ -325,7 +331,8 @@ const CHECKS: Record<Forbidden, Check> = {
   [Forbidden.NoPeak]: noPeak,
   [Forbidden.RoughCut]: roughCut,
   [Forbidden.Screenshots]: screenshots,
-  [Forbidden.MissingStoryBeat]: missingStory
+  [Forbidden.MissingStoryBeat]: missingStory,
+  [Forbidden.Rushed]: rushed
 };
 
 export type StyleProblem = { effect: Forbidden; at: number; detail: string };

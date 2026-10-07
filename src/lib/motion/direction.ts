@@ -56,7 +56,8 @@ export const SEVERITY: Record<Check, Severity> = {
   [Forbidden.RoughCut]: Severity.Warning,
   [Forbidden.UnreadableText]: Severity.Blocking,
   [Forbidden.Screenshots]: Severity.Blocking,
-  [Forbidden.MissingStoryBeat]: Severity.Blocking
+  [Forbidden.MissingStoryBeat]: Severity.Blocking,
+  [Forbidden.Rushed]: Severity.Warning
 };
 
 export type Pixels = Record<string, { width: number; height: number }>;
