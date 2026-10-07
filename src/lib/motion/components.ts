@@ -12,6 +12,7 @@ import { EMITTERS, Emitter, PARTICLE_COLOURS, PARTICLE_COLOUR_KEYS, PARTICLE_NUM
 import { CELL_FITS, CELL_TIMINGS } from './bento/model';
 import { BENTO_GRID } from '../canvas/composition/bento';
 import { GLASS_NUMBERS, GLASS_NUMBER_KEYS, GLASS_TINT, GlassSection } from './glass/model';
+import { BLOB_NUMBERS, BLOB_NUMBER_KEYS, BLOB_TINT, BlobSection } from './blob/model';
 import { CAPS, FILL_KINDS, FILL_RULES, FillKind, JOINS, MAX_MODIFIERS, MAX_MORPHS, SHAPE_KINDS, STROKE_KINDS, ShapeKind, StrokeKind, modifierSchema, pathString } from './shape/schema';
 
 export enum Control {
@@ -218,6 +219,19 @@ const glassNumbers = Object.fromEntries(
   GLASS_NUMBER_KEYS.map((key) => {
     const g = GLASS_NUMBERS[key];
     return [key, range(g.min, g.max, g.step, g.fallback, g.label, GLASS_GROUP[g.section])];
+  })
+);
+
+const BLOB_GROUP: Record<BlobSection, Group> = {
+  [BlobSection.Layout]: Group.Layout,
+  [BlobSection.Glass]: Group.Style,
+  [BlobSection.Motion]: Group.Motion
+};
+
+const blobNumbers = Object.fromEntries(
+  BLOB_NUMBER_KEYS.map((key) => {
+    const b = BLOB_NUMBERS[key];
+    return [key, range(b.min, b.max, b.step, b.fallback, b.label, BLOB_GROUP[b.section])];
   })
 );
 
@@ -490,6 +504,13 @@ export const COMPONENTS = {
     track: TrackKind.Visual,
     durationInFrames: seconds(4),
     schema: z.object({ ...glassNumbers, [GLASS_TINT.key]: color(GLASS_TINT.fallback, GLASS_TINT.label) }).strict()
+  },
+  LiquidBlob: {
+    label: 'Liquid blob',
+    description: 'A real 3D drop of liquid glass over everything on the tracks below it, rendered in WebGL: it refracts what it covers through its true curved surface (magnified in the middle, flipped and bent at the rim), splits light into colours at the edges, reflects a soft studio, casts a soft shadow with a caustic, and wobbles, stretches as it moves and squashes when it stops. drops 1..4 with split (distance between them) and splitAngle make it break into droplets that melt back together as split returns to 0; blend sets how far they melt. ior, dispersion, reflection, frost, tint and tintAmount shape the glass; viscosity, wobble, wobbleSpeed and stretch the liquid; seed changes the ripple. Refracts text, shapes, solid boxes and pictures below it (not CSS effects). Every number and the tint take set_keyframes and set_expression (spring() for a soft move).',
+    track: TrackKind.Visual,
+    durationInFrames: seconds(4),
+    schema: z.object({ ...blobNumbers, [BLOB_TINT.key]: color(BLOB_TINT.fallback, BLOB_TINT.label) }).strict()
   },
   Precomp: {
     label: 'Precomp',

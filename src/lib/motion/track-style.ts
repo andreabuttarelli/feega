@@ -64,6 +64,7 @@ const COMPONENT_FAMILY: Record<ComponentId, ClipFamily> = {
   Particles: ClipFamily.Shape,
   Precomp: ClipFamily.Precomp,
   LiquidGlass: ClipFamily.Adjustment,
+  LiquidBlob: ClipFamily.Adjustment,
   Adjustment: ClipFamily.Adjustment,
   Custom: ClipFamily.Custom
 };

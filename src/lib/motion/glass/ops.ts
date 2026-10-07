@@ -6,10 +6,11 @@ import type { Spring } from '../spring';
 import { addClip, addTrack, moveTrack, setKeyframes, type OpResult } from '../timeline';
 
 export enum Lens {
-  Glass = 'LiquidGlass'
+  Glass = 'LiquidGlass',
+  Blob = 'LiquidBlob'
 }
 
-const TRACK_NAME: Record<Lens, string> = { [Lens.Glass]: 'Glass' };
+const TRACK_NAME: Record<Lens, string> = { [Lens.Glass]: 'Glass', [Lens.Blob]: 'Liquid' };
 
 export type GlassStop = { time: number; x: number; y: number };
 

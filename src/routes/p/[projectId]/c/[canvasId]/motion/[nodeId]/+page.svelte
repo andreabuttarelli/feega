@@ -487,7 +487,8 @@
 
   const ADD: Partial<Record<ComponentId, (id: string) => OpResult>> = {
     Adjustment: (id) => addAdjustment(doc, { from: frame }, { clip: id, track: newId() }),
-    LiquidGlass: (id) => addLens(doc, Lens.Glass, { from: frame, durationInFrames: COMPONENTS.LiquidGlass.durationInFrames, props: {}, path: [], spring: SPRINGS.soft, fadeIn: 0, fadeOut: 0 }, { clip: id, track: newId() })
+    LiquidGlass: (id) => addLens(doc, Lens.Glass, { from: frame, durationInFrames: COMPONENTS.LiquidGlass.durationInFrames, props: {}, path: [], spring: SPRINGS.soft, fadeIn: 0, fadeOut: 0 }, { clip: id, track: newId() }),
+    LiquidBlob: (id) => addLens(doc, Lens.Blob, { from: frame, durationInFrames: COMPONENTS.LiquidBlob.durationInFrames, props: {}, path: [], spring: SPRINGS.soft, fadeIn: 0, fadeOut: 0 }, { clip: id, track: newId() })
   };
 
   function add(component: ComponentId) {
