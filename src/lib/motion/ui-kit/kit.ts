@@ -28,7 +28,27 @@ export const UI_KINDS = Object.values(UiKind) as [UiKind, ...UiKind[]];
 
 export type UiSize = { width: number; height: number };
 
-export type UiPiece = { name: string; about: string; size: UiSize; html: string; css: string; js: string };
+export type UiProps = Record<string, unknown>;
+
+export type UiPiece = { name: string; about: string; size: UiSize; html: string; css: string; js: string; settles: (props: UiProps, duration: number) => number };
+
+const count = (props: UiProps, key: string, fallback: number) => (typeof props[key] === 'string' ? String(props[key]).split('\n').filter((r) => r.trim()).length : fallback);
+
+const speedOf = (props: UiProps) => (typeof props.speed === 'number' && props.speed > 0 ? props.speed : 1);
+
+const shortenerClick = (duration: number) => 0.2 + Math.min(1.6, duration * 0.35) + 0.45;
+
+const DEFAULT_SETTLE = 1;
+
+const SETTLES: Partial<Record<string, (props: UiProps, duration: number) => number>> = {
+  UiLinkShortener: (_, d) => shortenerClick(d) + 0.7,
+  UiLinkList: (p) => 0.35 + (count(p, 'links', 4) - 1) * 0.14 + 1.2,
+  UiStatCards: (p) => (p.chart === 'bar' ? Math.max(0.2 + (count(p, 'stats', 3) - 1) * 0.12 + 1.3, 0.3 + 23 * 0.04 + 0.6) : Math.max(0.2 + (count(p, 'stats', 3) - 1) * 0.12 + 1.3, 1.85 + 0.5)),
+  UiFunnel: (p) => 0.25 + (count(p, 'stages', 3) - 1) * 0.45 + 0.9,
+  UiPayouts: (p) => Math.max(0.2 + (count(p, 'rows', 4) - 1) * 0.12 + 0.9, 1.1 + (count(p, 'rows', 4) - 1) * 0.25 + 0.3),
+  UiQr: () => 0.5 + 1.1 + 0.25,
+  UiWindow: () => 0.5
+};
 
 export const UI_SAFE = 0.9;
 
@@ -127,7 +147,7 @@ const BASE_CSS = `
 .muted { color: var(--muted); }
 `;
 
-const piece = (name: string, about: string, size: UiSize, css: string, js: string): UiPiece => ({ name, about, size, html: '', css: BASE_CSS + css, js: `const DESIGN_W = ${size.width};\nconst DESIGN_H = ${size.height};\nconst SAFE = ${UI_SAFE};\n` + STYLE_PARAMS.replace('SPRING_MATH', () => springSource()) + js });
+const piece = (name: string, about: string, size: UiSize, css: string, js: string): UiPiece => ({ name, about, size, settles: (props, duration) => (SETTLES[name]?.(props, duration) ?? DEFAULT_SETTLE) / speedOf(props), html: '', css: BASE_CSS + css, js: `const DESIGN_W = ${size.width};\nconst DESIGN_H = ${size.height};\nconst SAFE = ${UI_SAFE};\n` + STYLE_PARAMS.replace('SPRING_MATH', () => springSource()) + js });
 
 const SHORTENER = piece(
   'UiLinkShortener',

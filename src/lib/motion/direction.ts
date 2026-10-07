@@ -7,6 +7,7 @@ import { UI_KIT, UI_SAFE, uiScale } from './ui-kit/kit';
 import { sampleTrack } from './sample-track';
 import { cursorClicks, cursorMisses, reelMisses, TARGET_SEPARATOR } from './clicks';
 import { emptyContent, interactionOf, isUiPiece, Interaction } from './ui-kit/content';
+import { FillKind, ShapeKind } from './shape/schema';
 
 export enum Quality {
   RepeatedLayout = 'repeated-layout',
@@ -25,7 +26,9 @@ export enum Quality {
   ClickMiss = 'click-miss',
   EmptyUi = 'empty-ui',
   NoMicroMotion = 'no-micro-motion',
-  NoScript = 'no-script'
+  NoScript = 'no-script',
+  CutMidAnimation = 'cut-mid-animation',
+  BackgroundSeam = 'background-seam'
 }
 
 export enum Severity {
@@ -423,10 +426,78 @@ function unscripted(doc: MotionDoc): QualityProblem[] {
   return SCORED[styleOf(doc)] && !doc.script && everyClip(doc).length ? [{ kind: Quality.NoScript, detail: 'no research and script saved: for a launch film or trailer, write_script first (problem, struggle, flow, sourced proof, promise) and build that' }] : [];
 }
 
+const HOLD_S = 1;
+const DRIFT_S = 2;
+
+function unsettledPiece(doc: MotionDoc, clip: Clip): number | null {
+  const piece = clip.component === 'Custom' ? PIECES.get(String(clip.props.name)) : undefined;
+  if (!piece) {
+    return null;
+  }
+  const length = clip.durationInFrames / doc.fps;
+  const settled = piece.settles(clip.props, length);
+  return settled + HOLD_S > length ? settled : null;
+}
+
+function unsettledKeys(doc: MotionDoc, clip: Clip): number | null {
+  const cutoff = clip.durationInFrames - HOLD_S * doc.fps;
+  const ends = Object.values(clip.keyframes).flatMap((track) =>
+    (track ?? []).slice(1).flatMap((k, i) => {
+      const prev = track[i];
+      const moving = Number(k.value) !== Number(prev.value);
+      const drift = k.frame - prev.frame >= DRIFT_S * doc.fps;
+      return moving && !drift && prev.frame < cutoff && k.frame > cutoff ? [k.frame / doc.fps] : [];
+    })
+  );
+  return ends.length ? Math.max(...ends) : null;
+}
+
+function cutsMidAnimation(doc: MotionDoc): QualityProblem[] {
+  return doc.tracks.flatMap((t) => t.clips as Clip[]).flatMap((clip) => {
+    const settled = unsettledPiece(doc, clip) ?? unsettledKeys(doc, clip);
+    if (settled === null) {
+      return [];
+    }
+    const need = round(settled + HOLD_S);
+    return [{ kind: Quality.CutMidAnimation, at: seconds(doc, clip.from + clip.durationInFrames), detail: `${clip.id} is cut at ${seconds(doc, clip.from + clip.durationInFrames)}s while it still animates (it settles ${round(settled)}s in): give it at least ${need}s so the last state holds ${HOLD_S}s before the cut` }];
+  });
+}
+
+const BACKDROP_AREA = 0.5;
+const GRADIENTS: ReadonlySet<string> = new Set([FillKind.Linear, FillKind.Radial]);
+const CORNERS = [[0, 0], [1, 0], [0, 1], [1, 1]];
+
+type Box = { x: number; y: number; w: number; h: number };
+
+const COVERS: Partial<Record<ShapeKind, (b: Box) => boolean>> = {
+  [ShapeKind.Ellipse]: (b) => CORNERS.every(([cx, cy]) => ((cx - b.x) / (b.w / 2)) ** 2 + ((cy - b.y) / (b.h / 2)) ** 2 <= 1),
+  [ShapeKind.Circle]: (b) => CORNERS.every(([cx, cy]) => ((cx - b.x) / (b.w / 2)) ** 2 + ((cy - b.y) / (b.h / 2)) ** 2 <= 1)
+};
+
+const boxCovers = (b: Box) => b.x - b.w / 2 <= 0 && b.x + b.w / 2 >= 1 && b.y - b.h / 2 <= 0 && b.y + b.h / 2 >= 1;
+
+function backgroundSeams(doc: MotionDoc): QualityProblem[] {
+  return doc.tracks.flatMap((t) => t.clips as Clip[]).flatMap((clip) => {
+    if (clip.component !== 'Shape' || !GRADIENTS.has(String(clip.props.fillKind))) {
+      return [];
+    }
+    const scale = at(clip, 'scale', clip.durationInFrames - 1, 1);
+    const box = { x: num(clip, 'x', 0.5), y: num(clip, 'y', 0.5), w: num(clip, 'width', 0) * scale, h: num(clip, 'height', 0) * scale };
+    if (box.w * box.h < BACKDROP_AREA) {
+      return [];
+    }
+    const covers = COVERS[clip.props.shape as ShapeKind] ?? boxCovers;
+    if (covers(box)) {
+      return [];
+    }
+    return [{ kind: Quality.BackgroundSeam, at: seconds(doc, clip.from), detail: `${clip.id} is a background gradient that stops inside the frame: its edge shows as a seam. Make it cover the whole frame (a rect at least as large as the frame, an ellipse large enough to clear the corners) or use a flat colour` }];
+  });
+}
+
 export function docProblems(doc: MotionDoc, input: { audioAssets: number; pixels?: Pixels; logos?: readonly string[] }): QualityProblem[] {
   const list = scenes(doc);
   const pixels = input.pixels ?? {};
-  return [...unscripted(doc), ...clickMisses(doc), ...emptyUis(doc), ...stillUis(doc), ...repeated(doc, list), ...smallTitles(doc), ...silent(doc, input.audioAssets), ...softPictures(doc, pixels), ...croppedScreens(doc, pixels), ...alteredLogos(doc, new Set(input.logos ?? [])), ...outOfFrame(doc), ...tiltedText(doc), ...emptyFrames(doc), ...smallLogos(doc, pixels), ...styleProblems(doc).map((p) => ({ kind: Quality.OffStyle, at: p.at, effect: p.effect, detail: p.detail }))];
+  return [...unscripted(doc), ...clickMisses(doc), ...emptyUis(doc), ...stillUis(doc), ...repeated(doc, list), ...smallTitles(doc), ...silent(doc, input.audioAssets), ...softPictures(doc, pixels), ...croppedScreens(doc, pixels), ...alteredLogos(doc, new Set(input.logos ?? [])), ...outOfFrame(doc), ...tiltedText(doc), ...emptyFrames(doc), ...smallLogos(doc, pixels), ...cutsMidAnimation(doc), ...backgroundSeams(doc), ...styleProblems(doc).map((p) => ({ kind: Quality.OffStyle, at: p.at, effect: p.effect, detail: p.detail }))];
 }
 
 export function frameProblems(stats: readonly FrameStat[]): QualityProblem[] {
