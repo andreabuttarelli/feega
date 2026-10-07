@@ -21,13 +21,23 @@ describe('layoutAt', () => {
 			'carousel-3d',
 			'coverflow',
 			'explorer-grid',
+			'film-strip',
+			'globe',
 			'helix',
+			'marquee',
+			'masonry',
 			'media-cloud',
 			'media-ring',
+			'parallax',
+			'perspective-wall',
+			'polaroid',
 			'ring',
+			'split-reveal',
+			'stack',
 			'staggered-grid',
 			'tilted-grid',
-			'vertical-flow'
+			'vertical-flow',
+			'zoom-tunnel'
 		]);
 	});
 });

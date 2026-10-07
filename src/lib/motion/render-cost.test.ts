@@ -103,3 +103,13 @@ describe('what makes a 2D frame heavy', () => {
     expect(first(ringed) / measuredMs).toBeLessThan(1.5);
   });
 });
+
+describe('composition layouts', () => {
+  it('a WebGL composition costs its layout on every frame, a heavier layout more', () => {
+    const base = { ...newMotionDoc(MotionFormat.Vertical), durationInFrames: 30 };
+    const cost = (layout: string) => frameCosts(30, costSpans(ok(addClip(base, { component: 'Composition', from: 0, durationInFrames: 30, props: { layout, media: [] } }, 'c'))))[0];
+
+    expect(cost('globe')).toBeGreaterThan(FLAT_FRAME_MS);
+    expect(cost('masonry')).toBeGreaterThan(cost('globe'));
+  });
+});

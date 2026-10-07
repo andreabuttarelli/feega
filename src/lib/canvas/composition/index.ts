@@ -1,4 +1,17 @@
 import * as bento from './bento';
+import type { CameraState } from './camera';
+import * as filmStrip from './film-strip';
+import * as globe from './globe';
+import { withFrame } from './loop';
+import * as marquee from './marquee';
+import * as masonry from './masonry';
+import type { Motion } from './motion';
+import * as parallax from './parallax';
+import * as perspectiveWall from './perspective-wall';
+import * as polaroid from './polaroid';
+import * as splitReveal from './split-reveal';
+import * as stack from './stack';
+import * as zoomTunnel from './zoom-tunnel';
 import * as carousel3d from './carousel-3d';
 import * as coverflow from './coverflow';
 import * as explorerGrid from './explorer-grid';
@@ -14,9 +27,10 @@ import type { LayoutId, LayoutParam, LayoutParams, Transform } from './types';
 type LayoutDefinition = {
 	label: string;
 	description: string;
-	motion: 'cycle' | 'ping-pong';
+	motion: Motion;
 	camera: 'fixed' | 'selected';
 	params: LayoutParam[];
+	fit?: (params: LayoutParams, camera: CameraState, aspect: number) => LayoutParams;
 	instances: (mediaCount: number, params: LayoutParams) => number;
 	transforms: (count: number, params: LayoutParams, t: number) => Transform[];
 };
@@ -74,6 +88,7 @@ export const LAYOUTS: Record<LayoutId, LayoutDefinition> = {
 		motion: 'cycle',
 		camera: 'fixed',
 		params: explorerGrid.params,
+		fit: (values, camera, aspect) => explorerGrid.fitViewport(values, camera, aspect).params,
 		instances: explorerGrid.instanceCount,
 		transforms: explorerGrid.transforms
 	},
@@ -122,6 +137,100 @@ export const LAYOUTS: Record<LayoutId, LayoutDefinition> = {
 		params: bento.params,
 		instances: (mediaCount) => mediaCount,
 		transforms: (count, values) => bento.transforms(count, values)
+	},
+	marquee: {
+		label: 'Marquee',
+		description: 'Endless rows of cards gliding in alternate directions, each row at its own pace.',
+		motion: 'linear',
+		camera: 'fixed',
+		params: marquee.params,
+		fit: withFrame,
+		instances: marquee.instances,
+		transforms: marquee.transforms
+	},
+	stack: {
+		label: 'Card stack',
+		description: 'A pile of cards; the front one slides away and the next comes forward.',
+		motion: 'linear',
+		camera: 'fixed',
+		params: stack.params,
+		instances: stack.instances,
+		transforms: stack.transforms
+	},
+	parallax: {
+		label: 'Parallax layers',
+		description: 'Media on planes at different depths, with a slow camera drift.',
+		motion: 'linear',
+		camera: 'fixed',
+		params: parallax.params,
+		fit: withFrame,
+		instances: parallax.instances,
+		transforms: parallax.transforms
+	},
+	'perspective-wall': {
+		label: 'Perspective wall',
+		description: 'A wall of media receding in perspective, panning slowly.',
+		motion: 'linear',
+		camera: 'fixed',
+		params: perspectiveWall.params,
+		instances: perspectiveWall.instances,
+		transforms: perspectiveWall.transforms
+	},
+	'film-strip': {
+		label: 'Film strip',
+		description: 'A strip of cards that steps along, one card in focus at a time.',
+		motion: 'linear',
+		camera: 'fixed',
+		params: filmStrip.params,
+		instances: filmStrip.instances,
+		transforms: filmStrip.transforms
+	},
+	'split-reveal': {
+		label: 'Split reveal',
+		description: 'Panels side by side that part up and down to reveal the next set.',
+		motion: 'linear',
+		camera: 'fixed',
+		params: splitReveal.params,
+		fit: withFrame,
+		instances: splitReveal.instances,
+		transforms: splitReveal.transforms
+	},
+	'zoom-tunnel': {
+		label: 'Zoom tunnel',
+		description: 'A continuous fly-through: each card grows past the frame and the next takes its place.',
+		motion: 'linear',
+		camera: 'fixed',
+		params: zoomTunnel.params,
+		instances: zoomTunnel.instances,
+		transforms: zoomTunnel.transforms
+	},
+	polaroid: {
+		label: 'Polaroid pile',
+		description: 'Slightly turned cards that settle on a pile one after another.',
+		motion: 'linear',
+		camera: 'fixed',
+		params: polaroid.params,
+		instances: polaroid.instances,
+		transforms: polaroid.transforms
+	},
+	globe: {
+		label: 'Globe',
+		description: 'Media on the surface of a sphere that turns slowly.',
+		motion: 'linear',
+		camera: 'fixed',
+		params: globe.params,
+		instances: globe.instances,
+		transforms: globe.transforms
+	},
+	masonry: {
+		label: 'Masonry scroll',
+		description: 'Masonry columns of different widths scrolling at different speeds.',
+		motion: 'linear',
+		camera: 'fixed',
+		params: masonry.params,
+		fit: withFrame,
+		instances: masonry.instances,
+		transforms: masonry.transforms
 	}
 };
 

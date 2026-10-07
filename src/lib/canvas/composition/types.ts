@@ -18,7 +18,17 @@ export type LayoutId =
 	| 'vertical-flow'
 	| 'coverflow'
 	| 'ring'
-	| 'bento';
+	| 'bento'
+	| 'marquee'
+	| 'stack'
+	| 'parallax'
+	| 'perspective-wall'
+	| 'film-strip'
+	| 'split-reveal'
+	| 'zoom-tunnel'
+	| 'polaroid'
+	| 'globe'
+	| 'masonry';
 
 export type LayoutParam =
 	| { name: string; label: string; kind: 'range'; min: number; max: number; step: number; default: number }
