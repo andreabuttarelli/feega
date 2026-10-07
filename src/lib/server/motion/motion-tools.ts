@@ -36,7 +36,7 @@ import { addMorphReel } from '$lib/motion/ui-morph/ops';
 import { STORY_BEATS, STORY_SHARE, markStory } from '$lib/motion/story';
 import { anchorsOf } from '$lib/motion/clicks';
 import { clickUi } from '$lib/motion/cursor-ops';
-import { ACTS, briefOf, scriptProblems, scriptSchema, sourcesOf } from '$lib/motion/script';
+import { ACTS, BrandKind, briefOf, scriptProblems, scriptSchema, sourcesOf, type LaunchScript } from '$lib/motion/script';
 import { quoted, type SitePage } from './site-copy';
 import { PATCH_COMPONENT, READ_COMPONENT, WRITE_COMPONENT } from './model-route';
 import { CAMERA, CAMERA_KEYS, CAMERA_LANE, SPACES, type Camera } from '$lib/motion/camera';
@@ -363,6 +363,16 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     const pages = (read as { site?: { pages?: SitePage[] } }).site?.pages ?? [];
     sitePages.push(...pages);
     return read;
+  };
+
+  const SOURCING: Record<BrandKind, (script: LaunchScript) => { unread: boolean; problems: string[] }> = {
+    [BrandKind.Real]: (script) => ({
+      unread: !sitePages.length,
+      problems: sourcesOf(script)
+        .filter((s) => !quoted(sitePages, s))
+        .map((s) => `"${s.quote}" is not on ${s.url}: quote the page word for word or drop the claim`)
+    }),
+    [BrandKind.Fictional]: () => ({ unread: false, problems: [] })
   };
 
   const readLogos = (read: SourceRead) => {
@@ -1344,7 +1354,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     write_script: tool({
-      description: `Save the research and the four-act script of a launch film before building it; the video is not built until this passes. Research: who it serves, the concrete problem, the struggle as an everyday scene, how the product works step by step (input → what happens → result), 1–3 benefits and up to 4 numbers or results, the tone, the promise. Every benefit, number, promise and proof cites its source: the url of a page analyze_site read and a quote copied from that page; a claim without a source on the site is refused, so never invent one. Acts ${ACTS.join(', ')} in order: problem shows the "before" UI, cluttered or slow, with realistic data; solution shows the product's real flow with specific content; proof shows a number or result from the site; claim puts the site's own promise on screen. The turn ends there: the user reads the brief in the chat, then says go or corrects it.`,
+      description: `Save the research and the four-act script of a launch film before building it; the video is not built until this passes. Research: who it serves, the concrete problem, the struggle as an everyday scene, how the product works step by step (input → what happens → result), 1–3 benefits and up to 4 numbers or results, the tone, the promise. Every benefit, number, promise and proof cites its source: the url of a page analyze_site read and a quote copied from that page; a claim without a source on the site is refused, so never invent one. Acts ${ACTS.join(', ')} in order: problem shows the "before" UI, cluttered or slow, with realistic data; solution shows the product's real flow with specific content; proof shows a number or result from the site; claim puts the site's own promise on screen. For an invented demo brand (no real site), set brand: fictional: no site is read and sources are the brand's own copy; the brief says it is fictional. Never use it for a real brand. The turn ends there: the user reads the brief in the chat, then says go or corrects it.`,
       inputSchema: scriptSchema,
       execute: async (raw) => {
         const parsed = scriptSchema.safeParse(raw);
@@ -1352,11 +1362,11 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
           return { ok: false, error: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ') };
         }
         const input = parsed.data;
-        if (!sitePages.length) {
+        const sourcing = SOURCING[input.brand](input);
+        if (sourcing.unread) {
           return { ok: false, error: 'read the site first: analyze_site gives the pages and quotes every claim must come from' };
         }
-        const unsourced = sourcesOf(input).filter((s) => !quoted(sitePages, s));
-        const problems = [...scriptProblems(input), ...unsourced.map((s) => `"${s.quote}" is not on ${s.url}: quote the page word for word or drop the claim`)];
+        const problems = [...scriptProblems(input), ...sourcing.problems];
         if (problems.length) {
           return { ok: false, error: problems.join('; ') };
         }
