@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { BRIEF_AUTO_GO_S, GO_MESSAGE, briefAwaits, pendingBrief, savedBrief } from './script-brief';
+import { BRIEF_AUTO_GO_S, GO_MESSAGE, briefAwaits, pendingBrief, promptTexts, savedBrief } from './script-brief';
+import { MotionFormat, newMotionDoc } from './doc';
 
 const written = { toolName: 'write_script', status: 'done' as const, output: { ok: true, brief: '**Research**\n- For: makers' } };
 const refused = { toolName: 'write_script', status: 'done' as const, output: { ok: false, error: 'read the site first' } };
@@ -39,3 +40,13 @@ describe('script brief', () => {
     expect(BRIEF_AUTO_GO_S).toBeLessThanOrEqual(15);
   });
 });
+
+describe('screening the go message', () => {
+  it('screens the go together with the script it builds: alone it reads as a script nobody can see', () => {
+    const doc = { ...newMotionDoc(MotionFormat.Landscape), script: { research: { promise: { text: 'Every site you run.' } }, acts: [] } } as unknown as Parameters<typeof promptTexts>[1];
+
+    expect(promptTexts(GO_MESSAGE, newMotionDoc(MotionFormat.Landscape))).toEqual([GO_MESSAGE]);
+    expect(promptTexts(GO_MESSAGE, doc)).toHaveLength(2);
+  });
+});
+

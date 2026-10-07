@@ -1,3 +1,5 @@
+import type { MotionDoc } from './doc';
+
 export const WRITE_SCRIPT = 'write_script';
 export const BRIEF_AUTO_GO_S = 8;
 export const GO_MESSAGE = 'Go: build the video from this script.';
@@ -28,3 +30,5 @@ export function pendingBrief(messages: readonly Message[]): string | null {
 export function briefAwaits(steps: readonly Step[]): boolean {
   return (steps.at(-1)?.content ?? []).some((p) => p.type === TOOL_RESULT && savedBrief({ toolName: p.toolName ?? '', output: p.output }) !== null);
 }
+
+export const promptTexts = (message: string, doc: Pick<MotionDoc, 'script'>): string[] => (doc.script ? [message, JSON.stringify(doc.script)] : [message]);
