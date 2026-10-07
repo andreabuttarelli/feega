@@ -3,6 +3,7 @@ import { Ease, FPS, TransitionKind, type Edge } from './design';
 import { MotionFormat, newMotionDoc, parseMotionDoc, type MotionDoc } from './doc';
 import type { EaseSpec, KeyValue, Transform } from './keyframes';
 import type { MaskInput } from './mask';
+import type { FontFace } from './fonts/model';
 import { addClip } from './timeline';
 
 export const s = (seconds: number) => Math.round(seconds * FPS);
@@ -33,8 +34,8 @@ function keyframesOf(keys: Record<string, Key[]> = {}) {
   return Object.fromEntries(Object.entries(keys).map(([prop, track]) => [prop, track.map(([at, value, ease]) => ({ frame: s(at), value, ease: ease ?? Ease.Standard }))]));
 }
 
-export function assemble(input: { format: MotionFormat; seconds: number; tracks: TrackSpec[]; beats: (Beat | null)[] }): MotionDoc {
-  let doc: MotionDoc = { ...newMotionDoc(input.format), durationInFrames: s(input.seconds), tracks: input.tracks.map((t) => ({ ...t, clips: [] })) };
+export function assemble(input: { format: MotionFormat; seconds: number; tracks: TrackSpec[]; beats: (Beat | null)[]; fonts?: FontFace[] }): MotionDoc {
+  let doc: MotionDoc = { ...newMotionDoc(input.format), durationInFrames: s(input.seconds), tracks: input.tracks.map((t) => ({ ...t, clips: [] })), fonts: input.fonts ?? [] };
 
   for (const beat of input.beats) {
     if (!beat) {
