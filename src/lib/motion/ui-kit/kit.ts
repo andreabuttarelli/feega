@@ -134,15 +134,23 @@ cursor.innerHTML = '<svg viewBox="0 0 24 24" width="40" height="40"><path d="M4 
 const TYPE_AT = 0.2;
 const TYPE_LEN = Math.min(1.6, duration * 0.35);
 const CLICK = TYPE_AT + TYPE_LEN + 0.45;
+const CURSOR_TRAVEL = 0.6;
+const CURSOR_FROM = { x: 170, y: 230 };
+const CURSOR_TIP = { x: 40 * 4 / 24, y: 40 * 2 / 24 };
+const CURSOR_STIFFNESS = 13;
+const settle = (s) => 1 - (1 + CURSOR_STIFFNESS * s) * Math.exp(-CURSOR_STIFFNESS * s);
+cursor.style.transformOrigin = CURSOR_TIP.x + 'px ' + CURSOR_TIP.y + 'px';
 drive((t) => {
   const typing = span(t, TYPE_AT, TYPE_LEN);
   typed.textContent = url.slice(0, Math.round(url.length * typing));
   caret.style.opacity = typing < 1 || Math.floor(t * 2.5) % 2 === 0 ? '1' : '0';
-  const travel = inOut(span(t, CLICK - 0.55, 0.5));
-  cursor.style.left = (1080 - 140 * travel) + 'px';
-  cursor.style.top = (300 - 240 * travel + 14) + 'px';
-  cursor.style.opacity = String(span(t, CLICK - 0.7, 0.15));
+  const aim = { x: btn.offsetLeft + btn.offsetWidth * 0.5, y: btn.offsetTop + btn.offsetHeight * 0.55 };
+  const travel = settle(Math.max(0, t - (CLICK - CURSOR_TRAVEL) / speed) * speed);
   const press = span(t, CLICK, 0.08) - span(t, CLICK + 0.08, 0.12);
+  cursor.style.left = (aim.x - CURSOR_TIP.x + CURSOR_FROM.x * (1 - travel)) + 'px';
+  cursor.style.top = (aim.y - CURSOR_TIP.y + CURSOR_FROM.y * (1 - travel)) + 'px';
+  cursor.style.opacity = String(span(t, CLICK - CURSOR_TRAVEL - 0.1, 0.15));
+  cursor.style.transform = 'scale(' + (1 - 0.14 * press) + ')';
   btn.style.transform = 'scale(' + (1 - 0.06 * press) + ')';
   const shown = out(span(t, CLICK + 0.1, 0.4));
   result.style.opacity = String(shown);
