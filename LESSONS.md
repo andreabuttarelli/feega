@@ -76,6 +76,17 @@ run fallito dopo ~1 minuto con quell'errore, mentre il job locale continua a scr
 Mossa: il prefisso entra in `OWN_RECONCILER_PREFIXES` nello stesso commit; per una prova prima del
 merge, seguire il job dai params (`end`), non da `status`.
 
+### `Sandbox.list` con `namePrefix` risponde 400 senza `sortBy: 'name'`
+`vercelFarm().running()` chiedeva le sandbox vive per prefisso e l'API rifiutava ogni chiamata
+(`namePrefix is only valid when sortBy is name`): chi elenca i worker per spegnere gli orfani non
+ne vedeva nessuno. Segnale: `APIError 400` alla lista, sandbox che restano accese. Mossa:
+`sortBy: 'name'` accanto a `namePrefix`.
+
+### Una prova in dev non renderizza sul farm
+Ogni prova di un job Deep sul farm costa sandbox vere: in pochi giorni di test ~50 $. In dev gli
+stills del critico si fanno sulla macchina (`local-stills.ts`, `npx hyperframes render` + ffmpeg,
+~25 s per 15 s di video), lo stesso motore del farm; il farm resta per il deploy (`stillsEngine`).
+
 ### Il render `whole` del farm ignora la risoluzione scelta
 `chunkSpec` per la rotta whole non passa `width`/`height` al producer: un html composto con
 `scale < 1` (720p su un doc 1080) viene catturato a viewport piena e il contenuto occupa solo

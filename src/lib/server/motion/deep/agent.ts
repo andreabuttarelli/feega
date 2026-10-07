@@ -20,9 +20,11 @@ import { Vision, VIEW_FRAMES, type Frame } from '$lib/server/motion/frames';
 import { awaitTask, FarmTask, launchStills, readStills, TaskState } from '$lib/server/motion/farm-render';
 import { farmJob } from '$lib/server/motion/render-run';
 import { motionRenderFarm } from '$lib/server/motion/renderer';
+import { localStills, machinePorts } from '$lib/server/motion/local-stills';
+import { dev } from '$app/environment';
 import { RENDER_CALL_LABEL, Resolution, sandboxCostUsd } from '$lib/motion/render-quote';
 import { ExportFormat, Quality } from '$lib/motion/export-formats';
-import { Quality, docProblems, frameProblems } from '$lib/motion/direction';
+import { Quality as Defect, docProblems, frameProblems } from '$lib/motion/direction';
 import { STYLES, styleOf } from '$lib/motion/style';
 import { AssetKind } from '$lib/motion/components';
 import type { CanvasNodeRecord } from '$lib/server/repos/canvas';
@@ -30,7 +32,7 @@ import type { MotionNode } from '$lib/canvas/motion-node';
 import type { DeepPorts, DeepState } from './loop';
 import { critiquePrompt, critiqueTimes, parseVerdict, sampleTimes, stillSpans } from './critic';
 import { ASSET_TOOLS, BUILD_NOTE, DIRECTOR_TOOLS, assetsPrompt, buildPrompt, directorSystem, summaryPrompt } from './prompts';
-import { DEEP_BUILD_STEPS, DEEP_RESERVE_MS } from './limits';
+import { DEEP_BUILD_STEPS, DEEP_RESERVE_MS, Runtime, StillsEngine, stillsEngine } from './limits';
 
 export const DEEP_AGENT_KEY = 'motion-deep';
 const DIRECTOR_STEPS = 10;
@@ -156,17 +158,20 @@ export async function deepPorts(ctx: DeepContext, hooks: DeepHooks): Promise<Dee
       return result.text;
     });
 
-  const renderFrames = async (): Promise<Frame[]> => {
+  const stillsJob = async () => {
+    const signed = await motionAssets({ db, orgId, projectId: project.id, canvasId: motion.record.canvasId }, SIGNED_URL_TTL_S.render);
+    const soundIds = signed.filter((a) => a.kind === AssetKind.Audio).map((a) => a.id);
+    const analyses = await analyzeSounds(storageAnalysis(db), { orgId, projectId: project.id }, signed, soundIds);
+    return farmJob({ doc: session.doc, tokens, assets: assetUrls(signed), analyses }, { format: ExportFormat.Mp4H264, fps: session.doc.fps, quality: Quality.Standard, resolution: UNSCALED });
+  };
+
+  const farmFrames = async (): Promise<Frame[]> => {
     const farm = motionRenderFarm();
     if (!farm) {
       throw new Error('rendering is not configured here');
     }
-    const signed = await motionAssets({ db, orgId, projectId: project.id, canvasId: motion.record.canvasId }, SIGNED_URL_TTL_S.render);
-    const soundIds = signed.filter((a) => a.kind === AssetKind.Audio).map((a) => a.id);
-    const analyses = await analyzeSounds(storageAnalysis(db), { orgId, projectId: project.id }, signed, soundIds);
-    const job = farmJob({ doc: session.doc, tokens, assets: assetUrls(signed), analyses }, { format: ExportFormat.Mp4H264, fps: session.doc.fps, quality: Quality.Standard, resolution: UNSCALED });
     const times = sampleTimes(session.doc);
-    const name = await launchStills(farm, job, times);
+    const name = await launchStills(farm, await stillsJob(), times);
     const check = await awaitTask(farm, name, FarmTask.Stills, STILLS_WAIT);
     const frames = check.state === TaskState.Done ? await readStills(farm, name, times) : null;
     const usage = await farm.usage(name).catch(() => null);
@@ -180,6 +185,11 @@ export async function deepPorts(ctx: DeepContext, hooks: DeepHooks): Promise<Dee
     return frames;
   };
 
+  const machineFrames = async (): Promise<Frame[]> => localStills(machinePorts)(await stillsJob(), sampleTimes(session.doc));
+
+  const STILLS: Record<StillsEngine, () => Promise<Frame[]>> = { [StillsEngine.Farm]: farmFrames, [StillsEngine.Machine]: machineFrames };
+  const renderFrames = STILLS[stillsEngine(dev ? Runtime.Dev : Runtime.Deployed)];
+
   const critique = async (input: { storyboard: string; frames: Frame[] }) => {
     const seconds = session.doc.durationInFrames / session.doc.fps;
     const shownTimes = critiqueTimes(session.doc, input.frames.map((f) => f.time));
@@ -187,7 +197,7 @@ export async function deepPorts(ctx: DeepContext, hooks: DeepHooks): Promise<Dee
     const signed = await Promise.all(input.frames.map(async (f) => ({ time: f.time, signature: await signature(f.bytes) })));
     const stills = stillSpans(signed, seconds).map((s) => `nothing moves from ${s.from}s to ${s.to}s: give the picture a slow push-in or pan, or cut sooner`);
     const audioAssets = assets.filter((a) => a.kind === AssetKind.Audio).length;
-    const objective = [...docProblems(session.doc, { audioAssets }), ...frameProblems(await frameStats(shown)).filter((p) => p.kind !== Quality.WhiteArea)].map((p) => p.detail).concat(stills);
+    const objective = [...docProblems(session.doc, { audioAssets }), ...frameProblems(await frameStats(shown)).filter((p) => p.kind !== Defect.WhiteArea)].map((p) => p.detail).concat(stills);
     const text = critiquePrompt({ storyboard: input.storyboard, times: shown.map((f) => f.time), objective, styleRules: style.rules });
     const content = [{ type: 'text' as const, text }, ...shown.map((f) => ({ type: 'file' as const, mediaType: 'image/jpeg', data: f.bytes }))];
     const answer = await call({ messages: [{ role: 'user', content }], effort: Effort.High, steps: 1, label: 'critique' });

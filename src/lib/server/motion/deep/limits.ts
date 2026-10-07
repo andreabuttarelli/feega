@@ -21,3 +21,17 @@ export const DEEP_PHASE_MS: Record<DeepPhase, number> = {
 };
 
 export const DEEP_ROUNDS = { min: DEEP_ITERATIONS.min, max: DEEP_ITERATIONS.max };
+
+export enum StillsEngine {
+  Farm = 'farm',
+  Machine = 'machine'
+}
+
+export enum Runtime {
+  Dev = 'dev',
+  Deployed = 'deployed'
+}
+
+const ENGINE_OF: Record<Runtime, StillsEngine> = { [Runtime.Dev]: StillsEngine.Machine, [Runtime.Deployed]: StillsEngine.Farm };
+
+export const stillsEngine = (runtime: Runtime) => ENGINE_OF[runtime];
