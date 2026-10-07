@@ -13,9 +13,25 @@ export type CutProblem = { fault: CutFault; frame: number; detail: string };
 type Clip = MotionDoc['tracks'][number]['clips'][number];
 
 const HOLD_S = 1;
-const DRIFT_S = 2;
 const EDGE_FRAMES = 1;
 const LOOKAHEAD_S = 4;
+
+const DRIFT_SECONDS = 2;
+
+const DRIFT_RATE: Readonly<Record<string, number>> = {
+  scale: 0.05,
+  scaleX: 0.05,
+  scaleY: 0.05,
+  dolly: 0.08,
+  zoom: 0.08,
+  x: 0.03,
+  y: 0.03,
+  rotate: 6,
+  orbit: 12,
+  objectRotateX: 12,
+  objectRotateY: 12,
+  objectRotateZ: 12
+};
 
 const PIECES = new Map(Object.values(UI_KIT).map((p) => [p.name, p]));
 
@@ -32,11 +48,13 @@ function pieceSettle(doc: MotionDoc, clip: Clip): number {
 
 type Moves = { settle: number; past: number[] };
 
+const drifts = (prop: string, change: number, seconds: number) => seconds >= DRIFT_SECONDS || (prop in DRIFT_RATE && seconds > 0 && Math.abs(change) / seconds <= DRIFT_RATE[prop]);
+
 function keyMoves(doc: MotionDoc, clip: Clip, cut: number): Moves {
   const hold = HOLD_S * doc.fps;
-  const segments = Object.values(clip.keyframes).flatMap((track) => (track ?? []).slice(1).map((k, i) => ({ from: track[i].frame, to: k.frame, landed: i > 0, moves: Number(k.value) !== Number(track[i].value) })));
+  const segments = Object.entries(clip.keyframes).flatMap(([prop, track]) => (track ?? []).slice(1).map((k, i) => ({ from: track[i].frame, to: k.frame, landed: i > 0, moves: Number(k.value) !== Number(track[i].value), drifts: drifts(prop, Number(k.value) - Number(track[i].value), (k.frame - track[i].frame) / doc.fps) })));
   const exit = (s: { from: number; to: number; landed: boolean }) => s.landed && s.from >= cut - hold && s.to >= cut - EDGE_FRAMES;
-  const counted = segments.filter((s) => s.moves && s.to - s.from < DRIFT_S * doc.fps && !exit(s));
+  const counted = segments.filter((s) => s.moves && !s.drifts && !exit(s));
   return { settle: Math.max(0, ...counted.filter((s) => s.to <= cut).map((s) => s.to)), past: counted.filter((s) => s.to > cut).map((s) => s.to) };
 }
 

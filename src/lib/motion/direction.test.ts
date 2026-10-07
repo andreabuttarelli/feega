@@ -329,6 +329,14 @@ describe('a cut waits for the scene to finish', () => {
     expect([...cuts(keyed(drift)), ...held(keyed(drift)), ...cuts(keyed(exit)), ...held(keyed(exit))]).toEqual([]);
   });
 
+  it('a slow camera drift is never an animation to hold, however short; a fast move of the same length is', () => {
+    const drift = { dolly: [{ frame: 0, value: 1, ease: Ease.Linear }, { frame: 36, value: 1, ease: Ease.Linear }, { frame: 90, value: 1.04, ease: Ease.Linear }] };
+    const push = { scale: [{ frame: 0, value: 1, ease: Ease.Linear }, { frame: 36, value: 1, ease: Ease.Linear }, { frame: 90, value: 1.6, ease: Ease.Linear }] };
+
+    expect([...cuts(keyed(drift)), ...held(keyed(drift))]).toEqual([]);
+    expect([...cuts(keyed(push)), ...held(keyed(push))].length).toBeGreaterThan(0);
+  });
+
   it('a transition out starts the cut: a move still running when it begins is cut mid-animation', () => {
     const early = { scale: [{ frame: 0, value: 1, ease: Ease.Linear }, { frame: 10, value: 1, ease: Ease.Linear }, { frame: 60, value: 1.3, ease: Ease.Linear }] };
     const doc = must(setTransition(keyed(early), 'c', Side.Out, { kind: TransitionKind.Fade, durationInFrames: 40 }));
