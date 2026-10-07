@@ -213,14 +213,16 @@ const CLIP_CHECKS: Partial<Record<Forbidden, ClipCheck>> = {
 
 const beatFrames = (doc: MotionDoc) => (doc.markers ?? []).filter((m) => BEAT_LABEL.test(m.label)).map((m) => m.frame);
 
+const halfBeats = (beats: readonly number[]) => beats.flatMap((b, i) => (i + 1 < beats.length ? [b, (b + beats[i + 1]) / 2] : [b]));
+
 function offBeat(doc: MotionDoc): Found[] {
-  const beats = beatFrames(doc);
+  const beats = halfBeats(beatFrames(doc));
   if (beats.length < 2) {
     return [];
   }
   const cuts = timelines(doc)[0].filter((c) => c.from > 0 && COMPONENTS[c.component].track === TrackKind.Visual);
   const missed = cuts.find((c) => Math.min(...beats.map((b) => Math.abs(b - c.from))) > BEAT_TOLERANCE_FRAMES);
-  return missed ? [{ clip: missed, at: missed.from, detail: `${missed.id} cuts in off the beat: move it onto a beat marker (cut_to_beat or move_clip to "beat N")` }] : [];
+  return missed ? [{ clip: missed, at: missed.from, detail: `${missed.id} cuts in off the beat: move it onto a beat or half beat (cut_to_beat or move_clip to "beat N")` }] : [];
 }
 
 const peakOf = (clip: Clip) => Object.entries(PEAK_TRAVEL).some(([prop, size]) => travel(clip.keyframes[prop] ?? []) >= size);

@@ -148,11 +148,17 @@ describe('the launch film style', () => {
   });
 
   it('names a cut that misses the beat once the beats are marked, not one that lands on it', () => {
-    const offBeat = withClip(withClip(beatMarkers(film(), 0.5), 'a', 'Title', { keyframes: rise }), 'b', 'Title', { keyframes: rise }, at(3.2));
+    const offBeat = withClip(withClip(beatMarkers(film(), 0.5), 'a', 'Title', { keyframes: rise }), 'b', 'Title', { keyframes: rise }, at(3.13));
     const onBeat = withClip(withClip(beatMarkers(film(), 0.5), 'a', 'Title', { keyframes: rise }), 'b', 'Title', { keyframes: rise }, at(3));
 
     expect(effects(offBeat)).toContain(Forbidden.OffBeat);
     expect(effects(onBeat)).not.toContain(Forbidden.OffBeat);
+  });
+
+  it('a cut on a half beat is on the music too', () => {
+    const half = withClip(withClip(beatMarkers(film(), 0.5), 'a', 'Title', { keyframes: rise }), 'b', 'Title', { keyframes: rise }, at(3.25));
+
+    expect(effects(half)).not.toContain(Forbidden.OffBeat);
   });
 
   it('names a video of six seconds or more with no peak, and finds the peak in a big 3D move', () => {
