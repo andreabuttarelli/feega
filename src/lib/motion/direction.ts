@@ -106,7 +106,7 @@ function largestZoom(clip: Clip): number {
   return num(clip, 'scale', 1) * peak('scale', clip.transform?.scale ?? 1) * peak('zoom', num(clip, 'zoom', 1));
 }
 
-function softPictures(doc: MotionDoc, pixels: Pixels): QualityProblem[] {
+export function softPictures(doc: MotionDoc, pixels: Pixels): QualityProblem[] {
   return everyClip(doc).flatMap((clip) => {
     const source = clip.component === 'Image' ? pixels[String(clip.props.assetId)] : undefined;
     if (!source) {

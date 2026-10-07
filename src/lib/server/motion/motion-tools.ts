@@ -27,7 +27,7 @@ import { EASE_PRESETS, EASE_PRESET_IDS, easeHandles, withHandles } from '$lib/mo
 import { ANIMATABLE, INTERPS, Interp, SPATIAL_KEYS, TRANSFORM_KEYS, ValueKind, easeSchema, type Keyframe } from '$lib/motion/keyframes';
 import type { MotionAsset } from './editor';
 import { MAX_FRAMES_PER_VIEW, MAX_VIEWS_PER_TURN, VIEW_FRAMES, type Frame } from './frames';
-import { docProblems, frameProblems, type FrameStat } from '$lib/motion/direction';
+import { docProblems, frameProblems, softPictures, type FrameStat, type Pixels } from '$lib/motion/direction';
 import { CheckState, MAX_CSS, MAX_HTML, MAX_JS, SOURCE_FILES, checkState, propsSchemaSchema, sourceHash, type CustomComponent } from '$lib/motion/custom/component';
 import { patchComponent, recordCheck, removeComponent, writeComponent } from '$lib/motion/custom/ops';
 import { UI_KINDS, UI_KIT } from '$lib/motion/ui-kit/kit';
@@ -339,9 +339,21 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     return read;
   };
 
+  const assetPixels = (): Pixels => Object.fromEntries(deps.assets.flatMap((a) => (a.width && a.height ? [[a.id, { width: a.width, height: a.height }]] : [])));
+
+  const newlySoft = (doc: MotionDoc) => {
+    const pixels = assetPixels();
+    const already = new Set(softPictures(session.doc, pixels).map((p) => p.detail));
+    return softPictures(doc, pixels).filter((p) => !already.has(p.detail));
+  };
+
   const apply = (result: OpResult, what: string) => {
     if (!result.ok) {
       return { ok: false, error: explained(session.doc, result.error) };
+    }
+    const blownUp = newlySoft(result.doc);
+    if (blownUp.length) {
+      return { ok: false, error: blownUp.map((p) => p.detail).join('; ') };
     }
     session.doc = result.doc;
     session.edits.push(what);
@@ -1428,7 +1440,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         session.checkedAt = session.edits.length;
         const stats = deps.inspect ? await deps.inspect(frames) : [];
         const audioAssets = deps.assets.filter((a) => a.kind === AssetKind.Audio).length;
-        const pixels = Object.fromEntries(deps.assets.flatMap((a) => (a.width && a.height ? [[a.id, { width: a.width, height: a.height }]] : [])));
+        const pixels = assetPixels();
         const quality = [...docProblems(session.doc, { audioAssets, pixels, logos: [...brandLogos] }), ...frameProblems(stats)].map((p) => p.detail);
         return { ok: true, times: frames.map((f) => f.time), quality, note: quality.length ? 'The quality gate found the problems in quality: fix each one, then look again. The frames follow as images in the next message.' : 'The frames follow as images in the next message.' };
       }
