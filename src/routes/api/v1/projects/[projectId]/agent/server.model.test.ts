@@ -64,7 +64,7 @@ vi.mock('$lib/server/ai-log', () => ({
 }));
 vi.mock('$lib/server/cli-auth', () => ({ gateAiAction: async () => null, gateOrgAiAction: async () => null }));
 vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: async () => [] }));
-vi.mock('$lib/server/repos/canvas', () => ({ listCanvases: async () => [] }));
+vi.mock('$lib/server/repos/canvas', async (importOriginal) => ({ ...(await importOriginal<typeof import('$lib/server/repos/canvas')>()), listCanvases: async () => [] }));
 vi.mock('$lib/server/projects/lookup', () => ({
   findReachableProject: async () => ({ orgId: 'org-1', project: { id: 'p-1', name: 'P', brandId: null } })
 }));
@@ -86,7 +86,7 @@ function postEvent(body: Record<string, unknown>) {
     body: JSON.stringify({ message: 'hi', ...body })
   });
   const locals = { safeGetSession: async () => ({ session: { access_token: 'tok' }, user: { id: 'u-1' } }), db: async () => ({}) };
-  return { request, params: { projectId: 'p-1' }, locals } as unknown as Parameters<typeof POST>[0];
+  return { request, url: new URL(request.url), params: { projectId: 'p-1' }, locals } as unknown as Parameters<typeof POST>[0];
 }
 
 async function settled(res: Response) {

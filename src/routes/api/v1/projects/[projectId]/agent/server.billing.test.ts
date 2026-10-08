@@ -42,7 +42,7 @@ vi.mock('$lib/server/chat-model/catalogue', async (importOriginal) => ({
 vi.mock('$lib/server/moderation/model-input', () => ({ screenModelInput: async () => ({ ok: true }) }));
 vi.mock('$lib/server/cli-auth', () => ({ gateAiAction: async () => null, gateOrgAiAction: async () => null }));
 vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: async () => [] }));
-vi.mock('$lib/server/repos/canvas', () => ({ listCanvases: async () => [] }));
+vi.mock('$lib/server/repos/canvas', async (importOriginal) => ({ ...(await importOriginal<typeof import('$lib/server/repos/canvas')>()), listCanvases: async () => [] }));
 vi.mock('$lib/server/projects/lookup', () => ({
   findReachableProject: async () => ({ orgId: 'org-1', project: { id: 'p-1', name: 'P', brandId: null } })
 }));
@@ -61,7 +61,7 @@ describe('the project agent bills the gateway invoice', () => {
   it('the cost the gateway reported during the turn reaches the log row, reasoning included', async () => {
     const request = new Request('http://x', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ message: 'hi' }) });
     const locals = { safeGetSession: async () => ({ session: { access_token: 't' }, user: { id: 'u-1' } }), db: async () => ({}) };
-    const res = await POST({ request, params: { projectId: 'p-1' }, locals } as unknown as Parameters<typeof POST>[0]);
+    const res = await POST({ request, url: new URL(request.url), params: { projectId: 'p-1' }, locals } as unknown as Parameters<typeof POST>[0]);
     await res.text();
     for (let i = 0; i < 50 && !seen.invoice.length; i++) {
       await new Promise((r) => setTimeout(r, 10));

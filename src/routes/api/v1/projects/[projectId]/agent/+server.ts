@@ -13,6 +13,7 @@ import { finishedTurn } from '$lib/server/project-agent/finished-turn';
 import { openReply, ReplyStatus } from '$lib/server/repos/chat-reply';
 import { agentActor, SIDEBAR_AGENT_KEY } from '$lib/server/repos/actor';
 import { createProjectTools } from '$lib/server/project-agent/project-tools';
+import { createMotionDelegation } from '$lib/server/project-agent/motion-delegation';
 import { openAgentTools } from '$lib/server/project-agent/tool-surface';
 import { projectAgentPrompt } from '$lib/server/project-agent/system-prompt';
 import { AGENT_MAX_DURATION_S, agentStopWhen } from '$lib/server/project-agent/limits';
@@ -50,7 +51,7 @@ async function loadBriefBrand(
   return (data as BriefBrand | null) ?? null;
 }
 
-export const POST: RequestHandler = async ({ request, params, locals }) => {
+export const POST: RequestHandler = async ({ request, url, params, locals }) => {
   const { session, user } = await locals.safeGetSession();
   if (!session?.access_token || !user) {
     return json({ error: 'unauthenticated' }, { status: 401 });
@@ -109,13 +110,10 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
   const reply = await openReply(db, { orgId, threadId, actor });
   const steps: Parameters<typeof finishedTurn>[0][number][] = [];
 
-  const projectTools = createProjectTools({
-    db,
-    orgId,
-    projectId: project.id,
-    userId: user.id,
-    brandId: brand?.id ?? null
-  });
+  const projectTools = {
+    ...createProjectTools({ db, orgId, projectId: project.id, userId: user.id, brandId: brand?.id ?? null }),
+    ...createMotionDelegation({ db, orgId, projectId: project.id, userId: user.id, origin: url.origin, model })
+  };
   const agent = await openAgentTools({
     projectTools,
     brand,
