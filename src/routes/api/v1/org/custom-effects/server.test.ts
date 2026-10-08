@@ -127,13 +127,8 @@ describe('/api/v1/org/custom-effects', () => {
   });
 
   it('answers unavailable while the table is not migrated', async () => {
-    const missing = fakeDb({});
-    const from = missing.db.from.bind(missing.db);
-    (missing.db as unknown as { from: unknown }).from = (table: string) => {
-      const real = from(table) as unknown as Record<string, () => unknown>;
-      return { ...real, select: () => ({ eq: () => ({ is: () => ({ order: async () => ({ data: null, error: { code: 'PGRST205' } }) }) }) }) };
-    };
-    caller(missing);
+    const unmigrated = { from: () => ({ select: () => ({ eq: () => ({ is: () => ({ order: async () => ({ data: null, error: { code: 'PGRST205' } }) }) }) }) }) };
+    resolveOrgCaller.mockResolvedValue({ caller: { orgId: 'org-1', userId: 'user-1', db: unmigrated, writeAllowed: true } });
 
     const { res, body } = await call(GET, 'GET');
 
