@@ -106,6 +106,31 @@ test.describe('motion editor a dito @real', () => {
     });
   });
 
+  for (const size of [...TOUCH_SIZES, DESKTOP]) {
+    test.describe(`${size.name} comandi`, () => {
+      test.use({ viewport: { width: size.width, height: size.height } });
+
+      test('undo e redo stanno nella barra, la toolbar ha al massimo sei controlli', async ({ page, session, seedNode }) => {
+        const node = await seedNode({ type: 'motion', data: MOTION_DATA });
+        await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}/motion/${node.id}`);
+
+        const bar = page.locator('header.bar');
+        await expect(bar.getByRole('button', { name: 'Undo', exact: true })).toBeInViewport();
+        await expect(bar.getByRole('button', { name: 'Redo', exact: true })).toBeInViewport();
+
+        const toolbar = page.locator('.toolbar');
+        expect(await toolbar.locator(':scope > button, :scope > * > button').count()).toBeLessThanOrEqual(6);
+
+        await page.getByTestId('timeline-more').click();
+        await expect(page.getByTestId('overflow-menu')).toBeInViewport();
+        await expect(page.getByRole('menuitem', { name: /Nudge 1 frame earlier/ })).toBeVisible();
+        if (SHOTS) {
+          await page.screenshot({ path: `${SHOTS}/${size.name}-menu.png` });
+        }
+      });
+    });
+  }
+
   test('il clock apre un menu timecode / frames', async ({ page, session, seedNode }) => {
     const node = await seedNode({ type: 'motion', data: MOTION_DATA });
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}/motion/${node.id}`);

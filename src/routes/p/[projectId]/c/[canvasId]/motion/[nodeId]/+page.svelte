@@ -16,7 +16,8 @@
   import Upload from '@lucide/svelte/icons/upload';
   import ShortcutHelp from '$lib/components/motion/ShortcutHelp.svelte';
   import IconButton from '$lib/components/motion/IconButton.svelte';
-  import { Action, Caption } from '$lib/motion/actions';
+  import { Action, Caption, menuSections, type ActionId } from '$lib/motion/actions';
+  import OverflowMenu, { type MenuBlock } from '$lib/components/motion/OverflowMenu.svelte';
   import { CHAT_PLACE, ChatPlace, DEFAULT_LAYOUT, Panel, Side, flip, readLayout, sideWidth, timelineHeight, toggleSide, viewportOf, writeLayout, type EditorLayout, type LayoutStore } from '$lib/motion/editor-layout';
   import { provideSelection } from '$lib/motion/selection-context';
   import { addAdjustment, mergeView, pathNames, precompose, viewOf } from '$lib/motion/precomp';
@@ -79,7 +80,7 @@
     type OpResult
   } from '$lib/motion/timeline';
   import { amend, canRedo, canUndo, previousSource, record, redo, startHistory, undo, type History } from '$lib/motion/history';
-  import { Reveal, Snap, ZOOM_MAX, ZOOM_MIN, clampZoom } from '$lib/motion/timeline-view';
+  import { Reveal, Snap, clampZoom } from '$lib/motion/timeline-view';
   import { InspectorTab } from '$lib/motion/inspector';
   import { Command, commandFor, isTyping } from '$lib/motion/shortcuts';
   import { composeHtml } from '$lib/motion/hyperframes/compose';
@@ -159,6 +160,7 @@
   let settingsOpen = $state(false);
   let moreOpen = $state(false);
   let clockOpen = $state(false);
+  let toolsOpen = $state(false);
   let pressAt: { x: number; y: number } | null = null;
 
   function browserStore(): LayoutStore | null {
@@ -827,6 +829,33 @@
     [Command.Precompose]: precomposeSelection
   };
 
+  const TOOL_RUN: Partial<Record<ActionId, () => void>> = {
+    ...COMMANDS,
+    [Action.NullFromSelection]: groupUnderNull,
+    [Action.ClearWorkArea]: () => apply(setWorkArea(doc, null), 'Cleared the work area'),
+    [Action.GraphMode]: () => (graphOpen = !graphOpen),
+    [Action.MarkBeats]: markBeats,
+    [Action.CutToBeat]: cutSelectionToBeat
+  };
+
+  const NEEDS_SELECTION = new Set<ActionId>([Action.NullFromSelection, Action.Precompose, Action.StartHere, Action.EndHere, Action.TrimIn, Action.TrimOut, Action.NudgeBack, Action.NudgeForward, Action.NudgeBackMore, Action.NudgeForwardMore, Action.CutToBeat]);
+  const NEEDS_BEATS = new Set<ActionId>([Action.MarkBeats, Action.CutToBeat]);
+
+  const toolSections = $derived<MenuBlock[]>([
+    ...(selection.length > 1 ? [{ section: 'Arrange', items: Object.entries(ARRANGE).map(([id, op]) => ({ label: op.label, run: () => arrange(id) })) }] : []),
+    ...menuSections().map(({ section, ids }) => ({
+      section,
+      items: ids
+        .filter((id) => !NEEDS_BEATS.has(id) || beats.length > 0)
+        .map((id) => ({
+          id,
+          run: TOOL_RUN[id] ?? (() => {}),
+          disabled: (NEEDS_SELECTION.has(id) && !selection.length) || (id === Action.ClearWorkArea && !doc.workArea),
+          pressed: id === Action.GraphMode ? graphOpen : undefined
+        }))
+    }))
+  ]);
+
   function pressDown(e: PointerEvent) {
     pressAt = { x: e.clientX, y: e.clientY };
   }
@@ -842,12 +871,14 @@
     }
     settingsOpen = false;
     clockOpen = false;
+    toolsOpen = false;
   }
 
   function onKey(e: KeyboardEvent) {
-    if ((settingsOpen || clockOpen) && e.key === 'Escape') {
+    if ((settingsOpen || clockOpen || toolsOpen) && e.key === 'Escape') {
       settingsOpen = false;
       clockOpen = false;
+      toolsOpen = false;
       return;
     }
     if (exporting || sounding || isTyping(e.target as HTMLElement | null)) {
@@ -905,6 +936,8 @@
     </div>
 
     <div class="group trail" data-testid="bar-trail">
+      <IconButton action={Action.Undo} disabled={!canUndo(history)} onclick={undoEdit} />
+      <IconButton action={Action.Redo} disabled={!canRedo(history)} onclick={redoEdit} />
       <div class="popover-anchor">
         <button type="button" class="chip" aria-expanded={settingsOpen} title="Composition settings" data-testid="comp-settings" onclick={() => (settingsOpen = !settingsOpen)}>
           <span class="long">{compositionLabel(doc)}</span><span class="short">{compositionShort(doc)}</span><ChevronDown size={12} />
@@ -1103,37 +1136,14 @@
         </div>
         <IconButton action={Action.Split} size={14} disabled={!selection.length} onclick={split} />
         <IconButton action={Action.Duplicate} size={14} disabled={!selection.length} onclick={duplicate} />
-        <IconButton action={Action.NullFromSelection} size={14} caption={Caption.Wide} data-testid="null-from-selection" disabled={!selection.length} onclick={groupUnderNull} />
-        <IconButton action={Action.Precompose} size={14} caption={Caption.Wide} data-testid="precompose" disabled={!selection.length} onclick={precomposeSelection} />
         <IconButton action={Action.Delete} size={14} disabled={!selection.length && !keySelection.length} onclick={remove} />
-        <span class="gap" aria-hidden="true"></span>
-        <IconButton action={Action.Undo} size={14} disabled={!canUndo(history)} onclick={undoEdit} />
-        <IconButton action={Action.Redo} size={14} disabled={!canRedo(history)} onclick={redoEdit} />
-        <span class="gap" aria-hidden="true"></span>
-        <div class="segmented" role="group" aria-label="Timeline mode">
-          <button type="button" aria-pressed={!graphOpen} onclick={() => (graphOpen = false)}>Clips</button>
-          <button type="button" aria-pressed={graphOpen} data-testid="graph-toggle" onclick={() => (graphOpen = !graphOpen)}>Graph</button>
-        </div>
         <IconButton action={Action.Snap} size={14} caption={Caption.Wide} pressed={snap === Snap.On} onclick={() => (snap = snap === Snap.On ? Snap.Off : Snap.On)} />
-        <IconButton action={Action.AddMarker} size={14} data-testid="add-marker" onclick={markHere} />
-        <IconButton action={Action.ClearWorkArea} size={14} label={doc.workArea ? undefined : 'Work area: set with I and O'} pressed={!!doc.workArea} onclick={() => apply(setWorkArea(doc, null), 'Cleared the work area')} disabled={!doc.workArea} />
-        {#if selection.length > 1}
-          <select class="arrange" aria-label="Arrange" data-testid="arrange" value="" onchange={(e) => (arrange(e.currentTarget.value), (e.currentTarget.value = ''))}>
-            <option value="" disabled>Arrange</option>
-            {#each Object.entries(ARRANGE) as [id, op] (id)}<option value={id}>{op.label}</option>{/each}
-          </select>
-        {/if}
-        {#if beats.length}
-          <span class="gap" aria-hidden="true"></span>
-          <button type="button" class="tool text" data-testid="mark-beats" onclick={markBeats}>Mark beats</button>
-          {#if selection.length}<button type="button" class="tool text" data-testid="cut-to-beat" onclick={cutSelectionToBeat}>Cut to beat</button>{/if}
-        {/if}
         {#if notice}<span class="notice" role="status">{notice}</span>{/if}
         <span class="spacer"></span>
-        <IconButton action={Action.ZoomOut} size={14} onclick={COMMANDS[Command.ZoomOut]} />
-        <input class="zoom wide" type="range" aria-label="Timeline zoom" min={Math.log2(ZOOM_MIN)} max={Math.log2(ZOOM_MAX)} step="0.05" value={Math.log2(zoom)} oninput={(e) => (zoom = clampZoom(2 ** Number(e.currentTarget.value)))} data-testid="timeline-zoom" />
-        <IconButton action={Action.ZoomIn} size={14} onclick={COMMANDS[Command.ZoomIn]} />
-        <IconButton action={Action.Help} size={14} class="wide" data-testid="shortcut-help-open" onclick={COMMANDS[Command.Help]} />
+        <div class="popover-anchor">
+          <IconButton action={Action.More} size={14} aria-expanded={toolsOpen} data-testid="timeline-more" onclick={() => (toolsOpen = !toolsOpen)} />
+          {#if toolsOpen}<OverflowMenu sections={toolSections} onclose={() => (toolsOpen = false)} />{/if}
+        </div>
       </div>
 
       <div class="tl">
@@ -1862,14 +1872,6 @@
     grid-template-columns: auto minmax(0, 1fr) auto;
   }
 
-  [data-viewport='tablet'] .toolbar {
-    overflow-x: auto;
-  }
-
-  [data-viewport='tablet'] .toolbar > * {
-    flex-shrink: 0;
-  }
-
   [data-viewport='tablet'] .body {
     --props-w: 280px;
     --chat-w: 0px;
@@ -1969,14 +1971,6 @@
 
   [data-viewport='phone'] .resize {
     display: none;
-  }
-
-  [data-viewport='phone'] .toolbar {
-    overflow-x: auto;
-  }
-
-  [data-viewport='phone'] .toolbar > * {
-    flex-shrink: 0;
   }
 
   [data-viewport='phone'] .menu {
