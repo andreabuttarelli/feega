@@ -923,9 +923,11 @@ export type Database = {
           org_id: string
           role: string
           seq: number
+          status: string
           thread_id: string
           tool_call_id: string | null
           tool_calls: Json | null
+          updated_at: string
         }
         Insert: {
           actor_id?: string | null
@@ -939,9 +941,11 @@ export type Database = {
           org_id: string
           role: string
           seq: number
+          status?: string
           thread_id: string
           tool_call_id?: string | null
           tool_calls?: Json | null
+          updated_at?: string
         }
         Update: {
           actor_id?: string | null
@@ -955,9 +959,11 @@ export type Database = {
           org_id?: string
           role?: string
           seq?: number
+          status?: string
           thread_id?: string
           tool_call_id?: string | null
           tool_calls?: Json | null
+          updated_at?: string
         }
         Relationships: [
           {
