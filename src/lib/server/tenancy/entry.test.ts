@@ -183,12 +183,12 @@ describe('where an arrival lands: one rule table', () => {
     expect(await homePathFor(db, deps({}), user)).toBe(DASHBOARD_PATH);
   });
 
-  it('a first-run user goes straight to the canvas the bootstrap built', async () => {
+  it('a first-run user lands on the dashboard, where the video brief is the first step', async () => {
     const d = deps({ listMemberships: vi.fn(async () => []), listProjects: vi.fn(async () => []) });
 
     const path = await homePathFor(db, d, user);
 
-    expect(path).toBe(`/p/${PROJECT}/c/${CANVAS}`);
+    expect(path).toBe(DASHBOARD_PATH);
     expect(d.createFirstOrg).toHaveBeenCalledOnce();
   });
 
@@ -199,7 +199,7 @@ describe('where an arrival lands: one rule table', () => {
   it('the table names a landing for every arrival', () => {
     expect(ARRIVAL_LANDING).toEqual({
       [Arrival.Returning]: Landing.Dashboard,
-      [Arrival.FirstRun]: Landing.Canvas,
+      [Arrival.FirstRun]: Landing.Dashboard,
       [Arrival.Campaign]: Landing.Canvas,
       [Arrival.Invite]: Landing.Canvas
     });

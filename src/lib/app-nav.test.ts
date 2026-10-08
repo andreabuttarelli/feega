@@ -1,13 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { TOOLS } from '$lib/tools';
+import { TOOLS, ToolRole } from '$lib/tools';
 import { APP_NAV, NavKind, NavSection, isNavActive, navHref, visibleNav } from './app-nav';
 
 const PROJECT = 'p1';
 
 describe('app sidebar table', () => {
-  it('lists every tool of tools.ts, in order', () => {
+  it('puts motion and the gallery at the top, under home', () => {
+    const main = APP_NAV.filter((item) => item.section === NavSection.Main);
+    expect(main.map((item) => item.id)).toEqual(['home', 'tool:motion', 'gallery']);
+  });
+
+  it('lists every supporting tool of tools.ts, in order', () => {
     const tools = APP_NAV.filter((item) => item.section === NavSection.Tools);
-    expect(tools.map((item) => item.id)).toEqual(TOOLS.map((tool) => `tool:${tool.id}`));
+    expect(tools.map((item) => item.id)).toEqual(TOOLS.filter((tool) => tool.role === ToolRole.Support).map((tool) => `tool:${tool.id}`));
   });
 
   it('keeps every entry the old burger menu had in /app', () => {

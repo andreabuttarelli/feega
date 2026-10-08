@@ -100,9 +100,16 @@
     {/each}
   </div>
 
+  <div class="group" data-testid="app-sidebar-tools">
+    <span class="heading">Tools</span>
+    {#each inSection(NavSection.Tools) as item (item.id)}
+      {@render entry(item)}
+    {/each}
+  </div>
+
   {#if projects.length}
-    <div class="group">
-      <span class="heading">Projects</span>
+    <div class="group" data-testid="app-sidebar-canvas">
+      <span class="heading">Assets &amp; canvas</span>
       {#each projects as project (project.id)}
         <a class="row" href="/p/{project.id}">
           <Folder size={ICON} strokeWidth={STROKE} />
@@ -111,13 +118,6 @@
       {/each}
     </div>
   {/if}
-
-  <div class="group" data-testid="app-sidebar-tools">
-    <span class="heading">Tools</span>
-    {#each inSection(NavSection.Tools) as item (item.id)}
-      {@render entry(item)}
-    {/each}
-  </div>
 
   <div class="foot">
     <div class="group">

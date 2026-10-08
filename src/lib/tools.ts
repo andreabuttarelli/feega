@@ -6,6 +6,11 @@ export enum ToolStatus {
   ComingSoon = 'coming_soon'
 }
 
+export enum ToolRole {
+  Lead = 'lead',
+  Support = 'support'
+}
+
 export type ToolIcon = 'camera' | 'clapperboard' | 'upscale' | 'orbit';
 
 export type Tool = {
@@ -15,6 +20,7 @@ export type Tool = {
   icon: ToolIcon;
   route: string | null;
   status: ToolStatus;
+  role: ToolRole;
   campaign?: Campaign;
 };
 
@@ -25,7 +31,8 @@ export const TOOLS: readonly Tool[] = [
     description: 'Product photos for your store from one picture, in three steps.',
     icon: 'camera',
     route: '/app/studio',
-    status: ToolStatus.Beta
+    status: ToolStatus.Beta,
+    role: ToolRole.Support
   },
   {
     id: 'motion',
@@ -33,7 +40,8 @@ export const TOOLS: readonly Tool[] = [
     description: 'Short videos from titles, media and 3D, edited with an agent.',
     icon: 'clapperboard',
     route: '/app/motion',
-    status: ToolStatus.Beta
+    status: ToolStatus.Beta,
+    role: ToolRole.Lead
   },
   {
     id: 'compose',
@@ -41,7 +49,8 @@ export const TOOLS: readonly Tool[] = [
     description: 'Many images and videos in a looping 3D layout, from a template.',
     icon: 'orbit',
     route: '/app/compose',
-    status: ToolStatus.Beta
+    status: ToolStatus.Beta,
+    role: ToolRole.Support
   },
   {
     id: 'upscale',
@@ -50,9 +59,12 @@ export const TOOLS: readonly Tool[] = [
     icon: 'upscale',
     route: '/app/upscale',
     status: ToolStatus.Beta,
+    role: ToolRole.Support,
     campaign: 'ai-video-upscaler'
   }
 ];
+
+export const SUPPORT_TOOLS: readonly Tool[] = TOOLS.filter((tool) => tool.role === ToolRole.Support);
 
 export const TOOL_STATUS_LABEL: Record<ToolStatus, string | null> = {
   [ToolStatus.Available]: null,

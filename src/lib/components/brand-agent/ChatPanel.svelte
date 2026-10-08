@@ -13,6 +13,7 @@
   import { BRIEF_AUTO_GO_S, GO_MESSAGE, pendingBrief } from '$lib/motion/script-brief';
   import ChatModelPicker from './ChatModelPicker.svelte';
   import { chatModelPrefs } from './chat-model-prefs.svelte';
+  import { PrefillMode, type ChatPrefill } from './chat-prefill';
 
   let {
     projectId = '',
@@ -22,14 +23,21 @@
     onturnend,
     ondata,
     prefill = null
-  }: { projectId?: string; motionNodeId?: string; reload?: number; context?: () => Record<string, unknown>; onturnend?: () => void; ondata?: (part: StreamData) => void; prefill?: { text: string; at: number } | null } = $props();
+  }: { projectId?: string; motionNodeId?: string; reload?: number; context?: () => Record<string, unknown>; onturnend?: () => void; ondata?: (part: StreamData) => void; prefill?: ChatPrefill | null } = $props();
 
   let draft = $state('');
 
+  let queued = $state<string | null>(null);
+
   $effect(() => {
-    if (prefill) {
-      draft = prefill.text;
+    if (!prefill) {
+      return;
     }
+    if (prefill.mode === PrefillMode.Send) {
+      queued = prefill.text;
+      return;
+    }
+    draft = prefill.text;
   });
   let follow = $state<Follow>('following');
   let scroller = $state<HTMLDivElement | null>(null);
@@ -66,6 +74,15 @@
   const brief = $derived(motionNodeId && !sending ? pendingBrief(messages) : null);
   let editingBrief = $state(false);
   const showEmpty = $derived(!loading && failed !== 'load' && !messages.length);
+
+  $effect(() => {
+    if (!queued || loading || !session) {
+      return;
+    }
+    const text = queued;
+    queued = null;
+    untrack(() => send(text));
+  });
 
   function on(event: FollowEvent) {
     follow = nextFollow(follow, event);

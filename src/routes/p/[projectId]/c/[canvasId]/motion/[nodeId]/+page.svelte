@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onMount, tick, untrack } from 'svelte';
   import { deserialize } from '$app/forms';
+  import { replaceState } from '$app/navigation';
+  import { page } from '$app/state';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import { watchMotionNode } from '$lib/realtime/motion-channel';
   import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
@@ -108,6 +110,8 @@
   import RemixBanner from '$lib/components/gallery/RemixBanner.svelte';
   import DocFields from '$lib/components/motion/DocFields.svelte';
   import { BRAND_PARAM, BRAND_REMIX_PROMPT } from '$lib/gallery/model';
+  import { BRIEF_PARAM } from '$lib/motion/video-brief';
+  import { PrefillMode, type ChatPrefill } from '$lib/components/brand-agent/chat-prefill';
   import type { PageData } from './$types';
 
   const SAVE_DEBOUNCE_MS = 700;
@@ -145,7 +149,7 @@
   let templating = $state(false);
   let publishing = $state(false);
   let listed = $state(data.gallery.listed);
-  let brandAsk = $state<{ text: string; at: number } | null>(null);
+  let brandAsk = $state<ChatPrefill | null>(null);
   let browsing = $state(false);
   let templates = $state<TemplateEntry[]>(data.templates);
   let previewDoc = $state<MotionDoc | null>(null);
@@ -177,8 +181,13 @@
 
   onMount(() => {
     layout = readLayout(browserStore());
-    if (new URL(window.location.href).searchParams.has(BRAND_PARAM)) {
+    const url = new URL(window.location.href);
+    if (url.searchParams.has(BRAND_PARAM)) {
       void askBrand();
+    }
+    const brief = url.searchParams.get(BRIEF_PARAM);
+    if (brief) {
+      void sendBrief(url, brief);
     }
     return watchMotionNode(supabase, data.node.id, () => void pullExternalEdit());
   });
@@ -233,6 +242,13 @@
     OPEN_CHAT[chatPlace]();
     await tick();
     document.querySelector<HTMLTextAreaElement>('aside.chat textarea')?.focus();
+  }
+
+  async function sendBrief(url: URL, brief: string) {
+    url.searchParams.delete(BRIEF_PARAM);
+    replaceState(url, page.state);
+    brandAsk = { text: brief, at: Date.now(), mode: PrefillMode.Send };
+    await askAgent();
   }
 
   async function askBrand() {

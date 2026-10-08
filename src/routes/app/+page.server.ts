@@ -8,10 +8,17 @@ import { DASHBOARD_DEPS, dashboardFor } from '$lib/server/dashboard/dashboard';
 import { listMemberships } from '$lib/server/repos/orgs';
 import { createProject } from '$lib/server/repos/projects';
 import { createCanvas } from '$lib/server/repos/canvas';
-import { TOOLS } from '$lib/tools';
+import { SUPPORT_TOOLS } from '$lib/tools';
+import { toolScope } from '$lib/server/dashboard/tool-scope';
+import { MOTION_START_DEPS, startMotion } from '$lib/server/motion/start';
+import { listGallery } from '$lib/server/repos/gallery';
+import { gallerySearchSchema } from '$lib/gallery/model';
+import { BRIEF_MAX, BRIEF_TEMPLATES, briefEditorPath, briefName } from '$lib/motion/video-brief';
 
 const HTTP_SEE_OTHER = 303;
+const HTTP_BAD_REQUEST = 400;
 const HTTP_NOT_FOUND = 404;
+const HOME_GALLERY_SIZE = 8;
 const ORG_COOKIE_MAX_AGE_S = 60 * 60 * 24 * 365;
 const SLUG_BYTES = 4;
 
@@ -24,7 +31,8 @@ export const load: PageServerLoad = async (event) => {
   }
 
   const { org } = await event.parent();
-  return { dashboard: await dashboardFor(db, DASHBOARD_DEPS, org.id), tools: TOOLS };
+  const [dashboard, gallery] = await Promise.all([dashboardFor(db, DASHBOARD_DEPS, org.id), listGallery(db, gallerySearchSchema.parse({ limit: HOME_GALLERY_SIZE }))]);
+  return { dashboard, gallery, templates: BRIEF_TEMPLATES, tools: SUPPORT_TOOLS };
 };
 
 function projectSlug(): string {
@@ -33,6 +41,21 @@ function projectSlug(): string {
 }
 
 export const actions: Actions = {
+  video: async (event) => {
+    const brief = String((await event.request.formData()).get('brief') ?? '').trim().slice(0, BRIEF_MAX);
+    if (!brief) {
+      return fail(HTTP_BAD_REQUEST, { error: 'Paste a URL or describe your video' });
+    }
+
+    const scope = await toolScope(event);
+    const started = await startMotion(scope.db, MOTION_START_DEPS, { orgId: scope.orgId, projectId: scope.projectId, canvasId: null, userId: scope.userId, name: briefName(brief) });
+    if (!started) {
+      return fail(HTTP_NOT_FOUND, { error: 'No canvas for this video' });
+    }
+
+    throw redirect(HTTP_SEE_OTHER, briefEditorPath(started, brief));
+  },
+
   project: async (event) => {
     const { db, user } = await signedInDb(event);
     const membership = chooseOrg(await listMemberships(db, user.id), event.cookies.get(ORG_COOKIE) ?? null);
