@@ -17,3 +17,7 @@ export function adoptAgentAssets<T extends AgentAsset>(known: T[], incoming: T[]
   const fresh = (incoming ?? []).filter((a) => !known.some((k) => k.id === a.id));
   return fresh.length ? [...fresh, ...known] : known;
 }
+
+export function agentDraft(shown: MotionDoc | null, part: { type: string; data: unknown }): MotionDoc | null {
+  return part.type === FRAMES_REQUEST ? (part.data as FramesRequest).doc : shown;
+}
