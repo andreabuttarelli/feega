@@ -18,6 +18,8 @@ describe('social publishing flag', () => {
   it.each([
     ['/p/[projectId]/calendar', ''],
     ['/p/[projectId]/ads', ''],
+    ['/p/[projectId]/promote', ''],
+    ['/p/[projectId]/promote', '?/propose_ad'],
     ['/p/[projectId]/settings/connected-accounts', ''],
     ['/p/[projectId]/settings/connect/[platform]', ''],
     ['/p/[projectId]/settings/facebook', ''],
@@ -38,7 +40,6 @@ describe('social publishing flag', () => {
   it.each([
     ['/p/[projectId]/c/[canvasId]', '?/run'],
     ['/p/[projectId]/c/[canvasId]', ''],
-    ['/p/[projectId]/promote', '?/propose_ad'],
     ['/p/[projectId]/calendarx', ''],
     ['/api/v1/motion/agent', ''],
     ['/p/[projectId]/settings/project', ''],

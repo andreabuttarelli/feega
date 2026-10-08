@@ -9,6 +9,7 @@ export const SOCIAL_PUBLISHING_SURFACE = {
   routes: [
     '/p/[projectId]/calendar',
     '/p/[projectId]/ads',
+    '/p/[projectId]/promote',
     '/p/[projectId]/posts',
     '/p/[projectId]/settings/connected-accounts',
     '/p/[projectId]/settings/connect',
