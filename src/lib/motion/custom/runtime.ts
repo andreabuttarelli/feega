@@ -7,6 +7,7 @@ import { GENERATIVE_GLOBAL } from './generative';
 import { TWGL_GLOBAL } from './twgl';
 import { FX_GLOBAL } from './fx';
 import { SPLITTING_GLOBAL } from './splitting';
+import { OPEN_PROPS_GLOBAL } from './open-props';
 
 export const REGISTRY = '__feegaComponents';
 export const ERRORS = '__feegaErrors';
@@ -57,7 +58,8 @@ export enum Library {
   Generative = 'gen',
   Twgl = 'twgl',
   Fx = 'fx',
-  Splitting = 'Splitting'
+  Splitting = 'Splitting',
+  OpenProps = 'OpenProps'
 }
 
 const USES: Record<Library, RegExp> = {
@@ -70,7 +72,12 @@ const USES: Record<Library, RegExp> = {
   [Library.Generative]: /\bgen\./,
   [Library.Twgl]: /\btwgl\b/,
   [Library.Fx]: /\bfx\./,
-  [Library.Splitting]: /\bSplitting\b/
+  [Library.Splitting]: /\bSplitting\b/,
+  [Library.OpenProps]: /\bOpenProps\b|['"]ease-[a-z0-9-]+['"]/
+};
+
+const STYLE_USES: Partial<Record<Library, RegExp>> = {
+  [Library.OpenProps]: /var\(--(size|shadow|gradient|ease)-/
 };
 
 const GLOBALS: Record<Library, string> = {
@@ -83,12 +90,14 @@ const GLOBALS: Record<Library, string> = {
   [Library.Generative]: GENERATIVE_GLOBAL,
   [Library.Twgl]: TWGL_GLOBAL,
   [Library.Fx]: FX_GLOBAL,
-  [Library.Splitting]: SPLITTING_GLOBAL
+  [Library.Splitting]: SPLITTING_GLOBAL,
+  [Library.OpenProps]: OPEN_PROPS_GLOBAL
 };
 
 export function librariesOf(components: CustomComponents, used: Iterable<string>): Set<Library> {
   const code = [...used].map((name) => components[name]?.source.js ?? '').join('\n');
-  return new Set((Object.keys(USES) as Library[]).filter((lib) => USES[lib].test(code)));
+  const styles = [...used].map((name) => components[name]?.source.css ?? '').join('\n');
+  return new Set((Object.keys(USES) as Library[]).filter((lib) => USES[lib].test(code) || STYLE_USES[lib]?.test(styles)));
 }
 
 export type ParamKey = { at: number; value: number | string; ease: string };
@@ -105,7 +114,7 @@ export function definitionScript(name: string, code: string): string {
   return `<script>(window.${REGISTRY}=window.${REGISTRY}||{})[${js(name)}]=function(ctx,${SHADOWED.join(',')}){"use strict";const {root,props,tl,duration,fps,assets,brand,rand,param,format,motion,gsap,SplitText,${Object.values(Library).join(',')}}=ctx;{\n${body}\n}};</script>`;
 }
 
-type Engine = { timeline: () => Timeline; parseEase: (ease: string) => (p: number) => number; utils: { interpolate: (a: unknown, b: unknown, p: number) => unknown }; split: unknown; SplitText: unknown };
+type Engine = { timeline: () => Timeline; parseEase: (ease: string) => (p: number) => number; registerEase: (name: string, ease: (p: number) => number) => void; utils: { interpolate: (a: unknown, b: unknown, p: number) => unknown }; split: unknown; SplitText: unknown };
 type BootWindow = Window & Record<string, unknown>;
 type Timeline = { time: () => number; to: (t: object, v: object, at: number) => void; set: (t: object, v: object, at: number) => void; add: (child: object, at: number) => void; fromTo: (t: object, a: object, b: object, at: number) => void; tweenFromTo: (from: number, to: number, vars: object) => object };
 type ClipError = { clip: string; component: string; message: string };
@@ -221,6 +230,7 @@ function bootCustom(cfg: { registry: string; errors: string; listener: string; l
   };
   const shaders = (twgl: object) => ({ ...twgl, webgl: (canvas: HTMLCanvasElement) => canvas.getContext('webgl2', { preserveDrawingBuffer: true, antialias: true }) });
   const effects = (fx: (clip: object) => unknown, { tl, run }: ClipScope) => fx({ tl, length: run.length + (run.trim ?? 0), seed: run.seed });
+  const tokens = (openProps: (clip: object) => unknown, { tl }: ClipScope) => openProps({ tl, registerEase: engine.registerEase });
   const splits = ({ Splitting }: { Splitting: (options: Split) => unknown }, { root, tl, run }: ClipScope) => {
     const scoped = ({ target = '[data-splitting]', ...options }: Split = {}) => Splitting({ ...options, target: typeof target === 'string' ? root.querySelectorAll(target) : target });
     const drive = (el: HTMLElement, { at = 0, duration = run.length + (run.trim ?? 0) - at, ease = 'none' }: { at?: number; duration?: number; ease?: string } = {}) => {
@@ -230,7 +240,7 @@ function bootCustom(cfg: { registry: string; errors: string; listener: string; l
     };
     return Object.assign(scoped, { drive });
   };
-  const wraps: Record<string, (lib: never, scope: ClipScope) => unknown> = { p5: sketches, PIXI: stages, Matter: worlds, gen: utilities, twgl: shaders, fx: effects, Splitting: splits };
+  const wraps: Record<string, (lib: never, scope: ClipScope) => unknown> = { p5: sketches, PIXI: stages, Matter: worlds, gen: utilities, twgl: shaders, fx: effects, Splitting: splits, OpenProps: tokens };
   const libraries = Object.entries(cfg.libraries).map(([name, global]) => [name, w[global] ?? null] as const);
   const clipLibraries = (scope: ClipScope) => Object.fromEntries(libraries.map(([name, lib]) => [name, lib && wraps[name] ? wraps[name](lib as never, scope) : lib]));
 

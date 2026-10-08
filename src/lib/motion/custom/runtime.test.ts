@@ -6,6 +6,7 @@ import './generative-entry';
 import './twgl-entry';
 import './fx-entry';
 import './splitting-entry';
+import './open-props-entry';
 import { installEngine, testTimeline, type TestTimeline } from '../engine/testing';
 import { ERRORS, REGISTRY, bootScript, definitionScript, librariesOf, Library, seedOf, type CustomRun } from './runtime';
 
@@ -360,6 +361,55 @@ describe('libraries', () => {
     expect(first[0]).toBe('0.15');
     expect(first[1]).toBe('0.75,0.25,0');
     expect([h1.style.getPropertyValue('--split'), chars()]).toEqual(first);
+  });
+
+  it('loads Open Props for a component that animates with it, names one of its easings or reads its tokens', () => {
+    const components = {
+      A: { source: { html: '', css: '', js: 'OpenProps.animate(root, "fade-in")' } },
+      E: { source: { html: '', css: '', js: 'tl.to(root, { x: 9, ease: "ease-spring-2" })' } },
+      C: { source: { html: '', css: '.card{box-shadow:var(--shadow-3)}', js: '' } },
+      N: { source: { html: '', css: '.card{color:var(--accent)}', js: 'tl.to(root, { x: 9, ease: "power2.out" })' } }
+    } as never;
+
+    expect(['A', 'E', 'C', 'N'].map((name) => [...librariesOf(components, [name])])).toEqual([[Library.OpenProps], [Library.OpenProps], [Library.OpenProps], []]);
+  });
+
+  it('registers the Open Props easings on the engine: a spring overshoots, the same frame sought twice', () => {
+    const { master, root, errors } = run('Spring', 'tl.fromTo(root.querySelector(".dot"), { x: 0 }, { x: 100, duration: 1, ease: "ease-spring-2" }, 0); OpenProps;');
+    const dot = root.querySelector('.dot') as HTMLElement;
+
+    master.seek(1.36);
+    const first = dot.style.transform;
+    master.seek(2.5);
+    master.seek(1.36);
+
+    expect(errors).toEqual([]);
+    expect(first).toContain('translate3d(107px');
+    expect(dot.style.transform).toBe(first);
+  });
+
+  it('turns an Open Props keyframe animation into tl tweens', () => {
+    const { master, root } = run('Shake', 'OpenProps.animate(root.querySelector(".dot"), "shake-x", { duration: 1, ease: "none" });');
+    const dot = root.querySelector('.dot') as HTMLElement;
+    const reference = run('Reference', 'tl.fromTo(root.querySelector(".dot"), { xPercent: 0 }, { xPercent: -5, duration: 0.2, ease: "none" }, 0);');
+    const expected = reference.root.querySelector('.dot') as HTMLElement;
+
+    reference.master.seek(1.2);
+    master.seek(1.2);
+
+    expect(dot.style.transform).toBe(expected.style.transform);
+    expect(master.duration()).toBeGreaterThanOrEqual(2);
+  });
+
+  it('puts the Open Props tokens on the page without glows or CSS animations', () => {
+    run('Tokens', 'OpenProps;');
+    const css = [...document.head.querySelectorAll('style')].map((s) => s.textContent).join('');
+
+    expect(css).toContain('--size-5:');
+    expect(css).toContain('--shadow-3:');
+    expect(css).toContain('--gradient-7:');
+    expect(css).not.toContain('--inner-shadow');
+    expect(css).not.toMatch(/@keyframes|animation:/);
   });
 
   it('a d3 chart drawn from progress gives the same frame from any seek order', () => {

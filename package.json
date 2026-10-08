@@ -111,6 +111,7 @@
     "marked": "^18.0.5",
     "markitdown-ts": "^0.0.10",
     "mediabunny": "1.61.0",
+    "open-props": "1.7.23",
     "pg": "^8.13.1",
     "poisson-disk-sampling": "2.3.1",
     "polygon-clipping": "^0.15.7",

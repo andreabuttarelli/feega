@@ -407,6 +407,15 @@ describe('custom components in the composition', () => {
     expect(html).not.toContain('ClipperLib');
   });
 
+  it('inlines Open Props only for a component that reads its tokens, with no network', () => {
+    const card = { ...graph, source: { ...graph.source, css: '.node{box-shadow:var(--shadow-4)}' } };
+    const page = compose(must(addClip(must(writeComponent(newMotionDoc(MotionFormat.Landscape), 'Card', card)), { component: 'Custom', from: 0, durationInFrames: 60, props: { name: 'Card' } }, 'k1')));
+
+    expect(page).toContain('Adam Argyle');
+    expect(page.match(/<script src="[^"]+"/g)).toEqual(html.match(/<script src="[^"]+"/g));
+    expect(html).not.toContain('Adam Argyle');
+  });
+
   it('inlines Splitting only for a component that uses it, with no network', () => {
     const title = { ...graph, source: { ...graph.source, js: 'Splitting({ by: "chars" });' } };
     const page = compose(must(addClip(must(writeComponent(newMotionDoc(MotionFormat.Landscape), 'Title', title)), { component: 'Custom', from: 0, durationInFrames: 60, props: { name: 'Title' } }, 't1')));
