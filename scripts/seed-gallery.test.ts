@@ -3,7 +3,22 @@ import { builtinTemplate } from '$lib/motion/template/builtins';
 import { everyClip } from '$lib/motion/doc';
 import { publishRefusal } from '$lib/gallery/refusals';
 import { ProjectMode } from '$lib/project-mode';
-import { builtinTitle, DEMOS, EXCLUDED_DEMOS, filledTemplate, seedId } from './seed-gallery';
+import { existsSync, mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
+import { addClip } from '$lib/motion/timeline';
+import { builtinTitle, catalogue, DEMOS, EXCLUDED_DEMOS, filledTemplate, seedId, seedProblems, SHOWCASE, SOURCE_DIR } from './seed-gallery';
+
+function titled(): MotionDoc {
+  const added = addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Title', from: 0, durationInFrames: 60, props: { text: 'Hello' } }, 't1');
+  if (!added.ok) {
+    throw new Error(added.error);
+  }
+  return { ...added.doc, assets: [{ id: 'music', kind: 'audio', name: 'music' }] };
+}
+
+const ready = { key: 'k', title: 't', description: 'd', tags: [], doc: titled(), files: { music: '/x/music.mp3' }, preview: '/x/p.mp4', poster: '/x/p.jpg' };
 
 describe('the Feega gallery seed', () => {
   it('gives every item the same id on every run, so a second run updates instead of duplicating', () => {
@@ -34,4 +49,40 @@ describe('the Feega gallery seed', () => {
   it('drops the "Launch ·" prefix from the template name', () => {
     expect(builtinTitle('Launch · Device orbit')).toBe('Device orbit');
   });
+
+  it('passes an item with its files, a preview, a poster and something to edit', () => {
+    expect(seedProblems(ready)).toEqual([]);
+  });
+
+  it('refuses an item that still points at a local server, a file it does not ship, or has nothing to show', () => {
+    const local = { ...ready, doc: { ...ready.doc, assets: [{ id: 'music', kind: 'audio' as const, name: 'http://localhost:8794/music.mp3' }] } };
+
+    expect(seedProblems(local)).toEqual([expect.stringMatching(/local server/)]);
+    expect(seedProblems({ ...ready, files: {} })).toEqual([expect.stringMatching(/music/)]);
+    expect(seedProblems({ ...ready, files: { music: 'http://localhost:8794/music.mp3' } })).toEqual([expect.stringMatching(/local server/)]);
+    expect(seedProblems({ ...ready, preview: null, poster: null })).toEqual([expect.stringMatching(/preview/), expect.stringMatching(/poster/)]);
+  });
+
+  it('refuses an item a remixer could not change', () => {
+    const bare = { ...ready, doc: { ...newMotionDoc(MotionFormat.Landscape), assets: [] }, files: {} };
+
+    expect(seedProblems(bare)).toEqual([expect.stringMatching(/edit/)]);
+  });
+
+  it('ships the six showcase videos, every cut with a preview and its music licence', () => {
+    const names = new Set(SHOWCASE.map((d) => d.doc.split('/')[1]));
+
+    expect([...names].sort()).toEqual(['drop', 'launch-film', 'liquid-type', 'logo-sting', 'material', 'numbers']);
+    expect(SHOWCASE.filter((d) => !d.preview.endsWith('.mp4') || !d.licence)).toEqual([]);
+    expect(SHOWCASE.every((d) => DEMOS.includes(d))).toBe(true);
+  });
+
+  it.skipIf(!existsSync(join(SOURCE_DIR, 'showcase')))('builds every showcase cut from the local folder with nothing to refuse', () => {
+    const { seeds, skipped } = catalogue(mkdtempSync(join(tmpdir(), 'seed-test-')), SHOWCASE);
+    const problems = seeds.flatMap((s) => seedProblems(s).map((p) => `${s.key}: ${p}`));
+
+    expect(skipped).toEqual([]);
+    expect(problems).toEqual([]);
+    expect(seeds).toHaveLength(SHOWCASE.length);
+  }, 120_000);
 });
