@@ -236,6 +236,29 @@ test.describe('motion editor a dito @real', () => {
     });
   });
 
+  test.describe('preview a dito', () => {
+    test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
+
+    test('un tocco sulla preview mentre suona mette in pausa e seleziona', async ({ page, session, seedNode }) => {
+      const node = await seedNode({ type: 'motion', data: MOTION_DATA });
+      await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}/motion/${node.id}`);
+      await page.getByRole('button', { name: 'Add', exact: true }).click();
+      await page.getByRole('menuitem', { name: 'feega trailer v2 · 16:9' }).dispatchEvent('click');
+      await page.getByTestId('timeline-more').click();
+      await page.getByRole('menuitem', { name: 'Deselect' }).click();
+      await expect(page.getByTestId('clip-bar')).toHaveCount(0);
+
+      await page.getByRole('button', { name: 'Play', exact: true }).click();
+      await page.getByTestId('play-catch').tap();
+
+      await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeVisible();
+      await expect(page.getByTestId('clip-bar')).toBeVisible();
+      if (SHOTS) {
+        await page.screenshot({ path: `${SHOTS}/iphone-tap-while-playing.png` });
+      }
+    });
+  });
+
   test('il tasto destro apre lo stesso menu del clip', async ({ page, session, seedNode }) => {
     const node = await seedNode({ type: 'motion', data: MOTION_DATA });
     await openEditor(page, `/p/${session.projectId}/c/${session.canvasId}/motion/${node.id}`);

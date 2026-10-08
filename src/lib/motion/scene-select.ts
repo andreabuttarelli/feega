@@ -104,6 +104,21 @@ export function stackAt(doc: MotionDoc, frame: number, boxes: Boxes, p: Pt): str
     .map((c) => c.id);
 }
 
+export enum Modifier {
+  None = 'none',
+  Alt = 'alt'
+}
+
+const SAME_SPOT_PX = 12;
+
+export function pickModeAt(previous: Pt | null, at: Pt, modifier: Modifier): PickMode {
+  if (modifier === Modifier.Alt) {
+    return PickMode.Beneath;
+  }
+  const again = previous && Math.hypot(at[0] - previous[0], at[1] - previous[1]) < SAME_SPOT_PX;
+  return again ? PickMode.Beneath : PickMode.Top;
+}
+
 export function pick(stack: string[], current: string | null, mode: PickMode): string | null {
   if (!stack.length) {
     return null;

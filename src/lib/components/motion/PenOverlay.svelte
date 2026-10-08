@@ -129,12 +129,12 @@
   </div>
   {#each outline as contour, ci (ci)}
     {#each contour.vertices as v, vi (vi)}
-      <button type="button" class="point" class:sel={selected?.contour === ci && selected?.index === vi} aria-label={`Path point ${ci + 1}.${vi + 1}`} data-point={`${ci}.${vi}`} style={pct(v.p)} onpointerdown={(e) => startPoint(e, { contour: ci, index: vi })}></button>
+      <button type="button" data-drawn-small class="point" class:sel={selected?.contour === ci && selected?.index === vi} aria-label={`Path point ${ci + 1}.${vi + 1}`} data-point={`${ci}.${vi}`} style={pct(v.p)} onpointerdown={(e) => startPoint(e, { contour: ci, index: vi })}></button>
     {/each}
   {/each}
   {#if selected}
     {#each handles(selected) as [which, h] (which)}
-      <button type="button" class="handle" aria-label={`Bezier handle ${which}`} style={pct(h)} onpointerdown={(e) => startHandle(e, selected!, which)}></button>
+      <button type="button" data-drawn-small class="handle" aria-label={`Bezier handle ${which}`} style={pct(h)} onpointerdown={(e) => startHandle(e, selected!, which)}></button>
     {/each}
   {/if}
 </div>
@@ -221,5 +221,17 @@
     background: var(--ui-accent-wash);
     border-color: var(--ui-accent);
     color: var(--ui-accent);
+  }
+
+  @media (pointer: coarse) {
+    [data-drawn-small]::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 44px;
+      height: 44px;
+      transform: translate(-50%, -50%);
+    }
   }
 </style>

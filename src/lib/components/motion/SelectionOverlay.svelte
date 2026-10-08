@@ -4,7 +4,7 @@
   import { selectionView } from '$lib/motion/selection-context';
   import type { ComponentId } from '$lib/motion/components';
   import type { Transform } from '$lib/motion/keyframes';
-  import { Grip, PickMode, aabb, anchorOf, dragPatch, handlesOf, pick, quadOf, readout, stackAt, writePatch, type Boxes, type Guide, type Pt, type Quad } from '$lib/motion/scene-select';
+  import { Grip, Modifier, aabb, pickModeAt, anchorOf, dragPatch, handlesOf, pick, quadOf, readout, stackAt, writePatch, type Boxes, type Guide, type Pt, type Quad } from '$lib/motion/scene-select';
 
   let {
     doc,
@@ -12,7 +12,8 @@
     html,
     measure,
     onpreview,
-    onchange
+    onchange,
+    pickAt = null
   }: {
     doc: MotionDoc;
     frame: number;
@@ -20,6 +21,7 @@
     measure: () => Promise<Record<string, MeasuredBox>>;
     onpreview: (doc: MotionDoc | null) => void;
     onchange: (doc: MotionDoc, summary: string) => void;
+    pickAt?: Pt | null;
   } = $props();
 
   const shared = selectionView()!;
@@ -68,6 +70,18 @@
     boxes = Object.fromEntries(
       Object.entries(measured).map(([id, b]) => [id, { left: b.left * doc.width, top: b.top * doc.height, width: b.width * doc.width, height: b.height * doc.height }])
     );
+    pickPending();
+  }
+
+  let pendingPick = pickAt;
+
+  function pickPending() {
+    if (!pendingPick || !Object.keys(boxes).length) {
+      return;
+    }
+    const next = stackAt(doc, frame, boxes, pendingPick)[0];
+    pendingPick = null;
+    onselect(next ? [next] : []);
   }
 
   $effect(() => {
@@ -98,9 +112,13 @@
     grab = { grip, handle, clipId, from: local(e), pointer: e.pointerId };
   }
 
+  let lastPress: Pt | null = null;
+
   function press(e: PointerEvent) {
     const p = local(e);
-    const next = pick(stackAt(doc, frame, boxes, p), selected, e.altKey ? PickMode.Beneath : PickMode.Top);
+    const mode = pickModeAt(lastPress, p, e.altKey ? Modifier.Alt : Modifier.None);
+    lastPress = p;
+    const next = pick(stackAt(doc, frame, boxes, p), selected, mode);
     if (!next) {
       onselect([]);
       return;
