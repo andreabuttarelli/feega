@@ -3,7 +3,8 @@ import { BuiltinFont, FONT_NAME } from './fonts/model';
 import { DURATION, EASE_IDS, Ease, FPS } from './design';
 import { MATERIALS, Material } from './materials';
 import { DEVICES, Device, FINISHES, Finish, SCREEN_FITS, ScreenFit, screenGuide } from './devices';
-import { LAYOUTS } from '../canvas/composition/index';
+import { CUSTOM_LAYOUT, LAYOUTS, type CompositionLayout } from '../canvas/composition/index';
+import { layoutSpecSchema } from '../canvas/composition/spec';
 import { CARD_ASPECTS, RATIO_RANGE } from '../canvas/composition/card-look';
 import { CAMERA_PRESETS } from '../canvas/composition/camera';
 import type { CameraPresetId } from '../canvas/composition/camera';
@@ -154,6 +155,7 @@ const position3d = {
 };
 
 export const COMPOSITION_LAYOUTS = Object.keys(LAYOUTS) as [LayoutId, ...LayoutId[]];
+export const COMPOSITION_LAYOUT_CHOICES = [...COMPOSITION_LAYOUTS, CUSTOM_LAYOUT] as [CompositionLayout, ...CompositionLayout[]];
 export const COMPOSITION_CAMERAS = Object.keys(CAMERA_PRESETS) as [CameraPresetId, ...CameraPresetId[]];
 export const COMPOSITION_MEDIA_KINDS = ['image', 'video'] as const;
 export const COMPOSITION_CARD_KINDS = [...COMPOSITION_MEDIA_KINDS, 'comp'] as const;
@@ -467,7 +469,9 @@ export const COMPONENTS = {
     durationInFrames: seconds(6),
     schema: z
       .object({
-        layout: choice(COMPOSITION_LAYOUTS, 'tilted-grid', 'Template', Group.Content),
+        layout: choice(COMPOSITION_LAYOUT_CHOICES, 'tilted-grid', 'Template', Group.Content),
+        layoutSpec: layoutSpecSchema.nullable().default(null).meta(managed('Custom layout')),
+        layoutRef: z.string().max(64).default('').meta(managed('Custom layout id')),
         media: z
           .array(compositionCard)
           .max(MAX_COMPOSITION_MEDIA)
