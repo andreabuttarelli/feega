@@ -1317,9 +1317,10 @@
   }
 
   .strip img {
+    flex: 1 1 0;
+    min-width: 0;
     height: 100%;
-    width: auto;
-    flex-shrink: 0;
+    object-fit: cover;
   }
 
   .wave {

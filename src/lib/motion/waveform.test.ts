@@ -10,8 +10,8 @@ describe('waveform', () => {
     expect(slice).toHaveLength(PEAKS_PER_SECOND);
   });
 
-  it('draws one centred bar per peak, as tall as the peak', () => {
-    expect(wavePath([1, 0.5])).toBe('M0 0V1M1 0.25V0.75');
+  it('draws one filled, centred bar per peak, as tall as the peak, so a fill shows it', () => {
+    expect(wavePath([1, 0.5])).toBe('M0 0h0.8V1h-0.8ZM1 0.25h0.8V0.75h-0.8Z');
     expect(wavePath([])).toBe('');
   });
 });

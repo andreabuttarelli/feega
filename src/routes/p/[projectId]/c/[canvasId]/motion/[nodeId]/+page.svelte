@@ -15,6 +15,7 @@
   import LayoutTemplate from '@lucide/svelte/icons/layout-template';
   import Upload from '@lucide/svelte/icons/upload';
   import ShortcutHelp from '$lib/components/motion/ShortcutHelp.svelte';
+  import { decodePeaks } from '$lib/motion/peaks-decode';
   import IconButton from '$lib/components/motion/IconButton.svelte';
   import { Action, Caption, menuSections, type ActionId } from '$lib/motion/actions';
   import { ClipOp, runClipOp } from '$lib/motion/clip-ops';
@@ -143,7 +144,8 @@
   let sounding = $state<SoundKind | null>(null);
   let madeAssets = $state<PageData['assets']>([]);
   let analyses = $state<Record<string, AudioAnalysis>>({});
-  const waveforms = $derived(Object.fromEntries(Object.entries(analyses).map(([id, a]) => [id, a.amp])));
+  let decodedPeaks = $state<Record<string, number[]>>({});
+  const waveforms = $derived({ ...decodedPeaks, ...Object.fromEntries(Object.entries(analyses).map(([id, a]) => [id, a.amp])) });
   const analysing = new Set<string>();
   let sheet = $state<Sheet>(Sheet.None);
   let inspectorTab = $state<InspectorTab>(InspectorTab.Properties);
@@ -302,6 +304,14 @@
     edit(result.doc, 'Cut to the beat');
   }
 
+  function decodeMissing(ids: string[]) {
+    for (const id of ids.filter((id) => !analyses[id] && assetUrls[id])) {
+      decodePeaks(id, assetUrls[id])
+        .then((peaks) => (decodedPeaks = { ...decodedPeaks, [id]: peaks }))
+        .catch(() => {});
+    }
+  }
+
   async function analyse(ids: string[]) {
     const form = new FormData();
     for (const id of ids) {
@@ -322,7 +332,9 @@
     for (const id of fresh) {
       analysing.add(id);
     }
-    void analyse(fresh).catch(() => {});
+    void analyse(fresh)
+      .catch(() => {})
+      .then(() => decodeMissing(fresh));
   });
 
   function edit(next: MotionDoc, summary: string) {
