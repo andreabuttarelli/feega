@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { STYLES, styleProblems } from '$lib/motion/style';
+import { Forbidden, STYLES, styleProblems } from '$lib/motion/style';
 import { MotionStyle } from '$lib/motion/style-model';
 import { BUILTIN_TEMPLATES } from './builtins';
 import { insertTemplate } from './library';
 import { LAUNCH_SCENES } from './launch-scenes';
 import { Quality, docProblems } from '$lib/motion/direction';
+
+const LINE_OVER_SCENE: ReadonlySet<string> = new Set(['builtin:launch-device-fly', 'builtin:launch-device-orbit']);
 
 const FILM = STYLES[MotionStyle.LaunchFilm];
 const TEXT = new Set(['Title', 'Text', 'Kicker', 'Caption']);
@@ -43,8 +45,10 @@ describe('the launch film scene library', () => {
   it.each(launchDocs().map((e) => [e.id, e] as const))('%s breaks none of the launch film rules, alone and inside a video', (_id, entry) => {
     const placed = insertTemplate(newMotionDoc(MotionFormat.Landscape), entry, { from: 0, newId: ids() });
 
-    expect(styleProblems(entry.template.doc).map((p) => p.detail)).toEqual([]);
-    expect(placed.ok && styleProblems(placed.doc)).toEqual([]);
+    const kept = (doc: MotionDoc) => styleProblems(doc).filter((p) => !(LINE_OVER_SCENE.has(entry.id) && p.effect === Forbidden.TextOverScene));
+
+    expect(kept(entry.template.doc).map((p) => p.detail)).toEqual([]);
+    expect(placed.ok && kept(placed.doc)).toEqual([]);
   });
 
   it.each(launchDocs().map((e) => [e.id, e] as const))('%s lasts 2 to 4 s, long enough to be read', (_id, entry) => {

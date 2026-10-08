@@ -25,7 +25,9 @@ export enum Forbidden {
   MissingStoryBeat = 'missing-story-beat',
   Rushed = 'rushed',
   LoopSeam = 'loop-seam',
-  TooDense = 'too-dense'
+  TooDense = 'too-dense',
+  TextOverScene = 'text-over-scene',
+  TooMuchText = 'too-much-text'
 }
 
 export type StyleSpec = {
@@ -67,7 +69,16 @@ const SHOWN_PICTURE: readonly [component: string, prop: string][] = [
   ['Image', 'assetId'],
   ['Device3D', 'screen']
 ];
+const HEADLINES = new Set(['Title', 'Text', 'Kicker']);
+const HEADLINE_SIZE = 0.06;
+const SCENES = new Set(['Custom', 'Device3D', 'Video', 'Model3D']);
+const SHARED_SECONDS = 0.5;
+const MAX_WORDS_PER_SECOND = 1;
+const TITLE_CARDS: readonly Forbidden[] = [Forbidden.TextOverScene, Forbidden.TooMuchText];
 const CALM: readonly Forbidden[] = [Forbidden.Particles, Forbidden.Glow, Forbidden.Rotation, Forbidden.Bounce, Forbidden.FlyingText, Forbidden.Crowded, Forbidden.Transition, Forbidden.Still];
+
+export const TITLE_CARD_RULE =
+  'Little text, and a title owns the frame: most of the video is scenes (rebuilt UI, devices, the product). When words appear they are a title card: big, centred, alone on the frame, nothing competing; the scene it announces comes after. Alternate title card → scene → title card → scene, each its own row in the storyboard. Never lay a headline over a UI, device or picture: only short labels that belong to the rebuilt UI itself. The gate names a headline over a scene and a video carried by text (more than one word per second).';
 
 export const STYLES: Record<MotionStyle, StyleSpec> = {
   [MotionStyle.LaunchFilm]: {
@@ -80,11 +91,12 @@ export const STYLES: Record<MotionStyle, StyleSpec> = {
     junctions: [JunctionKind.Crossfade, JunctionKind.DipToBlack, JunctionKind.Blur, JunctionKind.Zoom, JunctionKind.PushLeft, JunctionKind.PushRight, JunctionKind.Wipe],
     entrances: [TransitionKind.None, TransitionKind.Fade, TransitionKind.Blur, TransitionKind.Scale, TransitionKind.SlideLeft, TransitionKind.SlideRight, TransitionKind.SlideUp],
     reading: READING,
-    forbidden: [Forbidden.Particles, Forbidden.Glow, Forbidden.Bounce, Forbidden.Crowded, Forbidden.Transition, Forbidden.Still, Forbidden.OffBeat, Forbidden.NoPeak, Forbidden.RoughCut, Forbidden.ReadingTime, Forbidden.Screenshots, Forbidden.MissingStoryBeat, Forbidden.Rushed],
+    forbidden: [Forbidden.Particles, Forbidden.Glow, Forbidden.Bounce, Forbidden.Crowded, Forbidden.Transition, Forbidden.Still, Forbidden.OffBeat, Forbidden.NoPeak, Forbidden.RoughCut, Forbidden.ReadingTime, Forbidden.Screenshots, Forbidden.MissingStoryBeat, Forbidden.Rushed, ...TITLE_CARDS],
     pace: { minGap: 0.25, hold: 0.5 },
     maxMoving: 4,
     rules: [
       'Launch film is the house style: the LOOK of an Apple keynote film, Linear, Vercel Ship or Stripe Sessions (few elements, very large type, the real product, a sober palette) with HIGH ENERGY. Minimal never means slow: the bar is "would a client pay for this?". Never a slideshow, a still picture, a slow fade, the same layout twice or a PowerPoint effect.',
+      TITLE_CARD_RULE,
       'Story first: four acts, problem (the user\'s pain in the brand\'s own words), solution (the product enters), proof (features shown live, numbers, results), claim (promise, original logo, address), about 20/15/45/20% of the length, each marked with mark_story; the gate names a missing act.',
       'Storyboard first: before the first edit write a table, one row per scene, grouped by act: time, beat, scene template, the line it says, the move (kinetic type, speed ramp, device fly, match cut, montage, peak, logo build).',
       'Music is always there and drives the cut: with no audio in the project call add_music first (mood and bpm that fit the brand; it lays the track and marks its beats), otherwise put the project music on an Audio clip, analyze_audio, mark_beats; then cut on the beat, never on a half beat (cut_to_beat). A scene lasts until every animation in it has finished, plus a 1–1.5 s hold; never cut while something is still moving. Longer beats compressed: fewer ideas, never faster cuts (3 to 5 scenes in 15 s). Backgrounds never show a cut-off or banded gradient.',
@@ -113,11 +125,12 @@ export const STYLES: Record<MotionStyle, StyleSpec> = {
     junctions: [JunctionKind.Crossfade, JunctionKind.DipToBlack, JunctionKind.Blur],
     entrances: [TransitionKind.None, TransitionKind.Fade, TransitionKind.Blur],
     reading: READING,
-    forbidden: [...CALM, Forbidden.ReadingTime],
+    forbidden: [...CALM, Forbidden.ReadingTime, ...TITLE_CARDS],
     pace: { minGap: 1, hold: 1 },
     maxMoving: 2,
     rules: [
       'Apple minimal is the house style: every frame should look like a frame of an Apple keynote or product film. Confident and calm: type snaps in and holds, the camera drifts slowly, one idea at a time.',
+      TITLE_CARD_RULE,
       'Build the video from the scene library: list_templates, then insert_template the builtin:scene-* scenes one after another and fill them with set_template_fields (real text, brand pictures, the one accent colour). Build primitives by hand only for something no scene can show.',
       'Storyboard first: before the first edit, write the plan as a short table, one row per scene: time, scene template, the line it says, the beat it lands on.',
       'One idea per scene, 2–4 s each. Type is either very large (one line that fills the frame) or very small; nothing in between. Lots of empty space.',
@@ -359,6 +372,34 @@ function missingStory(doc: MotionDoc): Found[] {
   return [{ at: 0, detail: `the story misses ${missing.join(', ')}: a brand or product film tells problem (the user's pain, in the brand's own words), solution (the product enters), proof (key features shown with live UI, numbers, results) and claim (promise, original logo, address), about ${STORY_BEATS.map((b) => `${Math.round(STORY_SHARE[b] * 100)}%`).join(' / ')} of the length; mark each act with mark_story` }];
 }
 
+const isHeadline = (clip: Clip) => HEADLINES.has(clip.component) && Number(clip.props.size ?? 0) >= HEADLINE_SIZE;
+
+const isScene = (clip: Clip) => SCENES.has(clip.component) || (clip.component === 'Image' && area(clip) >= MAIN_PICTURE_AREA && !veiled(clip));
+
+const shared = (a: Placed, b: Placed) => Math.min(a.from + a.clip.durationInFrames, b.from + b.clip.durationInFrames) - Math.max(a.from, b.from);
+
+function textOverScene(doc: MotionDoc): Found[] {
+  const all = placed(doc, doc.tracks, 0, new Set());
+  const scenes = all.filter((p) => isScene(p.clip));
+  return all
+    .filter((p) => isHeadline(p.clip))
+    .flatMap((text) => {
+      const under = scenes.find((s) => shared(text, s) > SHARED_SECONDS * doc.fps);
+      return under ? [{ clip: text.clip, at: Math.max(text.from, under.from), detail: `${text.clip.id} ("${String(text.clip.props.text ?? '')}") sits over the scene ${under.clip.id}: a title owns the whole frame. Put this line on its own title card before the scene (big, centred, nothing else), then cut to the scene; keep only short labels that belong to the UI inside it` }] : [];
+    });
+}
+
+function tooMuchText(doc: MotionDoc): Found[] {
+  const seconds = doc.durationInFrames / doc.fps;
+  const total = placed(doc, doc.tracks, 0, new Set())
+    .filter((p) => TEXT.has(p.clip.component))
+    .reduce((sum, p) => sum + words(p.clip), 0);
+  if (seconds < PEAK_FROM_S || total / seconds <= MAX_WORDS_PER_SECOND) {
+    return [];
+  }
+  return [{ at: 0, detail: `${total} words in ${Math.round(seconds)} s: the video is carried by text. Keep it to a few short title cards (at most ${MAX_WORDS_PER_SECOND} word per second of video) and let the scenes, the UI and the product tell the rest` }];
+}
+
 const CHECKS: Record<Forbidden, Check> = {
   ...(Object.fromEntries(Object.entries(CLIP_CHECKS).map(([effect, check]) => [effect, perTimeline(check)])) as Record<Forbidden, Check>),
   [Forbidden.OffBeat]: offBeat,
@@ -367,6 +408,8 @@ const CHECKS: Record<Forbidden, Check> = {
   [Forbidden.Screenshots]: screenshots,
   [Forbidden.MissingStoryBeat]: missingStory,
   [Forbidden.Rushed]: rushed,
+  [Forbidden.TextOverScene]: textOverScene,
+  [Forbidden.TooMuchText]: tooMuchText,
   [Forbidden.TooDense]: (doc, spec) => tooDense(doc, spec.pace.minGap).map((p) => ({ clip: p.clip, at: 0, detail: p.detail })),
   [Forbidden.LoopSeam]: (doc) => loopSeam(doc).map((p) => ({ clip: p.clip, at: doc.durationInFrames - 1, detail: p.detail }))
 };

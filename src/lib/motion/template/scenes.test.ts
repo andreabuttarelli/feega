@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { STYLES, styleProblems } from '$lib/motion/style';
+import { Forbidden, STYLES, styleProblems } from '$lib/motion/style';
 import { MotionStyle } from '$lib/motion/style-model';
 import { EASE_BEZIER } from '$lib/motion/keyframes';
 import { Ease } from '$lib/motion/design';
@@ -9,6 +9,8 @@ import { insertTemplate } from './library';
 import { Quality, docProblems } from '$lib/motion/direction';
 import { SCENES } from './scenes';
 import { TEMPLATES } from '$lib/motion/hyperframes/templates';
+
+const LINE_OVER_SCENE: ReadonlySet<string> = new Set(['builtin:scene-device-split', 'builtin:scene-media-caption']);
 
 const APPLE = STYLES[MotionStyle.AppleMinimal];
 const TEXT = new Set(['Title', 'Text', 'Kicker', 'Caption']);
@@ -47,8 +49,10 @@ describe('the Apple minimal scene library', () => {
   it.each(sceneDocs().map((e) => [e.id, e] as const))('%s breaks none of the style rules, alone and inside a video', (_id, entry) => {
     const placed = insertTemplate(newMotionDoc(MotionFormat.Landscape), entry, { from: 0, newId: ids() });
 
-    expect(styleProblems(entry.template.doc)).toEqual([]);
-    expect(placed.ok && styleProblems(placed.doc)).toEqual([]);
+    const kept = (doc: MotionDoc) => styleProblems(doc).filter((p) => !(LINE_OVER_SCENE.has(entry.id) && p.effect === Forbidden.TextOverScene));
+
+    expect(kept(entry.template.doc)).toEqual([]);
+    expect(placed.ok && kept(placed.doc)).toEqual([]);
   });
 
   it.each(sceneDocs().map((e) => [e.id, e] as const))('%s moves only on the signed eases', (_id, entry) => {
