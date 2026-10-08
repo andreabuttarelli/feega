@@ -45,7 +45,10 @@ const FORBIDDEN_GLOBALS: Record<string, string> = {
 
 export const FORBIDDEN_NAMES = Object.keys(FORBIDDEN_GLOBALS);
 
+const D3_CLOCK = 'd3 timers run on the clock: compute the state from tl progress in onUpdate';
+
 const FORBIDDEN_MEMBERS: Record<string, Record<string, string>> = {
+  d3: { timer: D3_CLOCK, interval: D3_CLOCK, timeout: D3_CLOCK, now: D3_CLOCK },
   Date: { now: 'time comes from tl, not the clock' },
   Math: { random: 'use rand(), seeded per clip' },
   document: { cookie: 'no cookies', domain: 'no access', write: 'build DOM inside root', defaultView: 'use root, not window' }
@@ -54,6 +57,7 @@ const FORBIDDEN_MEMBERS: Record<string, Record<string, string>> = {
 const FORBIDDEN_PROPERTIES: Record<string, string> = {
   constructor: 'no constructor access',
   __proto__: 'no prototype access',
+  transition: 'transitions run on the clock and do not seek: set the state from tl progress in onUpdate',
   toLocaleString: LOCALE,
   toLocaleDateString: LOCALE,
   toLocaleTimeString: LOCALE

@@ -67,6 +67,8 @@ export const COMPOSITION_ID = 'main';
 const RUNTIME_URL = `https://cdn.jsdelivr.net/npm/@hyperframes/core@${HYPERFRAMES_VERSION}/dist/hyperframe.runtime.iife.js`;
 export const LOTTIE_VERSION = '5.13.0';
 const LOTTIE_URL = `https://cdn.jsdelivr.net/npm/lottie-web@${LOTTIE_VERSION}/build/player/lottie_light.min.js`;
+export const D3_VERSION = '7.9.0';
+const D3_URL = `https://cdn.jsdelivr.net/npm/d3@${D3_VERSION}/dist/d3.min.js`;
 const THREE_BASE = `https://cdn.jsdelivr.net/npm/three@${THREE_VERSION}/`;
 const FONTS_URL = 'https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Fragment+Mono&display=block';
 
@@ -443,7 +445,8 @@ function customRun(clip: MotionClip, ctx: TemplateCtx<ComponentId>, components: 
 
 const LIBRARY_TAGS: Record<Library, { scripts: string[]; tag: string }> = {
   [Library.Lottie]: { scripts: [LOTTIE_URL], tag: `<script src="${LOTTIE_URL}"></script>` },
-  [Library.Three]: { scripts: [THREE_BASE], tag: '' }
+  [Library.Three]: { scripts: [THREE_BASE], tag: '' },
+  [Library.D3]: { scripts: [D3_URL], tag: `<script src="${D3_URL}"></script>` }
 };
 
 function brandEnv(tokens: BrandTokens) {

@@ -45,17 +45,20 @@ export const SHADOWED = [
 
 export enum Library {
   Lottie = 'lottie',
-  Three = 'THREE'
+  Three = 'THREE',
+  D3 = 'd3'
 }
 
 const USES: Record<Library, RegExp> = {
   [Library.Lottie]: /\blottie\b/,
-  [Library.Three]: /\bTHREE\b/
+  [Library.Three]: /\bTHREE\b/,
+  [Library.D3]: /\bd3\b/
 };
 
 const GLOBALS: Record<Library, string> = {
   [Library.Lottie]: 'lottie',
-  [Library.Three]: THREE_GLOBAL
+  [Library.Three]: THREE_GLOBAL,
+  [Library.D3]: 'd3'
 };
 
 export function librariesOf(components: CustomComponents, used: Iterable<string>): Set<Library> {

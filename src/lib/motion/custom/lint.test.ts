@@ -29,7 +29,13 @@ describe('the authoring contract', () => {
     ['const d = new Date();', 'new Date()'],
     ['const r = Math.random();', 'Math.random'],
     ['const F = (() => {}).constructor;', 'constructor'],
-    ['performance.now();', 'performance']
+    ['performance.now();', 'performance'],
+    ['d3.timer(() => {});', 'd3.timer'],
+    ['d3.interval(f, 10);', 'd3.interval'],
+    ['d3.timeout(f, 10);', 'd3.timeout'],
+    ['d3.now();', 'd3.now'],
+    ['d3.select(root).transition().attr("x", 1);', 'transition'],
+    ['d3.transition();', 'transition']
   ])('refuses %s', (js, name) => {
     expect(problemsOf({ js }).join(' ')).toContain(name);
   });

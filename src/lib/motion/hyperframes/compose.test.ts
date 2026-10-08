@@ -390,6 +390,14 @@ describe('custom components in the composition', () => {
   const custom = must(addClip(must(writeComponent(newMotionDoc(MotionFormat.Landscape), 'NodeGraph', graph)), { component: 'Custom', from: 30, durationInFrames: 60, props: { name: 'NodeGraph', picture: 'img1' } }, 'g1'));
   const html = compose(custom, { img1: 'https://store.supabase.co/storage/v1/object/sign/a.png?token=t' });
 
+  it('loads d3 only for a component that uses it', () => {
+    const chart = { ...graph, source: { ...graph.source, js: 'd3.select(root).append("svg");' } };
+    const charted = must(addClip(must(writeComponent(newMotionDoc(MotionFormat.Landscape), 'Chart', chart)), { component: 'Custom', from: 0, durationInFrames: 60, props: { name: 'Chart' } }, 'c1'));
+
+    expect(compose(charted)).toMatch(/<script src="https:\/\/cdn\.jsdelivr\.net\/npm\/d3@[\d.]+\/dist\/d3\.min\.js"><\/script>/);
+    expect(html).not.toContain('/npm/d3@');
+  });
+
   it('renders the component markup under a root scoped to the clip', () => {
     expect(html).toContain('<div class="cc" id="cc-g1" data-component="NodeGraph"><style>@scope (#cc-g1) {.node{background:#111}}</style><div class="node"></div></div>');
   });

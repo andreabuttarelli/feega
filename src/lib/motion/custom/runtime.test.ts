@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
+import * as d3 from 'd3';
 import { installEngine, testTimeline, type TestTimeline } from '../engine/testing';
 import { ERRORS, REGISTRY, bootScript, definitionScript, librariesOf, Library, seedOf, type CustomRun } from './runtime';
 
@@ -104,5 +105,29 @@ describe('libraries', () => {
 
     expect([...librariesOf(components, ['A'])]).toEqual([]);
     expect([...librariesOf(components, ['B'])]).toEqual([Library.Lottie]);
+  });
+
+  it('loads d3 for a component that names it', () => {
+    const components = { C: { source: { html: '', css: '', js: 'const x = d3.scaleLinear()' } } } as never;
+
+    expect([...librariesOf(components, ['C'])]).toEqual([Library.D3]);
+  });
+
+  it('a d3 chart drawn from progress gives the same frame from any seek order', () => {
+    (window as unknown as Record<string, unknown>).d3 = d3;
+    const js = 'const svg = d3.select(root).append("svg"); const bars = svg.selectAll("rect").data([3, 9, 5]).join("rect"); const y = d3.scaleLinear().domain([0, 9]).range([0, 300]); tl.to({}, { duration: 2, ease: "none", onUpdate() { const p = this.progress(); bars.attr("height", (d) => y(d) * d3.easeCubicOut(p)).attr("fill", d3.interpolateRgb("#000", "#09f")(p)); } }, 0);';
+    const { master, root, errors } = run('Bars', js, 0);
+    const frame = (t: number) => {
+      master.seek(t);
+      return root.innerHTML;
+    };
+
+    const first = frame(1.3);
+    frame(1.9);
+    frame(0.2);
+
+    expect(errors).toEqual([]);
+    expect(first).toContain('<rect');
+    expect(frame(1.3)).toBe(first);
   });
 });
