@@ -11,6 +11,7 @@ import { insertTemplate } from './template/library';
 import { MotionStyle } from './style-model';
 import { UI_KIT, UiKind } from './ui-kit/kit';
 import { writeComponent } from './custom/ops';
+import { ComponentMode } from './custom/component';
 
 function must(r: { ok: true; doc: MotionDoc } | { ok: false; error: string }): MotionDoc {
   if (!r.ok) {
@@ -411,3 +412,16 @@ describe('a background has no seams', () => {
     expect(seams(backdrop({ shape: 'ellipse', x: 0.5, y: 0.4, width: 0.3, height: 0.3 }))).toEqual([]);
   });
 });
+
+describe('a live scene in a video', () => {
+  const game = { source: { html: '', css: '', js: 'requestAnimationFrame(() => {});' }, propsSchema: { type: 'object' as const, properties: {} }, mode: ComponentMode.Live };
+  const played = must(addClip(must(writeComponent(newMotionDoc(MotionFormat.Landscape), 'Game', game)), { component: 'Custom', from: 30, durationInFrames: 60, props: { name: 'Game' } }, 'g1'));
+
+  it('warns that the video shows a still and points at the embed, without blocking', () => {
+    const live = docProblems(played, { audioAssets: 1 }).filter((p) => p.kind === Quality.LiveScene);
+
+    expect(live).toEqual([expect.objectContaining({ at: 1, detail: expect.stringContaining('export it as Embed') })]);
+    expect(blocking(live)).toEqual([]);
+  });
+});
+
