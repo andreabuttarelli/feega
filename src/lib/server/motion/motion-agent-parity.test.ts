@@ -17,7 +17,7 @@ const DOC: Record<string, Access> = {
   fields: { write: ['expose_field', 'unexpose_field', 'insert_template', 'set_template_fields'], read: 'fields' },
   width: { write: ['set_canvas'], read: 'width' },
   height: { write: ['set_canvas'], read: 'height' },
-  durationInFrames: { write: ['set_canvas'], read: 'duration' },
+  durationInFrames: { write: ['set_canvas', 'fit_duration'], read: 'duration' },
   tracks: { write: ['add_track', 'set_track', 'remove_track'], read: 'tracks' },
   comps: { write: ['precompose', 'edit_comp', 'insert_template', 'detach_template'], read: 'comps' },
   assets: { write: ['add_asset', 'remove_asset'], read: 'assets' },

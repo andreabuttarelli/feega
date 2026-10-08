@@ -245,6 +245,30 @@ describe('empty frames', () => {
     expect(empty(frameProblems([{ time: 1, luma: 120, ...flat }, { time: 1.1, luma: 125, ...flat }]))).toEqual([]);
   });
 
+  const tail = (doc: MotionDoc) => docProblems(doc, { audioAssets: 0 }).filter((p) => p.kind === Quality.TrailingEmpty || p.kind === Quality.EmptyFrames);
+  const phones = (seconds: number) => must(addClip({ ...newMotionDoc(MotionFormat.Landscape), durationInFrames: seconds * 30 }, { component: 'Device3D', from: 0, durationInFrames: 6 * 30, props: {} }, 'phones'));
+
+  it('a 15 s film whose content ends at 6 s is blocked for its empty tail', () => {
+    const found = tail(phones(15));
+
+    expect(found.map((p) => [p.kind, p.at])).toEqual([[Quality.TrailingEmpty, 6]]);
+    expect(blocking(found)).toHaveLength(1);
+  });
+
+  it('a tail under half a second after the last content passes', () => {
+    const doc = must(addClip({ ...newMotionDoc(MotionFormat.Landscape), durationInFrames: 6 * 30 + 12 }, { component: 'Device3D', from: 0, durationInFrames: 6 * 30, props: {} }, 'phones'));
+
+    expect(tail(doc)).toEqual([]);
+  });
+
+  it('content faded to black at 6 s and left on to 15 s is an empty tail', () => {
+    const doc = phones(15);
+    const black = { opacity: [{ frame: 150, value: 1, ease: Ease.Linear }, { frame: 180, value: 0, ease: Ease.Linear }] };
+    const faded = { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => ({ ...c, durationInFrames: 15 * 30, keyframes: black })) })) };
+
+    expect(tail(faded).map((p) => [p.kind, p.at])).toEqual([[Quality.TrailingEmpty, 6]]);
+  });
+
   it('an empty frame blocks delivery', () => {
     expect(SEVERITY[Quality.EmptyFrames]).toBe(Severity.Blocking);
   });

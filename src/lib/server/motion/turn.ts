@@ -17,6 +17,7 @@ import { screenModelInput } from '$lib/server/moderation/model-input';
 import { ModerationProfile } from '$lib/server/moderation/profiles';
 import { blockedPrompt } from '$lib/server/moderation/blocked-response';
 import { assetUrls, headOrNew, motionAssets, motionTokens, saveMotionDoc } from '$lib/server/motion/editor';
+import { fitNewVideo } from '$lib/motion/fit-duration';
 import { createMotionTools, selectionNote, type MotionSession } from '$lib/server/motion/motion-tools';
 import { templateLibrary } from '$lib/server/motion/templates';
 import { analyzeSounds, storageAnalysis } from '$lib/server/motion/audio-analysis';
@@ -294,6 +295,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
   const labelOf = (modelId: string) => (modelId === model ? 'motion-agent' : modelId === codeModel ? 'motion-agent-code' : 'motion-agent-vision');
 
   async function finishTurn(steps: TurnStep[]): Promise<TurnOutcome> {
+    session.doc = fitNewVideo(head.doc, session.doc);
     const write = session.edits.length
       ? await saveMotionDoc(db, { orgId, nodeId: motion.record.id, expectedVersion: session.baseVersion, doc: session.doc, actor, summary: session.edits.join(', ') })
       : null;
