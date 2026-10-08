@@ -161,7 +161,7 @@ describe('audio', () => {
   });
 
   it('reads every live input at its default when nothing is connected', () => {
-    expect(run('input.pointer.x + input.pointer.y')).toBe(1);
+    expect(run('input.pointer.x + input.pointer.y')).toBe(fallbackPort(1).read(InputKey.PointerX) + fallbackPort(1).read(InputKey.PointerY));
     expect(run('input.pointer.down + input.hover + input.tilt.x + input.tilt.y + input.scroll')).toBe(0);
     expect(run('input.time')).toBe(1);
   });
@@ -171,7 +171,7 @@ describe('audio', () => {
 
     expect(run('(input.pointer.x - 0.5) * 100', { input })).toBeCloseTo(40);
     expect(run('input.tilt.y * 20 + input.scroll', { input })).toBeCloseTo(-9.75);
-    expect(run('input.pointer.y + input.time', { input })).toBe(2.5);
+    expect(run('input.pointer.y + input.time', { input })).toBe(fallbackPort(2).read(InputKey.PointerY) + 2);
   });
 
   it('smooths through the port, one slot per call in reading order', () => {

@@ -17,10 +17,11 @@ export enum Crossing {
 type InputSpec = { fallback: (seconds: number) => number; crossing: Crossing; about: string };
 
 const constant = (n: number) => () => n;
+const wander = (reach: number, periodSeconds: number) => (seconds: number) => 0.5 + reach * Math.sin((2 * Math.PI * seconds) / periodSeconds);
 
 export const INPUTS: Record<InputKey, InputSpec> = {
-  [InputKey.PointerX]: { fallback: constant(0.5), crossing: Crossing.Local, about: 'cursor or finger across the player, 0 left .. 1 right' },
-  [InputKey.PointerY]: { fallback: constant(0.5), crossing: Crossing.Local, about: 'cursor or finger down the player, 0 top .. 1 bottom' },
+  [InputKey.PointerX]: { fallback: wander(0.22, 7), crossing: Crossing.Local, about: 'cursor or finger across the player, 0 left .. 1 right' },
+  [InputKey.PointerY]: { fallback: wander(0.14, 4.6), crossing: Crossing.Local, about: 'cursor or finger down the player, 0 top .. 1 bottom' },
   [InputKey.PointerDown]: { fallback: constant(0), crossing: Crossing.Global, about: '1 while pressed' },
   [InputKey.Hover]: { fallback: constant(0), crossing: Crossing.Local, about: '1 while the cursor is over the player (or over the layer box it lives in)' },
   [InputKey.TiltX]: { fallback: constant(0), crossing: Crossing.Global, about: 'phone tilted left -1 .. right 1' },
@@ -85,4 +86,4 @@ export function readsInput(source: string): boolean {
   return READS_INPUT.test(source);
 }
 
-export const INPUT_GUIDE = `Live input (interactive web export only): ${INPUT_KEYS.map((k) => `input.${k} (${INPUTS[k].about})`).join('; ')}; input.smooth(v, seconds) eases v towards its target over about that many seconds. In the preview, in video renders and when an input is missing every input reads its default (pointer 0.5, tilt/scroll/hover/down 0, time = timeline seconds), so videos stay identical. Inside a precomp the cursor reads in that precomp's own box. Live input drives transforms, number props and liquid glass/blob props; on any other property it is refused.`;
+export const INPUT_GUIDE = `Live input (interactive web export only): ${INPUT_KEYS.map((k) => `input.${k} (${INPUTS[k].about})`).join('; ')}; input.smooth(v, seconds) eases v towards its target over about that many seconds. In the preview, in video renders and when an input is missing every input reads its default (pointer wanders gently around the centre, 0.5 ± 0.22 across and ± 0.14 down, starting at 0.5; tilt/scroll/hover/down 0; time = timeline seconds), so the preview matches the video and a cursor-driven effect still moves in a render. Inside a precomp the cursor reads in that precomp's own box. Live input drives transforms, number props and liquid glass/blob props; on any other property it is refused.`;

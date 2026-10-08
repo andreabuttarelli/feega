@@ -5,6 +5,7 @@ import { addClip, setKeyframes, setTransform } from '../timeline';
 import { sampleTrack } from '../keyframes';
 import { setCameraExpression, setExpression } from './ops';
 import { bakeExpressions, expressionErrors, expressionValue } from './bake';
+import { InputKey, fallbackPort } from './inputs';
 import { setCamera } from '../camera-ops';
 
 function ok(result: { ok: true; doc: MotionDoc } | { ok: false; error: string }): MotionDoc {
@@ -138,9 +139,11 @@ describe('audio-reactive expressions', () => {
 
   it('bakes an input expression exactly as its defaults, so the video never depends on a cursor', () => {
     const live = ok(setExpression(ok(setExpression(twoShapes(), 'a', 'rotateY', '(input.pointer.x - 0.5) * 30 + input.tilt.x * 20')), 'a', 'x', 'value + input.scroll + input.time * 0'));
-    const literal = ok(setExpression(ok(setExpression(twoShapes(), 'a', 'rotateY', '(0.5 - 0.5) * 30 + 0 * 20')), 'a', 'x', 'value + 0'));
+    const literal = ok(setExpression(twoShapes(), 'a', 'x', 'value + 0'));
+    const frame = 45;
 
-    expect(bakeExpressions(live)).toEqual(bakeExpressions(literal));
+    expect(expressionValue(live, 'a', 'rotateY', frame)).toBeCloseTo((fallbackPort(frame / live.fps).read(InputKey.PointerX) - 0.5) * 30);
+    expect(findClip(bakeExpressions(live), 'a')!.clip.keyframes.x).toEqual(findClip(bakeExpressions(literal), 'a')!.clip.keyframes.x);
     expect(bakeExpressions(live)).toEqual(bakeExpressions(live));
   });
 });
