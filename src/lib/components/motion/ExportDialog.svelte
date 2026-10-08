@@ -13,7 +13,7 @@
   import { RenderPlace, renderPlace, thisDevice, type Device } from '$lib/motion/render-place';
   import { saveExport } from '$lib/motion/export/save';
   import type { FrameSize } from './MotionPreview.svelte';
-  import { unverified } from '$lib/motion/custom/determinism';
+  import { liveComponents, liveNote, unverified } from '$lib/motion/custom/determinism';
   import { CheckState } from '$lib/motion/custom/component';
   import { deserialize } from '$app/forms';
   import { HOLD_BUFFER, renderQuote } from '$lib/motion/render-quote';
@@ -149,6 +149,7 @@
   const remaining = $derived(eta({ done, total, elapsedMs: now - startedAt }));
   const busy = $derived(phase === Phase.Mixing || phase === Phase.Rendering || phase === Phase.Saving);
   const blockers = $derived(unverified(doc));
+  const live = $derived(liveComponents(doc));
   const BLOCKER_LABEL: Record<CheckState, string> = { [CheckState.Unchecked]: 'is still being checked', [CheckState.Failed]: 'failed the seek check', [CheckState.Passed]: '' };
   const hasAudio = $derived(withAudio && sounds.length > 0);
   const place = $derived(caps && device ? renderPlace({ doc: target, settings, capabilities: caps, device, background, hasAudio }) : null);
@@ -394,6 +395,9 @@
         <p class="warn" role="alert" data-testid="export-failed">Server render failed: {job.error ?? job.status}. Nothing was charged.</p>
       {/if}
       {#if serverError}<p class="warn" role="alert">{serverError}</p>{/if}
+      {#if live.length}
+        <p class="warn" role="alert" data-testid="export-live">{liveNote(live)}. <button type="button" class="link" onclick={() => (mode = ExportMode.Interactive)}>Embed on a website</button></p>
+      {/if}
 
       {#if PROGRESS_LABEL[phase]}
         <div class="progress" data-testid="export-progress">

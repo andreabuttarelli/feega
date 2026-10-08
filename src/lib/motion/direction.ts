@@ -1,5 +1,5 @@
 import { COMPONENTS, TrackKind, type ComponentId } from './components';
-import type { MotionDoc } from './doc';
+import { clipsOf, type MotionDoc } from './doc';
 import { DEVICE, Device } from './devices';
 import { Forbidden, styleOf, styleProblems } from './style';
 import { MotionStyle } from './style-model';
@@ -11,6 +11,7 @@ import { FillKind, ShapeKind } from './shape/schema';
 import { CutFault, cutProblems } from './cuts';
 import { scriptDrift } from './script-drift';
 import { contentEnd, shownSpans, type Span } from './fit-duration';
+import { liveComponents, liveNote } from './custom/determinism';
 
 export enum Quality {
   RepeatedLayout = 'repeated-layout',
@@ -34,7 +35,8 @@ export enum Quality {
   CutMidAnimation = 'cut-mid-animation',
   NoHold = 'no-hold',
   ScriptDrift = 'script-drift',
-  BackgroundSeam = 'background-seam'
+  BackgroundSeam = 'background-seam',
+  LiveScene = 'live-scene'
 }
 
 export enum Severity {
@@ -67,6 +69,7 @@ export const SEVERITY: Record<Check, Severity> = {
   [Quality.NoHold]: Severity.Blocking,
   [Quality.ScriptDrift]: Severity.Blocking,
   [Quality.BackgroundSeam]: Severity.Warning,
+  [Quality.LiveScene]: Severity.Warning,
   [Forbidden.Particles]: Severity.Warning,
   [Forbidden.Glow]: Severity.Warning,
   [Forbidden.Rotation]: Severity.Warning,
@@ -474,10 +477,17 @@ function backgroundSeams(doc: MotionDoc): QualityProblem[] {
   });
 }
 
+function liveScenes(doc: MotionDoc): QualityProblem[] {
+  return liveComponents(doc).map((name) => {
+    const first = clipsOf(doc).find((c) => c.component === 'Custom' && c.props.name === name);
+    return { kind: Quality.LiveScene, at: seconds(doc, first?.from ?? 0), detail: liveNote([name]) };
+  });
+}
+
 export function docProblems(doc: MotionDoc, input: { audioAssets: number; pixels?: Pixels; logos?: readonly string[] }): QualityProblem[] {
   const list = scenes(doc);
   const pixels = input.pixels ?? {};
-  return [...unscripted(doc), ...drifted(doc), ...clickMisses(doc), ...emptyUis(doc), ...stillUis(doc), ...repeated(doc, list), ...smallTitles(doc), ...silent(doc, input.audioAssets), ...softPictures(doc, pixels), ...croppedScreens(doc, pixels), ...alteredLogos(doc, new Set(input.logos ?? [])), ...outOfFrame(doc), ...tiltedText(doc), ...emptyFrames(doc), ...trailingEmpty(doc), ...smallLogos(doc, pixels), ...cutsMidAnimation(doc), ...backgroundSeams(doc), ...styleProblems(doc).map((p) => ({ kind: Quality.OffStyle, at: p.at, effect: p.effect, detail: p.detail }))];
+  return [...unscripted(doc), ...drifted(doc), ...clickMisses(doc), ...emptyUis(doc), ...stillUis(doc), ...repeated(doc, list), ...smallTitles(doc), ...silent(doc, input.audioAssets), ...softPictures(doc, pixels), ...croppedScreens(doc, pixels), ...alteredLogos(doc, new Set(input.logos ?? [])), ...outOfFrame(doc), ...tiltedText(doc), ...emptyFrames(doc), ...trailingEmpty(doc), ...smallLogos(doc, pixels), ...cutsMidAnimation(doc), ...backgroundSeams(doc), ...liveScenes(doc), ...styleProblems(doc).map((p) => ({ kind: Quality.OffStyle, at: p.at, effect: p.effect, detail: p.detail }))];
 }
 
 export function frameProblems(stats: readonly FrameStat[]): QualityProblem[] {

@@ -8,13 +8,16 @@ import { FEEGA_TOKENS } from '$lib/motion/brand';
 import { RenderQueue } from '$lib/motion/server-render';
 import { Reaction } from '$lib/motion/interactive/summary';
 import { DEFAULT_INTERACTIVE } from '$lib/motion/interactive/settings';
+import { addClip, type OpResult } from '$lib/motion/timeline';
+import { writeComponent } from '$lib/motion/custom/ops';
+import { ComponentMode } from '$lib/motion/custom/component';
 
 const doc = newMotionDoc(MotionFormat.Landscape);
 
-function dialog(start: ExportMode | null = null) {
+function dialog(start: ExportMode | null = null, shown = doc) {
   return render(ExportDialog, {
     props: {
-      doc,
+      doc: shown,
       assetUrls: {},
       scope: { orgId: 'o', projectId: 'p', nodeId: 'n' },
       editorUrl: '/p/p/c/c/motion/n',
@@ -125,3 +128,23 @@ describe('the embed path discloses step by step', () => {
     expect(body).toContain('data-testid="interactive-weight"');
   });
 });
+
+describe('a live scene in the video export', () => {
+  const must = (r: OpResult) => {
+    if (!r.ok) {
+      throw new Error(r.error);
+    }
+    return r.doc;
+  };
+  const game = { source: { html: '', css: '', js: 'requestAnimationFrame(() => {});' }, propsSchema: { type: 'object' as const, properties: {} }, mode: ComponentMode.Live };
+  const played = must(addClip(must(writeComponent(newMotionDoc(MotionFormat.Landscape), 'Game', game)), { component: 'Custom', from: 0, durationInFrames: 60, props: { name: 'Game' } }, 'g1'));
+
+  it('says the video shows a still and offers the embed', () => {
+    const body = dialog(ExportMode.Video, played);
+
+    expect(body).toContain('data-testid="export-live"');
+    expect(body).toContain('export it as Embed');
+    expect(dialog(ExportMode.Video)).not.toContain('data-testid="export-live"');
+  });
+});
+

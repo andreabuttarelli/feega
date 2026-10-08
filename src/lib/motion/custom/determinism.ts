@@ -68,6 +68,8 @@ export type Unverified = { name: string; state: CheckState };
 
 const usedComponents = (doc: MotionDoc) => new Set(clipsOf(doc).filter((c) => c.component === 'Custom').map((c) => String(c.props.name)));
 
+export const liveNote = (names: readonly string[]) => `${names.join(', ')} ${names.length === 1 ? 'is' : 'are'} live: it will look different in the video (a still stands in); export it as Embed`;
+
 export function liveComponents(doc: MotionDoc): string[] {
   return [...usedComponents(doc)].filter((name) => doc.components[name]?.mode === ComponentMode.Live);
 }
