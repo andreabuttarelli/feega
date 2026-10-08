@@ -174,12 +174,14 @@ code:
   next case is added with a row and all of them are visible together. A rule written in five
   places diverges at the first change — and diverges silently.
 
-## Angoli quadrati, ovunque (una regola, non un'abitudine)
+## Cerchi o rettangoli, niente in mezzo (una regola, non un'abitudine)
 
-**Nessun border radius.** Pagine, componenti, menu, nodi della tela, avatar, badge, pill: tutto a
-0px. La regola vive in un token, `--radius: 0rem` in `src/lib/styles/tailwind.css`, da cui
-derivano `--radius-sm/md/lg/xl`: niente classi `rounded-*`, niente `border-radius` scritti a
-mano, niente `rx`/`ry` sugli SVG.
+**Una forma è un rettangolo a spigoli vivi o un cerchio perfetto.** Pagine, pannelli, menu, nodi
+della tela, card, input, badge: rettangoli a 0px. Bottoni-icona, avatar, pallini di stato, pill di
+un bottone possono essere **completamente tondi** (`rounded-full`, `border-radius: 9999px`/`50%`).
+Mai un raggio intermedio: niente `rounded-md`, niente `border-radius: 8px`. Il token resta
+`--radius: 0rem` in `src/lib/styles/tailwind.css` (da cui `--radius-sm/md/lg/xl`); l'unica
+eccezione scritta è il tondo pieno. Sugli SVG `rx`/`ry` solo per disegnare un cerchio o una pill.
 
 ## L'app comanda, CLI e MCP si adattano (una regola, non un'abitudine)
 
