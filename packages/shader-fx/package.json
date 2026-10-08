@@ -4,9 +4,11 @@
   "version": "0.0.0",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./gl": "./src/gl.ts"
   },
   "dependencies": {
+    "twgl.js": "7.0.0",
     "zod": "^4.4.3"
   }
 }
