@@ -61,6 +61,21 @@ async function hoverOnly(page: Page): Promise<string[]> {
   });
 }
 
+const LONG_PRESS_HOLD_MS = 800;
+const EDGE_PX = 24;
+
+async function longPress(page: Page, selector: string): Promise<void> {
+  const target = page.locator(selector).first();
+  await target.scrollIntoViewIfNeeded();
+  const box = (await target.boundingBox())!;
+  const right = page.viewportSize()!.width - EDGE_PX;
+  const point = { x: Math.min(box.x + box.width / 2, right), y: box.y + box.height / 2 };
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });
+  await page.waitForTimeout(LONG_PRESS_HOLD_MS);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+}
+
 async function openEditor(page: Page, url: string): Promise<void> {
   await gotoHydrated(page, url);
   await page.getByRole('button', { name: 'Add', exact: true }).click();
@@ -130,6 +145,48 @@ test.describe('motion editor a dito @real', () => {
       });
     });
   }
+
+  test.describe('clip a dito', () => {
+    test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
+
+    test('una pressione lunga sul clip apre il suo menu, e da lì si sceglie il parent', async ({ page, session, seedNode }) => {
+      const node = await seedNode({ type: 'motion', data: MOTION_DATA });
+      await openEditor(page, `/p/${session.projectId}/c/${session.canvasId}/motion/${node.id}`);
+      await page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Properties' }).click();
+
+      await expect(page.getByTestId('clip-bar')).toBeVisible();
+      await longPress(page, '[data-layer="bar-1"] .bar');
+      const menu = page.getByRole('menu', { name: 'Clip' });
+      await expect(menu).toBeVisible();
+      if (SHOTS) {
+        await page.screenshot({ path: `${SHOTS}/iphone-clip-menu.png` });
+      }
+
+      await menu.getByRole('menuitem', { name: 'Parent to…' }).click();
+      await page.getByRole('menu', { name: 'Parent to' }).getByRole('menuitem').nth(1).click();
+      await expect(page.locator('[data-layer="bar-1"] em.parent')).toBeAttached();
+    });
+
+    test('Select several aggiunge clip con un tocco, senza tasti', async ({ page, session, seedNode }) => {
+      const node = await seedNode({ type: 'motion', data: MOTION_DATA });
+      await openEditor(page, `/p/${session.projectId}/c/${session.canvasId}/motion/${node.id}`);
+      await page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Properties' }).click();
+
+      await page.getByTestId('clip-bar').getByRole('button', { name: 'Select several' }).click();
+      await page.locator('[data-layer="bar-1"] .bar').first().tap();
+      await expect(page.getByTestId('clip-bar')).toContainText('2 selected');
+      await page.getByTestId('clip-bar').getByRole('button', { name: 'Done' }).click();
+      await expect(page.getByTestId('clip-bar')).not.toContainText('selected');
+    });
+  });
+
+  test('il tasto destro apre lo stesso menu del clip', async ({ page, session, seedNode }) => {
+    const node = await seedNode({ type: 'motion', data: MOTION_DATA });
+    await openEditor(page, `/p/${session.projectId}/c/${session.canvasId}/motion/${node.id}`);
+
+    await page.locator('[data-layer="bar-1"] .bar').first().click({ button: 'right' });
+    await expect(page.getByRole('menu', { name: 'Clip' }).getByRole('menuitem', { name: 'Parent to…' })).toBeVisible();
+  });
 
   test('il clock apre un menu timecode / frames', async ({ page, session, seedNode }) => {
     const node = await seedNode({ type: 'motion', data: MOTION_DATA });

@@ -7,12 +7,32 @@
 
 <script lang="ts">
   import { ACTIONS, shortcutOf } from '$lib/motion/actions';
+  import type { Point } from '$lib/motion/press-menu';
 
-  let { sections, onclose }: { sections: MenuBlock[]; onclose: () => void } = $props();
+  type Props = { sections: MenuBlock[]; onclose: () => void; at?: Point | null; label?: string };
+
+  let { sections, onclose, at = null, label = 'More actions' }: Props = $props();
 
   const MARGIN_PX = 12;
+  const SHEET = '(max-width: 759px)';
+
+  const clamp = (value: number, max: number) => Math.max(MARGIN_PX, Math.min(value, max - MARGIN_PX));
+
+  function atPoint(node: HTMLElement, point: Point) {
+    node.style.setProperty('--room', `${innerHeight - 2 * MARGIN_PX}px`);
+    const box = node.getBoundingClientRect();
+    node.style.position = 'fixed';
+    node.style.right = 'auto';
+    node.style.bottom = 'auto';
+    node.style.left = `${clamp(point.x, innerWidth - box.width)}px`;
+    node.style.top = `${clamp(point.y, innerHeight - box.height)}px`;
+  }
 
   const fitAbove = (node: HTMLElement) => {
+    if (at && !matchMedia(SHEET).matches) {
+      atPoint(node, at);
+      return;
+    }
     const top = node.parentElement?.getBoundingClientRect().top ?? innerHeight;
     node.style.setProperty('--room', `${Math.max(top - MARGIN_PX, 0)}px`);
   };
@@ -23,7 +43,7 @@
   };
 </script>
 
-<div class="overflow" use:fitAbove role="menu" aria-label="More actions" data-testid="overflow-menu">
+<div class="overflow" use:fitAbove role="menu" aria-label={label} data-testid="overflow-menu">
   {#each sections.filter((s) => s.items.length) as block (block.section)}
     <span class="head">{block.section}</span>
     {#each block.items as item, i (item.id ?? `${block.section}-${i}`)}

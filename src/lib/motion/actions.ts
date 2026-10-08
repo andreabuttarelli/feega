@@ -58,6 +58,9 @@ import Shuffle from '@lucide/svelte/icons/shuffle';
 import ArrowRight from '@lucide/svelte/icons/arrow-right';
 import CircleDashed from '@lucide/svelte/icons/circle-dashed';
 import Group from '@lucide/svelte/icons/group';
+import FolderOpen from '@lucide/svelte/icons/folder-open';
+import CopyCheck from '@lucide/svelte/icons/copy-check';
+import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
 import ChartSpline from '@lucide/svelte/icons/chart-spline';
 import AudioWaveform from '@lucide/svelte/icons/audio-waveform';
 import ScissorsLineDashed from '@lucide/svelte/icons/scissors-line-dashed';
@@ -94,7 +97,11 @@ export enum Tool {
   InOrder = 'in-order',
   GraphMode = 'graph-mode',
   MarkBeats = 'mark-beats',
-  CutToBeat = 'cut-to-beat'
+  CutToBeat = 'cut-to-beat',
+  OpenComp = 'open-comp',
+  ParentTo = 'parent-to',
+  SelectSeveral = 'select-several',
+  ClipProperties = 'clip-properties'
 }
 
 export const Action = { ...Command, ...Tool } as const;
@@ -119,7 +126,8 @@ export enum Place {
   Track = 'a track header',
   Layer = 'a layer row',
   Graph = 'the graph editor',
-  Menu = 'the ⋯ menu'
+  Menu = 'the ⋯ menu',
+  Clip = 'the clip bar or a long press on the clip'
 }
 
 export enum MenuSection {
@@ -217,6 +225,10 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Tool.InOrder]: { name: 'Keep the order', icon: ArrowRight },
   [Tool.GraphMode]: { name: 'Graph editor', icon: ChartSpline, group: GuideGroup.Timeline, menu: MenuSection.View },
   [Tool.MarkBeats]: { name: 'Mark the beats', icon: AudioWaveform, group: GuideGroup.Timeline, menu: MenuSection.Time },
+  [Tool.OpenComp]: { name: 'Open composition', icon: FolderOpen, group: GuideGroup.Edit, place: Place.Clip, gesture: 'Double-click the clip' },
+  [Tool.ParentTo]: { name: 'Parent to…', icon: Link2, group: GuideGroup.Edit, place: Place.Clip },
+  [Tool.SelectSeveral]: { name: 'Select several', icon: CopyCheck, group: GuideGroup.Edit, place: Place.Clip },
+  [Tool.ClipProperties]: { name: 'Properties', icon: SlidersHorizontal, place: Place.Clip },
   [Tool.CutToBeat]: { name: 'Cut to the beat', icon: ScissorsLineDashed, group: GuideGroup.Edit, menu: MenuSection.Time }
 };
 
