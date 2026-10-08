@@ -49,6 +49,8 @@ const D3_CLOCK = 'd3 timers run on the clock: compute the state from tl progress
 
 const P5_CLOCK = 'a p5 sketch is redrawn on every seek: draw from p.frameCount, never on its own loop or clock';
 
+const PIXI_CLOCK = 'a PixiJS ticker runs on the clock: set the stage in an onUpdate on tl and call app.render() there';
+
 const FORBIDDEN_MEMBERS: Record<string, Record<string, string>> = {
   d3: { timer: D3_CLOCK, interval: D3_CLOCK, timeout: D3_CLOCK, now: D3_CLOCK },
   Date: { now: 'time comes from tl, not the clock' },
@@ -64,6 +66,8 @@ const FORBIDDEN_PROPERTIES: Record<string, string> = {
   frameRate: P5_CLOCK,
   millis: P5_CLOCK,
   deltaTime: P5_CLOCK,
+  ticker: PIXI_CLOCK,
+  Ticker: PIXI_CLOCK,
   toLocaleString: LOCALE,
   toLocaleDateString: LOCALE,
   toLocaleTimeString: LOCALE

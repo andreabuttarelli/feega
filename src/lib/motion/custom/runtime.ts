@@ -47,21 +47,24 @@ export enum Library {
   Lottie = 'lottie',
   Three = 'THREE',
   D3 = 'd3',
-  P5 = 'p5'
+  P5 = 'p5',
+  Pixi = 'PIXI'
 }
 
 const USES: Record<Library, RegExp> = {
   [Library.Lottie]: /\blottie\b/,
   [Library.Three]: /\bTHREE\b/,
   [Library.D3]: /\bd3\b/,
-  [Library.P5]: /\bp5\b/
+  [Library.P5]: /\bp5\b/,
+  [Library.Pixi]: /\bPIXI\b/
 };
 
 const GLOBALS: Record<Library, string> = {
   [Library.Lottie]: 'lottie',
   [Library.Three]: THREE_GLOBAL,
   [Library.D3]: 'd3',
-  [Library.P5]: 'p5'
+  [Library.P5]: 'p5',
+  [Library.Pixi]: 'PIXI'
 };
 
 export function librariesOf(components: CustomComponents, used: Iterable<string>): Set<Library> {
@@ -89,6 +92,7 @@ type Timeline = { time: () => number; to: (t: object, v: object, at: number) => 
 type ClipError = { clip: string; component: string; message: string };
 type Sketch = { setup?: () => void; frameCount: number; noLoop: () => void; randomSeed: (seed: number) => void; noiseSeed: (seed: number) => void; redraw: () => void };
 type SketchClass = new (sketch: (p: Sketch) => void, node: HTMLElement) => Sketch;
+type Stage = { Application: new (options: object) => object };
 type ClipScope = { root: HTMLElement; tl: Timeline; run: CustomRun };
 
 function bootCustom(cfg: { registry: string; errors: string; listener: string; libraries: Record<string, string>; engine: string; shadowed: string[] }, runs: CustomRun[], env: CustomEnv, master: Timeline, format: ReturnType<typeof fixedFormat>) {
@@ -149,7 +153,17 @@ function bootCustom(cfg: { registry: string; errors: string; listener: string; l
     } }, 0);
     return instance;
   };
-  const wraps: Record<string, (lib: never, scope: ClipScope) => unknown> = { p5: sketches };
+  const stages = (PIXI: Stage) =>
+    Object.create(PIXI, {
+      Application: {
+        value: class extends PIXI.Application {
+          constructor(options: object) {
+            super({ ...options, autoStart: false, sharedTicker: false, preserveDrawingBuffer: true });
+          }
+        }
+      }
+    });
+  const wraps: Record<string, (lib: never, scope: ClipScope) => unknown> = { p5: sketches, PIXI: stages };
   const libraries = Object.entries(cfg.libraries).map(([name, global]) => [name, w[global] ?? null] as const);
   const clipLibraries = (scope: ClipScope) => Object.fromEntries(libraries.map(([name, lib]) => [name, lib && wraps[name] ? wraps[name](lib as never, scope) : lib]));
 
