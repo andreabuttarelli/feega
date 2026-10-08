@@ -23,7 +23,7 @@
   import InspectorSection from './InspectorSection.svelte';
   import { onMount, type Snippet } from 'svelte';
   import { FieldKind, clockText, parseClock } from '$lib/motion/number-field';
-  import { DIAL_KEYS, GROUP_SECTION, Part, SECTION_ORDER, SECTION_TITLE, Section, fieldLook, flipSection, isOpen as sectionOpen, readSections, shows, transformSection, type SectionState } from '$lib/motion/inspector-sections';
+  import { DIAL_KEYS, GROUP_SECTION, Part, SECTION_ORDER, SECTION_TITLE, Section, fieldLook, flipSection, isOpen as sectionOpen, readSections, sectionSummary, shows, transformSection, type SectionState } from '$lib/motion/inspector-sections';
   import { CLIP_FAMILIES, familyOf } from '$lib/motion/track-style';
   import { KeyMark } from '$lib/motion/timeline-layers';
   import type { LayoutStore } from '$lib/motion/editor-layout';
@@ -375,7 +375,7 @@
     <CodeEditor {doc} name={customName} previous={previousSource(customName)} {onchange} />
   {:else}
     {#each SECTION_ORDER.filter((s) => has[s]) as section (section)}
-      <InspectorSection title={SECTION_TITLE[section]} {section} open={sectionOpen(sections, family, section)} ontoggle={() => toggleSection(section)}>
+      <InspectorSection title={SECTION_TITLE[section]} {section} summary={sectionSummary(section, clip, doc.fps)} open={sectionOpen(sections, family, section)} ontoggle={() => toggleSection(section)}>
         {@render BODIES[section]()}
       </InspectorSection>
     {/each}

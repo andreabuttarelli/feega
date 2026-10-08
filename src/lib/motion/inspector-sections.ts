@@ -3,7 +3,10 @@ import { ClipFamily } from './track-style';
 import type { LayoutStore } from './editor-layout';
 import { Group } from './components';
 import { FieldFill } from './number-field';
-import { Source } from './keyframes';
+import { Source, type Transform } from './keyframes';
+import { secondsLabel } from './inspector';
+import { clipName } from './organize';
+import type { MotionClip } from './doc';
 
 export enum Section {
   Content = 'content',
@@ -33,10 +36,10 @@ export const SECTION_TITLE: Record<Section, string> = {
 
 const DEFAULT_OPEN: Record<Section, boolean> = {
   [Section.Content]: true,
-  [Section.Style]: true,
-  [Section.Layout]: true,
-  [Section.Timing]: true,
-  [Section.Shape]: true,
+  [Section.Style]: false,
+  [Section.Layout]: false,
+  [Section.Timing]: false,
+  [Section.Shape]: false,
   [Section.Animate]: false,
   [Section.Effects]: false,
   [Section.ThreeD]: false,
@@ -143,3 +146,37 @@ export function fieldLook(key: string, source: Source = Source.Prop): FieldLook 
   const look = { ...LOOKS[key], ...SOURCE_LOOKS[source]?.[key] };
   return { glyph: look.glyph ?? null, unit: look.unit ?? '', fill: look.fill ?? FieldFill.None };
 }
+
+type Summed = Pick<MotionClip, 'from' | 'durationInFrames' | 'component' | 'props' | 'parent'> & { transform: Transform; keyframes: Record<string, unknown[] | undefined>; effects: readonly unknown[]; mask: unknown };
+
+const PERCENT = 100;
+const SEP = ' · ';
+
+const TRANSFORM_SUMMARY: [keyof Transform, (v: number) => string, number][] = [
+  ['scale', (v) => `Scale ${Math.round(v * PERCENT)}%`, 1],
+  ['rotateZ', (v) => `Rotate ${v}°`, 0],
+  ['opacity', (v) => `Opacity ${Math.round(v * PERCENT)}%`, 1]
+];
+
+function layoutSummary(clip: Summed): string {
+  return TRANSFORM_SUMMARY.filter(([key, , rest]) => clip.transform[key] !== undefined && clip.transform[key] !== rest)
+    .map(([key, say]) => say(clip.transform[key] as number))
+    .join(SEP);
+}
+
+const animated = (clip: Summed) => Object.values(clip.keyframes).filter((keys) => keys?.length).length;
+const countOf = (n: number, noun: string) => (n ? `${n} ${noun}` : '');
+
+const SUMMARY: Record<Section, (clip: Summed, fps: number) => string> = {
+  [Section.Content]: (clip) => clipName(clip),
+  [Section.Style]: () => '',
+  [Section.Layout]: layoutSummary,
+  [Section.Timing]: (clip, fps) => `At ${secondsLabel(clip.from, fps)}s${SEP}${secondsLabel(clip.durationInFrames, fps)}s long`,
+  [Section.Shape]: () => '',
+  [Section.Animate]: (clip) => countOf(animated(clip), 'animated'),
+  [Section.Effects]: (clip) => countOf(clip.effects.length, 'effects'),
+  [Section.ThreeD]: () => '',
+  [Section.Parent]: (clip) => [clip.parent ? 'Parented' : '', clip.mask ? 'Masked' : ''].filter(Boolean).join(SEP)
+};
+
+export const sectionSummary = (section: Section, clip: Summed, fps: number): string => SUMMARY[section](clip, fps);

@@ -21,6 +21,7 @@
   import { PickMode, clipActions, parentChoices } from '$lib/motion/clip-bar';
   import type { Point } from '$lib/motion/press-menu';
   import ClipBar from '$lib/components/motion/ClipBar.svelte';
+  import { Detent, nearestDetent, nextDetent, sheetHeight } from '$lib/motion/sheet-detents';
   import OverflowMenu, { type MenuBlock } from '$lib/components/motion/OverflowMenu.svelte';
   import { CHAT_PLACE, ChatPlace, DEFAULT_LAYOUT, Panel, Side, flip, readLayout, sideWidth, timelineHeight, toggleSide, viewportOf, Viewport, writeLayout, type EditorLayout, type LayoutStore } from '$lib/motion/editor-layout';
   import { provideSelection } from '$lib/motion/selection-context';
@@ -148,6 +149,10 @@
   const waveforms = $derived({ ...decodedPeaks, ...Object.fromEntries(Object.entries(analyses).map(([id, a]) => [id, a.amp])) });
   const analysing = new Set<string>();
   let sheet = $state<Sheet>(Sheet.None);
+  let detent = $state(Detent.Half);
+  let sheetDrag = $state<{ y: number; from: number; height: number } | null>(null);
+  let stageEl = $state<HTMLElement | null>(null);
+  let viewportH = $state(0);
   let inspectorTab = $state<InspectorTab>(InspectorTab.Properties);
   let preview = $state<MotionPreview | null>(null);
   let zoomStage = $state<ZoomStage | null>(null);
@@ -164,7 +169,7 @@
   let menuOpen = $state(false);
   let clockOpen = $state(false);
   let toolsOpen = $state(false);
-  let pickMode = $state(PickMode.One);
+  let pickMode = $state<PickMode>(PickMode.One);
   let clipMenu = $state<{ at: Point | null; parents: boolean } | null>(null);
   let menuAt: Point | null = null;
   let pressAt: { x: number; y: number } | null = null;
@@ -433,6 +438,41 @@
     chatReload++;
   }
 
+  function peekChat() {
+    if (sheet === Sheet.Agent) {
+      detent = Detent.Peek;
+    }
+  }
+
+  const SHEET_FLOOR_PX = 120;
+  const sheetRoom = () => ({ viewport: viewportH, stageBottom: stageEl?.getBoundingClientRect().bottom ?? 0, floor: SHEET_FLOOR_PX });
+  const sheetPx = $derived(sheetDrag?.height ?? (viewportH ? sheetHeight(detent, sheetRoom()) : 0));
+
+  $effect(() => {
+    void sheet;
+    detent = Detent.Half;
+  });
+
+  function grabSheet(e: PointerEvent) {
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    sheetDrag = { y: e.clientY, from: sheetPx, height: sheetPx };
+  }
+
+  function dragSheet(e: PointerEvent) {
+    if (sheetDrag) {
+      sheetDrag = { ...sheetDrag, height: Math.max(0, sheetDrag.from + sheetDrag.y - e.clientY) };
+    }
+  }
+
+  function dropSheet(e: PointerEvent) {
+    if (!sheetDrag) {
+      return;
+    }
+    const moved = !isTap({ x: 0, y: sheetDrag.y }, { x: 0, y: e.clientY });
+    detent = moved ? nearestDetent(sheetDrag.height, sheetRoom()) : nextDetent(detent);
+    sheetDrag = null;
+  }
+
   const LAND: Record<Landing, (shown: AgentDraft) => void> = {
     [Landing.Head]: () => (draft = null),
     [Landing.KeepDraft]: (shown) => {
@@ -444,6 +484,7 @@
   };
 
   async function pullAgentEdit() {
+    peekChat();
     const head = await pullHead();
     LAND[landTurn(draft, head)](draft);
   }
@@ -520,7 +561,11 @@
 
   function onAgentData(part: StreamData) {
     const handle = AGENT_DATA[part.type];
+    const before = draft;
     draft = agentDraft(draft, part);
+    if (draft !== before) {
+      peekChat();
+    }
     madeAssets = adoptAgentAssets(madeAssets, (part.data as { assets?: PageData['assets'] } | null)?.assets);
     if (handle && preview) {
       void handle(part.data).catch((e) => console.error('[motion] agent request not answered', part.type, e));
@@ -977,9 +1022,9 @@
 </script>
 
 <svelte:head><title>{data.node.name ?? 'Motion'} · Motion editor</title></svelte:head>
-<svelte:window bind:innerWidth={width} onkeydown={onKey} onpointerdown={pressDown} onpointerup={closePopovers} />
+<svelte:window bind:innerWidth={width} bind:innerHeight={viewportH} onkeydown={onKey} onpointerdown={pressDown} onpointerup={closePopovers} />
 
-<div class="editor" data-testid="motion-editor" data-viewport={viewport}>
+<div class="editor" data-testid="motion-editor" data-viewport={viewport} style={`--sheet-h: ${sheetPx}px; --sheet-floor: ${SHEET_FLOOR_PX}px;`}>
   <header class="bar">
     <div class="group lead">
       <IconButton action={Action.Menu} aria-expanded={menuOpen} aria-haspopup="dialog" data-testid="menu-open" onclick={() => (menuOpen = true)} />
@@ -1122,7 +1167,7 @@
   {/if}
 
   <div class="body" bind:this={body} style={`--tl-h: ${layout.timelinePx}px; --side-w: ${sideWidth(layout.sidePx, width)}px;`} class:coding={inspectorTab === InspectorTab.Code && selected?.component === 'Custom'} class:no-props={!docked && layout.inspector === Panel.Closed} class:no-chat={!docked && layout.chat === Panel.Closed} class:no-side={docked && !sideOpen}>
-    <section class="stage" aria-label="Preview">
+    <section class="stage" aria-label="Preview" bind:this={stageEl}>
       <ZoomStage bind:this={zoomStage} frame={{ width: doc.width, height: doc.height }} onspace={COMMANDS[Command.TogglePlay]}>
       <MotionPreview bind:this={preview} {html} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null}>
         {#if playing}<div class="play-catch" role="presentation" data-testid="play-catch" onpointerdown={catchTap}></div>{/if}
@@ -1151,7 +1196,7 @@
     <SideColumn place={chatPlace} side={layout.side} onside={(side) => relayout({ side })} widthPx={sideWidth(layout.sidePx, width)} onwidth={(sidePx) => (layout = { ...layout, sidePx })} oncommit={() => relayout({})} busy={agentBusy}>
     {#snippet properties()}
     <aside class="props" class:open={sheet === Sheet.Properties} aria-label="Properties">
-      <div class="sheet-head"><span>Properties</span><IconButton action={Action.Close} onclick={() => (sheet = Sheet.None)} /></div>
+      <div class="sheet-head"><button type="button" class="grabber" aria-label="Resize the sheet" data-detent={detent} data-testid="sheet-grabber" onpointerdown={grabSheet} onpointermove={dragSheet} onpointerup={dropSheet} onpointercancel={dropSheet}><i aria-hidden="true"></i></button><span>Properties</span><IconButton action={Action.Close} onclick={() => (sheet = Sheet.None)} /></div>
       {#if cameraOpen && !selection.length}
         <CameraInspector {doc} {frame} onchange={edit} />
         <LookInspector {doc} onchange={edit} />
@@ -1174,7 +1219,7 @@
     {/snippet}
     {#snippet chat()}
     <aside class="chat" class:open={sheet === Sheet.Agent} aria-label="Agent">
-      <div class="sheet-head"><span>Agent</span><IconButton action={Action.Close} onclick={() => (sheet = Sheet.None)} /></div>
+      <div class="sheet-head"><button type="button" class="grabber" aria-label="Resize the sheet" data-detent={detent} data-testid="sheet-grabber" onpointerdown={grabSheet} onpointermove={dragSheet} onpointerup={dropSheet} onpointercancel={dropSheet}><i aria-hidden="true"></i></button><span>Agent</span><IconButton action={Action.Close} onclick={() => (sheet = Sheet.None)} /></div>
       <ChatPanel projectId={data.projectId} motionNodeId={data.node.id} reload={chatReload} prefill={brandAsk} context={() => ({ selection })} onturnend={() => void pullAgentEdit()} ondata={onAgentData} onbusy={(busy) => (agentBusy = busy)} />
     </aside>
     {/snippet}
@@ -1898,8 +1943,8 @@
     position: fixed;
     left: 0;
     right: 0;
-    bottom: 120px;
-    height: 62vh;
+    bottom: var(--sheet-floor);
+    height: var(--sheet-h);
     z-index: 30;
     display: none;
     flex-direction: column;
@@ -1916,7 +1961,35 @@
     overflow: auto;
   }
 
+  .grabber {
+    display: none;
+  }
+
+  [data-viewport='phone'] .grabber {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 88px;
+    height: 44px;
+    margin-left: -44px;
+    border: 0;
+    background: none;
+    touch-action: none;
+    cursor: ns-resize;
+  }
+
+  .grabber i {
+    width: 36px;
+    height: 4px;
+    border-radius: 9999px;
+    background: var(--ui-text-3);
+  }
+
   [data-viewport='phone'] .sheet-head {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: space-between;

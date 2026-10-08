@@ -3,13 +3,14 @@
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
 
-  let { title, open, section, ontoggle, children }: { title: string; open: boolean; section: string; ontoggle: () => void; children: Snippet } = $props();
+  let { title, open, section, summary = '', ontoggle, children }: { title: string; open: boolean; section: string; summary?: string; ontoggle: () => void; children: Snippet } = $props();
 </script>
 
 <section class="section" data-section={section}>
   <button type="button" class="section-head" aria-expanded={open} onclick={ontoggle}>
     {#if open}<ChevronDown size={12} />{:else}<ChevronRight size={12} />{/if}
     <span>{title}</span>
+    {#if !open && summary}<span class="summary">{summary}</span>{/if}
   </button>
   {#if open}<div class="section-body">{@render children()}</div>{/if}
 </section>
@@ -35,6 +36,16 @@
     font-weight: 500;
     text-align: left;
     cursor: pointer;
+  }
+
+  .summary {
+    min-width: 0;
+    margin-left: auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--ui-text-2);
+    font-weight: 400;
   }
 
   .section-head :global(svg) {

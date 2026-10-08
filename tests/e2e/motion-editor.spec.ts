@@ -87,6 +87,7 @@ test.describe('motion editor @real', () => {
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}/motion/${node.id}`);
     await page.getByRole('button', { name: 'Add', exact: true }).click();
     await page.getByRole('menuitem', { name: 'Title', exact: true }).dispatchEvent('click');
+    await page.locator('[data-section="layout"] .section-head').dispatchEvent('click');
     await page.waitForTimeout(3000);
 
     const how = await page.evaluate(
@@ -167,6 +168,7 @@ test.describe('motion editor on a phone @real', () => {
     await clip.tap();
 
     await page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Properties' }).tap();
+    await page.locator('[data-section="layout"] .section-head').tap();
     const opacity = page.getByRole('textbox', { name: 'Opacity', exact: true }).first();
     await opacity.fill('50');
     await opacity.press('Enter');
