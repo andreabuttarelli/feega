@@ -18,7 +18,8 @@ import { ModerationProfile } from '$lib/server/moderation/profiles';
 import { blockedPrompt } from '$lib/server/moderation/blocked-response';
 import { assetUrls, headOrNew, motionAssets, motionTokens, saveMotionDoc } from '$lib/server/motion/editor';
 import { fitNewVideo } from '$lib/motion/fit-duration';
-import { createMotionTools, selectionNote, type MotionSession } from '$lib/server/motion/motion-tools';
+import { EmbedAction, createMotionTools, selectionNote, type MotionSession } from '$lib/server/motion/motion-tools';
+import { publishEmbed, removeEmbed } from '$lib/server/motion/embed';
 import { templateLibrary } from '$lib/server/motion/templates';
 import { analyzeSounds, storageAnalysis } from '$lib/server/motion/audio-analysis';
 import { motionAgentPrompt } from '$lib/server/motion/motion-prompt';
@@ -180,6 +181,14 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
       }
       const link = await createRenderLink(db, { orgId, nodeId: motion.record.id, version: head.version, actor });
       return { ok: true, render_url: renderPagePath(link.token), expires_at: link.expiresAt, credits: BROWSER_RENDER_CREDITS };
+    },
+    embed: async (action) => {
+      const nodeId = motion.record.id;
+      const EMBED_RUN: Record<EmbedAction, () => Promise<Record<string, unknown>>> = {
+        [EmbedAction.Publish]: () => publishEmbed(db, { nodeId, doc: session.doc, tokens, assetUrls: assetUrls(assets), title: motion.record.displayName ?? 'feega', fetchBlob: (url) => fetch(url).then((r) => r.blob()) }),
+        [EmbedAction.Unpublish]: () => removeEmbed(db, nodeId)
+      };
+      return EMBED_RUN[action]();
     },
     batch: async ({ rows }) => {
       if (session.edits.length) {

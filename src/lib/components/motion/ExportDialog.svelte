@@ -279,7 +279,7 @@
   </div>
 
   {#if mode === Mode.Interactive}
-    <InteractiveExport {doc} {tokens} {assetUrls} {analyses} {fileName} />
+    <InteractiveExport {doc} {tokens} {assetUrls} {analyses} {fileName} {editorUrl} />
   {:else}
     <dl>
       <dt>Preset</dt>

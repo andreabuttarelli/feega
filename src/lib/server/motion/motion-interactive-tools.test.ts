@@ -58,6 +58,22 @@ describe('motion agent interactive tools', () => {
     expect(String(out.snippet)).toContain('<iframe');
   });
 
+  it('publish_embed hosts the clip and returns the snippet; unpublish takes it down', async () => {
+    const embed = vi.fn(async (action: string) => ({ ok: true, action, snippet: '<iframe src="https://oh.feega.app/e/n"></iframe>' }));
+    const session: MotionSession = { doc: newMotionDoc(MotionFormat.Landscape), baseVersion: 1, edits: [], selection: [], frames: new Map(), views: 0, checkedAt: 0, codeWrites: 0 };
+    const tools = createMotionTools({ session, assets: [], newId: () => 'x', voiceover: vi.fn(), frames: vi.fn(), check: vi.fn(), embed });
+    const run = (input: unknown) => (tools.publish_embed as Tool & { execute: Exec }).execute(input, { toolCallId: 'c' });
+
+    expect(await run({})).toMatchObject({ ok: true, action: 'publish' });
+    expect(await run({ action: 'unpublish' })).toMatchObject({ action: 'unpublish' });
+  });
+
+  it('publish_embed without hosting says so', async () => {
+    const { run } = setup();
+
+    expect(await run('publish_embed', {})).toMatchObject({ ok: false });
+  });
+
   it('the prompt teaches live input and the interactive export', () => {
     const prompt = motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Missing });
 
