@@ -1231,8 +1231,7 @@
 
   .tool,
   .clock,
-  .crumb,
-  .segmented button {
+  .crumb {
     border: 0;
     border-radius: 0;
     background: none;
@@ -1637,81 +1636,8 @@
     cursor: default;
   }
 
-  .gap {
-    flex-shrink: 0;
-    width: var(--ui-space-2);
-  }
-
-  .segmented {
-    display: inline-flex;
-    height: var(--ui-hit);
-    background: var(--ui-field);
-  }
-
-  .segmented button {
-    padding: 0 var(--ui-space-3);
-    font-size: var(--ui-text-xs);
-    color: var(--ui-ink-2);
-  }
-
-  .segmented button:hover {
-    color: var(--ui-ink);
-  }
-
-  .segmented button[aria-pressed='true'] {
-    background: var(--ui-accent-wash);
-    color: var(--ui-accent);
-  }
-
-  .arrange {
-    height: var(--ui-hit);
-    padding: 0 var(--ui-space-2);
-    border: 0;
-    border-radius: 0;
-    color: var(--ui-ink);
-    font: inherit;
-    font-size: var(--ui-text-xs);
-  }
-
   .spacer {
     flex: 1;
-  }
-
-  .zoom {
-    width: 96px;
-    height: var(--ui-hit);
-    appearance: none;
-    background: transparent;
-    cursor: pointer;
-    touch-action: none;
-  }
-
-  .zoom::-webkit-slider-runnable-track {
-    height: 2px;
-    background: var(--ui-text-3);
-  }
-
-  .zoom::-moz-range-track {
-    height: 2px;
-    background: var(--ui-text-3);
-  }
-
-  .zoom::-webkit-slider-thumb {
-    appearance: none;
-    width: 10px;
-    height: 10px;
-    margin-top: -4px;
-    border: 1.5px solid var(--ui-ink-2);
-    border-radius: 0;
-    background: var(--ui-bg);
-  }
-
-  .zoom::-moz-range-thumb {
-    width: 10px;
-    height: 10px;
-    border: 1.5px solid var(--ui-ink-2);
-    border-radius: 0;
-    background: var(--ui-bg);
   }
 
   .add {
