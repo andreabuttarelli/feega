@@ -407,6 +407,15 @@ describe('custom components in the composition', () => {
     expect(html).not.toContain('ClipperLib');
   });
 
+  it('inlines fx only for a component that uses it, with no network', () => {
+    const glow = { ...graph, source: { ...graph.source, js: 'fx.grid(root);' } };
+    const page = compose(must(addClip(must(writeComponent(newMotionDoc(MotionFormat.Landscape), 'Backdrop', glow)), { component: 'Custom', from: 0, durationInFrames: 60, props: { name: 'Backdrop' } }, 'b1')));
+
+    expect(page).toContain('--fx-marquee');
+    expect(page.match(/<script src="[^"]+"/g)).toEqual(html.match(/<script src="[^"]+"/g));
+    expect(html).not.toContain('--fx-marquee');
+  });
+
   it('inlines TWGL only for a component that uses it, with no network', () => {
     const shader = { ...graph, source: { ...graph.source, js: 'const gl = twgl.webgl(root.querySelector("canvas"));' } };
     const page = compose(must(addClip(must(writeComponent(newMotionDoc(MotionFormat.Landscape), 'Shader', shader)), { component: 'Custom', from: 0, durationInFrames: 60, props: { name: 'Shader' } }, 't1')));

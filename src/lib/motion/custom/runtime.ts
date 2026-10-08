@@ -5,6 +5,7 @@ import { ENGINE_GLOBAL } from '../engine/engine';
 import { fixedFormat } from './format';
 import { GENERATIVE_GLOBAL } from './generative';
 import { TWGL_GLOBAL } from './twgl';
+import { FX_GLOBAL } from './fx';
 
 export const REGISTRY = '__feegaComponents';
 export const ERRORS = '__feegaErrors';
@@ -53,7 +54,8 @@ export enum Library {
   Pixi = 'PIXI',
   Matter = 'Matter',
   Generative = 'gen',
-  Twgl = 'twgl'
+  Twgl = 'twgl',
+  Fx = 'fx'
 }
 
 const USES: Record<Library, RegExp> = {
@@ -64,7 +66,8 @@ const USES: Record<Library, RegExp> = {
   [Library.Pixi]: /\bPIXI\b/,
   [Library.Matter]: /\bMatter\b/,
   [Library.Generative]: /\bgen\./,
-  [Library.Twgl]: /\btwgl\b/
+  [Library.Twgl]: /\btwgl\b/,
+  [Library.Fx]: /\bfx\./
 };
 
 const GLOBALS: Record<Library, string> = {
@@ -75,7 +78,8 @@ const GLOBALS: Record<Library, string> = {
   [Library.Pixi]: 'PIXI',
   [Library.Matter]: 'Matter',
   [Library.Generative]: GENERATIVE_GLOBAL,
-  [Library.Twgl]: TWGL_GLOBAL
+  [Library.Twgl]: TWGL_GLOBAL,
+  [Library.Fx]: FX_GLOBAL
 };
 
 export function librariesOf(components: CustomComponents, used: Iterable<string>): Set<Library> {
@@ -211,7 +215,8 @@ function bootCustom(cfg: { registry: string; errors: string; listener: string; l
     };
   };
   const shaders = (twgl: object) => ({ ...twgl, webgl: (canvas: HTMLCanvasElement) => canvas.getContext('webgl2', { preserveDrawingBuffer: true, antialias: true }) });
-  const wraps: Record<string, (lib: never, scope: ClipScope) => unknown> = { p5: sketches, PIXI: stages, Matter: worlds, gen: utilities, twgl: shaders };
+  const effects = (fx: (clip: object) => unknown, { tl, run }: ClipScope) => fx({ tl, length: run.length + (run.trim ?? 0), seed: run.seed });
+  const wraps: Record<string, (lib: never, scope: ClipScope) => unknown> = { p5: sketches, PIXI: stages, Matter: worlds, gen: utilities, twgl: shaders, fx: effects };
   const libraries = Object.entries(cfg.libraries).map(([name, global]) => [name, w[global] ?? null] as const);
   const clipLibraries = (scope: ClipScope) => Object.fromEntries(libraries.map(([name, lib]) => [name, lib && wraps[name] ? wraps[name](lib as never, scope) : lib]));
 

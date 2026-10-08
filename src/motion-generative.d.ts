@@ -3,6 +3,11 @@ declare module 'virtual:motion-generative' {
 	export default source;
 }
 
+declare module 'virtual:motion-fx' {
+	const source: string;
+	export default source;
+}
+
 declare module 'virtual:motion-twgl' {
 	const source: string;
 	export default source;

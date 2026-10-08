@@ -57,6 +57,7 @@ import { engineScript } from '../engine/engine';
 import liveRuntime from 'virtual:motion-live-runtime';
 import generative from 'virtual:motion-generative';
 import twgl from 'virtual:motion-twgl';
+import fx from 'virtual:motion-fx';
 import { liveSpec, type SpecInput } from '../interactive/spec';
 import { LIVE_GLOBAL } from '../interactive/runtime';
 import { Liveness, interactiveOf } from '../interactive/settings';
@@ -461,7 +462,8 @@ const LIBRARY_TAGS: Record<Library, { scripts: string[]; tag: string }> = {
   [Library.Pixi]: { scripts: PIXI_URLS, tag: PIXI_URLS.map((url) => `<script src="${url}"></script>`).join('') },
   [Library.Matter]: { scripts: [MATTER_URL], tag: `<script src="${MATTER_URL}"></script>` },
   [Library.Generative]: { scripts: [], tag: inlineScript(generative) },
-  [Library.Twgl]: { scripts: [], tag: inlineScript(twgl) }
+  [Library.Twgl]: { scripts: [], tag: inlineScript(twgl) },
+  [Library.Fx]: { scripts: [], tag: inlineScript(fx) }
 };
 
 function brandEnv(tokens: BrandTokens) {
