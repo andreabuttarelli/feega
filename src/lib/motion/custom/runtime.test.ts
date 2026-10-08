@@ -5,6 +5,7 @@ import Matter from 'matter-js';
 import './generative-entry';
 import './twgl-entry';
 import './fx-entry';
+import './splitting-entry';
 import { installEngine, testTimeline, type TestTimeline } from '../engine/testing';
 import { ERRORS, REGISTRY, bootScript, definitionScript, librariesOf, Library, seedOf, type CustomRun } from './runtime';
 
@@ -328,6 +329,37 @@ describe('libraries', () => {
 
     expect(grainOf()).toContain('seed');
     expect(grainOf()).toBe(grainOf());
+  });
+
+  it('loads Splitting for a component that splits text', () => {
+    const components = { S: { source: { html: '', css: '', js: 'Splitting({ by: "chars" })' } } } as never;
+
+    expect([...librariesOf(components, ['S'])]).toEqual([Library.Splitting]);
+  });
+
+  it('splits only inside its own clip, with index variables on every char', () => {
+    document.body.insertAdjacentHTML('beforeend', '<p data-splitting id="outside">no</p>');
+    const js = 'root.innerHTML = "<h1 data-splitting>hey</h1>"; const [title] = Splitting({ by: "chars" }); root.dataset.v = title.chars.map((c) => c.style.getPropertyValue("--char-index")).join();';
+    const { root, errors } = run('Title', js);
+
+    expect(errors).toEqual([]);
+    expect(root.dataset.v).toBe('0,1,2');
+  });
+
+  it('drives a split by one variable or staggers its chars on tl, the same frame sought twice', () => {
+    const js = 'root.innerHTML = "<h1>hey</h1>"; const h1 = root.querySelector("h1"); const [title] = Splitting({ target: h1, by: "chars" }); Splitting.drive(h1); tl.fromTo(title.chars, { opacity: 0 }, { opacity: 1, duration: 0.4, stagger: 0.2, ease: "none" }, 0);';
+    const { master, root } = run('Reveal', js);
+    const h1 = root.querySelector('h1') as HTMLElement;
+    const chars = () => [...root.querySelectorAll<HTMLElement>('.char')].map((c) => c.style.opacity).join();
+
+    master.seek(1.3);
+    const first = [h1.style.getPropertyValue('--split'), chars()];
+    master.seek(2.9);
+    master.seek(1.3);
+
+    expect(first[0]).toBe('0.15');
+    expect(first[1]).toBe('0.75,0.25,0');
+    expect([h1.style.getPropertyValue('--split'), chars()]).toEqual(first);
   });
 
   it('a d3 chart drawn from progress gives the same frame from any seek order', () => {

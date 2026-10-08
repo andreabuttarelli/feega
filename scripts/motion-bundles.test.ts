@@ -3,11 +3,13 @@ import { LIVE_ENTRY, bundleSource } from './motion-bundles';
 import { GENERATIVE_ENTRY } from '../src/lib/motion/custom/generative';
 import { TWGL_ENTRY } from '../src/lib/motion/custom/twgl';
 import { FX_ENTRY } from '../src/lib/motion/custom/fx';
+import { SPLITTING_ENTRY } from '../src/lib/motion/custom/splitting';
 
 const MAX_RUNTIME_BYTES = 40 * 1024;
 const MAX_GENERATIVE_BYTES = 200 * 1024;
 const MAX_TWGL_BYTES = 120 * 1024;
 const MAX_FX_BYTES = 8 * 1024;
+const MAX_SPLITTING_BYTES = 8 * 1024;
 
 describe('live player runtime', () => {
   it('stays small: no doc model, schema library or parser bundle comes along', async () => {
@@ -32,6 +34,13 @@ describe('live player runtime', () => {
     expect(code).toContain('__feegaFx');
     expect(code).not.toMatch(/@keyframes|transition:|animation:/);
     expect(code.length).toBeLessThan(MAX_FX_BYTES);
+  });
+
+  it('keeps Splitting small, its MIT notice inside', async () => {
+    const { code } = await bundleSource(SPLITTING_ENTRY);
+
+    expect(code).toContain('Copyright (c) 2018 Stephen Shaw');
+    expect(code.length).toBeLessThan(MAX_SPLITTING_BYTES);
   });
 
   it('keeps TWGL small enough to inline', async () => {
