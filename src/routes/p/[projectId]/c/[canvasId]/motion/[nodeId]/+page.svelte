@@ -24,7 +24,7 @@
   import ClipBar from '$lib/components/motion/ClipBar.svelte';
   import { Detent, nearestDetent, nextDetent, sheetHeight } from '$lib/motion/sheet-detents';
   import OverflowMenu, { type MenuBlock } from '$lib/components/motion/OverflowMenu.svelte';
-  import { CHAT_PLACE, ChatPlace, DEFAULT_LAYOUT, Panel, Side, flip, readLayout, sideWidth, timelineHeight, toggleSide, viewportOf, Viewport, writeLayout, type EditorLayout, type LayoutStore } from '$lib/motion/editor-layout';
+  import { CHAT_PLACE, ChatPlace, DEFAULT_LAYOUT, Panel, Side, flip, readLayout, sideWidth, timelineHeight, toggleSide, toggleTimeline, viewportOf, Viewport, writeLayout, type EditorLayout, type LayoutStore } from '$lib/motion/editor-layout';
   import { provideSelection } from '$lib/motion/selection-context';
   import { addAdjustment, mergeView, pathNames, precompose, viewOf } from '$lib/motion/precomp';
   import { Lens, addLens } from '$lib/motion/glass/ops';
@@ -904,6 +904,7 @@
     [Command.RevealAnimated]: () => (reveal = Reveal.Animated),
     [Command.ToggleChat]: () => CHAT_TOGGLE[chatPlace](),
     [Command.ToggleInspector]: toggleInspector,
+    [Command.ToggleTimeline]: () => relayout(toggleTimeline(layout)),
     [Command.Help]: () => (helpOpen = !helpOpen),
     [Command.Precompose]: precomposeSelection
   };
@@ -1051,6 +1052,7 @@
       <IconButton action={playing ? Action.Pause : Action.Play} class="play" fill="currentColor" onclick={COMMANDS[Command.TogglePlay]} />
       <IconButton action={Action.StepForward} class="step" onclick={COMMANDS[Command.StepForward]} />
       <IconButton action={Action.GoEnd} onclick={COMMANDS[Command.GoEnd]} />
+      <IconButton action={Action.ToggleTimeline} class="toggle" pressed={layout.timeline === Panel.Open} data-testid="toggle-timeline" onclick={COMMANDS[Command.ToggleTimeline]} />
       <div class="popover-anchor">
         <button type="button" class="clock" aria-haspopup="menu" aria-expanded={clockOpen} aria-label={`Time display: ${DISPLAY_NAME[display]}`} data-testid="clock" onclick={() => (clockOpen = !clockOpen)}>
           <span data-testid="timecode"><b>{clockLabel(frame, doc.fps, display)}</b> <i>/ {clockLabel(doc.durationInFrames, doc.fps, display)}</i></span><ChevronDown size={12} />
@@ -1179,7 +1181,7 @@
     />
   {/if}
 
-  <div class="body" bind:this={body} style={`--tl-h: ${layout.timelinePx}px; --side-w: ${sideWidth(layout.sidePx, width)}px;`} class:coding={inspectorTab === InspectorTab.Code && selected?.component === 'Custom'} class:no-props={!docked && layout.inspector === Panel.Closed} class:no-chat={!docked && layout.chat === Panel.Closed} class:no-side={docked && !sideOpen}>
+  <div class="body" bind:this={body} style={`--tl-h: ${layout.timelinePx}px; --side-w: ${sideWidth(layout.sidePx, width)}px;`} class:coding={inspectorTab === InspectorTab.Code && selected?.component === 'Custom'} class:no-props={!docked && layout.inspector === Panel.Closed} class:no-chat={!docked && layout.chat === Panel.Closed} class:no-side={docked && !sideOpen} class:no-timeline={layout.timeline === Panel.Closed}>
     <section class="stage" aria-label="Preview" bind:this={stageEl}>
       <ZoomStage bind:this={zoomStage} frame={{ width: doc.width, height: doc.height }} onspace={COMMANDS[Command.TogglePlay]}>
       <MotionPreview bind:this={preview} {html} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null}>
@@ -1238,7 +1240,7 @@
     {/snippet}
     </SideColumn>
 
-    <section class="timeline-area" aria-label="Timeline">
+    <section class="timeline-area" aria-label="Timeline" inert={layout.timeline === Panel.Closed}>
       <div class="resize" role="separator" aria-orientation="horizontal" aria-label="Resize the timeline" aria-valuenow={layout.timelinePx} data-testid="timeline-resize" onpointerdown={startResize} ondblclick={() => relayout({ timelinePx: DEFAULT_LAYOUT.timelinePx })}></div>
 
       {#if clipBarShown}
@@ -1475,6 +1477,24 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr) var(--props-w) var(--chat-w);
     grid-template-rows: minmax(0, 1fr) var(--tl-h);
+    transition: grid-template-rows 180ms ease-out;
+  }
+
+  .body.no-timeline {
+    grid-template-rows: minmax(0, 1fr) 0px;
+  }
+
+  .body.no-timeline .timeline-area {
+    visibility: hidden;
+    overflow: hidden;
+    transition: visibility 0s 180ms;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .body,
+    .body.no-timeline .timeline-area {
+      transition: none;
+    }
   }
 
   .body.coding {
@@ -1929,6 +1949,14 @@
   [data-viewport='phone'] .timeline-area {
     flex: 1;
     min-height: 160px;
+  }
+
+  [data-viewport='phone'] .body.no-timeline .stage {
+    flex: 1;
+  }
+
+  [data-viewport='phone'] .body.no-timeline .timeline-area {
+    display: none;
   }
 
   [data-viewport='phone'] .resize {

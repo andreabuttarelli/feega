@@ -10,7 +10,7 @@ export enum Side {
   Properties = 'properties'
 }
 
-export type EditorLayout = { chat: Panel; inspector: Panel; timelinePx: number; side: Side; sidePx: number };
+export type EditorLayout = { chat: Panel; inspector: Panel; timeline: Panel; timelinePx: number; side: Side; sidePx: number };
 export type LayoutStore = { getItem: (key: string) => string | null; setItem: (key: string, value: string) => void };
 
 export const TIMELINE_MIN_PX = 140;
@@ -20,9 +20,9 @@ const SIDE_MAX_SHARE = 0.5;
 const PREVIEW_MIN_PX = 160;
 const STORAGE_KEY = 'motion-editor-layout';
 
-export const DEFAULT_LAYOUT: EditorLayout = { chat: Panel.Open, inspector: Panel.Open, timelinePx: 360, side: Side.Chat, sidePx: SIDE_DEFAULT_PX };
+export const DEFAULT_LAYOUT: EditorLayout = { chat: Panel.Open, inspector: Panel.Open, timeline: Panel.Open, timelinePx: 360, side: Side.Chat, sidePx: SIDE_DEFAULT_PX };
 
-const layoutSchema = z.object({ chat: z.enum(Panel), inspector: z.enum(Panel), timelinePx: z.number().finite(), side: z.enum(Side), sidePx: z.number().finite() });
+const layoutSchema = z.object({ chat: z.enum(Panel), inspector: z.enum(Panel), timeline: z.enum(Panel).default(Panel.Open), timelinePx: z.number().finite(), side: z.enum(Side), sidePx: z.number().finite() });
 
 export function readLayout(store: LayoutStore | null): EditorLayout {
   try {
@@ -42,6 +42,8 @@ export function writeLayout(store: LayoutStore | null, layout: EditorLayout): vo
 }
 
 export const flip = (panel: Panel): Panel => (panel === Panel.Open ? Panel.Closed : Panel.Open);
+
+export const toggleTimeline = (layout: EditorLayout): EditorLayout => ({ ...layout, timeline: flip(layout.timeline) });
 
 export function timelineHeight(px: number, room: number): number {
   return Math.max(TIMELINE_MIN_PX, Math.min(Math.round(px), room - PREVIEW_MIN_PX));

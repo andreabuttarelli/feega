@@ -100,4 +100,11 @@ describe('a touch path for every command', () => {
 
     expect(toolbar.length + 2).toBeLessThanOrEqual(6);
   });
+
+  it('the timeline hides with ⌘J from the transport, listed under View', () => {
+    const row = guideSections().find((s) => s.group === GuideGroup.View)!.rows.find((r) => r.id === Command.ToggleTimeline);
+
+    expect(row).toMatchObject({ name: 'Timeline', keys: '⌘J' });
+    expect(placeOf(Command.ToggleTimeline)).toBe(Place.Transport);
+  });
 });
