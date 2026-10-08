@@ -2,6 +2,7 @@ import { Ease } from '../design';
 import { findClip, type MotionClip, type MotionDoc } from '../doc';
 import { setKeyframes, type OpResult } from '../timeline';
 import { ANIMATOR_PREFIX, AnimatorUnit, MAX_ANIMATORS, SelectorShape, animatorKey, animatorSchema, type TextAnimator } from './model';
+import { unitPositions } from './split';
 
 const fail = (error: string): OpResult => ({ ok: false, error });
 
@@ -93,37 +94,41 @@ export enum TextPreset {
 
 export const TEXT_PRESETS = Object.values(TextPreset) as [TextPreset, ...TextPreset[]];
 
-type Preset = { about: string; animator: AnimatorInput; from: number; to: number };
+type Preset = { about: string; animator: Required<Pick<AnimatorInput, 'unit' | 'softness' | 'start'>> & AnimatorInput };
 
 export const PRESETS: Record<TextPreset, Preset> = {
   [TextPreset.BlurUp]: {
     about: 'each character rises out of a blur, left to right',
-    animator: { unit: AnimatorUnit.Char, shape: SelectorShape.Smooth, softness: 0.35, start: 0, end: 200, values: { opacity: 0, y: 0.35, blur: 14 } },
-    from: -40,
-    to: 135
+    animator: { unit: AnimatorUnit.Char, shape: SelectorShape.Smooth, softness: 0.35, start: 0, end: 200, values: { opacity: 0, y: 0.35, blur: 14 } }
   },
   [TextPreset.WordStagger]: {
     about: 'words fade and slide up one after another',
-    animator: { unit: AnimatorUnit.Word, shape: SelectorShape.Ramp, softness: 0.5, start: 0, end: 200, values: { opacity: 0, y: 0.6 } },
-    from: -55,
-    to: 150
+    animator: { unit: AnimatorUnit.Word, shape: SelectorShape.Ramp, softness: 0.5, start: 0, end: 200, values: { opacity: 0, y: 0.6 } }
   },
   [TextPreset.LineMaskUp]: {
     about: 'each line slides up from below its own baseline, like a mask reveal',
-    animator: { unit: AnimatorUnit.Line, shape: SelectorShape.Smooth, softness: 0.4, start: 0, end: 200, values: { y: 1.2 } },
-    from: -45,
-    to: 140
+    animator: { unit: AnimatorUnit.Line, shape: SelectorShape.Smooth, softness: 0.4, start: 0, end: 200, values: { y: 1.2 } }
   }
 };
 
+const LONE_UNIT = [0.5];
+
+function sweepOf(spec: Preset, text: string): { from: number; to: number } {
+  const found = unitPositions(text, spec.animator.unit);
+  const at = found.length ? found : LONE_UNIT;
+  const { softness, start } = spec.animator;
+  return { from: (Math.min(...at) - softness) * 100 - start, to: Math.max(...at) * 100 - start };
+}
+
 export function applyPreset(doc: MotionDoc, clipId: string, preset: TextPreset, span: { start: number; duration: number }, id: string): OpResult {
   const spec = PRESETS[preset];
+  const sweep = sweepOf(spec, String(findClip(doc, clipId)?.clip.props.text ?? ''));
   const added = addAnimator(doc, clipId, id, spec.animator);
   if (!added.ok) {
     return added;
   }
   return setKeyframes(added.doc, clipId, animatorKey(id, 'offset'), [
-    { frame: span.start, value: spec.from, ease: Ease.Linear },
-    { frame: span.start + span.duration, value: spec.to, ease: Ease.Linear }
+    { frame: span.start, value: sweep.from, ease: Ease.Linear },
+    { frame: span.start + span.duration, value: sweep.to, ease: Ease.Linear }
   ]);
 }

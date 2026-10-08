@@ -108,6 +108,29 @@ describe('text animators', () => {
   });
 });
 
+describe('a preset sweeps over the units the text really has', () => {
+  const STEPS = 24;
+  const MAX_STEP = 0.15;
+
+  function amounts(text: string, preset: TextPreset): number[] {
+    const doc = ok(applyPreset(ok(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Title', from: 0, durationInFrames: 60, props: { text } }, 'title')), 'title', preset, { start: 0, duration: STEPS }, 'p'));
+    const clip = clipOf(doc);
+    const [from, to] = clip.keyframes[animatorKey('p', 'offset')].map((k) => k.value as number);
+    const a = clip.animators[0];
+    return Array.from({ length: STEPS + 1 }, (_, i) => selection({ ...a, offset: from + ((to - from) * i) / STEPS }, 0.5));
+  }
+
+  it('a one-line mask-up moves across the whole span, not in a few frames of it', () => {
+    const steps = amounts('code.', TextPreset.LineMaskUp);
+    const jumps = steps.slice(1).map((v, i) => steps[i] - v);
+
+    expect(steps[0]).toBe(1);
+    expect(steps.at(-1)).toBe(0);
+    expect(Math.max(...jumps)).toBeLessThan(MAX_STEP);
+    expect(jumps.every((j) => j >= 0)).toBe(true);
+  });
+});
+
 describe('animators with different units on one clip', () => {
   it('a char preset and a per-word colour live together: the text splits by char and each char also knows its word', () => {
     let doc = ok(addAnimator(titled(), 'title', 'a1', { unit: AnimatorUnit.Char, values: { opacity: 0, blur: 8 } }));

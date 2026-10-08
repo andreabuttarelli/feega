@@ -23,8 +23,8 @@ describe('motion agent text animator tools', () => {
     const out = await run('apply_text_preset', { clip_id: 'id1', preset: 'blur-up', start: 0, duration: 1 });
     expect(out).toMatchObject({ ok: true, animator_id: 'id2' });
     expect(findClip(session.doc, 'id1')!.clip.keyframes['ta.id2.offset']).toEqual([
-      { frame: 0, value: -40, ease: 'linear' },
-      { frame: 30, value: 135, ease: 'linear' }
+      { frame: 0, value: -30, ease: 'linear' },
+      { frame: 30, value: 95, ease: 'linear' }
     ]);
     expect(JSON.stringify(await run('get_motion_doc', {}))).toContain('"unit":"char"');
 
