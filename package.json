@@ -121,6 +121,7 @@
     "simple-icons": "^16.22.0",
     "simplex-noise": "4.0.3",
     "simplify-js": "1.2.4",
+    "splitting": "1.1.0",
     "stripe": "^22.6.1",
     "svelte-i18n": "^4.0.1",
     "tailwind-merge": "^3.6.0",

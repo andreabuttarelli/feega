@@ -407,6 +407,15 @@ describe('custom components in the composition', () => {
     expect(html).not.toContain('ClipperLib');
   });
 
+  it('inlines Splitting only for a component that uses it, with no network', () => {
+    const title = { ...graph, source: { ...graph.source, js: 'Splitting({ by: "chars" });' } };
+    const page = compose(must(addClip(must(writeComponent(newMotionDoc(MotionFormat.Landscape), 'Title', title)), { component: 'Custom', from: 0, durationInFrames: 60, props: { name: 'Title' } }, 't1')));
+
+    expect(page).toContain('Stephen Shaw');
+    expect(page.match(/<script src="[^"]+"/g)).toEqual(html.match(/<script src="[^"]+"/g));
+    expect(html).not.toContain('Stephen Shaw');
+  });
+
   it('inlines fx only for a component that uses it, with no network', () => {
     const glow = { ...graph, source: { ...graph.source, js: 'fx.grid(root);' } };
     const page = compose(must(addClip(must(writeComponent(newMotionDoc(MotionFormat.Landscape), 'Backdrop', glow)), { component: 'Custom', from: 0, durationInFrames: 60, props: { name: 'Backdrop' } }, 'b1')));

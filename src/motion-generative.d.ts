@@ -8,6 +8,16 @@ declare module 'virtual:motion-fx' {
 	export default source;
 }
 
+declare module 'virtual:motion-splitting' {
+	const source: string;
+	export default source;
+}
+
+declare module 'splitting' {
+	type Split = { el: HTMLElement; chars?: HTMLElement[]; words?: HTMLElement[]; lines?: HTMLElement[][]; cells?: HTMLElement[] };
+	export default function Splitting(options?: { target?: string | Element | Element[] | NodeList; by?: string; key?: string }): Split[];
+}
+
 declare module 'virtual:motion-twgl' {
 	const source: string;
 	export default source;
