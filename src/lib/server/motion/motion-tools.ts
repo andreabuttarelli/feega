@@ -1681,7 +1681,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const times = input.times.map((t) => Math.min(t, end));
         const frames = await deps.frames(toolCallId, times);
         if (!frames) {
-          return { ok: false, error: 'no editor preview answered: the frames cannot be seen right now, continue without them' };
+          return { ok: true, seen: false, note: 'frames unavailable: the editor is not open in a browser, so nothing can draw them. Continue without them; the user sees the video when they open the editor.' };
         }
         session.frames.set(toolCallId, frames);
         session.checkedAt = session.edits.length;

@@ -253,12 +253,14 @@ describe('motion agent tools', () => {
     expect(out.blocking.some((q) => q.includes('fit_duration'))).toBe(true);
   });
 
-  it('with no preview open the agent is told so instead of waiting forever', async () => {
-    const { run } = setup({ frames: async () => null });
+  it('with no editor open the look is skipped, not failed: the agent goes on and the change stays unseen', async () => {
+    const { run, session } = setup({ frames: async () => null });
+    await run('add_clip', { component: 'Title', start: 0, duration: 1, props: { text: 'Unseen' } });
     const out = await run('view_frames', { times: [1] });
 
-    expect(out.ok).toBe(false);
-    expect(String(out.error)).toContain('preview');
+    expect(out).toMatchObject({ ok: true, seen: false });
+    expect(String(out.note)).toContain('editor is not open');
+    expect(session.checkedAt).toBe(0);
   });
 
   it('a turn cannot look at frames more than its budget allows', async () => {

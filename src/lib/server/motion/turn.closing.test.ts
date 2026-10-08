@@ -21,7 +21,8 @@ const world = vi.hoisted(() => ({
   viewsWhileEditing: false,
   blankViews: 0,
   views: 0,
-  scripting: false
+  scripting: false,
+  awaited: 0
 }));
 
 const SITE = 'https://supasito.com/';
@@ -154,7 +155,7 @@ vi.mock('$lib/server/motion/editor', () => ({
 }));
 vi.mock('$lib/server/motion/frame-store', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$lib/server/motion/frame-store')>()),
-  awaitFrames: async (_bucket: unknown, _prefix: string, count: number) => Array.from({ length: count }, (_, i) => ({ time: i, bytes: Buffer.from([0xff, 0xd8]) }))
+  awaitFrames: async (_bucket: unknown, _prefix: string, count: number) => (world.awaited++, Array.from({ length: count }, (_, i) => ({ time: i, bytes: Buffer.from([0xff, 0xd8]) })))
 }));
 vi.mock('$lib/server/motion/frame-stats', () => ({
   frameStats: async (frames: { time: number }[]) => {
@@ -185,10 +186,10 @@ async function turn(reasoning: string | null = 'low', browser = Browser.Attached
   return started.done;
 }
 
-async function leftAfterFirstChunk() {
+async function leftAfterFirstChunk(browser = Browser.Absent) {
   const db = { storage: { from: () => ({}) } } as never;
   const motion = { record: { id: 'n-1', canvasId: 'c-1' }, node: { id: 'n-1', format: MotionFormat.Landscape, docHeadRevision: 0, posterAssetId: null, lastRenderAssetId: null } } as never;
-  const started = await startMotionTurn({ db, userId: 'u-1', orgId: 'o-1', project: { id: 'p-1', brandId: null }, motion, message: 'make it pop', selection: [], model: 'anthropic/claude-opus-5.5', reasoning: 'low', requester: { kind: 'user', id: 'u-1' }, browser: Browser.Absent });
+  const started = await startMotionTurn({ db, userId: 'u-1', orgId: 'o-1', project: { id: 'p-1', brandId: null }, motion, message: 'make it pop', selection: [], model: 'anthropic/claude-opus-5.5', reasoning: 'low', requester: { kind: 'user', id: 'u-1' }, browser });
   if (started instanceof Response) {
     throw new Error('turn refused');
   }
@@ -214,6 +215,7 @@ describe('a motion turn closes on a look and a summary', () => {
     world.blankViews = 0;
     world.views = 0;
     world.scripting = false;
+    world.awaited = 0;
   });
 
   it('looks at its frames after the last edit even when the edits spent the whole budget', async () => {
@@ -310,5 +312,13 @@ describe('a motion turn closes on a look and a summary', () => {
 
     expect(outcome.reply.trim().length).toBeGreaterThan(0);
     expect(world.saved.find((t) => t.role === 'assistant')?.content).toBe(outcome.reply);
+  });
+
+  it('a client that left is not waited on for frames: the look is skipped without an error and the turn closes', async () => {
+    const outcome = await leftAfterFirstChunk(Browser.Attached);
+
+    expect(world.toolCalls).toContain('view_frames');
+    expect(world.awaited).toBe(0);
+    expect(outcome.reply.trim().length).toBeGreaterThan(0);
   });
 });

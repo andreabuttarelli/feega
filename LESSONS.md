@@ -2606,3 +2606,11 @@ arrivata per intero: Chromium offline blocca le richieste NUOVE, non il `fetch` 
 corso. Mossa: taglia lo stream tu, con un `addInitScript` che avvolge `fetch` e fa
 `controller.error` sul body (vedi `tests/e2e/chat-background.spec.ts`), e asserisci lo stato di
 riconnessione prima di proseguire.
+
+### `view_frames` che risponde «editor non aperto» con l'editor aperto
+Segnale: il tool dice che nessuna preview ha risposto, ma l'editor è aperto. Guarda
+`storage.objects` in `canvas-assets` sotto `…/motion-frames/<nodeId>/<toolCallId>/`: se non c'è
+nulla il browser non ha mai ricevuto la richiesta (stream tagliato, tab in background, telefono
+bloccato: la chat segue il turno via GET, che non porta le richieste di frame); se ci sono jpg
+rimasti il browser ha risposto oltre i 25 s. Mossa: riprodurre il lato client con
+`tests/e2e/motion-frames.spec.ts`, che finge lo stream e passa dalla route `/agent/frames` vera.
