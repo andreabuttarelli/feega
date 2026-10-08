@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import PageTitle from './PageTitle.svelte';
+import { TitleSize } from './page-title';
 
 const VIEWS = [
   'src/routes/app/+page.svelte',
@@ -29,5 +30,19 @@ describe('titolo di vista in mega type', () => {
     const { body } = render(PageTitle, { props: { text: 'Create a Video' } });
 
     expect(body).toContain('>create a video</h1>');
+  });
+
+  it('il login è l\'unica vista col titolo piccolo', () => {
+    const source = readFileSync('src/routes/login/+page.svelte', 'utf8');
+    const titles = source.match(/<PageTitle [^>]*>/g) ?? [];
+
+    expect(titles.length).toBeGreaterThan(0);
+    expect(titles.every((t) => t.includes('size={TitleSize.Small}'))).toBe(true);
+  });
+
+  it('il titolo piccolo non usa la mega type', () => {
+    const { body } = render(PageTitle, { props: { text: 'Sign in', size: TitleSize.Small } });
+
+    expect(body).toContain('small');
   });
 });
