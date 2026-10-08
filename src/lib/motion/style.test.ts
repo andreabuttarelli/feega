@@ -24,7 +24,7 @@ const SHORT_TEXT: Partial<Record<string, { text: string }>> = { Title: { text: '
 
 type Patch = Partial<MotionDoc['tracks'][number]['clips'][number]>;
 
-function withClip(doc: MotionDoc, id: string, component: 'Title' | 'Image' | 'Particles' | 'Device3D', patch: Patch = {}, from = 0): MotionDoc {
+function withClip(doc: MotionDoc, id: string, component: 'Title' | 'Text' | 'Logo' | 'Image' | 'Particles' | 'Device3D', patch: Patch = {}, from = 0): MotionDoc {
   const added = must(addClip(doc, { component, from, durationInFrames: 3 * SECOND, props: { ...SHORT_TEXT[component] } }, id));
   return { ...added, tracks: added.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === id ? { ...c, ...patch } : c)) })) };
 }
@@ -113,7 +113,7 @@ describe('the Apple minimal style', () => {
 
   it('names three things moving at once, not two', () => {
     const drift = { ...rise, scale: [{ frame: 0, value: 1, ease: Ease.Linear }, { frame: 3 * SECOND, value: 1.04, ease: Ease.Linear }] };
-    const two = withClip(withClip(blank(), 'a', 'Title', { keyframes: rise }), 'b', 'Image', { keyframes: drift });
+    const two = withClip(withClip(blank(), 'a', 'Title', { keyframes: rise, props: { text: 'Launch', size: 0.04 } }), 'b', 'Image', { keyframes: drift });
 
     expect(effects(two)).toEqual([]);
     expect(effects(withClip(two, 'c', 'Title', { keyframes: rise }))).toContain(Forbidden.Crowded);
@@ -255,5 +255,54 @@ describe('the launch film style', () => {
     expect(effects(long)).toContain(Forbidden.MissingStoryBeat);
     expect(effects(half)).toContain(Forbidden.MissingStoryBeat);
     expect(effects(told)).not.toContain(Forbidden.MissingStoryBeat);
+  });
+});
+
+describe('a title owns the frame, the scene comes after', () => {
+  const film = (style = MotionStyle.LaunchFilm): MotionDoc => ({ ...newMotionDoc(MotionFormat.Landscape), style, durationInFrames: 12 * SECOND });
+  const title = (doc: MotionDoc, from: number, text = 'Ship faster.') => withClip(doc, `t${from}`, 'Title', { props: { text, size: 0.11 } }, from * SECOND);
+  const device = (doc: MotionDoc, from: number) => withClip(doc, `d${from}`, 'Device3D', {}, from * SECOND);
+
+  it('a title alone, then the scene, passes', () => {
+    expect(effects(device(title(film(), 0), 3))).not.toContain(Forbidden.TextOverScene);
+  });
+
+  it('names a headline laid over a device or UI scene', () => {
+    expect(effects(device(title(film(), 0), 1))).toContain(Forbidden.TextOverScene);
+    expect(effects(device(title(film(MotionStyle.AppleMinimal), 0), 1))).toContain(Forbidden.TextOverScene);
+  });
+
+  it('tells the agent to give the line its own title card', () => {
+    const found = styleProblems(device(title(film(), 0), 1)).find((p) => p.effect === Forbidden.TextOverScene);
+
+    expect(found?.detail).toMatch(/own title card/);
+  });
+
+  it('a small label inside the scene is not a headline', () => {
+    const label = withClip(device(film(), 0), 'l', 'Text', { props: { text: 'Saved', size: 0.03 } }, SECOND);
+
+    expect(effects(label)).not.toContain(Forbidden.TextOverScene);
+  });
+
+  it('the logo lockup with its address is not a scene', () => {
+    const lockup = withClip(title(film(), 0, 'feega.app'), 'logo', 'Logo', { props: { assetId: 'brandlogo' } });
+
+    expect(effects(lockup)).not.toContain(Forbidden.TextOverScene);
+  });
+
+  it('names a video carried by text: more words than seconds', () => {
+    const wordy = [0, 3, 6, 9].reduce((doc, s) => title(doc, s, 'One more line of copy here'), film());
+    const sparse = [0, 6].reduce((doc, s) => title(doc, s, 'Ship faster.'), film());
+
+    expect(effects(wordy)).toContain(Forbidden.TooMuchText);
+    expect(effects(sparse)).not.toContain(Forbidden.TooMuchText);
+  });
+
+  it('warns in the launch film and Apple minimal, not in the UI morph reel', () => {
+    expect(STYLES[MotionStyle.LaunchFilm].forbidden).toEqual(expect.arrayContaining([Forbidden.TextOverScene, Forbidden.TooMuchText]));
+    expect(STYLES[MotionStyle.AppleMinimal].forbidden).toEqual(expect.arrayContaining([Forbidden.TextOverScene, Forbidden.TooMuchText]));
+    expect(STYLES[MotionStyle.UiMorph].forbidden).not.toContain(Forbidden.TextOverScene);
+    expect(SEVERITY[Forbidden.TextOverScene]).toBe(Severity.Warning);
+    expect(SEVERITY[Forbidden.TooMuchText]).toBe(Severity.Warning);
   });
 });

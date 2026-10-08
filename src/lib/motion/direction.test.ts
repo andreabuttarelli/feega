@@ -60,7 +60,7 @@ describe('the quality gate reads the direction of the video', () => {
       doc = must(setTransition(doc, `t${i}`, Side.In, { kind: TransitionKind.Fade, durationInFrames: 12 }));
     });
 
-    expect(kinds(fitted(doc))).toEqual([]);
+    expect(docProblems(fitted(doc), { audioAssets: 0 }).filter((p) => p.effect !== Forbidden.TextOverScene)).toEqual([]);
   });
 
   it('scenes from the library are told apart by their template: two different scenes pass, the same one twice repeats', () => {

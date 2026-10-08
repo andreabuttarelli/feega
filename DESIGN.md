@@ -66,6 +66,15 @@ the style system (`src/lib/motion/style.ts`); the default style is the launch fi
 - Micro-interactions on springs (closed-form, pure functions of time); UIs morph from one state to
   the next instead of leaving and entering; a cursor clicks exactly on real elements.
 
+### words and pictures take turns
+
+- **Little text.** Most of the video is scenes: the rebuilt UI, devices, the product. Fewer than
+  one word per second of video.
+- **A title owns the frame.** When words appear they are a title card: big, centred, nothing else
+  competing. The scene it announces comes after.
+- **Alternate:** title card → scene → title card → scene. Never a headline laid over a UI,
+  device or picture; only short labels that belong to the rebuilt UI itself.
+
 ### the story
 
 Every brand or product video has four acts: **problem → solution → product and proof → claim.**
