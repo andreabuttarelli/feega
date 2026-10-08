@@ -44,6 +44,28 @@ export async function readHead(db: Db, input: { orgId: string; nodeId: string })
   return data ? headOf(data as RevisionRow) : null;
 }
 
+export async function readHeads(db: Db, input: { orgId: string; heads: { nodeId: string; version: number }[] }): Promise<Map<string, MotionHead>> {
+  if (!input.heads.length) {
+    return new Map();
+  }
+
+  const { data, error } = await db
+    .from('motion_revisions')
+    .select('node_id, version, doc, summary, actor_kind')
+    .eq('org_id', input.orgId)
+    .or(input.heads.map((h) => `and(node_id.eq.${h.nodeId},version.eq.${h.version})`).join(','));
+
+  if (error) {
+    throw error;
+  }
+  return new Map(
+    ((data ?? []) as (RevisionRow & { node_id: string })[]).flatMap((row) => {
+      const head = headOf(row);
+      return head ? [[row.node_id, head] as const] : [];
+    })
+  );
+}
+
 export async function readRevision(db: Db, input: { orgId: string; nodeId: string; version: number }): Promise<MotionHead | null> {
   const { data, error } = await db
     .from('motion_revisions')

@@ -6,25 +6,20 @@ import { composeEditorPath, newDraft } from '$lib/motion/composition-draft';
 import { COMPOSITION_LAYOUTS } from '$lib/motion/components';
 import { MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
 import type { LayoutId } from '$lib/canvas/composition/types';
-import { listProjectAssets } from '$lib/server/repos/assets';
 import { signedAssets } from '$lib/server/studio/studio-media';
 
 const HTTP_SEE_OTHER = 303;
 const HTTP_BAD_REQUEST = 400;
 const HTTP_NOT_FOUND = 404;
 const UNTITLED = 'Untitled composition';
-const SAMPLE_COUNT = 8;
-
-async function samplePictures(db: Parameters<typeof listProjectAssets>[0], scope: { orgId: string; projectId: string }): Promise<string[]> {
-  const pictures = (await listProjectAssets(db, scope)).filter((a) => a.type === 'image').slice(0, SAMPLE_COUNT);
-  const { urls } = await signedAssets(db, scope.orgId, pictures.map((p) => p.id), 'pickerTile');
-  return pictures.map((p) => urls[p.id]).filter((url): url is string => Boolean(url));
-}
 
 export const load: PageServerLoad = async (event) => {
   const { db, orgId, projectId } = await toolScope(event);
-  const [recent, samples] = await Promise.all([recentCompositions(db, COMPOSE_DEPS, { orgId, projectId }), samplePictures(db, { orgId, projectId })]);
-  return { projectId, recent, samples };
+  const recent = await recentCompositions(db, COMPOSE_DEPS, { orgId, projectId });
+  const ids = recent.flatMap((r) => [r.posterAssetId, r.renderAssetId]).filter((id): id is string => Boolean(id));
+  const { urls } = ids.length ? await signedAssets(db, orgId, ids) : { urls: {} as Record<string, string | null> };
+  const urlOf = (id: string | null) => (id ? (urls[id] ?? null) : null);
+  return { projectId, recent: recent.map((r) => ({ ...r, posterUrl: urlOf(r.posterAssetId), previewUrl: urlOf(r.renderAssetId) })) };
 };
 
 function oneOf<T extends string>(values: readonly T[], raw: FormDataEntryValue | null): T | null {

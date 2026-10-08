@@ -4,7 +4,7 @@ import { findNode, listConnections } from '$lib/server/repos/canvas';
 import { compositionOf } from '$lib/canvas-node-data';
 import { upstreamCards, type UpstreamCard } from '$lib/canvas/composition-node';
 import { listRecentNodes } from '$lib/server/repos/dashboard';
-import { readHead } from '$lib/server/repos/motion-revisions';
+import { readHead, readHeads } from '$lib/server/repos/motion-revisions';
 import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
 import { MOTION_START_DEPS, startMotion, type MotionStart, type MotionStartDeps } from './start';
 import { saveMotionDoc } from './editor';
@@ -18,12 +18,13 @@ export type ComposeDeps = MotionStartDeps & {
   saveMotionDoc: typeof saveMotionDoc;
   listRecentNodes: typeof listRecentNodes;
   readHead: typeof readHead;
+  readHeads: typeof readHeads;
   findNode: typeof findNode;
   listConnections: typeof listConnections;
   listProjectAssets: typeof listProjectAssets;
 };
 
-export const COMPOSE_DEPS: ComposeDeps = { ...MOTION_START_DEPS, saveMotionDoc, listRecentNodes, readHead, findNode, listConnections, listProjectAssets };
+export const COMPOSE_DEPS: ComposeDeps = { ...MOTION_START_DEPS, saveMotionDoc, listRecentNodes, readHead, readHeads, findNode, listConnections, listProjectAssets };
 
 export type ComposeStart = { ok: true; start: MotionStart } | { ok: false; error: string };
 
@@ -55,24 +56,36 @@ export function mediaOfRefs(assets: Pick<Asset, 'id' | 'type'>[], refs: string[]
   });
 }
 
-export type RecentComposition = { id: string; name: string; layout: LayoutId; updatedAt: string; href: string };
+export type RecentComposition = { id: string; name: string; layout: LayoutId; updatedAt: string; href: string; posterAssetId: string | null; renderAssetId: string | null };
 
 const RECENT_SCAN = 24;
 const RECENT_LIMIT = 8;
 const UNTITLED = 'Untitled composition';
 
+const idOf = (value: unknown): string | null => (typeof value === 'string' && value ? value : null);
+
 export async function recentCompositions(db: Db, deps: ComposeDeps, scope: { orgId: string; projectId: string }): Promise<RecentComposition[]> {
-  const nodes = (await deps.listRecentNodes(db, { orgId: scope.orgId, type: 'motion', limit: RECENT_SCAN })).filter((n) => n.projectId === scope.projectId);
-  const heads = await Promise.all(nodes.map((n) => deps.readHead(db, { orgId: scope.orgId, nodeId: n.id })));
+  const nodes = (await deps.listRecentNodes(db, { orgId: scope.orgId, type: 'motion', limit: RECENT_SCAN })).filter((n) => n.projectId === scope.projectId && Number(n.data.docHeadRevision) > 0);
+  const heads = await deps.readHeads(db, { orgId: scope.orgId, heads: nodes.map((n) => ({ nodeId: n.id, version: Number(n.data.docHeadRevision) })) });
 
   return nodes
-    .flatMap((node, i) => {
-      const doc = heads[i]?.doc;
+    .flatMap((node) => {
+      const doc = heads.get(node.id)?.doc;
       const draft = doc ? draftFromDoc(doc) : null;
       if (!draft) {
         return [];
       }
-      return [{ id: node.id, name: node.name ?? UNTITLED, layout: draft.layout, updatedAt: node.updatedAt, href: composeEditorPath({ projectId: scope.projectId, nodeId: node.id }) }];
+      return [
+        {
+          id: node.id,
+          name: node.name ?? UNTITLED,
+          layout: draft.layout,
+          updatedAt: node.updatedAt,
+          href: composeEditorPath({ projectId: scope.projectId, nodeId: node.id }),
+          posterAssetId: idOf(node.data.posterAssetId),
+          renderAssetId: idOf(node.data.lastRenderAssetId)
+        }
+      ];
     })
     .slice(0, RECENT_LIMIT);
 }

@@ -1,9 +1,8 @@
 <script lang="ts">
   import PageTitle from '$lib/components/PageTitle.svelte';
   import { goto } from '$app/navigation';
-  import Orbit from '@lucide/svelte/icons/orbit';
   import PageHead from '$lib/components/PageHead.svelte';
-  import TemplatePreview from '$lib/components/compose/TemplatePreview.svelte';
+  import PreviewCard from '$lib/components/compose/PreviewCard.svelte';
   import { LAYOUTS } from '$lib/canvas/composition/index';
   import { COMPOSITION_LAYOUTS } from '$lib/motion/components';
   import { FORMATS, MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
@@ -13,6 +12,8 @@
 
   let format = $state<MotionFormat>(MotionFormat.Vertical);
   const ratio = $derived(`${FORMATS[format].width} / ${FORMATS[format].height}`);
+  const POSTER = { width: 270, height: 480 };
+  const sample = (layout: string, ext: string) => `/compose-templates/${layout}.${ext}`;
 </script>
 
 <svelte:head><title>Compositions · feega</title></svelte:head>
@@ -54,7 +55,7 @@
             <input type="hidden" name="name" value={LAYOUTS[layout].label} />
             <button type="submit" class="template-button" aria-label={`Use ${LAYOUTS[layout].label}`}>
               <span class="stage" style={`aspect-ratio: ${ratio}`}>
-                <TemplatePreview {layout} pictures={data.samples} />
+                <PreviewCard poster={sample(layout, 'jpg')} preview={sample(layout, 'mp4')} {...POSTER} />
               </span>
               <span class="template-text">
                 <span class="template-name">{LAYOUTS[layout].label}</span>
@@ -70,13 +71,17 @@
   <section aria-labelledby="recent-heading">
     <h2 id="recent-heading">Your compositions</h2>
     {#if data.recent.length}
-      <ul class="recent" data-testid="compose-recent">
+      <ul class="templates" data-testid="compose-recent">
         {#each data.recent as item (item.id)}
           <li>
-            <a href={item.href} class="recent-item">
-              <Orbit size={16} strokeWidth={1.6} />
-              <span class="recent-name">{item.name}</span>
-              <span class="muted">{LAYOUTS[item.layout].label} · {formatLastEdited(item.updatedAt)}</span>
+            <a href={item.href} class="template-button">
+              <span class="stage" style={`aspect-ratio: ${ratio}`}>
+                <PreviewCard poster={item.posterUrl} preview={item.previewUrl} {...POSTER} />
+              </span>
+              <span class="template-text">
+                <span class="template-name">{item.name}</span>
+                <span class="muted">{LAYOUTS[item.layout].label} · {formatLastEdited(item.updatedAt)}</span>
+              </span>
             </a>
           </li>
         {/each}
@@ -190,6 +195,8 @@
   }
 
   .template-button {
+    box-sizing: border-box;
+    text-decoration: none;
     display: flex;
     flex-direction: column;
     width: 100%;
@@ -223,38 +230,6 @@
   }
 
   .template-name {
-    font-size: 13px;
-    font-weight: 600;
-  }
-
-  .recent {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    border: 1px solid var(--ui-line);
-    background: var(--ui-bg);
-  }
-
-  .recent li + li {
-    border-top: 1px solid var(--ui-line);
-  }
-
-  .recent-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 12px;
-    color: var(--ui-ink);
-    text-decoration: none;
-  }
-
-  .recent-item:hover {
-    background: var(--ui-surface);
-  }
-
-  .recent-name {
     font-size: 13px;
     font-weight: 600;
   }
