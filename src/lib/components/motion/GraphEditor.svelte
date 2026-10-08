@@ -1,7 +1,6 @@
 <script lang="ts">
-  import Maximize from '@lucide/svelte/icons/maximize';
-  import ClipboardCopy from '@lucide/svelte/icons/clipboard-copy';
-  import ClipboardPaste from '@lucide/svelte/icons/clipboard-paste';
+  import IconButton from './IconButton.svelte';
+  import { Action } from '$lib/motion/actions';
   import type { MotionDoc } from '$lib/motion/doc';
   import { Interp, type Keyframe } from '$lib/motion/keyframes';
   import { EASE_PRESETS, EASE_PRESET_IDS, EasePreset, GraphMode, KeyEnd, curvePoints, dragHandle, easeHandles, fitView, handlePoints, type GraphPoint, type GraphView } from '$lib/motion/graph';
@@ -190,9 +189,9 @@
       {#each EASE_PRESET_IDS.slice(3) as id (id)}<option value={id}>{EASE_PRESETS[id].label}</option>{/each}
     </select>
     <span class="sep"></span>
-    <button type="button" title="Copy ease" aria-label="Copy ease" onclick={copy}><ClipboardCopy size={14} /></button>
-    <button type="button" title="Paste ease" aria-label="Paste ease" disabled={!board} onclick={paste}><ClipboardPaste size={14} /></button>
-    <button type="button" title="Fit to view" aria-label="Fit to view" onclick={() => (fitted = null)}><Maximize size={14} /></button>
+    <IconButton action={Action.CopyEase} size={14} onclick={copy} />
+    <IconButton action={Action.PasteEase} size={14} disabled={!board} onclick={paste} />
+    <IconButton action={Action.FitGraph} size={14} onclick={() => (fitted = null)} />
   </div>
 
   <div class="plot" bind:clientWidth={width} bind:clientHeight={height}>
@@ -243,6 +242,7 @@
   }
 
   .bar {
+    --ib-size: 24px;
     display: flex;
     align-items: center;
     gap: 4px;

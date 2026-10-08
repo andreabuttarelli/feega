@@ -7,37 +7,18 @@
   import { watchMotionNode } from '$lib/realtime/motion-channel';
   import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
   import { registerUpload } from '$lib/motion/fonts/ops';
-  import ArrowLeft from '@lucide/svelte/icons/arrow-left';
-  import Play from '@lucide/svelte/icons/play';
-  import Pause from '@lucide/svelte/icons/pause';
-  import Scissors from '@lucide/svelte/icons/scissors';
-  import Copy from '@lucide/svelte/icons/copy';
-  import Trash from '@lucide/svelte/icons/trash-2';
-  import Undo from '@lucide/svelte/icons/undo-2';
-  import Redo from '@lucide/svelte/icons/redo-2';
-  import Magnet from '@lucide/svelte/icons/magnet';
   import Plus from '@lucide/svelte/icons/plus';
-  import ZoomIn from '@lucide/svelte/icons/zoom-in';
-  import ZoomOut from '@lucide/svelte/icons/zoom-out';
-  import SkipBack from '@lucide/svelte/icons/skip-back';
-  import SkipForward from '@lucide/svelte/icons/skip-forward';
-  import StepBack from '@lucide/svelte/icons/step-back';
-  import StepForward from '@lucide/svelte/icons/step-forward';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
-  import Bookmark from '@lucide/svelte/icons/bookmark';
-  import Brackets from '@lucide/svelte/icons/brackets';
-  import PanelRight from '@lucide/svelte/icons/panel-right';
   import CompositionSettings from '$lib/components/motion/CompositionSettings.svelte';
   import { SAVE_TONE, SaveState, TimeDisplay, clockLabel, compositionLabel, compositionShort, nextDisplay } from '$lib/motion/editor-bar';
-  import X from '@lucide/svelte/icons/x';
-  import Ellipsis from '@lucide/svelte/icons/ellipsis';
-  import Crosshair from '@lucide/svelte/icons/crosshair';
   import Keyboard from '@lucide/svelte/icons/keyboard';
-  import BotMessageSquare from '@lucide/svelte/icons/bot-message-square';
+  import LayoutTemplate from '@lucide/svelte/icons/layout-template';
+  import Upload from '@lucide/svelte/icons/upload';
   import ShortcutHelp from '$lib/components/motion/ShortcutHelp.svelte';
+  import IconButton from '$lib/components/motion/IconButton.svelte';
+  import { Action, Caption } from '$lib/motion/actions';
   import { CHAT_PLACE, ChatPlace, DEFAULT_LAYOUT, Panel, Side, flip, readLayout, sideWidth, timelineHeight, toggleSide, viewportOf, writeLayout, type EditorLayout, type LayoutStore } from '$lib/motion/editor-layout';
   import { provideSelection } from '$lib/motion/selection-context';
-  import Layers from '@lucide/svelte/icons/layers';
   import { addAdjustment, mergeView, pathNames, precompose, viewOf } from '$lib/motion/precomp';
   import { Lens, addLens } from '$lib/motion/glass/ops';
   import { SPRINGS } from '$lib/motion/spring';
@@ -860,7 +841,7 @@
 <div class="editor" data-testid="motion-editor" data-viewport={viewport}>
   <header class="bar">
     <div class="group lead">
-      <a class="icon-btn" href={`/p/${data.projectId}/c/${data.canvas.id}`} title={`Back to ${data.canvas.name}`} aria-label={`Back to ${data.canvas.name}`}><ArrowLeft size={16} /></a>
+      <IconButton action={Action.Back} href={`/p/${data.projectId}/c/${data.canvas.id}`} label={`Back to ${data.canvas.name}`} />
       <nav class="crumbs" aria-label="Compositions" data-testid="comp-breadcrumb">
         <a class="crumb" href={`/p/${data.projectId}/c/${data.canvas.id}`}>{data.canvas.name}</a>
         <span class="slash" aria-hidden="true">/</span>
@@ -877,13 +858,11 @@
     </div>
 
     <div class="group transport" role="group" aria-label="Transport">
-      <button type="button" class="icon-btn" title="Go to start (Home)" aria-label="Go to start" onclick={COMMANDS[Command.GoStart]}><SkipBack size={16} /></button>
-      <button type="button" class="icon-btn step" title="Previous frame (←)" aria-label="Previous frame" onclick={COMMANDS[Command.StepBack]}><StepBack size={16} /></button>
-      <button type="button" class="icon-btn play" aria-label={playing ? 'Pause' : 'Play'} title={playing ? 'Pause (Space)' : 'Play (Space)'} onclick={() => (playing = !playing)}>
-        {#if playing}<Pause size={16} fill="currentColor" />{:else}<Play size={16} fill="currentColor" />{/if}
-      </button>
-      <button type="button" class="icon-btn step" title="Next frame (→)" aria-label="Next frame" onclick={COMMANDS[Command.StepForward]}><StepForward size={16} /></button>
-      <button type="button" class="icon-btn" title="Go to end (End)" aria-label="Go to end" onclick={COMMANDS[Command.GoEnd]}><SkipForward size={16} /></button>
+      <IconButton action={Action.GoStart} onclick={COMMANDS[Command.GoStart]} />
+      <IconButton action={Action.StepBack} class="step" onclick={COMMANDS[Command.StepBack]} />
+      <IconButton action={playing ? Action.Pause : Action.Play} class="play" fill="currentColor" onclick={COMMANDS[Command.TogglePlay]} />
+      <IconButton action={Action.StepForward} class="step" onclick={COMMANDS[Command.StepForward]} />
+      <IconButton action={Action.GoEnd} onclick={COMMANDS[Command.GoEnd]} />
       <button type="button" class="clock" title={display === TimeDisplay.Timecode ? 'Show frames' : 'Show timecode'} data-testid="clock" onclick={() => (display = nextDisplay(display))}>
         <span data-testid="timecode"><b>{clockLabel(frame, doc.fps, display)}</b> <i>/ {clockLabel(doc.durationInFrames, doc.fps, display)}</i></span>
       </button>
@@ -903,18 +882,18 @@
       </div>
       <span class="save" data-testid="save-state" data-tone={SAVE_TONE[saveState]}><i aria-hidden="true"></i>{saveState} · v{version}</span>
       {#if !docked}
-        <button type="button" class="icon-btn toggle" title="Properties (⌥⌘B)" aria-label="Properties panel" aria-pressed={propsShown} data-testid="toggle-inspector" onclick={COMMANDS[Command.ToggleInspector]}><PanelRight size={16} /></button>
-        <button type="button" class="icon-btn toggle" title="Agent (⌘B)" aria-label="Agent panel" aria-pressed={chatShown} data-testid="toggle-chat" onclick={COMMANDS[Command.ToggleChat]}><BotMessageSquare size={16} /></button>
+        <IconButton action={Action.ToggleInspector} class="toggle" pressed={propsShown} data-testid="toggle-inspector" onclick={COMMANDS[Command.ToggleInspector]} />
+        <IconButton action={Action.ToggleChat} class="toggle" pressed={chatShown} data-testid="toggle-chat" onclick={COMMANDS[Command.ToggleChat]} />
       {/if}
       <button type="button" class="secondary wide" onclick={() => (leaveTo(0), (templating = true))} data-testid="template-open">Template</button>
       <button type="button" class="secondary wide" onclick={() => (leaveTo(0), (publishing = true))} data-testid="publish-open">{listed ? 'In gallery' : 'Publish'}</button>
       <div class="popover-anchor narrow">
-        <button type="button" class="icon-btn" aria-label="More actions" aria-expanded={moreOpen} data-testid="more-actions" onclick={() => (moreOpen = !moreOpen)}><Ellipsis size={16} /></button>
+        <IconButton action={Action.More} aria-expanded={moreOpen} data-testid="more-actions" onclick={() => (moreOpen = !moreOpen)} />
         {#if moreOpen}
           <div class="menu more" role="menu">
-            <button type="button" role="menuitem" onclick={() => ((moreOpen = false), leaveTo(0), (templating = true))}>Template</button>
-            <button type="button" role="menuitem" onclick={() => ((moreOpen = false), leaveTo(0), (publishing = true))}>{listed ? 'In gallery' : 'Publish'}</button>
-            <button type="button" role="menuitem" onclick={() => ((moreOpen = false), COMMANDS[Command.Help]())}>Keyboard shortcuts</button>
+            <button type="button" role="menuitem" onclick={() => ((moreOpen = false), leaveTo(0), (templating = true))}><LayoutTemplate size={14} /><span>Template</span></button>
+            <button type="button" role="menuitem" onclick={() => ((moreOpen = false), leaveTo(0), (publishing = true))}><Upload size={14} /><span>{listed ? 'In gallery' : 'Publish'}</span></button>
+            <button type="button" role="menuitem" data-testid="guide-open-menu" onclick={() => ((moreOpen = false), COMMANDS[Command.Help]())}><Keyboard size={14} /><span>Keyboard & gestures</span><kbd>?</kbd></button>
           </div>
         {/if}
       </div>
@@ -1023,7 +1002,7 @@
     <SideColumn place={chatPlace} side={layout.side} onside={(side) => relayout({ side })} widthPx={sideWidth(layout.sidePx, width)} onwidth={(sidePx) => (layout = { ...layout, sidePx })} oncommit={() => relayout({})} busy={agentBusy}>
     {#snippet properties()}
     <aside class="props" class:open={sheet === Sheet.Properties} aria-label="Properties">
-      <div class="sheet-head"><span>Properties</span><button type="button" aria-label="Close" onclick={() => (sheet = Sheet.None)}><X size={16} /></button></div>
+      <div class="sheet-head"><span>Properties</span><IconButton action={Action.Close} onclick={() => (sheet = Sheet.None)} /></div>
       {#if cameraOpen && !selection.length}
         <CameraInspector {doc} {frame} onchange={edit} />
         <LookInspector {doc} onchange={edit} />
@@ -1046,7 +1025,7 @@
     {/snippet}
     {#snippet chat()}
     <aside class="chat" class:open={sheet === Sheet.Agent} aria-label="Agent">
-      <div class="sheet-head"><span>Agent</span><button type="button" aria-label="Close" onclick={() => (sheet = Sheet.None)}><X size={16} /></button></div>
+      <div class="sheet-head"><span>Agent</span><IconButton action={Action.Close} onclick={() => (sheet = Sheet.None)} /></div>
       <ChatPanel projectId={data.projectId} motionNodeId={data.node.id} reload={chatReload} prefill={brandAsk} context={() => ({ selection })} onturnend={() => void pullAgentEdit()} ondata={onAgentData} onbusy={(busy) => (agentBusy = busy)} />
     </aside>
     {/snippet}
@@ -1084,22 +1063,22 @@
             </div>
           {/if}
         </div>
-        <button type="button" class="tool" title="Split at playhead (⇧⌘D)" aria-label="Split" disabled={!selection.length} onclick={split}><Scissors size={14} /></button>
-        <button type="button" class="tool" title="Duplicate (⌘D)" aria-label="Duplicate" disabled={!selection.length} onclick={duplicate}><Copy size={14} /></button>
-        <button type="button" class="tool" title="Create null from selection" aria-label="Create null from selection" data-testid="null-from-selection" disabled={!selection.length} onclick={groupUnderNull}><Crosshair size={14} /></button>
-        <button type="button" class="tool" title="Precompose (⇧⌘C)" aria-label="Precompose" data-testid="precompose" disabled={!selection.length} onclick={precomposeSelection}><Layers size={14} /></button>
-        <button type="button" class="tool" title="Delete (Del)" aria-label="Delete" disabled={!selection.length && !keySelection.length} onclick={remove}><Trash size={14} /></button>
+        <IconButton action={Action.Split} size={14} disabled={!selection.length} onclick={split} />
+        <IconButton action={Action.Duplicate} size={14} disabled={!selection.length} onclick={duplicate} />
+        <IconButton action={Action.NullFromSelection} size={14} caption={Caption.Wide} data-testid="null-from-selection" disabled={!selection.length} onclick={groupUnderNull} />
+        <IconButton action={Action.Precompose} size={14} caption={Caption.Wide} data-testid="precompose" disabled={!selection.length} onclick={precomposeSelection} />
+        <IconButton action={Action.Delete} size={14} disabled={!selection.length && !keySelection.length} onclick={remove} />
         <span class="gap" aria-hidden="true"></span>
-        <button type="button" class="tool" title="Undo (⌘Z)" aria-label="Undo" disabled={!canUndo(history)} onclick={undoEdit}><Undo size={14} /></button>
-        <button type="button" class="tool" title="Redo (⇧⌘Z)" aria-label="Redo" disabled={!canRedo(history)} onclick={redoEdit}><Redo size={14} /></button>
+        <IconButton action={Action.Undo} size={14} disabled={!canUndo(history)} onclick={undoEdit} />
+        <IconButton action={Action.Redo} size={14} disabled={!canRedo(history)} onclick={redoEdit} />
         <span class="gap" aria-hidden="true"></span>
         <div class="segmented" role="group" aria-label="Timeline mode">
           <button type="button" aria-pressed={!graphOpen} onclick={() => (graphOpen = false)}>Clips</button>
           <button type="button" aria-pressed={graphOpen} data-testid="graph-toggle" onclick={() => (graphOpen = !graphOpen)}>Graph</button>
         </div>
-        <button type="button" class="tool" title="Snap" aria-label="Snap" aria-pressed={snap === Snap.On} onclick={() => (snap = snap === Snap.On ? Snap.Off : Snap.On)}><Magnet size={14} /></button>
-        <button type="button" class="tool" title="Add marker (M)" aria-label="Add marker" data-testid="add-marker" onclick={markHere}><Bookmark size={14} /></button>
-        <button type="button" class="tool" title={doc.workArea ? 'Clear work area' : 'Work area: set in/out with I and O'} aria-label="Work area" aria-pressed={!!doc.workArea} onclick={() => apply(setWorkArea(doc, null), 'Cleared the work area')} disabled={!doc.workArea}><Brackets size={14} /></button>
+        <IconButton action={Action.Snap} size={14} caption={Caption.Wide} pressed={snap === Snap.On} onclick={() => (snap = snap === Snap.On ? Snap.Off : Snap.On)} />
+        <IconButton action={Action.AddMarker} size={14} data-testid="add-marker" onclick={markHere} />
+        <IconButton action={Action.ClearWorkArea} size={14} label={doc.workArea ? undefined : 'Work area: set with I and O'} pressed={!!doc.workArea} onclick={() => apply(setWorkArea(doc, null), 'Cleared the work area')} disabled={!doc.workArea} />
         {#if selection.length > 1}
           <select class="arrange" aria-label="Arrange" data-testid="arrange" value="" onchange={(e) => (arrange(e.currentTarget.value), (e.currentTarget.value = ''))}>
             <option value="" disabled>Arrange</option>
@@ -1113,10 +1092,10 @@
         {/if}
         {#if notice}<span class="notice" role="status">{notice}</span>{/if}
         <span class="spacer"></span>
-        <button type="button" class="tool" title="Zoom out (−)" aria-label="Zoom out" onclick={COMMANDS[Command.ZoomOut]}><ZoomOut size={14} /></button>
+        <IconButton action={Action.ZoomOut} size={14} onclick={COMMANDS[Command.ZoomOut]} />
         <input class="zoom wide" type="range" aria-label="Timeline zoom" min={Math.log2(ZOOM_MIN)} max={Math.log2(ZOOM_MAX)} step="0.05" value={Math.log2(zoom)} oninput={(e) => (zoom = clampZoom(2 ** Number(e.currentTarget.value)))} data-testid="timeline-zoom" />
-        <button type="button" class="tool" title="Zoom in (+)" aria-label="Zoom in" onclick={COMMANDS[Command.ZoomIn]}><ZoomIn size={14} /></button>
-        <button type="button" class="tool wide" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts" data-testid="shortcut-help-open" onclick={COMMANDS[Command.Help]}><Keyboard size={14} /></button>
+        <IconButton action={Action.ZoomIn} size={14} onclick={COMMANDS[Command.ZoomIn]} />
+        <IconButton action={Action.Help} size={14} class="wide" data-testid="shortcut-help-open" onclick={COMMANDS[Command.Help]} />
       </div>
 
       <div class="tl">
@@ -1202,7 +1181,6 @@
     justify-content: flex-end;
   }
 
-  .icon-btn,
   .tool,
   .clock,
   .crumb,
@@ -1213,28 +1191,8 @@
     cursor: pointer;
   }
 
-  .icon-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    width: var(--ui-hit);
-    height: var(--ui-hit);
-    color: var(--ui-ink-2);
-  }
-
-  .icon-btn:hover {
-    background: var(--ui-hover);
+  .transport :global(.play) {
     color: var(--ui-ink);
-  }
-
-  .icon-btn.play {
-    color: var(--ui-ink);
-  }
-
-  .icon-btn.toggle[aria-pressed='true'] {
-    background: var(--ui-accent-wash);
-    color: var(--ui-accent);
   }
 
   .crumbs {
@@ -1604,11 +1562,6 @@
     cursor: default;
   }
 
-  .tool[aria-pressed='true'] {
-    background: var(--ui-accent-wash);
-    color: var(--ui-accent);
-  }
-
   .gap {
     flex-shrink: 0;
     width: var(--ui-space-2);
@@ -1710,7 +1663,20 @@
     bottom: auto;
     left: auto;
     right: 0;
-    grid-template-columns: 160px;
+    grid-template-columns: 220px;
+  }
+
+  .menu.more button {
+    display: flex;
+    align-items: center;
+    gap: var(--ui-space-2);
+  }
+
+  .menu.more kbd {
+    margin-left: auto;
+    font-family: var(--ui-mono);
+    font-size: var(--ui-text-xs);
+    color: var(--ui-text-3);
   }
 
   .menu .col {
@@ -1781,7 +1747,8 @@
   }
 
   @media (max-width: 1359px) {
-    .wide {
+    .wide,
+    .toolbar :global(.ib.wide) {
       display: none;
     }
 
@@ -1791,7 +1758,7 @@
   }
 
   [data-viewport='tablet'] .chip .long,
-  [data-viewport='tablet'] .step,
+  [data-viewport='tablet'] .transport :global(.step),
   [data-viewport='tablet'] .crumb:not(.current),
   [data-viewport='tablet'] .slash {
     display: none;
@@ -1883,12 +1850,12 @@
     background: var(--ui-bg);
   }
 
-  [data-viewport='phone'] .step,
+  [data-viewport='phone'] .transport :global(.step),
   [data-viewport='phone'] .crumb:not(.current),
   [data-viewport='phone'] .slash,
   [data-viewport='phone'] .save,
   [data-viewport='phone'] .chip,
-  [data-viewport='phone'] .trail .toggle {
+  [data-viewport='phone'] .trail :global(.toggle) {
     display: none;
   }
 
@@ -1930,6 +1897,11 @@
     bottom: auto;
     max-height: 50vh;
     overflow: auto;
+  }
+
+  [data-viewport='phone'] .menu.more {
+    top: 56px;
+    grid-template-columns: 1fr;
   }
 
   [data-viewport='phone'] .props,

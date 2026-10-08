@@ -1,6 +1,7 @@
 <script lang="ts">
+  import IconButton from './IconButton.svelte';
+  import { Action } from '$lib/motion/actions';
   import { onMount } from 'svelte';
-  import X from '@lucide/svelte/icons/x';
   import Download from '@lucide/svelte/icons/download';
   import type { MotionDoc } from '$lib/motion/doc';
   import { Background, FORMATS, formatOf } from '$lib/motion/doc';
@@ -270,7 +271,7 @@
 <div class="dialog" role="dialog" aria-modal="true" aria-label="Export video" data-testid="export-dialog">
   <header>
     <span>Export</span>
-    <button type="button" aria-label="Close" disabled={busy} onclick={onclose}><X size={16} /></button>
+    <IconButton action={Action.Close} disabled={busy} onclick={onclose} />
   </header>
 
   <div class="choice modes" role="radiogroup" aria-label="What to export">
@@ -433,19 +434,6 @@
     margin: 0 calc(var(--ui-space-2) - var(--ui-space-6)) 0 0;
     font-size: var(--ui-text-lg);
     font-weight: 600;
-  }
-
-  header button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: var(--ui-hit);
-    height: var(--ui-hit);
-    color: var(--ui-text-2);
-  }
-
-  header button:hover {
-    background: var(--ui-hover);
   }
 
   dl {

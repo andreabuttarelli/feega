@@ -1,9 +1,9 @@
 <script lang="ts">
-  import ChevronUp from '@lucide/svelte/icons/chevron-up';
+  import IconButton from './IconButton.svelte';
+  import { Action } from '$lib/motion/actions';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import { tick } from 'svelte';
-  import Link2 from '@lucide/svelte/icons/link-2';
   import { CLIP_FAMILIES, ClipFamily, Preview, familyOf, tileFrames } from '$lib/motion/track-style';
   import { filmstrip, type Strip } from '$lib/motion/filmstrip';
   import { COMPONENTS, THREE_D_COMPONENTS, TrackKind } from '$lib/motion/components';
@@ -24,12 +24,6 @@
   import { ancestorsOf } from '$lib/motion/parent';
   import { setParent } from '$lib/motion/parent-ops';
   import EasePicker from './EasePicker.svelte';
-  import Eye from '@lucide/svelte/icons/eye';
-  import EyeOff from '@lucide/svelte/icons/eye-off';
-  import Lock from '@lucide/svelte/icons/lock';
-  import LockOpen from '@lucide/svelte/icons/lock-open';
-  import Headphones from '@lucide/svelte/icons/headphones';
-  import Ghost from '@lucide/svelte/icons/ghost';
   import { allMarkers, isLocked, setClipFlags, setTrackFlags, shownTracks } from '$lib/motion/organize';
   import { PEAKS_PER_SECOND, clipPeaks, wavePath } from '$lib/motion/waveform';
   import { FadeEdge, dragFade, fadeHandles } from '$lib/motion/fade-handles';
@@ -39,6 +33,8 @@
   const COMPACT_BELOW_PX = 760;
   const TILE_PX = 64;
   const MAX_TILES = 48;
+
+  const onIf = (on: boolean | undefined) => (on ? 'on' : '');
   const INDENT_PX = 10;
 
   const Drag = { Move: 'move', TrimStart: 'trim-start', TrimEnd: 'trim-end', Scrub: 'scrub', Keys: 'keys', FadeIn: 'fade-in', FadeOut: 'fade-out' } as const;
@@ -598,7 +594,7 @@
     <div class="ruler" role="slider" tabindex="-1" aria-label="Playhead" aria-valuenow={frame} onpointerdown={startScrub}>
       <div class="corner">
         <input class="search" type="search" placeholder="Search layers" aria-label="Search layers" bind:value={filter} onpointerdown={(e) => e.stopPropagation()} />
-        <button type="button" class="shy-toggle" class:on={hideShy} aria-pressed={hideShy} title="Hide shy tracks" onpointerdown={(e) => e.stopPropagation()} onclick={() => (hideShy = !hideShy)}><Ghost size={12} /></button>
+        <IconButton action={Action.HideShy} size={12} class="shy-toggle" pressed={hideShy} onpointerdown={(e) => e.stopPropagation()} onclick={() => (hideShy = !hideShy)} />
       </div>
       {#each marks as mark (mark.frame)}
         <span class="tick" class:major={mark.label} style={`left: ${headPx + mark.frame * ppf}px;`}>
@@ -662,12 +658,12 @@
             <span class="group-name">{track.name || track.id}</span>
             <span class="count">{track.clips.length}</span>
             <span class="flags">
-              <button type="button" title={track.hidden ? 'Show track' : 'Hide track'} aria-label={track.hidden ? 'Show track' : 'Hide track'} aria-pressed={!!track.hidden} data-flag="hide" class:on={track.hidden} onclick={() => flag(track.id, { hidden: !track.hidden }, track.hidden ? 'Showed a track' : 'Hid a track')}>{#if track.hidden}<EyeOff size={12} />{:else}<Eye size={12} />{/if}</button>
-              <button type="button" title={track.locked ? 'Unlock track' : 'Lock track'} aria-label={track.locked ? 'Unlock track' : 'Lock track'} aria-pressed={!!track.locked} data-flag="lock" class:on={track.locked} onclick={() => flag(track.id, { locked: !track.locked }, track.locked ? 'Unlocked a track' : 'Locked a track')}>{#if track.locked}<Lock size={12} />{:else}<LockOpen size={12} />{/if}</button>
-              <button type="button" title="Solo track" aria-label="Solo track" aria-pressed={solo.includes(track.id)} data-flag="solo" class:on={solo.includes(track.id)} onclick={() => (solo = toggled(solo, track.id))}><Headphones size={12} /></button>
-              <button type="button" title="Shy track" aria-label="Shy track" aria-pressed={shy.includes(track.id)} data-flag="shy" class:on={shy.includes(track.id)} onclick={() => (shy = toggled(shy, track.id))}><Ghost size={12} /></button>
-              <button type="button" title="Move track up" aria-label="Move track up" disabled={index <= 0} onclick={() => reorder(track.id, -1)}><ChevronUp size={12} /></button>
-              <button type="button" title="Move track down" aria-label="Move track down" disabled={index === shown.tracks.length - 1} onclick={() => reorder(track.id, 1)}><ChevronDown size={12} /></button>
+              <IconButton action={track.hidden ? Action.ShowTrack : Action.HideTrack} size={12} pressed={!!track.hidden} data-flag="hide" class={onIf(track.hidden)} onclick={() => flag(track.id, { hidden: !track.hidden }, track.hidden ? 'Showed a track' : 'Hid a track')} />
+              <IconButton action={track.locked ? Action.UnlockTrack : Action.LockTrack} size={12} pressed={!!track.locked} data-flag="lock" class={onIf(track.locked)} onclick={() => flag(track.id, { locked: !track.locked }, track.locked ? 'Unlocked a track' : 'Locked a track')} />
+              <IconButton action={Action.SoloTrack} size={12} pressed={solo.includes(track.id)} data-flag="solo" class={onIf(solo.includes(track.id))} onclick={() => (solo = toggled(solo, track.id))} />
+              <IconButton action={Action.ShyTrack} size={12} pressed={shy.includes(track.id)} data-flag="shy" class={onIf(shy.includes(track.id))} onclick={() => (shy = toggled(shy, track.id))} />
+              <IconButton action={Action.TrackUp} size={12} disabled={index <= 0} onclick={() => reorder(track.id, -1)} />
+              <IconButton action={Action.TrackDown} size={12} disabled={index === shown.tracks.length - 1} onclick={() => reorder(track.id, 1)} />
             </span>
           </div>
           <div class="lane" data-track-id={track.id}>
@@ -696,10 +692,10 @@
             <span class="layer-name" title={layerName(clip, doc.comps)}>{#if clip.parent}<em class="parent">↳ {parentName(clip)}</em>{/if}{layerName(clip, doc.comps)}</span>
             <span class="flags">
               {#if track.kind === TrackKind.Visual}
-                <button type="button" class="whip" title="Drag onto another layer to parent this one to it" aria-label="Parent pick-whip" data-whip={clip.id} onpointerdown={(e) => startWhip(e, clip.id)}><Link2 size={12} /></button>
+                <IconButton action={Action.ParentWhip} size={12} class="whip" data-whip={clip.id} onpointerdown={(e) => startWhip(e, clip.id)} />
               {/if}
-              <button type="button" title={clip.hidden ? 'Show layer' : 'Hide layer'} aria-label={clip.hidden ? 'Show layer' : 'Hide layer'} aria-pressed={!!clip.hidden} class:on={clip.hidden} onpointerdown={(e) => e.stopPropagation()} onclick={() => clipFlag(clip.id, { hidden: !clip.hidden }, clip.hidden ? 'Showed a layer' : 'Hid a layer')}>{#if clip.hidden}<EyeOff size={12} />{:else}<Eye size={12} />{/if}</button>
-              <button type="button" title={clip.locked ? 'Unlock layer' : 'Lock layer'} aria-label={clip.locked ? 'Unlock layer' : 'Lock layer'} aria-pressed={!!clip.locked} class:on={clip.locked} onpointerdown={(e) => e.stopPropagation()} onclick={() => clipFlag(clip.id, { locked: !clip.locked }, clip.locked ? 'Unlocked a layer' : 'Locked a layer')}>{#if clip.locked}<Lock size={12} />{:else}<LockOpen size={12} />{/if}</button>
+              <IconButton action={clip.hidden ? Action.ShowLayer : Action.HideLayer} size={12} pressed={!!clip.hidden} class={onIf(clip.hidden)} onpointerdown={(e) => e.stopPropagation()} onclick={() => clipFlag(clip.id, { hidden: !clip.hidden }, clip.hidden ? 'Showed a layer' : 'Hid a layer')} />
+              <IconButton action={clip.locked ? Action.UnlockLayer : Action.LockLayer} size={12} pressed={!!clip.locked} class={onIf(clip.locked)} onpointerdown={(e) => e.stopPropagation()} onclick={() => clipFlag(clip.id, { locked: !clip.locked }, clip.locked ? 'Unlocked a layer' : 'Locked a layer')} />
             </span>
           </div>
           <div class="lane" data-track-id={track.id}>
@@ -862,22 +858,8 @@
     border-color: var(--ui-accent);
   }
 
-  .shy-toggle {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
-    color: var(--ui-ink-3);
-  }
-
-  .shy-toggle:hover {
-    color: var(--ui-ink);
-  }
-
-  .shy-toggle.on {
-    background: var(--ui-accent-wash);
-    color: var(--ui-accent);
+  .timeline :global(.ib.shy-toggle) {
+    --ib-size: 22px;
   }
 
   .tick {
@@ -1161,30 +1143,29 @@
     flex-shrink: 0;
   }
 
-  .flags button {
-    width: 20px;
-    height: 20px;
+  .flags {
+    --ib-size: 20px;
   }
 
-  .flags button:not(.on) {
+  .flags :global(.ib:not(.on)) {
     visibility: hidden;
   }
 
-  .row:hover .flags button,
-  .head:focus-within .flags button {
+  .row:hover .flags :global(.ib),
+  .head:focus-within .flags :global(.ib) {
     visibility: visible;
   }
 
-  .flags button:hover:not(:disabled) {
+  .flags :global(.ib:hover:not(:disabled)) {
     color: var(--ui-ink);
     background: var(--ui-hover);
   }
 
-  .flags button:disabled {
+  .flags :global(.ib:disabled) {
     opacity: 0.4;
   }
 
-  .flags button.on {
+  .flags :global(.ib.on) {
     color: var(--ui-accent);
   }
 
@@ -1387,7 +1368,7 @@
     z-index: 3;
   }
 
-  .whip {
+  .flags :global(.ib.whip) {
     cursor: crosshair;
   }
 
@@ -1494,8 +1475,8 @@
   }
 
   @media (hover: none) {
-    .row.group .flags button,
-    .row.layer.selected .flags button {
+    .row.group .flags :global(.ib),
+    .row.layer.selected .flags :global(.ib) {
       visibility: visible;
     }
 
@@ -1510,8 +1491,11 @@
       --prop-row: 40px;
     }
 
+    .flags {
+      --ib-size: 40px;
+    }
+
     .twirl,
-    .flags button,
     .mark {
       width: 32px;
       height: 40px;
