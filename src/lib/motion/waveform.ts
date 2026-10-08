@@ -9,7 +9,8 @@ export function clipPeaks(peaks: readonly number[], clip: { trimStart: number; d
 }
 
 const round = (n: number) => Math.round(n * 1000) / 1000;
+const BAR_WIDTH = 0.8;
 
 export function wavePath(peaks: readonly number[]): string {
-  return peaks.map((p, i) => `M${i} ${round((1 - p) / 2)}V${round((1 + p) / 2)}`).join('');
+  return peaks.map((p, i) => `M${i} ${round((1 - p) / 2)}h${BAR_WIDTH}V${round((1 + p) / 2)}h-${BAR_WIDTH}Z`).join('');
 }
