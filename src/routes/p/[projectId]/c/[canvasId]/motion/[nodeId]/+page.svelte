@@ -26,7 +26,7 @@
   import { nullFromSelection } from '$lib/motion/parent-ops';
   import MotionPreview from '$lib/components/motion/MotionPreview.svelte';
   import type { StreamData } from '$lib/components/brand-agent/chat-session.svelte';
-  import { CHECK_REQUEST, FRAMES_REQUEST, adoptAgentAssets, type CheckRequest, type FramesRequest } from '$lib/motion/frames-request';
+  import { CHECK_REQUEST, FRAMES_REQUEST, adoptAgentAssets, agentDraft, type CheckRequest, type FramesRequest } from '$lib/motion/frames-request';
   import { runCheck, type CheckPorts } from '$lib/motion/custom/run-check';
   import { recordCheck } from '$lib/motion/custom/ops';
   import { unverified } from '$lib/motion/custom/determinism';
@@ -136,6 +136,7 @@
   let browsing = $state(false);
   let templates = $state<TemplateEntry[]>(data.templates);
   let previewDoc = $state<MotionDoc | null>(null);
+  let draft = $state<MotionDoc | null>(null);
   let sounding = $state<SoundKind | null>(null);
   let madeAssets = $state<PageData['assets']>([]);
   let analyses = $state<Record<string, AudioAnalysis>>({});
@@ -213,7 +214,7 @@
   let interactive = $state(false);
   let tiltX = $state(0);
   let tiltY = $state(0);
-  const html = $derived(composeHtml({ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls, analyses, liveness: interactive ? Liveness.Live : Liveness.Baked }));
+  const html = $derived(composeHtml({ doc: previewDoc ?? (draft ? viewOf(draft, compPath) : doc), tokens: data.tokens, assets: assetUrls, analyses, liveness: interactive ? Liveness.Live : Liveness.Baked }));
   const selected = $derived(selection.length === 1 ? (findClip(doc, selection[0])?.clip ?? null) : null);
   const blank = $derived(!path.length && doc.tracks.every((t) => !t.clips.length));
 
@@ -407,6 +408,11 @@
   }
 
   async function pullAgentEdit() {
+    await pullHead();
+    draft = null;
+  }
+
+  async function pullHead() {
     for (let i = 0; i < HEAD_POLL_TRIES; i++) {
       const res = await fetch(agentUrl);
       const body = (await res.json().catch(() => null)) as { head?: { version: number; doc: MotionDoc } } | null;
@@ -477,6 +483,7 @@
 
   function onAgentData(part: StreamData) {
     const handle = AGENT_DATA[part.type];
+    draft = agentDraft(draft, part);
     madeAssets = adoptAgentAssets(madeAssets, (part.data as { assets?: PageData['assets'] } | null)?.assets);
     if (handle && preview) {
       void handle(part.data).catch((e) => console.error('[motion] agent request not answered', part.type, e));
