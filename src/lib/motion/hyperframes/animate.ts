@@ -9,6 +9,8 @@ import { animatorOfKey, animatorProps, cssName } from '../text-animators/model';
 import { textHostId } from '../text-animators/render';
 import { ENGINE_GLOBAL } from '../engine/engine';
 import { OUT, Out } from './channel-out';
+import { paintOf } from '../interactive/live-props';
+import { LivePaint } from '../interactive/paint';
 
 export const ENGINE = `window.${ENGINE_GLOBAL}`;
 
@@ -39,9 +41,11 @@ const CHANNELS: Record<Exclude<TransformKey, 'anchorX' | 'anchorY'>, Channel> = 
   blur: { wrapper: Wrapper.Transform, prop: 'filter', out: Out.Blur }
 };
 
-export type LiveTarget = { target: string; prop: string; out: Out };
+type StyleTarget = { target: string; prop: string; out: Out };
 
-const LIVE_TARGET: Partial<Record<Source, (clip: MotionClip, key: string, parents: Parents) => LiveTarget | null>> = {
+export type LiveTarget = ({ paint: LivePaint.Style } & StyleTarget) | { paint: LivePaint.Lens };
+
+const STYLE_TARGET: Partial<Record<Source, (clip: MotionClip, key: string, parents: Parents) => StyleTarget | null>> = {
   [Source.Transform]: (clip, key, parents) => {
     const channel = CHANNELS[key as keyof typeof CHANNELS];
     return channel ? { target: target(channel.wrapper, clip, key, parents), prop: channel.prop, out: channel.out } : null;
@@ -49,12 +53,18 @@ const LIVE_TARGET: Partial<Record<Source, (clip: MotionClip, key: string, parent
   [Source.Prop]: (clip, key) => ({ target: target(Wrapper.Scale, clip), prop: cssVar(key), out: Out.Same })
 };
 
+const PAINT_TARGET: Record<LivePaint, (clip: MotionClip, key: string, parents: Parents, source: Source) => LiveTarget | null> = {
+  [LivePaint.Style]: (clip, key, parents, source) => {
+    const style = STYLE_TARGET[source]?.(clip, key, parents);
+    return style ? { paint: LivePaint.Style, ...style } : null;
+  },
+  [LivePaint.Lens]: () => ({ paint: LivePaint.Lens })
+};
+
 export function liveTarget(clip: MotionClip, key: string, parents: Parents): LiveTarget | null {
   const prop = animProp(clip.component, key, animatorProps(clip.animators));
-  if (!prop || prop.kind !== ValueKind.Number) {
-    return null;
-  }
-  return LIVE_TARGET[prop.source]?.(clip, key, parents) ?? null;
+  const paint = prop ? paintOf(clip.component, prop) : null;
+  return prop && paint ? PAINT_TARGET[paint](clip, key, parents, prop.source) : null;
 }
 
 export const ANIMATE_CSS = '.kp{position:absolute;inset:0}.kf,.ks{position:absolute;inset:0;transform-style:preserve-3d;backface-visibility:visible;will-change:transform,opacity,filter}';

@@ -12,7 +12,7 @@ import { bakeExpressions } from '../expression/bake';
 import { Outside } from './settings';
 import { embedMotion, motionCompId } from '../embed';
 
-const sceneOf = (doc: MotionDoc, outside: Outside) => liveScene(liveSpec({ live: doc, baked: bakeExpressions(doc), outside, parents: [] }));
+const sceneOf = (doc: MotionDoc, outside: Outside) => liveScene(liveSpec({ live: doc, baked: bakeExpressions(doc), outside, parents: [], color: (v) => v }));
 
 function ok(result: OpResult): MotionDoc {
   if (!result.ok) {

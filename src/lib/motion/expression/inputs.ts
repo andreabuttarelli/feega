@@ -85,4 +85,4 @@ export function readsInput(source: string): boolean {
   return READS_INPUT.test(source);
 }
 
-export const INPUT_GUIDE = `Live input (interactive web export only): ${INPUT_KEYS.map((k) => `input.${k} (${INPUTS[k].about})`).join('; ')}; input.smooth(v, seconds) eases v towards its target over about that many seconds. In the preview, in video renders and when an input is missing every input reads its default (pointer 0.5, tilt/scroll/hover/down 0, time = timeline seconds), so videos stay identical. Inside a precomp the cursor reads in that precomp's own box.`;
+export const INPUT_GUIDE = `Live input (interactive web export only): ${INPUT_KEYS.map((k) => `input.${k} (${INPUTS[k].about})`).join('; ')}; input.smooth(v, seconds) eases v towards its target over about that many seconds. In the preview, in video renders and when an input is missing every input reads its default (pointer 0.5, tilt/scroll/hover/down 0, time = timeline seconds), so videos stay identical. Inside a precomp the cursor reads in that precomp's own box. Live input drives transforms, number props and liquid glass/blob props; on any other property it is refused.`;

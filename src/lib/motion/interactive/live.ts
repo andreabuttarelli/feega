@@ -4,8 +4,11 @@ import { InputKey, crossLevel, valuesPort, type Crossed, type InputValues, type 
 import type { Out } from '../hyperframes/channel-out';
 import { apply2d, type Affine } from '../affine';
 import { Outside } from './settings';
+import type { LivePaint, LensSpec } from './paint';
 
-export type LiveLane = { id: string; key: string; target: string; prop: string; out: Out };
+export type StyleLane = { id: string; key: string; paint: LivePaint.Style; target: string; prop: string; out: Out };
+export type LensLane = { id: string; key: string; paint: LivePaint.Lens };
+export type LiveLane = StyleLane | LensLane;
 
 export type Rect = [number, number, number, number];
 
@@ -20,6 +23,7 @@ export type LiveSpec = {
   height: number;
   outside: Outside;
   live: LiveLane[];
+  lenses: LensSpec[];
   lanes: LaneData[];
   order: string[];
   names: Record<string, string>;

@@ -1,7 +1,9 @@
 import type { InputValues } from '../expression/inputs';
 import { OUT } from '../hyperframes/channel-out';
 import { ENGINE_GLOBAL } from '../engine/engine';
-import { laneName, liveScene, type LiveSpec } from './live';
+import { laneName, liveScene, type LiveSpec, type StyleLane } from './live';
+import { lensPainter } from './lens-paint';
+import { LivePaint } from './paint';
 
 export const INPUT_MESSAGE = 'feega:input';
 export const LIVE_GLOBAL = '__feegaLive';
@@ -20,6 +22,8 @@ export function installLive(spec: LiveSpec): void {
   const win = window as unknown as LiveWindow;
   const scene = liveScene(spec);
   const size = { width: spec.width, height: spec.height };
+  const styles = scene.lanes.filter((lane): lane is StyleLane => lane.paint === LivePaint.Style);
+  const lenses = lensPainter(spec.lenses, { ...size, fps: spec.fps }, win);
   const engine = () => win[ENGINE_GLOBAL] as Engine | undefined;
   const timeline = () => win.__timelines?.[COMPOSITION_TIMELINE];
   let inputs: InputValues = {};
@@ -27,11 +31,12 @@ export function installLive(spec: LiveSpec): void {
   let last = performance.now();
 
   const paint = () => {
+    lenses.paint();
     const set = engine()?.set;
     if (!set) {
       return;
     }
-    for (const lane of scene.lanes) {
+    for (const lane of styles) {
       const value = latest.get(laneName(lane));
       if (value === undefined) {
         continue;
@@ -45,6 +50,7 @@ export function installLive(spec: LiveSpec): void {
     last = now;
     const frame = Math.round((timeline()?.time() ?? 0) * spec.fps);
     latest = scene.tick(inputs, frame, dt);
+    lenses.tick(latest, frame, dt);
     paint();
     requestAnimationFrame(step);
   };
