@@ -57,6 +57,28 @@ test.describe('motion editor @real', () => {
     await expect(page.getByLabel('Agent', { exact: true })).toBeHidden();
   });
 
+  test('⌘J nasconde la timeline, la preview prende lo spazio, il transport resta e la timeline torna alla stessa altezza', async ({ page, session, seedNode }) => {
+    const node = await seedNode({ type: 'motion', data: MOTION_DATA });
+    const url = `/p/${session.projectId}/c/${session.canvasId}/motion/${node.id}`;
+    await gotoHydrated(page, url);
+    const timeline = page.getByRole('region', { name: 'Timeline', exact: true, includeHidden: true });
+    const stage = page.getByRole('region', { name: 'Preview', exact: true });
+    const before = await timeline.boundingBox();
+    const stageBefore = await stage.boundingBox();
+
+    await page.keyboard.press('ControlOrMeta+j');
+    await expect(timeline).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeVisible();
+    await expect.poll(async () => (await stage.boundingBox())?.height ?? 0).toBeGreaterThan((stageBefore?.height ?? 0) + 100);
+
+    await gotoHydrated(page, url);
+    await expect(timeline).toBeHidden();
+
+    await page.getByTestId('toggle-timeline').click();
+    await expect(timeline).toBeVisible();
+    await expect.poll(async () => Math.round((await timeline.boundingBox())?.height ?? 0)).toBe(Math.round(before?.height ?? 0));
+  });
+
   test('un clip con keyframe mostra le sue lane con ◆ e la sua curva nel graph editor', async ({ page, session, seedNode }) => {
     const node = await seedNode({ type: 'motion', data: MOTION_DATA });
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}/motion/${node.id}`);

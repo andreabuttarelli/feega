@@ -37,6 +37,7 @@ import ZoomIn from '@lucide/svelte/icons/zoom-in';
 import ZoomOut from '@lucide/svelte/icons/zoom-out';
 import BotMessageSquare from '@lucide/svelte/icons/bot-message-square';
 import PanelRight from '@lucide/svelte/icons/panel-right';
+import PanelBottom from '@lucide/svelte/icons/panel-bottom';
 import Keyboard from '@lucide/svelte/icons/keyboard';
 import ArrowLeft from '@lucide/svelte/icons/arrow-left';
 import Ellipsis from '@lucide/svelte/icons/ellipsis';
@@ -216,6 +217,7 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.PreviewFit]: { name: 'Fit preview', icon: Scan, group: GuideGroup.View, menu: MenuSection.View, gesture: DOUBLE_TAP_PREVIEW },
   [Command.PreviewActual]: { name: 'Preview at 100%', icon: SquareDashed, group: GuideGroup.View, menu: MenuSection.View, gesture: DOUBLE_TAP_PREVIEW },
   [Command.ToggleInspector]: { name: 'Properties panel', icon: PanelRight, group: GuideGroup.View, place: Place.Bar },
+  [Command.ToggleTimeline]: { name: 'Timeline', icon: PanelBottom, group: GuideGroup.View, place: Place.Transport },
   [Command.ToggleChat]: { name: 'Agent panel', icon: BotMessageSquare, group: GuideGroup.View, place: Place.Bar },
   [Command.Help]: { name: 'Keyboard & gestures', icon: Keyboard, group: GuideGroup.View, place: Place.Drawer },
   [Tool.Menu]: { name: 'Menu', icon: Menu, group: GuideGroup.View, place: Place.Bar },

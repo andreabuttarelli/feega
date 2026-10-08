@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CHAT_PLACE, ChatPlace, DEFAULT_LAYOUT, Panel, SIDE_DEFAULT_PX, SIDE_MIN_PX, Side, TIMELINE_MIN_PX, Viewport, flip, readLayout, sideWidth, timelineHeight, toggleSide, viewportOf, writeLayout } from './editor-layout';
+import { CHAT_PLACE, ChatPlace, DEFAULT_LAYOUT, Panel, SIDE_DEFAULT_PX, SIDE_MIN_PX, Side, TIMELINE_MIN_PX, Viewport, flip, readLayout, sideWidth, timelineHeight, toggleSide, toggleTimeline, viewportOf, writeLayout } from './editor-layout';
 
 function memory() {
   const items = new Map<string, string>();
@@ -18,7 +18,7 @@ const broken = {
 describe('editor layout', () => {
   it('remembers closed panels and the timeline height', () => {
     const store = memory();
-    const layout = { chat: Panel.Closed, inspector: Panel.Open, timelinePx: 420, side: Side.Properties, sidePx: 480 };
+    const layout = { chat: Panel.Closed, inspector: Panel.Open, timeline: Panel.Closed, timelinePx: 420, side: Side.Properties, sidePx: 480 };
 
     writeLayout(store, layout);
 
@@ -75,5 +75,20 @@ describe('editor layout', () => {
     expect(toggleSide(open, Side.Properties)).toMatchObject({ side: Side.Properties, chat: Panel.Open, inspector: Panel.Open });
     expect(toggleSide(open, Side.Chat)).toMatchObject({ side: Side.Chat, chat: Panel.Closed, inspector: Panel.Closed });
     expect(toggleSide({ ...open, chat: Panel.Closed, inspector: Panel.Closed }, Side.Chat)).toMatchObject({ chat: Panel.Open, inspector: Panel.Open });
+  });
+
+  it('the timeline starts shown, and a layout saved before it could hide keeps everything else', () => {
+    const store = memory();
+    store.setItem('motion-editor-layout', JSON.stringify({ chat: Panel.Closed, inspector: Panel.Closed, timelinePx: 420, side: Side.Chat, sidePx: 480 }));
+
+    expect(DEFAULT_LAYOUT.timeline).toBe(Panel.Open);
+    expect(readLayout(store)).toEqual({ chat: Panel.Closed, inspector: Panel.Closed, timeline: Panel.Open, timelinePx: 420, side: Side.Chat, sidePx: 480 });
+  });
+
+  it('hiding the timeline keeps its height for when it comes back', () => {
+    const hidden = toggleTimeline({ ...DEFAULT_LAYOUT, timelinePx: 420 });
+
+    expect(hidden).toMatchObject({ timeline: Panel.Closed, timelinePx: 420 });
+    expect(toggleTimeline(hidden)).toMatchObject({ timeline: Panel.Open, timelinePx: 420 });
   });
 });

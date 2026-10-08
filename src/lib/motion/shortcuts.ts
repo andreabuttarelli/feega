@@ -44,6 +44,7 @@ export enum Command {
   PreviewActual = 'preview-actual',
   ToggleChat = 'toggle-chat',
   ToggleInspector = 'toggle-inspector',
+  ToggleTimeline = 'toggle-timeline',
   Help = 'help',
   Precompose = 'precompose'
 }
@@ -117,6 +118,7 @@ export const SHORTCUTS: readonly Binding[] = [
   { key: '1', mod: true, command: Command.PreviewActual, label: '⌘1', does: 'Preview at 100%', group: ShortcutGroup.View },
   { key: 'b', mod: true, command: Command.ToggleChat, label: '⌘B', does: 'Show / hide the agent', group: ShortcutGroup.View },
   { key: 'b', mod: true, alt: true, command: Command.ToggleInspector, label: '⌥⌘B', does: 'Show / hide properties', group: ShortcutGroup.View },
+  { key: 'j', mod: true, command: Command.ToggleTimeline, label: '⌘J', does: 'Show / hide the timeline', group: ShortcutGroup.View },
   { key: '?', shift: true, command: Command.Help, label: '?', does: 'Keyboard & gestures', group: ShortcutGroup.View }
 ];
 
