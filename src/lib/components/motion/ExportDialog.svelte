@@ -17,21 +17,35 @@
   import { CheckState } from '$lib/motion/custom/component';
   import { deserialize } from '$app/forms';
   import { HOLD_BUFFER, renderQuote } from '$lib/motion/render-quote';
-  import { EXPORT_FORMATS, FORMAT, PRESETS, Preset, Quality, estimateBytes, exportProblem, settingsOf, type RenderSettings } from '$lib/motion/export-formats';
+  import { EXPORT_FORMATS, ExportFormat, FORMAT, Preset, Quality, estimateBytes, exportProblem, settingsOf, type RenderSettings } from '$lib/motion/export-formats';
   import { FRAME_RATES } from '$lib/motion/design';
   import { setFrameRate } from '$lib/motion/frame-rate';
   import { RenderStage, STALL_AFTER_MS, Stall, framesDone, renderStall, watchProgress, type ProgressWatch, type RenderView, type ServerRender } from '$lib/motion/server-render';
   import type { BrandTokens } from '$lib/motion/brand';
   import type { AudioAnalysis } from '$lib/motion/audio-analysis';
   import InteractiveExport from './InteractiveExport.svelte';
+  import { ExportMode } from './export-mode';
+  import Film from '@lucide/svelte/icons/film';
+  import Code from '@lucide/svelte/icons/code';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
 
   type Renderer = (times: number[], size: FrameSize, onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>, signal: AbortSignal) => Promise<void>;
 
   const Phase = { Checking: 'checking', Ready: 'ready', Mixing: 'mixing', Rendering: 'rendering', Saving: 'saving', Done: 'done', Failed: 'failed' } as const;
   type Phase = (typeof Phase)[keyof typeof Phase];
 
-  const Mode = { Video: 'video', Interactive: 'interactive' } as const;
-  type Mode = (typeof Mode)[keyof typeof Mode];
+  const FORMAT_CHOICE: Record<ExportFormat, string> = {
+    [ExportFormat.Mp4H264]: 'MP4',
+    [ExportFormat.Mp4H265]: 'MP4 HEVC',
+    [ExportFormat.Gif]: 'GIF',
+    [ExportFormat.WebmAlpha]: 'WebM alpha',
+    [ExportFormat.ProRes422]: 'ProRes',
+    [ExportFormat.ProRes4444]: 'ProRes alpha',
+    [ExportFormat.PngSequence]: 'PNG frames'
+  };
+  const RESOLUTION_LABEL: Record<Resolution, string> = { [Resolution.P720]: '720p', [Resolution.P1080]: '1080p', [Resolution.P1440]: '1440p', [Resolution.P2160]: '4K' };
+  const QUALITY_LABEL: Record<Quality, string> = { [Quality.Standard]: 'Standard', [Quality.High]: 'High' };
+  const MODE_TITLE: Record<ExportMode, string> = { [ExportMode.Video]: 'Video file', [ExportMode.Interactive]: 'Embed on a website' };
 
   const STAGE_LABEL: Record<RenderStage, string> = {
     [RenderStage.Starting]: 'Starting render machines…',
@@ -75,6 +89,8 @@
     server,
     tokens,
     analyses = {},
+    opening = null,
+    onpresets,
     onclose
   }: {
     doc: MotionDoc;
@@ -86,20 +102,20 @@
     server: ServerRender;
     tokens: BrandTokens;
     analyses?: Record<string, AudioAnalysis>;
+    opening?: ExportMode | null;
+    onpresets?: () => void;
     onclose: () => void;
   } = $props();
 
-  let mode = $state<Mode>(Mode.Video);
   let background = $state(false);
   let job = $state<RenderView | null>(server.latest && !SETTLED.has(server.latest.status) ? server.latest : null);
+  let mode = $state<ExportMode | null>(job ? ExportMode.Video : opening);
   let serverError = $state('');
   let pollTimer: ReturnType<typeof setTimeout> | null = null;
   let clock = $state(Date.now());
   let watch = $state<ProgressWatch | null>(job ? watchProgress(null, job, clock) : null);
 
   let settings = $state<RenderSettings>({ ...settingsOf(Preset.Social), fps: doc.fps });
-  const SETTING_KEYS = ['format', 'fps', 'quality', 'resolution'] as const;
-  const isPreset = (preset: Preset) => SETTING_KEYS.every((k) => settingsOf(preset)[k] === settings[k]);
   const target = $derived.by(() => {
     const paced = setFrameRate(doc, settings.fps);
     return paced.ok ? paced.doc : doc;
@@ -137,6 +153,7 @@
   const hasAudio = $derived(withAudio && sounds.length > 0);
   const place = $derived(caps && device ? renderPlace({ doc: target, settings, capabilities: caps, device, background, hasAudio }) : null);
   const onFarm = $derived(place?.place === RenderPlace.Farm || jobRunning);
+  const canBack = $derived(mode !== null && !busy && !jobRunning);
   const STAGE_PHASE: Record<BrowserStage, Phase> = { [BrowserStage.Mixing]: Phase.Mixing, [BrowserStage.Rendering]: Phase.Rendering };
 
   async function postAction(name: string, form: FormData): Promise<{ ok: boolean; data: Record<string, unknown> }> {
@@ -193,7 +210,7 @@
 
   async function renderHere() {
     await cancelServer();
-    mode = Mode.Browser;
+    background = false;
   }
 
   onMount(() => {
@@ -268,82 +285,94 @@
 </script>
 
 <div class="scrim" role="presentation" onclick={() => !busy && onclose()}></div>
-<div class="dialog" role="dialog" aria-modal="true" aria-label="Export video" data-testid="export-dialog">
+<div class="dialog" role="dialog" aria-modal="true" aria-label="Export" data-testid="export-dialog">
   <header>
-    <span>Export</span>
+    {#if canBack}<IconButton action={Action.Back} onclick={() => (mode = null)} />{/if}
+    <h2 class:inset={!canBack}>{mode ? MODE_TITLE[mode] : 'Export'}</h2>
     <IconButton action={Action.Close} disabled={busy} onclick={onclose} />
   </header>
 
-  <div class="choice modes" role="radiogroup" aria-label="What to export">
-    <label><input type="radio" name="mode" value={Mode.Video} bind:group={mode} disabled={busy} data-testid="export-mode-video" /> Video</label>
-    <label><input type="radio" name="mode" value={Mode.Interactive} bind:group={mode} disabled={busy} data-testid="export-mode-interactive" /> Interactive (web)</label>
-  </div>
-
-  {#if mode === Mode.Interactive}
-    <InteractiveExport {doc} {tokens} {assetUrls} {analyses} {fileName} {editorUrl} />
+  {#if mode === null}
+    <p class="ask">What do you want?</p>
+    <div class="choices" role="group" aria-label="What to export">
+      <button type="button" class="choice" onclick={() => (mode = ExportMode.Video)} data-testid="export-mode-video">
+        <span class="icon"><Film size={20} /></span>
+        <b>Video file</b>
+        <span class="hint">MP4, GIF, ProRes, transparent WebM. To post or edit.</span>
+      </button>
+      <button type="button" class="choice" onclick={() => (mode = ExportMode.Interactive)} data-testid="export-mode-interactive">
+        <span class="icon"><Code size={20} /></span>
+        <b>Embed on a website</b>
+        <span class="hint">A live player you paste into your site. It can react to the cursor and scroll.</span>
+      </button>
+    </div>
+  {:else if mode === ExportMode.Interactive}
+    <InteractiveExport {doc} {tokens} {assetUrls} {analyses} {fileName} {editorUrl} {onpresets} />
   {:else}
-    <dl>
-      <dt>Preset</dt>
-      <dd class="presets" data-testid="export-presets">
-        {#each Object.values(Preset) as preset (preset)}
-          {@const [name, detail] = PRESETS[preset].label.split(' · ')}
-          <button type="button" class="preset" aria-pressed={isPreset(preset)} disabled={jobRunning || busy} onclick={() => (settings = settingsOf(preset))}><b>{name}</b><span>{detail}</span></button>
+    {@const locked = jobRunning || busy}
+    <div class="field">
+      <span class="label">Format</span>
+      <div class="seg four" role="radiogroup" aria-label="Format" data-testid="export-format">
+        {#each EXPORT_FORMATS as format (format)}
+          <button type="button" role="radio" aria-checked={settings.format === format} disabled={locked} title={FORMAT[format].label} onclick={() => (settings.format = format)}>{FORMAT_CHOICE[format]}</button>
         {/each}
-      </dd>
-      <dt>File</dt>
-      <dd>
-        <select bind:value={settings.format} disabled={jobRunning || busy} data-testid="export-format">
-          {#each EXPORT_FORMATS as format (format)}<option value={format}>{FORMAT[format].label}</option>{/each}
-        </select>
-      </dd>
-      <dt>Frame rate</dt>
-      <dd>
-        <select bind:value={settings.fps} disabled={jobRunning || busy} data-testid="export-fps">
-          {#each FRAME_RATES as rate (rate)}<option value={rate}>{rate} fps</option>{/each}
-        </select>
-      </dd>
-      <dt>Resolution</dt>
-      <dd>
-        <select bind:value={settings.resolution} disabled={jobRunning || busy} data-testid="export-resolution">
-          {#each Object.values(Resolution) as r (r)}<option value={r}>{r === Resolution.P2160 ? '4K (2160p)' : r}</option>{/each}
-        </select>
-      </dd>
-      <dt>Quality</dt>
-      <dd class="choice">
-        <label><input type="radio" name="quality" value={Quality.High} bind:group={settings.quality} disabled={jobRunning || busy} /> High</label>
-        <label><input type="radio" name="quality" value={Quality.Standard} bind:group={settings.quality} disabled={jobRunning || busy} /> Standard</label>
-      </dd>
-      <dt>Audio</dt>
-      <dd>
-        {#if !sounds.length}
-          <span class="muted">No audio clips</span>
-        {:else}
-          <label><input type="checkbox" bind:checked={withAudio} disabled={busy || jobRunning} /> {sounds.length} {sounds.length === 1 ? 'track' : 'tracks'} mixed in</label>
-        {/if}
-      </dd>
-      <dt>Output</dt>
-      <dd>
-        {FORMATS[formatOf(doc)].label} · {output.width}×{output.height} · {settings.fps} fps · {Math.round(quote.seconds)} s · up to ~{megabytes} MB{#if onFarm && server.uploadLimit} (a saved file can be {Math.round(server.uploadLimit / BYTES_PER_MB)} MB){/if}
-        {#if spec.alpha && doc.background !== Background.Transparent}<br /><span class="muted">Keeps alpha only where nothing is painted: set the background to Transparent for a see-through file.</span>{/if}
-      </dd>
-      {#if server.configured}
-        <dt>Where</dt>
-        <dd>
-          <label><input type="checkbox" bind:checked={background} disabled={busy || jobRunning} data-testid="export-background" /> Render in the background: you can close this tab (~{quote.credits} credits)</label>
-        </dd>
+      </div>
+    </div>
+
+    <div class="field">
+      <span class="label">Resolution</span>
+      <div class="seg" role="radiogroup" aria-label="Resolution" data-testid="export-resolution">
+        {#each Object.values(Resolution) as r (r)}
+          <button type="button" role="radio" aria-checked={settings.resolution === r} disabled={locked} onclick={() => (settings.resolution = r)}>{RESOLUTION_LABEL[r]}</button>
+        {/each}
+      </div>
+    </div>
+
+    <div class="field">
+      <span class="label">Quality</span>
+      <div class="seg" role="radiogroup" aria-label="Quality" data-testid="export-quality">
+        {#each [Quality.Standard, Quality.High] as q (q)}
+          <button type="button" role="radio" aria-checked={settings.quality === q} disabled={locked} onclick={() => (settings.quality = q)}>{QUALITY_LABEL[q]}</button>
+        {/each}
+      </div>
+    </div>
+
+    <div class="summary" data-testid="export-quote">
+      <span class="out">{output.width}×{output.height} · {Math.round(quote.seconds)} s · up to ~{megabytes} MB</span>
+      {#if !place}
+        <span class="hint">Checking what this browser can encode…</span>
+      {:else if onFarm}
+        {#if place.place === RenderPlace.Farm}<span class="hint" data-testid="export-farm-reason">{place.message}</span>{/if}
+        <span class="hint">About {quote.credits} credits on our servers. {Math.ceil(quote.credits * HOLD_BUFFER)} held while it renders; you pay the real time, nothing if it fails.</span>
+      {:else}
+        <span class="hint">Free. Renders in this tab: keep it open until it finishes.</span>
       {/if}
-      <dt>Cost</dt>
-      <dd data-testid="export-quote">
-        {#if !place}
-          <span class="muted">Checking what this browser can encode…</span>
-        {:else if onFarm}
-          {#if place.place === RenderPlace.Farm}<span data-testid="export-farm-reason">{place.message}</span><br />{/if}
-          About {quote.credits} credits. {Math.ceil(quote.credits * HOLD_BUFFER)} are held while it renders; you pay the time it really takes, never more than held, nothing if it fails.
-        {:else}
-          Free: it renders in this tab. Keep it open and the screen on until it finishes.
+      {#if spec.alpha && doc.background !== Background.Transparent}<span class="hint">Transparent only where nothing is painted: set the background to Transparent for a see-through file.</span>{/if}
+      {#if onFarm && server.uploadLimit}<span class="hint">A saved file can be up to {Math.round(server.uploadLimit / BYTES_PER_MB)} MB.</span>{/if}
+    </div>
+
+    <details class="advanced">
+      <summary><ChevronRight size={14} /> Advanced</summary>
+      <div class="rows">
+        <label class="row">
+          <span>Frame rate</span>
+          <select bind:value={settings.fps} disabled={locked} data-testid="export-fps">
+            {#each FRAME_RATES as rate (rate)}<option value={rate}>{rate} fps</option>{/each}
+          </select>
+        </label>
+        <label class="row">
+          <span>{sounds.length ? `Audio · ${sounds.length} ${sounds.length === 1 ? 'track' : 'tracks'}` : 'No audio clips'}</span>
+          <input type="checkbox" bind:checked={withAudio} disabled={locked || !sounds.length} />
+        </label>
+        {#if server.configured}
+          <label class="row">
+            <span>Render on our servers, so you can close this tab (~{quote.credits} credits)</span>
+            <input type="checkbox" bind:checked={background} disabled={locked} data-testid="export-background" />
+          </label>
         {/if}
-      </dd>
-    </dl>
+        <span class="hint">{FORMAT[settings.format].label} · {FORMATS[formatOf(doc)].label} · {settings.fps} fps</span>
+      </div>
+    </details>
 
     {#if job && jobRunning}
       <div class="progress" data-testid="export-progress">
@@ -352,14 +381,14 @@
       </div>
       {#if stall !== Stall.None}
         <p class="warn" role="alert" data-testid="export-stalled">{STALL_LABEL[stall]}</p>
-        <button type="button" onclick={renderHere} data-testid="export-switch-browser">Render in this browser</button>
+        <button type="button" class="secondary" onclick={renderHere} data-testid="export-switch-browser">Render in this browser</button>
       {:else}
-        <p class="muted">You can close this tab: the video lands in your assets when it is ready.</p>
+        <p class="hint">You can close this tab: the video lands in your assets when it is ready.</p>
       {/if}
-      <button type="button" onclick={cancelServer} data-testid="export-cancel">Cancel render</button>
+      <button type="button" class="link" onclick={cancelServer} data-testid="export-cancel">Cancel render</button>
     {:else if job?.status === 'done' && job.assetId && phase !== Phase.Done}
-      <p class="muted" data-testid="export-saved">Saved to the canvas assets and attached to this video.</p>
-      <a class="primary" href={server.assetHref(job.assetId)} download={`${fileName}.${spec.ext}`} data-testid="export-download"><Download size={14} /> Download {spec.ext.toUpperCase()}</a>
+      <p class="hint" data-testid="export-saved">Saved to the canvas assets and attached to this video.</p>
+      <a class="primary" href={server.assetHref(job.assetId)} download={`${fileName}.${spec.ext}`} data-testid="export-download"><Download size={16} /> Download {spec.ext.toUpperCase()}</a>
     {:else}
       {#if job && (job.status === 'failed' || job.status === 'expired')}
         <p class="warn" role="alert" data-testid="export-failed">Server render failed: {job.error ?? job.status}. Nothing was charged.</p>
@@ -376,8 +405,8 @@
       {#if phase === Phase.Failed}<p class="warn" role="alert">Export failed: {error}</p>{/if}
 
       {#if phase === Phase.Done}
-        <p class="muted" data-testid="export-saved">{savedNote}</p>
-        <a class="primary" href={downloadUrl} download={`${fileName}.mp4`} data-testid="export-download"><Download size={14} /> Download MP4</a>
+        <p class="hint" data-testid="export-saved">{savedNote}</p>
+        <a class="primary" href={downloadUrl} download={`${fileName}.mp4`} data-testid="export-download"><Download size={16} /> Download MP4</a>
       {:else if busy}
         <button type="button" class="secondary" disabled={phase === Phase.Saving} onclick={cancel}>Cancel</button>
       {:else if blockers.length}
@@ -387,13 +416,13 @@
       {:else if problem}
         <p class="warn" role="alert" data-testid="export-problem">{problem}</p>
       {:else if !place}
-        <button type="button" class="primary" disabled>Export</button>
+        <button type="button" class="primary" disabled>Export video</button>
       {:else if place.place === RenderPlace.Browser}
-        <button type="button" class="primary" onclick={start} data-testid="export-start">Export {settings.resolution} · free</button>
+        <button type="button" class="primary" onclick={start} data-testid="export-start">Export video</button>
       {:else if server.configured}
-        <button type="button" class="primary" onclick={startServer} disabled={!server.saved} data-testid="export-start-server">{server.saved ? `Render on our servers · ~${quote.credits} credits` : 'Saving your changes…'}</button>
+        <button type="button" class="primary" onclick={startServer} disabled={!server.saved} data-testid="export-start-server">{server.saved ? `Export video · ~${quote.credits} credits` : 'Saving your changes…'}</button>
       {:else}
-        <p class="warn" role="alert">Server rendering is not available right now: pick MP4 H.264 up to 1080p to render it here.</p>
+        <p class="warn" role="alert">Server rendering is not available right now: pick MP4 up to 1080p to render it here.</p>
       {/if}
     {/if}
   {/if}
@@ -418,138 +447,196 @@
     z-index: 41;
     display: flex;
     flex-direction: column;
-    gap: var(--ui-space-4);
+    gap: var(--ui-space-6);
     padding: 0 var(--ui-space-6) var(--ui-space-6);
     background: var(--ui-raised);
     color: var(--ui-ink);
     box-shadow: 0 24px 64px rgb(0 0 0 / 0.24);
-    font-size: var(--ui-text-sm);
+    font-size: var(--ui-text-md);
   }
 
   header {
+    position: sticky;
+    top: 0;
+    z-index: 1;
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    height: 56px;
-    margin: 0 calc(var(--ui-space-2) - var(--ui-space-6)) 0 0;
+    gap: var(--ui-space-2);
+    min-height: 56px;
+    margin: 0 calc(var(--ui-space-2) - var(--ui-space-6)) calc(-1 * var(--ui-space-2));
+    background: var(--ui-raised);
+  }
+
+  h2 {
+    flex: 1;
+    margin: 0;
     font-size: var(--ui-text-lg);
     font-weight: 600;
   }
 
-  dl {
+  h2.inset {
+    padding-left: calc(var(--ui-space-6) - var(--ui-space-2));
+  }
+
+  input[type='checkbox'] {
+    accent-color: var(--ui-accent);
+  }
+
+  .ask {
+    margin: 0;
+    color: var(--ui-text-2);
+  }
+
+  .choices {
     display: grid;
-    grid-template-columns: 96px minmax(0, 1fr);
-    align-items: center;
-    gap: var(--ui-space-3) var(--ui-space-4);
-    margin: 0;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--ui-space-3);
   }
 
-  dt {
+  .choice {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--ui-space-2);
+    padding: var(--ui-space-6) var(--ui-space-4);
+    background: var(--ui-field);
+    text-align: left;
+    color: var(--ui-ink);
+  }
+
+  .choice:hover {
+    background: var(--ui-accent-wash);
+  }
+
+  .choice:hover .icon {
+    background: var(--ui-accent);
+    color: var(--ui-accent-ink);
+  }
+
+  .choice b {
+    font-size: var(--ui-text-lg);
+    font-weight: 600;
+  }
+
+  .icon {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    margin-bottom: var(--ui-space-2);
+    border-radius: 50%;
+    background: var(--ui-raised);
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-space-2);
+  }
+
+  .label {
     color: var(--ui-text-3);
-    align-self: start;
-    padding-top: 4px;
+    font-size: var(--ui-text-sm);
   }
 
-  dd {
+  .seg {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    gap: 2px;
+    border: 0;
+    background: var(--ui-field);
+    padding: 2px;
+  }
+
+  .seg.four {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .seg button {
+    border: 0;
+    background: transparent;
+    min-height: var(--ui-hit);
+    padding: 0 var(--ui-space-2);
+    color: var(--ui-text-2);
+    font-size: var(--ui-text-sm);
+    white-space: nowrap;
+  }
+
+  .seg button:hover:not(:disabled) {
+    color: var(--ui-ink);
+  }
+
+  .seg button[aria-checked='true'] {
+    background: var(--ui-raised);
+    color: var(--ui-accent);
+    font-weight: 600;
+  }
+
+  .summary {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-space-1);
+  }
+
+  .out {
+    font-family: var(--ui-mono);
+    font-size: var(--ui-text-sm);
+  }
+
+  .hint {
     margin: 0;
-    min-width: 0;
+    color: var(--ui-text-2);
+    font-size: var(--ui-text-sm);
+    line-height: 1.5;
+  }
+
+  .advanced summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: var(--ui-hit);
+    color: var(--ui-text-2);
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .advanced summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .advanced[open] summary :global(svg) {
+    transform: rotate(90deg);
+  }
+
+  .rows {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-space-2);
+    padding-top: var(--ui-space-2);
+  }
+
+  .row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--ui-space-4);
+    min-height: var(--ui-hit);
+    color: var(--ui-text-2);
   }
 
   select {
-    width: 100%;
-    height: 32px;
+    height: var(--ui-hit);
     padding: 0 var(--ui-space-2);
-    border: 1px solid transparent;
-    border-radius: 0;
+    border: 0;
     background: var(--ui-field);
     color: var(--ui-ink);
     font: inherit;
   }
 
   select:focus-visible {
-    outline: none;
-    border-color: var(--ui-accent);
-  }
-
-  .choice {
-    display: flex;
-    gap: 14px;
-  }
-
-  label {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .modes {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0;
-    background: var(--ui-field);
-  }
-
-  .modes label {
-    justify-content: center;
-    height: var(--ui-hit);
-    color: var(--ui-text-2);
-    cursor: pointer;
-  }
-
-  .modes input {
-    position: absolute;
-    opacity: 0;
-    pointer-events: none;
-  }
-
-  .modes label:has(input:checked) {
-    background: var(--ui-accent-wash);
-    color: var(--ui-accent);
-    font-weight: 600;
-  }
-
-  .modes label:has(input:focus-visible) {
     outline: 1px solid var(--ui-accent);
-    outline-offset: -1px;
-  }
-
-  .presets {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-
-  .preset {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    height: 40px;
-    padding: 0 var(--ui-space-3);
-    text-align: left;
-  }
-
-  .preset:hover:not(:disabled) {
-    background: var(--ui-hover);
-  }
-
-  .preset[aria-pressed='true'] {
-    background: var(--ui-accent-wash);
-  }
-
-  .preset b {
-    font-size: var(--ui-text-sm);
-    font-weight: 600;
-  }
-
-  .preset span {
-    font-family: var(--ui-mono);
-    font-size: 10px;
-    color: var(--ui-text-3);
-  }
-
-  .muted {
-    color: var(--ui-text-2);
-    margin: 0;
   }
 
   .warn {
@@ -562,7 +649,7 @@
     flex-direction: column;
     gap: 6px;
     font-family: var(--ui-mono);
-    font-size: 11px;
+    font-size: var(--ui-text-xs);
   }
 
   .track {
@@ -581,12 +668,13 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
-    align-self: flex-end;
-    height: var(--ui-hit);
+    gap: 8px;
+    width: 100%;
+    height: 44px;
     padding: 0 var(--ui-space-4);
-    font-size: var(--ui-text-sm);
+    font-size: var(--ui-text-md);
     font-weight: 600;
+    text-decoration: none;
   }
 
   .primary {
@@ -595,11 +683,43 @@
   }
 
   .primary:disabled {
-    background: var(--ui-hover);
-    color: var(--ui-ink-3);
+    background: var(--ui-field);
+    color: var(--ui-text-3);
   }
 
   .secondary {
     background: var(--ui-field);
+    color: var(--ui-ink);
+  }
+
+  .link {
+    align-self: center;
+    min-height: var(--ui-hit);
+    color: var(--ui-text-2);
+    background: none;
+  }
+
+  @media (max-width: 640px) {
+    .dialog {
+      inset: 0;
+      transform: none;
+      width: 100%;
+      max-height: none;
+      height: 100dvh;
+      padding: 0 var(--ui-space-4) calc(var(--ui-space-6) + env(safe-area-inset-bottom));
+      box-shadow: none;
+    }
+
+    header {
+      margin: 0 calc(var(--ui-space-2) - var(--ui-space-4)) calc(-1 * var(--ui-space-2));
+    }
+
+    h2.inset {
+      padding-left: calc(var(--ui-space-4) - var(--ui-space-2));
+    }
+
+    .choices {
+      grid-template-columns: 1fr;
+    }
   }
 </style>
