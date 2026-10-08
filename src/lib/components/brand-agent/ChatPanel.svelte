@@ -22,8 +22,9 @@
     context,
     onturnend,
     ondata,
-    prefill = null
-  }: { projectId?: string; motionNodeId?: string; reload?: number; context?: () => Record<string, unknown>; onturnend?: () => void; ondata?: (part: StreamData) => void; prefill?: ChatPrefill | null } = $props();
+    prefill = null,
+    onbusy
+  }: { projectId?: string; motionNodeId?: string; reload?: number; context?: () => Record<string, unknown>; onturnend?: () => void; ondata?: (part: StreamData) => void; prefill?: ChatPrefill | null; onbusy?: (busy: boolean) => void } = $props();
 
   let draft = $state('');
 
@@ -65,6 +66,10 @@
   const messages = $derived(session?.messages ?? []);
   const sending = $derived(session?.sending ?? false);
   const loading = $derived(session?.loading ?? false);
+
+  $effect(() => {
+    onbusy?.(sending);
+  });
   const failed = $derived(session?.failed ?? '');
   const failedDetail = $derived(session?.failedDetail ?? '');
   const starts = $derived(speakerStarts(messages));

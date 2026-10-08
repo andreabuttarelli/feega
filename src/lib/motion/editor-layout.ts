@@ -5,16 +5,24 @@ export enum Panel {
   Closed = 'closed'
 }
 
-export type EditorLayout = { chat: Panel; inspector: Panel; timelinePx: number };
+export enum Side {
+  Chat = 'chat',
+  Properties = 'properties'
+}
+
+export type EditorLayout = { chat: Panel; inspector: Panel; timelinePx: number; side: Side; sidePx: number };
 export type LayoutStore = { getItem: (key: string) => string | null; setItem: (key: string, value: string) => void };
 
 export const TIMELINE_MIN_PX = 140;
+export const SIDE_MIN_PX = 320;
+export const SIDE_DEFAULT_PX = 400;
+const SIDE_MAX_SHARE = 0.5;
 const PREVIEW_MIN_PX = 160;
 const STORAGE_KEY = 'motion-editor-layout';
 
-export const DEFAULT_LAYOUT: EditorLayout = { chat: Panel.Open, inspector: Panel.Open, timelinePx: 360 };
+export const DEFAULT_LAYOUT: EditorLayout = { chat: Panel.Open, inspector: Panel.Open, timelinePx: 360, side: Side.Chat, sidePx: SIDE_DEFAULT_PX };
 
-const layoutSchema = z.object({ chat: z.enum(Panel), inspector: z.enum(Panel), timelinePx: z.number().finite() });
+const layoutSchema = z.object({ chat: z.enum(Panel), inspector: z.enum(Panel), timelinePx: z.number().finite(), side: z.enum(Side), sidePx: z.number().finite() });
 
 export function readLayout(store: LayoutStore | null): EditorLayout {
   try {
@@ -37,6 +45,16 @@ export const flip = (panel: Panel): Panel => (panel === Panel.Open ? Panel.Close
 
 export function timelineHeight(px: number, room: number): number {
   return Math.max(TIMELINE_MIN_PX, Math.min(Math.round(px), room - PREVIEW_MIN_PX));
+}
+
+export function sideWidth(px: number, windowPx: number): number {
+  return Math.max(SIDE_MIN_PX, Math.min(Math.round(px), Math.floor(windowPx * SIDE_MAX_SHARE)));
+}
+
+export function toggleSide(layout: EditorLayout, side: Side): EditorLayout {
+  const open = layout.chat === Panel.Open || layout.inspector === Panel.Open;
+  const panel = open && layout.side === side ? Panel.Closed : Panel.Open;
+  return { ...layout, side, chat: panel, inspector: panel };
 }
 
 export enum Viewport {

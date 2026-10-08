@@ -34,7 +34,7 @@
   import Keyboard from '@lucide/svelte/icons/keyboard';
   import BotMessageSquare from '@lucide/svelte/icons/bot-message-square';
   import ShortcutHelp from '$lib/components/motion/ShortcutHelp.svelte';
-  import { CHAT_PLACE, ChatPlace, DEFAULT_LAYOUT, Panel, flip, readLayout, timelineHeight, viewportOf, writeLayout, type EditorLayout, type LayoutStore } from '$lib/motion/editor-layout';
+  import { CHAT_PLACE, ChatPlace, DEFAULT_LAYOUT, Panel, Side, flip, readLayout, sideWidth, timelineHeight, toggleSide, viewportOf, writeLayout, type EditorLayout, type LayoutStore } from '$lib/motion/editor-layout';
   import { provideSelection } from '$lib/motion/selection-context';
   import Layers from '@lucide/svelte/icons/layers';
   import { addAdjustment, mergeView, pathNames, precompose, viewOf } from '$lib/motion/precomp';
@@ -75,6 +75,7 @@
   import { insertTemplate, isLockedComp, type TemplateEntry } from '$lib/motion/template/library';
   import SoundDialog, { type Made, type SoundKind } from '$lib/components/motion/SoundDialog.svelte';
   import ChatPanel from '$lib/components/brand-agent/ChatPanel.svelte';
+  import SideColumn from '$lib/components/motion/SideColumn.svelte';
   import { AssetKind, COMPONENTS, LIBRARY_IDS, TrackKind, type ComponentId } from '$lib/motion/components';
   import { findClip, type MotionDoc } from '$lib/motion/doc';
   import {
@@ -165,6 +166,7 @@
   let helpOpen = $state(false);
   let layout = $state<EditorLayout>(DEFAULT_LAYOUT);
   let chatReload = $state(0);
+  let agentBusy = $state(false);
   let display = $state(TimeDisplay.Timecode);
   let width = $state(1440);
   const viewport = $derived(viewportOf(width));
@@ -233,7 +235,7 @@
   const blank = $derived(!path.length && doc.tracks.every((t) => !t.clips.length));
 
   const OPEN_CHAT: Record<ChatPlace, () => void> = {
-    [ChatPlace.Column]: () => relayout({ chat: Panel.Open }),
+    [ChatPlace.Column]: () => relayout({ chat: Panel.Open, inspector: Panel.Open, side: Side.Chat }),
     [ChatPlace.Drawer]: () => (sheet = Sheet.Agent),
     [ChatPlace.Sheet]: () => (sheet = Sheet.Agent)
   };
@@ -767,11 +769,15 @@
   });
 
   const CHAT_TOGGLE: Record<ChatPlace, () => void> = {
-    [ChatPlace.Column]: () => relayout({ chat: flip(layout.chat) }),
+    [ChatPlace.Column]: () => relayout(toggleSide(layout, Side.Chat)),
     [ChatPlace.Drawer]: () => (sheet = sheet === Sheet.Agent ? Sheet.None : Sheet.Agent),
     [ChatPlace.Sheet]: () => (sheet = sheet === Sheet.Agent ? Sheet.None : Sheet.Agent)
   };
-  const chatShown = $derived(chatPlace === ChatPlace.Column ? layout.chat === Panel.Open : sheet === Sheet.Agent);
+  const docked = $derived(chatPlace === ChatPlace.Column);
+  const sideOpen = $derived(layout.chat === Panel.Open || layout.inspector === Panel.Open);
+  const chatShown = $derived(docked ? sideOpen && layout.side === Side.Chat : sheet === Sheet.Agent);
+  const propsShown = $derived(docked ? sideOpen && layout.side === Side.Properties : layout.inspector === Panel.Open);
+  const toggleInspector = () => relayout(docked ? toggleSide(layout, Side.Properties) : { inspector: flip(layout.inspector) });
 
   const COMMANDS: Record<Command, () => void> = {
     [Command.TogglePlay]: () => (playing = !playing),
@@ -818,7 +824,7 @@
     [Command.RevealOpacity]: () => revealLanes(Reveal.Opacity),
     [Command.RevealAnimated]: () => (reveal = Reveal.Animated),
     [Command.ToggleChat]: () => CHAT_TOGGLE[chatPlace](),
-    [Command.ToggleInspector]: () => relayout({ inspector: flip(layout.inspector) }),
+    [Command.ToggleInspector]: toggleInspector,
     [Command.Help]: () => (helpOpen = !helpOpen),
     [Command.Precompose]: precomposeSelection
   };
@@ -895,7 +901,7 @@
       </div>
       <span class="save" data-testid="save-state" data-tone={SAVE_TONE[saveState]}><i aria-hidden="true"></i>{saveState} · v{version}</span>
       <span class="divider" aria-hidden="true"></span>
-      <button type="button" class="icon-btn toggle" title="Properties (⌥⌘B)" aria-label="Properties panel" aria-pressed={layout.inspector === Panel.Open} data-testid="toggle-inspector" onclick={COMMANDS[Command.ToggleInspector]}><PanelRight size={16} /></button>
+      <button type="button" class="icon-btn toggle" title="Properties (⌥⌘B)" aria-label="Properties panel" aria-pressed={propsShown} data-testid="toggle-inspector" onclick={COMMANDS[Command.ToggleInspector]}><PanelRight size={16} /></button>
       <button type="button" class="icon-btn toggle" title="Agent (⌘B)" aria-label="Agent panel" aria-pressed={chatShown} data-testid="toggle-chat" onclick={COMMANDS[Command.ToggleChat]}><BotMessageSquare size={16} /></button>
       <span class="divider" aria-hidden="true"></span>
       <button type="button" class="secondary" onclick={() => (leaveTo(0), (templating = true))} data-testid="template-open">Template</button>
@@ -978,7 +984,7 @@
     />
   {/if}
 
-  <div class="body" bind:this={body} style={`--tl-h: ${layout.timelinePx}px;`} class:coding={inspectorTab === InspectorTab.Code && selected?.component === 'Custom'} class:no-props={layout.inspector === Panel.Closed} class:no-chat={layout.chat === Panel.Closed}>
+  <div class="body" bind:this={body} style={`--tl-h: ${layout.timelinePx}px; --side-w: ${sideWidth(layout.sidePx, width)}px;`} class:coding={inspectorTab === InspectorTab.Code && selected?.component === 'Custom'} class:no-props={!docked && layout.inspector === Panel.Closed} class:no-chat={!docked && layout.chat === Panel.Closed} class:no-side={docked && !sideOpen}>
     <section class="stage" aria-label="Preview">
       <MotionPreview bind:this={preview} {html} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null}>
         {#if !playing}<SelectionOverlay {doc} {frame} {html} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} />{/if}
@@ -1002,6 +1008,8 @@
       {/if}
     </section>
 
+    <SideColumn place={chatPlace} side={layout.side} onside={(side) => relayout({ side })} widthPx={sideWidth(layout.sidePx, width)} onwidth={(sidePx) => (layout = { ...layout, sidePx })} oncommit={() => relayout({})} busy={agentBusy}>
+    {#snippet properties()}
     <aside class="props" class:open={sheet === Sheet.Properties} aria-label="Properties">
       <div class="sheet-head"><span>Properties</span><button type="button" aria-label="Close" onclick={() => (sheet = Sheet.None)}><X size={16} /></button></div>
       {#if cameraOpen && !selection.length}
@@ -1023,11 +1031,14 @@
         </div>
       {/if}
     </aside>
-
+    {/snippet}
+    {#snippet chat()}
     <aside class="chat" class:open={sheet === Sheet.Agent} aria-label="Agent">
       <div class="sheet-head"><span>Agent</span><button type="button" aria-label="Close" onclick={() => (sheet = Sheet.None)}><X size={16} /></button></div>
-      <ChatPanel projectId={data.projectId} motionNodeId={data.node.id} reload={chatReload} prefill={brandAsk} context={() => ({ selection })} onturnend={() => void pullAgentEdit()} ondata={onAgentData} />
+      <ChatPanel projectId={data.projectId} motionNodeId={data.node.id} reload={chatReload} prefill={brandAsk} context={() => ({ selection })} onturnend={() => void pullAgentEdit()} ondata={onAgentData} onbusy={(busy) => (agentBusy = busy)} />
     </aside>
+    {/snippet}
+    </SideColumn>
 
     <section class="timeline-area" aria-label="Timeline">
       <div class="resize" role="separator" aria-orientation="horizontal" aria-label="Resize the timeline" aria-valuenow={layout.timelinePx} data-testid="timeline-resize" onpointerdown={startResize}></div>
@@ -1393,6 +1404,27 @@
   .body.no-props .props,
   .body.no-chat .chat {
     display: none;
+  }
+
+  [data-viewport='desktop'] .body {
+    grid-template-columns: minmax(0, 1fr) var(--side-w);
+  }
+
+  [data-viewport='desktop'] .body.no-side {
+    grid-template-columns: minmax(0, 1fr) 0px;
+  }
+
+  [data-viewport='desktop'] .body > :global([data-testid='side-column']) {
+    grid-column: 2;
+    grid-row: 1 / 3;
+  }
+
+  [data-viewport='desktop'] .body.no-side > :global([data-testid='side-column']) {
+    display: none;
+  }
+
+  [data-viewport='desktop'] .timeline-area {
+    grid-column: 1;
   }
 
   .stage {
