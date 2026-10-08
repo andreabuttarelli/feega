@@ -8,6 +8,8 @@
   import type { ShareState } from '$lib/canvas/shared-view';
   import Megaphone from '@lucide/svelte/icons/megaphone';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
+  import { page } from '$app/state';
+  import { SOCIAL_PUBLISHING_SURFACE, shownUnder } from '$lib/social-publishing';
   import { canvasSelection, promotePath } from '$lib/canvas/promote-sheet';
   import { _ } from 'svelte-i18n';
   import ArrowLeft from '@lucide/svelte/icons/arrow-left';
@@ -77,7 +79,7 @@
   {#if $pageTopActions}
     <div class="actions">{@render $pageTopActions()}</div>
   {/if}
-  {#if $canvasSelection.length}
+  {#if $canvasSelection.length && shownUnder(page.data.socialPublishing, SOCIAL_PUBLISHING_SURFACE.topBarActions, 'promote')}
     <a class="promote" aria-label="Promote" data-testid="mobile-promote" href={`/p/${projectId}${promotePath($canvasSelection)}`}>
       <Megaphone size={MOBILE_ICON.size} strokeWidth={MOBILE_ICON.stroke} />
     </a>

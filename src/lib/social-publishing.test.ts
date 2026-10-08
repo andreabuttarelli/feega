@@ -4,6 +4,7 @@ import {
   socialPublishingOf,
   routeRefused,
   visibleUnder,
+  shownUnder,
   SOCIAL_PUBLISHING_SURFACE
 } from './social-publishing';
 
@@ -16,6 +17,7 @@ describe('social publishing flag', () => {
 
   it.each([
     ['/p/[projectId]/calendar', ''],
+    ['/p/[projectId]/ads', ''],
     ['/p/[projectId]/settings/connected-accounts', ''],
     ['/p/[projectId]/settings/connect/[platform]', ''],
     ['/p/[projectId]/settings/facebook', ''],
@@ -49,5 +51,10 @@ describe('social publishing flag', () => {
     const items = ['text', 'calendar', 'motion'];
     expect(visibleUnder(SocialPublishing.Off, SOCIAL_PUBLISHING_SURFACE.addable, items)).toEqual(['text', 'motion']);
     expect(visibleUnder(SocialPublishing.On, SOCIAL_PUBLISHING_SURFACE.addable, items)).toEqual(items);
+  });
+
+  it('il bottone Promote della barra in alto esiste solo col flag acceso', () => {
+    expect(shownUnder(SocialPublishing.Off, SOCIAL_PUBLISHING_SURFACE.topBarActions, 'promote')).toBe(false);
+    expect(shownUnder(SocialPublishing.On, SOCIAL_PUBLISHING_SURFACE.topBarActions, 'promote')).toBe(true);
   });
 });
