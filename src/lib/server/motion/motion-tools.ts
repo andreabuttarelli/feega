@@ -76,8 +76,10 @@ import { SHAPE_KINDS, StrokeKind, modifierKey } from '$lib/motion/shape/schema';
 import { PRESET as SHAPE_PRESET, SHAPE_PRESETS, applyShapePreset } from '$lib/motion/shape/presets';
 import { MAX_RATE, MIN_RATE, REMAP_KEY, clearTimeRemap, freezeFrame } from '$lib/motion/time-remap';
 import { PARTICLE_PRESETS, PRESET_PROPS as PARTICLE_PRESET, applyParticlePreset } from '$lib/motion/particles/presets';
-import { addLiquidGlass } from '$lib/motion/glass/ops';
+import { Lens, addLens } from '$lib/motion/glass/ops';
 import { SPRINGS } from '$lib/motion/spring';
+import { BLOB_INPUT } from '$lib/motion/blob/inputs';
+import { BLOB_NUMBER_KEYS, MAX_DROPS } from '$lib/motion/blob/model';
 import { DUCK_DEFAULTS, duckUnder } from '$lib/motion/duck';
 import type { AudioAnalysis } from '$lib/motion/audio-analysis';
 import { Division, Hit, cutToBeat, hitFrames, markHits } from '$lib/motion/beats';
@@ -870,7 +872,51 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const path = (input.path ?? []).map((s) => ({ time: s.time, x: s.x / session.doc.width, y: s.y / session.doc.height }));
         const id = deps.newId();
         const glass = { from: frames(input.start), durationInFrames: frames(input.duration), props, path, spring: { ...SPRINGS[input.spring ?? 'soft'], ...(input.stiffness ? { stiffness: input.stiffness } : {}), ...(input.damping ? { damping: input.damping } : {}) }, fadeIn: frames(input.fade_in ?? 0), fadeOut: frames(input.fade_out ?? 0) };
-        return created(apply(addLiquidGlass(session.doc, glass, { clip: id, track: deps.newId() }), 'added liquid glass'), id);
+        return created(apply(addLens(session.doc, Lens.Glass, glass, { clip: id, track: deps.newId() }), 'added liquid glass'), id);
+      }
+    }),
+
+    add_liquid_blob: tool({
+      description: `Add a real 3D drop of liquid glass on a new top track, rendered in WebGL over everything below it: true refraction through its curved surface (the content magnifies, bends and flips at the rim), chromatic dispersion, a soft studio reflection, sharp highlights, a thin lit rim, a soft shadow with a caustic. It wobbles, stretches along its motion and squashes when it stops. All in px of the frame: x/y its centre, diameter its size, split the distance between droplets. path glides it on a spring through stops ({time in seconds from the clip start, x, y}), spring ${Object.keys(SPRINGS).join('|')} (soft by default; stiffness and damping override it). drops 1..${MAX_DROPS} with split > 0 break it into droplets along split_angle (degrees); keyframe split back to 0 and they melt into one (blend sets how far they melt). ior 1..2.4 (water 1.33, glass 1.5), dispersion 0..0.3, reflection 0..2, frost (px blur), tint and tint_amount colour the glass; viscosity 0..1, wobble 0..1, wobble_speed (Hz) and stretch 0..2 shape the liquid; seed changes the ripple. fade_in/fade_out seconds fade it. Everything takes set_keyframes and set_expression afterwards (${BLOB_NUMBER_KEYS.join(', ')}, tint). Returns the clip id.`,
+      inputSchema: z.object({
+        start: z.number().min(0),
+        duration: z.number().positive(),
+        x: z.number().optional(),
+        y: z.number().optional(),
+        diameter: z.number().positive().optional(),
+        path: z.array(z.object({ time: z.number().min(0), x: z.number(), y: z.number() })).max(12).optional(),
+        spring: z.enum(Object.keys(SPRINGS) as [keyof typeof SPRINGS, ...(keyof typeof SPRINGS)[]]).optional(),
+        stiffness: z.number().positive().max(2000).optional(),
+        damping: z.number().positive().max(200).optional(),
+        drops: z.number().int().min(1).max(MAX_DROPS).optional(),
+        split: z.number().min(0).optional(),
+        split_angle: z.number().optional(),
+        blend: z.number().min(0.05).max(1.5).optional(),
+        ior: z.number().min(1).max(2.4).optional(),
+        dispersion: z.number().min(0).max(0.3).optional(),
+        frost: z.number().min(0).max(40).optional(),
+        reflection: z.number().min(0).max(2).optional(),
+        tint: z.string().optional(),
+        tint_amount: z.number().min(0).max(1).optional(),
+        viscosity: z.number().min(0).max(1).optional(),
+        wobble: z.number().min(0).max(1).optional(),
+        wobble_speed: z.number().min(0).max(4).optional(),
+        stretch: z.number().min(0).max(2).optional(),
+        seed: z.number().int().min(0).max(999).optional(),
+        fade_in: z.number().min(0).optional(),
+        fade_out: z.number().min(0).optional()
+      }),
+      execute: async (input) => {
+        const late = (input.path ?? []).find((s) => s.time > input.duration);
+        if (late) {
+          return { ok: false, error: `path stop at time ${late.time} is after the clip ends (${input.duration} s): times are seconds from the clip start` };
+        }
+        const given = Object.fromEntries(Object.entries(BLOB_INPUT).map(([arg, key]) => [key, input[arg as keyof typeof BLOB_INPUT]]));
+        const props = propsIn('LiquidBlob', Object.fromEntries(Object.entries(given).filter(([, v]) => v !== undefined)));
+        const path = (input.path ?? []).map((s) => ({ time: s.time, x: s.x / session.doc.width, y: s.y / session.doc.height }));
+        const id = deps.newId();
+        const blob = { from: frames(input.start), durationInFrames: frames(input.duration), props, path, spring: { ...SPRINGS[input.spring ?? 'soft'], ...(input.stiffness ? { stiffness: input.stiffness } : {}), ...(input.damping ? { damping: input.damping } : {}) }, fadeIn: frames(input.fade_in ?? 0), fadeOut: frames(input.fade_out ?? 0) };
+        return created(apply(addLens(session.doc, Lens.Blob, blob, { clip: id, track: deps.newId() }), 'added liquid blob'), id);
       }
     }),
 

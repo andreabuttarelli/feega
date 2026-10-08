@@ -5,6 +5,13 @@ import { setExpression } from '../expression/ops';
 import type { Spring } from '../spring';
 import { addClip, addTrack, moveTrack, setKeyframes, type OpResult } from '../timeline';
 
+export enum Lens {
+  Glass = 'LiquidGlass',
+  Blob = 'LiquidBlob'
+}
+
+const TRACK_NAME: Record<Lens, string> = { [Lens.Glass]: 'Glass', [Lens.Blob]: 'Liquid' };
+
 export type GlassStop = { time: number; x: number; y: number };
 
 export type GlassInput = {
@@ -39,7 +46,7 @@ function presenceKeys(input: GlassInput) {
   return keys.map((k) => ({ ...k, ease: Ease.Standard }));
 }
 
-function steps(input: GlassInput, ids: { clip: string; track: string }): Step[] {
+function steps(lens: Lens, input: GlassInput, ids: { clip: string; track: string }): Step[] {
   const first = input.path[0];
   const placed = first ? { centerX: first.x, centerY: first.y } : {};
   const glide: Step[] =
@@ -48,17 +55,17 @@ function steps(input: GlassInput, ids: { clip: string; track: string }): Step[] 
       : [];
   const fade: Step[] = input.fadeIn > 0 || input.fadeOut > 0 ? [(doc) => setKeyframes(doc, ids.clip, 'presence', presenceKeys(input))] : [];
   return [
-    (doc) => addTrack(doc, TrackKind.Visual, ids.track, 'Glass'),
+    (doc) => addTrack(doc, TrackKind.Visual, ids.track, TRACK_NAME[lens]),
     (doc) => moveTrack(doc, ids.track, TOP),
-    (doc) => addClip(doc, { component: 'LiquidGlass', from: input.from, durationInFrames: input.durationInFrames, trackId: ids.track, props: { ...input.props, ...placed } }, ids.clip),
+    (doc) => addClip(doc, { component: lens, from: input.from, durationInFrames: input.durationInFrames, trackId: ids.track, props: { ...input.props, ...placed } }, ids.clip),
     ...glide,
     ...fade
   ];
 }
 
-export function addLiquidGlass(doc: MotionDoc, input: GlassInput, ids: { clip: string; track: string }): OpResult {
+export function addLens(doc: MotionDoc, lens: Lens, input: GlassInput, ids: { clip: string; track: string }): OpResult {
   let result: OpResult = { ok: true, doc };
-  for (const step of steps(input, ids)) {
+  for (const step of steps(lens, input, ids)) {
     if (!result.ok) {
       return result;
     }

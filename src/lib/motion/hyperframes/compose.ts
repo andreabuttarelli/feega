@@ -13,6 +13,7 @@ import { screenBake, screenHtml, type ScreenBake, type ScreenInput } from './dev
 import { screenCompOf, screenFrames } from '../device-screen';
 import { ringBake, ringHtml, ringScript } from './ring';
 import { glassLayer, glassTimeline } from './glass';
+import { blobBake, blobLayer, blobScript, type BlobBake } from './blob';
 import { RING_LAYOUT } from '../ring/model';
 import { bentoBake, bentoHtml, bentoScript } from './bento';
 import { BENTO_LAYOUT, cellFrames } from '../bento/model';
@@ -294,6 +295,11 @@ const GROUPS: Partial<Record<ComponentId, GroupSpec>> = {
     html: (clip, ctx, placed, content) => glassLayer(clip, ctx, content, placed.layer),
     effects: (clip, ctx) => glassTimeline(clip, ctx)
   },
+  LiquidBlob: {
+    firstLayer: () => 0,
+    html: (clip, ctx, placed, content) => blobLayer(clip, ctx, content, placed.layer),
+    effects: () => []
+  },
   Adjustment: {
     firstLayer: () => 0,
     html: (clip, ctx, placed, content) => adjustmentLayer(clip, ctx, ctx.color, content, placed.layer),
@@ -516,6 +522,7 @@ export function composeHtml(raw: ComposeInput): string {
   const shapes: ShapeBake[] = [];
   const textPaths: TextPathBake[] = [];
   const particles: ParticleBake[] = [];
+  const blobs: BlobBake[] = [];
   const cardBakes = new Map<CardLayout, unknown[]>(Object.values(CARD_LAYOUTS).map((l) => [l, []]));
   const clips: MotionClip[] = [];
   const runs: CustomRun[] = [];
@@ -563,6 +570,9 @@ export function composeHtml(raw: ComposeInput): string {
       }
       if (clip.component === 'Particles') {
         particles.push(particleBake(clip, ctx));
+      }
+      if (clip.component === 'LiquidBlob') {
+        blobs.push(blobBake(clip, ctx));
       }
       if (cards) {
         cardBakes.get(cards)!.push(cards.bake(clip, ctx));
@@ -624,6 +634,7 @@ export function composeHtml(raw: ComposeInput): string {
     hotScript(shapeScript(shapes, doc.fps, Number(duration))),
     hotScript(textPathScript(textPaths, doc.fps, Number(duration))),
     hotScript(particleScript(particles, doc.fps, Number(duration))),
+    hotScript(blobScript(blobs, Number(duration))),
     ...[...cardBakes].map(([layout, bakes]) => hotScript(layout.script(bakes as never[], doc.fps, Number(duration))))
   ].join('');
   const live = LIVE_SCRIPT[raw.liveness ?? Liveness.Baked]({ live: prepared, baked: doc, outside: interactiveOf(raw.doc).outside, parents: [...parentsWithChildren(doc)] });

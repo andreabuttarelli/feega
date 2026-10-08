@@ -252,6 +252,11 @@ const LiquidGlass: Template<'LiquidGlass'> = {
   html: () => ''
 };
 
+const LiquidBlob: Template<'LiquidBlob'> = {
+  timing: Timing.Media,
+  html: () => ''
+};
+
 const BrandBackground: Template<'BrandBackground'> = {
   timing: Timing.Wrapper,
   html: (ctx) => `<div style="${css({ position: 'absolute', inset: '0', background: ctx.color(ctx.p.fill), opacity: ctx.p.opacity, ...PATTERNS[ctx.p.pattern](ctx.color(ctx.p.accent)) })}"></div>`
@@ -436,6 +441,7 @@ export const TEMPLATES: { [K in ComponentId]: Template<K> } = {
   Composition,
   Particles,
   LiquidGlass,
+  LiquidBlob,
   Precomp,
   Adjustment,
   Custom

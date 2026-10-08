@@ -2593,3 +2593,9 @@ Segnale: contact sheet con un frame nero o parole tagliate a metà altezza all'i
 
 ## Build CPU alto con poche build di produzione
 Segnale: `Build CPU Minutes` per progetto (`/v1/billing/charges`, tag `ProjectName`) sproporzionato rispetto ai deploy di produzione; `/v6/deployments?target=preview` pieno di `READY`. Ogni build si paga a minuto intero per vCPU (`standard` = 4). Un ignore command scritto in dashboard non sta nel repo e un secondo progetto non lo eredita. Mossa: `ignoreCommand` in `vercel.json` (`scripts/vercel-ignore.sh`, exit 0 = salta), preview solo con `[preview]` nel messaggio dell'ultimo commit.
+
+## Uno script `$lib/server` lanciato con `vite-node` muore con `An impossible situation occurred`
+Segnale: lo stack finisce in `@sveltejs/kit/src/exports/vite/index.js` (guardia degli import
+server-only), senza dire quale import. Causa: senza `scripts/vite-node.config.ts` il plugin di
+SvelteKit tratta lo script come codice client. Mossa: la config di `scripts/` (vedi sopra) o un
+test vitest usa e getta che importa lo script ed attende la sua promessa: vitest gira in SSR.

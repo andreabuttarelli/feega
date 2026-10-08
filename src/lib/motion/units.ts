@@ -119,6 +119,8 @@ export const PROPERTY_UNITS: Readonly<Record<string, Rule>> = {
   diameter: px(Basis.Short),
   frost: px(Basis.Same),
   rim: px(Basis.Same),
+  split: px(Basis.Short),
+  splitAngle: degrees(),
   restitution: percent(),
   friction: percent()
 };
