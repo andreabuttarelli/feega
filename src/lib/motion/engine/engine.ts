@@ -867,7 +867,7 @@ export function motionEngine(win: Window & Record<string, unknown>): MotionEngin
               ease,
               from: mode === 'from' || mode === 'fromTo' ? start[prop] : undefined,
               to: mode === 'from' ? undefined : goal[prop],
-              lazyFrom: mode === 'to' || mode === 'set',
+              lazyFrom: mode === 'to' || mode === 'set' || (mode === 'fromTo' && !(prop in start)),
               immediate,
               repeat,
               yoyo,
