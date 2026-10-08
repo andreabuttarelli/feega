@@ -23,7 +23,7 @@ export const SOCIAL_PUBLISHING_SURFACE = {
     '/p/[projectId]/c/[canvasId]': ['create_post', 'calendar_posts', 'plan_post', 'schedule_post'],
     '/app/studio/[batchId]': ['calendar']
   } as Record<string, readonly string[]>,
-  navEntries: ['calendar'],
+  navEntries: ['calendar', 'ads'],
   addable: ['calendar'],
   settingsSections: ['connected-accounts', 'facebook', 'linkedin', 'connect/[platform]'],
   promoteTabs: ['organic'],

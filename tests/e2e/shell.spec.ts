@@ -14,7 +14,7 @@ test.skip(!REAL_STACK, 'richiede uno stack disposable con utente/org/progetto se
 
 test.setTimeout(60_000);
 
-test('apri il progetto, la rail c\'è, Ads si apre come foglio ed Esc torna alla tela', async ({ page, session }) => {
+test('apri il progetto, la rail c\'è, Settings si apre come foglio ed Esc torna alla tela', async ({ page, session }) => {
   await page.goto(`/p/${session.projectId}`);
   await page.waitForURL(new RegExp(`/p/${session.projectId}/c/`));
   // La tela idrata dopo che il DOM del server è già lì: un click sparato prima che Svelte abbia
@@ -23,13 +23,13 @@ test('apri il progetto, la rail c\'è, Ads si apre come foglio ed Esc torna alla
   await page.waitForLoadState('networkidle');
   const canvasUrl = page.url();
 
-  await expect(page.getByRole('button', { name: 'Assets' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Assets', exact: true })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Ads' }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
 
   const sheet = page.locator('[role="dialog"].canvas-sheet');
 
-  await expect(page).toHaveURL(`${new URL(canvasUrl).origin}/p/${session.projectId}/ads`);
+  await expect(page).toHaveURL(`${new URL(canvasUrl).origin}/p/${session.projectId}/settings/project`);
   await expect(sheet).toBeVisible();
 
   await page.keyboard.press('Escape');

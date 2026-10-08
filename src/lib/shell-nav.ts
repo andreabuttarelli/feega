@@ -1,4 +1,5 @@
 import type { Viewport } from '$lib/breakpoints';
+import { SOCIAL_PUBLISHING_SURFACE, visibleUnder, type SocialPublishing } from '$lib/social-publishing';
 
 export type NavFamily = 'panel' | 'sheet' | 'route';
 
@@ -37,6 +38,10 @@ export const PANEL_WIDTHS: Record<string, number> = {
 
 export function navEntriesByGroup(group: NavEntry['group']): NavEntry[] {
   return NAV_ENTRIES.filter((entry) => entry.group === group);
+}
+
+export function visibleNav(publishing: SocialPublishing, entries: readonly NavEntry[]): NavEntry[] {
+  return visibleUnder(publishing, SOCIAL_PUBLISHING_SURFACE.navEntries, entries, (entry) => entry.id);
 }
 
 const projectPath = (projectId: string, path: string) => `/p/${projectId}${path}`;

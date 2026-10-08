@@ -2,12 +2,11 @@
   import { _ } from 'svelte-i18n';
   import * as Tooltip from '$lib/components/ui/tooltip/index.js';
   import { cn } from '$lib/utils';
-  import { navEntriesByGroup, type NavEntry, type NavFamily } from '$lib/shell-nav';
+  import { navEntriesByGroup, visibleNav, type NavEntry, type NavFamily } from '$lib/shell-nav';
   import { prefetchEntry } from '$lib/canvas/chrome-loaders';
   import { NAV_ICONS } from './nav-icons';
   import { ProjectMode, sectionAllowed } from '$lib/project-mode';
   import { page } from '$app/state';
-  import { SOCIAL_PUBLISHING_SURFACE, visibleUnder } from '$lib/social-publishing';
 
   /**
    * LA RAIL FLOTTANTE: due gruppi separati da un divisore, e il divisore stesso dice il
@@ -31,7 +30,7 @@
     mode?: ProjectMode;
   } = $props();
 
-  const sheets = $derived(visibleUnder(page.data.socialPublishing, SOCIAL_PUBLISHING_SURFACE.navEntries, navEntriesByGroup('workbench'), (entry) => entry.id).filter((entry) => sectionAllowed(mode, entry.id)));
+  const sheets = $derived(visibleNav(page.data.socialPublishing, navEntriesByGroup('workbench')).filter((entry) => sectionAllowed(mode, entry.id)));
 
   const OPEN: Record<NavFamily, (entry: NavEntry) => void> = {
     panel: (entry) => onPanel(entry),
@@ -80,7 +79,7 @@
 <Tooltip.Provider delayDuration={200}>
   <nav class="rail" aria-label={$_('app.shell.rail')}>
     <div class="rail-group">
-      {#each navEntriesByGroup('panel') as entry (entry.id)}
+      {#each visibleNav(page.data.socialPublishing, navEntriesByGroup('panel')) as entry (entry.id)}
         {@render railButton(entry)}
       {/each}
     </div>
