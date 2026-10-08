@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { UI_KINDS, UI_KIT, type UiPiece } from './kit';
+import { UI_KINDS, UI_KIT, UiBlock, recreatedUi, type UiPiece } from './kit';
 import { drawPiece, placeholders } from './render';
 import { skeletons } from './content';
 
@@ -38,6 +38,28 @@ describe('every UI kit piece', () => {
 
   it.each(UI_KINDS.map((k) => [k]))('%s never leaves grey placeholder rows or shape-only cards on screen once it has loaded', (kind) => {
     expect(skeletons(UI_KIT[kind].name, {}, DURATION)).toEqual([]);
+  });
+});
+
+describe('corners', () => {
+  const FULL_ROUND = /^(50%|9999px)$/;
+  const recreated = recreatedUi('UiRecreated', {
+    layout: 'app',
+    colors: { ink: '#000000', muted: '#666666', paper: '#ffffff', line: '#eeeeee', accent: '#ff0000' },
+    font: 'Inter',
+    radius: 0,
+    blocks: [{ kind: UiBlock.Heading, text: 'Hi' }]
+  });
+  const pieces: [string, UiPiece][] = [...UI_KINDS.map((k): [string, UiPiece] => [k, UI_KIT[k]]), ['recreated', recreated]];
+
+  it.each(pieces)('%s is a sharp rectangle unless asked otherwise', (_kind, piece) => {
+    expect(piece.js).toMatch(/param\('radius', 0,/);
+  });
+
+  it.each(pieces)('%s rounds a corner only fully or by the radius param', (_kind, piece) => {
+    const radii = [...piece.css.matchAll(/border-radius:\s*([^;]+);/g)].map((m) => m[1].trim());
+
+    expect(radii.filter((r) => !FULL_ROUND.test(r) && !r.includes('var(--r)'))).toEqual([]);
   });
 });
 
