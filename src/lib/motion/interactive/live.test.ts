@@ -5,7 +5,7 @@ import { bentoSlotAt } from '../hyperframes/bento';
 import { clipsOf, type MotionClip } from '../doc';
 import { precompose, flattenComps } from '../precomp';
 import { setExpression } from '../expression/ops';
-import { InputKey } from '../expression/inputs';
+import { InputKey, fallbackPort } from '../expression/inputs';
 import { liveScene } from './live';
 import { liveSpec } from './spec';
 import { bakeExpressions } from '../expression/bake';
@@ -47,6 +47,9 @@ function grid(): MotionDoc {
   return doc;
 }
 
+const FPS = 30;
+const wanderedX = (frame: number) => fallbackPort(frame / FPS).read(InputKey.PointerX) - 0.5;
+
 const at = (x: number, y: number) => ({ [InputKey.PointerX]: x, [InputKey.PointerY]: y, [InputKey.Hover]: 1 });
 
 describe('live inputs through nested compositions', () => {
@@ -66,7 +69,7 @@ describe('live inputs through nested compositions', () => {
       scene.tick(at(0.375, 0.125), 10, 0);
     }
 
-    expect(fallback.tick(at(0.9, 0.9), 11, 0).get('tl__0__dot.x')).toBeCloseTo(0);
+    expect(fallback.tick(at(0.9, 0.9), 11, 0).get('tl__0__dot.x')).toBeCloseTo(wanderedX(11));
     expect(hold.tick(at(0.9, 0.9), 11, 0).get('tl__0__dot.x')).toBeCloseTo(0.25);
   });
 
@@ -95,7 +98,7 @@ describe('live inputs through nested compositions', () => {
   it('with no input at all every live lane equals the rendered video', () => {
     const scene = sceneOf(flattenComps(grid()), Outside.Fallback);
 
-    expect(scene.tick({}, 10, 0).get('tl__0__dot.x')).toBeCloseTo(0);
+    expect(scene.tick({}, 10, 0).get('tl__0__dot.x')).toBeCloseTo(wanderedX(10));
   });
 
   it('tilt and scroll cross every level unchanged', () => {
@@ -155,7 +158,7 @@ describe('live inputs through nested compositions', () => {
 
     expect(values.get('grid__b0__0__dot.x')).toBeCloseTo(0.1);
     expect(values.get('grid__b0__0__dot.y')).toBeCloseTo(-0.25);
-    expect(values.get('grid__b1__0__dot2.x')).toBeCloseTo(0);
+    expect(values.get('grid__b1__0__dot2.x')).toBeCloseTo(wanderedX(10));
   });
 
   it('a landscape motion in a vertical bento reads the cursor in its own frame', () => {
