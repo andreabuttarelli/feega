@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, test } from 'bun:test';
 import { createServer, type Server } from 'node:http';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { AddressInfo } from 'node:net';
@@ -269,6 +269,6 @@ describe('feega motion embed', () => {
     });
 
     expect(calls[0]).toMatchObject({ method: 'GET', path: `/api/v1/motion/${NODE}/embed/bundle` });
-    expect(await Bun.file(join(dir, 'out.html')).text()).toBe('<html>bundle</html>');
+    expect(readFileSync(join(dir, 'out.html'), 'utf8')).toBe('<html>bundle</html>');
   });
 });
