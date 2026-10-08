@@ -3,7 +3,7 @@ import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
 import { addClip, addTrack, setKeyframe, setTransform, type OpResult } from './timeline';
 import { setParent } from './parent-ops';
 import { TrackKind } from './components';
-import { Grip, PickMode, aabb, dragPatch, handlesOf, pick, quadOf, readout, snapMove, stackAt, writePatch, type Boxes } from './scene-select';
+import { Grip, Modifier, PickMode, aabb, pickModeAt, dragPatch, handlesOf, pick, quadOf, readout, snapMove, stackAt, writePatch, type Boxes } from './scene-select';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -87,6 +87,13 @@ describe('clicking in the preview', () => {
     expect(pick(stack, null, PickMode.Top)).toBe('front');
     expect(pick(stack, 'front', PickMode.Beneath)).toBe('back');
     expect(pick(stack, 'back', PickMode.Beneath)).toBe('front');
+  });
+
+  it('a second tap on the same spot walks beneath, like Alt; a tap elsewhere starts at the top', () => {
+    expect(pickModeAt(null, [100, 100], Modifier.None)).toBe(PickMode.Top);
+    expect(pickModeAt([100, 100], [104, 98], Modifier.None)).toBe(PickMode.Beneath);
+    expect(pickModeAt([100, 100], [300, 100], Modifier.None)).toBe(PickMode.Top);
+    expect(pickModeAt(null, [100, 100], Modifier.Alt)).toBe(PickMode.Beneath);
   });
 
   it('a clip off the playhead cannot be picked', () => {

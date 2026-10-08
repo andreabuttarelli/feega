@@ -91,7 +91,7 @@
     {#each handles as h, i (h.frame)}
       <span class="key" style={pct(screen(h.point))} data-path-key={h.frame}></span>
       {#each [Side.In, Side.Out] as side (side)}
-        <button type="button" class="handle" aria-label={`Path ${side} handle at frame ${h.frame}`} data-path-handle={`${h.frame}:${side}`} style={pct(tip(h, side))} onpointerdown={(e) => start(e, i, side)}></button>
+        <button type="button" data-drawn-small class="handle" aria-label={`Path ${side} handle at frame ${h.frame}`} data-path-handle={`${h.frame}:${side}`} style={pct(tip(h, side))} onpointerdown={(e) => start(e, i, side)}></button>
       {/each}
     {/each}
     {#if here}<span class="now" style={pct(screen([here.x, here.y]))}></span>{/if}
@@ -160,5 +160,17 @@
     background: #fff;
     border: 1.5px solid var(--ui-accent);
     cursor: move;
+  }
+
+  @media (pointer: coarse) {
+    [data-drawn-small]::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 44px;
+      height: 44px;
+      transform: translate(-50%, -50%);
+    }
   }
 </style>

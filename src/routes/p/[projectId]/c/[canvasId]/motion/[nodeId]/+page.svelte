@@ -896,6 +896,20 @@
     }
   });
 
+  let caughtAt = $state<[number, number] | null>(null);
+
+  $effect(() => {
+    if (playing) {
+      caughtAt = null;
+    }
+  });
+
+  function catchTap(e: PointerEvent) {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    caughtAt = [((e.clientX - rect.left) / rect.width) * doc.width, ((e.clientY - rect.top) / rect.height) * doc.height];
+    playing = false;
+  }
+
   function pressDown(e: PointerEvent) {
     pressAt = { x: e.clientX, y: e.clientY };
     pressedMenu = clipMenu;
@@ -1098,7 +1112,8 @@
     <section class="stage" aria-label="Preview">
       <ZoomStage bind:this={zoomStage} frame={{ width: doc.width, height: doc.height }} onspace={COMMANDS[Command.TogglePlay]}>
       <MotionPreview bind:this={preview} {html} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null}>
-        {#if !playing}<SelectionOverlay {doc} {frame} {html} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} />{/if}
+        {#if playing}<div class="play-catch" role="presentation" data-testid="play-catch" onpointerdown={catchTap}></div>{/if}
+        {#if !playing}<SelectionOverlay pickAt={caughtAt} {doc} {frame} {html} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} />{/if}
         {#if selected?.mask && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<MaskOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected?.component === 'Shape' && selected.props.shape === 'path' && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<PenOverlay {doc} clip={selected} onchange={edit} />{/if}
         {#if selected?.path && !playing}<MotionPathOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
@@ -1747,11 +1762,11 @@
   }
 
   @media (pointer: coarse) {
-    .editor :global(:is(button, a[href], select, [role='button'], [role='slider'], label:has(> input[type='checkbox']), input:not([type='checkbox'], [type='radio'], [type='range'], [type='hidden']))) {
+    .editor :global(:is(button, a[href], select, [role='button'], [role='slider'], label:has(> input[type='checkbox']), input:not([type='checkbox'], [type='radio'], [type='range'], [type='hidden'])):not([data-drawn-small])) {
       min-height: var(--ui-hit);
     }
 
-    .editor :global(:is(button, [role='button'], input[type='color']):not(.bar)) {
+    .editor :global(:is(button, [role='button'], input[type='color']):not(.bar, [data-drawn-small])) {
       min-width: var(--ui-hit);
     }
 
@@ -2033,5 +2048,11 @@
 
   .tabs button.on {
     color: var(--ui-ink);
+  }
+
+  .play-catch {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
   }
 </style>

@@ -75,11 +75,11 @@
     </svg>
     <button type="button" class="body" aria-label="Move mask" style={pct(pointAt(box, [0.5, 0.5], size))} onpointerdown={(e) => start(e, Grab.Body)}></button>
     {#each corners as corner (corner)}
-      <button type="button" class="handle" aria-label={`Resize mask ${corner}`} data-grab={corner} style={pct(cornerAt(box, corner, size))} onpointerdown={(e) => start(e, corner)}></button>
+      <button type="button" data-drawn-small class="handle" aria-label={`Resize mask ${corner}`} data-grab={corner} style={pct(cornerAt(box, corner, size))} onpointerdown={(e) => start(e, corner)}></button>
     {/each}
     {#if polygon}
       {#each points as point, i (i)}
-        <button type="button" class="handle point" aria-label={`Mask point ${i + 1}`} data-point={i} style={pct(pointAt(box, point, size))} onpointerdown={(e) => start(e, i)}></button>
+        <button type="button" data-drawn-small class="handle point" aria-label={`Mask point ${i + 1}`} data-point={i} style={pct(pointAt(box, point, size))} onpointerdown={(e) => start(e, i)}></button>
       {/each}
     {/if}
   </div>
@@ -138,5 +138,17 @@
     background: color-mix(in srgb, var(--ui-accent) 35%, transparent);
     border: 1.5px solid var(--ui-accent);
     cursor: move;
+  }
+
+  @media (pointer: coarse) {
+    [data-drawn-small]::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 44px;
+      height: 44px;
+      transform: translate(-50%, -50%);
+    }
   }
 </style>
