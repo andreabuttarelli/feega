@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { BILLING_PATH } from '$lib/billing-path';
   import { tick, untrack } from 'svelte';
   import { _, json } from 'svelte-i18n';
   import { page } from '$app/stores';
@@ -246,7 +247,7 @@
           <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 4.5v4.5M8 11v1" stroke="currentColor" stroke-width="1.8" /><rect x="1.5" y="1.5" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.3" /></svg>
           <span class="banner-text">{failure.action === 'rephrase' && failedDetail ? failedDetail : $_(failure.messageKey)}</span>
           {#if failure.action === 'credits'}
-            <a class="banner-act" href={`/p/${scopeProjectId}/credits`}>{$_('chat.panel.buyCredits')}</a>
+            <a class="banner-act" href={BILLING_PATH}>{$_('chat.panel.buyCredits')}</a>
           {:else if failure.action === 'retry'}
             <button type="button" class="banner-act" onclick={retry}>{$_('chat.panel.retry')}</button>
           {/if}

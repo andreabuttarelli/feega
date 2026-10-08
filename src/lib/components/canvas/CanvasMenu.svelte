@@ -20,6 +20,7 @@
   import Scale from '@lucide/svelte/icons/scale';
   import Flag from '@lucide/svelte/icons/flag';
   import { REPORT_PATH } from '$lib/reports/report-link';
+  import { BILLING_PATH } from '$lib/billing-path';
   import { FOOTER_LEGAL_LINKS, LEGAL_LINKS, legalHref } from '$lib/legal-links';
 
   type RailPages = 'include' | 'omit';
@@ -82,7 +83,7 @@
   }> = [
     { id: 'home', group: 'navigate', labelKey: 'app.shell.menu.home', icon: LayoutGrid, href: DASHBOARD_HREF },
     { id: 'settings', group: 'navigate', labelKey: 'app.shell.menu.settings', icon: Settings, sheet: '/settings/project' },
-    { id: 'billing', group: 'navigate', labelKey: 'app.shell.menu.billing', icon: CreditCard, sheet: '/settings/billing' },
+    { id: 'billing', group: 'navigate', labelKey: 'app.shell.menu.billing', icon: CreditCard, href: BILLING_PATH },
     { id: 'shortcuts', group: 'help', labelKey: 'app.shell.menu.shortcuts', icon: Keyboard, sub: true, desktopOnly: true },
     { id: 'changelog', group: 'help', labelKey: 'app.shell.menu.changelog', icon: Sparkles, href: '/changelog', marketingPage: true },
     { id: 'report', group: 'help', labelKey: 'app.shell.menu.report', icon: Flag, href: REPORT_PATH },
@@ -148,14 +149,14 @@
               <a {...props} href={hrefOf(item)}>
                 <item.icon size={16} />
                 <span>{$_(item.labelKey)}</span>
+                {#if item.id === 'billing'}
+                  <span class="menu-balance"><CreditAmount amount={creditBalance} /></span>
+                {/if}
               </a>
             {:else}
               <button {...props} type="button" onclick={() => onItemClick(item)}>
                 <item.icon size={16} />
                 <span>{$_(item.labelKey)}</span>
-                {#if item.id === 'billing'}
-                  <span class="menu-balance"><CreditAmount amount={creditBalance} /></span>
-                {/if}
               </button>
             {/if}
           {/snippet}

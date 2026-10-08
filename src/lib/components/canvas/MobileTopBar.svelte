@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { BILLING_PATH } from '$lib/billing-path';
   import CreditAmount from '$lib/components/CreditAmount.svelte';
   import CanvasMenu from './CanvasMenu.svelte';
   import CanvasShare from './CanvasShare.svelte';
@@ -84,7 +85,7 @@
   {#if share}
     <CanvasShare shareToken={share.shareToken} onShare={share.onShare} />
   {/if}
-  <a href="/p/{projectId}/settings/billing" class="credits">
+  <a href={BILLING_PATH} class="credits">
     <CreditAmount amount={creditBalance} />
   </a>
 </header>

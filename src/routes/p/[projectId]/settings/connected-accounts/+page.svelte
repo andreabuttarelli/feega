@@ -1,7 +1,7 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
   import { page } from '$app/stores';
-  import { billingPath } from '$lib/billing-path';
+  import { BILLING_PATH } from '$lib/billing-path';
   import { onMount } from 'svelte';
   import { _ } from 'svelte-i18n';
   import { Panel } from '$lib/components/ui/panel';
@@ -124,7 +124,7 @@
       </div>
       <div class="nm"><div class="h">{p.label}</div><div class="s">{count ? $_('app.settings.connectedAddAnother', { values: { count } }) : $_('app.settings.connectViaOauth')}</div></div>
       {#if atLimit}
-        <Button variant="secondary" size="sm" href={billingPath($page.params.projectId ?? '')}>{$_('app.settings.connect')}</Button>
+        <Button variant="secondary" size="sm" href={BILLING_PATH}>{$_('app.settings.connect')}</Button>
       {:else}
         <Button variant="secondary" size="sm" href={`${base}/settings/connect/${p.key}`} target="_blank" rel="noopener" onclick={() => (pendingConnect = true)}>{$_('app.settings.connect')}</Button>
       {/if}

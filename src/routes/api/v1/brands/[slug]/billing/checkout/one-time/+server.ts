@@ -4,11 +4,9 @@ import { authenticate, checkApiKeyWriteAccess, loadBrandForUser } from '$lib/ser
 import { isOrgOwner, orgBillingForBrand } from '$lib/server/org-billing';
 import { billingGrantsReady } from '$lib/server/billing-readiness';
 import { rungFor } from '$lib/credit-ladder';
-import { checkoutReturnUrls } from '$lib/billing-path';
+import { BILLING_PATH, checkoutReturnUrls } from '$lib/billing-path';
 import { appOrigin } from '$lib/server/app-url';
-import { appPathForBrand } from '$lib/server/tenancy/brand-slug';
 
-const BILLING_SUBPATH = '/settings/billing';
 import { ONE_TIME_CHECKOUT_LINK, statusForFailure } from '@feega/api-contracts';
 
 /**
@@ -62,7 +60,7 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
     );
   }
 
-  const appBillingUrl = `${appOrigin(url)}${await appPathForBrand(supabase, brand.id, BILLING_SUBPATH)}`;
+  const appBillingUrl = `${appOrigin(url)}${BILLING_PATH}`;
 
   try {
     const { ensureOrgCustomer, createOneTimeCreditCheckout } = await import('$lib/server/stripe');

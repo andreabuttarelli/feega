@@ -23,8 +23,7 @@ describe('app sidebar table', () => {
   it('hides project-bound entries when there is no project', () => {
     const ids = visibleNav(null).map((item) => item.id);
     expect(ids).not.toContain('settings');
-    expect(ids).not.toContain('billing');
-    expect(visibleNav(PROJECT).map((item) => item.id)).toContain('billing');
+    expect(ids).toContain('billing');
   });
 
   it('links tools to the most recent project', () => {
@@ -33,9 +32,10 @@ describe('app sidebar table', () => {
     expect(navHref(studio, null)).toBe('/app/studio');
   });
 
-  it('links settings into the project', () => {
+  it('links credits to the workspace page, with or without a project', () => {
     const billing = APP_NAV.find((item) => item.id === 'billing')!;
-    expect(navHref(billing, PROJECT)).toBe('/p/p1/settings/billing');
+    expect(navHref(billing, PROJECT)).toBe('/app/credits');
+    expect(navHref(billing, null)).toBe('/app/credits');
   });
 
   it('only links are navigable', () => {

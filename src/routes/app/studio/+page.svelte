@@ -11,7 +11,7 @@
   import type { NodeReference } from '$lib/canvas/node-references';
   import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
-  import { billingPath } from '$lib/billing-path';
+  import { BILLING_PATH } from '$lib/billing-path';
   import { DEFAULT_VERSIONS, Step, STEPS, VERSION_CHOICES } from '$lib/studio/wizard';
 
   type Quote = { count: number; overLimit: boolean; perImage: number; total: number; droppedRefs: number; skipped: string[] };
@@ -323,7 +323,7 @@
         <div class="empty-credits" role="alert" data-testid="studio-no-credits">
           <p><strong>Not enough credits.</strong> These photos cost <CreditAmount amount={shortfall?.needed ?? quote?.total ?? 0} />, you have <CreditAmount amount={shortfall?.balance ?? data.balance} />.</p>
           <p class="muted">Pick Draft quality or fewer versions, or add credits.</p>
-          <a class="button" href={billingPath(data.projectId)}>Add credits</a>
+          <a class="button" href={BILLING_PATH}>Add credits</a>
         </div>
       {:else if failure}
         <p class="error" role="alert">{failure}</p>

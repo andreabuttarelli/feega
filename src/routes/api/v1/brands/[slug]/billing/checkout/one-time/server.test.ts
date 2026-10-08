@@ -90,8 +90,8 @@ describe('POST /api/v1/brands/:slug/billing/checkout/one-time', () => {
 			orgId: 'org-1',
 			price: 32,
 			credits: 3200,
-			successUrl: 'https://feega.test/p/p1/settings/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}',
-			cancelUrl: 'https://feega.test/p/p1/settings/billing?checkout=canceled'
+			successUrl: 'https://feega.test/app/credits?checkout=success&session_id={CHECKOUT_SESSION_ID}',
+			cancelUrl: 'https://feega.test/app/credits?checkout=canceled'
 		});
 	});
 

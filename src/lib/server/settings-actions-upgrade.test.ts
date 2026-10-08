@@ -26,8 +26,8 @@ vi.mock('$lib/server/billing-readiness', () => ({
 import { upgrade } from './settings-actions';
 
 function ownerSupabase() {
-	const project = { org_id: 'org-1', brand_id: null };
-	const q = { select: () => q, eq: () => q, is: () => q, maybeSingle: async () => ({ data: project }) };
+	const memberships = [{ role: 'owner', orgs: { id: 'org-1', name: 'Acme', slug: 'acme' } }];
+	const q = { select: () => q, eq: () => q, then: (resolve: (v: unknown) => void) => resolve({ data: memberships, error: null }) };
 	return {
 		auth: { getUser: async () => ({ data: { user: { id: 'user-1' } } }) },
 		from: () => q
@@ -55,8 +55,9 @@ function formEvent(usd: string) {
 	data.set('usd', usd);
 	return {
 		request: { formData: async () => data },
-		params: { projectId: 'p1' },
-		url: new URL('https://feega.test/p/p1/settings/billing'),
+		params: {},
+		cookies: { get: () => undefined },
+		url: new URL('https://feega.test/app/credits'),
 		locals: { supabase: ownerSupabase() }
 	} as never;
 }
@@ -84,8 +85,8 @@ describe('upgrade — starting a first subscription for a ladder rung', () => {
 				orgId: 'org-1',
 				priceId: 'price_sub_32',
 				credits: 3200,
-				successUrl: 'https://feega.test/p/p1/settings/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}',
-				cancelUrl: 'https://feega.test/p/p1/settings/billing?checkout=canceled'
+				successUrl: 'https://feega.test/app/credits?checkout=success&session_id={CHECKOUT_SESSION_ID}',
+				cancelUrl: 'https://feega.test/app/credits?checkout=canceled'
 			})
 		);
 	});

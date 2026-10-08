@@ -68,10 +68,9 @@ describe('il riquadro destro porta credito, share e il toggle della chat', () =>
     expect(share).toMatch(/ShareState\.On/);
   });
 
-  it('CreditAmount resta, e il link va alle impostazioni di fatturazione del progetto via openSheet', () => {
+  it('CreditAmount resta, e il link va alla pagina crediti del workspace', () => {
     expect(top).toMatch(/<CreditAmount/);
-    expect(top).toMatch(/openSheet\(projectId, ['"`]\/settings\/billing['"`]\)/);
-    expect(top).not.toMatch(/href=["'`]\/app\/billing["'`]/);
+    expect(top).toMatch(/href=\{BILLING_PATH\}/);
   });
 });
 
