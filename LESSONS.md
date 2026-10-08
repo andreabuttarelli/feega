@@ -12,6 +12,13 @@ con `audioMixArgs(job.audio, …)`. Segnale: render locale nitido sulle whip pan
 installare `@hyperframes/producer` alla stessa versione e chiamare `executeRenderJob` con
 `motionBlur`, poi mixare con `audioMixArgs` come il farm.
 
+### Un export dal browser senza la goccia di vetro, e il render locale invece è giusto
+html-to-image mette ogni `<canvas>` e immagine come `<img data:...>` dentro un SVG; WebKit le
+carica solo dopo aver disegnato l'SVG a piena risoluzione, quindi il primo disegno esce senza.
+Segnale: asset `source: upload` (export nel browser, nessun `node_runs`) con il testo ma senza
+WebGL/immagini, mentre il producer locale sullo stesso html è giusto. Mossa: riprodurre con
+Playwright `webkit` (non Chromium) e `hyperframes-player`; i frame passano da `paintSvg`.
+
 ### `visibility: hidden` su un contenitore non nasconde i clip che il runtime accende
 Il runtime hyperframes scrive `visibility: visible` su ogni clip nel suo range, e un figlio
 `visible` vince su un padre `hidden`. Uno schermo `screenComp` nascosto così mostrava la sua UI

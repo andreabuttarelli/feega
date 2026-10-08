@@ -1,6 +1,7 @@
 import { freezeMasks } from './masks';
 import { inlineMedia, shrinkImage } from './inline-media';
 import { js } from './html';
+import { paintSvg } from './svg-paint';
 import { ERRORS } from '../custom/runtime';
 export { contentStamp } from '../stamp';
 
@@ -26,12 +27,11 @@ export type CaptureReply = { type: typeof CAPTURE_REPLY; id: string; stamp?: str
 type RuntimeConfig = { request: string; reply: string; lib: string; width: number; height: number; mediaTimeoutMs: number; stamp: string; errorsKey: string; settle: Settle };
 type Shot = { body: Record<string, unknown>; transfer: Transferable[] };
 type HtmlToImage = {
-  toJpeg: (node: HTMLElement, options: Record<string, unknown>) => Promise<string>;
-  toCanvas: (node: HTMLElement, options: Record<string, unknown>) => Promise<HTMLCanvasElement>;
+  toSvg: (node: HTMLElement, options: Record<string, unknown>) => Promise<string>;
   getFontEmbedCSS: (node: HTMLElement) => Promise<string>;
 };
 
-function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, inline: typeof inlineMedia, shrink: typeof shrinkImage) {
+function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, inline: typeof inlineMedia, shrink: typeof shrinkImage, paint: typeof paintSvg) {
   const shrunk = new Map<string, Promise<string>>();
   let lib: Promise<unknown> | null = null;
   let fonts: Promise<string> | null = null;
@@ -72,11 +72,50 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
   };
 
   const size = (m: CaptureRequest, embed: string) => ({ width: cfg.width, height: cfg.height, canvasWidth: m.width, canvasHeight: m.height, pixelRatio: 1, fontEmbedCSS: embed, filter: drawable });
+  const PRINT = { width: 64, height: 36 };
+  const NESTED_PICTURE = 'data%3Aimage';
+  const DOT = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==';
+  const canvasOf = (width: number, height: number) => Object.assign(document.createElement('canvas'), { width, height });
+  const penOf = (width: number, height: number) => canvasOf(width, height).getContext('2d', { willReadFrequently: true }) as CanvasRenderingContext2D;
+  const picture = (url: string) =>
+    new Promise<HTMLImageElement>((ok, ko) => {
+      const img = new Image();
+      img.onload = () => ok(img);
+      img.onerror = ko;
+      img.src = url;
+    });
+  const dotSvg = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"><foreignObject width="1" height="1"><img xmlns="http://www.w3.org/1999/xhtml" src="${DOT}" width="1" height="1"/></foreignObject></svg>`)}`;
+  let lazyProbe: Promise<boolean> | null = null;
+  const lazyNesting = () =>
+    (lazyProbe ??= picture(dotSvg)
+      .then((img) => {
+        const pen = penOf(1, 1);
+        pen.drawImage(img, 0, 0);
+        return pen.getImageData(0, 0, 1, 1).data[3] === 0;
+      })
+      .catch(() => false));
+  const full = (img: HTMLImageElement, width: number, height: number) => {
+    const out = canvasOf(width, height);
+    (out.getContext('2d') as CanvasRenderingContext2D).drawImage(img, 0, 0, width, height);
+    return out;
+  };
+  const painter = (lazy: boolean) => ({
+    load: picture,
+    settles: (url: string) => lazy && url.includes(NESTED_PICTURE),
+    print: (img: HTMLImageElement) => {
+      const pen = penOf(PRINT.width, PRINT.height);
+      pen.drawImage(full(img, cfg.width, cfg.height), 0, 0, PRINT.width, PRINT.height);
+      return pen.getImageData(0, 0, PRINT.width, PRINT.height).data.join();
+    },
+    tick: frame,
+    draw: full
+  });
+  const drawn = (root: HTMLElement, m: CaptureRequest, embed: string) =>
+    Promise.all([tool().toSvg(root, size(m, embed)), lazyNesting()]).then(([url, lazy]) => paint(url, m.width, m.height, painter(lazy)));
   const output: Record<string, (root: HTMLElement, m: CaptureRequest, embed: string) => Promise<Shot>> = {
-    jpeg: (root, m, embed) => tool().toJpeg(root, { ...size(m, embed), quality: m.quality }).then((url) => ({ body: { url }, transfer: [] })),
+    jpeg: (root, m, embed) => drawn(root, m, embed).then((canvas) => ({ body: { url: canvas.toDataURL('image/jpeg', m.quality ?? 1) }, transfer: [] })),
     bitmap: (root, m, embed) =>
-      tool()
-        .toCanvas(root, size(m, embed))
+      drawn(root, m, embed)
         .then((canvas) => createImageBitmap(canvas))
         .then((bitmap) => ({ body: { bitmap }, transfer: [bitmap] }))
   };
@@ -127,5 +166,5 @@ export function stampOf(html: string): string | null {
 
 export function captureScript(doc: { width: number; height: number }, stamp: string): string {
   const cfg: RuntimeConfig = { request: CAPTURE_REQUEST, reply: CAPTURE_REPLY, lib: SCREENSHOT_URL, width: doc.width, height: doc.height, mediaTimeoutMs: MEDIA_TIMEOUT_MS, stamp, errorsKey: ERRORS, settle: Settle.Paint };
-  return `<script>(${captureRuntime.toString()})(${js(cfg)},(${freezeMasks.toString()}),(${inlineMedia.toString()}),(${shrinkImage.toString()}));</script>`;
+  return `<script>(${captureRuntime.toString()})(${js(cfg)},(${freezeMasks.toString()}),(${inlineMedia.toString()}),(${shrinkImage.toString()}),(${paintSvg.toString()}));</script>`;
 }
