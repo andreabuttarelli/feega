@@ -1,3 +1,4 @@
+import { shaderProps, type ClipShader, type ShaderDefs } from '../shaders/model';
 import { modifierProps } from '../shape/model';
 import type { Modifier } from '../shape/schema';
 import { parse, type Node } from 'acorn';
@@ -106,6 +107,6 @@ function shapeModifierProps(clip: Pick<MotionClip, 'component' | 'props'>): Anim
   return clip.component === 'Shape' ? modifierProps((clip.props.modifiers as Modifier[] | undefined) ?? []) : [];
 }
 
-export function withParams<C extends Pick<MotionClip, 'component' | 'props'> & { effects?: Effect[]; animators?: TextAnimator[]; textPath?: TextPath | null }>(doc: Pick<MotionDoc, 'components'>, clip: C): C & { params: AnimProp[] } {
-  return { ...clip, params: [...paramProps(doc, clip), ...effectProps(clip.effects ?? []), ...animatorProps(clip.animators ?? []), ...shapeModifierProps(clip), ...textPathProps(clip.textPath ?? null)] };
+export function withParams<C extends Pick<MotionClip, 'component' | 'props'> & { effects?: Effect[]; shaders?: ClipShader[]; animators?: TextAnimator[]; textPath?: TextPath | null }>(doc: Pick<MotionDoc, 'components'> & { shaders?: ShaderDefs }, clip: C): C & { params: AnimProp[] } {
+  return { ...clip, params: [...paramProps(doc, clip), ...effectProps(clip.effects ?? []), ...shaderProps(clip.shaders ?? [], doc.shaders ?? {}), ...animatorProps(clip.animators ?? []), ...shapeModifierProps(clip), ...textPathProps(clip.textPath ?? null)] };
 }

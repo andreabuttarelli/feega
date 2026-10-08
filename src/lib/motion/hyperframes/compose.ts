@@ -60,6 +60,8 @@ import twgl from 'virtual:motion-twgl';
 import fx from 'virtual:motion-fx';
 import splitting from 'virtual:motion-splitting';
 import openProps from 'virtual:motion-open-props';
+import shaderRuntime from 'virtual:motion-shader-fx';
+import { shaderBakes, shaderScript, type ShaderBake } from '../shaders/compose';
 import { liveSpec, type SpecInput } from '../interactive/spec';
 import { LIVE_GLOBAL } from '../interactive/runtime';
 import { Liveness, interactiveOf } from '../interactive/settings';
@@ -561,6 +563,7 @@ export function composeHtml(raw: ComposeInput): string {
   const cardBakes = new Map<CardLayout, unknown[]>(Object.values(CARD_LAYOUTS).map((l) => [l, []]));
   const clips: MotionClip[] = [];
   const runs: CustomRun[] = [];
+  const shaderClips: ShaderBake[] = [];
   const pairs = mattePairs(doc);
   const matteOf = new Map(pairs.map((p) => [p.target, p]));
   const hidden = new Set(pairs.map((p) => p.source));
@@ -612,6 +615,7 @@ export function composeHtml(raw: ComposeInput): string {
       if (cards) {
         cardBakes.get(cards)!.push(cards.bake(clip, ctx));
       }
+      shaderClips.push(...shaderBakes(clip, doc, { start: ctx.start, fps: doc.fps, color: ctx.color }));
       const run = clip.component === 'Custom' ? customRun(clip, ctx, doc.components, raw.target ?? Target.Video) : null;
       if (run) {
         runs.push(run);
@@ -645,6 +649,7 @@ export function composeHtml(raw: ComposeInput): string {
     `<script src="${RUNTIME_URL}"></script>`,
     `<script>${engineScript()}</script>`,
     ...[...libraries].map((lib) => LIBRARY_TAGS[lib].tag),
+    shaderClips.length ? inlineScript(shaderRuntime) : '',
     three.length || compositions.length || threeCustom ? threeImportMap() : '',
     `<link rel="stylesheet" crossorigin="anonymous" href="${FONTS_URL}" />`,
     fitScript(),
@@ -670,6 +675,7 @@ export function composeHtml(raw: ComposeInput): string {
     hotScript(textPathScript(textPaths, doc.fps, Number(duration))),
     hotScript(particleScript(particles, doc.fps, Number(duration))),
     hotScript(blobScript(blobs, Number(duration))),
+    hotScript(shaderScript(shaderClips, Number(duration))),
     ...[...cardBakes].map(([layout, bakes]) => hotScript(layout.script(bakes as never[], doc.fps, Number(duration))))
   ].join('');
   const live = LIVE_SCRIPT[raw.liveness ?? Liveness.Baked]({ live: prepared, baked: doc, outside: interactiveOf(raw.doc).outside, parents: [...parentsWithChildren(doc)], color: (v) => resolveColor(v, tokens) });

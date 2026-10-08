@@ -1,4 +1,5 @@
 import { compile, createRuntime, draw, drawEffect, read } from '../../../packages/shader-fx/src/gl';
+import { measure } from '../../../packages/shader-fx/src/measure';
 
 const SIZE = 64;
 const HD_WIDTH = 1920;
@@ -60,6 +61,7 @@ function hd(): HTMLCanvasElement {
 }
 
 const probe = {
+  measure: (frag: string) => measure({ frag, params: [] }),
   costMs: (frag: string, draws: number) => {
     const rt = runtime();
     const src = hd();

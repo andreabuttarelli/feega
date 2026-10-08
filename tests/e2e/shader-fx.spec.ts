@@ -59,6 +59,19 @@ test('the same effect at the same time and seed draws identical bytes', async ({
   expect(later).not.toBe(a);
 });
 
+test('measure reports cost and no problems for a clean effect, and flicker for a strobe', async ({ page }) => {
+  const [clean, strobe, broken] = await page.evaluate(
+    ([a, b]) => [window.shaderFxProbe.measure(a), window.shaderFxProbe.measure(b), window.shaderFxProbe.measure('vec4 effect(vec2 uv) { return nope; }')],
+    [INVERT, 'vec4 effect(vec2 uv) { float on = mod(floor(u_time * 30.0), 2.0); return vec4(vec3(on), 1.0); }']
+  );
+
+  expect(clean.problems).toEqual([]);
+  expect(clean.costMs).toBeGreaterThan(0);
+  expect(strobe.flicker).toBeGreaterThan(0.5);
+  expect(clean.flicker).toBeLessThan(0.05);
+  expect(broken.problems.length).toBeGreaterThan(0);
+});
+
 test('a 1080p grain frame stays inside the software GL budget', async ({ page }) => {
   const { ms, renderer } = await page.evaluate(([frag, draws]) => window.shaderFxProbe.costMs(frag as string, draws as number), [GRAIN, COST_DRAWS] as const);
   test.info().annotations.push({ type: 'cost', description: `${ms.toFixed(2)} ms/frame on ${renderer}` });

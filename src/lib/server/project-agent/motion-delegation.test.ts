@@ -139,6 +139,7 @@ vi.mock('$lib/server/repos/node-runs', async (importOriginal) => ({
 vi.mock('$lib/server/motion/frame-stats', () => ({ frameStats: async (frames: { time: number }[]) => frames.map((f) => ({ time: f.time, luma: 100, lumaStd: 30, whiteShare: 0 })) }));
 vi.mock('$lib/server/motion/chromium-frames', () => ({
   serverFramesOpen: () => true,
+  chromiumGl: { run: async () => ({ problems: [], costMs: 1, flicker: 0 }) },
   chromiumFrames: { open: async () => ({ load: async () => {}, seek: async () => {}, jpeg: async () => Buffer.from([0xff, 0xd8, 0xff]), close: async () => {} }) }
 }));
 
