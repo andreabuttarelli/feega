@@ -7,6 +7,8 @@ import { COMPOSITION_LAYOUTS } from '$lib/motion/components';
 import { MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
 import type { LayoutId } from '$lib/canvas/composition/types';
 import { signedAssets } from '$lib/server/studio/studio-media';
+import { findMotionNode } from '$lib/server/motion/editor';
+import { savePoster } from '$lib/server/motion/poster';
 
 const HTTP_SEE_OTHER = 303;
 const HTTP_BAD_REQUEST = 400;
@@ -53,6 +55,16 @@ export const actions: Actions = {
         draft: { ...newDraft(layout), format }
       })
     );
+  },
+
+  poster: async (event) => {
+    const form = await event.request.formData();
+    const { db, orgId, projectId, userId } = await toolScope(event);
+    const motion = await findMotionNode(db, { orgId, nodeId: String(form.get('node') ?? ''), place: { projectId } });
+    if (!motion) {
+      return fail(HTTP_NOT_FOUND, { error: 'not_found' });
+    }
+    return savePoster(db, { orgId, projectId, nodeId: motion.record.id, actor: { kind: 'user', id: userId }, form });
   },
 
   fromNode: async (event) => {

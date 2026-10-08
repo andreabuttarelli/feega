@@ -14,6 +14,7 @@ import { listNodeRuns } from '$lib/server/repos/node-runs';
 import { SIGNED_URL_TTL_S } from '$lib/server/repos/asset-storage';
 import { gateOrgAiActionForForm } from '$lib/server/cli-auth';
 import { saveExport } from '$lib/server/motion/export';
+import { savePoster } from '$lib/server/motion/poster';
 import { Sound, generateSound } from '$lib/server/motion/voiceover';
 import { withOrgContext } from '$lib/server/ai-log';
 import { saveFontUpload } from '$lib/server/motion/font-upload';
@@ -53,7 +54,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
     projectId: params.projectId,
     canvas: { id: scope.canvas.id, name: scope.canvas.name },
     orgId: scope.orgId,
-    node: { id: scope.motion.record.id, name: scope.motion.record.displayName, lastRenderAssetId: scope.motion.node.lastRenderAssetId },
+    node: { id: scope.motion.record.id, name: scope.motion.record.displayName, lastRenderAssetId: scope.motion.node.lastRenderAssetId, posterAssetId: scope.motion.node.posterAssetId },
     head: { version: head.version, doc: head.doc },
     tokens,
     assets,
@@ -114,6 +115,11 @@ export const actions: Actions = {
       seconds: Number(form.get('seconds'))
     });
     return saved.ok ? { assetId: saved.assetId } : fail(HTTP_BAD_REQUEST, { error: saved.error });
+  },
+
+  poster: async ({ locals, params, request }) => {
+    const scope = await scopeFor(locals, params);
+    return savePoster(scope.db, { orgId: scope.orgId, projectId: params.projectId, nodeId: scope.motion.record.id, actor: { kind: 'user', id: scope.userId }, form: await request.formData() });
   },
 
   uploadFont: async ({ locals, params, request }) => {
