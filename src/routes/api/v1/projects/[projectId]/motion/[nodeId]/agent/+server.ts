@@ -3,7 +3,8 @@ import { createUIMessageStreamResponse } from 'ai';
 import { z } from 'zod';
 import { offeredChatModels, resolveChoice } from '$lib/server/chat-model/catalogue';
 import { gateOrgAiAction } from '$lib/server/cli-auth';
-import { loadTurns, openNodeThread } from '$lib/server/repos/chat';
+import { loadTurns, openNodeThread, turnRunning } from '$lib/server/repos/chat';
+import { runInBackground } from '$lib/server/background-work';
 import { AGENT_MAX_DURATION_S } from '$lib/server/project-agent/limits';
 import { headOrNew } from '$lib/server/motion/editor';
 import { motionAgentScope } from '$lib/server/motion/agent-scope';
@@ -42,6 +43,7 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
   if (turn instanceof Response) {
     return turn;
   }
+  runInBackground(() => turn.done, 'motion-turn');
   return createUIMessageStreamResponse({ stream: turn.stream });
 };
 
@@ -53,6 +55,6 @@ export const GET: RequestHandler = async ({ params, locals }) => {
   const { db, user, orgId, project, motion } = scope;
 
   const threadId = await openNodeThread(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId: user.id, brandId: project.brandId });
-  const [messages, head] = await Promise.all([loadTurns(db, { orgId, threadId }), headOrNew(db, { orgId, nodeId: motion.record.id }, motion.node)]);
-  return json({ threadId, messages, head: { version: head.version, doc: head.doc, summary: head.summary, actorKind: head.actorKind } });
+  const [messages, running, head] = await Promise.all([loadTurns(db, { orgId, threadId }), turnRunning(db, { orgId, threadId }), headOrNew(db, { orgId, nodeId: motion.record.id }, motion.node)]);
+  return json({ threadId, messages, running, head: { version: head.version, doc: head.doc, summary: head.summary, actorKind: head.actorKind } });
 };

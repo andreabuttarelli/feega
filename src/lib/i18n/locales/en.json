@@ -625,6 +625,7 @@
         "max": "Max"
       },
       "responding": "Agent is responding",
+      "reconnecting": "Reconnecting… the agent keeps working.",
       "retry": "Retry",
       "buyCredits": "Get credits",
       "openOnCanvas": "Open on canvas",

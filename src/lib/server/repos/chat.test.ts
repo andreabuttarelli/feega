@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { fakeDb, filtersOf } from '$lib/server/db/fake-db';
 import { agentActor, SIDEBAR_AGENT_KEY } from '$lib/server/repos/actor';
-import { HISTORY_LIMIT, loadTurns, openThread, promptHistory, saveTurn } from './chat';
+import { HISTORY_LIMIT, loadTurns, openThread, promptHistory, saveTurn, turnRunning } from './chat';
 
 const ORG = '11111111-1111-1111-1111-111111111111';
 const PROJECT = '22222222-2222-2222-2222-222222222222';
@@ -92,5 +92,38 @@ describe('i tool del turno sopravvivono al reload', () => {
 
     expect(turns).toEqual([{ role: 'assistant', content: '', tools: [TOOL] }]);
     expect(promptHistory(turns)).toEqual([]);
+  });
+});
+
+describe('turnRunning — a turn still working after the client left', () => {
+  const NOW = Date.parse('2026-10-08T12:00:00Z');
+  const ago = (s: number) => new Date(NOW - s * 1000).toISOString();
+
+  it('an unanswered message sent a minute ago is a turn still running', async () => {
+    const { db } = fakeDb({ chat_messages: [{ role: 'user', created_at: ago(60) }] });
+
+    expect(await turnRunning(db, { orgId: ORG, threadId: THREAD }, NOW)).toBe(true);
+  });
+
+  it('an answered message is a finished turn', async () => {
+    const { db } = fakeDb({ chat_messages: [{ role: 'assistant', created_at: ago(60) }] });
+
+    expect(await turnRunning(db, { orgId: ORG, threadId: THREAD }, NOW)).toBe(false);
+  });
+
+  it('an unanswered message older than the longest turn is a turn that died', async () => {
+    const { db } = fakeDb({ chat_messages: [{ role: 'user', created_at: ago(3600) }] });
+
+    expect(await turnRunning(db, { orgId: ORG, threadId: THREAD }, NOW)).toBe(false);
+  });
+});
+
+describe('saveTurn — a retry of an unanswered message', () => {
+  it('does not write the same user message twice in a row', async () => {
+    const { db, calls } = fakeDb({ chat_messages: [{ seq: 4, role: 'user', content: 'ciao' }] });
+
+    await saveTurn(db, { orgId: ORG, threadId: THREAD, role: 'user', content: 'ciao', actor: { kind: 'user', id: USER } });
+
+    expect(calls.some((c) => c.op === 'insert')).toBe(false);
   });
 });

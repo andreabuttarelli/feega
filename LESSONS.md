@@ -2599,3 +2599,10 @@ Segnale: lo stack finisce in `@sveltejs/kit/src/exports/vite/index.js` (guardia 
 server-only), senza dire quale import. Causa: senza `scripts/vite-node.config.ts` il plugin di
 SvelteKit tratta lo script come codice client. Mossa: la config di `scripts/` (vedi sopra) o un
 test vitest usa e getta che importa lo script ed attende la sua promessa: vitest gira in SSR.
+
+### `setOffline(true)` di Playwright non taglia uno stream già aperto
+Segnale: una spec che simula il telefono in background passa, ma lo screenshot mostra la risposta
+arrivata per intero: Chromium offline blocca le richieste NUOVE, non il `fetch` in streaming in
+corso. Mossa: taglia lo stream tu, con un `addInitScript` che avvolge `fetch` e fa
+`controller.error` sul body (vedi `tests/e2e/chat-background.spec.ts`), e asserisci lo stato di
+riconnessione prima di proseguire.

@@ -18,11 +18,25 @@ export type StreamData = { type: string; data: unknown };
 const DATA_PREFIX = 'data-';
 
 const HTTP_NOT_FOUND = 404;
+const FOLLOW_POLL_MS = 3000;
 const SILENT_TOOLS = new Set(['reply']);
 
 const turns = $state({ running: 0 });
 
 type FailureBody = { error?: string; code?: string };
+
+type SavedThread = { messages?: ChatMessage[]; running?: boolean };
+
+const sleep = (ms: number, wake: (resolve: () => void) => void) =>
+  new Promise<void>((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    wake(() => {
+      clearTimeout(timer);
+      resolve();
+    });
+  });
+
+const livePlaceholder = (partial: ChatMessage | null): ChatMessage => ({ role: 'assistant', content: partial?.content ?? '', reasoning: partial?.reasoning, tools: partial?.tools ?? [], pending: true, live: true, at: partial?.at ?? Date.now() });
 
 class HttpFailure extends Error {
   status: number;
@@ -41,6 +55,7 @@ async function failureBody(res: Response): Promise<FailureBody> {
 export class ChatSession {
   messages = $state<ChatMessage[]>([]);
   sending = $state(false);
+  reconnecting = $state(false);
   loading = $state(true);
   failed = $state<Failure | ''>('');
   failedDetail = $state('');
@@ -50,6 +65,8 @@ export class ChatSession {
   onData: ((part: StreamData) => void) | null = null;
 
   #abort: AbortController | null = null;
+  #wake: () => void = () => {};
+  #following = false;
   readonly #endpoint: string;
   readonly #fetch: typeof fetch;
 
@@ -75,9 +92,12 @@ export class ChatSession {
       if (!res.ok) {
         throw new HttpFailure(res.status);
       }
-      const data = (await res.json()) as { messages?: ChatMessage[] };
-      if (!this.sending) {
+      const data = (await res.json()) as SavedThread;
+      if (!this.sending && !this.reconnecting) {
         this.messages = data.messages ?? [];
+      }
+      if (data.running && !this.sending) {
+        void this.#follow(null);
       }
     } catch {
       this.failed = 'load';
@@ -88,7 +108,7 @@ export class ChatSession {
   }
 
   async send(text: string, echo: UserEcho) {
-    if (!text || this.sending) {
+    if (!text || this.sending || this.reconnecting) {
       return;
     }
 
@@ -118,7 +138,7 @@ export class ChatSession {
       await this.#stream(res);
       this.#settleDone();
     } catch (e) {
-      this.#settleAfter(e);
+      this.#settleAfter(e, text);
     } finally {
       this.sending = false;
       turns.running--;
@@ -141,6 +161,68 @@ export class ChatSession {
 
   stop() {
     this.#abort?.abort();
+    this.#following = false;
+    this.reconnecting = false;
+    this.#wake();
+  }
+
+  resume() {
+    if (this.#following) {
+      this.#wake();
+      return;
+    }
+    if (this.failed === 'load') {
+      void this.load();
+    }
+  }
+
+  async #follow(sent: string | null) {
+    if (this.#following) {
+      this.#wake();
+      return;
+    }
+    this.#following = true;
+    this.reconnecting = true;
+    this.failed = '';
+
+    while (this.#following) {
+      const thread = await this.#saved();
+      if (thread && !thread.running) {
+        this.#landed(thread.messages ?? [], sent);
+        break;
+      }
+      if (thread) {
+        this.messages = [...(thread.messages ?? []), livePlaceholder(this.#lastAssistant())];
+        this.revision++;
+      }
+      await sleep(FOLLOW_POLL_MS, (wake) => (this.#wake = wake));
+    }
+
+    this.#following = false;
+    this.reconnecting = false;
+    this.revision++;
+  }
+
+  async #saved(): Promise<SavedThread | null> {
+    try {
+      const res = await this.#fetch(this.#endpoint);
+      return res.ok ? ((await res.json()) as SavedThread) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  #landed(saved: ChatMessage[], sent: string | null) {
+    const lastUser = [...saved].reverse().find((m) => m.role === 'user');
+    const unanswered = saved.at(-1)?.role === 'user';
+    const lost = sent !== null && lastUser?.content !== sent;
+
+    this.messages = lost ? [...saved, { role: 'user', content: sent, at: Date.now() }] : saved;
+    if (unanswered || lost) {
+      this.failed = 'send';
+      return;
+    }
+    this.onTurnEnd?.();
   }
 
   #lastAssistant(): ChatMessage | null {
@@ -208,9 +290,14 @@ export class ChatSession {
     }
   }
 
-  #settleAfter(e: unknown) {
+  #settleAfter(e: unknown, sent: string) {
     const partial = this.#lastAssistant();
     const aborted = (e as Error | undefined)?.name === 'AbortError';
+
+    if (!aborted && !(e instanceof HttpFailure)) {
+      void this.#follow(sent);
+      return;
+    }
 
     if (aborted && partial && (partial.content || partial.tools?.length)) {
       partial.live = false;
