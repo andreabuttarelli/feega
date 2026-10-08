@@ -1,5 +1,7 @@
 <script lang="ts">
   import { setMotionPath } from '$lib/motion/path-ops';
+  import IconButton from './IconButton.svelte';
+  import { Action } from '$lib/motion/actions';
   import { duckUnder, voicesOver } from '$lib/motion/duck';
   import { PULSE_PROPS, pulseWithMusic } from '$lib/motion/pulse';
   import type { AudioAnalysis } from '$lib/motion/audio-analysis';
@@ -389,7 +391,7 @@
 {#snippet exprEditor(key: string)}
   {#if clip.expressions[key] !== undefined}
     <div class="expr" data-expression={key}>
-      <div class="expr-head"><span>ƒ {key}</span><button type="button" aria-label={`Remove the ${key} expression`} onclick={() => toggleExpression(key)}>×</button></div>
+      <div class="expr-head"><span>ƒ {key}</span><IconButton action={Action.Remove} size={14} label={`Remove the ${key} expression`} onclick={() => toggleExpression(key)} /></div>
       <textarea class="code" rows="2" spellcheck="false" aria-label={`${key} expression`} value={clip.expressions[key]} onchange={(e) => editExpression(key, e.currentTarget.value)}></textarea>
       {#if faults[key]}<p class="expr-error" role="alert">{faults[key]}</p>{:else}<output class="expr-now">= {expressionNow(key)}</output>{/if}
     </div>
@@ -584,7 +586,7 @@
     {#each shapeMorphs as _target, i (i)}
       <div class="line">
         <span class="label">Morph {i + 1}</span>
-        <button type="button" class="icon" aria-label={`Remove morph target ${i + 1}`} onclick={() => commit(setProps(doc, clip.id, { morphs: shapeMorphs.filter((_, j) => j !== i) }), 'Removed a morph target')}>×</button>
+        <IconButton action={Action.Remove} size={14} label={`Remove morph target ${i + 1}`} onclick={() => commit(setProps(doc, clip.id, { morphs: shapeMorphs.filter((_, j) => j !== i) }), 'Removed a morph target')} />
       </div>
     {/each}
     <select class="add" aria-label="Morph to" data-testid="add-morph" title="Adds the shape and keys the morph from the playhead over one second" value="" onchange={(e) => addMorphOf(e.currentTarget)}>
@@ -599,9 +601,9 @@
       <div class="effect" class:off={!modifier.enabled} data-modifier={modifier.id}>
         <div class="effect-head">
           <label class="effect-name"><input type="checkbox" checked={modifier.enabled} aria-label={`Enable ${MODIFIERS[modifier.kind].label}`} onchange={(e) => commit(setModifier(doc, clip.id, modifier.id, { enabled: e.currentTarget.checked }), 'Toggled a modifier')} />{MODIFIERS[modifier.kind].label}</label>
-          <button type="button" class="icon" aria-label="Move modifier up" disabled={i === 0} onclick={() => commit(setModifier(doc, clip.id, modifier.id, { index: i - 1 }), 'Reordered modifiers')}>↑</button>
-          <button type="button" class="icon" aria-label="Move modifier down" disabled={i === shapeModifiers.length - 1} onclick={() => commit(setModifier(doc, clip.id, modifier.id, { index: i + 1 }), 'Reordered modifiers')}>↓</button>
-          <button type="button" class="icon" aria-label={`Remove ${MODIFIERS[modifier.kind].label}`} onclick={() => commit(removeModifier(doc, clip.id, modifier.id), 'Removed a modifier')}>×</button>
+          <IconButton action={Action.ItemUp} size={14} label="Move modifier up" disabled={i === 0} onclick={() => commit(setModifier(doc, clip.id, modifier.id, { index: i - 1 }), 'Reordered modifiers')} />
+          <IconButton action={Action.ItemDown} size={14} label="Move modifier down" disabled={i === shapeModifiers.length - 1} onclick={() => commit(setModifier(doc, clip.id, modifier.id, { index: i + 1 }), 'Reordered modifiers')} />
+          <IconButton action={Action.Remove} size={14} label={`Remove ${MODIFIERS[modifier.kind].label}`} onclick={() => commit(removeModifier(doc, clip.id, modifier.id), 'Removed a modifier')} />
         </div>
         {@render animList(modifierParams(modifier.id), afterDot)}
       </div>
@@ -623,8 +625,8 @@
             <select aria-label="Selector shape" value={animator.shape} onchange={(e) => commit(setAnimator(doc, clip.id, animator.id, { shape: e.currentTarget.value as SelectorShape }), 'Changed a text animator')}>
               {#each SELECTOR_SHAPES as shape (shape)}<option value={shape}>{shape}</option>{/each}
             </select>
-            <button type="button" class="icon" aria-label="Shuffle order" title="Randomise the order (seeded)" onclick={() => commit(setAnimator(doc, clip.id, animator.id, { seed: animator.seed === null ? 1 : null }), 'Changed a text animator')}>{animator.seed === null ? '↯' : '→'}</button>
-            <button type="button" class="icon" aria-label={`Remove animator ${i + 1}`} onclick={() => commit(removeAnimator(doc, clip.id, animator.id), 'Removed a text animator')}>×</button>
+            <IconButton action={animator.seed === null ? Action.Shuffle : Action.InOrder} size={14} onclick={() => commit(setAnimator(doc, clip.id, animator.id, { seed: animator.seed === null ? 1 : null }), 'Changed a text animator')} />
+            <IconButton action={Action.Remove} size={14} label={`Remove animator ${i + 1}`} onclick={() => commit(removeAnimator(doc, clip.id, animator.id), 'Removed a text animator')} />
           </div>
           {@render animList(animatorRows(animator.id).filter((p) => p.kind === ValueKind.Number), afterDot)}
         </div>
@@ -700,9 +702,9 @@
         <div class="effect-head">
           <span class="grip" aria-hidden="true">⋮⋮</span>
           <label class="effect-name"><input type="checkbox" checked={effect.enabled} aria-label={`Enable ${EFFECTS[effect.kind].label}`} onchange={(e) => commit(setEffect(doc, clip.id, effect.id, { enabled: e.currentTarget.checked }), 'Toggled an effect')} />{EFFECTS[effect.kind].label}</label>
-          <button type="button" class="icon" aria-label="Move effect up" disabled={i === 0} onclick={() => commit(setEffect(doc, clip.id, effect.id, { index: i - 1 }), 'Reordered effects')}>↑</button>
-          <button type="button" class="icon" aria-label="Move effect down" disabled={i === clip.effects.length - 1} onclick={() => commit(setEffect(doc, clip.id, effect.id, { index: i + 1 }), 'Reordered effects')}>↓</button>
-          <button type="button" class="icon" aria-label={`Remove ${EFFECTS[effect.kind].label}`} onclick={() => commit(removeEffect(doc, clip.id, effect.id), 'Removed an effect')}>×</button>
+          <IconButton action={Action.ItemUp} size={14} label="Move effect up" disabled={i === 0} onclick={() => commit(setEffect(doc, clip.id, effect.id, { index: i - 1 }), 'Reordered effects')} />
+          <IconButton action={Action.ItemDown} size={14} label="Move effect down" disabled={i === clip.effects.length - 1} onclick={() => commit(setEffect(doc, clip.id, effect.id, { index: i + 1 }), 'Reordered effects')} />
+          <IconButton action={Action.Remove} size={14} label={`Remove ${EFFECTS[effect.kind].label}`} onclick={() => commit(removeEffect(doc, clip.id, effect.id), 'Removed an effect')} />
         </div>
         {#if effect.kind === 'lut'}<LutPicker {doc} clipId={clip.id} {effect} {onchange} />{/if}
         {#each effectParams(effect.id) as prop (prop.key)}
@@ -1162,24 +1164,6 @@
     font-weight: 600;
   }
 
-  .icon {
-    width: 20px;
-    height: 20px;
-    border: 0;
-    background: none;
-    color: var(--ui-ink-3);
-    cursor: pointer;
-  }
-
-  .icon:hover:not(:disabled) {
-    color: var(--ui-ink);
-    background: var(--ui-hover);
-  }
-
-  .icon:disabled {
-    opacity: 0.4;
-  }
-
   .grip {
     cursor: grab;
     color: var(--ui-ink-3);
@@ -1309,8 +1293,7 @@
       height: 40px;
     }
 
-    .key,
-    .icon {
+    .key {
       width: 40px;
       height: 40px;
     }

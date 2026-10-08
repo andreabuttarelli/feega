@@ -38,11 +38,9 @@ import ZoomOut from '@lucide/svelte/icons/zoom-out';
 import BotMessageSquare from '@lucide/svelte/icons/bot-message-square';
 import PanelRight from '@lucide/svelte/icons/panel-right';
 import Keyboard from '@lucide/svelte/icons/keyboard';
-import Layers from '@lucide/svelte/icons/layers';
 import ArrowLeft from '@lucide/svelte/icons/arrow-left';
 import Ellipsis from '@lucide/svelte/icons/ellipsis';
 import Magnet from '@lucide/svelte/icons/magnet';
-import Crosshair from '@lucide/svelte/icons/crosshair';
 import Brackets from '@lucide/svelte/icons/brackets';
 import Maximize from '@lucide/svelte/icons/maximize';
 import Ghost from '@lucide/svelte/icons/ghost';
@@ -56,6 +54,10 @@ import ChevronDown from '@lucide/svelte/icons/chevron-down';
 import Link2 from '@lucide/svelte/icons/link-2';
 import Scan from '@lucide/svelte/icons/scan';
 import SquareDashed from '@lucide/svelte/icons/square-dashed';
+import Shuffle from '@lucide/svelte/icons/shuffle';
+import ArrowRight from '@lucide/svelte/icons/arrow-right';
+import CircleDashed from '@lucide/svelte/icons/circle-dashed';
+import Group from '@lucide/svelte/icons/group';
 import { Command, SHORTCUTS } from './shortcuts';
 
 export enum Tool {
@@ -81,7 +83,12 @@ export enum Tool {
   HideLayer = 'hide-layer',
   ShowLayer = 'show-layer',
   LockLayer = 'lock-layer',
-  UnlockLayer = 'unlock-layer'
+  UnlockLayer = 'unlock-layer',
+  ItemUp = 'item-up',
+  ItemDown = 'item-down',
+  Remove = 'remove',
+  Shuffle = 'shuffle',
+  InOrder = 'in-order'
 }
 
 export const Action = { ...Command, ...Tool } as const;
@@ -139,8 +146,8 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.Paste]: { name: 'Paste keyframes', icon: ClipboardPaste, group: GuideGroup.Edit },
   [Command.SelectAll]: { name: 'Select all clips', icon: ListChecks, group: GuideGroup.Edit },
   [Command.Deselect]: { name: 'Deselect', icon: X, group: GuideGroup.Edit, gesture: 'Tap an empty lane' },
-  [Command.Precompose]: { name: 'Precompose', icon: Layers, group: GuideGroup.Edit, place: Place.Toolbar },
-  [Tool.NullFromSelection]: { name: 'Null parent', icon: Crosshair, group: GuideGroup.Edit, place: Place.Toolbar },
+  [Command.Precompose]: { name: 'Precompose', icon: Group, group: GuideGroup.Edit, place: Place.Toolbar },
+  [Tool.NullFromSelection]: { name: 'Null parent', icon: CircleDashed, group: GuideGroup.Edit, place: Place.Toolbar },
   [Command.StartHere]: { name: 'Move clip to start here', icon: AlignStart, group: GuideGroup.Edit, gesture: 'Drag the clip' },
   [Command.EndHere]: { name: 'Move clip to end here', icon: AlignEnd, group: GuideGroup.Edit, gesture: 'Drag the clip' },
   [Command.TrimIn]: { name: 'Trim start to here', icon: ArrowRightFromLine, group: GuideGroup.Edit, gesture: 'Drag the clip’s left edge' },
@@ -189,7 +196,12 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.Help]: { name: 'Keyboard & gestures', icon: Keyboard, group: GuideGroup.View, place: Place.Menu },
   [Tool.Back]: { name: 'Back to the canvas', icon: ArrowLeft },
   [Tool.More]: { name: 'More actions', icon: Ellipsis },
-  [Tool.Close]: { name: 'Close', icon: X }
+  [Tool.Close]: { name: 'Close', icon: X },
+  [Tool.ItemUp]: { name: 'Move up', icon: ChevronUp },
+  [Tool.ItemDown]: { name: 'Move down', icon: ChevronDown },
+  [Tool.Remove]: { name: 'Remove', icon: X },
+  [Tool.Shuffle]: { name: 'Shuffle the order', icon: Shuffle },
+  [Tool.InOrder]: { name: 'Keep the order', icon: ArrowRight }
 };
 
 export function shortcutOf(id: ActionId): string {
