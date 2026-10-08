@@ -165,7 +165,8 @@ renders in their browser and lands in the project assets. Show the link; never o
 the status and, when done, a signed `file_url`. CLI: `feega motion render <nodeId>`.
 
 Put one on a website with `publish_motion_embed`: free, it hosts the interactive web export of
-the saved revision and returns a public `url` and an iframe `snippet`; publishing again updates
+the saved revision and returns a public `url` and an iframe `snippet` (live components — games,
+generative pieces — run live there; a video shows a still of them); publishing again updates
 it in place, `action: "unpublish"` takes it down. Uncensored projects are refused.
 `get_motion_embed` reads the state. The self-contained HTML (no hosting):
 `feega motion embed <nodeId> --download page.html`.

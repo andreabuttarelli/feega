@@ -1636,9 +1636,9 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     [WRITE_COMPONENT]: tool({
-      description: `Create or replace a custom component written in code. The editor runs it in a sandbox and checks that seeking gives the same frame from any direction; a failing check comes back as an error with the offending frames. Use it in clips with add_clip component "Custom", props { name, ...props }.`,
+      description: `Create or replace a custom component written in code. The editor runs it in a sandbox and checks that seeking gives the same frame from any direction (a live component: its video still); a failing check comes back as an error with the offending frames. Use it in clips with add_clip component "Custom", props { name, ...props }.`,
       inputSchema: z.object({
-        mode: z.enum(ComponentMode).optional().describe('deterministic (default): every frame from tl, seekable, exact in the video. live: runs its own loop and reads input, different on every view; the video shows a still'),
+        mode: z.enum(ComponentMode).optional().describe('deterministic (default): every frame from tl, seekable, exact in the video. live: for games, generative pieces that differ on every view and interactive heroes meant for the website embed; runs its own loop (requestAnimationFrame, timers, Math.random) and reads input.x, input.y, input.down, input.keys, input.tiltX/Y, with onPause, onResume, onDestroy; gets the game engines LittleJS (LittleJS.engineInit(init, update, updatePost, render, renderPost)) and kaplay (const k = kaplay({ background: [0, 0, 0] })), and p5 loops on its own. The video shows a still of a live component: its first frame, seeded, or what it returns as { still(t) {} }'),
         name: z.string().describe('PascalCase, e.g. NodeGraph'),
         html: z.string().max(MAX_HTML).describe('markup inside the component root; no script, style, iframe, media or external urls'),
         css: z.string().max(MAX_CSS).describe('scoped to the component root (:scope is the root); no animation, transition, @keyframes, @import or external url()'),

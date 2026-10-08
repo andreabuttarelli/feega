@@ -38,6 +38,15 @@ function setup(check: MotionToolDeps['check'] = vi.fn(async () => PASSED)) {
 }
 
 describe('component tools', () => {
+  it('write_component explains live components to the model', () => {
+    const { schema } = setup();
+    const described = JSON.stringify((schema(WRITE_COMPONENT) as unknown as { toJSONSchema?: () => unknown }).toJSONSchema?.() ?? '');
+
+    expect(described).toContain('live');
+    expect(described).toContain('LittleJS');
+    expect(described).toContain('kaplay');
+  });
+
   it('write_component writes a live component that runs its own loop, and read_component says so', async () => {
     const { session, run } = setup();
     const game = { ...CHAT, name: 'Game', js: 'requestAnimationFrame(function f() { root.dataset.r = String(Math.random()); requestAnimationFrame(f); });', mode: ComponentMode.Live };

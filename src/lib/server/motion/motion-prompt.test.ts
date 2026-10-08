@@ -21,3 +21,18 @@ describe('the motion agent keeps titles and scenes apart', () => {
     expect(prompt(MotionStyle.LaunchFilm)).toMatch(/title card → scene → title card/);
   });
 });
+
+describe('live components', () => {
+  const text = prompt(MotionStyle.LaunchFilm);
+
+  it('says when to pick live and that the video shows a still', () => {
+    expect(text).toContain('mode "live"');
+    expect(text).toMatch(/games, generative pieces that should differ on every view, interactive heroes/);
+    expect(text).toContain('the video shows a still');
+  });
+
+  it.each(['LittleJS.engineInit(', 'kaplay(', 'p5((p) =>', 'input.keys', 'still(t)'])('shows the pattern %s', (pattern) => {
+    expect(text).toContain(pattern);
+  });
+});
+
