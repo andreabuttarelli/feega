@@ -17,6 +17,8 @@ import { agentStopWhen } from '$lib/server/project-agent/limits';
 import { screenModelInput } from '$lib/server/moderation/model-input';
 import { ModerationProfile } from '$lib/server/moderation/profiles';
 import { blockedPrompt } from '$lib/server/moderation/blocked-response';
+import { drawFrames, firstFrames } from '$lib/server/motion/server-frames';
+import { chromiumFrames, serverFramesOpen } from '$lib/server/motion/chromium-frames';
 import { assetUrls, headOrNew, motionAssets, motionTokens, saveMotionDoc } from '$lib/server/motion/editor';
 import { fitNewVideo } from '$lib/motion/fit-duration';
 import { EmbedAction, createMotionTools, selectionNote, type MotionSession } from '$lib/server/motion/motion-tools';
@@ -54,8 +56,10 @@ export enum Browser {
 
 const BROWSER_VISION: Record<Browser, (visionModel: string | null) => Vision> = {
   [Browser.Attached]: (visionModel) => (visionModel ? Vision.Available : Vision.Missing),
-  [Browser.Absent]: () => Vision.Missing
+  [Browser.Absent]: (visionModel) => (visionModel && serverFramesOpen() ? Vision.Available : Vision.Missing)
 };
+
+const EDITOR_DRAWS: Record<Browser, boolean> = { [Browser.Attached]: true, [Browser.Absent]: false };
 
 const BROWSER_DRAWS: Record<Browser, () => void> = {
   [Browser.Attached]: () => {},
@@ -166,16 +170,19 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
     voiceover: (voice) => withOrgContext(orgId, () => speakVoiceover(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, actor }, voice)),
     music: (ask) => withOrgContext(orgId, () => layMusic(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, actor }, ask)),
     frames: async (callId, times) => {
-      BROWSER_DRAWS[browser]();
-      if (client === Client.Gone) {
-        return null;
-      }
       const review = await screenModelInput(db, { profile: ModerationProfile.Standard, texts: docTexts(session.doc), scope: moderationScope });
       if (!review.ok) {
         throw new Error(`frames withheld by the safety review: ${review.error}`);
       }
-      askPreview({ callId, times, doc: session.doc, assets: assets.slice(knownAssets) });
-      return awaitFrames(bucket, framesPrefix(frameScope, callId), times.length);
+      const editor = async () => {
+        if (!EDITOR_DRAWS[browser] || client === Client.Gone) {
+          return null;
+        }
+        askPreview({ callId, times, doc: session.doc, assets: assets.slice(knownAssets) });
+        return awaitFrames(bucket, framesPrefix(frameScope, callId), times.length);
+      };
+      const server = async () => (serverFramesOpen() ? drawFrames(chromiumFrames, { compose: { doc: session.doc, tokens, assets: assetUrls(assets) }, times }) : null);
+      return firstFrames([editor, server]);
     },
     inspect: frameStats,
     readUi: uiReader({ ask: (q) => withOrgContext(orgId, () => llmStructured({ ...q, model: llmVisionModel() ?? model, label: 'motion-recreate-ui' })), fetchBytes: fetchImageBytes }),

@@ -2,7 +2,7 @@ import { loadSession, type StoredSession } from '../lib/auth.ts';
 import { getRequestAuth } from './context.ts';
 
 export type ToolResult = {
-  content: { type: 'text'; text: string }[];
+  content: ({ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string })[];
   isError?: boolean;
   structuredContent?: Record<string, unknown>;
 };

@@ -199,6 +199,7 @@ list. Returns how many combinations it actually stopped.
 | `get_render` | `feega motion render-status <runId>` |
 | `publish_motion_embed` | `feega motion embed <nodeId> [--unpublish]` |
 | `get_motion_embed` | `feega motion embed <nodeId> --status` |
+| `view_motion_frames` | `feega motion frames <nodeId> --at 1,2.5,4 [--width 640] [--out dir]` |
 | (CLI / API only) | `feega motion embed <nodeId> --download <file>` |
 
 `list_motion_videos({ org, project_id? })` lists `motion` nodes newest first: `node_id`, `name`,
@@ -209,7 +210,7 @@ list. Returns how many combinations it actually stopped.
 a `motion` node, with the editor's own tools, and saves a new revision. It returns at once with
 `{ run_id, status: "running" }`; poll `get_motion_run({ org, run_id })` until `done`, which carries
 `reply`, `summary`, `version` and `cost_usd`. `wait: true` polls for you, up to about 4 minutes. The agent
-cannot look at rendered frames: that needs the editor open in a browser. Spends credits. For a launch film it
+looks at its own frames even with no editor open. Spends credits. For a launch film it
 rebuilds the product UI as vector components (UI kit or `recreate_ui` from a site capture),
 never as screenshots: asking "recreate the dashboard from the capture" works.
 
@@ -228,6 +229,13 @@ revision and returns `{ published, url, snippet, revision }` — the iframe snip
 site. Publishing again updates the same URL; `action: "unpublish"` removes it. Free. Uncensored
 projects get 403 with `refusal`; an empty video 409. `get_motion_embed({ org, node_id })` reads
 `published`, `url`, `snippet`. The self-contained HTML is `GET /api/v1/motion/{node_id}/embed/bundle`.
+
+`view_motion_frames({ org, node_id, times, width? })` draws the saved revision at up to 6 times
+(seconds, inside the video) in a server-side browser and returns each frame as an MCP image, plus
+`quality` (every problem the editor agent's quality gate finds) and `blocking` (the ones to fix
+before delivery). `width` is the longest side, default and max 960. Free, read-only, about 10 calls
+a minute per workspace (429 past that); bad times 400, empty video 409. API:
+`POST /api/v1/motion/{node_id}/frames` `{ times, width? }` → `{ revision, frames: [{ time, mime, data }], quality, blocking }`.
 
 ## Gallery
 

@@ -253,13 +253,13 @@ describe('motion agent tools', () => {
     expect(out.blocking.some((q) => q.includes('fit_duration'))).toBe(true);
   });
 
-  it('with no editor open the look is skipped, not failed: the agent goes on and the change stays unseen', async () => {
+  it('with nothing able to draw the look is skipped, not failed: the agent goes on and the change stays unseen', async () => {
     const { run, session } = setup({ frames: async () => null });
     await run('add_clip', { component: 'Title', start: 0, duration: 1, props: { text: 'Unseen' } });
     const out = await run('view_frames', { times: [1] });
 
     expect(out).toMatchObject({ ok: true, seen: false });
-    expect(String(out.note)).toContain('editor is not open');
+    expect(String(out.note)).toContain('neither the editor nor the server');
     expect(session.checkedAt).toBe(0);
   });
 
