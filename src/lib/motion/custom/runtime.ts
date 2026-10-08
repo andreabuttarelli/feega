@@ -17,6 +17,7 @@ const ERROR_LISTENER = '__feegaErrorListener';
 export const THREE_GLOBAL = '__feegaThree';
 export const LIVE_RUNS = '__feegaLiveRuns';
 export const EVENT_MESSAGE = 'feega:event';
+export const LITTLEJS_GLOBAL = '__feegaLittleJS';
 
 export enum Play {
   Seeked = 'seeked',
@@ -62,6 +63,8 @@ export const SHADOWED = [
 
 export enum Library {
   Lottie = 'lottie',
+  LittleJS = 'LittleJS',
+  Kaplay = 'kaplay',
   Three = 'THREE',
   D3 = 'd3',
   P5 = 'p5',
@@ -76,6 +79,8 @@ export enum Library {
 
 const USES: Record<Library, RegExp> = {
   [Library.Lottie]: /\blottie\b/,
+  [Library.LittleJS]: /\bLittleJS\b/,
+  [Library.Kaplay]: /\bkaplay\b/,
   [Library.Three]: /\bTHREE\b/,
   [Library.D3]: /\bd3\b/,
   [Library.P5]: /\bp5\b/,
@@ -94,6 +99,8 @@ const STYLE_USES: Partial<Record<Library, RegExp>> = {
 
 const GLOBALS: Record<Library, string> = {
   [Library.Lottie]: 'lottie',
+  [Library.LittleJS]: LITTLEJS_GLOBAL,
+  [Library.Kaplay]: 'kaplay',
   [Library.Three]: THREE_GLOBAL,
   [Library.D3]: 'd3',
   [Library.P5]: 'p5',
@@ -140,7 +147,9 @@ type Physics = { Engine: { update: (engine: World, delta: number) => void }; Com
 type Random = () => number;
 type Generative = { createNoise2D: (r: Random) => unknown; createNoise3D: (r: Random) => unknown; createNoise4D: (r: Random) => unknown; PoissonDiskSampling: new (options: object, r: Random) => unknown };
 type Split = { target?: string | object; by?: string };
-type ClipScope = { root: HTMLElement; tl: Timeline; run: CustomRun };
+type ClipScope = { root: HTMLElement; tl: Timeline; run: CustomRun; hooks: Hooks };
+type Little = { vec2: (x: number, y: number) => object; setCanvasFixedSize: (size: object) => void; setEngineManualStep: (on: boolean) => void; engineStep: (frames: number) => void; engineObjectsDestroy: () => void; engineInit: (...args: unknown[]) => Promise<unknown> };
+type Game = { debug: { paused: boolean }; quit: () => void; randSeed: (seed: number) => void; onDraw: (draw: () => void) => void };
 type Input = { x: number; y: number; down: boolean; hover: boolean; tiltX: number; tiltY: number; keys: Set<string> };
 type Hooks = { pause: (() => void)[]; resume: (() => void)[]; destroy: (() => void)[] };
 type Forwarded = { type?: string; kind?: string; x?: number; y?: number; key?: string; code?: string; values?: Record<string, number> };
@@ -198,6 +207,9 @@ function bootCustom(cfg: BootConfig, runs: CustomRun[], env: CustomEnv, master: 
     const kind = m.kind ?? 'pointermove';
     target.dispatchEvent(typeof PointerEvent === 'function' ? new PointerEvent(kind, { ...at, pointerId: 1, isPrimary: true }) : new MouseEvent(kind, at));
     target.dispatchEvent(new MouseEvent(POINTER_TO_MOUSE[kind] ?? kind, at));
+    if (kind === 'pointerdown') {
+      (target as HTMLElement).focus?.({ preventScroll: true });
+    }
   };
   const listenInput = (area: HTMLElement) => {
     const point = (e: MouseEvent) => {
@@ -330,6 +342,7 @@ function bootCustom(cfg: BootConfig, runs: CustomRun[], env: CustomEnv, master: 
     };
   };
   const stillClock = (seed: number) => {
+    Math.random = seeded(seed);
     const frames: FrameRequestCallback[] = [];
     const never = () => 0;
     const frozenDate = new Proxy(Date, {
@@ -389,9 +402,52 @@ function bootCustom(cfg: BootConfig, runs: CustomRun[], env: CustomEnv, master: 
         setup?.call(p);
       };
     }, root);
+  const liveSketches = (P5: new (sketch: (p: Sketch) => void, node: HTMLElement) => Sketch & { loop: () => void; remove: () => void }, { root, hooks }: ClipScope) => (sketch: (p: Sketch) => void) => {
+    const instance = new P5(sketch, root);
+    hooks.pause.push(() => instance.noLoop());
+    hooks.resume.push(() => instance.loop());
+    hooks.destroy.push(() => instance.remove());
+    return instance;
+  };
+  const littleGames =
+    (frozen: boolean) =>
+    (L: Little, { root, hooks }: ClipScope) =>
+      Object.create(L, {
+        engineInit: {
+          value: (init: unknown, update: unknown, updatePost: unknown, render: unknown, renderPost: unknown, images: unknown[] = []) => {
+            L.setCanvasFixedSize(L.vec2(root.clientWidth, root.clientHeight));
+            if (frozen) {
+              L.setEngineManualStep(true);
+            }
+            hooks.pause.push(() => L.setEngineManualStep(true));
+            hooks.resume.push(() => L.setEngineManualStep(false));
+            hooks.destroy.push(() => {
+              L.setEngineManualStep(true);
+              L.engineObjectsDestroy();
+              root.querySelectorAll('canvas').forEach((canvas) => canvas.remove());
+            });
+            const started = L.engineInit(init, update, updatePost, render, renderPost, images, root);
+            return frozen ? started.then(() => L.engineStep(1)) : started;
+          }
+        }
+      });
+  const kaplayGames =
+    (frozen: boolean) =>
+    (make: (options: object) => Game, { root, run, hooks }: ClipScope) =>
+    (options: object = {}) => {
+      const game = make({ ...options, global: false, root, width: root.clientWidth, height: root.clientHeight });
+      hooks.pause.push(() => (game.debug.paused = true));
+      hooks.resume.push(() => (game.debug.paused = false));
+      hooks.destroy.push(() => game.quit());
+      if (frozen) {
+        game.randSeed(run.seed);
+        game.onDraw(() => (game.debug.paused = true));
+      }
+      return game;
+    };
   type Wrap = (lib: never, scope: ClipScope) => unknown;
   const raw: Wrap = (lib) => lib;
-  const played = (play: string) => ({ seeked: wraps, live: { ...wraps, p5: raw, PIXI: raw, Matter: raw }, still: { ...wraps, p5: frozenSketches } })[play] as Record<string, Wrap>;
+  const played = (play: string) => ({ seeked: wraps, live: { ...wraps, p5: liveSketches, PIXI: raw, Matter: raw, LittleJS: littleGames(false), kaplay: kaplayGames(false) }, still: { ...wraps, p5: frozenSketches, LittleJS: littleGames(true), kaplay: kaplayGames(true) } })[play] as Record<string, Wrap>;
 
   const stages = (PIXI: Stage) =>
     Object.create(PIXI, {
@@ -502,7 +558,7 @@ function bootCustom(cfg: BootConfig, runs: CustomRun[], env: CustomEnv, master: 
     const lifecycle = { input, onPause: (fn: () => void) => hooks.pause.push(fn), onResume: (fn: () => void) => hooks.resume.push(fn), onDestroy: (fn: () => void) => hooks.destroy.push(fn) };
     try {
       const made = make(
-        { root, props: values, tl: child, param, duration: run.length, fps: run.fps, assets: env.assets, brand: env.brand, rand: seeded(run.seed), format, motion: engine, gsap: engine, SplitText: engine.SplitText, ...lifecycle, ...clipLibraries({ root, tl: child, run }) },
+        { root, props: values, tl: child, param, duration: run.length, fps: run.fps, assets: env.assets, brand: env.brand, rand: seeded(run.seed), format, motion: engine, gsap: engine, SplitText: engine.SplitText, ...lifecycle, ...clipLibraries({ root, tl: child, run, hooks }) },
         ...shadows
       ) as { still?: (t: number) => void } | undefined;
       still?.flush();

@@ -127,3 +127,10 @@ describe('a live component', () => {
   });
 });
 
+describe('game engines', () => {
+  it.each(['LittleJS.engineInit(() => {}, () => {}, () => {}, () => {}, () => {});', 'const k = kaplay();'])('need a live component: %s', (js) => {
+    expect(problemsOf({ js }).join(' ')).toContain('declare the component live');
+    expect(lintSource({ ...ok, js }, ComponentMode.Live)).toEqual([]);
+  });
+});
+

@@ -25,7 +25,7 @@ import { SCREENSHOT_URL, captureScript, contentStamp } from './capture';
 import { cspMeta } from './csp';
 import { measureScript } from './measure';
 import { THREE_VERSION } from './three';
-import { Library, Play, THREE_GLOBAL, bootScript, definitionScript, librariesOf, seedOf, type CustomRun } from '../custom/runtime';
+import { LITTLEJS_GLOBAL, Library, Play, THREE_GLOBAL, bootScript, definitionScript, librariesOf, seedOf, type CustomRun } from '../custom/runtime';
 import { ComponentMode, PropFormat, modeOf, type CustomComponents } from '../custom/component';
 import { mattePairs, type MattePair } from '../matte';
 import { matteScript, matteWrapper } from './mattes';
@@ -81,6 +81,10 @@ const PIXI_URLS = [`https://cdn.jsdelivr.net/npm/pixi.js@${PIXI_VERSION}/dist/pi
 export const MATTER_VERSION = '0.20.0';
 const MATTER_URL = `https://cdn.jsdelivr.net/npm/matter-js@${MATTER_VERSION}/build/matter.min.js`;
 const THREE_BASE = `https://cdn.jsdelivr.net/npm/three@${THREE_VERSION}/`;
+export const LITTLEJS_VERSION = '1.26.1';
+const LITTLEJS_URL = `https://cdn.jsdelivr.net/npm/littlejsengine@${LITTLEJS_VERSION}/dist/littlejs.esm.min.js`;
+export const KAPLAY_VERSION = '3001.0.19';
+const KAPLAY_URL = `https://cdn.jsdelivr.net/npm/kaplay@${KAPLAY_VERSION}/dist/kaplay.js`;
 const FONTS_URL = 'https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Fragment+Mono&display=block';
 
 const SHOWN: Vars = { opacity: 1, xPercent: 0, yPercent: 0, scale: 1, clipPath: 'inset(0 0% 0 0)', filter: 'blur(0px)' };
@@ -469,6 +473,8 @@ const inlineScript = (code: string) => `<script>${code.replace(/<\/script/gi, '<
 
 const LIBRARY_TAGS: Record<Library, { scripts: string[]; tag: string; module?: string }> = {
   [Library.Lottie]: { scripts: [LOTTIE_URL], tag: `<script src="${LOTTIE_URL}"></script>` },
+  [Library.LittleJS]: { scripts: [LITTLEJS_URL], tag: '', module: `import * as LittleJS from '${LITTLEJS_URL}';window.${LITTLEJS_GLOBAL}=LittleJS;` },
+  [Library.Kaplay]: { scripts: [KAPLAY_URL], tag: `<script src="${KAPLAY_URL}"></script>` },
   [Library.Three]: { scripts: [THREE_BASE], tag: '', module: `import * as THREE from 'three';window.${THREE_GLOBAL}=THREE;` },
   [Library.D3]: { scripts: [D3_URL], tag: `<script src="${D3_URL}"></script>` },
   [Library.P5]: { scripts: [P5_URL], tag: `<script src="${P5_URL}"></script>` },
