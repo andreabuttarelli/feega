@@ -8,6 +8,7 @@ export enum SocialPublishing {
 export const SOCIAL_PUBLISHING_SURFACE = {
   routes: [
     '/p/[projectId]/calendar',
+    '/p/[projectId]/ads',
     '/p/[projectId]/posts',
     '/p/[projectId]/settings/connected-accounts',
     '/p/[projectId]/settings/connect',
@@ -27,6 +28,7 @@ export const SOCIAL_PUBLISHING_SURFACE = {
   addable: ['calendar'],
   settingsSections: ['connected-accounts', 'facebook', 'linkedin', 'connect/[platform]'],
   promoteTabs: ['organic'],
+  topBarActions: ['promote'],
   webTools: ['create_social_connect_link']
 } as const;
 
@@ -63,4 +65,8 @@ export function visibleUnder<T>(publishing: SocialPublishing, hidden: readonly s
     return [...items];
   }
   return items.filter((item) => !hidden.includes(key(item)));
+}
+
+export function shownUnder(publishing: SocialPublishing, hidden: readonly string[], id: string): boolean {
+  return visibleUnder(publishing, hidden, [id]).length > 0;
 }

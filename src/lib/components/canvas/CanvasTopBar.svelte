@@ -12,6 +12,8 @@
   import { openSheet } from '$lib/canvas/sheet-nav';
   import { BILLING_PATH } from '$lib/billing-path';
   import Megaphone from '@lucide/svelte/icons/megaphone';
+  import { page } from '$app/state';
+  import { SOCIAL_PUBLISHING_SURFACE, shownUnder } from '$lib/social-publishing';
   import { canvasSelection, promotePath } from '$lib/canvas/promote-sheet';
   import { formatLastEdited } from '$lib/canvas/format-last-edited';
   import { CanvasAction, submitCanvasAction, renameProjectAction } from '$lib/canvas/canvas-list';
@@ -331,7 +333,7 @@
       <CreditAmount amount={creditBalance} />
     </a>
 
-    {#if modeAllows(mode, Capability.Promote)}
+    {#if modeAllows(mode, Capability.Promote) && shownUnder(page.data.socialPublishing, SOCIAL_PUBLISHING_SURFACE.topBarActions, 'promote')}
       <button
         type="button"
         class="promote-btn"
