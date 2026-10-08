@@ -1,5 +1,6 @@
 <script lang="ts">
   import PageTitle from '$lib/components/PageTitle.svelte';
+  import { TitleSize } from '$lib/components/page-title';
   import { onMount } from 'svelte';
   import { enhance } from '$app/forms';
   import { page } from '$app/stores';
@@ -128,25 +129,25 @@
       {/if}
 
       {#if form?.reset}
-        <PageTitle text={$_('login.reset.sentTitle')} />
+        <PageTitle size={TitleSize.Small} text={$_('login.reset.sentTitle')} />
         <p class="sub">{@html $_('login.reset.sentSub', { values: { email: '<b>' + (form.email ?? '') + '</b>' } })}</p>
         <p class="toggle"><a class="textlink" href="/login">{$_('login.forgot.back')}</a></p>
       {:else}
         {#if mode === 'forgot'}
-          <PageTitle text={$_('login.forgot.title')} />
+          <PageTitle size={TitleSize.Small} text={$_('login.forgot.title')} />
           <p class="sub">{$_('login.forgot.sub')}</p>
         {:else if mode === 'signup'}
           {#if startFlow}
-            <PageTitle text={chosenPlan ? $_('login.start.titlePlan', { values: { plan: chosenPlan.name } }) : $_('login.start.title')} />
+            <PageTitle size={TitleSize.Small} text={chosenPlan ? $_('login.start.titlePlan', { values: { plan: chosenPlan.name } }) : $_('login.start.title')} />
             <p class="sub">
               {chosenPlan ? $_('login.start.subPlan', { values: { plan: chosenPlan.name } }) : $_('login.start.sub')}
             </p>
           {:else}
-            <PageTitle text={$_('login.signup.title')} />
+            <PageTitle size={TitleSize.Small} text={$_('login.signup.title')} />
             <p class="sub">{$_('login.signup.sub')}</p>
           {/if}
         {:else}
-          <PageTitle text={$_('login.signin.title')} />
+          <PageTitle size={TitleSize.Small} text={$_('login.signin.title')} />
           <p class="sub">{$_('login.signin.sub')}</p>
         {/if}
         {#if mode !== 'forgot'}

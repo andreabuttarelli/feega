@@ -29,7 +29,7 @@ Dark mode redefines the same names under `[data-theme='dark']`. `.ui-app` (on th
 - **Type**: DM Sans for UI; Fragment Mono (`--ui-mono`, self-hosted) for section labels,
   timecodes, ids. Scale `--ui-text-xs/sm/md/lg/xl` = 11/12/13/15/20.
 - **Page titles**: `PageTitle.svelte`, the one `h1` of a view. Mega type, lowercase in the
-  text (not `text-transform`): `--ui-mega` = `clamp(48px, 8vw, 128px)`, `clamp(36px, 10vw, 64px)`
+  text (not `text-transform`): `--ui-mega` = `clamp(40px, 4.5vw, 72px)`, `clamp(36px, 10vw, 64px)`
   below 1024px; `--ui-mega-weight` 600, `--ui-mega-leading` 0.95, `--ui-mega-tracking` -0.04em.
   Everything under it stays small.
 - **Spacing**: `--ui-space-1..8` = 4/8/12/16/24/32.
