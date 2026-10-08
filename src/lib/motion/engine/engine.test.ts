@@ -339,6 +339,132 @@ describe('split', () => {
   });
 });
 
+type Driver = Record<string, number>;
+type Helpers = {
+  drawPath: (path: Element) => Driver;
+  morph: (path: Element, to: string, vars?: { points?: number }) => Driver;
+  scramble: (el: Element, text: string, vars?: { seed?: number; chars?: string }) => Driver;
+  flip: (targets: Element[], change: () => void) => Driver;
+};
+
+const SVG = 'http://www.w3.org/2000/svg';
+
+function polygonOf(d: string): number[][] {
+  const n = (d.match(/-?[\d.]+/g) ?? []).map(Number);
+  return Array.from({ length: n.length / 2 }, (_, i) => [n[2 * i], n[2 * i + 1]]);
+}
+
+function measurePolygons() {
+  const proto = window.SVGElement.prototype as unknown as Record<string, unknown>;
+  const edges = (el: Element) => {
+    const pts = polygonOf(el.getAttribute('d') ?? '');
+    return pts.map((p, i) => [p, pts[(i + 1) % pts.length]]);
+  };
+  proto.getTotalLength = function (this: Element) {
+    return edges(this).reduce((sum, [a, b]) => sum + Math.hypot(b[0] - a[0], b[1] - a[1]), 0);
+  };
+  proto.getPointAtLength = function (this: Element, at: number) {
+    let left = at;
+    for (const [a, b] of edges(this)) {
+      const length = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      if (left <= length) {
+        return { x: a[0] + ((b[0] - a[0]) * left) / length, y: a[1] + ((b[1] - a[1]) * left) / length };
+      }
+      left -= length;
+    }
+    return { x: 0, y: 0 };
+  };
+}
+
+describe('seekable helpers', () => {
+  const helpers = () => engine() as unknown as Helpers & { timeline: () => Tl };
+
+  it('drawPath draws a stroke from progress, whatever the path length', () => {
+    const svg = document.createElementNS(SVG, 'svg');
+    const path = document.createElementNS(SVG, 'path');
+    svg.appendChild(path);
+    document.body.appendChild(svg);
+    const m = helpers();
+    const tl = m.timeline();
+    const line = m.drawPath(path);
+    tl.fromTo(line, { draw: 0 }, { draw: 1, duration: 1, ease: 'none' }, 0);
+
+    tl.totalTime(0.25, true);
+    const first = path.getAttribute('style');
+    tl.totalTime(0.9, true);
+    tl.totalTime(0.25, true);
+
+    expect(path.getAttribute('pathLength')).toBe('1');
+    expect((path as SVGElement).style.strokeDasharray).toBe('0.25 2');
+    expect(path.getAttribute('style')).toBe(first);
+  });
+
+  it('morph resamples both shapes to the same points and blends them', () => {
+    measurePolygons();
+    const svg = document.createElementNS(SVG, 'svg');
+    const path = document.createElementNS(SVG, 'path');
+    path.setAttribute('d', 'M0 0 L10 0 L10 10 L0 10 Z');
+    svg.appendChild(path);
+    document.body.appendChild(svg);
+    const m = helpers();
+    const tl = m.timeline();
+    const shape = m.morph(path, 'M0 0 L20 0 L20 20 L0 20 Z', { points: 4 });
+    tl.fromTo(shape, { morph: 0 }, { morph: 1, duration: 1, ease: 'none' }, 0);
+
+    tl.totalTime(0.5, true);
+    const half = path.getAttribute('d');
+    tl.totalTime(1, true);
+    tl.totalTime(0.5, true);
+
+    expect(half).toBe('M0,0L15,0L15,15L0,15Z');
+    expect(path.getAttribute('d')).toBe(half);
+    expect(svg.children).toHaveLength(1);
+  });
+
+  it('scramble reveals the text left to right through seeded noise, the same at every visit', () => {
+    el('a').textContent = '';
+    const m = helpers();
+    const tl = m.timeline();
+    const text = m.scramble(el('a'), 'hello world', { seed: 7 });
+    tl.fromTo(text, { reveal: 0 }, { reveal: 1, duration: 1, ease: 'none' }, 0);
+
+    tl.totalTime(0.4, true);
+    const first = el('a').textContent ?? '';
+    tl.totalTime(0.9, true);
+    tl.totalTime(0.4, true);
+
+    expect(first).toHaveLength(11);
+    expect(first.slice(0, 4)).toBe('hell');
+    expect(first.slice(4)).not.toBe('o world');
+    expect(first[5]).toBe(' ');
+    expect(el('a').textContent).toBe(first);
+    tl.totalTime(1, true);
+    expect(el('a').textContent).toBe('hello world');
+  });
+
+  it('flip animates from the recorded layout to the new one', () => {
+    const box = el('a');
+    let rect = { left: 0, top: 0, width: 100, height: 100 };
+    box.getBoundingClientRect = () => ({ ...rect, right: 0, bottom: 0, x: rect.left, y: rect.top, toJSON: () => rect }) as DOMRect;
+    const m = helpers();
+    const tl = m.timeline();
+    const moved = m.flip([box], () => {
+      rect = { left: 200, top: 50, width: 50, height: 50 };
+    });
+    tl.fromTo(moved, { flip: 0 }, { flip: 1, duration: 1, ease: 'none' }, 0);
+
+    tl.totalTime(0.5, true);
+    const half = box.style.transform;
+    tl.totalTime(1, true);
+    const done = box.style.transform;
+    tl.totalTime(0.5, true);
+
+    expect(half).toBe('translate(-100px, -25px) scale(1.5, 1.5)');
+    expect(done).toBe('translate(0px, 0px) scale(1, 1)');
+    expect(box.style.transform).toBe(half);
+  });
+});
+
 describe('in the page', () => {
   it('installs itself on the window', () => {
     window.eval(engineScript());
