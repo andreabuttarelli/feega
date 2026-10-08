@@ -68,7 +68,9 @@ export function playerMain(cfg: PlayerConfig): void {
     point(e);
     values[cfg.keys.down] = 1;
     askTilt();
+    el.iframeElement?.focus();
   });
+  pad.addEventListener('mousedown', (e) => e.preventDefault());
   pad.addEventListener('pointerup', (e) => {
     point(e);
     values[cfg.keys.down] = 0;

@@ -477,6 +477,18 @@ describe('a live component', () => {
     expect(seen).toEqual(['Space', 'mouse 0']);
   });
 
+  it('a forwarded tap focuses what it lands on, as a real one would, so a canvas that listens for keys gets them', () => {
+    const { root } = live('');
+    const canvas = document.createElement('canvas');
+    canvas.tabIndex = 0;
+    root.appendChild(canvas);
+    document.elementFromPoint = () => canvas;
+
+    window.dispatchEvent(new MessageEvent('message', { data: { type: EVENT_MESSAGE, kind: 'pointerdown', x: 0.5, y: 0.5 } }));
+
+    expect(document.activeElement).toBe(canvas);
+  });
+
   it('holds its frames while it is off screen', () => {
     const { root } = live('let n = 0; requestAnimationFrame(function f() { root.dataset.n = String(++n); requestAnimationFrame(f); });');
     flush();
@@ -517,6 +529,84 @@ describe('a live component in a video', () => {
     master.seek(1.5);
 
     expect(root.dataset.t).toBe('1.5');
+  });
+});
+
+describe('game engines in a live component', () => {
+  const calls: string[] = [];
+  const fakeLittle = () => ({
+    vec2: (x: number, y: number) => ({ x, y }),
+    setCanvasFixedSize: (size: { x: number; y: number }) => calls.push(`size ${size.x}x${size.y}`),
+    setEngineManualStep: (on: boolean) => calls.push(`manual ${on}`),
+    engineStep: (frames: number) => calls.push(`step ${frames}`),
+    engineObjectsDestroy: () => calls.push('objects destroyed'),
+    engineInit: (...args: unknown[]) => {
+      calls.push(`init into ${(args[6] as HTMLElement).id}`);
+      return Promise.resolve();
+    }
+  });
+  const fakeKaplay = () => (options: Record<string, unknown>) => {
+    calls.push(`kaplay ${JSON.stringify({ ...options, root: (options.root as HTMLElement).id })}`);
+    const debug = { paused: false };
+    return { debug, quit: () => calls.push('quit'), randSeed: (seed: number) => calls.push(`seed ${seed}`), onDraw: (f: () => void) => f() };
+  };
+  const w = window as unknown as Record<string, unknown>;
+
+  beforeEach(() => {
+    calls.length = 0;
+    w.__feegaLittleJS = fakeLittle();
+    w.kaplay = fakeKaplay();
+    vi.stubGlobal('requestAnimationFrame', () => 0);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    (w[LIVE_RUNS] as (() => void)[] | undefined)?.forEach((destroy) => destroy());
+    delete w[LIVE_RUNS];
+    delete w.__feegaLittleJS;
+    delete w.kaplay;
+  });
+
+  it('LittleJS mounts in the component root at its size and stops for good on unmount', () => {
+    const { errors } = run('Arcade', 'LittleJS.engineInit(() => {}, () => {}, () => {}, () => {}, () => {});', 0, 2, Play.Live);
+    run('Other', '', 0);
+
+    expect(errors).toEqual([]);
+    expect(calls).toEqual(['size 0x0', 'init into cc-c1', 'manual true', 'objects destroyed']);
+  });
+
+  it('KAPLAY mounts in the root, never on the page globals, and quits on unmount', () => {
+    run('Jumper', 'const k = kaplay({ background: "#000", global: true });', 0, 2, Play.Live);
+    run('Other', '', 0);
+
+    expect(calls[0]).toBe('kaplay {"background":"#000","global":false,"root":"cc-c1","width":0,"height":0}');
+    expect(calls).toContain('quit');
+  });
+
+  it('a live p5 sketch mounts in the root, loops on its own and is removed on unmount', () => {
+    class LiveP5 {
+      constructor(sketch: (p: LiveP5) => void, node: HTMLElement) {
+        calls.push(`p5 into ${node.id}`);
+        sketch(this);
+      }
+      remove() {
+        calls.push('p5 removed');
+      }
+    }
+    w.p5 = LiveP5;
+    run('Field', 'p5((p) => { p.draw = () => {}; });', 0, 2, Play.Live);
+    run('Other', '', 0);
+
+    expect(calls).toEqual(['p5 into cc-c1', 'p5 removed']);
+  });
+
+  it('in a video LittleJS takes one manual step and KAPLAY freezes on its first frame, both seeded', async () => {
+    run('Arcade', 'LittleJS.engineInit(() => {}, () => {}, () => {}, () => {}, () => {});', 0, 2, Play.Still);
+    await Promise.resolve();
+    run('Jumper', 'const k = kaplay(); root.dataset.paused = String(k.debug.paused);', 0, 2, Play.Still);
+
+    expect(calls).toEqual(['size 0x0', 'manual true', 'init into cc-c1', 'step 1', expect.stringContaining('kaplay'), `seed ${seedOf('c1')}`]);
+    expect(document.getElementById('cc-c1')!.dataset.paused).toBe('true');
   });
 });
 

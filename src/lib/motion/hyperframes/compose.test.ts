@@ -478,6 +478,17 @@ describe('custom components in the composition', () => {
     expect(composeHtml({ doc: custom, tokens: FEEGA_TOKENS, assets: {}, target: Target.Screen })).not.toContain('"play"');
   });
 
+  it('loads a game engine only for a live component that uses it, LittleJS as a module before the boot', () => {
+    const live = (name: string, js: string) => must(addClip(must(writeComponent(newMotionDoc(MotionFormat.Landscape), name, { ...graph, mode: ComponentMode.Live, source: { ...graph.source, js } })), { component: 'Custom', from: 0, durationInFrames: 60, props: { name } }, 'k1'));
+    const little = composeHtml({ doc: live('Arcade', 'LittleJS.engineInit(() => {}, () => {}, () => {}, () => {}, () => {});'), tokens: FEEGA_TOKENS, assets: {}, target: Target.Screen });
+    const kaboom = composeHtml({ doc: live('Jumper', 'const k = kaplay();'), tokens: FEEGA_TOKENS, assets: {}, target: Target.Screen });
+
+    expect(little).toMatch(/<script type="module"[^>]*>import \* as LittleJS from 'https:\/\/cdn\.jsdelivr\.net\/npm\/littlejsengine@[\d.]+\/dist\/littlejs\.esm\.min\.js';/);
+    expect(kaboom).toMatch(/<script src="https:\/\/cdn\.jsdelivr\.net\/npm\/kaplay@[\d.]+\/dist\/kaplay\.js"><\/script>/);
+    expect(html).not.toContain('littlejsengine');
+    expect(html).not.toContain('/npm/kaplay@');
+  });
+
   it('renders the component markup under a root scoped to the clip', () => {
     expect(html).toContain('<div class="cc" id="cc-g1" data-component="NodeGraph"><style>@scope (#cc-g1) {.node{background:#111}}</style><div class="node"></div></div>');
   });

@@ -61,6 +61,10 @@ const FORBIDDEN_GLOBALS: Record<string, Rule> = {
 
 export const FORBIDDEN_NAMES = Object.keys(FORBIDDEN_GLOBALS);
 
+const GAME_LOOP = clock('a game engine runs its own loop and reads input: declare the component live');
+
+const GAME_ENGINES: Record<string, Rule> = { LittleJS: GAME_LOOP, kaplay: GAME_LOOP };
+
 const D3_CLOCK = clock('d3 timers run on the clock: compute the state from tl progress in onUpdate');
 
 const P5_CLOCK = clock('a p5 sketch is redrawn on every seek: draw from p.frameCount, never on its own loop or clock');
@@ -109,7 +113,7 @@ const propertyName = (node: AnyNode): string | null => {
 
 const VISITS: Record<string, Visit> = {
   Identifier: (node, report) => {
-    const rule = FORBIDDEN_GLOBALS[String(node.name)];
+    const rule = FORBIDDEN_GLOBALS[String(node.name)] ?? GAME_ENGINES[String(node.name)];
     if (rule) {
       report(rule, String(node.name));
     }
