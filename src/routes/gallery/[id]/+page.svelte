@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PageTitle from '$lib/components/PageTitle.svelte';
   import { enhance } from '$app/forms';
   import GalleryPlayer from '$lib/components/gallery/GalleryPlayer.svelte';
   import FormatGlyph from '$lib/components/gallery/FormatGlyph.svelte';
@@ -28,7 +29,7 @@
 
   <div class="gx-info">
     <div class="gx-text">
-      <h1>{item.title}</h1>
+      <PageTitle text={item.title} />
       <p class="gx-byline" data-testid="gallery-byline">
         by {item.authorName}{#if item.remixedFrom} · remix of <a href={itemPath(item.remixedFrom.id)}>{item.remixedFrom.title}</a>{/if}
       </p>
@@ -114,13 +115,6 @@
     flex-direction: column;
     gap: var(--ui-space-1);
     max-width: 640px;
-  }
-
-  h1 {
-    margin: 0;
-    font-size: var(--ui-text-xl);
-    font-weight: 600;
-    letter-spacing: -0.02em;
   }
 
   .gx-byline {

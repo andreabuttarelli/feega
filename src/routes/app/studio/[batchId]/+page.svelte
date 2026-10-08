@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PageTitle from '$lib/components/PageTitle.svelte';
   import { enhance } from '$app/forms';
   import { publishes } from '$lib/social-publishing';
   import { invalidate } from '$app/navigation';
@@ -91,7 +92,7 @@
 <div class="batch" data-testid="studio-batch">
   <header>
     <a class="back" href={`/app/studio?project=${data.projectId}`}><ArrowLeft size={16} /> New photos</a>
-    <h1>{data.batch.name}</h1>
+    <PageTitle text={data.batch.name} />
     {#if data.batch.canvasId}<a class="quiet" href={`/p/${data.projectId}/c/${data.batch.canvasId}`}>Open on the canvas</a>{/if}
   </header>
 
@@ -235,12 +236,9 @@
     align-items: baseline;
     gap: var(--ui-space-2) var(--ui-space-4);
   }
-  h1 {
+  header > :global(h1) {
     flex: 1 1 100%;
     order: 2;
-    margin: 0;
-    font-size: var(--ui-text-xl);
-    font-weight: 600;
   }
   .back,
   .quiet {

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PageTitle from '$lib/components/PageTitle.svelte';
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
@@ -103,6 +104,7 @@
   {/if}
   <div class="content settings-shell" class:brand-kit={isBrandKit}>
     <PageHead title={head.title} subtitle={head.subtitle ?? null} />
+    <PageTitle text={head.title} />
     {#if !isIndex}
       <a class="back-to-sections" href={settingsBase}>
         <ChevronLeft size={16} />

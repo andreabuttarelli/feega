@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PageTitle from '$lib/components/PageTitle.svelte';
   import { goto } from '$app/navigation';
   import Film from '@lucide/svelte/icons/film';
   import Plus from '@lucide/svelte/icons/plus';
@@ -12,6 +13,7 @@
 
 <div class="motion-hub">
   <PageHead title="Motion editor" subtitle="Short videos from titles, media and 3D. Each video lives as a node on a canvas." />
+  <PageTitle text="Motion editor" />
 
   <section class="new" aria-labelledby="new-heading">
     <h2 id="new-heading">New video</h2>
