@@ -5,6 +5,7 @@
   import { Background, FORMATS, MOTION_FORMATS, MAX_SECONDS, formatOf, type MotionDoc, type MotionFormat } from '$lib/motion/doc';
   import { setCanvas, type OpResult } from '$lib/motion/timeline';
   import { parseDecimal, secondsLabel } from '$lib/motion/inspector';
+  import { fitDuration } from '$lib/motion/fit-duration';
 
   let { doc, onchange }: { doc: MotionDoc; onchange: (result: OpResult, summary: string) => void } = $props();
 
@@ -31,6 +32,7 @@
       <em>s</em>
     </span>
   </label>
+  <button type="button" class="fit" title="End where the last content ends, plus a short hold" onclick={() => onchange(fitDuration(doc), 'Fitted duration to content')} data-testid="fit-duration">Fit length to content</button>
   <label>
     <span>Frame rate</span>
     <select value={doc.fps} onchange={(e) => onchange(setFrameRate(doc, Number(e.currentTarget.value) as FrameRate), 'Changed frame rate')} data-testid="frame-rate">
@@ -107,6 +109,21 @@
   select:focus-visible,
   input:focus-visible {
     outline: none;
+    border-color: var(--ui-accent);
+  }
+
+  .fit {
+    justify-self: end;
+    padding: 2px 8px;
+    border: 1px solid var(--ui-line-strong);
+    border-radius: 0;
+    background: var(--ui-bg);
+    color: var(--ui-ink);
+    font-size: var(--ui-text-xs);
+    cursor: pointer;
+  }
+
+  .fit:hover {
     border-color: var(--ui-accent);
   }
 

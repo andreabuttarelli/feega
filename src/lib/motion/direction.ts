@@ -10,6 +10,7 @@ import { emptyContent, interactionOf, isUiPiece, Interaction, skeletons } from '
 import { FillKind, ShapeKind } from './shape/schema';
 import { CutFault, cutProblems } from './cuts';
 import { scriptDrift } from './script-drift';
+import { contentEnd, shownSpans, type Span } from './fit-duration';
 
 export enum Quality {
   RepeatedLayout = 'repeated-layout',
@@ -24,6 +25,7 @@ export enum Quality {
   OutOfFrame = 'out-of-frame',
   TiltedText = 'tilted-text',
   EmptyFrames = 'empty-frames',
+  TrailingEmpty = 'trailing-empty',
   SmallLogo = 'small-logo',
   ClickMiss = 'click-miss',
   EmptyUi = 'empty-ui',
@@ -55,6 +57,7 @@ export const SEVERITY: Record<Check, Severity> = {
   [Quality.OutOfFrame]: Severity.Blocking,
   [Quality.TiltedText]: Severity.Warning,
   [Quality.EmptyFrames]: Severity.Blocking,
+  [Quality.TrailingEmpty]: Severity.Blocking,
   [Quality.SmallLogo]: Severity.Warning,
   [Quality.ClickMiss]: Severity.Blocking,
   [Quality.EmptyUi]: Severity.Blocking,
@@ -321,25 +324,8 @@ function outOfFrame(doc: MotionDoc): QualityProblem[] {
 }
 
 const EMPTY_SECONDS = 0.3;
+const TRAILING_SECONDS = 0.5;
 const FLASH_LUMA_JUMP = 200;
-const SCENERY: ReadonlySet<ComponentId> = new Set([...BACKDROPS, 'Shape'] as ComponentId[]);
-
-type Span = { from: number; to: number };
-
-function shownSpans(doc: MotionDoc, tracks: MotionDoc['tracks'], offset: number, end: number): Span[] {
-  return tracks
-    .filter((t) => t.kind === TrackKind.Visual)
-    .flatMap((t) => t.clips as Clip[])
-    .flatMap((clip): Span[] => {
-      const from = offset + clip.from;
-      const to = Math.min(end, from + clip.durationInFrames);
-      const nested = clip.component === 'Precomp' ? doc.comps[String(clip.props.comp)] : undefined;
-      if (nested) {
-        return shownSpans(doc, nested.tracks, from - clip.trimStart, to).filter((s) => s.to > from).map((s) => ({ from: Math.max(from, s.from), to: s.to }));
-      }
-      return SCENERY.has(clip.component) ? [] : [{ from, to }];
-    });
-}
 
 function holes(shown: readonly boolean[]): Span[] {
   const found: Span[] = [];
@@ -364,8 +350,16 @@ function emptyFrames(doc: MotionDoc): QualityProblem[] {
   }
 
   return holes(shown)
-    .filter((h) => h.to - h.from > EMPTY_SECONDS * doc.fps)
+    .filter((h) => h.to < doc.durationInFrames && h.to - h.from > EMPTY_SECONDS * doc.fps)
     .map((h) => ({ kind: Quality.EmptyFrames, at: seconds(doc, h.from), detail: `from ${seconds(doc, h.from)}s to ${seconds(doc, h.to)}s only the background is on screen: an empty hole the viewer reads as a mistake. Close the gap (start the next scene or its content sooner) or fill it` }));
+}
+
+function trailingEmpty(doc: MotionDoc): QualityProblem[] {
+  const end = contentEnd(doc);
+  if (doc.durationInFrames - end <= TRAILING_SECONDS * doc.fps) {
+    return [];
+  }
+  return [{ kind: Quality.TrailingEmpty, at: seconds(doc, end), detail: `the content ends at ${seconds(doc, end)}s but the video runs to ${seconds(doc, doc.durationInFrames)}s: an empty or black tail. Run fit_duration (the last content plus the style hold), or hold the last frame on screen` }];
 }
 
 function flashes(stats: readonly FrameStat[]): QualityProblem[] {
@@ -481,7 +475,7 @@ function backgroundSeams(doc: MotionDoc): QualityProblem[] {
 export function docProblems(doc: MotionDoc, input: { audioAssets: number; pixels?: Pixels; logos?: readonly string[] }): QualityProblem[] {
   const list = scenes(doc);
   const pixels = input.pixels ?? {};
-  return [...unscripted(doc), ...drifted(doc), ...clickMisses(doc), ...emptyUis(doc), ...stillUis(doc), ...repeated(doc, list), ...smallTitles(doc), ...silent(doc, input.audioAssets), ...softPictures(doc, pixels), ...croppedScreens(doc, pixels), ...alteredLogos(doc, new Set(input.logos ?? [])), ...outOfFrame(doc), ...tiltedText(doc), ...emptyFrames(doc), ...smallLogos(doc, pixels), ...cutsMidAnimation(doc), ...backgroundSeams(doc), ...styleProblems(doc).map((p) => ({ kind: Quality.OffStyle, at: p.at, effect: p.effect, detail: p.detail }))];
+  return [...unscripted(doc), ...drifted(doc), ...clickMisses(doc), ...emptyUis(doc), ...stillUis(doc), ...repeated(doc, list), ...smallTitles(doc), ...silent(doc, input.audioAssets), ...softPictures(doc, pixels), ...croppedScreens(doc, pixels), ...alteredLogos(doc, new Set(input.logos ?? [])), ...outOfFrame(doc), ...tiltedText(doc), ...emptyFrames(doc), ...trailingEmpty(doc), ...smallLogos(doc, pixels), ...cutsMidAnimation(doc), ...backgroundSeams(doc), ...styleProblems(doc).map((p) => ({ kind: Quality.OffStyle, at: p.at, effect: p.effect, detail: p.detail }))];
 }
 
 export function frameProblems(stats: readonly FrameStat[]): QualityProblem[] {

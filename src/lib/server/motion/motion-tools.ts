@@ -27,6 +27,7 @@ import { EASE_PRESETS, EASE_PRESET_IDS, easeHandles, withHandles } from '$lib/mo
 import { ANIMATABLE, INTERPS, Interp, SPATIAL_KEYS, TRANSFORM_KEYS, ValueKind, easeSchema, type Keyframe } from '$lib/motion/keyframes';
 import type { MotionAsset } from './editor';
 import { MAX_FRAMES_PER_VIEW, MAX_VIEWS_PER_TURN, VIEW_FRAMES, type Frame } from './frames';
+import { contentEnd, fitDuration } from '$lib/motion/fit-duration';
 import { blocking, docProblems, frameProblems, softPictures, type FrameStat, type Pixels, type QualityProblem } from '$lib/motion/direction';
 import { CheckState, MAX_CSS, MAX_HTML, MAX_JS, SOURCE_FILES, checkState, propsSchemaSchema, sourceHash, type CustomComponent } from '$lib/motion/custom/component';
 import { patchComponent, recordCheck, removeComponent, writeComponent } from '$lib/motion/custom/ops';
@@ -410,6 +411,14 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     return { ok: true, edit: what };
   };
 
+  const shortened = (result: OpResult): OpResult => {
+    if (!result.ok || contentEnd(result.doc) >= contentEnd(session.doc)) {
+      return result;
+    }
+    const fitted = fitDuration(result.doc);
+    return fitted.ok ? fitted : result;
+  };
+
   async function codeWrite(result: OpResult, name: string, what: string, callId: string) {
     if (session.codeWrites >= MAX_CODE_WRITES_PER_TURN) {
       return { ok: false, error: `code budget for this turn is spent (${MAX_CODE_WRITES_PER_TURN} writes): finish with what you have` };
@@ -516,7 +525,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: 'Change when a clip starts and how long it lasts, in seconds.',
       inputSchema: z.object({ clip_id: z.string(), start: z.number().min(0).optional(), duration: z.number().positive().optional() }),
       execute: async (input) =>
-        apply(setTiming(session.doc, input.clip_id, { from: input.start === undefined ? undefined : frames(input.start), durationInFrames: input.duration === undefined ? undefined : frames(input.duration) }), `retimed ${input.clip_id}`)
+        apply(shortened(setTiming(session.doc, input.clip_id, { from: input.start === undefined ? undefined : frames(input.start), durationInFrames: input.duration === undefined ? undefined : frames(input.duration) })), `retimed ${input.clip_id}`)
     }),
 
     set_props: tool({
@@ -554,7 +563,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     trim_clip: tool({
       description: 'Move the start or the end edge of a clip to a time in seconds, keeping the other edge.',
       inputSchema: z.object({ clip_id: z.string(), edge: z.enum([ClipEdge.Start, ClipEdge.End]), at: z.number().min(0) }),
-      execute: async (input) => apply(trimClip(session.doc, input.clip_id, input.edge, frames(input.at)), `trimmed ${input.clip_id}`)
+      execute: async (input) => apply(shortened(trimClip(session.doc, input.clip_id, input.edge, frames(input.at))), `trimmed ${input.clip_id}`)
     }),
 
     move_clip: tool({
@@ -604,9 +613,15 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     remove_clip: tool({
-      description: 'Remove one or more clips.',
+      description: 'Remove one or more clips. When the content then ends earlier, the video is fitted to it (fit_duration).',
       inputSchema: z.object({ clip_ids: z.array(z.string()).min(1) }),
-      execute: async (input) => apply(removeClips(session.doc, input.clip_ids), `removed ${input.clip_ids.length} clip(s)`)
+      execute: async (input) => apply(shortened(removeClips(session.doc, input.clip_ids)), `removed ${input.clip_ids.length} clip(s)`)
+    }),
+
+    fit_duration: tool({
+      description: 'Fit the video length to its content: it ends where the last content ends plus the style hold (the last frame stays on screen), and backgrounds and music past that end are trimmed. Use it whenever the gate names an empty tail.',
+      inputSchema: z.object({}),
+      execute: async () => apply(fitDuration(session.doc), 'fitted the duration to the content')
     }),
 
     set_transform: tool({

@@ -237,10 +237,20 @@ describe('motion agent tools', () => {
   it('view_frames names an empty hole in the film as blocking', async () => {
     const { run } = setup({ inspect: async (frames) => frames.map((f) => ({ time: f.time, luma: 120, lumaStd: 40, whiteShare: 0 })) });
     await run('add_clip', { component: 'Title', start: 0, duration: 1, props: { text: 'Then nothing' } });
+    await run('add_clip', { component: 'Title', start: 2, duration: 13, props: { text: 'Then this' } });
 
     const out = (await run('view_frames', { times: [1] })) as { blocking: string[] };
 
     expect(out.blocking.some((q) => q.includes('only the background'))).toBe(true);
+  });
+
+  it('view_frames names an empty tail after the last content as blocking', async () => {
+    const { run } = setup({ inspect: async (frames) => frames.map((f) => ({ time: f.time, luma: 120, lumaStd: 40, whiteShare: 0 })) });
+    await run('add_clip', { component: 'Title', start: 0, duration: 6, props: { text: 'Then nothing' } });
+
+    const out = (await run('view_frames', { times: [1] })) as { blocking: string[] };
+
+    expect(out.blocking.some((q) => q.includes('fit_duration'))).toBe(true);
   });
 
   it('with no preview open the agent is told so instead of waiting forever', async () => {
@@ -301,5 +311,35 @@ describe('set_clip_transition', () => {
     await run('add_clip', { component: 'Shape', start: 1, duration: 2 });
 
     expect(await run('set_clip_transition', { clip_id: 'id1', kind: 'push-left' })).toMatchObject({ ok: false, error: expect.stringMatching(/nothing ends/) });
+  });
+});
+
+describe('the video length follows its content', () => {
+  it('fit_duration ends the video at the last content plus the style hold', async () => {
+    const { session, run } = setup();
+    await run('add_clip', { component: 'Title', start: 0, duration: 6, props: { text: 'Phones' } });
+
+    expect((await run('fit_duration', {})).ok).toBe(true);
+    expect(session.doc.durationInFrames).toBeGreaterThan(6 * session.doc.fps);
+    expect(session.doc.durationInFrames).toBeLessThan(8 * session.doc.fps);
+  });
+
+  it('removing the last scene shortens the video instead of leaving a black tail', async () => {
+    const { session, run } = setup();
+    await run('add_clip', { component: 'Title', start: 0, duration: 4, props: { text: 'One' } });
+    await run('add_clip', { component: 'Title', start: 4, duration: 8, props: { text: 'Two' } });
+
+    await run('remove_clip', { clip_ids: ['id2'] });
+
+    expect(session.doc.durationInFrames).toBeLessThan(6 * session.doc.fps);
+  });
+
+  it('trimming the last clip shorter shortens the video', async () => {
+    const { session, run } = setup();
+    await run('add_clip', { component: 'Title', start: 0, duration: 12, props: { text: 'One' } });
+
+    await run('trim_clip', { clip_id: 'id1', edge: 'end', at: 5 });
+
+    expect(session.doc.durationInFrames).toBeLessThan(7 * session.doc.fps);
   });
 });
