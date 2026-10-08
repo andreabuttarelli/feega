@@ -87,7 +87,7 @@ import { Division, Hit, cutToBeat, hitFrames, markHits } from '$lib/motion/beats
 import { Mood } from '$lib/motion/music-library';
 import { PULSE_PROPS, pulseWithMusic } from '$lib/motion/pulse';
 import { applyValues, exposeField, fieldValues, removeField } from '$lib/motion/template/fields';
-import { FIELD_TYPES, type ExposedField } from '$lib/motion/template/field-model';
+import { FIELD_TYPES, MAX_LINKED, type ExposedField } from '$lib/motion/template/field-model';
 import { detachTemplate, insertTemplate, isLockedComp, setTemplateValues, templateFields } from '$lib/motion/template/library';
 import type { TemplateLibrary } from './templates';
 import { DEFAULT_NAME_PATTERN, MAX_BATCH_ROWS, outputName } from '$lib/motion/template/batch';
@@ -1262,9 +1262,13 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     expose_field: tool({
-      description: 'Expose a clip prop as a named template field (After Effects Essential Graphics): text, a custom component param, a colour, an asset slot. key is snake_case and names the CSV column a batch fills; default is the prop value now unless given.',
-      inputSchema: z.object({ key: z.string().max(40), label: z.string().min(1).max(60), type: z.enum(FIELD_TYPES), clip_id: z.string(), prop: z.string().max(60), default: z.unknown().optional() }),
-      execute: async (input) => apply(exposeField(session.doc, { key: input.key, label: input.label, type: input.type, clipId: input.clip_id, prop: input.prop, default: input.default }), `exposed field ${input.key}`)
+      description: 'Expose a clip prop as a named template field (After Effects Essential Graphics): text, a custom component param, a colour, an asset slot. key is snake_case and names the CSV column a batch fills; default is the prop value now unless given. also lists more clip props the same value drives, e.g. one accent colour repeated in every scene.',
+      inputSchema: z.object({ key: z.string().max(40), label: z.string().min(1).max(60), type: z.enum(FIELD_TYPES), clip_id: z.string(), prop: z.string().max(60), default: z.unknown().optional(), also: z.array(z.object({ clip_id: z.string(), prop: z.string().max(60) })).max(MAX_LINKED).optional() }),
+      execute: async (input) =>
+        apply(
+          exposeField(session.doc, { key: input.key, label: input.label, type: input.type, clipId: input.clip_id, prop: input.prop, default: input.default, also: input.also?.map((t) => ({ clipId: t.clip_id, prop: t.prop })) }),
+          `exposed field ${input.key}`
+        )
     }),
 
     unexpose_field: tool({

@@ -40,6 +40,20 @@ describe('exposed fields', () => {
     expect(filled.ok && filled.doc.tracks.flatMap((t) => t.clips)[0].props.layoutParams).toEqual({ turns: 3, tiltX: -10 });
   });
 
+  it('one field can drive the same prop on several clips, so an accent repeated across scenes changes once', () => {
+    const first = addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Shape', from: 0, durationInFrames: 30, props: { fill: '#ff4a1c' } }, 's1');
+    const second = first.ok ? addClip(first.doc, { component: 'Shape', from: 30, durationInFrames: 30, props: { fill: '#ff4a1c' } }, 's2') : first;
+    const exposed = second.ok ? exposeField(second.doc, { key: 'accent', label: 'Accent', type: FieldType.Color, clipId: 's1', prop: 'fill', also: [{ clipId: 's2', prop: 'fill' }] }) : second;
+    const filled = exposed.ok ? applyValues(exposed.doc, { accent: '#00ff00' }) : exposed;
+
+    expect(filled.ok && filled.doc.tracks.flatMap((t) => t.clips).map((c) => c.props.fill)).toEqual(['#00ff00', '#00ff00']);
+    expect(exposed.ok && motionDocSchema.safeParse(exposed.doc).success).toBe(true);
+  });
+
+  it('a linked target on a clip that does not exist is refused', () => {
+    expect(exposeField(withTitle(), { ...headline, also: [{ clipId: 'nope', prop: 'text' }] })).toEqual({ ok: false, error: expect.stringMatching(/nope/) });
+  });
+
   it('a field on a clip that does not exist is refused', () => {
     expect(exposeField(withTitle(), { ...headline, clipId: 'nope' })).toEqual({ ok: false, error: expect.stringMatching(/nope/) });
   });

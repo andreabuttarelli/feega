@@ -98,7 +98,15 @@ const PATH = '.';
 const propOf = (doc: MotionDoc, field: Pick<ExposedField, 'clipId' | 'prop'>) =>
   field.prop.split(PATH).reduce<unknown>((at, key) => (at as Record<string, unknown> | undefined)?.[key], locateClip(doc, field.clipId)?.clip.props);
 
-export function setField(doc: MotionDoc, field: Pick<ExposedField, 'clipId' | 'prop'>, value: unknown): OpResult {
+type Target = Pick<ExposedField, 'clipId' | 'prop'>;
+
+const targetsOf = (field: Target & Pick<ExposedField, 'also'>): Target[] => [field, ...(field.also ?? [])];
+
+export function setField(doc: MotionDoc, field: Target & Pick<ExposedField, 'also'>, value: unknown): OpResult {
+  return targetsOf(field).reduce<OpResult>((current, target) => (current.ok ? setTarget(current.doc, target, value) : current), { ok: true, doc });
+}
+
+function setTarget(doc: MotionDoc, field: Target, value: unknown): OpResult {
   const [head, ...rest] = field.prop.split(PATH);
   if (!rest.length) {
     return setDeepProps(doc, field.clipId, { [head]: value });
@@ -111,8 +119,9 @@ export function exposeField(doc: MotionDoc, input: FieldInput): OpResult {
   if (!FIELD_KEY.test(input.key)) {
     return { ok: false, error: `"${input.key}" is not a field key: use snake_case, e.g. headline` };
   }
-  if (!locateClip(doc, input.clipId)) {
-    return { ok: false, error: `no clip ${input.clipId}` };
+  const lost = targetsOf(input).find((t) => !locateClip(doc, t.clipId));
+  if (lost) {
+    return { ok: false, error: `no clip ${lost.clipId}` };
   }
   const field: ExposedField = { ...input, default: input.default ?? propOf(doc, input) ?? null };
   const others = doc.fields.filter((f) => f.key !== input.key);
