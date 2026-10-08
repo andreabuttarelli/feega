@@ -33,7 +33,7 @@ import { SELF_CHECK_MAX_STEPS, SUMMARY_PROMPT, VIEW_FRAMES, Vision, deliveryBloc
 import { frameStats } from '$lib/server/motion/frame-stats';
 import { awaitFrames, awaitVerdict, framesPrefix, FRAME_POLL_MS, type FrameBucket } from '$lib/server/motion/frame-store';
 import { CANVAS_ASSET_BUCKET, SIGNED_URL_TTL_S } from '$lib/server/repos/asset-storage';
-import { ASSETS_ADDED, CHECK_REQUEST, FRAMES_REQUEST, type CheckRequest, type FramesRequest } from '$lib/motion/frames-request';
+import { ASSETS_ADDED, CHECK_REQUEST, DOC_EDITED, FRAMES_REQUEST, type CheckRequest, type FramesRequest } from '$lib/motion/frames-request';
 import { rowRequests } from '$lib/server/motion/batch-input';
 import { startFarmBatch } from '$lib/server/motion/render-start';
 import { Preset, settingsOf } from '$lib/motion/export-formats';
@@ -152,6 +152,8 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
   const frameScope = { orgId, projectId: project.id, nodeId: motion.record.id };
   let askPreview: (request: FramesRequest) => void = () => {};
   let askCheck: (request: CheckRequest) => void = () => {};
+  let announced = 0;
+  let announce: () => void = () => {};
   let client = Client.Watching;
 
   const tools = createMotionTools({
@@ -238,6 +240,11 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
       tools,
       activeTools: toolNames,
       stopWhen: ROUND_STOPS[kind](t0, overBudget),
+      onChunk: ({ chunk }) => {
+        if (chunk.type === 'tool-result') {
+          announce();
+        }
+      },
       onStepFinish: (step) => {
         spent += spentUsd([extractSdkUsage(step.usage)], [stepModels.at(-1) ?? model], gatewayRate);
         onStep(step);
@@ -267,6 +274,13 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
     execute: async ({ writer }) => {
       askPreview = (request) => writer.write({ type: FRAMES_REQUEST, data: request });
       askCheck = (request) => writer.write({ type: CHECK_REQUEST, data: request });
+      announce = () => {
+        if (session.edits.length === announced) {
+          return;
+        }
+        announced = session.edits.length;
+        writer.write({ type: DOC_EDITED, data: { edit: announced, doc: session.doc } });
+      };
       let conversation = openingMessages;
 
       const play = async (messages: ModelMessage[], kind: Round) => {
@@ -313,13 +327,21 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
     }
   });
 
+  async function saveAgentDoc() {
+    const save = (expectedVersion: number) => saveMotionDoc(db, { orgId, nodeId: motion.record.id, expectedVersion, doc: session.doc, actor, summary: session.edits.join(', ') });
+    const first = await save(session.baseVersion);
+    if (first.outcome !== RevisionOutcome.Conflict) {
+      return first;
+    }
+    const latest = await headOrNew(db, nodeScope, motion.node);
+    return save(latest.version);
+  }
+
   const labelOf = (modelId: string) => (modelId === model ? 'motion-agent' : modelId === codeModel ? 'motion-agent-code' : 'motion-agent-vision');
 
   async function finishTurn(steps: TurnStep[]): Promise<TurnOutcome> {
     session.doc = fitNewVideo(head.doc, session.doc);
-    const write = session.edits.length
-      ? await saveMotionDoc(db, { orgId, nodeId: motion.record.id, expectedVersion: session.baseVersion, doc: session.doc, actor, summary: session.edits.join(', ') })
-      : null;
+    const write = session.edits.length ? await saveAgentDoc() : null;
     if (write && write.outcome !== RevisionOutcome.Written) {
       console.warn('[motion-agent] revision not saved', { nodeId: motion.record.id, outcome: write.outcome });
     }

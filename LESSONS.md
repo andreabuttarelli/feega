@@ -2621,3 +2621,6 @@ nulla il browser non ha mai ricevuto la richiesta (stream tagliato, tab in backg
 bloccato: la chat segue il turno via GET, che non porta le richieste di frame); se ci sono jpg
 rimasti il browser ha risposto oltre i 25 s. Mossa: riprodurre il lato client con
 `tests/e2e/motion-frames.spec.ts`, che finge lo stream e passa dalla route `/agent/frames` vera.
+
+### Una promessa senza scadenza dentro una coda esclusiva ferma tutto ciò che segue
+Segnale: le prime N operazioni di un turno riescono, le successive "non rispondono", senza errori nel log. Mossa: cerca un `await` su un evento (`ready`, `load`) dentro `exclusive`/una coda seriale: ogni attesa lì dentro vuole un timeout che rifiuta.

@@ -8,7 +8,7 @@ const COMMIT_MS = 30;
 const page = (name: string) => `<html><body data-name="${name}">${name}</body>${captureScript({ width: 64, height: 36 }, name)}</html>`;
 const nameOf = (html: string) => /data-name="([^"]+)"/.exec(html)?.[1] ?? '';
 
-function slowPlayer(first: string) {
+function slowPlayer(first: string, stuck = '') {
   let committed = first;
   const ready = new Set<() => void>();
   const replies = new Set<(r: CaptureReply) => void>();
@@ -16,6 +16,9 @@ function slowPlayer(first: string) {
 
   const port: PlayerPort = {
     load: (html) => {
+      if (nameOf(html) === stuck) {
+        return;
+      }
       queueMicrotask(() => ready.forEach((l) => l()));
       setTimeout(() => {
         committed = html;
@@ -60,6 +63,32 @@ describe('the preview driver', () => {
     await Promise.all([job('export'), job('agent')]);
 
     expect(order).toEqual(['start export', 'export:export', 'start agent', 'agent:agent']);
+  });
+});
+
+describe('agent looks during one turn', () => {
+  const SHORT_MS = 200;
+
+  it('a document that never becomes ready fails its own look, and every later look is still answered', async () => {
+    const driver = previewDriver(slowPlayer(page('editor'), 'stuck'), () => crypto.randomUUID(), SHORT_MS);
+    const look = (name: string) =>
+      driver.exclusive(async () => {
+        try {
+          await driver.loaded(page(name));
+          return (await driver.shoot(0, REQUEST)).url;
+        } finally {
+          await driver.loaded(page('editor'));
+        }
+      });
+
+    const first = await look('one');
+    await new Promise((r) => setTimeout(r, COMMIT_MS * 2));
+    const overlapping = await Promise.allSettled([look('stuck'), look('three'), look('four')]);
+    const fifth = await look('five');
+
+    expect(first).toBe('one');
+    expect(overlapping.map((r) => (r.status === 'fulfilled' ? r.value : 'failed'))).toEqual(['failed', 'three', 'four']);
+    expect(fifth).toBe('five');
   });
 });
 
