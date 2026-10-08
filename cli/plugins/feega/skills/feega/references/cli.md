@@ -22,18 +22,8 @@ bun run cli.ts --help
 
 ```bash
 feega brands                                    # List brands
-feega status <slug>                             # Pending posts, quota, last runs
-feega health                                     # Check Supabase / Gemini / Zernio
+feega health                                     # Check Supabase / Gemini
 feega dashboard <slug>                          # Brand overview
-feega content <slug> [--status pending_user]    # Posts, filtered by status
-feega content <slug> --clear pending_user       # Bulk-delete posts in that status
-feega approve <slug> [--all] [--dry]            # Approve pending posts
-feega calendar <slug> [--month YYYY-MM]         # Monthly scheduled posts
-feega post <slug> <id>                          # Show a post
-feega post <slug> <id> edit --caption "..."     # Edit fields (no render, no credits)
-feega post <slug> <id> render                   # Draw the missing image from its prompt
-feega post <slug> <id> approve|publish|reject   # Move it forward
-feega post <slug> <id> reschedule --scheduledFor "2026-06-20T10:00"
 feega products <slug> [sync]                    # List, or re-import from the connected store
 feega ads <slug>                                  # Meta ad campaigns of the brand
 feega ads <slug> --approve <id> | --pause <id> | --resume <id>
@@ -42,11 +32,11 @@ feega upgrade <slug> --top-up 8                 # One-time top-up, credits never
 feega update                                    # Update the CLI itself
 ```
 
-`--id` and post/ad ids accept the short prefix printed in the tables. Full command reference and
+`--id` and ad ids accept the short prefix printed in the tables. Full command reference and
 flags: [`cli/README.md`](../../../README.md).
 
 ## MCP instead
 
-MCP reaches the whole org directly (`query`, `insert_row`, `create_post`, `run_node_generation`,
+MCP reaches the whole org directly (`query`, `insert_row`, `ask_motion_agent`, `run_node_generation`,
 …) and is preferred when connected — see [mcp.md](mcp.md). Tool ↔ command mapping:
 [tools.md](tools.md).

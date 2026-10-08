@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { publishes } from '$lib/social-publishing';
   import { MediaOrigin, audioNodeFiles } from '$lib/canvas/download';
   /**
    * LA TELA.
@@ -267,6 +268,9 @@
   }
 
   function calendarNodes(): CalendarNodeState[] {
+    if (!publishes(data.socialPublishing)) {
+      return [];
+    }
     return nodes.map((n) => calendarOf(n)).filter((c): c is CalendarNodeState => c !== null);
   }
 
@@ -2759,7 +2763,7 @@
           <MotionNode node={motion} href={motionEditorPath(motionAt)} previewUrl={motionPreviewPath(motionAt)} posterUrl={assetUrl(motion.posterAssetId)} />
         {:else if studioBatch}
           <StudioBatchNode node={studioBatch} projectId={data.projectId} onpick={(batchId) => write(id, newStudioBatchData(batchId), SaveTiming.Now)} />
-        {:else if calendar}
+        {:else if calendar && publishes(data.socialPublishing)}
           {@const calState = calendarStateOf(id)}
           <CalendarNode
             node={calendar}

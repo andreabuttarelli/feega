@@ -1,3 +1,5 @@
+import { publishes } from '$lib/social-publishing';
+import { socialPublishing } from '$lib/server/social-publishing';
 import { json } from '@sveltejs/kit';
 import { createAdminClient } from '$lib/server/supabase-admin';
 import { env } from '$env/dynamic/private';
@@ -88,15 +90,8 @@ export const GET: RequestHandler = async ({ url }) => {
     }),
   ];
 
-  const [database, aiText, aiVision, publishing, ...endpoints] = await Promise.all([
-    checkSupabase(),
-    checkAiText(),
-    checkAiVision(),
-    checkZernio(),
-    ...endpointChecks
-  ]);
-
-  const services = [database, aiText, aiVision, publishing, ...endpoints];
+  const publishingChecks = publishes(await socialPublishing()) ? [checkZernio()] : [];
+  const services = await Promise.all([checkSupabase(), checkAiText(), checkAiVision(), ...publishingChecks, ...endpointChecks]);
   const errorCount = services.filter((s) => s.status === 'error').length;
   const status = errorCount === 0 ? 'ok' : errorCount >= 2 ? 'critical' : 'degraded';
 

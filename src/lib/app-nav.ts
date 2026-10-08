@@ -94,7 +94,7 @@ export const APP_NAV: readonly NavItem[] = [
   ...toolsOf(ToolRole.Lead),
   row({ id: 'gallery', section: NavSection.Main, kind: NavKind.Link, label: { text: 'Gallery' }, icon: Shuffle, load: NavLoad.Document, href: () => GALLERY_PATH }),
   ...toolsOf(ToolRole.Support),
-  row({ id: 'settings', section: NavSection.Account, kind: NavKind.Link, label: { key: 'app.shell.menu.settings' }, icon: Settings, needs: NavNeeds.Project, href: inProject('/settings/connected-accounts') }),
+  row({ id: 'settings', section: NavSection.Account, kind: NavKind.Link, label: { key: 'app.shell.menu.settings' }, icon: Settings, needs: NavNeeds.Project, href: inProject('/settings/project') }),
   row({ id: 'billing', section: NavSection.Account, kind: NavKind.Link, label: { key: 'app.shell.menu.billing' }, icon: CreditCard, needs: NavNeeds.Project, meta: NavMeta.Credits, href: inProject('/settings/billing') }),
   row({ id: 'changelog', section: NavSection.Account, kind: NavKind.Link, label: { key: 'app.shell.menu.changelog' }, icon: Sparkles, load: NavLoad.Document, href: () => '/changelog' }),
   row({ id: 'report', section: NavSection.Account, kind: NavKind.Link, label: { key: 'app.shell.menu.report' }, icon: Flag, href: () => REPORT_PATH }),

@@ -1,7 +1,7 @@
 # feega MCP — how to use it
 
 feega exposes a [Model Context Protocol](https://modelcontextprotocol.io) server so coding agents
-(Cursor, Claude, etc.) can read and write the canvas — projects, canvases, nodes, posts, ad
+(Cursor, Claude, etc.) can read and write the canvas — projects, canvases, nodes, motion videos, ad
 campaigns — with the **same OAuth login as the CLI**. There are **no static API tokens**.
 
 ```
@@ -82,10 +82,9 @@ Auth: Bearer **or** the local session file.
 ## What to call first
 
 1. `query` on `brands` — confirm auth, see what you can see
-2. `query` on `posts`, filtered by `brand_id` and `status` — approval queue
-3. `list_posts` / `list_ad_campaigns` for the brand-scoped named reads
+2. `list_ad_campaigns` for the brand-scoped named read
 
-Post and ad campaign ids accept **short unambiguous prefixes** from list results (same rule as
+Ad campaign ids accept **short unambiguous prefixes** from list results (same rule as
 the CLI).
 
 ## Tool areas
@@ -94,7 +93,6 @@ the CLI).
 |------|-------|
 | Database (org-scoped) | `query`, `insert_row`, `update_row`, `delete_row`, `describe_node_types` |
 | Canvas generation | `run_node_generation`, `get_media` |
-| Posts | `list_posts`, `create_post`, `set_post_status` |
 | Ads (Meta) | `list_ad_campaigns`, `create_ad_campaign`, `approve_ad_campaign`, `set_ad_campaign_status` |
 
 12 tools total. Full map: [`skills/feega/references/tools.md`](../skills/feega/references/tools.md).

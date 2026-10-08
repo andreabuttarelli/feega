@@ -72,10 +72,6 @@ read why and change your call.
 | a project's canvases | `query` on `canvases` — `id`, `name`, `project_id`, `viewport`, filtered `project_id` `eq` |
 | the nodes on a canvas | `query` on `nodes` — `id`, `type`, `data`, `version`, filtered `canvas_id` `eq` and `deleted_at` `is` null |
 | a node's connections | `query` on `nodes_connections` — `source_node_id`, `target_node_id`, `target_handle`, filtered on the canvas's node ids |
-| posts, by status | `query` on `posts` — `id`, `status`, `caption`, `scheduled_for`, `brand_id`; CLI `feega content <slug> [--status …]` |
-| one post, whole | the same read with an `id` filter and `limit: 1`; CLI `feega post <slug> <id>` |
-| the calendar | `query` on `scheduled_posts` or `posts` filtered on `scheduled_for`; CLI `feega calendar <slug> [--month YYYY-MM]` |
-| what a post came from | `query` on `post_sources` embedding `nodes`, filtered `post_id` `eq` |
 | ad campaigns | `query` on `ad_campaigns` — `id`, `name`, `status`, `budget_amount`, `budget_type`, `approved_by`; CLI `feega ads <slug>` |
 | products | `query` on `products` — `id`, `title`, `pricing`, `url`, `featured`, `images`; CLI `feega products <slug>` |
 | connected accounts | `query` on `social_accounts` — `platform`, `username`, `status`, `connected_at` |
@@ -241,43 +237,6 @@ original keeps its count of remixes; withdrawing it later never touches the copi
 `motion` node: its files are copied to a public folder, so the item never depends on the author's
 permissions. Refused with `uncensored_not_publishable`, `real_brand_not_publishable`,
 `brand_logo_not_publishable`, `site_material_not_publishable` or `moderated`. Free.
-
-## Posts
-
-| MCP | CLI |
-|-----|-----|
-| `list_posts` | `feega content <slug> [--status …]` |
-| `create_post` | (MCP only) |
-| `set_post_status` | (MCP only — CLI equivalents are `feega post <slug> <id> approve\|publish\|reject`) |
-| — | `feega post <slug> <id> edit …` |
-| — | `feega post <slug> <id> render` |
-| — | `feega post <slug> <id> reschedule --scheduledFor …` |
-| — | `feega approve <slug> [--all] [--dry]` |
-
-A post (`posts` table) is the promoted artifact — caption, media, brand — different from a canvas
-node, which is raw material. `post_sources` links a post back to the nodes it came from.
-
-`list_posts({ org, brand_id, status? })` reads one brand's posts, filtered by `draft`, `ready` or
-`archived`. Free.
-
-`create_post({ org, brand_id, caption, media?, title?, link_url?, sources?, node_ids?, planned_for? })` turns material into
-a post: give it a brand, the copy (you write it — this calls no model) and its media (asset ids
-already in this org). `sources` optionally links back to the nodes it came from
-(`role: caption|media|reference`). `planned_for` (ISO date-time) places the draft on the canvas
-Calendar node and the Calendar page. Lands as `draft`; nothing is scheduled or published from here.
-Free.
-
-`set_post_status({ org, id, status })` moves a post between `draft`, `ready` and `archived`. Does
-not schedule or publish it. Free.
-
-The CLI's post surface is a different, older-shaped set of REST endpoints that still work
-brand-scoped: `feega post <slug> <id> edit` changes caption/title/link/subreddit/media/platforms
-without a render or a credit; `render` draws the missing image from the post's prompt; `approve`
-schedules it; `publish` sends it immediately; `reschedule --scheduledFor …` moves it; `reject`
-deletes a pending one. `feega approve <slug> --all` approves every pending post in one pass — MCP
-has no equivalent on purpose: `set_post_status` moves one post's status at a time, and there is no
-approve-everything tool, because approving distribution for a whole queue from a misread question
-is the incident this asymmetry exists to prevent.
 
 ## Ads
 

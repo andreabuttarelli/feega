@@ -10,6 +10,7 @@ import { registerNodeTools } from './tools/nodes.ts';
 import { registerPromptTools } from './tools/prompts.ts';
 import { registerMotionTools } from './tools/motion.ts';
 import { registerGalleryTools } from './tools/gallery.ts';
+import { SocialPublishing } from './features.ts';
 
 /**
  * Il client la mostra da solo al handshake, una volta per sessione, PRIMA di ogni descrizione e
@@ -20,17 +21,34 @@ import { registerGalleryTools } from './tools/gallery.ts';
  * chiamava per qualunque cosa e poi sceglieva un brand a caso, spendendo i crediti di
  * un'organizzazione vera e scrivendo nella libreria di un cliente vero.
  */
-export const MCP_INSTRUCTIONS = [
+const POSTS_INSTRUCTION =
+  'A canvas node is raw material; a post (`list_posts`/`create_post`/`set_post_status`) is the promoted artifact ready to schedule.';
+
+const ADS_INSTRUCTION =
+  'An ad campaign (`list_ad_campaigns`/`create_ad_campaign`/`approve_ad_campaign`/`set_ad_campaign_status`) always drafts unapproved; only a signed-in person approves it.';
+
+const INSTRUCTIONS_OF: Record<SocialPublishing, string> = {
+  [SocialPublishing.On]: `${POSTS_INSTRUCTION} ${ADS_INSTRUCTION}`,
+  [SocialPublishing.Off]: ADS_INSTRUCTION,
+};
+
+export function mcpInstructions(publishing: SocialPublishing): string {
+  return MCP_INSTRUCTION_LINES(INSTRUCTIONS_OF[publishing]).join(' ');
+}
+
+const MCP_INSTRUCTION_LINES = (promoted: string) => [
   'feega is an infinite canvas of typed nodes (media, social feeds, products, ads, generations), driven by a person, the in-app chat, or an agent here over MCP.',
   'Reads cost nothing and change nothing, and READING IS ONE TOOL: `query`. Every table, scoped to your org. Name `columns` or the answer comes back short; `offset` is the next page; `count: "exact"` when the number IS the answer; `embed` brings a related table along.',
   'Three generic writes reach every table: `insert_row`, `update_row`, `delete_row`. `describe_node_types` gives the JSON Schema `nodes.data` must match per `type` before you insert or update one.',
   '`run_node_generation` is the canvas Generate button: fills an existing node, never creates one; omit `model` for the recommended one; `medium` must match the node\'s type; a video comes back `queued`. `apply_effects`/`make_effects_pair` render effects (`list_effects`), free. `enhance_prompt` improves a prompt. `run_node_loop` queues every combination of a node\'s inputs and returns at once (`preview_node_loop` free, `cancel_node_loop` stops what\'s queued); confirm above 50, refused above 1000.',
-  'A canvas node is raw material; a post (`list_posts`/`create_post`/`set_post_status`) is the promoted artifact ready to schedule. An ad campaign (`list_ad_campaigns`/`create_ad_campaign`/`approve_ad_campaign`/`set_ad_campaign_status`) always drafts unapproved; only a signed-in person approves it.',
+  promoted,
   'A project has no brand until one is attached (`projects.brand_id` is nullable, and that is the normal case): open a canvas to explore, choose a brand only once something is ready to publish.',
   '`get_media` shows what a node, run or asset holds: fetch `preview_url` to look, give `full_url` to the user.',
   '`ask_motion_agent` edits `motion` (`get_motion_run`, `get_motion_summary`); `render_video`, `get_render`; `search_gallery`, `remix_gallery_item`, `publish_to_gallery`.',
   'Signing in is not a tool: over HTTP the host sends the Bearer; locally run `feega login` once (shared session file).'
-].join(' ');
+];
+
+export const MCP_INSTRUCTIONS = mcpInstructions(SocialPublishing.Off);
 
 type ListedTool = { inputSchema?: Record<string, unknown> };
 
@@ -128,22 +146,27 @@ function recordToolCalls(server: McpServer): void {
     }) as never)) as typeof server.registerTool;
 }
 
-export function createFeegaMcpServer(): McpServer {
+const PUBLISHING_TOOLS: Record<SocialPublishing, (server: McpServer) => void> = {
+  [SocialPublishing.On]: registerPostTools,
+  [SocialPublishing.Off]: () => {},
+};
+
+export function createFeegaMcpServer(publishing: SocialPublishing): McpServer {
   const server = new McpServer(
     {
       name: 'feega',
       version: '0.1.0',
       description:
-        'feega infinite canvas — query and write projects, canvases, nodes, posts and ad campaigns via OAuth.',
+        'feega infinite canvas — query and write projects, canvases, nodes, motion videos and ad campaigns via OAuth.',
     },
-    { instructions: MCP_INSTRUCTIONS },
+    { instructions: mcpInstructions(publishing) },
   );
 
   trimListedTools(server);
   recordToolCalls(server);
 
   registerOrgDataTools(server);
-  registerPostTools(server);
+  PUBLISHING_TOOLS[publishing](server);
   registerAdsTools(server);
   registerNodeTools(server);
   registerPromptTools(server);

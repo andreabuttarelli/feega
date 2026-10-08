@@ -2,9 +2,10 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { z } from 'zod';
 import { BRAND_ENDPOINTS, MEDIA_MODEL_SLOT_IDS, type BrandEndpoint } from '@feega/api-contracts';
 import { annotationsFor, brandWebMcpTools, callApi, inputSchemaFor, modelContext, registerBrandWebMcp } from './webmcp';
+import { SocialPublishing } from '$lib/social-publishing';
 
 const TOKEN = 'eyJ-fake-session-token';
-const tools = () => brandWebMcpTools('demo', TOKEN);
+const tools = () => brandWebMcpTools('demo', TOKEN, SocialPublishing.On);
 const byName = (name: string) => {
   const tool = tools().find((t) => t.name === name);
   if (!tool) throw new Error(`${name} non generato`);
@@ -184,7 +185,7 @@ describe('quando il browser non ha la specifica', () => {
   });
 
   it('registrare non fa niente e non esplode', async () => {
-    await expect(registerBrandWebMcp('demo', TOKEN, new AbortController().signal)).resolves.toBe(0);
+    await expect(registerBrandWebMcp('demo', TOKEN, SocialPublishing.On, new AbortController().signal)).resolves.toBe(0);
   });
 
   it('ma se c’e’, registra tutto il registry con un segnale per toglierlo', async () => {
@@ -192,11 +193,19 @@ describe('quando il browser non ha la specifica', () => {
     vi.stubGlobal('document', { modelContext: { registerTool } });
     const controller = new AbortController();
 
-    const count = await registerBrandWebMcp('demo', TOKEN, controller.signal);
+    const count = await registerBrandWebMcp('demo', TOKEN, SocialPublishing.On, controller.signal);
 
     expect(count).toBe(BRAND_ENDPOINTS.length);
     expect(registerTool).toHaveBeenCalledTimes(BRAND_ENDPOINTS.length);
     expect(registerTool.mock.calls[0][1]).toEqual({ signal: controller.signal });
     vi.unstubAllGlobals();
+  });
+});
+
+describe('con la pubblicazione social spenta', () => {
+  it('il link per collegare un account social non è fra gli strumenti', () => {
+    const names = brandWebMcpTools('demo', TOKEN, SocialPublishing.Off).map((t) => t.name);
+    expect(names).not.toContain('create_social_connect_link');
+    expect(names).toContain('query');
   });
 });

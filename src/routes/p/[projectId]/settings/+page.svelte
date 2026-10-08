@@ -1,7 +1,7 @@
 <script lang="ts">
   import { _ } from 'svelte-i18n';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
-  import { SETTINGS_GROUPS } from '$lib/components/settings/platforms';
+  import { settingsGroupsFor } from '$lib/components/settings/platforms';
   import LegalFooter from '$lib/components/LegalFooter.svelte';
 
   let { data } = $props();
@@ -10,7 +10,7 @@
 </script>
 
 <nav class="sections" aria-label={$_('app.nav.settings')}>
-  {#each SETTINGS_GROUPS as group (group.labelKey)}
+  {#each settingsGroupsFor(data.socialPublishing) as group (group.labelKey)}
     <h2>{$_(group.labelKey)}</h2>
     <ul>
       {#each group.items as item (item.section)}

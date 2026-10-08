@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { SHEET_PAGE_LOADERS, settingsPageLoader, settingsSectionOf } from './sheet-pages';
 
 describe('settingsSectionOf: quale cartella sotto settings/ risponde a questo path', () => {
-  it('la radice di settings apre connected-accounts, come fa il suo redirect', () => {
-    expect(settingsSectionOf('/settings')).toBe('connected-accounts');
-    expect(settingsSectionOf('/settings/')).toBe('connected-accounts');
+  it('la radice di settings apre il progetto', () => {
+    expect(settingsSectionOf('/settings')).toBe('project');
+    expect(settingsSectionOf('/settings/')).toBe('project');
   });
 
   it('ogni sezione usa il suo primo segmento', () => {
@@ -29,8 +29,8 @@ describe('settingsPageLoader: la sezione trova la sua pagina reale', () => {
     expect(settingsPageLoader('/settings/does-not-exist')).toBeNull();
   });
 
-  it('la radice di settings trova la stessa pagina di connected-accounts', () => {
-    expect(settingsPageLoader('/settings')).toBe(settingsPageLoader('/settings/connected-accounts'));
+  it('la radice di settings trova la stessa pagina del progetto', () => {
+    expect(settingsPageLoader('/settings')).toBe(settingsPageLoader('/settings/project'));
   });
 });
 

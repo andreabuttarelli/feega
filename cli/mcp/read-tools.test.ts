@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { handleMcpFetch } from './http-app.ts';
-import { MCP_INSTRUCTIONS } from './server.ts';
+import { MCP_INSTRUCTIONS, mcpInstructions } from './server.ts';
+import { assumeSocialPublishing, SocialPublishing } from './features.ts';
 
 /**
  * IL LEDGER DEL RITIRO. La superficie MCP passa da decine di tool brand-scoped (piano editoriale,
@@ -51,9 +52,6 @@ const RESTANO = [
   'update_row',
   'delete_row',
   'describe_node_types',
-  'list_posts',
-  'create_post',
-  'set_post_status',
   'list_ad_campaigns',
   'create_ad_campaign',
   'approve_ad_campaign',
@@ -92,7 +90,7 @@ describe('la superficie MCP è le ventisei dichiarate', () => {
 
   test('le sei letture sono annotate readOnlyHint', async () => {
     const all = await tools();
-    const reads = ['query', 'describe_node_types', 'list_posts', 'list_ad_campaigns', 'preview_node_loop', 'get_media'];
+    const reads = ['query', 'describe_node_types', 'list_ad_campaigns', 'preview_node_loop', 'get_media'];
 
     for (const name of reads) {
       const tool = all.find((t) => t.name === name) as { annotations?: { readOnlyHint?: boolean } } | undefined;
@@ -108,5 +106,32 @@ describe('la superficie MCP è le ventisei dichiarate', () => {
 
   test('nominano describe_node_types, insert_row/update_row/delete_row e le due famiglie autonome', () => {
     for (const name of RESTANO) expect(MCP_INSTRUCTIONS, name).toContain(name);
+  });
+});
+
+const PUBLISHING = ['list_posts', 'create_post', 'set_post_status'];
+
+describe('i tool dei post seguono il flag social_publishing', () => {
+  test('con il flag spento non sono in tools/list né nelle istruzioni', async () => {
+    const names = (await tools()).map((t) => t.name);
+
+    for (const name of PUBLISHING) {
+      expect(names, name).not.toContain(name);
+      expect(MCP_INSTRUCTIONS, name).not.toContain(name);
+    }
+  });
+
+  test('con il flag acceso tornano come prima', async () => {
+    assumeSocialPublishing(SocialPublishing.On);
+    try {
+      const names = (await tools()).map((t) => t.name);
+
+      for (const name of PUBLISHING) {
+        expect(names, name).toContain(name);
+        expect(mcpInstructions(SocialPublishing.On), name).toContain(name);
+      }
+    } finally {
+      assumeSocialPublishing(SocialPublishing.Off);
+    }
   });
 });
