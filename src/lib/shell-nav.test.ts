@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { NAV_ENTRIES, navEntriesByGroup, navHref, sheetEntryForPath, BURGER_ENTRIES, mobileNavHref, directLoadMode } from './shell-nav';
+import { NAV_ENTRIES, navEntriesByGroup, navHref, sheetEntryForPath, BURGER_ENTRIES, mobileNavHref, directLoadMode, visibleNav } from './shell-nav';
+import { SocialPublishing } from './social-publishing';
 
 describe('la rail: due gruppi, un comportamento a testa', () => {
   it('il gruppo "panel" è Assets, Brands e Influencers, in quest\'ordine', () => {
@@ -104,5 +105,20 @@ describe('un link diretto a un foglio su desktop apre la tela con il foglio', ()
 
   it.each(cases)('%s%s su %s → %s', (path, search, viewport, expected) => {
     expect(directLoadMode(path, search, viewport)).toBe(expected);
+  });
+});
+
+describe('la rail senza pubblicazione social', () => {
+  const SOCIAL = ['calendar', 'ads'];
+
+  it('a flag spento nasconde calendario e ads', () => {
+    const ids = visibleNav(SocialPublishing.Off, BURGER_ENTRIES).map((e) => e.id);
+    expect(ids.filter((id) => SOCIAL.includes(id))).toEqual([]);
+    expect(ids).toContain('assets');
+  });
+
+  it('a flag acceso le mostra', () => {
+    const ids = visibleNav(SocialPublishing.On, BURGER_ENTRIES).map((e) => e.id);
+    expect(ids).toEqual(expect.arrayContaining(SOCIAL));
   });
 });
