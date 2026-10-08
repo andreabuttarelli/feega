@@ -1,6 +1,7 @@
 <script lang="ts">
+  import IconButton from './IconButton.svelte';
+  import { Action } from '$lib/motion/actions';
   import { onMount } from 'svelte';
-  import X from '@lucide/svelte/icons/x';
   import Download from '@lucide/svelte/icons/download';
   import { deserialize } from '$app/forms';
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
@@ -208,7 +209,7 @@
 
 <div class="scrim" role="presentation" onclick={onclose}></div>
 <div class="dialog" role="dialog" aria-modal="true" aria-label="Template" data-testid="template-dialog">
-  <header><span>Template</span><button type="button" aria-label="Close" onclick={onclose}><X size={16} /></button></header>
+  <header><span>Template</span><IconButton action={Action.Close} onclick={onclose} /></header>
 
   <section>
     <h3>Fields</h3>

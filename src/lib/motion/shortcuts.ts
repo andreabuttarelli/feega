@@ -108,7 +108,7 @@ export const SHORTCUTS: readonly Binding[] = [
   { key: '-', command: Command.ZoomOut, label: '−', does: 'Zoom the timeline out', group: ShortcutGroup.View },
   { key: 'b', mod: true, command: Command.ToggleChat, label: '⌘B', does: 'Show / hide the agent', group: ShortcutGroup.View },
   { key: 'b', mod: true, alt: true, command: Command.ToggleInspector, label: '⌥⌘B', does: 'Show / hide properties', group: ShortcutGroup.View },
-  { key: '?', shift: true, command: Command.Help, label: '?', does: 'Keyboard shortcuts', group: ShortcutGroup.View }
+  { key: '?', shift: true, command: Command.Help, label: '?', does: 'Keyboard & gestures', group: ShortcutGroup.View }
 ];
 
 const PHYSICAL_KEYS: Record<string, string> = { BracketLeft: '[', BracketRight: ']' };

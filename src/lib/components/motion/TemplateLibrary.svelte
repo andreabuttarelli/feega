@@ -1,4 +1,6 @@
 <script lang="ts">
+  import IconButton from './IconButton.svelte';
+  import { Action } from '$lib/motion/actions';
   import X from '@lucide/svelte/icons/x';
   import { deserialize } from '$app/forms';
   import MotionPreview from './MotionPreview.svelte';
@@ -78,7 +80,7 @@
 
 <div class="scrim" role="presentation" onclick={onclose}></div>
 <div class="dialog" role="dialog" aria-modal="true" aria-label="Templates" data-testid="template-library">
-  <header><span>Templates</span><button type="button" aria-label="Close" onclick={onclose}><X size={16} /></button></header>
+  <header><span>Templates</span><IconButton action={Action.Close} onclick={onclose} /></header>
 
   <div class="split">
     <ul class="list">

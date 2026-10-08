@@ -1,6 +1,7 @@
 <script lang="ts">
+  import IconButton from './IconButton.svelte';
+  import { Action } from '$lib/motion/actions';
   import { deserialize } from '$app/forms';
-  import X from '@lucide/svelte/icons/x';
 
   export type SoundKind = 'voice' | 'music';
   export type Made = { assetId: string; seconds: number; url: string | null };
@@ -47,7 +48,7 @@
 <div class="dialog" role="dialog" aria-modal="true" aria-label={copy.title}>
   <header>
     <span>{copy.title}</span>
-    <button type="button" aria-label="Close" disabled={working} onclick={onclose}><X size={16} /></button>
+    <IconButton action={Action.Close} disabled={working} onclick={onclose} />
   </header>
   <label>
     {copy.label}
