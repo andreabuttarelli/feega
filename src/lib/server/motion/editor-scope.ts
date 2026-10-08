@@ -24,5 +24,5 @@ export async function motionScope(locals: App.Locals, params: { projectId: strin
   if (!motion) {
     throw error(404, 'This motion node does not exist');
   }
-  return { db, userId: user.id, orgId: found.orgId, canvas: found.canvas, projectBrandId: found.projectBrandId, motion };
+  return { db, userId: user.id, orgId: found.orgId, canvas: found.canvas, mode: found.mode, projectBrandId: found.projectBrandId, motion };
 }

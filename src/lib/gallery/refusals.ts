@@ -1,6 +1,6 @@
 import { everyClip, type MotionClip, type MotionDoc } from '$lib/motion/doc';
 import { BrandKind } from '$lib/motion/script';
-import { Capability, MODE_ALLOWS, type ProjectMode } from '$lib/project-mode';
+import { Capability, MODE_ALLOWS, modeAllows, type ProjectMode } from '$lib/project-mode';
 
 export enum PublishRefusal {
   Uncensored = 'uncensored_not_publishable',
@@ -55,4 +55,8 @@ const RULES: readonly Rule[] = [
 export function publishRefusal(facts: PublishFacts): { refusal: PublishRefusal; message: string } | null {
   const rule = RULES.find((r) => r.applies(facts));
   return rule ? { refusal: rule.refusal, message: rule.message } : null;
+}
+
+export function embedRefusal(mode: ProjectMode): { refusal: PublishRefusal; message: string } | null {
+  return modeAllows(mode, Capability.Share) ? null : { refusal: PublishRefusal.Uncensored, message: 'Videos from an uncensored project are never published as an embed.' };
 }

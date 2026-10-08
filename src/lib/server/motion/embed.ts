@@ -1,5 +1,7 @@
 import { env as publicEnv } from '$env/dynamic/public';
 import type { Db } from '$lib/server/db/client';
+import { embedRefusal, type PublishRefusal } from '$lib/gallery/refusals';
+import type { ProjectMode } from '$lib/project-mode';
 import { embedSnippet, embedUrl, interactiveBundle, type InteractiveInput } from '$lib/motion/interactive/bundle';
 
 export const EMBED_BUCKET = 'embeds';
@@ -8,13 +10,21 @@ const EMBED_CACHE_S = 60;
 const NODE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export type EmbedResult = { ok: true } | { ok: false; error: string };
-export type EmbedSlot = { ok: true; upload: { url: string; headers: Record<string, string> } } | { ok: false; error: string };
-export type PublishedEmbed = { ok: true; url: string; snippet: string } | { ok: false; error: string };
-export type EmbedPublish = Omit<InteractiveInput, 'settings'> & { nodeId: string };
+export type EmbedRefused = { ok: false; error: string; refusal: PublishRefusal };
+export type EmbedSlot = { ok: true; upload: { url: string; headers: Record<string, string> } } | { ok: false; error: string } | EmbedRefused;
+export type PublishedEmbed = { ok: true; url: string; snippet: string } | { ok: false; error: string } | EmbedRefused;
+export type EmbedPublish = Omit<InteractiveInput, 'settings'> & { nodeId: string; mode: ProjectMode };
 
 const embedPath = (nodeId: string) => `${nodeId}.html`;
 const bucketOf = (db: Db) => db.storage.from(EMBED_BUCKET);
 const outcome = (error: { message: string } | null): EmbedResult => (error ? { ok: false, error: error.message } : { ok: true });
+
+function refused(mode: ProjectMode): EmbedRefused | null {
+  const refusal = embedRefusal(mode);
+  return refusal ? { ok: false, error: refusal.message, refusal: refusal.refusal } : null;
+}
+
+export const isRefused = (result: { ok: boolean }): result is EmbedRefused => 'refusal' in result;
 
 export const embedOrigin = () => (publicEnv.PUBLIC_APP_URL ?? '').replace(/\/$/, '');
 
@@ -24,6 +34,11 @@ export async function storeEmbed(db: Db, nodeId: string, html: string): Promise<
 }
 
 export async function publishEmbed(db: Db, input: EmbedPublish, origin = embedOrigin()): Promise<PublishedEmbed> {
+  const refusal = refused(input.mode);
+  if (refusal) {
+    return refusal;
+  }
+
   const bundle = await interactiveBundle(input);
   const stored = await storeEmbed(db, input.nodeId, bundle.html);
   if (!stored.ok) {
@@ -34,7 +49,12 @@ export async function publishEmbed(db: Db, input: EmbedPublish, origin = embedOr
   return { ok: true, url, snippet: embedSnippet(input.doc, url) };
 }
 
-export async function embedSlot(db: Db, nodeId: string): Promise<EmbedSlot> {
+export async function embedSlot(db: Db, nodeId: string, mode: ProjectMode): Promise<EmbedSlot> {
+  const refusal = refused(mode);
+  if (refusal) {
+    return refusal;
+  }
+
   const { data, error } = await bucketOf(db).createSignedUploadUrl(embedPath(nodeId), { upsert: true });
   if (error || !data) {
     return { ok: false, error: error?.message ?? 'no upload slot' };

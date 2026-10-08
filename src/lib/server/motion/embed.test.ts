@@ -5,6 +5,7 @@ vi.mock('$env/dynamic/public', () => ({ env: { PUBLIC_SUPABASE_URL: 'https://sb.
 const { EMBED_BUCKET, embedSlot, publishEmbed, readEmbed, removeEmbed, embedPublished } = await import('./embed');
 const { MotionFormat, newMotionDoc } = await import('$lib/motion/doc');
 const { FEEGA_TOKENS } = await import('$lib/motion/brand');
+const { ProjectMode } = await import('$lib/project-mode');
 
 const NODE = '6f1c2a8e-0b7d-4f1e-9a3c-2d5e8f7a1b40';
 
@@ -24,7 +25,7 @@ describe('hosted embed', () => {
     const { db, bucket, from } = fakeDb();
     const doc = newMotionDoc(MotionFormat.Landscape);
 
-    const out = await publishEmbed(db, { nodeId: NODE, doc, tokens: FEEGA_TOKENS, assetUrls: {}, title: 'Clip', fetchBlob: vi.fn() });
+    const out = await publishEmbed(db, { nodeId: NODE, doc, tokens: FEEGA_TOKENS, assetUrls: {}, title: 'Clip', fetchBlob: vi.fn(), mode: ProjectMode.Standard });
 
     expect(from).toHaveBeenCalledWith(EMBED_BUCKET);
     expect(bucket.upload).toHaveBeenCalledWith(`${NODE}.html`, expect.any(Blob), expect.objectContaining({ contentType: 'text/html', upsert: true }));
@@ -35,10 +36,23 @@ describe('hosted embed', () => {
   it('the upload slot for the editor is signed for the same path, with the headers the upload must carry', async () => {
     const { db, bucket } = fakeDb();
 
-    const slot = await embedSlot(db, NODE);
+    const slot = await embedSlot(db, NODE, ProjectMode.Standard);
 
     expect(bucket.createSignedUploadUrl).toHaveBeenCalledWith(`${NODE}.html`, { upsert: true });
     expect(slot).toMatchObject({ ok: true, upload: { url: 'https://sb.test/upload?token=t', headers: expect.objectContaining({ 'content-type': 'text/html', 'x-upsert': 'true' }) } });
+  });
+
+  it('an uncensored project is never published as an embed, by the agent or the editor', async () => {
+    const { db, bucket } = fakeDb();
+    const doc = newMotionDoc(MotionFormat.Landscape);
+
+    const published = await publishEmbed(db, { nodeId: NODE, doc, tokens: FEEGA_TOKENS, assetUrls: {}, title: 'Clip', fetchBlob: vi.fn(), mode: ProjectMode.Uncensored });
+    const slot = await embedSlot(db, NODE, ProjectMode.Uncensored);
+
+    expect(published).toMatchObject({ ok: false, error: expect.stringContaining('uncensored') });
+    expect(slot).toMatchObject({ ok: false, error: expect.stringContaining('uncensored') });
+    expect(bucket.upload).not.toHaveBeenCalled();
+    expect(bucket.createSignedUploadUrl).not.toHaveBeenCalled();
   });
 
   it('unpublishing removes the file, and published reads whether it is there', async () => {
