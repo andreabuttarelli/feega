@@ -95,7 +95,7 @@
     flex-direction: column;
     gap: 4px;
     padding: 10px 10px 8px 12px;
-    background: var(--paper, #fff);
+    background: var(--chat-field, var(--paper, #fff));
     border: 1px solid var(--line-2, #d2d2d7);
     transition: border-color 0.14s ease, box-shadow 0.14s ease;
   }

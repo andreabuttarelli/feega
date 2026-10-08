@@ -339,6 +339,9 @@
     margin: 0;
     padding: 0;
     list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: var(--chat-gap, 0);
     border: 1px solid var(--line, #ededef);
     background: var(--paper, #fff);
   }
@@ -354,7 +357,7 @@
     min-height: 44px;
     padding: 10px 12px;
     border: 0;
-    background: transparent;
+    background: var(--chat-field, transparent);
     font: inherit;
     font-size: 13.5px;
     line-height: 1.4;

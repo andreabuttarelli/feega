@@ -122,6 +122,7 @@
     text-align: left;
     padding: 4px 6px;
     border: 1px solid var(--border, #ddd);
+    background: var(--ui-field);
     font-size: 14px;
   }
 

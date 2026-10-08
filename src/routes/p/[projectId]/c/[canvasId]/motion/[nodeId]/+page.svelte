@@ -30,6 +30,7 @@
   import CompositionSettings from '$lib/components/motion/CompositionSettings.svelte';
   import { SAVE_TONE, SaveState, TimeDisplay, clockLabel, compositionLabel, compositionShort, nextDisplay } from '$lib/motion/editor-bar';
   import X from '@lucide/svelte/icons/x';
+  import Ellipsis from '@lucide/svelte/icons/ellipsis';
   import Crosshair from '@lucide/svelte/icons/crosshair';
   import Keyboard from '@lucide/svelte/icons/keyboard';
   import BotMessageSquare from '@lucide/svelte/icons/bot-message-square';
@@ -172,6 +173,7 @@
   const viewport = $derived(viewportOf(width));
   const chatPlace = $derived(CHAT_PLACE[viewport]);
   let settingsOpen = $state(false);
+  let moreOpen = $state(false);
 
   function browserStore(): LayoutStore | null {
     try {
@@ -887,7 +889,7 @@
       </button>
     </div>
 
-    <div class="group trail">
+    <div class="group trail" data-testid="bar-trail">
       <div class="popover-anchor">
         <button type="button" class="chip" aria-expanded={settingsOpen} title="Composition settings" data-testid="comp-settings" onclick={() => (settingsOpen = !settingsOpen)}>
           <span class="long">{compositionLabel(doc)}</span><span class="short">{compositionShort(doc)}</span><ChevronDown size={12} />
@@ -900,12 +902,22 @@
         {/if}
       </div>
       <span class="save" data-testid="save-state" data-tone={SAVE_TONE[saveState]}><i aria-hidden="true"></i>{saveState} · v{version}</span>
-      <span class="divider" aria-hidden="true"></span>
-      <button type="button" class="icon-btn toggle" title="Properties (⌥⌘B)" aria-label="Properties panel" aria-pressed={propsShown} data-testid="toggle-inspector" onclick={COMMANDS[Command.ToggleInspector]}><PanelRight size={16} /></button>
-      <button type="button" class="icon-btn toggle" title="Agent (⌘B)" aria-label="Agent panel" aria-pressed={chatShown} data-testid="toggle-chat" onclick={COMMANDS[Command.ToggleChat]}><BotMessageSquare size={16} /></button>
-      <span class="divider" aria-hidden="true"></span>
-      <button type="button" class="secondary" onclick={() => (leaveTo(0), (templating = true))} data-testid="template-open">Template</button>
-      <button type="button" class="secondary" onclick={() => (leaveTo(0), (publishing = true))} data-testid="publish-open">{listed ? 'In gallery' : 'Publish'}</button>
+      {#if !docked}
+        <button type="button" class="icon-btn toggle" title="Properties (⌥⌘B)" aria-label="Properties panel" aria-pressed={propsShown} data-testid="toggle-inspector" onclick={COMMANDS[Command.ToggleInspector]}><PanelRight size={16} /></button>
+        <button type="button" class="icon-btn toggle" title="Agent (⌘B)" aria-label="Agent panel" aria-pressed={chatShown} data-testid="toggle-chat" onclick={COMMANDS[Command.ToggleChat]}><BotMessageSquare size={16} /></button>
+      {/if}
+      <button type="button" class="secondary wide" onclick={() => (leaveTo(0), (templating = true))} data-testid="template-open">Template</button>
+      <button type="button" class="secondary wide" onclick={() => (leaveTo(0), (publishing = true))} data-testid="publish-open">{listed ? 'In gallery' : 'Publish'}</button>
+      <div class="popover-anchor narrow">
+        <button type="button" class="icon-btn" aria-label="More actions" aria-expanded={moreOpen} data-testid="more-actions" onclick={() => (moreOpen = !moreOpen)}><Ellipsis size={16} /></button>
+        {#if moreOpen}
+          <div class="menu more" role="menu">
+            <button type="button" role="menuitem" onclick={() => ((moreOpen = false), leaveTo(0), (templating = true))}>Template</button>
+            <button type="button" role="menuitem" onclick={() => ((moreOpen = false), leaveTo(0), (publishing = true))}>{listed ? 'In gallery' : 'Publish'}</button>
+            <button type="button" role="menuitem" onclick={() => ((moreOpen = false), COMMANDS[Command.Help]())}>Keyboard shortcuts</button>
+          </div>
+        {/if}
+      </div>
       <button type="button" class="render" onclick={() => (leaveTo(0), (exporting = true))} data-testid="export-open">Export</button>
     </div>
   </header>
@@ -1072,16 +1084,15 @@
             </div>
           {/if}
         </div>
-        <span class="divider" aria-hidden="true"></span>
         <button type="button" class="tool" title="Split at playhead (⇧⌘D)" aria-label="Split" disabled={!selection.length} onclick={split}><Scissors size={14} /></button>
         <button type="button" class="tool" title="Duplicate (⌘D)" aria-label="Duplicate" disabled={!selection.length} onclick={duplicate}><Copy size={14} /></button>
         <button type="button" class="tool" title="Create null from selection" aria-label="Create null from selection" data-testid="null-from-selection" disabled={!selection.length} onclick={groupUnderNull}><Crosshair size={14} /></button>
         <button type="button" class="tool" title="Precompose (⇧⌘C)" aria-label="Precompose" data-testid="precompose" disabled={!selection.length} onclick={precomposeSelection}><Layers size={14} /></button>
         <button type="button" class="tool" title="Delete (Del)" aria-label="Delete" disabled={!selection.length && !keySelection.length} onclick={remove}><Trash size={14} /></button>
-        <span class="divider" aria-hidden="true"></span>
+        <span class="gap" aria-hidden="true"></span>
         <button type="button" class="tool" title="Undo (⌘Z)" aria-label="Undo" disabled={!canUndo(history)} onclick={undoEdit}><Undo size={14} /></button>
         <button type="button" class="tool" title="Redo (⇧⌘Z)" aria-label="Redo" disabled={!canRedo(history)} onclick={redoEdit}><Redo size={14} /></button>
-        <span class="divider" aria-hidden="true"></span>
+        <span class="gap" aria-hidden="true"></span>
         <div class="segmented" role="group" aria-label="Timeline mode">
           <button type="button" aria-pressed={!graphOpen} onclick={() => (graphOpen = false)}>Clips</button>
           <button type="button" aria-pressed={graphOpen} data-testid="graph-toggle" onclick={() => (graphOpen = !graphOpen)}>Graph</button>
@@ -1096,16 +1107,16 @@
           </select>
         {/if}
         {#if beats.length}
-          <span class="divider" aria-hidden="true"></span>
+          <span class="gap" aria-hidden="true"></span>
           <button type="button" class="tool text" data-testid="mark-beats" onclick={markBeats}>Mark beats</button>
           {#if selection.length}<button type="button" class="tool text" data-testid="cut-to-beat" onclick={cutSelectionToBeat}>Cut to beat</button>{/if}
         {/if}
         {#if notice}<span class="notice" role="status">{notice}</span>{/if}
         <span class="spacer"></span>
         <button type="button" class="tool" title="Zoom out (−)" aria-label="Zoom out" onclick={COMMANDS[Command.ZoomOut]}><ZoomOut size={14} /></button>
-        <input class="zoom" type="range" aria-label="Timeline zoom" min={Math.log2(ZOOM_MIN)} max={Math.log2(ZOOM_MAX)} step="0.05" value={Math.log2(zoom)} oninput={(e) => (zoom = clampZoom(2 ** Number(e.currentTarget.value)))} data-testid="timeline-zoom" />
+        <input class="zoom wide" type="range" aria-label="Timeline zoom" min={Math.log2(ZOOM_MIN)} max={Math.log2(ZOOM_MAX)} step="0.05" value={Math.log2(zoom)} oninput={(e) => (zoom = clampZoom(2 ** Number(e.currentTarget.value)))} data-testid="timeline-zoom" />
         <button type="button" class="tool" title="Zoom in (+)" aria-label="Zoom in" onclick={COMMANDS[Command.ZoomIn]}><ZoomIn size={14} /></button>
-        <button type="button" class="tool" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts" data-testid="shortcut-help-open" onclick={COMMANDS[Command.Help]}><Keyboard size={14} /></button>
+        <button type="button" class="tool wide" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts" data-testid="shortcut-help-open" onclick={COMMANDS[Command.Help]}><Keyboard size={14} /></button>
       </div>
 
       <div class="tl">
@@ -1135,6 +1146,24 @@
     font-family: 'DM Sans', system-ui, sans-serif;
     accent-color: var(--ui-accent);
     z-index: 10;
+    --ui-ink-2: var(--ui-text-2);
+    --ui-ink-3: var(--ui-text-3);
+    --ui-line: transparent;
+    --ui-line-strong: transparent;
+    --border: transparent;
+  }
+
+  [data-viewport='tablet'],
+  [data-viewport='phone'] {
+    --ui-hit: 44px;
+  }
+
+  [data-viewport='phone'] {
+    --ui-hit-gap: 12px;
+  }
+
+  .editor :global(:is(input:not([type='checkbox'], [type='radio'], [type='range'], [type='color']), select, textarea)) {
+    background-color: var(--ui-field);
   }
 
   .editor :global(:focus-visible) {
@@ -1146,8 +1175,9 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: stretch;
-    height: var(--ui-bar-h-dense);
-    border-bottom: 1px solid var(--ui-line);
+    gap: var(--ui-space-4);
+    height: calc(var(--ui-hit) + var(--ui-space-3));
+    padding: 0 var(--ui-space-2);
     background: var(--ui-bg);
     font-size: var(--ui-text-sm);
     flex-shrink: 0;
@@ -1156,9 +1186,8 @@
   .group {
     display: flex;
     align-items: center;
-    gap: 2px;
+    gap: var(--ui-hit-gap);
     min-width: 0;
-    padding: 0 var(--ui-space-2);
   }
 
   .lead {
@@ -1167,14 +1196,10 @@
 
   .transport {
     justify-content: center;
-    border-left: 1px solid var(--ui-line);
-    border-right: 1px solid var(--ui-line);
-    padding: 0 var(--ui-space-3);
   }
 
   .trail {
     justify-content: flex-end;
-    gap: var(--ui-space-1);
   }
 
   .icon-btn,
@@ -1193,8 +1218,8 @@
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    width: 28px;
-    height: 28px;
+    width: var(--ui-hit);
+    height: var(--ui-hit);
     color: var(--ui-ink-2);
   }
 
@@ -1278,10 +1303,9 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    height: 24px;
-    padding: 0 8px;
-    border: 1px solid var(--ui-line);
-    background: var(--ui-surface);
+    height: var(--ui-hit);
+    padding: 0 var(--ui-space-3);
+    background: var(--ui-field);
     color: var(--ui-ink-2);
     font-family: var(--ui-mono);
     font-size: var(--ui-text-xs);
@@ -1291,7 +1315,7 @@
 
   .chip:hover,
   .chip[aria-expanded='true'] {
-    border-color: var(--ui-line-strong);
+    background: var(--ui-hover);
     color: var(--ui-ink);
   }
 
@@ -1301,17 +1325,16 @@
     right: 0;
     z-index: 40;
     width: 300px;
-    padding: var(--ui-space-3);
-    border: 1px solid var(--ui-line-strong);
-    background: var(--ui-bg);
+    padding: var(--ui-space-4);
+    background: var(--ui-raised);
     box-shadow: 0 12px 32px rgb(0 0 0 / 0.14);
   }
 
   .popover-head {
     display: block;
-    margin-bottom: var(--ui-space-2);
-    font-size: var(--ui-text-sm);
-    font-weight: 600;
+    margin-bottom: var(--ui-space-3);
+    font-size: var(--ui-text-xs);
+    color: var(--ui-text-3);
   }
 
   .save {
@@ -1343,25 +1366,17 @@
     color: var(--ui-danger);
   }
 
-  .divider {
-    align-self: stretch;
-    width: 1px;
-    margin: 8px var(--ui-space-1);
-    background: var(--ui-line);
-  }
-
   .secondary,
   .render {
-    height: 28px;
-    padding: 0 12px;
+    height: var(--ui-hit);
+    padding: 0 var(--ui-space-4);
     font-size: var(--ui-text-sm);
     font-weight: 600;
     white-space: nowrap;
   }
 
   .secondary {
-    border: 1px solid var(--ui-line-strong);
-    background: var(--ui-bg);
+    background: var(--ui-field);
     color: var(--ui-ink);
   }
 
@@ -1440,10 +1455,6 @@
     container-type: size;
   }
 
-  .stage :global(> *) {
-    outline: 1px solid var(--ui-line-strong);
-  }
-
   .stage {
     position: relative;
   }
@@ -1453,14 +1464,10 @@
     bottom: 0;
     left: 0;
     right: 0;
-    padding: 0 var(--ui-space-2, 8px);
+    padding: 0 var(--ui-space-4);
     background: var(--ui-surface);
-    border-top: 1px solid var(--ui-line);
+    color: var(--ui-text-2);
     outline: none;
-  }
-
-  :global([data-theme='dark']) .stage {
-    background: var(--ui-bg);
   }
 
   .empty-state {
@@ -1474,8 +1481,8 @@
     gap: var(--ui-space-3);
     padding: var(--ui-space-6);
     max-width: calc(100% - 32px);
-    background: var(--ui-bg);
-    border: 1px solid var(--ui-line-strong);
+    background: var(--ui-raised);
+    box-shadow: 0 12px 32px rgb(0 0 0 / 0.1);
     outline: none !important;
   }
 
@@ -1493,21 +1500,18 @@
   }
 
   .composition {
-    padding: 0 12px 12px;
+    padding: 0 var(--ui-space-4) var(--ui-space-4);
   }
 
   .composition-head {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
     height: 40px;
-    padding-top: 12px;
-    margin: 0 -12px 8px;
-    padding: 0 12px;
-    align-items: center;
-    border-bottom: 1px solid var(--ui-line);
-    font-size: var(--ui-text-md);
-    font-weight: 600;
+    margin-bottom: var(--ui-space-2);
+    font-size: var(--ui-text-xs);
+    font-weight: 500;
+    color: var(--ui-text-3);
   }
 
   .composition-head em {
@@ -1521,15 +1525,19 @@
   .props {
     grid-column: 2;
     grid-row: 1;
-    border-left: 1px solid var(--ui-line);
     min-height: 0;
     overflow: hidden;
   }
 
   .chat {
+    --line: transparent;
+    --line-2: transparent;
+    --ink-soft: var(--ui-text-2);
+    --ink-faint: var(--ui-text-3);
+    --chat-field: var(--ui-field);
+    --chat-gap: 2px;
     grid-column: 3;
     grid-row: 1 / 3;
-    border-left: 1px solid var(--ui-line);
     min-height: 0;
     display: flex;
     flex-direction: column;
@@ -1543,7 +1551,6 @@
     flex-direction: column;
     min-width: 0;
     min-height: 0;
-    border-top: 1px solid var(--ui-line);
   }
 
   .resize {
@@ -1564,10 +1571,9 @@
   .toolbar {
     display: flex;
     align-items: center;
-    gap: 2px;
-    height: 32px;
-    padding: 0 var(--ui-space-2);
-    border-bottom: 1px solid var(--ui-line);
+    gap: var(--ui-hit-gap);
+    height: calc(var(--ui-hit) + var(--ui-space-3));
+    padding: 0 var(--ui-space-3);
     background: var(--ui-bg);
     font-size: var(--ui-text-sm);
     flex-shrink: 0;
@@ -1578,13 +1584,13 @@
     align-items: center;
     justify-content: center;
     gap: 4px;
-    min-width: 24px;
-    height: 24px;
+    min-width: var(--ui-hit);
+    height: var(--ui-hit);
     color: var(--ui-ink-2);
   }
 
   .tool.text {
-    padding: 0 6px;
+    padding: 0 var(--ui-space-2);
     color: var(--ui-ink);
   }
 
@@ -1603,25 +1609,21 @@
     color: var(--ui-accent);
   }
 
-  .toolbar .divider {
-    margin: 8px 6px;
+  .gap {
+    flex-shrink: 0;
+    width: var(--ui-space-2);
   }
 
   .segmented {
     display: inline-flex;
-    height: 24px;
-    margin-right: 4px;
-    border: 1px solid var(--ui-line);
+    height: var(--ui-hit);
+    background: var(--ui-field);
   }
 
   .segmented button {
-    padding: 0 10px;
+    padding: 0 var(--ui-space-3);
     font-size: var(--ui-text-xs);
     color: var(--ui-ink-2);
-  }
-
-  .segmented button + button {
-    border-left: 1px solid var(--ui-line);
   }
 
   .segmented button:hover {
@@ -1634,12 +1636,10 @@
   }
 
   .arrange {
-    height: 24px;
-    margin-left: 4px;
-    padding: 0 4px;
-    border: 1px solid var(--ui-line-strong);
+    height: var(--ui-hit);
+    padding: 0 var(--ui-space-2);
+    border: 0;
     border-radius: 0;
-    background: var(--ui-bg);
     color: var(--ui-ink);
     font: inherit;
     font-size: var(--ui-text-xs);
@@ -1650,9 +1650,8 @@
   }
 
   .zoom {
-    width: 120px;
-    height: 24px;
-    margin: 0 4px;
+    width: 96px;
+    height: var(--ui-hit);
     appearance: none;
     background: transparent;
     cursor: pointer;
@@ -1661,12 +1660,12 @@
 
   .zoom::-webkit-slider-runnable-track {
     height: 2px;
-    background: var(--ui-line-strong);
+    background: var(--ui-text-3);
   }
 
   .zoom::-moz-range-track {
     height: 2px;
-    background: var(--ui-line-strong);
+    background: var(--ui-text-3);
   }
 
   .zoom::-webkit-slider-thumb {
@@ -1701,10 +1700,17 @@
     gap: 4px;
     max-height: calc(100vh - 120px);
     overflow: auto;
-    padding: 4px;
-    background: var(--ui-bg);
-    border: 1px solid var(--ui-line-strong);
+    padding: var(--ui-space-2);
+    background: var(--ui-raised);
     box-shadow: 0 12px 32px rgb(0 0 0 / 0.14);
+  }
+
+  .menu.more {
+    top: calc(100% + 6px);
+    bottom: auto;
+    left: auto;
+    right: 0;
+    grid-template-columns: 160px;
   }
 
   .menu .col {
@@ -1714,7 +1720,8 @@
 
   .menu button {
     text-align: left;
-    padding: 5px 8px;
+    min-height: var(--ui-hit);
+    padding: 0 var(--ui-space-3);
   }
 
   .menu button:hover {
@@ -1722,10 +1729,9 @@
   }
 
   .menu-head {
-    padding: 6px 8px 2px;
+    padding: var(--ui-space-3) var(--ui-space-3) var(--ui-space-1);
     font-size: var(--ui-text-xs);
-    font-weight: 600;
-    color: var(--ui-ink-3);
+    color: var(--ui-text-3);
   }
 
   .notice {
@@ -1752,37 +1758,36 @@
     display: none;
   }
 
-  @media (max-width: 1280px) {
+  .chip .short,
+  .narrow {
+    display: none;
+  }
+
+  @media (max-width: 1599px) {
     .save {
       font-size: 0;
       gap: 0;
     }
   }
 
-  @media (pointer: coarse) {
-    .icon-btn,
-    .tool {
-      min-width: 44px;
-      height: 44px;
+  @media (max-width: 1439px) {
+    .chip .long {
+      display: none;
     }
 
-    .toolbar {
-      height: 48px;
-    }
-
-    .segmented {
-      height: 36px;
-    }
-
-    .chip,
-    .secondary,
-    .render {
-      height: 36px;
+    .chip .short {
+      display: inline;
     }
   }
 
-  .chip .short {
-    display: none;
+  @media (max-width: 1359px) {
+    .wide {
+      display: none;
+    }
+
+    .narrow {
+      display: block;
+    }
   }
 
   [data-viewport='tablet'] .chip .long,
@@ -1825,7 +1830,7 @@
     bottom: 0;
     width: min(380px, 90vw);
     z-index: 30;
-    background: var(--ui-bg);
+    background: var(--ui-raised);
     box-shadow: -12px 0 32px rgb(0 0 0 / 0.16);
   }
 
@@ -1837,9 +1842,9 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 8px 12px;
-    border-bottom: 1px solid var(--ui-line);
-    font-weight: 600;
+    padding: var(--ui-space-2) var(--ui-space-2) 0 var(--ui-space-4);
+    font-size: var(--ui-text-xs);
+    color: var(--ui-text-3);
     flex-shrink: 0;
   }
 
@@ -1861,34 +1866,28 @@
 
   [data-viewport='phone'] .lead {
     grid-area: lead;
-    height: 48px;
-    border-bottom: 1px solid var(--ui-line);
+    height: 56px;
+    padding-left: var(--ui-space-2);
   }
 
   [data-viewport='phone'] .trail {
     grid-area: trail;
-    height: 48px;
-    border-bottom: 1px solid var(--ui-line);
+    height: 56px;
+    padding-right: var(--ui-space-2);
   }
 
   [data-viewport='phone'] .transport {
     grid-area: transport;
-    height: 56px;
-    border: 0;
-    border-top: 1px solid var(--ui-line);
+    height: 64px;
+    padding: 0 var(--ui-space-2);
     background: var(--ui-bg);
   }
 
-  [data-viewport='phone'] .transport .icon-btn {
-    width: 44px;
-    height: 44px;
-  }
-
+  [data-viewport='phone'] .step,
   [data-viewport='phone'] .crumb:not(.current),
   [data-viewport='phone'] .slash,
   [data-viewport='phone'] .save,
   [data-viewport='phone'] .chip,
-  [data-viewport='phone'] .trail .divider,
   [data-viewport='phone'] .trail .toggle {
     display: none;
   }
@@ -1938,14 +1937,12 @@
     position: fixed;
     left: 0;
     right: 0;
-    bottom: 104px;
+    bottom: 120px;
     height: 62vh;
     z-index: 30;
     display: none;
     flex-direction: column;
-    background: var(--ui-bg);
-    border-left: 0;
-    border-top: 1px solid var(--ui-line-strong);
+    background: var(--ui-raised);
     box-shadow: 0 -12px 32px rgb(0 0 0 / 0.16);
   }
 
@@ -1962,10 +1959,10 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    height: 44px;
-    padding: 0 4px 0 12px;
-    border-bottom: 1px solid var(--ui-line);
-    font-weight: 600;
+    height: 56px;
+    padding: 0 var(--ui-space-1) 0 var(--ui-space-4);
+    font-size: var(--ui-text-xs);
+    color: var(--ui-text-3);
     flex-shrink: 0;
   }
 
@@ -1985,19 +1982,17 @@
   [data-viewport='phone'] .tabs {
     grid-area: tabs;
     display: flex;
-    height: 48px;
-    border-top: 1px solid var(--ui-line);
+    height: 56px;
   }
 
   .tabs button {
     flex: 1;
     font-size: 13px;
     font-weight: 500;
-    color: var(--ui-ink-2);
+    color: var(--ui-text-3);
   }
 
   .tabs button.on {
     color: var(--ui-ink);
-    box-shadow: inset 0 2px 0 var(--ui-accent);
   }
 </style>

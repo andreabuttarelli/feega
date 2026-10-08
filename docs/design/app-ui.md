@@ -12,6 +12,11 @@ defined in `src/app.css` (`--ui-*`). Square corners everywhere (`--radius: 0`).
 | `--ui-hover` | `#f2f2ef` | hover wash |
 | `--ui-line` / `--ui-line-strong` | `#ececea` / `#dcdcd8` | hairlines / input borders |
 | `--ui-ink` / `-2` / `-3` | `#111` / `#5c5c58` / `#93938e` | text, secondary, labels |
+| `--ui-text-2` / `-3` | ink at 60% / 40% | hierarchy by opacity (the editor maps `--ui-ink-2/3` to these) |
+| `--ui-field` | `#f4f4f1` (dark `#161616`) | filled inputs and secondary buttons, no outline |
+| `--ui-raised` | `#fff` (dark `#0a0a0a`) | menus, popovers, dialogs, sheets |
+| `--ui-grid` | `#ececea` (dark `#1f1f1f`) | the only hairline left in the editor: ruler ticks, swatch edges |
+| `--ui-hit` / `--ui-hit-gap` | 32px (44px on touch, tablet, phone) / 8px (12px phone) | icon button size and spacing |
 | `--ui-accent` | `#0099ff` | primary action, selection, focus, active state |
 | `--ui-accent-wash` | accent 10% | selected chip/segment background |
 | `--ui-ok` / `--ui-warn` / `--ui-danger` | green / amber / red | status squares (saved, saving, error) |
@@ -23,7 +28,8 @@ Dark mode redefines the same names under `[data-theme='dark']`. `.ui-app` (on th
 ## Rules
 
 - **Top bars**: white, 48px (`--ui-bar-h`), hairline bottom border. No black bars. The motion
-  editor uses 44px (`--ui-bar-h-dense`): breadcrumb, centred transport, composition chip.
+  editor has no lines at all (`.editor` sets `--ui-line*` to transparent): breadcrumb, centred
+  transport, composition chip; below 1360px secondary actions move into a `⋯` menu.
 - **Buttons**: primary = solid accent; secondary = white with `--ui-line-strong` border.
   Selected chip/segment = accent wash + accent text/border, never solid ink.
 - **Type**: DM Sans for UI; Fragment Mono (`--ui-mono`, self-hosted) for section labels,

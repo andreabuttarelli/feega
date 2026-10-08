@@ -146,6 +146,13 @@
   --ui-ink: #111111;
   --ui-ink-2: #5c5c58;
   --ui-ink-3: #93938e;
+  --ui-text-2: color-mix(in srgb, var(--ui-ink) 60%, transparent);
+  --ui-text-3: color-mix(in srgb, var(--ui-ink) 40%, transparent);
+  --ui-field: #f4f4f1;
+  --ui-raised: #ffffff;
+  --ui-grid: #ececea;
+  --ui-hit: 32px;
+  --ui-hit-gap: 8px;
   --ui-accent: #0099ff;
   --ui-accent-ink: #ffffff;
   --ui-accent-wash: color-mix(in srgb, var(--ui-accent) 10%, transparent);
@@ -174,6 +181,12 @@
   --ui-icon: 16px;
   --ui-icon-sm: 14px;
   --ui-focus: 0 0 0 2px var(--ui-bg), 0 0 0 3px var(--ui-accent);
+}
+
+@media (pointer: coarse) {
+  :root {
+    --ui-hit: 44px;
+  }
 }
 
 @media (max-width: 1023px) {
@@ -212,6 +225,9 @@
   --ui-ink: #ededed;
   --ui-ink-2: #a3a3a0;
   --ui-ink-3: #77776f;
+  --ui-field: #161616;
+  --ui-raised: #0a0a0a;
+  --ui-grid: #1f1f1f;
   --ui-ok: #30a46c;
   --ui-warn: #f0a83a;
   --ui-danger: #ff5a5f;

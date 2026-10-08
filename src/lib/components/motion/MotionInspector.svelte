@@ -820,11 +820,10 @@
   header {
     display: flex;
     align-items: center;
-    gap: 8px;
-    height: 40px;
+    gap: var(--ui-space-2);
+    height: 48px;
     flex-shrink: 0;
-    padding: 0 12px;
-    border-bottom: 1px solid var(--ui-line);
+    padding: 0 var(--ui-space-4);
   }
 
   .swatch-bar {
@@ -847,19 +846,18 @@
 
   .tabs {
     display: flex;
-    border-bottom: 1px solid var(--ui-line);
+    gap: var(--ui-space-4);
+    padding: 0 var(--ui-space-4);
   }
 
   .tabs button {
-    flex: 1;
-    padding: 6px 0;
+    min-height: var(--ui-hit);
     font-size: var(--ui-text-xs);
-    color: var(--ui-ink-2);
+    color: var(--ui-text-3);
   }
 
   .tabs button.on {
     color: var(--ui-ink);
-    box-shadow: inset 0 -2px 0 var(--ui-accent);
   }
 
   .grid2 {
@@ -967,9 +965,9 @@
     width: 100%;
     height: 24px;
     padding: 0 6px;
-    border: 1px solid var(--ui-line-strong);
+    border: 1px solid transparent;
     border-radius: 0;
-    background: var(--ui-bg);
+    background: var(--ui-field);
     color: var(--ui-ink);
     font: inherit;
   }
@@ -1013,7 +1011,7 @@
   .swatch {
     width: 20px;
     height: 20px;
-    border: 1px solid var(--ui-line-strong);
+    border: 1px solid var(--ui-grid);
   }
 
   .swatch.on {
@@ -1269,8 +1267,7 @@
   .anchor button {
     width: 12px;
     height: 12px;
-    border: 1px solid var(--ui-line-strong);
-    background: var(--ui-bg);
+    background: var(--ui-field);
   }
 
   .anchor button.on {
