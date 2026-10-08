@@ -5,6 +5,7 @@ import type { OpResult } from '../timeline';
 import { expressionErrors } from './bake';
 import { compileExpression } from './language';
 import { expressionProblem, type Expressions } from './schema';
+import { liveInputProblem } from '../interactive/live-props';
 
 const fail = (error: string): OpResult => ({ ok: false, error });
 
@@ -23,7 +24,8 @@ export function setExpression(doc: MotionDoc, clipId: string, key: string, sourc
   if (!found) {
     return fail(`no clip ${clipId}`);
   }
-  const problem = source === null ? null : expressionProblem(withParams(doc, found.clip), key, source);
+  const clip = withParams(doc, found.clip);
+  const problem = source === null ? null : (expressionProblem(clip, key, source) ?? liveInputProblem(clip, key, source));
   if (problem) {
     return fail(problem);
   }

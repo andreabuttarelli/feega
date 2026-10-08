@@ -637,7 +637,7 @@ export function composeHtml(raw: ComposeInput): string {
     hotScript(blobScript(blobs, Number(duration))),
     ...[...cardBakes].map(([layout, bakes]) => hotScript(layout.script(bakes as never[], doc.fps, Number(duration))))
   ].join('');
-  const live = LIVE_SCRIPT[raw.liveness ?? Liveness.Baked]({ live: prepared, baked: doc, outside: interactiveOf(raw.doc).outside, parents: [...parentsWithChildren(doc)] });
+  const live = LIVE_SCRIPT[raw.liveness ?? Liveness.Baked]({ live: prepared, baked: doc, outside: interactiveOf(raw.doc).outside, parents: [...parentsWithChildren(doc)], color: (v) => resolveColor(v, tokens) });
   return `${page}${live}${captureScript(frame, contentStamp(page))}${measureScript()}</body></html>`;
 }
 

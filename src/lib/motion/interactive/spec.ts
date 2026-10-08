@@ -11,6 +11,8 @@ import { BENTO_LAYOUT, bentoCellId, cellFrames, type BentoCard, type CompFrame }
 import { bentoSlotAt } from '../hyperframes/bento';
 import type { HostSpec, HostStep, LiveLane, LiveSpec, Rect } from './live';
 import type { Outside } from './settings';
+import { lensSpec } from './live-props';
+import { LivePaint, type LensSpec } from './paint';
 
 const READS_AUDIO = /\baudio\s*\./;
 
@@ -20,7 +22,7 @@ export function liveLanes(doc: MotionDoc, parents: ReadonlySet<string> = new Set
   return clipsOf(doc).flatMap((c) =>
     Object.entries(c.expressions).flatMap(([key, source]) => {
       const target = isLiveSource(source) ? liveTarget(c, key, parents) : null;
-      return target ? [{ id: c.id, key, ...target }] : [];
+      return target ? [{ id: c.id, key, ...target } as LiveLane] : [];
     })
   );
 }
@@ -125,7 +127,14 @@ function namesOf(doc: MotionDoc): Record<string, string> {
   return names;
 }
 
-export type SpecInput = { live: MotionDoc; baked: MotionDoc; outside: Outside; parents: readonly string[] };
+export type SpecInput = { live: MotionDoc; baked: MotionDoc; outside: Outside; parents: readonly string[]; color: (v: string) => string };
+
+function lensesOf(baked: MotionDoc, lanes: LiveLane[], color: (v: string) => string): LensSpec[] {
+  const ids = new Set(lanes.filter((l) => l.paint === LivePaint.Lens).map((l) => l.id));
+  return clipsOf(baked)
+    .filter((c) => ids.has(c.id))
+    .flatMap((c) => lensSpec(c.component, c, color) ?? []);
+}
 
 export function liveSpec(input: SpecInput): LiveSpec {
   const { live, baked } = input;
@@ -143,6 +152,7 @@ export function liveSpec(input: SpecInput): LiveSpec {
     height: live.height,
     outside: input.outside,
     live: lanes,
+    lenses: lensesOf(baked, lanes, input.color),
     lanes: lanesOf(baked, live, lanes),
     order: clipsOf(baked).map((c) => c.id),
     names: namesOf(baked),

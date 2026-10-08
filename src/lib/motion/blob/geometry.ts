@@ -72,17 +72,26 @@ export function jellyOf(viscosity: number): Jelly {
   return { stiffness: w * w, damping: 2 * zeta * w };
 }
 
+export type JellyState = { e: Strain; v: Strain };
+
+export const JELLY_AT_REST: JellyState = { e: NO_STRAIN, v: NO_STRAIN };
+
+export function jellyStep(state: JellyState, target: Strain, jelly: Jelly, seconds: number): JellyState {
+  const dt = seconds / SUBSTEPS;
+  const { stiffness, damping } = jelly;
+  let { e, v } = state;
+  for (let s = 0; s < SUBSTEPS; s++) {
+    v = { p: v.p + (stiffness * (target.p - e.p) - damping * v.p) * dt, q: v.q + (stiffness * (target.q - e.q) - damping * v.q) * dt };
+    e = { p: e.p + v.p * dt, q: e.q + v.q * dt };
+  }
+  return { e, v };
+}
+
 export function jellyStrains(targets: readonly Strain[], jellies: readonly Jelly[], fps: number): Strain[] {
-  const dt = 1 / (fps * SUBSTEPS);
-  let e = { ...NO_STRAIN };
-  let v = { ...NO_STRAIN };
+  let state = JELLY_AT_REST;
   return targets.map((target, i) => {
-    const { stiffness, damping } = jellies[i];
-    for (let s = 0; s < SUBSTEPS; s++) {
-      v = { p: v.p + (stiffness * (target.p - e.p) - damping * v.p) * dt, q: v.q + (stiffness * (target.q - e.q) - damping * v.q) * dt };
-      e = { p: e.p + v.p * dt, q: e.q + v.q * dt };
-    }
-    return e;
+    state = jellyStep(state, target, jellies[i], 1 / fps);
+    return state.e;
   });
 }
 

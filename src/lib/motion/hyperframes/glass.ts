@@ -1,23 +1,10 @@
 import type { EffectSet } from '../effects/render';
 import type { Keyframe } from '../keyframes';
-import { LENS_MAP_SIZE, lensMapUrl } from '../glass/lens-map';
-import { glassPose, type GlassPose } from '../glass/pose';
+import { lensMapUrl } from '../glass/lens-map';
+import { glassPose } from '../glass/pose';
+import type { GlassPose } from '../glass/shape';
 import { css, esc } from './html';
-
-export const glassIds = {
-  layer: (id: string) => `lg-${id}`,
-  filter: (id: string) => `lgf-${id}`,
-  map: (id: string) => `lgm-${id}`,
-  smooth: (id: string) => `lgn-${id}`,
-  bend: (id: string) => `lgd-${id}`,
-  frost: (id: string) => `lgb-${id}`,
-  cut: (id: string) => `lgk-${id}`,
-  chrome: (id: string) => `lgs-${id}`,
-  body: (id: string) => `lgc-${id}`,
-  rim: (id: string) => `lgr-${id}`,
-  shine: (id: string) => `lgh-${id}`,
-  shade: (id: string) => `lgo-${id}`
-};
+import { UNIT, glassAttrs, glassIds, type Attrs } from './glass-attrs';
 
 export const RIM_STOPS = [
   [0, 0.45],
@@ -28,10 +15,6 @@ export const RIM_STOPS = [
   [100, 0.45]
 ] as const;
 
-const UNIT = 100;
-const EDGE_PAD = 2;
-const SMOOTH_TEXELS = 3;
-const PRECISION = 100;
 const HALF_FRAME = 0.5;
 const TIME_PRECISION = 10000;
 const INSET_LIGHT = 0.1;
@@ -41,28 +24,8 @@ const LENS_OFF = 'none';
 type GlassClip = { id: string; from: number; durationInFrames: number; props: Record<string, unknown>; keyframes: Record<string, Keyframe[] | undefined> };
 export type GlassFrame = { width: number; height: number; fps: number; color: (v: string) => string };
 
-const round = (n: number) => Math.round(n * PRECISION) / PRECISION;
 const setTime = (frame: number, fps: number) => Math.round(((frame - HALF_FRAME) / fps) * TIME_PRECISION) / TIME_PRECISION;
 const lensOn = (id: string) => `url(#${glassIds.filter(id)})`;
-
-type Attrs = Record<string, string | number>;
-
-function region(p: GlassPose): Attrs {
-  return { x: round(p.cx - p.rx - EDGE_PAD), y: round(p.cy - p.ry - EDGE_PAD), width: round(2 * (p.rx + EDGE_PAD)), height: round(2 * (p.ry + EDGE_PAD)) };
-}
-
-function poseAttrs(id: string, p: GlassPose): Map<string, Attrs> {
-  const box = region(p);
-  const texel = (2 * SMOOTH_TEXELS) / LENS_MAP_SIZE;
-  return new Map<string, Attrs>([
-    [glassIds.map(id), { x: round(p.cx - p.rx), y: round(p.cy - p.ry), width: round(2 * p.rx), height: round(2 * p.ry) }],
-    [glassIds.smooth(id), { ...box, stdDeviation: `${round(texel * p.rx)} ${round(texel * p.ry)}` }],
-    [glassIds.bend(id), { ...box, scale: round(p.bend) }],
-    [glassIds.frost(id), { ...box, stdDeviation: round(p.frost) }],
-    [glassIds.cut(id), box],
-    [glassIds.body(id), { transform: `translate(${round(p.cx)} ${round(p.cy)}) scale(${round(p.rx / UNIT)} ${round(p.ry / UNIT)})`, opacity: round(p.alpha) }]
-  ]);
-}
 
 const attrText = (a: Attrs) =>
   Object.entries(a)
@@ -106,7 +69,7 @@ function chrome(id: string, frame: GlassFrame, p: GlassPose, a: Map<string, Attr
 
 export function glassLayer(clip: GlassClip, frame: GlassFrame, inner: string, zIndex: number): string {
   const pose = glassPose(clip, 0, frame, frame.color);
-  const a = poseAttrs(clip.id, pose);
+  const a = glassAttrs(clip.id, pose);
   const shown = clip.from === 0;
   const defs = `<svg class="efd" aria-hidden="true"><defs>${lensFilter(clip.id, frame, a)}</defs></svg>`;
   const lens = `<div class="ef" id="${glassIds.layer(clip.id)}" data-clip="${esc(clip.id)}" data-group="${esc(clip.id)}" style="z-index:${zIndex};filter:${shown ? lensOn(clip.id) : LENS_OFF}">${defs}${inner}</div>`;
@@ -116,9 +79,9 @@ export function glassLayer(clip: GlassClip, frame: GlassFrame, inner: string, zI
 
 function poseSets(clip: GlassClip, frame: GlassFrame): EffectSet[] {
   const sets: EffectSet[] = [];
-  let previous = poseAttrs(clip.id, glassPose(clip, 0, frame, frame.color));
+  let previous = glassAttrs(clip.id, glassPose(clip, 0, frame, frame.color));
   for (let local = 1; local < clip.durationInFrames; local++) {
-    const next = poseAttrs(clip.id, glassPose(clip, local, frame, frame.color));
+    const next = glassAttrs(clip.id, glassPose(clip, local, frame, frame.color));
     const at = setTime(clip.from + local, frame.fps);
     for (const [target, attrs] of next) {
       const before = previous.get(target) ?? {};

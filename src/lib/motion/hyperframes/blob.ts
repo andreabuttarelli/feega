@@ -1,10 +1,12 @@
 import type { Keyframe } from '../keyframes';
 import { BLOB_NUMBERS } from '../blob/model';
-import { DEPTH, FLAT, ROW, blobRows } from '../blob/pose';
+import { blobRows } from '../blob/pose';
+import { DEPTH, FLAT, ROW } from '../blob/shape';
 import { paintOps, paintPlan } from './blob-paint';
 import { ON_DISPOSE, hotScope, hotSeek } from './hot';
 import { seekDriver } from './stage';
 import { esc, js } from './html';
+import { BLOB_LIVE, BLOB_REDRAW } from './blob-live';
 
 export const BLOB_TIMELINE = 'feegaBlob';
 export const BLOB_GL = '__feegaBlobGl';
@@ -264,7 +266,8 @@ function drawBlob(it, time) {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, it.paper);
     it.key = plan.key;
   }
-  const r = rowAt(b, local);
+  const live = window[LIVE] && window[LIVE][b.id];
+  const r = live ? live.row : rowAt(b, local);
   const u = it.u;
   const at = (name, n) => r.slice(ROW[name], ROW[name] + n);
   gl.viewport(0, 0, b.width, b.height);
@@ -277,7 +280,7 @@ function drawBlob(it, time) {
   gl.uniform1f(u.uWobble, r[ROW.wobble]);
   gl.uniform1f(u.uWobbleSpeed, r[ROW.wobbleSpeed]);
   gl.uniform1f(u.uTime, local);
-  gl.uniform1f(u.uSeed, b.seed);
+  gl.uniform1f(u.uSeed, live ? live.seed : b.seed);
   gl.uniform1f(u.uIor, r[ROW.ior]);
   gl.uniform1f(u.uDisp, r[ROW.dispersion]);
   gl.uniform1f(u.uFrost, r[ROW.frost]);
@@ -301,13 +304,14 @@ export function blobScript(bakes: readonly BlobBake[], duration: number): string
   if (!bakes.length) {
     return '';
   }
-  return `<script>(function(){${hotScope(BLOB_TIMELINE)}const VERTEX=${js(VERTEX)};const FRAGMENT=${js(FRAGMENT)};const ROW=${js(ROW)};const PLAN=(${paintPlan.toString()});const PAINT=(${paintOps.toString()});
+  return `<script>(function(){${hotScope(BLOB_TIMELINE)}const VERTEX=${js(VERTEX)};const FRAGMENT=${js(FRAGMENT)};const ROW=${js(ROW)};const LIVE=${js(BLOB_LIVE)};const REDRAW=${js(BLOB_REDRAW)};const PLAN=(${paintPlan.toString()});const PAINT=(${paintOps.toString()});
 ${RUNTIME}
 const B=${js(bakes)};
 const items=B.map(adopt).filter(Boolean);
 Object.keys(kept).filter((id)=>!B.some((b)=>b.id===id)).forEach((id)=>{delete kept[id];});
 function blobsAt(time){items.forEach(function(it){drawBlob(it,time);});}
 const tl=window.__timelines&&window.__timelines.main;
+window[REDRAW]=function(){blobsAt(tl?tl.time():0);};
 ${seekDriver(BLOB_TIMELINE, duration, 'blobsAt')}
 ${hotSeek('blobsAt')}
 ${ON_DISPOSE}(function(){items.forEach(clear);});
