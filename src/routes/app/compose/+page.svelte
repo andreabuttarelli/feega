@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PageTitle from '$lib/components/PageTitle.svelte';
   import { goto } from '$app/navigation';
   import Orbit from '@lucide/svelte/icons/orbit';
   import PageHead from '$lib/components/PageHead.svelte';
@@ -18,6 +19,7 @@
 
 <div class="compose-hub">
   <PageHead title="Compositions" subtitle="Pick a template, drop in images and videos, export a looping 3D video." />
+  <PageTitle text="Compositions" />
 
   <section class="options" aria-label="Project and format">
     <label>

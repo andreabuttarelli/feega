@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PageTitle from '$lib/components/PageTitle.svelte';
   import { goto } from '$app/navigation';
   import X from '@lucide/svelte/icons/x';
   import GalleryPlayer from '$lib/components/gallery/GalleryPlayer.svelte';
@@ -23,7 +24,7 @@
 
 <div class="gallery">
   <header class="gx-head">
-    <h1>Gallery</h1>
+    <PageTitle text="Gallery" />
     <p>Motion and compositions to remix, free.</p>
   </header>
 
@@ -91,16 +92,8 @@
     font-size: var(--ui-text-md);
   }
 
-  h1 {
-    margin: 0;
-    font-size: var(--ui-text-xl);
-    font-weight: 600;
-    line-height: 28px;
-    letter-spacing: -0.02em;
-  }
-
   .gx-head p {
-    margin: var(--ui-space-1) 0 0;
+    margin: var(--ui-space-3) 0 0;
     line-height: 20px;
     color: var(--ui-ink-3);
   }

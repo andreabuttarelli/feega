@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PageTitle from '$lib/components/PageTitle.svelte';
   import { onDestroy } from 'svelte';
   import { deserialize } from '$app/forms';
   import { goto, invalidateAll } from '$app/navigation';
@@ -113,6 +114,7 @@
 
 <div class="upscale">
   <PageHead title="AI Video Upscaler" subtitle="Upscale a clip to 2× or 4K with FLUX Video Upscale. MP4 up to 20 s, 1440p and 50 MB." />
+  <PageTitle text="AI Video Upscaler" />
 
   {#if job}
     <section class="result" data-testid="upscale-job" data-status={job.status}>

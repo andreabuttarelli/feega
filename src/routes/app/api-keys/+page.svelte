@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PageTitle from '$lib/components/PageTitle.svelte';
   import { HOME_PATH } from '$lib/home-path';
   import { enhance } from '$app/forms';
   import { _ } from 'svelte-i18n';
@@ -32,7 +33,7 @@
     <a href={HOME_PATH} class="text-muted-foreground hover:text-foreground mb-4 inline-flex items-center gap-1.5 text-sm transition">
       {$_('app.settings.back')}
     </a>
-    <h1 class="text-2xl font-semibold tracking-tight">{$_('app.settings.apiKeys.title')}</h1>
+    <PageTitle text={$_('app.settings.apiKeys.title')} />
     <p class="text-muted-foreground mt-2 text-sm">{$_('app.settings.apiKeys.subtitle')}</p>
 
     {#if form?.apiKeyCreated && form?.apiKeyRaw}

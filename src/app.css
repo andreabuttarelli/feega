@@ -161,6 +161,10 @@
   --ui-text-md: 13px;
   --ui-text-lg: 15px;
   --ui-text-xl: 20px;
+  --ui-mega: clamp(48px, 8vw, 128px);
+  --ui-mega-weight: 600;
+  --ui-mega-leading: 0.95;
+  --ui-mega-tracking: -0.04em;
   --ui-space-1: 4px;
   --ui-space-2: 8px;
   --ui-space-3: 12px;
@@ -174,6 +178,7 @@
 
 @media (max-width: 1023px) {
   :root {
+    --ui-mega: clamp(36px, 10vw, 64px);
     --content-pad-x: 14px;
     --content-pad-top: 16px;
     --content-pad-bottom: 48px;

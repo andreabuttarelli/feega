@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PageTitle from '$lib/components/PageTitle.svelte';
   import { deserialize } from '$app/forms';
   import type { ActionResult } from '@sveltejs/kit';
   import { goto, invalidateAll } from '$app/navigation';
@@ -165,7 +166,7 @@
   {#if step === Step.Photo}
     <section class="panel">
       <header>
-        <h1>Add your product photo</h1>
+        <PageTitle text="Add your product photo" />
         <p>A clear photo of the product alone, in good light. We keep its shape, colours and label.</p>
       </header>
 
@@ -213,7 +214,7 @@
     <section class="panel">
       <header>
         <button type="button" class="back" onclick={() => (step = Step.Photo)}><ArrowLeft size={16} /> Photo</button>
-        <h1>Pick a style</h1>
+        <PageTitle text="Pick a style" />
         <p>Each style you pick becomes its own photo. White is ready for Amazon and most marketplaces.</p>
       </header>
 
@@ -278,7 +279,7 @@
     <section class="panel">
       <header>
         <button type="button" class="back" onclick={() => (step = Step.Style)}><ArrowLeft size={16} /> Style</button>
-        <h1>Generate your photos</h1>
+        <PageTitle text="Generate your photos" />
         <p>You see the price before anything is spent.</p>
       </header>
 
@@ -393,11 +394,6 @@
     flex-direction: column;
     align-items: flex-start;
     gap: var(--ui-space-1);
-  }
-  h1 {
-    margin: 0;
-    font-size: var(--ui-text-xl);
-    font-weight: 600;
   }
   header p {
     margin: 0;

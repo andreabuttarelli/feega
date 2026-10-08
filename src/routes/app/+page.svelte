@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PageTitle from '$lib/components/PageTitle.svelte';
   import ArrowRight from '@lucide/svelte/icons/arrow-right';
   import Film from '@lucide/svelte/icons/film';
   import { enhance } from '$app/forms';
@@ -30,10 +31,10 @@
   <section class="hero" aria-labelledby="create-heading">
     {#if firstVideo}
       <p class="eyebrow" data-testid="onboarding">Start here</p>
-      <h1 id="create-heading">Paste your URL.<br />Get a video.</h1>
+      <PageTitle id="create-heading" text="Paste your URL. Get a video." />
       <p class="lede">Your site, product or app becomes a motion video. Or describe the one you want.</p>
     {:else}
-      <h1 id="create-heading">Create a video</h1>
+      <PageTitle id="create-heading" text="Create a video" />
     {/if}
 
     <form method="POST" action="?/video" class="brief" use:enhance={submit}>
@@ -147,14 +148,6 @@
     text-transform: uppercase;
     letter-spacing: 0.08em;
     color: var(--ui-ink-3);
-  }
-
-  h1 {
-    margin: 0;
-    font-size: clamp(32px, 6vw, 56px);
-    line-height: 1.02;
-    font-weight: 600;
-    letter-spacing: -0.035em;
   }
 
   .lede {
