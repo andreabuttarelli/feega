@@ -1,5 +1,5 @@
 import { LOOK_FIELDS, SOLID_LOOK, cardBox, lookOf, type CardLook } from '../../canvas/composition/card-look';
-import { LAYOUTS } from '../../canvas/composition/index';
+import { layoutOf } from '../../canvas/composition/index';
 import { instancesOf, poseAt, type PoseInput } from '../../canvas/composition/pose';
 import { MEDIA_FRAGMENT_SHADER, MEDIA_UNIFORMS, MEDIA_VERTEX_SHADER } from '../../canvas/composition/shader';
 import { js } from './html';
@@ -45,6 +45,7 @@ export function resolvedMedia(p: Pick<CompositionProps, 'media'>, asset: (id: st
 export function poseInputOf(p: CompositionProps, mediaCount: number, size: { width: number; height: number }): PoseInput {
   return {
     layout: p.layout,
+    layoutSpec: p.layoutSpec,
     layoutParams: p.layoutParams,
     camera: p.camera,
     cameraParams: p.cameraParams,
@@ -70,9 +71,10 @@ export function bakeComposition(id: string, p: CompositionProps, size: { width: 
   }
 
   const cards = p.media.filter((m) => asset(m.assetId));
-  const defaults = Object.fromEntries(LAYOUTS[p.layout].params.map((param) => [param.name, param.default]));
+  const layout = layoutOf(p.layout, p.layoutSpec);
+  const defaults = Object.fromEntries(layout.params.map((param) => [param.name, param.default]));
   const params = { ...defaults, ...p.layoutParams };
-  const marks = LAYOUTS[p.layout].solids?.(instances.length, input.layoutParams) ?? 0;
+  const marks = layout.solids?.(instances.length, input.layoutParams) ?? 0;
   const looks = instances.flatMap((mediaIndex, i): number[] => {
     const look: CardLook = i >= instances.length - marks ? SOLID_LOOK : lookOf(cards[mediaIndex] ?? {}, params);
     return [look.aspect, look.fit, look.focusX, look.focusY, look.solid];

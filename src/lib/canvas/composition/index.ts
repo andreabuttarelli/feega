@@ -22,8 +22,9 @@ import * as ring from './ring';
 import * as tiltedGrid from './tilted-grid';
 import * as verticalFlow from './vertical-flow';
 import type { LayoutId, LayoutParam, LayoutParams, Transform } from './types';
+import { specDefinition, type LayoutSpec } from './spec';
 
-type LayoutDefinition = {
+export type LayoutDefinition = {
 	label: string;
 	description: string;
 	motion: Motion;
@@ -239,6 +240,20 @@ export const LAYOUTS = Object.fromEntries(
 	Object.entries(DEFINED).map(([id, def]) => [id, def.cards ? { ...def, params: [...def.params, ...cardParams(def.cards)] } : def])
 ) as Record<LayoutId, LayoutDefinition>;
 
+export const CUSTOM_LAYOUT = 'custom';
+
+export type CompositionLayout = LayoutId | typeof CUSTOM_LAYOUT;
+
+export function layoutOf(layout: CompositionLayout, spec: LayoutSpec | null | undefined): LayoutDefinition {
+	if (layout !== CUSTOM_LAYOUT) {
+		return LAYOUTS[layout];
+	}
+
+	return spec ? specDefinition(spec) : LAYOUTS[FALLBACK_LAYOUT];
+}
+
+const FALLBACK_LAYOUT: LayoutId = 'tilted-grid';
+
 export function layoutAt(id: LayoutId, count: number, params: LayoutParams, t: number): Transform[] {
 	return LAYOUTS[id].transforms(count, params, t);
 }
@@ -248,7 +263,7 @@ export function instanceCountFor(id: LayoutId, mediaCount: number, params: Layou
 }
 
 export function mediaIndexFor(
-	id: LayoutId,
+	id: CompositionLayout,
 	index: number,
 	_count: number,
 	params: LayoutParams,

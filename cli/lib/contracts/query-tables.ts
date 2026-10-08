@@ -19,7 +19,7 @@ export const QUERY_TABLES =
   'brand_visual_insights brand_webhooks brands chat_artifacts chat_jobs chat_messages chat_model_catalog ' +
   'chat_threads competitors content_plans content_quality_samples content_reports credit_grants custom_voices ' +
   'disruptive_ideas editorial_plans effects expert_requests feature_flags gallery_items gallery_remixes ' +
-  'graphic_designs gtm_plans incidents lifecycle_emails loop_cursors loop_ticks market_account_baselines ' +
+  'graphic_designs gtm_plans incidents layouts lifecycle_emails loop_cursors loop_ticks market_account_baselines ' +
   'market_account_fetch_attempts market_harvest_errors market_harvest_runs market_post_observations market_posts ' +
   'market_teardowns market_video_analyses media_generator_items media_generator_prompts moderation_checks ' +
   'motion_craft_scores motion_reference_specs motion_video_prompts motion_video_references motion_videos ' +
