@@ -1,5 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { extname, join, resolve } from 'node:path';
@@ -37,7 +39,8 @@ const MIME: Readonly<Record<string, string>> = {
   '.jpeg': 'image/jpeg',
   '.mp3': 'audio/mpeg',
   '.wav': 'audio/wav',
-  '.mp4': 'video/mp4'
+  '.mp4': 'video/mp4',
+  '.html': 'text/html'
 };
 
 export type Seed = {
@@ -358,9 +361,62 @@ function dryRun(seeds: (Seed & { poster: string | null })[], out: string) {
   writeFileSync(join(out, 'catalogue.json'), JSON.stringify(files, null, 1));
 }
 
+
+const POSTER_SETTLE_MS = 1500;
+const PLAYER_TIMEOUT_MS = 30_000;
+
+async function renderPosters(dir: string, seeds: (Seed & { poster: string | null })[]): Promise<void> {
+  const missing = seeds.filter((s) => !s.poster);
+  if (!missing.length) {
+    return;
+  }
+  const served = new Map<string, string>();
+  const server = createServer((req, res) => {
+    const path = served.get(req.url ?? '');
+    if (!path) {
+      res.writeHead(404).end();
+      return;
+    }
+    res.writeHead(200, { 'content-type': mimeOf(path), 'access-control-allow-origin': '*' }).end(readFileSync(path));
+  });
+  await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
+  const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  const { chromium } = await import('playwright');
+  const browser = await chromium.launch();
+  try {
+    for (const seed of missing) {
+      const assets = Object.fromEntries(Object.entries(seed.files).map(([id, path]) => {
+        const url = `/${seed.key}/${id}${extname(path)}`;
+        served.set(url, path);
+        return [id, `${origin}${url}`];
+      }));
+      const page = `/${seed.key}.html`;
+      const html = join(dir, `${seed.key}.html`);
+      writeFileSync(html, composeHtml({ doc: seed.doc, tokens: FEEGA_TOKENS, assets }));
+      served.set(page, html);
+      const tab = await browser.newPage({ viewport: { width: seed.doc.width, height: seed.doc.height } });
+      await tab.goto(`${origin}${page}`);
+      await tab.waitForFunction(() => (window as unknown as { __playerReady?: boolean }).__playerReady === true, null, { timeout: PLAYER_TIMEOUT_MS });
+      await tab.evaluate(async (t) => {
+        const w = window as unknown as { __player: { renderSeek: (t: number) => void }; __hfWaitForSeekCompletion?: () => Promise<void> };
+        w.__player.renderSeek(t);
+        await w.__hfWaitForSeekCompletion?.();
+      }, factsOf(seed.doc).durationS * POSTER_SHARE);
+      await tab.waitForTimeout(POSTER_SETTLE_MS);
+      seed.poster = join(dir, `${seed.key}-poster.jpg`);
+      await tab.screenshot({ path: seed.poster, type: 'jpeg', quality: 85 });
+      await tab.close();
+    }
+  } finally {
+    await browser.close();
+    server.close();
+  }
+}
+
 async function main() {
   const work = mkdtempSync(join(tmpdir(), 'feega-gallery-seed-'));
   const { seeds, skipped } = catalogue(work);
+  await renderPosters(work, seeds);
 
   const refused = seeds.flatMap((s) => {
     const verdict = publishRefusal({ mode: ProjectMode.Standard, hasBrand: false, doc: s.doc, siteAssetIds: new Set() });

@@ -4,16 +4,21 @@
   import { FEEGA_TOKENS, type BrandTokens } from '$lib/motion/brand';
   import type { MotionDoc } from '$lib/motion/doc';
 
-  let { doc, assets, tokens = FEEGA_TOKENS, active = true }: { doc: MotionDoc; assets: Record<string, string>; tokens?: BrandTokens; active?: boolean } = $props();
+  let { doc, assets, tokens = FEEGA_TOKENS, active = true, restFrame = 0 }: { doc: MotionDoc; assets: Record<string, string>; tokens?: BrandTokens; active?: boolean; restFrame?: number } = $props();
 
-  let frame = $state(0);
+  let frame = $state(restFrame);
   let playing = $state(false);
 
   const html = $derived(composeHtml({ doc, tokens, assets }));
   const last = $derived(doc.durationInFrames - 1);
 
   $effect(() => {
-    if (!active || playing) {
+    if (!active) {
+      playing = false;
+      frame = restFrame;
+      return;
+    }
+    if (playing) {
       return;
     }
     if (frame >= last) {

@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import CompositionPlayer from '$lib/components/motion/CompositionPlayer.svelte';
   import { FORMATS, type MotionDoc, type MotionFormat } from '$lib/motion/doc';
+  import { Playback } from '$lib/gallery/model';
 
   type Source = { doc: MotionDoc; assets: Record<string, string> };
 
@@ -11,17 +12,34 @@
     posterUrl,
     previewUrl,
     source = null,
-    eager = false
-  }: { id: string; format: MotionFormat; posterUrl: string | null; previewUrl: string | null; source?: Source | null; eager?: boolean } = $props();
+    playback = Playback.OnHover,
+    hovered = false
+  }: { id: string; format: MotionFormat; posterUrl: string | null; previewUrl: string | null; source?: Source | null; playback?: Playback; hovered?: boolean } = $props();
 
   const VISIBLE_MARGIN = '200px';
+  const REST_SHARE = 0.4;
 
   let box = $state<HTMLDivElement | null>(null);
+  let video = $state<HTMLVideoElement | null>(null);
   let visible = $state(false);
+  let canHover = $state(true);
   let loaded = $state<Source | null>(null);
 
   const live = $derived(source ?? loaded);
   const ratio = $derived(`${FORMATS[format].width} / ${FORMATS[format].height}`);
+  const playing = $derived(visible && (playback === Playback.Always || !canHover || hovered));
+  const restFrame = $derived(live ? Math.round(live.doc.durationInFrames * REST_SHARE) : 0);
+
+  $effect(() => {
+    if (!video) {
+      return;
+    }
+    if (playing) {
+      void video.play().catch(() => {});
+      return;
+    }
+    video.pause();
+  });
 
   async function fetchSource() {
     if (live || previewUrl) {
@@ -32,11 +50,7 @@
   }
 
   onMount(() => {
-    if (eager) {
-      visible = true;
-      void fetchSource();
-      return;
-    }
+    canHover = window.matchMedia('(hover: hover)').matches;
     const observer = new IntersectionObserver(
       ([entry]) => {
         visible = entry.isIntersecting;
@@ -53,12 +67,13 @@
   });
 </script>
 
-<div class="player" bind:this={box} style={`aspect-ratio: ${ratio};`} data-testid="gallery-player">
-  {#if posterUrl}<img class="poster" src={posterUrl} alt="" loading="lazy" />{/if}
-  {#if visible && previewUrl}
-    <video class="media" src={previewUrl} poster={posterUrl ?? undefined} muted loop playsinline autoplay preload="metadata"></video>
+<div class="player" bind:this={box} style={`aspect-ratio: ${ratio};`} data-testid="gallery-player" data-playing={playing}>
+  {#if previewUrl}
+    <video bind:this={video} class="media" src={visible ? previewUrl : undefined} poster={posterUrl ?? undefined} muted loop playsinline preload="metadata"></video>
+  {:else if posterUrl && !playing}
+    <img class="media" src={posterUrl} alt="" loading="lazy" />
   {:else if visible && live}
-    <div class="media"><CompositionPlayer doc={live.doc} assets={live.assets} /></div>
+    <div class="media"><CompositionPlayer doc={live.doc} assets={live.assets} active={playing} {restFrame} /></div>
   {/if}
 </div>
 
@@ -70,7 +85,6 @@
     background: var(--ui-surface);
   }
 
-  .poster,
   .media {
     position: absolute;
     inset: 0;
