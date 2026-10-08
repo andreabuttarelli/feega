@@ -64,10 +64,12 @@ import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
 import ChartSpline from '@lucide/svelte/icons/chart-spline';
 import AudioWaveform from '@lucide/svelte/icons/audio-waveform';
 import ScissorsLineDashed from '@lucide/svelte/icons/scissors-line-dashed';
+import Menu from '@lucide/svelte/icons/menu';
 import { Command, SHORTCUTS } from './shortcuts';
 
 export enum Tool {
   Back = 'back',
+  Menu = 'menu',
   More = 'more',
   Close = 'close',
   Snap = 'snap',
@@ -127,7 +129,8 @@ export enum Place {
   Layer = 'a layer row',
   Graph = 'the graph editor',
   Menu = 'the ⋯ menu',
-  Clip = 'the clip bar or a long press on the clip'
+  Clip = 'the clip bar or a long press on the clip',
+  Drawer = 'the menu'
 }
 
 export enum MenuSection {
@@ -214,7 +217,8 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.PreviewActual]: { name: 'Preview at 100%', icon: SquareDashed, group: GuideGroup.View, menu: MenuSection.View, gesture: DOUBLE_TAP_PREVIEW },
   [Command.ToggleInspector]: { name: 'Properties panel', icon: PanelRight, group: GuideGroup.View, place: Place.Bar },
   [Command.ToggleChat]: { name: 'Agent panel', icon: BotMessageSquare, group: GuideGroup.View, place: Place.Bar },
-  [Command.Help]: { name: 'Keyboard & gestures', icon: Keyboard, group: GuideGroup.View, menu: MenuSection.View },
+  [Command.Help]: { name: 'Keyboard & gestures', icon: Keyboard, group: GuideGroup.View, place: Place.Drawer },
+  [Tool.Menu]: { name: 'Menu', icon: Menu, group: GuideGroup.View, place: Place.Bar },
   [Tool.Back]: { name: 'Back to the canvas', icon: ArrowLeft },
   [Tool.More]: { name: 'More actions', icon: Ellipsis },
   [Tool.Close]: { name: 'Close', icon: X },
