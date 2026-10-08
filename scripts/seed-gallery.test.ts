@@ -99,3 +99,19 @@ describe.skipIf(!existsSync(join(SOURCE_DIR, 'showcase/drop')))('the product dro
     expect(clips.filter((c) => c.props.fill === '#00ff00')).toHaveLength(4);
   });
 });
+
+describe('seed owner', () => {
+  it('gives the system user a profile before joining it to the org, as orgs_members requires', async () => {
+    const { fakeDb } = await import('$lib/server/db/fake-db');
+    const { seedOrg } = await import('./seed-gallery');
+    const { db, calls } = fakeDb({ orgs: [{ id: 'org-f', name: 'Feega', slug: 'feega' }], orgs_members: [], profiles: [] });
+
+    await seedOrg(db, 'u-sys', 'feega');
+
+    const profile = calls.findIndex((c) => c.table === 'profiles' && c.op === 'upsert');
+    const member = calls.findIndex((c) => c.table === 'orgs_members' && c.op === 'insert');
+    expect(profile).toBeGreaterThan(-1);
+    expect(profile).toBeLessThan(member);
+    expect(calls[profile].payload).toMatchObject({ id: 'u-sys', email: 'gallery@feega.app' });
+  });
+});

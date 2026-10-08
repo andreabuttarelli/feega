@@ -428,7 +428,7 @@ async function systemUser(db: Db): Promise<string> {
   return data.user.id;
 }
 
-async function seedOrg(db: Db, userId: string, slug: string): Promise<{ id: string; name: string }> {
+export async function seedOrg(db: Db, userId: string, slug: string): Promise<{ id: string; name: string }> {
   const client = db as unknown as SupabaseClient;
   const found = await client.from('orgs').select('id, name').eq('slug', slug).maybeSingle();
   if (found.error) {
@@ -437,6 +437,10 @@ async function seedOrg(db: Db, userId: string, slug: string): Promise<{ id: stri
   const org = found.data ?? (await client.from('orgs').insert({ name: FEEGA_AUTHOR, slug }).select('id, name').single()).data;
   if (!org) {
     throw new Error(`could not create the org ${slug}`);
+  }
+  const profile = await client.from('profiles').upsert({ id: userId, email: SYSTEM_EMAIL, name: FEEGA_AUTHOR });
+  if (profile.error) {
+    throw profile.error;
   }
   const member = await client.from('orgs_members').select('user_id').eq('org_id', org.id).eq('user_id', userId).maybeSingle();
   if (!member.data) {
