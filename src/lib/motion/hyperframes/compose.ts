@@ -467,9 +467,9 @@ function customRun(clip: MotionClip, ctx: TemplateCtx<ComponentId>, components: 
 
 const inlineScript = (code: string) => `<script>${code.replace(/<\/script/gi, '<\\/script')}</script>`;
 
-const LIBRARY_TAGS: Record<Library, { scripts: string[]; tag: string }> = {
+const LIBRARY_TAGS: Record<Library, { scripts: string[]; tag: string; module?: string }> = {
   [Library.Lottie]: { scripts: [LOTTIE_URL], tag: `<script src="${LOTTIE_URL}"></script>` },
-  [Library.Three]: { scripts: [THREE_BASE], tag: '' },
+  [Library.Three]: { scripts: [THREE_BASE], tag: '', module: `import * as THREE from 'three';window.${THREE_GLOBAL}=THREE;` },
   [Library.D3]: { scripts: [D3_URL], tag: `<script src="${D3_URL}"></script>` },
   [Library.P5]: { scripts: [P5_URL], tag: `<script src="${P5_URL}"></script>` },
   [Library.Pixi]: { scripts: PIXI_URLS, tag: PIXI_URLS.map((url) => `<script src="${url}"></script>`).join('') },
@@ -630,8 +630,9 @@ export function composeHtml(raw: ComposeInput): string {
   const env = { assets: input.assets, brand: brandEnv(tokens) };
   const boot = gated(bootScript(runs, env, `window.__timelines[${js(COMPOSITION_ID)}]`));
   const definitions = [...used].map((name) => hotScript(definitionScript(name, doc.components[name].source.js))).join('');
-  const customBoot = threeCustom
-    ? `<script type="module">import * as THREE from 'three';window.${THREE_GLOBAL}=THREE;${boot}</script>`
+  const modules = [...libraries].map((lib) => LIBRARY_TAGS[lib].module ?? '').join('');
+  const customBoot = modules
+    ? `<script type="module">${modules}${boot}</script>`
     : boot
       ? `<script>${boot}</script>`
       : '';
