@@ -78,6 +78,12 @@ export async function listGallery(db: Db, search: GallerySearch): Promise<Galler
     query = query.gt('duration_s', band.min);
     query = Number.isFinite(band.max) ? query.lte('duration_s', band.max) : query;
   }
+  if (search.min !== undefined) {
+    query = query.gte('duration_s', search.min);
+  }
+  if (search.max !== undefined) {
+    query = query.lte('duration_s', search.max);
+  }
   if (search.tag) {
     query = query.contains('tags', [search.tag]);
   }

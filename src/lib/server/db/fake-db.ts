@@ -83,10 +83,12 @@ export function fakeDb(rows: Record<string, unknown[]>, options: FakeOptions = {
       neq() {
         return chain;
       },
-      gte() {
+      gte(column: string, value: unknown) {
+        call.filters.push([`${column}>=`, value]);
         return chain;
       },
-      lte() {
+      lte(column: string, value: unknown) {
+        call.filters.push([`${column}<=`, value]);
         return chain;
       },
       contains() {

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { GALLERY_PATH } from './paths';
-import { everyClip, formatOf, FORMATS, MOTION_FORMATS, type AssetRef, type MotionDoc, type MotionFormat } from '$lib/motion/doc';
+import { everyClip, formatOf, FORMATS, MOTION_FORMATS, MotionFormat as MotionFormatEnum, type AssetRef, type MotionDoc, type MotionFormat } from '$lib/motion/doc';
 
 export { GALLERY_PATH, itemPath } from './paths';
 
@@ -43,6 +43,7 @@ export const DESCRIPTION_MAX = 500;
 export const TAGS_MAX = 8;
 export const TAG_MAX = 24;
 export const PAGE_SIZE = 48;
+export const SECONDS_CEILING = 180;
 export const BRAND_PARAM = 'brand';
 export const BRAND_REMIX_PROMPT = 'Put my brand on this video: logo, colours, fonts and copy. Keep its motion and pacing.';
 
@@ -98,8 +99,10 @@ export const gallerySearchSchema = z.object({
   format: z.enum(MOTION_FORMATS).optional(),
   duration: z.enum(DurationBand).optional(),
   tag: z.string().trim().toLowerCase().max(TAG_MAX).optional(),
+  min: z.coerce.number().min(0).max(SECONDS_CEILING).optional(),
+  max: z.coerce.number().min(0).max(SECONDS_CEILING).optional(),
   limit: z.coerce.number().int().min(1).max(PAGE_SIZE).default(PAGE_SIZE)
-});
+}).transform((s) => (s.min !== undefined && s.max !== undefined && s.min > s.max ? { ...s, min: s.max, max: s.min } : s));
 
 export type GallerySearch = z.infer<typeof gallerySearchSchema>;
 
@@ -140,19 +143,45 @@ export function swapAssetIds(doc: MotionDoc, ids: Readonly<Record<string, string
   return JSON.parse(json) as MotionDoc;
 }
 
-type FilterKey = 'format' | 'duration' | 'kind';
+type FilterKey = 'format' | 'kind' | 'min' | 'max' | 'tag' | 'q';
 
-export type FilterGroup = { key: FilterKey; label: string; options: { value: string; label: string }[] };
+export type SearchParams = Partial<Record<FilterKey, string | undefined>>;
+
+export type FilterGroup = { key: 'format' | 'kind'; label: string; options: { value: string; label: string }[] };
+
+const LISTED_FORMATS = MOTION_FORMATS.filter((f) => f !== MotionFormatEnum.SquareLarge);
 
 export const FILTER_GROUPS: readonly FilterGroup[] = [
   { key: 'kind', label: 'Type', options: (Object.keys(KIND_LABEL) as GalleryKind[]).map((k) => ({ value: k, label: KIND_LABEL[k] })) },
-  { key: 'format', label: 'Format', options: MOTION_FORMATS.map((f) => ({ value: f, label: FORMATS[f].label })) },
-  { key: 'duration', label: 'Length', options: (Object.keys(DURATION_BANDS) as DurationBand[]).map((d) => ({ value: d, label: DURATION_BANDS[d].label })) }
+  { key: 'format', label: 'Format', options: LISTED_FORMATS.map((f) => ({ value: f, label: FORMATS[f].label })) }
 ];
 
-export function filterHref(search: Partial<Record<FilterKey | 'q' | 'tag', string | undefined>>, key: FilterKey | 'tag', value: string | null): string {
+export const SLIDER_MAX = 30;
+export const RANGE_KEYS = ['min', 'max'] as const;
+
+const GLYPH_BOX = 14;
+
+export function glyphSize(format: MotionFormat): { width: number; height: number } {
+  const { width, height } = FORMATS[format];
+  const scale = GLYPH_BOX / Math.max(width, height);
+  return { width: Math.round(width * scale), height: Math.round(height * scale) };
+}
+
+export function filterHref(search: SearchParams, key: FilterKey, value: string | null): string {
   const next = { ...search, [key]: value ?? undefined };
   const params = new URLSearchParams(Object.entries(next).filter((e): e is [string, string] => typeof e[1] === 'string' && e[1] !== ''));
   const query = params.toString();
   return query ? `${GALLERY_PATH}?${query}` : GALLERY_PATH;
+}
+
+export function rangeHref(search: SearchParams, range: { min: number; max: number }): string {
+  const open = { min: range.min <= 0, max: range.max >= SLIDER_MAX };
+  return filterHref({ ...search, min: open.min ? undefined : String(range.min) }, 'max', open.max ? null : String(range.max));
+}
+
+export function resultCount(n: number): string {
+  if (!n) {
+    return 'No videos';
+  }
+  return n === 1 ? '1 video' : `${n} videos`;
 }

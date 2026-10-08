@@ -4,7 +4,7 @@ import { addClip, type OpResult } from '$lib/motion/timeline';
 import { BrandKind } from '$lib/motion/script';
 import { ProjectMode } from '$lib/project-mode';
 import { builtinTemplate, BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
-import { bandOf, byline, DurationBand, factsOf, GalleryKind, publishMetaSchema, swapAssetIds } from './model';
+import { bandOf, byline, DurationBand, factsOf, filterHref, GalleryKind, glyphSize, publishMetaSchema, rangeHref, resultCount, SLIDER_MAX, swapAssetIds } from './model';
 import { publishRefusal, PublishRefusal, type PublishFacts } from './refusals';
 import { exposeMainFields } from './remix-fields';
 
@@ -108,5 +108,24 @@ describe('the main fields of a remix', () => {
   it('keeps the fields a template already exposes', () => {
     const template = BUILTIN_TEMPLATES[0].template.doc;
     expect(exposeMainFields(template).fields).toEqual(template.fields);
+  });
+});
+
+describe('the details of the gallery filters', () => {
+  it('draws each format as a rectangle in its real proportions, never taller or wider than the box', () => {
+    expect(glyphSize(MotionFormat.Landscape)).toEqual({ width: 14, height: 8 });
+    expect(glyphSize(MotionFormat.Vertical)).toEqual({ width: 8, height: 14 });
+    expect(glyphSize(MotionFormat.Square)).toEqual({ width: 14, height: 14 });
+    expect(glyphSize(MotionFormat.Portrait)).toEqual({ width: 11, height: 14 });
+  });
+
+  it('keeps the other filters when the length range changes, and drops an open end', () => {
+    expect(filterHref({ kind: 'motion' }, 'min', '4')).toBe('/gallery?kind=motion&min=4');
+    expect(rangeHref({ kind: 'motion', min: '4' }, { min: 0, max: 12 })).toBe('/gallery?kind=motion&max=12');
+    expect(rangeHref({}, { min: 0, max: SLIDER_MAX })).toBe('/gallery');
+  });
+
+  it('counts the results in words', () => {
+    expect([resultCount(0), resultCount(1), resultCount(36)]).toEqual(['No videos', '1 video', '36 videos']);
   });
 });

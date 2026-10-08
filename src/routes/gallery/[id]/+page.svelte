@@ -1,6 +1,8 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
   import GalleryPlayer from '$lib/components/gallery/GalleryPlayer.svelte';
+  import FormatGlyph from '$lib/components/gallery/FormatGlyph.svelte';
+  import KindGlyph from '$lib/components/gallery/KindGlyph.svelte';
   import { assetUrlMap, GALLERY_PATH, itemPath, KIND_LABEL, Playback } from '$lib/gallery/model';
 
   let { data, form } = $props();
@@ -29,7 +31,11 @@
       <h1>{item.title}</h1>
       <p class="gx-byline" data-testid="gallery-byline">
         by {item.authorName}{#if item.remixedFrom} · remix of <a href={itemPath(item.remixedFrom.id)}>{item.remixedFrom.title}</a>{/if}
-        · {item.format} · {item.durationS} s
+      </p>
+      <p class="gx-facts">
+        <span title="Type"><KindGlyph kind={item.kind} /> {KIND_LABEL[item.kind]}</span>
+        <span title="Format"><FormatGlyph format={item.format} /> {item.format}</span>
+        <span title="Length">{item.durationS} s</span>
       </p>
       {#if item.description}<p class="gx-description">{item.description}</p>{/if}
     </div>
@@ -123,6 +129,29 @@
     color: var(--ui-ink-3);
   }
 
+  .gx-facts {
+    display: flex;
+    gap: var(--ui-space-4);
+    margin: var(--ui-space-1) 0 0;
+    font-size: var(--ui-text-xs);
+    color: var(--ui-ink-3);
+  }
+
+  .gx-facts span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .gx-primary:hover:not(:disabled) {
+    opacity: 0.88;
+  }
+
+  .gx-primary:focus-visible {
+    outline: none;
+    box-shadow: var(--ui-focus);
+  }
+
   .gx-byline a {
     color: var(--ui-ink-2);
   }
@@ -147,6 +176,7 @@
   }
 
   .gx-primary {
+    transition: opacity 120ms ease;
     height: 40px;
     min-width: 140px;
     padding: 0 var(--ui-space-6);
