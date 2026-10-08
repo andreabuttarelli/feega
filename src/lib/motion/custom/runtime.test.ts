@@ -4,6 +4,7 @@ import * as d3 from 'd3';
 import Matter from 'matter-js';
 import './generative-entry';
 import './twgl-entry';
+import './fx-entry';
 import { installEngine, testTimeline, type TestTimeline } from '../engine/testing';
 import { ERRORS, REGISTRY, bootScript, definitionScript, librariesOf, Library, seedOf, type CustomRun } from './runtime';
 
@@ -274,6 +275,59 @@ describe('libraries', () => {
     } finally {
       HTMLCanvasElement.prototype.getContext = getContext;
     }
+  });
+
+  it('loads fx for a component that uses it', () => {
+    const components = { F: { source: { html: '', css: '', js: 'fx.grain(root)' } } } as never;
+
+    expect([...librariesOf(components, ['F'])]).toEqual([Library.Fx]);
+  });
+
+  it('drives each fx effect by one variable on tl: the same frame sought twice gives the same style', () => {
+    const js = [
+      'const dot = root.querySelector(".dot");',
+      'fx.border(dot, { colors: ["#ffffff", "#0099ff"] });',
+      'fx.gradient(root, { colors: ["#000000", "#0099ff"], cycles: 2 });',
+      'fx.grid(root, { size: 40 });',
+      'fx.shimmer(dot);',
+      'fx.grain(root, { boil: 12 });'
+    ].join('');
+    const { master, root, errors } = run('Effects', js);
+    const dot = root.querySelector('.dot') as HTMLElement;
+    const grain = root.querySelector('[data-fx="grain"]') as HTMLElement;
+    const styles = () => [root.style.cssText, dot.style.cssText, grain.style.cssText].join('|');
+
+    master.seek(1.5);
+    const first = styles();
+    master.seek(2.9);
+    master.seek(1.5);
+
+    expect(errors).toEqual([]);
+    expect(dot.style.getPropertyValue('--fx-border')).toBe('0.25');
+    expect(root.style.getPropertyValue('--fx-gradient')).toBe('0.5');
+    expect(grain.style.getPropertyValue('--fx-grain')).toBe('6');
+    expect(styles()).toBe(first);
+  });
+
+  it('loops a marquee over a doubled track, seekable both ways', () => {
+    const { master, root } = run('Ticker', 'root.innerHTML = "<span>a</span><span>b</span>"; fx.marquee(root, { cycles: 4 });');
+    const track = root.querySelector('[data-fx="marquee"]') as HTMLElement;
+
+    master.seek(1.25);
+    const early = track.style.getPropertyValue('--fx-marquee');
+    master.seek(2.75);
+    master.seek(1.25);
+
+    expect(track.querySelectorAll('span')).toHaveLength(4);
+    expect(early).toBe('0.5');
+    expect(track.style.getPropertyValue('--fx-marquee')).toBe(early);
+  });
+
+  it('seeds the grain per clip', () => {
+    const grainOf = () => (run('Grain', 'fx.grain(root);').root.querySelector('[data-fx="grain"]') as HTMLElement).style.backgroundImage;
+
+    expect(grainOf()).toContain('seed');
+    expect(grainOf()).toBe(grainOf());
   });
 
   it('a d3 chart drawn from progress gives the same frame from any seek order', () => {
