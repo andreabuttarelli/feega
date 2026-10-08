@@ -9,23 +9,60 @@
     ${TAG} {
       --lg-ink: #000;
       --lg-bg: #fff;
+      --lg-accent: #1a3cf5;
+      --lg-on-accent: #fff;
       --lg-font: "Inter Tight", "Helvetica Neue", Arial, sans-serif;
       position: relative;
-      display: grid;
-      place-content: center;
-      min-height: 480px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      width: 100%;
+      height: 100%;
+      min-height: 100%;
+      padding: 0 16px;
       background: var(--lg-bg);
       color: var(--lg-ink);
+      font-family: var(--lg-font);
+      text-align: center;
       overflow: hidden;
       touch-action: pan-y;
-      text-align: center;
-      font: 800 clamp(56px, 11vw, 200px)/0.92 var(--lg-font);
-      letter-spacing: -0.055em;
     }
 
-    ${TAG} > :not(canvas) { margin: 0; font: inherit; letter-spacing: inherit; }
-    ${TAG}[data-live] > :not(canvas) { color: transparent; }
-    ${TAG}[data-live]:not(:has(> :not(canvas))) { color: transparent; }
+    ${TAG} h1 {
+      margin: 0;
+      font: 500 clamp(56px, 12vw, 200px)/0.9 var(--lg-font);
+      letter-spacing: -0.045em;
+    }
+
+    ${TAG} p {
+      margin: 0.9em 0 0;
+      max-width: 40ch;
+      font: 400 clamp(17px, 2vw, 28px)/1.25 var(--lg-font);
+      letter-spacing: -0.015em;
+    }
+
+    ${TAG} .lg-cta {
+      margin-top: clamp(28px, 4vw, 56px);
+      padding: 0.95em 2.6em;
+      border: 0;
+      border-radius: 0;
+      background: var(--lg-accent);
+      color: var(--lg-on-accent);
+      font: 500 clamp(17px, 1.8vw, 26px)/1 var(--lg-font);
+      letter-spacing: -0.01em;
+      text-decoration: none;
+    }
+
+    ${TAG} .lg-link {
+      margin-top: clamp(20px, 2.6vw, 36px);
+      color: inherit;
+      font: 500 clamp(16px, 1.7vw, 24px)/1 var(--lg-font);
+      letter-spacing: -0.01em;
+      text-decoration: none;
+    }
 
     ${TAG} > canvas {
       position: absolute;
@@ -133,6 +170,8 @@
   const DPR_MAX = 2;
   const DEFAULT_SIZE = 0.13;
   const DEFAULT_POWER = 1;
+  const TRANSPARENT = 'rgba(0, 0, 0, 0)';
+  const WORD = /\S+/g;
   const UNIFORMS = ['tex', 'res', 'a', 'b', 'ra', 'rb', 'stretch', 't', 'power'];
 
   function shader(gl, type, src) {
@@ -199,7 +238,6 @@
       this.gl = gl;
       this.setup();
       this.listen();
-      this.setAttribute('data-live', '');
       this.raf = requestAnimationFrame((now) => this.frame(now));
     }
 
@@ -208,7 +246,6 @@
       this.resizer?.disconnect();
       this.viewer?.disconnect();
       this.canvas?.remove();
-      this.removeAttribute('data-live');
     }
 
     setup() {
@@ -260,30 +297,48 @@
       document.fonts.ready.then(() => this.paint());
     }
 
-    title() {
-      return [...this.children].find((c) => c !== this.canvas) ?? this;
-    }
-
     paint() {
-      const title = this.title();
-      const style = getComputedStyle(title);
-      const host = getComputedStyle(this);
-      const size = parseFloat(style.fontSize) * this.dpr;
-      const lead = parseFloat(style.lineHeight) * this.dpr || size * 0.92;
-      const lines = title.innerText.split('\n').filter((l) => l.trim());
       const ink = this.paper.getContext('2d');
+      const box = this.getBoundingClientRect();
+      const k = this.dpr;
 
       this.paper.width = this.w;
       this.paper.height = this.h;
-      ink.fillStyle = host.backgroundColor;
+      ink.fillStyle = getComputedStyle(this).backgroundColor;
       ink.fillRect(0, 0, this.w, this.h);
-      ink.fillStyle = host.getPropertyValue('--lg-ink').trim() || '#000';
-      ink.font = `${style.fontWeight} ${size}px ${style.fontFamily}`;
-      ink.letterSpacing = `${parseFloat(style.letterSpacing) * this.dpr || 0}px`;
-      ink.textAlign = 'center';
-      ink.textBaseline = 'middle';
-      const top = this.h / 2 - (lead * (lines.length - 1)) / 2;
-      lines.forEach((line, i) => ink.fillText(line, this.w / 2, top + i * lead));
+
+      for (const el of this.querySelectorAll('*')) {
+        if (el === this.canvas) {
+          continue;
+        }
+        const bg = getComputedStyle(el).backgroundColor;
+        if (bg === TRANSPARENT) {
+          continue;
+        }
+        const r = el.getBoundingClientRect();
+        ink.fillStyle = bg;
+        ink.fillRect((r.left - box.left) * k, (r.top - box.top) * k, r.width * k, r.height * k);
+      }
+
+      const walker = document.createTreeWalker(this, NodeFilter.SHOW_TEXT);
+      const range = document.createRange();
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const style = getComputedStyle(node.parentElement);
+        ink.fillStyle = style.color;
+        ink.font = `${style.fontWeight} ${parseFloat(style.fontSize) * k}px ${style.fontFamily}`;
+        ink.letterSpacing = `${(parseFloat(style.letterSpacing) || 0) * k}px`;
+        ink.textBaseline = 'middle';
+        ink.textAlign = 'left';
+        for (const word of node.textContent.matchAll(WORD)) {
+          range.setStart(node, word.index);
+          range.setEnd(node, word.index + word[0].length);
+          const r = range.getBoundingClientRect();
+          if (!r.width) {
+            continue;
+          }
+          ink.fillText(word[0], (r.left - box.left) * k, (r.top - box.top + r.height / 2) * k);
+        }
+      }
 
       const gl = this.gl;
       gl.bindTexture(gl.TEXTURE_2D, this.texture);
@@ -303,7 +358,7 @@
     wander(time) {
       return {
         x: this.w / 2 + Math.sin(time * 0.37) * this.w * 0.24,
-        y: this.h / 2 + Math.sin(time * 0.53 + 1.2) * this.h * 0.05
+        y: this.h * 0.62 + Math.sin(time * 0.53 + 1.2) * this.h * 0.08
       };
     }
 
