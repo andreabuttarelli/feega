@@ -13,6 +13,8 @@ import { MOTION_START_DEPS, startMotion } from '$lib/server/motion/start';
 import { RenderMode, renderState, requestRender } from '$lib/server/motion/agent-render';
 import { motionFrames } from '$lib/server/motion/agent-frames';
 import { MAX_FRAMES_PER_VIEW } from '$lib/server/motion/frames';
+import { framePaths, framesPrefix, putFrames, type FrameBucket } from '$lib/server/motion/frame-store';
+import { CANVAS_ASSET_BUCKET } from '$lib/server/repos/asset-storage';
 import { motionEmbedState, publishMotionEmbed, type EmbedAnswer } from '$lib/server/motion/agent-embed';
 
 export const MOTION_DELEGATION_TOOLS = [
@@ -27,7 +29,7 @@ export const MOTION_DELEGATION_TOOLS = [
   'get_motion_embed'
 ] as const;
 
-export type MotionDelegationDeps = { db: Db; orgId: string; projectId: string; userId: string; origin: string; model?: string; pollMs?: number };
+export type MotionDelegationDeps = { db: Db; orgId: string; projectId: string; userId: string; origin: string; model?: string; canvasId?: string | null; pollMs?: number };
 
 const POLL_MS = 2000;
 const MAX_WAIT_S = 90;
@@ -49,8 +51,10 @@ function mediaOf(assets: Asset[], ref: string): Asset | null {
 
 type DrawnFrame = { time: number; mime: string; data: string };
 
-function framesForModel(output: Record<string, unknown>) {
-  const { frames, ...rest } = output as { frames?: DrawnFrame[] };
+type ViewedFrame = { time: number; path: string };
+
+function framesForModel(output: Record<string, unknown>, drawn: DrawnFrame[] = []) {
+  const { frames, ...rest } = output as { frames?: ViewedFrame[] };
   if (!frames) {
     return { type: 'json' as const, value: rest as never };
   }
@@ -58,10 +62,12 @@ function framesForModel(output: Record<string, unknown>) {
     type: 'content' as const,
     value: [
       { type: 'text' as const, text: JSON.stringify({ ...rest, times: frames.map((f) => f.time) }) },
-      ...frames.map((f) => ({ type: 'file' as const, mediaType: f.mime, data: { type: 'data' as const, data: f.data } }))
+      ...drawn.map((f) => ({ type: 'file' as const, mediaType: f.mime, data: { type: 'data' as const, data: f.data } }))
     ]
   };
 }
+
+const VIEW_PREFIX = 'view-';
 
 const mediaLine = (media: Asset[]) => `Media from the canvas to use (asset ids in list_assets): ${media.map((a) => `${a.id} (${a.type})`).join(', ')}.`;
 
@@ -69,6 +75,18 @@ export function createMotionDelegation(deps: MotionDelegationDeps): Record<strin
   const { db, orgId, projectId, userId } = deps;
   const actor = agentActor(userId, SIDEBAR_AGENT_KEY);
   const pollMs = deps.pollMs ?? POLL_MS;
+  const drawnByCall = new Map<string, DrawnFrame[]>();
+
+  async function keptFrames(nodeId: string, callId: string, drawn: DrawnFrame[]): Promise<ViewedFrame[] | null> {
+    const prefix = framesPrefix({ orgId, projectId, nodeId }, `${VIEW_PREFIX}${callId}`);
+    const frames = drawn.map((f) => ({ time: f.time, bytes: Buffer.from(f.data, 'base64') }));
+    const bucket = db.storage.from(CANVAS_ASSET_BUCKET) as unknown as FrameBucket;
+    if (!(await putFrames(bucket, prefix, frames))) {
+      return null;
+    }
+    const paths = framePaths(prefix, drawn);
+    return drawn.map((f, i) => ({ time: f.time, path: paths[i] }));
+  }
 
   const inProject = (nodeId: string) => findMotionNode(db, { orgId, nodeId, place: { projectId } });
 
@@ -90,7 +108,8 @@ export function createMotionDelegation(deps: MotionDelegationDeps): Record<strin
     if (asked instanceof Response) {
       return asked.json();
     }
-    return { run_id: asked.runId, node_id: nodeId, status: RUNNING, editor_url: motionEditorPath({ projectId, canvasId: motion.record.canvasId, nodeId }) };
+    const started = { run_id: asked.runId, node_id: nodeId, status: RUNNING, model: asked.model, editor_url: motionEditorPath({ projectId, canvasId: motion.record.canvasId, nodeId }) };
+    return asked.refusedModel ? { ...started, model_note: `${asked.refusedModel} cannot drive the motion tools: the motion agent runs on ${asked.model}. Tell the user.` } : started;
   }
 
   async function settled(runId: string, waitS: number): Promise<Record<string, unknown>> {
@@ -112,7 +131,7 @@ export function createMotionDelegation(deps: MotionDelegationDeps): Record<strin
 
     create_motion_video: tool({
       description: [
-        'Create a new motion video node on a canvas of THIS project (default canvas: the "Motion" canvas), placed to the right of the nodes listed in near.',
+        'Create a new motion video node on a canvas of THIS project (default: the canvas the user has open, else the "Motion" canvas), placed to the right of the nodes listed in near.',
         'With a brief, the motion agent starts building it right away (costs credits, only when the user asked): poll get_motion_run with the returned run_id.',
         'media: node or asset ids whose image, video or audio the motion agent should use.'
       ].join(' '),
@@ -127,7 +146,7 @@ export function createMotionDelegation(deps: MotionDelegationDeps): Record<strin
         })
         .strict(),
       execute: async (input: { name: string; canvasId?: string; format?: MotionFormat; near?: string[]; brief?: string; media?: string[] }) => {
-        const started = await startMotion(db, MOTION_START_DEPS, { orgId, projectId, canvasId: input.canvasId ?? null, userId, name: input.name, format: input.format, near: input.near, actor });
+        const started = await startMotion(db, MOTION_START_DEPS, { orgId, projectId, canvasId: input.canvasId ?? deps.canvasId ?? null, userId, name: input.name, format: input.format, near: input.near, actor });
         if (!started) {
           return { error: 'canvas_not_found', message: 'No canvas with that id in this project.' };
         }
@@ -154,14 +173,20 @@ export function createMotionDelegation(deps: MotionDelegationDeps): Record<strin
     view_motion_frames: tool({
       description: `Look at a saved motion video of THIS project: up to ${MAX_FRAMES_PER_VIEW} frames at the given seconds, drawn on the server, with the quality gate (quality, blocking). Free. Use it to check what the motion agent built before telling the user.`,
       inputSchema: z.object({ nodeId: z.string(), times: z.array(z.number().min(0)).min(1).max(MAX_FRAMES_PER_VIEW) }).strict(),
-      execute: async (input: { nodeId: string; times: number[] }) => {
+      execute: async (input: { nodeId: string; times: number[] }, { toolCallId }) => {
         if (!(await inProject(input.nodeId))) {
           return NOT_FOUND;
         }
         const drawn = await motionFrames(db, { orgId, nodeId: input.nodeId }, { times: input.times });
-        return drawn.ok ? drawn.body : { error: drawn.failure, detail: drawn.detail };
+        if (!drawn.ok) {
+          return { error: drawn.failure, detail: drawn.detail };
+        }
+        const images = drawn.body.frames as DrawnFrame[];
+        drawnByCall.set(toolCallId, images);
+        const kept = await keptFrames(input.nodeId, toolCallId, images);
+        return { ...drawn.body, frames: kept ?? images.map((f) => ({ time: f.time, path: null })) };
       },
-      toModelOutput: ({ output }) => framesForModel(output)
+      toModelOutput: ({ toolCallId, output }) => framesForModel(output, drawnByCall.get(toolCallId))
     }),
 
     render_motion_video: tool({

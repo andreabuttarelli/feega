@@ -24,8 +24,11 @@ const VERDICT_NAME = 'verdict.json';
 
 export type StoredVerdict = { ok: boolean; problems: string[] };
 
+export const framePaths = (prefix: string, frames: readonly { time: number }[]) => frames.map((f, i) => `${prefix}/${nameOf(i, f.time)}`);
+
 export async function putFrames(bucket: FrameBucket, prefix: string, frames: Frame[]): Promise<boolean> {
-  const results = await Promise.all(frames.map((f, i) => bucket.upload(`${prefix}/${nameOf(i, f.time)}`, f.bytes, { contentType: 'image/jpeg', upsert: true })));
+  const paths = framePaths(prefix, frames);
+  const results = await Promise.all(frames.map((f, i) => bucket.upload(paths[i], f.bytes, { contentType: 'image/jpeg', upsert: true })));
   return results.every((r) => !r.error);
 }
 

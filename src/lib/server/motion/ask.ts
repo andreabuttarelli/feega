@@ -4,7 +4,7 @@ import { findNode, type CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { findProjectById } from '$lib/server/repos/projects';
 import { createRun, failRun, runsByIds, settleRun, type NodeRun } from '$lib/server/repos/node-runs';
 import { agentActor } from '$lib/server/repos/actor';
-import { offeredChatModels, resolveChoice } from '$lib/server/chat-model/catalogue';
+import { motionAsk, offeredChatModels, resolveChoice } from '$lib/server/chat-model/catalogue';
 import { runInBackground } from '$lib/server/background-work';
 import { motionEditorPath, motionOf, type MotionNode } from '$lib/canvas/motion-node';
 import { headOrNew } from '$lib/server/motion/editor';
@@ -28,7 +28,9 @@ const editorUrl = (record: CanvasNodeRecord) => motionEditorPath({ projectId: re
 
 const notFound = () => json({ error: 'motion_node_not_found' }, { status: HTTP_NOT_FOUND });
 
-export async function askMotion(db: Db, input: { orgId: string; userId: string; nodeId: string; prompt: string; agentKey?: string; choice?: { model?: unknown; reasoning?: unknown } }): Promise<{ runId: string } | Response> {
+export type AskStarted = { runId: string; model: string; refusedModel: string | null };
+
+export async function askMotion(db: Db, input: { orgId: string; userId: string; nodeId: string; prompt: string; agentKey?: string; choice?: { model?: unknown; reasoning?: unknown } }): Promise<AskStarted | Response> {
   const { orgId, userId, nodeId, prompt, agentKey = MCP_AGENT_KEY, choice: asked = {} } = input;
   const motion = await findMotion(db, { orgId, nodeId });
   const project = motion ? await findProjectById(db, { orgId, projectId: motion.record.projectId }) : null;
@@ -36,7 +38,8 @@ export async function askMotion(db: Db, input: { orgId: string; userId: string; 
     return notFound();
   }
 
-  const choice = resolveChoice(await offeredChatModels(), asked);
+  const guarded = motionAsk(asked);
+  const choice = resolveChoice(await offeredChatModels(), guarded.asked);
   if (!choice.ok) {
     return json({ error: choice.error }, { status: HTTP_UNAVAILABLE });
   }
@@ -60,7 +63,7 @@ export async function askMotion(db: Db, input: { orgId: string; userId: string; 
 
   const run = await createRun(db, { orgId, nodeId, prompt, model: choice.choice.model, params: { kind: ASK_KIND }, actorKind: 'agent', actorId: userId });
   runInBackground(() => settleAsk(db, run, turn), ASK_KIND);
-  return { runId: run.id };
+  return { runId: run.id, model: choice.choice.model, refusedModel: guarded.refused };
 }
 
 async function settleAsk(db: Db, run: NodeRun, turn: MotionTurn): Promise<void> {

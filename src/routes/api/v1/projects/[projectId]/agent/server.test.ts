@@ -103,7 +103,18 @@ vi.mock('$lib/server/cli-auth', () => ({
   gateOrgAiAction: async () => null
 }));
 vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: async () => [] }));
-vi.mock('$lib/server/repos/canvas', async (importOriginal) => ({ ...(await importOriginal<typeof import('$lib/server/repos/canvas')>()), listCanvases: async () => [] }));
+vi.mock('$lib/server/repos/canvas', async (importOriginal) => ({ ...(await importOriginal<typeof import('$lib/server/repos/canvas')>()), listCanvases: async () => [{ id: 'c-1', name: 'Ideas' }] }));
+const delegated = vi.hoisted(() => ({ canvasId: undefined as string | null | undefined }));
+vi.mock('$lib/server/project-agent/motion-delegation', async (importOriginal) => {
+  const real = await importOriginal<typeof import('$lib/server/project-agent/motion-delegation')>();
+  return {
+    ...real,
+    createMotionDelegation: (deps: Parameters<typeof real.createMotionDelegation>[0]) => {
+      delegated.canvasId = deps.canvasId;
+      return real.createMotionDelegation(deps);
+    }
+  };
+});
 vi.mock('$lib/server/projects/lookup', () => ({
   findReachableProject: async () => ({ orgId: 'org-1', project: { id: 'p-1', name: 'P', brandId: null } })
 }));
@@ -126,11 +137,11 @@ vi.mock('$lib/server/project-agent/tool-surface', () => ({
 const { GET, POST } = await import('./+server');
 const { MOTION_DELEGATION_TOOLS } = await import('$lib/server/project-agent/motion-delegation');
 
-function postEvent() {
+function postEvent(extra: Record<string, unknown> = {}) {
   const request = new Request('http://x/api/v1/projects/p-1/agent', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ message: 'make a doc' })
+    body: JSON.stringify({ message: 'make a doc', ...extra })
   });
   const locals = {
     safeGetSession: async () => ({ session: { access_token: 'tok' }, user: { id: 'u-1' } }),
@@ -178,6 +189,18 @@ describe('POST /api/v1/projects/[projectId]/agent', () => {
     await POST(postEvent());
 
     expect(offeredProjectTools.names).toEqual(expect.arrayContaining([...MOTION_DELEGATION_TOOLS]));
+  });
+
+  it('hands the motion delegation the canvas the user has open', async () => {
+    await POST(postEvent({ canvasId: 'c-1' }));
+
+    expect(delegated.canvasId).toBe('c-1');
+  });
+
+  it('ignores an open canvas that is not in this project', async () => {
+    await POST(postEvent({ canvasId: 'c-elsewhere' }));
+
+    expect(delegated.canvasId).toBeNull();
   });
 
   it('salva la risposta anche se il client chiude la connessione a metà turno', async () => {

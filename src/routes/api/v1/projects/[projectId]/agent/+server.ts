@@ -74,7 +74,7 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
   const gated = brand ? await gateAiAction(brand, undefined) : await gateOrgAiAction(orgId, undefined);
   if (gated) return gated;
 
-  const { message, model: askedModel, reasoning: askedReasoning } = (await request.json()) as { message?: string; model?: unknown; reasoning?: unknown };
+  const { message, model: askedModel, reasoning: askedReasoning, canvasId: openCanvas } = (await request.json()) as { message?: string; model?: unknown; reasoning?: unknown; canvasId?: unknown };
   const text = message?.trim();
   if (!text) return json({ error: 'empty_message' }, { status: 400 });
 
@@ -91,6 +91,7 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
   });
 
   const canvases = await listCanvases(db, { orgId, projectId: project.id });
+  const canvasId = canvases.find((c) => c.id === openCanvas)?.id ?? null;
   const threadId = await openThread(db, {
     orgId,
     projectId: project.id,
@@ -112,7 +113,7 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
 
   const projectTools = {
     ...createProjectTools({ db, orgId, projectId: project.id, userId: user.id, brandId: brand?.id ?? null }),
-    ...createMotionDelegation({ db, orgId, projectId: project.id, userId: user.id, origin: url.origin, model })
+    ...createMotionDelegation({ db, orgId, projectId: project.id, userId: user.id, origin: url.origin, model, canvasId })
   };
   const agent = await openAgentTools({
     projectTools,
