@@ -23,7 +23,10 @@ const world = vi.hoisted(() => ({
   blankViews: 0,
   views: 0,
   scripting: false,
-  awaited: 0
+  awaited: 0,
+  conflicts: 0,
+  writes: [] as { expectedVersion: number }[],
+  chunks: [] as { type: string; data?: unknown }[]
 }));
 
 const SITE = 'https://supasito.com/';
@@ -163,7 +166,14 @@ vi.mock('$lib/server/motion/editor', () => ({
   motionTokens: async () => ({ name: 'Brand' }),
   motionAssets: async () => [],
   assetUrls: () => ({}),
-  saveMotionDoc: async () => null
+  saveMotionDoc: async (_db: unknown, input: { expectedVersion: number }) => {
+    world.writes.push(input);
+    if (world.conflicts > 0) {
+      world.conflicts--;
+      return { outcome: 'conflict' };
+    }
+    return { outcome: 'written', head: { version: input.expectedVersion + 1, doc: {}, summary: null, actorKind: 'agent' } };
+  },
 }));
 vi.mock('$lib/server/motion/frame-store', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$lib/server/motion/frame-store')>()),
@@ -183,6 +193,8 @@ vi.mock('$lib/server/motion/brand-sources', async () => {
 });
 
 const { startMotionTurn, Browser, MAX_DELIVERY_ATTEMPTS } = await import('./turn');
+const { DOC_EDITED } = await import('$lib/motion/frames-request');
+type DocEdited = import('$lib/motion/frames-request').DocEdited;
 
 async function turn(reasoning: string | null = 'low', browser = Browser.Attached) {
   const db = { storage: { from: () => ({}) } } as never;
@@ -192,8 +204,8 @@ async function turn(reasoning: string | null = 'low', browser = Browser.Attached
     throw new Error('turn refused');
   }
   const reader = started.stream.getReader();
-  while (!(await reader.read()).done) {
-    continue;
+  for (let next = await reader.read(); !next.done; next = await reader.read()) {
+    world.chunks.push(next.value as { type: string; data?: unknown });
   }
   return started.done;
 }
@@ -229,6 +241,9 @@ describe('a motion turn closes on a look and a summary', () => {
     world.views = 0;
     world.scripting = false;
     world.awaited = 0;
+    world.conflicts = 0;
+    world.writes = [];
+    world.chunks = [];
   });
 
   it('looks at its frames after the last edit even when the edits spent the whole budget', async () => {
@@ -341,5 +356,25 @@ describe('a motion turn closes on a look and a summary', () => {
     expect(world.toolCalls).toContain('view_frames');
     expect(world.awaited).toBe(0);
     expect(outcome.reply.trim().length).toBeGreaterThan(0);
+  });
+
+  it('every applied edit reaches the editor as it lands, numbered in order, before the turn ends', async () => {
+    await turn();
+    const edits = world.chunks.filter((c) => c.type === DOC_EDITED).map((c) => (c.data as DocEdited).edit);
+    const finish = world.chunks.findIndex((c) => c.type === 'finish');
+    const lastEdit = world.chunks.findLastIndex((c) => c.type === DOC_EDITED);
+
+    expect(edits).toEqual([1]);
+    expect(lastEdit).toBeLessThan(finish);
+    expect((world.chunks[lastEdit].data as DocEdited).doc.tracks.some((t) => t.clips.length)).toBe(true);
+  });
+
+  it('a save refused by a newer head is retried on that head: the agent work is never dropped', async () => {
+    world.conflicts = 1;
+
+    const outcome = await turn();
+
+    expect(world.writes).toHaveLength(2);
+    expect(outcome.revision).toBe('written');
   });
 });

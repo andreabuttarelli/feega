@@ -32,7 +32,8 @@
   import MotionPreview from '$lib/components/motion/MotionPreview.svelte';
   import ZoomStage from '$lib/components/motion/ZoomStage.svelte';
   import type { StreamData } from '$lib/components/brand-agent/chat-session.svelte';
-  import { CHECK_REQUEST, FRAMES_REQUEST, adoptAgentAssets, agentDraft, type CheckRequest, type FramesRequest } from '$lib/motion/frames-request';
+  import { CHECK_REQUEST, FRAMES_REQUEST, Head, Landing, adoptAgentAssets, agentDraft, landTurn, type AgentDraft, type CheckRequest, type FramesRequest } from '$lib/motion/frames-request';
+  import { Agent, showsStart } from '$lib/motion/start-prompt';
   import { runCheck, type CheckPorts } from '$lib/motion/custom/run-check';
   import { recordCheck } from '$lib/motion/custom/ops';
   import { unverified } from '$lib/motion/custom/determinism';
@@ -139,7 +140,7 @@
   let browsing = $state(false);
   let templates = $state<TemplateEntry[]>(data.templates);
   let previewDoc = $state<MotionDoc | null>(null);
-  let draft = $state<MotionDoc | null>(null);
+  let draft = $state<AgentDraft>(null);
   let sounding = $state<SoundKind | null>(null);
   let madeAssets = $state<PageData['assets']>([]);
   let analyses = $state<Record<string, AudioAnalysis>>({});
@@ -218,16 +219,16 @@
   let unsavedSummary = '';
 
   const compPath = $derived(path.map((p) => p.comp));
-  const doc = $derived(viewOf(history.present, compPath));
+  const doc = $derived(viewOf(draft?.doc ?? history.present, compPath));
   const beats = $derived(hitFrames(doc, analyses, Hit.Beats));
   const assets = $derived([...madeAssets, ...data.assets]);
   const assetUrls = $derived(Object.fromEntries(assets.filter((a) => a.url).map((a) => [a.id, a.url as string])));
   let interactive = $state(false);
   let tiltX = $state(0);
   let tiltY = $state(0);
-  const html = $derived(composeHtml({ doc: previewDoc ?? (draft ? viewOf(draft, compPath) : doc), tokens: data.tokens, assets: assetUrls, analyses, liveness: interactive ? Liveness.Live : Liveness.Baked }));
+  const html = $derived(composeHtml({ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls, analyses, liveness: interactive ? Liveness.Live : Liveness.Baked }));
   const selected = $derived(selection.length === 1 ? (findClip(doc, selection[0])?.clip ?? null) : null);
-  const blank = $derived(!path.length && doc.tracks.every((t) => !t.clips.length));
+  const blank = $derived(!path.length && showsStart(doc, agentBusy ? Agent.Working : Agent.Idle));
 
   const OPEN_CHAT: Record<ChatPlace, () => void> = {
     [ChatPlace.Column]: () => relayout({ chat: Panel.Open, inspector: Panel.Open, side: Side.Chat }),
@@ -407,6 +408,9 @@
   }
 
   async function pullExternalEdit() {
+    if (agentBusy) {
+      return;
+    }
     const res = await fetch(agentUrl);
     const body = (await res.json().catch(() => null)) as { head?: { version: number; doc: MotionDoc; actorKind: string } } | null;
     if (!body?.head || body.head.version <= version || body.head.actorKind !== 'agent') {
@@ -418,12 +422,22 @@
     chatReload++;
   }
 
+  const LAND: Record<Landing, (shown: AgentDraft) => void> = {
+    [Landing.Head]: () => (draft = null),
+    [Landing.KeepDraft]: (shown) => {
+      history = record(history, shown!.doc);
+      draft = null;
+      scheduleSave('Kept the agent edits');
+    },
+    [Landing.Nothing]: () => {}
+  };
+
   async function pullAgentEdit() {
-    await pullHead();
-    draft = null;
+    const head = await pullHead();
+    LAND[landTurn(draft, head)](draft);
   }
 
-  async function pullHead() {
+  async function pullHead(): Promise<Head> {
     for (let i = 0; i < HEAD_POLL_TRIES; i++) {
       const res = await fetch(agentUrl);
       const body = (await res.json().catch(() => null)) as { head?: { version: number; doc: MotionDoc } } | null;
@@ -431,10 +445,11 @@
         history = record(history, body.head.doc);
         version = body.head.version;
         selection = selection.filter((id) => findClip(body.head!.doc, id));
-        return;
+        return Head.Newer;
       }
       await new Promise((r) => setTimeout(r, HEAD_POLL_MS));
     }
+    return Head.Same;
   }
 
   const checkPorts: CheckPorts = {

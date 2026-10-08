@@ -64,6 +64,32 @@ describe('a chat whose tab went to the background', () => {
     expect(session.messages.map((m) => m.content)).toEqual(['first ask', 'first answer', ASK, 'Working on it']);
   });
 
+  it('a cut stream does not announce the turn ended while it still runs, and announces it once when it lands', async () => {
+    const thread: Thread = { messages: OLD, running: false };
+    const server = backgrounded(thread);
+    const session = chatSession(ENDPOINT, server.fetcher);
+    let ended = 0;
+    session.onTurnEnd = () => ended++;
+    await session.load();
+
+    const sent = session.send(ASK, 'append-user');
+    await settle();
+    thread.messages = ASKED;
+    thread.running = true;
+    server.cut();
+    await sent;
+    await settle();
+
+    expect(ended).toBe(0);
+
+    thread.messages = [...ASKED, { role: 'assistant', content: 'Made it pop.' }];
+    thread.running = false;
+    session.resume();
+    await settle();
+
+    expect(ended).toBe(1);
+  });
+
   it('coming back to a turn that finished meanwhile shows its answer', async () => {
     const thread: Thread = { messages: OLD, running: false };
     const session = await cutMidTurn(thread, true);

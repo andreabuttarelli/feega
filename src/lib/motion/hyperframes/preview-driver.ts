@@ -89,8 +89,13 @@ export function previewDriver(port: PlayerPort, newId: () => string = () => cryp
   }
 
   function loaded(html: string): Promise<void> {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        off();
+        reject(new Error('preview never became ready'));
+      }, timeoutMs);
       const off = port.onReady(() => {
+        clearTimeout(timer);
         off();
         resolve();
       });

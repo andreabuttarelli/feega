@@ -156,7 +156,9 @@ export class ChatSession {
       turns.running--;
       this.#abort = null;
       this.revision++;
-      this.onTurnEnd?.();
+      if (!this.#following) {
+        this.onTurnEnd?.();
+      }
     }
   }
 
