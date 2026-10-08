@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, tick, untrack } from 'svelte';
+  import { POSTER_WIDTH, posterJob, posterSecond, sendPoster } from '$lib/motion/poster-capture';
   import { deserialize } from '$app/forms';
   import { replaceState } from '$app/navigation';
   import { page } from '$app/state';
@@ -268,6 +269,18 @@
     }
   });
   const editorUrl = $derived(`/p/${data.projectId}/c/${data.canvas.id}/motion/${data.node.id}`);
+
+  const poster = posterJob(
+    () => preview?.still(posterSecond(history.present), POSTER_WIDTH) ?? Promise.resolve(''),
+    (jpeg) => sendPoster(`${editorUrl}?/poster`, jpeg, { width: String(POSTER_WIDTH), height: String(Math.round((POSTER_WIDTH * history.present.height) / history.present.width)) })
+  );
+  let posterVersion = data.node.posterAssetId ? data.head.version : -1;
+  $effect(() => {
+    if (version > 0 && version !== posterVersion) {
+      posterVersion = version;
+      untrack(() => poster.schedule());
+    }
+  });
   const agentUrl = $derived(`/api/v1/projects/${data.projectId}/motion/${data.node.id}/agent`);
 
   const soundAssets = $derived(findSoundAssets(doc));

@@ -7,6 +7,7 @@
   import { COMPOSITION_LAYOUTS } from '$lib/motion/components';
   import { FORMATS, MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
   import { formatLastEdited } from '$lib/canvas/format-last-edited';
+  import { sendPoster, videoPoster } from '$lib/motion/poster-capture';
 
   let { data, form } = $props();
 
@@ -14,6 +15,23 @@
   const ratio = $derived(`${FORMATS[format].width} / ${FORMATS[format].height}`);
   const POSTER = { width: 270, height: 480 };
   const sample = (layout: string, ext: string) => `/compose-templates/${layout}.${ext}`;
+
+  let frames = $state<Record<string, string>>({});
+  const deriving = new Set<string>();
+  $effect(() => {
+    for (const item of data.recent) {
+      if (item.posterUrl || !item.previewUrl || deriving.has(item.id)) {
+        continue;
+      }
+      deriving.add(item.id);
+      void videoPoster(item.previewUrl, POSTER.width)
+        .then(({ jpeg, height }) => {
+          frames[item.id] = jpeg;
+          return sendPoster(`?project=${data.projectId}&/poster`, jpeg, { node: item.id, width: String(POSTER.width), height: String(height) });
+        })
+        .catch((e) => console.error('[compose] poster not derived', e));
+    }
+  });
 </script>
 
 <svelte:head><title>Compositions · feega</title></svelte:head>
@@ -76,7 +94,7 @@
           <li>
             <a href={item.href} class="template-button">
               <span class="stage" style={`aspect-ratio: ${ratio}`}>
-                <PreviewCard poster={item.posterUrl} preview={item.previewUrl} {...POSTER} />
+                <PreviewCard poster={item.posterUrl ?? (frames[item.id] || null)} preview={item.previewUrl} {...POSTER} />
               </span>
               <span class="template-text">
                 <span class="template-name">{item.name}</span>

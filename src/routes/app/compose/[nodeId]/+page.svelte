@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { onDestroy } from 'svelte';
+  import { onDestroy, untrack } from 'svelte';
+  import { POSTER_WIDTH, posterJob, posterSecond, sendPoster } from '$lib/motion/poster-capture';
   import { deserialize } from '$app/forms';
   import { invalidateAll } from '$app/navigation';
   import Play from '@lucide/svelte/icons/play';
@@ -54,6 +55,18 @@
   let dragging = $state(false);
   let preview = $state<MotionPreview | null>(null);
   let saveTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const poster = posterJob(
+    () => preview?.still(posterSecond(doc), POSTER_WIDTH) ?? Promise.resolve(''),
+    (jpeg) => sendPoster(`${data.editorUrl}?/poster`, jpeg, { width: String(POSTER_WIDTH), height: String(Math.round((POSTER_WIDTH * doc.height) / doc.width)) })
+  );
+  let posterVersion = data.node.posterAssetId ? data.head.version : -1;
+  $effect(() => {
+    if (version > 0 && version !== posterVersion) {
+      posterVersion = version;
+      untrack(() => poster.schedule());
+    }
+  });
 
   const library = $derived(data.assets.filter((a) => MEDIA_KINDS.has(a.kind)));
   const assetUrls = $derived(Object.fromEntries(data.assets.filter((a) => a.url).map((a) => [a.id, a.url as string])));

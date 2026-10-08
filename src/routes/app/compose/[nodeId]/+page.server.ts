@@ -47,7 +47,7 @@ export const load: PageServerLoad = async (event) => {
   return {
     projectId,
     orgId,
-    node: { id: motion.record.id, name: motion.record.displayName },
+    node: { id: motion.record.id, name: motion.record.displayName, posterAssetId: motion.node.posterAssetId },
     head: { version: head.version, doc: head.doc },
     draft: draftFromDoc(head.doc),
     tokens,
