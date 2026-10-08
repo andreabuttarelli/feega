@@ -1,7 +1,8 @@
 import type { EffectSet } from '../effects/render';
 import type { Keyframe } from '../keyframes';
 import { LENS_MAP_SIZE, lensMapUrl } from '../glass/lens-map';
-import { glassPose, type GlassPose } from '../glass/pose';
+import { glassPose } from '../glass/pose';
+import type { GlassPose } from '../glass/shape';
 import { css, esc } from './html';
 
 export const glassIds = {

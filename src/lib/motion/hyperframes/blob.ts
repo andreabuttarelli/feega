@@ -1,6 +1,7 @@
 import type { Keyframe } from '../keyframes';
 import { BLOB_NUMBERS } from '../blob/model';
-import { DEPTH, FLAT, ROW, blobRows } from '../blob/pose';
+import { blobRows } from '../blob/pose';
+import { DEPTH, FLAT, ROW } from '../blob/shape';
 import { paintOps, paintPlan } from './blob-paint';
 import { ON_DISPOSE, hotScope, hotSeek } from './hot';
 import { seekDriver } from './stage';

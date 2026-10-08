@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Ease } from '../design';
-import { blobPose, blobRows, blobStrains, ROW, ROW_LENGTH, type BlobClip } from './pose';
+import { blobPose, blobRows, blobStrains, type BlobClip } from './pose';
+import { ROW, ROW_LENGTH } from './shape';
 
 const frame = { width: 1920, height: 1080, fps: 30 };
 const same = (v: string) => v;
