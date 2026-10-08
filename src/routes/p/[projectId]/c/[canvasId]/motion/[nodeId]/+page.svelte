@@ -10,12 +10,11 @@
   import Plus from '@lucide/svelte/icons/plus';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import CompositionSettings from '$lib/components/motion/CompositionSettings.svelte';
-  import { SAVE_TONE, SaveState, TimeDisplay, clockLabel, compositionLabel, compositionShort, DISPLAY_NAME, isTap } from '$lib/motion/editor-bar';
-  import Keyboard from '@lucide/svelte/icons/keyboard';
-  import LayoutTemplate from '@lucide/svelte/icons/layout-template';
+  import { SAVE_TONE, SaveState, TimeDisplay, clockLabel, DISPLAY_NAME, isTap } from '$lib/motion/editor-bar';
   import Upload from '@lucide/svelte/icons/upload';
   import ShortcutHelp from '$lib/components/motion/ShortcutHelp.svelte';
   import { decodePeaks } from '$lib/motion/peaks-decode';
+  import MenuDrawer from '$lib/components/motion/MenuDrawer.svelte';
   import IconButton from '$lib/components/motion/IconButton.svelte';
   import { Action, Caption, menuSections, type ActionId } from '$lib/motion/actions';
   import { ClipOp, runClipOp } from '$lib/motion/clip-ops';
@@ -160,8 +159,8 @@
   let width = $state(1440);
   const viewport = $derived(viewportOf(width));
   const chatPlace = $derived(CHAT_PLACE[viewport]);
-  let settingsOpen = $state(false);
   let moreOpen = $state(false);
+  let menuOpen = $state(false);
   let clockOpen = $state(false);
   let toolsOpen = $state(false);
   let pickMode = $state(PickMode.One);
@@ -922,7 +921,6 @@
     if ((e.target as HTMLElement | null)?.closest('.popover-anchor, [role=menu]')) {
       return;
     }
-    settingsOpen = false;
     clockOpen = false;
     toolsOpen = false;
     if (clipMenu === pressedMenu) {
@@ -931,8 +929,7 @@
   }
 
   function onKey(e: KeyboardEvent) {
-    if ((settingsOpen || clockOpen || toolsOpen || clipMenu) && e.key === 'Escape') {
-      settingsOpen = false;
+    if ((clockOpen || toolsOpen || clipMenu) && e.key === 'Escape') {
       clockOpen = false;
       toolsOpen = false;
       clipMenu = null;
@@ -956,20 +953,9 @@
 <div class="editor" data-testid="motion-editor" data-viewport={viewport}>
   <header class="bar">
     <div class="group lead">
-      <IconButton action={Action.Back} href={`/p/${data.projectId}/c/${data.canvas.id}`} label={`Back to ${data.canvas.name}`} />
-      <nav class="crumbs" aria-label="Compositions" data-testid="comp-breadcrumb">
-        <a class="crumb" href={`/p/${data.projectId}/c/${data.canvas.id}`}>{data.canvas.name}</a>
-        <span class="slash" aria-hidden="true">/</span>
-        {#if path.length}
-          <button type="button" class="crumb" onclick={() => leaveTo(0)}>{data.node.name ?? 'Motion'}</button>
-        {:else}
-          <span class="crumb current" aria-current="page">{data.node.name ?? 'Motion'}</span>
-        {/if}
-        {#each pathNames(history.present, compPath) as name, i (i)}
-          <span class="slash" aria-hidden="true">/</span>
-          {#if i === path.length - 1}<span class="crumb current" aria-current="page">{name}</span>{:else}<button type="button" class="crumb" onclick={() => leaveTo(i + 1)}>{name}</button>{/if}
-        {/each}
-      </nav>
+      <IconButton action={Action.Menu} aria-expanded={menuOpen} aria-haspopup="dialog" data-testid="menu-open" onclick={() => (menuOpen = true)} />
+      <span class="title" title={data.node.name ?? 'Motion'}>{pathNames(history.present, compPath).at(-1) ?? data.node.name ?? 'Motion'}</span>
+      <span class="save-dot" data-tone={SAVE_TONE[saveState]} role="status" aria-label={`${saveState} · v${version}`}></span>
     </div>
 
     <div class="group transport" role="group" aria-label="Transport">
@@ -995,31 +981,16 @@
     <div class="group trail" data-testid="bar-trail">
       <IconButton action={Action.Undo} disabled={!canUndo(history)} onclick={undoEdit} />
       <IconButton action={Action.Redo} disabled={!canRedo(history)} onclick={redoEdit} />
-      <div class="popover-anchor">
-        <button type="button" class="chip" aria-expanded={settingsOpen} title="Composition settings" data-testid="comp-settings" onclick={() => (settingsOpen = !settingsOpen)}>
-          <span class="long">{compositionLabel(doc)}</span><span class="short">{compositionShort(doc)}</span><ChevronDown size={12} />
-        </button>
-        {#if settingsOpen}
-          <div class="popover" role="dialog" aria-label="Composition settings">
-            <span class="popover-head">Composition</span>
-            <CompositionSettings {doc} onchange={apply} />
-          </div>
-        {/if}
-      </div>
-      <span class="save" data-testid="save-state" data-tone={SAVE_TONE[saveState]}><i aria-hidden="true"></i>{saveState} · v{version}</span>
       {#if !docked}
         <IconButton action={Action.ToggleInspector} class="toggle" pressed={propsShown} data-testid="toggle-inspector" onclick={COMMANDS[Command.ToggleInspector]} />
         <IconButton action={Action.ToggleChat} class="toggle" pressed={chatShown} data-testid="toggle-chat" onclick={COMMANDS[Command.ToggleChat]} />
       {/if}
-      <button type="button" class="secondary wide" onclick={() => (leaveTo(0), (templating = true))} data-testid="template-open">Template</button>
       <button type="button" class="secondary wide" onclick={() => (leaveTo(0), (publishing = true))} data-testid="publish-open">{listed ? 'In gallery' : 'Publish'}</button>
       <div class="popover-anchor narrow">
         <IconButton action={Action.More} aria-expanded={moreOpen} data-testid="more-actions" onclick={() => (moreOpen = !moreOpen)} />
         {#if moreOpen}
           <div class="menu more" role="menu">
-            <button type="button" role="menuitem" onclick={() => ((moreOpen = false), leaveTo(0), (templating = true))}><LayoutTemplate size={14} /><span>Template</span></button>
             <button type="button" role="menuitem" onclick={() => ((moreOpen = false), leaveTo(0), (publishing = true))}><Upload size={14} /><span>{listed ? 'In gallery' : 'Publish'}</span></button>
-            <button type="button" role="menuitem" data-testid="guide-open-menu" onclick={() => ((moreOpen = false), COMMANDS[Command.Help]())}><Keyboard size={14} /><span>Keyboard & gestures</span><kbd>?</kbd></button>
           </div>
         {/if}
       </div>
@@ -1051,6 +1022,21 @@
 
   {#if clipMenu && selection.length}
     <OverflowMenu sections={clipSections} at={clipMenu.at} label={clipMenu.parents ? 'Parent to' : 'Clip'} onclose={() => (clipMenu = null)} />
+  {/if}
+
+  {#if menuOpen}
+    <MenuDrawer
+      canvasHref={`/p/${data.projectId}/c/${data.canvas.id}`}
+      canvasName={data.canvas.name}
+      crumbs={[data.node.name ?? 'Motion', ...pathNames(history.present, compPath)].map((name, i, all) => ({ name, go: i === all.length - 1 ? null : () => leaveTo(i) }))}
+      {doc}
+      onchange={apply}
+      {saveState}
+      {version}
+      ontemplate={() => (leaveTo(0), (templating = true))}
+      onhelp={COMMANDS[Command.Help]}
+      onclose={() => (menuOpen = false)}
+    />
   {/if}
 
   {#if helpOpen}
@@ -1289,6 +1275,31 @@
     gap: var(--ui-space-1);
   }
 
+  .title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--ui-text-md);
+    font-weight: 600;
+  }
+
+  .save-dot {
+    flex-shrink: 0;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--ui-ok);
+  }
+
+  .save-dot[data-tone='busy'] {
+    background: var(--ui-warn);
+  }
+
+  .save-dot[data-tone='error'] {
+    background: var(--ui-danger);
+  }
+
   .transport {
     justify-content: center;
   }
@@ -1298,8 +1309,7 @@
   }
 
   .tool,
-  .clock,
-  .crumb {
+  .clock {
     border: 0;
     border-radius: 0;
     background: none;
@@ -1308,40 +1318,6 @@
 
   .transport :global(.play) {
     color: var(--ui-ink);
-  }
-
-  .crumbs {
-    display: flex;
-    align-items: center;
-    gap: 2px;
-    min-width: 0;
-    font-size: var(--ui-text-md);
-  }
-
-  .crumb {
-    flex-shrink: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    padding: 4px 6px;
-    color: var(--ui-ink-2);
-    font: inherit;
-  }
-
-  a.crumb:hover,
-  button.crumb:hover {
-    background: var(--ui-hover);
-    color: var(--ui-ink);
-  }
-
-  .crumb.current {
-    color: var(--ui-ink);
-    font-weight: 600;
-  }
-
-  .slash {
-    color: var(--ui-ink-3);
   }
 
   .clock {
@@ -1374,73 +1350,6 @@
 
   .popover-anchor {
     position: relative;
-  }
-
-  .chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    height: var(--ui-hit);
-    padding: 0 var(--ui-space-3);
-    background: var(--ui-field);
-    color: var(--ui-ink-2);
-    font-family: var(--ui-mono);
-    font-size: var(--ui-text-xs);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-  }
-
-  .chip:hover,
-  .chip[aria-expanded='true'] {
-    background: var(--ui-hover);
-    color: var(--ui-ink);
-  }
-
-  .popover {
-    position: absolute;
-    top: calc(100% + 6px);
-    right: 0;
-    z-index: 40;
-    width: 300px;
-    padding: var(--ui-space-4);
-    background: var(--ui-raised);
-    box-shadow: 0 12px 32px rgb(0 0 0 / 0.14);
-  }
-
-  .popover-head {
-    display: block;
-    margin-bottom: var(--ui-space-3);
-    font-size: var(--ui-text-xs);
-    color: var(--ui-text-3);
-  }
-
-  .save {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 0 var(--ui-space-1);
-    font-family: var(--ui-mono);
-    font-size: var(--ui-text-xs);
-    color: var(--ui-ink-3);
-    white-space: nowrap;
-  }
-
-  .save i {
-    width: 6px;
-    height: 6px;
-    background: var(--ui-ok);
-  }
-
-  .save[data-tone='busy'] i {
-    background: var(--ui-warn);
-  }
-
-  .save[data-tone='error'] i {
-    background: var(--ui-danger);
-  }
-
-  .save[data-tone='error'] {
-    color: var(--ui-danger);
   }
 
   .secondary,
@@ -1818,26 +1727,8 @@
     display: none;
   }
 
-  .chip .short,
   .narrow {
     display: none;
-  }
-
-  @media (max-width: 1599px) {
-    .save {
-      font-size: 0;
-      gap: 0;
-    }
-  }
-
-  @media (max-width: 1439px) {
-    .chip .long {
-      display: none;
-    }
-
-    .chip .short {
-      display: inline;
-    }
   }
 
   @media (max-width: 1359px) {
@@ -1851,15 +1742,8 @@
     }
   }
 
-  [data-viewport='tablet'] .chip .long,
-  [data-viewport='tablet'] .transport :global(.step),
-  [data-viewport='tablet'] .crumbs,
-  [data-viewport='tablet'] .slash {
+  [data-viewport='tablet'] .transport :global(.step) {
     display: none;
-  }
-
-  [data-viewport='tablet'] .chip .short {
-    display: inline;
   }
 
   [data-viewport='tablet'] .bar {
@@ -1937,10 +1821,6 @@
   }
 
   [data-viewport='phone'] .transport :global(.step),
-  [data-viewport='phone'] .crumb:not(.current),
-  [data-viewport='phone'] .slash,
-  [data-viewport='phone'] .save,
-  [data-viewport='phone'] .chip,
   [data-viewport='phone'] .trail :global(.toggle) {
     display: none;
   }
