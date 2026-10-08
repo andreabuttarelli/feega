@@ -17,6 +17,7 @@
   import ShortcutHelp from '$lib/components/motion/ShortcutHelp.svelte';
   import IconButton from '$lib/components/motion/IconButton.svelte';
   import { Action, Caption, menuSections, type ActionId } from '$lib/motion/actions';
+  import { ClipOp, runClipOp } from '$lib/motion/clip-ops';
   import OverflowMenu, { type MenuBlock } from '$lib/components/motion/OverflowMenu.svelte';
   import { CHAT_PLACE, ChatPlace, DEFAULT_LAYOUT, Panel, Side, flip, readLayout, sideWidth, timelineHeight, toggleSide, viewportOf, writeLayout, type EditorLayout, type LayoutStore } from '$lib/motion/editor-layout';
   import { provideSelection } from '$lib/motion/selection-context';
@@ -70,11 +71,8 @@
     adjacentKeyframe,
     copyKeyframes,
     deleteKeyframes,
-    duplicateClip,
     keyframeFrames,
     pasteKeyframes,
-    removeClips,
-    splitClip,
     type KeyBoard,
     type KeyRef,
     type OpResult
@@ -601,14 +599,16 @@
     apply(addTrack(doc, kind, newId()), 'Added a track');
   }
 
-  function split() {
-    for (const id of selection) {
-      const result = splitClip(doc, id, frame, newId());
-      if (result.ok) {
-        edit(result.doc, 'Split');
-      }
+  function clipOp(op: ClipOp, parent: string | null = null) {
+    const result = runClipOp(op, { doc, selection, frame, parent, newId });
+    if (!result.ok) {
+      return;
     }
+    edit(result.doc, result.summary);
+    selection = result.selection;
   }
+
+  const split = () => clipOp(ClipOp.Split);
 
   function groupUnderNull() {
     const id = newId();
@@ -621,18 +621,7 @@
     selection = [id];
   }
 
-  function duplicate() {
-    const copies: string[] = [];
-    for (const id of selection) {
-      const copy = newId();
-      const result = duplicateClip(doc, id, copy);
-      if (result.ok) {
-        edit(result.doc, 'Duplicated');
-        copies.push(copy);
-      }
-    }
-    selection = copies;
-  }
+  const duplicate = () => clipOp(ClipOp.Duplicate);
 
   function remove() {
     if (keySelection.length) {
@@ -643,8 +632,7 @@
     if (!selection.length) {
       return;
     }
-    apply(removeClips(doc, selection), 'Deleted');
-    selection = [];
+    clipOp(ClipOp.Delete);
   }
 
   function undoEdit() {
