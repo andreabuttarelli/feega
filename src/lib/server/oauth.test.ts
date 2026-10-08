@@ -15,8 +15,10 @@ import {
   issueClientId,
   issueCode,
   readClientId,
+  OAUTH_RETURN_COOKIE,
   readCode,
   redirectUriMatches,
+  takeOAuthReturn,
   verifyPkce
 } from './oauth';
 import { GET as discovery } from '../../routes/.well-known/oauth-authorization-server/+server';
@@ -133,5 +135,22 @@ describe('discovery metadata (RFC 8414)', () => {
     expect(m.code_challenge_methods_supported).toContain('S256');
     expect(m.grant_types_supported).toContain('authorization_code');
     expect(m.registration_endpoint).toBeTruthy();
+  });
+});
+
+describe('where a login comes back to', () => {
+  const jar = (value: string) => {
+    const cookies = new Map([[OAUTH_RETURN_COOKIE, value]]);
+    return { get: (k: string) => cookies.get(k), delete: (k: string) => cookies.delete(k), set: () => {} } as never;
+  };
+
+  it('resumes an interrupted authorization and a gallery remix', () => {
+    expect(takeOAuthReturn(jar('/oauth/authorize?client_id=x'))).toBe('/oauth/authorize?client_id=x');
+    expect(takeOAuthReturn(jar('/gallery/abc'))).toBe('/gallery/abc');
+  });
+
+  it('never an address outside those paths', () => {
+    expect(takeOAuthReturn(jar('https://evil.example/gallery/'))).toBeNull();
+    expect(takeOAuthReturn(jar('/app/settings'))).toBeNull();
   });
 });

@@ -145,6 +145,50 @@ motion
     await cmdMotionRenderState(runId, opts);
   });
 
+const gallery = program
+  .command('gallery [query]')
+  .description('Search the public gallery of free motion videos and compositions to remix')
+  .option('--kind <k>', 'motion or composition')
+  .option('--format <f>', '16:9, 9:16, 1:1 or 4:5')
+  .option('--duration <d>', 'short (up to 6 s), medium (6 to 15 s) or long')
+  .option('--tag <t>', 'One tag')
+  .action(async (query: string | undefined, opts) => {
+    const { cmdGallery } = await import('./commands/gallery.ts');
+    await cmdGallery(query, opts);
+  });
+
+gallery
+  .command('remix <itemId>')
+  .description('Copy a gallery item into a project as a new motion video (free)')
+  .requiredOption('--project <id>', 'The project to remix into')
+  .option('--canvas <id>', 'The canvas (default: the Motion canvas)')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (itemId: string, opts) => {
+    const { cmdGalleryRemix } = await import('./commands/gallery.ts');
+    await cmdGalleryRemix(itemId, opts);
+  });
+
+gallery
+  .command('publish <nodeId>')
+  .description('Publish a motion video to the gallery so anyone can remix it (free)')
+  .requiredOption('--title <t>', 'Up to 80 characters')
+  .option('--description <d>', 'Up to 500 characters')
+  .option('--tags <list>', 'Comma-separated, up to 8')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (nodeId: string, opts) => {
+    const { cmdGalleryPublish } = await import('./commands/gallery.ts');
+    await cmdGalleryPublish(nodeId, opts);
+  });
+
+gallery
+  .command('withdraw <itemId>')
+  .description('Take your item out of the gallery; copies already remixed stay')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (itemId: string, opts) => {
+    const { cmdGalleryWithdraw } = await import('./commands/gallery.ts');
+    await cmdGalleryWithdraw(itemId, opts);
+  });
+
 program
   .command('upgrade <slug>')
   .description('Open Stripe checkout: a monthly plan (--credits 8|16|32|64|128|256) or a one-time top-up (--top-up)')

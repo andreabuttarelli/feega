@@ -51,6 +51,14 @@ export function createUserDb(accessToken: string): Db {
   return markRlsScoped(client);
 }
 
+export function createAnonDb(): Db {
+  const key = publicEnv.PUBLIC_SUPABASE_ANON_KEY;
+  if (!key) {
+    throw new Error('PUBLIC_SUPABASE_ANON_KEY not configured');
+  }
+  return markRlsScoped(createClient<NarrowedDatabase>(url(), key, AUTH_OFF));
+}
+
 /**
  * Il client che scavalca la RLS. L'argomento non è decorativo: senza una voce del registro non
  * si ottiene, e una voce nuova è una riga in un file solo — visibile accanto a tutte le altre.

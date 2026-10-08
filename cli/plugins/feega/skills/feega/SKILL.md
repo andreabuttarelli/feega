@@ -168,6 +168,17 @@ renders in their browser and lands in the project assets. Show the link; never o
 open a browser, or wants ProRes, HEVC, WebM, GIF, PNG or 4K. `get_render` gives
 the status and, when done, a signed `file_url`. CLI: `feega motion render <nodeId> [--server]`.
 
+## Remix from the gallery
+
+The public gallery holds free motion videos and compositions anyone can remix, many by Feega.
+`search_gallery` finds them by title words, `kind`, `format`, `duration` (short, medium, long) or
+`tag`. `remix_gallery_item` copies one into a project as a new `motion` node with its texts,
+colours, logo and media exposed as fields; then offer to put the user's brand on it with
+`ask_motion_agent`. `publish_to_gallery` shares a `motion` node, only when the user asks: it is
+refused for uncensored projects, real brands (their logo, a real-brand script, logos or pictures
+imported from a website) and content the moderation refuses. Free. CLI: `feega gallery [query]`,
+`feega gallery remix <itemId> --project <id>`, `feega gallery publish <nodeId> --title "…"`.
+
 ## Promote to a post
 
 A canvas node is not a post. `create_post` is what makes something publishable: give it a

@@ -21,7 +21,7 @@ export type Call = {
 
 export type FakeDb = { db: Db; calls: Call[] };
 
-export type FakeOptions = { updateRows?: Record<string, unknown[]>; filter?: boolean; mutate?: boolean };
+export type FakeOptions = { updateRows?: Record<string, unknown[]>; filter?: boolean; mutate?: boolean; newId?: () => string };
 
 export function fakeDb(rows: Record<string, unknown[]>, options: FakeOptions = {}): FakeDb {
   const calls: Call[] = [];
@@ -80,6 +80,21 @@ export function fakeDb(rows: Record<string, unknown[]>, options: FakeOptions = {
         call.filters.push([column, value]);
         return chain;
       },
+      neq() {
+        return chain;
+      },
+      gte() {
+        return chain;
+      },
+      lte() {
+        return chain;
+      },
+      contains() {
+        return chain;
+      },
+      ilike() {
+        return chain;
+      },
       order(column: string, opts?: unknown) {
         call.order = [column, opts];
         return chain;
@@ -97,7 +112,7 @@ export function fakeDb(rows: Record<string, unknown[]>, options: FakeOptions = {
           return { data: first, error: null };
         }
         if (op === 'insert' && payload) {
-          return { data: { id: 'generated-id', ...(payload as object) }, error: null };
+          return { data: { id: options.newId?.() ?? 'generated-id', ...(payload as object) }, error: null };
         }
         return { data: null, error: null };
       },
@@ -131,6 +146,15 @@ export function fakeDb(rows: Record<string, unknown[]>, options: FakeOptions = {
         upload: async (path: string, file?: unknown) => {
           calls.push({ table: `storage:${bucket}`, op: 'upload', filters: [['path', path]], payload: file });
           return { data: { path }, error: null };
+        },
+        getPublicUrl: (path: string) => ({ data: { publicUrl: `https://public.example/${bucket}/${path}` } }),
+        list: async (folder: string) => {
+          calls.push({ table: `storage:${bucket}`, op: 'list', filters: [['folder', folder]] });
+          return { data: [], error: null };
+        },
+        remove: async (paths: string[]) => {
+          calls.push({ table: `storage:${bucket}`, op: 'remove', filters: [['paths', paths]] });
+          return { data: [], error: null };
         }
       })
     }

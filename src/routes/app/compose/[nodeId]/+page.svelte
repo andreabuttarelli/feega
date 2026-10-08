@@ -11,6 +11,10 @@
   import X from '@lucide/svelte/icons/x';
   import Film from '@lucide/svelte/icons/film';
   import PageHead from '$lib/components/PageHead.svelte';
+  import PublishDialog from '$lib/components/gallery/PublishDialog.svelte';
+  import RemixBanner from '$lib/components/gallery/RemixBanner.svelte';
+  import { goto } from '$app/navigation';
+  import { BRAND_PARAM } from '$lib/gallery/model';
   import MotionPreview from '$lib/components/motion/MotionPreview.svelte';
   import ExportDialog from '$lib/components/motion/ExportDialog.svelte';
   import StudioParamControl from '$lib/components/canvas/StudioParamControl.svelte';
@@ -44,6 +48,8 @@
   let frame = $state(0);
   let playing = $state(true);
   let exporting = $state(false);
+  let publishing = $state(false);
+  let listed = $state(data.gallery.listed);
   let uploading = $state(0);
   let dragging = $state(false);
   let preview = $state<MotionPreview | null>(null);
@@ -197,13 +203,31 @@
   />
 {/if}
 
+{#if publishing}
+  <PublishDialog
+    actionUrl={`/app/compose/${data.node.id}?project=${data.projectId}`}
+    {doc}
+    assets={assetUrls}
+    tokens={data.tokens}
+    name={data.node.name ?? ''}
+    {listed}
+    saved={saveState === SaveState.Saved}
+    onlisted={(item) => (listed = item)}
+    onclose={() => (publishing = false)}
+  />
+{/if}
+
 <div class="compose" data-testid="compose-editor">
+  {#if data.gallery.remixOf}
+    <RemixBanner origin={data.gallery.remixOf} onbrand={() => goto(`${data.editorUrl}?${BRAND_PARAM}=1`)} />
+  {/if}
   <header class="bar">
     <a class="back" href={`/app/compose?project=${data.projectId}`}>Compositions</a>
     <span class="save" data-testid="compose-save" data-state={saveState}>{saveState}</span>
     <div class="actions">
       <a class="button" href={data.canvasHref}><LayoutGrid size={14} /> Canvas</a>
       <a class="button" href={data.editorUrl} data-testid="compose-open-motion"><SquarePen size={14} /> Open in motion editor</a>
+      <button type="button" class="button" onclick={() => (publishing = true)} data-testid="publish-open">{listed ? 'In gallery' : 'Publish'}</button>
       <button type="button" class="button primary" onclick={() => (exporting = true)} data-testid="compose-export"><Download size={14} /> Export</button>
     </div>
   </header>

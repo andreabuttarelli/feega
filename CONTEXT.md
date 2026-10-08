@@ -68,6 +68,14 @@ _Avoid_: fan-out, broadcast.
 The shared memory of a brand: facts, skills and notes any main agent can read and write. The place a notion lives when it must outlive the turn that produced it.
 _Avoid_: context, knowledge base.
 
+**Gallery item**:
+A motion video or composition published to the public gallery: a snapshot of one revision plus a public copy of every file it uses, credited to the author's workspace (Feega for the demos). Never a live link to the author's project.
+_Avoid_: template (a template lives in one workspace's library), share link (a share link opens the author's own canvas).
+
+**Remix**:
+A free copy of a gallery item into a project of the remixer, as a new motion node with its own files and its main texts, colours, logo and media exposed as fields. Withdrawing the original never touches it.
+_Avoid_: fork, duplicate.
+
 **Brand accent**:
 The one colour a motion film adds to ink and paper. Read from the brand, never chosen: the first saturated colour (chroma ≥ 0.18) in this order, held by `ACCENT_ORDER` in `src/lib/motion/accent.ts`.
 

@@ -132,6 +132,21 @@ export const WRITABLE_COLUMNS: Record<string, { insert: string[]; update: string
       "own_history_at"
     ]
   },
+  "gallery_items": {
+    "insert": [],
+    "update": [
+      "title",
+      "description",
+      "tags",
+      "status",
+      "doc",
+      "assets",
+      "poster_url",
+      "preview_url",
+      "updated_at",
+      "published_at"
+    ]
+  },
   "organizations": {
     "insert": [
       "name",

@@ -9,6 +9,7 @@ import { registerAdsTools } from './tools/ads.ts';
 import { registerNodeTools } from './tools/nodes.ts';
 import { registerPromptTools } from './tools/prompts.ts';
 import { registerMotionTools } from './tools/motion.ts';
+import { registerGalleryTools } from './tools/gallery.ts';
 
 /**
  * Il client la mostra da solo al handshake, una volta per sessione, PRIMA di ogni descrizione e
@@ -27,7 +28,7 @@ export const MCP_INSTRUCTIONS = [
   'A canvas node is raw material; a post (`list_posts`/`create_post`/`set_post_status`) is the promoted artifact ready to schedule. An ad campaign (`list_ad_campaigns`/`create_ad_campaign`/`approve_ad_campaign`/`set_ad_campaign_status`) always drafts unapproved; only a signed-in person approves it.',
   'A project has no brand until one is attached (`projects.brand_id` is nullable, and that is the normal case): open a canvas to explore, choose a brand only once something is ready to publish.',
   '`get_media` shows what a node, run or asset holds: fetch `preview_url` to look, give `full_url` to the user.',
-  '`ask_motion_agent` edits a `motion` video via the editor AI (`get_motion_run`, `get_motion_summary`). `render_video` (free browser link by default), `get_render`.',
+  '`ask_motion_agent` edits `motion` (`get_motion_run`, `get_motion_summary`); `render_video`, `get_render`; `search_gallery`, `remix_gallery_item`, `publish_to_gallery`.',
   'Signing in is not a tool: over HTTP the host sends the Bearer; locally run `feega login` once (shared session file).'
 ].join(' ');
 
@@ -147,6 +148,7 @@ export function createFeegaMcpServer(): McpServer {
   registerNodeTools(server);
   registerPromptTools(server);
   registerMotionTools(server);
+  registerGalleryTools(server);
 
   return server;
 }

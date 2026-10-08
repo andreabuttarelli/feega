@@ -70,6 +70,9 @@ const RESTANO = [
   'ask_motion_agent',
   'get_motion_run',
   'get_motion_summary',
+  'search_gallery',
+  'remix_gallery_item',
+  'publish_to_gallery',
   'render_video',
   'get_render'
 ];
