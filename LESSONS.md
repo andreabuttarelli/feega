@@ -2624,3 +2624,6 @@ rimasti il browser ha risposto oltre i 25 s. Mossa: riprodurre il lato client co
 
 ### Una promessa senza scadenza dentro una coda esclusiva ferma tutto ciò che segue
 Segnale: le prime N operazioni di un turno riescono, le successive "non rispondono", senza errori nel log. Mossa: cerca un `await` su un evento (`ready`, `load`) dentro `exclusive`/una coda seriale: ogni attesa lì dentro vuole un timeout che rifiuta.
+
+### Un `.d.ts` rotto da un conflitto risolto passa la CI verde
+Due PR aggiungono ciascuna un `declare module 'virtual:…'` in `src/motion-generative.d.ts`; la risoluzione del conflitto lascia un blocco aperto e il successivo annidato. `typecheck-runtime` lo conta fra gli errori «non fatali» e i test girano lo stesso: la CI è verde. Segnale: `svelte-check` con `Cannot find module 'virtual:motion-…'` su `compose.ts`, e il numero di errori ignorati che sale. Mossa: dopo ogni conflitto in un `.d.ts`, `npx svelte-check --threshold error | grep virtual:` prima del push.
