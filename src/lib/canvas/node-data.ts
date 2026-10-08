@@ -23,7 +23,7 @@ import { z } from 'zod';
 import { mergeNodeData, type NodeData } from './node-patch';
 import { SOCIAL_PLATFORMS } from './social-platforms';
 import { FEED_MEDIA, FEED_SORTS, PRODUCT_SORTS } from './source-filters';
-import { EFFECTS } from './effects';
+import { CUSTOM, EFFECTS } from './effects';
 import { nodeReferenceSchema } from './node-references';
 import type { EffectId, EffectParam } from './effects';
 import { LAYOUTS } from './composition/index';
@@ -382,8 +382,15 @@ const effectStepSchema = z
     }
   });
 
+const customStepSchema = z.object({
+  id: z.literal(CUSTOM),
+  ref: z.string().min(1),
+  params: z.record(z.string(), z.union([z.number(), z.string()])).default({}),
+  enabled: z.boolean().default(true)
+});
+
 const effectsSchema = z.object({
-  effects: z.array(effectStepSchema).default([]),
+  effects: z.array(z.union([customStepSchema, effectStepSchema])).default([]),
   refId: z.string().nullish(),
   sourceRefId: z.string().nullish()
 });

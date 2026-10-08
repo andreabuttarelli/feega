@@ -14,7 +14,7 @@ import { apply as applyShapeCutout, CUTOUT_SIDE_OPTIONS, CUTOUT_STYLE_OPTIONS, C
 import { apply as applyShapeMosaic, MOSAIC_BACKGROUND_OPTIONS, MosaicBackground } from './shape-mosaic';
 import { SHAPE_SET_OPTIONS } from './shapes';
 import { apply as applySwirl } from './swirl';
-import type { EffectId, EffectParam, EffectStep, Pixels } from './types';
+import { CUSTOM, type BuiltinStep, type CustomPass, type CustomStep, type EffectId, type EffectParam, type EffectStep, type Pixels } from './types';
 import { apply as applyWave } from './wave';
 
 type EffectDefinition = {
@@ -217,12 +217,23 @@ function clampParams(id: EffectId, params: Record<string, number | string>): Rec
 	return clamped;
 }
 
-export function applyStack(pixels: Pixels, steps: EffectStep[]): Pixels {
+const passthrough: CustomPass = (pixels) => pixels;
+
+export function applyStack(pixels: Pixels, steps: EffectStep[], custom: CustomPass = passthrough): Pixels {
 	let current = pixels;
 
 	for (const step of steps) {
+		if (!step.enabled) {
+			continue;
+		}
+
+		if (step.id === CUSTOM) {
+			current = custom(current, step);
+			continue;
+		}
+
 		const definition = EFFECTS[step.id];
-		if (!definition || !step.enabled) {
+		if (!definition) {
 			continue;
 		}
 
@@ -232,4 +243,5 @@ export function applyStack(pixels: Pixels, steps: EffectStep[]): Pixels {
 	return current;
 }
 
-export type { EffectId, EffectParam, EffectStep, Pixels };
+export { CUSTOM };
+export type { BuiltinStep, CustomPass, CustomStep, EffectId, EffectParam, EffectStep, Pixels };

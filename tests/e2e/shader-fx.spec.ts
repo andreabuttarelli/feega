@@ -40,6 +40,12 @@ test('a shader that fails to compile leaves the frame unchanged', async ({ page 
   expect(same).toBe(true);
 });
 
+test('read returns the drawn frame top-down, as ImageData holds it', async ({ page }) => {
+  const same = await page.evaluate(() => window.shaderFxProbe.readMatches());
+
+  expect(same).toBe(true);
+});
+
 test('an effect changes the pixels', async ({ page }) => {
   const changed = await page.evaluate((frag) => window.shaderFxProbe.changes(frag), INVERT);
 

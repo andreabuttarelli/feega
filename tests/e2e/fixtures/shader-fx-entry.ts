@@ -1,4 +1,4 @@
-import { compile, createRuntime, draw, drawEffect } from '../../../packages/shader-fx/src/gl';
+import { compile, createRuntime, draw, drawEffect, read } from '../../../packages/shader-fx/src/gl';
 
 const SIZE = 64;
 const HD_WIDTH = 1920;
@@ -76,6 +76,13 @@ const probe = {
   problemsOf: (frag: string) => {
     const compiled = compile(runtime(), { frag, params: [] });
     return 'problems' in compiled ? compiled.problems : [];
+  },
+  readMatches: () => {
+    const src = source();
+    const rt = runtime();
+    const image = src.getContext('2d')!.getImageData(0, 0, SIZE, SIZE);
+    draw(rt, null, image, uniforms());
+    return equal(read(rt), image.data);
   },
   passthroughMatches: () => {
     const src = source();

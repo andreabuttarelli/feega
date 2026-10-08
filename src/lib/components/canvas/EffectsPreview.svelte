@@ -1,6 +1,10 @@
 <script lang="ts">
+  import { page } from '$app/state';
   import { applyStack, type EffectStep, type Pixels } from '$lib/canvas/effects';
   import { fitWithin } from '$lib/canvas/effects/editor';
+  import { customPass } from '$lib/canvas/effects/custom';
+  import { customEffectsOf } from '$lib/canvas/effects/custom-effects.svelte';
+  import { glDrawer } from '$lib/canvas/effects/gl-drawer';
 
   const MAX_SIDE = 480;
   const FRAME_INTERVAL_MS = 1000 / 24;
@@ -16,9 +20,13 @@
   } = $props();
 
   let canvas = $state<HTMLCanvasElement | null>(null);
+  const customs = customEffectsOf(page.params.projectId);
+  const drawer = glDrawer();
+  const pass = $derived(customPass(customs.list, drawer.draw));
 
   $effect(() => {
     JSON.stringify(effects);
+    void pass;
     if (!canvas) {
       return;
     }
@@ -90,7 +98,7 @@
     context.drawImage(source, 0, 0, size.width, size.height);
     const image = context.getImageData(0, 0, size.width, size.height);
     const pixels: Pixels = { width: size.width, height: size.height, data: image.data };
-    const rendered = applyStack(pixels, effects);
+    const rendered = applyStack(pixels, effects, pass);
     target.width = rendered.width;
     target.height = rendered.height;
     target.getContext('2d')?.putImageData(

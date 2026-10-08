@@ -7,7 +7,16 @@ const KEY = /^[a-z][a-z0-9_]*$/i;
 const NAME = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const HEX = /^#[0-9a-f]{6}$/i;
 
-const base = { key: z.string().regex(KEY).max(32), label: z.string().min(1).max(40) };
+export const RESERVED_KEYS = ['src', 'res', 'time', 'seed'];
+
+const base = {
+  key: z
+    .string()
+    .regex(KEY)
+    .max(32)
+    .refine((k) => !RESERVED_KEYS.includes(k), 'key clashes with a contract uniform (src, res, time, seed)'),
+  label: z.string().min(1).max(40)
+};
 
 const numberParam = z
   .object({ ...base, kind: z.literal('number'), min: z.number(), max: z.number(), step: z.number().positive(), default: z.number() })

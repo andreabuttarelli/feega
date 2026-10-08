@@ -1,6 +1,7 @@
 import { applyStack, EFFECTS } from './index';
+import { customParams, type CustomEffect } from './custom';
 import { mosaicSvg } from './shape-mosaic';
-import type { EffectId, EffectParam, EffectStep, Pixels } from './types';
+import { CUSTOM, type EffectId, type EffectParam, type EffectStep, type Pixels } from './types';
 
 type ParamValue = number | string;
 
@@ -32,6 +33,25 @@ const CONTROLS: { [K in EffectParam['kind']]: (param: ParamOfKind<K>, value: unk
 export function controlFor(param: EffectParam, value: unknown): Control {
 	const build = CONTROLS[param.kind] as (param: EffectParam, value: unknown) => Control;
 	return build(param, value);
+}
+
+const MISSING_LABEL = 'Missing effect';
+
+export function stepLabel(step: EffectStep, customs: CustomEffect[]): string {
+	if (step.id !== CUSTOM) {
+		return EFFECTS[step.id].label;
+	}
+
+	return customs.find((c) => c.id === step.ref)?.name ?? MISSING_LABEL;
+}
+
+export function stepParams(step: EffectStep, customs: CustomEffect[]): EffectParam[] {
+	if (step.id !== CUSTOM) {
+		return EFFECTS[step.id].params;
+	}
+
+	const effect = customs.find((c) => c.id === step.ref);
+	return effect ? customParams(effect) : [];
 }
 
 export type Direction = 'up' | 'down';
