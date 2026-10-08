@@ -271,6 +271,28 @@ export async function listNodesByIds(
   return (data ?? []).map(toNode);
 }
 
+const MOTION_LIST_LIMIT = 200;
+
+export async function listMotionNodes(
+  db: Db,
+  scope: { orgId: string; projectId: string | null }
+): Promise<CanvasNodeRecord[]> {
+  const query = db
+    .from('nodes')
+    .select(NODE_COLUMNS)
+    .eq('org_id', scope.orgId)
+    .eq('type', 'motion')
+    .is('deleted_at', null);
+  const { data, error } = await (scope.projectId ? query.eq('project_id', scope.projectId) : query)
+    .order('updated_at', { ascending: false })
+    .limit(MOTION_LIST_LIMIT);
+
+  if (error) {
+    throw error;
+  }
+  return (data ?? []).map(toNode);
+}
+
 export async function findNode(
   db: Db,
   input: { orgId: string; nodeId: string }

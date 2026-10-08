@@ -14,9 +14,9 @@ export function registerMotionTools(server: McpServer) {
         'Edit a motion video (a `motion` canvas node) by asking the motion editor\'s own AI in plain words, ' +
         'e.g. "make the title red and add a bounce". It runs one turn of the same agent as the editor chat, ' +
         'with its own tools, writes a new revision of the video and posts the exchange in the editor chat. ' +
-        'Read the video first with `get_motion_summary` to name clips precisely. ' +
-        'With `wait` (default true) it returns when the turn ends, up to about 4 minutes; otherwise, or past ' +
-        'that, it returns a `run_id` still `running` — poll `get_motion_run`. Frames cannot be inspected ' +
+        'Find the node id with `list_motion_videos`; read the video first with `get_motion_summary` to name clips precisely. ' +
+        'Returns at once with a `run_id` (`running`): poll `get_motion_run` every few seconds until `done`, which carries the ' +
+        'reply, the summary and the new revision `version`. `wait: true` polls for you, up to about 4 minutes. Frames cannot be inspected ' +
         'without the editor open in a browser. Spends credits.',
       inputSchema: z.object({ org, node_id: z.string(), prompt: z.string().min(1), wait: z.boolean().optional() }),
       annotations: { readOnlyHint: false, destructiveHint: false }
@@ -24,7 +24,7 @@ export function registerMotionTools(server: McpServer) {
     async ({ org, node_id, prompt, wait }) =>
       withAuth(async (token) => {
         const run = await motionApi.ask(token, node_id, prompt, org);
-        return wait === false ? run : awaitRun(token, run, { org });
+        return wait === true ? awaitRun(token, run, { org }) : run;
       })
   );
 
@@ -55,11 +55,13 @@ export function registerMotionTools(server: McpServer) {
         node_id: z.string(),
         mode: z.enum(['browser', 'server']).optional(),
         resolution: z.enum(['720p', '1080p', '1440p', '2160p']).optional(),
-        format: z.string().optional().describe('server only: mp4-h264, mp4-h265, prores-422hq, prores-4444, webm-alpha, png-sequence, gif')
+        format: z.string().optional().describe('server only: mp4-h264, mp4-h265, prores-422hq, prores-4444, webm-alpha, png-sequence, gif'),
+        quality: z.enum(['standard', 'high']).optional(),
+        fps: z.union([z.literal(24), z.literal(25), z.literal(30), z.literal(50), z.literal(60)]).optional()
       }),
       annotations: { readOnlyHint: false, destructiveHint: false }
     },
-    async ({ org, node_id, mode, resolution, format }) => withAuth((token) => motionApi.render(token, node_id, { mode, resolution, format }, org))
+    async ({ org, node_id, mode, resolution, format, quality, fps }) => withAuth((token) => motionApi.render(token, node_id, { mode, resolution, format, quality, fps }, org))
   );
 
   server.registerTool(
@@ -84,5 +86,47 @@ export function registerMotionTools(server: McpServer) {
       annotations: { readOnlyHint: true }
     },
     async ({ org, node_id }) => withAuth((token) => motionApi.summary(token, node_id, org))
+  );
+
+  server.registerTool(
+    'list_motion_videos',
+    {
+      title: 'List motion videos',
+      description:
+        'The motion videos (`motion` canvas nodes) of the org, newest first, optionally of one project: `node_id`, `name`, ' +
+        '`project_id`, `canvas_id`, `format`, saved revision `version` (0 = empty), signed `poster_url` and `last_render_url` ' +
+        '(one hour, null when none) and `editor_url`. Use it to find the `node_id` the other motion tools take. Reads only.',
+      inputSchema: z.object({ org, project_id: z.string().optional() }),
+      annotations: { readOnlyHint: true }
+    },
+    async ({ org, project_id }) => withAuth((token) => motionApi.list(token, project_id, org))
+  );
+
+  server.registerTool(
+    'publish_motion_embed',
+    {
+      title: 'Publish a motion video as a web embed',
+      description:
+        'Host the interactive web export of the saved revision on feega and return the public `url` and an iframe `snippet` to paste ' +
+        'into any site (keeps pointer, tilt and scroll input). Publishing again updates the same embed in place, so the site needs no ' +
+        'new paste. `action: "unpublish"` takes it down. Videos from an uncensored project are refused (403, `refusal`). Free.',
+      inputSchema: z.object({ org, node_id: z.string(), action: z.enum(['publish', 'unpublish']).optional() }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true }
+    },
+    async ({ org, node_id, action }) => withAuth((token) => (action === 'unpublish' ? motionApi.unembed(token, node_id, org) : motionApi.embed(token, node_id, org)))
+  );
+
+  server.registerTool(
+    'get_motion_embed',
+    {
+      title: 'Read a motion web embed',
+      description:
+        'Whether the web embed of a motion video is `published`, its public `url`, the iframe `snippet` and the saved `revision`. ' +
+        'The self-contained HTML file (no hosting) is downloaded with `feega motion embed <node> --download <file>`, or GET ' +
+        '`/api/v1/motion/{node_id}/embed/bundle`. Reads only.',
+      inputSchema: z.object({ org, node_id: z.string() }),
+      annotations: { readOnlyHint: true }
+    },
+    async ({ org, node_id }) => withAuth((token) => motionApi.embedState(token, node_id, org))
   );
 }

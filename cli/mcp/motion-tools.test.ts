@@ -51,6 +51,20 @@ const fake: Server = createServer((req, res) => {
       send(200, { run_id: 'render-1', mode: 'browser', status: 'done', asset_id: 'a1', file_url: 'https://files/a1.mp4' });
       return;
     }
+    if (route === '/api/v1/motion') {
+      send(200, { videos: [{ node_id: NODE, name: 'Launch', version: 3 }] });
+      return;
+    }
+    if (route === `/api/v1/motion/${NODE}/embed/bundle`) {
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end('<html>bundle</html>');
+      return;
+    }
+    if (route === `/api/v1/motion/${NODE}/embed`) {
+      const published = req.method !== 'DELETE';
+      send(200, published ? { published, url: `https://feega.app/e/${NODE}`, snippet: `<iframe src="https://feega.app/e/${NODE}"></iframe>`, revision: 3 } : { published });
+      return;
+    }
     if (route === `/api/v1/motion/${NODE}`) {
       send(200, { node_id: NODE, version: 3, doc: { duration: 6, tracks: [] } });
       return;
@@ -95,15 +109,15 @@ beforeEach(() => {
 });
 
 describe('the motion agent over MCP', () => {
-  test('ask_motion_agent sends the prompt and waits for the revision by default', async () => {
-    const result = await callTool('ask_motion_agent', { node_id: NODE, prompt: 'make the title red' });
+  test('ask_motion_agent with wait true polls until the revision', async () => {
+    const result = await callTool('ask_motion_agent', { node_id: NODE, prompt: 'make the title red', wait: true });
 
     expect(calls[0]).toEqual({ method: 'POST', path: `/api/v1/motion/${NODE}/ask`, body: { prompt: 'make the title red' } });
     expect(result?.structuredContent).toMatchObject({ run_id: RUN, status: 'done', version: 3, summary: 'added Title' });
   });
 
-  test('ask_motion_agent with wait false returns the run at once', async () => {
-    const result = await callTool('ask_motion_agent', { node_id: NODE, prompt: 'add a bounce', wait: false });
+  test('ask_motion_agent returns the run at once by default', async () => {
+    const result = await callTool('ask_motion_agent', { node_id: NODE, prompt: 'add a bounce' });
 
     expect(result?.structuredContent).toEqual({ run_id: RUN, status: 'running' });
     expect(calls).toHaveLength(1);
@@ -133,6 +147,34 @@ describe('the motion agent over MCP', () => {
     const farm = await callTool('render_video', { node_id: NODE, mode: 'server', resolution: '720p' });
     expect(calls[0].body).toEqual({ mode: 'server', settings: { resolution: '720p' } });
     expect(JSON.stringify(farm)).toContain('farm-1');
+
+    calls.length = 0;
+    await callTool('render_video', { node_id: NODE, mode: 'server', format: 'mp4-h265', quality: 'standard', fps: 60 });
+    expect(calls[0].body).toEqual({ mode: 'server', settings: { format: 'mp4-h265', quality: 'standard', fps: 60 } });
+  });
+
+  test('list_motion_videos lists the videos, narrowed to a project', async () => {
+    const result = await callTool('list_motion_videos', { project_id: 'p-1' });
+    expect(calls[0]).toEqual({ method: 'GET', path: '/api/v1/motion?project=p-1', body: null });
+    expect(JSON.stringify(result)).toContain('Launch');
+  });
+
+  test('publish_motion_embed publishes and returns the snippet', async () => {
+    const result = await callTool('publish_motion_embed', { node_id: NODE });
+    expect(calls[0]).toMatchObject({ method: 'POST', path: `/api/v1/motion/${NODE}/embed` });
+    expect(result?.structuredContent).toMatchObject({ published: true, url: `https://feega.app/e/${NODE}` });
+    expect(JSON.stringify(result)).toContain('iframe');
+  });
+
+  test('publish_motion_embed with unpublish takes it down', async () => {
+    const result = await callTool('publish_motion_embed', { node_id: NODE, action: 'unpublish' });
+    expect(calls[0]).toMatchObject({ method: 'DELETE', path: `/api/v1/motion/${NODE}/embed` });
+    expect(result?.structuredContent).toMatchObject({ published: false });
+  });
+
+  test('get_motion_embed reads the embed state', async () => {
+    await callTool('get_motion_embed', { node_id: NODE });
+    expect(calls[0]).toMatchObject({ method: 'GET', path: `/api/v1/motion/${NODE}/embed` });
   });
 
   test('get_render reads a render and its file', async () => {
@@ -145,7 +187,7 @@ describe('the motion agent over MCP', () => {
     await rpc('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'motion', version: '0.0.1' } });
     const names = ((await rpc('tools/list', {})).result?.tools ?? []).map((t) => t.name);
 
-    expect(names.filter((n) => n.includes('motion')).sort()).toEqual(['ask_motion_agent', 'get_motion_run', 'get_motion_summary']);
+    expect(names.filter((n) => n.includes('motion')).sort()).toEqual(['ask_motion_agent', 'get_motion_embed', 'get_motion_run', 'get_motion_summary', 'list_motion_videos', 'publish_motion_embed']);
     expect(names).toContain('render_video');
     expect(names).toContain('get_render');
     expect(names).not.toContain('add_clip');
@@ -198,5 +240,35 @@ describe('feega motion render', () => {
 
     expect(calls[0].body).toEqual({ mode: 'server' });
     expect(out).toContain('12 credits');
+  });
+});
+
+describe('feega motion embed', () => {
+  test('publishes and prints the snippet', async () => {
+    const lines: string[] = [];
+    const log = console.log;
+    console.log = (...args: unknown[]) => {
+      lines.push(args.join(' '));
+    };
+    const { embedAndReport } = await import('../commands/motion.ts');
+    await embedAndReport('token', NODE, {}).finally(() => {
+      console.log = log;
+    });
+
+    expect(calls[0]).toMatchObject({ method: 'POST', path: `/api/v1/motion/${NODE}/embed` });
+    expect(lines.join('\n')).toContain('<iframe');
+  });
+
+  test('--download saves the self-contained html', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'feega-bundle-'));
+    const { embedAndReport } = await import('../commands/motion.ts');
+    const log = console.log;
+    console.log = () => {};
+    await embedAndReport('token', NODE, { download: join(dir, 'out.html') }).finally(() => {
+      console.log = log;
+    });
+
+    expect(calls[0]).toMatchObject({ method: 'GET', path: `/api/v1/motion/${NODE}/embed/bundle` });
+    expect(await Bun.file(join(dir, 'out.html')).text()).toBe('<html>bundle</html>');
   });
 });
