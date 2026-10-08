@@ -11,6 +11,9 @@ import { Liveness, PlayMode, interactiveOf, type Interactive } from './settings'
 export const HOST_MESSAGE = 'feega:host';
 export const PLAYER_URL = `https://cdn.jsdelivr.net/npm/@hyperframes/player@${HYPERFRAMES_VERSION}/dist/hyperframes-player.global.js`;
 export const BUNDLE_FILE = 'feega-interactive.html';
+export const EMBED_ROUTE = '/e';
+
+export const embedUrl = (origin: string, id: string) => `${origin}${EMBED_ROUTE}/${id}`;
 
 export type FetchBlob = (url: string) => Promise<Blob>;
 

@@ -121,6 +121,7 @@ export type MotionToolDeps = {
   analysis?: (assetId: string) => Promise<AudioAnalysis | null>;
   batch?: (input: { doc: MotionDoc; rows: { name: string; values: Record<string, string> }[] }) => Promise<Record<string, unknown>>;
   renderLink?: () => Promise<Record<string, unknown>>;
+  embed?: (action: EmbedAction) => Promise<Record<string, unknown>>;
   templates?: TemplateLibrary;
   site?: (url: string) => Promise<SourceRead>;
   brand?: (name?: string) => Promise<SourceRead>;
@@ -145,6 +146,11 @@ export type SiteCapture = { ok: true; shots: CaptureShot[] } | { ok: false; erro
 export type SourceRead = { ok: true } & Record<string, unknown> | { ok: false; error: string };
 
 export type AssetImport = { ok: true; asset: MotionAsset; width: number | null; height: number | null } | { ok: false; error: string };
+
+export enum EmbedAction {
+  Publish = 'publish',
+  Unpublish = 'unpublish'
+}
 
 const UNREADABLE = (what: string) => ({ ok: false as const, error: `${what} is not available in this workspace` });
 
@@ -1131,12 +1137,18 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     export_interactive: tool({
-      description: 'Check the interactive web export: lists the clip properties that react to live input, the playback settings and the embed snippet. The self-contained HTML file is downloaded by the user from Export → Interactive (web).',
+      description: 'Check the interactive web export: lists the clip properties that react to live input, the playback settings and the embed snippet. The self-contained HTML file is downloaded by the user from Export → Interactive (web); publish_embed hosts it instead.',
       inputSchema: z.object({}),
       execute: async () => {
         const live = liveLanes(flattenComps(session.doc)).map((l) => ({ clip_id: l.id, prop: l.key }));
         return { ok: true, live, settings: interactiveOf(session.doc), snippet: embedSnippet(session.doc), note: live.length ? 'Ready: Export → Interactive (web) downloads the file.' : 'Nothing reads input yet: apply_interactive_preset or set_expression with input.*.' };
       }
+    }),
+
+    publish_embed: tool({
+      description: 'Host the interactive web export on feega and return a snippet to paste into any site: an iframe that fills the container width and keeps pointer, tilt and scroll working. Publishing again updates the same embed, so the site updates without a new paste. action unpublish takes it down.',
+      inputSchema: z.object({ action: z.enum(EmbedAction).optional() }),
+      execute: async (input) => (deps.embed ? deps.embed(input.action ?? EmbedAction.Publish) : { ok: false, error: 'hosting embeds is not available here' })
     }),
 
     add_shape: tool({

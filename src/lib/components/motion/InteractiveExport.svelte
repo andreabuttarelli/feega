@@ -1,15 +1,19 @@
 <script lang="ts">
   import Download from '@lucide/svelte/icons/download';
   import Copy from '@lucide/svelte/icons/copy';
+  import Globe from '@lucide/svelte/icons/globe';
   import type { MotionDoc } from '$lib/motion/doc';
   import type { BrandTokens } from '$lib/motion/brand';
   import type { AudioAnalysis } from '$lib/motion/audio-analysis';
-  import { BUNDLE_FILE, interactiveBundle, type InteractiveBundle } from '$lib/motion/interactive/bundle';
+  import { BUNDLE_FILE, embedSnippet, interactiveBundle, type InteractiveBundle } from '$lib/motion/interactive/bundle';
   import { liveLanes } from '$lib/motion/interactive/spec';
   import { flattenComps } from '$lib/motion/precomp';
   import { OUTSIDES, PLAY_MODES, PLAY_MODE_LABEL, Outside, interactiveOf, type Interactive } from '$lib/motion/interactive/settings';
 
-  let { doc, tokens, assetUrls, analyses = {}, fileName }: { doc: MotionDoc; tokens: BrandTokens; assetUrls: Record<string, string>; analyses?: Record<string, AudioAnalysis>; fileName: string } = $props();
+  let { doc, tokens, assetUrls, analyses = {}, fileName, editorUrl }: { doc: MotionDoc; tokens: BrandTokens; assetUrls: Record<string, string>; analyses?: Record<string, AudioAnalysis>; fileName: string; editorUrl: string } = $props();
+
+  type Hosted = { published: boolean; url: string };
+  type Slot = { ok: true; url: string; upload: { url: string; headers: Record<string, string> } } | { ok: false; error: string };
 
   const BYTES_PER_KB = 1024;
   const BYTES_PER_MB = BYTES_PER_KB * 1024;
@@ -19,6 +23,11 @@
   let bundle = $state<InteractiveBundle | null>(null);
   let error = $state('');
   let copied = $state(false);
+  let hosted = $state<Hosted | null>(null);
+  let hosting = $state(false);
+  let hostedCopied = $state(false);
+  const embedEndpoint = $derived(`${editorUrl}/embed`);
+  const hostedSnippet = $derived(hosted?.published ? embedSnippet(doc, hosted.url) : '');
   const blobs = new Map<string, Promise<Blob>>();
   const fetchBlob = (url: string) => {
     if (!blobs.has(url)) {
@@ -40,6 +49,52 @@
       (e) => (error = e instanceof Error ? e.message : String(e))
     );
   });
+
+  $effect(() => {
+    fetch(embedEndpoint).then(
+      async (r) => (hosted = r.ok ? await r.json() : null),
+      () => (hosted = null)
+    );
+  });
+
+  async function publish() {
+    if (!bundle) {
+      return;
+    }
+    hosting = true;
+    error = '';
+    try {
+      const slot: Slot = await (await fetch(embedEndpoint, { method: 'POST' })).json();
+      if (!slot.ok) {
+        throw new Error(slot.error);
+      }
+      const put = await fetch(slot.upload.url, { method: 'PUT', headers: slot.upload.headers, body: bundle.html });
+      if (!put.ok) {
+        throw new Error(`Publishing failed (${put.status})`);
+      }
+      hosted = { published: true, url: slot.url };
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+    } finally {
+      hosting = false;
+    }
+  }
+
+  async function unpublish() {
+    hosting = true;
+    const res = await fetch(embedEndpoint, { method: 'DELETE' });
+    hosting = false;
+    if (!res.ok) {
+      error = 'Unpublishing failed';
+      return;
+    }
+    hosted = hosted && { ...hosted, published: false };
+  }
+
+  async function copyHosted() {
+    await navigator.clipboard.writeText(hostedSnippet);
+    hostedCopied = true;
+  }
 
   async function copy() {
     if (!bundle) {
@@ -76,7 +131,22 @@
 {#if error}<p class="warn" role="alert">{error}</p>{/if}
 
 {#if bundle}
-  <label class="snippet">Embed (host the file next to your page as {BUNDLE_FILE})<textarea readonly rows="4" data-testid="interactive-snippet">{bundle.snippet}</textarea></label>
+  <section class="hosted" data-testid="interactive-hosted">
+    {#if hosted?.published}
+      <label class="snippet">Hosted embed: paste it once, publish again to update it<textarea readonly rows="4" data-testid="interactive-hosted-snippet">{hostedSnippet}</textarea></label>
+      <div class="actions">
+        <button type="button" class="secondary" disabled={hosting} onclick={unpublish} data-testid="interactive-unpublish">Unpublish</button>
+        <button type="button" class="secondary" disabled={hosting} onclick={publish} data-testid="interactive-republish"><Globe size={14} /> {hosting ? 'Publishing…' : 'Publish update'}</button>
+        <button type="button" class="primary" onclick={copyHosted}><Copy size={14} /> {hostedCopied ? 'Copied' : 'Copy snippet'}</button>
+      </div>
+    {:else}
+      <div class="actions">
+        <span class="muted">feega hosts it: no file to upload.</span>
+        <button type="button" class="primary" disabled={hosting || !hosted} onclick={publish} data-testid="interactive-publish"><Globe size={14} /> {hosting ? 'Publishing…' : 'Publish embed'}</button>
+      </div>
+    {/if}
+  </section>
+  <label class="snippet">Or host the file yourself, next to your page as {BUNDLE_FILE}<textarea readonly rows="4" data-testid="interactive-snippet">{bundle.snippet}</textarea></label>
   <div class="actions">
     <button type="button" class="secondary" onclick={copy}><Copy size={14} /> {copied ? 'Copied' : 'Copy snippet'}</button>
     <a class="primary" {href} download={BUNDLE_FILE} data-testid="interactive-download"><Download size={14} /> Download HTML</a>
@@ -95,10 +165,14 @@
     font-size: 11px;
     resize: vertical;
   }
+  .hosted {
+    margin-bottom: 16px;
+  }
   .actions {
     display: flex;
     gap: 8px;
     justify-content: flex-end;
+    align-items: center;
     margin-top: 8px;
   }
 </style>
