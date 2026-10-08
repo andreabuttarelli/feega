@@ -22,7 +22,7 @@ import { audioDescription } from '$lib/server/canvas/audio-description';
 import { connectRefusal, nodeModelError, targetTakesNoInputs, UNCENSORED_NO_INPUTS_ERROR } from '$lib/server/canvas/node-model';
 import { applyEffectsTo, makeEffectsPair } from '$lib/server/canvas/effects-actions';
 import { effectsCatalogue } from '$lib/canvas/effects/catalogue';
-import { CUSTOM } from '$lib/canvas/effects';
+import { effectListing } from '$lib/server/effects/listing';
 import { effectStore } from '$lib/server/effects/store';
 import { CheckState, Outcome } from '$lib/server/repos/effects';
 import { chromiumGl, serverFramesOpen } from '$lib/server/motion/chromium-frames';
@@ -326,7 +326,7 @@ export function createProjectTools(deps: ProjectToolDeps): Record<string, Tool> 
         const custom = (await effects.list()) ?? [];
         return {
           effects: effectsCatalogue(),
-          custom: custom.map((e) => ({ effect_id: e.id, name: e.name, version: e.version, params: e.params, state: e.check.state, problems: e.check.problems, step: { id: CUSTOM, ref: e.id } }))
+          custom: custom.map(effectListing)
         };
       }
     }),

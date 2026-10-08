@@ -225,6 +225,37 @@ gallery
     await cmdGalleryWithdraw(itemId, opts);
   });
 
+const effects = program
+  .command('effects')
+  .description('List image effects and the custom shader effects of your workspace')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (opts) => {
+    const { cmdEffects } = await import('./commands/effects.ts');
+    await cmdEffects(opts);
+  });
+
+effects
+  .command('write <name>')
+  .description('Write a custom effect from a GLSL file (same name replaces it), free')
+  .requiredOption('--file <path>', 'GLSL body defining vec4 effect(vec2 uv)')
+  .option('--params <path>', 'JSON file with the params list')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (name: string, opts) => {
+    const { cmdEffectsWrite } = await import('./commands/effects.ts');
+    await cmdEffectsWrite(name, opts);
+  });
+
+effects
+  .command('patch <effectId>')
+  .description('Replace the GLSL of a custom effect at its version, free')
+  .requiredOption('--at-version <n>', 'The version list or write printed')
+  .requiredOption('--file <path>', 'The new GLSL body')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (effectId: string, opts) => {
+    const { cmdEffectsPatch } = await import('./commands/effects.ts');
+    await cmdEffectsPatch(effectId, opts);
+  });
+
 program
   .command('upgrade <slug>')
   .description('Open Stripe checkout: a monthly plan (--credits 8|16|32|64|128|256) or a one-time top-up (--top-up)')

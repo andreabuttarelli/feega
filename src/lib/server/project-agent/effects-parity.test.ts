@@ -5,7 +5,7 @@ import { fakeDb } from '$lib/server/db/fake-db';
 import { createProjectTools } from './project-tools';
 import { registerNodeTools } from '../../../../cli/mcp/tools/nodes';
 
-const EFFECT_TOOLS = ['apply_effects', 'make_effects_pair', 'list_effects'];
+const EFFECT_TOOLS = ['apply_effects', 'make_effects_pair', 'list_effects', 'write_effect'];
 const MCP_ONLY_FIELDS = ['org'];
 
 type Registered = { name: string; fields: string[] };
