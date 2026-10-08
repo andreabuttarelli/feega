@@ -160,6 +160,13 @@ it replaces the stack when `effects` is given, then renders. `make_effects_pair(
 creates and renders the A/B twin of a `shape-cutout` node. All return `{ node_id, asset_id }` and
 spend no credits.
 
+`write_effect` (`{ org, name, frag, params? }`) stores a custom shader effect for the workspace (same
+name replaces it): `frag` defines `vec4 effect(vec2 uv)` over `u_src`, `u_res`, `u_time`, `u_seed`,
+`hash`, `noise`, and each param becomes `u_<key>`. It returns `{ effect }` with its check: `passed`,
+`failed` with `problems`, or `unchecked`. `patch_effect` (`{ org, effect_id, version, edits?, params? }`)
+applies `[{ find, replace }]` edits; a stale `version` is a 409. `list_effects` returns them under
+`custom` with the `step` (`{ id: "custom", ref }`) that `apply_effects` takes. Free.
+
 ## Node loops
 
 | MCP | CLI |

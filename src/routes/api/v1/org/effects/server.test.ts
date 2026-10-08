@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { EFFECTS } from '$lib/canvas/effects';
+import { fakeDb } from '$lib/server/db/fake-db';
 
 const resolveOrgCaller = vi.fn();
 
@@ -19,7 +20,7 @@ function call() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  resolveOrgCaller.mockResolvedValue({ caller: { orgId: 'org-1' } });
+  resolveOrgCaller.mockResolvedValue({ caller: { orgId: 'org-1', db: fakeDb({ effects: [] }).db } });
 });
 
 describe('GET /api/v1/org/effects', () => {
@@ -28,6 +29,15 @@ describe('GET /api/v1/org/effects', () => {
 
     expect(res.status).toBe(200);
     expect(body.effects.map((e: { id: string }) => e.id).sort()).toEqual(Object.keys(EFFECTS).sort());
+  });
+
+  it('lists the custom effects of the workspace beside the built-ins, with the step that uses each', async () => {
+    const row = { id: 'fx-1', org_id: 'org-1', name: 'vhs', version: 2, frag: 'f', params: [], check_state: 'passed', check_problems: [], cost_ms: 3, deleted_at: null, updated_at: 'now' };
+    resolveOrgCaller.mockResolvedValue({ caller: { orgId: 'org-1', db: fakeDb({ effects: [row] }, { filter: true }).db } });
+
+    const { body } = await call();
+
+    expect(body.custom).toEqual([expect.objectContaining({ effect_id: 'fx-1', name: 'vhs', version: 2, state: 'passed', step: { id: 'custom', ref: 'fx-1' } })]);
   });
 
   it('refuses without a caller', async () => {

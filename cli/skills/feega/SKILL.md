@@ -135,6 +135,11 @@ it, wired to it, and renders the chain; on an `effects` node it replaces the sta
 it when `effects` is omitted). `make_effects_pair` turns a `shape-cutout` node into an A/B pair:
 the twin has the same shapes and seed, the other side. All free.
 
+Custom effects: `write_effect` writes a GLSL shader effect for the whole workspace (name, frag, params)
+and returns its check; `patch_effect` edits it by find/replace at its `version`. `list_effects` shows
+them under `custom`, each with the `step` to put in an `apply_effects` stack. On motion clips, ask
+`ask_motion_agent` to add it.
+
 ## Loop a node over many combinations
 
 `run_node_loop` queues every combination from a node's `iterate` wires (or a plain "repeat N")

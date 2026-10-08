@@ -107,12 +107,59 @@ export function registerNodeTools(server: McpServer) {
     {
       title: 'List image effects',
       description:
-        'Every image effect `apply_effects` accepts, with its params (range, options, default). ' +
-        'Reads only, spends nothing.',
+        'Every image effect `apply_effects` accepts, with its params (range, options, default), and ' +
+        "the workspace's custom effects (`write_effect`) as `custom: [{ effect_id, name, version, state, step }]`: " +
+        'put `step` (`{ id: "custom", ref }`) in an `apply_effects` stack. Reads only, spends nothing.',
       inputSchema: z.object({ org }),
       annotations: { readOnlyHint: true }
     },
     async ({ org }) => withAuth((token) => call(token, 'GET', '/api/v1/org/effects', org))
+  );
+
+  server.registerTool(
+    'write_effect',
+    {
+      title: 'Write a custom effect',
+      description:
+        'Writes a custom shader effect for the whole workspace (same name replaces it): `frag` is a GLSL ES 1.0 ' +
+        'body defining `vec4 effect(vec2 uv)`, with `u_src` (the picture), `u_res`, `u_time`, `u_seed`, `v_uv`, ' +
+        '`hash(vec2)` and `noise(vec2)` given, and each param a uniform `u_<key>` (number → float, color → vec3, ' +
+        'seed → float; keys src, res, time, seed are taken). No #extension, no derivatives, loops bounded at 64, ' +
+        'at most 16 texture2D, 12 KB. Returns `{ effect }` with its check (passed, failed + problems, unchecked). ' +
+        'Spends no credits.',
+      inputSchema: z.object({
+        org,
+        name: z.string().describe('kebab-case, e.g. vhs-glow'),
+        frag: z.string(),
+        params: z.array(z.record(z.string(), z.unknown())).max(12).optional()
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false }
+    },
+    async ({ org, name, frag, params }) =>
+      withAuth((token) => call(token, 'POST', '/api/v1/org/custom-effects', org, { name, frag, params: params ?? [] }))
+  );
+
+  server.registerTool(
+    'patch_effect',
+    {
+      title: 'Patch a custom effect',
+      description:
+        'Edits a custom effect: `edits` `[{ find, replace }]` applied in order on its frag, `params` replaces the ' +
+        'list. `version` is the one `list_effects` or `write_effect` returned; a stale one answers 409 conflict. ' +
+        'Returns `{ effect }` with the new check. Spends no credits.',
+      inputSchema: z.object({
+        org,
+        effect_id: z.string(),
+        version: z.number().int(),
+        edits: z.array(z.object({ find: z.string(), replace: z.string() })).optional(),
+        params: z.array(z.record(z.string(), z.unknown())).max(12).optional()
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false }
+    },
+    async ({ org, effect_id, version, edits, params }) =>
+      withAuth((token) =>
+        call(token, 'PATCH', `/api/v1/org/custom-effects/${encodeURIComponent(effect_id)}`, org, { version, edits, params })
+      )
   );
 
   server.registerTool(
