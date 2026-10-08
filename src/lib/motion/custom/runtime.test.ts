@@ -164,6 +164,29 @@ describe('libraries', () => {
     expect(frame(1.5)).toBe(first);
   });
 
+  it('loads PixiJS for a stage', () => {
+    const components = { P: { source: { html: '', css: '', js: 'const app = new PIXI.Application({ width: 10, height: 10 })' } } } as never;
+
+    expect([...librariesOf(components, ['P'])]).toEqual([Library.Pixi]);
+  });
+
+  it('a PixiJS application never starts its own ticker and keeps its frame for capture', () => {
+    class Application {
+      options: Record<string, unknown>;
+      constructor(options: Record<string, unknown>) {
+        this.options = options;
+      }
+    }
+    class Graphics {}
+    (window as unknown as Record<string, unknown>).PIXI = { Application, Graphics };
+    const js = 'const app = new PIXI.Application({ width: 10, height: 10, autoStart: true }); root.dataset.options = JSON.stringify(app.options); root.dataset.graphics = String(typeof PIXI.Graphics);';
+    const { root, errors } = run('Stage', js, 0);
+
+    expect(errors).toEqual([]);
+    expect(JSON.parse(root.dataset.options!)).toEqual({ width: 10, height: 10, autoStart: false, sharedTicker: false, preserveDrawingBuffer: true });
+    expect(root.dataset.graphics).toBe('function');
+  });
+
   it('a d3 chart drawn from progress gives the same frame from any seek order', () => {
     (window as unknown as Record<string, unknown>).d3 = d3;
     const js = 'const svg = d3.select(root).append("svg"); const bars = svg.selectAll("rect").data([3, 9, 5]).join("rect"); const y = d3.scaleLinear().domain([0, 9]).range([0, 300]); tl.to({}, { duration: 2, ease: "none", onUpdate() { const p = this.progress(); bars.attr("height", (d) => y(d) * d3.easeCubicOut(p)).attr("fill", d3.interpolateRgb("#000", "#09f")(p)); } }, 0);';

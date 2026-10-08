@@ -406,6 +406,16 @@ describe('custom components in the composition', () => {
     expect(html).not.toContain('/npm/p5@');
   });
 
+  it('loads PixiJS and its no-eval shader sync only for a component that uses it', () => {
+    const stage = { ...graph, source: { ...graph.source, js: 'const app = new PIXI.Application({ width: 10, height: 10 });' } };
+    const staged = must(addClip(must(writeComponent(newMotionDoc(MotionFormat.Landscape), 'Stage', stage)), { component: 'Custom', from: 0, durationInFrames: 60, props: { name: 'Stage' } }, 'p1'));
+    const page = compose(staged);
+
+    expect(page).toMatch(/<script src="https:\/\/cdn\.jsdelivr\.net\/npm\/pixi\.js@[\d.]+\/dist\/pixi\.min\.js"><\/script><script src="https:\/\/cdn\.jsdelivr\.net\/npm\/@pixi\/unsafe-eval@[\d.]+\/dist\/unsafe-eval\.min\.js"><\/script>/);
+    expect(page).not.toContain('unsafe-eval\'');
+    expect(html).not.toContain('/npm/pixi.js@');
+  });
+
   it('renders the component markup under a root scoped to the clip', () => {
     expect(html).toContain('<div class="cc" id="cc-g1" data-component="NodeGraph"><style>@scope (#cc-g1) {.node{background:#111}}</style><div class="node"></div></div>');
   });
