@@ -19,6 +19,7 @@ declare module 'splitting' {
 }
 
 declare module 'virtual:motion-open-props' {
+declare module 'virtual:motion-shader-fx' {
 	const source: string;
 	export default source;
 }

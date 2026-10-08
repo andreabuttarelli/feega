@@ -9,6 +9,8 @@ import { OPEN_PROPS_ENTRY, OPEN_PROPS_MODULE } from '../src/lib/motion/custom/op
 
 export const LIVE_RUNTIME_MODULE = 'virtual:motion-live-runtime';
 export const LIVE_ENTRY = 'src/lib/motion/interactive/live-entry.ts';
+export const SHADER_FX_MODULE = 'virtual:motion-shader-fx';
+export const SHADER_FX_ENTRY = 'src/lib/motion/shaders/runtime-entry.ts';
 
 const BUNDLES: Record<string, string> = {
   [LIVE_RUNTIME_MODULE]: LIVE_ENTRY,
@@ -16,7 +18,8 @@ const BUNDLES: Record<string, string> = {
   [TWGL_MODULE]: TWGL_ENTRY,
   [FX_MODULE]: FX_ENTRY,
   [SPLITTING_MODULE]: SPLITTING_ENTRY,
-  [OPEN_PROPS_MODULE]: OPEN_PROPS_ENTRY
+  [OPEN_PROPS_MODULE]: OPEN_PROPS_ENTRY,
+  [SHADER_FX_MODULE]: SHADER_FX_ENTRY
 };
 
 const resolved = (id: string) => `\0${id}`;

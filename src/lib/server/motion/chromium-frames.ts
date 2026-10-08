@@ -1,5 +1,7 @@
 import type { Browser, Page } from 'puppeteer-core';
+import shaderRuntime from 'virtual:motion-shader-fx';
 import type { BrowserPort, FramePage, Viewport } from './server-frames';
+import type { GlPage } from '$lib/server/effects/check';
 
 const CHROMIUM_VERSION = '153.0.0';
 const CHROMIUM_PACK = `https://github.com/Sparticuz/chromium/releases/download/v${CHROMIUM_VERSION}/chromium-v${CHROMIUM_VERSION}-pack.x64.tar`;
@@ -73,3 +75,15 @@ async function pageOf(viewport: Viewport): Promise<FramePage> {
 export const serverFramesOpen = () => Boolean(process.env.VERCEL || process.env.CHROMIUM_PATH);
 
 export const chromiumFrames: BrowserPort = { open: pageOf };
+
+async function runGl<T>(script: string): Promise<T> {
+  const page = await (await browser()).newPage();
+  try {
+    await page.setContent(`<script>${shaderRuntime.replace(/<\/script/gi, '<\\/script')}</script>`, { waitUntil: 'load', timeout: LOAD_TIMEOUT_MS });
+    return (await page.evaluate(script)) as T;
+  } finally {
+    await page.close();
+  }
+}
+
+export const chromiumGl: GlPage = { run: runGl };

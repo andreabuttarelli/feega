@@ -15,6 +15,7 @@ import { PARENT_OPACITIES, ParentOpacity, parentProblem } from './parent';
 import { expressionsSchema, expressionsProblem } from './expression/schema';
 import { fontRefProblem, fontsSchema, usedFaces } from './fonts/model';
 import { effectsSchema, effectsProblem } from './effects/model';
+import { clipShadersSchema, clipShadersProblem, shadersSchema } from './shaders/model';
 import { BLEND_MODES, BlendMode } from './blend';
 import { animatorsSchema } from './text-animators/model';
 import { textPathSchema } from './text-path/model';
@@ -88,6 +89,7 @@ const clipSchema = z.object({
   parentOpacity: z.enum(PARENT_OPACITIES).default(ParentOpacity.Inherit),
   expressions: expressionsSchema,
   effects: effectsSchema,
+  shaders: clipShadersSchema,
   blend: z.enum(BLEND_MODES).default(BlendMode.Normal),
   animators: animatorsSchema,
   textPath: textPathSchema.nullable().default(null),
@@ -154,6 +156,7 @@ export const motionDocSchema = z
       .record(z.string().regex(CUSTOM_NAME, 'component names are PascalCase, e.g. NodeGraph'), customComponentSchema)
       .refine((c) => Object.keys(c).length <= MAX_COMPONENTS, `at most ${MAX_COMPONENTS} custom components`)
       .default({}),
+    shaders: shadersSchema,
     markers: z.array(markerSchema).max(MAX_MARKERS).optional(),
     workArea: z.object({ from: z.number().int().min(0), to: z.number().int().min(1) }).nullable().optional(),
     interactive: interactiveSchema.optional(),
@@ -227,7 +230,7 @@ function clipProblem(doc: MotionDoc, clip: MotionClip): string | null {
   }
   clip.props = verdict.props;
   clip.keyframes = Object.fromEntries(Object.entries(clip.keyframes).map(([key, track]) => [key, byFrame(track)]));
-  return effectsProblem(clip.effects) ?? keyframesProblem(withParams(doc, clip)) ?? expressionsProblem(withParams(doc, clip));
+  return effectsProblem(clip.effects) ?? clipShadersProblem(clip.component, clip.shaders, doc.shaders) ?? keyframesProblem(withParams(doc, clip)) ?? expressionsProblem(withParams(doc, clip));
 }
 
 function propsProblem(doc: MotionDoc): string | null {
@@ -348,7 +351,8 @@ export function newMotionDoc(format: MotionFormat): MotionDoc {
     background: Background.Brand,
     motionBlur: DEFAULT_MOTION_BLUR,
     fields: [],
-    components: {}
+    components: {},
+    shaders: {}
   };
 }
 
@@ -370,6 +374,7 @@ export function newClip(fields: Pick<MotionClip, 'id' | 'from' | 'durationInFram
     parentOpacity: ParentOpacity.Inherit,
     expressions: {},
     effects: [],
+    shaders: [],
     blend: BlendMode.Normal,
     animators: [],
     textPath: null,

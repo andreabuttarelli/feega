@@ -1,4 +1,9 @@
 import { tool, type Tool, type ToolExecutionOptions } from 'ai';
+import { addShader, removeShader, setShader } from '$lib/motion/shaders/ops';
+import type { EffectStore } from '$lib/server/effects/store';
+import { CheckState as EffectCheck, Outcome, type Written } from '$lib/server/repos/effects';
+
+const MAX_EFFECT_FAILURES = 3;
 import { addAdjustment, createComp, mergeView, precompose, viewOf } from '$lib/motion/precomp';
 import { z } from 'zod';
 import { AssetKind, COMPONENTS, COMPONENT_IDS, TrackKind, type ComponentId } from '$lib/motion/components';
@@ -98,7 +103,7 @@ import { STYLES, styleOf } from '$lib/motion/style';
 import { MOTION_STYLES } from '$lib/motion/style-model';
 import { unitOf, propsOwner, shownKeyframes, shownMask, shownOffset, shownRecord, storedMask, storedOffset, storedRecord, toShown, toStored, type Owner } from '$lib/motion/units';
 
-export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number; gate?: QualityProblem[] };
+export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number; effectFailures?: number; gate?: QualityProblem[] };
 
 export type CheckResult = { ok: boolean; problems: string[]; frames: Frame[] };
 
@@ -128,6 +133,7 @@ export type MotionToolDeps = {
   importAsset?: (url: string, label?: string) => Promise<AssetImport>;
   capture?: (url: string, view: CaptureView) => Promise<SiteCapture>;
   readUi?: (asset: MotionAsset, region?: UiRegion) => Promise<UiRead>;
+  effects?: EffectStore;
 };
 
 export type UiRegion = { x: number; y: number; width: number; height: number };
@@ -203,6 +209,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
         parentOpacity: c.parentOpacity,
         expressions: c.expressions,
         effects: c.effects,
+        shaders: c.shaders,
         blend: c.blend,
         animators: c.animators,
         textPath: c.textPath,
@@ -225,6 +232,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
     camera: cameraSummary(doc.camera),
     look: lookSummary(doc.look),
     components: Object.entries(doc.components).map(([name, c]) => customSummary(name, c)),
+    shaders: Object.fromEntries(Object.entries(doc.shaders).map(([ref, d]) => [ref, { name: d.name, version: d.version, params: d.params }])),
     comps: Object.entries(doc.comps).map(([id, c]) => ({ id, name: c.name, ...(c.template ? { template: c.template.id } : {}), duration: secs(c.durationInFrames), clips: c.tracks.flatMap((t) => t.clips.map((clip) => clip.id)) }))
   };
 }
@@ -353,6 +361,28 @@ function propsError(doc: MotionDoc, clipId: string, patch: Record<string, unknow
 }
 
 export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
+  const effectWrite = async (write: (store: EffectStore) => Promise<Written>) => {
+    if (!deps.effects) {
+      return { ok: false, error: 'custom effects are not available here' };
+    }
+    if ((deps.session.effectFailures ?? 0) >= MAX_EFFECT_FAILURES) {
+      return { ok: false, error: 'three effect writes failed this turn: tell the user what the check said instead of trying again' };
+    }
+
+    const written = await write(deps.effects);
+    if (written.outcome !== Outcome.Ok) {
+      deps.session.effectFailures = (deps.session.effectFailures ?? 0) + 1;
+      return { ok: false, error: `${written.outcome}${written.problems?.length ? `: ${written.problems.join('; ')}` : ''}` };
+    }
+
+    const { effect } = written;
+    const passed = effect.check.state !== EffectCheck.Failed;
+    if (!passed) {
+      deps.session.effectFailures = (deps.session.effectFailures ?? 0) + 1;
+    }
+    return { ok: passed, ...(passed ? {} : { error: effect.check.problems.join('; ') }), effect_id: effect.id, name: effect.name, version: effect.version, check: effect.check };
+  };
+
   const { session } = deps;
   const frames = (s: number) => framesAt(s, session.doc.fps);
   const asKey = (k: KeyInput): Keyframe => shaped({ frame: frames(k.time), value: k.value, ease: k.ease }, { in: k.in, out: k.out, roving: k.roving });
@@ -1253,6 +1283,54 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: 'Remove an effect from a clip, with its keyframes and expressions.',
       inputSchema: z.object({ clip_id: z.string(), effect_id: z.string() }),
       execute: async (input) => apply(removeEffect(session.doc, input.clip_id, input.effect_id), `removed effect ${input.effect_id}`)
+    }),
+
+    write_effect: tool({
+      description: `Write a custom effect for the whole workspace: a GLSL ES 1.0 fragment body defining vec4 effect(vec2 uv). Given: uniform sampler2D u_src (the clip picture), vec2 u_res (pixels), float u_time (clip seconds), float u_seed, varying v_uv, float hash(vec2), float noise(vec2). Every param becomes a uniform u_<key> (number → float, color → vec3, seed → float); keys src, res, time, seed are taken. No #extension, no derivatives, for loops with a constant bound ≤ 64, ≤ 16 texture2D, ≤ 12 KB. Same name replaces it. Returns the check (passed, failed with problems, or unchecked); fix and write again, at most three failed tries a turn. Then add_custom_effect.`,
+      inputSchema: z.object({ name: z.string(), frag: z.string(), params: z.array(z.record(z.string(), z.unknown())).max(12).default([]) }),
+      execute: async (input) => effectWrite((store) => store.write(input as never))
+    }),
+
+    patch_effect: tool({
+      description: 'Edit a custom effect by text: edits [{find, replace}] applied in order on its frag, params replaces the list. version is the one list_effects or write_effect returned; a stale one answers conflict. Returns the new check.',
+      inputSchema: z.object({ effect_id: z.string(), version: z.number().int(), edits: z.array(z.object({ find: z.string().min(1), replace: z.string() })).default([]), params: z.array(z.record(z.string(), z.unknown())).max(12).optional() }),
+      execute: async (input) => effectWrite((store) => store.patch({ effectId: input.effect_id, version: input.version, edits: input.edits, params: input.params as never }))
+    }),
+
+    list_effects: tool({
+      description: 'The custom effects of the workspace: id, name, version, params, check state and cost per 1080p frame. Free, reads only.',
+      inputSchema: z.object({}),
+      execute: async () => {
+        const effects = deps.effects ? await deps.effects.list() : null;
+        return { effects: (effects ?? []).map((e) => ({ effect_id: e.id, name: e.name, version: e.version, params: e.params, state: e.check.state, problems: e.check.problems, cost_ms: e.check.costMs })) };
+      }
+    }),
+
+    add_custom_effect: tool({
+      description: `Put a custom effect of the workspace (write_effect / list_effects) on an Image or Video clip, one per clip. The shader runs on the picture first, then the clip's effect stack. Params not given take their defaults; animate them with set_keyframes on fx.<effect id>.<param>.`,
+      inputSchema: z.object({ clip_id: z.string(), effect_id: z.string(), params: z.record(z.string(), z.union([z.number(), z.string()])).optional() }),
+      execute: async (input) => {
+        const effect = deps.effects ? await deps.effects.find(input.effect_id) : null;
+        if (!effect) {
+          return { ok: false, error: deps.effects ? `no custom effect ${input.effect_id}: list_effects shows the workspace's` : 'custom effects are not available here' };
+        }
+        const id = deps.newId();
+        const snapshot = { name: effect.name, version: effect.version, frag: effect.frag, params: effect.params };
+        const out = apply(addShader(session.doc, input.clip_id, id, { ref: effect.id, snapshot }, input.params), `added ${effect.name} to ${input.clip_id}`);
+        return out.ok ? { ...out, custom_effect_id: id, check: effect.check.state, animate: effect.params.map((p) => effectKey(id, p.key)) } : out;
+      }
+    }),
+
+    set_custom_effect: tool({
+      description: 'Change a custom effect on a clip: some params (the rest are kept) or enabled on/off.',
+      inputSchema: z.object({ clip_id: z.string(), custom_effect_id: z.string(), params: z.record(z.string(), z.union([z.number(), z.string()])).optional(), enabled: z.boolean().optional() }),
+      execute: async (input) => apply(setShader(session.doc, input.clip_id, input.custom_effect_id, { params: input.params, enabled: input.enabled }), `changed custom effect ${input.custom_effect_id}`)
+    }),
+
+    remove_custom_effect: tool({
+      description: 'Remove a custom effect from a clip, with its keyframes.',
+      inputSchema: z.object({ clip_id: z.string(), custom_effect_id: z.string() }),
+      execute: async (input) => apply(removeShader(session.doc, input.clip_id, input.custom_effect_id), `removed custom effect ${input.custom_effect_id}`)
     }),
 
     set_blend_mode: tool({

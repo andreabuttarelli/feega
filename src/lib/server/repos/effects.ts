@@ -6,6 +6,7 @@ const TABLE = 'effects';
 const COLUMNS = 'id, org_id, name, version, frag, params, check_state, check_problems, cost_ms, updated_at';
 const MISSING_TABLE_CODES = new Set(['42P01', 'PGRST205']);
 const UNIQUE_VIOLATION = '23505';
+const FIRST_VERSION = 1;
 
 export enum CheckState {
   Unchecked = 'unchecked',
@@ -112,6 +113,18 @@ export async function findEffect(db: Db, orgId: string, id: string): Promise<Sto
   return data ? toEffect(data as Row) : null;
 }
 
+export async function findEffectByName(db: Db, orgId: string, name: string): Promise<StoredEffect | null> {
+  const { data, error } = await untyped(db).from(TABLE).select(COLUMNS).eq('org_id', orgId).eq('name', name).is('deleted_at', null).maybeSingle();
+  if (missing(error)) {
+    return null;
+  }
+  if (error) {
+    throw error;
+  }
+
+  return data ? toEffect(data as Row) : null;
+}
+
 export async function createEffect(db: Db, orgId: string, actor: Actor, input: unknown): Promise<Written> {
   const valid = checked(input);
   if (!valid.ok) {
@@ -120,7 +133,7 @@ export async function createEffect(db: Db, orgId: string, actor: Actor, input: u
 
   const { data, error } = await untyped(db)
     .from(TABLE)
-    .insert({ org_id: orgId, ...valid.effect, ...valid.columns, actor_kind: actor.kind, actor_id: actor.id, agent_key: actor.agentKey ?? null })
+    .insert({ org_id: orgId, ...valid.effect, ...valid.columns, version: FIRST_VERSION, actor_kind: actor.kind, actor_id: actor.id, agent_key: actor.agentKey ?? null })
     .select(COLUMNS)
     .single();
   if (error) {
