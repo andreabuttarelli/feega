@@ -150,12 +150,13 @@ finishes regardless, and what it already produced stays in the output list.
 
 ## Edit a motion video
 
-A `motion` node is a video built in the motion editor. `get_motion_summary` reads it — revision,
+A `motion` node is a video built in the motion editor. `list_motion_videos` finds them (optionally
+per project) with their `node_id`, revision and poster. `get_motion_summary` reads one — revision,
 duration, every track and clip in seconds. `ask_motion_agent` asks the editor's own AI to change
 it in plain words ("make the title red and add a bounce"): one turn of the same agent the editor
-chat runs, a new revision, the exchange visible in the editor chat. By default it waits for the
-turn; with `wait: false`, or past about 4 minutes, it returns a running `run_id` — read it with
-`get_motion_run`. Spends credits. CLI: `feega motion ask <nodeId> "<prompt>"`.
+chat runs, a new revision, the exchange visible in the editor chat. It returns at once with a
+running `run_id`: poll `get_motion_run` every few seconds until `done` (reply, summary, new
+`version`); `wait: true` polls for you up to about 4 minutes. Spends credits. CLI: `feega motion ask <nodeId> "<prompt>"`.
 
 Render one with `render_video`: by default it is FREE and returns a `render_url`,
 a one-time link (30 minutes, bound to the saved revision) the user opens on any device — the video
@@ -163,6 +164,12 @@ renders in their browser and lands in the project assets. Show the link; never o
 `mode: "server"` renders on our machines instead and spends credits: only when the user cannot
 open a browser, or wants ProRes, HEVC, WebM, GIF, PNG or 4K. `get_render` gives
 the status and, when done, a signed `file_url`. CLI: `feega motion render <nodeId> [--server]`.
+
+Put one on a website with `publish_motion_embed`: free, it hosts the interactive web export of
+the saved revision and returns a public `url` and an iframe `snippet`; publishing again updates
+it in place, `action: "unpublish"` takes it down. Uncensored projects are refused.
+`get_motion_embed` reads the state. The self-contained HTML (no hosting):
+`feega motion embed <nodeId> --download page.html`.
 
 ## Remix from the gallery
 

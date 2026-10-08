@@ -1,3 +1,4 @@
+import { writeFile } from 'node:fs/promises';
 import { loadSession } from '../lib/auth.ts';
 import { awaitRun, motionApi, type MotionRun, type RenderStart } from '../lib/motion.ts';
 
@@ -44,14 +45,14 @@ function printRun(run: MotionRun) {
   }
 }
 
-type RenderOpts = { org?: string; server?: boolean; resolution?: string; format?: string };
+type RenderOpts = { org?: string; server?: boolean; resolution?: string; format?: string; quality?: string; fps?: string };
 
 export async function cmdMotionRender(nodeId: string, opts: RenderOpts) {
   await renderAndReport(await token(), nodeId, opts);
 }
 
 export async function renderAndReport(bearer: string, nodeId: string, opts: RenderOpts) {
-  const started = await motionApi.render(bearer, nodeId, { mode: opts.server ? 'server' : 'browser', resolution: opts.resolution, format: opts.format }, opts.org);
+  const started = await motionApi.render(bearer, nodeId, { mode: opts.server ? 'server' : 'browser', resolution: opts.resolution, format: opts.format, quality: opts.quality, fps: opts.fps ? Number(opts.fps) : undefined }, opts.org);
   printRender(started);
 }
 
@@ -75,4 +76,39 @@ function printRender(started: RenderStart) {
     console.log(`Rendering on our servers: about ${started.credits} credits.`);
   }
   console.log(`Check it: feega motion render-status ${started.run_id}`);
+}
+
+export async function cmdMotionList(opts: { org?: string; project?: string }) {
+  const { videos } = await motionApi.list(await token(), opts.project, opts.org);
+  if (!videos.length) {
+    console.log('No motion videos.');
+    return;
+  }
+  for (const v of videos) {
+    console.log(`${v.node_id}  ${v.name ?? '(untitled)'}  ${v.format}  revision ${v.version}  project ${v.project_id}`);
+  }
+}
+
+type EmbedOpts = { org?: string; unpublish?: boolean; status?: boolean; download?: string };
+
+export async function cmdMotionEmbed(nodeId: string, opts: EmbedOpts) {
+  await embedAndReport(await token(), nodeId, opts);
+}
+
+export async function embedAndReport(bearer: string, nodeId: string, opts: EmbedOpts) {
+  if (opts.download) {
+    await writeFile(opts.download, await motionApi.bundle(bearer, nodeId, opts.org));
+    console.log(`Saved the self-contained HTML to ${opts.download}`);
+    return;
+  }
+  if (opts.unpublish) {
+    await motionApi.unembed(bearer, nodeId, opts.org);
+    console.log('Embed taken down.');
+    return;
+  }
+  const state = opts.status ? await motionApi.embedState(bearer, nodeId, opts.org) : await motionApi.embed(bearer, nodeId, opts.org);
+  console.log(state.published ? `Published: ${state.url}` : `Not published. It would live at ${state.url}`);
+  if (state.snippet) {
+    console.log(state.snippet);
+  }
 }

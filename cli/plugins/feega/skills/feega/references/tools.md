@@ -191,16 +191,24 @@ list. Returns how many combinations it actually stopped.
 
 | MCP | CLI |
 |-----|-----|
+| `list_motion_videos` | `feega motion list [--project <id>]` |
 | `ask_motion_agent` | `feega motion ask <nodeId> "<prompt>" [--no-wait]` |
 | `get_motion_run` | `feega motion run <runId>` |
 | `get_motion_summary` | (MCP only) |
-| `render_video` | `feega motion render <nodeId> [--server] [--resolution 720p]` |
+| `render_video` | `feega motion render <nodeId> [--server] [--resolution 720p] [--format f] [--quality q] [--fps n]` |
 | `get_render` | `feega motion render-status <runId>` |
+| `publish_motion_embed` | `feega motion embed <nodeId> [--unpublish]` |
+| `get_motion_embed` | `feega motion embed <nodeId> --status` |
+| (CLI / API only) | `feega motion embed <nodeId> --download <file>` |
+
+`list_motion_videos({ org, project_id? })` lists `motion` nodes newest first: `node_id`, `name`,
+`project_id`, `canvas_id`, `format`, `version` (0 = empty), signed `poster_url` /
+`last_render_url` (one hour) and `editor_url`.
 
 `ask_motion_agent({ org, node_id, prompt, wait? })` runs one turn of the motion editor's agent on
-a `motion` node, with the editor's own tools, and saves a new revision. `wait` defaults to true and
-returns the finished run (`reply`, `summary`, `version`, `cost_usd`); past about 4 minutes, or with
-`wait: false`, the run comes back `running` — poll `get_motion_run({ org, run_id })`. The agent
+a `motion` node, with the editor's own tools, and saves a new revision. It returns at once with
+`{ run_id, status: "running" }`; poll `get_motion_run({ org, run_id })` until `done`, which carries
+`reply`, `summary`, `version` and `cost_usd`. `wait: true` polls for you, up to about 4 minutes. The agent
 cannot look at rendered frames: that needs the editor open in a browser. Spends credits. For a launch film it
 rebuilds the product UI as vector components (UI kit or `recreate_ui` from a site capture),
 never as screenshots: asking "recreate the dashboard from the capture" works.
@@ -208,12 +216,18 @@ never as screenshots: asking "recreate the dashboard from the capture" works.
 `get_motion_summary({ org, node_id })` reads the saved video: revision, last change, size, fps,
 duration, tracks and clips in seconds. Spends nothing.
 
-`render_video({ org, node_id, mode?, resolution?, format? })` renders the saved revision. Default
+`render_video({ org, node_id, mode?, resolution?, format?, quality?, fps? })` renders the saved revision. Default
 `mode: "browser"`: free, returns `{ render_url, run_id, expires_at, credits: 0 }`. The link works
 once, expires in 30 minutes if nobody opens it, and is claimed by the first device that opens it;
 that device renders, saves the MP4 to the project and closes the run. `mode: "server"` renders on
 the farm, spends credits and accepts every format and 4K. `get_render({ org, run_id })` returns
 `status`, `mode`, `asset_id` and a signed `file_url` (one hour) once `done`.
+
+`publish_motion_embed({ org, node_id, action? })` hosts the interactive web export of the saved
+revision and returns `{ published, url, snippet, revision }` — the iframe snippet goes into any
+site. Publishing again updates the same URL; `action: "unpublish"` removes it. Free. Uncensored
+projects get 403 with `refusal`; an empty video 409. `get_motion_embed({ org, node_id })` reads
+`published`, `url`, `snippet`. The self-contained HTML is `GET /api/v1/motion/{node_id}/embed/bundle`.
 
 ## Gallery
 

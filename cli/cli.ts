@@ -103,7 +103,7 @@ program
     await cmdMedia(opts);
   });
 
-const motion = program.command('motion').description('Motion videos: ask the editor agent to change one, render one');
+const motion = program.command('motion').description('Motion videos: list, ask the editor agent to change one, render, publish as a web embed');
 
 motion
   .command('ask <nodeId> <prompt>')
@@ -130,10 +130,34 @@ motion
   .option('--server', 'Render on our servers instead (spends credits)')
   .option('--resolution <r>', '720p, 1080p, 1440p or 2160p')
   .option('--format <f>', 'With --server: mp4-h264, mp4-h265, prores-422hq, prores-4444, webm-alpha, png-sequence, gif')
+  .option('--quality <q>', 'standard or high')
+  .option('--fps <n>', '24, 25, 30, 50 or 60')
   .option('--org <id>', 'Which org, if you belong to more than one')
   .action(async (nodeId: string, opts) => {
     const { cmdMotionRender } = await import('./commands/motion.ts');
     await cmdMotionRender(nodeId, opts);
+  });
+
+motion
+  .command('list')
+  .description('List motion videos, to find a node id')
+  .option('--project <id>', 'Only the videos of one project')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (opts) => {
+    const { cmdMotionList } = await import('./commands/motion.ts');
+    await cmdMotionList(opts);
+  });
+
+motion
+  .command('embed <nodeId>')
+  .description('Publish the video as a hosted web embed and print the snippet (free)')
+  .option('--unpublish', 'Take the embed down')
+  .option('--status', 'Show the embed state without publishing')
+  .option('--download <file>', 'Save the self-contained HTML instead of hosting it')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (nodeId: string, opts) => {
+    const { cmdMotionEmbed } = await import('./commands/motion.ts');
+    await cmdMotionEmbed(nodeId, opts);
   });
 
 motion
