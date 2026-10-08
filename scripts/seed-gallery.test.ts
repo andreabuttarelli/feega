@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { addClip } from '$lib/motion/timeline';
+import { applyValues } from '$lib/motion/template/fields';
 import { builtinTitle, catalogue, DEMOS, EXCLUDED_DEMOS, filledTemplate, seedId, seedProblems, SHOWCASE, SOURCE_DIR } from './seed-gallery';
 
 function titled(): MotionDoc {
@@ -85,4 +86,16 @@ describe('the Feega gallery seed', () => {
     expect(problems).toEqual([]);
     expect(seeds).toHaveLength(SHOWCASE.length);
   }, 120_000);
+});
+
+describe.skipIf(!existsSync(join(SOURCE_DIR, 'showcase/drop')))('the product drop showcase', () => {
+  it('changes the price once and the accent in every scene', () => {
+    const { seeds } = catalogue(mkdtempSync(join(tmpdir(), 'seed-test-')), SHOWCASE.filter((d) => d.key === 'showcase-drop'));
+    const filled = applyValues(seeds[0].doc, { price: '89', accent: '#00ff00' });
+    const clips = filled.ok ? Object.values(filled.doc.comps).flatMap((c) => c.tracks.flatMap((t) => t.clips)) : [];
+
+    expect(clips.filter((c) => c.props.price !== undefined).map((c) => c.props.price)).toEqual(['89']);
+    expect(clips.filter((c) => c.props.fill === '#ff4a1c')).toEqual([]);
+    expect(clips.filter((c) => c.props.fill === '#00ff00')).toHaveLength(4);
+  });
 });
