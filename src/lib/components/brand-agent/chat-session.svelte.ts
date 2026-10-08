@@ -9,6 +9,7 @@ export type ChatMessage = {
   tools?: ToolCall[];
   reasoning?: string;
   live?: boolean;
+  streaming?: true;
 };
 
 export type UserEcho = 'append-user' | 'reuse-user';
@@ -37,6 +38,17 @@ const sleep = (ms: number, wake: (resolve: () => void) => void) =>
   });
 
 const livePlaceholder = (partial: ChatMessage | null): ChatMessage => ({ role: 'assistant', content: partial?.content ?? '', reasoning: partial?.reasoning, tools: partial?.tools ?? [], pending: true, live: true, at: partial?.at ?? Date.now() });
+
+const hasWork = (m: ChatMessage | undefined) => Boolean(m?.content || m?.tools?.length);
+
+function following(saved: ChatMessage[], partial: ChatMessage | null): ChatMessage[] {
+  const last = saved.at(-1);
+  if (last?.streaming && hasWork(last)) {
+    return [...saved.slice(0, -1), livePlaceholder({ ...last, reasoning: partial?.reasoning })];
+  }
+  const settled = last?.streaming ? saved.slice(0, -1) : saved;
+  return [...settled, livePlaceholder(partial)];
+}
 
 class HttpFailure extends Error {
   status: number;
@@ -94,7 +106,7 @@ export class ChatSession {
       }
       const data = (await res.json()) as SavedThread;
       if (!this.sending && !this.reconnecting) {
-        this.messages = data.messages ?? [];
+        this.messages = data.running ? following(data.messages ?? [], null) : (data.messages ?? []);
       }
       if (data.running && !this.sending) {
         void this.#follow(null);
@@ -192,7 +204,7 @@ export class ChatSession {
         break;
       }
       if (thread) {
-        this.messages = [...(thread.messages ?? []), livePlaceholder(this.#lastAssistant())];
+        this.messages = following(thread.messages ?? [], this.#lastAssistant());
         this.revision++;
       }
       await sleep(FOLLOW_POLL_MS, (wake) => (this.#wake = wake));

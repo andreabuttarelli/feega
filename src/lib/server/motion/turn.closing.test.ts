@@ -12,7 +12,8 @@ type Call = { prompt: Message[]; toolChoice?: { type: string; toolName?: string 
 const world = vi.hoisted(() => ({
   calls: [] as Call[],
   toolCalls: [] as string[],
-  saved: [] as { role: string; content?: string }[],
+  saved: [] as { role: string; content?: string; status?: string }[],
+  progress: [] as { content: string; tools: unknown[] }[],
   nudgesToIgnore: 0,
   rate: 1,
   models: [] as string[],
@@ -145,6 +146,17 @@ vi.mock('$lib/server/repos/chat', () => ({
     world.saved.push(turn);
   }
 }));
+vi.mock('$lib/server/repos/chat-reply', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('$lib/server/repos/chat-reply')>()),
+  openReply: async () => ({
+    progress: async (body: { content: string; tools: unknown[] }) => {
+      world.progress.push(body);
+    },
+    finish: async (body: { content: string }, status: string) => {
+      world.saved.push({ role: 'assistant', ...body, status });
+    }
+  })
+}));
 vi.mock('$lib/server/motion/editor', () => ({
   headOrNew: async () => ({ version: 0, doc: { ...newMotionDoc(MotionFormat.Landscape), style: MotionStyle.AppleMinimal }, summary: null, actorKind: 'system' }),
   motionTokens: async () => ({ name: 'Brand' }),
@@ -205,6 +217,7 @@ describe('a motion turn closes on a look and a summary', () => {
     world.calls = [];
     world.toolCalls = [];
     world.saved = [];
+    world.progress = [];
     world.nudgesToIgnore = 0;
     world.rate = 1;
     world.models = [];
@@ -266,6 +279,14 @@ describe('a motion turn closes on a look and a summary', () => {
     expect(outcome.reply.trim().endsWith(SUMMARY)).toBe(true);
     expect(saved.trim().endsWith(SUMMARY)).toBe(true);
     expect(saved).not.toMatch(/\.[A-Z]/);
+  });
+
+  it('each finished step is written as progress before the answer is closed done', async () => {
+    const outcome = await turn();
+
+    expect(world.progress.length).toBeGreaterThan(1);
+    expect(world.progress.some((p) => p.tools.length > 0)).toBe(true);
+    expect(world.saved.filter((t) => t.role === 'assistant')).toEqual([expect.objectContaining({ content: outcome.reply, status: 'done' })]);
   });
 
   it('a check that ends on its own words is the summary: no extra step resends the turn', async () => {

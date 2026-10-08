@@ -10,6 +10,7 @@ import { ensureGatewayModels, gatewayModel, gatewayRate } from '$lib/server/open
 import { MOTION_TURN_CAP_USD, Tier, activeTools, openingTier, selfCheckChoice, spentUsd, stepTier, type ForcedTool } from '$lib/server/motion/model-route';
 import { extractSdkUsage, logAiCall, withOrgContext } from '$lib/server/ai-log';
 import { loadTurns, openNodeThread, promptHistory, saveTurn } from '$lib/server/repos/chat';
+import { openReply, ReplyStatus } from '$lib/server/repos/chat-reply';
 import { finishedTurn } from '$lib/server/project-agent/finished-turn';
 import { agentActor, type Actor } from '$lib/server/repos/actor';
 import { agentStopWhen } from '$lib/server/project-agent/limits';
@@ -138,6 +139,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
   const assets = await motionAssets({ db, orgId, projectId: project.id, canvasId: motion.record.canvasId, nodeId: motion.record.id });
   const history = promptHistory(await loadTurns(db, { orgId, threadId }));
   await saveTurn(db, { orgId, threadId, role: 'user', content: message, actor: requester });
+  const reply = await openReply(db, { orgId, threadId, actor });
 
   const knownAssets = assets.length;
   const session: MotionSession = { doc: head.doc, baseVersion: head.version, edits: [], selection, frames: new Map(), views: 0, checkedAt: 0, codeWrites: 0 };
@@ -252,11 +254,11 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
   });
   done.catch(() => {});
 
+  const steps: TurnStep[] = [];
   const stream = createUIMessageStream({
     execute: async ({ writer }) => {
       askPreview = (request) => writer.write({ type: FRAMES_REQUEST, data: request });
       askCheck = (request) => writer.write({ type: CHECK_REQUEST, data: request });
-      const steps: TurnStep[] = [];
       let conversation = openingMessages;
 
       const play = async (messages: ModelMessage[], kind: Round) => {
@@ -264,6 +266,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
         const played = round(messages, kind, (step) => {
           steps.push(step);
           answered.push(...(step.response.messages as ModelMessage[]));
+          void reply.progress(finishedTurn(steps));
         });
         writer.merge(played.toUIMessageStream({ sendStart: kind === Round.Edit, sendFinish: false, sendReasoning: true }));
         await Promise.resolve(played.steps).catch((e: unknown) => {
@@ -297,7 +300,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
     },
     onError: (e) => {
       console.error('[motion-agent] turn failed', e);
-      abandon(e);
+      void reply.finish(finishedTurn(steps), ReplyStatus.Failed).finally(() => abandon(e));
       return 'The agent could not finish this turn.';
     }
   });
@@ -315,7 +318,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
 
     const finished = finishedTurn(steps);
     const turn = { ...finished, content: finished.content + (briefAwaits(steps) ? '' : stillOpenNote(openErrors(session))) };
-    await saveTurn(db, { orgId, threadId, role: 'assistant', ...turn, actor }).catch((e) => console.error('[motion-agent] assistant turn not saved', { threadId }, e));
+    await reply.finish(turn, ReplyStatus.Done);
 
     for (const [modelId, usage] of usageByModel(steps.map((s) => extractSdkUsage(s.usage)), stepModels)) {
       withOrgContext(orgId, () =>

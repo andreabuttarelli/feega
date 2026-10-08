@@ -10,6 +10,7 @@ import { listCanvases } from '$lib/server/repos/canvas';
 import { findReachableProject } from '$lib/server/projects/lookup';
 import { openThread, loadTurns, promptHistory, saveTurn, turnRunning } from '$lib/server/repos/chat';
 import { finishedTurn } from '$lib/server/project-agent/finished-turn';
+import { openReply, ReplyStatus } from '$lib/server/repos/chat-reply';
 import { agentActor, SIDEBAR_AGENT_KEY } from '$lib/server/repos/actor';
 import { createProjectTools } from '$lib/server/project-agent/project-tools';
 import { openAgentTools } from '$lib/server/project-agent/tool-surface';
@@ -105,6 +106,8 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
   const actor = agentActor(user.id, SIDEBAR_AGENT_KEY);
   const userActor = { kind: 'user' as const, id: user.id };
   await saveTurn(db, { orgId, threadId, role: 'user', content: text, actor: userActor });
+  const reply = await openReply(db, { orgId, threadId, actor });
+  const steps: Parameters<typeof finishedTurn>[0][number][] = [];
 
   const projectTools = createProjectTools({
     db,
@@ -134,13 +137,14 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
     tools: agent.tools,
     providerOptions: reasoningProviderOptions(reasoning),
     stopWhen: [agentStopWhen(t0)],
-    onFinish: async ({ steps, totalUsage }) => {
+    onStepFinish: (step) => {
+      steps.push(step);
+      void reply.progress(finishedTurn(steps));
+    },
+    onFinish: async ({ steps: finished, totalUsage }) => {
       await agent.close().catch((e) => console.error('[project-agent] tools not closed:', e));
 
-      const turn = finishedTurn(steps);
-      await saveTurn(db, { orgId, threadId, role: 'assistant', ...turn, actor }).catch((e) =>
-        console.error('[project-agent] assistant turn not saved', { threadId, orgId }, e)
-      );
+      await reply.finish(finishedTurn(finished), ReplyStatus.Done);
 
       logAiCall({
         label: 'project-agent',
@@ -161,7 +165,13 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
     }
   }));
 
-  runInBackground(() => result.consumeStream({ onError: (e) => console.error('[project-agent] turn failed after client left', e) }), 'project-agent-turn');
+  runInBackground(
+    async () => {
+      await result.consumeStream({ onError: (e) => console.error('[project-agent] turn failed after client left', e) });
+      await reply.finish(finishedTurn(steps), ReplyStatus.Failed);
+    },
+    'project-agent-turn'
+  );
 
   return result.toUIMessageStreamResponse({ sendReasoning: true });
 };
