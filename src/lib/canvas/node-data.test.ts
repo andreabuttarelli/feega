@@ -394,6 +394,17 @@ describe('validateNodeData — effects', () => {
     expect(out.ok).toBe(true);
   });
 
+  it('a custom step that names its workspace effect is saved with its ref', () => {
+    const out = validateNodeData('effects', {
+      effects: [{ id: 'custom', ref: 'fx-1', params: { amount: 0.5, tint: '#ff0000' } }]
+    });
+    expect(out.ok && (out.data as { effects: unknown[] }).effects).toEqual([{ id: 'custom', ref: 'fx-1', params: { amount: 0.5, tint: '#ff0000' }, enabled: true }]);
+  });
+
+  it('a custom step without a ref is refused', () => {
+    expect(validateNodeData('effects', { effects: [{ id: 'custom', params: {} }] }).ok).toBe(false);
+  });
+
   it('rifiuta un effetto sconosciuto', () => {
     const out = validateNodeData('effects', {
       effects: [{ id: 'not-a-real-effect', params: {} }]

@@ -80,6 +80,22 @@ export function draw(rt: Runtime, compiled: Compiled | null, source: TexImageSou
   return canvas;
 }
 
+export function read(rt: Runtime): Uint8ClampedArray {
+  const { gl } = rt;
+  const width = gl.drawingBufferWidth;
+  const height = gl.drawingBufferHeight;
+  const rows = new Uint8Array(width * height * 4);
+  gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, rows);
+
+  const stride = width * 4;
+  const out = new Uint8ClampedArray(rows.length);
+  for (let y = 0; y < height; y++) {
+    out.set(rows.subarray((height - 1 - y) * stride, (height - y) * stride), y * stride);
+  }
+
+  return out;
+}
+
 export function drawEffect(rt: Runtime, source: ShaderSource, image: TexImageSource, uniforms: Uniforms): Drawn {
   const compiled = compile(rt, source);
   return { canvas: draw(rt, compiled, image, uniforms), passed: 'program' in compiled };

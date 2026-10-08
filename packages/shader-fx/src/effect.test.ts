@@ -16,6 +16,7 @@ describe('parseEffect', () => {
     ['min not below max', { name: 'flat', frag, params: [{ ...amount, min: 2, max: 2 }] }],
     ['default outside range', { name: 'out', frag, params: [{ ...amount, default: 5 }] }],
     ['duplicate keys', { name: 'dup', frag, params: [amount, amount] }],
+    ['a key that redefines a contract uniform', { name: 'seeded', frag, params: [{ key: 'seed', label: 'Seed', kind: 'seed', default: 1 }] }],
     ['a key that is not an identifier', { name: 'bad-key', frag, params: [{ ...amount, key: '1x' }] }],
     ['a colour that is not hex', { name: 'col', frag, params: [{ key: 'tint', label: 'Tint', kind: 'color', default: 'red' }] }]
   ])('refuses %s', (_, input) => {

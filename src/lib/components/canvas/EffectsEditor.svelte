@@ -7,8 +7,12 @@
   import Trash2 from '@lucide/svelte/icons/trash-2';
   import X from '@lucide/svelte/icons/x';
   import Plus from '@lucide/svelte/icons/plus';
-  import { applyStack, EFFECTS, type EffectId, type EffectStep, type Pixels } from '$lib/canvas/effects';
-  import { addStep, controlFor, fitWithin, moveStep, removeStep, setParam, exportsSvg, svgExport, toggleStep } from '$lib/canvas/effects/editor';
+  import { page } from '$app/state';
+  import { applyStack, CUSTOM, EFFECTS, type EffectId, type EffectStep, type Pixels } from '$lib/canvas/effects';
+  import { addStep, controlFor, fitWithin, moveStep, removeStep, setParam, exportsSvg, stepLabel, stepParams, svgExport, toggleStep } from '$lib/canvas/effects/editor';
+  import { addCustomStep, customPass, CustomStatus, statusOf } from '$lib/canvas/effects/custom';
+  import { customEffectsOf } from '$lib/canvas/effects/custom-effects.svelte';
+  import { glDrawer } from '$lib/canvas/effects/gl-drawer';
   import StudioParamControl from './StudioParamControl.svelte';
   import { ListMenu } from '$lib/components/ui/control/index.js';
 
@@ -42,6 +46,19 @@
   let preview: Pixels | null = null;
 
   const effectIds = Object.keys(EFFECTS) as EffectId[];
+  const CUSTOM_PREFIX = 'custom:';
+  const customs = customEffectsOf(page.params.projectId);
+  const drawer = glDrawer();
+  const pass = $derived(customPass(customs.list, drawer.draw));
+  let brokenRefs = $state<string[]>([]);
+
+  function broken(step: EffectStep): boolean {
+    if (step.id !== CUSTOM) {
+      return false;
+    }
+
+    return statusOf(customs.list, step.ref) !== CustomStatus.Ready || brokenRefs.includes(step.ref);
+  }
   const dirty = $derived(JSON.stringify(steps) !== JSON.stringify(initialSteps));
 
   async function loadBitmap(url: string): Promise<ImageBitmap> {
@@ -129,7 +146,11 @@
     if (video && video.readyState >= video.HAVE_CURRENT_DATA) {
       preview = pixelsOf(video, fitWithin(video.videoWidth, video.videoHeight, PREVIEW_MAX_SIDE));
     }
-    draw(canvas, view === 'before' ? preview : applyStack(copyOf(preview), $state.snapshot(steps) as EffectStep[]));
+    draw(canvas, view === 'before' ? preview : applyStack(copyOf(preview), $state.snapshot(steps) as EffectStep[], pass));
+    const failing = steps.flatMap((step) => (step.id === CUSTOM && drawer.broken(step.ref) ? [step.ref] : []));
+    if (failing.join() !== brokenRefs.join()) {
+      brokenRefs = failing;
+    }
   }
 
   $effect(() => {
@@ -148,6 +169,7 @@
   $effect(() => {
     JSON.stringify(steps);
     void view;
+    void pass;
 
     let frame = 0;
     const timer = setTimeout(() => {
@@ -185,7 +207,7 @@
     await new Promise((resolve) => requestAnimationFrame(resolve));
     try {
       const current = $state.snapshot(steps) as EffectStep[];
-      const output = bitmap ? await outputBlob(applyStack(pixelsOf(bitmap, bitmap), current)) : null;
+      const output = bitmap ? await outputBlob(applyStack(pixelsOf(bitmap, bitmap), current, pass)) : null;
       if (bitmap && !output) {
         loadError = 'Could not export the image';
         return;
@@ -215,10 +237,14 @@
     URL.revokeObjectURL(link.href);
   }
 
-  const effectItems = $derived([{ id: 'effects', label: '', items: effectIds.map((id) => ({ value: id, label: EFFECTS[id].label })) }]);
+  const effectItems = $derived([
+    { id: 'effects', label: '', items: effectIds.map((id) => ({ value: id, label: EFFECTS[id].label })) },
+    ...(customs.list.length ? [{ id: 'custom', label: 'Custom', items: customs.list.map((c) => ({ value: `${CUSTOM_PREFIX}${c.id}`, label: c.name })) }] : [])
+  ]);
 
   function add(id: string) {
-    steps = addStep(steps, id as EffectId);
+    const custom = id.startsWith(CUSTOM_PREFIX) ? customs.list.find((c) => c.id === id.slice(CUSTOM_PREFIX.length)) : null;
+    steps = custom ? addCustomStep(steps, custom) : addStep(steps, id as EffectId);
   }
 
   function onkeydown(event: KeyboardEvent) {
@@ -261,9 +287,9 @@
 
       <ol class="fx-stack">
         {#each steps as step, index (index)}
-          <li class="fx-step" class:is-off={!step.enabled} data-effect={step.id}>
+          <li class="fx-step" class:is-off={!step.enabled} class:is-broken={broken(step)} data-effect={step.id}>
             <div class="fx-step-head">
-              <span class="fx-step-name">{EFFECTS[step.id].label}</span>
+              <span class="fx-step-name">{stepLabel(step, customs.list)}</span>
               <button type="button" class="fx-icon" aria-label="Move up" disabled={index === 0} onclick={() => (steps = moveStep(steps, index, 'up'))}><ArrowUp size={14} /></button>
               <button type="button" class="fx-icon" aria-label="Move down" disabled={index === steps.length - 1} onclick={() => (steps = moveStep(steps, index, 'down'))}><ArrowDown size={14} /></button>
               <button type="button" class="fx-icon" aria-label={step.enabled ? 'Disattiva' : 'Attiva'} onclick={() => (steps = toggleStep(steps, index))}>
@@ -271,7 +297,7 @@
               </button>
               <button type="button" class="fx-icon" aria-label="Rimuovi" onclick={() => (steps = removeStep(steps, index))}><Trash2 size={14} /></button>
             </div>
-            {#each EFFECTS[step.id].params as param (param.name)}
+            {#each stepParams(step, customs.list) as param (param.name)}
               <StudioParamControl
                 label={param.label}
                 control={controlFor(param, step.params[param.name])}
@@ -424,6 +450,9 @@
     padding: 10px;
     margin-bottom: 8px;
     border: 1px solid var(--line, #ededef);
+  }
+  .fx-step.is-broken {
+    border-color: var(--danger, #d92d20);
   }
   .fx-step.is-off {
     opacity: 0.5;

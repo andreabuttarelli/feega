@@ -22,11 +22,24 @@ export type EffectParam =
 	| { name: string; label: string; kind: 'color'; default: string }
 	| { name: string; label: string; kind: 'seed'; default: number };
 
-export type EffectStep = {
+export type BuiltinStep = {
 	id: EffectId;
 	params: Record<string, number | string>;
 	enabled: boolean;
 };
+
+export const CUSTOM = 'custom';
+
+export type CustomStep = {
+	id: typeof CUSTOM;
+	ref: string;
+	params: Record<string, number | string>;
+	enabled: boolean;
+};
+
+export type EffectStep = BuiltinStep | CustomStep;
+
+export type CustomPass = (pixels: Pixels, step: CustomStep) => Pixels;
 
 export type Pixels = {
 	width: number;
