@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
 import * as d3 from 'd3';
+import Matter from 'matter-js';
 import { installEngine, testTimeline, type TestTimeline } from '../engine/testing';
 import { ERRORS, REGISTRY, bootScript, definitionScript, librariesOf, Library, seedOf, type CustomRun } from './runtime';
 
@@ -185,6 +186,36 @@ describe('libraries', () => {
     expect(errors).toEqual([]);
     expect(JSON.parse(root.dataset.options!)).toEqual({ width: 10, height: 10, autoStart: false, sharedTicker: false, preserveDrawingBuffer: true });
     expect(root.dataset.graphics).toBe('function');
+  });
+
+  it('loads matter.js for a physics scene', () => {
+    const components = { M: { source: { html: '', css: '', js: 'const engine = Matter.Engine.create()' } } } as never;
+
+    expect([...librariesOf(components, ['M'])]).toEqual([Library.Matter]);
+  });
+
+  it('a matter.js world steps at a fixed delta from the start, so any seek order lands on the same state', () => {
+    (window as unknown as Record<string, unknown>).Matter = Matter;
+    const js = 'const engine = Matter.Engine.create(); const ball = Matter.Bodies.circle(200, 0, 20, { restitution: 0.6 }); const ground = Matter.Bodies.rectangle(200, 400, 800, 40, { isStatic: true }); Matter.Composite.add(engine.world, [ball, ground]); const at = Matter.seekable(engine); root.dataset.runner = typeof Matter.Runner; tl.to({}, { duration, ease: "none", onUpdate() { const pose = at(this.time()).get(ball); root.dataset.pose = `${pose.x.toFixed(4)},${pose.y.toFixed(4)},${pose.angle.toFixed(4)}`; } }, 0);';
+    const { master, root, errors } = run('Drop', js, 0, 4);
+    const pose = (t: number) => {
+      master.seek(t);
+      return root.dataset.pose!;
+    };
+
+    const late = pose(3);
+    const early = pose(0.5);
+    const middle = pose(1.5);
+
+    expect(errors).toEqual([]);
+    expect(root.dataset.runner).toBe('undefined');
+    expect(Number(middle.split(',')[1])).toBeGreaterThan(Number(early.split(',')[1]));
+    expect(pose(1.5)).toBe(middle);
+    expect(pose(3)).toBe(late);
+    expect(pose(0.5)).toBe(early);
+    const fresh = run('Drop', js, 0, 4);
+    fresh.master.seek(0.5);
+    expect(fresh.root.dataset.pose).toBe(early);
   });
 
   it('a d3 chart drawn from progress gives the same frame from any seek order', () => {

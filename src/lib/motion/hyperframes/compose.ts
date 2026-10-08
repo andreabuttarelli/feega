@@ -73,6 +73,8 @@ export const P5_VERSION = '1.11.11';
 const P5_URL = `https://cdn.jsdelivr.net/npm/p5@${P5_VERSION}/lib/p5.min.js`;
 export const PIXI_VERSION = '7.4.3';
 const PIXI_URLS = [`https://cdn.jsdelivr.net/npm/pixi.js@${PIXI_VERSION}/dist/pixi.min.js`, `https://cdn.jsdelivr.net/npm/@pixi/unsafe-eval@${PIXI_VERSION}/dist/unsafe-eval.min.js`];
+export const MATTER_VERSION = '0.20.0';
+const MATTER_URL = `https://cdn.jsdelivr.net/npm/matter-js@${MATTER_VERSION}/build/matter.min.js`;
 const THREE_BASE = `https://cdn.jsdelivr.net/npm/three@${THREE_VERSION}/`;
 const FONTS_URL = 'https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Fragment+Mono&display=block';
 
@@ -452,7 +454,8 @@ const LIBRARY_TAGS: Record<Library, { scripts: string[]; tag: string }> = {
   [Library.Three]: { scripts: [THREE_BASE], tag: '' },
   [Library.D3]: { scripts: [D3_URL], tag: `<script src="${D3_URL}"></script>` },
   [Library.P5]: { scripts: [P5_URL], tag: `<script src="${P5_URL}"></script>` },
-  [Library.Pixi]: { scripts: PIXI_URLS, tag: PIXI_URLS.map((url) => `<script src="${url}"></script>`).join('') }
+  [Library.Pixi]: { scripts: PIXI_URLS, tag: PIXI_URLS.map((url) => `<script src="${url}"></script>`).join('') },
+  [Library.Matter]: { scripts: [MATTER_URL], tag: `<script src="${MATTER_URL}"></script>` }
 };
 
 function brandEnv(tokens: BrandTokens) {
