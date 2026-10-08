@@ -1,3 +1,4 @@
+import { SOCIAL_PUBLISHING_SURFACE, visibleUnder, type SocialPublishing } from '$lib/social-publishing';
 import { siInstagram, siTiktok, siFacebook, siX, siThreads, siYoutube, siBluesky, siReddit } from 'simple-icons';
 
 export const PLATFORMS = [
@@ -28,6 +29,8 @@ export const ICONS: Record<string, { path: string; hex: string }> = {
  * richiede un brand collegato al progetto (`requiresBrand`). `project` è vuoto oggi — è lo scope
  * che riceverà le prime sezioni a livello di progetto quando lo split (Step B+) le sposta lì.
  */
+export const SETTINGS_HOME = 'project';
+
 export type SettingsScope = 'project' | 'workspace' | 'brand' | 'account';
 
 export type SettingsSection = {
@@ -134,4 +137,11 @@ export const SETTINGS_GROUPS: readonly {
 export function sectionRequiresBrand(pathname: string): boolean {
   const trimmed = pathname.replace(/\/$/, '');
   return SETTINGS_SECTIONS.some((s) => s.requiresBrand && trimmed.endsWith(`/settings/${s.path}`));
+}
+
+export function settingsGroupsFor(publishing: SocialPublishing): typeof SETTINGS_GROUPS {
+  return SETTINGS_GROUPS.map((group) => ({
+    ...group,
+    items: visibleUnder(publishing, SOCIAL_PUBLISHING_SURFACE.settingsSections, group.items, (item) => item.section)
+  }));
 }

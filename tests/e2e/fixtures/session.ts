@@ -217,3 +217,4 @@ export const test = base.extend<{
 export { expect };
 
 export const REAL_STACK = process.env.E2E_REAL_STACK === '1';
+export const SOCIAL_PUBLISHING = process.env.E2E_SOCIAL_PUBLISHING === '1';

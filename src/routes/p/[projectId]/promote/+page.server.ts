@@ -9,6 +9,7 @@ import { listBoostablePosts, proposePaidAd, type BoostablePost } from '$lib/serv
 import { projectScope } from '$lib/server/projects/request-scope';
 import { tabFromQuery } from '$lib/canvas/promote-sheet';
 import { parsePaidAdForm } from '$lib/ads/paid-ad-form';
+import { socialPublishing } from '$lib/server/social-publishing';
 
 export const load: PageServerLoad = async ({ params, url, locals }) => {
   const nodeIds = url.searchParams.get('nodeIds')?.split(',').filter(Boolean) ?? [];
@@ -54,7 +55,7 @@ export const load: PageServerLoad = async ({ params, url, locals }) => {
     boostableByBrand,
     projectBrandId: project.brandId,
     canvasId,
-    tab: tabFromQuery(url.searchParams.get('tab'))
+    tab: tabFromQuery(url.searchParams.get('tab'), await socialPublishing())
   };
 };
 

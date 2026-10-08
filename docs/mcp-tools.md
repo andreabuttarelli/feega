@@ -3,8 +3,8 @@
 > Generato da `node scripts/mcp-inventory.mjs --write`, leggendo `tools/list` dal server vero.
 > Non si modifica a mano: il prossimo che rigenera cancella le correzioni.
 
-**29 tool** — 11 in lettura, 15 in scrittura, 3 che distruggono.
-Il payload di `tools/list` pesa **28.515 caratteri**, circa **7129 token**, ed e' il costo che ogni sessione paga prima di dire una parola.
+**26 tool** — 10 in lettura, 13 in scrittura, 3 che distruggono.
+Il payload di `tools/list` pesa **25.531 caratteri**, circa **6383 token**, ed e' il costo che ogni sessione paga prima di dire una parola.
 
 | gruppo | tool |
 |---|---:|
@@ -13,7 +13,6 @@ Il payload di `tools/list` pesa **28.515 caratteri**, circa **7129 token**, ed e
 | Ads | 4 |
 | Nodi e generazione | 4 |
 | Video motion | 3 |
-| Post | 3 |
 | Galleria e remix | 3 |
 
 Legenda: **R** legge e non cambia niente · **W** scrive · **D** distrugge, e il client puo' chiedere conferma.
@@ -324,50 +323,6 @@ The saved state of a motion video: revision `version`, last change and who made 
 |---|---|---|
 | `org`? | string | Which org, if you belong to more than one. |
 | `node_id` | string |  |
-
-## Post
-
-### `create_post` · W
-
-*Promote to a post*
-
-Turn material into a post: this is what makes something publishable, distinct from writing to a node. Two ways in: give it a brand, a caption and its media (asset ids already in this org) directly — or give it `node_ids` and let it resolve each node to its asset itself (uploaded or generated), ordered by canvas reading order (top-to-bottom, left-to-right), with text/doc nodes becoming the caption. `sources` optionally links back to the nodes it came from when using the direct form. Lands as `draft`; nothing is scheduled or published from here. Free.
-
-| campo | tipo | |
-|---|---|---|
-| `org`? | string | Which org, if you belong to more than one. |
-| `brand_id` | string |  |
-| `caption`? | string |  |
-| `media`? | object[] |  |
-| `title`? | string |  |
-| `link_url`? | string |  |
-| `sources`? | object[] |  |
-| `node_ids`? | string[] | Resolve these canvas nodes into the post instead of passing caption/media directly. |
-| `planned_for`? | string | ISO date-time the draft is planned for. It shows on calendars; nothing is scheduled. |
-
-### `list_posts` · R
-
-*List posts*
-
-Posts of one brand — the promoted artifacts, not canvas nodes. Filter by status (draft, ready, archived). Each carries plannedFor, the day a draft is planned for. Free.
-
-| campo | tipo | |
-|---|---|---|
-| `org`? | string | Which org, if you belong to more than one. |
-| `brand_id` | string |  |
-| `status`? | `draft` \| `ready` \| `archived` |  |
-
-### `set_post_status` · W
-
-*Change a post status*
-
-Move a post between draft, ready and archived. Does not schedule or publish it. Free.
-
-| campo | tipo | |
-|---|---|---|
-| `org`? | string | Which org, if you belong to more than one. |
-| `id` | string |  |
-| `status` | `draft` \| `ready` \| `archived` |  |
 
 ## Galleria e remix
 

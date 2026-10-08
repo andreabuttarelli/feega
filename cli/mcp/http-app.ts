@@ -112,8 +112,9 @@ export async function handleMcpFetch(req: Request): Promise<Response> {
       '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
     );
     const { createFeegaMcpServer } = await import('./server.ts');
+    const { socialPublishing } = await import('./features.ts');
 
-    const server = createFeegaMcpServer();
+    const server = createFeegaMcpServer(await socialPublishing());
     const transport = new WebStandardStreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,

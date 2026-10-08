@@ -1,5 +1,6 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
+  import { publishes } from '$lib/social-publishing';
   import { invalidate } from '$app/navigation';
   import { ArrowLeft, Check, Columns2, Download, CalendarPlus, RotateCcw, X, ChevronLeft, ChevronRight } from '@lucide/svelte';
   import PageHead from '$lib/components/PageHead.svelte';
@@ -175,10 +176,12 @@
       {/each}
       <a class="button" class:disabled={!picked.length} aria-disabled={!picked.length} href={picked.length ? `/app/studio/${data.batch.id}/zip` : undefined} download>Original</a>
     </div>
-    <button type="button" class="primary" disabled={!picked.length} onclick={() => (calendarOpen = !calendarOpen)}><CalendarPlus size={16} /> Add to calendar</button>
+    {#if publishes(data.socialPublishing)}
+      <button type="button" class="primary" disabled={!picked.length} onclick={() => (calendarOpen = !calendarOpen)}><CalendarPlus size={16} /> Add to calendar</button>
+    {/if}
   </footer>
 
-  {#if calendarOpen}
+  {#if calendarOpen && publishes(data.socialPublishing)}
     <section class="calendar" data-testid="studio-calendar">
       {#if posted}
         <p>Added as a draft post. <a href={posted.href}>Open the calendar</a></p>

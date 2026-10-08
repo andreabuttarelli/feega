@@ -19,10 +19,11 @@
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { loadEnv } from '../lib/config.ts';
 import { createFeegaMcpServer } from './server.ts';
+import { socialPublishing } from './features.ts';
 
 await loadEnv();
 
-const server = createFeegaMcpServer();
+const server = createFeegaMcpServer(await socialPublishing());
 const transport = new StdioServerTransport();
 await server.connect(transport);
 

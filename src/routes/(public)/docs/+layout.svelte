@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { publishes } from '$lib/social-publishing';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { _ } from 'svelte-i18n';
@@ -56,7 +57,7 @@
     ]},
     { label: $_('docs.layout.s31'), items: [
       { title: $_('docs.layout.s32'), href: '/docs/api/brands', icon: 'layers' },
-      { title: $_('docs.layout.s33'), href: '/docs/api/posts', icon: 'file-text' },
+      ...(publishes($page.data.socialPublishing) ? [{ title: $_('docs.layout.s33'), href: '/docs/api/posts', icon: 'file-text' }] : []),
       { title: $_('docs.layout.s37'), href: '/docs/api/analytics', icon: 'bar-chart' },
       { title: $_('docs.layout.s38'), href: '/docs/api/products', icon: 'package' },
     ]},

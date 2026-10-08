@@ -16,24 +16,7 @@ curl -sSL https://raw.githubusercontent.com/andreabuttarelli/feega/main/cli/scri
 - `feega brands` — List all brands
 - `feega dashboard <slug>` — Full brand dashboard
 - `feega status <slug>` — Detailed status
-- `feega health` — Check Supabase / Gemini / Zernio API status
-
-### Posts
-- `feega content <slug> [--status <status>]` — List/filter posts (status: pending_user, approved, scheduled, published, failed)
-- `feega content <slug> --clear <status>` — Bulk-delete posts with that status
-- `feega approve <slug> [--all] [--dry]` — Approve pending posts
-- `feega post <slug> <id>` — Show post: text, media, platforms
-- `feega post <slug> <id> edit [--caption|--title|--link|--subreddit|--firstComment|--imagePrompt|--media|--format|--platforms|--platformCaption|--slot|--product]` — Edit fields (no render, no credits)
-- `feega post <slug> <id> render` — Generate the missing image from the prompt
-- `feega post <slug> <id> approve` — Approve single post
-- `feega post <slug> <id> publish` — Publish immediately
-- `feega post <slug> <id> reschedule --scheduledFor "2026-06-20T10:00"` — Reschedule
-- `feega post <slug> <id> reject` — Delete pending post
-
-Editing a SCHEDULED post re-syncs it to Zernio automatically, so what goes out is what you edited.
-
-### Calendar
-- `feega calendar <slug> [--month YYYY-MM]` — Monthly scheduled posts
+- `feega health` — Check Supabase / Gemini API status
 
 ### Products
 - `feega products <slug> [list|sync]` — List catalog, or re-import from the connected store (Shopify/Woo)
@@ -64,7 +47,7 @@ Run `feega login` once to authenticate via browser, or non-interactively with `f
 
 MCP server in `mcp/` — stdio + Streamable HTTP. Same OAuth identity as the CLI (no static API tokens).
 Twelve tools, org-scoped: `query`, `insert_row`, `update_row`, `delete_row`, `describe_node_types`,
-`list_posts`, `create_post`, `set_post_status`, `list_ad_campaigns`, `create_ad_campaign`,
+`list_ad_campaigns`, `create_ad_campaign`,
 `approve_ad_campaign`, `set_ad_campaign_status`, `run_node_generation`, `get_media` (signed
 `preview_url` to look at an image, `full_url` for the user).
 

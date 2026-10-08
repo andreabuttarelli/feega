@@ -7,6 +7,7 @@ const CLI = fileURLToPath(new URL('../', import.meta.url));
 const MCP_TOOLS = join(CLI, 'mcp', 'tools');
 const SKILL = join(CLI, 'skills', 'feega', 'SKILL.md');
 const REFERENCE = join(CLI, 'skills', 'feega', 'references', 'tools.md');
+const BEHIND_SOCIAL_PUBLISHING = ['posts.ts'];
 
 /**
  * La superficie MCP reale non nasce da un registro: e' cablata a mano in
@@ -16,7 +17,7 @@ const REFERENCE = join(CLI, 'skills', 'feega', 'references', 'tools.md');
  */
 function registeredTools(): Set<string> {
   const source = readdirSync(MCP_TOOLS)
-    .filter((file) => file.endsWith('.ts') && !file.endsWith('.test.ts'))
+    .filter((file) => file.endsWith('.ts') && !file.endsWith('.test.ts') && !BEHIND_SOCIAL_PUBLISHING.includes(file))
     .map((file) => readFileSync(join(MCP_TOOLS, file), 'utf8'))
     .join('\n');
 

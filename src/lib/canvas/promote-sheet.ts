@@ -1,4 +1,5 @@
 import { writable } from 'svelte/store';
+import { SOCIAL_PUBLISHING_SURFACE, visibleUnder, type SocialPublishing } from '$lib/social-publishing';
 
 export const PROMOTE_TABS = [
   { id: 'organic', label: 'Organic post' },
@@ -19,8 +20,13 @@ export function paidGateFor(readiness: PaidReadiness): PaidGate {
   return PAID_GATES.find((g) => g.blocked(readiness))?.gate ?? 'ready';
 }
 
-export function tabFromQuery(raw: string | null): PromoteTab {
-  return PROMOTE_TABS.find((t) => t.id === raw)?.id ?? 'organic';
+export function promoteTabsFor(publishing: SocialPublishing): (typeof PROMOTE_TABS)[number][] {
+  return visibleUnder(publishing, SOCIAL_PUBLISHING_SURFACE.promoteTabs, PROMOTE_TABS, (t) => t.id);
+}
+
+export function tabFromQuery(raw: string | null, publishing: SocialPublishing): PromoteTab {
+  const tabs = promoteTabsFor(publishing);
+  return tabs.find((t) => t.id === raw)?.id ?? tabs[0].id;
 }
 
 export function promotePath(nodeIds: string[], tab?: PromoteTab): string {

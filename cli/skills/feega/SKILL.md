@@ -1,9 +1,9 @@
 ---
 name: feega
 description: >-
-  Operate feega (infinite canvas for social content) via MCP tools or the
-  feega CLI: canvas nodes, generation, posts, ad campaigns. Use when the user
-  mentions feega, feega.app, a feega canvas, approving social posts, or
+  Operate feega (motion videos on an infinite canvas) via MCP tools or the
+  feega CLI: motion videos, canvas nodes, generation, gallery, ad campaigns.
+  Use when the user mentions feega, feega.app, a feega canvas or video, or
   managing brand content and ads from an agent.
 license: Apache-2.0
 compatibility: >-
@@ -27,12 +27,12 @@ iframe, social feed, social post mockup, products, ads) — through **MCP tools*
 
 | Situation | Action |
 |-----------|--------|
-| feega MCP is connected | Call MCP tools (`query`, `create_post`, `run_node_generation`, …) |
+| feega MCP is connected | Call MCP tools (`query`, `ask_motion_agent`, `run_node_generation`, …) |
 | MCP not available | Shell: `feega …` after `feega login` |
 
-MCP reaches the whole org: any project, canvas, node, post or ad campaign the signed-in user can
-see. The CLI is narrower and always brand-scoped — it is the fallback for approving, editing and
-reading posts and ads without a connected agent. Never invent REST endpoints or API keys.
+MCP reaches the whole org: any project, canvas, node or ad campaign the signed-in user can
+see. The CLI is narrower — it is the fallback for motion, gallery and ads without a connected
+agent. Never invent REST endpoints or API keys.
 
 ## Auth (always OAuth)
 
@@ -55,18 +55,15 @@ Setup details: [references/mcp.md](references/mcp.md).
    need nothing named; the tools that DO need a `brand_id` or `project_id` take it as an input —
    read it back with `query` first (recipe below), never invent one. Guessing spends a real
    organisation's credits and writes into a real client's canvas.
-2. Post ids and ad campaign ids accept short unambiguous prefixes from list output — never guess
+2. Ad campaign ids accept short unambiguous prefixes from list output — never guess
    if ambiguous.
 3. `run_node_generation` needs the node's current `version` (optimistic concurrency): read the
    node with `query` first, pass that number, and if the call comes back `conflict`, re-read and
    retry — never assume your write landed.
-4. A canvas node is raw material; a post (`list_posts`/`create_post`/`set_post_status`) is the
-   promoted artifact ready to schedule. Writing a node is not an action on the world; promoting
-   one to a post is.
-5. An ad campaign always drafts unapproved. `approve_ad_campaign` only works from a signed-in
+4. An ad campaign always drafts unapproved. `approve_ad_campaign` only works from a signed-in
    person's own session — an API key (an agent acting alone) is refused on purpose. If you are an
    agent and this fails, tell the person to approve it themselves.
-6. Confirm before deleting unless the user clearly asked: `delete_row` does not come back.
+5. Confirm before deleting unless the user clearly asked: `delete_row` does not come back.
 
 ## Reading is one tool
 
@@ -95,7 +92,6 @@ are cut at 2 000 chars and `limits` says in which columns.
 | a project's canvases | `query({table:"canvases", columns:["id","name","project_id"], where:[{column:"project_id",op:"eq",value:"…"}]})` |
 | the nodes on a canvas | `query({table:"nodes", columns:["id","type","data","version","canvas_id"], where:[{column:"canvas_id",op:"eq",value:"…"},{column:"deleted_at",op:"is",value:null}]})` |
 | a node's current version (before generating into it) | same read, `limit:1` on the node's `id`, read back `version` |
-| posts waiting on the calendar | `query({table:"posts", columns:["id","status","caption","scheduled_for","brand_id"], where:[{column:"brand_id",op:"eq",value:"…"},{column:"status",op:"eq",value:"draft"}]})` |
 | ad campaigns and their spend | `query({table:"ad_campaigns", columns:["id","name","status","budget_amount","budget_type"], where:[{column:"brand_id",op:"eq",value:"…"}]})` |
 | what a brand sells | `query({table:"products", columns:["id","title","pricing","url","featured"]})` |
 | connected social accounts | `query({table:"social_accounts", columns:["platform","username","status"]})` |
@@ -179,19 +175,11 @@ refused for uncensored projects, real brands (their logo, a real-brand script, l
 imported from a website) and content the moderation refuses. Free. CLI: `feega gallery [query]`,
 `feega gallery remix <itemId> --project <id>`, `feega gallery publish <nodeId> --title "…"`.
 
-## Promote to a post
-
-A canvas node is not a post. `create_post` is what makes something publishable: give it a
-`brand_id`, a `caption` and its `media` (asset ids already in this org); `sources` optionally
-links back to the nodes it came from. It lands as `draft` — nothing is scheduled or published from
-here. `set_post_status` moves it between `draft`, `ready` and `archived`, still without publishing
-it. `list_posts` filters by brand and status.
-
 ## Ad campaigns
 
 Meta only (Facebook + Instagram). `list_ad_campaigns` reads a brand's campaigns and their status.
 `create_ad_campaign` drafts one against a brand's Meta ad account — objective, budget, days,
-audience, placements, copy, and canvas image/video nodes (or a published post to boost) — and it
+audience, placements, copy, and canvas image/video nodes (or an existing post to boost) — and it
 always lands `draft` with no `approved_by`: nothing here can make it spend. `approve_ad_campaign`
 is the only door that launches it, and it only opens for a signed-in person's own session.
 `set_ad_campaign_status` pauses or resumes a launched campaign.

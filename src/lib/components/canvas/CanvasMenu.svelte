@@ -14,6 +14,8 @@
   import { CANVAS_SHORTCUTS } from '$lib/canvas/shortcuts';
   import { openSheet } from '$lib/canvas/sheet-nav';
   import { BURGER_ENTRIES, mobileNavHref } from '$lib/shell-nav';
+  import { page } from '$app/state';
+  import { SOCIAL_PUBLISHING_SURFACE, visibleUnder } from '$lib/social-publishing';
   import { NAV_ICONS } from './nav-icons';
   import Scale from '@lucide/svelte/icons/scale';
   import Flag from '@lucide/svelte/icons/flag';
@@ -79,7 +81,7 @@
     desktopOnly?: true;
   }> = [
     { id: 'home', group: 'navigate', labelKey: 'app.shell.menu.home', icon: LayoutGrid, href: DASHBOARD_HREF },
-    { id: 'settings', group: 'navigate', labelKey: 'app.shell.menu.settings', icon: Settings, sheet: '/settings/connected-accounts' },
+    { id: 'settings', group: 'navigate', labelKey: 'app.shell.menu.settings', icon: Settings, sheet: '/settings/project' },
     { id: 'billing', group: 'navigate', labelKey: 'app.shell.menu.billing', icon: CreditCard, sheet: '/settings/billing' },
     { id: 'shortcuts', group: 'help', labelKey: 'app.shell.menu.shortcuts', icon: Keyboard, sub: true, desktopOnly: true },
     { id: 'changelog', group: 'help', labelKey: 'app.shell.menu.changelog', icon: Sparkles, href: '/changelog', marketingPage: true },
@@ -166,7 +168,7 @@
 
       <DropdownMenu.Group>
         <DropdownMenu.GroupHeading class="menu-heading">{$_('app.shell.menu.pages')}</DropdownMenu.GroupHeading>
-        {#each BURGER_ENTRIES as entry (entry.id)}
+        {#each visibleUnder(page.data.socialPublishing, SOCIAL_PUBLISHING_SURFACE.navEntries, BURGER_ENTRIES, (entry) => entry.id) as entry (entry.id)}
           {@const Icon = NAV_ICONS[entry.icon]}
           <DropdownMenu.Item class="menu-row">
             {#snippet child({ props })}

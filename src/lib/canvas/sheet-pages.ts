@@ -1,4 +1,5 @@
 import type { Component } from 'svelte';
+import { SETTINGS_HOME } from '$lib/components/settings/platforms';
 
 type PageModule = { default: Component<{ data: unknown; form: unknown }> };
 
@@ -23,13 +24,13 @@ export const SHEET_PAGE_LOADERS = {
  *  nello switcher. `ads/accounts` e `ads` sono due pagine diverse nello stesso gruppo "ads". */
 export function settingsSectionOf(path: string): string {
   const section = path.replace(/^\/settings\/?/, '').split('/')[0];
-  return section || 'connected-accounts';
+  return section || SETTINGS_HOME;
 }
 
 /** Il percorso intero sotto `settings/` — quello che sceglie DAVVERO quale `+page.svelte` caricare. */
 function settingsSubpathOf(path: string): string {
   const subpath = path.replace(/^\/settings\/?/, '');
-  return subpath || 'connected-accounts';
+  return subpath || SETTINGS_HOME;
 }
 
 export function settingsPageLoader(path: string): (() => Promise<PageModule>) | null {

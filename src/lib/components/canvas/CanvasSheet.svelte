@@ -6,7 +6,7 @@
   import { openSheet, closeSheet } from '$lib/canvas/sheet-nav';
   import { SHEET_PAGE_LOADERS, settingsPageLoader } from '$lib/canvas/sheet-pages';
   import { sheetEntryForPath } from '$lib/shell-nav';
-  import { SETTINGS_GROUPS } from '$lib/components/settings/platforms';
+  import { settingsGroupsFor, SETTINGS_HOME } from '$lib/components/settings/platforms';
   import { cn } from '$lib/utils';
 
   let { projectId }: { projectId: string } = $props();
@@ -27,7 +27,7 @@
    */
   const sheet = $derived(page.state.sheet ?? null);
   const entry = $derived(sheet ? sheetEntryForPath(sheet.path) : null);
-  const settingsSubpath = $derived(sheet ? sheet.path.replace(/^\/settings\/?/, '') || 'connected-accounts' : '');
+  const settingsSubpath = $derived(sheet ? sheet.path.replace(/^\/settings\/?/, '') || SETTINGS_HOME : '');
   const settingsLoader = $derived(sheet && entry?.id === 'settings' ? settingsPageLoader(sheet.path) : null);
 
   function onOpenChange(open: boolean) {
@@ -55,7 +55,7 @@
         {#if entry.id === 'settings'}
           <div class="settings-shell">
             <nav class="settings-switcher" aria-label={$_('app.nav.settings')}>
-              {#each SETTINGS_GROUPS as group (group.labelKey)}
+              {#each settingsGroupsFor(page.data.socialPublishing) as group (group.labelKey)}
                 <p class="switcher-group">{$_(group.labelKey)}</p>
                 {#each group.items as item (item.section)}
                   <button

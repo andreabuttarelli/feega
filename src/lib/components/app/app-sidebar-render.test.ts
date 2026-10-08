@@ -44,7 +44,7 @@ describe('app sidebar', () => {
 
   it('keeps account entries: settings, billing, changelog, report, legal, theme, sign out', () => {
     const body = html();
-    expect(body).toContain('href="/p/p1/settings/connected-accounts"');
+    expect(body).toContain('href="/p/p1/settings/project"');
     expect(body).toContain('href="/p/p1/settings/billing"');
     expect(body).toContain('href="/changelog"');
     expect(body).toContain('href="/report"');
