@@ -3,6 +3,7 @@ import { js } from '../hyperframes/html';
 import type { CustomComponents } from './component';
 import { ENGINE_GLOBAL } from '../engine/engine';
 import { fixedFormat } from './format';
+import { GENERATIVE_GLOBAL } from './generative';
 
 export const REGISTRY = '__feegaComponents';
 export const ERRORS = '__feegaErrors';
@@ -49,7 +50,8 @@ export enum Library {
   D3 = 'd3',
   P5 = 'p5',
   Pixi = 'PIXI',
-  Matter = 'Matter'
+  Matter = 'Matter',
+  Generative = 'gen'
 }
 
 const USES: Record<Library, RegExp> = {
@@ -58,7 +60,8 @@ const USES: Record<Library, RegExp> = {
   [Library.D3]: /\bd3\b/,
   [Library.P5]: /\bp5\b/,
   [Library.Pixi]: /\bPIXI\b/,
-  [Library.Matter]: /\bMatter\b/
+  [Library.Matter]: /\bMatter\b/,
+  [Library.Generative]: /\bgen\./
 };
 
 const GLOBALS: Record<Library, string> = {
@@ -67,7 +70,8 @@ const GLOBALS: Record<Library, string> = {
   [Library.D3]: 'd3',
   [Library.P5]: 'p5',
   [Library.Pixi]: 'PIXI',
-  [Library.Matter]: 'Matter'
+  [Library.Matter]: 'Matter',
+  [Library.Generative]: GENERATIVE_GLOBAL
 };
 
 export function librariesOf(components: CustomComponents, used: Iterable<string>): Set<Library> {
@@ -100,6 +104,8 @@ type Body = { position: { x: number; y: number }; angle: number };
 type Pose = { x: number; y: number; angle: number };
 type World = { world: object };
 type Physics = { Engine: { update: (engine: World, delta: number) => void }; Composite: { allBodies: (world: object) => Body[] }; Common: { _seed: number } };
+type Random = () => number;
+type Generative = { createNoise2D: (r: Random) => unknown; createNoise3D: (r: Random) => unknown; createNoise4D: (r: Random) => unknown; PoissonDiskSampling: new (options: object, r: Random) => unknown };
 type ClipScope = { root: HTMLElement; tl: Timeline; run: CustomRun };
 
 function bootCustom(cfg: { registry: string; errors: string; listener: string; libraries: Record<string, string>; engine: string; shadowed: string[] }, runs: CustomRun[], env: CustomEnv, master: Timeline, format: ReturnType<typeof fixedFormat>) {
@@ -189,7 +195,18 @@ function bootCustom(cfg: { registry: string; errors: string; listener: string; l
     };
     return Object.create(Matter, { seekable: { value: seekable }, Runner: { value: undefined }, Render: { value: undefined } });
   };
-  const wraps: Record<string, (lib: never, scope: ClipScope) => unknown> = { p5: sketches, PIXI: stages, Matter: worlds };
+  const utilities = ({ createNoise2D, createNoise3D, createNoise4D, PoissonDiskSampling, ...geometry }: Generative, { run }: ClipScope) => {
+    let salt = 0;
+    const random = () => seeded(run.seed + ++salt);
+    return {
+      ...geometry,
+      noise2D: () => createNoise2D(random()),
+      noise3D: () => createNoise3D(random()),
+      noise4D: () => createNoise4D(random()),
+      poisson: (options: object) => new PoissonDiskSampling(options, random())
+    };
+  };
+  const wraps: Record<string, (lib: never, scope: ClipScope) => unknown> = { p5: sketches, PIXI: stages, Matter: worlds, gen: utilities };
   const libraries = Object.entries(cfg.libraries).map(([name, global]) => [name, w[global] ?? null] as const);
   const clipLibraries = (scope: ClipScope) => Object.fromEntries(libraries.map(([name, lib]) => [name, lib && wraps[name] ? wraps[name](lib as never, scope) : lib]));
 

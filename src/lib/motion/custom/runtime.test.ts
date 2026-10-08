@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import * as d3 from 'd3';
 import Matter from 'matter-js';
+import './generative-entry';
 import { installEngine, testTimeline, type TestTimeline } from '../engine/testing';
 import { ERRORS, REGISTRY, bootScript, definitionScript, librariesOf, Library, seedOf, type CustomRun } from './runtime';
 
@@ -216,6 +217,38 @@ describe('libraries', () => {
     const fresh = run('Drop', js, 0, 4);
     fresh.master.seek(0.5);
     expect(fresh.root.dataset.pose).toBe(early);
+  });
+
+  it('loads the generative utilities for a component that uses gen', () => {
+    const components = { G: { source: { html: '', css: '', js: 'const noise = gen.noise2D()' } } } as never;
+
+    expect([...librariesOf(components, ['G'])]).toEqual([Library.Generative]);
+  });
+
+  it('seeds noise and poisson sampling per clip: the same clip draws the same field, two fields differ', () => {
+    const js = 'const a = gen.noise2D(); const b = gen.noise2D(); const dots = gen.poisson({ shape: [200, 200], minDistance: 20 }).fill(); root.dataset.v = JSON.stringify([a(0.3, 0.7), b(0.3, 0.7), dots.length, dots[3]]);';
+    const first = JSON.parse(run('Field', js).root.dataset.v!);
+    const again = JSON.parse(run('Field', js).root.dataset.v!);
+
+    expect(again).toEqual(first);
+    expect(first[0]).not.toBe(first[1]);
+    expect(first[2]).toBeGreaterThan(20);
+  });
+
+  it('hands over the geometry utilities: Delaunay, simplify, isect, RBush, KDBush, inside, ClipperLib', () => {
+    const js = [
+      'const d = gen.Delaunay.from([[0, 0], [10, 0], [0, 10], [10, 10]]);',
+      'const cells = [...d.voronoi([0, 0, 10, 10]).cellPolygons()].length;',
+      'const line = gen.simplify([{ x: 0, y: 0 }, { x: 1, y: 0.01 }, { x: 2, y: 0 }], 0.1).length;',
+      'const hits = gen.isect.bush([{ from: { x: 0, y: 0 }, to: { x: 10, y: 10 } }, { from: { x: 0, y: 10 }, to: { x: 10, y: 0 } }]).run().length;',
+      'const tree = new gen.RBush(); tree.insert({ minX: 0, minY: 0, maxX: 1, maxY: 1 });',
+      'const index = new gen.KDBush(1); index.add(5, 5); index.finish();',
+      'const near = index.range(0, 0, 9, 9).length;',
+      'const where = gen.inside([[0, 0], [10, 0], [10, 10], [0, 10]], [5, 5]);',
+      'root.dataset.v = [cells, line, hits, tree.search({ minX: 0, minY: 0, maxX: 2, maxY: 2 }).length, near, where, typeof gen.ClipperLib.Clipper].join();'
+    ].join('');
+
+    expect(run('Geometry', js).root.dataset.v).toBe('4,2,1,1,1,-1,function');
   });
 
   it('a d3 chart drawn from progress gives the same frame from any seek order', () => {

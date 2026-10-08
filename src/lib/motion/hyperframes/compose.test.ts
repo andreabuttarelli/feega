@@ -398,6 +398,15 @@ describe('custom components in the composition', () => {
     expect(html).not.toContain('/npm/d3@');
   });
 
+  it('inlines the generative utilities only for a component that uses them, with no network', () => {
+    const field = { ...graph, source: { ...graph.source, js: 'const noise = gen.noise2D();' } };
+    const page = compose(must(addClip(must(writeComponent(newMotionDoc(MotionFormat.Landscape), 'Field', field)), { component: 'Custom', from: 0, durationInFrames: 60, props: { name: 'Field' } }, 'f1')));
+
+    expect(page).toContain('ClipperLib');
+    expect(page.match(/<script src="[^"]+"/g)).toEqual(html.match(/<script src="[^"]+"/g));
+    expect(html).not.toContain('ClipperLib');
+  });
+
   it('loads p5 only for a component that uses it', () => {
     const sketch = { ...graph, source: { ...graph.source, js: 'p5((p) => { p.draw = () => p.circle(0, 0, 9); });' } };
     const sketched = must(addClip(must(writeComponent(newMotionDoc(MotionFormat.Landscape), 'Sketch', sketch)), { component: 'Custom', from: 0, durationInFrames: 60, props: { name: 'Sketch' } }, 's1'));
