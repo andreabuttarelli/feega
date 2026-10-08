@@ -1,7 +1,10 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { awaitRun, motionApi } from '../../lib/motion.ts';
-import { withAuth } from '../util.ts';
+import { requireAuth, withAuth, fail, type ToolResult } from '../util.ts';
+
+const MAX_FRAMES = 6;
+const MAX_FRAME_WIDTH = 960;
 
 const org = z.string().optional().describe('Which org, if you belong to more than one.');
 
@@ -16,8 +19,8 @@ export function registerMotionTools(server: McpServer) {
         'with its own tools, writes a new revision of the video and posts the exchange in the editor chat. ' +
         'Find the node id with `list_motion_videos`; read the video first with `get_motion_summary` to name clips precisely. ' +
         'Returns at once with a `run_id` (`running`): poll `get_motion_run` every few seconds until `done`, which carries the ' +
-        'reply, the summary and the new revision `version`. `wait: true` polls for you, up to about 4 minutes. Frames cannot be inspected ' +
-        'without the editor open in a browser. Spends credits.',
+        'reply, the summary and the new revision `version`. `wait: true` polls for you, up to about 4 minutes. The agent looks at its own ' +
+        'frames even with no editor open. Spends credits.',
       inputSchema: z.object({ org, node_id: z.string(), prompt: z.string().min(1), wait: z.boolean().optional() }),
       annotations: { readOnlyHint: false, destructiveHint: false }
     },
@@ -114,6 +117,34 @@ export function registerMotionTools(server: McpServer) {
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true }
     },
     async ({ org, node_id, action }) => withAuth((token) => (action === 'unpublish' ? motionApi.unembed(token, node_id, org) : motionApi.embed(token, node_id, org)))
+  );
+
+  server.registerTool(
+    'view_motion_frames',
+    {
+      title: 'See frames of a motion video',
+      description:
+        `Draw the saved revision of a motion video at up to ${MAX_FRAMES} exact times (seconds) and see them as JPEG images, ` +
+        'with the quality gate the editor agent uses: `quality` lists every problem found (clipped or tiny text, flat or blank frames, ' +
+        'flashes, missing music...), `blocking` the ones that must be fixed before delivery. `width` is the longest side in pixels ' +
+        `(default and max ${MAX_FRAME_WIDTH}). Use it to check a video before and after \`ask_motion_agent\`. Free; about 10 calls a minute per workspace.`,
+      inputSchema: z.object({ org, node_id: z.string(), times: z.array(z.number().min(0)).min(1).max(MAX_FRAMES), width: z.number().int().min(64).max(MAX_FRAME_WIDTH).optional() }),
+      annotations: { readOnlyHint: true }
+    },
+    async ({ org, node_id, times, width }): Promise<ToolResult> => {
+      const auth = await requireAuth();
+      if (!auth.ok) return auth.result;
+      try {
+        const { frames, ...notes } = await motionApi.frames(auth.session.access_token, node_id, { times, width }, org);
+        const shown = { ...notes, times: frames.map((f) => f.time) };
+        return {
+          content: [{ type: 'text', text: JSON.stringify(shown, null, 2) }, ...frames.map((f) => ({ type: 'image' as const, data: f.data, mimeType: f.mime }))],
+          structuredContent: shown
+        };
+      } catch (e) {
+        return fail(e instanceof Error ? e.message : String(e));
+      }
+    }
   );
 
   server.registerTool(

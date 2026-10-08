@@ -161,6 +161,18 @@ motion
   });
 
 motion
+  .command('frames <nodeId>')
+  .description('Save frames of the saved video as JPEGs and print the quality notes (free)')
+  .requiredOption('--at <seconds>', 'Comma-separated times in seconds, up to 6 (e.g. 1,2.5,4)')
+  .option('--width <px>', 'Longest side in pixels, up to 960')
+  .option('--out <dir>', 'Where to save the frames (default: current directory)')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (nodeId: string, opts) => {
+    const { cmdMotionFrames } = await import('./commands/motion.ts');
+    await cmdMotionFrames(nodeId, opts);
+  });
+
+motion
   .command('render-status <runId>')
   .description('State of a render and the link to its file')
   .option('--org <id>', 'Which org, if you belong to more than one')

@@ -23,7 +23,7 @@ const fetchBlob = (url: string) => fetch(url).then((r) => r.blob());
 
 const failed = (failure: EmbedFailure, body: Record<string, unknown> = {}): EmbedAnswer => ({ ok: false, failure, body: { error: failure, ...body } });
 
-async function savedMotion(db: Db, scope: Scope): Promise<Saved | null> {
+export async function savedMotion(db: Db, scope: Scope): Promise<Saved | null> {
   const record = await findNode(db, scope);
   const node = record ? motionOf(record) : null;
   const project = record && node ? await findProjectById(db, { orgId: scope.orgId, projectId: record.projectId }) : null;

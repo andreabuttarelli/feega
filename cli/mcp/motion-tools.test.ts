@@ -65,6 +65,10 @@ const fake: Server = createServer((req, res) => {
       send(200, published ? { published, url: `https://feega.app/e/${NODE}`, snippet: `<iframe src="https://feega.app/e/${NODE}"></iframe>`, revision: 3 } : { published });
       return;
     }
+    if (route === `/api/v1/motion/${NODE}/frames`) {
+      send(200, { revision: 3, frames: [{ time: 1, mime: 'image/jpeg', data: 'AAAA' }], quality: ['title too small'], blocking: [] });
+      return;
+    }
     if (route === `/api/v1/motion/${NODE}`) {
       send(200, { node_id: NODE, version: 3, doc: { duration: 6, tracks: [] } });
       return;
@@ -177,6 +181,15 @@ describe('the motion agent over MCP', () => {
     expect(calls[0]).toMatchObject({ method: 'GET', path: `/api/v1/motion/${NODE}/embed` });
   });
 
+  test('view_motion_frames returns each frame as an image and the quality notes as text', async () => {
+    const result = (await callTool('view_motion_frames', { node_id: NODE, times: [1], width: 480 })) as { content: { type: string; data?: string; mimeType?: string; text?: string }[] };
+    expect(calls[0]).toEqual({ method: 'POST', path: `/api/v1/motion/${NODE}/frames`, body: { times: [1], width: 480 } });
+    expect(result.content.find((c) => c.type === 'image')).toEqual({ type: 'image', data: 'AAAA', mimeType: 'image/jpeg' });
+    const text = result.content.find((c) => c.type === 'text')?.text ?? '';
+    expect(text).toContain('title too small');
+    expect(text).not.toContain('AAAA');
+  });
+
   test('get_render reads a render and its file', async () => {
     const result = await callTool('get_render', { run_id: 'render-1' });
     expect(calls[0].path).toBe('/api/v1/motion/renders/render-1');
@@ -187,7 +200,7 @@ describe('the motion agent over MCP', () => {
     await rpc('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'motion', version: '0.0.1' } });
     const names = ((await rpc('tools/list', {})).result?.tools ?? []).map((t) => t.name);
 
-    expect(names.filter((n) => n.includes('motion')).sort()).toEqual(['ask_motion_agent', 'get_motion_embed', 'get_motion_run', 'get_motion_summary', 'list_motion_videos', 'publish_motion_embed']);
+    expect(names.filter((n) => n.includes('motion')).sort()).toEqual(['ask_motion_agent', 'get_motion_embed', 'get_motion_run', 'get_motion_summary', 'list_motion_videos', 'publish_motion_embed', 'view_motion_frames']);
     expect(names).toContain('render_video');
     expect(names).toContain('get_render');
     expect(names).not.toContain('add_clip');
@@ -270,5 +283,24 @@ describe('feega motion embed', () => {
 
     expect(calls[0]).toMatchObject({ method: 'GET', path: `/api/v1/motion/${NODE}/embed/bundle` });
     expect(readFileSync(join(dir, 'out.html'), 'utf8')).toBe('<html>bundle</html>');
+  });
+});
+
+describe('feega motion frames', () => {
+  test('saves each frame as a jpeg and prints the quality notes', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'feega-frames-'));
+    const lines: string[] = [];
+    const log = console.log;
+    console.log = (...args: unknown[]) => {
+      lines.push(args.join(' '));
+    };
+    const { framesAndReport } = await import('../commands/motion.ts');
+    await framesAndReport('token', NODE, { at: '1', out: dir }).finally(() => {
+      console.log = log;
+    });
+
+    expect(calls[0]).toEqual({ method: 'POST', path: `/api/v1/motion/${NODE}/frames`, body: { times: [1] } });
+    expect(readFileSync(join(dir, `${NODE}-1s.jpg`))).toEqual(Buffer.from('AAAA', 'base64'));
+    expect(lines.join('\n')).toContain('title too small');
   });
 });

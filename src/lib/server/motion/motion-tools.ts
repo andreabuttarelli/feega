@@ -1674,7 +1674,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     [VIEW_FRAMES]: tool({
-      description: `See the video: the editor preview renders these exact times (seconds, up to ${MAX_FRAMES_PER_VIEW}) and you get the frames as images. Use it to check text that is clipped or overflows, overlaps, contrast and the safe area before and after edits.`,
+      description: `See the video: the editor preview (or, with no editor open, a server-side browser) renders these exact times (seconds, up to ${MAX_FRAMES_PER_VIEW}) and you get the frames as images. Use it to check text that is clipped or overflows, overlaps, contrast and the safe area before and after edits.`,
       inputSchema: z.object({ times: z.array(z.number().min(0)).min(1).max(MAX_FRAMES_PER_VIEW) }),
       execute: async (input, { toolCallId }) => {
         if (session.views >= MAX_VIEWS_PER_TURN && session.checkedAt === session.edits.length) {
@@ -1685,7 +1685,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const times = input.times.map((t) => Math.min(t, end));
         const frames = await deps.frames(toolCallId, times);
         if (!frames) {
-          return { ok: true, seen: false, note: 'frames unavailable: the editor is not open in a browser, so nothing can draw them. Continue without them; the user sees the video when they open the editor.' };
+          return { ok: true, seen: false, note: 'frames unavailable: neither the editor nor the server could draw them. Continue without them; the user sees the video when they open the editor.' };
         }
         session.frames.set(toolCallId, frames);
         session.checkedAt = session.edits.length;

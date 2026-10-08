@@ -170,6 +170,10 @@ it in place, `action: "unpublish"` takes it down. Uncensored projects are refuse
 `get_motion_embed` reads the state. The self-contained HTML (no hosting):
 `feega motion embed <nodeId> --download page.html`.
 
+See a video with `view_motion_frames` (up to 6 times in seconds): the frames come back as
+images with the quality gate's `quality` and `blocking` notes. Free; look before and after
+`ask_motion_agent`. CLI: `feega motion frames <nodeId> --at 1,2.5,4`.
+
 ## Remix from the gallery
 
 The public gallery holds free motion videos and compositions anyone can remix, many by Feega.

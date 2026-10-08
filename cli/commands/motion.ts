@@ -1,4 +1,5 @@
-import { writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { loadSession } from '../lib/auth.ts';
 import { awaitRun, motionApi, type MotionRun, type RenderStart } from '../lib/motion.ts';
 
@@ -110,5 +111,27 @@ export async function embedAndReport(bearer: string, nodeId: string, opts: Embed
   console.log(state.published ? `Published: ${state.url}` : `Not published. It would live at ${state.url}`);
   if (state.snippet) {
     console.log(state.snippet);
+  }
+}
+
+type FramesOpts = { org?: string; at: string; width?: string; out?: string };
+
+export async function cmdMotionFrames(nodeId: string, opts: FramesOpts) {
+  await framesAndReport(await token(), nodeId, opts);
+}
+
+export async function framesAndReport(bearer: string, nodeId: string, opts: FramesOpts) {
+  const times = opts.at.split(',').map(Number);
+  const width = opts.width ? Number(opts.width) : undefined;
+  const shot = await motionApi.frames(bearer, nodeId, width ? { times, width } : { times }, opts.org);
+  const dir = opts.out ?? '.';
+  await mkdir(dir, { recursive: true });
+  for (const f of shot.frames) {
+    const file = join(dir, `${nodeId}-${f.time}s.jpg`);
+    await writeFile(file, Buffer.from(f.data, 'base64'));
+    console.log(`${f.time}s  ${file}`);
+  }
+  for (const note of shot.quality) {
+    console.log(`${shot.blocking.includes(note) ? 'blocking' : 'quality '}  ${note}`);
   }
 }
