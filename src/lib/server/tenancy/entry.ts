@@ -52,7 +52,7 @@ export enum Landing {
 
 export const ARRIVAL_LANDING: Record<Arrival, Landing> = {
   [Arrival.Returning]: Landing.Dashboard,
-  [Arrival.FirstRun]: Landing.Canvas,
+  [Arrival.FirstRun]: Landing.Dashboard,
   [Arrival.Campaign]: Landing.Canvas,
   [Arrival.Invite]: Landing.Canvas
 };

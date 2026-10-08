@@ -1,64 +1,110 @@
 <script lang="ts">
-  import Plus from '@lucide/svelte/icons/plus';
+  import ArrowRight from '@lucide/svelte/icons/arrow-right';
   import Film from '@lucide/svelte/icons/film';
-  import Images from '@lucide/svelte/icons/images';
+  import { enhance } from '$app/forms';
   import { formatLastEdited } from '$lib/canvas/format-last-edited';
   import { TOOL_STATUS_LABEL, toolHref } from '$lib/tools';
   import { TOOL_ICONS } from '$lib/components/app/tool-icons';
+  import { GALLERY_PATH, byline, itemPath } from '$lib/gallery/model';
+  import { BRIEF_MAX } from '$lib/motion/video-brief';
 
-  let { data } = $props();
+  let { data, form } = $props();
+
+  let sending = $state(false);
 
   const recentProjectId = $derived(data.dashboard.projects[0]?.id ?? null);
-  const hasOutputs = $derived(data.dashboard.batches.length > 0 || data.dashboard.motions.length > 0);
+  const firstVideo = $derived(data.dashboard.motions.length === 0);
+
+  const submit = () => {
+    sending = true;
+    return async ({ update }: { update: () => Promise<void> }) => {
+      await update();
+      sending = false;
+    };
+  };
 </script>
 
-<svelte:head><title>Dashboard · feega</title></svelte:head>
+<svelte:head><title>Create a video · feega</title></svelte:head>
 
-<div class="dashboard">
-  <h1>Home</h1>
+<div class="home">
+  <section class="hero" aria-labelledby="create-heading">
+    {#if firstVideo}
+      <p class="eyebrow" data-testid="onboarding">Start here</p>
+      <h1 id="create-heading">Paste your URL.<br />Get a video.</h1>
+      <p class="lede">Your site, product or app becomes a motion video. Or describe the one you want.</p>
+    {:else}
+      <h1 id="create-heading">Create a video</h1>
+    {/if}
 
-  <section aria-labelledby="projects-heading">
-    <div class="section-head">
-      <h2 id="projects-heading">Projects</h2>
-      <form method="POST" action="?/project" class="new-project">
-        <input name="name" placeholder="Project name" aria-label="New project name" maxlength="80" />
-        <button type="submit" class="primary"><Plus size={14} /> New project</button>
-      </form>
-    </div>
+    <form method="POST" action="?/video" class="brief" use:enhance={submit}>
+      <input
+        name="brief"
+        data-testid="video-brief"
+        placeholder="Paste your URL or describe your video"
+        aria-label="Paste your URL or describe your video"
+        maxlength={BRIEF_MAX}
+        autocomplete="off"
+        required
+      />
+      <button type="submit" class="go" disabled={sending} aria-label="Create video">
+        <span class="go-label">Create</span><ArrowRight size={16} strokeWidth={1.8} />
+      </button>
+    </form>
+    {#if form?.error}<p class="error" role="alert">{form.error}</p>{/if}
 
-    <ul class="projects" data-testid="dashboard-projects">
-      {#each data.dashboard.projects as project (project.id)}
-        <li class="project">
-          <a class="cover" href={project.href} aria-label={`Open ${project.name}`}>
-            {#if project.thumbs.length}
-              <span class="mosaic" data-count={project.thumbs.length}>
-                {#each project.thumbs as thumb (thumb)}
-                  <img src={thumb} alt="" loading="lazy" />
-                {/each}
-              </span>
-            {:else}
-              <span class="empty-cover"><Images size={22} strokeWidth={1.5} /></span>
-            {/if}
-          </a>
-          <div class="project-body">
-            <a class="project-name" href={project.href}>{project.name}</a>
-            <span class="muted">Edited {formatLastEdited(project.updatedAt)}</span>
-            {#if project.canvases.length}
-              <span class="canvases">
-                {#each project.canvases as canvas (canvas.id)}
-                  <a href={canvas.href}>{canvas.name}</a>
-                {/each}
-              </span>
-            {/if}
-          </div>
-        </li>
+    <form method="POST" action="?/video" class="templates" use:enhance={submit} aria-label="Templates">
+      {#each data.templates as template (template.id)}
+        <button type="submit" name="brief" value={template.brief} disabled={sending}>{template.name}</button>
       {/each}
-    </ul>
+    </form>
   </section>
 
+  {#if data.gallery.length}
+    <section aria-labelledby="gallery-heading">
+      <div class="head">
+        <h2 id="gallery-heading">Remix from the gallery</h2>
+        <a class="more" href={GALLERY_PATH} data-sveltekit-reload>All</a>
+      </div>
+      <ul class="grid gallery" data-testid="home-gallery">
+        {#each data.gallery as card (card.id)}
+          <li>
+            <a href={itemPath(card.id)} class="card" data-sveltekit-reload>
+              <span class="poster">
+                {#if card.posterUrl}<img src={card.posterUrl} alt="" loading="lazy" />{:else}<Film size={18} strokeWidth={1.4} />{/if}
+              </span>
+              <span class="name">{card.title}</span>
+              <span class="muted">{byline(card)}</span>
+            </a>
+          </li>
+        {/each}
+      </ul>
+    </section>
+  {/if}
+
+  {#if data.dashboard.motions.length}
+    <section aria-labelledby="videos-heading">
+      <div class="head">
+        <h2 id="videos-heading">Your videos</h2>
+      </div>
+      <ul class="grid">
+        {#each data.dashboard.motions as motion (motion.id)}
+          <li>
+            <a href={motion.href} class="card">
+              <span class="poster">
+                {#if motion.poster}<img src={motion.poster} alt="" loading="lazy" />{:else}<Film size={18} strokeWidth={1.4} />{/if}
+              </span>
+              <span class="name">{motion.name}</span>
+              <span class="muted">{formatLastEdited(motion.updatedAt)}</span>
+            </a>
+          </li>
+        {/each}
+      </ul>
+    </section>
+  {/if}
+
   <section aria-labelledby="tools-heading">
-    <div class="section-head">
-      <h2 id="tools-heading">Tools</h2>
+    <div class="head">
+      <h2 id="tools-heading">More tools</h2>
     </div>
     <ul class="tools" data-testid="dashboard-tools">
       {#each data.tools as tool (tool.id)}
@@ -66,100 +112,157 @@
         {@const href = toolHref(tool, recentProjectId)}
         {@const badge = TOOL_STATUS_LABEL[tool.status]}
         <li>
-          <svelte:element this={href ? 'a' : 'div'} class="tool" class:is-disabled={!href} {href}>
-            <span class="tool-preview"><Icon size={28} strokeWidth={1.4} /></span>
-            <span class="tool-name">{tool.name}{#if badge}<span class="badge">{badge}</span>{/if}</span>
-            <span class="muted">{tool.description}</span>
+          <svelte:element this={href ? 'a' : 'div'} class="tool" {href}>
+            <Icon size={16} strokeWidth={1.5} />
+            <span class="name">{tool.name}</span>
+            {#if badge}<span class="badge">{badge}</span>{/if}
           </svelte:element>
         </li>
       {/each}
     </ul>
   </section>
-
-  {#if hasOutputs}
-    <section aria-labelledby="outputs-heading">
-      <div class="section-head">
-        <h2 id="outputs-heading">Recent outputs</h2>
-      </div>
-      <div class="outputs">
-        {#if data.dashboard.batches.length}
-          <div class="output-list">
-            <h3>Photo studio</h3>
-            <ul>
-              {#each data.dashboard.batches as batch (batch.id)}
-                <li><a href={batch.href}>{batch.name}</a><span class="muted">{batch.projectName} · {batch.status}</span></li>
-              {/each}
-            </ul>
-          </div>
-        {/if}
-        {#if data.dashboard.motions.length}
-          <div class="output-list">
-            <h3>Motion</h3>
-            <ul>
-              {#each data.dashboard.motions as motion (motion.id)}
-                <li>
-                  <a href={motion.href} class="motion-row">
-                    {#if motion.poster}<img src={motion.poster} alt="" loading="lazy" />{:else}<span class="poster-empty"><Film size={14} /></span>{/if}
-                    {motion.name}
-                  </a>
-                  <span class="muted">{motion.projectName} · {formatLastEdited(motion.updatedAt)}</span>
-                </li>
-              {/each}
-            </ul>
-          </div>
-        {/if}
-      </div>
-    </section>
-  {/if}
 </div>
 
 <style>
-  .dashboard {
-    max-width: 1120px;
+  .home {
+    max-width: 960px;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
-    gap: 48px;
+    gap: 64px;
     color: var(--ui-ink);
+  }
+
+  .hero {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-space-4);
+    padding-top: 8vh;
+  }
+
+  .eyebrow {
+    margin: 0;
+    font-family: var(--ui-mono);
+    font-size: var(--ui-text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ui-ink-3);
   }
 
   h1 {
     margin: 0;
-    font-size: var(--ui-text-xl);
+    font-size: clamp(32px, 6vw, 56px);
+    line-height: 1.02;
     font-weight: 600;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.035em;
   }
 
-  .section-head {
+  .lede {
+    margin: 0;
+    max-width: 520px;
+    font-size: var(--ui-text-lg);
+    color: var(--ui-ink-2);
+  }
+
+  .brief {
+    display: flex;
+    margin-top: var(--ui-space-4);
+    background: var(--ui-surface);
+    border: 1px solid var(--ui-line-strong);
+  }
+
+  .brief:focus-within {
+    border-color: var(--ui-accent);
+  }
+
+  .brief input {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 56px;
+    padding: 0 var(--ui-space-4);
+    border: 0;
+    background: transparent;
+    color: var(--ui-ink);
+    font-size: var(--ui-text-lg);
+  }
+
+  .brief input:focus {
+    outline: none;
+  }
+
+  .brief input::placeholder {
+    color: var(--ui-ink-3);
+  }
+
+  .go {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--ui-space-2);
+    padding: 0 var(--ui-space-6);
+    border: 0;
+    background: var(--ui-ink);
+    color: var(--ui-bg);
+    font-size: var(--ui-text-md);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .go:disabled {
+    opacity: 0.5;
+  }
+
+  .error {
+    margin: 0;
+    font-size: var(--ui-text-sm);
+    color: var(--ui-danger);
+  }
+
+  .templates {
     display: flex;
     flex-wrap: wrap;
-    align-items: center;
+    gap: var(--ui-space-2);
+  }
+
+  .templates button {
+    height: 28px;
+    padding: 0 var(--ui-space-3);
+    border: 1px solid var(--ui-line);
+    background: transparent;
+    color: var(--ui-ink-2);
+    font-size: var(--ui-text-sm);
+    cursor: pointer;
+  }
+
+  .templates button:hover {
+    border-color: var(--ui-ink-3);
+    color: var(--ui-ink);
+  }
+
+  .head {
+    display: flex;
+    align-items: baseline;
     justify-content: space-between;
-    gap: var(--ui-space-3);
-    min-height: 32px;
     margin-bottom: var(--ui-space-4);
   }
 
   h2 {
     margin: 0;
-    font-size: var(--ui-text-md);
-    font-weight: 600;
-    color: var(--ui-ink);
-  }
-
-  h3 {
-    margin: 0 0 var(--ui-space-2);
     font-family: var(--ui-mono);
     font-size: var(--ui-text-xs);
     font-weight: 400;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.08em;
     color: var(--ui-ink-3);
   }
 
-  .muted {
+  .more {
     font-size: var(--ui-text-sm);
-    color: var(--ui-ink-3);
+    color: var(--ui-ink-2);
+    text-decoration: none;
+  }
+
+  .more:hover {
+    color: var(--ui-ink);
   }
 
   ul {
@@ -168,250 +271,108 @@
     padding: 0;
   }
 
-  .new-project {
-    display: flex;
-    gap: var(--ui-space-2);
-  }
-
-  .new-project input {
-    height: 32px;
-    width: 200px;
-    padding: 0 var(--ui-space-3);
-    border: 0;
-    background: var(--ui-surface);
-    color: var(--ui-ink);
-    font-size: var(--ui-text-md);
-  }
-
-  .new-project input:focus {
-    outline: none;
-    box-shadow: var(--ui-focus);
-  }
-
-  .primary {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    height: 32px;
-    padding: 0 var(--ui-space-3);
-    border: 0;
-    background: var(--ui-accent);
-    color: var(--ui-accent-ink);
-    font-size: var(--ui-text-md);
-    font-weight: 600;
-    cursor: pointer;
-  }
-
-  .primary:hover {
-    background: color-mix(in srgb, var(--ui-accent) 88%, #000);
-  }
-
-  .projects,
-  .tools {
+  .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    grid-template-columns: repeat(4, 1fr);
     gap: var(--ui-space-6) var(--ui-space-4);
   }
 
-  .project {
+  .card {
     display: flex;
     flex-direction: column;
-    gap: var(--ui-space-2);
+    gap: 2px;
+    color: var(--ui-ink);
+    text-decoration: none;
   }
 
-  .cover,
-  .tool-preview {
-    display: block;
+  .poster {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     aspect-ratio: 16 / 10;
-    background: var(--ui-surface);
+    margin-bottom: var(--ui-space-2);
     overflow: hidden;
-    transition: background 120ms;
+    background: var(--ui-surface);
+    color: var(--ui-ink-3);
   }
 
-  .cover:hover,
-  a.tool:hover .tool-preview {
-    background: var(--ui-hover);
-  }
-
-  .mosaic {
-    display: grid;
-    width: 100%;
-    height: 100%;
-    grid-template-columns: repeat(2, 1fr);
-    grid-template-rows: repeat(2, 1fr);
-    gap: 1px;
-  }
-
-  .mosaic[data-count='1'] {
-    grid-template-columns: 1fr;
-    grid-template-rows: 1fr;
-  }
-
-  .mosaic[data-count='2'] {
-    grid-template-rows: 1fr;
-  }
-
-  .mosaic img {
+  .poster img {
     width: 100%;
     height: 100%;
     object-fit: cover;
     transition: opacity 120ms;
   }
 
-  .cover:hover img {
-    opacity: 0.9;
+  .card:hover img {
+    opacity: 0.88;
   }
 
-  .empty-cover {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    height: 100%;
+  .name {
+    font-size: var(--ui-text-md);
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .muted {
+    font-size: var(--ui-text-sm);
     color: var(--ui-ink-3);
   }
 
-  .project-body {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-
-  .project-name {
-    font-size: var(--ui-text-md);
-    font-weight: 500;
-    color: var(--ui-ink);
-    text-decoration: none;
-  }
-
-  .project-name:hover {
-    color: var(--ui-accent);
-  }
-
-  .canvases {
+  .tools {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--ui-space-1) var(--ui-space-3);
-    margin-top: var(--ui-space-1);
-  }
-
-  .canvases a {
-    font-size: var(--ui-text-sm);
-    color: var(--ui-ink-2);
-    text-decoration: none;
-  }
-
-  .canvases a:hover {
-    color: var(--ui-accent);
+    gap: var(--ui-space-2);
   }
 
   .tool {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    color: var(--ui-ink);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--ui-space-2);
+    height: 36px;
+    padding: 0 var(--ui-space-3);
+    background: var(--ui-surface);
+    color: var(--ui-ink-2);
     text-decoration: none;
   }
 
-  .tool.is-disabled {
-    opacity: 0.5;
-  }
-
-  .tool-preview {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: var(--ui-space-2);
-    color: var(--ui-ink-2);
-  }
-
-  a.tool:hover .tool-preview {
+  a.tool:hover {
+    background: var(--ui-hover);
     color: var(--ui-ink);
-  }
-
-  .tool-name {
-    display: flex;
-    align-items: center;
-    gap: var(--ui-space-2);
-    font-size: var(--ui-text-md);
-    font-weight: 500;
   }
 
   .badge {
-    padding: 0 4px;
-    background: var(--ui-accent-wash);
-    color: var(--ui-accent);
     font-family: var(--ui-mono);
     font-size: 9px;
-    line-height: 14px;
-    font-weight: 400;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-  }
-
-  .outputs {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: var(--ui-space-4);
-  }
-
-  .output-list {
-    padding: var(--ui-space-4);
-    background: var(--ui-surface);
-  }
-
-  .output-list li {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding: var(--ui-space-2) 0;
-  }
-
-  .output-list a {
-    font-size: var(--ui-text-md);
-    font-weight: 500;
-    color: var(--ui-ink);
-    text-decoration: none;
-  }
-
-  .output-list a:hover {
-    color: var(--ui-accent);
-  }
-
-  .motion-row {
-    display: flex;
-    align-items: center;
-    gap: var(--ui-space-2);
-  }
-
-  .motion-row img,
-  .poster-empty {
-    width: 28px;
-    height: 28px;
-    object-fit: cover;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--ui-hover);
     color: var(--ui-ink-3);
   }
 
   @media (max-width: 640px) {
-    .dashboard {
-      gap: var(--ui-space-8);
+    .home {
+      gap: 48px;
     }
 
-    .new-project {
-      width: 100%;
+    .hero {
+      padding-top: var(--ui-space-6);
     }
 
-    .new-project input {
-      flex: 1 1 auto;
-      width: auto;
+    .brief input {
+      height: 52px;
+      font-size: var(--ui-text-md);
     }
 
-    .projects,
-    .tools {
+    .go {
+      padding: 0 var(--ui-space-4);
+    }
+
+    .go-label {
+      display: none;
+    }
+
+    .grid {
       grid-template-columns: repeat(2, 1fr);
       gap: var(--ui-space-4) var(--ui-space-2);
     }

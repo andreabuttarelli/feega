@@ -126,13 +126,13 @@ describe('settings/project actions', () => {
     expect(calls.find((c) => c.op === 'delete')).toBeUndefined();
   });
 
-  it('cancellato l unico progetto, ne nasce esattamente uno nuovo e non si passa da /app', async () => {
+  it('cancellato l unico progetto, ne nasce esattamente uno nuovo e si torna alla home del video', async () => {
     const { db, calls } = entryDb([]);
 
     const result = await run('delete', { confirmName: NAME }, db);
 
     expect(isRedirect(result)).toBe(true);
-    expect((result as { location: string }).location).not.toBe('/app');
+    expect((result as { location: string }).location).toBe('/app');
     expect(calls.filter((c) => c.table === 'projects' && c.op === 'insert')).toHaveLength(1);
   });
 });

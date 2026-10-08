@@ -9,8 +9,15 @@ const listProjects = vi.fn(async () => [project]);
 const createProject = vi.fn(async (_db: unknown, input: { name: string }) => ({ ...project, id: 'p-new', name: input.name }));
 vi.mock('$lib/server/repos/projects', () => ({ listProjects, createProject }));
 
-const createCanvas = vi.fn(async () => ({ id: 'c-new', projectId: 'p-new', name: 'Untitled', viewport: null }));
-vi.mock('$lib/server/repos/canvas', async (original) => ({ ...(await original<object>()), createCanvas }));
+const createCanvas = vi.fn(async (_db: unknown, input: { name: string }) => ({ id: input.name === 'Motion' ? 'c-motion' : 'c-new', projectId: 'p-new', name: input.name, viewport: null }));
+const listCanvases = vi.fn(async () => [{ id: 'c1', projectId: 'p1', name: 'Board', viewport: null }]);
+const createNode = vi.fn(async (_db: unknown, input: { canvasId: string }) => ({ id: 'm-new', canvasId: input.canvasId }));
+vi.mock('$lib/server/repos/canvas', async (original) => ({ ...(await original<object>()), createCanvas, listCanvases, listNodes: vi.fn(async () => []), createNode }));
+
+vi.mock('$lib/server/projects/lookup', () => ({ findReachableProject: vi.fn(async (_db: unknown, input: { projectId: string }) => ({ orgId: 'org-a', project: { id: input.projectId } })) }));
+
+const listGallery = vi.fn(async () => [{ id: 'g1', title: 'Launch', authorName: 'Feega', kind: 'motion', format: 'landscape', durationS: 8, tags: [], posterUrl: null, previewUrl: null, remixCount: 0, remixedFrom: null }]);
+vi.mock('$lib/server/repos/gallery', () => ({ listGallery }));
 
 vi.mock('$lib/server/repos/dashboard', () => ({
   listRecentCanvases: vi.fn(async () => [{ id: 'c1', projectId: 'p1', name: 'Board', updatedAt: '2026-10-03' }]),
@@ -63,7 +70,7 @@ describe('/app is the dashboard for a returning user', () => {
     expect(data.dashboard.projects.map((p) => p.id)).toEqual(['p1']);
     expect(data.dashboard.projects[0].canvases).toEqual([{ id: 'c1', name: 'Board', href: '/p/p1/c/c1' }]);
     expect(data.dashboard.batches[0].href).toBe('/app/studio/b1');
-    expect(data.tools.map((t) => t.id)).toEqual(['studio', 'motion', 'compose', 'upscale']);
+    expect(data.tools.map((t) => t.id)).toEqual(['studio', 'compose', 'upscale']);
   });
 
   it('a first-run or campaign arrival is sent on to its canvas', async () => {
@@ -78,6 +85,28 @@ describe('/app is the dashboard for a returning user', () => {
     expect(createProject).toHaveBeenCalledWith({}, expect.objectContaining({ orgId: 'org-b', name: 'Spring' }));
     expect(createCanvas).toHaveBeenCalledWith({}, { orgId: 'org-b', projectId: 'p-new', name: 'Untitled' });
     expect(redirected).toMatchObject({ status: 303, location: '/p/p-new/c/c-new' });
+  });
+
+  it('a brief starts a motion video on the Motion canvas and opens the chat with it', async () => {
+    const brief = 'https://acme.com';
+    const redirected = await thrown(() => actions.video({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ brief }) } as never));
+
+    expect(createNode).toHaveBeenCalledWith({}, expect.objectContaining({ orgId: 'org-a', projectId: 'p1', canvasId: 'c-motion', type: 'motion', displayName: 'acme.com' }));
+    expect(redirected).toMatchObject({ status: 303, location: '/p/p1/c/c-motion/motion/m-new?brief=https%3A%2F%2Facme.com' });
+  });
+
+  it('an empty brief is refused before anything is created', async () => {
+    const refused = (await actions.video({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ brief: '  ' }) } as never)) as { status: number };
+
+    expect(refused.status).toBe(400);
+    expect(createNode).not.toHaveBeenCalled();
+  });
+
+  it('the home shows the gallery to remix and the brief templates', async () => {
+    const data = (await load({ locals, cookies: cookieJar(), parent: async () => ({ org: { id: 'org-a' } }) } as never)) as { gallery: { id: string }[]; templates: { id: string }[] };
+
+    expect(data.gallery.map((g) => g.id)).toEqual(['g1']);
+    expect(data.templates.length).toBeGreaterThan(0);
   });
 
   it('switching workspace remembers a membership, never a stranger org', async () => {
