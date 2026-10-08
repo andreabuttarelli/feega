@@ -18,12 +18,13 @@ import { composeHtml } from '$lib/motion/hyperframes/compose';
 import { FEEGA_TOKENS } from '$lib/motion/brand';
 import { factsOf, FEEGA_AUTHOR, GalleryStatus, swapAssetIds, type GalleryAsset } from '$lib/gallery/model';
 import { publishRefusal } from '$lib/gallery/refusals';
+import { exposeMainFields } from '$lib/gallery/remix-fields';
 import { ProjectMode } from '$lib/project-mode';
 
 export const SEED_NAMESPACE = 'feega-gallery';
 const ORG_SLUG = 'feega';
 const SYSTEM_EMAIL = process.env.GALLERY_SYSTEM_EMAIL ?? 'gallery@feega.app';
-const SOURCE_DIR = resolve(process.env.FEEGA_VIDEOS_DIR ?? join(homedir(), 'Documents/feega-videos'));
+export const SOURCE_DIR = resolve(process.env.FEEGA_VIDEOS_DIR ?? join(homedir(), 'Documents/feega-videos'));
 const REPO = resolve(import.meta.dirname, '..');
 const DRY_RUN = process.argv.includes('--dry-run');
 const OUT_FLAG = '--out';
@@ -53,7 +54,138 @@ export type Seed = {
   preview: string | null;
 };
 
-type DemoSource = Omit<Seed, 'doc' | 'files' | 'preview'> & { doc: string; files: Record<string, string>; preview: string };
+type DemoSource = Omit<Seed, 'doc' | 'files' | 'preview'> & { doc: string; files: Record<string, string>; preview: string; licence?: string; posterAt?: number };
+
+type Ready = Seed & { poster: string | null };
+
+const CC0 = 'CC0-1.0';
+const LIBRARY_TRACK = `drive-128 · ${CC0} · feega music library`;
+const STING_TRACK = (file: string) => `${file} · ${CC0} · synthesized by feega`;
+
+const cut = (dir: string, name: string, music = `showcase/${dir}/music.mp3`, extra: Record<string, string> = {}) => ({
+  doc: `showcase/${dir}/${name}/doc.json`,
+  files: { music, ...Object.fromEntries(Object.entries(extra).map(([id, file]) => [id, `showcase/${dir}/${file}`])) }
+});
+
+export const SHOWCASE: readonly DemoSource[] = [
+  {
+    key: 'showcase-liquid-type',
+    title: 'Liquid type',
+    description: 'Glass drops roll across bold type, split, blend and refract, then settle into a call to action.',
+    tags: ['glass', 'typography', 'brand'],
+    ...cut('liquid-type', 'wide'),
+    preview: 'showcase/liquid-type/liquid-type-16x9.mp4',
+    licence: LIBRARY_TRACK
+  },
+  {
+    key: 'showcase-liquid-type-portrait',
+    title: 'Liquid type, portrait',
+    description: 'The liquid type film, cut for a 4:5 feed.',
+    tags: ['glass', 'typography', 'brand'],
+    ...cut('liquid-type', 'tall'),
+    preview: 'showcase/liquid-type/liquid-type-9x16.mp4',
+    licence: LIBRARY_TRACK
+  },
+  {
+    key: 'showcase-launch-film',
+    title: 'Nimbra launch film',
+    description: 'A launch for an invented calendar app: a crowded week, the fix on a laptop and a phone, the numbers, the promise.',
+    tags: ['launch', 'saas', 'ui'],
+    ...cut('launch-film', 'wide', undefined, { logo: 'logo.svg' }),
+    preview: 'showcase/launch-film/launch-film-16x9.mp4',
+    licence: LIBRARY_TRACK
+  },
+  {
+    key: 'showcase-launch-film-square',
+    title: 'Nimbra launch film, square',
+    description: 'The Nimbra launch, cut for a square feed.',
+    tags: ['launch', 'saas', 'ui'],
+    ...cut('launch-film', 'square', undefined, { logo: 'logo.svg' }),
+    preview: 'showcase/launch-film/launch-film-1x1.mp4',
+    licence: LIBRARY_TRACK
+  },
+  {
+    key: 'showcase-material',
+    title: 'Material',
+    description: 'Shape, light and rhythm: a grid morphs, glass bends stripes, bars pulse, and a mark lands on the name.',
+    tags: ['shapes', 'glass', 'brand'],
+    ...cut('material', 'square'),
+    preview: 'showcase/material/material-1x1.mp4',
+    licence: LIBRARY_TRACK
+  },
+  {
+    key: 'showcase-material-vertical',
+    title: 'Material, vertical',
+    description: 'The material film, cut for stories and reels.',
+    tags: ['shapes', 'glass', 'brand'],
+    ...cut('material', 'vertical'),
+    preview: 'showcase/material/material-9x16.mp4',
+    licence: LIBRARY_TRACK
+  },
+  {
+    key: 'showcase-numbers',
+    title: 'Graphyn in numbers',
+    description: 'A quarterly story told in live charts: bars, a counter, a retention line, a share donut and a dashboard.',
+    tags: ['data', 'charts', 'saas'],
+    ...cut('numbers', 'wide', undefined, { logo: 'logo.svg' }),
+    preview: 'showcase/numbers/numbers-16x9.mp4',
+    licence: LIBRARY_TRACK
+  },
+  {
+    key: 'showcase-numbers-square',
+    title: 'Graphyn in numbers, square',
+    description: 'The chart story, cut for a square feed.',
+    tags: ['data', 'charts', 'saas'],
+    ...cut('numbers', 'square', undefined, { logo: 'logo.svg' }),
+    preview: 'showcase/numbers/numbers-1x1.mp4',
+    licence: LIBRARY_TRACK
+  },
+  {
+    key: 'showcase-logo-sting',
+    title: 'Logo sting',
+    description: 'A liquid drop melts away to reveal the logo and a tagline, in six seconds.',
+    tags: ['logo', 'intro', 'glass'],
+    ...cut('logo-sting', 'sting', 'showcase/logo-sting/sting-6.mp3', { logo: 'logo.svg' }),
+    preview: 'showcase/logo-sting/sting-16x9.mp4',
+    licence: STING_TRACK('sting-6.mp3')
+  },
+  {
+    key: 'showcase-logo-loop',
+    title: 'Logo loop',
+    description: 'A four-second seamless loop of the logo under a moving glass drop, for a profile or a background.',
+    tags: ['logo', 'loop', 'glass'],
+    ...cut('logo-sting', 'loop', 'showcase/logo-sting/loop-4.mp3', { logo: 'logo.svg' }),
+    preview: 'showcase/logo-sting/sting-loop-1x1.mp4',
+    licence: STING_TRACK('loop-4.mp3')
+  },
+  {
+    key: 'showcase-logo-outro',
+    title: 'Logo outro',
+    description: 'An end card for reels: logo, handle, a follow button and a link.',
+    tags: ['logo', 'outro', 'social'],
+    ...cut('logo-sting', 'outro', 'showcase/logo-sting/outro-8.mp3', { logo: 'logo.svg' }),
+    preview: 'showcase/logo-sting/outro-9x16.mp4',
+    licence: STING_TRACK('outro-8.mp3')
+  },
+  {
+    key: 'showcase-drop',
+    title: 'Product drop',
+    description: 'A four-beat product drop: the teaser, the product, a rolling price with the date, and the pre-order call.',
+    tags: ['product', 'ecommerce', 'launch'],
+    ...cut('drop', 'vertical', undefined, { product: 'product.svg' }),
+    preview: 'showcase/drop/drop-9x16.mp4',
+    licence: LIBRARY_TRACK
+  },
+  {
+    key: 'showcase-drop-portrait',
+    title: 'Product drop, portrait',
+    description: 'The product drop, cut for a 4:5 feed.',
+    tags: ['product', 'ecommerce', 'launch'],
+    ...cut('drop', 'portrait', undefined, { product: 'product.svg' }),
+    preview: 'showcase/drop/drop-4x5.mp4',
+    licence: LIBRARY_TRACK
+  }
+];
 
 export const DEMOS: readonly DemoSource[] = [
   {
@@ -118,7 +250,8 @@ export const DEMOS: readonly DemoSource[] = [
     doc: 'device-screens/doc-v2.json',
     files: {},
     preview: 'device-screens/demo-v2.mp4'
-  }
+  },
+  ...SHOWCASE
 ];
 
 export const EXCLUDED_DEMOS: readonly { name: string; why: string }[] = [
@@ -198,9 +331,9 @@ function stills(dir: string): Record<string, string> {
   return out;
 }
 
-function poster(dir: string, key: string, video: string, seconds: number): string {
+function poster(dir: string, key: string, video: string, at: number): string {
   const file = join(dir, `${key}-poster.jpg`);
-  execFileSync('ffmpeg', ['-v', 'error', '-y', '-ss', String(seconds * POSTER_SHARE), '-i', video, '-frames:v', '1', '-vf', `scale=${STILL_WIDTH}:-2`, '-q:v', '3', file]);
+  execFileSync('ffmpeg', ['-v', 'error', '-y', '-ss', String(at), '-i', video, '-frames:v', '1', '-vf', `scale=${STILL_WIDTH}:-2`, '-q:v', '3', file]);
   return file;
 }
 
@@ -208,37 +341,58 @@ export function builtinTitle(name: string): string {
   return name.replace(/^Launch · /, '').trim();
 }
 
-function catalogue(dir: string): { seeds: (Seed & { poster: string | null })[]; skipped: { key: string; why: string }[] } {
-  const skipped: { key: string; why: string }[] = [];
-  const seeds: (Seed & { poster: string | null })[] = [];
+const LOCAL_SERVER = /\b(localhost|127\.0\.0\.1)\b/;
 
-  for (const demo of DEMOS) {
+export function seedProblems(seed: Ready): string[] {
+  const local = LOCAL_SERVER.test(JSON.stringify(seed.doc)) || Object.values(seed.files).some((f) => LOCAL_SERVER.test(f));
+  const unshipped = seed.doc.assets.filter((a) => !seed.files[a.id]).map((a) => `no file for asset ${a.id}`);
+  const fixed = !exposeMainFields(seed.doc).fields.length;
+  return [
+    ...(local ? ['points at a local server'] : []),
+    ...unshipped,
+    ...(seed.preview ? [] : ['no preview video']),
+    ...(seed.poster ? [] : ['no poster']),
+    ...(fixed ? ['nothing a remixer can edit'] : [])
+  ];
+}
+
+const withLicence = (doc: MotionDoc, licence: string | undefined): MotionDoc =>
+  licence ? { ...doc, assets: doc.assets.map((a) => (a.kind === 'audio' ? { ...a, name: `${a.id} · ${licence}` } : a)) } : doc;
+
+export function catalogue(dir: string, demos: readonly DemoSource[]): { seeds: Ready[]; skipped: { key: string; why: string }[] } {
+  const skipped: { key: string; why: string }[] = [];
+  const seeds: Ready[] = [];
+
+  for (const demo of demos) {
     const docPath = join(SOURCE_DIR, demo.doc);
     const missing = [demo.doc, ...Object.values(demo.files)].find((f) => !existsSync(join(SOURCE_DIR, f)));
     if (missing) {
       skipped.push({ key: demo.key, why: `${missing} is missing and there is no build script that rebuilds it here` });
       continue;
     }
-    const doc = parsed(JSON.parse(readFileSync(docPath, 'utf8')), demo.doc);
+    const { licence, posterAt, ...meta } = demo;
+    const doc = withLicence(parsed(JSON.parse(readFileSync(docPath, 'utf8')), demo.doc), licence);
     const preview = existsSync(join(SOURCE_DIR, demo.preview)) ? join(SOURCE_DIR, demo.preview) : null;
     const files = Object.fromEntries(Object.entries(demo.files).map(([id, f]) => [id, join(SOURCE_DIR, f)]));
-    seeds.push({ ...demo, doc, files, preview, poster: preview ? poster(dir, demo.key, preview, factsOf(doc).durationS) : null });
+    seeds.push({ ...meta, doc, files, preview, poster: preview ? poster(dir, demo.key, preview, posterAt ?? factsOf(doc).durationS * POSTER_SHARE) : null });
   }
 
+  return { seeds, skipped };
+}
+
+function templateSeeds(dir: string): Ready[] {
   const samples = stills(dir);
   const sampleCount = Object.keys(samples).length - 1;
-  for (const entry of BUILTIN_TEMPLATES) {
+  return BUILTIN_TEMPLATES.flatMap((entry): Ready[] => {
     const tags = BUILTIN_TAGS.find(([prefix]) => entry.id.startsWith(prefix))?.[1];
     if (!tags) {
-      continue;
+      return [];
     }
     const doc = filledTemplate(entry.template.doc, sampleCount);
     const files = Object.fromEntries(doc.assets.filter((a) => samples[a.id]).map((a) => [a.id, samples[a.id]]));
     const key = entry.id.replace(/^builtin:/, 'template-');
-    seeds.push({ key, title: builtinTitle(entry.template.name), description: entry.template.description, tags, doc, files, preview: null, poster: null });
-  }
-
-  return { seeds, skipped };
+    return [{ key, title: builtinTitle(entry.template.name), description: entry.template.description, tags, doc, files, preview: null, poster: null }];
+  });
 }
 
 const mimeOf = (path: string) => MIME[extname(path).toLowerCase()] ?? 'application/octet-stream';
@@ -350,7 +504,7 @@ function argument(flag: string): string | null {
   return at >= 0 ? (process.argv[at + 1] ?? null) : null;
 }
 
-function dryRun(seeds: (Seed & { poster: string | null })[], out: string) {
+function dryRun(seeds: Ready[], out: string) {
   mkdirSync(out, { recursive: true });
   const files = seeds.map((seed) => {
     const assets = Object.fromEntries(Object.entries(seed.files).map(([id, path]) => [id, `file://${path}`]));
@@ -365,7 +519,7 @@ function dryRun(seeds: (Seed & { poster: string | null })[], out: string) {
 const POSTER_SETTLE_MS = 1500;
 const PLAYER_TIMEOUT_MS = 30_000;
 
-async function renderPosters(dir: string, seeds: (Seed & { poster: string | null })[]): Promise<void> {
+async function renderPosters(dir: string, seeds: Ready[]): Promise<void> {
   const missing = seeds.filter((s) => !s.poster);
   if (!missing.length) {
     return;
@@ -415,12 +569,17 @@ async function renderPosters(dir: string, seeds: (Seed & { poster: string | null
 
 async function main() {
   const work = mkdtempSync(join(tmpdir(), 'feega-gallery-seed-'));
-  const { seeds, skipped } = catalogue(work);
+  const { seeds: demos, skipped } = catalogue(work, DEMOS);
+  const seeds = [...demos, ...templateSeeds(work)];
   await renderPosters(work, seeds);
 
   const refused = seeds.flatMap((s) => {
     const verdict = publishRefusal({ mode: ProjectMode.Standard, hasBrand: false, doc: s.doc, siteAssetIds: new Set() });
-    return verdict ? [{ key: s.key, why: verdict.message }] : [];
+    const problems = SHOWCASE.some((d) => d.key === s.key) ? seedProblems(s) : [];
+    if (verdict) {
+      return [{ key: s.key, why: verdict.message }];
+    }
+    return problems.length ? [{ key: s.key, why: problems.join('; ') }] : [];
   });
   const ready = seeds.filter((s) => !refused.some((r) => r.key === s.key));
 
