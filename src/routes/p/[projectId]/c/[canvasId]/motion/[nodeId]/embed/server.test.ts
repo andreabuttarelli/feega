@@ -8,8 +8,10 @@ const bucket = vi.hoisted(() => ({
   list: vi.fn(async () => ({ data: [], error: null }))
 }));
 
+const scope = vi.hoisted(() => ({ mode: 'standard' }));
+
 vi.mock('$lib/server/motion/editor-scope', () => ({
-  motionScope: async () => ({ db: { storage: { from: () => bucket } }, motion: { record: { id: 'n-1' } } })
+  motionScope: async () => ({ db: { storage: { from: () => bucket } }, mode: scope.mode, motion: { record: { id: 'n-1' } } })
 }));
 
 const { GET, POST, DELETE } = await import('./+server');
@@ -28,5 +30,17 @@ describe('motion embed endpoint', () => {
     expect(await (await GET(event('GET'))).json()).toEqual({ published: false, url: 'http://localhost:5173/e/n-1' });
     expect(await (await DELETE(event('DELETE'))).json()).toEqual({ ok: true });
     expect(bucket.remove).toHaveBeenCalledWith(['n-1.html']);
+  });
+
+  it('POST refuses an uncensored project with the reason, and signs nothing', async () => {
+    scope.mode = 'uncensored';
+    bucket.createSignedUploadUrl.mockClear();
+
+    const res = await POST(event('POST'));
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ ok: false, error: expect.stringContaining('uncensored') });
+    expect(bucket.createSignedUploadUrl).not.toHaveBeenCalled();
+    scope.mode = 'standard';
   });
 });

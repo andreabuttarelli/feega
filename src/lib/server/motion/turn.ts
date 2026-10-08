@@ -20,6 +20,7 @@ import { assetUrls, headOrNew, motionAssets, motionTokens, saveMotionDoc } from 
 import { fitNewVideo } from '$lib/motion/fit-duration';
 import { EmbedAction, createMotionTools, selectionNote, type MotionSession } from '$lib/server/motion/motion-tools';
 import { publishEmbed, removeEmbed } from '$lib/server/motion/embed';
+import type { ProjectMode } from '$lib/project-mode';
 import { templateLibrary } from '$lib/server/motion/templates';
 import { analyzeSounds, storageAnalysis } from '$lib/server/motion/audio-analysis';
 import { motionAgentPrompt } from '$lib/server/motion/motion-prompt';
@@ -105,7 +106,7 @@ export type MotionTurnInput = {
   db: Db;
   userId: string;
   orgId: string;
-  project: { id: string; brandId: string | null };
+  project: { id: string; brandId: string | null; mode: ProjectMode };
   motion: { record: CanvasNodeRecord; node: MotionNode };
   message: string;
   selection: string[];
@@ -185,7 +186,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
     embed: async (action) => {
       const nodeId = motion.record.id;
       const EMBED_RUN: Record<EmbedAction, () => Promise<Record<string, unknown>>> = {
-        [EmbedAction.Publish]: () => publishEmbed(db, { nodeId, doc: session.doc, tokens, assetUrls: assetUrls(assets), title: motion.record.displayName ?? 'feega', fetchBlob: (url) => fetch(url).then((r) => r.blob()) }),
+        [EmbedAction.Publish]: () => publishEmbed(db, { nodeId, doc: session.doc, tokens, assetUrls: assetUrls(assets), title: motion.record.displayName ?? 'feega', fetchBlob: (url) => fetch(url).then((r) => r.blob()), mode: project.mode }),
         [EmbedAction.Unpublish]: () => removeEmbed(db, nodeId)
       };
       return EMBED_RUN[action]();
