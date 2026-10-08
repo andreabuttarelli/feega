@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { createEffect, listEffects } from '$lib/server/repos/effects';
-import { bodyOf, callerOf, forbidden, written } from '$lib/server/effects/http';
+import { listEffects } from '$lib/server/repos/effects';
+import { bodyOf, callerOf, forbidden, storeOf, written } from '$lib/server/effects/http';
 
 const CREATED = 201;
 
@@ -26,6 +26,5 @@ export const POST: RequestHandler = async ({ request, url }) => {
     return forbidden();
   }
 
-  const result = await createEffect(caller.db, caller.orgId, { kind: 'user', id: caller.userId }, await bodyOf(request));
-  return written(result, CREATED);
+  return written(await storeOf(caller).write((await bodyOf(request)) as never), CREATED);
 };

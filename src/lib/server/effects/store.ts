@@ -1,5 +1,5 @@
 import type { Db } from '$lib/server/db/client';
-import type { ShaderParam, TextEdit } from '@feega/shader-fx';
+import { parseEffect, type ShaderParam, type TextEdit } from '@feega/shader-fx';
 import {
   CheckState,
   createEffect,
@@ -17,7 +17,7 @@ import { checkEffect, type GlPage } from './check';
 
 export type EffectDraft = { name: string; frag: string; params: ShaderParam[] };
 
-export type EffectEdit = { effectId: string; version: number; edits?: TextEdit[]; params?: ShaderParam[] };
+export type EffectEdit = { effectId: string; version: number; frag?: string; edits?: TextEdit[]; params?: ShaderParam[] };
 
 export type EffectStore = {
   write: (draft: EffectDraft) => Promise<Written>;
@@ -47,11 +47,16 @@ export function effectStore(scope: StoreScope): EffectStore {
 
   return {
     write: async (draft) => {
+      const parsed = parseEffect(draft);
+      if (!parsed.ok) {
+        return { outcome: Outcome.Invalid, problems: parsed.problems };
+      }
+
       const existing = await findEffectByName(db, orgId, draft.name);
       const written = existing ? await patchEffect(db, orgId, existing.id, { version: existing.version, frag: draft.frag, params: draft.params }) : await createEffect(db, orgId, actor, draft);
       return checked(written);
     },
-    patch: async (edit) => checked(await patchEffect(db, orgId, edit.effectId, { version: edit.version, edits: edit.edits, params: edit.params })),
+    patch: async (edit) => checked(await patchEffect(db, orgId, edit.effectId, { version: edit.version, frag: edit.frag, edits: edit.edits, params: edit.params })),
     list: () => listEffects(db, orgId),
     find: (id) => findEffect(db, orgId, id)
   };

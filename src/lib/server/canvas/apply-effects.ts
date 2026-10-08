@@ -5,8 +5,10 @@ import { findAsset, insertAsset, type Asset, type AssetSource } from '$lib/serve
 import { DIGITAL_SOURCE_TYPE, markGenerated } from '$lib/server/content-credentials';
 import { CANVAS_ASSET_BUCKET } from '$lib/server/repos/asset-storage';
 import type { Actor } from '$lib/server/repos/actor';
-import { applyStack } from '$lib/canvas/effects';
-import type { EffectStep, Pixels } from '$lib/canvas/effects';
+import { listEffects } from '$lib/server/repos/effects';
+import { chromiumGl, serverFramesOpen } from '$lib/server/motion/chromium-frames';
+import { applyStackAsync, glPass, type AsyncCustomPass } from './custom-steps';
+import { CUSTOM, type EffectStep, type Pixels } from '$lib/canvas/effects';
 import { renderVideoEffects } from './video-effects';
 
 export type ApplyEffectsOutcome =
@@ -52,7 +54,7 @@ export async function applyEffectsNode(
   const isVideo = sourceAsset.type === 'video' || node.data.mediaKind === 'video';
   const rendered = isVideo
     ? await renderVideoEffects(inputBytes, steps)
-    : await renderImageEffects(inputBytes, steps);
+    : await renderImageEffects(inputBytes, steps, glPass(serverFramesOpen() ? chromiumGl : null, await customsOf(db, input.orgId, steps)));
   const output = await markDerived(rendered.bytes, rendered.mimeType, sourceAsset.source);
 
   const extension = isVideo ? 'mp4' : 'png';
@@ -101,9 +103,13 @@ async function markDerived(bytes: Buffer, mime: string, source: AssetSource | nu
   return markGenerated(bytes, mime, { model: null, provider: null, sourceType: DIGITAL_SOURCE_TYPE.composite });
 }
 
-async function renderImageEffects(inputBytes: Buffer, steps: EffectStep[]) {
+async function customsOf(db: Db, orgId: string, steps: EffectStep[]) {
+  return steps.some((step) => step.id === CUSTOM) ? ((await listEffects(db, orgId)) ?? []) : [];
+}
+
+async function renderImageEffects(inputBytes: Buffer, steps: EffectStep[], custom: AsyncCustomPass) {
   const pixels = await decodeToPixels(inputBytes);
-  const result = applyStack(pixels, steps);
+  const result = await applyStackAsync(pixels, steps, custom);
   return {
     bytes: await encodePng(result),
     mimeType: 'image/png' as const,

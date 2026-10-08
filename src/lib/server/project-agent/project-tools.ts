@@ -15,13 +15,17 @@ import {
 } from '$lib/server/repos/canvas';
 import { listProjectAssets } from '$lib/server/repos/assets';
 import { runGenNode, runsOf, type RunOutcome } from '$lib/server/canvas/generate';
-import { agentActor, type Actor } from '$lib/server/repos/actor';
+import { agentActor, SIDEBAR_AGENT_KEY, type Actor } from '$lib/server/repos/actor';
 import { withBrandContext, withOrgContext } from '$lib/server/ai-log';
 import { GEN_MEDIUMS, isGenMedium, type GenParams } from '$lib/canvas/gen-node';
 import { audioDescription } from '$lib/server/canvas/audio-description';
 import { connectRefusal, nodeModelError, targetTakesNoInputs, UNCENSORED_NO_INPUTS_ERROR } from '$lib/server/canvas/node-model';
 import { applyEffectsTo, makeEffectsPair } from '$lib/server/canvas/effects-actions';
 import { effectsCatalogue } from '$lib/canvas/effects/catalogue';
+import { CUSTOM } from '$lib/canvas/effects';
+import { effectStore } from '$lib/server/effects/store';
+import { CheckState, Outcome } from '$lib/server/repos/effects';
+import { chromiumGl, serverFramesOpen } from '$lib/server/motion/chromium-frames';
 import { describeNodeType, describeNodeTypes, isNodeType, unknownFieldsError, validateNewNodeData } from '$lib/canvas/node-data';
 import { listGallery } from '$lib/server/repos/gallery';
 import { cardView, publishNode, remixInto } from '$lib/server/gallery/service';
@@ -73,6 +77,7 @@ function outcomeOf(out: RunOutcome): Record<string, unknown> {
 
 export function createProjectTools(deps: ProjectToolDeps): Record<string, Tool> {
   const actor: Actor = agentActor(deps.userId);
+  const effects = effectStore({ db: deps.db, orgId: deps.orgId, actor: { kind: 'agent', id: deps.userId, agentKey: SIDEBAR_AGENT_KEY }, gl: serverFramesOpen() ? chromiumGl : null });
 
   /** La generazione spende: il costo deve atterrare sul brand, o sull'org se non ce n'è uno. */
   const billed = <T>(fn: () => Promise<T>): Promise<T> =>
@@ -315,9 +320,34 @@ export function createProjectTools(deps: ProjectToolDeps): Record<string, Tool> 
     }),
 
     list_effects: tool({
-      description: 'Every image effect apply_effects accepts, with its params (range, options, default). Free, reads only.',
+      description: 'Every image effect apply_effects accepts, with its params (range, options, default), and the custom effects of the workspace (write_effect) with the step that puts each in a stack. Free, reads only.',
       inputSchema: z.object({}).strict(),
-      execute: async () => ({ effects: effectsCatalogue() })
+      execute: async () => {
+        const custom = (await effects.list()) ?? [];
+        return {
+          effects: effectsCatalogue(),
+          custom: custom.map((e) => ({ effect_id: e.id, name: e.name, version: e.version, params: e.params, state: e.check.state, problems: e.check.problems, step: { id: CUSTOM, ref: e.id } }))
+        };
+      }
+    }),
+
+    write_effect: tool({
+      description: [
+        'Write a custom effect for the whole workspace, free: a GLSL ES 1.0 fragment body defining vec4 effect(vec2 uv).',
+        'Given: uniform sampler2D u_src (the image), vec2 u_res, float u_time, float u_seed, varying v_uv, float hash(vec2), float noise(vec2).',
+        'Every param becomes a uniform u_<key> (number → float, color → vec3, seed → float); keys src, res, time, seed are taken.',
+        'No #extension, no derivatives, for loops with a constant bound ≤ 64, ≤ 16 texture2D, ≤ 12 KB. Same name replaces it.',
+        'Returns the check; then put { id: "custom", ref: effect_id, params } in apply_effects. Motion clips: ask_motion_agent.'
+      ].join(' '),
+      inputSchema: z.object({ name: z.string(), frag: z.string(), params: z.array(z.record(z.string(), z.unknown())).max(12).default([]) }).strict(),
+      execute: async (input: { name: string; frag: string; params: Record<string, unknown>[] }) => {
+        const written = await effects.write(input as never);
+        if (written.outcome !== Outcome.Ok) {
+          return { ok: false, error: `${written.outcome}${written.problems?.length ? `: ${written.problems.join('; ')}` : ''}` };
+        }
+        const { effect } = written;
+        return { ok: effect.check.state !== CheckState.Failed, effect_id: effect.id, name: effect.name, version: effect.version, check: effect.check };
+      }
     }),
 
     apply_effects: tool({
