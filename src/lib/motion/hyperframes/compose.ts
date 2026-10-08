@@ -59,6 +59,7 @@ import generative from 'virtual:motion-generative';
 import twgl from 'virtual:motion-twgl';
 import fx from 'virtual:motion-fx';
 import splitting from 'virtual:motion-splitting';
+import openProps from 'virtual:motion-open-props';
 import { liveSpec, type SpecInput } from '../interactive/spec';
 import { LIVE_GLOBAL } from '../interactive/runtime';
 import { Liveness, interactiveOf } from '../interactive/settings';
@@ -465,7 +466,8 @@ const LIBRARY_TAGS: Record<Library, { scripts: string[]; tag: string }> = {
   [Library.Generative]: { scripts: [], tag: inlineScript(generative) },
   [Library.Twgl]: { scripts: [], tag: inlineScript(twgl) },
   [Library.Fx]: { scripts: [], tag: inlineScript(fx) },
-  [Library.Splitting]: { scripts: [], tag: inlineScript(splitting) }
+  [Library.Splitting]: { scripts: [], tag: inlineScript(splitting) },
+  [Library.OpenProps]: { scripts: [], tag: inlineScript(openProps) }
 };
 
 function brandEnv(tokens: BrandTokens) {

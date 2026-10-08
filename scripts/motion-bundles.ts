@@ -5,6 +5,7 @@ import { GENERATIVE_ENTRY, GENERATIVE_MODULE } from '../src/lib/motion/custom/ge
 import { TWGL_ENTRY, TWGL_MODULE } from '../src/lib/motion/custom/twgl';
 import { FX_ENTRY, FX_MODULE } from '../src/lib/motion/custom/fx';
 import { SPLITTING_ENTRY, SPLITTING_MODULE } from '../src/lib/motion/custom/splitting';
+import { OPEN_PROPS_ENTRY, OPEN_PROPS_MODULE } from '../src/lib/motion/custom/open-props';
 
 export const LIVE_RUNTIME_MODULE = 'virtual:motion-live-runtime';
 export const LIVE_ENTRY = 'src/lib/motion/interactive/live-entry.ts';
@@ -14,7 +15,8 @@ const BUNDLES: Record<string, string> = {
   [GENERATIVE_MODULE]: GENERATIVE_ENTRY,
   [TWGL_MODULE]: TWGL_ENTRY,
   [FX_MODULE]: FX_ENTRY,
-  [SPLITTING_MODULE]: SPLITTING_ENTRY
+  [SPLITTING_MODULE]: SPLITTING_ENTRY,
+  [OPEN_PROPS_MODULE]: OPEN_PROPS_ENTRY
 };
 
 const resolved = (id: string) => `\0${id}`;

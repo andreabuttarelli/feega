@@ -18,6 +18,11 @@ declare module 'splitting' {
 	export default function Splitting(options?: { target?: string | Element | Element[] | NodeList; by?: string; key?: string }): Split[];
 }
 
+declare module 'virtual:motion-open-props' {
+	const source: string;
+	export default source;
+}
+
 declare module 'virtual:motion-twgl' {
 	const source: string;
 	export default source;
