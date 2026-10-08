@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ClipFamily } from './track-style';
-import { Part, SECTION_ORDER, Section, fieldLook, flipSection, isOpen, readSections, shows, transformSection } from './inspector-sections';
+import { Part, SECTION_ORDER, Section, fieldLook, sectionSummary, flipSection, isOpen, readSections, shows, transformSection } from './inspector-sections';
 import { FieldFill } from './number-field';
 import { Source } from './keyframes';
 
@@ -13,6 +13,23 @@ describe('inspector sections', () => {
   it('puts what you edit most first, the same for every family', () => {
     expect(SECTION_ORDER.slice(0, 4)).toEqual([Section.Content, Section.Style, Section.Layout, Section.Timing]);
     expect(SECTION_ORDER.indexOf(Section.ThreeD)).toBeGreaterThan(SECTION_ORDER.indexOf(Section.Effects));
+  });
+
+  it('opens only the first section by default, so a clip shows a short list of summaries', () => {
+    expect(isOpen({}, ClipFamily.Text, Section.Content)).toBe(true);
+    expect(isOpen({}, ClipFamily.Text, Section.Style)).toBe(false);
+    expect(isOpen({}, ClipFamily.Text, Section.Layout)).toBe(false);
+    expect(isOpen({}, ClipFamily.Text, Section.Timing)).toBe(false);
+  });
+
+  it('sums a closed section up in one line', () => {
+    const clip = { from: 30, durationInFrames: 60, transform: { scale: 1.5, rotateZ: 10 }, keyframes: { opacity: [], x: [{ frame: 0, value: 0, ease: 'linear' as const }] }, effects: [], blend: 'normal', parent: null, mask: null, component: 'Title' as const, props: { text: 'Hello\nworld' } };
+
+    expect(sectionSummary(Section.Layout, clip, 30)).toBe('Scale 150% · Rotate 10°');
+    expect(sectionSummary(Section.Timing, clip, 30)).toBe('At 1s · 2s long');
+    expect(sectionSummary(Section.Animate, clip, 30)).toBe('1 animated');
+    expect(sectionSummary(Section.Content, clip, 30)).toBe('Hello');
+    expect(sectionSummary(Section.Parent, clip, 30)).toBe('');
   });
 
   it('opens 3D only on 3D layers', () => {

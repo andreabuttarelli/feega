@@ -259,6 +259,35 @@ test.describe('motion editor a dito @real', () => {
     });
   });
 
+  test.describe('fogli a dito', () => {
+    test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
+
+    test('Properties a metà lascia la preview visibile; un tocco sul grabber la apre tutta', async ({ page, session, seedNode }) => {
+      const node = await seedNode({ type: 'motion', data: MOTION_DATA });
+      await openEditor(page, `/p/${session.projectId}/c/${session.canvasId}/motion/${node.id}`);
+
+      const sheet = page.getByRole('complementary', { name: 'Properties' });
+      await expect(sheet).toBeVisible();
+      const stage = (await page.getByRole('region', { name: 'Preview' }).boundingBox())!;
+      const half = (await sheet.boundingBox())!;
+      expect(half.y).toBeGreaterThanOrEqual(stage.y + stage.height - 1);
+      if (SHOTS) {
+        await page.screenshot({ path: `${SHOTS}/iphone-sheet-half.png` });
+      }
+
+      await sheet.getByTestId('sheet-grabber').tap();
+      await expect(sheet.getByTestId('sheet-grabber')).toHaveAttribute('data-detent', 'full');
+      expect((await sheet.boundingBox())!.y).toBeLessThan(half.y);
+    });
+
+    test('una sezione chiusa mostra il suo riassunto', async ({ page, session, seedNode }) => {
+      const node = await seedNode({ type: 'motion', data: MOTION_DATA });
+      await openEditor(page, `/p/${session.projectId}/c/${session.canvasId}/motion/${node.id}`);
+
+      await expect(page.locator('[data-section="timing"] .section-head')).toContainText(/At .*s long/);
+    });
+  });
+
   test('il tasto destro apre lo stesso menu del clip', async ({ page, session, seedNode }) => {
     const node = await seedNode({ type: 'motion', data: MOTION_DATA });
     await openEditor(page, `/p/${session.projectId}/c/${session.canvasId}/motion/${node.id}`);
