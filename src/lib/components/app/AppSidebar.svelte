@@ -1,6 +1,7 @@
 <script lang="ts">
   import { _ } from 'svelte-i18n';
   import Folder from '@lucide/svelte/icons/folder';
+  import Plus from '@lucide/svelte/icons/plus';
   import ThemeSwitch from '$lib/components/ThemeSwitch.svelte';
   import CreditAmount from '$lib/components/CreditAmount.svelte';
   import { FOOTER_LEGAL_LINKS, LEGAL_LINKS, legalHref } from '$lib/legal-links';
@@ -107,17 +108,21 @@
     {/each}
   </div>
 
-  {#if projects.length}
-    <div class="group" data-testid="app-sidebar-canvas">
-      <span class="heading">Assets &amp; canvas</span>
-      {#each projects as project (project.id)}
-        <a class="row" href="/p/{project.id}">
-          <Folder size={ICON} strokeWidth={STROKE} />
-          <span class="label">{project.name}</span>
-        </a>
-      {/each}
-    </div>
-  {/if}
+  <div class="group" data-testid="app-sidebar-canvas">
+    <span class="heading">Assets &amp; canvas</span>
+    {#each projects as project (project.id)}
+      <a class="row" href="/p/{project.id}">
+        <Folder size={ICON} strokeWidth={STROKE} />
+        <span class="label">{project.name}</span>
+      </a>
+    {/each}
+    <form method="POST" action="/app?/project">
+      <button type="submit" class="row new-project" data-testid="app-sidebar-new-project">
+        <Plus size={ICON} strokeWidth={STROKE} />
+        <span class="label">New project</span>
+      </button>
+    </form>
+  </div>
 
   <div class="foot">
     <div class="group">
@@ -201,6 +206,11 @@
     text-decoration: none;
     cursor: pointer;
     transition: background 120ms, color 120ms;
+  }
+
+  .new-project {
+    color: var(--ui-ink-3);
+    cursor: pointer;
   }
 
   .row:hover {

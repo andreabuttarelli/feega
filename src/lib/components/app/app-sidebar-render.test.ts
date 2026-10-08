@@ -31,6 +31,17 @@ describe('app sidebar', () => {
     expect(body.match(/class="badge[^"]*"/g)?.length).toBe(TOOLS.filter((t) => t.status === 'beta').length);
   });
 
+  it('ends the projects section with a light New project entry', () => {
+    const body = html();
+    expect(body).toContain('action="/app?/project"');
+    expect(body).toContain('New project');
+    expect(body.indexOf('Spring launch')).toBeLessThan(body.indexOf('New project'));
+  });
+
+  it('offers New project even with no projects yet', () => {
+    expect(html({ projects: [] })).toContain('action="/app?/project"');
+  });
+
   it('lists the projects', () => {
     expect(html()).toContain('href="/p/p1"');
     expect(html()).toContain('Spring launch');

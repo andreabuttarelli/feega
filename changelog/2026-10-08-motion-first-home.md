@@ -16,4 +16,5 @@ nuovo utente atterrava su una tela vuota.
   mostra "Paste your URL. Get a video.".
 - **Sidebar**: `Tool.role` (`Lead`/`Support`) decide la sezione; motion sale in Main fra Home e
   Gallery, i progetti scendono sotto i tool come "Assets & canvas". Griglia progetti e form
-  "New project" escono dalla home (l'action `project` resta).
+  "New project" escono dalla home; "+ New project" sta in fondo alla sezione progetti della
+  sidebar (`AppSidebar.svelte`, POST a `/app?/project`), sempre visibile anche senza progetti.
