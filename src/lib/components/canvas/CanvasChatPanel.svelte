@@ -2,6 +2,8 @@
   import { _ } from 'svelte-i18n';
   import { CHROME_LOADERS } from '$lib/canvas/chrome-loaders';
   import { browser } from '$app/environment';
+  import { page } from '$app/stores';
+  import { get } from 'svelte/store';
   import { readChatPanelPx, writeChatPanelPx, readChatTab, writeChatTab, CHAT_PANEL, type ChatTab } from '$lib/shell-prefs';
   import { guideOpenRequest } from '$lib/canvas/guide-open';
   import CanvasGuideTab from './CanvasGuideTab.svelte';
@@ -76,7 +78,7 @@
           <CanvasGuideTab initialSlug={$guideOpenRequest} onopened={() => guideOpenRequest.set(null)} />
         {:else if browser}
           {#await CHROME_LOADERS.chat() then { default: ChatPanel }}
-            <ChatPanel {projectId} />
+            <ChatPanel {projectId} context={() => ({ canvasId: get(page).params.canvasId ?? null })} />
           {/await}
         {/if}
       </div>

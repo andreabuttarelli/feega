@@ -67,7 +67,7 @@ vi.mock('$lib/server/llm', () => ({
 vi.mock('$lib/server/openrouter-models', () => ({ ensureGatewayModels: async () => undefined, gatewayRate: () => ({ input: 1, cachedInput: 0, output: 1 }), gatewayModel: () => null }));
 vi.mock('$lib/server/chat-model/catalogue', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$lib/server/chat-model/catalogue')>()),
-  offeredChatModels: async () => [{ id: 'anthropic/claude-opus-5.5', label: 'S', provider: 'anthropic', costTier: '$$$', inputUsdPerM: 2, outputUsdPerM: 10, efforts: ['low'], defaultEffort: 'low' }, { id: 'cheap/model', label: 'C', provider: 'cheap', costTier: '$', inputUsdPerM: 0.1, outputUsdPerM: 0.4, efforts: [], defaultEffort: null }]
+  offeredChatModels: async () => [{ id: 'anthropic/claude-opus-5.5', label: 'S', provider: 'anthropic', costTier: '$$$', inputUsdPerM: 2, outputUsdPerM: 10, efforts: ['low'], defaultEffort: 'low' }, { id: 'anthropic/claude-sonnet-5.5', label: 'S5', provider: 'anthropic', costTier: '$$', inputUsdPerM: 1, outputUsdPerM: 5, efforts: [], defaultEffort: null }, { id: 'cheap/model', label: 'C', provider: 'cheap', costTier: '$', inputUsdPerM: 0.1, outputUsdPerM: 0.4, efforts: [], defaultEffort: null }]
 }));
 vi.mock('$lib/server/ai-log', () => ({ extractSdkUsage: () => ({ inputTokens: 10, outputTokens: 5 }), logAiCall: vi.fn(), withOrgContext: (_id: string, fn: () => unknown) => fn(), withBrandContext: (_id: string, fn: () => unknown) => fn() }));
 vi.mock('$lib/server/moderation/model-input', () => ({ screenModelInput: async () => (store.blocked ? { ok: false, error: 'prompt_refused' } : { ok: true }) }));
@@ -144,7 +144,8 @@ vi.mock('$lib/server/motion/chromium-frames', () => ({
 
 const { createMotionDelegation, MOTION_DELEGATION_TOOLS } = await import('./motion-delegation');
 
-const db = { storage: { from: () => ({ createSignedUrl: async () => ({ data: null }) }) } };
+const uploads: { bucket: string; path: string }[] = [];
+const db = { storage: { from: (bucket: string) => ({ createSignedUrl: async () => ({ data: null }), upload: async (path: string) => (uploads.push({ bucket, path }), { error: null }) }) } };
 const tools = () => createMotionDelegation({ db: db as never, orgId: ORG, projectId: PROJECT, userId: USER, origin: 'https://feega.test', pollMs: 5 });
 const call = (t: Tool, args: unknown) => (t.execute as (a: unknown, o: unknown) => Promise<Record<string, unknown>>)(args, { toolCallId: 't1', messages: [] });
 
@@ -158,6 +159,7 @@ beforeEach(() => {
   store.blocked = false;
   store.head = 0;
   prompts.length = 0;
+  uploads.length = 0;
   step = 0;
 });
 
@@ -183,12 +185,22 @@ describe('the canvas agent delegates motion videos', () => {
     expect(store.turns[0]).toMatchObject({ role: 'user', actor: { kind: 'agent', id: USER, agentKey: 'sidebar' } });
   });
 
-  it('runs the motion agent on the model the canvas chat uses', async () => {
+  it('runs the motion agent on the model the canvas chat uses when it can drive the motion tools', async () => {
+    const delegation = createMotionDelegation({ db: db as never, orgId: ORG, projectId: PROJECT, userId: USER, origin: 'https://feega.test', model: 'anthropic/claude-sonnet-5.5', pollMs: 5 });
+
+    const asked = await call(delegation.ask_motion_agent, { nodeId: NODE, request: 'x' });
+
+    expect(store.runs.get(asked.run_id as string)).toMatchObject({ model: 'anthropic/claude-sonnet-5.5' });
+    expect(asked.model_note).toBeUndefined();
+  });
+
+  it('runs the motion agent on the default model when the chat model cannot drive the motion tools, and says so', async () => {
     const delegation = createMotionDelegation({ db: db as never, orgId: ORG, projectId: PROJECT, userId: USER, origin: 'https://feega.test', model: 'cheap/model', pollMs: 5 });
 
     const asked = await call(delegation.ask_motion_agent, { nodeId: NODE, request: 'x' });
 
-    expect(store.runs.get(asked.run_id as string)).toMatchObject({ model: 'cheap/model' });
+    expect(store.runs.get(asked.run_id as string)).toMatchObject({ model: 'anthropic/claude-opus-5.5' });
+    expect(asked).toMatchObject({ model: 'anthropic/claude-opus-5.5', model_note: expect.stringContaining('cheap/model') });
   });
 
   it('hands canvas media to the motion agent as asset ids it can place', async () => {
@@ -215,6 +227,20 @@ describe('the canvas agent delegates motion videos', () => {
     expect(created.position.y).toBe(400);
     expect(out.run_id).toBeTruthy();
     expect((await call(tools().get_motion_run, { runId: out.run_id, waitSeconds: 5 })).status).toBe('done');
+  });
+
+  it('puts a new video on the canvas the user has open', async () => {
+    const delegation = createMotionDelegation({ db: db as never, orgId: ORG, projectId: PROJECT, userId: USER, origin: 'https://feega.test', canvasId: CANVAS, pollMs: 5 });
+
+    const out = await call(delegation.create_motion_video, { name: 'Hello' });
+
+    expect(out.canvas_id).toBe(CANVAS);
+  });
+
+  it('puts a new video on the Motion canvas when no canvas is open', async () => {
+    const out = await call(tools().create_motion_video, { name: 'Hello' });
+
+    expect(out.canvas_id).toBe('canvas-new');
   });
 
   it('passes the moderation refusal back instead of spending', async () => {
@@ -248,6 +274,9 @@ describe('the canvas agent delegates motion videos', () => {
     const model = await (view.toModelOutput as (o: unknown) => Promise<{ type: string; value: { type: string; mediaType?: string }[] }>)({ toolCallId: 't1', input: {}, output: out });
 
     expect(out).toMatchObject({ revision: 2 });
+    expect(JSON.stringify(out)).not.toContain('/9j/');
+    expect(out.frames).toEqual([expect.objectContaining({ time: 0, path: expect.stringContaining('/motion-frames/') }), expect.objectContaining({ time: 1 })]);
+    expect(uploads.map((u) => u.bucket)).toEqual(['canvas-assets', 'canvas-assets']);
     expect(model.type).toBe('content');
     expect(model.value.filter((p) => p.type === 'file').map((p) => p.mediaType)).toEqual(['image/jpeg', 'image/jpeg']);
   });

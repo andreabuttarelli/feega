@@ -65,6 +65,23 @@ export function resolveChoice(options: readonly ChatModelOption[], asked: AskedC
   return { ok: false, error: ChoiceError.UnknownModel };
 }
 
+export const MOTION_CAPABLE_MODELS: ReadonlySet<string> = new Set([
+  'anthropic/claude-opus-5.5',
+  'anthropic/claude-opus-5',
+  'anthropic/claude-sonnet-5.5',
+  'openai/gpt-5.6-sol'
+]);
+
+export type MotionAsk = { asked: AskedChoice; refused: string | null };
+
+export function motionAsk(asked: AskedChoice): MotionAsk {
+  const model = asText(asked.model);
+  if (!model || MOTION_CAPABLE_MODELS.has(model)) {
+    return { asked, refused: null };
+  }
+  return { asked: {}, refused: model };
+}
+
 export function reasoningProviderOptions(reasoning: string | null): Record<string, Record<string, string | boolean>> {
   if (!reasoning) {
     return {};
