@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { lintSource } from './lint';
+import { ComponentMode } from './component';
 
 const ok = { html: '<div class="node"><span class="port"></span></div>', css: '.node{width:200px;background:#111}', js: 'tl.from(root.querySelector(".node"),{scale:0,duration:0.4,ease:"back.out"});' };
 
@@ -91,3 +92,38 @@ describe('the authoring contract', () => {
     expect(problemsOf({ html }).join(' ')).toContain(name);
   });
 });
+
+describe('a live component', () => {
+  const liveProblems = (patch: Partial<typeof ok>) => lintSource({ ...ok, ...patch }, ComponentMode.Live).map((p) => p.message);
+
+  it.each([
+    'requestAnimationFrame(function loop() { requestAnimationFrame(loop); });',
+    'setTimeout(() => {}, 10); setInterval(f, 10);',
+    'const r = Math.random(); const t = Date.now(); const d = new Date(); performance.now();',
+    'p5((p) => { p.setup = () => p.frameRate(60); p.draw = () => p.circle(p.millis(), 0, p.deltaTime); });',
+    'app.ticker.add(() => {}); d3.timer(() => {});'
+  ])('runs its own loop: %s', (js) => {
+    expect(liveProblems({ js })).toEqual([]);
+  });
+
+  it('may animate with CSS', () => {
+    expect(liveProblems({ css: '@keyframes spin{to{transform:rotate(1turn)}} .a{animation:spin 1s;transition:opacity .2s}' })).toEqual([]);
+  });
+
+  it.each([
+    ['fetch("https://x.y");', 'fetch'],
+    ['localStorage.getItem("a");', 'localStorage'],
+    ['parent.postMessage(1, "*");', 'parent'],
+    ['eval("1");', 'eval'],
+    ['new Function("return 1");', 'Function'],
+    ['window.foo = 1;', 'window'],
+    ['import("https://x.y/m.js");', 'import()']
+  ])('still stays in the sandbox: %s', (js, name) => {
+    expect(liveProblems({ js }).join(' ')).toContain(name);
+  });
+
+  it('keeps network out of its css', () => {
+    expect(liveProblems({ css: '@import url(x.css);' }).join(' ')).toContain('@import');
+  });
+});
+

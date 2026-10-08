@@ -25,8 +25,8 @@ import { SCREENSHOT_URL, captureScript, contentStamp } from './capture';
 import { cspMeta } from './csp';
 import { measureScript } from './measure';
 import { THREE_VERSION } from './three';
-import { Library, THREE_GLOBAL, bootScript, definitionScript, librariesOf, seedOf, type CustomRun } from '../custom/runtime';
-import { PropFormat, type CustomComponents } from '../custom/component';
+import { Library, Play, THREE_GLOBAL, bootScript, definitionScript, librariesOf, seedOf, type CustomRun } from '../custom/runtime';
+import { ComponentMode, PropFormat, modeOf, type CustomComponents } from '../custom/component';
 import { mattePairs, type MattePair } from '../matte';
 import { matteScript, matteWrapper } from './mattes';
 import { Composite, cameraMath, stageSpec } from '../camera';
@@ -106,7 +106,12 @@ const MOVE: Record<PropsOf<'Image'>['move'], { from: Vars; to: Vars }> = {
   'pan-right': { from: { scale: 1.12, xPercent: -3 }, to: { scale: 1.12, xPercent: 3 } }
 };
 
-export type ComposeInput = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; scale?: number; analyses?: Record<string, AudioAnalysis>; liveness?: Liveness };
+export enum Target {
+  Video = 'video',
+  Screen = 'screen'
+}
+
+export type ComposeInput = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; scale?: number; analyses?: Record<string, AudioAnalysis>; liveness?: Liveness; target?: Target };
 
 function pick(vars: Vars, keys: string[]): Vars {
   return Object.fromEntries(keys.map((k) => [k, vars[k]]));
@@ -437,7 +442,12 @@ const RESOLVE: Record<PropFormat, ValueResolver> = {
   [PropFormat.Font]: (v, ctx) => ctx.font(String(v))
 };
 
-function customRun(clip: MotionClip, ctx: TemplateCtx<ComponentId>, components: CustomComponents): CustomRun | null {
+const PLAY: Record<Target, Record<ComponentMode, Play>> = {
+  [Target.Video]: { [ComponentMode.Deterministic]: Play.Seeked, [ComponentMode.Live]: Play.Still },
+  [Target.Screen]: { [ComponentMode.Deterministic]: Play.Seeked, [ComponentMode.Live]: Play.Live }
+};
+
+function customRun(clip: MotionClip, ctx: TemplateCtx<ComponentId>, components: CustomComponents, target: Target): CustomRun | null {
   const { name, ...given } = clip.props as { name: string } & Record<string, unknown>;
   const component = components[name];
   if (!component) {
@@ -451,7 +461,8 @@ function customRun(clip: MotionClip, ctx: TemplateCtx<ComponentId>, components: 
       .filter(([key]) => key in component.propsSchema.properties)
       .map(([key, track]) => [key, track.map((k) => ({ at: round(k.frame / ctx.fps), value: typeof k.value === 'string' ? ctx.color(k.value) : k.value, ease: easeName(k.ease) }))])
   );
-  return { id: clip.id, name, start: ctx.start, length: ctx.length, fps: ctx.fps, values, seed: seedOf(clip.id), ...(Object.keys(keys).length ? { keys } : {}), ...(ctx.mediaStart ? { trim: ctx.mediaStart } : {}) };
+  const play = PLAY[target][modeOf(component)];
+  return { id: clip.id, name, start: ctx.start, length: ctx.length, fps: ctx.fps, values, seed: seedOf(clip.id), ...(Object.keys(keys).length ? { keys } : {}), ...(ctx.mediaStart ? { trim: ctx.mediaStart } : {}), ...(play === Play.Seeked ? {} : { play }) };
 }
 
 const inlineScript = (code: string) => `<script>${code.replace(/<\/script/gi, '<\\/script')}</script>`;
@@ -601,7 +612,7 @@ export function composeHtml(raw: ComposeInput): string {
       if (cards) {
         cardBakes.get(cards)!.push(cards.bake(clip, ctx));
       }
-      const run = clip.component === 'Custom' ? customRun(clip, ctx, doc.components) : null;
+      const run = clip.component === 'Custom' ? customRun(clip, ctx, doc.components, raw.target ?? Target.Video) : null;
       if (run) {
         runs.push(run);
       }

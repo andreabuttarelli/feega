@@ -2,7 +2,7 @@ import type { ClipError } from '../hyperframes/capture';
 import { TrackKind } from '../components';
 import { TransitionKind } from '../design';
 import { clipsOf, newClip, type MotionDoc } from '../doc';
-import { CheckState, checkState } from './component';
+import { CheckState, ComponentMode, checkState } from './component';
 
 export const CHECK_POINTS = 5;
 const SPREAD = [0.1, 0.3, 0.5, 0.7, 0.92];
@@ -66,8 +66,14 @@ export function checkDoc(doc: MotionDoc, name: string): MotionDoc {
 
 export type Unverified = { name: string; state: CheckState };
 
+const usedComponents = (doc: MotionDoc) => new Set(clipsOf(doc).filter((c) => c.component === 'Custom').map((c) => String(c.props.name)));
+
+export function liveComponents(doc: MotionDoc): string[] {
+  return [...usedComponents(doc)].filter((name) => doc.components[name]?.mode === ComponentMode.Live);
+}
+
 export function unverified(doc: MotionDoc): Unverified[] {
-  const used = new Set(clipsOf(doc).filter((c) => c.component === 'Custom').map((c) => String(c.props.name)));
+  const used = usedComponents(doc);
   return [...used]
     .filter((name) => doc.components[name])
     .map((name) => ({ name, state: checkState(doc.components[name]) }))

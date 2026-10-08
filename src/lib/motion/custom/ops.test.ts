@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, newMotionDoc, parseMotionDoc, type MotionDoc } from '../doc';
 import { addClip, setProps, type OpResult } from '../timeline';
-import { CheckState, sourceHash } from './component';
+import { CheckState, ComponentMode, sourceHash } from './component';
 import { patchComponent, recordCheck, removeComponent, writeComponent } from './ops';
 
 function must(r: OpResult): MotionDoc {
@@ -78,3 +78,19 @@ describe('custom component ops', () => {
     expect(must(removeComponent(withNodes(), 'NodeGraph')).components).toEqual({});
   });
 });
+
+describe('a live component', () => {
+  const loop = { ...NODES, source: { ...NODES.source, js: 'requestAnimationFrame(function f() { root.dataset.r = String(Math.random()); requestAnimationFrame(f); });' } };
+
+  it('is refused as deterministic and written as live', () => {
+    expect(writeComponent(newMotionDoc(MotionFormat.Landscape), 'Game', loop).ok).toBe(false);
+    expect(must(writeComponent(newMotionDoc(MotionFormat.Landscape), 'Game', { ...loop, mode: ComponentMode.Live })).components.Game.mode).toBe(ComponentMode.Live);
+  });
+
+  it('stays live through a patch', () => {
+    const doc = must(writeComponent(newMotionDoc(MotionFormat.Landscape), 'Game', { ...loop, mode: ComponentMode.Live }));
+
+    expect(must(patchComponent(doc, 'Game', [{ file: 'js', find: 'f()', replace: 'g()' }])).components.Game.mode).toBe(ComponentMode.Live);
+  });
+});
+

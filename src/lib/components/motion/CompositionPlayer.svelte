@@ -1,6 +1,6 @@
 <script lang="ts">
   import MotionPreview from './MotionPreview.svelte';
-  import { composeHtml } from '$lib/motion/hyperframes/compose';
+  import { Target, composeHtml } from '$lib/motion/hyperframes/compose';
   import { FEEGA_TOKENS, type BrandTokens } from '$lib/motion/brand';
   import type { MotionDoc } from '$lib/motion/doc';
 
@@ -9,7 +9,7 @@
   let frame = $state(restFrame);
   let playing = $state(false);
 
-  const html = $derived(composeHtml({ doc, tokens, assets }));
+  const html = $derived(composeHtml({ doc, tokens, assets, target: Target.Screen }));
   const last = $derived(doc.durationInFrames - 1);
 
   $effect(() => {

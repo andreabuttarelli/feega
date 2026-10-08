@@ -11,10 +11,10 @@ import { Ease } from '../design';
 import { findClip } from '../doc';
 import { Interp, easeName, sampleTrack } from '../keyframes';
 import { keyframeTweens } from './animate';
-import { CAPTURE_REPLY, CAPTURE_REQUEST, composeHtml } from './compose';
+import { CAPTURE_REPLY, CAPTURE_REQUEST, Target, composeHtml } from './compose';
 import { MEASURE_REQUEST } from './measure';
 import { writeComponent } from '../custom/ops';
-import { PropFormat } from '../custom/component';
+import { ComponentMode, PropFormat } from '../custom/component';
 import { setExpression } from '../expression/ops';
 import { bakeExpressions, expressionValue } from '../expression/bake';
 
@@ -467,6 +467,15 @@ describe('custom components in the composition', () => {
 
     expect(compose(physical)).toMatch(/<script src="https:\/\/cdn\.jsdelivr\.net\/npm\/matter-js@[\d.]+\/build\/matter\.min\.js"><\/script>/);
     expect(html).not.toContain('/npm/matter-js@');
+  });
+
+  it('runs a live component live on screen and as a seeded still in the video', () => {
+    const game = { ...graph, mode: ComponentMode.Live, source: { ...graph.source, js: 'requestAnimationFrame(function f() { requestAnimationFrame(f); });' } };
+    const played = must(addClip(must(writeComponent(newMotionDoc(MotionFormat.Landscape), 'Game', game)), { component: 'Custom', from: 0, durationInFrames: 60, props: { name: 'Game' } }, 'g1'));
+
+    expect(composeHtml({ doc: played, tokens: FEEGA_TOKENS, assets: {}, target: Target.Screen })).toContain('"play":"live"');
+    expect(compose(played)).toContain('"play":"still"');
+    expect(composeHtml({ doc: custom, tokens: FEEGA_TOKENS, assets: {}, target: Target.Screen })).not.toContain('"play"');
   });
 
   it('renders the component markup under a root scoped to the clip', () => {

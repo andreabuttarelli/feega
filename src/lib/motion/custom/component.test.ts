@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CheckState, PropFormat, Strictness, checkState, customValues, parseComponent, sourceHash, type CustomComponent } from './component';
+import { CheckState, ComponentMode, modeOf, PropFormat, Strictness, checkState, customValues, parseComponent, sourceHash, type CustomComponent } from './component';
 
 const counter: CustomComponent = {
   source: { html: '<div class="n"></div>', css: '.n{font-size:120px}', js: 'tl.to(root.querySelector(".n"),{x:100,duration:1});' },
@@ -59,3 +59,19 @@ describe('a custom component', () => {
     expect(parseComponent(bad).ok).toBe(false);
   });
 });
+
+describe('the mode of a component', () => {
+  it('is deterministic unless declared live', () => {
+    const parsed = parseComponent(counter);
+    const live = parseComponent({ ...counter, mode: ComponentMode.Live });
+
+    expect(parsed.ok && modeOf(parsed.component)).toBe(ComponentMode.Deterministic);
+    expect(live.ok && modeOf(live.component)).toBe(ComponentMode.Live);
+  });
+
+  it('changes the check stamp when it turns live, not before', () => {
+    expect(sourceHash({ ...counter, mode: ComponentMode.Deterministic })).toBe(sourceHash(counter));
+    expect(sourceHash({ ...counter, mode: ComponentMode.Live })).not.toBe(sourceHash(counter));
+  });
+});
+

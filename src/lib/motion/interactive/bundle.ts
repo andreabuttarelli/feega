@@ -1,10 +1,11 @@
 import type { BrandTokens } from '../brand';
 import type { AudioAnalysis } from '../audio-analysis';
 import type { MotionDoc } from '../doc';
-import { HYPERFRAMES_VERSION, composeHtml } from '../hyperframes/compose';
+import { HYPERFRAMES_VERSION, Target, composeHtml } from '../hyperframes/compose';
 import { esc } from '../hyperframes/html';
 import { InputKey } from '../expression/inputs';
 import { INPUT_MESSAGE } from './runtime';
+import { EVENT_MESSAGE } from '../custom/runtime';
 import { playerMain, type PlayerConfig } from './player';
 import { Liveness, PlayMode, interactiveOf, type Interactive } from './settings';
 
@@ -58,6 +59,7 @@ function playerConfig(html: string, doc: MotionDoc, settings: Interactive): Play
     loop: settings.loop,
     modes: { autoplay: PlayMode.Autoplay, inView: PlayMode.InView, scrub: PlayMode.Scrub },
     inputMessage: INPUT_MESSAGE,
+    eventMessage: EVENT_MESSAGE,
     hostMessage: HOST_MESSAGE,
     keys: { x: InputKey.PointerX, y: InputKey.PointerY, down: InputKey.PointerDown, hover: InputKey.Hover, tiltX: InputKey.TiltX, tiltY: InputKey.TiltY, scroll: InputKey.Scroll, time: InputKey.Time }
   };
@@ -89,7 +91,7 @@ export async function interactiveBundle(input: InteractiveInput): Promise<Intera
   const logo = input.tokens.logoUrl ? await inlineAssets({ logo: input.tokens.logoUrl }, input.fetchBlob) : {};
   const assets = await inlineAssets(input.assetUrls, input.fetchBlob);
   const tokens = { ...input.tokens, logoUrl: logo.logo ?? input.tokens.logoUrl };
-  const composed = composeHtml({ doc: input.doc, tokens, assets, analyses: input.analyses, liveness: Liveness.Live });
+  const composed = composeHtml({ doc: input.doc, tokens, assets, analyses: input.analyses, liveness: Liveness.Live, target: Target.Screen });
   const html = playerPage(composed, input.doc, settings, input.title);
   return { html, bytes: new TextEncoder().encode(html).length, snippet: embedSnippet(input.doc) };
 }

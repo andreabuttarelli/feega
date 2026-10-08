@@ -29,7 +29,7 @@
   import { BRAND_COLORS, COMPOSITION_LAYOUTS, MAX_COMPOSITION_MEDIA, AssetKind } from '$lib/motion/components';
   import { FORMATS, MOTION_FORMATS, type MotionDoc, MotionFormat } from '$lib/motion/doc';
   import { resolveColor } from '$lib/motion/brand';
-  import { composeHtml } from '$lib/motion/hyperframes/compose';
+  import { Target, composeHtml } from '$lib/motion/hyperframes/compose';
   import { MAX_COMPOSE_SECONDS, MIN_SECONDS, applyDraft, clampSeconds, draftFromDoc, newDraft, withCamera, withLayout, type ComposeDraft, type ComposeMedia } from '$lib/motion/composition-draft';
 
   const SAVE_DEBOUNCE_MS = 700;
@@ -70,7 +70,7 @@
 
   const library = $derived(data.assets.filter((a) => MEDIA_KINDS.has(a.kind)));
   const assetUrls = $derived(Object.fromEntries(data.assets.filter((a) => a.url).map((a) => [a.id, a.url as string])));
-  const html = $derived(composeHtml({ doc, tokens: data.tokens, assets: assetUrls }));
+  const html = $derived(composeHtml({ doc, tokens: data.tokens, assets: assetUrls, target: Target.Screen }));
   const picked = $derived(new Map((draft?.media ?? []).map((m, i) => [m.assetId, i])));
   const fixedCamera = $derived(draft ? LAYOUTS[draft.layout].camera === 'fixed' : false);
   const seconds = $derived(doc.durationInFrames / doc.fps);

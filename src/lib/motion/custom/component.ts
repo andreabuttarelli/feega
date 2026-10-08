@@ -18,6 +18,11 @@ export enum PropFormat {
   Font = 'font'
 }
 
+export enum ComponentMode {
+  Deterministic = 'deterministic',
+  Live = 'live'
+}
+
 export enum CheckState {
   Unchecked = 'unchecked',
   Passed = 'passed',
@@ -56,6 +61,7 @@ export const customComponentSchema = z
   .object({
     source: sourceSchema,
     propsSchema: propsSchemaSchema,
+    mode: z.enum(ComponentMode).optional(),
     version: z.number().int().min(1),
     check: checkSchema.nullable().default(null)
   })
@@ -154,8 +160,11 @@ export function customValues(component: Pick<CustomComponent, 'propsSchema'>, gi
   return { ok: true, values };
 }
 
-export function sourceHash(component: Pick<CustomComponent, 'source' | 'propsSchema'>): string {
-  return contentStamp(JSON.stringify([component.source.html, component.source.css, component.source.js, component.propsSchema]));
+export const modeOf = (component: { mode?: ComponentMode }) => component.mode ?? ComponentMode.Deterministic;
+
+export function sourceHash(component: Pick<CustomComponent, 'source' | 'propsSchema'> & { mode?: ComponentMode }): string {
+  const live = component.mode === ComponentMode.Live ? [ComponentMode.Live] : [];
+  return contentStamp(JSON.stringify([component.source.html, component.source.css, component.source.js, component.propsSchema, ...live]));
 }
 
 export function checkState(component: CustomComponent): CheckState {

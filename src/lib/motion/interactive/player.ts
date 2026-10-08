@@ -7,6 +7,7 @@ export type PlayerConfig = {
   loop: boolean;
   modes: { autoplay: string; inView: string; scrub: string };
   inputMessage: string;
+  eventMessage: string;
   hostMessage: string;
   keys: { x: string; y: string; down: string; hover: string; tiltX: string; tiltY: string; scroll: string; time: string };
 };
@@ -27,6 +28,7 @@ export function playerMain(cfg: PlayerConfig): void {
 
   const clamp = (v: number) => Math.max(-1, Math.min(1, v));
   const post = () => el.iframeElement?.contentWindow?.postMessage({ type: cfg.inputMessage, values }, '*');
+  const send = (event: object) => el.iframeElement?.contentWindow?.postMessage({ type: cfg.eventMessage, ...event }, '*');
   const play = () => {
     if (ready && !playing) {
       el.play();
@@ -49,7 +51,9 @@ export function playerMain(cfg: PlayerConfig): void {
     values[cfg.keys.x] = (e.clientX - box.left) / box.width;
     values[cfg.keys.y] = (e.clientY - box.top) / box.height;
     values[cfg.keys.hover] = 1;
+    send({ kind: e.type, x: values[cfg.keys.x], y: values[cfg.keys.y] });
   };
+  const key = (e: KeyboardEvent) => send({ kind: e.type, key: e.key, code: e.code });
   const askTilt = () => {
     const orientation = window.DeviceOrientationEvent as Orientation | undefined;
     if (asked || !orientation?.requestPermission) {
@@ -65,9 +69,12 @@ export function playerMain(cfg: PlayerConfig): void {
     values[cfg.keys.down] = 1;
     askTilt();
   });
-  pad.addEventListener('pointerup', () => {
+  pad.addEventListener('pointerup', (e) => {
+    point(e);
     values[cfg.keys.down] = 0;
   });
+  addEventListener('keydown', key);
+  addEventListener('keyup', key);
   pad.addEventListener('pointerleave', () => {
     delete values[cfg.keys.x];
     delete values[cfg.keys.y];
