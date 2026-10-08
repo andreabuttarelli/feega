@@ -5,11 +5,9 @@ import { billingLink } from '$lib/server/billing-links';
 import { isOrgOwner, orgBillingForBrand } from '$lib/server/org-billing';
 import { billingGrantsReady } from '$lib/server/billing-readiness';
 import { CREDIT_LADDER, rungFor } from '$lib/credit-ladder';
-import { checkoutReturnUrls } from '$lib/billing-path';
+import { BILLING_PATH, checkoutReturnUrls } from '$lib/billing-path';
 import { appOrigin } from '$lib/server/app-url';
-import { appPathForBrand } from '$lib/server/tenancy/brand-slug';
 
-const BILLING_SUBPATH = '/settings/billing';
 import { CHECKOUT_LINK, statusForFailure } from '@feega/api-contracts';
 
 const SUBSCRIPTION_RUNGS = CREDIT_LADDER.map((rung) => ({
@@ -47,7 +45,7 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
     return json({ error: 'invalid_input', details: parsed.error.issues }, { status: 400 });
   }
 
-  const appBillingUrl = `${appOrigin(url)}${await appPathForBrand(supabase, brand.id, BILLING_SUBPATH)}`;
+  const appBillingUrl = `${appOrigin(url)}${BILLING_PATH}`;
 
   if (!(await isOrgOwner(supabase, brand.org_id, user.id))) {
     return json(

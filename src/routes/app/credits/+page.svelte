@@ -10,6 +10,8 @@
   import { CheckoutOutcome } from '$lib/billing-path';
   import { DISPLAY_UNITS_PER_CREDIT } from '$lib/components/credit-amount-format';
   import LegalFooter from '$lib/components/LegalFooter.svelte';
+  import PageTitle from '$lib/components/PageTitle.svelte';
+  import PageHead from '$lib/components/PageHead.svelte';
 
   let { data, form } = $props();
 
@@ -40,6 +42,10 @@
     return data.currentPlanUsd == null ? 'subscribe' : 'switchPlan';
   };
 </script>
+
+<div class="credits-page">
+<PageHead title="Credits" subtitle={$_('app.account.billing.poolDesc')} />
+<PageTitle text="Credits" />
 
 {#if data.checkoutOutcome === CheckoutOutcome.Paid}
   <Notice tone="success">{$_('app.account.billing.paymentReceived')}</Notice>
@@ -144,8 +150,18 @@
 <div class="legal-wrap">
   <LegalFooter />
 </div>
+</div>
 
 <style>
+  .credits-page {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    max-width: 56rem;
+    width: 100%;
+    margin: 0 auto;
+    padding: 2rem 1rem 3rem;
+  }
   .legal-wrap {
     margin-top: 1.5rem;
   }
@@ -164,6 +180,19 @@
   .ladder th {
     font-weight: 500;
     opacity: 0.7;
+  }
+  @media (max-width: 640px) {
+    .ladder tr {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+      padding: 0.75rem 0;
+      border-top: 1px solid var(--line, #e5e5e5);
+    }
+    .ladder td {
+      padding: 0;
+      border-top: 0;
+    }
   }
 
   .brand-usage {

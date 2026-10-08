@@ -114,7 +114,7 @@ describe('POST /api/v1/brands/:slug/billing/checkout', () => {
 
 		expect(createBillingPortalSession).toHaveBeenCalledWith({
 			customerId: 'cus_org',
-			returnUrl: 'https://feega.test/p/p1/settings/billing',
+			returnUrl: 'https://feega.test/app/credits',
 			flow: 'upgrade',
 			subscriptionId: 'sub_org'
 		});
@@ -168,7 +168,7 @@ describe('POST /api/v1/brands/:slug/billing/checkout', () => {
 
 		expect(res.status).toBe(409);
 		expect(body.error).toBe('no_subscription');
-		expect(body.app_billing_url).toBe('https://feega.test/p/p1/settings/billing');
+		expect(body.app_billing_url).toBe('https://feega.test/app/credits');
 		expect(createBillingPortalSession).not.toHaveBeenCalled();
 	});
 
@@ -196,8 +196,8 @@ describe('POST /api/v1/brands/:slug/billing/checkout', () => {
 				orgId: 'org-1',
 				priceId: 'price_sub_32',
 				credits: 3200,
-				successUrl: 'https://feega.test/p/p1/settings/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}',
-				cancelUrl: 'https://feega.test/p/p1/settings/billing?checkout=canceled'
+				successUrl: 'https://feega.test/app/credits?checkout=success&session_id={CHECKOUT_SESSION_ID}',
+				cancelUrl: 'https://feega.test/app/credits?checkout=canceled'
 			});
 		});
 
@@ -208,7 +208,7 @@ describe('POST /api/v1/brands/:slug/billing/checkout', () => {
 
 			expect(res.status).toBe(409);
 			expect(body.error).toBe('subscriptions_not_configured');
-			expect(body.app_billing_url).toBe('https://feega.test/p/p1/settings/billing');
+			expect(body.app_billing_url).toBe('https://feega.test/app/credits');
 			expect(createSubscriptionCheckout).not.toHaveBeenCalled();
 			expect(createBillingPortalSession).not.toHaveBeenCalled();
 		});
@@ -230,7 +230,7 @@ describe('POST /api/v1/brands/:slug/billing/checkout', () => {
 
 		expect(res.status).toBe(409);
 		expect(body.error).toBe('no_customer');
-		expect(body.app_billing_url).toBe('https://feega.test/p/p1/settings/billing');
+		expect(body.app_billing_url).toBe('https://feega.test/app/credits');
 	});
 
 	it('a Stripe outage is ours: 502, not a 4xx that accuses the caller', async () => {

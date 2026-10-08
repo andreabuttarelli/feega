@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { BILLING_PATH } from '$lib/billing-path';
   import ArrowLeft from '@lucide/svelte/icons/arrow-left';
   import CreditAmount from '$lib/components/CreditAmount.svelte';
   import CanvasMenu from './CanvasMenu.svelte';
@@ -35,7 +36,7 @@
     {#if $pageTopActions}
       <div class="actions">{@render $pageTopActions()}</div>
     {/if}
-    <a href="/p/{projectId}/settings/billing" class="credits">
+    <a href={BILLING_PATH} class="credits">
       <CreditAmount amount={creditBalance} />
     </a>
   </div>

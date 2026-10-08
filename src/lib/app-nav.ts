@@ -12,6 +12,7 @@ import { GALLERY_PATH } from '$lib/gallery/paths';
 import { TOOLS, TOOL_STATUS_LABEL, ToolRole, toolHref } from '$lib/tools';
 import { TOOL_ICONS } from '$lib/components/app/tool-icons';
 import { REPORT_PATH } from '$lib/reports/report-link';
+import { BILLING_PATH } from '$lib/billing-path';
 
 export enum NavSection {
   Main = 'main',
@@ -95,7 +96,7 @@ export const APP_NAV: readonly NavItem[] = [
   row({ id: 'gallery', section: NavSection.Main, kind: NavKind.Link, label: { text: 'Gallery' }, icon: Shuffle, load: NavLoad.Document, href: () => GALLERY_PATH }),
   ...toolsOf(ToolRole.Support),
   row({ id: 'settings', section: NavSection.Account, kind: NavKind.Link, label: { key: 'app.shell.menu.settings' }, icon: Settings, needs: NavNeeds.Project, href: inProject('/settings/project') }),
-  row({ id: 'billing', section: NavSection.Account, kind: NavKind.Link, label: { key: 'app.shell.menu.billing' }, icon: CreditCard, needs: NavNeeds.Project, meta: NavMeta.Credits, href: inProject('/settings/billing') }),
+  row({ id: 'billing', section: NavSection.Account, kind: NavKind.Link, label: { key: 'app.shell.menu.billing' }, icon: CreditCard, meta: NavMeta.Credits, href: () => BILLING_PATH }),
   row({ id: 'changelog', section: NavSection.Account, kind: NavKind.Link, label: { key: 'app.shell.menu.changelog' }, icon: Sparkles, load: NavLoad.Document, href: () => '/changelog' }),
   row({ id: 'report', section: NavSection.Account, kind: NavKind.Link, label: { key: 'app.shell.menu.report' }, icon: Flag, href: () => REPORT_PATH }),
   row({ id: 'legal', section: NavSection.Account, kind: NavKind.Legal, label: { key: 'legal.menuLabel' }, icon: Scale }),

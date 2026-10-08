@@ -56,7 +56,7 @@ describe('app sidebar', () => {
   it('keeps account entries: settings, billing, changelog, report, legal, theme, sign out', () => {
     const body = html();
     expect(body).toContain('href="/p/p1/settings/project"');
-    expect(body).toContain('href="/p/p1/settings/billing"');
+    expect(body).toContain('href="/app/credits"');
     expect(body).toContain('href="/changelog"');
     expect(body).toContain('href="/report"');
     expect(body).toContain('href="https://feega.app/terms"');
@@ -64,7 +64,7 @@ describe('app sidebar', () => {
     expect(body).toContain('action="/auth/signout"');
   });
 
-  it('drops project-bound entries without a project', () => {
-    expect(html({ projectId: null, projects: [] })).not.toContain('/settings/billing');
+  it('keeps credits without a project', () => {
+    expect(html({ projectId: null, projects: [] })).toContain('href="/app/credits"');
   });
 });

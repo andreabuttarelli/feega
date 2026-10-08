@@ -7,7 +7,7 @@ import {
   type LinkedInOrg
 } from '$lib/server/zernio';
 import { canAffordSeat } from '$lib/server/social-connections';
-import { billingPath } from '$lib/billing-path';
+import { BILLING_PATH } from '$lib/billing-path';
 import { brandSlugOf } from '$lib/server/tenancy/brand-slug';
 
 // LinkedIn headless connect — the page Zernio redirects back to after OAuth. It carries a one-time
@@ -70,7 +70,7 @@ export const actions: Actions = {
       .maybeSingle();
     if (!brand?.zernio_profile_id) return fail(404, { error: 'brand' });
     if (!(await canAffordSeat(supabase, brand.org_id))) {
-      throw redirect(303, billingPath(params.projectId));
+      throw redirect(303, BILLING_PATH);
     }
 
     let userProfile: unknown = null;

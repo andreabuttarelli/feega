@@ -10,6 +10,7 @@
   import CanvasShare from './CanvasShare.svelte';
   import type { ShareState } from '$lib/canvas/shared-view';
   import { openSheet } from '$lib/canvas/sheet-nav';
+  import { BILLING_PATH } from '$lib/billing-path';
   import Megaphone from '@lucide/svelte/icons/megaphone';
   import { canvasSelection, promotePath } from '$lib/canvas/promote-sheet';
   import { formatLastEdited } from '$lib/canvas/format-last-edited';
@@ -152,11 +153,6 @@
     await submitCanvasAction(canvasHref, CanvasAction.Delete);
   }
 
-  function openBilling() {
-    openSheet(projectId, '/settings/billing').catch((err) => {
-      console.error('apertura del foglio "billing" fallita', err);
-    });
-  }
 </script>
 
 <header class="canvas-topbar">
@@ -331,7 +327,7 @@
   />
 
   <div class="top-box right">
-    <a href="#billing" class="credits" onclick={(e) => { e.preventDefault(); openBilling(); }}>
+    <a href={BILLING_PATH} class="credits">
       <CreditAmount amount={creditBalance} />
     </a>
 

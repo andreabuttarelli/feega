@@ -434,7 +434,7 @@
       },
       "billing": {
         "title": "Plan & billing",
-        "membersNotice": "For security reasons, invited members can't manage billing — only the brand owner (admin) can.",
+        "membersNotice": "For security reasons, invited members can't manage billing — only the workspace owner can.",
         "retentionApplied": "🎉 Done — 50% off your next 2 months. Your plan stays active.",
         "canceledOn": "Your plan will cancel on {date}. You keep full access until then.",
         "canceledNoDate": "Your plan will cancel. You keep full access until then.",
@@ -533,7 +533,7 @@
     "account": {
       "signOut": "Sign out",
       "billing": {
-        "poolDesc": "One subscription covers every brand in your account.",
+        "poolDesc": "Credits belong to the workspace: one plan and one balance for every project in it.",
         "breakdownTitle": "Usage by brand",
         "brandCol": "Brand",
         "creditsCol": "Credits used",

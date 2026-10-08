@@ -160,7 +160,7 @@
   import type { SocialPost } from '$lib/server/repos/social-posts';
   import { openSheet } from '$lib/canvas/sheet-nav';
   import { promotePath, canvasSelection } from '$lib/canvas/promote-sheet';
-  import { billingPath } from '$lib/billing-path';
+  import { BILLING_PATH } from '$lib/billing-path';
 
   let { data } = $props();
 
@@ -2489,7 +2489,7 @@
     <p class="warning" role="alert">
       {failed}
       {#if failedIsCreditsExhausted}
-        <a href={billingPath(data.projectId)}>Buy credits</a>
+        <a href={BILLING_PATH}>Buy credits</a>
       {/if}
     </p>
   {/if}

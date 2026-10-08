@@ -1,10 +1,10 @@
 <script lang="ts">
   import { _ } from 'svelte-i18n';
   import { page } from '$app/state';
-  import { billingPath } from '$lib/billing-path';
+  import { BILLING_PATH } from '$lib/billing-path';
 </script>
 
-<a class="upgrade-link" href={billingPath(page.params.projectId ?? '')}>{$_('app.nav.upgrade')} →</a>
+<a class="upgrade-link" href={BILLING_PATH}>{$_('app.nav.upgrade')} →</a>
 
 <style>
   .upgrade-link {
