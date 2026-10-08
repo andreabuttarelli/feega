@@ -11,7 +11,12 @@ export type ChunkPlan = { size: number; count: number };
 export type RenderProgress = { stage: RenderStage; chunksDone: number; chunks: number; totalFrames: number };
 export type RenderRunStatus = 'running' | 'finishing' | 'done' | 'failed' | 'expired';
 export type RenderView = { id: string; status: RenderRunStatus; progress: RenderProgress | null; error: string | null; assetId: string | null; credits: number | null };
-export type ServerRender = { configured: boolean; version: number; saved: boolean; latest: RenderView | null; uploadLimit?: number | null; assetHref: (id: string) => string };
+export enum RenderQueue {
+  Ticking = 'ticking',
+  Stopped = 'stopped'
+}
+
+export type ServerRender = { configured: boolean; version: number; saved: boolean; latest: RenderView | null; queue: RenderQueue; uploadLimit?: number | null; assetHref: (id: string) => string };
 export type RenderEvent = { kind: 'started' | 'chunk' | 'assembling' | 'saving' | 'done' | 'failed' };
 
 const CHUNK_TARGET_FRAMES = 450;
@@ -88,4 +93,30 @@ export function progressOf(params: Record<string, unknown>): RenderProgress | nu
     return null;
   }
   return { stage: p.stage as RenderStage, chunksDone: Number(p.chunksDone), chunks: Number(p.chunks), totalFrames: Number(p.totalFrames) };
+}
+
+export const STALL_AFTER_MS = 5 * 60_000;
+
+export enum Stall {
+  None = 'none',
+  Slow = 'slow',
+  QueueOff = 'queue-off'
+}
+
+export type ProgressWatch = { mark: string; since: number };
+
+const markOf = (view: RenderView) => `${view.status}:${view.progress?.stage ?? RenderStage.Starting}:${view.progress?.chunksDone ?? 0}`;
+
+export function watchProgress(prev: ProgressWatch | null, view: RenderView, now: number): ProgressWatch {
+  const mark = markOf(view);
+  return prev?.mark === mark ? prev : { mark, since: now };
+}
+
+const QUEUE_STALL: Record<RenderQueue, (waitedMs: number) => Stall> = {
+  [RenderQueue.Stopped]: () => Stall.QueueOff,
+  [RenderQueue.Ticking]: (waitedMs) => (waitedMs >= STALL_AFTER_MS ? Stall.Slow : Stall.None)
+};
+
+export function renderStall(input: { watch: ProgressWatch; queue: RenderQueue; now: number }): Stall {
+  return QUEUE_STALL[input.queue](input.now - input.watch.since);
 }

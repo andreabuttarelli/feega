@@ -19,7 +19,7 @@
   import { EXPORT_FORMATS, FORMAT, PRESETS, Preset, Quality, estimateBytes, exportProblem, settingsOf, type RenderSettings } from '$lib/motion/export-formats';
   import { FRAME_RATES } from '$lib/motion/design';
   import { setFrameRate } from '$lib/motion/frame-rate';
-  import { RenderStage, framesDone, type RenderView, type ServerRender } from '$lib/motion/server-render';
+  import { RenderStage, STALL_AFTER_MS, Stall, framesDone, renderStall, watchProgress, type ProgressWatch, type RenderView, type ServerRender } from '$lib/motion/server-render';
   import type { BrandTokens } from '$lib/motion/brand';
   import type { AudioAnalysis } from '$lib/motion/audio-analysis';
   import InteractiveExport from './InteractiveExport.svelte';
@@ -50,6 +50,12 @@
     rendering_not_configured: 'Server rendering is not available right now. Use the browser export.',
     credits_exhausted: 'Not enough credits for a server render.',
     render_unavailable: 'The render machines could not start. Try again in a minute.'
+  };
+
+  const STALL_LABEL: Record<Stall, string> = {
+    [Stall.None]: '',
+    [Stall.Slow]: `No progress for ${STALL_AFTER_MS / 60_000} minutes: the render machines may be stuck. Cancel it (held credits come back) or render in this browser.`,
+    [Stall.QueueOff]: 'This dev server runs no render queue (DEV_CRONS is off), so this render will not advance. Cancel it, or render in this browser.'
   };
 
   const PROGRESS_LABEL: Partial<Record<Phase, string>> = {
@@ -87,6 +93,8 @@
   let job = $state<RenderView | null>(server.latest && !SETTLED.has(server.latest.status) ? server.latest : null);
   let serverError = $state('');
   let pollTimer: ReturnType<typeof setTimeout> | null = null;
+  let clock = $state(Date.now());
+  let watch = $state<ProgressWatch | null>(job ? watchProgress(null, job, clock) : null);
 
   let settings = $state<RenderSettings>({ ...settingsOf(Preset.Social), fps: doc.fps });
   const SETTING_KEYS = ['format', 'fps', 'quality', 'resolution'] as const;
@@ -103,6 +111,7 @@
   const jobRunning = $derived(job !== null && !SETTLED.has(job.status));
   const jobFrames = $derived(job?.progress ? framesDone(job.progress) : 0);
   const jobTotal = $derived(job?.progress?.totalFrames ?? target.durationInFrames);
+  const stall = $derived(jobRunning && watch ? renderStall({ watch, queue: server.queue, now: clock }) : Stall.None);
 
   let phase = $state<Phase>(Phase.Checking);
   let caps = $state<Capabilities | null>(null);
@@ -144,6 +153,10 @@
     if (latest && latest.id === job?.id) {
       job = latest;
     }
+    clock = Date.now();
+    if (job) {
+      watch = watchProgress(watch, job, clock);
+    }
     if (job && !SETTLED.has(job.status)) {
       pollTimer = setTimeout(poll, POLL_MS);
     }
@@ -165,6 +178,8 @@
       return;
     }
     job = { id: String(started.data.runId), status: 'running', progress: null, error: null, assetId: null, credits: quote.credits };
+    clock = Date.now();
+    watch = watchProgress(null, job, clock);
     pollTimer = setTimeout(poll, POLL_MS);
   }
 
@@ -173,6 +188,11 @@
     if (cancelled?.ok && job) {
       job = { ...job, status: 'failed', error: 'cancelled' };
     }
+  }
+
+  async function renderHere() {
+    await cancelServer();
+    mode = Mode.Browser;
   }
 
   onMount(() => {
@@ -329,7 +349,12 @@
         <div class="track"><div class="fill" style={`width: ${(jobFrames / jobTotal) * 100}%`}></div></div>
         <span>{job.progress ? STAGE_LABEL[job.progress.stage] : STAGE_LABEL[RenderStage.Starting]} {#if job.progress?.stage === RenderStage.Rendering}{jobFrames}/{jobTotal}{/if}</span>
       </div>
-      <p class="muted">You can close this tab: the video lands in your assets when it is ready.</p>
+      {#if stall !== Stall.None}
+        <p class="warn" role="alert" data-testid="export-stalled">{STALL_LABEL[stall]}</p>
+        <button type="button" onclick={renderHere} data-testid="export-switch-browser">Render in this browser</button>
+      {:else}
+        <p class="muted">You can close this tab: the video lands in your assets when it is ready.</p>
+      {/if}
       <button type="button" onclick={cancelServer} data-testid="export-cancel">Cancel render</button>
     {:else if job?.status === 'done' && job.assetId && phase !== Phase.Done}
       <p class="muted" data-testid="export-saved">Saved to the canvas assets and attached to this video.</p>

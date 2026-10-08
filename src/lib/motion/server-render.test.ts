@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RenderStage, chunkPlan, progressOf, advance, framesDone, type RenderProgress } from './server-render';
+import { RenderQueue, RenderStage, STALL_AFTER_MS, Stall, chunkPlan, progressOf, advance, framesDone, renderStall, watchProgress, type RenderProgress, type RenderView } from './server-render';
 
 describe('chunkPlan', () => {
   it('splits a 28 s trailer into two chunks of 15 s at most', () => {
@@ -106,5 +106,31 @@ describe('render progress', () => {
     expect(progressOf({ progress: start })).toEqual(start);
     expect(progressOf({ progress: { stage: 'nope' } })).toBeNull();
     expect(progressOf({})).toBeNull();
+  });
+});
+
+describe('a render that does not move is told to the user', () => {
+  const view = (chunksDone: number): RenderView => ({ id: 'r', status: 'running', progress: { stage: RenderStage.Rendering, chunksDone, chunks: 2, totalFrames: 450 }, error: null, assetId: null, credits: 10 });
+  const minutes = (n: number) => n * 60_000;
+
+  it('a queue that no tick drives is stuck from the start', () => {
+    const watch = watchProgress(null, view(0), 0);
+
+    expect(renderStall({ watch, queue: RenderQueue.Stopped, now: 0 })).toBe(Stall.QueueOff);
+  });
+
+  it('a ticking queue is slow only after STALL_AFTER_MS without progress', () => {
+    const watch = watchProgress(null, view(0), 0);
+
+    expect(renderStall({ watch, queue: RenderQueue.Ticking, now: STALL_AFTER_MS - 1 })).toBe(Stall.None);
+    expect(renderStall({ watch, queue: RenderQueue.Ticking, now: STALL_AFTER_MS })).toBe(Stall.Slow);
+  });
+
+  it('a chunk that lands restarts the clock', () => {
+    const first = watchProgress(null, view(0), 0);
+    const moved = watchProgress(first, view(1), minutes(4));
+
+    expect(renderStall({ watch: moved, queue: RenderQueue.Ticking, now: minutes(8) })).toBe(Stall.None);
+    expect(watchProgress(moved, view(1), minutes(9))).toEqual(moved);
   });
 });
