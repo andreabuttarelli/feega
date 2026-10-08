@@ -52,6 +52,7 @@ export function registerMotionTools(server: McpServer) {
         'Render the saved revision of a motion video to MP4. Default `mode: "browser"`: free, returns a `render_url` — a one-time link ' +
         '(expires in 30 minutes, bound to this revision) the user opens on any device; it renders in their browser and saves the file ' +
         'to the project. Show the link to the user. `mode: "server"` is not available yet: it is refused with 403. ' +
+        'A live component (a game or generative piece) cannot be seeked: the video shows a still of it; publish it as an embed instead. ' +
         'Poll `get_render` with the `run_id` for the file.',
       inputSchema: z.object({
         org,
@@ -111,7 +112,7 @@ export function registerMotionTools(server: McpServer) {
       title: 'Publish a motion video as a web embed',
       description:
         'Host the interactive web export of the saved revision on feega and return the public `url` and an iframe `snippet` to paste ' +
-        'into any site (keeps pointer, tilt and scroll input). Publishing again updates the same embed in place, so the site needs no ' +
+        'into any site (keeps pointer, tilt, scroll, key and tap input; live components such as games and generative pieces run live there). Publishing again updates the same embed in place, so the site needs no ' +
         'new paste. `action: "unpublish"` takes it down. Videos from an uncensored project are refused (403, `refusal`). Free.',
       inputSchema: z.object({ org, node_id: z.string(), action: z.enum(['publish', 'unpublish']).optional() }),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true }
