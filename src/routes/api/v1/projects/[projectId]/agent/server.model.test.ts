@@ -41,7 +41,7 @@ const option = (over: Partial<ChatModelOption>): ChatModelOption => ({
 });
 
 const OFFERED = [
-  option({ id: 'anthropic/claude-sonnet-5.5', provider: 'anthropic', efforts: ['high', 'medium', 'low'], defaultEffort: 'high' }),
+  option({ id: 'anthropic/claude-opus-5.5', provider: 'anthropic', efforts: ['high', 'medium', 'low'], defaultEffort: 'high' }),
   option({ id: 'mistralai/plain', provider: 'mistralai' })
 ];
 
@@ -103,15 +103,15 @@ describe('the project agent runs the model the user chose', () => {
     calls.logged.length = 0;
   });
 
-  it('no choice: the default model at medium, billed as that model', async () => {
+  it('no choice: the default model at low, billed as that model', async () => {
     await settled(await POST(postEvent({})));
-    expect(calls.models).toEqual(['anthropic/claude-sonnet-5.5']);
-    expect(calls.providerOptions[0]).toMatchObject({ openai: { reasoningEffort: 'medium', forceReasoning: true } });
-    expect(calls.logged[0]?.model).toBe('anthropic/claude-sonnet-5.5');
+    expect(calls.models).toEqual(['anthropic/claude-opus-5.5']);
+    expect(calls.providerOptions[0]).toMatchObject({ openai: { reasoningEffort: 'low', forceReasoning: true } });
+    expect(calls.logged[0]?.model).toBe('anthropic/claude-opus-5.5');
   });
 
   it('a chosen model and effort reach the wire', async () => {
-    await settled(await POST(postEvent({ model: 'anthropic/claude-sonnet-5.5', reasoning: 'low' })));
+    await settled(await POST(postEvent({ model: 'anthropic/claude-opus-5.5', reasoning: 'low' })));
     expect(calls.providerOptions[0]).toMatchObject({ openai: { reasoningEffort: 'low' } });
   });
 
