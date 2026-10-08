@@ -5,7 +5,7 @@ import { DURATION_BANDS, GalleryStatus, type GalleryAsset, type GalleryCard, typ
 import { actorCols, type Actor } from './actor';
 
 const CARD_COLUMNS =
-  'id, title, author_name, kind, format, duration_s, tags, poster_url, preview_url, remix_count, origin:gallery_items!gallery_items_remixed_from_fkey(id, title, author_name)';
+  'id, title, author_name, kind, format, duration_s, tags, poster_url, preview_url, remix_count, origin:gallery_items!remixed_from(id, title, author_name)';
 const ITEM_COLUMNS = `${CARD_COLUMNS}, description, status, doc, assets, published_at`;
 
 type OriginRow = { id: string; title: string; author_name: string } | null;
