@@ -472,3 +472,27 @@ describe('in the page', () => {
     expect(typeof (window as unknown as Record<string, { timeline: unknown }>)[ENGINE_GLOBAL].timeline).toBe('function');
   });
 });
+
+describe('a revisited frame', () => {
+  it.each([
+    ['fromTo, only in the to vars', (tl: Tl) => tl.fromTo('#a', { scale: 0 }, { transformOrigin: '50% 0%', opacity: 0.5, scale: 1, duration: 1, ease: 'none' }, 0.5)],
+    ['fromTo, in both vars', (tl: Tl) => tl.fromTo('#a', { transformOrigin: '0% 100%' }, { transformOrigin: '50% 50%', duration: 1, ease: 'none' }, 0.5)],
+    ['to', (tl: Tl) => tl.to('#a', { transformOrigin: 'left top', duration: 1, ease: 'none' }, 0.5)],
+    ['from', (tl: Tl) => tl.from('#a', { transformOrigin: 'right bottom', duration: 1, ease: 'none' }, 0.5)],
+    ['set', (tl: Tl) => tl.set('#a', { transformOrigin: 'center top', display: 'block' }, 0.5)]
+  ])('a prop in %s draws the same frame on every visit', (_mode, build) => {
+    const tl = timeline();
+    build(tl);
+    const frames: string[] = [];
+    const style = el('a').style;
+
+    for (const t of [0.8, 0, 2, 0.8, 0.2, 0.8, 0]) {
+      tl.totalTime(t, true);
+      frames.push([style.transformOrigin, style.opacity, style.display, style.transform].join('|'));
+    }
+
+    expect(frames[3]).toBe(frames[0]);
+    expect(frames[5]).toBe(frames[0]);
+    expect(frames[6]).toBe(frames[1]);
+  });
+});
