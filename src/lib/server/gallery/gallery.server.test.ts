@@ -168,6 +168,21 @@ describe('remixing a gallery item', () => {
     expect(revision.doc.tracks[0].clips.find((c) => c.id === 'logo')!.shaders[0].ref).toBe(newRef);
   });
 
+  it("re-inserts the custom layout of a composition into the remixer's workspace and points the clip at it", async () => {
+    const row = galleryRow([{ id: 'g-logo', kind: 'image', name: 'logo', url: `${PUBLIC}g-logo.svg` }]);
+    const spec = { kind: 'spec', name: 'orbit', slots: 6, place: { kind: 'ring', radius: 3 } };
+    const doc = must(addClip(row.doc, { component: 'Composition', from: 0, durationInFrames: 60, props: { layout: 'custom', layoutRef: 'author-lay', layoutSpec: spec } }, 'comp'));
+    let n = 0;
+    const { db, calls } = fakeDb({ gallery_items: [{ ...row, doc }], canvases: [{ id: 'c-9', org_id: 'org-2', project_id: 'p-2', name: 'Motion', viewport: null }], nodes: [], assets: [], gallery_remixes: [], effects: [], layouts: [] }, { filter: true, newId: () => `new-${++n}` });
+
+    expect(await remixGalleryItem(db, { download }, remixInput)).toMatchObject({ ok: true });
+
+    expect(of(calls, 'layouts', 'insert')[0].payload).toMatchObject({ org_id: 'org-2', name: 'orbit', kind: 'spec' });
+    const revision = of(calls, 'motion_revisions', 'insert')[0].payload as { doc: MotionDoc };
+    const comp = revision.doc.tracks.flatMap((t) => t.clips).find((c) => c.id === 'comp')!;
+    expect((comp.props as { layoutRef: string }).layoutRef).not.toBe('author-lay');
+  });
+
   it('never fetches a file outside the gallery folder of that item', async () => {
     const { db, calls } = remixWorld([{ id: 'g-logo', kind: 'image', name: 'logo', url: 'http://169.254.169.254/latest/meta-data' }]);
     expect(await remixGalleryItem(db, { download }, remixInput)).toMatchObject({ ok: false, error: RemixError.ForeignFile });

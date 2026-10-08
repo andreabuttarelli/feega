@@ -20,6 +20,7 @@ import { blockedPrompt } from '$lib/server/moderation/blocked-response';
 import { drawFrames, firstFrames } from '$lib/server/motion/server-frames';
 import { chromiumFrames, chromiumGl, serverFramesOpen } from '$lib/server/motion/chromium-frames';
 import { effectStore } from '$lib/server/effects/store';
+import { layoutStore } from '$lib/server/layouts/store';
 import { assetUrls, headOrNew, motionAssets, motionTokens, saveMotionDoc } from '$lib/server/motion/editor';
 import { fitNewVideo } from '$lib/motion/fit-duration';
 import { EmbedAction, createMotionTools, selectionNote, type MotionSession } from '$lib/server/motion/motion-tools';
@@ -186,6 +187,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
       return firstFrames([editor, server]);
     },
     inspect: frameStats,
+    layouts: layoutStore({ db, orgId, actor: { kind: 'agent', id: userId, agentKey: MOTION_AGENT_KEY } }),
     effects: effectStore({ db, orgId, actor: { kind: 'agent', id: userId, agentKey: MOTION_AGENT_KEY }, gl: serverFramesOpen() ? chromiumGl : null }),
     readUi: uiReader({ ask: (q) => withOrgContext(orgId, () => llmStructured({ ...q, model: llmVisionModel() ?? model, label: 'motion-recreate-ui' })), fetchBytes: fetchImageBytes }),
     check: async (callId, doc, name) => {

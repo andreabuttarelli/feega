@@ -11,7 +11,8 @@ import type { AssetRef } from '$lib/motion/doc';
 import { swapAssetIds, type GalleryAsset } from '$lib/gallery/model';
 import { exposeMainFields } from '$lib/gallery/remix-fields';
 import { downloadFile, isGalleryFile, storeRemixFile, type FileBytes } from './files';
-import { adoptShaders } from '$lib/server/effects/adopt';
+import { adoptShaders, workspaceAuthor } from '$lib/server/effects/adopt';
+import { adoptLayouts } from '$lib/server/layouts/adopt';
 
 export type RemixPorts = { download?: (url: string) => Promise<FileBytes> };
 
@@ -70,7 +71,8 @@ export async function remixGalleryItem(db: Db, ports: RemixPorts, input: RemixIn
     return fail(RemixError.CanvasNotFound, 'That canvas is not in this project.');
   }
 
-  const doc = await adoptShaders(db, input, exposeMainFields(swapAssetIds(item.doc, ids)));
+  const workspace = { orgId: input.orgId, author: workspaceAuthor(input) };
+  const doc = await adoptLayouts(db, workspace, await adoptShaders(db, workspace, exposeMainFields(swapAssetIds(item.doc, ids))));
   const saved = await saveMotionDoc(db, { orgId: input.orgId, nodeId: start.nodeId, expectedVersion: 0, doc, actor: input.actor, summary: `${REMIX_SUMMARY} ${item.title}` });
   if (saved.outcome !== RevisionOutcome.Written) {
     return fail(RemixError.NotSaved, 'The copy could not be saved.');

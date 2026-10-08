@@ -62,6 +62,9 @@ const RESTANO = [
   'list_effects',
   'write_effect',
   'patch_effect',
+  'list_layouts',
+  'write_layout',
+  'patch_layout',
   'enhance_prompt',
   'run_node_loop',
   'preview_node_loop',
@@ -81,8 +84,8 @@ const RESTANO = [
   'get_render'
 ];
 
-describe('la superficie MCP è le trentadue dichiarate', () => {
-  test('tools/list è esattamente questi trentadue nomi', async () => {
+describe('la superficie MCP è le trentacinque dichiarate', () => {
+  test('tools/list è esattamente questi trentacinque nomi', async () => {
     const names = (await tools()).map((t) => t.name).sort();
 
     expect(names).toEqual([...RESTANO].sort());

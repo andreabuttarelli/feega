@@ -32,7 +32,12 @@ vi.mock('$lib/server/repos/node-runs', () => ({ listNodeRuns: vi.fn(async () => 
 const registerUploadedAsset = vi.fn(async () => ({ asset: { id: 'up1', type: 'video' }, kind: 'video' }));
 vi.mock('$lib/server/canvas/upload', () => ({ registerUploadedAsset, UploadError: class extends Error {} }));
 
+const llmStructured = vi.fn();
+vi.mock('$lib/server/llm', () => ({ llmStructured }));
+vi.mock('$lib/server/moderation/model-input', () => ({ screenModelInput: async () => ({ ok: true }) }));
+
 const { load, actions } = await import('./+page.server');
+const { fakeDb } = await import('$lib/server/db/fake-db');
 
 const event = (fields?: Record<string, string>) => {
   const body = new FormData();
@@ -81,5 +86,20 @@ describe('/app/compose/[nodeId] edits one composition video', () => {
 
     expect(refused.status).toBe(400);
     expect(registerUploadedAsset).not.toHaveBeenCalled();
+  });
+
+  it('edit with AI writes a spec layout for the workspace and hands it to the picker', async () => {
+    const fake = fakeDb({ layouts: [] }, { filter: true });
+    toolScope.mockResolvedValueOnce({ db: fake.db as never, orgId: 'org', projectId: 'p1', userId: 'u1' });
+    llmStructured.mockResolvedValueOnce({ name: 'orbit', spec: { kind: 'spec', slots: 6, place: { kind: 'ring', radius: 3 } } });
+
+    const made = (await actions.designLayout(event({ prompt: 'cards orbiting slowly' }))) as { layout: { name: string; spec: unknown } };
+
+    expect(made.layout).toMatchObject({ name: 'orbit', spec: { kind: 'spec' } });
+    expect(fake.calls.find((c) => c.op === 'insert')!.payload).toMatchObject({ org_id: 'org', name: 'orbit', agent_key: 'compose' });
+  });
+
+  it('edit with AI refuses an empty prompt', async () => {
+    expect(((await actions.designLayout(event({ prompt: ' ' }))) as { status: number }).status).toBe(400);
   });
 });
