@@ -254,7 +254,7 @@
   });
 </script>
 
-<div class="stage" style={`aspect-ratio: ${width} / ${height}; width: min(100cqw, calc(100cqh * ${width / height}));`} data-testid="motion-preview">
+<div class="stage" style={`aspect-ratio: ${width} / ${height}; width: var(--preview-w, min(100cqw, calc(100cqh * ${width / height})));`} data-testid="motion-preview">
   <div class="host" bind:this={host}></div>
   {@render children?.()}
   {#if live}
@@ -276,6 +276,7 @@
 <style>
   .stage {
     position: relative;
+    flex-shrink: 0;
     background: #000;
     outline: 1px solid var(--ui-line);
   }

@@ -134,3 +134,16 @@ describe('typing', () => {
     expect(press('c', { mod: true })).toBe(Command.Copy);
   });
 });
+
+describe('preview zoom keys', () => {
+  it('⌘= / ⌘+ zoom in, ⌘- out, ⌘0 fits, ⌘1 is 100%; plain + and - stay on the timeline', () => {
+    expect(press('=', { mod: true })).toBe(Command.PreviewZoomIn);
+    expect(press('+', { mod: true, shift: true })).toBe(Command.PreviewZoomIn);
+    expect(press('-', { mod: true })).toBe(Command.PreviewZoomOut);
+    expect(press('0', { mod: true })).toBe(Command.PreviewFit);
+    expect(press('1', { mod: true })).toBe(Command.PreviewActual);
+    expect(press('=')).toBe(Command.ZoomIn);
+    expect(press('-')).toBe(Command.ZoomOut);
+  });
+});
+

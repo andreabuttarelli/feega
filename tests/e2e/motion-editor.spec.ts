@@ -185,3 +185,29 @@ test.describe('motion editor on a phone @real', () => {
     await expect(page.getByLabel('Agent', { exact: true })).toBeVisible();
   });
 });
+
+test.describe('preview zoom @real', () => {
+  test.skip(!REAL_STACK, 'richiede uno stack disposable: E2E_REAL_STACK=1');
+
+  test('⌘= ingrandisce, doppio clic intorno torna a Fit, ⌘1 è 100%: la vista cambia, la storia no', async ({ page, session, seedNode }) => {
+    const node = await seedNode({ type: 'motion', data: MOTION_DATA });
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}/motion/${node.id}`);
+    const value = page.getByTestId('preview-zoom-value');
+    const undo = page.getByRole('button', { name: 'Undo', exact: true });
+    await expect(value).toHaveText('Fit');
+    await expect(undo).toBeDisabled();
+
+    await page.keyboard.press('ControlOrMeta+=');
+    await expect(page.getByTestId('zoom-stage')).toHaveAttribute('data-zoom', /%$/);
+
+    const stage = await page.getByTestId('zoom-stage').boundingBox();
+    await page.mouse.dblclick(stage!.x + 4, stage!.y + 4);
+    await expect(value).toHaveText('Fit');
+
+    await page.keyboard.press('ControlOrMeta+1');
+    await expect(value).toHaveText('100%');
+    await page.keyboard.press('ControlOrMeta+0');
+    await expect(value).toHaveText('Fit');
+    await expect(undo).toBeDisabled();
+  });
+});
