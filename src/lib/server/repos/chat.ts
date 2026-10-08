@@ -29,7 +29,9 @@ export type SavedTool = {
   errorText?: string;
 };
 
-export type Turn = { role: 'user' | 'assistant'; content: string; tools?: SavedTool[] };
+export type Turn = { role: 'user' | 'assistant'; content: string; tools?: SavedTool[]; streaming?: true };
+
+const STREAMING = 'streaming';
 
 export type PromptTurn = { role: Turn['role']; content: string };
 
@@ -119,13 +121,13 @@ export async function loadTurns(
 ): Promise<Turn[]> {
   const { data } = await db
     .from('chat_messages')
-    .select('role, content, tool_calls')
+    .select('*')
     .eq('org_id', input.orgId)
     .eq('thread_id', input.threadId)
     .order('seq', { ascending: false })
     .limit(HISTORY_LIMIT);
 
-  const rows = (data ?? []) as Array<{ role?: string; content?: string | null; tool_calls?: SavedTool[] | null }>;
+  const rows = (data ?? []) as Array<{ role?: string; content?: string | null; tool_calls?: SavedTool[] | null; status?: string }>;
 
   return rows
     .filter((row) => row.role === 'user' || row.role === 'assistant')
@@ -133,7 +135,8 @@ export async function loadTurns(
     .map((row) => ({
       role: row.role as Turn['role'],
       content: row.content ?? '',
-      ...(row.tool_calls?.length ? { tools: row.tool_calls } : {})
+      ...(row.tool_calls?.length ? { tools: row.tool_calls } : {}),
+      ...(row.status === STREAMING ? { streaming: true as const } : {})
     }))
     .reverse();
 }
@@ -191,16 +194,18 @@ export async function saveTurn(
 export async function turnRunning(db: Db, input: { orgId: string; threadId: string }, now = Date.now()): Promise<boolean> {
   const { data } = await db
     .from('chat_messages')
-    .select('role, created_at')
+    .select('*')
     .eq('org_id', input.orgId)
     .eq('thread_id', input.threadId)
     .order('seq', { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  const last = data as { role?: string; created_at?: string } | null;
-  if (last?.role !== 'user' || !last.created_at) {
+  const last = data as { role?: string; status?: string; created_at?: string; updated_at?: string } | null;
+  const touched = last?.updated_at ?? last?.created_at;
+  const awaited = last?.role === 'user' || last?.status === STREAMING;
+  if (!awaited || !touched) {
     return false;
   }
-  return now - Date.parse(last.created_at) < AGENT_MAX_DURATION_S * MS_PER_S;
+  return now - Date.parse(touched) < AGENT_MAX_DURATION_S * MS_PER_S;
 }

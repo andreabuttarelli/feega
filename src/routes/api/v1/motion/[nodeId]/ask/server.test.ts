@@ -85,6 +85,15 @@ vi.mock('$lib/server/repos/chat', () => ({
     store.turns.push(turn);
   }
 }));
+vi.mock('$lib/server/repos/chat-reply', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('$lib/server/repos/chat-reply')>()),
+  openReply: async (_db: unknown, scope: { actor: unknown }) => ({
+    progress: async () => undefined,
+    finish: async (body: { content: string }) => {
+      store.turns.push({ role: 'assistant', ...body, actor: scope.actor });
+    }
+  })
+}));
 vi.mock('$lib/server/repos/motion-revisions', async (importOriginal) => {
   const real = await importOriginal<typeof import('$lib/server/repos/motion-revisions')>();
   return {

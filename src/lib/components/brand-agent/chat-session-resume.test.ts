@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { chatSession, forgetChatSessions } from './chat-session.svelte';
 
-type Saved = { role: 'user' | 'assistant'; content: string };
+type Saved = { role: 'user' | 'assistant'; content: string; tools?: { toolCallId: string; toolName: string; status: 'done' }[]; streaming?: true };
 type Thread = { messages: Saved[]; running: boolean };
 
 const ENDPOINT = '/api/v1/projects/p/motion/n/agent';
@@ -96,5 +96,28 @@ describe('a chat whose tab went to the background', () => {
     expect(session.reconnecting).toBe(false);
     expect(session.failed).toBe('send');
     expect(session.messages.map((m) => m.content)).toEqual(['first ask', 'first answer', ASK]);
+  });
+
+  it('coming back shows the steps done meanwhile, then swaps to the final answer in the same place', async () => {
+    const STEP = { toolCallId: 'c1', toolName: 'add_clip', status: 'done' as const };
+    const thread: Thread = { messages: [...ASKED, { role: 'assistant', content: 'Adding a title', tools: [STEP], streaming: true }], running: true };
+    const session = chatSession(ENDPOINT, backgrounded(thread).fetcher);
+
+    await session.load();
+    await settle();
+
+    expect(session.reconnecting).toBe(true);
+    expect(session.messages.map((m) => m.content)).toEqual(['first ask', 'first answer', ASK, 'Adding a title']);
+    expect(session.messages.at(-1)).toMatchObject({ live: true, pending: true, tools: [STEP] });
+
+    thread.messages = [...ASKED, { role: 'assistant', content: 'Adding a title\n\nMade it pop.', tools: [STEP] }];
+    thread.running = false;
+    session.resume();
+    await settle();
+
+    expect(session.reconnecting).toBe(false);
+    expect(session.failed).toBe('');
+    expect(session.messages.map((m) => m.content)).toEqual(['first ask', 'first answer', ASK, 'Adding a title\n\nMade it pop.']);
+    expect(session.messages.at(-1)?.live).toBeFalsy();
   });
 });

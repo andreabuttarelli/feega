@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MockLanguageModelV4 } from 'ai/test';
+import { tool } from 'ai';
+import { z } from 'zod';
+import { fakeDb, type Call } from '$lib/server/db/fake-db';
+import { forgetReplySchema } from '$lib/server/repos/chat-reply';
 
 const streamed = vi.fn();
 const { screenModelInput } = vi.hoisted(() => ({ screenModelInput: vi.fn() }));
@@ -8,6 +12,48 @@ vi.mock('$lib/server/moderation/model-input', () => ({ screenModelInput }));
 const saveTurn = vi.fn(async (_db: unknown, _turn: { role: string; content?: string }) => undefined);
 
 let releaseTail: () => void = () => {};
+const world = { stepped: false, fails: false, db: fakeDb({ chat_messages: [] }) };
+const USAGE = {
+  inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 },
+  outputTokens: { total: 1, text: 1, reasoning: 0 }
+};
+
+function steppedModel() {
+  const tail = new Promise<void>((resolve) => (releaseTail = resolve));
+  let call = 0;
+  return new MockLanguageModelV4({
+    doStream: async () => {
+      call++;
+      const first = call === 1;
+      return {
+        stream: new ReadableStream({
+          async start(controller) {
+            controller.enqueue({ type: 'stream-start', warnings: [] });
+            if (first) {
+              controller.enqueue({ type: 'text-start', id: 'a' });
+              controller.enqueue({ type: 'text-delta', id: 'a', delta: 'Looking.' });
+              controller.enqueue({ type: 'text-end', id: 'a' });
+              controller.enqueue({ type: 'tool-call', toolCallId: 'c1', toolName: 'list_nodes', input: '{}' });
+              controller.enqueue({ type: 'finish', finishReason: { unified: 'tool-calls', raw: 'tool_calls' }, usage: USAGE });
+              controller.close();
+              return;
+            }
+            await tail;
+            if (world.fails) {
+              controller.error(new Error('provider down'));
+              return;
+            }
+            controller.enqueue({ type: 'text-start', id: 'b' });
+            controller.enqueue({ type: 'text-delta', id: 'b', delta: 'Done.' });
+            controller.enqueue({ type: 'text-end', id: 'b' });
+            controller.enqueue({ type: 'finish', finishReason: { unified: 'stop', raw: 'stop' }, usage: USAGE });
+            controller.close();
+          }
+        })
+      };
+    }
+  });
+}
 
 function slowModel() {
   const tail = new Promise<void>((resolve) => (releaseTail = resolve));
@@ -40,7 +86,7 @@ function slowModel() {
 }
 
 vi.mock('$lib/server/llm', () => ({
-  llmLanguageModel: () => slowModel()
+  llmLanguageModel: () => (world.stepped ? steppedModel() : slowModel())
 }));
 vi.mock('$lib/server/chat-model/catalogue', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$lib/server/chat-model/catalogue')>()),
@@ -70,7 +116,7 @@ vi.mock('$lib/server/repos/chat', () => ({
 }));
 vi.mock('$lib/server/project-agent/project-tools', () => ({ createProjectTools: () => ({}) }));
 vi.mock('$lib/server/project-agent/tool-surface', () => ({
-  openAgentTools: async () => ({ tools: {}, close: async () => undefined })
+  openAgentTools: async () => ({ tools: { list_nodes: tool({ inputSchema: z.object({}), execute: async () => ({ n: 2 }) }) }, close: async () => undefined })
 }));
 
 const { GET, POST } = await import('./+server');
@@ -83,26 +129,29 @@ function postEvent() {
   });
   const locals = {
     safeGetSession: async () => ({ session: { access_token: 'tok' }, user: { id: 'u-1' } }),
-    db: async () => ({})
+    db: async () => world.db.db
   };
   return { request, params: { projectId: 'p-1' }, locals } as unknown as Parameters<typeof POST>[0];
 }
 
-async function assistantSaved() {
-  for (let i = 0; i < 50; i++) {
-    const saved = saveTurn.mock.calls.find(([, t]) => t.role === 'assistant');
-    if (saved) {
-      return saved[1];
+const replyWrites = (calls: Call[]) => calls.filter((c) => c.table === 'chat_messages' && c.op === 'update').map((c) => c.payload as { content: string; status: string; tool_calls: unknown });
+
+async function settled(calls: Call[], status: string) {
+  for (let i = 0; i < 100; i++) {
+    if (replyWrites(calls).some((w) => w.status === status)) {
+      return;
     }
     await new Promise((r) => setTimeout(r, 10));
   }
-  return null;
 }
 
 describe('POST /api/v1/projects/[projectId]/agent', () => {
   beforeEach(() => {
     saveTurn.mockClear();
     streamed.mockClear();
+    forgetReplySchema();
+    world.stepped = false;
+    world.db = fakeDb({ chat_messages: [] });
     screenModelInput.mockReset();
     screenModelInput.mockResolvedValue({ ok: true });
   });
@@ -127,9 +176,46 @@ describe('POST /api/v1/projects/[projectId]/agent', () => {
     await reader.cancel();
 
     releaseTail();
+    await settled(world.db.calls, 'done');
 
-    const saved = await assistantSaved();
-    expect(saved?.content).toBe('Created the doc.');
+    expect(replyWrites(world.db.calls).at(-1)).toMatchObject({ content: 'Created the doc.', status: 'done' });
+  });
+});
+
+describe('POST — the answer is written while the turn runs', () => {
+  beforeEach(() => {
+    forgetReplySchema();
+    world.stepped = true;
+    world.fails = false;
+    world.db = fakeDb({ chat_messages: [] });
+    screenModelInput.mockResolvedValue({ ok: true });
+  });
+
+  it('a finished step is on the database before the turn ends, then the row turns done', async () => {
+    const res = await POST(postEvent());
+    await res.body!.getReader().cancel();
+    await settled(world.db.calls, 'streaming');
+
+    const opened = world.db.calls.find((c) => c.op === 'insert' && (c.payload as { role: string }).role === 'assistant');
+    expect(opened?.payload).toMatchObject({ status: 'streaming', content: '' });
+    expect(replyWrites(world.db.calls)).toEqual([expect.objectContaining({ content: 'Looking.', status: 'streaming', tool_calls: [expect.objectContaining({ toolName: 'list_nodes', status: 'done' })] })]);
+
+    releaseTail();
+    await settled(world.db.calls, 'done');
+
+    expect(replyWrites(world.db.calls).at(-1)).toMatchObject({ content: 'Looking.\n\nDone.', status: 'done' });
+  });
+
+  it('a turn that breaks after a step keeps the step and ends failed', async () => {
+    world.fails = true;
+    const res = await POST(postEvent());
+    await res.body!.getReader().cancel();
+    await settled(world.db.calls, 'streaming');
+
+    releaseTail();
+    await settled(world.db.calls, 'failed');
+
+    expect(replyWrites(world.db.calls).at(-1)).toMatchObject({ content: 'Looking.', status: 'failed' });
   });
 });
 

@@ -116,6 +116,38 @@ describe('turnRunning — a turn still working after the client left', () => {
 
     expect(await turnRunning(db, { orgId: ORG, threadId: THREAD }, NOW)).toBe(false);
   });
+
+  it('an answer still being written is a turn still running', async () => {
+    const { db } = fakeDb({ chat_messages: [{ role: 'assistant', status: 'streaming', created_at: ago(600), updated_at: ago(5) }] });
+
+    expect(await turnRunning(db, { orgId: ORG, threadId: THREAD }, NOW)).toBe(true);
+  });
+
+  it('an answer marked done or failed is a finished turn', async () => {
+    for (const status of ['done', 'failed']) {
+      const { db } = fakeDb({ chat_messages: [{ role: 'assistant', status, created_at: ago(5), updated_at: ago(1) }] });
+
+      expect(await turnRunning(db, { orgId: ORG, threadId: THREAD }, NOW)).toBe(false);
+    }
+  });
+
+  it('an answer left streaming by a server that died is not running forever', async () => {
+    const { db } = fakeDb({ chat_messages: [{ role: 'assistant', status: 'streaming', created_at: ago(3600), updated_at: ago(3600) }] });
+
+    expect(await turnRunning(db, { orgId: ORG, threadId: THREAD }, NOW)).toBe(false);
+  });
+});
+
+describe('loadTurns — the answer being written comes back with its status', () => {
+  it('a streaming row returns its partial text and tools, marked streaming', async () => {
+    const TOOL = { toolCallId: 'c1', toolName: 'list_nodes', status: 'done' as const };
+    const { db } = fakeDb({ chat_messages: [{ role: 'assistant', content: 'Half', tool_calls: [TOOL], status: 'streaming' }, { role: 'user', content: 'go' }] });
+
+    expect(await loadTurns(db, { orgId: ORG, threadId: THREAD })).toEqual([
+      { role: 'user', content: 'go' },
+      { role: 'assistant', content: 'Half', tools: [TOOL], streaming: true }
+    ]);
+  });
 });
 
 describe('saveTurn — a retry of an unanswered message', () => {
