@@ -85,6 +85,10 @@ export type MotionEngine = {
     revert: () => void;
   };
   SplitText: unknown;
+  drawPath: (target: unknown) => Record<'start' | 'draw', number>;
+  morph: (target: unknown, to: string, vars?: { points?: number }) => Record<'morph', number>;
+  scramble: (target: unknown, text: string, vars?: { seed?: number; chars?: string }) => Record<'reveal', number>;
+  flip: (targets: unknown, change: () => void) => Record<'flip', number>;
 };
 
 export function motionEngine(win: Window & Record<string, unknown>): MotionEngine {
@@ -1291,7 +1295,132 @@ export function motionEngine(win: Window & Record<string, unknown>): MotionEngin
     return split(target, vars);
   }
 
+  type Shape = SVGElement & { getTotalLength: () => number; getPointAtLength: (at: number) => { x: number; y: number } };
+  type Point = [number, number];
+
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const MORPH_POINTS = 96;
+  const SCRAMBLE_CHARS = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  const SCRAMBLES_PER_CHAR = 3;
+
+  const first = <T>(target: unknown) => resolveTargets(target)[0] as T;
+  const rounded = (v: number) => Math.round(v * 100) / 100;
+
+  function driver<K extends string>(keys: Record<K, number>, paint: (values: Record<K, number>) => void) {
+    const values = { ...keys };
+    const handle = {} as Record<K, number>;
+    for (const key of Object.keys(keys) as K[]) {
+      Object.defineProperty(handle, key, {
+        enumerable: true,
+        get: () => values[key],
+        set: (v: number) => {
+          values[key] = v;
+          paint(values);
+        }
+      });
+    }
+    paint(values);
+    return handle;
+  }
+
+  function drawPath(target: unknown) {
+    const path = first<SVGElement>(target);
+    path.setAttribute('pathLength', '1');
+    return driver({ start: 0, draw: 0 }, ({ start, draw }) => {
+      path.style.setProperty('stroke-dasharray', `${Math.max(0, draw - start)} 2`);
+      path.style.setProperty('stroke-dashoffset', String(-start));
+    });
+  }
+
+  function sampled(host: Node, d: string, count: number, closed: boolean): Point[] {
+    const probe = doc.createElementNS(SVG_NS, 'path') as Shape;
+    probe.setAttribute('d', d);
+    host.appendChild(probe);
+    const length = probe.getTotalLength();
+    const span = closed ? count : count - 1;
+    const points = Array.from({ length: count }, (_, i): Point => {
+      const at = probe.getPointAtLength((length * i) / span);
+      return [at.x, at.y];
+    });
+    probe.remove();
+    return points;
+  }
+
+  function aligned(from: Point[], to: Point[]): Point[] {
+    const cost = (candidate: Point[], shift: number) => from.reduce((sum, p, i) => {
+      const q = candidate[(i + shift) % candidate.length];
+      return sum + (p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2;
+    }, 0);
+    let best = { points: to, shift: 0, cost: Infinity };
+    for (const candidate of [to, [...to].reverse()]) {
+      for (let shift = 0; shift < candidate.length; shift++) {
+        const c = cost(candidate, shift);
+        if (c < best.cost) {
+          best = { points: candidate, shift, cost: c };
+        }
+      }
+    }
+    return from.map((_, i) => best.points[(i + best.shift) % best.points.length]);
+  }
+
+  function morph(target: unknown, to: string, vars: { points?: number } = {}) {
+    const path = first<SVGElement>(target);
+    const fromD = path.getAttribute('d') ?? '';
+    const closed = /z\s*$/i.test(fromD) && /z\s*$/i.test(to);
+    const count = vars.points ?? MORPH_POINTS;
+    const host = path.parentNode ?? doc.body;
+    const from = sampled(host, fromD, count, closed);
+    const goal = sampled(host, to, count, closed);
+    const end = closed ? aligned(from, goal) : goal;
+    return driver({ morph: 0 }, ({ morph: p }) => {
+      const points = from.map(([x, y], i) => `${rounded(x + (end[i][0] - x) * p)},${rounded(y + (end[i][1] - y) * p)}`);
+      path.setAttribute('d', `M${points.join('L')}${closed ? 'Z' : ''}`);
+    });
+  }
+
+  function noise(seed: number, i: number, step: number): number {
+    let h = (seed ^ Math.imul(i + 1, 0x9e3779b1) ^ Math.imul(step + 1, 0x85ebca6b)) >>> 0;
+    h = Math.imul(h ^ (h >>> 16), 0x7feb352d);
+    h = Math.imul(h ^ (h >>> 15), 0x846ca68b);
+    return (h ^ (h >>> 16)) >>> 0;
+  }
+
+  function scramble(target: unknown, text: string, vars: { seed?: number; chars?: string } = {}) {
+    const el = first<HTMLElement>(target);
+    const glyphs = [...text];
+    const chars = [...(vars.chars ?? SCRAMBLE_CHARS)];
+    const seed = vars.seed ?? 0;
+    return driver({ reveal: 0 }, ({ reveal }) => {
+      const shown = reveal >= 1 ? glyphs.length : Math.floor(reveal * glyphs.length);
+      const step = Math.floor(reveal * glyphs.length * SCRAMBLES_PER_CHAR);
+      el.textContent = glyphs.map((g, i) => (i < shown || /\s/.test(g) ? g : chars[noise(seed, i, step) % chars.length])).join('');
+    });
+  }
+
+  function flip(targets: unknown, change: () => void) {
+    const els = resolveTargets(targets) as unknown as HTMLElement[];
+    const box = (el: HTMLElement) => el.getBoundingClientRect();
+    const before = els.map(box);
+    change();
+    const after = els.map(box);
+    const ratio = (a: number, b: number) => (b ? a / b : 1);
+    return driver({ flip: 0 }, ({ flip: p }) => {
+      const q = 1 - p;
+      els.forEach((el, i) => {
+        const [a, b] = [before[i], after[i]];
+        const sx = rounded(1 + (ratio(a.width, b.width) - 1) * q);
+        const sy = rounded(1 + (ratio(a.height, b.height) - 1) * q);
+        el.style.transformOrigin = '0 0';
+        el.style.transform = `translate(${rounded((a.left - b.left) * q)}px, ${rounded((a.top - b.top) * q)}px) scale(${sx}, ${sy})`;
+      });
+    });
+  }
+
   return {
+    drawPath,
+    morph,
+    scramble,
+    flip,
     timeline,
     set,
     parseEase,
