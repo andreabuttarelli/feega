@@ -169,7 +169,7 @@ describe('the farm knows its own workers', () => {
 
     const running = await vercelFarm({ token: 't' }, 'production').running();
 
-    expect(sdk.list).toHaveBeenCalledWith(expect.objectContaining({ namePrefix: workerPrefix('production'), token: 't' }));
+    expect(sdk.list).toHaveBeenCalledWith(expect.objectContaining({ namePrefix: workerPrefix('production'), sortBy: 'name', token: 't' }));
     expect(running).toEqual([{ name: `${workerPrefix('production')}a`, createdAt: 5 }]);
   });
 });

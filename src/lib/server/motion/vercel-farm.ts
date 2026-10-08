@@ -94,7 +94,7 @@ export function vercelFarm(access: FarmAccess, deployment = 'local'): RenderFarm
       return sandbox?.status === RUNNING ? workerOf(sandbox) : null;
     },
     running: async (): Promise<LiveWorker[]> => {
-      const listed = await (await Sandbox.list({ ...access, namePrefix: prefix })).toArray();
+      const listed = await (await Sandbox.list({ ...access, namePrefix: prefix, sortBy: 'name' })).toArray();
       return listed.filter((s) => s.status === RUNNING).map((s) => ({ name: s.name, createdAt: s.createdAt }));
     },
     usage: async (name: string): Promise<WorkerUsage | null> => {
