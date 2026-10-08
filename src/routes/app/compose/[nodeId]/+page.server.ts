@@ -5,6 +5,7 @@ import { toolScope } from '$lib/server/dashboard/tool-scope';
 import { findMotionNode, headOrNew, motionAssets, motionTokens } from '$lib/server/motion/editor';
 import { motionRenderFarm } from '$lib/server/motion/renderer';
 import { renderView } from '$lib/server/motion/render-run';
+import { serverRenderOpen } from '$lib/motion/server-render';
 import { renderQueue } from '$lib/server/motion/render-queue';
 import { listNodeRuns } from '$lib/server/repos/node-runs';
 import { listProjects } from '$lib/server/repos/projects';
@@ -51,7 +52,7 @@ export const load: PageServerLoad = async (event) => {
     draft: draftFromDoc(head.doc),
     tokens,
     assets,
-    serverRender: { configured: motionRenderFarm() !== null, latest: renderView(runs), queue: renderQueue() },
+    serverRender: { configured: motionRenderFarm() !== null && serverRenderOpen(), latest: renderView(runs), queue: renderQueue() },
     editorUrl: motionEditorPath({ projectId, canvasId, nodeId: motion.record.id }),
     canvasHref: `/p/${projectId}/c/${canvasId}`,
     gallery

@@ -195,7 +195,7 @@ list. Returns how many combinations it actually stopped.
 | `ask_motion_agent` | `feega motion ask <nodeId> "<prompt>" [--no-wait]` |
 | `get_motion_run` | `feega motion run <runId>` |
 | `get_motion_summary` | (MCP only) |
-| `render_video` | `feega motion render <nodeId> [--server] [--resolution 720p] [--format f] [--quality q] [--fps n]` |
+| `render_video` | `feega motion render <nodeId> [--resolution 720p] [--quality q] [--fps n]` |
 | `get_render` | `feega motion render-status <runId>` |
 | `publish_motion_embed` | `feega motion embed <nodeId> [--unpublish]` |
 | `get_motion_embed` | `feega motion embed <nodeId> --status` |
@@ -219,8 +219,8 @@ duration, tracks and clips in seconds. Spends nothing.
 `render_video({ org, node_id, mode?, resolution?, format?, quality?, fps? })` renders the saved revision. Default
 `mode: "browser"`: free, returns `{ render_url, run_id, expires_at, credits: 0 }`. The link works
 once, expires in 30 minutes if nobody opens it, and is claimed by the first device that opens it;
-that device renders, saves the MP4 to the project and closes the run. `mode: "server"` renders on
-the farm, spends credits and accepts every format and 4K. `get_render({ org, run_id })` returns
+that device renders, saves the MP4 to the project and closes the run. `mode: "server"` is not
+available yet: it is refused with 403 `server_render_unavailable`. `get_render({ org, run_id })` returns
 `status`, `mode`, `asset_id` and a signed `file_url` (one hour) once `done`.
 
 `publish_motion_embed({ org, node_id, action? })` hosts the interactive web export of the saved

@@ -22,6 +22,7 @@ import type { RenderFarm } from './render-farm';
 
 export enum RenderRefusal {
   NotConfigured = 'rendering_not_configured',
+  Closed = 'server_render_unavailable',
   Unverified = 'components_unverified',
   Busy = 'render_in_progress',
   Unsupported = 'render_unsupported',
