@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { ACTIONS, Action, GuideGroup, guideSections, tipText } from './actions';
+import { ACTIONS, Action, GuideGroup, MenuSection, Place, guideSections, menuSections, placeOf, tipText } from './actions';
 import { Command } from './shortcuts';
 
 const EDITOR_PAGE = 'src/routes/p/[projectId]/c/[canvasId]/motion/[nodeId]/+page.svelte';
@@ -70,5 +70,34 @@ describe('the action table', () => {
     expect(row(Command.PreviewZoomOut)).toMatchObject({ keys: '⌘−', gesture: 'Pinch the preview' });
     expect(row(Command.PreviewFit)).toMatchObject({ keys: '⌘0', gesture: 'Double-tap around the preview' });
     expect(row(Command.PreviewActual)?.keys).toBe('⌘1');
+  });
+});
+
+describe('a touch path for every command', () => {
+  it('every command sits on a surface you can tap: a bar, the toolbar or the ⋯ menu', () => {
+    const untappable = Object.values(Command).filter((command) => !placeOf(command));
+
+    expect(untappable).toEqual([]);
+  });
+
+  it('the ⋯ menu lists each of its actions once, grouped Layer, Time, Keyframes, View', () => {
+    const sections = menuSections();
+    const ids = sections.flatMap((s) => s.ids);
+
+    expect(sections.map((s) => s.section)).toEqual(Object.values(MenuSection));
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids).toContain(Command.NudgeBack);
+    expect(ids).not.toContain(Command.Undo);
+  });
+
+  it('undo and redo live in the top bar, so no size class hides them in a scroll', () => {
+    expect(placeOf(Command.Undo)).toBe(Place.Bar);
+    expect(placeOf(Command.Redo)).toBe(Place.Bar);
+  });
+
+  it('the toolbar keeps at most six controls: Add, the toolbar actions and ⋯', () => {
+    const toolbar = (Object.keys(ACTIONS) as (keyof typeof ACTIONS)[]).filter((id) => placeOf(id) === Place.Toolbar);
+
+    expect(toolbar.length + 2).toBeLessThanOrEqual(6);
   });
 });

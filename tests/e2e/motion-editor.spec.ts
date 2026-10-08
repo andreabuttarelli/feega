@@ -77,7 +77,8 @@ test.describe('motion editor @real', () => {
     await page.mouse.up();
     await expect(value).not.toHaveText(before ?? '');
 
-    await page.getByTestId('graph-toggle').click();
+    await page.getByTestId('timeline-more').click();
+    await page.getByRole('menuitemcheckbox', { name: 'Graph editor' }).click();
     await expect(page.getByText('Select a clip with keyframes')).toHaveCount(0);
   });
 
