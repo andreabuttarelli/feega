@@ -17,8 +17,12 @@
   import ShortcutHelp from '$lib/components/motion/ShortcutHelp.svelte';
   import IconButton from '$lib/components/motion/IconButton.svelte';
   import { Action, Caption, menuSections, type ActionId } from '$lib/motion/actions';
+  import { ClipOp, runClipOp } from '$lib/motion/clip-ops';
+  import { PickMode, clipActions, parentChoices } from '$lib/motion/clip-bar';
+  import type { Point } from '$lib/motion/press-menu';
+  import ClipBar from '$lib/components/motion/ClipBar.svelte';
   import OverflowMenu, { type MenuBlock } from '$lib/components/motion/OverflowMenu.svelte';
-  import { CHAT_PLACE, ChatPlace, DEFAULT_LAYOUT, Panel, Side, flip, readLayout, sideWidth, timelineHeight, toggleSide, viewportOf, writeLayout, type EditorLayout, type LayoutStore } from '$lib/motion/editor-layout';
+  import { CHAT_PLACE, ChatPlace, DEFAULT_LAYOUT, Panel, Side, flip, readLayout, sideWidth, timelineHeight, toggleSide, viewportOf, Viewport, writeLayout, type EditorLayout, type LayoutStore } from '$lib/motion/editor-layout';
   import { provideSelection } from '$lib/motion/selection-context';
   import { addAdjustment, mergeView, pathNames, precompose, viewOf } from '$lib/motion/precomp';
   import { Lens, addLens } from '$lib/motion/glass/ops';
@@ -70,11 +74,8 @@
     adjacentKeyframe,
     copyKeyframes,
     deleteKeyframes,
-    duplicateClip,
     keyframeFrames,
     pasteKeyframes,
-    removeClips,
-    splitClip,
     type KeyBoard,
     type KeyRef,
     type OpResult
@@ -161,7 +162,11 @@
   let moreOpen = $state(false);
   let clockOpen = $state(false);
   let toolsOpen = $state(false);
+  let pickMode = $state(PickMode.One);
+  let clipMenu = $state<{ at: Point | null; parents: boolean } | null>(null);
+  let menuAt: Point | null = null;
   let pressAt: { x: number; y: number } | null = null;
+  let pressedMenu: unknown = null;
 
   function browserStore(): LayoutStore | null {
     try {
@@ -601,14 +606,16 @@
     apply(addTrack(doc, kind, newId()), 'Added a track');
   }
 
-  function split() {
-    for (const id of selection) {
-      const result = splitClip(doc, id, frame, newId());
-      if (result.ok) {
-        edit(result.doc, 'Split');
-      }
+  function clipOp(op: ClipOp, parent: string | null = null) {
+    const result = runClipOp(op, { doc, selection, frame, parent, newId });
+    if (!result.ok) {
+      return;
     }
+    edit(result.doc, result.summary);
+    selection = result.selection;
   }
+
+  const split = () => clipOp(ClipOp.Split);
 
   function groupUnderNull() {
     const id = newId();
@@ -621,18 +628,7 @@
     selection = [id];
   }
 
-  function duplicate() {
-    const copies: string[] = [];
-    for (const id of selection) {
-      const copy = newId();
-      const result = duplicateClip(doc, id, copy);
-      if (result.ok) {
-        edit(result.doc, 'Duplicated');
-        copies.push(copy);
-      }
-    }
-    selection = copies;
-  }
+  const duplicate = () => clipOp(ClipOp.Duplicate);
 
   function remove() {
     if (keySelection.length) {
@@ -643,8 +639,7 @@
     if (!selection.length) {
       return;
     }
-    apply(removeClips(doc, selection), 'Deleted');
-    selection = [];
+    clipOp(ClipOp.Delete);
   }
 
   function undoEdit() {
@@ -856,8 +851,54 @@
     }))
   ]);
 
+  function showProperties() {
+    if (viewport === Viewport.Phone) {
+      sheet = Sheet.Properties;
+      return;
+    }
+    if (!propsShown) {
+      toggleInspector();
+    }
+  }
+
+  const CLIP_RUN: Partial<Record<ActionId, () => void>> = {
+    [Action.Split]: split,
+    [Action.Duplicate]: duplicate,
+    [Action.Delete]: remove,
+    [Action.OpenComp]: () => selected?.component === 'Precomp' && enterComp(String(selected.props.comp)),
+    [Action.ParentTo]: () => (clipMenu = { at: menuAt, parents: true }),
+    [Action.SelectSeveral]: () => (pickMode = PickMode.Many),
+    [Action.ClipProperties]: showProperties
+  };
+
+  function runFromBar(id: ActionId) {
+    menuAt = { x: innerWidth / 2, y: innerHeight / 3 };
+    clipMenu = null;
+    CLIP_RUN[id]?.();
+  }
+
+  function openClipMenu(at: Point) {
+    menuAt = at;
+    clipMenu = { at, parents: false };
+  }
+
+  const clipBarShown = $derived(selection.length > 0 && (viewport !== Viewport.Desktop || pickMode === PickMode.Many));
+
+  const clipSections = $derived<MenuBlock[]>(
+    clipMenu?.parents
+      ? [{ section: 'Parent to', items: parentChoices(doc, selection).map((choice) => ({ label: choice.name, run: () => clipOp(ClipOp.Parent, choice.id) })) }]
+      : [{ section: 'Clip', items: clipActions(doc, selection).map((id) => ({ id, run: () => CLIP_RUN[id]?.() })) }]
+  );
+
+  $effect(() => {
+    if (!selection.length) {
+      pickMode = PickMode.One;
+    }
+  });
+
   function pressDown(e: PointerEvent) {
     pressAt = { x: e.clientX, y: e.clientY };
+    pressedMenu = clipMenu;
   }
 
   function closePopovers(e: PointerEvent) {
@@ -866,19 +907,23 @@
     if (!from || !isTap(from, { x: e.clientX, y: e.clientY })) {
       return;
     }
-    if ((e.target as HTMLElement | null)?.closest('.popover-anchor')) {
+    if ((e.target as HTMLElement | null)?.closest('.popover-anchor, [role=menu]')) {
       return;
     }
     settingsOpen = false;
     clockOpen = false;
     toolsOpen = false;
+    if (clipMenu === pressedMenu) {
+      clipMenu = null;
+    }
   }
 
   function onKey(e: KeyboardEvent) {
-    if ((settingsOpen || clockOpen || toolsOpen) && e.key === 'Escape') {
+    if ((settingsOpen || clockOpen || toolsOpen || clipMenu) && e.key === 'Escape') {
       settingsOpen = false;
       clockOpen = false;
       toolsOpen = false;
+      clipMenu = null;
       return;
     }
     if (exporting || sounding || isTyping(e.target as HTMLElement | null)) {
@@ -990,6 +1035,10 @@
 
   {#if sounding}
     <SoundDialog kind={sounding} {editorUrl} seconds={doc.durationInFrames / doc.fps} onclose={() => (sounding = null)} onmade={(made) => placeSound(sounding ?? 'voice', made)} />
+  {/if}
+
+  {#if clipMenu && selection.length}
+    <OverflowMenu sections={clipSections} at={clipMenu.at} label={clipMenu.parents ? 'Parent to' : 'Clip'} onclose={() => (clipMenu = null)} />
   {/if}
 
   {#if helpOpen}
@@ -1106,6 +1155,10 @@
     <section class="timeline-area" aria-label="Timeline">
       <div class="resize" role="separator" aria-orientation="horizontal" aria-label="Resize the timeline" aria-valuenow={layout.timelinePx} data-testid="timeline-resize" onpointerdown={startResize} ondblclick={() => relayout({ timelinePx: DEFAULT_LAYOUT.timelinePx })}></div>
 
+      {#if clipBarShown}
+        <ClipBar {doc} {selection} pick={pickMode} onrun={runFromBar} ondone={() => (pickMode = PickMode.One)} />
+      {/if}
+
       <div class="toolbar">
         <div class="add">
           <button type="button" class="tool text" onclick={() => (adding = !adding)}><Plus size={14} /> Add</button>
@@ -1135,9 +1188,11 @@
             </div>
           {/if}
         </div>
-        <IconButton action={Action.Split} size={14} disabled={!selection.length} onclick={split} />
-        <IconButton action={Action.Duplicate} size={14} disabled={!selection.length} onclick={duplicate} />
-        <IconButton action={Action.Delete} size={14} disabled={!selection.length && !keySelection.length} onclick={remove} />
+        {#if !clipBarShown || keySelection.length}
+          <IconButton action={Action.Split} size={14} disabled={!selection.length} onclick={split} />
+          <IconButton action={Action.Duplicate} size={14} disabled={!selection.length} onclick={duplicate} />
+          <IconButton action={Action.Delete} size={14} disabled={!selection.length && !keySelection.length} onclick={remove} />
+        {/if}
         <IconButton action={Action.Snap} size={14} caption={Caption.Wide} pressed={snap === Snap.On} onclick={() => (snap = snap === Snap.On ? Snap.Off : Snap.On)} />
         {#if notice}<span class="notice" role="status">{notice}</span>{/if}
         <span class="spacer"></span>
@@ -1151,7 +1206,7 @@
         {#if graphOpen}
           <GraphEditor {doc} {frame} {selection} bind:keySelection camera={cameraOpen} onchange={edit} />
         {:else}
-          <MotionTimeline {doc} bind:frame bind:selection bind:keySelection bind:camera={cameraOpen} bind:zoom {snap} {waveforms} {beats} {assetUrls} {reveal} onchange={edit} onopen={enterComp} />
+          <MotionTimeline pick={pickMode} onmenu={(_, at) => openClipMenu(at)} {doc} bind:frame bind:selection bind:keySelection bind:camera={cameraOpen} bind:zoom {snap} {waveforms} {beats} {assetUrls} {reveal} onchange={edit} onopen={enterComp} />
         {/if}
       </div>
     </section>

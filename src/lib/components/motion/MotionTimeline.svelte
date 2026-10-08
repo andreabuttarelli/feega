@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { pressMenu, type Point } from '$lib/motion/press-menu';
+  import { PickMode } from '$lib/motion/clip-bar';
   import IconButton from './IconButton.svelte';
   import { Action } from '$lib/motion/actions';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
@@ -56,8 +58,10 @@
     beats = [],
     assetUrls = {},
     reveal = Reveal.Animated,
+    pick = PickMode.One,
     onchange,
-    onopen
+    onopen,
+    onmenu
   }: {
     doc: MotionDoc;
     frame?: number;
@@ -70,8 +74,10 @@
     beats?: number[];
     assetUrls?: Record<string, string>;
     reveal?: Reveal;
+    pick?: PickMode;
     onchange: (doc: MotionDoc, summary: string) => void;
     onopen?: (comp: string) => void;
+    onmenu?: (clipId: string, at: Point) => void;
   } = $props();
 
   let folded = $state<string[]>([]);
@@ -266,13 +272,21 @@
 
   function select(clipId: string, e: PointerEvent) {
     camera = false;
-    if (e.shiftKey || e.metaKey || e.ctrlKey) {
+    if (pick === PickMode.Many || e.shiftKey || e.metaKey || e.ctrlKey) {
       selection = selection.includes(clipId) ? selection.filter((id) => id !== clipId) : [...selection, clipId];
       return;
     }
     if (!selection.includes(clipId)) {
       selection = [clipId];
     }
+  }
+
+  function menuOn(clipId: string, at: Point) {
+    gesture = null;
+    if (!selection.includes(clipId)) {
+      selection = [clipId];
+    }
+    onmenu?.(clipId, at);
   }
 
   const GRIP_DRAG: Record<Grip, Drag> = { [Grip.Start]: Drag.TrimStart, [Grip.End]: Drag.TrimEnd };
@@ -712,6 +726,7 @@
               style={`left: ${clip.from * ppf}px; width: ${Math.max(4, clip.durationInFrames * ppf)}px;`}
               onpointerdown={(e) => startClip(e, clip, track.id)}
               ondblclick={() => openComp(clip)}
+              use:pressMenu={(at) => menuOn(clip.id, at)}
             >
               {#if url && preview === Preview.Thumb}
                 <span class="thumbs" style={`background-image: url("${url}");`} aria-hidden="true"></span>
