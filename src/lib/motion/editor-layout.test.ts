@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CHAT_PLACE, ChatPlace, DEFAULT_LAYOUT, Panel, TIMELINE_MIN_PX, Viewport, flip, readLayout, timelineHeight, viewportOf, writeLayout } from './editor-layout';
+import { CHAT_PLACE, ChatPlace, DEFAULT_LAYOUT, Panel, SIDE_DEFAULT_PX, SIDE_MIN_PX, Side, TIMELINE_MIN_PX, Viewport, flip, readLayout, sideWidth, timelineHeight, toggleSide, viewportOf, writeLayout } from './editor-layout';
 
 function memory() {
   const items = new Map<string, string>();
@@ -18,7 +18,7 @@ const broken = {
 describe('editor layout', () => {
   it('remembers closed panels and the timeline height', () => {
     const store = memory();
-    const layout = { chat: Panel.Closed, inspector: Panel.Open, timelinePx: 420 };
+    const layout = { chat: Panel.Closed, inspector: Panel.Open, timelinePx: 420, side: Side.Properties, sidePx: 480 };
 
     writeLayout(store, layout);
 
@@ -59,5 +59,21 @@ describe('editor layout', () => {
     expect(CHAT_PLACE[Viewport.Desktop]).toBe(ChatPlace.Column);
     expect(CHAT_PLACE[Viewport.Tablet]).toBe(ChatPlace.Drawer);
     expect(CHAT_PLACE[Viewport.Phone]).toBe(ChatPlace.Sheet);
+  });
+
+  it('keeps the side column between its minimum and half the window', () => {
+    expect(sideWidth(100, 1440)).toBe(SIDE_MIN_PX);
+    expect(sideWidth(450.4, 1440)).toBe(450);
+    expect(sideWidth(5000, 1440)).toBe(720);
+    expect(sideWidth(5000, 500)).toBe(SIDE_MIN_PX);
+    expect(SIDE_DEFAULT_PX).toBeGreaterThan(360);
+  });
+
+  it('a toggle shows its segment, and closes the column when that segment is already showing', () => {
+    const open = { ...DEFAULT_LAYOUT, side: Side.Chat };
+
+    expect(toggleSide(open, Side.Properties)).toMatchObject({ side: Side.Properties, chat: Panel.Open, inspector: Panel.Open });
+    expect(toggleSide(open, Side.Chat)).toMatchObject({ side: Side.Chat, chat: Panel.Closed, inspector: Panel.Closed });
+    expect(toggleSide({ ...open, chat: Panel.Closed, inspector: Panel.Closed }, Side.Chat)).toMatchObject({ chat: Panel.Open, inspector: Panel.Open });
   });
 });

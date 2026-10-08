@@ -34,7 +34,7 @@ test.describe('motion editor @real', () => {
     expect(errors, errors.join('\n')).toEqual([]);
   });
 
-  test('? apre le scorciatoie, ⌘B e ⌥⌘B chiudono i pannelli e restano chiusi dopo un reload', async ({ page, session, seedNode }) => {
+  test('? apre le scorciatoie, ⌘B chiude la colonna e resta chiusa dopo un reload, ⌥⌘B la riapre su Properties', async ({ page, session, seedNode }) => {
     const node = await seedNode({ type: 'motion', data: MOTION_DATA });
     const url = `/p/${session.projectId}/c/${session.canvasId}/motion/${node.id}`;
     await gotoHydrated(page, url);
@@ -45,12 +45,15 @@ test.describe('motion editor @real', () => {
     await expect(page.getByTestId('shortcut-help')).toHaveCount(0);
 
     await page.keyboard.press('ControlOrMeta+b');
-    await page.keyboard.press('ControlOrMeta+Alt+b');
     await expect(page.getByLabel('Agent', { exact: true })).toBeHidden();
     await expect(page.getByLabel('Properties', { exact: true })).toBeHidden();
 
     await gotoHydrated(page, url);
     await expect(page.getByTestId('toggle-chat')).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.getByLabel('Agent', { exact: true })).toBeHidden();
+
+    await page.keyboard.press('ControlOrMeta+Alt+b');
+    await expect(page.getByLabel('Properties', { exact: true })).toBeVisible();
     await expect(page.getByLabel('Agent', { exact: true })).toBeHidden();
   });
 
