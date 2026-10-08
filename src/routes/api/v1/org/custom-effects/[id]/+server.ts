@@ -2,8 +2,8 @@ import { json } from '@sveltejs/kit';
 import { z } from 'zod';
 import type { RequestHandler } from './$types';
 import { shaderParam, textEdit } from '@feega/shader-fx';
-import { deleteEffect, Outcome, patchEffect } from '$lib/server/repos/effects';
-import { bodyOf, callerOf, forbidden, refused, written } from '$lib/server/effects/http';
+import { deleteEffect, Outcome } from '$lib/server/repos/effects';
+import { bodyOf, callerOf, forbidden, refused, storeOf, written } from '$lib/server/effects/http';
 
 const OK = 200;
 
@@ -30,7 +30,7 @@ export const PATCH: RequestHandler = async ({ request, url, params }) => {
     return refused(Outcome.Invalid, body.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`));
   }
 
-  return written(await patchEffect(caller.db, caller.orgId, params.id, body.data), OK);
+  return written(await storeOf(caller).patch({ effectId: params.id, ...body.data }), OK);
 };
 
 export const DELETE: RequestHandler = async ({ request, url, params }) => {
