@@ -1,5 +1,11 @@
+export enum RefuseWhen {
+  Requested = 'requested',
+  Suspected = 'suspected'
+}
+
 export type ModerationCategory = {
   instructions: string;
+  refuseWhen?: RefuseWhen;
   refusal: string;
   escalateAbove: number;
   refuseAbove?: number;
@@ -27,7 +33,8 @@ export const MODERATION_CATEGORIES: Readonly<Record<string, ModerationCategory>>
     instructions: 'Any minor, child, teenager or childlike body in a sexual, suggestive or nude context, or any request that sexualises youth.',
     refusal: 'Refused: content that sexualises minors is never generated.',
     escalateAbove: ZERO_TOLERANCE,
-    refuseAbove: ZERO_TOLERANCE
+    refuseAbove: ZERO_TOLERANCE,
+    refuseWhen: RefuseWhen.Suspected
   },
   [REAL_PERSON]: {
     instructions:
@@ -50,13 +57,15 @@ export const MODERATION_CATEGORIES: Readonly<Record<string, ModerationCategory>>
     instructions: 'Graphic violence, gore, mutilation, torture or realistic depictions of killing.',
     refusal: 'Refused: graphic violence and gore are never generated.',
     escalateAbove: ZERO_TOLERANCE,
-    refuseAbove: ZERO_TOLERANCE
+    refuseAbove: ZERO_TOLERANCE,
+    refuseWhen: RefuseWhen.Suspected
   },
   animals_sexual: {
     instructions: 'Any animal in a sexual, suggestive or nude-erotic context, or any request combining animals with sexual acts (bestiality, zoophilia).',
     refusal: 'Refused: sexual content involving animals is never generated.',
     escalateAbove: ZERO_TOLERANCE,
-    refuseAbove: ZERO_TOLERANCE
+    refuseAbove: ZERO_TOLERANCE,
+    refuseWhen: RefuseWhen.Suspected
   },
   self_harm: {
     instructions: 'Self-harm, suicide, eating disorders presented approvingly or instructionally.',
@@ -125,9 +134,9 @@ export function mentionsMinor(text: string): boolean {
   return MINOR_PATTERNS.some((pattern) => pattern.test(text));
 }
 
-export type JudgeVerdict = { allowed: boolean; category: string; reason: string };
+export type JudgeVerdict = { allowed: boolean; category: string; reason: string; requested?: boolean };
 
-const UNREADABLE_VERDICT: JudgeVerdict = { allowed: false, category: 'unknown', reason: 'the moderator gave no readable verdict' };
+const UNREADABLE_VERDICT: JudgeVerdict = { allowed: false, category: 'unknown', requested: true, reason: 'the moderator gave no readable verdict' };
 
 export function parseJudgeVerdict(raw: string): JudgeVerdict {
   const json = raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1);
@@ -136,6 +145,7 @@ export function parseJudgeVerdict(raw: string): JudgeVerdict {
     return {
       allowed: parsed.allowed === true,
       category: typeof parsed.category === 'string' ? parsed.category : 'unknown',
+      requested: parsed.requested !== false,
       reason: typeof parsed.reason === 'string' ? parsed.reason : ''
     };
   } catch {
@@ -190,14 +200,26 @@ export const IDENTIFIABILITY_JUDGE_SYSTEM = [
   'Answer with JSON only: {"allowed": boolean, "category": string, "reason": string}.'
 ].join('\n');
 
+export function judgeRefuses(categories: ModerationCategories, verdict: JudgeVerdict): boolean {
+  if (verdict.allowed) {
+    return false;
+  }
+  if (categories[verdict.category]?.refuseWhen === RefuseWhen.Suspected) {
+    return true;
+  }
+  return verdict.requested !== false;
+}
+
 export function judgeSystem(categories: ModerationCategories): string {
   return [
     'You are a strict content-safety moderator for an image, video, audio and text generator.',
-    'Decide whether the request below may be generated. Refuse when in doubt.',
+    'Decide whether the request below may be generated. Refuse when the request asks for content in a category below, or when in doubt about what it asks for.',
+    'Judge what the request asks for, never what it could be misused for: a bare URL, a website, a brand, a product or a person\'s name with no harmful request is safe — a site is material to read, not content to depict.',
     'Categories that must be refused:',
     ...Object.entries(categories)
       .filter(([name]) => name !== SAFE)
       .map(([name, category]) => `- ${name}: ${category.instructions}`),
-    'Answer with JSON only: {"allowed": boolean, "category": string, "reason": string}.'
+    'Set "requested" to true only when the request itself asks for the refused category\'s content.',
+    'Answer with JSON only: {"allowed": boolean, "category": string, "requested": boolean, "reason": string}.'
   ].join('\n');
 }

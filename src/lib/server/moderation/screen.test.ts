@@ -213,3 +213,20 @@ describe('an image-only 3D run has no text to screen', () => {
     expect(await screenGeneration(p, { ...model3d(''), operation: 'video' })).toMatchObject({ ok: false });
   });
 });
+
+describe('a judge refusal stands only when the refused content was asked for', () => {
+  const PRODUCTION_REASON = 'The prompt is only a URL to a personal website belonging to what appears to be a named, real individual. No sexual content';
+  const judgeSays = (category: string, requested: boolean) => vi.fn(async () => ({ allowed: false, category, requested, reason: PRODUCTION_REASON }));
+  const jevDown = () => vi.fn(async () => Promise.reject(new Error('jev_not_configured')));
+
+  it.each([
+    { text: 'alessiopallante.com', category: 'real_person_sexual', requested: false, ok: true },
+    { text: 'make a launch video for https://alessiopallante.com', category: 'real_person_sexual', requested: false, ok: true },
+    { text: 'a nude photo of Alessio Pallante', category: 'real_person_sexual', requested: true, ok: false },
+    { text: 'kids at the beach', category: 'minors', requested: false, ok: false },
+    { text: 'a battle scene', category: 'violence_gore', requested: false, ok: false }
+  ])('$text: $category, requested $requested, allowed $ok', async ({ text, category, requested, ok }) => {
+    const out = await screenGeneration(ports({ decide: jevDown(), judge: judgeSays(category, requested) }), request(text));
+    expect(out.ok).toBe(ok);
+  });
+});
