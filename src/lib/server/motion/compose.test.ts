@@ -28,6 +28,7 @@ function deps(overrides: Partial<ComposeDeps> = {}): ComposeDeps {
     saveMotionDoc: vi.fn(async (_db: Db, input: { doc: unknown }) => ({ outcome: RevisionOutcome.Written as const, head: { version: 1, doc: input.doc as MotionDoc, summary: null, actorKind: 'user' } })),
     listRecentNodes: vi.fn(async () => []),
     readHead: vi.fn(async () => null),
+    readHeads: vi.fn(async () => new Map()),
     findNode: vi.fn(async () => null),
     listConnections: vi.fn(async () => []),
     listProjectAssets: vi.fn(async () => []),
@@ -72,16 +73,16 @@ describe('mediaOfRefs', () => {
 
 describe('recentCompositions', () => {
   it('lists only the motion videos of the project that hold a composition', async () => {
-    const node = (id: string, projectId: string) => ({ id, projectId, canvasId: 'c1', name: `video ${id}`, data: {}, updatedAt: '2026-10-04' });
+    const node = (id: string, projectId: string) => ({ id, projectId, canvasId: 'c1', name: `video ${id}`, data: { docHeadRevision: 1 }, updatedAt: '2026-10-04' });
     const heads: Record<string, MotionDoc> = { comp: composedDoc('helix'), plain: newMotionDoc(MotionFormat.Vertical) };
     const d = deps({
       listRecentNodes: vi.fn(async () => [node('comp', 'p1'), node('plain', 'p1'), node('other', 'p2')]),
-      readHead: vi.fn(async (_db: Db, scope: { nodeId: string }) => (heads[scope.nodeId] ? { version: 1, doc: heads[scope.nodeId], summary: null, actorKind: 'user' } : null))
+      readHeads: vi.fn(async () => new Map(Object.entries(heads).map(([id, doc]) => [id, { version: 1, doc, summary: null, actorKind: 'user' }])))
     });
 
     const listed = await recentCompositions(db, d, { orgId: 'org', projectId: 'p1' });
 
-    expect(listed).toEqual([{ id: 'comp', name: 'video comp', layout: 'helix', updatedAt: '2026-10-04', href: '/app/compose/comp?project=p1' }]);
+    expect(listed).toEqual([{ id: 'comp', name: 'video comp', layout: 'helix', updatedAt: '2026-10-04', href: '/app/compose/comp?project=p1', posterAssetId: null, renderAssetId: null }]);
   });
 });
 
