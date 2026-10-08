@@ -140,6 +140,10 @@ and returns its check; `patch_effect` edits it by find/replace at its `version`.
 them under `custom`, each with the `step` to put in an `apply_effects` stack. On motion clips, ask
 `ask_motion_agent` to add it.
 
+Custom composition layouts: `write_layout` writes a spec layout (placement, slots, animation) for the
+workspace, `patch_layout` replaces its spec at a `version`, `list_layouts` lists them; ask
+`ask_motion_agent` to arrange a composition on one.
+
 ## Loop a node over many combinations
 
 `run_node_loop` queues every combination from a node's `iterate` wires (or a plain "repeat N")

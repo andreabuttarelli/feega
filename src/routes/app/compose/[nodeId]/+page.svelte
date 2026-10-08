@@ -22,7 +22,7 @@
   import { ColorField, ControlRow, ControlLayout, NumberField, OptionMenu, RatioChips, Switch } from '$lib/components/ui/control/index.js';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
-  import { LAYOUTS } from '$lib/canvas/composition/index';
+  import { CUSTOM_LAYOUT, LAYOUTS, layoutOf } from '$lib/canvas/composition/index';
   import { CAMERA_PRESETS, type CameraPresetId } from '$lib/canvas/composition/camera';
   import type { LayoutId } from '$lib/canvas/composition/types';
   import { controlFor, setLayoutParam } from '$lib/canvas/composition-editor';
@@ -30,7 +30,7 @@
   import { FORMATS, MOTION_FORMATS, type MotionDoc, MotionFormat } from '$lib/motion/doc';
   import { resolveColor } from '$lib/motion/brand';
   import { Target, composeHtml } from '$lib/motion/hyperframes/compose';
-  import { MAX_COMPOSE_SECONDS, MIN_SECONDS, applyDraft, clampSeconds, draftFromDoc, newDraft, withCamera, withLayout, type ComposeDraft, type ComposeMedia } from '$lib/motion/composition-draft';
+  import { MAX_COMPOSE_SECONDS, MIN_SECONDS, applyDraft, clampSeconds, draftFromDoc, newDraft, withCamera, withCustomLayout, withLayout, type ComposeDraft, type CustomLayout, type ComposeMedia } from '$lib/motion/composition-draft';
 
   const SAVE_DEBOUNCE_MS = 700;
   const SaveState = { Saved: 'Saved', Saving: 'Saving…', Pending: 'Unsaved', Conflict: 'Reloaded the latest version', Failed: 'Not saved' } as const;
@@ -72,7 +72,28 @@
   const assetUrls = $derived(Object.fromEntries(data.assets.filter((a) => a.url).map((a) => [a.id, a.url as string])));
   const html = $derived(composeHtml({ doc, tokens: data.tokens, assets: assetUrls, target: Target.Screen }));
   const picked = $derived(new Map((draft?.media ?? []).map((m, i) => [m.assetId, i])));
-  const fixedCamera = $derived(draft ? LAYOUTS[draft.layout].camera === 'fixed' : false);
+  const fixedCamera = $derived(draft ? layoutOf(draft.layout, draft.custom?.spec).camera === 'fixed' : false);
+  let layoutPrompt = $state('');
+  let designing = $state(false);
+  let designError = $state<string | null>(null);
+
+  async function designLayout(current: ComposeDraft) {
+    if (!layoutPrompt.trim() || designing) {
+      return;
+    }
+
+    designing = true;
+    designError = null;
+    const form = new FormData();
+    form.set('prompt', layoutPrompt);
+    const result = await post('?/designLayout', form).finally(() => (designing = false));
+    if (result.type === 'success' && result.data?.layout) {
+      change(withCustomLayout(current, result.data.layout as CustomLayout));
+      layoutPrompt = '';
+      return;
+    }
+    designError = result.type === 'failure' ? String(result.data?.error ?? 'The layout could not be made.') : 'The layout could not be made.';
+  }
   const seconds = $derived(doc.durationInFrames / doc.fps);
 
   onDestroy(() => {
@@ -275,7 +296,15 @@
             {#each COMPOSITION_LAYOUTS as layout (layout)}
               <button type="button" role="radio" aria-checked={current.layout === layout} class:on={current.layout === layout} onclick={() => change(withLayout(current, layout))}>{LAYOUTS[layout].label}</button>
             {/each}
+            {#if current.custom}
+              <button type="button" role="radio" aria-checked={current.layout === CUSTOM_LAYOUT} class:on={current.layout === CUSTOM_LAYOUT} onclick={() => current.custom && change(withCustomLayout(current, current.custom))}>{current.custom.name}</button>
+            {/if}
           </div>
+          <form class="design" onsubmit={(e) => { e.preventDefault(); void designLayout(current); }}>
+            <input type="text" placeholder="Edit with AI: cards orbiting slowly…" bind:value={layoutPrompt} aria-label="Describe a layout" disabled={designing} />
+            <button type="submit" class="button" disabled={designing || !layoutPrompt.trim()}>{designing ? 'Designing…' : 'Make layout'}</button>
+          </form>
+          {#if designError}<p class="muted" role="alert">{designError}</p>{/if}
         </section>
 
         <section class="group" aria-labelledby="g-media">
@@ -341,9 +370,9 @@
         </section>
 
         <section class="group" aria-labelledby="g-layout">
-          <h3 id="g-layout">{LAYOUTS[current.layout].label} settings</h3>
+          <h3 id="g-layout">{layoutOf(current.layout, current.custom?.spec).label} settings</h3>
           <div class="params">
-            {#each LAYOUTS[current.layout].params as param (param.name)}
+            {#each layoutOf(current.layout, current.custom?.spec).params as param (param.name)}
               <StudioParamControl label={param.label} control={controlFor(param, current.layoutParams[param.name])} onchange={(value) => change({ ...current, layoutParams: setLayoutParam(current.layoutParams, param.name, value) })} />
             {/each}
           </div>
@@ -535,6 +564,19 @@
     color: var(--ink-soft);
   }
 
+  .design {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .design input {
+    flex: 1;
+    min-width: 0;
+    padding: 6px 8px;
+    border: 1px solid var(--line, #ededef);
+    background: transparent;
+    font: inherit;
+  }
   .chips {
     display: flex;
     flex-wrap: wrap;

@@ -1,6 +1,10 @@
 import { tool, type Tool, type ToolExecutionOptions } from 'ai';
 import { addShader, removeShader, setShader } from '$lib/motion/shaders/ops';
 import type { EffectStore } from '$lib/server/effects/store';
+import type { LayoutStore } from '$lib/server/layouts/store';
+import type { LayoutWritten } from '$lib/server/repos/layouts';
+import { LAYOUT_SPEC_GUIDE } from '$lib/server/layouts/design';
+import { CUSTOM_LAYOUT } from '$lib/canvas/composition/index';
 import { CheckState as EffectCheck, Outcome, type Written } from '$lib/server/repos/effects';
 
 const MAX_EFFECT_FAILURES = 3;
@@ -134,6 +138,7 @@ export type MotionToolDeps = {
   capture?: (url: string, view: CaptureView) => Promise<SiteCapture>;
   readUi?: (asset: MotionAsset, region?: UiRegion) => Promise<UiRead>;
   effects?: EffectStore;
+  layouts?: LayoutStore;
 };
 
 export type UiRegion = { x: number; y: number; width: number; height: number };
@@ -361,6 +366,16 @@ function propsError(doc: MotionDoc, clipId: string, patch: Record<string, unknow
 }
 
 export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
+  const layoutWritten = (written: LayoutWritten | null) => {
+    if (!written) {
+      return { ok: false, error: 'custom layouts are not available here' };
+    }
+    if (written.outcome !== Outcome.Ok) {
+      return { ok: false, error: `${written.outcome}${written.problems?.length ? `: ${written.problems.join('; ')}` : ''}` };
+    }
+    return { ok: true, layout_id: written.layout.id, name: written.layout.name, version: written.layout.version };
+  };
+
   const effectWrite = async (write: (store: EffectStore) => Promise<Written>) => {
     if (!deps.effects) {
       return { ok: false, error: 'custom effects are not available here' };
@@ -1303,6 +1318,36 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       execute: async () => {
         const effects = deps.effects ? await deps.effects.list() : null;
         return { effects: (effects ?? []).map((e) => ({ effect_id: e.id, name: e.name, version: e.version, params: e.params, state: e.check.state, problems: e.check.problems, cost_ms: e.check.costMs })) };
+      }
+    }),
+
+    write_layout: tool({
+      description: `Write a custom composition layout for the whole workspace (same name replaces it). ${LAYOUT_SPEC_GUIDE} Then apply_layout on a Composition clip.`,
+      inputSchema: z.object({ name: z.string(), spec: z.record(z.string(), z.unknown()) }),
+      execute: async (input) => layoutWritten(deps.layouts ? await deps.layouts.write(input) : null)
+    }),
+
+    patch_layout: tool({
+      description: 'Replace the spec of a custom layout at its version (list_layouts); a stale version answers conflict. Clips that use it keep their snapshot until apply_layout again.',
+      inputSchema: z.object({ layout_id: z.string(), version: z.number().int(), spec: z.record(z.string(), z.unknown()) }),
+      execute: async (input) => layoutWritten(deps.layouts ? await deps.layouts.patch({ layoutId: input.layout_id, version: input.version, spec: input.spec }) : null)
+    }),
+
+    list_layouts: tool({
+      description: 'The custom composition layouts of the workspace: id, name, version, spec. Free, reads only.',
+      inputSchema: z.object({}),
+      execute: async () => ({ layouts: ((deps.layouts ? await deps.layouts.list() : null) ?? []).map((l) => ({ layout_id: l.id, name: l.name, version: l.version, spec: l.spec })) })
+    }),
+
+    apply_layout: tool({
+      description: 'Arrange a Composition clip on a custom layout of the workspace (list_layouts / write_layout): its spec is copied into the clip, so the video renders with no workspace. layoutParams keep working for the params the spec declares.',
+      inputSchema: z.object({ clip_id: z.string(), layout_id: z.string() }),
+      execute: async (input) => {
+        const layout = deps.layouts ? await deps.layouts.find(input.layout_id) : null;
+        if (!layout) {
+          return { ok: false, error: deps.layouts ? `no layout ${input.layout_id}: list_layouts shows the workspace's` : 'custom layouts are not available here' };
+        }
+        return apply(setProps(session.doc, input.clip_id, { layout: CUSTOM_LAYOUT, layoutRef: layout.id, layoutSpec: { ...layout.spec, name: layout.name } }), `arranged ${input.clip_id} on ${layout.name}`);
       }
     }),
 

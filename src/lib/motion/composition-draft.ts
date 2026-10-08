@@ -1,5 +1,6 @@
 import { CAMERA_PRESETS, type CameraPresetId } from '../canvas/composition/camera';
-import { LAYOUTS } from '../canvas/composition/index';
+import { CUSTOM_LAYOUT, layoutOf, type CompositionLayout } from '../canvas/composition/index';
+import type { LayoutSpec } from '../canvas/composition/spec';
 import type { LayoutId, LayoutParams } from '../canvas/composition/types';
 import type { CompositionAspect, CompositionNode, UpstreamCard } from '../canvas/composition-node';
 import { COMP_CARD_LAYOUTS } from './card-layouts';
@@ -10,8 +11,11 @@ import type { PropsOf } from './hyperframes/templates';
 
 export type ComposeMedia = PropsOf<'Composition'>['media'][number];
 
+export type CustomLayout = { id: string; name: string; spec: LayoutSpec };
+
 export type ComposeDraft = {
-  layout: LayoutId;
+  layout: CompositionLayout;
+  custom: CustomLayout | null;
   layoutParams: LayoutParams;
   camera: CameraPresetId;
   cameraParams: LayoutParams;
@@ -45,11 +49,20 @@ const FORMAT_OF_ASPECT: Record<CompositionAspect, MotionFormat> = {
 
 const defaultsOf = (defs: readonly { name: string; default: number | string }[]): LayoutParams => Object.fromEntries(defs.map((d) => [d.name, d.default]));
 
-export function withLayout(draft: ComposeDraft, layout: LayoutId): ComposeDraft {
-  const camera = LAYOUTS[layout].camera === 'fixed' ? STILL_CAMERA : draft.camera;
+function selected(draft: ComposeDraft, layout: CompositionLayout, custom: CustomLayout | null): ComposeDraft {
+  const definition = layoutOf(layout, custom?.spec);
+  const camera = definition.camera === 'fixed' ? STILL_CAMERA : draft.camera;
   const cameraParams = camera === draft.camera ? draft.cameraParams : defaultsOf(CAMERA_PRESETS[camera].params);
-  return { ...draft, layout, layoutParams: defaultsOf(LAYOUTS[layout].params), camera, cameraParams };
+  return { ...draft, layout, custom, layoutParams: defaultsOf(definition.params), camera, cameraParams };
 }
+
+export const withLayout = (draft: ComposeDraft, layout: LayoutId): ComposeDraft => selected(draft, layout, null);
+
+export const withCustomLayout = (draft: ComposeDraft, custom: CustomLayout): ComposeDraft => selected(draft, CUSTOM_LAYOUT, { ...custom, spec: { ...custom.spec, name: custom.name } });
+
+const CUSTOM_LABEL = 'Custom';
+
+const customName = (spec: LayoutSpec) => spec.name ?? CUSTOM_LABEL;
 
 export function withCamera(draft: ComposeDraft, camera: CameraPresetId): ComposeDraft {
   return { ...draft, camera, cameraParams: defaultsOf(CAMERA_PRESETS[camera].params) };
@@ -58,6 +71,7 @@ export function withCamera(draft: ComposeDraft, camera: CameraPresetId): Compose
 export function newDraft(layout: LayoutId): ComposeDraft {
   const base: ComposeDraft = {
     layout,
+    custom: null,
     layoutParams: {},
     camera: MOVING_CAMERA,
     cameraParams: defaultsOf(CAMERA_PRESETS[MOVING_CAMERA].params),
@@ -130,6 +144,8 @@ export function applyDraft(base: MotionDoc, draft: ComposeDraft): DocVerdict {
 
   const composition = clipOf(COMPOSITION_CLIP, 'Composition', frames, {
     layout: draft.layout,
+    layoutSpec: draft.custom?.spec ?? null,
+    layoutRef: draft.custom?.id ?? '',
     media: draft.media,
     layoutParams: draft.layoutParams,
     camera: draft.camera,
@@ -163,6 +179,7 @@ export function draftFromDoc(doc: MotionDoc): ComposeDraft | null {
 
   return {
     layout: p.layout,
+    custom: p.layout === CUSTOM_LAYOUT && p.layoutSpec ? { id: p.layoutRef, name: customName(p.layoutSpec), spec: p.layoutSpec } : null,
     layoutParams: p.layoutParams,
     camera: p.camera,
     cameraParams: p.cameraParams,

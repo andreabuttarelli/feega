@@ -33,6 +33,7 @@ const animation = z.object({
 export const layoutSpecSchema = z
 	.object({
 		kind: z.literal('spec'),
+		name: z.string().max(48).optional(),
 		cards: z.enum(CARD_ASPECTS).default('1:1'),
 		camera: z.enum(['fixed', 'selected']).default('fixed'),
 		motion: z.enum(['cycle', 'ping-pong', 'linear']).default('cycle'),
@@ -163,7 +164,7 @@ export function specDefinition(input: LayoutSpec): LayoutDefinition {
 	const spec = parsed.spec;
 	const params: LayoutParam[] = spec.params;
 	return {
-		label: 'Custom',
+		label: spec.name ?? 'Custom',
 		description: 'A layout written for this workspace.',
 		motion: spec.motion,
 		camera: spec.camera,

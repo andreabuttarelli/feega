@@ -12,7 +12,7 @@ import { applyDraft, composeEditorPath, draftFromDoc, draftFromNode, slotsOf, wi
 import type { MotionDoc } from '$lib/motion/doc';
 import { COMPOSITION_MEDIA_KINDS } from '$lib/motion/components';
 import { newMotionDoc } from '$lib/motion/doc';
-import type { LayoutId } from '$lib/canvas/composition/types';
+import type { CompositionLayout } from '$lib/canvas/composition/index';
 
 export type ComposeDeps = MotionStartDeps & {
   saveMotionDoc: typeof saveMotionDoc;
@@ -56,7 +56,7 @@ export function mediaOfRefs(assets: Pick<Asset, 'id' | 'type'>[], refs: string[]
   });
 }
 
-export type RecentComposition = { id: string; name: string; layout: LayoutId; updatedAt: string; href: string; posterAssetId: string | null; renderAssetId: string | null };
+export type RecentComposition = { id: string; name: string; layout: CompositionLayout; updatedAt: string; href: string; posterAssetId: string | null; renderAssetId: string | null };
 
 const RECENT_SCAN = 24;
 const RECENT_LIMIT = 8;

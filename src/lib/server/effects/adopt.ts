@@ -6,9 +6,14 @@ import type { Actor } from '$lib/server/repos/actor';
 
 const AGENT = 'agent';
 
-export async function adoptShaders(db: Db, scope: { orgId: string; userId: string; actor: Actor }, doc: MotionDoc): Promise<MotionDoc> {
-  const { orgId } = scope;
-  const author = { kind: scope.actor.kind === AGENT ? AGENT : 'user', id: scope.userId, agentKey: scope.actor.agentKey ?? undefined } as const;
+export type WorkspaceAuthor = { kind: 'user' | 'agent'; id: string; agentKey?: string };
+
+export function workspaceAuthor(scope: { userId: string; actor: Actor }): WorkspaceAuthor {
+  return { kind: scope.actor.kind === AGENT ? AGENT : 'user', id: scope.userId, agentKey: scope.actor.agentKey ?? undefined };
+}
+
+export async function adoptShaders(db: Db, scope: { orgId: string; author: WorkspaceAuthor }, doc: MotionDoc): Promise<MotionDoc> {
+  const { orgId, author } = scope;
   const entries = Object.entries(doc.shaders);
   if (!entries.length) {
     return doc;

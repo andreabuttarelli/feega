@@ -167,6 +167,11 @@ name replaces it): `frag` defines `vec4 effect(vec2 uv)` over `u_src`, `u_res`, 
 applies `[{ find, replace }]` edits; a stale `version` is a 409. `list_effects` returns them under
 `custom` with the `step` (`{ id: "custom", ref }`) that `apply_effects` takes. Free.
 
+`write_layout` (`{ org, name, spec }`) stores a custom composition layout: `spec` is `{ kind: "spec",
+slots, place, camera?, motion?, params?, tilt?, scale?, animate? }` with `place` a grid, ring, line or
+scatter. `patch_layout` (`{ org, layout_id, version, spec }`) replaces it; `list_layouts` lists them.
+Free.
+
 ## Node loops
 
 | MCP | CLI |

@@ -18,6 +18,8 @@ const ASSETS = { a: 'https://cdn.test/a.png', b: 'https://cdn.test/b.png', v: 'h
 function propsFor(layout: LayoutId): CompositionProps {
   return {
     layout,
+    layoutSpec: null,
+    layoutRef: '',
     media: [
       { assetId: 'a', kind: 'image' },
       { assetId: 'b', kind: 'image' },

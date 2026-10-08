@@ -15,9 +15,12 @@ import { uploadKindOf } from '$lib/canvas/upload-kind';
 import { draftFromDoc } from '$lib/motion/composition-draft';
 import { COMPOSITION_MEDIA_KINDS } from '$lib/motion/components';
 import { editorGallery, publishFromForm, withdrawFromForm } from '$lib/server/gallery/editor';
+import { designLayout } from '$lib/server/layouts/design';
+import { Outcome } from '$lib/server/repos/effects';
 
 const HTTP_BAD_REQUEST = 400;
 const HTTP_NOT_FOUND = 404;
+const LAYOUT_REFUSED: Partial<Record<Outcome, string>> = { [Outcome.Unavailable]: 'Custom layouts are not available yet.' };
 const MEDIA_KINDS = new Set<string>(COMPOSITION_MEDIA_KINDS);
 
 async function scopeOf(event: Pick<RequestEvent, 'locals' | 'url' | 'cookies' | 'params'>) {
@@ -62,6 +65,20 @@ export const load: PageServerLoad = async (event) => {
 const galleryScope = (scope: { db: Db; orgId: string; userId: string }) => ({ db: scope.db, orgId: scope.orgId, userId: scope.userId, actor: { kind: 'user' as const, id: scope.userId } });
 
 export const actions: Actions = {
+  designLayout: async (event) => {
+    const { db, orgId, userId } = await scopeOf(event);
+    const prompt = String((await event.request.formData()).get('prompt') ?? '').trim();
+    if (!prompt) {
+      return fail(HTTP_BAD_REQUEST, { error: 'Describe the layout you want.' });
+    }
+
+    const written = await designLayout(db, { orgId, userId }, prompt);
+    if (written.outcome !== Outcome.Ok) {
+      return fail(HTTP_BAD_REQUEST, { error: LAYOUT_REFUSED[written.outcome] ?? (written.problems ?? []).join('; ') });
+    }
+    return { layout: { id: written.layout.id, name: written.layout.name, spec: written.layout.spec } };
+  },
+
   publishGallery: async (event) => {
     const scope = await scopeOf(event);
     return publishFromForm(galleryScope(scope), scope.motion.record.id, await event.request.formData());

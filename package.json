@@ -38,6 +38,7 @@
     "eval:canvas": "vite-node --config scripts/vite-node.config.ts scripts/eval/canvas.ts",
     "eval:image-node": "vite-node --config scripts/vite-node.config.ts scripts/eval/image-node.ts",
     "eval:custom-effect": "vite-node --config scripts/vite-node.config.ts scripts/eval/custom-effect.ts",
+    "eval:custom-layout": "vite-node --config scripts/vite-node.config.ts scripts/eval/custom-layout.ts",
     "eval:gen-node": "vite-node --config scripts/vite-node.config.ts scripts/eval/gen-node.ts",
     "eval:bootstrap": "vite-node --config scripts/vite-node.config.ts scripts/eval/bootstrap.ts",
     "eval:moderation": "vite-node --config scripts/vite-node.config.ts scripts/eval/moderation-edges.ts",

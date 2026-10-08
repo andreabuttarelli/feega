@@ -10,6 +10,7 @@ import { registerNodeTools } from './tools/nodes.ts';
 import { registerPromptTools } from './tools/prompts.ts';
 import { registerMotionTools } from './tools/motion.ts';
 import { registerGalleryTools } from './tools/gallery.ts';
+import { registerLayoutTools } from './tools/layouts.ts';
 import { SocialPublishing } from './features.ts';
 
 /**
@@ -42,9 +43,9 @@ const MCP_INSTRUCTION_LINES = (promoted: string) => [
   'Three generic writes reach every table: `insert_row`, `update_row`, `delete_row`. `describe_node_types` gives the JSON Schema `nodes.data` must match per `type` before you insert or update one.',
   '`run_node_generation` is the canvas Generate button: fills an existing node, never creates one; omit `model` for the default; `medium` must match the node\'s type; a video comes back `queued`. `apply_effects`/`make_effects_pair` render effects (`list_effects`; custom: `write_effect`, `patch_effect`), free. `enhance_prompt` improves a prompt. `run_node_loop` queues every combination of a node\'s inputs (`preview_node_loop` free, `cancel_node_loop` stops what\'s queued); confirm >50, refused >1000.',
   promoted,
-  'A project has no brand until one is attached (`projects.brand_id` is nullable, and that is the normal case): open a canvas to explore, choose a brand only once something is ready to publish.',
+  'A project needs no brand (`projects.brand_id` is nullable, and that is the normal case): attach one only to publish.',
   '`get_media` shows what a node, run or asset holds: fetch `preview_url` to look, give `full_url` to the user.',
-  '`list_motion_videos` finds `motion` nodes; `ask_motion_agent` edits one (`get_motion_run`, `get_motion_summary`); `render_video`, `get_render`; `publish_motion_embed`, `get_motion_embed`; `view_motion_frames` shows frames of one; `search_gallery`, `remix_gallery_item`, `publish_to_gallery`.',
+  '`list_motion_videos` finds `motion` nodes; `ask_motion_agent` edits one (`get_motion_run`, `get_motion_summary`); `render_video`, `get_render`; `publish_motion_embed`, `get_motion_embed`; `view_motion_frames` shows frames of one; `search_gallery`, `remix_gallery_item`, `publish_to_gallery`; layouts: `write_layout`, `patch_layout`, `list_layouts`.',
   'Signing in is not a tool: over HTTP the host sends the Bearer; locally run `feega login` once (shared session file).'
 ];
 
@@ -172,6 +173,7 @@ export function createFeegaMcpServer(publishing: SocialPublishing): McpServer {
   registerPromptTools(server);
   registerMotionTools(server);
   registerGalleryTools(server);
+  registerLayoutTools(server);
 
   return server;
 }

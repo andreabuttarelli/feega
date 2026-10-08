@@ -256,6 +256,36 @@ effects
     await cmdEffectsPatch(effectId, opts);
   });
 
+const layouts = program
+  .command('layouts')
+  .description('List the custom composition layouts of your workspace')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (opts) => {
+    const { cmdLayouts } = await import('./commands/layouts.ts');
+    await cmdLayouts(opts);
+  });
+
+layouts
+  .command('write <name>')
+  .description('Write a custom layout from a JSON spec file (same name replaces it), free')
+  .requiredOption('--file <path>', 'JSON spec: { kind: "spec", slots, place, ... }')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (name: string, opts) => {
+    const { cmdLayoutsWrite } = await import('./commands/layouts.ts');
+    await cmdLayoutsWrite(name, opts);
+  });
+
+layouts
+  .command('patch <layoutId>')
+  .description('Replace the spec of a custom layout at its version, free')
+  .requiredOption('--at-version <n>', 'The version list or write printed')
+  .requiredOption('--file <path>', 'The new JSON spec')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (layoutId: string, opts) => {
+    const { cmdLayoutsPatch } = await import('./commands/layouts.ts');
+    await cmdLayoutsPatch(layoutId, opts);
+  });
+
 program
   .command('upgrade <slug>')
   .description('Open Stripe checkout: a monthly plan (--credits 8|16|32|64|128|256) or a one-time top-up (--top-up)')
