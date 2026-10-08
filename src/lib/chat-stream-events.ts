@@ -7,6 +7,8 @@
  * ripreso identico a quello perso.
  */
 
+import { WRITE_SCRIPT } from '$lib/motion/script-brief';
+
 export type StreamToolCallState = {
   toolCallId: string;
   toolName: string;
@@ -152,6 +154,8 @@ export function readSseEvents(buffered: string): { events: unknown[]; rest: stri
 /** Un input più lungo di così non è un parametro: è un payload travestito. */
 const MAX_MIRRORED_PAYLOAD_CHARS = 2_000;
 
+const OUTPUTS_READ_BACK = new Set([WRITE_SCRIPT]);
+
 /**
  * La stessa lista di tool con PARAMETRI e RISULTATI, entrambi sotto un tetto.
  *
@@ -175,7 +179,7 @@ export function toolsForMirror(tools: StreamToolCallState[]): StreamToolCallStat
   return tools.map(({ output, errorText, input, ...rest }) => ({
     ...rest,
     ...(input === undefined ? {} : { input: clampMirrored(input) }),
-    ...(output === undefined ? {} : { output: clampMirrored(output) }),
+    ...(output === undefined ? {} : { output: OUTPUTS_READ_BACK.has(rest.toolName) ? output : clampMirrored(output) }),
     ...(errorText === undefined ? {} : { errorText: String(clampMirrored(errorText)) })
   }));
 }
