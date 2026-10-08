@@ -226,6 +226,7 @@
 
   class LiquidGlass extends HTMLElement {
     connectedCallback() {
+      this.openLinksOutside();
       this.canvas = document.createElement('canvas');
       this.canvas.setAttribute('aria-hidden', 'true');
       this.appendChild(this.canvas);
@@ -239,6 +240,13 @@
       this.setup();
       this.listen();
       this.raf = requestAnimationFrame((now) => this.frame(now));
+    }
+
+    openLinksOutside() {
+      for (const link of this.querySelectorAll('a[href]:not([target])')) {
+        link.target = '_blank';
+        link.rel = 'noopener';
+      }
     }
 
     disconnectedCallback() {
