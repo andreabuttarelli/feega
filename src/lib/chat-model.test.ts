@@ -14,8 +14,8 @@ const option = (over: Partial<ChatModelOption>): ChatModelOption => ({
 });
 
 describe('default reasoning per model', () => {
-  it('the default model starts at medium', () => {
-    expect(defaultEffortOf(option({ id: 'anthropic/claude-sonnet-5.5', efforts: ['high', 'medium', 'low'], defaultEffort: 'high' }))).toBe('medium');
+  it('the default model starts at low', () => {
+    expect(defaultEffortOf(option({ id: 'anthropic/claude-opus-5.5', efforts: ['high', 'medium', 'low'], defaultEffort: 'high' }))).toBe('low');
   });
 
   it('any other model starts at what the catalogue declares', () => {

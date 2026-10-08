@@ -19,7 +19,7 @@ export type ChatModelChoice = { model: string; reasoning: string | null };
 
 export type ChatModelGroup = { provider: string; options: ChatModelOption[] };
 
-export const DEFAULT_CHAT_CHOICE: ChatModelChoice = { model: 'anthropic/claude-sonnet-5.5', reasoning: 'medium' };
+export const DEFAULT_CHAT_CHOICE: ChatModelChoice = { model: 'anthropic/claude-opus-5.5', reasoning: 'low' };
 
 export function defaultEffortOf(option: ChatModelOption): string | null {
   const preferred = option.id === DEFAULT_CHAT_CHOICE.model ? DEFAULT_CHAT_CHOICE.reasoning : null;

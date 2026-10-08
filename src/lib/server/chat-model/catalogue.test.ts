@@ -17,9 +17,9 @@ const model = (over: Partial<GatewayModel>): GatewayModel => ({
   ...over
 });
 
-const SONNET = model({
-  id: 'anthropic/claude-sonnet-5.5',
-  label: 'Anthropic: Claude Sonnet 5.5',
+const OPUS = model({
+  id: 'anthropic/claude-opus-5.5',
+  label: 'Anthropic: Claude Opus 5.5',
   rate: { input: 2, cachedInput: 0.2, output: 10 },
   reasoning: true,
   efforts: ['max', 'xhigh', 'high', 'medium', 'low'],
@@ -28,19 +28,19 @@ const SONNET = model({
 const GLM = model({ id: 'z-ai/glm-5.3-flash', label: 'Z.ai: GLM 5.3 Flash', rate: { input: 0.15, cachedInput: 0.03, output: 0.5 }, reasoning: true, efforts: ['max', 'high', 'low'], defaultEffort: 'max' });
 const PLAIN = model({ id: 'mistralai/plain', label: 'Mistral: Plain', rate: { input: 1, cachedInput: 1, output: 3 } });
 const NO_TOOLS = model({ id: 'x/no-tools', tools: false, usable: false });
-const VARIANT = model({ id: 'anthropic/claude-sonnet-5.5:free' });
+const VARIANT = model({ id: 'anthropic/claude-opus-5.5:free' });
 const ROUTER = model({ id: '~anthropic/claude-sonnet-latest' });
 
-const OPTIONS = chatModelOptions([SONNET, GLM, PLAIN, NO_TOOLS, VARIANT, ROUTER]);
+const OPTIONS = chatModelOptions([OPUS, GLM, PLAIN, NO_TOOLS, VARIANT, ROUTER]);
 
 describe('capability table from the catalogue', () => {
   it('offers only tool-calling models, without variants or aliases', () => {
-    expect(OPTIONS.map((o) => o.id).sort()).toEqual(['anthropic/claude-sonnet-5.5', 'mistralai/plain', 'z-ai/glm-5.3-flash']);
+    expect(OPTIONS.map((o) => o.id).sort()).toEqual(['anthropic/claude-opus-5.5', 'mistralai/plain', 'z-ai/glm-5.3-flash']);
   });
 
   it('carries provider, price tier and the declared efforts', () => {
-    const sonnet = OPTIONS.find((o) => o.id === SONNET.id);
-    expect(sonnet).toMatchObject({ provider: 'anthropic', costTier: CostTier.High, inputUsdPerM: 2, outputUsdPerM: 10, efforts: SONNET.efforts, defaultEffort: 'high' });
+    const sonnet = OPTIONS.find((o) => o.id === OPUS.id);
+    expect(sonnet).toMatchObject({ provider: 'anthropic', costTier: CostTier.High, inputUsdPerM: 2, outputUsdPerM: 10, efforts: OPUS.efforts, defaultEffort: 'high' });
     expect(OPTIONS.find((o) => o.id === GLM.id)?.costTier).toBe(CostTier.Low);
     expect(OPTIONS.find((o) => o.id === PLAIN.id)?.costTier).toBe(CostTier.Mid);
   });
@@ -51,8 +51,8 @@ describe('capability table from the catalogue', () => {
 });
 
 describe('server validation of the turn choice', () => {
-  it('nothing asked: the default model at medium', () => {
-    expect(resolveChoice(OPTIONS, {})).toEqual({ ok: true, choice: { model: SONNET.id, reasoning: 'medium' } });
+  it('nothing asked: the default model at low', () => {
+    expect(resolveChoice(OPTIONS, {})).toEqual({ ok: true, choice: { model: OPUS.id, reasoning: 'low' } });
   });
 
   it('a model asked without reasoning gets its declared default', () => {
@@ -78,7 +78,7 @@ describe('server validation of the turn choice', () => {
   });
 
   it('an empty catalogue still runs the default model, without reasoning it cannot verify', () => {
-    expect(resolveChoice([], {})).toEqual({ ok: true, choice: { model: SONNET.id, reasoning: null } });
+    expect(resolveChoice([], {})).toEqual({ ok: true, choice: { model: OPUS.id, reasoning: null } });
     expect(resolveChoice([], { model: GLM.id })).toEqual({ ok: false, error: ChoiceError.UnknownModel });
   });
 });
