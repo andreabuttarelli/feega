@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite';
 import base from './vite-node.config';
-import { motionLiveRuntime } from './motion-live-runtime';
+import { motionBundles } from './motion-bundles';
 
-export default defineConfig({ ...base, plugins: [motionLiveRuntime()] });
+export default defineConfig({ ...base, plugins: [motionBundles()] });

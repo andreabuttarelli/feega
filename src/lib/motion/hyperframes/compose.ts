@@ -55,6 +55,7 @@ import { blendStyle } from '../blend';
 import { HELD, holdScript } from './blur';
 import { engineScript } from '../engine/engine';
 import liveRuntime from 'virtual:motion-live-runtime';
+import generative from 'virtual:motion-generative';
 import { liveSpec, type SpecInput } from '../interactive/spec';
 import { LIVE_GLOBAL } from '../interactive/runtime';
 import { Liveness, interactiveOf } from '../interactive/settings';
@@ -455,7 +456,8 @@ const LIBRARY_TAGS: Record<Library, { scripts: string[]; tag: string }> = {
   [Library.D3]: { scripts: [D3_URL], tag: `<script src="${D3_URL}"></script>` },
   [Library.P5]: { scripts: [P5_URL], tag: `<script src="${P5_URL}"></script>` },
   [Library.Pixi]: { scripts: PIXI_URLS, tag: PIXI_URLS.map((url) => `<script src="${url}"></script>`).join('') },
-  [Library.Matter]: { scripts: [MATTER_URL], tag: `<script src="${MATTER_URL}"></script>` }
+  [Library.Matter]: { scripts: [MATTER_URL], tag: `<script src="${MATTER_URL}"></script>` },
+  [Library.Generative]: { scripts: [], tag: `<script>${generative.replace(/<\/script/gi, '<\\/script')}</script>` }
 };
 
 function brandEnv(tokens: BrandTokens) {
