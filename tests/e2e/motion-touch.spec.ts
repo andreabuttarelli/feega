@@ -76,6 +76,16 @@ async function longPress(page: Page, selector: string): Promise<void> {
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
 }
 
+async function touchDrag(page: Page, from: { x: number; y: number }, dx: number, dy = 0): Promise<void> {
+  const cdp = await page.context().newCDPSession(page);
+  const STEPS = 8;
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [from] });
+  for (let i = 1; i <= STEPS; i++) {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: from.x + (dx * i) / STEPS, y: from.y + (dy * i) / STEPS }] });
+  }
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+}
+
 async function openEditor(page: Page, url: string): Promise<void> {
   await gotoHydrated(page, url);
   await page.getByRole('button', { name: 'Add', exact: true }).click();
@@ -177,6 +187,52 @@ test.describe('motion editor a dito @real', () => {
       await expect(page.getByTestId('clip-bar')).toContainText('2 selected');
       await page.getByTestId('clip-bar').getByRole('button', { name: 'Done' }).click();
       await expect(page.getByTestId('clip-bar')).not.toContainText('selected');
+    });
+  });
+
+  test.describe('timeline a dito', () => {
+    test.use({ viewport: { width: 820, height: 1180 }, hasTouch: true });
+
+    test('un trim col dito allunga il clip selezionato di quanto si trascina, snap entro 20px', async ({ page, session, seedNode }) => {
+      const TRIM_PX = 40;
+      const SNAP_SLACK_PX = 20;
+      const node = await seedNode({ type: 'motion', data: MOTION_DATA });
+      await openEditor(page, `/p/${session.projectId}/c/${session.canvasId}/motion/${node.id}`);
+
+      const bar = page.locator('[data-layer="bar-1"] .bar').first();
+      await bar.scrollIntoViewIfNeeded();
+      await bar.tap();
+      const clipId = await bar.getAttribute('data-clip-id');
+      const grip = page.locator(`[data-grip-clip="${clipId}"][data-grip="end"]`);
+      await grip.scrollIntoViewIfNeeded();
+      const before = (await bar.boundingBox())!.width;
+      const box = (await grip.boundingBox())!;
+
+      await touchDrag(page, { x: box.x + box.width / 2, y: box.y + box.height / 2 }, -TRIM_PX);
+
+      const after = (await bar.boundingBox())!.width;
+      if (SHOTS) {
+        await page.screenshot({ path: `${SHOTS}/ipad-portrait-trimmed.png` });
+      }
+      expect(before - after).toBeGreaterThan(TRIM_PX - SNAP_SLACK_PX);
+      expect(before - after).toBeLessThan(TRIM_PX + SNAP_SLACK_PX);
+    });
+
+    test('un dito in orizzontale su una lane vuota sposta il playhead, in verticale no', async ({ page, session, seedNode }) => {
+      const node = await seedNode({ type: 'motion', data: MOTION_DATA });
+      await openEditor(page, `/p/${session.projectId}/c/${session.canvasId}/motion/${node.id}`);
+      const timecode = page.getByTestId('timecode');
+      const start = await timecode.textContent();
+      const bar = page.locator('[data-layer="bar-1"] .bar').first();
+      await bar.scrollIntoViewIfNeeded();
+      const clip = (await bar.boundingBox())!;
+      const empty = { x: Math.min(clip.x + clip.width + 160, page.viewportSize()!.width - 20), y: clip.y + clip.height / 2 };
+
+      await touchDrag(page, empty, 0, -60);
+      await expect(timecode).toHaveText(start ?? '');
+
+      await touchDrag(page, empty, -120, 4);
+      await expect(timecode).not.toHaveText(start ?? '');
     });
   });
 

@@ -11,7 +11,16 @@ import type { KeyRef } from './timeline';
 export const ZOOM_MIN = 0.5;
 export const ZOOM_MAX = 16;
 export const BASE_PX_PER_SECOND = 60;
-export const SNAP_PX = 8;
+
+export enum Pointer {
+  Fine = 'fine',
+  Coarse = 'coarse'
+}
+
+export const SNAP_RADIUS_PX: Record<Pointer, number> = {
+  [Pointer.Fine]: 12,
+  [Pointer.Coarse]: 20
+};
 
 export function pxPerFrame(zoom: number, fps: number = FPS): number {
   return (BASE_PX_PER_SECOND * zoom) / fps;
@@ -36,11 +45,15 @@ export enum Snap {
   Off = 'off'
 }
 
-export function snapped(doc: MotionDoc, frame: number, input: { playhead: number; exclude: readonly string[]; zoom: number; snap: Snap; beats?: readonly number[] }): number {
+export const snapFrames = (pointer: Pointer, ppf: number): number => Math.max(1, Math.round(SNAP_RADIUS_PX[pointer] / ppf));
+
+type SnapInput = { playhead: number; exclude: readonly string[]; zoom: number; snap: Snap; beats?: readonly number[]; pointer?: Pointer };
+
+export function snapped(doc: MotionDoc, frame: number, input: SnapInput): number {
   if (input.snap === Snap.Off) {
     return frame;
   }
-  return snapFrame(frame, [...snapTargets(doc, input), ...(input.beats ?? [])], Math.max(1, Math.round(SNAP_PX / pxPerFrame(input.zoom))));
+  return snapFrame(frame, [...snapTargets(doc, input), ...(input.beats ?? [])], snapFrames(input.pointer ?? Pointer.Fine, pxPerFrame(input.zoom)));
 }
 
 export const HANDLE_PX = 8;
