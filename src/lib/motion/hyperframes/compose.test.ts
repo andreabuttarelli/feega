@@ -416,6 +416,14 @@ describe('custom components in the composition', () => {
     expect(html).not.toContain('/npm/pixi.js@');
   });
 
+  it('loads matter.js only for a component that uses it', () => {
+    const scene = { ...graph, source: { ...graph.source, js: 'const engine = Matter.Engine.create();' } };
+    const physical = must(addClip(must(writeComponent(newMotionDoc(MotionFormat.Landscape), 'Drop', scene)), { component: 'Custom', from: 0, durationInFrames: 60, props: { name: 'Drop' } }, 'm1'));
+
+    expect(compose(physical)).toMatch(/<script src="https:\/\/cdn\.jsdelivr\.net\/npm\/matter-js@[\d.]+\/build\/matter\.min\.js"><\/script>/);
+    expect(html).not.toContain('/npm/matter-js@');
+  });
+
   it('renders the component markup under a root scoped to the clip', () => {
     expect(html).toContain('<div class="cc" id="cc-g1" data-component="NodeGraph"><style>@scope (#cc-g1) {.node{background:#111}}</style><div class="node"></div></div>');
   });

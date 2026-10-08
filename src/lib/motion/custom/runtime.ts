@@ -48,7 +48,8 @@ export enum Library {
   Three = 'THREE',
   D3 = 'd3',
   P5 = 'p5',
-  Pixi = 'PIXI'
+  Pixi = 'PIXI',
+  Matter = 'Matter'
 }
 
 const USES: Record<Library, RegExp> = {
@@ -56,7 +57,8 @@ const USES: Record<Library, RegExp> = {
   [Library.Three]: /\bTHREE\b/,
   [Library.D3]: /\bd3\b/,
   [Library.P5]: /\bp5\b/,
-  [Library.Pixi]: /\bPIXI\b/
+  [Library.Pixi]: /\bPIXI\b/,
+  [Library.Matter]: /\bMatter\b/
 };
 
 const GLOBALS: Record<Library, string> = {
@@ -64,7 +66,8 @@ const GLOBALS: Record<Library, string> = {
   [Library.Three]: THREE_GLOBAL,
   [Library.D3]: 'd3',
   [Library.P5]: 'p5',
-  [Library.Pixi]: 'PIXI'
+  [Library.Pixi]: 'PIXI',
+  [Library.Matter]: 'Matter'
 };
 
 export function librariesOf(components: CustomComponents, used: Iterable<string>): Set<Library> {
@@ -93,6 +96,10 @@ type ClipError = { clip: string; component: string; message: string };
 type Sketch = { setup?: () => void; frameCount: number; noLoop: () => void; randomSeed: (seed: number) => void; noiseSeed: (seed: number) => void; redraw: () => void };
 type SketchClass = new (sketch: (p: Sketch) => void, node: HTMLElement) => Sketch;
 type Stage = { Application: new (options: object) => object };
+type Body = { position: { x: number; y: number }; angle: number };
+type Pose = { x: number; y: number; angle: number };
+type World = { world: object };
+type Physics = { Engine: { update: (engine: World, delta: number) => void }; Composite: { allBodies: (world: object) => Body[] }; Common: { _seed: number } };
 type ClipScope = { root: HTMLElement; tl: Timeline; run: CustomRun };
 
 function bootCustom(cfg: { registry: string; errors: string; listener: string; libraries: Record<string, string>; engine: string; shadowed: string[] }, runs: CustomRun[], env: CustomEnv, master: Timeline, format: ReturnType<typeof fixedFormat>) {
@@ -163,7 +170,26 @@ function bootCustom(cfg: { registry: string; errors: string; listener: string; l
         }
       }
     });
-  const wraps: Record<string, (lib: never, scope: ClipScope) => unknown> = { p5: sketches, PIXI: stages };
+  const worlds = (Matter: Physics, { run }: ClipScope) => {
+    const seekable = (engine: World) => {
+      Matter.Common._seed = run.seed;
+      const step = 1000 / run.fps;
+      const last = Math.ceil((run.length + (run.trim ?? 0)) * run.fps);
+      const poses: Map<Body, Pose>[] = [];
+      const record = () => poses.push(new Map(Matter.Composite.allBodies(engine.world).map((b) => [b, { x: b.position.x, y: b.position.y, angle: b.angle }])));
+      record();
+      return (t: number) => {
+        const frame = Math.min(last, Math.max(0, Math.round(t * run.fps)));
+        while (poses.length <= frame) {
+          Matter.Engine.update(engine, step);
+          record();
+        }
+        return poses[frame];
+      };
+    };
+    return Object.create(Matter, { seekable: { value: seekable }, Runner: { value: undefined }, Render: { value: undefined } });
+  };
+  const wraps: Record<string, (lib: never, scope: ClipScope) => unknown> = { p5: sketches, PIXI: stages, Matter: worlds };
   const libraries = Object.entries(cfg.libraries).map(([name, global]) => [name, w[global] ?? null] as const);
   const clipLibraries = (scope: ClipScope) => Object.fromEntries(libraries.map(([name, lib]) => [name, lib && wraps[name] ? wraps[name](lib as never, scope) : lib]));
 

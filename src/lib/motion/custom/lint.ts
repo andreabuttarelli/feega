@@ -51,7 +51,10 @@ const P5_CLOCK = 'a p5 sketch is redrawn on every seek: draw from p.frameCount, 
 
 const PIXI_CLOCK = 'a PixiJS ticker runs on the clock: set the stage in an onUpdate on tl and call app.render() there';
 
+const MATTER_CLOCK = 'matter.js loops run on the clock: Matter.seekable(engine) steps the world to the sought frame';
+
 const FORBIDDEN_MEMBERS: Record<string, Record<string, string>> = {
+  Matter: { Runner: MATTER_CLOCK, Render: MATTER_CLOCK },
   d3: { timer: D3_CLOCK, interval: D3_CLOCK, timeout: D3_CLOCK, now: D3_CLOCK },
   Date: { now: 'time comes from tl, not the clock' },
   Math: { random: 'use rand(), seeded per clip' },
