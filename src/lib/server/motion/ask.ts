@@ -28,15 +28,15 @@ const editorUrl = (record: CanvasNodeRecord) => motionEditorPath({ projectId: re
 
 const notFound = () => json({ error: 'motion_node_not_found' }, { status: HTTP_NOT_FOUND });
 
-export async function askMotion(db: Db, input: { orgId: string; userId: string; nodeId: string; prompt: string }): Promise<{ runId: string } | Response> {
-  const { orgId, userId, nodeId, prompt } = input;
+export async function askMotion(db: Db, input: { orgId: string; userId: string; nodeId: string; prompt: string; agentKey?: string; choice?: { model?: unknown; reasoning?: unknown } }): Promise<{ runId: string } | Response> {
+  const { orgId, userId, nodeId, prompt, agentKey = MCP_AGENT_KEY, choice: asked = {} } = input;
   const motion = await findMotion(db, { orgId, nodeId });
   const project = motion ? await findProjectById(db, { orgId, projectId: motion.record.projectId }) : null;
   if (!motion || !project) {
     return notFound();
   }
 
-  const choice = resolveChoice(await offeredChatModels(), {});
+  const choice = resolveChoice(await offeredChatModels(), asked);
   if (!choice.ok) {
     return json({ error: choice.error }, { status: HTTP_UNAVAILABLE });
   }
@@ -51,7 +51,7 @@ export async function askMotion(db: Db, input: { orgId: string; userId: string; 
     selection: [],
     model: choice.choice.model,
     reasoning: choice.choice.reasoning,
-    requester: agentActor(userId, MCP_AGENT_KEY),
+    requester: agentActor(userId, agentKey),
     browser: Browser.Absent
   });
   if (turn instanceof Response) {

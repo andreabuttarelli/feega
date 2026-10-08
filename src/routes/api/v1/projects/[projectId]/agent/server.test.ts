@@ -103,7 +103,7 @@ vi.mock('$lib/server/cli-auth', () => ({
   gateOrgAiAction: async () => null
 }));
 vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: async () => [] }));
-vi.mock('$lib/server/repos/canvas', () => ({ listCanvases: async () => [] }));
+vi.mock('$lib/server/repos/canvas', async (importOriginal) => ({ ...(await importOriginal<typeof import('$lib/server/repos/canvas')>()), listCanvases: async () => [] }));
 vi.mock('$lib/server/projects/lookup', () => ({
   findReachableProject: async () => ({ orgId: 'org-1', project: { id: 'p-1', name: 'P', brandId: null } })
 }));
@@ -115,11 +115,16 @@ vi.mock('$lib/server/repos/chat', () => ({
   saveTurn: (db: unknown, turn: { role: string }) => saveTurn(db, turn)
 }));
 vi.mock('$lib/server/project-agent/project-tools', () => ({ createProjectTools: () => ({}) }));
+const offeredProjectTools = vi.hoisted(() => ({ names: [] as string[] }));
 vi.mock('$lib/server/project-agent/tool-surface', () => ({
-  openAgentTools: async () => ({ tools: { list_nodes: tool({ inputSchema: z.object({}), execute: async () => ({ n: 2 }) }) }, close: async () => undefined })
+  openAgentTools: async (input: { projectTools: Record<string, unknown> }) => {
+    offeredProjectTools.names = Object.keys(input.projectTools);
+    return { tools: { list_nodes: tool({ inputSchema: z.object({}), execute: async () => ({ n: 2 }) }) }, close: async () => undefined };
+  }
 }));
 
 const { GET, POST } = await import('./+server');
+const { MOTION_DELEGATION_TOOLS } = await import('$lib/server/project-agent/motion-delegation');
 
 function postEvent() {
   const request = new Request('http://x/api/v1/projects/p-1/agent', {
@@ -131,7 +136,7 @@ function postEvent() {
     safeGetSession: async () => ({ session: { access_token: 'tok' }, user: { id: 'u-1' } }),
     db: async () => world.db.db
   };
-  return { request, params: { projectId: 'p-1' }, locals } as unknown as Parameters<typeof POST>[0];
+  return { request, url: new URL(request.url), params: { projectId: 'p-1' }, locals } as unknown as Parameters<typeof POST>[0];
 }
 
 const replyWrites = (calls: Call[]) => calls.filter((c) => c.table === 'chat_messages' && c.op === 'update').map((c) => c.payload as { content: string; status: string; tool_calls: unknown });
@@ -167,6 +172,12 @@ describe('POST /api/v1/projects/[projectId]/agent', () => {
     expect(streamed).not.toHaveBeenCalled();
     expect(saveTurn).not.toHaveBeenCalled();
     expect(screenModelInput.mock.calls[0][1]).toMatchObject({ profile: 'standard', texts: ['make a doc'], scope: { orgId: 'org-1', userId: 'u-1', projectId: 'p-1' } });
+  });
+
+  it('hands the canvas agent the motion delegation tools', async () => {
+    await POST(postEvent());
+
+    expect(offeredProjectTools.names).toEqual(expect.arrayContaining([...MOTION_DELEGATION_TOOLS]));
   });
 
   it('salva la risposta anche se il client chiude la connessione a metà turno', async () => {

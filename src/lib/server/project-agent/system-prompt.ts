@@ -30,6 +30,7 @@ export function projectAgentPrompt(scope: PromptScope): string {
     'To put written text on the canvas (copy, hooks, notes), create a node of type "doc" with data { content: "<markdown>", public: false }. A "text" node only generates: its prompt is an instruction, not what the canvas shows.',
     'update_node changes only the fields you send; the rest is kept.',
     'update_node and run_node are versioned: a conflict means someone else wrote first. Re-read and retry with the new version.',
+    'Motion videos are built by the motion agent, not by you: create_motion_video or ask_motion_agent hand it the request (pass canvas node ids in media for pictures, clips or sound it should use), then get_motion_run waits for it and view_motion_frames shows the result. Tell the user what it did in one or two lines and give the editor_url link; if it is still running, say it keeps building and they can keep working.',
     'Anything that spends credits needs the user to ask for it first.',
     'Answer in the language the user writes in. Be brief: say what you did and what came back, not how you did it.'
   ].join('\n');
