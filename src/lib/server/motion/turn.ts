@@ -35,8 +35,7 @@ import { awaitFrames, awaitVerdict, framesPrefix, FRAME_POLL_MS, type FrameBucke
 import { CANVAS_ASSET_BUCKET, SIGNED_URL_TTL_S } from '$lib/server/repos/asset-storage';
 import { ASSETS_ADDED, CHECK_REQUEST, FRAMES_REQUEST, type CheckRequest, type FramesRequest } from '$lib/motion/frames-request';
 import { rowRequests } from '$lib/server/motion/batch-input';
-import { startBatch } from '$lib/server/motion/render-run';
-import { motionRenderFarm, motionRenderStorage } from '$lib/server/motion/renderer';
+import { startFarmBatch } from '$lib/server/motion/render-start';
 import { Preset, settingsOf } from '$lib/motion/export-formats';
 import type { CanvasNodeRecord } from '$lib/server/repos/canvas';
 import type { MotionNode } from '$lib/canvas/motion-node';
@@ -212,7 +211,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
         return made;
       }
       const editorUrl = `/p/${project.id}/c/${motion.record.canvasId}/motion/${motion.record.id}`;
-      return startBatch(db, motionRenderFarm(), { ...nodeScope, projectId: project.id, userId, editorUrl }, made.rows, motionRenderStorage());
+      return startFarmBatch(db, { ...nodeScope, projectId: project.id, userId, editorUrl }, made.rows);
     }
   });
 

@@ -6,6 +6,7 @@ import { agentActor } from '$lib/server/repos/actor';
 import { MCP_AGENT_KEY } from '$lib/server/motion/ask';
 import { RenderAsk, RenderMode, requestRender } from '$lib/server/motion/agent-render';
 import { RenderRefusal } from '$lib/server/motion/render-run';
+import { SERVER_RENDER_UNAVAILABLE, serverRenderOpen } from '$lib/motion/server-render';
 import { Preset, settingsOf, settingsSchema } from '$lib/motion/export-formats';
 import type { RequestHandler } from './$types';
 
@@ -26,6 +27,7 @@ const bodySchema = z.object({
 const STATUS_OF: Record<string, number> = {
   [RenderAsk.NotFound]: HTTP_NOT_FOUND,
   [RenderAsk.Empty]: HTTP_CONFLICT,
+  [RenderRefusal.Closed]: HTTP_FORBIDDEN,
   [RenderRefusal.Busy]: HTTP_CONFLICT,
   [RenderRefusal.Unverified]: HTTP_CONFLICT,
   [RenderRefusal.Unsupported]: HTTP_BAD_REQUEST,
@@ -52,6 +54,9 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
   }
 
   const mode = body.data.mode;
+  if (mode === RenderMode.Server && !serverRenderOpen()) {
+    return json({ error: RenderRefusal.Closed, detail: SERVER_RENDER_UNAVAILABLE }, { status: HTTP_FORBIDDEN });
+  }
   if (mode === RenderMode.Server) {
     const gate = await gateOrgAiAction(orgId, apiKeyId ? { id: apiKeyId, name: '', user_id: userId, org_id: orgId, scopes: ['write'] } : undefined);
     if (gate) {

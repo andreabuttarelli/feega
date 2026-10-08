@@ -120,3 +120,9 @@ const QUEUE_STALL: Record<RenderQueue, (waitedMs: number) => Stall> = {
 export function renderStall(input: { watch: ProgressWatch; queue: RenderQueue; now: number }): Stall {
   return QUEUE_STALL[input.queue](input.now - input.watch.since);
 }
+
+export const SERVER_RENDER_UNAVAILABLE = 'Server rendering is not available yet';
+
+export function serverRenderOpen(): boolean {
+  return false;
+}

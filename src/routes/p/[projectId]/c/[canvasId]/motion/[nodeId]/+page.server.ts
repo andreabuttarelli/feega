@@ -4,8 +4,9 @@ import { motionScope as scopeFor } from '$lib/server/motion/editor-scope';
 import { assetUrls, headOrNew, motionAssets, motionTokens, saveMotionDoc } from '$lib/server/motion/editor';
 import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
 import { motionRenderFarm, motionRenderStorage } from '$lib/server/motion/renderer';
-import { batchView, cancelRender, renderView, startBatch } from '$lib/server/motion/render-run';
-import { startFarmRender } from '$lib/server/motion/render-start';
+import { batchView, cancelRender, renderView } from '$lib/server/motion/render-run';
+import { startFarmBatch, startFarmRender } from '$lib/server/motion/render-start';
+import { serverRenderOpen } from '$lib/motion/server-render';
 import { batchInput, rowRequests } from '$lib/server/motion/batch-input';
 import { renderQueue } from '$lib/server/motion/render-queue';
 import { parseSettings } from '$lib/motion/export-formats';
@@ -56,7 +57,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
     head: { version: head.version, doc: head.doc },
     tokens,
     assets,
-    serverRender: { configured: farm !== null, latest: renderView(runs), queue: renderQueue(), uploadLimit },
+    serverRender: { configured: farm !== null && serverRenderOpen(), latest: renderView(runs), queue: renderQueue(), uploadLimit },
     batch: batchView(runs),
     templates,
     gallery
@@ -210,7 +211,7 @@ export const actions: Actions = {
 
     const editorUrl = `/p/${params.projectId}/c/${params.canvasId}/motion/${params.nodeId}`;
     const renderScope = { ...nodeScope, projectId: params.projectId, userId: scope.userId, editorUrl };
-    const started = await startBatch(scope.db, motionRenderFarm(), renderScope, rows.rows, motionRenderStorage());
+    const started = await startFarmBatch(scope.db, renderScope, rows.rows);
     return started.ok ? started : fail(HTTP_UNAVAILABLE, { error: started.error, detail: started.detail });
   },
 

@@ -75,14 +75,13 @@ describe('POST /api/v1/motion/[nodeId]/render', () => {
     expect((await post({})).status).toBe(201);
   });
 
-  it('mode server è esplicito, a pagamento, e passa dal cancello', async () => {
-    const res = await post({ mode: 'server', settings: { resolution: '720p' } });
-    expect(res.status).toBe(202);
-    expect(await res.json()).toMatchObject({ mode: 'server', run_id: 'farm-1', credits: 12 });
-    expect(store.farm[0]).toMatchObject({ orgId: ORG, nodeId: NODE, settings: { format: 'mp4-h264', resolution: '720p' } });
-
+  it('il render sul server non è ancora disponibile: 403, prima dei crediti, niente farm', async () => {
     store.gate = new Response(JSON.stringify({ error: 'credits_exhausted' }), { status: 402 });
-    expect((await post({ mode: 'server' })).status).toBe(402);
+    const res = await post({ mode: 'server', settings: { resolution: '720p' } });
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: 'server_render_unavailable', detail: 'Server rendering is not available yet' });
+    expect(store.farm).toEqual([]);
   });
 
   it('un nodo di un’altra org o inesistente è un 404', async () => {

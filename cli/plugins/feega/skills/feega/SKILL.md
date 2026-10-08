@@ -161,9 +161,8 @@ running `run_id`: poll `get_motion_run` every few seconds until `done` (reply, s
 Render one with `render_video`: by default it is FREE and returns a `render_url`,
 a one-time link (30 minutes, bound to the saved revision) the user opens on any device — the video
 renders in their browser and lands in the project assets. Show the link; never open it yourself.
-`mode: "server"` renders on our machines instead and spends credits: only when the user cannot
-open a browser, or wants ProRes, HEVC, WebM, GIF, PNG or 4K. `get_render` gives
-the status and, when done, a signed `file_url`. CLI: `feega motion render <nodeId> [--server]`.
+`mode: "server"` (our machines) is not available yet and is refused. `get_render` gives
+the status and, when done, a signed `file_url`. CLI: `feega motion render <nodeId>`.
 
 Put one on a website with `publish_motion_embed`: free, it hosts the interactive web export of
 the saved revision and returns a public `url` and an iframe `snippet`; publishing again updates

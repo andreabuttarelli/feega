@@ -48,8 +48,8 @@ export function registerMotionTools(server: McpServer) {
       description:
         'Render the saved revision of a motion video to MP4. Default `mode: "browser"`: free, returns a `render_url` — a one-time link ' +
         '(expires in 30 minutes, bound to this revision) the user opens on any device; it renders in their browser and saves the file ' +
-        'to the project. Show the link to the user. `mode: "server"` renders on our machines instead: spends credits, use it only when ' +
-        'the user cannot open a browser or needs ProRes, HEVC, WebM, GIF, PNG or 4K. Poll `get_render` with the `run_id` for the file.',
+        'to the project. Show the link to the user. `mode: "server"` is not available yet: it is refused with 403. ' +
+        'Poll `get_render` with the `run_id` for the file.',
       inputSchema: z.object({
         org,
         node_id: z.string(),
