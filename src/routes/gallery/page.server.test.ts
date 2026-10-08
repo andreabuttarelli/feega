@@ -40,4 +40,17 @@ describe('the public gallery', () => {
     expect(page.search.format).toBeUndefined();
     expect(page.cards).toHaveLength(1);
   });
+
+  it('filters by a range of seconds from the two-thumb slider', async () => {
+    const page = await read('?min=5&max=10');
+    const filters = state.world!.calls[0].filters;
+    expect(filters).toContainEqual(['duration_s>=', 5]);
+    expect(filters).toContainEqual(['duration_s<=', 10]);
+    expect(page.search).toMatchObject({ min: 5, max: 10 });
+  });
+
+  it('a range upside down is read the right way round', async () => {
+    const page = await read('?min=12&max=4');
+    expect(page.search).toMatchObject({ min: 4, max: 12 });
+  });
 });

@@ -24,6 +24,8 @@
   let visible = $state(false);
   let canHover = $state(true);
   let loaded = $state<Source | null>(null);
+  let painted = $state(false);
+  let started = $state(false);
 
   const live = $derived(source ?? loaded);
   const ratio = $derived(`${FORMATS[format].width} / ${FORMATS[format].height}`);
@@ -67,13 +69,14 @@
   });
 </script>
 
-<div class="player" bind:this={box} style={`aspect-ratio: ${ratio};`} data-testid="gallery-player" data-playing={playing}>
+<div class="player" bind:this={box} style={`aspect-ratio: ${ratio};`} data-testid="gallery-player" data-playing={playing} class:loading={!painted && !(live && !posterUrl)}>
+  {#if posterUrl}
+    <img class="media" class:shown={painted} src={posterUrl} alt="" loading="lazy" onload={() => (painted = true)} />
+  {/if}
   {#if previewUrl}
-    <video bind:this={video} class="media" src={visible ? previewUrl : undefined} poster={posterUrl ?? undefined} muted loop playsinline preload="metadata"></video>
-  {:else if posterUrl && !playing}
-    <img class="media" src={posterUrl} alt="" loading="lazy" />
-  {:else if visible && live}
-    <div class="media"><CompositionPlayer doc={live.doc} assets={live.assets} active={playing} {restFrame} /></div>
+    <video bind:this={video} class="media" class:shown={playing && started} onplaying={() => (started = true)} src={visible ? previewUrl : undefined} muted loop playsinline preload="none"></video>
+  {:else if visible && live && (playing || !posterUrl)}
+    <div class="media shown"><CompositionPlayer doc={live.doc} assets={live.assets} active={playing} {restFrame} /></div>
   {/if}
 </div>
 
@@ -91,5 +94,32 @@
     width: 100%;
     height: 100%;
     object-fit: cover;
+    opacity: 0;
+    transition: opacity 240ms ease;
+  }
+
+  .media.shown {
+    opacity: 1;
+  }
+
+  .loading {
+    background: linear-gradient(90deg, var(--ui-surface) 0%, var(--ui-hover) 50%, var(--ui-surface) 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s linear infinite;
+  }
+
+  @keyframes shimmer {
+    from {
+      background-position: 100% 0;
+    }
+    to {
+      background-position: -100% 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .loading {
+      animation: none;
+    }
   }
 </style>
