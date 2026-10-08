@@ -1,6 +1,6 @@
 import { parse, type Node } from 'acorn';
 import { full } from 'acorn-walk';
-import type { CustomSource, SourceFile } from './component';
+import { ComponentMode, type CustomSource, type SourceFile } from './component';
 
 export type LintProblem = { file: SourceFile; message: string };
 
@@ -8,76 +8,94 @@ const ECMA_VERSION = 2022;
 
 const LOCALE = 'the locale differs between preview and render: use format.number, format.compact or format.percent';
 
-const FORBIDDEN_GLOBALS: Record<string, string> = {
-  setTimeout: 'animate on tl, not with timers',
-  setInterval: 'animate on tl, not with timers',
-  setImmediate: 'animate on tl, not with timers',
-  requestAnimationFrame: 'animate on tl: the frame is driven by seeking',
-  cancelAnimationFrame: 'animate on tl: the frame is driven by seeking',
-  requestIdleCallback: 'animate on tl, not with callbacks',
-  queueMicrotask: 'build the timeline synchronously',
-  fetch: 'no network: use props and assets',
-  XMLHttpRequest: 'no network: use props and assets',
-  WebSocket: 'no network',
-  EventSource: 'no network',
-  Worker: 'no workers',
-  SharedWorker: 'no workers',
-  importScripts: 'no network',
-  eval: 'no eval',
-  Function: 'no Function constructor',
-  window: 'use root, not window',
-  globalThis: 'use root, not globalThis',
-  self: 'use root, not self',
-  parent: 'no access to the editor',
-  top: 'no access to the editor',
-  opener: 'no access to the editor',
-  frames: 'no access to other frames',
-  localStorage: 'no storage',
-  sessionStorage: 'no storage',
-  indexedDB: 'no storage',
-  caches: 'no storage',
-  navigator: 'no device access',
-  location: 'no navigation',
-  performance: 'time comes from tl, not the clock',
-  postMessage: 'no messaging',
-  Intl: LOCALE
+enum Concern {
+  Clock = 'clock',
+  Chance = 'chance',
+  Sandbox = 'sandbox'
+}
+
+type Rule = { reason: string; concern: Concern };
+
+const clock = (reason: string): Rule => ({ reason, concern: Concern.Clock });
+const sandbox = (reason: string): Rule => ({ reason, concern: Concern.Sandbox });
+
+const ALLOWED: Record<ComponentMode, ReadonlySet<Concern>> = {
+  [ComponentMode.Deterministic]: new Set(),
+  [ComponentMode.Live]: new Set([Concern.Clock, Concern.Chance])
+};
+
+const FORBIDDEN_GLOBALS: Record<string, Rule> = {
+  setTimeout: clock('animate on tl, not with timers'),
+  setInterval: clock('animate on tl, not with timers'),
+  setImmediate: clock('animate on tl, not with timers'),
+  requestAnimationFrame: clock('animate on tl: the frame is driven by seeking'),
+  cancelAnimationFrame: clock('animate on tl: the frame is driven by seeking'),
+  requestIdleCallback: clock('animate on tl, not with callbacks'),
+  queueMicrotask: clock('build the timeline synchronously'),
+  fetch: sandbox('no network: use props and assets'),
+  XMLHttpRequest: sandbox('no network: use props and assets'),
+  WebSocket: sandbox('no network'),
+  EventSource: sandbox('no network'),
+  Worker: sandbox('no workers'),
+  SharedWorker: sandbox('no workers'),
+  importScripts: sandbox('no network'),
+  eval: sandbox('no eval'),
+  Function: sandbox('no Function constructor'),
+  window: sandbox('use root, not window'),
+  globalThis: sandbox('use root, not globalThis'),
+  self: sandbox('use root, not self'),
+  parent: sandbox('no access to the editor'),
+  top: sandbox('no access to the editor'),
+  opener: sandbox('no access to the editor'),
+  frames: sandbox('no access to other frames'),
+  localStorage: sandbox('no storage'),
+  sessionStorage: sandbox('no storage'),
+  indexedDB: sandbox('no storage'),
+  caches: sandbox('no storage'),
+  navigator: sandbox('no device access: a live component reads input'),
+  location: sandbox('no navigation'),
+  performance: clock('time comes from tl, not the clock'),
+  postMessage: sandbox('no messaging'),
+  Intl: sandbox(LOCALE)
 };
 
 export const FORBIDDEN_NAMES = Object.keys(FORBIDDEN_GLOBALS);
 
-const D3_CLOCK = 'd3 timers run on the clock: compute the state from tl progress in onUpdate';
+const D3_CLOCK = clock('d3 timers run on the clock: compute the state from tl progress in onUpdate');
 
-const P5_CLOCK = 'a p5 sketch is redrawn on every seek: draw from p.frameCount, never on its own loop or clock';
+const P5_CLOCK = clock('a p5 sketch is redrawn on every seek: draw from p.frameCount, never on its own loop or clock');
 
-const PIXI_CLOCK = 'a PixiJS ticker runs on the clock: set the stage in an onUpdate on tl and call app.render() there';
+const PIXI_CLOCK = clock('a PixiJS ticker runs on the clock: set the stage in an onUpdate on tl and call app.render() there');
 
-const MATTER_CLOCK = 'matter.js loops run on the clock: Matter.seekable(engine) steps the world to the sought frame';
+const MATTER_CLOCK = clock('matter.js loops run on the clock: Matter.seekable(engine) steps the world to the sought frame');
 
-const FORBIDDEN_MEMBERS: Record<string, Record<string, string>> = {
+const WALL_CLOCK = clock('time comes from tl, not the clock');
+
+const FORBIDDEN_MEMBERS: Record<string, Record<string, Rule>> = {
   Matter: { Runner: MATTER_CLOCK, Render: MATTER_CLOCK },
   d3: { timer: D3_CLOCK, interval: D3_CLOCK, timeout: D3_CLOCK, now: D3_CLOCK },
-  Date: { now: 'time comes from tl, not the clock' },
-  Math: { random: 'use rand(), seeded per clip' },
-  document: { cookie: 'no cookies', domain: 'no access', write: 'build DOM inside root', defaultView: 'use root, not window' }
+  Date: { now: WALL_CLOCK },
+  Math: { random: { reason: 'use rand(), seeded per clip', concern: Concern.Chance } },
+  document: { cookie: sandbox('no cookies'), domain: sandbox('no access'), write: sandbox('build DOM inside root'), defaultView: sandbox('use root, not window') }
 };
 
-const FORBIDDEN_PROPERTIES: Record<string, string> = {
-  constructor: 'no constructor access',
-  __proto__: 'no prototype access',
-  transition: 'transitions run on the clock and do not seek: set the state from tl progress in onUpdate',
+const FORBIDDEN_PROPERTIES: Record<string, Rule> = {
+  constructor: sandbox('no constructor access'),
+  __proto__: sandbox('no prototype access'),
+  transition: clock('transitions run on the clock and do not seek: set the state from tl progress in onUpdate'),
   loop: P5_CLOCK,
   frameRate: P5_CLOCK,
   millis: P5_CLOCK,
   deltaTime: P5_CLOCK,
   ticker: PIXI_CLOCK,
   Ticker: PIXI_CLOCK,
-  toLocaleString: LOCALE,
-  toLocaleDateString: LOCALE,
-  toLocaleTimeString: LOCALE
+  toLocaleString: sandbox(LOCALE),
+  toLocaleDateString: sandbox(LOCALE),
+  toLocaleTimeString: sandbox(LOCALE)
 };
 
 type AnyNode = Node & Record<string, unknown>;
-type Visit = (node: AnyNode, problems: string[]) => void;
+type Visit = (node: AnyNode, report: (rule: Rule, what: string) => void) => void;
 
 const name = (node: unknown) => (node as AnyNode | undefined)?.type === 'Identifier' ? String((node as AnyNode).name) : null;
 
@@ -90,35 +108,35 @@ const propertyName = (node: AnyNode): string | null => {
 };
 
 const VISITS: Record<string, Visit> = {
-  Identifier: (node, problems) => {
-    const reason = FORBIDDEN_GLOBALS[String(node.name)];
-    if (reason) {
-      problems.push(`${node.name}: ${reason}`);
+  Identifier: (node, report) => {
+    const rule = FORBIDDEN_GLOBALS[String(node.name)];
+    if (rule) {
+      report(rule, String(node.name));
     }
   },
-  MemberExpression: (node, problems) => {
+  MemberExpression: (node, report) => {
     const object = name(node.object);
     const property = propertyName(node);
     if (!property) {
       return;
     }
-    const reason = (object && FORBIDDEN_MEMBERS[object]?.[property]) || FORBIDDEN_PROPERTIES[property];
-    if (reason) {
-      problems.push(`${object ? `${object}.` : ''}${property}: ${reason}`);
+    const rule = (object && FORBIDDEN_MEMBERS[object]?.[property]) || FORBIDDEN_PROPERTIES[property];
+    if (rule) {
+      report(rule, `${object ? `${object}.` : ''}${property}`);
     }
   },
-  NewExpression: (node, problems) => {
+  NewExpression: (node, report) => {
     if (name(node.callee) === 'Date' && (node.arguments as unknown[]).length === 0) {
-      problems.push('new Date(): time comes from tl, not the clock');
+      report(WALL_CLOCK, 'new Date()');
     }
   },
-  CallExpression: (node, problems) => {
+  CallExpression: (node, report) => {
     if (name(node.callee) === 'Date') {
-      problems.push('Date(): time comes from tl, not the clock');
+      report(WALL_CLOCK, 'Date()');
     }
   },
-  ImportExpression: (_, problems) => {
-    problems.push('import(): no network, the allowed libraries are already loaded');
+  ImportExpression: (_, report) => {
+    report(sandbox('no network, the allowed libraries are already loaded'), 'import()');
   }
 };
 
@@ -177,7 +195,7 @@ function isReference(node: AnyNode, parent: AnyNode | null): boolean {
   return true;
 }
 
-function lintJs(js: string): string[] {
+function lintJs(js: string, allowed: ReadonlySet<Concern>): string[] {
   let program: Node;
   try {
     program = parse(js, { ecmaVersion: ECMA_VERSION, sourceType: 'script', locations: true, allowReturnOutsideFunction: true });
@@ -187,6 +205,11 @@ function lintJs(js: string): string[] {
   }
 
   const problems: string[] = [];
+  const report = (rule: Rule, what: string) => {
+    if (!allowed.has(rule.concern)) {
+      problems.push(`${what}: ${rule.reason}`);
+    }
+  };
   const declared = declaredNames(program);
   const parents = new Map<Node, AnyNode>();
   full(program, (node) => {
@@ -206,17 +229,17 @@ function lintJs(js: string): string[] {
     if (DECLARED_ONLY.has(node.type) && (!isReference(node as AnyNode, parents.get(node) ?? null) || declared.has(String((node as AnyNode).name)))) {
       return;
     }
-    visit(node as AnyNode, problems);
+    visit(node as AnyNode, report);
   });
   return [...new Set(problems)];
 }
 
-type TextRule = { pattern: RegExp; message: string };
+type TextRule = { pattern: RegExp; message: string; concern?: Concern };
 
 const CSS_RULES: TextRule[] = [
-  { pattern: /@keyframes/i, message: '@keyframes: animate on tl, CSS animations do not seek' },
-  { pattern: /(^|[;{\s])animation(-[a-z-]+)?\s*:/i, message: 'animation: animate on tl, CSS animations do not seek' },
-  { pattern: /(^|[;{\s])transition(-[a-z-]+)?\s*:/i, message: 'transition: animate on tl, CSS transitions do not seek' },
+  { pattern: /@keyframes/i, message: '@keyframes: animate on tl, CSS animations do not seek', concern: Concern.Clock },
+  { pattern: /(^|[;{\s])animation(-[a-z-]+)?\s*:/i, message: 'animation: animate on tl, CSS animations do not seek', concern: Concern.Clock },
+  { pattern: /(^|[;{\s])transition(-[a-z-]+)?\s*:/i, message: 'transition: animate on tl, CSS transitions do not seek', concern: Concern.Clock },
   { pattern: /@import/i, message: '@import: no network' },
   { pattern: /@font-face/i, message: '@font-face: use DM Sans or Fragment Mono, already loaded' },
   { pattern: /url\(\s*(?!['"]?data:image\/)/i, message: 'url(: only data:image urls; pass pictures as asset props' },
@@ -234,13 +257,14 @@ const HTML_RULES: TextRule[] = [
   { pattern: /\s(src|href|srcset|poster|xlink:href)\s*=\s*['"]?(?!data:image\/|#)/i, message: 'src/href: only data:image urls; set pictures from asset props in js' }
 ];
 
-const textProblems = (text: string, rules: TextRule[]) => rules.filter((r) => r.pattern.test(text)).map((r) => r.message);
+const textProblems = (text: string, rules: TextRule[], allowed: ReadonlySet<Concern>) => rules.filter((r) => !(r.concern && allowed.has(r.concern)) && r.pattern.test(text)).map((r) => r.message);
 
-export function lintSource(source: CustomSource): LintProblem[] {
+export function lintSource(source: CustomSource, mode = ComponentMode.Deterministic): LintProblem[] {
+  const allowed = ALLOWED[mode];
   return [
-    ...textProblems(source.html, HTML_RULES).map((message) => ({ file: 'html' as const, message })),
-    ...textProblems(source.css, CSS_RULES).map((message) => ({ file: 'css' as const, message })),
-    ...lintJs(source.js).map((message) => ({ file: 'js' as const, message }))
+    ...textProblems(source.html, HTML_RULES, allowed).map((message) => ({ file: 'html' as const, message })),
+    ...textProblems(source.css, CSS_RULES, allowed).map((message) => ({ file: 'css' as const, message })),
+    ...lintJs(source.js, allowed).map((message) => ({ file: 'js' as const, message }))
   ];
 }
 

@@ -3,9 +3,9 @@ import { clipsOf, parseMotionDoc, type MotionDoc } from '../doc';
 import type { OpResult } from '../timeline';
 import { lintReport, lintSource } from './lint';
 import { extractParams } from './params';
-import { parseComponent, type ComponentCheck, type CustomSource, type PropsSchema, type SourceFile } from './component';
+import { ComponentMode, parseComponent, type ComponentCheck, type CustomSource, type PropsSchema, type SourceFile } from './component';
 
-export type ComponentDraft = { source: CustomSource; propsSchema: PropsSchema };
+export type ComponentDraft = { source: CustomSource; propsSchema: PropsSchema; mode?: ComponentMode };
 export type SourceEdit = { file: SourceFile; find: string; replace: string };
 
 const fail = (error: string): OpResult => ({ ok: false, error });
@@ -19,7 +19,7 @@ export function writeComponent(doc: MotionDoc, name: string, draft: ComponentDra
   if (!CUSTOM_NAME.test(name)) {
     return fail(`component names are PascalCase letters and digits, e.g. NodeGraph (got "${name}")`);
   }
-  const problems = lintSource(draft.source);
+  const problems = lintSource(draft.source, draft.mode);
   if (problems.length) {
     return fail(`the code breaks the authoring contract:\n${lintReport(problems)}`);
   }
@@ -55,7 +55,7 @@ export function patchComponent(doc: MotionDoc, name: string, edits: SourceEdit[]
     }
     source[edit.file] = source[edit.file].replace(edit.find, () => edit.replace);
   }
-  return writeComponent(doc, name, { source, propsSchema: component.propsSchema });
+  return writeComponent(doc, name, { source, propsSchema: component.propsSchema, mode: component.mode });
 }
 
 export function removeComponent(doc: MotionDoc, name: string): OpResult {

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as d3 from 'd3';
 import Matter from 'matter-js';
 import './generative-entry';
@@ -8,16 +8,16 @@ import './fx-entry';
 import './splitting-entry';
 import './open-props-entry';
 import { installEngine, testTimeline, type TestTimeline } from '../engine/testing';
-import { ERRORS, REGISTRY, bootScript, definitionScript, librariesOf, Library, seedOf, type CustomRun } from './runtime';
+import { ERRORS, EVENT_MESSAGE, LIVE_RUNS, Play, REGISTRY, bootScript, definitionScript, librariesOf, Library, seedOf, type CustomRun } from './runtime';
 
 const ENV = { assets: {}, brand: { name: 'feega', colors: { accent: '#0099ff' }, logoUrl: null } };
 
-function run(name: string, js: string, at = 1, length = 2): { master: TestTimeline; errors: { message: string }[]; root: HTMLElement } {
+function run(name: string, js: string, at = 1, length = 2, play = Play.Seeked): { master: TestTimeline; errors: { message: string }[]; root: HTMLElement } {
   document.body.innerHTML = `<div id="cc-c1"><div class="dot"></div></div>`;
   const w = window as unknown as Record<string, unknown>;
   const master = testTimeline(installEngine());
   w.__master = master;
-  const runs: CustomRun[] = [{ id: 'c1', name, start: at, length, fps: 30, values: { label: 'Hi' }, seed: seedOf('c1') }];
+  const runs: CustomRun[] = [{ id: 'c1', name, start: at, length, fps: 30, values: { label: 'Hi' }, seed: seedOf('c1'), ...(play === Play.Seeked ? {} : { play }) }];
   const definition = definitionScript(name, js).replace(/^<script>|<\/script>$/g, '');
   window.eval(definition);
   window.eval(bootScript(runs, ENV, 'window.__master'));
@@ -430,3 +430,93 @@ describe('libraries', () => {
     expect(frame(1.3)).toBe(first);
   });
 });
+
+describe('a live component', () => {
+  const frames: FrameRequestCallback[] = [];
+  const flush = () => frames.splice(0).forEach((f) => f(0));
+  const live = (js: string) => run('Game', js, 0, 2, Play.Live);
+
+  beforeEach(() => {
+    vi.stubGlobal('requestAnimationFrame', (f: FrameRequestCallback) => frames.push(f));
+  });
+
+  afterEach(() => {
+    frames.length = 0;
+    vi.unstubAllGlobals();
+    const w = window as unknown as Record<string, (() => void)[]>;
+    w[LIVE_RUNS]?.forEach((destroy) => destroy());
+    delete w[LIVE_RUNS];
+  });
+
+  it('runs its own loop with the clock and chance, still without network or the window', () => {
+    const { root, errors } = live('root.dataset.t = [typeof requestAnimationFrame, typeof setTimeout, typeof performance.now(), typeof Math.random(), typeof Date.now(), typeof fetch, typeof window].join(",");');
+
+    expect(errors).toEqual([]);
+    expect(root.dataset.t).toBe('function,function,number,number,number,undefined,undefined');
+  });
+
+  it('reads the pointer and the keys', () => {
+    const { root } = live('root.addEventListener("probe", () => { root.dataset.input = [Math.round(input.x), Math.round(input.y), input.down, [...input.keys].join("+")].join(","); });');
+    document.dispatchEvent(new MouseEvent('pointermove', { clientX: 40, clientY: 30 }));
+    document.dispatchEvent(new MouseEvent('pointerdown', { clientX: 40, clientY: 30 }));
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', code: 'ArrowLeft' }));
+    root.dispatchEvent(new Event('probe'));
+
+    expect(root.dataset.input).toBe('40,30,true,ArrowLeft');
+  });
+
+  it('gets the input the embed forwards as real events, which game engines read', () => {
+    live('');
+    const seen: string[] = [];
+    document.addEventListener('keydown', (e) => seen.push(e.code));
+    document.addEventListener('mousedown', (e) => seen.push(`mouse ${e.clientX}`));
+
+    window.dispatchEvent(new MessageEvent('message', { data: { type: EVENT_MESSAGE, kind: 'keydown', key: ' ', code: 'Space' } }));
+    window.dispatchEvent(new MessageEvent('message', { data: { type: EVENT_MESSAGE, kind: 'pointerdown', x: 0, y: 0 } }));
+
+    expect(seen).toEqual(['Space', 'mouse 0']);
+  });
+
+  it('holds its frames while it is off screen', () => {
+    const { root } = live('let n = 0; requestAnimationFrame(function f() { root.dataset.n = String(++n); requestAnimationFrame(f); });');
+    flush();
+    flush();
+    (root as HTMLElement & { checkVisibility: () => boolean }).checkVisibility = () => false;
+    flush();
+    flush();
+
+    expect(root.dataset.n).toBe('2');
+  });
+
+  it('is torn down when the preview boots it again', () => {
+    live('onDestroy(() => { document.body.dataset.destroyed = "yes"; }); requestAnimationFrame(() => { document.body.dataset.late = "ran"; });');
+    run('Other', '', 0);
+
+    expect(document.body.dataset.destroyed).toBe('yes');
+    flush();
+    expect(document.body.dataset.late).toBeUndefined();
+  });
+});
+
+describe('a live component in a video', () => {
+  const still = (js: string) => run('Game', js, 0, 2, Play.Still);
+
+  it('freezes on its first frame, with the same chance every render', () => {
+    const js = 'let n = 0; root.dataset.r = String(Math.random()); requestAnimationFrame(function f() { root.dataset.n = String(++n); requestAnimationFrame(f); }); setTimeout(() => { root.dataset.timer = "ran"; }, 0);';
+    const first = still(js).root.dataset;
+    const again = still(js).root.dataset;
+
+    expect(first.n).toBe('1');
+    expect(first.timer).toBeUndefined();
+    expect(first.r).toBe(again.r);
+  });
+
+  it('draws its still(t) on every seek when it gives one', () => {
+    const { master, root } = still('return { still(t) { root.dataset.t = t.toFixed(1); } };');
+
+    master.seek(1.5);
+
+    expect(root.dataset.t).toBe('1.5');
+  });
+});
+

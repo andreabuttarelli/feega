@@ -7,6 +7,9 @@ import { LIVE_GLOBAL } from './runtime';
 import { Liveness, PlayMode } from './settings';
 import { InteractivePreset, applyInteractivePreset } from './presets';
 import { HOST_MESSAGE, PLAYER_URL, interactiveBundle } from './bundle';
+import { writeComponent } from '../custom/ops';
+import { ComponentMode } from '../custom/component';
+import { EVENT_MESSAGE } from '../custom/runtime';
 
 function ok(result: OpResult): MotionDoc {
   if (!result.ok) {
@@ -62,3 +65,16 @@ describe('interactive web export', () => {
     expect(script.indexOf('</script>')).toBe(script.lastIndexOf('</script>'));
   });
 });
+
+describe('a live component in the embed', () => {
+  const game = { source: { html: '', css: '', js: 'requestAnimationFrame(function f() { requestAnimationFrame(f); });' }, propsSchema: { type: 'object' as const, properties: {} }, mode: ComponentMode.Live };
+  const played = () => ok(addClip(ok(writeComponent(newMotionDoc(MotionFormat.Square), 'Game', game)), { component: 'Custom', from: 0, durationInFrames: 60, props: { name: 'Game' } }, 'g1'));
+
+  it('runs live and gets the keys and taps the player forwards', async () => {
+    const bundle = await interactiveBundle({ doc: played(), tokens: FEEGA_TOKENS, assetUrls: {}, title: 'Game', fetchBlob });
+
+    expect(bundle.html).toContain('\\"play\\":\\"live\\"');
+    expect(bundle.html).toContain(`"eventMessage":"${EVENT_MESSAGE}"`);
+  });
+});
+

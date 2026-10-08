@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import type { MotionDoc } from '$lib/motion/doc';
-  import { CheckState, checkState, type CustomSource, type PropsSchema } from '$lib/motion/custom/component';
+  import { CheckState, ComponentMode, checkState, modeOf, type CustomSource, type PropsSchema } from '$lib/motion/custom/component';
   import { writeComponent } from '$lib/motion/custom/ops';
   import type { CodeLanguage, CodeView } from './code-editor';
 
@@ -82,7 +82,7 @@
     if (!component) {
       return;
     }
-    const draft = { source: { ...component.source }, propsSchema: component.propsSchema };
+    const draft = { source: { ...component.source }, propsSchema: component.propsSchema, mode: component.mode };
     if (file === Pane.Props) {
       try {
         draft.propsSchema = JSON.parse(text) as PropsSchema;
@@ -102,6 +102,21 @@
     onchange(result.doc, `Edited the code of ${name}`);
   }
 
+  const NEXT_MODE: Record<ComponentMode, ComponentMode> = { [ComponentMode.Deterministic]: ComponentMode.Live, [ComponentMode.Live]: ComponentMode.Deterministic };
+
+  function toggleLive() {
+    if (!component) {
+      return;
+    }
+    const result = writeComponent(doc, name, { source: component.source, propsSchema: component.propsSchema, mode: NEXT_MODE[modeOf(component)] });
+    if (!result.ok) {
+      error = result.error;
+      return;
+    }
+    error = '';
+    onchange(result.doc, `Made ${name} ${modeOf(result.doc.components[name])}`);
+  }
+
   function pick(next: Pane) {
     file = next;
   }
@@ -112,6 +127,7 @@
     {#each FILES as f (f.file)}
       <button type="button" role="tab" aria-selected={file === f.file} class:on={file === f.file} onclick={() => pick(f.file)}>{f.label}</button>
     {/each}
+    <label class="diff" title="Live: runs its own loop and reads input, different on every view; the video shows a still"><input type="checkbox" checked={component?.mode === ComponentMode.Live} onchange={toggleLive} data-testid="code-live" /> Live</label>
     <label class="diff"><input type="checkbox" bind:checked={showDiff} disabled={!previous || file === Pane.Props} /> Diff</label>
   </div>
   <div class="editor" bind:this={host}></div>
@@ -157,6 +173,10 @@
     align-items: center;
     font-size: 11px;
     color: var(--ui-ink-2);
+  }
+
+  .diff + .diff {
+    margin-left: 8px;
   }
 
   .editor {

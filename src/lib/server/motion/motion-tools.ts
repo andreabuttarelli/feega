@@ -29,7 +29,7 @@ import type { MotionAsset } from './editor';
 import { MAX_FRAMES_PER_VIEW, MAX_VIEWS_PER_TURN, VIEW_FRAMES, type Frame } from './frames';
 import { contentEnd, fitDuration } from '$lib/motion/fit-duration';
 import { blocking, docProblems, frameProblems, softPictures, type FrameStat, type Pixels, type QualityProblem } from '$lib/motion/direction';
-import { CheckState, MAX_CSS, MAX_HTML, MAX_JS, SOURCE_FILES, checkState, propsSchemaSchema, sourceHash, type CustomComponent } from '$lib/motion/custom/component';
+import { CheckState, ComponentMode, MAX_CSS, MAX_HTML, MAX_JS, SOURCE_FILES, checkState, modeOf, propsSchemaSchema, sourceHash, type CustomComponent } from '$lib/motion/custom/component';
 import { patchComponent, recordCheck, removeComponent, writeComponent } from '$lib/motion/custom/ops';
 import { RECREATE_STATES, UI_KINDS, UI_KIT, recreatedStyle, recreatedUi, type UiStructure } from '$lib/motion/ui-kit/kit';
 import { MORPH_KINDS, DEFAULT_REEL } from '$lib/motion/ui-morph/reel';
@@ -1546,7 +1546,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         if (!component) {
           return { ok: false, error: `no custom component ${input.name}; this video has ${Object.keys(session.doc.components).join(', ') || 'none'}` };
         }
-        return { ok: true, name: input.name, ...component.source, props_schema: component.propsSchema, version: component.version, check: checkState(component), problems: component.check?.problems ?? [] };
+        return { ok: true, name: input.name, ...component.source, props_schema: component.propsSchema, mode: modeOf(component), version: component.version, check: checkState(component), problems: component.check?.problems ?? [] };
       }
     }),
 
@@ -1638,6 +1638,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     [WRITE_COMPONENT]: tool({
       description: `Create or replace a custom component written in code. The editor runs it in a sandbox and checks that seeking gives the same frame from any direction; a failing check comes back as an error with the offending frames. Use it in clips with add_clip component "Custom", props { name, ...props }.`,
       inputSchema: z.object({
+        mode: z.enum(ComponentMode).optional().describe('deterministic (default): every frame from tl, seekable, exact in the video. live: runs its own loop and reads input, different on every view; the video shows a still'),
         name: z.string().describe('PascalCase, e.g. NodeGraph'),
         html: z.string().max(MAX_HTML).describe('markup inside the component root; no script, style, iframe, media or external urls'),
         css: z.string().max(MAX_CSS).describe('scoped to the component root (:scope is the root); no animation, transition, @keyframes, @import or external url()'),
@@ -1653,7 +1654,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
           session.codeWrites += 1;
           return { ok: false, error: `props_schema: ${schema.error.issues.map((i) => `${i.path.join('.')} ${i.message}`).join('; ')}` };
         }
-        const draft = { source: { html: input.html, css: input.css, js: input.js }, propsSchema: schema.data };
+        const draft = { source: { html: input.html, css: input.css, js: input.js }, propsSchema: schema.data, mode: input.mode };
         return codeWrite(writeComponent(session.doc, input.name, draft), input.name, `wrote ${input.name}`, toolCallId);
       }
     }),

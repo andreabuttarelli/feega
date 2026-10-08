@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Tool } from 'ai';
 import { MotionFormat, findClip, newMotionDoc } from '$lib/motion/doc';
-import { CheckState } from '$lib/motion/custom/component';
+import { CheckState, ComponentMode } from '$lib/motion/custom/component';
 import { createMotionTools, MAX_CODE_WRITES_PER_TURN, type CheckResult, type MotionSession, type MotionToolDeps } from './motion-tools';
-import { WRITE_COMPONENT } from './model-route';
+import { READ_COMPONENT, WRITE_COMPONENT } from './model-route';
 import { motionAgentPrompt } from './motion-prompt';
 import { Vision } from './frames';
 
@@ -38,6 +38,16 @@ function setup(check: MotionToolDeps['check'] = vi.fn(async () => PASSED)) {
 }
 
 describe('component tools', () => {
+  it('write_component writes a live component that runs its own loop, and read_component says so', async () => {
+    const { session, run } = setup();
+    const game = { ...CHAT, name: 'Game', js: 'requestAnimationFrame(function f() { root.dataset.r = String(Math.random()); requestAnimationFrame(f); });', mode: ComponentMode.Live };
+
+    expect(await run(WRITE_COMPONENT, { ...game, mode: undefined })).toMatchObject({ ok: false });
+    expect(await run(WRITE_COMPONENT, game)).toMatchObject({ ok: true });
+    expect(session.doc.components.Game.mode).toBe(ComponentMode.Live);
+    expect(await run(READ_COMPONENT, { name: 'Game' })).toMatchObject({ mode: ComponentMode.Live });
+  });
+
   it('write_component saves the code, runs the determinism check and records it', async () => {
     const { session, run, deps } = setup();
     const out = await run(WRITE_COMPONENT, CHAT);

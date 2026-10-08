@@ -87,7 +87,8 @@
   import { Reveal, Snap, clampZoom } from '$lib/motion/timeline-view';
   import { InspectorTab } from '$lib/motion/inspector';
   import { Command, commandFor, isTyping } from '$lib/motion/shortcuts';
-  import { composeHtml } from '$lib/motion/hyperframes/compose';
+  import { Target, composeHtml } from '$lib/motion/hyperframes/compose';
+  import { liveComponents } from '$lib/motion/custom/determinism';
   import { feegaTrailer } from '$lib/motion/trailer';
   import type { AudioAnalysis } from '$lib/motion/audio-analysis';
   import { Hit, cutToBeat, hitFrames, markHits } from '$lib/motion/beats';
@@ -233,7 +234,8 @@
   let interactive = $state(false);
   let tiltX = $state(0);
   let tiltY = $state(0);
-  const html = $derived(composeHtml({ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls, analyses, liveness: interactive ? Liveness.Live : Liveness.Baked }));
+  const html = $derived(composeHtml({ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls, analyses, liveness: interactive ? Liveness.Live : Liveness.Baked, target: Target.Screen }));
+  const liveScene = $derived(liveComponents(doc));
   const selected = $derived(selection.length === 1 ? (findClip(doc, selection[0])?.clip ?? null) : null);
   const blank = $derived(!path.length && showsStart(doc, agentBusy ? Agent.Working : Agent.Idle));
 
@@ -1193,6 +1195,7 @@
         {#if selected?.textPath && !playing}<TextPathOverlay {doc} clip={selected} {frame} />{/if}
       </MotionPreview>
       </ZoomStage>
+      {#if liveScene.length}<span class="live-badge" data-testid="live-badge" title={`${liveScene.join(', ')} ${liveScene.length === 1 ? 'runs' : 'run'} live: different on every view, a still in the video`}>live</span>{/if}
       <div class="live-bar">
         <InteractivePanel bind:active={interactive} bind:tiltX bind:tiltY clipId={selected?.id ?? null} onpreset={(preset) => apply(applyInteractivePreset(doc, preset, selected?.id ?? null), preset)} />
       </div>
@@ -1551,6 +1554,18 @@
 
   .stage {
     position: relative;
+  }
+
+  .live-badge {
+    position: absolute;
+    top: var(--ui-space-3);
+    left: var(--ui-space-3);
+    padding: 2px var(--ui-space-2);
+    background: var(--ui-accent);
+    color: var(--ui-accent-ink);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    pointer-events: auto;
   }
 
   .live-bar {

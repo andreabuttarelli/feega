@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { checkDoc, seekPlan, unverified, verdictOf, type Shot } from './determinism';
+import { checkDoc, liveComponents, seekPlan, unverified, verdictOf, type Shot } from './determinism';
 import { MotionFormat, clipsOf, newMotionDoc, parseMotionDoc, type MotionDoc } from '../doc';
 import { composeHtml } from '../hyperframes/compose';
 import { FEEGA_TOKENS } from '../brand';
 import { addClip, type OpResult } from '../timeline';
-import { CheckState, sourceHash } from './component';
+import { CheckState, ComponentMode, sourceHash } from './component';
 import { recordCheck, writeComponent } from './ops';
 
 function must(r: OpResult): MotionDoc {
@@ -117,3 +117,14 @@ describe('what the check renders and what export accepts', () => {
     expect(unverified(base)).toEqual([]);
   });
 });
+
+describe('live scenes', () => {
+  const draft = { source: { html: '', css: '', js: 'requestAnimationFrame(() => {});' }, propsSchema: { type: 'object' as const, properties: {} }, mode: ComponentMode.Live };
+  const written = must(writeComponent(newMotionDoc(MotionFormat.Vertical), 'Game', draft));
+
+  it('names the live components the video uses, not the ones it only declares', () => {
+    expect(liveComponents(written)).toEqual([]);
+    expect(liveComponents(must(addClip(written, { component: 'Custom', from: 0, durationInFrames: 30, props: { name: 'Game' } }, 'g1')))).toEqual(['Game']);
+  });
+});
+
