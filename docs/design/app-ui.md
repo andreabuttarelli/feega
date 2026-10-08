@@ -1,7 +1,7 @@
 # App UI system
 
 Dashboard (`/app`), tool pages, canvas chrome and the motion editor share one set of tokens,
-defined in `src/app.css` (`--ui-*`). Square corners everywhere (`--radius: 0`).
+defined in `src/app.css` (`--ui-*`). A shape is a sharp rectangle (`--radius: 0`) or a perfect circle (`rounded-full`, for icon buttons, avatars, dots, a button pill); never an intermediate radius.
 
 ## Surfaces and colour
 

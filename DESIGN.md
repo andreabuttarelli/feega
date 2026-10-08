@@ -11,7 +11,7 @@ the tokens and component rules it names live in `docs/design/app-ui.md` and `src
 
 | Rule | Value |
 |---|---|
-| Corners | **square, everywhere.** `--radius: 0`. No `rounded-*`, no `border-radius`, no `rx`/`ry`, in pages, components, nodes, avatars, badges, menus. |
+| Shapes | **a sharp rectangle or a perfect circle, nothing in between.** Pages, panels, menus, nodes, cards, inputs: 0px (`--radius: 0`). Icon buttons, avatars, status dots and a button pill may be fully round (`rounded-full`). Never an intermediate radius (`rounded-md`, `8px`). |
 | Dark background | **`#000`**, pure. Surfaces step up in small increments (`#0a0a0a`, `#111`, `#161616`). |
 | Light background | `#ffffff`, one secondary surface `#fafaf8`. |
 | Accent | one: `#0099ff` (`--ui-accent`). Selection, focus, primary action. Nothing else is blue. |
