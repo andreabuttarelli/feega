@@ -1,0 +1,100 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { chatSession, forgetChatSessions } from './chat-session.svelte';
+
+type Saved = { role: 'user' | 'assistant'; content: string };
+type Thread = { messages: Saved[]; running: boolean };
+
+const ENDPOINT = '/api/v1/projects/p/motion/n/agent';
+const ASK = 'make it pop';
+const OLD: Saved[] = [
+  { role: 'user', content: 'first ask' },
+  { role: 'assistant', content: 'first answer' }
+];
+const ASKED: Saved[] = [...OLD, { role: 'user', content: ASK }];
+
+function backgrounded(thread: Thread) {
+  const encoder = new TextEncoder();
+  let cut: (() => void) | null = null;
+
+  const fetcher = (async (_url: string, init?: RequestInit) => {
+    if (init?.method !== 'POST') {
+      return new Response(JSON.stringify(thread), { status: 200 });
+    }
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'text-delta', id: 't', delta: 'Working on it' })}\n\n`));
+        cut = () => controller.error(new TypeError('Load failed'));
+      }
+    });
+    return new Response(body, { status: 200 });
+  }) as typeof fetch;
+
+  return { fetcher, cut: () => cut!() };
+}
+
+async function settle() {
+  for (let i = 0; i < 10; i++) {
+    await new Promise((r) => setTimeout(r, 0));
+  }
+}
+
+async function cutMidTurn(thread: Thread, running: boolean) {
+  const server = backgrounded(thread);
+  const session = chatSession(ENDPOINT, server.fetcher);
+  await session.load();
+
+  const sent = session.send(ASK, 'append-user');
+  await settle();
+  thread.messages = ASKED;
+  thread.running = running;
+  server.cut();
+  await sent;
+  await settle();
+  return session;
+}
+
+describe('a chat whose tab went to the background', () => {
+  beforeEach(() => forgetChatSessions());
+
+  it('a cut stream keeps the whole transcript and follows the turn instead of failing', async () => {
+    const session = await cutMidTurn({ messages: OLD, running: false }, true);
+
+    expect(session.failed).toBe('');
+    expect(session.reconnecting).toBe(true);
+    expect(session.messages.map((m) => m.content)).toEqual(['first ask', 'first answer', ASK, 'Working on it']);
+  });
+
+  it('coming back to a turn that finished meanwhile shows its answer', async () => {
+    const thread: Thread = { messages: OLD, running: false };
+    const session = await cutMidTurn(thread, true);
+
+    thread.messages = [...ASKED, { role: 'assistant', content: 'Made it pop.' }];
+    thread.running = false;
+    session.resume();
+    await settle();
+
+    expect(session.reconnecting).toBe(false);
+    expect(session.failed).toBe('');
+    expect(session.messages.map((m) => m.content)).toEqual(['first ask', 'first answer', ASK, 'Made it pop.']);
+  });
+
+  it('a reload during a running turn follows it rather than showing an empty or failed chat', async () => {
+    const session = chatSession(ENDPOINT, backgrounded({ messages: ASKED, running: true }).fetcher);
+
+    await session.load();
+    await settle();
+
+    expect(session.reconnecting).toBe(true);
+    expect(session.failed).toBe('');
+    expect(session.messages.map((m) => m.role)).toEqual(['user', 'assistant', 'user', 'assistant']);
+    expect(session.messages.at(-1)?.pending).toBe(true);
+  });
+
+  it('says the agent did not answer only when the turn ended on the server without an answer', async () => {
+    const session = await cutMidTurn({ messages: OLD, running: false }, false);
+
+    expect(session.reconnecting).toBe(false);
+    expect(session.failed).toBe('send');
+    expect(session.messages.map((m) => m.content)).toEqual(['first ask', 'first answer', ASK]);
+  });
+});

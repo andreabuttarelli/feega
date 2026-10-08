@@ -185,6 +185,19 @@ async function turn(reasoning: string | null = 'low', browser = Browser.Attached
   return started.done;
 }
 
+async function leftAfterFirstChunk() {
+  const db = { storage: { from: () => ({}) } } as never;
+  const motion = { record: { id: 'n-1', canvasId: 'c-1' }, node: { id: 'n-1', format: MotionFormat.Landscape, docHeadRevision: 0, posterAssetId: null, lastRenderAssetId: null } } as never;
+  const started = await startMotionTurn({ db, userId: 'u-1', orgId: 'o-1', project: { id: 'p-1', brandId: null }, motion, message: 'make it pop', selection: [], model: 'anthropic/claude-opus-5.5', reasoning: 'low', requester: { kind: 'user', id: 'u-1' }, browser: Browser.Absent });
+  if (started instanceof Response) {
+    throw new Error('turn refused');
+  }
+  const reader = started.stream.getReader();
+  await reader.read();
+  await reader.cancel();
+  return started.done;
+}
+
 const viewedAfterLastEdit = () => world.toolCalls.lastIndexOf('view_frames') > world.toolCalls.lastIndexOf('add_clip');
 
 describe('a motion turn closes on a look and a summary', () => {
@@ -290,5 +303,12 @@ describe('a motion turn closes on a look and a summary', () => {
     expect(world.toolCalls).toEqual(['analyze_site', 'write_script']);
     expect(world.calls.some((c) => c.toolChoice?.type === 'none')).toBe(false);
     expect(outcome.reply).not.toMatch(/still open/i);
+  });
+
+  it('a client that leaves mid-stream does not stop the turn: the answer is still saved', async () => {
+    const outcome = await leftAfterFirstChunk();
+
+    expect(outcome.reply.trim().length).toBeGreaterThan(0);
+    expect(world.saved.find((t) => t.role === 'assistant')?.content).toBe(outcome.reply);
   });
 });

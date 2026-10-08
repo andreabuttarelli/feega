@@ -2,6 +2,9 @@ import type { Db } from '$lib/server/db/client';
 import type { Json } from '$lib/database.types';
 import { toolsForMirror } from '$lib/chat-stream-events';
 import { actorCols, type Actor } from './actor';
+import { AGENT_MAX_DURATION_S } from '$lib/server/brand-agent/limits';
+
+const MS_PER_S = 1000;
 
 /**
  * I THREAD DELLA CHAT DI PROGETTO, SULLO SCHEMA NUOVO.
@@ -156,14 +159,19 @@ export async function saveTurn(
 ): Promise<void> {
   const { data: last } = await db
     .from('chat_messages')
-    .select('seq')
+    .select('seq, role, content')
     .eq('org_id', input.orgId)
     .eq('thread_id', input.threadId)
     .order('seq', { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  const seq = Number((last as { seq?: number } | null)?.seq ?? 0) + 1;
+  const previous = last as { seq?: number; role?: string; content?: string | null } | null;
+  if (input.role === 'user' && previous?.role === 'user' && previous.content === input.content) {
+    return;
+  }
+
+  const seq = Number(previous?.seq ?? 0) + 1;
 
   const { error } = await db.from('chat_messages').insert({
     org_id: input.orgId,
@@ -178,4 +186,21 @@ export async function saveTurn(
   if (error) {
     throw new Error(error.message);
   }
+}
+
+export async function turnRunning(db: Db, input: { orgId: string; threadId: string }, now = Date.now()): Promise<boolean> {
+  const { data } = await db
+    .from('chat_messages')
+    .select('role, created_at')
+    .eq('org_id', input.orgId)
+    .eq('thread_id', input.threadId)
+    .order('seq', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const last = data as { role?: string; created_at?: string } | null;
+  if (last?.role !== 'user' || !last.created_at) {
+    return false;
+  }
+  return now - Date.parse(last.created_at) < AGENT_MAX_DURATION_S * MS_PER_S;
 }

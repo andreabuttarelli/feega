@@ -4,6 +4,7 @@
   import { page } from '$app/stores';
   import { nearBottom } from '$lib/chat-scroll';
   import { chatEndpoint } from './chat-endpoint';
+  import { keepDraft, keptDraft } from './chat-draft';
   import { chatSession, type ChatSession, type StreamData } from './chat-session.svelte';
   import { nextFollow, type Follow, type FollowEvent } from './chat-follow';
   import { FAILURES, keyboardInset, speakerStarts } from './chat-view';
@@ -65,10 +66,12 @@
   });
   const messages = $derived(session?.messages ?? []);
   const sending = $derived(session?.sending ?? false);
+  const reconnecting = $derived(session?.reconnecting ?? false);
+  const busy = $derived(sending || reconnecting);
   const loading = $derived(session?.loading ?? false);
 
   $effect(() => {
-    onbusy?.(sending);
+    onbusy?.(busy);
   });
   const failed = $derived(session?.failed ?? '');
   const failedDetail = $derived(session?.failedDetail ?? '');
@@ -76,7 +79,7 @@
   const failure = $derived(failed ? FAILURES[failed] : null);
   const copyKey = $derived(motionNodeId ? 'chat.panel.motion' : 'chat.panel');
   const suggestions = $derived(($json(`${copyKey}.suggestions`) as string[] | undefined) ?? []);
-  const brief = $derived(motionNodeId && !sending ? pendingBrief(messages) : null);
+  const brief = $derived(motionNodeId && !busy ? pendingBrief(messages) : null);
   let editingBrief = $state(false);
   const showEmpty = $derived(!loading && failed !== 'load' && !messages.length);
 
@@ -124,6 +127,43 @@
   });
 
   $effect(() => {
+    const kept = endpoint;
+    if (!kept) {
+      return;
+    }
+    untrack(() => {
+      draft = draft || keptDraft(kept);
+    });
+  });
+
+  $effect(() => {
+    if (!endpoint) {
+      return;
+    }
+    keepDraft(endpoint, draft);
+  });
+
+  $effect(() => {
+    const current = session;
+    if (!current) {
+      return;
+    }
+    const back = () => {
+      if (document.visibilityState === 'visible') {
+        current.resume();
+      }
+    };
+    document.addEventListener('visibilitychange', back);
+    window.addEventListener('pageshow', back);
+    window.addEventListener('online', back);
+    return () => {
+      document.removeEventListener('visibilitychange', back);
+      window.removeEventListener('pageshow', back);
+      window.removeEventListener('online', back);
+    };
+  });
+
+  $effect(() => {
     const vv = window.visualViewport;
     if (!vv || !root) {
       return;
@@ -143,7 +183,7 @@
   });
 
   function send(text: string) {
-    if (!text || !session || session.sending) {
+    if (!text || !session || busy) {
       return;
     }
     draft = '';
@@ -181,7 +221,7 @@
       role="log"
       aria-label={$_('chat.panel.log')}
       aria-live="polite"
-      aria-busy={sending}
+      aria-busy={busy}
     >
       <div class="column">
         {#if loading}
@@ -241,6 +281,10 @@
         </button>
       {/if}
 
+      {#if reconnecting}
+        <p class="reconnecting" role="status">{$_('chat.panel.reconnecting')}</p>
+      {/if}
+
       {#if failure}
         <div class="banner" role="alert">
           <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 4.5v4.5M8 11v1" stroke="currentColor" stroke-width="1.8" /><rect x="1.5" y="1.5" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.3" /></svg>
@@ -255,7 +299,7 @@
 
       <ChatComposer
         bind:value={draft}
-        busy={sending}
+        {busy}
         enabled={!loading}
         onsend={() => send(draft.trim())}
         onstop={stop}
@@ -412,6 +456,12 @@
   .jump:focus-visible {
     outline: 2px solid var(--accent, #c485fe);
     outline-offset: 2px;
+  }
+
+  .reconnecting {
+    margin: 0;
+    font-size: 12.5px;
+    color: var(--ink-soft, #6e6e73);
   }
 
   .banner {

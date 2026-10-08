@@ -8,7 +8,7 @@ import { gateAiAction, gateOrgAiAction } from '$lib/server/cli-auth';
 import { listMemberships } from '$lib/server/repos/orgs';
 import { listCanvases } from '$lib/server/repos/canvas';
 import { findReachableProject } from '$lib/server/projects/lookup';
-import { openThread, loadTurns, promptHistory, saveTurn } from '$lib/server/repos/chat';
+import { openThread, loadTurns, promptHistory, saveTurn, turnRunning } from '$lib/server/repos/chat';
 import { finishedTurn } from '$lib/server/project-agent/finished-turn';
 import { agentActor, SIDEBAR_AGENT_KEY } from '$lib/server/repos/actor';
 import { createProjectTools } from '$lib/server/project-agent/project-tools';
@@ -18,6 +18,7 @@ import { AGENT_MAX_DURATION_S, agentStopWhen } from '$lib/server/project-agent/l
 import { screenModelInput } from '$lib/server/moderation/model-input';
 import { ModerationProfile } from '$lib/server/moderation/profiles';
 import { blockedPrompt } from '$lib/server/moderation/blocked-response';
+import { runInBackground } from '$lib/server/background-work';
 import type { RequestHandler } from './$types';
 
 /**
@@ -160,7 +161,7 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
     }
   }));
 
-  void result.consumeStream({ onError: (e) => console.error('[project-agent] turn failed after client left', e) });
+  runInBackground(() => result.consumeStream({ onError: (e) => console.error('[project-agent] turn failed after client left', e) }), 'project-agent-turn');
 
   return result.toUIMessageStreamResponse({ sendReasoning: true });
 };
@@ -188,5 +189,6 @@ export const GET: RequestHandler = async ({ params, locals }) => {
     brandId: project.brandId
   });
 
-  return json({ threadId, messages: await loadTurns(db, { orgId, threadId }) });
+  const [messages, running] = await Promise.all([loadTurns(db, { orgId, threadId }), turnRunning(db, { orgId, threadId })]);
+  return json({ threadId, messages, running });
 };

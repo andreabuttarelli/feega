@@ -65,6 +65,7 @@ vi.mock('$lib/server/repos/chat', () => ({
   openThread: async () => 'thread-1',
   loadTurns: async () => [],
   promptHistory: () => [],
+  turnRunning: async () => true,
   saveTurn: (db: unknown, turn: { role: string }) => saveTurn(db, turn)
 }));
 vi.mock('$lib/server/project-agent/project-tools', () => ({ createProjectTools: () => ({}) }));
@@ -72,7 +73,7 @@ vi.mock('$lib/server/project-agent/tool-surface', () => ({
   openAgentTools: async () => ({ tools: {}, close: async () => undefined })
 }));
 
-const { POST } = await import('./+server');
+const { GET, POST } = await import('./+server');
 
 function postEvent() {
   const request = new Request('http://x/api/v1/projects/p-1/agent', {
@@ -129,5 +130,13 @@ describe('POST /api/v1/projects/[projectId]/agent', () => {
 
     const saved = await assistantSaved();
     expect(saved?.content).toBe('Created the doc.');
+  });
+});
+
+describe('GET /api/v1/projects/[projectId]/agent', () => {
+  it('says the turn is still running, so a client coming back follows it instead of failing', async () => {
+    const res = await GET(postEvent() as unknown as Parameters<typeof GET>[0]);
+
+    expect(await res.json()).toMatchObject({ threadId: 'thread-1', running: true });
   });
 });
