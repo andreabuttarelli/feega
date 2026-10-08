@@ -7,6 +7,8 @@ import Flag from '@lucide/svelte/icons/flag';
 import Scale from '@lucide/svelte/icons/scale';
 import SunMoon from '@lucide/svelte/icons/sun-moon';
 import LogOut from '@lucide/svelte/icons/log-out';
+import Shuffle from '@lucide/svelte/icons/shuffle';
+import { GALLERY_PATH } from '$lib/gallery/paths';
 import { TOOLS, TOOL_STATUS_LABEL, toolHref } from '$lib/tools';
 import { TOOL_ICONS } from '$lib/components/app/tool-icons';
 import { REPORT_PATH } from '$lib/reports/report-link';
@@ -71,6 +73,7 @@ const inProject = (path: string) => (projectId: string | null) => (projectId ? `
 
 export const APP_NAV: readonly NavItem[] = [
   row({ id: 'home', section: NavSection.Main, kind: NavKind.Link, label: { key: 'app.shell.menu.home' }, icon: LayoutGrid, href: () => DASHBOARD_PATH }),
+  row({ id: 'gallery', section: NavSection.Main, kind: NavKind.Link, label: { text: 'Gallery' }, icon: Shuffle, load: NavLoad.Document, href: () => GALLERY_PATH }),
   ...TOOLS.map((tool) =>
     row({
       id: `tool:${tool.id}`,

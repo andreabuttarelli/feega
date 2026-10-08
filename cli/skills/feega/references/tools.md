@@ -219,6 +219,29 @@ that device renders, saves the MP4 to the project and closes the run. `mode: "se
 the farm, spends credits and accepts every format and 4K. `get_render({ org, run_id })` returns
 `status`, `mode`, `asset_id` and a signed `file_url` (one hour) once `done`.
 
+## Gallery
+
+| MCP | CLI |
+|-----|-----|
+| `search_gallery` | `feega gallery [query] [--kind] [--format] [--duration] [--tag]` |
+| `remix_gallery_item` | `feega gallery remix <itemId> --project <id> [--canvas <id>]` |
+| `publish_to_gallery` | `feega gallery publish <nodeId> --title "…" [--description] [--tags a,b]` |
+| — | `feega gallery withdraw <itemId>` |
+
+`search_gallery({ query?, kind?, format?, duration?, tag? })` lists published items, newest first:
+`id`, `title`, `author`, `kind`, `format`, `seconds`, `tags`, `remixes`, `remix_of` and `url`.
+Reads only, needs no org.
+
+`remix_gallery_item({ org, item_id, project_id, canvas_id? })` copies the item's doc and files into
+`project_id` as a new `motion` node (on `canvas_id`, or on the Motion canvas) and returns `node_id`
+and `editor_url`. The main texts, colours, logo and media become fields, like a template. The
+original keeps its count of remixes; withdrawing it later never touches the copies. Free.
+
+`publish_to_gallery({ org, node_id, title, description?, tags? })` publishes the saved revision of a
+`motion` node: its files are copied to a public folder, so the item never depends on the author's
+permissions. Refused with `uncensored_not_publishable`, `real_brand_not_publishable`,
+`brand_logo_not_publishable`, `site_material_not_publishable` or `moderated`. Free.
+
 ## Posts
 
 | MCP | CLI |

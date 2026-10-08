@@ -54,10 +54,13 @@ describe('la superficie del modello mostra solo ciò che può usare', () => {
         'describe_node_types',
         'list_effects',
         'apply_effects',
-        'make_effects_pair'
+        'make_effects_pair',
+        'search_gallery',
+        'remix_gallery_item',
+        'publish_to_gallery'
       ])
     );
-    expect(names).toHaveLength(14);
+    expect(names).toHaveLength(17);
   });
 
   it('col brand i tool di brand ci sono, accanto a quelli di progetto', () => {

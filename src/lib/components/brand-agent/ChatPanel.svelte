@@ -20,10 +20,17 @@
     reload = 0,
     context,
     onturnend,
-    ondata
-  }: { projectId?: string; motionNodeId?: string; reload?: number; context?: () => Record<string, unknown>; onturnend?: () => void; ondata?: (part: StreamData) => void } = $props();
+    ondata,
+    prefill = null
+  }: { projectId?: string; motionNodeId?: string; reload?: number; context?: () => Record<string, unknown>; onturnend?: () => void; ondata?: (part: StreamData) => void; prefill?: { text: string; at: number } | null } = $props();
 
   let draft = $state('');
+
+  $effect(() => {
+    if (prefill) {
+      draft = prefill.text;
+    }
+  });
   let follow = $state<Follow>('following');
   let scroller = $state<HTMLDivElement | null>(null);
   let root = $state<HTMLDivElement | null>(null);

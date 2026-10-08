@@ -46,7 +46,8 @@ const GROUPS = [
   ['Post', /post/],
   ['Ads', /ad_campaign/],
   ['Nodi e generazione', /node/],
-  ['Video motion', /motion/]
+  ['Video motion', /motion/],
+  ['Galleria e remix', /gallery/]
 ];
 const groupOf = (name) => (GROUPS.find(([, re]) => re.test(name)) ?? ['Altro'])[0];
 

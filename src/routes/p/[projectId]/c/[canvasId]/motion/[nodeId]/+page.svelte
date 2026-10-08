@@ -104,6 +104,10 @@
   import { previewAudio } from '$lib/motion/preview-audio';
   import { AD_TEMPLATES, AD_TEMPLATE_IDS, templateAssets, type AdTemplate } from '$lib/motion/ad-templates';
   import { composeEditorPath } from '$lib/motion/composition-draft';
+  import PublishDialog from '$lib/components/gallery/PublishDialog.svelte';
+  import RemixBanner from '$lib/components/gallery/RemixBanner.svelte';
+  import DocFields from '$lib/components/motion/DocFields.svelte';
+  import { BRAND_PARAM, BRAND_REMIX_PROMPT } from '$lib/gallery/model';
   import type { PageData } from './$types';
 
   const SAVE_DEBOUNCE_MS = 700;
@@ -139,6 +143,9 @@
   let adding = $state(false);
   let exporting = $state(false);
   let templating = $state(false);
+  let publishing = $state(false);
+  let listed = $state(data.gallery.listed);
+  let brandAsk = $state<{ text: string; at: number } | null>(null);
   let browsing = $state(false);
   let templates = $state<TemplateEntry[]>(data.templates);
   let previewDoc = $state<MotionDoc | null>(null);
@@ -170,6 +177,9 @@
 
   onMount(() => {
     layout = readLayout(browserStore());
+    if (new URL(window.location.href).searchParams.has(BRAND_PARAM)) {
+      void askBrand();
+    }
     return watchMotionNode(supabase, data.node.id, () => void pullExternalEdit());
   });
   let body = $state<HTMLDivElement | null>(null);
@@ -223,6 +233,11 @@
     OPEN_CHAT[chatPlace]();
     await tick();
     document.querySelector<HTMLTextAreaElement>('aside.chat textarea')?.focus();
+  }
+
+  async function askBrand() {
+    brandAsk = { text: BRAND_REMIX_PROMPT, at: Date.now() };
+    await askAgent();
   }
 
   provideSelection({
@@ -868,9 +883,28 @@
       <button type="button" class="icon-btn toggle" title="Agent (⌘B)" aria-label="Agent panel" aria-pressed={chatShown} data-testid="toggle-chat" onclick={COMMANDS[Command.ToggleChat]}><BotMessageSquare size={16} /></button>
       <span class="divider" aria-hidden="true"></span>
       <button type="button" class="secondary" onclick={() => (leaveTo(0), (templating = true))} data-testid="template-open">Template</button>
+      <button type="button" class="secondary" onclick={() => (leaveTo(0), (publishing = true))} data-testid="publish-open">{listed ? 'In gallery' : 'Publish'}</button>
       <button type="button" class="render" onclick={() => (leaveTo(0), (exporting = true))} data-testid="export-open">Export</button>
     </div>
   </header>
+
+  {#if data.gallery.remixOf}
+    <RemixBanner origin={data.gallery.remixOf} onbrand={askBrand} />
+  {/if}
+
+  {#if publishing}
+    <PublishDialog
+      actionUrl={editorUrl}
+      {doc}
+      assets={assetUrls}
+      tokens={data.tokens}
+      name={data.node.name ?? ''}
+      {listed}
+      saved={saveState === SaveState.Saved}
+      onlisted={(item) => (listed = item)}
+      onclose={() => (publishing = false)}
+    />
+  {/if}
 
   {#if sounding}
     <SoundDialog kind={sounding} {editorUrl} seconds={doc.durationInFrames / doc.fps} onclose={() => (sounding = null)} onmade={(made) => placeSound(sounding ?? 'voice', made)} />
@@ -966,6 +1000,7 @@
         {#if selected.component === 'Particles'}<ParticlePresets {doc} clip={selected} onchange={edit} />{/if}
         {#if THREE_D_COMPONENTS.includes(selected.component)}<LookInspector {doc} onchange={edit} />{/if}
       {:else}
+        <DocFields {doc} {assets} onchange={edit} />
         <div class="composition" data-testid="composition-inspector">
           <header class="composition-head"><span>Composition</span>{#if selection.length > 1}<em>{selection.length} clips selected</em>{/if}</header>
           <CompositionSettings {doc} onchange={apply} />
@@ -975,7 +1010,7 @@
 
     <aside class="chat" class:open={sheet === Sheet.Agent} aria-label="Agent">
       <div class="sheet-head"><span>Agent</span><button type="button" aria-label="Close" onclick={() => (sheet = Sheet.None)}><X size={16} /></button></div>
-      <ChatPanel projectId={data.projectId} motionNodeId={data.node.id} reload={chatReload} context={() => ({ selection })} onturnend={() => void pullAgentEdit()} ondata={onAgentData} />
+      <ChatPanel projectId={data.projectId} motionNodeId={data.node.id} reload={chatReload} prefill={brandAsk} context={() => ({ selection })} onturnend={() => void pullAgentEdit()} ondata={onAgentData} />
     </aside>
 
     <section class="timeline-area" aria-label="Timeline">

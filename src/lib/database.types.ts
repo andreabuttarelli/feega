@@ -1473,6 +1473,164 @@ export type Database = {
         }
         Relationships: []
       }
+      gallery_items: {
+        Row: {
+          actor_id: string | null
+          actor_kind: string
+          agent_key: string | null
+          assets: Json
+          author_name: string
+          created_at: string
+          description: string
+          doc: Json
+          duration_s: number
+          format: string
+          id: string
+          kind: string
+          org_id: string
+          poster_url: string | null
+          preview_url: string | null
+          published_at: string | null
+          remix_count: number
+          remixed_from: string | null
+          source_node_id: string | null
+          status: string
+          tags: string[]
+          title: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          actor_id?: string | null
+          actor_kind: string
+          agent_key?: string | null
+          assets?: Json
+          author_name: string
+          created_at?: string
+          description?: string
+          doc: Json
+          duration_s: number
+          format: string
+          id?: string
+          kind: string
+          org_id: string
+          poster_url?: string | null
+          preview_url?: string | null
+          published_at?: string | null
+          remix_count?: number
+          remixed_from?: string | null
+          source_node_id?: string | null
+          status?: string
+          tags?: string[]
+          title: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          actor_id?: string | null
+          actor_kind?: string
+          agent_key?: string | null
+          assets?: Json
+          author_name?: string
+          created_at?: string
+          description?: string
+          doc?: Json
+          duration_s?: number
+          format?: string
+          id?: string
+          kind?: string
+          org_id?: string
+          poster_url?: string | null
+          preview_url?: string | null
+          published_at?: string | null
+          remix_count?: number
+          remixed_from?: string | null
+          source_node_id?: string | null
+          status?: string
+          tags?: string[]
+          title?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gallery_items_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gallery_items_remixed_from_fkey"
+            columns: ["remixed_from"]
+            isOneToOne: false
+            referencedRelation: "gallery_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gallery_items_source_node_id_fkey"
+            columns: ["source_node_id"]
+            isOneToOne: false
+            referencedRelation: "nodes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gallery_remixes: {
+        Row: {
+          actor_id: string | null
+          actor_kind: string
+          agent_key: string | null
+          created_at: string
+          id: string
+          item_id: string | null
+          node_id: string
+          org_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          actor_kind: string
+          agent_key?: string | null
+          created_at?: string
+          id?: string
+          item_id?: string | null
+          node_id: string
+          org_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          actor_kind?: string
+          agent_key?: string | null
+          created_at?: string
+          id?: string
+          item_id?: string | null
+          node_id?: string
+          org_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gallery_remixes_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "gallery_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gallery_remixes_node_id_fkey"
+            columns: ["node_id"]
+            isOneToOne: true
+            referencedRelation: "nodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gallery_remixes_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       influencer_views: {
         Row: {
           created_at: string

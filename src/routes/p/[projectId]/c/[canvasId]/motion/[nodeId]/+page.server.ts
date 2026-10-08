@@ -20,6 +20,7 @@ import { analyzeSounds, storageAnalysis } from '$lib/server/motion/audio-analysi
 import { clipsOf, parseMotionDoc } from '$lib/motion/doc';
 import { templateLibrary } from '$lib/server/motion/templates';
 import type { Db } from '$lib/server/db/client';
+import { editorGallery, publishFromForm, withdrawFromForm } from '$lib/server/gallery/editor';
 
 function parsedJson(text: string): unknown {
   try {
@@ -37,13 +38,14 @@ export const load: PageServerLoad = async ({ locals, params }) => {
   const scope = await scopeFor(locals, params);
   const nodeScope = { orgId: scope.orgId, nodeId: scope.motion.record.id };
   const farm = motionRenderFarm();
-  const [head, tokens, assets, runs, uploadLimit, templates] = await Promise.all([
+  const [head, tokens, assets, runs, uploadLimit, templates, gallery] = await Promise.all([
     headOrNew(scope.db, nodeScope, scope.motion.node),
     motionTokens(scope.db, { orgId: scope.orgId, brandId: scope.projectBrandId }),
     motionAssets({ db: scope.db, orgId: scope.orgId, projectId: params.projectId, canvasId: scope.canvas.id, nodeId: scope.motion.record.id }),
     listNodeRuns(scope.db, nodeScope),
     farm ? motionRenderStorage().limit().catch(() => null) : null,
-    libraryOf(scope).list()
+    libraryOf(scope).list(),
+    editorGallery(scope.db, nodeScope)
   ]);
 
   return {
@@ -56,9 +58,12 @@ export const load: PageServerLoad = async ({ locals, params }) => {
     assets,
     serverRender: { configured: farm !== null, latest: renderView(runs), queue: renderQueue(), uploadLimit },
     batch: batchView(runs),
-    templates
+    templates,
+    gallery
   };
 };
+
+const galleryScope = (scope: { db: Db; orgId: string; userId: string }) => ({ db: scope.db, orgId: scope.orgId, userId: scope.userId, actor: { kind: 'user' as const, id: scope.userId } });
 
 const libraryOf = (scope: { db: Db; orgId: string; userId: string }) => templateLibrary(scope.db, { orgId: scope.orgId, actor: { kind: 'user', id: scope.userId } });
 
@@ -223,6 +228,16 @@ export const actions: Actions = {
       posterFrame: Number(form.get('posterFrame')) || 0
     });
     return saved.ok ? { entry: saved.entry } : fail(HTTP_BAD_REQUEST, { error: saved.error });
+  },
+
+  publishGallery: async ({ locals, params, request }) => {
+    const scope = await scopeFor(locals, params);
+    return publishFromForm(galleryScope(scope), scope.motion.record.id, await request.formData());
+  },
+
+  withdrawGallery: async ({ locals, params, request }) => {
+    const scope = await scopeFor(locals, params);
+    return withdrawFromForm(galleryScope(scope), await request.formData());
   },
 
   deleteTemplate: async ({ locals, params, request }) => {

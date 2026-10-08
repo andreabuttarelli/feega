@@ -3,8 +3,8 @@
 > Generato da `node scripts/mcp-inventory.mjs --write`, leggendo `tools/list` dal server vero.
 > Non si modifica a mano: il prossimo che rigenera cancella le correzioni.
 
-**26 tool** — 10 in lettura, 13 in scrittura, 3 che distruggono.
-Il payload di `tools/list` pesa **26.215 caratteri**, circa **6554 token**, ed e' il costo che ogni sessione paga prima di dire una parola.
+**29 tool** — 11 in lettura, 15 in scrittura, 3 che distruggono.
+Il payload di `tools/list` pesa **28.515 caratteri**, circa **7129 token**, ed e' il costo che ogni sessione paga prima di dire una parola.
 
 | gruppo | tool |
 |---|---:|
@@ -14,6 +14,7 @@ Il payload di `tools/list` pesa **26.215 caratteri**, circa **6554 token**, ed e
 | Nodi e generazione | 4 |
 | Video motion | 3 |
 | Post | 3 |
+| Galleria e remix | 3 |
 
 Legenda: **R** legge e non cambia niente · **W** scrive · **D** distrugge, e il client puo' chiedere conferma.
 
@@ -367,4 +368,47 @@ Move a post between draft, ready and archived. Does not schedule or publish it. 
 | `org`? | string | Which org, if you belong to more than one. |
 | `id` | string |  |
 | `status` | `draft` \| `ready` \| `archived` |  |
+
+## Galleria e remix
+
+### `publish_to_gallery` · W
+
+*Publish a video to the gallery*
+
+Publish a `motion` node to the public gallery, free, so anyone can remix it. Only when the user asks. Refused for uncensored projects, real brands (their logo, a script about a real brand, logos or pictures imported from a website) and content the moderation refuses. `title` up to 80 characters, `description` up to 500, up to 8 one-word `tags`. Returns the gallery `id` and `url`.
+
+| campo | tipo | |
+|---|---|---|
+| `org`? | string | Which org, if you belong to more than one. |
+| `node_id` | string |  |
+| `title` | string |  |
+| `description`? | string |  |
+| `tags`? | string[] |  |
+
+### `remix_gallery_item` · W
+
+*Remix a gallery item*
+
+Remix a gallery item, free: copies its video and files into a new `motion` node of `project_id` (on `canvas_id`, or on the Motion canvas), with its main texts, colours, logo and media exposed as fields. Returns `node_id` and `editor_url`. Then offer to put the user brand on it with `ask_motion_agent`.
+
+| campo | tipo | |
+|---|---|---|
+| `org`? | string | Which org, if you belong to more than one. |
+| `item_id` | string |  |
+| `project_id` | string |  |
+| `canvas_id`? | string |  |
+
+### `search_gallery` · R
+
+*Search the remix gallery*
+
+Search the public gallery of free motion videos and compositions anyone can remix (many by Feega). Filters: `query` (title words), `kind` (motion, composition), `format` (16:9, 9:16, 1:1, 4:5), `duration` (short up to 6 s, medium 6 to 15 s, long over 15 s), `tag`. Returns id, title, author, format, seconds, remixes and url. Free, reads only.
+
+| campo | tipo | |
+|---|---|---|
+| `query`? | string |  |
+| `kind`? | `motion` \| `composition` |  |
+| `format`? | `16:9` \| `9:16` \| `1:1` \| `4:5` \| `1:1 1440` |  |
+| `duration`? | `short` \| `medium` \| `long` |  |
+| `tag`? | string |  |
 

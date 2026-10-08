@@ -7,7 +7,8 @@ import { IDENTIFIABILITY_CATEGORIES, IDENTIFIABILITY_JUDGE_SYSTEM, judgeSystem, 
 import { JudgeTier, MODERATION_PROFILES, carriedProfile } from './profiles';
 import type { RecommendationTier } from '$lib/canvas/recommended-models';
 import type { ModerationRecord, ScreenPorts } from './screen';
-import { parsePeopleVerdict, PEOPLE_DETECTOR_SYSTEM, ReferenceMedium, type PeopleDetector } from './people';
+import { parsePeopleVerdict, PEOPLE_DETECTOR_SYSTEM, ReferenceMedium, type PeopleDetector, type Reference } from './people';
+import { GALLERY_MEDIA_SYSTEM, parseMediaVerdict, type MediaJudge } from './gallery-media';
 
 const JEV_LABEL = 'moderation.jev';
 const IDENTIFIABILITY_JEV_LABEL = 'moderation.jev.identifiability';
@@ -16,6 +17,8 @@ const IDENTIFIABILITY_JUDGE_LABEL = 'moderation.judge.identifiability';
 const JEV_NOT_CONFIGURED = 'jev_not_configured';
 const PEOPLE_LABEL = 'moderation.people';
 const PEOPLE_QUESTION = 'Does this reference show any person?';
+const GALLERY_MEDIA_LABEL = 'moderation.gallery_media';
+const GALLERY_MEDIA_QUESTION = 'Can this be shown in the public gallery?';
 
 export type ModerationScope = {
   orgId: string;
@@ -115,17 +118,23 @@ const UPSTREAM_KEY_OF: Readonly<Record<ReferenceMedium, 'imageUrls' | 'videoUrls
 };
 
 export function peopleDetector(orgId: string): PeopleDetector {
-  return async (reference) => {
-    const [{ llmText, llmVideoReviewerModel }, { withOrgContext }] = await Promise.all([import('$lib/server/llm'), import('$lib/server/ai-log')]);
-    const { text } = await withOrgContext(orgId, () =>
-      llmText({
-        prompt: PEOPLE_QUESTION,
-        system: PEOPLE_DETECTOR_SYSTEM,
-        model: llmVideoReviewerModel(),
-        label: PEOPLE_LABEL,
-        upstream: { [UPSTREAM_KEY_OF[reference.medium]]: [reference.url] }
-      })
-    );
-    return parsePeopleVerdict(text);
-  };
+  return async (reference) => parsePeopleVerdict(await askAboutReference(orgId, reference, { question: PEOPLE_QUESTION, system: PEOPLE_DETECTOR_SYSTEM, label: PEOPLE_LABEL }));
+}
+
+async function askAboutReference(orgId: string, reference: Reference, ask: { question: string; system: string; label: string }): Promise<string> {
+  const [{ llmText, llmVideoReviewerModel }, { withOrgContext }] = await Promise.all([import('$lib/server/llm'), import('$lib/server/ai-log')]);
+  const { text } = await withOrgContext(orgId, () =>
+    llmText({
+      prompt: ask.question,
+      system: ask.system,
+      model: llmVideoReviewerModel(),
+      label: ask.label,
+      upstream: { [UPSTREAM_KEY_OF[reference.medium]]: [reference.url] }
+    })
+  );
+  return text;
+}
+
+export function galleryMediaJudge(orgId: string): MediaJudge {
+  return async (reference) => parseMediaVerdict(await askAboutReference(orgId, reference, { question: GALLERY_MEDIA_QUESTION, system: GALLERY_MEDIA_SYSTEM, label: GALLERY_MEDIA_LABEL }));
 }

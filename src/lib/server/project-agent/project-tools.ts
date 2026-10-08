@@ -23,6 +23,10 @@ import { connectRefusal, nodeModelError, targetTakesNoInputs, UNCENSORED_NO_INPU
 import { applyEffectsTo, makeEffectsPair } from '$lib/server/canvas/effects-actions';
 import { effectsCatalogue } from '$lib/canvas/effects/catalogue';
 import { describeNodeType, describeNodeTypes, isNodeType, unknownFieldsError, validateNewNodeData } from '$lib/canvas/node-data';
+import { listGallery } from '$lib/server/repos/gallery';
+import { cardView, publishNode, remixInto } from '$lib/server/gallery/service';
+import { DurationBand, GalleryKind, gallerySearchSchema, itemPath } from '$lib/gallery/model';
+import { MOTION_FORMATS } from '$lib/motion/doc';
 
 /**
  * I TOOL DI PROGETTO E TELA. Sempre presenti, anche senza brand.
@@ -346,6 +350,45 @@ export function createProjectTools(deps: ProjectToolDeps): Record<string, Tool> 
       execute: async (input: { nodeId: string }) => {
         const runs = await runsOf(deps.db, { orgId: deps.orgId, nodeId: input.nodeId });
         return { runs };
+      }
+    }),
+
+    search_gallery: tool({
+      description:
+        'Search the public gallery of free motion videos and compositions anyone can remix (many by Feega). Filters: query (title words), kind, format, duration (short up to 6 s, medium 6 to 15 s, long over 15 s), tag. Returns id, title, author, format, seconds, remixes and url. Free, reads only.',
+      inputSchema: z
+        .object({
+          query: z.string().max(80).optional(),
+          kind: z.enum(GalleryKind).optional(),
+          format: z.enum(MOTION_FORMATS).optional(),
+          duration: z.enum(DurationBand).optional(),
+          tag: z.string().max(24).optional()
+        })
+        .strict(),
+      execute: async (input: { query?: string; kind?: GalleryKind; format?: (typeof MOTION_FORMATS)[number]; duration?: DurationBand; tag?: string }) => {
+        const search = gallerySearchSchema.parse({ q: input.query, kind: input.kind, format: input.format, duration: input.duration, tag: input.tag });
+        return { items: (await listGallery(deps.db, search)).map((card) => cardView(card)) };
+      }
+    }),
+
+    remix_gallery_item: tool({
+      description:
+        'Remix a gallery item, free: copies its video and files into a new motion node of THIS project (on canvasId, or on the Motion canvas), with its main texts, colours, logo and media exposed as fields. Then offer to put the user brand on it: open the editor and ask the motion agent. Returns nodeId and editorPath.',
+      inputSchema: z.object({ itemId: z.string(), canvasId: z.string().optional() }).strict(),
+      execute: async (input: { itemId: string; canvasId?: string }) => {
+        const remixed = await remixInto({ db: deps.db, orgId: deps.orgId, userId: deps.userId, actor }, { itemId: input.itemId, projectId: deps.projectId, canvasId: input.canvasId ?? null });
+        return remixed.ok ? { nodeId: remixed.start.nodeId, canvasId: remixed.start.canvasId, editorPath: remixed.editorPath } : { error: remixed.error, message: remixed.message };
+      }
+    }),
+
+    publish_to_gallery: tool({
+      description:
+        'Publish a motion node of the workspace to the public gallery, free, so anyone can remix it. Only when the user asks. Refused for uncensored projects, real brands (their logo, a script about a real brand, logos or pictures imported from a website) and content the moderation refuses. title up to 80 characters, description up to 500, up to 8 one-word tags. Returns the gallery id and url.',
+      inputSchema: z.object({ nodeId: z.string(), title: z.string(), description: z.string().optional(), tags: z.array(z.string()).optional() }).strict(),
+      execute: async (input: { nodeId: string; title: string; description?: string; tags?: string[] }) => {
+        const { nodeId, ...meta } = input;
+        const published = await publishNode({ db: deps.db, orgId: deps.orgId, userId: deps.userId, actor }, { nodeId, meta });
+        return published.ok ? { id: published.id, url: itemPath(published.id) } : { error: published.error, message: published.message };
       }
     })
   };

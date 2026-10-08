@@ -16,7 +16,7 @@ function composed(): MotionDoc {
 
 const motionRecord = { id: 'm1', canvasId: 'c-motion', projectId: 'p1', type: 'motion', displayName: 'Spring', position: { x: 0, y: 0, z: 0 }, size: { width: 420, height: 320 }, data: { format: '9:16', docHeadRevision: 2, posterAssetId: null, lastRenderAssetId: null }, version: 1 };
 const findNode = vi.fn(async (): Promise<typeof motionRecord | null> => motionRecord);
-vi.mock('$lib/server/repos/canvas', () => ({ findNode, patchNodeData: vi.fn(), DataCheck: { Schema: 'schema' } }));
+vi.mock('$lib/server/repos/canvas', () => ({ findNode, patchNodeData: vi.fn(), listCanvases: vi.fn(), createCanvas: vi.fn(), listNodes: vi.fn(), createNode: vi.fn(), DataCheck: { Schema: 'schema' } }));
 
 const head = vi.fn(async (): Promise<{ version: number; doc: MotionDoc; summary: null; actorKind: string } | null> => ({ version: 2, doc: composed(), summary: null, actorKind: 'user' }));
 vi.mock('$lib/server/repos/motion-revisions', () => ({ readHead: head, appendRevision: vi.fn(), RevisionOutcome: { Written: 'written', Conflict: 'conflict', Invalid: 'invalid' } }));

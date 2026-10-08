@@ -1,4 +1,5 @@
 import { error, fail, type RequestEvent } from '@sveltejs/kit';
+import type { Db } from '$lib/server/db/client';
 import type { Actions, PageServerLoad } from './$types';
 import { toolScope } from '$lib/server/dashboard/tool-scope';
 import { findMotionNode, headOrNew, motionAssets, motionTokens } from '$lib/server/motion/editor';
@@ -12,6 +13,7 @@ import { motionEditorPath } from '$lib/canvas/motion-node';
 import { uploadKindOf } from '$lib/canvas/upload-kind';
 import { draftFromDoc } from '$lib/motion/composition-draft';
 import { COMPOSITION_MEDIA_KINDS } from '$lib/motion/components';
+import { editorGallery, publishFromForm, withdrawFromForm } from '$lib/server/gallery/editor';
 
 const HTTP_BAD_REQUEST = 400;
 const HTTP_NOT_FOUND = 404;
@@ -33,11 +35,12 @@ export const load: PageServerLoad = async (event) => {
   const projects = await listProjects(db, orgId);
   const brandId = projects.find((p) => p.id === projectId)?.brandId ?? null;
 
-  const [head, tokens, assets, runs] = await Promise.all([
+  const [head, tokens, assets, runs, gallery] = await Promise.all([
     headOrNew(db, nodeScope, motion.node),
     motionTokens(db, { orgId, brandId }),
     motionAssets({ db, orgId, projectId, canvasId, nodeId: motion.record.id }),
-    listNodeRuns(db, nodeScope)
+    listNodeRuns(db, nodeScope),
+    editorGallery(db, nodeScope)
   ]);
 
   return {
@@ -50,11 +53,24 @@ export const load: PageServerLoad = async (event) => {
     assets,
     serverRender: { configured: motionRenderFarm() !== null, latest: renderView(runs), queue: renderQueue() },
     editorUrl: motionEditorPath({ projectId, canvasId, nodeId: motion.record.id }),
-    canvasHref: `/p/${projectId}/c/${canvasId}`
+    canvasHref: `/p/${projectId}/c/${canvasId}`,
+    gallery
   };
 };
 
+const galleryScope = (scope: { db: Db; orgId: string; userId: string }) => ({ db: scope.db, orgId: scope.orgId, userId: scope.userId, actor: { kind: 'user' as const, id: scope.userId } });
+
 export const actions: Actions = {
+  publishGallery: async (event) => {
+    const scope = await scopeOf(event);
+    return publishFromForm(galleryScope(scope), scope.motion.record.id, await event.request.formData());
+  },
+
+  withdrawGallery: async (event) => {
+    const scope = await scopeOf(event);
+    return withdrawFromForm(galleryScope(scope), await event.request.formData());
+  },
+
   upload: async (event) => {
     const { db, orgId, projectId } = await scopeOf(event);
     const form = await event.request.formData();

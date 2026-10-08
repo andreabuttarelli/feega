@@ -74,6 +74,11 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
     tables: ['influencers', 'influencer_views']
   },
   {
+    path: 'scripts/seed-gallery.ts',
+    why: "Uno script una tantum, senza sessione utente: crea l'utente di sistema e l'org \"Feega\" (non esiste ancora un JWT di chi pubblica) e ne pubblica i video demo nella galleria. Scrive solo gallery_items di quell'org, ritrovata per slug, e i file sotto `media/gallery/<itemId>/`; legge auth.users solo per ritrovare l'utente di sistema per email. Non accetta un org_id da fuori: lo slug è fisso, o quello di un'org di prova passato a mano.",
+    tables: ['orgs', 'orgs_members', 'gallery_items']
+  },
+  {
     path: 'scripts/seed-reference-images.ts',
     why: "Uno script una tantum, senza sessione utente: semina il catalogo globale delle foto di riferimento (`reference_images.org_id = null`, bucket `reference-images` sotto `catalogue/`), che nessuna policy lascia scrivere a un JWT — il catalogo si legge da ogni org e non lo scrive nessuna.",
     tables: ['reference_images']
