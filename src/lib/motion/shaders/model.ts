@@ -91,3 +91,30 @@ export function shaderProps(shaders: readonly ClipShader[], defs: ShaderDefs): A
     });
   });
 }
+
+type WithClips = { tracks: { clips: { shaders?: ClipShader[] }[] }[] };
+
+function rewireTracks<T extends WithClips>(holder: T, refs: Record<string, string>): T {
+  return {
+    ...holder,
+    tracks: holder.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.shaders?.length ? { ...c, shaders: c.shaders.map((s) => ({ ...s, ref: refs[s.ref] ?? s.ref })) } : c)) }))
+  };
+}
+
+export function rewireShaders<D extends WithClips & { shaders: ShaderDefs; comps: Record<string, WithClips> }>(doc: D, refs: Record<string, string>, renamed: Record<string, string> = {}): D {
+  const shaders = Object.fromEntries(Object.entries(doc.shaders).map(([ref, def]) => [refs[ref] ?? ref, { ...def, name: renamed[ref] ?? def.name }]));
+  const comps = Object.fromEntries(Object.entries(doc.comps).map(([id, comp]) => [id, rewireTracks(comp, refs)]));
+  return { ...rewireTracks(doc, refs), shaders, comps };
+}
+
+export function freeName(name: string, taken: ReadonlySet<string>): string {
+  if (!taken.has(name)) {
+    return name;
+  }
+
+  let n = 2;
+  while (taken.has(`${name}-${n}`)) {
+    n += 1;
+  }
+  return `${name}-${n}`;
+}

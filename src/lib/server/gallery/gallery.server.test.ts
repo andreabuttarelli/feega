@@ -148,6 +148,26 @@ describe('remixing a gallery item', () => {
     expect(of(calls, 'gallery_remixes', 'insert')[0].payload).toMatchObject({ org_id: 'org-2', item_id: 'item-1', actor_kind: 'user', actor_id: 'u-2' });
   });
 
+  it("re-inserts the item's custom effects into the remixer's workspace, renamed on a clash, and points the clips at them", async () => {
+    const shader = { name: 'vhs', version: 3, frag: 'vec4 effect(vec2 uv) { return texture2D(u_src, uv); }', params: [] };
+    const row = galleryRow([{ id: 'g-logo', kind: 'image', name: 'logo', url: `${PUBLIC}g-logo.svg` }]);
+    const doc = { ...row.doc, shaders: { 'author-fx': shader } } as MotionDoc;
+    doc.tracks[0].clips = doc.tracks[0].clips.map((c) => (c.id === 'logo' ? { ...c, component: 'Image' as const, shaders: [{ id: 's1', ref: 'author-fx', enabled: true, params: {} }] } : c));
+    let n = 0;
+    const own = { id: 'mine', org_id: 'org-2', name: 'vhs', version: 1, frag: 'x', params: [], check_state: 'passed', check_problems: [], cost_ms: 1, deleted_at: null, updated_at: 'now' };
+    const { db, calls } = fakeDb({ gallery_items: [{ ...row, doc }], canvases: [{ id: 'c-9', org_id: 'org-2', project_id: 'p-2', name: 'Motion', viewport: null }], nodes: [], assets: [], gallery_remixes: [], effects: [own] }, { filter: true, newId: () => `new-${++n}` });
+
+    expect(await remixGalleryItem(db, { download }, remixInput)).toMatchObject({ ok: true });
+
+    const inserted = of(calls, 'effects', 'insert')[0].payload as { org_id: string; name: string; frag: string };
+    expect(inserted).toMatchObject({ org_id: 'org-2', name: 'vhs-2', frag: shader.frag });
+    const revision = of(calls, 'motion_revisions', 'insert')[0].payload as { doc: MotionDoc };
+    const newRef = Object.keys(revision.doc.shaders)[0];
+    expect(newRef).not.toBe('author-fx');
+    expect(revision.doc.shaders[newRef].name).toBe('vhs-2');
+    expect(revision.doc.tracks[0].clips.find((c) => c.id === 'logo')!.shaders[0].ref).toBe(newRef);
+  });
+
   it('never fetches a file outside the gallery folder of that item', async () => {
     const { db, calls } = remixWorld([{ id: 'g-logo', kind: 'image', name: 'logo', url: 'http://169.254.169.254/latest/meta-data' }]);
     expect(await remixGalleryItem(db, { download }, remixInput)).toMatchObject({ ok: false, error: RemixError.ForeignFile });
