@@ -1488,17 +1488,24 @@
   @media (pointer: coarse) {
     .timeline {
       --row: 44px;
-      --prop-row: 40px;
+      --prop-row: 44px;
     }
 
     .flags {
-      --ib-size: 40px;
+      --ib-size: 44px;
     }
 
     .twirl,
     .mark {
-      width: 32px;
-      height: 40px;
+      width: 44px;
+      height: 44px;
+    }
+
+    .bar {
+      top: 0;
+      height: var(--row);
+      border-top: 4px solid var(--ui-bg);
+      border-bottom: 4px solid var(--ui-bg);
     }
 
     .grip {
@@ -1512,11 +1519,11 @@
     }
 
     .ruler {
-      height: 36px;
+      height: 44px;
     }
 
     .playhead {
-      top: 36px;
+      top: 44px;
     }
   }
 </style>

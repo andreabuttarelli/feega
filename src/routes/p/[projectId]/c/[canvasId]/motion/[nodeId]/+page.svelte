@@ -10,7 +10,7 @@
   import Plus from '@lucide/svelte/icons/plus';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import CompositionSettings from '$lib/components/motion/CompositionSettings.svelte';
-  import { SAVE_TONE, SaveState, TimeDisplay, clockLabel, compositionLabel, compositionShort, nextDisplay } from '$lib/motion/editor-bar';
+  import { SAVE_TONE, SaveState, TimeDisplay, clockLabel, compositionLabel, compositionShort, DISPLAY_NAME, isTap } from '$lib/motion/editor-bar';
   import Keyboard from '@lucide/svelte/icons/keyboard';
   import LayoutTemplate from '@lucide/svelte/icons/layout-template';
   import Upload from '@lucide/svelte/icons/upload';
@@ -158,6 +158,8 @@
   const chatPlace = $derived(CHAT_PLACE[viewport]);
   let settingsOpen = $state(false);
   let moreOpen = $state(false);
+  let clockOpen = $state(false);
+  let pressAt: { x: number; y: number } | null = null;
 
   function browserStore(): LayoutStore | null {
     try {
@@ -825,15 +827,27 @@
     [Command.Precompose]: precomposeSelection
   };
 
-  function closeSettings(e: PointerEvent) {
-    if (settingsOpen && !(e.target as HTMLElement | null)?.closest('.popover-anchor')) {
-      settingsOpen = false;
+  function pressDown(e: PointerEvent) {
+    pressAt = { x: e.clientX, y: e.clientY };
+  }
+
+  function closePopovers(e: PointerEvent) {
+    const from = pressAt;
+    pressAt = null;
+    if (!from || !isTap(from, { x: e.clientX, y: e.clientY })) {
+      return;
     }
+    if ((e.target as HTMLElement | null)?.closest('.popover-anchor')) {
+      return;
+    }
+    settingsOpen = false;
+    clockOpen = false;
   }
 
   function onKey(e: KeyboardEvent) {
-    if (settingsOpen && e.key === 'Escape') {
+    if ((settingsOpen || clockOpen) && e.key === 'Escape') {
       settingsOpen = false;
+      clockOpen = false;
       return;
     }
     if (exporting || sounding || isTyping(e.target as HTMLElement | null)) {
@@ -849,7 +863,7 @@
 </script>
 
 <svelte:head><title>{data.node.name ?? 'Motion'} · Motion editor</title></svelte:head>
-<svelte:window bind:innerWidth={width} onkeydown={onKey} onpointerdown={closeSettings} />
+<svelte:window bind:innerWidth={width} onkeydown={onKey} onpointerdown={pressDown} onpointerup={closePopovers} />
 
 <div class="editor" data-testid="motion-editor" data-viewport={viewport}>
   <header class="bar">
@@ -876,9 +890,18 @@
       <IconButton action={playing ? Action.Pause : Action.Play} class="play" fill="currentColor" onclick={COMMANDS[Command.TogglePlay]} />
       <IconButton action={Action.StepForward} class="step" onclick={COMMANDS[Command.StepForward]} />
       <IconButton action={Action.GoEnd} onclick={COMMANDS[Command.GoEnd]} />
-      <button type="button" class="clock" title={display === TimeDisplay.Timecode ? 'Show frames' : 'Show timecode'} data-testid="clock" onclick={() => (display = nextDisplay(display))}>
-        <span data-testid="timecode"><b>{clockLabel(frame, doc.fps, display)}</b> <i>/ {clockLabel(doc.durationInFrames, doc.fps, display)}</i></span>
-      </button>
+      <div class="popover-anchor">
+        <button type="button" class="clock" aria-haspopup="menu" aria-expanded={clockOpen} aria-label={`Time display: ${DISPLAY_NAME[display]}`} data-testid="clock" onclick={() => (clockOpen = !clockOpen)}>
+          <span data-testid="timecode"><b>{clockLabel(frame, doc.fps, display)}</b> <i>/ {clockLabel(doc.durationInFrames, doc.fps, display)}</i></span><ChevronDown size={12} />
+        </button>
+        {#if clockOpen}
+          <div class="menu more clock-menu" role="menu">
+            {#each Object.values(TimeDisplay) as option (option)}
+              <button type="button" role="menuitemradio" aria-checked={display === option} onclick={() => ((display = option), (clockOpen = false))}><span>{DISPLAY_NAME[option]}</span><kbd>{clockLabel(frame, doc.fps, option)}</kbd></button>
+            {/each}
+          </div>
+        {/if}
+      </div>
     </div>
 
     <div class="group trail" data-testid="bar-trail">
@@ -1245,8 +1268,12 @@
   }
 
   .clock {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
     margin-left: var(--ui-space-2);
     padding: 4px 6px;
+    color: var(--ui-text-3);
     font-family: var(--ui-mono);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
@@ -1715,6 +1742,31 @@
     font-family: var(--ui-mono);
     font-size: var(--ui-text-xs);
     color: var(--ui-text-3);
+  }
+
+  .clock-menu {
+    left: 0;
+    right: auto;
+    grid-template-columns: 180px;
+  }
+
+  .menu [aria-checked='true'] {
+    color: var(--ui-accent);
+  }
+
+  @media (pointer: coarse) {
+    .editor :global(:is(button, a[href], select, [role='button'], [role='slider'], label:has(> input[type='checkbox']), input:not([type='checkbox'], [type='radio'], [type='range'], [type='hidden']))) {
+      min-height: var(--ui-hit);
+    }
+
+    .editor :global(:is(button, [role='button'], input[type='color']):not(.bar)) {
+      min-width: var(--ui-hit);
+    }
+
+    .editor :global(:is(a[href], label:has(> input[type='checkbox']))) {
+      display: inline-flex;
+      align-items: center;
+    }
   }
 
   .menu .col {

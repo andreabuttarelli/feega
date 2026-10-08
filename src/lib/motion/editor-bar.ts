@@ -36,7 +36,16 @@ const CLOCK: Record<TimeDisplay, (frame: number, fps: number) => string> = {
 
 export const clockLabel = (frame: number, fps: number, display: TimeDisplay): string => CLOCK[display](frame, fps);
 
-export const nextDisplay = (display: TimeDisplay): TimeDisplay => (display === TimeDisplay.Timecode ? TimeDisplay.Frames : TimeDisplay.Timecode);
+export const DISPLAY_NAME: Record<TimeDisplay, string> = {
+  [TimeDisplay.Timecode]: 'Timecode',
+  [TimeDisplay.Frames]: 'Frames'
+};
+
+type Point = { x: number; y: number };
+
+const TAP_SLOP_PX = 8;
+
+export const isTap = (from: Point, to: Point): boolean => Math.hypot(to.x - from.x, to.y - from.y) < TAP_SLOP_PX;
 
 export function compositionLabel(doc: Pick<MotionDoc, 'width' | 'height' | 'fps' | 'durationInFrames'>): string {
   return `${FORMATS[formatOf(doc)].label} · ${doc.width}×${doc.height} · ${doc.fps}fps · ${secondsLabel(doc.durationInFrames, doc.fps)}s`;
