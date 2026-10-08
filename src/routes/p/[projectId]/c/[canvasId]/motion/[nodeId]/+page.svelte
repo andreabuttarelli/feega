@@ -1841,7 +1841,7 @@
 
   [data-viewport='tablet'] .chip .long,
   [data-viewport='tablet'] .transport :global(.step),
-  [data-viewport='tablet'] .crumb:not(.current),
+  [data-viewport='tablet'] .crumbs,
   [data-viewport='tablet'] .slash {
     display: none;
   }

@@ -12,8 +12,9 @@
   import { compOf, type MotionClip, type MotionDoc } from '$lib/motion/doc';
   import { ClipEdge, moveClip, moveKeyframes, moveTrack, removeKeyframes, setKeyEase, setKeyInterp, setKeyframe, trimClip, type KeyRef, type OpResult } from '$lib/motion/timeline';
   import { withParams } from '$lib/motion/custom/params';
-  import { Grip, KeySide, Reveal, Snap, edgeHandles, frameAt, keyLanes, pxPerFrame, snapped } from '$lib/motion/timeline-view';
-  import { KeyMark, RowKind, keyGlyph, keyMark, layerName, layerRows, pinched, propValue, rulerMarks, type PropLane } from '$lib/motion/timeline-layers';
+  import { Grip, KeySide, Pointer, Reveal, Snap, edgeHandles, frameAt, keyLanes, pxPerFrame, snapped } from '$lib/motion/timeline-view';
+  import { Axis, lockAxis, pinchView, type PinchStart } from '$lib/motion/timeline-touch';
+  import { KeyMark, RowKind, keyGlyph, keyMark, layerName, layerRows, propValue, rulerMarks, type PropLane } from '$lib/motion/timeline-layers';
   import { MASK_KINDS, Matte } from '$lib/motion/mask';
   import type { MotionTrack } from '$lib/motion/doc';
   import { Interp, Source, type EaseSpec, type Keyframe } from '$lib/motion/keyframes';
@@ -221,30 +222,50 @@
     node.select();
   }
 
-  const fingers = new Map<number, number>();
-  let pinch: { zoom: number; distance: number } | null = null;
+  const TOUCH = 'touch';
+  const SNAP_HAPTIC_MS = 5;
 
-  const spread = () => Math.abs([...fingers.values()].reduce((a, b) => a - b));
+  const fingers = new Map<number, Point>();
+  let pinch: PinchStart | null = null;
+  let pointer = $state(Pointer.Fine);
+  let guide = $state<number | null>(null);
+  let laneDrag: { from: Point; scrollTop: number; axis: Axis | null } | null = null;
+
+  const laneLeft = () => (lanes?.getBoundingClientRect().left ?? 0) + headPx;
+
+  function twoFingers(): { mid: number; distance: number } {
+    const [a, b] = [...fingers.values()];
+    return { mid: (a.x + b.x) / 2 - laneLeft(), distance: Math.max(1, Math.abs(a.x - b.x)) };
+  }
 
   function touchDown(e: PointerEvent) {
-    if (e.pointerType !== 'touch') {
+    pointer = e.pointerType === TOUCH ? Pointer.Coarse : Pointer.Fine;
+    if (e.pointerType !== TOUCH) {
       return;
     }
-    fingers.set(e.pointerId, e.clientX);
+    fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    startLane(e);
     if (fingers.size === 2) {
-      pinch = { zoom, distance: Math.max(1, spread()) };
+      pinch = { zoom, scrollLeft: lanes?.scrollLeft ?? 0, ...twoFingers() };
       gesture = null;
       draft = null;
+      laneDrag = null;
     }
   }
 
-  function touchMove(e: PointerEvent) {
+  async function touchMove(e: PointerEvent) {
     if (!fingers.has(e.pointerId)) {
       return;
     }
-    fingers.set(e.pointerId, e.clientX);
-    if (pinch && fingers.size === 2) {
-      zoom = pinched(pinch.zoom, pinch.distance, Math.max(1, spread()));
+    fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (!pinch || fingers.size !== 2) {
+      return;
+    }
+    const view = pinchView(pinch, twoFingers());
+    zoom = view.zoom;
+    await tick();
+    if (lanes) {
+      lanes.scrollLeft = view.scrollLeft;
     }
   }
 
@@ -253,6 +274,40 @@
     if (fingers.size < 2) {
       pinch = null;
     }
+  }
+
+  function startLane(e: PointerEvent) {
+    if (!(e.target as HTMLElement).classList.contains('lane')) {
+      return;
+    }
+    laneDrag = { from: { x: e.clientX, y: e.clientY }, scrollTop: lanes?.scrollTop ?? 0, axis: null };
+  }
+
+  const LANE_DRAG: Record<Axis, (e: PointerEvent, drag: NonNullable<typeof laneDrag>) => void> = {
+    [Axis.Horizontal]: (e) => (frame = Math.min(frameOfPointer(e), doc.durationInFrames - 1)),
+    [Axis.Vertical]: (e, drag) => lanes && (lanes.scrollTop = drag.scrollTop - (e.clientY - drag.from.y))
+  };
+
+  function moveLane(e: PointerEvent): boolean {
+    if (!laneDrag || pinch) {
+      return false;
+    }
+    laneDrag.axis ??= lockAxis(e.clientX - laneDrag.from.x, e.clientY - laneDrag.from.y);
+    if (laneDrag.axis) {
+      LANE_DRAG[laneDrag.axis](e, laneDrag);
+    }
+    return true;
+  }
+
+  function snapTo(base: MotionDoc, raw: number, exclude: string[], playhead = frame): number {
+    return snapped(base, raw, { playhead, exclude, zoom, snap, beats, pointer });
+  }
+
+  function markSnap(at: number | null) {
+    if (at !== null && at !== guide && pointer === Pointer.Coarse) {
+      navigator.vibrate?.(SNAP_HAPTIC_MS);
+    }
+    guide = at;
   }
 
   function toggleMark(owner: KeyOwner, prop: string, mark: KeyMark) {
@@ -295,9 +350,13 @@
 
   function startClip(e: PointerEvent, clip: MotionClip, trackId: string, kind: Drag = Drag.Move) {
     e.stopPropagation();
+    const wasSelected = selection.includes(clip.id);
     select(clip.id, e);
     keySelection = [];
     if (isLocked(doc, clip.id)) {
+      return;
+    }
+    if (e.pointerType === TOUCH && !wasSelected) {
       return;
     }
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
@@ -417,28 +476,38 @@
     return (hit as HTMLElement | undefined)?.dataset.trackId ?? null;
   }
 
+  function trimTo(g: Gesture, at: number): number {
+    const edge = snapTo(g.base, at, [g.clipId]);
+    markSnap(edge !== at ? edge : null);
+    return edge;
+  }
+
   const GESTURES: Record<Exclude<Drag, typeof Drag.Scrub>, (g: Gesture, at: number, e: PointerEvent) => OpResult> = {
     [Drag.Move]: (g, at, e) => {
       const from = g.originFrom + (at - g.grabFrame);
       const clip = g.base.tracks.flatMap((t) => t.clips).find((c) => c.id === g.clipId)!;
-      const start = snapped(g.base, from, { playhead: frame, exclude: [g.clipId], zoom, snap, beats });
-      const endSnap = snapped(g.base, from + clip.durationInFrames, { playhead: frame, exclude: [g.clipId], zoom, snap, beats }) - clip.durationInFrames;
-      const target = start !== from ? start : endSnap;
+      const start = snapTo(g.base, from, [g.clipId]);
+      const end = snapTo(g.base, from + clip.durationInFrames, [g.clipId]);
+      const target = start !== from ? start : end - clip.durationInFrames;
+      markSnap(start !== from ? start : end !== from + clip.durationInFrames ? end : null);
       const over = trackUnder(e);
       const sameKind = g.base.tracks.find((t) => t.id === over)?.kind === g.base.tracks.find((t) => t.id === g.trackId)?.kind;
       return moveClip(g.base, g.clipId, { from: target, trackId: over && sameKind ? over : undefined });
     },
-    [Drag.TrimStart]: (g, at) => trimClip(g.base, g.clipId, ClipEdge.Start, snapped(g.base, at, { playhead: frame, exclude: [g.clipId], zoom, snap, beats })),
-    [Drag.TrimEnd]: (g, at) => trimClip(g.base, g.clipId, ClipEdge.End, snapped(g.base, at, { playhead: frame, exclude: [g.clipId], zoom, snap, beats })),
+    [Drag.TrimStart]: (g, at) => trimClip(g.base, g.clipId, ClipEdge.Start, trimTo(g, at)),
+    [Drag.TrimEnd]: (g, at) => trimClip(g.base, g.clipId, ClipEdge.End, trimTo(g, at)),
     [Drag.FadeIn]: (g, at) => dragFade(g.base, g.clipId, FadeEdge.In, at),
     [Drag.FadeOut]: (g, at) => dragFade(g.base, g.clipId, FadeEdge.Out, at),
     [Drag.Keys]: (g, at) => {
-      g.delta = snapped(g.base, g.originFrom + (at - g.grabFrame), { playhead: g.originFrom, exclude: [], zoom, snap, beats }) - g.originFrom;
+      g.delta = snapTo(g.base, g.originFrom + (at - g.grabFrame), [], g.originFrom) - g.originFrom;
       return moveKeyframes(g.base, g.refs, g.delta);
     }
   };
 
   function onMove(e: PointerEvent) {
+    if (moveLane(e)) {
+      return;
+    }
     if (whip) {
       const at = pointInTimeline(e);
       whip = { ...whip, x: at.x, y: at.y };
@@ -474,6 +543,8 @@
     }
     gesture = null;
     draft = null;
+    guide = null;
+    laneDrag = null;
   }
 
   function reorder(trackId: string, delta: number) {
@@ -769,6 +840,7 @@
             {#each edgeHandles([clip], ppf, selection) as handle (handle.grip)}
               <div
                 class="grip"
+                class:selected={selection.includes(clip.id)}
                 data-grip={handle.grip}
                 data-grip-clip={handle.clipId}
                 role="separator"
@@ -798,6 +870,7 @@
       <svg class="whip-line" aria-hidden="true"><line x1={whip.x0} y1={whip.y0} x2={whip.x} y2={whip.y} /></svg>
     {/if}
 
+    {#if guide !== null}<div class="snap-guide" data-testid="snap-guide" style={`left: ${headPx + guide * ppf}px;`}></div>{/if}
     <div class="playhead" style={`left: ${headPx + frame * ppf}px;`}></div>
   </div>
 </div>
@@ -948,6 +1021,16 @@
     clip-path: polygon(0 0, 100% 0, 100% 60%, 50% 100%, 0 60%);
     pointer-events: none;
     z-index: 3;
+  }
+
+  .snap-guide {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: var(--ui-accent);
+    pointer-events: none;
+    z-index: 8;
   }
 
   .playhead {
@@ -1523,8 +1606,31 @@
       border-bottom: 4px solid var(--ui-bg);
     }
 
-    .grip {
-      min-width: 16px;
+    .grip:not(.selected) {
+      display: none;
+    }
+
+    .grip.selected::after {
+      content: '';
+      position: absolute;
+      top: 25%;
+      bottom: 25%;
+      left: 50%;
+      width: 4px;
+      margin-left: -2px;
+      background: var(--ui-accent);
+    }
+
+    .grip::before,
+    .fade::before,
+    .key::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 44px;
+      height: 44px;
+      transform: translate(-50%, -50%);
     }
 
     .key {
