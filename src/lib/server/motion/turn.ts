@@ -65,6 +65,11 @@ const BROWSER_DRAWS: Record<Browser, () => void> = {
   }
 };
 
+enum Client {
+  Watching = 'watching',
+  Gone = 'gone'
+}
+
 enum Round {
   Edit = 'edit',
   SelfCheck = 'self-check',
@@ -148,6 +153,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
   const frameScope = { orgId, projectId: project.id, nodeId: motion.record.id };
   let askPreview: (request: FramesRequest) => void = () => {};
   let askCheck: (request: CheckRequest) => void = () => {};
+  let client = Client.Watching;
 
   const tools = createMotionTools({
     session,
@@ -160,6 +166,9 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
     music: (ask) => withOrgContext(orgId, () => layMusic(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, actor }, ask)),
     frames: async (callId, times) => {
       BROWSER_DRAWS[browser]();
+      if (client === Client.Gone) {
+        return null;
+      }
       const review = await screenModelInput(db, { profile: ModerationProfile.Standard, texts: docTexts(session.doc), scope: moderationScope });
       if (!review.ok) {
         throw new Error(`frames withheld by the safety review: ${review.error}`);
@@ -344,5 +353,20 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
     return { reply: turn.content, summary: written ? session.edits.join(', ') : null, version: written?.version ?? null, revision: write?.outcome ?? null, costUsd: spent };
   }
 
-  return { stream, done };
+  const reader = stream.getReader();
+  const followed = new ReadableStream<UIMessageChunk>({
+    pull: async (controller) => {
+      const next = await reader.read();
+      if (next.done) {
+        controller.close();
+        return;
+      }
+      controller.enqueue(next.value);
+    },
+    cancel: (reason) => {
+      client = Client.Gone;
+      return reader.cancel(reason);
+    }
+  });
+  return { stream: followed, done };
 }
