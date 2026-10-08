@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BRIEF_AUTO_GO_S, GO_MESSAGE, briefAwaits, pendingBrief, promptTexts, savedBrief } from './script-brief';
 import { MotionFormat, newMotionDoc } from './doc';
+import { toolsForMirror } from '$lib/chat-stream-events';
 
 const written = { toolName: 'write_script', status: 'done' as const, output: { ok: true, brief: '**Research**\n- For: makers' } };
 const refused = { toolName: 'write_script', status: 'done' as const, output: { ok: false, error: 'read the site first' } };
@@ -18,6 +19,12 @@ describe('script brief', () => {
       { role: 'assistant' as const, content: '', tools: [written] }
     ];
     expect(pendingBrief(messages)).toBe('**Research**\n- For: makers');
+  });
+
+  it('keeps a long brief whole when the reply row is saved, so a reload still shows it', () => {
+    const long = { ...written, toolCallId: 'c1', output: { ok: true, brief: `**Research**\n${'- a sourced claim\n'.repeat(200)}` } };
+    const saved = [{ role: 'assistant' as const, content: '', tools: toolsForMirror([long]) }];
+    expect(pendingBrief(saved)).toBe(long.output.brief);
   });
 
   it('stops waiting once the user answered, or while the turn still streams', () => {
