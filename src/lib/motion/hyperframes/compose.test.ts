@@ -398,6 +398,14 @@ describe('custom components in the composition', () => {
     expect(html).not.toContain('/npm/d3@');
   });
 
+  it('loads p5 only for a component that uses it', () => {
+    const sketch = { ...graph, source: { ...graph.source, js: 'p5((p) => { p.draw = () => p.circle(0, 0, 9); });' } };
+    const sketched = must(addClip(must(writeComponent(newMotionDoc(MotionFormat.Landscape), 'Sketch', sketch)), { component: 'Custom', from: 0, durationInFrames: 60, props: { name: 'Sketch' } }, 's1'));
+
+    expect(compose(sketched)).toMatch(/<script src="https:\/\/cdn\.jsdelivr\.net\/npm\/p5@[\d.]+\/lib\/p5\.min\.js"><\/script>/);
+    expect(html).not.toContain('/npm/p5@');
+  });
+
   it('renders the component markup under a root scoped to the clip', () => {
     expect(html).toContain('<div class="cc" id="cc-g1" data-component="NodeGraph"><style>@scope (#cc-g1) {.node{background:#111}}</style><div class="node"></div></div>');
   });
