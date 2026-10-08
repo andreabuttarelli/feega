@@ -3,8 +3,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const CATALOGUE = {
   data: [
     {
-      id: 'anthropic/claude-sonnet-5.5',
-      name: 'Anthropic: Claude Sonnet 5.5',
+      id: 'anthropic/claude-opus-5.5',
+      name: 'Anthropic: Claude Opus 5.5',
       supported_parameters: ['tools', 'reasoning'],
       reasoning: { supported_efforts: ['high', 'medium', 'low'], default_effort: 'high' },
       pricing: { prompt: '0.000002', completion: '0.00001' }
@@ -47,7 +47,7 @@ describe('chat model picker endpoint', () => {
     const res = await GET(event({}).ev);
     const body = await res.json();
     expect(body.groups.map((g: { provider: string }) => g.provider)).toEqual(['anthropic', 'z-ai']);
-    expect(body.choice).toEqual({ model: 'anthropic/claude-sonnet-5.5', reasoning: 'medium' });
+    expect(body.choice).toEqual({ model: 'anthropic/claude-opus-5.5', reasoning: 'low' });
   });
 
   it('returns the saved choice', async () => {
@@ -62,7 +62,7 @@ describe('chat model picker endpoint', () => {
 
   it('a saved choice the catalogue no longer offers falls back to the default', async () => {
     const res = await GET(event({ chat_model: { model: 'gone/model', reasoning: 'low' } }).ev);
-    expect((await res.json()).choice).toEqual({ model: 'anthropic/claude-sonnet-5.5', reasoning: 'medium' });
+    expect((await res.json()).choice).toEqual({ model: 'anthropic/claude-opus-5.5', reasoning: 'low' });
   });
 
   it('saves a valid choice on the user', async () => {
