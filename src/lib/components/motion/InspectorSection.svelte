@@ -15,8 +15,8 @@
 </section>
 
 <style>
-  .section {
-    border-bottom: 1px solid var(--ui-line);
+  .section + .section {
+    margin-top: var(--ui-space-2);
   }
 
   .section-head {
@@ -24,15 +24,15 @@
     align-items: center;
     gap: 6px;
     width: 100%;
-    height: 32px;
-    padding: 0 12px 0 8px;
+    height: 40px;
+    padding: 0 var(--ui-space-4);
     border: 0;
     border-radius: 0;
     background: none;
-    color: var(--ui-ink);
+    color: var(--ui-text-3);
     font: inherit;
     font-size: var(--ui-text-xs);
-    font-weight: 600;
+    font-weight: 500;
     text-align: left;
     cursor: pointer;
   }
@@ -48,10 +48,10 @@
   }
 
   .section-head:hover {
-    background: var(--ui-hover);
+    color: var(--ui-text-2);
   }
 
   .section-body {
-    padding: 2px 12px 12px;
+    padding: 0 var(--ui-space-4) var(--ui-space-4);
   }
 </style>

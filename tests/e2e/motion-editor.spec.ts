@@ -49,7 +49,7 @@ test.describe('motion editor @real', () => {
     await expect(page.getByLabel('Properties', { exact: true })).toBeHidden();
 
     await gotoHydrated(page, url);
-    await expect(page.getByTestId('toggle-chat')).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.getByTestId('side-column')).toBeHidden();
     await expect(page.getByLabel('Agent', { exact: true })).toBeHidden();
 
     await page.keyboard.press('ControlOrMeta+Alt+b');
@@ -117,6 +117,40 @@ test.describe('motion editor @real', () => {
   });
 });
 
+test.describe('motion editor top bar @real', () => {
+  test.skip(!REAL_STACK, 'richiede uno stack disposable: E2E_REAL_STACK=1');
+
+  for (const width of [1100, 1280]) {
+    test(`a ${width}px la barra non ha i toggle dei pannelli e il centro non tocca la destra`, async ({ page, session, seedNode }) => {
+      await page.setViewportSize({ width, height: 800 });
+      const node = await seedNode({ type: 'motion', data: MOTION_DATA });
+      await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}/motion/${node.id}`);
+
+      await expect(page.getByTestId('toggle-chat')).toHaveCount(0);
+      await expect(page.getByTestId('toggle-inspector')).toHaveCount(0);
+
+      const centre = (await page.getByRole('group', { name: 'Transport' }).boundingBox())!;
+      const right = (await page.getByTestId('bar-trail').boundingBox())!;
+      expect(centre.x + centre.width).toBeLessThanOrEqual(right.x);
+      const trail = await page.getByTestId('bar-trail').evaluate((el) => el.scrollWidth <= el.clientWidth);
+      expect(trail).toBe(true);
+    });
+  }
+});
+
+test.describe('motion editor on a tablet @real', () => {
+  test.skip(!REAL_STACK, 'richiede uno stack disposable: E2E_REAL_STACK=1');
+  test.use({ viewport: { width: 1024, height: 768 }, hasTouch: true });
+
+  test('il toggle apre la chat nel cassetto', async ({ page, session, seedNode }) => {
+    const node = await seedNode({ type: 'motion', data: MOTION_DATA });
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}/motion/${node.id}`);
+
+    await page.getByTestId('toggle-chat').tap();
+    await expect(page.getByLabel('Agent', { exact: true })).toBeVisible();
+  });
+});
+
 test.describe('motion editor on a phone @real', () => {
   test.skip(!REAL_STACK, 'richiede uno stack disposable: E2E_REAL_STACK=1');
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
@@ -141,5 +175,13 @@ test.describe('motion editor on a phone @real', () => {
     const timecode = page.getByTestId('timecode');
     await page.getByRole('button', { name: 'Play', exact: true }).tap();
     await expect(timecode).not.toHaveText(START, { timeout: 5000 });
+  });
+
+  test('la barra in basso apre la chat', async ({ page, session, seedNode }) => {
+    const node = await seedNode({ type: 'motion', data: MOTION_DATA });
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}/motion/${node.id}`);
+
+    await page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Agent' }).tap();
+    await expect(page.getByLabel('Agent', { exact: true })).toBeVisible();
   });
 });

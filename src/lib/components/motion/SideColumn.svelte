@@ -124,7 +124,6 @@
     flex-direction: column;
     min-height: 0;
     min-width: 0;
-    border-left: 1px solid var(--ui-line);
   }
 
   .docked .pane {
@@ -178,33 +177,26 @@
   .segments {
     display: flex;
     flex-shrink: 0;
-    margin: 8px 12px;
-    height: 28px;
-    border: 1px solid var(--ui-line);
+    gap: var(--ui-space-4);
+    margin: var(--ui-space-2) var(--ui-space-4) 0;
+    height: var(--ui-hit);
   }
 
   .segments button {
-    flex: 1;
     display: inline-flex;
     align-items: center;
-    justify-content: center;
     gap: 6px;
-    font-size: var(--ui-text-xs);
-    color: var(--ui-ink-2);
-  }
-
-  .segments button + button {
-    border-left: 1px solid var(--ui-line);
+    font-size: var(--ui-text-md);
+    font-weight: 500;
+    color: var(--ui-text-3);
   }
 
   .segments button:hover {
-    background: var(--ui-hover);
-    color: var(--ui-ink);
+    color: var(--ui-text-2);
   }
 
   .segments button[aria-selected='true'] {
-    background: var(--ui-accent-wash);
-    color: var(--ui-accent);
+    color: var(--ui-ink);
   }
 
   .segments button:focus-visible {
@@ -218,9 +210,4 @@
     background: var(--ui-accent);
   }
 
-  @media (pointer: coarse) {
-    .segments {
-      height: 44px;
-    }
-  }
 </style>

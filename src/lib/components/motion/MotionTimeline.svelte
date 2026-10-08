@@ -885,7 +885,7 @@
     bottom: 0;
     width: 1px;
     height: 5px;
-    background: var(--ui-line-strong);
+    background: var(--ui-grid);
     pointer-events: none;
   }
 
@@ -1424,7 +1424,7 @@
     right: 0;
     top: 4px;
     height: 1px;
-    background: var(--ui-line-strong);
+    background: var(--ui-grid);
   }
 
   .segment:hover::after {
