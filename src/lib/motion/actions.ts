@@ -54,6 +54,8 @@ import Headphones from '@lucide/svelte/icons/headphones';
 import ChevronUp from '@lucide/svelte/icons/chevron-up';
 import ChevronDown from '@lucide/svelte/icons/chevron-down';
 import Link2 from '@lucide/svelte/icons/link-2';
+import Scan from '@lucide/svelte/icons/scan';
+import SquareDashed from '@lucide/svelte/icons/square-dashed';
 import { Command, SHORTCUTS } from './shortcuts';
 
 export enum Tool {
@@ -111,6 +113,8 @@ type ActionSpec = { name: string; icon: Component; group?: GuideGroup; place?: P
 
 const PINCH = 'Pinch the timeline';
 const DRAG_PLAYHEAD = 'Drag the playhead';
+const PINCH_PREVIEW = 'Pinch the preview';
+const DOUBLE_TAP_PREVIEW = 'Double-tap around the preview';
 
 export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.TogglePlay]: { name: 'Play / pause', icon: Play, group: GuideGroup.Playback, place: Place.Transport },
@@ -176,6 +180,10 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Tool.UnlockLayer]: { name: 'Unlock layer', icon: Lock, place: Place.Layer },
   [Tool.FitGraph]: { name: 'Fit curves to view', icon: Maximize, group: GuideGroup.Timeline, place: Place.Graph },
 
+  [Command.PreviewZoomIn]: { name: 'Zoom preview in', icon: ZoomIn, group: GuideGroup.View, gesture: PINCH_PREVIEW },
+  [Command.PreviewZoomOut]: { name: 'Zoom preview out', icon: ZoomOut, group: GuideGroup.View, gesture: PINCH_PREVIEW },
+  [Command.PreviewFit]: { name: 'Fit preview', icon: Scan, group: GuideGroup.View, gesture: DOUBLE_TAP_PREVIEW },
+  [Command.PreviewActual]: { name: 'Preview at 100%', icon: SquareDashed, group: GuideGroup.View, gesture: DOUBLE_TAP_PREVIEW },
   [Command.ToggleInspector]: { name: 'Properties panel', icon: PanelRight, group: GuideGroup.View, place: Place.Bar },
   [Command.ToggleChat]: { name: 'Agent panel', icon: BotMessageSquare, group: GuideGroup.View, place: Place.Bar },
   [Command.Help]: { name: 'Keyboard & gestures', icon: Keyboard, group: GuideGroup.View, place: Place.Menu },

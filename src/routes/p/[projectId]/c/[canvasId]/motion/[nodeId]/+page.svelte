@@ -25,6 +25,7 @@
   import GraphEditor from '$lib/components/motion/GraphEditor.svelte';
   import { nullFromSelection } from '$lib/motion/parent-ops';
   import MotionPreview from '$lib/components/motion/MotionPreview.svelte';
+  import ZoomStage from '$lib/components/motion/ZoomStage.svelte';
   import type { StreamData } from '$lib/components/brand-agent/chat-session.svelte';
   import { CHECK_REQUEST, FRAMES_REQUEST, adoptAgentAssets, agentDraft, type CheckRequest, type FramesRequest } from '$lib/motion/frames-request';
   import { runCheck, type CheckPorts } from '$lib/motion/custom/run-check';
@@ -145,6 +146,7 @@
   let sheet = $state<Sheet>(Sheet.None);
   let inspectorTab = $state<InspectorTab>(InspectorTab.Properties);
   let preview = $state<MotionPreview | null>(null);
+  let zoomStage = $state<ZoomStage | null>(null);
   let reveal = $state(Reveal.Animated);
   let helpOpen = $state(false);
   let layout = $state<EditorLayout>(DEFAULT_LAYOUT);
@@ -787,6 +789,10 @@
     [Command.StepForwardMore]: () => step(STEP_MORE),
     [Command.ZoomIn]: () => (zoom = clampZoom(zoom * ZOOM_STEP)),
     [Command.ZoomOut]: () => (zoom = clampZoom(zoom / ZOOM_STEP)),
+    [Command.PreviewZoomIn]: () => zoomStage?.zoomIn(),
+    [Command.PreviewZoomOut]: () => zoomStage?.zoomOut(),
+    [Command.PreviewFit]: () => zoomStage?.fit(),
+    [Command.PreviewActual]: () => zoomStage?.actual(),
     [Command.SelectAll]: () => (selection = doc.tracks.flatMap((t) => t.clips.map((c) => c.id))),
     [Command.Deselect]: () => {
       helpOpen = false;
@@ -984,6 +990,7 @@
 
   <div class="body" bind:this={body} style={`--tl-h: ${layout.timelinePx}px; --side-w: ${sideWidth(layout.sidePx, width)}px;`} class:coding={inspectorTab === InspectorTab.Code && selected?.component === 'Custom'} class:no-props={!docked && layout.inspector === Panel.Closed} class:no-chat={!docked && layout.chat === Panel.Closed} class:no-side={docked && !sideOpen}>
     <section class="stage" aria-label="Preview">
+      <ZoomStage bind:this={zoomStage} frame={{ width: doc.width, height: doc.height }} onspace={COMMANDS[Command.TogglePlay]}>
       <MotionPreview bind:this={preview} {html} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null}>
         {#if !playing}<SelectionOverlay {doc} {frame} {html} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} />{/if}
         {#if selected?.mask && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<MaskOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
@@ -991,6 +998,7 @@
         {#if selected?.path && !playing}<MotionPathOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected?.textPath && !playing}<TextPathOverlay {doc} clip={selected} {frame} />{/if}
       </MotionPreview>
+      </ZoomStage>
       <div class="live-bar">
         <InteractivePanel bind:active={interactive} bind:tiltX bind:tiltY clipId={selected?.id ?? null} onpreset={(preset) => apply(applyInteractivePreset(doc, preset, selected?.id ?? null), preset)} />
       </div>
@@ -1039,7 +1047,7 @@
     </SideColumn>
 
     <section class="timeline-area" aria-label="Timeline">
-      <div class="resize" role="separator" aria-orientation="horizontal" aria-label="Resize the timeline" aria-valuenow={layout.timelinePx} data-testid="timeline-resize" onpointerdown={startResize}></div>
+      <div class="resize" role="separator" aria-orientation="horizontal" aria-label="Resize the timeline" aria-valuenow={layout.timelinePx} data-testid="timeline-resize" onpointerdown={startResize} ondblclick={() => relayout({ timelinePx: DEFAULT_LAYOUT.timelinePx })}></div>
 
       <div class="toolbar">
         <div class="add">
@@ -1533,6 +1541,29 @@
     background: var(--ui-accent);
   }
 
+  @media (pointer: coarse) {
+    .resize {
+      top: calc(var(--ui-space-2) - var(--ui-hit));
+      height: var(--ui-hit);
+    }
+
+    .resize::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 40px;
+      height: 4px;
+      transform: translate(-50%, -50%);
+      border-radius: 9999px;
+      background: var(--ui-line);
+    }
+
+    .resize:hover {
+      background: none;
+    }
+  }
+
   .toolbar {
     display: flex;
     align-items: center;
@@ -1876,6 +1907,7 @@
     flex: 0 0 auto;
     height: 34vh;
     padding: 8px;
+    --stage-pad: 8px;
   }
 
   [data-viewport='phone'] .timeline-area {

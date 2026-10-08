@@ -61,4 +61,14 @@ describe('the action table', () => {
     }
     expect(rows.find((r) => r.id === Command.ZoomIn)?.gesture).toBe('Pinch the timeline');
   });
+
+  it('the preview zoom sits under View with its ⌘ keys and gestures', () => {
+    const rows = guideSections().find((s) => s.group === GuideGroup.View)!.rows;
+    const row = (id: Command) => rows.find((r) => r.id === id);
+
+    expect(row(Command.PreviewZoomIn)).toMatchObject({ keys: '⌘+', gesture: 'Pinch the preview' });
+    expect(row(Command.PreviewZoomOut)).toMatchObject({ keys: '⌘−', gesture: 'Pinch the preview' });
+    expect(row(Command.PreviewFit)).toMatchObject({ keys: '⌘0', gesture: 'Double-tap around the preview' });
+    expect(row(Command.PreviewActual)?.keys).toBe('⌘1');
+  });
 });
