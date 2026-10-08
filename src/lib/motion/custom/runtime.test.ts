@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import * as d3 from 'd3';
 import Matter from 'matter-js';
 import './generative-entry';
+import './twgl-entry';
 import { installEngine, testTimeline, type TestTimeline } from '../engine/testing';
 import { ERRORS, REGISTRY, bootScript, definitionScript, librariesOf, Library, seedOf, type CustomRun } from './runtime';
 
@@ -249,6 +250,30 @@ describe('libraries', () => {
     ].join('');
 
     expect(run('Geometry', js).root.dataset.v).toBe('4,2,1,1,1,-1,function');
+  });
+
+  it('loads TWGL for a shader component', () => {
+    const components = { T: { source: { html: '', css: '', js: 'const gl = twgl.webgl(canvas)' } } } as never;
+
+    expect([...librariesOf(components, ['T'])]).toEqual([Library.Twgl]);
+  });
+
+  it('hands TWGL a WebGL context that keeps its frame for capture', () => {
+    const asked: unknown[] = [];
+    const getContext = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, ...args: unknown[]) {
+      asked.push(args);
+      return null;
+    } as never;
+    try {
+      const { root, errors } = run('Shader', 'const canvas = document.createElement("canvas"); twgl.webgl(canvas); root.dataset.helpers = typeof twgl.createProgramInfo + typeof twgl.drawBufferInfo;');
+
+      expect(errors).toEqual([]);
+      expect(asked).toEqual([['webgl2', { preserveDrawingBuffer: true, antialias: true }]]);
+      expect(root.dataset.helpers).toBe('functionfunction');
+    } finally {
+      HTMLCanvasElement.prototype.getContext = getContext;
+    }
   });
 
   it('a d3 chart drawn from progress gives the same frame from any seek order', () => {
