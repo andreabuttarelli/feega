@@ -1,9 +1,7 @@
 <script lang="ts">
-  import ArrowLeft from '@lucide/svelte/icons/arrow-left';
-  import Shuffle from '@lucide/svelte/icons/shuffle';
   import { enhance } from '$app/forms';
   import GalleryPlayer from '$lib/components/gallery/GalleryPlayer.svelte';
-  import { assetUrlMap, filterHref, GALLERY_PATH, itemPath, KIND_LABEL } from '$lib/gallery/model';
+  import { assetUrlMap, GALLERY_PATH, itemPath, KIND_LABEL, Playback } from '$lib/gallery/model';
 
   let { data, form } = $props();
 
@@ -19,192 +17,139 @@
   {#if item.posterUrl}<meta property="og:image" content={item.posterUrl} />{/if}
 </svelte:head>
 
-<article class="item" data-testid="gallery-item">
-  <a class="back" href={GALLERY_PATH}><ArrowLeft size={14} /> Gallery</a>
+<article class="gx-item" data-testid="gallery-item">
+  <a class="gx-back" href={GALLERY_PATH}>Gallery</a>
 
-  <div class="layout">
-    <div class="stage">
-      <GalleryPlayer id={item.id} format={item.format} posterUrl={item.posterUrl} previewUrl={null} {source} eager />
+  <div class="gx-stage">
+    <GalleryPlayer id={item.id} format={item.format} posterUrl={item.posterUrl} previewUrl={item.previewUrl} {source} playback={Playback.Always} />
+  </div>
+
+  <div class="gx-info">
+    <div class="gx-text">
+      <h1>{item.title}</h1>
+      <p class="gx-byline" data-testid="gallery-byline">
+        by {item.authorName}{#if item.remixedFrom} · remix of <a href={itemPath(item.remixedFrom.id)}>{item.remixedFrom.title}</a>{/if}
+        · {item.format} · {item.durationS} s
+      </p>
+      {#if item.description}<p class="gx-description">{item.description}</p>{/if}
     </div>
 
-    <aside class="side">
-      <h1>{item.title}</h1>
-      <p class="byline" data-testid="gallery-byline">
-        by <strong>{item.authorName}</strong>
-        {#if item.remixedFrom}· remix of <a href={itemPath(item.remixedFrom.id)}>{item.remixedFrom.title}</a>{/if}
-      </p>
-      {#if item.description}<p class="description">{item.description}</p>{/if}
-
-      <dl class="facts">
-        <dt>Type</dt><dd>{KIND_LABEL[item.kind]}</dd>
-        <dt>Format</dt><dd>{item.format}</dd>
-        <dt>Length</dt><dd>{item.durationS} s</dd>
-        <dt>Remixes</dt><dd>{item.remixCount}</dd>
-      </dl>
-
-      {#if item.tags.length}
-        <p class="tags">{#each item.tags as tag (tag)}<a href={filterHref({}, 'tag', tag)}>#{tag}</a>{/each}</p>
-      {/if}
-
-      {#if data.signedIn}
-        <form
-          method="POST"
-          action="?/remix"
-          class="remix"
-          use:enhance={() => {
-            busy = true;
-            return async ({ update }) => {
-              await update();
-              busy = false;
-            };
-          }}
-        >
-          {#if data.projects.length > 1}
-            <label>
-              <span>Into project</span>
-              <select name="project">
-                {#each data.projects as project (project.id)}<option value={project.id}>{project.name}</option>{/each}
-              </select>
-            </label>
-          {:else if data.projects.length === 1}
-            <input type="hidden" name="project" value={data.projects[0].id} />
-          {/if}
-          <button type="submit" class="primary" disabled={busy || !data.projects.length} data-testid="remix"><Shuffle size={14} /> {busy ? 'Copying…' : 'Remix'}</button>
-          {#if !data.projects.length}<p class="muted">Create a project first, then remix it there.</p>{/if}
-        </form>
-      {:else}
-        <form method="POST" action="?/signin" class="remix">
-          <button type="submit" class="primary" data-testid="remix-signin"><Shuffle size={14} /> Sign in to remix</button>
-        </form>
-      {/if}
-      {#if form?.error}<p class="error" role="alert">{form.error}</p>{/if}
-      <p class="muted">Free. A copy lands in your project with its texts, colours and media ready to change, then the agent can put your brand on it.</p>
-    </aside>
+    {#if data.signedIn}
+      <form
+        method="POST"
+        action="?/remix"
+        class="gx-remix"
+        use:enhance={() => {
+          busy = true;
+          return async ({ update }) => {
+            await update();
+            busy = false;
+          };
+        }}
+      >
+        {#if data.projects.length > 1}
+          <select name="project" aria-label="Into project">
+            {#each data.projects as project (project.id)}<option value={project.id}>{project.name}</option>{/each}
+          </select>
+        {:else if data.projects.length === 1}
+          <input type="hidden" name="project" value={data.projects[0].id} />
+        {/if}
+        <button type="submit" class="gx-primary" disabled={busy || !data.projects.length} data-testid="remix">{busy ? 'Copying…' : 'Remix'}</button>
+      </form>
+    {:else}
+      <form method="POST" action="?/signin" class="gx-remix">
+        <button type="submit" class="gx-primary" data-testid="remix-signin">Remix</button>
+      </form>
+    {/if}
   </div>
+  {#if form?.error}<p class="gx-error" role="alert">{form.error}</p>{/if}
 </article>
 
 <style>
-  .item {
+  .gx-item {
     display: flex;
     flex-direction: column;
-    gap: var(--ui-space-4);
-  }
-
-  .back {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--ui-space-1);
-    font-size: var(--ui-text-sm);
-    color: var(--ui-ink-2);
-  }
-
-  .layout {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
     gap: var(--ui-space-6);
+    font-size: var(--ui-text-md);
   }
 
-  .stage {
-    width: 100%;
-    max-height: 78dvh;
+  .gx-back {
+    font-size: var(--ui-text-sm);
+    color: var(--ui-ink-3);
+  }
+
+  .gx-back:hover {
+    color: var(--ui-ink);
+  }
+
+  .gx-stage {
     display: flex;
     justify-content: center;
     background: var(--ui-surface);
   }
 
-  .stage :global(.player) {
-    max-height: 78dvh;
+  .gx-stage :global(.player) {
+    max-height: 72dvh;
     width: auto;
     max-width: 100%;
     flex: 1;
   }
 
-  .side {
+  .gx-info {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--ui-space-4);
+  }
+
+  .gx-text {
     display: flex;
     flex-direction: column;
-    gap: var(--ui-space-3);
+    gap: var(--ui-space-1);
+    max-width: 640px;
   }
 
   h1 {
     margin: 0;
-    font-size: 24px;
+    font-size: var(--ui-text-xl);
     font-weight: 600;
-    letter-spacing: -0.03em;
+    letter-spacing: -0.02em;
   }
 
-  .byline {
-    margin: 0;
-    font-size: var(--ui-text-md);
-    color: var(--ui-ink-2);
-  }
-
-  .byline a {
-    text-decoration: underline;
-  }
-
-  .description {
-    margin: 0;
-    font-size: var(--ui-text-md);
-    line-height: 1.5;
-  }
-
-  .facts {
-    display: grid;
-    grid-template-columns: 80px 1fr;
-    gap: var(--ui-space-1) var(--ui-space-3);
+  .gx-byline {
     margin: 0;
     font-size: var(--ui-text-sm);
-  }
-
-  dt {
-    font-family: var(--ui-mono);
-    font-size: var(--ui-text-xs);
-    text-transform: uppercase;
     color: var(--ui-ink-3);
   }
 
-  dd {
-    margin: 0;
-  }
-
-  .tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--ui-space-2);
-    margin: 0;
-    font-size: var(--ui-text-sm);
+  .gx-byline a {
     color: var(--ui-ink-2);
   }
 
-  .remix {
-    display: flex;
-    flex-direction: column;
-    gap: var(--ui-space-2);
+  .gx-description {
+    margin: var(--ui-space-2) 0 0;
+    color: var(--ui-ink-2);
+    line-height: 1.5;
   }
 
-  .remix label {
+  .gx-remix {
     display: flex;
-    flex-direction: column;
-    gap: var(--ui-space-1);
-    font-size: var(--ui-text-sm);
-    color: var(--ui-ink-2);
+    gap: var(--ui-space-2);
   }
 
   select {
-    height: 36px;
+    height: 40px;
     padding: 0 var(--ui-space-2);
-    border: 1px solid var(--ui-line);
-    background: var(--ui-bg);
+    border: 0;
+    background: var(--ui-surface);
     color: var(--ui-ink);
   }
 
-  .primary {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
+  .gx-primary {
     height: 40px;
-    padding: 0 var(--ui-space-4);
+    min-width: 140px;
+    padding: 0 var(--ui-space-6);
     border: 0;
     background: var(--ui-ink);
     color: var(--ui-bg);
@@ -213,32 +158,20 @@
     cursor: pointer;
   }
 
-  .primary:disabled {
+  .gx-primary:disabled {
     opacity: 0.5;
-    cursor: default;
   }
 
-  .muted {
+  .gx-error {
     margin: 0;
-    font-size: var(--ui-text-sm);
-    color: var(--ui-ink-3);
-  }
-
-  .error {
-    margin: 0;
-    font-size: var(--ui-text-sm);
     color: var(--ui-danger);
+    font-size: var(--ui-text-sm);
   }
 
-  @media (min-width: 1024px) {
-    .layout {
-      grid-template-columns: minmax(0, 1fr) 320px;
-      align-items: start;
-    }
-
-    .side {
-      position: sticky;
-      top: calc(var(--ui-bar-h) + var(--ui-space-8));
+  @media (max-width: 640px) {
+    .gx-remix,
+    .gx-primary {
+      width: 100%;
     }
   }
 </style>

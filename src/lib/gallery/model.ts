@@ -15,6 +15,11 @@ export enum GalleryKind {
   Composition = 'composition'
 }
 
+export enum Playback {
+  OnHover = 'on-hover',
+  Always = 'always'
+}
+
 export enum DurationBand {
   Short = 'short',
   Medium = 'medium',
