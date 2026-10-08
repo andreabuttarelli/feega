@@ -113,6 +113,57 @@ describe('libraries', () => {
     expect([...librariesOf(components, ['C'])]).toEqual([Library.D3]);
   });
 
+  it('loads p5 for a sketch', () => {
+    const components = { S: { source: { html: '', css: '', js: 'p5((p) => { p.draw = () => p.circle(0, 0, 9); })' } } } as never;
+
+    expect([...librariesOf(components, ['S'])]).toEqual([Library.P5]);
+  });
+
+  it('a p5 sketch never loops and redraws the timeline frame on every seek, reseeded', () => {
+    class FakeP5 {
+      frameCount = 0;
+      looping = true;
+      seeds: number[] = [];
+      setup?: () => void;
+      draw?: () => void;
+      constructor(sketch: (p: FakeP5) => void, node: HTMLElement) {
+        node.dataset.mounted = '';
+        sketch(this);
+        this.setup?.();
+        this.redraw();
+      }
+      noLoop() {
+        this.looping = false;
+      }
+      randomSeed(seed: number) {
+        this.seeds.push(seed);
+      }
+      noiseSeed(seed: number) {
+        this.seeds.push(seed);
+      }
+      redraw() {
+        this.frameCount += 1;
+        this.draw?.();
+      }
+    }
+    (window as unknown as Record<string, unknown>).p5 = FakeP5;
+    const js = 'const sketch = p5((p) => { p.draw = () => { root.dataset.f = String(p.frameCount); root.dataset.seed = String(p.seeds.at(-1)); }; }); root.dataset.looping = String(sketch.looping);';
+    const { master, root, errors } = run('Sketch', js, 0);
+    const frame = (t: number) => {
+      master.seek(t);
+      return `${root.dataset.f}/${root.dataset.seed}`;
+    };
+
+    const first = frame(1.5);
+    frame(0.5);
+
+    expect(errors).toEqual([]);
+    expect(root.dataset.looping).toBe('false');
+    expect(first).toBe(`45/${seedOf('c1')}`);
+    expect(frame(0.5)).toBe(`15/${seedOf('c1')}`);
+    expect(frame(1.5)).toBe(first);
+  });
+
   it('a d3 chart drawn from progress gives the same frame from any seek order', () => {
     (window as unknown as Record<string, unknown>).d3 = d3;
     const js = 'const svg = d3.select(root).append("svg"); const bars = svg.selectAll("rect").data([3, 9, 5]).join("rect"); const y = d3.scaleLinear().domain([0, 9]).range([0, 300]); tl.to({}, { duration: 2, ease: "none", onUpdate() { const p = this.progress(); bars.attr("height", (d) => y(d) * d3.easeCubicOut(p)).attr("fill", d3.interpolateRgb("#000", "#09f")(p)); } }, 0);';

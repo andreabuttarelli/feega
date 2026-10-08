@@ -35,7 +35,11 @@ describe('the authoring contract', () => {
     ['d3.timeout(f, 10);', 'd3.timeout'],
     ['d3.now();', 'd3.now'],
     ['d3.select(root).transition().attr("x", 1);', 'transition'],
-    ['d3.transition();', 'transition']
+    ['d3.transition();', 'transition'],
+    ['p5((p) => { p.setup = () => p.loop(); });', 'loop'],
+    ['p5((p) => { p.setup = () => p.frameRate(60); });', 'frameRate'],
+    ['p5((p) => { p.draw = () => p.circle(p.millis(), 0, 9); });', 'millis'],
+    ['p5((p) => { p.draw = () => p.circle(p.deltaTime, 0, 9); });', 'deltaTime']
   ])('refuses %s', (js, name) => {
     expect(problemsOf({ js }).join(' ')).toContain(name);
   });

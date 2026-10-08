@@ -46,19 +46,22 @@ export const SHADOWED = [
 export enum Library {
   Lottie = 'lottie',
   Three = 'THREE',
-  D3 = 'd3'
+  D3 = 'd3',
+  P5 = 'p5'
 }
 
 const USES: Record<Library, RegExp> = {
   [Library.Lottie]: /\blottie\b/,
   [Library.Three]: /\bTHREE\b/,
-  [Library.D3]: /\bd3\b/
+  [Library.D3]: /\bd3\b/,
+  [Library.P5]: /\bp5\b/
 };
 
 const GLOBALS: Record<Library, string> = {
   [Library.Lottie]: 'lottie',
   [Library.Three]: THREE_GLOBAL,
-  [Library.D3]: 'd3'
+  [Library.D3]: 'd3',
+  [Library.P5]: 'p5'
 };
 
 export function librariesOf(components: CustomComponents, used: Iterable<string>): Set<Library> {
@@ -82,8 +85,11 @@ export function definitionScript(name: string, code: string): string {
 
 type Engine = { timeline: () => Timeline; parseEase: (ease: string) => (p: number) => number; utils: { interpolate: (a: unknown, b: unknown, p: number) => unknown }; split: unknown; SplitText: unknown };
 type BootWindow = Window & Record<string, unknown>;
-type Timeline = { time: () => number; set: (t: object, v: object, at: number) => void; add: (child: object, at: number) => void; fromTo: (t: object, a: object, b: object, at: number) => void; tweenFromTo: (from: number, to: number, vars: object) => object };
+type Timeline = { time: () => number; to: (t: object, v: object, at: number) => void; set: (t: object, v: object, at: number) => void; add: (child: object, at: number) => void; fromTo: (t: object, a: object, b: object, at: number) => void; tweenFromTo: (from: number, to: number, vars: object) => object };
 type ClipError = { clip: string; component: string; message: string };
+type Sketch = { setup?: () => void; frameCount: number; noLoop: () => void; randomSeed: (seed: number) => void; noiseSeed: (seed: number) => void; redraw: () => void };
+type SketchClass = new (sketch: (p: Sketch) => void, node: HTMLElement) => Sketch;
+type ClipScope = { root: HTMLElement; tl: Timeline; run: CustomRun };
 
 function bootCustom(cfg: { registry: string; errors: string; listener: string; libraries: Record<string, string>; engine: string; shadowed: string[] }, runs: CustomRun[], env: CustomEnv, master: Timeline, format: ReturnType<typeof fixedFormat>) {
   const w = window as unknown as BootWindow;
@@ -122,7 +128,30 @@ function bootCustom(cfg: { registry: string; errors: string; listener: string; l
   w[cfg.listener] = onError;
   addEventListener('error', onError);
 
-  const libraries = Object.fromEntries(Object.entries(cfg.libraries).map(([name, global]) => [name, w[global] ?? null]));
+  const sketches = (P5: SketchClass, { root, tl, run }: ClipScope) => (sketch: (p: Sketch) => void) => {
+    const reseed = (p: Sketch) => {
+      p.randomSeed(run.seed);
+      p.noiseSeed(run.seed);
+    };
+    const instance = new P5((p) => {
+      sketch(p);
+      const setup = p.setup;
+      p.setup = () => {
+        p.noLoop();
+        reseed(p);
+        setup?.call(p);
+      };
+    }, root);
+    tl.to({}, { duration: run.length + (run.trim ?? 0), ease: 'none', onUpdate: () => {
+      instance.frameCount = Math.round(tl.time() * run.fps) - 1;
+      reseed(instance);
+      instance.redraw();
+    } }, 0);
+    return instance;
+  };
+  const wraps: Record<string, (lib: never, scope: ClipScope) => unknown> = { p5: sketches };
+  const libraries = Object.entries(cfg.libraries).map(([name, global]) => [name, w[global] ?? null] as const);
+  const clipLibraries = (scope: ClipScope) => Object.fromEntries(libraries.map(([name, lib]) => [name, lib && wraps[name] ? wraps[name](lib as never, scope) : lib]));
 
   for (const run of runs) {
     const root = document.getElementById(`cc-${run.id}`);
@@ -163,7 +192,7 @@ function bootCustom(cfg: { registry: string; errors: string; listener: string; l
     const param = (name: string, fallback: unknown) => (name in values ? values[name] : fallback);
     try {
       make(
-        { root, props: values, tl: child, param, duration: run.length, fps: run.fps, assets: env.assets, brand: env.brand, rand: seeded(run.seed), format, motion: engine, gsap: engine, SplitText: engine.SplitText, ...libraries },
+        { root, props: values, tl: child, param, duration: run.length, fps: run.fps, assets: env.assets, brand: env.brand, rand: seeded(run.seed), format, motion: engine, gsap: engine, SplitText: engine.SplitText, ...clipLibraries({ root, tl: child, run }) },
         ...shadows
       );
     } catch (e) {

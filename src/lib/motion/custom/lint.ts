@@ -47,6 +47,8 @@ export const FORBIDDEN_NAMES = Object.keys(FORBIDDEN_GLOBALS);
 
 const D3_CLOCK = 'd3 timers run on the clock: compute the state from tl progress in onUpdate';
 
+const P5_CLOCK = 'a p5 sketch is redrawn on every seek: draw from p.frameCount, never on its own loop or clock';
+
 const FORBIDDEN_MEMBERS: Record<string, Record<string, string>> = {
   d3: { timer: D3_CLOCK, interval: D3_CLOCK, timeout: D3_CLOCK, now: D3_CLOCK },
   Date: { now: 'time comes from tl, not the clock' },
@@ -58,6 +60,10 @@ const FORBIDDEN_PROPERTIES: Record<string, string> = {
   constructor: 'no constructor access',
   __proto__: 'no prototype access',
   transition: 'transitions run on the clock and do not seek: set the state from tl progress in onUpdate',
+  loop: P5_CLOCK,
+  frameRate: P5_CLOCK,
+  millis: P5_CLOCK,
+  deltaTime: P5_CLOCK,
   toLocaleString: LOCALE,
   toLocaleDateString: LOCALE,
   toLocaleTimeString: LOCALE
