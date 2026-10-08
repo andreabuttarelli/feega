@@ -1,11 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { paidGateFor, promotePath, tabFromQuery, PROMOTE_TABS } from './promote-sheet';
+import { SocialPublishing } from '$lib/social-publishing';
 
 describe('promote sheet tabs', () => {
   it('opens on organic unless the link asks for paid', () => {
-    expect(tabFromQuery(null)).toBe('organic');
-    expect(tabFromQuery('bogus')).toBe('organic');
-    expect(tabFromQuery('paid')).toBe('paid');
+    expect(tabFromQuery(null, SocialPublishing.On)).toBe('organic');
+    expect(tabFromQuery('bogus', SocialPublishing.On)).toBe('organic');
+    expect(tabFromQuery('paid', SocialPublishing.On)).toBe('paid');
+  });
+
+  it('con la pubblicazione spenta resta solo l’annuncio a pagamento', () => {
+    expect(tabFromQuery(null, SocialPublishing.Off)).toBe('paid');
+    expect(tabFromQuery('organic', SocialPublishing.Off)).toBe('paid');
   });
 
   it('has exactly the two tabs, organic first', () => {

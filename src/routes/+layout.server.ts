@@ -5,6 +5,7 @@ import { selineSetUser } from '$lib/server/seline';
 import { isInternalEmail } from '$lib/server/internal-users';
 import { trackingAllowed } from '$lib/analytics';
 import { outdatedTermsVersion } from '$lib/terms-notice';
+import { socialPublishing } from '$lib/server/social-publishing';
 
 export const load: LayoutServerLoad = async ({ url, locals: { safeGetSession, db } }) => {
   const { session, user } = await safeGetSession();
@@ -47,6 +48,7 @@ export const load: LayoutServerLoad = async ({ url, locals: { safeGetSession, db
     analyticsOptOut,
     internalViewer,
     planGo: isPlanGoEnabled(),
+    socialPublishing: await socialPublishing(),
     termsNoticeVersion
   };
 };

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
+import { test, expect, REAL_STACK, SOCIAL_PUBLISHING, gotoHydrated } from './fixtures/session';
 
 /**
  * IL CHECKBOX DELL'ACCOUNT NEL CALENDARIO, DAL FOGLIO FLOTTANTE — smoke test per il difetto
@@ -10,6 +10,7 @@ import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
  */
 test.describe('calendar checkbox @real', () => {
   test.skip(!REAL_STACK, 'richiede uno stack disposable: E2E_REAL_STACK=1');
+  test.skip(!SOCIAL_PUBLISHING, 'il Calendar esiste solo con social_publishing acceso: E2E_SOCIAL_PUBLISHING=1');
 
   test.setTimeout(60_000);
 

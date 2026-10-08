@@ -25,7 +25,7 @@ export const NAV_ENTRIES: NavEntry[] = [
   { id: 'calendar', labelKey: 'app.hub.publish.calendar', icon: 'calendar-days', family: 'sheet', path: '/calendar', group: 'workbench' },
   { id: 'ads', labelKey: 'app.hub.ads.social', icon: 'megaphone', family: 'sheet', path: '/ads', group: 'workbench' },
   { id: 'studio', labelKey: 'app.nav2.studio', icon: 'camera', family: 'route', path: '/app/studio', group: 'workbench' },
-  { id: 'settings', labelKey: 'app.nav.settings', icon: 'settings', family: 'sheet', path: '/settings/connected-accounts', mobilePath: '/settings', group: 'workbench' },
+  { id: 'settings', labelKey: 'app.nav.settings', icon: 'settings', family: 'sheet', path: '/settings/project', mobilePath: '/settings', group: 'workbench' },
   { id: 'promote', labelKey: 'app.hub.publish.promote', icon: 'megaphone', family: 'sheet', path: '/promote', group: 'hidden' }
 ];
 

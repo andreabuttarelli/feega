@@ -6,6 +6,8 @@
   import { prefetchEntry } from '$lib/canvas/chrome-loaders';
   import { NAV_ICONS } from './nav-icons';
   import { ProjectMode, sectionAllowed } from '$lib/project-mode';
+  import { page } from '$app/state';
+  import { SOCIAL_PUBLISHING_SURFACE, visibleUnder } from '$lib/social-publishing';
 
   /**
    * LA RAIL FLOTTANTE: due gruppi separati da un divisore, e il divisore stesso dice il
@@ -29,7 +31,7 @@
     mode?: ProjectMode;
   } = $props();
 
-  const sheets = $derived(navEntriesByGroup('workbench').filter((entry) => sectionAllowed(mode, entry.id)));
+  const sheets = $derived(visibleUnder(page.data.socialPublishing, SOCIAL_PUBLISHING_SURFACE.navEntries, navEntriesByGroup('workbench'), (entry) => entry.id).filter((entry) => sectionAllowed(mode, entry.id)));
 
   const OPEN: Record<NavFamily, (entry: NavEntry) => void> = {
     panel: (entry) => onPanel(entry),

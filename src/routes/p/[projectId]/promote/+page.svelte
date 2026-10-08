@@ -2,7 +2,7 @@
   import { page } from '$app/state';
   import OrganicPostForm from '$lib/components/promote/OrganicPostForm.svelte';
   import PaidAdForm from '$lib/components/promote/PaidAdForm.svelte';
-  import { PROMOTE_TABS, type PromoteTab } from '$lib/canvas/promote-sheet';
+  import { promoteTabsFor, type PromoteTab } from '$lib/canvas/promote-sheet';
   import type { PageData } from './$types';
 
   let { data, form = null }: { data: PageData; form?: unknown } = $props();
@@ -18,7 +18,7 @@
   </header>
 
   <div class="tabs" role="tablist">
-    {#each PROMOTE_TABS as t (t.id)}
+    {#each promoteTabsFor(page.data.socialPublishing) as t (t.id)}
       <button type="button" role="tab" aria-selected={tab === t.id} class:on={tab === t.id} onclick={() => (tab = t.id)}>
         {t.label}
       </button>

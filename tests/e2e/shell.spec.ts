@@ -1,4 +1,4 @@
-import { test, expect, REAL_STACK } from './fixtures/session';
+import { test, expect, REAL_STACK, SOCIAL_PUBLISHING } from './fixtures/session';
 
 /**
  * UN SOLO SMOKE E2E PER LA SHELL DEL PROGETTO: apri il progetto → atterri sulla tela → la rail
@@ -14,7 +14,7 @@ test.skip(!REAL_STACK, 'richiede uno stack disposable con utente/org/progetto se
 
 test.setTimeout(60_000);
 
-test('apri il progetto, la rail c\'è, Calendar si apre come foglio ed Esc torna alla tela', async ({ page, session }) => {
+test('apri il progetto, la rail c\'è, Ads si apre come foglio ed Esc torna alla tela', async ({ page, session }) => {
   await page.goto(`/p/${session.projectId}`);
   await page.waitForURL(new RegExp(`/p/${session.projectId}/c/`));
   // La tela idrata dopo che il DOM del server è già lì: un click sparato prima che Svelte abbia
@@ -25,11 +25,11 @@ test('apri il progetto, la rail c\'è, Calendar si apre come foglio ed Esc torna
 
   await expect(page.getByRole('button', { name: 'Assets' })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Calendar' }).click();
+  await page.getByRole('button', { name: 'Ads' }).click();
 
   const sheet = page.locator('[role="dialog"].canvas-sheet');
 
-  await expect(page).toHaveURL(`${new URL(canvasUrl).origin}/p/${session.projectId}/calendar`);
+  await expect(page).toHaveURL(`${new URL(canvasUrl).origin}/p/${session.projectId}/ads`);
   await expect(sheet).toBeVisible();
 
   await page.keyboard.press('Escape');
@@ -42,6 +42,7 @@ const DESKTOP = { width: 1440, height: 900 };
 const MIN_CALENDAR_WIDTH = 1000;
 
 test.describe('a 1440px', () => {
+  test.skip(!SOCIAL_PUBLISHING, 'il Calendar esiste solo con social_publishing acceso: E2E_SOCIAL_PUBLISHING=1');
   test.use({ viewport: DESKTOP });
 
   test('il foglio Calendar occupa la tela, non una colonna schiacciata a sinistra', async ({ page, session }) => {

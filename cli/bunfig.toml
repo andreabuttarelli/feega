@@ -1,0 +1,2 @@
+[test]
+preload = ["./mcp/test-preload.ts"]

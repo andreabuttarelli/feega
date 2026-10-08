@@ -28,6 +28,8 @@
   import { CANVAS_ADD_BAR, CANVAS_BAR_MAIN, CANVAS_BAR_MORE, ADDABLE_LABEL, type Addable } from '$lib/canvas/addable';
   import { ADDABLE_ICON } from '$lib/canvas/addable-icons';
   import { CANVAS_DRAG_MEDIUM } from '$lib/canvas/new-node';
+  import { page } from '$app/state';
+  import { SOCIAL_PUBLISHING_SURFACE, visibleUnder } from '$lib/social-publishing';
 
   let {
     onpick,
@@ -137,7 +139,7 @@
 
   {#if showMore}
     <div class="more">
-      {#each CANVAS_BAR_MORE as what (what)}
+      {#each visibleUnder(page.data.socialPublishing, SOCIAL_PUBLISHING_SURFACE.addable, CANVAS_BAR_MORE) as what (what)}
         {@const Icon = ADDABLE_ICON[what]}
         <button
           type="button"
