@@ -2,13 +2,15 @@ import { resolve } from 'node:path';
 import { build } from 'esbuild';
 import type { Plugin } from 'vite';
 import { GENERATIVE_ENTRY, GENERATIVE_MODULE } from '../src/lib/motion/custom/generative';
+import { TWGL_ENTRY, TWGL_MODULE } from '../src/lib/motion/custom/twgl';
 
 export const LIVE_RUNTIME_MODULE = 'virtual:motion-live-runtime';
 export const LIVE_ENTRY = 'src/lib/motion/interactive/live-entry.ts';
 
 const BUNDLES: Record<string, string> = {
   [LIVE_RUNTIME_MODULE]: LIVE_ENTRY,
-  [GENERATIVE_MODULE]: GENERATIVE_ENTRY
+  [GENERATIVE_MODULE]: GENERATIVE_ENTRY,
+  [TWGL_MODULE]: TWGL_ENTRY
 };
 
 const resolved = (id: string) => `\0${id}`;

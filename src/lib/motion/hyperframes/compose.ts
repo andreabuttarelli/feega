@@ -56,6 +56,7 @@ import { HELD, holdScript } from './blur';
 import { engineScript } from '../engine/engine';
 import liveRuntime from 'virtual:motion-live-runtime';
 import generative from 'virtual:motion-generative';
+import twgl from 'virtual:motion-twgl';
 import { liveSpec, type SpecInput } from '../interactive/spec';
 import { LIVE_GLOBAL } from '../interactive/runtime';
 import { Liveness, interactiveOf } from '../interactive/settings';
@@ -450,6 +451,8 @@ function customRun(clip: MotionClip, ctx: TemplateCtx<ComponentId>, components: 
   return { id: clip.id, name, start: ctx.start, length: ctx.length, fps: ctx.fps, values, seed: seedOf(clip.id), ...(Object.keys(keys).length ? { keys } : {}), ...(ctx.mediaStart ? { trim: ctx.mediaStart } : {}) };
 }
 
+const inlineScript = (code: string) => `<script>${code.replace(/<\/script/gi, '<\\/script')}</script>`;
+
 const LIBRARY_TAGS: Record<Library, { scripts: string[]; tag: string }> = {
   [Library.Lottie]: { scripts: [LOTTIE_URL], tag: `<script src="${LOTTIE_URL}"></script>` },
   [Library.Three]: { scripts: [THREE_BASE], tag: '' },
@@ -457,7 +460,8 @@ const LIBRARY_TAGS: Record<Library, { scripts: string[]; tag: string }> = {
   [Library.P5]: { scripts: [P5_URL], tag: `<script src="${P5_URL}"></script>` },
   [Library.Pixi]: { scripts: PIXI_URLS, tag: PIXI_URLS.map((url) => `<script src="${url}"></script>`).join('') },
   [Library.Matter]: { scripts: [MATTER_URL], tag: `<script src="${MATTER_URL}"></script>` },
-  [Library.Generative]: { scripts: [], tag: `<script>${generative.replace(/<\/script/gi, '<\\/script')}</script>` }
+  [Library.Generative]: { scripts: [], tag: inlineScript(generative) },
+  [Library.Twgl]: { scripts: [], tag: inlineScript(twgl) }
 };
 
 function brandEnv(tokens: BrandTokens) {

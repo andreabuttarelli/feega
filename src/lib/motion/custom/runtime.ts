@@ -4,6 +4,7 @@ import type { CustomComponents } from './component';
 import { ENGINE_GLOBAL } from '../engine/engine';
 import { fixedFormat } from './format';
 import { GENERATIVE_GLOBAL } from './generative';
+import { TWGL_GLOBAL } from './twgl';
 
 export const REGISTRY = '__feegaComponents';
 export const ERRORS = '__feegaErrors';
@@ -51,7 +52,8 @@ export enum Library {
   P5 = 'p5',
   Pixi = 'PIXI',
   Matter = 'Matter',
-  Generative = 'gen'
+  Generative = 'gen',
+  Twgl = 'twgl'
 }
 
 const USES: Record<Library, RegExp> = {
@@ -61,7 +63,8 @@ const USES: Record<Library, RegExp> = {
   [Library.P5]: /\bp5\b/,
   [Library.Pixi]: /\bPIXI\b/,
   [Library.Matter]: /\bMatter\b/,
-  [Library.Generative]: /\bgen\./
+  [Library.Generative]: /\bgen\./,
+  [Library.Twgl]: /\btwgl\b/
 };
 
 const GLOBALS: Record<Library, string> = {
@@ -71,7 +74,8 @@ const GLOBALS: Record<Library, string> = {
   [Library.P5]: 'p5',
   [Library.Pixi]: 'PIXI',
   [Library.Matter]: 'Matter',
-  [Library.Generative]: GENERATIVE_GLOBAL
+  [Library.Generative]: GENERATIVE_GLOBAL,
+  [Library.Twgl]: TWGL_GLOBAL
 };
 
 export function librariesOf(components: CustomComponents, used: Iterable<string>): Set<Library> {
@@ -206,7 +210,8 @@ function bootCustom(cfg: { registry: string; errors: string; listener: string; l
       poisson: (options: object) => new PoissonDiskSampling(options, random())
     };
   };
-  const wraps: Record<string, (lib: never, scope: ClipScope) => unknown> = { p5: sketches, PIXI: stages, Matter: worlds, gen: utilities };
+  const shaders = (twgl: object) => ({ ...twgl, webgl: (canvas: HTMLCanvasElement) => canvas.getContext('webgl2', { preserveDrawingBuffer: true, antialias: true }) });
+  const wraps: Record<string, (lib: never, scope: ClipScope) => unknown> = { p5: sketches, PIXI: stages, Matter: worlds, gen: utilities, twgl: shaders };
   const libraries = Object.entries(cfg.libraries).map(([name, global]) => [name, w[global] ?? null] as const);
   const clipLibraries = (scope: ClipScope) => Object.fromEntries(libraries.map(([name, lib]) => [name, lib && wraps[name] ? wraps[name](lib as never, scope) : lib]));
 

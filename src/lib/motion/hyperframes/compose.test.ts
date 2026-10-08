@@ -407,6 +407,15 @@ describe('custom components in the composition', () => {
     expect(html).not.toContain('ClipperLib');
   });
 
+  it('inlines TWGL only for a component that uses it, with no network', () => {
+    const shader = { ...graph, source: { ...graph.source, js: 'const gl = twgl.webgl(root.querySelector("canvas"));' } };
+    const page = compose(must(addClip(must(writeComponent(newMotionDoc(MotionFormat.Landscape), 'Shader', shader)), { component: 'Custom', from: 0, durationInFrames: 60, props: { name: 'Shader' } }, 't1')));
+
+    expect(page).toContain('createProgramInfo');
+    expect(page.match(/<script src="[^"]+"/g)).toEqual(html.match(/<script src="[^"]+"/g));
+    expect(html).not.toContain('createProgramInfo');
+  });
+
   it('loads p5 only for a component that uses it', () => {
     const sketch = { ...graph, source: { ...graph.source, js: 'p5((p) => { p.draw = () => p.circle(0, 0, 9); });' } };
     const sketched = must(addClip(must(writeComponent(newMotionDoc(MotionFormat.Landscape), 'Sketch', sketch)), { component: 'Custom', from: 0, durationInFrames: 60, props: { name: 'Sketch' } }, 's1'));

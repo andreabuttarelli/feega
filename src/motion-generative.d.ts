@@ -3,6 +3,11 @@ declare module 'virtual:motion-generative' {
 	export default source;
 }
 
+declare module 'virtual:motion-twgl' {
+	const source: string;
+	export default source;
+}
+
 declare module 'poisson-disk-sampling' {
 	export default class PoissonDiskSampling {
 		constructor(options: { shape: number[]; minDistance: number; maxDistance?: number; tries?: number }, rng?: () => number);
