@@ -974,6 +974,7 @@
       tokens={data.tokens}
       {analyses}
       server={{ ...data.serverRender, version, saved: saveState === SaveState.Saved, assetHref: (id: string) => `/p/${data.projectId}/c/${data.canvas.id}/assets/${id}` }}
+      onpresets={() => ((exporting = false), (interactive = true))}
       onclose={() => (exporting = false)}
     />
   {/if}
