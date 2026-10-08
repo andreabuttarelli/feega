@@ -6,7 +6,8 @@ import {
   judgeDecision,
   MODERATION_CATEGORIES,
   mentionsMinor,
-  parseJudgeVerdict
+  parseJudgeVerdict,
+  judgeSystem
 } from './policy';
 
 const only = (choice: string, overrides: Record<string, number> = {}) => {
@@ -102,6 +103,7 @@ describe('the escalation judge verdict', () => {
     expect(parseJudgeVerdict('{"allowed":true,"category":"safe","reason":"landscape"}')).toEqual({
       allowed: true,
       category: 'safe',
+      requested: true,
       reason: 'landscape'
     });
   });
@@ -112,5 +114,16 @@ describe('the escalation judge verdict', () => {
 
   it('refuses when allowed is anything but true', () => {
     expect(parseJudgeVerdict('{"allowed":"yes","category":"safe"}')).toMatchObject({ allowed: false });
+  });
+
+  it('reads whether the content was asked for, and assumes it was when the judge does not say', () => {
+    expect(parseJudgeVerdict('{"allowed":false,"category":"real_person_sexual","requested":false,"reason":"only a URL"}')).toMatchObject({ requested: false });
+    expect(parseJudgeVerdict('{"allowed":false,"category":"hate","reason":"slur"}')).toMatchObject({ requested: true });
+  });
+
+  it('tells the judge that a URL, a name or a website is material to read, not a request', () => {
+    const system = judgeSystem(MODERATION_CATEGORIES);
+    expect(system).toContain('"requested": boolean');
+    expect(system).toMatch(/URL/);
   });
 });

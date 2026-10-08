@@ -2,6 +2,7 @@ import {
   identifiabilityDecision,
   IDENTIFIABILITY_CATEGORIES,
   judgeDecision,
+  judgeRefuses,
   mentionsMinor,
   MINORS,
   REAL_PERSON,
@@ -66,8 +67,9 @@ async function escalateContent(ports: ScreenPorts, state: string, policy: Profil
     return { ok: false, error: `${UNAVAILABLE}: the safety review could not run`, unavailable: true };
   }
 
-  ports.record({ stage: 'llm', verdict: verdict.allowed ? 'clear' : 'refuse', category: verdict.category, probabilities: {}, reason: verdict.reason });
-  if (verdict.allowed) {
+  const refused = judgeRefuses(policy.categories, verdict);
+  ports.record({ stage: 'llm', verdict: refused ? 'refuse' : 'clear', category: verdict.category, probabilities: {}, reason: verdict.reason });
+  if (!refused) {
     return { ok: true };
   }
   const message = policy.categories[verdict.category]?.refusal || policy.judgeRefusal;
