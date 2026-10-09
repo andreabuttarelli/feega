@@ -48,6 +48,8 @@ import type { MotionNode } from '$lib/canvas/motion-node';
 import { createRenderLink } from './render-link';
 import { renderPagePath } from '$lib/motion/render-link';
 import { BROWSER_RENDER_CREDITS } from '$lib/motion/render-place';
+import type { ChatAttachment } from '$lib/chat-attachments';
+import { motionPlaceHint, userContent } from '$lib/server/chat-attachments/model-parts';
 
 export const MOTION_AGENT_KEY = 'motion';
 const CHECK_WAIT_MS = 90_000;
@@ -127,6 +129,7 @@ export type MotionTurnInput = {
   project: { id: string; brandId: string | null; mode: ProjectMode };
   motion: { record: CanvasNodeRecord; node: MotionNode };
   message: string;
+  attachments?: ChatAttachment[];
   selection: string[];
   model: string;
   reasoning: string | null;
@@ -141,7 +144,7 @@ export type MotionTurn = { stream: ReadableStream<UIMessageChunk>; done: Promise
 
 export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Response> {
   const startedAt = Date.now();
-  const { db, userId, orgId, project, motion, message, selection, model, reasoning, requester, browser, timing = PLATFORM_TIMING } = input;
+  const { db, userId, orgId, project, motion, message, attachments = [], selection, model, reasoning, requester, browser, timing = PLATFORM_TIMING } = input;
   const actor = agentActor(userId, MOTION_AGENT_KEY);
   const nodeScope = { orgId, nodeId: motion.record.id };
 
@@ -157,7 +160,8 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
 
   const assets = await motionAssets({ db, orgId, projectId: project.id, canvasId: motion.record.canvasId, nodeId: motion.record.id });
   const history = promptHistory(await loadTurns(db, { orgId, threadId }));
-  await saveTurn(db, { orgId, threadId, role: 'user', content: message, actor: requester });
+  await saveTurn(db, { orgId, threadId, role: 'user', content: message, attachments, actor: requester });
+  const openingContent = await userContent(db, { orgId, text: message, attachments, hint: motionPlaceHint });
   const reply = await openReply(db, { orgId, threadId, actor });
 
   const knownAssets = assets.length;
@@ -247,7 +251,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
   const system = motionAgentPrompt({ brandName: project.brandId ? tokens.name : null, selectionNote: selectionNote(head.doc, selection), vision, frame: head.doc, style: styleOf(head.doc) });
   const t0 = Date.now();
   const stepModels: string[] = [];
-  const openingMessages = [...history, { role: 'user', content: message }] as ModelMessage[];
+  const openingMessages = [...history, { role: 'user', content: openingContent }] as ModelMessage[];
   const stepTiers: Tier[] = [];
   let spent = 0;
   const overBudget: Stop = overTurnCap(() => spent);

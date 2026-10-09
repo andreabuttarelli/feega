@@ -2,11 +2,18 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { awaitRun, motionApi } from '../../lib/motion.ts';
 import { requireAuth, withAuth, fail, type ToolResult } from '../util.ts';
+import { MAX_ATTACHMENTS } from '../../lib/attachments.ts';
 
 const MAX_FRAMES = 6;
 const MAX_FRAME_WIDTH = 960;
 
 const org = z.string().optional().describe('Which org, if you belong to more than one.');
+
+const attachment = z.union([
+  z.object({ url: z.string().url(), name: z.string().optional() }),
+  z.object({ asset_id: z.string() }),
+  z.object({ data: z.string().describe('base64, up to about 4 MB'), name: z.string(), mime_type: z.string() })
+]);
 
 export function registerMotionTools(server: McpServer) {
   server.registerTool(
@@ -20,13 +27,15 @@ export function registerMotionTools(server: McpServer) {
         'Find the node id with `list_motion_videos`; read the video first with `get_motion_summary` to name clips precisely. ' +
         'Returns at once with a `run_id` (`running`): poll `get_motion_run` every few seconds until `done`, which carries the ' +
         'reply, the summary and the new revision `version`. `wait: true` polls for you, up to about 4 minutes of a turn that can run up to 30. The agent looks at its own ' +
-        'frames even with no editor open. Spends credits.',
-      inputSchema: z.object({ org, node_id: z.string(), prompt: z.string().min(1), wait: z.boolean().optional() }),
+        'frames even with no editor open. Spends credits. ' +
+        `\`attachments\` (up to ${MAX_ATTACHMENTS}): images (PNG, JPG, WebP, GIF) the agent sees and can place in the video, and PDF/DOCX/PPTX/XLSX/CSV/TXT/MD/HTML files it reads as text — ` +
+        'each one a public `url`, an `asset_id` of the project, or inline base64 `data` with `name` and `mime_type`; at most 20 MB each.',
+      inputSchema: z.object({ org, node_id: z.string(), prompt: z.string().min(1), wait: z.boolean().optional(), attachments: z.array(attachment).max(MAX_ATTACHMENTS).optional() }),
       annotations: { readOnlyHint: false, destructiveHint: false }
     },
-    async ({ org, node_id, prompt, wait }) =>
+    async ({ org, node_id, prompt, wait, attachments }) =>
       withAuth(async (token) => {
-        const run = await motionApi.ask(token, node_id, prompt, org);
+        const run = await motionApi.ask(token, node_id, prompt, org, attachments);
         return wait === true ? awaitRun(token, run, { org }) : run;
       })
   );

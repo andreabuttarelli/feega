@@ -1,5 +1,6 @@
 import { request } from './api.ts';
 import { appUrl } from './config.ts';
+import type { AttachmentSource } from './attachments.ts';
 
 export type MotionRun = {
   run_id: string;
@@ -51,8 +52,8 @@ async function download(path: string, token: string): Promise<string> {
 const id = encodeURIComponent;
 
 export const motionApi = {
-  ask: (token: string, nodeId: string, prompt: string, org?: string) =>
-    request<MotionRun>(withOrg(`/api/v1/motion/${id(nodeId)}/ask`, org), token, { method: 'POST', body: JSON.stringify({ prompt }) }),
+  ask: (token: string, nodeId: string, prompt: string, org?: string, attachments: AttachmentSource[] = []) =>
+    request<MotionRun>(withOrg(`/api/v1/motion/${id(nodeId)}/ask`, org), token, { method: 'POST', body: JSON.stringify(attachments.length ? { prompt, attachments } : { prompt }) }),
   run: (token: string, runId: string, org?: string) => request<MotionRun>(withOrg(`/api/v1/motion/runs/${id(runId)}`, org), token),
   render: (token: string, nodeId: string, opts: RenderOptions, org?: string) =>
     request<RenderStart>(withOrg(`/api/v1/motion/${id(nodeId)}/render`, org), token, { method: 'POST', body: JSON.stringify(renderBody(opts)) }),

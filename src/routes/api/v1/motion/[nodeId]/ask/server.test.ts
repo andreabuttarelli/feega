@@ -75,7 +75,21 @@ vi.mock('$lib/server/repos/canvas', async (importOriginal) => ({
   patchNodeData: async () => ({ outcome: 'written' })
 }));
 vi.mock('$lib/server/repos/projects', () => ({ findProjectById: async (_db: unknown, input: { orgId: string }) => (input.orgId === ORG ? { id: PROJECT, brandId: null } : null) }));
-vi.mock('$lib/server/repos/assets', () => ({ listProjectAssets: async () => [] }));
+vi.mock('$lib/server/repos/assets', () => ({
+  listProjectAssets: async () => [],
+  findAssets: async () => new Map([['a-doc', { id: 'a-doc', projectId: PROJECT, type: 'document', url: 'x', content: 'Green bottles.', mimeType: 'text/markdown' }]])
+}));
+const attached = vi.hoisted(() => ({ asked: [] as unknown[], fail: null as null | Error }));
+vi.mock('$lib/server/chat-attachments/register', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('$lib/server/chat-attachments/register')>()),
+  resolveSources: async (_db: unknown, scope: unknown, sources: unknown[]) => {
+    attached.asked.push({ scope, sources });
+    if (attached.fail) {
+      throw attached.fail;
+    }
+    return sources.map(() => ({ assetId: 'a-doc', kind: 'document', name: 'brief.md', mimeType: 'text/markdown', bytes: 14 }));
+  }
+}));
 vi.mock('$lib/server/canvas/sign-media', () => ({ createAssetSigningDb: () => ({}), signAssetPaths: async () => new Map() }));
 vi.mock('$lib/server/repos/chat', () => ({
   openNodeThread: async () => 'thread-1',
@@ -188,6 +202,29 @@ describe('POST /api/v1/motion/[nodeId]/ask', () => {
 
     expect(offeredTools[0]).toContain('add_clip');
     expect(offeredTools[0]).not.toContain('view_frames');
+  });
+
+  it('takes attachments as URLs, inline files or asset ids, in the project of the video', async () => {
+    attached.asked.length = 0;
+    attached.fail = null;
+    const sources = [{ url: 'https://example.com/brief.md' }];
+    const { run_id } = await (await ask(NODE, { prompt: 'summarize', attachments: sources })).json();
+    await settled(run_id);
+
+    expect(attached.asked[0]).toMatchObject({ scope: { orgId: ORG, projectId: PROJECT }, sources });
+    expect(store.turns[0]).toMatchObject({ role: 'user', content: 'summarize', attachments: [{ assetId: 'a-doc', name: 'brief.md' }] });
+  });
+
+  it('a refused attachment is a clear error and no run', async () => {
+    const { AttachmentFailure } = await import('$lib/server/chat-attachments/register');
+    const { AttachmentError } = await import('$lib/chat-attachments');
+    attached.fail = new AttachmentFailure(AttachmentError.TooLarge);
+    const res = await ask(NODE, { prompt: 'x', attachments: [{ url: 'https://example.com/huge.pdf' }] });
+    attached.fail = null;
+
+    expect(res.status).toBe(413);
+    expect(await res.json()).toMatchObject({ code: 'attachment_too_large' });
+    expect(store.runs.size).toBe(0);
   });
 
   it('refuses a node that is not a motion video', async () => {

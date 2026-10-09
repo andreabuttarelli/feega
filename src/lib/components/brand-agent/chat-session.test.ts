@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { chatSession, anyChatRunning, forgetChatSessions } from './chat-session.svelte';
+import { AttachmentKind } from '$lib/chat-attachments';
 
 type Pipe = { push: (text: string) => void; end: () => void };
 
@@ -124,5 +125,54 @@ describe('chatSession', () => {
     await session.send('look', 'append-user');
 
     expect(seen).toEqual([evt]);
+  });
+});
+
+describe('chatSession — attachments', () => {
+  it('send carries the asset ids and echoes the chips on the user message; retry sends them again', async () => {
+    forgetChatSessions();
+    const bodies: Record<string, unknown>[] = [];
+    let fail = true;
+    const fetcher = (async (_url: string, init?: RequestInit) => {
+      if (init?.method !== 'POST') {
+        return new Response(JSON.stringify({ messages: [] }), { status: 200 });
+      }
+      bodies.push(JSON.parse(String(init.body)));
+      if (fail) {
+        fail = false;
+        return new Response(JSON.stringify({ error: 'x' }), { status: 500 });
+      }
+      return new Response(sse({ type: 'text-delta', id: 't', delta: 'ok' }), { status: 200 });
+    }) as typeof fetch;
+    const logo = { assetId: 'a-1', kind: AttachmentKind.Image, name: 'logo.png', mimeType: 'image/png', bytes: 10 };
+    const session = chatSession('/api/v1/projects/p/attach', fetcher);
+    await session.load();
+
+    await session.send('place it', 'append-user', [logo]);
+
+    expect(bodies[0]).toMatchObject({ message: 'place it', attachments: ['a-1'] });
+    expect(session.messages[0]).toMatchObject({ role: 'user', content: 'place it', attachments: [logo] });
+
+    session.retry();
+    await settle();
+    expect(bodies[1]).toMatchObject({ message: 'place it', attachments: ['a-1'] });
+  });
+
+  it('a message of attachments only is sent', async () => {
+    forgetChatSessions();
+    const bodies: Record<string, unknown>[] = [];
+    const fetcher = (async (_url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') {
+        bodies.push(JSON.parse(String(init.body)));
+        return new Response(sse({ type: 'text-delta', id: 't', delta: 'ok' }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ messages: [] }), { status: 200 });
+    }) as typeof fetch;
+    const session = chatSession('/api/v1/projects/p/only', fetcher);
+    await session.load();
+
+    await session.send('', 'append-user', [{ assetId: 'a-2', kind: AttachmentKind.Document, name: 'brief.pdf', mimeType: 'application/pdf', bytes: 3 }]);
+
+    expect(bodies).toHaveLength(1);
   });
 });

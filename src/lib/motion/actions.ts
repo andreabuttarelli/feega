@@ -66,6 +66,7 @@ import ChartSpline from '@lucide/svelte/icons/chart-spline';
 import AudioWaveform from '@lucide/svelte/icons/audio-waveform';
 import ScissorsLineDashed from '@lucide/svelte/icons/scissors-line-dashed';
 import Menu from '@lucide/svelte/icons/menu';
+import Paperclip from '@lucide/svelte/icons/paperclip';
 import { Command, SHORTCUTS } from './shortcuts';
 
 export enum Tool {
@@ -73,6 +74,7 @@ export enum Tool {
   Menu = 'menu',
   More = 'more',
   Close = 'close',
+  Attach = 'attach',
   Snap = 'snap',
   NullFromSelection = 'null-from-selection',
   ClearWorkArea = 'clear-work-area',
@@ -224,6 +226,7 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Tool.Back]: { name: 'Back to the canvas', icon: ArrowLeft },
   [Tool.More]: { name: 'More actions', icon: Ellipsis },
   [Tool.Close]: { name: 'Close', icon: X },
+  [Tool.Attach]: { name: 'Attach files or images', icon: Paperclip },
   [Tool.ItemUp]: { name: 'Move up', icon: ChevronUp },
   [Tool.ItemDown]: { name: 'Move down', icon: ChevronDown },
   [Tool.Remove]: { name: 'Remove', icon: X },

@@ -1,5 +1,6 @@
 import { applyChatStreamEvent, closeDanglingToolCalls, emptyStreamState, readSseEvents, type ChatStreamState } from '$lib/chat-stream-events';
 import { failureOfStatus, type Failure, type ToolCall } from './chat-view';
+import type { ChatAttachment } from '$lib/chat-attachments';
 
 export type ChatMessage = {
   role: 'user' | 'assistant';
@@ -7,6 +8,7 @@ export type ChatMessage = {
   pending?: boolean;
   at?: number | null;
   tools?: ToolCall[];
+  attachments?: ChatAttachment[];
   reasoning?: string;
   live?: boolean;
   streaming?: true;
@@ -120,8 +122,8 @@ export class ChatSession {
     }
   }
 
-  async send(text: string, echo: UserEcho) {
-    if (!text || this.sending || this.reconnecting) {
+  async send(text: string, echo: UserEcho, attachments: ChatAttachment[] = []) {
+    if ((!text && !attachments.length) || this.sending || this.reconnecting) {
       return;
     }
 
@@ -132,7 +134,7 @@ export class ChatSession {
     this.#abort = new AbortController();
 
     if (echo === 'append-user') {
-      this.messages = [...this.messages, { role: 'user', content: text, at: Date.now() }];
+      this.messages = [...this.messages, { role: 'user', content: text, at: Date.now(), ...(attachments.length ? { attachments } : {}) }];
     }
     this.messages = [...this.messages, { role: 'assistant', content: '', pending: true, at: Date.now(), tools: [], live: true }];
     this.revision++;
@@ -141,7 +143,7 @@ export class ChatSession {
       const res = await this.#fetch(this.#endpoint, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ ...this.context(), message: text }),
+        body: JSON.stringify({ ...this.context(), message: text, ...(attachments.length ? { attachments: attachments.map((a) => a.assetId) } : {}) }),
         signal: this.#abort.signal
       });
       if (!res.ok || !res.body) {
@@ -170,7 +172,7 @@ export class ChatSession {
     }
     const lastUser = [...this.messages].reverse().find((m) => m.role === 'user');
     if (lastUser) {
-      void this.send(lastUser.content, 'reuse-user');
+      void this.send(lastUser.content, 'reuse-user', lastUser.attachments ?? []);
     }
   }
 

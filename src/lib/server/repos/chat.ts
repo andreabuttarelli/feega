@@ -3,6 +3,7 @@ import type { Json } from '$lib/database.types';
 import { toolsForMirror } from '$lib/chat-stream-events';
 import { actorCols, type Actor } from './actor';
 import { AGENT_STALE_MS } from '$lib/server/brand-agent/limits';
+import { attachedNote, type ChatAttachment } from '$lib/chat-attachments';
 
 /**
  * I THREAD DELLA CHAT DI PROGETTO, SULLO SCHEMA NUOVO.
@@ -27,7 +28,7 @@ export type SavedTool = {
   errorText?: string;
 };
 
-export type Turn = { role: 'user' | 'assistant'; content: string; tools?: SavedTool[]; streaming?: true };
+export type Turn = { role: 'user' | 'assistant'; content: string; tools?: SavedTool[]; attachments?: ChatAttachment[]; streaming?: true };
 
 const STREAMING = 'streaming';
 
@@ -125,22 +126,25 @@ export async function loadTurns(
     .order('seq', { ascending: false })
     .limit(HISTORY_LIMIT);
 
-  const rows = (data ?? []) as Array<{ role?: string; content?: string | null; tool_calls?: SavedTool[] | null; status?: string }>;
+  const rows = (data ?? []) as Array<{ role?: string; content?: string | null; tool_calls?: SavedTool[] | null; attachments?: ChatAttachment[] | null; status?: string }>;
 
   return rows
     .filter((row) => row.role === 'user' || row.role === 'assistant')
-    .filter((row) => row.content?.trim() || row.tool_calls?.length)
+    .filter((row) => row.content?.trim() || row.tool_calls?.length || row.attachments?.length)
     .map((row) => ({
       role: row.role as Turn['role'],
       content: row.content ?? '',
       ...(row.tool_calls?.length ? { tools: row.tool_calls } : {}),
+      ...(row.attachments?.length ? { attachments: row.attachments } : {}),
       ...(row.status === STREAMING ? { streaming: true as const } : {})
     }))
     .reverse();
 }
 
 export function promptHistory(turns: Turn[]): PromptTurn[] {
-  return turns.filter((t) => t.content.trim()).map(({ role, content }) => ({ role, content }));
+  return turns
+    .map(({ role, content, attachments }) => ({ role, content: content + attachedNote(attachments ?? []) }))
+    .filter((t) => t.content.trim());
 }
 
 /**
@@ -155,6 +159,7 @@ export async function saveTurn(
     role: Turn['role'];
     content: string;
     tools?: SavedTool[];
+    attachments?: ChatAttachment[];
     actor: Actor;
   }
 ): Promise<void> {
@@ -168,7 +173,7 @@ export async function saveTurn(
     .maybeSingle();
 
   const previous = last as { seq?: number; role?: string; content?: string | null } | null;
-  if (input.role === 'user' && previous?.role === 'user' && previous.content === input.content) {
+  if (input.role === 'user' && previous?.role === 'user' && previous.content === input.content && !input.attachments?.length) {
     return;
   }
 
@@ -180,6 +185,7 @@ export async function saveTurn(
     role: input.role,
     content: input.content,
     tool_calls: input.tools?.length ? (toolsForMirror(input.tools) as Json) : null,
+    attachments: input.attachments?.length ? (input.attachments as unknown as Json) : null,
     seq,
     ...actorCols(input.actor)
   });

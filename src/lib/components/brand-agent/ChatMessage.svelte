@@ -3,6 +3,10 @@
   import { renderDocHtml } from '$lib/canvas/doc-render';
   import ChatToolRow from './ChatToolRow.svelte';
   import type { ToolCall } from './chat-view';
+  import type { ChatAttachment } from '$lib/chat-attachments';
+  import { AssetSize, canvasAssetUrl } from '$lib/canvas/asset-url';
+  import ChatAttachments from './ChatAttachments.svelte';
+  import { UploadStatus } from './chat-uploads.svelte';
 
   const REASONING_PLACEHOLDER = '\u200b';
 
@@ -15,7 +19,9 @@
     tools = [],
     reasoning = '',
     live = false,
-    first = true
+    first = true,
+    attachments = [],
+    canvasId = ''
   }: {
     role: 'user' | 'assistant';
     content: string;
@@ -26,7 +32,21 @@
     reasoning?: string;
     live?: boolean;
     first?: boolean;
+    attachments?: ChatAttachment[];
+    canvasId?: string;
   } = $props();
+
+  const chips = $derived(
+    attachments.map((a) => ({
+      id: a.assetId,
+      name: a.name,
+      bytes: a.bytes,
+      kind: a.kind,
+      preview: canvasId ? canvasAssetUrl(projectId, canvasId, a.assetId, AssetSize.Thumb) : null,
+      progress: 1,
+      status: UploadStatus.Ready
+    }))
+  );
 
   const time = $derived(at ? new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '');
   const html = $derived(role === 'assistant' && content ? renderDocHtml(content) : '');
@@ -37,7 +57,12 @@
 
 <div class="msg is-{role}" class:first class:live role="group" aria-label={role === 'user' ? $_('chat.panel.you') : $_('chat.panel.agent')}>
   {#if role === 'user'}
-    <div class="user-body">{content}</div>
+    {#if chips.length}
+      <div class="user-files"><ChatAttachments items={chips} /></div>
+    {/if}
+    {#if content}
+      <div class="user-body">{content}</div>
+    {/if}
   {:else}
     {#if first}
       <div class="who">
@@ -73,6 +98,10 @@
 </div>
 
 <style>
+  .user-files {
+    align-self: flex-end;
+    max-width: 100%;
+  }
   .msg {
     display: flex;
     flex-direction: column;

@@ -21,7 +21,7 @@ export type Call = {
 
 export type FakeDb = { db: Db; calls: Call[] };
 
-export type FakeOptions = { updateRows?: Record<string, unknown[]>; filter?: boolean; mutate?: boolean; newId?: () => string };
+export type FakeOptions = { updateRows?: Record<string, unknown[]>; filter?: boolean; mutate?: boolean; newId?: () => string; files?: Record<string, Uint8Array> };
 
 export function fakeDb(rows: Record<string, unknown[]>, options: FakeOptions = {}): FakeDb {
   const calls: Call[] = [];
@@ -148,6 +148,15 @@ export function fakeDb(rows: Record<string, unknown[]>, options: FakeOptions = {
         upload: async (path: string, file?: unknown) => {
           calls.push({ table: `storage:${bucket}`, op: 'upload', filters: [['path', path]], payload: file });
           return { data: { path }, error: null };
+        },
+        download: async (path: string) => {
+          calls.push({ table: `storage:${bucket}`, op: 'download', filters: [['path', path]] });
+          const file = options.files?.[path];
+          return file ? { data: new Blob([file as BlobPart]), error: null } : { data: null, error: { message: 'Object not found' } };
+        },
+        createSignedUploadUrl: async (path: string) => {
+          calls.push({ table: `storage:${bucket}`, op: 'sign-upload', filters: [['path', path]] });
+          return { data: { path, token: 'upload-token', signedUrl: `https://upload.example/${bucket}/${path}` }, error: null };
         },
         getPublicUrl: (path: string) => ({ data: { publicUrl: `https://public.example/${bucket}/${path}` } }),
         list: async (folder: string) => {

@@ -3,6 +3,7 @@ import { fakeDb, filtersOf } from '$lib/server/db/fake-db';
 import { agentActor, SIDEBAR_AGENT_KEY } from '$lib/server/repos/actor';
 import { HISTORY_LIMIT, loadTurns, openThread, promptHistory, saveTurn, turnRunning } from './chat';
 import { AGENT_STALE_MS } from '$lib/server/brand-agent/limits';
+import { AttachmentKind } from '$lib/chat-attachments';
 
 const ORG = '11111111-1111-1111-1111-111111111111';
 const PROJECT = '22222222-2222-2222-2222-222222222222';
@@ -93,6 +94,27 @@ describe('i tool del turno sopravvivono al reload', () => {
 
     expect(turns).toEqual([{ role: 'assistant', content: '', tools: [TOOL] }]);
     expect(promptHistory(turns)).toEqual([]);
+  });
+});
+
+describe('gli allegati del messaggio sopravvivono al reload', () => {
+  const LOGO = { assetId: 'a-1', kind: AttachmentKind.Image, name: 'logo.png', mimeType: 'image/png', bytes: 10 };
+
+  it('saveTurn scrive gli allegati in attachments', async () => {
+    const { db, calls } = fakeDb({ chat_messages: [] });
+
+    await saveTurn(db, { orgId: ORG, threadId: THREAD, role: 'user', content: 'use this', attachments: [LOGO], actor: { kind: 'user', id: USER } });
+
+    expect(calls.find((c) => c.op === 'insert')!.payload).toMatchObject({ attachments: [LOGO] });
+  });
+
+  it('un messaggio fatto solo di allegati torna nella cronologia e nel prompt, con gli asset', async () => {
+    const { db } = fakeDb({ chat_messages: [{ role: 'user', content: '', attachments: [LOGO] }] });
+
+    const turns = await loadTurns(db, { orgId: ORG, threadId: THREAD });
+
+    expect(turns).toEqual([{ role: 'user', content: '', attachments: [LOGO] }]);
+    expect(promptHistory(turns)).toEqual([{ role: 'user', content: '\n\n[Attached: logo.png (image, asset a-1)]' }]);
   });
 });
 

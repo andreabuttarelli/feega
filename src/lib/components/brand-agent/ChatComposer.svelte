@@ -2,6 +2,11 @@
   import type { Snippet } from 'svelte';
   import { composerHeight } from './composer-height';
   import { _ } from 'svelte-i18n';
+  import IconButton from '$lib/components/motion/IconButton.svelte';
+  import { Tool } from '$lib/motion/actions';
+  import { CHAT_ATTACH_ACCEPT } from '$lib/chat-attachments';
+  import ChatAttachments from './ChatAttachments.svelte';
+  import type { Upload } from './chat-uploads.svelte';
 
   let {
     value = $bindable(),
@@ -9,7 +14,12 @@
     enabled = true,
     onsend,
     onstop,
-    controls
+    controls,
+    files = [],
+    ready = 0,
+    uploading = false,
+    onfiles,
+    onremove
   }: {
     value: string;
     busy?: boolean;
@@ -17,11 +27,50 @@
     onsend: () => void;
     onstop: () => void;
     controls?: Snippet;
+    files?: Upload[];
+    ready?: number;
+    uploading?: boolean;
+    onfiles?: (files: File[]) => void;
+    onremove?: (id: string) => void;
   } = $props();
 
   let textarea = $state<HTMLTextAreaElement | null>(null);
+  let picker = $state<HTMLInputElement | null>(null);
+  let dragging = $state(false);
 
-  const canSend = $derived(!busy && enabled && !!value.trim());
+  const canSend = $derived(!busy && enabled && !uploading && (!!value.trim() || ready > 0));
+
+  function picked(e: Event) {
+    const input = e.currentTarget as HTMLInputElement;
+    onfiles?.([...(input.files ?? [])]);
+    input.value = '';
+  }
+
+  function pasted(e: ClipboardEvent) {
+    const pastedFiles = [...(e.clipboardData?.files ?? [])];
+    if (!onfiles || !pastedFiles.length) {
+      return;
+    }
+    e.preventDefault();
+    onfiles(pastedFiles);
+  }
+
+  function dragged(e: DragEvent) {
+    if (!onfiles || !e.dataTransfer?.types.includes('Files')) {
+      return;
+    }
+    e.preventDefault();
+    dragging = true;
+  }
+
+  function dropped(e: DragEvent) {
+    dragging = false;
+    if (!onfiles || !e.dataTransfer?.files.length) {
+      return;
+    }
+    e.preventDefault();
+    onfiles([...e.dataTransfer.files]);
+  }
 
   function grow() {
     if (!textarea) {
@@ -54,17 +103,28 @@
 <form
   class="composer"
   class:is-disabled={!enabled}
+  class:dragging
+  ondragover={dragged}
+  ondragleave={() => (dragging = false)}
+  ondrop={dropped}
   onsubmit={(e) => {
     e.preventDefault();
     submit();
   }}
 >
+  {#if files.length}
+    <ChatAttachments items={files} {onremove} />
+  {/if}
+  {#if dragging}
+    <p class="drop-hint" aria-hidden="true">{$_('chat.panel.attach.drop')}</p>
+  {/if}
   <label class="sr-only" for="chat-composer-input">{$_('chat.panel.placeholder')}</label>
   <textarea
     id="chat-composer-input"
     bind:this={textarea}
     bind:value
     onkeydown={onKeydown}
+    onpaste={pasted}
     rows="1"
     placeholder={$_('chat.panel.placeholder')}
     disabled={!enabled}
@@ -72,6 +132,12 @@
   ></textarea>
 
   <div class="row">
+    {#if onfiles}
+      <span class="attach">
+        <IconButton action={Tool.Attach} label={$_('chat.panel.attach.button')} data-testid="chat-attach" disabled={!enabled} onclick={() => picker?.click()} />
+        <input bind:this={picker} class="sr-only" type="file" multiple accept={CHAT_ATTACH_ACCEPT} tabindex="-1" aria-hidden="true" onchange={picked} />
+      </span>
+    {/if}
     {#if controls}
       <div class="controls">{@render controls()}</div>
     {:else}
@@ -105,6 +171,20 @@
   }
   .composer.is-disabled {
     opacity: 0.6;
+  }
+  .composer.dragging {
+    border-color: var(--accent, #c485fe);
+    border-style: dashed;
+  }
+  .drop-hint {
+    margin: 0;
+    font-size: 12px;
+    color: var(--ink-soft, #6e6e73);
+  }
+  .attach {
+    flex: 0 0 auto;
+    --ib-size: 44px;
+    margin: -6px 0;
   }
 
   textarea {

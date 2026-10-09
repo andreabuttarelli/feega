@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, test } from 'bun:test';
 import { createServer, type Server } from 'node:http';
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { AddressInfo } from 'node:net';
@@ -120,6 +120,13 @@ describe('the motion agent over MCP', () => {
     expect(result?.structuredContent).toMatchObject({ run_id: RUN, status: 'done', version: 3, summary: 'added Title' });
   });
 
+  test('ask_motion_agent passes attachments through: URLs, asset ids, inline files', async () => {
+    const attachments = [{ url: 'https://example.com/brief.pdf' }, { asset_id: 'a-1' }, { data: 'aGk=', name: 'notes.md', mime_type: 'text/markdown' }];
+    await callTool('ask_motion_agent', { node_id: NODE, prompt: 'use these', attachments });
+
+    expect(calls[0]).toEqual({ method: 'POST', path: `/api/v1/motion/${NODE}/ask`, body: { prompt: 'use these', attachments } });
+  });
+
   test('ask_motion_agent returns the run at once by default', async () => {
     const result = await callTool('ask_motion_agent', { node_id: NODE, prompt: 'add a bounce' });
 
@@ -223,6 +230,26 @@ describe('feega motion ask', () => {
     expect(calls[0]).toEqual({ method: 'POST', path: `/api/v1/motion/${NODE}/ask`, body: { prompt: 'make the title red' } });
     expect(lines.join('\n')).toContain('revision 3');
     expect(lines.join('\n')).toContain('added Title');
+  });
+});
+
+describe('feega motion ask --attach', () => {
+  test('a local file goes inline, a URL as a URL, asset:<id> as an asset', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'feega-attach-'));
+    const file = join(dir, 'notes.md');
+    writeFileSync(file, '# Notes');
+    const log = console.log;
+    console.log = () => {};
+    const { askAndReport } = await import('../commands/motion.ts');
+
+    await askAndReport('token', NODE, 'summarize', { wait: false, attach: [file, 'https://example.com/logo.png', 'asset:a-9'] }).finally(() => {
+      console.log = log;
+    });
+
+    expect(calls[0].body).toEqual({
+      prompt: 'summarize',
+      attachments: [{ data: Buffer.from('# Notes').toString('base64'), name: 'notes.md', mime_type: 'text/markdown' }, { url: 'https://example.com/logo.png' }, { asset_id: 'a-9' }]
+    });
   });
 });
 
