@@ -5,7 +5,7 @@ import type { Db } from '$lib/server/db/client';
 import { llmCodeModel, llmLanguageModel, llmStructured, llmVisionModel } from '$lib/server/llm';
 import { fetchImageBytes, uiReader } from '$lib/server/motion/ui-read';
 import { PromptCache } from '$lib/server/prompt-cache';
-import { reasoningProviderOptions } from '$lib/server/chat-model/catalogue';
+import { reasoningProviderOptions, toolForcing } from '$lib/server/chat-model/catalogue';
 import { ensureGatewayModels, gatewayModel, gatewayRate } from '$lib/server/openrouter-models';
 import { Tier, activeTools, openingTier, selfCheckChoice, spentUsd, stepTier, type ForcedTool } from '$lib/server/motion/model-route';
 import { extractSdkUsage, logAiCall, withOrgContext } from '$lib/server/ai-log';
@@ -114,7 +114,7 @@ const ROUND_STOPS: Record<Round, (t0: number, overBudget: Stop) => Stop[]> = {
 
 type Choice = ForcedTool | { toolChoice: 'none' };
 
-type ChoiceInput = { tier: Tier; reasoning: string | null; stepNumber: number };
+type ChoiceInput = Parameters<typeof selfCheckChoice>[0] & { stepNumber: number };
 
 const ROUND_CHOICE: Record<Round, (input: ChoiceInput) => Choice> = {
   [Round.Edit]: () => ({}),
@@ -302,7 +302,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
         routed?.shown?.forEach((id) => framesShown.add(id));
         const stepModel = routed?.model ?? tierModel;
         stepModels.push(stepModel);
-        const forced = ROUND_CHOICE[kind]({ tier, reasoning: stepModel === model ? reasoning : null, stepNumber });
+        const forced = ROUND_CHOICE[kind]({ tier, reasoning: stepModel === model ? reasoning : null, forcing: toolForcing(stepModel), stepNumber });
         return { model: llmLanguageModel(stepModel, PromptCache.On), providerOptions: stepModel === model ? reasoningProviderOptions(reasoning) : {}, activeTools: activeTools(tier, toolNames), ...(routed?.messages ? { messages: routed.messages } : {}), ...forced };
       }
     });

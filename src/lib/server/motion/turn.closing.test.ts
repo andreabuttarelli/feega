@@ -317,6 +317,13 @@ describe('a motion turn closes on a look and a summary', () => {
     expect(world.calls.some((c) => c.toolChoice?.type === 'tool')).toBe(false);
   });
 
+  it('never forces a tool on a model that refuses forced tool_choice, and still looks at its frames', async () => {
+    await turn(null);
+
+    expect(world.calls.some((c) => c.toolChoice?.type === 'tool')).toBe(false);
+    expect(viewedAfterLastEdit()).toBe(true);
+  });
+
   it('a turn cut by its budget in the middle of the work still ends on a summary, and the notes keep their spacing', async () => {
     world.rate = 1_000_000;
 
