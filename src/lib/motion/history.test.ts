@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, newMotionDoc } from './doc';
-import { HISTORY_LIMIT, amend, canRedo, canUndo, previousSource, record, redo, startHistory, undo } from './history';
+import { HISTORY_LIMIT, UNSAVED_VERSION, adoptHead, amend, canRedo, canUndo, previousSource, record, redo, startHistory, undo } from './history';
+import { Agent } from './start-prompt';
 import { setCanvas } from './timeline';
 
 const base = newMotionDoc(MotionFormat.Landscape);
@@ -58,5 +59,29 @@ describe('the code of a component in earlier revisions', () => {
 
     expect(previousSource(h, 'Chat')?.css).toBe('a');
     expect(previousSource(startHistory(at('a')), 'Chat')).toBeNull();
+  });
+});
+
+describe('undo while the agent works or before anything was saved', () => {
+  it('undo does nothing while an agent turn is drawing its draft over the timeline', () => {
+    const h = record(startHistory(base), longer);
+
+    expect(undo(h, Agent.Working)).toBe(h);
+    expect(canUndo(h, Agent.Working)).toBe(false);
+    expect(canRedo(undo(h), Agent.Working)).toBe(false);
+  });
+
+  it('a head pulled into a tab opened on an unsaved node cannot be undone into the blank doc', () => {
+    const h = adoptHead(startHistory(base), longer, UNSAVED_VERSION);
+
+    expect(h.present).toBe(longer);
+    expect(canUndo(h)).toBe(false);
+  });
+
+  it('a head pulled into a tab that already saved is one undo step, the whole agent turn at once', () => {
+    const h = adoptHead(record(startHistory(base), longer), { ...base, durationInFrames: 90 }, 4);
+
+    expect(undo(h).present).toBe(longer);
+    expect(undo(undo(h)).present).toBe(base);
   });
 });
