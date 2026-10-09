@@ -229,6 +229,25 @@ vero (`hyperframes-player` + `feega:capture`), bisezione togliendo componenti, e
 l'immagine catturata: un filtro `userSpaceOnUse` su un layer HTML in WebKit si risolve sul
 contenuto dipinto, non sul box — un frame "più veloce" può essere un frame vuoto.
 
+### Un raster dell'export rifatto a ogni frame anche se non cambia nulla
+Segnale: `rasterOf` va in miss al secondo frame su ogni layer, e la chiave differisce solo per gli
+spazi dello `style` (`left:0px` → `left: 0px;`). `setProperty` riscrive l'attributo nella
+serializzazione del browser. Mossa: chiavi dagli stili parsati (`el.style.cssText`), mai da
+`getAttribute('style')`.
+
+### Il costo di export si sposta, non sparisce: misura a A/B, non per stadio
+Segnale: tolto un lavoro (es. un raster), le colonne del bench cambiano ma il ms/frame no. In WebKit
+un `ImageBitmap` di un canvas WebGL è pigro: la lettura dal GPU (e l'attesa del render three.js)
+si paga al `texImage2D` nell'host, quindi si sposta fra "output" e "composite". Mossa: A/B
+interlacciato (prima/dopo alternati, 3 giri, carico macchina alto) sul ms/frame totale.
+
+### Chromium a 4 lane perde i layer 3D di una lane
+Segnale: nell'mp4 Chromium 4 lane un frame su 4 è senza sfere/oggetti 3D (PSNR 19 dB contro
+WebKit, periodico); console `Too many active WebGL contexts. Oldest context will be lost.`
+Chromium tiene 16 contesti WebGL per pagina: lane × canvas 3D (+ compositor) > 16 e la lane più
+vecchia li perde, senza errore. Mossa: controllare l'mp4 completo frame per frame (PSNR per frame
+contro WebKit 1 lane), non 3 frame a campione.
+
 ## Ambiente e worktree
 
 ### Verde in locale, rosso in CI: una chiave del `.env` sceglie il ramo

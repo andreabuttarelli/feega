@@ -5,6 +5,7 @@ import { addClip, addTrack, setKeyframes, type OpResult } from '../timeline';
 import { Ease } from '../design';
 import { TrackKind } from '../components';
 import { composeHtml } from './compose';
+import { POSE_ATTR } from './raster-key';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -26,6 +27,10 @@ const compose = (doc: MotionDoc) => composeHtml({ doc, tokens: FEEGA_TOKENS, ass
 const attrSets = (html: string, target: string) => [...html.matchAll(new RegExp(`tl\\.set\\("${target}",\\{"attr":(\\{[^}]*\\})\\},([\\d.]+)\\)`, 'g'))].map((m) => ({ attr: JSON.parse(m[1]) as Record<string, number>, at: Number(m[2]) }));
 
 describe('liquid glass', () => {
+  it('marks the moving glass body as one rigid pose, so the export rasters it once and moves it on the GPU', () => {
+    expect(compose(withGlass())).toContain(`<g id="lgc-drop" ${POSE_ATTR}=""`);
+  });
+
   it('bends what lies below it through one SVG lens filter, never backdrop-filter or CSS animations', () => {
     const html = compose(withGlass());
     const lens = html.indexOf('id="lg-drop"');

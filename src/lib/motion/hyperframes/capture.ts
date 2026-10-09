@@ -10,6 +10,7 @@ import { GRAIN_TILE } from '../effects/registry';
 import { NOT_WEBKIT_UA, WEBKIT_UA } from '../engine';
 import { ERRORS } from '../custom/runtime';
 import { PARTICLE_STATE } from './particles';
+import { POSE_ATTR, neutralised as neutralise, pathStyles as stylesOf, restingPose as resting } from './raster-key';
 export { contentStamp } from '../stamp';
 
 export const CAPTURE_REQUEST = 'feega:capture';
@@ -36,14 +37,14 @@ export type CaptureRequest = { type: typeof CAPTURE_REQUEST; id: string; format:
 export type ClipError = { clip: string; component: string; message: string };
 export type CaptureReply = { type: typeof CAPTURE_REPLY; id: string; stamp?: string; url?: string; bitmap?: ImageBitmap; tree?: LayerTree; sheets?: ImageBitmap[]; error?: string; layout?: string; errors?: ClipError[] };
 
-type RuntimeConfig = { request: string; reply: string; lib: string; width: number; height: number; mediaTimeoutMs: number; stamp: string; errorsKey: string; settle: Settle; grainTile: number; grainOffset: number; webkitUa: string; notWebkitUa: string; particleState: string };
+type RuntimeConfig = { request: string; reply: string; lib: string; width: number; height: number; mediaTimeoutMs: number; stamp: string; errorsKey: string; settle: Settle; grainTile: number; grainOffset: number; webkitUa: string; notWebkitUa: string; particleState: string; poseAttr: string };
 type Shot = { body: Record<string, unknown>; transfer: Transferable[] };
 type HtmlToImage = {
   toSvg: (node: HTMLElement, options: Record<string, unknown>) => Promise<string>;
   getFontEmbedCSS: (node: HTMLElement) => Promise<string>;
 };
 
-function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, inline: typeof inlineMedia, shrink: typeof shrinkImage, paint: typeof paintSvg, plan: typeof planLayers, grainOn: typeof grainPixels, tileOf: typeof turbulenceTile, chain: typeof chainAffine, affine: typeof cssAffine, rgba: typeof cssRgba, join: typeof joinRasters, cssMasks: typeof readMasks, cssFilters: typeof readFilters, fitsUnder: typeof filtersFit) {
+function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, inline: typeof inlineMedia, shrink: typeof shrinkImage, paint: typeof paintSvg, plan: typeof planLayers, grainOn: typeof grainPixels, tileOf: typeof turbulenceTile, chain: typeof chainAffine, affine: typeof cssAffine, rgba: typeof cssRgba, join: typeof joinRasters, cssMasks: typeof readMasks, cssFilters: typeof readFilters, fitsUnder: typeof filtersFit, neutralised: typeof neutralise, pathStyles: typeof stylesOf, restingPose: typeof resting) {
   type Grain = { baseFrequency: number; seed: number; amount: number };
   const shrunk = new Map<string, Promise<string>>();
   let lib: Promise<unknown> | null = null;
@@ -513,7 +514,8 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
   const grouped = (items: Walked[]) => join<TreeNode, Element>(items);
   type SheetPaint = Extract<Paint, { kind: 'sheet' }>;
   type Slot = { source: HTMLCanvasElement | Picture | Run; paint: SheetPaint };
-  type Walk = { at: Place; slots: Slot[]; live: number };
+  type Pose = { rest: () => () => void; move: Affine; alpha: number };
+  type Walk = { at: Place; slots: Slot[]; live: number; poses: Map<Run, Pose> };
   type Cropped = { canvas: HTMLCanvasElement; box: [number, number, number, number]; size: [number, number] } | null;
   const slotted = (w: Walk, source: Slot['source'], part: Omit<SheetPaint, 'kind' | 'sheet'>): SheetPaint => {
     const paint: SheetPaint = { kind: SHEET, sheet: -1, ...part };
@@ -584,12 +586,98 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
     }
     return slotted(w, el, { width: el.offsetWidth, height: el.offsetHeight, at });
   };
+  const invert = ([a, b, c, d, e, f]: Affine): Affine => {
+    const det = a * d - b * c;
+    return [d / det, -b / det, -c / det, a / det, (c * f - d * e) / det, (b * e - a * f) / det];
+  };
+  const ctmOf = (el: SVGGraphicsElement): Affine | null => {
+    const m = el.getCTM();
+    return m ? [m.a, m.b, m.c, m.d, m.e, m.f] : null;
+  };
+  const put = (el: Element, name: string, value: string | null) => (value === null ? el.removeAttribute(name) : el.setAttribute(name, value));
+  const restingSvg = (el: SVGGraphicsElement, resting: string) => () => {
+    const transform = el.getAttribute('transform');
+    const opacity = el.getAttribute('opacity');
+    el.setAttribute('transform', resting);
+    el.removeAttribute('opacity');
+    return () => {
+      put(el, 'transform', transform);
+      put(el, 'opacity', opacity);
+    };
+  };
+  const STILL = { transform: 'none', opacity: '1' };
+  const restingCss = (el: HTMLElement) => () => {
+    const saved = Object.keys(STILL).map((name) => [name, el.style.getPropertyValue(name), el.style.getPropertyPriority(name)]);
+    Object.entries(STILL).forEach(([name, value]) => el.style.setProperty(name, value, 'important'));
+    return () => saved.forEach(([name, value, priority]) => el.style.setProperty(name, value, priority));
+  };
+  const rigid = (only: Element, el: Element) =>
+    [only, ...only.querySelectorAll('*')].every((e) => e === el || el.contains(e) || e.closest('defs') || inert(e) || (e.contains(el) && (e instanceof SVGElement || paintsNothing(e, getComputedStyle(e)))));
+  const svgPose = (run: Run, at: Place): Pose | null => {
+    const [only] = run.raster;
+    const posed = run.raster.length === 1 ? [...only.querySelectorAll(`[${cfg.poseAttr}]`)] : [];
+    const el = posed[0];
+    const svg = el instanceof SVGGraphicsElement ? el.ownerSVGElement : null;
+    if (posed.length !== 1 || !svg || !rigid(only, el)) {
+      return null;
+    }
+    const box = svg.getBoundingClientRect();
+    const size = [svg.width.baseVal.value, svg.height.baseVal.value];
+    const own = (el as SVGGraphicsElement).transform.baseVal.consolidate()?.matrix;
+    const scale = own ? Math.max(Math.hypot(own.a, own.b), Math.hypot(own.c, own.d)) : 1;
+    const view = svg.viewBox.baseVal;
+    const rest = restingSvg(el as SVGGraphicsElement, restingPose(scale, view?.width || size[0], view?.height || size[1]));
+    const now = ctmOf(el as SVGGraphicsElement);
+    const back = rest();
+    const still = ctmOf(el as SVGGraphicsElement);
+    back();
+    if (!now || !still || Math.abs(box.width - size[0]) > FLAT_PX || Math.abs(box.height - size[1]) > FLAT_PX || view?.x || view?.y) {
+      return null;
+    }
+    const screen: Affine = [at.sx, 0, 0, at.sy, (box.left - at.base.left) * at.sx, (box.top - at.base.top) * at.sy];
+    return { rest, move: chain(chain(screen, chain(now, invert(still))), invert(screen)), alpha: Number(el.getAttribute('opacity') ?? 1) };
+  };
+  const cssPose = (run: Run, at: Place): Pose | null => {
+    const [el] = run.raster;
+    const style = run.raster.length === 1 && el instanceof HTMLElement ? getComputedStyle(el) : null;
+    const moving = style && FLAT_TRANSFORM.test(style.transform) && (style.transform !== 'none' || Number(style.opacity) < 1);
+    if (!moving) {
+      return null;
+    }
+    const rest = restingCss(el as HTMLElement);
+    const now = affineOf(el, at);
+    const back = rest();
+    const still = affineOf(el, at);
+    const box = el.getBoundingClientRect();
+    back();
+    const left = (box.left - at.base.left) * at.sx;
+    const top = (box.top - at.base.top) * at.sy;
+    const inFrame = left >= 0 && top >= 0 && left + box.width * at.sx <= at.width && top + box.height * at.sy <= at.height;
+    if (!now || !still || !inFrame) {
+      return null;
+    }
+    return { rest, move: chain(now, invert(still)), alpha: Number(style.opacity) };
+  };
+  const POSES = [svgPose, cssPose];
+  const poseOf = (run: Run, at: Place): Pose | null => {
+    for (const find of POSES) {
+      const pose = find(run, at);
+      if (pose) {
+        return pose;
+      }
+    }
+    return null;
+  };
   const held = (parts: (TreeNode | Run)[], w: Walk) =>
     parts.map((p) => {
       if (isNode(p)) {
         return p;
       }
-      const holder: TreeNode = { paints: [], children: [], opacity: 1, blend: 'normal', effects: [], clip: null, masks: [] };
+      const pose = poseOf(p, w.at);
+      if (pose) {
+        w.poses.set(p, pose);
+      }
+      const holder: TreeNode = { paints: [], children: [], opacity: pose?.alpha ?? 1, blend: 'normal', effects: [], clip: null, masks: [] };
       holder.paints.push(slotted(w, p, { width: w.at.width, height: w.at.height, at: [1, 0, 0, 1, 0, 0] }));
       return holder;
     });
@@ -687,13 +775,6 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
   const LIVE = 'canvas, video, iframe';
   const MAX_LIVE_RASTERS = 2;
   const alive = (el: Element) => el.matches(LIVE) || el.querySelector(LIVE) !== null;
-  const kebab = (name: string) => name.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
-  const NEUTRAL: [string, string][] = Object.entries({ filter: 'none', opacity: '1', mixBlendMode: 'normal', backgroundColor: 'transparent', mask: 'none', WebkitMask: 'none' }).map(([name, value]) => [kebab(name), value]);
-  const neutralised = (path: HTMLElement[]) => {
-    const saved = path.map((el) => NEUTRAL.map(([name]) => [el.style.getPropertyValue(name), el.style.getPropertyPriority(name)] as const));
-    path.forEach((el) => NEUTRAL.forEach(([name, value]) => el.style.setProperty(name, value, 'important')));
-    return () => path.forEach((el, i) => NEUTRAL.forEach(([name], j) => el.style.setProperty(name, saved[i][j][0], saved[i][j][1])));
-  };
   const pathOf = (root: HTMLElement, run: Run) => {
     const path: HTMLElement[] = [];
     for (let at = run.raster[0].parentElement; at && at !== root; at = at.parentElement) {
@@ -702,9 +783,17 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
     return path;
   };
   const keyOf = (root: HTMLElement, m: CaptureRequest, run: Run, pad: number) => {
-    return run.raster.some(alive) ? null : `${m.width}x${m.height}+${pad}|${pathOf(root, run).map((el) => el.getAttribute('style') ?? '').join('|')}|${run.raster.map((el) => el.outerHTML).join('')}`;
+    return run.raster.some(alive) ? null : `${m.width}x${m.height}+${pad}|${pathStyles(pathOf(root, run))}|${run.raster.map((el) => el.outerHTML).join('')}`;
   };
-  const rasterOf = async (root: HTMLElement, m: CaptureRequest, embed: string, run: Run, pad: number) => {
+  const rasterOf = async (root: HTMLElement, m: CaptureRequest, embed: string, run: Run, pad: number, pose: Pose | null) => {
+    const unpose = pose ? pose.rest() : () => {};
+    try {
+      return await rasterAt(root, m, embed, run, pad);
+    } finally {
+      unpose();
+    }
+  };
+  const rasterAt = async (root: HTMLElement, m: CaptureRequest, embed: string, run: Run, pad: number) => {
     const path = pathOf(root, run);
     const key = keyOf(root, m, run, pad);
     const known = rasterKeys.get(run.raster[0]);
@@ -731,7 +820,7 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
   const treeOf = async (root: HTMLElement, m: CaptureRequest, embed: string) => {
     const backdrop = backdropOf(root);
     const at = placeOf(root, m);
-    const w: Walk = { at, slots: [], live: 0 };
+    const w: Walk = { at, slots: [], live: 0, poses: new Map() };
     const base: Affine = [at.sx, 0, 0, at.sy, 0, 0];
     const parts = grouped([...root.children].map((el) => walk(el, base, w)));
     if (backdrop === null || !parts.some((p) => isNode(p) && gpuOnly(p))) {
@@ -745,9 +834,9 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
     const sources: HTMLCanvasElement[] = [];
     for (const { source, paint } of w.slots) {
       if ('raster' in source) {
-        Object.assign(paint, { width: m.width + 2 * pad, height: m.height + 2 * pad, at: [1, 0, 0, 1, -pad, -pad] });
+        Object.assign(paint, { width: m.width + 2 * pad, height: m.height + 2 * pad, at: chain(w.poses.get(source)?.move ?? [1, 0, 0, 1, 0, 0], [1, 0, 0, 1, -pad, -pad]) });
       }
-      const found = source instanceof HTMLCanvasElement ? whole(source) : 'raster' in source ? await rasterOf(root, m, embed, source, pad) : await pictureOf(source);
+      const found = source instanceof HTMLCanvasElement ? whole(source) : 'raster' in source ? await rasterOf(root, m, embed, source, pad, w.poses.get(source) ?? null) : await pictureOf(source);
       fit(paint, found, sources.length);
       if (found) {
         sources.push(found.canvas);
@@ -826,6 +915,6 @@ export function stampOf(html: string): string | null {
 }
 
 export function captureScript(doc: { width: number; height: number }, stamp: string, lib: string): string {
-  const cfg: RuntimeConfig = { request: CAPTURE_REQUEST, reply: CAPTURE_REPLY, lib, width: doc.width, height: doc.height, mediaTimeoutMs: MEDIA_TIMEOUT_MS, stamp, errorsKey: ERRORS, settle: Settle.Paint, grainTile: GRAIN_TILE, grainOffset: GRAIN_SAMPLE_OFFSET, webkitUa: WEBKIT_UA.source, notWebkitUa: NOT_WEBKIT_UA.source, particleState: PARTICLE_STATE };
-  return `<script>(${captureRuntime.toString()})(${js(cfg)},(${freezeMasks.toString()}),(${inlineMedia.toString()}),(${shrinkImage.toString()}),(${paintSvg.toString()}),(${planLayers.toString()}),(${grainPixels.toString()}),(${turbulenceTile.toString()}),(${chainAffine.toString()}),(${cssAffine.toString()}),(${cssRgba.toString()}),(${joinRasters.toString()}),(${readMasks.toString()}),(${readFilters.toString()}),(${filtersFit.toString()}));</script>`;
+  const cfg: RuntimeConfig = { request: CAPTURE_REQUEST, reply: CAPTURE_REPLY, lib, width: doc.width, height: doc.height, mediaTimeoutMs: MEDIA_TIMEOUT_MS, stamp, errorsKey: ERRORS, settle: Settle.Paint, grainTile: GRAIN_TILE, grainOffset: GRAIN_SAMPLE_OFFSET, webkitUa: WEBKIT_UA.source, notWebkitUa: NOT_WEBKIT_UA.source, particleState: PARTICLE_STATE, poseAttr: POSE_ATTR };
+  return `<script>(${captureRuntime.toString()})(${js(cfg)},(${freezeMasks.toString()}),(${inlineMedia.toString()}),(${shrinkImage.toString()}),(${paintSvg.toString()}),(${planLayers.toString()}),(${grainPixels.toString()}),(${turbulenceTile.toString()}),(${chainAffine.toString()}),(${cssAffine.toString()}),(${cssRgba.toString()}),(${joinRasters.toString()}),(${readMasks.toString()}),(${readFilters.toString()}),(${filtersFit.toString()}),(${neutralise.toString()}),(${stylesOf.toString()}),(${resting.toString()}));</script>`;
 }

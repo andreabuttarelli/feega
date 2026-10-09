@@ -5,6 +5,7 @@ import { glassPose } from '../glass/pose';
 import type { GlassPose } from '../glass/shape';
 import { css, esc } from './html';
 import { UNIT, glassAttrs, glassIds, type Attrs } from './glass-attrs';
+import { POSE_ATTR } from './raster-key';
 
 export const RIM_STOPS = [
   [0, 0.45],
@@ -64,7 +65,7 @@ function chrome(id: string, frame: GlassFrame, p: GlassPose, a: Map<string, Attr
     `<circle r="${UNIT}" transform="translate(32 64) rotate(-28) scale(0.42 0.08)" fill="url(#${glassIds.shine(id)})" opacity="0.25"/>`
   ].join('');
   const style = css({ position: 'absolute', left: '0', top: '0', pointerEvents: 'none', overflow: 'visible', visibility: shown ? 'visible' : 'hidden' });
-  return `<svg id="${glassIds.chrome(id)}" width="${frame.width}" height="${frame.height}" viewBox="0 0 ${frame.width} ${frame.height}" aria-hidden="true" style="${style}"><defs>${defs}</defs><g id="${glassIds.body(id)}" ${attrText(a.get(glassIds.body(id))!)}>${body}</g></svg>`;
+  return `<svg id="${glassIds.chrome(id)}" width="${frame.width}" height="${frame.height}" viewBox="0 0 ${frame.width} ${frame.height}" aria-hidden="true" style="${style}"><defs>${defs}</defs><g id="${glassIds.body(id)}" ${POSE_ATTR}="" ${attrText(a.get(glassIds.body(id))!)}>${body}</g></svg>`;
 }
 
 export function glassLayer(clip: GlassClip, frame: GlassFrame, inner: string, zIndex: number): string {
