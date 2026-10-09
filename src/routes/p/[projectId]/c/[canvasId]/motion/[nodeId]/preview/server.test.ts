@@ -34,7 +34,7 @@ function titled(text: string) {
 
 async function read() {
   const params = { projectId: 'p-1', canvasId: 'c-1', nodeId: 'n-1' };
-  const res = await GET({ locals: {}, params } as unknown as Parameters<typeof GET>[0]);
+  const res = await GET({ locals: {}, params, url: new URL('https://oh.feega.test/p/p-1/c/c-1/motion/n-1/preview') } as unknown as Parameters<typeof GET>[0]);
   return { status: res.status, body: await res.json() };
 }
 
@@ -51,6 +51,7 @@ describe('GET motion preview', () => {
     expect(status).toBe(200);
     expect(body).toMatchObject({ version: 3, width: 1920, height: 1080, fps: 30, durationInFrames: 90 });
     expect(body.html).toContain('Launch day');
+    expect(body.html).toContain('https://oh.feega.test/motion-libs/');
   });
 
   it('a video never saved previews the empty doc of its format', async () => {

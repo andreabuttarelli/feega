@@ -11,11 +11,11 @@ import { ENGINE_GLOBAL } from '../engine/engine';
 import { drawOnce, faceShown, quadMatrix, screenKey, screenPlacement } from './three-draw';
 import { strokePolygons } from './stroke-outline';
 import { ON_DISPOSE, hotScope, hotSeek, keptGl } from './hot';
+import { Module, moduleUrl } from '../libs/catalog';
+export { THREE_VERSION } from '../libs/catalog';
 
-export const THREE_VERSION = '0.181.2';
 export const THREE_TIMELINE = 'feegaThree';
 export const THREE_REDRAW = '__feegaThreeRedraw';
-export const OPENTYPE_URL = 'https://cdn.jsdelivr.net/npm/opentype.js@1.3.4/dist/opentype.module.js';
 
 export function onScreen(clip: { start: number; length: number }, time: number): boolean {
   return time >= clip.start && time <= clip.start + clip.length;
@@ -79,9 +79,31 @@ export function threeAssetUrls(look: LookRuntime | null, clips: readonly ThreeCl
   return [...(look?.hdri ? [look.hdri] : []), ...outlines];
 }
 
-export function threeImportMap(): string {
-  const base = `https://cdn.jsdelivr.net/npm/three@${THREE_VERSION}`;
-  return `<script type="importmap">${js({ imports: { three: `${base}/build/three.module.js`, 'three/addons/': `${base}/examples/jsm/`, opentype: OPENTYPE_URL } })}</script>`;
+export type InlinedModules = Partial<Record<Module, string>>;
+
+export const SCENE_MODULES = [Module.Three, Module.Gltf, Module.Svg, Module.Hdr, Module.Room, Module.RectArea];
+
+function base64(code: string): string {
+  const bytes = new TextEncoder().encode(code);
+  const CHUNK = 0x8000;
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(binary);
+}
+
+const moduleSource = (origin: string, module: Module, inlined: InlinedModules) => {
+  const code = inlined[module];
+  return code === undefined ? moduleUrl(origin, module) : `data:text/javascript;base64,${base64(code)}`;
+};
+
+export function threeImportMap(origin: string, modules: Module[], inlined: InlinedModules = {}): string {
+  if (!modules.length) {
+    return '';
+  }
+  const imports = Object.fromEntries(modules.map((module) => [module, moduleSource(origin, module, inlined)]));
+  return `<script type="importmap">${js({ imports })}</script>`;
 }
 
 const SCENE_SCRIPT = `

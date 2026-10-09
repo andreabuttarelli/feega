@@ -6,6 +6,8 @@ import { addClip, setProps, type OpResult } from '$lib/motion/timeline';
 import { FEEGA_TOKENS } from '$lib/motion/brand';
 import { addShader } from '$lib/motion/shaders/ops';
 import { drawFrames, type BrowserPort } from './server-frames';
+import { MOTION_LIBS_ROUTE } from '$lib/motion/libs/catalog';
+import { libraryPath } from '../../../../scripts/motion-libs';
 
 const LOAD_TIMEOUT_MS = 30_000;
 const SIZE = 320;
@@ -18,6 +20,7 @@ let browser: Browser;
 const port: BrowserPort = {
   open: async (viewport) => {
     const page = await browser.newPage({ viewport: { width: viewport.width, height: viewport.height }, deviceScaleFactor: viewport.scale });
+    await page.route(`**${MOTION_LIBS_ROUTE}/**`, (route) => route.fulfill({ path: libraryPath(process.cwd(), new URL(route.request().url()).pathname), headers: { 'access-control-allow-origin': '*' } }));
     return {
       load: async (html) => {
         await page.setContent(html, { waitUntil: 'load', timeout: LOAD_TIMEOUT_MS });

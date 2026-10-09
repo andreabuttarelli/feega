@@ -41,6 +41,39 @@ describe('/e/[id]', () => {
     expect(page).toMatch(new RegExp(`https://oh\\.feega\\.app/e/${NODE}/a/[0-9a-f]+`));
   });
 
+  it('serves an embed published with jsdelivr libraries from our origin', async () => {
+    const cdn = 'https://cdn.jsdelivr.net/npm/';
+    const html = `<meta http-equiv="Content-Security-Policy" content="script-src ${cdn}@hyperframes/core@0.8.114/dist/hyperframe.runtime.iife.js ${cdn}three@0.181.2/" /><script src="${cdn}@hyperframes/core@0.8.114/dist/hyperframe.runtime.iife.js"></script><script type="importmap">{"imports":{"three":"${cdn}three@0.181.2/build/three.module.js","three/addons/":"${cdn}three@0.181.2/examples/jsm/","opentype":"${cdn}opentype.js@1.3.4/dist/opentype.module.js"}}</script>`;
+    const cfg = { html, width: 1920, height: 1080, duration: 24, playback: 'autoplay', loop: true };
+    const legacy = `<!doctype html><html><head><title>Saturn</title><script src="${cdn}@hyperframes/player@0.8.114/dist/hyperframes-player.global.js"></script></head><body><script>(function playerMain(cfg){})(${JSON.stringify(cfg).replace(/</g, '\\u003c')});</script></body></html>`;
+
+    const page = await (await open(NODE, legacy)).text();
+    const libs = 'https://oh.feega.app/motion-libs/';
+
+    expect(page).not.toContain('jsdelivr');
+    expect(page).toContain(`<script src="${libs}hyperframes-player@0.8.114/hyperframes-player.global.js" integrity="sha384-`);
+    expect(page).toContain(`${libs}hyperframes-core@0.8.114/hyperframe.runtime.iife.js`);
+    expect(page).toContain(`\\"three\\":\\"${libs}three@0.181.2/esm/three.module.js\\"`);
+    expect(page).toContain(`\\"three/addons/\\":\\"${libs}three@0.181.2/esm/addons/\\"`);
+    expect(page).toContain(`${libs}opentype.js@1.3.4/esm/opentype.module.js`);
+  });
+
+  it('loads the libraries a downloaded bundle inlined from our origin when it is hosted', async () => {
+    const libs = 'https://oh.feega.app/motion-libs/';
+    const three = `data:text/javascript;base64,${Buffer.from('export const X=1;'.repeat(400)).toString('base64')}`;
+    const html = `<meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;; script-src &#39;unsafe-inline&#39; data:; style-src &#39;unsafe-inline&#39;" /><script>/*! p5@1.11.11 | LGPL-2.1 | https://github.com/processing/p5.js */\nwindow.p5=function(){};</script><script type="importmap">{"imports":{"three":"${three}"}}</script>`;
+    const cfg = { html, width: 1920, height: 1080, duration: 24, playback: 'autoplay', loop: true };
+    const stored = `<!doctype html><html><head><title>Saturn</title></head><body><script>(function playerMain(cfg){})(${JSON.stringify(cfg).replace(/</g, '\\u003c')});</script></body></html>`;
+
+    const page = await (await open(NODE, stored)).text();
+
+    expect(page).not.toContain('window.p5=function');
+    expect(page).not.toContain('data:text/javascript');
+    expect(page).toContain(`\\u003cscript src=\\"${libs}p5@1.11.11/p5.min.js\\" integrity=\\"sha384-`);
+    expect(page).toContain(`\\"three\\":\\"${libs}three@0.181.2/esm/three.module.js\\"`);
+    expect(page).toContain(`script-src &#39;unsafe-inline&#39; ${libs} data:`);
+  });
+
   it('an unpublished embed is a 404', async () => {
     await expect(open(NODE, null)).rejects.toMatchObject({ status: 404 });
   });

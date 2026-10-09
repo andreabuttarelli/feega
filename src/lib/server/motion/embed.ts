@@ -5,6 +5,7 @@ import type { ProjectMode } from '$lib/project-mode';
 import { embedSettings, embedUrl, interactiveBundle, upgradePlayer, type InteractiveInput } from '$lib/motion/interactive/bundle';
 import { embedSnippet, type EmbedSettings } from '$lib/motion/interactive/loader';
 import { assetOf, hostAssets, type HostedAsset } from './embed-assets';
+import { libsOrigin } from './libs-origin';
 
 export const EMBED_BUCKET = 'embeds';
 const EMBED_TYPE = 'text/html';
@@ -41,7 +42,7 @@ export async function publishEmbed(db: Db, input: EmbedPublish, origin = embedOr
     return refusal;
   }
 
-  const bundle = await interactiveBundle(input);
+  const bundle = await interactiveBundle({ origin: libsOrigin(), ...input });
   const stored = await storeEmbed(db, input.nodeId, bundle.html);
   if (!stored.ok) {
     return stored;
@@ -86,7 +87,7 @@ export const assetBase = (origin: string, id: string) => `${embedUrl(origin, id)
 
 export async function readEmbed(fetchFn: typeof fetch, id: string, origin: string): Promise<string | null> {
   const page = await storedEmbed(fetchFn, id);
-  return page === null ? null : hostAssets(upgradePlayer(page) ?? page, assetBase(origin, id));
+  return page === null ? null : hostAssets(upgradePlayer(page, origin) ?? page, assetBase(origin, id));
 }
 
 export async function readEmbedAsset(fetchFn: typeof fetch, id: string, hash: string): Promise<HostedAsset | null> {

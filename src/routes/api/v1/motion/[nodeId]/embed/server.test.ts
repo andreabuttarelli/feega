@@ -57,6 +57,7 @@ const call = (handler: Handler, method: string, path = 'embed') => {
 };
 
 beforeEach(() => {
+  vi.stubGlobal('fetch', async () => new Response('window.lib=1;', { headers: { 'content-type': 'text/javascript' } }));
   store.caller = { db: { storage: { from: () => bucket } }, orgId: ORG, userId: 'u-1', apiKeyId: 'key-1', writeAllowed: true };
   store.head = 2;
   store.mode = ProjectMode.Standard;
