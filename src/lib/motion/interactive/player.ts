@@ -1,4 +1,4 @@
-import type { readHost, selfScroll } from './host';
+import type { gestureScrub, readHost, selfScroll } from './host';
 import type { fitBox } from './fit';
 
 export type PlayerConfig = {
@@ -15,13 +15,14 @@ export type PlayerConfig = {
   selfScroll: string;
   standaloneMs: number;
   fitScale: Record<string, 'max' | 'min'>;
+  scrollLength: number;
   keys: { x: string; y: string; down: string; hover: string; tiltX: string; tiltY: string; scroll: string; time: string };
 };
 
 type PlayerEl = HTMLElement & { seek: (t: number) => void; play: () => void; pause: () => void; iframeElement?: HTMLIFrameElement };
 type Orientation = typeof DeviceOrientationEvent & { requestPermission?: () => Promise<string> };
 
-export function playerMain(cfg: PlayerConfig, read: typeof readHost, own: typeof selfScroll, fit: typeof fitBox): void {
+export function playerMain(cfg: PlayerConfig, read: typeof readHost, own: typeof selfScroll, fit: typeof fitBox, swipe: typeof gestureScrub): void {
   const TILT_DEGREES = 45;
   const UPRIGHT_BETA = 45;
   const el = document.getElementById('player') as PlayerEl;
@@ -31,6 +32,7 @@ export function playerMain(cfg: PlayerConfig, read: typeof readHost, own: typeof
   let ready = false;
   let playing = false;
   let asked = false;
+  let swiping = false;
 
   const clamp = (v: number) => Math.max(-1, Math.min(1, v));
   const post = () => el.iframeElement?.contentWindow?.postMessage({ type: cfg.inputMessage, values }, '*');
@@ -117,6 +119,10 @@ export function playerMain(cfg: PlayerConfig, read: typeof readHost, own: typeof
       return;
     }
     standalone?.cancel();
+    if (m.gesture && cfg.playback === cfg.modes.scrub && !swiping) {
+      swiping = true;
+      swipe(pad, window, cfg.scrollLength, scrub);
+    }
     if (m.progress !== undefined) {
       scrub(m.progress);
     }

@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { hostMain, readHost, selfScroll } from './host';
+import { gestureScrub, hostMain, readHost, selfScroll } from './host';
 
 const TYPE = 'feega:host';
 const VIEWPORT = 1000;
 
 type Box = { top: number; height: number };
 
-function fakeHost(frame: Box, opts: { wrapper?: Box & { scroll: string }; scrollHeight?: number } = {}) {
+function fakeHost(frame: Box, opts: { wrapper?: Box & { scroll: string }; scrollHeight?: number; anchor?: Box } = {}) {
   const posted: Array<Record<string, unknown>> = [];
   const listeners: Record<string, () => void> = {};
   const rect = (b: Box) => ({ top: b.top, bottom: b.top + b.height, height: b.height });
@@ -24,7 +24,8 @@ function fakeHost(frame: Box, opts: { wrapper?: Box & { scroll: string }; scroll
     document: { documentElement: { scrollHeight: opts.scrollHeight ?? VIEWPORT } },
     addEventListener: (name: string, fn: () => void) => (listeners[name] = fn)
   };
-  hostMain(el as never, TYPE, win as never);
+  const anchor = opts.anchor ? { getBoundingClientRect: () => rect(opts.anchor!) } : undefined;
+  hostMain(el as never, TYPE, win as never, anchor as never);
   const last = () => posted[posted.length - 1];
   return { el, wrapper, last, fire: (name: string) => listeners[name]() };
 }
@@ -45,6 +46,15 @@ describe('the host script', () => {
     host.fire('scroll');
     expect(host.last().progress).toBe(1);
     expect(host.last().visible).toBe(false);
+  });
+
+  it('measures the anchor it is given, the frame that holds the embed inside a parent page', () => {
+    const host = fakeHost({ top: 5000, height: 500 }, { anchor: { top: 250, height: 500 } });
+
+    host.fire('scroll');
+
+    expect(host.last().progress).toBe(0.5);
+    expect(host.last().visible).toBe(true);
   });
 
   it('keeps the old whole-page scroll field for players already published', () => {
@@ -75,6 +85,64 @@ describe('the player reading the host', () => {
     expect(readHost({ type: TYPE, scroll: 0.9, visible: true }, TYPE)).toEqual({ progress: 0.9, visible: true });
     expect(readHost({ type: 'other', progress: 0.3 }, TYPE)).toBeNull();
     expect(readHost(null, TYPE)).toBeNull();
+  });
+
+  it('hears when the host hands the scrub to gestures', () => {
+    expect(readHost({ type: TYPE, gesture: true }, TYPE)).toEqual({ progress: undefined, visible: undefined, gesture: true });
+  });
+});
+
+describe('the scrub driven by gestures', () => {
+  const HEIGHT = 500;
+  const TRAVEL = 2;
+
+  function fakePad() {
+    const handlers: Record<string, (e: Record<string, unknown>) => void> = {};
+    const frames: Array<() => void> = [];
+    const pad = { clientHeight: HEIGHT, style: {} as Record<string, string>, addEventListener: (name: string, fn: (e: Record<string, unknown>) => void) => (handlers[name] = fn) };
+    const win = { requestAnimationFrame: (fn: () => void) => frames.push(fn) };
+    const seen: number[] = [];
+    gestureScrub(pad as never, win as never, TRAVEL, (p) => seen.push(p));
+    const settle = () => {
+      while (frames.length) {
+        frames.shift()!();
+      }
+    };
+    const wheel = (deltaY: number) => {
+      const e = { deltaY, preventDefault: vi.fn() };
+      handlers.wheel(e);
+      return e;
+    };
+    return { pad, handlers, seen, settle, wheel };
+  }
+
+  it('advances the timeline by the wheel, travel heights for the whole of it', () => {
+    const g = fakePad();
+
+    expect(g.wheel(HEIGHT).preventDefault).toHaveBeenCalled();
+    g.settle();
+
+    expect(g.seen.at(-1)).toBeCloseTo(0.5, 2);
+  });
+
+  it('lets the page scroll once the timeline is at its end', () => {
+    const g = fakePad();
+
+    expect(g.wheel(-100).preventDefault).not.toHaveBeenCalled();
+    g.wheel(HEIGHT * TRAVEL * 2);
+    expect(g.wheel(100).preventDefault).not.toHaveBeenCalled();
+  });
+
+  it('keeps moving after a drag is released', () => {
+    const g = fakePad();
+
+    g.handlers.pointerdown({ clientY: 400 });
+    g.handlers.pointermove({ clientY: 350 });
+    g.handlers.pointerup({});
+    g.settle();
+
+    expect(g.seen.at(-1)).toBeGreaterThan(50 / (HEIGHT * TRAVEL));
+    expect(g.pad.style.touchAction).toBe('none');
   });
 });
 

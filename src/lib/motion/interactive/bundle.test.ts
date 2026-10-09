@@ -84,6 +84,14 @@ describe('interactive web export', () => {
     expect(bundle.html).toContain(`"standaloneMs":${STANDALONE_MS}`);
   });
 
+  it('can scrub by wheel and drag when the page around it is out of reach', async () => {
+    const scrub = ok(applyInteractivePreset(card(), InteractivePreset.ScrollScrub, null));
+    const bundle = await interactiveBundle({ doc: scrub, tokens: FEEGA_TOKENS, assetUrls: {}, title: 'Card', fetchBlob });
+
+    expect(bundle.html).toContain('function gestureScrub');
+    expect(bundle.html).toMatch(/"scrollLength":\d/);
+  });
+
   it('keeps the composed page from closing the player script early', async () => {
     const bundle = await interactiveBundle({ doc: card(), tokens: FEEGA_TOKENS, assetUrls: {}, title: 'Card', fetchBlob });
     const script = bundle.html.slice(bundle.html.indexOf('<script>(function'));
