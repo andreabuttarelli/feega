@@ -5,6 +5,7 @@
   import { CAPTURE_TIMEOUT_MS, Playback, previewDriver, type ShotRequest } from '$lib/motion/hyperframes/preview-driver';
   import { mountCapturePlayer } from '$lib/motion/hyperframes/capture-player';
   import { shootInLanes } from '$lib/motion/export/lanes';
+  import { exportLayering, frameOf } from '$lib/motion/export/webgl-device';
   import { CAPTURE_PROFILES, CaptureProfile } from '$lib/motion/export/capture-profile';
   import { MEASURE_REPLY, MEASURE_REQUEST, type MeasureReply, type MeasuredBox } from '$lib/motion/hyperframes/measure';
   import { InputKey, type InputValues } from '$lib/motion/expression/inputs';
@@ -201,18 +202,12 @@
 
   export function render(times: number[], size: FrameSize, onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>, signal: AbortSignal, source: string = html, profile: CaptureProfile = CaptureProfile.Fast): Promise<void> {
     const { settle, lanes } = CAPTURE_PROFILES[profile];
-    const request = { format: FrameFormat.Bitmap, settle, ...size };
-    const bitmapOf = (reply: CaptureReply) => {
-      if (!reply.bitmap) {
-        throw new Error('frame not rendered');
-      }
-      return reply.bitmap;
-    };
+    const request = { format: FrameFormat.Bitmap, settle, layering: exportLayering(), ...size };
     return borrowed(source, async () => {
       const extra = host ? await Promise.all(Array.from({ length: lanes() - 1 }, () => mountCapturePlayer(host!, source))) : [];
       const sharedWait = CAPTURE_TIMEOUT_MS * (extra.length + 1);
       try {
-        const shooters = [(time: number) => shoot(time, request, sharedWait).then(bitmapOf), ...extra.map((p) => (time: number) => p.shoot(time, request, sharedWait).then(bitmapOf))];
+        const shooters = [(time: number) => shoot(time, request, sharedWait).then(frameOf), ...extra.map((p) => (time: number) => p.shoot(time, request, sharedWait).then(frameOf))];
         await shootInLanes(times, shooters, onFrame, signal);
       } finally {
         extra.forEach((p) => p.dispose());

@@ -2,6 +2,7 @@ import { mountCapturePlayer } from '$lib/motion/hyperframes/capture-player';
 import { FrameFormat, Layering, Settle } from '$lib/motion/hyperframes/capture';
 import { shootInLanes } from '$lib/motion/export/lanes';
 import { encodeMp4 } from '$lib/motion/export/encode';
+import { frameOf } from '$lib/motion/export/webgl-device';
 
 import { STATS_REPLY, STATS_REQUEST, type BenchInput, type BenchResult, type ParityFrame, type ParityInput, type Stages } from './probe';
 
@@ -45,7 +46,7 @@ async function bench(input: BenchInput): Promise<BenchResult> {
     render: (onFrame) =>
       shootInLanes(
         input.times,
-        players.map((p) => (time: number) => p.shoot(time, request, 600_000).then((r) => r.bitmap as ImageBitmap)),
+        players.map((p) => (time: number) => p.shoot(time, request, 600_000).then(frameOf)),
         async (bitmap, index) => {
           const t = performance.now();
           await onFrame(bitmap, index);
@@ -77,7 +78,7 @@ async function parity(input: ParityInput): Promise<ParityFrame[]> {
   let flatPng: Promise<string> = Promise.resolve('');
   const shot = (time: number, layering: Layering) =>
     player.shoot(time, { format: FrameFormat.Bitmap, settle: Settle.Paint, layering, width: input.width, height: input.height }, 600_000).then((r) => {
-      const bitmap = r.bitmap as ImageBitmap;
+      const bitmap = frameOf(r);
       const keep = new OffscreenCanvas(bitmap.width, bitmap.height);
       (keep.getContext('2d') as OffscreenCanvasRenderingContext2D).drawImage(bitmap, 0, 0, keep.width, keep.height);
       png = keep.convertToBlob().then(base64);
