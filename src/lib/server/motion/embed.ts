@@ -2,7 +2,7 @@ import { env as publicEnv } from '$env/dynamic/public';
 import type { Db } from '$lib/server/db/client';
 import { embedRefusal, type PublishRefusal } from '$lib/gallery/refusals';
 import type { ProjectMode } from '$lib/project-mode';
-import { embedSnippet, embedUrl, interactiveBundle, type InteractiveInput } from '$lib/motion/interactive/bundle';
+import { embedSnippet, embedUrl, interactiveBundle, upgradePlayer, type InteractiveInput } from '$lib/motion/interactive/bundle';
 
 export const EMBED_BUCKET = 'embeds';
 const EMBED_TYPE = 'text/html';
@@ -77,5 +77,9 @@ export async function readEmbed(fetchFn: typeof fetch, id: string): Promise<stri
     return null;
   }
   const res = await fetchFn(`${publicEnv.PUBLIC_SUPABASE_URL}/storage/v1/object/public/${EMBED_BUCKET}/${embedPath(id)}`);
-  return res.ok ? res.text() : null;
+  if (!res.ok) {
+    return null;
+  }
+  const page = await res.text();
+  return upgradePlayer(page) ?? page;
 }

@@ -14,4 +14,6 @@ work: on a long page the hosted player redrew.
   to `<html>` (4 viewports tall, sticky stage) and scrubs on its own scroll; the first host message
   hands control back.
 - The last progress is applied on `ready`, so the load-time message is no longer lost.
-- Stored embeds keep the old player until published again.
+- `/e/` serves every stored embed through the current player (`upgradePlayer` lifts the stored
+  config out of the page and rebuilds it), so embeds already pasted get the fix without a
+  republish. Discarded: asking users to republish — the snippet would still talk to the old player.
