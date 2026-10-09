@@ -73,7 +73,6 @@ const STYLESHEET = /<link[^>]+rel=["']stylesheet["'][^>]*>/gi;
 const FAMILY_NAME = /^[\w][\w .-]*$/;
 const SVG_NS ='http://www.w3.org/2000/svg';
 const TITLE_SEPARATOR = /\s+[|–—:·-]\s+/;
-const CSS_RULE = /([^{}]+)\{([^{}]*)\}/g;
 const ACTION_SELECTOR = /button|btn|cta|primary|\ba\b|link/i;
 const GOOGLE_FAMILIES = new Map(GOOGLE_FONTS.map((f) => [f.f.toLowerCase(), f.f]));
 
@@ -146,8 +145,16 @@ async function logoColours(logo: SiteLogo | undefined): Promise<string[]> {
   return logo ? LOGO_COLOURS[logo.kind](logo).catch(() => []) : [];
 }
 
+function cssRules(css: string): { selector: string; body: string }[] {
+  return css.split('}').slice(0, -1).flatMap((chunk) => {
+    const open = chunk.lastIndexOf('{');
+    const selector = open > 0 ? chunk.slice(chunk.lastIndexOf('{', open - 1) + 1, open) : '';
+    return selector ? [{ selector, body: chunk.slice(open + 1) }] : [];
+  });
+}
+
 function actionColours(css: string): string[] {
-  return [...css.matchAll(CSS_RULE)].filter((m) => ACTION_SELECTOR.test(m[1])).flatMap((m) => hexesIn(m[2]));
+  return cssRules(css).filter((r) => ACTION_SELECTOR.test(r.selector)).flatMap((r) => hexesIn(r.body));
 }
 
 async function linkedCss(html: string, base: string): Promise<string> {

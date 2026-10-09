@@ -53,6 +53,7 @@ function serves(hops: Record<string, Hop>): string[] {
 const png = (width: number, height: number) => sharp({ create: { width, height, channels: 3, background: '#1a6b4f' } }).png().toBuffer();
 
 const SITE = 'https://brand.example/';
+const LOOP_STALL_MS = 200;
 
 const HTML = `<!doctype html><html><head>
 <title>Verde — Shoes that walk lighter</title>
@@ -208,6 +209,27 @@ describe('readSite: what a trailer needs from a public page', () => {
 
     expect(read.site.accent.hex).toBeNull();
     expect(read.site.accent.neutral).not.toBeNull();
+  });
+
+  it('keeps the event loop answering while it reads a page with a long run of text and no braces', async () => {
+    const prose = 'Financial infrastructure to grow your revenue. '.repeat(2_000);
+    const page = `<html><head><title>Big</title><style>.btn-primary { background: #635BFF }</style></head><body><p>${prose}}</p></body></html>`;
+    serves({ [SITE]: { type: 'text/html', body: page } });
+    let longest = 0;
+    let last = performance.now();
+    const sample = () => {
+      const now = performance.now();
+      longest = Math.max(longest, now - last);
+      last = now;
+    };
+    const ticker = setInterval(sample, 5);
+
+    const read = await readSite(SITE);
+    sample();
+    clearInterval(ticker);
+
+    expect(longest).toBeLessThan(LOOP_STALL_MS);
+    expect(read.ok && read.site.accent).toMatchObject({ hex: '#635BFF', source: 'buttons' });
   });
 
   it('keeps the page when an image is too large to probe, dropping only that image', async () => {
