@@ -12,6 +12,7 @@ import { MotionStyle } from './style-model';
 import { UI_KIT, UiKind } from './ui-kit/kit';
 import { writeComponent } from './custom/ops';
 import { ComponentMode } from './custom/component';
+import { Isolate, focusUi } from './ui-focus';
 
 function must(r: { ok: true; doc: MotionDoc } | { ok: false; error: string }): MotionDoc {
   if (!r.ok) {
@@ -180,6 +181,27 @@ describe('nothing important leaves the frame', () => {
   it('a long line of large type that overflows the frame is named, a short word is not', () => {
     expect(out(placed('Title', { text: 'Turn every click into revenue today', size: 0.3, x: 0.5, y: 0.5, width: 1, height: 0.4 }))).toHaveLength(1);
     expect(out(placed('Title', { text: 'Links.', size: 0.2, x: 0.5, y: 0.5, width: 0.9, height: 0.3 }))).toEqual([]);
+  });
+
+  it('a UI zoomed past the frame counts only the part its mask isolates', () => {
+    const piece = UI_KIT[UiKind.PromptBox];
+    const base = must(writeComponent(calm(), piece.name, { source: { html: piece.html, css: piece.css, js: piece.js }, propsSchema: { type: 'object', properties: {} } }));
+    const doc = must(addClip(base, { component: 'Custom', from: 0, durationInFrames: 90, props: { name: piece.name } }, 'c'));
+    const zoom = (isolate: Isolate) => must(focusUi(doc, { clipId: 'c', anchor: 'send', at: 10, frames: 10, fill: 0.3, isolate }));
+
+    expect(out(zoom(Isolate.Part))).toEqual([]);
+    expect(out(zoom(Isolate.Context))).toHaveLength(1);
+  });
+
+  it('a zoom from the field to the send button and on to the progress bar keeps the isolated part inside the frame all the way', () => {
+    const piece = UI_KIT[UiKind.PromptBox];
+    const base = must(writeComponent(calm(), piece.name, { source: { html: piece.html, css: piece.css, js: piece.js }, propsSchema: { type: 'object', properties: {} } }));
+    const doc = must(addClip(base, { component: 'Custom', from: 0, durationInFrames: 255, props: { name: piece.name, radius: 14, speed: 0.5 } }, 'c'));
+    const field = must(focusUi(doc, { clipId: 'c', anchor: 'field', at: 27, frames: 18, fill: 0.82, isolate: Isolate.Part }));
+    const send = must(focusUi(field, { clipId: 'c', anchor: 'send', at: 126, frames: 15, fill: 0.28, isolate: Isolate.Part }));
+    const progress = must(focusUi(send, { clipId: 'c', anchor: 'progress', at: 150, frames: 12, fill: 0.85, isolate: Isolate.Part }));
+
+    expect(out(progress)).toEqual([]);
   });
 
   it('a move out of frame in the last moments of a clip is a transition, not a fault', () => {

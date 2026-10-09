@@ -82,6 +82,7 @@ describe('every part a beat can isolate has an anchor', () => {
     expect(anchors.progress.y).toBeGreaterThan(anchors.field.y + anchors.field.h);
     expect(anchors.progress.h).toBe(6);
     expect(anchors.done.y).toBeGreaterThan(anchors.progress.y);
+    expect(anchors.done.w).toBeLessThan(anchors.progress.w / 2);
   });
 
   it('the generated result names its picture and its copy', () => {

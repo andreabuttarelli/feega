@@ -70,10 +70,10 @@ describe('the Feega gallery seed', () => {
     expect(seedProblems(bare)).toEqual([expect.stringMatching(/edit/)]);
   });
 
-  it('ships the six showcase videos, every cut with a preview and its music licence', () => {
+  it('ships the seven showcase videos, every cut with a preview and its music licence', () => {
     const names = new Set(SHOWCASE.map((d) => d.doc.split('/')[1]));
 
-    expect([...names].sort()).toEqual(['drop', 'launch-film', 'liquid-type', 'logo-sting', 'material', 'numbers']);
+    expect([...names].sort()).toEqual(['drop', 'launch-film', 'liquid-type', 'logo-sting', 'material', 'numbers', 'ui-focus']);
     expect(SHOWCASE.filter((d) => !d.preview.endsWith('.mp4') || !d.licence)).toEqual([]);
     expect(SHOWCASE.every((d) => DEMOS.includes(d))).toBe(true);
   });

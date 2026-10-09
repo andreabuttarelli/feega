@@ -67,7 +67,7 @@ const PROMPT_BOX: Layout = (p) => {
     field: { x: -620, y: top, w: 1240, h: field },
     send: { x: 536.5, y: top + field - 83.5, w: 64, h: 64 },
     progress: { x: -620, y: progress, w: 1240, h: 6 },
-    done: { x: -620, y: progress + 22, w: 1240, h: 34 }
+    done: { x: -620, y: progress + 22, w: 46 + textWidth(str(p, 'done'), 24, Weight.Bold), h: 34 }
   };
 };
 
@@ -109,11 +109,11 @@ const TOGGLE: Layout = (p) => {
 
 const UPLOAD: Layout = () => ({ drop: { x: -550, y: -180, w: 1100, h: 224 } });
 
-const RESULT = { top: -230, picture: 460, gap: 34, copy: 638 };
+const RESULT = { left: -600, top: -230, picture: 460, gap: 34, copy: 706 };
 
 const GENERATED_RESULT: Layout = () => ({
-  picture: { x: -566, y: RESULT.top, w: RESULT.picture, h: RESULT.picture },
-  copy: { x: -566 + RESULT.picture + RESULT.gap, y: RESULT.top, w: RESULT.copy, h: RESULT.picture }
+  picture: { x: RESULT.left, y: RESULT.top, w: RESULT.picture, h: RESULT.picture },
+  copy: { x: RESULT.left + RESULT.picture + RESULT.gap, y: RESULT.top, w: RESULT.copy, h: RESULT.picture }
 });
 
 const NONE: Layout = () => ({});

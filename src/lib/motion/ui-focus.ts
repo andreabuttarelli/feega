@@ -16,9 +16,10 @@ export enum Isolate {
 export type UiFocus = { clipId: string; anchor: string; at: number; frames: number; fill: number; isolate: Isolate };
 
 type Values = { scale: number; x: number; y: number };
-type MaskBox = Record<'maskX' | 'maskY' | 'maskWidth' | 'maskHeight', number>;
+export type MaskBox = Record<'maskX' | 'maskY' | 'maskWidth' | 'maskHeight', number>;
 
 const PART_MARGIN = 12;
+const MASK_LEAD = 0.5;
 const WHOLE: MaskBox = { maskX: 0.5, maskY: 0.5, maskWidth: 1, maskHeight: 1 };
 const MASK_FIELD: Record<keyof MaskBox, 'x' | 'y' | 'width' | 'height'> = { maskX: 'x', maskY: 'y', maskWidth: 'width', maskHeight: 'height' };
 
@@ -40,7 +41,7 @@ function partMask(clip: MotionClip, size: { width: number; height: number }, cen
   return { maskX: (centre[0] - box.left) / box.width, maskY: (centre[1] - box.top) / box.height, maskWidth: (part.w + 2 * PART_MARGIN) / box.width, maskHeight: (part.h + 2 * PART_MARGIN) / box.height };
 }
 
-const maskAt = (clip: MotionClip, key: keyof MaskBox, frame: number) => {
+export const maskAt = (clip: Pick<MotionClip, 'keyframes' | 'mask'>, key: keyof MaskBox, frame: number) => {
   const track = clip.keyframes[key];
   return track?.length ? sampleTrack(track, frame) : (clip.mask?.[MASK_FIELD[key]] ?? WHOLE[key]);
 };
@@ -82,7 +83,8 @@ export function focusUi(doc: MotionDoc, focus: UiFocus): OpResult {
   const centre = local(origin, scale, rect);
   const part = { w: rect.w * scale, h: rect.h * scale };
 
-  const moved = keyAll(doc, focus.clipId, start, end, now, framed(clip, place.size, centre, part, focus.fill));
+  const next = framed(clip, place.size, centre, part, focus.fill);
+  const moved = keyAll(doc, focus.clipId, start, end, now, next);
   if (!moved.ok || (focus.isolate === Isolate.Context && !clip.mask)) {
     return moved;
   }
@@ -93,7 +95,9 @@ export function focusUi(doc: MotionDoc, focus: UiFocus): OpResult {
   }
   const target = focus.isolate === Isolate.Part ? partMask(clip, place.size, centre, part) : WHOLE;
   const current = Object.fromEntries((Object.keys(WHOLE) as (keyof MaskBox)[]).map((k) => [k, maskAt(clip, k, start)]));
-  return keyAll(masked.doc, focus.clipId, start, end, current, target satisfies Partial<Record<MaskKey, number>>);
+  const lead = Math.round(focus.frames * MASK_LEAD);
+  const [from, to] = next.scale > now.scale ? [start, start + lead] : [end - lead, end];
+  return keyAll(masked.doc, focus.clipId, from, to, current, target satisfies Partial<Record<MaskKey, number>>);
 }
 
 const HELD_SECONDS = 1.5;
