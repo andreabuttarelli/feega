@@ -79,6 +79,11 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
     tables: ['orgs', 'orgs_members', 'gallery_items']
   },
   {
+    path: 'scripts/import-showcase.ts',
+    why: "Uno script una tantum, lanciato a mano, senza sessione utente: importa i video showcase nel progetto \"Showcase\" di UNA org fissa (l'id è una costante, sovrascrivibile solo da chi lancia lo script). Legge orgs_members solo per trovare l'owner a cui intestare le azioni; crea progetto, tela, nodi motion, revisioni e asset di quell'org, carica i file sotto `canvas-assets/<orgId>/<projectId>/showcase/` e pubblica l'embed nel bucket `embeds`.",
+    tables: ['orgs_members', 'projects', 'canvases', 'nodes', 'canvas_events', 'motion_revisions', 'assets']
+  },
+  {
     path: 'scripts/seed-reference-images.ts',
     why: "Uno script una tantum, senza sessione utente: semina il catalogo globale delle foto di riferimento (`reference_images.org_id = null`, bucket `reference-images` sotto `catalogue/`), che nessuna policy lascia scrivere a un JWT — il catalogo si legge da ogni org e non lo scrive nessuna.",
     tables: ['reference_images']
