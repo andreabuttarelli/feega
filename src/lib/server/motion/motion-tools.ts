@@ -50,6 +50,7 @@ import { clickUi } from '$lib/motion/cursor-ops';
 import { Isolate, focusUi } from '$lib/motion/ui-focus';
 import { ACTS, BrandKind, briefOf, scriptProblems, scriptSchema, sourcesOf, type LaunchScript } from '$lib/motion/script';
 import { quoted, type SitePage } from './site-copy';
+import { MediaKind, storyboardSchema, type Storyboard, type StoryboardRead } from '$lib/motion/storyboard';
 import { PATCH_COMPONENT, READ_COMPONENT, WRITE_COMPONENT } from './model-route';
 import { CAMERA, CAMERA_KEYS, CAMERA_LANE, SPACES, type Camera } from '$lib/motion/camera';
 import { ENV_PRESETS, HDRI, LIGHT, envPresetInput, LIGHT_KEYS, LIGHT_KINDS, type Look } from '$lib/motion/look';
@@ -145,7 +146,16 @@ export type MotionToolDeps = {
   effects?: EffectStore;
   layouts?: LayoutStore;
   web?: WebToolDeps;
+  storyboard?: StoryboardPort;
 };
+
+export type StoryboardPort = {
+  write: (board: Storyboard, media: Record<string, MediaKind>) => Promise<{ canvasId: string; nodes: number; connections: number }>;
+  read: () => Promise<({ canvasId: string } & StoryboardRead) | null>;
+  edit: (nodeId: string, text: string) => Promise<{ ok: true } | { ok: false; error: string }>;
+};
+
+const BOARD_MEDIA: Partial<Record<string, MediaKind>> = { [AssetKind.Image]: MediaKind.Image, [AssetKind.Video]: MediaKind.Video };
 
 export type RevisionEntry = { version: number; summary: string | null; actorKind: string; createdAt: string; clips: number };
 
@@ -1623,6 +1633,48 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const saved = apply({ ok: true, doc: { ...session.doc, script: input } }, 'saved the research and the script');
         return saved.ok ? { ok: true, brief: briefOf(input) } : saved;
       }
+    }),
+
+    write_storyboard: tool({
+      description: 'Lay the film out as a storyboard: a canvas of its own, linked to this video, that the user opens full screen. One card per beat (act, kind, title, intent, on-screen text, emotion with intensity 0-1, duration, visual notes, music cue), left to right in story order, higher on the board the stronger the emotion, so the curve reads at a glance; branch_of (index of an earlier beat) puts an alternative under the beat it would replace. media hangs pictures or clips of this project (asset ids: captures, product shots, imports, generated) under a beat as visual notes. Write it right after write_script, from the same script. Writing again replaces the cards you placed before and keeps what the user added: read_storyboard first so their edits carry over.',
+      inputSchema: storyboardSchema,
+      execute: async (input) => {
+        if (!deps.storyboard) {
+          return UNREADABLE('the storyboard');
+        }
+        const ids = [...new Set(input.beats.flatMap((b) => b.media))];
+        const kinds: Record<string, MediaKind> = {};
+        for (const id of ids) {
+          const kind = BOARD_MEDIA[deps.assets.find((a) => a.id === id)?.kind ?? ''];
+          if (kind) {
+            kinds[id] = kind;
+          }
+        }
+        const unknown = ids.filter((id) => !kinds[id]);
+        if (unknown.length) {
+          return { ok: false, error: `not a picture or clip of this project: ${unknown.join(', ')} (list_assets)` };
+        }
+        const written = await deps.storyboard.write(input, kinds);
+        return { ok: true, canvas_id: written.canvasId, nodes: written.nodes, connections: written.connections };
+      }
+    }),
+
+    read_storyboard: tool({
+      description: "Read the storyboard of this video as it is now: its cards left to right (the user may have rewritten, moved or added some), the pictures and clips on it with their asset ids and the card each one feeds, and the flow between cards. Follow it when you build: the user's edits win over your script, and its media are assets you can place.",
+      inputSchema: z.object({}),
+      execute: async () => {
+        if (!deps.storyboard) {
+          return UNREADABLE('the storyboard');
+        }
+        const read = await deps.storyboard.read();
+        return read ? { ok: true, canvas_id: read.canvasId, cards: read.cards, media: read.media, flow: read.flow } : { ok: true, storyboard: null };
+      }
+    }),
+
+    update_storyboard_card: tool({
+      description: 'Rewrite the text of one card of the storyboard (node_id from read_storyboard).',
+      inputSchema: z.object({ node_id: z.string(), text: z.string().min(1).max(4000) }),
+      execute: async (input) => (deps.storyboard ? deps.storyboard.edit(input.node_id, input.text) : UNREADABLE('the storyboard'))
     }),
 
     use_brand: tool({

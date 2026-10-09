@@ -18,12 +18,22 @@ const FORMAT_NAMES: Record<string, MotionFormat> = {
 
 const formatOf = (value: unknown) => (typeof value === 'string' ? (FORMAT_NAMES[value.trim().toLowerCase()] ?? value) : value);
 
+export type StoryboardLink = { canvasId: string; placed: string[] };
+
+const linkSchema = z.object({ canvasId: z.string().min(1), placed: z.array(z.string()) });
+
 export const motionNodeSchema = z.object({
   format: z.preprocess(formatOf, z.enum(MOTION_FORMATS)),
   docHeadRevision: z.number().int().min(0),
   posterAssetId: z.string().nullable(),
-  lastRenderAssetId: z.string().nullable()
+  lastRenderAssetId: z.string().nullable(),
+  storyboard: linkSchema.optional()
 });
+
+export function storyboardOf(data: Record<string, unknown>): StoryboardLink | null {
+  const parsed = linkSchema.safeParse(data.storyboard);
+  return parsed.success ? parsed.data : null;
+}
 
 export const MOTION_NODE_BAR_H = 44;
 
