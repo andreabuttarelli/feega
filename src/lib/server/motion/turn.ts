@@ -180,7 +180,9 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
   const cut = new AbortController();
 
   const screenPicture = (url: string) => ATTACHMENT_PORTS.screenImage({ orgId, mode: project.mode, url });
-  const sources = brandSources(db, { orgId, projectId: project.id, canvasId: motion.record.canvasId, brandId: project.brandId, screen: screenPicture });
+  const sources = brandSources(db, { orgId, userId, projectId: project.id, canvasId: motion.record.canvasId, brandId: project.brandId, screen: screenPicture }, (usd) => {
+    spent += usd;
+  });
   const tools = createMotionTools({
     session,
     assets,

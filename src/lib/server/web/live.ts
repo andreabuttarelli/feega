@@ -9,6 +9,9 @@ import { CHAT_ATTACHMENT_MAX_BYTES } from '$lib/chat-attachments';
 import type { ProjectMode } from '$lib/project-mode';
 import { SearchEngine, exaSearch, openRouterSearch, searchEngineOf, type SearchPort } from './search';
 import { readPage } from './read-page';
+import { browserless, localBrowser, type BrowserlessUse, type OpenBrowser } from './browser';
+import { browse } from './browse';
+import { directFetch, exaContents, renderedSite, secondarySources, type SiteStrategy } from './site-fetch';
 import { screenshotPage } from './screenshot';
 import { readStore, storeProducts } from './store';
 import { viewImages, type ViewPorts } from './view-images';
@@ -31,6 +34,9 @@ const IMAGE_TIMEOUT_MS = 20_000;
 const SEARCH_LABEL = 'web-search';
 const PICTURES_PER_PRODUCT = 2;
 const VIEW_MAX_BYTES = 15_000_000;
+const BROWSERLESS_LABEL = 'browserless';
+const BROWSERLESS_MODEL = 'stealth';
+const EXA_CONTENTS_LABEL = 'site-read-exa';
 
 const ENGINES: Record<SearchEngine, () => { port: SearchPort; provider: 'exa' | 'llm'; model: string }> = {
   [SearchEngine.Exa]: () => ({ port: exaSearch(env.EXA_API_KEY!.trim()), provider: 'exa', model: 'exa-search' }),
@@ -94,13 +100,95 @@ function viewer(db: Db, scope: WebScope): NonNullable<WebToolDeps['view']> {
   return (urls, detail, callId) => viewImages(urls, detail, webViewPrefix(scope, callId), ports);
 }
 
+type Metered = Omit<WebScope, 'mode'>;
+
+function logged(scope: Metered, entry: { label: string; provider: 'browserless' | 'exa'; model: string; ms: number; usd: number; units?: number }) {
+  logAiCall({
+    label: entry.label,
+    provider: entry.provider,
+    model: entry.model,
+    ms: entry.ms,
+    ok: true,
+    flatCostUsd: entry.usd,
+    ...(entry.units ? { providerCredits: entry.units } : {}),
+    orgId: scope.orgId,
+    brandId: scope.brandId ?? undefined,
+    userId: scope.userId,
+    projectId: scope.projectId,
+    actorKind: 'agent',
+    actorId: scope.userId
+  });
+}
+
+async function connectBrowserless(endpoint: string) {
+  const { default: puppeteer } = await import('puppeteer-core');
+  return puppeteer.connect({ browserWSEndpoint: endpoint });
+}
+
+export function liveBrowser(scope: Metered): OpenBrowser | null {
+  const key = env.BROWSERLESS_API_KEY?.trim();
+  if (key) {
+    const meter = (use: BrowserlessUse) => logged(scope, { label: BROWSERLESS_LABEL, provider: 'browserless', model: BROWSERLESS_MODEL, ms: use.ms, usd: use.usd, units: use.units });
+    return browserless({ key, base: env.BROWSERLESS_BASE_URL?.trim() || undefined }, { connect: connectBrowserless, meter });
+  }
+  return serverFramesOpen() ? localBrowser(chromiumPage) : null;
+}
+
+function meteredExa(scope: Metered, key: string): SiteStrategy {
+  const strategy = exaContents(key);
+  return {
+    ...strategy,
+    get: async (url) => {
+      const started = Date.now();
+      const got = await strategy.get(url);
+      if (got.costUsd) {
+        logged(scope, { label: EXA_CONTENTS_LABEL, provider: 'exa', model: 'exa-contents', ms: Date.now() - started, usd: got.costUsd });
+      }
+      return got;
+    }
+  };
+}
+
+export function liveSiteChain(scope: Metered): SiteStrategy[] {
+  const browser = liveBrowser(scope);
+  const exaKey = env.EXA_API_KEY?.trim();
+  return [
+    directFetch(),
+    ...(browser ? [renderedSite(browser)] : []),
+    ...(exaKey ? [meteredExa(scope, exaKey), secondarySources(loggedSearch(scope, SearchEngine.Exa), (url) => readPage(url))] : [])
+  ];
+}
+
+function browser(db: Db, scope: WebScope, open: OpenBrowser): NonNullable<WebToolDeps['browse']> {
+  return async (url, steps, callId) => {
+    const seen = await browse(url, steps, open);
+    if (!seen.ok) {
+      return seen;
+    }
+    const prefix = webViewPrefix(scope, callId);
+    const shots = await Promise.all(
+      seen.shots.map(async (jpeg, i) => {
+        const path = `${prefix}/browse-${i}.jpg`;
+        const stored = await storeAssetFile(db, path, new File([new Uint8Array(jpeg)], `browse-${i}.jpg`, { type: 'image/jpeg' })).then(
+          () => path,
+          () => null
+        );
+        return { jpeg, path: stored };
+      })
+    );
+    return { ...seen, shots };
+  };
+}
+
 export function liveWebDeps(db: Db, scope: WebScope, spend: (usd: number) => void): WebToolDeps {
+  const open = liveBrowser(scope);
   return {
     view: viewer(db, scope),
     search: loggedSearch(scope),
     read: (url) => readPage(url),
     store: (url, opts) => readStore(url, opts),
     shoot: serverFramesOpen() ? (url, view) => screenshotPage(url, view, chromiumPage) : undefined,
+    browse: open ? browser(db, scope, open) : undefined,
     spend
   };
 }

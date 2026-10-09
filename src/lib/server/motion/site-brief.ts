@@ -11,10 +11,11 @@ import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
 import { AccentSource, pickAccent, type Accent } from '$lib/motion/accent';
 import { PageRole, linksWorthReading, pageOf, type SitePage } from './site-copy';
 import { StoreKind, readStore, type StoreProduct } from '$lib/server/web/store';
+import { SITE_PAGE_MAX_BYTES, SiteSource, fetchSite, type SiteStrategy, type SiteTry } from '$lib/server/web/site-fetch';
 
-export const PAGE_MAX_BYTES = 2_000_000;
+export const PAGE_MAX_BYTES = SITE_PAGE_MAX_BYTES;
 const PAGE_TIMEOUT_MS = 10_000;
-const SITE_DEADLINE_MS = 40_000;
+const SITE_DEADLINE_MS = 110_000;
 const LOGO_SVG_MAX_BYTES = 500_000;
 const IMAGE_MAX_BYTES = 8_000_000;
 const IMAGE_TIMEOUT_MS = 6_000;
@@ -24,7 +25,6 @@ const MIN_IMAGE_EDGE = 300;
 const PALETTE_MAX = 8;
 const PRODUCTS_MAX = 8;
 const TAGLINE_MAX = 120;
-const HTML_TYPES = ['text/html', 'application/xhtml+xml'];
 const STYLESHEETS_READ = 3;
 const STYLESHEET_MAX_BYTES = 1_000_000;
 const INLINE_LOGO_MAX = 100_000;
@@ -60,8 +60,19 @@ export type SiteBrief = {
   products: SiteProduct[];
   socials: { platform: string; url: string }[];
   pages: SitePage[];
+  source: SiteSource;
+  note: string | null;
+  tried: SiteTry[];
 };
-export type SiteRead = { ok: true; site: SiteBrief } | { ok: false; error: string };
+export type SiteRead = { ok: true; site: SiteBrief; costUsd: number } | { ok: false; error: string; costUsd: number };
+
+const SOURCE_NOTES: Record<SiteSource, string | null> = {
+  [SiteSource.Fetch]: null,
+  [SiteSource.Browser]: null,
+  [SiteSource.Exa]: "The site blocked direct reads; its text came through Exa's crawler, without stylesheets: palette and fonts may be missing, so look at the logo or ask the user before picking colours.",
+  [SiteSource.Secondary]: 'The site refused every read. The pages below are OTHER sources about it (press, stores, socials), not the site: quote them as what others say, name the source, and ask the user for the brand colours, logo and claims.'
+};
+const UNREAD_ADVICE = 'Continue without it: ask the user for the brand colours, logo and claims, or search the web.';
 
 const HEX = /#(?:[0-9a-f]{6}|[0-9a-f]{3})\b/gi;
 const SVG_URL = /\.svg(?:[?#]|$)/i;
@@ -205,18 +216,15 @@ async function morePages(html: string, base: string): Promise<SitePage[]> {
   return (await Promise.all(pages)).flat();
 }
 
-async function read(input: string): Promise<SiteRead> {
-  const page = await safeFetchUrl(input, { maxBytes: PAGE_MAX_BYTES, timeoutMs: PAGE_TIMEOUT_MS });
-  if (!page.ok) {
-    return { ok: false, error: `the site answered ${page.status}` };
+async function read(input: string, chain: SiteStrategy[]): Promise<SiteRead> {
+  const got = await fetchSite(input, chain);
+  if (!got.ok) {
+    return { ok: false, error: `could not read ${input} (${got.error}). ${UNREAD_ADVICE}`, costUsd: got.costUsd };
   }
-  const type = (page.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase();
-  if (type && !HTML_TYPES.includes(type)) {
-    return { ok: false, error: `not a web page (${type})` };
-  }
+  const page = { headers: got.headers ?? new Headers(), body: got.html };
 
-  const html = page.body;
-  const base = page.url;
+  const html = got.html;
+  const base = got.url;
   const metadata = parseHTMLMetadata(html, base);
   const logos = logosOf(html, base, metadata);
   const logoLike = new Set(logos.map((l) => l.url));
@@ -248,8 +256,12 @@ async function read(input: string): Promise<SiteRead> {
     [AccentSource.Css]: [...cssVars, ...metadata.cssColors]
   });
 
+  const home = html ? [pageOf(base, html)] : [];
+  const others = (got.sources ?? []).map((s) => pageOf(s.url, s.html, PageRole.Inner));
+
   return {
     ok: true,
+    costUsd: got.costUsd,
     site: {
       url: base,
       name: metaContent(html, 'og:site_name') ?? metadata.title.split(TITLE_SEPARATOR)[0]?.trim() ?? new URL(base).hostname,
@@ -263,18 +275,21 @@ async function read(input: string): Promise<SiteRead> {
       store,
       products: products.map((p) => ({ name: p.title, price: priceOf(p), url: p.url, image: p.images[0] ?? null })),
       socials: extractSocialHandles(html).map((s) => ({ platform: s.platform, url: s.url })),
-      pages: [pageOf(base, html), ...pages]
+      pages: [...home, ...pages, ...others],
+      source: got.source,
+      note: SOURCE_NOTES[got.source],
+      tried: got.tried
     }
   };
 }
 
-export async function readSite(url: string): Promise<SiteRead> {
+export async function readSite(url: string, chain: SiteStrategy[]): Promise<SiteRead> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const deadline = new Promise<SiteRead>((resolve) => {
-    timer = setTimeout(() => resolve({ ok: false, error: 'the site took too long to read' }), SITE_DEADLINE_MS);
+    timer = setTimeout(() => resolve({ ok: false, error: `the site took too long to read. ${UNREAD_ADVICE}`, costUsd: 0 }), SITE_DEADLINE_MS);
   });
   try {
-    return await Promise.race([read(url).catch((e: unknown): SiteRead => ({ ok: false, error: `could not read ${url}: ${errorOf(e)}` })), deadline]);
+    return await Promise.race([read(url, chain).catch((e: unknown): SiteRead => ({ ok: false, error: `could not read ${url}: ${errorOf(e)}. ${UNREAD_ADVICE}`, costUsd: 0 })), deadline]);
   } finally {
     clearTimeout(timer);
   }

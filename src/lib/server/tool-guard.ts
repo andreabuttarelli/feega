@@ -266,6 +266,7 @@ type HopOptions = {
    * changed its name would start collecting 403s that look exactly like expired links.
    */
   userAgent?: string;
+  headers?: Record<string, string>;
 };
 
 /**
@@ -295,7 +296,7 @@ async function fetchFollowingGatedRedirects(
 
     const res = await fetch(current, {
       method: opts.method ?? 'GET',
-      headers: { 'User-Agent': userAgent, Accept: '*/*' },
+      headers: { 'User-Agent': userAgent, Accept: '*/*', ...opts.headers },
       redirect: 'manual',
       signal: AbortSignal.timeout(remaining)
     });
@@ -318,7 +319,7 @@ async function fetchFollowingGatedRedirects(
  */
 export async function safeFetchUrl(
   input: string,
-  opts: { maxBytes?: number; timeoutMs?: number; maxRedirects?: number; method?: 'GET' | 'HEAD' } = {}
+  opts: { maxBytes?: number; timeoutMs?: number; maxRedirects?: number; method?: 'GET' | 'HEAD'; userAgent?: string; headers?: Record<string, string> } = {}
 ): Promise<SafeFetchResult> {
   const maxBytes = opts.maxBytes ?? 2_000_000;
   const { url, res } = await fetchFollowingGatedRedirects(input, opts);

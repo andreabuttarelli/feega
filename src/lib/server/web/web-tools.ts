@@ -5,10 +5,14 @@ import type { PageRead } from './read-page';
 import { ShotView, type Shot } from './screenshot';
 import { MAX_VIEWED, ViewDetail, type ImagePart, type ViewOutcome } from './view-images';
 import { STORE_ITEMS_DEFAULT, STORE_ITEMS_MAX, type StoreRead } from './store';
+import { BROWSE_DEADLINE_MS, BROWSE_MAX_SHOTS, BROWSE_MAX_STEPS, browseStepSchema, type BrowseStep, type StepReport } from './browse';
 
 export type ImageImport = { ok: true; assetId: string; width: number | null; height: number | null } | { ok: false; error: string };
 
 export type ProductsImport = { ok: true; products: { handle: string; title: string; asset_ids: string[] }[]; missing: string[]; node_id?: string } | { ok: false; error: string };
+
+export type BrowseShot = { jpeg: Buffer; path: string | null };
+export type BrowseView = { ok: true; url: string; steps: StepReport[]; shots: BrowseShot[]; costUsd: number; stopped?: string } | { ok: false; error: string; costUsd: number };
 
 export type WebToolDeps = {
   search: SearchPort;
@@ -18,10 +22,11 @@ export type WebToolDeps = {
   store: (url: string, opts: { max: number; category?: string }) => Promise<StoreRead>;
   importProducts?: (storeUrl: string, handles: string[]) => Promise<ProductsImport>;
   view?: (urls: string[], detail: ViewDetail, callId: string) => Promise<ViewOutcome>;
+  browse?: (url: string, steps: BrowseStep[], callId: string) => Promise<BrowseView>;
   spend: (usd: number) => void;
 };
 
-export const WEB_TOOLS = ['web_search', 'read_page', 'read_store', 'view_images', 'screenshot_page', 'import_image', 'import_products'] as const;
+export const WEB_TOOLS = ['web_search', 'read_page', 'read_store', 'view_images', 'screenshot_page', 'import_image', 'import_products', 'browse'] as const;
 
 export const MAX_SEARCHES_PER_TURN = 8;
 export const MAX_READS_PER_TURN = 20;
@@ -29,6 +34,7 @@ export const MAX_SHOTS_PER_TURN = 4;
 export const MAX_IMPORTS_PER_TURN = 12;
 export const MAX_STORE_READS_PER_TURN = 6;
 export const MAX_VIEWS_PER_TURN = 4;
+export const MAX_BROWSES_PER_TURN = 3;
 const MAX_PRODUCTS_IMPORTED = 12;
 const DEFAULT_RESULTS = 5;
 const MAX_RESULTS = 10;
@@ -67,6 +73,7 @@ export function createWebTools(deps: WebToolDeps): Record<string, Tool> {
   const imports = counter(MAX_IMPORTS_PER_TURN);
   const storeReads = counter(MAX_STORE_READS_PER_TURN);
   const views = counter(MAX_VIEWS_PER_TURN);
+  const browses = counter(MAX_BROWSES_PER_TURN);
   const seenByCall = new Map<string, ImagePart[]>();
 
   const tools: Record<string, Tool> = {
@@ -140,6 +147,27 @@ export function createWebTools(deps: WebToolDeps): Record<string, Tool> {
         const seen = await view(input.urls, input.detail ?? ViewDetail.High, toolCallId);
         seenByCall.set(toolCallId, seen.parts);
         return { ok: true, images: seen.images };
+      },
+      toModelOutput: ({ toolCallId, output }) => withImages(output, seenByCall.get(toolCallId))
+    });
+  }
+
+  if (deps.browse) {
+    const browse = deps.browse;
+    tools.browse = tool({
+      description: `Drive a real browser on a public page when read_page or screenshot_page is not enough: a site that blocks plain reads, content behind a cookie banner, a tab, a "load more", a scroll. Opens url, then runs up to ${BROWSE_MAX_STEPS} steps in order: navigate(url), click(selector or visible text), type(selector, text), scroll(px or to top/bottom), wait(ms or selector), extract(markdown, links or images), screenshot (at most ${BROWSE_MAX_SHOTS}, you see them). Never logs in, never fills password or payment fields, never downloads. ${BROWSE_DEADLINE_MS / 1000} s at most, costs per use: at most ${MAX_BROWSES_PER_TURN} per turn.`,
+      inputSchema: z.object({ url: z.string().url().max(2000), steps: z.array(browseStepSchema).max(BROWSE_MAX_STEPS) }),
+      execute: async (input, { toolCallId }) => {
+        if (!browses()) {
+          return limitReached('browse', MAX_BROWSES_PER_TURN);
+        }
+        const seen = await browse(input.url, input.steps, toolCallId);
+        deps.spend(seen.costUsd);
+        if (!seen.ok) {
+          return seen;
+        }
+        seenByCall.set(toolCallId, seen.shots.map((s) => ({ mediaType: 'image/jpeg', data: s.jpeg.toString('base64') })));
+        return { ok: true, url: seen.url, steps: seen.steps, screenshots: seen.shots.map((s) => s.path), ...(seen.stopped ? { stopped: seen.stopped } : {}) };
       },
       toModelOutput: ({ toolCallId, output }) => withImages(output, seenByCall.get(toolCallId))
     });
