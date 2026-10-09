@@ -275,18 +275,33 @@ export function moveTrack(doc: MotionDoc, trackId: string, toIndex: number): OpR
   return { ok: true, doc: { ...doc, tracks: [...rest.slice(0, at), track, ...rest.slice(at)] } };
 }
 
+const SOUND_TAIL_SECONDS = 1.5;
+
+function endSoundsAt(doc: MotionDoc, end: number): MotionDoc {
+  const fit = (clip: MotionClip): MotionClip => {
+    if (clipEnd(clip) <= end || clip.from >= end) {
+      return clip;
+    }
+    const durationInFrames = end - clip.from;
+    const fadeOut = Math.max(Number(clip.props.fadeOut ?? 0), Math.min(SOUND_TAIL_SECONDS, durationInFrames / doc.fps));
+    return { ...clip, durationInFrames, props: { ...clip.props, fadeOut } };
+  };
+  return { ...doc, tracks: doc.tracks.map((t) => (t.kind === TrackKind.Audio ? { ...t, clips: t.clips.map(fit) } : t)) };
+}
+
 export function setCanvas(doc: MotionDoc, input: { format?: MotionFormat; durationInFrames?: number; background?: Background }): OpResult {
   const size = input.format ? FORMATS[input.format] : { width: doc.width, height: doc.height };
   const durationInFrames = Math.round(input.durationInFrames ?? doc.durationInFrames);
-  const end = Math.max(0, ...doc.tracks.flatMap((t) => t.clips.map(clipEnd)));
+  const fitted = endSoundsAt(doc, durationInFrames);
+  const end = Math.max(0, ...fitted.tracks.flatMap((t) => t.clips.map(clipEnd)));
 
   if (durationInFrames < Math.max(1, end)) {
     return fail(`a clip ends at frame ${end}: move or trim it before shortening the video`);
   }
-  if (durationInFrames > maxFrames(doc.fps)) {
+  if (durationInFrames > maxFrames(fitted.fps)) {
     return fail(`the video can be at most ${MAX_SECONDS} seconds`);
   }
-  return { ok: true, doc: { ...doc, width: size.width, height: size.height, durationInFrames, background: input.background ?? doc.background } };
+  return { ok: true, doc: { ...fitted, width: size.width, height: size.height, durationInFrames, background: input.background ?? fitted.background } };
 }
 
 export function snapFrame(frame: number, targets: readonly number[], threshold: number): number {
