@@ -1,4 +1,4 @@
-import { COMPONENTS, TrackKind } from './components';
+import { COMPONENTS, HEADLINE_SIZE, TITLE_LOOK, TITLE_RANGE, TrackKind } from './components';
 import { STORY_BEATS, STORY_SHARE, storyBeats } from './story';
 import type { MotionDoc } from './doc';
 import { EffectKind } from './effects/registry';
@@ -31,7 +31,8 @@ export enum Forbidden {
   TextOverScene = 'text-over-scene',
   TooMuchText = 'too-much-text',
   WeakEase = 'weak-ease',
-  UiOverload = 'ui-overload'
+  UiOverload = 'ui-overload',
+  TitleType = 'title-type'
 }
 
 export type StyleSpec = {
@@ -74,15 +75,17 @@ const SHOWN_PICTURE: readonly [component: string, prop: string][] = [
   ['Device3D', 'screen']
 ];
 const HEADLINES = new Set(['Title', 'Text', 'Kicker']);
-const HEADLINE_SIZE = 0.06;
 const SCENES = new Set(['Custom', 'Device3D', 'Video', 'Model3D']);
 const SHARED_SECONDS = 0.5;
 const MAX_WORDS_PER_SECOND = 1;
-const TITLE_CARDS: readonly Forbidden[] = [Forbidden.TextOverScene, Forbidden.TooMuchText];
+const TITLE_CARDS: readonly Forbidden[] = [Forbidden.TextOverScene, Forbidden.TooMuchText, Forbidden.TitleType];
 const CALM: readonly Forbidden[] = [Forbidden.WeakEase, Forbidden.Particles, Forbidden.Glow, Forbidden.Rotation, Forbidden.Bounce, Forbidden.FlyingText, Forbidden.Crowded, Forbidden.Transition, Forbidden.Still];
 
 export const TITLE_CARD_RULE =
   'Little text, and a title owns the frame: most of the video is scenes (rebuilt UI, devices, the product). When words appear they are a title card: big, centred, alone on the frame, nothing competing; the scene it announces comes after. Alternate title card → scene → title card → scene, each its own row in the storyboard. Never lay a headline over a UI, device or picture: only short labels that belong to the rebuilt UI itself. The gate names a headline over a scene and a video carried by text (more than one word per second).';
+
+export const TITLE_TYPE_RULE =
+  'Titles are semibold or medium with very tight tracking: every Title, and every Text at headline size, takes weight 600 (500 at most for a softer line), never bold or black (700–900) and never light, and tracking -0.05 (between -0.04 and -0.06, letter-spacing in em). Both are the default when left out; body copy and labels inside the UI keep their own. The title-type gate names a headline outside them.';
 
 export const UI_FOCUS_RULE =
   'One part of the UI at a time, as with words: a product act is a sequence of UI beats, each showing one element (or two that belong together) large in the frame, faithful to the real product UI, then moving on to the next. Example, a prompt being typed: zoom on the text field and the typed text → the button being pressed → the progress bar alone → the result. Build each beat with focus_ui on the anchors add_ui and recreate_ui return (isolate on: the part alone, masked, its box framed on the house ease); pass from beat to beat with a zoom or a shared-element morph (the same element changing size and place), never a cut to a new full screen. The whole screen appears at most briefly, as an establishing shot or at the end; never a busy dashboard held on screen. The ui-overload gate names a whole UI held more than 1.5 s and more than two UI pieces on screen at once.';
@@ -96,7 +99,7 @@ export const STYLES: Record<MotionStyle, StyleSpec> = {
     eases: STYLE_EASES[MotionStyle.LaunchFilm],
     seconds: { enter: [0.2, 0.35], stagger: 0.06, exit: 0.2, still: 0.5, scene: [2, 5] },
     movement: { rise: 0.12, settle: 0.7, blur: 18, pushIn: 1.25, turn: 100 },
-    type: { family: 'Inter', weights: { display: 800, text: 500 }, sizes: { hero: 0.26, line: 0.12, small: 0.026 } },
+    type: { family: 'Inter', weights: { display: 600, text: 500 }, sizes: { hero: 0.26, line: 0.12, small: 0.026 } },
     palette: { ink: '#050505', paper: '#ffffff', muted: '#8b8b8b', accents: 1 },
     junctions: [JunctionKind.Crossfade, JunctionKind.DipToBlack, JunctionKind.Blur, JunctionKind.Zoom, JunctionKind.PushLeft, JunctionKind.PushRight, JunctionKind.Wipe],
     entrances: [TransitionKind.None, TransitionKind.Fade, TransitionKind.Blur, TransitionKind.Scale, TransitionKind.SlideLeft, TransitionKind.SlideRight, TransitionKind.SlideUp],
@@ -107,6 +110,7 @@ export const STYLES: Record<MotionStyle, StyleSpec> = {
     rules: [
       'Launch film is the house style: the LOOK of an Apple keynote film, Linear, Vercel Ship or Stripe Sessions (few elements, very large type, the real product, a sober palette) with HIGH ENERGY. Minimal never means slow: the bar is "would a client pay for this?". Never a slideshow, a still picture, a slow fade, the same layout twice or a PowerPoint effect.',
       TITLE_CARD_RULE,
+      TITLE_TYPE_RULE,
       UI_FOCUS_RULE,
       EASING_RULE,
       'Story first: four acts, problem (the user\'s pain in the brand\'s own words), solution (the product enters), proof (features shown live, numbers, results), claim (promise, original logo, address), about 20/15/45/20% of the length, each marked with mark_story; the gate names a missing act.',
@@ -143,6 +147,7 @@ export const STYLES: Record<MotionStyle, StyleSpec> = {
     rules: [
       'Apple minimal is the house style: every frame should look like a frame of an Apple keynote or product film. Confident and calm: type snaps in and holds, the camera drifts slowly, one idea at a time.',
       TITLE_CARD_RULE,
+      TITLE_TYPE_RULE,
       UI_FOCUS_RULE,
       EASING_RULE,
       'Build the video from the scene library: list_templates, then insert_template the builtin:scene-* scenes one after another and fill them with set_template_fields (real text, brand pictures, the one accent colour). Build primitives by hand only for something no scene can show.',
@@ -451,6 +456,21 @@ function textOverScene(doc: MotionDoc): Found[] {
     });
 }
 
+const outside = (value: number, [min, max]: readonly [number, number]) => value < min || value > max;
+
+function titleType(doc: MotionDoc): Found[] {
+  return placed(doc, doc.tracks, 0, new Set())
+    .filter((p) => isHeadline(p.clip))
+    .flatMap(({ clip, from }) => {
+      const weight = Number(clip.props.weight ?? TITLE_LOOK.weight);
+      const tracking = Number(clip.props.tracking ?? TITLE_LOOK.tracking);
+      if (!outside(weight, TITLE_RANGE.weight) && !outside(tracking, TITLE_RANGE.tracking)) {
+        return [];
+      }
+      return [{ clip, at: from, detail: `${clip.id} ("${String(clip.props.text ?? '')}") is set at weight ${weight}, tracking ${tracking}: a title is semibold or medium (weight ${TITLE_RANGE.weight.join('–')}) with very tight tracking (${TITLE_RANGE.tracking[1]} to ${TITLE_RANGE.tracking[0]}); set weight ${TITLE_LOOK.weight} and tracking ${TITLE_LOOK.tracking}` }];
+    });
+}
+
 function tooMuchText(doc: MotionDoc): Found[] {
   const seconds = doc.durationInFrames / doc.fps;
   const total = placed(doc, doc.tracks, 0, new Set())
@@ -472,6 +492,7 @@ const CHECKS: Record<Forbidden, Check> = {
   [Forbidden.Rushed]: rushed,
   [Forbidden.TextOverScene]: textOverScene,
   [Forbidden.TooMuchText]: tooMuchText,
+  [Forbidden.TitleType]: titleType,
   [Forbidden.WeakEase]: weakEases,
   [Forbidden.UiOverload]: uiOverload,
   [Forbidden.TooDense]: (doc, spec) => tooDense(doc, spec.pace.minGap).map((p) => ({ clip: p.clip, at: 0, detail: p.detail })),

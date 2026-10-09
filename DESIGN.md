@@ -72,6 +72,9 @@ the style system (`src/lib/motion/style.ts`); the default style is the launch fi
   one word per second of video.
 - **A title owns the frame.** When words appear they are a title card: big, centred, nothing else
   competing. The scene it announces comes after.
+- **Title type:** semibold (600) or medium (500), never bold, black or light; very tight
+  tracking, -0.04 to -0.06em (default -0.05em), like the app's mega titles. Body copy and UI
+  labels keep their own.
 - **Alternate:** title card → scene → title card → scene. Never a headline laid over a UI,
   device or picture; only short labels that belong to the rebuilt UI itself.
 

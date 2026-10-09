@@ -30,7 +30,7 @@ const compose = (doc: MotionDoc, assets: Record<string, string> = {}) => compose
 
 describe('fonts', () => {
   it('text clips default to the built-in sans at their usual weight', () => {
-    expect(findClip(titled(), 'title')!.clip.props).toMatchObject({ font: BuiltinFont.Sans, weight: 500, italic: false });
+    expect(findClip(titled(), 'title')!.clip.props).toMatchObject({ font: BuiltinFont.Sans, weight: 600, italic: false });
     expect(fontStack(BuiltinFont.Mono, [])).toContain("'Fragment Mono'");
   });
 

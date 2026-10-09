@@ -1,6 +1,6 @@
 import { LAYOUTS } from '$lib/canvas/composition/index';
 import type { LayoutId, LayoutParam } from '$lib/canvas/composition/types';
-import { COMPOSITION_CAMERAS } from '$lib/motion/components';
+import { COMPOSITION_CAMERAS, TITLE_LOOK } from '$lib/motion/components';
 import { Ease, TransitionKind } from '$lib/motion/design';
 import { FADE_OUT, RISE, edge, type Beat } from '$lib/motion/template-kit';
 import { FieldType } from './fields';
@@ -112,7 +112,7 @@ const DESIGNS: Design[] = [
     beats: [
       backdrop(PAPER, 5),
       { id: 'mark', track: 'middle', component: 'Title', at: 0, len: 5, props: { text: '“', color: ORANGE, size: 0.3, y: 0.22, height: 0.25 }, exit: FADE_OUT },
-      { id: 'quote', track: 'front', component: 'Text', at: 0.3, len: 4.7, props: { text: 'Make the thing you wish existed.', color: INK, size: 0.06, y: 0.5, width: 0.72, height: 0.3 }, exit: FADE_OUT },
+      { id: 'quote', track: 'front', component: 'Text', at: 0.3, len: 4.7, props: { text: 'Make the thing you wish existed.', color: INK, size: 0.06, ...TITLE_LOOK, y: 0.5, width: 0.72, height: 0.3 }, exit: FADE_OUT },
       { id: 'author', track: 'front', component: 'Kicker', at: 0.8, len: 4.2, props: { text: '— Ada Lovelace', color: INK, y: 0.72 }, enter: RISE, exit: FADE_OUT }
     ],
     fields: [text('quote', 'Quote', 'quote'), text('author', 'Author', 'author'), colour('accent', 'Mark colour', 'mark', 'color'), colour('background', 'Background', 'bg', 'fill')]

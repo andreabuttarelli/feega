@@ -80,6 +80,11 @@ const toggle = (fallback: boolean, label: string, group: Group) =>
 export const FONTS = [BuiltinFont.Sans, BuiltinFont.Mono] as const;
 const REGULAR = 400;
 const MEDIUM = 500;
+const SEMIBOLD = 600;
+
+export const HEADLINE_SIZE = 0.06;
+export const TITLE_LOOK = { weight: SEMIBOLD, tracking: -0.05 } as const;
+export const TITLE_RANGE = { weight: [MEDIUM, SEMIBOLD], tracking: [-0.07, -0.04] } as const;
 export const ALIGNS = ['left', 'center', 'right'] as const;
 export const MOVES = ['none', 'drift-up', 'zoom-in', 'zoom-out', 'pan-left', 'pan-right'] as const;
 export type Move = (typeof MOVES)[number];
@@ -245,7 +250,7 @@ export const COMPONENTS = {
     description: 'Large headline, lines reveal one after another. Use \\n for line breaks.',
     track: TrackKind.Visual,
     durationInFrames: seconds(3),
-    schema: z.object({ text: text('Better marketing\non canvas.', 'Text', true), ...typography(0.11, 'brand.text', { weight: MEDIUM, tracking: -0.045, leading: 0.95 }), ...layout({ height: 0.4 }) }).strict()
+    schema: z.object({ text: text('Better marketing\non canvas.', 'Text', true), ...typography(0.11, 'brand.text', { ...TITLE_LOOK, leading: 0.95 }), ...layout({ height: 0.4 }) }).strict()
   },
   Text: {
     label: 'Text',
@@ -561,8 +566,22 @@ export function defaultProps(id: ComponentId): Record<string, unknown> {
 
 export type PropsVerdict = { ok: true; props: Record<string, unknown> } | { ok: false; error: string };
 
+const TITLED: readonly ComponentId[] = ['Title', 'Text'];
+
+function titleLook(id: ComponentId, props: unknown): unknown {
+  if (typeof (props ?? {}) !== 'object') {
+    return props;
+  }
+  const raw = (props ?? {}) as Record<string, unknown>;
+  const size = Number(raw.size ?? defaultProps(id).size ?? 0);
+  if (!TITLED.includes(id) || size < HEADLINE_SIZE) {
+    return raw;
+  }
+  return { ...TITLE_LOOK, ...raw };
+}
+
 export function parseProps(id: ComponentId, props: unknown): PropsVerdict {
-  const parsed = COMPONENTS[id].schema.safeParse(props ?? {});
+  const parsed = COMPONENTS[id].schema.safeParse(titleLook(id, props));
   if (!parsed.success) {
     return { ok: false, error: `${id}: ${parsed.error.issues.map((i) => `${i.path.join('.')} ${i.message}`).join('; ')}` };
   }
