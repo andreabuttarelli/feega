@@ -1,8 +1,8 @@
 import { fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { motionScope as scopeFor } from '$lib/server/motion/editor-scope';
-import { assetUrls, headOrNew, motionAssets, motionTokens, saveMotionDoc } from '$lib/server/motion/editor';
-import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
+import { Restore, assetUrls, headOrNew, motionAssets, motionTokens, restoreRevision, saveMotionDoc } from '$lib/server/motion/editor';
+import { RevisionOutcome, listRevisions } from '$lib/server/repos/motion-revisions';
 import { motionRenderFarm, motionRenderStorage } from '$lib/server/motion/renderer';
 import { batchView, cancelRender, renderView } from '$lib/server/motion/render-run';
 import { startFarmBatch, startFarmRender } from '$lib/server/motion/render-start';
@@ -35,6 +35,7 @@ function parsedJson(text: string): unknown {
 const HTTP_CONFLICT = 409;
 const HTTP_BAD_REQUEST = 400;
 const HTTP_UNAVAILABLE = 503;
+const HTTP_NOT_FOUND = 404;
 
 export const load: PageServerLoad = async ({ locals, params }) => {
   const scope = await scopeFor(locals, params);
@@ -99,6 +100,24 @@ export const actions: Actions = {
       return fail(HTTP_BAD_REQUEST, { error: write.error });
     }
     return { version: write.head.version };
+  },
+
+  revisions: async ({ locals, params }) => {
+    const scope = await scopeFor(locals, params);
+    return { revisions: await listRevisions(scope.db, { orgId: scope.orgId, nodeId: scope.motion.record.id }) };
+  },
+
+  restore: async ({ locals, params, request }) => {
+    const scope = await scopeFor(locals, params);
+    const version = Number((await request.formData()).get('version'));
+    const out = await restoreRevision(scope.db, { orgId: scope.orgId, nodeId: scope.motion.record.id, node: scope.motion.node, version, actor: { kind: 'user', id: scope.userId } });
+    if (out.outcome === Restore.Missing) {
+      return fail(HTTP_NOT_FOUND, { error: 'no_such_version' });
+    }
+    if (out.outcome === Restore.Conflict) {
+      return fail(HTTP_CONFLICT, { error: 'conflict' });
+    }
+    return { head: { version: out.head.version, doc: out.head.doc } };
   },
 
   exported: async ({ locals, params, request }) => {

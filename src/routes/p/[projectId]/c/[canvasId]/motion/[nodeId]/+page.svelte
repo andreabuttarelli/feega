@@ -13,6 +13,7 @@
   import CompositionSettings from '$lib/components/motion/CompositionSettings.svelte';
   import { SAVE_TONE, SaveState, TimeDisplay, clockLabel, DISPLAY_NAME, isTap } from '$lib/motion/editor-bar';
   import Upload from '@lucide/svelte/icons/upload';
+  import HistoryIcon from '@lucide/svelte/icons/history';
   import ShortcutHelp from '$lib/components/motion/ShortcutHelp.svelte';
   import { decodePeaks } from '$lib/motion/peaks-decode';
   import MenuDrawer from '$lib/components/motion/MenuDrawer.svelte';
@@ -730,6 +731,45 @@
     clipOp(ClipOp.Delete);
   }
 
+  type Revision = { version: number; summary: string | null; actorKind: string; createdAt: string; clips: number };
+  let revisionsOpen = $state(false);
+  let revisions = $state<Revision[]>([]);
+
+  async function editorAction(name: string, form = new FormData()) {
+    const res = await fetch(`${editorUrl}?/${name}`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
+    return deserialize(await res.text());
+  }
+
+  async function toggleRevisions() {
+    revisionsOpen = !revisionsOpen;
+    if (!revisionsOpen) {
+      return;
+    }
+    const result = await editorAction('revisions');
+    revisions = result.type === 'success' ? ((result.data?.revisions as Revision[]) ?? []) : [];
+  }
+
+  async function restoreTo(target: number) {
+    revisionsOpen = false;
+    if (saveTimer) {
+      clearTimeout(saveTimer);
+      saveTimer = null;
+      await save();
+    }
+    const form = new FormData();
+    form.set('version', String(target));
+    const result = await editorAction('restore', form);
+    if (result.type !== 'success') {
+      notice = `Version ${target} could not be restored: reload and try again.`;
+      return;
+    }
+    const head = result.data?.head as { version: number; doc: MotionDoc };
+    history = adoptHead(history, head.doc, version);
+    version = head.version;
+    selection = selection.filter((id) => findClip(head.doc, id));
+    notice = `Restored version ${target}. ⌘Z to undo.`;
+  }
+
   function undoEdit() {
     if (!canUndo(history, agent)) {
       return;
@@ -1080,6 +1120,18 @@
     <div class="group trail" data-testid="bar-trail">
       <IconButton action={Action.Undo} disabled={!canUndo(history, agent)} onclick={undoEdit} />
       <IconButton action={Action.Redo} disabled={!canRedo(history, agent)} onclick={redoEdit} />
+      <div class="popover-anchor">
+        <button type="button" class="clock" aria-haspopup="menu" aria-expanded={revisionsOpen} aria-label="Version history" title="Version history" disabled={agent === Agent.Working} data-testid="revisions-open" onclick={() => void toggleRevisions()}><HistoryIcon size={16} /></button>
+        {#if revisionsOpen}
+          <div class="menu more" role="menu" data-testid="revisions">
+            {#each revisions as r (r.version)}
+              <button type="button" role="menuitem" disabled={r.version === version} onclick={() => void restoreTo(r.version)}><span>v{r.version} · {r.actorKind === 'agent' ? 'Agent' : 'You'} · {r.clips} clips</span><kbd>{r.version === version ? 'Current' : 'Restore'}</kbd></button>
+            {:else}
+              <span class="empty">No saved versions yet</span>
+            {/each}
+          </div>
+        {/if}
+      </div>
       {#if !docked}
         <IconButton action={Action.ToggleInspector} class="toggle" pressed={propsShown} data-testid="toggle-inspector" onclick={COMMANDS[Command.ToggleInspector]} />
         <IconButton action={Action.ToggleChat} class="toggle" pressed={chatShown} data-testid="toggle-chat" onclick={COMMANDS[Command.ToggleChat]} />

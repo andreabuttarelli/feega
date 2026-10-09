@@ -93,6 +93,32 @@ export function registerMotionTools(server: McpServer) {
   );
 
   server.registerTool(
+    'list_motion_revisions',
+    {
+      title: 'List the saved versions of a motion video',
+      description:
+        'Every saved revision of a motion video, newest first: `version`, who saved it (`actorKind` user or agent), the `summary` ' +
+        'of the change and how many `clips` it had, so a broken or emptied version can be told from a good one. Reads only.',
+      inputSchema: z.object({ org, node_id: z.string() }),
+      annotations: { readOnlyHint: true }
+    },
+    async ({ org, node_id }) => withAuth((token) => motionApi.revisions(token, node_id, org))
+  );
+
+  server.registerTool(
+    'restore_motion_revision',
+    {
+      title: 'Restore a saved version of a motion video',
+      description:
+        'Put an earlier revision of a motion video back (number from `list_motion_revisions`). It is saved as a NEW revision: ' +
+        'no history is deleted, and restoring again undoes it. Free.',
+      inputSchema: z.object({ org, node_id: z.string(), version: z.number().int().positive() }),
+      annotations: { readOnlyHint: false, destructiveHint: false }
+    },
+    async ({ org, node_id, version }) => withAuth((token) => motionApi.restore(token, node_id, version, org))
+  );
+
+  server.registerTool(
     'list_motion_videos',
     {
       title: 'List motion videos',

@@ -25,6 +25,8 @@ export type RenderOptions = { mode?: RenderMode; resolution?: string; format?: s
 export type MotionVideo = { node_id: string; name: string | null; project_id: string; canvas_id: string; format: string; version: number; poster_url: string | null; last_render_url: string | null; editor_url: string };
 export type MotionFrames = { revision: number; frames: { time: number; mime: string; data: string }[]; quality: string[]; blocking: string[] };
 
+export type MotionRevision = { version: number; summary: string | null; actorKind: string; createdAt: string; clips: number };
+
 export type EmbedState = { published: boolean; url?: string; snippet?: string; revision?: number };
 
 function renderBody(opts: RenderOptions): Record<string, unknown> {
@@ -64,6 +66,9 @@ export const motionApi = {
   embedState: (token: string, nodeId: string, org?: string) => request<EmbedState>(withOrg(`/api/v1/motion/${id(nodeId)}/embed`, org), token),
   frames: (token: string, nodeId: string, ask: { times: number[]; width?: number }, org?: string) =>
     request<MotionFrames>(withOrg(`/api/v1/motion/${id(nodeId)}/frames`, org), token, { method: 'POST', body: JSON.stringify(ask) }),
+  revisions: (token: string, nodeId: string, org?: string) => request<{ revisions: MotionRevision[] }>(withOrg(`/api/v1/motion/${id(nodeId)}/revisions`, org), token),
+  restore: (token: string, nodeId: string, version: number, org?: string) =>
+    request<{ version: number; restored: number }>(withOrg(`/api/v1/motion/${id(nodeId)}/revisions`, org), token, { method: 'POST', body: JSON.stringify({ version }) }),
   bundle: (token: string, nodeId: string, org?: string) => download(withOrg(`/api/v1/motion/${id(nodeId)}/embed/bundle`, org), token)
 };
 

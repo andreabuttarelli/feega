@@ -7,7 +7,8 @@ import { agentActor } from '$lib/server/repos/actor';
 import { motionAsk, offeredChatModels, resolveChoice } from '$lib/server/chat-model/catalogue';
 import { runInBackground } from '$lib/server/background-work';
 import { motionEditorPath, motionOf, type MotionNode } from '$lib/canvas/motion-node';
-import { headOrNew } from '$lib/server/motion/editor';
+import { Restore, headOrNew, restoreRevision } from '$lib/server/motion/editor';
+import { listRevisions } from '$lib/server/repos/motion-revisions';
 import { docSummary } from '$lib/server/motion/motion-tools';
 import { MOTION_ASK_KIND } from '$lib/server/motion/ask-kind';
 import { Browser, startMotionTurn, type MotionTurn, type TurnOutcome } from '$lib/server/motion/turn';
@@ -15,6 +16,7 @@ import { Browser, startMotionTurn, type MotionTurn, type TurnOutcome } from '$li
 export const MCP_AGENT_KEY = 'mcp';
 const HTTP_NOT_FOUND = 404;
 const HTTP_UNAVAILABLE = 503;
+const HTTP_CONFLICT = 409;
 
 type Motion = { record: CanvasNodeRecord; node: MotionNode };
 
@@ -109,4 +111,29 @@ export async function motionSummary(db: Db, input: { orgId: string; nodeId: stri
 
   const head = await headOrNew(db, input, motion.node);
   return { node_id: motion.record.id, name: motion.record.displayName, version: head.version, last_change: head.summary, last_actor: head.actorKind, editor_url: editorUrl(motion.record), doc: docSummary(head.doc, []) };
+}
+
+export async function motionRevisions(db: Db, input: { orgId: string; nodeId: string }): Promise<Record<string, unknown> | Response> {
+  const motion = await findMotion(db, input);
+  if (!motion) {
+    return notFound();
+  }
+  return { revisions: await listRevisions(db, input) };
+}
+
+const RESTORE_REFUSAL: Record<Restore.Missing | Restore.Conflict, () => Response> = {
+  [Restore.Missing]: () => json({ error: 'no_such_version' }, { status: HTTP_NOT_FOUND }),
+  [Restore.Conflict]: () => json({ error: 'conflict' }, { status: HTTP_CONFLICT })
+};
+
+export async function restoreMotion(db: Db, input: { orgId: string; userId: string; nodeId: string; version: number }): Promise<Record<string, unknown> | Response> {
+  const motion = await findMotion(db, input);
+  if (!motion) {
+    return notFound();
+  }
+  const out = await restoreRevision(db, { orgId: input.orgId, nodeId: input.nodeId, node: motion.node, version: input.version, actor: agentActor(input.userId, MCP_AGENT_KEY) });
+  if (out.outcome !== Restore.Restored) {
+    return RESTORE_REFUSAL[out.outcome]();
+  }
+  return { version: out.head.version, restored: input.version };
 }

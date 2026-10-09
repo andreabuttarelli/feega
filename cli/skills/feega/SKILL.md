@@ -184,6 +184,10 @@ See a video with `view_motion_frames` (up to 6 times in seconds): the frames com
 images with the quality gate's `quality` and `blocking` notes. Free; look before and after
 `ask_motion_agent`. CLI: `feega motion frames <nodeId> --at 1,2.5,4`.
 
+Every save is a revision. `list_motion_revisions` lists them (who saved, clip count);
+`restore_motion_revision` puts one back as a new revision, history kept. Free. CLI:
+`feega motion revisions <nodeId> [--restore <version>]`.
+
 ## Remix from the gallery
 
 The public gallery holds free motion videos and compositions anyone can remix, many by Feega.

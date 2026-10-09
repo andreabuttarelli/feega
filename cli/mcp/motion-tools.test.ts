@@ -65,6 +65,10 @@ const fake: Server = createServer((req, res) => {
       send(200, published ? { published, url: `https://feega.app/e/${NODE}`, snippet: `<iframe src="https://feega.app/e/${NODE}"></iframe>`, revision: 3 } : { published });
       return;
     }
+    if (route === `/api/v1/motion/${NODE}/revisions`) {
+      send(200, req.method === 'POST' ? { version: 21, restored: 17 } : { revisions: [{ version: 20, summary: 'Undo', actorKind: 'user', createdAt: '', clips: 0 }] });
+      return;
+    }
     if (route === `/api/v1/motion/${NODE}/frames`) {
       send(200, { revision: 3, frames: [{ time: 1, mime: 'image/jpeg', data: 'AAAA' }], quality: ['title too small'], blocking: [] });
       return;
@@ -190,6 +194,18 @@ describe('the motion agent over MCP', () => {
     expect(text).not.toContain('AAAA');
   });
 
+  test('restore_motion_revision posts the version and keeps history server side', async () => {
+    const result = await callTool('restore_motion_revision', { node_id: NODE, version: 17 });
+    expect(calls[0]).toEqual({ method: 'POST', path: `/api/v1/motion/${NODE}/revisions`, body: { version: 17 } });
+    expect(JSON.stringify(result)).toContain('21');
+  });
+
+  test('list_motion_revisions reads the versions with their clip counts', async () => {
+    const result = await callTool('list_motion_revisions', { node_id: NODE });
+    expect(calls[0]).toMatchObject({ method: 'GET', path: `/api/v1/motion/${NODE}/revisions` });
+    expect(JSON.stringify(result)).toContain('clips');
+  });
+
   test('get_render reads a render and its file', async () => {
     const result = await callTool('get_render', { run_id: 'render-1' });
     expect(calls[0].path).toBe('/api/v1/motion/renders/render-1');
@@ -200,7 +216,7 @@ describe('the motion agent over MCP', () => {
     await rpc('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'motion', version: '0.0.1' } });
     const names = ((await rpc('tools/list', {})).result?.tools ?? []).map((t) => t.name);
 
-    expect(names.filter((n) => n.includes('motion')).sort()).toEqual(['ask_motion_agent', 'get_motion_embed', 'get_motion_run', 'get_motion_summary', 'list_motion_videos', 'publish_motion_embed', 'view_motion_frames']);
+    expect(names.filter((n) => n.includes('motion')).sort()).toEqual(['ask_motion_agent', 'get_motion_embed', 'get_motion_run', 'get_motion_summary', 'list_motion_revisions', 'list_motion_videos', 'publish_motion_embed', 'restore_motion_revision', 'view_motion_frames']);
     expect(names).toContain('render_video');
     expect(names).toContain('get_render');
     expect(names).not.toContain('add_clip');

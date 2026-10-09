@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Db } from '$lib/server/db/client';
 import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
-import { RevisionOutcome, appendRevision, readHead } from './motion-revisions';
+import { RevisionOutcome, appendRevision, listRevisions, readHead } from './motion-revisions';
 
 type Row = Record<string, unknown>;
 
@@ -17,11 +17,10 @@ export function revisionsDb(seed: Row[] = []) {
       },
       order: () => chain,
       limit: () => chain,
-      maybeSingle: async () => {
-        const hits = rows.filter((r) => filters.every(([c, v]) => r[c] === v)).sort((a, b) => Number(b.version) - Number(a.version));
-        return { data: hits[0] ?? null, error: null };
-      }
+      maybeSingle: async () => ({ data: hits()[0] ?? null, error: null }),
+      then: (resolve: (r: { data: Row[]; error: null }) => unknown) => resolve({ data: hits(), error: null })
     };
+    const hits = () => rows.filter((r) => filters.every(([c, v]) => r[c] === v)).sort((a, b) => Number(b.version) - Number(a.version));
     return chain;
   };
 
@@ -47,6 +46,21 @@ const user = { kind: 'user' as const, id: 'u1' };
 const agent = { kind: 'agent' as const, id: 'u1', agentKey: 'motion' };
 
 describe('motion revisions', () => {
+  it('lists every version newest first with its clip count, so a broken head can be told from a good one', async () => {
+    const { db } = revisionsDb();
+    const full = { ...newMotionDoc(MotionFormat.Square) };
+    full.tracks = [{ ...full.tracks[0], clips: [{ ...{ id: 'c1', component: 'Title', from: 0, durationInFrames: 30, props: {}, keyframes: {} } }] } as never, full.tracks[1]];
+    await appendRevision(db, { orgId: ORG, nodeId: NODE, expectedVersion: 0, doc: full, actor: agent, summary: 'added a title' });
+    await appendRevision(db, { orgId: ORG, nodeId: NODE, expectedVersion: 1, doc: newMotionDoc(MotionFormat.Square), actor: user, summary: 'Undo' });
+
+    const listed = await listRevisions(db, { orgId: ORG, nodeId: NODE });
+
+    expect(listed.map((r) => [r.version, r.actorKind, r.summary, r.clips])).toEqual([
+      [2, 'user', 'Undo', 0],
+      [1, 'agent', 'added a title', 1]
+    ]);
+  });
+
   it('no revision yet means no head', async () => {
     expect(await readHead(revisionsDb().db, { orgId: ORG, nodeId: NODE })).toBeNull();
   });

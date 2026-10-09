@@ -2,7 +2,7 @@ import type { Db } from '$lib/server/db/client';
 import { listProjectAssets, type Asset } from '$lib/server/repos/assets';
 import { findBrandLook } from '$lib/server/repos/brands';
 import { DataCheck, findNode, patchNodeData, type CanvasNodeRecord } from '$lib/server/repos/canvas';
-import { appendRevision, readHead, RevisionOutcome, type MotionHead, type RevisionWrite } from '$lib/server/repos/motion-revisions';
+import { appendRevision, readHead, readRevision, RevisionOutcome, type MotionHead, type RevisionWrite } from '$lib/server/repos/motion-revisions';
 import type { Actor } from '$lib/server/repos/actor';
 import { createAssetSigningDb, signAssetPaths } from '$lib/server/canvas/sign-media';
 import { motionOf, type MotionNode } from '$lib/canvas/motion-node';
@@ -44,6 +44,26 @@ export async function findMotionNode(db: Db, scope: { orgId: string; nodeId: str
 
 export async function headOrNew(db: Db, scope: { orgId: string; nodeId: string }, node: MotionNode): Promise<MotionHead> {
   return (await readHead(db, scope)) ?? { version: 0, doc: newMotionDoc(node.format), summary: null, actorKind: 'system' };
+}
+
+export enum Restore {
+  Restored = 'restored',
+  Missing = 'missing',
+  Conflict = 'conflict'
+}
+
+export type Restored = { outcome: Restore.Restored; head: MotionHead } | { outcome: Restore.Missing } | { outcome: Restore.Conflict };
+
+export async function restoreRevision(db: Db, input: { orgId: string; nodeId: string; node: MotionNode; version: number; actor: Actor }): Promise<Restored> {
+  const scope = { orgId: input.orgId, nodeId: input.nodeId };
+  const old = await readRevision(db, { ...scope, version: input.version });
+  if (!old) {
+    return { outcome: Restore.Missing };
+  }
+
+  const head = await headOrNew(db, scope, input.node);
+  const write = await saveMotionDoc(db, { ...scope, expectedVersion: head.version, doc: old.doc, actor: input.actor, summary: `Restored version ${input.version}` });
+  return write.outcome === RevisionOutcome.Written ? { outcome: Restore.Restored, head: write.head } : { outcome: Restore.Conflict };
 }
 
 export async function motionTokens(db: Db, input: { orgId: string; brandId: string | null }): Promise<BrandTokens> {
