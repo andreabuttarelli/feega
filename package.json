@@ -44,7 +44,8 @@
     "eval:bootstrap": "vite-node --config scripts/vite-node.config.ts scripts/eval/bootstrap.ts",
     "eval:moderation": "vite-node --config scripts/vite-node.config.ts scripts/eval/moderation-edges.ts",
     "eval:people": "vite-node --config scripts/vite-node.config.ts scripts/eval/people-detector.ts",
-    "docs:mcp-tools": "node scripts/mcp-inventory.mjs --write"
+    "docs:mcp-tools": "node scripts/mcp-inventory.mjs --write",
+    "bench:export": "vite-node --config scripts/vite-node.motion.config.ts scripts/bench/export-bench.ts --"
   },
   "devDependencies": {
     "@internationalized/date": "^3.12.0",

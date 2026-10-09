@@ -2,6 +2,7 @@ import { freezeMasks } from './masks';
 import { inlineMedia, shrinkImage } from './inline-media';
 import { js } from './html';
 import { paintSvg } from './svg-paint';
+import { planLayers, type Pass } from './layer-plan';
 import { ERRORS } from '../custom/runtime';
 export { contentStamp } from '../stamp';
 
@@ -15,12 +16,17 @@ export enum FrameFormat {
   Bitmap = 'bitmap'
 }
 
+export enum Layering {
+  Flat = 'flat',
+  Split = 'split'
+}
+
 export enum Settle {
   Paint = 'paint',
   Seek = 'seek'
 }
 
-export type CaptureRequest = { type: typeof CAPTURE_REQUEST; id: string; format: FrameFormat; width: number; height: number; quality?: number; settle?: Settle };
+export type CaptureRequest = { type: typeof CAPTURE_REQUEST; id: string; format: FrameFormat; width: number; height: number; quality?: number; settle?: Settle; layering?: Layering };
 export type ClipError = { clip: string; component: string; message: string };
 export type CaptureReply = { type: typeof CAPTURE_REPLY; id: string; stamp?: string; url?: string; bitmap?: ImageBitmap; error?: string; layout?: string; errors?: ClipError[] };
 
@@ -31,7 +37,7 @@ type HtmlToImage = {
   getFontEmbedCSS: (node: HTMLElement) => Promise<string>;
 };
 
-function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, inline: typeof inlineMedia, shrink: typeof shrinkImage, paint: typeof paintSvg) {
+function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, inline: typeof inlineMedia, shrink: typeof shrinkImage, paint: typeof paintSvg, plan: typeof planLayers) {
   const shrunk = new Map<string, Promise<string>>();
   let lib: Promise<unknown> | null = null;
   let fonts: Promise<string> | null = null;
@@ -110,8 +116,129 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
     tick: frame,
     draw: full
   });
-  const drawn = (root: HTMLElement, m: CaptureRequest, embed: string) =>
-    Promise.all([tool().toSvg(root, size(m, embed)), lazyNesting()]).then(([url, lazy]) => paint(url, m.width, m.height, painter(lazy)));
+  const svgOf = (root: HTMLElement, m: CaptureRequest, embed: string, options: Record<string, unknown> = {}) =>
+    Promise.all([tool().toSvg(root, { ...size(m, embed), ...options }), lazyNesting()]).then(([url, lazy]) => paint(url, m.width, m.height, painter(lazy)));
+
+  const PLAIN = new Set(['DIV', 'SPAN', 'CANVAS']);
+  const INERT = new Set(['STYLE', 'SCRIPT']);
+  const UPRIGHT = /^matrix\([-\d.e]+, 0, 0, [-\d.e]+, [-\d.e]+, [-\d.e]+\)$/;
+  const SEEN_THROUGH = /rgba\(.*, 0\)$|^transparent$/;
+  const none = (value: string | undefined) => !value || value === 'none';
+  const flat = (el: Element, style: CSSStyleDeclaration, layer: Element) =>
+    PLAIN.has(el.tagName) &&
+    none(style.filter) &&
+    none(style.maskImage || (style as unknown as { webkitMaskImage?: string }).webkitMaskImage) &&
+    none(style.clipPath) &&
+    none(style.backdropFilter) &&
+    none(style.boxShadow) &&
+    none(style.backgroundImage) &&
+    (style.transform === 'none' || UPRIGHT.test(style.transform)) &&
+    (el === layer || style.mixBlendMode === 'normal') &&
+    (style.zIndex === 'auto' || el === layer) &&
+    parseFloat(style.borderTopLeftRadius) + parseFloat(style.borderBottomRightRadius) + parseFloat(style.borderTopRightRadius) + parseFloat(style.borderBottomLeftRadius) === 0 &&
+    parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth) + parseFloat(style.borderLeftWidth) + parseFloat(style.borderRightWidth) === 0 &&
+    [...el.childNodes].every((n) => n.nodeType !== Node.TEXT_NODE || !n.textContent?.trim());
+  const drawnAlone = (layer: Element) => {
+    const all = [layer, ...layer.querySelectorAll('*')].filter((el) => !INERT.has(el.tagName));
+    return all.some((el) => el instanceof HTMLCanvasElement) && all.every((el) => flat(el, getComputedStyle(el), layer));
+  };
+  const factsOf = (layers: Element[]) =>
+    layers.map((layer) => ({
+      canvas: drawnAlone(layer),
+      blend: getComputedStyle(layer).mixBlendMode,
+      backdrop: [layer, ...layer.querySelectorAll('*')].some((el) => !none(getComputedStyle(el).backdropFilter))
+    }));
+  const OPERATION: Record<string, GlobalCompositeOperation> = { normal: 'source-over' };
+  const operationOf = (blend: string) => OPERATION[blend] ?? (blend as GlobalCompositeOperation);
+  type Place = { base: DOMRect; sx: number; sy: number; width: number; height: number };
+  const boxOf = (el: Element, at: Place) => {
+    const r = el.getBoundingClientRect();
+    return [(r.left - at.base.left) * at.sx, (r.top - at.base.top) * at.sy, r.width * at.sx, r.height * at.sy] as const;
+  };
+  const paintEl = (pen: CanvasRenderingContext2D, el: Element, at: Place) => {
+    if (INERT.has(el.tagName)) {
+      return;
+    }
+    const style = getComputedStyle(el);
+    const alpha = Number(style.opacity);
+    if (style.display === 'none' || alpha <= 0) {
+      return;
+    }
+    if (alpha < 1) {
+      const group = canvasOf(at.width, at.height);
+      paintOwn(group.getContext('2d') as CanvasRenderingContext2D, el, style, at);
+      pen.globalAlpha = alpha;
+      pen.drawImage(group, 0, 0);
+      pen.globalAlpha = 1;
+      return;
+    }
+    paintOwn(pen, el, style, at);
+  };
+  const paintOwn = (pen: CanvasRenderingContext2D, el: Element, style: CSSStyleDeclaration, at: Place) => {
+    const [x, y, w, h] = boxOf(el, at);
+    const shown = style.visibility !== 'hidden';
+    if (shown && !SEEN_THROUGH.test(style.backgroundColor)) {
+      pen.fillStyle = style.backgroundColor;
+      pen.fillRect(x, y, w, h);
+    }
+    if (shown && el instanceof HTMLCanvasElement && w && h && el.width && el.height) {
+      pen.drawImage(el, x, y, w, h);
+    }
+    const clips = style.overflow !== 'visible';
+    if (clips) {
+      pen.save();
+      pen.beginPath();
+      pen.rect(x, y, w, h);
+      pen.clip();
+    }
+    for (const child of el.children) {
+      paintEl(pen, child, at);
+    }
+    if (clips) {
+      pen.restore();
+    }
+  };
+  const drawCanvases = (pen: CanvasRenderingContext2D, layer: Element, root: HTMLElement, m: CaptureRequest) =>
+    paintEl(pen, layer, { base: root.getBoundingClientRect(), sx: m.width / cfg.width, sy: m.height / cfg.height, width: m.width, height: m.height });
+  const backdropOf = (root: HTMLElement) => {
+    const style = getComputedStyle(root);
+    return style.backgroundImage === 'none' ? style.backgroundColor : null;
+  };
+  const layered = async (root: HTMLElement, m: CaptureRequest, embed: string, passes: Pass[], layers: Element[]) => {
+    const out = canvasOf(m.width, m.height);
+    const pen = out.getContext('2d') as CanvasRenderingContext2D;
+    const firstDom = passes.findIndex((p) => p.kind === 'dom');
+    if (passes[0].kind === 'canvas') {
+      pen.fillStyle = backdropOf(root) ?? 'transparent';
+      pen.fillRect(0, 0, m.width, m.height);
+    }
+    for (const [index, pass] of passes.entries()) {
+      pen.globalCompositeOperation = operationOf(pass.blend);
+      if (pass.kind === 'canvas') {
+        const own = canvasOf(m.width, m.height);
+        drawCanvases(own.getContext('2d') as CanvasRenderingContext2D, layers[pass.layers[0]], root, m);
+        pen.drawImage(own, 0, 0);
+        continue;
+      }
+      const shown = new Set(pass.layers.map((i) => layers[i]));
+      const hidden = new Set(layers.filter((l) => !shown.has(l)));
+      const style = index === firstDom && passes[0].kind === 'dom' ? {} : { style: { background: 'transparent' } };
+      const part = await svgOf(root, m, embed, { ...style, filter: (node: Node) => drawable(node) && !hidden.has(node as Element) });
+      pen.drawImage(part, 0, 0);
+    }
+    pen.globalCompositeOperation = 'source-over';
+    return out;
+  };
+  const LAYERED = 'split';
+  const drawn = (root: HTMLElement, m: CaptureRequest, embed: string) => {
+    const layers = [...root.children].filter((el) => !(el instanceof HTMLScriptElement) && !(el instanceof HTMLStyleElement));
+    const passes = (m.layering ?? LAYERED) === LAYERED ? plan(factsOf(layers)) : [];
+    const solid = passes[0]?.kind !== 'canvas' || backdropOf(root) !== null;
+    if (!passes.some((p) => p.kind === 'canvas') || !solid) {
+      return svgOf(root, m, embed);
+    }
+    return layered(root, m, embed, passes, layers);
+  };
   const output: Record<string, (root: HTMLElement, m: CaptureRequest, embed: string) => Promise<Shot>> = {
     jpeg: (root, m, embed) => drawn(root, m, embed).then((canvas) => ({ body: { url: canvas.toDataURL('image/jpeg', m.quality ?? 1) }, transfer: [] })),
     bitmap: (root, m, embed) =>
@@ -166,5 +293,5 @@ export function stampOf(html: string): string | null {
 
 export function captureScript(doc: { width: number; height: number }, stamp: string): string {
   const cfg: RuntimeConfig = { request: CAPTURE_REQUEST, reply: CAPTURE_REPLY, lib: SCREENSHOT_URL, width: doc.width, height: doc.height, mediaTimeoutMs: MEDIA_TIMEOUT_MS, stamp, errorsKey: ERRORS, settle: Settle.Paint };
-  return `<script>(${captureRuntime.toString()})(${js(cfg)},(${freezeMasks.toString()}),(${inlineMedia.toString()}),(${shrinkImage.toString()}),(${paintSvg.toString()}));</script>`;
+  return `<script>(${captureRuntime.toString()})(${js(cfg)},(${freezeMasks.toString()}),(${inlineMedia.toString()}),(${shrinkImage.toString()}),(${paintSvg.toString()}),(${planLayers.toString()}));</script>`;
 }
