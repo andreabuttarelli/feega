@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FORMATS, MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
-import { MOTION_NODE_BAR_H, motionEditorPath, motionNodeSize, motionOf, motionPreviewPath, newMotionData } from './motion-node';
+import { MOTION_NODE_BAR_H, motionEditorPath, motionNodeSize, motionOf, motionPreviewPath, newMotionData, storyboardPath } from './motion-node';
 import { nodeSize } from './node-size';
 
 describe('motion node', () => {
@@ -56,5 +56,13 @@ describe('motion node', () => {
 
   it('the preview is read next to the editor', () => {
     expect(motionPreviewPath({ projectId: 'p', canvasId: 'c', nodeId: 'n' })).toBe('/p/p/c/c/motion/n/preview');
+  });
+});
+
+describe('the storyboard of a video', () => {
+  it('opens the canvas linked on the motion node, or nothing before the agent writes one', () => {
+    expect(storyboardPath('p', { storyboard: { canvasId: 'board', placed: [] } })).toBe('/p/p/c/board');
+    expect(storyboardPath('p', {})).toBeNull();
+    expect(storyboardPath('p', { storyboard: { canvasId: '' } })).toBeNull();
   });
 });

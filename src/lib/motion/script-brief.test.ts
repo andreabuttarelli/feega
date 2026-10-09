@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BRIEF_AUTO_GO_S, GO_MESSAGE, briefAwaits, pendingBrief, promptTexts, savedBrief } from './script-brief';
+import { BRIEF_AUTO_GO_S, GO_MESSAGE, briefAwaits, pendingBoard, pendingBrief, promptTexts, savedBrief } from './script-brief';
 import { MotionFormat, newMotionDoc } from './doc';
 import { toolsForMirror } from '$lib/chat-stream-events';
 
@@ -57,3 +57,17 @@ describe('screening the go message', () => {
   });
 });
 
+
+describe('the storyboard next to the brief', () => {
+  const outline = [{ act: 'problem', intensity: 0.3, branch: false }];
+  const board = { toolName: 'write_storyboard', output: { ok: true, canvas_id: 'board', outline } };
+
+  it('reads the board the same turn wrote, even through the mirrored row', () => {
+    expect(pendingBoard([{ role: 'assistant', content: '', tools: toolsForMirror([board, written]) }])).toEqual({ canvasId: 'board', outline });
+  });
+
+  it('has none when the turn wrote none, or it was refused', () => {
+    expect(pendingBoard([{ role: 'assistant', content: '', tools: [written] }])).toBeNull();
+    expect(pendingBoard([{ role: 'assistant', content: '', tools: [{ toolName: 'write_storyboard', output: { ok: false } }] }])).toBeNull();
+  });
+});
