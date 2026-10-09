@@ -239,11 +239,12 @@ available yet: it is refused with 403 `server_render_unavailable`. `get_render({
 `status`, `mode`, `asset_id` and a signed `file_url` (one hour) once `done`.
 
 `publish_motion_embed({ org, node_id, action? })` hosts the interactive web export of the saved
-revision and returns `{ published, url, snippet, revision }` — the iframe snippet goes into any
-site; live components (games, generative pieces) run live there and get keys and taps, while a video
+revision and returns `{ published, url, snippet, revision }` — the snippet (feega's loader script
+plus `<feega-motion src="id">`, or `<div data-feega="id">`) goes into any site and fills 100% of
+its box (`fit="contain"` to letterbox); live components (games, generative pieces) run live there and get keys and taps, while a video
 render shows only a still of them. Publishing again updates the same URL; `action: "unpublish"` removes it. Free. Uncensored
-projects get 403 with `refusal`; an empty video 409. A scrub embed follows its own travel through
-the viewport; wrap the snippet in `<div data-scroll="N">` for a sticky section N viewports long.
+projects get 403 with `refusal`; an empty video 409. Playback and scroll length are read from feega,
+not the snippet: a scrub embed builds its own sticky section of the saved scroll length.
 Opened alone, the embed page scrolls itself. `get_motion_embed({ org, node_id })` reads
 `published`, `url`, `snippet`. The self-contained HTML is `GET /api/v1/motion/{node_id}/embed/bundle`.
 

@@ -1,4 +1,5 @@
 import type { readHost, selfScroll } from './host';
+import type { fitBox } from './fit';
 
 export type PlayerConfig = {
   html: string;
@@ -13,13 +14,14 @@ export type PlayerConfig = {
   hostMessage: string;
   selfScroll: string;
   standaloneMs: number;
+  fitScale: Record<string, 'max' | 'min'>;
   keys: { x: string; y: string; down: string; hover: string; tiltX: string; tiltY: string; scroll: string; time: string };
 };
 
 type PlayerEl = HTMLElement & { seek: (t: number) => void; play: () => void; pause: () => void; iframeElement?: HTMLIFrameElement };
 type Orientation = typeof DeviceOrientationEvent & { requestPermission?: () => Promise<string> };
 
-export function playerMain(cfg: PlayerConfig, read: typeof readHost, own: typeof selfScroll): void {
+export function playerMain(cfg: PlayerConfig, read: typeof readHost, own: typeof selfScroll, fit: typeof fitBox): void {
   const TILT_DEGREES = 45;
   const UPRIGHT_BETA = 45;
   const el = document.getElementById('player') as PlayerEl;
@@ -43,13 +45,19 @@ export function playerMain(cfg: PlayerConfig, read: typeof readHost, own: typeof
       el.pause();
     }
   };
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const scaleBy = Math[cfg.fitScale[new URLSearchParams(location.search).get('fit') ?? ''] ?? cfg.fitScale.cover];
   const content = () => {
     const r = pad.getBoundingClientRect();
-    const scale = Math.min(r.width / cfg.width, r.height / cfg.height);
-    const w = cfg.width * scale;
-    const h = cfg.height * scale;
-    return { left: r.left + (r.width - w) / 2, top: r.top + (r.height - h) / 2, width: w, height: h };
+    const box = fit(r, cfg, scaleBy);
+    return { ...box, left: r.left + box.left, top: r.top + box.top };
   };
+  const layout = () => {
+    const box = fit(pad.getBoundingClientRect(), cfg, scaleBy);
+    Object.assign(el.style, { left: `${box.left}px`, top: `${box.top}px`, width: `${box.width}px`, height: `${box.height}px` });
+  };
+  addEventListener('resize', layout);
+  layout();
   const point = (e: PointerEvent) => {
     const box = content();
     values[cfg.keys.x] = (e.clientX - box.left) / box.width;
@@ -131,7 +139,7 @@ export function playerMain(cfg: PlayerConfig, read: typeof readHost, own: typeof
     if (progress !== undefined) {
       scrub(progress);
     }
-    if (cfg.playback === cfg.modes.autoplay) {
+    if (cfg.playback === cfg.modes.autoplay && !still) {
       play();
     }
   });

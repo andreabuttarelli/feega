@@ -7,13 +7,13 @@ import { InputKey } from '../expression/inputs';
 import { INPUT_MESSAGE } from './runtime';
 import { EVENT_MESSAGE } from '../custom/runtime';
 import { playerMain, type PlayerConfig } from './player';
-import { hostMain, readHost, selfScroll } from './host';
-import { Liveness, PlayMode, interactiveOf, type Interactive } from './settings';
+import { EMBED_ROUTE, HOST_MESSAGE, hostMain, readHost, selfScroll } from './host';
+import { Liveness, PlayMode, SCROLL_LENGTH, interactiveOf, type Interactive } from './settings';
+import { FIT_SCALE, fitBox } from './fit';
+import type { EmbedSettings } from './loader';
 
-export const HOST_MESSAGE = 'feega:host';
 export const PLAYER_URL = `https://cdn.jsdelivr.net/npm/@hyperframes/player@${HYPERFRAMES_VERSION}/dist/hyperframes-player.global.js`;
 export const BUNDLE_FILE = 'feega-interactive.html';
-export const EMBED_ROUTE = '/e';
 export const SELF_SCROLL = 'self-scroll';
 export const STANDALONE_MS = 500;
 const SELF_SCROLL_VIEWPORTS = 4;
@@ -53,7 +53,7 @@ function scriptJson(value: unknown): string {
   return JSON.stringify(value).replace(/</g, '\\u003c');
 }
 
-type PlayerSource = Pick<PlayerConfig, 'html' | 'width' | 'height' | 'duration' | 'playback' | 'loop'>;
+type PlayerSource = Pick<PlayerConfig, 'html' | 'width' | 'height' | 'duration' | 'playback' | 'loop'> & { scrollLength?: number };
 
 const PLAYER_START = '<script>(function playerMain';
 const TITLE = /<title>([^<]*)<\/title>/;
@@ -67,6 +67,7 @@ function playerConfig(source: PlayerSource): PlayerConfig {
     hostMessage: HOST_MESSAGE,
     selfScroll: SELF_SCROLL,
     standaloneMs: STANDALONE_MS,
+    fitScale: FIT_SCALE,
     keys: { x: InputKey.PointerX, y: InputKey.PointerY, down: InputKey.PointerDown, hover: InputKey.Hover, tiltX: InputKey.TiltX, tiltY: InputKey.TiltY, scroll: InputKey.Scroll, time: InputKey.Time }
   };
 }
@@ -79,7 +80,7 @@ const PAD_TOUCH: Record<PlayMode, string> = {
 };
 
 function sourceOf(html: string, doc: MotionDoc, settings: Interactive): PlayerSource {
-  return { html, width: doc.width, height: doc.height, duration: doc.durationInFrames / doc.fps, playback: settings.playback, loop: settings.loop };
+  return { html, width: doc.width, height: doc.height, duration: doc.durationInFrames / doc.fps, playback: settings.playback, loop: settings.loop, scrollLength: settings.scrollLength };
 }
 
 function jsonEnd(text: string, start: number): number {
@@ -111,17 +112,27 @@ function isEscaped(text: string, at: number): boolean {
   return slashes % 2 === 1;
 }
 
-export function upgradePlayer(page: string): string | null {
+type Stored = { source: PlayerSource; title: string };
+
+function storedPlayer(page: string): Stored | null {
   const script = page.indexOf(PLAYER_START);
   const start = script < 0 ? -1 : page.indexOf('({"html":', script) + 1;
   const end = start > 0 ? jsonEnd(page, start) : -1;
   if (end < 0) {
     return null;
   }
-  const stored = JSON.parse(page.slice(start, end)) as PlayerSource;
-  const title = TITLE.exec(page)?.[1] ?? '';
-  const { html, width, height, duration, playback, loop } = stored;
-  return pageOf({ html, width, height, duration, playback, loop }, title);
+  const { html, width, height, duration, playback, loop, scrollLength } = JSON.parse(page.slice(start, end)) as PlayerSource;
+  return { source: { html, width, height, duration, playback, loop, scrollLength }, title: TITLE.exec(page)?.[1] ?? '' };
+}
+
+export function upgradePlayer(page: string): string | null {
+  const stored = storedPlayer(page);
+  return stored ? pageOf(stored.source, stored.title) : null;
+}
+
+export function embedSettings(page: string): EmbedSettings | null {
+  const source = storedPlayer(page)?.source;
+  return source ? { width: source.width, height: source.height, playback: source.playback, scrollLength: source.scrollLength ?? SCROLL_LENGTH.default } : null;
 }
 
 export function playerPage(html: string, doc: MotionDoc, settings: Interactive, title: string): string {
@@ -134,11 +145,11 @@ function pageOf(source: PlayerSource, title: string): string {
     '<meta name="viewport" content="width=device-width, initial-scale=1" />',
     `<title>${title}</title>`,
     `<script src="${PLAYER_URL}"></script>`,
-    `<style>html,body{margin:0;height:100%;background:transparent;overflow:hidden}#stage{position:relative;width:100%;height:100%}#player,#pad{position:absolute;inset:0;width:100%;height:100%}#pad{touch-action:${PAD_TOUCH[source.playback as PlayMode]}}html.${SELF_SCROLL}{overflow-y:auto;height:auto}html.${SELF_SCROLL} body{overflow:visible;height:${SELF_SCROLL_VIEWPORTS * 100}vh}html.${SELF_SCROLL} #stage{position:sticky;top:0;height:100vh}</style>`,
+    `<style>html,body{margin:0;height:100%;background:transparent;overflow:hidden}#stage{position:relative;width:100%;height:100%;overflow:hidden}#player{position:absolute}#pad{position:absolute;inset:0;width:100%;height:100%}#pad{touch-action:${PAD_TOUCH[source.playback as PlayMode]}}html.${SELF_SCROLL}{overflow-y:auto;height:auto}html.${SELF_SCROLL} body{overflow:visible;height:${SELF_SCROLL_VIEWPORTS * 100}vh}html.${SELF_SCROLL} #stage{position:sticky;top:0;height:100vh}</style>`,
     '</head><body><div id="stage">',
     '<hyperframes-player id="player" sandbox-origin="opaque" assets-loading-ui="none" disable-click-to-play></hyperframes-player>',
     '<div id="pad"></div></div>',
-    `<script>(${playerMain.toString()})(${scriptJson(playerConfig(source))},${readHost.toString()},${selfScroll.toString()});</script>`,
+    `<script>(${playerMain.toString()})(${scriptJson(playerConfig(source))},${readHost.toString()},${selfScroll.toString()},${fitBox.toString()});</script>`,
     '</body></html>'
   ].join('');
 }

@@ -2,7 +2,8 @@ import { env as publicEnv } from '$env/dynamic/public';
 import type { Db } from '$lib/server/db/client';
 import { embedRefusal, type PublishRefusal } from '$lib/gallery/refusals';
 import type { ProjectMode } from '$lib/project-mode';
-import { fileSnippet, embedUrl, interactiveBundle, upgradePlayer, type InteractiveInput } from '$lib/motion/interactive/bundle';
+import { embedSettings, embedUrl, interactiveBundle, upgradePlayer, type InteractiveInput } from '$lib/motion/interactive/bundle';
+import { embedSnippet, type EmbedSettings } from '$lib/motion/interactive/loader';
 
 export const EMBED_BUCKET = 'embeds';
 const EMBED_TYPE = 'text/html';
@@ -46,7 +47,7 @@ export async function publishEmbed(db: Db, input: EmbedPublish, origin = embedOr
   }
 
   const url = embedUrl(origin, input.nodeId);
-  return { ok: true, url, snippet: fileSnippet(input.doc, url) };
+  return { ok: true, url, snippet: embedSnippet(origin, input.nodeId) };
 }
 
 export async function embedSlot(db: Db, nodeId: string, mode: ProjectMode): Promise<EmbedSlot> {
@@ -72,14 +73,20 @@ export async function embedPublished(db: Db, nodeId: string): Promise<boolean> {
   return (data ?? []).some((f) => f.name === embedPath(nodeId));
 }
 
-export async function readEmbed(fetchFn: typeof fetch, id: string): Promise<string | null> {
+async function storedEmbed(fetchFn: typeof fetch, id: string): Promise<string | null> {
   if (!NODE_ID.test(id)) {
     return null;
   }
   const res = await fetchFn(`${publicEnv.PUBLIC_SUPABASE_URL}/storage/v1/object/public/${EMBED_BUCKET}/${embedPath(id)}`);
-  if (!res.ok) {
-    return null;
-  }
-  const page = await res.text();
-  return upgradePlayer(page) ?? page;
+  return res.ok ? res.text() : null;
+}
+
+export async function readEmbed(fetchFn: typeof fetch, id: string): Promise<string | null> {
+  const page = await storedEmbed(fetchFn, id);
+  return page === null ? null : (upgradePlayer(page) ?? page);
+}
+
+export async function readEmbedSettings(fetchFn: typeof fetch, id: string): Promise<EmbedSettings | null> {
+  const page = await storedEmbed(fetchFn, id);
+  return page === null ? null : embedSettings(page);
 }
