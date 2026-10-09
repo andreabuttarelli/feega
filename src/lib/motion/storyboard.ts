@@ -228,3 +228,15 @@ export function boardMedia(board: Storyboard, assets: { id: string; kind: string
   const unknown = ids.filter((id) => !kinds[id]);
   return unknown.length ? { ok: false, error: `not a picture or clip of this project: ${unknown.join(', ')}` } : { ok: true, kinds };
 }
+
+export function boardNote(read: StoryboardRead | null): string | null {
+  if (!read?.cards.length) {
+    return null;
+  }
+  const media = read.media.filter((m) => m.asset_id).map((m) => `${m.kind} ${m.asset_id}${m.for.length ? ` for ${m.for.join(', ')}` : ''}`);
+  return [
+    'The storyboard of this video as it is now; the user may have edited it, and their version wins over the saved script. Build what it says, and link_storyboard_beat every card to the clips that play it as you build them.',
+    ...read.cards.map((c) => `[${c.node_id}]${c.clip_ids.length ? ` (clips ${c.clip_ids.join(', ')})` : ''}\n${c.text}`),
+    ...(media.length ? [`Media on the board: ${media.join('; ')}`] : [])
+  ].join('\n\n');
+}

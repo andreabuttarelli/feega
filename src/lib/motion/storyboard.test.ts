@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MediaKind, beatHref, clipSeek, planStoryboard, readStoryboard, storyboardSchema, type Storyboard } from './storyboard';
+import { MediaKind, beatHref, boardNote, clipSeek, planStoryboard, readStoryboard, storyboardSchema, type Storyboard } from './storyboard';
 
 const beat = (act: string, title: string, intensity: number, extra: Record<string, unknown> = {}) => ({
   act,
@@ -153,5 +153,21 @@ describe('a beat linked to its clips', () => {
     expect(clipSeek(doc, '?clip=c1')).toBe(42);
     expect(clipSeek(doc, '?clip=gone')).toBeNull();
     expect(clipSeek(doc, '')).toBeNull();
+  });
+});
+
+describe('the storyboard handed to every turn', () => {
+  it('carries each card with its id, the media and an order to follow it and link the beats', () => {
+    const note = boardNote({ cards: [{ node_id: 'c1', text: '## Cookie banner\nStill guessing?', clip_ids: [] }], media: [{ node_id: 'm', kind: 'image', asset_id: 'a1', prompt: '', for: ['c1'] }], flow: [] });
+
+    expect(note).toContain('[c1]');
+    expect(note).toContain('Still guessing?');
+    expect(note).toContain('a1');
+    expect(note).toContain('link_storyboard_beat');
+  });
+
+  it('says nothing without cards', () => {
+    expect(boardNote(null)).toBeNull();
+    expect(boardNote({ cards: [], media: [], flow: [] })).toBeNull();
   });
 });
