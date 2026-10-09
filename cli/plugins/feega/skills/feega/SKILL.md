@@ -140,6 +140,8 @@ and returns its check; `patch_effect` edits it by find/replace at its `version`.
 them under `custom`, each with the `step` to put in an `apply_effects` stack. On motion clips, ask
 `ask_motion_agent` to add it.
 
+The canvas and motion agents browse the web themselves (`web_search`, `read_page`, `screenshot_page`, `import_image`), so a request to `ask_motion_agent` can say "find X's brand colours". As an external agent, browse with your own web tools; feega does not proxy search.
+
 Custom composition layouts: `write_layout` writes a spec layout (placement, slots, animation) for the
 workspace, `patch_layout` replaces its spec at a `version`, `list_layouts` lists them; ask
 `ask_motion_agent` to arrange a composition on one.

@@ -26,6 +26,14 @@ describe('il prompt dichiara lo scope, non un brand obbligatorio', () => {
     expect(prompt).toContain('publishing tools are available');
   });
 
+  it('dice quando cercare sul web e di citare le fonti', () => {
+    const prompt = projectAgentPrompt({ project, canvases, brand: null });
+
+    for (const word of ['web_search', 'read_page', 'import_image', 'cite']) {
+      expect(prompt).toContain(word);
+    }
+  });
+
   it('il testo scritto va in un doc, non in un text che genera', () => {
     const prompt = projectAgentPrompt({ project, canvases, brand: null });
 

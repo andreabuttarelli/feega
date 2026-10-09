@@ -25,6 +25,7 @@ import { assetUrls, headOrNew, motionAssets, motionTokens, saveMotionDoc } from 
 import { fitNewVideo } from '$lib/motion/fit-duration';
 import { AGENT_SELF_SAVE_MS, overTurnCap } from '$lib/server/project-agent/limits';
 import { dropWorkingDoc, keepWorkingDoc } from '$lib/server/motion/working-doc';
+import { liveWebDeps } from '$lib/server/web/live';
 import { EmbedAction, createMotionTools, selectionNote, type MotionSession } from '$lib/server/motion/motion-tools';
 import { publishEmbed, removeEmbed } from '$lib/server/motion/embed';
 import type { ProjectMode } from '$lib/project-mode';
@@ -202,6 +203,9 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
       return firstFrames([editor, server]);
     },
     inspect: frameStats,
+    web: liveWebDeps({ orgId, userId, projectId: project.id, brandId: project.brandId }, (usd) => {
+      spent += usd;
+    }),
     layouts: layoutStore({ db, orgId, actor: { kind: 'agent', id: userId, agentKey: MOTION_AGENT_KEY } }),
     effects: effectStore({ db, orgId, actor: { kind: 'agent', id: userId, agentKey: MOTION_AGENT_KEY }, gl: serverFramesOpen() ? chromiumGl : null }),
     readUi: uiReader({ ask: (q) => withOrgContext(orgId, () => llmStructured({ ...q, model: llmVisionModel() ?? model, label: 'motion-recreate-ui' })), fetchBytes: fetchImageBytes }),

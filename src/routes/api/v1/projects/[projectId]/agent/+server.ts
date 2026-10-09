@@ -15,6 +15,8 @@ import { agentActor, SIDEBAR_AGENT_KEY } from '$lib/server/repos/actor';
 import { createProjectTools } from '$lib/server/project-agent/project-tools';
 import { createMotionDelegation } from '$lib/server/project-agent/motion-delegation';
 import { openAgentTools } from '$lib/server/project-agent/tool-surface';
+import { createWebTools } from '$lib/server/web/web-tools';
+import { liveWebDeps, webImageImport } from '$lib/server/web/live';
 import { projectAgentPrompt } from '$lib/server/project-agent/system-prompt';
 import { AGENT_MAX_DURATION_S, agentStopWhen, overTurnCap } from '$lib/server/project-agent/limits';
 import { spentUsd } from '$lib/server/motion/model-route';
@@ -122,9 +124,16 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
   const reply = await openReply(db, { orgId, threadId, actor });
   const steps: Parameters<typeof finishedTurn>[0][number][] = [];
 
+  let spent = 0;
   const projectTools = {
     ...createProjectTools({ db, orgId, projectId: project.id, userId: user.id, brandId: brand?.id ?? null }),
-    ...createMotionDelegation({ db, orgId, projectId: project.id, userId: user.id, origin: url.origin, model, canvasId })
+    ...createMotionDelegation({ db, orgId, projectId: project.id, userId: user.id, origin: url.origin, model, canvasId }),
+    ...createWebTools({
+      ...liveWebDeps({ orgId, userId: user.id, projectId: project.id, brandId: brand?.id ?? null }, (usd) => {
+        spent += usd;
+      }),
+      importImage: webImageImport(db, { orgId, projectId: project.id, mode: project.mode })
+    })
   };
   const agent = await openAgentTools({
     projectTools,
@@ -133,7 +142,6 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
   });
 
   await ensureGatewayModels();
-  let spent = 0;
   const t0 = Date.now();
   const billedScope = <T>(fn: () => T): T => (brand ? withBrandContext(brand.id, fn) : withOrgContext(orgId, fn));
 

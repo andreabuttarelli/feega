@@ -5,6 +5,7 @@ import { EFFECT_KINDS } from '$lib/motion/effects/registry';
 import { UNITS_GUIDE } from '$lib/motion/units';
 import { STYLES } from '$lib/motion/style';
 import { DEFAULT_STYLE, type MotionStyle } from '$lib/motion/style-model';
+import { WEB_GUIDANCE } from '$lib/server/web/web-tools';
 
 const SEEING: Record<Vision, string> = {
   [Vision.Available]: `You can SEE the video: ${VIEW_FRAMES} renders up to ${MAX_FRAMES_PER_VIEW} exact times from the editor preview and shows you the frames. Use it when how something looks matters. After a turn that changed the video, an automatic self-check shows you the middle of each scene once: fix clipped or overflowing text, overlaps, low contrast and safe-area problems then, and only those. Write your summary for the user after that check, not before: until then keep any note to one line.`,
@@ -82,6 +83,7 @@ export function motionAgentPrompt(input: { brandName: string | null; selectionNo
     'Timing (start, duration) is set_timing, never a prop. A tool that fails tells you why: read the error and retry with what it says.',
     componentContract(input.frame ?? { width: 1920, height: 1080 }),
     'generate_voiceover spends credits: only when the user asked for a voice-over.',
+    `${WEB_GUIDANCE} In a launch film every claim still comes from the brand's own site through analyze_site and write_script: the web helps you find the site and references, never a claim's source. import_asset a picture you found to use it.`,
     'Answer in the language the user writes in. Be brief: say what changed.'
   ].join('\n');
 }

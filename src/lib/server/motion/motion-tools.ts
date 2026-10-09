@@ -101,6 +101,7 @@ import { applyValues, exposeField, fieldValues, removeField } from '$lib/motion/
 import { FIELD_TYPES, MAX_LINKED, type ExposedField } from '$lib/motion/template/field-model';
 import { detachTemplate, insertTemplate, isLockedComp, setTemplateValues, templateFields } from '$lib/motion/template/library';
 import type { TemplateLibrary } from './templates';
+import { createWebTools, type WebToolDeps } from '$lib/server/web/web-tools';
 import { DEFAULT_NAME_PATTERN, MAX_BATCH_ROWS, outputName } from '$lib/motion/template/batch';
 import { renderQuote } from '$lib/motion/render-quote';
 import { BOUNDS, PHYSICS, PHYSICS_KEYS, PHYSICS_PRESET, PHYSICS_PRESETS } from '$lib/motion/physics/model';
@@ -142,6 +143,7 @@ export type MotionToolDeps = {
   readUi?: (asset: MotionAsset, region?: UiRegion) => Promise<UiRead>;
   effects?: EffectStore;
   layouts?: LayoutStore;
+  web?: WebToolDeps;
 };
 
 export type RevisionEntry = { version: number; summary: string | null; actorKind: string; createdAt: string; clips: number };
@@ -2028,7 +2030,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     return ((await nested.execute(parsed.data, options)) ?? {}) as { ok?: boolean; error?: unknown };
   }
 
-  return oneAtATime(tools);
+  return { ...oneAtATime(tools), ...(deps.web ? createWebTools(deps.web) : {}) };
 }
 
 type Execute = (input: unknown, options: ToolExecutionOptions<unknown>) => Promise<unknown>;
