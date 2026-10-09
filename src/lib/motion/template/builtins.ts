@@ -18,7 +18,7 @@ const WHITE = '#ffffff';
 const ORANGE = '#ff5a1f';
 
 const WIPE = edge(TransitionKind.Wipe, 0.4);
-const POP: Beat['keys'] = { scale: [[0, 0.9], [0.6, 1, Ease.Overshoot]] };
+const POP: Beat['keys'] = { scale: [[0, 0.9], [0.6, 1, Ease.Enter]] };
 
 const PHOTO = { width: 0.36, height: 0.5 };
 const LOGO = { width: 0.12, height: 0.2 };

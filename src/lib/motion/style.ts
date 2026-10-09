@@ -1,10 +1,11 @@
-import { TransitionKind } from './design';
 import { COMPONENTS, TrackKind } from './components';
 import { STORY_BEATS, STORY_SHARE, storyBeats } from './story';
 import type { MotionDoc } from './doc';
 import { EffectKind } from './effects/registry';
 import { JunctionKind } from './junction-model';
-import { EASE_BEZIER, type Bezier, type Keyframe } from './keyframes';
+import { TransitionKind } from './design';
+import { EASE_BEZIER, easeCurve, type Bezier, type Keyframe } from './keyframes';
+import { motionEngine } from './engine/engine';
 import { loopSeam, tooDense } from './ui-morph/ops';
 import { DEFAULT_STYLE, MotionStyle, STYLE_EASES, type StyleEases } from './style-model';
 
@@ -27,7 +28,8 @@ export enum Forbidden {
   LoopSeam = 'loop-seam',
   TooDense = 'too-dense',
   TextOverScene = 'text-over-scene',
-  TooMuchText = 'too-much-text'
+  TooMuchText = 'too-much-text',
+  WeakEase = 'weak-ease'
 }
 
 export type StyleSpec = {
@@ -75,10 +77,13 @@ const SCENES = new Set(['Custom', 'Device3D', 'Video', 'Model3D']);
 const SHARED_SECONDS = 0.5;
 const MAX_WORDS_PER_SECOND = 1;
 const TITLE_CARDS: readonly Forbidden[] = [Forbidden.TextOverScene, Forbidden.TooMuchText];
-const CALM: readonly Forbidden[] = [Forbidden.Particles, Forbidden.Glow, Forbidden.Rotation, Forbidden.Bounce, Forbidden.FlyingText, Forbidden.Crowded, Forbidden.Transition, Forbidden.Still];
+const CALM: readonly Forbidden[] = [Forbidden.WeakEase, Forbidden.Particles, Forbidden.Glow, Forbidden.Rotation, Forbidden.Bounce, Forbidden.FlyingText, Forbidden.Crowded, Forbidden.Transition, Forbidden.Still];
 
 export const TITLE_CARD_RULE =
   'Little text, and a title owns the frame: most of the video is scenes (rebuilt UI, devices, the product). When words appear they are a title card: big, centred, alone on the frame, nothing competing; the scene it announces comes after. Alternate title card → scene → title card → scene, each its own row in the storyboard. Never lay a headline over a UI, device or picture: only short labels that belong to the rebuilt UI itself. The gate names a headline over a scene and a video carried by text (more than one word per second).';
+
+export const EASING_RULE =
+  'Easing is strongly accentuated, with a soft settle: every entrance on enter (feega.out), every exit on exit (feega.in), every move on standard (feega.inOut, the default), an expo-like curve that lands with an almost imperceptible resistance (at most 1–2% past the mark, never a visible bounce). In code, tween with ease: \'feega.out\' / \'feega.inOut\' / \'feega.in\'; springs stay near critical damping. Linear only for a continuous drift, a loop or a driver tween; never sine, power1 or a plain ease; never bouncy or elastic (back, elastic, bounce, overshoot). The weak-ease gate names the rest.';
 
 export const STYLES: Record<MotionStyle, StyleSpec> = {
   [MotionStyle.LaunchFilm]: {
@@ -91,19 +96,20 @@ export const STYLES: Record<MotionStyle, StyleSpec> = {
     junctions: [JunctionKind.Crossfade, JunctionKind.DipToBlack, JunctionKind.Blur, JunctionKind.Zoom, JunctionKind.PushLeft, JunctionKind.PushRight, JunctionKind.Wipe],
     entrances: [TransitionKind.None, TransitionKind.Fade, TransitionKind.Blur, TransitionKind.Scale, TransitionKind.SlideLeft, TransitionKind.SlideRight, TransitionKind.SlideUp],
     reading: READING,
-    forbidden: [Forbidden.Particles, Forbidden.Glow, Forbidden.Bounce, Forbidden.Crowded, Forbidden.Transition, Forbidden.Still, Forbidden.OffBeat, Forbidden.NoPeak, Forbidden.RoughCut, Forbidden.ReadingTime, Forbidden.Screenshots, Forbidden.MissingStoryBeat, Forbidden.Rushed, ...TITLE_CARDS],
+    forbidden: [Forbidden.Particles, Forbidden.Glow, Forbidden.Bounce, Forbidden.WeakEase, Forbidden.Crowded, Forbidden.Transition, Forbidden.Still, Forbidden.OffBeat, Forbidden.NoPeak, Forbidden.RoughCut, Forbidden.ReadingTime, Forbidden.Screenshots, Forbidden.MissingStoryBeat, Forbidden.Rushed, ...TITLE_CARDS],
     pace: { minGap: 0.25, hold: 0.5 },
     maxMoving: 4,
     rules: [
       'Launch film is the house style: the LOOK of an Apple keynote film, Linear, Vercel Ship or Stripe Sessions (few elements, very large type, the real product, a sober palette) with HIGH ENERGY. Minimal never means slow: the bar is "would a client pay for this?". Never a slideshow, a still picture, a slow fade, the same layout twice or a PowerPoint effect.',
       TITLE_CARD_RULE,
+      EASING_RULE,
       'Story first: four acts, problem (the user\'s pain in the brand\'s own words), solution (the product enters), proof (features shown live, numbers, results), claim (promise, original logo, address), about 20/15/45/20% of the length, each marked with mark_story; the gate names a missing act.',
       'Storyboard first: before the first edit write a table, one row per scene, grouped by act: time, beat, scene template, the line it says, the move (kinetic type, speed ramp, device fly, match cut, montage, peak, logo build).',
       'Music is always there and drives the cut: with no audio in the project call add_music first (mood and bpm that fit the brand; it lays the track and marks its beats), otherwise put the project music on an Audio clip, analyze_audio, mark_beats; then cut on the beat, never on a half beat (cut_to_beat). A scene lasts until every animation in it has finished, plus a 1–1.5 s hold; never cut while something is still moving. Longer beats compressed: fewer ideas, never faster cuts (3 to 5 scenes in 15 s). Backgrounds never show a cut-off or banded gradient.',
       'Build from the launch scenes: list_templates, insert_template builtin:launch-* (word-burst, ui-speed-ramp, device-fly, number-match-cut, ui-tilt-zoom, beat-montage, ui-explode, device-orbit, logo-build) and fill them with set_template_fields; push them further with keyframes. builtin:scene-* are the calm variants, for a beat of rest.',
-      'Kinetic type that can be read: words land on the beat, very large, each punching in from 130–140% and an 18 px blur in 0.2–0.3 s on cubic-bezier(0.16,1,0.3,1), then STAY: every text is on screen at least 0.4 s per word plus 0.6 s, 1.2 s at least for a phrase, plus a 1 s pause once read (the gate names unreadable text). Build a line word by word and hold it; energy comes from movement and transitions, never from text that disappears. One accent colour on the key word.',
+      'Kinetic type that can be read: words land on the beat, very large, each punching in from 130–140% and an 18 px blur in 0.2–0.3 s on enter (feega.out), then STAY: every text is on screen at least 0.4 s per word plus 0.6 s, 1.2 s at least for a phrase, plus a 1 s pause once read (the gate names unreadable text). Build a line word by word and hold it; energy comes from movement and transitions, never from text that disappears. One accent colour on the key word.',
       'Camera never rests: every picture pushes, zooms inside its box (Image zoom with focus_x/focus_y) or pans; devices fly in turning 90° or more and keep drifting; nothing holds still for more than half a second (the quality gate names it). A drift is slow (a few % of scale, a few % of the frame or about 10° per second) or longer than 2 s: it is camera, it never needs a hold and never blocks a cut; anything faster is an animation that must finish and hold.',
-      'Speed ramps: a zoom into the real UI runs slow-fast-slow on cubic-bezier(0.83,0,0.17,1): hold a beat, whip to the detail on the next beat, keep creeping. Motion blur on (set_motion_blur, 180°, 6 samples) so the whip smears.',
+      'Speed ramps: a zoom into the real UI runs slow-fast-slow on standard (feega.inOut): hold a beat, whip to the detail on the next beat, keep creeping. Motion blur on (set_motion_blur, 180°, 6 samples) so the whip smears.',
       'Match cuts: carry a word, a number or the product across the cut in the same place (the hook word becomes the headline on the real page; three numbers swap in one spot).',
       'One clear wow peak on the strongest beat, about two thirds in: the UI exploding into 3D (launch-ui-explode), a white flash on the drop, the biggest move of the film. The gate names a film with no peak.',
       'Every junction flows: a match cut (an element carries on into the next scene), camera continuity (a zoom that goes through and becomes the next scene: set_clip_transition zoom), a whip pan with motion blur (push-left/push-right), a soft wipe, a dissolve with movement, a shape or UI morphing into the next. A hard cut is the exception, a deliberate hit on a strong beat, and rare: the gate names a film cut together hard.',
@@ -131,12 +137,13 @@ export const STYLES: Record<MotionStyle, StyleSpec> = {
     rules: [
       'Apple minimal is the house style: every frame should look like a frame of an Apple keynote or product film. Confident and calm: type snaps in and holds, the camera drifts slowly, one idea at a time.',
       TITLE_CARD_RULE,
+      EASING_RULE,
       'Build the video from the scene library: list_templates, then insert_template the builtin:scene-* scenes one after another and fill them with set_template_fields (real text, brand pictures, the one accent colour). Build primitives by hand only for something no scene can show.',
       'Storyboard first: before the first edit, write the plan as a short table, one row per scene: time, scene template, the line it says, the beat it lands on.',
       'One idea per scene, 2–4 s each. Type is either very large (one line that fills the frame) or very small; nothing in between. Lots of empty space.',
       'Palette: black or white background, the text white or near-black, one accent from the brand used on one word or one number at a time. Never more than one accent colour.',
-      'Text enters fast and decisive, then holds still: 0.3–0.5 s on the expo-out ease cubic-bezier(0.16,1,0.3,1), a 2% rise and a light blur per line, each line a clip staggered 0.05–0.15 s after the one before. Never a slow 1 s text fade.',
-      'Slow movement belongs to the camera and the product only: a push-in or pan that runs the whole time a picture is on screen, on cubic-bezier(0.65,0,0.35,1) or linear. No picture or device may stand still for more than 1 s: the quality gate names it.',
+      'Text enters fast and decisive, then holds still: 0.3–0.5 s on enter (feega.out), a 2% rise and a light blur per line, each line a clip staggered 0.05–0.15 s after the one before. Never a slow 1 s text fade.',
+      'Slow movement belongs to the camera and the product only: a push-in or pan that runs the whole time a picture is on screen, linear. No picture or device may stand still for more than 1 s: the quality gate names it.',
       'Product reveal and UI close-up scenes always drift: a slow push-in plus a small pan. When the project has AI video clips made from the product photos, use them instead of the still photo.',
       'Never zoom a picture past its real resolution: the largest scale is source pixels / pixels on screen. For UI use import_asset with capture desktop or mobile (sharp 2× screenshots of the page and its sections), never og:image or a small site thumbnail; the quality gate names a soft picture.',
       'A phone screen wants a mobile capture, a laptop or browser a desktop one: a desktop screenshot on a phone loses its sides.',
@@ -159,10 +166,11 @@ export const STYLES: Record<MotionStyle, StyleSpec> = {
     junctions: [],
     entrances: [TransitionKind.None],
     reading: READING,
-    forbidden: [Forbidden.Particles, Forbidden.Glow, Forbidden.Bounce, Forbidden.LoopSeam, Forbidden.TooDense],
+    forbidden: [Forbidden.Particles, Forbidden.Glow, Forbidden.Bounce, Forbidden.WeakEase, Forbidden.LoopSeam, Forbidden.TooDense],
     pace: { minGap: 0.9, hold: 0.6 },
     maxMoving: 2,
     rules: [
+      EASING_RULE,
       'One shape, never a cut: every UI state is the same element morphing size, radius and colour on springs while its content swaps with a short blur (ui_morph_reel builds it).',
       'A cursor drives every change with real clicks and drags; while a knob is held its value comes from the pointer, on release it springs from where it is.',
       'Warm light grey canvas, black and white components and at most one accent; a clean UI font (Geist); no gradients, glows, particles or bouncy eases.',
@@ -272,6 +280,52 @@ const CLIP_CHECKS: Partial<Record<Forbidden, ClipCheck>> = {
       .filter((c) => (c.junction && !spec.junctions.includes(c.junction.kind)) || !spec.entrances.includes(c.transitionIn.kind) || !spec.entrances.includes(c.transitionOut.kind))
       .map((clip) => ({ clip, at: clip.from, detail: `${clip.id} enters or leaves with ${clip.junction?.kind ?? clip.transitionIn.kind}: use a cut, a dissolve (${spec.junctions.join(', ')}) or a match cut` }))
 };
+
+const WEAK_BAND = 0.12;
+const SETTLE_LIMIT = 0.02;
+const CURVE_SAMPLES = 100;
+const QUARTERS = [0.25, 0.75];
+const MOVE_SECONDS = { min: 0.15, max: 2 };
+const DRIFT_SPEED: Record<string, number> = { opacity: 0, x: 0.05, y: 0.05, scale: 0.05, blur: 4 };
+const LINEAR_DRIVERS = new Set(['none', 'linear', 'power0']);
+const CODED_EASE = /ease:\s*["'`]([^"'`]+)["'`]/g;
+const engine = motionEngine({} as Window & Record<string, unknown>);
+
+type Curve = (p: number) => number;
+
+const isWeak = (curve: Curve) => QUARTERS.every((p) => Math.abs(curve(p) - p) < WEAK_BAND);
+
+function isBouncy(curve: Curve): boolean {
+  const values = Array.from({ length: CURVE_SAMPLES + 1 }, (_, i) => curve(i / CURVE_SAMPLES));
+  return Math.max(...values) > 1 + SETTLE_LIMIT || Math.min(...values) < -SETTLE_LIMIT;
+}
+
+function weakMove(clip: Clip, fps: number): Found | null {
+  for (const [prop, speed] of Object.entries(DRIFT_SPEED)) {
+    const track = clip.keyframes[prop] ?? [];
+    for (let i = 1; i < track.length; i++) {
+      const [a, b] = [track[i - 1], track[i]];
+      const seconds = (b.frame - a.frame) / fps;
+      const travel = Math.abs(Number(b.value) - Number(a.value));
+      if (seconds < MOVE_SECONDS.min || seconds > MOVE_SECONDS.max || !(travel > 0) || travel / seconds <= speed || !isWeak(easeCurve(a.ease))) {
+        continue;
+      }
+      return { clip, at: clip.from + a.frame, detail: `${clip.id} moves ${prop} on a weak curve (linear or sine-like): use enter for entrances, exit for exits, standard for moves; linear only for a drift or a loop` };
+    }
+  }
+  return null;
+}
+
+function weakCode(doc: MotionDoc): Found[] {
+  return Object.entries(doc.components).flatMap(([name, component]) =>
+    [...component.source.js.matchAll(CODED_EASE)]
+      .map((m) => m[1])
+      .filter((ease) => !LINEAR_DRIVERS.has(ease) && (isWeak(engine.parseEase(ease)) || isBouncy(engine.parseEase(ease))))
+      .map((ease) => ({ at: 0, detail: `${name} tweens on ${ease}: weak or bouncy. Use feega.out for entrances, feega.in for exits, feega.inOut for moves; 'none' only for a drift or a loop` }))
+  );
+}
+
+const weakEases: Check = (doc) => [...timelines(doc).flatMap((clips) => clips.flatMap((clip) => weakMove(clip, doc.fps) ?? [])), ...weakCode(doc)];
 
 const beatFrames = (doc: MotionDoc) => (doc.markers ?? []).filter((m) => BEAT_LABEL.test(m.label)).map((m) => m.frame);
 
@@ -410,6 +464,7 @@ const CHECKS: Record<Forbidden, Check> = {
   [Forbidden.Rushed]: rushed,
   [Forbidden.TextOverScene]: textOverScene,
   [Forbidden.TooMuchText]: tooMuchText,
+  [Forbidden.WeakEase]: weakEases,
   [Forbidden.TooDense]: (doc, spec) => tooDense(doc, spec.pace.minGap).map((p) => ({ clip: p.clip, at: 0, detail: p.detail })),
   [Forbidden.LoopSeam]: (doc) => loopSeam(doc).map((p) => ({ clip: p.clip, at: doc.durationInFrames - 1, detail: p.detail }))
 };

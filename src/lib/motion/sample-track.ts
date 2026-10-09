@@ -1,10 +1,16 @@
+import { Ease } from './design';
+
 export type SampledKey = { frame: number; value: number | string; ease: string | number[]; in?: string; out?: string; roving?: boolean };
 
 export function sampleTrack(track: SampledKey[], frame: number): number {
+  const expoIn = (p: number) => 2 ** (10 * (p - 1)) * p + p ** 6 * (1 - p);
+  const expoOut = (p: number) => 1 - expoIn(1 - p);
+  const expoInOut = (p: number) => (p < 0.5 ? expoIn(p * 2) / 2 : 1 - expoIn((1 - p) * 2) / 2);
+  const settled = (ease: (p: number) => number, depth: number, lateness: number) => (p: number) => ease(p) + depth * p ** lateness * (1 - p);
   const curves: Record<string, (p: number) => number> = {
-    standard: (p) => 1 - (1 - p) ** 4,
-    enter: (p) => 1 - (1 - p) ** 3,
-    exit: (p) => p ** 3,
+    standard: settled(expoInOut, 0.35, 12),
+    enter: settled(expoOut, 0.2, 6),
+    exit: expoIn,
     linear: (p) => p,
     overshoot: (p) => {
       const q = p - 1;
@@ -12,9 +18,9 @@ export function sampleTrack(track: SampledKey[], frame: number): number {
     }
   };
   const handles: Record<string, number[]> = {
-    standard: [0.165, 0.84, 0.44, 1],
-    enter: [0.215, 0.61, 0.355, 1],
-    exit: [0.55, 0.055, 0.675, 0.19],
+    standard: [0.87, 0, 0.13, 1],
+    enter: [0.16, 1, 0.3, 1],
+    exit: [0.7, 0, 0.84, 0],
     linear: [1 / 3, 1 / 3, 2 / 3, 2 / 3],
     overshoot: [0.175, 0.885, 0.32, 1.275]
   };
@@ -115,3 +121,5 @@ export function sampleTrack(track: SampledKey[], frame: number): number {
   const y2 = into === 'bezier' ? va + ease[3] * dv : vb - (slopeOf[into](i + 1) * dt) / 3;
   return cubic(va, y1, y2, vb, along(x1, x2, p));
 }
+
+export const easeCurve = (ease: string | number[]) => (p: number) => sampleTrack([{ frame: 0, value: 0, ease }, { frame: 1, value: 1, ease: Ease.Linear }], p);

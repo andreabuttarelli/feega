@@ -1,4 +1,5 @@
-import type { Bezier } from './keyframes';
+import { Ease } from './design';
+import type { EaseSpec } from './keyframes';
 
 export enum MotionStyle {
   LaunchFilm = 'launch-film',
@@ -9,10 +10,12 @@ export enum MotionStyle {
 export const MOTION_STYLES = Object.values(MotionStyle) as [MotionStyle, ...MotionStyle[]];
 export const DEFAULT_STYLE = MotionStyle.LaunchFilm;
 
-export type StyleEases = { enter: Bezier; move: Bezier };
+export type StyleEases = { enter: EaseSpec; move: EaseSpec };
+
+const HOUSE_EASES: StyleEases = { enter: Ease.Enter, move: Ease.Standard };
 
 export const STYLE_EASES: Record<MotionStyle, StyleEases> = {
-  [MotionStyle.LaunchFilm]: { enter: [0.16, 1, 0.3, 1], move: [0.83, 0, 0.17, 1] },
-  [MotionStyle.AppleMinimal]: { enter: [0.16, 1, 0.3, 1], move: [0.65, 0, 0.35, 1] },
-  [MotionStyle.UiMorph]: { enter: [0.16, 1, 0.3, 1], move: [0.65, 0, 0.35, 1] }
+  [MotionStyle.LaunchFilm]: HOUSE_EASES,
+  [MotionStyle.AppleMinimal]: HOUSE_EASES,
+  [MotionStyle.UiMorph]: HOUSE_EASES
 };

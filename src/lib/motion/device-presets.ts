@@ -32,7 +32,7 @@ export const PRESET: Record<DevicePreset, { about: string; lanes: (length: numbe
     about: 'spins in from behind and settles at a three-quarter view',
     fits: () => true,
     lanes: () => ({
-      objectRotateY: [key(0, SETTLE_Y - 330, Ease.Overshoot), key(SPIN_FRAMES, SETTLE_Y)],
+      objectRotateY: [key(0, SETTLE_Y - 330, Ease.Enter), key(SPIN_FRAMES, SETTLE_Y)],
       objectRotateX: [key(0, 18), key(SPIN_FRAMES, SETTLE_X)],
       dolly: [key(0, 0.7), key(SPIN_FRAMES, 1)]
     })

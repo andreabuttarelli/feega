@@ -9,6 +9,8 @@ const track: Keyframe[] = [
   { frame: 60, value: 180, ease: [0.25, 0.1, 0.25, 1] }
 ];
 
+const standard = motionEngine({} as Window & Record<string, unknown>).parseEase('feega.inOut');
+
 describe('keyframe interpolation', () => {
   it('holds the first value before and the last value after', () => {
     expect(sampleTrack(track, -5)).toBe(0);
@@ -25,7 +27,7 @@ describe('keyframe interpolation', () => {
 
   it('the ease of a segment is the ease of the keyframe it leaves', () => {
     const half = sampleTrack(track, 45);
-    expect(half).toBeCloseTo(90 + 90 * (1 - 0.5 ** 4), 6);
+    expect(half).toBeCloseTo(90 + 90 * standard(0.5), 6);
   });
 
   it('every named ease matches the engine ease the generator emits', () => {
@@ -105,7 +107,7 @@ const slope = (t: Keyframe[], f: number, side: number) => (sampleTrack(t, f + si
 
 describe('interpolation kinds per keyframe', () => {
   it('without in/out a keyframe keeps its bezier ease, as before', () => {
-    expect(sampleTrack([key(0, 0), key(30, 90)], 15)).toBeCloseTo(90 * (1 - 0.5 ** 4), 9);
+    expect(sampleTrack([key(0, 0), key(30, 90)], 15)).toBeCloseTo(90 * standard(0.5), 9);
   });
 
   it('hold out keeps the value until the next keyframe, then jumps', () => {
@@ -185,6 +187,20 @@ describe('named ease handles', () => {
       const [x1, y1] = EASE_BEZIER[ease];
       const t = [key(0, 0, { ease }), key(10, 100, { in: Interp.Linear })];
       expect(slope(t, 0, 1)).toBeCloseTo((y1 / x1) * 10, 1);
+    }
+  });
+});
+
+describe('the house curves on keyframes', () => {
+  const HOUSE: [Ease, string][] = [
+    [Ease.Standard, 'feega.inOut'],
+    [Ease.Enter, 'feega.out'],
+    [Ease.Exit, 'feega.in']
+  ];
+
+  it('standard, enter and exit render on feega.inOut, feega.out and feega.in', () => {
+    for (const [ease, name] of HOUSE) {
+      expect(easeName(ease)).toBe(name);
     }
   });
 });

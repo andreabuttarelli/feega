@@ -95,14 +95,14 @@ describe('MotionDoc to HyperFrames composition', () => {
     const trimmed = { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === 'title' ? { ...c, trimStart: 10 } : c)) })) };
     const html = compose(trimmed);
 
-    expect(html).toContain('"duration":0.2,"ease":"power3.out","immediateRender":false},0.5);');
-    expect(html).toContain('"duration":0.3667,"ease":"power3.out","immediateRender":false},0.5);');
+    expect(html).toContain('"duration":0.2,"ease":"feega.inOut","immediateRender":false},0.5);');
+    expect(html).toContain('"duration":0.3667,"ease":"feega.inOut","immediateRender":false},0.5);');
   });
 
   it('a transition becomes a tween on the clip at its edge', () => {
     const faded = must(setTransition(doc, 'title', Side.Out, { kind: TransitionKind.Fade, durationInFrames: 15 }));
 
-    expect(compose(faded)).toContain('tl.fromTo("#fx-title",{"opacity":1},{"opacity":0,"duration":0.5,"ease":"power2.in","immediateRender":false},2)');
+    expect(compose(faded)).toContain('tl.fromTo("#fx-title",{"opacity":1},{"opacity":0,"duration":0.5,"ease":"feega.in","immediateRender":false},2)');
   });
 
   it('escapes text so props cannot inject markup', () => {
@@ -290,7 +290,7 @@ describe('keyframes and 3D transforms', () => {
   });
 
   it('an offset is a fraction of the frame, tweened in pixels', () => {
-    expect(compose(moved)).toContain('tl.fromTo("#kf-card",{"x":0},{"x":960,"duration":3,"ease":"power3.out","immediateRender":false},1);');
+    expect(compose(moved)).toContain('tl.fromTo("#kf-card",{"x":0},{"x":960,"duration":3,"ease":"feega.inOut","immediateRender":false},1);');
   });
 
   it('a colour keyframe tweens a CSS variable the template reads, brand colours resolved', () => {

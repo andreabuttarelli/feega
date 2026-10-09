@@ -14,7 +14,7 @@ import { textPathProps, type TextPath } from '../text-path/model';
 export const PARAM_CALL = 'param';
 export const PARAM_CSS_PREFIX = '--param-';
 
-export const PARAM_EASES = ['none', 'power1.out', 'power2.out', 'power3.out', 'power2.in', 'power2.inOut', 'back.out(1.7)', 'elastic.out(1,0.4)', 'expo.out', 'sine.inOut'] as const;
+export const PARAM_EASES = ['feega.out', 'feega.inOut', 'feega.in', 'none', 'power1.out', 'power2.out', 'power3.out', 'power2.in', 'power2.inOut', 'back.out(1.7)', 'elastic.out(1,0.4)', 'expo.out', 'sine.inOut'] as const;
 
 const UNBOUNDED = 1_000_000;
 
@@ -35,7 +35,7 @@ const PARAM_TYPES: Record<string, (fallback: unknown, o: Options) => PropSpec> =
   select: (d, o) => spec({ type: 'string', enum: o.options, default: String(d ?? o.options?.[0] ?? '') }, o),
   asset: (_, o) => spec({ type: 'string', format: PropFormat.Asset, assetKind: (o.kind ?? 'image') as PropSpec['assetKind'], default: null }, o),
   font: (d, o) => spec({ type: 'string', format: PropFormat.Font, default: String(d ?? FONTS[0]) }, o),
-  ease: (d, o) => spec({ type: 'string', enum: [...PARAM_EASES], default: String(d ?? PARAM_EASES[2]) }, o)
+  ease: (d, o) => spec({ type: 'string', enum: [...PARAM_EASES], default: String(d ?? PARAM_EASES[0]) }, o)
 };
 
 const TYPE_OF_VALUE: Record<string, string> = { number: 'number', boolean: 'boolean', string: 'text' };

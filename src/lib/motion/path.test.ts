@@ -5,7 +5,7 @@ import { FEEGA_TOKENS } from './brand';
 import { defaultProps } from './components';
 import { composeHtml } from './hyperframes/compose';
 import { transformAt } from './parent';
-import type { Keyframe } from './keyframes';
+import { easeCurve, type Keyframe } from './keyframes';
 import { bakePaths, pathAt, pathHandles, pathProblem, type MotionPath } from './path';
 
 const SIZE = { width: 1000, height: 1000 };
@@ -58,7 +58,7 @@ describe('motion path sampling', () => {
 
   it('the ease of the x keyframes times the travel along the path', () => {
     const clip = clipWith([{ frame: 0, value: 0, ease: Ease.Exit }, lin(40, 0.4)], [lin(0, 0), lin(40, 0)]);
-    expect(px(clip, 20)[0]).toBeCloseTo(400 * 0.5 ** 3, 2);
+    expect(px(clip, 20)[0]).toBeCloseTo(400 * easeCurve(Ease.Exit)(0.5), 1);
   });
 
   it('auto-orient turns the clip along the direction of travel', () => {

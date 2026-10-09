@@ -26,7 +26,7 @@ export function holdStill(tl: Timelineish, isHeld: (target: never) => boolean, f
       continue;
     }
     const start = globalStart(tween);
-    const eased = engine.parseEase(tween.vars.ease ?? 'power1.out');
+    const eased = engine.parseEase(tween.vars.ease);
     tween.vars.ease = (p: number) => eased(Math.min(1, Math.max(0, (frameTime(start + p * duration) - start) / duration)));
     tween.invalidate();
   }

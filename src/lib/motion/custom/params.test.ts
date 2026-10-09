@@ -46,6 +46,13 @@ describe('params declared in code', () => {
     expect(props.curve.enum).toContain('power2.out');
   });
 
+  it('an ease param with no default offers the house curves first and starts on feega.out', () => {
+    const { curve } = extractParams("param('curve', null, { type: 'ease' });");
+
+    expect(curve.default).toBe('feega.out');
+    expect(curve.enum?.slice(0, 3)).toEqual(['feega.out', 'feega.inOut', 'feega.in']);
+  });
+
   it('refresh the schema on every write, so the agent never maintains it by hand', () => {
     const doc = must(writeComponent(newMotionDoc(MotionFormat.Landscape), 'Grid', draft));
     const edited = must(writeComponent(doc, 'Grid', { ...draft, source: { ...draft.source, js: "param('gap', 8, { type: 'number', min: 0, max: 40 });" } }));

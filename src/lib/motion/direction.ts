@@ -87,6 +87,7 @@ export const SEVERITY: Record<Check, Severity> = {
   [Forbidden.Rushed]: Severity.Warning,
   [Forbidden.LoopSeam]: Severity.Blocking,
   [Forbidden.TooDense]: Severity.Warning,
+  [Forbidden.WeakEase]: Severity.Warning,
   [Forbidden.TextOverScene]: Severity.Warning,
   [Forbidden.TooMuchText]: Severity.Warning
 };
