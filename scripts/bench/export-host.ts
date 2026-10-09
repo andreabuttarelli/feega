@@ -74,10 +74,11 @@ async function parity(input: ParityInput): Promise<ParityFrame[]> {
   const player = await mountCapturePlayer(host, input.html);
   const frame = () => (host.querySelector('hyperframes-player') as HTMLElement & { iframeElement: HTMLIFrameElement }).iframeElement;
   let png: Promise<string> = Promise.resolve('');
+  let flatPng: Promise<string> = Promise.resolve('');
   const shot = (time: number, layering: Layering) =>
     player.shoot(time, { format: FrameFormat.Bitmap, settle: Settle.Paint, layering, width: input.width, height: input.height }, 600_000).then((r) => {
       const bitmap = r.bitmap as ImageBitmap;
-      const keep = new OffscreenCanvas(bitmap.width / 4, bitmap.height / 4);
+      const keep = new OffscreenCanvas(bitmap.width, bitmap.height);
       (keep.getContext('2d') as OffscreenCanvasRenderingContext2D).drawImage(bitmap, 0, 0, keep.width, keep.height);
       png = keep.convertToBlob().then(base64);
       return pixels(bitmap);
@@ -86,6 +87,7 @@ async function parity(input: ParityInput): Promise<ParityFrame[]> {
   for (const time of input.times) {
     const before = (await statsOf(frame())).svgs;
     const flat = await shot(time, Layering.Flat);
+    flatPng = png;
     const split = await shot(time, input.layering as Layering);
     let sum = 0;
     let over = 0;
@@ -95,7 +97,7 @@ async function parity(input: ParityInput): Promise<ParityFrame[]> {
       over += d > VISIBLE_STEP ? 1 : 0;
     }
     const svgs = (await statsOf(frame())).svgs - before - 1;
-    out.push({ time, mean: sum / (flat.length / 4), over: over / (flat.length / 4), svgs, png: await png });
+    out.push({ time, mean: sum / (flat.length / 4), over: over / (flat.length / 4), svgs, png: await png, flat: await flatPng });
   }
   player.dispose();
   return out;

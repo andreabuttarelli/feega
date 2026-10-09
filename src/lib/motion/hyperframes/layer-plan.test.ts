@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { PassKind, planLayers, type LayerFacts } from './layer-plan';
 
-const dom = (blend = 'normal', backdrop = false): LayerFacts => ({ canvas: false, blend, backdrop });
-const canvas = (blend = 'normal'): LayerFacts => ({ canvas: true, blend, backdrop: false });
+const dom = (blend = 'normal', backdrop = false): LayerFacts => ({ kind: PassKind.Dom, blend, backdrop });
+const canvas = (blend = 'normal'): LayerFacts => ({ kind: PassKind.Canvas, blend, backdrop: false });
+const grained = (blend = 'normal'): LayerFacts => ({ kind: PassKind.Grain, blend, backdrop: false });
 
 describe('planLayers', () => {
   it('senza canvas resta un solo passaggio DOM, come prima', () => {
@@ -27,6 +28,29 @@ describe('planLayers', () => {
 
   it('più di due passaggi DOM costano più del canvas risparmiato: resta un passaggio solo', () => {
     expect(planLayers([dom(), canvas(), dom('screen'), dom(), dom('screen')])).toEqual([{ kind: PassKind.Dom, layers: [0, 1, 2, 3, 4], blend: 'normal' }]);
+  });
+
+  it('quando i passaggi sarebbero troppi, tiene diretti solo i canvas in cima e in fondo', () => {
+    expect(planLayers([dom(), canvas(), dom('screen'), dom(), dom('screen'), canvas(), canvas()])).toEqual([
+      { kind: PassKind.Dom, layers: [0, 1, 2, 3, 4], blend: 'normal' },
+      { kind: PassKind.Canvas, layers: [5], blend: 'normal' },
+      { kind: PassKind.Canvas, layers: [6], blend: 'normal' }
+    ]);
+  });
+
+  it('un layer con grana va in un passaggio a sé, come un canvas', () => {
+    expect(planLayers([dom(), dom('screen'), grained(), grained('screen')])).toEqual([
+      { kind: PassKind.Dom, layers: [0, 1], blend: 'normal' },
+      { kind: PassKind.Grain, layers: [2], blend: 'normal' },
+      { kind: PassKind.Grain, layers: [3], blend: 'screen' }
+    ]);
+  });
+
+  it('i layer con grana nel mezzo tornano DOM quando i passaggi sarebbero troppi', () => {
+    expect(planLayers([dom(), grained(), dom('screen'), dom(), dom('screen'), grained()])).toEqual([
+      { kind: PassKind.Dom, layers: [0, 1, 2, 3, 4], blend: 'normal' },
+      { kind: PassKind.Grain, layers: [5], blend: 'normal' }
+    ]);
   });
 
   it('i layer in fusione sotto il primo canvas restano nel primo passaggio', () => {

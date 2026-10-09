@@ -2647,5 +2647,9 @@ Segnale: in `chat_messages.tool_calls` più chiamate dello stesso passo che muta
 
 ### Un benchmark di export in Chromium headless misura la CPU, non la GPU
 Segnale: il Chromium di Playwright impiega ~14 s a frame su un doc che in Chrome ne costa ~0.6. Il `chromium-headless-shell` predefinito disegna WebGL e filtri in software. Mossa: `launch({ channel: 'chromium', args: ['--enable-gpu', '--use-angle=metal', '--ignore-gpu-blocklist'] })`, come `scripts/bench/export-bench.ts`; e un `--parity` prima di credere a un frame più veloce.
+
 ## Un embed con particelle scatta sul telefono
 Segnale: un doc con `Particles` morbide (stelle, polvere) sotto i 10 fps in embed; in WebKit ~1 fps. Il profilo CDP (`Profiler.start` sulla pagina, Chromium lanciato con `--disable-features=IsolateSandboxedIframes` così l'iframe sandbox sta nello stesso processo, e `--use-angle=metal --enable-gpu`: senza GPU headless compone in software e metà del frame è `ReadPixels` dei canvas WebGL, un artefatto) mostra `addColorStop`/`createRadialGradient`/`save` in cima. WebKit dipinge i gradienti radiali in CPU. Mossa: glow dipinti una volta in un foglio unico (un canvas per glow = una texture per glow, peggio dei gradienti in Chromium), `drawImage` per particella; il test conta le chiamate su un contesto finto (`particles.test.ts`).
+
+### Spezzare un frame in più passaggi SVG rallenta Chromium e accelera WebKit
+Segnale: un cambio di cattura che in WebKit dimezza il frame lo raddoppia in Chromium (0.66 → 1.27 s). Chromium dipinge i filtri SVG sulla GPU; ogni passaggio html-to-image in più costa più del filtro tolto. Mossa: misurare entrambi con `npm run bench:export`; un passaggio che toglie filtri vale solo dove i filtri sono in software (WebKit). Il probe `lazyNesting` non distingue i motori: in Chromium dentro il player risponde come WebKit.

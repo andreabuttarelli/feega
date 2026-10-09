@@ -92,6 +92,7 @@ if (parity) {
     for (const r of rows) {
       console.log(`parity ${name} ${engine} t=${r.time.toFixed(2)} mean=${r.mean.toFixed(3)} over8=${(r.over * 100).toFixed(3)}% svgs=${r.svgs}`);
       writeFileSync(join(OUT, `parity-${name}-${engine}-${r.time.toFixed(2)}.png`), Buffer.from(r.png, 'base64'));
+      writeFileSync(join(OUT, `parity-${name}-${engine}-${r.time.toFixed(2)}-flat.png`), Buffer.from(r.flat, 'base64'));
     }
     await browser.close();
   }
