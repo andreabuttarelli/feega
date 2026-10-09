@@ -213,6 +213,14 @@ Segnale: in un harness Playwright le clip con `from` > 0 non compaiono mai, anch
 sul farm e nel player sì. `__timelines.main.seek(t)` muove solo GSAP, non la visibilità delle clip
 che governa il runtime. Mossa: `window.__player.renderSeek(t)`, lo stesso seek del render.
 
+### Un export dal browser che va in timeout al frame 0 e in Chromium funziona
+Segnale: "Export video" fallisce al primo frame; puppeteer/Chrome cattura lo stesso html in 1 s.
+È WebKit: filtri SVG (grana) e canvas grandi costano 5–10× e le lane del player girano su un
+thread solo, quindi 4 lane = 4 scatti in coda. Mossa: misurare con Playwright `webkit` sul percorso
+vero (`hyperframes-player` + `feega:capture`), bisezione togliendo componenti, e controllare
+l'immagine catturata: un filtro `userSpaceOnUse` su un layer HTML in WebKit si risolve sul
+contenuto dipinto, non sul box — un frame "più veloce" può essere un frame vuoto.
+
 ## Ambiente e worktree
 
 ### I tempi di idratazione misurati in dev non dicono niente

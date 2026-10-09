@@ -2,7 +2,7 @@
   import { onMount, type Snippet } from 'svelte';
   import { FPS } from '$lib/motion/design';
   import { CAPTURE_REPLY, FrameFormat, type CaptureReply, type ClipError } from '$lib/motion/hyperframes/capture';
-  import { Playback, previewDriver, type ShotRequest } from '$lib/motion/hyperframes/preview-driver';
+  import { CAPTURE_TIMEOUT_MS, Playback, previewDriver, type ShotRequest } from '$lib/motion/hyperframes/preview-driver';
   import { mountCapturePlayer } from '$lib/motion/hyperframes/capture-player';
   import { shootInLanes } from '$lib/motion/export/lanes';
   import { CAPTURE_PROFILES, CaptureProfile } from '$lib/motion/export/capture-profile';
@@ -136,7 +136,7 @@
     }
   });
 
-  const shoot = (time: number, request: ShotRequest) => driver.shoot(time, request);
+  const shoot = (time: number, request: ShotRequest, waitMs?: number) => driver.shoot(time, request, waitMs);
   const loaded = (next: string) => driver.loaded(next);
 
   function borrowed<T>(source: string, work: () => Promise<T>): Promise<T> {
@@ -210,8 +210,9 @@
     };
     return borrowed(source, async () => {
       const extra = host ? await Promise.all(Array.from({ length: lanes() - 1 }, () => mountCapturePlayer(host!, source))) : [];
+      const sharedWait = CAPTURE_TIMEOUT_MS * (extra.length + 1);
       try {
-        const shooters = [(time: number) => shoot(time, request).then(bitmapOf), ...extra.map((p) => (time: number) => p.shoot(time, request).then(bitmapOf))];
+        const shooters = [(time: number) => shoot(time, request, sharedWait).then(bitmapOf), ...extra.map((p) => (time: number) => p.shoot(time, request, sharedWait).then(bitmapOf))];
         await shootInLanes(times, shooters, onFrame, signal);
       } finally {
         extra.forEach((p) => p.dispose());
