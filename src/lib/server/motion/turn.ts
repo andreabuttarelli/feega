@@ -178,7 +178,8 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
   let client = Client.Watching;
   const cut = new AbortController();
 
-  const sources = brandSources(db, { orgId, projectId: project.id, canvasId: motion.record.canvasId, brandId: project.brandId });
+  const screenPicture = (url: string) => ATTACHMENT_PORTS.screenImage({ orgId, mode: project.mode, url });
+  const sources = brandSources(db, { orgId, projectId: project.id, canvasId: motion.record.canvasId, brandId: project.brandId, screen: screenPicture });
   const tools = createMotionTools({
     session,
     assets,
@@ -209,7 +210,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
       ...liveWebDeps(db, { orgId, userId, projectId: project.id, brandId: project.brandId, mode: project.mode }, (usd) => {
         spent += usd;
       }),
-      importProducts: productImport(screenedImport(sources.importAsset, (url) => ATTACHMENT_PORTS.screenImage({ orgId, mode: project.mode, url }), assets))
+      importProducts: productImport(screenedImport(sources.importAsset, screenPicture, assets))
     },
     layouts: layoutStore({ db, orgId, actor: { kind: 'agent', id: userId, agentKey: MOTION_AGENT_KEY } }),
     effects: effectStore({ db, orgId, actor: { kind: 'agent', id: userId, agentKey: MOTION_AGENT_KEY }, gl: serverFramesOpen() ? chromiumGl : null }),

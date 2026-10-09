@@ -2663,3 +2663,5 @@ Segnale: un cambio di cattura che in WebKit dimezza il frame lo raddoppia in Chr
 
 ## `npx prettier --write` riscrive file interi
 Segnale: un diff di poche righe diventa centinaia, virgolette doppie e righe a 80 colonne. Causa: il repo non ha config prettier, quindi valgono i default. Mossa: non lanciare prettier sui file del repo; se serve, `--single-quote --print-width 220 --trailing-comma none --object-wrap collapse` riproduce lo stile esistente (verificato sui file motion).
+### Un `fetch` su un URL scelto da un agente è un SSRF
+Segnale: `fetch(url)` dove `url` arriva da un tool, dall'MCP o da una pagina letta; un controllo sulla sola stringa (`isUrlSafe`) passa un nome che risolve a `10.x`. Mossa: `safeFetchBytes`/`safeFetchUrl` (`tool-guard.ts`), e nei test `node:dns/promises` finto che restituisca l'IP letterale com'è, o `169.254.169.254` sembra pubblico e il test mente.

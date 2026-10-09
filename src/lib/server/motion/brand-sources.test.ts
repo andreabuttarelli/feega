@@ -74,7 +74,7 @@ describe('brand sources wired into the real motion tools, against a served page'
     const session: MotionSession = { doc: newMotionDoc(MotionFormat.Landscape), baseVersion: 1, edits: [], selection: [], frames: new Map(), views: 0, checkedAt: 0, codeWrites: 0 };
     const assets: MotionAsset[] = [];
     let n = 0;
-    const tools = createMotionTools({ session, assets, newId: () => `id${++n}`, voiceover: vi.fn(), frames: vi.fn(), check: vi.fn(), ...brandSources(db, { orgId: 'org1', projectId: 'proj1', canvasId: 'c1', brandId: null }) });
+    const tools = createMotionTools({ session, assets, newId: () => `id${++n}`, voiceover: vi.fn(), frames: vi.fn(), check: vi.fn(), ...brandSources(db, { orgId: 'org1', projectId: 'proj1', canvasId: 'c1', brandId: null, screen: async () => ({ ok: true }) }) });
     const run = (name: string, input: unknown) => (tools[name] as Tool & { execute: Exec }).execute(input, { toolCallId: 'c' });
 
     const read = (await run('analyze_site', { url: 'https://brand.example/' })) as { ok: boolean; site: { name: string; tagline: string; palette: string[]; fonts: unknown[]; logos: { url: string }[]; images: { url: string; width: number }[] } };
@@ -100,7 +100,7 @@ describe('brand sources wired into the real motion tools, against a served page'
 
   it('imports a logo drawn inline in the page, which has no url of its own', async () => {
     const { db, stored } = storageDb();
-    const sources = brandSources(db, { orgId: 'org1', projectId: 'proj1', canvasId: 'c1', brandId: null });
+    const sources = brandSources(db, { orgId: 'org1', projectId: 'proj1', canvasId: 'c1', brandId: null, screen: async () => ({ ok: true }) });
     vi.stubGlobal('fetch', async () => new Response('<html><body><a class="site-logo" href="/"><svg viewBox="0 0 10 10"><path d="M0 0h10v10z"/></svg></a></body></html>', { headers: { 'content-type': 'text/html' } }));
 
     const read = (await sources.site('https://brand.example/')) as { ok: true; site: { logos: { url: string; markup?: string }[] } };
@@ -113,7 +113,7 @@ describe('brand sources wired into the real motion tools, against a served page'
 
   it('still refuses a host that resolves to this machine', async () => {
     const { db } = storageDb();
-    const sources = brandSources(db, { orgId: 'org1', projectId: 'proj1', canvasId: 'c1', brandId: null });
+    const sources = brandSources(db, { orgId: 'org1', projectId: 'proj1', canvasId: 'c1', brandId: null, screen: async () => ({ ok: true }) });
 
     expect(await sources.site(origin)).toMatchObject({ ok: false });
     expect(await sources.importAsset(`${origin}/hero.png`)).toMatchObject({ ok: false });

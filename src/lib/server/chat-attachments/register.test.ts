@@ -1,4 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+const lookup = vi.hoisted(() => vi.fn(async (host: string) => [{ address: /^[\d.]+$/.test(host) ? host : host === 'rebound.example' ? '10.0.0.5' : '93.184.216.34', family: 4 }]));
+vi.mock('node:dns/promises', () => ({ lookup }));
+vi.mock('$env/dynamic/private', () => ({ env: {} }));
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import sharp from 'sharp';
@@ -83,13 +87,31 @@ describe('registerAttachment', () => {
 });
 
 describe('importAttachment', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
   it('scarica un URL, lo carica e lo registra', async () => {
     const body = await png();
-    const fetcher = vi.fn(async () => new Response(body as BodyInit, { headers: { 'content-type': 'image/png' } }));
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(body as BodyInit, { headers: { 'content-type': 'image/png' } })));
     const { db, calls } = fakeDb({ assets: [assetRow()] }, { files: new Proxy({}, { get: () => body }) as Record<string, Uint8Array> });
-    const made = await importAttachment(db, scope, { url: 'https://example.com/brand/logo.png' }, { ...clear, fetch: fetcher as unknown as typeof fetch });
+    const made = await importAttachment(db, scope, { url: 'https://example.com/brand/logo.png' }, clear);
     expect(made.name).toBe('logo.png');
     expect(calls.some((c) => c.op === 'upload')).toBe(true);
+  });
+
+  it.each(['http://169.254.169.254/latest/meta-data/', 'http://localhost/admin', 'https://rebound.example/x.png'])('non scarica mai un indirizzo interno: %s', async (url) => {
+    const fetcher = vi.fn(async () => new Response('secret', { headers: { 'content-type': 'image/png' } }));
+    vi.stubGlobal('fetch', fetcher);
+    const { db } = fakeDb({});
+    expect((await failure(importAttachment(db, scope, { url }, clear))).code).toBe(AttachmentError.NotFound);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('non segue un redirect verso un indirizzo privato', async () => {
+    const fetcher = vi.fn(async (input: URL | string) => (String(input).includes('example.com') ? new Response(null, { status: 302, headers: { location: 'http://169.254.169.254/latest/meta-data/' } }) : new Response('secret', { headers: { 'content-type': 'image/png' } })));
+    vi.stubGlobal('fetch', fetcher);
+    const { db } = fakeDb({});
+    expect((await failure(importAttachment(db, scope, { url: 'https://example.com/r' }, clear))).code).toBe(AttachmentError.NotFound);
+    expect(fetcher).toHaveBeenCalledTimes(1);
   });
 });
 

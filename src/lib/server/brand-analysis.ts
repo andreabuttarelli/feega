@@ -10,6 +10,7 @@
  * questo indirizzo. È un ponte, non una casa: chi tocca uno di quei moduli lo faccia puntare al
  * package.
  */
+import { safeFetchBytes } from '$lib/server/tool-guard';
 import { swallow } from '$lib/server/swallow';
 import { SITE_TYPES, clampSiteType, sanitizeThemeColor } from '$lib/brand-fields';
 import { structured } from '$lib/server/research';
@@ -233,20 +234,11 @@ const GEMINI_IMAGE_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 'ima
  * SVGs are rasterised to PNG so the model can still read them; unsupported types are dropped.
  */
 async function fetchImageInlinePart(url: string): Promise<InlineImagePart | null> {
-    if (!isUrlSafe(url)) return null;
     try {
-        const res = await fetch(url, {
-            signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-            headers: { 'User-Agent': 'Mozilla/5.0 (compatible; DalNullaBot/1.0)' },
-            redirect: 'error',
-        });
-        if (!res.ok) return null;
-        let mimeType = (res.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase() || 'image/jpeg';
-        if (mimeType === 'image/jpg') mimeType = 'image/jpeg';
-        const contentLength = res.headers.get('content-length');
-        if (contentLength && parseInt(contentLength) > MAX_IMAGE_BYTES) return null;
-        const buf = Buffer.from(await res.arrayBuffer());
-        if (buf.length > MAX_IMAGE_BYTES) return null;
+        const fetched = await safeFetchBytes(url, { maxBytes: MAX_IMAGE_BYTES, timeoutMs: FETCH_TIMEOUT_MS, maxRedirects: 0, userAgent: 'Mozilla/5.0 (compatible; DalNullaBot/1.0)' });
+        if (!fetched.ok) return null;
+        const mimeType = fetched.mime === 'image/jpg' ? 'image/jpeg' : fetched.mime || 'image/jpeg';
+        const buf = fetched.bytes;
 
         // SVG → rasterise to PNG (Gemini can't read SVG directly).
         if (mimeType === 'image/svg+xml' || (mimeType === 'image/jpeg' && /\.svg(\?|$)/i.test(url))) {

@@ -15,8 +15,10 @@ import type { ProjectMode } from '$lib/project-mode';
 import { findAssets, insertAsset, type Asset } from '$lib/server/repos/assets';
 import { CANVAS_ASSET_BUCKET, removeAssetFile, signAssetFile } from '$lib/server/repos/asset-storage';
 import type { ScreenOutcome } from '$lib/server/moderation/screen';
+import { SafeFetchError, safeFetchBytes, type SafeFetchBytesResult } from '$lib/server/tool-guard';
 import { attachmentMarkdown } from './convert';
 
+const IMPORT_TIMEOUT_MS = 20_000;
 const HTTP_BAD_REQUEST = 400;
 const HTTP_NOT_FOUND = 404;
 const HTTP_TOO_LARGE = 413;
@@ -53,7 +55,7 @@ export class AttachmentFailure extends Error {
 }
 
 export type AttachmentScope = { orgId: string; projectId: string; mode: ProjectMode };
-export type AttachmentPorts = { screenImage: (input: { orgId: string; mode: ProjectMode; url: string }) => Promise<ScreenOutcome>; fetch?: typeof fetch };
+export type AttachmentPorts = { screenImage: (input: { orgId: string; mode: ProjectMode; url: string }) => Promise<ScreenOutcome> };
 
 const ASSET_KIND: Record<string, AttachmentKind | undefined> = { image: AttachmentKind.Image, document: AttachmentKind.Document };
 
@@ -142,17 +144,24 @@ async function storeAndRegister(db: Db, scope: AttachmentScope, file: { name: st
   return registerAttachment(db, scope, { path, mimeType: file.mimeType }, ports);
 }
 
+async function download(url: string): Promise<SafeFetchBytesResult> {
+  const fetched = await safeFetchBytes(url, { maxBytes: CHAT_ATTACHMENT_MAX_BYTES, timeoutMs: IMPORT_TIMEOUT_MS }).catch((e: unknown) => {
+    if (e instanceof SafeFetchError && e.reason === 'too_large') {
+      throw new AttachmentFailure(AttachmentError.TooLarge);
+    }
+    return null;
+  });
+  if (!fetched?.ok) {
+    throw new AttachmentFailure(AttachmentError.NotFound, `Could not download ${url}.`);
+  }
+  return fetched;
+}
+
 export async function importAttachment(db: Db, scope: AttachmentScope, source: { url: string; name?: string }, ports: AttachmentPorts): Promise<ChatAttachment> {
-  const res = await (ports.fetch ?? fetch)(source.url).catch(() => null);
-  if (!res?.ok) {
-    throw new AttachmentFailure(AttachmentError.NotFound, `Could not download ${source.url}.`);
-  }
-  if (Number(res.headers.get('content-length') ?? 0) > CHAT_ATTACHMENT_MAX_BYTES) {
-    throw new AttachmentFailure(AttachmentError.TooLarge);
-  }
-  const body = new Uint8Array(await res.arrayBuffer());
+  const fetched = await download(source.url);
+  const body = new Uint8Array(fetched.bytes);
+  const mimeType = fetched.mime;
   const name = source.name ?? decodeURIComponent(new URL(source.url).pathname.split('/').pop() || 'file');
-  const mimeType = (res.headers.get('content-type') ?? '').split(';')[0].trim();
   return storeAndRegister(db, scope, { name, mimeType, body }, ports);
 }
 
