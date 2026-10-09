@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, motionDocSchema, newMotionDoc, type MotionDoc } from '../doc';
-import { embedSnippet } from './bundle';
+import { fileSnippet } from './bundle';
 import { DEFAULT_INTERACTIVE, Outside, PlayMode, SCROLL_LENGTH, interactiveOf } from './settings';
 import { interactiveSchema } from './schema';
 
@@ -9,7 +9,7 @@ const saturn = { ...newMotionDoc(MotionFormat.Landscape), interactive: { loop: f
 
 describe('the embed snippet fits the playback', () => {
   it('wraps a scrub embed in a scroll section the host script reads', () => {
-    const snippet = embedSnippet(saturn, URL);
+    const snippet = fileSnippet(saturn, URL);
 
     expect(snippet.startsWith(`<div data-scroll="${SCROLL_LENGTH.default}">`)).toBe(true);
     expect(snippet.endsWith('</div>')).toBe(true);
@@ -18,12 +18,12 @@ describe('the embed snippet fits the playback', () => {
 
   it('uses the doc scroll length', () => {
     const doc = { ...saturn, interactive: { ...interactiveOf(saturn), scrollLength: 6 } };
-    expect(embedSnippet(doc, URL)).toContain('data-scroll="6"');
+    expect(fileSnippet(doc, URL)).toContain('data-scroll="6"');
   });
 
   it.each([PlayMode.Autoplay, PlayMode.InView, PlayMode.Paused])('leaves %s as a plain iframe', (playback) => {
     const doc = { ...saturn, interactive: { ...DEFAULT_INTERACTIVE, playback } };
-    const snippet = embedSnippet(doc, URL);
+    const snippet = fileSnippet(doc, URL);
 
     expect(snippet).not.toContain('<div data-scroll');
     expect(snippet.startsWith('<iframe')).toBe(true);

@@ -2,7 +2,7 @@ import type { Db } from '$lib/server/db/client';
 import { findNode, type CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { findProjectById, type Project } from '$lib/server/repos/projects';
 import { motionOf } from '$lib/canvas/motion-node';
-import { embedSnippet, embedUrl, interactiveBundle, BUNDLE_FILE } from '$lib/motion/interactive/bundle';
+import { fileSnippet, embedUrl, interactiveBundle, BUNDLE_FILE } from '$lib/motion/interactive/bundle';
 import type { MotionDoc } from '$lib/motion/doc';
 import { assetUrls, headOrNew, motionAssets, motionTokens, type AssetSigner } from './editor';
 import { embedPublished, isRefused, publishEmbed, removeEmbed } from './embed';
@@ -71,7 +71,7 @@ export async function motionEmbedState(db: Db, scope: Scope, origin: string): Pr
     return failed(EmbedFailure.NotFound);
   }
   const url = embedUrl(origin, scope.nodeId);
-  return { ok: true, body: { published: await embedPublished(db, scope.nodeId), url, snippet: embedSnippet(saved.doc, url), revision: saved.version } };
+  return { ok: true, body: { published: await embedPublished(db, scope.nodeId), url, snippet: fileSnippet(saved.doc, url), revision: saved.version } };
 }
 
 export type MotionBundle = { ok: true; html: string; filename: string } | { ok: false; failure: EmbedFailure };

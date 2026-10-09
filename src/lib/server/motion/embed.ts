@@ -2,7 +2,7 @@ import { env as publicEnv } from '$env/dynamic/public';
 import type { Db } from '$lib/server/db/client';
 import { embedRefusal, type PublishRefusal } from '$lib/gallery/refusals';
 import type { ProjectMode } from '$lib/project-mode';
-import { embedSnippet, embedUrl, interactiveBundle, upgradePlayer, type InteractiveInput } from '$lib/motion/interactive/bundle';
+import { fileSnippet, embedUrl, interactiveBundle, upgradePlayer, type InteractiveInput } from '$lib/motion/interactive/bundle';
 
 export const EMBED_BUCKET = 'embeds';
 const EMBED_TYPE = 'text/html';
@@ -46,7 +46,7 @@ export async function publishEmbed(db: Db, input: EmbedPublish, origin = embedOr
   }
 
   const url = embedUrl(origin, input.nodeId);
-  return { ok: true, url, snippet: embedSnippet(input.doc, url) };
+  return { ok: true, url, snippet: fileSnippet(input.doc, url) };
 }
 
 export async function embedSlot(db: Db, nodeId: string, mode: ProjectMode): Promise<EmbedSlot> {

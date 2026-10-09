@@ -2,7 +2,7 @@
   import type { MotionDoc } from '$lib/motion/doc';
   import type { BrandTokens } from '$lib/motion/brand';
   import type { AudioAnalysis } from '$lib/motion/audio-analysis';
-  import { embedSnippet, interactiveBundle, type InteractiveBundle } from '$lib/motion/interactive/bundle';
+  import { fileSnippet, interactiveBundle, type InteractiveBundle } from '$lib/motion/interactive/bundle';
   import { interactiveOf, type Interactive } from '$lib/motion/interactive/settings';
   import { reactionsOf } from '$lib/motion/interactive/summary';
   import EmbedView from './EmbedView.svelte';
@@ -27,7 +27,7 @@
   let hosting = $state(false);
   let updated = $state(false);
   const embedEndpoint = $derived(`${editorUrl}/embed`);
-  const hostedSnippet = $derived(hosted?.published ? embedSnippet({ ...doc, interactive: settings }, hosted.url) : '');
+  const hostedSnippet = $derived(hosted?.published ? fileSnippet({ ...doc, interactive: settings }, hosted.url) : '');
   const reactions = $derived(reactionsOf({ ...doc, interactive: settings }));
   const blobs = new Map<string, Promise<Blob>>();
   const fetchBlob = (url: string) => {

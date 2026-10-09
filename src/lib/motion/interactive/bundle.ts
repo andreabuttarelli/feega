@@ -155,7 +155,7 @@ const SNIPPET_SHAPE: Record<PlayMode, (embed: string, settings: Interactive) => 
   [PlayMode.Paused]: plainSnippet
 };
 
-export function embedSnippet(doc: SnippetDoc, file = BUNDLE_FILE): string {
+export function fileSnippet(doc: SnippetDoc, file = BUNDLE_FILE): string {
   const settings = interactiveOf(doc);
   const frame = `<iframe src="${esc(file)}" title="Interactive video" style="width:100%;aspect-ratio:${doc.width}/${doc.height};border:0;display:block" allow="accelerometer; gyroscope" loading="lazy"></iframe>`;
   const host = `<script>(${hostMain.toString()})(document.currentScript.previousElementSibling,"${HOST_MESSAGE}",window);</script>`;
@@ -169,5 +169,5 @@ export async function interactiveBundle(input: InteractiveInput): Promise<Intera
   const tokens = { ...input.tokens, logoUrl: logo.logo ?? input.tokens.logoUrl };
   const composed = composeHtml({ doc: input.doc, tokens, assets, analyses: input.analyses, liveness: Liveness.Live, target: Target.Screen });
   const html = playerPage(composed, input.doc, settings, input.title);
-  return { html, bytes: new TextEncoder().encode(html).length, snippet: embedSnippet({ ...input.doc, interactive: settings }) };
+  return { html, bytes: new TextEncoder().encode(html).length, snippet: fileSnippet({ ...input.doc, interactive: settings }) };
 }

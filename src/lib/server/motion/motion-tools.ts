@@ -65,7 +65,7 @@ import { INTERACTIVE_PRESETS, PRESET, applyInteractivePreset, setInteractive } f
 import { OUTSIDES, PLAY_MODES, SCROLL_LENGTH, interactiveOf } from '$lib/motion/interactive/settings';
 import { interactiveSchema } from '$lib/motion/interactive/schema';
 import { liveLanes } from '$lib/motion/interactive/spec';
-import { embedSnippet } from '$lib/motion/interactive/bundle';
+import { fileSnippet } from '$lib/motion/interactive/bundle';
 import { flattenComps } from '$lib/motion/precomp';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
 import { BuiltinFont, FONT_WEIGHTS, fontRefProblem, searchFonts } from '$lib/motion/fonts/model';
@@ -1196,7 +1196,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       inputSchema: z.object({}),
       execute: async () => {
         const live = liveLanes(flattenComps(session.doc)).map((l) => ({ clip_id: l.id, prop: l.key }));
-        return { ok: true, live, settings: interactiveOf(session.doc), snippet: embedSnippet(session.doc), note: live.length ? 'Ready: Export → Interactive (web) downloads the file.' : 'Nothing reads input yet: apply_interactive_preset or set_expression with input.*.' };
+        return { ok: true, live, settings: interactiveOf(session.doc), snippet: fileSnippet(session.doc), note: live.length ? 'Ready: Export → Interactive (web) downloads the file.' : 'Nothing reads input yet: apply_interactive_preset or set_expression with input.*.' };
       }
     }),
 
