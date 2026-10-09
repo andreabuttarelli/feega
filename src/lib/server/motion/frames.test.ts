@@ -145,17 +145,7 @@ describe('the self-check compares the frames with the references seen in the tur
     expect(refs.map((r) => r.data)).not.toContain('FRAME');
   });
 
-  it('with references, the check carries them and asks for a concrete diff of composition, not only colour', () => {
-    const message = checkMessage([], [1, 2], viewedReferences(turn));
-    const text = JSON.stringify(message.content);
-
-    expect(text).toContain('"type":"image"');
-    for (const asked of ['type scale', 'bleed', 'grid', 'columns']) {
-      expect(text).toContain(asked);
-    }
-  });
-
-  it('without references the check stays the plain text it was', () => {
-    expect(typeof checkMessage([], [1, 2], []).content).toBe('string');
+  it('the check stays a plain text ask: the view it asks for carries the references', () => {
+    expect(typeof checkMessage([], [1, 2]).content).toBe('string');
   });
 });

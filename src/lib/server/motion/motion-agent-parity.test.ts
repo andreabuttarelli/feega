@@ -30,7 +30,8 @@ const DOC: Record<string, Access> = {
   workArea: { write: ['set_work_area'], read: 'workArea' },
   interactive: { write: ['set_interactive', 'apply_interactive_preset'], read: 'interactive' },
   style: { write: ['set_style'], read: 'style' },
-  script: { write: ['write_script'], read: 'script' }
+  script: { write: ['write_script'], read: 'script' },
+  referenceLook: { write: ['set_reference_look'], read: 'referenceLook' }
 };
 
 const TRACK: Record<string, Access> = {

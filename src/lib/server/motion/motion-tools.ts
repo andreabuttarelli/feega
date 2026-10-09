@@ -36,7 +36,8 @@ import { setMotionPath, setPathTangent } from '$lib/motion/path-ops';
 import { EASE_PRESETS, EASE_PRESET_IDS, easeHandles, withHandles } from '$lib/motion/graph';
 import { ANIMATABLE, INTERPS, Interp, SPATIAL_KEYS, TRANSFORM_KEYS, ValueKind, easeSchema, type Keyframe } from '$lib/motion/keyframes';
 import type { MotionAsset } from './editor';
-import { MAX_FRAMES_PER_VIEW, MAX_VIEWS_PER_TURN, VIEW_FRAMES, withFrames, type Frame } from './frames';
+import { referenceLookSchema } from '$lib/motion/reference-look-model';
+import { MAX_FRAMES_PER_VIEW, MAX_VIEWS_PER_TURN, VIEW_FRAMES, withFrames, type Frame, type Reference } from './frames';
 import { contentEnd, fitDuration } from '$lib/motion/fit-duration';
 import { blocking, docProblems, frameProblems, softPictures, type FrameStat, type Pixels, type QualityProblem } from '$lib/motion/direction';
 import { CheckState, ComponentMode, MAX_CSS, MAX_HTML, MAX_JS, SOURCE_FILES, checkState, modeOf, propsSchemaSchema, sourceHash, type CustomComponent } from '$lib/motion/custom/component';
@@ -112,7 +113,7 @@ import { STYLES, styleOf } from '$lib/motion/style';
 import { MOTION_STYLES } from '$lib/motion/style-model';
 import { unitOf, propsOwner, shownKeyframes, shownMask, shownOffset, shownRecord, storedMask, storedOffset, storedRecord, toShown, toStored, type Owner } from '$lib/motion/units';
 
-export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number; effectFailures?: number; gate?: QualityProblem[] };
+export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number; effectFailures?: number; gate?: QualityProblem[]; references?: Reference[] };
 
 export type CheckResult = { ok: boolean; problems: string[]; frames: Frame[] };
 
@@ -248,6 +249,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
     })),
     assets: doc.assets,
     fields: doc.fields,
+    referenceLook: doc.referenceLook ?? null,
     fonts: doc.fonts,
     markers: (doc.markers ?? []).map((m) => ({ label: m.label, time: secs(m.frame) })),
     workArea: doc.workArea ? { start: secs(doc.workArea.from), end: secs(doc.workArea.to) } : null,
@@ -1460,6 +1462,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       execute: async (input) => apply({ ok: true, doc: { ...session.doc, style: input.style } }, `style ${input.style}`)
     }),
 
+    set_reference_look: tool({
+      description: 'Record what the references you looked at measure, before building: the largest type as a share of the frame height (a word that fills a poster is 0.6–1.2), whether type bleeds off the edge, grid columns, how much small text, the palette, the font class and the imagery. view_frames then measures the video against it and blocks gross misses.',
+      inputSchema: referenceLookSchema,
+      execute: async (input) => apply({ ok: true, doc: { ...session.doc, referenceLook: input } }, 'recorded the reference look')
+    }),
+
     set_motion_blur: tool({
       description: `Real motion blur, like After Effects: each frame averages sub-frame samples across the shutter, so fast moves smear. Video-wide: enabled, shutter_angle (degrees open, 180 is film), shutter_phase (degrees, -90 centres the shutter on the frame), samples (2..${MAX_SAMPLES}, 8 is enough for most moves; more costs more render time). Per clip: clip_ids with clips_blur false keeps those clips sharp. Renders on our servers in one pass, Video clips and device screens included; 3D clips make each sample slower, so long 3D shots allow fewer samples.`,
       inputSchema: z.object({
@@ -1893,7 +1901,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const stats = deps.inspect ? await deps.inspect(frames) : [];
         const audioAssets = deps.assets.filter((a) => a.kind === AssetKind.Audio).length;
         const pixels = assetPixels();
-        session.gate = [...docProblems(session.doc, { audioAssets, pixels, logos: [...brandLogos] }), ...frameProblems(stats)];
+        session.gate = [...docProblems(session.doc, { audioAssets, pixels, logos: [...brandLogos], referencesSeen: Boolean(session.references?.length) }), ...frameProblems(stats)];
         const quality = session.gate.map((p) => p.detail);
         const open = blocking(session.gate).map((p) => p.detail);
         return { ok: true, times: frames.map((f) => f.time), quality, blocking: open, note: open.length ? 'blocking lists what must be fixed before the video can be delivered: fix each one, then look again. The frames are attached as images.' : quality.length ? 'The quality gate found the problems in quality: fix each one, then look again. The frames are attached as images.' : 'The frames are attached as images.' };
@@ -2090,7 +2098,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     return ((await nested.execute(parsed.data, options)) ?? {}) as { ok?: boolean; error?: unknown };
   }
 
-  return { ...withFrames(oneAtATime(tools), session.frames), ...(deps.web ? createWebTools(deps.web) : {}) };
+  return { ...withFrames(oneAtATime(tools), session), ...(deps.web ? createWebTools(deps.web) : {}) };
 }
 
 type Execute = (input: unknown, options: ToolExecutionOptions<unknown>) => Promise<unknown>;

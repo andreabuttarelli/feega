@@ -86,6 +86,7 @@ export function motionAgentPrompt(input: { brandName: string | null; selectionNo
     componentContract(input.frame ?? { width: 1920, height: 1080 }),
     'generate_voiceover spends credits: only when the user asked for a voice-over.',
     `${WEB_GUIDANCE} In a launch film every claim still comes from the brand's own site through analyze_site and write_script: the web helps you find the site and references, never a claim's source. import_asset a picture you found to use it.`,
+    'References: once you have looked at reference pictures, call set_reference_look with what they measure (largest type as a share of the frame height, bleed, columns, small text, palette, font class, imagery) before building. Every view_frames then shows them next to your frames, and the gate blocks a video far from them.',
     'Answer in the language the user writes in. Be brief: say what changed.'
   ].join('\n');
 }
