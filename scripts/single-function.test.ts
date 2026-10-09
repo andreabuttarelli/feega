@@ -33,14 +33,14 @@ function declaredDurations(): { path: string; seconds: number }[] {
   });
 }
 
-describe('one Vercel function for the whole app', () => {
+describe('one Vercel function for the app, one for the agent turns', () => {
   it('sets maxDuration on the adapter, so routes without a config share it', () => {
     expect(adapterMaxDuration()).not.toBeNull();
   });
 
-  it('keeps every route config equal to the adapter default: each distinct value emits another full function', () => {
-    const fallback = adapterMaxDuration();
-    const outliers = declaredDurations().filter((route) => route.seconds !== fallback);
+  it('keeps every route config to the adapter default or the agent limit: each distinct value emits another full function', () => {
+    const allowed = new Set([adapterMaxDuration(), AGENT_MAX_DURATION_S]);
+    const outliers = declaredDurations().filter((route) => !allowed.has(route.seconds));
     expect(outliers).toEqual([]);
   });
 });

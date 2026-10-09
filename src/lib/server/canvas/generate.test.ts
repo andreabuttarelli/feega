@@ -3,6 +3,7 @@ import { fakeDb } from '$lib/server/db/fake-db';
 import type { Db } from '$lib/server/db/client';
 import { expireStuckRuns, reconcileVideoNodeRuns, runGenNode, RUN_STALE_MS } from './generate';
 import { getOrgContext } from '$lib/server/ai-log';
+import { AGENT_STALE_MS } from '$lib/server/brand-agent/limits';
 
 const ORG = '11111111-1111-1111-1111-111111111111';
 const NODE = '22222222-2222-2222-2222-222222222222';
@@ -1849,5 +1850,23 @@ describe('a video node on the upscale model upscales the clip wired into it', ()
 
     expect(await run(db)).toMatchObject({ kind: 'refused', error: 'source_video_required' });
     expect(generateVideoWithoutBrand).not.toHaveBeenCalled();
+  });
+});
+
+describe('a motion agent turn asked through the API expires on the agent limit', () => {
+  const askRow = (ageMs: number) => ({ ...runRow, params: { kind: 'motion-ask' }, started_at: new Date(Date.now() - ageMs).toISOString() });
+
+  it('a turn twenty minutes in is still working', async () => {
+    const row = askRow(20 * 60_000);
+    const { db } = fakeDb({ node_runs: [row], nodes: [nodeRow] }, { updateRows: { node_runs: [row], nodes: [nodeRow] } });
+
+    expect(await expireStuckRuns(db)).toMatchObject({ expired: 0 });
+  });
+
+  it('a turn older than the agent limit died', async () => {
+    const row = askRow(AGENT_STALE_MS + 60_000);
+    const { db } = fakeDb({ node_runs: [row], nodes: [nodeRow] }, { updateRows: { node_runs: [row], nodes: [nodeRow] } });
+
+    expect(await expireStuckRuns(db)).toMatchObject({ expired: 1 });
   });
 });

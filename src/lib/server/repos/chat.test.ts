@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { fakeDb, filtersOf } from '$lib/server/db/fake-db';
 import { agentActor, SIDEBAR_AGENT_KEY } from '$lib/server/repos/actor';
 import { HISTORY_LIMIT, loadTurns, openThread, promptHistory, saveTurn, turnRunning } from './chat';
+import { AGENT_STALE_MS } from '$lib/server/brand-agent/limits';
 
 const ORG = '11111111-1111-1111-1111-111111111111';
 const PROJECT = '22222222-2222-2222-2222-222222222222';
@@ -105,6 +106,12 @@ describe('turnRunning — a turn still working after the client left', () => {
     expect(await turnRunning(db, { orgId: ORG, threadId: THREAD }, NOW)).toBe(true);
   });
 
+  it('an unanswered message sent twenty minutes ago is a turn still running', async () => {
+    const { db } = fakeDb({ chat_messages: [{ role: 'user', created_at: ago(20 * 60) }] });
+
+    expect(await turnRunning(db, { orgId: ORG, threadId: THREAD }, NOW)).toBe(true);
+  });
+
   it('an answered message is a finished turn', async () => {
     const { db } = fakeDb({ chat_messages: [{ role: 'assistant', created_at: ago(60) }] });
 
@@ -124,13 +131,13 @@ describe('turnRunning — a turn still working after the client left', () => {
   });
 
   it('an answer started longer ago than the platform lets a turn live is over, however recent its last write', async () => {
-    const { db } = fakeDb({ chat_messages: [{ role: 'assistant', status: 'streaming', created_at: ago(400), updated_at: ago(5) }] });
+    const { db } = fakeDb({ chat_messages: [{ role: 'assistant', status: 'streaming', created_at: ago(AGENT_STALE_MS / 1000 + 60), updated_at: ago(5) }] });
 
     expect(await turnRunning(db, { orgId: ORG, threadId: THREAD }, NOW)).toBe(false);
   });
 
   it('an answer left streaming by a server that was cut is closed failed when read', async () => {
-    const { db, calls } = fakeDb({ chat_messages: [{ id: 'm-1', role: 'assistant', status: 'streaming', created_at: ago(400), updated_at: ago(100) }] });
+    const { db, calls } = fakeDb({ chat_messages: [{ id: 'm-1', role: 'assistant', status: 'streaming', created_at: ago(AGENT_STALE_MS / 1000 + 60), updated_at: ago(100) }] });
 
     await turnRunning(db, { orgId: ORG, threadId: THREAD }, NOW);
     const closed = calls.find((c) => c.table === 'chat_messages' && c.op === 'update');

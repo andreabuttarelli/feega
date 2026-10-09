@@ -7,7 +7,7 @@ import { fetchImageBytes, uiReader } from '$lib/server/motion/ui-read';
 import { PromptCache } from '$lib/server/prompt-cache';
 import { reasoningProviderOptions } from '$lib/server/chat-model/catalogue';
 import { ensureGatewayModels, gatewayModel, gatewayRate } from '$lib/server/openrouter-models';
-import { MOTION_TURN_CAP_USD, Tier, activeTools, openingTier, selfCheckChoice, spentUsd, stepTier, type ForcedTool } from '$lib/server/motion/model-route';
+import { Tier, activeTools, openingTier, selfCheckChoice, spentUsd, stepTier, type ForcedTool } from '$lib/server/motion/model-route';
 import { extractSdkUsage, logAiCall, withOrgContext } from '$lib/server/ai-log';
 import { loadTurns, openNodeThread, promptHistory, saveTurn } from '$lib/server/repos/chat';
 import { openReply, ReplyStatus } from '$lib/server/repos/chat-reply';
@@ -23,7 +23,7 @@ import { effectStore } from '$lib/server/effects/store';
 import { layoutStore } from '$lib/server/layouts/store';
 import { assetUrls, headOrNew, motionAssets, motionTokens, saveMotionDoc } from '$lib/server/motion/editor';
 import { fitNewVideo } from '$lib/motion/fit-duration';
-import { AGENT_MAX_DURATION_S } from '$lib/server/project-agent/limits';
+import { AGENT_SELF_SAVE_MS, overTurnCap } from '$lib/server/project-agent/limits';
 import { dropWorkingDoc, keepWorkingDoc } from '$lib/server/motion/working-doc';
 import { EmbedAction, createMotionTools, selectionNote, type MotionSession } from '$lib/server/motion/motion-tools';
 import { publishEmbed, removeEmbed } from '$lib/server/motion/embed';
@@ -86,12 +86,11 @@ enum Round {
 type Stop = ReturnType<typeof agentStopWhen>;
 
 const CLOSING_RESERVE_MS = 60_000;
-const LANDING_RESERVE_MS = 25_000;
 const SAVE_ATTEMPTS = 4;
 
 export type TurnTiming = { landingMs: number; stopPollMs: number };
 
-const PLATFORM_TIMING: TurnTiming = { landingMs: AGENT_MAX_DURATION_S * 1000 - LANDING_RESERVE_MS, stopPollMs: 3000 };
+const PLATFORM_TIMING: TurnTiming = { landingMs: AGENT_SELF_SAVE_MS, stopPollMs: 3000 };
 export const MAX_DELIVERY_ATTEMPTS = 3;
 const STILL_OPEN_ID = 'still-open';
 
@@ -251,7 +250,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
   const openingMessages = [...history, { role: 'user', content: message }] as ModelMessage[];
   const stepTiers: Tier[] = [];
   let spent = 0;
-  const overBudget: Stop = () => spent > MOTION_TURN_CAP_USD;
+  const overBudget: Stop = overTurnCap(() => spent);
   const TIER_MODEL: Record<Tier, string> = { [Tier.Edit]: model, [Tier.Code]: codeModel };
 
   const round = (messages: ModelMessage[], kind: Round, onStep: (step: TurnStep & { response: { messages: unknown[] } }) => void) =>

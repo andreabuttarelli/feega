@@ -9,10 +9,10 @@ import { runInBackground } from '$lib/server/background-work';
 import { motionEditorPath, motionOf, type MotionNode } from '$lib/canvas/motion-node';
 import { headOrNew } from '$lib/server/motion/editor';
 import { docSummary } from '$lib/server/motion/motion-tools';
+import { MOTION_ASK_KIND } from '$lib/server/motion/ask-kind';
 import { Browser, startMotionTurn, type MotionTurn, type TurnOutcome } from '$lib/server/motion/turn';
 
 export const MCP_AGENT_KEY = 'mcp';
-const ASK_KIND = 'motion-ask';
 const HTTP_NOT_FOUND = 404;
 const HTTP_UNAVAILABLE = 503;
 
@@ -61,8 +61,8 @@ export async function askMotion(db: Db, input: { orgId: string; userId: string; 
     return turn;
   }
 
-  const run = await createRun(db, { orgId, nodeId, prompt, model: choice.choice.model, params: { kind: ASK_KIND }, actorKind: 'agent', actorId: userId });
-  runInBackground(() => settleAsk(db, run, turn), ASK_KIND);
+  const run = await createRun(db, { orgId, nodeId, prompt, model: choice.choice.model, params: { kind: MOTION_ASK_KIND }, actorKind: 'agent', actorId: userId });
+  runInBackground(() => settleAsk(db, run, turn), MOTION_ASK_KIND);
   return { runId: run.id, model: choice.choice.model, refusedModel: guarded.refused };
 }
 
@@ -70,7 +70,7 @@ async function settleAsk(db: Db, run: NodeRun, turn: MotionTurn): Promise<void> 
   try {
     await turn.stream.pipeTo(new WritableStream());
     const outcome: TurnOutcome = await turn.done;
-    await settleRun(db, { orgId: run.orgId, runId: run.id, params: { kind: ASK_KIND, ...outcome }, costUsd: outcome.costUsd });
+    await settleRun(db, { orgId: run.orgId, runId: run.id, params: { kind: MOTION_ASK_KIND, ...outcome }, costUsd: outcome.costUsd });
   } catch (e) {
     await failRun(db, { orgId: run.orgId, runId: run.id, error: e instanceof Error ? e.message : String(e) });
   }
@@ -78,7 +78,7 @@ async function settleAsk(db: Db, run: NodeRun, turn: MotionTurn): Promise<void> 
 
 export async function askStatus(db: Db, input: { orgId: string; runId: string }): Promise<Record<string, unknown> | Response> {
   const [run] = await runsByIds(db, { ids: [input.runId] });
-  const motion = run?.orgId === input.orgId && run.params.kind === ASK_KIND ? await findMotion(db, { orgId: input.orgId, nodeId: run.nodeId }) : null;
+  const motion = run?.orgId === input.orgId && run.params.kind === MOTION_ASK_KIND ? await findMotion(db, { orgId: input.orgId, nodeId: run.nodeId }) : null;
   if (!run || !motion) {
     return json({ error: 'run_not_found' }, { status: HTTP_NOT_FOUND });
   }

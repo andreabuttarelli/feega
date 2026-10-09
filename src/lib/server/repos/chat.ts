@@ -2,9 +2,7 @@ import type { Db } from '$lib/server/db/client';
 import type { Json } from '$lib/database.types';
 import { toolsForMirror } from '$lib/chat-stream-events';
 import { actorCols, type Actor } from './actor';
-import { AGENT_MAX_DURATION_S } from '$lib/server/brand-agent/limits';
-
-const MS_PER_S = 1000;
+import { AGENT_STALE_MS } from '$lib/server/brand-agent/limits';
 
 /**
  * I THREAD DELLA CHAT DI PROGETTO, SULLO SCHEMA NUOVO.
@@ -208,7 +206,7 @@ export async function turnRunning(db: Db, input: { orgId: string; threadId: stri
     return false;
   }
 
-  const alive = now - Date.parse(last.created_at) < AGENT_MAX_DURATION_S * MS_PER_S;
+  const alive = now - Date.parse(last.created_at) < AGENT_STALE_MS;
   if (!alive && streaming && last.id) {
     await closeCutReply(db, { orgId: input.orgId, id: last.id });
   }
