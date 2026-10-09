@@ -137,6 +137,28 @@ export function planStoryboard(board: Storyboard, media: Record<string, MediaKin
   return { nodes, edges };
 }
 
+export type OutlinePoint = { act: Act; intensity: number; branch: boolean };
+
+export function outlineOf(board: Storyboard): OutlinePoint[] {
+  return board.beats.map((b, i) => ({ act: b.act, intensity: b.intensity, branch: isBranch(board.beats, i) }));
+}
+
+export type MiniPoint = { x: number; y: number; branch: boolean };
+
+const MINI_BRANCH_DROP = 0.25;
+
+export function miniPoints(outline: OutlinePoint[], box: { w: number; h: number; pad: number }): MiniPoint[] {
+  const mains = outline.filter((p) => !p.branch).length;
+  const step = mains > 1 ? (box.w - 2 * box.pad) / (mains - 1) : 0;
+  const span = box.h - 2 * box.pad;
+  let col = -1;
+  return outline.map((p) => {
+    col += p.branch ? 0 : 1;
+    const drop = p.branch ? MINI_BRANCH_DROP : 0;
+    return { x: box.pad + Math.max(col, 0) * step, y: box.pad + Math.min(1, 1 - p.intensity + drop) * span, branch: p.branch };
+  });
+}
+
 type BoardNode = { id: string; type: string; position: { x: number; y: number }; data: Record<string, unknown> };
 type BoardEdge = { sourceNodeId: string; targetNodeId: string };
 

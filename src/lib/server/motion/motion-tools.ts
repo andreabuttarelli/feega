@@ -50,7 +50,7 @@ import { clickUi } from '$lib/motion/cursor-ops';
 import { Isolate, focusUi } from '$lib/motion/ui-focus';
 import { ACTS, BrandKind, briefOf, scriptProblems, scriptSchema, sourcesOf, type LaunchScript } from '$lib/motion/script';
 import { quoted, type SitePage } from './site-copy';
-import { MediaKind, storyboardSchema, type Storyboard, type StoryboardRead } from '$lib/motion/storyboard';
+import { MediaKind, outlineOf, storyboardSchema, type Storyboard, type StoryboardRead } from '$lib/motion/storyboard';
 import { PATCH_COMPONENT, READ_COMPONENT, WRITE_COMPONENT } from './model-route';
 import { CAMERA, CAMERA_KEYS, CAMERA_LANE, SPACES, type Camera } from '$lib/motion/camera';
 import { ENV_PRESETS, HDRI, LIGHT, envPresetInput, LIGHT_KEYS, LIGHT_KINDS, type Look } from '$lib/motion/look';
@@ -1655,7 +1655,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
           return { ok: false, error: `not a picture or clip of this project: ${unknown.join(', ')} (list_assets)` };
         }
         const written = await deps.storyboard.write(input, kinds);
-        return { ok: true, canvas_id: written.canvasId, nodes: written.nodes, connections: written.connections };
+        return { ok: true, canvas_id: written.canvasId, nodes: written.nodes, connections: written.connections, outline: outlineOf(input) };
       }
     }),
 

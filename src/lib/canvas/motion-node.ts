@@ -76,3 +76,8 @@ export function motionSourcePath(input: { projectId: string; canvasId: string; n
 export function motionPreviewPath(input: { projectId: string; canvasId: string; nodeId: string }): string {
   return `${motionEditorPath(input)}/preview`;
 }
+
+export function storyboardPath(projectId: string, data: Record<string, unknown>): string | null {
+  const link = storyboardOf(data);
+  return link ? `/p/${projectId}/c/${link.canvasId}` : null;
+}

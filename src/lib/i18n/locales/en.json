@@ -627,7 +627,8 @@
         "go": "Build it",
         "edit": "Change it",
         "countdown": "Building in {seconds} s",
-        "held": "Waiting for your changes"
+        "held": "Waiting for your changes",
+        "storyboard": "Open storyboard"
       },
       "model": "Model",
       "reasoning": "Reasoning",

@@ -12,7 +12,7 @@
   import ChatComposer from './ChatComposer.svelte';
   import ChatMessage from './ChatMessage.svelte';
   import ScriptBrief from './ScriptBrief.svelte';
-  import { BRIEF_AUTO_GO_S, GO_MESSAGE, pendingBrief } from '$lib/motion/script-brief';
+  import { BRIEF_AUTO_GO_S, GO_MESSAGE, pendingBoard, pendingBrief } from '$lib/motion/script-brief';
   import ChatModelPicker from './ChatModelPicker.svelte';
   import { chatModelPrefs } from './chat-model-prefs.svelte';
   import { PrefillMode, type ChatPrefill } from './chat-prefill';
@@ -85,6 +85,8 @@
   const copyKey = $derived(motionNodeId ? 'chat.panel.motion' : 'chat.panel');
   const suggestions = $derived(($json(`${copyKey}.suggestions`) as string[] | undefined) ?? []);
   const brief = $derived(motionNodeId && !busy ? pendingBrief(messages) : null);
+  const pendingOutline = $derived(brief ? pendingBoard(messages) : null);
+  const board = $derived(pendingOutline ? { href: `/p/${scopeProjectId}/c/${pendingOutline.canvasId}`, outline: pendingOutline.outline } : null);
   let editingBrief = $state(false);
   const showEmpty = $derived(!loading && failed !== 'load' && !messages.length);
 
@@ -275,7 +277,7 @@
 
         {#if brief}
           {#key brief}
-            <ScriptBrief {brief} seconds={BRIEF_AUTO_GO_S} held={editingBrief || !!draft.trim()} ongo={() => send(GO_MESSAGE)} onedit={editBrief} />
+            <ScriptBrief {brief} {board} seconds={BRIEF_AUTO_GO_S} held={editingBrief || !!draft.trim()} ongo={() => send(GO_MESSAGE)} onedit={editBrief} />
           {/key}
         {/if}
       </div>

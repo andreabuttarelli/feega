@@ -1137,6 +1137,9 @@
         <IconButton action={Action.ToggleInspector} class="toggle" pressed={propsShown} data-testid="toggle-inspector" onclick={COMMANDS[Command.ToggleInspector]} />
         <IconButton action={Action.ToggleChat} class="toggle" pressed={chatShown} data-testid="toggle-chat" onclick={COMMANDS[Command.ToggleChat]} />
       {/if}
+      {#if data.storyboardHref}
+        <a class="secondary storyboard" href={data.storyboardHref} data-testid="storyboard-open">Storyboard</a>
+      {/if}
       <button type="button" class="secondary wide" onclick={() => (leaveTo(0), (publishing = true))} data-testid="publish-open">{listed ? 'In gallery' : 'Publish'}</button>
       <div class="popover-anchor narrow">
         <IconButton action={Action.More} aria-expanded={moreOpen} data-testid="more-actions" onclick={() => (moreOpen = !moreOpen)} />
@@ -1522,6 +1525,12 @@
 
   .secondary:hover {
     background: var(--ui-hover);
+  }
+
+  .storyboard {
+    display: inline-flex;
+    align-items: center;
+    text-decoration: none;
   }
 
   .render {

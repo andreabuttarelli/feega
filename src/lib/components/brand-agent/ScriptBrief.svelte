@@ -1,10 +1,12 @@
 <script lang="ts">
   import { _ } from 'svelte-i18n';
   import { renderDocHtml } from '$lib/canvas/doc-render';
+  import StoryboardMini from './StoryboardMini.svelte';
+  import type { OutlinePoint } from '$lib/motion/storyboard';
 
   const TICK_MS = 1000;
 
-  let { brief, seconds, held = false, ongo, onedit }: { brief: string; seconds: number; held?: boolean; ongo: () => void; onedit: () => void } = $props();
+  let { brief, seconds, held = false, board = null, ongo, onedit }: { brief: string; seconds: number; held?: boolean; board?: { href: string; outline: OutlinePoint[] } | null; ongo: () => void; onedit: () => void } = $props();
 
   let left = $state(0);
   let open = $state(false);
@@ -35,6 +37,9 @@
     <strong>{$_('chat.panel.brief.title')}</strong>
     <span class="count" aria-live="polite">{held ? $_('chat.panel.brief.held') : $_('chat.panel.brief.countdown', { values: { seconds: left || seconds } })}</span>
   </header>
+  {#if board}
+    <StoryboardMini href={board.href} outline={board.outline} />
+  {/if}
   <div class="body prose" class:open>{@html html}</div>
   <button type="button" class="more" onclick={() => (open = !open)} aria-expanded={open}>{open ? '−' : '+'}</button>
   <footer>

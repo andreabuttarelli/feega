@@ -24,6 +24,7 @@ import { templateLibrary } from '$lib/server/motion/templates';
 import type { Db } from '$lib/server/db/client';
 import { loadAttachments } from '$lib/server/chat-attachments/register';
 import { briefAttachmentIds } from '$lib/motion/video-brief';
+import { storyboardPath } from '$lib/canvas/motion-node';
 import { editorGallery, publishFromForm, withdrawFromForm } from '$lib/server/gallery/editor';
 
 function parsedJson(text: string): unknown {
@@ -67,7 +68,8 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
     batch: batchView(runs),
     templates,
     gallery,
-    briefAttachments
+    briefAttachments,
+    storyboardHref: storyboardPath(params.projectId, scope.motion.record.data)
   };
 };
 
