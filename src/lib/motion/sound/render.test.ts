@@ -71,6 +71,13 @@ describe('sound score render', () => {
     expect(Math.max(...out.left.map(Math.abs))).toBeLessThanOrEqual(1);
   });
 
+  it.each([Instrument.Whoosh, Instrument.Hit, Instrument.Riser, Instrument.Pad, Instrument.Sub])('gain times velocity is the peak of a lone %s', (instrument) => {
+    const out = renderScore(score([{ voice: 'v', at: 0, duration: 1, velocity: 0.5 }], [{ id: 'v', instrument, gain: 0.6 }]), 1);
+    const peak = out.left.reduce((m, v) => Math.max(m, Math.abs(v)), 0);
+
+    expect(peak).toBeCloseTo(0.3, 2);
+  });
+
   it('pans a voice to one side', () => {
     const out = renderScore(score([{ voice: 'fx', at: 0, duration: 0.3 }], [{ id: 'fx', instrument: Instrument.Click, pan: -1 }]), 0.5);
 

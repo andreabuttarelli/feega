@@ -141,6 +141,11 @@ function reverb(input: Float32Array, spread: number): Float32Array {
   return out;
 }
 
+function normalized(samples: Float32Array): Float32Array {
+  const peak = samples.reduce((m, v) => Math.max(m, Math.abs(v)), 0);
+  return peak > 0 ? samples.map((v) => v / peak) : samples;
+}
+
 const limit = (v: number) => (Math.abs(v) <= KNEE ? v : Math.sign(v) * (KNEE + HEADROOM * Math.tanh((Math.abs(v) - KNEE) / HEADROOM)));
 
 function eventSeed(seed: number, index: number): number {
@@ -161,7 +166,7 @@ export function renderScore(score: SoundScore, seconds: number): StereoBuffer {
     if (start >= length) {
       continue;
     }
-    const mono = VOICES[voice.instrument](event, voice, seeded(eventSeed(score.seed, index)));
+    const mono = normalized(VOICES[voice.instrument](event, voice, seeded(eventSeed(score.seed, index))));
     const level = voice.gain * event.velocity;
     const toLeft = level * Math.min(1, 1 - voice.pan);
     const toRight = level * Math.min(1, 1 + voice.pan);
