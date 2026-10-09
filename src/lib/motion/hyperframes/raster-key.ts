@@ -7,5 +7,5 @@ export function neutralised(path: HTMLElement[]): () => void {
 }
 
 export function pathStyles(path: HTMLElement[]): string {
-  return path.map((el) => el.getAttribute('style') ?? '').join('|');
+  return path.map((el) => el.style.cssText).join('|');
 }
