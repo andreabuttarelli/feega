@@ -119,7 +119,7 @@ export function showcasePlan(sourceDir: string, sources: readonly ShowcaseSource
   return plan;
 }
 
-const LABEL_KEY = 'name';
+const NAMING_KEYS: ReadonlySet<string> = new Set(['id', 'name', 'key', 'label', 'clipId', 'prop', 'component']);
 
 function swapped(value: unknown, ids: Readonly<Record<string, string>>): unknown {
   if (typeof value === 'string') {
@@ -131,11 +131,12 @@ function swapped(value: unknown, ids: Readonly<Record<string, string>>): unknown
   if (!value || typeof value !== 'object') {
     return value;
   }
-  return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, k === LABEL_KEY ? v : swapped(v, ids)]));
+  return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, NAMING_KEYS.has(k) ? v : swapped(v, ids)]));
 }
 
 export function remapAssets(doc: MotionDoc, ids: Readonly<Record<string, string>>): MotionDoc {
-  return swapped(doc, ids) as MotionDoc;
+  const remapped = swapped(doc, ids) as MotionDoc;
+  return { ...remapped, assets: doc.assets.map((a) => ({ ...a, id: ids[a.id] ?? a.id })) };
 }
 
 export function showcaseNode<T extends { type: string; data: Record<string, unknown> }>(nodes: readonly T[], key: string): T | null {
@@ -216,7 +217,7 @@ async function reviseDoc(db: Db, scope: { orgId: string; nodeId: string; actor: 
   }
   const write = await saveMotionDoc(db, { ...scope, expectedVersion: head?.version ?? 0, doc, summary: 'Imported from the showcase' });
   if (write.outcome !== RevisionOutcome.Written) {
-    throw new Error(`${key}: revision ${write.outcome}`);
+    throw new Error(`${key}: revision ${write.outcome}${'error' in write ? ` ${write.error}` : ''}`);
   }
 }
 
@@ -284,11 +285,22 @@ async function main() {
   const ctx = { orgId: ORG_ID, projectId: project.id, canvasId, actor: { kind: 'user', id: ownerId } as Actor, work: mkdtempSync(join(tmpdir(), 'feega-showcase-')), sign: operatorSigner(db) };
 
   const rows: Imported[] = [];
+  const failed: string[] = [];
   for (const item of plan.items) {
-    rows.push(await importItem(db, ctx, item));
+    try {
+      rows.push(await importItem(db, ctx, item));
+    } catch (cause) {
+      failed.push(item.key);
+      console.error(`FAILED ${item.key}: ${cause instanceof Error ? cause.message : String(cause)}`);
+    }
   }
   console.table(rows.map(({ title, editor, embed }) => ({ title, editor, embed })));
   rows.forEach((r) => console.log(`\n${r.title}\n${r.snippet}`));
+
+  if (failed.length) {
+    console.error(`${failed.length} cuts failed: ${failed.join(', ')}`);
+    process.exit(1);
+  }
 }
 
 if (process.env.VITEST === undefined) {

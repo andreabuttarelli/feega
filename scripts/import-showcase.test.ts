@@ -80,6 +80,20 @@ describe('remapAssets', () => {
     expect(text).not.toContain('"assetId":"music"');
     expect(parseMotionDoc(doc).ok).toBe(true);
   });
+
+  it('leaves names that only look like an asset id alone', () => {
+    const base = docWithMusic();
+    const clip = { ...base.tracks.at(-1)!.clips[0], id: 'logo', props: { assetId: 'logo', volume: 1, pan: 0, fadeIn: 0, fadeOut: 0 } };
+    const field = { key: 'logo', label: 'logo', type: 'asset', clipId: 'logo', prop: 'assetId', default: 'logo' };
+    const source = { ...base, assets: [{ id: 'logo', kind: 'audio', name: 'logo' }], tracks: [...base.tracks.slice(0, -1), { ...base.tracks.at(-1)!, clips: [clip] }], fields: [field] };
+
+    const doc = remapAssets(source as never, { logo: 'row-1' });
+
+    expect(doc.assets[0].id).toBe('row-1');
+    expect(doc.fields[0]).toMatchObject({ key: 'logo', label: 'logo', clipId: 'logo', prop: 'assetId', default: 'row-1' });
+    expect(doc.tracks.at(-1)!.clips[0]).toMatchObject({ id: 'logo', props: { assetId: 'row-1' } });
+    expect(parseMotionDoc(doc).ok).toBe(true);
+  });
 });
 
 describe('idempotency', () => {
