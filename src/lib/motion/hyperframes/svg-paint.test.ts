@@ -10,6 +10,7 @@ function engine(input: { settles: boolean; arrivals: number[] }) {
     load: async () => ({}),
     settles: () => input.settles,
     print: () => `${landed()} pictures`,
+    blank: (print) => print.startsWith('0 '),
     tick: async () => {
       ticks += 1;
     },
@@ -42,6 +43,12 @@ describe('paintSvg', () => {
     const stuck = engine({ settles: true, arrivals: [Number.POSITIVE_INFINITY] });
 
     expect(await paintSvg(FRAME, 1920, 1080, stuck.painter)).toBe('0 of 1 pictures at 1920x1080');
-    expect(stuck.ticks()).toBeLessThanOrEqual(12);
+    expect(stuck.ticks()).toBeLessThanOrEqual(120);
+  });
+
+  it('keeps waiting while a layer made only of a nested picture is still blank, as WebKit under four lanes', async () => {
+    const slow = engine({ settles: true, arrivals: [30] });
+
+    expect(await paintSvg(FRAME, 1920, 1080, slow.painter)).toBe('1 of 1 pictures at 1920x1080');
   });
 });

@@ -1,4 +1,5 @@
 import { Device, deviceOf, type DeviceInfo } from '../render-place';
+import { Engine } from '../engine';
 
 export type Shooter<F> = (time: number, index: number) => Promise<F>;
 
@@ -13,8 +14,8 @@ const LANES_OF: Record<Device, (cores: number | null) => number> = {
   [Device.WeakMobile]: () => 1
 };
 
-export function laneCount(info: DeviceInfo): number {
-  return LANES_OF[deviceOf(info)](info.cores);
+export function laneCount(info: DeviceInfo, engine: Engine): number {
+  return engine === Engine.WebKit ? 1 : LANES_OF[deviceOf(info)](info.cores);
 }
 
 export async function shootInLanes<F>(times: number[], lanes: Shooter<F>[], onFrame: (frame: F, index: number) => Promise<void>, signal: AbortSignal): Promise<void> {

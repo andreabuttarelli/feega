@@ -1,6 +1,7 @@
 import { Settle } from '../hyperframes/capture';
 import { laneCount } from './lanes';
 import { deviceInfo } from '../render-place';
+import { engineOf } from '../engine';
 
 export enum CaptureProfile {
   Fast = 'fast',
@@ -8,7 +9,7 @@ export enum CaptureProfile {
 }
 
 export const CAPTURE_PROFILES: Record<CaptureProfile, { settle: Settle; lanes: () => number }> = {
-  [CaptureProfile.Fast]: { settle: Settle.Seek, lanes: () => laneCount(deviceInfo(navigator)) },
+  [CaptureProfile.Fast]: { settle: Settle.Seek, lanes: () => laneCount(deviceInfo(navigator), engineOf(navigator.userAgent)) },
   [CaptureProfile.Exact]: { settle: Settle.Paint, lanes: () => 1 }
 };
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { laneCount, shootInLanes, type Shooter } from './lanes';
+import { Engine } from '../engine';
 
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
@@ -82,6 +83,10 @@ describe('laneCount', () => {
     [{ cores: 4, memoryGb: 2, mobile: true }, 1],
     [{ cores: null, memoryGb: null, mobile: false }, 2]
   ])('%o → %i', (info, n) => {
-    expect(laneCount(info)).toBe(n);
+    expect(laneCount(info, Engine.Other)).toBe(n);
+  });
+
+  it('WebKit runs the lane iframes on one thread: one lane, however many cores', () => {
+    expect(laneCount({ cores: 8, memoryGb: 8, mobile: false }, Engine.WebKit)).toBe(1);
   });
 });

@@ -2,11 +2,12 @@ export type Painter<I, F> = {
   load: (url: string) => Promise<I>;
   settles: (url: string) => boolean;
   print: (img: I) => string;
+  blank: (print: string) => boolean;
   tick: () => Promise<void>;
   draw: (img: I, width: number, height: number) => F;
 };
 
-export async function paintSvg<I, F>(url: string, width: number, height: number, painter: Painter<I, F>, wait = { maxTicks: 12, stillTicks: 3 }): Promise<F> {
+export async function paintSvg<I, F>(url: string, width: number, height: number, painter: Painter<I, F>, wait = { maxTicks: 12, maxBlankTicks: 120, stillTicks: 3 }): Promise<F> {
   const img = await painter.load(url);
   if (!painter.settles(url)) {
     return painter.draw(img, width, height);
@@ -15,7 +16,10 @@ export async function paintSvg<I, F>(url: string, width: number, height: number,
   let before = painter.print(img);
   let changed = false;
   let still = 0;
-  for (let tick = 0; tick < wait.maxTicks; tick++) {
+  for (let tick = 0; tick < wait.maxBlankTicks; tick++) {
+    if (tick >= wait.maxTicks && !painter.blank(before)) {
+      break;
+    }
     await painter.tick();
     const now = painter.print(img);
     if (now !== before) {
