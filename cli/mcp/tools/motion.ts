@@ -19,7 +19,7 @@ export function registerMotionTools(server: McpServer) {
         'with its own tools, writes a new revision of the video and posts the exchange in the editor chat. ' +
         'Find the node id with `list_motion_videos`; read the video first with `get_motion_summary` to name clips precisely. ' +
         'Returns at once with a `run_id` (`running`): poll `get_motion_run` every few seconds until `done`, which carries the ' +
-        'reply, the summary and the new revision `version`. `wait: true` polls for you, up to about 4 minutes. The agent looks at its own ' +
+        'reply, the summary and the new revision `version`. `wait: true` polls for you, up to about 4 minutes of a turn that can run up to 30. The agent looks at its own ' +
         'frames even with no editor open. Spends credits.',
       inputSchema: z.object({ org, node_id: z.string(), prompt: z.string().min(1), wait: z.boolean().optional() }),
       annotations: { readOnlyHint: false, destructiveHint: false }

@@ -16,7 +16,9 @@ import { createProjectTools } from '$lib/server/project-agent/project-tools';
 import { createMotionDelegation } from '$lib/server/project-agent/motion-delegation';
 import { openAgentTools } from '$lib/server/project-agent/tool-surface';
 import { projectAgentPrompt } from '$lib/server/project-agent/system-prompt';
-import { AGENT_MAX_DURATION_S, agentStopWhen } from '$lib/server/project-agent/limits';
+import { AGENT_MAX_DURATION_S, agentStopWhen, overTurnCap } from '$lib/server/project-agent/limits';
+import { spentUsd } from '$lib/server/motion/model-route';
+import { ensureGatewayModels, gatewayRate } from '$lib/server/openrouter-models';
 import { screenModelInput } from '$lib/server/moderation/model-input';
 import { ModerationProfile } from '$lib/server/moderation/profiles';
 import { blockedPrompt } from '$lib/server/moderation/blocked-response';
@@ -121,6 +123,8 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
     accessToken: session.access_token
   });
 
+  await ensureGatewayModels();
+  let spent = 0;
   const t0 = Date.now();
   const billedScope = <T>(fn: () => T): T => (brand ? withBrandContext(brand.id, fn) : withOrgContext(orgId, fn));
 
@@ -135,8 +139,9 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
     messages: [...history, { role: 'user', content: text }] as ModelMessage[],
     tools: agent.tools,
     providerOptions: reasoningProviderOptions(reasoning),
-    stopWhen: [agentStopWhen(t0)],
+    stopWhen: [agentStopWhen(t0), overTurnCap(() => spent)],
     onStepFinish: (step) => {
+      spent += spentUsd([extractSdkUsage(step.usage)], [model], gatewayRate);
       steps.push(step);
       void reply.progress(finishedTurn(steps));
     },

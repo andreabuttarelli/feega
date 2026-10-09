@@ -2,6 +2,8 @@ import type { Db } from '$lib/server/db/client';
 import { RENDER_DEADLINE_MS } from '$lib/server/motion/farm-render';
 import { BROWSER_RENDER_DEADLINE_MS } from '$lib/motion/render-link';
 import { releaseHold } from '$lib/server/motion/render-run';
+import { MOTION_ASK_KIND } from '$lib/server/motion/ask-kind';
+import { AGENT_STALE_MS } from '$lib/server/brand-agent/limits';
 import { promptRequired, type GenMedium, type GenParams } from '$lib/canvas/gen-node';
 import { upscaleLimitsOf } from '$lib/video-models';
 import { findAsset, insertAsset, type Asset } from '$lib/server/repos/assets';
@@ -1062,10 +1064,11 @@ const WIRO_IMAGE_TIMEOUT_MS = 10 * 60_000;
 const WIRO_VIDEO_TIMEOUT_MS = 30 * 60_000;
 const DUBBING_TIMEOUT_MS = 60 * 60_000;
 
-type JobKind = 'sync' | 'video' | 'wiro_image' | 'wiro_video' | 'dubbing' | 'motion_render' | 'browser_render';
+type JobKind = 'sync' | 'agent_turn' | 'video' | 'wiro_image' | 'wiro_video' | 'dubbing' | 'motion_render' | 'browser_render';
 
 const JOB_TIMEOUTS_MS: Record<JobKind, number> = {
   sync: RUN_STALE_MS,
+  agent_turn: AGENT_STALE_MS,
   video: VIDEO_TIMEOUT_MS,
   wiro_image: WIRO_IMAGE_TIMEOUT_MS,
   wiro_video: WIRO_VIDEO_TIMEOUT_MS,
@@ -1083,7 +1086,10 @@ const ON_EXPIRE: Partial<Record<JobKind, (run: NodeRun) => Promise<void>>> = {
  * `elevenlabs:` sono i due fornitori con un riconciliatore proprio (`node-runs.ts`), e per Wiro
  * il genere fine (immagine o video) sta sul nodo che lo ospita — l'ID del task non lo dice.
  */
-function jobKindOf(run: { externalJobId: string | null }, nodeType: string | null): JobKind {
+function jobKindOf(run: { externalJobId: string | null; params: Record<string, unknown> }, nodeType: string | null): JobKind {
+  if (run.params.kind === MOTION_ASK_KIND) {
+    return 'agent_turn';
+  }
   if (!run.externalJobId) {
     return 'sync';
   }

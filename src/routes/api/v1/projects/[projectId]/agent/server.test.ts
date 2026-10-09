@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { fakeDb, type Call } from '$lib/server/db/fake-db';
 import { forgetReplySchema } from '$lib/server/repos/chat-reply';
 
+import { AGENT_TURN_CAP_USD } from '$lib/server/project-agent/limits';
 const streamed = vi.fn();
 const { screenModelInput } = vi.hoisted(() => ({ screenModelInput: vi.fn() }));
 vi.mock('$lib/server/moderation/model-input', () => ({ screenModelInput }));
@@ -12,7 +13,7 @@ vi.mock('$lib/server/moderation/model-input', () => ({ screenModelInput }));
 const saveTurn = vi.fn(async (_db: unknown, _turn: { role: string; content?: string }) => undefined);
 
 let releaseTail: () => void = () => {};
-const world = { stepped: false, fails: false, db: fakeDb({ chat_messages: [] }) };
+const world = { stepped: false, fails: false, usdPerToken: 0, db: fakeDb({ chat_messages: [] }) };
 const USAGE = {
   inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 },
   outputTokens: { total: 1, text: 1, reasoning: 0 }
@@ -88,12 +89,16 @@ function slowModel() {
 vi.mock('$lib/server/llm', () => ({
   llmLanguageModel: () => (world.stepped ? steppedModel() : slowModel())
 }));
+vi.mock('$lib/server/openrouter-models', () => ({
+  ensureGatewayModels: async () => {},
+  gatewayRate: () => ({ input: world.usdPerToken * 1_000_000, cachedInput: 0, output: world.usdPerToken * 1_000_000 })
+}));
 vi.mock('$lib/server/chat-model/catalogue', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$lib/server/chat-model/catalogue')>()),
   offeredChatModels: async () => []
 }));
 vi.mock('$lib/server/ai-log', () => ({
-  extractSdkUsage: () => ({}),
+  extractSdkUsage: () => ({ inputTokens: 1, outputTokens: 1 }),
   logAiCall: vi.fn(),
   withBrandContext: (_id: string, fn: () => void) => fn(),
   withOrgContext: (_id: string, fn: () => void) => fn()
@@ -221,6 +226,7 @@ describe('POST — the answer is written while the turn runs', () => {
     forgetReplySchema();
     world.stepped = true;
     world.fails = false;
+    world.usdPerToken = 0;
     world.db = fakeDb({ chat_messages: [] });
     screenModelInput.mockResolvedValue({ ok: true });
   });
@@ -238,6 +244,16 @@ describe('POST — the answer is written while the turn runs', () => {
     await settled(world.db.calls, 'done');
 
     expect(replyWrites(world.db.calls).at(-1)).toMatchObject({ content: 'Looking.\n\nDone.', status: 'done' });
+  });
+
+  it('a turn that spent its cap stops after the step that crossed it', async () => {
+    world.usdPerToken = AGENT_TURN_CAP_USD;
+    const res = await POST(postEvent());
+    await res.body!.getReader().cancel();
+
+    await settled(world.db.calls, 'done');
+
+    expect(replyWrites(world.db.calls).at(-1)).toMatchObject({ content: 'Looking.', status: 'done' });
   });
 
   it('a turn that breaks after a step keeps the step and ends failed', async () => {

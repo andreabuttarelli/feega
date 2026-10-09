@@ -25,8 +25,6 @@ const CODE_INTENT = /\b(code|components?|custom|animated|animation|ui|interface|
 
 const MILLION = 1_000_000;
 
-export const MOTION_TURN_CAP_USD = 1.5;
-
 type Opening = { message: string; doc: MotionDoc; selection: string[] };
 
 export function openingTier(input: Opening): Tier {

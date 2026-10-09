@@ -293,7 +293,7 @@ QUEUES many combinations from a node's `iterate` wires (or plain "repeat N" vari
 
 *Ask the motion editor agent*
 
-Edit a motion video (a `motion` canvas node) by asking the motion editor's own AI in plain words, e.g. "make the title red and add a bounce". It runs one turn of the same agent as the editor chat, with its own tools, writes a new revision of the video and posts the exchange in the editor chat. Read the video first with `get_motion_summary` to name clips precisely. With `wait` (default true) it returns when the turn ends, up to about 4 minutes; otherwise, or past that, it returns a `run_id` still `running` — poll `get_motion_run`. Frames cannot be inspected without the editor open in a browser. Spends credits.
+Edit a motion video (a `motion` canvas node) by asking the motion editor's own AI in plain words, e.g. "make the title red and add a bounce". It runs one turn of the same agent as the editor chat, with its own tools, writes a new revision of the video and posts the exchange in the editor chat. Read the video first with `get_motion_summary` to name clips precisely. With `wait` (default true) it returns when the turn ends, up to about 4 minutes of a turn that can run up to 30; otherwise, or past that, it returns a `run_id` still `running` — poll `get_motion_run`. Frames cannot be inspected without the editor open in a browser. Spends credits.
 
 | campo | tipo | |
 |---|---|---|

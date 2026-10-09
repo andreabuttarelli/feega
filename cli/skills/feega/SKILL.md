@@ -165,7 +165,7 @@ duration, every track and clip in seconds. `ask_motion_agent` asks the editor's 
 it in plain words ("make the title red and add a bounce"): one turn of the same agent the editor
 chat runs, a new revision, the exchange visible in the editor chat. It returns at once with a
 running `run_id`: poll `get_motion_run` every few seconds until `done` (reply, summary, new
-`version`); `wait: true` polls for you up to about 4 minutes. Spends credits. CLI: `feega motion ask <nodeId> "<prompt>"`.
+`version`); `wait: true` polls for you up to about 4 minutes of a turn that can run up to 30. Spends credits. CLI: `feega motion ask <nodeId> "<prompt>"`.
 
 Render one with `render_video`: by default it is FREE and returns a `render_url`,
 a one-time link (30 minutes, bound to the saved revision) the user opens on any device — the video
