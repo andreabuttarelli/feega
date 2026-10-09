@@ -1,3 +1,4 @@
+import { GPU_GLOBAL, Scaling } from './gpu';
 import { js } from './html';
 import { SCENE, sampleTrack, type Keyframe, type SceneKey } from '../keyframes';
 import type { StageSpec } from '../camera';
@@ -261,11 +262,10 @@ function ground(scene, c) {
 }
 
 function stage(c) {
-  const renderer = keptRenderer('three-' + c.id, (canvas) => new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: true }));
+  const blurred = STAGE && STAGE.dof && c.depth !== null;
+  const renderer = keptRenderer('three-' + c.id, (canvas) => window.${GPU_GLOBAL}.renderer(THREE, canvas, {}, blurred ? ${js(Scaling.Fixed)} : ${js(Scaling.Adaptive)}));
   if (!renderer) return null;
   const canvas = renderer.domElement;
-  renderer.setPixelRatio(1);
-  renderer.setSize(canvas.width, canvas.height, false);
   renderer.toneMapping = THREE.NoToneMapping;
   renderer.shadowMap.enabled = false;
   if (LOOK) {
@@ -282,7 +282,7 @@ function stage(c) {
   const object = new THREE.Group();
   pivot.add(object);
   scene.add(pivot);
-  return { renderer, scene, camera, pivot, object, lights, bokeh: STAGE && STAGE.dof && c.depth !== null ? bokeh(canvas) : null };
+  return { renderer, scene, camera, pivot, object, lights, bokeh: blurred ? bokeh(canvas) : null };
 }
 
 function dressed(c, base) {

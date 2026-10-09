@@ -106,6 +106,19 @@ describe('callbacks under the HyperFrames seek', () => {
 });
 
 describe('libraries', () => {
+  it('three.renderer hands a component the renderer tuned for where it plays', () => {
+    const w = window as unknown as Record<string, unknown>;
+    w.__feegaThree = { tag: 'three' };
+    w.__feegaGpu = { renderer: (lib: { tag: string }, canvas: HTMLCanvasElement, extra: object) => ({ via: lib.tag + ':' + canvas.tagName + ':' + JSON.stringify(extra) }) };
+
+    const { root } = run('Orb', 'root.dataset.via = three.renderer(root.ownerDocument.createElement("canvas"), { alpha: false }).via;');
+
+    expect(root.dataset.via).toBe('three:CANVAS:{"alpha":false}');
+    expect(librariesOf({ Orb: { source: { js: 'three.renderer(c)', css: '' } } } as never, ['Orb']).has(Library.Three)).toBe(true);
+    delete w.__feegaThree;
+    delete w.__feegaGpu;
+  });
+
   it('loads only the libraries the used code names', () => {
     const components = { A: { source: { html: '', css: '', js: 'motion.split(root)' } }, B: { source: { html: '', css: '', js: 'lottie.loadAnimation({})' } } } as never;
 
