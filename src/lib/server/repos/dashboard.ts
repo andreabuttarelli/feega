@@ -61,8 +61,8 @@ export async function listRecentBatches(db: Db, scope: Scope): Promise<RecentBat
   }));
 }
 
-export async function listRecentNodes(db: Db, scope: Scope & { type: NodeType }): Promise<RecentNode[]> {
-  const result = await db
+export async function listRecentNodes(db: Db, scope: Scope & { type: NodeType; before?: string }): Promise<RecentNode[]> {
+  const query = db
     .from('nodes')
     .select('id, project_id, canvas_id, display_name, data, updated_at')
     .eq('org_id', scope.orgId)
@@ -70,6 +70,7 @@ export async function listRecentNodes(db: Db, scope: Scope & { type: NodeType })
     .is('deleted_at', null)
     .order('updated_at', { ascending: false })
     .limit(scope.limit);
+  const result = await (scope.before ? query.lt('updated_at', scope.before) : query);
   return rowsOf<{ id: string; project_id: string; canvas_id: string; display_name: string | null; data: unknown; updated_at: string }>(result).map((r) => ({
     id: r.id,
     projectId: r.project_id,
