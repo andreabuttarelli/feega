@@ -1,6 +1,7 @@
 import { env } from '$env/dynamic/private';
 import type { Db } from '$lib/server/db/client';
-import { logAiCall } from '$lib/server/ai-log';
+import { logAiCall, withBrandContext, withOrgContext } from '$lib/server/ai-log';
+import { SCRAPECREATORS_COST_USD, scrapeCreatorsGet } from '$lib/server/scrapecreators';
 import { llmApiKey, llmBaseUrl, llmDefaultModel } from '$lib/server/llm';
 import { safeFetchBytes } from '$lib/server/tool-guard';
 import { chromiumPage, serverFramesOpen } from '$lib/server/motion/chromium-frames';
@@ -15,6 +16,7 @@ import { directFetch, exaContents, renderedSite, secondarySources, type SiteStra
 import { screenshotPage } from './screenshot';
 import { readStore, storeProducts } from './store';
 import { viewImages, type ViewPorts } from './view-images';
+import { pinterestBoard, pinterestPin, pinterestSearch, type PinterestGet, type PinsFound } from './pinterest';
 import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
 import { removeAssetFile, signAssetFile, storeAssetFile } from '$lib/server/repos/asset-storage';
 import type { FetchedProduct, StorePlatform } from '$lib/server/store-fetch';
@@ -24,7 +26,7 @@ import type { Actor } from '$lib/server/repos/actor';
 import type { ScreenOutcome } from '$lib/server/moderation/screen';
 import type { AssetImport } from '$lib/server/motion/motion-tools';
 import type { MotionAsset } from '$lib/server/motion/editor';
-import type { ImageImport, ProductsImport, WebToolDeps } from './web-tools';
+import type { ImageImport, PinterestPort, PinterestRead, ProductsImport, WebToolDeps } from './web-tools';
 
 export type WebScope = { orgId: string; userId: string; projectId: string; brandId?: string | null; mode: ProjectMode };
 
@@ -180,6 +182,24 @@ function browser(db: Db, scope: WebScope, open: OpenBrowser): NonNullable<WebToo
   };
 }
 
+const priced = (found: PinsFound): PinterestRead => ({ ...found, costUsd: found.requests * SCRAPECREATORS_COST_USD });
+
+export function pinterestPort(get: PinterestGet): PinterestPort {
+  return {
+    search: async (query, limit) => priced(await pinterestSearch(get, query, limit)),
+    pin: async (url) => priced(await pinterestPin(get, url)),
+    board: async (url, limit) => priced(await pinterestBoard(get, url, limit))
+  };
+}
+
+function livePinterest(scope: Metered): PinterestPort | undefined {
+  if (!env.SCRAPECREATORS_API_KEY?.trim()) {
+    return undefined;
+  }
+  const billed = <T>(fn: () => T): T => (scope.brandId ? withBrandContext(scope.brandId, fn) : withOrgContext(scope.orgId, fn));
+  return pinterestPort((path) => billed(() => scrapeCreatorsGet(path)));
+}
+
 export function liveWebDeps(db: Db, scope: WebScope, spend: (usd: number) => void): WebToolDeps {
   const open = liveBrowser(scope);
   return {
@@ -189,6 +209,7 @@ export function liveWebDeps(db: Db, scope: WebScope, spend: (usd: number) => voi
     store: (url, opts) => readStore(url, opts),
     shoot: serverFramesOpen() ? (url, view) => screenshotPage(url, view, chromiumPage) : undefined,
     browse: open ? browser(db, scope, open) : undefined,
+    pinterest: livePinterest(scope),
     spend
   };
 }

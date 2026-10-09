@@ -6,7 +6,7 @@ vi.mock('$env/dynamic/private', () => ({ env: { EXA_API_KEY: 'k' } }));
 vi.mock('$lib/server/ai-log', () => ({ logAiCall: M.logAiCall }));
 vi.mock('./search', async (importOriginal) => ({ ...(await importOriginal<typeof import('./search')>()), exaSearch: () => M.port }));
 
-import { loggedSearch, productImport, screenedImport } from './live';
+import { loggedSearch, pinterestPort, productImport, screenedImport } from './live';
 import { SearchEngine } from './search';
 
 const SCOPE = { orgId: 'org-1', userId: 'u-1', projectId: 'p-1', brandId: null };
@@ -67,3 +67,13 @@ describe('motion product pictures', () => {
   });
 });
 
+
+describe('pinterest billing', () => {
+  it('prices every ScrapeCreators request a Pinterest read made, failed ones included', async () => {
+    const get = vi.fn().mockResolvedValueOnce({ pins: [{ id: '1' }], cursor: 'c' }).mockRejectedValueOnce(new Error('scrapecreators 500'));
+
+    const found = await pinterestPort(get).search('glass', 20);
+
+    expect(found).toMatchObject({ ok: false, requests: 2, costUsd: 0.004 });
+  });
+});

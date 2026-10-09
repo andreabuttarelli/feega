@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { generateText, stepCountIs, type Tool } from 'ai';
 import { MockLanguageModelV4 } from 'ai/test';
-import { MAX_BROWSES_PER_TURN, MAX_SEARCHES_PER_TURN, MAX_SHOTS_PER_TURN, WEB_TOOLS, createWebTools, type WebToolDeps } from './web-tools';
+import { MAX_BROWSES_PER_TURN, MAX_PINTEREST_PER_TURN, MAX_SEARCHES_PER_TURN, MAX_SHOTS_PER_TURN, WEB_TOOLS, createWebTools, type WebToolDeps } from './web-tools';
 import { ShotView } from './screenshot';
 import { StoreKind } from './store';
 import { ViewDetail } from './view-images';
@@ -130,6 +130,34 @@ describe('web tools', () => {
 
     expect(await run('import_products', { store_url: 'https://shop.example', handles: ['a', 'b'] })).toEqual({ ok: true, products: [{ handle: 'a', title: 'A', asset_ids: ['x1'] }], missing: ['b'], node_id: 'n1' });
     expect(importProducts).toHaveBeenCalledWith('https://shop.example', ['a', 'b']);
+  });
+
+  it('pinterest_search returns the pins and spends what the requests cost, capped per turn', async () => {
+    const pins = [{ id: '1', url: 'https://www.pinterest.com/pin/1/', title: 'Glass', description: null, image: { url: 'https://i.pinimg.com/originals/a.jpg', width: 10, height: 10 }, colour: '#fff', link: null, pinner: 'p', board: null }];
+    const search = vi.fn(async () => ({ ok: true as const, pins, requests: 2, costUsd: 0.004 }));
+    const { run, spent } = setup({ pinterest: { search, pin: vi.fn(), board: vi.fn() } });
+
+    expect(await run('pinterest_search', { query: 'liquid glass hero', limit: 12 })).toEqual({ ok: true, pins });
+    expect(search).toHaveBeenCalledWith('liquid glass hero', 12);
+    expect(spent()).toBeCloseTo(0.004);
+
+    for (let i = 1; i < MAX_PINTEREST_PER_TURN; i++) {
+      await run('pinterest_search', { query: `q${i}` });
+    }
+    expect(await run('pinterest_search', { query: 'one more' })).toMatchObject({ ok: false });
+    expect(search).toHaveBeenCalledTimes(MAX_PINTEREST_PER_TURN);
+  });
+
+  it('pinterest_pin and pinterest_board read the url given, and a failure still spends what it cost', async () => {
+    const pin = vi.fn(async () => ({ ok: false as const, error: 'pinterest pin failed: 404', requests: 1, costUsd: 0.002 }));
+    const board = vi.fn(async () => ({ ok: true as const, pins: [], requests: 1, costUsd: 0.002 }));
+    const { run, spent } = setup({ pinterest: { search: vi.fn(), pin, board } });
+
+    expect(await run('pinterest_pin', { url: 'https://www.pinterest.com/pin/1/' })).toEqual({ ok: false, error: 'pinterest pin failed: 404' });
+    expect(await run('pinterest_board', { url: 'https://www.pinterest.com/a/b/' })).toEqual({ ok: true, pins: [] });
+    expect(board).toHaveBeenCalledWith('https://www.pinterest.com/a/b/', 25);
+    expect(spent()).toBeCloseTo(0.004);
+    expect(WEB_TOOLS).toEqual(expect.arrayContaining(['pinterest_search', 'pinterest_pin', 'pinterest_board']));
   });
 
   it('view_images hands the model real image parts, and keeps only paths in its record', async () => {
