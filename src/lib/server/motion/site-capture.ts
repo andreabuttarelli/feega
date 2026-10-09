@@ -1,3 +1,4 @@
+import { assertPublicUrl } from '$lib/server/tool-guard';
 import { FARM_JOB_DIR, FARM_RUNTIME_DIR, type FarmWorker, type RenderFarm } from './render-farm';
 import { CaptureView, type CaptureShot, type SiteCapture } from './motion-tools';
 
@@ -77,7 +78,8 @@ async function shotsOf(worker: FarmWorker, url: string, view: CaptureView): Prom
 
 export function farmCapture(farm: RenderFarm, store: StoreShot) {
   return async (url: string, view: CaptureView): Promise<SiteCapture> => {
-    if (!/^https:\/\//.test(url)) {
+    const reachable = await assertPublicUrl(new URL(url), 'https-only').then(() => true, () => false);
+    if (!reachable) {
       return { ok: false, error: 'capture takes a public https page' };
     }
     const worker = await farm.open(WORKER);

@@ -1,4 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('$env/dynamic/private', () => ({ env: {} }));
+vi.mock('node:dns/promises', () => ({ lookup: vi.fn(async (host: string) => [{ address: /^[\d.]+$/.test(host) ? host : host === 'rebound.example' ? '10.0.0.5' : '93.184.216.34', family: 4 }]) }));
 import { AssetKind } from '$lib/motion/components';
 import type { FarmWorker, RenderFarm } from './render-farm';
 import { CaptureView } from './motion-tools';
@@ -37,6 +40,13 @@ describe('capturing a site on the render farm', () => {
     const { farm } = fakeFarm(vi.fn(), {});
 
     expect(await farmCapture(farm, stored)('file:///etc/passwd', CaptureView.Desktop)).toMatchObject({ ok: false });
+    expect(farm.open).not.toHaveBeenCalled();
+  });
+
+  it.each(['https://169.254.169.254/latest/meta-data/', 'https://localhost/', 'https://rebound.example/'])('refuses an internal host before opening a sandbox: %s', async (url) => {
+    const { farm } = fakeFarm(vi.fn(), {});
+
+    expect(await farmCapture(farm, stored)(url, CaptureView.Desktop)).toMatchObject({ ok: false });
     expect(farm.open).not.toHaveBeenCalled();
   });
 

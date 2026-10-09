@@ -8,7 +8,7 @@ import sharp from 'sharp';
 import type { Db } from '$lib/server/db/client';
 import { importImageAsset, IMPORT_MAX_BYTES, IMPORT_MAX_EDGE } from './asset-import';
 
-const SCOPE = { orgId: 'org1', projectId: 'proj1', canvasId: 'canvas1' };
+const SCOPE = { orgId: 'org1', projectId: 'proj1', canvasId: 'canvas1', screen: async () => ({ ok: true as const }) };
 
 function serves(type: string, body: Buffer | string, length?: string) {
   vi.stubGlobal(
@@ -25,12 +25,17 @@ function serves(type: string, body: Buffer | string, length?: string) {
 
 function fakeDb() {
   const uploads: { bucket: string; path: string; type: string }[] = [];
+  const removed: string[] = [];
   const rows: Record<string, unknown>[] = [];
   const db = {
     storage: {
       from: (bucket: string) => ({
         upload: async (path: string, file: File) => {
           uploads.push({ bucket, path, type: file.type });
+          return { error: null };
+        },
+        remove: async (paths: string[]) => {
+          removed.push(...paths);
           return { error: null };
         },
         createSignedUrl: async (path: string) => ({ data: { signedUrl: `https://signed/${path}` }, error: null })
@@ -43,7 +48,7 @@ function fakeDb() {
       }
     })
   };
-  return { db: db as unknown as Db, uploads, rows };
+  return { db: db as unknown as Db, uploads, rows, removed };
 }
 
 describe('importImageAsset: a picture from the web becomes a project asset', () => {
@@ -103,5 +108,18 @@ describe('importImageAsset: a picture from the web becomes a project asset', () 
     const { db } = fakeDb();
 
     expect(await importImageAsset(db, SCOPE, 'http://brand.example/logo.png')).toMatchObject({ ok: false });
+  });
+
+  it('refuses a picture the safety review rejects, and keeps neither the file nor the row', async () => {
+    serves('image/png', await sharp({ create: { width: 64, height: 64, channels: 3, background: '#f0c' } }).png().toBuffer());
+    const { db, uploads, rows, removed } = fakeDb();
+    const screen = vi.fn(async () => ({ ok: false as const, error: 'refused by the safety review' }));
+
+    const out = await importImageAsset(db, { ...SCOPE, screen }, 'https://brand.example/nsfw.png');
+
+    expect(out).toEqual({ ok: false, error: 'refused by the safety review' });
+    expect(screen).toHaveBeenCalledWith(`https://signed/${uploads[0].path}`);
+    expect(removed).toEqual([uploads[0].path]);
+    expect(rows).toEqual([]);
   });
 });

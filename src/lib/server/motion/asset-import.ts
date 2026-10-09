@@ -3,7 +3,8 @@ import type { Db } from '$lib/server/db/client';
 import { safeFetchBytes } from '$lib/server/tool-guard';
 import { probeImageDimensions } from '$lib/server/brand-media';
 import { insertAsset } from '$lib/server/repos/assets';
-import { signAssetFile, storeAssetFile } from '$lib/server/repos/asset-storage';
+import { removeAssetFile, signAssetFile, storeAssetFile } from '$lib/server/repos/asset-storage';
+import type { ScreenOutcome } from '$lib/server/moderation/screen';
 import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
 import { AssetKind } from '$lib/motion/components';
 import type { AssetImport } from './motion-tools';
@@ -37,7 +38,7 @@ export function pictureOf(bytes: Buffer): Picture | null {
   return SIGNATURES.find(([, matches]) => matches(head))?.[0] ?? null;
 }
 
-type ImportScope = { orgId: string; projectId: string; canvasId: string };
+export type ImportScope = { orgId: string; projectId: string; canvasId: string; screen: (url: string) => Promise<ScreenOutcome> };
 
 export async function importImageAsset(db: Db, scope: ImportScope, url: string, label?: string): Promise<AssetImport> {
   const fetched = await safeFetchBytes(url, { maxBytes: IMPORT_MAX_BYTES, timeoutMs: IMPORT_TIMEOUT_MS, scheme: 'https-only' }).catch((e: unknown) => (e instanceof Error ? e.message : String(e)));
@@ -62,6 +63,13 @@ export async function storeImage(db: Db, scope: ImportScope, file: { bytes: Buff
   const bytes = await fitted(file.bytes, picture, edge);
   const path = `${canvasUploadPrefix(scope.orgId, scope.projectId)}imports/${crypto.randomUUID()}.${picture.ext}`;
   await storeAssetFile(db, path, new File([new Uint8Array(bytes)], path.split('/').at(-1) as string, { type: picture.mime }));
+  const signed = await signAssetFile(db, path);
+  const review = await scope.screen(signed);
+  if (!review.ok) {
+    await removeAssetFile(db, path);
+    return { ok: false, error: review.error };
+  }
+
   const { width, height } = await probeImageDimensions(bytes);
   const row = await insertAsset(db, { orgId: scope.orgId, projectId: scope.projectId, type: 'image', source: 'imported', url: path, mimeType: picture.mime, bytes: bytes.length, width, height });
 
@@ -69,6 +77,6 @@ export async function storeImage(db: Db, scope: ImportScope, file: { bytes: Buff
     ok: true,
     width,
     height,
-    asset: { id: row.id, kind: AssetKind.Image, width, height, label: label ?? `image · ${new URL(file.url).hostname}`, previewUrl: `/p/${scope.projectId}/c/${scope.canvasId}/assets/${row.id}`, url: await signAssetFile(db, path) }
+    asset: { id: row.id, kind: AssetKind.Image, width, height, label: label ?? `image · ${new URL(file.url).hostname}`, previewUrl: `/p/${scope.projectId}/c/${scope.canvasId}/assets/${row.id}`, url: signed }
   };
 }
