@@ -50,6 +50,7 @@ export const soundScoreSchema = z
   .refine((s) => s.events.reduce((sum, e) => sum + e.duration, 0) <= MAX_SOUNDING_SECONDS, `at most ${MAX_SOUNDING_SECONDS} s of sounding events in total`);
 
 export type SoundScore = z.infer<typeof soundScoreSchema>;
+export type SoundScoreInput = z.input<typeof soundScoreSchema>;
 export type ScoreVoice = SoundScore['voices'][number];
 export type ScoreEvent = SoundScore['events'][number];
 

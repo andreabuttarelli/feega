@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { Instrument, SAMPLE_RATE, soundScoreSchema, type SoundScore } from './score';
+import { Instrument, SAMPLE_RATE, soundScoreSchema, type SoundScore, type SoundScoreInput } from './score';
 import { renderScore } from './render';
 import { decodeWav, encodeWav } from './wav';
 
 const FPS = 30;
 const ONSET = 0.02;
 
-const score = (events: SoundScore['events'], voices: SoundScore['voices'] = [{ id: 'fx', instrument: Instrument.Hit }]): SoundScore =>
+const score = (events: SoundScoreInput['events'], voices: SoundScoreInput['voices'] = [{ id: 'fx', instrument: Instrument.Hit }]): SoundScore =>
   soundScoreSchema.parse({ seed: 7, voices, events });
 
 function onsetFrame(channel: Float32Array): number {
