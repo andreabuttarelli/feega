@@ -98,6 +98,7 @@ export default defineConfig({
       'packages/*/src/**/*.{test,spec}.{js,ts}',
       'packages/*.{test,spec}.{js,ts}',
       'scripts/**/*.{test,spec}.{js,ts}',
+      'tests/e2e/fixtures/*.test.ts',
       'docker/**/*.{test,spec}.{js,mjs,ts}',
       // I test della CLI sono scritti per `bun:test` e giravano solo se qualcuno lanciava
       // `bun test` dentro `cli/` a mano: nessun runner li vedeva, CI compresa. L'alias li fa
