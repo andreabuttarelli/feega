@@ -42,6 +42,18 @@ describe('particles are a pure function of time', () => {
     expect(particlesAt(bakeOf({ seed: 8 }), 30)).not.toEqual(one);
   });
 
+  it('remembering each particle across frames gives the same frames, and remembers each particle once', () => {
+    const bake = bakeOf({ emitter: Emitter.Box, rate: 120, gravity: 1, drag: 0.5, wobble: 0.02, prewarm: true });
+    const memo = new Map();
+    for (const f of [0, 1, 2, 30, 31, 90, 12]) {
+      expect(particlesAt(bake, f + 0.5, memo)).toEqual(particlesAt(bake, f + 0.5));
+    }
+    const remembered = memo.size;
+    particlesAt(bake, 30.5, memo);
+    expect(memo.size).toBe(remembered);
+    expect(remembered).toBeGreaterThan(100);
+  });
+
   it('the runtime copy of the simulation is self-contained and gives the same answer', () => {
     const bake = bakeOf({ emitter: Emitter.Ring, rate: 120 });
     const copy = new Function(`return (${particlesAt.toString()})`)() as typeof particlesAt;
