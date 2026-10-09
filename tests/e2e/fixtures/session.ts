@@ -91,8 +91,8 @@ const LIST_PAGE = 1000;
 
 function storageOf(db: SupabaseClient): StoragePort {
   return {
-    buckets: async () => (await checked(db.storage.listBuckets())).map((b) => b.name),
-    list: async (bucket, prefix) => (await checked(db.storage.from(bucket).list(prefix, { limit: LIST_PAGE }))).map((e) => ({ name: e.name, folder: e.id === null })),
+    buckets: async () => ((await checked(db.storage.listBuckets())) ?? []).map((b) => b.name),
+    list: async (bucket, prefix) => ((await checked(db.storage.from(bucket).list(prefix, { limit: LIST_PAGE }))) ?? []).map((e) => ({ name: e.name, folder: e.id === null })),
     remove: async (bucket, paths) => {
       await checked(db.storage.from(bucket).remove(paths));
     }

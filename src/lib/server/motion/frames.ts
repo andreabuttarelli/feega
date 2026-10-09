@@ -177,10 +177,6 @@ const REFERENCE_ASK =
 
 export type Reference = { mediaType: string; data: string };
 
-type FilePart = { type: 'file'; mediaType: string; data: { type: string; data?: unknown } };
-
-const isPicture = (v: { type: string }): v is FilePart => v.type === 'file' && typeof (v as FilePart).data?.data === 'string';
-
 export function viewedReferences(messages: readonly ModelMessage[], max = MAX_SELF_CHECK_REFS): Reference[] {
   const seen = messages.flatMap((m) =>
     m.role !== 'tool'
@@ -189,7 +185,7 @@ export function viewedReferences(messages: readonly ModelMessage[], max = MAX_SE
           if (part.type !== 'tool-result' || !REFERENCE_TOOLS.has(part.toolName) || part.output.type !== 'content') {
             return [];
           }
-          return part.output.value.filter(isPicture).map((v) => ({ mediaType: v.mediaType, data: String(v.data.data) }));
+          return part.output.value.flatMap((v) => (v.type === 'file' && v.data.type === 'data' && typeof v.data.data === 'string' ? [{ mediaType: v.mediaType, data: v.data.data }] : []));
         })
   );
   return seen.slice(-max);
