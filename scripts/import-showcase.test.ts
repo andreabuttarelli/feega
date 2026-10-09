@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { newMotionDoc, MotionFormat, parseMotionDoc } from '$lib/motion/doc';
-import { assetPath, remapAssets, showcaseNode, showcasePlan, SHOWCASE_SOURCES, SHOWCASE_KEY, type ShowcaseSource } from './import-showcase';
+import { assetPath, docHash, remapAssets, showcaseNode, showcasePlan, SHOWCASE_SOURCES, SHOWCASE_KEY, type ShowcaseSource } from './import-showcase';
 
 const ORG = '82813960-3537-4ec8-8524-b966b46105f1';
 const PROJECT = '11111111-1111-4111-8111-111111111111';
@@ -60,6 +60,14 @@ describe('showcasePlan', () => {
     expect(SHOWCASE_SOURCES.filter((s) => s.doc.startsWith('showcase/logo-sting/'))).toHaveLength(3);
     expect(new Set(SHOWCASE_SOURCES.map((s) => s.key)).size).toBe(SHOWCASE_SOURCES.length);
   });
+
+  it('plans both lead-finder cuts with their logo and music', () => {
+    const cuts = SHOWCASE_SOURCES.filter((s) => s.doc.startsWith('showcase/lead-finder/'));
+
+    expect(cuts.map((s) => s.doc)).toEqual(['showcase/lead-finder/doc-16x9.json', 'showcase/lead-finder/doc-9x16.json']);
+    expect(cuts.map((s) => s.preview)).toEqual(['showcase/lead-finder/lead-finder-16x9.mp4', 'showcase/lead-finder/lead-finder-9x16.mp4']);
+    cuts.forEach((s) => expect(s.files).toEqual({ music: 'showcase/lead-finder/music.mp3', logo: 'showcase/lead-finder/logo.svg' }));
+  });
 });
 
 describe('remapAssets', () => {
@@ -91,5 +99,15 @@ describe('idempotency', () => {
 
     expect(path).toBe(`${ORG}/${PROJECT}/showcase/drop/music.mp3`);
     expect(assetPath({ orgId: ORG, projectId: PROJECT }, 'drop', 'music', '/y/other.mp3')).toBe(path);
+  });
+});
+
+describe('docHash', () => {
+  it('is the same for an identical doc whatever the key order, so a rerun writes no revision', () => {
+    const doc = docWithMusic();
+    const reordered = Object.fromEntries(Object.entries(doc).reverse());
+
+    expect(docHash(reordered as never)).toBe(docHash(doc as never));
+    expect(docHash({ ...doc, fps: 60 } as never)).not.toBe(docHash(doc as never));
   });
 });
