@@ -14,7 +14,6 @@ export { contentStamp } from '../stamp';
 
 export const CAPTURE_REQUEST = 'feega:capture';
 export const CAPTURE_REPLY = 'feega:frame';
-export const SCREENSHOT_URL = 'https://cdn.jsdelivr.net/npm/html-to-image@1.11.13/dist/html-to-image.js';
 const MEDIA_TIMEOUT_MS = 8000;
 
 export enum FrameFormat {
@@ -52,13 +51,15 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
   const tool = () => (window as unknown as { htmlToImage: HtmlToImage }).htmlToImage;
 
   const load = () =>
-    (lib ??= new Promise((ok, ko) => {
-      const s = document.createElement('script');
-      s.src = cfg.lib;
-      s.onload = ok;
-      s.onerror = ko;
-      document.head.appendChild(s);
-    }));
+    (lib ??= tool()
+      ? Promise.resolve()
+      : new Promise((ok, ko) => {
+          const s = document.createElement('script');
+          s.src = cfg.lib;
+          s.onload = ok;
+          s.onerror = ko;
+          document.head.appendChild(s);
+        }));
   const frame = () => new Promise<void>((r) => requestAnimationFrame(() => r()));
   const painted = () => frame().then(frame);
   const settled = (v: HTMLVideoElement) => {
@@ -824,7 +825,7 @@ export function stampOf(html: string): string | null {
   return STAMP.exec(html)?.[1] ?? null;
 }
 
-export function captureScript(doc: { width: number; height: number }, stamp: string): string {
-  const cfg: RuntimeConfig = { request: CAPTURE_REQUEST, reply: CAPTURE_REPLY, lib: SCREENSHOT_URL, width: doc.width, height: doc.height, mediaTimeoutMs: MEDIA_TIMEOUT_MS, stamp, errorsKey: ERRORS, settle: Settle.Paint, grainTile: GRAIN_TILE, grainOffset: GRAIN_SAMPLE_OFFSET, webkitUa: WEBKIT_UA.source, notWebkitUa: NOT_WEBKIT_UA.source, particleState: PARTICLE_STATE };
+export function captureScript(doc: { width: number; height: number }, stamp: string, lib: string): string {
+  const cfg: RuntimeConfig = { request: CAPTURE_REQUEST, reply: CAPTURE_REPLY, lib, width: doc.width, height: doc.height, mediaTimeoutMs: MEDIA_TIMEOUT_MS, stamp, errorsKey: ERRORS, settle: Settle.Paint, grainTile: GRAIN_TILE, grainOffset: GRAIN_SAMPLE_OFFSET, webkitUa: WEBKIT_UA.source, notWebkitUa: NOT_WEBKIT_UA.source, particleState: PARTICLE_STATE };
   return `<script>(${captureRuntime.toString()})(${js(cfg)},(${freezeMasks.toString()}),(${inlineMedia.toString()}),(${shrinkImage.toString()}),(${paintSvg.toString()}),(${planLayers.toString()}),(${grainPixels.toString()}),(${turbulenceTile.toString()}),(${chainAffine.toString()}),(${cssAffine.toString()}),(${cssRgba.toString()}),(${joinRasters.toString()}),(${readMasks.toString()}),(${readFilters.toString()}),(${filtersFit.toString()}));</script>`;
 }

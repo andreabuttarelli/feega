@@ -47,7 +47,7 @@ function page(matte: Exclude<Matte, Matte.None> = Matte.Alpha) {
     src = '';
     decode = async () => undefined;
   }
-  const script = matteScript([{ target: 't', source: 's', matte }], 4).replace(/^<script>|<\/script>$/g, '');
+  const script = matteScript([{ target: 't', source: 's', matte }], 4, 'lib.js').replace(/^<script>|<\/script>$/g, '');
   new Function('window', 'document', 'addEventListener', 'removeEventListener', 'getComputedStyle', 'Image', 'setTimeout', 'clearTimeout', script)(
     win,
     document,

@@ -1,3 +1,4 @@
+import { Script, scriptUrl } from '$lib/motion/libs/catalog';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('$env/dynamic/public', () => ({ env: { PUBLIC_SUPABASE_URL: 'https://sb.test', PUBLIC_APP_URL: 'https://oh.feega.app' } }));
@@ -25,12 +26,14 @@ describe('hosted embed', () => {
     const { db, bucket, from } = fakeDb();
     const doc = newMotionDoc(MotionFormat.Landscape);
 
-    const out = await publishEmbed(db, { nodeId: NODE, doc, tokens: FEEGA_TOKENS, assetUrls: {}, title: 'Clip', fetchBlob: vi.fn(), mode: ProjectMode.Standard });
+    const fetchBlob = vi.fn(async () => new Blob(['window.lib=1;']));
+    const out = await publishEmbed(db, { nodeId: NODE, doc, tokens: FEEGA_TOKENS, assetUrls: {}, title: 'Clip', fetchBlob, mode: ProjectMode.Standard });
 
     expect(from).toHaveBeenCalledWith(EMBED_BUCKET);
     expect(bucket.upload).toHaveBeenCalledWith(`${NODE}.html`, expect.any(Blob), expect.objectContaining({ contentType: 'text/html', upsert: true }));
     expect(out).toMatchObject({ ok: true, url: `https://oh.feega.app/e/${NODE}` });
     expect(out.ok && out.snippet).toBe(`<script src="https://oh.feega.app/embed.js" async></script>\n<feega-motion src="${NODE}"></feega-motion>`);
+    expect(fetchBlob).toHaveBeenCalledWith(scriptUrl('https://oh.feega.app', Script.Player));
   });
 
   it('the upload slot for the editor is signed for the same path, with the headers the upload must carry', async () => {

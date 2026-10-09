@@ -1,5 +1,6 @@
 import { composeHtml, type ComposeInput } from '$lib/motion/hyperframes/compose';
 import type { Frame } from './frames';
+import { libsOrigin } from './libs-origin';
 
 export const MAX_FRAME_SIZE = 960;
 export const FRAME_QUALITY = 80;
@@ -27,7 +28,7 @@ export async function drawFrames(port: BrowserPort, ask: FrameAsk): Promise<Fram
   const page = await port.open({ width: doc.width, height: doc.height, scale });
 
   try {
-    await page.load(composeHtml(ask.compose));
+    await page.load(composeHtml({ ...ask.compose, origin: ask.compose.origin ?? libsOrigin() }));
     const frames: Frame[] = [];
     for (const time of ask.times) {
       await page.seek(time);

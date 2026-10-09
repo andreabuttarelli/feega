@@ -5,7 +5,8 @@ import { addClip } from '../timeline';
 import { EnvPreset, LightKind } from '../look';
 import { setLight, setLook } from '../look-ops';
 import { composeHtml } from './compose';
-import { OPENTYPE_URL } from './three';
+import { APP_ORIGIN, Module, moduleUrl } from '../libs/catalog';
+const OPENTYPE_URL = moduleUrl(APP_ORIGIN, Module.Opentype);
 
 const must = (r: DocVerdict): MotionDoc => {
   if (!r.ok) {

@@ -6,7 +6,7 @@ import { resolveColor, type BrandTokens } from '../brand';
 import { css, esc, js, seconds } from './html';
 import { DEVICE_OVERSCAN, TEMPLATES, Timing, type PropsOf, type TemplateCtx, type Tween, type Vars } from './templates';
 import { SCREEN_GPU, VIDEO_GPU, gpuScript, type GpuProfile } from './gpu';
-import { LIGHTING, OPENTYPE_URL, ThreeKind, lookRuntime, surfaceOf, threeAssetUrls, threeImportMap, threeScript, type ThreeClip } from './three';
+import { LIGHTING, SCENE_MODULES, ThreeKind, lookRuntime, surfaceOf, threeAssetUrls, threeImportMap, threeScript, type InlinedModules, type ThreeClip } from './three';
 import { outlineUrl } from '../fonts/outline';
 import { Finish, ScreenFit } from '../devices';
 import { deviceRuntime } from './device-runtime';
@@ -22,11 +22,10 @@ import { bakeComposition, compositionScript, type TimedBake } from './compositio
 import { ANIMATE_CSS, ENGINE, animationScript, keyedOverrides, sceneKeys, wrapAnimated, wrapParents } from './animate';
 import { ancestorsOf, parentsWithChildren } from '../parent';
 import { MASK_CSS, MaskScope, maskLayer, startValues } from './masks';
-import { SCREENSHOT_URL, captureScript, contentStamp } from './capture';
+import { captureScript, contentStamp } from './capture';
 import { cspMeta } from './csp';
 import { measureScript } from './measure';
-import { THREE_VERSION } from './three';
-import { LITTLEJS_GLOBAL, Library, Play, THREE_GLOBAL, bootScript, definitionScript, librariesOf, seedOf, type CustomRun } from '../custom/runtime';
+import { Library, Play, bootScript, definitionScript, librariesOf, seedOf, type CustomRun } from '../custom/runtime';
 import { ComponentMode, PropFormat, modeOf, type CustomComponents } from '../custom/component';
 import { mattePairs, type MattePair } from '../matte';
 import { matteScript, matteWrapper } from './mattes';
@@ -66,28 +65,14 @@ import { shaderBakes, shaderScript, type ShaderBake } from '../shaders/compose';
 import { liveSpec, type SpecInput } from '../interactive/spec';
 import { LIVE_GLOBAL } from '../interactive/runtime';
 import { Liveness, interactiveOf } from '../interactive/settings';
+import integrity from 'virtual:motion-libs';
+import { HOSTED, Module, Script, defaultOrigin, moduleUrl, notice, scriptUrl } from '../libs/catalog';
 
 export { CAPTURE_REPLY, CAPTURE_REQUEST } from './capture';
 
-export const HYPERFRAMES_VERSION = '0.8.114';
+export { HYPERFRAMES_VERSION } from '../libs/catalog';
 export const COMPOSITION_ID = 'main';
 
-const RUNTIME_URL = `https://cdn.jsdelivr.net/npm/@hyperframes/core@${HYPERFRAMES_VERSION}/dist/hyperframe.runtime.iife.js`;
-export const LOTTIE_VERSION = '5.13.0';
-const LOTTIE_URL = `https://cdn.jsdelivr.net/npm/lottie-web@${LOTTIE_VERSION}/build/player/lottie_light.min.js`;
-export const D3_VERSION = '7.9.0';
-const D3_URL = `https://cdn.jsdelivr.net/npm/d3@${D3_VERSION}/dist/d3.min.js`;
-export const P5_VERSION = '1.11.11';
-const P5_URL = `https://cdn.jsdelivr.net/npm/p5@${P5_VERSION}/lib/p5.min.js`;
-export const PIXI_VERSION = '7.4.3';
-const PIXI_URLS = [`https://cdn.jsdelivr.net/npm/pixi.js@${PIXI_VERSION}/dist/pixi.min.js`, `https://cdn.jsdelivr.net/npm/@pixi/unsafe-eval@${PIXI_VERSION}/dist/unsafe-eval.min.js`];
-export const MATTER_VERSION = '0.20.0';
-const MATTER_URL = `https://cdn.jsdelivr.net/npm/matter-js@${MATTER_VERSION}/build/matter.min.js`;
-const THREE_BASE = `https://cdn.jsdelivr.net/npm/three@${THREE_VERSION}/`;
-export const LITTLEJS_VERSION = '1.26.1';
-const LITTLEJS_URL = `https://cdn.jsdelivr.net/npm/littlejsengine@${LITTLEJS_VERSION}/dist/littlejs.esm.min.js`;
-export const KAPLAY_VERSION = '3001.0.19';
-const KAPLAY_URL = `https://cdn.jsdelivr.net/npm/kaplay@${KAPLAY_VERSION}/dist/kaplay.js`;
 const FONTS_URL = 'https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Fragment+Mono&display=block';
 
 const SHOWN: Vars = { opacity: 1, xPercent: 0, yPercent: 0, scale: 1, clipPath: 'inset(0 0% 0 0)', filter: 'blur(0px)' };
@@ -118,7 +103,9 @@ export enum Target {
   Screen = 'screen'
 }
 
-export type ComposeInput = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; scale?: number; analyses?: Record<string, AudioAnalysis>; liveness?: Liveness; target?: Target };
+export type Inlined = Partial<Record<Script, string>>;
+
+export type ComposeInput = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; scale?: number; analyses?: Record<string, AudioAnalysis>; liveness?: Liveness; target?: Target; origin?: string; inlined?: Inlined; modules?: InlinedModules };
 
 function pick(vars: Vars, keys: string[]): Vars {
   return Object.fromEntries(keys.map((k) => [k, vars[k]]));
@@ -476,21 +463,50 @@ function customRun(clip: MotionClip, ctx: TemplateCtx<ComponentId>, components: 
 
 const inlineScript = (code: string) => `<script>${code.replace(/<\/script/gi, '<\\/script')}</script>`;
 
-const LIBRARY_TAGS: Record<Library, { scripts: string[]; tag: string; module?: string }> = {
-  [Library.Lottie]: { scripts: [LOTTIE_URL], tag: `<script src="${LOTTIE_URL}"></script>` },
-  [Library.LittleJS]: { scripts: [LITTLEJS_URL], tag: '', module: `import * as LittleJS from '${LITTLEJS_URL}';window.${LITTLEJS_GLOBAL}=LittleJS;` },
-  [Library.Kaplay]: { scripts: [KAPLAY_URL], tag: `<script src="${KAPLAY_URL}"></script>` },
-  [Library.Three]: { scripts: [THREE_BASE], tag: '', module: `import * as THREE from 'three';window.${THREE_GLOBAL}=THREE;` },
-  [Library.D3]: { scripts: [D3_URL], tag: `<script src="${D3_URL}"></script>` },
-  [Library.P5]: { scripts: [P5_URL], tag: `<script src="${P5_URL}"></script>` },
-  [Library.Pixi]: { scripts: PIXI_URLS, tag: PIXI_URLS.map((url) => `<script src="${url}"></script>`).join('') },
-  [Library.Matter]: { scripts: [MATTER_URL], tag: `<script src="${MATTER_URL}"></script>` },
-  [Library.Generative]: { scripts: [], tag: inlineScript(generative) },
-  [Library.Twgl]: { scripts: [], tag: inlineScript(twgl) },
-  [Library.Fx]: { scripts: [], tag: inlineScript(fx) },
-  [Library.Splitting]: { scripts: [], tag: inlineScript(splitting) },
-  [Library.OpenProps]: { scripts: [], tag: inlineScript(openProps) }
+const LIBRARY_SOURCE: Record<Library, Script[] | string> = {
+  [Library.Lottie]: [Script.Lottie],
+  [Library.LittleJS]: [Script.LittleJS],
+  [Library.Kaplay]: [Script.Kaplay],
+  [Library.Three]: [Script.Three],
+  [Library.D3]: [Script.D3],
+  [Library.P5]: [Script.P5],
+  [Library.Pixi]: [Script.Pixi, Script.PixiEval],
+  [Library.Matter]: [Script.Matter],
+  [Library.Generative]: generative,
+  [Library.Twgl]: twgl,
+  [Library.Fx]: fx,
+  [Library.Splitting]: splitting,
+  [Library.OpenProps]: openProps
 };
+
+type Delivery = { origin: string; inlined: Inlined; modules: InlinedModules };
+
+export const hostedScriptTag = (origin: string, script: Script) => `<script src="${scriptUrl(origin, script)}" integrity="${integrity[script]}" crossorigin="anonymous"></script>`;
+
+export const inlinedScript = (script: Script, code: string) => inlineScript(`/*! ${notice(HOSTED[script])} */\n${code}`);
+
+function scriptTag(script: Script, delivery: Delivery): string {
+  const code = delivery.inlined[script];
+  if (code !== undefined) {
+    return inlinedScript(script, code);
+  }
+  return hostedScriptTag(delivery.origin, script);
+}
+
+const scriptsOf = (lib: Library): Script[] => {
+  const source = LIBRARY_SOURCE[lib];
+  return typeof source === 'string' ? [] : source;
+};
+
+function libraryTag(lib: Library, delivery: Delivery): string {
+  const source = LIBRARY_SOURCE[lib];
+  return typeof source === 'string' ? inlineScript(source) : source.map((script) => scriptTag(script, delivery)).join('');
+}
+
+function modulesOf(three: ThreeClip[], compositions: TimedBake[]): Module[] {
+  const scene = three.length ? SCENE_MODULES : compositions.length ? [Module.Three] : [];
+  return three.some((c) => c.kind === ThreeKind.Text) ? [...scene, Module.Opentype] : scene;
+}
 
 function brandEnv(tokens: BrandTokens) {
   const colors = Object.fromEntries(Object.entries(tokens.colors).map(([k, v]) => [k.replace('brand.', ''), v]));
@@ -557,6 +573,7 @@ export function composeHtml(raw: ComposeInput): string {
   const prepared = bakePaths(withoutBackdrop(flattenComps(withJunctions(shown))));
   const input = { ...raw, doc: bakePhysics(bakeExpressions(prepared, raw.analyses)) };
   const { doc, tokens } = input;
+  const delivery: Delivery = { origin: raw.origin ?? defaultOrigin(), inlined: raw.inlined ?? {}, modules: raw.modules ?? {} };
   const scale = raw.scale ?? 1;
   const frame = { width: Math.round(doc.width * scale), height: Math.round(doc.height * scale) };
   const bottomFirst = doc.tracks.map((track, index) => ({ track, index })).reverse();
@@ -635,32 +652,32 @@ export function composeHtml(raw: ComposeInput): string {
   const duration = seconds(doc.durationInFrames, doc.fps);
   const background = ROOT_BACKGROUND[doc.background](tokens);
   const look = lookRuntime(doc.look);
-  const outlines = three.some((c) => c.kind === ThreeKind.Text) ? [OPENTYPE_URL] : [];
+  const modules = modulesOf(three, compositions);
   const animation = animationScript(clips, doc, (v) => resolveColor(v, tokens), parentsWithChildren(doc));
   const used = new Set(runs.map((r) => r.name));
   const libraries = librariesOf(doc.components, used);
-  const threeCustom = libraries.has(Library.Three);
   const env = { assets: input.assets, brand: brandEnv(tokens) };
   const boot = gated(bootScript(runs, env, `window.__timelines[${js(COMPOSITION_ID)}]`));
   const definitions = [...used].map((name) => hotScript(definitionScript(name, doc.components[name].source.js))).join('');
-  const modules = [...libraries].map((lib) => LIBRARY_TAGS[lib].module ?? '').join('');
-  const customBoot = modules
-    ? `<script type="module">${modules}${boot}</script>`
-    : boot
-      ? `<script>${boot}</script>`
-      : '';
-  const scripts = [RUNTIME_URL, SCREENSHOT_URL, ...(three.length || compositions.length ? [THREE_BASE] : []), ...outlines, ...[...libraries].flatMap((lib) => LIBRARY_TAGS[lib].scripts)];
+  const customBoot = boot ? `<script>${boot}</script>` : '';
+  const hosted = [Script.Runtime, ...[...libraries].flatMap(scriptsOf)].filter((script) => delivery.inlined[script] === undefined).map((script) => scriptUrl(delivery.origin, script));
+  const screenshotInlined = delivery.inlined[Script.Screenshot] !== undefined;
+  const moduleSources = modules.map((module) => (delivery.modules[module] === undefined ? moduleUrl(delivery.origin, module) : 'data:'));
+  const screenshotSrc = screenshotInlined ? '' : scriptUrl(delivery.origin, Script.Screenshot);
+  const scripts = [...hosted, screenshotSrc, ...moduleSources].filter(Boolean);
   const assetUrls = [...Object.values(input.assets), ...(tokens.logoUrl ? [tokens.logoUrl] : []), ...threeAssetUrls(look, three)];
 
   const page = [
     '<!doctype html><html lang="en"><head><meta charset="UTF-8" />',
     `<meta name="viewport" content="width=${frame.width}, height=${frame.height}" />`,
     cspMeta({ scripts: [...new Set(scripts)], assetUrls }),
-    `<script src="${RUNTIME_URL}"></script>`,
+    scriptTag(Script.Runtime, delivery),
     `<script>${engineScript()}</script>`,
-    ...[...libraries].map((lib) => LIBRARY_TAGS[lib].tag),
+    ...[...libraries].map((lib) => libraryTag(lib, delivery)),
+    screenshotInlined ? scriptTag(Script.Screenshot, delivery) : '',
     shaderClips.length ? inlineScript(shaderRuntime) : '',
-    three.length || compositions.length || threeCustom ? threeImportMap() + `<script>${gpuScript(GPU[raw.target ?? Target.Video])}</script>` : '',
+    threeImportMap(delivery.origin, modules, delivery.modules),
+    three.length || compositions.length || libraries.has(Library.Three) ? `<script>${gpuScript(GPU[raw.target ?? Target.Video])}</script>` : '',
     `<link rel="stylesheet" crossorigin="anonymous" href="${FONTS_URL}" />`,
     fitScript(),
     hotRuntime(),
@@ -675,7 +692,7 @@ export function composeHtml(raw: ComposeInput): string {
     HOT_CLOSE,
     '</div>',
     `${HOT_SCRIPT}${animation.setup}const tl=${ENGINE}.timeline();${holds.map(holdLine).join('')}${tweens.map(tweenLine).join('')}${animation.timeline}${effectScript(effectSets)}${held.size ? holdScript(doc.fps, doc.motionBlur) : ''}tl.set({}, {}, ${duration});window.__timelines=window.__timelines||{};window.__timelines[${js(COMPOSITION_ID)}]=tl;</script>`,
-    hotScript(matteScript(pairs, Number(duration))),
+    hotScript(matteScript(pairs, Number(duration), screenshotSrc)),
     definitions,
     hotScript(customBoot),
     stage ? `${HOT_SCRIPT}${stageScript(stage, doc.fps, Number(duration))}</script>` : '',
@@ -689,7 +706,7 @@ export function composeHtml(raw: ComposeInput): string {
     ...[...cardBakes].map(([layout, bakes]) => hotScript(layout.script(bakes as never[], doc.fps, Number(duration))))
   ].join('');
   const live = LIVE_SCRIPT[raw.liveness ?? Liveness.Baked]({ live: prepared, baked: doc, outside: interactiveOf(raw.doc).outside, parents: [...parentsWithChildren(doc)], color: (v) => resolveColor(v, tokens) });
-  return `${page}${live}${captureScript(frame, contentStamp(page))}${measureScript()}</body></html>`;
+  return `${page}${live}${captureScript(frame, contentStamp(page), screenshotSrc)}${measureScript()}</body></html>`;
 }
 
 const LIVE_SCRIPT: Record<Liveness, (input: SpecInput) => string> = {

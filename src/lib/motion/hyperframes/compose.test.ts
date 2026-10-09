@@ -13,6 +13,8 @@ import { Interp, easeName, sampleTrack } from '../keyframes';
 import { keyframeTweens } from './animate';
 import { CAPTURE_REPLY, CAPTURE_REQUEST, Target, composeHtml } from './compose';
 import { GPU_GLOBAL, SCREEN_GPU, VIDEO_GPU, gpuScript } from './gpu';
+import { Module, Script, moduleUrl, scriptUrl } from '../libs/catalog';
+import integrity from 'virtual:motion-libs';
 import { MEASURE_REQUEST } from './measure';
 import { writeComponent } from '../custom/ops';
 import { ComponentMode, PropFormat } from '../custom/component';
@@ -28,9 +30,13 @@ function must(r: OpResult): MotionDoc {
 
 const doc = must(addClip(must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'BrandBackground', from: 0, durationInFrames: 450 }, 'bg')), { component: 'Title', from: 15, durationInFrames: 60, props: { text: 'One\nTwo' } }, 'title'));
 
+const ORIGIN = 'https://app.test';
+
 function compose(d: MotionDoc, assets: Record<string, string> = {}): string {
-  return composeHtml({ doc: d, tokens: FEEGA_TOKENS, assets });
+  return composeHtml({ doc: d, tokens: FEEGA_TOKENS, assets, origin: ORIGIN });
 }
+
+const hosted = (script: Script) => `<script src="${scriptUrl(ORIGIN, script)}" integrity="${integrity[script]}" crossorigin="anonymous"></script>`;
 
 describe('MotionDoc to HyperFrames composition', () => {
   it('the page answers the editor when it asks where the clips are', () => {
@@ -395,8 +401,8 @@ describe('custom components in the composition', () => {
     const chart = { ...graph, source: { ...graph.source, js: 'd3.select(root).append("svg");' } };
     const charted = must(addClip(must(writeComponent(newMotionDoc(MotionFormat.Landscape), 'Chart', chart)), { component: 'Custom', from: 0, durationInFrames: 60, props: { name: 'Chart' } }, 'c1'));
 
-    expect(compose(charted)).toMatch(/<script src="https:\/\/cdn\.jsdelivr\.net\/npm\/d3@[\d.]+\/dist\/d3\.min\.js"><\/script>/);
-    expect(html).not.toContain('/npm/d3@');
+    expect(compose(charted)).toContain(hosted(Script.D3));
+    expect(html).not.toContain(scriptUrl(ORIGIN, Script.D3));
   });
 
   it('inlines the generative utilities only for a component that uses them, with no network', () => {
@@ -448,8 +454,8 @@ describe('custom components in the composition', () => {
     const sketch = { ...graph, source: { ...graph.source, js: 'p5((p) => { p.draw = () => p.circle(0, 0, 9); });' } };
     const sketched = must(addClip(must(writeComponent(newMotionDoc(MotionFormat.Landscape), 'Sketch', sketch)), { component: 'Custom', from: 0, durationInFrames: 60, props: { name: 'Sketch' } }, 's1'));
 
-    expect(compose(sketched)).toMatch(/<script src="https:\/\/cdn\.jsdelivr\.net\/npm\/p5@[\d.]+\/lib\/p5\.min\.js"><\/script>/);
-    expect(html).not.toContain('/npm/p5@');
+    expect(compose(sketched)).toContain(hosted(Script.P5));
+    expect(html).not.toContain(scriptUrl(ORIGIN, Script.P5));
   });
 
   it('loads PixiJS and its no-eval shader sync only for a component that uses it', () => {
@@ -457,17 +463,47 @@ describe('custom components in the composition', () => {
     const staged = must(addClip(must(writeComponent(newMotionDoc(MotionFormat.Landscape), 'Stage', stage)), { component: 'Custom', from: 0, durationInFrames: 60, props: { name: 'Stage' } }, 'p1'));
     const page = compose(staged);
 
-    expect(page).toMatch(/<script src="https:\/\/cdn\.jsdelivr\.net\/npm\/pixi\.js@[\d.]+\/dist\/pixi\.min\.js"><\/script><script src="https:\/\/cdn\.jsdelivr\.net\/npm\/@pixi\/unsafe-eval@[\d.]+\/dist\/unsafe-eval\.min\.js"><\/script>/);
+    expect(page).toContain(hosted(Script.Pixi) + hosted(Script.PixiEval));
     expect(page).not.toContain('unsafe-eval\'');
-    expect(html).not.toContain('/npm/pixi.js@');
+    expect(html).not.toContain(scriptUrl(ORIGIN, Script.Pixi));
   });
 
   it('loads matter.js only for a component that uses it', () => {
     const scene = { ...graph, source: { ...graph.source, js: 'const engine = Matter.Engine.create();' } };
     const physical = must(addClip(must(writeComponent(newMotionDoc(MotionFormat.Landscape), 'Drop', scene)), { component: 'Custom', from: 0, durationInFrames: 60, props: { name: 'Drop' } }, 'm1'));
 
-    expect(compose(physical)).toMatch(/<script src="https:\/\/cdn\.jsdelivr\.net\/npm\/matter-js@[\d.]+\/build\/matter\.min\.js"><\/script>/);
-    expect(html).not.toContain('/npm/matter-js@');
+    expect(compose(physical)).toContain(hosted(Script.Matter));
+    expect(html).not.toContain(scriptUrl(ORIGIN, Script.Matter));
+  });
+
+  it('loads every library from our origin, never from a CDN', () => {
+    const all = { ...graph, mode: ComponentMode.Live, source: { ...graph.source, js: 'const all = [lottie, d3, p5, PIXI, Matter, THREE, kaplay, LittleJS];' } };
+    const page = compose(must(addClip(must(writeComponent(newMotionDoc(MotionFormat.Landscape), 'All', all)), { component: 'Custom', from: 0, durationInFrames: 60, props: { name: 'All' } }, 'a1')));
+    const sources = [...page.matchAll(/<script src="([^"]+)"/g)].map((m) => m[1]);
+    const scriptSrc = (/script-src ([^;]+)/.exec(page)?.[1] ?? '').split(' ').filter((s) => s.startsWith('http'));
+
+    expect(sources).toEqual(expect.arrayContaining([Script.Runtime, Script.Lottie, Script.D3, Script.P5, Script.Pixi, Script.PixiEval, Script.Matter, Script.Three, Script.Kaplay, Script.LittleJS].map((s) => scriptUrl(ORIGIN, s))));
+    expect([...sources, ...scriptSrc].every((url) => url.startsWith(`${ORIGIN}/motion-libs/`))).toBe(true);
+    expect(page).not.toContain('jsdelivr');
+  });
+
+  it('points the three.js import map at our origin', () => {
+    const html = compose(must(addClip(doc, { component: 'Model3D', from: 0, props: { assetId: 'glb' } }, 'm')), { glb: '/assets/glb' });
+
+    expect(html).toContain(`"three":"${moduleUrl(ORIGIN, Module.Three)}"`);
+    expect(html).toContain(`"${Module.Gltf}":"${moduleUrl(ORIGIN, Module.Gltf)}"`);
+    expect(html).not.toContain('jsdelivr.net/npm');
+  });
+
+  it('inlines a library handed to it instead of loading it, with its licence notice', () => {
+    const sketch = { ...graph, source: { ...graph.source, js: 'p5((p) => {});' } };
+    const sketched = must(addClip(must(writeComponent(newMotionDoc(MotionFormat.Landscape), 'Sketch', sketch)), { component: 'Custom', from: 0, durationInFrames: 60, props: { name: 'Sketch' } }, 's1'));
+    const page = composeHtml({ doc: sketched, tokens: FEEGA_TOKENS, assets: {}, origin: ORIGIN, inlined: { [Script.P5]: 'window.p5=function(){};', [Script.Runtime]: 'window.__hf=1;' } });
+
+    expect(page).toContain('window.p5=function(){};');
+    expect(page).toContain('p5@1.11.11 | LGPL-2.1 | https://github.com/processing/p5.js');
+    expect(page).not.toContain(scriptUrl(ORIGIN, Script.P5));
+    expect(page).not.toContain(scriptUrl(ORIGIN, Script.Runtime));
   });
 
   it('a three.js component gets the screen GPU profile on screen and the full-quality one in the video', () => {
@@ -488,15 +524,17 @@ describe('custom components in the composition', () => {
     expect(composeHtml({ doc: custom, tokens: FEEGA_TOKENS, assets: {}, target: Target.Screen })).not.toContain('"play"');
   });
 
-  it('loads a game engine only for a live component that uses it, LittleJS as a module before the boot', () => {
+  it('loads a game engine only for a live component that uses it, LittleJS as a script before the boot', () => {
     const live = (name: string, js: string) => must(addClip(must(writeComponent(newMotionDoc(MotionFormat.Landscape), name, { ...graph, mode: ComponentMode.Live, source: { ...graph.source, js } })), { component: 'Custom', from: 0, durationInFrames: 60, props: { name } }, 'k1'));
-    const little = composeHtml({ doc: live('Arcade', 'LittleJS.engineInit(() => {}, () => {}, () => {}, () => {}, () => {});'), tokens: FEEGA_TOKENS, assets: {}, target: Target.Screen });
-    const kaboom = composeHtml({ doc: live('Jumper', 'const k = kaplay();'), tokens: FEEGA_TOKENS, assets: {}, target: Target.Screen });
+    const little = composeHtml({ doc: live('Arcade', 'LittleJS.engineInit(() => {}, () => {}, () => {}, () => {}, () => {});'), tokens: FEEGA_TOKENS, assets: {}, target: Target.Screen, origin: ORIGIN });
+    const kaboom = composeHtml({ doc: live('Jumper', 'const k = kaplay();'), tokens: FEEGA_TOKENS, assets: {}, target: Target.Screen, origin: ORIGIN });
 
-    expect(little).toMatch(/<script type="module"[^>]*>import \* as LittleJS from 'https:\/\/cdn\.jsdelivr\.net\/npm\/littlejsengine@[\d.]+\/dist\/littlejs\.esm\.min\.js';/);
-    expect(kaboom).toMatch(/<script src="https:\/\/cdn\.jsdelivr\.net\/npm\/kaplay@[\d.]+\/dist\/kaplay\.js"><\/script>/);
-    expect(html).not.toContain('littlejsengine');
-    expect(html).not.toContain('/npm/kaplay@');
+    expect(little.indexOf(hosted(Script.LittleJS))).toBeGreaterThan(-1);
+    expect(little.indexOf(hosted(Script.LittleJS))).toBeLessThan(little.indexOf('engineInit'));
+    expect(little).not.toContain('<script type="module">');
+    expect(kaboom).toContain(hosted(Script.Kaplay));
+    expect(html).not.toContain(scriptUrl(ORIGIN, Script.LittleJS));
+    expect(html).not.toContain(scriptUrl(ORIGIN, Script.Kaplay));
   });
 
   it('renders the component markup under a root scoped to the clip', () => {

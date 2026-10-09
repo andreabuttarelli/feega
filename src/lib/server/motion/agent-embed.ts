@@ -7,6 +7,7 @@ import { embedSnippet } from '$lib/motion/interactive/loader';
 import type { MotionDoc } from '$lib/motion/doc';
 import { assetUrls, headOrNew, motionAssets, motionTokens, type AssetSigner } from './editor';
 import { embedPublished, isRefused, publishEmbed, removeEmbed } from './embed';
+import { libsOrigin } from './libs-origin';
 
 export enum EmbedFailure {
   NotFound = 'motion_node_not_found',
@@ -85,6 +86,6 @@ export async function motionBundle(db: Db, scope: Scope): Promise<MotionBundle> 
   if (saved.version === 0) {
     return { ok: false, failure: EmbedFailure.Empty };
   }
-  const bundle = await interactiveBundle(await bundleInput(db, scope, saved));
+  const bundle = await interactiveBundle({ origin: libsOrigin(), ...(await bundleInput(db, scope, saved)) });
   return { ok: true, html: bundle.html, filename: BUNDLE_FILE };
 }
