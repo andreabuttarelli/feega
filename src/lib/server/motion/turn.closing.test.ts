@@ -26,8 +26,26 @@ const world = vi.hoisted(() => ({
   awaited: 0,
   conflicts: 0,
   writes: [] as { expectedVersion: number }[],
-  chunks: [] as { type: string; data?: unknown }[]
+  chunks: [] as { type: string; data?: unknown }[],
+  hangsAfterEdit: false,
+  stored: new Map<string, string>(),
+  removed: [] as string[],
+  stopped: false
 }));
+
+const draftBucket = {
+  upload: async (path: string, bytes: Buffer) => {
+    world.stored.set(path, bytes.toString());
+    return { error: null };
+  },
+  remove: async (paths: string[]) => {
+    world.removed.push(...paths);
+    paths.forEach((p) => world.stored.delete(p));
+    return { error: null };
+  },
+  list: async () => ({ data: [], error: null }),
+  download: async () => ({ data: null, error: null })
+};
 
 const SITE = 'https://supasito.com/';
 const PROMISE = 'Every site you run. Up to date. In one place.';
@@ -105,6 +123,9 @@ function scripted() {
     doStream: async (options) => {
       const call = { prompt: options.prompt as unknown as Message[], toolChoice: options.toolChoice as Call['toolChoice'] };
       world.calls.push(call);
+      if (world.hangsAfterEdit && lastMessage(call.prompt).role === 'tool') {
+        return { stream: new ReadableStream({ start() {} }) };
+      }
       const parts = [{ type: 'stream-start', warnings: [] }, ...reply(call)];
       parts.filter((p) => (p as Part).type === 'tool-call').forEach((p) => world.toolCalls.push((p as Part).toolName!));
       return {
@@ -158,7 +179,8 @@ vi.mock('$lib/server/repos/chat-reply', async (importOriginal) => ({
     },
     finish: async (body: { content: string }, status: string) => {
       world.saved.push({ role: 'assistant', ...body, status });
-    }
+    },
+    stopped: async () => world.stopped
   })
 }));
 vi.mock('$lib/server/motion/editor', () => ({
@@ -196,12 +218,16 @@ const { startMotionTurn, Browser, MAX_DELIVERY_ATTEMPTS } = await import('./turn
 const { DOC_EDITED } = await import('$lib/motion/frames-request');
 type DocEdited = import('$lib/motion/frames-request').DocEdited;
 
-async function turn(reasoning: string | null = 'low', browser = Browser.Attached) {
-  const db = { storage: { from: () => ({}) } } as never;
+async function turn(reasoning: string | null = 'low', browser = Browser.Attached, landingMs?: number, stopPollMs = 3000) {
+  const db = { storage: { from: () => draftBucket } } as never;
   const motion = { record: { id: 'n-1', canvasId: 'c-1' }, node: { id: 'n-1', format: MotionFormat.Landscape, docHeadRevision: 0, posterAssetId: null, lastRenderAssetId: null } } as never;
-  const started = await startMotionTurn({ db, userId: 'u-1', orgId: 'o-1', project: { id: 'p-1', brandId: null }, motion, message: 'make it pop', selection: [], model: 'anthropic/claude-opus-5.5', reasoning, requester: { kind: 'user', id: 'u-1' }, browser });
+  const started = await startMotionTurn({ db, userId: 'u-1', orgId: 'o-1', project: { id: 'p-1', brandId: null }, motion, message: 'make it pop', selection: [], model: 'anthropic/claude-opus-5.5', reasoning, requester: { kind: 'user', id: 'u-1' }, browser, ...(landingMs === undefined ? {} : { timing: { landingMs, stopPollMs } }) });
   if (started instanceof Response) {
     throw new Error('turn refused');
+  }
+  if (landingMs !== undefined) {
+    void started.stream.pipeTo(new WritableStream({ write: (c) => void world.chunks.push(c as { type: string }) })).catch(() => {});
+    return started.done;
   }
   const reader = started.stream.getReader();
   for (let next = await reader.read(); !next.done; next = await reader.read()) {
@@ -244,6 +270,10 @@ describe('a motion turn closes on a look and a summary', () => {
     world.conflicts = 0;
     world.writes = [];
     world.chunks = [];
+    world.hangsAfterEdit = false;
+    world.stored = new Map();
+    world.removed = [];
+    world.stopped = false;
   });
 
   it('looks at its frames after the last edit even when the edits spent the whole budget', async () => {
@@ -375,6 +405,56 @@ describe('a motion turn closes on a look and a summary', () => {
     const outcome = await turn();
 
     expect(world.writes).toHaveLength(2);
+    expect(outcome.revision).toBe('written');
+  });
+
+  it('a save refused again and again is retried until it lands: no browser is needed to keep the agent work', async () => {
+    world.conflicts = 2;
+
+    const outcome = await turn();
+
+    expect(outcome.revision).toBe('written');
+  });
+
+  it('a turn the platform is about to cut lands its edits and closes its answer before the wall', async () => {
+    world.hangsAfterEdit = true;
+
+    const outcome = await turn('low', Browser.Attached, 200);
+    const written = world.writes.at(-1) as unknown as { doc: { tracks: { clips: unknown[] }[] } };
+
+    expect(outcome.revision).toBe('written');
+    expect(written.doc.tracks.some((t) => t.clips.length)).toBe(true);
+    expect(world.saved.filter((t) => t.role === 'assistant')).toHaveLength(1);
+  });
+
+  it('the working doc is kept on the server as each edit lands, so a reload mid-turn sees it', async () => {
+    world.hangsAfterEdit = true;
+
+    void turn('low', Browser.Attached, 60_000);
+    await vi.waitFor(() => expect(world.stored.size).toBe(1));
+    const [path, body] = [...world.stored][0];
+    const draft = JSON.parse(body) as DocEdited;
+
+    expect(path).toBe('o-1/p-1/motion-drafts/n-1.json');
+    expect(draft.edit).toBe(1);
+    expect(draft.doc.tracks.some((t) => t.clips.length)).toBe(true);
+  });
+
+  it('the working doc is dropped once the turn has landed its revision', async () => {
+    await turn();
+
+    expect(world.stored.size).toBe(0);
+    expect(world.removed).toContain('o-1/p-1/motion-drafts/n-1.json');
+  });
+
+  it('a turn stopped from the chat ends at once and still keeps the edits it made', async () => {
+    world.hangsAfterEdit = true;
+
+    const ended = turn('low', Browser.Attached, 60_000, 10);
+    await vi.waitFor(() => expect(world.stored.size).toBe(1));
+    world.stopped = true;
+    const outcome = await ended;
+
     expect(outcome.revision).toBe('written');
   });
 });

@@ -201,11 +201,20 @@ export async function turnRunning(db: Db, input: { orgId: string; threadId: stri
     .limit(1)
     .maybeSingle();
 
-  const last = data as { role?: string; status?: string; created_at?: string; updated_at?: string } | null;
-  const touched = last?.updated_at ?? last?.created_at;
-  const awaited = last?.role === 'user' || last?.status === STREAMING;
-  if (!awaited || !touched) {
+  const last = data as { id?: string; role?: string; status?: string; created_at?: string } | null;
+  const streaming = last?.status === STREAMING;
+  const awaited = last?.role === 'user' || streaming;
+  if (!awaited || !last?.created_at) {
     return false;
   }
-  return now - Date.parse(touched) < AGENT_MAX_DURATION_S * MS_PER_S;
+
+  const alive = now - Date.parse(last.created_at) < AGENT_MAX_DURATION_S * MS_PER_S;
+  if (!alive && streaming && last.id) {
+    await closeCutReply(db, { orgId: input.orgId, id: last.id });
+  }
+  return alive;
+}
+
+async function closeCutReply(db: Db, input: { orgId: string; id: string }) {
+  await db.from('chat_messages').update({ status: 'failed', updated_at: new Date().toISOString() }).eq('org_id', input.orgId).eq('id', input.id).eq('status', STREAMING);
 }

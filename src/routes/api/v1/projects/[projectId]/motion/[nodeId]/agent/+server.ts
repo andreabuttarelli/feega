@@ -9,6 +9,11 @@ import { AGENT_MAX_DURATION_S } from '$lib/server/project-agent/limits';
 import { headOrNew } from '$lib/server/motion/editor';
 import { motionAgentScope } from '$lib/server/motion/agent-scope';
 import { Browser, startMotionTurn } from '$lib/server/motion/turn';
+import { stopTurn } from '$lib/server/repos/chat-reply';
+import { readWorkingDoc } from '$lib/server/motion/working-doc';
+import { CANVAS_ASSET_BUCKET } from '$lib/server/repos/asset-storage';
+import { DOC_EDITED } from '$lib/motion/frames-request';
+import type { FrameBucket } from '$lib/server/motion/frame-store';
 import type { RequestHandler } from './$types';
 
 export const config = { maxDuration: AGENT_MAX_DURATION_S };
@@ -56,5 +61,20 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 
   const threadId = await openNodeThread(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId: user.id, brandId: project.brandId });
   const [messages, running, head] = await Promise.all([loadTurns(db, { orgId, threadId }), turnRunning(db, { orgId, threadId }), headOrNew(db, { orgId, nodeId: motion.record.id }, motion.node)]);
-  return json({ threadId, messages, running, head: { version: head.version, doc: head.doc, summary: head.summary, actorKind: head.actorKind } });
+  const bucket = db.storage.from(CANVAS_ASSET_BUCKET) as unknown as FrameBucket;
+  const working = running ? await readWorkingDoc({ orgId, projectId: project.id, nodeId: motion.record.id, bucket }) : null;
+  const parts = working ? [{ type: DOC_EDITED, data: working }] : [];
+  return json({ threadId, messages, running, parts, head: { version: head.version, doc: head.doc, summary: head.summary, actorKind: head.actorKind } });
+};
+
+export const DELETE: RequestHandler = async ({ params, locals }) => {
+  const scope = await motionAgentScope(locals, params);
+  if (scope instanceof Response) {
+    return scope;
+  }
+  const { db, user, orgId, project, motion } = scope;
+
+  const threadId = await openNodeThread(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId: user.id, brandId: project.brandId });
+  await stopTurn(db, { orgId, threadId });
+  return json({ stopped: true });
 };

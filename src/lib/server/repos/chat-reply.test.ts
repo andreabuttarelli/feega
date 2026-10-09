@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { Db } from '$lib/server/db/client';
 import { fakeDb, type Call } from '$lib/server/db/fake-db';
 import { agentActor } from '$lib/server/repos/actor';
-import { forgetReplySchema, openReply, ReplyStatus } from './chat-reply';
+import { forgetReplySchema, openReply, ReplyStatus, stopTurn } from './chat-reply';
 
 const ORG = '11111111-1111-1111-1111-111111111111';
 const THREAD = '44444444-4444-4444-4444-444444444444';
@@ -103,5 +103,43 @@ describe('openReply — the answer is written while it is made', () => {
     await openReply(db, scope);
 
     expect(calls.filter((c) => c.op === 'insert-refused')).toHaveLength(1);
+  });
+});
+
+describe('stopping a turn — works even when the server running it is gone', () => {
+  beforeEach(() => forgetReplySchema());
+
+  it('stopTurn closes the thread answer still streaming as failed, inside the org', async () => {
+    const { db, calls } = fakeDb({ chat_messages: [] });
+
+    await stopTurn(db, { orgId: ORG, threadId: THREAD });
+    const closed = calls.find((c) => c.op === 'update')!;
+
+    expect(closed.payload).toMatchObject({ status: ReplyStatus.Failed });
+    expect(closed.filters).toEqual(expect.arrayContaining([['org_id', ORG], ['thread_id', THREAD], ['status', ReplyStatus.Streaming]]));
+  });
+
+  it('a live answer only rewrites a row still streaming: a stopped answer stays stopped', async () => {
+    const { db, calls } = fakeDb({ chat_messages: [] });
+    const reply = await openReply(db, scope);
+
+    await reply.progress({ content: 'Looking', tools: [] });
+    await reply.finish({ content: 'Done', tools: [] }, ReplyStatus.Done);
+
+    expect(calls.filter((c) => c.op === 'update').every((c) => c.filters.some(([k, v]) => k === 'status' && v === ReplyStatus.Streaming))).toBe(true);
+  });
+
+  it('a live answer knows when someone else closed it', async () => {
+    const { db } = fakeDb({ chat_messages: [{ id: 'generated-id', status: ReplyStatus.Failed }] });
+    const reply = await openReply(db, scope);
+
+    expect(await reply.stopped()).toBe(true);
+  });
+
+  it('a live answer still streaming is not stopped', async () => {
+    const { db } = fakeDb({ chat_messages: [{ id: 'generated-id', status: ReplyStatus.Streaming }] });
+    const reply = await openReply(db, scope);
+
+    expect(await reply.stopped()).toBe(false);
   });
 });
