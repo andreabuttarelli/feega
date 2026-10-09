@@ -10,6 +10,7 @@ import { GRAIN_TILE } from '../effects/registry';
 import { NOT_WEBKIT_UA, WEBKIT_UA } from '../engine';
 import { ERRORS } from '../custom/runtime';
 import { PARTICLE_STATE } from './particles';
+import { neutralised as neutralise, pathStyles as stylesOf } from './raster-key';
 export { contentStamp } from '../stamp';
 
 export const CAPTURE_REQUEST = 'feega:capture';
@@ -43,7 +44,7 @@ type HtmlToImage = {
   getFontEmbedCSS: (node: HTMLElement) => Promise<string>;
 };
 
-function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, inline: typeof inlineMedia, shrink: typeof shrinkImage, paint: typeof paintSvg, plan: typeof planLayers, grainOn: typeof grainPixels, tileOf: typeof turbulenceTile, chain: typeof chainAffine, affine: typeof cssAffine, rgba: typeof cssRgba, join: typeof joinRasters, cssMasks: typeof readMasks, cssFilters: typeof readFilters, fitsUnder: typeof filtersFit) {
+function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, inline: typeof inlineMedia, shrink: typeof shrinkImage, paint: typeof paintSvg, plan: typeof planLayers, grainOn: typeof grainPixels, tileOf: typeof turbulenceTile, chain: typeof chainAffine, affine: typeof cssAffine, rgba: typeof cssRgba, join: typeof joinRasters, cssMasks: typeof readMasks, cssFilters: typeof readFilters, fitsUnder: typeof filtersFit, neutralised: typeof neutralise, pathStyles: typeof stylesOf) {
   type Grain = { baseFrequency: number; seed: number; amount: number };
   const shrunk = new Map<string, Promise<string>>();
   let lib: Promise<unknown> | null = null;
@@ -687,13 +688,6 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
   const LIVE = 'canvas, video, iframe';
   const MAX_LIVE_RASTERS = 2;
   const alive = (el: Element) => el.matches(LIVE) || el.querySelector(LIVE) !== null;
-  const kebab = (name: string) => name.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
-  const NEUTRAL: [string, string][] = Object.entries({ filter: 'none', opacity: '1', mixBlendMode: 'normal', backgroundColor: 'transparent', mask: 'none', WebkitMask: 'none' }).map(([name, value]) => [kebab(name), value]);
-  const neutralised = (path: HTMLElement[]) => {
-    const saved = path.map((el) => NEUTRAL.map(([name]) => [el.style.getPropertyValue(name), el.style.getPropertyPriority(name)] as const));
-    path.forEach((el) => NEUTRAL.forEach(([name, value]) => el.style.setProperty(name, value, 'important')));
-    return () => path.forEach((el, i) => NEUTRAL.forEach(([name], j) => el.style.setProperty(name, saved[i][j][0], saved[i][j][1])));
-  };
   const pathOf = (root: HTMLElement, run: Run) => {
     const path: HTMLElement[] = [];
     for (let at = run.raster[0].parentElement; at && at !== root; at = at.parentElement) {
@@ -702,7 +696,7 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
     return path;
   };
   const keyOf = (root: HTMLElement, m: CaptureRequest, run: Run, pad: number) => {
-    return run.raster.some(alive) ? null : `${m.width}x${m.height}+${pad}|${pathOf(root, run).map((el) => el.getAttribute('style') ?? '').join('|')}|${run.raster.map((el) => el.outerHTML).join('')}`;
+    return run.raster.some(alive) ? null : `${m.width}x${m.height}+${pad}|${pathStyles(pathOf(root, run))}|${run.raster.map((el) => el.outerHTML).join('')}`;
   };
   const rasterOf = async (root: HTMLElement, m: CaptureRequest, embed: string, run: Run, pad: number) => {
     const path = pathOf(root, run);
@@ -827,5 +821,5 @@ export function stampOf(html: string): string | null {
 
 export function captureScript(doc: { width: number; height: number }, stamp: string, lib: string): string {
   const cfg: RuntimeConfig = { request: CAPTURE_REQUEST, reply: CAPTURE_REPLY, lib, width: doc.width, height: doc.height, mediaTimeoutMs: MEDIA_TIMEOUT_MS, stamp, errorsKey: ERRORS, settle: Settle.Paint, grainTile: GRAIN_TILE, grainOffset: GRAIN_SAMPLE_OFFSET, webkitUa: WEBKIT_UA.source, notWebkitUa: NOT_WEBKIT_UA.source, particleState: PARTICLE_STATE };
-  return `<script>(${captureRuntime.toString()})(${js(cfg)},(${freezeMasks.toString()}),(${inlineMedia.toString()}),(${shrinkImage.toString()}),(${paintSvg.toString()}),(${planLayers.toString()}),(${grainPixels.toString()}),(${turbulenceTile.toString()}),(${chainAffine.toString()}),(${cssAffine.toString()}),(${cssRgba.toString()}),(${joinRasters.toString()}),(${readMasks.toString()}),(${readFilters.toString()}),(${filtersFit.toString()}));</script>`;
+  return `<script>(${captureRuntime.toString()})(${js(cfg)},(${freezeMasks.toString()}),(${inlineMedia.toString()}),(${shrinkImage.toString()}),(${paintSvg.toString()}),(${planLayers.toString()}),(${grainPixels.toString()}),(${turbulenceTile.toString()}),(${chainAffine.toString()}),(${cssAffine.toString()}),(${cssRgba.toString()}),(${joinRasters.toString()}),(${readMasks.toString()}),(${readFilters.toString()}),(${filtersFit.toString()}),(${neutralise.toString()}),(${stylesOf.toString()}));</script>`;
 }
