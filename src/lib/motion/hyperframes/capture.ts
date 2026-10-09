@@ -3,7 +3,7 @@ import { inlineMedia, shrinkImage } from './inline-media';
 import { js } from './html';
 import { paintSvg } from './svg-paint';
 import { planLayers, type Pass } from './layer-plan';
-import { chain as chainAffine, cssAffine, cssFilters as readFilters, cssMasks as readMasks, cssRgba, joinRasters, type LayerTree } from './layer-tree';
+import { chain as chainAffine, cssAffine, cssFilters as readFilters, cssMasks as readMasks, cssRgba, filtersFit, joinRasters, type LayerTree } from './layer-tree';
 import { grainPixels, type GrainArea } from '../effects/grain';
 import { GRAIN_SAMPLE_OFFSET, turbulenceTile } from '../effects/turbulence';
 import { GRAIN_TILE } from '../effects/registry';
@@ -43,7 +43,7 @@ type HtmlToImage = {
   getFontEmbedCSS: (node: HTMLElement) => Promise<string>;
 };
 
-function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, inline: typeof inlineMedia, shrink: typeof shrinkImage, paint: typeof paintSvg, plan: typeof planLayers, grainOn: typeof grainPixels, tileOf: typeof turbulenceTile, chain: typeof chainAffine, affine: typeof cssAffine, rgba: typeof cssRgba, join: typeof joinRasters, cssMasks: typeof readMasks, cssFilters: typeof readFilters) {
+function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, inline: typeof inlineMedia, shrink: typeof shrinkImage, paint: typeof paintSvg, plan: typeof planLayers, grainOn: typeof grainPixels, tileOf: typeof turbulenceTile, chain: typeof chainAffine, affine: typeof cssAffine, rgba: typeof cssRgba, join: typeof joinRasters, cssMasks: typeof readMasks, cssFilters: typeof readFilters, fitsUnder: typeof filtersFit) {
   type Grain = { baseFrequency: number; seed: number; amount: number };
   const shrunk = new Map<string, Promise<string>>();
   let lib: Promise<unknown> | null = null;
@@ -489,8 +489,6 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
     const flat = Math.abs(x[0] + y[0] - o[0] - far[0]) < FLAT_PX && Math.abs(x[1] + y[1] - o[1] - far[1]) < FLAT_PX;
     return flat ? [(x[0] - o[0]) / PROBE_STEP, (x[1] - o[1]) / PROBE_STEP, (y[0] - o[0]) / PROBE_STEP, (y[1] - o[1]) / PROBE_STEP, o[0], o[1]] : null;
   };
-  const UPRIGHT_AFFINE = 1e-6;
-  const upright = (m: Affine) => Math.abs(m[1]) < UPRIGHT_AFFINE && Math.abs(m[2]) < UPRIGHT_AFFINE;
   const leafAffine = (el: HTMLElement, parent: Affine, style: CSSStyleDeclaration): Affine | null => {
     const own = affine(style.transform, style.transformOrigin);
     return own && el.offsetParent === el.parentElement ? chain(chain(parent, [1, 0, 0, 1, el.offsetLeft, el.offsetTop]), own) : null;
@@ -570,7 +568,7 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
   };
   const canvasPaint = (el: HTMLCanvasElement, parent: Affine, style: CSSStyleDeclaration, w: Walk): Paint | null | undefined => {
     const at = leafAffine(el, parent, style);
-    if (!at || !upright(at)) {
+    if (!at) {
       return undefined;
     }
     if (!el.width || !el.height || !el.offsetWidth || !el.offsetHeight) {
@@ -614,7 +612,7 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
     }
     const filters = cssFilters(style.filter, stepOf as never);
     const at = filters ? (leafAffine(el as HTMLElement, parent, style) ?? affineOf(el, w.at)) : null;
-    const effects = filters && at && upright(at) ? effectsOf(filters, el as HTMLElement, at, w) : null;
+    const effects = filters && at ? effectsOf(filters, el as HTMLElement, at, w) : null;
     if (!at || !effects) {
       return raster();
     }
@@ -634,8 +632,6 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
     self.children = held(parts, w);
     return self;
   };
-  const SIMILAR = 1e-3;
-  const isotropic = (m: Affine) => Math.abs(m[0] * m[2] + m[1] * m[3]) < SIMILAR * scaleOf(m) ** 2 && Math.abs(Math.hypot(m[0], m[1]) - Math.hypot(m[2], m[3])) < SIMILAR * scaleOf(m);
   type Read = { kind: string; grains?: Grain[]; sigma?: number; glass?: GlassFilter };
   const placed = (b: Box, at: Affine): Box => [at[0] * b[0] + at[4], at[3] * b[1] + at[5], at[0] * b[2], at[3] * b[3]];
   const glassEffect = (g: GlassFilter, at: Affine, w: Walk): Effect => {
@@ -650,7 +646,7 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
     glass: (f, _el, at, w) => glassEffect(f.glass as GlassFilter, at, w)
   };
   const effectsOf = (filters: Read[], el: HTMLElement, at: Affine, w: Walk): Effect[] | null => {
-    if (filters.some((f) => f.kind !== 'grain') && !isotropic(at)) {
+    if (!fitsUnder(filters.map((f) => f.kind) as never, at)) {
       return null;
     }
     return filters.map((f) => EFFECT_OF[f.kind](f, el, at, w));
@@ -823,5 +819,5 @@ export function stampOf(html: string): string | null {
 
 export function captureScript(doc: { width: number; height: number }, stamp: string): string {
   const cfg: RuntimeConfig = { request: CAPTURE_REQUEST, reply: CAPTURE_REPLY, lib: SCREENSHOT_URL, width: doc.width, height: doc.height, mediaTimeoutMs: MEDIA_TIMEOUT_MS, stamp, errorsKey: ERRORS, settle: Settle.Paint, grainTile: GRAIN_TILE, grainOffset: GRAIN_SAMPLE_OFFSET, webkitUa: WEBKIT_UA.source, notWebkitUa: NOT_WEBKIT_UA.source };
-  return `<script>(${captureRuntime.toString()})(${js(cfg)},(${freezeMasks.toString()}),(${inlineMedia.toString()}),(${shrinkImage.toString()}),(${paintSvg.toString()}),(${planLayers.toString()}),(${grainPixels.toString()}),(${turbulenceTile.toString()}),(${chainAffine.toString()}),(${cssAffine.toString()}),(${cssRgba.toString()}),(${joinRasters.toString()}),(${readMasks.toString()}),(${readFilters.toString()}));</script>`;
+  return `<script>(${captureRuntime.toString()})(${js(cfg)},(${freezeMasks.toString()}),(${inlineMedia.toString()}),(${shrinkImage.toString()}),(${paintSvg.toString()}),(${planLayers.toString()}),(${grainPixels.toString()}),(${turbulenceTile.toString()}),(${chainAffine.toString()}),(${cssAffine.toString()}),(${cssRgba.toString()}),(${joinRasters.toString()}),(${readMasks.toString()}),(${readFilters.toString()}),(${filtersFit.toString()}));</script>`;
 }

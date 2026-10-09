@@ -135,3 +135,15 @@ export function cssFilters(filter: string, lookup: (id: string) => FilterStep | 
   }
   return out;
 }
+
+export function filtersFit(kinds: EffectKind[], at: Affine): boolean {
+  const TOLERANCE = 1e-3;
+  const [a, b, c, d] = at;
+  const sx = Math.hypot(a, b);
+  const sy = Math.hypot(c, d);
+  const scale = Math.max(sx, sy);
+  const isotropic = Math.abs(a * c + b * d) < TOLERANCE * scale * scale && Math.abs(sx - sy) < TOLERANCE * scale;
+  const upright = Math.abs(b) < TOLERANCE * scale && Math.abs(c) < TOLERANCE * scale;
+  const NEEDS: Record<string, boolean> = { grain: true, blur: isotropic, glass: isotropic && upright };
+  return kinds.every((kind) => NEEDS[kind]);
+}

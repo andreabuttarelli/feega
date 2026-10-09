@@ -7,6 +7,7 @@ import { Layering } from '../hyperframes/capture';
 const MAX_GRAINS = 4;
 const SCRATCH_UNIT = MAX_GRAINS + 2;
 const BLUR_REACH = 3;
+const EDGE_PX = 1;
 
 const QUAD_VS = `#version 300 es
 in vec2 corner;
@@ -14,10 +15,11 @@ uniform vec2 box;
 uniform vec2 frame;
 uniform mat3 at;
 uniform float pad;
+uniform vec2 grow;
 out vec2 uv;
 void main() {
-  uv = corner;
-  vec2 p = (at * vec3(corner * box, 1.0)).xy + pad;
+  uv = corner * (1.0 + 2.0 * grow) - grow;
+  vec2 p = (at * vec3(uv * box, 1.0)).xy + pad;
   gl_Position = vec4(p.x / frame.x * 2.0 - 1.0, 1.0 - p.y / frame.y * 2.0, 0.0, 1.0);
 }`;
 
@@ -35,7 +37,9 @@ uniform vec4 color;
 uniform int solid;
 out vec4 outColor;
 void main() {
-  outColor = solid == 1 ? color : texture(sheet, uv);
+  vec2 inside = min(uv, 1.0 - uv) / max(fwidth(uv), vec2(1e-6));
+  float cover = clamp(min(inside.x, inside.y) + 0.5, 0.0, 1.0);
+  outColor = (solid == 1 ? color : texture(sheet, clamp(uv, 0.0, 1.0))) * cover;
 }`;
 
 const COPY_FS = `#version 300 es
@@ -367,6 +371,8 @@ export function webglGpu(canvas: OffscreenCanvas): Gpu {
       gl.uniform2f(paint.uniform('box'), p.width, p.height);
       gl.uniform2f(paint.uniform('frame'), size.width, size.height);
       gl.uniform1f(paint.uniform('pad'), pad);
+      const [a, b, c, d] = p.at;
+      gl.uniform2f(paint.uniform('grow'), EDGE_PX / Math.max(p.width * Math.hypot(a, b), 1), EDGE_PX / Math.max(p.height * Math.hypot(c, d), 1));
       gl.uniformMatrix3fv(paint.uniform('at'), false, mat3(p.at));
       if (p.kind === PaintKind.Fill) {
         const [r, g, b, a] = p.color;
