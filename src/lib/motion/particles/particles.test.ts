@@ -132,10 +132,14 @@ describe('particles in the composition', () => {
   });
 });
 
-function countingPaint(): { paint: CanvasRenderingContext2D; calls: Record<string, number> } {
+function countingPaint(): { paint: CanvasRenderingContext2D; calls: Record<string, number>; images: number[][] } {
   const calls: Record<string, number> = {};
-  const count = (name: string) => () => {
+  const images: number[][] = [];
+  const count = (name: string) => (...args: unknown[]) => {
     calls[name] = (calls[name] ?? 0) + 1;
+    if (name === 'drawImage') {
+      images.push(args.slice(1) as number[]);
+    }
     return name === 'createRadialGradient' ? { addColorStop: count('addColorStop') } : undefined;
   };
   const paint = new Proxy({ canvas: { width: 100, height: 100 } } as Record<string, unknown>, {
@@ -145,7 +149,7 @@ function countingPaint(): { paint: CanvasRenderingContext2D; calls: Record<strin
       return true;
     }
   });
-  return { paint: paint as unknown as CanvasRenderingContext2D, calls };
+  return { paint: paint as unknown as CanvasRenderingContext2D, calls, images };
 }
 
 const softDot = (x: number): Particle => ({ x, y: 10, size: 4, angle: x, r: 255, g: 255, b: 255, alpha: 0.9, softness: 0.3 });
@@ -159,7 +163,7 @@ describe('drawing particles stays cheap per frame', () => {
       made.push(fresh.calls);
       return { width: 0, height: 0, getContext: () => fresh.paint } as unknown as HTMLCanvasElement;
     });
-    const dots = Array.from({ length: 500 }, (_, i) => softDot(i));
+    const dots = Array.from({ length: 500 }, (_, i) => softDot(i % 100));
     drawParticles(paint, dots, 'circle', null, counted);
     drawParticles(paint, dots, 'circle', null, counted);
     expect(made).toHaveLength(1);
@@ -180,11 +184,27 @@ describe('drawing particles stays cheap per frame', () => {
     expect(made).toHaveLength(2);
   });
 
+  it('glows on the sheet keep a gap as wide as themselves, so shrinking one never samples its neighbour', () => {
+    const { paint, images } = countingPaint();
+    const tiles = glowTiles(() => ({ width: 0, height: 0, getContext: () => countingPaint().paint }) as unknown as HTMLCanvasElement);
+    drawParticles(paint, [softDot(10), { ...softDot(20), r: 10 }], 'circle', null, tiles);
+    const [first, second] = images;
+    expect(second[0] - (first[0] + first[2])).toBeGreaterThanOrEqual(first[2]);
+  });
+
+  it('a particle wholly outside the canvas is not drawn', () => {
+    const { paint, calls } = countingPaint();
+    const at = (x: number, y: number): Particle => ({ ...softDot(x), y });
+    const outside = [at(-50, 10), at(150, 10), at(50, -30), at(50, 130)];
+    drawParticles(paint, [...outside, at(50, 10), at(-1, 50)], 'square', null, glowTiles(() => document.createElement('canvas')));
+    expect(calls.fillRect).toBe(2);
+  });
+
   it('no particle saves and restores the whole canvas state', () => {
     const { paint, calls } = countingPaint();
     drawParticles(
       paint,
-      Array.from({ length: 500 }, (_, i) => softDot(i)),
+      Array.from({ length: 500 }, (_, i) => softDot(i % 100)),
       'square',
       null,
       glowTiles(() => {

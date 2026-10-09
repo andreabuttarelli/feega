@@ -2653,3 +2653,6 @@ Segnale: un doc con `Particles` morbide (stelle, polvere) sotto i 10 fps in embe
 
 ### Spezzare un frame in più passaggi SVG rallenta Chromium e accelera WebKit
 Segnale: un cambio di cattura che in WebKit dimezza il frame lo raddoppia in Chromium (0.66 → 1.27 s). Chromium dipinge i filtri SVG sulla GPU; ogni passaggio html-to-image in più costa più del filtro tolto. Mossa: misurare entrambi con `npm run bench:export`; un passaggio che toglie filtri vale solo dove i filtri sono in software (WebKit). Il probe `lazyNesting` non distingue i motori: in Chromium dentro il player risponde come WebKit.
+
+## `npx prettier --write` riscrive file interi
+Segnale: un diff di poche righe diventa centinaia, virgolette doppie e righe a 80 colonne. Causa: il repo non ha config prettier, quindi valgono i default. Mossa: non lanciare prettier sui file del repo; se serve, `--single-quote --print-width 220 --trailing-comma none --object-wrap collapse` riproduce lo stile esistente (verificato sui file motion).

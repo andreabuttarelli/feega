@@ -102,7 +102,6 @@ export function drawParticles(paint: CanvasRenderingContext2D, particles: Partic
   const MIN_GLOW_PX = 4;
   const SHEET_PX = 2048;
   const MAX_GLOW_PX = SHEET_PX / 2;
-  const GUTTER_PX = 2;
   const STREAK_LENGTH = 4;
   const STREAK_THICKNESS = 0.35;
   const rgb = (p: Particle, a: number) => `rgba(${Math.round(p.r)},${Math.round(p.g)},${Math.round(p.b)},${a})`;
@@ -119,7 +118,7 @@ export function drawParticles(paint: CanvasRenderingContext2D, particles: Partic
   };
 
   const slotFor = (px: number) => {
-    const span = px + GUTTER_PX;
+    const span = px * 2;
     if (glows.x + span > SHEET_PX) {
       glows.x = 0;
       glows.y += glows.row;
@@ -214,9 +213,15 @@ export function drawParticles(paint: CanvasRenderingContext2D, particles: Partic
   };
 
   paint.clearRect(0, 0, paint.canvas.width, paint.canvas.height);
+  const { width, height } = paint.canvas;
+  const offCanvas = (p: Particle) => {
+    const reach = p.size * STREAK_LENGTH;
+    return p.x + reach < 0 || p.x - reach > width || p.y + reach < 0 || p.y - reach > height;
+  };
+
   let alpha = -1;
   for (const p of particles) {
-    if (p.alpha <= 0 || p.size <= 0) {
+    if (p.alpha <= 0 || p.size <= 0 || offCanvas(p)) {
       continue;
     }
     if (alpha !== p.alpha) {
