@@ -58,6 +58,15 @@ describe('interactive web export', () => {
     expect(bundle.snippet).toContain(HOST_MESSAGE);
   });
 
+  it('lets a vertical swipe on the embed scroll the host page when scroll scrubs the timeline', async () => {
+    const scrub = ok(applyInteractivePreset(card(), InteractivePreset.ScrollScrub, null));
+    const scrubbed = await interactiveBundle({ doc: scrub, tokens: FEEGA_TOKENS, assetUrls: {}, title: 'Card', fetchBlob });
+    const tilted = await interactiveBundle({ doc: card(), tokens: FEEGA_TOKENS, assetUrls: {}, title: 'Card', fetchBlob });
+
+    expect(scrubbed.html).toContain('#pad{touch-action:pan-y}');
+    expect(tilted.html).toContain('#pad{touch-action:none}');
+  });
+
   it('keeps the composed page from closing the player script early', async () => {
     const bundle = await interactiveBundle({ doc: card(), tokens: FEEGA_TOKENS, assetUrls: {}, title: 'Card', fetchBlob });
     const script = bundle.html.slice(bundle.html.indexOf('<script>(function'));
