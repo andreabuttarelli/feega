@@ -26,7 +26,7 @@ export type PreviewDriver = {
   load: (html: string) => void;
   update: (html: string) => void;
   loaded: (html: string) => Promise<void>;
-  shoot: (time: number, request: ShotRequest) => Promise<CaptureReply>;
+  shoot: (time: number, request: ShotRequest, waitMs?: number) => Promise<CaptureReply>;
   exclusive: <T>(work: () => Promise<T>) => Promise<T>;
   ready: () => void;
   playback: (next: Playback) => void;
@@ -103,7 +103,7 @@ export function previewDriver(port: PlayerPort, newId: () => string = () => cryp
     });
   }
 
-  function shoot(time: number, request: ShotRequest): Promise<CaptureReply> {
+  function shoot(time: number, request: ShotRequest, waitMs = timeoutMs): Promise<CaptureReply> {
     const id = newId();
     const message = { type: CAPTURE_REQUEST, id, ...request } as const;
     let retry: ReturnType<typeof setTimeout> | null = null;
@@ -123,7 +123,7 @@ export function previewDriver(port: PlayerPort, newId: () => string = () => cryp
           done(() => reject(new Error('preview not ready')));
         }
       };
-      const timer = setTimeout(() => done(() => reject(new Error('capture timed out'))), timeoutMs);
+      const timer = setTimeout(() => done(() => reject(new Error(`the frame at ${time.toFixed(2)}s did not draw within ${Math.round(waitMs / 1000)}s`))), waitMs);
       const off = port.onReply((m) => {
         if (m.id !== id) {
           return;

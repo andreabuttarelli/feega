@@ -3,7 +3,7 @@ import { previewDriver, type ShotRequest } from './preview-driver';
 
 type Player = HTMLElement & { seek: (t: number) => void; play: () => void; pause: () => void; iframeElement: HTMLIFrameElement };
 
-export type CapturePlayer = { shoot: (time: number, request: ShotRequest) => Promise<CaptureReply>; dispose: () => void };
+export type CapturePlayer = { shoot: (time: number, request: ShotRequest, waitMs?: number) => Promise<CaptureReply>; dispose: () => void };
 
 export async function mountCapturePlayer(host: HTMLElement, html: string): Promise<CapturePlayer> {
   await import('@hyperframes/player');
@@ -45,5 +45,5 @@ export async function mountCapturePlayer(host: HTMLElement, html: string): Promi
 
   el.addEventListener('ready', () => driver.ready(), { once: true });
   await driver.loaded(html);
-  return { shoot: (time, request) => driver.shoot(time, request), dispose: () => el.remove() };
+  return { shoot: (time, request, waitMs) => driver.shoot(time, request, waitMs), dispose: () => el.remove() };
 }

@@ -127,6 +127,14 @@ describe('layer effects', () => {
     expect(sets.find((s) => s.target === '#ef-card-s-0' && Math.round(s.at * 30 + 0.5) === 35)?.vars).toEqual({ attr: { radius: 5 } });
   });
 
+  it('grain is computed once on a small seamless tile and repeated, not over the whole layer', () => {
+    const doc = ok(addEffect(base(), 'card', EffectKind.Noise, 'n'));
+    const html = effectLayer(clipOf(doc), frame, plain, '');
+
+    expect(html).toMatch(/<feTurbulence id="ef-card-n-0"[^>]* x="0" y="0" width="256" height="256" stitchTiles="stitch" result="tile"/);
+    expect(html).toMatch(/<feTile [^>]*in="tile" result="grain"/);
+  });
+
   it('a still clip with no animated effect needs no timeline work', () => {
     const doc = ok(addEffect(base(), 'card', EffectKind.Tint, 't', { white: '#ff0000' }));
     expect(effectTimeline(clipOf(doc), frame, plain)).toEqual([]);

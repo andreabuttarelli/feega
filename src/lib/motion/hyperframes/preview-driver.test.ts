@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CAPTURE_REPLY, FrameFormat, captureScript, type CaptureReply, type CaptureRequest } from './capture';
 import { Playback, RELOAD_DEBOUNCE_MS, previewDriver, type PlayerPort } from './preview-driver';
 
@@ -41,6 +41,10 @@ function slowPlayer(first: string, stuck = '') {
 }
 
 describe('the preview driver', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('captures the document it was asked to load, not the one a stale ready left behind', async () => {
     const driver = previewDriver(slowPlayer(page('trailer-v2')));
 
@@ -48,6 +52,23 @@ describe('the preview driver', () => {
     const reply = await driver.shoot(0, REQUEST);
 
     expect(reply.url).toBe('ugc');
+  });
+
+  it('a frame that never draws fails after the wait it was given, naming the moment and the wait', async () => {
+    vi.useFakeTimers();
+    const silent: PlayerPort = { ...slowPlayer(page('a')), post: () => true };
+    const driver = previewDriver(silent);
+    const outcome = driver.shoot(1.5, REQUEST, 40_000).then(
+      () => 'drawn',
+      (e: Error) => e.message
+    );
+
+    await vi.advanceTimersByTimeAsync(39_000);
+    const early = await Promise.race([outcome, Promise.resolve('waiting')]);
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    expect(early).toBe('waiting');
+    expect(await outcome).toBe('the frame at 1.50s did not draw within 40s');
   });
 
   it('runs borrowed captures one after the other', async () => {

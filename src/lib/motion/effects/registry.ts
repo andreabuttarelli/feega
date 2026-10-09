@@ -65,6 +65,7 @@ const node = (tag: string, attrs: SvgNode['attrs'], children?: SvgNode[]): SvgNo
 
 const LUMA = [0.2126, 0.7152, 0.0722];
 const GAUSS_TAIL = 4;
+const GRAIN_TILE = 256;
 
 const shadowNode = (dx: number, dy: number, blur: number, colour: string, opacity: number, link: SvgNode['attrs'] = {}): SvgNode =>
   node('feDropShadow', { ...link, dx, dy, stdDeviation: r(blur / 2), 'flood-color': colour, 'flood-opacity': r(opacity) });
@@ -244,7 +245,8 @@ export const EFFECTS: Record<EffectKind, Spec> = {
     render: (v, f, id) => {
       const amount = n(v, 'amount');
       return svg(id, [
-        node('feTurbulence', { type: 'fractalNoise', baseFrequency: r(1 / n(v, 'size')), numOctaves: 1, seed: Math.floor(f.frame * n(v, 'evolve')), result: 'grain' }),
+        node('feTurbulence', { type: 'fractalNoise', baseFrequency: r(1 / n(v, 'size')), numOctaves: 1, seed: Math.floor(f.frame * n(v, 'evolve')), x: 0, y: 0, width: GRAIN_TILE, height: GRAIN_TILE, stitchTiles: 'stitch', result: 'tile' }),
+        node('feTile', { in: 'tile', result: 'grain' }),
         node('feColorMatrix', { in: 'grain', type: 'saturate', values: 0, result: 'gray' }),
         node('feComposite', { in: 'gray', in2: 'SourceGraphic', operator: 'arithmetic', k1: 0, k2: r(amount), k3: 1, k4: r(-amount / 2), result: 'mixed' }),
         node('feComposite', { in: 'mixed', in2: 'SourceAlpha', operator: 'in' })
