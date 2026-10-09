@@ -96,6 +96,15 @@ describe('composite', () => {
     expect(log).toEqual(['region 3,5,7,7', 'paint s1 sheet0', 'blend s1->s0 0.5 normal', 'release s1', 'region all', 'finish s0']);
   });
 
+  it('bends what a lens holds without widening it: the lens samples inside its own box', () => {
+    const { device, log } = recorder();
+    const small: Paint = { kind: PaintKind.Sheet, sheet: 0, width: 4, height: 2, at: [1, 0, 0, 1, 3, 5] };
+    const lens: Effect = { kind: EffectKind.Glass, map: sheet(1), box: [3, 5, 2, 2], smooth: [1, 1], scale: 4, frost: 1 };
+    composite(device, { ...tree(node({ children: [node({ paints: [small], effects: [lens] })] }), null), pad: 5 });
+
+    expect(log).toEqual(['region 3,5,7,7', 'paint s1 sheet0', 'glass s1', 'blend s1->s0 1 normal', 'release s1', 'region all', 'finish s0']);
+  });
+
   it('widens a blurred layer by its reach, into the margin kept around the frame', () => {
     const { device, log } = recorder();
     const small: Paint = { kind: PaintKind.Sheet, sheet: 0, width: 4, height: 2, at: [1, 0, 0, 1, 3, 5] };

@@ -46,7 +46,8 @@ const GAUSS_REACH = 3;
 
 const REACH: Record<EffectKind, (e: Effect) => number> = {
   [EffectKind.Grain]: () => 0,
-  [EffectKind.Blur]: (e) => GAUSS_REACH * (e as Extract<Effect, { kind: EffectKind.Blur }>).sigma
+  [EffectKind.Blur]: (e) => GAUSS_REACH * (e as Extract<Effect, { kind: EffectKind.Blur }>).sigma,
+  [EffectKind.Glass]: () => 0
 };
 
 function grown(r: Rect | null, by: number): Rect | null {
