@@ -7,7 +7,7 @@ import { InputKey } from '../expression/inputs';
 import { INPUT_MESSAGE } from './runtime';
 import { EVENT_MESSAGE } from '../custom/runtime';
 import { playerMain, type PlayerConfig } from './player';
-import { EMBED_ROUTE, HOST_MESSAGE, hostMain, readHost, selfScroll } from './host';
+import { EMBED_ROUTE, HOST_MESSAGE, gestureScrub, hostMain, readHost, selfScroll } from './host';
 import { Liveness, PlayMode, SCROLL_LENGTH, interactiveOf, type Interactive } from './settings';
 import { FIT_SCALE, fitBox } from './fit';
 import type { EmbedSettings } from './loader';
@@ -61,6 +61,7 @@ const TITLE = /<title>([^<]*)<\/title>/;
 function playerConfig(source: PlayerSource): PlayerConfig {
   return {
     ...source,
+    scrollLength: source.scrollLength ?? SCROLL_LENGTH.default,
     modes: { autoplay: PlayMode.Autoplay, inView: PlayMode.InView, scrub: PlayMode.Scrub },
     inputMessage: INPUT_MESSAGE,
     eventMessage: EVENT_MESSAGE,
@@ -149,7 +150,7 @@ function pageOf(source: PlayerSource, title: string): string {
     '</head><body><div id="stage">',
     '<hyperframes-player id="player" sandbox-origin="opaque" assets-loading-ui="none" disable-click-to-play></hyperframes-player>',
     '<div id="pad"></div></div>',
-    `<script>(${playerMain.toString()})(${scriptJson(playerConfig(source))},${readHost.toString()},${selfScroll.toString()},${fitBox.toString()});</script>`,
+    `<script>(${playerMain.toString()})(${scriptJson(playerConfig(source))},${readHost.toString()},${selfScroll.toString()},${fitBox.toString()},${gestureScrub.toString()});</script>`,
     '</body></html>'
   ].join('');
 }
