@@ -64,10 +64,15 @@ export const LIGHTING = {
   dramatic: { ambient: 0.6, key: 5, fill: 0.2 }
 } as const;
 
-export type LookRuntime = Look & { hdri: string | null };
+export enum EnvLoad {
+  Wait = 'wait',
+  Swap = 'swap'
+}
 
-export function lookRuntime(look: Look | null): LookRuntime | null {
-  return look ? { ...look, hdri: hdriUrl(look.environment.preset) } : null;
+export type LookRuntime = Look & { hdri: string | null; envLoad: EnvLoad };
+
+export function lookRuntime(look: Look | null, origin: string, envLoad: EnvLoad): LookRuntime | null {
+  return look ? { ...look, hdri: hdriUrl(look.environment.preset, origin), envLoad } : null;
 }
 
 export function surfaceOf(material: Material | undefined): Surface | null {
@@ -232,11 +237,16 @@ function environment(s) {
   s.scene.environmentIntensity = LOOK.environment.intensity;
   s.scene.environmentRotation.set(0, LOOK.environment.rotation * DEG, 0);
   const pmrem = new THREE.PMREMGenerator(s.renderer);
+  const room = () => { s.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture; };
   if (!LOOK.hdri) {
-    s.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    room();
     return Promise.resolve();
   }
-  return hdri().then((t) => { if (t) s.scene.environment = pmrem.fromEquirectangular(t).texture; });
+  const swapped = hdri().then((t) => { if (t) s.scene.environment = pmrem.fromEquirectangular(t).texture; return t; });
+  if (LOOK.envLoad === '${EnvLoad.Wait}') return swapped;
+  room();
+  swapped.then((t) => { if (t) redraw(window.__hfThreeTime || 0); });
+  return Promise.resolve();
 }
 
 function contactBlob() {

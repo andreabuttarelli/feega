@@ -2722,3 +2722,10 @@ jsDelivr and letterboxes. Cause: code that finds its own output by a function na
 (`playerMain.toString()`) breaks on output built in the browser, where the bundle is minified
 (`function vi`). Move: anchor on data the minifier cannot rename (the config JSON), and test with
 the name replaced.
+
+## A `/motion-runtime/<chunk>.<hash>.js` 404s from a script or another build
+
+Signal: a page composed by `vite-node` (or by an older deploy) loads a runtime chunk that the
+server answers 404. The hash covers code built from `fn.toString()`, which differs between the
+minified server build and unminified `vite-node`. Move: compose hosted pages and serve chunks from
+the same build (`/e/[id]` does); in local harnesses serve the chunks the harness itself wrote.

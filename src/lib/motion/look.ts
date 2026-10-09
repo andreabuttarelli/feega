@@ -38,21 +38,21 @@ const ENV_ALIASES: Record<string, EnvPreset> = { studio: EnvPreset.Room };
 
 export const envPresetInput = z.preprocess((value) => (typeof value === 'string' ? (ENV_ALIASES[value] ?? value) : value), z.enum(ENV_PRESETS));
 
-const HDRI_BASE = 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r181/examples/textures/equirectangular/';
+export const MOTION_ENV_ROUTE = '/motion-env/r181/';
 
 export const HDRI: Record<EnvPreset, { file: string | null; about: string }> = {
   [EnvPreset.None]: { file: null, about: 'no image-based light' },
   [EnvPreset.Room]: { file: null, about: 'neutral procedural studio room, soft and even (the studio look)' },
-  [EnvPreset.Overpass]: { file: 'pedestrian_overpass_1k.hdr', about: 'soft overcast city light' },
-  [EnvPreset.Sunset]: { file: 'venice_sunset_1k.hdr', about: 'warm low sun over a city' },
-  [EnvPreset.Sunrise]: { file: 'spruit_sunrise_1k.hdr', about: 'cool morning sky, open field' },
-  [EnvPreset.Quarry]: { file: 'quarry_01_1k.hdr', about: 'bright outdoor daylight' },
-  [EnvPreset.Night]: { file: 'moonless_golf_1k.hdr', about: 'dark night sky, low key' }
+  [EnvPreset.Overpass]: { file: 'pedestrian_overpass_256.hdr', about: 'soft overcast city light' },
+  [EnvPreset.Sunset]: { file: 'venice_sunset_256.hdr', about: 'warm low sun over a city' },
+  [EnvPreset.Sunrise]: { file: 'spruit_sunrise_256.hdr', about: 'cool morning sky, open field' },
+  [EnvPreset.Quarry]: { file: 'quarry_01_256.hdr', about: 'bright outdoor daylight' },
+  [EnvPreset.Night]: { file: 'moonless_golf_256.hdr', about: 'dark night sky, low key' }
 };
 
-export function hdriUrl(preset: EnvPreset): string | null {
+export function hdriUrl(preset: EnvPreset, origin: string): string | null {
   const file = HDRI[preset].file;
-  return file ? HDRI_BASE + file : null;
+  return file ? `${origin}${MOTION_ENV_ROUTE}${file}` : null;
 }
 
 const HEX = /^#[0-9a-fA-F]{6}$/;

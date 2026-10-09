@@ -74,7 +74,7 @@ describe('/api/v1/motion/[nodeId]/embed', () => {
     expect(body.url).toBe(`https://feega.app/e/${NODE}`);
     expect(body.snippet).toBe(`<script src="https://feega.app/embed.js" async></script>\n<feega-motion src="${NODE}"></feega-motion>`);
     expect(body.revision).toBe(2);
-    expect(store.files.get(`${NODE}.html`)).toContain('<html');
+    expect(store.files.get(`${NODE}.html`)).toContain('application/feega-embed+json');
   });
 
   it('hands the React and Flutter snippets for the same video', async () => {

@@ -4,7 +4,8 @@ import { MotionFormat, newMotionDoc, type DocVerdict, type MotionDoc } from '../
 import { addClip } from '../timeline';
 import { EnvPreset, LightKind } from '../look';
 import { setLight, setLook } from '../look-ops';
-import { composeHtml } from './compose';
+import { Target, composeHtml } from './compose';
+import { EnvLoad } from './three';
 import { APP_ORIGIN, Module, moduleUrl } from '../libs/catalog';
 const OPENTYPE_URL = moduleUrl(APP_ORIGIN, Module.Opentype);
 
@@ -25,8 +26,17 @@ describe('3D look in the composed page', () => {
     const html = compose(lit);
     expect(html).toContain('"kind":"spot"');
     expect(html).toContain('"metalness":1');
-    expect(csp(html)).toMatch(/connect-src[^;]*https:\/\/cdn\.jsdelivr\.net/);
-    expect(html).toContain('pedestrian_overpass_1k.hdr');
+    expect(csp(html)).toMatch(/connect-src[^;]*https:\/\/feega\.app/);
+    expect(html).toContain(`${APP_ORIGIN}/motion-env/r181/pedestrian_overpass_256.hdr`);
+    expect(html).not.toContain('jsdelivr');
+  });
+
+  it('a live page draws its first frame with fallback light and swaps the environment in; an export waits for it', () => {
+    const shape = must(addClip(newMotionDoc(MotionFormat.Square), { component: 'Shape3D', from: 0 }, 's'));
+    const doc = must(setLook(shape, { environment: { preset: EnvPreset.Night } }));
+
+    expect(composeHtml({ doc, tokens: FEEGA_TOKENS, assets: {}, target: Target.Screen })).toContain(`"envLoad":"${EnvLoad.Swap}"`);
+    expect(composeHtml({ doc, tokens: FEEGA_TOKENS, assets: {}, target: Target.Video })).toContain(`"envLoad":"${EnvLoad.Wait}"`);
   });
 
   it('without a look the page keeps the old lighting and fetches nothing new', () => {
