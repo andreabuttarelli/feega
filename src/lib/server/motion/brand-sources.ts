@@ -5,18 +5,20 @@ import { readBrand } from './brand-brief';
 import { CAPTURE_MAX_EDGE, importImageAsset, storeImage, type ImportScope } from './asset-import';
 import { farmCapture } from './site-capture';
 import { motionRenderFarm } from './renderer';
+import { liveSiteChain } from '$lib/server/web/live';
 
 export type BrandSources = Required<Pick<MotionToolDeps, 'site' | 'brand' | 'importAsset'>> & Pick<MotionToolDeps, 'capture'>;
 
-export function brandSources(db: Db, scope: ImportScope & { brandId: string | null }): BrandSources {
+export function brandSources(db: Db, scope: ImportScope & { userId: string; brandId: string | null }, spend: (usd: number) => void = () => undefined): BrandSources {
   const drawnLogos = new Map<string, string>();
   const farm = motionRenderFarm();
 
   return {
     site: async (url): Promise<SourceRead> => {
-      const read = await readSite(url);
+      const read = await readSite(url, liveSiteChain(scope));
+      spend(read.costUsd);
       if (!read.ok) {
-        return read;
+        return { ok: false, error: read.error };
       }
       const logos = read.site.logos.map(({ markup, ...logo }) => {
         if (markup) {

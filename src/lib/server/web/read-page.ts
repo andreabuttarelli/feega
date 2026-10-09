@@ -131,7 +131,7 @@ function capped(markdown: string): { markdown: string; truncated: boolean } {
   return markdown.length <= MARKDOWN_MAX_CHARS ? { markdown, truncated: false } : { markdown: markdown.slice(0, MARKDOWN_MAX_CHARS), truncated: true };
 }
 
-async function htmlPage(url: string, html: string): Promise<PageRead> {
+export async function readHtml(url: string, html: string): Promise<PageRead> {
   const lower = html.toLowerCase();
   return {
     ok: true,
@@ -160,7 +160,7 @@ export async function readPage(input: string, fetchPage: PageFetch = guarded): P
     if (type && !HTML_TYPES.includes(type)) {
       return { ok: false, error: `not a web page (${type})` };
     }
-    return await htmlPage(page.url, page.body);
+    return await readHtml(page.url, page.body);
   } catch (e) {
     return { ok: false, error: `could not read ${input}: ${errorOf(e)}` };
   }

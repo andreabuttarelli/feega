@@ -10,6 +10,8 @@ export enum SearchEngine {
 }
 
 const EXA_URL = 'https://api.exa.ai/search';
+const EXA_CONTENTS_URL = 'https://api.exa.ai/contents';
+const CONTENTS_MAX_CHARS = 20_000;
 const SEARCH_TIMEOUT_MS = 20_000;
 const SNIPPET_MAX = 400;
 const HIGHLIGHT_SENTENCES = 3;
@@ -47,6 +49,24 @@ export function exaSearch(apiKey: string, http: typeof fetch = fetch): SearchPor
       return failed(e);
     }
   };
+}
+
+export type ExaPage = { ok: true; url: string; title: string; text: string; image: string | null; favicon: string | null; costUsd: number } | { ok: false; error: string };
+
+type ExaContents = { results?: (ExaResult & { image?: string; favicon?: string })[]; statuses?: { id: string; status: string; error?: { tag?: string } }[]; costDollars?: { total?: number } };
+
+export async function exaPage(apiKey: string, url: string, http: typeof fetch = fetch): Promise<ExaPage> {
+  try {
+    const body = (await posted(http, EXA_CONTENTS_URL, { 'x-api-key': apiKey }, { urls: [url], text: { maxCharacters: CONTENTS_MAX_CHARS }, livecrawl: 'fallback' })) as ExaContents;
+    const page = body.results?.[0];
+    if (!page?.text) {
+      const status = body.statuses?.[0];
+      return { ok: false, error: `Exa could not read it (${status?.error?.tag ?? status?.status ?? 'no text'})` };
+    }
+    return { ok: true, url: page.url, title: page.title || page.url, text: page.text, image: page.image ?? null, favicon: page.favicon ?? null, costUsd: body.costDollars?.total ?? 0 };
+  } catch (e) {
+    return { ok: false, error: `Exa failed: ${e instanceof Error ? e.message : String(e)}` };
+  }
 }
 
 type Gateway = { baseUrl: string; apiKey: string; model: string };

@@ -8,6 +8,9 @@ import sharp from 'sharp';
 import { readFileSync } from 'node:fs';
 import { lookup } from 'node:dns/promises';
 import { readSite, PAGE_MAX_BYTES } from './site-brief';
+import { SiteSource, directFetch } from '$lib/server/web/site-fetch';
+
+const DIRECT = [directFetch()];
 
 type Hop = { status?: number; location?: string; type?: string; length?: string; body?: string | Buffer };
 
@@ -88,7 +91,7 @@ describe('readSite: what a trailer needs from a public page', () => {
       'https://brand.example/logo.svg': { type: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg"><path fill="#0B3D2E" d="M0 0h10v10z"/></svg>' }
     });
 
-    const read = await readSite('brand.example');
+    const read = await readSite('brand.example', DIRECT);
     if (!read.ok) {
       throw new Error(read.error);
     }
@@ -123,7 +126,7 @@ describe('readSite: what a trailer needs from a public page', () => {
       'https://brand.example/how-it-works': { type: 'text/html', body: '<h2>How it works</h2><li>Pick your size.</li><li>Walk 30 days.</li>' }
     });
 
-    const read = await readSite('brand.example');
+    const read = await readSite('brand.example', DIRECT);
     if (!read.ok) {
       throw new Error(read.error);
     }
@@ -137,7 +140,7 @@ describe('readSite: what a trailer needs from a public page', () => {
     resolvesTo({ 'evil.example': '10.0.0.5' });
     const requested = serves({});
 
-    const read = await readSite('https://evil.example/');
+    const read = await readSite('https://evil.example/', DIRECT);
 
     expect(read.ok).toBe(false);
     expect(requested).toEqual([]);
@@ -146,22 +149,22 @@ describe('readSite: what a trailer needs from a public page', () => {
   it('refuses a redirect into the metadata service', async () => {
     const requested = serves({ [SITE]: { status: 302, location: 'http://169.254.169.254/latest/meta-data/' } });
 
-    const read = await readSite(SITE);
+    const read = await readSite(SITE, DIRECT);
 
     expect(read.ok).toBe(false);
-    expect(requested).toEqual([SITE]);
+    expect(requested).not.toContain('http://169.254.169.254/latest/meta-data/');
   });
 
   it('refuses a page that declares more bytes than the ceiling', async () => {
     serves({ [SITE]: { type: 'text/html', length: String(PAGE_MAX_BYTES + 1), body: HTML } });
 
-    expect(await readSite(SITE)).toMatchObject({ ok: false });
+    expect(await readSite(SITE, DIRECT)).toMatchObject({ ok: false });
   });
 
   it('refuses what is not a web page', async () => {
     serves({ [SITE]: { type: 'application/pdf', body: '%PDF-1.7' } });
 
-    expect(await readSite(SITE)).toMatchObject({ ok: false, error: expect.stringContaining('not a web page') });
+    expect(await readSite(SITE, DIRECT)).toMatchObject({ ok: false, error: expect.stringContaining('not a web page') });
   });
 
   it('finds a logo drawn inline in the header and fonts declared in a linked stylesheet', async () => {
@@ -171,7 +174,7 @@ describe('readSite: what a trailer needs from a public page', () => {
       'https://brand.example/theme.css': { type: 'text/css', body: "html { font-family: var(--font-sans) } @font-face { font-family: 'Geograph'; } h1 { font-family: 'Geograph', sans-serif } p { font-family: Lora, serif }" }
     });
 
-    const read = await readSite(SITE);
+    const read = await readSite(SITE, DIRECT);
     if (!read.ok) {
       throw new Error(read.error);
     }
@@ -191,7 +194,7 @@ describe('readSite: what a trailer needs from a public page', () => {
       'https://brand.example/app.css': { type: 'text/css', body: 'body { color: #1C1917 } .btn-primary { background: #F2552F; color: #FFFFFF } a:hover { color: #D9431F }' }
     });
 
-    const read = await readSite(SITE);
+    const read = await readSite(SITE, DIRECT);
     if (!read.ok) {
       throw new Error(read.error);
     }
@@ -203,7 +206,7 @@ describe('readSite: what a trailer needs from a public page', () => {
     const page = `<html><head><title>Grey</title><style>:root { --background: #FAFAF9; --foreground: #1C1917 } button { background: #111111 }</style></head><body></body></html>`;
     serves({ [SITE]: { type: 'text/html', body: page } });
 
-    const read = await readSite(SITE);
+    const read = await readSite(SITE, DIRECT);
     if (!read.ok) {
       throw new Error(read.error);
     }
@@ -225,7 +228,7 @@ describe('readSite: what a trailer needs from a public page', () => {
     };
     const ticker = setInterval(sample, 5);
 
-    const read = await readSite(SITE);
+    const read = await readSite(SITE, DIRECT);
     sample();
     clearInterval(ticker);
 
@@ -240,7 +243,7 @@ describe('readSite: what a trailer needs from a public page', () => {
       'https://brand.example/og.png': { type: 'image/png', body: await png(1200, 630) }
     });
 
-    const read = await readSite(SITE);
+    const read = await readSite(SITE, DIRECT);
 
     expect(read.ok && read.site.images.map((i) => i.url)).toEqual(['https://brand.example/og.png']);
   });
@@ -252,10 +255,48 @@ describe('readSite: what a trailer needs from a public page', () => {
       'https://brand.example/wp-json/wc/store/v1/products?per_page=50&page=1': { type: 'application/json', body: catalogue }
     });
 
-    const read = await readSite(SITE);
+    const read = await readSite(SITE, DIRECT);
 
     expect(read.ok && read.site.store).toBe('woocommerce');
     expect(read.ok && read.site.products[0]).toMatchObject({ name: 'QR Code by QodeVault', price: '49 USD', url: 'https://woocommerce.com/products/qr-code-by-qodevault/' });
   });
-});
 
+  it('reads a site that refuses plain requests through the next strategy, and says which', async () => {
+    serves({ [SITE]: { status: 403, type: 'text/html', body: 'Forbidden' } });
+    const rendered = { source: SiteSource.Browser, timeoutMs: 1_000, get: async () => ({ ok: true as const, url: SITE, html: HTML.replace('</h1>', `</h1><p>${'Wool sneakers made from natural materials, shipped worldwide. '.repeat(5)}</p>`) }) };
+
+    const read = await readSite(SITE, [directFetch(), rendered]);
+    if (!read.ok) {
+      throw new Error(read.error);
+    }
+
+    expect(read.site).toMatchObject({ name: 'Verde', source: SiteSource.Browser, note: null });
+    expect(read.site.tried.map((t) => [t.source, t.error])).toEqual([
+      [SiteSource.Fetch, 'the site answered 403'],
+      [SiteSource.Browser, null]
+    ]);
+  });
+
+  it('marks what comes from other sources as such, never as the site', async () => {
+    serves({ [SITE]: { status: 403, type: 'text/html', body: 'Forbidden' } });
+    const press = '<html><title>Verde raises</title><h2>About Verde</h2><p>Verde makes wool sneakers in Milan.</p></html>';
+    const others = { source: SiteSource.Secondary, timeoutMs: 1_000, get: async () => ({ ok: true as const, url: SITE, html: '', sources: [{ url: 'https://press.example/verde', html: press }] }) };
+
+    const read = await readSite(SITE, [directFetch(), others]);
+    if (!read.ok) {
+      throw new Error(read.error);
+    }
+
+    expect(read.site.source).toBe(SiteSource.Secondary);
+    expect(read.site.note).toMatch(/not the site/i);
+    expect(read.site.pages.map((p) => p.url)).toEqual(['https://press.example/verde']);
+  });
+
+  it('degrades with a note the agent can act on when every strategy fails', async () => {
+    serves({ [SITE]: { status: 403, type: 'text/html', body: 'Forbidden' } });
+
+    const read = await readSite(SITE, DIRECT);
+
+    expect(read).toMatchObject({ ok: false, error: expect.stringMatching(/fetch: the site answered 403[\s\S]*ask the user/) });
+  });
+});

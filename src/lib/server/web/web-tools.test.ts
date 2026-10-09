@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { generateText, stepCountIs, type Tool } from 'ai';
 import { MockLanguageModelV4 } from 'ai/test';
-import { MAX_SEARCHES_PER_TURN, MAX_SHOTS_PER_TURN, WEB_TOOLS, createWebTools, type WebToolDeps } from './web-tools';
+import { MAX_BROWSES_PER_TURN, MAX_SEARCHES_PER_TURN, MAX_SHOTS_PER_TURN, WEB_TOOLS, createWebTools, type WebToolDeps } from './web-tools';
 import { ShotView } from './screenshot';
 import { StoreKind } from './store';
 import { ViewDetail } from './view-images';
+import { StepKind } from './browse';
 
 type Exec = (input: unknown, options: { toolCallId: string }) => Promise<Record<string, unknown>>;
 
@@ -76,6 +77,30 @@ describe('web tools', () => {
       await run('screenshot_page', { url: 'https://a.example/' }, `s${i + 1}`);
     }
     expect(await run('screenshot_page', { url: 'https://a.example/' }, 'last')).toMatchObject({ ok: false });
+  });
+
+  it('browse runs the steps, shows its screenshots to the model, stores them as paths and spends what the browser cost', async () => {
+    const browse = vi.fn(async () => ({
+      ok: true as const,
+      url: 'https://a.example/',
+      steps: [{ do: StepKind.Navigate, ok: true as const }, { do: StepKind.Screenshot, ok: true as const, shot: 0 }],
+      shots: [{ jpeg: Buffer.from('jpg'), path: 'org/p/web-views/b1/shot-0.jpg' }],
+      costUsd: 0.004
+    }));
+    const { run, tools, spent } = setup({ browse });
+
+    const out = await run('browse', { url: 'https://a.example/', steps: [{ do: 'screenshot' }] }, 'b1');
+    const model = await (tools.browse.toModelOutput as (o: unknown) => Promise<{ type: string; value: { type: string; mediaType?: string }[] }>)({ toolCallId: 'b1', input: {}, output: out });
+
+    expect(browse).toHaveBeenCalledWith('https://a.example/', [{ do: 'screenshot' }], 'b1');
+    expect(out).toMatchObject({ ok: true, screenshots: ['org/p/web-views/b1/shot-0.jpg'] });
+    expect(model.value.some((p) => p.type === 'file' && p.mediaType === 'image/jpeg')).toBe(true);
+    expect(spent()).toBeCloseTo(0.004);
+
+    for (let i = 1; i < MAX_BROWSES_PER_TURN; i++) {
+      await run('browse', { url: 'https://a.example/', steps: [] }, `b${i + 1}`);
+    }
+    expect(await run('browse', { url: 'https://a.example/', steps: [] }, 'last')).toMatchObject({ ok: false });
   });
 
   it('leaves out screenshot_page and import_image when there is nothing behind them', () => {

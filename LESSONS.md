@@ -2668,3 +2668,6 @@ Segnale: `fetch(url)` dove `url` arriva da un tool, dall'MCP o da una pagina let
 
 ## Un embed dentro l'iframe di un site builder è ritagliato e lo scrub non parte
 Segnale: in Framer/Webflow/Wix/Notion il video sta rientrato di 8px, tagliato in basso, e lo scroll non lo fa avanzare. Il builder mette lo snippet in un SUO iframe a misura fissa: `body` con margine e altezza auto, nessuno scroll interno, così una sezione sticky `N×100vh` non scorre mai. Mossa: riprodurre con Playwright un `<iframe srcdoc>` (anche `sandbox="allow-scripts"`) attorno allo snippet e misurare elemento, iframe e `#player`; la fonte dello scrub per tipo di host sta in `SCRUB_SOURCE` (`loader.ts`).
+
+## `analyze_site` answers `the site answered 403` on a Cloudflare site
+Segnale: 403 da `readSite` su siti dietro Cloudflare/WAF (lovable.dev, g2.com) che in un browser si aprono. Causa: una richiesta sola con UA da bot. Mossa: la catena di `site-fetch.ts`. Su Browserless solo la rotta `/stealth` passa il challenge di lovable.dev; `/content`, `/chromium` e `/chromium/stealth` restituiscono «Just a moment...» con 200: giudica l'HTML, non lo status. `/unblock` su g2.com è rimasto appeso 139 s ignorando `timeout`: ogni chiamata a un fornitore ha un timeout nostro.
