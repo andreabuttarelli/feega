@@ -95,6 +95,21 @@ export function drawParticles(paint: CanvasRenderingContext2D, particles: Partic
   const STREAK_THICKNESS = 0.35;
   const rgb = (p: Particle, a: number) => `rgba(${Math.round(p.r)},${Math.round(p.g)},${Math.round(p.b)},${a})`;
 
+  const glows = new Map<string, CanvasGradient>();
+  const glowOf = (p: Particle) => {
+    const key = `${rgb(p, 1)}${p.softness}`;
+    const known = glows.get(key);
+    if (known) {
+      return known;
+    }
+    const glow = paint.createRadialGradient(0, 0, 0, 0, 0, 1);
+    glow.addColorStop(0, rgb(p, 1));
+    glow.addColorStop(Math.max(0, 1 - p.softness), rgb(p, 1));
+    glow.addColorStop(1, rgb(p, 0));
+    glows.set(key, glow);
+    return glow;
+  };
+
   const DRAW: Record<string, (p: Particle) => void> = {
     circle: (p) => {
       const radius = p.size / 2;
@@ -105,13 +120,10 @@ export function drawParticles(paint: CanvasRenderingContext2D, particles: Partic
         paint.fill();
         return;
       }
-      const glow = paint.createRadialGradient(0, 0, 0, 0, 0, radius);
-      glow.addColorStop(0, rgb(p, 1));
-      glow.addColorStop(Math.max(0, 1 - p.softness), rgb(p, 1));
-      glow.addColorStop(1, rgb(p, 0));
-      paint.fillStyle = glow;
+      paint.scale(radius, radius);
+      paint.fillStyle = glowOf(p);
       paint.beginPath();
-      paint.arc(0, 0, radius, 0, TAU);
+      paint.arc(0, 0, 1, 0, TAU);
       paint.fill();
     },
     square: (p) => {
@@ -143,11 +155,12 @@ export function drawParticles(paint: CanvasRenderingContext2D, particles: Partic
     if (p.alpha <= 0 || p.size <= 0) {
       continue;
     }
-    paint.save();
-    paint.translate(p.x, p.y);
-    paint.rotate(p.angle);
+    const cos = Math.cos(p.angle);
+    const sin = Math.sin(p.angle);
+    paint.setTransform(cos, sin, -sin, cos, p.x, p.y);
     paint.globalAlpha = p.alpha;
     DRAW[shape](p);
-    paint.restore();
   }
+  paint.setTransform(1, 0, 0, 1, 0, 0);
+  paint.globalAlpha = 1;
 }

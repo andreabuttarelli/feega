@@ -2647,3 +2647,5 @@ Segnale: in `chat_messages.tool_calls` più chiamate dello stesso passo che muta
 
 ### Un benchmark di export in Chromium headless misura la CPU, non la GPU
 Segnale: il Chromium di Playwright impiega ~14 s a frame su un doc che in Chrome ne costa ~0.6. Il `chromium-headless-shell` predefinito disegna WebGL e filtri in software. Mossa: `launch({ channel: 'chromium', args: ['--enable-gpu', '--use-angle=metal', '--ignore-gpu-blocklist'] })`, come `scripts/bench/export-bench.ts`; e un `--parity` prima di credere a un frame più veloce.
+## Un embed con particelle scatta sul telefono
+Segnale: un doc con `Particles` morbide (stelle, polvere) sotto i 10 fps in embed con CPU 4×; il profilo CDP (`Profiler.start` sulla pagina con `--disable-features=IsolateSandboxedIframes`, così l'iframe sandbox sta nello stesso processo) mostra `addColorStop`/`createRadialGradient`/`save` in cima. Causa: un gradiente e un `save`/`restore` per particella, migliaia per frame. Mossa: gradiente unitario condiviso per colore, `setTransform` al posto di `save`/`restore`; il test conta le chiamate su un contesto finto (`particles.test.ts`).

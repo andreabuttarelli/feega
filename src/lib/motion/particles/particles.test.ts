@@ -7,7 +7,7 @@ import { keyframesProblem } from '../keyframes';
 import { addClip, setKeyframes, type OpResult } from '../timeline';
 import { composeHtml } from '../hyperframes/compose';
 import { particleBake } from '../hyperframes/particles';
-import { particlesAt, type ParticleBake } from './simulate';
+import { drawParticles, particlesAt, type Particle, type ParticleBake } from './simulate';
 import { PARTICLE_PRESETS, ParticlePreset, applyParticlePreset, PRESET_PROPS } from './presets';
 import { Emitter } from './model';
 
@@ -129,5 +129,45 @@ describe('particles in the composition', () => {
     const doc = must(setKeyframes(base, 'p', 'rate', [{ frame: 0, value: 0, ease: Ease.Linear }, { frame: 29, value: 200, ease: Ease.Linear }]));
     const html = composeHtml({ doc, tokens: FEEGA_TOKENS, assets: {} });
     expect(html.match(/"rate":/g)?.length).toBe(30);
+  });
+});
+
+function countingPaint(): { paint: CanvasRenderingContext2D; calls: Record<string, number> } {
+  const calls: Record<string, number> = {};
+  const count = (name: string) => () => {
+    calls[name] = (calls[name] ?? 0) + 1;
+    return name === 'createRadialGradient' ? { addColorStop: count('addColorStop') } : undefined;
+  };
+  const paint = new Proxy({ canvas: { width: 100, height: 100 } } as Record<string, unknown>, {
+    get: (target, key: string) => (key in target ? target[key] : count(key)),
+    set: (target, key: string, value) => {
+      target[key] = value;
+      return true;
+    }
+  });
+  return { paint: paint as unknown as CanvasRenderingContext2D, calls };
+}
+
+const softDot = (x: number): Particle => ({ x, y: 10, size: 4, angle: x, r: 255, g: 255, b: 255, alpha: 0.9, softness: 0.3 });
+
+describe('drawing particles stays cheap per frame', () => {
+  it('soft particles of one colour share one gradient', () => {
+    const { paint, calls } = countingPaint();
+    drawParticles(paint, Array.from({ length: 500 }, (_, i) => softDot(i)), 'circle', null);
+    expect(calls.createRadialGradient).toBe(1);
+  });
+
+  it('no particle saves and restores the whole canvas state', () => {
+    const { paint, calls } = countingPaint();
+    drawParticles(paint, Array.from({ length: 500 }, (_, i) => softDot(i)), 'square', null);
+    expect(calls.save ?? 0).toBe(0);
+    expect(calls.fillRect).toBe(500);
+  });
+
+  it('the runtime copy of the drawing is self-contained', () => {
+    const copy = new Function(`return (${drawParticles.toString()})`)() as typeof drawParticles;
+    const { paint, calls } = countingPaint();
+    copy(paint, [softDot(1), softDot(2)], 'circle', null);
+    expect(calls.fill).toBe(2);
   });
 });
