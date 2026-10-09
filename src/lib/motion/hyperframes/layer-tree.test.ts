@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chain, cssAffine, cssFilters, cssMasks, cssRgba, EffectKind, joinRasters, IDENTITY, MaskComposite, type FilterStep } from './layer-tree';
+import { chain, cssAffine, cssFilters, cssMasks, cssRgba, EffectKind, filtersFit, joinRasters, IDENTITY, MaskComposite, type Affine, type FilterStep } from './layer-tree';
 
 describe('chain', () => {
   it('applies the inner affine first, then the outer', () => {
@@ -67,6 +67,27 @@ describe('cssMasks', () => {
     expect(cssMasks('none', 'add')).toEqual([]);
     expect(cssMasks('url("#mk-a")', 'add')).toBeNull();
     expect(cssMasks('linear-gradient(red, blue)', 'add')).toBeNull();
+  });
+});
+
+describe('filtersFit', () => {
+  const turn = (deg: number, sx = 1, sy = sx): Affine => {
+    const r = (deg * Math.PI) / 180;
+    return [Math.cos(r) * sx, Math.sin(r) * sx, -Math.sin(r) * sy, Math.cos(r) * sy, 10, 20];
+  };
+
+  it('draws grain under any flat transform: its noise follows the layer', () => {
+    expect(filtersFit([EffectKind.Grain], turn(30, 1.2, 0.8))).toBe(true);
+  });
+
+  it('draws a blur under a turn or a uniform scale, not under a squash', () => {
+    expect(filtersFit([EffectKind.Blur], turn(-22, 2))).toBe(true);
+    expect(filtersFit([EffectKind.Blur], turn(0, 1.2, 0.8))).toBe(false);
+  });
+
+  it('draws a lens only upright, its box is axis-aligned', () => {
+    expect(filtersFit([EffectKind.Glass], turn(0, 1.5))).toBe(true);
+    expect(filtersFit([EffectKind.Glass], turn(10))).toBe(false);
   });
 });
 
