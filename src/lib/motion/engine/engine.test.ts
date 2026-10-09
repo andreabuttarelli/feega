@@ -319,6 +319,42 @@ describe('placement', () => {
 
     expect(child.time()).toBe(1.5);
   });
+
+  it('a child timeline outside its window is drawn once, not on every frame', () => {
+    const e = engine();
+    const master = e.timeline() as unknown as Tl;
+    const child = e.timeline() as unknown as Tl;
+    let draws = 0;
+    child.to({}, { duration: 1, ease: 'none', onUpdate: () => draws++ }, 0);
+    master.add(child.tweenFromTo(0, 1, { duration: 1 }), 5);
+    master.to({}, { duration: 10 }, 0);
+
+    [0, 0.1, 0.2, 0.3].forEach((t) => master.totalTime(t, true));
+    expect(draws).toBe(1);
+
+    [5.1, 5.2].forEach((t) => master.totalTime(t, true));
+    expect(draws).toBe(3);
+
+    [7, 8, 9].forEach((t) => master.totalTime(t, true));
+    expect(draws).toBe(4);
+  });
+
+  it('seeking a frame twice leaves the same page as seeking it once', () => {
+    const e = engine();
+    const master = e.timeline() as unknown as Tl;
+    const child = e.timeline() as unknown as Tl;
+    child.fromTo('#a', { x: 0 }, { x: 100, duration: 1, ease: 'none', immediateRender: false }, 0);
+    master.add(child.tweenFromTo(0, 1, { duration: 1 }), 2);
+    master.to({}, { duration: 10 }, 0);
+
+    master.totalTime(2.5, true);
+    const once = document.body.innerHTML;
+    master.totalTime(6, true);
+    master.totalTime(2.5, true);
+    master.totalTime(2.5, true);
+
+    expect(document.body.innerHTML).toBe(once);
+  });
 });
 
 describe('split', () => {

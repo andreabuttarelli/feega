@@ -60,6 +60,7 @@ type ChildItem = {
   dur: number;
   render: (local: number) => void;
   handle: Handle;
+  shown: number;
 };
 type Item = TweenItem | ChildItem;
 type Handle = Record<string, unknown>;
@@ -1041,13 +1042,21 @@ export function motionEngine(win: Window & Record<string, unknown>): MotionEngin
       const ordered = items.slice().sort((a, b) => a.start - b.start || a.order - b.order);
       for (const item of ordered) {
         if (item.kind === 'child') {
-          item.render(clamp(0, item.dur, t - item.start));
+          renderChild(item, clamp(0, item.dur, t - item.start));
           continue;
         }
         if (item.onUpdate) {
           item.onUpdate.call(item.handle);
         }
       }
+    }
+
+    function renderChild(item: ChildItem, local: number) {
+      if (local === item.shown) {
+        return;
+      }
+      item.shown = local;
+      item.render(local);
     }
 
     function stop() {
@@ -1090,7 +1099,8 @@ export function motionEngine(win: Window & Record<string, unknown>): MotionEngin
         start,
         dur,
         render: child.renderAt as (t: number) => void,
-        handle: child
+        handle: child,
+        shown: NaN
       };
       items.push(item);
       track(start, start + dur);
