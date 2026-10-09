@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chain, cssAffine, cssMasks, cssRgba, joinRasters, IDENTITY, MaskComposite } from './layer-tree';
+import { chain, cssAffine, cssFilters, cssMasks, cssRgba, EffectKind, joinRasters, IDENTITY, MaskComposite, type FilterStep } from './layer-tree';
 
 describe('chain', () => {
   it('applies the inner affine first, then the outer', () => {
@@ -67,5 +67,33 @@ describe('cssMasks', () => {
     expect(cssMasks('none', 'add')).toEqual([]);
     expect(cssMasks('url("#mk-a")', 'add')).toBeNull();
     expect(cssMasks('linear-gradient(red, blue)', 'add')).toBeNull();
+  });
+});
+
+describe('cssFilters', () => {
+  const grain = (seed: number): FilterStep => ({ kind: EffectKind.Grain, grain: { baseFrequency: 1, seed, amount: 0.2 } });
+  const known: Record<string, FilterStep> = { g1: grain(1), g2: grain(2), soft: { kind: EffectKind.Blur, sigma: 6 } };
+  const lookup = (id: string) => known[id] ?? null;
+
+  it('has nothing to do without a filter', () => {
+    expect(cssFilters('none', lookup)).toEqual([]);
+  });
+
+  it('reads a CSS blur in pixels', () => {
+    expect(cssFilters('blur(25px)', lookup)).toEqual([{ kind: EffectKind.Blur, sigma: 25 }]);
+  });
+
+  it('keeps the order of the chain, joining neighbouring grains in one pass', () => {
+    expect(cssFilters('url("#g1") url("#g2") blur(4px) url(#soft)', lookup)).toEqual([
+      { kind: EffectKind.Grain, grains: [{ baseFrequency: 1, seed: 1, amount: 0.2 }, { baseFrequency: 1, seed: 2, amount: 0.2 }] },
+      { kind: EffectKind.Blur, sigma: 4 },
+      { kind: EffectKind.Blur, sigma: 6 }
+    ]);
+  });
+
+  it('refuses what it cannot draw: another CSS function or an unknown SVG filter', () => {
+    expect(cssFilters('brightness(1.2)', lookup)).toBeNull();
+    expect(cssFilters('url("#other")', lookup)).toBeNull();
+    expect(cssFilters('blur(2px) saturate(2)', lookup)).toBeNull();
   });
 });

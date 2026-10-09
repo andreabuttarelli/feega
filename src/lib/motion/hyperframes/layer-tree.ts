@@ -14,12 +14,17 @@ export type Rgba = [number, number, number, number];
 export type Paint = { kind: PaintKind.Sheet; sheet: number; width: number; height: number; at: Affine } | { kind: PaintKind.Fill; color: Rgba; width: number; height: number; at: Affine };
 
 export enum EffectKind {
-  Grain = 'grain'
+  Grain = 'grain',
+  Blur = 'blur'
 }
 
 export type Grain = { baseFrequency: number; seed: number; amount: number };
 
-export type Effect = { kind: EffectKind.Grain; grains: Grain[]; area: GrainArea };
+export type Effect = { kind: EffectKind.Grain; grains: Grain[]; area: GrainArea } | { kind: EffectKind.Blur; sigma: number };
+
+export type FilterStep = { kind: EffectKind.Grain; grain: Grain } | { kind: EffectKind.Blur; sigma: number };
+
+export type Filter = { kind: EffectKind.Grain; grains: Grain[] } | { kind: EffectKind.Blur; sigma: number };
 
 export enum MaskComposite {
   Add = 'add',
@@ -32,7 +37,7 @@ export type Mask = { paint: Paint; composite: MaskComposite };
 
 export type LayerNode = { paints: Paint[]; children: LayerNode[]; opacity: number; blend: string; effects: Effect[]; clip: Paint | null; masks: Mask[] };
 
-export type LayerTree = { width: number; height: number; backdrop: Rgba | null; root: LayerNode };
+export type LayerTree = { width: number; height: number; pad: number; backdrop: Rgba | null; root: LayerNode };
 
 export function node(part: Partial<LayerNode>): LayerNode {
   return { paints: [], children: [], opacity: 1, blend: 'normal', effects: [], clip: null, masks: [], ...part };
@@ -91,4 +96,35 @@ export function cssMasks(image: string, composite: string): CssMask[] | null {
   }
   const ops = composite.split(',').map((op) => NAMES[op.trim()] ?? 'add');
   return urls.map((url, i) => ({ url, composite: ops[i % ops.length] as MaskComposite }));
+}
+
+export function cssFilters(filter: string, lookup: (id: string) => FilterStep | null): Filter[] | null {
+  const GRAIN = 'grain' as EffectKind.Grain;
+  const TOKEN = /[a-z-]+\((?:"[^"]*"|[^)])*\)/g;
+  if (!filter || filter === 'none') {
+    return [];
+  }
+  if (filter.replace(TOKEN, '').trim()) {
+    return null;
+  }
+  const steps: FilterStep[] = [];
+  for (const token of filter.match(TOKEN) ?? []) {
+    const ref = /^url\("?#([^")]+)"?\)$/.exec(token);
+    const blur = /^blur\(([\d.]+)px\)$/.exec(token);
+    const step = ref ? lookup(ref[1]) : blur ? ({ kind: 'blur', sigma: Number(blur[1]) } as FilterStep) : null;
+    if (!step) {
+      return null;
+    }
+    steps.push(step);
+  }
+  const out: Filter[] = [];
+  for (const step of steps) {
+    const last = out[out.length - 1];
+    if (step.kind === GRAIN && last?.kind === GRAIN) {
+      last.grains.push(step.grain);
+      continue;
+    }
+    out.push(step.kind === GRAIN ? { kind: GRAIN, grains: [step.grain] } : step);
+  }
+  return out;
 }

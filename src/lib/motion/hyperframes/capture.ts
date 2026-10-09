@@ -3,7 +3,7 @@ import { inlineMedia, shrinkImage } from './inline-media';
 import { js } from './html';
 import { paintSvg } from './svg-paint';
 import { planLayers, type Pass } from './layer-plan';
-import { chain as chainAffine, cssAffine, cssMasks as readMasks, cssRgba, joinRasters, type LayerTree } from './layer-tree';
+import { chain as chainAffine, cssAffine, cssFilters as readFilters, cssMasks as readMasks, cssRgba, joinRasters, type LayerTree } from './layer-tree';
 import { grainPixels, type GrainArea } from '../effects/grain';
 import { GRAIN_SAMPLE_OFFSET, turbulenceTile } from '../effects/turbulence';
 import { GRAIN_TILE } from '../effects/registry';
@@ -43,7 +43,7 @@ type HtmlToImage = {
   getFontEmbedCSS: (node: HTMLElement) => Promise<string>;
 };
 
-function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, inline: typeof inlineMedia, shrink: typeof shrinkImage, paint: typeof paintSvg, plan: typeof planLayers, grainOn: typeof grainPixels, tileOf: typeof turbulenceTile, chain: typeof chainAffine, affine: typeof cssAffine, rgba: typeof cssRgba, join: typeof joinRasters, cssMasks: typeof readMasks) {
+function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, inline: typeof inlineMedia, shrink: typeof shrinkImage, paint: typeof paintSvg, plan: typeof planLayers, grainOn: typeof grainPixels, tileOf: typeof turbulenceTile, chain: typeof chainAffine, affine: typeof cssAffine, rgba: typeof cssRgba, join: typeof joinRasters, cssMasks: typeof readMasks, cssFilters: typeof readFilters) {
   type Grain = { baseFrequency: number; seed: number; amount: number };
   const shrunk = new Map<string, Promise<string>>();
   let lib: Promise<unknown> | null = null;
@@ -157,6 +157,19 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
       attr(filter, 'x') === '-25%' &&
       attr(filter, 'width') === '150%';
     return fits ? { baseFrequency: Number(attr(noise, 'baseFrequency')), seed: Number(attr(noise, 'seed')), amount } : null;
+  };
+  const blurOf = (filter: Element | null): number | null => {
+    const steps = [...(filter?.children ?? [])];
+    const [only] = steps;
+    const sigma = attr(only, 'stdDeviation').trim();
+    const fits = steps.length === 1 && only.tagName === 'feGaussianBlur' && ['', 'SourceGraphic'].includes(attr(only, 'in')) && /^[\d.]+$/.test(sigma);
+    return fits ? Number(sigma) : null;
+  };
+  const stepOf = (id: string) => {
+    const filter = document.getElementById(id);
+    const grain = grainOf(filter);
+    const sigma = grain ? null : blurOf(filter);
+    return grain ? { kind: 'grain' as const, grain } : sigma !== null ? { kind: 'blur' as const, sigma } : null;
   };
   const grainsOf = (style: CSSStyleDeclaration): Grain[] | null => {
     if (none(style.filter)) {
@@ -403,7 +416,7 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
   type Affine = [number, number, number, number, number, number];
   type Rgba = [number, number, number, number];
   type Paint = { kind: 'sheet'; sheet: number; width: number; height: number; at: Affine } | { kind: 'fill'; color: Rgba; width: number; height: number; at: Affine };
-  type Effect = { kind: 'grain'; grains: Grain[]; area: GrainArea };
+  type Effect = { kind: 'grain'; grains: Grain[]; area: GrainArea } | { kind: 'blur'; sigma: number };
   type Mask = { paint: Paint; composite: string };
   type TreeNode = { paints: Paint[]; children: TreeNode[]; opacity: number; blend: string; effects: Effect[]; clip: Paint | null; masks: Mask[] };
   type Picture = { url: string; width: number; height: number };
@@ -545,15 +558,15 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
       }
       return { paints: paint && shown ? [paint] : [], children: [], opacity, blend: style.mixBlendMode, effects: [], clip: null, masks: [] };
     }
-    const grains = grainsOf(style);
-    const at = grains ? affineOf(el, w.at) : null;
-    if (!grains || !at || !upright(at)) {
+    const filters = cssFilters(style.filter, stepOf as never);
+    const at = filters ? affineOf(el, w.at) : null;
+    const effects = filters && at && upright(at) ? effectsOf(filters, el as HTMLElement, at, w) : null;
+    if (!at || !effects) {
       return raster;
     }
     const color = rgba(style.backgroundColor);
     const box = { width: (el as HTMLElement).offsetWidth, height: (el as HTMLElement).offsetHeight, at };
     const paints: Paint[] = color && shown ? [{ kind: FILL, color, ...box }] : [];
-    const effects: Effect[] = grains.length ? [{ kind: 'grain', grains, area: areaOf(el as HTMLElement, w.at).area }] : [];
     const clip: Paint | null = style.overflow !== 'visible' ? { kind: FILL, color: WHITE, ...box } : null;
     const masks = masksOf(style, box, w);
     if (!masks) {
@@ -567,6 +580,17 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
     self.children = held(parts, w);
     return self;
   };
+  const SIMILAR = 1e-3;
+  const isotropic = (m: Affine) => Math.abs(m[0] * m[2] + m[1] * m[3]) < SIMILAR * scaleOf(m) ** 2 && Math.abs(Math.hypot(m[0], m[1]) - Math.hypot(m[2], m[3])) < SIMILAR * scaleOf(m);
+  const effectsOf = (filters: { kind: string; grains?: Grain[]; sigma?: number }[], el: HTMLElement, at: Affine, w: Walk): Effect[] | null => {
+    if (filters.some((f) => f.kind === 'blur') && !isotropic(at)) {
+      return null;
+    }
+    return filters.map((f) => (f.kind === 'blur' ? { kind: 'blur', sigma: (f.sigma as number) * scaleOf(at) } : { kind: 'grain', grains: f.grains as Grain[], area: areaOf(el, w.at).area }));
+  };
+  const BLUR_REACH = 3;
+  const MAX_PAD = 384;
+  const reachOf = (n: TreeNode): number => n.effects.reduce((sum, e) => sum + (e.kind === 'blur' ? BLUR_REACH * e.sigma : 0), 0) + Math.max(0, ...n.children.map(reachOf));
   const gpuOnly = (n: TreeNode): boolean => n.effects.length > 0 || n.masks.length > 0 || n.children.some(gpuOnly);
   const pictures = new Map<string, Promise<Cropped>>();
   const MAX_PICTURES = 64;
@@ -602,22 +626,22 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
     }
     return path;
   };
-  const keyOf = (root: HTMLElement, m: CaptureRequest, run: Run) => {
+  const keyOf = (root: HTMLElement, m: CaptureRequest, run: Run, pad: number) => {
     const live = run.raster.some((el) => el.matches(LIVE) || el.querySelector(LIVE));
-    return live ? null : `${m.width}x${m.height}|${pathOf(root, run).map((el) => el.getAttribute('style') ?? '').join('|')}|${run.raster.map((el) => el.outerHTML).join('')}`;
+    return live ? null : `${m.width}x${m.height}+${pad}|${pathOf(root, run).map((el) => el.getAttribute('style') ?? '').join('|')}|${run.raster.map((el) => el.outerHTML).join('')}`;
   };
   const seen = new WeakMap<Element, string>();
-  const changing = (root: HTMLElement, m: CaptureRequest, run: Run) => {
-    const key = keyOf(root, m, run);
+  const changing = (root: HTMLElement, m: CaptureRequest, run: Run, pad: number) => {
+    const key = keyOf(root, m, run, pad);
     const before = seen.get(run.raster[0]);
     if (key !== null) {
       seen.set(run.raster[0], key);
     }
     return key === null || key !== before;
   };
-  const rasterOf = async (root: HTMLElement, m: CaptureRequest, embed: string, run: Run) => {
+  const rasterOf = async (root: HTMLElement, m: CaptureRequest, embed: string, run: Run, pad: number) => {
     const path = pathOf(root, run);
-    const key = keyOf(root, m, run);
+    const key = keyOf(root, m, run, pad);
     const known = rasterKeys.get(run.raster[0]);
     if (key !== null && known?.key === key) {
       return known.canvas;
@@ -626,7 +650,10 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
     const inside = (node: Node) => kept.has(node) || run.raster.some((el) => el === node || el.contains(node));
     const restore = neutralised(path);
     try {
-      const shot = await svgOf(root, m, embed, { style: { background: 'transparent' }, filter: (node: Node) => drawable(node) && (!(node instanceof Element) || inside(node)) });
+      const margin = pad / (m.width / cfg.width);
+      const padded = { ...m, width: m.width + 2 * pad, height: m.height + 2 * pad };
+      const style = { background: 'transparent', width: `${cfg.width}px`, height: `${cfg.height}px`, overflow: 'visible', transform: `translate(${margin}px, ${margin}px)` };
+      const shot = await svgOf(root, padded, embed, { width: cfg.width + 2 * margin, height: cfg.height + 2 * margin, style, filter: (node: Node) => drawable(node) && (!(node instanceof Element) || inside(node)) });
       const canvas = key === null ? whole(shot) : cropped(shot);
       if (key !== null) {
         rasterKeys.set(run.raster[0], { key, canvas });
@@ -646,20 +673,24 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
       return null;
     }
     const children = held(parts, w);
+    const pad = Math.min(MAX_PAD, Math.ceil(Math.max(0, ...children.map(reachOf))));
     const runs = w.slots.map((slot) => slot.source).filter((source): source is Run => 'raster' in source);
-    if (runs.filter((run) => changing(root, m, run)).length > MAX_FRESH_RASTERS) {
+    if (runs.filter((run) => changing(root, m, run, pad)).length > MAX_FRESH_RASTERS) {
       return null;
     }
     const sources: HTMLCanvasElement[] = [];
     for (const { source, paint } of w.slots) {
-      const found = source instanceof HTMLCanvasElement ? whole(source) : 'raster' in source ? await rasterOf(root, m, embed, source) : await pictureOf(source);
+      if ('raster' in source) {
+        Object.assign(paint, { width: m.width + 2 * pad, height: m.height + 2 * pad, at: [1, 0, 0, 1, -pad, -pad] });
+      }
+      const found = source instanceof HTMLCanvasElement ? whole(source) : 'raster' in source ? await rasterOf(root, m, embed, source, pad) : await pictureOf(source);
       fit(paint, found, sources.length);
       if (found) {
         sources.push(found.canvas);
       }
     }
     const sheets = await Promise.all(sources.map((c) => createImageBitmap(c, { premultiplyAlpha: 'premultiply' })));
-    const tree = { width: m.width, height: m.height, backdrop: rgba(backdrop), root: { paints: [], children, opacity: 1, blend: 'normal', effects: [], clip: null, masks: [] } };
+    const tree = { width: m.width, height: m.height, pad, backdrop: rgba(backdrop), root: { paints: [], children, opacity: 1, blend: 'normal', effects: [], clip: null, masks: [] } };
     return { tree, sheets };
   };
   const MAX_FRESH_RASTERS = 2;
@@ -733,5 +764,5 @@ export function stampOf(html: string): string | null {
 
 export function captureScript(doc: { width: number; height: number }, stamp: string): string {
   const cfg: RuntimeConfig = { request: CAPTURE_REQUEST, reply: CAPTURE_REPLY, lib: SCREENSHOT_URL, width: doc.width, height: doc.height, mediaTimeoutMs: MEDIA_TIMEOUT_MS, stamp, errorsKey: ERRORS, settle: Settle.Paint, grainTile: GRAIN_TILE, grainOffset: GRAIN_SAMPLE_OFFSET, webkitUa: WEBKIT_UA.source, notWebkitUa: NOT_WEBKIT_UA.source };
-  return `<script>(${captureRuntime.toString()})(${js(cfg)},(${freezeMasks.toString()}),(${inlineMedia.toString()}),(${shrinkImage.toString()}),(${paintSvg.toString()}),(${planLayers.toString()}),(${grainPixels.toString()}),(${turbulenceTile.toString()}),(${chainAffine.toString()}),(${cssAffine.toString()}),(${cssRgba.toString()}),(${joinRasters.toString()}),(${readMasks.toString()}));</script>`;
+  return `<script>(${captureRuntime.toString()})(${js(cfg)},(${freezeMasks.toString()}),(${inlineMedia.toString()}),(${shrinkImage.toString()}),(${paintSvg.toString()}),(${planLayers.toString()}),(${grainPixels.toString()}),(${turbulenceTile.toString()}),(${chainAffine.toString()}),(${cssAffine.toString()}),(${cssRgba.toString()}),(${joinRasters.toString()}),(${readMasks.toString()}),(${readFilters.toString()}));</script>`;
 }

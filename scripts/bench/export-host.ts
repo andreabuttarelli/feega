@@ -70,9 +70,11 @@ const pixels = (bitmap: ImageBitmap) => {
 
 const VISIBLE_STEP = 8;
 
+let live: Awaited<ReturnType<typeof mountCapturePlayer>> | null = null;
+
 async function parity(input: ParityInput): Promise<ParityFrame[]> {
   const host = document.getElementById('host') as HTMLElement;
-  const player = await mountCapturePlayer(host, input.html);
+  const player = input.live ? (live ??= await mountCapturePlayer(host, input.html)) : await mountCapturePlayer(host, input.html);
   const frame = () => (host.querySelector('hyperframes-player') as HTMLElement & { iframeElement: HTMLIFrameElement }).iframeElement;
   let png: Promise<string> = Promise.resolve('');
   let flatPng: Promise<string> = Promise.resolve('');
@@ -100,7 +102,9 @@ async function parity(input: ParityInput): Promise<ParityFrame[]> {
     const svgs = (await statsOf(frame())).svgs - before - 1;
     out.push({ time, mean: sum / (flat.length / 4), over: over / (flat.length / 4), svgs, png: await png, flat: await flatPng });
   }
-  player.dispose();
+  if (!input.live) {
+    player.dispose();
+  }
   return out;
 }
 

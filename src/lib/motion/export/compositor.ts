@@ -1,4 +1,4 @@
-import type { Effect, LayerNode, LayerTree, Mask, MaskComposite, Paint, Rgba } from '../hyperframes/layer-tree';
+import { EffectKind, type Effect, type LayerNode, type LayerTree, type Mask, type MaskComposite, type Paint, type Rgba } from '../hyperframes/layer-tree';
 
 export type Rect = [number, number, number, number];
 
@@ -42,10 +42,25 @@ function within(r: Rect | null, limit: Rect | null): Rect | null {
   return out[2] > out[0] && out[3] > out[1] ? out : null;
 }
 
-const boundsOf = (n: LayerNode): Rect | null => union([...n.paints.map(quad), ...n.children.map(boundsOf)]);
+const GAUSS_REACH = 3;
+
+const REACH: Record<EffectKind, (e: Effect) => number> = {
+  [EffectKind.Grain]: () => 0,
+  [EffectKind.Blur]: (e) => GAUSS_REACH * (e as Extract<Effect, { kind: EffectKind.Blur }>).sigma
+};
+
+function grown(r: Rect | null, by: number): Rect | null {
+  return r && [r[0] - by, r[1] - by, r[2] + by, r[3] + by];
+}
+
+const boundsOf = (n: LayerNode): Rect | null =>
+  grown(
+    union([...n.paints.map(quad), ...n.children.map(boundsOf)]),
+    n.effects.reduce((sum, e) => sum + REACH[e.kind](e), 0)
+  );
 
 export function composite<S, F>(device: Device<S, F>, tree: LayerTree): F {
-  const frame: Rect = [0, 0, tree.width, tree.height];
+  const frame: Rect = [-tree.pad, -tree.pad, tree.width + tree.pad, tree.height + tree.pad];
   let current: Rect | null = null;
   const scoped = (r: Rect | null, work: () => void) => {
     const outer = current;

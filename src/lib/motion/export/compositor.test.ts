@@ -43,7 +43,7 @@ function recorder() {
   return { device, log, live: () => live };
 }
 
-const tree = (root: LayerTree['root'], backdrop: LayerTree['backdrop'] = [0, 0, 0, 1]): LayerTree => ({ width: 10, height: 10, backdrop, root });
+const tree = (root: LayerTree['root'], backdrop: LayerTree['backdrop'] = [0, 0, 0, 1]): LayerTree => ({ width: 10, height: 10, pad: 0, backdrop, root });
 
 describe('composite', () => {
   it('paints plain layers straight into the frame, bottom first, over the backdrop', () => {
@@ -94,5 +94,13 @@ describe('composite', () => {
     composite(device, tree(node({ children: [node({ paints: [small], opacity: 0.5 })] }), null));
 
     expect(log).toEqual(['region 3,5,7,7', 'paint s1 sheet0', 'blend s1->s0 0.5 normal', 'release s1', 'region all', 'finish s0']);
+  });
+
+  it('widens a blurred layer by its reach, into the margin kept around the frame', () => {
+    const { device, log } = recorder();
+    const small: Paint = { kind: PaintKind.Sheet, sheet: 0, width: 4, height: 2, at: [1, 0, 0, 1, 3, 5] };
+    composite(device, { ...tree(node({ children: [node({ paints: [small], effects: [{ kind: EffectKind.Blur, sigma: 2 }] })] }), null), pad: 5 });
+
+    expect(log).toEqual(['region -3,-1,13,13', 'paint s1 sheet0', 'blur s1', 'blend s1->s0 1 normal', 'release s1', 'region all', 'finish s0']);
   });
 });
