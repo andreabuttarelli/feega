@@ -1,4 +1,5 @@
 import type { GrainArea } from '../effects/grain';
+import type { ParticleShape } from '../particles/model';
 
 export type Affine = [number, number, number, number, number, number];
 
@@ -6,12 +7,14 @@ export const IDENTITY: Affine = [1, 0, 0, 1, 0, 0];
 
 export enum PaintKind {
   Sheet = 'sheet',
-  Fill = 'fill'
+  Fill = 'fill',
+  Particles = 'particles'
 }
 
 export type Rgba = [number, number, number, number];
 
-export type Paint = { kind: PaintKind.Sheet; sheet: number; width: number; height: number; at: Affine } | { kind: PaintKind.Fill; color: Rgba; width: number; height: number; at: Affine };
+export type Paint = { kind: PaintKind.Sheet; sheet: number; width: number; height: number; at: Affine } | { kind: PaintKind.Fill; color: Rgba; width: number; height: number; at: Affine }
+  | { kind: PaintKind.Particles; shape: `${ParticleShape}`; quads: Float32Array; width: number; height: number; at: Affine };
 
 export enum EffectKind {
   Grain = 'grain',

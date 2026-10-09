@@ -106,6 +106,17 @@ export function particlesAt(bake: ParticleBake, t: number, memo: ParticleMemo = 
   return out;
 }
 
+export const PARTICLE_STRIDE = 9;
+export const MIN_GLOW_PX = 4;
+export const MAX_GLOW_PX = 1024;
+
+export function particleQuads(particles: Particle[]): Float32Array {
+  const stride = 9;
+  const out = new Float32Array(particles.length * stride);
+  particles.forEach((p, i) => out.set([p.x, p.y, p.size, p.angle, Math.round(p.r), Math.round(p.g), Math.round(p.b), p.alpha, p.softness], i * stride));
+  return out;
+}
+
 type Glow = { sheet: HTMLCanvasElement; x: number; y: number; px: number };
 
 export type GlowTiles = { known: Map<number, Glow>; sheet: HTMLCanvasElement | null; x: number; y: number; row: number; blank: () => HTMLCanvasElement };
