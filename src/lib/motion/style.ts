@@ -7,6 +7,7 @@ import { TransitionKind } from './design';
 import { EASE_BEZIER, easeCurve, type Bezier, type Keyframe } from './keyframes';
 import { motionEngine } from './engine/engine';
 import { loopSeam, tooDense } from './ui-morph/ops';
+import { uiOverload } from './ui-focus';
 import { DEFAULT_STYLE, MotionStyle, STYLE_EASES, type StyleEases } from './style-model';
 
 export enum Forbidden {
@@ -29,7 +30,8 @@ export enum Forbidden {
   TooDense = 'too-dense',
   TextOverScene = 'text-over-scene',
   TooMuchText = 'too-much-text',
-  WeakEase = 'weak-ease'
+  WeakEase = 'weak-ease',
+  UiOverload = 'ui-overload'
 }
 
 export type StyleSpec = {
@@ -82,6 +84,9 @@ const CALM: readonly Forbidden[] = [Forbidden.WeakEase, Forbidden.Particles, For
 export const TITLE_CARD_RULE =
   'Little text, and a title owns the frame: most of the video is scenes (rebuilt UI, devices, the product). When words appear they are a title card: big, centred, alone on the frame, nothing competing; the scene it announces comes after. Alternate title card → scene → title card → scene, each its own row in the storyboard. Never lay a headline over a UI, device or picture: only short labels that belong to the rebuilt UI itself. The gate names a headline over a scene and a video carried by text (more than one word per second).';
 
+export const UI_FOCUS_RULE =
+  'One part of the UI at a time, as with words: a product act is a sequence of UI beats, each showing one element (or two that belong together) large in the frame, faithful to the real product UI, then moving on to the next. Example, a prompt being typed: zoom on the text field and the typed text → the button being pressed → the progress bar alone → the result. Build each beat with focus_ui on the anchors add_ui and recreate_ui return (isolate on: the part alone, masked, its box framed on the house ease); pass from beat to beat with a zoom or a shared-element morph (the same element changing size and place), never a cut to a new full screen. The whole screen appears at most briefly, as an establishing shot or at the end; never a busy dashboard held on screen. The ui-overload gate names a whole UI held more than 1.5 s and more than two UI pieces on screen at once.';
+
 export const EASING_RULE =
   'Easing is strongly accentuated, with a soft settle: every entrance on enter (feega.out), every exit on exit (feega.in), every move on standard (feega.inOut, the default), an expo-like curve that lands with an almost imperceptible resistance (at most 1–2% past the mark, never a visible bounce). In code, tween with ease: \'feega.out\' / \'feega.inOut\' / \'feega.in\'; springs stay near critical damping. Linear only for a continuous drift, a loop or a driver tween; never sine, power1 or a plain ease; never bouncy or elastic (back, elastic, bounce, overshoot). The weak-ease gate names the rest.';
 
@@ -96,12 +101,13 @@ export const STYLES: Record<MotionStyle, StyleSpec> = {
     junctions: [JunctionKind.Crossfade, JunctionKind.DipToBlack, JunctionKind.Blur, JunctionKind.Zoom, JunctionKind.PushLeft, JunctionKind.PushRight, JunctionKind.Wipe],
     entrances: [TransitionKind.None, TransitionKind.Fade, TransitionKind.Blur, TransitionKind.Scale, TransitionKind.SlideLeft, TransitionKind.SlideRight, TransitionKind.SlideUp],
     reading: READING,
-    forbidden: [Forbidden.Particles, Forbidden.Glow, Forbidden.Bounce, Forbidden.WeakEase, Forbidden.Crowded, Forbidden.Transition, Forbidden.Still, Forbidden.OffBeat, Forbidden.NoPeak, Forbidden.RoughCut, Forbidden.ReadingTime, Forbidden.Screenshots, Forbidden.MissingStoryBeat, Forbidden.Rushed, ...TITLE_CARDS],
+    forbidden: [Forbidden.Particles, Forbidden.Glow, Forbidden.Bounce, Forbidden.WeakEase, Forbidden.Crowded, Forbidden.Transition, Forbidden.Still, Forbidden.OffBeat, Forbidden.NoPeak, Forbidden.RoughCut, Forbidden.ReadingTime, Forbidden.Screenshots, Forbidden.MissingStoryBeat, Forbidden.Rushed, Forbidden.UiOverload, ...TITLE_CARDS],
     pace: { minGap: 0.25, hold: 0.5 },
     maxMoving: 4,
     rules: [
       'Launch film is the house style: the LOOK of an Apple keynote film, Linear, Vercel Ship or Stripe Sessions (few elements, very large type, the real product, a sober palette) with HIGH ENERGY. Minimal never means slow: the bar is "would a client pay for this?". Never a slideshow, a still picture, a slow fade, the same layout twice or a PowerPoint effect.',
       TITLE_CARD_RULE,
+      UI_FOCUS_RULE,
       EASING_RULE,
       'Story first: four acts, problem (the user\'s pain in the brand\'s own words), solution (the product enters), proof (features shown live, numbers, results), claim (promise, original logo, address), about 20/15/45/20% of the length, each marked with mark_story; the gate names a missing act.',
       'Storyboard first: before the first edit write a table, one row per scene, grouped by act: time, beat, scene template, the line it says, the move (kinetic type, speed ramp, device fly, match cut, montage, peak, logo build).',
@@ -131,12 +137,13 @@ export const STYLES: Record<MotionStyle, StyleSpec> = {
     junctions: [JunctionKind.Crossfade, JunctionKind.DipToBlack, JunctionKind.Blur],
     entrances: [TransitionKind.None, TransitionKind.Fade, TransitionKind.Blur],
     reading: READING,
-    forbidden: [...CALM, Forbidden.ReadingTime, ...TITLE_CARDS],
+    forbidden: [...CALM, Forbidden.ReadingTime, Forbidden.UiOverload, ...TITLE_CARDS],
     pace: { minGap: 1, hold: 1 },
     maxMoving: 2,
     rules: [
       'Apple minimal is the house style: every frame should look like a frame of an Apple keynote or product film. Confident and calm: type snaps in and holds, the camera drifts slowly, one idea at a time.',
       TITLE_CARD_RULE,
+      UI_FOCUS_RULE,
       EASING_RULE,
       'Build the video from the scene library: list_templates, then insert_template the builtin:scene-* scenes one after another and fill them with set_template_fields (real text, brand pictures, the one accent colour). Build primitives by hand only for something no scene can show.',
       'Storyboard first: before the first edit, write the plan as a short table, one row per scene: time, scene template, the line it says, the beat it lands on.',
@@ -171,6 +178,7 @@ export const STYLES: Record<MotionStyle, StyleSpec> = {
     maxMoving: 2,
     rules: [
       EASING_RULE,
+      UI_FOCUS_RULE,
       'One shape, never a cut: every UI state is the same element morphing size, radius and colour on springs while its content swaps with a short blur (ui_morph_reel builds it).',
       'A cursor drives every change with real clicks and drags; while a knob is held its value comes from the pointer, on release it springs from where it is.',
       'Warm light grey canvas, black and white components and at most one accent; a clean UI font (Geist); no gradients, glows, particles or bouncy eases.',
@@ -465,6 +473,7 @@ const CHECKS: Record<Forbidden, Check> = {
   [Forbidden.TextOverScene]: textOverScene,
   [Forbidden.TooMuchText]: tooMuchText,
   [Forbidden.WeakEase]: weakEases,
+  [Forbidden.UiOverload]: uiOverload,
   [Forbidden.TooDense]: (doc, spec) => tooDense(doc, spec.pace.minGap).map((p) => ({ clip: p.clip, at: 0, detail: p.detail })),
   [Forbidden.LoopSeam]: (doc) => loopSeam(doc).map((p) => ({ clip: p.clip, at: doc.durationInFrames - 1, detail: p.detail }))
 };

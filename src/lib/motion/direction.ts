@@ -12,6 +12,9 @@ import { CutFault, cutProblems } from './cuts';
 import { scriptDrift } from './script-drift';
 import { contentEnd, shownSpans, type Span } from './fit-duration';
 import { liveComponents, liveNote } from './custom/determinism';
+import { maskAt } from './ui-focus';
+import { MaskKind } from './mask';
+import { pivotBox } from './parent';
 
 export enum Quality {
   RepeatedLayout = 'repeated-layout',
@@ -89,7 +92,8 @@ export const SEVERITY: Record<Check, Severity> = {
   [Forbidden.TooDense]: Severity.Warning,
   [Forbidden.WeakEase]: Severity.Warning,
   [Forbidden.TextOverScene]: Severity.Warning,
-  [Forbidden.TooMuchText]: Severity.Warning
+  [Forbidden.TooMuchText]: Severity.Warning,
+  [Forbidden.UiOverload]: Severity.Warning
 };
 
 export type Pixels = Record<string, { width: number; height: number }>;
@@ -272,12 +276,31 @@ const at = (clip: Clip, key: string, frame: number, fallback: number) => {
   return track?.length ? Number(sampleTrack(track as never, frame)) : ((clip.transform as Record<string, number> | undefined)?.[key] ?? fallback);
 };
 
+type Shown = { dx: number; dy: number; width: number; height: number };
+
+function shown(clip: Clip, size: Size, frame: Size, f: number): Shown {
+  if (clip.mask?.kind !== MaskKind.Rect || clip.mask.invert) {
+    return { dx: 0, dy: 0, ...size };
+  }
+  const box = pivotBox(clip.props, frame);
+  const mx = (maskAt(clip, 'maskX', f) - 0.5) * box.width;
+  const my = (maskAt(clip, 'maskY', f) - 0.5) * box.height;
+  const halfW = (maskAt(clip, 'maskWidth', f) * box.width) / 2;
+  const halfH = (maskAt(clip, 'maskHeight', f) * box.height) / 2;
+  const left = Math.max(mx - halfW, -size.width / 2);
+  const right = Math.min(mx + halfW, size.width / 2);
+  const top = Math.max(my - halfH, -size.height / 2);
+  const bottom = Math.min(my + halfH, size.height / 2);
+  return { dx: (left + right) / 2, dy: (top + bottom) / 2, width: Math.max(0, right - left), height: Math.max(0, bottom - top) };
+}
+
 function outside(clip: Clip, size: Size, frame: Size, f: number): boolean {
   const scale = at(clip, 'scale', f, 1);
-  const cx = (num(clip, 'x', 0.5) + at(clip, 'x', f, 0)) * frame.width;
-  const cy = (num(clip, 'y', 0.5) + at(clip, 'y', f, 0)) * frame.height;
-  const halfW = (size.width * scale) / 2;
-  const halfH = (size.height * scale) / 2;
+  const visible = shown(clip, size, frame, f);
+  const cx = (num(clip, 'x', 0.5) + at(clip, 'x', f, 0)) * frame.width + visible.dx * scale;
+  const cy = (num(clip, 'y', 0.5) + at(clip, 'y', f, 0)) * frame.height + visible.dy * scale;
+  const halfW = (visible.width * scale) / 2;
+  const halfH = (visible.height * scale) / 2;
   const margin = (1 - UI_SAFE) / 2;
   return cx - halfW < frame.width * margin - 1 || cx + halfW > frame.width * (1 - margin) + 1 || cy - halfH < frame.height * margin - 1 || cy + halfH > frame.height * (1 - margin) + 1;
 }

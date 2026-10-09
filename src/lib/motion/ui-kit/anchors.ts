@@ -62,7 +62,13 @@ const PROMPT_BOX: Layout = (p) => {
   const field = Math.max(130, lines(str(p, 'prompt'), 30, Weight.Regular, 1112) * 40.5) + 47;
   const height = 74 + 42.4 + field + 28 + 50;
   const top = -height / 2 + 1 + 36 + 42.4;
-  return { field: { x: -620, y: top, w: 1240, h: field }, send: { x: 536.5, y: top + field - 83.5, w: 64, h: 64 } };
+  const progress = top + field + 22;
+  return {
+    field: { x: -620, y: top, w: 1240, h: field },
+    send: { x: 536.5, y: top + field - 83.5, w: 64, h: 64 },
+    progress: { x: -620, y: progress, w: 1240, h: 6 },
+    done: { x: -620, y: progress + 22, w: 46 + textWidth(str(p, 'done'), 24, Weight.Bold), h: 34 }
+  };
 };
 
 const EDITOR_SLOTS = [[30, 30, 1300, 80], [30, 140, 760, 300], [820, 140, 510, 300], [30, 470, 640, 170], [700, 470, 630, 170]];
@@ -103,6 +109,13 @@ const TOGGLE: Layout = (p) => {
 
 const UPLOAD: Layout = () => ({ drop: { x: -550, y: -180, w: 1100, h: 224 } });
 
+const RESULT = { left: -600, top: -230, picture: 460, gap: 34, copy: 706 };
+
+const GENERATED_RESULT: Layout = () => ({
+  picture: { x: RESULT.left, y: RESULT.top, w: RESULT.picture, h: RESULT.picture },
+  copy: { x: RESULT.left + RESULT.picture + RESULT.gap, y: RESULT.top, w: RESULT.copy, h: RESULT.picture }
+});
+
 const NONE: Layout = () => ({});
 
 const LAYOUTS: Record<UiKind, Layout> = {
@@ -123,7 +136,7 @@ const LAYOUTS: Record<UiKind, Layout> = {
   [UiKind.Modal]: MODAL,
   [UiKind.Toggle]: TOGGLE,
   [UiKind.Upload]: UPLOAD,
-  [UiKind.GeneratedResult]: NONE,
+  [UiKind.GeneratedResult]: GENERATED_RESULT,
   [UiKind.Cursor]: NONE
 };
 
@@ -145,14 +158,15 @@ function recreatedAnchors(structure: UiStructure): Anchors {
   const anchors: Anchors = {};
   const nav = structure.blocks.some((b) => b.kind === 'nav');
   let y = -431 + 1 + (nav ? 77 : 0) + 44;
-  let inputs = 0;
+  const counts = new Map<string, number>();
   for (const block of structure.blocks.filter((b) => b.kind !== 'nav')) {
     const h = BLOCK_HEIGHT[block.kind](block);
-    if (block.kind === 'input') {
-      anchors[`input-${inputs++}`] = { x: -636, y, w: 1272, h };
-    }
+    const n = counts.get(block.kind) ?? 0;
+    counts.set(block.kind, n + 1);
     if (block.kind === 'button') {
       anchors.button = { x: -636, y, w: 80 + textWidth(block.text, 26, Weight.Bold), h };
+    } else {
+      anchors[`${block.kind}-${n}`] = { x: -636, y, w: 1272, h };
     }
     y += h + RECREATED_GAP;
   }

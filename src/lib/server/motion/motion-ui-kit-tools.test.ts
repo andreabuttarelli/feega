@@ -48,6 +48,17 @@ describe('the UI recreation kit', () => {
     expect(session.codeWrites).toBe(0);
   });
 
+  it('focus_ui frames one part of an added UI, isolated, on the timeline seconds', async () => {
+    const { session, run } = setup();
+    const added = await run('add_ui', { kind: UiKind.PromptBox, start: 1, duration: 4 });
+    const focused = await run('focus_ui', { clip_id: added.clip_id, anchor: 'send', start: 2, duration: 0.5, fill: 0.5, isolate: 'part' });
+    const clip = findClip(session.doc, String(added.clip_id))!.clip;
+
+    expect(focused.ok).toBe(true);
+    expect(clip.keyframes.scale.map((k) => k.frame)).toEqual([30, 45]);
+    expect(clip.mask?.kind).toBe('rect');
+  });
+
   it('a second piece of the same kind reuses the component', async () => {
     const { session, run } = setup();
     await run('add_ui', { kind: UiKind.StatCards, start: 0, duration: 2 });

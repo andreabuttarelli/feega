@@ -110,6 +110,15 @@ export const SHOWCASE: readonly DemoSource[] = [
     licence: STING_TRACK('outro-8.mp3')
   },
   {
+    key: 'showcase-ui-focus',
+    title: 'One part at a time',
+    description: 'A product flow told one element per beat: the field typing, the button pressed, the progress bar, the result.',
+    tags: ['ui', 'saas', 'product'],
+    ...cut('ui-focus', 'wide'),
+    preview: 'showcase/ui-focus/ui-focus-16x9.mp4',
+    licence: LIBRARY_TRACK
+  },
+  {
     key: 'showcase-drop',
     title: 'Product drop',
     description: 'A four-beat product drop: the teaser, the product, a rolling price with the date, and the pre-order call.',

@@ -75,6 +75,17 @@ the style system (`src/lib/motion/style.ts`); the default style is the launch fi
 - **Alternate:** title card → scene → title card → scene. Never a headline laid over a UI,
   device or picture; only short labels that belong to the rebuilt UI itself.
 
+### one part of the UI at a time
+
+- **As with words, so with UIs.** A product act is a sequence of UI beats: one element (or two
+  that belong together) per beat, large in the frame, faithful to the real product, then the next.
+- **Example:** someone types a prompt → zoom on the text field and the typed text → the button
+  being pressed → the progress bar alone → the result.
+- **Isolate and zoom** (`focus_ui` on an anchor of `add_ui` / `recreate_ui`): the part alone, the
+  rest masked away. Between beats a zoom or a shared-element morph, never a cut to a new full screen.
+- **The whole screen only briefly:** an establishing shot or the end. Never a busy dashboard held
+  on screen (gate `ui-overload`: a whole UI held over 1.5 s, more than two UI pieces at once).
+
 ### the story
 
 Every brand or product video has four acts: **problem → solution → product and proof → claim.**
