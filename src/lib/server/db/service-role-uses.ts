@@ -80,7 +80,7 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
   },
   {
     path: 'scripts/import-showcase.ts',
-    why: "Uno script una tantum, lanciato a mano, senza sessione utente: importa i video showcase nel progetto \"Showcase\" di UNA org fissa (l'id è una costante, sovrascrivibile solo da chi lancia lo script). Legge orgs_members solo per trovare l'owner a cui intestare le azioni; crea progetto, tela, nodi motion, revisioni e asset di quell'org, carica i file sotto `canvas-assets/<orgId>/<projectId>/showcase/` e pubblica l'embed nel bucket `embeds`.",
+    why: "Uno script una tantum, lanciato a mano, senza sessione utente: importa i video showcase nel progetto \"Showcase\" di UNA org fissa (l'id è una costante, sovrascrivibile solo da chi lancia lo script). Legge orgs_members solo per trovare l'owner a cui intestare le azioni; crea progetto, tela, nodi motion, revisioni e asset di quell'org, carica i file sotto `canvas-assets/<orgId>/<projectId>/showcase/` e pubblica l'embed nel bucket `embeds`. Firma gli asset di quel progetto con questo stesso client (non con `signAssetPaths`, che pretende un client utente come prova di appartenenza): l'operatore che lancia lo script a mano ha già la chiave di servizio, e nessuna sessione utente esiste da provare.",
     tables: ['orgs_members', 'projects', 'canvases', 'nodes', 'canvas_events', 'motion_revisions', 'assets']
   },
   {

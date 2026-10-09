@@ -4,7 +4,7 @@ import { findProjectById, type Project } from '$lib/server/repos/projects';
 import { motionOf } from '$lib/canvas/motion-node';
 import { embedSnippet, embedUrl, interactiveBundle, BUNDLE_FILE } from '$lib/motion/interactive/bundle';
 import type { MotionDoc } from '$lib/motion/doc';
-import { assetUrls, headOrNew, motionAssets, motionTokens } from './editor';
+import { assetUrls, headOrNew, motionAssets, motionTokens, type AssetSigner } from './editor';
 import { embedPublished, isRefused, publishEmbed, removeEmbed } from './embed';
 
 export enum EmbedFailure {
@@ -18,6 +18,7 @@ export type EmbedAnswer = { ok: true; body: Record<string, unknown> } | { ok: fa
 
 type Saved = { record: CanvasNodeRecord; project: Project; version: number; doc: MotionDoc };
 type Scope = { orgId: string; nodeId: string };
+type PublishScope = Scope & { sign?: AssetSigner };
 
 const fetchBlob = (url: string) => fetch(url).then((r) => r.blob());
 
@@ -34,13 +35,13 @@ export async function savedMotion(db: Db, scope: Scope): Promise<Saved | null> {
   return { record, project, version: head.version, doc: head.doc };
 }
 
-async function bundleInput(db: Db, scope: Scope, saved: Saved) {
-  const assets = await motionAssets({ db, orgId: scope.orgId, projectId: saved.project.id, canvasId: saved.record.canvasId });
+async function bundleInput(db: Db, scope: PublishScope, saved: Saved) {
+  const assets = await motionAssets({ db, orgId: scope.orgId, projectId: saved.project.id, canvasId: saved.record.canvasId, sign: scope.sign });
   const tokens = await motionTokens(db, { orgId: scope.orgId, brandId: saved.project.brandId });
   return { doc: saved.doc, tokens, assetUrls: assetUrls(assets), title: saved.record.displayName ?? 'feega', fetchBlob };
 }
 
-export async function publishMotionEmbed(db: Db, scope: Scope, origin: string): Promise<EmbedAnswer> {
+export async function publishMotionEmbed(db: Db, scope: PublishScope, origin: string): Promise<EmbedAnswer> {
   const saved = await savedMotion(db, scope);
   if (!saved) {
     return failed(EmbedFailure.NotFound);

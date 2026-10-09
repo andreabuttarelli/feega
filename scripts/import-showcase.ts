@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { extname, join, resolve } from 'node:path';
@@ -7,9 +8,10 @@ import { SERVICE_ROLE_USES } from '$lib/server/db/service-role-uses';
 import { createProject, findProjectBySlug, type Project } from '$lib/server/repos/projects';
 import { createCanvas, createNode, DataCheck, listCanvases, listNodes, patchNodeData } from '$lib/server/repos/canvas';
 import { insertAsset, listProjectAssets, type Asset, type AssetType } from '$lib/server/repos/assets';
-import { storeAssetFile } from '$lib/server/repos/asset-storage';
+import { signAssetFiles, storeAssetFile } from '$lib/server/repos/asset-storage';
+import { signKnowledgePaths } from '$lib/server/media-archive';
 import { readHead, RevisionOutcome } from '$lib/server/repos/motion-revisions';
-import { saveMotionDoc } from '$lib/server/motion/editor';
+import { saveMotionDoc, type AssetSigner } from '$lib/server/motion/editor';
 import { publishMotionEmbed } from '$lib/server/motion/agent-embed';
 import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
 import { motionEditorPath, newMotionData } from '$lib/canvas/motion-node';
@@ -31,7 +33,7 @@ const GRID_COLUMNS = 4;
 const CELL = { w: 520, h: 640 };
 const POSTER_SHARE = 0.4;
 const POSTER_WIDTH = 1280;
-const POSTER_MIME = 'image/jpeg';
+const EMBED_ATTEMPTS = 3;
 
 const MIME: Readonly<Record<string, string>> = {
   '.svg': 'image/svg+xml',
@@ -61,11 +63,20 @@ const generative = (ratio: string, title: string): ShowcaseSource => ({
   preview: `showcase/generative/generative-${ratio}.mp4`
 });
 
+const leadFinder = (ratio: string, title: string): ShowcaseSource => ({
+  key: `showcase-lead-finder-${ratio}`,
+  title,
+  doc: `showcase/lead-finder/doc-${ratio}.json`,
+  files: { music: 'showcase/lead-finder/music.mp3', logo: 'showcase/lead-finder/logo.svg' },
+  preview: `showcase/lead-finder/lead-finder-${ratio}.mp4`
+});
+
 export const SHOWCASE_SOURCES: readonly ShowcaseSource[] = [
   ...SHOWCASE.map(({ key, title, doc, files, preview }) => ({ key, title, doc, files, preview })),
   generative('16x9', 'Generative'),
   generative('9x16', 'Generative, vertical'),
-  { key: 'showcase-lead-finder', title: 'Lead finder', doc: 'showcase/lead-finder/doc.json', files: {}, preview: 'showcase/lead-finder/lead-finder.mp4' },
+  leadFinder('16x9', 'Lead finder'),
+  leadFinder('9x16', 'Lead finder, vertical'),
   { key: 'saturn', title: 'Saturn', doc: 'saturn/doc.json', files: {}, preview: 'saturn/saturn-16x9.mp4' }
 ];
 
@@ -131,6 +142,20 @@ export function showcaseNode<T extends { type: string; data: Record<string, unkn
   return nodes.find((n) => n.type === 'motion' && n.data[SHOWCASE_KEY] === key) ?? null;
 }
 
+function canonical(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(canonical);
+  }
+  if (!value || typeof value !== 'object') {
+    return value;
+  }
+  return Object.fromEntries(Object.keys(value).sort().map((k) => [k, canonical((value as Record<string, unknown>)[k])]));
+}
+
+export function docHash(doc: MotionDoc): string {
+  return createHash('sha256').update(JSON.stringify(canonical(doc))).digest('hex');
+}
+
 type Scope = { orgId: string; projectId: string };
 
 export function assetPath(scope: Scope, key: string, id: string, file: string): string {
@@ -183,9 +208,41 @@ function posterFrame(work: string, item: PlanItem): string | null {
   return file;
 }
 
+async function reviseDoc(db: Db, scope: { orgId: string; nodeId: string; actor: Actor }, key: string, doc: MotionDoc): Promise<void> {
+  const head = await readHead(db, scope);
+  if (head && docHash(head.doc) === docHash(doc)) {
+    console.log(`${key}: doc unchanged, no new revision`);
+    return;
+  }
+  const write = await saveMotionDoc(db, { ...scope, expectedVersion: head?.version ?? 0, doc, summary: 'Imported from the showcase' });
+  if (write.outcome !== RevisionOutcome.Written) {
+    throw new Error(`${key}: revision ${write.outcome}`);
+  }
+}
+
+async function publishedEmbed(db: Db, scope: { orgId: string; nodeId: string; sign: AssetSigner }, key: string) {
+  let last = '';
+  for (let attempt = 1; attempt <= EMBED_ATTEMPTS; attempt++) {
+    const embed = await publishMotionEmbed(db, scope, ORIGIN);
+    if (embed.ok) {
+      return embed;
+    }
+    last = `${embed.failure} ${JSON.stringify(embed.body)}`;
+    console.log(`${key}: embed attempt ${attempt} failed: ${last}`);
+  }
+  throw new Error(`${key}: embed ${last}`);
+}
+
+const operatorSigner =
+  (db: Db): AssetSigner =>
+  async (paths, ttlSeconds) => {
+    const [generated, uploaded] = await Promise.all([signKnowledgePaths(db as never, paths.generated, ttlSeconds), signAssetFiles(db, paths.uploaded, ttlSeconds)]);
+    return new Map([...generated, ...uploaded]);
+  };
+
 type Imported = { title: string; editor: string; embed: string; snippet: string };
 
-async function importItem(db: Db, ctx: Scope & { canvasId: string; actor: Actor; work: string }, item: PlanItem): Promise<Imported> {
+async function importItem(db: Db, ctx: Scope & { canvasId: string; actor: Actor; work: string; sign: AssetSigner }, item: PlanItem): Promise<Imported> {
   const nodes = await listNodes(db, { orgId: ctx.orgId, canvasId: ctx.canvasId });
   const node =
     showcaseNode(nodes, item.key) ??
@@ -199,11 +256,7 @@ async function importItem(db: Db, ctx: Scope & { canvasId: string; actor: Actor;
     ids[ref.id] = row.id;
   }
 
-  const head = await readHead(db, { orgId: ctx.orgId, nodeId: node.id });
-  const write = await saveMotionDoc(db, { orgId: ctx.orgId, nodeId: node.id, expectedVersion: head?.version ?? 0, doc: remapAssets(item.doc, ids), actor: ctx.actor, summary: 'Imported from the showcase' });
-  if (write.outcome !== RevisionOutcome.Written) {
-    throw new Error(`${item.key}: revision ${write.outcome}`);
-  }
+  await reviseDoc(db, { orgId: ctx.orgId, nodeId: node.id, actor: ctx.actor }, item.key, remapAssets(item.doc, ids));
 
   const poster = posterFrame(ctx.work, item);
   if (poster) {
@@ -211,10 +264,7 @@ async function importItem(db: Db, ctx: Scope & { canvasId: string; actor: Actor;
     await patchNodeData(db, { orgId: ctx.orgId, nodeId: node.id, patch: { posterAssetId: row.id }, check: DataCheck.Schema, actor: ctx.actor });
   }
 
-  const embed = await publishMotionEmbed(db, { orgId: ctx.orgId, nodeId: node.id }, ORIGIN);
-  if (!embed.ok) {
-    throw new Error(`${item.key}: embed ${embed.failure} ${JSON.stringify(embed.body)}`);
-  }
+  const embed = await publishedEmbed(db, { orgId: ctx.orgId, nodeId: node.id, sign: ctx.sign }, item.key);
   return { title: item.title, editor: `${ORIGIN}${motionEditorPath({ projectId: ctx.projectId, canvasId: ctx.canvasId, nodeId: node.id })}`, embed: String(embed.body.url), snippet: String(embed.body.snippet) };
 }
 
@@ -231,7 +281,7 @@ async function main() {
   const db = createServiceRoleDb(importUse());
   const ownerId = await ownerOf(db, ORG_ID);
   const { project, canvasId } = await showcaseProject(db, ORG_ID);
-  const ctx = { orgId: ORG_ID, projectId: project.id, canvasId, actor: { kind: 'user', id: ownerId } as Actor, work: mkdtempSync(join(tmpdir(), 'feega-showcase-')) };
+  const ctx = { orgId: ORG_ID, projectId: project.id, canvasId, actor: { kind: 'user', id: ownerId } as Actor, work: mkdtempSync(join(tmpdir(), 'feega-showcase-')), sign: operatorSigner(db) };
 
   const rows: Imported[] = [];
   for (const item of plan.items) {
