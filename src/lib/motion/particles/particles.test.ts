@@ -6,8 +6,8 @@ import { MotionFormat, findClip, newMotionDoc, type MotionClip, type MotionDoc }
 import { keyframesProblem } from '../keyframes';
 import { addClip, setKeyframes, type OpResult } from '../timeline';
 import { composeHtml } from '../hyperframes/compose';
-import { particleBake } from '../hyperframes/particles';
-import { drawParticles, glowTiles, particlesAt, type Particle, type ParticleBake } from './simulate';
+import { PARTICLE_STATE, particleBake } from '../hyperframes/particles';
+import { MAX_GLOW_PX, MIN_GLOW_PX, PARTICLE_STRIDE, drawParticles, glowTiles, particleQuads, particlesAt, type Particle, type ParticleBake } from './simulate';
 import { PARTICLE_PRESETS, ParticlePreset, applyParticlePreset, PRESET_PROPS } from './presets';
 import { Emitter } from './model';
 
@@ -141,6 +141,33 @@ describe('particles in the composition', () => {
     const doc = must(setKeyframes(base, 'p', 'rate', [{ frame: 0, value: 0, ease: Ease.Linear }, { frame: 29, value: 200, ease: Ease.Linear }]));
     const html = composeHtml({ doc, tokens: FEEGA_TOKENS, assets: {} });
     expect(html.match(/"rate":/g)?.length).toBe(30);
+  });
+
+  it('each frame leaves its particles on the canvas for the export to draw, not just their pixels', () => {
+    const doc = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Particles', from: 0, durationInFrames: 30 }, 'p'));
+    const html = composeHtml({ doc, tokens: FEEGA_TOKENS, assets: {} });
+    expect(html).toContain('const PT_QUADS=(');
+    expect(html).toContain(`[${JSON.stringify(PARTICLE_STATE)}]=`);
+  });
+});
+
+describe('particles as GPU quads', () => {
+  it('packs every particle as one row: place, size, turn, rounded colour, opacity, softness', () => {
+    const quads = particleQuads([{ x: 1, y: 2, size: 3, angle: 0.5, r: 10.4, g: 20.6, b: 254.5, alpha: 0.25, softness: 0.75 }]);
+    expect([...quads]).toEqual([1, 2, 3, 0.5, 10, 21, 255, 0.25, 0.75]);
+    expect(quads.length).toBe(PARTICLE_STRIDE);
+  });
+
+  it('the GPU glow takes its tile size from the same bounds as the 2D glow sheet', () => {
+    const { paint, images } = countingPaint();
+    const tiles = glowTiles(() => ({ width: 0, height: 0, getContext: () => countingPaint().paint }) as unknown as HTMLCanvasElement);
+    drawParticles(paint, [{ ...softDot(10), size: 1 }, { ...softDot(20), size: 5000, r: 1 }], 'circle', null, tiles);
+    expect(images.map((args) => args[2])).toEqual([MIN_GLOW_PX, MAX_GLOW_PX]);
+  });
+
+  it('the runtime copy of the packing is self-contained', () => {
+    const copy = new Function(`return (${particleQuads.toString()})`)() as typeof particleQuads;
+    expect(copy([softDot(1), softDot(2)]).length).toBe(2 * PARTICLE_STRIDE);
   });
 });
 

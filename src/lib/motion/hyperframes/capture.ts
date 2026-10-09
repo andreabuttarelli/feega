@@ -9,6 +9,7 @@ import { GRAIN_SAMPLE_OFFSET, turbulenceTile } from '../effects/turbulence';
 import { GRAIN_TILE } from '../effects/registry';
 import { NOT_WEBKIT_UA, WEBKIT_UA } from '../engine';
 import { ERRORS } from '../custom/runtime';
+import { PARTICLE_STATE } from './particles';
 export { contentStamp } from '../stamp';
 
 export const CAPTURE_REQUEST = 'feega:capture';
@@ -36,7 +37,7 @@ export type CaptureRequest = { type: typeof CAPTURE_REQUEST; id: string; format:
 export type ClipError = { clip: string; component: string; message: string };
 export type CaptureReply = { type: typeof CAPTURE_REPLY; id: string; stamp?: string; url?: string; bitmap?: ImageBitmap; tree?: LayerTree; sheets?: ImageBitmap[]; error?: string; layout?: string; errors?: ClipError[] };
 
-type RuntimeConfig = { request: string; reply: string; lib: string; width: number; height: number; mediaTimeoutMs: number; stamp: string; errorsKey: string; settle: Settle; grainTile: number; grainOffset: number; webkitUa: string; notWebkitUa: string };
+type RuntimeConfig = { request: string; reply: string; lib: string; width: number; height: number; mediaTimeoutMs: number; stamp: string; errorsKey: string; settle: Settle; grainTile: number; grainOffset: number; webkitUa: string; notWebkitUa: string; particleState: string };
 type Shot = { body: Record<string, unknown>; transfer: Transferable[] };
 type HtmlToImage = {
   toSvg: (node: HTMLElement, options: Record<string, unknown>) => Promise<string>;
@@ -446,7 +447,8 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
   };
   type Affine = [number, number, number, number, number, number];
   type Rgba = [number, number, number, number];
-  type Paint = { kind: 'sheet'; sheet: number; width: number; height: number; at: Affine } | { kind: 'fill'; color: Rgba; width: number; height: number; at: Affine };
+  type Particles = { shape: string; quads: Float32Array };
+  type Paint = { kind: 'sheet'; sheet: number; width: number; height: number; at: Affine } | { kind: 'fill'; color: Rgba; width: number; height: number; at: Affine } | ({ kind: 'particles'; width: number; height: number; at: Affine } & Particles);
   type Box = [number, number, number, number];
   type GlassFilter = { href: string; map: Box; box: Box; smooth: [number, number]; scale: number; frost: number };
   type Effect = { kind: 'grain'; grains: Grain[]; area: GrainArea } | { kind: 'blur'; sigma: number } | { kind: 'glass'; map: Paint; box: Box; smooth: [number, number]; scale: number; frost: number };
@@ -495,6 +497,7 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
   };
   const SHEET: Paint['kind'] = 'sheet';
   const FILL: Paint['kind'] = 'fill';
+  const PARTICLES = 'particles' as const;
   const WHITE: Rgba = [1, 1, 1, 1];
   const hasText = (el: Element) => [...el.childNodes].some((n) => n.nodeType === Node.TEXT_NODE && n.textContent?.trim());
   const boxed = (style: CSSStyleDeclaration) =>
@@ -573,6 +576,10 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
     }
     if (!el.width || !el.height || !el.offsetWidth || !el.offsetHeight) {
       return null;
+    }
+    const particles = (el as unknown as Record<string, (() => Particles) | undefined>)[cfg.particleState]?.();
+    if (particles) {
+      return { kind: PARTICLES, ...particles, width: el.width, height: el.height, at: chain(at, [el.offsetWidth / el.width, 0, 0, el.offsetHeight / el.height, 0, 0]) };
     }
     return slotted(w, el, { width: el.offsetWidth, height: el.offsetHeight, at });
   };
@@ -818,6 +825,6 @@ export function stampOf(html: string): string | null {
 }
 
 export function captureScript(doc: { width: number; height: number }, stamp: string): string {
-  const cfg: RuntimeConfig = { request: CAPTURE_REQUEST, reply: CAPTURE_REPLY, lib: SCREENSHOT_URL, width: doc.width, height: doc.height, mediaTimeoutMs: MEDIA_TIMEOUT_MS, stamp, errorsKey: ERRORS, settle: Settle.Paint, grainTile: GRAIN_TILE, grainOffset: GRAIN_SAMPLE_OFFSET, webkitUa: WEBKIT_UA.source, notWebkitUa: NOT_WEBKIT_UA.source };
+  const cfg: RuntimeConfig = { request: CAPTURE_REQUEST, reply: CAPTURE_REPLY, lib: SCREENSHOT_URL, width: doc.width, height: doc.height, mediaTimeoutMs: MEDIA_TIMEOUT_MS, stamp, errorsKey: ERRORS, settle: Settle.Paint, grainTile: GRAIN_TILE, grainOffset: GRAIN_SAMPLE_OFFSET, webkitUa: WEBKIT_UA.source, notWebkitUa: NOT_WEBKIT_UA.source, particleState: PARTICLE_STATE };
   return `<script>(${captureRuntime.toString()})(${js(cfg)},(${freezeMasks.toString()}),(${inlineMedia.toString()}),(${shrinkImage.toString()}),(${paintSvg.toString()}),(${planLayers.toString()}),(${grainPixels.toString()}),(${turbulenceTile.toString()}),(${chainAffine.toString()}),(${cssAffine.toString()}),(${cssRgba.toString()}),(${joinRasters.toString()}),(${readMasks.toString()}),(${readFilters.toString()}),(${filtersFit.toString()}));</script>`;
 }

@@ -3,6 +3,8 @@ import { EffectKind, MaskComposite, PaintKind, type Affine, type Effect, type Gl
 import { GRAIN_SAMPLE_OFFSET, turbulenceTile } from '../effects/turbulence';
 import { GRAIN_TILE } from '../effects/registry';
 import { Layering } from '../hyperframes/capture';
+import { MAX_GLOW_PX, MIN_GLOW_PX, PARTICLE_STRIDE } from '../particles/simulate';
+import { ParticleShape } from '../particles/model';
 
 const MAX_GRAINS = 4;
 const SCRATCH_UNIT = MAX_GRAINS + 2;
@@ -21,6 +23,93 @@ void main() {
   uv = corner * (1.0 + 2.0 * grow) - grow;
   vec2 p = (at * vec3(uv * box, 1.0)).xy + pad;
   gl_Position = vec4(p.x / frame.x * 2.0 - 1.0, 1.0 - p.y / frame.y * 2.0, 0.0, 1.0);
+}`;
+
+const PARTICLE_VS = `#version 300 es
+in vec2 corner;
+in vec4 place;
+in vec4 tint;
+in float soft;
+uniform mat3 at;
+uniform vec2 frame;
+uniform float pad;
+uniform vec4 box;
+uniform float edge;
+uniform int shape;
+out vec2 local;
+out vec2 spot;
+flat out vec4 colour;
+flat out float softness;
+flat out float size;
+void main() {
+  vec2 lo = box.xy * place.z - edge;
+  vec2 hi = box.zw * place.z + edge;
+  local = mix(lo, hi, corner);
+  float turn = shape == 0 && soft > 0.0 ? 0.0 : place.w;
+  float c = cos(turn);
+  float s = sin(turn);
+  spot = place.xy + vec2(c * local.x - s * local.y, s * local.x + c * local.y);
+  vec2 p = (at * vec3(spot, 1.0)).xy + pad;
+  gl_Position = vec4(p.x / frame.x * 2.0 - 1.0, 1.0 - p.y / frame.y * 2.0, 0.0, 1.0);
+  colour = vec4(tint.rgb / 255.0, tint.a);
+  softness = soft;
+  size = place.z;
+}`;
+
+const PARTICLE_FS = `#version 300 es
+precision highp float;
+in vec2 local;
+in vec2 spot;
+flat in vec4 colour;
+flat in float softness;
+flat in float size;
+uniform highp int shape;
+uniform vec4 box;
+uniform vec2 canvas;
+out vec4 outColor;
+uniform vec2 glowPx;
+float covered(float d) {
+  return clamp(d / max(fwidth(d), 1e-6) + 0.5, 0.0, 1.0);
+}
+float span(float at, float lo, float hi, float w) {
+  return clamp((min(at + 0.5 * w, hi) - max(at - 0.5 * w, lo)) / w, 0.0, 1.0);
+}
+float rect() {
+  vec2 lo = box.xy * size;
+  vec2 hi = box.zw * size;
+  vec2 w = max(fwidth(local), vec2(1e-6));
+  return span(local.x, lo.x, hi.x, w.x) * span(local.y, lo.y, hi.y, w.y);
+}
+float texel(vec2 t, float px) {
+  if (t.x < 0.0 || t.y < 0.0 || t.x >= px || t.y >= px) {
+    return 0.0;
+  }
+  float r = length(t + 0.5 - 0.5 * px) / (0.5 * px);
+  return r >= 1.0 ? 0.0 : clamp((1.0 - r) / min(softness, 1.0), 0.0, 1.0);
+}
+float glow() {
+  float px = clamp(exp2(ceil(log2(size))), glowPx.x, glowPx.y);
+  vec2 uv = (local / size + 0.5) * px - 0.5;
+  vec2 o = floor(uv);
+  vec2 f = uv - o;
+  float top = mix(texel(o, px), texel(o + vec2(1.0, 0.0), px), f.x);
+  float bottom = mix(texel(o + vec2(0.0, 1.0), px), texel(o + vec2(1.0, 1.0), px), f.x);
+  return mix(top, bottom, f.y) * rect();
+}
+float circle() {
+  return softness <= 0.0 ? covered(size * 0.5 - length(local)) : glow();
+}
+float triangle() {
+  float h = size * 0.5;
+  vec2 q = local - vec2(0.0, -h);
+  return min(covered(h - local.y), min(covered(dot(q, vec2(-2.0, 1.0)) / sqrt(5.0)), covered(dot(q, vec2(2.0, 1.0)) / sqrt(5.0))));
+}
+void main() {
+  if (spot.x < 0.0 || spot.y < 0.0 || spot.x > canvas.x || spot.y > canvas.y) {
+    discard;
+  }
+  float a = colour.a * (shape == 0 ? circle() : shape == 2 ? triangle() : rect());
+  outColor = vec4(colour.rgb * a, a);
 }`;
 
 const FULL_VS = `#version 300 es
@@ -229,6 +318,17 @@ void main() {
   outColor = pixel;
 }`;
 
+const STREAK_LENGTH = 4;
+const STREAK_THICKNESS = 0.35;
+const UNIT_BOX: [number, number, number, number] = [-0.5, -0.5, 0.5, 0.5];
+
+const PARTICLE_SHAPES: Record<Exclude<ParticleShape, ParticleShape.Sprite>, { index: number; box: [number, number, number, number] }> = {
+  [ParticleShape.Circle]: { index: 0, box: UNIT_BOX },
+  [ParticleShape.Square]: { index: 1, box: UNIT_BOX },
+  [ParticleShape.Triangle]: { index: 2, box: UNIT_BOX },
+  [ParticleShape.Streak]: { index: 1, box: [-STREAK_LENGTH, -STREAK_THICKNESS / 2, 0, STREAK_THICKNESS / 2] }
+};
+
 const COMBINE_OPS: Record<MaskComposite, number> = { [MaskComposite.Add]: 0, [MaskComposite.Subtract]: 1, [MaskComposite.Intersect]: 2, [MaskComposite.Exclude]: 3 };
 
 const BLEND_MODES = ['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten', 'color-dodge', 'color-burn', 'hard-light', 'soft-light', 'difference', 'exclusion', 'hue', 'saturation', 'color', 'luminosity'];
@@ -266,6 +366,8 @@ function compile(gl: WebGL2RenderingContext, vs: string, fs: string): Program {
   return { program, uniform };
 }
 
+const scaleOf = (m: Affine) => Math.max(Math.hypot(m[0], m[1]), Math.hypot(m[2], m[3]));
+
 const mat3 = (m: Affine) => new Float32Array([m[0], m[1], 0, m[2], m[3], 0, m[4], m[5], 1]);
 
 export function webglGpu(canvas: OffscreenCanvas): Gpu {
@@ -280,6 +382,27 @@ export function webglGpu(canvas: OffscreenCanvas): Gpu {
   gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
 
   const paint = compile(gl, QUAD_VS, PAINT_FS);
+  const sprinkle = compile(gl, PARTICLE_VS, PARTICLE_FS);
+  const instances = gl.createBuffer();
+  const particleVao = gl.createVertexArray();
+  gl.bindVertexArray(particleVao);
+  gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  gl.bindBuffer(gl.ARRAY_BUFFER, instances);
+  const FLOAT_BYTES = Float32Array.BYTES_PER_ELEMENT;
+  [
+    ['place', 4, 0],
+    ['tint', 4, 4],
+    ['soft', 1, 8]
+  ].forEach(([name, count, offset]) => {
+    const at = gl.getAttribLocation(sprinkle.program, name as string);
+    gl.enableVertexAttribArray(at);
+    gl.vertexAttribPointer(at, count as number, gl.FLOAT, false, PARTICLE_STRIDE * FLOAT_BYTES, (offset as number) * FLOAT_BYTES);
+    gl.vertexAttribDivisor(at, 1);
+  });
+  gl.bindVertexArray(null);
+  gl.bindBuffer(gl.ARRAY_BUFFER, quad);
   const copy = compile(gl, FULL_VS, COPY_FS);
   const blend = compile(gl, FULL_VS, BLEND_FS);
   const grain = compile(gl, FULL_VS, GRAIN_FS);
@@ -360,20 +483,21 @@ export function webglGpu(canvas: OffscreenCanvas): Gpu {
       return t;
     });
 
-    const draw = (s: Surface, p: Paint) => {
-      if (!p.width || !p.height) {
-        return;
-      }
+    const placed = (program: Program, s: Surface, at: Affine) => {
       target(s);
-      gl.useProgram(paint.program);
+      gl.useProgram(program.program);
       gl.enable(gl.BLEND);
       gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+      gl.uniform2f(program.uniform('frame'), size.width, size.height);
+      gl.uniform1f(program.uniform('pad'), pad);
+      gl.uniformMatrix3fv(program.uniform('at'), false, mat3(at));
+    };
+
+    const box = (s: Surface, p: Extract<Paint, { kind: PaintKind.Sheet | PaintKind.Fill }>) => {
+      placed(paint, s, p.at);
       gl.uniform2f(paint.uniform('box'), p.width, p.height);
-      gl.uniform2f(paint.uniform('frame'), size.width, size.height);
-      gl.uniform1f(paint.uniform('pad'), pad);
       const [a, b, c, d] = p.at;
       gl.uniform2f(paint.uniform('grow'), EDGE_PX / Math.max(p.width * Math.hypot(a, b), 1), EDGE_PX / Math.max(p.height * Math.hypot(c, d), 1));
-      gl.uniformMatrix3fv(paint.uniform('at'), false, mat3(p.at));
       if (p.kind === PaintKind.Fill) {
         const [r, g, b, a] = p.color;
         gl.uniform1i(paint.uniform('solid'), 1);
@@ -387,6 +511,38 @@ export function webglGpu(canvas: OffscreenCanvas): Gpu {
       }
       full();
       gl.disable(gl.BLEND);
+    };
+
+    const particles = (s: Surface, p: Extract<Paint, { kind: PaintKind.Particles }>) => {
+      const count = p.quads.length / PARTICLE_STRIDE;
+      if (!count) {
+        return;
+      }
+      const look = PARTICLE_SHAPES[p.shape as keyof typeof PARTICLE_SHAPES];
+      placed(sprinkle, s, p.at);
+      gl.uniform1i(sprinkle.uniform('shape'), look.index);
+      gl.uniform4f(sprinkle.uniform('box'), ...look.box);
+      gl.uniform1f(sprinkle.uniform('edge'), EDGE_PX / Math.max(scaleOf(p.at), 1e-6));
+      gl.uniform2f(sprinkle.uniform('canvas'), p.width, p.height);
+      gl.uniform2f(sprinkle.uniform('glowPx'), MIN_GLOW_PX, MAX_GLOW_PX);
+      gl.bindBuffer(gl.ARRAY_BUFFER, instances);
+      gl.bufferData(gl.ARRAY_BUFFER, p.quads, gl.STREAM_DRAW);
+      gl.bindVertexArray(particleVao);
+      gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, count);
+      gl.bindVertexArray(null);
+      gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+      gl.disable(gl.BLEND);
+    };
+
+    const PAINTS: Record<PaintKind, (s: Surface, p: Paint) => void> = {
+      [PaintKind.Sheet]: box as (s: Surface, p: Paint) => void,
+      [PaintKind.Fill]: box as (s: Surface, p: Paint) => void,
+      [PaintKind.Particles]: particles as (s: Surface, p: Paint) => void
+    };
+    const draw = (s: Surface, p: Paint) => {
+      if (p.width && p.height) {
+        PAINTS[p.kind](s, p);
+      }
     };
 
     let bounds = [0, 0, size.width, size.height];

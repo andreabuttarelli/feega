@@ -1,7 +1,7 @@
 import type { MotionClip } from '../doc';
 import { sampleColor, sampleTrack } from '../keyframes';
-import { PARTICLE_COLOUR_KEYS, PARTICLE_NUMBER_KEYS, type Emitter, type ParticleShape } from '../particles/model';
-import { drawParticles, glowTiles, particlesAt, type ParticleBake, type ParticleRow, type Rgb } from '../particles/simulate';
+import { PARTICLE_COLOUR_KEYS, PARTICLE_NUMBER_KEYS, ParticleShape, type Emitter } from '../particles/model';
+import { drawParticles, glowTiles, particleQuads, particlesAt, type ParticleBake, type ParticleRow, type Rgb } from '../particles/simulate';
 import { css, esc, js } from './html';
 import { seekDriver } from './stage';
 import { ON_DISPOSE, hotScope, hotSeek } from './hot';
@@ -11,6 +11,8 @@ type Env = { width: number; height: number; unit: number; fps: number; color: (v
 const PARTICLE_TIMELINE = 'feegaParticles';
 const HEX = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i;
 const WHITE: Rgb = [255, 255, 255];
+
+export const PARTICLE_STATE = 'feegaParticles';
 
 export const canvasId = (clipId: string) => `pt-${clipId}`;
 export const spriteId = (clipId: string) => `pts-${clipId}`;
@@ -57,16 +59,18 @@ export function particleScript(bakes: readonly ParticleBake[], fps: number, dura
   if (!bakes.length) {
     return '';
   }
-  return `<script>(function(){${hotScope(PARTICLE_TIMELINE)}const PT_AT=(${particlesAt.toString()});const PT_DRAW=(${drawParticles.toString()});const PT_GLOWS=(${glowTiles.toString()})(function(){return document.createElement('canvas');});
+  return `<script>(function(){${hotScope(PARTICLE_TIMELINE)}const PT_AT=(${particlesAt.toString()});const PT_DRAW=(${drawParticles.toString()});const PT_GLOWS=(${glowTiles.toString()})(function(){return document.createElement('canvas');});const PT_QUADS=(${particleQuads.toString()});
 const B=${js(bakes)};
-const items=B.map(function(b){const el=document.getElementById(${js(canvasId(''))}+b.id);return {b:b,memo:new Map(),paint:el&&el.getContext('2d'),sprite:document.getElementById(${js(spriteId(''))}+b.id)};});
+const items=B.map(function(b){const el=document.getElementById(${js(canvasId(''))}+b.id);return {b:b,el:el,memo:new Map(),paint:el&&el.getContext('2d'),sprite:document.getElementById(${js(spriteId(''))}+b.id)};});
 let shown=0;
 function particlesNow(time){
   shown=time;
   items.forEach(function(it){
     if(!it.paint){return;}
     const sprite=it.sprite&&it.sprite.complete&&it.sprite.naturalWidth?it.sprite:null;
-    PT_DRAW(it.paint,PT_AT(it.b,time*${fps}-it.b.from,it.memo),it.b.shape,sprite,PT_GLOWS);
+    const list=PT_AT(it.b,time*${fps}-it.b.from,it.memo);
+    PT_DRAW(it.paint,list,it.b.shape,sprite,PT_GLOWS);
+    if(it.b.shape!==${js(ParticleShape.Sprite)}){it.el[${js(PARTICLE_STATE)}]=function(){return {shape:it.b.shape,quads:PT_QUADS(list)};};}
   });
 }
 items.forEach(function(it){if(it.sprite){it.sprite.addEventListener('load',function(){particlesNow(shown);});}});
