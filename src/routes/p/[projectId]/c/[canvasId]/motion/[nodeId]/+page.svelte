@@ -101,8 +101,8 @@
   import RemixBanner from '$lib/components/gallery/RemixBanner.svelte';
   import DocFields from '$lib/components/motion/DocFields.svelte';
   import { BRAND_PARAM, BRAND_REMIX_PROMPT } from '$lib/gallery/model';
-  import { BRIEF_PARAM } from '$lib/motion/video-brief';
-  import { PrefillMode, type ChatPrefill } from '$lib/components/brand-agent/chat-prefill';
+  import { ATTACH_PARAM, BRIEF_PARAM } from '$lib/motion/video-brief';
+  import { briefPrefill, type ChatPrefill } from '$lib/components/brand-agent/chat-prefill';
   import type { PageData } from './$types';
 
   const SAVE_DEBOUNCE_MS = 700;
@@ -255,8 +255,9 @@
 
   async function sendBrief(url: URL, brief: string) {
     url.searchParams.delete(BRIEF_PARAM);
+    url.searchParams.delete(ATTACH_PARAM);
     replaceState(url, page.state);
-    brandAsk = { text: brief, at: Date.now(), mode: PrefillMode.Send };
+    brandAsk = briefPrefill(brief, data.briefAttachments, Date.now());
     await askAgent();
   }
 

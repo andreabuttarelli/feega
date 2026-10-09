@@ -22,6 +22,8 @@ import { analyzeSounds, storageAnalysis } from '$lib/server/motion/audio-analysi
 import { clipsOf, parseMotionDoc } from '$lib/motion/doc';
 import { templateLibrary } from '$lib/server/motion/templates';
 import type { Db } from '$lib/server/db/client';
+import { loadAttachments } from '$lib/server/chat-attachments/register';
+import { briefAttachmentIds } from '$lib/motion/video-brief';
 import { editorGallery, publishFromForm, withdrawFromForm } from '$lib/server/gallery/editor';
 
 function parsedJson(text: string): unknown {
@@ -37,18 +39,20 @@ const HTTP_BAD_REQUEST = 400;
 const HTTP_UNAVAILABLE = 503;
 const HTTP_NOT_FOUND = 404;
 
-export const load: PageServerLoad = async ({ locals, params }) => {
+export const load: PageServerLoad = async ({ locals, params, url }) => {
   const scope = await scopeFor(locals, params);
+  const briefIds = briefAttachmentIds(url);
   const nodeScope = { orgId: scope.orgId, nodeId: scope.motion.record.id };
   const farm = motionRenderFarm();
-  const [head, tokens, assets, runs, uploadLimit, templates, gallery] = await Promise.all([
+  const [head, tokens, assets, runs, uploadLimit, templates, gallery, briefAttachments] = await Promise.all([
     headOrNew(scope.db, nodeScope, scope.motion.node),
     motionTokens(scope.db, { orgId: scope.orgId, brandId: scope.projectBrandId }),
     motionAssets({ db: scope.db, orgId: scope.orgId, projectId: params.projectId, canvasId: scope.canvas.id, nodeId: scope.motion.record.id }),
     listNodeRuns(scope.db, nodeScope),
     farm ? motionRenderStorage().limit().catch(() => null) : null,
     libraryOf(scope).list(),
-    editorGallery(scope.db, nodeScope)
+    editorGallery(scope.db, nodeScope),
+    briefIds.length ? loadAttachments(scope.db, { orgId: scope.orgId, projectId: params.projectId, ids: briefIds }) : []
   ]);
 
   return {
@@ -62,7 +66,8 @@ export const load: PageServerLoad = async ({ locals, params }) => {
     serverRender: { configured: farm !== null && serverRenderOpen(), latest: renderView(runs), queue: renderQueue(), uploadLimit },
     batch: batchView(runs),
     templates,
-    gallery
+    gallery,
+    briefAttachments
   };
 };
 

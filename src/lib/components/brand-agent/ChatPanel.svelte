@@ -17,6 +17,7 @@
   import { chatModelPrefs } from './chat-model-prefs.svelte';
   import { PrefillMode, type ChatPrefill } from './chat-prefill';
   import { ChatUploads } from './chat-uploads.svelte';
+  import type { ChatAttachment } from '$lib/chat-attachments';
 
   let {
     projectId = '',
@@ -31,14 +32,14 @@
 
   let draft = $state('');
 
-  let queued = $state<string | null>(null);
+  let queued = $state<ChatPrefill | null>(null);
 
   $effect(() => {
     if (!prefill) {
       return;
     }
     if (prefill.mode === PrefillMode.Send) {
-      queued = prefill.text;
+      queued = prefill;
       return;
     }
     draft = prefill.text;
@@ -91,9 +92,9 @@
     if (!queued || loading || !session) {
       return;
     }
-    const text = queued;
+    const turn = queued;
     queued = null;
-    untrack(() => send(text));
+    untrack(() => send(turn.text, turn.attachments));
   });
 
   function on(event: FollowEvent) {
@@ -186,8 +187,7 @@
     };
   });
 
-  function send(text: string) {
-    const attachments = uploads?.ready ?? [];
+  function send(text: string, attachments: ChatAttachment[] = uploads?.ready ?? []) {
     if ((!text && !attachments.length) || !session || busy || uploads?.busy) {
       return;
     }

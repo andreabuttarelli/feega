@@ -13,7 +13,9 @@ import { toolScope } from '$lib/server/dashboard/tool-scope';
 import { MOTION_START_DEPS, startMotion } from '$lib/server/motion/start';
 import { listGallery } from '$lib/server/repos/gallery';
 import { gallerySearchSchema } from '$lib/gallery/model';
-import { BRIEF_MAX, BRIEF_TEMPLATES, briefEditorPath, briefMessage, briefName } from '$lib/motion/video-brief';
+import { loadAttachments } from '$lib/server/chat-attachments/register';
+import { parseAttachments } from '$lib/chat-attachments';
+import { BRIEF_MAX, BRIEF_TEMPLATES, FILES_ONLY_BRIEF, briefEditorPath, briefMessage, briefName } from '$lib/motion/video-brief';
 
 const HTTP_SEE_OTHER = 303;
 const HTTP_BAD_REQUEST = 400;
@@ -31,8 +33,12 @@ export const load: PageServerLoad = async (event) => {
   }
 
   const { org } = await event.parent();
-  const [dashboard, gallery] = await Promise.all([dashboardFor(db, DASHBOARD_DEPS, org.id), listGallery(db, gallerySearchSchema.parse({ limit: HOME_GALLERY_SIZE }))]);
-  return { dashboard, gallery, templates: BRIEF_TEMPLATES, tools: SUPPORT_TOOLS };
+  const [dashboard, gallery, attachProjectId] = await Promise.all([
+    dashboardFor(db, DASHBOARD_DEPS, org.id),
+    listGallery(db, gallerySearchSchema.parse({ limit: HOME_GALLERY_SIZE })),
+    toolScope(event).then((scope) => scope.projectId, () => null)
+  ]);
+  return { dashboard, gallery, templates: BRIEF_TEMPLATES, tools: SUPPORT_TOOLS, attachProjectId };
 };
 
 function projectSlug(): string {
@@ -42,18 +48,22 @@ function projectSlug(): string {
 
 export const actions: Actions = {
   video: async (event) => {
-    const brief = String((await event.request.formData()).get('brief') ?? '').trim().slice(0, BRIEF_MAX);
-    if (!brief) {
+    const form = await event.request.formData();
+    const typed = String(form.get('brief') ?? '').trim().slice(0, BRIEF_MAX);
+    const attachmentIds = parseAttachments(form.getAll('attachment'));
+    if (!typed && !attachmentIds.length) {
       return fail(HTTP_BAD_REQUEST, { error: 'Paste a URL or describe your video' });
     }
 
-    const scope = await toolScope(event);
+    const brief = typed || FILES_ONLY_BRIEF;
+    const scope = await toolScope(event, String(form.get('projectId') ?? '') || null);
+    const attachments = attachmentIds.length ? await loadAttachments(scope.db, { orgId: scope.orgId, projectId: scope.projectId, ids: attachmentIds }) : [];
     const started = await startMotion(scope.db, MOTION_START_DEPS, { orgId: scope.orgId, projectId: scope.projectId, canvasId: null, userId: scope.userId, name: briefName(brief) });
     if (!started) {
       return fail(HTTP_NOT_FOUND, { error: 'No canvas for this video' });
     }
 
-    throw redirect(HTTP_SEE_OTHER, briefEditorPath(started, briefMessage(brief)));
+    throw redirect(HTTP_SEE_OTHER, briefEditorPath(started, briefMessage(brief), attachments.map((a) => a.assetId)));
   },
 
   project: async (event) => {
