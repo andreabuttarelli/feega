@@ -17,3 +17,7 @@ one element per beat, isolated and zoomed.
   pieces (stat cards, payouts…) are only caught by the second rule.
 - Discarded: an `add_ui` `part` prop rendering one element in the kit JS — it would fork every
   piece; masking plus framing isolates any anchored part of any piece, recreated ones included.
+- `out-of-frame` now measures a rect-masked clip by its mask's visible box (a zoomed UI masked to
+  one part was blocking). The mask leads the zoom (half the move) so the part stays inside.
+- Demo built through the app's tools: `~/Documents/feega-videos/showcase/ui-focus/build.ts`,
+  registered as `showcase-ui-focus` for `import:showcase`.
