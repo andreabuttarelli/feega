@@ -1,25 +1,111 @@
 <script lang="ts">
   import PageTitle from '$lib/components/PageTitle.svelte';
-  import ArrowRight from '@lucide/svelte/icons/arrow-right';
   import Film from '@lucide/svelte/icons/film';
   import { onMount } from 'svelte';
+  import { _ } from 'svelte-i18n';
   import { enhance } from '$app/forms';
   import { formatLastEdited } from '$lib/canvas/format-last-edited';
   import { TOOL_STATUS_LABEL, toolHref } from '$lib/tools';
   import { TOOL_ICONS } from '$lib/components/app/tool-icons';
   import { GALLERY_PATH, byline, itemPath } from '$lib/gallery/model';
   import { BRIEF_MAX } from '$lib/motion/video-brief';
+  import { ComposerKey, composerKey, rotateTemplates } from '$lib/motion/brief-composer';
+  import { composerHeight } from '$lib/components/brand-agent/composer-height';
+  import { CHAT_ATTACH_ACCEPT } from '$lib/chat-attachments';
+  import { ChatUploads } from '$lib/components/brand-agent/chat-uploads.svelte';
+  import ChatAttachments from '$lib/components/brand-agent/ChatAttachments.svelte';
+  import IconButton from '$lib/components/motion/IconButton.svelte';
+  import { Tool } from '$lib/motion/actions';
 
   let { data, form } = $props();
 
+  const PLACEHOLDER = 'Paste your website or describe the video you want…';
+  const EXAMPLES_SHOWN = 3;
+  const EXAMPLE_TURN_MS = 6000;
+
   let sending = $state(false);
-  let field = $state<HTMLInputElement | null>(null);
+  let brief = $state('');
+  let turn = $state(0);
+  let dragging = $state(false);
+  let field = $state<HTMLTextAreaElement | null>(null);
+  let composer = $state<HTMLFormElement | null>(null);
+  let picker = $state<HTMLInputElement | null>(null);
 
-  onMount(() => field?.focus());
-
+  const uploads = $derived(data.attachProjectId ? new ChatUploads(data.attachProjectId) : null);
+  const ready = $derived(uploads?.ready ?? []);
+  const canSend = $derived(!sending && !uploads?.busy && (!!brief.trim() || ready.length > 0));
+  const examples = $derived(rotateTemplates(data.templates, turn, EXAMPLES_SHOWN));
   const recentProjectId = $derived(data.dashboard.projects[0]?.id ?? null);
 
-  const submit = () => {
+  onMount(() => {
+    if (matchMedia('(pointer: fine)').matches) {
+      field?.focus();
+    }
+    const timer = setInterval(() => (turn += 1), EXAMPLE_TURN_MS);
+    return () => clearInterval(timer);
+  });
+
+  $effect(() => {
+    void brief;
+    if (!field) {
+      return;
+    }
+    field.style.height = 'auto';
+    field.style.height = composerHeight(field.scrollHeight);
+  });
+
+  function fill(text: string) {
+    brief = text;
+    field?.focus();
+  }
+
+  function keyed(e: KeyboardEvent) {
+    if (composerKey(e) !== ComposerKey.Submit) {
+      return;
+    }
+    e.preventDefault();
+    if (canSend) {
+      composer?.requestSubmit();
+    }
+  }
+
+  function picked(e: Event) {
+    const input = e.currentTarget as HTMLInputElement;
+    uploads?.add([...(input.files ?? [])]);
+    input.value = '';
+  }
+
+  function pasted(e: ClipboardEvent) {
+    const files = [...(e.clipboardData?.files ?? [])];
+    if (!uploads || !files.length) {
+      return;
+    }
+    e.preventDefault();
+    uploads.add(files);
+  }
+
+  function dragged(e: DragEvent) {
+    if (!uploads || !e.dataTransfer?.types.includes('Files')) {
+      return;
+    }
+    e.preventDefault();
+    dragging = true;
+  }
+
+  function dropped(e: DragEvent) {
+    dragging = false;
+    if (!uploads || !e.dataTransfer?.files.length) {
+      return;
+    }
+    e.preventDefault();
+    uploads.add([...e.dataTransfer.files]);
+  }
+
+  const submit = ({ cancel }: { cancel: () => void }) => {
+    if (!canSend) {
+      cancel();
+      return;
+    }
     sending = true;
     return async ({ update }: { update: () => Promise<void> }) => {
       await update();
@@ -31,32 +117,65 @@
 <svelte:head><title>Make a video · feega</title></svelte:head>
 
 <div class="home">
-  <section class="hero" aria-labelledby="create-heading">
-    <PageTitle id="create-heading" text="make a video." />
+  <section class="hero" aria-labelledby="create-heading" data-testid="home-hero">
+    <div class="center">
+      <PageTitle id="create-heading" text="make a video." />
 
-    <form method="POST" action="?/video" class="brief" use:enhance={submit}>
-      <input
-        name="brief"
-        id="video-brief"
-        data-testid="video-brief"
-        placeholder="Your website or what you want to make"
-        aria-label="Your website or what you want to make"
-        maxlength={BRIEF_MAX}
-        autocomplete="off"
-        bind:this={field}
-        required
-      />
-      <button type="submit" class="go" disabled={sending} aria-label="Create video">
-        <span class="go-label">Make it</span><ArrowRight size={16} strokeWidth={1.8} />
-      </button>
-    </form>
-    {#if form?.error}<p class="error" role="alert">{form.error}</p>{/if}
+      <form
+        method="POST"
+        action="?/video"
+        class="composer"
+        class:dragging
+        bind:this={composer}
+        use:enhance={submit}
+        ondragover={dragged}
+        ondragleave={() => (dragging = false)}
+        ondrop={dropped}
+      >
+        {#if uploads?.items.length}
+          <ChatAttachments items={uploads.items} onremove={(id) => uploads?.remove(id)} />
+        {/if}
+        {#if dragging}
+          <p class="drop-hint" aria-hidden="true">{$_('chat.panel.attach.drop')}</p>
+        {/if}
+        <textarea
+          name="brief"
+          id="video-brief"
+          data-testid="video-brief"
+          placeholder={PLACEHOLDER}
+          aria-label={PLACEHOLDER}
+          maxlength={BRIEF_MAX}
+          rows="2"
+          enterkeyhint="send"
+          bind:value={brief}
+          bind:this={field}
+          onkeydown={keyed}
+          onpaste={pasted}
+        ></textarea>
+        {#if data.attachProjectId}<input type="hidden" name="projectId" value={data.attachProjectId} />{/if}
+        {#each ready as attachment (attachment.assetId)}<input type="hidden" name="attachment" value={attachment.assetId} />{/each}
+        <div class="row">
+          {#if uploads}
+            <span class="attach">
+              <IconButton action={Tool.Attach} label={$_('chat.panel.attach.button')} data-testid="chat-attach" onclick={() => picker?.click()} />
+              <input bind:this={picker} class="sr-only" type="file" multiple accept={CHAT_ATTACH_ACCEPT} tabindex="-1" aria-hidden="true" onchange={picked} />
+            </span>
+          {/if}
+          <button type="submit" class="send" data-testid="brief-send" disabled={!canSend} aria-label="Make the video" title="Make the video">
+            <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square" /></svg>
+          </button>
+        </div>
+      </form>
+      {#if form?.error}<p class="error" role="alert">{form.error}</p>{/if}
 
-    <form method="POST" action="?/video" class="templates" use:enhance={submit} aria-label="Templates">
-      {#each data.templates as template (template.id)}
-        <button type="submit" name="brief" value={template.brief} disabled={sending}>{template.name}</button>
-      {/each}
-    </form>
+      <div class="examples" data-testid="brief-examples" aria-label="Example prompts">
+        {#each examples as template (template.id)}
+          <button type="button" data-brief={template.brief} onclick={() => fill(template.brief)}>{template.name}</button>
+        {/each}
+      </div>
+
+      <p class="helper" data-testid="brief-helper">feega reads your site and makes a launch video · or describe any motion</p>
+    </div>
   </section>
 
   {#if data.dashboard.motions.length}
@@ -147,57 +266,117 @@
   }
 
   .hero {
+    --hero-chrome: calc(var(--ui-bar-h) + var(--content-pad-top));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: calc(100svh - var(--hero-chrome));
+    padding-bottom: var(--hero-chrome);
+    text-align: center;
+  }
+
+  .center {
     display: flex;
     flex-direction: column;
+    align-items: center;
     gap: var(--ui-space-4);
-    padding-top: 8vh;
+    width: 100%;
+    max-width: 720px;
   }
 
-  .brief {
+  .composer {
     display: flex;
-    margin-top: var(--ui-space-4);
-    background: var(--ui-surface);
+    flex-direction: column;
+    gap: var(--ui-space-2);
+    width: 100%;
+    margin-top: var(--ui-space-6);
+    padding: var(--ui-space-4) var(--ui-space-4) var(--ui-space-3);
+    background: var(--ui-bg);
     border: 1px solid var(--ui-line-strong);
+    text-align: left;
+    transition: border-color 0.14s ease;
   }
 
-  .brief:focus-within {
+  .composer:focus-within {
     border-color: var(--ui-accent);
   }
 
-  .brief input {
-    flex: 1 1 auto;
-    min-width: 0;
-    height: 64px;
-    padding: 0 var(--ui-space-4);
-    border: 0;
-    background: transparent;
-    color: var(--ui-ink);
-    font-size: var(--ui-text-lg);
+  .composer.dragging {
+    border-color: var(--ui-accent);
+    border-style: dashed;
   }
 
-  .brief input:focus {
-    outline: none;
-  }
-
-  .brief input::placeholder {
+  .drop-hint {
+    margin: 0;
+    font-size: var(--ui-text-sm);
     color: var(--ui-ink-3);
   }
 
-  .go {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--ui-space-2);
-    padding: 0 var(--ui-space-6);
+  textarea {
+    width: 100%;
+    min-height: 56px;
+    max-height: 200px;
+    padding: 0;
     border: 0;
-    background: var(--ui-ink);
-    color: var(--ui-bg);
-    font-size: var(--ui-text-md);
-    font-weight: 600;
-    cursor: pointer;
+    resize: none;
+    background: transparent;
+    color: var(--ui-ink);
+    font: inherit;
+    font-size: var(--ui-text-lg);
+    line-height: 1.5;
   }
 
-  .go:disabled {
-    opacity: 0.5;
+  textarea:focus {
+    outline: none;
+  }
+
+  textarea::placeholder {
+    color: var(--ui-ink-3);
+  }
+
+  .row {
+    display: flex;
+    align-items: center;
+    gap: var(--ui-space-2);
+  }
+
+  .attach {
+    flex: 0 0 auto;
+  }
+
+  .send {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    margin-left: auto;
+    border: 0;
+    border-radius: 9999px;
+    background: var(--ui-accent);
+    color: #fff;
+    cursor: pointer;
+    transition: opacity 0.14s ease;
+  }
+
+  .send:disabled {
+    background: var(--ui-field);
+    color: var(--ui-ink-3);
+    cursor: default;
+  }
+
+  .send:focus-visible {
+    outline: none;
+    box-shadow: var(--ui-focus);
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
 
   .error {
@@ -206,25 +385,33 @@
     color: var(--ui-danger);
   }
 
-  .templates {
+  .examples {
     display: flex;
     flex-wrap: wrap;
+    justify-content: center;
     gap: var(--ui-space-2);
   }
 
-  .templates button {
-    height: 28px;
+  .examples button {
+    height: 32px;
     padding: 0 var(--ui-space-3);
     border: 1px solid var(--ui-line);
+    border-radius: 9999px;
     background: transparent;
     color: var(--ui-ink-2);
     font-size: var(--ui-text-sm);
     cursor: pointer;
   }
 
-  .templates button:hover {
+  .examples button:hover {
     border-color: var(--ui-ink-3);
     color: var(--ui-ink);
+  }
+
+  .helper {
+    margin: 0;
+    font-size: var(--ui-text-sm);
+    color: var(--ui-ink-3);
   }
 
   .head {
@@ -340,26 +527,23 @@
     color: var(--ui-ink-3);
   }
 
+  @media (min-width: 1024px) {
+    .hero {
+      --hero-chrome: var(--ui-space-8);
+    }
+  }
+
   @media (max-width: 640px) {
     .home {
       gap: 48px;
     }
 
     .hero {
-      padding-top: var(--ui-space-6);
+      --hero-chrome: calc(var(--ui-bar-h) + var(--ui-space-2));
     }
 
-    .brief input {
-      height: 52px;
-      font-size: var(--ui-text-md);
-    }
-
-    .go {
-      padding: 0 var(--ui-space-4);
-    }
-
-    .go-label {
-      display: none;
+    textarea {
+      font-size: 16px;
     }
 
     .grid {

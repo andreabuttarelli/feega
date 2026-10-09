@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BRIEF_PARAM, BRIEF_TEMPLATES, BriefKind, briefEditorPath, briefKind, briefMessage, briefName } from './video-brief';
+import { BRIEF_PARAM, BRIEF_TEMPLATES, BriefKind, briefAttachmentIds, briefEditorPath, briefKind, briefMessage, briefName } from './video-brief';
 
 describe('a brief typed on /app names its video and travels to the editor', () => {
   it('a URL names the video after its host', () => {
@@ -17,6 +17,16 @@ describe('a brief typed on /app names its video and travels to the editor', () =
   it('the editor path carries the brief so the chat can send it', () => {
     const path = briefEditorPath({ projectId: 'p1', canvasId: 'c1', nodeId: 'n1' }, 'https://acme.com');
     expect(path).toBe(`/p/p1/c/c1/motion/n1?${BRIEF_PARAM}=https%3A%2F%2Facme.com`);
+  });
+
+  it('attachments travel to the editor as asset ids', () => {
+    const path = briefEditorPath({ projectId: 'p1', canvasId: 'c1', nodeId: 'n1' }, 'A logo reveal', ['a1', 'a2']);
+    expect(path).toBe(`/p/p1/c/c1/motion/n1?${BRIEF_PARAM}=A+logo+reveal&attach=a1%2Ca2`);
+    expect(briefAttachmentIds(new URL(`http://x${path}`))).toEqual(['a1', 'a2']);
+  });
+
+  it('a brief without files carries no attach param', () => {
+    expect(briefAttachmentIds(new URL('http://x/p?brief=hi'))).toEqual([]);
   });
 
   it('every template is a brief ready to send', () => {
