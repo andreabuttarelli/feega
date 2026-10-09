@@ -67,10 +67,10 @@ describe('hosted embed', () => {
   it('the public read fetches only a node id, and a missing file is null', async () => {
     const fetchFn = vi.fn(async (url: string) => (url.endsWith(`${NODE}.html`) ? new Response('<html>ok</html>') : new Response('', { status: 404 })));
 
-    expect(await readEmbed(fetchFn as never, NODE)).toBe('<html>ok</html>');
+    expect(await readEmbed(fetchFn as never, NODE, 'https://oh.feega.app')).toBe('<html>ok</html>');
     expect(fetchFn).toHaveBeenCalledWith(`https://sb.test/storage/v1/object/public/${EMBED_BUCKET}/${NODE}.html`);
-    expect(await readEmbed(fetchFn as never, '7a1c2a8e-0b7d-4f1e-9a3c-2d5e8f7a1b40')).toBeNull();
-    expect(await readEmbed(fetchFn as never, '../secrets')).toBeNull();
+    expect(await readEmbed(fetchFn as never, '7a1c2a8e-0b7d-4f1e-9a3c-2d5e8f7a1b40', 'https://oh.feega.app')).toBeNull();
+    expect(await readEmbed(fetchFn as never, '../secrets', 'https://oh.feega.app')).toBeNull();
     expect(fetchFn).toHaveBeenCalledTimes(2);
   });
 });
