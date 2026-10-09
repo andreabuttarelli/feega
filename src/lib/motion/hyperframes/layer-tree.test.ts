@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chain, cssAffine, cssRgba, joinRasters, IDENTITY } from './layer-tree';
+import { chain, cssAffine, cssMasks, cssRgba, joinRasters, IDENTITY, MaskComposite } from './layer-tree';
 
 describe('chain', () => {
   it('applies the inner affine first, then the outer', () => {
@@ -40,5 +40,32 @@ describe('joinRasters', () => {
   it('rasterises neighbouring DOM-only siblings in one pass, never across a GPU layer', () => {
     const gpu = { gpu: 'x' };
     expect(joinRasters([{ raster: ['a'] }, null, { raster: ['b'] }, gpu, { raster: ['c'] }])).toEqual([{ raster: ['a', 'b'] }, gpu, { raster: ['c'] }]);
+  });
+});
+
+describe('cssMasks', () => {
+  const a = 'data:image/svg+xml;charset=utf-8,%3Cg%20filter%3D%22url(%23kl)%22%2F%3E';
+  const b = 'data:image/svg+xml;charset=utf-8,%3Csvg%2F%3E';
+
+  it('reads frozen mask images top first, with the composite of each layer', () => {
+    expect(cssMasks(`url("${a}"), url("${b}")`, 'subtract, add')).toEqual([
+      { url: a, composite: MaskComposite.Subtract },
+      { url: b, composite: MaskComposite.Add }
+    ]);
+  });
+
+  it('understands the WebKit names of the composites', () => {
+    expect(cssMasks(`url("${a}"), url("${b}")`, 'source-out, source-over').map((m) => m.composite)).toEqual([MaskComposite.Subtract, MaskComposite.Add]);
+    expect(cssMasks(`url("${a}"), url("${b}")`, 'xor, source-in').map((m) => m.composite)).toEqual([MaskComposite.Exclude, MaskComposite.Intersect]);
+  });
+
+  it('repeats a short composite list, as CSS does', () => {
+    expect(cssMasks(`url("${a}"), url("${b}")`, 'intersect').map((m) => m.composite)).toEqual([MaskComposite.Intersect, MaskComposite.Intersect]);
+  });
+
+  it('has nothing to read without a mask, and refuses a mask that is not a frozen picture', () => {
+    expect(cssMasks('none', 'add')).toEqual([]);
+    expect(cssMasks('url("#mk-a")', 'add')).toBeNull();
+    expect(cssMasks('linear-gradient(red, blue)', 'add')).toBeNull();
   });
 });

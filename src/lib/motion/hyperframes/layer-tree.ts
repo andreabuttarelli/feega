@@ -21,12 +21,21 @@ export type Grain = { baseFrequency: number; seed: number; amount: number };
 
 export type Effect = { kind: EffectKind.Grain; grains: Grain[]; area: GrainArea };
 
-export type LayerNode = { paints: Paint[]; children: LayerNode[]; opacity: number; blend: string; effects: Effect[]; clip: Paint | null };
+export enum MaskComposite {
+  Add = 'add',
+  Subtract = 'subtract',
+  Intersect = 'intersect',
+  Exclude = 'exclude'
+}
+
+export type Mask = { paint: Paint; composite: MaskComposite };
+
+export type LayerNode = { paints: Paint[]; children: LayerNode[]; opacity: number; blend: string; effects: Effect[]; clip: Paint | null; masks: Mask[] };
 
 export type LayerTree = { width: number; height: number; backdrop: Rgba | null; root: LayerNode };
 
 export function node(part: Partial<LayerNode>): LayerNode {
-  return { paints: [], children: [], opacity: 1, blend: 'normal', effects: [], clip: null, ...part };
+  return { paints: [], children: [], opacity: 1, blend: 'normal', effects: [], clip: null, masks: [], ...part };
 }
 
 export function chain(outer: Affine, inner: Affine): Affine {
@@ -67,4 +76,19 @@ export function joinRasters<T extends object, E>(items: (T | Raster<E> | null)[]
     out.push('raster' in item ? { raster: [...(item as Raster<E>).raster] } : item);
   }
   return out;
+}
+
+export type CssMask = { url: string; composite: MaskComposite };
+
+export function cssMasks(image: string, composite: string): CssMask[] | null {
+  const NAMES: Record<string, string> = { add: 'add', 'source-over': 'add', subtract: 'subtract', 'source-out': 'subtract', intersect: 'intersect', 'source-in': 'intersect', exclude: 'exclude', xor: 'exclude' };
+  if (!image || image === 'none') {
+    return [];
+  }
+  const urls = [...image.matchAll(/url\("(data:[^"]+)"\)/g)].map((m) => m[1]);
+  if (!urls.length || image.replace(/url\("data:[^"]+"\)/g, '').replace(/[\s,]/g, '')) {
+    return null;
+  }
+  const ops = composite.split(',').map((op) => NAMES[op.trim()] ?? 'add');
+  return urls.map((url, i) => ({ url, composite: ops[i % ops.length] as MaskComposite }));
 }
