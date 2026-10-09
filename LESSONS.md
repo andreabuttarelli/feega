@@ -2600,6 +2600,9 @@ Segnale: `changed tsconfig file detected: .../.claude/worktrees/agent-*/.svelte-
 ## Uno script vite-node che importa il compositor motion non parte
 Segnale: `Failed to load url virtual:motion-live-runtime ... in src/lib/motion/hyperframes/compose.ts`. Causa: il config di `vite-node` senza il plugin che fornisce quel modulo virtuale. Dal 08/10/2026 `scripts/vite-node.config.ts` registra `motionBundles()` (e uno shim per `$app/server`): se torna, è un modulo virtuale nuovo non aggiunto a `BUNDLES` in `scripts/motion-bundles.ts`. In un worktree nuovo, prima `npx svelte-kit sync`.
 
+## Un turno motion su un sito vero ferma tutto il server
+Segnale: dopo `analyze_site` il dev server non risponde più a nessuno; in produzione `Task timed out after 300 seconds` sull'agent motion, e il `SITE_DEADLINE_MS` non scatta (un timer non gira con il loop fermo). Causa: una regex con una classe ripetuta all'inizio (`/([^{}]+)\{…\}/g`) riparte da ogni posizione di un testo lungo senza graffe: quadratica, minuti su stripe.com (760 KB). Mossa: per ogni regex su HTML/CSS di terzi, un ancoraggio a un carattere letterale o uno `split`; il test misura il loop (`site-brief.test.ts`, «keeps the event loop answering…»), non solo il risultato.
+
 ## Un keyframe x/y su un testo lo spedisce fuori campo
 Segnale: un numero o una parola keyframati su `y`/`x` spariscono o finiscono al bordo, mentre le props x/y degli stessi clip sono giuste. Causa: nelle props x/y sono posizioni, nei keyframe sono offset dal posto del clip (entrambi "px" per i tool). Mossa: keyframe da offset a 0 (es. y 140 → 0), mai la posizione assoluta.
 
