@@ -12,6 +12,13 @@ const prompt = (style: MotionStyle) =>
     style
   });
 
+describe('when the agent breaks the video', () => {
+  it('restores a saved version itself instead of asking the user to undo', () => {
+    expect(prompt(MotionStyle.LaunchFilm)).toMatch(/restore_revision/);
+    expect(prompt(MotionStyle.LaunchFilm)).toMatch(/never ask the user to undo/i);
+  });
+});
+
 describe('the motion agent keeps titles and scenes apart', () => {
   it.each([MotionStyle.LaunchFilm, MotionStyle.AppleMinimal])('%s carries the title card rule', (style) => {
     expect(prompt(style)).toContain(TITLE_CARD_RULE);

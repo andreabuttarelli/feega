@@ -132,6 +132,7 @@ export type MotionToolDeps = {
   renderLink?: () => Promise<Record<string, unknown>>;
   embed?: (action: EmbedAction) => Promise<Record<string, unknown>>;
   templates?: TemplateLibrary;
+  revisions?: RevisionLibrary;
   site?: (url: string) => Promise<SourceRead>;
   brand?: (name?: string) => Promise<SourceRead>;
   importAsset?: (url: string, label?: string) => Promise<AssetImport>;
@@ -140,6 +141,10 @@ export type MotionToolDeps = {
   effects?: EffectStore;
   layouts?: LayoutStore;
 };
+
+export type RevisionEntry = { version: number; summary: string | null; actorKind: string; createdAt: string; clips: number };
+
+export type RevisionLibrary = { list: () => Promise<RevisionEntry[]>; read: (version: number) => Promise<MotionDoc | null> };
 
 export type UiRegion = { x: number; y: number; width: number; height: number };
 
@@ -1960,6 +1965,35 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         }
         const saved = await deps.templates.save({ doc: session.doc, compId: input.comp ?? null, meta: { name: input.name, description: input.description ?? '' }, posterFrame: 0 });
         return saved.ok ? { ok: true, template_id: saved.entry.id } : saved;
+      }
+    }),
+
+    list_revisions: tool({
+      description: 'List the saved versions of this video, newest first: version number, who saved it (user or agent), what changed, how many clips it had. Use it to find the version to restore_revision.',
+      inputSchema: z.object({}).strict(),
+      execute: async () => {
+        if (!deps.revisions) {
+          return { ok: false, error: 'version history is not available here' };
+        }
+        const entries = await deps.revisions.list();
+        return { ok: true, revisions: entries.map((e) => ({ version: e.version, actor: e.actorKind, summary: e.summary, at: e.createdAt, clips: e.clips })) };
+      }
+    }),
+
+    restore_revision: tool({
+      description: 'Put a saved version of the video back (number from list_revisions). It replaces the whole doc, saved as a new version at the end of the turn: history is never deleted, and the user can undo the restore. When your edits broke the video, restore the last good version yourself instead of asking the user to undo.',
+      inputSchema: z.object({ version: z.number().int().positive() }),
+      execute: async (input) => {
+        if (!deps.revisions) {
+          return { ok: false, error: 'version history is not available here' };
+        }
+        const doc = await deps.revisions.read(input.version);
+        if (!doc) {
+          return { ok: false, error: `no version ${input.version}: call list_revisions` };
+        }
+        session.doc = doc;
+        session.edits.push(`restored version ${input.version}`);
+        return { ok: true, edit: `restored version ${input.version}`, doc: docSummary(session.doc, []) };
       }
     }),
 

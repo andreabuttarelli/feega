@@ -81,6 +81,33 @@ export async function readRevision(db: Db, input: { orgId: string; nodeId: strin
   return data ? headOf(data as RevisionRow) : null;
 }
 
+export const REVISION_LIST_LIMIT = 30;
+
+export type RevisionListing = { version: number; summary: string | null; actorKind: string; createdAt: string; clips: number };
+
+type ListedRow = { version: number; doc: { tracks?: { clips?: unknown[] }[] } | null; summary: string | null; actor_kind: string; created_at?: string };
+
+export async function listRevisions(db: Db, input: { orgId: string; nodeId: string }): Promise<RevisionListing[]> {
+  const { data, error } = await db
+    .from('motion_revisions')
+    .select('version, doc, summary, actor_kind, created_at')
+    .eq('org_id', input.orgId)
+    .eq('node_id', input.nodeId)
+    .order('version', { ascending: false })
+    .limit(REVISION_LIST_LIMIT);
+
+  if (error) {
+    throw error;
+  }
+  return ((data ?? []) as ListedRow[]).map((row) => ({
+    version: Number(row.version),
+    summary: row.summary,
+    actorKind: row.actor_kind,
+    createdAt: row.created_at ?? '',
+    clips: (row.doc?.tracks ?? []).reduce((n, t) => n + (t.clips?.length ?? 0), 0)
+  }));
+}
+
 export async function appendRevision(
   db: Db,
   input: { orgId: string; nodeId: string; expectedVersion: number; doc: unknown; actor: Actor; summary?: string | null }

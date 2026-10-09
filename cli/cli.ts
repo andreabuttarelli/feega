@@ -173,6 +173,16 @@ motion
   });
 
 motion
+  .command('revisions <nodeId>')
+  .description('List the saved versions of a video, or put one back as a new version (free)')
+  .option('--restore <version>', 'Restore this version; history is kept')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (nodeId: string, opts) => {
+    const { cmdMotionRevisions } = await import('./commands/motion.ts');
+    await cmdMotionRevisions(nodeId, opts);
+  });
+
+motion
   .command('render-status <runId>')
   .description('State of a render and the link to its file')
   .option('--org <id>', 'Which org, if you belong to more than one')

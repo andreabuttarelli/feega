@@ -33,7 +33,7 @@ import { analyzeSounds, storageAnalysis } from '$lib/server/motion/audio-analysi
 import { motionAgentPrompt } from '$lib/server/motion/motion-prompt';
 import { speakVoiceover } from '$lib/server/motion/voiceover';
 import { layMusic } from '$lib/server/motion/music';
-import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
+import { RevisionOutcome, listRevisions, readRevision } from '$lib/server/repos/motion-revisions';
 import { brandSources } from '$lib/server/motion/brand-sources';
 import { SELF_CHECK_MAX_STEPS, SUMMARY_PROMPT, VIEW_FRAMES, Vision, deliveryBlocked, docTexts, fixPrompt, keyFrameTimes, openErrors, selfCheckPrompt, stillOpenNote, usageByModel, visionStep } from '$lib/server/motion/frames';
 import { frameStats } from '$lib/server/motion/frame-stats';
@@ -177,6 +177,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
     assets,
     newId: () => crypto.randomUUID().slice(0, 8),
     templates: templateLibrary(db, { orgId, actor: { kind: 'agent', id: userId, agentKey: MOTION_AGENT_KEY } }),
+    revisions: { list: () => listRevisions(db, nodeScope), read: async (version) => (await readRevision(db, { ...nodeScope, version }))?.doc ?? null },
     ...brandSources(db, { orgId, projectId: project.id, canvasId: motion.record.canvasId, brandId: project.brandId }),
     analysis: async (assetId) => (await analyzeSounds(storageAnalysis(db), { orgId, projectId: project.id }, assets, [assetId]))[assetId] ?? null,
     voiceover: (voice) => withOrgContext(orgId, () => speakVoiceover(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, actor }, voice)),

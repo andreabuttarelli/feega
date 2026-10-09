@@ -79,6 +79,19 @@ function printRender(started: RenderStart) {
   console.log(`Check it: feega motion render-status ${started.run_id}`);
 }
 
+export async function cmdMotionRevisions(nodeId: string, opts: { org?: string; restore?: string }) {
+  const bearer = await token();
+  if (opts.restore) {
+    const restored = await motionApi.restore(bearer, nodeId, Number(opts.restore), opts.org);
+    console.log(`Restored version ${restored.restored} as revision ${restored.version}.`);
+    return;
+  }
+  const { revisions } = await motionApi.revisions(bearer, nodeId, opts.org);
+  for (const r of revisions) {
+    console.log(`v${r.version}  ${r.actorKind}  ${r.clips} clips  ${r.createdAt}  ${r.summary ?? ''}`);
+  }
+}
+
 export async function cmdMotionList(opts: { org?: string; project?: string }) {
   const { videos } = await motionApi.list(await token(), opts.project, opts.org);
   if (!videos.length) {
