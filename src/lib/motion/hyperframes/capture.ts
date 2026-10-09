@@ -3,9 +3,10 @@ import { inlineMedia, shrinkImage } from './inline-media';
 import { js } from './html';
 import { paintSvg } from './svg-paint';
 import { planLayers, type Pass } from './layer-plan';
-import { grainGl, type Grain, type GrainPass } from '../effects/grain-gl';
+import { grainPixels, type GrainArea } from '../effects/grain';
 import { GRAIN_SAMPLE_OFFSET, turbulenceTile } from '../effects/turbulence';
 import { GRAIN_TILE } from '../effects/registry';
+import { NOT_WEBKIT_UA, WEBKIT_UA } from '../engine';
 import { ERRORS } from '../custom/runtime';
 export { contentStamp } from '../stamp';
 
@@ -33,14 +34,15 @@ export type CaptureRequest = { type: typeof CAPTURE_REQUEST; id: string; format:
 export type ClipError = { clip: string; component: string; message: string };
 export type CaptureReply = { type: typeof CAPTURE_REPLY; id: string; stamp?: string; url?: string; bitmap?: ImageBitmap; error?: string; layout?: string; errors?: ClipError[] };
 
-type RuntimeConfig = { request: string; reply: string; lib: string; width: number; height: number; mediaTimeoutMs: number; stamp: string; errorsKey: string; settle: Settle; grainTile: number };
+type RuntimeConfig = { request: string; reply: string; lib: string; width: number; height: number; mediaTimeoutMs: number; stamp: string; errorsKey: string; settle: Settle; grainTile: number; grainOffset: number; webkitUa: string; notWebkitUa: string };
 type Shot = { body: Record<string, unknown>; transfer: Transferable[] };
 type HtmlToImage = {
   toSvg: (node: HTMLElement, options: Record<string, unknown>) => Promise<string>;
   getFontEmbedCSS: (node: HTMLElement) => Promise<string>;
 };
 
-function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, inline: typeof inlineMedia, shrink: typeof shrinkImage, paint: typeof paintSvg, plan: typeof planLayers, grain: GrainPass) {
+function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, inline: typeof inlineMedia, shrink: typeof shrinkImage, paint: typeof paintSvg, plan: typeof planLayers, grainOn: typeof grainPixels, tileOf: typeof turbulenceTile) {
+  type Grain = { baseFrequency: number; seed: number; amount: number };
   const shrunk = new Map<string, Promise<string>>();
   let lib: Promise<unknown> | null = null;
   let fonts: Promise<string> | null = null;
@@ -116,6 +118,7 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
       pen.drawImage(full(img, cfg.width, cfg.height), 0, 0, PRINT.width, PRINT.height);
       return pen.getImageData(0, 0, PRINT.width, PRINT.height).data.join();
     },
+    blank: (print: string) => print.split(',').every((v, i) => i % 4 !== 3 || v === '0'),
     tick: frame,
     draw: full
   });
@@ -270,7 +273,47 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
     const c = -ey[0] / det;
     const b = -ex[1] / det;
     const d = ex[0] / det;
-    return { inverse: [a, b, c, d, -(a * o[0] + c * o[1]), -(b * o[0] + d * o[1])], width: el.offsetWidth, height: el.offsetHeight, margin: REGION_MARGIN };
+    const width = el.offsetWidth;
+    const height = el.offsetHeight;
+    const corners = [
+      [-REGION_MARGIN * width, -REGION_MARGIN * height],
+      [(1 + REGION_MARGIN) * width, -REGION_MARGIN * height],
+      [-REGION_MARGIN * width, (1 + REGION_MARGIN) * height],
+      [(1 + REGION_MARGIN) * width, (1 + REGION_MARGIN) * height]
+    ].map(([u, v]) => [o[0] + u * ex[0] + v * ey[0], o[1] + u * ex[1] + v * ey[1]]);
+    const xs = corners.map((p) => p[0]);
+    const ys = corners.map((p) => p[1]);
+    const bounds = {
+      left: Math.max(0, Math.floor(Math.min(...xs))),
+      top: Math.max(0, Math.floor(Math.min(...ys))),
+      right: Math.min(at.width, Math.ceil(Math.max(...xs))),
+      bottom: Math.min(at.height, Math.ceil(Math.max(...ys)))
+    };
+    const area: GrainArea = { inverse: [a, b, c, d, -(a * o[0] + c * o[1]), -(b * o[0] + d * o[1])], width, height, margin: REGION_MARGIN };
+    return { area, bounds };
+  };
+  const tiles = new Map<string, Uint8ClampedArray>();
+  const tileFor = (g: Grain) => {
+    const key = `${g.baseFrequency}:${g.seed}`;
+    const known = tiles.get(key) ?? tileOf({ baseFrequency: g.baseFrequency, seed: g.seed, octaves: 1, size: cfg.grainTile, offset: cfg.grainOffset });
+    tiles.set(key, known);
+    return known;
+  };
+  const grain = (source: HTMLCanvasElement, grains: Grain[], place: ReturnType<typeof areaOf>) => {
+    const out = canvasOf(source.width, source.height);
+    const { left, top, right, bottom } = place.bounds;
+    if (right <= left || bottom <= top) {
+      return out;
+    }
+    const w = right - left;
+    const h = bottom - top;
+    const read = (source.getContext('2d') as CanvasRenderingContext2D).getImageData(left, top, w, h);
+    const [a, b, c, d, e, f] = place.area.inverse;
+    const area = { ...place.area, inverse: [a, b, c, d, e + a * left + c * top, f + b * left + d * top] };
+    const layers = grains.map((g) => ({ amount: g.amount, tile: tileFor(g), tileSize: cfg.grainTile }));
+    const done = grainOn(read.data, w, h, layers, area);
+    (out.getContext('2d') as CanvasRenderingContext2D).putImageData(new ImageData(done as Uint8ClampedArray<ArrayBuffer>, w, h), left, top);
+    return out;
   };
   const paintOwn = (pen: CanvasRenderingContext2D, el: Element, style: CSSStyleDeclaration, at: Place) => {
     const grains = grainsOf(style) ?? [];
@@ -356,11 +399,9 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
     return out;
   };
   const LAYERED = 'split';
-  const SOFTWARE_FILTERS = /AppleWebKit/;
-  const GPU_FILTERS = /Chrome\/|Firefox\//;
   const drawn = async (root: HTMLElement, m: CaptureRequest, embed: string) => {
     const layers = [...root.children].filter((el) => !(el instanceof HTMLScriptElement) && !(el instanceof HTMLStyleElement));
-    const cpuFilters = SOFTWARE_FILTERS.test(navigator.userAgent) && !GPU_FILTERS.test(navigator.userAgent);
+    const cpuFilters = new RegExp(cfg.webkitUa).test(navigator.userAgent) && !new RegExp(cfg.notWebkitUa).test(navigator.userAgent);
     const passes = (m.layering ?? LAYERED) === LAYERED ? plan(factsOf(layers, cpuFilters)) : [];
     const solid = passes[0]?.kind === 'dom' || backdropOf(root) !== null;
     if (!passes.some((p) => p.kind !== 'dom') || !solid) {
@@ -421,6 +462,6 @@ export function stampOf(html: string): string | null {
 }
 
 export function captureScript(doc: { width: number; height: number }, stamp: string): string {
-  const cfg: RuntimeConfig = { request: CAPTURE_REQUEST, reply: CAPTURE_REPLY, lib: SCREENSHOT_URL, width: doc.width, height: doc.height, mediaTimeoutMs: MEDIA_TIMEOUT_MS, stamp, errorsKey: ERRORS, settle: Settle.Paint, grainTile: GRAIN_TILE };
-  return `<script>(${captureRuntime.toString()})(${js(cfg)},(${freezeMasks.toString()}),(${inlineMedia.toString()}),(${shrinkImage.toString()}),(${paintSvg.toString()}),(${planLayers.toString()}),(${grainGl.toString()})((${turbulenceTile.toString()}),${GRAIN_TILE},${GRAIN_SAMPLE_OFFSET}));</script>`;
+  const cfg: RuntimeConfig = { request: CAPTURE_REQUEST, reply: CAPTURE_REPLY, lib: SCREENSHOT_URL, width: doc.width, height: doc.height, mediaTimeoutMs: MEDIA_TIMEOUT_MS, stamp, errorsKey: ERRORS, settle: Settle.Paint, grainTile: GRAIN_TILE, grainOffset: GRAIN_SAMPLE_OFFSET, webkitUa: WEBKIT_UA.source, notWebkitUa: NOT_WEBKIT_UA.source };
+  return `<script>(${captureRuntime.toString()})(${js(cfg)},(${freezeMasks.toString()}),(${inlineMedia.toString()}),(${shrinkImage.toString()}),(${paintSvg.toString()}),(${planLayers.toString()}),(${grainPixels.toString()}),(${turbulenceTile.toString()}));</script>`;
 }
