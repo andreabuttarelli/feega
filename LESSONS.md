@@ -2674,3 +2674,10 @@ Segnale: 403 da `readSite` su siti dietro Cloudflare/WAF (lovable.dev, g2.com) c
 
 ### Layer 3D che spariscono da un export Safari a più lane
 Segnale: nel video esportato in WebKit alcuni canvas three.js mancano in certi frame; con una lane sola, o in un confronto di pochi frame, tutto c'è. WebKit ha un tetto di contesti WebGL vivi per pagina e butta i più vecchi; ogni lane è un iframe con i suoi canvas, e un contesto in più (es. per un effetto) li fa saltare. Mossa: nessun contesto WebGL nel codice di cattura; in WebKit una lane sola (le lane condividono il thread); verificare con un export intero (`bench:export --frames=0 --keep`) a 4 lane, non solo con `--parity`.
+
+### Un modulo che esporta `then` diventa una promessa
+Segnale: `TypeError: x is not iterable` dentro una funzione mai chiamata dal test, appena il modulo viene importato con `await import` (vitest lo fa). Un export di nome `then` rende il namespace del modulo un thenable: `await` lo chiama. Mossa: mai esportare `then`; rinominare (`chain`).
+
+### WebGL: `GL_INVALID_OPERATION: Feedback loop` o una texture al posto di un'altra
+Segnale: un pass del compositore disegna vuoto o disegna la texture sbagliata (es. un tile di grana in un angolo). Un sampler del programma resta legato alla texture del framebuffer di destinazione anche se il ramo dello shader non lo legge; creare una texture la lega all'unità attiva e scavalca quella del pass. Mossa: ogni pass lega tutti i sampler del suo programma (una texture vuota se non servono); le texture nuove si creano su un'unità riservata (`SCRATCH_UNIT`, `webgl-device.ts`).
+

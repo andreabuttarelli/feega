@@ -3,6 +3,7 @@ import { inlineMedia, shrinkImage } from './inline-media';
 import { js } from './html';
 import { paintSvg } from './svg-paint';
 import { planLayers, type Pass } from './layer-plan';
+import { chain as chainAffine, cssAffine, cssRgba, joinRasters, type LayerTree } from './layer-tree';
 import { grainPixels, type GrainArea } from '../effects/grain';
 import { GRAIN_SAMPLE_OFFSET, turbulenceTile } from '../effects/turbulence';
 import { GRAIN_TILE } from '../effects/registry';
@@ -22,7 +23,8 @@ export enum FrameFormat {
 
 export enum Layering {
   Flat = 'flat',
-  Split = 'split'
+  Split = 'split',
+  Gpu = 'gpu'
 }
 
 export enum Settle {
@@ -32,7 +34,7 @@ export enum Settle {
 
 export type CaptureRequest = { type: typeof CAPTURE_REQUEST; id: string; format: FrameFormat; width: number; height: number; quality?: number; settle?: Settle; layering?: Layering };
 export type ClipError = { clip: string; component: string; message: string };
-export type CaptureReply = { type: typeof CAPTURE_REPLY; id: string; stamp?: string; url?: string; bitmap?: ImageBitmap; error?: string; layout?: string; errors?: ClipError[] };
+export type CaptureReply = { type: typeof CAPTURE_REPLY; id: string; stamp?: string; url?: string; bitmap?: ImageBitmap; tree?: LayerTree; sheets?: ImageBitmap[]; error?: string; layout?: string; errors?: ClipError[] };
 
 type RuntimeConfig = { request: string; reply: string; lib: string; width: number; height: number; mediaTimeoutMs: number; stamp: string; errorsKey: string; settle: Settle; grainTile: number; grainOffset: number; webkitUa: string; notWebkitUa: string };
 type Shot = { body: Record<string, unknown>; transfer: Transferable[] };
@@ -41,7 +43,7 @@ type HtmlToImage = {
   getFontEmbedCSS: (node: HTMLElement) => Promise<string>;
 };
 
-function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, inline: typeof inlineMedia, shrink: typeof shrinkImage, paint: typeof paintSvg, plan: typeof planLayers, grainOn: typeof grainPixels, tileOf: typeof turbulenceTile) {
+function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, inline: typeof inlineMedia, shrink: typeof shrinkImage, paint: typeof paintSvg, plan: typeof planLayers, grainOn: typeof grainPixels, tileOf: typeof turbulenceTile, chain: typeof chainAffine, affine: typeof cssAffine, rgba: typeof cssRgba, join: typeof joinRasters) {
   type Grain = { baseFrequency: number; seed: number; amount: number };
   const shrunk = new Map<string, Promise<string>>();
   let lib: Promise<unknown> | null = null;
@@ -398,11 +400,190 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
     pen.globalCompositeOperation = 'source-over';
     return out;
   };
-  const LAYERED = 'split';
+  type Affine = [number, number, number, number, number, number];
+  type Rgba = [number, number, number, number];
+  type Paint = { kind: 'sheet'; sheet: number; width: number; height: number; at: Affine } | { kind: 'fill'; color: Rgba; width: number; height: number; at: Affine };
+  type Effect = { kind: 'grain'; grains: Grain[]; area: GrainArea };
+  type TreeNode = { paints: Paint[]; children: TreeNode[]; opacity: number; blend: string; effects: Effect[]; clip: Paint | null };
+  type Run = { raster: Element[] };
+  type Walked = TreeNode | Run | null;
+  const FLAT_PX = 0.5;
+  const pointAt = (el: Element, x: number, y: number, at: Place) => {
+    const probe = document.createElement('div');
+    probe.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:0;height:0;margin:0;padding:0;border:0`;
+    el.appendChild(probe);
+    const r = probe.getBoundingClientRect();
+    probe.remove();
+    return [(r.left - at.base.left) * at.sx, (r.top - at.base.top) * at.sy];
+  };
+  const affineOf = (el: Element, at: Place): Affine | null => {
+    const o = pointAt(el, 0, 0, at);
+    const x = pointAt(el, PROBE_STEP, 0, at);
+    const y = pointAt(el, 0, PROBE_STEP, at);
+    const far = pointAt(el, PROBE_STEP, PROBE_STEP, at);
+    const flat = Math.abs(x[0] + y[0] - o[0] - far[0]) < FLAT_PX && Math.abs(x[1] + y[1] - o[1] - far[1]) < FLAT_PX;
+    return flat ? [(x[0] - o[0]) / PROBE_STEP, (x[1] - o[1]) / PROBE_STEP, (y[0] - o[0]) / PROBE_STEP, (y[1] - o[1]) / PROBE_STEP, o[0], o[1]] : null;
+  };
+  const UPRIGHT_AFFINE = 1e-6;
+  const upright = (m: Affine) => Math.abs(m[1]) < UPRIGHT_AFFINE && Math.abs(m[2]) < UPRIGHT_AFFINE;
+  const leafAffine = (el: HTMLElement, parent: Affine, style: CSSStyleDeclaration): Affine | null => {
+    const own = affine(style.transform, style.transformOrigin);
+    return own && el.offsetParent === el.parentElement ? chain(chain(parent, [1, 0, 0, 1, el.offsetLeft, el.offsetTop]), own) : null;
+  };
+  const SHEET: Paint['kind'] = 'sheet';
+  const FILL: Paint['kind'] = 'fill';
+  const WHITE: Rgba = [1, 1, 1, 1];
+  const hasText = (el: Element) => [...el.childNodes].some((n) => n.nodeType === Node.TEXT_NODE && n.textContent?.trim());
+  const boxed = (style: CSSStyleDeclaration) =>
+    none(style.boxShadow) &&
+    none(style.backgroundImage) &&
+    none(style.clipPath) &&
+    none(style.backdropFilter) &&
+    none(style.maskImage || (style as unknown as { webkitMaskImage?: string }).webkitMaskImage) &&
+    parseFloat(style.borderTopLeftRadius) + parseFloat(style.borderBottomRightRadius) + parseFloat(style.borderTopRightRadius) + parseFloat(style.borderBottomLeftRadius) === 0 &&
+    parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth) + parseFloat(style.borderLeftWidth) + parseFloat(style.borderRightWidth) === 0;
+  const isNode = (w: Walked): w is TreeNode => !!w && 'paints' in w;
+  const plainNode = (n: TreeNode) => !n.paints.length && !n.effects.length && !n.clip && n.opacity === 1 && n.blend === 'normal';
+  const grouped = (items: Walked[]) => join<TreeNode, Element>(items);
+  type Walk = { at: Place; sheets: HTMLCanvasElement[]; runs: { run: Run; node: TreeNode }[] };
+  const canvasPaint = (el: HTMLCanvasElement, parent: Affine, style: CSSStyleDeclaration, w: Walk): Paint | null | undefined => {
+    const at = leafAffine(el, parent, style);
+    if (!at || !upright(at)) {
+      return undefined;
+    }
+    if (!el.width || !el.height || !el.offsetWidth || !el.offsetHeight) {
+      return null;
+    }
+    w.sheets.push(el);
+    return { kind: SHEET, sheet: w.sheets.length - 1, width: el.offsetWidth, height: el.offsetHeight, at };
+  };
+  const held = (parts: (TreeNode | Run)[], w: Walk) =>
+    parts.map((p) => {
+      if (isNode(p)) {
+        return p;
+      }
+      const holder: TreeNode = { paints: [], children: [], opacity: 1, blend: 'normal', effects: [], clip: null };
+      w.runs.push({ run: p, node: holder });
+      return holder;
+    });
+  const walk = (el: Element, parent: Affine, w: Walk): Walked => {
+    if (inert(el)) {
+      return null;
+    }
+    const style = getComputedStyle(el);
+    const opacity = Number(style.opacity);
+    if (style.display === 'none' || opacity <= 0) {
+      return null;
+    }
+    const raster: Run = { raster: [el] };
+    if (!PLAIN.has(el.tagName) || hasText(el) || !boxed(style) || (el.parentElement && style.zIndex !== 'auto' && !stacked(el))) {
+      return raster;
+    }
+    const shown = style.visibility !== 'hidden';
+    if (el instanceof HTMLCanvasElement) {
+      const paint = canvasPaint(el, parent, style, w);
+      if (paint === undefined) {
+        return raster;
+      }
+      return { paints: paint && shown ? [paint] : [], children: [], opacity, blend: style.mixBlendMode, effects: [], clip: null };
+    }
+    const grains = grainsOf(style);
+    const at = grains ? affineOf(el, w.at) : null;
+    if (!grains || !at || !upright(at)) {
+      return raster;
+    }
+    const color = rgba(style.backgroundColor);
+    const box = { width: (el as HTMLElement).offsetWidth, height: (el as HTMLElement).offsetHeight, at };
+    const paints: Paint[] = color && shown ? [{ kind: FILL, color, ...box }] : [];
+    const effects: Effect[] = grains.length ? [{ kind: 'grain', grains, area: areaOf(el as HTMLElement, w.at).area }] : [];
+    const clip: Paint | null = style.overflow !== 'visible' ? { kind: FILL, color: WHITE, ...box } : null;
+    const parts = grouped([...el.children].map((child) => walk(child, at, w)));
+    const self: TreeNode = { paints, children: [], opacity, blend: style.mixBlendMode, effects, clip };
+    if (parts.every((p) => !isNode(p)) && plainNode(self)) {
+      return raster;
+    }
+    self.children = held(parts, w);
+    return self;
+  };
+  const gpuOnly = (n: TreeNode): boolean => n.effects.length > 0 || n.children.some(gpuOnly);
+  const rasterKeys = new WeakMap<Element, { key: string; canvas: HTMLCanvasElement }>();
+  const LIVE = 'canvas, video, iframe';
+  const kebab = (name: string) => name.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
+  const NEUTRAL: [string, string][] = Object.entries({ filter: 'none', opacity: '1', mixBlendMode: 'normal', backgroundColor: 'transparent', mask: 'none', WebkitMask: 'none' }).map(([name, value]) => [kebab(name), value]);
+  const neutralised = (path: HTMLElement[]) => {
+    const saved = path.map((el) => NEUTRAL.map(([name]) => [el.style.getPropertyValue(name), el.style.getPropertyPriority(name)] as const));
+    path.forEach((el) => NEUTRAL.forEach(([name, value]) => el.style.setProperty(name, value, 'important')));
+    return () => path.forEach((el, i) => NEUTRAL.forEach(([name], j) => el.style.setProperty(name, saved[i][j][0], saved[i][j][1])));
+  };
+  const pathOf = (root: HTMLElement, run: Run) => {
+    const path: HTMLElement[] = [];
+    for (let at = run.raster[0].parentElement; at && at !== root; at = at.parentElement) {
+      path.push(at);
+    }
+    return path;
+  };
+  const keyOf = (root: HTMLElement, m: CaptureRequest, run: Run) => {
+    const live = run.raster.some((el) => el.matches(LIVE) || el.querySelector(LIVE));
+    return live ? null : `${m.width}x${m.height}|${pathOf(root, run).map((el) => el.getAttribute('style') ?? '').join('|')}|${run.raster.map((el) => el.outerHTML).join('')}`;
+  };
+  const seen = new WeakMap<Element, string>();
+  const changing = (root: HTMLElement, m: CaptureRequest, run: Run) => {
+    const key = keyOf(root, m, run);
+    const before = seen.get(run.raster[0]);
+    if (key !== null) {
+      seen.set(run.raster[0], key);
+    }
+    return key === null || key !== before;
+  };
+  const rasterOf = async (root: HTMLElement, m: CaptureRequest, embed: string, run: Run) => {
+    const path = pathOf(root, run);
+    const key = keyOf(root, m, run);
+    const known = rasterKeys.get(run.raster[0]);
+    if (key !== null && known?.key === key) {
+      return known.canvas;
+    }
+    const kept = new Set<Node>(path);
+    const inside = (node: Node) => kept.has(node) || run.raster.some((el) => el === node || el.contains(node));
+    const restore = neutralised(path);
+    try {
+      const canvas = await svgOf(root, m, embed, { style: { background: 'transparent' }, filter: (node: Node) => drawable(node) && (!(node instanceof Element) || inside(node)) });
+      if (key !== null) {
+        rasterKeys.set(run.raster[0], { key, canvas });
+      }
+      return canvas;
+    } finally {
+      restore();
+    }
+  };
+  const treeOf = async (root: HTMLElement, m: CaptureRequest, embed: string) => {
+    const backdrop = backdropOf(root);
+    const at = placeOf(root, m);
+    const w: Walk = { at, sheets: [], runs: [] };
+    const base: Affine = [at.sx, 0, 0, at.sy, 0, 0];
+    const parts = grouped([...root.children].map((el) => walk(el, base, w)));
+    if (backdrop === null || !parts.some((p) => isNode(p) && gpuOnly(p))) {
+      return null;
+    }
+    const children = held(parts, w);
+    if (w.runs.filter(({ run }) => changing(root, m, run)).length > MAX_FRESH_RASTERS) {
+      return null;
+    }
+    const sources: HTMLCanvasElement[] = [...w.sheets];
+    for (const { run, node } of w.runs) {
+      sources.push(await rasterOf(root, m, embed, run));
+      node.paints.push({ kind: SHEET, sheet: sources.length - 1, width: m.width, height: m.height, at: [1, 0, 0, 1, 0, 0] });
+    }
+    const sheets = await Promise.all(sources.map((c) => createImageBitmap(c, { premultiplyAlpha: 'premultiply' })));
+    const tree = { width: m.width, height: m.height, backdrop: rgba(backdrop), root: { paints: [], children, opacity: 1, blend: 'normal', effects: [], clip: null } };
+    return { tree, sheets };
+  };
+  const MAX_FRESH_RASTERS = 2;
+  const GPU = 'gpu';
+  const FLAT = 'flat';
   const drawn = async (root: HTMLElement, m: CaptureRequest, embed: string) => {
     const layers = [...root.children].filter((el) => !(el instanceof HTMLScriptElement) && !(el instanceof HTMLStyleElement));
     const cpuFilters = new RegExp(cfg.webkitUa).test(navigator.userAgent) && !new RegExp(cfg.notWebkitUa).test(navigator.userAgent);
-    const passes = (m.layering ?? LAYERED) === LAYERED ? plan(factsOf(layers, cpuFilters)) : [];
+    const passes = m.layering !== FLAT ? plan(factsOf(layers, cpuFilters)) : [];
     const solid = passes[0]?.kind === 'dom' || backdropOf(root) !== null;
     if (!passes.some((p) => p.kind !== 'dom') || !solid) {
       return svgOf(root, m, embed);
@@ -411,10 +592,14 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
   };
   const output: Record<string, (root: HTMLElement, m: CaptureRequest, embed: string) => Promise<Shot>> = {
     jpeg: (root, m, embed) => drawn(root, m, embed).then((canvas) => ({ body: { url: canvas.toDataURL('image/jpeg', m.quality ?? 1) }, transfer: [] })),
-    bitmap: (root, m, embed) =>
-      drawn(root, m, embed)
-        .then((canvas) => createImageBitmap(canvas))
-        .then((bitmap) => ({ body: { bitmap }, transfer: [bitmap] }))
+    bitmap: async (root, m, embed) => {
+      const layered = m.layering === GPU ? await treeOf(root, m, embed) : null;
+      if (layered) {
+        return { body: layered, transfer: layered.sheets };
+      }
+      const bitmap = await createImageBitmap(await drawn(root, m, embed));
+      return { body: { bitmap }, transfer: [bitmap] };
+    }
   };
 
   const layout = (root: HTMLElement) => {
@@ -463,5 +648,5 @@ export function stampOf(html: string): string | null {
 
 export function captureScript(doc: { width: number; height: number }, stamp: string): string {
   const cfg: RuntimeConfig = { request: CAPTURE_REQUEST, reply: CAPTURE_REPLY, lib: SCREENSHOT_URL, width: doc.width, height: doc.height, mediaTimeoutMs: MEDIA_TIMEOUT_MS, stamp, errorsKey: ERRORS, settle: Settle.Paint, grainTile: GRAIN_TILE, grainOffset: GRAIN_SAMPLE_OFFSET, webkitUa: WEBKIT_UA.source, notWebkitUa: NOT_WEBKIT_UA.source };
-  return `<script>(${captureRuntime.toString()})(${js(cfg)},(${freezeMasks.toString()}),(${inlineMedia.toString()}),(${shrinkImage.toString()}),(${paintSvg.toString()}),(${planLayers.toString()}),(${grainPixels.toString()}),(${turbulenceTile.toString()}));</script>`;
+  return `<script>(${captureRuntime.toString()})(${js(cfg)},(${freezeMasks.toString()}),(${inlineMedia.toString()}),(${shrinkImage.toString()}),(${paintSvg.toString()}),(${planLayers.toString()}),(${grainPixels.toString()}),(${turbulenceTile.toString()}),(${chainAffine.toString()}),(${cssAffine.toString()}),(${cssRgba.toString()}),(${joinRasters.toString()}));</script>`;
 }
