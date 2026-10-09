@@ -4,8 +4,8 @@ import type { RequestHandler } from './$types';
 
 const EMBED_CACHE = 'public, max-age=60, s-maxage=60';
 
-export const GET: RequestHandler = async ({ params, fetch }) => {
-  const html = await readEmbed(fetch, params.id);
+export const GET: RequestHandler = async ({ params, fetch, url }) => {
+  const html = await readEmbed(fetch, params.id, url.origin);
   if (html === null) {
     throw error(404, 'This embed is not published');
   }

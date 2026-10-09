@@ -68,6 +68,12 @@ export function loaderMain(win: Window, cfg: LoaderConfig, host: typeof hostMain
   const fill = doc.createElement('style');
   fill.textContent = `${cfg.tag},[${cfg.attr}]{display:block;width:100%;height:100%}`;
   doc.head.prepend(fill);
+  if (!doc.head.querySelector(`link[rel="preconnect"][href="${cfg.origin}"]`)) {
+    const hint = doc.createElement('link');
+    hint.rel = 'preconnect';
+    hint.href = cfg.origin;
+    doc.head.append(hint);
+  }
 
   const settingsOf = (id: string): Promise<EmbedSettings> =>
     win
@@ -80,6 +86,7 @@ export function loaderMain(win: Window, cfg: LoaderConfig, host: typeof hostMain
     frame.src = `${cfg.origin}${cfg.route}/${encodeURIComponent(id)}${fit ? `?fit=${encodeURIComponent(fit)}` : ''}`;
     frame.title = 'Interactive video';
     frame.allow = 'accelerometer; gyroscope';
+    frame.setAttribute('loading', 'lazy');
     frame.setAttribute('style', 'position:absolute;inset:0;width:100%;height:100%;border:0;display:block');
     return frame;
   };

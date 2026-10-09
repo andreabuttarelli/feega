@@ -4,6 +4,7 @@ import { embedRefusal, type PublishRefusal } from '$lib/gallery/refusals';
 import type { ProjectMode } from '$lib/project-mode';
 import { embedSettings, embedUrl, interactiveBundle, upgradePlayer, type InteractiveInput } from '$lib/motion/interactive/bundle';
 import { embedSnippet, type EmbedSettings } from '$lib/motion/interactive/loader';
+import { assetOf, hostAssets, type HostedAsset } from './embed-assets';
 
 export const EMBED_BUCKET = 'embeds';
 const EMBED_TYPE = 'text/html';
@@ -81,9 +82,16 @@ async function storedEmbed(fetchFn: typeof fetch, id: string): Promise<string | 
   return res.ok ? res.text() : null;
 }
 
-export async function readEmbed(fetchFn: typeof fetch, id: string): Promise<string | null> {
+export const assetBase = (origin: string, id: string) => `${embedUrl(origin, id)}/a`;
+
+export async function readEmbed(fetchFn: typeof fetch, id: string, origin: string): Promise<string | null> {
   const page = await storedEmbed(fetchFn, id);
-  return page === null ? null : (upgradePlayer(page) ?? page);
+  return page === null ? null : hostAssets(upgradePlayer(page) ?? page, assetBase(origin, id));
+}
+
+export async function readEmbedAsset(fetchFn: typeof fetch, id: string, hash: string): Promise<HostedAsset | null> {
+  const page = await storedEmbed(fetchFn, id);
+  return page === null ? null : assetOf(page, hash);
 }
 
 export async function readEmbedSettings(fetchFn: typeof fetch, id: string): Promise<EmbedSettings | null> {

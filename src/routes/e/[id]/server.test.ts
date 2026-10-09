@@ -8,7 +8,7 @@ const NODE = '6f1c2a8e-0b7d-4f1e-9a3c-2d5e8f7a1b40';
 
 async function open(id: string, body: string | null) {
   const fetch = async () => (body === null ? new Response('', { status: 404 }) : new Response(body));
-  return GET({ params: { id }, fetch } as unknown as Parameters<typeof GET>[0]);
+  return GET({ params: { id }, fetch, url: new URL(`https://oh.feega.app/e/${id}`) } as unknown as Parameters<typeof GET>[0]);
 }
 
 describe('/e/[id]', () => {
@@ -30,6 +30,15 @@ describe('/e/[id]', () => {
     expect(page).toContain('function selfScroll');
     expect(page).toContain('\\u003cp>clip\\u003c/p>');
     expect(page).toContain('"standaloneMs":500');
+  });
+
+  it('points large inlined assets at cached urls instead of shipping them in the page', async () => {
+    const audio = `data:audio/mpeg;base64,${Buffer.alloc(4096, 7).toString('base64')}`;
+
+    const page = await (await open(NODE, `<html>${audio}</html>`)).text();
+
+    expect(page).not.toContain('base64');
+    expect(page).toMatch(new RegExp(`https://oh\\.feega\\.app/e/${NODE}/a/[0-9a-f]+`));
   });
 
   it('an unpublished embed is a 404', async () => {

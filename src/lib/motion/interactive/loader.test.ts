@@ -37,6 +37,19 @@ describe('the hosted embed loader', () => {
     expect(frame.parentElement?.tagName).toBe('FEEGA-MOTION');
   });
 
+  it('loads an offscreen embed only as it nears the viewport', async () => {
+    const frame = await load(`<feega-motion src="${ID}"></feega-motion>`);
+    expect(frame.getAttribute('loading')).toBe('lazy');
+  });
+
+  it('opens the connection to feega before the iframe asks for it', async () => {
+    await load(`<feega-motion src="${ID}"></feega-motion>`);
+    const hint = document.head.querySelector('link[rel="preconnect"]') as HTMLLinkElement;
+
+    expect(hint.href).toBe(`${ORIGIN}/`);
+    expect(document.head.querySelectorAll('link[rel="preconnect"]')).toHaveLength(1);
+  });
+
   it('reads the video settings from feega, not from the snippet', async () => {
     const fetch = serve({ width: 1080, height: 1920, playback: 'autoplay', scrollLength: 3 });
     await load(`<feega-motion src="${ID}"></feega-motion>`);
