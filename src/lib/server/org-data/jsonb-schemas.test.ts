@@ -128,7 +128,6 @@ describe('validateJsonbColumn — colonne intenzionalmente libere: passano sempr
     ['canvas_events', 'before'],
     ['canvas_events', 'after'],
     ['chat_messages', 'tool_calls'],
-    ['chat_messages', 'attachments'],
     ['brands', 'palette'],
     ['brands', 'target'],
     ['node_runs', 'params'],
@@ -152,5 +151,12 @@ describe('validateJsonbColumn — una colonna non registrata non blocca niente',
   it('una colonna jsonb ipotetica fuori registro passa senza essere giudicata', () => {
     const out = validateJsonbColumn('orgs', 'settings', { qualunque: 'cosa' });
     expect(out.ok).toBe(true);
+  });
+});
+
+describe('validateJsonbColumn — chat_messages.attachments', () => {
+  it('accetta la forma che saveTurn scrive e rifiuta il resto', () => {
+    expect(validateJsonbColumn('chat_messages', 'attachments', [{ assetId: 'a', kind: 'image', name: 'l.png', mimeType: 'image/png', bytes: 1 }]).ok).toBe(true);
+    expect(validateJsonbColumn('chat_messages', 'attachments', [{ name: 'l.png' }]).ok).toBe(false);
   });
 });

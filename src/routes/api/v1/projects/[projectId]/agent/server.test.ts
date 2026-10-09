@@ -10,7 +10,7 @@ const streamed = vi.fn();
 const { screenModelInput } = vi.hoisted(() => ({ screenModelInput: vi.fn() }));
 vi.mock('$lib/server/moderation/model-input', () => ({ screenModelInput }));
 
-const saveTurn = vi.fn(async (_db: unknown, _turn: { role: string; content?: string }) => undefined);
+const saveTurn = vi.fn(async (_db: unknown, _turn: { role: string; content?: string; attachments?: unknown[] }) => undefined);
 
 let releaseTail: () => void = () => {};
 const world = { stepped: false, fails: false, usdPerToken: 0, db: fakeDb({ chat_messages: [] }) };
@@ -59,8 +59,8 @@ function steppedModel() {
 function slowModel() {
   const tail = new Promise<void>((resolve) => (releaseTail = resolve));
   return new MockLanguageModelV4({
-    doStream: async () => {
-      streamed();
+    doStream: async (options: unknown) => {
+      streamed(options);
       return {
       stream: new ReadableStream({
         async start(controller) {
@@ -128,7 +128,7 @@ vi.mock('$lib/server/repos/chat', () => ({
   loadTurns: async () => [],
   promptHistory: () => [],
   turnRunning: async () => true,
-  saveTurn: (db: unknown, turn: { role: string }) => saveTurn(db, turn)
+  saveTurn: (db: unknown, turn: { role: string; attachments?: unknown[] }) => saveTurn(db, turn)
 }));
 vi.mock('$lib/server/project-agent/project-tools', () => ({ createProjectTools: () => ({}) }));
 const offeredProjectTools = vi.hoisted(() => ({ names: [] as string[] }));
@@ -188,6 +188,36 @@ describe('POST /api/v1/projects/[projectId]/agent', () => {
     expect(streamed).not.toHaveBeenCalled();
     expect(saveTurn).not.toHaveBeenCalled();
     expect(screenModelInput.mock.calls[0][1]).toMatchObject({ profile: 'standard', texts: ['make a doc'], scope: { orgId: 'org-1', userId: 'u-1', projectId: 'p-1' } });
+  });
+
+  it('a message with attachments reaches the model as text and image parts, and is saved with them', async () => {
+    const png = new Uint8Array(await (await import('sharp')).default({ create: { width: 8, height: 8, channels: 3, background: '#0f0' } }).png().toBuffer());
+    const asset = (id: string, over: Record<string, unknown>) => ({ id, project_id: 'p-1', width: null, height: null, duration_s: null, source: 'upload', source_node_id: null, uncensored: false, created_at: '2026-10-09', bytes: 5, ...over });
+    world.db = fakeDb(
+      { chat_messages: [], assets: [asset('a-doc', { type: 'document', url: 'org-1/p-1/chat/u__brief.pdf', content: 'Green bottles.', mime_type: 'application/pdf' }), asset('a-img', { type: 'image', url: 'org-1/p-1/chat/u__logo.png', content: null, mime_type: 'image/png' })] },
+      { files: { 'org-1/p-1/chat/u__logo.png': png } }
+    );
+
+    const res = await POST(postEvent({ message: 'summarize and place', attachments: ['a-doc', 'a-img'] }));
+    releaseTail();
+    await res.text();
+
+    const prompt = (streamed.mock.calls[0][0] as { prompt: { role: string; content: { type: string; text?: string; mediaType?: string }[] }[] }).prompt;
+    const user = prompt.at(-1)!;
+    expect(user.role).toBe('user');
+    expect(user.content.map((p) => p.type)).toEqual(['text', 'text', 'text', 'file']);
+    expect(user.content[1].text).toBe('### Attached file: brief.pdf\n\nGreen bottles.');
+    expect(user.content[2].text).toMatch(/project asset a-img.*create_node type "image"/);
+    expect(user.content[3].mediaType).toBe('image/png');
+    expect(saveTurn.mock.calls[0][1]).toMatchObject({ role: 'user', content: 'summarize and place', attachments: [{ assetId: 'a-doc', name: 'brief.pdf' }, { assetId: 'a-img', name: 'logo.png' }] });
+  });
+
+  it('refuses attachments that are not assets of this project', async () => {
+    const res = await POST(postEvent({ attachments: ['someone-elses'] }));
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toMatchObject({ code: 'attachment_not_found' });
+    expect(saveTurn).not.toHaveBeenCalled();
   });
 
   it('hands the canvas agent the motion delegation tools', async () => {

@@ -2,8 +2,9 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { loadSession } from '../lib/auth.ts';
 import { awaitRun, motionApi, type MotionRun, type RenderStart } from '../lib/motion.ts';
+import { attachmentSource } from '../lib/attachments.ts';
 
-type AskOpts = { org?: string; wait?: boolean };
+type AskOpts = { org?: string; wait?: boolean; attach?: string[] };
 
 async function token(): Promise<string> {
   const session = await loadSession();
@@ -19,7 +20,8 @@ export async function cmdMotionAsk(nodeId: string, prompt: string, opts: AskOpts
 }
 
 export async function askAndReport(bearer: string, nodeId: string, prompt: string, opts: AskOpts) {
-  const started = await motionApi.ask(bearer, nodeId, prompt, opts.org);
+  const attachments = await Promise.all((opts.attach ?? []).map(attachmentSource));
+  const started = await motionApi.ask(bearer, nodeId, prompt, opts.org, attachments);
   printRun(opts.wait === false ? started : await awaitRun(bearer, started, { org: opts.org }));
 }
 

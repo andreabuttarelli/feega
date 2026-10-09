@@ -600,6 +600,24 @@
       },
       "placeholder": "Ask the agent…",
       "hint": "Enter to send · Shift+Enter for a new line",
+      "attach": {
+        "button": "Attach files or images",
+        "drop": "Drop files to attach",
+        "remove": "Remove {name}",
+        "list": "Attachments",
+        "uploading": "Uploading {name}",
+        "error": {
+          "attachment_empty": "The file is empty.",
+          "attachment_too_large": "Too large: 20 MB at most.",
+          "attachment_unsupported": "Not supported: images, PDF, DOCX, PPTX, XLSX, CSV, TXT, MD or HTML.",
+          "too_many_attachments": "10 attachments per message at most.",
+          "attachment_unreadable": "No text could be read from this file.",
+          "attachment_refused": "Refused by the safety review.",
+          "attachment_not_found": "The upload was lost: try again.",
+          "attachment_invalid_path": "The upload was lost: try again.",
+          "upload_failed": "Upload failed: try again."
+        }
+      },
       "send": "Send",
       "stop": "Stop generating",
       "jump": "Jump to latest",

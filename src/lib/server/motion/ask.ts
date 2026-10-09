@@ -12,6 +12,9 @@ import { listRevisions } from '$lib/server/repos/motion-revisions';
 import { docSummary } from '$lib/server/motion/motion-tools';
 import { MOTION_ASK_KIND } from '$lib/server/motion/ask-kind';
 import { Browser, startMotionTurn, type MotionTurn, type TurnOutcome } from '$lib/server/motion/turn';
+import { ATTACHMENT_PORTS, AttachmentFailure, resolveSources, type AttachmentSource } from '$lib/server/chat-attachments/register';
+import type { ChatAttachment } from '$lib/chat-attachments';
+import { failed } from '$lib/server/chat-attachments/route-scope';
 
 export const MCP_AGENT_KEY = 'mcp';
 const HTTP_NOT_FOUND = 404;
@@ -30,14 +33,30 @@ const editorUrl = (record: CanvasNodeRecord) => motionEditorPath({ projectId: re
 
 const notFound = () => json({ error: 'motion_node_not_found' }, { status: HTTP_NOT_FOUND });
 
+async function attached(db: Db, scope: Parameters<typeof resolveSources>[1], sources: AttachmentSource[]): Promise<ChatAttachment[] | Response> {
+  try {
+    return await resolveSources(db, scope, sources, ATTACHMENT_PORTS);
+  } catch (e) {
+    if (e instanceof AttachmentFailure) {
+      return failed(e);
+    }
+    throw e;
+  }
+}
+
 export type AskStarted = { runId: string; model: string; refusedModel: string | null };
 
-export async function askMotion(db: Db, input: { orgId: string; userId: string; nodeId: string; prompt: string; agentKey?: string; choice?: { model?: unknown; reasoning?: unknown } }): Promise<AskStarted | Response> {
-  const { orgId, userId, nodeId, prompt, agentKey = MCP_AGENT_KEY, choice: asked = {} } = input;
+export async function askMotion(db: Db, input: { orgId: string; userId: string; nodeId: string; prompt: string; attachments?: AttachmentSource[]; agentKey?: string; choice?: { model?: unknown; reasoning?: unknown } }): Promise<AskStarted | Response> {
+  const { orgId, userId, nodeId, prompt, attachments: sources = [], agentKey = MCP_AGENT_KEY, choice: asked = {} } = input;
   const motion = await findMotion(db, { orgId, nodeId });
   const project = motion ? await findProjectById(db, { orgId, projectId: motion.record.projectId }) : null;
   if (!motion || !project) {
     return notFound();
+  }
+
+  const attachments = await attached(db, { orgId, projectId: project.id, mode: project.mode }, sources);
+  if (attachments instanceof Response) {
+    return attachments;
   }
 
   const guarded = motionAsk(asked);
@@ -53,6 +72,7 @@ export async function askMotion(db: Db, input: { orgId: string; userId: string; 
     project,
     motion,
     message: prompt,
+    attachments,
     selection: [],
     model: choice.choice.model,
     reasoning: choice.choice.reasoning,

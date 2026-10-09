@@ -14,11 +14,12 @@ import { readWorkingDoc } from '$lib/server/motion/working-doc';
 import { CANVAS_ASSET_BUCKET } from '$lib/server/repos/asset-storage';
 import { DOC_EDITED } from '$lib/motion/frames-request';
 import type { FrameBucket } from '$lib/server/motion/frame-store';
+import { askedAttachments } from '$lib/server/chat-attachments/route-scope';
 import type { RequestHandler } from './$types';
 
 export const config = { maxDuration: AGENT_MAX_DURATION_S };
 
-const bodySchema = z.object({ message: z.string().trim().min(1).max(8000), selection: z.array(z.string()).max(50).default([]), model: z.unknown().optional(), reasoning: z.unknown().optional() });
+const bodySchema = z.object({ message: z.string().trim().max(8000).default(''), attachments: z.unknown().optional(), selection: z.array(z.string()).max(50).default([]), model: z.unknown().optional(), reasoning: z.unknown().optional() });
 
 export const POST: RequestHandler = async ({ request, params, locals }) => {
   const scope = await motionAgentScope(locals, params);
@@ -37,6 +38,13 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
     return json({ error: 'empty_message' }, { status: 400 });
   }
   const { message, selection } = body.data;
+  const attachments = await askedAttachments(db, { orgId, projectId: project.id }, body.data.attachments);
+  if (attachments instanceof Response) {
+    return attachments;
+  }
+  if (!message && !attachments.length) {
+    return json({ error: 'empty_message' }, { status: 400 });
+  }
 
   const resolved = resolveChoice(await offeredChatModels(), { model: body.data.model, reasoning: body.data.reasoning });
   if (!resolved.ok) {
@@ -44,7 +52,7 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
   }
   const { model, reasoning } = resolved.choice;
 
-  const turn = await startMotionTurn({ db, userId: user.id, orgId, project, motion, message, selection, model, reasoning, requester: { kind: 'user', id: user.id }, browser: Browser.Attached });
+  const turn = await startMotionTurn({ db, userId: user.id, orgId, project, motion, message, attachments, selection, model, reasoning, requester: { kind: 'user', id: user.id }, browser: Browser.Attached });
   if (turn instanceof Response) {
     return turn;
   }

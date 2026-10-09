@@ -165,7 +165,10 @@ duration, every track and clip in seconds. `ask_motion_agent` asks the editor's 
 it in plain words ("make the title red and add a bounce"): one turn of the same agent the editor
 chat runs, a new revision, the exchange visible in the editor chat. It returns at once with a
 running `run_id`: poll `get_motion_run` every few seconds until `done` (reply, summary, new
-`version`); `wait: true` polls for you up to about 4 minutes of a turn that can run up to 30. Spends credits. CLI: `feega motion ask <nodeId> "<prompt>"`.
+`version`); `wait: true` polls for you up to about 4 minutes of a turn that can run up to 30. Spends credits. `attachments` (up to 10, 20 MB each): images the agent sees and can place
+(e.g. a logo) and PDF/DOCX/PPTX/XLSX/CSV/TXT/MD/HTML it reads as text — each a public `url`, a
+project `asset_id`, or base64 `data` + `name` + `mime_type`. CLI: `feega motion ask <nodeId> "<prompt>"
+--attach ./brief.pdf https://…/logo.png asset:<id>`.
 
 Render one with `render_video`: by default it is FREE and returns a `render_url`,
 a one-time link (30 minutes, bound to the saved revision) the user opens on any device — the video

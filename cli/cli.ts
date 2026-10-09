@@ -110,6 +110,7 @@ motion
   .description('Ask the motion editor agent to edit a video (spends credits)')
   .option('--no-wait', 'Return the run id without waiting for the turn to end')
   .option('--org <id>', 'Which org, if you belong to more than one')
+  .option('--attach <ref...>', 'Attach files: a local path (up to 4 MB), a URL, or asset:<id> (images and PDF/DOCX/PPTX/XLSX/CSV/TXT/MD/HTML, up to 10)')
   .action(async (nodeId: string, prompt: string, opts) => {
     const { cmdMotionAsk } = await import('./commands/motion.ts');
     await cmdMotionAsk(nodeId, prompt, opts);

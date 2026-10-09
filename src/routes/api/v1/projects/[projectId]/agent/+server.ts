@@ -23,6 +23,8 @@ import { screenModelInput } from '$lib/server/moderation/model-input';
 import { ModerationProfile } from '$lib/server/moderation/profiles';
 import { blockedPrompt } from '$lib/server/moderation/blocked-response';
 import { runInBackground } from '$lib/server/background-work';
+import { askedAttachments } from '$lib/server/chat-attachments/route-scope';
+import { canvasPlaceHint, userContent } from '$lib/server/chat-attachments/model-parts';
 import type { RequestHandler } from './$types';
 
 /**
@@ -76,9 +78,15 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
   const gated = brand ? await gateAiAction(brand, undefined) : await gateOrgAiAction(orgId, undefined);
   if (gated) return gated;
 
-  const { message, model: askedModel, reasoning: askedReasoning, canvasId: openCanvas } = (await request.json()) as { message?: string; model?: unknown; reasoning?: unknown; canvasId?: unknown };
-  const text = message?.trim();
-  if (!text) return json({ error: 'empty_message' }, { status: 400 });
+  const { message, model: askedModel, reasoning: askedReasoning, canvasId: openCanvas, attachments: askedFiles } = (await request.json()) as { message?: string; model?: unknown; reasoning?: unknown; canvasId?: unknown; attachments?: unknown };
+  const text = message?.trim() ?? '';
+  const attachments = await askedAttachments(db, { orgId, projectId: project.id }, askedFiles);
+  if (attachments instanceof Response) {
+    return attachments;
+  }
+  if (!text && !attachments.length) {
+    return json({ error: 'empty_message' }, { status: 400 });
+  }
 
   const resolved = resolveChoice(await offeredChatModels(), { model: askedModel, reasoning: askedReasoning });
   if (!resolved.ok) {
@@ -109,7 +117,8 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
 
   const actor = agentActor(user.id, SIDEBAR_AGENT_KEY);
   const userActor = { kind: 'user' as const, id: user.id };
-  await saveTurn(db, { orgId, threadId, role: 'user', content: text, actor: userActor });
+  await saveTurn(db, { orgId, threadId, role: 'user', content: text, attachments, actor: userActor });
+  const opening = await userContent(db, { orgId, text, attachments, hint: canvasPlaceHint(project.id) });
   const reply = await openReply(db, { orgId, threadId, actor });
   const steps: Parameters<typeof finishedTurn>[0][number][] = [];
 
@@ -136,7 +145,7 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
       brand: brand ? { name: brand.name, slug: brand.slug } : null
     }),
     allowSystemInMessages: true,
-    messages: [...history, { role: 'user', content: text }] as ModelMessage[],
+    messages: [...history, { role: 'user', content: opening }] as ModelMessage[],
     tools: agent.tools,
     providerOptions: reasoningProviderOptions(reasoning),
     stopWhen: [agentStopWhen(t0), overTurnCap(() => spent)],

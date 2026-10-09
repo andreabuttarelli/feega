@@ -12,7 +12,13 @@ const HTTP_ACCEPTED = 202;
 const HTTP_BAD_REQUEST = 400;
 const HTTP_FORBIDDEN = 403;
 
-const bodySchema = z.object({ prompt: z.string().trim().min(1).max(8000) });
+const sourceSchema = z.union([
+  z.object({ asset_id: z.string().min(1) }),
+  z.object({ url: z.string().url(), name: z.string().max(200).optional() }),
+  z.object({ data: z.string().min(1), name: z.string().min(1).max(200), mime_type: z.string().max(200) })
+]);
+
+const bodySchema = z.object({ prompt: z.string().trim().min(1).max(8000), attachments: z.array(sourceSchema).optional() });
 
 export const POST: RequestHandler = async ({ request, params, url }) => {
   const bearer = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
@@ -28,7 +34,7 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
 
   const body = bodySchema.safeParse(await request.json().catch(() => ({})));
   if (!body.success) {
-    return json({ error: 'empty_prompt' }, { status: HTTP_BAD_REQUEST });
+    return json({ error: body.error.issues.some((i) => i.path[0] === 'attachments') ? 'invalid_attachments' : 'empty_prompt' }, { status: HTTP_BAD_REQUEST });
   }
 
   const gate = await gateOrgAiAction(orgId, apiKeyId ? { id: apiKeyId, name: '', user_id: userId, org_id: orgId, scopes: ['write'] } : undefined);
@@ -36,7 +42,7 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
     return gate;
   }
 
-  const asked = await askMotion(db, { orgId, userId, nodeId: params.nodeId ?? '', prompt: body.data.prompt });
+  const asked = await askMotion(db, { orgId, userId, nodeId: params.nodeId ?? '', prompt: body.data.prompt, attachments: body.data.attachments });
   if (asked instanceof Response) {
     return asked;
   }

@@ -16,6 +16,7 @@
   import ChatModelPicker from './ChatModelPicker.svelte';
   import { chatModelPrefs } from './chat-model-prefs.svelte';
   import { PrefillMode, type ChatPrefill } from './chat-prefill';
+  import { ChatUploads } from './chat-uploads.svelte';
 
   let {
     projectId = '',
@@ -49,6 +50,8 @@
 
   const routeProjectId = $derived($page.params.projectId ?? '');
   const scopeProjectId = $derived(projectId || routeProjectId);
+  const canvasId = $derived($page.params.canvasId ?? '');
+  const uploads = $derived(scopeProjectId ? new ChatUploads(scopeProjectId) : null);
   const endpoint = $derived(chatEndpoint({ projectId: scopeProjectId, motionNodeId }));
   const session = $derived<ChatSession | null>(endpoint ? chatSession(endpoint) : null);
   const models = chatModelPrefs();
@@ -184,13 +187,15 @@
   });
 
   function send(text: string) {
-    if (!text || !session || busy) {
+    const attachments = uploads?.ready ?? [];
+    if ((!text && !attachments.length) || !session || busy || uploads?.busy) {
       return;
     }
     draft = '';
+    uploads?.clear();
     on({ kind: 'sent' });
     editingBrief = false;
-    void session.send(text, 'append-user');
+    void session.send(text, 'append-user', attachments);
   }
 
   function editBrief() {
@@ -260,6 +265,8 @@
             pending={message.pending}
             at={message.at}
             tools={message.tools}
+            attachments={message.attachments}
+            {canvasId}
             reasoning={message.reasoning}
             live={message.live}
             first={starts[i]}
@@ -304,6 +311,11 @@
         enabled={!loading}
         onsend={() => send(draft.trim())}
         onstop={stop}
+        files={uploads?.items ?? []}
+        ready={uploads?.ready.length ?? 0}
+        uploading={uploads?.busy ?? false}
+        onfiles={uploads ? (files) => uploads.add(files) : undefined}
+        onremove={(id) => uploads?.remove(id)}
       >
         {#snippet controls()}
           {#if models.choice && models.groups.length}

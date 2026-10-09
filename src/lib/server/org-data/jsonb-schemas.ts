@@ -132,8 +132,8 @@ export const JSONB_COLUMN_SCHEMAS: Record<string, JsonbEntry> = {
     'rispecchia la forma che l\'AI SDK usa per le tool call, non nostra da governare — e nessun ' +
       'repository del nuovo schema la scrive ancora (`repos/chat.ts::saveTurn` non la tocca).'
   ),
-  'chat_messages.attachments': freeForm(
-    'stesso motivo di chat_messages.tool_calls: nessun repository del nuovo schema la scrive oggi.'
+  'chat_messages.attachments': validated(
+    z.array(z.object({ assetId: z.string(), kind: z.enum(['image', 'document']), name: z.string(), mimeType: z.string(), bytes: z.number() }))
   ),
 
   'node_runs.params': freeForm(
