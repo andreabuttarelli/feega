@@ -610,7 +610,6 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
         props: {
           text: 'example.com',
           ...word(0.06),
-          weight: 700,
           y: 0.8,
           width: 0.8,
           height: 0.15

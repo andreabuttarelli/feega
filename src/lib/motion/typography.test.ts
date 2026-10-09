@@ -26,7 +26,7 @@ const compose = (d: MotionDoc) => composeHtml({ doc: d, tokens: FEEGA_TOKENS, as
 
 describe('rich typography', () => {
   it('text clips carry tracking, leading and variable axes with the look they had', () => {
-    expect(findClip(doc(), 'title')!.clip.props).toMatchObject({ tracking: -0.045, leading: 0.95, stretch: 100, slant: 0, axes: '' });
+    expect(findClip(doc(), 'title')!.clip.props).toMatchObject({ tracking: -0.05, leading: 0.95, stretch: 100, slant: 0, axes: '' });
     const text = ok(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Text', from: 0, durationInFrames: 30 }, 't'));
     expect(findClip(text, 't')!.clip.props).toMatchObject({ tracking: -0.01, leading: 1.3 });
   });
@@ -70,7 +70,7 @@ describe('rich typography', () => {
   });
 
   it('built-in faces are loaded explicitly too, because hidden text never asks for its font and the fit would measure a fallback', () => {
-    expect(compose(doc())).toContain('document.fonts.load("normal 500 1em \\"DM Sans\\"")');
+    expect(compose(doc())).toContain('document.fonts.load("normal 600 1em \\"DM Sans\\"")');
   });
 
   it('the composition fits text after the fonts load and before anything waits on them', () => {

@@ -1,6 +1,6 @@
 import { Ease, TransitionKind } from '$lib/motion/design';
 import { DEVICES, Device } from '$lib/motion/devices';
-import { IMAGE_ZOOM } from '$lib/motion/components';
+import { IMAGE_ZOOM, TITLE_LOOK } from '$lib/motion/components';
 import { FontCategory, FontSource, type FontFace } from '$lib/motion/fonts/model';
 import { EASE_BEZIER } from '$lib/motion/keyframes';
 import { STYLES } from '$lib/motion/style';
@@ -27,8 +27,9 @@ const WORD_BEAT = 1.97;
 
 const FONTS: FontFace[] = [{ family: FAMILY, source: FontSource.Google, category: FontCategory.Sans, weights: [BODY, DISPLAY], italic: false, axes: [] }];
 
-const display = (size: number, color = PAPER) => ({ font: FAMILY, weight: DISPLAY, size, color, tracking: -0.035, leading: 1.04 });
+const display = (size: number, color = PAPER) => ({ font: FAMILY, weight: DISPLAY, size, color, tracking: TITLE_LOOK.tracking, leading: 1.04 });
 const body = (size: number, color = PAPER) => ({ font: FAMILY, weight: BODY, size, color, tracking: size <= SMALL ? 0 : -0.02, leading: 1.25 });
+const line = (color = PAPER) => ({ ...body(LINE, color), weight: DISPLAY, tracking: TITLE_LOOK.tracking });
 
 function snapUp(seconds = SNAP): Record<string, Key[]> {
   return {
@@ -90,7 +91,7 @@ const SCENE_DESIGNS: Omit<Design, 'fonts'>[] = [
     name: 'Scene · Feature line',
     description: 'Apple minimal. One sentence, large, centred on black: one feature per scene.',
     seconds: 3.5,
-    beats: [fill(INK, 3.5), { id: 'line', track: 'front', component: 'Text', at: 0.1, len: 3.4, props: { text: 'One idea, said simply.', ...body(LINE), weight: DISPLAY, y: 0.5, width: 0.74, height: 0.36 }, keys: snapUp(), exit: OUT }],
+    beats: [fill(INK, 3.5), { id: 'line', track: 'front', component: 'Text', at: 0.1, len: 3.4, props: { text: 'One idea, said simply.', ...line(), y: 0.5, width: 0.74, height: 0.36 }, keys: snapUp(), exit: OUT }],
     fields: [text('line', 'Line', 'line'), colour('background', 'Background', 'bg', 'fill'), colour('text_color', 'Text colour', 'line', 'color')]
   },
   {
@@ -98,7 +99,7 @@ const SCENE_DESIGNS: Omit<Design, 'fonts'>[] = [
     name: 'Scene · Feature line, light',
     description: 'Apple minimal. The feature line in black on white, to alternate with the dark scenes.',
     seconds: 3,
-    beats: [fill(PAPER, 3), { id: 'line', track: 'front', component: 'Text', at: 0.1, len: 2.9, props: { text: 'Built for teams.', ...body(LINE, INK), weight: DISPLAY, y: 0.5, width: 0.74, height: 0.36 }, keys: snapUp(), exit: OUT }],
+    beats: [fill(PAPER, 3), { id: 'line', track: 'front', component: 'Text', at: 0.1, len: 2.9, props: { text: 'Built for teams.', ...line(INK), y: 0.5, width: 0.74, height: 0.36 }, keys: snapUp(), exit: OUT }],
     fields: [text('line', 'Line', 'line'), colour('background', 'Background', 'bg', 'fill'), colour('text_color', 'Text colour', 'line', 'color')]
   },
   {
@@ -108,8 +109,8 @@ const SCENE_DESIGNS: Omit<Design, 'fonts'>[] = [
     seconds: 3.5,
     beats: [
       fill(INK, 3.5),
-      { id: 'line', track: 'middle', component: 'Text', at: 0.1, len: 3.4, props: { text: 'Simple to start.', ...body(LINE), weight: DISPLAY, y: 0.43, width: 0.8, height: 0.14 }, keys: snapUp(), exit: OUT },
-      { id: 'accent_line', track: 'front', component: 'Text', at: 0.1 + STAGGER * 3, len: 3.4 - STAGGER * 3, props: { text: 'Built to scale.', ...body(LINE, ACCENT), weight: DISPLAY, y: 0.57, width: 0.8, height: 0.14 }, keys: snapUp(), exit: OUT }
+      { id: 'line', track: 'middle', component: 'Text', at: 0.1, len: 3.4, props: { text: 'Simple to start.', ...line(), y: 0.43, width: 0.8, height: 0.14 }, keys: snapUp(), exit: OUT },
+      { id: 'accent_line', track: 'front', component: 'Text', at: 0.1 + STAGGER * 3, len: 3.4 - STAGGER * 3, props: { text: 'Built to scale.', ...line(ACCENT), y: 0.57, width: 0.8, height: 0.14 }, keys: snapUp(), exit: OUT }
     ],
     fields: [text('line', 'Line', 'line'), text('accent_line', 'Accent line', 'accent_line'), colour('accent', 'Accent', 'accent_line', 'color'), colour('background', 'Background', 'bg', 'fill')]
   },
@@ -132,7 +133,7 @@ const SCENE_DESIGNS: Omit<Design, 'fonts'>[] = [
     seconds: 4.5,
     beats: [
       fill(INK, 4.5),
-      { id: 'quote', track: 'front', component: 'Text', at: 0.1, len: 4.4, props: { text: '“The best tool we added this year.”', ...body(LINE), y: 0.45, width: 0.76, height: 0.4 }, keys: snapUp(), exit: OUT },
+      { id: 'quote', track: 'front', component: 'Text', at: 0.1, len: 4.4, props: { text: '“The best tool we added this year.”', ...line(), y: 0.45, width: 0.76, height: 0.4 }, keys: snapUp(), exit: OUT },
       { id: 'author', track: 'middle', component: 'Text', at: 0.1 + STAGGER * 4, len: 4.4 - STAGGER * 4, props: { text: 'Ada Lovelace, Analytical Engines', ...body(SMALL, MUTED), y: 0.72, width: 0.6, height: 0.06 }, keys: snapUp(), exit: OUT }
     ],
     fields: [text('quote', 'Quote', 'quote'), text('author', 'Author', 'author'), colour('background', 'Background', 'bg', 'fill'), colour('text_color', 'Quote colour', 'quote', 'color')]
@@ -203,7 +204,7 @@ const SCENE_DESIGNS: Omit<Design, 'fonts'>[] = [
     seconds: 4,
     beats: [
       fill(INK, 4),
-      { id: 'line', track: 'front', component: 'Text', at: 0.2, len: 3.8, props: { text: 'In your pocket.', ...body(LINE), weight: DISPLAY, x: 0.3, y: 0.5, width: 0.42, height: 0.3, align: 'left' }, keys: snapUp(), exit: OUT },
+      { id: 'line', track: 'front', component: 'Text', at: 0.2, len: 3.8, props: { text: 'In your pocket.', ...line(), x: 0.3, y: 0.5, width: 0.42, height: 0.3, align: 'left' }, keys: snapUp(), exit: OUT },
       { id: 'device', track: 'middle', component: 'Device3D', at: 0, len: 4, props: { device: Device.PhonePro, startAngle: -APPLE.movement.turn, endAngle: APPLE.movement.turn, easing: Ease.Linear, lighting: 'studio', x: 0.7, y: 0.5, width: 0.5, height: 0.92 }, keys: { opacity: [[0, 0, ENTER], [SHOW, 1, ENTER]] }, exit: OUT }
     ],
     fields: [{ ...picture('screen', 'Screen', 'device', { width: 9, height: 19.5 }), prop: 'screen' }, text('line', 'Line', 'line'), colour('background', 'Background', 'bg', 'fill')]
@@ -216,7 +217,7 @@ const SCENE_DESIGNS: Omit<Design, 'fonts'>[] = [
     beats: [
       fill(INK, 4),
       { id: 'photo', track: 'middle', component: 'Image', at: 0, len: 4, props: { x: 0.5, y: 0.4, ...BAND, fit: 'cover' }, keys: drift(4), exit: OUT },
-      { id: 'line', track: 'front', component: 'Text', at: 0.3, len: 3.7, props: { text: 'One line under the picture.', ...body(LINE), weight: DISPLAY, y: 0.9, width: 0.8, height: 0.1 }, keys: snapUp(), exit: OUT }
+      { id: 'line', track: 'front', component: 'Text', at: 0.3, len: 3.7, props: { text: 'One line under the picture.', ...line(), y: 0.9, width: 0.8, height: 0.1 }, keys: snapUp(), exit: OUT }
     ],
     fields: [picture('photo', 'Picture', 'photo', BAND), text('line', 'Line', 'line')]
   },
@@ -251,9 +252,9 @@ const SCENE_DESIGNS: Omit<Design, 'fonts'>[] = [
     seconds: 4.5,
     beats: [
       fill(INK, 4.5),
-      { id: 'point_1', track: 'front', component: 'Text', at: 0.1, len: 4.4, props: { text: 'First point.', ...body(LINE), weight: DISPLAY, y: 0.34, width: 0.8, height: 0.13 }, keys: snapUp(), exit: OUT },
-      { id: 'point_2', track: 'front', component: 'Text', at: 0.1 + STAGGER * 2.5, len: 4.4 - STAGGER * 2.5, props: { text: 'Second point.', ...body(LINE), weight: DISPLAY, y: 0.5, width: 0.8, height: 0.13 }, keys: snapUp(), exit: OUT },
-      { id: 'point_3', track: 'front', component: 'Text', at: 0.1 + STAGGER * 5, len: 4.4 - STAGGER * 5, props: { text: 'Third point.', ...body(LINE, ACCENT), weight: DISPLAY, y: 0.66, width: 0.8, height: 0.13 }, keys: snapUp(), exit: OUT }
+      { id: 'point_1', track: 'front', component: 'Text', at: 0.1, len: 4.4, props: { text: 'First point.', ...line(), y: 0.34, width: 0.8, height: 0.13 }, keys: snapUp(), exit: OUT },
+      { id: 'point_2', track: 'front', component: 'Text', at: 0.1 + STAGGER * 2.5, len: 4.4 - STAGGER * 2.5, props: { text: 'Second point.', ...line(), y: 0.5, width: 0.8, height: 0.13 }, keys: snapUp(), exit: OUT },
+      { id: 'point_3', track: 'front', component: 'Text', at: 0.1 + STAGGER * 5, len: 4.4 - STAGGER * 5, props: { text: 'Third point.', ...line(ACCENT), y: 0.66, width: 0.8, height: 0.13 }, keys: snapUp(), exit: OUT }
     ],
     fields: [text('point_1', 'First point', 'point_1'), text('point_2', 'Second point', 'point_2'), text('point_3', 'Third point', 'point_3'), colour('accent', 'Last point colour', 'point_3', 'color'), colour('background', 'Background', 'bg', 'fill')]
   },
