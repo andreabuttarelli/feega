@@ -83,7 +83,7 @@
     type KeyRef,
     type OpResult
   } from '$lib/motion/timeline';
-  import { amend, canRedo, canUndo, previousSource, record, redo, startHistory, undo, type History } from '$lib/motion/history';
+  import { adoptHead, amend, canRedo, canUndo, previousSource, record, redo, startHistory, undo, type History } from '$lib/motion/history';
   import { Reveal, Snap, clampZoom } from '$lib/motion/timeline-view';
   import { InspectorTab } from '$lib/motion/inspector';
   import { Command, commandFor, isTyping } from '$lib/motion/shortcuts';
@@ -237,6 +237,7 @@
   const html = $derived(composeHtml({ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls, analyses, liveness: interactive ? Liveness.Live : Liveness.Baked, target: Target.Screen }));
   const liveScene = $derived(liveComponents(doc));
   const selected = $derived(selection.length === 1 ? (findClip(doc, selection[0])?.clip ?? null) : null);
+  const agent = $derived(agentBusy || draft ? Agent.Working : Agent.Idle);
   const blank = $derived(!path.length && showsStart(doc, agentBusy ? Agent.Working : Agent.Idle));
 
   const OPEN_CHAT: Record<ChatPlace, () => void> = {
@@ -399,7 +400,7 @@
     }
     if (result.type === 'failure' && result.data?.error === 'conflict') {
       const head = result.data.head as { version: number; doc: MotionDoc };
-      history = record(history, head.doc);
+      history = adoptHead(history, head.doc, version);
       version = head.version;
       saveState = SaveState.Conflict;
       return;
@@ -447,7 +448,7 @@
     if (!body?.head || body.head.version <= version || body.head.actorKind !== 'agent') {
       return;
     }
-    history = record(history, body.head.doc);
+    history = adoptHead(history, body.head.doc, version);
     version = body.head.version;
     selection = selection.filter((id) => findClip(body.head!.doc, id));
     chatReload++;
@@ -510,7 +511,7 @@
       const res = await fetch(agentUrl);
       const body = (await res.json().catch(() => null)) as { head?: { version: number; doc: MotionDoc } } | null;
       if (body?.head && body.head.version > version) {
-        history = record(history, body.head.doc);
+        history = adoptHead(history, body.head.doc, version);
         version = body.head.version;
         selection = selection.filter((id) => findClip(body.head!.doc, id));
         return Head.Newer;
@@ -730,11 +731,17 @@
   }
 
   function undoEdit() {
+    if (!canUndo(history, agent)) {
+      return;
+    }
     history = undo(history);
     scheduleSave('Undo');
   }
 
   function redoEdit() {
+    if (!canRedo(history, agent)) {
+      return;
+    }
     history = redo(history);
     scheduleSave('Redo');
   }
@@ -1071,8 +1078,8 @@
     </div>
 
     <div class="group trail" data-testid="bar-trail">
-      <IconButton action={Action.Undo} disabled={!canUndo(history)} onclick={undoEdit} />
-      <IconButton action={Action.Redo} disabled={!canRedo(history)} onclick={redoEdit} />
+      <IconButton action={Action.Undo} disabled={!canUndo(history, agent)} onclick={undoEdit} />
+      <IconButton action={Action.Redo} disabled={!canRedo(history, agent)} onclick={redoEdit} />
       {#if !docked}
         <IconButton action={Action.ToggleInspector} class="toggle" pressed={propsShown} data-testid="toggle-inspector" onclick={COMMANDS[Command.ToggleInspector]} />
         <IconButton action={Action.ToggleChat} class="toggle" pressed={chatShown} data-testid="toggle-chat" onclick={COMMANDS[Command.ToggleChat]} />

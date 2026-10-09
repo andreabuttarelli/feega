@@ -1986,7 +1986,19 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     return ((await nested.execute(parsed.data, options)) ?? {}) as { ok?: boolean; error?: unknown };
   }
 
-  return tools;
+  return oneAtATime(tools);
+}
+
+type Execute = (input: unknown, options: ToolExecutionOptions<unknown>) => Promise<unknown>;
+
+function oneAtATime(tools: Record<string, Tool>): Record<string, Tool> {
+  let queue: Promise<unknown> = Promise.resolve();
+  const inTurn = (execute: Execute): Execute => (input, options) => {
+    const run = queue.then(() => execute(input, options));
+    queue = run.catch(() => undefined);
+    return run;
+  };
+  return Object.fromEntries(Object.entries(tools).map(([name, t]) => [name, t.execute ? { ...t, execute: inTurn(t.execute as Execute) } : t]));
 }
 
 function parsedJson(text: string): unknown {

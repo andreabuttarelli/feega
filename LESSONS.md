@@ -2630,3 +2630,6 @@ Segnale: `chat_messages.status='streaming'` con il testo finale già scritto, ne
 
 ### Un `.d.ts` rotto da un conflitto risolto passa la CI verde
 Due PR aggiungono ciascuna un `declare module 'virtual:…'` in `src/motion-generative.d.ts`; la risoluzione del conflitto lascia un blocco aperto e il successivo annidato. `typecheck-runtime` lo conta fra gli errori «non fatali» e i test girano lo stesso: la CI è verde. Segnale: `svelte-check` con `Cannot find module 'virtual:motion-…'` su `compose.ts`, e il numero di errori ignorati che sale. Mossa: dopo ogni conflitto in un `.d.ts`, `npx svelte-check --threshold error | grep virtual:` prima del push.
+
+### Tool paralleli che si pestano su `session.doc`
+Segnale: in `chat_messages.tool_calls` più chiamate dello stesso passo che mutano il doc (es. cinque `edit_comp`), poi errori «no clip» con id appena restituiti, e la timeline principale che contiene ciò che stava in una comp. Causa: l AI SDK esegue in parallelo i tool di un passo; un tool che legge il doc, fa `await` e poi scrive lavora su uno stato vecchio. Mossa: i tool che condividono stato passano da una coda unica (`oneAtATime` in `motion-tools.ts`); un test con `Promise.all` deve dare lo stesso doc della sequenza.
