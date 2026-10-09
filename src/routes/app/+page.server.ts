@@ -13,7 +13,7 @@ import { toolScope } from '$lib/server/dashboard/tool-scope';
 import { MOTION_START_DEPS, startMotion } from '$lib/server/motion/start';
 import { listGallery } from '$lib/server/repos/gallery';
 import { gallerySearchSchema } from '$lib/gallery/model';
-import { BRIEF_MAX, BRIEF_TEMPLATES, briefEditorPath, briefName } from '$lib/motion/video-brief';
+import { BRIEF_MAX, BRIEF_TEMPLATES, briefEditorPath, briefMessage, briefName } from '$lib/motion/video-brief';
 
 const HTTP_SEE_OTHER = 303;
 const HTTP_BAD_REQUEST = 400;
@@ -53,7 +53,7 @@ export const actions: Actions = {
       return fail(HTTP_NOT_FOUND, { error: 'No canvas for this video' });
     }
 
-    throw redirect(HTTP_SEE_OTHER, briefEditorPath(started, brief));
+    throw redirect(HTTP_SEE_OTHER, briefEditorPath(started, briefMessage(brief)));
   },
 
   project: async (event) => {

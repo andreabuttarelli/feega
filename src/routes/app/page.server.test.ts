@@ -92,7 +92,13 @@ describe('/app is the dashboard for a returning user', () => {
     const redirected = await thrown(() => actions.video({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ brief }) } as never));
 
     expect(createNode).toHaveBeenCalledWith({}, expect.objectContaining({ orgId: 'org-a', projectId: 'p1', canvasId: 'c-motion', type: 'motion', displayName: 'acme.com' }));
-    expect(redirected).toMatchObject({ status: 303, location: '/p/p1/c/c-motion/motion/m-new?brief=https%3A%2F%2Facme.com' });
+    expect(redirected).toMatchObject({ status: 303, location: '/p/p1/c/c-motion/motion/m-new?brief=Make+a+launch+film+of+https%3A%2F%2Facme.com' });
+  });
+
+  it('a described video opens the chat with the words as typed', async () => {
+    const redirected = await thrown(() => actions.video({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ brief: 'A logo reveal' }) } as never));
+
+    expect(redirected).toMatchObject({ status: 303, location: '/p/p1/c/c-motion/motion/m-new?brief=A+logo+reveal' });
   });
 
   it('an empty brief is refused before anything is created', async () => {

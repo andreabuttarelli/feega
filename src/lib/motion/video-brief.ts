@@ -33,6 +33,31 @@ export function briefName(brief: string): string {
   return hostOf(text) ?? text.split(/\s+/).slice(0, NAME_WORDS).join(' ');
 }
 
+export enum BriefKind {
+  Site = 'site',
+  Text = 'text'
+}
+
+const BARE_URL = /^(https?:\/\/)?[\w-]+(\.[\w-]+)+(\/\S*)?$/i;
+
+function siteUrl(text: string): string {
+  return /^https?:\/\//i.test(text) ? text : `https://${text}`;
+}
+
+export function briefKind(brief: string): BriefKind {
+  return BARE_URL.test(brief.trim()) ? BriefKind.Site : BriefKind.Text;
+}
+
+const MESSAGE_OF: Record<BriefKind, (text: string) => string> = {
+  [BriefKind.Site]: (text) => `Make a launch film of ${siteUrl(text)}`,
+  [BriefKind.Text]: (text) => text
+};
+
+export function briefMessage(brief: string): string {
+  const text = brief.trim();
+  return MESSAGE_OF[briefKind(text)](text);
+}
+
 export function briefEditorPath(start: { projectId: string; canvasId: string; nodeId: string }, brief: string): string {
   return `${motionEditorPath(start)}?${new URLSearchParams({ [BRIEF_PARAM]: brief })}`;
 }
