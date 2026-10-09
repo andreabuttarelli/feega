@@ -280,6 +280,37 @@ test.describe('motion editor a dito @real', () => {
       expect((await sheet.boundingBox())!.y).toBeLessThan(half.y);
     });
 
+    test('Agent a metà o tutto nasconde la barra di play; a peek torna', async ({ page, session, seedNode }) => {
+      const node = await seedNode({ type: 'motion', data: MOTION_DATA });
+      await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}/motion/${node.id}`);
+      const transport = page.getByRole('group', { name: 'Transport' });
+      await expect(transport).toBeVisible();
+
+      await page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Agent' }).click();
+      const sheet = page.getByRole('complementary', { name: 'Agent' });
+      const grabber = sheet.getByTestId('sheet-grabber');
+      await expect(grabber).toHaveAttribute('data-detent', 'half');
+      await expect(transport).toBeHidden();
+      if (SHOTS) {
+        await page.screenshot({ path: `${SHOTS}/iphone-agent-half.png` });
+      }
+
+      await grabber.tap();
+      await expect(grabber).toHaveAttribute('data-detent', 'full');
+      await expect(transport).toBeHidden();
+      if (SHOTS) {
+        await page.screenshot({ path: `${SHOTS}/iphone-agent-full.png` });
+      }
+
+      await grabber.tap();
+      await expect(grabber).toHaveAttribute('data-detent', 'peek');
+      await expect(transport).toBeVisible();
+      if (SHOTS) {
+        await page.waitForTimeout(250);
+        await page.screenshot({ path: `${SHOTS}/iphone-agent-peek.png` });
+      }
+    });
+
     test('una sezione chiusa mostra il suo riassunto', async ({ page, session, seedNode }) => {
       const node = await seedNode({ type: 'motion', data: MOTION_DATA });
       await openEditor(page, `/p/${session.projectId}/c/${session.canvasId}/motion/${node.id}`);

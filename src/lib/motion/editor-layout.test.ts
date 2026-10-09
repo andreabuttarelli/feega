@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { CHAT_PLACE, ChatPlace, DEFAULT_LAYOUT, Panel, SIDE_DEFAULT_PX, SIDE_MIN_PX, Side, TIMELINE_MIN_PX, Viewport, flip, readLayout, sideWidth, timelineHeight, toggleSide, toggleTimeline, viewportOf, writeLayout } from './editor-layout';
+import { CHAT_PLACE, ChatPlace, DEFAULT_LAYOUT, Panel, SIDE_DEFAULT_PX, SIDE_MIN_PX, Side, TIMELINE_MIN_PX, Transport, Viewport, flip, readLayout, sheetFloor, sideWidth, timelineHeight, toggleSide, toggleTimeline, transportOf, viewportOf, writeLayout } from './editor-layout';
+import { Detent } from './sheet-detents';
 
 function memory() {
   const items = new Map<string, string>();
@@ -90,5 +91,27 @@ describe('editor layout', () => {
 
     expect(hidden).toMatchObject({ timeline: Panel.Closed, timelinePx: 420 });
     expect(toggleTimeline(hidden)).toMatchObject({ timeline: Panel.Open, timelinePx: 420 });
+  });
+});
+
+describe('transport bar', () => {
+  it('hides on phone while the agent sheet is half or full', () => {
+    expect(transportOf(Viewport.Phone, Detent.Half)).toBe(Transport.Hidden);
+    expect(transportOf(Viewport.Phone, Detent.Full)).toBe(Transport.Hidden);
+  });
+
+  it('shows on phone at peek or with the agent sheet closed', () => {
+    expect(transportOf(Viewport.Phone, Detent.Peek)).toBe(Transport.Shown);
+    expect(transportOf(Viewport.Phone, null)).toBe(Transport.Shown);
+  });
+
+  it('always shows off phone', () => {
+    expect(transportOf(Viewport.Tablet, Detent.Full)).toBe(Transport.Shown);
+    expect(transportOf(Viewport.Desktop, Detent.Half)).toBe(Transport.Shown);
+  });
+
+  it('lowers the sheet floor to the tabs when hidden', () => {
+    expect(sheetFloor(Transport.Shown)).toBe(120);
+    expect(sheetFloor(Transport.Hidden)).toBe(56);
   });
 });

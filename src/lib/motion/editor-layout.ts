@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { Detent } from './sheet-detents';
 
 export enum Panel {
   Open = 'open',
@@ -84,3 +85,22 @@ export const CHAT_PLACE: Record<Viewport, ChatPlace> = {
   [Viewport.Tablet]: ChatPlace.Drawer,
   [Viewport.Phone]: ChatPlace.Sheet
 };
+
+export enum Transport {
+  Shown = 'shown',
+  Hidden = 'hidden'
+}
+
+const PHONE_TRANSPORT_UNDER_AGENT: Record<Detent, Transport> = {
+  [Detent.Peek]: Transport.Shown,
+  [Detent.Half]: Transport.Hidden,
+  [Detent.Full]: Transport.Hidden
+};
+
+export const transportOf = (viewport: Viewport, agent: Detent | null): Transport =>
+  viewport === Viewport.Phone && agent ? PHONE_TRANSPORT_UNDER_AGENT[agent] : Transport.Shown;
+
+const PHONE_TABS_PX = 56;
+const PHONE_TRANSPORT_PX = 64;
+
+export const sheetFloor = (transport: Transport): number => PHONE_TABS_PX + (transport === Transport.Shown ? PHONE_TRANSPORT_PX : 0);

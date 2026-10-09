@@ -24,7 +24,7 @@
   import ClipBar from '$lib/components/motion/ClipBar.svelte';
   import { Detent, nearestDetent, nextDetent, sheetHeight } from '$lib/motion/sheet-detents';
   import OverflowMenu, { type MenuBlock } from '$lib/components/motion/OverflowMenu.svelte';
-  import { CHAT_PLACE, ChatPlace, DEFAULT_LAYOUT, Panel, Side, flip, readLayout, sideWidth, timelineHeight, toggleSide, toggleTimeline, viewportOf, Viewport, writeLayout, type EditorLayout, type LayoutStore } from '$lib/motion/editor-layout';
+  import { CHAT_PLACE, ChatPlace, DEFAULT_LAYOUT, Panel, Side, flip, readLayout, sideWidth, timelineHeight, sheetFloor, toggleSide, toggleTimeline, transportOf, viewportOf, Viewport, writeLayout, type EditorLayout, type LayoutStore } from '$lib/motion/editor-layout';
   import { provideSelection } from '$lib/motion/selection-context';
   import { addAdjustment, mergeView, pathNames, precompose, viewOf } from '$lib/motion/precomp';
   import { Lens, addLens } from '$lib/motion/glass/ops';
@@ -459,8 +459,9 @@
     }
   }
 
-  const SHEET_FLOOR_PX = 120;
-  const sheetRoom = () => ({ viewport: viewportH, stageBottom: stageEl?.getBoundingClientRect().bottom ?? 0, floor: SHEET_FLOOR_PX });
+  const transport = $derived(transportOf(viewport, sheet === Sheet.Agent ? detent : null));
+  const floorPx = $derived(sheetFloor(transport));
+  const sheetRoom = () => ({ viewport: viewportH, stageBottom: stageEl?.getBoundingClientRect().bottom ?? 0, floor: floorPx });
   const sheetPx = $derived(sheetDrag?.height ?? (viewportH ? sheetHeight(detent, sheetRoom()) : 0));
 
   $effect(() => {
@@ -1040,7 +1041,7 @@
 <svelte:head><title>{data.node.name ?? 'Motion'} · Motion editor</title></svelte:head>
 <svelte:window bind:innerWidth={width} bind:innerHeight={viewportH} onkeydown={onKey} onpointerdown={pressDown} onpointerup={closePopovers} />
 
-<div class="editor" data-testid="motion-editor" data-viewport={viewport} style={`--sheet-h: ${sheetPx}px; --sheet-floor: ${SHEET_FLOOR_PX}px;`}>
+<div class="editor" data-testid="motion-editor" data-viewport={viewport} data-transport={transport} data-dragging={sheetDrag ? '' : undefined} style={`--sheet-h: ${sheetPx}px; --sheet-floor: ${floorPx}px;`}>
   <header class="bar">
     <div class="group lead">
       <IconButton action={Action.Menu} aria-expanded={menuOpen} aria-haspopup="dialog" data-testid="menu-open" onclick={() => (menuOpen = true)} />
@@ -1941,6 +1942,28 @@
     height: 64px;
     padding: 0 var(--ui-space-2);
     background: var(--ui-bg);
+    overflow: hidden;
+    transition: height 160ms ease;
+  }
+
+  [data-viewport='phone'][data-transport='hidden'] .transport {
+    height: 0;
+    visibility: hidden;
+    transition: height 160ms ease, visibility 0s 160ms;
+  }
+
+  [data-viewport='phone']:not([data-dragging]) .props,
+  [data-viewport='phone']:not([data-dragging]) .chat {
+    transition: bottom 160ms ease, height 160ms ease;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    [data-viewport='phone'] .transport,
+    [data-viewport='phone'][data-transport='hidden'] .transport,
+    [data-viewport='phone']:not([data-dragging]) .props,
+    [data-viewport='phone']:not([data-dragging]) .chat {
+      transition: none;
+    }
   }
 
   [data-viewport='phone'] .transport :global(.step),
