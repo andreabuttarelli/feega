@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TOOL_STATUS, canvasLinkOf, failureOfStatus, keyboardInset, speakerStarts, toolStatusOf } from './chat-view';
+import { TOOL_STATUS, canvasLinkOf, failureOfStatus, keyboardInset, speakerStarts, toolStatusOf, viewedPicturesOf } from './chat-view';
 
 describe('toolStatusOf', () => {
   it('treats a call without a status as still running', () => {
@@ -74,5 +74,20 @@ describe('keyboardInset', () => {
 
   it('never goes negative without a keyboard', () => {
     expect(keyboardInset({ innerHeight: 800, viewportHeight: 800, offsetTop: 0, reservedBelow: 90 })).toBe(0);
+  });
+});
+
+describe('pictures the agent looked at', () => {
+  const call = (images: unknown[]) => ({ toolName: 'view_images', status: 'done' as const, output: { ok: true, images } });
+
+  it('links each stored picture through the canvas, never the source url', () => {
+    const out = viewedPicturesOf(call([{ url: 'https://a.example/x.png', path: 'org-1/p1/web-views/v1/0.jpg' }, { url: 'https://a.example/y.png', error: 'refused' }]), 'p1', 'c1');
+
+    expect(out).toEqual([{ href: '/p/p1/c/c1/web-views/v1/0.jpg', source: 'https://a.example/x.png' }]);
+  });
+
+  it('shows nothing without a canvas or for other tools', () => {
+    expect(viewedPicturesOf(call([{ url: 'u', path: 'o/p/web-views/v/0.jpg' }]), 'p1', '')).toEqual([]);
+    expect(viewedPicturesOf({ toolName: 'read_page', output: { images: [{ path: 'o/p/web-views/v/0.jpg' }] } }, 'p1', 'c1')).toEqual([]);
   });
 });

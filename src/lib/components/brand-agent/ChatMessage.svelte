@@ -82,7 +82,7 @@
     {#if tools.length}
       <ul class="tools" aria-label={$_('chat.panel.tools', { values: { count: tools.length } })}>
         {#each tools as call, i (call.toolCallId ?? `${call.toolName}-${i}`)}
-          <ChatToolRow {call} {projectId} />
+          <ChatToolRow {call} {projectId} {canvasId} />
         {/each}
       </ul>
     {/if}

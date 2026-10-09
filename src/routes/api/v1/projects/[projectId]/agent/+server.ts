@@ -16,7 +16,7 @@ import { createProjectTools } from '$lib/server/project-agent/project-tools';
 import { createMotionDelegation } from '$lib/server/project-agent/motion-delegation';
 import { openAgentTools } from '$lib/server/project-agent/tool-surface';
 import { createWebTools } from '$lib/server/web/web-tools';
-import { liveWebDeps, webImageImport } from '$lib/server/web/live';
+import { liveWebDeps, productImport, productsNodePlacer, webImageImport } from '$lib/server/web/live';
 import { projectAgentPrompt } from '$lib/server/project-agent/system-prompt';
 import { AGENT_MAX_DURATION_S, agentStopWhen, overTurnCap } from '$lib/server/project-agent/limits';
 import { spentUsd } from '$lib/server/motion/model-route';
@@ -129,10 +129,11 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
     ...createProjectTools({ db, orgId, projectId: project.id, userId: user.id, brandId: brand?.id ?? null }),
     ...createMotionDelegation({ db, orgId, projectId: project.id, userId: user.id, origin: url.origin, model, canvasId }),
     ...createWebTools({
-      ...liveWebDeps({ orgId, userId: user.id, projectId: project.id, brandId: brand?.id ?? null }, (usd) => {
+      ...liveWebDeps(db, { orgId, userId: user.id, projectId: project.id, brandId: brand?.id ?? null, mode: project.mode }, (usd) => {
         spent += usd;
       }),
-      importImage: webImageImport(db, { orgId, projectId: project.id, mode: project.mode })
+      importImage: webImageImport(db, { orgId, projectId: project.id, mode: project.mode }),
+      importProducts: productImport(webImageImport(db, { orgId, projectId: project.id, mode: project.mode }), canvasId ? productsNodePlacer(db, { orgId, projectId: project.id, canvasId, actor }) : undefined)
     })
   };
   const agent = await openAgentTools({

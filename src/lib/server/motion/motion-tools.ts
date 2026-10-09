@@ -1597,7 +1597,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     analyze_site: tool({
-      description: 'Read a public website for a brand: name, tagline, description, logos (svg first, then favicon, apple-touch-icon, og:image), palette (theme, logo, CSS), accent (hex and where it was found; hex null with a neutral palette when the brand has none), fonts (google true = usable by name after register_font), images with width and height (og, hero, product), products and social links. Nothing is stored: import_asset the logo and the pictures you will use.',
+      description: 'Read a public website for a brand: name, tagline, description, logos (svg first, then favicon, apple-touch-icon, og:image), palette (theme, logo, CSS), accent (hex and where it was found; hex null with a neutral palette when the brand has none), fonts (google true = usable by name after register_font), images with width and height (og, hero, product), store (shopify, woocommerce or none) with its real products from the public catalogue, and social links. Nothing is stored: import_asset the logo and the pictures you will use.',
       inputSchema: z.object({ url: z.string().min(4).max(2000).describe('the site, e.g. https://www.allbirds.com or allbirds.com') }),
       execute: async (input) => (deps.site ? readPages(readLogos(await deps.site(input.url))) : UNREADABLE('reading sites'))
     }),

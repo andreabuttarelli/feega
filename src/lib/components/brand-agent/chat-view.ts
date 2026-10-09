@@ -95,3 +95,20 @@ export function keyboardInset(v: {
   const covered = v.innerHeight - v.viewportHeight - v.offsetTop;
   return Math.max(0, Math.round(covered - v.reservedBelow));
 }
+
+const VIEWED_PATH = /\/web-views\/([\w-]+)\/([\w-]+\.jpg)$/;
+const VIEWING_TOOLS = new Set(['view_images']);
+
+export type ViewedPicture = { href: string; source: string };
+
+export function viewedPicturesOf(call: ToolCall, projectId: string, canvasId: string): ViewedPicture[] {
+  const images = (call.output as { images?: { url?: unknown; path?: unknown }[] } | null)?.images;
+  if (!VIEWING_TOOLS.has(call.toolName) || !canvasId || !Array.isArray(images)) {
+    return [];
+  }
+  return images.flatMap((image) => {
+    const match = typeof image.path === 'string' ? image.path.match(VIEWED_PATH) : null;
+    return match ? [{ href: `/p/${projectId}/c/${canvasId}/web-views/${match[1]}/${match[2]}`, source: String(image.url ?? '') }] : [];
+  });
+}
+

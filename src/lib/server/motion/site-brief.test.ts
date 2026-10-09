@@ -5,6 +5,7 @@ vi.mock('$env/dynamic/private', () => ({ env: {} }));
 vi.mock('node:dns/promises', () => ({ lookup: vi.fn() }));
 
 import sharp from 'sharp';
+import { readFileSync } from 'node:fs';
 import { lookup } from 'node:dns/promises';
 import { readSite, PAGE_MAX_BYTES } from './site-brief';
 
@@ -243,4 +244,18 @@ describe('readSite: what a trailer needs from a public page', () => {
 
     expect(read.ok && read.site.images.map((i) => i.url)).toEqual(['https://brand.example/og.png']);
   });
+
+  it('reads a store it detects from the public catalogue: real products with price and currency', async () => {
+    const catalogue = readFileSync(new URL('../web/fixtures/woo-products.json', import.meta.url), 'utf8');
+    serves({
+      [SITE]: { type: 'text/html', body: HTML.replace('<body>', '<body class="woocommerce">') },
+      'https://brand.example/wp-json/wc/store/v1/products?per_page=50&page=1': { type: 'application/json', body: catalogue }
+    });
+
+    const read = await readSite(SITE);
+
+    expect(read.ok && read.site.store).toBe('woocommerce');
+    expect(read.ok && read.site.products[0]).toMatchObject({ name: 'QR Code by QodeVault', price: '49 USD', url: 'https://woocommerce.com/products/qr-code-by-qodevault/' });
+  });
 });
+

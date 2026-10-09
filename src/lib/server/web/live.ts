@@ -10,12 +10,27 @@ import type { ProjectMode } from '$lib/project-mode';
 import { SearchEngine, exaSearch, openRouterSearch, searchEngineOf, type SearchPort } from './search';
 import { readPage } from './read-page';
 import { screenshotPage } from './screenshot';
-import type { ImageImport, WebToolDeps } from './web-tools';
+import { readStore, storeProducts } from './store';
+import { viewImages, type ViewPorts } from './view-images';
+import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
+import { removeAssetFile, signAssetFile, storeAssetFile } from '$lib/server/repos/asset-storage';
+import type { FetchedProduct, StorePlatform } from '$lib/server/store-fetch';
+import { createNode } from '$lib/server/repos/canvas';
+import { upsertNodeProducts } from '$lib/server/repos/products';
+import type { Actor } from '$lib/server/repos/actor';
+import type { ScreenOutcome } from '$lib/server/moderation/screen';
+import type { AssetImport } from '$lib/server/motion/motion-tools';
+import type { MotionAsset } from '$lib/server/motion/editor';
+import type { ImageImport, ProductsImport, WebToolDeps } from './web-tools';
 
-export type WebScope = { orgId: string; userId: string; projectId: string; brandId?: string | null };
+export type WebScope = { orgId: string; userId: string; projectId: string; brandId?: string | null; mode: ProjectMode };
+
+export const WEB_VIEWS_DIR = 'web-views';
 
 const IMAGE_TIMEOUT_MS = 20_000;
 const SEARCH_LABEL = 'web-search';
+const PICTURES_PER_PRODUCT = 2;
+const VIEW_MAX_BYTES = 15_000_000;
 
 const ENGINES: Record<SearchEngine, () => { port: SearchPort; provider: 'exa' | 'llm'; model: string }> = {
   [SearchEngine.Exa]: () => ({ port: exaSearch(env.EXA_API_KEY!.trim()), provider: 'exa', model: 'exa-search' }),
@@ -25,7 +40,7 @@ const ENGINES: Record<SearchEngine, () => { port: SearchPort; provider: 'exa' | 
   }
 };
 
-export function loggedSearch(scope: WebScope, engine: SearchEngine = searchEngineOf(env)): SearchPort {
+export function loggedSearch(scope: Omit<WebScope, 'mode'>, engine: SearchEngine = searchEngineOf(env)): SearchPort {
   const { port, provider, model } = ENGINES[engine]();
   return async (query, max) => {
     const t0 = Date.now();
@@ -65,11 +80,71 @@ export function webImageImport(db: Db, scope: { orgId: string; projectId: string
   };
 }
 
-export function liveWebDeps(scope: WebScope, spend: (usd: number) => void): WebToolDeps {
+export function webViewPrefix(scope: { orgId: string; projectId: string }, callId: string): string {
+  return `${canvasUploadPrefix(scope.orgId, scope.projectId)}${WEB_VIEWS_DIR}/${callId}`;
+}
+
+function viewer(db: Db, scope: WebScope): NonNullable<WebToolDeps['view']> {
+  const ports: ViewPorts = {
+    fetchImage: (url) => safeFetchBytes(url, { maxBytes: VIEW_MAX_BYTES, timeoutMs: IMAGE_TIMEOUT_MS }),
+    store: (path, bytes) => storeAssetFile(db, path, new File([new Uint8Array(bytes)], path.split('/').at(-1) as string, { type: 'image/jpeg' })),
+    screen: async (path) => ATTACHMENT_PORTS.screenImage({ orgId: scope.orgId, mode: scope.mode, url: await signAssetFile(db, path) }),
+    remove: (path) => removeAssetFile(db, path)
+  };
+  return (urls, detail, callId) => viewImages(urls, detail, webViewPrefix(scope, callId), ports);
+}
+
+export function liveWebDeps(db: Db, scope: WebScope, spend: (usd: number) => void): WebToolDeps {
   return {
+    view: viewer(db, scope),
     search: loggedSearch(scope),
     read: (url) => readPage(url),
+    store: (url, opts) => readStore(url, opts),
     shoot: serverFramesOpen() ? (url, view) => screenshotPage(url, view, chromiumPage) : undefined,
     spend
+  };
+}
+
+type SavePicture = (url: string) => Promise<ImageImport>;
+type PlaceProducts = (platform: StorePlatform, storeUrl: string, products: FetchedProduct[]) => Promise<string | null>;
+
+export function productImport(save: SavePicture, place?: PlaceProducts, fetchProducts = storeProducts): (storeUrl: string, handles: string[]) => Promise<ProductsImport> {
+  return async (storeUrl, handles) => {
+    const found = await fetchProducts(storeUrl, handles);
+    if (!found.ok) {
+      return found;
+    }
+    const products = await Promise.all(
+      found.products.map(async (p) => {
+        const saved = await Promise.all(p.images.slice(0, PICTURES_PER_PRODUCT).map((i) => save(i.url)));
+        return { handle: p.handle ?? p.title, title: p.title, asset_ids: saved.flatMap((s) => (s.ok ? [s.assetId] : [])) };
+      })
+    );
+    const nodeId = place && found.products.length ? await place(found.platform, storeUrl, found.products) : null;
+    return { ok: true, products, missing: found.missing, ...(nodeId ? { node_id: nodeId } : {}) };
+  };
+}
+
+export function productsNodePlacer(db: Db, scope: { orgId: string; projectId: string; canvasId: string; actor: Actor }): PlaceProducts {
+  return async (platform, storeUrl, products) => {
+    const url = new URL(/^https?:\/\//i.test(storeUrl) ? storeUrl : `https://${storeUrl}`).origin;
+    const node = await createNode(db, { ...scope, type: 'products', x: 0, y: 0, data: { type: platform, url, limit: products.length } });
+    await upsertNodeProducts(db, { orgId: scope.orgId, projectId: scope.projectId, nodeId: node.id, platform, products });
+    return node.id;
+  };
+}
+
+export function screenedImport(importAsset: (url: string) => Promise<AssetImport>, screen: (url: string) => Promise<ScreenOutcome>, assets: MotionAsset[]): SavePicture {
+  return async (url) => {
+    const review = await screen(url);
+    if (!review.ok) {
+      return { ok: false, error: review.error };
+    }
+    const imported = await importAsset(url);
+    if (!imported.ok) {
+      return imported;
+    }
+    assets.push(imported.asset);
+    return { ok: true, assetId: imported.asset.id, width: imported.width, height: imported.height };
   };
 }

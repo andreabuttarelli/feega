@@ -1,0 +1,134 @@
+[
+ {
+  "id": 18734006935398,
+  "name": "QR Code by QodeVault",
+  "slug": "qr-code-by-qodevault",
+  "permalink": "https://woocommerce.com/products/qr-code-by-qodevault/",
+  "sku": "",
+  "short_description": "<p>Create branded QR codes for your products, change where they point after printing, and track scans, all from your WooCommerce admin.</p>",
+  "description": "<p data-pm-slice=\"1 1 []\">QR Code by QodeVault for WooCommerce turns what you print (packaging, flyers, and in-store signs) into a direct path to your store. Pick a product from your catalog, style the code to match your brand, and download it ready to print. If a link changes later, update the code instead of reprinting it.</p>\n<ul class=\"wccom-tick-list-secondary\">\n<li data-pm-slice=\"1 1 []\">Sen",
+  "on_sale": false,
+  "prices": {
+   "price": "4900",
+   "regular_price": "4900",
+   "sale_price": "4900",
+   "price_range": null,
+   "currency_code": "USD",
+   "currency_symbol": "$",
+   "currency_minor_unit": 2,
+   "currency_decimal_separator": ".",
+   "currency_thousand_separator": ",",
+   "currency_prefix": "$",
+   "currency_suffix": ""
+  },
+  "images": [
+   {
+    "id": 18734006936984,
+    "src": "https://woocommerce.com/wp-content/uploads/2026/10/qodevault_logo.png",
+    "thumbnail": "https://woocommerce.com/wp-content/uploads/2026/10/qodevault_logo.png?w=160",
+    "srcset": "https://woocommerce.com/wp-content/uploads/2026/10/qodevault_logo.png 160w, https://woocommerce.com/wp-content/uploads/2026/10/qodevault_logo.png?resize=150,150 150w, https://woocommerce.com/wp-content/uploads/2026/10/qodevault_logo.png?resize=100,100 100w",
+    "sizes": "(max-width: 160px) 100vw, 160px",
+    "thumbnail_srcset": "https://woocommerce.com/wp-content/uploads/2026/10/qodevault_logo.png 160w, https://woocommerce.com/wp-content/uploads/2026/10/qodevault_logo.png?resize=150,150 150w, https://woocommerce.com/wp-content/uploads/2026/10/qodevault_logo.png?resize=100,100 100w",
+    "thumbnail_sizes": "(max-width: 160px) 100vw, 160px",
+    "name": "QodeVault Logo",
+    "alt": "qodevault logo"
+   },
+   {
+    "id": 18734006937208,
+    "src": "https://woocommerce.com/wp-content/uploads/2026/10/gallery-2-design.png",
+    "thumbnail": "https://woocommerce.com/wp-content/uploads/2026/10/gallery-2-design.png?w=300",
+    "srcset": "https://woocommerce.com/wp-content/uploads/2026/10/gallery-2-design.png 1792w, https://woocommerce.com/wp-content/uploads/2026/10/gallery-2-design.png?resize=896,550 896w, https://woocommerce.com/wp-content/uploads/2026/10/gallery-2-design.png?resize=768,471 768w, https://woocommerce.com/wp-content/uploads/2026/10/gallery-2-design.png?resize=1200,737 1200w, https://woocommerce.com/wp-content/uploads/2026/10/gallery-2-design.png?resize=1536,943 1536w, https://woocommerce.com/wp-content/uploads/2026/10/gallery-2-design.png?resize=300,184 300w, https://woocommerce.com/wp-content/uploads/2026/10/gallery-2-design.png?resize=958,588 958w",
+    "sizes": "(max-width: 1792px) 100vw, 1792px",
+    "thumbnail_srcset": "https://woocommerce.com/wp-content/uploads/2026/10/gallery-2-design.png 1792w, https://woocommerce.com/wp-content/uploads/2026/10/gallery-2-design.png?resize=896,550 896w, https://woocommerce.com/wp-content/uploads/2026/10/gallery-2-design.png?resize=768,471 768w, https://woocommerce.com/wp-content/uploads/2026/10/gallery-2-design.png?resize=1200,737 1200w, https://woocommerce.com/wp-content/uploads/2026/10/gallery-2-design.png?resize=1536,943 1536w, https://woocommerce.com/wp-content/uploads/2026/10/gallery-2-design.png?resize=300,184 300w, https://woocommerce.com/wp-content/uploads/2026/10/gallery-2-design.png?resize=958,588 958w",
+    "thumbnail_sizes": "(max-width: 300px) 100vw, 300px",
+    "name": "Match your brand with a live preview",
+    "alt": "QR code design options for dot patterns and corner markers, beside a live preview"
+   }
+  ],
+  "categories": [
+   {
+    "id": 1021,
+    "name": "WooCommerce extensions",
+    "slug": "woocommerce-extensions",
+    "link": "https://woocommerce.com/product-category/woocommerce-extensions/"
+   },
+   {
+    "id": 1024,
+    "name": "Marketing",
+    "slug": "marketing-extensions",
+    "link": "https://woocommerce.com/product-category/woocommerce-extensions/marketing-extensions/"
+   }
+  ],
+  "tags": [],
+  "attributes": [],
+  "variations": [],
+  "is_in_stock": true,
+  "type": "simple"
+ },
+ {
+  "id": 18734006928975,
+  "name": "Wix Data Migrator",
+  "slug": "wix-data-migrator",
+  "permalink": "https://woocommerce.com/products/wix-data-migrator/",
+  "sku": "",
+  "short_description": "<p>Migrate Wix to WooCommerce with ease transfer products, customers, orders &amp; reviews with SEO redirects, advanced filters, and live sync.</p>",
+  "description": "<h3>Get help migrating from Wix to WooCommerce</h3>\n<p>Move your Wix store to WooCommerce without complicated CSV exports.</p>\n<p>Wix Data Migrator lets you transfer products, customers, orders, and product reviews directly from your WordPress admin. Connect to the Wix API, configure your migration rules, and import your store data in the background while your Wix store remains online.</p>\n<p>Whet",
+  "on_sale": false,
+  "prices": {
+   "price": "6900",
+   "regular_price": "6900",
+   "sale_price": "6900",
+   "price_range": null,
+   "currency_code": "USD",
+   "currency_symbol": "$",
+   "currency_minor_unit": 2,
+   "currency_decimal_separator": ".",
+   "currency_thousand_separator": ",",
+   "currency_prefix": "$",
+   "currency_suffix": ""
+  },
+  "images": [
+   {
+    "id": 18734006930425,
+    "src": "https://woocommerce.com/wp-content/uploads/2026/10/Gemini_Generated_Image_upse7qupse7qupse-1.jpg",
+    "thumbnail": "https://woocommerce.com/wp-content/uploads/2026/10/Gemini_Generated_Image_upse7qupse7qupse-1.jpg?w=160",
+    "srcset": "https://woocommerce.com/wp-content/uploads/2026/10/Gemini_Generated_Image_upse7qupse7qupse-1.jpg 160w, https://woocommerce.com/wp-content/uploads/2026/10/Gemini_Generated_Image_upse7qupse7qupse-1.jpg?resize=150,150 150w, https://woocommerce.com/wp-content/uploads/2026/10/Gemini_Generated_Image_upse7qupse7qupse-1.jpg?resize=100,100 100w",
+    "sizes": "(max-width: 160px) 100vw, 160px",
+    "thumbnail_srcset": "https://woocommerce.com/wp-content/uploads/2026/10/Gemini_Generated_Image_upse7qupse7qupse-1.jpg 160w, https://woocommerce.com/wp-content/uploads/2026/10/Gemini_Generated_Image_upse7qupse7qupse-1.jpg?resize=150,150 150w, https://woocommerce.com/wp-content/uploads/2026/10/Gemini_Generated_Image_upse7qupse7qupse-1.jpg?resize=100,100 100w",
+    "thumbnail_sizes": "(max-width: 160px) 100vw, 160px",
+    "name": "Gemini_Generated_Image_upse7qupse7qupse (1)",
+    "alt": ""
+   },
+   {
+    "id": 18734006930413,
+    "src": "https://woocommerce.com/wp-content/uploads/2026/10/QTY-Breaks-9.jpg",
+    "thumbnail": "https://woocommerce.com/wp-content/uploads/2026/10/QTY-Breaks-9.jpg?w=300",
+    "srcset": "https://woocommerce.com/wp-content/uploads/2026/10/QTY-Breaks-9.jpg 1600w, https://woocommerce.com/wp-content/uploads/2026/10/QTY-Breaks-9.jpg?resize=896,504 896w, https://woocommerce.com/wp-content/uploads/2026/10/QTY-Breaks-9.jpg?resize=768,432 768w, https://woocommerce.com/wp-content/uploads/2026/10/QTY-Breaks-9.jpg?resize=1200,675 1200w, https://woocommerce.com/wp-content/uploads/2026/10/QTY-Breaks-9.jpg?resize=1536,864 1536w, https://woocommerce.com/wp-content/uploads/2026/10/QTY-Breaks-9.jpg?resize=300,169 300w, https://woocommerce.com/wp-content/uploads/2026/10/QTY-Breaks-9.jpg?resize=958,539 958w",
+    "sizes": "(max-width: 1600px) 100vw, 1600px",
+    "thumbnail_srcset": "https://woocommerce.com/wp-content/uploads/2026/10/QTY-Breaks-9.jpg 1600w, https://woocommerce.com/wp-content/uploads/2026/10/QTY-Breaks-9.jpg?resize=896,504 896w, https://woocommerce.com/wp-content/uploads/2026/10/QTY-Breaks-9.jpg?resize=768,432 768w, https://woocommerce.com/wp-content/uploads/2026/10/QTY-Breaks-9.jpg?resize=1200,675 1200w, https://woocommerce.com/wp-content/uploads/2026/10/QTY-Breaks-9.jpg?resize=1536,864 1536w, https://woocommerce.com/wp-content/uploads/2026/10/QTY-Breaks-9.jpg?resize=300,169 300w, https://woocommerce.com/wp-content/uploads/2026/10/QTY-Breaks-9.jpg?resize=958,539 958w",
+    "thumbnail_sizes": "(max-width: 300px) 100vw, 300px",
+    "name": "QTY Breaks (9)",
+    "alt": ""
+   }
+  ],
+  "categories": [
+   {
+    "id": 1021,
+    "name": "WooCommerce extensions",
+    "slug": "woocommerce-extensions",
+    "link": "https://woocommerce.com/product-category/woocommerce-extensions/"
+   },
+   {
+    "id": 1888,
+    "name": "Store management",
+    "slug": "operations",
+    "link": "https://woocommerce.com/product-category/woocommerce-extensions/operations/"
+   }
+  ],
+  "tags": [],
+  "attributes": [],
+  "variations": [],
+  "is_in_stock": true,
+  "type": "simple"
+ }
+]

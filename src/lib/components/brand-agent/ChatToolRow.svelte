@@ -1,15 +1,16 @@
 <script lang="ts">
   import { _ } from 'svelte-i18n';
   import { toolLabel } from '$lib/chat-parts';
-  import { TOOL_STATUS, canvasLinkOf, toolStatusOf, type ToolCall } from './chat-view';
+  import { TOOL_STATUS, canvasLinkOf, toolStatusOf, viewedPicturesOf, type ToolCall } from './chat-view';
 
-  let { call, projectId }: { call: ToolCall; projectId: string } = $props();
+  let { call, projectId, canvasId = '' }: { call: ToolCall; projectId: string; canvasId?: string } = $props();
 
   let open = $state(false);
 
   const status = $derived(toolStatusOf(call));
   const row = $derived(TOOL_STATUS[status]);
   const link = $derived(canvasLinkOf(call, projectId));
+  const pictures = $derived(viewedPicturesOf(call, projectId, canvasId));
   const hasDetails = $derived(call.input !== undefined || call.output !== undefined || !!call.errorText);
 
   function pretty(value: unknown): string {
@@ -45,6 +46,14 @@
     {/if}
   </div>
 
+  {#if pictures.length}
+    <div class="pictures">
+      {#each pictures as picture (picture.href)}
+        <a href={picture.source} target="_blank" rel="noopener noreferrer"><img src={picture.href} alt="" loading="lazy" /></a>
+      {/each}
+    </div>
+  {/if}
+
   {#if open}
     <div class="details">
       {#if call.errorText}
@@ -63,6 +72,19 @@
 </li>
 
 <style>
+  .pictures {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 0 10px 10px 34px;
+  }
+  .pictures img {
+    display: block;
+    width: 64px;
+    height: 64px;
+    object-fit: cover;
+    border: 1px solid var(--line, #ededef);
+  }
   .tool {
     list-style: none;
     border-top: 1px solid var(--line, #ededef);
