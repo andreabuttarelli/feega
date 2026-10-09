@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { purgeStorage, type StoragePort } from './storage-purge';
+import { purgeStorage, type StoragePort } from '../tests/e2e/fixtures/storage-purge';
 
 function memoryStorage(files: Record<string, string[]>): StoragePort & { files: Record<string, string[]> } {
   const childrenOf = (bucket: string, prefix: string) => {

@@ -6,4 +6,4 @@
 
 - `purgeStorage` (`tests/e2e/fixtures/storage-purge.ts`) walks every bucket under the org, user and
   colour-swatch prefixes and removes every file; Supabase is behind a three-method port so the walk
-  is tested in memory (`tests/e2e/fixtures/*.test.ts` joined the vitest include).
+  is tested in memory (test in `scripts/e2e-storage-purge.test.ts`: Playwright loads every test file under `tests/e2e`).
