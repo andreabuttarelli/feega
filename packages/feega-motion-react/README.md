@@ -20,7 +20,7 @@ story (the saved number of screens, pinned while you scroll), as the web embed d
 | Prop | |
 |---|---|
 | `id` | the published video id |
-| `origin` | where feega serves embeds; copy it from the export dialog |
+| `origin` | where feega serves embeds; defaults to `https://oh.feega.app` |
 | `fit` | `'cover'` (default) or `'contain'` |
 | `scrollLength` | screens of scroll story; default from the video, `0` for none |
 | `scrollContainer` | a ref to the element that scrolls, when it is not the page |
