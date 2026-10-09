@@ -90,6 +90,22 @@ describe('the player reading the host', () => {
   it('hears when the host hands the scrub to gestures', () => {
     expect(readHost({ type: TYPE, gesture: true }, TYPE)).toEqual({ progress: undefined, visible: undefined, gesture: true });
   });
+
+  it('hears the commands an app host sends: play, pause, seek, fit, links, reduced motion', () => {
+    expect(readHost({ type: TYPE, command: 'seek', time: 2.5 }, TYPE)).toMatchObject({ command: 'seek', time: 2.5 });
+    expect(readHost({ type: TYPE, command: 'play' }, TYPE)).toMatchObject({ command: 'play' });
+    expect(readHost({ type: TYPE, fit: 'contain' }, TYPE)).toMatchObject({ fit: 'contain' });
+    expect(readHost({ type: TYPE, links: 'host', reducedMotion: true }, TYPE)).toMatchObject({ links: 'host', reducedMotion: true });
+  });
+
+  it('passes an app pointer and tilt through, clamped to their ranges', () => {
+    expect(readHost({ type: TYPE, pointer: { x: 0.25, y: 2, down: true } }, TYPE)).toMatchObject({ pointer: { x: 0.25, y: 1, down: true } });
+    expect(readHost({ type: TYPE, tilt: { x: -3, y: 0.5 } }, TYPE)).toMatchObject({ tilt: { x: -1, y: 0.5 } });
+  });
+
+  it('ignores a command it does not know and a malformed pointer', () => {
+    expect(readHost({ type: TYPE, command: 'rewind', pointer: { x: 'a' } }, TYPE)).toEqual({ progress: undefined, visible: undefined });
+  });
 });
 
 describe('the scrub driven by gestures', () => {

@@ -13,6 +13,7 @@ import { playerMain, type PlayerConfig } from './player';
 import { EMBED_ROUTE, HOST_MESSAGE, gestureScrub, hostMain, readHost, selfScroll } from './host';
 import { Liveness, PlayMode, SCROLL_LENGTH, interactiveOf, type Interactive } from './settings';
 import { FIT_SCALE, fitBox } from './fit';
+import { LINK_MESSAGE, NATIVE_BRIDGE, PLAYER_MESSAGE, PROTOCOL_VERSION, PlayerEvent } from './protocol';
 import type { EmbedSettings } from './loader';
 
 export const BUNDLE_FILE = 'feega-interactive.html';
@@ -69,6 +70,11 @@ function playerConfig(source: PlayerSource): PlayerConfig {
     inputMessage: INPUT_MESSAGE,
     eventMessage: EVENT_MESSAGE,
     hostMessage: HOST_MESSAGE,
+    playerMessage: PLAYER_MESSAGE,
+    linkMessage: LINK_MESSAGE,
+    nativeBridge: NATIVE_BRIDGE,
+    protocol: PROTOCOL_VERSION,
+    events: { ...PlayerEvent },
     selfScroll: SELF_SCROLL,
     standaloneMs: STANDALONE_MS,
     fitScale: FIT_SCALE,

@@ -12,6 +12,11 @@ export type PlayerConfig = {
   inputMessage: string;
   eventMessage: string;
   hostMessage: string;
+  playerMessage: string;
+  linkMessage: string;
+  nativeBridge: string;
+  protocol: number;
+  events: Record<'Size' | 'Ready' | 'TimeUpdate' | 'Ended' | 'Link' | 'Error', string>;
   selfScroll: string;
   standaloneMs: number;
   fitScale: Record<string, 'max' | 'min'>;
@@ -20,6 +25,7 @@ export type PlayerConfig = {
 };
 
 type PlayerEl = HTMLElement & { seek: (t: number) => void; play: () => void; pause: () => void; iframeElement?: HTMLIFrameElement };
+type Bridge = { postMessage: (message: string) => void };
 type Orientation = typeof DeviceOrientationEvent & { requestPermission?: () => Promise<string> };
 
 export function playerMain(cfg: PlayerConfig, read: typeof readHost, own: typeof selfScroll, fit: typeof fitBox, swipe: typeof gestureScrub): void {
@@ -33,6 +39,8 @@ export function playerMain(cfg: PlayerConfig, read: typeof readHost, own: typeof
   let playing = false;
   let asked = false;
   let swiping = false;
+  let hostLinks = false;
+  let pending: (() => void) | null = null;
 
   const clamp = (v: number) => Math.max(-1, Math.min(1, v));
   const post = () => el.iframeElement?.contentWindow?.postMessage({ type: cfg.inputMessage, values }, '*');
@@ -47,8 +55,16 @@ export function playerMain(cfg: PlayerConfig, read: typeof readHost, own: typeof
       el.pause();
     }
   };
-  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const scaleBy = Math[cfg.fitScale[new URLSearchParams(location.search).get('fit') ?? ''] ?? cfg.fitScale.cover];
+  const emit = (event: string, data: object = {}) => {
+    const message = { type: cfg.playerMessage, v: cfg.protocol, event, ...data };
+    if (window.parent !== window) {
+      window.parent.postMessage(message, '*');
+    }
+    (window as unknown as Record<string, Bridge | undefined>)[cfg.nativeBridge]?.postMessage(JSON.stringify(message));
+  };
+  let still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const scaleOf = (fit: string | null) => Math[cfg.fitScale[fit ?? ''] ?? cfg.fitScale.cover];
+  let scaleBy = scaleOf(new URLSearchParams(location.search).get('fit'));
   const content = () => {
     const r = pad.getBoundingClientRect();
     const box = fit(r, cfg, scaleBy);
@@ -60,6 +76,7 @@ export function playerMain(cfg: PlayerConfig, read: typeof readHost, own: typeof
   };
   addEventListener('resize', layout);
   layout();
+  emit(cfg.events.Size, { width: cfg.width, height: cfg.height, aspect: cfg.width / cfg.height });
   const point = (e: PointerEvent) => {
     const box = content();
     values[cfg.keys.x] = (e.clientX - box.left) / box.width;
@@ -113,10 +130,60 @@ export function playerMain(cfg: PlayerConfig, read: typeof readHost, own: typeof
     }
   };
   const standalone = cfg.playback === cfg.modes.scrub ? own(window, cfg.standaloneMs, cfg.selfScroll, scrub) : null;
+  const openLink = (url: unknown) => {
+    if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) {
+      return;
+    }
+    if (hostLinks) {
+      emit(cfg.events.Link, { url });
+      return;
+    }
+    window.open(url, '_blank', 'noopener');
+  };
+  const commands: Record<string, (time?: number) => void> = {
+    play: () => el.play(),
+    pause: () => el.pause(),
+    seek: (time) => el.seek(time ?? 0)
+  };
+  const obey = (command: string, time?: number) => {
+    const run = () => commands[command](time);
+    if (!ready) {
+      pending = run;
+      return;
+    }
+    run();
+  };
   addEventListener('message', (e: MessageEvent) => {
+    if (e.data?.type === cfg.linkMessage && e.source === el.iframeElement?.contentWindow) {
+      openLink(e.data.url);
+      return;
+    }
     const m = read(e.data, cfg.hostMessage);
     if (!m) {
       return;
+    }
+    if (m.links) {
+      hostLinks = true;
+    }
+    if (m.reducedMotion !== undefined) {
+      still = m.reducedMotion;
+    }
+    if (m.fit) {
+      scaleBy = scaleOf(m.fit);
+      layout();
+    }
+    if (m.pointer) {
+      values[cfg.keys.x] = m.pointer.x;
+      values[cfg.keys.y] = m.pointer.y;
+      values[cfg.keys.down] = m.pointer.down ? 1 : 0;
+      values[cfg.keys.hover] = 1;
+    }
+    if (m.tilt) {
+      values[cfg.keys.tiltX] = m.tilt.x;
+      values[cfg.keys.tiltY] = m.tilt.y;
+    }
+    if (m.command) {
+      obey(m.command, m.time);
     }
     standalone?.cancel();
     if (m.gesture && cfg.playback === cfg.modes.scrub && !swiping) {
@@ -133,8 +200,11 @@ export function playerMain(cfg: PlayerConfig, read: typeof readHost, own: typeof
 
   el.addEventListener('play', () => (playing = true));
   el.addEventListener('pause', () => (playing = false));
+  el.addEventListener('timeupdate', (e) => emit(cfg.events.TimeUpdate, { time: (e as CustomEvent<{ currentTime: number }>).detail.currentTime, duration: cfg.duration }));
+  el.addEventListener('playbackerror', (e) => emit(cfg.events.Error, { message: String((e as CustomEvent<{ error?: { message?: string } }>).detail?.error?.message ?? 'playback failed') }));
   el.addEventListener('ended', () => {
     playing = false;
+    emit(cfg.events.Ended);
     if (cfg.loop && cfg.playback !== cfg.modes.scrub) {
       el.seek(0);
       play();
@@ -148,6 +218,9 @@ export function playerMain(cfg: PlayerConfig, read: typeof readHost, own: typeof
     if (cfg.playback === cfg.modes.autoplay && !still) {
       play();
     }
+    pending?.();
+    pending = null;
+    emit(cfg.events.Ready, { width: cfg.width, height: cfg.height, duration: cfg.duration, playback: cfg.playback, loop: cfg.loop });
   });
   new IntersectionObserver((entries) => {
     if (cfg.playback === cfg.modes.inView) {
