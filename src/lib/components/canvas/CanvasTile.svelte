@@ -87,7 +87,7 @@
 </script>
 
 {#if tile.connectable}
-  {#if tile.connectors}
+  {#if tile.connectors?.length}
     {#each tile.connectors as connector, i (connector)}
       <Handle
         type="target"

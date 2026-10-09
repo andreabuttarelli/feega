@@ -89,6 +89,45 @@ export function registerMotionTools(server: McpServer) {
   );
 
   server.registerTool(
+    'get_storyboard',
+    {
+      title: 'Read the storyboard of a motion video',
+      description:
+        'The storyboard canvas linked to a motion video: its cards left to right (`node_id`, `text`, the `clip_ids` that play it), ' +
+        'the pictures and clips on it with their asset ids and the card each feeds, and the card-to-card `flow`. `storyboard: null` when none was written. Reads only.',
+      inputSchema: z.object({ org, node_id: z.string() }),
+      annotations: { readOnlyHint: true }
+    },
+    async ({ org, node_id }) => withAuth((token) => motionApi.storyboard(token, node_id, org))
+  );
+
+  server.registerTool(
+    'write_storyboard',
+    {
+      title: 'Write the storyboard of a motion video',
+      description:
+        'Lay out a motion video as a storyboard canvas: one card per beat, story order left to right, stronger emotion higher. ' +
+        'Each beat: `act` (problem, solution, proof, claim), `kind` (title_card, ui_beat, product_shot, scene, logo), `title`, `intent`, `on_screen`, ' +
+        '`emotion`, `intensity` 0-1, `duration` seconds, `visual`, `music`, `media` (project image/video asset ids), `branch_of` (index of an earlier beat it replaces). ' +
+        'Replaces the cards written before; what the user added stays.',
+      inputSchema: z.object({ org, node_id: z.string(), beats: z.array(z.record(z.string(), z.unknown())).min(1).max(40) }),
+      annotations: { readOnlyHint: false, destructiveHint: false }
+    },
+    async ({ org, node_id, beats }) => withAuth((token) => motionApi.writeStoryboard(token, node_id, { beats }, org))
+  );
+
+  server.registerTool(
+    'edit_storyboard_card',
+    {
+      title: 'Rewrite a storyboard card',
+      description: 'Replace the text of one card of a motion video storyboard (`card_id` from `get_storyboard`).',
+      inputSchema: z.object({ org, node_id: z.string(), card_id: z.string(), text: z.string().min(1).max(4000) }),
+      annotations: { readOnlyHint: false, destructiveHint: false }
+    },
+    async ({ org, node_id, card_id, text }) => withAuth((token) => motionApi.editStoryboard(token, node_id, card_id, text, org))
+  );
+
+  server.registerTool(
     'get_motion_summary',
     {
       title: 'Read a motion video',

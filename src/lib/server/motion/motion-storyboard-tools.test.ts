@@ -20,7 +20,8 @@ function setup(storyboard?: StoryboardPort) {
 const port = (): StoryboardPort => ({
   write: vi.fn(async () => ({ canvasId: 'board', nodes: 3, connections: 1 })),
   read: vi.fn(async () => ({ canvasId: 'board', cards: [], media: [], flow: [] })),
-  edit: vi.fn(async () => ({ ok: true as const }))
+  edit: vi.fn(async () => ({ ok: true as const })),
+  link: vi.fn(async () => ({ ok: true as const }))
 });
 
 describe('storyboard tools', () => {
@@ -63,5 +64,16 @@ describe('storyboard tools', () => {
     const run = setup();
 
     expect(await run('read_storyboard', {})).toMatchObject({ ok: false });
+  });
+
+  it('links a card to clips that exist in the video', async () => {
+    const board = port();
+    const run = setup(board);
+    const clip = await run('add_clip', { component: 'Title', start: 0, duration: 2, props: { text: 'Hi' } });
+
+    expect(await run('link_storyboard_beat', { node_id: 'n', clip_ids: ['nope'] })).toMatchObject({ ok: false });
+    expect(board.link).not.toHaveBeenCalled();
+    expect(await run('link_storyboard_beat', { node_id: 'n', clip_ids: [clip.clip_id] })).toMatchObject({ ok: true });
+    expect(board.link).toHaveBeenCalledWith('n', [clip.clip_id]);
   });
 });

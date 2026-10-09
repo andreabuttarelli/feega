@@ -214,6 +214,9 @@ list. Returns how many combinations it actually stopped.
 | `view_motion_frames` | `feega motion frames <nodeId> --at 1,2.5,4 [--width 640] [--out dir]` |
 | `list_motion_revisions` | `feega motion revisions <nodeId>` |
 | `restore_motion_revision` | `feega motion revisions <nodeId> --restore <version>` |
+| `get_storyboard` | `feega motion storyboard <nodeId>` |
+| `write_storyboard` | `feega motion storyboard <nodeId> --write beats.json` |
+| `edit_storyboard_card` | `feega motion storyboard <nodeId> --card <id> --text "..."` |
 | (CLI / API only) | `feega motion embed <nodeId> --download <file>` |
 
 `list_motion_videos({ org, project_id? })` lists `motion` nodes newest first: `node_id`, `name`,

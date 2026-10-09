@@ -74,4 +74,13 @@ describe('storyboardStore', () => {
     expect(await store.edit('c', '## new')).toMatchObject({ ok: true });
     expect(fake.calls.find((c) => c.table === 'nodes' && c.op === 'update')?.payload).toMatchObject({ data: { content: '## new' } });
   });
+
+  it('links a card to the clips that play it, with the editor that plays them', async () => {
+    const fake = fakeDb({ nodes: [row('motion', 'home', 'motion', { storyboard: { canvasId: 'board', placed: [] } }), row('c', 'board', 'doc', { content: 'a', public: false }), row('far', 'home', 'doc', { content: 'b', public: false })], canvas_events: [] }, { filter: true });
+    const store = storyboardStore(fake.db, scope);
+
+    expect(await store.link('far', ['clip'])).toMatchObject({ ok: false });
+    expect(await store.link('c', ['clip'])).toMatchObject({ ok: true });
+    expect(fake.calls.find((c) => c.table === 'nodes' && c.op === 'update')?.payload).toMatchObject({ data: { beat: { editor: '/p/project/c/home/motion/motion', clipIds: ['clip'] } } });
+  });
 });

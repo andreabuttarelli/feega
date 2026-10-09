@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MediaKind, planStoryboard, readStoryboard, storyboardSchema, type Storyboard } from './storyboard';
+import { MediaKind, beatHref, clipSeek, planStoryboard, readStoryboard, storyboardSchema, type Storyboard } from './storyboard';
 
 const beat = (act: string, title: string, intensity: number, extra: Record<string, unknown> = {}) => ({
   act,
@@ -77,6 +77,10 @@ describe('planStoryboard', () => {
     expect(edge('Prompt, voice', 'Preview')).toBe(false);
   });
 
+  it('lands every wire on the plain input a card draws: a doc has no typed ports, and a named one would leave the line undrawn', () => {
+    expect(planStoryboard(BOARD, MEDIA).edges.every((e) => e.targetHandle === null)).toBe(true);
+  });
+
   it('puts an alternative in the same column as the beat it replaces, below it', () => {
     const plan = planStoryboard(BOARD, MEDIA);
     const main = plan.nodes[cardOf(plan, 'Prompt')];
@@ -117,6 +121,7 @@ describe('readStoryboard', () => {
     );
 
     expect(read.cards.map((c) => c.node_id)).toEqual(['a', 'n', 'b']);
+    expect(read.cards[0].clip_ids).toEqual([]);
     expect(read.cards[2].text).toContain('the user rewrote this');
     expect(read.cards[1].text).toBe('make it warmer');
     expect(read.media).toEqual([
@@ -124,5 +129,29 @@ describe('readStoryboard', () => {
       { node_id: 'm', kind: 'image', asset_id: 'asset-1', prompt: '', for: ['b'] }
     ]);
     expect(read.flow).toEqual([['a', 'b']]);
+  });
+});
+
+describe('a beat linked to its clips', () => {
+  const beat = { editor: '/p/p/c/c/motion/m', clipIds: ['c1', 'c2'] };
+
+  it('plays from its first clip in the editor', () => {
+    expect(beatHref({ beat })).toBe('/p/p/c/c/motion/m?clip=c1');
+    expect(beatHref({})).toBeNull();
+    expect(beatHref({ beat: { editor: '/x', clipIds: [] } })).toBeNull();
+  });
+
+  it('is read back with the clips it plays', () => {
+    const read = readStoryboard([{ id: 'a', type: 'doc', position: { x: 0, y: 0 }, data: { content: '## A', beat } }], []);
+
+    expect(read.cards).toEqual([{ node_id: 'a', text: '## A', clip_ids: ['c1', 'c2'] }]);
+  });
+
+  it('seeks the editor to the start of the clip it names', () => {
+    const doc = { tracks: [{ clips: [{ id: 'c1', from: 42 }] }] } as unknown as Parameters<typeof clipSeek>[0];
+
+    expect(clipSeek(doc, '?clip=c1')).toBe(42);
+    expect(clipSeek(doc, '?clip=gone')).toBeNull();
+    expect(clipSeek(doc, '')).toBeNull();
   });
 });

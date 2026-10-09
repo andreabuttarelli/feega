@@ -69,6 +69,10 @@ const fake: Server = createServer((req, res) => {
       send(200, req.method === 'POST' ? { version: 21, restored: 17 } : { revisions: [{ version: 20, summary: 'Undo', actorKind: 'user', createdAt: '', clips: 0 }] });
       return;
     }
+    if (route === `/api/v1/motion/${NODE}/storyboard`) {
+      send(200, req.method === 'GET' ? { canvas_id: 'board', cards: [{ node_id: 'c1', text: '## Hook', clip_ids: [] }], media: [], flow: [] } : { ok: true, canvas_id: 'board' });
+      return;
+    }
     if (route === `/api/v1/motion/${NODE}/frames`) {
       send(200, { revision: 3, frames: [{ time: 1, mime: 'image/jpeg', data: 'AAAA' }], quality: ['title too small'], blocking: [] });
       return;
@@ -345,5 +349,23 @@ describe('feega motion frames', () => {
     expect(calls[0]).toEqual({ method: 'POST', path: `/api/v1/motion/${NODE}/frames`, body: { times: [1] } });
     expect(readFileSync(join(dir, `${NODE}-1s.jpg`))).toEqual(Buffer.from('AAAA', 'base64'));
     expect(lines.join('\n')).toContain('title too small');
+  });
+});
+
+describe('the storyboard over MCP', () => {
+  test('get_storyboard reads the cards', async () => {
+    const result = await callTool('get_storyboard', { node_id: NODE });
+
+    expect(calls[0]).toMatchObject({ method: 'GET', path: `/api/v1/motion/${NODE}/storyboard` });
+    expect(result?.structuredContent).toMatchObject({ canvas_id: 'board', cards: [{ node_id: 'c1' }] });
+  });
+
+  test('write_storyboard posts the beats, edit_storyboard_card patches one card', async () => {
+    const beats = [{ act: 'problem', kind: 'scene', title: 'Hook', intent: 'the pain', emotion: 'tense', intensity: 0.4, duration: 3 }];
+    await callTool('write_storyboard', { node_id: NODE, beats });
+    await callTool('edit_storyboard_card', { node_id: NODE, card_id: 'c1', text: '## New' });
+
+    expect(calls[0]).toEqual({ method: 'POST', path: `/api/v1/motion/${NODE}/storyboard`, body: { beats } });
+    expect(calls[1]).toEqual({ method: 'PATCH', path: `/api/v1/motion/${NODE}/storyboard`, body: { card_id: 'c1', text: '## New' } });
   });
 });

@@ -81,6 +81,9 @@
 
 <div class="doc">
   <header class="doc-head">
+    {#if node.play}
+      <a class="doc-play" href={node.play} data-testid="doc-play">Play in video</a>
+    {/if}
     <div class="doc-modes" role="group" aria-label="How the document looks">
       <button type="button" class:is-on={mode === 'view'} onclick={() => (mode = 'view')}>
         Read
@@ -312,5 +315,10 @@
     font-size: 12px;
     text-align: center;
     color: var(--ink-soft, #6e6e73);
+  }
+  .doc-play {
+    font-size: 12px;
+    color: inherit;
+    text-decoration: underline;
   }
 </style>

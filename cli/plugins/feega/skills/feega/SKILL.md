@@ -197,6 +197,12 @@ Every save is a revision. `list_motion_revisions` lists them (who saved, clip co
 `restore_motion_revision` puts one back as a new revision, history kept. Free. CLI:
 `feega motion revisions <nodeId> [--restore <version>]`.
 
+A launch film's script is also laid out as a storyboard canvas linked to the video: one card per
+beat, story order left to right, stronger emotion higher. `get_storyboard` reads it (the user's
+edits included, and the clips each card plays), `write_storyboard` writes it from beats,
+`edit_storyboard_card` rewrites one card. Free. CLI: `feega motion storyboard <nodeId>
+[--write beats.json | --card <id> --text "..."]`.
+
 ## Remix from the gallery
 
 The public gallery holds free motion videos and compositions anyone can remix, many by Feega.

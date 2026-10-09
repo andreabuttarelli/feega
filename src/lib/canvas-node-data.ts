@@ -1,3 +1,4 @@
+import { beatHref } from '$lib/motion/storyboard';
 import { GEN_MEDIUMS, type GenMedium, type GenNode, type GenParams } from '$lib/canvas/gen-node';
 import { sourceOf, type IframeNode } from '$lib/canvas/iframe-node';
 import type { DocNode } from '$lib/canvas/doc-node';
@@ -122,6 +123,11 @@ export function frameOf(row: NodeRow): IframeNode | null {
   return { id: row.id, source: sourceOf({ url, html }), url, html };
 }
 
+const playOf = (data: Record<string, unknown>) => {
+  const play = beatHref(data);
+  return play ? { play } : {};
+};
+
 /** Il documento dietro una riga, o null quando quella riga è un'altra cosa. */
 export function docOf(row: NodeRow): DocNode | null {
   if (row.type !== 'doc') {
@@ -131,7 +137,8 @@ export function docOf(row: NodeRow): DocNode | null {
   return {
     id: row.id,
     content: str(row.data.content),
-    public: row.data.public === true
+    public: row.data.public === true,
+    ...playOf(row.data)
   };
 }
 

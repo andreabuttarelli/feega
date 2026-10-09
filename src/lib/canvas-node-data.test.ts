@@ -144,6 +144,7 @@ describe('un documento, letto dalla riga', () => {
   });
 
   it('una riga appena nata non è una riga rotta: si legge coi suoi vuoti', () => {
+    expect(docOf({ id: 'n1', type: 'doc', data: { content: '## Beat', public: false, beat: { editor: '/p/p/c/c/motion/m', clipIds: ['k'] } } })?.play).toBe('/p/p/c/c/motion/m?clip=k');
     expect(docOf({ id: 'n1', type: 'doc', data: {} })).toEqual({
       id: 'n1',
       content: '',
