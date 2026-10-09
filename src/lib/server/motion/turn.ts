@@ -23,6 +23,8 @@ import { effectStore } from '$lib/server/effects/store';
 import { layoutStore } from '$lib/server/layouts/store';
 import { assetUrls, headOrNew, motionAssets, motionTokens, saveMotionDoc } from '$lib/server/motion/editor';
 import { fitNewVideo } from '$lib/motion/fit-duration';
+import { AGENT_MAX_DURATION_S } from '$lib/server/project-agent/limits';
+import { dropWorkingDoc, keepWorkingDoc } from '$lib/server/motion/working-doc';
 import { EmbedAction, createMotionTools, selectionNote, type MotionSession } from '$lib/server/motion/motion-tools';
 import { publishEmbed, removeEmbed } from '$lib/server/motion/embed';
 import type { ProjectMode } from '$lib/project-mode';
@@ -84,6 +86,12 @@ enum Round {
 type Stop = ReturnType<typeof agentStopWhen>;
 
 const CLOSING_RESERVE_MS = 60_000;
+const LANDING_RESERVE_MS = 25_000;
+const SAVE_ATTEMPTS = 4;
+
+export type TurnTiming = { landingMs: number; stopPollMs: number };
+
+const PLATFORM_TIMING: TurnTiming = { landingMs: AGENT_MAX_DURATION_S * 1000 - LANDING_RESERVE_MS, stopPollMs: 3000 };
 export const MAX_DELIVERY_ATTEMPTS = 3;
 const STILL_OPEN_ID = 'still-open';
 
@@ -125,6 +133,7 @@ export type MotionTurnInput = {
   reasoning: string | null;
   requester: Actor;
   browser: Browser;
+  timing?: TurnTiming;
 };
 
 export type TurnOutcome = { reply: string; summary: string | null; version: number | null; revision: RevisionOutcome | null; costUsd: number };
@@ -132,7 +141,8 @@ export type TurnOutcome = { reply: string; summary: string | null; version: numb
 export type MotionTurn = { stream: ReadableStream<UIMessageChunk>; done: Promise<TurnOutcome> };
 
 export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Response> {
-  const { db, userId, orgId, project, motion, message, selection, model, reasoning, requester, browser } = input;
+  const startedAt = Date.now();
+  const { db, userId, orgId, project, motion, message, selection, model, reasoning, requester, browser, timing = PLATFORM_TIMING } = input;
   const actor = agentActor(userId, MOTION_AGENT_KEY);
   const nodeScope = { orgId, nodeId: motion.record.id };
 
@@ -161,6 +171,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
   let announced = 0;
   let announce: () => void = () => {};
   let client = Client.Watching;
+  const cut = new AbortController();
 
   const tools = createMotionTools({
     session,
@@ -249,6 +260,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
       system,
       messages,
       tools,
+      abortSignal: cut.signal,
       activeTools: toolNames,
       stopWhen: ROUND_STOPS[kind](t0, overBudget),
       onChunk: ({ chunk }) => {
@@ -281,6 +293,34 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
   done.catch(() => {});
 
   const steps: TurnStep[] = [];
+  const workingScope = { ...frameScope, bucket };
+  let keeping: Promise<void> = Promise.resolve();
+  let keptEdit = 0;
+  const keepWork = () => {
+    keeping = keeping.then(async () => {
+      if (keptEdit === session.edits.length) {
+        return;
+      }
+      keptEdit = session.edits.length;
+      await keepWorkingDoc(workingScope, { edit: keptEdit, doc: session.doc });
+    });
+  };
+
+  let landing: Promise<TurnOutcome> | null = null;
+  const land = () => (landing ??= finishTurn(steps));
+  const landEarly = () => {
+    void land().then(settle, abandon);
+    cut.abort();
+  };
+  const wall = setTimeout(landEarly, Math.max(0, timing.landingMs - (Date.now() - startedAt)));
+  const watch = setInterval(() => {
+    void reply.stopped().then((stopped) => {
+      if (stopped) {
+        landEarly();
+      }
+    });
+  }, timing.stopPollMs);
+
   const stream = createUIMessageStream({
     execute: async ({ writer }) => {
       askPreview = (request) => writer.write({ type: FRAMES_REQUEST, data: request });
@@ -291,6 +331,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
         }
         announced = session.edits.length;
         writer.write({ type: DOC_EDITED, data: { edit: announced, doc: session.doc } });
+        keepWork();
       };
       let conversation = openingMessages;
 
@@ -329,32 +370,41 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
       if (assets.length > knownAssets) {
         writer.write({ type: ASSETS_ADDED, data: { assets: assets.slice(knownAssets) } });
       }
-      settle(await finishTurn(steps));
+      settle(await land());
     },
     onError: (e) => {
       console.error('[motion-agent] turn failed', e);
-      void reply.finish(finishedTurn(steps), ReplyStatus.Failed).finally(() => abandon(e));
+      void reply
+        .finish(finishedTurn(steps), ReplyStatus.Failed)
+        .then(land)
+        .finally(() => abandon(e));
       return 'The agent could not finish this turn.';
     }
   });
 
   async function saveAgentDoc() {
     const save = (expectedVersion: number) => saveMotionDoc(db, { orgId, nodeId: motion.record.id, expectedVersion, doc: session.doc, actor, summary: session.edits.join(', ') });
-    const first = await save(session.baseVersion);
-    if (first.outcome !== RevisionOutcome.Conflict) {
-      return first;
+    let write = await save(session.baseVersion);
+    for (let attempt = 1; attempt < SAVE_ATTEMPTS && write.outcome === RevisionOutcome.Conflict; attempt++) {
+      const latest = await headOrNew(db, nodeScope, motion.node);
+      write = await save(latest.version);
     }
-    const latest = await headOrNew(db, nodeScope, motion.node);
-    return save(latest.version);
+    return write;
   }
 
   const labelOf = (modelId: string) => (modelId === model ? 'motion-agent' : modelId === codeModel ? 'motion-agent-code' : 'motion-agent-vision');
 
   async function finishTurn(steps: TurnStep[]): Promise<TurnOutcome> {
+    clearTimeout(wall);
+    clearInterval(watch);
     session.doc = fitNewVideo(head.doc, session.doc);
     const write = session.edits.length ? await saveAgentDoc() : null;
     if (write && write.outcome !== RevisionOutcome.Written) {
       console.warn('[motion-agent] revision not saved', { nodeId: motion.record.id, outcome: write.outcome });
+    }
+    if (write?.outcome === RevisionOutcome.Written) {
+      await keeping;
+      await dropWorkingDoc(workingScope);
     }
 
     const finished = finishedTurn(steps);

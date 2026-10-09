@@ -118,9 +118,25 @@ describe('turnRunning — a turn still working after the client left', () => {
   });
 
   it('an answer still being written is a turn still running', async () => {
-    const { db } = fakeDb({ chat_messages: [{ role: 'assistant', status: 'streaming', created_at: ago(600), updated_at: ago(5) }] });
+    const { db } = fakeDb({ chat_messages: [{ role: 'assistant', status: 'streaming', created_at: ago(60), updated_at: ago(5) }] });
 
     expect(await turnRunning(db, { orgId: ORG, threadId: THREAD }, NOW)).toBe(true);
+  });
+
+  it('an answer started longer ago than the platform lets a turn live is over, however recent its last write', async () => {
+    const { db } = fakeDb({ chat_messages: [{ role: 'assistant', status: 'streaming', created_at: ago(400), updated_at: ago(5) }] });
+
+    expect(await turnRunning(db, { orgId: ORG, threadId: THREAD }, NOW)).toBe(false);
+  });
+
+  it('an answer left streaming by a server that was cut is closed failed when read', async () => {
+    const { db, calls } = fakeDb({ chat_messages: [{ id: 'm-1', role: 'assistant', status: 'streaming', created_at: ago(400), updated_at: ago(100) }] });
+
+    await turnRunning(db, { orgId: ORG, threadId: THREAD }, NOW);
+    const closed = calls.find((c) => c.table === 'chat_messages' && c.op === 'update');
+
+    expect(closed?.payload).toMatchObject({ status: 'failed' });
+    expect(closed?.filters).toEqual(expect.arrayContaining([['org_id', ORG], ['id', 'm-1'], ['status', 'streaming']]));
   });
 
   it('an answer marked done or failed is a finished turn', async () => {

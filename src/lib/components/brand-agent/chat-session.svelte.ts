@@ -26,7 +26,7 @@ const turns = $state({ running: 0 });
 
 type FailureBody = { error?: string; code?: string };
 
-type SavedThread = { messages?: ChatMessage[]; running?: boolean };
+type SavedThread = { messages?: ChatMessage[]; running?: boolean; parts?: StreamData[] };
 
 const sleep = (ms: number, wake: (resolve: () => void) => void) =>
   new Promise<void>((resolve) => {
@@ -108,6 +108,7 @@ export class ChatSession {
       if (!this.sending && !this.reconnecting) {
         this.messages = data.running ? following(data.messages ?? [], null) : (data.messages ?? []);
       }
+      this.#replay(data);
       if (data.running && !this.sending) {
         void this.#follow(null);
       }
@@ -174,10 +175,42 @@ export class ChatSession {
   }
 
   stop() {
+    const running = this.sending || this.#following;
+    const followed = this.#following;
     this.#abort?.abort();
     this.#following = false;
     this.reconnecting = false;
     this.#wake();
+    if (!running) {
+      return;
+    }
+    void this.#fetch(this.#endpoint, { method: 'DELETE' }).catch(() => undefined);
+    if (followed) {
+      this.#settleStopped();
+      this.onTurnEnd?.();
+    }
+  }
+
+  #settleStopped() {
+    const partial = this.#lastAssistant();
+    if (!partial?.live) {
+      return;
+    }
+    if (!hasWork(partial)) {
+      this.messages = this.messages.slice(0, -1);
+      return;
+    }
+    partial.live = false;
+    partial.pending = false;
+  }
+
+  #replay(thread: SavedThread) {
+    if (!thread.running) {
+      return;
+    }
+    for (const part of thread.parts ?? []) {
+      this.onData?.(part);
+    }
   }
 
   resume() {
@@ -201,12 +234,16 @@ export class ChatSession {
 
     while (this.#following) {
       const thread = await this.#saved();
+      if (!this.#following) {
+        break;
+      }
       if (thread && !thread.running) {
         this.#landed(thread.messages ?? [], sent);
         break;
       }
       if (thread) {
         this.messages = following(thread.messages ?? [], this.#lastAssistant());
+        this.#replay(thread);
         this.revision++;
       }
       await sleep(FOLLOW_POLL_MS, (wake) => (this.#wake = wake));

@@ -15,6 +15,7 @@ export type ReplyBody = { content: string; tools: SavedTool[] };
 export type Reply = {
   progress(body: ReplyBody): Promise<void>;
   finish(body: ReplyBody, status: ReplyStatus.Done | ReplyStatus.Failed): Promise<void>;
+  stopped(): Promise<boolean>;
 };
 
 type ReplyScope = { orgId: string; threadId: string; actor: Actor };
@@ -56,7 +57,9 @@ const rowOf = async (db: Db, scope: ReplyScope) => ({
   ...actorCols(scope.actor)
 });
 
-function endingOnce(write: (body: ReplyBody, status: ReplyStatus) => Promise<void>, progress: (body: ReplyBody) => Promise<void>): Reply {
+type Ending = Omit<Reply, 'stopped'>;
+
+function endingOnce(write: (body: ReplyBody, status: ReplyStatus) => Promise<void>, progress: (body: ReplyBody) => Promise<void>): Ending {
   let ended = false;
   let queue = Promise.resolve();
   const enqueue = (fn: () => Promise<void>) => (queue = queue.then(fn).catch((e) => console.error('[chat-reply] write failed', e)));
@@ -74,7 +77,7 @@ function endingOnce(write: (body: ReplyBody, status: ReplyStatus) => Promise<voi
 }
 
 function savedAtEnd(db: Db, scope: ReplyScope): Reply {
-  return endingOnce(
+  const ending = endingOnce(
     async (body, status) => {
       if (status === ReplyStatus.Failed && !body.content && !body.tools.length) {
         return;
@@ -86,6 +89,7 @@ function savedAtEnd(db: Db, scope: ReplyScope): Reply {
     },
     async () => {}
   );
+  return { ...ending, stopped: async () => false };
 }
 
 function writtenLive(db: Db, scope: ReplyScope, id: string): Reply {
@@ -94,12 +98,30 @@ function writtenLive(db: Db, scope: ReplyScope, id: string): Reply {
       .from('chat_messages')
       .update({ ...bodyCols(body), status, updated_at: new Date().toISOString() })
       .eq('org_id', scope.orgId)
-      .eq('id', id);
+      .eq('id', id)
+      .eq('status', ReplyStatus.Streaming);
     if (error) {
       throw new Error(error.message);
     }
   };
-  return endingOnce(update, (body) => update(body, ReplyStatus.Streaming));
+  const stopped = async () => {
+    const { data } = await db.from('chat_messages').select('status').eq('org_id', scope.orgId).eq('id', id).maybeSingle();
+    const status = (data as { status?: string } | null)?.status;
+    return Boolean(status) && status !== ReplyStatus.Streaming;
+  };
+  return { ...endingOnce(update, (body) => update(body, ReplyStatus.Streaming)), stopped };
+}
+
+export async function stopTurn(db: Db, scope: { orgId: string; threadId: string }): Promise<void> {
+  const { error } = await db
+    .from('chat_messages')
+    .update({ status: ReplyStatus.Failed, updated_at: new Date().toISOString() })
+    .eq('org_id', scope.orgId)
+    .eq('thread_id', scope.threadId)
+    .eq('status', ReplyStatus.Streaming);
+  if (error && !MISSING_COLUMN_CODES.has(error.code ?? '')) {
+    throw new Error(error.message);
+  }
 }
 
 export async function openReply(db: Db, scope: ReplyScope): Promise<Reply> {
