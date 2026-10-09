@@ -83,6 +83,8 @@ const MEDIUM = 500;
 const SEMIBOLD = 600;
 
 export const HEADLINE_SIZE = 0.06;
+const HAIRLINE = 0.0002;
+const BLEED_REACH = 2;
 export const TITLE_LOOK = { weight: SEMIBOLD, tracking: -0.05 } as const;
 export const TITLE_RANGE = { weight: [MEDIUM, SEMIBOLD], tracking: [-0.07, -0.04] } as const;
 export const ALIGNS = ['left', 'center', 'right'] as const;
@@ -338,7 +340,9 @@ export const COMPONENTS = {
         gap: range(0, 0.5, 0.001, 0, 'Gap', Group.Style),
         cap: choice(CAPS, 'butt', 'Cap', Group.Style),
         join: choice(JOINS, 'miter', 'Join', Group.Style),
-        ...layout({ y: 0.6, height: 0.004 })
+        ...layout({ y: 0.6, height: 0.004 }),
+        width: range(HAIRLINE, BLEED_REACH, 0.0001, 0.8, 'Width', Group.Layout),
+        height: range(HAIRLINE, BLEED_REACH, 0.0001, 0.004, 'Height', Group.Layout)
       })
       .strict()
   },

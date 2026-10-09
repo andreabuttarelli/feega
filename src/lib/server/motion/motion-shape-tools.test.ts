@@ -100,3 +100,27 @@ describe('motion agent liquid shapes', () => {
     expect(prompt).toContain('gooey');
   });
 });
+
+describe('shape rules in px, as the doc model says', () => {
+  const inFormat = (format: MotionFormat) => {
+    const { session, run } = setup();
+    session.doc = newMotionDoc(format);
+    return { session, run };
+  };
+
+  it.each([MotionFormat.Landscape, MotionFormat.Vertical, MotionFormat.Portrait])('a 4 px rule and a full-height column are accepted in %s', async (format) => {
+    const { session, run } = inFormat(format);
+    const rule = await run('add_shape', { kind: 'rect', start: 0, props: { x: 240, y: session.doc.height / 2, width: 4, height: session.doc.height, fill: '#0a0a0a' } });
+    const flat = await run('add_shape', { kind: 'rect', start: 0, props: { x: session.doc.width / 2, y: 300, width: session.doc.width, height: 4, fill: '#0a0a0a' } });
+
+    expect(rule.ok, String(rule.error)).toBe(true);
+    expect(flat.ok, String(flat.error)).toBe(true);
+    expect(findClip(session.doc, String(rule.clip_id))!.clip.props.width).toBeCloseTo(4 / session.doc.width);
+  });
+
+  it('a block that bleeds past the frame edge is accepted', async () => {
+    const { run } = inFormat(MotionFormat.Landscape);
+
+    expect((await run('add_shape', { kind: 'rect', start: 0, props: { x: 960, y: 540, width: 1000, height: 1200 } })).ok).toBe(true);
+  });
+});
