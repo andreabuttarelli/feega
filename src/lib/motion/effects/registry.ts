@@ -65,7 +65,7 @@ const node = (tag: string, attrs: SvgNode['attrs'], children?: SvgNode[]): SvgNo
 
 const LUMA = [0.2126, 0.7152, 0.0722];
 const GAUSS_TAIL = 4;
-const GRAIN_TILE = 256;
+export const GRAIN_TILE = 256;
 
 const shadowNode = (dx: number, dy: number, blur: number, colour: string, opacity: number, link: SvgNode['attrs'] = {}): SvgNode =>
   node('feDropShadow', { ...link, dx, dy, stdDeviation: r(blur / 2), 'flood-color': colour, 'flood-opacity': r(opacity) });
