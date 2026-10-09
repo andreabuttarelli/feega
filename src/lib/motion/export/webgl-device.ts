@@ -6,16 +6,18 @@ import { Layering } from '../hyperframes/capture';
 
 const MAX_GRAINS = 4;
 const SCRATCH_UNIT = MAX_GRAINS + 2;
+const BLUR_REACH = 3;
 
 const QUAD_VS = `#version 300 es
 in vec2 corner;
 uniform vec2 box;
 uniform vec2 frame;
 uniform mat3 at;
+uniform float pad;
 out vec2 uv;
 void main() {
   uv = corner;
-  vec2 p = (at * vec3(corner * box, 1.0)).xy;
+  vec2 p = (at * vec3(corner * box, 1.0)).xy + pad;
   gl_Position = vec4(p.x / frame.x * 2.0 - 1.0, 1.0 - p.y / frame.y * 2.0, 0.0, 1.0);
 }`;
 
@@ -40,9 +42,33 @@ const COPY_FS = `#version 300 es
 precision highp float;
 uniform sampler2D src;
 uniform float opacity;
+uniform int shift;
 out vec4 outColor;
 void main() {
-  outColor = texelFetch(src, ivec2(gl_FragCoord.xy), 0) * opacity;
+  outColor = texelFetch(src, ivec2(gl_FragCoord.xy) + shift, 0) * opacity;
+}`;
+
+const BLUR_FS = `#version 300 es
+precision highp float;
+uniform sampler2D src;
+uniform ivec2 step;
+uniform float sigma;
+uniform int radius;
+uniform ivec4 bounds;
+out vec4 outColor;
+void main() {
+  ivec2 p = ivec2(gl_FragCoord.xy);
+  vec4 sum = vec4(0.0);
+  float weights = 0.0;
+  for (int i = -radius; i <= radius; i++) {
+    ivec2 q = p + step * i;
+    float w = exp(-0.5 * float(i * i) / (sigma * sigma));
+    weights += w;
+    if (q.x >= bounds.x && q.y >= bounds.y && q.x < bounds.z && q.y < bounds.w) {
+      sum += texelFetch(src, q, 0) * w;
+    }
+  }
+  outColor = sum / weights;
 }`;
 
 const MASK_FS = `#version 300 es
@@ -136,6 +162,7 @@ uniform float amounts[${MAX_GRAINS}];
 uniform int count;
 uniform int tileSize;
 uniform float frameHeight;
+uniform float pad;
 uniform mat3 inverse;
 uniform vec4 bounds;
 out vec4 outColor;
@@ -158,7 +185,7 @@ vec4 noiseAt(int i, vec2 uv) {
 }
 void main() {
   vec4 s = texelFetch(src, ivec2(gl_FragCoord.xy), 0);
-  vec2 px = vec2(gl_FragCoord.x, frameHeight - gl_FragCoord.y);
+  vec2 px = vec2(gl_FragCoord.x, frameHeight - gl_FragCoord.y) - pad;
   vec2 uv = (inverse * vec3(px, 1.0)).xy;
   if (s.a == 0.0 || uv.x < bounds.x || uv.y < bounds.y || uv.x >= bounds.z || uv.y >= bounds.w) {
     outColor = vec4(0.0);
@@ -234,6 +261,7 @@ export function webglGpu(canvas: OffscreenCanvas): Gpu {
   const grain = compile(gl, FULL_VS, GRAIN_FS);
   const masking = compile(gl, FULL_VS, MASK_FS);
   const combining = compile(gl, FULL_VS, COMBINE_FS);
+  const blurring = compile(gl, FULL_VS, BLUR_FS);
 
   const texture = (width: number, height: number, data: ArrayBufferView | null = null, filter: number = gl.LINEAR) => {
     const t = gl.createTexture() as WebGLTexture;
@@ -248,9 +276,13 @@ export function webglGpu(canvas: OffscreenCanvas): Gpu {
   };
 
   let size = { width: 0, height: 0 };
+  let pad = 0;
   let free: Surface[] = [];
-  const resize = (width: number, height: number) => {
-    if (size.width === width && size.height === height) {
+  const resize = (width: number, height: number, margin: number) => {
+    canvas.width = width;
+    canvas.height = height;
+    pad = margin;
+    if (size.width === width + 2 * margin && size.height === height + 2 * margin) {
       return;
     }
     free.forEach((s) => {
@@ -258,9 +290,7 @@ export function webglGpu(canvas: OffscreenCanvas): Gpu {
       gl.deleteFramebuffer(s.buffer);
     });
     free = [];
-    size = { width, height };
-    canvas.width = width;
-    canvas.height = height;
+    size = { width: width + 2 * margin, height: height + 2 * margin };
   };
   const surface = (): Surface => {
     const s = free.pop() ?? (() => {
@@ -279,7 +309,7 @@ export function webglGpu(canvas: OffscreenCanvas): Gpu {
   const release = (s: Surface) => void free.push(s);
   const target = (s: Surface | null) => {
     gl.bindFramebuffer(gl.FRAMEBUFFER, s?.buffer ?? null);
-    gl.viewport(0, 0, size.width, size.height);
+    gl.viewport(0, 0, s ? size.width : canvas.width, s ? size.height : canvas.height);
   };
   const bind = (unit: number, t: WebGLTexture) => {
     gl.activeTexture(gl.TEXTURE0 + unit);
@@ -296,8 +326,8 @@ export function webglGpu(canvas: OffscreenCanvas): Gpu {
     return known;
   };
 
-  const device = (sheets: ImageBitmap[], width: number, height: number): Device<Surface, ImageBitmap> => {
-    resize(width, height);
+  const device = (sheets: ImageBitmap[], width: number, height: number, margin: number): Device<Surface, ImageBitmap> => {
+    resize(width, height, margin);
     const uploaded = sheets.map((bitmap) => {
       const t = texture(1, 1);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, bitmap);
@@ -315,6 +345,7 @@ export function webglGpu(canvas: OffscreenCanvas): Gpu {
       gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
       gl.uniform2f(paint.uniform('box'), p.width, p.height);
       gl.uniform2f(paint.uniform('frame'), size.width, size.height);
+      gl.uniform1f(paint.uniform('pad'), pad);
       gl.uniformMatrix3fv(paint.uniform('at'), false, mat3(p.at));
       if (p.kind === PaintKind.Fill) {
         const [r, g, b, a] = p.color;
@@ -331,13 +362,16 @@ export function webglGpu(canvas: OffscreenCanvas): Gpu {
       gl.disable(gl.BLEND);
     };
 
+    let bounds = [0, 0, size.width, size.height];
     const region = (r: Rect | null) => {
       if (!r) {
+        bounds = [0, 0, size.width, size.height];
         gl.disable(gl.SCISSOR_TEST);
         return;
       }
+      bounds = [r[0] + pad, size.height - r[3] - pad, r[2] + pad, size.height - r[1] - pad];
       gl.enable(gl.SCISSOR_TEST);
-      gl.scissor(r[0], size.height - r[3], r[2] - r[0], r[3] - r[1]);
+      gl.scissor(bounds[0], bounds[1], bounds[2] - bounds[0], bounds[3] - bounds[1]);
     };
 
     const fill = (s: Surface, [r, g, b, a]: Rgba) => {
@@ -361,6 +395,7 @@ export function webglGpu(canvas: OffscreenCanvas): Gpu {
       gl.uniform1i(grain.uniform('count'), Math.min(e.grains.length, MAX_GRAINS));
       gl.uniform1i(grain.uniform('tileSize'), GRAIN_TILE);
       gl.uniform1f(grain.uniform('frameHeight'), size.height);
+      gl.uniform1f(grain.uniform('pad'), pad);
       gl.uniformMatrix3fv(grain.uniform('inverse'), false, mat3(e.area.inverse as Affine));
       const { margin, width: w, height: h } = e.area;
       gl.uniform4f(grain.uniform('bounds'), -margin * w, -margin * h, (1 + margin) * w, (1 + margin) * h);
@@ -369,8 +404,24 @@ export function webglGpu(canvas: OffscreenCanvas): Gpu {
       return out;
     };
 
+    const pass = (s: Surface, step: [number, number], sigma: number) => {
+      const out = surface();
+      gl.useProgram(blurring.program);
+      bind(0, s.texture);
+      gl.uniform1i(blurring.uniform('src'), 0);
+      gl.uniform2i(blurring.uniform('step'), step[0], step[1]);
+      gl.uniform1f(blurring.uniform('sigma'), sigma);
+      gl.uniform1i(blurring.uniform('radius'), Math.ceil(BLUR_REACH * sigma));
+      gl.uniform4i(blurring.uniform('bounds'), bounds[0], bounds[1], bounds[2], bounds[3]);
+      full();
+      release(s);
+      return out;
+    };
+    const blurOn = (s: Surface, e: Extract<Effect, { kind: EffectKind.Blur }>) => (e.sigma > 0 ? pass(pass(s, [1, 0], e.sigma), [0, 1], e.sigma) : s);
+
     const EFFECTS: Record<EffectKind, (s: Surface, e: Effect) => Surface> = {
-      [EffectKind.Grain]: grainOn
+      [EffectKind.Grain]: grainOn,
+      [EffectKind.Blur]: blurOn
     };
 
     const maskBy = (s: Surface, by: Surface) => {
@@ -408,6 +459,7 @@ export function webglGpu(canvas: OffscreenCanvas): Gpu {
         bind(0, from.texture);
         gl.uniform1i(copy.uniform('src'), 0);
         gl.uniform1f(copy.uniform('opacity'), opacity);
+        gl.uniform1i(copy.uniform('shift'), 0);
         full();
         gl.disable(gl.BLEND);
         return;
@@ -435,6 +487,7 @@ export function webglGpu(canvas: OffscreenCanvas): Gpu {
       bind(0, s.texture);
       gl.uniform1i(copy.uniform('src'), 0);
       gl.uniform1f(copy.uniform('opacity'), 1);
+      gl.uniform1i(copy.uniform('shift'), pad);
       full();
       release(s);
       uploaded.forEach((t) => gl.deleteTexture(t));
@@ -466,7 +519,7 @@ type Shot = { bitmap?: ImageBitmap; tree?: LayerTree; sheets?: ImageBitmap[] };
 export function frameOf(shot: Shot): ImageBitmap {
   const gpu = shot.tree && shot.sheets ? sharedGpu() : null;
   if (gpu && shot.tree && shot.sheets) {
-    return composite(gpu.device(shot.sheets, shot.tree.width, shot.tree.height), shot.tree);
+    return composite(gpu.device(shot.sheets, shot.tree.width, shot.tree.height, shot.tree.pad), shot.tree);
   }
   if (!shot.bitmap) {
     throw new Error('frame not rendered');

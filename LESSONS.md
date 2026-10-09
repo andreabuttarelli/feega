@@ -2681,3 +2681,6 @@ Segnale: `TypeError: x is not iterable` dentro una funzione mai chiamata dal tes
 ### WebGL: `GL_INVALID_OPERATION: Feedback loop` o una texture al posto di un'altra
 Segnale: un pass del compositore disegna vuoto o disegna la texture sbagliata (es. un tile di grana in un angolo). Un sampler del programma resta legato alla texture del framebuffer di destinazione anche se il ramo dello shader non lo legge; creare una texture la lega all'unità attiva e scavalca quella del pass. Mossa: ogni pass lega tutti i sampler del suo programma (una texture vuota se non servono); le texture nuove si creano su un'unità riservata (`SCRATCH_UNIT`, `webgl-device.ts`).
 
+### In Safari un layer sfocato sta ~100 px più in basso a destra che in Chrome
+Segnale: `bench:export --parity` in WebKit dà una differenza a forma del layer sfocato, spostata; in Chromium nessuna. WebKit (anteprima viva e html-to-image) sposta il contenuto di un elemento con un filtro SVG `filterUnits="userSpaceOnUse"` di x/y della regione del filtro. Mossa: `--parity --live` salva anche lo screenshot del player per frame; se il vivo WebKit concorda col flat ma non con Chromium è il motore, non la cattura.
+

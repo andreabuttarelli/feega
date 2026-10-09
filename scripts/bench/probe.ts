@@ -3,7 +3,7 @@ export const STATS_REPLY = 'bench:stats-reply';
 
 export type Stages = { seek: number; serialize: number; paint: number; readback: number; shots: number; svgs: number };
 export type BenchInput = { html: string; layering: string; lanes: number; times: number[]; width: number; height: number; fps: number; keep: boolean };
-export type ParityInput = { html: string; layering: string; times: number[]; width: number; height: number };
+export type ParityInput = { html: string; layering: string; times: number[]; width: number; height: number; live?: boolean };
 export type ParityFrame = { time: number; mean: number; over: number; svgs: number; png: string; flat: string };
 export type BenchResult = { wallMs: number; frames: number; stages: Stages; encodeMs: number; mp4: string | null };
 

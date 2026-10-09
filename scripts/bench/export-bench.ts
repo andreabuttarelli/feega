@@ -21,7 +21,7 @@ const LAUNCH: Record<string, Parameters<BrowserType['launch']>[0]> = {
 const OUT = resolve(process.env.BENCH_OUT ?? join(homedir(), 'Documents/feega-videos/bench'));
 const FRAME_TIMEOUT_MS = 3_600_000;
 
-type Args = { doc: string; engines: string[]; lanes: number[]; frames: number; keep: boolean; parity: boolean; strip: Set<string>; layering: Layering };
+type Args = { doc: string; engines: string[]; lanes: number[]; frames: number; keep: boolean; parity: boolean; live: boolean; strip: Set<string>; layering: Layering };
 
 function args(): Args {
   const flags = new Map(process.argv.slice(2).map((a) => a.replace(/^--/, '').split('=') as [string, string]));
@@ -32,6 +32,7 @@ function args(): Args {
     frames: Number(flags.get('frames') ?? 0),
     keep: flags.has('keep'),
     parity: flags.has('parity'),
+    live: flags.has('live'),
     layering: (flags.get('layering') ?? Layering.Split) as Layering,
     strip: new Set((flags.get('strip') ?? '').split(',').filter(Boolean))
   };
@@ -69,7 +70,7 @@ function stripped<T extends Tracked>(doc: T, kinds: Set<string>): T {
   return { ...clean(doc), comps: Object.fromEntries(Object.entries(comps).map(([k, v]) => [k, clean(v)])) } as unknown as T;
 }
 
-const { doc: docPath, engines, lanes, frames, keep, parity, strip, layering } = args();
+const { doc: docPath, engines, lanes, frames, keep, parity, live, strip, layering } = args();
 const loaded = JSON.parse(readFileSync(docPath, 'utf8')) as { doc: MotionDoc; assets: Record<string, string> };
 const doc = stripped(loaded.doc as unknown as Tracked, strip) as unknown as MotionDoc;
 const assets = loaded.assets;
@@ -87,8 +88,14 @@ if (parity) {
     const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
     page.setDefaultTimeout(FRAME_TIMEOUT_MS);
     await page.goto(server.url);
-    const input: ParityInput = { html, layering, times, width: size.width, height: size.height };
-    const rows = (await page.evaluate((i) => (window as unknown as { parity: (i: ParityInput) => Promise<ParityFrame[]> }).parity(i), input)) as ParityFrame[];
+    const run = (i: ParityInput) => page.evaluate((x) => (window as unknown as { parity: (i: ParityInput) => Promise<ParityFrame[]> }).parity(x), i) as Promise<ParityFrame[]>;
+    const rows: ParityFrame[] = [];
+    for (const group of live ? times.map((t) => [t]) : [times]) {
+      rows.push(...(await run({ html, layering, times: group, width: size.width, height: size.height, live })));
+      if (live) {
+        await page.locator('#host').screenshot({ path: join(OUT, `parity-${name}-${engine}-${group[0].toFixed(2)}-live.png`) });
+      }
+    }
     for (const r of rows) {
       console.log(`parity ${name} ${engine} t=${r.time.toFixed(2)} mean=${r.mean.toFixed(3)} over8=${(r.over * 100).toFixed(3)}% svgs=${r.svgs}`);
       writeFileSync(join(OUT, `parity-${name}-${engine}-${r.time.toFixed(2)}.png`), Buffer.from(r.png, 'base64'));
