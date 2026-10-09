@@ -36,7 +36,7 @@ export async function scrapeCreatorsPost(path: string, body: Record<string, unkn
 // ScrapeCreators bills a flat 1 credit per request on EVERY endpoint ($10/5k → $0.002/req,
 // verified on their pricing 2026-07). Each request is logged to ai_calls so it bills the
 // brand's credits like any AI call (brand_id comes from the withBrandContext scope).
-const SCRAPECREATORS_COST_USD = 0.002;
+export const SCRAPECREATORS_COST_USD = 0.002;
 
 /**
  * Hard ceiling on a single request. Node's `fetch` has NO default timeout, so a stalled connection

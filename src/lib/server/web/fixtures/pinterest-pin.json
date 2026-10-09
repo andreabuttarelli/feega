@@ -1,0 +1,100 @@
+{
+ "success": true,
+ "credits_remaining": 0,
+ "credits_charged": 1,
+ "id": "UGluOjE0MDgwNjIzNTAxODQxOA==",
+ "entityId": "140806235018418",
+ "title": "",
+ "description": " ",
+ "seoTitle": "Upload button ui | Button ui mobile design, Liquid glass navigation bar, Glassmorphism button",
+ "seoDescription": "A digital interface element featuring a circular button with an upward-pointing arrow in the center. To the right of this button is a rectangular area labeled \"Upload.\" The design is minimalist, with a focus on clean lines and a monochromatic color scheme. Glassy ui, Css, App ui",
+ "link": null,
+ "gridTitle": "",
+ "closeupUnifiedTitle": "",
+ "images_236x": {
+  "url": "https://i.pinimg.com/236x/7d/05/58/7d0558f260a76d1f6a942549b0e37f3d.jpg",
+  "height": 191,
+  "width": 236
+ },
+ "images_474x": {
+  "url": "https://i.pinimg.com/474x/7d/05/58/7d0558f260a76d1f6a942549b0e37f3d.jpg",
+  "height": 384,
+  "width": 474
+ },
+ "images_736x": {
+  "url": "https://i.pinimg.com/736x/7d/05/58/7d0558f260a76d1f6a942549b0e37f3d.jpg",
+  "height": 597,
+  "width": 736
+ },
+ "images_orig": {
+  "url": "https://i.pinimg.com/originals/7d/05/58/7d0558f260a76d1f6a942549b0e37f3d.jpg",
+  "height": 1662,
+  "width": 2048,
+  "__typename": "ImageDetails"
+ },
+ "board": {
+  "name": "HA Design & Code",
+  "url": "/joachimpers2275/ha-design-code/",
+  "id": "Qm9hcmQ6MTQwODc0OTI3Nzc4NzQ3",
+  "entityId": "140874927778747",
+  "imageThumbnailUrl": "https://i.pinimg.com/upload/140874927778747_board_thumbnail_2026-04-08-01-51-56_94238_60.jpg",
+  "imageCoverUrl": "https://i.pinimg.com/200x150/51/c7/fb/51c7fbabd996c949b2634a6a31cbd36b.jpg",
+  "pinCount": 4,
+  "sectionCount": 0,
+  "boardOrderModifiedAt": "Fri, 03 Apr 2026 23:35:46 +0000",
+  "coverImageSpec_236x": {
+   "url": "https://i.pinimg.com/236x/51/c7/fb/51c7fbabd996c949b2634a6a31cbd36b.jpg"
+  },
+  "coverImageSpec_400x300": {
+   "url": "https://i.pinimg.com/400x300/51/c7/fb/51c7fbabd996c949b2634a6a31cbd36b.jpg"
+  },
+  "coverImageSpec_216x146": {
+   "url": "https://i.pinimg.com/216x146/51/c7/fb/51c7fbabd996c949b2634a6a31cbd36b.jpg"
+  },
+  "imageCoverHdUrl": "https://i.pinimg.com/474x/51/c7/fb/51c7fbabd996c949b2634a6a31cbd36b.jpg",
+  "followedByMe": false,
+  "owner": {
+   "entityId": "140943646812049",
+   "id": "VXNlcjoxNDA5NDM2NDY4MTIwNDk="
+  },
+  "collaboratedByMe": false,
+  "privacy": "public",
+  "layout": "default",
+  "isCollaborative": false
+ },
+ "pinner": {
+  "blockedByMe": false,
+  "id": "VXNlcjoxNDA5NDM2NDY4MTIwNDk=",
+  "__typename": "User",
+  "explicitlyFollowedByMe": false,
+  "fullName": "JP",
+  "username": "joachimpers2275",
+  "entityId": "140943646812049",
+  "imageSmallUrl": "https://s.pinimg.com/images/user/default_30.png",
+  "imageMediumUrl": "https://s.pinimg.com/images/user/default_75.png",
+  "isVerifiedMerchant": false,
+  "followerCount": 3,
+  "imageLargeUrl": "https://s.pinimg.com/images/user/default_140.png",
+  "verifiedIdentity": {
+   "verified": null
+  }
+ },
+ "originPinner": {
+  "isVerifiedMerchant": false,
+  "id": "VXNlcjo2NjAyNzAxMzI3Nzc1MDM0MzU=",
+  "entityId": "660270132777503435",
+  "username": "onklllive",
+  "imageMediumUrl": "https://i.pinimg.com/75x75_RS/3e/31/28/3e31281cbcc537f1cccf894062d8021a.jpg",
+  "blockedByMe": false,
+  "explicitlyFollowedByMe": false,
+  "followerCount": 32,
+  "fullName": "\u0420\u043e\u043c\u0430\u043d \u0412\u0430\u0441\u0438\u043b\u044c\u0435\u0432",
+  "imageLargeUrl": "https://i.pinimg.com/140x140_RS/3e/31/28/3e31281cbcc537f1cccf894062d8021a.jpg",
+  "imageSmallUrl": "https://i.pinimg.com/30x30_RS/3e/31/28/3e31281cbcc537f1cccf894062d8021a.jpg",
+  "verifiedIdentity": {
+   "verified": null
+  }
+ },
+ "isVideo": false,
+ "domain": "Uploaded by user"
+}
