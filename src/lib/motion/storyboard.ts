@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ACTS, Act } from './script';
+import { findClip, type MotionDoc } from './doc';
 import { nodeSize } from '$lib/canvas/node-size';
 import { PLACEMENT_GAP } from '$lib/canvas/placement';
 import type { DuplicatePlan, DuplicatedEdge, DuplicatedNode } from '$lib/canvas/duplicate-plan';
@@ -52,8 +53,6 @@ const MEDIA_STEP = MEDIA_SIZE.h + PLACEMENT_GAP;
 const MEDIA_TOP = CURVE_TOP + CURVE_SPAN + BRANCH_DROP + CARD.h + PLACEMENT_GAP;
 const FLOW = 'derives_from';
 
-const MEDIA_HANDLE: Record<MediaKind, string> = { [MediaKind.Image]: 'images', [MediaKind.Video]: 'videos' };
-
 const ACT_NAME: Record<Act, string> = { [Act.Problem]: 'Problem', [Act.Solution]: 'Solution', [Act.Proof]: 'Proof', [Act.Claim]: 'Claim' };
 
 const KIND_NAME: Record<BeatKind, string> = {
@@ -91,7 +90,7 @@ export function planStoryboard(board: Storyboard, media: Record<string, MediaKin
   const nodes: DuplicatedNode[] = [];
   const edges: DuplicatedEdge[] = [];
   const place = (type: string, data: Record<string, unknown>, x: number, y: number) => nodes.push({ sourceIndex: nodes.length, type, data, x, y }) - 1;
-  const wire = (from: number, to: number, handle: string) => edges.push({ sourceIndex: from, targetIndex: to, sourceHandle: FLOW, targetHandle: handle });
+  const wire = (from: number, to: number) => edges.push({ sourceIndex: from, targetIndex: to, sourceHandle: FLOW, targetHandle: null });
 
   const column = new Map<number, number>();
   const before = new Map<number, number | null>();
@@ -124,13 +123,13 @@ export function planStoryboard(board: Storyboard, media: Record<string, MediaKin
   beats.forEach((b, i) => {
     const prior = before.get(i);
     if (prior !== null && prior !== undefined) {
-      wire(card.get(prior)!, card.get(i)!, 'text');
+      wire(card.get(prior)!, card.get(i)!);
     }
     const ids = b.media.filter((id) => media[id]);
     ids.forEach((id, k) => {
       const kind = media[id];
       const at = place(kind, mediaData(id), column.get(i)! * COLUMN, MEDIA_TOP + k * MEDIA_STEP + (isBranch(beats, i) ? BRANCH_DROP : 0));
-      wire(at, card.get(i)!, MEDIA_HANDLE[kind]);
+      wire(at, card.get(i)!);
     });
   });
 
@@ -172,7 +171,7 @@ const MEDIA_TYPES: readonly string[] = [MediaKind.Image, MediaKind.Video];
 const assetOf = (data: Record<string, unknown>) => (typeof data.assetId === 'string' ? data.assetId : typeof data.output_asset_id === 'string' ? data.output_asset_id : null);
 
 export type StoryboardRead = {
-  cards: { node_id: string; text: string }[];
+  cards: { node_id: string; text: string; clip_ids: string[] }[];
   media: { node_id: string; kind: string; asset_id: string | null; prompt: string; for: string[] }[];
   flow: [string, string][];
 };
@@ -183,10 +182,61 @@ export function readStoryboard(nodes: BoardNode[], edges: BoardEdge[]): Storyboa
   const isCard = (id: string) => TEXT_OF[kinds.get(id) ?? ''] !== undefined;
 
   return {
-    cards: ordered.filter((n) => TEXT_OF[n.type]).map((n) => ({ node_id: n.id, text: TEXT_OF[n.type](n.data) })),
+    cards: ordered.filter((n) => TEXT_OF[n.type]).map((n) => ({ node_id: n.id, text: TEXT_OF[n.type](n.data), clip_ids: beatOf(n.data)?.clipIds ?? [] })),
     media: ordered
       .filter((n) => MEDIA_TYPES.includes(n.type))
       .map((n) => ({ node_id: n.id, kind: n.type, asset_id: assetOf(n.data), prompt: String(n.data.prompt ?? ''), for: edges.filter((e) => e.sourceNodeId === n.id && isCard(e.targetNodeId)).map((e) => e.targetNodeId) })),
     flow: edges.filter((e) => isCard(e.sourceNodeId) && isCard(e.targetNodeId)).map((e) => [e.sourceNodeId, e.targetNodeId])
   };
+}
+
+export const CLIP_PARAM = 'clip';
+
+export type BeatLink = { editor: string; clipIds: string[] };
+
+const beatLinkSchema = z.object({ editor: z.string().min(1), clipIds: z.array(z.string()) });
+
+export function beatOf(data: Record<string, unknown>): BeatLink | null {
+  const parsed = beatLinkSchema.safeParse(data.beat);
+  return parsed.success ? parsed.data : null;
+}
+
+export function beatHref(data: Record<string, unknown>): string | null {
+  const beat = beatOf(data);
+  const first = beat?.clipIds[0];
+  return beat && first ? `${beat.editor}?${CLIP_PARAM}=${encodeURIComponent(first)}` : null;
+}
+
+export function clipSeek(doc: MotionDoc, search: string): number | null {
+  const id = new URLSearchParams(search).get(CLIP_PARAM);
+  return id ? (findClip(doc, id)?.clip.from ?? null) : null;
+}
+
+const MEDIA_OF: Partial<Record<string, MediaKind>> = { [MediaKind.Image]: MediaKind.Image, [MediaKind.Video]: MediaKind.Video };
+
+export type BoardMedia = { ok: true; kinds: Record<string, MediaKind> } | { ok: false; error: string };
+
+export function boardMedia(board: Storyboard, assets: { id: string; kind: string }[]): BoardMedia {
+  const ids = [...new Set(board.beats.flatMap((b) => b.media))];
+  const kinds: Record<string, MediaKind> = {};
+  for (const id of ids) {
+    const kind = MEDIA_OF[assets.find((a) => a.id === id)?.kind ?? ''];
+    if (kind) {
+      kinds[id] = kind;
+    }
+  }
+  const unknown = ids.filter((id) => !kinds[id]);
+  return unknown.length ? { ok: false, error: `not a picture or clip of this project: ${unknown.join(', ')}` } : { ok: true, kinds };
+}
+
+export function boardNote(read: StoryboardRead | null): string | null {
+  if (!read?.cards.length) {
+    return null;
+  }
+  const media = read.media.filter((m) => m.asset_id).map((m) => `${m.kind} ${m.asset_id}${m.for.length ? ` for ${m.for.join(', ')}` : ''}`);
+  return [
+    'The storyboard of this video as it is now; the user may have edited it, and their version wins over the saved script. Build what it says, and link_storyboard_beat every card to the clips that play it as you build them.',
+    ...read.cards.map((c) => `[${c.node_id}]${c.clip_ids.length ? ` (clips ${c.clip_ids.join(', ')})` : ''}\n${c.text}`),
+    ...(media.length ? [`Media on the board: ${media.join('; ')}`] : [])
+  ].join('\n\n');
 }

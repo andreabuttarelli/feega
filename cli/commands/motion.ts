@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { loadSession } from '../lib/auth.ts';
 import { awaitRun, motionApi, type MotionRun, type RenderStart } from '../lib/motion.ts';
@@ -148,5 +148,29 @@ export async function framesAndReport(bearer: string, nodeId: string, opts: Fram
   }
   for (const note of shot.quality) {
     console.log(`${shot.blocking.includes(note) ? 'blocking' : 'quality '}  ${note}`);
+  }
+}
+
+export async function cmdMotionStoryboard(nodeId: string, opts: { org?: string; write?: string; card?: string; text?: string }) {
+  const bearer = await token();
+  if (opts.write) {
+    const board = JSON.parse(await readFile(opts.write, 'utf8')) as { beats: unknown[] };
+    const out = await motionApi.writeStoryboard(bearer, nodeId, board, opts.org);
+    console.log(`Storyboard written on canvas ${String(out.canvas_id)}.`);
+    return;
+  }
+  if (opts.card && opts.text) {
+    await motionApi.editStoryboard(bearer, nodeId, opts.card, opts.text, opts.org);
+    console.log(`Card ${opts.card} rewritten.`);
+    return;
+  }
+  const board = (await motionApi.storyboard(bearer, nodeId, opts.org)) as { canvas_id?: string; cards?: { node_id: string; text: string; clip_ids: string[] }[] };
+  if (!board.cards) {
+    console.log('No storyboard yet.');
+    return;
+  }
+  console.log(`canvas ${board.canvas_id}`);
+  for (const c of board.cards) {
+    console.log(`\n[${c.node_id}]${c.clip_ids.length ? ` clips ${c.clip_ids.join(',')}` : ''}\n${c.text}`);
   }
 }

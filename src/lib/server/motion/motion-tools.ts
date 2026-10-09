@@ -50,7 +50,7 @@ import { clickUi } from '$lib/motion/cursor-ops';
 import { Isolate, focusUi } from '$lib/motion/ui-focus';
 import { ACTS, BrandKind, briefOf, scriptProblems, scriptSchema, sourcesOf, type LaunchScript } from '$lib/motion/script';
 import { quoted, type SitePage } from './site-copy';
-import { MediaKind, outlineOf, storyboardSchema, type Storyboard, type StoryboardRead } from '$lib/motion/storyboard';
+import { MediaKind, boardMedia, outlineOf, storyboardSchema, type Storyboard, type StoryboardRead } from '$lib/motion/storyboard';
 import { PATCH_COMPONENT, READ_COMPONENT, WRITE_COMPONENT } from './model-route';
 import { CAMERA, CAMERA_KEYS, CAMERA_LANE, SPACES, type Camera } from '$lib/motion/camera';
 import { ENV_PRESETS, HDRI, LIGHT, envPresetInput, LIGHT_KEYS, LIGHT_KINDS, type Look } from '$lib/motion/look';
@@ -153,9 +153,8 @@ export type StoryboardPort = {
   write: (board: Storyboard, media: Record<string, MediaKind>) => Promise<{ canvasId: string; nodes: number; connections: number }>;
   read: () => Promise<({ canvasId: string } & StoryboardRead) | null>;
   edit: (nodeId: string, text: string) => Promise<{ ok: true } | { ok: false; error: string }>;
+  link: (nodeId: string, clipIds: string[]) => Promise<{ ok: true } | { ok: false; error: string }>;
 };
-
-const BOARD_MEDIA: Partial<Record<string, MediaKind>> = { [AssetKind.Image]: MediaKind.Image, [AssetKind.Video]: MediaKind.Video };
 
 export type RevisionEntry = { version: number; summary: string | null; actorKind: string; createdAt: string; clips: number };
 
@@ -1642,19 +1641,11 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         if (!deps.storyboard) {
           return UNREADABLE('the storyboard');
         }
-        const ids = [...new Set(input.beats.flatMap((b) => b.media))];
-        const kinds: Record<string, MediaKind> = {};
-        for (const id of ids) {
-          const kind = BOARD_MEDIA[deps.assets.find((a) => a.id === id)?.kind ?? ''];
-          if (kind) {
-            kinds[id] = kind;
-          }
+        const media = boardMedia(input, deps.assets);
+        if (!media.ok) {
+          return { ok: false, error: `${media.error} (list_assets)` };
         }
-        const unknown = ids.filter((id) => !kinds[id]);
-        if (unknown.length) {
-          return { ok: false, error: `not a picture or clip of this project: ${unknown.join(', ')} (list_assets)` };
-        }
-        const written = await deps.storyboard.write(input, kinds);
+        const written = await deps.storyboard.write(input, media.kinds);
         return { ok: true, canvas_id: written.canvasId, nodes: written.nodes, connections: written.connections, outline: outlineOf(input) };
       }
     }),
@@ -1675,6 +1666,21 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: 'Rewrite the text of one card of the storyboard (node_id from read_storyboard).',
       inputSchema: z.object({ node_id: z.string(), text: z.string().min(1).max(4000) }),
       execute: async (input) => (deps.storyboard ? deps.storyboard.edit(input.node_id, input.text) : UNREADABLE('the storyboard'))
+    }),
+
+    link_storyboard_beat: tool({
+      description: 'Tie a storyboard card to the clips that play it, once they are built: the card then opens the editor at that beat. Call it for every beat as you build the acts.',
+      inputSchema: z.object({ node_id: z.string(), clip_ids: z.array(z.string()).min(1).max(20) }),
+      execute: async (input) => {
+        if (!deps.storyboard) {
+          return UNREADABLE('the storyboard');
+        }
+        const missing = input.clip_ids.filter((id) => !findClip(session.doc, id));
+        if (missing.length) {
+          return { ok: false, error: `no clip ${missing.join(', ')} in this video` };
+        }
+        return deps.storyboard.link(input.node_id, input.clip_ids);
+      }
     }),
 
     use_brand: tool({

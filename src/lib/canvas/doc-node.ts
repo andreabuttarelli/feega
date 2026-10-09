@@ -14,6 +14,7 @@ export type DocNode = {
   id: string;
   content: string;
   public: boolean;
+  play?: string;
 };
 
 /** Due modi di stare sul documento: leggere il markdown reso, o scriverlo grezzo. */

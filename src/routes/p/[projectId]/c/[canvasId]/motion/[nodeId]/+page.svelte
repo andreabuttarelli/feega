@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, tick, untrack } from 'svelte';
+  import { clipSeek } from '$lib/motion/storyboard';
   import { POSTER_WIDTH, posterJob, posterSecond, sendPoster } from '$lib/motion/poster-capture';
   import { deserialize } from '$app/forms';
   import { replaceState } from '$app/navigation';
@@ -187,6 +188,10 @@
   }
 
   onMount(() => {
+    const at = clipSeek(doc, location.search);
+    if (at !== null) {
+      seekTo(at);
+    }
     layout = readLayout(browserStore());
     const url = new URL(window.location.href);
     if (url.searchParams.has(BRAND_PARAM)) {

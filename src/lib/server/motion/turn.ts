@@ -38,6 +38,7 @@ import { layMusic } from '$lib/server/motion/music';
 import { RevisionOutcome, listRevisions, readRevision } from '$lib/server/repos/motion-revisions';
 import { brandSources } from '$lib/server/motion/brand-sources';
 import { storyboardStore } from '$lib/server/motion/storyboard';
+import { boardNote } from '$lib/motion/storyboard';
 import { SELF_CHECK_MAX_STEPS, SUMMARY_PROMPT, VIEW_FRAMES, Vision, deliveryBlocked, docTexts, fixPrompt, keyFrameTimes, openErrors, selfCheckPrompt, stillOpenNote, usageByModel, visionStep } from '$lib/server/motion/frames';
 import { frameStats } from '$lib/server/motion/frame-stats';
 import { awaitFrames, awaitVerdict, framesPrefix, FRAME_POLL_MS, type FrameBucket } from '$lib/server/motion/frame-store';
@@ -164,7 +165,9 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
   const assets = await motionAssets({ db, orgId, projectId: project.id, canvasId: motion.record.canvasId, nodeId: motion.record.id });
   const history = promptHistory(await loadTurns(db, { orgId, threadId }));
   await saveTurn(db, { orgId, threadId, role: 'user', content: message, attachments, actor: requester });
-  const openingContent = await userContent(db, { orgId, text: message, attachments, hint: motionPlaceHint });
+  const storyboard = storyboardStore(db, { orgId, projectId: project.id, motionNodeId: motion.record.id, title: motion.record.displayName ?? 'Video', actor });
+  const note = motion.node.storyboard ? boardNote(await storyboard.read()) : null;
+  const openingContent = await userContent(db, { orgId, text: note ? `${message}\n\n${note}` : message, attachments, hint: motionPlaceHint });
   const reply = await openReply(db, { orgId, threadId, actor });
 
   const knownAssets = assets.length;
@@ -217,7 +220,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
     },
     layouts: layoutStore({ db, orgId, actor: { kind: 'agent', id: userId, agentKey: MOTION_AGENT_KEY } }),
     effects: effectStore({ db, orgId, actor: { kind: 'agent', id: userId, agentKey: MOTION_AGENT_KEY }, gl: serverFramesOpen() ? chromiumGl : null }),
-    storyboard: storyboardStore(db, { orgId, projectId: project.id, motionNodeId: motion.record.id, title: motion.record.displayName ?? 'Video', actor }),
+    storyboard,
     readUi: uiReader({ ask: (q) => withOrgContext(orgId, () => llmStructured({ ...q, model: llmVisionModel() ?? model, label: 'motion-recreate-ui' })), fetchBytes: fetchImageBytes }),
     check: async (callId, doc, name) => {
       BROWSER_DRAWS[browser]();

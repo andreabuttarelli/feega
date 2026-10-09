@@ -3,17 +3,32 @@ import type { Actor } from '$lib/server/repos/actor';
 import { createCanvas, deleteNode, findNode, listConnections, listNodes, patchNodeData, DataCheck } from '$lib/server/repos/canvas';
 import { writePlan } from '$lib/server/canvas/duplicate';
 import { planStoryboard, readStoryboard, type MediaKind, type Storyboard } from '$lib/motion/storyboard';
-import { storyboardOf } from '$lib/canvas/motion-node';
+import { motionEditorPath, storyboardOf } from '$lib/canvas/motion-node';
 import type { StoryboardPort } from './motion-tools';
 
 type Scope = { orgId: string; projectId: string; motionNodeId: string; title: string; actor: Actor };
 
 const EDITABLE: Record<string, string> = { doc: 'content', text: 'prompt' };
 
+const NOT_A_CARD = { ok: false as const, error: 'not a card of this storyboard: read_storyboard lists them' };
+
 export function storyboardStore(db: Db, scope: Scope): StoryboardPort {
   const link = async () => {
     const motion = await findNode(db, { orgId: scope.orgId, nodeId: scope.motionNodeId });
     return motion ? storyboardOf(motion.data) : null;
+  };
+
+  const card = async (nodeId: string) => {
+    const motion = await findNode(db, { orgId: scope.orgId, nodeId: scope.motionNodeId });
+    const linked = motion ? storyboardOf(motion.data) : null;
+    const node = await findNode(db, { orgId: scope.orgId, nodeId });
+    const field = node ? EDITABLE[node.type] : undefined;
+    return motion && linked && node && node.canvasId === linked.canvasId && field ? { motion, field } : null;
+  };
+
+  const save = async (nodeId: string, patch: Record<string, unknown>) => {
+    const written = await patchNodeData(db, { orgId: scope.orgId, nodeId, patch, check: DataCheck.Schema, actor: scope.actor });
+    return written.outcome === 'written' ? { ok: true as const } : { ok: false as const, error: `the card was not saved (${written.outcome})` };
   };
 
   return {
@@ -43,15 +58,17 @@ export function storyboardStore(db: Db, scope: Scope): StoryboardPort {
     },
 
     async edit(nodeId: string, text: string) {
-      const linked = await link();
-      const node = await findNode(db, { orgId: scope.orgId, nodeId });
-      const field = node ? EDITABLE[node.type] : undefined;
-      if (!linked || !node || node.canvasId !== linked.canvasId || !field) {
-        return { ok: false as const, error: 'not a card of this storyboard: read_storyboard lists them' };
-      }
+      const found = await card(nodeId);
+      return found ? save(nodeId, { [found.field]: text }) : NOT_A_CARD;
+    },
 
-      const written = await patchNodeData(db, { orgId: scope.orgId, nodeId, patch: { [field]: text }, check: DataCheck.Schema, actor: scope.actor });
-      return written.outcome === 'written' ? { ok: true as const } : { ok: false as const, error: `the card was not saved (${written.outcome})` };
+    async link(nodeId: string, clipIds: string[]) {
+      const found = await card(nodeId);
+      if (!found) {
+        return NOT_A_CARD;
+      }
+      const editor = motionEditorPath({ projectId: found.motion.projectId, canvasId: found.motion.canvasId, nodeId: found.motion.id });
+      return save(nodeId, { beat: { editor, clipIds } });
     }
   };
 }

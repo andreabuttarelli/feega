@@ -174,6 +174,18 @@ motion
   });
 
 motion
+  .command('storyboard <nodeId>')
+  .description('Read the storyboard of a motion video, write it from a JSON file of beats, or rewrite one card')
+  .option('--org <slug>', 'Org, if you belong to more than one')
+  .option('--write <file>', 'JSON file { "beats": [...] } to write the storyboard from')
+  .option('--card <cardId>', 'Card to rewrite (with --text)')
+  .option('--text <text>', 'New text of the card')
+  .action(async (nodeId: string, opts) => {
+    const { cmdMotionStoryboard } = await import('./commands/motion.ts');
+    await cmdMotionStoryboard(nodeId, opts);
+  });
+
+motion
   .command('revisions <nodeId>')
   .description('List the saved versions of a video, or put one back as a new version (free)')
   .option('--restore <version>', 'Restore this version; history is kept')

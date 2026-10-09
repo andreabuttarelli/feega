@@ -7,6 +7,7 @@ export type MotionNode = {
   docHeadRevision: number;
   posterAssetId: string | null;
   lastRenderAssetId: string | null;
+  storyboard?: StoryboardLink;
 };
 
 const FORMAT_NAMES: Record<string, MotionFormat> = {
