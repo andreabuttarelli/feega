@@ -77,6 +77,7 @@ const MODEL_CALLERS: Readonly<Record<string, string>> = {
   'src/lib/server/layouts/design.ts': SCREENED,
   'src/lib/server/motion/music.ts': 'asks the configured provider only to pick the source; composing goes through generateSound, which screens',
   'src/lib/server/moderation/moderation-config.ts': 'the moderator itself: Jev and the LLM judge',
+  'src/lib/server/web/live.ts': 'only reads the gateway settings for a web search query, which generates nothing; the turn that wrote it was screened',
   'src/lib/server/provider-purgers.ts': 'deletes stored provider copies, sends no prompt',
   'src/lib/server/brand-analysis.ts': 'brand wizard: reads a third-party website, the user types only its URL',
   'src/lib/server/brand-context.ts': 'brand research over site, catalogue and competitor material',
