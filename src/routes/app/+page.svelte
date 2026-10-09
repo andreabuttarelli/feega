@@ -2,6 +2,7 @@
   import PageTitle from '$lib/components/PageTitle.svelte';
   import ArrowRight from '@lucide/svelte/icons/arrow-right';
   import Film from '@lucide/svelte/icons/film';
+  import { onMount } from 'svelte';
   import { enhance } from '$app/forms';
   import { formatLastEdited } from '$lib/canvas/format-last-edited';
   import { TOOL_STATUS_LABEL, toolHref } from '$lib/tools';
@@ -12,9 +13,11 @@
   let { data, form } = $props();
 
   let sending = $state(false);
+  let field = $state<HTMLInputElement | null>(null);
+
+  onMount(() => field?.focus());
 
   const recentProjectId = $derived(data.dashboard.projects[0]?.id ?? null);
-  const firstVideo = $derived(data.dashboard.motions.length === 0);
 
   const submit = () => {
     sending = true;
@@ -25,30 +28,26 @@
   };
 </script>
 
-<svelte:head><title>Create a video · feega</title></svelte:head>
+<svelte:head><title>Make a video · feega</title></svelte:head>
 
 <div class="home">
   <section class="hero" aria-labelledby="create-heading">
-    {#if firstVideo}
-      <p class="eyebrow" data-testid="onboarding">Start here</p>
-      <PageTitle id="create-heading" text="Paste your URL. Get a video." />
-      <p class="lede">Your site, product or app becomes a motion video. Or describe the one you want.</p>
-    {:else}
-      <PageTitle id="create-heading" text="Create a video" />
-    {/if}
+    <PageTitle id="create-heading" text="make a video." />
 
     <form method="POST" action="?/video" class="brief" use:enhance={submit}>
       <input
         name="brief"
+        id="video-brief"
         data-testid="video-brief"
-        placeholder="Paste your URL or describe your video"
-        aria-label="Paste your URL or describe your video"
+        placeholder="Your website or what you want to make"
+        aria-label="Your website or what you want to make"
         maxlength={BRIEF_MAX}
         autocomplete="off"
+        bind:this={field}
         required
       />
       <button type="submit" class="go" disabled={sending} aria-label="Create video">
-        <span class="go-label">Create</span><ArrowRight size={16} strokeWidth={1.8} />
+        <span class="go-label">Make it</span><ArrowRight size={16} strokeWidth={1.8} />
       </button>
     </form>
     {#if form?.error}<p class="error" role="alert">{form.error}</p>{/if}
@@ -59,6 +58,27 @@
       {/each}
     </form>
   </section>
+
+  {#if data.dashboard.motions.length}
+    <section aria-labelledby="videos-heading">
+      <div class="head">
+        <h2 id="videos-heading">Your videos</h2>
+      </div>
+      <ul class="grid" data-testid="home-videos">
+        {#each data.dashboard.motions as motion (motion.id)}
+          <li>
+            <a href={motion.href} class="card">
+              <span class="poster">
+                {#if motion.poster}<img src={motion.poster} alt="" loading="lazy" />{:else}<Film size={18} strokeWidth={1.4} />{/if}
+              </span>
+              <span class="name">{motion.name}</span>
+              <span class="muted">{formatLastEdited(motion.updatedAt)}</span>
+            </a>
+          </li>
+        {/each}
+      </ul>
+    </section>
+  {/if}
 
   {#if data.gallery.length}
     <section aria-labelledby="gallery-heading">
@@ -82,22 +102,14 @@
     </section>
   {/if}
 
-  {#if data.dashboard.motions.length}
-    <section aria-labelledby="videos-heading">
+  {#if data.dashboard.projects.length}
+    <section aria-labelledby="projects-heading">
       <div class="head">
-        <h2 id="videos-heading">Your videos</h2>
+        <h2 id="projects-heading">Projects</h2>
       </div>
-      <ul class="grid">
-        {#each data.dashboard.motions as motion (motion.id)}
-          <li>
-            <a href={motion.href} class="card">
-              <span class="poster">
-                {#if motion.poster}<img src={motion.poster} alt="" loading="lazy" />{:else}<Film size={18} strokeWidth={1.4} />{/if}
-              </span>
-              <span class="name">{motion.name}</span>
-              <span class="muted">{formatLastEdited(motion.updatedAt)}</span>
-            </a>
-          </li>
+      <ul class="projects" data-testid="home-projects">
+        {#each data.dashboard.projects as project (project.id)}
+          <li><a href={project.href} class="tool">{project.name}</a></li>
         {/each}
       </ul>
     </section>
@@ -141,22 +153,6 @@
     padding-top: 8vh;
   }
 
-  .eyebrow {
-    margin: 0;
-    font-family: var(--ui-mono);
-    font-size: var(--ui-text-xs);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--ui-ink-3);
-  }
-
-  .lede {
-    margin: 0;
-    max-width: 520px;
-    font-size: var(--ui-text-lg);
-    color: var(--ui-ink-2);
-  }
-
   .brief {
     display: flex;
     margin-top: var(--ui-space-4);
@@ -171,7 +167,7 @@
   .brief input {
     flex: 1 1 auto;
     min-width: 0;
-    height: 56px;
+    height: 64px;
     padding: 0 var(--ui-space-4);
     border: 0;
     background: transparent;
@@ -313,7 +309,8 @@
     color: var(--ui-ink-3);
   }
 
-  .tools {
+  .tools,
+  .projects {
     display: flex;
     flex-wrap: wrap;
     gap: var(--ui-space-2);

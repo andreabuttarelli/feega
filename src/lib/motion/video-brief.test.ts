@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BRIEF_PARAM, BRIEF_TEMPLATES, briefEditorPath, briefName } from './video-brief';
+import { BRIEF_PARAM, BRIEF_TEMPLATES, BriefKind, briefEditorPath, briefKind, briefMessage, briefName } from './video-brief';
 
 describe('a brief typed on /app names its video and travels to the editor', () => {
   it('a URL names the video after its host', () => {
@@ -21,5 +21,17 @@ describe('a brief typed on /app names its video and travels to the editor', () =
 
   it('every template is a brief ready to send', () => {
     expect(BRIEF_TEMPLATES.every((t) => t.brief.length > 0 && t.name.length > 0)).toBe(true);
+  });
+
+  it('a bare URL is a site to read, anything else a brief', () => {
+    expect(briefKind('acme.com')).toBe(BriefKind.Site);
+    expect(briefKind(' https://www.acme.com/pricing ')).toBe(BriefKind.Site);
+    expect(briefKind('A logo reveal for acme.com')).toBe(BriefKind.Text);
+  });
+
+  it('a site becomes the launch film request, a brief travels as typed', () => {
+    expect(briefMessage('acme.com')).toBe('Make a launch film of https://acme.com');
+    expect(briefMessage('https://acme.com/pricing')).toBe('Make a launch film of https://acme.com/pricing');
+    expect(briefMessage('A logo reveal on black')).toBe('A logo reveal on black');
   });
 });

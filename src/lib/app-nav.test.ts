@@ -5,9 +5,10 @@ import { APP_NAV, NavKind, NavSection, isNavActive, navHref, visibleNav } from '
 const PROJECT = 'p1';
 
 describe('app sidebar table', () => {
-  it('puts motion and the gallery at the top, under home', () => {
+  it('opens with New video, then home, motion and the gallery', () => {
     const main = APP_NAV.filter((item) => item.section === NavSection.Main);
-    expect(main.map((item) => item.id)).toEqual(['home', 'tool:motion', 'gallery']);
+    expect(main.map((item) => item.id)).toEqual(['new-video', 'home', 'tool:motion', 'gallery']);
+    expect(navHref(main[0], null)).toBe('/app#video-brief');
   });
 
   it('lists every supporting tool of tools.ts, in order', () => {
