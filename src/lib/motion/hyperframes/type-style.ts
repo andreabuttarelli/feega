@@ -1,9 +1,11 @@
-import { TYPE } from '../components';
+import { TYPE, type TextCase } from '../components';
 import { px } from './html';
 
 type Keyed = number | string;
 
-export type TypeProps = { font: string; weight: Keyed; italic: boolean; tracking: Keyed; leading: Keyed; stretch: Keyed; slant: Keyed; axes: string };
+export type TypeProps = { font: string; weight: Keyed; italic: boolean; tracking: Keyed; leading: Keyed; stretch: Keyed; slant: Keyed; axes: string; textCase?: TextCase };
+
+const TRANSFORM: Record<TextCase, string | undefined> = { 'as-typed': undefined, upper: 'uppercase', lower: 'lowercase' };
 
 type TypeCtx = { font: (family: string) => string; weight: (family: string, weight: number) => number };
 
@@ -22,6 +24,7 @@ export function typeStyle(ctx: TypeCtx, p: TypeProps, size: number): Record<stri
     fontSize: px(size),
     letterSpacing: em(p.tracking),
     lineHeight: p.leading,
+    textTransform: TRANSFORM[p.textCase ?? 'as-typed'],
     fontVariationSettings: variation(p)
   };
 }

@@ -39,7 +39,7 @@ import { RevisionOutcome, listRevisions, readRevision } from '$lib/server/repos/
 import { brandSources } from '$lib/server/motion/brand-sources';
 import { storyboardStore } from '$lib/server/motion/storyboard';
 import { boardNote } from '$lib/motion/storyboard';
-import { SELF_CHECK_MAX_STEPS, SUMMARY_PROMPT, VIEW_FRAMES, Vision, deliveryBlocked, docTexts, checkMessage, keyFrameTimes, openErrors, stillOpenNote, viewedReferences, usageByModel, visionStep } from '$lib/server/motion/frames';
+import { SELF_CHECK_MAX_STEPS, SUMMARY_PROMPT, VIEW_FRAMES, Vision, deliveryBlocked, docTexts, checkMessage, keyFrameTimes, openErrors, selfCheckDue, stillOpenNote, viewedReferences, usageByModel, visionStep } from '$lib/server/motion/frames';
 import { frameStats } from '$lib/server/motion/frame-stats';
 import { awaitFrames, awaitVerdict, framesPrefix, FRAME_POLL_MS, type FrameBucket } from '$lib/server/motion/frame-store';
 import { CANVAS_ASSET_BUCKET, SIGNED_URL_TTL_S } from '$lib/server/repos/asset-storage';
@@ -99,6 +99,7 @@ export type TurnTiming = { landingMs: number; stopPollMs: number };
 const PLATFORM_TIMING: TurnTiming = { landingMs: AGENT_SELF_SAVE_MS, stopPollMs: 3000 };
 export const MAX_DELIVERY_ATTEMPTS = 3;
 const STILL_OPEN_ID = 'still-open';
+const LAST_LOOK_ID = 'last-look';
 
 const oneStep: Stop = ({ steps }) => steps.length >= 1;
 
@@ -311,6 +312,18 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
       }
     });
 
+  const lastLook = async (messages: ModelMessage[]): Promise<ModelMessage[]> => {
+    const view = tools[VIEW_FRAMES];
+    const scenes = keyFrameTimes(session.doc);
+    const input = { times: scenes.length ? scenes : [session.doc.durationInFrames / session.doc.fps / 2] };
+    const output = await view.execute!(input, { toolCallId: LAST_LOOK_ID, messages, context: {} });
+    const result = await view.toModelOutput!({ toolCallId: LAST_LOOK_ID, input, output });
+    return [
+      { role: 'assistant', content: [{ type: 'tool-call', toolCallId: LAST_LOOK_ID, toolName: VIEW_FRAMES, input }] },
+      { role: 'tool', content: [{ type: 'tool-result', toolCallId: LAST_LOOK_ID, toolName: VIEW_FRAMES, output: result }] }
+    ];
+  };
+
   let settle: (outcome: TurnOutcome) => void = () => {};
   let abandon: (e: unknown) => void = () => {};
   const done = new Promise<TurnOutcome>((resolve, reject) => {
@@ -383,7 +396,11 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
         const times = keyFrameTimes(session.doc);
         await play([...conversation, checkMessage(errors, times)], Round.SelfCheck);
       }
-      if (steps.length && !awaitsGo && !closedByModel(steps.at(-1))) {
+      const unlooked = steps.length > 0 && !awaitsGo && selfCheckDue(session, vision);
+      if (unlooked) {
+        conversation = [...conversation, ...(await lastLook(conversation))];
+      }
+      if (steps.length && !awaitsGo && (unlooked || !closedByModel(steps.at(-1)))) {
         await play([...conversation, { role: 'user', content: SUMMARY_PROMPT }], Round.Summary);
       }
       const open = awaitsGo ? '' : stillOpenNote(openErrors(session));

@@ -292,6 +292,17 @@ describe('a motion turn closes on a look and a summary', () => {
     expect(viewedAfterLastEdit()).toBe(true);
   });
 
+  it('a model that ignores every request to look is shown its last frames before it sums up', async () => {
+    world.nudgesToIgnore = 1_000;
+
+    const outcome = await turn();
+    const summed = world.calls.at(-1)!.prompt;
+
+    expect(world.views).toBe(1);
+    expect(summed.some(hasImage) || JSON.stringify(summed).includes('"type":"file"')).toBe(true);
+    expect(outcome.reply.trim().length).toBeGreaterThan(0);
+  });
+
   it('a step that fails after the edits keeps them in the conversation: the summary sees the work', async () => {
     world.visionFails = true;
     world.viewsWhileEditing = true;

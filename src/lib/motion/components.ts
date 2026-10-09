@@ -88,6 +88,8 @@ const BLEED_REACH = 2;
 export const TITLE_LOOK = { weight: SEMIBOLD, tracking: -0.05 } as const;
 export const TITLE_RANGE = { weight: [MEDIUM, SEMIBOLD], tracking: [-0.07, -0.04] } as const;
 export const ALIGNS = ['left', 'center', 'right'] as const;
+export const TEXT_CASES = ['as-typed', 'upper', 'lower'] as const;
+export type TextCase = (typeof TEXT_CASES)[number];
 export const MOVES = ['none', 'drift-up', 'zoom-in', 'zoom-out', 'pan-left', 'pan-right'] as const;
 export type Move = (typeof MOVES)[number];
 
@@ -128,6 +130,7 @@ const typography = (size: number, fallbackColor: string, look: Look) => ({
   size: range(0.01, POSTER_TYPE_MAX, 0.005, size, 'Size', Group.Style),
   tracking: range(TYPE.tracking.min, TYPE.tracking.max, TYPE.tracking.step, look.tracking, 'Tracking', Group.Style),
   leading: range(TYPE.leading.min, TYPE.leading.max, TYPE.leading.step, look.leading, 'Leading', Group.Style),
+  textCase: choice(TEXT_CASES, 'as-typed', 'Case', Group.Style),
   stretch: range(TYPE.stretch.min, TYPE.stretch.max, TYPE.stretch.step, TYPE.stretch.fallback, 'Width axis', Group.Style),
   slant: range(TYPE.slant.min, TYPE.slant.max, TYPE.slant.step, TYPE.slant.fallback, 'Slant axis', Group.Style),
   axes: z.string().max(200).regex(AXES, "axes look like 'GRAD' 50, 'CASL' 1").default('').meta({ control: Control.Text, label: 'Other axes', group: Group.Style })
