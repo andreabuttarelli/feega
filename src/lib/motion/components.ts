@@ -83,6 +83,8 @@ const MEDIUM = 500;
 const SEMIBOLD = 600;
 
 export const HEADLINE_SIZE = 0.06;
+const HAIRLINE = 0.0002;
+const BLEED_REACH = 2;
 export const TITLE_LOOK = { weight: SEMIBOLD, tracking: -0.05 } as const;
 export const TITLE_RANGE = { weight: [MEDIUM, SEMIBOLD], tracking: [-0.07, -0.04] } as const;
 export const ALIGNS = ['left', 'center', 'right'] as const;
@@ -116,12 +118,14 @@ export const AXES = /^('[A-Za-z0-9]{4}' -?\d+(\.\d+)?)(, '[A-Za-z0-9]{4}' -?\d+(
 
 type Look = { weight?: number; tracking: number; leading: number };
 
+const POSTER_TYPE_MAX = 1.2;
+
 const typography = (size: number, fallbackColor: string, look: Look) => ({
   color: color(fallbackColor, 'Colour'),
   font: font(),
   weight: range(TYPE.weight.min, TYPE.weight.max, TYPE.weight.step, look.weight ?? REGULAR, 'Weight', Group.Style),
   italic: toggle(false, 'Italic', Group.Style),
-  size: range(0.01, 0.4, 0.005, size, 'Size', Group.Style),
+  size: range(0.01, POSTER_TYPE_MAX, 0.005, size, 'Size', Group.Style),
   tracking: range(TYPE.tracking.min, TYPE.tracking.max, TYPE.tracking.step, look.tracking, 'Tracking', Group.Style),
   leading: range(TYPE.leading.min, TYPE.leading.max, TYPE.leading.step, look.leading, 'Leading', Group.Style),
   stretch: range(TYPE.stretch.min, TYPE.stretch.max, TYPE.stretch.step, TYPE.stretch.fallback, 'Width axis', Group.Style),
@@ -338,7 +342,9 @@ export const COMPONENTS = {
         gap: range(0, 0.5, 0.001, 0, 'Gap', Group.Style),
         cap: choice(CAPS, 'butt', 'Cap', Group.Style),
         join: choice(JOINS, 'miter', 'Join', Group.Style),
-        ...layout({ y: 0.6, height: 0.004 })
+        ...layout({ y: 0.6, height: 0.004 }),
+        width: range(HAIRLINE, BLEED_REACH, 0.0001, 0.8, 'Width', Group.Layout),
+        height: range(HAIRLINE, BLEED_REACH, 0.0001, 0.004, 'Height', Group.Layout)
       })
       .strict()
   },

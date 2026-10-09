@@ -4,6 +4,7 @@ import { COMPONENTS, Control, TrackKind } from '$lib/motion/components';
 import { fieldsOf } from '$lib/motion/inspector';
 import type { MotionDoc } from '$lib/motion/doc';
 import { blocking, type QualityProblem } from '$lib/motion/direction';
+import { REFERENCE_TOOLS } from '$lib/server/web/web-tools';
 
 export const VIEW_FRAMES = 'view_frames';
 export const MAX_FRAMES_PER_VIEW = 6;
@@ -167,6 +168,35 @@ const SUMMARY_ASK = 'write the user a short summary of the video as it now stand
 
 export function selfCheckPrompt(times: number[]): string {
   return `Self-check: call ${VIEW_FRAMES} with times [${times.join(', ')}] and look at the result. If text is clipped or overflows, overlaps another element, has poor contrast or leaves the safe area, or the result lists quality problems, fix them with the editing tools; otherwise change nothing. Then, as your last message, ${SUMMARY_ASK}`;
+}
+
+export const MAX_SELF_CHECK_REFS = 3;
+
+const REFERENCE_ASK =
+  'The pictures below are the references you looked at this turn. When the frames arrive, set each one next to the reference it follows and write the difference in one line per frame: type scale (the largest type as a share of the frame height, here and there), edge bleed (does the big type run off the edge?), grid and rules, columns of small text, where the blocks of colour sit. Colour alone is not a match. Fix the biggest differences first, with the editing tools; a deliberate bleed off the edge is declared with set_visibility bleed true.';
+
+export type Reference = { mediaType: string; data: string };
+
+export function viewedReferences(messages: readonly ModelMessage[], max = MAX_SELF_CHECK_REFS): Reference[] {
+  const seen = messages.flatMap((m) =>
+    m.role !== 'tool'
+      ? []
+      : m.content.flatMap((part) => {
+          if (part.type !== 'tool-result' || !REFERENCE_TOOLS.has(part.toolName) || part.output.type !== 'content') {
+            return [];
+          }
+          return part.output.value.flatMap((v) => (v.type === 'file' && v.data.type === 'data' && typeof v.data.data === 'string' ? [{ mediaType: v.mediaType, data: v.data.data }] : []));
+        })
+  );
+  return seen.slice(-max);
+}
+
+export function checkMessage(errors: readonly QualityProblem[], times: number[], refs: readonly Reference[]): ModelMessage {
+  const ask = errors.length ? fixPrompt(errors, times) : selfCheckPrompt(times);
+  if (!refs.length) {
+    return { role: 'user', content: ask };
+  }
+  return { role: 'user', content: [{ type: 'text', text: `${ask}\n\n${REFERENCE_ASK}` }, ...refs.map((r) => ({ type: 'image' as const, image: r.data, mediaType: r.mediaType }))] };
 }
 
 export function fixPrompt(errors: readonly QualityProblem[], times: number[]): string {

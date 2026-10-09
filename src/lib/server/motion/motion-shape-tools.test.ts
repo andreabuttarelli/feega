@@ -5,6 +5,7 @@ import { composeHtml } from '$lib/motion/hyperframes/compose';
 import { FEEGA_TOKENS } from '$lib/motion/brand';
 import { MODIFIER_KINDS } from '$lib/motion/shape/modifiers';
 import { SHAPE_PRESETS } from '$lib/motion/shape/presets';
+import { Quality, docProblems } from '$lib/motion/direction';
 import { motionAgentPrompt } from './motion-prompt';
 import { Vision } from './frames';
 import { createMotionTools, type MotionSession } from './motion-tools';
@@ -98,5 +99,40 @@ describe('motion agent liquid shapes', () => {
     const prompt = motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Missing });
     expect(prompt).toContain('apply_shape_preset');
     expect(prompt).toContain('gooey');
+  });
+});
+
+describe('shape rules in px, as the doc model says', () => {
+  const inFormat = (format: MotionFormat) => {
+    const { session, run } = setup();
+    session.doc = newMotionDoc(format);
+    return { session, run };
+  };
+
+  it.each([MotionFormat.Landscape, MotionFormat.Vertical, MotionFormat.Portrait])('a 4 px rule and a full-height column are accepted in %s', async (format) => {
+    const { session, run } = inFormat(format);
+    const rule = await run('add_shape', { kind: 'rect', start: 0, props: { x: 240, y: session.doc.height / 2, width: 4, height: session.doc.height, fill: '#0a0a0a' } });
+    const flat = await run('add_shape', { kind: 'rect', start: 0, props: { x: session.doc.width / 2, y: 300, width: session.doc.width, height: 4, fill: '#0a0a0a' } });
+
+    expect(rule.ok, String(rule.error)).toBe(true);
+    expect(flat.ok, String(flat.error)).toBe(true);
+    expect(findClip(session.doc, String(rule.clip_id))!.clip.props.width).toBeCloseTo(4 / session.doc.width);
+  });
+
+  it('giant type the agent declares as a bleed is not pushed back into the safe area', async () => {
+    const { session, run } = inFormat(MotionFormat.Vertical);
+    const added = await run('add_clip', { component: 'Title', start: 0, duration: 3, props: { text: '57', size: 700, x: 900, y: 1500, width: 1080, height: 900 } });
+    expect(added.ok, String(added.error)).toBe(true);
+    const outside = () => docProblems(session.doc, { audioAssets: 0 }).filter((p) => p.kind === Quality.OutOfFrame);
+
+    expect(outside()).toHaveLength(1);
+    expect((await run('set_visibility', { clip_id: 'id1', bleed: true })).ok).toBe(true);
+    expect(outside()).toEqual([]);
+  });
+
+  it('a block that bleeds past the frame edge is accepted', async () => {
+    const { run } = inFormat(MotionFormat.Landscape);
+
+    expect((await run('add_shape', { kind: 'rect', start: 0, props: { x: 960, y: 540, width: 1000, height: 1200 } })).ok).toBe(true);
   });
 });

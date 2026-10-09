@@ -3,12 +3,12 @@ import { MotionFormat, newMotionDoc, type MotionDoc } from './doc';
 import { Side, addClip, removeClips, setTransition } from './timeline';
 import { precompose } from './precomp';
 import { Quality, SEVERITY, Severity, blocking, docProblems, frameProblems } from './direction';
-import { Forbidden } from './style';
+import { Forbidden, STYLES, Script } from './style';
 import supasitoV1 from './fixtures/supasito-v1.json';
 import { Ease, TransitionKind } from './design';
 import { builtinTemplate } from './template/builtins';
 import { insertTemplate } from './template/library';
-import { MotionStyle } from './style-model';
+import { MOTION_STYLES, MotionStyle } from './style-model';
 import { UI_KIT, UiKind } from './ui-kit/kit';
 import { writeComponent } from './custom/ops';
 import { ComponentMode } from './custom/component';
@@ -447,3 +447,19 @@ describe('a live scene in a video', () => {
   });
 });
 
+
+describe('the script gate', () => {
+  const titled = (style: MotionStyle) => must(addClip({ ...newMotionDoc(MotionFormat.Portrait), style }, { component: 'Title', from: 0, durationInFrames: SCENE, props: { text: 'Forma' } }, 't'));
+  const asksScript = (style: MotionStyle) => docProblems(titled(style), { audioAssets: 0 }).some((p) => p.kind === Quality.NoScript);
+
+  it('chiede lo script solo dove la tabella degli stili lo dichiara', () => {
+    for (const style of MOTION_STYLES) {
+      expect(asksScript(style), style).toBe(STYLES[style].script === Script.Required);
+    }
+  });
+
+  it('un esercizio di stile grafico non resta bloccato su uno script che non può avere', () => {
+    expect(asksScript(MotionStyle.Graphic)).toBe(false);
+    expect(asksScript(MotionStyle.LaunchFilm)).toBe(true);
+  });
+});

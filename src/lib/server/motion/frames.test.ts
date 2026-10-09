@@ -3,7 +3,7 @@ import type { ModelMessage } from 'ai';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { addClip } from '$lib/motion/timeline';
 import { writeComponent } from '$lib/motion/custom/ops';
-import { FrameUpload, MAX_FRAME_BYTES, MAX_FRAMES_PER_VIEW, MAX_VIEWS_PER_TURN, VIEW_FRAMES, decodeFrame, docTexts, keyFrameTimes, selfCheckDue, usageByModel, Vision, visionStep } from './frames';
+import { FrameUpload, MAX_SELF_CHECK_REFS, checkMessage, viewedReferences, MAX_FRAME_BYTES, MAX_FRAMES_PER_VIEW, MAX_VIEWS_PER_TURN, VIEW_FRAMES, decodeFrame, docTexts, keyFrameTimes, selfCheckDue, usageByModel, Vision, visionStep } from './frames';
 
 const jpeg = (bytes: number) => `data:image/jpeg;base64,${Buffer.alloc(bytes, 1).toString('base64')}`;
 
@@ -127,5 +127,35 @@ describe('billing a turn that mixed models', () => {
 
     expect(byModel.get('text')).toEqual({ inputTokens: 150, outputTokens: 20 });
     expect(byModel.get('vision')).toEqual({ inputTokens: 400, outputTokens: 10 });
+  });
+});
+
+describe('the self-check compares the frames with the references seen in the turn', () => {
+  const picture = (data: string) => ({ type: 'file' as const, mediaType: 'image/jpeg', data: { type: 'data' as const, data } });
+  const looked = (toolCallId: string, toolName: string, datas: string[]): ModelMessage => ({
+    role: 'tool',
+    content: [{ type: 'tool-result', toolCallId, toolName, output: { type: 'content', value: [{ type: 'text', text: '{}' }, ...datas.map(picture)] } }]
+  });
+  const turn: ModelMessage[] = [{ role: 'user', content: 'poster svizzero brutalista' }, looked('p', 'pinterest_search', ['A', 'B']), looked('v', 'view_images', ['C', 'D', 'E']), looked('f', VIEW_FRAMES, ['FRAME'])];
+
+  it('takes the last pictures the agent looked at, never its own frames, a few at most', () => {
+    const refs = viewedReferences(turn);
+
+    expect(refs.map((r) => r.data)).toEqual(['C', 'D', 'E'].slice(-MAX_SELF_CHECK_REFS));
+    expect(refs.map((r) => r.data)).not.toContain('FRAME');
+  });
+
+  it('with references, the check carries them and asks for a concrete diff of composition, not only colour', () => {
+    const message = checkMessage([], [1, 2], viewedReferences(turn));
+    const text = JSON.stringify(message.content);
+
+    expect(text).toContain('"type":"image"');
+    for (const asked of ['type scale', 'bleed', 'grid', 'columns']) {
+      expect(text).toContain(asked);
+    }
+  });
+
+  it('without references the check stays the plain text it was', () => {
+    expect(typeof checkMessage([], [1, 2], []).content).toBe('string');
   });
 });

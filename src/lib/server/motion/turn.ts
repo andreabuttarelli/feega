@@ -39,7 +39,7 @@ import { RevisionOutcome, listRevisions, readRevision } from '$lib/server/repos/
 import { brandSources } from '$lib/server/motion/brand-sources';
 import { storyboardStore } from '$lib/server/motion/storyboard';
 import { boardNote } from '$lib/motion/storyboard';
-import { SELF_CHECK_MAX_STEPS, SUMMARY_PROMPT, VIEW_FRAMES, Vision, deliveryBlocked, docTexts, fixPrompt, keyFrameTimes, openErrors, selfCheckPrompt, stillOpenNote, usageByModel, visionStep } from '$lib/server/motion/frames';
+import { SELF_CHECK_MAX_STEPS, SUMMARY_PROMPT, VIEW_FRAMES, Vision, deliveryBlocked, docTexts, checkMessage, keyFrameTimes, openErrors, stillOpenNote, viewedReferences, usageByModel, visionStep } from '$lib/server/motion/frames';
 import { frameStats } from '$lib/server/motion/frame-stats';
 import { awaitFrames, awaitVerdict, framesPrefix, FRAME_POLL_MS, type FrameBucket } from '$lib/server/motion/frame-store';
 import { CANVAS_ASSET_BUCKET, SIGNED_URL_TTL_S } from '$lib/server/repos/asset-storage';
@@ -377,7 +377,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
       for (let attempt = 0; attempt < MAX_DELIVERY_ATTEMPTS && !awaitsGo && steps.length && deliveryBlocked(session, vision); attempt++) {
         const errors = openErrors(session);
         const times = keyFrameTimes(session.doc);
-        await play([...conversation, { role: 'user', content: errors.length ? fixPrompt(errors, times) : selfCheckPrompt(times) }], Round.SelfCheck);
+        await play([...conversation, checkMessage(errors, times, viewedReferences(conversation))], Round.SelfCheck);
       }
       if (steps.length && !awaitsGo && !closedByModel(steps.at(-1))) {
         await play([...conversation, { role: 'user', content: SUMMARY_PROMPT }], Round.Summary);

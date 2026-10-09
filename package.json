@@ -33,8 +33,8 @@
     "test:privileges": "node scripts/privilege-harness.mjs",
     "test:stripe-grants": "node scripts/stripe-grants-harness.mjs",
     "test:gallery-rls": "node scripts/gallery-rls-harness.mjs",
-    "seed:gallery": "vite-node --config scripts/vite-node.motion.config.ts scripts/seed-gallery.ts",
-    "import:showcase": "vite-node --config scripts/vite-node.motion.config.ts scripts/import-showcase.ts",
+    "seed:gallery": "vite-node --config scripts/vite-node.config.ts scripts/seed-gallery.ts",
+    "import:showcase": "vite-node --config scripts/vite-node.config.ts scripts/import-showcase.ts",
     "db:types": "supabase gen types typescript --project-id klnswzhhgrqvbfjzioul > src/lib/database.types.ts",
     "eval:canvas": "vite-node --config scripts/vite-node.config.ts scripts/eval/canvas.ts",
     "eval:image-node": "vite-node --config scripts/vite-node.config.ts scripts/eval/image-node.ts",
@@ -45,7 +45,7 @@
     "eval:moderation": "vite-node --config scripts/vite-node.config.ts scripts/eval/moderation-edges.ts",
     "eval:people": "vite-node --config scripts/vite-node.config.ts scripts/eval/people-detector.ts",
     "docs:mcp-tools": "node scripts/mcp-inventory.mjs --write",
-    "bench:export": "vite-node --config scripts/vite-node.motion.config.ts scripts/bench/export-bench.ts --"
+    "bench:export": "vite-node --config scripts/vite-node.config.ts scripts/bench/export-bench.ts --"
   },
   "devDependencies": {
     "@internationalized/date": "^3.12.0",

@@ -1,7 +1,7 @@
 import { COMPONENTS, TrackKind, type ComponentId } from './components';
 import { clipsOf, type MotionDoc } from './doc';
 import { DEVICE, Device } from './devices';
-import { Forbidden, styleOf, styleProblems } from './style';
+import { Forbidden, STYLES, Script, styleOf, styleProblems } from './style';
 import { MotionStyle } from './style-model';
 import { UI_KIT, UI_SAFE, uiScale } from './ui-kit/kit';
 import { sampleTrack } from './sample-track';
@@ -175,7 +175,7 @@ function smallTitles(doc: MotionDoc): QualityProblem[] {
     .map((c) => ({ kind: Quality.SmallTitle, at: seconds(doc, c.from), detail: `title ${c.id} at ${seconds(doc, c.from)}s sits in a small box (${Math.round(num(c, 'width', 0.8) * 100)}% × ${Math.round(num(c, 'height', 0.4) * 100)}% of the frame): it reads small` }));
 }
 
-const SCORED: Record<MotionStyle, boolean> = { [MotionStyle.LaunchFilm]: true, [MotionStyle.AppleMinimal]: false, [MotionStyle.UiMorph]: true };
+const SCORED: Record<MotionStyle, boolean> = { [MotionStyle.LaunchFilm]: true, [MotionStyle.AppleMinimal]: false, [MotionStyle.UiMorph]: true, [MotionStyle.Graphic]: false };
 
 function silent(doc: MotionDoc, audioAssets: number): QualityProblem[] {
   const plays = doc.tracks.some((t) => t.kind === TrackKind.Audio && t.clips.length > 0);
@@ -342,14 +342,14 @@ function outOfFrame(doc: MotionDoc): QualityProblem[] {
   const edge = Math.round(EDGE_SECONDS * doc.fps);
   return placedClips(doc).flatMap((clip) => {
     const size = contentSize(clip, frame);
-    if (!size) {
+    if (!size || clip.bleed) {
       return [];
     }
     const out = heldFrames(clip, edge).filter((f) => outside(clip, size, frame, f));
     if (out.length <= OUT_FRAMES_ALLOWED) {
       return [];
     }
-    return [{ kind: Quality.OutOfFrame, at: seconds(doc, clip.from + out[0]), detail: `${clip.id} leaves the safe area (5% from each edge) for ${out.length} frames from ${seconds(doc, clip.from + out[0])}s: keep scale moves small and slow, move the camera or the position instead, or shrink it (zoom, width)` }];
+    return [{ kind: Quality.OutOfFrame, at: seconds(doc, clip.from + out[0]), detail: `${clip.id} leaves the safe area (5% from each edge) for ${out.length} frames from ${seconds(doc, clip.from + out[0])}s: keep scale moves small and slow, move the camera or the position instead, or shrink it (zoom, width). If it runs off the edge on purpose (poster type, a full-bleed block), declare it: set_visibility bleed true` }];
   });
 }
 
@@ -455,7 +455,7 @@ function stillUis(doc: MotionDoc): QualityProblem[] {
 }
 
 function unscripted(doc: MotionDoc): QualityProblem[] {
-  return SCORED[styleOf(doc)] && !doc.script && everyClip(doc).length ? [{ kind: Quality.NoScript, detail: 'no research and script saved: for a launch film or trailer, write_script first (problem, struggle, flow, sourced proof, promise) and build that' }] : [];
+  return STYLES[styleOf(doc)].script === Script.Required && !doc.script && everyClip(doc).length ? [{ kind: Quality.NoScript, detail: 'no research and script saved: for a launch film or trailer, write_script first (problem, struggle, flow, sourced proof, promise) and build that' }] : [];
 }
 
 const CUT_QUALITY: Record<CutFault, Quality> = {

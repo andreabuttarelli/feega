@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { test as base, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
+import { purgeStorage, type StoragePort } from './storage-purge';
 
 /**
  * LA SESSIONE USA-E-GETTA CHE OGNI SPEC `@real` COSTRUISCE SOPRA. Stesso pattern di
@@ -22,8 +23,6 @@ export type E2eSession = {
   canvasId: string;
   canvasName: string;
 };
-
-const UPLOAD_BUCKET = 'canvas-assets';
 
 /** Abbondante per qualunque scenario reale della suite: una generazione di testo costa ~14 crediti. */
 export const E2E_ORG_CREDITS = 5000;
@@ -88,17 +87,22 @@ export async function createE2eSession(opts: { withCredits?: boolean } = {}): Pr
   return { userId, email, password, orgId, projectId, canvasId, canvasName };
 }
 
-/** Cancella nell'ordine giusto: la org porta via progetto e tela per cascata, lo Storage no —
- *  vive fuori da Postgres e va ripulito a parte, sul prefisso `${orgId}/${projectId}/`. L'utente
- *  resta per ultimo perché `auth.users` non è nello schema pubblico. */
+const LIST_PAGE = 1000;
+
+function storageOf(db: SupabaseClient): StoragePort {
+  return {
+    buckets: async () => ((await checked(db.storage.listBuckets())) ?? []).map((b) => b.name),
+    list: async (bucket, prefix) => ((await checked(db.storage.from(bucket).list(prefix, { limit: LIST_PAGE }))) ?? []).map((e) => ({ name: e.name, folder: e.id === null })),
+    remove: async (bucket, paths) => {
+      await checked(db.storage.from(bucket).remove(paths));
+    }
+  };
+}
+
 export async function teardownE2eSession(session: E2eSession): Promise<void> {
   const db = adminClient();
 
-  const { data: files } = await db.storage.from(UPLOAD_BUCKET).list(`${session.orgId}/${session.projectId}`);
-  if (files?.length) {
-    const paths = files.map((f) => `${session.orgId}/${session.projectId}/${f.name}`);
-    await db.storage.from(UPLOAD_BUCKET).remove(paths);
-  }
+  await purgeStorage(storageOf(db), [session.orgId, session.userId, `colours/${session.orgId}`]);
 
   await db.from('orgs').delete().eq('id', session.orgId);
   await db.auth.admin.deleteUser(session.userId);
