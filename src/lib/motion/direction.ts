@@ -15,6 +15,7 @@ import { liveComponents, liveNote } from './custom/determinism';
 import { maskAt } from './ui-focus';
 import { MaskKind } from './mask';
 import { pivotBox } from './parent';
+import { Instrument } from './sound/score';
 
 export enum Quality {
   RepeatedLayout = 'repeated-layout',
@@ -39,7 +40,8 @@ export enum Quality {
   NoHold = 'no-hold',
   ScriptDrift = 'script-drift',
   BackgroundSeam = 'background-seam',
-  LiveScene = 'live-scene'
+  LiveScene = 'live-scene',
+  Unaccented = 'unaccented'
 }
 
 export enum Severity {
@@ -73,6 +75,7 @@ export const SEVERITY: Record<Check, Severity> = {
   [Quality.ScriptDrift]: Severity.Blocking,
   [Quality.BackgroundSeam]: Severity.Warning,
   [Quality.LiveScene]: Severity.Warning,
+  [Quality.Unaccented]: Severity.Warning,
   [Forbidden.Particles]: Severity.Warning,
   [Forbidden.Glow]: Severity.Warning,
   [Forbidden.Rotation]: Severity.Warning,
@@ -186,6 +189,32 @@ function silent(doc: MotionDoc, audioAssets: number): QualityProblem[] {
     return [{ kind: Quality.Silent, detail: 'the project has music the video never plays' }];
   }
   return SCORED[styleOf(doc)] ? [{ kind: Quality.Silent, detail: 'the launch film has no music: add_music lays a track under it (pick mood and bpm), then cut on its beats' }] : [];
+}
+
+const BEDS: ReadonlySet<Instrument> = new Set([Instrument.Pad, Instrument.Tone]);
+const ACCENT_LEAD_FRAMES = 2;
+const ACCENT_REACH_S = 1;
+
+function accented(doc: MotionDoc, cut: number): boolean {
+  const voices = new Map((doc.sound?.score.voices ?? []).map((v) => [v.id, v.instrument]));
+  return (doc.sound?.score.events ?? []).some((e) => {
+    const instrument = voices.get(e.voice);
+    const start = e.at * doc.fps;
+    const end = (e.at + Math.min(e.duration, ACCENT_REACH_S)) * doc.fps;
+    return instrument !== undefined && !BEDS.has(instrument) && start - ACCENT_LEAD_FRAMES <= cut && cut <= end;
+  });
+}
+
+function unaccented(doc: MotionDoc, list: Clip[][]): QualityProblem[] {
+  if (!SCORED[styleOf(doc)]) {
+    return [];
+  }
+  const missing = list.slice(1).map((scene) => scene[0].from).filter((cut) => !accented(doc, cut));
+  if (!missing.length) {
+    return [];
+  }
+  const times = missing.map((f) => seconds(doc, f));
+  return [{ kind: Quality.Unaccented, at: times[0], detail: `cuts with no sound accent at ${times.join(', ')}s: compose_sound puts a whoosh into each cut (or a hit on it), subtle under the music` }];
 }
 
 const everyClip = (doc: MotionDoc) => [doc.tracks, ...Object.values(doc.comps).map((c) => c.tracks)].flatMap((tracks) => tracks.flatMap((t) => t.clips as Clip[]));
@@ -512,7 +541,7 @@ function liveScenes(doc: MotionDoc): QualityProblem[] {
 export function docProblems(doc: MotionDoc, input: { audioAssets: number; pixels?: Pixels; logos?: readonly string[] }): QualityProblem[] {
   const list = scenes(doc);
   const pixels = input.pixels ?? {};
-  return [...unscripted(doc), ...drifted(doc), ...clickMisses(doc), ...emptyUis(doc), ...stillUis(doc), ...repeated(doc, list), ...smallTitles(doc), ...silent(doc, input.audioAssets), ...softPictures(doc, pixels), ...croppedScreens(doc, pixels), ...alteredLogos(doc, new Set(input.logos ?? [])), ...outOfFrame(doc), ...tiltedText(doc), ...emptyFrames(doc), ...trailingEmpty(doc), ...smallLogos(doc, pixels), ...cutsMidAnimation(doc), ...backgroundSeams(doc), ...liveScenes(doc), ...styleProblems(doc).map((p) => ({ kind: Quality.OffStyle, at: p.at, effect: p.effect, detail: p.detail }))];
+  return [...unscripted(doc), ...drifted(doc), ...clickMisses(doc), ...emptyUis(doc), ...stillUis(doc), ...repeated(doc, list), ...smallTitles(doc), ...silent(doc, input.audioAssets), ...softPictures(doc, pixels), ...croppedScreens(doc, pixels), ...alteredLogos(doc, new Set(input.logos ?? [])), ...outOfFrame(doc), ...tiltedText(doc), ...emptyFrames(doc), ...trailingEmpty(doc), ...smallLogos(doc, pixels), ...cutsMidAnimation(doc), ...backgroundSeams(doc), ...liveScenes(doc), ...unaccented(doc, list), ...styleProblems(doc).map((p) => ({ kind: Quality.OffStyle, at: p.at, effect: p.effect, detail: p.detail }))];
 }
 
 export function frameProblems(stats: readonly FrameStat[]): QualityProblem[] {

@@ -35,6 +35,7 @@ import { analyzeSounds, storageAnalysis } from '$lib/server/motion/audio-analysi
 import { motionAgentPrompt } from '$lib/server/motion/motion-prompt';
 import { speakVoiceover } from '$lib/server/motion/voiceover';
 import { layMusic } from '$lib/server/motion/music';
+import { storeSound } from '$lib/server/motion/sound';
 import { RevisionOutcome, listRevisions, readRevision } from '$lib/server/repos/motion-revisions';
 import { brandSources } from '$lib/server/motion/brand-sources';
 import { storyboardStore } from '$lib/server/motion/storyboard';
@@ -196,6 +197,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
     analysis: async (assetId) => (await analyzeSounds(storageAnalysis(db), { orgId, projectId: project.id }, assets, [assetId]))[assetId] ?? null,
     voiceover: (voice) => withOrgContext(orgId, () => speakVoiceover(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, actor }, voice)),
     music: (ask) => withOrgContext(orgId, () => layMusic(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, actor }, ask)),
+    sound: (score, seconds) => storeSound(db, { orgId, projectId: project.id, nodeId: motion.record.id }, score, seconds),
     frames: async (callId, times) => {
       const review = await screenModelInput(db, { profile: ModerationProfile.Standard, texts: docTexts(session.doc), scope: moderationScope });
       if (!review.ok) {

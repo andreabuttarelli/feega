@@ -186,6 +186,15 @@ motion
   });
 
 motion
+  .command('sound <nodeId> <file>')
+  .description('Write the sound design of a video from a JSON score { seed, voices, events }: whooshes, hits, risers, clicks, pads')
+  .option('--org <slug>', 'Org, if you belong to more than one')
+  .action(async (nodeId: string, file: string, opts) => {
+    const { cmdMotionSound } = await import('./commands/motion.ts');
+    await cmdMotionSound(nodeId, file, opts);
+  });
+
+motion
   .command('revisions <nodeId>')
   .description('List the saved versions of a video, or put one back as a new version (free)')
   .option('--restore <version>', 'Restore this version; history is kept')

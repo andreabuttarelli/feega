@@ -174,3 +174,10 @@ export async function cmdMotionStoryboard(nodeId: string, opts: { org?: string; 
     console.log(`\n[${c.node_id}]${c.clip_ids.length ? ` clips ${c.clip_ids.join(',')}` : ''}\n${c.text}`);
   }
 }
+
+export async function cmdMotionSound(nodeId: string, file: string, opts: { org?: string }) {
+  const bearer = await token();
+  const score = JSON.parse(await readFile(file, 'utf8')) as Record<string, unknown>;
+  const out = await motionApi.writeSound(bearer, nodeId, score, opts.org);
+  console.log(`Sound design written: ${String(out.events)} events, version ${String(out.version)}.`);
+}

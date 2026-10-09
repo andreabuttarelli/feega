@@ -13,6 +13,7 @@ import { UI_KIT, UiKind } from './ui-kit/kit';
 import { writeComponent } from './custom/ops';
 import { ComponentMode } from './custom/component';
 import { Isolate, focusUi } from './ui-focus';
+import { Instrument, soundScoreSchema } from './sound/score';
 
 function must(r: { ok: true; doc: MotionDoc } | { ok: false; error: string }): MotionDoc {
   if (!r.ok) {
@@ -444,6 +445,39 @@ describe('a live scene in a video', () => {
 
     expect(live).toEqual([expect.objectContaining({ at: 1, detail: expect.stringContaining('export it as Embed') })]);
     expect(blocking(live)).toEqual([]);
+  });
+});
+
+describe('sound accents', () => {
+  const cutFilm = () => {
+    let doc: MotionDoc = { ...newMotionDoc(MotionFormat.Landscape), style: MotionStyle.LaunchFilm };
+    for (const [i, from] of [0, 90].entries()) {
+      const out = addClip(doc, { component: 'Title', from, durationInFrames: 90, props: { text: `scene ${i}` } }, `t${i}`);
+      doc = out.ok ? out.doc : doc;
+    }
+    return doc;
+  };
+  const scored = (doc: MotionDoc, at: number, instrument = Instrument.Whoosh) => ({
+    ...doc,
+    sound: { score: soundScoreSchema.parse({ voices: [{ id: 'v', instrument }], events: [{ voice: 'v', at, duration: 0.6 }] }), assetId: 'a', clipId: 'c' }
+  });
+  const accents = (doc: MotionDoc) => docProblems(doc, { audioAssets: 1 }).filter((p) => p.kind === Quality.Unaccented);
+
+  it('a launch film cut with no sound accent is named, as a warning', () => {
+    expect(accents(cutFilm())).toEqual([expect.objectContaining({ at: 3 })]);
+    expect(SEVERITY[Quality.Unaccented]).toBe(Severity.Warning);
+  });
+
+  it('a whoosh into the cut accents it', () => {
+    expect(accents(scored(cutFilm(), 2.7))).toEqual([]);
+  });
+
+  it('a pad under the cut is not an accent', () => {
+    expect(accents(scored(cutFilm(), 2.7, Instrument.Pad))).toHaveLength(1);
+  });
+
+  it('a calm film is not asked for accents', () => {
+    expect(accents({ ...cutFilm(), style: MotionStyle.AppleMinimal })).toEqual([]);
   });
 });
 

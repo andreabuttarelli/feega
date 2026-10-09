@@ -151,6 +151,11 @@ transform. A hard cut is a deliberate exception on the beat.
 
 Every launch video has music, cut on its beats. Generated in production (ElevenLabs), from the
 internal CC0 library otherwise, always with its licence recorded.
+- Sound design sits under the music, never over it: a whoosh into each cut, a hit or sub drop
+  on a peak, a riser that ends on the reveal, a click on every UI tap, a pad under a held scene.
+  Accents mark cuts and peaks, not every beat.
+- It is synthesised, not sampled: a seeded score rendered offline, so preview and export are the
+  same samples. A launch film cut with no accent is flagged by the quality gate (`unaccented`).
 
 ## 3. where it lives
 
