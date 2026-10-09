@@ -131,7 +131,7 @@ export function liveBrowser(scope: Metered): OpenBrowser | null {
     const meter = (use: BrowserlessUse) => logged(scope, { label: BROWSERLESS_LABEL, provider: 'browserless', model: BROWSERLESS_MODEL, ms: use.ms, usd: use.usd, units: use.units });
     return browserless({ key, base: env.BROWSERLESS_BASE_URL?.trim() || undefined }, { connect: connectBrowserless, meter });
   }
-  return serverFramesOpen() ? localBrowser(chromiumPage) : null;
+  return serverFramesOpen() ? localBrowser(() => chromiumPage()) : null;
 }
 
 function meteredExa(scope: Metered, key: string): SiteStrategy {
