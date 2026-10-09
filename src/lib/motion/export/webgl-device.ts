@@ -759,8 +759,6 @@ type Shot = { bitmap?: ImageBitmap; tree?: LayerTree; sheets?: ImageBitmap[] };
 export function frameOf(shot: Shot): ImageBitmap {
   const gpu = shot.tree && shot.sheets ? sharedGpu() : null;
   if (gpu && shot.tree && shot.sheets) {
-    const show = (n: LayerTree['root'], depth: string): string => `${depth}[${n.paints.map((p) => (p.kind === 'sheet' ? `s${p.sheet}:${Math.round(p.at[4])},${Math.round(p.at[5])} ${Math.round(p.width)}x${Math.round(p.height)}` : 'fill')).join(' ')}] o${n.opacity} ${n.blend} fx:${n.effects.map((e) => e.kind + (e.kind === 'blur' ? e.sigma : '')).join(',')} m${n.masks.length} c${n.clip ? 1 : 0}\n${n.children.map((c) => show(c, depth + '  ')).join('')}`;
-    console.log('DBGTREE pad', shot.tree.pad, '\n' + show(shot.tree.root, ''));
     return composite(gpu.device(shot.sheets, shot.tree.width, shot.tree.height, shot.tree.pad), shot.tree);
   }
   if (!shot.bitmap) {
