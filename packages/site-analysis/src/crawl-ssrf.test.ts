@@ -12,7 +12,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 vi.mock('node:dns/promises', () => ({ lookup: vi.fn() }));
 
 import { lookup } from 'node:dns/promises';
-import { extractColorsFromImage, fetchPage, fetchShopifyProducts, loadPageHtml } from './crawl';
+import { entryProbe, extractColorsFromImage, fetchPage, fetchShopifyProducts, loadPageHtml } from './crawl';
 
 const PUBLIC_ADDRESS = '93.184.216.34';
 const LOOPBACK = '127.0.0.1';
@@ -162,5 +162,23 @@ describe('il crawler continua a leggere i siti veri', () => {
 
     expect(await fetchPage('https://nowhere.example/')).toBe('');
     expect(dialled).toEqual([]);
+  });
+});
+
+describe('entryProbe', () => {
+  it('follows a public redirect hop by hop to its destination', async () => {
+    resolvesTo({ 'shop.example': PUBLIC_ADDRESS, 'brand.example': PUBLIC_ADDRESS });
+    const dialled = servesEverything({ 'http://shop.example/': 'https://brand.example/' });
+
+    expect(await entryProbe('http://shop.example/')).toEqual({ tlsError: false, finalUrl: 'https://brand.example/' });
+    expect(dialled).toEqual(['http://shop.example/', 'https://brand.example/']);
+  });
+
+  it.each([`http://${METADATA}/latest/meta-data/`, 'http://localhost/', 'https://rebind.example.com/'])('refuses a redirect to an internal address: %s', async (target) => {
+    resolvesTo({ 'shop.example': PUBLIC_ADDRESS, [METADATA]: METADATA, localhost: LOOPBACK, 'rebind.example.com': LOOPBACK });
+    const dialled = servesEverything({ 'http://shop.example/': target });
+
+    expect(await entryProbe('http://shop.example/')).toEqual({ tlsError: false, finalUrl: null });
+    expect(dialled).toEqual(['http://shop.example/']);
   });
 });

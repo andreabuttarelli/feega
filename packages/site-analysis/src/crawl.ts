@@ -921,8 +921,38 @@ const TLS_ERROR_CODES = new Set([
     'ERR_SSL_WRONG_VERSION_NUMBER',
 ]);
 
-const defaultEntryProbe: EntryProbe = async (url) => {
-    if (!(await isUrlSafeToFetch(url))) return { tlsError: false, finalUrl: null };
+const ENTRY_MAX_REDIRECTS = 5;
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+const UNREACHED = { tlsError: false, finalUrl: null };
+
+export const entryProbe: EntryProbe = async (url) => {
+    const deadline = AbortSignal.timeout(FETCH_TIMEOUT_MS);
+    let current = url;
+
+    try {
+        for (let hop = 0; hop <= ENTRY_MAX_REDIRECTS; hop++) {
+            if (!(await isUrlSafeToFetch(current))) {
+                return UNREACHED;
+            }
+
+            const res = await fetch(current, {
+                signal: deadline,
+                redirect: 'manual',
+                headers: { 'User-Agent': 'Mozilla/5.0 (compatible; DalNullaBot/1.0)' },
+            });
+            const location = res.headers.get('location');
+            if (!REDIRECT_STATUSES.has(res.status) || !location) {
+                return { tlsError: false, finalUrl: current };
+            }
+
+            current = new URL(location, current).href;
+        }
+        return UNREACHED;
+    } catch (e) {
+        const code = String((e as { cause?: { code?: unknown } })?.cause?.code ?? '');
+        return { tlsError: TLS_ERROR_CODES.has(code), finalUrl: null };
+    }
+};
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     try {
@@ -952,7 +982,7 @@ const defaultEntryProbe: EntryProbe = async (url) => {
  * nascosto: l'indirizzo torna quello di partenza e l'analisi fallisce onestamente, perché
  * analizzare in chiaro un sito che l'utente crede protetto è una decisione sua, non nostra.
  */
-export async function resolveEntryUrl(url: string, probe: EntryProbe = defaultEntryProbe): Promise<string> {
+export async function resolveEntryUrl(url: string, probe: EntryProbe = entryProbe): Promise<string> {
     if (!/^https:\/\//i.test(url)) return url;
 
     const { tlsError } = await probe(url);
