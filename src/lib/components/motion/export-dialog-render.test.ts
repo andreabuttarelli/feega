@@ -7,7 +7,7 @@ import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
 import { FEEGA_TOKENS } from '$lib/motion/brand';
 import { RenderQueue } from '$lib/motion/server-render';
 import { Reaction } from '$lib/motion/interactive/summary';
-import { DEFAULT_INTERACTIVE } from '$lib/motion/interactive/settings';
+import { DEFAULT_INTERACTIVE, PlayMode } from '$lib/motion/interactive/settings';
 import { addClip, type OpResult } from '$lib/motion/timeline';
 import { writeComponent } from '$lib/motion/custom/ops';
 import { ComponentMode } from '$lib/motion/custom/component';
@@ -126,6 +126,18 @@ describe('the embed path discloses step by step', () => {
     expect(body).toContain('data-testid="interactive-copy-snippet"');
     expect(body).toContain('data-testid="interactive-download"');
     expect(body).toContain('data-testid="interactive-weight"');
+  });
+
+  it('a scrub embed shows the scroll story length and what it means', () => {
+    const body = embed({ settings: { ...DEFAULT_INTERACTIVE, playback: PlayMode.Scrub, scrollLength: 4 } });
+
+    expect(body).toContain('Scroll story');
+    expect(body).toContain('data-testid="interactive-scroll-length"');
+    expect(body).toContain('The section is 4 screens tall; the video plays as the visitor scrolls through it');
+  });
+
+  it('other playbacks have no scroll length', () => {
+    expect(embed()).not.toContain('data-testid="interactive-scroll-length"');
   });
 });
 

@@ -8,6 +8,7 @@ const store = vi.hoisted(() => ({
   caller: null as null | Record<string, unknown>,
   head: 2 as number | null,
   mode: 'standard',
+  playback: 'autoplay',
   files: new Map<string, string>()
 }));
 
@@ -41,7 +42,7 @@ vi.mock('$lib/server/repos/motion-revisions', async (importOriginal) => ({
       return null;
     }
     const { newMotionDoc, MotionFormat } = await import('$lib/motion/doc');
-    return { version: store.head, doc: newMotionDoc(MotionFormat.Landscape), summary: null, actorKind: 'user' };
+    return { version: store.head, doc: { ...newMotionDoc(MotionFormat.Landscape), interactive: { loop: false, outside: 'fallback', playback: store.playback } }, summary: null, actorKind: 'user' };
   }
 }));
 
@@ -59,6 +60,7 @@ beforeEach(() => {
   store.caller = { db: { storage: { from: () => bucket } }, orgId: ORG, userId: 'u-1', apiKeyId: 'key-1', writeAllowed: true };
   store.head = 2;
   store.mode = ProjectMode.Standard;
+  store.playback = 'autoplay';
   store.files.clear();
 });
 
@@ -81,6 +83,15 @@ describe('/api/v1/motion/[nodeId]/embed', () => {
     const after = await (await call(route.GET as Handler, 'GET')).json();
     expect(after.published).toBe(true);
     expect(after.snippet).toContain(after.url);
+  });
+
+  it('hands a scrub video the scroll-story wrapper, the same on publish and on read', async () => {
+    store.playback = 'scrub';
+    const published = await (await call(route.POST as Handler, 'POST')).json();
+    const read = await (await call(route.GET as Handler, 'GET')).json();
+
+    expect(published.snippet.startsWith('<div data-scroll="3">')).toBe(true);
+    expect(read.snippet).toBe(published.snippet);
   });
 
   it('unpublishes', async () => {

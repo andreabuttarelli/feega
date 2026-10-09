@@ -5,7 +5,7 @@
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import type { MotionDoc } from '$lib/motion/doc';
   import { BUNDLE_FILE, type InteractiveBundle } from '$lib/motion/interactive/bundle';
-  import { OUTSIDES, PLAY_MODES, PLAY_MODE_LABEL, Outside, type Interactive } from '$lib/motion/interactive/settings';
+  import { OUTSIDES, PLAY_MODES, PLAY_MODE_LABEL, Outside, PlayMode, SCROLL_LENGTH, type Interactive } from '$lib/motion/interactive/settings';
   import { REACTION_LABEL, type Reaction } from '$lib/motion/interactive/summary';
 
   type Hosted = { published: boolean; url: string };
@@ -85,6 +85,19 @@
     {/if}
     {#if onpresets}<button type="button" class="link" onclick={onpresets} data-testid="interactive-presets">Interactive presets</button>{/if}
   </section>
+
+  {#if settings.playback === PlayMode.Scrub}
+    <section class="story" data-testid="interactive-scroll-story">
+      <label class="row">
+        <h3>Scroll story</h3>
+        <span class="length">
+          <input type="range" min={SCROLL_LENGTH.min} max={SCROLL_LENGTH.max} step="1" bind:value={settings.scrollLength} data-testid="interactive-scroll-length" />
+          <b>{settings.scrollLength} screens</b>
+        </span>
+      </label>
+      <p class="hint">The section is {settings.scrollLength} screens tall; the video plays as the visitor scrolls through it.</p>
+    </section>
+  {/if}
 
   {#if error}<p class="warn" role="alert">{error}</p>{/if}
 
@@ -195,6 +208,23 @@
     padding: 4px 10px;
     background: var(--ui-accent-wash);
     color: var(--ui-accent);
+  }
+
+  .story {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-space-2);
+  }
+
+  .length {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--ui-space-3);
+    color: var(--ui-ink);
+  }
+
+  .length input {
+    accent-color: var(--ui-accent);
   }
 
   .hint {

@@ -27,7 +27,7 @@
   let hosting = $state(false);
   let updated = $state(false);
   const embedEndpoint = $derived(`${editorUrl}/embed`);
-  const hostedSnippet = $derived(hosted?.published ? embedSnippet(doc, hosted.url) : '');
+  const hostedSnippet = $derived(hosted?.published ? embedSnippet({ ...doc, interactive: settings }, hosted.url) : '');
   const reactions = $derived(reactionsOf({ ...doc, interactive: settings }));
   const blobs = new Map<string, Promise<Blob>>();
   const fetchBlob = (url: string) => {

@@ -61,7 +61,8 @@ import { addNull, nullFromSelection, setParent, setParentOpacity } from '$lib/mo
 import { setCameraExpression, setExpression } from '$lib/motion/expression/ops';
 import { EXPRESSION_GUIDE } from '$lib/motion/expression/guide';
 import { INTERACTIVE_PRESETS, PRESET, applyInteractivePreset, setInteractive } from '$lib/motion/interactive/presets';
-import { OUTSIDES, PLAY_MODES, interactiveOf } from '$lib/motion/interactive/settings';
+import { OUTSIDES, PLAY_MODES, SCROLL_LENGTH, interactiveOf } from '$lib/motion/interactive/settings';
+import { interactiveSchema } from '$lib/motion/interactive/schema';
 import { liveLanes } from '$lib/motion/interactive/spec';
 import { embedSnippet } from '$lib/motion/interactive/bundle';
 import { flattenComps } from '$lib/motion/precomp';
@@ -1184,9 +1185,9 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_interactive: tool({
-      description: `How the interactive web export plays: playback ${PLAY_MODES.join('|')} (in-view plays while on screen, scrub ties the playhead to the embed travel through the viewport, or through a data-scroll="N" wrapper N viewports long; opened alone the embed scrolls itself), loop, and outside ${OUTSIDES.join('|')}: what a precomp reads when the cursor leaves its box (fallback = default pose, hold = last value).`,
-      inputSchema: z.object({ playback: z.enum(PLAY_MODES).optional(), loop: z.boolean().optional(), outside: z.enum(OUTSIDES).optional() }),
-      execute: async (input) => apply(setInteractive(session.doc, Object.fromEntries(Object.entries(input).filter(([, v]) => v !== undefined))), 'changed interactive playback')
+      description: `How the interactive web export plays: playback ${PLAY_MODES.join('|')} (in-view plays while on screen, scrub ties the playhead to the scroll through a section scroll_length viewports tall (${SCROLL_LENGTH.min}..${SCROLL_LENGTH.max}, default ${SCROLL_LENGTH.default}) that the embed snippet already wraps it in; opened alone the embed scrolls itself), loop, and outside ${OUTSIDES.join('|')}: what a precomp reads when the cursor leaves its box (fallback = default pose, hold = last value).`,
+      inputSchema: z.object({ playback: z.enum(PLAY_MODES).optional(), loop: z.boolean().optional(), outside: z.enum(OUTSIDES).optional(), scroll_length: interactiveSchema.shape.scrollLength.unwrap().optional() }),
+      execute: async ({ scroll_length, ...input }) => apply(setInteractive(session.doc, Object.fromEntries(Object.entries({ ...input, scrollLength: scroll_length }).filter(([, v]) => v !== undefined))), 'changed interactive playback')
     }),
 
     export_interactive: tool({
