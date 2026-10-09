@@ -8,7 +8,11 @@ export type ParticleBake = { id: string; from: number; fps: number; width: numbe
 
 export type Particle = { x: number; y: number; size: number; angle: number; r: number; g: number; b: number; alpha: number; softness: number };
 
-export function particlesAt(bake: ParticleBake, t: number): Particle[] {
+type Traits = { life: number; ox: number; oy: number; vx: number; vy: number; grow: number; turn: number; phase: number };
+
+export type ParticleMemo = Map<number, Traits>;
+
+export function particlesAt(bake: ParticleBake, t: number, memo: ParticleMemo = new Map()): Particle[] {
   const LIMIT = 4000;
   const STILL = 1e-6;
   const TAU = Math.PI * 2;
@@ -36,6 +40,24 @@ export function particlesAt(bake: ParticleBake, t: number): Particle[] {
     }
   };
 
+  const remember = (row: ParticleRow, n: number): Traits => {
+    const [ox, oy] = spawn[bake.emitter](row, n);
+    const heading = (row.direction + row.spread * (rand(n, 4) - 0.5)) * DEGREE;
+    const speed = row.speed * (1 + row.speedVariance * signed(n, 5)) * bake.unit;
+    const traits = {
+      life: row.life * (1 + row.lifeVariance * signed(n, 3)),
+      ox,
+      oy,
+      vx: Math.cos(heading) * speed,
+      vy: Math.sin(heading) * speed,
+      grow: 1 + row.sizeVariance * signed(n, 7),
+      turn: rand(n, 8) * 360,
+      phase: rand(n, 6)
+    };
+    memo.set(n, traits);
+    return traits;
+  };
+
   const longest = Math.max(...bake.rows.map((row) => row.life * (1 + row.lifeVariance)));
   const reach = Math.ceil(longest * bake.fps) + 1;
   const first = bake.prewarm ? -reach : 0;
@@ -53,29 +75,24 @@ export function particlesAt(bake: ParticleBake, t: number): Particle[] {
     }
     for (let n = Math.ceil(born); n < total && out.length < LIMIT; n++) {
       const age = (t - (f + (n - born) / perFrame)) / bake.fps;
-      const life = row.life * (1 + row.lifeVariance * signed(n, 3));
+      const { life, ox, oy, vx, vy, grow, turn, phase } = memo.get(n) ?? remember(row, n);
       if (age < 0 || age >= life) {
         continue;
       }
       const p = age / life;
-      const [ox, oy] = spawn[bake.emitter](row, n);
-      const heading = (row.direction + row.spread * (rand(n, 4) - 0.5)) * DEGREE;
-      const speed = row.speed * (1 + row.speedVariance * signed(n, 5)) * bake.unit;
-      const vx = Math.cos(heading) * speed;
-      const vy = Math.sin(heading) * speed;
       const gravity = row.gravity * bake.unit;
       const drag = row.drag;
       const decay = drag > STILL ? Math.exp(-drag * age) : 1;
       const travelled = drag > STILL ? (1 - decay) / drag : age;
       const fall = drag > STILL ? (gravity / drag) * (age - travelled) : 0.5 * gravity * age * age;
-      const sway = row.wobble * bake.unit * Math.sin(TAU * (row.wobbleRate * age + rand(n, 6)));
+      const sway = row.wobble * bake.unit * Math.sin(TAU * (row.wobbleRate * age + phase));
       const fallSpeed = drag > STILL ? (gravity / drag) * (1 - decay) : gravity * age;
-      const turned = bake.shape === 'streak' ? Math.atan2(vy * decay + fallSpeed, vx * decay) : (rand(n, 8) * 360 + row.spin * age) * DEGREE;
+      const turned = bake.shape === 'streak' ? Math.atan2(vy * decay + fallSpeed, vx * decay) : (turn + row.spin * age) * DEGREE;
       const mix = (a: number, b: number) => a + (b - a) * p;
       out.push({
         x: row.emitterX * bake.width + ox + vx * travelled + sway,
         y: row.emitterY * bake.height + oy + vy * travelled + fall,
-        size: Math.max(0, mix(row.sizeStart, row.sizeEnd) * bake.unit * (1 + row.sizeVariance * signed(n, 7))),
+        size: Math.max(0, mix(row.sizeStart, row.sizeEnd) * bake.unit * grow),
         angle: turned,
         r: mix(row.start[0], row.end[0]),
         g: mix(row.start[1], row.end[1]),

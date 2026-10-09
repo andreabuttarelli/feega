@@ -59,14 +59,14 @@ export function particleScript(bakes: readonly ParticleBake[], fps: number, dura
   }
   return `<script>(function(){${hotScope(PARTICLE_TIMELINE)}const PT_AT=(${particlesAt.toString()});const PT_DRAW=(${drawParticles.toString()});const PT_GLOWS=(${glowTiles.toString()})(function(){return document.createElement('canvas');});
 const B=${js(bakes)};
-const items=B.map(function(b){const el=document.getElementById(${js(canvasId(''))}+b.id);return {b:b,paint:el&&el.getContext('2d'),sprite:document.getElementById(${js(spriteId(''))}+b.id)};});
+const items=B.map(function(b){const el=document.getElementById(${js(canvasId(''))}+b.id);return {b:b,memo:new Map(),paint:el&&el.getContext('2d'),sprite:document.getElementById(${js(spriteId(''))}+b.id)};});
 let shown=0;
 function particlesNow(time){
   shown=time;
   items.forEach(function(it){
     if(!it.paint){return;}
     const sprite=it.sprite&&it.sprite.complete&&it.sprite.naturalWidth?it.sprite:null;
-    PT_DRAW(it.paint,PT_AT(it.b,time*${fps}-it.b.from),it.b.shape,sprite,PT_GLOWS);
+    PT_DRAW(it.paint,PT_AT(it.b,time*${fps}-it.b.from,it.memo),it.b.shape,sprite,PT_GLOWS);
   });
 }
 items.forEach(function(it){if(it.sprite){it.sprite.addEventListener('load',function(){particlesNow(shown);});}});
