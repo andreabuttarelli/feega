@@ -223,6 +223,13 @@ contenuto dipinto, non sul box — un frame "più veloce" può essere un frame v
 
 ## Ambiente e worktree
 
+### Verde in locale, rosso in CI: una chiave del `.env` sceglie il ramo
+Il `.env` copiato nel worktree porta chiavi (es. `EXA_API_KEY`) che la CI non ha: in locale il
+codice prende un altro ramo e i mock del test non vengono mai toccati. Segnale: `No "X" export is
+defined on the mock` solo in CI. Mossa: rilanciare il test con la variabile vuota
+(`EXA_API_KEY= npx vitest run …`), e costruire i client dei provider al primo uso, non alla
+creazione dei tool.
+
 ### I tempi di idratazione misurati in dev non dicono niente
 In dev Vite serve centinaia di moduli non raggruppati e compila le pagine alla prima richiesta:
 la tela «idrata» in secondi anche quando in produzione ci mette mezzo secondo, e un taglio di

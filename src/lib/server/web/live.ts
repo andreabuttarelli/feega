@@ -41,8 +41,8 @@ const ENGINES: Record<SearchEngine, () => { port: SearchPort; provider: 'exa' | 
 };
 
 export function loggedSearch(scope: Omit<WebScope, 'mode'>, engine: SearchEngine = searchEngineOf(env)): SearchPort {
-  const { port, provider, model } = ENGINES[engine]();
   return async (query, max) => {
+    const { port, provider, model } = ENGINES[engine]();
     const t0 = Date.now();
     const found = await port(query, max);
     logAiCall({
