@@ -514,7 +514,7 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
   const grouped = (items: Walked[]) => join<TreeNode, Element>(items);
   type SheetPaint = Extract<Paint, { kind: 'sheet' }>;
   type Slot = { source: HTMLCanvasElement | Picture | Run; paint: SheetPaint };
-  type Pose = { el: SVGGraphicsElement; resting: string; move: Affine; alpha: number };
+  type Pose = { rest: () => () => void; move: Affine; alpha: number };
   type Walk = { at: Place; slots: Slot[]; live: number; poses: Map<Run, Pose> };
   type Cropped = { canvas: HTMLCanvasElement; box: [number, number, number, number]; size: [number, number] } | null;
   const slotted = (w: Walk, source: Slot['source'], part: Omit<SheetPaint, 'kind' | 'sheet'>): SheetPaint => {
@@ -595,22 +595,25 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
     return m ? [m.a, m.b, m.c, m.d, m.e, m.f] : null;
   };
   const put = (el: Element, name: string, value: string | null) => (value === null ? el.removeAttribute(name) : el.setAttribute(name, value));
-  const rested = (pose: Pose | null) => {
-    if (!pose) {
-      return () => {};
-    }
-    const transform = pose.el.getAttribute('transform');
-    const opacity = pose.el.getAttribute('opacity');
-    pose.el.setAttribute('transform', pose.resting);
-    pose.el.removeAttribute('opacity');
+  const restingSvg = (el: SVGGraphicsElement, resting: string) => () => {
+    const transform = el.getAttribute('transform');
+    const opacity = el.getAttribute('opacity');
+    el.setAttribute('transform', resting);
+    el.removeAttribute('opacity');
     return () => {
-      put(pose.el, 'transform', transform);
-      put(pose.el, 'opacity', opacity);
+      put(el, 'transform', transform);
+      put(el, 'opacity', opacity);
     };
+  };
+  const STILL = { transform: 'none', opacity: '1' };
+  const restingCss = (el: HTMLElement) => () => {
+    const saved = Object.keys(STILL).map((name) => [name, el.style.getPropertyValue(name), el.style.getPropertyPriority(name)]);
+    Object.entries(STILL).forEach(([name, value]) => el.style.setProperty(name, value, 'important'));
+    return () => saved.forEach(([name, value, priority]) => el.style.setProperty(name, value, priority));
   };
   const rigid = (only: Element, el: Element) =>
     [only, ...only.querySelectorAll('*')].every((e) => e === el || el.contains(e) || e.closest('defs') || inert(e) || (e.contains(el) && (e instanceof SVGElement || paintsNothing(e, getComputedStyle(e)))));
-  const poseOf = (run: Run, at: Place): Pose | null => {
+  const svgPose = (run: Run, at: Place): Pose | null => {
     const [only] = run.raster;
     const posed = run.raster.length === 1 ? [...only.querySelectorAll(`[${cfg.poseAttr}]`)] : [];
     const el = posed[0];
@@ -623,17 +626,47 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
     const own = (el as SVGGraphicsElement).transform.baseVal.consolidate()?.matrix;
     const scale = own ? Math.max(Math.hypot(own.a, own.b), Math.hypot(own.c, own.d)) : 1;
     const view = svg.viewBox.baseVal;
-    const pose: Pose = { el: el as SVGGraphicsElement, resting: restingPose(scale, view?.width || size[0], view?.height || size[1]), move: [1, 0, 0, 1, 0, 0], alpha: Number(el.getAttribute('opacity') ?? 1) };
-    const now = ctmOf(pose.el);
-    const back = rested(pose);
-    const rest = ctmOf(pose.el);
+    const rest = restingSvg(el as SVGGraphicsElement, restingPose(scale, view?.width || size[0], view?.height || size[1]));
+    const now = ctmOf(el as SVGGraphicsElement);
+    const back = rest();
+    const still = ctmOf(el as SVGGraphicsElement);
     back();
-    if (!now || !rest || Math.abs(box.width - size[0]) > FLAT_PX || Math.abs(box.height - size[1]) > FLAT_PX || view?.x || view?.y) {
+    if (!now || !still || Math.abs(box.width - size[0]) > FLAT_PX || Math.abs(box.height - size[1]) > FLAT_PX || view?.x || view?.y) {
       return null;
     }
     const screen: Affine = [at.sx, 0, 0, at.sy, (box.left - at.base.left) * at.sx, (box.top - at.base.top) * at.sy];
-    pose.move = chain(chain(screen, chain(now, invert(rest))), invert(screen));
-    return pose;
+    return { rest, move: chain(chain(screen, chain(now, invert(still))), invert(screen)), alpha: Number(el.getAttribute('opacity') ?? 1) };
+  };
+  const cssPose = (run: Run, at: Place): Pose | null => {
+    const [el] = run.raster;
+    const style = run.raster.length === 1 && el instanceof HTMLElement ? getComputedStyle(el) : null;
+    const moving = style && FLAT_TRANSFORM.test(style.transform) && (style.transform !== 'none' || Number(style.opacity) < 1);
+    if (!moving) {
+      return null;
+    }
+    const rest = restingCss(el as HTMLElement);
+    const now = affineOf(el, at);
+    const back = rest();
+    const still = affineOf(el, at);
+    const box = el.getBoundingClientRect();
+    back();
+    const left = (box.left - at.base.left) * at.sx;
+    const top = (box.top - at.base.top) * at.sy;
+    const inFrame = left >= 0 && top >= 0 && left + box.width * at.sx <= at.width && top + box.height * at.sy <= at.height;
+    if (!now || !still || !inFrame) {
+      return null;
+    }
+    return { rest, move: chain(now, invert(still)), alpha: Number(style.opacity) };
+  };
+  const POSES = [svgPose, cssPose];
+  const poseOf = (run: Run, at: Place): Pose | null => {
+    for (const find of POSES) {
+      const pose = find(run, at);
+      if (pose) {
+        return pose;
+      }
+    }
+    return null;
   };
   const held = (parts: (TreeNode | Run)[], w: Walk) =>
     parts.map((p) => {
@@ -753,7 +786,7 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
     return run.raster.some(alive) ? null : `${m.width}x${m.height}+${pad}|${pathStyles(pathOf(root, run))}|${run.raster.map((el) => el.outerHTML).join('')}`;
   };
   const rasterOf = async (root: HTMLElement, m: CaptureRequest, embed: string, run: Run, pad: number, pose: Pose | null) => {
-    const unpose = rested(pose);
+    const unpose = pose ? pose.rest() : () => {};
     try {
       return await rasterAt(root, m, embed, run, pad);
     } finally {
