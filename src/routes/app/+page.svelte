@@ -1,12 +1,11 @@
 <script lang="ts">
   import PageTitle from '$lib/components/PageTitle.svelte';
-  import Film from '@lucide/svelte/icons/film';
   import { onMount } from 'svelte';
   import { _ } from 'svelte-i18n';
   import { enhance } from '$app/forms';
-  import { formatLastEdited } from '$lib/canvas/format-last-edited';
-  import { TOOL_STATUS_LABEL, toolHref } from '$lib/tools';
-  import { TOOL_ICONS } from '$lib/components/app/tool-icons';
+  import VideoCard from '$lib/components/app/VideoCard.svelte';
+  import ProjectCard from '$lib/components/app/ProjectCard.svelte';
+  import type { VideoPage } from '$lib/server/dashboard/dashboard';
   import { GALLERY_PATH, byline, itemPath } from '$lib/gallery/model';
   import { BRIEF_MAX } from '$lib/motion/video-brief';
   import { ComposerKey, composerKey, rotateTemplates } from '$lib/motion/brief-composer';
@@ -22,6 +21,7 @@
   const PLACEHOLDER = 'Paste your website or describe the video you want…';
   const EXAMPLES_SHOWN = 3;
   const EXAMPLE_TURN_MS = 6000;
+  const SKELETONS = 5;
 
   let sending = $state(false);
   let brief = $state('');
@@ -30,12 +30,14 @@
   let field = $state<HTMLTextAreaElement | null>(null);
   let composer = $state<HTMLFormElement | null>(null);
   let picker = $state<HTMLInputElement | null>(null);
+  let videos = $state(data.dashboard.motions);
+  let more = $state(data.dashboard.moreVideos);
+  let loadingMore = $state(false);
 
   const uploads = $derived(data.attachProjectId ? new ChatUploads(data.attachProjectId) : null);
   const ready = $derived(uploads?.ready ?? []);
   const canSend = $derived(!sending && !uploads?.busy && (!!brief.trim() || ready.length > 0));
   const examples = $derived(rotateTemplates(data.templates, turn, EXAMPLES_SHOWN));
-  const recentProjectId = $derived(data.dashboard.projects[0]?.id ?? null);
 
   onMount(() => {
     if (matchMedia('(pointer: fine)').matches) {
@@ -53,6 +55,25 @@
     field.style.height = 'auto';
     field.style.height = composerHeight(field.scrollHeight);
   });
+
+  async function loadMore() {
+    if (!more || loadingMore) {
+      return;
+    }
+    loadingMore = true;
+    try {
+      const response = await fetch(`/app/videos?before=${encodeURIComponent(more)}`);
+      if (!response.ok) {
+        return;
+      }
+      const page: VideoPage = await response.json();
+      const seen = new Set(videos.map((v) => v.id));
+      videos = [...videos, ...page.videos.filter((v) => !seen.has(v.id))];
+      more = page.more;
+    } finally {
+      loadingMore = false;
+    }
+  }
 
   function fill(text: string) {
     brief = text;
@@ -178,86 +199,73 @@
     </div>
   </section>
 
-  {#if data.dashboard.motions.length}
-    <section aria-labelledby="videos-heading">
-      <div class="head">
-        <h2 id="videos-heading">Your videos</h2>
-      </div>
+  <a class="peek" href="#videos-heading" data-testid="home-peek">your videos <span aria-hidden="true">↓</span></a>
+
+  <section class="shelf" aria-labelledby="videos-heading">
+    <h2 id="videos-heading">your videos</h2>
+    {#if videos.length}
       <ul class="grid" data-testid="home-videos">
-        {#each data.dashboard.motions as motion (motion.id)}
-          <li>
-            <a href={motion.href} class="card">
-              <span class="poster">
-                {#if motion.poster}<img src={motion.poster} alt="" loading="lazy" />{:else}<Film size={18} strokeWidth={1.4} />{/if}
-              </span>
-              <span class="name">{motion.name}</span>
-              <span class="muted">{formatLastEdited(motion.updatedAt)}</span>
-            </a>
-          </li>
+        {#each videos as video (video.id)}
+          <li><VideoCard {video} /></li>
+        {/each}
+        {#if loadingMore}
+          {#each { length: SKELETONS } as _, i (i)}
+            <li class="skeleton" aria-hidden="true"><span></span><i></i><i></i></li>
+          {/each}
+        {/if}
+      </ul>
+      {#if more}
+        <button type="button" class="quiet more-videos" data-testid="more-videos" disabled={loadingMore} onclick={loadMore}>show more</button>
+      {/if}
+    {:else}
+      <p class="empty" data-testid="home-videos-empty">nothing here yet. <a href="#video-brief">describe your first video</a> and it lands here.</p>
+    {/if}
+  </section>
+
+  <section class="shelf" aria-labelledby="projects-heading">
+    <div class="head">
+      <h2 id="projects-heading">projects</h2>
+      <form method="POST" action="?/project">
+        <button type="submit" class="quiet" data-testid="new-project">+ new project</button>
+      </form>
+    </div>
+    {#if data.dashboard.projects.length}
+      <ul class="grid" data-testid="home-projects">
+        {#each data.dashboard.projects as project (project.id)}
+          <li><ProjectCard {project} /></li>
         {/each}
       </ul>
-    </section>
-  {/if}
+    {:else}
+      <p class="empty" data-testid="home-projects-empty">no projects yet. every video you make opens one.</p>
+    {/if}
+  </section>
 
   {#if data.gallery.length}
-    <section aria-labelledby="gallery-heading">
+    <section class="shelf" aria-labelledby="gallery-heading">
       <div class="head">
-        <h2 id="gallery-heading">Remix from the gallery</h2>
-        <a class="more" href={GALLERY_PATH} data-sveltekit-reload>All</a>
+        <h2 id="gallery-heading">remix from the gallery</h2>
+        <a class="quiet" href={GALLERY_PATH} data-sveltekit-reload>see all</a>
       </div>
-      <ul class="grid gallery" data-testid="home-gallery">
+      <ul class="row-strip" data-testid="home-gallery">
         {#each data.gallery as card (card.id)}
           <li>
-            <a href={itemPath(card.id)} class="card" data-sveltekit-reload>
-              <span class="poster">
-                {#if card.posterUrl}<img src={card.posterUrl} alt="" loading="lazy" />{:else}<Film size={18} strokeWidth={1.4} />{/if}
+            <a href={itemPath(card.id)} class="strip-card" data-sveltekit-reload>
+              <span class="strip-poster">
+                {#if card.posterUrl}<img src={card.posterUrl} alt="" loading="lazy" decoding="async" width="240" height="135" />{/if}
               </span>
-              <span class="name">{card.title}</span>
-              <span class="muted">{byline(card)}</span>
+              <span class="strip-title">{card.title}</span>
+              <span class="strip-meta">{byline(card)}</span>
             </a>
           </li>
         {/each}
       </ul>
     </section>
   {/if}
-
-  {#if data.dashboard.projects.length}
-    <section aria-labelledby="projects-heading">
-      <div class="head">
-        <h2 id="projects-heading">Projects</h2>
-      </div>
-      <ul class="projects" data-testid="home-projects">
-        {#each data.dashboard.projects as project (project.id)}
-          <li><a href={project.href} class="tool">{project.name}</a></li>
-        {/each}
-      </ul>
-    </section>
-  {/if}
-
-  <section aria-labelledby="tools-heading">
-    <div class="head">
-      <h2 id="tools-heading">More tools</h2>
-    </div>
-    <ul class="tools" data-testid="dashboard-tools">
-      {#each data.tools as tool (tool.id)}
-        {@const Icon = TOOL_ICONS[tool.icon]}
-        {@const href = toolHref(tool, recentProjectId)}
-        {@const badge = TOOL_STATUS_LABEL[tool.status]}
-        <li>
-          <svelte:element this={href ? 'a' : 'div'} class="tool" {href}>
-            <Icon size={16} strokeWidth={1.5} />
-            <span class="name">{tool.name}</span>
-            {#if badge}<span class="badge">{badge}</span>{/if}
-          </svelte:element>
-        </li>
-      {/each}
-    </ul>
-  </section>
 </div>
 
 <style>
   .home {
-    max-width: 960px;
+    max-width: 1200px;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
@@ -270,8 +278,9 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: calc(100svh - var(--hero-chrome));
-    padding-bottom: var(--hero-chrome);
+    --peek: 260px;
+    min-height: calc(100svh - var(--hero-chrome) - var(--peek));
+    padding-top: calc(var(--peek) / 2);
     text-align: center;
   }
 
@@ -414,31 +423,87 @@
     color: var(--ui-ink-3);
   }
 
+  .home .peek {
+    align-self: center;
+    margin: calc(-1 * var(--ui-space-8) - var(--ui-space-6)) 0 calc(-1 * var(--ui-space-8));
+    padding: var(--ui-space-2) var(--ui-space-3);
+    font-size: var(--ui-text-sm);
+    color: var(--ui-text-3);
+    text-decoration: none;
+    transition: color 0.14s ease;
+  }
+
+  .home .peek:hover {
+    color: var(--ui-ink);
+  }
+
+  .shelf {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-space-6);
+    scroll-margin-top: var(--ui-space-8);
+  }
+
   .head {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
-    margin-bottom: var(--ui-space-4);
+    min-height: 32px;
   }
 
   h2 {
     margin: 0;
-    font-family: var(--ui-mono);
-    font-size: var(--ui-text-xs);
-    font-weight: 400;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--ui-ink-3);
+    font-size: var(--ui-text-md);
+    font-weight: 500;
+    color: var(--ui-text-3);
   }
 
-  .more {
+  .quiet {
+    height: 32px;
+    padding: 0 var(--ui-space-3);
+    border: 0;
+    border-radius: 9999px;
+    background: transparent;
+    color: var(--ui-text-3);
+    font: inherit;
     font-size: var(--ui-text-sm);
-    color: var(--ui-ink-2);
+    line-height: 32px;
     text-decoration: none;
+    cursor: pointer;
+    transition:
+      background 0.14s ease,
+      color 0.14s ease;
   }
 
-  .more:hover {
+  .quiet:hover {
+    background: var(--ui-hover);
     color: var(--ui-ink);
+  }
+
+  .more-videos {
+    align-self: center;
+    background: var(--ui-field);
+    color: var(--ui-ink);
+    padding: 0 var(--ui-space-6);
+  }
+
+  .more-videos:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  .empty {
+    margin: 0;
+    padding: var(--ui-space-8) 0;
+    font-size: var(--ui-text-md);
+    color: var(--ui-text-3);
+  }
+
+  .empty a {
+    color: var(--ui-ink);
+    text-decoration: underline;
+    text-decoration-color: var(--ui-text-3);
+    text-underline-offset: 3px;
   }
 
   ul {
@@ -449,11 +514,47 @@
 
   .grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: var(--ui-space-6) var(--ui-space-4);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--ui-space-6) var(--ui-space-3);
   }
 
-  .card {
+  .skeleton span {
+    display: block;
+    aspect-ratio: 16 / 9;
+    margin-bottom: var(--ui-space-3);
+    background: var(--ui-surface);
+    animation: breathe 1.4s ease-in-out infinite;
+  }
+
+  .skeleton i {
+    display: block;
+    width: 70%;
+    height: 12px;
+    margin-top: 6px;
+    background: var(--ui-surface);
+    animation: breathe 1.4s ease-in-out infinite;
+  }
+
+  .skeleton i + i {
+    width: 45%;
+  }
+
+  @keyframes breathe {
+    50% {
+      opacity: 0.5;
+    }
+  }
+
+  .row-strip {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(160px, 1fr);
+    gap: var(--ui-space-3);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .strip-card {
     display: flex;
     flex-direction: column;
     gap: 2px;
@@ -461,70 +562,55 @@
     text-decoration: none;
   }
 
-  .poster {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    aspect-ratio: 16 / 10;
+  .strip-poster {
+    display: block;
+    aspect-ratio: 16 / 9;
     margin-bottom: var(--ui-space-2);
     overflow: hidden;
     background: var(--ui-surface);
-    color: var(--ui-ink-3);
   }
 
-  .poster img {
+  .strip-poster img {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    transition: opacity 120ms;
+    transition: opacity 200ms ease;
   }
 
-  .card:hover img {
+  .strip-card:hover img {
     opacity: 0.88;
   }
 
-  .name {
-    font-size: var(--ui-text-md);
-    font-weight: 500;
+  .strip-title {
     overflow: hidden;
+    font-size: var(--ui-text-sm);
+    font-weight: 500;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .muted {
-    font-size: var(--ui-text-sm);
-    color: var(--ui-ink-3);
+  .strip-meta {
+    font-size: var(--ui-text-xs);
+    color: var(--ui-text-3);
   }
 
-  .tools,
-  .projects {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--ui-space-2);
+  @media (min-width: 641px) {
+    .grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: var(--ui-space-8) var(--ui-space-4);
+    }
   }
 
-  .tool {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--ui-space-2);
-    height: 36px;
-    padding: 0 var(--ui-space-3);
-    background: var(--ui-surface);
-    color: var(--ui-ink-2);
-    text-decoration: none;
+  @media (min-width: 1280px) {
+    .grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
   }
 
-  a.tool:hover {
-    background: var(--ui-hover);
-    color: var(--ui-ink);
-  }
-
-  .badge {
-    font-family: var(--ui-mono);
-    font-size: 9px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--ui-ink-3);
+  @media (min-width: 1600px) {
+    .grid {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
   }
 
   @media (min-width: 1024px) {
@@ -544,11 +630,6 @@
 
     textarea {
       font-size: 16px;
-    }
-
-    .grid {
-      grid-template-columns: repeat(2, 1fr);
-      gap: var(--ui-space-4) var(--ui-space-2);
     }
   }
 </style>
