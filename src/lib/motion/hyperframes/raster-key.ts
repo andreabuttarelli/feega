@@ -9,3 +9,10 @@ export function neutralised(path: HTMLElement[]): () => void {
 export function pathStyles(path: HTMLElement[]): string {
   return path.map((el) => el.style.cssText).join('|');
 }
+
+export const POSE_ATTR = 'data-pose';
+
+export function restingPose(scale: number, width: number, height: number): string {
+  const STEPS = 4;
+  return `translate(${width / 2} ${height / 2}) scale(${Math.ceil(scale * STEPS) / STEPS})`;
+}
