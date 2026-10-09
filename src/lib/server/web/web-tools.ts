@@ -38,6 +38,8 @@ export type WebToolDeps = {
 
 export const WEB_TOOLS = ['web_search', 'read_page', 'read_store', 'view_images', 'screenshot_page', 'import_image', 'import_products', 'browse', 'pinterest_search', 'pinterest_pin', 'pinterest_board'] as const;
 
+export const REFERENCE_TOOLS: ReadonlySet<string> = new Set<(typeof WEB_TOOLS)[number]>(['view_images', 'pinterest_search', 'pinterest_pin', 'pinterest_board']);
+
 export const MAX_SEARCHES_PER_TURN = 8;
 export const MAX_READS_PER_TURN = 20;
 export const MAX_SHOTS_PER_TURN = 4;
