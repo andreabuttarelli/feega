@@ -2671,3 +2671,6 @@ Segnale: in Framer/Webflow/Wix/Notion il video sta rientrato di 8px, tagliato in
 
 ## `analyze_site` answers `the site answered 403` on a Cloudflare site
 Segnale: 403 da `readSite` su siti dietro Cloudflare/WAF (lovable.dev, g2.com) che in un browser si aprono. Causa: una richiesta sola con UA da bot. Mossa: la catena di `site-fetch.ts`. Su Browserless solo la rotta `/stealth` passa il challenge di lovable.dev; `/content`, `/chromium` e `/chromium/stealth` restituiscono «Just a moment...» con 200: giudica l'HTML, non lo status. `/unblock` su g2.com è rimasto appeso 139 s ignorando `timeout`: ogni chiamata a un fornitore ha un timeout nostro.
+
+### Layer 3D che spariscono da un export Safari a più lane
+Segnale: nel video esportato in WebKit alcuni canvas three.js mancano in certi frame; con una lane sola, o in un confronto di pochi frame, tutto c'è. WebKit ha un tetto di contesti WebGL vivi per pagina e butta i più vecchi; ogni lane è un iframe con i suoi canvas, e un contesto in più (es. per un effetto) li fa saltare. Mossa: nessun contesto WebGL nel codice di cattura; in WebKit una lane sola (le lane condividono il thread); verificare con un export intero (`bench:export --frames=0 --keep`) a 4 lane, non solo con `--parity`.
