@@ -6,7 +6,7 @@ import { composeHtml } from '../hyperframes/compose';
 import { LIVE_GLOBAL } from './runtime';
 import { Liveness, PlayMode } from './settings';
 import { InteractivePreset, applyInteractivePreset } from './presets';
-import { HOST_MESSAGE, PLAYER_URL, interactiveBundle } from './bundle';
+import { HOST_MESSAGE, PLAYER_URL, SELF_SCROLL, STANDALONE_MS, interactiveBundle } from './bundle';
 import { writeComponent } from '../custom/ops';
 import { ComponentMode } from '../custom/component';
 import { EVENT_MESSAGE } from '../custom/runtime';
@@ -65,6 +65,22 @@ describe('interactive web export', () => {
 
     expect(scrubbed.html).toContain('#pad{touch-action:pan-y}');
     expect(tilted.html).toContain('#pad{touch-action:none}');
+  });
+
+  it('feeds the embed its own progress through the viewport and honours a data-scroll wrapper', async () => {
+    const bundle = await interactiveBundle({ doc: card(), tokens: FEEGA_TOKENS, assetUrls: {}, title: 'Card', fetchBlob });
+
+    expect(bundle.snippet).toContain('progress');
+    expect(bundle.snippet).toContain('[data-scroll]');
+    expect(bundle.snippet).toContain('document.currentScript.previousElementSibling');
+  });
+
+  it('lets a scrub embed opened on its own scroll its own page instead of freezing', async () => {
+    const scrub = ok(applyInteractivePreset(card(), InteractivePreset.ScrollScrub, null));
+    const bundle = await interactiveBundle({ doc: scrub, tokens: FEEGA_TOKENS, assetUrls: {}, title: 'Card', fetchBlob });
+
+    expect(bundle.html).toContain(`html.${SELF_SCROLL}`);
+    expect(bundle.html).toContain(`"standaloneMs":${STANDALONE_MS}`);
   });
 
   it('keeps the composed page from closing the player script early', async () => {

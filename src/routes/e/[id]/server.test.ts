@@ -20,6 +20,18 @@ describe('/e/[id]', () => {
     expect(await res.text()).toBe('<html>clip</html>');
   });
 
+  it('serves an embed published with an older player through the current one', async () => {
+    const cfg = { html: '<p>clip</p>', width: 1920, height: 1080, duration: 24, playback: 'scrub', loop: false };
+    const legacy = `<!doctype html><html><head><title>Saturn</title></head><body><script>(function playerMain(cfg){})(${JSON.stringify(cfg).replace(/</g, '\\u003c')});</script></body></html>`;
+
+    const page = await (await open(NODE, legacy)).text();
+
+    expect(page).toContain('<title>Saturn</title>');
+    expect(page).toContain('function selfScroll');
+    expect(page).toContain('\\u003cp>clip\\u003c/p>');
+    expect(page).toContain('"standaloneMs":500');
+  });
+
   it('an unpublished embed is a 404', async () => {
     await expect(open(NODE, null)).rejects.toMatchObject({ status: 404 });
   });

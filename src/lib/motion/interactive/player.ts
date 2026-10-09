@@ -1,3 +1,5 @@
+import type { readHost, selfScroll } from './host';
+
 export type PlayerConfig = {
   html: string;
   width: number;
@@ -9,13 +11,15 @@ export type PlayerConfig = {
   inputMessage: string;
   eventMessage: string;
   hostMessage: string;
+  selfScroll: string;
+  standaloneMs: number;
   keys: { x: string; y: string; down: string; hover: string; tiltX: string; tiltY: string; scroll: string; time: string };
 };
 
 type PlayerEl = HTMLElement & { seek: (t: number) => void; play: () => void; pause: () => void; iframeElement?: HTMLIFrameElement };
 type Orientation = typeof DeviceOrientationEvent & { requestPermission?: () => Promise<string> };
 
-export function playerMain(cfg: PlayerConfig): void {
+export function playerMain(cfg: PlayerConfig, read: typeof readHost, own: typeof selfScroll): void {
   const TILT_DEGREES = 45;
   const UPRIGHT_BETA = 45;
   const el = document.getElementById('player') as PlayerEl;
@@ -90,18 +94,25 @@ export function playerMain(cfg: PlayerConfig): void {
     values[cfg.keys.tiltX] = clamp(e.gamma / TILT_DEGREES);
     values[cfg.keys.tiltY] = clamp((e.beta - UPRIGHT_BETA) / TILT_DEGREES);
   });
+  let progress: number | undefined;
+  const scrub = (p: number) => {
+    progress = p;
+    values[cfg.keys.scroll] = p;
+    if (cfg.playback === cfg.modes.scrub && ready) {
+      el.seek(p * cfg.duration);
+    }
+  };
+  const standalone = cfg.playback === cfg.modes.scrub ? own(window, cfg.standaloneMs, cfg.selfScroll, scrub) : null;
   addEventListener('message', (e: MessageEvent) => {
-    const m = e.data as { type?: string; scroll?: number; visible?: boolean };
-    if (m?.type !== cfg.hostMessage) {
+    const m = read(e.data, cfg.hostMessage);
+    if (!m) {
       return;
     }
-    if (typeof m.scroll === 'number') {
-      values[cfg.keys.scroll] = m.scroll;
-      if (cfg.playback === cfg.modes.scrub && ready) {
-        el.seek(m.scroll * cfg.duration);
-      }
+    standalone?.cancel();
+    if (m.progress !== undefined) {
+      scrub(m.progress);
     }
-    if (cfg.playback === cfg.modes.inView && typeof m.visible === 'boolean') {
+    if (cfg.playback === cfg.modes.inView && m.visible !== undefined) {
       (m.visible ? play : pause)();
     }
   });
@@ -117,6 +128,9 @@ export function playerMain(cfg: PlayerConfig): void {
   });
   el.addEventListener('ready', () => {
     ready = true;
+    if (progress !== undefined) {
+      scrub(progress);
+    }
     if (cfg.playback === cfg.modes.autoplay) {
       play();
     }
