@@ -66,7 +66,7 @@ const TRACKS: TrackSpec[] = [
 const music = (a: TemplateAssets, seconds: number, volume = 0.8): Beat | null =>
   a.musicId ? { id: 'music', track: 'music', component: 'Audio', at: 0, len: seconds, props: { assetId: a.musicId, volume, fadeIn: 0.3, fadeOut: 1.5 } } : null;
 
-const POP = { scale: [[0, 0.86], [0.3, 1, Ease.Overshoot]] } as Beat['keys'];
+const POP = { scale: [[0, 0.86], [0.3, 1, Ease.Enter]] } as Beat['keys'];
 
 function productHero(a: TemplateAssets): MotionDoc {
   const benefits = ['Feather-light foam', 'Grips any street', 'Recycled knit'];
@@ -78,7 +78,7 @@ function productHero(a: TemplateAssets): MotionDoc {
       { id: 'bg', track: 'bg', component: 'BrandBackground', at: 0, len: 15, props: { pattern: 'gradient' } },
       { id: 'hook-kicker', track: 'text', component: 'Kicker', at: 0.2, len: 2.4, props: { text: '( New drop )', y: 0.27, width: 0.8, size: 0.045 }, exit: FADE_OUT },
       { id: 'hook', track: 'text', component: 'Title', at: 0.25, len: 2.35, props: { text: 'Stop scrolling.\nStart running.', y: 0.45, width: 0.92, height: 0.36, size: 0.17 }, exit: FADE_OUT },
-      { id: 'halo', track: 'media', component: 'Shape', at: 2.5, len: 4.7, props: { shape: 'circle', fill: 'brand.accent', y: 0.48, width: 0.72, height: 0.405, opacity: 0.9 }, keys: { scale: [[0, 0], [0.6, 1, Ease.Overshoot]] }, exit: FADE_OUT },
+      { id: 'halo', track: 'media', component: 'Shape', at: 2.5, len: 4.7, props: { shape: 'circle', fill: 'brand.accent', y: 0.48, width: 0.72, height: 0.405, opacity: 0.9 }, keys: { scale: [[0, 0], [0.6, 1, Ease.Enter]] }, exit: FADE_OUT },
       {
         id: 'product',
         track: 'media',
@@ -240,7 +240,7 @@ function beforeAfterOffer(a: TemplateAssets): MotionDoc {
       { id: 'after-label', track: 'text', component: 'Caption', at: 0.3, len: 6.7, props: { text: 'AFTER', x: 0.82, y: 0.08, width: 0.3, size: 0.032, background: 'brand.accent', color: WHITE }, exit: FADE_OUT },
       { id: 'offer-bg', track: 'bg', component: 'BrandBackground', at: 7, len: 8, props: { fill: 'brand.accent', pattern: 'dots', accent: INK }, enter: edge(TransitionKind.Wipe, 0.5) },
       { id: 'offer-kicker', track: 'text', component: 'Kicker', at: 7.3, len: 7.7, props: { text: '( This week )', y: 0.24, width: 0.8, size: 0.035, color: INK }, enter: RISE },
-      { id: 'offer', track: 'text', component: 'Title', at: 7.4, len: 7.6, props: { text: '-30%', y: 0.4, width: 0.9, height: 0.22, size: 0.32, color: INK }, keys: { scale: [[0, 0.6], [0.45, 1, Ease.Overshoot]] } },
+      { id: 'offer', track: 'text', component: 'Title', at: 7.4, len: 7.6, props: { text: '-30%', y: 0.4, width: 0.9, height: 0.22, size: 0.32, color: INK }, keys: { scale: [[0, 0.6], [0.45, 1, Ease.Enter]] } },
       { id: 'code', track: 'text', component: 'Text', at: 8, len: 7, props: { text: 'Code SPRING30 · ends Sunday', y: 0.56, width: 0.86, height: 0.06, size: 0.045, color: INK } },
       { id: 'claim', track: 'text', component: 'Caption', at: 8.5, len: 6.5, props: { text: 'Claim the offer', y: 0.68, width: 0.8, size: 0.05, background: INK, color: WHITE }, keys: POP },
       { id: 'logo', track: 'text', component: 'Logo', at: 9, len: 6, props: { y: 0.88, width: 0.3, height: 0.07 }, enter: RISE },

@@ -106,14 +106,14 @@ function threeD(l: Layout, a: TemplateAssets): Beat[] {
 
 function agents(l: Layout): Beat[] {
   const panel = inside(l.stage, 0.5, 0.5, 0.9, 1);
-  const live = { color: [[0, 'brand.text'], [2.5, 'brand.text'], [2.8, 'brand.accent', Ease.Standard]] as Key[], scale: [[0, 1], [2.5, 1], [2.9, 1.06, Ease.Overshoot]] as Key[] };
+  const live = { color: [[0, 'brand.text'], [2.5, 'brand.text'], [2.8, 'brand.accent', Ease.Standard]] as Key[], scale: [[0, 1], [2.5, 1], [2.9, 1.06, Ease.Enter]] as Key[] };
   return [
     ...chapter(l, 4, '( 04 ) Agents', 'Agents edit\nit live.', 16, 4.5, { keys: live, transform: { anchorX: 0 } }),
     { id: 'chat-panel', track: 'media', component: 'Shape', at: 16.05, len: 4.45, props: { shape: 'rect', fill: PAPER, ...panel }, enter: edge(TransitionKind.SlideLeft, 0.4), exit: FADE_OUT },
     { id: 'chat-head', track: 'ui', component: 'Kicker', at: 16.2, len: 4.3, props: { text: 'Chat', ...inside(panel, 0.5, 0.07, 0.86, 0.08), align: 'left', size: 0.024, color: INK, font: 'sans' }, exit: FADE_OUT },
-    { id: 'chat-ask', track: 'ui', component: 'Caption', at: 16.6, len: 3.9, props: { text: 'Make the headline blue.', ...inside(panel, 0.5, 0.24, 0.86, 0.1), align: 'right', size: 0.026, background: LIGHT, color: INK }, keys: { scale: [[0, 0.9], [0.25, 1, Ease.Overshoot]] }, exit: FADE_OUT },
+    { id: 'chat-ask', track: 'ui', component: 'Caption', at: 16.6, len: 3.9, props: { text: 'Make the headline blue.', ...inside(panel, 0.5, 0.24, 0.86, 0.1), align: 'right', size: 0.026, background: LIGHT, color: INK }, keys: { scale: [[0, 0.9], [0.25, 1, Ease.Enter]] }, exit: FADE_OUT },
     { id: 'chat-tool', track: 'ui', component: 'Kicker', at: 17.6, len: 2.9, props: { text: 'set_props · title · colour', ...inside(panel, 0.5, 0.38, 0.86, 0.08), align: 'left', size: 0.02, color: SOFT }, enter: RISE, exit: FADE_OUT },
-    { id: 'chat-done', track: 'ui', component: 'Caption', at: 18.6, len: 1.9, props: { text: 'Done. The headline is blue.', ...inside(panel, 0.5, 0.52, 0.86, 0.1), align: 'left', size: 0.026, background: INK, color: PAPER }, keys: { scale: [[0, 0.9], [0.25, 1, Ease.Overshoot]] }, exit: FADE_OUT },
+    { id: 'chat-done', track: 'ui', component: 'Caption', at: 18.6, len: 1.9, props: { text: 'Done. The headline is blue.', ...inside(panel, 0.5, 0.52, 0.86, 0.1), align: 'left', size: 0.026, background: INK, color: PAPER }, keys: { scale: [[0, 0.9], [0.25, 1, Ease.Enter]] }, exit: FADE_OUT },
     { id: 'chat-input', track: 'ui', component: 'Caption', at: 16.3, len: 4.2, props: { text: 'Ask the agent…', ...inside(panel, 0.5, 0.9, 0.86, 0.1), align: 'left', size: 0.024, background: LIGHT, color: '#9a9a9a' }, exit: FADE_OUT }
   ];
 }
@@ -133,7 +133,7 @@ function publish(l: Layout, a: TemplateAssets): Beat[] {
       at: 20.6 + i * 0.03,
       len: 3.9 - i * 0.03,
       props: { shape: 'rect', fill: scheduled ? 'brand.accent' : '#1c1c1c', ...inside(grid, (col + 0.5) / days, (row + 0.5) / weeks, 0.88 / days, 0.86 / weeks) },
-      keys: scheduled ? { scale: [[0, 0], [1.4, 0], [1.75, 1, Ease.Overshoot]] } : { opacity: [[0, 0], [0.3, 1]] },
+      keys: scheduled ? { scale: [[0, 0], [1.4, 0], [1.75, 1, Ease.Enter]] } : { opacity: [[0, 0], [0.3, 1]] },
       exit: FADE_OUT
     };
   };

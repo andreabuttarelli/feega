@@ -1,6 +1,7 @@
 import { MotionStyle, STYLE_EASES } from '../../motion/style-model';
+import { easeCurve } from '../../motion/sample-track';
 import { clampParams } from './clamp';
-import { bezierAt, card, centered, frameOf, smoothstep, stepAt, type Frame } from './loop';
+import { card, centered, frameOf, smoothstep, stepAt, type Frame } from './loop';
 import type { LayoutParam, LayoutParams, Transform } from './types';
 
 export const SLIDER_VARIANTS = ['slide-x', 'slide-y', 'crossfade', 'push', 'peek'] as const;
@@ -17,8 +18,7 @@ export const params: LayoutParam[] = [
 	{ name: 'indicators', label: 'Indicators', kind: 'select', options: INDICATORS.map((value) => ({ value, label: value })), default: 'none' }
 ];
 
-const MOVE = STYLE_EASES[MotionStyle.AppleMinimal].move;
-const ease = (x: number) => bezierAt(MOVE, x);
+const ease = easeCurve(STYLE_EASES[MotionStyle.AppleMinimal].move);
 const GONE = 0.98;
 const PEEK_SIZE = 0.7;
 const PEEK_SHRINK = 0.12;

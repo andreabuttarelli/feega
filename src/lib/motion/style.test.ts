@@ -6,7 +6,9 @@ import { JunctionKind } from './junction-model';
 import { EffectKind } from './effects/registry';
 import { Forbidden, STYLES, styleOf, styleProblems } from './style';
 import { SEVERITY, Severity } from './direction';
-import { DEFAULT_STYLE, MotionStyle } from './style-model';
+import { DEFAULT_STYLE, MOTION_STYLES, MotionStyle, STYLE_EASES } from './style-model';
+import { writeComponent } from './custom/ops';
+import type { Keyframe } from './keyframes';
 import supasito from './fixtures/supasito-v1.json';
 import { builtinTemplate } from './template/builtins';
 import { insertTemplate } from './template/library';
@@ -34,13 +36,6 @@ const effects = (doc: MotionDoc) => styleProblems(doc).map((p) => p.effect);
 const blank = (style = MotionStyle.AppleMinimal): MotionDoc => ({ ...newMotionDoc(MotionFormat.Landscape), style });
 
 describe('the Apple minimal style', () => {
-  it('signs its eases: an expo-out entrance that never overshoots, an in-out move', () => {
-    const { enter, move } = STYLES[MotionStyle.AppleMinimal].eases;
-
-    expect(enter).toEqual([0.16, 1, 0.3, 1]);
-    expect(move).toEqual([0.65, 0, 0.35, 1]);
-  });
-
   it('text enters in 0.3 to 0.5 s with a short stagger, then holds', () => {
     const { seconds } = STYLES[MotionStyle.AppleMinimal];
 
@@ -135,7 +130,7 @@ describe('the launch film style', () => {
     const { seconds, eases } = STYLES[MotionStyle.LaunchFilm];
 
     expect(seconds.enter[1]).toBeLessThanOrEqual(0.35);
-    expect(eases.enter[0]).toBeLessThanOrEqual(0.2);
+    expect(eases.enter).toBe(Ease.Enter);
   });
 
   it('lets a device fly in turning and a word punch in from the side: energy is not off-style', () => {
@@ -304,5 +299,47 @@ describe('a title owns the frame, the scene comes after', () => {
     expect(STYLES[MotionStyle.UiMorph].forbidden).not.toContain(Forbidden.TextOverScene);
     expect(SEVERITY[Forbidden.TextOverScene]).toBe(Severity.Warning);
     expect(SEVERITY[Forbidden.TooMuchText]).toBe(Severity.Warning);
+  });
+});
+
+describe('weak and bouncy eases', () => {
+  const fade = (ease: Keyframe['ease'], frames = 12) => ({ opacity: [{ frame: 0, value: 0, ease }, { frame: frames, value: 1, ease }] });
+  const weak = (doc: MotionDoc) => effects(doc).includes(Forbidden.WeakEase);
+  const coded = (js: string) => must(writeComponent(blank(), 'Card', { source: { html: '<b></b>', css: '', js }, propsSchema: { type: 'object', properties: {} } }));
+
+  it('names a linear entrance and a sine-like curve', () => {
+    expect(weak(withClip(blank(), 't', 'Title', { keyframes: fade(Ease.Linear) }))).toBe(true);
+    expect(weak(withClip(blank(), 't', 'Title', { keyframes: fade([0.37, 0, 0.63, 1]) }))).toBe(true);
+  });
+
+  it('lets the house curves through', () => {
+    for (const ease of [Ease.Enter, Ease.Standard, Ease.Exit]) {
+      expect(weak(withClip(blank(), 't', 'Title', { keyframes: fade(ease) }))).toBe(false);
+    }
+  });
+
+  it('lets a linear drift through: camera, not an entrance', () => {
+    const drift = { scale: [{ frame: 0, value: 1, ease: Ease.Linear }, { frame: 3 * SECOND, value: 1.04, ease: Ease.Linear }] };
+    expect(weak(withClip(blank(), 'i', 'Image', { keyframes: drift }))).toBe(false);
+  });
+
+  it('names a component that tweens on sine or springs on elastic, not one on the house curves or a linear driver', () => {
+    expect(weak(coded("tl.to(root, { x: 9, ease: 'sine.inOut' });"))).toBe(true);
+    expect(weak(coded('tl.to(root, { x: 9, ease: "elastic.out(1,0.4)" });'))).toBe(true);
+    expect(weak(coded("tl.to(root, { x: 9, ease: 'back.out(1.7)' });"))).toBe(true);
+    expect(weak(coded("tl.to(root, { x: 9, ease: 'feega.out' }); tl.to({}, { duration: 4, ease: 'none' });"))).toBe(false);
+  });
+
+  it('is a warning every style runs', () => {
+    for (const style of MOTION_STYLES) {
+      expect(STYLES[style].forbidden).toContain(Forbidden.WeakEase);
+    }
+    expect(SEVERITY[Forbidden.WeakEase]).toBe(Severity.Warning);
+  });
+
+  it('every style enters on feega.out and moves on feega.inOut', () => {
+    for (const style of MOTION_STYLES) {
+      expect(STYLE_EASES[style]).toEqual({ enter: Ease.Enter, move: Ease.Standard });
+    }
   });
 });

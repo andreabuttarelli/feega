@@ -98,6 +98,20 @@ The rule that matters most, and the one most often broken: **it is always too fa
 
 Energy comes from the quality of the movement, never from cramming more events per second.
 
+**Easing is strongly accentuated, with a soft settle.** Expo-like curves that land with an almost
+imperceptible resistance: at most 1–2% past the mark, never a visible bounce.
+
+| Move | Curve |
+|---|---|
+| Entrance | `feega.out` (keyframe ease `enter`) |
+| Exit | `feega.in` (`exit`) |
+| Move, zoom, morph | `feega.inOut` (`standard`, the default) |
+| Drift, loop | linear, only there |
+| Springs | near critical damping |
+| Never | sine, power1, plain ease, back, elastic, bounce, overshoot |
+
+The weak-ease gate names the rest.
+
 ### transitions
 
 Every junction is smooth: match cuts, zoom-through, whip with motion blur, shared elements that

@@ -329,17 +329,17 @@ function interpProblem(prop: AnimProp, track: readonly Keyframe[]): string | nul
 }
 
 export const EASE_BEZIER: Record<Ease, Bezier> = {
-  [Ease.Standard]: [0.165, 0.84, 0.44, 1],
-  [Ease.Enter]: [0.215, 0.61, 0.355, 1],
-  [Ease.Exit]: [0.55, 0.055, 0.675, 0.19],
+  [Ease.Standard]: [0.87, 0, 0.13, 1],
+  [Ease.Enter]: [0.16, 1, 0.3, 1],
+  [Ease.Exit]: [0.7, 0, 0.84, 0],
   [Ease.Linear]: [1 / 3, 1 / 3, 2 / 3, 2 / 3],
   [Ease.Overshoot]: [0.175, 0.885, 0.32, 1.275]
 };
 
 export const EASE_NAME: Record<Ease, string> = {
-  [Ease.Standard]: 'power3.out',
-  [Ease.Enter]: 'power2.out',
-  [Ease.Exit]: 'power2.in',
+  [Ease.Standard]: 'feega.inOut',
+  [Ease.Enter]: 'feega.out',
+  [Ease.Exit]: 'feega.in',
   [Ease.Linear]: 'none',
   [Ease.Overshoot]: 'back.out(1.7)'
 };
@@ -348,9 +348,9 @@ export function easeName(ease: EaseSpec): string {
   return typeof ease === 'string' ? EASE_NAME[ease] : `kf-bz-${ease.map((n) => String(n).replace('.', '_').replace('-', 'm')).join('-')}`;
 }
 
-import { sampleTrack, type SampledKey } from './sample-track';
+import { easeCurve, sampleTrack, type SampledKey } from './sample-track';
 
-export { sampleTrack, type SampledKey };
+export { easeCurve, sampleTrack, type SampledKey };
 
 const HEX = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i;
 

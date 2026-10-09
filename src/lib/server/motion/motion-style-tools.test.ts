@@ -43,7 +43,7 @@ describe('the motion style', () => {
     expect(text).toContain('builtin:launch-');
     expect(text).toContain('cut_to_beat');
     expect(text).toContain('peak');
-    expect(text).toContain('cubic-bezier(0.16,1,0.3,1)');
+    expect(text).toContain('enter (feega.out)');
     expect(text).toContain('particles');
     expect(text).not.toContain('mean more care, not more effects');
     expect(text).toContain('A real brand logo is always the original asset');

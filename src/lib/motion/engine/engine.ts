@@ -144,6 +144,12 @@ export function motionEngine(win: Window & Record<string, unknown>): MotionEngin
     return (p: number) => (((span * clamp(0, 1 - TINY, p)) | 0) + lift) * size;
   };
   const linear = (p: number) => p;
+  const expoIn = (p: number) => 2 ** (10 * (p - 1)) * p + p ** 6 * (1 - p);
+  const settled = (ease: EaseFn, depth: number, lateness: number) => (p: number) => ease(p) + depth * p ** lateness * (1 - p);
+  const house = () => {
+    const expo = fromIn(expoIn);
+    return { in: expo.in, out: settled(expo.out, 0.2, 6), inOut: settled(expo.inOut, 0.35, 12) };
+  };
 
   type Family = (args: number[]) => { in: EaseFn; out: EaseFn; inOut: EaseFn };
   const FAMILIES: Record<string, Family> = {
@@ -160,7 +166,8 @@ export function motionEngine(win: Window & Record<string, unknown>): MotionEngin
     quint: () => power(5),
     strong: () => power(5),
     sine: () => fromIn((p) => (p === 1 ? 1 : -Math.cos(p * (Math.PI / 2)) + 1)),
-    expo: () => fromIn((p) => 2 ** (10 * (p - 1)) * p + p ** 6 * (1 - p)),
+    expo: () => fromIn(expoIn),
+    feega: house,
     circ: () => fromIn((p) => -(Math.sqrt(1 - p * p) - 1)),
     back: (a) => back(a[0]),
     elastic: (a) => elastic(a[0], a[1]),
@@ -176,7 +183,7 @@ export function motionEngine(win: Window & Record<string, unknown>): MotionEngin
   };
   const custom: Record<string, EaseFn> = {};
   const parsed: Record<string, EaseFn> = {};
-  const DEFAULT_EASE = power(2).out;
+  const DEFAULT_EASE = house().out;
 
   function parseEase(ease: unknown): EaseFn {
     if (typeof ease === 'function') {

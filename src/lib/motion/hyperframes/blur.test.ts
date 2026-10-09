@@ -53,3 +53,17 @@ describe('a clip with motion blur off', () => {
     expect(sharp.x).toBe(first);
   });
 });
+
+describe('a held clip whose tween names no ease', () => {
+  it('lands on the frame the engine default puts it on', () => {
+    const engine = installEngine();
+    const tl = testTimeline(engine);
+    const sharp = { x: 0, held: true };
+    tl.fromTo(sharp, { x: 0 }, { x: 300, duration: 1 }, 0);
+    holdStill(tl as never, ((t: { held?: boolean }) => Boolean(t.held)) as never, FPS, blur, engine as never);
+
+    tl.totalTime(9 / FPS, true);
+
+    expect(sharp.x).toBeCloseTo(300 * engine.parseEase(undefined)(9 / FPS));
+  });
+});

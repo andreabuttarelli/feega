@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { STYLE_EASES } from '$lib/motion/style-model';
 import { LAYOUTS } from './index';
-import { bezierAt } from './loop';
+import { easeCurve } from '$lib/motion/keyframes';
 import { SLIDER_VARIANTS, instances, transforms } from './slider';
 import type { LayoutParams } from './types';
 
@@ -77,10 +77,11 @@ describe('slider', () => {
 		expect(LAYOUTS.slider.solids?.(count, FRAME) ?? 0).toBe(0);
 	});
 
-	it('moves on the Apple-minimal move ease', () => {
-		expect(bezierAt(MOVE, 0.5)).toBeCloseTo(0.5, 3);
-		expect(bezierAt(MOVE, 0.25)).toBeLessThan(0.15);
-		expect(bezierAt(MOVE, 0)).toBe(0);
-		expect(bezierAt(MOVE, 1)).toBe(1);
+	it('moves on the house move ease', () => {
+		const ease = easeCurve(MOVE);
+		expect(ease(0.5)).toBeCloseTo(0.5, 3);
+		expect(ease(0.25)).toBeLessThan(0.15);
+		expect(ease(0)).toBe(0);
+		expect(ease(1)).toBe(1);
 	});
 });

@@ -60,7 +60,7 @@ const revenue = (id: string): Beat[] => [
       len: CARD_SECONDS,
       props: { shape: ShapeKind.Rect, x: 0.18 + i * 0.16, y: 0.95 - (h * 0.42) / 2, width: 0.11, height: h * 0.42, fill: i === 4 ? ACCENT : '#9fc9f0' },
       transform: { anchorY: 1 },
-      keys: { scaleY: [[0.3 + i * 0.12, 0], [0.9 + i * 0.12, 1, Ease.Overshoot], [CARD_SECONDS - OUTRO, 1], [CARD_SECONDS, 0, Ease.Exit]] }
+      keys: { scaleY: [[0.3 + i * 0.12, 0], [0.9 + i * 0.12, 1, Ease.Enter], [CARD_SECONDS - OUTRO, 1], [CARD_SECONDS, 0, Ease.Exit]] }
     })
   )
 ];
