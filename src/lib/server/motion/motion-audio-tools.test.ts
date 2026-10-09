@@ -109,4 +109,30 @@ describe('pulse_with_music', () => {
     expect(out.ok).toBe(true);
     expect(findClip(session.doc, 'id2')!.clip.expressions.scale).toContain('audio.amp("id1"');
   });
+
+  it('compose_sound renders the score and lays it on the sound track', async () => {
+    let n = 0;
+    const session: MotionSession = { doc: newMotionDoc(MotionFormat.Square), baseVersion: 1, edits: [], selection: [], frames: new Map(), views: 0, checkedAt: 0, codeWrites: 0 };
+    const assets: { id: string; kind: AssetKind; label: string; previewUrl: string; url: string }[] = [];
+    const sound = vi.fn(async () => ({ ok: true as const, assetId: 'sfx', seconds: 4, url: 'https://x/sfx.wav' }));
+    const tools = createMotionTools({ session, assets, newId: () => `id${++n}`, voiceover: vi.fn(), frames: vi.fn(), check: vi.fn(), sound });
+    const score = { voices: [{ id: 'hit', instrument: 'hit' }], events: [{ voice: 'hit', at: 1, duration: 0.5 }] };
+    const out = await (tools.compose_sound as Tool & { execute: Exec }).execute(score, { toolCallId: 'c' });
+
+    expect(out.ok).toBe(true);
+    expect(sound).toHaveBeenCalledWith(expect.objectContaining({ seed: 1, events: [expect.objectContaining({ at: 1, velocity: 0.8 })] }), session.doc.durationInFrames / session.doc.fps);
+    expect(session.doc.sound?.assetId).toBe('sfx');
+    expect(session.doc.assets.some((a) => a.id === 'sfx')).toBe(true);
+    expect(findClip(session.doc, session.doc.sound!.clipId)?.clip.props.assetId).toBe('sfx');
+  });
+
+  it('compose_sound refuses an event on an undeclared voice before rendering', async () => {
+    const session: MotionSession = { doc: newMotionDoc(MotionFormat.Square), baseVersion: 1, edits: [], selection: [], frames: new Map(), views: 0, checkedAt: 0, codeWrites: 0 };
+    const sound = vi.fn();
+    const tools = createMotionTools({ session, assets: [], newId: () => 'x', voiceover: vi.fn(), frames: vi.fn(), check: vi.fn(), sound });
+    const out = await (tools.compose_sound as Tool & { execute: Exec }).execute({ voices: [{ id: 'a', instrument: 'hit' }], events: [{ voice: 'b', at: 0, duration: 1 }] }, { toolCallId: 'c' });
+
+    expect(out.ok).toBe(false);
+    expect(sound).not.toHaveBeenCalled();
+  });
 });

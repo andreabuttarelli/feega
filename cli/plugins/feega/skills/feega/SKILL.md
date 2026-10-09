@@ -203,6 +203,10 @@ edits included, and the clips each card plays), `write_storyboard` writes it fro
 `edit_storyboard_card` rewrites one card. Free. CLI: `feega motion storyboard <nodeId>
 [--write beats.json | --card <id> --text "..."]`.
 
+Sound design under the music: `write_motion_sound` writes a score of synth voices (whoosh, hit,
+riser, click, pad, sub, tone) and timed events, rendered offline to one audio track that plays the
+same in preview and export. Free. CLI: `feega motion sound <nodeId> score.json`.
+
 ## Remix from the gallery
 
 The public gallery holds free motion videos and compositions anyone can remix, many by Feega.

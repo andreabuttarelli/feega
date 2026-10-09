@@ -227,7 +227,7 @@ describe('the motion agent over MCP', () => {
     await rpc('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'motion', version: '0.0.1' } });
     const names = ((await rpc('tools/list', {})).result?.tools ?? []).map((t) => t.name);
 
-    expect(names.filter((n) => n.includes('motion')).sort()).toEqual(['ask_motion_agent', 'get_motion_embed', 'get_motion_run', 'get_motion_summary', 'list_motion_revisions', 'list_motion_videos', 'publish_motion_embed', 'restore_motion_revision', 'view_motion_frames']);
+    expect(names.filter((n) => n.includes('motion')).sort()).toEqual(['ask_motion_agent', 'get_motion_embed', 'get_motion_run', 'get_motion_summary', 'list_motion_revisions', 'list_motion_videos', 'publish_motion_embed', 'restore_motion_revision', 'view_motion_frames', 'write_motion_sound']);
     expect(names).toContain('render_video');
     expect(names).toContain('get_render');
     expect(names).not.toContain('add_clip');
@@ -367,5 +367,14 @@ describe('the storyboard over MCP', () => {
 
     expect(calls[0]).toEqual({ method: 'POST', path: `/api/v1/motion/${NODE}/storyboard`, body: { beats } });
     expect(calls[1]).toEqual({ method: 'PATCH', path: `/api/v1/motion/${NODE}/storyboard`, body: { card_id: 'c1', text: '## New' } });
+  });
+});
+
+describe('sound design over MCP', () => {
+  test('write_motion_sound posts the score', async () => {
+    const score = { seed: 3, voices: [{ id: 'hit', instrument: 'hit' }], events: [{ voice: 'hit', at: 1, duration: 0.4 }] };
+    await callTool('write_motion_sound', { node_id: NODE, ...score });
+
+    expect(calls[0]).toEqual({ method: 'POST', path: `/api/v1/motion/${NODE}/sound`, body: score });
   });
 });

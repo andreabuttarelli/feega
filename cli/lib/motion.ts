@@ -73,6 +73,8 @@ export const motionApi = {
   storyboard: (token: string, nodeId: string, org?: string) => request<Record<string, unknown>>(withOrg(`/api/v1/motion/${id(nodeId)}/storyboard`, org), token),
   writeStoryboard: (token: string, nodeId: string, board: { beats: unknown[] }, org?: string) =>
     request<Record<string, unknown>>(withOrg(`/api/v1/motion/${id(nodeId)}/storyboard`, org), token, { method: 'POST', body: JSON.stringify(board) }),
+  writeSound: (token: string, nodeId: string, score: Record<string, unknown>, org?: string) =>
+    request<Record<string, unknown>>(withOrg(`/api/v1/motion/${id(nodeId)}/sound`, org), token, { method: 'POST', body: JSON.stringify(score) }),
   editStoryboard: (token: string, nodeId: string, cardId: string, text: string, org?: string) =>
     request<Record<string, unknown>>(withOrg(`/api/v1/motion/${id(nodeId)}/storyboard`, org), token, { method: 'PATCH', body: JSON.stringify({ card_id: cardId, text }) }),
   bundle: (token: string, nodeId: string, org?: string) => download(withOrg(`/api/v1/motion/${id(nodeId)}/embed/bundle`, org), token)

@@ -217,6 +217,7 @@ list. Returns how many combinations it actually stopped.
 | `get_storyboard` | `feega motion storyboard <nodeId>` |
 | `write_storyboard` | `feega motion storyboard <nodeId> --write beats.json` |
 | `edit_storyboard_card` | `feega motion storyboard <nodeId> --card <id> --text "..."` |
+| `write_motion_sound` | `feega motion sound <nodeId> score.json` |
 | (CLI / API only) | `feega motion embed <nodeId> --download <file>` |
 
 `list_motion_videos({ org, project_id? })` lists `motion` nodes newest first: `node_id`, `name`,

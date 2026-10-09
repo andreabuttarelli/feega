@@ -117,6 +117,20 @@ export function registerMotionTools(server: McpServer) {
   );
 
   server.registerTool(
+    'write_motion_sound',
+    {
+      title: 'Write the sound design of a motion video',
+      description:
+        'Sound design under the music: synth `voices` (`id`, `instrument`: whoosh, hit, riser, click, pad, sub, tone; `gain`, `pan`, `reverb`, `brightness` 0-1) and timed `events` ' +
+        '(`voice`, `at` and `duration` in seconds, `note` like C3 or Hz, `velocity`), with a `seed`. Rendered offline and deterministically to one audio track, the same in preview and export; ' +
+        'replaces the previous sound design. Whoosh ~0.3 s before a cut, hit/sub on cuts and peaks, riser ending on the reveal, click on each UI tap; keep gains low under music.',
+      inputSchema: z.object({ org, node_id: z.string(), seed: z.number().int().min(0).optional(), bpm: z.number().optional(), voices: z.array(z.record(z.string(), z.unknown())).min(1).max(16), events: z.array(z.record(z.string(), z.unknown())).max(400) }),
+      annotations: { readOnlyHint: false, destructiveHint: false }
+    },
+    async ({ org, node_id, ...score }) => withAuth((token) => motionApi.writeSound(token, node_id, score, org))
+  );
+
+  server.registerTool(
     'edit_storyboard_card',
     {
       title: 'Rewrite a storyboard card',

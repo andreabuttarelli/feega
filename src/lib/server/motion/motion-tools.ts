@@ -98,6 +98,8 @@ import { DUCK_DEFAULTS, duckUnder } from '$lib/motion/duck';
 import type { AudioAnalysis } from '$lib/motion/audio-analysis';
 import { Division, Hit, cutToBeat, hitFrames, markHits } from '$lib/motion/beats';
 import { Mood } from '$lib/motion/music-library';
+import { INSTRUMENTS, eventSchema, soundScoreSchema, voiceSchema, type SoundScore } from '$lib/motion/sound/score';
+import { laySound } from '$lib/motion/sound/lay';
 import { PULSE_PROPS, pulseWithMusic } from '$lib/motion/pulse';
 import { applyValues, exposeField, fieldValues, removeField } from '$lib/motion/template/fields';
 import { FIELD_TYPES, MAX_LINKED, type ExposedField } from '$lib/motion/template/field-model';
@@ -123,12 +125,15 @@ export type Voiceover = { ok: true; assetId: string; seconds: number; url: strin
 
 export type Music = { ok: true; assetId: string; seconds: number; url: string | null; source: string; track: string } | { ok: false; error: string };
 
+export type SoundStored = { ok: true; assetId: string; seconds: number; url: string | null } | { ok: false; error: string };
+
 export type MotionToolDeps = {
   session: MotionSession;
   assets: MotionAsset[];
   newId: () => string;
   voiceover: (input: { text: string; voiceId?: string }) => Promise<Voiceover>;
   music?: (input: { mood: Mood; bpm?: number; seconds: number }) => Promise<Music>;
+  sound?: (score: SoundScore, seconds: number) => Promise<SoundStored>;
   frames: (callId: string, times: number[]) => Promise<Frame[] | null>;
   inspect?: (frames: Frame[]) => Promise<FrameStat[]>;
   check: (callId: string, doc: MotionDoc, name: string) => Promise<CheckResult | null>;
@@ -253,6 +258,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
     interactive: interactiveOf(doc),
     style: styleOf(doc),
     script: doc.script ?? null,
+    sound: doc.sound ?? null,
     camera: cameraSummary(doc.camera),
     look: lookSummary(doc.look),
     components: Object.entries(doc.components).map(([name, c]) => customSummary(name, c)),
@@ -1919,6 +1925,28 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         }
         const marked = apply(markHits(session.doc, await docBeats(Hit.Beats), Hit.Beats), 'marked the beats');
         return { ...marked, clip_id: id, source: track.source, track: track.track };
+      }
+    }),
+
+    compose_sound: tool({
+      description: `Sound design under the music: a score of synth voices (${INSTRUMENTS.join(', ')}) and timed events, rendered offline to one audio track that preview and export play identically (same seed, same samples). Calling it again replaces the previous sound design: always send the whole score. at/duration in seconds; a whoosh starts ~0.3 s before the cut it covers, a hit or sub lands on the cut or peak, a riser ends on the reveal, a click sits on each click_ui tap, a pad holds under a scene. Keep it subtle under music (gain 0.2–0.5, music stays the lead), accent cuts and peaks only, never every beat. note is a name (C3, F#4) or Hz; brightness 0..1 opens the filter; reverb 0..1.`,
+      inputSchema: z.object({ seed: z.number().int().min(0).optional(), bpm: z.number().min(40).max(220).optional(), voices: z.array(voiceSchema).min(1), events: z.array(eventSchema) }),
+      execute: async (input) => {
+        if (!deps.sound) {
+          return UNREADABLE('sound design');
+        }
+        const score = soundScoreSchema.safeParse(input);
+        if (!score.success) {
+          return { ok: false, error: score.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ') };
+        }
+        const stored = await deps.sound(score.data, session.doc.durationInFrames / session.doc.fps);
+        if (!stored.ok) {
+          return stored;
+        }
+        deps.assets.push({ id: stored.assetId, kind: AssetKind.Audio, label: 'sound design', previewUrl: '', url: stored.url });
+        const laid = laySound(session.doc, { score: score.data, assetId: stored.assetId }, { clip: deps.newId(), track: deps.newId() });
+        const out = apply(registered(laid, stored.assetId), `composed sound design (${score.data.events.length} events)`);
+        return out.ok ? { ...out, clip_id: session.doc.sound?.clipId, events: score.data.events.length } : out;
       }
     }),
 

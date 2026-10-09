@@ -45,8 +45,8 @@ const MCP_INSTRUCTION_LINES = (promoted: string) => [
   promoted,
   'A project needs no brand (`projects.brand_id` is nullable, and that is the normal case): attach one only to publish.',
   '`get_media` shows a node, run or asset: fetch `preview_url` to look, give `full_url` to the user.',
-  '`list_motion_videos`; `ask_motion_agent` edits one (`get_motion_run`, `get_motion_summary`); `render_video`/`get_render`; `publish_motion_embed`/`get_motion_embed`; `view_motion_frames`, `list_motion_revisions`, `restore_motion_revision`; `get_storyboard`/`write_storyboard`/`edit_storyboard_card`; `search_gallery`/`remix_gallery_item`/`publish_to_gallery`; `write_layout`/`patch_layout`/`list_layouts`.',
-  'Signing in is not a tool: over HTTP the host sends the Bearer; locally run `feega login` once.'
+  '`list_motion_videos`; `ask_motion_agent` edits one (`get_motion_run`, `get_motion_summary`); `render_video`/`get_render`; `publish_motion_embed`/`get_motion_embed`; `view_motion_frames`, `list_motion_revisions`, `restore_motion_revision`; `get_storyboard`/`write_storyboard`/`edit_storyboard_card`/`write_motion_sound`; `search_gallery`/`remix_gallery_item`/`publish_to_gallery`; `write_layout`/`patch_layout`/`list_layouts`.',
+  'Sign-in: over HTTP the host sends the Bearer; locally `feega login`.'
 ];
 
 export const MCP_INSTRUCTIONS = mcpInstructions(SocialPublishing.Off);
