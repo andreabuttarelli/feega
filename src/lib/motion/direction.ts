@@ -1,7 +1,7 @@
 import { COMPONENTS, TrackKind, type ComponentId } from './components';
 import { clipsOf, type MotionDoc } from './doc';
 import { DEVICE, Device } from './devices';
-import { Forbidden, styleOf, styleProblems } from './style';
+import { Forbidden, STYLES, Script, styleOf, styleProblems } from './style';
 import { MotionStyle } from './style-model';
 import { UI_KIT, UI_SAFE, uiScale } from './ui-kit/kit';
 import { sampleTrack } from './sample-track';
@@ -175,7 +175,7 @@ function smallTitles(doc: MotionDoc): QualityProblem[] {
     .map((c) => ({ kind: Quality.SmallTitle, at: seconds(doc, c.from), detail: `title ${c.id} at ${seconds(doc, c.from)}s sits in a small box (${Math.round(num(c, 'width', 0.8) * 100)}% × ${Math.round(num(c, 'height', 0.4) * 100)}% of the frame): it reads small` }));
 }
 
-const SCORED: Record<MotionStyle, boolean> = { [MotionStyle.LaunchFilm]: true, [MotionStyle.AppleMinimal]: false, [MotionStyle.UiMorph]: true };
+const SCORED: Record<MotionStyle, boolean> = { [MotionStyle.LaunchFilm]: true, [MotionStyle.AppleMinimal]: false, [MotionStyle.UiMorph]: true, [MotionStyle.Graphic]: false };
 
 function silent(doc: MotionDoc, audioAssets: number): QualityProblem[] {
   const plays = doc.tracks.some((t) => t.kind === TrackKind.Audio && t.clips.length > 0);
@@ -455,7 +455,7 @@ function stillUis(doc: MotionDoc): QualityProblem[] {
 }
 
 function unscripted(doc: MotionDoc): QualityProblem[] {
-  return SCORED[styleOf(doc)] && !doc.script && everyClip(doc).length ? [{ kind: Quality.NoScript, detail: 'no research and script saved: for a launch film or trailer, write_script first (problem, struggle, flow, sourced proof, promise) and build that' }] : [];
+  return STYLES[styleOf(doc)].script === Script.Required && !doc.script && everyClip(doc).length ? [{ kind: Quality.NoScript, detail: 'no research and script saved: for a launch film or trailer, write_script first (problem, struggle, flow, sourced proof, promise) and build that' }] : [];
 }
 
 const CUT_QUALITY: Record<CutFault, Quality> = {
