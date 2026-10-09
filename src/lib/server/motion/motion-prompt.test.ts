@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { motionAgentPrompt } from './motion-prompt';
 import { Vision } from './frames';
-import { TITLE_CARD_RULE } from '$lib/motion/style';
+import { TITLE_CARD_RULE, UI_FOCUS_RULE } from '$lib/motion/style';
 import { MotionStyle } from '$lib/motion/style-model';
 
 const prompt = (style: MotionStyle) =>
@@ -22,6 +22,19 @@ describe('when the agent breaks the video', () => {
 describe('the motion agent keeps titles and scenes apart', () => {
   it.each([MotionStyle.LaunchFilm, MotionStyle.AppleMinimal])('%s carries the title card rule', (style) => {
     expect(prompt(style)).toContain(TITLE_CARD_RULE);
+  });
+
+  it.each([MotionStyle.LaunchFilm, MotionStyle.AppleMinimal, MotionStyle.UiMorph])('%s carries the UI focus rule', (style) => {
+    expect(prompt(style)).toContain(UI_FOCUS_RULE);
+  });
+
+  it('shows the UI focus rule with the prompt field example, one part per beat', () => {
+    expect(UI_FOCUS_RULE).toMatch(/text field and the typed text → the button being pressed → the progress bar alone → the result/);
+    expect(UI_FOCUS_RULE).toContain('focus_ui');
+  });
+
+  it('writes product acts as a sequence of UI beats', () => {
+    expect(prompt(MotionStyle.LaunchFilm)).toMatch(/product act is a sequence of UI beats/);
   });
 
   it('the trailer structure alternates title cards and scenes', () => {

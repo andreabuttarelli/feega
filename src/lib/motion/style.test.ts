@@ -12,6 +12,8 @@ import type { Keyframe } from './keyframes';
 import supasito from './fixtures/supasito-v1.json';
 import { builtinTemplate } from './template/builtins';
 import { insertTemplate } from './template/library';
+import { Isolate, focusUi } from './ui-focus';
+import { UI_KIT } from './ui-kit/kit';
 
 const SECOND = 30;
 
@@ -341,5 +343,47 @@ describe('weak and bouncy eases', () => {
     for (const style of MOTION_STYLES) {
       expect(STYLE_EASES[style]).toEqual({ enter: Ease.Enter, move: Ease.Standard });
     }
+  });
+});
+
+describe('a UI is shown one part at a time', () => {
+  const film = (style = MotionStyle.LaunchFilm): MotionDoc => ({ ...newMotionDoc(MotionFormat.Landscape), style, durationInFrames: 6 * SECOND });
+  const piece = (doc: MotionDoc, name: string) => {
+    const kit = Object.values(UI_KIT).find((p) => p.name === name)!;
+    return doc.components[name] ? doc : must(writeComponent(doc, name, { source: { html: kit.html, css: kit.css, js: kit.js }, propsSchema: { type: 'object', properties: {} } }));
+  };
+  const ui = (doc: MotionDoc, id: string, name = 'UiPromptBox', seconds = 4) => must(addClip(piece(doc, name), { component: 'Custom', from: 0, durationInFrames: seconds * SECOND, props: { name } }, id));
+  const overload = (doc: MotionDoc) => styleProblems(doc).filter((p) => p.effect === Forbidden.UiOverload);
+
+  it('names a whole UI held on screen with all its parts for more than 1.5 s', () => {
+    const found = overload(ui(film(), 'u'));
+
+    expect(found).toHaveLength(1);
+    expect(found[0].detail).toMatch(/focus_ui/);
+  });
+
+  it('lets a whole UI through as a short establishing shot', () => {
+    expect(overload(ui(film(), 'u', 'UiPromptBox', 1))).toEqual([]);
+  });
+
+  it('lets the same UI through when each beat isolates one part', () => {
+    const shown = ui(film(), 'u');
+    const field = must(focusUi(shown, { clipId: 'u', anchor: 'field', at: 0, frames: 10, fill: 0.7, isolate: Isolate.Part }));
+    const send = must(focusUi(field, { clipId: 'u', anchor: 'send', at: 2 * SECOND, frames: 10, fill: 0.3, isolate: Isolate.Part }));
+
+    expect(overload(send)).toEqual([]);
+  });
+
+  it('names more than two UI pieces on screen at once', () => {
+    const three = ['a', 'b', 'c'].reduce((doc, id) => ui(doc, id, 'UiStatCards', 1), film());
+
+    expect(overload(three).map((p) => p.detail).join()).toMatch(/3 UI pieces/);
+  });
+
+  it('is a warning in the launch film and Apple minimal, not in the UI morph reel', () => {
+    expect(STYLES[MotionStyle.LaunchFilm].forbidden).toContain(Forbidden.UiOverload);
+    expect(STYLES[MotionStyle.AppleMinimal].forbidden).toContain(Forbidden.UiOverload);
+    expect(STYLES[MotionStyle.UiMorph].forbidden).not.toContain(Forbidden.UiOverload);
+    expect(SEVERITY[Forbidden.UiOverload]).toBe(Severity.Warning);
   });
 });

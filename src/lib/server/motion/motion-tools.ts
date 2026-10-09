@@ -46,6 +46,7 @@ import { addMorphReel } from '$lib/motion/ui-morph/ops';
 import { STORY_BEATS, STORY_SHARE, markStory } from '$lib/motion/story';
 import { anchorsOf } from '$lib/motion/clicks';
 import { clickUi } from '$lib/motion/cursor-ops';
+import { Isolate, focusUi } from '$lib/motion/ui-focus';
 import { ACTS, BrandKind, briefOf, scriptProblems, scriptSchema, sourcesOf, type LaunchScript } from '$lib/motion/script';
 import { quoted, type SitePage } from './site-copy';
 import { PATCH_COMPONENT, READ_COMPONENT, WRITE_COMPONENT } from './model-route';
@@ -1599,7 +1600,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     write_script: tool({
-      description: `Save the research and the four-act script of a launch film before building it; the video is not built until this passes. Research: who it serves, the concrete problem, the struggle as an everyday scene, how the product works step by step (input → what happens → result), 1–3 benefits and up to 4 numbers or results, the tone, the promise. Every benefit, number, promise and proof cites its source: the url of a page analyze_site read and a quote copied from that page; a claim without a source on the site is refused, so never invent one. Acts ${ACTS.join(', ')} in order: problem shows the "before" UI, cluttered or slow, with realistic data; solution shows the product's real flow with specific content; proof shows a number or result from the site; claim puts the site's own promise on screen. Keep on_screen lines few and short: each becomes its own full-frame title card, shown before the scene it announces, never over it. For an invented demo brand (no real site), set brand: fictional: no site is read and sources are the brand's own copy; the brief says it is fictional. Never use it for a real brand. The turn ends there: the user reads the brief in the chat, then says go or corrects it.`,
+      description: `Save the research and the four-act script of a launch film before building it; the video is not built until this passes. Research: who it serves, the concrete problem, the struggle as an everyday scene, how the product works step by step (input → what happens → result), 1–3 benefits and up to 4 numbers or results, the tone, the promise. Every benefit, number, promise and proof cites its source: the url of a page analyze_site read and a quote copied from that page; a claim without a source on the site is refused, so never invent one. Acts ${ACTS.join(', ')} in order: problem shows the "before" UI, cluttered or slow, with realistic data; solution shows the product's real flow with specific content, written as a sequence of UI beats, one element per beat (the field and its typed text, the button pressed, the progress, the result); proof shows a number or result from the site; claim puts the site's own promise on screen. Keep on_screen lines few and short: each becomes its own full-frame title card, shown before the scene it announces, never over it. For an invented demo brand (no real site), set brand: fictional: no site is read and sources are the brand's own copy; the brief says it is fictional. Never use it for a real brand. The turn ends there: the user reads the brief in the chat, then says go or corrects it.`,
       inputSchema: scriptSchema,
       execute: async (raw) => {
         const parsed = scriptSchema.safeParse(raw);
@@ -1743,6 +1744,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const shown = apply(placed, `placed ${piece.name}`);
         return shown.ok ? { ...made, clip_id: id, anchors: Object.keys(anchorsOf(session.doc, id)?.anchors ?? {}) } : shown;
       }
+    }),
+
+    focus_ui: tool({
+      description: 'Frame one part of a UI clip as its own beat: the clip scales and moves so the anchor (field, send, progress, done, button, input-0, heading-0, card-2…: add_ui and recreate_ui return them) lands in the centre at fill of the frame, on the house standard ease, starting at start (seconds of the video) over duration. isolate part (default) masks the clip down to that part alone (the rest of the screen disappears); context keeps the neighbours around it. Chain calls for the beats of one flow: the field and the typed text, then the button, then the progress bar, then the result; each call starts from where the last left, so the move between beats is a zoom from one part to the next.',
+      inputSchema: z.object({ clip_id: z.string(), anchor: z.string(), start: z.number().min(0), duration: z.number().positive().default(0.6), fill: z.number().min(0.1).max(1).default(0.6), isolate: z.enum(Isolate).default(Isolate.Part) }),
+      execute: async (input) => apply(focusUi(session.doc, { clipId: input.clip_id, anchor: input.anchor, at: frames(input.start), frames: frames(input.duration), fill: input.fill, isolate: input.isolate }), `focused ${input.clip_id}#${input.anchor}`)
     }),
 
     click_ui: tool({
