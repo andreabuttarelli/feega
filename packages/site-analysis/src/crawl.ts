@@ -953,22 +953,6 @@ export const entryProbe: EntryProbe = async (url) => {
         return { tlsError: TLS_ERROR_CODES.has(code), finalUrl: null };
     }
 };
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-    try {
-        const res = await fetch(url, {
-            signal: controller.signal,
-            redirect: 'follow',
-            headers: { 'User-Agent': 'Mozilla/5.0 (compatible; DalNullaBot/1.0)' },
-        });
-        return { tlsError: false, finalUrl: res.url || url };
-    } catch (e) {
-        const code = String((e as { cause?: { code?: unknown } })?.cause?.code ?? '');
-        return { tlsError: TLS_ERROR_CODES.has(code), finalUrl: null };
-    } finally {
-        clearTimeout(timeout);
-    }
-};
 
 /**
  * Risolve l'indirizzo da cui leggere davvero il sito.
