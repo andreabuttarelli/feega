@@ -41,6 +41,7 @@ import type { ParticleBake } from '../particles/simulate';
 import { bakeExpressions } from '../expression/bake';
 import type { AudioAnalysis } from '../audio-analysis';
 import { FIT_TEXT, fitScript } from './fit-runtime';
+import { webglMeta } from '../export/webgl-budget';
 import { HOT_CLOSE, HOT_MODULE, HOT_OPEN, HOT_SCRIPT, hotRuntime } from './hot';
 import { ANIMATOR_CSS, textRender } from '../text-animators/render';
 import { declaredFamilyCss, fontStack, loadDescriptors, googleFontsUrl, loadedWeight, uploadFaceCss, usedFaces } from '../fonts/model';
@@ -508,6 +509,12 @@ function modulesOf(three: ThreeClip[], compositions: TimedBake[]): Module[] {
   return three.some((c) => c.kind === ThreeKind.Text) ? [...scene, Module.Opentype] : scene;
 }
 
+const WEBGL_LIBRARIES: readonly Library[] = [Library.Three, Library.Twgl, Library.Pixi];
+
+function customContexts(runs: CustomRun[], components: CustomComponents): number {
+  return runs.filter((run) => WEBGL_LIBRARIES.some((lib) => librariesOf(components, [run.name]).has(lib))).length;
+}
+
 function brandEnv(tokens: BrandTokens) {
   const colors = Object.fromEntries(Object.entries(tokens.colors).map(([k, v]) => [k.replace('brand.', ''), v]));
   return { name: tokens.name, colors, logoUrl: tokens.logoUrl };
@@ -670,6 +677,7 @@ export function composeHtml(raw: ComposeInput): string {
   const page = [
     '<!doctype html><html lang="en"><head><meta charset="UTF-8" />',
     `<meta name="viewport" content="width=${frame.width}, height=${frame.height}" />`,
+    webglMeta(three.length + compositions.length + blobs.length + customContexts(runs, doc.components)),
     cspMeta({ scripts: [...new Set(scripts)], assetUrls }),
     scriptTag(Script.Runtime, delivery),
     `<script>${engineScript()}</script>`,

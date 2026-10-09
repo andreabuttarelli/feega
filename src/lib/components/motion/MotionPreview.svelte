@@ -5,6 +5,7 @@
   import { CAPTURE_TIMEOUT_MS, Playback, previewDriver, type ShotRequest } from '$lib/motion/hyperframes/preview-driver';
   import { mountCapturePlayer } from '$lib/motion/hyperframes/capture-player';
   import { shootInLanes } from '$lib/motion/export/lanes';
+  import { lanesWithin, webglPerLane } from '$lib/motion/export/webgl-budget';
   import { exportLayering, frameOf } from '$lib/motion/export/webgl-device';
   import { CAPTURE_PROFILES, CaptureProfile } from '$lib/motion/export/capture-profile';
   import { MEASURE_REPLY, MEASURE_REQUEST, type MeasureReply, type MeasuredBox } from '$lib/motion/hyperframes/measure';
@@ -204,7 +205,7 @@
     const { settle, lanes } = CAPTURE_PROFILES[profile];
     const request = { format: FrameFormat.Bitmap, settle, layering: exportLayering(), ...size };
     return borrowed(source, async () => {
-      const extra = host ? await Promise.all(Array.from({ length: lanes() - 1 }, () => mountCapturePlayer(host!, source))) : [];
+      const extra = host ? await Promise.all(Array.from({ length: lanesWithin(lanes(), webglPerLane(source)) - 1 }, () => mountCapturePlayer(host!, source))) : [];
       const sharedWait = CAPTURE_TIMEOUT_MS * (extra.length + 1);
       try {
         const shooters = [(time: number) => shoot(time, request, sharedWait).then(frameOf), ...extra.map((p) => (time: number) => p.shoot(time, request, sharedWait).then(frameOf))];
