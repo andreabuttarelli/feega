@@ -6,7 +6,7 @@ import { resolveColor, type BrandTokens } from '../brand';
 import { css, esc, js, seconds } from './html';
 import { DEVICE_OVERSCAN, TEMPLATES, Timing, type PropsOf, type TemplateCtx, type Tween, type Vars } from './templates';
 import { SCREEN_GPU, VIDEO_GPU, gpuScript, type GpuProfile } from './gpu';
-import { LIGHTING, SCENE_MODULES, ThreeKind, lookRuntime, surfaceOf, threeAssetUrls, threeImportMap, threeScript, type InlinedModules, type ThreeClip } from './three';
+import { EnvLoad, LIGHTING, SCENE_MODULES, ThreeKind, lookRuntime, surfaceOf, threeAssetUrls, threeImportMap, threeScript, type InlinedModules, type ThreeClip } from './three';
 import { outlineUrl } from '../fonts/outline';
 import { Finish, ScreenFit } from '../devices';
 import { deviceRuntime } from './device-runtime';
@@ -53,14 +53,8 @@ import { EFFECT_CSS, adjustmentLayer, adjustmentTimeline, effectLayer, effectScr
 import { flattenComps, type GroupProps } from '../precomp';
 import { blendStyle } from '../blend';
 import { HELD, holdScript } from './blur';
-import { engineScript } from '../engine/engine';
-import liveRuntime from 'virtual:motion-live-runtime';
-import generative from 'virtual:motion-generative';
-import twgl from 'virtual:motion-twgl';
-import fx from 'virtual:motion-fx';
-import splitting from 'virtual:motion-splitting';
-import openProps from 'virtual:motion-open-props';
-import shaderRuntime from 'virtual:motion-shader-fx';
+import { Chunk, chunkCode, chunkUrl } from './runtime-chunks';
+import { RuntimeDelivery } from './runtime-delivery';
 import { shaderBakes, shaderScript, type ShaderBake } from '../shaders/compose';
 import { liveSpec, type SpecInput } from '../interactive/spec';
 import { LIVE_GLOBAL } from '../interactive/runtime';
@@ -105,7 +99,7 @@ export enum Target {
 
 export type Inlined = Partial<Record<Script, string>>;
 
-export type ComposeInput = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; scale?: number; analyses?: Record<string, AudioAnalysis>; liveness?: Liveness; target?: Target; origin?: string; inlined?: Inlined; modules?: InlinedModules };
+export type ComposeInput = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; scale?: number; analyses?: Record<string, AudioAnalysis>; liveness?: Liveness; target?: Target; origin?: string; inlined?: Inlined; modules?: InlinedModules; runtime?: RuntimeDelivery };
 
 function pick(vars: Vars, keys: string[]): Vars {
   return Object.fromEntries(keys.map((k) => [k, vars[k]]));
@@ -436,6 +430,8 @@ const RESOLVE: Record<PropFormat, ValueResolver> = {
   [PropFormat.Font]: (v, ctx) => ctx.font(String(v))
 };
 
+const ENV_LOAD: Record<Target, EnvLoad> = { [Target.Video]: EnvLoad.Wait, [Target.Screen]: EnvLoad.Swap };
+
 const GPU: Record<Target, GpuProfile> = { [Target.Video]: VIDEO_GPU, [Target.Screen]: SCREEN_GPU };
 
 const PLAY: Record<Target, Record<ComponentMode, Play>> = {
@@ -463,7 +459,7 @@ function customRun(clip: MotionClip, ctx: TemplateCtx<ComponentId>, components: 
 
 const inlineScript = (code: string) => `<script>${code.replace(/<\/script/gi, '<\\/script')}</script>`;
 
-const LIBRARY_SOURCE: Record<Library, Script[] | string> = {
+const LIBRARY_SOURCE: Record<Library, Script[] | Chunk> = {
   [Library.Lottie]: [Script.Lottie],
   [Library.LittleJS]: [Script.LittleJS],
   [Library.Kaplay]: [Script.Kaplay],
@@ -472,14 +468,23 @@ const LIBRARY_SOURCE: Record<Library, Script[] | string> = {
   [Library.P5]: [Script.P5],
   [Library.Pixi]: [Script.Pixi, Script.PixiEval],
   [Library.Matter]: [Script.Matter],
-  [Library.Generative]: generative,
-  [Library.Twgl]: twgl,
-  [Library.Fx]: fx,
-  [Library.Splitting]: splitting,
-  [Library.OpenProps]: openProps
+  [Library.Generative]: Chunk.Generative,
+  [Library.Twgl]: Chunk.Twgl,
+  [Library.Fx]: Chunk.Fx,
+  [Library.Splitting]: Chunk.Splitting,
+  [Library.OpenProps]: Chunk.OpenProps
 };
 
-type Delivery = { origin: string; inlined: Inlined; modules: InlinedModules };
+type Delivery = { origin: string; inlined: Inlined; modules: InlinedModules; runtime: RuntimeDelivery };
+
+const CHUNK_TAG: Record<RuntimeDelivery, (chunk: Chunk, origin: string) => string> = {
+  [RuntimeDelivery.Inline]: (chunk) => inlineScript(chunkCode(chunk)),
+  [RuntimeDelivery.Hosted]: (chunk, origin) => `<script src="${chunkUrl(origin, chunk)}"></script>`
+};
+
+const chunkTag = (chunk: Chunk, delivery: Delivery) => CHUNK_TAG[delivery.runtime](chunk, delivery.origin);
+
+const hostedChunks = (chunks: Chunk[], delivery: Delivery) => (delivery.runtime === RuntimeDelivery.Hosted ? chunks.map((chunk) => chunkUrl(delivery.origin, chunk)) : []);
 
 export const hostedScriptTag = (origin: string, script: Script) => `<script src="${scriptUrl(origin, script)}" integrity="${integrity[script]}" crossorigin="anonymous"></script>`;
 
@@ -498,9 +503,14 @@ const scriptsOf = (lib: Library): Script[] => {
   return typeof source === 'string' ? [] : source;
 };
 
+const chunksOf = (lib: Library): Chunk[] => {
+  const source = LIBRARY_SOURCE[lib];
+  return typeof source === 'string' ? [source] : [];
+};
+
 function libraryTag(lib: Library, delivery: Delivery): string {
   const source = LIBRARY_SOURCE[lib];
-  return typeof source === 'string' ? inlineScript(source) : source.map((script) => scriptTag(script, delivery)).join('');
+  return typeof source === 'string' ? chunkTag(source, delivery) : source.map((script) => scriptTag(script, delivery)).join('');
 }
 
 function modulesOf(three: ThreeClip[], compositions: TimedBake[]): Module[] {
@@ -573,7 +583,7 @@ export function composeHtml(raw: ComposeInput): string {
   const prepared = bakePaths(withoutBackdrop(flattenComps(withJunctions(shown))));
   const input = { ...raw, doc: bakePhysics(bakeExpressions(prepared, raw.analyses)) };
   const { doc, tokens } = input;
-  const delivery: Delivery = { origin: raw.origin ?? defaultOrigin(), inlined: raw.inlined ?? {}, modules: raw.modules ?? {} };
+  const delivery: Delivery = { origin: raw.origin ?? defaultOrigin(), inlined: raw.inlined ?? {}, modules: raw.modules ?? {}, runtime: raw.runtime ?? RuntimeDelivery.Inline };
   const scale = raw.scale ?? 1;
   const frame = { width: Math.round(doc.width * scale), height: Math.round(doc.height * scale) };
   const bottomFirst = doc.tracks.map((track, index) => ({ track, index })).reverse();
@@ -651,7 +661,7 @@ export function composeHtml(raw: ComposeInput): string {
 
   const duration = seconds(doc.durationInFrames, doc.fps);
   const background = ROOT_BACKGROUND[doc.background](tokens);
-  const look = lookRuntime(doc.look);
+  const look = lookRuntime(doc.look, delivery.origin, ENV_LOAD[raw.target ?? Target.Video]);
   const modules = modulesOf(three, compositions);
   const animation = animationScript(clips, doc, (v) => resolveColor(v, tokens), parentsWithChildren(doc));
   const used = new Set(runs.map((r) => r.name));
@@ -664,7 +674,9 @@ export function composeHtml(raw: ComposeInput): string {
   const screenshotInlined = delivery.inlined[Script.Screenshot] !== undefined;
   const moduleSources = modules.map((module) => (delivery.modules[module] === undefined ? moduleUrl(delivery.origin, module) : 'data:'));
   const screenshotSrc = screenshotInlined ? '' : scriptUrl(delivery.origin, Script.Screenshot);
-  const scripts = [...hosted, screenshotSrc, ...moduleSources].filter(Boolean);
+  const live = LIVE_SCRIPT[raw.liveness ?? Liveness.Baked]({ live: prepared, baked: doc, outside: interactiveOf(raw.doc).outside, parents: [...parentsWithChildren(doc)], color: (v) => resolveColor(v, tokens) }, delivery);
+  const chunks = [Chunk.Engine, ...[...libraries].flatMap(chunksOf), ...(shaderClips.length ? [Chunk.Shader] : []), ...(particles.length ? [Chunk.Particles] : []), ...(live ? [Chunk.Live] : [])];
+  const scripts = [...hosted, screenshotSrc, ...moduleSources, ...hostedChunks(chunks, delivery)].filter(Boolean);
   const assetUrls = [...Object.values(input.assets), ...(tokens.logoUrl ? [tokens.logoUrl] : []), ...threeAssetUrls(look, three)];
 
   const page = [
@@ -672,10 +684,10 @@ export function composeHtml(raw: ComposeInput): string {
     `<meta name="viewport" content="width=${frame.width}, height=${frame.height}" />`,
     cspMeta({ scripts: [...new Set(scripts)], assetUrls }),
     scriptTag(Script.Runtime, delivery),
-    `<script>${engineScript()}</script>`,
+    chunkTag(Chunk.Engine, delivery),
     ...[...libraries].map((lib) => libraryTag(lib, delivery)),
     screenshotInlined ? scriptTag(Script.Screenshot, delivery) : '',
-    shaderClips.length ? inlineScript(shaderRuntime) : '',
+    shaderClips.length ? chunkTag(Chunk.Shader, delivery) : '',
     threeImportMap(delivery.origin, modules, delivery.modules),
     three.length || compositions.length || libraries.has(Library.Three) ? `<script>${gpuScript(GPU[raw.target ?? Target.Video])}</script>` : '',
     `<link rel="stylesheet" crossorigin="anonymous" href="${FONTS_URL}" />`,
@@ -700,20 +712,20 @@ export function composeHtml(raw: ComposeInput): string {
     hotScript(compositionScript(compositions, Number(duration))),
     hotScript(shapeScript(shapes, doc.fps, Number(duration))),
     hotScript(textPathScript(textPaths, doc.fps, Number(duration))),
-    hotScript(particleScript(particles, doc.fps, Number(duration))),
+    particles.length && delivery.runtime === RuntimeDelivery.Hosted ? chunkTag(Chunk.Particles, delivery) : '',
+    hotScript(particleScript(particles, doc.fps, Number(duration), delivery.runtime)),
     hotScript(blobScript(blobs, Number(duration))),
     hotScript(shaderScript(shaderClips, Number(duration))),
     ...[...cardBakes].map(([layout, bakes]) => hotScript(layout.script(bakes as never[], doc.fps, Number(duration))))
   ].join('');
-  const live = LIVE_SCRIPT[raw.liveness ?? Liveness.Baked]({ live: prepared, baked: doc, outside: interactiveOf(raw.doc).outside, parents: [...parentsWithChildren(doc)], color: (v) => resolveColor(v, tokens) });
   return `${page}${live}${captureScript(frame, contentStamp(page), screenshotSrc)}${measureScript()}</body></html>`;
 }
 
-const LIVE_SCRIPT: Record<Liveness, (input: SpecInput) => string> = {
+const LIVE_SCRIPT: Record<Liveness, (input: SpecInput, delivery: Delivery) => string> = {
   [Liveness.Baked]: () => '',
-  [Liveness.Live]: (input) => {
+  [Liveness.Live]: (input, delivery) => {
     const spec = liveSpec(input);
-    return spec.live.length ? `<script>${liveRuntime.replace(/<\/script/gi, '<\\/script')}</script><script>window.${LIVE_GLOBAL}(${scriptJson(spec)});</script>` : '';
+    return spec.live.length ? `${chunkTag(Chunk.Live, delivery)}<script>window.${LIVE_GLOBAL}(${scriptJson(spec)});</script>` : '';
   }
 };
 

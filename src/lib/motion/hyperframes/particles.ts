@@ -5,6 +5,7 @@ import { drawParticles, glowTiles, particleQuads, particlesAt, type ParticleBake
 import { css, esc, js } from './html';
 import { seekDriver } from './stage';
 import { ON_DISPOSE, hotScope, hotSeek } from './hot';
+import { PARTICLE_RUNTIME_GLOBAL, RuntimeDelivery } from './runtime-delivery';
 
 type Env = { width: number; height: number; unit: number; fps: number; color: (value: string) => string };
 
@@ -55,11 +56,20 @@ export function particleHtml(clipId: string, width: number, height: number, spri
   return `<div class="cc"><canvas id="${canvasId(clipId)}" width="${width}" height="${height}" style="${fill}"></canvas>${image}</div>`;
 }
 
-export function particleScript(bakes: readonly ParticleBake[], fps: number, duration: number): string {
+export function particleRuntime(): string {
+  return `{at:(${particlesAt.toString()}),draw:(${drawParticles.toString()}),glows:(${glowTiles.toString()})(function(){return document.createElement('canvas');}),quads:(${particleQuads.toString()})}`;
+}
+
+const RUNTIME_OF: Record<RuntimeDelivery, () => string> = {
+  [RuntimeDelivery.Inline]: () => `(${particleRuntime()})`,
+  [RuntimeDelivery.Hosted]: () => `window.${PARTICLE_RUNTIME_GLOBAL}`
+};
+
+export function particleScript(bakes: readonly ParticleBake[], fps: number, duration: number, runtime = RuntimeDelivery.Inline): string {
   if (!bakes.length) {
     return '';
   }
-  return `<script>(function(){${hotScope(PARTICLE_TIMELINE)}const PT_AT=(${particlesAt.toString()});const PT_DRAW=(${drawParticles.toString()});const PT_GLOWS=(${glowTiles.toString()})(function(){return document.createElement('canvas');});const PT_QUADS=(${particleQuads.toString()});
+  return `<script>(function(){${hotScope(PARTICLE_TIMELINE)}const PT=${RUNTIME_OF[runtime]()};const PT_AT=PT.at;const PT_DRAW=PT.draw;const PT_GLOWS=PT.glows;const PT_QUADS=PT.quads;
 const B=${js(bakes)};
 const items=B.map(function(b){const el=document.getElementById(${js(canvasId(''))}+b.id);return {b:b,el:el,memo:new Map(),paint:el&&el.getContext('2d'),sprite:document.getElementById(${js(spriteId(''))}+b.id)};});
 let shown=0;

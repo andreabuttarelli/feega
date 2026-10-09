@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('$env/dynamic/public', () => ({ env: { PUBLIC_SUPABASE_URL: 'https://sb.test' } }));
 
 const { GET } = await import('./+server');
+const { Chunk, chunkUrl } = await import('$lib/motion/hyperframes/runtime-chunks');
 
 const NODE = '6f1c2a8e-0b7d-4f1e-9a3c-2d5e8f7a1b40';
 
@@ -72,6 +73,35 @@ describe('/e/[id]', () => {
     expect(page).toContain(`\\u003cscript src=\\"${libs}p5@1.11.11/p5.min.js\\" integrity=\\"sha384-`);
     expect(page).toContain(`\\"three\\":\\"${libs}three@0.181.2/esm/three.module.js\\"`);
     expect(page).toContain(`script-src &#39;unsafe-inline&#39; ${libs} data:`);
+  });
+
+  it('an embed frozen with an old particle renderer draws with the current one', async () => {
+    const script = `<script data-hot>(function(){const PT_AT=(function ym(t,e){return [];});const PT_DRAW=(function(t,e,o,n){t.createRadialGradient(0,0,0,0,0,1);});\nconst B=[{"id":"p"}];\nfunction particlesNow(time){PT_DRAW(null,PT_AT(B[0],time),"circle",null);}\n})();</script>`;
+    const cfg = { html: `<html><head><meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;; script-src &#39;unsafe-inline&#39; https://feega.app/motion-libs/x.js" /></head><body>${script}</body></html>`, width: 1920, height: 1080, duration: 24, playback: 'autoplay', loop: true };
+    const legacy = `<!doctype html><html><head><title>fd37</title></head><body><script>(function playerMain(cfg){})(${JSON.stringify(cfg).replace(/</g, '\\u003c')});</script></body></html>`;
+
+    const page = await (await open(NODE, legacy)).text();
+
+    expect(page).not.toContain('createRadialGradient');
+    expect(page).toContain(`\\u003cscript src=\\"${chunkUrl('https://oh.feega.app', Chunk.Particles)}\\">`);
+    expect(page).toContain('const PT_AT=');
+    expect(page).toContain(`${new URL(chunkUrl('https://oh.feega.app', Chunk.Particles)).origin}/motion-runtime/`);
+  });
+
+  it('an embed frozen with a 1k environment from jsdelivr loads the small one from our origin and does not wait for it', async () => {
+    const hdr = 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r181/examples/textures/equirectangular/moonless_golf_1k.hdr';
+    const env = "  return hdri().then((t) => { if (t) s.scene.environment = pmrem.fromEquirectangular(t).texture; });\n}";
+    const html = `<html><head><meta http-equiv="Content-Security-Policy" content="connect-src data: https://cdn.jsdelivr.net; worker-src &#39;none&#39;" /></head><body><script type="module">const LOOK = {"hdri":"${hdr}"};function environment(s) {\n${env}\nconst redraw = (time) => painter.again(time);</script></body></html>`;
+    const cfg = { html, width: 1920, height: 1080, duration: 24, playback: 'autoplay', loop: true };
+    const legacy = `<!doctype html><html><head><title>fd37</title></head><body><script>(function playerMain(cfg){})(${JSON.stringify(cfg).replace(/</g, '\\u003c')});</script></body></html>`;
+
+    const page = await (await open(NODE, legacy)).text();
+
+    expect(page).not.toContain('moonless_golf_1k');
+    expect(page).toContain('https://oh.feega.app/motion-env/r181/moonless_golf_256.hdr');
+    expect(page).toContain('connect-src data: https://cdn.jsdelivr.net https://oh.feega.app;');
+    expect(page).toContain('RoomEnvironment');
+    expect(page).toContain('redraw(window.__hfThreeTime || 0)');
   });
 
   it('an unpublished embed is a 404', async () => {

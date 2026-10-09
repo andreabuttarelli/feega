@@ -7,6 +7,7 @@ import { HOSTED, MODULES, MODULE_EXTERNAL, MOTION_LIBS_ROUTE, OPENTYPE, Packing,
 
 export const MOTION_LIBS_MODULE = 'virtual:motion-libs';
 export const MOTION_LIBS_DIR = 'static/motion-libs';
+const MOTION_ENV_ROUTE = '/motion-env';
 
 export type Integrity = Record<Script, string>;
 
@@ -90,10 +91,12 @@ export function motionLibs(): Plugin {
     resolveId: (id) => (id === MOTION_LIBS_MODULE ? resolved : null),
     load: async (id) => (id === resolved ? `export default ${JSON.stringify(await ready(root))};` : null),
     configureServer: (server) => {
-      server.middlewares.use(MOTION_LIBS_ROUTE, (_req, res, next) => {
-        res.setHeader('Access-Control-Allow-Origin', '*');
-        next();
-      });
+      for (const route of [MOTION_LIBS_ROUTE, MOTION_ENV_ROUTE]) {
+        server.middlewares.use(route, (_req, res, next) => {
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          next();
+        });
+      }
     }
   };
 }
