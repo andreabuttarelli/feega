@@ -7,7 +7,41 @@ type Clip = MotionDoc['tracks'][number]['clips'][number];
 
 export type Span = { from: number; to: number };
 
-const SCENERY: ReadonlySet<ComponentId> = new Set(['BrandBackground', 'Adjustment', 'Particles', 'Null', 'Shape'] as ComponentId[]);
+enum Role {
+  Content = 'content',
+  Scenery = 'scenery'
+}
+
+const ROLE: Record<ComponentId, Role> = {
+  Title: Role.Content,
+  Text: Role.Content,
+  Kicker: Role.Content,
+  Caption: Role.Content,
+  Image: Role.Content,
+  Video: Role.Content,
+  Audio: Role.Content,
+  Shape: Role.Scenery,
+  Logo: Role.Content,
+  Null: Role.Scenery,
+  BrandBackground: Role.Scenery,
+  ProductCard: Role.Content,
+  SocialMockup: Role.Content,
+  CanvasMock: Role.Content,
+  Model3D: Role.Content,
+  Shape3D: Role.Content,
+  Text3D: Role.Content,
+  Logo3D: Role.Content,
+  Device3D: Role.Content,
+  Composition: Role.Content,
+  Particles: Role.Content,
+  LiquidGlass: Role.Content,
+  LiquidBlob: Role.Content,
+  Precomp: Role.Content,
+  Adjustment: Role.Scenery,
+  Custom: Role.Content
+};
+
+const isScenery = (component: ComponentId) => ROLE[component] === Role.Scenery;
 
 function visibleUntil(clip: Clip): number {
   const opacity = clip.keyframes.opacity ?? [];
@@ -26,7 +60,7 @@ export function shownSpans(doc: MotionDoc, tracks: MotionDoc['tracks'], offset: 
       if (nested) {
         return shownSpans(doc, nested.tracks, from - clip.trimStart, to).filter((s) => s.to > from).map((s) => ({ from: Math.max(from, s.from), to: s.to }));
       }
-      return SCENERY.has(clip.component) ? [] : [{ from, to }];
+      return isScenery(clip.component) ? [] : [{ from, to }];
     });
 }
 
@@ -39,7 +73,7 @@ const endsAt = (clip: Clip, frame: number) => clip.from + clip.durationInFrames 
 function heldTracks(doc: MotionDoc, end: number, hold: number): MotionDoc['tracks'] {
   return doc.tracks.map((t) => ({
     ...t,
-    clips: t.clips.map((c) => (t.kind === TrackKind.Visual && !SCENERY.has(c.component) && endsAt(c, end) ? { ...c, durationInFrames: c.durationInFrames + hold } : c))
+    clips: t.clips.map((c) => (t.kind === TrackKind.Visual && !isScenery(c.component) && endsAt(c, end) ? { ...c, durationInFrames: c.durationInFrames + hold } : c))
   }));
 }
 

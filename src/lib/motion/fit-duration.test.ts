@@ -27,6 +27,15 @@ describe('fit duration to content', () => {
     expect(contentEnd(phones())).toBe(6 * SECOND);
   });
 
+  it('a film made of particles has content to its end, not an empty tail from 0 s', () => {
+    const blank = { ...newMotionDoc(MotionFormat.Portrait), style: MotionStyle.AppleMinimal, durationInFrames: 15 * SECOND };
+    const paper = must(addClip(blank, { component: 'Shape', from: 0, durationInFrames: 15 * SECOND, props: {} }, 'paper'));
+    const dust = must(addClip(paper, { component: 'Particles', from: 0, durationInFrames: 15 * SECOND, props: {} }, 'dust'));
+
+    expect(contentEnd(dust)).toBe(15 * SECOND);
+    expect(emptyTail(dust)).toEqual([]);
+  });
+
   it('fits the 15 s phones demo to 6 s plus the style hold, held on the last frame', () => {
     const doc = must(fitDuration(phones()));
 

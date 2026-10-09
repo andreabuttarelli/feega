@@ -271,6 +271,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
   const stepModels: string[] = [];
   const openingMessages = [...history, { role: 'user', content: openingContent }] as ModelMessage[];
   const stepTiers: Tier[] = [];
+  const framesShown = new Set<string>();
   let spent = 0;
   const overBudget: Stop = overTurnCap(() => spent);
   const TIER_MODEL: Record<Tier, string> = { [Tier.Edit]: model, [Tier.Code]: codeModel };
@@ -297,7 +298,8 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
         const tier = stepTier(stepTiers.at(-1) ?? opening, steps.map((s) => s.toolCalls));
         stepTiers.push(tier);
         const tierModel = TIER_MODEL[tier];
-        const routed = visionModel ? visionStep({ lastCalls: steps.at(-1)?.toolCalls ?? [], messages: current, frames: session.frames, visionModel: tier === Tier.Code ? codeModel : visionModel }) : undefined;
+        const routed = visionModel ? visionStep({ messages: current, shown: framesShown, stepModel: tierModel, visionModel: tier === Tier.Code ? codeModel : visionModel }) : undefined;
+        routed?.shown?.forEach((id) => framesShown.add(id));
         const stepModel = routed?.model ?? tierModel;
         stepModels.push(stepModel);
         const forced = ROUND_CHOICE[kind]({ tier, reasoning: stepModel === model ? reasoning : null, stepNumber });

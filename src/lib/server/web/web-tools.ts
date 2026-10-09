@@ -10,7 +10,7 @@ import { BROWSE_DEADLINE_MS, BROWSE_MAX_SHOTS, BROWSE_MAX_STEPS, browseStepSchem
 
 export type ImageImport = { ok: true; assetId: string; width: number | null; height: number | null } | { ok: false; error: string };
 
-export type ProductsImport = { ok: true; products: { handle: string; title: string; asset_ids: string[] }[]; missing: string[]; node_id?: string } | { ok: false; error: string };
+export type ProductsImport = { ok: true; products: { handle: string; title: string; asset_ids: string[]; pictures: string[] }[]; missing: string[]; node_id?: string } | { ok: false; error: string };
 
 export type BrowseShot = { jpeg: Buffer; path: string | null };
 export type BrowseView = { ok: true; url: string; steps: StepReport[]; shots: BrowseShot[]; costUsd: number; stopped?: string } | { ok: false; error: string; costUsd: number };
@@ -90,6 +90,12 @@ export function createWebTools(deps: WebToolDeps): Record<string, Tool> {
   const browses = counter(MAX_BROWSES_PER_TURN);
   const seenByCall = new Map<string, ImagePart[]>();
 
+  const glance = async (urls: string[], callId: string) => {
+    if (deps.view && urls.length) {
+      seenByCall.set(callId, (await deps.view(urls.slice(0, MAX_VIEWED), ViewDetail.Low, callId)).parts);
+    }
+  };
+
   const tools: Record<string, Tool> = {
     web_search: tool({
       description: `Search the public web. Returns up to max_results (default ${DEFAULT_RESULTS}) results with title, url, snippet and date (null when unknown). Costs a little per call, at most ${MAX_SEARCHES_PER_TURN} per turn: write one precise query, not variations of it.`,
@@ -123,9 +129,19 @@ export function createWebTools(deps: WebToolDeps): Record<string, Tool> {
   if (deps.importProducts) {
     const importProducts = deps.importProducts;
     tools.import_products = tool({
-      description: `Save products the user chose from a store read with read_store: their pictures become project assets (screened like uploads), returned as asset_ids per product. handles: the handle of each product (max ${MAX_PRODUCTS_IMPORTED}).`,
+      description: `Save products the user chose from a store read with read_store: their pictures become project assets (screened like uploads), returned as asset_ids per product, and you see the first picture of each. handles: the handle of each product (max ${MAX_PRODUCTS_IMPORTED}).`,
       inputSchema: z.object({ store_url: z.string().min(4).max(2000), handles: z.array(z.string().min(1).max(200)).min(1).max(MAX_PRODUCTS_IMPORTED) }),
-      execute: async (input) => (imports() ? importProducts(input.store_url, input.handles) : limitReached('import', MAX_IMPORTS_PER_TURN))
+      execute: async (input, { toolCallId }) => {
+        if (!imports()) {
+          return limitReached('import', MAX_IMPORTS_PER_TURN);
+        }
+        const imported = await importProducts(input.store_url, input.handles);
+        if (imported.ok) {
+          await glance(imported.products.flatMap((p) => p.pictures.slice(0, 1)), toolCallId);
+        }
+        return imported;
+      },
+      toModelOutput: ({ toolCallId, output }) => withImages(output, seenByCall.get(toolCallId))
     });
   }
 
@@ -190,15 +206,20 @@ export function createWebTools(deps: WebToolDeps): Record<string, Tool> {
   if (deps.importImage) {
     const importImage = deps.importImage;
     tools.import_image = tool({
-      description: `Save a picture from a public https url (PNG, JPEG, WebP or GIF) into this project's assets, screened like an upload. Returns its asset_id. Only pictures the user wants to use: at most ${MAX_IMPORTS_PER_TURN} per turn.`,
+      description: `Save a picture from a public https url (PNG, JPEG, WebP or GIF) into this project's assets, screened like an upload. Returns its asset_id and you see the picture saved. Only pictures the user wants to use: at most ${MAX_IMPORTS_PER_TURN} per turn.`,
       inputSchema: z.object({ url: z.string().url().max(2000) }),
-      execute: async (input) => {
+      execute: async (input, { toolCallId }) => {
         if (!imports()) {
           return limitReached('import', MAX_IMPORTS_PER_TURN);
         }
         const imported = await importImage(input.url);
-        return imported.ok ? { ok: true, asset_id: imported.assetId, width: imported.width, height: imported.height } : imported;
-      }
+        if (!imported.ok) {
+          return imported;
+        }
+        await glance([input.url], toolCallId);
+        return { ok: true, asset_id: imported.assetId, width: imported.width, height: imported.height };
+      },
+      toModelOutput: ({ toolCallId, output }) => withImages(output, seenByCall.get(toolCallId))
     });
   }
 

@@ -26,11 +26,29 @@ export type ViewOutcome = { images: ViewedImage[]; parts: ImagePart[] };
 
 class Refused extends Error {}
 
+const META_TAG = /<meta\b[^>]*>/gi;
+const OG_IMAGE = /(?:property|name)=["']og:image(?::secure_url)?["']/i;
+const CONTENT = /content=["']([^"']+)["']/i;
+
+function declaredPicture(html: string): string | null {
+  const tag = (html.match(META_TAG) ?? []).find((t) => OG_IMAGE.test(t));
+  return tag ? (CONTENT.exec(tag)?.[1] ?? null) : null;
+}
+
+async function fetchPicture(url: string, ports: ViewPorts): Promise<SafeFetchBytesResult> {
+  const fetched = await ports.fetchImage(url);
+  if (!fetched.ok || !fetched.mime.startsWith('text/html')) {
+    return fetched;
+  }
+  const declared = declaredPicture(fetched.bytes.toString('utf8'));
+  return declared ? ports.fetchImage(new URL(declared, fetched.url).href) : fetched;
+}
+
 const errorOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 async function viewOne(url: string, path: string, edge: number, ports: ViewPorts): Promise<{ image: ViewedImage; part?: ImagePart }> {
   try {
-    const fetched = await ports.fetchImage(url);
+    const fetched = await fetchPicture(url, ports);
     if (!fetched.ok) {
       throw new Refused(`the server answered ${fetched.status}`);
     }

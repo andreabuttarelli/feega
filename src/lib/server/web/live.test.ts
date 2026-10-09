@@ -42,7 +42,7 @@ describe('import_products', () => {
 
     const out = await productImport(save, place, fetchProducts)('https://shop.example', ['a', 'b', 'c']);
 
-    expect(out).toEqual({ ok: true, products: [{ handle: 'a', title: 'A', asset_ids: ['asset:1', 'asset:2'] }, { handle: 'b', title: 'B', asset_ids: [] }], missing: ['c'], node_id: 'node-1' });
+    expect(out).toEqual({ ok: true, products: [{ handle: 'a', title: 'A', asset_ids: ['asset:1', 'asset:2'], pictures: ['https/1', 'https/2'] }, { handle: 'b', title: 'B', asset_ids: [], pictures: [] }], missing: ['c'], node_id: 'node-1' });
     expect(place).toHaveBeenCalledWith('shopify', 'https://shop.example', expect.any(Array));
   });
 
