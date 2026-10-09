@@ -39,6 +39,15 @@ describe('userContent', () => {
     const meta = await sharp(Buffer.from(image.image)).metadata();
     expect(Math.max(meta.width ?? 0, meta.height ?? 0)).toBe(MODEL_IMAGE_MAX_PX);
   });
+
+  it('an image whose file cannot be read says so, instead of claiming a picture the model never gets', async () => {
+    const { db } = fakeDb({ assets: [row('a-1', { type: 'image', url: 'o/p/chat/missing.png' })] }, { files: {} });
+
+    const content = await userContent(db, { orgId: 'org-1', text: 'look', attachments: [logo], hint: () => '' });
+
+    expect(JSON.stringify(content)).toContain('could not be loaded');
+    expect(JSON.stringify(content)).not.toContain('"type":"image"');
+  });
 });
 
 describe('attachedNote', () => {

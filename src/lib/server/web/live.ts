@@ -226,7 +226,7 @@ export function productImport(save: SavePicture, place?: PlaceProducts, fetchPro
     const products = await Promise.all(
       found.products.map(async (p) => {
         const saved = await Promise.all(p.images.slice(0, PICTURES_PER_PRODUCT).map((i) => save(i.url)));
-        return { handle: p.handle ?? p.title, title: p.title, asset_ids: saved.flatMap((s) => (s.ok ? [s.assetId] : [])) };
+        return { handle: p.handle ?? p.title, title: p.title, asset_ids: saved.flatMap((s) => (s.ok ? [s.assetId] : [])), pictures: p.images.slice(0, PICTURES_PER_PRODUCT).flatMap((i, n) => (saved[n].ok ? [i.url] : [])) };
       })
     );
     const nodeId = place && found.products.length ? await place(found.platform, storeUrl, found.products) : null;

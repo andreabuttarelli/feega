@@ -53,35 +53,38 @@ describe('the self-check looks at the middle of each scene', () => {
   });
 });
 
-describe('only the step that inspects frames goes to the vision model', () => {
-  const images = new Map([['c1', [{ time: 1, bytes: Buffer.from([1]) }]]]);
+describe('a main model that cannot see hands the frames to the vision model', () => {
   const base: ModelMessage[] = [{ role: 'user', content: 'fix the title' }];
+  const framed: ModelMessage[] = [
+    ...base,
+    { role: 'assistant', content: [{ type: 'tool-call', toolCallId: 'c1', toolName: VIEW_FRAMES, input: {} }] },
+    {
+      role: 'tool',
+      content: [{ type: 'tool-result', toolCallId: 'c1', toolName: VIEW_FRAMES, output: { type: 'content', value: [{ type: 'text', text: '{}' }, { type: 'file', mediaType: 'image/jpeg', data: { type: 'data', data: 'AQ==' } }] } }]
+    }
+  ];
+  const blindStep = { stepModel: 'text', visionModel: 'vision' };
 
-  it('right after view_frames: vision model, frames attached as a user message', () => {
-    const step = visionStep({ lastCalls: [{ toolName: VIEW_FRAMES, toolCallId: 'c1' }], messages: base, frames: images, visionModel: 'vision' });
-
-    expect(step?.model).toBe('vision');
-    const last = step!.messages!.at(-1)!;
-    expect(last.role).toBe('user');
-    expect(JSON.stringify(last.content)).toContain('image/jpeg');
+  it('a model that sees keeps the frames where they are, in the tool result', () => {
+    expect(visionStep({ messages: framed, shown: new Set(), stepModel: 'vision', visionModel: 'vision' })).toBeUndefined();
   });
 
-  it('the frames of a failed determinism check are shown like viewed frames', () => {
-    const step = visionStep({ lastCalls: [{ toolName: 'write_component', toolCallId: 'c1' }], messages: base, frames: images, visionModel: 'vision' });
+  it('frames not yet seen go to the vision model, whatever round they came from', () => {
+    const step = visionStep({ messages: [...framed, { role: 'user', content: 'The turn is over' }], shown: new Set(), ...blindStep });
 
-    expect(JSON.stringify(step?.messages?.at(-1)?.content)).toContain('image/jpeg');
+    expect(step).toEqual({ model: 'vision', shown: ['c1'] });
   });
 
-  it('any other step keeps the default model and drops images already seen', () => {
-    const seen: ModelMessage[] = [...base, { role: 'user', content: [{ type: 'file', mediaType: 'image/jpeg', data: Buffer.from([1]) }] }];
-    const step = visionStep({ lastCalls: [{ toolName: 'set_props', toolCallId: 'c2' }], messages: seen, frames: images, visionModel: 'vision' });
+  it('frames already seen are dropped for the model that cannot see them', () => {
+    const step = visionStep({ messages: framed, shown: new Set(['c1']), ...blindStep });
 
     expect(step?.model).toBeUndefined();
     expect(JSON.stringify(step?.messages)).not.toContain('image/jpeg');
+    expect(JSON.stringify(step?.messages)).toContain('frames already inspected');
   });
 
   it('a step with no images anywhere changes nothing', () => {
-    expect(visionStep({ lastCalls: [], messages: base, frames: new Map(), visionModel: 'vision' })).toBeUndefined();
+    expect(visionStep({ messages: base, shown: new Set(), ...blindStep })).toBeUndefined();
   });
 });
 

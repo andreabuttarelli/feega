@@ -27,7 +27,7 @@ const PARTS_OF: Record<AttachmentKind, (db: Db, a: ChatAttachment, asset: Asset,
   [AttachmentKind.Document]: async (_db, a, asset) => [{ type: 'text', text: `### Attached file: ${a.name}\n\n${asset.content ?? ''}` }],
   [AttachmentKind.Image]: async (db, a, asset, hint) => {
     const image = await modelImage(db, asset);
-    const label: Part = { type: 'text', text: `Attached image: ${a.name} — project asset ${a.assetId}. ${hint(a)}`.trim() };
+    const label: Part = { type: 'text', text: `Attached image: ${a.name} — project asset ${a.assetId}.${image ? '' : ' Its picture could not be loaded: you cannot see it.'} ${hint(a)}`.trim() };
     return image ? [label, image] : [label];
   }
 };

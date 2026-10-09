@@ -39,6 +39,19 @@ describe('view_images', () => {
     expect(JSON.stringify(out.images)).not.toMatch(/base64|data:/);
   });
 
+  it('a page link, like a Pinterest pin, shows the picture the page declares as its own', async () => {
+    const pin = 'https://www.pinterest.com/pin/123/';
+    const picture = 'https://i.pinimg.com/originals/ab/cd.jpg';
+    const page = Buffer.from(`<html><head><meta property="og:image" content="${picture}"></head></html>`);
+    const fetchImage = vi.fn(async (url: string) => (url === pin ? { url, status: 200, ok: true, mime: 'text/html; charset=utf-8', bytes: page } : { url, status: 200, ok: true, mime: 'image/png', bytes: await png(10, 10) }));
+
+    const out = await viewImages([pin], ViewDetail.Low, 'pre', ports({ fetchImage }).p);
+
+    expect(out.parts).toHaveLength(1);
+    expect(out.images[0]).toMatchObject({ url: pin, path: 'pre/0.jpg' });
+    expect(fetchImage).toHaveBeenCalledWith(picture);
+  });
+
   it('keeps the low detail smaller', async () => {
     const out = await viewImages(['https://a.example/x.png'], ViewDetail.Low, 'pre', ports().p);
 

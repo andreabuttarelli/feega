@@ -36,7 +36,7 @@ import { setMotionPath, setPathTangent } from '$lib/motion/path-ops';
 import { EASE_PRESETS, EASE_PRESET_IDS, easeHandles, withHandles } from '$lib/motion/graph';
 import { ANIMATABLE, INTERPS, Interp, SPATIAL_KEYS, TRANSFORM_KEYS, ValueKind, easeSchema, type Keyframe } from '$lib/motion/keyframes';
 import type { MotionAsset } from './editor';
-import { MAX_FRAMES_PER_VIEW, MAX_VIEWS_PER_TURN, VIEW_FRAMES, type Frame } from './frames';
+import { MAX_FRAMES_PER_VIEW, MAX_VIEWS_PER_TURN, VIEW_FRAMES, withFrames, type Frame } from './frames';
 import { contentEnd, fitDuration } from '$lib/motion/fit-duration';
 import { blocking, docProblems, frameProblems, softPictures, type FrameStat, type Pixels, type QualityProblem } from '$lib/motion/direction';
 import { CheckState, ComponentMode, MAX_CSS, MAX_HTML, MAX_JS, SOURCE_FILES, checkState, modeOf, propsSchemaSchema, sourceHash, type CustomComponent } from '$lib/motion/custom/component';
@@ -514,7 +514,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       return { ok: true, version, check: state };
     }
     session.frames.set(callId, check.frames);
-    const shown = check.frames.length ? ' The two frames that should be identical follow as images.' : '';
+    const shown = check.frames.length ? ' The two frames that should be identical are attached as images.' : '';
     return { ok: false, error: `${name} v${version} is saved but failed the seek-determinism check, so it cannot be exported:\n- ${check.problems.join('\n- ')}\nFix it with patch_component: build every change on tl from props and time only.${shown}` };
   }
 
@@ -1883,8 +1883,8 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         session.views += 1;
         const end = session.doc.durationInFrames / session.doc.fps;
         const times = input.times.map((t) => Math.min(t, end));
-        const frames = await deps.frames(toolCallId, times);
-        if (!frames) {
+        const frames = (await deps.frames(toolCallId, times))?.filter((f) => f.bytes.length > 0) ?? [];
+        if (!frames.length) {
           return { ok: true, seen: false, note: 'frames unavailable: neither the editor nor the server could draw them. Continue without them; the user sees the video when they open the editor.' };
         }
         session.frames.set(toolCallId, frames);
@@ -1895,7 +1895,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         session.gate = [...docProblems(session.doc, { audioAssets, pixels, logos: [...brandLogos] }), ...frameProblems(stats)];
         const quality = session.gate.map((p) => p.detail);
         const open = blocking(session.gate).map((p) => p.detail);
-        return { ok: true, times: frames.map((f) => f.time), quality, blocking: open, note: open.length ? 'blocking lists what must be fixed before the video can be delivered: fix each one, then look again. The frames follow as images in the next message.' : quality.length ? 'The quality gate found the problems in quality: fix each one, then look again. The frames follow as images in the next message.' : 'The frames follow as images in the next message.' };
+        return { ok: true, times: frames.map((f) => f.time), quality, blocking: open, note: open.length ? 'blocking lists what must be fixed before the video can be delivered: fix each one, then look again. The frames are attached as images.' : quality.length ? 'The quality gate found the problems in quality: fix each one, then look again. The frames are attached as images.' : 'The frames are attached as images.' };
       }
     }),
 
@@ -2089,7 +2089,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     return ((await nested.execute(parsed.data, options)) ?? {}) as { ok?: boolean; error?: unknown };
   }
 
-  return { ...oneAtATime(tools), ...(deps.web ? createWebTools(deps.web) : {}) };
+  return { ...withFrames(oneAtATime(tools), session.frames), ...(deps.web ? createWebTools(deps.web) : {}) };
 }
 
 type Execute = (input: unknown, options: ToolExecutionOptions<unknown>) => Promise<unknown>;

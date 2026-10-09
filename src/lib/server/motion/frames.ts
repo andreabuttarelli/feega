@@ -1,12 +1,11 @@
 import { z } from 'zod';
-import type { ModelMessage } from 'ai';
+import type { ModelMessage, Tool } from 'ai';
 import { COMPONENTS, Control, TrackKind } from '$lib/motion/components';
 import { fieldsOf } from '$lib/motion/inspector';
 import type { MotionDoc } from '$lib/motion/doc';
 import { blocking, type QualityProblem } from '$lib/motion/direction';
 
 export const VIEW_FRAMES = 'view_frames';
-const FRAME_TOOLS: ReadonlySet<string> = new Set([VIEW_FRAMES, 'write_component', 'patch_component']);
 export const MAX_FRAMES_PER_VIEW = 6;
 export const MAX_VIEWS_PER_TURN = 3;
 export const MAX_FRAME_BYTES = 200_000;
@@ -52,35 +51,64 @@ export function keyFrameTimes(doc: MotionDoc, max = SELF_CHECK_FRAMES): number[]
   return picked.map((f) => Math.round((f / doc.fps) * SECONDS_PRECISION) / SECONDS_PRECISION);
 }
 
-type Call = { toolName: string; toolCallId: string };
+const FRAMES_ASK = 'Look for clipped or overflowing text, overlaps, poor contrast and anything outside the safe area.';
 
-export type VisionStepInput = { lastCalls: readonly Call[]; messages: ModelMessage[]; frames: ReadonlyMap<string, Frame[]>; visionModel: string };
-
-function hasImage(message: ModelMessage): boolean {
-  return Array.isArray(message.content) && message.content.some((part) => part.type === 'file');
-}
-
-function withoutImages(messages: ModelMessage[]): ModelMessage[] {
-  return messages.map((m) => (m.role === 'user' && hasImage(m) ? { role: 'user', content: SEEN } : m));
-}
-
-function framesMessage(frames: Frame[]): ModelMessage {
+function framesOutput(output: unknown, frames: readonly Frame[] = []) {
+  if (!frames.length) {
+    return { type: 'json' as const, value: output as never };
+  }
   return {
-    role: 'user',
-    content: [
-      { type: 'text', text: `Frames you asked for, in order, at ${frames.map((f) => `${f.time}s`).join(', ')}. Look for clipped or overflowing text, overlaps, poor contrast and anything outside the safe area.` },
-      ...frames.map((f) => ({ type: 'file' as const, mediaType: 'image/jpeg', data: f.bytes }))
+    type: 'content' as const,
+    value: [
+      { type: 'text' as const, text: JSON.stringify(output) },
+      { type: 'text' as const, text: `Frames, in order, at ${frames.map((f) => `${f.time}s`).join(', ')}. ${FRAMES_ASK}` },
+      ...frames.map((f) => ({ type: 'file' as const, mediaType: 'image/jpeg', data: { type: 'data' as const, data: f.bytes.toString('base64') } }))
     ]
   };
 }
 
-export function visionStep(input: VisionStepInput): { model?: string; messages?: ModelMessage[] } | undefined {
-  const viewed = input.lastCalls.filter((c) => FRAME_TOOLS.has(c.toolName)).flatMap((c) => input.frames.get(c.toolCallId) ?? []);
-  if (viewed.length) {
-    return { model: input.visionModel, messages: [...withoutImages(input.messages), framesMessage(viewed)] };
+export function withFrames(tools: Record<string, Tool>, frames: ReadonlyMap<string, Frame[]>): Record<string, Tool> {
+  return Object.fromEntries(
+    Object.entries(tools).map(([name, t]) => [name, t.toModelOutput ? t : { ...t, toModelOutput: ({ toolCallId, output }: { toolCallId: string; output: unknown }) => framesOutput(output, frames.get(toolCallId)) }])
+  );
+}
+
+type Part = { type: string; output?: { type: string; value?: unknown } };
+
+const isFile = (part: { type: string }) => part.type === 'file';
+
+const framedResult = (part: Part) => part.type === 'tool-result' && part.output?.type === 'content' && Array.isArray(part.output.value) && part.output.value.some(isFile);
+
+function hasImage(message: ModelMessage): boolean {
+  return Array.isArray(message.content) && (message.content as Part[]).some((part) => isFile(part) || framedResult(part));
+}
+
+function blind(message: ModelMessage): ModelMessage {
+  if (message.role === 'user' && hasImage(message)) {
+    return { role: 'user', content: SEEN };
+  }
+  if (message.role !== 'tool' || !hasImage(message)) {
+    return message;
+  }
+  return { ...message, content: message.content.map((part) => (framedResult(part as Part) && part.type === 'tool-result' && part.output.type === 'content' ? { ...part, output: { ...part.output, value: [...part.output.value.filter((v) => !isFile(v)), { type: 'text' as const, text: SEEN }] } } : part)) };
+}
+
+function imageCalls(messages: readonly ModelMessage[]): string[] {
+  return messages.flatMap((m) => (m.role === 'tool' ? m.content.flatMap((part) => (framedResult(part as Part) && part.type === 'tool-result' ? [part.toolCallId] : [])) : []));
+}
+
+export type VisionStepInput = { messages: ModelMessage[]; shown: ReadonlySet<string>; stepModel: string; visionModel: string };
+
+export function visionStep(input: VisionStepInput): { model?: string; messages?: ModelMessage[]; shown?: string[] } | undefined {
+  if (input.stepModel === input.visionModel) {
+    return undefined;
+  }
+  const unseen = imageCalls(input.messages).filter((id) => !input.shown.has(id));
+  if (unseen.length) {
+    return { model: input.visionModel, shown: unseen };
   }
   if (input.messages.some(hasImage)) {
-    return { messages: withoutImages(input.messages) };
+    return { messages: input.messages.map(blind) };
   }
   return undefined;
 }

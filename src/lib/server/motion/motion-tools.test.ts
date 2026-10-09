@@ -253,6 +253,16 @@ describe('motion agent tools', () => {
     expect(out.blocking.some((q) => q.includes('fit_duration'))).toBe(true);
   });
 
+  it('a draw that returns no picture is reported unseen, never ok with frames to follow', async () => {
+    const { run, session } = setup({ frames: async () => [{ time: 1, bytes: Buffer.alloc(0) }] });
+    await run('add_clip', { component: 'Title', start: 0, duration: 1, props: { text: 'Unseen' } });
+    const out = await run('view_frames', { times: [1] });
+
+    expect(out).toMatchObject({ ok: true, seen: false });
+    expect(String(out.note)).not.toContain('follow as images');
+    expect(session.checkedAt).toBe(0);
+  });
+
   it('with nothing able to draw the look is skipped, not failed: the agent goes on and the change stays unseen', async () => {
     const { run, session } = setup({ frames: async () => null });
     await run('add_clip', { component: 'Title', start: 0, duration: 1, props: { text: 'Unseen' } });

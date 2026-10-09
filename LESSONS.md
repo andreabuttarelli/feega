@@ -4,6 +4,14 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 ## Motion editor
 
+### L'agente dice "le immagini non mi sono arrivate" dopo un `view_frames` riuscito
+Un'immagine iniettata da `prepareStep` (`messages` sostituiti) vale per quello step solo: lo step
+dopo, e ogni round successivo del turno, ricostruisce i messaggi dalle risposte e l'immagine non
+c'è più, mentre il tool result che la promette resta. Segnale: il primo riepilogo descrive i
+frame, quelli dei round di fix dicono di non averli visti (`chat_messages.content` del turno).
+Mossa: le immagini stanno dentro il tool result (`toModelOutput` con parti `file`), che resta
+nella conversazione; un test sul corpo HTTP inviato (`frames-wire.test.ts`) lo prova per round.
+
 ### Un render locale con `npx hyperframes render` non ha motion blur
 Il motion blur non sta nell'html di `farmJob`: è un'opzione del producer (`motionBlur:
 { shutterAngle, shutterPhase, samplesPerFrame }`) che il farm passa a `createRenderJob`, e la CLI

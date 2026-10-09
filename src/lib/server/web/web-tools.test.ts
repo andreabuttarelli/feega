@@ -125,10 +125,10 @@ describe('web tools', () => {
   });
 
   it('import_products saves the chosen products and reports what is missing', async () => {
-    const importProducts = vi.fn(async () => ({ ok: true as const, products: [{ handle: 'a', title: 'A', asset_ids: ['x1'] }], missing: ['b'], node_id: 'n1' }));
+    const importProducts = vi.fn(async () => ({ ok: true as const, products: [{ handle: 'a', title: 'A', asset_ids: ['x1'], pictures: [] }], missing: ['b'], node_id: 'n1' }));
     const { run } = setup({ importProducts });
 
-    expect(await run('import_products', { store_url: 'https://shop.example', handles: ['a', 'b'] })).toEqual({ ok: true, products: [{ handle: 'a', title: 'A', asset_ids: ['x1'] }], missing: ['b'], node_id: 'n1' });
+    expect(await run('import_products', { store_url: 'https://shop.example', handles: ['a', 'b'] })).toEqual({ ok: true, products: [{ handle: 'a', title: 'A', asset_ids: ['x1'], pictures: [] }], missing: ['b'], node_id: 'n1' });
     expect(importProducts).toHaveBeenCalledWith('https://shop.example', ['a', 'b']);
   });
 
