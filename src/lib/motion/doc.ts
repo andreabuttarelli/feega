@@ -23,6 +23,7 @@ import { DEFAULT_MOTION_BLUR, motionBlurSchema } from './motion-blur';
 import { interactiveSchema } from './interactive/schema';
 import { fieldsSchema } from './template/field-model';
 import { scriptSchema } from './script';
+import { soundScoreSchema } from './sound/score';
 import { physicsSchema } from './physics/model';
 import { MOTION_STYLES } from './style-model';
 
@@ -161,7 +162,8 @@ export const motionDocSchema = z
     workArea: z.object({ from: z.number().int().min(0), to: z.number().int().min(1) }).nullable().optional(),
     interactive: interactiveSchema.optional(),
     style: z.enum(MOTION_STYLES).optional(),
-    script: scriptSchema.optional()
+    script: scriptSchema.optional(),
+    sound: z.object({ score: soundScoreSchema, assetId: z.string().min(1), clipId: z.string().min(1) }).optional()
   })
   .refine((d) => Math.min(d.width, d.height) <= MAX_SHORT_SIDE || (d.width === d.height && d.width <= LARGE_SQUARE), 'resolution above 1080p (a 1440 square is the one exception)')
   .refine((d) => d.durationInFrames <= maxFrames(d.fps), { message: `the video can be at most ${MAX_SECONDS} seconds`, path: ['durationInFrames'] });
