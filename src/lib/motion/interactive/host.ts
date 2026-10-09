@@ -1,7 +1,19 @@
 export const HOST_MESSAGE = 'feega:host';
 export const EMBED_ROUTE = '/e';
 
-export type HostReading = { progress?: number; visible?: boolean; gesture?: boolean };
+export type HostPoint = { x: number; y: number };
+export type HostReading = {
+  progress?: number;
+  visible?: boolean;
+  gesture?: boolean;
+  command?: 'play' | 'pause' | 'seek';
+  time?: number;
+  fit?: string;
+  links?: 'host';
+  reducedMotion?: boolean;
+  pointer?: HostPoint & { down: boolean };
+  tilt?: HostPoint;
+};
 
 export function hostMain(frame: HTMLIFrameElement, type: string, win: Window, anchor: Element = frame): void {
   const wrapper = frame.closest('[data-scroll]') as HTMLElement | null;
@@ -35,14 +47,47 @@ export function hostMain(frame: HTMLIFrameElement, type: string, win: Window, an
 }
 
 export function readHost(data: unknown, type: string): HostReading | null {
-  const m = data as { type?: string; progress?: number; scroll?: number; visible?: boolean; gesture?: boolean } | null;
+  const m = data as Record<string, unknown> | null;
   if (m?.type !== type) {
     return null;
   }
-  const progress = typeof m.progress === 'number' ? m.progress : m.scroll;
-  const reading: HostReading = { progress: typeof progress === 'number' ? progress : undefined, visible: typeof m.visible === 'boolean' ? m.visible : undefined };
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
+  const within = (v: number, lo: number) => Math.min(1, Math.max(lo, v));
+  const pair = (v: unknown, lo: number) => {
+    const p = v as { x?: unknown; y?: unknown } | null;
+    const x = num(p?.x);
+    const y = num(p?.y);
+    return x === undefined || y === undefined ? undefined : { x: within(x, lo), y: within(y, lo) };
+  };
+  const progress = num(m.progress) ?? num(m.scroll);
+  const reading: HostReading = { progress, visible: typeof m.visible === 'boolean' ? m.visible : undefined };
+  const pointer = pair(m.pointer, 0);
+  const tilt = pair(m.tilt, -1);
+  const time = num(m.time);
+
   if (m.gesture === true) {
     reading.gesture = true;
+  }
+  if (m.command === 'play' || m.command === 'pause' || m.command === 'seek') {
+    reading.command = m.command;
+  }
+  if (time !== undefined) {
+    reading.time = time;
+  }
+  if (typeof m.fit === 'string') {
+    reading.fit = m.fit;
+  }
+  if (m.links === 'host') {
+    reading.links = 'host';
+  }
+  if (typeof m.reducedMotion === 'boolean') {
+    reading.reducedMotion = m.reducedMotion;
+  }
+  if (pointer) {
+    reading.pointer = { ...pointer, down: (m.pointer as { down?: unknown }).down === true };
+  }
+  if (tilt) {
+    reading.tilt = tilt;
   }
   return reading;
 }

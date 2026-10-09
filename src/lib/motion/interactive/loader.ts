@@ -41,9 +41,18 @@ export type LoaderConfig = {
 
 export const embedSnippet = (origin: string, id: string) => `<script src="${origin}/${LOADER_FILE}" async></script>\n<${EMBED_TAG} src="${id}"></${EMBED_TAG}>`;
 
-export function snippetOf(embedUrl: string): string {
+export const REACT_PACKAGE = '@feega/motion-react';
+export const FLUTTER_PACKAGE = 'feega_motion';
+
+export const reactSnippet = (origin: string, id: string) => `import { FeegaMotion } from '${REACT_PACKAGE}';\n\n<FeegaMotion id="${id}" origin="${origin}" />`;
+
+export const flutterSnippet = (origin: string, id: string) => `import 'package:${FLUTTER_PACKAGE}/${FLUTTER_PACKAGE}.dart';\n\nFeegaMotion(id: '${id}', origin: '${origin}')`;
+
+export const embedSnippets = (origin: string, id: string) => ({ snippet: embedSnippet(origin, id), react: reactSnippet(origin, id), flutter: flutterSnippet(origin, id) });
+
+export function snippetsOf(embedUrl: string): ReturnType<typeof embedSnippets> {
   const url = new URL(embedUrl);
-  return embedSnippet(url.origin, url.pathname.slice(url.pathname.lastIndexOf('/') + 1));
+  return embedSnippets(url.origin, url.pathname.slice(url.pathname.lastIndexOf('/') + 1));
 }
 
 export function loaderConfig(origin: string): LoaderConfig {

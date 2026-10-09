@@ -3,7 +3,7 @@ import { findNode, type CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { findProjectById, type Project } from '$lib/server/repos/projects';
 import { motionOf } from '$lib/canvas/motion-node';
 import { embedUrl, interactiveBundle, BUNDLE_FILE } from '$lib/motion/interactive/bundle';
-import { embedSnippet } from '$lib/motion/interactive/loader';
+import { embedSnippets } from '$lib/motion/interactive/loader';
 import type { MotionDoc } from '$lib/motion/doc';
 import { assetUrls, headOrNew, motionAssets, motionTokens, type AssetSigner } from './editor';
 import { embedPublished, isRefused, publishEmbed, removeEmbed } from './embed';
@@ -54,7 +54,7 @@ export async function publishMotionEmbed(db: Db, scope: PublishScope, origin: st
 
   const published = await publishEmbed(db, { ...(await bundleInput(db, scope, saved)), nodeId: scope.nodeId, mode: saved.project.mode }, origin);
   if (published.ok) {
-    return { ok: true, body: { published: true, url: published.url, snippet: published.snippet, revision: saved.version } };
+    return { ok: true, body: { published: true, url: published.url, ...embedSnippets(origin, scope.nodeId), revision: saved.version } };
   }
   return isRefused(published) ? failed(EmbedFailure.Refused, { refusal: published.refusal, detail: published.error }) : failed(EmbedFailure.Storage, { detail: published.error });
 }
@@ -73,7 +73,7 @@ export async function motionEmbedState(db: Db, scope: Scope, origin: string): Pr
     return failed(EmbedFailure.NotFound);
   }
   const url = embedUrl(origin, scope.nodeId);
-  return { ok: true, body: { published: await embedPublished(db, scope.nodeId), url, snippet: embedSnippet(origin, scope.nodeId), revision: saved.version } };
+  return { ok: true, body: { published: await embedPublished(db, scope.nodeId), url, ...embedSnippets(origin, scope.nodeId), revision: saved.version } };
 }
 
 export type MotionBundle = { ok: true; html: string; filename: string } | { ok: false; failure: EmbedFailure };

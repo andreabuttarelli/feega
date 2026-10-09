@@ -28,7 +28,7 @@ export type MotionFrames = { revision: number; frames: { time: number; mime: str
 
 export type MotionRevision = { version: number; summary: string | null; actorKind: string; createdAt: string; clips: number };
 
-export type EmbedState = { published: boolean; url?: string; snippet?: string; revision?: number };
+export type EmbedState = { published: boolean; url?: string; snippet?: string; react?: string; flutter?: string; revision?: number };
 
 function renderBody(opts: RenderOptions): Record<string, unknown> {
   const settings = Object.fromEntries(Object.entries({ resolution: opts.resolution, format: opts.format, quality: opts.quality, fps: opts.fps }).filter(([, v]) => v !== undefined));

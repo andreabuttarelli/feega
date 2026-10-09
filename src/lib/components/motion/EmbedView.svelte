@@ -9,6 +9,7 @@
   import { REACTION_LABEL, type Reaction } from '$lib/motion/interactive/summary';
 
   type Hosted = { published: boolean; url: string };
+  type AppSnippets = { react: string; flutter: string };
 
   let {
     doc,
@@ -16,6 +17,7 @@
     href,
     hosted,
     hostedSnippet,
+    appSnippets = null,
     reactions,
     settings = $bindable(),
     busy,
@@ -30,6 +32,7 @@
     href: string;
     hosted: Hosted | null;
     hostedSnippet: string;
+    appSnippets?: AppSnippets | null;
     reactions: Reaction[];
     settings: Interactive;
     busy: boolean;
@@ -40,7 +43,7 @@
     onpresets?: () => void;
   } = $props();
 
-  const Copied = { None: '', Hosted: 'hosted', File: 'file' } as const;
+  const Copied = { None: '', Hosted: 'hosted', File: 'file', React: 'react', Flutter: 'flutter' } as const;
   type Copied = (typeof Copied)[keyof typeof Copied];
 
   const COPIED_MS = 1600;
@@ -111,6 +114,20 @@
       <button type="button" class="primary wide" onclick={() => copy(hostedSnippet, Copied.Hosted)} data-testid="interactive-copy">
         {#if copied === Copied.Hosted}<Check size={16} /> Copied{:else}<Copy size={16} /> Copy code{/if}
       </button>
+      {#if appSnippets}
+        <h3>Embed in your app</h3>
+        <p class="hint">The same player, scroll and taps, inside a React or Flutter app.</p>
+        <p class="hint">React · <code>npm i @feega/motion-react</code></p>
+        <div class="code"><pre data-testid="interactive-react-snippet">{appSnippets.react}</pre></div>
+        <button type="button" class="secondary" onclick={() => copy(appSnippets.react, Copied.React)} data-testid="interactive-copy-react">
+          {#if copied === Copied.React}<Check size={16} /> Copied{:else}<Copy size={16} /> Copy React{/if}
+        </button>
+        <p class="hint">Flutter · <code>flutter pub add feega_motion</code></p>
+        <div class="code"><pre data-testid="interactive-flutter-snippet">{appSnippets.flutter}</pre></div>
+        <button type="button" class="secondary" onclick={() => copy(appSnippets.flutter, Copied.Flutter)} data-testid="interactive-copy-flutter">
+          {#if copied === Copied.Flutter}<Check size={16} /> Copied{:else}<Copy size={16} /> Copy Flutter{/if}
+        </button>
+      {/if}
       <div class="status">
         <span><i class="dot"></i>Published{updated ? ' · updated just now' : ''}</span>
         <span class="quiet">

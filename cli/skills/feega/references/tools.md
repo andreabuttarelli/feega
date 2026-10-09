@@ -242,7 +242,9 @@ available yet: it is refused with 403 `server_render_unavailable`. `get_render({
 `status`, `mode`, `asset_id` and a signed `file_url` (one hour) once `done`.
 
 `publish_motion_embed({ org, node_id, action? })` hosts the interactive web export of the saved
-revision and returns `{ published, url, snippet, revision }` — the snippet (feega's loader script
+revision and returns `{ published, url, snippet, react, flutter, revision }` — `react` and `flutter`
+embed the same player in an app (`@feega/motion-react`, `feega_motion`; protocol in
+`docs/embed-protocol.md`); the snippet (feega's loader script
 plus `<feega-motion src="id">`, or `<div data-feega="id">`) goes into any site and fills 100% of
 its box (`fit="contain"` to letterbox); live components (games, generative pieces) run live there and get keys and taps, while a video
 render shows only a still of them. Publishing again updates the same URL; `action: "unpublish"` removes it. Free. Uncensored
