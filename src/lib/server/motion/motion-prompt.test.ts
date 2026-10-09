@@ -82,6 +82,14 @@ describe('references become measurable targets before the build', () => {
     }
   });
 
+  it('every prompt asks to measure the typography of each role from the picture', () => {
+    for (const style of Object.values(MotionStyle)) {
+      for (const detail of ['per role', 'weight', 'tracking', 'line height', 'case', 'cap height']) {
+        expect(prompt(style)).toContain(detail);
+      }
+    }
+  });
+
   it('the graphic poster prompt names concrete poster moves', () => {
     const text = prompt(MotionStyle.Graphic);
 

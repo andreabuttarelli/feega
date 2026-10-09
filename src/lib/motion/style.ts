@@ -541,5 +541,6 @@ export type StyleProblem = { effect: Forbidden; at: number; detail: string };
 
 export function styleProblems(doc: MotionDoc): StyleProblem[] {
   const spec = STYLES[styleOf(doc)];
-  return spec.forbidden.flatMap((effect) => CHECKS[effect](doc, spec).map((f) => ({ effect, at: Math.round((f.at / doc.fps) * 100) / 100, detail: f.detail })));
+  const yielded: ReadonlySet<Forbidden> = new Set(doc.referenceLook ? HOUSE_DEFAULTS : []);
+  return spec.forbidden.filter((effect) => !yielded.has(effect)).flatMap((effect) => CHECKS[effect](doc, spec).map((f) => ({ effect, at: Math.round((f.at / doc.fps) * 100) / 100, detail: f.detail })));
 }

@@ -1463,7 +1463,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_reference_look: tool({
-      description: 'Record what the references you looked at measure, before building: the largest type as a share of the frame height (a word that fills a poster is 0.6–1.2), whether type bleeds off the edge, grid columns, how much small text, the palette, the font class and the imagery. view_frames then measures the video against it and blocks gross misses.',
+      description: 'Record what the references you looked at measure, before building: the largest type as a share of the frame height (a word that fills a poster is 0.6–1.2), whether type bleeds off the edge, grid columns, how much small text, the palette, the font class and the imagery. type: one entry per typographic role you SEE (display, headline, body, label, number) with font class, closest Google Fonts, weight, case, tracking (em), line height (measured: a line gap smaller than the cap height is about 0.85), size (share of frame height), alignment, rotation, and in measured what you measured. rules: hairline count, thickness and gap; margin: share of the frame width. view_frames then measures every text against the role nearest its size and blocks gross misses (wrong family class on the display title, weight off by 300 or more).',
       inputSchema: referenceLookSchema,
       execute: async (input) => apply({ ok: true, doc: { ...session.doc, referenceLook: input } }, 'recorded the reference look')
     }),

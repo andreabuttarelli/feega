@@ -178,7 +178,7 @@ export function selfCheckPrompt(times: number[]): string {
 export const MAX_SELF_CHECK_REFS = 3;
 
 const REFERENCE_ASK =
-  'The pictures after the frames are the references you looked at this turn. Set each frame next to the reference it follows and write the difference in one line per frame: type scale (the largest type as a share of the frame height, here and there), edge bleed (does the big type run off the edge?), grid and rules, columns of small text, where the blocks of colour sit. Colour alone is not a match. Fix the biggest differences first, with the editing tools; a deliberate bleed off the edge is declared with set_visibility bleed true.';
+  'The pictures after the frames are the references you looked at this turn. Set each frame next to the reference it follows and write the difference in one line per frame: type scale (the largest type as a share of the frame height, here and there), edge bleed (does the big type run off the edge?), grid and rules, columns of small text, where the blocks of colour sit. Then the typographic diff per role (display title, headline, body, labels, numbers), here and there: family (class and face), weight, tracking, leading (line gap against the cap height), case, alignment. Colour alone is not a match. Fix the biggest differences first, with the editing tools; a deliberate bleed off the edge is declared with set_visibility bleed true.';
 
 export type Reference = { mediaType: string; data: string };
 

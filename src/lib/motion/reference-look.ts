@@ -1,15 +1,9 @@
 import type { ComponentId } from './components';
 import type { MotionDoc } from './doc';
-import { SmallText, type ReferenceLook } from './reference-look-model';
+import { LookMiss, SmallText, type ReferenceLook } from './reference-look-model';
+import { typeProblems } from './reference-type';
 
-export enum LookMiss {
-  Unrecorded = 'look-unrecorded',
-  TypeScale = 'look-type-scale',
-  TypeScaleGross = 'look-type-scale-gross',
-  Bleed = 'look-bleed',
-  Columns = 'look-columns',
-  NoSmallText = 'look-no-small-text'
-}
+export { LookMiss };
 
 export type LookProblem = { miss: LookMiss; detail: string };
 
@@ -80,5 +74,5 @@ export function lookProblems(doc: MotionDoc, clips: readonly Clip[], referencesS
     return referencesSeen ? [{ miss: LookMiss.Unrecorded, detail: 'you looked at references but recorded no look: call set_reference_look with what they measure (largest type as a share of the frame height, bleed, columns, small text, palette, font class, imagery), then build to it' }] : [];
   }
   const texts = clips.filter((c) => TEXTS.has(c.component));
-  return [...typeScale(texts, look), ...bleed(clips, doc, look), ...columns(texts, look)];
+  return [...typeScale(texts, look), ...bleed(clips, doc, look), ...columns(texts, look), ...typeProblems(doc, clips, look)];
 }

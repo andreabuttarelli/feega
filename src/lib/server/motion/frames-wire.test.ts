@@ -70,7 +70,7 @@ describe('the frames of view_frames reach the model on the wire', () => {
 
     expect(bodies()[1]).toContain(ref);
     expect(bodies()[1]).toContain(JPEG.toString('base64'));
-    for (const asked of ['type scale', 'bleed', 'columns']) {
+    for (const asked of ['type scale', 'bleed', 'columns', 'per role', 'weight', 'tracking', 'leading', 'case', 'family']) {
       expect(bodies()[1]).toContain(asked);
     }
   });
