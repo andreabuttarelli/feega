@@ -242,7 +242,9 @@ available yet: it is refused with 403 `server_render_unavailable`. `get_render({
 revision and returns `{ published, url, snippet, revision }` — the iframe snippet goes into any
 site; live components (games, generative pieces) run live there and get keys and taps, while a video
 render shows only a still of them. Publishing again updates the same URL; `action: "unpublish"` removes it. Free. Uncensored
-projects get 403 with `refusal`; an empty video 409. `get_motion_embed({ org, node_id })` reads
+projects get 403 with `refusal`; an empty video 409. A scrub embed follows its own travel through
+the viewport; wrap the snippet in `<div data-scroll="N">` for a sticky section N viewports long.
+Opened alone, the embed page scrolls itself. `get_motion_embed({ org, node_id })` reads
 `published`, `url`, `snippet`. The self-contained HTML is `GET /api/v1/motion/{node_id}/embed/bundle`.
 
 `view_motion_frames({ org, node_id, times, width? })` draws the saved revision at up to 6 times
