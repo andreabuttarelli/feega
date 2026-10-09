@@ -2695,3 +2695,11 @@ Segnale: `bench:export --parity` in WebKit dà una differenza a forma del layer 
 ### Una sonda `position:absolute` dentro un elemento statico misura un altro elemento
 Segnale: un layer del compositore finisce fuori posto o tagliato (il titolo sparito dietro una clip spostata). Le sonde assolute si posizionano rispetto all'antenato posizionato più vicino, non al genitore statico. Mossa: affine da `offsetLeft/Top` + matrice propria quando l'`offsetParent` è il genitore; altrimenti `position: relative` temporaneo sull'elemento durante la sonda (`pointsIn`, `capture.ts`).
 
+
+## An embed published from the editor stays on the old player
+
+Signal: `/e/<id>.json` answers 404 while `/e/<id>` serves a page; the page still loads libs from
+jsDelivr and letterboxes. Cause: code that finds its own output by a function name
+(`playerMain.toString()`) breaks on output built in the browser, where the bundle is minified
+(`function vi`). Move: anchor on data the minifier cannot rename (the config JSON), and test with
+the name replaced.

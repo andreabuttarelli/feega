@@ -44,6 +44,7 @@ export function hostMain(frame: HTMLIFrameElement, type: string, win: Window, an
   win.addEventListener('scroll', send, { passive: true });
   win.addEventListener('resize', send);
   frame.addEventListener('load', send);
+  send();
 }
 
 export function readHost(data: unknown, type: string): HostReading | null {

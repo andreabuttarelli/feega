@@ -125,7 +125,11 @@ export function loaderMain(win: Window, cfg: LoaderConfig, host: typeof hostMain
       watchSelf(frame);
     },
     [cfg.sourceNames.ParentScroll]: (_el, frame) => host(frame, cfg.hostMessage, win.parent, win.frameElement as Element),
-    [cfg.sourceNames.Gesture]: (_el, frame) => frame.addEventListener('load', () => frame.contentWindow?.postMessage({ type: cfg.hostMessage, gesture: true }, '*'))
+    [cfg.sourceNames.Gesture]: (_el, frame) => {
+      const grant = () => frame.contentWindow?.postMessage({ type: cfg.hostMessage, gesture: true }, '*');
+      frame.addEventListener('load', grant);
+      grant();
+    }
   };
 
   const mount = async (el: HTMLElement) => {
@@ -142,10 +146,10 @@ export function loaderMain(win: Window, cfg: LoaderConfig, host: typeof hostMain
       el.style.position = 'relative';
     }
 
-    const settings = await settingsOf(id);
-    const source = settings.playback === cfg.scrub ? cfg.sources[kind] : null;
     const frame = frameOf(id, el.getAttribute('fit'));
     el.appendChild(frame);
+    const settings = await settingsOf(id);
+    const source = settings.playback === cfg.scrub ? cfg.sources[kind] : null;
 
     if (el.clientHeight === 0 && !el.style.height) {
       if (source === cfg.sourceNames.Story) {
