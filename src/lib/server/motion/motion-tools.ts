@@ -65,7 +65,7 @@ import { INTERACTIVE_PRESETS, PRESET, applyInteractivePreset, setInteractive } f
 import { OUTSIDES, PLAY_MODES, SCROLL_LENGTH, interactiveOf } from '$lib/motion/interactive/settings';
 import { interactiveSchema } from '$lib/motion/interactive/schema';
 import { liveLanes } from '$lib/motion/interactive/spec';
-import { embedSnippet } from '$lib/motion/interactive/bundle';
+import { fileSnippet } from '$lib/motion/interactive/bundle';
 import { flattenComps } from '$lib/motion/precomp';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
 import { BuiltinFont, FONT_WEIGHTS, fontRefProblem, searchFonts } from '$lib/motion/fonts/model';
@@ -1186,7 +1186,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_interactive: tool({
-      description: `How the interactive web export plays: playback ${PLAY_MODES.join('|')} (in-view plays while on screen, scrub ties the playhead to the scroll through a section scroll_length viewports tall (${SCROLL_LENGTH.min}..${SCROLL_LENGTH.max}, default ${SCROLL_LENGTH.default}) that the embed snippet already wraps it in; opened alone the embed scrolls itself), loop, and outside ${OUTSIDES.join('|')}: what a precomp reads when the cursor leaves its box (fallback = default pose, hold = last value).`,
+      description: `How the interactive web export plays: playback ${PLAY_MODES.join('|')} (in-view plays while on screen, scrub ties the playhead to the scroll through a section scroll_length viewports tall (${SCROLL_LENGTH.min}..${SCROLL_LENGTH.max}, default ${SCROLL_LENGTH.default}) that the hosted embed builds itself; opened alone the embed scrolls itself), loop, and outside ${OUTSIDES.join('|')}: what a precomp reads when the cursor leaves its box (fallback = default pose, hold = last value).`,
       inputSchema: z.object({ playback: z.enum(PLAY_MODES).optional(), loop: z.boolean().optional(), outside: z.enum(OUTSIDES).optional(), scroll_length: interactiveSchema.shape.scrollLength.unwrap().optional() }),
       execute: async ({ scroll_length, ...input }) => apply(setInteractive(session.doc, Object.fromEntries(Object.entries({ ...input, scrollLength: scroll_length }).filter(([, v]) => v !== undefined))), 'changed interactive playback')
     }),
@@ -1196,12 +1196,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       inputSchema: z.object({}),
       execute: async () => {
         const live = liveLanes(flattenComps(session.doc)).map((l) => ({ clip_id: l.id, prop: l.key }));
-        return { ok: true, live, settings: interactiveOf(session.doc), snippet: embedSnippet(session.doc), note: live.length ? 'Ready: Export → Interactive (web) downloads the file.' : 'Nothing reads input yet: apply_interactive_preset or set_expression with input.*.' };
+        return { ok: true, live, settings: interactiveOf(session.doc), snippet: fileSnippet(session.doc), note: live.length ? 'Ready: Export → Interactive (web) downloads the file.' : 'Nothing reads input yet: apply_interactive_preset or set_expression with input.*.' };
       }
     }),
 
     publish_embed: tool({
-      description: 'Host the interactive web export on feega and return a snippet to paste into any site: an iframe that fills the container width and keeps pointer, tilt and scroll working. Publishing again updates the same embed, so the site updates without a new paste. action unpublish takes it down.',
+      description: 'Host the interactive web export on feega and return a snippet to paste into any site: the feega loader script and a <feega-motion> element that fills 100% of its box and keeps pointer, tilt and scroll working; playback and scroll length come from feega, not the snippet. Publishing again updates the same embed, so the site updates without a new paste. action unpublish takes it down.',
       inputSchema: z.object({ action: z.enum(EmbedAction).optional() }),
       execute: async (input) => (deps.embed ? deps.embed(input.action ?? EmbedAction.Publish) : { ok: false, error: 'hosting embeds is not available here' })
     }),

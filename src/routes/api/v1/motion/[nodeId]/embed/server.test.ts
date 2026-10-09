@@ -71,7 +71,7 @@ describe('/api/v1/motion/[nodeId]/embed', () => {
 
     expect(res.status).toBe(200);
     expect(body.url).toBe(`https://feega.app/e/${NODE}`);
-    expect(body.snippet).toContain(body.url);
+    expect(body.snippet).toBe(`<script src="https://feega.app/embed.js" async></script>\n<feega-motion src="${NODE}"></feega-motion>`);
     expect(body.revision).toBe(2);
     expect(store.files.get(`${NODE}.html`)).toContain('<html');
   });
@@ -82,15 +82,15 @@ describe('/api/v1/motion/[nodeId]/embed', () => {
 
     const after = await (await call(route.GET as Handler, 'GET')).json();
     expect(after.published).toBe(true);
-    expect(after.snippet).toContain(after.url);
+    expect(after.snippet).toBe(`<script src="https://feega.app/embed.js" async></script>\n<feega-motion src="${NODE}"></feega-motion>`);
   });
 
-  it('hands a scrub video the scroll-story wrapper, the same on publish and on read', async () => {
+  it('hands a scrub video the same two-line snippet: the scroll story is built by the loader', async () => {
     store.playback = 'scrub';
     const published = await (await call(route.POST as Handler, 'POST')).json();
     const read = await (await call(route.GET as Handler, 'GET')).json();
 
-    expect(published.snippet.startsWith('<div data-scroll="3">')).toBe(true);
+    expect(published.snippet).not.toContain('data-scroll');
     expect(read.snippet).toBe(published.snippet);
   });
 

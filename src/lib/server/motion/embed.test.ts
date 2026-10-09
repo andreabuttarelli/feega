@@ -21,7 +21,7 @@ function fakeDb(listed: string[] = []) {
 }
 
 describe('hosted embed', () => {
-  it('publishing stores one html file per node, overwriting the last one, and returns a snippet pointing at the public route', async () => {
+  it('publishing stores one html file per node, overwriting the last one, and returns the loader snippet for that node', async () => {
     const { db, bucket, from } = fakeDb();
     const doc = newMotionDoc(MotionFormat.Landscape);
 
@@ -30,7 +30,7 @@ describe('hosted embed', () => {
     expect(from).toHaveBeenCalledWith(EMBED_BUCKET);
     expect(bucket.upload).toHaveBeenCalledWith(`${NODE}.html`, expect.any(Blob), expect.objectContaining({ contentType: 'text/html', upsert: true }));
     expect(out).toMatchObject({ ok: true, url: `https://oh.feega.app/e/${NODE}` });
-    expect(out.ok && out.snippet).toContain(`src="https://oh.feega.app/e/${NODE}"`);
+    expect(out.ok && out.snippet).toBe(`<script src="https://oh.feega.app/embed.js" async></script>\n<feega-motion src="${NODE}"></feega-motion>`);
   });
 
   it('the upload slot for the editor is signed for the same path, with the headers the upload must carry', async () => {

@@ -1,3 +1,6 @@
+export const HOST_MESSAGE = 'feega:host';
+export const EMBED_ROUTE = '/e';
+
 export type HostReading = { progress?: number; visible?: boolean };
 
 export function hostMain(frame: HTMLIFrameElement, type: string, win: Window): void {

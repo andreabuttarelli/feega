@@ -211,7 +211,7 @@ export function createMotionDelegation(deps: MotionDelegationDeps): Record<strin
     }),
 
     publish_motion_embed: tool({
-      description: 'Publish a motion video of THIS project as an embeddable interactive page: returns its public url and an iframe snippet. Only when the user asked. Refused for content the moderation refuses.',
+      description: 'Publish a motion video of THIS project as an embeddable interactive page: returns its public url and a two-line loader snippet. Only when the user asked. Refused for content the moderation refuses.',
       inputSchema: z.object({ nodeId: z.string() }).strict(),
       execute: async (input: { nodeId: string }) => ((await inProject(input.nodeId)) ? embedBody(await publishMotionEmbed(db, { orgId, nodeId: input.nodeId }, deps.origin)) : NOT_FOUND)
     }),
