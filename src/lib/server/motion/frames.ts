@@ -54,23 +54,28 @@ export function keyFrameTimes(doc: MotionDoc, max = SELF_CHECK_FRAMES): number[]
 
 const FRAMES_ASK = 'Look for clipped or overflowing text, overlaps, poor contrast and anything outside the safe area.';
 
-function framesOutput(output: unknown, frames: readonly Frame[] = []) {
+function framesOutput(output: unknown, frames: readonly Frame[] = [], refs: readonly Reference[] = []) {
   if (!frames.length) {
     return { type: 'json' as const, value: output as never };
   }
+  const picture = (mediaType: string, data: string) => ({ type: 'file' as const, mediaType, data: { type: 'data' as const, data } });
+  const compared = refs.length ? [{ type: 'text' as const, text: REFERENCE_ASK }, ...refs.map((r) => picture(r.mediaType, r.data))] : [];
   return {
     type: 'content' as const,
     value: [
       { type: 'text' as const, text: JSON.stringify(output) },
       { type: 'text' as const, text: `Frames, in order, at ${frames.map((f) => `${f.time}s`).join(', ')}. ${FRAMES_ASK}` },
-      ...frames.map((f) => ({ type: 'file' as const, mediaType: 'image/jpeg', data: { type: 'data' as const, data: f.bytes.toString('base64') } }))
+      ...frames.map((f) => picture('image/jpeg', f.bytes.toString('base64'))),
+      ...compared
     ]
   };
 }
 
-export function withFrames(tools: Record<string, Tool>, frames: ReadonlyMap<string, Frame[]>): Record<string, Tool> {
+export type FramedSession = { frames: ReadonlyMap<string, Frame[]>; references?: readonly Reference[] };
+
+export function withFrames(tools: Record<string, Tool>, session: FramedSession): Record<string, Tool> {
   return Object.fromEntries(
-    Object.entries(tools).map(([name, t]) => [name, t.toModelOutput ? t : { ...t, toModelOutput: ({ toolCallId, output }: { toolCallId: string; output: unknown }) => framesOutput(output, frames.get(toolCallId)) }])
+    Object.entries(tools).map(([name, t]) => [name, t.toModelOutput ? t : { ...t, toModelOutput: ({ toolCallId, output }: { toolCallId: string; output: unknown }) => framesOutput(output, session.frames.get(toolCallId), session.references) }])
   );
 }
 
@@ -173,7 +178,7 @@ export function selfCheckPrompt(times: number[]): string {
 export const MAX_SELF_CHECK_REFS = 3;
 
 const REFERENCE_ASK =
-  'The pictures below are the references you looked at this turn. When the frames arrive, set each one next to the reference it follows and write the difference in one line per frame: type scale (the largest type as a share of the frame height, here and there), edge bleed (does the big type run off the edge?), grid and rules, columns of small text, where the blocks of colour sit. Colour alone is not a match. Fix the biggest differences first, with the editing tools; a deliberate bleed off the edge is declared with set_visibility bleed true.';
+  'The pictures after the frames are the references you looked at this turn. Set each frame next to the reference it follows and write the difference in one line per frame: type scale (the largest type as a share of the frame height, here and there), edge bleed (does the big type run off the edge?), grid and rules, columns of small text, where the blocks of colour sit. Colour alone is not a match. Fix the biggest differences first, with the editing tools; a deliberate bleed off the edge is declared with set_visibility bleed true.';
 
 export type Reference = { mediaType: string; data: string };
 
@@ -191,12 +196,8 @@ export function viewedReferences(messages: readonly ModelMessage[], max = MAX_SE
   return seen.slice(-max);
 }
 
-export function checkMessage(errors: readonly QualityProblem[], times: number[], refs: readonly Reference[]): ModelMessage {
-  const ask = errors.length ? fixPrompt(errors, times) : selfCheckPrompt(times);
-  if (!refs.length) {
-    return { role: 'user', content: ask };
-  }
-  return { role: 'user', content: [{ type: 'text', text: `${ask}\n\n${REFERENCE_ASK}` }, ...refs.map((r) => ({ type: 'image' as const, image: r.data, mediaType: r.mediaType }))] };
+export function checkMessage(errors: readonly QualityProblem[], times: number[]): ModelMessage {
+  return { role: 'user', content: errors.length ? fixPrompt(errors, times) : selfCheckPrompt(times) };
 }
 
 export function fixPrompt(errors: readonly QualityProblem[], times: number[]): string {

@@ -23,9 +23,9 @@ const DONE = reply([{ type: 'message', id: 'm', role: 'assistant', status: 'comp
 
 const bodies = () => M.fetch.mock.calls.map((c) => JSON.stringify(JSON.parse((c[1] as RequestInit).body as string).input));
 
-async function motionTools() {
+async function motionTools(references: MotionSession['references'] = []) {
   const { createMotionTools } = await import('./motion-tools');
-  const session: MotionSession = { doc: newMotionDoc(MotionFormat.Vertical), baseVersion: 1, edits: [], selection: [], frames: new Map(), views: 0, checkedAt: 0, codeWrites: 0 };
+  const session: MotionSession = { doc: newMotionDoc(MotionFormat.Vertical), baseVersion: 1, edits: [], selection: [], frames: new Map(), views: 0, checkedAt: 0, codeWrites: 0, references };
   const deps = { session, assets: [], newId: () => 'id', frames: async (_id: string, times: number[]) => times.map((time) => ({ time, bytes: JPEG })), check: async () => null } as unknown as MotionToolDeps;
   return createMotionTools(deps);
 }
@@ -59,5 +59,28 @@ describe('the frames of view_frames reach the model on the wire', () => {
     await generateText({ model: llmLanguageModel(MODEL, PromptCache.On), messages: next, tools });
 
     expect(bodies().at(-1)).toContain(JPEG.toString('base64'));
+  });
+
+  it('with references seen in the turn, every view carries them next to the frames and asks for a per-frame diff', async () => {
+    const { llmLanguageModel } = await import('../llm');
+    const ref = Buffer.from('REFERENCE-PIN').toString('base64');
+    const tools = await motionTools([{ mediaType: 'image/jpeg', data: ref }]);
+
+    await generateText({ model: llmLanguageModel(MODEL, PromptCache.On), prompt: 'look', tools, stopWhen: stepCountIs(2) });
+
+    expect(bodies()[1]).toContain(ref);
+    expect(bodies()[1]).toContain(JPEG.toString('base64'));
+    for (const asked of ['type scale', 'bleed', 'columns']) {
+      expect(bodies()[1]).toContain(asked);
+    }
+  });
+
+  it('without references a view carries only its frames', async () => {
+    const { llmLanguageModel } = await import('../llm');
+    const tools = await motionTools();
+
+    await generateText({ model: llmLanguageModel(MODEL, PromptCache.On), prompt: 'look', tools, stopWhen: stepCountIs(2) });
+
+    expect(bodies()[1]).not.toContain('type scale');
   });
 });

@@ -74,3 +74,19 @@ describe('a style the user asks for beats the house defaults', () => {
     }
   });
 });
+
+describe('references become measurable targets before the build', () => {
+  it('every prompt asks to record the reference look before building', () => {
+    for (const style of Object.values(MotionStyle)) {
+      expect(prompt(style)).toContain('set_reference_look');
+    }
+  });
+
+  it('the graphic poster prompt names concrete poster moves', () => {
+    const text = prompt(MotionStyle.Graphic);
+
+    for (const move of ['cropped by the frame', 'columns', 'rule']) {
+      expect(text).toContain(move);
+    }
+  });
+});

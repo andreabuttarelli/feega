@@ -15,6 +15,7 @@ import { liveComponents, liveNote } from './custom/determinism';
 import { maskAt } from './ui-focus';
 import { MaskKind } from './mask';
 import { pivotBox } from './parent';
+import { LookMiss, lookProblems } from './reference-look';
 
 export enum Quality {
   RepeatedLayout = 'repeated-layout',
@@ -39,7 +40,8 @@ export enum Quality {
   NoHold = 'no-hold',
   ScriptDrift = 'script-drift',
   BackgroundSeam = 'background-seam',
-  LiveScene = 'live-scene'
+  LiveScene = 'live-scene',
+  OffLook = 'off-look'
 }
 
 export enum Severity {
@@ -47,7 +49,7 @@ export enum Severity {
   Blocking = 'blocking'
 }
 
-export type Check = Quality | Forbidden;
+export type Check = Quality | Forbidden | LookMiss;
 
 export const SEVERITY: Record<Check, Severity> = {
   [Quality.RepeatedLayout]: Severity.Warning,
@@ -73,6 +75,13 @@ export const SEVERITY: Record<Check, Severity> = {
   [Quality.ScriptDrift]: Severity.Blocking,
   [Quality.BackgroundSeam]: Severity.Warning,
   [Quality.LiveScene]: Severity.Warning,
+  [Quality.OffLook]: Severity.Warning,
+  [LookMiss.Unrecorded]: Severity.Blocking,
+  [LookMiss.TypeScale]: Severity.Warning,
+  [LookMiss.TypeScaleGross]: Severity.Blocking,
+  [LookMiss.Bleed]: Severity.Blocking,
+  [LookMiss.Columns]: Severity.Warning,
+  [LookMiss.NoSmallText]: Severity.Blocking,
   [Forbidden.Particles]: Severity.Warning,
   [Forbidden.Glow]: Severity.Warning,
   [Forbidden.Rotation]: Severity.Warning,
@@ -99,7 +108,7 @@ export const SEVERITY: Record<Check, Severity> = {
 
 export type Pixels = Record<string, { width: number; height: number }>;
 
-export type QualityProblem = { kind: Quality; effect?: Forbidden; at?: number; detail: string };
+export type QualityProblem = { kind: Quality; effect?: Forbidden | LookMiss; at?: number; detail: string };
 
 export const severityOf = (p: QualityProblem) => SEVERITY[p.effect ?? p.kind];
 
@@ -509,10 +518,10 @@ function liveScenes(doc: MotionDoc): QualityProblem[] {
   });
 }
 
-export function docProblems(doc: MotionDoc, input: { audioAssets: number; pixels?: Pixels; logos?: readonly string[] }): QualityProblem[] {
+export function docProblems(doc: MotionDoc, input: { audioAssets: number; pixels?: Pixels; logos?: readonly string[]; referencesSeen?: boolean }): QualityProblem[] {
   const list = scenes(doc);
   const pixels = input.pixels ?? {};
-  return [...unscripted(doc), ...drifted(doc), ...clickMisses(doc), ...emptyUis(doc), ...stillUis(doc), ...repeated(doc, list), ...smallTitles(doc), ...silent(doc, input.audioAssets), ...softPictures(doc, pixels), ...croppedScreens(doc, pixels), ...alteredLogos(doc, new Set(input.logos ?? [])), ...outOfFrame(doc), ...tiltedText(doc), ...emptyFrames(doc), ...trailingEmpty(doc), ...smallLogos(doc, pixels), ...cutsMidAnimation(doc), ...backgroundSeams(doc), ...liveScenes(doc), ...styleProblems(doc).map((p) => ({ kind: Quality.OffStyle, at: p.at, effect: p.effect, detail: p.detail }))];
+  return [...unscripted(doc), ...drifted(doc), ...clickMisses(doc), ...emptyUis(doc), ...stillUis(doc), ...repeated(doc, list), ...smallTitles(doc), ...silent(doc, input.audioAssets), ...softPictures(doc, pixels), ...croppedScreens(doc, pixels), ...alteredLogos(doc, new Set(input.logos ?? [])), ...outOfFrame(doc), ...tiltedText(doc), ...emptyFrames(doc), ...trailingEmpty(doc), ...smallLogos(doc, pixels), ...cutsMidAnimation(doc), ...backgroundSeams(doc), ...liveScenes(doc), ...styleProblems(doc).map((p) => ({ kind: Quality.OffStyle, at: p.at, effect: p.effect, detail: p.detail })), ...lookProblems(doc, placedClips(doc), input.referencesSeen ?? false).map((p) => ({ kind: Quality.OffLook, effect: p.miss, detail: p.detail }))];
 }
 
 export function frameProblems(stats: readonly FrameStat[]): QualityProblem[] {

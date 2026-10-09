@@ -295,6 +295,10 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
         onStep(step);
       },
       prepareStep: ({ steps, messages: current, stepNumber }) => {
+        const seen = viewedReferences(current);
+        if (seen.length) {
+          session.references = seen;
+        }
         const tier = stepTier(stepTiers.at(-1) ?? opening, steps.map((s) => s.toolCalls));
         stepTiers.push(tier);
         const tierModel = TIER_MODEL[tier];
@@ -377,7 +381,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
       for (let attempt = 0; attempt < MAX_DELIVERY_ATTEMPTS && !awaitsGo && steps.length && deliveryBlocked(session, vision); attempt++) {
         const errors = openErrors(session);
         const times = keyFrameTimes(session.doc);
-        await play([...conversation, checkMessage(errors, times, viewedReferences(conversation))], Round.SelfCheck);
+        await play([...conversation, checkMessage(errors, times)], Round.SelfCheck);
       }
       if (steps.length && !awaitsGo && !closedByModel(steps.at(-1))) {
         await play([...conversation, { role: 'user', content: SUMMARY_PROMPT }], Round.Summary);
