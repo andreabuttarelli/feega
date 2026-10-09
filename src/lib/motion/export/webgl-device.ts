@@ -1,5 +1,5 @@
 import { composite, type Device, type Rect } from './compositor';
-import { EffectKind, MaskComposite, PaintKind, type Affine, type Effect, type LayerTree, type Paint, type Rgba } from '../hyperframes/layer-tree';
+import { EffectKind, MaskComposite, PaintKind, type Affine, type Effect, type GlassEffect, type LayerTree, type Paint, type Rgba } from '../hyperframes/layer-tree';
 import { GRAIN_SAMPLE_OFFSET, turbulenceTile } from '../effects/turbulence';
 import { GRAIN_TILE } from '../effects/registry';
 import { Layering } from '../hyperframes/capture';
@@ -46,6 +46,26 @@ uniform int shift;
 out vec4 outColor;
 void main() {
   outColor = texelFetch(src, ivec2(gl_FragCoord.xy) + shift, 0) * opacity;
+}`;
+
+const DISPLACE_FS = `#version 300 es
+precision highp float;
+uniform sampler2D src;
+uniform sampler2D map;
+uniform float scale;
+uniform ivec4 bounds;
+out vec4 outColor;
+vec4 tap(ivec2 q) {
+  return q.x >= bounds.x && q.y >= bounds.y && q.x < bounds.z && q.y < bounds.w ? texelFetch(src, q, 0) : vec4(0.0);
+}
+void main() {
+  vec4 m = texelFetch(map, ivec2(gl_FragCoord.xy), 0);
+  vec2 c = m.a > 0.0 ? m.rg / m.a : vec2(0.0);
+  vec2 at = gl_FragCoord.xy + vec2(scale * (c.r - 0.5), -scale * (c.g - 0.5)) - 0.5;
+  vec2 o = floor(at);
+  vec2 f = at - o;
+  ivec2 p = ivec2(o);
+  outColor = mix(mix(tap(p), tap(p + ivec2(1, 0)), f.x), mix(tap(p + ivec2(0, 1)), tap(p + ivec2(1, 1)), f.x), f.y);
 }`;
 
 const BLUR_FS = `#version 300 es
@@ -262,6 +282,7 @@ export function webglGpu(canvas: OffscreenCanvas): Gpu {
   const masking = compile(gl, FULL_VS, MASK_FS);
   const combining = compile(gl, FULL_VS, COMBINE_FS);
   const blurring = compile(gl, FULL_VS, BLUR_FS);
+  const displacing = compile(gl, FULL_VS, DISPLACE_FS);
 
   const texture = (width: number, height: number, data: ArrayBufferView | null = null, filter: number = gl.LINEAR) => {
     const t = gl.createTexture() as WebGLTexture;
@@ -363,15 +384,28 @@ export function webglGpu(canvas: OffscreenCanvas): Gpu {
     };
 
     let bounds = [0, 0, size.width, size.height];
+    let current: Rect | null = null;
     const region = (r: Rect | null) => {
+      current = r;
       if (!r) {
         bounds = [0, 0, size.width, size.height];
         gl.disable(gl.SCISSOR_TEST);
         return;
       }
-      bounds = [r[0] + pad, size.height - r[3] - pad, r[2] + pad, size.height - r[1] - pad];
+      const x0 = Math.max(0, Math.floor(r[0] + pad));
+      const x1 = Math.min(size.width, Math.ceil(r[2] + pad));
+      const y0 = Math.max(0, Math.floor(size.height - r[3] - pad));
+      const y1 = Math.min(size.height, Math.ceil(size.height - r[1] - pad));
+      bounds = [x0, y0, Math.max(x0, x1), Math.max(y0, y1)];
       gl.enable(gl.SCISSOR_TEST);
       gl.scissor(bounds[0], bounds[1], bounds[2] - bounds[0], bounds[3] - bounds[1]);
+    };
+    const inside = (r: Rect, work: () => void) => {
+      const outer = current;
+      const limit = outer ?? [-pad, -pad, size.width - pad, size.height - pad];
+      region([Math.max(r[0], limit[0]), Math.max(r[1], limit[1]), Math.min(r[2], limit[2]), Math.min(r[3], limit[3])]);
+      work();
+      region(outer);
     };
 
     const fill = (s: Surface, [r, g, b, a]: Rgba) => {
@@ -404,7 +438,7 @@ export function webglGpu(canvas: OffscreenCanvas): Gpu {
       return out;
     };
 
-    const pass = (s: Surface, step: [number, number], sigma: number) => {
+    const spread = (s: Surface, step: [number, number], sigma: number) => {
       const out = surface();
       gl.useProgram(blurring.program);
       bind(0, s.texture);
@@ -414,14 +448,58 @@ export function webglGpu(canvas: OffscreenCanvas): Gpu {
       gl.uniform1i(blurring.uniform('radius'), Math.ceil(BLUR_REACH * sigma));
       gl.uniform4i(blurring.uniform('bounds'), bounds[0], bounds[1], bounds[2], bounds[3]);
       full();
+      return out;
+    };
+    const pass = (s: Surface, step: [number, number], sigma: number) => {
+      if (sigma <= 0) {
+        return s;
+      }
+      const out = spread(s, step, sigma);
       release(s);
       return out;
     };
-    const blurOn = (s: Surface, e: Extract<Effect, { kind: EffectKind.Blur }>) => (e.sigma > 0 ? pass(pass(s, [1, 0], e.sigma), [0, 1], e.sigma) : s);
+    const blurOn = (s: Surface, e: Extract<Effect, { kind: EffectKind.Blur }>) => pass(pass(s, [1, 0], e.sigma), [0, 1], e.sigma);
+
+    const displace = (src: Surface, map: Surface, scale: number, from: number[]) => {
+      const out = surface();
+      gl.useProgram(displacing.program);
+      bind(0, src.texture);
+      bind(1, map.texture);
+      gl.uniform1i(displacing.uniform('src'), 0);
+      gl.uniform1i(displacing.uniform('map'), 1);
+      gl.uniform1f(displacing.uniform('scale'), scale);
+      gl.uniform4i(displacing.uniform('bounds'), from[0], from[1], from[2], from[3]);
+      full();
+      return out;
+    };
+    const glassOn = (s: Surface, e: GlassEffect) => {
+      const [x, y, w, h] = e.box;
+      const content = [...bounds];
+      inside([x, y, x + w, y + h], () => {
+        const map = surface();
+        draw(map, e.map);
+        const smooth = pass(pass(copyOf(map), [1, 0], e.smooth[0]), [0, 1], e.smooth[1]);
+        const bent = displace(s, smooth, e.scale, content);
+        release(smooth);
+        const lens = maskBy(pass(pass(bent, [1, 0], e.frost), [0, 1], e.frost), map);
+        release(map);
+        blendInto(s, lens, 1, 'normal');
+        release(lens);
+      });
+      return s;
+    };
+    const copyOf = (s: Surface) => {
+      const out = surface();
+      gl.bindFramebuffer(gl.READ_FRAMEBUFFER, s.buffer);
+      gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, out.buffer);
+      gl.blitFramebuffer(0, 0, size.width, size.height, 0, 0, size.width, size.height, gl.COLOR_BUFFER_BIT, gl.NEAREST);
+      return out;
+    };
 
     const EFFECTS: Record<EffectKind, (s: Surface, e: Effect) => Surface> = {
       [EffectKind.Grain]: grainOn,
-      [EffectKind.Blur]: blurOn
+      [EffectKind.Blur]: blurOn,
+      [EffectKind.Glass]: glassOn
     };
 
     const maskBy = (s: Surface, by: Surface) => {
@@ -519,6 +597,8 @@ type Shot = { bitmap?: ImageBitmap; tree?: LayerTree; sheets?: ImageBitmap[] };
 export function frameOf(shot: Shot): ImageBitmap {
   const gpu = shot.tree && shot.sheets ? sharedGpu() : null;
   if (gpu && shot.tree && shot.sheets) {
+    const show = (n: LayerTree['root'], depth: string): string => `${depth}[${n.paints.map((p) => (p.kind === 'sheet' ? `s${p.sheet}:${Math.round(p.at[4])},${Math.round(p.at[5])} ${Math.round(p.width)}x${Math.round(p.height)}` : 'fill')).join(' ')}] o${n.opacity} ${n.blend} fx:${n.effects.map((e) => e.kind + (e.kind === 'blur' ? e.sigma : '')).join(',')} m${n.masks.length} c${n.clip ? 1 : 0}\n${n.children.map((c) => show(c, depth + '  ')).join('')}`;
+    console.log('DBGTREE pad', shot.tree.pad, '\n' + show(shot.tree.root, ''));
     return composite(gpu.device(shot.sheets, shot.tree.width, shot.tree.height, shot.tree.pad), shot.tree);
   }
   if (!shot.bitmap) {

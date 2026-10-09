@@ -15,16 +15,23 @@ export type Paint = { kind: PaintKind.Sheet; sheet: number; width: number; heigh
 
 export enum EffectKind {
   Grain = 'grain',
-  Blur = 'blur'
+  Blur = 'blur',
+  Glass = 'glass'
 }
+
+export type Box = [number, number, number, number];
+
+export type GlassFilter = { href: string; map: Box; box: Box; smooth: [number, number]; scale: number; frost: number };
 
 export type Grain = { baseFrequency: number; seed: number; amount: number };
 
-export type Effect = { kind: EffectKind.Grain; grains: Grain[]; area: GrainArea } | { kind: EffectKind.Blur; sigma: number };
+export type GlassEffect = { kind: EffectKind.Glass; map: Paint; box: Box; smooth: [number, number]; scale: number; frost: number };
 
-export type FilterStep = { kind: EffectKind.Grain; grain: Grain } | { kind: EffectKind.Blur; sigma: number };
+export type Effect = { kind: EffectKind.Grain; grains: Grain[]; area: GrainArea } | { kind: EffectKind.Blur; sigma: number } | GlassEffect;
 
-export type Filter = { kind: EffectKind.Grain; grains: Grain[] } | { kind: EffectKind.Blur; sigma: number };
+export type FilterStep = { kind: EffectKind.Grain; grain: Grain } | { kind: EffectKind.Blur; sigma: number } | { kind: EffectKind.Glass; glass: GlassFilter };
+
+export type Filter = { kind: EffectKind.Grain; grains: Grain[] } | { kind: EffectKind.Blur; sigma: number } | { kind: EffectKind.Glass; glass: GlassFilter };
 
 export enum MaskComposite {
   Add = 'add',

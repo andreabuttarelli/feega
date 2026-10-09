@@ -165,11 +165,42 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
     const fits = steps.length === 1 && only.tagName === 'feGaussianBlur' && ['', 'SourceGraphic'].includes(attr(only, 'in')) && /^[\d.]+$/.test(sigma);
     return fits ? Number(sigma) : null;
   };
+  const GLASS_CHAIN = 'feImage feGaussianBlur feDisplacementMap feGaussianBlur feComposite feMerge';
+  const boxOfAttrs = (el: Element): Box => [Number(attr(el, 'x')), Number(attr(el, 'y')), Number(attr(el, 'width')), Number(attr(el, 'height'))];
+  const glassOf = (filter: Element | null): GlassFilter | null => {
+    const steps = [...(filter?.children ?? [])];
+    const [image, smooth, bend, frost, cut, merge] = steps;
+    const sigmas = attr(smooth, 'stdDeviation').trim().split(/\s+/).map(Number);
+    const box = bend ? boxOfAttrs(bend) : null;
+    const same = (el: Element) => box !== null && boxOfAttrs(el).every((v, i) => Math.abs(v - box[i]) < 1e-3);
+    const fits =
+      steps.map((n) => n.tagName).join(' ') === GLASS_CHAIN &&
+      attr(filter, 'filterUnits') === 'userSpaceOnUse' &&
+      attr(filter, 'primitiveUnits') === 'userSpaceOnUse' &&
+      attr(image, 'preserveAspectRatio') === 'none' &&
+      attr(smooth, 'in') === attr(image, 'result') &&
+      attr(bend, 'in') === 'SourceGraphic' &&
+      attr(bend, 'in2') === attr(smooth, 'result') &&
+      attr(bend, 'xChannelSelector') === 'R' &&
+      attr(bend, 'yChannelSelector') === 'G' &&
+      attr(frost, 'in') === attr(bend, 'result') &&
+      attr(cut, 'in') === attr(frost, 'result') &&
+      attr(cut, 'in2') === attr(image, 'result') &&
+      attr(cut, 'operator') === 'in' &&
+      [...merge.children].map((n) => attr(n, 'in')).join(' ') === `SourceGraphic ${attr(cut, 'result')}` &&
+      [smooth, frost, cut].every(same) &&
+      sigmas.length <= 2 &&
+      sigmas.every((v) => v >= 0);
+    return fits && box
+      ? { href: attr(image, 'href'), map: boxOfAttrs(image), box, smooth: [sigmas[0], sigmas[sigmas.length - 1]], scale: Number(attr(bend, 'scale')), frost: Number(attr(frost, 'stdDeviation')) }
+      : null;
+  };
   const stepOf = (id: string) => {
     const filter = document.getElementById(id);
     const grain = grainOf(filter);
     const sigma = grain ? null : blurOf(filter);
-    return grain ? { kind: 'grain' as const, grain } : sigma !== null ? { kind: 'blur' as const, sigma } : null;
+    const glass = grain || sigma !== null ? null : glassOf(filter);
+    return grain ? { kind: 'grain' as const, grain } : sigma !== null ? { kind: 'blur' as const, sigma } : glass ? { kind: 'glass' as const, glass } : null;
   };
   const grainsOf = (style: CSSStyleDeclaration): Grain[] | null => {
     if (none(style.filter)) {
@@ -416,26 +447,45 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
   type Affine = [number, number, number, number, number, number];
   type Rgba = [number, number, number, number];
   type Paint = { kind: 'sheet'; sheet: number; width: number; height: number; at: Affine } | { kind: 'fill'; color: Rgba; width: number; height: number; at: Affine };
-  type Effect = { kind: 'grain'; grains: Grain[]; area: GrainArea } | { kind: 'blur'; sigma: number };
+  type Box = [number, number, number, number];
+  type GlassFilter = { href: string; map: Box; box: Box; smooth: [number, number]; scale: number; frost: number };
+  type Effect = { kind: 'grain'; grains: Grain[]; area: GrainArea } | { kind: 'blur'; sigma: number } | { kind: 'glass'; map: Paint; box: Box; smooth: [number, number]; scale: number; frost: number };
   type Mask = { paint: Paint; composite: string };
   type TreeNode = { paints: Paint[]; children: TreeNode[]; opacity: number; blend: string; effects: Effect[]; clip: Paint | null; masks: Mask[] };
   type Picture = { url: string; width: number; height: number };
   type Run = { raster: Element[] };
   type Walked = TreeNode | Run | null;
   const FLAT_PX = 0.5;
-  const pointAt = (el: Element, x: number, y: number, at: Place) => {
-    const probe = document.createElement('div');
-    probe.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:0;height:0;margin:0;padding:0;border:0`;
-    el.appendChild(probe);
-    const r = probe.getBoundingClientRect();
-    probe.remove();
-    return [(r.left - at.base.left) * at.sx, (r.top - at.base.top) * at.sy];
+  const CORNERS = [
+    [0, 0],
+    [PROBE_STEP, 0],
+    [0, PROBE_STEP],
+    [PROBE_STEP, PROBE_STEP]
+  ];
+  const pointsIn = (el: HTMLElement, at: Place) => {
+    const anchored = getComputedStyle(el).position !== 'static';
+    const before = el.style.getPropertyValue('position');
+    if (!anchored) {
+      el.style.setProperty('position', 'relative');
+    }
+    const probes = CORNERS.map(([x, y]) => {
+      const probe = document.createElement('div');
+      probe.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:0;height:0;margin:0;padding:0;border:0`;
+      el.appendChild(probe);
+      return probe;
+    });
+    const points = probes.map((probe) => {
+      const r = probe.getBoundingClientRect();
+      return [(r.left - at.base.left) * at.sx, (r.top - at.base.top) * at.sy];
+    });
+    probes.forEach((probe) => probe.remove());
+    if (!anchored) {
+      el.style.setProperty('position', before);
+    }
+    return points;
   };
   const affineOf = (el: Element, at: Place): Affine | null => {
-    const o = pointAt(el, 0, 0, at);
-    const x = pointAt(el, PROBE_STEP, 0, at);
-    const y = pointAt(el, 0, PROBE_STEP, at);
-    const far = pointAt(el, PROBE_STEP, PROBE_STEP, at);
+    const [o, x, y, far] = pointsIn(el as HTMLElement, at);
     const flat = Math.abs(x[0] + y[0] - o[0] - far[0]) < FLAT_PX && Math.abs(x[1] + y[1] - o[1] - far[1]) < FLAT_PX;
     return flat ? [(x[0] - o[0]) / PROBE_STEP, (x[1] - o[1]) / PROBE_STEP, (y[0] - o[0]) / PROBE_STEP, (y[1] - o[1]) / PROBE_STEP, o[0], o[1]] : null;
   };
@@ -461,7 +511,7 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
   const grouped = (items: Walked[]) => join<TreeNode, Element>(items);
   type SheetPaint = Extract<Paint, { kind: 'sheet' }>;
   type Slot = { source: HTMLCanvasElement | Picture | Run; paint: SheetPaint };
-  type Walk = { at: Place; slots: Slot[] };
+  type Walk = { at: Place; slots: Slot[]; live: number };
   type Cropped = { canvas: HTMLCanvasElement; box: [number, number, number, number]; size: [number, number] } | null;
   const slotted = (w: Walk, source: Slot['source'], part: Omit<SheetPaint, 'kind' | 'sheet'>): SheetPaint => {
     const paint: SheetPaint = { kind: SHEET, sheet: -1, ...part };
@@ -546,23 +596,27 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
     if (style.display === 'none' || opacity <= 0) {
       return null;
     }
-    const raster: Run = { raster: [el] };
-    if (!PLAIN.has(el.tagName) || hasText(el) || !boxed(style) || (el.parentElement && style.zIndex !== 'auto' && !stacked(el))) {
-      return raster;
+    const before = w.live;
+    const raster = (): Run => {
+      w.live = before + (alive(el) ? 1 : 0);
+      return { raster: [el] };
+    };
+    if (w.live > MAX_LIVE_RASTERS || !PLAIN.has(el.tagName) || hasText(el) || !boxed(style) || (el.parentElement && style.zIndex !== 'auto' && !stacked(el))) {
+      return raster();
     }
     const shown = style.visibility !== 'hidden';
     if (el instanceof HTMLCanvasElement) {
       const paint = canvasPaint(el, parent, style, w);
       if (paint === undefined) {
-        return raster;
+        return raster();
       }
       return { paints: paint && shown ? [paint] : [], children: [], opacity, blend: style.mixBlendMode, effects: [], clip: null, masks: [] };
     }
     const filters = cssFilters(style.filter, stepOf as never);
-    const at = filters ? affineOf(el, w.at) : null;
+    const at = filters ? (leafAffine(el as HTMLElement, parent, style) ?? affineOf(el, w.at)) : null;
     const effects = filters && at && upright(at) ? effectsOf(filters, el as HTMLElement, at, w) : null;
     if (!at || !effects) {
-      return raster;
+      return raster();
     }
     const color = rgba(style.backgroundColor);
     const box = { width: (el as HTMLElement).offsetWidth, height: (el as HTMLElement).offsetHeight, at };
@@ -570,23 +624,36 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
     const clip: Paint | null = style.overflow !== 'visible' ? { kind: FILL, color: WHITE, ...box } : null;
     const masks = masksOf(style, box, w);
     if (!masks) {
-      return raster;
+      return raster();
     }
     const parts = grouped([...el.children].map((child) => walk(child, at, w)));
     const self: TreeNode = { paints, children: [], opacity, blend: style.mixBlendMode, effects, clip, masks };
     if (parts.every((p) => !isNode(p)) && plainNode(self)) {
-      return raster;
+      return raster();
     }
     self.children = held(parts, w);
     return self;
   };
   const SIMILAR = 1e-3;
   const isotropic = (m: Affine) => Math.abs(m[0] * m[2] + m[1] * m[3]) < SIMILAR * scaleOf(m) ** 2 && Math.abs(Math.hypot(m[0], m[1]) - Math.hypot(m[2], m[3])) < SIMILAR * scaleOf(m);
-  const effectsOf = (filters: { kind: string; grains?: Grain[]; sigma?: number }[], el: HTMLElement, at: Affine, w: Walk): Effect[] | null => {
-    if (filters.some((f) => f.kind === 'blur') && !isotropic(at)) {
+  type Read = { kind: string; grains?: Grain[]; sigma?: number; glass?: GlassFilter };
+  const placed = (b: Box, at: Affine): Box => [at[0] * b[0] + at[4], at[3] * b[1] + at[5], at[0] * b[2], at[3] * b[3]];
+  const glassEffect = (g: GlassFilter, at: Affine, w: Walk): Effect => {
+    const s = scaleOf(at);
+    const [mx, my, mw, mh] = placed(g.map, at);
+    const map = slotted(w, { url: g.href, width: 0, height: 0 }, { width: mw, height: mh, at: [1, 0, 0, 1, mx, my] });
+    return { kind: 'glass', map, box: placed(g.box, at), smooth: [g.smooth[0] * s, g.smooth[1] * s], scale: g.scale * s, frost: g.frost * s };
+  };
+  const EFFECT_OF: Record<string, (f: Read, el: HTMLElement, at: Affine, w: Walk) => Effect> = {
+    grain: (f, el, _at, w) => ({ kind: 'grain', grains: f.grains as Grain[], area: areaOf(el, w.at).area }),
+    blur: (f, _el, at) => ({ kind: 'blur', sigma: (f.sigma as number) * scaleOf(at) }),
+    glass: (f, _el, at, w) => glassEffect(f.glass as GlassFilter, at, w)
+  };
+  const effectsOf = (filters: Read[], el: HTMLElement, at: Affine, w: Walk): Effect[] | null => {
+    if (filters.some((f) => f.kind !== 'grain') && !isotropic(at)) {
       return null;
     }
-    return filters.map((f) => (f.kind === 'blur' ? { kind: 'blur', sigma: (f.sigma as number) * scaleOf(at) } : { kind: 'grain', grains: f.grains as Grain[], area: areaOf(el, w.at).area }));
+    return filters.map((f) => EFFECT_OF[f.kind](f, el, at, w));
   };
   const BLUR_REACH = 3;
   const MAX_PAD = 384;
@@ -599,8 +666,10 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
     const known =
       pictures.get(key) ??
       picture(p.url).then((img) => {
-        const out = canvasOf(p.width, p.height);
-        (out.getContext('2d', { willReadFrequently: true }) as CanvasRenderingContext2D).drawImage(img, 0, 0, p.width, p.height);
+        const width = p.width || img.naturalWidth;
+        const height = p.height || img.naturalHeight;
+        const out = canvasOf(width, height);
+        (out.getContext('2d', { willReadFrequently: true }) as CanvasRenderingContext2D).drawImage(img, 0, 0, width, height);
         return cropped(out);
       });
     pictures.delete(key);
@@ -612,6 +681,8 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
   };
   const rasterKeys = new WeakMap<Element, { key: string; canvas: Cropped }>();
   const LIVE = 'canvas, video, iframe';
+  const MAX_LIVE_RASTERS = 2;
+  const alive = (el: Element) => el.matches(LIVE) || el.querySelector(LIVE) !== null;
   const kebab = (name: string) => name.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
   const NEUTRAL: [string, string][] = Object.entries({ filter: 'none', opacity: '1', mixBlendMode: 'normal', backgroundColor: 'transparent', mask: 'none', WebkitMask: 'none' }).map(([name, value]) => [kebab(name), value]);
   const neutralised = (path: HTMLElement[]) => {
@@ -627,17 +698,7 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
     return path;
   };
   const keyOf = (root: HTMLElement, m: CaptureRequest, run: Run, pad: number) => {
-    const live = run.raster.some((el) => el.matches(LIVE) || el.querySelector(LIVE));
-    return live ? null : `${m.width}x${m.height}+${pad}|${pathOf(root, run).map((el) => el.getAttribute('style') ?? '').join('|')}|${run.raster.map((el) => el.outerHTML).join('')}`;
-  };
-  const seen = new WeakMap<Element, string>();
-  const changing = (root: HTMLElement, m: CaptureRequest, run: Run, pad: number) => {
-    const key = keyOf(root, m, run, pad);
-    const before = seen.get(run.raster[0]);
-    if (key !== null) {
-      seen.set(run.raster[0], key);
-    }
-    return key === null || key !== before;
+    return run.raster.some(alive) ? null : `${m.width}x${m.height}+${pad}|${pathOf(root, run).map((el) => el.getAttribute('style') ?? '').join('|')}|${run.raster.map((el) => el.outerHTML).join('')}`;
   };
   const rasterOf = async (root: HTMLElement, m: CaptureRequest, embed: string, run: Run, pad: number) => {
     const path = pathOf(root, run);
@@ -666,18 +727,17 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
   const treeOf = async (root: HTMLElement, m: CaptureRequest, embed: string) => {
     const backdrop = backdropOf(root);
     const at = placeOf(root, m);
-    const w: Walk = { at, slots: [] };
+    const w: Walk = { at, slots: [], live: 0 };
     const base: Affine = [at.sx, 0, 0, at.sy, 0, 0];
     const parts = grouped([...root.children].map((el) => walk(el, base, w)));
     if (backdrop === null || !parts.some((p) => isNode(p) && gpuOnly(p))) {
       return null;
     }
     const children = held(parts, w);
-    const pad = Math.min(MAX_PAD, Math.ceil(Math.max(0, ...children.map(reachOf))));
-    const runs = w.slots.map((slot) => slot.source).filter((source): source is Run => 'raster' in source);
-    if (runs.filter((run) => changing(root, m, run, pad)).length > MAX_FRESH_RASTERS) {
+    if (w.live > MAX_LIVE_RASTERS) {
       return null;
     }
+    const pad = Math.min(MAX_PAD, Math.ceil(Math.max(0, ...children.map(reachOf))));
     const sources: HTMLCanvasElement[] = [];
     for (const { source, paint } of w.slots) {
       if ('raster' in source) {
@@ -693,7 +753,6 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
     const tree = { width: m.width, height: m.height, pad, backdrop: rgba(backdrop), root: { paints: [], children, opacity: 1, blend: 'normal', effects: [], clip: null, masks: [] } };
     return { tree, sheets };
   };
-  const MAX_FRESH_RASTERS = 2;
   const GPU = 'gpu';
   const FLAT = 'flat';
   const drawn = async (root: HTMLElement, m: CaptureRequest, embed: string) => {

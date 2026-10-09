@@ -91,6 +91,11 @@ describe('cssFilters', () => {
     ]);
   });
 
+  it('passes a liquid-glass lens through as one step', () => {
+    const glass: FilterStep = { kind: EffectKind.Glass, glass: { href: 'data:image/png;base64,AA', map: [1, 2, 3, 4], box: [0, 1, 5, 6], smooth: [2, 2], scale: 9, frost: 3 } };
+    expect(cssFilters('url("#lens")', (id) => (id === 'lens' ? glass : null))).toEqual([glass]);
+  });
+
   it('refuses what it cannot draw: another CSS function or an unknown SVG filter', () => {
     expect(cssFilters('brightness(1.2)', lookup)).toBeNull();
     expect(cssFilters('url("#other")', lookup)).toBeNull();
