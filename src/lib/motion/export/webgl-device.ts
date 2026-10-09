@@ -1,5 +1,5 @@
-import { composite, type Device } from './compositor';
-import { EffectKind, PaintKind, type Affine, type Effect, type LayerTree, type Paint, type Rgba } from '../hyperframes/layer-tree';
+import { composite, type Device, type Rect } from './compositor';
+import { EffectKind, MaskComposite, PaintKind, type Affine, type Effect, type LayerTree, type Paint, type Rgba } from '../hyperframes/layer-tree';
 import { GRAIN_SAMPLE_OFFSET, turbulenceTile } from '../effects/turbulence';
 import { GRAIN_TILE } from '../effects/registry';
 import { Layering } from '../hyperframes/capture';
@@ -53,6 +53,20 @@ out vec4 outColor;
 void main() {
   ivec2 at = ivec2(gl_FragCoord.xy);
   outColor = texelFetch(src, at, 0) * texelFetch(by, at, 0).a;
+}`;
+
+const COMBINE_FS = `#version 300 es
+precision highp float;
+uniform sampler2D src;
+uniform sampler2D dst;
+uniform int op;
+out vec4 outColor;
+void main() {
+  ivec2 at = ivec2(gl_FragCoord.xy);
+  float s = texelFetch(src, at, 0).a;
+  float d = texelFetch(dst, at, 0).a;
+  float a = op == 1 ? s * (1.0 - d) : op == 2 ? s * d : op == 3 ? s * (1.0 - d) + d * (1.0 - s) : s + d * (1.0 - s);
+  outColor = vec4(a);
 }`;
 
 const BLEND_FS = `#version 300 es
@@ -164,6 +178,8 @@ void main() {
   outColor = pixel;
 }`;
 
+const COMBINE_OPS: Record<MaskComposite, number> = { [MaskComposite.Add]: 0, [MaskComposite.Subtract]: 1, [MaskComposite.Intersect]: 2, [MaskComposite.Exclude]: 3 };
+
 const BLEND_MODES = ['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten', 'color-dodge', 'color-burn', 'hard-light', 'soft-light', 'difference', 'exclusion', 'hue', 'saturation', 'color', 'luminosity'];
 
 type Surface = { texture: WebGLTexture; buffer: WebGLFramebuffer };
@@ -217,6 +233,7 @@ export function webglGpu(canvas: OffscreenCanvas): Gpu {
   const blend = compile(gl, FULL_VS, BLEND_FS);
   const grain = compile(gl, FULL_VS, GRAIN_FS);
   const masking = compile(gl, FULL_VS, MASK_FS);
+  const combining = compile(gl, FULL_VS, COMBINE_FS);
 
   const texture = (width: number, height: number, data: ArrayBufferView | null = null, filter: number = gl.LINEAR) => {
     const t = gl.createTexture() as WebGLTexture;
@@ -289,6 +306,9 @@ export function webglGpu(canvas: OffscreenCanvas): Gpu {
     });
 
     const draw = (s: Surface, p: Paint) => {
+      if (!p.width || !p.height) {
+        return;
+      }
       target(s);
       gl.useProgram(paint.program);
       gl.enable(gl.BLEND);
@@ -309,6 +329,15 @@ export function webglGpu(canvas: OffscreenCanvas): Gpu {
       }
       full();
       gl.disable(gl.BLEND);
+    };
+
+    const region = (r: Rect | null) => {
+      if (!r) {
+        gl.disable(gl.SCISSOR_TEST);
+        return;
+      }
+      gl.enable(gl.SCISSOR_TEST);
+      gl.scissor(r[0], size.height - r[3], r[2] - r[0], r[3] - r[1]);
     };
 
     const fill = (s: Surface, [r, g, b, a]: Rgba) => {
@@ -356,6 +385,19 @@ export function webglGpu(canvas: OffscreenCanvas): Gpu {
       return out;
     };
 
+    const combine = (src: Surface, dst: Surface, op: MaskComposite) => {
+      const out = surface();
+      gl.useProgram(combining.program);
+      bind(0, src.texture);
+      bind(1, dst.texture);
+      gl.uniform1i(combining.uniform('src'), 0);
+      gl.uniform1i(combining.uniform('dst'), 1);
+      gl.uniform1i(combining.uniform('op'), COMBINE_OPS[op]);
+      full();
+      release(dst);
+      return out;
+    };
+
     const blendInto = (into: Surface, from: Surface, opacity: number, mode: string) => {
       const index = Math.max(0, BLEND_MODES.indexOf(mode));
       if (index === 0) {
@@ -387,6 +429,7 @@ export function webglGpu(canvas: OffscreenCanvas): Gpu {
     };
 
     const finish = (s: Surface) => {
+      region(null);
       target(null);
       gl.useProgram(copy.program);
       bind(0, s.texture);
@@ -398,7 +441,7 @@ export function webglGpu(canvas: OffscreenCanvas): Gpu {
       return canvas.transferToImageBitmap();
     };
 
-    return { surface, release, fill, paint: draw, effect: (s, e) => EFFECTS[e.kind](s, e), mask: maskBy, blend: blendInto, finish };
+    return { surface, release, region, fill, paint: draw, effect: (s, e) => EFFECTS[e.kind](s, e), combine, mask: maskBy, blend: blendInto, finish };
   };
 
   return { device };

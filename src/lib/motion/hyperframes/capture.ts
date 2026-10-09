@@ -3,7 +3,7 @@ import { inlineMedia, shrinkImage } from './inline-media';
 import { js } from './html';
 import { paintSvg } from './svg-paint';
 import { planLayers, type Pass } from './layer-plan';
-import { chain as chainAffine, cssAffine, cssRgba, joinRasters, type LayerTree } from './layer-tree';
+import { chain as chainAffine, cssAffine, cssMasks as readMasks, cssRgba, joinRasters, type LayerTree } from './layer-tree';
 import { grainPixels, type GrainArea } from '../effects/grain';
 import { GRAIN_SAMPLE_OFFSET, turbulenceTile } from '../effects/turbulence';
 import { GRAIN_TILE } from '../effects/registry';
@@ -43,7 +43,7 @@ type HtmlToImage = {
   getFontEmbedCSS: (node: HTMLElement) => Promise<string>;
 };
 
-function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, inline: typeof inlineMedia, shrink: typeof shrinkImage, paint: typeof paintSvg, plan: typeof planLayers, grainOn: typeof grainPixels, tileOf: typeof turbulenceTile, chain: typeof chainAffine, affine: typeof cssAffine, rgba: typeof cssRgba, join: typeof joinRasters) {
+function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, inline: typeof inlineMedia, shrink: typeof shrinkImage, paint: typeof paintSvg, plan: typeof planLayers, grainOn: typeof grainPixels, tileOf: typeof turbulenceTile, chain: typeof chainAffine, affine: typeof cssAffine, rgba: typeof cssRgba, join: typeof joinRasters, cssMasks: typeof readMasks) {
   type Grain = { baseFrequency: number; seed: number; amount: number };
   const shrunk = new Map<string, Promise<string>>();
   let lib: Promise<unknown> | null = null;
@@ -404,7 +404,9 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
   type Rgba = [number, number, number, number];
   type Paint = { kind: 'sheet'; sheet: number; width: number; height: number; at: Affine } | { kind: 'fill'; color: Rgba; width: number; height: number; at: Affine };
   type Effect = { kind: 'grain'; grains: Grain[]; area: GrainArea };
-  type TreeNode = { paints: Paint[]; children: TreeNode[]; opacity: number; blend: string; effects: Effect[]; clip: Paint | null };
+  type Mask = { paint: Paint; composite: string };
+  type TreeNode = { paints: Paint[]; children: TreeNode[]; opacity: number; blend: string; effects: Effect[]; clip: Paint | null; masks: Mask[] };
+  type Picture = { url: string; width: number; height: number };
   type Run = { raster: Element[] };
   type Walked = TreeNode | Run | null;
   const FLAT_PX = 0.5;
@@ -439,13 +441,70 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
     none(style.backgroundImage) &&
     none(style.clipPath) &&
     none(style.backdropFilter) &&
-    none(style.maskImage || (style as unknown as { webkitMaskImage?: string }).webkitMaskImage) &&
     parseFloat(style.borderTopLeftRadius) + parseFloat(style.borderBottomRightRadius) + parseFloat(style.borderTopRightRadius) + parseFloat(style.borderBottomLeftRadius) === 0 &&
     parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth) + parseFloat(style.borderLeftWidth) + parseFloat(style.borderRightWidth) === 0;
   const isNode = (w: Walked): w is TreeNode => !!w && 'paints' in w;
-  const plainNode = (n: TreeNode) => !n.paints.length && !n.effects.length && !n.clip && n.opacity === 1 && n.blend === 'normal';
+  const plainNode = (n: TreeNode) => !n.paints.length && !n.effects.length && !n.masks.length && !n.clip && n.opacity === 1 && n.blend === 'normal';
   const grouped = (items: Walked[]) => join<TreeNode, Element>(items);
-  type Walk = { at: Place; sheets: HTMLCanvasElement[]; runs: { run: Run; node: TreeNode }[] };
+  type SheetPaint = Extract<Paint, { kind: 'sheet' }>;
+  type Slot = { source: HTMLCanvasElement | Picture | Run; paint: SheetPaint };
+  type Walk = { at: Place; slots: Slot[] };
+  type Cropped = { canvas: HTMLCanvasElement; box: [number, number, number, number]; size: [number, number] } | null;
+  const slotted = (w: Walk, source: Slot['source'], part: Omit<SheetPaint, 'kind' | 'sheet'>): SheetPaint => {
+    const paint: SheetPaint = { kind: SHEET, sheet: -1, ...part };
+    w.slots.push({ source, paint });
+    return paint;
+  };
+  const cropped = (canvas: HTMLCanvasElement): Cropped => {
+    const { width, height } = canvas;
+    const alpha = (canvas.getContext('2d') as CanvasRenderingContext2D).getImageData(0, 0, width, height).data;
+    let [x0, y0, x1, y1] = [width, height, 0, 0];
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        if (!alpha[(y * width + x) * 4 + 3]) {
+          continue;
+        }
+        x0 = Math.min(x0, x);
+        x1 = Math.max(x1, x + 1);
+        y0 = Math.min(y0, y);
+        y1 = Math.max(y1, y + 1);
+      }
+    }
+    if (x1 <= x0 || y1 <= y0) {
+      return null;
+    }
+    const out = canvasOf(x1 - x0, y1 - y0);
+    (out.getContext('2d') as CanvasRenderingContext2D).drawImage(canvas, -x0, -y0);
+    return { canvas: out, box: [x0, y0, x1, y1], size: [width, height] };
+  };
+  const whole = (canvas: HTMLCanvasElement): Cropped => ({ canvas, box: [0, 0, canvas.width, canvas.height], size: [canvas.width, canvas.height] });
+  const fit = (paint: SheetPaint, c: Cropped, sheet: number) => {
+    if (!c) {
+      paint.width = 0;
+      paint.height = 0;
+      return;
+    }
+    const kx = paint.width / c.size[0];
+    const ky = paint.height / c.size[1];
+    const [x0, y0, x1, y1] = c.box;
+    paint.sheet = sheet;
+    paint.at = chain(paint.at, [1, 0, 0, 1, x0 * kx, y0 * ky]);
+    paint.width = (x1 - x0) * kx;
+    paint.height = (y1 - y0) * ky;
+  };
+  type Prefixed = CSSStyleDeclaration & { webkitMaskImage?: string; webkitMaskComposite?: string };
+  const scaleOf = (m: Affine) => Math.max(Math.hypot(m[0], m[1]), Math.hypot(m[2], m[3]));
+  const masksOf = (style: CSSStyleDeclaration, box: { width: number; height: number; at: Affine }, w: Walk): Mask[] | null => {
+    const prefixed = style as Prefixed;
+    const found = cssMasks(style.maskImage || prefixed.webkitMaskImage || 'none', style.maskComposite || prefixed.webkitMaskComposite || 'add');
+    const scale = scaleOf(box.at);
+    return (
+      found?.map(({ url, composite }) => {
+        const picture = { url, width: Math.max(1, Math.ceil(box.width * scale)), height: Math.max(1, Math.ceil(box.height * scale)) };
+        return { paint: slotted(w, picture, box), composite };
+      }) ?? null
+    );
+  };
   const canvasPaint = (el: HTMLCanvasElement, parent: Affine, style: CSSStyleDeclaration, w: Walk): Paint | null | undefined => {
     const at = leafAffine(el, parent, style);
     if (!at || !upright(at)) {
@@ -454,16 +513,15 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
     if (!el.width || !el.height || !el.offsetWidth || !el.offsetHeight) {
       return null;
     }
-    w.sheets.push(el);
-    return { kind: SHEET, sheet: w.sheets.length - 1, width: el.offsetWidth, height: el.offsetHeight, at };
+    return slotted(w, el, { width: el.offsetWidth, height: el.offsetHeight, at });
   };
   const held = (parts: (TreeNode | Run)[], w: Walk) =>
     parts.map((p) => {
       if (isNode(p)) {
         return p;
       }
-      const holder: TreeNode = { paints: [], children: [], opacity: 1, blend: 'normal', effects: [], clip: null };
-      w.runs.push({ run: p, node: holder });
+      const holder: TreeNode = { paints: [], children: [], opacity: 1, blend: 'normal', effects: [], clip: null, masks: [] };
+      holder.paints.push(slotted(w, p, { width: w.at.width, height: w.at.height, at: [1, 0, 0, 1, 0, 0] }));
       return holder;
     });
   const walk = (el: Element, parent: Affine, w: Walk): Walked => {
@@ -485,7 +543,7 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
       if (paint === undefined) {
         return raster;
       }
-      return { paints: paint && shown ? [paint] : [], children: [], opacity, blend: style.mixBlendMode, effects: [], clip: null };
+      return { paints: paint && shown ? [paint] : [], children: [], opacity, blend: style.mixBlendMode, effects: [], clip: null, masks: [] };
     }
     const grains = grainsOf(style);
     const at = grains ? affineOf(el, w.at) : null;
@@ -497,16 +555,38 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
     const paints: Paint[] = color && shown ? [{ kind: FILL, color, ...box }] : [];
     const effects: Effect[] = grains.length ? [{ kind: 'grain', grains, area: areaOf(el as HTMLElement, w.at).area }] : [];
     const clip: Paint | null = style.overflow !== 'visible' ? { kind: FILL, color: WHITE, ...box } : null;
+    const masks = masksOf(style, box, w);
+    if (!masks) {
+      return raster;
+    }
     const parts = grouped([...el.children].map((child) => walk(child, at, w)));
-    const self: TreeNode = { paints, children: [], opacity, blend: style.mixBlendMode, effects, clip };
+    const self: TreeNode = { paints, children: [], opacity, blend: style.mixBlendMode, effects, clip, masks };
     if (parts.every((p) => !isNode(p)) && plainNode(self)) {
       return raster;
     }
     self.children = held(parts, w);
     return self;
   };
-  const gpuOnly = (n: TreeNode): boolean => n.effects.length > 0 || n.children.some(gpuOnly);
-  const rasterKeys = new WeakMap<Element, { key: string; canvas: HTMLCanvasElement }>();
+  const gpuOnly = (n: TreeNode): boolean => n.effects.length > 0 || n.masks.length > 0 || n.children.some(gpuOnly);
+  const pictures = new Map<string, Promise<Cropped>>();
+  const MAX_PICTURES = 64;
+  const pictureOf = (p: Picture) => {
+    const key = `${p.width}x${p.height}|${p.url}`;
+    const known =
+      pictures.get(key) ??
+      picture(p.url).then((img) => {
+        const out = canvasOf(p.width, p.height);
+        (out.getContext('2d', { willReadFrequently: true }) as CanvasRenderingContext2D).drawImage(img, 0, 0, p.width, p.height);
+        return cropped(out);
+      });
+    pictures.delete(key);
+    pictures.set(key, known);
+    if (pictures.size > MAX_PICTURES) {
+      pictures.delete(pictures.keys().next().value as string);
+    }
+    return known;
+  };
+  const rasterKeys = new WeakMap<Element, { key: string; canvas: Cropped }>();
   const LIVE = 'canvas, video, iframe';
   const kebab = (name: string) => name.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
   const NEUTRAL: [string, string][] = Object.entries({ filter: 'none', opacity: '1', mixBlendMode: 'normal', backgroundColor: 'transparent', mask: 'none', WebkitMask: 'none' }).map(([name, value]) => [kebab(name), value]);
@@ -546,7 +626,8 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
     const inside = (node: Node) => kept.has(node) || run.raster.some((el) => el === node || el.contains(node));
     const restore = neutralised(path);
     try {
-      const canvas = await svgOf(root, m, embed, { style: { background: 'transparent' }, filter: (node: Node) => drawable(node) && (!(node instanceof Element) || inside(node)) });
+      const shot = await svgOf(root, m, embed, { style: { background: 'transparent' }, filter: (node: Node) => drawable(node) && (!(node instanceof Element) || inside(node)) });
+      const canvas = key === null ? whole(shot) : cropped(shot);
       if (key !== null) {
         rasterKeys.set(run.raster[0], { key, canvas });
       }
@@ -558,23 +639,27 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
   const treeOf = async (root: HTMLElement, m: CaptureRequest, embed: string) => {
     const backdrop = backdropOf(root);
     const at = placeOf(root, m);
-    const w: Walk = { at, sheets: [], runs: [] };
+    const w: Walk = { at, slots: [] };
     const base: Affine = [at.sx, 0, 0, at.sy, 0, 0];
     const parts = grouped([...root.children].map((el) => walk(el, base, w)));
     if (backdrop === null || !parts.some((p) => isNode(p) && gpuOnly(p))) {
       return null;
     }
     const children = held(parts, w);
-    if (w.runs.filter(({ run }) => changing(root, m, run)).length > MAX_FRESH_RASTERS) {
+    const runs = w.slots.map((slot) => slot.source).filter((source): source is Run => 'raster' in source);
+    if (runs.filter((run) => changing(root, m, run)).length > MAX_FRESH_RASTERS) {
       return null;
     }
-    const sources: HTMLCanvasElement[] = [...w.sheets];
-    for (const { run, node } of w.runs) {
-      sources.push(await rasterOf(root, m, embed, run));
-      node.paints.push({ kind: SHEET, sheet: sources.length - 1, width: m.width, height: m.height, at: [1, 0, 0, 1, 0, 0] });
+    const sources: HTMLCanvasElement[] = [];
+    for (const { source, paint } of w.slots) {
+      const found = source instanceof HTMLCanvasElement ? whole(source) : 'raster' in source ? await rasterOf(root, m, embed, source) : await pictureOf(source);
+      fit(paint, found, sources.length);
+      if (found) {
+        sources.push(found.canvas);
+      }
     }
     const sheets = await Promise.all(sources.map((c) => createImageBitmap(c, { premultiplyAlpha: 'premultiply' })));
-    const tree = { width: m.width, height: m.height, backdrop: rgba(backdrop), root: { paints: [], children, opacity: 1, blend: 'normal', effects: [], clip: null } };
+    const tree = { width: m.width, height: m.height, backdrop: rgba(backdrop), root: { paints: [], children, opacity: 1, blend: 'normal', effects: [], clip: null, masks: [] } };
     return { tree, sheets };
   };
   const MAX_FRESH_RASTERS = 2;
@@ -648,5 +733,5 @@ export function stampOf(html: string): string | null {
 
 export function captureScript(doc: { width: number; height: number }, stamp: string): string {
   const cfg: RuntimeConfig = { request: CAPTURE_REQUEST, reply: CAPTURE_REPLY, lib: SCREENSHOT_URL, width: doc.width, height: doc.height, mediaTimeoutMs: MEDIA_TIMEOUT_MS, stamp, errorsKey: ERRORS, settle: Settle.Paint, grainTile: GRAIN_TILE, grainOffset: GRAIN_SAMPLE_OFFSET, webkitUa: WEBKIT_UA.source, notWebkitUa: NOT_WEBKIT_UA.source };
-  return `<script>(${captureRuntime.toString()})(${js(cfg)},(${freezeMasks.toString()}),(${inlineMedia.toString()}),(${shrinkImage.toString()}),(${paintSvg.toString()}),(${planLayers.toString()}),(${grainPixels.toString()}),(${turbulenceTile.toString()}),(${chainAffine.toString()}),(${cssAffine.toString()}),(${cssRgba.toString()}),(${joinRasters.toString()}));</script>`;
+  return `<script>(${captureRuntime.toString()})(${js(cfg)},(${freezeMasks.toString()}),(${inlineMedia.toString()}),(${shrinkImage.toString()}),(${paintSvg.toString()}),(${planLayers.toString()}),(${grainPixels.toString()}),(${turbulenceTile.toString()}),(${chainAffine.toString()}),(${cssAffine.toString()}),(${cssRgba.toString()}),(${joinRasters.toString()}),(${readMasks.toString()}));</script>`;
 }

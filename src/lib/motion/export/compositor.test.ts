@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { composite, type Device } from './compositor';
-import { EffectKind, IDENTITY, PaintKind, node, type Effect, type LayerTree, type Paint } from '../hyperframes/layer-tree';
+import { EffectKind, IDENTITY, MaskComposite, PaintKind, node, type Effect, type LayerTree, type Paint } from '../hyperframes/layer-tree';
 
 const clip: Paint = { kind: PaintKind.Fill, color: [1, 1, 1, 1], width: 5, height: 5, at: IDENTITY };
 const sheet = (n: number): Paint => ({ kind: PaintKind.Sheet, sheet: n, width: 10, height: 10, at: IDENTITY });
@@ -25,6 +25,11 @@ function recorder() {
       log.push(`${e.kind} ${s}`);
       return s;
     },
+    combine: (src, dst, op) => {
+      log.push(`combine ${src} ${op} ${dst}`);
+      return dst;
+    },
+    region: (r) => log.push(`region ${r ? r.join(',') : 'all'}`),
     mask: (s, m) => {
       log.push(`mask ${s} by ${m}`);
       return s;
@@ -52,7 +57,7 @@ describe('composite', () => {
     const { device, log, live } = recorder();
     composite(device, tree(node({ children: [node({ paints: [sheet(0)] }), node({ paints: [sheet(1)], blend: 'screen', opacity: 0.5 })] }), null));
 
-    expect(log).toEqual(['paint s0 sheet0', 'paint s1 sheet1', 'blend s1->s0 0.5 screen', 'release s1', 'finish s0']);
+    expect(log).toEqual(['paint s0 sheet0', 'region 0,0,10,10', 'paint s1 sheet1', 'blend s1->s0 0.5 screen', 'release s1', 'region all', 'finish s0']);
     expect(live()).toBe(1);
   });
 
@@ -60,14 +65,34 @@ describe('composite', () => {
     const { device, log } = recorder();
     composite(device, tree(node({ children: [node({ paints: [sheet(0)] }), node({ effects: [grain], children: [node({ paints: [sheet(1)] }), node({ paints: [sheet(2)] })] })] }), null));
 
-    expect(log).toEqual(['paint s0 sheet0', 'paint s1 sheet1', 'paint s1 sheet2', 'grain s1', 'blend s1->s0 1 normal', 'release s1', 'finish s0']);
+    expect(log).toEqual(['paint s0 sheet0', 'region 0,0,10,10', 'paint s1 sheet1', 'paint s1 sheet2', 'grain s1', 'blend s1->s0 1 normal', 'release s1', 'region all', 'finish s0']);
   });
 
   it('clips what an element holds to its box, but not its own background', () => {
     const { device, log, live } = recorder();
     composite(device, tree(node({ children: [node({ paints: [sheet(0)], clip, children: [node({ paints: [sheet(1)] })] })] }), null));
 
-    expect(log).toEqual(['paint s0 sheet0', 'paint s1 sheet1', 'paint s2 fill', 'mask s1 by s2', 'release s2', 'blend s1->s0 1 normal', 'release s1', 'finish s0']);
+    expect(log).toEqual(['paint s0 sheet0', 'region 0,0,5,5', 'paint s1 sheet1', 'paint s2 fill', 'mask s1 by s2', 'release s2', 'blend s1->s0 1 normal', 'release s1', 'region all', 'finish s0']);
     expect(live()).toBe(1);
+  });
+
+  it('masks everything the element holds with its mask layers, bottom layer first', () => {
+    const { device, log, live } = recorder();
+    const masks = [
+      { paint: sheet(2), composite: MaskComposite.Subtract },
+      { paint: sheet(3), composite: MaskComposite.Add }
+    ];
+    composite(device, tree(node({ children: [node({ paints: [sheet(0)], masks, children: [node({ paints: [sheet(1)] })] })] }), null));
+
+    expect(log).toEqual(['region 0,0,10,10', 'paint s1 sheet0', 'paint s1 sheet1', 'paint s2 sheet3', 'paint s3 sheet2', 'combine s3 subtract s2', 'release s3', 'mask s1 by s2', 'release s2', 'blend s1->s0 1 normal', 'release s1', 'region all', 'finish s0']);
+    expect(live()).toBe(1);
+  });
+
+  it('works only inside the box an isolated layer covers, then gives the frame back', () => {
+    const { device, log } = recorder();
+    const small: Paint = { kind: PaintKind.Sheet, sheet: 0, width: 4, height: 2, at: [1, 0, 0, 1, 3, 5] };
+    composite(device, tree(node({ children: [node({ paints: [small], opacity: 0.5 })] }), null));
+
+    expect(log).toEqual(['region 3,5,7,7', 'paint s1 sheet0', 'blend s1->s0 0.5 normal', 'release s1', 'region all', 'finish s0']);
   });
 });
