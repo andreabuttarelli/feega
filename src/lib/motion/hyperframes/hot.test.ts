@@ -14,7 +14,7 @@ import { TrackKind, type ComponentId } from '../components';
 import { Matte } from '../mask';
 import { MATTE_RUNTIME } from './mattes';
 import { composeHtml } from './compose';
-import { HOT_PATCH, hotPatch, type HotPatch } from './hot';
+import { GL_GLOBAL, HOT_PATCH, hotPatch, keptGl, type HotPatch } from './hot';
 
 function must(r: OpResult | { ok: true; doc: MotionDoc } | { ok: false; error: string }): MotionDoc {
   if (!r.ok) {
@@ -188,5 +188,28 @@ describe('a script run again by a patch replaces its previous run', () => {
     const script = strip(shapeScript([{ id: 's', from: 0, index: [0], frames: [''] } as never], 30, 2));
 
     expect(seekListeners(() => window.eval(script))).toBe(1);
+  });
+});
+
+describe('the WebGL renderer survives a patch', () => {
+  it('a renderer drawing below output resolution is reused, not rebuilt', () => {
+    const made: object[] = [];
+    const kept = new Function('document', 'window', `${keptGl()};return keptRenderer;`)(document, window) as (id: string, make: (c: HTMLCanvasElement) => object) => object;
+    const make = (canvas: HTMLCanvasElement) => {
+      const r = { canvas, setRenderTarget: () => undefined, dispose: () => undefined, forceContextLoss: () => undefined };
+      made.push(r);
+      canvas.width = 540;
+      canvas.height = 960;
+      return r;
+    };
+
+    document.body.innerHTML = '<canvas id="three-a" width="1080" height="1920"></canvas>';
+    const first = kept('three-a', make);
+    document.body.innerHTML = '<canvas id="three-a" width="1080" height="1920"></canvas>';
+    const second = kept('three-a', make);
+
+    expect(second).toBe(first);
+    expect(made).toHaveLength(1);
+    delete (window as unknown as Record<string, unknown>)[GL_GLOBAL];
   });
 });

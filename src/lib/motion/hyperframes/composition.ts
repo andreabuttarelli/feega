@@ -4,6 +4,7 @@ import { instancesOf, poseAt, type PoseInput } from '../../canvas/composition/po
 import { MEDIA_FRAGMENT_SHADER, MEDIA_UNIFORMS, MEDIA_VERTEX_SHADER } from '../../canvas/composition/shader';
 import { js } from './html';
 import type { PropsOf } from './templates';
+import { GPU_GLOBAL } from './gpu';
 import { ON_DISPOSE, hotScope, hotSeek, keptGl } from './hot';
 
 export type CompositionProps = PropsOf<'Composition'>;
@@ -114,11 +115,9 @@ function texture(b, m, i, loads) {
 }
 
 function stage(b) {
-  const renderer = keptRenderer('comp-' + b.id, (canvas) => new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true }));
+  const renderer = keptRenderer('comp-' + b.id, (canvas) => window.${GPU_GLOBAL}.renderer(THREE, canvas));
   if (!renderer) return null;
   const canvas = renderer.domElement;
-  renderer.setPixelRatio(1);
-  renderer.setSize(canvas.width, canvas.height, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(50, canvas.width / canvas.height, 0.1, 500);

@@ -5,6 +5,7 @@ import { Background, clipsOf, type MotionClip, type MotionDoc } from '../doc';
 import { resolveColor, type BrandTokens } from '../brand';
 import { css, esc, js, seconds } from './html';
 import { DEVICE_OVERSCAN, TEMPLATES, Timing, type PropsOf, type TemplateCtx, type Tween, type Vars } from './templates';
+import { SCREEN_GPU, VIDEO_GPU, gpuScript, type GpuProfile } from './gpu';
 import { LIGHTING, OPENTYPE_URL, ThreeKind, lookRuntime, surfaceOf, threeAssetUrls, threeImportMap, threeScript, type ThreeClip } from './three';
 import { outlineUrl } from '../fonts/outline';
 import { Finish, ScreenFit } from '../devices';
@@ -448,6 +449,8 @@ const RESOLVE: Record<PropFormat, ValueResolver> = {
   [PropFormat.Font]: (v, ctx) => ctx.font(String(v))
 };
 
+const GPU: Record<Target, GpuProfile> = { [Target.Video]: VIDEO_GPU, [Target.Screen]: SCREEN_GPU };
+
 const PLAY: Record<Target, Record<ComponentMode, Play>> = {
   [Target.Video]: { [ComponentMode.Deterministic]: Play.Seeked, [ComponentMode.Live]: Play.Still },
   [Target.Screen]: { [ComponentMode.Deterministic]: Play.Seeked, [ComponentMode.Live]: Play.Live }
@@ -657,7 +660,7 @@ export function composeHtml(raw: ComposeInput): string {
     `<script>${engineScript()}</script>`,
     ...[...libraries].map((lib) => LIBRARY_TAGS[lib].tag),
     shaderClips.length ? inlineScript(shaderRuntime) : '',
-    three.length || compositions.length || threeCustom ? threeImportMap() : '',
+    three.length || compositions.length || threeCustom ? threeImportMap() + `<script>${gpuScript(GPU[raw.target ?? Target.Video])}</script>` : '',
     `<link rel="stylesheet" crossorigin="anonymous" href="${FONTS_URL}" />`,
     fitScript(),
     hotRuntime(),

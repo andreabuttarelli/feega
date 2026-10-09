@@ -12,6 +12,7 @@ import { findClip } from '../doc';
 import { Interp, easeName, sampleTrack } from '../keyframes';
 import { keyframeTweens } from './animate';
 import { CAPTURE_REPLY, CAPTURE_REQUEST, Target, composeHtml } from './compose';
+import { GPU_GLOBAL, SCREEN_GPU, VIDEO_GPU, gpuScript } from './gpu';
 import { MEASURE_REQUEST } from './measure';
 import { writeComponent } from '../custom/ops';
 import { ComponentMode, PropFormat } from '../custom/component';
@@ -467,6 +468,15 @@ describe('custom components in the composition', () => {
 
     expect(compose(physical)).toMatch(/<script src="https:\/\/cdn\.jsdelivr\.net\/npm\/matter-js@[\d.]+\/build\/matter\.min\.js"><\/script>/);
     expect(html).not.toContain('/npm/matter-js@');
+  });
+
+  it('a three.js component gets the screen GPU profile on screen and the full-quality one in the video', () => {
+    const orb = { ...graph, source: { ...graph.source, js: 'const r = three.renderer(root.querySelector("canvas")); new THREE.Scene();' } };
+    const placed = must(addClip(must(writeComponent(newMotionDoc(MotionFormat.Landscape), 'Orb', orb)), { component: 'Custom', from: 0, durationInFrames: 60, props: { name: 'Orb' } }, 'o1'));
+
+    expect(composeHtml({ doc: placed, tokens: FEEGA_TOKENS, assets: {}, target: Target.Screen })).toContain(`<script>${gpuScript(SCREEN_GPU)}</script>`);
+    expect(compose(placed)).toContain(`<script>${gpuScript(VIDEO_GPU)}</script>`);
+    expect(compose(newMotionDoc(MotionFormat.Landscape))).not.toContain(GPU_GLOBAL);
   });
 
   it('runs a live component live on screen and as a seeded still in the video', () => {

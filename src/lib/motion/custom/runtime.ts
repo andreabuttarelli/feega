@@ -10,6 +10,7 @@ import { TWGL_GLOBAL } from './twgl';
 import { FX_GLOBAL } from './fx';
 import { SPLITTING_GLOBAL } from './splitting';
 import { OPEN_PROPS_GLOBAL } from './open-props';
+import { GPU_GLOBAL } from '../hyperframes/gpu';
 
 export const REGISTRY = '__feegaComponents';
 export const ERRORS = '__feegaErrors';
@@ -81,7 +82,7 @@ const USES: Record<Library, RegExp> = {
   [Library.Lottie]: /\blottie\b/,
   [Library.LittleJS]: /\bLittleJS\b/,
   [Library.Kaplay]: /\bkaplay\b/,
-  [Library.Three]: /\bTHREE\b/,
+  [Library.Three]: /\bTHREE\b|\bthree\.renderer\b/,
   [Library.D3]: /\bd3\b/,
   [Library.P5]: /\bp5\b/,
   [Library.Pixi]: /\bPIXI\b/,
@@ -130,7 +131,7 @@ export function seedOf(clipId: string): number {
 
 export function definitionScript(name: string, code: string): string {
   const body = code.replace(/<\/(script)/gi, '<\\/$1');
-  return `<script>(window.${REGISTRY}=window.${REGISTRY}||{})[${js(name)}]=function(ctx,${SHADOWED.join(',')}){"use strict";const {root,props,tl,duration,fps,assets,brand,rand,param,format,motion,gsap,SplitText,input,onPause,onResume,onDestroy,${Object.values(Library).join(',')}}=ctx;{\n${body}\n}};</script>`;
+  return `<script>(window.${REGISTRY}=window.${REGISTRY}||{})[${js(name)}]=function(ctx,${SHADOWED.join(',')}){"use strict";const {root,props,tl,duration,fps,assets,brand,rand,param,format,motion,gsap,SplitText,three,input,onPause,onResume,onDestroy,${Object.values(Library).join(',')}}=ctx;{\n${body}\n}};</script>`;
 }
 
 type Engine = { timeline: () => Timeline; parseEase: (ease: string) => (p: number) => number; registerEase: (name: string, ease: (p: number) => number) => void; utils: { interpolate: (a: unknown, b: unknown, p: number) => unknown }; split: unknown; SplitText: unknown };
@@ -153,7 +154,7 @@ type Game = { debug: { paused: boolean }; quit: () => void; randSeed: (seed: num
 type Input = { x: number; y: number; down: boolean; hover: boolean; tiltX: number; tiltY: number; keys: Set<string> };
 type Hooks = { pause: (() => void)[]; resume: (() => void)[]; destroy: (() => void)[] };
 type Forwarded = { type?: string; kind?: string; x?: number; y?: number; key?: string; code?: string; values?: Record<string, number> };
-type BootConfig = { registry: string; errors: string; listener: string; libraries: Record<string, string>; engine: string; shadowed: string[]; clock: string[]; liveRuns: string; eventMessage: string; inputMessage: string; tilt: { x: string; y: string } };
+type BootConfig = { registry: string; errors: string; listener: string; libraries: Record<string, string>; engine: string; shadowed: string[]; clock: string[]; liveRuns: string; eventMessage: string; inputMessage: string; tilt: { x: string; y: string }; gpu: { global: string; three: string } };
 
 function bootCustom(cfg: BootConfig, runs: CustomRun[], env: CustomEnv, master: Timeline, format: ReturnType<typeof fixedFormat>) {
   const w = window as unknown as BootWindow;
@@ -503,6 +504,7 @@ function bootCustom(cfg: BootConfig, runs: CustomRun[], env: CustomEnv, master: 
   };
   const wraps: Record<string, (lib: never, scope: ClipScope) => unknown> = { p5: sketches, PIXI: stages, Matter: worlds, gen: utilities, twgl: shaders, fx: effects, Splitting: splits, OpenProps: tokens };
   const libraries = Object.entries(cfg.libraries).map(([name, global]) => [name, w[global] ?? null] as const);
+  const three = { renderer: (canvas: unknown, extra?: object) => (w[cfg.gpu.global] as { renderer: (lib: unknown, canvas: unknown, extra?: object) => unknown }).renderer(w[cfg.gpu.three], canvas, extra) };
   const clipLibraries = (scope: ClipScope) => {
     const wrapped = played(scope.run.play ?? 'seeked');
     return Object.fromEntries(libraries.map(([name, lib]) => [name, lib && wrapped[name] ? wrapped[name](lib as never, scope) : lib]));
@@ -558,7 +560,7 @@ function bootCustom(cfg: BootConfig, runs: CustomRun[], env: CustomEnv, master: 
     const lifecycle = { input, onPause: (fn: () => void) => hooks.pause.push(fn), onResume: (fn: () => void) => hooks.resume.push(fn), onDestroy: (fn: () => void) => hooks.destroy.push(fn) };
     try {
       const made = make(
-        { root, props: values, tl: child, param, duration: run.length, fps: run.fps, assets: env.assets, brand: env.brand, rand: seeded(run.seed), format, motion: engine, gsap: engine, SplitText: engine.SplitText, ...lifecycle, ...clipLibraries({ root, tl: child, run, hooks }) },
+        { root, props: values, tl: child, param, duration: run.length, fps: run.fps, assets: env.assets, brand: env.brand, rand: seeded(run.seed), format, motion: engine, gsap: engine, SplitText: engine.SplitText, three, ...lifecycle, ...clipLibraries({ root, tl: child, run, hooks }) },
         ...shadows
       ) as { still?: (t: number) => void } | undefined;
       still?.flush();
@@ -583,6 +585,6 @@ export function bootScript(runs: CustomRun[], env: CustomEnv, master: string): s
   if (!runs.length) {
     return '';
   }
-  const cfg: BootConfig = { registry: REGISTRY, errors: ERRORS, listener: ERROR_LISTENER, libraries: GLOBALS, engine: ENGINE_GLOBAL, shadowed: [...SHADOWED], clock: CLOCK_SHADOWS, liveRuns: LIVE_RUNS, eventMessage: EVENT_MESSAGE, inputMessage: INPUT_MESSAGE, tilt: { x: InputKey.TiltX, y: InputKey.TiltY } };
+  const cfg: BootConfig = { registry: REGISTRY, errors: ERRORS, listener: ERROR_LISTENER, libraries: GLOBALS, engine: ENGINE_GLOBAL, shadowed: [...SHADOWED], clock: CLOCK_SHADOWS, liveRuns: LIVE_RUNS, eventMessage: EVENT_MESSAGE, inputMessage: INPUT_MESSAGE, tilt: { x: InputKey.TiltX, y: InputKey.TiltY }, gpu: { global: GPU_GLOBAL, three: THREE_GLOBAL } };
   return `(${bootCustom.toString()})(${js(cfg)},${js(runs)},${js(env)},${master},(${fixedFormat.toString()})());`;
 }

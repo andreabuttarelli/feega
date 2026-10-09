@@ -60,15 +60,17 @@ function keptRenderer(id, make) {
   const canvas = document.getElementById(id);
   if (!canvas) return null;
   const old = kept[id];
-  if (old && old.canvas.width === canvas.width && old.canvas.height === canvas.height) {
+  if (old && old.width === canvas.width && old.height === canvas.height) {
     copyAttrs(canvas, old.canvas);
     canvas.replaceWith(old.canvas);
     old.renderer.setRenderTarget(null);
     return old.renderer;
   }
   if (old) dropRenderer(kept, id);
+  const width = canvas.width;
+  const height = canvas.height;
   const renderer = make(canvas);
-  kept[id] = { canvas, renderer };
+  kept[id] = { canvas, renderer, width, height };
   return renderer;
 }
 function dropRenderer(kept, id) {
