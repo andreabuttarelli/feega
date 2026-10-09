@@ -5,6 +5,7 @@ import { composeHtml } from '$lib/motion/hyperframes/compose';
 import { FEEGA_TOKENS } from '$lib/motion/brand';
 import { MODIFIER_KINDS } from '$lib/motion/shape/modifiers';
 import { SHAPE_PRESETS } from '$lib/motion/shape/presets';
+import { Quality, docProblems } from '$lib/motion/direction';
 import { motionAgentPrompt } from './motion-prompt';
 import { Vision } from './frames';
 import { createMotionTools, type MotionSession } from './motion-tools';
@@ -116,6 +117,17 @@ describe('shape rules in px, as the doc model says', () => {
     expect(rule.ok, String(rule.error)).toBe(true);
     expect(flat.ok, String(flat.error)).toBe(true);
     expect(findClip(session.doc, String(rule.clip_id))!.clip.props.width).toBeCloseTo(4 / session.doc.width);
+  });
+
+  it('giant type the agent declares as a bleed is not pushed back into the safe area', async () => {
+    const { session, run } = inFormat(MotionFormat.Vertical);
+    const added = await run('add_clip', { component: 'Title', start: 0, duration: 3, props: { text: '57', size: 700, x: 900, y: 1500, width: 1080, height: 900 } });
+    expect(added.ok, String(added.error)).toBe(true);
+    const outside = () => docProblems(session.doc, { audioAssets: 0 }).filter((p) => p.kind === Quality.OutOfFrame);
+
+    expect(outside()).toHaveLength(1);
+    expect((await run('set_visibility', { clip_id: 'id1', bleed: true })).ok).toBe(true);
+    expect(outside()).toEqual([]);
   });
 
   it('a block that bleeds past the frame edge is accepted', async () => {

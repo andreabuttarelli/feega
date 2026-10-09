@@ -342,14 +342,14 @@ function outOfFrame(doc: MotionDoc): QualityProblem[] {
   const edge = Math.round(EDGE_SECONDS * doc.fps);
   return placedClips(doc).flatMap((clip) => {
     const size = contentSize(clip, frame);
-    if (!size) {
+    if (!size || clip.bleed) {
       return [];
     }
     const out = heldFrames(clip, edge).filter((f) => outside(clip, size, frame, f));
     if (out.length <= OUT_FRAMES_ALLOWED) {
       return [];
     }
-    return [{ kind: Quality.OutOfFrame, at: seconds(doc, clip.from + out[0]), detail: `${clip.id} leaves the safe area (5% from each edge) for ${out.length} frames from ${seconds(doc, clip.from + out[0])}s: keep scale moves small and slow, move the camera or the position instead, or shrink it (zoom, width)` }];
+    return [{ kind: Quality.OutOfFrame, at: seconds(doc, clip.from + out[0]), detail: `${clip.id} leaves the safe area (5% from each edge) for ${out.length} frames from ${seconds(doc, clip.from + out[0])}s: keep scale moves small and slow, move the camera or the position instead, or shrink it (zoom, width). If it runs off the edge on purpose (poster type, a full-bleed block), declare it: set_visibility bleed true` }];
   });
 }
 

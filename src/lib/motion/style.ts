@@ -85,6 +85,9 @@ const SCENES = new Set(['Custom', 'Device3D', 'Video', 'Model3D']);
 const SHARED_SECONDS = 0.5;
 const MAX_WORDS_PER_SECOND = 1;
 const TITLE_CARDS: readonly Forbidden[] = [Forbidden.TextOverScene, Forbidden.TooMuchText, Forbidden.TitleType];
+export const HOUSE_DEFAULTS: readonly Forbidden[] = [...TITLE_CARDS, Forbidden.Crowded];
+
+export const HOUSE_DEFAULTS_RULE = `House defaults yield to a look the user asks for or to the references they give or you viewed: the gates ${HOUSE_DEFAULTS.join(', ')}, the house type family and weight, little text and the minimal look. Then set_style graphic (or the closest style) and follow the references. Hard rules always hold: text on screen long enough to read, nothing clipped by accident (a deliberate bleed off the edge is declared with set_visibility bleed true), the brand logo intact.`;
 const CALM: readonly Forbidden[] = [Forbidden.WeakEase, Forbidden.Particles, Forbidden.Glow, Forbidden.Rotation, Forbidden.Bounce, Forbidden.FlyingText, Forbidden.Crowded, Forbidden.Transition, Forbidden.Still];
 
 export const TITLE_CARD_RULE =
@@ -215,13 +218,13 @@ export const STYLES: Record<MotionStyle, StyleSpec> = {
     junctions: [JunctionKind.Crossfade, JunctionKind.Wipe, JunctionKind.PushLeft, JunctionKind.PushRight],
     entrances: [TransitionKind.None, TransitionKind.Fade, TransitionKind.SlideLeft, TransitionKind.SlideRight, TransitionKind.SlideUp],
     reading: READING,
-    forbidden: [Forbidden.Particles, Forbidden.Glow, Forbidden.Bounce, Forbidden.WeakEase, Forbidden.Crowded, Forbidden.ReadingTime],
+    forbidden: [Forbidden.Particles, Forbidden.Glow, Forbidden.Bounce, Forbidden.WeakEase, Forbidden.ReadingTime],
     pace: { minGap: 0.5, hold: 0.6 },
     maxMoving: 3,
     rules: [
       'Graphic poster is for a look, poster or type exercise with no product to sell (Swiss, brutalist, editorial, a moodboard): every frame is a printed poster that moves. No script and no story acts: the references and the brief are the whole direction.',
       GRAPHIC_REFERENCE_RULE,
-      'Type is the image: one word or number so large it bleeds off one or two edges (Title or Text 0.4–1.2 of the frame, x or y partly outside), set against small text (0.015–0.025) in narrow columns, captions and numbers on the grid. Mix weights and widths as the references do; never everything in one size. Pick the face the references show with set_font, any Google family: a condensed or heavy grotesk (Archivo Narrow, Archivo Black, Anton, Oswald, Bebas Neue) for the giant word, a neo-grotesk (Inter Tight, Space Grotesk) for the small text.',
+      'Type is the image: one word or number so large it bleeds off one or two edges (Title or Text 0.4–1.2 of the frame, x or y partly outside), set against small text (0.015–0.025) in narrow columns, captions and numbers on the grid. Declare every deliberate bleed with set_visibility bleed true, or the safe-area gate pushes it back in. Mix weights and widths as the references do; never everything in one size. Pick the face the references show with set_font, any Google family: a condensed or heavy grotesk (Archivo Narrow, Archivo Black, Anton, Oswald, Bebas Neue) for the giant word, a neo-grotesk (Inter Tight, Space Grotesk) for the small text.',
       'A visible grid: thin rules (add_shape lines 2–6 px) on a column grid, blocks of flat colour aligned to it, text hung on its lines, generous margins only where the references keep them.',
       EASING_RULE,
       'Movement is graphic: blocks wipe in along the grid, giant type slides across the frame or is revealed by a mask, rules draw on; cut on the beat when there is music. Each layout holds long enough to read as a poster (1 s at least).'

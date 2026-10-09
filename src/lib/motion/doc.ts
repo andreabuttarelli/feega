@@ -98,6 +98,7 @@ const clipSchema = z.object({
   physics: physicsSchema.nullable().optional(),
   hidden: z.boolean().optional(),
   locked: z.boolean().optional(),
+  bleed: z.boolean().optional(),
   markers: z.array(markerSchema).max(MAX_MARKERS).optional()
 });
 

@@ -72,6 +72,7 @@ const CLIP: Record<string, Access> = {
   physics: { write: ['set_physics', 'apply_physics_preset'], read: 'physics' },
   hidden: { write: ['set_visibility'], read: 'hidden' },
   locked: { write: ['set_visibility'], read: 'locked' },
+  bleed: { write: ['set_visibility'], read: 'bleed' },
   markers: { write: ['set_marker', 'remove_marker'], read: 'markers' }
 };
 

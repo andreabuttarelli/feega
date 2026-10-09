@@ -118,12 +118,14 @@ export const AXES = /^('[A-Za-z0-9]{4}' -?\d+(\.\d+)?)(, '[A-Za-z0-9]{4}' -?\d+(
 
 type Look = { weight?: number; tracking: number; leading: number };
 
+const POSTER_TYPE_MAX = 1.2;
+
 const typography = (size: number, fallbackColor: string, look: Look) => ({
   color: color(fallbackColor, 'Colour'),
   font: font(),
   weight: range(TYPE.weight.min, TYPE.weight.max, TYPE.weight.step, look.weight ?? REGULAR, 'Weight', Group.Style),
   italic: toggle(false, 'Italic', Group.Style),
-  size: range(0.01, 0.4, 0.005, size, 'Size', Group.Style),
+  size: range(0.01, POSTER_TYPE_MAX, 0.005, size, 'Size', Group.Style),
   tracking: range(TYPE.tracking.min, TYPE.tracking.max, TYPE.tracking.step, look.tracking, 'Tracking', Group.Style),
   leading: range(TYPE.leading.min, TYPE.leading.max, TYPE.leading.step, look.leading, 'Leading', Group.Style),
   stretch: range(TYPE.stretch.min, TYPE.stretch.max, TYPE.stretch.step, TYPE.stretch.fallback, 'Width axis', Group.Style),

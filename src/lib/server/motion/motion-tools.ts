@@ -240,6 +240,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
         motionBlur: c.motionBlur,
         hidden: c.hidden ?? false,
         locked: c.locked ?? false,
+        bleed: c.bleed ?? false,
         markers: (c.markers ?? []).map((m) => ({ label: m.label, time: secs(m.frame) })),
         physics: c.physics ? shownRecord(c.component, c.physics, doc) : null,
         path: c.path ? { autoOrient: c.path.autoOrient, tangents: c.path.tangents.map((t) => ({ time: secs(t.frame), in: shownOffset(c.component, t.in, doc), out: shownOffset(c.component, t.out, doc) })), problem: pathProblem(c) } : null
@@ -669,10 +670,10 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_visibility: tool({
-      description: 'Hide (left out of the render) or lock (not moved by edits) a track (track_id) or a clip (clip_id).',
-      inputSchema: z.object({ track_id: z.string().optional(), clip_id: z.string().optional(), hidden: z.boolean().optional(), locked: z.boolean().optional() }),
+      description: 'Hide (left out of the render) or lock (not moved by edits) a track (track_id) or a clip (clip_id). bleed true on a clip declares that it runs off the frame edge on purpose (poster type, a full-bleed block): the safe-area check skips it.',
+      inputSchema: z.object({ track_id: z.string().optional(), clip_id: z.string().optional(), hidden: z.boolean().optional(), locked: z.boolean().optional(), bleed: z.boolean().optional() }),
       execute: async (input) => {
-        const flags = { ...(input.hidden === undefined ? {} : { hidden: input.hidden }), ...(input.locked === undefined ? {} : { locked: input.locked }) };
+        const flags = { ...(input.hidden === undefined ? {} : { hidden: input.hidden }), ...(input.locked === undefined ? {} : { locked: input.locked }), ...(input.bleed === undefined || !input.clip_id ? {} : { bleed: input.bleed }) };
         const result = input.clip_id ? setClipFlags(session.doc, input.clip_id, flags) : input.track_id ? setTrackFlags(session.doc, input.track_id, flags) : { ok: false as const, error: 'give a track_id or a clip_id' };
         return apply(result, 'changed visibility');
       }
