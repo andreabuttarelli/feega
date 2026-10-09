@@ -58,7 +58,7 @@ function scriptJson(value: unknown): string {
 
 type PlayerSource = Pick<PlayerConfig, 'html' | 'width' | 'height' | 'duration' | 'playback' | 'loop'> & { scrollLength?: number };
 
-const PLAYER_START = '<script>(function playerMain';
+const PLAYER_CALL = '})({"html":';
 const TITLE = /<title>([^<]*)<\/title>/;
 
 function playerConfig(source: PlayerSource): PlayerConfig {
@@ -164,8 +164,8 @@ function isEscaped(text: string, at: number): boolean {
 type Stored = { source: PlayerSource; title: string };
 
 function storedPlayer(page: string): Stored | null {
-  const script = page.indexOf(PLAYER_START);
-  const start = script < 0 ? -1 : page.indexOf('({"html":', script) + 1;
+  const call = page.indexOf(PLAYER_CALL);
+  const start = call < 0 ? -1 : call + PLAYER_CALL.indexOf('{');
   const end = start > 0 ? jsonEnd(page, start) : -1;
   if (end < 0) {
     return null;

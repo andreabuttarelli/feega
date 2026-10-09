@@ -8,7 +8,7 @@ import { composeHtml } from '../hyperframes/compose';
 import { LIVE_GLOBAL } from './runtime';
 import { Liveness, PlayMode } from './settings';
 import { InteractivePreset, applyInteractivePreset } from './presets';
-import { SELF_SCROLL, STANDALONE_MS, interactiveBundle } from './bundle';
+import { SELF_SCROLL, STANDALONE_MS, embedSettings, interactiveBundle, upgradePlayer } from './bundle';
 import { HOST_MESSAGE } from './host';
 import { HOSTED, MOTION_LIBS_ROUTE, Script, scriptUrl } from '../libs/catalog';
 import { writeComponent } from '../custom/ops';
@@ -174,6 +174,19 @@ describe('a live component in the embed', () => {
 
     expect(bundle.html).toContain('\\"play\\":\\"live\\"');
     expect(bundle.html).toContain(`"eventMessage":"${EVENT_MESSAGE}"`);
+  });
+});
+
+describe('a page published from the minified editor', () => {
+  const minified = (html: string) => html.replace('(function playerMain(', '(function vi(');
+
+  it('still answers its settings and gets the current player on read', async () => {
+    const doc = newMotionDoc(MotionFormat.Landscape);
+    const page = minified((await interactiveBundle({ doc, tokens: FEEGA_TOKENS, assetUrls: {}, title: 'Clip', fetchBlob, origin: ORIGIN })).html);
+
+    expect(page).not.toContain('function playerMain(');
+    expect(embedSettings(page)).toEqual({ width: doc.width, height: doc.height, playback: PlayMode.Autoplay, scrollLength: expect.any(Number) });
+    expect(upgradePlayer(page, ORIGIN)).toContain('(function playerMain(');
   });
 });
 
