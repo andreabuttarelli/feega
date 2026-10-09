@@ -77,6 +77,16 @@ describe('/api/v1/motion/[nodeId]/embed', () => {
     expect(store.files.get(`${NODE}.html`)).toContain('<html');
   });
 
+  it('hands the React and Flutter snippets for the same video', async () => {
+    const body = await (await call(route.POST as Handler, 'POST')).json();
+    const read = await (await call(route.GET as Handler, 'GET')).json();
+
+    expect(body.react).toContain(`<FeegaMotion id="${NODE}" origin="https://feega.app" />`);
+    expect(body.flutter).toContain(`FeegaMotion(id: '${NODE}', origin: 'https://feega.app')`);
+    expect(read.react).toBe(body.react);
+    expect(read.flutter).toBe(body.flutter);
+  });
+
   it('reports whether it is published, with the snippet', async () => {
     expect(await (await call(route.GET as Handler, 'GET')).json()).toMatchObject({ published: false, url: `https://feega.app/e/${NODE}` });
     await call(route.POST as Handler, 'POST');

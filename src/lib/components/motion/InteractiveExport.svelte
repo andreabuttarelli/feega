@@ -3,7 +3,7 @@
   import type { BrandTokens } from '$lib/motion/brand';
   import type { AudioAnalysis } from '$lib/motion/audio-analysis';
   import { interactiveBundle, type InteractiveBundle } from '$lib/motion/interactive/bundle';
-  import { snippetOf } from '$lib/motion/interactive/loader';
+  import { snippetsOf } from '$lib/motion/interactive/loader';
   import { interactiveOf, type Interactive } from '$lib/motion/interactive/settings';
   import { reactionsOf } from '$lib/motion/interactive/summary';
   import EmbedView from './EmbedView.svelte';
@@ -28,7 +28,8 @@
   let hosting = $state(false);
   let updated = $state(false);
   const embedEndpoint = $derived(`${editorUrl}/embed`);
-  const hostedSnippet = $derived(hosted?.published ? snippetOf(hosted.url) : '');
+  const snippets = $derived(hosted?.published ? snippetsOf(hosted.url) : null);
+  const hostedSnippet = $derived(snippets?.snippet ?? '');
   const reactions = $derived(reactionsOf({ ...doc, interactive: settings }));
   const blobs = new Map<string, Promise<Blob>>();
   const fetchBlob = (url: string) => {
@@ -94,4 +95,4 @@
   }
 </script>
 
-<EmbedView {doc} {bundle} {href} {hosted} {hostedSnippet} {reactions} bind:settings busy={hosting} {error} {updated} onpublish={publish} onunpublish={unpublish} {onpresets} />
+<EmbedView {doc} {bundle} {href} {hosted} {hostedSnippet} appSnippets={snippets} {reactions} bind:settings busy={hosting} {error} {updated} onpublish={publish} onunpublish={unpublish} {onpresets} />

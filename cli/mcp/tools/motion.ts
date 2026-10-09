@@ -187,7 +187,7 @@ export function registerMotionTools(server: McpServer) {
       description:
         'Host the interactive web export of the saved revision on feega and return the public `url` and a `snippet` to paste ' +
         'into any site: feega\'s loader script and a `<feega-motion>` element that fills 100% of its box, reading playback and scroll length from feega (keeps pointer, tilt, scroll, key and tap input; live components such as games and generative pieces run live there). Publishing again updates the same embed in place, so the site needs no ' +
-        'new paste. `action: "unpublish"` takes it down. Videos from an uncensored project are refused (403, `refusal`). Free.',
+        'new paste. Also returns `react` and `flutter`: the same embed for a React app (`@feega/motion-react`) or a Flutter app (`feega_motion`), running the same player. `action: "unpublish"` takes it down. Videos from an uncensored project are refused (403, `refusal`). Free.',
       inputSchema: z.object({ org, node_id: z.string(), action: z.enum(['publish', 'unpublish']).optional() }),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true }
     },

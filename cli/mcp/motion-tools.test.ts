@@ -62,7 +62,7 @@ const fake: Server = createServer((req, res) => {
     }
     if (route === `/api/v1/motion/${NODE}/embed`) {
       const published = req.method !== 'DELETE';
-      send(200, published ? { published, url: `https://feega.app/e/${NODE}`, snippet: `<iframe src="https://feega.app/e/${NODE}"></iframe>`, revision: 3 } : { published });
+      send(200, published ? { published, url: `https://feega.app/e/${NODE}`, snippet: `<iframe src="https://feega.app/e/${NODE}"></iframe>`, react: `<FeegaMotion id="${NODE}" />`, flutter: `FeegaMotion(id: '${NODE}')`, revision: 3 } : { published });
       return;
     }
     if (route === `/api/v1/motion/${NODE}/revisions`) {
@@ -183,6 +183,7 @@ describe('the motion agent over MCP', () => {
     expect(calls[0]).toMatchObject({ method: 'POST', path: `/api/v1/motion/${NODE}/embed` });
     expect(result?.structuredContent).toMatchObject({ published: true, url: `https://feega.app/e/${NODE}` });
     expect(JSON.stringify(result)).toContain('iframe');
+    expect(result?.structuredContent).toMatchObject({ react: `<FeegaMotion id="${NODE}" />`, flutter: `FeegaMotion(id: '${NODE}')` });
   });
 
   test('publish_motion_embed with unpublish takes it down', async () => {
@@ -317,6 +318,8 @@ describe('feega motion embed', () => {
 
     expect(calls[0]).toMatchObject({ method: 'POST', path: `/api/v1/motion/${NODE}/embed` });
     expect(lines.join('\n')).toContain('<iframe');
+    expect(lines.join('\n')).toContain(`React:\n<FeegaMotion id="${NODE}" />`);
+    expect(lines.join('\n')).toContain(`Flutter:\nFeegaMotion(id: '${NODE}')`);
   });
 
   test('--download saves the self-contained html', async () => {

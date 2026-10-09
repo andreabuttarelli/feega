@@ -127,6 +127,12 @@ export async function embedAndReport(bearer: string, nodeId: string, opts: Embed
   if (state.snippet) {
     console.log(state.snippet);
   }
+  if (state.react) {
+    console.log(`\nReact:\n${state.react}`);
+  }
+  if (state.flutter) {
+    console.log(`\nFlutter:\n${state.flutter}`);
+  }
 }
 
 type FramesOpts = { org?: string; at: string; width?: string; out?: string };
