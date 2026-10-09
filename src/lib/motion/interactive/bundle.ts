@@ -65,13 +65,20 @@ function playerConfig(html: string, doc: MotionDoc, settings: Interactive): Play
   };
 }
 
+const PAD_TOUCH: Record<PlayMode, string> = {
+  [PlayMode.Autoplay]: 'none',
+  [PlayMode.InView]: 'none',
+  [PlayMode.Scrub]: 'pan-y',
+  [PlayMode.Paused]: 'none'
+};
+
 export function playerPage(html: string, doc: MotionDoc, settings: Interactive, title: string): string {
   return [
     '<!doctype html><html lang="en"><head><meta charset="UTF-8" />',
     '<meta name="viewport" content="width=device-width, initial-scale=1" />',
     `<title>${esc(title)}</title>`,
     `<script src="${PLAYER_URL}"></script>`,
-    '<style>html,body{margin:0;height:100%;background:transparent;overflow:hidden}#stage{position:relative;width:100%;height:100%}#player,#pad{position:absolute;inset:0;width:100%;height:100%}#pad{touch-action:none}</style>',
+    `<style>html,body{margin:0;height:100%;background:transparent;overflow:hidden}#stage{position:relative;width:100%;height:100%}#player,#pad{position:absolute;inset:0;width:100%;height:100%}#pad{touch-action:${PAD_TOUCH[settings.playback]}}</style>`,
     '</head><body><div id="stage">',
     '<hyperframes-player id="player" sandbox-origin="opaque" assets-loading-ui="none" disable-click-to-play></hyperframes-player>',
     '<div id="pad"></div></div>',
