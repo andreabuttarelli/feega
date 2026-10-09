@@ -1184,7 +1184,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_interactive: tool({
-      description: `How the interactive web export plays: playback ${PLAY_MODES.join('|')} (in-view plays while on screen, scrub ties the playhead to the host page scroll), loop, and outside ${OUTSIDES.join('|')}: what a precomp reads when the cursor leaves its box (fallback = default pose, hold = last value).`,
+      description: `How the interactive web export plays: playback ${PLAY_MODES.join('|')} (in-view plays while on screen, scrub ties the playhead to the embed travel through the viewport, or through a data-scroll="N" wrapper N viewports long; opened alone the embed scrolls itself), loop, and outside ${OUTSIDES.join('|')}: what a precomp reads when the cursor leaves its box (fallback = default pose, hold = last value).`,
       inputSchema: z.object({ playback: z.enum(PLAY_MODES).optional(), loop: z.boolean().optional(), outside: z.enum(OUTSIDES).optional() }),
       execute: async (input) => apply(setInteractive(session.doc, Object.fromEntries(Object.entries(input).filter(([, v]) => v !== undefined))), 'changed interactive playback')
     }),

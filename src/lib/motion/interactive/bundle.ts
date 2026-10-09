@@ -7,12 +7,16 @@ import { InputKey } from '../expression/inputs';
 import { INPUT_MESSAGE } from './runtime';
 import { EVENT_MESSAGE } from '../custom/runtime';
 import { playerMain, type PlayerConfig } from './player';
+import { hostMain, readHost, selfScroll } from './host';
 import { Liveness, PlayMode, interactiveOf, type Interactive } from './settings';
 
 export const HOST_MESSAGE = 'feega:host';
 export const PLAYER_URL = `https://cdn.jsdelivr.net/npm/@hyperframes/player@${HYPERFRAMES_VERSION}/dist/hyperframes-player.global.js`;
 export const BUNDLE_FILE = 'feega-interactive.html';
 export const EMBED_ROUTE = '/e';
+export const SELF_SCROLL = 'self-scroll';
+export const STANDALONE_MS = 500;
+const SELF_SCROLL_VIEWPORTS = 4;
 
 export const embedUrl = (origin: string, id: string) => `${origin}${EMBED_ROUTE}/${id}`;
 
@@ -61,6 +65,8 @@ function playerConfig(html: string, doc: MotionDoc, settings: Interactive): Play
     inputMessage: INPUT_MESSAGE,
     eventMessage: EVENT_MESSAGE,
     hostMessage: HOST_MESSAGE,
+    selfScroll: SELF_SCROLL,
+    standaloneMs: STANDALONE_MS,
     keys: { x: InputKey.PointerX, y: InputKey.PointerY, down: InputKey.PointerDown, hover: InputKey.Hover, tiltX: InputKey.TiltX, tiltY: InputKey.TiltY, scroll: InputKey.Scroll, time: InputKey.Time }
   };
 }
@@ -78,18 +84,18 @@ export function playerPage(html: string, doc: MotionDoc, settings: Interactive, 
     '<meta name="viewport" content="width=device-width, initial-scale=1" />',
     `<title>${esc(title)}</title>`,
     `<script src="${PLAYER_URL}"></script>`,
-    `<style>html,body{margin:0;height:100%;background:transparent;overflow:hidden}#stage{position:relative;width:100%;height:100%}#player,#pad{position:absolute;inset:0;width:100%;height:100%}#pad{touch-action:${PAD_TOUCH[settings.playback]}}</style>`,
+    `<style>html,body{margin:0;height:100%;background:transparent;overflow:hidden}#stage{position:relative;width:100%;height:100%}#player,#pad{position:absolute;inset:0;width:100%;height:100%}#pad{touch-action:${PAD_TOUCH[settings.playback]}}html.${SELF_SCROLL}{overflow-y:auto;height:auto}html.${SELF_SCROLL} body{overflow:visible;height:${SELF_SCROLL_VIEWPORTS * 100}vh}html.${SELF_SCROLL} #stage{position:sticky;top:0;height:100vh}</style>`,
     '</head><body><div id="stage">',
     '<hyperframes-player id="player" sandbox-origin="opaque" assets-loading-ui="none" disable-click-to-play></hyperframes-player>',
     '<div id="pad"></div></div>',
-    `<script>(${playerMain.toString()})(${scriptJson(playerConfig(html, doc, settings))});</script>`,
+    `<script>(${playerMain.toString()})(${scriptJson(playerConfig(html, doc, settings))},${readHost.toString()},${selfScroll.toString()});</script>`,
     '</body></html>'
   ].join('');
 }
 
 export function embedSnippet(doc: MotionDoc, file = BUNDLE_FILE): string {
   const frame = `<iframe src="${esc(file)}" title="Interactive video" style="width:100%;aspect-ratio:${doc.width}/${doc.height};border:0;display:block" allow="accelerometer; gyroscope" loading="lazy"></iframe>`;
-  const host = `<script>(function(f){function s(){var d=document.documentElement,m=Math.max(1,d.scrollHeight-innerHeight),r=f.getBoundingClientRect();f.contentWindow&&f.contentWindow.postMessage({type:"${HOST_MESSAGE}",scroll:Math.min(1,Math.max(0,scrollY/m)),visible:r.bottom>0&&r.top<innerHeight},"*")}addEventListener("scroll",s,{passive:true});addEventListener("resize",s);f.addEventListener("load",s)})(document.currentScript.previousElementSibling);</script>`;
+  const host = `<script>(${hostMain.toString()})(document.currentScript.previousElementSibling,"${HOST_MESSAGE}",window);</script>`;
   return `${frame}\n${host}`;
 }
 

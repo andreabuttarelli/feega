@@ -179,7 +179,9 @@ the status and, when done, a signed `file_url`. CLI: `feega motion render <nodeI
 Put one on a website with `publish_motion_embed`: free, it hosts the interactive web export of
 the saved revision and returns a public `url` and an iframe `snippet` (live components — games,
 generative pieces — run live there; a video shows a still of them); publishing again updates
-it in place, `action: "unpublish"` takes it down. Uncensored projects are refused.
+it in place, `action: "unpublish"` takes it down. Uncensored projects are refused. Scrub
+follows the embed through the viewport; `<div data-scroll="N">` around the snippet makes a
+sticky scroll story N viewports long.
 `get_motion_embed` reads the state. The self-contained HTML (no hosting):
 `feega motion embed <nodeId> --download page.html`.
 
