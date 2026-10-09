@@ -2,7 +2,7 @@ export const PROTOCOL_VERSION = 1;
 export const HOST_MESSAGE = 'feega:host';
 export const PLAYER_MESSAGE = 'feega:player';
 export const EMBED_ROUTE = '/e';
-export const DEFAULT_ORIGIN = 'https://feega.app';
+export const DEFAULT_ORIGIN = 'https://oh.feega.app';
 export const SCRUB_PLAYBACK = 'scrub';
 
 export enum Fit {

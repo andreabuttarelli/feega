@@ -63,4 +63,8 @@ void main() {
   test('embed url carries the fit', () {
     expect(embedUri('https://feega.app', 'abc', Fit.cover).toString(), 'https://feega.app/e/abc?fit=cover');
   });
+
+  test('default origin is the embed host, not the homepage', () {
+    expect(defaultOrigin, 'https://oh.feega.app');
+  });
 }

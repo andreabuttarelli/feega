@@ -6,7 +6,7 @@ const protocolVersion = 1;
 const hostMessage = 'feega:host';
 const playerMessage = 'feega:player';
 const nativeBridge = 'FeegaHost';
-const defaultOrigin = 'https://feega.app';
+const defaultOrigin = 'https://oh.feega.app';
 const embedRoute = '/e';
 
 enum Fit { cover, contain }
