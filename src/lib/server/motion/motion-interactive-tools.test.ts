@@ -37,12 +37,12 @@ describe('motion agent interactive tools', () => {
     expect(Object.values(clip.expressions).join() + JSON.stringify(session.doc.interactive ?? {})).toMatch(/input\.|scrub/);
   });
 
-  it('set_interactive stores playback, loop and the outside rule, and get_motion_doc shows them', async () => {
+  it('set_interactive stores playback, loop, the outside rule and the scroll length, and get_motion_doc shows them', async () => {
     const { session, run } = setup();
 
-    await run('set_interactive', { playback: PlayMode.InView, loop: false, outside: Outside.Hold });
+    await run('set_interactive', { playback: PlayMode.Scrub, loop: false, outside: Outside.Hold, scroll_length: 5 });
 
-    expect(session.doc.interactive).toEqual({ playback: PlayMode.InView, loop: false, outside: Outside.Hold });
+    expect(session.doc.interactive).toEqual({ playback: PlayMode.Scrub, loop: false, outside: Outside.Hold, scrollLength: 5 });
     expect((await run('get_motion_doc', {})).interactive).toEqual(session.doc.interactive);
   });
 

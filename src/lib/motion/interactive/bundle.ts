@@ -143,10 +143,23 @@ function pageOf(source: PlayerSource, title: string): string {
   ].join('');
 }
 
-export function embedSnippet(doc: MotionDoc, file = BUNDLE_FILE): string {
+type SnippetDoc = Pick<MotionDoc, 'width' | 'height'> & { interactive?: Partial<Interactive> };
+
+const plainSnippet = (embed: string) => embed;
+const scrollStory = (embed: string, settings: Interactive) => `<div data-scroll="${settings.scrollLength}">\n${embed}\n</div>`;
+
+const SNIPPET_SHAPE: Record<PlayMode, (embed: string, settings: Interactive) => string> = {
+  [PlayMode.Autoplay]: plainSnippet,
+  [PlayMode.InView]: plainSnippet,
+  [PlayMode.Scrub]: scrollStory,
+  [PlayMode.Paused]: plainSnippet
+};
+
+export function embedSnippet(doc: SnippetDoc, file = BUNDLE_FILE): string {
+  const settings = interactiveOf(doc);
   const frame = `<iframe src="${esc(file)}" title="Interactive video" style="width:100%;aspect-ratio:${doc.width}/${doc.height};border:0;display:block" allow="accelerometer; gyroscope" loading="lazy"></iframe>`;
   const host = `<script>(${hostMain.toString()})(document.currentScript.previousElementSibling,"${HOST_MESSAGE}",window);</script>`;
-  return `${frame}\n${host}`;
+  return SNIPPET_SHAPE[settings.playback](`${frame}\n${host}`, settings);
 }
 
 export async function interactiveBundle(input: InteractiveInput): Promise<InteractiveBundle> {
@@ -156,5 +169,5 @@ export async function interactiveBundle(input: InteractiveInput): Promise<Intera
   const tokens = { ...input.tokens, logoUrl: logo.logo ?? input.tokens.logoUrl };
   const composed = composeHtml({ doc: input.doc, tokens, assets, analyses: input.analyses, liveness: Liveness.Live, target: Target.Screen });
   const html = playerPage(composed, input.doc, settings, input.title);
-  return { html, bytes: new TextEncoder().encode(html).length, snippet: embedSnippet(input.doc) };
+  return { html, bytes: new TextEncoder().encode(html).length, snippet: embedSnippet({ ...input.doc, interactive: settings }) };
 }
