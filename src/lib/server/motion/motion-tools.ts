@@ -102,6 +102,7 @@ import { applyValues, exposeField, fieldValues, removeField } from '$lib/motion/
 import { FIELD_TYPES, MAX_LINKED, type ExposedField } from '$lib/motion/template/field-model';
 import { detachTemplate, insertTemplate, isLockedComp, setTemplateValues, templateFields } from '$lib/motion/template/library';
 import type { TemplateLibrary } from './templates';
+import { createWebTools, type WebToolDeps } from '$lib/server/web/web-tools';
 import { DEFAULT_NAME_PATTERN, MAX_BATCH_ROWS, outputName } from '$lib/motion/template/batch';
 import { renderQuote } from '$lib/motion/render-quote';
 import { BOUNDS, PHYSICS, PHYSICS_KEYS, PHYSICS_PRESET, PHYSICS_PRESETS } from '$lib/motion/physics/model';
@@ -143,6 +144,7 @@ export type MotionToolDeps = {
   readUi?: (asset: MotionAsset, region?: UiRegion) => Promise<UiRead>;
   effects?: EffectStore;
   layouts?: LayoutStore;
+  web?: WebToolDeps;
 };
 
 export type RevisionEntry = { version: number; summary: string | null; actorKind: string; createdAt: string; clips: number };
@@ -1596,7 +1598,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     analyze_site: tool({
-      description: 'Read a public website for a brand: name, tagline, description, logos (svg first, then favicon, apple-touch-icon, og:image), palette (theme, logo, CSS), accent (hex and where it was found; hex null with a neutral palette when the brand has none), fonts (google true = usable by name after register_font), images with width and height (og, hero, product), products and social links. Nothing is stored: import_asset the logo and the pictures you will use.',
+      description: 'Read a public website for a brand: name, tagline, description, logos (svg first, then favicon, apple-touch-icon, og:image), palette (theme, logo, CSS), accent (hex and where it was found; hex null with a neutral palette when the brand has none), fonts (google true = usable by name after register_font), images with width and height (og, hero, product), store (shopify, woocommerce or none) with its real products from the public catalogue, and social links. Nothing is stored: import_asset the logo and the pictures you will use.',
       inputSchema: z.object({ url: z.string().min(4).max(2000).describe('the site, e.g. https://www.allbirds.com or allbirds.com') }),
       execute: async (input) => (deps.site ? readPages(readLogos(await deps.site(input.url))) : UNREADABLE('reading sites'))
     }),
@@ -2029,7 +2031,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     return ((await nested.execute(parsed.data, options)) ?? {}) as { ok?: boolean; error?: unknown };
   }
 
-  return oneAtATime(tools);
+  return { ...oneAtATime(tools), ...(deps.web ? createWebTools(deps.web) : {}) };
 }
 
 type Execute = (input: unknown, options: ToolExecutionOptions<unknown>) => Promise<unknown>;

@@ -226,6 +226,12 @@ describe('POST /api/v1/projects/[projectId]/agent', () => {
     expect(offeredProjectTools.names).toEqual(expect.arrayContaining([...MOTION_DELEGATION_TOOLS]));
   });
 
+  it('hands the canvas agent the web tools', async () => {
+    await POST(postEvent());
+
+    expect(offeredProjectTools.names).toEqual(expect.arrayContaining(['web_search', 'read_page', 'read_store', 'view_images', 'import_image', 'import_products']));
+  });
+
   it('hands the motion delegation the canvas the user has open', async () => {
     await POST(postEvent({ canvasId: 'c-1' }));
 

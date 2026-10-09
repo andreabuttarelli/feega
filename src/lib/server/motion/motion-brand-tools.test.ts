@@ -88,6 +88,23 @@ describe('motion agent brand tools', () => {
     }
   });
 
+  it('browses the web with the shared web tools when the workspace gives them', async () => {
+    const search = vi.fn(async () => ({ ok: true as const, results: [], costUsd: 0.007 }));
+    const read = vi.fn(async () => ({ ok: false as const, error: 'x' }));
+    const { run } = setup({ web: { search, read, spend: () => {} } });
+
+    expect(await run('web_search', { query: 'launch videos' })).toEqual({ ok: true, results: [] });
+    expect(await run('read_page', { url: 'https://a.example/' })).toEqual({ ok: false, error: 'x' });
+  });
+
+  it('the prompt says when to search and to cite what it found', () => {
+    const prompt = motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Available });
+
+    for (const word of ['web_search', 'read_page', 'cite']) {
+      expect(prompt).toContain(word);
+    }
+  });
+
   it('the prompt carries the brand trailer recipe', () => {
     const prompt = motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Available });
 

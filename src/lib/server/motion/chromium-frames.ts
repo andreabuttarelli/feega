@@ -76,6 +76,8 @@ export const serverFramesOpen = () => Boolean(process.env.VERCEL || process.env.
 
 export const chromiumFrames: BrowserPort = { open: pageOf };
 
+export const chromiumPage = async (): Promise<Page> => (await browser()).newPage();
+
 async function runGl<T>(script: string): Promise<T> {
   const page = await (await browser()).newPage();
   try {

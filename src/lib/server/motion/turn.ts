@@ -25,6 +25,8 @@ import { assetUrls, headOrNew, motionAssets, motionTokens, saveMotionDoc } from 
 import { fitNewVideo } from '$lib/motion/fit-duration';
 import { AGENT_SELF_SAVE_MS, overTurnCap } from '$lib/server/project-agent/limits';
 import { dropWorkingDoc, keepWorkingDoc } from '$lib/server/motion/working-doc';
+import { liveWebDeps, productImport, screenedImport } from '$lib/server/web/live';
+import { ATTACHMENT_PORTS } from '$lib/server/chat-attachments/register';
 import { EmbedAction, createMotionTools, selectionNote, type MotionSession } from '$lib/server/motion/motion-tools';
 import { publishEmbed, removeEmbed } from '$lib/server/motion/embed';
 import type { ProjectMode } from '$lib/project-mode';
@@ -176,13 +178,14 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
   let client = Client.Watching;
   const cut = new AbortController();
 
+  const sources = brandSources(db, { orgId, projectId: project.id, canvasId: motion.record.canvasId, brandId: project.brandId });
   const tools = createMotionTools({
     session,
     assets,
     newId: () => crypto.randomUUID().slice(0, 8),
     templates: templateLibrary(db, { orgId, actor: { kind: 'agent', id: userId, agentKey: MOTION_AGENT_KEY } }),
     revisions: { list: () => listRevisions(db, nodeScope), read: async (version) => (await readRevision(db, { ...nodeScope, version }))?.doc ?? null },
-    ...brandSources(db, { orgId, projectId: project.id, canvasId: motion.record.canvasId, brandId: project.brandId }),
+    ...sources,
     analysis: async (assetId) => (await analyzeSounds(storageAnalysis(db), { orgId, projectId: project.id }, assets, [assetId]))[assetId] ?? null,
     voiceover: (voice) => withOrgContext(orgId, () => speakVoiceover(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, actor }, voice)),
     music: (ask) => withOrgContext(orgId, () => layMusic(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, actor }, ask)),
@@ -202,6 +205,12 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
       return firstFrames([editor, server]);
     },
     inspect: frameStats,
+    web: {
+      ...liveWebDeps(db, { orgId, userId, projectId: project.id, brandId: project.brandId, mode: project.mode }, (usd) => {
+        spent += usd;
+      }),
+      importProducts: productImport(screenedImport(sources.importAsset, (url) => ATTACHMENT_PORTS.screenImage({ orgId, mode: project.mode, url }), assets))
+    },
     layouts: layoutStore({ db, orgId, actor: { kind: 'agent', id: userId, agentKey: MOTION_AGENT_KEY } }),
     effects: effectStore({ db, orgId, actor: { kind: 'agent', id: userId, agentKey: MOTION_AGENT_KEY }, gl: serverFramesOpen() ? chromiumGl : null }),
     readUi: uiReader({ ask: (q) => withOrgContext(orgId, () => llmStructured({ ...q, model: llmVisionModel() ?? model, label: 'motion-recreate-ui' })), fetchBytes: fetchImageBytes }),
