@@ -80,6 +80,11 @@ export const rulesSpecSchema = z.object({
   gap: z.number().min(0).max(1).optional()
 });
 
+export const pacingSpecSchema = z.object({
+  shotSeconds: z.number().min(0.2).max(30),
+  cuts: z.string().max(160).optional()
+});
+
 export const referenceLookSchema = z.object({
   typeScale: z.number().min(0.02).max(1.2),
   bleed: z.boolean(),
@@ -91,6 +96,7 @@ export const referenceLookSchema = z.object({
   type: z.array(typeSpecSchema).max(6).optional(),
   rules: rulesSpecSchema.optional(),
   margin: z.number().min(0).max(0.3).optional(),
+  pacing: pacingSpecSchema.optional(),
   notes: z.string().max(400).optional(),
   avoid: z.array(z.object({ image: z.string().url().max(2000), why: z.string().max(240).optional() })).max(12).optional()
 });

@@ -1,7 +1,9 @@
 import { env } from '$env/dynamic/private';
 import type { Db } from '$lib/server/db/client';
 import { logAiCall, withBrandContext, withOrgContext } from '$lib/server/ai-log';
-import { SCRAPECREATORS_COST_USD, scrapeCreatorsGet } from '$lib/server/scrapecreators';
+import { SCRAPECREATORS_COST_USD, fetchProfileHistory, fetchSinglePost, scrapeCreatorsGet } from '$lib/server/scrapecreators';
+import { ensureFfmpegPath } from '$lib/server/ffmpeg-bin';
+import { classifySocialInput } from '$lib/canvas/social-url-classifier';
 import { llmApiKey, llmBaseUrl, llmDefaultModel } from '$lib/server/llm';
 import { safeFetchBytes } from '$lib/server/tool-guard';
 import { chromiumPage, serverFramesOpen } from '$lib/server/motion/chromium-frames';
@@ -17,6 +19,9 @@ import { screenshotPage } from './screenshot';
 import { readStore, storeProducts } from './store';
 import { viewImages, type ViewPorts } from './view-images';
 import { socialSearch, type ClipsFound, type SocialGet } from './social-search';
+import { profileAccount, socialItem } from './social-posts';
+import { viewVideoFrames, type FramePorts } from './video-frames';
+import { videoStills } from './video-stills';
 import { pinterestBoard, pinterestPin, pinterestSearch, type PinterestGet, type PinsFound } from './pinterest';
 import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
 import { removeAssetFile, signAssetFile, storeAssetFile } from '$lib/server/repos/asset-storage';
@@ -27,13 +32,16 @@ import type { Actor } from '$lib/server/repos/actor';
 import type { ScreenOutcome } from '$lib/server/moderation/screen';
 import type { AssetImport } from '$lib/server/motion/motion-tools';
 import type { MotionAsset } from '$lib/server/motion/editor';
-import type { ImageImport, PinterestPort, ProductsImport, SocialPort, WebToolDeps } from './web-tools';
+import type { ImageImport, PinterestPort, ItemsRead, ProductsImport, SocialPort, WebToolDeps } from './web-tools';
 
 export type WebScope = { orgId: string; userId: string; projectId: string; brandId?: string | null; mode: ProjectMode };
 
 export const WEB_VIEWS_DIR = 'web-views';
 
 const IMAGE_TIMEOUT_MS = 20_000;
+const VIDEO_TIMEOUT_MS = 60_000;
+const VIDEO_MAX_BYTES = 80_000_000;
+const PROFILE_PAGES = 1;
 const SEARCH_LABEL = 'web-search';
 const PICTURES_PER_PRODUCT = 2;
 const VIEW_MAX_BYTES = 15_000_000;
@@ -93,14 +101,33 @@ export function webViewPrefix(scope: { orgId: string; projectId: string }, callI
   return `${canvasUploadPrefix(scope.orgId, scope.projectId)}${WEB_VIEWS_DIR}/${callId}`;
 }
 
-function viewer(db: Db, scope: WebScope): NonNullable<WebToolDeps['view']> {
-  const ports: ViewPorts = {
+function viewPorts(db: Db, scope: WebScope): ViewPorts {
+  return {
     fetchImage: (url) => safeFetchBytes(url, { maxBytes: VIEW_MAX_BYTES, timeoutMs: IMAGE_TIMEOUT_MS }),
     store: (path, bytes) => storeAssetFile(db, path, new File([new Uint8Array(bytes)], path.split('/').at(-1) as string, { type: 'image/jpeg' })),
     screen: async (path) => ATTACHMENT_PORTS.screenImage({ orgId: scope.orgId, mode: scope.mode, url: await signAssetFile(db, path) }),
     remove: (path) => removeAssetFile(db, path)
   };
+}
+
+function viewer(db: Db, scope: WebScope): NonNullable<WebToolDeps['view']> {
+  const ports = viewPorts(db, scope);
   return (urls, detail, callId) => viewImages(urls, detail, webViewPrefix(scope, callId), ports);
+}
+
+function framesViewer(db: Db, scope: WebScope): NonNullable<WebToolDeps['frames']> {
+  const ports: FramePorts = {
+    ...viewPorts(db, scope),
+    fetchVideo: (url) => safeFetchBytes(url, { maxBytes: VIDEO_MAX_BYTES, timeoutMs: VIDEO_TIMEOUT_MS, scheme: 'https-only' }),
+    stills: async (video, points) => {
+      const bin = await ensureFfmpegPath();
+      if (!bin) {
+        throw new Error('video frames are unavailable right now (no ffmpeg)');
+      }
+      return videoStills(video, points, bin);
+    }
+  };
+  return (source, callId) => viewVideoFrames(source, webViewPrefix(scope, callId), ports);
 }
 
 type Metered = Omit<WebScope, 'mode'>;
@@ -193,21 +220,59 @@ export function pinterestPort(get: PinterestGet): PinterestPort {
   };
 }
 
-export function socialPort(get: SocialGet): SocialPort {
-  return async (platform, query, limit) => priced(await socialSearch(get, platform, query, limit));
+export type SocialFetchers = { history: typeof fetchProfileHistory; single: typeof fetchSinglePost };
+
+const SOCIAL_REQUEST_USD = SCRAPECREATORS_COST_USD;
+const failed = (what: string, e: unknown, costUsd: number): ItemsRead => ({ ok: false, error: `${what} failed: ${e instanceof Error ? e.message : String(e)}`, costUsd });
+
+export function socialPort(get: SocialGet, fetchers: SocialFetchers): SocialPort {
+  return {
+    search: async (platform, query, limit) => priced(await socialSearch(get, platform, query, limit)),
+    profile: async (platform, handle, limit) => {
+      const target = profileAccount(platform, handle);
+      if (!target.ok) {
+        return { ...target, costUsd: 0 };
+      }
+      try {
+        const posts = await fetchers.history(target.platform, target.account, { maxPages: PROFILE_PAGES, maxPosts: limit });
+        return { ok: true, items: posts.map((p) => socialItem(target.platform, p)), costUsd: SOCIAL_REQUEST_USD };
+      } catch (e) {
+        return failed('social profile', e, SOCIAL_REQUEST_USD);
+      }
+    },
+    post: async (url) => {
+      const classified = classifySocialInput(url);
+      if (!classified.ok || classified.entry.kind !== 'post') {
+        return { ok: false, error: `not a post url: ${url}`, costUsd: 0 };
+      }
+      try {
+        return { ok: true, items: [socialItem(classified.entry.platform, await fetchers.single(classified.entry.platform, url))], costUsd: SOCIAL_REQUEST_USD };
+      } catch (e) {
+        return failed('social post', e, SOCIAL_REQUEST_USD);
+      }
+    }
+  };
 }
 
-function billedScrape(scope: Metered): PinterestGet | undefined {
+type Billed = <T>(fn: () => T) => T;
+
+function scrapeBilling(scope: Metered): Billed | undefined {
   if (!env.SCRAPECREATORS_API_KEY?.trim()) {
     return undefined;
   }
-  const billed = <T>(fn: () => T): T => (scope.brandId ? withBrandContext(scope.brandId, fn) : withOrgContext(scope.orgId, fn));
-  return (path) => billed(() => scrapeCreatorsGet(path));
+  return (fn) => (scope.brandId ? withBrandContext(scope.brandId, fn) : withOrgContext(scope.orgId, fn));
+}
+
+function liveSocial(billed: Billed): SocialPort {
+  return socialPort((path) => billed(() => scrapeCreatorsGet(path)), {
+    history: (...args) => billed(() => fetchProfileHistory(...args)),
+    single: (...args) => billed(() => fetchSinglePost(...args))
+  });
 }
 
 export function liveWebDeps(db: Db, scope: WebScope, spend: (usd: number) => void): WebToolDeps {
   const open = liveBrowser(scope);
-  const scrape = billedScrape(scope);
+  const billed = scrapeBilling(scope);
   return {
     view: viewer(db, scope),
     search: loggedSearch(scope),
@@ -215,8 +280,9 @@ export function liveWebDeps(db: Db, scope: WebScope, spend: (usd: number) => voi
     store: (url, opts) => readStore(url, opts),
     shoot: serverFramesOpen() ? (url, view) => screenshotPage(url, view, chromiumPage) : undefined,
     browse: open ? browser(db, scope, open) : undefined,
-    pinterest: scrape ? pinterestPort(scrape) : undefined,
-    social: scrape ? socialPort(scrape) : undefined,
+    pinterest: billed ? pinterestPort((path) => billed(() => scrapeCreatorsGet(path))) : undefined,
+    social: billed ? liveSocial(billed) : undefined,
+    frames: framesViewer(db, scope),
     spend
   };
 }
