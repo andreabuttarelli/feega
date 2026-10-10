@@ -172,6 +172,10 @@ slots, place, camera?, motion?, params?, tilt?, scale?, animate? }` with `place`
 scatter. `patch_layout` (`{ org, layout_id, version, spec }`) replaces it; `list_layouts` lists them.
 Free.
 
+`get_app_account` (`{ project_id }`) shows the TEST login of the user's app the project chat remembers
+(login url, email, session expiry; never the password). `forget_app_account` (`{ project_id }`) deletes it
+and its session. Free.
+
 ## Node loops
 
 | MCP | CLI |

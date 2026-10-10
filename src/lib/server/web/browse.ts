@@ -35,7 +35,7 @@ export type BrowseStep = z.infer<typeof browseStepSchema>;
 export type StepReport = ({ do: StepKind; ok: true } & Record<string, unknown>) | { do: StepKind; ok: false; error: string };
 export type BrowseOutcome = { ok: true; url: string; steps: StepReport[]; shots: Buffer[]; costUsd: number; stopped?: string } | { ok: false; error: string; costUsd: number };
 
-type Run = { tab: Tab; shots: Buffer[] };
+type Run = { tab: Tab; shots: Buffer[]; maxShots: number };
 type Runner<S extends BrowseStep> = (step: S, run: Run) => Promise<Record<string, unknown>>;
 
 const REFUSED_FIELD = 'refused: that field belongs to a password or payment form';
@@ -90,8 +90,8 @@ const RUNNERS: { [K in StepKind]: Runner<Extract<BrowseStep, { do: K }>> } = {
   },
   [StepKind.Extract]: (step, { tab }) => extract(tab, step.what),
   [StepKind.Screenshot]: async (_, run) => {
-    if (run.shots.length >= BROWSE_MAX_SHOTS) {
-      throw new Error(`at most ${BROWSE_MAX_SHOTS} screenshots per browse`);
+    if (run.shots.length >= run.maxShots) {
+      throw new Error(`at most ${run.maxShots} screenshots per browse`);
     }
     run.shots.push(await run.tab.shot());
     return { shot: run.shots.length - 1 };
@@ -108,6 +108,27 @@ async function stepOf(step: BrowseStep, run: Run): Promise<StepReport> {
 
 const outOfTime = Symbol('out of time');
 
+export type Walked = { steps: StepReport[]; shots: Buffer[]; stopped?: string };
+
+export async function walkSteps(tab: Tab, all: BrowseStep[], deadline: number, maxShots = BROWSE_MAX_SHOTS): Promise<Walked> {
+  const run: Run = { tab, shots: [], maxShots };
+  const reports: StepReport[] = [];
+
+  for (const [i, step] of all.entries()) {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<typeof outOfTime>((resolve) => {
+      timer = setTimeout(() => resolve(outOfTime), Math.max(0, deadline - Date.now()));
+    });
+    const report = await Promise.race([stepOf(step, run), late]).finally(() => clearTimeout(timer));
+    if (report === outOfTime) {
+      return { steps: reports, shots: run.shots, stopped: `time limit reached: ${all.length - i} step(s) not run` };
+    }
+    reports.push(report);
+  }
+
+  return { steps: reports, shots: run.shots };
+}
+
 export async function browse(start: string, steps: BrowseStep[], open: OpenBrowser, limits: { deadlineMs?: number } = {}): Promise<BrowseOutcome> {
   try {
     await publicOnly(start);
@@ -122,25 +143,7 @@ export async function browse(start: string, steps: BrowseStep[], open: OpenBrows
     return { ok: false, error: `the browser could not open: ${errorOf(e)}`, costUsd: 0 };
   }
 
-  const deadline = Date.now() + (limits.deadlineMs ?? BROWSE_DEADLINE_MS);
-  const run: Run = { tab, shots: [] };
-  const reports: StepReport[] = [];
-  const all: BrowseStep[] = [{ do: StepKind.Navigate, url: start }, ...steps.slice(0, BROWSE_MAX_STEPS)];
-  let stopped: string | undefined;
-
-  for (const [i, step] of all.entries()) {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const late = new Promise<typeof outOfTime>((resolve) => {
-      timer = setTimeout(() => resolve(outOfTime), Math.max(0, deadline - Date.now()));
-    });
-    const report = await Promise.race([stepOf(step, run), late]).finally(() => clearTimeout(timer));
-    if (report === outOfTime) {
-      stopped = `time limit reached: ${all.length - i} step(s) not run`;
-      break;
-    }
-    reports.push(report);
-  }
-
+  const walked = await walkSteps(tab, [{ do: StepKind.Navigate, url: start }, ...steps.slice(0, BROWSE_MAX_STEPS)], Date.now() + (limits.deadlineMs ?? BROWSE_DEADLINE_MS));
   const costUsd = await tab.close().catch(() => 0);
-  return { ok: true, url: tab.url(), steps: reports, shots: run.shots, costUsd, ...(stopped ? { stopped } : {}) };
+  return { ok: true, url: tab.url(), ...walked, costUsd };
 }

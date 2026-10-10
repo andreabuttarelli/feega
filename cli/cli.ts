@@ -315,6 +315,15 @@ layouts
   });
 
 program
+  .command('app-account <projectId>')
+  .description('Show the TEST account of your app the project chat logs in with, or --forget it')
+  .option('--forget', 'Delete the test account and its session')
+  .action(async (projectId: string, opts) => {
+    const { cmdAppAccount } = await import('./commands/app-account.ts');
+    await cmdAppAccount(projectId, opts);
+  });
+
+program
   .command('upgrade <slug>')
   .description('Open Stripe checkout: a monthly plan (--credits 8|16|32|64|128|256) or a one-time top-up (--top-up)')
   .option('--credits <n>', 'Monthly credits (1 credit = €1)')

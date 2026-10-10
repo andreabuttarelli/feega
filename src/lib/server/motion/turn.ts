@@ -27,6 +27,7 @@ import { fitNewVideo } from '$lib/motion/fit-duration';
 import { AGENT_SELF_SAVE_MS, overTurnCap } from '$lib/server/project-agent/limits';
 import { dropWorkingDoc, keepWorkingDoc } from '$lib/server/motion/working-doc';
 import { liveWebDeps, productImport, screenedImport } from '$lib/server/web/live';
+import { CAPTURE_MAX_EDGE, storeImage } from './asset-import';
 import { ATTACHMENT_PORTS } from '$lib/server/chat-attachments/register';
 import { EmbedAction, createMotionTools, selectionNote, type MotionSession, type MotionToolDeps } from '$lib/server/motion/motion-tools';
 import type { MotionAsset } from '$lib/server/motion/editor';
@@ -236,9 +237,21 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
     },
     inspect: frameStats,
     web: {
-      ...liveWebDeps(db, { orgId, userId, projectId: project.id, brandId: project.brandId, mode: project.mode }, (usd) => {
-        spent += usd;
-      }),
+      ...liveWebDeps(
+        db,
+        { orgId, userId, projectId: project.id, brandId: project.brandId, mode: project.mode },
+        (usd) => {
+          spent += usd;
+        },
+        async (jpeg, name) => {
+          const stored = await storeImage(db, { orgId, projectId: project.id, canvasId: motion.record.canvasId, screen: screenPicture }, { bytes: jpeg, url: name }, name, CAPTURE_MAX_EDGE);
+          if (!stored.ok) {
+            return null;
+          }
+          assets.push(stored.asset);
+          return stored.asset.id;
+        }
+      ),
       importProducts: productImport(screenedImport(sources.importAsset, screenPicture, assets)),
       avoid: avoidedImages(pick),
       shown: shownRefs(turns),

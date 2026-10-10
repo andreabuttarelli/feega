@@ -146,6 +146,8 @@ Custom composition layouts: `write_layout` writes a spec layout (placement, slot
 workspace, `patch_layout` replaces its spec at a `version`, `list_layouts` lists them; ask
 `ask_motion_agent` to arrange a composition on one.
 
+Test app account: the project chat logs in to the user's own app with a TEST account the user gives it in chat, and photographs its screens. `get_app_account` shows that account (never the password), `forget_app_account` drops it and its session.
+
 ## Loop a node over many combinations
 
 `run_node_loop` queues every combination from a node's `iterate` wires (or a plain "repeat N")
