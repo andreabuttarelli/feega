@@ -6,6 +6,7 @@ export type CaptureLimits = { max: number; text: number; svg: number };
 export const CAPTURE_LIMITS: CaptureLimits = { max: 3_000, text: 300, svg: 6_000 };
 
 const SETTLE_MS = 1_500;
+const NAV_TIMEOUT = /navigation timeout/i;
 
 export function captureOf(limits: CaptureLimits): RawCapture {
   const W = window.innerWidth;
@@ -223,7 +224,7 @@ export function vectorCapture(open: OpenAppBrowser, settleMs = SETTLE_MS): UiCap
   return async (url) => {
     const tab = await open();
     try {
-      const status = await tab.goto(url);
+      const status = await tab.goto(url).catch((e: unknown) => (NAV_TIMEOUT.test(String(e)) ? null : Promise.reject(e)));
       if (status !== null && status >= 400) {
         return { ok: false, error: `${url} answered ${status}` };
       }
