@@ -261,6 +261,35 @@ export function hostedPage(page: string, origin: string): string | null {
   return `<!doctype html>${playerPage(composed, doc, settings, title, hostedScriptTag(origin, Script.Player))}`;
 }
 
+export const isSourceEmbed = (page: string) => STORED_SOURCE.test(page);
+
+const CLIP_TAG = /<[^>]*\bdata-clip="([^"]+)"[^>]*>/g;
+const CLIP_PART = '__';
+const ATTR = (tag: string, name: string) => new RegExp(`\\b${name}="([^"]*)"`).exec(tag)?.[1] ?? '';
+const HIDDEN_TEXT = /<(script|style)\b[\s\S]*?<\/\1>/g;
+const TAG = /<[^>]*>/g;
+const SPACE = /\s+/g;
+
+function fingerprintOf(source: PlayerSource): string {
+  const clips = [...source.html.matchAll(CLIP_TAG)]
+    .filter(([, id]) => !id.includes(CLIP_PART))
+    .map(([tag, id]) => `${id}@${ATTR(tag, 'data-start')}+${ATTR(tag, 'data-duration')}`)
+    .sort();
+  const text = source.html.replace(HIDDEN_TEXT, ' ').replace(TAG, ' ').replace(SPACE, ' ').trim();
+  const { width, height, duration, playback, loop } = source;
+  return JSON.stringify({ width, height, duration, playback, loop: Boolean(loop), clips, text });
+}
+
+export function legacyFingerprint(page: string): string | null {
+  const stored = storedPlayer(page);
+  return stored ? fingerprintOf(stored.source) : null;
+}
+
+export function revisionFingerprint(input: Pick<InteractiveInput, 'doc' | 'tokens' | 'assetUrls' | 'analyses'>, origin: string): string {
+  const html = composeHtml({ doc: input.doc, tokens: input.tokens, assets: input.assetUrls, analyses: input.analyses, liveness: Liveness.Live, target: Target.Screen, origin, runtime: RuntimeDelivery.Hosted });
+  return fingerprintOf(sourceOf(html, input.doc, interactiveOf(input.doc)));
+}
+
 async function inlinedInput(input: InteractiveInput): Promise<EmbedSource> {
   const logo = input.tokens.logoUrl ? await inlineAssets({ logo: input.tokens.logoUrl }, input.fetchBlob) : {};
   const assets = await inlineAssets(input.assetUrls, input.fetchBlob);

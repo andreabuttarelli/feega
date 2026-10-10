@@ -83,9 +83,19 @@ async function storedEmbed(fetchFn: typeof fetch, id: string): Promise<string | 
 
 export const assetBase = (origin: string, id: string) => `${embedUrl(origin, id)}/a`;
 
-export async function readEmbed(fetchFn: typeof fetch, id: string, origin: string): Promise<string | null> {
+export type HostedEmbed = { html: string; legacy: boolean };
+
+export async function readHostedEmbed(fetchFn: typeof fetch, id: string, origin: string): Promise<HostedEmbed | null> {
   const page = await storedEmbed(fetchFn, id);
-  return page === null ? null : hostAssets(hostedPage(page, origin) ?? upgradePlayer(page, origin) ?? page, assetBase(origin, id));
+  if (page === null) {
+    return null;
+  }
+  const hosted = hostedPage(page, origin);
+  return { html: hostAssets(hosted ?? upgradePlayer(page, origin) ?? page, assetBase(origin, id)), legacy: hosted === null };
+}
+
+export async function readEmbed(fetchFn: typeof fetch, id: string, origin: string): Promise<string | null> {
+  return (await readHostedEmbed(fetchFn, id, origin))?.html ?? null;
 }
 
 export async function readEmbedAsset(fetchFn: typeof fetch, id: string, hash: string): Promise<HostedAsset | null> {
