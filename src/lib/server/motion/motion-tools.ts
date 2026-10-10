@@ -38,7 +38,8 @@ import { setMotionPath, setPathTangent } from '$lib/motion/path-ops';
 import { EASE_PRESETS, EASE_PRESET_IDS, easeHandles, withHandles } from '$lib/motion/graph';
 import { ANIMATABLE, INTERPS, Interp, SPATIAL_KEYS, TRANSFORM_KEYS, ValueKind, easeSchema, type Keyframe } from '$lib/motion/keyframes';
 import type { MotionAsset } from './editor';
-import { referenceLookSchema } from '$lib/motion/reference-look-model';
+import { referenceLookSchema, type ReferenceLook } from '$lib/motion/reference-look-model';
+import type { PickAnswer } from '$lib/reference-pick';
 import { MAX_FRAMES_PER_VIEW, MAX_VIEWS_PER_TURN, VIEW_FRAMES, withFrames, type Frame, type Reference } from './frames';
 import { contentEnd, fitDuration } from '$lib/motion/fit-duration';
 import { blocking, docProblems, frameProblems, softPictures, type FrameStat, type Pixels, type QualityProblem } from '$lib/motion/direction';
@@ -115,7 +116,7 @@ import { STYLES, styleOf } from '$lib/motion/style';
 import { MOTION_STYLES } from '$lib/motion/style-model';
 import { unitOf, propsOwner, shownKeyframes, shownMask, shownOffset, shownRecord, storedMask, storedOffset, storedRecord, toShown, toStored, type Owner } from '$lib/motion/units';
 
-export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number; guides?: GuideTopic[]; effectFailures?: number; gate?: QualityProblem[]; references?: Reference[] };
+export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number; guides?: GuideTopic[]; effectFailures?: number; gate?: QualityProblem[]; references?: Reference[]; pick?: PickAnswer | null; pickAssets?: string[] };
 
 export type CheckResult = { ok: boolean; problems: string[]; frames: Frame[] };
 
@@ -186,6 +187,16 @@ export enum EmbedAction {
 }
 
 const UNREADABLE = (what: string) => ({ ok: false as const, error: `${what} is not available in this workspace` });
+
+const AVOIDED_REF = { ok: false as const, error: 'the user marked this reference as avoid: never use it as a target' };
+
+const avoidedRef = (pick: PickAnswer | null | undefined, url: string) => (pick?.avoid ?? []).some((c) => c.image === url);
+
+function withAvoided(look: ReferenceLook, pick: PickAnswer | null | undefined): ReferenceLook {
+  const picked = (pick?.avoid ?? []).map((c) => ({ image: c.image, ...(c.why ?? c.title ? { why: c.why ?? c.title } : {}) }));
+  const avoid = [...(look.avoid ?? []), ...picked.filter((p) => !look.avoid?.some((a) => a.image === p.image))];
+  return avoid.length ? { ...look, avoid } : look;
+}
 
 const fieldSpec = (f: ExposedField) => ({ key: f.key, label: f.label, type: f.type, min: f.min, max: f.max, unit: f.unit, options: f.options, aspect: f.aspect });
 
@@ -1475,7 +1486,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     set_reference_look: tool({
       description: 'Record what the references you looked at measure, before building: the largest type as a share of the frame height (a word that fills a poster is 0.6–1.2), whether type bleeds off the edge, grid columns, how much small text, the palette, the font class and the imagery. type: one entry per typographic role you SEE (display, headline, body, label, number) with font class, closest Google Fonts, weight, case, tracking (em), line height (measured: a line gap smaller than the cap height is about 0.85), size (share of frame height), alignment, rotation, and in measured what you measured. rules: hairline count, thickness and gap; margin: share of the frame width. view_frames then measures every text against the role nearest its size and blocks gross misses (wrong family class on the display title, weight off by 300 or more).',
       inputSchema: referenceLookSchema,
-      execute: async (input) => apply({ ok: true, doc: { ...session.doc, referenceLook: input } }, 'recorded the reference look')
+      execute: async (input) => apply({ ok: true, doc: { ...session.doc, referenceLook: withAvoided(input, session.pick) } }, 'recorded the reference look')
     }),
 
     set_motion_blur: tool({
@@ -1660,6 +1671,11 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         if (!deps.storyboard) {
           return UNREADABLE('the storyboard');
         }
+        const hung = new Set(input.beats.flatMap((b) => b.media));
+        const left = (session.pickAssets ?? []).filter((id) => !hung.has(id));
+        if (left.length) {
+          return { ok: false, error: `the user chose to follow these references: hang each under the beat it inspires (media): ${left.join(', ')}` };
+        }
         const media = boardMedia(input, deps.assets);
         if (!media.ok) {
           return { ok: false, error: `${media.error} (list_assets)` };
@@ -1719,6 +1735,9 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
           }
           deps.assets.push(...captured.shots.map((s) => s.asset));
           return { ok: true, captures: captured.shots.map((s) => ({ asset_id: s.asset.id, part: s.part, width: s.width, height: s.height })) };
+        }
+        if (avoidedRef(session.pick, input.url)) {
+          return AVOIDED_REF;
         }
         const imported = deps.importAsset ? await deps.importAsset(input.url, input.label) : UNREADABLE('importing pictures');
         if (!imported.ok) {

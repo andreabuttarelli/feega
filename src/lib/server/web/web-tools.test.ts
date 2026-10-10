@@ -3,6 +3,7 @@ import { generateText, stepCountIs, type Tool } from 'ai';
 import { MockLanguageModelV4 } from 'ai/test';
 import { MAX_BROWSES_PER_TURN, MAX_PINTEREST_PER_TURN, MAX_SEARCHES_PER_TURN, MAX_SHOTS_PER_TURN, WEB_TOOLS, createWebTools, type WebToolDeps } from './web-tools';
 import { ShotView } from './screenshot';
+import { MAX_REJECTED_ROUNDS } from '$lib/reference-pick';
 import { StoreKind } from './store';
 import { ViewDetail } from './view-images';
 import { StepKind } from './browse';
@@ -184,6 +185,56 @@ describe('web tools', () => {
     const recorded = result.steps[0].toolResults[0].output;
     expect(recorded).toEqual({ ok: true, images: [{ url: 'https://a.example/p.png', path: 'o/p/web-views/c/0.jpg', width: 10, height: 10 }] });
     expect(JSON.stringify(recorded)).not.toContain('AAAA');
+  });
+});
+
+describe('ask_reference_pick', () => {
+  const candidates = Array.from({ length: 4 }, (_, i) => ({ id: `pin${i}`, image: `https://i.pinimg.com/${i}.jpg`, title: `Pin ${i}` }));
+
+  it('hands the candidates to the chat card, free, and caps the pick at the candidates', async () => {
+    const { run, spent } = setup({ view: vi.fn(async () => ({ images: [], parts: [] })) as never });
+    expect(WEB_TOOLS).toContain('ask_reference_pick');
+    expect(await run('ask_reference_pick', { question: 'Which look is yours?', candidates, max: 9 })).toEqual({ ok: true, question: 'Which look is yours?', candidates, min: 1, max: 4 });
+    expect(spent()).toBe(0);
+  });
+
+  it('a new search after a rejection never shows pins the user already saw', async () => {
+    const pin = (id: string) => ({ id, url: `https://www.pinterest.com/pin/${id}/`, title: id, description: null, image: { url: `https://i.pinimg.com/${id}.jpg`, width: 10, height: 10 }, colour: null, link: null, pinner: 'p', board: null });
+    const search = vi.fn(async () => ({ ok: true as const, pins: [pin('a'), pin('b'), pin('c')], requests: 1, costUsd: 0 }));
+    const { run } = setup({ pinterest: { search, pin: vi.fn(), board: vi.fn() }, shown: new Set(['a', 'https://i.pinimg.com/b.jpg']) });
+
+    const out = await run('pinterest_search', { query: 'warm light' });
+    expect((out.pins as { id: string }[]).map((p) => p.id)).toEqual(['c']);
+  });
+
+  it('a new card never repeats a picture the user already saw', async () => {
+    const view = vi.fn(async () => ({ images: [], parts: [] })) as never;
+    const { run } = setup({ view, shown: new Set(['pin0', 'https://i.pinimg.com/1.jpg']) });
+
+    const out = await run('ask_reference_pick', { question: 'Which?', candidates });
+    expect((out.candidates as { id: string }[]).map((c) => c.id)).toEqual(['pin2', 'pin3']);
+  });
+
+  it('asks once per turn, and stops asking after the user rejected too many rounds in a row', async () => {
+    const view = vi.fn(async () => ({ images: [], parts: [] })) as never;
+    const { run } = setup({ view });
+    expect(await run('ask_reference_pick', { question: 'Which?', candidates })).toMatchObject({ ok: true });
+    expect(await run('ask_reference_pick', { question: 'Which?', candidates })).toMatchObject({ ok: false });
+
+    const tired = setup({ view, rejections: MAX_REJECTED_ROUNDS });
+    expect(await tired.run('ask_reference_pick', { question: 'Which?', candidates })).toMatchObject({ ok: false, error: expect.stringMatching(/choose/) });
+  });
+
+  it('a picture the user avoided is never looked at again nor imported', async () => {
+    const view = vi.fn(async (urls: string[]) => ({ images: urls.map((url) => ({ url })), parts: [] }));
+    const importImage = vi.fn(async () => ({ ok: true as const, assetId: 'a1', width: 1, height: 1 }));
+    const { run } = setup({ avoid: new Set(['https://i.pinimg.com/3.jpg']), view: view as never, importImage });
+
+    expect(await run('import_image', { url: 'https://i.pinimg.com/3.jpg' })).toMatchObject({ ok: false });
+    expect(importImage).not.toHaveBeenCalled();
+
+    await run('view_images', { urls: ['https://i.pinimg.com/0.jpg', 'https://i.pinimg.com/3.jpg'] });
+    expect(view.mock.calls[0][0]).toEqual(['https://i.pinimg.com/0.jpg']);
   });
 });
 

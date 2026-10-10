@@ -14,7 +14,10 @@ export type MotionRun = {
   cost_usd?: number | null;
   error?: string | null;
   editor_url?: string;
+  reference_pick?: { question: string; candidates: { id: string; image: string; title?: string; why?: string }[]; min: number; max: number } | null;
 };
+
+export type ReferencePickReply = { follow: string[]; avoid: string[]; note?: string; rejected?: boolean; query?: string; avoid_all?: boolean };
 
 export const RUN_POLL_MS = 3_000;
 export const RUN_WAIT_MS = 240_000;
@@ -54,8 +57,8 @@ async function download(path: string, token: string): Promise<string> {
 const id = encodeURIComponent;
 
 export const motionApi = {
-  ask: (token: string, nodeId: string, prompt: string, org?: string, attachments: AttachmentSource[] = []) =>
-    request<MotionRun>(withOrg(`/api/v1/motion/${id(nodeId)}/ask`, org), token, { method: 'POST', body: JSON.stringify(attachments.length ? { prompt, attachments } : { prompt }) }),
+  ask: (token: string, nodeId: string, prompt: string, org?: string, attachments: AttachmentSource[] = [], pick?: ReferencePickReply) =>
+    request<MotionRun>(withOrg(`/api/v1/motion/${id(nodeId)}/ask`, org), token, { method: 'POST', body: JSON.stringify({ prompt, ...(attachments.length ? { attachments } : {}), ...(pick ? { reference_pick: pick } : {}) }) }),
   run: (token: string, runId: string, org?: string) => request<MotionRun>(withOrg(`/api/v1/motion/runs/${id(runId)}`, org), token),
   render: (token: string, nodeId: string, opts: RenderOptions, org?: string) =>
     request<RenderStart>(withOrg(`/api/v1/motion/${id(nodeId)}/render`, org), token, { method: 'POST', body: JSON.stringify(renderBody(opts)) }),

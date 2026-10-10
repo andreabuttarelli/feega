@@ -18,7 +18,11 @@ const sourceSchema = z.union([
   z.object({ data: z.string().min(1), name: z.string().min(1).max(200), mime_type: z.string().max(200) })
 ]);
 
-const bodySchema = z.object({ prompt: z.string().trim().min(1).max(8000), attachments: z.array(sourceSchema).optional() });
+const pickSchema = z.object({ follow: z.array(z.string().min(1)).max(12), avoid: z.array(z.string().min(1)).max(12), note: z.string().max(1000).optional(), rejected: z.boolean().optional(), query: z.string().max(300).optional(), avoid_all: z.boolean().optional() });
+
+const bodySchema = z
+  .object({ prompt: z.string().trim().max(8000).default(''), attachments: z.array(sourceSchema).optional(), reference_pick: pickSchema.optional() })
+  .refine((b) => b.prompt.length > 0 || b.reference_pick, { path: ['prompt'] });
 
 export const POST: RequestHandler = async ({ request, params, url }) => {
   const bearer = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
@@ -42,7 +46,7 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
     return gate;
   }
 
-  const asked = await askMotion(db, { orgId, userId, nodeId: params.nodeId ?? '', prompt: body.data.prompt, attachments: body.data.attachments });
+  const asked = await askMotion(db, { orgId, userId, nodeId: params.nodeId ?? '', prompt: body.data.prompt, attachments: body.data.attachments, pick: body.data.reference_pick });
   if (asked instanceof Response) {
     return asked;
   }

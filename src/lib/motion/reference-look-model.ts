@@ -91,7 +91,8 @@ export const referenceLookSchema = z.object({
   type: z.array(typeSpecSchema).max(6).optional(),
   rules: rulesSpecSchema.optional(),
   margin: z.number().min(0).max(0.3).optional(),
-  notes: z.string().max(400).optional()
+  notes: z.string().max(400).optional(),
+  avoid: z.array(z.object({ image: z.string().url().max(2000), why: z.string().max(240).optional() })).max(12).optional()
 });
 
 export type ReferenceLook = z.infer<typeof referenceLookSchema>;
