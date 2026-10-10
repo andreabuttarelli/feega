@@ -41,7 +41,7 @@ describe('app sidebar table', () => {
 
   it('only links are navigable', () => {
     const controls = APP_NAV.filter((item) => item.kind !== NavKind.Link).map((item) => item.id);
-    expect(controls).toEqual(['legal', 'theme', 'logout']);
+    expect(controls).toEqual(['tour', 'legal', 'theme', 'logout']);
   });
 });
 

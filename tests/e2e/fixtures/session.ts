@@ -48,7 +48,14 @@ async function checked<T>(result: PromiseLike<{ data: T; error: { message: strin
  * `withCredits: false` è per l'unica spec che prova il rifiuto del cancello — il saldo zero è il
  * caso da provare in QUELLO scenario, non un default che ogni altra spec deve aggirare.
  */
-export async function createE2eSession(opts: { withCredits?: boolean } = {}): Promise<E2eSession> {
+export enum E2eTour {
+  Seen = 'seen',
+  Due = 'due'
+}
+
+export const TOUR_SEEN_KEY = 'feega:tour-seen';
+
+export async function createE2eSession(opts: { withCredits?: boolean; tour?: E2eTour } = {}): Promise<E2eSession> {
   const db = adminClient();
   const email = `e2e-shell-${randomUUID()}@feega.app`;
   const password = randomUUID();
@@ -65,6 +72,9 @@ export async function createE2eSession(opts: { withCredits?: boolean } = {}): Pr
   const canvasName = 'Prima tela';
 
   await checked(db.from('profiles').upsert({ id: userId, email, name: 'E2E shell' }));
+  if ((opts.tour ?? E2eTour.Seen) === E2eTour.Seen) {
+    await db.from('profiles').update({ onboarding_seen_at: new Date().toISOString() }).eq('id', userId);
+  }
   await checked(db.from('orgs').insert({ id: orgId, name: 'E2E shell', slug: `e2e-shell-${orgId}` }));
   await checked(db.from('orgs_members').insert({ org_id: orgId, user_id: userId, role: 'owner' }));
   await checked(db.from('projects').insert({ id: projectId, org_id: orgId, name: 'E2E project', slug: `e2e-project-${projectId}` }));
@@ -147,7 +157,10 @@ export async function gotoHydrated(page: Page, path: string): Promise<import('@p
  * morto, non un errore di credenziali). `waitForResponse` aspetta il segnale vero — il POST che
  * `use:enhance` intercetta — non un'approssimazione temporale.
  */
-export async function signInE2e(page: Page, session: Pick<E2eSession, 'email' | 'password'>): Promise<void> {
+export async function signInE2e(page: Page, session: Pick<E2eSession, 'email' | 'password'>, tour: E2eTour = E2eTour.Seen): Promise<void> {
+  if (tour === E2eTour.Seen) {
+    await page.addInitScript((key) => localStorage.setItem(key, '1'), TOUR_SEEN_KEY);
+  }
   await gotoHydrated(page, '/login');
   await page.getByPlaceholder('you@yourbrand.com').fill(session.email);
   await page.locator('input[type="password"]').fill(session.password);
