@@ -232,6 +232,10 @@ describe('rendering above the doc size', () => {
   it('the editor composes at the doc size, unzoomed', () => {
     expect(composeHtml({ doc, tokens: FEEGA_TOKENS, assets: {} })).not.toContain('zoom:');
   });
+
+  it('the stage has the doc size in pixels before the player sizes its frame, so a component that measures at mount never measures zero', () => {
+    expect(composeHtml({ doc, tokens: FEEGA_TOKENS, assets: {} })).toContain('#root{width:1920px;height:1080px}');
+  });
 });
 
 describe('background of the frame', () => {

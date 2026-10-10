@@ -24,11 +24,12 @@ const LAUNCH: Record<string, Parameters<BrowserType['launch']>[0]> = {
 const OUT = resolve(process.env.BENCH_OUT ?? join(homedir(), 'Documents/feega-videos/bench'));
 const FRAME_TIMEOUT_MS = 3_600_000;
 
-type Args = { doc: string; engines: string[]; lanes: number[]; frames: number; keep: boolean; parity: boolean; live: boolean; strip: Set<string>; layering: Layering };
+type Args = { range: [number, number] | null; doc: string; engines: string[]; lanes: number[]; frames: number; keep: boolean; parity: boolean; live: boolean; strip: Set<string>; layering: Layering };
 
 function args(): Args {
   const flags = new Map(process.argv.slice(2).map((a) => a.replace(/^--/, '').split('=') as [string, string]));
   return {
+    range: flags.has('range') ? (String(flags.get('range')).split(',').map(Number) as [number, number]) : null,
     doc: flags.get('doc') ?? '',
     engines: (flags.get('engines') ?? 'chromium,webkit').split(','),
     lanes: (flags.get('lanes') ?? '4,1').split(',').map(Number),
@@ -89,7 +90,10 @@ function serve(script: string): Promise<{ url: string; origin: string; close: ()
   );
 }
 
-function spread(total: number, count: number, fps: number): number[] {
+function spread(total: number, count: number, fps: number, range: [number, number] | null): number[] {
+  if (range) {
+    return Array.from({ length: range[1] - range[0] }, (_, i) => (range[0] + i) / fps);
+  }
   const n = count > 0 ? Math.min(count, total) : total;
   return Array.from({ length: n }, (_, i) => Math.floor((i * total) / n) / fps);
 }
@@ -104,7 +108,7 @@ function stripped<T extends Tracked>(doc: T, kinds: Set<string>): T {
   return { ...clean(doc), comps: Object.fromEntries(Object.entries(comps).map(([k, v]) => [k, clean(v)])) } as unknown as T;
 }
 
-const { doc: docPath, engines, lanes, frames, keep, parity, live, strip, layering } = args();
+const { range, doc: docPath, engines, lanes, frames, keep, parity, live, strip, layering } = args();
 const loaded = JSON.parse(readFileSync(docPath, 'utf8')) as { doc: MotionDoc; assets: Record<string, string> };
 const doc = stripped(loaded.doc as unknown as Tracked, strip) as unknown as MotionDoc;
 const assets = loaded.assets;
@@ -112,7 +116,7 @@ const name = docPath.split('/').pop()?.replace('.json', '') ?? 'doc';
 const server = await serve(await hostBundle());
 const html = withProbe(composeHtml({ doc, tokens: FEEGA_TOKENS, assets, origin: server.origin }), CAPTURE_REQUEST, STATS_REQUEST, STATS_REPLY);
 const size = exportSize(doc, Resolution.P1080);
-const times = spread(doc.durationInFrames, frames, doc.fps);
+const times = spread(doc.durationInFrames, frames, doc.fps, range);
 mkdirSync(OUT, { recursive: true });
 
 if (parity) {

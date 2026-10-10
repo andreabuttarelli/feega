@@ -2751,3 +2751,11 @@ check that only reads tool results misses it, the screenshot of the grid catches
 Signal: a server-side edit (a tool, a port) has no effect in agent turns, and nothing new lands in
 storage, while unit tests pass. The dev server kept the old module for turns running in the
 background. Move: restart `vite dev` after server edits before trusting a real-check run.
+
+## An export flickers every other frame but a 1-lane render is smooth
+
+Signal: consecutive exported frames alternate between two states (`bench:export --lanes=4` vs
+`--lanes=1` differ; `scripts/motion-smoothness.ts` reports `flicker`). Cause: something reads
+layout once at mount (`clientWidth`) and a lane's iframe had no size yet. Move: render the window
+with `bench:export --range=a,b --lanes=4,1 --keep` and diff; make the read happen per frame or give
+the stage a fixed px size.

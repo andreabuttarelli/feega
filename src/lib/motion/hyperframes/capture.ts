@@ -10,6 +10,7 @@ import { GRAIN_TILE } from '../effects/registry';
 import { NOT_WEBKIT_UA, WEBKIT_UA } from '../engine';
 import { ERRORS } from '../custom/runtime';
 import { PARTICLE_STATE } from './particles';
+import { offStageClip } from './off-stage';
 import { POSE_ATTR, neutralised as neutralise, pathStyles as stylesOf, restingPose as resting } from './raster-key';
 export { contentStamp } from '../stamp';
 
@@ -44,7 +45,7 @@ type HtmlToImage = {
   getFontEmbedCSS: (node: HTMLElement) => Promise<string>;
 };
 
-function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, inline: typeof inlineMedia, shrink: typeof shrinkImage, paint: typeof paintSvg, plan: typeof planLayers, grainOn: typeof grainPixels, tileOf: typeof turbulenceTile, chain: typeof chainAffine, affine: typeof cssAffine, rgba: typeof cssRgba, join: typeof joinRasters, cssMasks: typeof readMasks, cssFilters: typeof readFilters, fitsUnder: typeof filtersFit, neutralised: typeof neutralise, pathStyles: typeof stylesOf, restingPose: typeof resting) {
+function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, inline: typeof inlineMedia, shrink: typeof shrinkImage, paint: typeof paintSvg, plan: typeof planLayers, grainOn: typeof grainPixels, tileOf: typeof turbulenceTile, chain: typeof chainAffine, affine: typeof cssAffine, rgba: typeof cssRgba, join: typeof joinRasters, cssMasks: typeof readMasks, cssFilters: typeof readFilters, fitsUnder: typeof filtersFit, neutralised: typeof neutralise, pathStyles: typeof stylesOf, restingPose: typeof resting, offStage: typeof offStageClip) {
   type Grain = { baseFrequency: number; seed: number; amount: number };
   const shrunk = new Map<string, Promise<string>>();
   let lib: Promise<unknown> | null = null;
@@ -76,7 +77,7 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
       }
     });
   };
-  const drawable = (node: Node) => !(node instanceof HTMLVideoElement) || (node.offsetParent !== null && node.readyState >= 2 && node.videoWidth > 0);
+  const drawable = (node: Node) => !offStage(node) && (!(node instanceof HTMLVideoElement) || (node.offsetParent !== null && node.readyState >= 2 && node.videoWidth > 0));
   const reason = (err: unknown) => {
     const src = (err as Event)?.target instanceof HTMLElement ? ((err as Event).target as HTMLImageElement).src?.slice(0, 80) : '';
     return err instanceof Event ? `a picture or video in this frame could not be drawn${src ? ` (${src})` : ''}` : String(err);
@@ -916,5 +917,5 @@ export function stampOf(html: string): string | null {
 
 export function captureScript(doc: { width: number; height: number }, stamp: string, lib: string): string {
   const cfg: RuntimeConfig = { request: CAPTURE_REQUEST, reply: CAPTURE_REPLY, lib, width: doc.width, height: doc.height, mediaTimeoutMs: MEDIA_TIMEOUT_MS, stamp, errorsKey: ERRORS, settle: Settle.Paint, grainTile: GRAIN_TILE, grainOffset: GRAIN_SAMPLE_OFFSET, webkitUa: WEBKIT_UA.source, notWebkitUa: NOT_WEBKIT_UA.source, particleState: PARTICLE_STATE, poseAttr: POSE_ATTR };
-  return `<script>(${captureRuntime.toString()})(${js(cfg)},(${freezeMasks.toString()}),(${inlineMedia.toString()}),(${shrinkImage.toString()}),(${paintSvg.toString()}),(${planLayers.toString()}),(${grainPixels.toString()}),(${turbulenceTile.toString()}),(${chainAffine.toString()}),(${cssAffine.toString()}),(${cssRgba.toString()}),(${joinRasters.toString()}),(${readMasks.toString()}),(${readFilters.toString()}),(${filtersFit.toString()}),(${neutralise.toString()}),(${stylesOf.toString()}),(${resting.toString()}));</script>`;
+  return `<script>(${captureRuntime.toString()})(${js(cfg)},(${freezeMasks.toString()}),(${inlineMedia.toString()}),(${shrinkImage.toString()}),(${paintSvg.toString()}),(${planLayers.toString()}),(${grainPixels.toString()}),(${turbulenceTile.toString()}),(${chainAffine.toString()}),(${cssAffine.toString()}),(${cssRgba.toString()}),(${joinRasters.toString()}),(${readMasks.toString()}),(${readFilters.toString()}),(${filtersFit.toString()}),(${neutralise.toString()}),(${stylesOf.toString()}),(${resting.toString()}),(${offStageClip.toString()}));</script>`;
 }

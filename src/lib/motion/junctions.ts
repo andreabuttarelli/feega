@@ -63,6 +63,7 @@ export function withJunctions(doc: MotionDoc): MotionDoc {
     }
     return {
       ...clip,
+      props: after && clip.component === 'Precomp' && !clip.props.loop ? { ...clip.props, hold: true } : clip.props,
       from: clip.from - before,
       durationInFrames: clip.durationInFrames + before + after,
       trimStart: Math.max(0, clip.trimStart - before),

@@ -581,7 +581,7 @@ function hotScript(script: string): string {
 }
 
 function zoomed(doc: MotionDoc, scale: number): string {
-  return scale === 1 ? '' : `#root{width:${doc.width}px;height:${doc.height}px;zoom:${scale}}`;
+  return `#root{width:${doc.width}px;height:${doc.height}px${scale === 1 ? '' : `;zoom:${scale}`}}`;
 }
 
 export function composeHtml(raw: ComposeInput): string {

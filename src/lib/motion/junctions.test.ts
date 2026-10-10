@@ -4,6 +4,7 @@ import { MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from './d
 import { addClip, addTrack, setJunction } from './timeline';
 import { TrackKind } from './components';
 import { TransitionKind } from './design';
+import { flattenComps, precompose } from './precomp';
 
 function ok(r: { ok: true; doc: MotionDoc } | { ok: false; error: string }): MotionDoc {
   if (!r.ok) {
@@ -82,6 +83,14 @@ describe('withJunctions', () => {
   it('the transition replaces the out edge of the first clip and the in edge of the second', () => {
     expect(clip(joined, 'b').transitionIn.kind).toBe(TransitionKind.None);
     expect(clip(joined, 'a').transitionOut.kind).toBe(TransitionKind.None);
+  });
+
+  it('a precomp that leaves through a transition holds its last frame across it instead of going empty at the cut', () => {
+    const doc = ok(precompose(cut(), ['a'], { comp: 'scene', clip: 'pa' }, 'Scene'));
+    const flat = flattenComps(withJunctions(ok(setJunction(doc, 'b', { kind: JunctionKind.Zoom, durationInFrames: 12 }))));
+    const inner = flat.tracks.flatMap((t) => t.clips as MotionClip[]).find((c) => c.id.startsWith('pa') && c.id.endsWith('a') && c.id !== 'pa')!;
+
+    expect(inner.from + inner.durationInFrames).toBe(96);
   });
 
   it('a doc without junctions is the same doc', () => {
