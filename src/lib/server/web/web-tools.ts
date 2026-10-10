@@ -121,6 +121,14 @@ export function createWebTools(deps: WebToolDeps): Record<string, Tool> {
   const views = counter(MAX_VIEWS_PER_TURN);
   const browses = counter(MAX_BROWSES_PER_TURN);
   const seenByCall = new Map<string, ImagePart[]>();
+  const storedCopy = new Map<string, string>();
+  const keepCopies = (images: ViewOutcome['images']) => {
+    for (const image of images) {
+      if ('path' in image) {
+        storedCopy.set(image.url, image.path);
+      }
+    }
+  };
   const avoided = (url: string) => deps.avoid?.has(url) ?? false;
 
   const glance = async (urls: string[], callId: string) => {
@@ -213,6 +221,7 @@ export function createWebTools(deps: WebToolDeps): Record<string, Tool> {
         }
         const seen = await view(urls, input.detail ?? ViewDetail.High, toolCallId);
         seenByCall.set(toolCallId, seen.parts);
+        keepCopies(seen.images);
         return { ok: true, images: seen.images };
       },
       toModelOutput: ({ toolCallId, output }) => withImages(output, seenByCall.get(toolCallId))
@@ -226,7 +235,10 @@ export function createWebTools(deps: WebToolDeps): Record<string, Tool> {
         if ((deps.rejections ?? 0) >= MAX_REJECTED_ROUNDS) {
           return { ok: false, error: `the user rejected ${MAX_REJECTED_ROUNDS} rounds of references in a row: stop asking, choose the closest ones yourself from what they said and explain why` };
         }
-        const candidates = input.candidates.filter((c) => !deps.shown?.has(c.id) && !deps.shown?.has(c.image));
+        const candidates = input.candidates.filter((c) => !deps.shown?.has(c.id) && !deps.shown?.has(c.image)).map(({ preview: _claimed, ...c }) => {
+          const preview = storedCopy.get(c.image);
+          return preview ? { ...c, preview } : c;
+        });
         if (candidates.length < MIN_CANDIDATES) {
           return { ok: false, error: 'the user already saw these references: search for new ones before asking' };
         }
@@ -376,6 +388,7 @@ export function createWebTools(deps: WebToolDeps): Record<string, Tool> {
         }
         const seen = await frames(source, toolCallId);
         seenByCall.set(toolCallId, seen.parts);
+        keepCopies(seen.images);
         return { ok: true, images: seen.images };
       },
       toModelOutput: ({ toolCallId, output }) => withImages(output, seenByCall.get(toolCallId))

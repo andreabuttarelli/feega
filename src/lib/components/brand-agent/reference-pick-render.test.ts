@@ -39,3 +39,13 @@ describe('reference pick card', () => {
     expect(body).not.toContain('data-testid="pick-reject"');
   });
 });
+
+describe('reference pick pictures', () => {
+  it('shows the stored copy of a candidate when there is one, the source otherwise', () => {
+    const stored = { question: 'Which?', candidates: [{ id: 'a', image: 'https://scontent.cdninstagram.com/a.jpg', preview: 'o/p1/web-views/v1/0.jpg' }, { id: 'b', image: 'https://i.pinimg.com/b.jpg' }], min: 1, max: 2 };
+    const body = render(ReferencePick, { props: { card: { ask: stored, state: PickState.Waiting, answer: null }, stored: (path: string) => `/p/p1/c/c1/${path}`, onpick: () => {}, onreject: () => {} } }).body;
+
+    expect(body).toContain('src="/p/p1/c/c1/o/p1/web-views/v1/0.jpg"');
+    expect(body).toContain('src="https://i.pinimg.com/b.jpg"');
+  });
+});

@@ -2,7 +2,7 @@
   import { _ } from 'svelte-i18n';
   import { Mark, NEXT_MARK, PickState, type PickCard } from '$lib/reference-pick';
 
-  let { card, onpick, onreject }: { card: PickCard; onpick: (marks: Record<string, Mark>, note: string) => void; onreject: (query: string, avoidAll: boolean) => void } = $props();
+  let { card, stored = () => null, onpick, onreject }: { card: PickCard; stored?: (path: string) => string | null; onpick: (marks: Record<string, Mark>, note: string) => void; onreject: (query: string, avoidAll: boolean) => void } = $props();
 
   let marks = $state<Record<string, Mark>>({});
   let note = $state('');
@@ -62,7 +62,7 @@
           disabled={!open}
           onclick={() => toggle(candidate.id)}
         >
-          <img src={candidate.image} alt={candidate.title ?? ''} loading="lazy" referrerpolicy="no-referrer" />
+          <img src={(candidate.preview && stored(candidate.preview)) || candidate.image} alt={candidate.title ?? ''} loading="lazy" referrerpolicy="no-referrer" />
           {#if mark !== Mark.Neutral}
             <span class="badge" aria-hidden="true">
               {#if mark === Mark.Follow}

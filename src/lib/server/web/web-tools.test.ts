@@ -258,6 +258,22 @@ describe('ask_reference_pick', () => {
     expect(spent()).toBe(0);
   });
 
+  it('a candidate the agent looked at carries its stored copy, because social CDNs refuse to be shown elsewhere', async () => {
+    const view = vi.fn(async () => ({ images: [{ url: 'https://scontent.cdninstagram.com/a.jpg', path: 'o/p/web-views/v1/0.jpg', width: 10, height: 10 }], parts: [] }));
+    const frames = vi.fn(async () => ({ images: [{ url: 'https://p16.tiktokcdn.com/c.jpg', path: 'o/p/web-views/f1/cover.jpg', width: 10, height: 10 }], parts: [] }));
+    const { run } = setup({ view, frames });
+    await run('view_images', { urls: ['https://scontent.cdninstagram.com/a.jpg'] }, 'v1');
+    await run('view_video_frames', { cover: 'https://p16.tiktokcdn.com/c.jpg' }, 'f1');
+
+    const out = await run('ask_reference_pick', { question: 'Which?', candidates: [{ id: 'a', image: 'https://scontent.cdninstagram.com/a.jpg' }, { id: 'b', image: 'https://p16.tiktokcdn.com/c.jpg' }, { id: 'c', image: 'https://i.pinimg.com/c.jpg', preview: 'x/y/web-views/z/0.jpg' }] });
+
+    expect(out.candidates).toEqual([
+      { id: 'a', image: 'https://scontent.cdninstagram.com/a.jpg', preview: 'o/p/web-views/v1/0.jpg' },
+      { id: 'b', image: 'https://p16.tiktokcdn.com/c.jpg', preview: 'o/p/web-views/f1/cover.jpg' },
+      { id: 'c', image: 'https://i.pinimg.com/c.jpg' }
+    ]);
+  });
+
   it('a new search after a rejection never shows pins the user already saw', async () => {
     const pin = (id: string) => ({ id, url: `https://www.pinterest.com/pin/${id}/`, title: id, description: null, image: { url: `https://i.pinimg.com/${id}.jpg`, width: 10, height: 10 }, colour: null, link: null, pinner: 'p', board: null });
     const search = vi.fn(async () => ({ ok: true as const, pins: [pin('a'), pin('b'), pin('c')], requests: 1, costUsd: 0 }));
