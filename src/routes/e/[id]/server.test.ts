@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('$env/dynamic/public', () => ({ env: { PUBLIC_SUPABASE_URL: 'https://sb.test' } }));
+const scheduleRebuild = vi.fn();
+vi.mock('$lib/server/motion/embed-rebuild-db', () => ({ scheduleRebuild }));
 
 const { GET } = await import('./+server');
 const { Chunk, chunkUrl } = await import('$lib/motion/hyperframes/runtime-chunks');
@@ -13,6 +15,21 @@ async function open(id: string, body: string | null) {
 }
 
 describe('/e/[id]', () => {
+  it('a legacy page is served as it is and rebuilt in the background, a source page is not', async () => {
+    const legacy = `<!doctype html><html><head><title>Saturn</title></head><body><script>(function playerMain(cfg){})(${JSON.stringify({ html: '<p>clip</p>', width: 10, height: 10, duration: 1, playback: 'autoplay', loop: false })});</script></body></html>`;
+
+    const served = await open(NODE, legacy);
+    expect(served.status).toBe(200);
+    expect(scheduleRebuild).toHaveBeenCalledWith(NODE, 'https://oh.feega.app');
+
+    scheduleRebuild.mockClear();
+    const { embedSource } = await import('$lib/motion/interactive/bundle');
+    const { MotionFormat, newMotionDoc } = await import('$lib/motion/doc');
+    const { FEEGA_TOKENS } = await import('$lib/motion/brand');
+    await open(NODE, await embedSource({ doc: newMotionDoc(MotionFormat.Landscape), tokens: FEEGA_TOKENS, assetUrls: {}, title: 'Clip', fetchBlob: vi.fn() }));
+    expect(scheduleRebuild).not.toHaveBeenCalled();
+  });
+
   it('serves the published bundle as a page anyone can frame', async () => {
     const res = await open(NODE, '<html>clip</html>');
 
