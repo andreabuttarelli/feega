@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { generateText, stepCountIs, type Tool } from 'ai';
 import { MockLanguageModelV4 } from 'ai/test';
-import { MAX_BROWSES_PER_TURN, MAX_PINTEREST_PER_TURN, MAX_SEARCHES_PER_TURN, MAX_SHOTS_PER_TURN, MAX_SOCIAL_PER_TURN, REFERENCE_TOOLS, WEB_GUIDANCE, WEB_TOOLS, createWebTools, type WebToolDeps } from './web-tools';
+import { MAX_APP_BROWSES_PER_TURN, MAX_BROWSES_PER_TURN, MAX_PINTEREST_PER_TURN, MAX_SEARCHES_PER_TURN, MAX_SHOTS_PER_TURN, MAX_SOCIAL_PER_TURN, REFERENCE_TOOLS, WEB_GUIDANCE, WEB_TOOLS, createWebTools, type WebToolDeps } from './web-tools';
 import { ShotView } from './screenshot';
 import { MAX_REJECTED_ROUNDS } from '$lib/reference-pick';
 import { StoreKind } from './store';
@@ -9,6 +9,7 @@ import { ViewDetail } from './view-images';
 import { StepKind } from './browse';
 import { SocialPlatform } from './social-search';
 import { ItemKind } from './social-posts';
+import { SessionUse } from './app-browse';
 
 type Exec = (input: unknown, options: { toolCallId: string }) => Promise<Record<string, unknown>>;
 
@@ -245,6 +246,56 @@ describe('web tools', () => {
     const recorded = result.steps[0].toolResults[0].output;
     expect(recorded).toEqual({ ok: true, images: [{ url: 'https://a.example/p.png', path: 'o/p/web-views/c/0.jpg', width: 10, height: 10 }] });
     expect(JSON.stringify(recorded)).not.toContain('AAAA');
+  });
+
+  it('app_browse shows the app screens to the model, returns their assets and UI, and spends what the browser cost', async () => {
+    const browse = vi.fn(async () => ({
+      ok: true as const,
+      url: 'https://app.example/dashboard',
+      session: SessionUse.Fresh,
+      pages: [{ url: 'https://app.example/dashboard', ok: true as const, shot: 0, ui: { title: 'D', elements: [] } }],
+      steps: [],
+      shots: [{ jpeg: Buffer.from('jpg'), assetId: 'a1' }],
+      costUsd: 0.004
+    }));
+    const { run, tools, spent } = setup({ app: { browse, forget: vi.fn() } });
+
+    const out = await run('app_browse', { login_url: 'https://app.example/login', email: 'e@x.y', password: 'p', pages: ['/dashboard'] }, 'ab1');
+    const model = await (tools.app_browse.toModelOutput as (o: unknown) => Promise<{ type: string; value: { type: string; mediaType?: string }[] }>)({ toolCallId: 'ab1', input: {}, output: out });
+
+    expect(out).toMatchObject({ ok: true, session: 'fresh', asset_ids: ['a1'], pages: [{ ui: { title: 'D' } }] });
+    expect(model.value.filter((p) => p.type === 'file')).toHaveLength(1);
+    expect(spent()).toBeCloseTo(0.004);
+  });
+
+  it('a failed login still shows its picture and its cost', async () => {
+    const browse = vi.fn(async () => ({ ok: false as const, error: 'login failed', shots: [{ jpeg: Buffer.from('jpg'), assetId: null }], costUsd: 0.002 }));
+    const { run, tools, spent } = setup({ app: { browse, forget: vi.fn() } });
+
+    const out = await run('app_browse', {}, 'ab2');
+    const model = await (tools.app_browse.toModelOutput as unknown as (o: unknown) => Promise<{ value: { type: string }[] }>)({ toolCallId: 'ab2', input: {}, output: out });
+
+    expect(out).toMatchObject({ ok: false, error: 'login failed' });
+    expect(model.value.filter((p) => p.type === 'file')).toHaveLength(1);
+    expect(spent()).toBeCloseTo(0.002);
+  });
+
+  it(`caps app_browse at ${MAX_APP_BROWSES_PER_TURN} per turn`, async () => {
+    const browse = vi.fn(async () => ({ ok: false as const, error: 'x', shots: [], costUsd: 0 }));
+    const { run } = setup({ app: { browse, forget: vi.fn() } });
+    for (let i = 0; i < MAX_APP_BROWSES_PER_TURN; i++) {
+      await run('app_browse', {}, `c${i}`);
+    }
+
+    expect(await run('app_browse', {}, 'last')).toMatchObject({ ok: false, error: expect.stringContaining('limit') });
+  });
+
+  it('app_forget drops the remembered test account', async () => {
+    const forget = vi.fn(async () => undefined);
+    const { run } = setup({ app: { browse: vi.fn(), forget } });
+
+    expect(await run('app_forget', {})).toEqual({ ok: true });
+    expect(forget).toHaveBeenCalled();
   });
 });
 
