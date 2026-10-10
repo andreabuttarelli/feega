@@ -1,4 +1,6 @@
 import { THREE_GUIDANCE } from './three-guidance';
+import { GUIDES, guidesFor, type GuideTopic } from './guides';
+import { lintAdvice } from '$lib/motion/custom/lint';
 import { tool, type Tool, type ToolExecutionOptions } from 'ai';
 import { addShader, removeShader, setShader } from '$lib/motion/shaders/ops';
 import type { EffectStore } from '$lib/server/effects/store';
@@ -40,7 +42,7 @@ import { referenceLookSchema } from '$lib/motion/reference-look-model';
 import { MAX_FRAMES_PER_VIEW, MAX_VIEWS_PER_TURN, VIEW_FRAMES, withFrames, type Frame, type Reference } from './frames';
 import { contentEnd, fitDuration } from '$lib/motion/fit-duration';
 import { blocking, docProblems, frameProblems, softPictures, type FrameStat, type Pixels, type QualityProblem } from '$lib/motion/direction';
-import { CheckState, ComponentMode, MAX_CSS, MAX_HTML, MAX_JS, SOURCE_FILES, checkState, modeOf, propsSchemaSchema, sourceHash, type CustomComponent } from '$lib/motion/custom/component';
+import { CheckState, ComponentMode, MAX_CSS, MAX_HTML, MAX_JS, SOURCE_FILES, checkState, modeOf, propsSchemaSchema, sourceHash, type CustomComponent, type CustomSource } from '$lib/motion/custom/component';
 import { patchComponent, recordCheck, removeComponent, writeComponent } from '$lib/motion/custom/ops';
 import { RECREATE_STATES, UI_KINDS, UI_KIT, recreatedStyle, recreatedUi, type UiStructure } from '$lib/motion/ui-kit/kit';
 import { MORPH_KINDS, DEFAULT_REEL } from '$lib/motion/ui-morph/reel';
@@ -113,7 +115,7 @@ import { STYLES, styleOf } from '$lib/motion/style';
 import { MOTION_STYLES } from '$lib/motion/style-model';
 import { unitOf, propsOwner, shownKeyframes, shownMask, shownOffset, shownRecord, storedMask, storedOffset, storedRecord, toShown, toStored, type Owner } from '$lib/motion/units';
 
-export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number; effectFailures?: number; gate?: QualityProblem[]; references?: Reference[] };
+export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number; guides?: GuideTopic[]; effectFailures?: number; gate?: QualityProblem[]; references?: Reference[] };
 
 export type CheckResult = { ok: boolean; problems: string[]; frames: Frame[] };
 
@@ -505,20 +507,28 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     session.doc = result.doc;
     session.edits.push(what);
     const version = result.doc.components[name].version;
+    const advice = adviceFor(result.doc.components[name].source);
 
     const check = await deps.check(callId, result.doc, name);
     if (!check) {
-      return { ok: true, version, check: CheckState.Unchecked, note: 'no editor preview answered: the editor checks it when opened, and export waits for it' };
+      return { ok: true, version, check: CheckState.Unchecked, note: 'no editor preview answered: the editor checks it when opened, and export waits for it', ...advice };
     }
     const state = check.ok ? CheckState.Passed : CheckState.Failed;
     const recorded = recordCheck(session.doc, name, { hash: sourceHash(result.doc.components[name]), state, problems: check.problems });
     session.doc = recorded.ok ? recorded.doc : session.doc;
     if (check.ok) {
-      return { ok: true, version, check: state };
+      return { ok: true, version, check: state, ...advice };
     }
     session.frames.set(callId, check.frames);
     const shown = check.frames.length ? ' The two frames that should be identical are attached as images.' : '';
-    return { ok: false, error: `${name} v${version} is saved but failed the seek-determinism check, so it cannot be exported:\n- ${check.problems.join('\n- ')}\nFix it with patch_component: build every change on tl from props and time only.${shown}` };
+    return { ok: false, error: `${name} v${version} is saved but failed the seek-determinism check, so it cannot be exported:\n- ${check.problems.join('\n- ')}\nFix it with patch_component: build every change on tl from props and time only.${shown}`, ...advice };
+  }
+
+  function adviceFor(source: CustomSource) {
+    const warnings = lintAdvice(source);
+    const topics = guidesFor(source, session.guides ?? []);
+    session.guides = [...(session.guides ?? []), ...topics];
+    return { ...(warnings.length ? { warnings } : {}), ...(topics.length ? { guide: topics.map((t) => GUIDES[t].text).join('\n\n') } : {}) };
   }
 
   const analysisOf = (assetId: string) => (deps.analysis ? deps.analysis(assetId) : Promise.resolve(null));
