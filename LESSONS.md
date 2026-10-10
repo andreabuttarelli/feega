@@ -2737,3 +2737,11 @@ Signal: a page composed by `vite-node` (or by an older deploy) loads a runtime c
 server answers 404. The hash covers code built from `fn.toString()`, which differs between the
 minified server build and unminified `vite-node`. Move: compose hosted pages and serve chunks from
 the same build (`/e/[id]` does); in local harnesses serve the chunks the harness itself wrote.
+
+## Reference pictures from Instagram or TikTok show as broken images in the chat
+
+Signal: `ask_reference_pick` returns ok, the grid has titles and empty frames; the same urls work
+for the server (`view_images` stored them). Cause: social CDNs (`cdninstagram`, `fbcdn`,
+`tiktokcdn`) refuse to be embedded on another site, and their urls are signed and expire. Move:
+show the stored, screened copy (`candidate.preview` → `/web-views/...`), never the CDN url; a
+check that only reads tool results misses it, the screenshot of the grid catches it.
