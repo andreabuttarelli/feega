@@ -11,6 +11,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 import 'progress.dart';
 import 'protocol.dart';
+import 'story_stage.dart';
 
 const _tiltPlatforms = {TargetPlatform.android, TargetPlatform.iOS};
 
@@ -69,7 +70,6 @@ class _FeegaMotionState extends State<FeegaMotion> with WidgetsBindingObserver {
   bool _foreground = true;
   bool _shown = false;
   int _story = 0;
-  double _stageTop = 0;
   double? _viewportHeight;
   double? _aspect;
   Playback? _playback;
@@ -253,15 +253,8 @@ class _FeegaMotionState extends State<FeegaMotion> with WidgetsBindingObserver {
     final story = _story > 0;
     final progress = story ? storyProgress(own, viewport.height, viewport) : travelProgress(own, viewport);
     _send(HostMessage.progress(progress, visible: isVisible(own, viewport)));
-    if (!story) {
-      return;
-    }
-    final top = stageOffset(own, viewport.height, viewport);
-    if (top != _stageTop || viewport.height != _viewportHeight) {
-      setState(() {
-        _stageTop = top;
-        _viewportHeight = viewport.height;
-      });
+    if (story && viewport.height != _viewportHeight) {
+      setState(() => _viewportHeight = viewport.height);
     }
   }
 
@@ -280,10 +273,7 @@ class _FeegaMotionState extends State<FeegaMotion> with WidgetsBindingObserver {
       child: LayoutBuilder(builder: (context, constraints) {
         if (_story > 0) {
           final stage = _viewportHeight ?? MediaQuery.sizeOf(context).height;
-          return SizedBox(
-            height: _story * stage,
-            child: Stack(children: [Positioned(top: _stageTop, left: 0, right: 0, height: stage, child: _player())]),
-          );
+          return StoryStage(stage: stage, length: _story, scroll: Listenable.merge([_position, widget.scrollController]), child: _player());
         }
         if (constraints.hasBoundedHeight) {
           return SizedBox.expand(child: _player());
