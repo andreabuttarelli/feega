@@ -9,6 +9,7 @@ import { modeOf, ProjectMode } from '$lib/project-mode';
 import { UNCENSORED_LOCK_TEXT, UncensoredLock, uncensoredSectionVisible } from '$lib/uncensored-lock';
 import { verifyUserAge } from '$lib/server/uncensored-workspace/workspace';
 import { SWITCH_REFUSAL_TEXT, switchProjectMode } from '$lib/server/uncensored-workspace/mode-switch';
+import { appAccountStore, readAppAccount } from '$lib/server/repos/app-accounts';
 
 const HTTP_BAD_REQUEST = 400;
 const HTTP_FORBIDDEN = 403;
@@ -61,7 +62,8 @@ export const load: PageServerLoad = async ({ parent, locals }) => {
     project: { id: project.id, name: project.name, mode: modeOf(project.mode) },
     uncensored: { lock: uncensored.lock, visible: uncensoredSectionVisible(uncensored.lock), text: UNCENSORED_LOCK_TEXT[uncensored.lock as UncensoredLock] },
     linkedBrand: brand ? { id: brand.id, name: brand.name } : null,
-    orgBrands: orgBrands.map((b) => ({ id: b.id, name: b.name }))
+    orgBrands: orgBrands.map((b) => ({ id: b.id, name: b.name })),
+    appAccount: await readAppAccount(db, { orgId: org.id, projectId: project.id })
   };
 };
 
@@ -120,6 +122,12 @@ export const actions: Actions = {
       throw redirect(303, back);
     }
     return { linked: true };
+  },
+
+  forgetAppAccount: async (event) => {
+    const { db, orgId, projectId } = await ownedProject(event);
+    await appAccountStore(db, { orgId, projectId, actor: { kind: 'user', id: await userIdOf(event) } }).forget();
+    return { forgotten: true };
   },
 
   unlinkBrand: async (event) => {

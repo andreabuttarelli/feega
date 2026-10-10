@@ -65,6 +65,22 @@
   </div>
 </Panel>
 
+<Panel
+  title="Test app account"
+  description="To show your app, the chat asks for a TEST login (url, email, password) and logs in to photograph its screens. The AI sees these credentials: never give a real account."
+>
+  {#if data.appAccount}
+    <div class="flex flex-wrap items-center gap-2 text-sm" data-testid="app-account">
+      <span>{data.appAccount.email} on {data.appAccount.loginUrl}</span>
+      <form method="POST" action="?/forgetAppAccount" use:enhance>
+        <Button variant="ghost" type="submit" data-testid="app-account-forget">Forget account</Button>
+      </form>
+    </div>
+  {:else}
+    <p class="text-sm">{form?.forgotten ? 'Forgotten.' : 'None saved.'}</p>
+  {/if}
+</Panel>
+
 {#if data.uncensored.visible || inUncensored}
   <Panel title="Uncensored mode" description="Models without built-in content filters, for adults (18+). Outputs stay in this project: never shared, published, scheduled or promoted.">
     <div class="flex flex-col gap-3 text-sm" data-testid="uncensored-switch">

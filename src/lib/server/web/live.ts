@@ -10,7 +10,9 @@ import { CHAT_ATTACHMENT_MAX_BYTES } from '$lib/chat-attachments';
 import type { ProjectMode } from '$lib/project-mode';
 import { SearchEngine, exaSearch, openRouterSearch, searchEngineOf, type SearchPort } from './search';
 import { readPage } from './read-page';
-import { browserless, localBrowser, type BrowserlessUse, type OpenBrowser } from './browser';
+import { browserless, localBrowser, type BrowserlessUse, type OpenAppBrowser } from './browser';
+import { appBrowse } from './app-browse';
+import { appAccountStore } from '$lib/server/repos/app-accounts';
 import { browse } from './browse';
 import { directFetch, exaContents, renderedSite, secondarySources, type SiteStrategy } from './site-fetch';
 import { screenshotPage } from './screenshot';
@@ -26,7 +28,7 @@ import type { Actor } from '$lib/server/repos/actor';
 import type { ScreenOutcome } from '$lib/server/moderation/screen';
 import type { AssetImport } from '$lib/server/motion/motion-tools';
 import type { MotionAsset } from '$lib/server/motion/editor';
-import type { ImageImport, PinterestPort, PinterestRead, ProductsImport, WebToolDeps } from './web-tools';
+import type { AppPort, ImageImport, PinterestPort, PinterestRead, ProductsImport, WebToolDeps } from './web-tools';
 
 export type WebScope = { orgId: string; userId: string; projectId: string; brandId?: string | null; mode: ProjectMode };
 
@@ -127,7 +129,7 @@ async function connectBrowserless(endpoint: string) {
   return puppeteer.connect({ browserWSEndpoint: endpoint });
 }
 
-export function liveBrowser(scope: Metered): OpenBrowser | null {
+export function liveBrowser(scope: Metered): OpenAppBrowser | null {
   const key = env.BROWSERLESS_API_KEY?.trim();
   if (key) {
     const meter = (use: BrowserlessUse) => logged(scope, { label: BROWSERLESS_LABEL, provider: 'browserless', model: BROWSERLESS_MODEL, ms: use.ms, usd: use.usd, units: use.units });
@@ -161,7 +163,7 @@ export function liveSiteChain(scope: Metered): SiteStrategy[] {
   ];
 }
 
-function browser(db: Db, scope: WebScope, open: OpenBrowser): NonNullable<WebToolDeps['browse']> {
+function browser(db: Db, scope: WebScope, open: OpenAppBrowser): NonNullable<WebToolDeps['browse']> {
   return async (url, steps, callId) => {
     const seen = await browse(url, steps, open);
     if (!seen.ok) {
@@ -179,6 +181,28 @@ function browser(db: Db, scope: WebScope, open: OpenBrowser): NonNullable<WebToo
       })
     );
     return { ...seen, shots };
+  };
+}
+
+export type KeepShot = (jpeg: Buffer, name: string) => Promise<string | null>;
+
+export function attachedShot(db: Db, scope: WebScope): KeepShot {
+  return (jpeg, name) => inlineAttachment(db, scope, { data: jpeg.toString('base64'), name, mimeType: 'image/jpeg' }, ATTACHMENT_PORTS).then(
+    (saved) => saved.assetId,
+    () => null
+  );
+}
+
+export function appPort(db: Db, scope: WebScope, open: OpenAppBrowser, keep: KeepShot): AppPort {
+  const accounts = appAccountStore(db, { orgId: scope.orgId, projectId: scope.projectId, actor: { kind: 'agent', id: scope.userId } });
+  return {
+    browse: async (input) => {
+      const seen = await appBrowse(input, { open, accounts });
+      const host = URL.canParse(seen.ok ? seen.url : '') ? new URL(seen.ok ? seen.url : '').hostname : 'app';
+      const shots = await Promise.all(seen.shots.map(async (jpeg, i) => ({ jpeg, assetId: await keep(jpeg, `${host}-${i + 1}.jpg`) })));
+      return { ...seen, shots };
+    },
+    forget: () => accounts.forget()
   };
 }
 
@@ -200,7 +224,7 @@ function livePinterest(scope: Metered): PinterestPort | undefined {
   return pinterestPort((path) => billed(() => scrapeCreatorsGet(path)));
 }
 
-export function liveWebDeps(db: Db, scope: WebScope, spend: (usd: number) => void): WebToolDeps {
+export function liveWebDeps(db: Db, scope: WebScope, spend: (usd: number) => void, keep: KeepShot = attachedShot(db, scope)): WebToolDeps {
   const open = liveBrowser(scope);
   return {
     view: viewer(db, scope),
@@ -210,6 +234,7 @@ export function liveWebDeps(db: Db, scope: WebScope, spend: (usd: number) => voi
     shoot: serverFramesOpen() ? (url, view) => screenshotPage(url, view, chromiumPage) : undefined,
     browse: open ? browser(db, scope, open) : undefined,
     pinterest: livePinterest(scope),
+    app: open ? appPort(db, scope, open, keep) : undefined,
     spend
   };
 }
