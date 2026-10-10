@@ -207,6 +207,14 @@ describe('ask_reference_pick', () => {
     expect((out.pins as { id: string }[]).map((p) => p.id)).toEqual(['c']);
   });
 
+  it('a new card never repeats a picture the user already saw', async () => {
+    const view = vi.fn(async () => ({ images: [], parts: [] })) as never;
+    const { run } = setup({ view, shown: new Set(['pin0', 'https://i.pinimg.com/1.jpg']) });
+
+    const out = await run('ask_reference_pick', { question: 'Which?', candidates });
+    expect((out.candidates as { id: string }[]).map((c) => c.id)).toEqual(['pin2', 'pin3']);
+  });
+
   it('asks once per turn, and stops asking after the user rejected too many rounds in a row', async () => {
     const view = vi.fn(async () => ({ images: [], parts: [] })) as never;
     const { run } = setup({ view });

@@ -6,7 +6,7 @@ import { ShotView, type Shot } from './screenshot';
 import { MAX_VIEWED, ViewDetail, type ImagePart, type ViewOutcome } from './view-images';
 import { STORE_ITEMS_DEFAULT, STORE_ITEMS_MAX, type StoreRead } from './store';
 import { PINTEREST_MAX_PINS, type Pin, type PinsFound } from './pinterest';
-import { ASK_REFERENCE_PICK, MAX_CANDIDATES, MAX_REJECTED_ROUNDS, pickAsk, pickAskSchema } from '$lib/reference-pick';
+import { ASK_REFERENCE_PICK, MAX_CANDIDATES, MAX_REJECTED_ROUNDS, MIN_CANDIDATES, pickAsk, pickAskSchema } from '$lib/reference-pick';
 import { BROWSE_DEADLINE_MS, BROWSE_MAX_SHOTS, BROWSE_MAX_STEPS, browseStepSchema, type BrowseStep, type StepReport } from './browse';
 
 export type ImageImport = { ok: true; assetId: string; width: number | null; height: number | null } | { ok: false; error: string };
@@ -203,7 +203,11 @@ export function createWebTools(deps: WebToolDeps): Record<string, Tool> {
         if ((deps.rejections ?? 0) >= MAX_REJECTED_ROUNDS) {
           return { ok: false, error: `the user rejected ${MAX_REJECTED_ROUNDS} rounds of references in a row: stop asking, choose the closest ones yourself from what they said and explain why` };
         }
-        return picks() ? { ok: true, ...pickAsk(input) } : limitReached('reference pick', MAX_PICKS_PER_TURN);
+        const candidates = input.candidates.filter((c) => !deps.shown?.has(c.id) && !deps.shown?.has(c.image));
+        if (candidates.length < MIN_CANDIDATES) {
+          return { ok: false, error: 'the user already saw these references: search for new ones before asking' };
+        }
+        return picks() ? { ok: true, ...pickAsk({ ...input, candidates }) } : limitReached('reference pick', MAX_PICKS_PER_TURN);
       }
     });
   }
