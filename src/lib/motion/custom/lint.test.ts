@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lintSource } from './lint';
+import { lintAdvice, lintSource } from './lint';
 import { ComponentMode } from './component';
 
 const ok = { html: '<div class="node"><span class="port"></span></div>', css: '.node{width:200px;background:#111}', js: 'tl.from(root.querySelector(".node"),{scale:0,duration:0.4,ease:"back.out"});' };
@@ -130,6 +130,40 @@ describe('a live component', () => {
 describe('game engines', () => {
   it.each(['LittleJS.engineInit(() => {}, () => {}, () => {}, () => {}, () => {});', 'const k = kaplay();'])('need a live component: %s', (js) => {
     expect(problemsOf({ js }).join(' ')).toContain('declare the component live');
+    expect(lintSource({ ...ok, js }, ComponentMode.Live)).toEqual([]);
+  });
+});
+
+const SCENE = 'const canvas = root.querySelector("canvas"); const renderer = three.renderer(canvas); const scene = new THREE.Scene(); const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100); tl.to({}, { duration, onUpdate() { renderer.render(scene, camera); } }); onDestroy(() => renderer.dispose());';
+
+const adviceOf = (js: string) => lintAdvice({ html: '<canvas></canvas>', css: '', js });
+
+describe('3D performance advice', () => {
+  it('stays quiet on a scene built the way the guide says', () => {
+    expect(adviceOf(SCENE)).toEqual([]);
+  });
+
+  it.each([
+    [SCENE.replace('three.renderer(canvas)', 'new THREE.WebGLRenderer({ canvas })'), 'WebGLRenderer'],
+    [SCENE + ' renderer.setPixelRatio(2);', 'setPixelRatio'],
+    [SCENE + ' const other = three.renderer(root.querySelector("canvas + canvas"));', 'one renderer'],
+    [SCENE.replace(' onDestroy(() => renderer.dispose());', ''), 'dispose'],
+    [SCENE + ' renderer.shadowMap.enabled = true; scene.add(new THREE.PointLight(), new THREE.SpotLight(), new THREE.DirectionalLight());', 'shadow']
+  ])('warns on %s', (js, word) => {
+    expect(adviceOf(js).join('\n')).toContain(word);
+  });
+
+  it('a shadow map with one light and ambient fill is fine', () => {
+    expect(adviceOf(SCENE + ' renderer.shadowMap.enabled = true; scene.add(new THREE.AmbientLight(), new THREE.DirectionalLight());')).toEqual([]);
+  });
+
+  it('a component without WebGL gets no advice', () => {
+    expect(adviceOf('tl.from(root, { opacity: 0 });')).toEqual([]);
+  });
+
+  it('THREE.Clock is refused in a deterministic component and allowed in a live one', () => {
+    const js = 'const clock = new THREE.Clock();';
+    expect(problemsOf({ js }).join('\n')).toContain('THREE.Clock');
     expect(lintSource({ ...ok, js }, ComponentMode.Live)).toEqual([]);
   });
 });
