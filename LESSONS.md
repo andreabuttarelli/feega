@@ -241,6 +241,14 @@ un `ImageBitmap` di un canvas WebGL è pigro: la lettura dal GPU (e l'attesa del
 si paga al `texImage2D` nell'host, quindi si sposta fra "output" e "composite". Mossa: A/B
 interlacciato (prima/dopo alternati, 3 giri, carico macchina alto) sul ms/frame totale.
 
+### Uno stallo WebKit che cade sul primo `await` GPU di ogni scatto, qualunque esso sia
+Segnale: ~450 ms che si spostano fra `createImageBitmap`, `texImage2D` nell'host e un rAF
+aggiunto; il lavoro misurato dello scatto (raster, three.js) è di pochi ms. È WebKit che dipinge
+la pagina viva della lane, che nessuno guarda. Mossa: un'attesa di 600 ms fra gli scatti — se lo
+stallo sparisce è lavoro in background, non dello scatto; la lane in WebKit va
+`visibility: hidden` (`laneVisibility`). In Chromium no: ferma il rAF di un iframe cross-origin
+nascosto e `Settle.Paint` resta appeso.
+
 ### Chromium a 4 lane perde i layer 3D di una lane
 Segnale: nell'mp4 Chromium 4 lane un frame su 4 è senza sfere/oggetti 3D (PSNR 19 dB contro
 WebKit, periodico); console `Too many active WebGL contexts. Oldest context will be lost.`

@@ -1,5 +1,7 @@
 import { CAPTURE_REPLY, type CaptureReply } from './capture';
 import { previewDriver, type ShotRequest } from './preview-driver';
+import { laneVisibility } from '../export/lanes';
+import { engineOf } from '../engine';
 
 type Player = HTMLElement & { seek: (t: number) => void; play: () => void; pause: () => void; iframeElement: HTMLIFrameElement };
 
@@ -12,6 +14,7 @@ export async function mountCapturePlayer(host: HTMLElement, html: string): Promi
   el.setAttribute('assets-loading-ui', 'none');
   el.setAttribute('disable-click-to-play', '');
   el.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none';
+  el.style.visibility = laneVisibility(engineOf(navigator.userAgent));
   host.appendChild(el);
 
   const driver = previewDriver({

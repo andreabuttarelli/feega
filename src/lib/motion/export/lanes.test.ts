@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { laneCount, shootInLanes, type Shooter } from './lanes';
+import { laneCount, laneVisibility, shootInLanes, type Shooter } from './lanes';
 import { Engine } from '../engine';
 
 const tick = () => new Promise((r) => setTimeout(r, 0));
@@ -88,5 +88,15 @@ describe('laneCount', () => {
 
   it('WebKit runs the lane iframes on one thread: one lane, however many cores', () => {
     expect(laneCount({ cores: 8, memoryGb: 8, mobile: false }, Engine.WebKit)).toBe(1);
+  });
+});
+
+describe('laneVisibility', () => {
+  it('WebKit hides a shooting lane: painting the live page stalls every frame behind it', () => {
+    expect(laneVisibility(Engine.WebKit)).toBe('hidden');
+  });
+
+  it('Chromium keeps it visible: it stops animation frames in a hidden cross-origin iframe', () => {
+    expect(laneVisibility(Engine.Other)).toBe('visible');
   });
 });

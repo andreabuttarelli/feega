@@ -4,7 +4,8 @@
   import { CAPTURE_REPLY, FrameFormat, type CaptureReply, type ClipError } from '$lib/motion/hyperframes/capture';
   import { CAPTURE_TIMEOUT_MS, Playback, previewDriver, type ShotRequest } from '$lib/motion/hyperframes/preview-driver';
   import { mountCapturePlayer } from '$lib/motion/hyperframes/capture-player';
-  import { shootInLanes } from '$lib/motion/export/lanes';
+  import { laneVisibility, shootInLanes } from '$lib/motion/export/lanes';
+  import { engineOf } from '$lib/motion/engine';
   import { lanesWithin, webglPerLane } from '$lib/motion/export/webgl-budget';
   import { exportLayering, frameOf } from '$lib/motion/export/webgl-device';
   import { CAPTURE_PROFILES, CaptureProfile } from '$lib/motion/export/capture-profile';
@@ -149,11 +150,17 @@
     playing = false;
     const back = frame;
     capturing = true;
+    if (player) {
+      player.style.visibility = laneVisibility(engineOf(navigator.userAgent));
+    }
     try {
       await loaded(source);
       return await work();
     } finally {
       capturing = false;
+      if (player) {
+        player.style.visibility = 'visible';
+      }
       await loaded(html);
       player?.seek(back / fps);
     }
