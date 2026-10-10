@@ -5,8 +5,8 @@ import type { PageRead } from './read-page';
 import { ShotView, type Shot } from './screenshot';
 import { MAX_VIEWED, ViewDetail, type ImagePart, type ViewOutcome } from './view-images';
 import { STORE_ITEMS_DEFAULT, STORE_ITEMS_MAX, type StoreRead } from './store';
-import { PINTEREST_MAX_PINS, type PinsFound } from './pinterest';
-import { ASK_REFERENCE_PICK, MAX_CANDIDATES, pickAsk, pickAskSchema } from '$lib/reference-pick';
+import { PINTEREST_MAX_PINS, type Pin, type PinsFound } from './pinterest';
+import { ASK_REFERENCE_PICK, MAX_CANDIDATES, MAX_REJECTED_ROUNDS, pickAsk, pickAskSchema } from '$lib/reference-pick';
 import { BROWSE_DEADLINE_MS, BROWSE_MAX_SHOTS, BROWSE_MAX_STEPS, browseStepSchema, type BrowseStep, type StepReport } from './browse';
 
 export type ImageImport = { ok: true; assetId: string; width: number | null; height: number | null } | { ok: false; error: string };
@@ -35,6 +35,8 @@ export type WebToolDeps = {
   browse?: (url: string, steps: BrowseStep[], callId: string) => Promise<BrowseView>;
   pinterest?: PinterestPort;
   avoid?: ReadonlySet<string>;
+  shown?: ReadonlySet<string>;
+  rejections?: number;
   spend: (usd: number) => void;
 };
 
@@ -50,6 +52,7 @@ export const MAX_STORE_READS_PER_TURN = 6;
 export const MAX_VIEWS_PER_TURN = 4;
 export const MAX_BROWSES_PER_TURN = 3;
 export const MAX_PINTEREST_PER_TURN = 6;
+export const MAX_PICKS_PER_TURN = 1;
 const DEFAULT_PINS = 12;
 const MAX_PRODUCTS_IMPORTED = 12;
 const DEFAULT_RESULTS = 5;
@@ -192,10 +195,16 @@ export function createWebTools(deps: WebToolDeps): Record<string, Tool> {
       toModelOutput: ({ toolCallId, output }) => withImages(output, seenByCall.get(toolCallId))
     });
 
+    const picks = counter(MAX_PICKS_PER_TURN);
     tools[ASK_REFERENCE_PICK] = tool({
       description: `Ask the user which references match their taste: shows them a grid of 2 to ${MAX_CANDIDATES} candidate pictures (id, image url, title, why you chose it) to mark follow or avoid, with a note. Call it after looking at the candidates and before building; it ends your turn: write nothing after it. min and max bound how many to follow (default 1 to all).`,
       inputSchema: pickAskSchema,
-      execute: async (input) => ({ ok: true, ...pickAsk(input) })
+      execute: async (input) => {
+        if ((deps.rejections ?? 0) >= MAX_REJECTED_ROUNDS) {
+          return { ok: false, error: `the user rejected ${MAX_REJECTED_ROUNDS} rounds of references in a row: stop asking, choose the closest ones yourself from what they said and explain why` };
+        }
+        return picks() ? { ok: true, ...pickAsk(input) } : limitReached('reference pick', MAX_PICKS_PER_TURN);
+      }
     });
   }
 
@@ -252,7 +261,8 @@ export function createWebTools(deps: WebToolDeps): Record<string, Tool> {
       }
       const found = await read();
       deps.spend(found.costUsd);
-      return found.ok ? { ok: true, pins: found.pins } : { ok: false, error: found.error };
+      const fresh = (p: Pin) => !deps.shown?.has(p.id) && !deps.shown?.has(p.image?.url ?? '');
+      return found.ok ? { ok: true, pins: found.pins.filter(fresh) } : { ok: false, error: found.error };
     };
     const limit = z.number().int().min(1).max(PINTEREST_MAX_PINS).optional();
     const pins = 'pins with id, url, title, description, image (largest picture: url, width, height), colour (dominant, null when unknown), link (the page it was saved from), pinner and board';

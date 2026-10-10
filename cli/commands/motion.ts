@@ -4,7 +4,7 @@ import { loadSession } from '../lib/auth.ts';
 import { awaitRun, motionApi, type MotionRun, type RenderStart } from '../lib/motion.ts';
 import { attachmentSource } from '../lib/attachments.ts';
 
-type AskOpts = { org?: string; wait?: boolean; attach?: string[]; follow?: string[]; avoid?: string[]; note?: string };
+type AskOpts = { org?: string; wait?: boolean; attach?: string[]; follow?: string[]; avoid?: string[]; note?: string; reject?: string | boolean; avoidAll?: boolean };
 
 async function token(): Promise<string> {
   const session = await loadSession();
@@ -21,8 +21,11 @@ export async function cmdMotionAsk(nodeId: string, prompt: string, opts: AskOpts
 
 export async function askAndReport(bearer: string, nodeId: string, prompt: string, opts: AskOpts) {
   const attachments = await Promise.all((opts.attach ?? []).map(attachmentSource));
-  const picked = opts.follow?.length || opts.avoid?.length;
-  const pick = picked ? { follow: opts.follow ?? [], avoid: opts.avoid ?? [], ...(opts.note ? { note: opts.note } : {}) } : undefined;
+  const rejected = opts.reject !== undefined && opts.reject !== false;
+  const picked = rejected || opts.follow?.length || opts.avoid?.length;
+  const marks = { follow: opts.follow ?? [], avoid: opts.avoid ?? [], ...(opts.note ? { note: opts.note } : {}) };
+  const rejection = rejected ? { rejected: true, query: typeof opts.reject === 'string' ? opts.reject : '', avoid_all: opts.avoidAll === true } : {};
+  const pick = picked ? { ...marks, ...rejection } : undefined;
   const started = await motionApi.ask(bearer, nodeId, prompt, opts.org, attachments, pick);
   printRun(opts.wait === false ? started : await awaitRun(bearer, started, { org: opts.org }));
 }

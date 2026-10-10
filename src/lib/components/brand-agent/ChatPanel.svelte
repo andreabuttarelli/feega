@@ -13,7 +13,7 @@
   import ChatMessage from './ChatMessage.svelte';
   import ScriptBrief from './ScriptBrief.svelte';
   import ReferencePick from './ReferencePick.svelte';
-  import { PickState, answerLabel, answerText, pickCards, type Mark, type PickAsk } from '$lib/reference-pick';
+  import { PickState, answerLabel, answerText, pickCards, rejectText, type Mark, type PickAsk } from '$lib/reference-pick';
   import { BRIEF_AUTO_GO_S, GO_MESSAGE, pendingBoard, pendingBrief } from '$lib/motion/script-brief';
   import ChatModelPicker from './ChatModelPicker.svelte';
   import { chatModelPrefs } from './chat-model-prefs.svelte';
@@ -282,7 +282,7 @@
           />
           {@const card = picks.get(i)}
           {#if card && !message.live && !message.pending}
-            <ReferencePick card={busy && card.state === PickState.Waiting ? { ...card, state: PickState.Passed } : card} onpick={(marks, note) => pick(card.ask, marks, note)} />
+            <ReferencePick card={busy && card.state === PickState.Waiting ? { ...card, state: PickState.Passed } : card} onpick={(marks, note) => pick(card.ask, marks, note)} onreject={(query, avoidAll) => send(rejectText(card.ask, query, avoidAll))} />
           {/if}
         {/each}
 

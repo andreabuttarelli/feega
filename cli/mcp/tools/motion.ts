@@ -31,14 +31,14 @@ export function registerMotionTools(server: McpServer) {
         `\`attachments\` (up to ${MAX_ATTACHMENTS}): images (PNG, JPG, WebP, GIF) the agent sees and can place in the video, and PDF/DOCX/PPTX/XLSX/CSV/TXT/MD/HTML files it reads as text — ` +
         'each one a public `url`, an `asset_id` of the project, or inline base64 `data` with `name` and `mime_type`; at most 20 MB each. ' +
         'When the agent wants the user\'s taste it ends its turn with `reference_pick` in the run (question and candidate pictures with ids): ' +
-        'show them to the user, then call again with `reference_pick: { follow: [ids], avoid: [ids], note }` (prompt optional). Followed pictures become the targets, avoided ones what not to do.',
+        'show them to the user, then call again with `reference_pick: { follow: [ids], avoid: [ids], note }` (prompt optional), or `{ follow: [], avoid: [], rejected: true, query, avoid_all }` when none fit: the agent searches again. Followed pictures become the targets, avoided ones what not to do.',
       inputSchema: z.object({
         org,
         node_id: z.string(),
         prompt: z.string().optional(),
         wait: z.boolean().optional(),
         attachments: z.array(attachment).max(MAX_ATTACHMENTS).optional(),
-        reference_pick: z.object({ follow: z.array(z.string()), avoid: z.array(z.string()), note: z.string().optional() }).optional()
+        reference_pick: z.object({ follow: z.array(z.string()), avoid: z.array(z.string()), note: z.string().optional(), rejected: z.boolean().optional(), query: z.string().optional(), avoid_all: z.boolean().optional() }).optional()
       }),
       annotations: { readOnlyHint: false, destructiveHint: false }
     },

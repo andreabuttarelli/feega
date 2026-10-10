@@ -640,7 +640,15 @@
         "go": "Continue",
         "count": "{follow} to follow · {avoid} to avoid",
         "answered": "Your pick",
-        "passed": "Not answered"
+        "passed": "Not answered",
+        "reject": "None of these, search again",
+        "query": "What to look for instead? (optional)",
+        "avoidAll": "Avoid these too",
+        "back": "Back",
+        "search": "Search again",
+        "rejected": "None fit",
+        "searchedFor": "Searching again for: {query}",
+        "searchedOwn": "Searching again with a new query"
       },
       "model": "Model",
       "reasoning": "Reasoning",

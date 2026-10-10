@@ -17,7 +17,7 @@ export type MotionRun = {
   reference_pick?: { question: string; candidates: { id: string; image: string; title?: string; why?: string }[]; min: number; max: number } | null;
 };
 
-export type ReferencePickReply = { follow: string[]; avoid: string[]; note?: string };
+export type ReferencePickReply = { follow: string[]; avoid: string[]; note?: string; rejected?: boolean; query?: string; avoid_all?: boolean };
 
 export const RUN_POLL_MS = 3_000;
 export const RUN_WAIT_MS = 240_000;

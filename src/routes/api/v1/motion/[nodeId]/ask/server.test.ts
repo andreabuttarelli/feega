@@ -288,6 +288,17 @@ describe('POST /api/v1/motion/[nodeId]/ask', () => {
     expect(answer?.note).toBe('darker');
   });
 
+  it('an external agent can reject every candidate and ask for another search', async () => {
+    const { readAnswer } = await import('$lib/reference-pick');
+    store.history = [{ role: 'assistant', content: '', tools: [{ toolName: 'ask_reference_pick', status: 'done', output: { ok: true, ...PICK, min: 1, max: 4 } }] }];
+
+    const { run_id } = await (await ask(NODE, { reference_pick: { follow: [], avoid: [], rejected: true, query: 'warmer light', avoid_all: true } })).json();
+    await settled(run_id);
+
+    expect(readAnswer(store.turns[0].content ?? '')).toMatchObject({ rejected: true, query: 'warmer light', follow: [] });
+    expect(readAnswer(store.turns[0].content ?? '')?.avoid).toHaveLength(4);
+  });
+
   it('answering a pick nobody asked is refused', async () => {
     const res = await ask(NODE, { reference_pick: { follow: ['pin0'], avoid: [] } });
     expect(res.status).toBe(409);

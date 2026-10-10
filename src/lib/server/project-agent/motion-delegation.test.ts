@@ -15,6 +15,7 @@ const usage = {
 };
 
 let step = 0;
+const PICK = { question: 'Which look?', candidates: Array.from({ length: 4 }, (_, i) => ({ id: `pin${i}`, image: `https://i.pinimg.com/${i}.jpg` })) };
 const prompts: string[] = [];
 
 function scriptedModel() {
@@ -23,7 +24,13 @@ function scriptedModel() {
       prompts.push(JSON.stringify(options.prompt));
       step++;
       const parts =
-        step % 2 === 1
+        step === 1 && store.picking
+          ? [
+              { type: 'stream-start', warnings: [] },
+              { type: 'tool-call', toolCallId: 'p1', toolName: 'ask_reference_pick', input: JSON.stringify(PICK) },
+              { type: 'finish', finishReason: { unified: 'tool-calls', raw: 'tool_calls' }, usage }
+            ]
+          : step % 2 === 1
           ? [
               { type: 'stream-start', warnings: [] },
               { type: 'tool-call', toolCallId: `c${step}`, toolName: 'add_clip', input: JSON.stringify({ component: 'Title', start: 0, duration: 6, props: { text: 'Hello' } }) },
@@ -56,7 +63,9 @@ const store = vi.hoisted(() => ({
   turns: [] as { role: string; content?: string; actor?: unknown }[],
   revisions: [] as { expectedVersion: number }[],
   blocked: false,
-  head: 0
+  head: 0,
+  picking: false,
+  history: [] as unknown[]
 }));
 
 vi.mock('$lib/server/llm', () => ({
@@ -93,7 +102,7 @@ vi.mock('$lib/server/repos/assets', () => ({
 vi.mock('$lib/server/canvas/sign-media', () => ({ createAssetSigningDb: () => ({}), signAssetPaths: async () => new Map() }));
 vi.mock('$lib/server/repos/chat', () => ({
   openNodeThread: async () => 'thread-1',
-  loadTurns: async () => [],
+  loadTurns: async () => store.history,
   promptHistory: () => [],
   saveTurn: async (_db: unknown, turn: { role: string; content?: string; actor?: unknown }) => {
     store.turns.push(turn);
@@ -159,6 +168,8 @@ beforeEach(() => {
   store.revisions.length = 0;
   store.blocked = false;
   store.head = 0;
+  store.picking = false;
+  store.history = [];
   prompts.length = 0;
   uploads.length = 0;
   step = 0;
@@ -184,6 +195,28 @@ describe('the canvas agent delegates motion videos', () => {
     expect(run).toMatchObject({ status: 'done', reply: expect.stringContaining('Added a hello title.'), summary: expect.stringContaining('added Title') });
     expect(store.revisions.length).toBeGreaterThan(0);
     expect(store.turns[0]).toMatchObject({ role: 'user', actor: { kind: 'agent', id: USER, agentKey: 'sidebar' } });
+  });
+
+  it('a pick asked inside the motion turn comes back to the canvas chat, to ask the user there', async () => {
+    store.picking = true;
+    const asked = await call(tools().ask_motion_agent, { nodeId: NODE, request: 'find pinterest references' });
+
+    const run = await call(tools().get_motion_run, { runId: asked.run_id, waitSeconds: 5 });
+
+    expect(run.reference_pick).toMatchObject({ candidates: PICK.candidates });
+    expect(run.next).toMatch(/ask_reference_pick/);
+  });
+
+  it('the canvas chat answers the pick to the motion agent by id', async () => {
+    const { readAnswer } = await import('$lib/reference-pick');
+    store.history = [{ role: 'assistant', content: '', tools: [{ toolName: 'ask_reference_pick', status: 'done', output: { ok: true, ...PICK, min: 1, max: 4 } }] }];
+
+    const asked = await call(tools().ask_motion_agent, { nodeId: NODE, request: 'go on', reference_pick: { follow: ['pin1'], avoid: ['pin2'] } });
+    await call(tools().get_motion_run, { runId: asked.run_id, waitSeconds: 5 });
+
+    const answer = readAnswer(store.turns[0].content ?? '');
+    expect(answer?.follow.map((c) => c.id)).toEqual(['pin1']);
+    expect(answer?.avoid.map((c) => c.id)).toEqual(['pin2']);
   });
 
   it('runs the motion agent on the model the canvas chat uses when it can drive the motion tools', async () => {

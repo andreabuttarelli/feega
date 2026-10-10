@@ -3,6 +3,7 @@ import { generateText, stepCountIs, type Tool } from 'ai';
 import { MockLanguageModelV4 } from 'ai/test';
 import { MAX_BROWSES_PER_TURN, MAX_PINTEREST_PER_TURN, MAX_SEARCHES_PER_TURN, MAX_SHOTS_PER_TURN, WEB_TOOLS, createWebTools, type WebToolDeps } from './web-tools';
 import { ShotView } from './screenshot';
+import { MAX_REJECTED_ROUNDS } from '$lib/reference-pick';
 import { StoreKind } from './store';
 import { ViewDetail } from './view-images';
 import { StepKind } from './browse';
@@ -195,6 +196,25 @@ describe('ask_reference_pick', () => {
     expect(WEB_TOOLS).toContain('ask_reference_pick');
     expect(await run('ask_reference_pick', { question: 'Which look is yours?', candidates, max: 9 })).toEqual({ ok: true, question: 'Which look is yours?', candidates, min: 1, max: 4 });
     expect(spent()).toBe(0);
+  });
+
+  it('a new search after a rejection never shows pins the user already saw', async () => {
+    const pin = (id: string) => ({ id, url: `https://www.pinterest.com/pin/${id}/`, title: id, description: null, image: { url: `https://i.pinimg.com/${id}.jpg`, width: 10, height: 10 }, colour: null, link: null, pinner: 'p', board: null });
+    const search = vi.fn(async () => ({ ok: true as const, pins: [pin('a'), pin('b'), pin('c')], requests: 1, costUsd: 0 }));
+    const { run } = setup({ pinterest: { search, pin: vi.fn(), board: vi.fn() }, shown: new Set(['a', 'https://i.pinimg.com/b.jpg']) });
+
+    const out = await run('pinterest_search', { query: 'warm light' });
+    expect((out.pins as { id: string }[]).map((p) => p.id)).toEqual(['c']);
+  });
+
+  it('asks once per turn, and stops asking after the user rejected too many rounds in a row', async () => {
+    const view = vi.fn(async () => ({ images: [], parts: [] })) as never;
+    const { run } = setup({ view });
+    expect(await run('ask_reference_pick', { question: 'Which?', candidates })).toMatchObject({ ok: true });
+    expect(await run('ask_reference_pick', { question: 'Which?', candidates })).toMatchObject({ ok: false });
+
+    const tired = setup({ view, rejections: MAX_REJECTED_ROUNDS });
+    expect(await tired.run('ask_reference_pick', { question: 'Which?', candidates })).toMatchObject({ ok: false, error: expect.stringMatching(/choose/) });
   });
 
   it('a picture the user avoided is never looked at again nor imported', async () => {

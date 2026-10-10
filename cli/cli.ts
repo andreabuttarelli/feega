@@ -114,6 +114,8 @@ motion
   .option('--follow <ids...>', 'Answer a reference pick: the candidate ids to follow')
   .option('--avoid <ids...>', 'Answer a reference pick: the candidate ids to avoid')
   .option('--note <text>', 'Answer a reference pick: a note on your taste')
+  .option('--reject [query]', 'Answer a reference pick: none fit, search again (optionally for this)')
+  .option('--avoid-all', 'With --reject: avoid every candidate shown too')
   .action(async (nodeId: string, prompt: string, opts) => {
     const { cmdMotionAsk } = await import('./commands/motion.ts');
     await cmdMotionAsk(nodeId, prompt, opts);

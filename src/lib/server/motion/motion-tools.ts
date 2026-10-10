@@ -116,7 +116,7 @@ import { STYLES, styleOf } from '$lib/motion/style';
 import { MOTION_STYLES } from '$lib/motion/style-model';
 import { unitOf, propsOwner, shownKeyframes, shownMask, shownOffset, shownRecord, storedMask, storedOffset, storedRecord, toShown, toStored, type Owner } from '$lib/motion/units';
 
-export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number; guides?: GuideTopic[]; effectFailures?: number; gate?: QualityProblem[]; references?: Reference[]; pick?: PickAnswer | null };
+export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number; guides?: GuideTopic[]; effectFailures?: number; gate?: QualityProblem[]; references?: Reference[]; pick?: PickAnswer | null; pickAssets?: string[] };
 
 export type CheckResult = { ok: boolean; problems: string[]; frames: Frame[] };
 
@@ -1670,6 +1670,11 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       execute: async (input) => {
         if (!deps.storyboard) {
           return UNREADABLE('the storyboard');
+        }
+        const hung = new Set(input.beats.flatMap((b) => b.media));
+        const left = (session.pickAssets ?? []).filter((id) => !hung.has(id));
+        if (left.length) {
+          return { ok: false, error: `the user chose to follow these references: hang each under the beat it inspires (media): ${left.join(', ')}` };
         }
         const media = boardMedia(input, deps.assets);
         if (!media.ok) {

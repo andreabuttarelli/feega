@@ -25,3 +25,19 @@ Reload: `ask_reference_pick` output is kept whole in the mirrored row (`OUTPUTS_
 
 Discarded: a structured column on `chat_messages` (a migration for what a tagged message already
 carries); filtering references by url inside `viewedReferences` (image parts carry no url).
+
+## Follow-up: storyboard, rejection, handoff
+
+- **Followed refs land on the storyboard.** The answering turn imports the followed images as
+  project assets before the model runs (`importFollowed` in `turn.ts`) and names their asset ids
+  in the opening message; `write_storyboard` refuses a board that leaves any of them out.
+- **None fit.** The card has "None of these, search again" with an optional query and "avoid
+  these too" (off by default: rejecting a set is not disliking every detail). The answer is
+  `{rejected: true, query}`. Pinterest results drop pins already shown in the thread (id or
+  image url, `shownRefs`). After `MAX_REJECTED_ROUNDS` (3) rejections in a row the tool refuses
+  and the agent chooses itself; `MAX_PICKS_PER_TURN` (1) caps one card per turn. A plain reply
+  that turns the set down is covered by the prompt guidance.
+- **Canvas → motion.** When a delegated motion turn ends on a pick, `get_motion_run` returns it
+  with `next`: the canvas agent re-asks with its own `ask_reference_pick` (same ids) and passes
+  the answer to `ask_motion_agent` as `reference_pick`.
+- API/MCP/CLI accept `rejected`, `query`, `avoid_all`; CLI `--reject [query] --avoid-all`.

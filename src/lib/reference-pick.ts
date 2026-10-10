@@ -3,6 +3,7 @@ import { z } from 'zod';
 export const ASK_REFERENCE_PICK = 'ask_reference_pick';
 export const MIN_CANDIDATES = 2;
 export const MAX_CANDIDATES = 12;
+export const MAX_REJECTED_ROUNDS = 3;
 
 const OPEN_TAG = '<reference-pick>';
 const CLOSE_TAG = '</reference-pick>';
@@ -26,7 +27,7 @@ export const pickAskSchema = z.object({
 
 export type Candidate = z.infer<typeof candidateSchema>;
 export type PickAsk = { question: string; candidates: Candidate[]; min: number; max: number };
-export type PickAnswer = { follow: Candidate[]; avoid: Candidate[]; note: string };
+export type PickAnswer = { follow: Candidate[]; avoid: Candidate[]; note: string; rejected?: true; query?: string };
 
 export enum Mark {
   Follow = 'follow',
@@ -72,6 +73,14 @@ export function answerText(ask: PickAsk, marks: Readonly<Record<string, Mark>>, 
   return `${line}\n\n${OPEN_TAG}${JSON.stringify(answer)}${CLOSE_TAG}`;
 }
 
+const tagged = (line: string, answer: PickAnswer) => `${line}\n\n${OPEN_TAG}${JSON.stringify(answer)}${CLOSE_TAG}`;
+
+export function rejectText(ask: PickAsk, query: string, avoidAll: boolean): string {
+  const wanted = query.trim();
+  const answer: PickAnswer = { follow: [], avoid: avoidAll ? ask.candidates : [], note: '', rejected: true, query: wanted };
+  return tagged(`None of these references: search again${wanted ? ` for ${wanted}` : ''}.`, answer);
+}
+
 export function readAnswer(text: string): PickAnswer | null {
   const payload = PAYLOAD.exec(text)?.[1];
   if (!payload) {
@@ -79,7 +88,11 @@ export function readAnswer(text: string): PickAnswer | null {
   }
   try {
     const parsed = JSON.parse(payload) as Partial<PickAnswer>;
-    return Array.isArray(parsed.follow) && Array.isArray(parsed.avoid) ? { follow: parsed.follow, avoid: parsed.avoid, note: parsed.note ?? '' } : null;
+    if (!Array.isArray(parsed.follow) || !Array.isArray(parsed.avoid)) {
+      return null;
+    }
+    const base = { follow: parsed.follow, avoid: parsed.avoid, note: parsed.note ?? '' };
+    return parsed.rejected ? { ...base, rejected: true, query: parsed.query ?? '' } : base;
   } catch {
     return null;
   }
@@ -92,6 +105,15 @@ export const latestAnswer = (turns: readonly { role: string; content: string }[]
     .filter((t) => t.role === 'user')
     .map((t) => readAnswer(t.content))
     .findLast((a) => a !== null) ?? null;
+
+export const shownRefs = (turns: readonly Message[]): ReadonlySet<string> =>
+  new Set(turns.flatMap((t) => (t.role === 'assistant' ? (t.tools ?? []).map(savedPick).flatMap((p) => (p?.candidates ?? []).flatMap((c) => [c.id, c.image])) : [])));
+
+export function rejectedRounds(turns: readonly { role: string; content: string }[]): number {
+  const answers = turns.filter((t) => t.role === 'user').map((t) => readAnswer(t.content)).filter((a) => a !== null);
+  const lastKept = answers.findLastIndex((a) => !a.rejected);
+  return answers.length - 1 - lastKept;
+}
 
 export const avoidedImages = (answer: PickAnswer | null): ReadonlySet<string> => new Set((answer?.avoid ?? []).map((c) => c.image));
 

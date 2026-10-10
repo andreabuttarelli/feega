@@ -16,7 +16,7 @@ import { ATTACHMENT_PORTS, AttachmentFailure, resolveSources, type AttachmentSou
 import type { ChatAttachment } from '$lib/chat-attachments';
 import { failed } from '$lib/server/chat-attachments/route-scope';
 import { loadTurns, openNodeThread } from '$lib/server/repos/chat';
-import { Mark, answerText, pickOf, type PickAsk } from '$lib/reference-pick';
+import { Mark, answerText, pickOf, rejectText, type PickAsk } from '$lib/reference-pick';
 
 export const MCP_AGENT_KEY = 'mcp';
 const HTTP_NOT_FOUND = 404;
@@ -46,7 +46,7 @@ async function attached(db: Db, scope: Parameters<typeof resolveSources>[1], sou
   }
 }
 
-export type PickReply = { follow: string[]; avoid: string[]; note?: string };
+export type PickReply = { follow: string[]; avoid: string[]; note?: string; rejected?: boolean; query?: string; avoid_all?: boolean };
 
 const noPickAsked = () => json({ error: 'no_reference_pick_asked' }, { status: HTTP_CONFLICT });
 
@@ -58,9 +58,13 @@ async function askedPick(db: Db, scope: { orgId: string; userId: string; project
 }
 
 function pickPrompt(ask: PickAsk, reply: PickReply, prompt: string): string {
-  const marks = Object.fromEntries([...reply.follow.map((id) => [id, Mark.Follow]), ...reply.avoid.map((id) => [id, Mark.Avoid])]);
-  const answer = answerText(ask, marks, reply.note ?? '');
+  const answer = reply.rejected ? rejectText(ask, reply.query ?? '', reply.avoid_all === true) : markedText(ask, reply);
   return prompt ? `${prompt}\n\n${answer}` : answer;
+}
+
+function markedText(ask: PickAsk, reply: PickReply): string {
+  const marks = Object.fromEntries([...reply.follow.map((id) => [id, Mark.Follow]), ...reply.avoid.map((id) => [id, Mark.Avoid])]);
+  return answerText(ask, marks, reply.note ?? '');
 }
 
 export type AskStarted = { runId: string; model: string; refusedModel: string | null };

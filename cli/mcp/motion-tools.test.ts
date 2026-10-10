@@ -293,6 +293,18 @@ describe('feega motion ask --follow --avoid', () => {
 
     expect(calls[0].body).toEqual({ prompt: '', reference_pick: { follow: ['pin0'], avoid: ['pin3'], note: 'darker' } });
   });
+
+  test('--reject asks for another search, --avoid-all avoids the shown ones too', async () => {
+    const log = console.log;
+    console.log = () => {};
+    const { askAndReport } = await import('../commands/motion.ts');
+
+    await askAndReport('token', NODE, '', { wait: false, reject: 'warmer light', avoidAll: true }).finally(() => {
+      console.log = log;
+    });
+
+    expect(calls[0].body).toEqual({ prompt: '', reference_pick: { follow: [], avoid: [], rejected: true, query: 'warmer light', avoid_all: true } });
+  });
 });
 
 describe('feega motion render', () => {

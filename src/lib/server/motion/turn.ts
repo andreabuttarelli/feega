@@ -1,6 +1,6 @@
 import { styleOf } from '$lib/motion/style';
 import { briefAwaits, promptTexts } from '$lib/motion/script-brief';
-import { ASK_REFERENCE_PICK, avoidedImages, choosesForUser, latestAnswer, pickAwaits, readAnswer, savedPick, type PickAsk } from '$lib/reference-pick';
+import { ASK_REFERENCE_PICK, avoidedImages, choosesForUser, latestAnswer, pickAwaits, readAnswer, rejectedRounds, shownRefs, savedPick, type PickAnswer, type PickAsk } from '$lib/reference-pick';
 import { createUIMessageStream, streamText, type ModelMessage, type UIMessageChunk } from 'ai';
 import type { Db } from '$lib/server/db/client';
 import { llmCodeModel, llmLanguageModel, llmStructured, llmVisionModel } from '$lib/server/llm';
@@ -28,7 +28,8 @@ import { AGENT_SELF_SAVE_MS, overTurnCap } from '$lib/server/project-agent/limit
 import { dropWorkingDoc, keepWorkingDoc } from '$lib/server/motion/working-doc';
 import { liveWebDeps, productImport, screenedImport } from '$lib/server/web/live';
 import { ATTACHMENT_PORTS } from '$lib/server/chat-attachments/register';
-import { EmbedAction, createMotionTools, selectionNote, type MotionSession } from '$lib/server/motion/motion-tools';
+import { EmbedAction, createMotionTools, selectionNote, type MotionSession, type MotionToolDeps } from '$lib/server/motion/motion-tools';
+import type { MotionAsset } from '$lib/server/motion/editor';
 import { publishEmbed, removeEmbed } from '$lib/server/motion/embed';
 import type { ProjectMode } from '$lib/project-mode';
 import { templateLibrary } from '$lib/server/motion/templates';
@@ -146,6 +147,19 @@ export type MotionTurnInput = {
   timing?: TurnTiming;
 };
 
+type Followed = { ids: string[]; note: string };
+
+async function importFollowed(answer: PickAnswer | null, importAsset: MotionToolDeps['importAsset'], assets: MotionAsset[]): Promise<Followed> {
+  if (!answer?.follow.length || !importAsset) {
+    return { ids: [], note: '' };
+  }
+  const landed = await Promise.all(answer.follow.map(async (c) => ({ c, out: await importAsset(c.image, c.title) })));
+  const ok = landed.flatMap(({ c, out }) => (out.ok ? [{ c, asset: out.asset }] : []));
+  assets.push(...ok.map((o) => o.asset));
+  const lines = ok.map(({ c, asset }) => `- ${c.title || c.id}: asset ${asset.id}`);
+  return { ids: ok.map((o) => o.asset.id), note: lines.length ? `The references the user follows are now project assets: hang each under the storyboard beat it inspires (write_storyboard media) and take the look from them:\n${lines.join('\n')}` : '' };
+}
+
 export type TurnOutcome = { reply: string; summary: string | null; version: number | null; revision: RevisionOutcome | null; costUsd: number; pick: PickAsk | null };
 
 export type MotionTurn = { stream: ReadableStream<UIMessageChunk>; done: Promise<TurnOutcome> };
@@ -173,7 +187,6 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
   await saveTurn(db, { orgId, threadId, role: 'user', content: message, attachments, actor: requester });
   const storyboard = storyboardStore(db, { orgId, projectId: project.id, motionNodeId: motion.record.id, title: motion.record.displayName ?? 'Video', actor });
   const note = motion.node.storyboard ? boardNote(await storyboard.read()) : null;
-  const openingContent = await userContent(db, { orgId, text: note ? `${message}\n\n${note}` : message, attachments, hint: motionPlaceHint });
   const reply = await openReply(db, { orgId, threadId, actor });
 
   const knownAssets = assets.length;
@@ -192,6 +205,10 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
   const sources = brandSources(db, { orgId, userId, projectId: project.id, canvasId: motion.record.canvasId, brandId: project.brandId, screen: screenPicture }, (usd) => {
     spent += usd;
   });
+  const picked = await importFollowed(readAnswer(message), sources.importAsset, assets);
+  session.pickAssets = picked.ids;
+  const openingText = [message, note, picked.note].filter(Boolean).join('\n\n');
+  const openingContent = await userContent(db, { orgId, text: openingText, attachments, hint: motionPlaceHint });
   const tools = createMotionTools({
     session,
     assets,
@@ -223,7 +240,9 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
         spent += usd;
       }),
       importProducts: productImport(screenedImport(sources.importAsset, screenPicture, assets)),
-      avoid: avoidedImages(pick)
+      avoid: avoidedImages(pick),
+      shown: shownRefs(turns),
+      rejections: rejectedRounds([...turns, { role: 'user', content: message }])
     },
     layouts: layoutStore({ db, orgId, actor: { kind: 'agent', id: userId, agentKey: MOTION_AGENT_KEY } }),
     effects: effectStore({ db, orgId, actor: { kind: 'agent', id: userId, agentKey: MOTION_AGENT_KEY }, gl: serverFramesOpen() ? chromiumGl : null }),

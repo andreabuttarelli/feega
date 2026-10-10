@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ASK_REFERENCE_PICK, Mark, PickState, answerLabel, answerText, avoidedImages, choosesForUser, latestAnswer, pickAwaits, pickCards, readAnswer, savedPick, type PickAsk } from './reference-pick';
+import { ASK_REFERENCE_PICK, MAX_REJECTED_ROUNDS, Mark, rejectText, rejectedRounds, shownRefs, PickState, answerLabel, answerText, avoidedImages, choosesForUser, latestAnswer, pickAwaits, pickCards, readAnswer, savedPick, type PickAsk } from './reference-pick';
 import { toolsForMirror } from '$lib/chat-stream-events';
 
 const candidates = Array.from({ length: 6 }, (_, i) => ({ id: `pin${i}`, image: `https://i.pinimg.com/${i}.jpg`, title: `Pin ${i}`, why: 'bold type' }));
@@ -78,5 +78,31 @@ describe('reference pick', () => {
     expect(choosesForUser('Find refs and choose for me')).toBe(true);
     expect(choosesForUser('decidi tu')).toBe(true);
     expect(choosesForUser('find pinterest references')).toBe(false);
+  });
+
+  it('rejecting all asks for a new search, and avoids them only when the user says so', () => {
+    const plain = readAnswer(rejectText(ask, 'more warm light', false));
+    expect(plain).toMatchObject({ rejected: true, query: 'more warm light', follow: [], avoid: [] });
+
+    const all = readAnswer(rejectText(ask, '', true));
+    expect(all?.avoid).toHaveLength(6);
+    expect(all?.rejected).toBe(true);
+    expect(answerLabel(rejectText(ask, 'more warm light', false))).toContain('more warm light');
+  });
+
+  it('every picture already shown in the thread is known, by id and by url', () => {
+    const turns = [{ role: 'assistant' as const, content: '', tools: [asked] }];
+    const shown = shownRefs(turns);
+    expect(shown.has('pin0')).toBe(true);
+    expect(shown.has('https://i.pinimg.com/5.jpg')).toBe(true);
+    expect(shown.has('pin9')).toBe(false);
+  });
+
+  it('counts the rounds the user rejected in a row, so the search cannot run away', () => {
+    const rejected = { role: 'user' as const, content: rejectText(ask, 'x', false) };
+    const picked = { role: 'user' as const, content: answerText(ask, marks, '') };
+    expect(rejectedRounds([picked, rejected, rejected])).toBe(2);
+    expect(rejectedRounds([rejected, picked])).toBe(0);
+    expect(MAX_REJECTED_ROUNDS).toBeGreaterThan(0);
   });
 });

@@ -35,7 +35,8 @@ const world = vi.hoisted(() => ({
   looking: false,
   message: 'make it pop',
   history: [] as { role: string; content: string }[],
-  tools: [] as string[][]
+  tools: [] as string[][],
+  imported: [] as string[]
 }));
 
 const draftBucket = {
@@ -226,7 +227,11 @@ vi.mock('$lib/server/motion/frame-stats', () => ({
 vi.mock('$lib/server/motion/templates', () => ({ templateLibrary: () => ({ list: async () => [] }) }));
 vi.mock('$lib/server/motion/brand-sources', async () => {
   const { pageOf } = await import('./site-copy');
-  return { brandSources: () => (world.scripting ? { site: async () => ({ ok: true, site: { url: SITE, logos: [], pages: [pageOf(SITE, `<h1>${PROMISE}</h1>`)] } }) } : {}) };
+  const importAsset = async (url: string) => {
+    world.imported.push(url);
+    return { ok: true, asset: { id: `asset-${world.imported.length}`, kind: 'image', label: url, previewUrl: '', url }, width: 10, height: 10 };
+  };
+  return { brandSources: () => (world.scripting ? { importAsset, site: async () => ({ ok: true, site: { url: SITE, logos: [], pages: [pageOf(SITE, `<h1>${PROMISE}</h1>`)] } }) } : { importAsset }) };
 });
 
 const { startMotionTurn, Browser, MAX_DELIVERY_ATTEMPTS } = await import('./turn');
@@ -294,6 +299,7 @@ describe('a motion turn closes on a look and a summary', () => {
     world.message = 'make it pop';
     world.history = [];
     world.tools = [];
+    world.imported = [];
   });
 
   it('looks at its frames after the last edit even when the edits spent the whole budget', async () => {
@@ -436,6 +442,16 @@ describe('a motion turn closes on a look and a summary', () => {
 
     const doc = (world.chunks.findLast((c) => c.type === DOC_EDITED)?.data as DocEdited).doc;
     expect(doc.referenceLook?.avoid?.map((a) => a.image)).toEqual(['https://i.pinimg.com/3.jpg']);
+  });
+
+  it('the pick answer imports the followed references, only those, and names their assets to the model', async () => {
+    const { answerText, Mark } = await import('$lib/reference-pick');
+    world.message = answerText({ ...PICK, min: 1, max: 6 }, { pin0: Mark.Follow, pin1: Mark.Follow, pin2: Mark.Follow, pin3: Mark.Avoid }, '');
+
+    await turn();
+
+    expect(world.imported).toEqual(['https://i.pinimg.com/0.jpg', 'https://i.pinimg.com/1.jpg', 'https://i.pinimg.com/2.jpg']);
+    expect(JSON.stringify(world.calls[0].prompt)).toContain('asset-3');
   });
 
   it('a client that leaves mid-stream does not stop the turn: the answer is still saved', async () => {

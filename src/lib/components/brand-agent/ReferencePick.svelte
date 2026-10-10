@@ -2,10 +2,13 @@
   import { _ } from 'svelte-i18n';
   import { Mark, NEXT_MARK, PickState, type PickCard } from '$lib/reference-pick';
 
-  let { card, onpick }: { card: PickCard; onpick: (marks: Record<string, Mark>, note: string) => void } = $props();
+  let { card, onpick, onreject }: { card: PickCard; onpick: (marks: Record<string, Mark>, note: string) => void; onreject: (query: string, avoidAll: boolean) => void } = $props();
 
   let marks = $state<Record<string, Mark>>({});
   let note = $state('');
+  let rejecting = $state(false);
+  let query = $state('');
+  let avoidAll = $state(false);
 
   const open = $derived(card.state === PickState.Waiting);
   const answeredMarks = $derived(Object.fromEntries([...(card.answer?.follow ?? []).map((c) => [c.id, Mark.Follow]), ...(card.answer?.avoid ?? []).map((c) => [c.id, Mark.Avoid])]) as Record<string, Mark>);
@@ -35,7 +38,7 @@
       {#if open}
         {$_('chat.panel.pick.count', { values: { follow: follows, avoid: count(Mark.Avoid) } })}
       {:else}
-        {card.state === PickState.Answered ? $_('chat.panel.pick.answered') : $_('chat.panel.pick.passed')}
+        {card.answer?.rejected ? $_('chat.panel.pick.rejected') : card.state === PickState.Answered ? $_('chat.panel.pick.answered') : $_('chat.panel.pick.passed')}
       {/if}
     </span>
   </header>
@@ -74,11 +77,23 @@
     {/each}
   </ul>
 
-  {#if open}
+  {#if open && rejecting}
+    <div class="reject">
+      <input type="text" bind:value={query} placeholder={$_('chat.panel.pick.query')} aria-label={$_('chat.panel.pick.query')} data-testid="pick-query" />
+      <label><input type="checkbox" bind:checked={avoidAll} data-testid="pick-avoid-all" /> {$_('chat.panel.pick.avoidAll')}</label>
+      <footer>
+        <button type="button" class="ghost" onclick={() => (rejecting = false)}>{$_('chat.panel.pick.back')}</button>
+        <button type="button" class="go" data-testid="pick-search" onclick={() => onreject(query, avoidAll)}>{$_('chat.panel.pick.search')}</button>
+      </footer>
+    </div>
+  {:else if open}
     <textarea bind:value={note} rows="2" placeholder={$_('chat.panel.pick.note')} aria-label={$_('chat.panel.pick.note')}></textarea>
     <footer>
+      <button type="button" class="ghost" data-testid="pick-reject" onclick={() => (rejecting = true)}>{$_('chat.panel.pick.reject')}</button>
       <button type="button" class="go" data-testid="pick-go" disabled={!ready} onclick={go}>{$_('chat.panel.pick.go')}</button>
     </footer>
+  {:else if card.answer?.rejected}
+    <p class="hint">{card.answer.query ? $_('chat.panel.pick.searchedFor', { values: { query: card.answer.query } }) : $_('chat.panel.pick.searchedOwn')}</p>
   {:else if card.answer?.note}
     <p class="hint">{card.answer.note}</p>
   {/if}
@@ -173,7 +188,37 @@
   }
   footer {
     display: flex;
+    flex-wrap: wrap;
     justify-content: flex-end;
+    gap: 6px;
+  }
+  .reject {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .reject input[type='text'] {
+    width: 100%;
+    min-height: 32px;
+    padding: 0 8px;
+    border: 1px solid var(--line, #ededef);
+    background: var(--paper, #fff);
+    color: inherit;
+    font: inherit;
+  }
+  .reject label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .ghost {
+    min-height: 32px;
+    padding: 0 12px;
+    border: 1px solid var(--ink, #1d1d1f);
+    background: transparent;
+    color: var(--ink, #1d1d1f);
+    font: inherit;
+    cursor: pointer;
   }
   .go {
     min-height: 32px;

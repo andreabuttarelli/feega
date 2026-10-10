@@ -27,7 +27,7 @@ import { blockedPrompt } from '$lib/server/moderation/blocked-response';
 import { runInBackground } from '$lib/server/background-work';
 import { askedAttachments } from '$lib/server/chat-attachments/route-scope';
 import { canvasPlaceHint, userContent } from '$lib/server/chat-attachments/model-parts';
-import { ASK_REFERENCE_PICK, avoidedImages, choosesForUser, latestAnswer, pickAwaits, readAnswer } from '$lib/reference-pick';
+import { ASK_REFERENCE_PICK, avoidedImages, choosesForUser, latestAnswer, pickAwaits, readAnswer, rejectedRounds, shownRefs } from '$lib/reference-pick';
 import type { RequestHandler } from './$types';
 
 /**
@@ -134,7 +134,9 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
     }),
     importImage: webImageImport(db, { orgId, projectId: project.id, mode: project.mode }),
     importProducts: productImport(webImageImport(db, { orgId, projectId: project.id, mode: project.mode }), canvasId ? productsNodePlacer(db, { orgId, projectId: project.id, canvasId, actor }) : undefined),
-    avoid: avoidedImages(pick)
+    avoid: avoidedImages(pick),
+      shown: shownRefs(turns),
+      rejections: rejectedRounds([...turns, { role: 'user', content: text }])
   });
   if (choosesForUser(text)) {
     delete webTools[ASK_REFERENCE_PICK];

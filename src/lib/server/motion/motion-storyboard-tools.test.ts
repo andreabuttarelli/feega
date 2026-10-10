@@ -6,8 +6,8 @@ import { createMotionTools, type MotionSession, type StoryboardPort } from './mo
 
 const BEAT = { act: 'problem', kind: 'scene', title: 'Folders', intent: 'the mess', emotion: 'tense', intensity: 0.4, duration: 3 };
 
-function setup(storyboard?: StoryboardPort) {
-  const session: MotionSession = { doc: newMotionDoc(MotionFormat.Landscape), baseVersion: 1, edits: [], selection: [], frames: new Map(), views: 0, checkedAt: 0, codeWrites: 0 };
+function setup(storyboard?: StoryboardPort, pickAssets?: string[]) {
+  const session: MotionSession = { doc: newMotionDoc(MotionFormat.Landscape), baseVersion: 1, edits: [], selection: [], frames: new Map(), views: 0, checkedAt: 0, codeWrites: 0, pickAssets };
   const assets = [
     { id: 'pic', kind: AssetKind.Image, label: 'pic', previewUrl: '', url: null },
     { id: 'clip', kind: AssetKind.Video, label: 'clip', previewUrl: '', url: null },
@@ -33,6 +33,15 @@ describe('storyboard tools', () => {
 
     expect(out).toMatchObject({ ok: true, canvas_id: 'board' });
     expect(board.write).toHaveBeenCalledWith(expect.objectContaining({ beats: [expect.objectContaining({ title: 'Folders' })] }), { pic: 'image', clip: 'video' });
+  });
+
+  it('refuses a board that leaves out a reference the user chose to follow', async () => {
+    const board = port();
+    const run = setup(board, ['pic', 'clip']);
+
+    expect(await run('write_storyboard', { beats: [{ ...BEAT, media: ['pic'] }] })).toMatchObject({ ok: false, error: expect.stringContaining('clip') });
+    expect(board.write).not.toHaveBeenCalled();
+    expect(await run('write_storyboard', { beats: [{ ...BEAT, media: ['pic', 'clip'] }] })).toMatchObject({ ok: true });
   });
 
   it('refuses media that is not a picture or clip of this project', async () => {

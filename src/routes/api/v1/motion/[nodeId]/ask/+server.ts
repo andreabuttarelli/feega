@@ -18,7 +18,7 @@ const sourceSchema = z.union([
   z.object({ data: z.string().min(1), name: z.string().min(1).max(200), mime_type: z.string().max(200) })
 ]);
 
-const pickSchema = z.object({ follow: z.array(z.string().min(1)).max(12), avoid: z.array(z.string().min(1)).max(12), note: z.string().max(1000).optional() });
+const pickSchema = z.object({ follow: z.array(z.string().min(1)).max(12), avoid: z.array(z.string().min(1)).max(12), note: z.string().max(1000).optional(), rejected: z.boolean().optional(), query: z.string().max(300).optional(), avoid_all: z.boolean().optional() });
 
 const bodySchema = z
   .object({ prompt: z.string().trim().max(8000).default(''), attachments: z.array(sourceSchema).optional(), reference_pick: pickSchema.optional() })
