@@ -13,6 +13,7 @@ import { UI_KIT, UiKind } from './ui-kit/kit';
 import { writeComponent } from './custom/ops';
 import { ComponentMode } from './custom/component';
 import { Isolate, focusUi } from './ui-focus';
+import { JunctionKind } from './junctions';
 
 function must(r: { ok: true; doc: MotionDoc } | { ok: false; error: string }): MotionDoc {
   if (!r.ok) {
@@ -204,6 +205,19 @@ describe('nothing important leaves the frame', () => {
     expect(out(progress)).toEqual([]);
   });
 
+  it('leaving the safe area is a note, never a reason to hold delivery', () => {
+    expect(SEVERITY[Quality.OutOfFrame]).toBe(Severity.Warning);
+  });
+
+  it('a bleed declared on a scene covers the words inside it', () => {
+    const big = { text: 'Turn every click into revenue today', size: 0.3, x: 0.5, y: 0.5, width: 1, height: 0.4 };
+    const scene = must(precompose(placed('Title', big), ['c'], { comp: 'hook', clip: 'h' }, 'Hook'));
+    const bled = { ...scene, tracks: scene.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === 'h' ? { ...c, bleed: true } : c)) })) };
+
+    expect(out(scene)).toHaveLength(1);
+    expect(out(bled)).toEqual([]);
+  });
+
   it('a move out of frame in the last moments of a clip is a transition, not a fault', () => {
     const exit = { scale: [{ frame: 0, value: 1, ease: Ease.Linear }, { frame: 82, value: 1, ease: Ease.Linear }, { frame: 90, value: 2.5, ease: Ease.Linear }] };
 
@@ -278,10 +292,14 @@ describe('empty frames', () => {
     expect(blocking(found)).toHaveLength(1);
   });
 
-  it('a tail under half a second after the last content passes', () => {
-    const doc = must(addClip({ ...newMotionDoc(MotionFormat.Landscape), durationInFrames: 6 * 30 + 12 }, { component: 'Device3D', from: 0, durationInFrames: 6 * 30, props: {} }, 'phones'));
+  const tailed = (frames: number) => must(addClip({ ...newMotionDoc(MotionFormat.Landscape), durationInFrames: 6 * 30 + frames }, { component: 'Device3D', from: 0, durationInFrames: 6 * 30, props: {} }, 'phones'));
 
-    expect(tail(doc)).toEqual([]);
+  it('a tail of a few frames after the last content passes', () => {
+    expect(tail(tailed(4))).toEqual([]);
+  });
+
+  it('half a second of black after the last content is a black tail', () => {
+    expect(tail(tailed(15)).map((p) => p.kind)).toEqual([Quality.TrailingEmpty]);
   });
 
   it('content faded to black at 6 s and left on to 15 s is an empty tail', () => {
@@ -461,5 +479,23 @@ describe('the script gate', () => {
   it('un esercizio di stile grafico non resta bloccato su uno script che non può avere', () => {
     expect(asksScript(MotionStyle.Graphic)).toBe(false);
     expect(asksScript(MotionStyle.LaunchFilm)).toBe(true);
+  });
+});
+
+describe('transitions that cannot play', () => {
+  const dead = (doc: MotionDoc) => docProblems(doc, { audioAssets: 0 }).filter((p) => p.kind === Quality.DeadJunction);
+  const pair = (firstLength: number) => {
+    const a = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Title', from: 0, durationInFrames: firstLength, props: { text: 'One' } }, 'a'));
+    const b = must(addClip(a, { component: 'Title', from: 90, durationInFrames: 90, props: { text: 'Two' } }, 'b'));
+    return { ...b, tracks: b.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === 'b' ? { ...c, junction: { kind: JunctionKind.PushLeft, durationInFrames: 15 } } : c)) })) };
+  };
+
+  it('a transition whose clip before was lengthened past the cut does nothing, and blocks', () => {
+    expect(dead(pair(98)).map((p) => p.at)).toEqual([3]);
+    expect(SEVERITY[Quality.DeadJunction]).toBe(Severity.Blocking);
+  });
+
+  it('a transition at a real cut plays', () => {
+    expect(dead(pair(90))).toEqual([]);
   });
 });
