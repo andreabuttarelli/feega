@@ -1,12 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import { generateText, stepCountIs, type Tool } from 'ai';
 import { MockLanguageModelV4 } from 'ai/test';
-import { MAX_BROWSES_PER_TURN, MAX_PINTEREST_PER_TURN, MAX_SEARCHES_PER_TURN, MAX_SHOTS_PER_TURN, WEB_TOOLS, createWebTools, type WebToolDeps } from './web-tools';
+import { MAX_BROWSES_PER_TURN, MAX_PINTEREST_PER_TURN, MAX_SEARCHES_PER_TURN, MAX_SHOTS_PER_TURN, MAX_SOCIAL_PER_TURN, REFERENCE_TOOLS, WEB_TOOLS, createWebTools, type WebToolDeps } from './web-tools';
 import { ShotView } from './screenshot';
 import { MAX_REJECTED_ROUNDS } from '$lib/reference-pick';
 import { StoreKind } from './store';
 import { ViewDetail } from './view-images';
 import { StepKind } from './browse';
+import { SocialPlatform } from './social-search';
 
 type Exec = (input: unknown, options: { toolCallId: string }) => Promise<Record<string, unknown>>;
 
@@ -159,6 +160,27 @@ describe('web tools', () => {
     expect(board).toHaveBeenCalledWith('https://www.pinterest.com/a/b/', 25);
     expect(spent()).toBeCloseTo(0.004);
     expect(WEB_TOOLS).toEqual(expect.arrayContaining(['pinterest_search', 'pinterest_pin', 'pinterest_board']));
+  });
+
+  it('social_search finds clips on the platform asked, spends their cost and is capped per turn', async () => {
+    const clips = [{ platform: SocialPlatform.TikTok, id: '1', url: 'https://www.tiktok.com/@a/video/1', caption: 'c', thumbnail: 'https://t.example/1.jpg', video: 'https://v.example/1.mp4', author: 'a', views: 10, likes: 1, seconds: 12, publishedAt: null }];
+    const search = vi.fn(async () => ({ ok: true as const, clips, requests: 1, costUsd: 0.002 }));
+    const { run, spent } = setup({ social: search });
+
+    expect(await run('social_search', { platform: 'tiktok', query: 'motion design', limit: 5 })).toEqual({ ok: true, clips });
+    expect(search).toHaveBeenCalledWith(SocialPlatform.TikTok, 'motion design', 5);
+    expect(spent()).toBeCloseTo(0.002);
+
+    for (let i = 1; i < MAX_SOCIAL_PER_TURN; i++) {
+      await run('social_search', { platform: 'youtube', query: `q${i}` });
+    }
+    expect(await run('social_search', { platform: 'instagram', query: 'one more' })).toMatchObject({ ok: false });
+    expect(search).toHaveBeenCalledTimes(MAX_SOCIAL_PER_TURN);
+    expect(REFERENCE_TOOLS.has('social_search')).toBe(true);
+  });
+
+  it('social_search is absent without a social port', () => {
+    expect(setup().tools.social_search).toBeUndefined();
   });
 
   it('view_images hands the model real image parts, and keeps only paths in its record', async () => {

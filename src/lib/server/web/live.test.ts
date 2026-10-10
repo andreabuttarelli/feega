@@ -6,7 +6,8 @@ vi.mock('$env/dynamic/private', () => ({ env: { EXA_API_KEY: 'k' } }));
 vi.mock('$lib/server/ai-log', () => ({ logAiCall: M.logAiCall }));
 vi.mock('./search', async (importOriginal) => ({ ...(await importOriginal<typeof import('./search')>()), exaSearch: () => M.port }));
 
-import { loggedSearch, pinterestPort, productImport, screenedImport } from './live';
+import { SocialPlatform } from './social-search';
+import { loggedSearch, pinterestPort, productImport, socialPort, screenedImport } from './live';
 import { SearchEngine } from './search';
 
 const SCOPE = { orgId: 'org-1', userId: 'u-1', projectId: 'p-1', brandId: null };
@@ -75,5 +76,13 @@ describe('pinterest billing', () => {
     const found = await pinterestPort(get).search('glass', 20);
 
     expect(found).toMatchObject({ ok: false, requests: 2, costUsd: 0.004 });
+  });
+});
+
+describe('social search billing', () => {
+  it('prices the ScrapeCreators request a social search made, a failed one included', async () => {
+    const get = vi.fn().mockRejectedValueOnce(new Error('scrapecreators 500'));
+
+    expect(await socialPort(get)(SocialPlatform.TikTok, 'motion', 5)).toMatchObject({ ok: false, requests: 1, costUsd: 0.002 });
   });
 });
