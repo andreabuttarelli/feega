@@ -274,6 +274,29 @@ describe('ask_reference_pick', () => {
     ]);
   });
 
+  it('finds the stored copy even when the agent copies a signed url with a different query', async () => {
+    const view = vi.fn(async () => ({ images: [{ url: 'https://scontent.cdninstagram.com/v/a.jpg?stp=dst&_nc_ohc=x1&oe=1', path: 'o/p/web-views/v1/0.jpg', width: 10, height: 10 }], parts: [] }));
+    const { run } = setup({ view });
+    await run('view_images', { urls: ['https://scontent.cdninstagram.com/v/a.jpg?stp=dst&_nc_ohc=x1&oe=1'] }, 'v1');
+
+    const out = await run('ask_reference_pick', { question: 'Which?', candidates: [{ id: 'a', image: 'https://scontent.cdninstagram.com/v/a.jpg?stp=dst&amp;_nc_ohc=x1' }, { id: 'b', image: 'https://i.pinimg.com/b.jpg' }] });
+
+    expect((out.candidates as { preview?: string }[])[0].preview).toBe('o/p/web-views/v1/0.jpg');
+  });
+
+  it('stores the candidates the agent never looked at, so the grid never shows a broken picture', async () => {
+    const view = vi.fn(async (urls: string[]) => ({ images: urls.map((url, i) => (url.includes('refused') ? { url, error: 'people' } : { url, path: `o/p/web-views/k1/${i}.jpg`, width: 1, height: 1 })), parts: [] }));
+    const { run } = setup({ view });
+
+    const out = await run('ask_reference_pick', { question: 'Which?', candidates: [{ id: 'a', image: 'https://scontent.cdninstagram.com/a.jpg' }, { id: 'b', image: 'https://scontent.cdninstagram.com/refused.jpg' }, { id: 'c', image: 'https://i.pinimg.com/c.jpg' }] }, 'k1');
+
+    expect(view).toHaveBeenCalledWith(['https://scontent.cdninstagram.com/a.jpg', 'https://scontent.cdninstagram.com/refused.jpg', 'https://i.pinimg.com/c.jpg'], ViewDetail.Low, 'k1');
+    expect(out.candidates).toEqual([
+      { id: 'a', image: 'https://scontent.cdninstagram.com/a.jpg', preview: 'o/p/web-views/k1/0.jpg' },
+      { id: 'c', image: 'https://i.pinimg.com/c.jpg', preview: 'o/p/web-views/k1/2.jpg' }
+    ]);
+  });
+
   it('a new search after a rejection never shows pins the user already saw', async () => {
     const pin = (id: string) => ({ id, url: `https://www.pinterest.com/pin/${id}/`, title: id, description: null, image: { url: `https://i.pinimg.com/${id}.jpg`, width: 10, height: 10 }, colour: null, link: null, pinner: 'p', board: null });
     const search = vi.fn(async () => ({ ok: true as const, pins: [pin('a'), pin('b'), pin('c')], requests: 1, costUsd: 0 }));

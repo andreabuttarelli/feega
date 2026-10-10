@@ -10,7 +10,7 @@ import { SOCIAL_MAX_CLIPS, SocialPlatform, type Clip, type ClipsFound } from './
 import type { SocialItem } from './social-posts';
 import type { VideoSource } from './video-frames';
 import { CLASSIFIABLE_PLATFORMS, type ClassifiablePlatform } from '$lib/canvas/social-url-classifier';
-import { ASK_REFERENCE_PICK, MAX_CANDIDATES, MAX_REJECTED_ROUNDS, MIN_CANDIDATES, pickAsk, pickAskSchema } from '$lib/reference-pick';
+import { ASK_REFERENCE_PICK, MAX_CANDIDATES, type Candidate, MAX_REJECTED_ROUNDS, MIN_CANDIDATES, pickAsk, pickAskSchema } from '$lib/reference-pick';
 import { BROWSE_DEADLINE_MS, BROWSE_MAX_SHOTS, BROWSE_MAX_STEPS, browseStepSchema, type BrowseStep, type StepReport } from './browse';
 
 export type ImageImport = { ok: true; assetId: string; width: number | null; height: number | null } | { ok: false; error: string };
@@ -107,6 +107,15 @@ function withImages(output: unknown, parts: ImagePart[] = []) {
   };
 }
 
+function pictureKey(url: string): string {
+  try {
+    const u = new URL(url);
+    return `${u.host}${u.pathname}`;
+  } catch {
+    return url;
+  }
+}
+
 function counter(max: number) {
   let used = 0;
   return () => (used < max ? ++used : 0);
@@ -125,7 +134,7 @@ export function createWebTools(deps: WebToolDeps): Record<string, Tool> {
   const keepCopies = (images: ViewOutcome['images']) => {
     for (const image of images) {
       if ('path' in image) {
-        storedCopy.set(image.url, image.path);
+        storedCopy.set(pictureKey(image.url), image.path);
       }
     }
   };
@@ -228,19 +237,41 @@ export function createWebTools(deps: WebToolDeps): Record<string, Tool> {
     });
 
     const picks = counter(MAX_PICKS_PER_TURN);
+    const withCopies = async (candidates: Candidate[], callId: string): Promise<Candidate[]> => {
+      const missing = candidates.filter((c) => !storedCopy.has(pictureKey(c.image)));
+      const refused = new Set<string>();
+      for (let start = 0; start < missing.length; start += MAX_VIEWED) {
+        const urls = missing.slice(start, start + MAX_VIEWED).map((c) => c.image);
+        const seen = await view(urls, ViewDetail.Low, start ? `${callId}-${start / MAX_VIEWED}` : callId);
+        keepCopies(seen.images);
+        for (const image of seen.images) {
+          if ('error' in image) {
+            refused.add(image.url);
+          }
+        }
+      }
+      return candidates.flatMap((c) => {
+        if (refused.has(c.image)) {
+          return [];
+        }
+        const preview = storedCopy.get(pictureKey(c.image));
+        return [preview ? { ...c, preview } : c];
+      });
+    };
     tools[ASK_REFERENCE_PICK] = tool({
       description: `Ask the user which references match their taste: shows them a grid of 2 to ${MAX_CANDIDATES} candidate pictures (id, image url, title, why you chose it) to mark follow or avoid, with a note. Call it after looking at the candidates and before building; it ends your turn: write nothing after it. min and max bound how many to follow (default 1 to all).`,
       inputSchema: pickAskSchema,
-      execute: async (input) => {
+      execute: async (input, { toolCallId }) => {
         if ((deps.rejections ?? 0) >= MAX_REJECTED_ROUNDS) {
           return { ok: false, error: `the user rejected ${MAX_REJECTED_ROUNDS} rounds of references in a row: stop asking, choose the closest ones yourself from what they said and explain why` };
         }
-        const candidates = input.candidates.filter((c) => !deps.shown?.has(c.id) && !deps.shown?.has(c.image)).map(({ preview: _claimed, ...c }) => {
-          const preview = storedCopy.get(c.image);
-          return preview ? { ...c, preview } : c;
-        });
-        if (candidates.length < MIN_CANDIDATES) {
+        const fresh = input.candidates.filter((c) => !deps.shown?.has(c.id) && !deps.shown?.has(c.image)).map(({ preview: _claimed, ...c }) => c);
+        if (fresh.length < MIN_CANDIDATES) {
           return { ok: false, error: 'the user already saw these references: search for new ones before asking' };
+        }
+        const candidates = await withCopies(fresh, toolCallId);
+        if (candidates.length < MIN_CANDIDATES) {
+          return { ok: false, error: 'these pictures could not be shown to the user (refused by the safety review or unreachable): choose other references' };
         }
         return picks() ? { ok: true, ...pickAsk({ ...input, candidates }) } : limitReached('reference pick', MAX_PICKS_PER_TURN);
       }
