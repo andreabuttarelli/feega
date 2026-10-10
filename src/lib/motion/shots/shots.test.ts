@@ -177,3 +177,75 @@ describe('a recreated vector UI', () => {
     expect([...TIMES].reverse().map(seek).reverse()).toEqual(first);
   });
 });
+
+const VERTICAL = { width: 1080, height: 1920 };
+const LANDSCAPE = { width: 1920, height: 1080 };
+const TITLE_SHOTS = [ShotId.KineticTitle, ShotId.StatCount, ShotId.BeforeAfter, ShotId.LogoResolve, ShotId.TaglineCard];
+
+type Drawn = ReturnType<ReturnType<typeof drawPiece>>;
+
+const cssOf = (n: Drawn) => String(n.style.cssText ?? '');
+const sizeOf = (n: Drawn) => Number(/font-size:([\d.]+)px/.exec(cssOf(n))?.[1] ?? 0);
+const all = (n: Drawn): Drawn[] => [n, ...n.children.flatMap(all)];
+const wordsUnder = (n: Drawn): string[] => all(n).flatMap((c) => c.textContent.split(/\s+/)).filter(Boolean);
+const drawnAt = (id: ShotId, frame: { width: number; height: number }, t = DURATION) => drawPiece(shotSource(id, UI).js, SLOTS[id], DURATION, frame)(t);
+const title = (tree: Drawn) => all(tree).reduce((a, b) => (sizeOf(b) > sizeOf(a) ? b : a));
+
+describe('the type scale follows the aspect', () => {
+  it.each(TITLE_SHOTS.map((s) => [s]))('%s sets its title by the height in 9:16, stacking lines, not by the width alone (v3: titles tiny in vertical)', (id) => {
+    const big = title(drawnAt(id, VERTICAL));
+
+    expect(sizeOf(big) / VERTICAL.width).toBeGreaterThanOrEqual(0.18);
+    expect(cssOf(big)).toMatch(/line-height:0\.95/);
+  });
+
+  it.each(TITLE_SHOTS.map((s) => [s]))('%s keeps every word of its title inside the frame in 9:16 and 16:9', (id) => {
+    for (const frame of [VERTICAL, LANDSCAPE]) {
+      const big = title(drawnAt(id, frame));
+      const longest = Math.max(...wordsUnder(big).map((w) => w.length));
+
+      expect(longest * 0.52 * sizeOf(big)).toBeLessThanOrEqual(frame.width * 0.92);
+    }
+  });
+});
+
+describe('every text slot declares how much it holds', () => {
+  it.each(TITLE_SHOTS.map((s) => [s]))('%s declares max words and characters for the texts it shows', (id) => {
+    const limits = Object.entries(SHOTS[id].limits);
+
+    expect(limits.length).toBeGreaterThan(0);
+    for (const [slot, limit] of limits) {
+      expect(slot in SHOTS[id].slots.shape).toBe(true);
+      expect(limit.words).toBeGreaterThan(0);
+      expect(limit.chars).toBeGreaterThan(0);
+    }
+  });
+
+  it('refuses a full sentence on the tagline card and offers a cut (v3: the card got a sentence and became unreadable)', () => {
+    const made = addShot(withUi(), { shot: ShotId.TaglineCard, slots: { lines: 'Launch films, product demos and animated ads, made by you and your agents.' }, at: 0 }, 'c1');
+
+    expect(made.ok ? '' : made.error).toMatch(/lines.*at most \d+ words.*cut to "Launch films, product/);
+  });
+
+  it('takes a tagline inside its limits', () => {
+    expect(addShot(withUi(), { shot: ShotId.TaglineCard, slots: { lines: 'make your brand|move.' }, at: 0 }, 'c1').ok).toBe(true);
+  });
+});
+
+describe('UI shots in vertical', () => {
+  it('before-after stacks in 9:16: the UI wipes in under the pain line, not beside it', () => {
+    const clipped = (frame: { width: number; height: number }) => all(drawnAt(ShotId.BeforeAfter, frame)).map((n) => String(n.style.clipPath ?? '')).find((c) => c.startsWith('inset('));
+
+    expect(clipped(VERTICAL)).toMatch(/^inset\([1-9][\d.]*px 0 0 0\)$/);
+    expect(clipped(LANDSCAPE)).toMatch(/^inset\(0 0 0 [1-9][\d.]*px\)$/);
+  });
+
+  it('ui-focus dims the page briefly and keeps it visible (v3: the page sat grey for most of the shot)', () => {
+    const draw = drawPiece(shotSource(ShotId.UiFocus, UI).js, SLOTS[ShotId.UiFocus], DURATION, VERTICAL);
+    const times = Array.from({ length: 36 }, (_, i) => (i * DURATION) / 35);
+    const lowest = times.map((t) => Math.min(...all(draw(t)).filter((n) => n.className !== 'vcaret').map((n) => Number(n.style.opacity ?? 1))));
+
+    expect(Math.min(...lowest)).toBeGreaterThanOrEqual(0.3);
+    expect(lowest.filter((o) => o < 0.95).length / times.length).toBeLessThanOrEqual(0.5);
+  });
+});

@@ -5,7 +5,7 @@ vi.mock('$env/dynamic/private', () => ({ env: {} }));
 vi.mock('node:dns/promises', () => ({ lookup: vi.fn() }));
 
 import { lookup } from 'node:dns/promises';
-import { APP_MAX_SHOTS, APP_SESSION_TTL_MS, DEFAULT_SUBMIT_SELECTOR, appBrowse, destructiveWord, type AppAccount, type AppAccountStore } from './app-browse';
+import { APP_MAX_SHOTS, APP_SESSION_TTL_MS, DEFAULT_SUBMIT_SELECTOR, appBrowse, destructiveWord, savedSession, type AppAccount, type AppAccountStore } from './app-browse';
 import { StepKind } from './browse';
 import type { AppSession, AppTab, SessionCookie } from './browser';
 
@@ -229,5 +229,18 @@ describe('destructive words: one table', () => {
 
   it.each(['Settings', 'Payments history', 'Display options'])('%s does not', (label) => {
     expect(destructiveWord(label)).toBeNull();
+  });
+});
+
+describe('the session app_browse leaves for other tools', () => {
+  const account = (sessionUntil: number | null): AppAccount => ({ loginUrl: LOGIN, email: 'test@app.example', password: 'test-pass-1', session: SESSION, sessionUntil });
+
+  it('hands the live session to a page of the same app', async () => {
+    expect(await savedSession(memoryStore(account(NOW + 1)), () => NOW)(`${APP}/editor`)).toEqual({ session: SESSION, origin: APP });
+  });
+
+  it('never to another site, nor once it expired', async () => {
+    expect(await savedSession(memoryStore(account(NOW + 1)), () => NOW)('https://other.example/')).toBeNull();
+    expect(await savedSession(memoryStore(account(NOW - 1)), () => NOW)(`${APP}/editor`)).toBeNull();
   });
 });

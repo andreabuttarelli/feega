@@ -1844,7 +1844,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     recreate_ui: tool({
-      description: `Rebuild a real product UI as a sharp, vector, animatable component. With url (best: the product's own page or app screen) the live page is read element by element (boxes, real texts, fonts, colours, corners, icons as SVG) into a faithful vector UI; every element gets an id (input-0, button-2, heading-0, stat-1, text-4…) that focus_ui, click_ui and add_shot animate; pictures that are photos stay flagged in raster. With asset_id instead, a vision model reads a capture into a simpler layout: ${RECREATE_STATES.join('; ')}. With start and duration it also places the clip.`,
+      description: `Rebuild a real product UI as a sharp, vector, animatable component. With url (best: the product's own page or app screen) the live page is read element by element (boxes, real texts, fonts, colours, corners, icons as SVG) into a faithful vector UI; every element gets an id (input-0, button-2, heading-0, stat-1, text-4…) that focus_ui, click_ui and add_shot animate; pictures that are photos stay flagged in raster. With asset_id instead, a vision model reads a capture into a simpler layout: ${RECREATE_STATES.join('; ')}. With start and duration it also places the clip. An app screen behind a login: sign in with app_browse first (a TEST account the user gave in chat), then pass its url here; the saved session opens it.`,
       inputSchema: z
         .object({
           url: z.string().url().optional(),
@@ -1890,11 +1890,11 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     list_shots: tool({
       description: 'The library of premium shots: handcrafted, deterministic scenes with their own camera move, secondary motion, house easing and holds. For a trailer or product film, direct with shots (add_shot) instead of laying out primitives.',
       inputSchema: z.object({}),
-      execute: async () => ({ ok: true, shots: SHOT_IDS.map((id) => ({ id, about: SHOTS[id].about, slots: Object.keys(SHOTS[id].slots.shape), seconds: SHOTS[id].seconds, needs_ui: SHOTS[id].ui === ShotUi.Required, preview: shotPreview(id) })) })
+      execute: async () => ({ ok: true, shots: SHOT_IDS.map((id) => ({ id, about: SHOTS[id].about, slots: Object.keys(SHOTS[id].slots.shape), text_limits: SHOTS[id].limits, seconds: SHOTS[id].seconds, needs_ui: SHOTS[id].ui === ShotUi.Required, preview: shotPreview(id) })) })
     }),
 
     add_shot: tool({
-      description: `Place a premium shot from the library (list_shots): ${SHOT_IDS.map((id) => `${id} (${SHOTS[id].about})`).join('; ')}. slots are its data only: texts, element ids of the recreated UI, and font ink paper muted accent. ui is the name of a UI rebuilt with recreate_ui from a url; the shots that show the product need it. at and seconds place it (2–4 s, transitions shorter); with beats marked (mark_beats) start and end snap to the beat grid. The shot is an ordinary clip: its slots stay editable as props.`,
+      description: `Place a premium shot from the library (list_shots): ${SHOT_IDS.map((id) => `${id} (${SHOTS[id].about})`).join('; ')}. slots are its data only: texts, element ids of the recreated UI, and font ink paper muted accent. Every text slot holds a few words at most (text_limits in list_shots: a title is a claim of up to 6 words, never a sentence); a longer text is refused with a cut to use. ui is the name of a UI rebuilt with recreate_ui from a url; the shots that show the product need it. at and seconds place it (2–4 s, transitions shorter); with beats marked (mark_beats) start and end snap to the beat grid. The shot is an ordinary clip: its slots stay editable as props.`,
       inputSchema: z.object({ shot: z.enum(SHOT_IDS), slots: z.record(z.string(), z.union([z.string(), z.number()])).default({}), ui: z.string().optional(), at: z.number().min(0), seconds: z.number().positive().optional(), track_id: z.string().optional() }),
       execute: async (input) => {
         const fonts = registeredFont(session.doc, input.slots.font);

@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { frameDiffs, motionJolts } from '$lib/motion/smoothness';
+import { docCuts, frameDiffs, motionJolts } from '$lib/motion/smoothness';
 
 const [video, docPath] = process.argv.slice(2);
 const SIZE = { width: 108, height: 192 };
@@ -10,11 +10,7 @@ const raw = execFileSync('ffmpeg', ['-v', 'error', '-i', video, '-vf', `scale=${
 const frames = Array.from({ length: raw.length / FRAME_BYTES }, (_, i) => raw.subarray(i * FRAME_BYTES, (i + 1) * FRAME_BYTES));
 const doc = docPath ? JSON.parse(readFileSync(docPath, 'utf8')) : null;
 const fps = doc?.fps ?? 30;
-type Clip = { from: number; durationInFrames: number; junction?: unknown };
-const clips: Clip[] = doc ? doc.tracks.flatMap((t: { clips: Clip[] }) => t.clips) : [];
-const joined = new Set(clips.filter((c) => c.junction).map((c) => c.from));
-const edges = clips.flatMap((c) => [c.from, c.from + c.durationInFrames]).filter((f) => !joined.has(f));
-const cuts = edges.flatMap((f) => [f - 1, f]);
+const cuts = doc ? docCuts(doc) : [];
 
 const jolts = motionJolts(frameDiffs(frames), { cuts });
 console.log(`frames ${frames.length}, jolts ${jolts.length}`);
