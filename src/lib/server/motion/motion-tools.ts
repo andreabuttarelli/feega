@@ -45,6 +45,11 @@ import { contentEnd, fitDuration } from '$lib/motion/fit-duration';
 import { blocking, docProblems, frameProblems, softPictures, type FrameStat, type Pixels, type QualityProblem } from '$lib/motion/direction';
 import { CheckState, ComponentMode, MAX_CSS, MAX_HTML, MAX_JS, SOURCE_FILES, checkState, modeOf, propsSchemaSchema, sourceHash, type CustomComponent, type CustomSource } from '$lib/motion/custom/component';
 import { patchComponent, recordCheck, removeComponent, writeComponent } from '$lib/motion/custom/ops';
+import type { UiCapture } from '$lib/server/web/vector-capture';
+import { vectorPiece, withFonts } from '$lib/motion/vector-ui/piece';
+import { VectorRole } from '$lib/motion/vector-ui/model';
+import { SHOTS, SHOT_IDS, ShotUi, shotPreview } from '$lib/motion/shots/library';
+import { addShot } from '$lib/motion/shots/ops';
 import { RECREATE_STATES, UI_KINDS, UI_KIT, recreatedStyle, recreatedUi, type UiStructure } from '$lib/motion/ui-kit/kit';
 import { MORPH_KINDS, DEFAULT_REEL } from '$lib/motion/ui-morph/reel';
 import { addMorphReel } from '$lib/motion/ui-morph/ops';
@@ -147,6 +152,7 @@ export type MotionToolDeps = {
   importAsset?: (url: string, label?: string) => Promise<AssetImport>;
   capture?: (url: string, view: CaptureView) => Promise<SiteCapture>;
   readUi?: (asset: MotionAsset, region?: UiRegion) => Promise<UiRead>;
+  captureUi?: UiCapture;
   effects?: EffectStore;
   layouts?: LayoutStore;
   web?: WebToolDeps;
@@ -185,6 +191,8 @@ export enum EmbedAction {
   Publish = 'publish',
   Unpublish = 'unpublish'
 }
+
+const SHOWN_ELEMENTS = 60;
 
 const UNREADABLE = (what: string) => ({ ok: false as const, error: `${what} is not available in this workspace` });
 
@@ -570,6 +578,33 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     clipIds.flatMap((id) => effects.map((e) => ({ id, e }))).reduce<OpResult>((r, { id, e }) => (r.ok ? addEffect(r.doc, id, e.kind, deps.newId(), e.params) : r), result);
 
   const created = (out: ReturnType<typeof apply>, clipId: string) => (out.ok ? { ...out, clip_id: clipId } : out);
+
+  async function recreateFromUrl(url: string, input: { name: string; start?: number; duration: number; track_id?: string }) {
+    if (!deps.captureUi) {
+      return UNREADABLE('a browser to read the page');
+    }
+    const read = await deps.captureUi(url);
+    if (!read.ok) {
+      return read;
+    }
+    const ui = withFonts(read.ui, GOOGLE_FONTS.map((f) => f.f));
+    const withUiFonts = ui.fonts.reduce<OpResult>((r, f) => (r.ok ? registeredFont(r.doc, f) : r), { ok: true, doc: session.doc });
+    const piece = vectorPiece(input.name, ui);
+    const written = apply(withUiFonts.ok ? writeComponent(withUiFonts.doc, piece.name, { source: { html: piece.html, css: piece.css, js: piece.js }, propsSchema: { type: 'object', properties: {} } }) : withUiFonts, `recreated ${piece.name} from ${url}`);
+    if (!written.ok) {
+      return written;
+    }
+    const elements = ui.nodes.filter((n) => n.role !== VectorRole.Box).slice(0, SHOWN_ELEMENTS).map((n) => ({ id: n.id, role: n.role, ...(n.text ? { text: n.text.slice(0, 40) } : {}) }));
+    const made = { ok: true, name: piece.name, size: piece.size, elements, raster: ui.raster, ...(ui.raster.length ? { note: `${ui.raster.length} pictures stayed pictures (photos, canvas, video): they show as empty frames` } : {}) };
+    if (input.start === undefined) {
+      return made;
+    }
+    const id = deps.newId();
+    const shown = apply(addClip(session.doc, { component: 'Custom', from: frames(input.start), durationInFrames: frames(input.duration), trackId: input.track_id, props: { name: piece.name } }, id), `placed ${piece.name}`);
+    return shown.ok ? { ...made, clip_id: id, anchors: Object.keys(anchorsOf(session.doc, id)?.anchors ?? {}) } : shown;
+  }
+
+  const registeredFont = (doc: MotionDoc, font: unknown): OpResult => (typeof font !== 'string' || doc.fonts.some((f) => f.family === font) || !GOOGLE_FONTS.some((f) => f.f === font) ? { ok: true, doc } : registerFont(doc, font, GOOGLE_FONTS));
 
   const tools: Record<string, Tool> = {
     get_motion_doc: tool({
@@ -1809,19 +1844,25 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     recreate_ui: tool({
-      description: `Rebuild a product UI from a site capture as a sharp, vector, animatable component in the brand style, for any product the kit does not cover: a vision model reads the capture (or a region of it, fractions of the picture) into layout, blocks, real texts, colours, font and corners, and the component replays it: ${RECREATE_STATES.join('; ')}. With start and duration it also places the clip. Spends one code write.`,
-      inputSchema: z.object({
-        asset_id: z.string(),
-        name: z.string().regex(/^[A-Z][A-Za-z0-9]*$/).describe('PascalCase, e.g. UiEditor'),
-        region: z.object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1), width: z.number().positive().max(1), height: z.number().positive().max(1) }).optional(),
-        start: z.number().min(0).optional(),
-        duration: z.number().positive().default(3),
-        track_id: z.string().optional()
-      }),
+      description: `Rebuild a real product UI as a sharp, vector, animatable component. With url (best: the product's own page or app screen) the live page is read element by element (boxes, real texts, fonts, colours, corners, icons as SVG) into a faithful vector UI; every element gets an id (input-0, button-2, heading-0, stat-1, text-4…) that focus_ui, click_ui and add_shot animate; pictures that are photos stay flagged in raster. With asset_id instead, a vision model reads a capture into a simpler layout: ${RECREATE_STATES.join('; ')}. With start and duration it also places the clip.`,
+      inputSchema: z
+        .object({
+          url: z.string().url().optional(),
+          asset_id: z.string().optional(),
+          name: z.string().regex(/^[A-Z][A-Za-z0-9]*$/).describe('PascalCase, e.g. UiEditor'),
+          region: z.object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1), width: z.number().positive().max(1), height: z.number().positive().max(1) }).optional(),
+          start: z.number().min(0).optional(),
+          duration: z.number().positive().default(3),
+          track_id: z.string().optional()
+        })
+        .refine((v) => Boolean(v.url) !== Boolean(v.asset_id), 'give url or asset_id, one of them'),
       execute: async (input, { toolCallId }) => {
+        if (input.url) {
+          return recreateFromUrl(input.url, input);
+        }
         const asset = deps.assets.find((a) => a.id === input.asset_id && a.kind === AssetKind.Image);
         if (!asset) {
-          return { ok: false, error: `no picture ${input.asset_id} in this project: capture the site first (import_asset with capture)` };
+          return { ok: false, error: `no picture ${input.asset_id} in this project: capture the site first (import_asset with capture), or pass url` };
         }
         if (!deps.readUi) {
           return UNREADABLE('a vision model to read the capture');
@@ -1843,6 +1884,27 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const placed = addClip(session.doc, { component: 'Custom', from: frames(input.start), durationInFrames: frames(input.duration), trackId: input.track_id, props: { name: piece.name, ...recreatedStyle(read.structure, fontRefProblem(read.structure.font, session.doc.fonts) === null) } }, id);
         const shown = apply(placed, `placed ${piece.name}`);
         return shown.ok ? { ...made, clip_id: id, anchors: Object.keys(anchorsOf(session.doc, id)?.anchors ?? {}) } : shown;
+      }
+    }),
+
+    list_shots: tool({
+      description: 'The library of premium shots: handcrafted, deterministic scenes with their own camera move, secondary motion, house easing and holds. For a trailer or product film, direct with shots (add_shot) instead of laying out primitives.',
+      inputSchema: z.object({}),
+      execute: async () => ({ ok: true, shots: SHOT_IDS.map((id) => ({ id, about: SHOTS[id].about, slots: Object.keys(SHOTS[id].slots.shape), seconds: SHOTS[id].seconds, needs_ui: SHOTS[id].ui === ShotUi.Required, preview: shotPreview(id) })) })
+    }),
+
+    add_shot: tool({
+      description: `Place a premium shot from the library (list_shots): ${SHOT_IDS.map((id) => `${id} (${SHOTS[id].about})`).join('; ')}. slots are its data only: texts, element ids of the recreated UI, and font ink paper muted accent. ui is the name of a UI rebuilt with recreate_ui from a url; the shots that show the product need it. at and seconds place it (2–4 s, transitions shorter); with beats marked (mark_beats) start and end snap to the beat grid. The shot is an ordinary clip: its slots stay editable as props.`,
+      inputSchema: z.object({ shot: z.enum(SHOT_IDS), slots: z.record(z.string(), z.union([z.string(), z.number()])).default({}), ui: z.string().optional(), at: z.number().min(0), seconds: z.number().positive().optional(), track_id: z.string().optional() }),
+      execute: async (input) => {
+        const fonts = registeredFont(session.doc, input.slots.font);
+        if (!fonts.ok) {
+          return fonts;
+        }
+        const id = deps.newId();
+        const made = addShot(fonts.doc, { shot: input.shot, slots: input.slots, ui: input.ui, at: input.at, seconds: input.seconds, trackId: input.track_id }, id);
+        const shown = created(apply(made, `added shot ${input.shot}`), id);
+        return shown.ok && made.ok && made.placed ? { ...shown, from: made.placed.from / session.doc.fps, seconds: made.placed.frames / session.doc.fps, on_beat: made.placed.snapped } : shown;
       }
     }),
 

@@ -26,7 +26,7 @@ import { assetUrls, headOrNew, motionAssets, motionTokens, saveMotionDoc } from 
 import { fitNewVideo } from '$lib/motion/fit-duration';
 import { AGENT_SELF_SAVE_MS, overTurnCap } from '$lib/server/project-agent/limits';
 import { dropWorkingDoc, keepWorkingDoc } from '$lib/server/motion/working-doc';
-import { liveWebDeps, productImport, screenedImport } from '$lib/server/web/live';
+import { liveWebDeps, productImport, screenedImport, uiCapture } from '$lib/server/web/live';
 import { CAPTURE_MAX_EDGE, storeImage } from './asset-import';
 import { ATTACHMENT_PORTS } from '$lib/server/chat-attachments/register';
 import { EmbedAction, createMotionTools, selectionNote, type MotionSession, type MotionToolDeps } from '$lib/server/motion/motion-tools';
@@ -260,6 +260,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
     layouts: layoutStore({ db, orgId, actor: { kind: 'agent', id: userId, agentKey: MOTION_AGENT_KEY } }),
     effects: effectStore({ db, orgId, actor: { kind: 'agent', id: userId, agentKey: MOTION_AGENT_KEY }, gl: serverFramesOpen() ? chromiumGl : null }),
     storyboard,
+    captureUi: uiCapture({ orgId, userId, projectId: project.id, brandId: project.brandId }),
     readUi: uiReader({ ask: (q) => withOrgContext(orgId, () => llmStructured({ ...q, model: llmVisionModel() ?? model, label: 'motion-recreate-ui' })), fetchBytes: fetchImageBytes }),
     check: async (callId, doc, name) => {
       BROWSER_DRAWS[browser]();

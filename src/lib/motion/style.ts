@@ -8,6 +8,7 @@ import { EASE_BEZIER, easeCurve, type Bezier, type Keyframe } from './keyframes'
 import { motionEngine } from './engine/engine';
 import { loopSeam, tooDense } from './ui-morph/ops';
 import { uiOverload } from './ui-focus';
+import { PEAK_SHOTS } from './shots/library';
 import { DEFAULT_STYLE, MotionStyle, STYLE_EASES, type StyleEases } from './style-model';
 
 export enum Forbidden {
@@ -102,6 +103,9 @@ export const UI_FOCUS_RULE =
 export const GRAPHIC_REFERENCE_RULE =
   'References lead: when the user gives or you viewed reference images, copy their composition and type scale, not only their colours: how big the largest type is relative to the frame and whether it bleeds off the edge, the grid and its rules, the columns of small text, where the blocks of colour sit, the ratio of big to small. In view_frames put each frame next to the reference it follows and fix the biggest difference first. Poster moves: one word or number cropped by the frame (size 0.8–1.2, a third of it outside, bleed true); 3–5 columns of small text (dates, places, numbers, 0.015–0.025) hung on the grid; hairline rules on the column lines; a flat block of the accent covering a third of the frame with type overprinting it; a word turned 90° along one edge.';
 
+export const SHOTS_RULE =
+  'Direct, do not lay out pixels: a trailer or product film is a sequence of premium shots from the library (list_shots, add_shot), each with its own camera move, secondary motion and holds, cut on the beat. First rebuild the real product UI with recreate_ui from the product url (its app screens, the page that shows the product): that vector UI, never a generic kit card, is what the device, focus, morph, before-after and whip shots show. A product film without the real UI is blocked by the gate. Each shot lasts 2–4 s; when words need longer, cut words, never stretch the shot. Raw primitives only for what no shot covers.';
+
 export const EASING_RULE =
   'Easing is strongly accentuated, with a soft settle: every entrance on enter (feega.out), every exit on exit (feega.in), every move on standard (feega.inOut, the default), an expo-like curve that lands with an almost imperceptible resistance (at most 1–2% past the mark, never a visible bounce). In code, tween with ease: \'feega.out\' / \'feega.inOut\' / \'feega.in\'; springs stay near critical damping. Linear only for a continuous drift, a loop or a driver tween; never sine, power1 or a plain ease; never bouncy or elastic (back, elastic, bounce, overshoot). The weak-ease gate names the rest.';
 
@@ -122,6 +126,7 @@ export const STYLES: Record<MotionStyle, StyleSpec> = {
     maxMoving: 4,
     rules: [
       'Launch film is the house style: the LOOK of an Apple keynote film, Linear, Vercel Ship or Stripe Sessions (few elements, very large type, the real product, a sober palette) with HIGH ENERGY. Minimal never means slow: the bar is "would a client pay for this?". Never a slideshow, a still picture, a slow fade, the same layout twice or a PowerPoint effect.',
+      SHOTS_RULE,
       TITLE_CARD_RULE,
       TITLE_TYPE_RULE,
       UI_FOCUS_RULE,
@@ -394,7 +399,9 @@ const PEAK_SPANS: readonly { from: string; to: string; size: number }[] = [{ fro
 
 const spanned = (clip: Clip) => PEAK_SPANS.some(({ from, to, size }) => Math.abs(Number(clip.props[to] ?? 0) - Number(clip.props[from] ?? 0)) >= size);
 
-const peakOf = (clip: Clip) => spanned(clip) || Object.entries(PEAK_TRAVEL).some(([prop, size]) => travel(clip.keyframes[prop] ?? []) >= size);
+const peakShot = (clip: Clip) => clip.component === 'Custom' && [...PEAK_SHOTS].some((n) => String(clip.props.name ?? '').startsWith(n));
+
+const peakOf = (clip: Clip) => peakShot(clip) || spanned(clip) || Object.entries(PEAK_TRAVEL).some(([prop, size]) => travel(clip.keyframes[prop] ?? []) >= size);
 
 function noPeak(doc: MotionDoc): Found[] {
   const clips = timelines(doc).flat();
@@ -429,10 +436,23 @@ const words = (clip: Clip) => String(clip.props.text ?? '').split(/\s+/).filter(
 
 const readingTime = (n: number, spec: StyleSpec) => Math.max(spec.reading.perWord * n + spec.reading.base, n > 1 ? spec.reading.phrase : 0) + spec.reading.pause;
 
+const LONGEST_HOLD_S = 4;
+
+const wordsFor = (seconds: number, spec: StyleSpec) => Math.max(1, Math.floor((seconds - spec.reading.base - spec.reading.pause) / spec.reading.perWord + 1e-9));
+
+function readingAdvice(clip: Clip, spec: StyleSpec, fps: number): string {
+  const shown = Math.round((clip.durationInFrames / fps) * 10) / 10;
+  const need = readingTime(words(clip), spec);
+  if (need > LONGEST_HOLD_S) {
+    return `${clip.id} is on screen ${shown} s for ${words(clip)} words: no shot holds more than ${LONGEST_HOLD_S} s, so cut it to ${wordsFor(LONGEST_HOLD_S, spec)} words or fewer (or split it into two title cards), never stretch it`;
+  }
+  return `${clip.id} is on screen ${shown} s for ${words(clip)} words: it needs ${Math.round(need * 10) / 10} s to be read. Keep the words on screen (let them build the line and stay) and move the camera instead`;
+}
+
 function unreadable(clips: readonly Clip[], spec: StyleSpec, fps: number): Found[] {
   return clips
     .filter((c) => TEXT.has(c.component) && words(c) > 0 && c.durationInFrames / fps < readingTime(words(c), spec) - 1 / fps)
-    .map((clip) => ({ clip, at: clip.from, detail: `${clip.id} is on screen ${Math.round((clip.durationInFrames / fps) * 10) / 10} s for ${words(clip)} words: it needs ${Math.round(readingTime(words(clip), spec) * 10) / 10} s to be read. Keep the words on screen (let them build the line and stay) and move the camera instead` }));
+    .map((clip) => ({ clip, at: clip.from, detail: readingAdvice(clip, spec, fps) }));
 }
 
 const area = (clip: Clip) => Number(clip.props.width ?? 1) * Number(clip.props.height ?? 1);
