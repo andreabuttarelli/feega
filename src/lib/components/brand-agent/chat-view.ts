@@ -107,8 +107,13 @@ export function viewedPicturesOf(call: ToolCall, projectId: string, canvasId: st
     return [];
   }
   return images.flatMap((image) => {
-    const match = typeof image.path === 'string' ? image.path.match(VIEWED_PATH) : null;
-    return match ? [{ href: `/p/${projectId}/c/${canvasId}/web-views/${match[1]}/${match[2]}`, source: String(image.url ?? '') }] : [];
+    const href = typeof image.path === 'string' ? viewedHref(image.path, projectId, canvasId) : null;
+    return href ? [{ href, source: String(image.url ?? '') }] : [];
   });
+}
+
+export function viewedHref(path: string, projectId: string, canvasId: string): string | null {
+  const match = path.match(VIEWED_PATH);
+  return match ? `/p/${projectId}/c/${canvasId}/web-views/${match[1]}/${match[2]}` : null;
 }
 
