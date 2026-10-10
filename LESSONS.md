@@ -2759,3 +2759,14 @@ Signal: consecutive exported frames alternate between two states (`bench:export 
 layout once at mount (`clientWidth`) and a lane's iframe had no size yet. Move: render the window
 with `bench:export --range=a,b --lanes=4,1 --keep` and diff; make the read happen per frame or give
 the stage a fixed px size.
+
+## Eval
+
+### `eval:motion` conta una scena sola in un video di 34 s
+`ffmpeg select='gt(scene,0.3)'` non vede i cambi fatti di dissolvenze e sfondo nero: il punteggio
+più alto era 0.13. Segnale: `scenes 1`, `maxHold` uguale alla durata. Mossa: i tagli vengono dal
+doc (`docCuts`: inizi dei clip visivi di primo livello); ffmpeg solo se il doc manca.
+
+### Un export dal browser di un video di 51 s non sta in 20 minuti
+Headless, 1080×1920 High: ~1 frame/s. Segnale: `export failed: TimeoutError` con la barra
+all'80%. Mossa: tetto a 45 min in `eval:motion`; la durata è un fatto, non un errore del driver.
