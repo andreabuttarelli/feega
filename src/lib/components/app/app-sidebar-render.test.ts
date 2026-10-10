@@ -64,6 +64,10 @@ describe('app sidebar', () => {
     expect(body).toContain('action="/auth/signout"');
   });
 
+  it('reopens the tour from How feega works', () => {
+    expect(html()).toMatch(/data-testid="open-tour"[^>]*>[\s\S]*How feega works/);
+  });
+
   it('keeps credits without a project', () => {
     expect(html({ projectId: null, projects: [] })).toContain('href="/app/credits"');
   });

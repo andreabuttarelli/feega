@@ -4,6 +4,7 @@
   import Plus from '@lucide/svelte/icons/plus';
   import ThemeSwitch from '$lib/components/ThemeSwitch.svelte';
   import CreditAmount from '$lib/components/CreditAmount.svelte';
+  import { tourDialog } from '$lib/onboarding/tour-dialog.svelte';
   import { FOOTER_LEGAL_LINKS, LEGAL_LINKS, legalHref } from '$lib/legal-links';
   import { NavKind, NavLoad, NavMeta, NavSection, isNavActive, navHref, visibleNav, type NavItem, type NavLabel } from '$lib/app-nav';
 
@@ -82,6 +83,11 @@
       <span class="label">{labelOf(item.label)}</span>
       <ThemeSwitch />
     </div>
+  {:else if item.kind === NavKind.Tour}
+    <button type="button" class="row" onclick={() => (tourDialog.open = true)} data-testid="open-tour">
+      <item.icon size={ICON} strokeWidth={STROKE} />
+      <span class="label">{labelOf(item.label)}</span>
+    </button>
   {:else if item.kind === NavKind.Logout}
     <form method="POST" action="/auth/signout">
       <button type="submit" class="row">
