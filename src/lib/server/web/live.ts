@@ -12,6 +12,7 @@ import { CHAT_ATTACHMENT_MAX_BYTES } from '$lib/chat-attachments';
 import type { ProjectMode } from '$lib/project-mode';
 import { SearchEngine, exaSearch, openRouterSearch, searchEngineOf, type SearchPort } from './search';
 import { readPage } from './read-page';
+import { vectorCapture, type UiCapture } from './vector-capture';
 import { browserless, localBrowser, type BrowserlessUse, type OpenAppBrowser } from './browser';
 import { appBrowse } from './app-browse';
 import { appAccountStore } from '$lib/server/repos/app-accounts';
@@ -164,6 +165,11 @@ export function liveBrowser(scope: Metered): OpenAppBrowser | null {
     return browserless({ key, base: env.BROWSERLESS_BASE_URL?.trim() || undefined }, { connect: connectBrowserless, meter });
   }
   return serverFramesOpen() ? localBrowser(() => chromiumPage()) : null;
+}
+
+export function uiCapture(scope: Metered): UiCapture | undefined {
+  const open = liveBrowser(scope);
+  return open ? vectorCapture(open) : undefined;
 }
 
 function meteredExa(scope: Metered, key: string): SiteStrategy {

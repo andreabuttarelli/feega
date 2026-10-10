@@ -16,6 +16,8 @@ import { maskAt } from './ui-focus';
 import { MaskKind } from './mask';
 import { pivotBox } from './parent';
 import { LookMiss, lookProblems } from './reference-look';
+import { VECTOR_TOKEN } from './vector-ui/piece';
+import { structureOf } from './ui-kit/anchors';
 
 export enum Quality {
   RepeatedLayout = 'repeated-layout',
@@ -41,7 +43,8 @@ export enum Quality {
   ScriptDrift = 'script-drift',
   BackgroundSeam = 'background-seam',
   LiveScene = 'live-scene',
-  OffLook = 'off-look'
+  OffLook = 'off-look',
+  NoProductUi = 'no-product-ui'
 }
 
 export enum Severity {
@@ -76,6 +79,7 @@ export const SEVERITY: Record<Check, Severity> = {
   [Quality.BackgroundSeam]: Severity.Warning,
   [Quality.LiveScene]: Severity.Warning,
   [Quality.OffLook]: Severity.Warning,
+  [Quality.NoProductUi]: Severity.Blocking,
   [LookMiss.Unrecorded]: Severity.Blocking,
   [LookMiss.TypeScale]: Severity.Warning,
   [LookMiss.TypeScaleGross]: Severity.Blocking,
@@ -527,10 +531,25 @@ function liveScenes(doc: MotionDoc): QualityProblem[] {
   });
 }
 
+const STORY_MARK = /^story: /;
+
+const realUi = (doc: MotionDoc, clip: Clip) => {
+  const js = clip.component === 'Custom' ? doc.components[String(clip.props.name)]?.source.js : undefined;
+  return Boolean(js && (VECTOR_TOKEN.test(js) || structureOf(js)));
+};
+
+function productUiMissing(doc: MotionDoc): QualityProblem[] {
+  const story = Boolean(doc.script) || (doc.markers ?? []).some((m) => STORY_MARK.test(m.label));
+  if (!story || everyClip(doc).some((c) => realUi(doc, c))) {
+    return [];
+  }
+  return [{ kind: Quality.NoProductUi, detail: 'this product film never shows the real product: rebuild its UI with recreate_ui from the product url (its app screens) and show it with add_shot (device-fly-in, ui-focus, ui-morph, before-after, whip-zoom); generic kit cards do not count' }];
+}
+
 export function docProblems(doc: MotionDoc, input: { audioAssets: number; pixels?: Pixels; logos?: readonly string[]; referencesSeen?: boolean }): QualityProblem[] {
   const list = scenes(doc);
   const pixels = input.pixels ?? {};
-  return [...unscripted(doc), ...drifted(doc), ...clickMisses(doc), ...emptyUis(doc), ...stillUis(doc), ...repeated(doc, list), ...smallTitles(doc), ...silent(doc, input.audioAssets), ...softPictures(doc, pixels), ...croppedScreens(doc, pixels), ...alteredLogos(doc, new Set(input.logos ?? [])), ...outOfFrame(doc), ...tiltedText(doc), ...emptyFrames(doc), ...trailingEmpty(doc), ...smallLogos(doc, pixels), ...cutsMidAnimation(doc), ...backgroundSeams(doc), ...liveScenes(doc), ...styleProblems(doc).map((p) => ({ kind: Quality.OffStyle, at: p.at, effect: p.effect, detail: p.detail })), ...lookProblems(doc, placedClips(doc), input.referencesSeen ?? false).map((p) => ({ kind: Quality.OffLook, effect: p.miss, detail: p.detail }))];
+  return [...unscripted(doc), ...productUiMissing(doc), ...drifted(doc), ...clickMisses(doc), ...emptyUis(doc), ...stillUis(doc), ...repeated(doc, list), ...smallTitles(doc), ...silent(doc, input.audioAssets), ...softPictures(doc, pixels), ...croppedScreens(doc, pixels), ...alteredLogos(doc, new Set(input.logos ?? [])), ...outOfFrame(doc), ...tiltedText(doc), ...emptyFrames(doc), ...trailingEmpty(doc), ...smallLogos(doc, pixels), ...cutsMidAnimation(doc), ...backgroundSeams(doc), ...liveScenes(doc), ...styleProblems(doc).map((p) => ({ kind: Quality.OffStyle, at: p.at, effect: p.effect, detail: p.detail })), ...lookProblems(doc, placedClips(doc), input.referencesSeen ?? false).map((p) => ({ kind: Quality.OffLook, effect: p.miss, detail: p.detail }))];
 }
 
 export function frameProblems(stats: readonly FrameStat[]): QualityProblem[] {
