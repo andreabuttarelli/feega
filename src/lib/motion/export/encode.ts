@@ -4,16 +4,18 @@ import { scheduleEntry } from '../audio-graph';
 import { exportSize, type Capabilities, type Size } from '../export-plan';
 import { Resolution } from '../render-quote';
 import type { MotionDoc } from '../doc';
+import { lumaOf, type JoltMeter } from '../smoothness';
 
 export const MP4_MIME = 'video/mp4';
 const SAMPLE_RATE = 48_000;
 const CHANNELS = 2;
 const AUDIO_BITRATE = 192_000;
 const KEYFRAME_SECONDS = 2;
+const PROBE_LONG_SIDE = 192;
 
 export type FrameRenderer = (onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>) => Promise<void>;
 
-export type EncodeJob = { size: Size; fps: number; frames: number; samples: number; render: FrameRenderer; audio: AudioBuffer | null; onFrame: (done: number) => void; signal: AbortSignal; gate?: () => Promise<void> };
+export type EncodeJob = { size: Size; fps: number; frames: number; samples: number; render: FrameRenderer; audio: AudioBuffer | null; onFrame: (done: number) => void; signal: AbortSignal; gate?: () => Promise<void>; meter?: JoltMeter };
 
 export async function capabilities(doc: Pick<MotionDoc, 'width' | 'height'>): Promise<Capabilities> {
   if (typeof VideoEncoder === 'undefined') {
@@ -48,6 +50,22 @@ export async function mixAudio(entries: AudioEntry[], seconds: number): Promise<
   return context.startRendering();
 }
 
+function probeOf(size: Size, meter: JoltMeter | undefined): ((source: OffscreenCanvas) => void) | null {
+  if (!meter) {
+    return null;
+  }
+  const k = PROBE_LONG_SIDE / Math.max(size.width, size.height);
+  const probe = new OffscreenCanvas(Math.max(1, Math.round(size.width * k)), Math.max(1, Math.round(size.height * k)));
+  const look = probe.getContext('2d', { willReadFrequently: true });
+  if (!look) {
+    return null;
+  }
+  return (source) => {
+    look.drawImage(source, 0, 0, probe.width, probe.height);
+    meter.add(lumaOf(look.getImageData(0, 0, probe.width, probe.height).data));
+  };
+}
+
 export async function encodeMp4(job: EncodeJob): Promise<Blob> {
   const canvas = new OffscreenCanvas(job.size.width, job.size.height);
   const paint = canvas.getContext('2d');
@@ -55,6 +73,7 @@ export async function encodeMp4(job: EncodeJob): Promise<Blob> {
     throw new Error('no 2D canvas');
   }
 
+  const measure = probeOf(job.size, job.meter);
   const target = new BufferTarget();
   const output = new Output({ format: new Mp4OutputFormat({ fastStart: 'in-memory' }), target });
   const video = new CanvasSource(canvas, { codec: 'avc', bitrate: QUALITY_HIGH, keyFrameInterval: KEYFRAME_SECONDS });
@@ -85,6 +104,7 @@ export async function encodeMp4(job: EncodeJob): Promise<Blob> {
       if (k < job.samples - 1) {
         return;
       }
+      measure?.(canvas);
       await video.add(frame / job.fps, 1 / job.fps);
       job.onFrame(frame + 1);
     });
