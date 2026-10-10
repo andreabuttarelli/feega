@@ -1,5 +1,7 @@
 import type { Browser, HTTPRequest, Page } from 'puppeteer-core';
 import { RequestVerdict, requestVerdict } from './screenshot';
+import { CAPTURE_LIMITS, captureOf, framedNodes } from './vector-capture';
+import type { RawCapture } from '$lib/motion/vector-ui/model';
 
 export type Target = { selector?: string; text?: string };
 export type ScrollTo = { px?: number; to?: 'top' | 'bottom' };
@@ -30,6 +32,7 @@ export type AppTab = Tab & {
   restore: (session: AppSession, origin: string) => Promise<void>;
   label: (target: Target) => Promise<string>;
   ui: () => Promise<UiDigest>;
+  vector: () => Promise<unknown>;
 };
 
 export type OpenBrowser = () => Promise<Tab>;
@@ -138,6 +141,23 @@ function uiOf(limits: { max: number; text: number }): UiDigest {
   return { title: document.title, elements };
 }
 
+export async function vectorOfPage(page: Page): Promise<RawCapture> {
+  const main = await page.evaluate(captureOf, CAPTURE_LIMITS);
+  const inner = await Promise.all(
+    page.mainFrame().childFrames().map(async (frame) => {
+      const host = await frame.frameElement();
+      const box = await host?.boundingBox();
+      await host?.dispose();
+      if (!box || box.width < 1 || box.height < 1) {
+        return [];
+      }
+      const raw = await frame.evaluate(captureOf, CAPTURE_LIMITS).catch(() => null);
+      return raw ? [framedNodes(raw, box)] : [];
+    })
+  );
+  return { ...main, nodes: [...main.nodes, ...inner.flat().flat()] };
+}
+
 function labelOf(el: Element): string {
   return `${(el as HTMLElement).innerText ?? ''} ${el.getAttribute('aria-label') ?? ''} ${el.getAttribute('title') ?? ''} ${(el as HTMLInputElement).value ?? ''}`.replace(/\s+/g, ' ').trim();
 }
@@ -180,7 +200,8 @@ function tabOf(page: Page, close: () => Promise<number>): AppTab {
       const handle = await page.$(locator(target));
       return handle ? handle.evaluate(labelOf).finally(() => handle.dispose()) : '';
     },
-    ui: () => page.evaluate(uiOf, { max: UI_MAX_ELEMENTS, text: UI_MAX_TEXT })
+    ui: () => page.evaluate(uiOf, { max: UI_MAX_ELEMENTS, text: UI_MAX_TEXT }),
+    vector: () => vectorOfPage(page)
   };
 }
 

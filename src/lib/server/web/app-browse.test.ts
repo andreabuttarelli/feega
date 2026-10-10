@@ -53,7 +53,8 @@ function fakeTab(opts: { loginWorks?: boolean; sessionAlive?: boolean; labels?: 
       cookies = sessionAlive ? given.cookies : [];
     }),
     label: vi.fn(async (target) => labels[target.selector ?? target.text ?? ''] ?? ''),
-    ui: vi.fn(async () => UI)
+    ui: vi.fn(async () => UI),
+    vector: vi.fn(async () => ({}))
   };
   return tab;
 }
