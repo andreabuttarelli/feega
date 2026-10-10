@@ -41,6 +41,22 @@ function reachable(comps: MotionDoc['comps'], tracks: readonly MotionTrack[]): s
   return [...seen];
 }
 
+const TEXT_STACKS: ReadonlySet<string> = new Set(['Title', 'Text', 'Kicker', 'Caption']);
+const tallness = (frame: Pick<MotionDoc, 'width' | 'height'>) => frame.height / Math.min(frame.width, frame.height);
+
+function stackedFor(clip: MotionClip, squeeze: number): MotionClip {
+  if (squeeze === 1 || !TEXT_STACKS.has(clip.component)) {
+    return clip;
+  }
+  const toCentre = (y: number) => 0.5 + (y - 0.5) * squeeze;
+  const y = clip.keyframes.y;
+  return {
+    ...clip,
+    props: { ...clip.props, y: toCentre(Number(clip.props.y ?? 0.5)), height: Number(clip.props.height ?? 1) * squeeze },
+    keyframes: y ? { ...clip.keyframes, y: y.map((k) => ({ ...k, value: Number(k.value) * squeeze })) } : clip.keyframes
+  };
+}
+
 const unmarked = ({ template: _mark, ...comp }: MotionComp): MotionComp => comp;
 
 function made(meta: TemplateMeta, doc: MotionDoc): Made {
@@ -106,7 +122,9 @@ export function insertTemplate(doc: MotionDoc, entry: TemplateEntry, at: Placeme
   const source = entry.template.doc;
   const prefix = at.newId();
   const rename = (id: string) => `${prefix}-${id}`;
-  const clip = (c: MotionClip): MotionClip => {
+  const squeeze = Math.min(1, tallness(source) / tallness(doc));
+  const clip = (raw: MotionClip): MotionClip => {
+    const c = stackedFor(raw, squeeze);
     const ref = compRef(c);
     return { ...c, id: rename(c.id), parent: c.parent ? rename(c.parent) : null, props: ref ? { ...c.props, comp: rename(ref) } : c.props };
   };

@@ -6,6 +6,8 @@ import { BUILTIN_TEMPLATES } from './builtins';
 import { insertTemplate } from './library';
 import { LAUNCH_SCENES } from './launch-scenes';
 import { Quality, docProblems } from '$lib/motion/direction';
+import { sampleTrack } from '$lib/motion/sample-track';
+import { motionJolts } from '$lib/motion/smoothness';
 
 const LINE_OVER_SCENE: ReadonlySet<string> = new Set(['builtin:launch-device-fly', 'builtin:launch-device-orbit']);
 
@@ -108,5 +110,44 @@ describe('the launch film scene library', () => {
     expect(clipsOf(doc).some((c) => c.component === 'Logo3D')).toBe(false);
     expect(logo.component).toBe('Logo');
     expect(docProblems(withAsset, { audioAssets: 0, logos: ['brand'] }).filter((p) => p.kind === Quality.BrandLogoAltered)).toEqual([]);
+  });
+});
+
+describe('smooth fades', () => {
+  const POP = { popFloor: 0.05, stopSpeed: 0.05 };
+
+  it.each(launchDocs().map((e) => [e.id, e] as const))('%s fades without a one-frame jump after its entrance', (_, entry) => {
+    const fades = clipsOf(entry.template.doc).flatMap((c) => {
+      const track = c.keyframes.opacity ?? [];
+      if (!track.length) {
+        return [];
+      }
+      const values = Array.from({ length: c.durationInFrames }, (_, f) => sampleTrack(track as never, f));
+      const steps = values.slice(1).map((v, f) => Math.abs(v - values[f]));
+      return motionJolts(steps, { ...POP, cuts: [0, 1, 2] }).map((j) => `${c.id} at frame ${j.frame}`);
+    });
+
+    expect(fades).toEqual([]);
+  });
+});
+
+describe('stacked display lines', () => {
+  const TIGHT = 1;
+  const pitches = (format: MotionFormat) => {
+    const doc = newMotionDoc(format);
+    const entry = BUILTIN_TEMPLATES.find((e) => e.id === 'builtin:launch-word-burst')!;
+    const placed = insertTemplate(doc, entry, { from: 0, newId: ids() });
+    if (!placed.ok) {
+      throw new Error(placed.error);
+    }
+    const unit = Math.min(doc.width, doc.height);
+    const words = clipsOf(placed.doc)
+      .filter((c) => c.component === 'Title')
+      .sort((a, b) => Number(a.props.y) - Number(b.props.y));
+    return words.slice(1).map((w, i) => ((Number(w.props.y) - Number(words[i].props.y)) * doc.height) / (Number(w.props.size) * unit));
+  };
+
+  it.each([MotionFormat.Landscape, MotionFormat.Vertical])('the word burst stacks its lines tight in %s, never a body line height', (format) => {
+    expect(Math.max(...pitches(format))).toBeLessThanOrEqual(TIGHT);
   });
 });
