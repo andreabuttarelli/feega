@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'vitest';
 import { beatAlignment, compareRuns, docCuts, edgeDensity, emptyShare, gateBlockingLeft, holdStats, spentUsd, textMinShare, toolErrors, uiLayers, type CaseResult } from './score';
 
+const VECTOR_JS = 'const U = {"width":1280,"height":800,"nodes":[]};\nconst boxOf = 1;';
+
 const flat = (w: number, h: number, v: number) => new Uint8Array(w * h).fill(v);
 
 describe('edgeDensity', () => {
@@ -80,8 +82,13 @@ describe('textMinShare', () => {
 
 describe('uiLayers', () => {
   test('splits custom UI clips into kit pieces and recreated ones', () => {
-    const d = doc([{ component: 'Custom', props: { name: 'UiPromptBox' } }, { component: 'Custom', props: { name: 'UiAcmeEditor' } }, { component: 'Title' }]);
+    const d = { ...doc([{ component: 'Custom', props: { name: 'UiPromptBox' } }, { component: 'Custom', props: { name: 'UiAcmeEditor' } }, { component: 'Title' }]), components: { UiAcmeEditor: { source: { js: VECTOR_JS } } } };
     expect(uiLayers(d, new Set(['UiPromptBox']))).toEqual({ recreated: 1, kit: 1 });
+  });
+
+  test('a shot that shows the recreated UI counts as recreated, a text-only shot as neither', () => {
+    const d = { ...doc([{ component: 'Custom', props: { name: 'ShotDeviceFlyInUiFeega' } }, { component: 'Custom', props: { name: 'ShotKineticTitle' } }]), components: { ShotDeviceFlyInUiFeega: { source: { js: VECTOR_JS } }, ShotKineticTitle: { source: { js: 'const copy = 1;' } } } };
+    expect(uiLayers(d, new Set())).toEqual({ recreated: 1, kit: 0 });
   });
 });
 
