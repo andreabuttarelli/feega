@@ -3,6 +3,7 @@ import type { ModelMessage } from 'ai';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { addClip } from '$lib/motion/timeline';
 import { writeComponent } from '$lib/motion/custom/ops';
+import { finalReply } from './frames';
 import { FrameUpload, MAX_SELF_CHECK_REFS, checkMessage, viewedReferences, MAX_FRAME_BYTES, MAX_FRAMES_PER_VIEW, MAX_VIEWS_PER_TURN, VIEW_FRAMES, decodeFrame, docTexts, keyFrameTimes, selfCheckDue, usageByModel, Vision, visionStep } from './frames';
 
 const jpeg = (bytes: number) => `data:image/jpeg;base64,${Buffer.alloc(bytes, 1).toString('base64')}`;
@@ -147,5 +148,21 @@ describe('the self-check compares the frames with the references seen in the tur
 
   it('the check stays a plain text ask: the view it asks for carries the references', () => {
     expect(typeof checkMessage([], [1, 2]).content).toBe('string');
+  });
+});
+
+describe('finalReply', () => {
+  const open = [{ kind: 'out-of-frame', detail: 'title leaves the safe area' }] as never;
+
+  it('is the last summary alone, not every draft the turn wrote', () => {
+    expect(finalReply(['Draft one.', 'Draft two.', 'Done: the trailer is ready.'], [])).toBe('Done: the trailer is ready.');
+  });
+
+  it('ends on the question, with what is still open just before it', () => {
+    const reply = finalReply(['Draft.', 'The cut is built.\n\nWhich way do you prefer?'], open);
+
+    expect(reply.endsWith('Which way do you prefer?')).toBe(true);
+    expect(reply).toContain('title leaves the safe area');
+    expect(reply).not.toContain('Draft.');
   });
 });

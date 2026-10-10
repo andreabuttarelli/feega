@@ -208,6 +208,20 @@ export function stillOpenNote(errors: readonly QualityProblem[]): string {
   return errors.length ? `\n\nStill open after the last check, not fixed:\n${errors.map((e) => `- ${e.detail}`).join('\n')}` : '';
 }
 
+const PARAGRAPH = /\n\s*\n/;
+const QUESTION = /\?\s*$/;
+
+export function finalReply(texts: readonly string[], errors: readonly QualityProblem[]): string {
+  const last = [...texts].reverse().find((t) => t.trim())?.trim() ?? '';
+  const note = stillOpenNote(errors).trim();
+  if (!note) {
+    return last;
+  }
+  const paragraphs = last.split(PARAGRAPH);
+  const ask = paragraphs.length > 1 && QUESTION.test(last) ? paragraphs.pop()! : '';
+  return [paragraphs.join('\n\n'), note, ask].filter(Boolean).join('\n\n');
+}
+
 export const SUMMARY_PROMPT = `The turn is over: ${SUMMARY_ASK}`;
 
 export type TokenUsage = Partial<Record<'inputTokens' | 'outputTokens' | 'cachedTokens' | 'thinkingTokens', number>>;

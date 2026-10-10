@@ -12,6 +12,7 @@ import { Tier, activeTools, openingTier, selfCheckChoice, spentUsd, stepTier, ty
 import { extractSdkUsage, logAiCall, withOrgContext } from '$lib/server/ai-log';
 import { loadTurns, openNodeThread, promptHistory, saveTurn } from '$lib/server/repos/chat';
 import { openReply, ReplyStatus } from '$lib/server/repos/chat-reply';
+import { referencedAssets } from '$lib/motion/doc-assets';
 import { finishedTurn } from '$lib/server/project-agent/finished-turn';
 import { agentActor, type Actor } from '$lib/server/repos/actor';
 import { agentStopWhen } from '$lib/server/project-agent/limits';
@@ -42,7 +43,7 @@ import { RevisionOutcome, listRevisions, readRevision } from '$lib/server/repos/
 import { brandSources } from '$lib/server/motion/brand-sources';
 import { storyboardStore } from '$lib/server/motion/storyboard';
 import { boardNote } from '$lib/motion/storyboard';
-import { SELF_CHECK_MAX_STEPS, SUMMARY_PROMPT, VIEW_FRAMES, Vision, deliveryBlocked, docTexts, checkMessage, keyFrameTimes, openErrors, selfCheckDue, stillOpenNote, viewedReferences, usageByModel, visionStep } from '$lib/server/motion/frames';
+import { SELF_CHECK_MAX_STEPS, SUMMARY_PROMPT, VIEW_FRAMES, Vision, deliveryBlocked, docTexts, checkMessage, keyFrameTimes, openErrors, selfCheckDue, stillOpenNote, finalReply, viewedReferences, usageByModel, visionStep } from '$lib/server/motion/frames';
 import { frameStats } from '$lib/server/motion/frame-stats';
 import { awaitFrames, awaitVerdict, framesPrefix, FRAME_POLL_MS, type FrameBucket } from '$lib/server/motion/frame-store';
 import { CANVAS_ASSET_BUCKET, SIGNED_URL_TTL_S } from '$lib/server/repos/asset-storage';
@@ -482,6 +483,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
     clearTimeout(wall);
     clearInterval(watch);
     session.doc = fitNewVideo(head.doc, session.doc);
+    session.doc = { ...session.doc, assets: referencedAssets(session.doc, assets.map((a) => ({ id: a.id, kind: a.kind, name: a.label }))) };
     const write = session.edits.length ? await saveAgentDoc() : null;
     if (write && write.outcome !== RevisionOutcome.Written) {
       console.warn('[motion-agent] revision not saved', { nodeId: motion.record.id, outcome: write.outcome });
@@ -492,7 +494,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
     }
 
     const finished = finishedTurn(steps);
-    const turn = { ...finished, content: finished.content + (awaitsUser(steps) ? '' : stillOpenNote(openErrors(session))) };
+    const turn = { ...finished, content: finalReply(steps.map((s) => s.text), awaitsUser(steps) ? [] : openErrors(session)) };
     await reply.finish(turn, ReplyStatus.Done);
 
     for (const [modelId, usage] of usageByModel(steps.map((s) => extractSdkUsage(s.usage)), stepModels)) {
