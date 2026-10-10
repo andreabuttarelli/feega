@@ -14,7 +14,7 @@ import { SearchEngine, exaSearch, openRouterSearch, searchEngineOf, type SearchP
 import { readPage } from './read-page';
 import { vectorCapture, type UiCapture } from './vector-capture';
 import { browserless, localBrowser, type BrowserlessUse, type OpenAppBrowser } from './browser';
-import { appBrowse } from './app-browse';
+import { appBrowse, savedSession } from './app-browse';
 import { appAccountStore } from '$lib/server/repos/app-accounts';
 import { browse } from './browse';
 import { directFetch, exaContents, renderedSite, secondarySources, type SiteStrategy } from './site-fetch';
@@ -167,9 +167,10 @@ export function liveBrowser(scope: Metered): OpenAppBrowser | null {
   return serverFramesOpen() ? localBrowser(() => chromiumPage()) : null;
 }
 
-export function uiCapture(scope: Metered): UiCapture | undefined {
+export function uiCapture(db: Db, scope: Metered): UiCapture | undefined {
   const open = liveBrowser(scope);
-  return open ? vectorCapture(open) : undefined;
+  const accounts = appAccountStore(db, { orgId: scope.orgId, projectId: scope.projectId, actor: { kind: 'agent', id: scope.userId } });
+  return open ? vectorCapture(open, undefined, savedSession(accounts)) : undefined;
 }
 
 function meteredExa(scope: Metered, key: string): SiteStrategy {

@@ -1,5 +1,6 @@
 import { RAW_CAPTURE, VectorHint, VectorKind, vectorUi, type RawCapture, type VectorUi } from '$lib/motion/vector-ui/model';
 import type { OpenAppBrowser } from './browser';
+import { signInPath, type KeptSession } from './app-browse';
 
 export type CaptureLimits = { max: number; text: number; svg: number };
 
@@ -218,15 +219,26 @@ export function framedNodes(inner: RawCapture, box: FrameBox): RawCapture['nodes
 
 export type UiCapture = (url: string) => Promise<{ ok: true; ui: VectorUi } | { ok: false; error: string }>;
 
+export type SignedIn = (url: string) => Promise<KeptSession | null>;
+
+const SIGNED_OUT: SignedIn = async () => null;
+
 const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-export function vectorCapture(open: OpenAppBrowser, settleMs = SETTLE_MS): UiCapture {
+export function vectorCapture(open: OpenAppBrowser, settleMs = SETTLE_MS, signedIn: SignedIn = SIGNED_OUT): UiCapture {
   return async (url) => {
     const tab = await open();
     try {
+      const kept = await signedIn(url);
+      if (kept) {
+        await tab.restore(kept.session, kept.origin);
+      }
       const status = await tab.goto(url).catch((e: unknown) => (NAV_TIMEOUT.test(String(e)) ? null : Promise.reject(e)));
       if (status !== null && status >= 400) {
         return { ok: false, error: `${url} answered ${status}` };
+      }
+      if (signInPath(tab.url()) && !signInPath(url)) {
+        return { ok: false, error: `${url} sent the browser to its sign-in page: it is an app screen behind a login. Ask the user in chat for a TEST account, sign in with app_browse, then call recreate_ui on the same url (the session is reused)` };
       }
       await pause(settleMs);
       const parsed = RAW_CAPTURE.safeParse(await tab.vector());
