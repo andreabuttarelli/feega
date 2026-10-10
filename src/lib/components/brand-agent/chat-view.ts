@@ -97,7 +97,7 @@ export function keyboardInset(v: {
 }
 
 const VIEWED_PATH = /\/web-views\/([\w-]+)\/([\w-]+\.jpg)$/;
-const VIEWING_TOOLS = new Set(['view_images']);
+const VIEWING_TOOLS = new Set(['view_images', 'view_video_frames']);
 
 export type ViewedPicture = { href: string; source: string };
 
