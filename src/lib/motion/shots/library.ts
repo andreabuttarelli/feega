@@ -23,6 +23,8 @@ export enum ShotUi {
   Required = 'required'
 }
 
+export type SlotLimit = { words: number; chars: number };
+
 export type ShotSpec = {
   name: string;
   about: string;
@@ -30,11 +32,13 @@ export type ShotSpec = {
   ui: ShotUi;
   peak: boolean;
   slots: z.ZodObject<z.ZodRawShape>;
+  limits: Record<string, SlotLimit>;
   css: string;
   js: string;
 };
 
-const text = (max: number) => z.string().trim().min(1).max(max);
+const text = z.string().trim().min(1);
+const limit = (words: number, chars: number): SlotLimit => ({ words, chars });
 const nodeId = z.string().regex(/^[a-z]+-\d+$/, 'an element id of the recreated UI, e.g. button-0, input-0, text-3');
 
 const PRELUDE = `
@@ -67,11 +71,36 @@ const el = (tag, css, host, content) => {
   return n;
 };
 const TITLE = 'font-weight:600;letter-spacing:-0.05em;line-height:0.95;';
-const titleSize = (copy, share) => {
-  const lines = copy.length > 14 ? 2 : 1;
-  const perLine = Math.max(5, Math.ceil(copy.length / lines) + 1);
-  return Math.min((H * share) / lines, (W * 0.86) / (perLine * 0.5));
+const GLYPH = 0.52;
+const MAX_ROWS = WIDE ? 2 : 4;
+const CAPTION = UNIT * (WIDE ? 0.04 : 0.056);
+const wrapRows = (line, cap) => line.split(/\\s+/).filter(Boolean).reduce((rows, w) => {
+  const last = rows[rows.length - 1];
+  if (last !== undefined && (last + ' ' + w).length <= cap) {
+    rows[rows.length - 1] = last + ' ' + w;
+    return rows;
+  }
+  rows.push(w);
+  return rows;
+}, []);
+const fitRows = (lines, share, most) => {
+  const longest = Math.max(1, ...lines.map((l) => l.length));
+  const word = Math.max(1, ...lines.flatMap((l) => l.split(/\\s+/)).map((w) => w.length));
+  let best = { size: 0, rows: lines };
+  for (let cap = longest; cap >= word; cap--) {
+    const rows = lines.flatMap((l) => wrapRows(l, cap));
+    if (rows.length > Math.max(most, lines.length)) {
+      continue;
+    }
+    const wide = Math.max(...rows.map((r) => r.length));
+    const size = Math.min((H * share) / rows.length, (W * 0.86) / (wide * GLYPH));
+    if (size > best.size) {
+      best = { size, rows };
+    }
+  }
+  return best;
 };
+const titleSize = (copy, share) => fitRows([String(copy)], share, MAX_ROWS).size;
 const drive = (render) => {
   render(0);
   tl.to({}, { duration, ease: 'none', onUpdate() { render(this.time()); } }, 0);
@@ -120,9 +149,17 @@ const copy = param('text', 'make your brand move.', { type: 'text', group: 'Cont
 const keyRaw = param('accent_word', '', { type: 'text', group: 'Content', label: 'Accent word (the word or its index)' });
 const words = String(copy).split(/\\s+/).filter(Boolean);
 const keyWord = /^-?\\d+$/.test(String(keyRaw)) ? Number(keyRaw) : words.indexOf(String(keyRaw));
-const size = titleSize(String(copy), 0.46);
-const box = el('div', 'position:absolute;left:50%;top:50%;width:' + W * 0.88 + 'px;text-align:center;color:' + ink + ';font-size:' + size + 'px;' + TITLE);
-const spans = words.map((w, i) => el('span', 'display:inline-block;white-space:pre;transform-origin:50% 60%;' + (i === keyWord ? 'color:' + accent + ';' : ''), box, w + (i < words.length - 1 ? ' ' : '')));
+const fitted = fitRows([words.join(' ')], 0.46, MAX_ROWS);
+const box = el('div', 'position:absolute;left:50%;top:50%;width:' + W * 0.92 + 'px;text-align:center;color:' + ink + ';font-size:' + fitted.size + 'px;' + TITLE);
+let next = 0;
+const spans = fitted.rows.flatMap((row) => {
+  const line = el('div', 'white-space:nowrap;', box);
+  const inRow = row.split(' ');
+  return inRow.map((w, j) => {
+    const i = next++;
+    return el('span', 'display:inline-block;white-space:pre;transform-origin:50% 60%;' + (i === keyWord ? 'color:' + accent + ';' : ''), line, w + (j < inRow.length - 1 ? ' ' : ''));
+  });
+});
 const STAGGER = 0.09;
 drive((t) => {
   const push = 1 + 0.05 * span(t, 0, duration);
@@ -189,17 +226,16 @@ const onField = frameOn(field, 0.72, 0.42);
 const onButton = frameOn({ x: button.x - button.w * 2, y: button.y - button.h * 1.5, w: button.w * 5, h: button.h * 4 }, 0.5, 0.5);
 const onResult = result ? frameOn(result, 0.7, 0.6) : WHOLE;
 const T = { type: 0.35, typeFor: Math.min(1.4, duration * 0.3), toButton: duration * 0.42, press: duration * 0.42 + 0.75, toResult: duration * 0.42 + 1.05 };
+const DIM = { depth: 0.55, at: 0.3, len: 0.3, release: 0.4 };
 drive((t) => {
   const arrive = out(span(t, 0, 0.7));
   let view = { k: onField.k * mix(0.82, 1, arrive), cx: onField.cx, cy: onField.cy };
   view = lerpCam(view, onButton, move(span(t, T.toButton, 0.7)));
   view = lerpCam(view, onResult, move(span(t, T.toResult, 0.8)));
   place(view, cam);
-  const back = move(span(t, T.toResult, 0.8));
   const focus = t < T.toButton + 0.35 ? field : button;
-  const level = mix(0.06, 1, result ? 0.06 : back);
-  dimAround(drawn, focus, level);
-  sheet.style.opacity = String(level);
+  const dim = out(span(t, DIM.at, DIM.len)) * (1 - move(span(t, T.toButton - 0.2, DIM.release)));
+  dimAround(drawn, focus, 1 - DIM.depth * dim);
   if (typeTarget) {
     typeInto(U, drawn.els, typeTarget, typed, span(t, T.type, T.typeFor), t);
   }
@@ -222,7 +258,7 @@ const tiles = items.map((label, i) => {
   const r = Math.floor(i / cols);
   const tile = el('div', 'position:absolute;left:' + c * (tw + GAP) + 'px;top:' + r * (th + GAP) + 'px;width:' + tw + 'px;height:' + th + 'px;background:rgba(255,255,255,0.06);box-shadow:0 0 0 1px rgba(255,255,255,0.08) inset;color:' + ink + ';', grid);
   el('div', 'position:absolute;left:' + tw * 0.08 + 'px;top:' + th * 0.12 + 'px;width:' + UNIT * 0.012 + 'px;height:' + UNIT * 0.012 + 'px;border-radius:50%;background:' + accent + ';', tile);
-  el('div', 'position:absolute;left:' + tw * 0.08 + 'px;bottom:' + th * 0.12 + 'px;right:' + tw * 0.08 + 'px;font-size:' + tw * 0.085 + 'px;' + TITLE, tile, label);
+  el('div', 'position:absolute;left:' + tw * 0.08 + 'px;bottom:' + th * 0.12 + 'px;right:' + tw * 0.08 + 'px;font-size:' + tw * (WIDE ? 0.085 : 0.11) + 'px;' + TITLE, tile, label);
   return tile;
 });
 drive((t) => {
@@ -247,7 +283,7 @@ const grouped = m[2].includes(',');
 const size = titleSize(value, 0.42);
 const num = el('div', 'position:absolute;left:0;right:0;top:' + (H * 0.5 - size * 0.62) + 'px;text-align:center;color:' + ink + ';font-size:' + size + 'px;font-variant-numeric:tabular-nums;' + TITLE);
 const rule = el('div', 'position:absolute;left:50%;top:' + (H * 0.5 + size * 0.42) + 'px;height:' + Math.max(2, UNIT * 0.004) + 'px;background:' + accent + ';');
-const cap = el('div', 'position:absolute;left:0;right:0;top:' + (H * 0.5 + size * 0.42 + UNIT * 0.04) + 'px;text-align:center;color:' + muted + ';font-size:' + UNIT * 0.042 + 'px;font-weight:500;letter-spacing:-0.02em;', root, label);
+const cap = el('div', 'position:absolute;left:0;right:0;top:' + (H * 0.5 + size * 0.42 + UNIT * 0.04) + 'px;text-align:center;color:' + muted + ';font-size:' + CAPTION + 'px;font-weight:500;letter-spacing:-0.02em;', root, label);
 const ruleW = Math.min(W * 0.5, size * 2.2);
 const show = (n) => {
   const v = n.toFixed(digits);
@@ -278,20 +314,27 @@ const BEFORE_AFTER = `
 const pain = param('before_text', 'three weeks in a timeline', { type: 'text', group: 'Content', label: 'Before' });
 const beforeLabel = param('before_label', 'before', { type: 'text', group: 'Content' });
 const afterLabel = param('after_label', 'after', { type: 'text', group: 'Content' });
-const left = el('div', 'position:absolute;left:0;top:0;bottom:0;width:' + W + 'px;');
-const painSize = titleSize(String(pain), 0.34);
-const painBox = el('div', 'position:absolute;left:' + W * 0.06 + 'px;right:' + W * 0.06 + 'px;top:50%;text-align:center;color:' + muted + ';font-size:' + painSize + 'px;' + TITLE, left, pain);
+const SPLIT = WIDE ? 0.38 : 0.36;
+const LONG = WIDE ? W : H;
+const fitted = fitRows([String(pain)], 0.34, MAX_ROWS);
+const painSize = fitted.size;
+const left = el('div', 'position:absolute;left:0;top:0;width:' + W + 'px;height:' + H + 'px;');
+const painBox = el('div', 'position:absolute;left:' + W * 0.06 + 'px;right:' + W * 0.06 + 'px;top:50%;text-align:center;white-space:pre-line;color:' + muted + ';font-size:' + painSize + 'px;' + TITLE, left, fitted.rows.join('\\n'));
 const strike = el('div', 'position:absolute;left:50%;top:50%;height:' + Math.max(2, UNIT * 0.005) + 'px;background:' + muted + ';', left);
-const right = el('div', 'position:absolute;top:0;bottom:0;left:0;width:' + W + 'px;overflow:hidden;');
+const right = el('div', 'position:absolute;left:0;top:0;width:' + W + 'px;height:' + H + 'px;overflow:hidden;');
 const cam = el('div', '', right);
 cam.className = 'cam';
 drawVector(U, cam);
-const divider = el('div', 'position:absolute;top:0;bottom:0;width:' + Math.max(2, UNIT * 0.003) + 'px;background:' + accent + ';');
-const tag = (copy) => el('div', 'position:absolute;top:' + H * 0.06 + 'px;font-size:' + UNIT * 0.026 + 'px;font-weight:500;letter-spacing:0.02em;text-transform:lowercase;color:' + muted + ';', root, copy);
+const RULE = Math.max(2, UNIT * 0.003);
+const divider = el('div', 'position:absolute;background:' + accent + ';' + (WIDE ? 'top:0;bottom:0;width:' + RULE + 'px;' : 'left:0;right:0;height:' + RULE + 'px;'));
+const tag = (copy) => el('div', 'position:absolute;top:' + H * (WIDE ? 0.06 : 0.04) + 'px;left:' + W * (WIDE ? 0.05 : 0.06) + 'px;font-size:' + CAPTION * 0.65 + 'px;font-weight:500;letter-spacing:0.02em;text-transform:lowercase;color:' + muted + ';', root, copy);
 const tagL = tag(beforeLabel);
 const tagR = tag(afterLabel);
-const SPLIT = WIDE ? 0.38 : 0.3;
-const view = { k: Math.min((W * (1 - SPLIT) * 0.92) / U.width, (H * 0.8) / U.height), cx: U.width / 2, cy: U.height / 2 };
+const room = WIDE ? { w: W * (1 - SPLIT), h: H } : { w: W, h: H * (1 - SPLIT) };
+const view = { k: Math.min((room.w * 0.92) / U.width, (room.h * 0.8) / U.height), cx: U.width / 2, cy: U.height / 2 };
+const painExtent = WIDE ? Math.max(...fitted.rows.map((r) => r.length)) * GLYPH * painSize : fitted.rows.length * 0.95 * painSize;
+const painRoom = LONG * SPLIT * 0.84;
+const offset = (LONG * SPLIT + (LONG * (1 - SPLIT)) / 2 - LONG / 2) / view.k;
 drive((t) => {
   const e = out(span(t, 0, 0.6));
   painBox.style.opacity = String(e);
@@ -299,20 +342,19 @@ drive((t) => {
   strike.style.width = (W * 0.5 * st).toFixed(1) + 'px';
   strike.style.marginLeft = (-W * 0.25 * st).toFixed(1) + 'px';
   const wipe = move(span(t, 1.15, 0.9));
-  const edge = mix(W, W * SPLIT, wipe);
-  divider.style.left = edge.toFixed(1) + 'px';
+  const edge = mix(LONG, LONG * SPLIT, wipe);
+  divider.style[WIDE ? 'left' : 'top'] = edge.toFixed(1) + 'px';
   divider.style.opacity = String(wipe > 0 && wipe < 1 ? 1 : wipe >= 1 ? 0.6 : 0);
-  right.style.clipPath = 'inset(0 0 0 ' + edge.toFixed(1) + 'px)';
-  const painW = String(pain).length * 0.5 * painSize;
-  const shrink = mix(1, Math.min(1, (W * SPLIT * 0.84) / painW), wipe);
+  right.style.clipPath = WIDE ? 'inset(0 0 0 ' + edge.toFixed(1) + 'px)' : 'inset(' + edge.toFixed(1) + 'px 0 0 0)';
+  const shrink = mix(1, Math.min(1, painRoom / painExtent), wipe);
   painBox.style.transform = 'translateY(-50%) scale(' + (mix(1.1, 1, e) * shrink).toFixed(4) + ')';
   strike.style.transform = 'scaleX(' + shrink.toFixed(4) + ')';
-  left.style.transform = 'translateX(' + (mix(0, W * SPLIT / 2 - W / 2, wipe)).toFixed(1) + 'px)';
-  const shift = W * SPLIT + (W * (1 - SPLIT)) / 2;
-  place({ k: view.k * mix(1.08, 1, wipe) * (1 + 0.03 * span(t, 2.1, duration)), cx: view.cx - (shift - W / 2) / view.k, cy: view.cy }, cam);
-  tagL.style.left = (W * 0.05) + 'px';
+  const slide = mix(0, (LONG * SPLIT) / 2 - LONG / 2, wipe).toFixed(1);
+  left.style.transform = WIDE ? 'translateX(' + slide + 'px)' : 'translateY(' + slide + 'px)';
+  const k = view.k * mix(1.08, 1, wipe) * (1 + 0.03 * span(t, 2.1, duration));
+  place({ k, cx: view.cx - (WIDE ? offset : 0), cy: view.cy - (WIDE ? 0 : offset) }, cam);
   tagL.style.opacity = String(e);
-  tagR.style.left = (edge + W * 0.03).toFixed(1) + 'px';
+  tagR.style[WIDE ? 'left' : 'top'] = (edge + LONG * 0.03).toFixed(1) + 'px';
   tagR.style.opacity = String(wipe);
 });
 `;
@@ -330,7 +372,7 @@ if (logo) {
 } else {
   el('div', 'color:' + ink + ';font-size:' + titleSize(String(wordmark), 0.26) + 'px;' + TITLE, mark, wordmark);
 }
-const address = el('div', 'position:absolute;left:0;right:0;top:' + H * 0.68 + 'px;text-align:center;color:' + muted + ';font-size:' + UNIT * 0.04 + 'px;font-weight:500;letter-spacing:-0.02em;', root, url);
+const address = el('div', 'position:absolute;left:0;right:0;top:' + H * 0.68 + 'px;text-align:center;color:' + muted + ';font-size:' + CAPTION + 'px;font-weight:500;letter-spacing:-0.02em;', root, url);
 drive((t) => {
   const p = out(span(t, 0.1, 1.1));
   mark.style.opacity = String(p);
@@ -381,14 +423,14 @@ const TAGLINE_CARD = `
 const lines = String(param('lines', 'make your brand|move.', { type: 'text', group: 'Content', label: 'Lines (a|b)' })).split('|').map((s) => s.trim()).filter(Boolean).slice(0, 3);
 const url = param('url', 'feega.app', { type: 'text', group: 'Content' });
 const keyLine = param('accent_line', -1, { type: 'number', min: -1, max: 2, group: 'Content' });
-const longest = lines.reduce((m, l) => Math.max(m, l.length), 1);
-const size = Math.min((H * 0.5) / lines.length, (W * 0.84) / (longest * 0.52));
+const fitted = lines.map((l) => fitRows([l], 0.5 / lines.length, Math.max(1, Math.floor(MAX_ROWS * 1.5 / lines.length))));
+const size = Math.min(...fitted.map((f) => f.size));
 const block = el('div', 'position:absolute;left:0;right:0;top:50%;text-align:center;color:' + ink + ';font-size:' + size + 'px;' + TITLE);
-const rows = lines.map((l, i) => {
-  const mask = el('div', 'overflow:hidden;padding-bottom:0.08em;', block);
+const rows = fitted.flatMap((f, i) => f.rows.map((l) => {
+  const mask = el('div', 'overflow:hidden;padding-bottom:0.08em;white-space:nowrap;', block);
   return el('div', i === keyLine ? 'color:' + accent + ';' : '', mask, l);
-});
-const address = el('div', 'position:absolute;left:0;right:0;bottom:' + H * 0.1 + 'px;text-align:center;color:' + muted + ';font-size:' + UNIT * 0.036 + 'px;font-weight:500;letter-spacing:-0.02em;', root, url);
+}));
+const address = el('div', 'position:absolute;left:0;right:0;bottom:' + H * 0.1 + 'px;text-align:center;color:' + muted + ';font-size:' + CAPTION + 'px;font-weight:500;letter-spacing:-0.02em;', root, url);
 drive((t) => {
   block.style.transform = 'translateY(-50%) scale(' + (1 + 0.04 * span(t, 0, duration)).toFixed(4) + ')';
   rows.forEach((r, i) => {
@@ -418,16 +460,16 @@ drive((t) => {
 `;
 
 export const SHOTS: Record<ShotId, ShotSpec> = {
-  [ShotId.KineticTitle]: { name: 'ShotKineticTitle', about: 'a full-frame title: words punch in one by one from 134% and an 18 px blur, then hold on a slow push-in', seconds: { min: 2, best: 2.5, max: 4 }, ui: ShotUi.None, peak: false, slots: z.object({ text: text(48), accent_word: z.union([z.number().int().min(-1).max(12), text(24)]).optional() }), css: '', js: KINETIC_TITLE },
-  [ShotId.DeviceFlyIn]: { name: 'ShotDeviceFlyIn', about: 'the recreated product UI on a screen flies in from deep space turning 104°, lands and drifts: the establishing shot of the product', seconds: { min: 2.5, best: 3.5, max: 4 }, ui: ShotUi.Required, peak: true, slots: z.object({}), css: UI_HOST_CSS, js: DEVICE_FLY_IN },
-  [ShotId.UiFocus]: { name: 'ShotUiFocus', about: 'one flow of the recreated UI, one part at a time: zoom on the field while the text types, move to the button and press it, pull back to the result', seconds: { min: 3, best: 4, max: 4 }, ui: ShotUi.Required, peak: false, slots: z.object({ field_id: nodeId, button_id: nodeId, type_text: text(80).optional(), result_id: nodeId.optional() }), css: UI_HOST_CSS, js: UI_FOCUS },
-  [ShotId.FeatureGrid]: { name: 'ShotFeatureGrid', about: 'up to six feature tiles fly in exploded in depth and assemble into a grid', seconds: { min: 2.5, best: 3, max: 4 }, ui: ShotUi.None, peak: true, slots: z.object({ items: text(160) }), css: '', js: FEATURE_GRID },
-  [ShotId.StatCount]: { name: 'ShotStatCount', about: 'one number counts up huge, an accent rule draws under it, the label rises', seconds: { min: 2.5, best: 3, max: 4 }, ui: ShotUi.None, peak: false, slots: z.object({ value: text(16), label: text(48) }), css: '', js: STAT_COUNT },
-  [ShotId.BeforeAfter]: { name: 'ShotBeforeAfter', about: 'the pain line is struck through, then an accent divider wipes the recreated UI in beside it', seconds: { min: 3, best: 3.5, max: 4 }, ui: ShotUi.Required, peak: false, slots: z.object({ before_text: text(48), before_label: text(16).optional(), after_label: text(16).optional() }), css: UI_HOST_CSS, js: BEFORE_AFTER },
-  [ShotId.LogoResolve]: { name: 'ShotLogoResolve', about: 'the original logo, flat and untouched, resolves with a fade and a small scale; the address follows', seconds: { min: 2, best: 2.5, max: 4 }, ui: ShotUi.None, peak: false, slots: z.object({ logo: z.string().min(1).optional(), wordmark: text(32).optional(), url: text(48).optional() }), css: '', js: LOGO_RESOLVE },
-  [ShotId.UiMorph]: { name: 'ShotUiMorph', about: 'a highlight travels from one element of the recreated UI to another as the camera follows, then the target changes state', seconds: { min: 2.5, best: 3, max: 4 }, ui: ShotUi.Required, peak: false, slots: z.object({ from_id: nodeId, to_id: nodeId, to_text: text(40).optional() }), css: UI_HOST_CSS, js: UI_MORPH },
-  [ShotId.TaglineCard]: { name: 'ShotTaglineCard', about: 'the end card: the promise rises line by line out of a mask, the address fades in under it', seconds: { min: 2.5, best: 3, max: 4 }, ui: ShotUi.None, peak: false, slots: z.object({ lines: text(80), url: text(48).optional(), accent_line: z.number().int().min(-1).max(2).optional() }), css: '', js: TAGLINE_CARD },
-  [ShotId.WhipZoom]: { name: 'ShotWhipZoom', about: 'a transition: the camera dives into one element of the recreated UI, blurring with speed, and lands on its colour for the next shot', seconds: { min: 1, best: 1.4, max: 2 }, ui: ShotUi.Required, peak: true, slots: z.object({ target_id: nodeId, end_colour: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional() }), css: UI_HOST_CSS, js: WHIP_ZOOM }
+  [ShotId.KineticTitle]: { name: 'ShotKineticTitle', about: 'a full-frame title: words punch in one by one from 134% and an 18 px blur, then hold on a slow push-in', seconds: { min: 2, best: 2.5, max: 4 }, ui: ShotUi.None, peak: false, slots: z.object({ text, accent_word: z.union([z.number().int().min(-1).max(12), text.max(24)]).optional() }), limits: { text: limit(6, 36) }, css: '', js: KINETIC_TITLE },
+  [ShotId.DeviceFlyIn]: { name: 'ShotDeviceFlyIn', about: 'the recreated product UI on a screen flies in from deep space turning 104°, lands and drifts: the establishing shot of the product', seconds: { min: 2.5, best: 3.5, max: 4 }, ui: ShotUi.Required, peak: true, slots: z.object({}), limits: {}, css: UI_HOST_CSS, js: DEVICE_FLY_IN },
+  [ShotId.UiFocus]: { name: 'ShotUiFocus', about: 'one flow of the recreated UI, one part at a time: zoom on the field while the text types, move to the button and press it, pull back to the result', seconds: { min: 3, best: 4, max: 4 }, ui: ShotUi.Required, peak: false, slots: z.object({ field_id: nodeId, button_id: nodeId, type_text: text.optional(), result_id: nodeId.optional() }), limits: { type_text: limit(8, 48) }, css: UI_HOST_CSS, js: UI_FOCUS },
+  [ShotId.FeatureGrid]: { name: 'ShotFeatureGrid', about: 'up to six feature tiles fly in exploded in depth and assemble into a grid', seconds: { min: 2.5, best: 3, max: 4 }, ui: ShotUi.None, peak: true, slots: z.object({ items: text }), limits: { items: limit(12, 96) }, css: '', js: FEATURE_GRID },
+  [ShotId.StatCount]: { name: 'ShotStatCount', about: 'one number counts up huge, an accent rule draws under it, the label rises', seconds: { min: 2.5, best: 3, max: 4 }, ui: ShotUi.None, peak: false, slots: z.object({ value: text, label: text }), limits: { value: limit(1, 12), label: limit(5, 32) }, css: '', js: STAT_COUNT },
+  [ShotId.BeforeAfter]: { name: 'ShotBeforeAfter', about: 'the pain line is struck through, then an accent divider wipes the recreated UI in beside it (under it in vertical)', seconds: { min: 3, best: 3.5, max: 4 }, ui: ShotUi.Required, peak: false, slots: z.object({ before_text: text, before_label: text.optional(), after_label: text.optional() }), limits: { before_text: limit(6, 36), before_label: limit(2, 16), after_label: limit(2, 16) }, css: UI_HOST_CSS, js: BEFORE_AFTER },
+  [ShotId.LogoResolve]: { name: 'ShotLogoResolve', about: 'the original logo, flat and untouched, resolves with a fade and a small scale; the address follows', seconds: { min: 2, best: 2.5, max: 4 }, ui: ShotUi.None, peak: false, slots: z.object({ logo: z.string().min(1).optional(), wordmark: text.optional(), url: text.optional() }), limits: { wordmark: limit(2, 24), url: limit(1, 40) }, css: '', js: LOGO_RESOLVE },
+  [ShotId.UiMorph]: { name: 'ShotUiMorph', about: 'a highlight travels from one element of the recreated UI to another as the camera follows, then the target changes state', seconds: { min: 2.5, best: 3, max: 4 }, ui: ShotUi.Required, peak: false, slots: z.object({ from_id: nodeId, to_id: nodeId, to_text: text.optional() }), limits: { to_text: limit(3, 24) }, css: UI_HOST_CSS, js: UI_MORPH },
+  [ShotId.TaglineCard]: { name: 'ShotTaglineCard', about: 'the end card: the promise rises line by line out of a mask, the address fades in under it', seconds: { min: 2.5, best: 3, max: 4 }, ui: ShotUi.None, peak: false, slots: z.object({ lines: text, url: text.optional(), accent_line: z.number().int().min(-1).max(2).optional() }), limits: { lines: limit(6, 40), url: limit(1, 40) }, css: '', js: TAGLINE_CARD },
+  [ShotId.WhipZoom]: { name: 'ShotWhipZoom', about: 'a transition: the camera dives into one element of the recreated UI, blurring with speed, and lands on its colour for the next shot', seconds: { min: 1, best: 1.4, max: 2 }, ui: ShotUi.Required, peak: true, slots: z.object({ target_id: nodeId, end_colour: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional() }), limits: {}, css: UI_HOST_CSS, js: WHIP_ZOOM }
 };
 
 export const PEAK_SHOTS: ReadonlySet<string> = new Set(Object.values(SHOTS).filter((s) => s.peak).map((s) => s.name));
@@ -452,8 +494,6 @@ export const SHOT_PREVIEWS = '/motion/shots';
 
 export const shotPreview = (id: ShotId) => `${SHOT_PREVIEWS}/${id}.jpg`;
 
-const TEXT_SLOTS = ['text', 'lines', 'items', 'value', 'label', 'before_text', 'after_label', 'before_label', 'wordmark', 'url', 'type_text', 'to_text'] as const;
-
 const SHOT_BY_NAME = new Map(Object.values(SHOTS).map((s) => [s.name, s]));
 
 export function shotWords(name: string, props: Record<string, unknown>): string | null {
@@ -461,5 +501,30 @@ export function shotWords(name: string, props: Record<string, unknown>): string 
   if (!spec) {
     return null;
   }
-  return TEXT_SLOTS.filter((k) => k in spec.slots.shape && typeof props[k] === 'string').map((k) => String(props[k]).replace(/\|/g, ' ')).join(' ');
+  return Object.keys(spec.limits).filter((k) => typeof props[k] === 'string').map((k) => String(props[k]).replace(/\|/g, ' ')).join(' ');
+}
+
+const wordsOf = (copy: string) => copy.split(/[\s|]+/).filter(Boolean);
+
+function cut(copy: string, room: SlotLimit): string {
+  const words = wordsOf(copy).slice(0, room.words);
+  while (words.length > 1 && words.join(' ').length > room.chars) {
+    words.pop();
+  }
+  return words.join(' ');
+}
+
+export function overLimits(id: ShotId, slots: Record<string, unknown>): string | null {
+  const over = Object.entries(SHOTS[id].limits).flatMap(([slot, room]) => {
+    const copy = slots[slot];
+    if (typeof copy !== 'string') {
+      return [];
+    }
+    const words = wordsOf(copy).length;
+    if (words <= room.words && copy.length <= room.chars) {
+      return [];
+    }
+    return [`${slot} "${copy}" is ${words} words, ${copy.length} characters: at most ${room.words} words and ${room.chars} characters stay readable on screen; cut to "${cut(copy, room)}" or similar`];
+  });
+  return over.length ? `${id}: ${over.join('; ')}` : null;
 }
