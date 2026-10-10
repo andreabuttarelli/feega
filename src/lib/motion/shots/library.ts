@@ -117,8 +117,9 @@ const UI_HOST_CSS = `${VECTOR_CSS}
 
 const KINETIC_TITLE = `
 const copy = param('text', 'make your brand move.', { type: 'text', group: 'Content' });
-const keyWord = param('accent_word', -1, { type: 'number', min: -1, max: 12, group: 'Content', label: 'Accent word (index)' });
+const keyRaw = param('accent_word', '', { type: 'text', group: 'Content', label: 'Accent word (the word or its index)' });
 const words = String(copy).split(/\\s+/).filter(Boolean);
+const keyWord = /^-?\\d+$/.test(String(keyRaw)) ? Number(keyRaw) : words.indexOf(String(keyRaw));
 const size = titleSize(String(copy), 0.46);
 const box = el('div', 'position:absolute;left:50%;top:50%;width:' + W * 0.88 + 'px;text-align:center;color:' + ink + ';font-size:' + size + 'px;' + TITLE);
 const spans = words.map((w, i) => el('span', 'display:inline-block;white-space:pre;transform-origin:50% 60%;' + (i === keyWord ? 'color:' + accent + ';' : ''), box, w + (i < words.length - 1 ? ' ' : '')));
@@ -417,7 +418,7 @@ drive((t) => {
 `;
 
 export const SHOTS: Record<ShotId, ShotSpec> = {
-  [ShotId.KineticTitle]: { name: 'ShotKineticTitle', about: 'a full-frame title: words punch in one by one from 134% and an 18 px blur, then hold on a slow push-in', seconds: { min: 2, best: 2.5, max: 4 }, ui: ShotUi.None, peak: false, slots: z.object({ text: text(48), accent_word: z.number().int().min(-1).max(12).optional() }), css: '', js: KINETIC_TITLE },
+  [ShotId.KineticTitle]: { name: 'ShotKineticTitle', about: 'a full-frame title: words punch in one by one from 134% and an 18 px blur, then hold on a slow push-in', seconds: { min: 2, best: 2.5, max: 4 }, ui: ShotUi.None, peak: false, slots: z.object({ text: text(48), accent_word: z.union([z.number().int().min(-1).max(12), text(24)]).optional() }), css: '', js: KINETIC_TITLE },
   [ShotId.DeviceFlyIn]: { name: 'ShotDeviceFlyIn', about: 'the recreated product UI on a screen flies in from deep space turning 104°, lands and drifts: the establishing shot of the product', seconds: { min: 2.5, best: 3.5, max: 4 }, ui: ShotUi.Required, peak: true, slots: z.object({}), css: UI_HOST_CSS, js: DEVICE_FLY_IN },
   [ShotId.UiFocus]: { name: 'ShotUiFocus', about: 'one flow of the recreated UI, one part at a time: zoom on the field while the text types, move to the button and press it, pull back to the result', seconds: { min: 3, best: 4, max: 4 }, ui: ShotUi.Required, peak: false, slots: z.object({ field_id: nodeId, button_id: nodeId, type_text: text(80).optional(), result_id: nodeId.optional() }), css: UI_HOST_CSS, js: UI_FOCUS },
   [ShotId.FeatureGrid]: { name: 'ShotFeatureGrid', about: 'up to six feature tiles fly in exploded in depth and assemble into a grid', seconds: { min: 2.5, best: 3, max: 4 }, ui: ShotUi.None, peak: true, slots: z.object({ items: text(160) }), css: '', js: FEATURE_GRID },
@@ -450,3 +451,15 @@ export function shotSource(id: ShotId, ui: VectorUi | null): ShotSource {
 export const SHOT_PREVIEWS = '/motion/shots';
 
 export const shotPreview = (id: ShotId) => `${SHOT_PREVIEWS}/${id}.jpg`;
+
+const TEXT_SLOTS = ['text', 'lines', 'items', 'value', 'label', 'before_text', 'after_label', 'before_label', 'wordmark', 'url', 'type_text', 'to_text'] as const;
+
+const SHOT_BY_NAME = new Map(Object.values(SHOTS).map((s) => [s.name, s]));
+
+export function shotWords(name: string, props: Record<string, unknown>): string | null {
+  const spec = [...SHOT_BY_NAME.entries()].find(([n]) => name.startsWith(n))?.[1];
+  if (!spec) {
+    return null;
+  }
+  return TEXT_SLOTS.filter((k) => k in spec.slots.shape && typeof props[k] === 'string').map((k) => String(props[k]).replace(/\|/g, ' ')).join(' ');
+}

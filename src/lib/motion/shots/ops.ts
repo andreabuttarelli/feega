@@ -55,6 +55,11 @@ function missingIds(slots: Record<string, unknown>, nodes: readonly VectorNode[]
 
 export const shotComponent = (shot: ShotId, ui?: string) => `${SHOTS[shot].name}${ui ?? ''}`;
 
+function asProps(doc: MotionDoc, name: string, slots: Record<string, unknown>): Record<string, unknown> {
+  const schema = doc.components[name]?.propsSchema.properties ?? {};
+  return Object.fromEntries(Object.entries(slots).map(([k, v]) => [k, schema[k]?.type === 'string' && typeof v === 'number' ? String(v) : v]));
+}
+
 export function addShot(doc: MotionDoc, plan: ShotPlan, id: string): OpResult & { placed?: Placed } {
   const spec = SHOTS[plan.shot];
   const parsed = spec.slots.extend(STYLE_SLOTS.shape).strict().safeParse(plan.slots);
@@ -80,6 +85,6 @@ export function addShot(doc: MotionDoc, plan: ShotPlan, id: string): OpResult & 
     return written;
   }
   const placed = onBeat(written.doc, Math.round(plan.at * doc.fps), Math.round(seconds * doc.fps), spec.seconds);
-  const made = addClip(written.doc, { component: 'Custom', from: placed.from, durationInFrames: placed.frames, trackId: plan.trackId, props: { name, ...parsed.data } }, id);
+  const made = addClip(written.doc, { component: 'Custom', from: placed.from, durationInFrames: placed.frames, trackId: plan.trackId, props: { name, ...asProps(written.doc, name, parsed.data) } }, id);
   return made.ok ? { ...made, placed } : made;
 }

@@ -110,6 +110,11 @@ describe('add_shot', () => {
     expect(made.ok ? '' : made.error).toMatch(/text.*accent_word/);
   });
 
+  it('takes the accent word as the word itself, as the agent first wrote it in the v3 run', () => {
+    expect(addShot(withUi(), { shot: ShotId.KineticTitle, slots: { text: 'make your brand move.', accent_word: 'move.' }, at: 0 }, 'c1').ok).toBe(true);
+    expect(addShot(withUi(), { shot: ShotId.KineticTitle, slots: { text: 'make your brand move.', accent_word: 3 }, at: 0 }, 'c1').ok).toBe(true);
+  });
+
   it('refuses a UI shot without a recreated UI', () => {
     const made = addShot(newMotionDoc(MotionFormat.Landscape), { shot: ShotId.DeviceFlyIn, slots: {}, at: 0 }, 'c1');
 
