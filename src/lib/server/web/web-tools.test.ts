@@ -187,3 +187,26 @@ describe('web tools', () => {
   });
 });
 
+describe('ask_reference_pick', () => {
+  const candidates = Array.from({ length: 4 }, (_, i) => ({ id: `pin${i}`, image: `https://i.pinimg.com/${i}.jpg`, title: `Pin ${i}` }));
+
+  it('hands the candidates to the chat card, free, and caps the pick at the candidates', async () => {
+    const { run, spent } = setup({ view: vi.fn(async () => ({ images: [], parts: [] })) as never });
+    expect(WEB_TOOLS).toContain('ask_reference_pick');
+    expect(await run('ask_reference_pick', { question: 'Which look is yours?', candidates, max: 9 })).toEqual({ ok: true, question: 'Which look is yours?', candidates, min: 1, max: 4 });
+    expect(spent()).toBe(0);
+  });
+
+  it('a picture the user avoided is never looked at again nor imported', async () => {
+    const view = vi.fn(async (urls: string[]) => ({ images: urls.map((url) => ({ url })), parts: [] }));
+    const importImage = vi.fn(async () => ({ ok: true as const, assetId: 'a1', width: 1, height: 1 }));
+    const { run } = setup({ avoid: new Set(['https://i.pinimg.com/3.jpg']), view: view as never, importImage });
+
+    expect(await run('import_image', { url: 'https://i.pinimg.com/3.jpg' })).toMatchObject({ ok: false });
+    expect(importImage).not.toHaveBeenCalled();
+
+    await run('view_images', { urls: ['https://i.pinimg.com/0.jpg', 'https://i.pinimg.com/3.jpg'] });
+    expect(view.mock.calls[0][0]).toEqual(['https://i.pinimg.com/0.jpg']);
+  });
+});
+

@@ -29,13 +29,22 @@ export function registerMotionTools(server: McpServer) {
         'reply, the summary and the new revision `version`. `wait: true` polls for you, up to about 4 minutes of a turn that can run up to 30. The agent looks at its own ' +
         'frames even with no editor open. Spends credits. ' +
         `\`attachments\` (up to ${MAX_ATTACHMENTS}): images (PNG, JPG, WebP, GIF) the agent sees and can place in the video, and PDF/DOCX/PPTX/XLSX/CSV/TXT/MD/HTML files it reads as text — ` +
-        'each one a public `url`, an `asset_id` of the project, or inline base64 `data` with `name` and `mime_type`; at most 20 MB each.',
-      inputSchema: z.object({ org, node_id: z.string(), prompt: z.string().min(1), wait: z.boolean().optional(), attachments: z.array(attachment).max(MAX_ATTACHMENTS).optional() }),
+        'each one a public `url`, an `asset_id` of the project, or inline base64 `data` with `name` and `mime_type`; at most 20 MB each. ' +
+        'When the agent wants the user\'s taste it ends its turn with `reference_pick` in the run (question and candidate pictures with ids): ' +
+        'show them to the user, then call again with `reference_pick: { follow: [ids], avoid: [ids], note }` (prompt optional). Followed pictures become the targets, avoided ones what not to do.',
+      inputSchema: z.object({
+        org,
+        node_id: z.string(),
+        prompt: z.string().optional(),
+        wait: z.boolean().optional(),
+        attachments: z.array(attachment).max(MAX_ATTACHMENTS).optional(),
+        reference_pick: z.object({ follow: z.array(z.string()), avoid: z.array(z.string()), note: z.string().optional() }).optional()
+      }),
       annotations: { readOnlyHint: false, destructiveHint: false }
     },
-    async ({ org, node_id, prompt, wait, attachments }) =>
+    async ({ org, node_id, prompt, wait, attachments, reference_pick }) =>
       withAuth(async (token) => {
-        const run = await motionApi.ask(token, node_id, prompt, org, attachments);
+        const run = await motionApi.ask(token, node_id, prompt ?? '', org, attachments, reference_pick);
         return wait === true ? awaitRun(token, run, { org }) : run;
       })
   );

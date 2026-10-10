@@ -6,6 +6,7 @@ import { ShotView, type Shot } from './screenshot';
 import { MAX_VIEWED, ViewDetail, type ImagePart, type ViewOutcome } from './view-images';
 import { STORE_ITEMS_DEFAULT, STORE_ITEMS_MAX, type StoreRead } from './store';
 import { PINTEREST_MAX_PINS, type PinsFound } from './pinterest';
+import { ASK_REFERENCE_PICK, MAX_CANDIDATES, pickAsk, pickAskSchema } from '$lib/reference-pick';
 import { BROWSE_DEADLINE_MS, BROWSE_MAX_SHOTS, BROWSE_MAX_STEPS, browseStepSchema, type BrowseStep, type StepReport } from './browse';
 
 export type ImageImport = { ok: true; assetId: string; width: number | null; height: number | null } | { ok: false; error: string };
@@ -33,10 +34,11 @@ export type WebToolDeps = {
   view?: (urls: string[], detail: ViewDetail, callId: string) => Promise<ViewOutcome>;
   browse?: (url: string, steps: BrowseStep[], callId: string) => Promise<BrowseView>;
   pinterest?: PinterestPort;
+  avoid?: ReadonlySet<string>;
   spend: (usd: number) => void;
 };
 
-export const WEB_TOOLS = ['web_search', 'read_page', 'read_store', 'view_images', 'screenshot_page', 'import_image', 'import_products', 'browse', 'pinterest_search', 'pinterest_pin', 'pinterest_board'] as const;
+export const WEB_TOOLS = ['web_search', 'read_page', 'read_store', 'view_images', 'screenshot_page', 'import_image', 'import_products', 'browse', 'pinterest_search', 'pinterest_pin', 'pinterest_board', 'ask_reference_pick'] as const;
 
 export const REFERENCE_TOOLS: ReadonlySet<string> = new Set<(typeof WEB_TOOLS)[number]>(['view_images', 'pinterest_search', 'pinterest_pin', 'pinterest_board']);
 
@@ -65,6 +67,8 @@ export const WEB_GUIDANCE = [
   'A Pinterest picture is someone else\'s work: use it as a reference for look and feel, never as the brand\'s own asset in the final video unless the user asks for that picture there. In an uncensored project pictures showing people are refused: choose pins without people.'
 ].join(' ');
 
+const AVOIDED = { ok: false as const, error: 'the user marked this reference as avoid: never use it as a target' };
+
 const limitReached = (what: string, max: number) => ({ ok: false as const, error: `${what} limit reached for this turn (${max}): answer with what you have` });
 
 function withImages(output: unknown, parts: ImagePart[] = []) {
@@ -91,6 +95,7 @@ export function createWebTools(deps: WebToolDeps): Record<string, Tool> {
   const views = counter(MAX_VIEWS_PER_TURN);
   const browses = counter(MAX_BROWSES_PER_TURN);
   const seenByCall = new Map<string, ImagePart[]>();
+  const avoided = (url: string) => deps.avoid?.has(url) ?? false;
 
   const glance = async (urls: string[], callId: string) => {
     if (deps.view && urls.length) {
@@ -176,11 +181,21 @@ export function createWebTools(deps: WebToolDeps): Record<string, Tool> {
         if (!views()) {
           return limitReached('view', MAX_VIEWS_PER_TURN);
         }
-        const seen = await view(input.urls, input.detail ?? ViewDetail.High, toolCallId);
+        const urls = input.urls.filter((url) => !avoided(url));
+        if (!urls.length) {
+          return AVOIDED;
+        }
+        const seen = await view(urls, input.detail ?? ViewDetail.High, toolCallId);
         seenByCall.set(toolCallId, seen.parts);
         return { ok: true, images: seen.images };
       },
       toModelOutput: ({ toolCallId, output }) => withImages(output, seenByCall.get(toolCallId))
+    });
+
+    tools[ASK_REFERENCE_PICK] = tool({
+      description: `Ask the user which references match their taste: shows them a grid of 2 to ${MAX_CANDIDATES} candidate pictures (id, image url, title, why you chose it) to mark follow or avoid, with a note. Call it after looking at the candidates and before building; it ends your turn: write nothing after it. min and max bound how many to follow (default 1 to all).`,
+      inputSchema: pickAskSchema,
+      execute: async (input) => ({ ok: true, ...pickAsk(input) })
     });
   }
 
@@ -211,6 +226,9 @@ export function createWebTools(deps: WebToolDeps): Record<string, Tool> {
       description: `Save a picture from a public https url (PNG, JPEG, WebP or GIF) into this project's assets, screened like an upload. Returns its asset_id and you see the picture saved. Only pictures the user wants to use: at most ${MAX_IMPORTS_PER_TURN} per turn.`,
       inputSchema: z.object({ url: z.string().url().max(2000) }),
       execute: async (input, { toolCallId }) => {
+        if (avoided(input.url)) {
+          return AVOIDED;
+        }
         if (!imports()) {
           return limitReached('import', MAX_IMPORTS_PER_TURN);
         }

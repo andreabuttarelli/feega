@@ -30,7 +30,12 @@ const world = vi.hoisted(() => ({
   hangsAfterEdit: false,
   stored: new Map<string, string>(),
   removed: [] as string[],
-  stopped: false
+  stopped: false,
+  picking: false,
+  looking: false,
+  message: 'make it pop',
+  history: [] as { role: string; content: string }[],
+  tools: [] as string[][]
 }));
 
 const draftBucket = {
@@ -59,6 +64,9 @@ const SCRIPT = {
     { act: 'claim', start: 11, end: 14, scene: 'Logo', on_screen: [PROMISE] }
   ]
 };
+
+const PICK = { question: 'Which look is yours?', candidates: Array.from({ length: 6 }, (_, i) => ({ id: `pin${i}`, image: `https://i.pinimg.com/${i}.jpg`, title: `Pin ${i}` })) };
+const LOOK = { typeScale: 0.4, bleed: false, columns: 2, smallText: 'some', palette: ['#111111'], font: 'grotesk', imagery: 'none' };
 
 const SUMMARY = 'Made a bold title card that pops in.';
 const NOTE = 'Adding the title now.';
@@ -106,6 +114,12 @@ function reply(call: Call): unknown[] {
     return tool('view_frames', { times: [1] });
   }
   const answered = JSON.stringify(last.content);
+  if (world.picking && last.role === 'user') {
+    return tool('ask_reference_pick', PICK);
+  }
+  if (world.looking && last.role === 'user') {
+    return tool('set_reference_look', LOOK);
+  }
   if (world.scripting && last.role === 'user') {
     return tool('analyze_site', { url: SITE });
   }
@@ -122,6 +136,7 @@ function scripted() {
   return new MockLanguageModelV4({
     doStream: async (options) => {
       const call = { prompt: options.prompt as unknown as Message[], toolChoice: options.toolChoice as Call['toolChoice'] };
+      world.tools.push((options.tools ?? []).map((t) => (t as { name: string }).name));
       world.calls.push(call);
       if (world.hangsAfterEdit && lastMessage(call.prompt).role === 'tool') {
         return { stream: new ReadableStream({ start() {} }) };
@@ -165,8 +180,8 @@ vi.mock('$lib/server/ai-log', () => ({ extractSdkUsage: () => ({ inputTokens: 10
 vi.mock('$lib/server/moderation/model-input', () => ({ screenModelInput: async () => ({ ok: true }) }));
 vi.mock('$lib/server/repos/chat', () => ({
   openNodeThread: async () => 'thread-1',
-  loadTurns: async () => [],
-  promptHistory: () => [],
+  loadTurns: async () => world.history,
+  promptHistory: (turns: unknown) => turns,
   saveTurn: async (_db: unknown, turn: { role: string; content?: string }) => {
     world.saved.push(turn);
   }
@@ -221,7 +236,7 @@ type DocEdited = import('$lib/motion/frames-request').DocEdited;
 async function turn(reasoning: string | null = 'low', browser = Browser.Attached, landingMs?: number, stopPollMs = 3000) {
   const db = { storage: { from: () => draftBucket } } as never;
   const motion = { record: { id: 'n-1', canvasId: 'c-1' }, node: { id: 'n-1', format: MotionFormat.Landscape, docHeadRevision: 0, posterAssetId: null, lastRenderAssetId: null } } as never;
-  const started = await startMotionTurn({ db, userId: 'u-1', orgId: 'o-1', project: { id: 'p-1', brandId: null }, motion, message: 'make it pop', selection: [], model: 'anthropic/claude-opus-5.5', reasoning, requester: { kind: 'user', id: 'u-1' }, browser, ...(landingMs === undefined ? {} : { timing: { landingMs, stopPollMs } }) });
+  const started = await startMotionTurn({ db, userId: 'u-1', orgId: 'o-1', project: { id: 'p-1', brandId: null }, motion, message: world.message, selection: [], model: 'anthropic/claude-opus-5.5', reasoning, requester: { kind: 'user', id: 'u-1' }, browser, ...(landingMs === undefined ? {} : { timing: { landingMs, stopPollMs } }) });
   if (started instanceof Response) {
     throw new Error('turn refused');
   }
@@ -274,6 +289,11 @@ describe('a motion turn closes on a look and a summary', () => {
     world.stored = new Map();
     world.removed = [];
     world.stopped = false;
+    world.picking = false;
+    world.looking = false;
+    world.message = 'make it pop';
+    world.history = [];
+    world.tools = [];
   });
 
   it('looks at its frames after the last edit even when the edits spent the whole budget', async () => {
@@ -382,6 +402,40 @@ describe('a motion turn closes on a look and a summary', () => {
     expect(world.toolCalls).toEqual(['analyze_site', 'write_script']);
     expect(world.calls.some((c) => c.toolChoice?.type === 'none')).toBe(false);
     expect(outcome.reply).not.toMatch(/still open/i);
+  });
+
+  it('stops after asking which references to follow: nothing is built or spent before the user picks', async () => {
+    world.picking = true;
+
+    const outcome = await turn();
+
+    expect(world.toolCalls).toEqual(['ask_reference_pick']);
+    expect(world.calls.some((c) => c.toolChoice?.type === 'none')).toBe(false);
+    expect(outcome.reply).not.toMatch(/still open/i);
+    expect(outcome.pick?.candidates).toHaveLength(6);
+  });
+
+  it('a user who said "scegli tu" is never asked to pick', async () => {
+    world.message = 'trova riferimenti su pinterest, scegli tu';
+
+    await turn();
+
+    expect(world.tools[0]).not.toContain('ask_reference_pick');
+    world.message = 'trova riferimenti su pinterest';
+    world.tools = [];
+    await turn();
+    expect(world.tools[0]).toContain('ask_reference_pick');
+  });
+
+  it('the look records the references the user avoided, as what not to do', async () => {
+    const { answerText, Mark } = await import('$lib/reference-pick');
+    world.message = answerText({ ...PICK, min: 1, max: 6 }, { pin0: Mark.Follow, pin1: Mark.Follow, pin2: Mark.Follow, pin3: Mark.Avoid }, '');
+    world.looking = true;
+
+    await turn();
+
+    const doc = (world.chunks.findLast((c) => c.type === DOC_EDITED)?.data as DocEdited).doc;
+    expect(doc.referenceLook?.avoid?.map((a) => a.image)).toEqual(['https://i.pinimg.com/3.jpg']);
   });
 
   it('a client that leaves mid-stream does not stop the turn: the answer is still saved', async () => {

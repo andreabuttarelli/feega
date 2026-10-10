@@ -4,7 +4,7 @@ import { loadSession } from '../lib/auth.ts';
 import { awaitRun, motionApi, type MotionRun, type RenderStart } from '../lib/motion.ts';
 import { attachmentSource } from '../lib/attachments.ts';
 
-type AskOpts = { org?: string; wait?: boolean; attach?: string[] };
+type AskOpts = { org?: string; wait?: boolean; attach?: string[]; follow?: string[]; avoid?: string[]; note?: string };
 
 async function token(): Promise<string> {
   const session = await loadSession();
@@ -21,7 +21,9 @@ export async function cmdMotionAsk(nodeId: string, prompt: string, opts: AskOpts
 
 export async function askAndReport(bearer: string, nodeId: string, prompt: string, opts: AskOpts) {
   const attachments = await Promise.all((opts.attach ?? []).map(attachmentSource));
-  const started = await motionApi.ask(bearer, nodeId, prompt, opts.org, attachments);
+  const picked = opts.follow?.length || opts.avoid?.length;
+  const pick = picked ? { follow: opts.follow ?? [], avoid: opts.avoid ?? [], ...(opts.note ? { note: opts.note } : {}) } : undefined;
+  const started = await motionApi.ask(bearer, nodeId, prompt, opts.org, attachments, pick);
   printRun(opts.wait === false ? started : await awaitRun(bearer, started, { org: opts.org }));
 }
 
@@ -39,6 +41,11 @@ function printRun(run: MotionRun) {
   }
   if (run.cost_usd !== undefined && run.cost_usd !== null) {
     console.log(`  cost     $${run.cost_usd.toFixed(4)}`);
+  }
+  if (run.reference_pick) {
+    console.log(`  ${run.reference_pick.question}`);
+    run.reference_pick.candidates.forEach((c) => console.log(`  ${c.id}  ${c.image}${c.why ? `  ${c.why}` : ''}`));
+    console.log(`Answer: feega motion ask ${run.node_id ?? '<nodeId>'} "" --follow <ids...> --avoid <ids...>`);
   }
   if (run.error) {
     console.error(run.error);

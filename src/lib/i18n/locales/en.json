@@ -630,6 +630,18 @@
         "held": "Waiting for your changes",
         "storyboard": "Open storyboard"
       },
+      "pick": {
+        "label": "Pick references",
+        "hint": "Tap once to follow, twice to avoid",
+        "follow": "Follow",
+        "avoid": "Avoid",
+        "neutral": "Not marked",
+        "note": "Anything else about your taste? (optional)",
+        "go": "Continue",
+        "count": "{follow} to follow · {avoid} to avoid",
+        "answered": "Your pick",
+        "passed": "Not answered"
+      },
       "model": "Model",
       "reasoning": "Reasoning",
       "reasoningTrace": "Thinking",

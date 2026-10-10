@@ -15,6 +15,8 @@ import { Browser, startMotionTurn, type MotionTurn, type TurnOutcome } from '$li
 import { ATTACHMENT_PORTS, AttachmentFailure, resolveSources, type AttachmentSource } from '$lib/server/chat-attachments/register';
 import type { ChatAttachment } from '$lib/chat-attachments';
 import { failed } from '$lib/server/chat-attachments/route-scope';
+import { loadTurns, openNodeThread } from '$lib/server/repos/chat';
+import { Mark, answerText, pickOf, type PickAsk } from '$lib/reference-pick';
 
 export const MCP_AGENT_KEY = 'mcp';
 const HTTP_NOT_FOUND = 404;
@@ -44,15 +46,38 @@ async function attached(db: Db, scope: Parameters<typeof resolveSources>[1], sou
   }
 }
 
+export type PickReply = { follow: string[]; avoid: string[]; note?: string };
+
+const noPickAsked = () => json({ error: 'no_reference_pick_asked' }, { status: HTTP_CONFLICT });
+
+async function askedPick(db: Db, scope: { orgId: string; userId: string; projectId: string; nodeId: string; brandId: string | null }): Promise<PickAsk | null> {
+  const threadId = await openNodeThread(db, scope);
+  const turns = await loadTurns(db, { orgId: scope.orgId, threadId });
+  const last = turns.findLast((t) => t.role === 'assistant');
+  return last ? pickOf(last) : null;
+}
+
+function pickPrompt(ask: PickAsk, reply: PickReply, prompt: string): string {
+  const marks = Object.fromEntries([...reply.follow.map((id) => [id, Mark.Follow]), ...reply.avoid.map((id) => [id, Mark.Avoid])]);
+  const answer = answerText(ask, marks, reply.note ?? '');
+  return prompt ? `${prompt}\n\n${answer}` : answer;
+}
+
 export type AskStarted = { runId: string; model: string; refusedModel: string | null };
 
-export async function askMotion(db: Db, input: { orgId: string; userId: string; nodeId: string; prompt: string; attachments?: AttachmentSource[]; agentKey?: string; choice?: { model?: unknown; reasoning?: unknown } }): Promise<AskStarted | Response> {
-  const { orgId, userId, nodeId, prompt, attachments: sources = [], agentKey = MCP_AGENT_KEY, choice: asked = {} } = input;
+export async function askMotion(db: Db, input: { orgId: string; userId: string; nodeId: string; prompt: string; attachments?: AttachmentSource[]; agentKey?: string; choice?: { model?: unknown; reasoning?: unknown }; pick?: PickReply }): Promise<AskStarted | Response> {
+  const { orgId, userId, nodeId, attachments: sources = [], agentKey = MCP_AGENT_KEY, choice: asked = {} } = input;
   const motion = await findMotion(db, { orgId, nodeId });
   const project = motion ? await findProjectById(db, { orgId, projectId: motion.record.projectId }) : null;
   if (!motion || !project) {
     return notFound();
   }
+
+  const pickAsked = input.pick ? await askedPick(db, { orgId, userId, projectId: project.id, nodeId, brandId: project.brandId }) : null;
+  if (input.pick && !pickAsked) {
+    return noPickAsked();
+  }
+  const prompt = input.pick && pickAsked ? pickPrompt(pickAsked, input.pick, input.prompt) : input.prompt;
 
   const attachments = await attached(db, { orgId, projectId: project.id, mode: project.mode }, sources);
   if (attachments instanceof Response) {
@@ -115,6 +140,7 @@ export async function askStatus(db: Db, input: { orgId: string; runId: string })
     summary: outcome.summary ?? null,
     version: outcome.version ?? null,
     revision: outcome.revision ?? null,
+    reference_pick: outcome.pick ?? null,
     cost_usd: run.costUsd,
     error: run.error,
     editor_url: editorUrl(motion.record),

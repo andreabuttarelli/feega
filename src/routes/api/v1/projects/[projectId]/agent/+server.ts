@@ -27,6 +27,7 @@ import { blockedPrompt } from '$lib/server/moderation/blocked-response';
 import { runInBackground } from '$lib/server/background-work';
 import { askedAttachments } from '$lib/server/chat-attachments/route-scope';
 import { canvasPlaceHint, userContent } from '$lib/server/chat-attachments/model-parts';
+import { ASK_REFERENCE_PICK, avoidedImages, choosesForUser, latestAnswer, pickAwaits, readAnswer } from '$lib/reference-pick';
 import type { RequestHandler } from './$types';
 
 /**
@@ -110,7 +111,9 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
     userId: user.id,
     brandId: brand?.id ?? null
   });
-  const history = promptHistory(await loadTurns(db, { orgId, threadId }));
+  const turns = await loadTurns(db, { orgId, threadId });
+  const history = promptHistory(turns);
+  const pick = readAnswer(text) ?? latestAnswer(turns);
 
   const screened = await screening;
   if (!screened.ok) {
@@ -125,16 +128,21 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
   const steps: Parameters<typeof finishedTurn>[0][number][] = [];
 
   let spent = 0;
+  const webTools = createWebTools({
+    ...liveWebDeps(db, { orgId, userId: user.id, projectId: project.id, brandId: brand?.id ?? null, mode: project.mode }, (usd) => {
+      spent += usd;
+    }),
+    importImage: webImageImport(db, { orgId, projectId: project.id, mode: project.mode }),
+    importProducts: productImport(webImageImport(db, { orgId, projectId: project.id, mode: project.mode }), canvasId ? productsNodePlacer(db, { orgId, projectId: project.id, canvasId, actor }) : undefined),
+    avoid: avoidedImages(pick)
+  });
+  if (choosesForUser(text)) {
+    delete webTools[ASK_REFERENCE_PICK];
+  }
   const projectTools = {
     ...createProjectTools({ db, orgId, projectId: project.id, userId: user.id, brandId: brand?.id ?? null }),
     ...createMotionDelegation({ db, orgId, projectId: project.id, userId: user.id, origin: url.origin, model, canvasId }),
-    ...createWebTools({
-      ...liveWebDeps(db, { orgId, userId: user.id, projectId: project.id, brandId: brand?.id ?? null, mode: project.mode }, (usd) => {
-        spent += usd;
-      }),
-      importImage: webImageImport(db, { orgId, projectId: project.id, mode: project.mode }),
-      importProducts: productImport(webImageImport(db, { orgId, projectId: project.id, mode: project.mode }), canvasId ? productsNodePlacer(db, { orgId, projectId: project.id, canvasId, actor }) : undefined)
-    })
+    ...webTools
   };
   const agent = await openAgentTools({
     projectTools,
@@ -157,7 +165,7 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
     messages: [...history, { role: 'user', content: opening }] as ModelMessage[],
     tools: agent.tools,
     providerOptions: reasoningProviderOptions(reasoning),
-    stopWhen: [agentStopWhen(t0), overTurnCap(() => spent)],
+    stopWhen: [agentStopWhen(t0), overTurnCap(() => spent), ({ steps }) => pickAwaits(steps)],
     onStepFinish: (step) => {
       spent += spentUsd([extractSdkUsage(step.usage)], [model], gatewayRate);
       steps.push(step);

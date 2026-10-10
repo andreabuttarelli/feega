@@ -13,6 +13,7 @@ const usage = {
 };
 
 const offeredTools: string[][] = [];
+const PICK = { question: 'Which look?', candidates: Array.from({ length: 4 }, (_, i) => ({ id: `pin${i}`, image: `https://i.pinimg.com/${i}.jpg` })) };
 let step = 0;
 
 function scriptedModel() {
@@ -21,7 +22,13 @@ function scriptedModel() {
       offeredTools.push((options.tools ?? []).map((t) => t.name));
       step++;
       const parts =
-        step === 1
+        step === 1 && store.picking
+          ? [
+              { type: 'stream-start', warnings: [] },
+              { type: 'tool-call', toolCallId: 'c1', toolName: 'ask_reference_pick', input: JSON.stringify(PICK) },
+              { type: 'finish', finishReason: { unified: 'tool-calls', raw: 'tool_calls' }, usage }
+            ]
+          : step === 1
           ? [
               { type: 'stream-start', warnings: [] },
               { type: 'tool-call', toolCallId: 'c1', toolName: 'add_clip', input: JSON.stringify({ component: 'Title', start: 0, duration: 2, props: { text: 'Hi', color: '#ff0000' } }) },
@@ -52,7 +59,9 @@ const store = vi.hoisted(() => ({
   revisions: [] as { expectedVersion: number; actor: unknown; summary?: string | null }[],
   node: null as null | Record<string, unknown>,
   caller: null as null | Record<string, unknown>,
-  gate: null as null | Response
+  gate: null as null | Response,
+  picking: false,
+  history: [] as unknown[]
 }));
 
 vi.mock('$lib/server/llm', () => ({
@@ -93,7 +102,7 @@ vi.mock('$lib/server/chat-attachments/register', async (importOriginal) => ({
 vi.mock('$lib/server/canvas/sign-media', () => ({ createAssetSigningDb: () => ({}), signAssetPaths: async () => new Map() }));
 vi.mock('$lib/server/repos/chat', () => ({
   openNodeThread: async () => 'thread-1',
-  loadTurns: async () => [],
+  loadTurns: async () => store.history,
   promptHistory: () => [],
   saveTurn: async (_db: unknown, turn: { role: string; content?: string; actor?: unknown }) => {
     store.turns.push(turn);
@@ -168,6 +177,8 @@ beforeEach(() => {
   offeredTools.length = 0;
   step = 0;
   store.gate = null;
+  store.picking = false;
+  store.history = [];
   store.caller = { db: { storage: { from: () => ({}) } }, orgId: ORG, userId: USER, writeAllowed: true, apiKeyId: 'key-1' };
   store.node = { id: NODE, canvasId: CANVAS, projectId: PROJECT, type: 'motion', displayName: 'Trailer', position: { x: 0, y: 0, z: 0 }, size: { width: null, height: null }, data: {}, version: 1 };
 });
@@ -252,6 +263,34 @@ describe('POST /api/v1/motion/[nodeId]/ask', () => {
     const res = await ask(NODE, { prompt: 'x' });
     expect(res.status).toBe(402);
     expect(store.turns).toHaveLength(0);
+  });
+
+  it('a turn that asks which references to follow ends there and hands the candidates to the caller', async () => {
+    store.picking = true;
+    const { run_id } = await (await ask(NODE, { prompt: 'find pinterest references' })).json();
+
+    const run = await settled(run_id);
+
+    expect(run.reference_pick).toMatchObject({ question: 'Which look?', candidates: PICK.candidates });
+    expect(step).toBe(1);
+  });
+
+  it('an external agent answers the pick by id: the turn reads followed and avoided pictures', async () => {
+    const { readAnswer } = await import('$lib/reference-pick');
+    store.history = [{ role: 'assistant', content: '', tools: [{ toolName: 'ask_reference_pick', status: 'done', output: { ok: true, ...PICK, min: 1, max: 4 } }] }];
+
+    const { run_id } = await (await ask(NODE, { reference_pick: { follow: ['pin0', 'pin1'], avoid: ['pin3'], note: 'darker' } })).json();
+    await settled(run_id);
+
+    const answer = readAnswer(store.turns[0].content ?? '');
+    expect(answer?.follow.map((c) => c.image)).toEqual(['https://i.pinimg.com/0.jpg', 'https://i.pinimg.com/1.jpg']);
+    expect(answer?.avoid.map((c) => c.id)).toEqual(['pin3']);
+    expect(answer?.note).toBe('darker');
+  });
+
+  it('answering a pick nobody asked is refused', async () => {
+    const res = await ask(NODE, { reference_pick: { follow: ['pin0'], avoid: [] } });
+    expect(res.status).toBe(409);
   });
 
   it('refuses an empty prompt', async () => {

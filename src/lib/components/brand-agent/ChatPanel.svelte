@@ -12,6 +12,8 @@
   import ChatComposer from './ChatComposer.svelte';
   import ChatMessage from './ChatMessage.svelte';
   import ScriptBrief from './ScriptBrief.svelte';
+  import ReferencePick from './ReferencePick.svelte';
+  import { PickState, answerLabel, answerText, pickCards, type Mark, type PickAsk } from '$lib/reference-pick';
   import { BRIEF_AUTO_GO_S, GO_MESSAGE, pendingBoard, pendingBrief } from '$lib/motion/script-brief';
   import ChatModelPicker from './ChatModelPicker.svelte';
   import { chatModelPrefs } from './chat-model-prefs.svelte';
@@ -88,6 +90,7 @@
   const pendingOutline = $derived(brief ? pendingBoard(messages) : null);
   const board = $derived(pendingOutline ? { href: `/p/${scopeProjectId}/c/${pendingOutline.canvasId}`, outline: pendingOutline.outline } : null);
   let editingBrief = $state(false);
+  const picks = $derived(pickCards(messages));
   const showEmpty = $derived(!loading && failed !== 'load' && !messages.length);
 
   $effect(() => {
@@ -200,6 +203,10 @@
     void session.send(text, 'append-user', attachments);
   }
 
+  function pick(ask: PickAsk, marks: Record<string, Mark>, note: string) {
+    send(answerText(ask, marks, note));
+  }
+
   function editBrief() {
     editingBrief = true;
     root?.querySelector('textarea')?.focus();
@@ -262,7 +269,7 @@
         {#each messages as message, i (i)}
           <ChatMessage
             role={message.role}
-            content={message.content}
+            content={message.role === 'user' ? answerLabel(message.content) : message.content}
             projectId={scopeProjectId}
             pending={message.pending}
             at={message.at}
@@ -273,6 +280,10 @@
             live={message.live}
             first={starts[i]}
           />
+          {@const card = picks.get(i)}
+          {#if card && !message.live && !message.pending}
+            <ReferencePick card={busy && card.state === PickState.Waiting ? { ...card, state: PickState.Passed } : card} onpick={(marks, note) => pick(card.ask, marks, note)} />
+          {/if}
         {/each}
 
         {#if brief}
