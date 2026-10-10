@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { MotionFormat, newMotionDoc, type MotionDoc } from './doc';
 import { addClip } from './timeline';
 import { precompose } from './precomp';
-import { referencedAssets } from './doc-assets';
+import { mayUseAssets, referencedAssets } from './doc-assets';
 
 function must(r: { ok: true; doc: MotionDoc } | { ok: false; error: string }): MotionDoc {
   if (!r.ok) {
@@ -22,5 +22,12 @@ describe('referencedAssets', () => {
     doc = must(precompose({ ...doc, assets: [MUSIC] }, ['p'], { comp: 'scene', clip: 's' }, 'Scene'));
 
     expect(referencedAssets(doc, [MUSIC, PHOTO, UNUSED])).toEqual([MUSIC, PHOTO]);
+  });
+});
+
+describe('mayUseAssets', () => {
+  it('a doc that names no asset needs no asset lookup', () => {
+    expect(mayUseAssets(newMotionDoc(MotionFormat.Vertical))).toBe(false);
+    expect(mayUseAssets(must(addClip(newMotionDoc(MotionFormat.Vertical), { component: 'Image', from: 0, durationInFrames: 30, props: { assetId: '1ddda28a-a52d-4463-9b43-e4c82c5787fe' } }, 'p')))).toBe(true);
   });
 });
