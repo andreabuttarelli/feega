@@ -102,6 +102,18 @@ describe('the resumable snapshot', () => {
     expect(got).toContain('…[+');
   });
 
+  it('keeps whole the pictures a viewing tool stored, however long their signed source urls', () => {
+    for (const toolName of ['view_images', 'view_video_frames']) {
+      const images = Array.from({ length: 4 }, (_, i) => ({ url: `https://p16.tiktokcdn.com/${'x'.repeat(900)}`, path: `o/p/web-views/c/${i}.jpg` }));
+      const viewed = feed([
+        { type: 'tool-input-available', toolCallId: 'v', toolName, input: {} },
+        { type: 'tool-output-available', toolCallId: 'v', output: { ok: true, images } }
+      ]).tools;
+
+      expect(toolsForMirror(viewed)[0].output).toEqual({ ok: true, images });
+    }
+  });
+
   /**
    * I parametri restano, ed è il punto: la scheda legge la riga rispecchiata ogni volta che non è
    * attaccata all'SSE — turno nel worker, tab riaperta, riconnessione — cioè proprio i turni lunghi.

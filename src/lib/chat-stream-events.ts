@@ -155,7 +155,9 @@ export function readSseEvents(buffered: string): { events: unknown[]; rest: stri
 /** Un input più lungo di così non è un parametro: è un payload travestito. */
 const MAX_MIRRORED_PAYLOAD_CHARS = 2_000;
 
-const OUTPUTS_READ_BACK = new Set([WRITE_SCRIPT, WRITE_STORYBOARD, ASK_REFERENCE_PICK]);
+export const VIEWING_TOOLS: ReadonlySet<string> = new Set(['view_images', 'view_video_frames']);
+
+const OUTPUTS_READ_BACK = new Set([WRITE_SCRIPT, WRITE_STORYBOARD, ASK_REFERENCE_PICK, ...VIEWING_TOOLS]);
 
 /**
  * La stessa lista di tool con PARAMETRI e RISULTATI, entrambi sotto un tetto.

@@ -8,7 +8,7 @@
   import { keepDraft, keptDraft } from './chat-draft';
   import { chatSession, type ChatSession, type StreamData } from './chat-session.svelte';
   import { nextFollow, type Follow, type FollowEvent } from './chat-follow';
-  import { FAILURES, keyboardInset, speakerStarts } from './chat-view';
+  import { FAILURES, keyboardInset, speakerStarts, viewedHref } from './chat-view';
   import ChatComposer from './ChatComposer.svelte';
   import ChatMessage from './ChatMessage.svelte';
   import ScriptBrief from './ScriptBrief.svelte';
@@ -282,7 +282,7 @@
           />
           {@const card = picks.get(i)}
           {#if card && !message.live && !message.pending}
-            <ReferencePick card={busy && card.state === PickState.Waiting ? { ...card, state: PickState.Passed } : card} onpick={(marks, note) => pick(card.ask, marks, note)} onreject={(query, avoidAll) => send(rejectText(card.ask, query, avoidAll))} />
+            <ReferencePick stored={(path) => viewedHref(path, scopeProjectId, canvasId)} card={busy && card.state === PickState.Waiting ? { ...card, state: PickState.Passed } : card} onpick={(marks, note) => pick(card.ask, marks, note)} onreject={(query, avoidAll) => send(rejectText(card.ask, query, avoidAll))} />
           {/if}
         {/each}
 

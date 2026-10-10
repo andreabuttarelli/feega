@@ -15,7 +15,8 @@ export const candidateSchema = z.object({
   id: z.string().min(1).max(200),
   image: z.string().url().max(2000),
   title: z.string().max(200).optional(),
-  why: z.string().max(240).optional()
+  why: z.string().max(240).optional(),
+  preview: z.string().max(600).optional()
 });
 
 export const pickAskSchema = z.object({

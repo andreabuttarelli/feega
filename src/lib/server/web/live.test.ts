@@ -6,7 +6,8 @@ vi.mock('$env/dynamic/private', () => ({ env: { EXA_API_KEY: 'k' } }));
 vi.mock('$lib/server/ai-log', () => ({ logAiCall: M.logAiCall }));
 vi.mock('./search', async (importOriginal) => ({ ...(await importOriginal<typeof import('./search')>()), exaSearch: () => M.port }));
 
-import { loggedSearch, pinterestPort, productImport, screenedImport } from './live';
+import { SocialPlatform } from './social-search';
+import { loggedSearch, pinterestPort, productImport, socialPort, screenedImport } from './live';
 import { SearchEngine } from './search';
 
 const SCOPE = { orgId: 'org-1', userId: 'u-1', projectId: 'p-1', brandId: null };
@@ -75,5 +76,43 @@ describe('pinterest billing', () => {
     const found = await pinterestPort(get).search('glass', 20);
 
     expect(found).toMatchObject({ ok: false, requests: 2, costUsd: 0.004 });
+  });
+});
+
+describe('social search billing', () => {
+  it('prices the ScrapeCreators request a social search made, a failed one included', async () => {
+    const get = vi.fn().mockRejectedValueOnce(new Error('scrapecreators 500'));
+
+    expect(await socialPort(get, { history: vi.fn(), single: vi.fn() }).search(SocialPlatform.TikTok, 'motion', 5)).toMatchObject({ ok: false, requests: 1, costUsd: 0.002 });
+  });
+});
+
+describe('social profile and post reads', () => {
+  const normalized = { externalId: '9', url: 'https://www.tiktok.com/@maker/video/9', content: 'hi', mediaType: 'video' as const, thumbnailUrl: 'https://cdn.example/9.jpg', publishedAt: null, metrics: { views: 5 }, videoUrl: 'https://cdn.example/9.mp4', durationMs: 8000 };
+
+  it('reads one page of an account and prices its request', async () => {
+    const history = vi.fn(async () => [normalized]);
+    const port = socialPort(vi.fn(), { history, single: vi.fn() });
+
+    const read = await port.profile('tiktok', '@maker', 6);
+
+    expect(history).toHaveBeenCalledWith('tiktok', { username: 'maker', profileUrl: null }, { maxPages: 1, maxPosts: 6 });
+    expect(read).toMatchObject({ ok: true, costUsd: 0.002, items: [{ id: '9', kind: 'video', video: 'https://cdn.example/9.mp4', seconds: 8, images: ['https://cdn.example/9.jpg'] }] });
+  });
+
+  it('reads a post url on the platform it belongs to; a failure still costs its request', async () => {
+    const single = vi.fn().mockResolvedValueOnce(normalized).mockRejectedValueOnce(new Error('scrapecreators 404'));
+    const port = socialPort(vi.fn(), { history: vi.fn(), single });
+
+    expect(await port.post('https://www.tiktok.com/@maker/video/9')).toMatchObject({ ok: true, costUsd: 0.002, items: [{ platform: 'tiktok', id: '9' }] });
+    expect(single).toHaveBeenCalledWith('tiktok', 'https://www.tiktok.com/@maker/video/9');
+    expect(await port.post('https://www.instagram.com/p/x/')).toEqual({ ok: false, error: 'social post failed: scrapecreators 404', costUsd: 0.002 });
+  });
+
+  it('a url that is not a post costs nothing', async () => {
+    const single = vi.fn();
+
+    expect(await socialPort(vi.fn(), { history: vi.fn(), single }).post('https://www.instagram.com/studio/')).toMatchObject({ ok: false, costUsd: 0 });
+    expect(single).not.toHaveBeenCalled();
   });
 });
