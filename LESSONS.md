@@ -2745,3 +2745,9 @@ for the server (`view_images` stored them). Cause: social CDNs (`cdninstagram`, 
 `tiktokcdn`) refuse to be embedded on another site, and their urls are signed and expire. Move:
 show the stored, screened copy (`candidate.preview` → `/web-views/...`), never the CDN url; a
 check that only reads tool results misses it, the screenshot of the grid catches it.
+
+## A real check against `vite dev` shows no change after an edit
+
+Signal: a server-side edit (a tool, a port) has no effect in agent turns, and nothing new lands in
+storage, while unit tests pass. The dev server kept the old module for turns running in the
+background. Move: restart `vite dev` after server edits before trusting a real-check run.

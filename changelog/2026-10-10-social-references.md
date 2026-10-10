@@ -36,3 +36,12 @@ Rules:
 
 Discarded: reusing `video-fetch.ts` helpers (private, and it trims for reviews); paging profiles
 (one page is enough to read a style, more costs credits).
+
+Found by the real check (`scripts/eval/social-refs-check.ts`, throwaway account, both cases):
+
+- The reference grid drew broken pictures: Instagram and TikTok CDNs refuse to be embedded, and
+  the agent re-types signed urls with a different query. `ask_reference_pick` now stores and
+  screens every candidate without a stored copy (`preview`), drops refused ones, and the grid
+  shows the copy.
+- Saved tool outputs over 2,000 chars become strings; viewing tools are now kept whole
+  (`VIEWING_TOOLS`), or the chat lost the thumbnails of what the agent watched.
