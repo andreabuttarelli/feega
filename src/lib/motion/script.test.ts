@@ -87,4 +87,12 @@ describe('the launch script', () => {
 
     expect(scriptProblems(s).join(' ')).toMatch(new RegExp(`at most ${MAX_LINE_WORDS}.*cut it to "Unlock the synergy of your whole"`));
   });
+
+  it('refuses a line said twice: each line appears once (v7: the tagline closed two acts)', () => {
+    const s = good();
+    s.acts[1].on_screen = [...s.acts[3].on_screen.slice(0, 1)];
+
+    expect(scriptProblems(s).join(' ')).toContain(`"${s.acts[3].on_screen[0]}" appears twice`);
+  });
 });
+

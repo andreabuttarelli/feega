@@ -1,7 +1,7 @@
 import { styleOf } from '$lib/motion/style';
 import { briefAwaits, promptTexts } from '$lib/motion/script-brief';
 import { ASK_REFERENCE_PICK, avoidedImages, choosesForUser, latestAnswer, pickAwaits, readAnswer, rejectedRounds, shownRefs, savedPick, type PickAnswer, type PickAsk } from '$lib/reference-pick';
-import { createUIMessageStream, streamText, type ModelMessage, type UIMessageChunk } from 'ai';
+import { createUIMessageStream, streamText, type ModelMessage, type Tool, type UIMessageChunk } from 'ai';
 import type { SpawnInput } from '$lib/server/agents/spawn';
 import { spawnAgents, spawnOffers } from '$lib/server/agents/spawn-agent';
 import { toolsWritingCode } from '$lib/server/motion/model-route';
@@ -12,9 +12,9 @@ import { PromptCache } from '$lib/server/prompt-cache';
 import { reasoningProviderOptions, toolForcing } from '$lib/server/chat-model/catalogue';
 import { ensureGatewayModels, gatewayModel, gatewayRate } from '$lib/server/openrouter-models';
 import { Tier, activeTools, openingTier, selfCheckChoice, spentUsd, stepTier, type ForcedTool } from '$lib/server/motion/model-route';
-import { billedUsdInScope, billingScope, extractSdkUsage, logAiCall, withOrgContext } from '$lib/server/ai-log';
+import { billedUsdInScope, billingScope, extractSdkUsage, logAiCall, withVideoContext } from '$lib/server/ai-log';
 import { loadTurns, openNodeThread, promptHistory, saveTurn } from '$lib/server/repos/chat';
-import { openReply, ReplyStatus } from '$lib/server/repos/chat-reply';
+import { openReply, ReplyStatus, type Reply } from '$lib/server/repos/chat-reply';
 import { referencedAssets } from '$lib/motion/doc-assets';
 import { finishedTurn } from '$lib/server/project-agent/finished-turn';
 import { agentActor, type Actor } from '$lib/server/repos/actor';
@@ -28,10 +28,11 @@ import { effectStore } from '$lib/server/effects/store';
 import { layoutStore } from '$lib/server/layouts/store';
 import { assetUrls, headOrNew, motionAssets, motionTokens, saveMotionDoc } from '$lib/server/motion/editor';
 import { fitNewVideo } from '$lib/motion/fit-duration';
-import { AGENT_SELF_SAVE_MS, AGENT_TURN_CAP_USD } from '$lib/server/project-agent/limits';
+import { AGENT_SELF_SAVE_MS, AGENT_TURN_CAP_USD, budgetSpentNote, videoBudgetLeft } from '$lib/server/project-agent/limits';
+import { videoSpentUsd } from '$lib/server/repos/video-spend';
 import { CRITIC_SCHEMA, critique, criticMessage, type Critique } from '$lib/server/motion/critic';
 import { VIEWER_MODEL, VIEWER_SCHEMA, viewFrames } from '$lib/server/motion/viewer';
-import { CutGate, REVIEW_CUT, cutGate, type CutReview } from '$lib/motion/cut-review';
+import { CutGate, KEPT_CUT, REVIEW_CUT, cutGate, keepsCut, reviewedBefore, type CutReview } from '$lib/motion/cut-review';
 import type { SavedTool } from '$lib/server/repos/chat';
 import { tileSheet } from '$lib/server/motion/contact-sheet';
 import { COPY_SCHEMA, copywrite } from '$lib/server/motion/copywriter';
@@ -145,6 +146,21 @@ function shotCrews(script: LaunchScript): Crew[] {
     .map((acts) => ({ acts: acts.map((a) => a.act), from: acts[0].start, to: acts.at(-1)!.end }));
 }
 
+const ADD_SHOT = 'add_shot';
+
+function crewTools<T extends Record<string, Tool>>(all: T, crew: Crew): T {
+  const add = all[ADD_SHOT];
+  if (!add?.execute) {
+    return all;
+  }
+  const guarded: Tool = {
+    ...add,
+    execute: async (input: { at: number; seconds?: number }, options) =>
+      input.at < crew.from || input.at >= crew.to ? { ok: false, error: `a shot at ${input.at} s is outside your range ${crew.from} s to ${crew.to} s: the other crew builds that part` } : add.execute!(input, options)
+  } as Tool;
+  return { ...all, [ADD_SHOT]: guarded };
+}
+
 const crewBrief = (crew: Crew) => `Shot crew: build only the ${crew.acts.join(', ')} acts of the script, from ${crew.from} s to ${crew.to} s, with library shots placed inside that range. Another crew builds the rest at the same time: never place, move or remove anything outside your range, and leave music to the sound pass.`;
 
 const RESEARCH_DONE = 'Research is done: the facts, captures and references are in the conversation above. Now write the script and the storyboard from them.';
@@ -207,6 +223,22 @@ export type TurnOutcome = { reply: string; summary: string | null; version: numb
 
 export type MotionTurn = { stream: ReadableStream<UIMessageChunk>; done: Promise<TurnOutcome> };
 
+const CANNED_ID = 'canned';
+
+function cannedTurn(content: string, reply: Pick<Reply, 'finish'>): MotionTurn {
+  const done = reply.finish({ content, tools: [] }, ReplyStatus.Done).then((): TurnOutcome => ({ reply: content, summary: null, version: null, revision: null, costUsd: 0, pick: null, cut: null }));
+  const stream = createUIMessageStream({
+    execute: ({ writer }) => {
+      writer.write({ type: 'start' });
+      writer.write({ type: 'text-start', id: CANNED_ID });
+      writer.write({ type: 'text-delta', id: CANNED_ID, delta: content });
+      writer.write({ type: 'text-end', id: CANNED_ID });
+      writer.write({ type: 'finish' });
+    }
+  });
+  return { stream, done };
+}
+
 export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Response> {
   const startedAt = Date.now();
   const { db, userId, orgId, project, motion, message, attachments = [], selection, model, reasoning, requester, browser, timing = PLATFORM_TIMING } = input;
@@ -231,6 +263,12 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
   const storyboard = storyboardStore(db, { orgId, projectId: project.id, motionNodeId: motion.record.id, title: motion.record.displayName ?? 'Video', actor });
   const note = motion.node.storyboard ? boardNote(await storyboard.read()) : null;
   const reply = await openReply(db, { orgId, threadId, actor });
+  const videoSpent = await videoSpentUsd(db, nodeScope).catch(() => 0);
+  const videoLeft = videoBudgetLeft(videoSpent, [...turns, { role: 'user', content: message }]);
+  const canned = videoLeft <= 0 ? budgetSpentNote(videoSpent) : keepsCut(message) ? KEPT_CUT : null;
+  if (canned) {
+    return cannedTurn(canned, reply);
+  }
 
   const knownAssets = assets.length;
   const session: MotionSession = { doc: head.doc, baseVersion: head.version, edits: [], selection, frames: new Map(), views: 0, checkedAt: 0, codeWrites: 0, pick };
@@ -283,9 +321,9 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
     revisions: { list: () => listRevisions(db, nodeScope), read: async (version) => (await readRevision(db, { ...nodeScope, version }))?.doc ?? null },
     ...sources,
     analysis: async (assetId) => (await analyzeSounds(storageAnalysis(db), { orgId, projectId: project.id }, assets, [assetId]))[assetId] ?? null,
-    voiceover: (voice) => withOrgContext(orgId, () => speakVoiceover(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, actor }, voice)),
-    music: (ask) => withOrgContext(orgId, () => layMusic(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, actor }, ask)),
-    sfx: (sound) => withOrgContext(orgId, () => laySfx(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, actor }, sound)),
+    voiceover: (voice) => withVideoContext(orgId, motion.record.id, () => speakVoiceover(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, actor }, voice)),
+    music: (ask) => withVideoContext(orgId, motion.record.id, () => layMusic(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, actor }, ask)),
+    sfx: (sound) => withVideoContext(orgId, motion.record.id, () => laySfx(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, actor }, sound)),
     frames: drawTurnFrames,
     inspect: frameStats,
     seam: async () => {
@@ -319,13 +357,13 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
     storyboard,
     copywrite: async (script) => {
       const ask = async (prompt: string) => ({ answer: await llmStructured({ prompt, schema: COPY_SCHEMA, model: roleModel(StudioRole.Copywriter, model), temperature: 0.4, label: STUDIO_ROSTER[StudioRole.Copywriter].label }), usd: billedUsdInScope() ?? 0 });
-      const out = await withOrgContext(orgId, () => copywrite({ ask }, script));
+      const out = await withVideoContext(orgId, motion.record.id, () => copywrite({ ask }, script));
       spent += out.usd;
       return out.script;
     },
     captureUi: uiCapture(db, { orgId, userId, projectId: project.id, brandId: project.brandId }),
     appAccountKept: appAccountKept(db, { orgId, userId, projectId: project.id, brandId: project.brandId }),
-    readUi: uiReader({ ask: (q) => withOrgContext(orgId, () => llmStructured({ ...q, model: llmVisionModel() ?? model, label: 'motion-recreate-ui' })), fetchBytes: fetchImageBytes }),
+    readUi: uiReader({ ask: (q) => withVideoContext(orgId, motion.record.id, () => llmStructured({ ...q, model: llmVisionModel() ?? model, label: 'motion-recreate-ui' })), fetchBytes: fetchImageBytes }),
     check: async (callId, doc, name) => {
       BROWSER_DRAWS[browser]();
       const review = await screenModelInput(db, { profile: ModerationProfile.Standard, texts: docTexts(doc), scope: moderationScope });
@@ -379,14 +417,15 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
   const framesShown = new Set<string>();
   let spent = 0;
   let roundsUsd = 0;
-  const billing = billingScope(orgId);
+  const billing = billingScope(orgId, motion.record.id);
   const charged = () => spent - roundsUsd + Math.max(roundsUsd, billing.gatewayUsd());
-  const overBudget: Stop = () => charged() > roleBudgetUsd(role, AGENT_TURN_CAP_USD);
+  const overBudget: Stop = () => charged() > Math.min(roleBudgetUsd(role, AGENT_TURN_CAP_USD), videoLeft);
   const TIER_MODEL: Record<Tier, string> = { [Tier.Edit]: model, [Tier.Code]: codeModel };
 
   spawnRun = spawnAgents(
     {
       orgId,
+      nodeId: motion.record.id,
       tools: () => Object.fromEntries(toolNames.map((n) => [n, tools[n]])),
       codeTools: toolsWritingCode,
       visionTools: new Set([VIEW_FRAMES]),
@@ -396,18 +435,18 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
       },
       changes: () => session.edits.length,
       changedSince: (mark) => session.edits.slice(mark),
-      log: (e) => withOrgContext(orgId, () => logAiCall({ label: `motion-spawned-${e.label}`, provider: 'llm', model: e.model, ms: 0, ok: true, orgId, userId, threadId, projectId: project.id, actorKind: 'agent', actorId: userId, agentKey: e.agentKey, ...e.usage })),
+      log: (e) => withVideoContext(orgId, motion.record.id, () => logAiCall({ label: `motion-spawned-${e.label}`, provider: 'llm', model: e.model, ms: 0, ok: true, orgId, userId, threadId, projectId: project.id, actorKind: 'agent', actorId: userId, agentKey: e.agentKey, ...e.usage })),
       abort: cut.signal
     },
     offers
   );
 
-  const round = (messages: ModelMessage[], kind: Round, onStep: (step: TurnStep & { response: { messages: unknown[] } }) => void) =>
+  const round = (messages: ModelMessage[], kind: Round, onStep: (step: TurnStep & { response: { messages: unknown[] } }) => void, toolSet: typeof tools = tools) =>
     billing.run(() => streamText({
       model: llmLanguageModel(ROUND_ROLE[kind] ? roleModel(ROUND_ROLE[kind], model) : model, PromptCache.On),
       system,
       messages,
-      tools,
+      tools: toolSet,
       abortSignal: cut.signal,
       activeTools: toolNames,
       stopWhen: ROUND_STOPS[kind](t0, overBudget),
@@ -482,9 +521,9 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
         const answer = await llmStructured({ ...q, schema: CRITIC_SCHEMA, model: roleModel(StudioRole.Critic, visionModel ?? model), temperature: 0, label: STUDIO_ROSTER[StudioRole.Critic].label });
         return { answer, usd: billedUsdInScope() ?? 0 };
       },
-      view: (frames: readonly Frame[]) => withOrgContext(orgId, () => viewFrames({ ask: viewerAsk }, frames))
+      view: (frames: readonly Frame[]) => withVideoContext(orgId, motion.record.id, () => viewFrames({ ask: viewerAsk }, frames))
     };
-    const out = await withOrgContext(orgId, () => critique(ports, { doc: session.doc, request: message, references: session.references ?? [] })).catch((e: unknown) => {
+    const out = await withVideoContext(orgId, motion.record.id, () => critique(ports, { doc: session.doc, request: message, references: session.references ?? [] })).catch((e: unknown) => {
       console.warn('[motion-agent] critic failed, delivering without its review', e);
       return { review: null, usd: 0, sheet: null };
     });
@@ -544,7 +583,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
       let conversation = openingMessages;
 
       let started = false;
-      const play = async (messages: ModelMessage[], kind: Round) => {
+      const play = async (messages: ModelMessage[], kind: Round, toolSet: typeof tools = tools) => {
         const first = !started;
         started = true;
         session.looks = roleLooks(ROUND_ROLE[kind] ?? role);
@@ -553,7 +592,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
           steps.push(step);
           answered.push(...(step.response.messages as ModelMessage[]));
           void reply.progress(finishedTurn(steps));
-        });
+        }, toolSet);
         writer.merge(played.toUIMessageStream({ sendStart: first, sendFinish: false, sendReasoning: true }));
         await Promise.resolve(played.steps).catch((e: unknown) => {
           console.error(`[motion-agent] ${kind} round failed, keeping the steps it finished`, e);
@@ -567,7 +606,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
         const base = openingMessages;
         const crewed = await Promise.all(crewsFor.map(async (crew) => {
           const asked: ModelMessage[] = [...base, { role: 'user', content: crewBrief(crew) }];
-          return [asked.at(-1)!, ...(await play(asked, openingRound))];
+          return [asked.at(-1)!, ...(await play(asked, openingRound, crewTools(tools, crew)))];
         }));
         conversation = [...base, ...crewed.flat()];
       } else {
@@ -585,7 +624,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
         const times = keyFrameTimes(session.doc);
         await play([...conversation, checkMessage(errors, times)], Round.SelfCheck);
       }
-      const critiqued = steps.length > 0 && !awaitsGo && REVIEWED.has(role) && vision === Vision.Available && session.edits.length > 0 ? await reviewCut() : null;
+      const critiqued = steps.length > 0 && !awaitsGo && REVIEWED.has(role) && !reviewedBefore(turns) && vision === Vision.Available && session.edits.length > 0 ? await reviewCut() : null;
       const fix = critiqued?.review ? criticMessage(critiqued.review) : null;
       if (fix && gate === CutGate.Auto) {
         await play([...conversation, fix], Round.SelfCheck);
@@ -660,7 +699,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
     await reply.finish(turn, ReplyStatus.Done);
 
     for (const [modelId, usage] of usageByModel(steps.map((s) => extractSdkUsage(s.usage)), stepModels)) {
-      withOrgContext(orgId, () =>
+      withVideoContext(orgId, motion.record.id, () =>
         logAiCall({
           label: labelOf(modelId),
           provider: 'llm',

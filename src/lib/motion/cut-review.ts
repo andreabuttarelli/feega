@@ -28,6 +28,12 @@ const ANSWERS: Record<CutAnswer, (fixes: readonly string[]) => string> = {
 
 export const cutAnswer = (answer: CutAnswer, fixes: readonly string[]) => ANSWERS[answer](fixes);
 
+export const keepsCut = (message: string): boolean => message.trim() === ANSWERS[CutAnswer.Ship]([]);
+
+export const KEPT_CUT = 'Kept the cut as it is: nothing changed.';
+
+export const reviewedBefore = (turns: readonly { tools?: readonly ToolOutcome[] }[]): boolean => turns.some((t) => (t.tools ?? []).some((tool) => savedReview(tool) !== null));
+
 
 export const answersCut = (message: string): boolean => message.startsWith(APPLY_HEAD);
 

@@ -2797,3 +2797,8 @@ Segnale: `motion-fixer-code` $3.03 in `ai_calls` con una quota di $0.75. Il tett
 `spentUsd` dal listino (`gatewayRate`), non la fattura del gateway. Mossa: il turno gira in
 `billingScope` e il tetto legge `max(stima, gatewayUsd())`. `pgrep -f run.ts` in un ciclo
 `until` trova anche il ciclo stesso: aspetta il PID (`kill -0`).
+
+### Un trailer costa $6 con ogni turno sotto il suo tetto
+Segnale: in `ai_calls` per ora, dopo `motion-fixer` altre righe `motion-agent` da $1.2 + $0.4 e un nuovo `motion-critic` a ogni risposta dell'utente ("Salta…", "Ship the cut"). Il tetto era per turno: ogni risposta apriva un turno pieno e una nuova revisione.
+Mossa: budget per video (`VIDEO_CAP_USD`, somma di `ai_calls.node_id`), critic una volta per video, "tieni il taglio" senza modello.
+
