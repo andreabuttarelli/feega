@@ -5,6 +5,7 @@ import { writeComponent } from '../custom/ops';
 import { VECTOR_TOKEN } from '../vector-ui/piece';
 import type { VectorNode, VectorUi } from '../vector-ui/model';
 import { SHOTS, ShotUi, overLimits, shotSource, type ShotId } from './library';
+import type { CursorStep } from './cursor';
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
@@ -43,9 +44,14 @@ export function vectorOf(doc: MotionDoc, name: string): VectorUi | null {
 
 const ID_SLOT = /_id$/;
 
+const idsIn = (slots: Record<string, unknown>): [string, unknown][] => [
+  ...Object.entries(slots).filter(([k]) => ID_SLOT.test(k)),
+  ...((slots.cursor as CursorStep[] | undefined) ?? []).map((step): [string, unknown] => ['cursor', step.target])
+];
+
 function missingIds(slots: Record<string, unknown>, nodes: readonly VectorNode[]): string | null {
   const known = new Set(nodes.map((n) => n.id));
-  const missing = Object.entries(slots).filter(([k, v]) => ID_SLOT.test(k) && typeof v === 'string' && !known.has(v));
+  const missing = idsIn(slots).filter(([, v]) => typeof v === 'string' && !known.has(v));
   if (!missing.length) {
     return null;
   }
@@ -57,7 +63,7 @@ export const shotComponent = (shot: ShotId, ui?: string) => `${SHOTS[shot].name}
 
 function asProps(doc: MotionDoc, name: string, slots: Record<string, unknown>): Record<string, unknown> {
   const schema = doc.components[name]?.propsSchema.properties ?? {};
-  return Object.fromEntries(Object.entries(slots).map(([k, v]) => [k, schema[k]?.type === 'string' && typeof v === 'number' ? String(v) : v]));
+  return Object.fromEntries(Object.entries(slots).map(([k, v]) => [k, schema[k]?.type === 'string' && typeof v !== 'string' ? (typeof v === 'object' ? JSON.stringify(v) : String(v)) : v]));
 }
 
 export function addShot(doc: MotionDoc, plan: ShotPlan, id: string): OpResult & { placed?: Placed } {

@@ -80,6 +80,26 @@ describe('the shot library', () => {
     expect(findClip(session.doc, String(made.clip_id))?.clip.props).toMatchObject({ field_id: 'input-0' });
   });
 
+  it('add_shot takes a cursor script that clicks, types and hovers elements of the recreated UI', async () => {
+    const { session, run } = setup(vi.fn(async () => ({ ok: true as const, ui: UI })));
+    await run('recreate_ui', { url: 'https://feega.test/app', name: 'UiFeega' });
+    const cursor = [{ target: 'input-0', action: 'type', text: 'a launch film' }, { target: 'button-0', action: 'click', at: 2.6 }];
+
+    const made = await run('add_shot', { shot: ShotId.UiFocus, ui: 'UiFeega', slots: { field_id: 'input-0', button_id: 'button-0', cursor }, at: 0 });
+
+    expect(made).toMatchObject({ ok: true });
+    expect(JSON.parse(String(findClip(session.doc, String(made.clip_id))?.clip.props.cursor))).toEqual(cursor);
+  });
+
+  it('list_shots says which shots take a cursor script and how it is written', async () => {
+    const { run } = setup();
+
+    const listed = (await run('list_shots', {})) as { shots: { id: string; cursor: string | null }[] };
+
+    expect(listed.shots.find((s) => s.id === ShotId.UiFocus)?.cursor).toMatch(/click.*type.*scroll/);
+    expect(listed.shots.find((s) => s.id === ShotId.KineticTitle)?.cursor).toBeNull();
+  });
+
   it('the prompt sends a product trailer to the shots', () => {
     expect(motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Available })).toMatch(/add_shot/);
   });
