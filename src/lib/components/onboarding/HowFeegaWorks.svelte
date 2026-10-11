@@ -1,11 +1,10 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
-  import X from '@lucide/svelte/icons/x';
-  import { track } from '$lib/analytics';
+    import { track } from '$lib/analytics';
   import { MAKE_VIDEO_PATH, TOUR_SLIDES, TourEvent, TourScene, opensOnArrival, type TourState } from '$lib/onboarding/tour';
   import { tourDialog } from '$lib/onboarding/tour-dialog.svelte';
   import { rememberTourSeen, seenInBrowser } from '$lib/onboarding/tour-memory';
-  import TourIllustration from './TourIllustration.svelte';
+  import TourStage from './TourStage.svelte';
 
   let { tour }: { tour: TourState } = $props();
 
@@ -66,36 +65,36 @@
 {#if tourDialog.open}
   <div class="tour-backdrop">
     <div class="tour" role="dialog" aria-modal="true" aria-labelledby="tour-title" tabindex="-1" bind:this={dialog} data-testid="tour" data-slide={slide.id}>
-      <button type="button" class="skip" aria-label="Skip" onclick={() => close(TourEvent.Skip)} data-testid="tour-skip">
-        <X size={16} strokeWidth={1.7} />
-      </button>
+      <TourStage scene={slide.id} />
 
-      <TourIllustration scene={slide.id} />
+      <button type="button" class="skip" onclick={() => close(TourEvent.Skip)} data-testid="tour-skip">Skip</button>
 
-      <div class="copy">
-        <span class="step">{index + 1} / {TOUR_SLIDES.length}</span>
-        <h2 id="tour-title">{slide.title}</h2>
-        <p>{slide.body}</p>
-      </div>
+      <div class="panel" class:finale={last}>
+        {#key slide.id}
+          <div class="copy">
+            <h2 id="tour-title">{slide.title}</h2>
+            <p>{slide.body}</p>
+          </div>
+        {/key}
 
-      {#if slide.id === TourScene.Start}
-        <div class="start">
-          <a class="primary" href={MAKE_VIDEO_PATH} onclick={() => close(TourEvent.Finish)} data-testid="tour-make-video">Make a video</a>
-          <form method="POST" action="/app?/project" onsubmit={() => close(TourEvent.Finish)}>
-            <button type="submit" class="secondary" data-testid="tour-open-canvas">Open a canvas</button>
-          </form>
-        </div>
-      {/if}
+        <div class="controls">
+          <div class="dots" role="tablist" aria-label="Slides">
+            {#each TOUR_SLIDES as s, i (s.id)}
+              <button type="button" role="tab" class="dot" aria-selected={i === index} aria-label="Slide {i + 1} of {TOUR_SLIDES.length}" onclick={() => go(i)}></button>
+            {/each}
+          </div>
 
-      <div class="tour-foot">
-        <div class="dots" role="tablist" aria-label="Slides">
-          {#each TOUR_SLIDES as s, i (s.id)}
-            <button type="button" role="tab" class="dot" aria-selected={i === index} aria-label="Slide {i + 1}" onclick={() => go(i)}></button>
-          {/each}
-        </div>
-        <div class="arrows">
-          {#if index > 0}<button type="button" class="ghost" onclick={() => go(index - 1)}>Back</button>{/if}
-          {#if !last}<button type="button" class="primary" onclick={() => go(index + 1)} data-testid="tour-next">Next</button>{/if}
+          <div class="arrows">
+            {#if index > 0}<button type="button" class="ghost" onclick={() => go(index - 1)}>Back</button>{/if}
+            {#if last}
+              <form method="POST" action="/app?/project" onsubmit={() => close(TourEvent.Finish)}>
+                <button type="submit" class="secondary" data-testid="tour-open-canvas">Open a canvas</button>
+              </form>
+              <a class="primary" href={MAKE_VIDEO_PATH} onclick={() => close(TourEvent.Finish)} data-testid="tour-make-video">Make a video</a>
+            {:else}
+              <button type="button" class="primary" onclick={() => go(index + 1)} data-testid="tour-next">Next</button>
+            {/if}
+          </div>
         </div>
       </div>
     </div>
@@ -110,98 +109,95 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(0, 0, 0, 0.5);
+    padding: 24px;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(6px);
+    animation: fade 400ms cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .tour {
     position: relative;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-    width: min(560px, calc(100vw - 32px));
-    max-height: calc(100dvh - 32px);
-    overflow-y: auto;
-    padding: 24px;
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr);
+    width: min(1360px, 100%);
+    height: min(880px, 100%);
+    overflow: hidden;
     background: var(--ui-bg, #fff);
     color: var(--ui-ink, #111);
     font-family: var(--ui-sans, 'DM Sans', system-ui, sans-serif);
     outline: none;
+    box-shadow: 0 60px 120px -40px rgba(0, 0, 0, 0.6);
+    animation: enter 600ms cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .skip {
     position: absolute;
-    top: 8px;
-    right: 8px;
+    top: 16px;
+    right: 16px;
     z-index: 1;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 44px;
-    height: 44px;
+    min-height: 44px;
+    padding: 0 20px;
     border: 0;
     border-radius: 9999px;
-    background: transparent;
-    color: var(--ui-ink-2, #555);
+    background: color-mix(in srgb, var(--ui-bg, #fff) 80%, transparent);
+    backdrop-filter: blur(8px);
+    color: var(--ui-ink-2, #5c5c58);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 500;
     cursor: pointer;
   }
 
   .skip:hover {
-    background: var(--ui-hover, rgba(0, 0, 0, 0.05));
+    color: var(--ui-ink, #111);
+  }
+
+  .panel {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    gap: 48px;
+    padding: 36px 40px 40px;
   }
 
   .copy {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-  }
-
-  .step {
-    font-family: var(--ui-mono, monospace);
-    font-size: 11px;
-    color: var(--ui-ink-3, #888);
+    gap: 14px;
+    animation: copy 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
   h2 {
     margin: 0;
-    font-size: clamp(36px, 6vw, 56px);
+    font-size: clamp(40px, 4.5vw, 72px);
     font-weight: 600;
-    letter-spacing: -0.04em;
+    letter-spacing: -0.045em;
     line-height: 0.95;
     text-transform: lowercase;
   }
 
   p {
+    max-width: 560px;
     margin: 0;
-    font-size: 15px;
+    font-size: 17px;
     line-height: 1.45;
-    color: var(--ui-ink-2, #555);
+    color: var(--ui-ink-2, #5c5c58);
   }
 
-  .start {
+  .controls {
     display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  .start form {
-    display: contents;
-  }
-
-  .tour-foot {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin-top: auto;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 16px;
   }
 
   .dots {
     display: flex;
-    gap: 2px;
   }
 
   .dot {
-    width: 24px;
+    width: 22px;
     height: 44px;
     padding: 0;
     border: 0;
@@ -216,16 +212,22 @@
     height: 8px;
     margin: auto;
     border-radius: 50%;
-    background: var(--ui-ink-3, #ccc);
+    background: color-mix(in srgb, var(--ui-ink, #111) 20%, transparent);
+    transition: transform 400ms cubic-bezier(0.16, 1, 0.3, 1), background 200ms;
   }
 
   .dot[aria-selected='true']::before {
     background: var(--ui-accent, #0099ff);
+    transform: scale(1.4);
   }
 
   .arrows {
     display: flex;
     gap: 8px;
+  }
+
+  .arrows form {
+    display: contents;
   }
 
   .primary,
@@ -234,14 +236,15 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-height: 44px;
-    padding: 0 20px;
+    min-height: 48px;
+    padding: 0 26px;
     border: 0;
     border-radius: 9999px;
     font: inherit;
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 600;
     text-decoration: none;
+    white-space: nowrap;
     cursor: pointer;
   }
 
@@ -251,13 +254,13 @@
   }
 
   .secondary {
-    background: var(--ui-surface, #f2f2f2);
+    background: var(--ui-hover, #f2f2ef);
     color: var(--ui-ink, #111);
   }
 
   .ghost {
     background: transparent;
-    color: var(--ui-ink-2, #555);
+    color: var(--ui-ink-2, #5c5c58);
   }
 
   .primary:focus-visible,
@@ -269,16 +272,75 @@
     box-shadow: var(--ui-focus, 0 0 0 2px #0099ff);
   }
 
+  @keyframes fade {
+    from { opacity: 0; }
+  }
+
+  @keyframes enter {
+    from { opacity: 0; transform: translateY(24px) scale(0.98); }
+  }
+
+  @keyframes copy {
+    from { opacity: 0; transform: translateY(16px); }
+  }
+
   @media (max-width: 640px) {
     .tour-backdrop {
-      align-items: stretch;
+      padding: 0;
     }
 
     .tour {
       width: 100vw;
-      max-height: none;
       height: 100dvh;
-      padding: 56px 16px calc(16px + env(safe-area-inset-bottom));
+      grid-template-rows: minmax(0, 1fr) auto;
+    }
+
+    .panel {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 20px;
+      padding: 24px 16px calc(16px + env(safe-area-inset-bottom));
+    }
+
+    h2 {
+      font-size: clamp(36px, 10vw, 64px);
+    }
+
+    p {
+      font-size: 15px;
+    }
+
+    .controls {
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .finale .controls {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .finale .ghost {
+      display: none;
+    }
+
+    .finale .arrows .primary,
+    .finale .arrows .secondary {
+      flex: 1;
+    }
+
+    .primary,
+    .secondary {
+      padding: 0 18px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .tour-backdrop,
+    .tour,
+    .copy {
+      animation: none;
     }
   }
 </style>

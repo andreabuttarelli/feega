@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { TOUR_LAUNCHED_AT, TOUR_SLIDES, TourState, tourShowsOn, tourStateOf, opensOnArrival } from './tour';
+import { TOUR_LAUNCHED_AT, TOUR_SLIDES, TourScene, TourState, tourShowsOn, tourStateOf, opensOnArrival } from './tour';
 
 const NEW_USER = '2026-10-12T09:00:00Z';
 const OLD_USER = '2026-01-01T09:00:00Z';
+const TITLE_MAX = 40;
+const BODY_MAX = 170;
 
 describe('who the tour opens for', () => {
   it('a new user who has not seen it is due', () => {
@@ -46,9 +48,33 @@ describe('where the tour lives', () => {
 });
 
 describe('the slides', () => {
-  it('explain that every motion lives on a canvas, and end with two ways in', () => {
-    expect(TOUR_SLIDES.length).toBeGreaterThanOrEqual(5);
-    expect(TOUR_SLIDES.some((s) => /canvas/i.test(s.body) && /motion/i.test(s.body))).toBe(true);
-    expect(new Set(TOUR_SLIDES.map((s) => s.id)).size).toBe(TOUR_SLIDES.length);
+  it('go from making a video to where it lives, and end with two ways in', () => {
+    expect(TOUR_SLIDES.map((s) => s.id)).toEqual([
+      TourScene.Make,
+      TourScene.Edit,
+      TourScene.Canvas,
+      TourScene.Connect,
+      TourScene.Share,
+      TourScene.Start
+    ]);
+  });
+
+  it('name the outcome in a short lowercase title', () => {
+    for (const slide of TOUR_SLIDES) {
+      expect(slide.title).toBe(slide.title.toLowerCase());
+      expect(slide.title.length).toBeLessThanOrEqual(TITLE_MAX);
+    }
+  });
+
+  it('answer what to do in at most two sentences', () => {
+    for (const slide of TOUR_SLIDES) {
+      expect(slide.body.length).toBeLessThanOrEqual(BODY_MAX);
+      expect(slide.body.split(/[.!?](?:\s|$)/).filter((p) => p.trim()).length).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it('say in the title that every video lives on a canvas', () => {
+    const canvas = TOUR_SLIDES.find((s) => s.id === TourScene.Canvas);
+    expect(canvas?.title).toMatch(/video.*canvas/);
   });
 });

@@ -10,10 +10,10 @@ base('al primo accesso il tour si apre, si sfoglia, si chiude e non torna', asyn
     await signInE2e(page, session, E2eTour.Due);
     const tour = page.getByTestId('tour');
     await expect(tour).toBeVisible();
-    await expect(tour).toHaveAttribute('data-slide', 'intro');
+    await expect(tour).toHaveAttribute('data-slide', 'make');
 
     await page.keyboard.press('ArrowRight');
-    await expect(tour).toHaveAttribute('data-slide', 'motion');
+    await expect(tour).toHaveAttribute('data-slide', 'edit');
 
     const saved = page.waitForResponse((r) => r.url().includes('/api/onboarding-tour'));
     await page.keyboard.press('Escape');
