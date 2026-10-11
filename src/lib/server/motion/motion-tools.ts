@@ -44,10 +44,10 @@ import { DESCRIBE_FRAMES, MAX_FRAMES_PER_VIEW, MAX_VIEWS_PER_TURN, VIEW_FRAMES, 
 import { loopJump, seamChecked } from '$lib/motion/loop';
 import { DESCRIBE_ASK, describeFramesTool, gateBlock, lookFirst, type Viewing } from './look';
 import { contentEnd, fitDuration } from '$lib/motion/fit-duration';
-import { Quality, blocking, docProblems, frameProblems, softPictures, type FrameStat, type Pixels, type QualityProblem } from '$lib/motion/direction';
+import { Quality, blocking, docProblems, frameProblems, softPictures, uiRecolour, uiShrink, type FrameStat, type Pixels, type QualityProblem } from '$lib/motion/direction';
 import { CheckState, ComponentMode, MAX_CSS, MAX_HTML, MAX_JS, SOURCE_FILES, checkState, modeOf, propsSchemaSchema, sourceHash, type CustomComponent, type CustomSource } from '$lib/motion/custom/component';
 import { patchComponent, recordCheck, removeComponent, writeComponent } from '$lib/motion/custom/ops';
-import { CaptureSession, offersSignIn, type UiCapture } from '$lib/server/web/vector-capture';
+import { CaptureSession, FIDELITY_MIN, offersSignIn, type UiCapture } from '$lib/server/web/vector-capture';
 import { StoreKind } from '$lib/server/web/store';
 import { vectorPiece, withFonts } from '$lib/motion/vector-ui/piece';
 import { VectorRole } from '$lib/motion/vector-ui/model';
@@ -219,6 +219,14 @@ export enum AppAccount {
 const SCRIPT_INPUT = scriptSchema.extend({ app_account: z.enum(AppAccount).optional().describe('declined: the user said they have no test account of the app') });
 
 const PUBLIC_SITE_NEXT = 'this is the public site of an app, read signed out: if the product is that app, the trailer shows its real screens, not this page. Before any shot, ask the user in chat for a TEST account (login url, email, password; say you will see it) and end the turn on that question; then sign in with app_browse and recreate_ui 2–3 signed-in work screens (the editor, the canvas, the result)';
+
+const fidelityOf = (fidelity: number | undefined) => {
+  if (fidelity === undefined) {
+    return {};
+  }
+  const low = fidelity < FIDELITY_MIN ? { low_fidelity: `the rebuild matches the page at ${Math.round(fidelity * 100)}% even after a second read: the page was still loading or is mostly pictures; recreate_ui it again or film another screen` } : {};
+  return { fidelity: Math.round(fidelity * 100) / 100, ...low };
+};
 
 const UNREADABLE = (what: string) => ({ ok: false as const, error: `${what} is not available in this workspace` });
 
@@ -640,7 +648,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       return written;
     }
     const elements = ui.nodes.filter((n) => n.role !== VectorRole.Box).slice(0, SHOWN_ELEMENTS).map((n) => ({ id: n.id, role: n.role, ...(n.text ? { text: n.text.slice(0, 40) } : {}) }));
-    const made = { ok: true, name: piece.name, size: piece.size, elements, raster: ui.raster, ...(read.dismissed ? { dismissed: read.dismissed } : {}), ...(ui.raster.length ? { note: `${ui.raster.length} pictures stayed pictures (photos, canvas, video): they show as empty frames` } : {}), ...(read.session === CaptureSession.None && offersSignIn(ui) ? { next: PUBLIC_SITE_NEXT } : {}) };
+    const made = { ok: true, name: piece.name, size: piece.size, elements, raster: ui.raster, ...(read.dismissed ? { dismissed: read.dismissed } : {}), ...(ui.raster.length ? { note: `${ui.raster.length} pictures stayed pictures (photos, canvas, video): they show as empty frames` } : {}), ...(read.session === CaptureSession.None && offersSignIn(ui) ? { next: PUBLIC_SITE_NEXT } : {}), ...fidelityOf(read.fidelity) };
     if (input.start === undefined) {
       return made;
     }
@@ -830,7 +838,13 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     set_transform: tool({
       description: `Set base transform values of a clip; the rest are kept. Keys: ${TRANSFORM_KEYS.join(', ')}. x/y are offsets in px of the frame, scale/scaleX/scaleY and opacity in % (100 = as is), rotations and skews in degrees, z and perspective in px, anchorX/anchorY the pivot inside the clip box (0..1), blur in px.`,
       inputSchema: z.object({ clip_id: z.string(), transform: transformInput }),
-      execute: async (input) => apply(setTransform(session.doc, input.clip_id, storedRecord(ownerOf(input.clip_id), input.transform, session.doc)), `transformed ${input.clip_id}`)
+      execute: async (input) => {
+        const shrunk = uiShrink(session.doc, input.clip_id, input.transform.scale as number | undefined);
+        if (shrunk) {
+          return { ok: false, error: shrunk };
+        }
+        return apply(setTransform(session.doc, input.clip_id, storedRecord(ownerOf(input.clip_id), input.transform, session.doc)), `transformed ${input.clip_id}`);
+      }
     }),
 
     set_keyframes: tool({
@@ -1418,6 +1432,10 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: `Add an effect at the end of a clip's effect stack (applied top to bottom, inside the clip transform). Kinds and params: ${EFFECT_CATALOGUE}. Params not given take their defaults. Returns effect_id and the keys to animate: set_keyframes / set_expression with prop fx.<effect id>.<param>.`,
       inputSchema: z.object({ clip_id: z.string(), kind: z.enum(EFFECT_KINDS), params: z.record(z.string(), z.union([z.number(), z.string()])).optional() }),
       execute: async (input) => {
+        const recoloured = uiRecolour(session.doc, input.clip_id, input.kind);
+        if (recoloured) {
+          return { ok: false, error: recoloured };
+        }
         const id = deps.newId();
         const out = apply(addEffect(session.doc, input.clip_id, input.kind, id, input.params), `added ${input.kind} to ${input.clip_id}`);
         return out.ok ? { ...out, effect_id: id, animate: EFFECTS[input.kind].params.map((p) => effectKey(id, p.key)) } : out;
@@ -1428,6 +1446,10 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: `Colour-grade a clip with a LUT: a preset (${LUT_PRESET_IDS.join(', ')}) or the text of a .cube file. Without effect_id it adds a LUT effect at the end of the stack; amount 0..1 mixes it (animate fx.<effect id>.amount). Pair with levels and lift-gamma-gain effects (add_effect).`,
       inputSchema: z.object({ clip_id: z.string(), effect_id: z.string().optional(), preset: z.enum(LUT_PRESET_IDS).optional(), cube: z.string().max(4_000_000).optional(), name: z.string().max(80).optional(), amount: z.number().min(0).max(1).optional() }),
       execute: async (input) => {
+        const recoloured = uiRecolour(session.doc, input.clip_id, EffectKind.Lut);
+        if (recoloured) {
+          return { ok: false, error: recoloured };
+        }
         const lut = input.cube ? lutFromCube(input.cube, input.name ?? 'custom') : input.preset ? compileLut(LUT_PRESETS[input.preset].look, input.preset) : 'give a preset or a .cube';
         if (typeof lut === 'string') {
           return { ok: false, error: lut };

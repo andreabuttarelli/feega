@@ -85,6 +85,33 @@ describe('recreate_ui from a url', () => {
   });
 });
 
+describe('the recreated app on screen', () => {
+  const placed = async (fidelity?: number) => {
+    const ctx = setup(vi.fn(async () => ({ ok: true as const, ui: UI, session: CaptureSession.Kept, ...(fidelity === undefined ? {} : { fidelity }) })));
+    const made = await ctx.run('recreate_ui', { url: 'https://feega.test/app', name: 'UiFeega', start: 0, duration: 3 });
+    return { ...ctx, made, clip: String(made.clip_id) };
+  };
+
+  it('says how faithful the rebuild is, and warns when it is far from the page', async () => {
+    expect((await placed(0.96)).made).toMatchObject({ fidelity: 0.96 });
+    expect(String((await placed(0.6)).made.low_fidelity)).toMatch(/60%/);
+    expect((await placed(0.96)).made.low_fidelity).toBeUndefined();
+  });
+
+  it('refuses a tint on it: v5 turned the editor into a negative', async () => {
+    const { run, clip } = await placed();
+
+    expect(await run('add_effect', { clip_id: clip, kind: 'tint' })).toMatchObject({ ok: false, error: expect.stringMatching(/native colours/) });
+  });
+
+  it('refuses shrinking it', async () => {
+    const { run, clip } = await placed();
+
+    expect(await run('set_transform', { clip_id: clip, transform: { scale: 70 } })).toMatchObject({ ok: false, error: expect.stringMatching(/fill the frame/) });
+    expect(await run('set_transform', { clip_id: clip, transform: { scale: 130 } })).toMatchObject({ ok: true });
+  });
+});
+
 describe('the shot library', () => {
   it('list_shots names every shot with what it does, its slots, its length and a preview', async () => {
     const { run } = setup();
